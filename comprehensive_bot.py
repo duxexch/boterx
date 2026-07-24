@@ -1033,6 +1033,67 @@ class ComprehensiveDUXBot:
         except:
             pass
         return None
+
+    def detect_language_from_phone(self, phone):
+        """تحديد اللغة والدولة تلقائياً من رقم الهاتف"""
+        if not phone:
+            return 'ar', 'SA'
+        phone_clean = phone.replace(' ', '').replace('-', '').replace('+', '').replace('00', '', 1) if phone.startswith('00') else phone.replace(' ', '').replace('-', '').replace('+', '')
+        
+        PHONE_TO_LANG = {
+            '966': ('ar', 'SA'),   # السعودية
+            '971': ('ar', 'AE'),   # الإمارات
+            '20':  ('ar', 'EG'),   # مصر
+            '965': ('ar', 'KW'),   # الكويت
+            '974': ('ar', 'QA'),   # قطر
+            '973': ('ar', 'BH'),   # البحرين
+            '968': ('ar', 'OM'),   # عمان
+            '962': ('ar', 'JO'),   # الأردن
+            '961': ('ar', 'LB'),   # لبنان
+            '964': ('ar', 'IQ'),   # العراق
+            '963': ('ar', 'SY'),   # سوريا
+            '212': ('ar', 'MA'),   # المغرب
+            '216': ('ar', 'TN'),   # تونس
+            '213': ('ar', 'DZ'),   # الجزائر
+            '218': ('ar', 'LY'),   # ليبيا
+            '967': ('ar', 'YE'),   # اليمن
+            '970': ('ar', 'PS'),   # فلسطين
+            '90':  ('tr', 'TR'),   # تركيا
+            '98':  ('fa', 'IR'),   # إيران
+            '92':  ('ur', 'PK'),   # باكستان
+            '91':  ('hi', 'IN'),   # الهند
+            '62':  ('id', 'ID'),   # إندونيسيا
+            '7':   ('ru', 'RU'),   # روسيا
+            '86':  ('zh', 'CN'),   # الصين
+            '81':  ('ja', 'JP'),   # اليابان
+            '82':  ('ko', 'KR'),   # كوريا
+            '66':  ('th', 'TH'),   # تايلاند
+            '49':  ('de', 'DE'),   # ألمانيا
+            '33':  ('fr', 'FR'),   # فرنسا
+            '34':  ('es', 'ES'),   # إسبانيا
+            '39':  ('it', 'IT'),   # إيطاليا
+            '55':  ('pt', 'BR'),   # البرازيل
+            '1':   ('en', 'US'),   # أمريكا/كندا
+            '44':  ('en', 'GB'),   # بريطانيا
+        }
+        
+        for prefix, (lang, country) in sorted(PHONE_TO_LANG.items(), key=lambda x: -len(x[0])):
+            if phone_clean.startswith(prefix):
+                return lang, country
+        return 'ar', 'SA'  # افتراضي
+
+    def detect_currency_from_country(self, country_code):
+        """تحديد العملة من كود الدولة"""
+        COUNTRY_TO_CURRENCY = {
+            'SA': 'SAR', 'AE': 'AED', 'EG': 'EGP', 'KW': 'KWD', 'QA': 'QAR',
+            'BH': 'BHD', 'OM': 'OMR', 'JO': 'JOD', 'LB': 'LBP', 'IQ': 'IQD',
+            'SY': 'SYP', 'MA': 'MAD', 'TN': 'TND', 'DZ': 'DZD', 'LY': 'LYD',
+            'YE': 'YER', 'PS': 'ILS', 'TR': 'TRY', 'IR': 'IRR', 'PK': 'PKR',
+            'IN': 'INR', 'ID': 'IDR', 'RU': 'RUB', 'CN': 'CNY', 'JP': 'JPY',
+            'KR': 'KRW', 'TH': 'THB', 'DE': 'EUR', 'FR': 'EUR', 'ES': 'EUR',
+            'IT': 'EUR', 'BR': 'BRL', 'US': 'USD', 'GB': 'GBP',
+        }
+        return COUNTRY_TO_CURRENCY.get(country_code, 'USD')
     
     def link_telegram_to_user(self, phone, new_telegram_id):
         """ربط telegram_id جديد بحساب موجود برقم الهاتف — عند إعادة التسجيل"""
@@ -1262,22 +1323,20 @@ class ComprehensiveDUXBot:
             welcome_text = f"مرحباً بعودتك {user['name']}! 👋\n🆔 رقم العميل: {user['customer_id']}"
             self.send_message(chat_id, welcome_text, self.main_keyboard(user.get('language', 'ar'), user_id))
         else:
+            # عرض خيارات للمستخدم الجديد: تسجيل جديد أو تسجيل دخول برقم الهاتف
             welcome_text = self.tr('welcome_new', 'ar', name='')
             
-            # كيبورد للمستخدمين الجدد مع خيار التخطي
-            skip_btn = self.tr('skip_registration', 'ar')
-            reset_btn = self.tr('reset_system', 'ar')
             new_user_keyboard = {
                 'keyboard': [
-                    [{'text': skip_btn}],
-                    [{'text': reset_btn}]
+                    [{'text': '📝 تسجيل حساب جديد'}],
+                    [{'text': '🔐 تسجيل الدخول برقم الهاتف'}],
+                    [{'text': self.tr('skip_registration', 'ar')}]
                 ],
                 'resize_keyboard': True,
                 'one_time_keyboard': True
             }
             
             self.send_message(chat_id, welcome_text, new_user_keyboard)
-            self.user_states[user_id] = 'registering_name'
     
     def handle_registration(self, message):
         """معالجة التسجيل"""
@@ -1393,11 +1452,17 @@ class ComprehensiveDUXBot:
                 del self.user_states[user_id]
                 return
             
-            # حفظ مستخدم جديد
+            # حفظ مستخدم جديد — مع تحديد اللغة والدولة والعملة تلقائياً من رقم الهاتف
+            detected_lang, detected_country = self.detect_language_from_phone(phone)
+            detected_currency = self.detect_currency_from_country(detected_country)
+            
             with open('users.csv', 'a', newline='', encoding='utf-8-sig') as f:
                 writer = csv.writer(f)
-                writer.writerow([user_id, name, phone, customer_id, 'ar', 
-                               datetime.now().strftime('%Y-%m-%d'), 'no', '', self.get_setting('default_currency') or 'SAR'])
+                writer.writerow([user_id, name, phone, customer_id, detected_lang, 
+                               datetime.now().strftime('%Y-%m-%d'), 'no', '', detected_currency])
+            
+            lang_names = self.get_language_names()
+            lang_display = lang_names.get(detected_lang, {}).get('native', detected_lang)
             
             welcome_text = f"""✅ تم التسجيل بنجاح!
 
@@ -1405,10 +1470,16 @@ class ComprehensiveDUXBot:
 📱 الهاتف: {phone}
 🆔 رقم العميل: {customer_id}
 📅 تاريخ التسجيل: {datetime.now().strftime('%Y-%m-%d')}
+🌐 اللغة: {lang_display}
+🌍 الدولة: {detected_country}
+💱 العملة: {detected_currency}
+
+💡 تم تحديد اللغة والعملة تلقائياً من رقم هاتفك.
+يمكنك تغييرها لاحقاً من الإعدادات.
 
 يمكنك الآن استخدام جميع الخدمات المالية:"""
             
-            self.send_message(message['chat']['id'], welcome_text, self.main_keyboard())
+            self.send_message(message['chat']['id'], welcome_text, self.main_keyboard(detected_lang, user_id))
             del self.user_states[user_id]
             
             # إشعار الأدمن بعضو جديد
@@ -1417,6 +1488,9 @@ class ComprehensiveDUXBot:
 👤 الاسم: {name}
 📱 الهاتف: {phone}
 🆔 رقم العميل: {customer_id}
+🌐 اللغة: {detected_lang}
+🌍 الدولة: {detected_country}
+💱 العملة: {detected_currency}
 📅 التاريخ: {datetime.now().strftime('%Y-%m-%d %H:%M')}"""
             self.notify_admins(admin_msg, notification_type='new_user')
     
@@ -2255,9 +2329,10 @@ class ComprehensiveDUXBot:
             self.start_matching_flow(message)
         elif text in currency_texts:
             self.show_currency_selection(message)
-        elif text in register_texts:
-            # بدء عملية التسجيل للمستخدمين غير المسجلين
+        elif text in register_texts or text == '📝 تسجيل حساب جديد':
             self.start_registration(message)
+        elif text == '🔐 تسجيل الدخول برقم الهاتف':
+            self.start_phone_login(message)
         elif text == '/myid':
             self.send_message(chat_id, f"🆔 معرف المستخدم الخاص بك: {user_id}")
         # أزرار نظام المطابقة
@@ -2357,6 +2432,9 @@ class ComprehensiveDUXBot:
                 elif state == 'selecting_language':
                     self.handle_language_change(message, text)
                     return
+                elif state == 'phone_login_waiting':
+                    self.handle_phone_login(message)
+                    return
 
             # معالجة حالات نظام المطابقة
             if isinstance(state, dict) and 'step' in state:
@@ -2396,6 +2474,91 @@ class ComprehensiveDUXBot:
             
             self.send_message(chat_id, error_msg, error_keyboard)
     
+    def start_phone_login(self, message):
+        """تسجيل الدخول برقم الهاتف — للمستخدمين الذين لديهم حساب سابق"""
+        user_id = message['from']['id']
+        chat_id = message['chat']['id']
+        
+        login_text = (
+            "🔐 تسجيل الدخول برقم الهاتف\n\n"
+            "📱 شارك رقم هاتفك أو اكتبه يدوياً:\n"
+            "مثال: +966501234567"
+        )
+        
+        keyboard = {
+            'keyboard': [
+                [{'text': '📱 مشاركة رقم الهاتف', 'request_contact': True}],
+                [{'text': '🏠 القائمة الرئيسية'}]
+            ],
+            'resize_keyboard': True,
+            'one_time_keyboard': True
+        }
+        
+        self.send_message(chat_id, login_text, keyboard)
+        self.user_states[user_id] = 'phone_login_waiting'
+
+    def handle_phone_login(self, message):
+        """معالجة تسجيل الدخول برقم الهاتف"""
+        user_id = message['from']['id']
+        chat_id = message['chat']['id']
+        
+        # استخراج رقم الهاتف
+        if 'contact' in message:
+            phone = message['contact']['phone_number']
+            if not phone.startswith('+'):
+                phone = '+' + phone
+        elif 'text' in message:
+            phone = message['text'].strip()
+            if len(phone) < 10:
+                self.send_message(chat_id, "❌ رقم هاتف غير صحيح. يرجى إدخال رقم صحيح:")
+                return
+        else:
+            self.send_message(chat_id, "❌ يرجى إرسال رقم هاتفك:")
+            return
+        
+        # البحث عن المستخدم برقم الهاتف
+        existing_user = self.find_user_by_phone(phone)
+        if not existing_user:
+            self.send_message(chat_id,
+                "❌ لم يتم العثور على حساب بهذا الرقم.\n\n"
+                "📝 يمكنك تسجيل حساب جديد بدلاً من ذلك.",
+                self.main_keyboard('ar', user_id))
+            if user_id in self.user_states:
+                del self.user_states[user_id]
+            return
+        
+        # ربط telegram_id الجديد بالحساب القديم
+        self.link_telegram_to_user(phone, user_id)
+        user = self.find_user(user_id)
+        
+        if not user:
+            self.send_message(chat_id, "❌ خطأ في استرجاع الحساب. تواصل مع الدعم.")
+            if user_id in self.user_states:
+                del self.user_states[user_id]
+            return
+        
+        lang = user.get('language', 'ar')
+        
+        # التحقق من الحظر
+        if user.get('is_banned') == 'yes':
+            ban_reason = user.get('ban_reason', 'غير محدد')
+            self.send_message(chat_id, f"❌ تم حظر حسابك\nالسبب: {ban_reason}")
+            if user_id in self.user_states:
+                del self.user_states[user_id]
+            return
+        
+        welcome_text = (
+            f"✅ تم تسجيل الدخول بنجاح!\n\n"
+            f"👤 الاسم: {user['name']}\n"
+            f"📱 الهاتف: {user['phone']}\n"
+            f"🆔 رقم العميل: {user['customer_id']}\n"
+            f"📅 تاريخ التسجيل: {user.get('date', '')}\n\n"
+            f"💡 تم استرجاع حسابك بكل بياناتك."
+        )
+        self.send_message(chat_id, welcome_text, self.main_keyboard(lang, user_id))
+        if user_id in self.user_states:
+            del self.user_states[user_id]
+
     def start_registration(self, message):
         """بدء عملية التسجيل للمستخدمين غير المسجلين"""
         user_id = message['from']['id']
