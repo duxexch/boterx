@@ -56,6 +56,10 @@ class ComprehensiveDUXBot:
         # نظام قفل ملفات CSV لمنع تلف البيانات عند الكتابة المتزامنة
         self.csv_locks = {}
         
+        # تهيئة البيانات المؤقتة للأدمن
+        self.edit_company_data = {}
+        self.temp_button_label_edit = {}
+        
         # نظام الإحالات
         self.init_referral_files()
         
@@ -1605,7 +1609,9 @@ class ComprehensiveDUXBot:
             if not selected_company:
                 user = self.find_user(user_id)
                 lang = user.get('language', 'ar') if user else 'ar'
-                self.send_message(message['chat']['id'], self.tr('invalid_wallet', lang))
+                # إعادة عرض قائمة الشركات بدلاً من رسالة خطأ فقط
+                self.send_message(message['chat']['id'], self.tr('invalid_wallet', lang),
+                    self.companies_keyboard('deposit'))
                 return
             
             # عرض وسائل الدفع للشركة المختارة
@@ -1635,6 +1641,7 @@ class ComprehensiveDUXBot:
                 company_name = parts[3] if len(parts) > 3 else ''
 
             wallet_number = self.sanitize_input(text.strip())
+            user = self.find_user(user_id)
             if len(wallet_number) < 5:
                 lang = user.get('language', 'ar') if user else 'ar'
                 self.send_message(message['chat']['id'], self.tr('invalid_wallet', lang))
@@ -1803,7 +1810,8 @@ class ComprehensiveDUXBot:
             if not selected_company:
                 user = self.find_user(user_id)
                 lang = user.get('language', 'ar') if user else 'ar'
-                self.send_message(message['chat']['id'], self.tr('invalid_wallet', lang))
+                self.send_message(message['chat']['id'], self.tr('invalid_wallet', lang),
+                    self.companies_keyboard('withdraw'))
                 return
             
             # عرض وسائل الدفع للشركة المختارة
@@ -1828,6 +1836,7 @@ class ComprehensiveDUXBot:
                 company_name = parts[3] if len(parts) > 3 else ''
 
             wallet_number = self.sanitize_input(text.strip())
+            user = self.find_user(user_id)
             if len(wallet_number) < 5:
                 lang = user.get('language', 'ar') if user else 'ar'
                 self.send_message(message['chat']['id'], self.tr('invalid_wallet', lang))
@@ -2244,6 +2253,16 @@ class ComprehensiveDUXBot:
         
         # فحص المستخدم المسجل
         user = self.find_user(user_id)
+        
+        # تعريف جميع مجموعات النصوص مسبقاً (لمنع NameError)
+        all_langs = self.get_supported_languages()
+        skip_texts = {self.tr('skip_registration', l) for l in all_langs}
+        register_texts_new = {self.tr('register_account', l) for l in all_langs}
+        register_texts_new.add('📝 تسجيل حساب جديد')
+        reset_texts = {self.tr('reset_system', l) for l in all_langs}
+        back_texts = {'🔙', '🔙 العودة', '🔙 العودة للقائمة الرئيسية', '🏠 القائمة الرئيسية', '🏠 الرئيسية'}
+        back_texts.add(self.tr('main_menu', 'ar'))
+        
         if not user:
             # فحص أزرار التسجيل أولاً قبل إعادة عرض handle_start
             skip_texts = {self.tr('skip_registration', l) for l in self.get_supported_languages()}
@@ -2262,7 +2281,7 @@ class ComprehensiveDUXBot:
                     "✅ تم تخطي التسجيل!\n\n⚠️ بدون تسجيل، لن تتمكن من حفظ طلباتك.\nيمكنك التسجيل لاحقاً.",
                     self.main_keyboard('ar', user_id))
                 return
-            elif text in reset_texts or text == self.tr('main_menu', 'ar'):
+            elif text in reset_texts or text in back_texts or text == self.tr('main_menu', 'ar'):
                 # زر العودة للقائمة
                 self.handle_start(message)
                 return
@@ -7113,6 +7132,7 @@ class ComprehensiveDUXBot:
                     clean_text = clean_text[len(emoji):].strip()
                     break
             selected_method = None
+            methods = state.get('methods', [])
             for method in methods:
                 if method['method_name'] == clean_text or method['method_name'] == text:
                     selected_method = method
