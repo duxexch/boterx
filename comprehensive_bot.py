@@ -2181,18 +2181,7 @@ class ComprehensiveDUXBot:
         chat_id = message['chat']['id']
         user_id = message['from']['id']
         
-        # فحص حد المعدل للمستخدمين العاديين (5 طلبات/دقيقة)
-        if not self.is_admin(user_id):
-            if not self.check_rate_limit(user_id, 'message'):
-                self.send_message(chat_id, "⏳ يرجى الانتظار قليلاً قبل إرسال رسالة أخرى.")
-                return
-        
-        # بداية المحادثة
-        if text == '/start':
-            self.handle_start(message)
-            return
-        
-        # معالجة حالة تسجيل الدخول برقم الهاتف أولاً (قبل أي فحص آخر)
+        # معالجة حالات التسجيل وتسجيل الدخول أولاً (قبل الـ rate limiter)
         # لأن رسالة contact لا تحتوي على text
         current_state = self.user_states.get(user_id, '')
         if current_state == 'phone_login_waiting':
@@ -2203,6 +2192,23 @@ class ComprehensiveDUXBot:
             return
         if isinstance(current_state, str) and current_state.startswith('registering'):
             self.handle_registration(message)
+            return
+        if isinstance(current_state, dict) and 'step' in current_state:
+            self.handle_matching_flow(message)
+            return
+        if isinstance(current_state, dict) and current_state.get('step') in ('chatting', 'rating'):
+            self.handle_matching_flow(message)
+            return
+        
+        # فحص حد المعدل للمستخدمين العاديين (5 طلبات/دقيقة)
+        if not self.is_admin(user_id):
+            if not self.check_rate_limit(user_id, 'message'):
+                self.send_message(chat_id, "⏳ يرجى الانتظار قليلاً قبل إرسال رسالة أخرى.")
+                return
+        
+        # بداية المحادثة
+        if text == '/start':
+            self.handle_start(message)
             return
             
         # معالجة زر إعادة التعيين أولاً (أولوية عالية)
