@@ -2175,6 +2175,19 @@ class ComprehensiveDUXBot:
         if text == '/start':
             self.handle_start(message)
             return
+        
+        # معالجة حالة تسجيل الدخول برقم الهاتف أولاً (قبل أي فحص آخر)
+        # لأن رسالة contact لا تحتوي على text
+        current_state = self.user_states.get(user_id, '')
+        if current_state == 'phone_login_waiting':
+            self.handle_phone_login(message)
+            return
+        if isinstance(current_state, str) and current_state.startswith('registering_phone_'):
+            self.handle_registration(message)
+            return
+        if isinstance(current_state, str) and current_state.startswith('registering'):
+            self.handle_registration(message)
+            return
             
         # معالجة زر إعادة التعيين أولاً (أولوية عالية)
         if text in ['🔄 إعادة تعيين النظام', '🔄 Reset System', '🔄 إعادة تعيين', '🆘 إصلاح شامل']:
