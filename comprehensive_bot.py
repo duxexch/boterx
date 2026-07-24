@@ -4127,8 +4127,8 @@ class ComprehensiveDUXBot:
             self.send_message(message['chat']['id'], "❌ حدث خطأ أثناء البحث", self.admin_keyboard())
     
         def add_admin_user(self, message, user_id_to_add):
-                """إضافة أدمن جديد — مع فحوصات أمنية"""
-                try:
+            """إضافة أدمن جديد — مع فحوصات أمنية"""
+            try:
                     # التحقق من صحة المعرف
                     if not user_id_to_add.isdigit():
                         self.send_message(message['chat']['id'], "❌ معرف المستخدم يجب أن يكون رقماً صحيحاً", self.admin_keyboard())
@@ -4165,10 +4165,10 @@ class ComprehensiveDUXBot:
 
                     self.send_message(message['chat']['id'], success_msg, self.admin_keyboard())
                     logger.info(f"تم إضافة أدمن جديد: {user_id_to_add} بواسطة: {requester_id}")
-                
-        except Exception as e:
-            logger.error(f"خطأ في إضافة الأدمن: {e}")
-            self.send_message(message['chat']['id'], "❌ حدث خطأ أثناء إضافة الأدمن", self.admin_keyboard())
+
+            except Exception as e:
+                logger.error(f"خطأ في إضافة الأدمن: {e}")
+                self.send_message(message['chat']['id'], "❌ حدث خطأ أثناء إضافة الأدمن", self.admin_keyboard())
     
     def prompt_add_admin(self, message):
         """طلب إضافة أدمن جديد"""
