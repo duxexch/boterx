@@ -1655,7 +1655,13 @@ class ComprehensiveDUXBot:
             lang = user.get('language', 'ar')
             amount_text = self.tr('enter_amount', lang, min=min_deposit, max=self.get_setting('max_daily_withdrawal') or '10000', currency=currency_symbol)
 
-            self.send_message(message['chat']['id'], amount_text)
+            # إضافة لوحة مفاتيح بها زر إلغاء
+            cancel_kb = {
+                'keyboard': [[{'text': '❌ إلغاء'}, {'text': '🏠 القائمة الرئيسية'}]],
+                'resize_keyboard': True,
+                'one_time_keyboard': True
+            }
+            self.send_message(message['chat']['id'], amount_text, cancel_kb)
             # حفظ كل البيانات في الحالة التالية بطريقة ديناميكية لمنع مشاكل الفواصل السفلية
             self.user_states[user_id] = f'deposit_amount_{company_id}_{company_name}_{method_id}_{wallet_number}'
             
@@ -1851,7 +1857,13 @@ class ComprehensiveDUXBot:
             lang = user.get('language', 'ar')
             amount_text = self.tr('enter_amount', lang, min=min_withdrawal, max=max_withdrawal, currency=currency_symbol)
             
-            self.send_message(message['chat']['id'], amount_text)
+            # إضافة لوحة مفاتيح بها زر إلغاء
+            cancel_kb = {
+                'keyboard': [[{'text': '❌ إلغاء'}, {'text': '🏠 القائمة الرئيسية'}]],
+                'resize_keyboard': True,
+                'one_time_keyboard': True
+            }
+            self.send_message(message['chat']['id'], amount_text, cancel_kb)
             # حفظ البيانات في الحالة التالية
             self.user_states[user_id] = f'withdraw_amount_{company_id}_{company_name}_{method_id}_{wallet_number}'
             
@@ -1908,7 +1920,12 @@ class ComprehensiveDUXBot:
                 + self.tr('enter_withdrawal_address', lang, address=withdrawal_address)
             )
 
-            self.send_message(message['chat']['id'], confirm_text)
+            cancel_kb = {
+                'keyboard': [[{'text': '❌ إلغاء'}, {'text': '🏠 القائمة الرئيسية'}]],
+                'resize_keyboard': True,
+                'one_time_keyboard': True
+            }
+            self.send_message(message['chat']['id'], confirm_text, cancel_kb)
             # حفظ المعلومات للتأكد لاحقاً
             self.user_states[user_id] = f'withdraw_confirmation_code_{company_id}_{company_name}_{wallet_number}_{amount}_{withdrawal_address}'
             
@@ -7180,7 +7197,12 @@ class ComprehensiveDUXBot:
             # طلب رقم محفظة العميل بوضوح
             wallet_text += f"\n📝 {self.tr('enter_wallet', lang, min_amount='0', currency='')}"
             
-            self.send_message(message['chat']['id'], wallet_text)
+            cancel_kb = {
+                'keyboard': [[{'text': '❌ إلغاء'}, {'text': '🏠 القائمة الرئيسية'}]],
+                'resize_keyboard': True,
+                'one_time_keyboard': True
+            }
+            self.send_message(message['chat']['id'], wallet_text, cancel_kb)
             
             # تحديث الحالة — استبدال _ في اسم الشركة بمسافة لمنع تلف الحالة
             safe_company_name = (company["name"] if company else "unknown").replace('_', ' ')
