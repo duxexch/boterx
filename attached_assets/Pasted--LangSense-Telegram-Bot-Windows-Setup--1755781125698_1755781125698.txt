@@ -1,0 +1,77 @@
+========================================
+LangSense Telegram Bot - Windows Setup
+========================================
+
+Python is installed ظ£ô
+
+Virtual environment already exists ظ£ô
+
+Activating virtual environment...
+Virtual environment activated ظ£ô
+
+Upgrading pip...
+Requirement already satisfied: pip in c:\users\zeyadanet\desktop\taskflowai\venv\lib\site-packages (25.2)
+Pip upgraded ظ£ô
+
+Installing required packages...
+Requirement already satisfied: aiogram in c:\users\zeyadanet\desktop\taskflowai\venv\lib\site-packages (3.22.0)
+Requirement already satisfied: sqlalchemy in c:\users\zeyadanet\desktop\taskflowai\venv\lib\site-packages (2.0.43)
+Requirement already satisfied: aiosqlite in c:\users\zeyadanet\desktop\taskflowai\venv\lib\site-packages (0.21.0)
+Requirement already satisfied: asyncpg in c:\users\zeyadanet\desktop\taskflowai\venv\lib\site-packages (0.30.0)
+Requirement already satisfied: python-dotenv in c:\users\zeyadanet\desktop\taskflowai\venv\lib\site-packages (1.1.1)
+Requirement already satisfied: aiohttp in c:\users\zeyadanet\desktop\taskflowai\venv\lib\site-packages (3.12.15)
+Requirement already satisfied: pydantic in c:\users\zeyadanet\desktop\taskflowai\venv\lib\site-packages (2.11.7)
+Requirement already satisfied: psutil in c:\users\zeyadanet\desktop\taskflowai\venv\lib\site-packages (7.0.0)
+Requirement already satisfied: requests in c:\users\zeyadanet\desktop\taskflowai\venv\lib\site-packages (2.32.5)
+Requirement already satisfied: aiofiles in c:\users\zeyadanet\desktop\taskflowai\venv\lib\site-packages (24.1.0)
+Requirement already satisfied: pillow in c:\users\zeyadanet\desktop\taskflowai\venv\lib\site-packages (11.3.0)
+Requirement already satisfied: cryptography in c:\users\zeyadanet\desktop\taskflowai\venv\lib\site-packages (45.0.6)
+Requirement already satisfied: apscheduler in c:\users\zeyadanet\desktop\taskflowai\venv\lib\site-packages (3.11.0)
+Requirement already satisfied: babel in c:\users\zeyadanet\desktop\taskflowai\venv\lib\site-packages (2.17.0)
+Requirement already satisfied: certifi>=2023.7.22 in c:\users\zeyadanet\desktop\taskflowai\venv\lib\site-packages (from aiogram) (2025.8.3)
+Requirement already satisfied: magic-filter<1.1,>=1.0.12 in c:\users\zeyadanet\desktop\taskflowai\venv\lib\site-packages (from aiogram) (1.0.12)
+Requirement already satisfied: typing-extensions<=5.0,>=4.7.0 in c:\users\zeyadanet\desktop\taskflowai\venv\lib\site-packages (from aiogram) (4.14.1)
+Requirement already satisfied: aiohappyeyeballs>=2.5.0 in c:\users\zeyadanet\desktop\taskflowai\venv\lib\site-packages (from aiohttp) (2.6.1)
+Requirement already satisfied: aiosignal>=1.4.0 in c:\users\zeyadanet\desktop\taskflowai\venv\lib\site-packages (from aiohttp) (1.4.0)
+Requirement already satisfied: attrs>=17.3.0 in c:\users\zeyadanet\desktop\taskflowai\venv\lib\site-packages (from aiohttp) (25.3.0)
+Requirement already satisfied: frozenlist>=1.1.1 in c:\users\zeyadanet\desktop\taskflowai\venv\lib\site-packages (from aiohttp) (1.7.0)
+Requirement already satisfied: multidict<7.0,>=4.5 in c:\users\zeyadanet\desktop\taskflowai\venv\lib\site-packages (from aiohttp) (6.6.4)
+Requirement already satisfied: propcache>=0.2.0 in c:\users\zeyadanet\desktop\taskflowai\venv\lib\site-packages (from aiohttp) (0.3.2)
+Requirement already satisfied: yarl<2.0,>=1.17.0 in c:\users\zeyadanet\desktop\taskflowai\venv\lib\site-packages (from aiohttp) (1.20.1)
+Requirement already satisfied: annotated-types>=0.6.0 in c:\users\zeyadanet\desktop\taskflowai\venv\lib\site-packages (from pydantic) (0.7.0)
+Requirement already satisfied: pydantic-core==2.33.2 in c:\users\zeyadanet\desktop\taskflowai\venv\lib\site-packages (from pydantic) (2.33.2)
+Requirement already satisfied: typing-inspection>=0.4.0 in c:\users\zeyadanet\desktop\taskflowai\venv\lib\site-packages (from pydantic) (0.4.1)
+Requirement already satisfied: idna>=2.0 in c:\users\zeyadanet\desktop\taskflowai\venv\lib\site-packages (from yarl<2.0,>=1.17.0->aiohttp) (3.10)
+Requirement already satisfied: greenlet>=1 in c:\users\zeyadanet\desktop\taskflowai\venv\lib\site-packages (from sqlalchemy) (3.2.4)
+Requirement already satisfied: charset_normalizer<4,>=2 in c:\users\zeyadanet\desktop\taskflowai\venv\lib\site-packages (from requests) (3.4.3)
+Requirement already satisfied: urllib3<3,>=1.21.1 in c:\users\zeyadanet\desktop\taskflowai\venv\lib\site-packages (from requests) (2.5.0)
+Requirement already satisfied: cffi>=1.14 in c:\users\zeyadanet\desktop\taskflowai\venv\lib\site-packages (from cryptography) (1.17.1)
+Requirement already satisfied: tzlocal>=3.0 in c:\users\zeyadanet\desktop\taskflowai\venv\lib\site-packages (from apscheduler) (5.3.1)
+Requirement already satisfied: pycparser in c:\users\zeyadanet\desktop\taskflowai\venv\lib\site-packages (from cffi>=1.14->cryptography) (2.22)
+Requirement already satisfied: tzdata in c:\users\zeyadanet\desktop\taskflowai\venv\lib\site-packages (from tzlocal>=3.0->apscheduler) (2025.2)
+Packages installed successfully ظ£ô
+
+.env file found ظ£ô
+
+
+========================================
+Setup completed successfully! ≡اë
+========================================
+
+Starting LangSense Bot...
+Press Ctrl+C to stop the bot
+
+2025-08-21 05:58:21,208 - __main__ - INFO - Starting LangSense Bot...
+2025-08-21 05:58:21,222 - __main__ - INFO - Database initialized successfully
+2025-08-21 05:58:21,730 - bot - INFO - Bot initialized: @depositbettingbot (ايداع/سحب deposit/withdrawl)
+2025-08-21 05:58:21,732 - bot - INFO - Broadcast service worker started
+2025-08-21 05:58:21,732 - bot - INFO - Starting bot polling...
+2025-08-21 05:58:21,733 - aiogram.dispatcher - INFO - Start polling
+2025-08-21 05:58:21,733 - services.broadcast_service - INFO - Broadcast service worker started
+2025-08-21 05:58:21,820 - aiogram.dispatcher - INFO - Run polling for bot @depositbettingbot id=8474120294 - 'ايداع/سحب deposit/withdrawl'
+2025-08-21 05:58:26,349 - aiogram.dispatcher - ERROR - Failed to fetch updates - TelegramConflictError: Telegram server says - Conflict: terminated by other getUpdates request; make sure that only one bot instance is running
+2025-08-21 05:58:26,349 - aiogram.dispatcher - WARNING - Sleep for 1.000000 seconds and try again... (tryings = 0, bot id = 8474120294)
+2025-08-21 05:58:31,886 - aiogram.dispatcher - ERROR - Failed to fetch updates - TelegramConflictError: Telegram server says - Conflict: terminated by other getUpdates request; make sure that only one bot instance is running
+2025-08-21 05:58:31,887 - aiogram.dispatcher - WARNING - Sleep for 1.314392 seconds and try again... (tryings = 1, bot id = 8474120294)
+2025-08-21 05:58:37,735 - aiogram.dispatcher - ERROR - Failed to fetch updates - TelegramConflictError: Telegram server says - Conflict: terminated by other getUpdates request; make sure that only one bot instance is running
+2025-08-21 05:58:37,735 - aiogram.dispatcher - WARNING - Sleep for 1.673913 seconds and try again... (tryings = 2, bot id = 8474120294)

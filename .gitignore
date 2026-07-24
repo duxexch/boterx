@@ -1,0 +1,13 @@
+# Git ignore for LangSense Bot
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.env
+*.db
+*.log
+*.zip
+LangSense_Backup_*.zip
+DUX_Backup_*.zip
+DUX_Professional_Report_*.csv
+bot.log

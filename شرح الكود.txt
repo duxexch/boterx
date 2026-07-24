@@ -1,0 +1,79 @@
+LangSense Telegram Bot - تشغيل محلي وعلى VPS
+=================================================
+
+🔹 الوظيفة العامة:
+بوت تيليجرام متعدد اللغات (عربي/إنجليزي) مبني بإطار Aiogram v3 مع قاعدة بيانات SQLite أو PostgreSQL.
+
+-------------------------------------------------
+🔧 التثبيت محليًا (Linux/Mac)
+-------------------------------------------------
+1. فك الضغط وادخل إلى المجلد:
+   cd TaskFlowAIgggg-main
+
+2. أنشئ بيئة افتراضية وفعّلها:
+   python3.11 -m venv venv
+   source venv/bin/activate
+   python -m pip install --upgrade pip
+
+3. ثبّت الحزم المطلوبة:
+   pip install aiogram aiohttp pydantic SQLAlchemy aiosqlite asyncpg python-dotenv apscheduler babel requests psutil aiofiles pillow cryptography
+
+4. انسخ إعدادات البيئة:
+   cp .env.example .env
+   # عدّل .env وضع BOT_TOKEN و ADMIN_USER_IDS
+
+5. شغّل البوت:
+   python main.py
+   # أو النسخة المبسطة:
+   python simple_payment_bot.py
+
+-------------------------------------------------
+🔧 التثبيت على VPS (Hostinger / Ubuntu 22.04)
+-------------------------------------------------
+1. تحديث النظام:
+   sudo apt update && sudo apt -y upgrade
+   sudo apt -y install python3.11 python3.11-venv python3-pip git
+
+2. إنشاء المجلد وبيئة التشغيل:
+   git clone <repo> langsense
+   cd langsense/TaskFlowAIgggg-main
+   python3.11 -m venv venv
+   source venv/bin/activate
+   pip install -r requirements.txt (أو استخدم القائمة أعلاه)
+
+3. إعداد .env:
+   cp .env.example .env
+   nano .env
+
+4. التشغيل:
+   python main.py
+
+5. تشغيل كخدمة systemd:
+   sudo nano /etc/systemd/system/langsense.service
+
+[Unit]
+Description=LangSense Telegram Bot
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/path/to/langsense/TaskFlowAIgggg-main
+ExecStart=/path/to/langsense/TaskFlowAIgggg-main/venv/bin/python main.py
+Restart=on-failure
+User=www-data
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
+
+   sudo systemctl daemon-reload
+   sudo systemctl enable langsense
+   sudo systemctl start langsense
+
+-------------------------------------------------
+🔐 نصائح أمان
+-------------------------------------------------
+- لا تشارك BOT_TOKEN علنًا.
+- استخدم PostgreSQL للإنتاج.
+- حدّد معدل الإرسال (broadcast limit) لتجنب الحظر.
+- استخدم HTTPS عند تفعيل Webhook.

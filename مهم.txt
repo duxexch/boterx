@@ -1,0 +1,1102 @@
+1️⃣ الفكرة العامة للبوت
+
+LangSense Telegram Bot
+بوت تيليجرام لخدمات مالية (إيداع/سحب/شكاوى/دعم…)، مبني على:
+
+Aiogram v3
+
+قاعدة بيانات (SQLite أو PostgreSQL) عن طريق SQLAlchemy Async
+
+دعم عربي + إنجليزي (ترجمات في translations/ar.json, en.json)
+
+لوحة إدارة للأدمن: مستخدمين – لغات – دول – الطلبات – برودكاست – إعلانات
+
+خدمة برودكاست داخلية (BroadcastService) مع Rate Limit وOutbox وTracking للحالة.
+
+المنظومة الحديثة هي:
+main.py → يجهز الـ DB → يشغّل bot.main() → يحمِّل الـ Routers في handlers/ ويبدأ Polling.
+
+السكربتات القديمة (advanced_bot.py, comprehensive_bot.py…):
+نسخ Legacy مبنية على CSV وRaw Telegram API – هارجع لها في الآخر.
+
+2️⃣ ملف الإعدادات config.py
+
+مسؤول عن تحميل الـ ENV وتوفير الـ Settings كـ ثوابت:
+
+BOT_TOKEN
+لازم يكون موجود، وإلا يرمي Error.
+
+ADMIN_USER_IDS
+لستة أرقام تيليجرام للأدمن، متقرا من متغير ADMIN_USER_IDS (قائمة IDs مفصولة بفواصل).
+
+DATABASE_URL
+افتراضي: sqlite+aiosqlite:///./langsense.db
+لو PostgreSQL بيحوّله لصيغة postgresql+asyncpg://.
+
+إعدادات البرودكاست:
+
+BROADCAST_RATE_LIMIT – عدد الرسائل في الثانية
+
+BROADCAST_CHUNK_SIZE – كام يوزر في الدفعة
+
+BROADCAST_RETRY_ATTEMPTS / BROADCAST_RETRY_DELAY
+
+إعدادات اللغات:
+
+DEFAULT_LANGUAGE (افتراضي ar)
+
+SUPPORTED_LANGUAGES = ["ar", "en"]
+
+إعدادات كود العميل:
+
+CUSTOMER_ID_PREFIX (مثلاً C)
+
+CUSTOMER_ID_YEAR_FORMAT (مثبتة 2025 حالياً في الكود).
+
+إعدادات رفع الملفات:
+
+MAX_FILE_SIZE (افتراضي 20MB)
+
+ALLOWED_IMAGE_TYPES (jpg/png/gif/webp)
+
+Pagination:
+
+USERS_PER_PAGE, ANNOUNCEMENTS_PER_PAGE
+
+Logging:
+
+LOG_LEVEL, LOG_FILE
+
+Rate limiting:
+
+USER_RATE_LIMIT, ADMIN_RATE_LIMIT
+
+في الآخر بيعمل validate_config() عشان يتأكد:
+
+التوكن شكله مظبوط
+
+فيه على الأقل أدمن واحد
+
+الـ Broadcast Rate ≤ 30 (حد تيليجرام).
+
+3️⃣ نماذج قاعدة البيانات models.py
+3.1 Enums
+
+OutboxType
+أنواع الرسائل/الطلبات في الـ Outbox:
+DEPOSIT, WITHDRAWAL, COMPLAINT, SUPPORT, BROADCAST, ANNOUNCEMENT
+
+OutboxStatus
+حالة الطلب: PENDING, APPROVED, REJECTED, PROCESSING, COMPLETED
+
+DeliveryStatus
+حالة توصيل الرسالة/الإعلان للمستخدم:
+PENDING, SENT, FAILED, READ
+
+3.2 جدول User
+
+__tablename__ = 'users'
+
+أهم الحقول:
+
+telegram_id (Unique + Index)
+
+username, first_name, last_name
+
+phone_number
+
+customer_code
+كود العميل اللي بيتولّد عن طريق generate_customer_code()
+
+Preferences:
+
+language_code (افتراضياً ar)
+
+country_code (افتراضياً SA)
+
+notifications_enabled (تشغيل/إيقاف إشعارات)
+
+Status:
+
+is_active
+
+is_banned
+
+is_admin
+
+Timestamps:
+
+created_at, updated_at, last_activity
+
+Relationships:
+
+outbox_messages → كل الطلبات اللي عملها
+
+announcement_deliveries → كل الإعلانات اللي وصلت له.
+
+3.3 جدول Language
+
+languages:
+
+code مثل ar, en
+
+name, native_name
+
+rtl (Right-To-Left)
+
+is_active
+
+يخدم إعدادات المستخدم واختيارات الواجهة.
+
+3.4 جدول Country
+
+countries:
+
+code (مثلاً SA, EG)
+
+name, native_name
+
+phone_prefix
+
+is_active
+
+لضبط إعدادات حسب الدولة (مستقبلاً عملة، حدود…).
+
+3.5 جدول Announcement + AnnouncementDelivery
+
+Announcement:
+
+عناوين عربي/إنجليزي: title_ar, title_en
+
+محتوى عربي/إنجليزي: content_ar, content_en
+
+image_url (هنا هو في الحقيقة file_id للصورة)
+
+Display:
+
+display_duration بالساعات (0 = دائم)
+
+is_active, priority
+
+Targeting:
+
+target_language (اختياري)
+
+target_country (لسه مش مستخدم في الهاندلرز الحالية)
+
+تواريخ: created_at, updated_at, scheduled_at, expires_at
+
+علاقة:
+
+deliveries مع AnnouncementDelivery
+
+AnnouncementDelivery:
+
+announcement_id, user_id
+
+status من DeliveryStatus
+
+delivered_at, read_at, error_message
+
+Unique على (announcement_id, user_id).
+
+3.6 جدول Outbox + OutboxRecipient
+
+Outbox: يمثل كل طلب أو رسالة سيستم (إيداع، سحب، شكوى، برودكاست…).
+
+user_id (صاحب الطلب)
+
+type من OutboxType
+
+status من OutboxStatus
+
+subject, content, attachment_url
+
+بيانات إضافية:
+
+metadata (JSON Text)
+
+priority, attempts, last_attempt, processed_by, processed_at, admin_comment
+
+Timestamps: created_at, updated_at
+
+علاقات:
+
+user
+
+recipients (OutboxRecipient)
+
+Indexes على:
+
+type, status, created_at … إلخ.
+
+OutboxRecipient:
+
+يربط Outbox بـ User في حالة البرودكاست.
+
+status (delivery status)
+
+attempts, last_attempt, delivered_at, error_message
+
+Unique على (outbox_id, user_id).
+
+4️⃣ نقطة الدخول وتشغيل البوت
+4.1 main.py
+
+يضبط الـ Logging (File + Console)
+
+init_database():
+
+يعدّل URL لو PostgreSQL → postgresql+asyncpg://
+
+لو SQLite يفعّل StaticPool و check_same_thread=False
+
+يعمل Base.metadata.create_all عشان ينشئ الجداول
+
+main():
+
+يشغل init_database()
+
+ينشئ async_sessionmaker(engine, expire_on_commit=False)
+
+ينادي bot.main(async_session)
+
+في آخر الملف: if __name__ == "__main__": asyncio.run(main())
+
+4.2 bot.py
+
+يهيّئ:
+
+Bot من Aiogram بالتوكن + ParseMode.HTML
+
+Dispatcher بـ MemoryStorage
+
+يسجِّل الـ Routers:
+
+handlers.start
+
+handlers.user_settings
+
+handlers.admin
+
+handlers.broadcast
+
+handlers.announcements
+
+ينشئ BroadcastService(bot_instance, async_session)
+
+يطبّق Middleware SessionMiddleware على كل Router:
+
+inject:
+
+session_maker
+
+broadcast_service
+بحيث أي هاندلر يقدر يستقبلهم كـ Arguments.
+
+main(async_session):
+
+يتأكد من BOT_TOKEN
+
+ينادي bot_instance.get_me() عشان يتأكد إن التوكن شغال
+
+يشغّل الـ Broadcast Worker في Background
+asyncio.create_task(broadcast_service.worker())
+
+يبدأ dp.start_polling(bot_instance)
+
+فيه دوال get_bot(), get_session_maker(), get_broadcast_service() لو حبيت تستخدمهم برّة.
+
+5️⃣ الخدمات (Services)
+5.1 services/i18n.py
+
+يحمِّل ملفات الترجمات من فولدر translations/:
+
+ar.json
+
+en.json
+
+يخزّنها في dict عالمي translations.
+
+الدوال المهمة:
+
+load_translations()
+
+get_text(key, language="ar", **kwargs)
+
+يرجّع النص حسب اللغة، ولو مش موجود ي fallback لعربي، ولو برضه مش موجود يرجّع الـ key.
+
+يدعم .format(**kwargs) مع Handling للأخطاء.
+
+get_user_language(language_code=None)
+
+لو الكود موجود في الترجمات يرجّعه، وإلا يرجّع ar.
+
+get_available_languages()
+
+is_rtl_language(language_code)
+
+في آخر الملف ينادي load_translations() تلقائيًا.
+
+5.2 services/customer_id.py
+
+أهم الدوال:
+
+generate_customer_code(session)
+منطقها:
+
+يجيب السنة الحالية أو سنة ثابتة من CUSTOMER_ID_YEAR_FORMAT.
+
+يبني pattern زي: C-2025-%
+
+يجيب أعلى User.customer_code يطابق الـ pattern.
+
+يستخرج آخر رقم ويزوّده 1 → رقم تسلسلي 6 أرقام.
+مثال: C-2025-000001, C-2025-000002…
+
+يتأكد من uniqueness، ولو clash يزوّد الرقم تاني.
+
+لو حصل Error يستخدم fallback مبني على timestamp.
+
+is_customer_code_unique(session, customer_code)
+
+get_user_by_customer_code(session, customer_code)
+
+5.3 services/broadcast_service.py
+
+قلب نظام البرودكاست.
+
+الكلاس BroadcastService:
+
+Attributes:
+
+bot
+
+session_maker
+
+broadcast_queue (asyncio.Queue)
+
+is_running
+
+الدوال المهمة:
+
+queue_broadcast(outbox_id, target_type, target_value, message_text, message_type="text", file_id=None, message_entities=None)
+
+يحط داتا البرودكاست في الـ Queue (لا يرسل فورًا).
+
+worker()
+
+Loop مستمر:
+
+ينتظر عناصر من الـ Queue
+
+لكل broadcast يستدعي process_broadcast(broadcast)
+
+يراعي الـ Rate Limit (BROADCAST_RATE_LIMIT).
+
+process_broadcast(broadcast)
+
+يفتح Session
+
+يجيب target users حسب:
+
+target_type:
+
+"all" → كل المستخدمين النشطين
+
+"language" → users بـ language_code = target_value
+
+(ممكن تتوسع مستقبلًا إلى country)
+
+يعمل OutboxRecipient entries لكل يوزر مع Status PENDING.
+
+يقسّم اليوزرز chunks (BROADCAST_CHUNK_SIZE)
+
+لكل chunk ينادي send_to_chunk(...)
+
+في النهاية يعدِّل حالة الـ Outbox إلى COMPLETED أو FAILED.
+
+get_target_users(session, target_type, target_value)
+
+create_recipient_records(session, outbox_id, users)
+
+send_to_chunk(session, outbox_id, users, broadcast)
+
+يبعث لكل يوزر:
+
+Text عادي
+
+أو Photo/Video/Document مع Caption
+
+يحدّث OutboxRecipient.status إلى SENT أو FAILED.
+
+send_to_user(user, broadcast)
+
+يتعامل مع Exceptions زي:
+
+TelegramForbiddenError (حظر/بـلوك)
+
+TelegramBadRequest (file_id بايظ… إلخ).
+
+update_broadcast_status(session, outbox_id, status)
+
+update_recipient_status(session, outbox_id, user_id, status, error_message=None)
+
+chunk_list(lst, chunk_size)
+
+stop() لإيقاف الـ Worker.
+
+6️⃣ الأدوات المساعدة (utils)
+6.1 utils/auth.py
+
+is_admin(user_id)
+يتحقق لو الـ ID موجود في ADMIN_USER_IDS.
+
+admin_required(func) – Decorator للهاندلرز:
+
+يستخرج user_id من Message أو CallbackQuery.
+
+لو مش أدمن:
+
+يطلع تحذير في اللوج
+
+يرسل رسالة unauthorized_access للمستخدم حسب الترجمات
+
+يوقف التنفيذ.
+
+لو أدمن يكمل.
+
+check_admin_permissions(user_id, required_level="basic")
+
+get_admin_level(user_id)
+
+الآن ترجع "super_admin" لكل الأدمنز.
+
+log_admin_action(user_id, action, details="")
+
+يسجّل في اللوج أي فعل إداري (ممكن يتطور لجدول في DB).
+
+AdminContext (Context Manager async):
+
+يستخدم لو حابب تلف أي عملية إدارية بين
+Started: ... و Completed: ... في اللوج.
+
+6.2 utils/keyboards.py
+
+مصنع كل الكيبوردات:
+
+get_main_menu_keyboard(language)
+Reply Keyboard فيها:
+
+سطر ١: إيداع / سحب
+
+سطر ٢: شكاوى / دعم (support)
+
+سطر ٣: المدير / الخطط (plans)
+
+سطر ٤: المبيعات / الإعدادات
+
+سطر ٥: رجوع / تقدم / حسابي
+
+ملاحظة: في الكود الحالي فيه هاندلرز لـ:
+إيداع، سحب، شكاوى، حسابي
+أمّا الأزرار: مدير، خطط، مبيعات، رجوع، تقدم، دعم… لسه مفيهاش منطق فعلي في الهاندلرز (جاهزة للتوسعة).
+
+get_phone_share_keyboard(language)
+Reply Keyboard فيها زر مشاركة رقم الهاتف.
+
+get_contact_confirmation_keyboard(language)
+Inline Keyboard:
+
+زر “تأكيد رقم الهاتف” (callback_data="confirm_phone")
+
+get_settings_keyboard(language)
+Inline:
+
+تغيير اللغة (change_language)
+
+تغيير الدولة (change_country)
+
+تبديل الإشعارات (toggle_notifications)
+
+رجوع (back_to_main أو back_to_settings حسب السيناريو).
+
+لوحات أخرى:
+
+get_language_selection_keyboard(languages, current_language, ui_language)
+
+get_country_selection_keyboard(countries, current_country, ui_language)
+
+get_admin_panel_keyboard(language)
+
+أزرار: admin_users, admin_languages, admin_countries, admin_broadcast, admin_outbox, user_statistics, back_to_admin
+
+(في الكود الحالي: فيه هاندلرز لـ admin_users, admin_languages, admin_countries, admin_outbox, وback_to_admin; أمّا admin_broadcast و user_statistics لسه مش متنفّذين).
+
+مفاتيح برودكاست:
+
+get_broadcast_targeting_keyboard (كل المستخدمين / حسب اللغة / حسب الدولة)
+
+get_broadcast_confirmation_keyboard
+
+مفاتيح إعلانات:
+
+get_announcement_menu_keyboard
+
+get_announcement_targeting_keyboard
+
+get_announcement_duration_keyboard
+
+get_announcement_confirmation_keyboard
+
+get_pagination_keyboard(base_callback, current_page, total_pages, language)
+
+أزرار «السابق»/«التالي» مع callback مثل admin_users_page_1…إلخ.
+
+7️⃣ الـ Handlers (سلوك البوت)
+7.1 handlers/start.py – بداية المستخدم
+الـ States
+
+RegistrationStates:
+
+waiting_for_phone
+
+confirming_phone
+
+الأوامر/الرسائل
+
+/start
+
+يحصل أو ينشئ User في DB (get_or_create_user).
+
+لو المستخدم ليس لديه رقم:
+
+يرسل رسالة ترحيب welcome_new_user
+
+يطلب مشاركة رقم الهاتف (Keyboard)
+
+يضع الـ FSM في حالة waiting_for_phone.
+
+لو لديه رقم:
+
+ينادي show_main_menu() ويعرض المينيو مباشرة.
+
+استلام الـ Contact (حالة waiting_for_phone)
+
+يتحقق إن الـ contact يخص نفس المستخدم (user_id متطابق).
+
+يحدّث user.phone_number + updated_at.
+
+لو مفيش customer_code يولّده عن طريق generate_customer_code().
+
+يحفظ في DB.
+
+يرسل رسالة تأكيد فيها:
+
+رقم الهاتف
+
+كود العميل
+
+يضيف Inline Keyboard للتأكيد (confirm_phone)
+
+يحط الـ FSM في حالة confirming_phone.
+
+Callback confirm_phone (حالة confirming_phone)
+
+يجيب اليوزر من DB
+
+يرسل رسالة “تم تأكيد رقمك”
+
+يعرض Main Menu
+
+يمسح حالة الـ FSM.
+
+زر "💰 إيداع / Deposit"
+
+Handler handle_deposit
+
+يجيب User
+
+يرسل نص deposit_instructions بلغته.
+
+(في النسخة دي، الإيداع مجرد إرشادات – من غير إنشاء Transaction في DB، واضح إن منطق التعامل المالي الحقيقي كان في السكربتات القديمة).
+
+زر "💸 سحب / Withdraw"
+
+مشابه للإيداع لكن بنص withdraw_instructions.
+
+زر "📨 شكاوى / Complaints"
+
+يرسل complaints_instructions.
+
+زر "👤 حسابي / My Account"
+
+يجمع معلومات من جدول users:
+
+الاسم
+
+username
+
+الهاتف
+
+customer_code
+
+اللغة، الدولة، حالة الإشعارات
+
+يصيغها باستخدام Template account_info ويبعثها للمستخدم.
+
+7.2 handlers/user_settings.py – إعدادات المستخدم
+الأوامر
+
+فتح قائمة الإعدادات
+
+Trigger لو المستخدم كتب:
+
+"🌐 اللغة", "🌐 Language", "⚙️ الإعدادات", "⚙️ Settings"
+
+يجيب اليوزر
+
+يحدد لغته الفعلية
+
+يرسل نص settings_menu مع Keyboard الإعدادات.
+
+change_language (Callback)
+
+يعرض قائمة اللغات الفعالة من جدول languages
+
+يستخدم get_language_selection_keyboard
+
+كل خيار lang_<code>.
+
+اختيار لغة lang_xx (Callback)
+
+يحدّث user.language_code
+
+يحفظ
+
+يرسل language_changed_success
+
+يعيد إظهار قائمة الإعدادات.
+
+change_country / country_XX
+
+مشابه للغات لكن على جدول countries والعمود country_code.
+
+toggle_notifications
+
+يقلب user.notifications_enabled True/False
+
+يرسل رسالة توضح ما إذا الإشعارات الآن مفعّلة أو متوقفة.
+
+back_to_settings
+
+يعيد إظهار شاشة الإعدادات.
+
+7.3 handlers/admin.py – لوحة الأدمن
+States
+
+AdminStates:
+
+managing_user (لسه مش مستخدم بشكل كامل)
+
+adding_language
+
+adding_country
+
+viewing_outbox
+
+الأوامر الأساسية
+
+/admin (للأدمن فقط بفضل @admin_required)
+
+يجمع إحصائيات:
+
+عدد المستخدمين الكلي
+
+عدد النشطين
+
+عدد الطلبات pending في Outbox
+
+يرسل نص admin_panel
+
+يرفق get_admin_panel_keyboard().
+
+admin_users (Callback)
+
+يستدعي show_users_page(page=0).
+
+admin_users_page_N
+
+show_users_page:
+
+يجيب مجموعة Users مع Pagination (USERS_PER_PAGE)
+
+يعرض:
+
+Active/Inactive
+
+Banned/Not
+
+Admin Mark
+
+Telegram ID، الاسم، username
+
+Customer Code
+
+اللغة/الدولة
+
+تاريخ الإنضمام
+
+يرفق Pagination Keyboard
+
+حالياً الإدارة قراءة فقط (مافيش أزرار Ban/Unban أو ترقية أدمن في الكود دا).
+
+admin_languages
+
+يجيب كل اللغات
+
+يعرضها في شكل Inline (مع Check للأكتف)
+
+كل زر: toggle_lang_<id>.
+
+toggle_lang_<id>
+
+يقلب Language.is_active
+
+يرسل رد بسيط ويعيد تحميل القائمة.
+
+admin_countries
+
+نفس الفكرة لكن على جدول الدول + toggle_country_<id>.
+
+admin_outbox
+
+يجيب أحدث 10 طلبات في Outbox بحالة PENDING
+
+يعرض لكل طلب:
+
+النوع (Deposit/Withdraw/Complaint/Support) مع Emoji
+
+الـ ID
+
+الـ user_id
+
+الـ status
+
+التاريخ… إلخ
+
+مجرد عرض حاليًا، مفيش Approve/Reject هنا (المنطق ده كان في السكربتات القديمة).
+
+back_to_admin
+
+يعيد إظهار /admin Panel.
+
+أزرار موجودة في الكيبورد لكن لسه بدون هاندلرز في هذه النسخة:
+
+admin_broadcast (ممكن تربطها مستقبلاً بـ فتح واجهة /broadcast)
+
+user_statistics
+
+7.4 handlers/broadcast.py – برودكاست للأدمن
+States
+
+BroadcastStates:
+
+selecting_target
+
+entering_message
+
+adding_media
+
+confirming
+
+الفلو
+
+بدء البرودكاست – أمر /broadcast (أدمن فقط)
+
+يجيب:
+
+عدد المستخدمين النشطين
+
+توزيعهم على اللغات/الدول (counts)
+
+يعرض رسالة وإزرار اختيار Target:
+
+كل المستخدمين
+
+حسب لغة
+
+حسب دولة.
+
+اختيار Target
+
+BroadcastStates.selecting_target + Callback:
+
+target_all → target_type="all"
+
+target_by_language → يعرض Keyboard لغات (lang_filter_<code>)
+
+target_by_country → يعرض Keyboard دول (country_filter_<code>)
+
+اختيار لغة/دولة بعينها
+
+يحدّث FSM بالـ target_type + target_value
+
+ينقل الحالة إلى entering_message
+
+يطلب من الأدمن يكتب/يبعت الرسالة (ممكن مع صورة/فيديو/ملف).
+
+استلام رسالة البرودكاست – entering_message
+
+يجمع:
+
+message.text أو caption
+
+message.entities
+
+يحدد message_type (text/photo/video/document)
+
+يحفظ file_id لو فيه Media.
+
+يروح على show_broadcast_confirmation().
+
+عرض صفحة التأكيد
+
+يعرض ملخص:
+
+Target (All / لغة محددة / دولة محددة)
+
+جزء من النص
+
+نوع الميديا إن وجدت.
+
+يضيف Keyboard:
+
+تأكيد (confirm_broadcast)
+
+إلغاء (cancel_broadcast)
+
+confirm_broadcast
+
+ينشئ Outbox جديد:
+
+type=OutboxType.BROADCAST
+
+status=PROCESSING
+
+user_id = 1 (system user)
+
+content = message_text
+
+يحفظ Outbox، يأخذ ID
+
+يستدعي:
+broadcast_service.queue_broadcast(outbox.id, target_type, target_value, message_text, message_type, file_id, message_entities)
+
+يحدِّث الرسالة للمسؤول إن البرودكاست بدأ، ويُصفّر الـ FSM.
+
+cancel_broadcast
+
+يلغي العملية ويخبر الأدمن.
+
+7.5 handlers/announcements.py – الإعلانات
+States
+
+AnnouncementStates:
+
+entering_title_ar
+
+entering_title_en
+
+entering_content_ar
+
+entering_content_en
+
+adding_image
+
+selecting_target
+
+setting_duration
+
+confirming
+
+الفلو
+
+/announce_new (أدمن)
+
+يطلب عنوان عربي.
+
+title_ar
+
+يتحقق إنه مش فاضي
+
+يحفظ في FSM
+
+يطلب عنوان إنجليزي.
+
+title_en
+
+يخزنه ثم يطلب محتوى عربي.
+
+content_ar → ثم content_en
+
+يحفظ الاثنين.
+
+بعد المحتوى الإنجليزي ينتقل لـ adding_image ويطلب صورة أو تجاوز.
+
+إضافة صورة
+
+لو الأدمن بعت Photo، يحفظ file_id في FSM
+
+أو يضغط زر skip_image فيعدّي بدون صورة.
+
+اختيار Target
+
+أزرار:
+
+announce_all → كل المستخدمين النشطين
+
+announce_by_language → يعرض قائمة لغات (announce_lang_<code>)
+
+(دولة ممكن تتضاف لاحقاً)
+
+يحفظ target_type و target_value (لو لغة).
+
+اختيار مدة الإعلان
+
+أزرار: duration_1h, duration_6h, duration_24h, duration_7d, duration_permanent
+
+تتحول لساعات في duration_hours (0 = دائم).
+
+صفحة التأكيد
+
+تعرض ملخص:
+
+العناوين
+
+المحتوى
+
+الـ Target
+
+المدة.
+
+confirm_announcement
+
+ينشئ Announcement في DB:
+
+العناوين والمحتوى عربي/إنجليزي
+
+image_url = الـ file_id (استخدام مبسّط)
+
+display_duration = duration_hours
+
+target_language لو target_type = language
+
+scheduled_at = الآن
+
+expires_at = الآن + المدة (لو المدة مش صفر).
+
+يجيب لستة user_ids حسب:
+
+كل النشطين
+
+أو حسب اللغة
+
+يعمل AnnouncementDelivery لكل User
+
+يحفظ
+
+يردّ على الأدمن بنجاح العملية وعدد المستخدمين المستهدفين.
+
+cancel_announcement
+
+يلغي العملية ويصفر الـ FSM.
+
+لاحظ إن الإعلانات هنا مختلفة عن البرودكاست:
+الإعلان يتحفظ في DB + جدول Deliveries (يصلح لدراسة من استلم/قرأ)،
+بينما البرودكاست يمر عبر Outbox + OutboxRecipients كـ رسائل عامة.
+
+8️⃣ ملفات البيانات CSV والسكربتات القديمة
+8.1 ملفات CSV
+
+users.csv
+حقول: telegram_id, name, phone, customer_id, language, date, is_banned, ban_reason, currency
+
+users_data.csv
+شكل أحدث مشابه لجدول Users في DB (username, first_name… إلخ).
+
+transactions.csv / transactions_data.csv
+تحتفظ بالعمليات المالية (id، customer_id، type، company، wallet_number، المبلغ، الحالة، التاريخ…).
+
+payment_methods.csv
+وسائل الدفع (id، company_id، method_name، method_type، account_data، status…).
+
+companies.csv
+شركات/مزودين مثل MELBET… مع نوعهم (deposit/withdraw/both).
+
+exchange_addresses.csv
+عناوين سحب (محلات/أماكن).
+
+complaints.csv
+الشكاوى وحالتها.
+
+system_settings.csv
+إعدادات عامة:
+
+رقم هاتف الدعم
+
+البريد
+
+اسم الشركة (DUX)
+
+min_deposit, min_withdrawal, max_daily_withdrawal
+
+رسائل ترحيب… إلخ.
+
+دي استخدمتها السكربتات القديمة advanced_bot.py وcomprehensive_bot.py كأنها Database Flat.
+
+8.2 السكربتات القديمة
+
+advanced_bot.py
+
+comprehensive_bot.py
+
+simple_bot.py, simple_improved_bot.py, simple_payment_bot.py, fixed_bot.py, test_bot.py… إلخ.
+
+الخلاصة عنهم:
+
+مبنيين على Requests مباشرة لـ Telegram API (بدون Aiogram).
+
+بيعتمدوا على CSV بدل DB.
+
+فيهم منطق كامل لإيداع، سحب، إدارة شكاوى، شركات، وسائل دفع، Outbox، موافقة/رفض من الأدمن… إلخ.
+
+واضح إن المشروع الحالي (Aiogram + DB) هو إعادة تصميم منظمة لنفس المنظومة لكن بشكل أنظف وقابل للتوسّع.
+
+9️⃣ إيه اللي واضح من التحليل؟
+
+المعماريّة نظيفة:
+
+فصل بين:
+
+Config
+
+Models
+
+Services
+
+Utils
+
+Handlers
+
+كل شيء مجهَّز للتوسعة:
+
+User Settings، Admin Panel، Broadcast، Announcements…
+
+لكن بعض الأزرار والـ flows لسه Placeholder (زي إدارة مستخدمين متقدمة، إحصائيات، جزء من المينيو الرئيسي).
+
+النقل من CSV → DB
+
+البيانات القديمة موجودة في CSV،
+
+والـ نماذج Outbox/Announcements/Users في DB جاهزة لاستقبال نفس المنطق.
