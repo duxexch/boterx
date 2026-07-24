@@ -2364,6 +2364,22 @@ class ComprehensiveDUXBot:
                         complaint_id = admin_state.replace('replying_to_complaint_', '')
                         self.handle_complaint_reply_buttons(message, complaint_id)
                         return
+                    elif admin_state.startswith('writing_custom_reply_'):
+                        complaint_id = admin_state.replace('writing_custom_reply_', '')
+                        reply_text = text.strip()
+                        if reply_text.lower() in ['/cancel', 'الغاء', 'إلغاء']:
+                            if user_id in self.user_states: del self.user_states[user_id]
+                            self.send_message(chat_id, "❌ تم الإلغاء", self.admin_keyboard())
+                            return
+                        if reply_text:
+                            success = self.save_complaint_reply(complaint_id, reply_text)
+                            if success:
+                                self.send_message(chat_id, f"✅ تم إرسال الرد!\n\n📝 {reply_text}", self.admin_keyboard())
+                                self.send_complaint_reply_to_customer(complaint_id, reply_text)
+                            else:
+                                self.send_message(chat_id, "❌ فشل في حفظ الرد", self.admin_keyboard())
+                        if user_id in self.user_states: del self.user_states[user_id]
+                        return
                     elif admin_state.startswith('editing_support_'):
                         self.handle_support_data_edit(message, admin_state)
                         return
@@ -4448,50 +4464,46 @@ class ComprehensiveDUXBot:
         except Exception as e:
             logger.error(f"خطأ في البحث: {e}")
             self.send_message(message['chat']['id'], "❌ حدث خطأ أثناء البحث", self.admin_keyboard())
-    
-        def add_admin_user(self, message, user_id_to_add):
-            """إضافة أدمن جديد — مع فحوصات أمنية"""
-            try:
-                    # التحقق من صحة المعرف
-                    if not user_id_to_add.isdigit():
-                        self.send_message(message['chat']['id'], "❌ معرف المستخدم يجب أن يكون رقماً صحيحاً", self.admin_keyboard())
-                        return
 
-                    new_admin_id = int(user_id_to_add)
-                    requester_id = message['from']['id']
+    def add_admin_user(self, message, user_id_to_add):
+        """إضافة أدمن جديد — مع فحوصات أمنية"""
+        try:
+            if not user_id_to_add.isdigit():
+                self.send_message(message['chat']['id'], "❌ معرف المستخدم يجب أن يكون رقماً صحيحاً", self.admin_keyboard())
+                return
 
-                    # أمان: منع إضافة النفس
-                    if new_admin_id == requester_id:
-                        self.send_message(message['chat']['id'], "⚠️ أنت أدمن بالفعل!", self.admin_keyboard())
-                        return
+            new_admin_id = int(user_id_to_add)
+            requester_id = message['from']['id']
 
-                    # أمان: التحقق من عدم وجود المستخدم مسبقاً
-                    if new_admin_id in self.admin_user_ids:
-                        self.send_message(message['chat']['id'], f"⚠️ المستخدم {user_id_to_add} أدمن بالفعل", self.admin_keyboard())
-                        return
+            if new_admin_id == requester_id:
+                self.send_message(message['chat']['id'], "⚠️ أنت أدمن بالفعل!", self.admin_keyboard())
+                return
 
-                    if new_admin_id in self.temp_admin_user_ids:
-                        self.send_message(message['chat']['id'], f"⚠️ المستخدم {user_id_to_add} مدير مؤقت بالفعل", self.admin_keyboard())
-                        return
+            if new_admin_id in self.admin_user_ids:
+                self.send_message(message['chat']['id'], f"⚠️ المستخدم {user_id_to_add} أدمن بالفعل", self.admin_keyboard())
+                return
 
-                    # إضافة الأدمن الجديد
-                    self.admin_user_ids.append(new_admin_id)
-                    self.log_admin_action(requester_id, "add_admin", f"added admin: {user_id_to_add}")
+            if new_admin_id in self.temp_admin_user_ids:
+                self.send_message(message['chat']['id'], f"⚠️ المستخدم {user_id_to_add} مدير مؤقت بالفعل", self.admin_keyboard())
+                return
 
-                    success_msg = f"""✅ تم إضافة أدمن جديد بنجاح!
+            self.admin_user_ids.append(new_admin_id)
+            self.log_admin_action(requester_id, "add_admin", f"added admin: {user_id_to_add}")
 
-    🆔 {user_id_to_add}
-    🔐 تم منح صلاحيات الإدارة
+            success_msg = f"""✅ تم إضافة أدمن جديد بنجاح!
 
-    💡 ملاحظة: هذا الأدمن نشط في الجلسة الحالية فقط.
-    للاستمرارية، أضف المعرف إلى متغير البيئة ADMIN_USER_IDS"""
+🆔 {user_id_to_add}
+🔐 تم منح صلاحيات الإدارة
 
-                    self.send_message(message['chat']['id'], success_msg, self.admin_keyboard())
-                    logger.info(f"تم إضافة أدمن جديد: {user_id_to_add} بواسطة: {requester_id}")
+💡 ملاحظة: هذا الأدمن نشط في الجلسة الحالية فقط.
+للاستمرارية، أضف المعرف إلى متغير البيئة ADMIN_USER_IDS"""
 
-            except Exception as e:
-                logger.error(f"خطأ في إضافة الأدمن: {e}")
-                self.send_message(message['chat']['id'], "❌ حدث خطأ أثناء إضافة الأدمن", self.admin_keyboard())
+            self.send_message(message['chat']['id'], success_msg, self.admin_keyboard())
+            logger.info(f"تم إضافة أدمن جديد: {user_id_to_add} بواسطة: {requester_id}")
+
+        except Exception as e:
+            logger.error(f"خطأ في إضافة الأدمن: {e}")
+            self.send_message(message['chat']['id'], "❌ حدث خطأ أثناء إضافة الأدمن", self.admin_keyboard())
     
     def prompt_add_admin(self, message):
         """طلب إضافة أدمن جديد"""
