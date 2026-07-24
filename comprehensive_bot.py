@@ -187,7 +187,7 @@ class ComprehensiveDUXBot:
                         self.i18n_translations[lang_code] = json.load(f)
             logger.info(f"Loaded i18n translations for {len(self.i18n_translations)} languages: {list(self.i18n_translations.keys())}")
         except Exception as e:
-            logger.error(f"Error loading i18n translations: {e}")
+            logger.error(f"خطأ في تحميل ترجمات i18n: {e}")
             self.i18n_translations = {}
 
     def get_i18n_text(self, key: str, lang: str) -> str:
@@ -1145,7 +1145,7 @@ class ComprehensiveDUXBot:
                     writer.writerow({k: row.get(k, '') for k in fieldnames})
             return True
         except Exception as e:
-            logger.error(f"Error linking telegram to user: {e}")
+            logger.error(f"خطأ في ربط تليجرام بالمستخدم: {e}")
             return False
     
     def get_companies(self, service_type=None):
@@ -3177,7 +3177,7 @@ class ComprehensiveDUXBot:
                 del self.edit_company_data[user_id]
             self.send_message(chat_id, "❌ تم إلغاء العملية", self.admin_keyboard())
         else:
-            self.send_message(chat_id, "أمر غير مفهوم. استخدم الأزرار أو الأوامر الصحيحة.", self.admin_keyboard())
+            self.send_message(message['chat']['id'], "أمر غير مفهوم. استخدم الأزرار أو الأوامر الصحيحة.", self.main_keyboard('ar', user_id))
     
     def show_pending_requests(self, message):
         """عرض الطلبات المعلقة للأدمن — تشمل pending و pending_code_verification"""
@@ -4431,8 +4431,8 @@ class ComprehensiveDUXBot:
             if user_id in self.user_states:
                 del self.user_states[user_id]
         except Exception as e:
-            logger.error(f"Error changing language: {e}")
-            self.send_message(message['chat']['id'], "❌ Error changing language", self.main_keyboard('ar'))
+            logger.error(f"خطأ في تغيير اللغة: {e}")
+            self.send_message(message['chat']['id'], "❌ حدث خطأ أثناء تغيير اللغة", self.main_keyboard('ar'))
     
     def prompt_admin_search(self, message):
         """طلب البحث من الأدمن"""
@@ -5002,7 +5002,7 @@ class ComprehensiveDUXBot:
                     self.admin_keyboard())
                 logger.info(f"Set admin role {role} for {admin_id_str}")
             except Exception as e:
-                logger.error(f"Error setting admin role: {e}")
+                logger.error(f"خطأ في تعيين دور المدير: {e}")
                 self.send_message(message['chat']['id'], "❌ خطأ في تعيين الدور", self.admin_keyboard())
 
     def prompt_remove_admin(self, message):
@@ -8117,7 +8117,7 @@ class ComprehensiveDUXBot:
                     return result
                     
             except Exception as e:
-                logger.error(f"Error sending message without keyboard: {e}")
+                logger.error(f"خطأ في إرسال رسالة بدون لوحة مفاتيح: {e}")
                 # محاولة بديلة بالطريقة العادية
                 try:
                     return self.send_message(chat_id, text)
@@ -8781,7 +8781,7 @@ if __name__ == "__main__":
             self.send_response(200)
             self.send_header('Content-type', 'text/plain')
             self.end_headers()
-            self.wfile.write(b'Bot is running')
+            self.wfile.write(b'البوت يعمل بنجاح')
         def log_message(self, format, *args):
             pass  # إسكات logs الـ HTTP
     
