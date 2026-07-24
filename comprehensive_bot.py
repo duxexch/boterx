@@ -2187,8 +2187,30 @@ class ComprehensiveDUXBot:
         # فحص المستخدم المسجل
         user = self.find_user(user_id)
         if not user:
-            self.handle_start(message)
-            return
+            # فحص أزرار التسجيل أولاً قبل إعادة عرض handle_start
+            skip_texts = {self.tr('skip_registration', l) for l in self.get_supported_languages()}
+            register_texts_new = {self.tr('register_account', l) for l in self.get_supported_languages()}
+            register_texts_new.add('📝 تسجيل حساب جديد')
+            
+            if text in register_texts_new:
+                self.start_registration(message)
+                return
+            elif text == '🔐 تسجيل الدخول برقم الهاتف':
+                self.start_phone_login(message)
+                return
+            elif text in skip_texts:
+                # المستخدم تخطى التسجيل — عرض القائمة الرئيسية كزائر
+                self.send_message(chat_id, 
+                    "✅ تم تخطي التسجيل!\n\n⚠️ بدون تسجيل، لن تتمكن من حفظ طلباتك.\nيمكنك التسجيل لاحقاً.",
+                    self.main_keyboard('ar', user_id))
+                return
+            elif text in reset_texts or text == self.tr('main_menu', 'ar'):
+                # زر العودة للقائمة
+                self.handle_start(message)
+                return
+            else:
+                self.handle_start(message)
+                return
         
         # فحص الحظر
         if user.get('is_banned') == 'yes':
@@ -2296,8 +2318,9 @@ class ComprehensiveDUXBot:
         ref_texts = {'🎁 إحالة', '🎁 Referral', '🎁 الإحالة'}
         help_texts = {'❓ مساعدة', '❓ Help', '❓ المساعدة'}
         register_texts = {self.tr('register_account', l) for l in self.get_supported_languages()}
+        register_texts.add('📝 تسجيل حساب جديد')
         reset_texts = {self.tr('reset_system', l) for l in self.get_supported_languages()}
-        register_texts = {self.tr('register_account', l) for l in self.get_supported_languages()}
+        skip_texts = {self.tr('skip_registration', l) for l in self.get_supported_languages()}
         
         if text in deposit_texts:
             logger.info(f"معالجة طلب إيداع من {user_id}")
