@@ -1403,6 +1403,20 @@ class ComprehensiveDUXBot:
                 self.send_message(message['chat']['id'], "❌ اسم قصير جداً. يرجى إدخال اسم صحيح:")
                 return
             
+            # منع استخدام نصوص الأزرار كأسماء
+            button_prefixes = ['📝', '🔐', '⏭️', '❌', '✅', '🔄', '🏠', '💰', '💸', '📋', '👤', '📨', '🆘', '💱', '🌐', '🎁', '❓', '🔔']
+            if any(name.startswith(p) for p in button_prefixes):
+                self.send_message(message['chat']['id'], 
+                    "❌ هذا نص زر وليس اسماً.\nاكتب اسمك الحقيقي:")
+                return
+            
+            # منع الأسماء التي تحتوي على رموز فقط
+            import re
+            if not re.search(r'[\u0600-\u06FFa-zA-Z]', name):
+                self.send_message(message['chat']['id'], 
+                    "❌ الاسم يجب أن يحتوي على حروف.\nاكتب اسمك الحقيقي:")
+                return
+            
             self.user_states[user_id] = f'registering_phone_{name}'
             
             # كيبورد مشاركة جهة الاتصال
@@ -1444,8 +1458,10 @@ class ComprehensiveDUXBot:
                     return
                 
                 phone = text
-                if len(phone) < 10:
-                    self.send_message(message['chat']['id'], "❌ رقم هاتف غير صحيح. يرجى إدخال رقم صحيح مع رمز البلد:")
+                # منع استخدام نصوص الأزرار كأرقام هاتف
+                if not self.validate_phone_number(phone):
+                    self.send_message(message['chat']['id'], 
+                        "❌ رقم هاتف غير صحيح.\nيجب أن يحتوي على أرقام فقط مع رمز البلد.\nمثال: +966501234567")
                     return
             else:
                 self.send_message(message['chat']['id'], "❌ يرجى مشاركة جهة الاتصال أو كتابة الرقم:")
@@ -2630,16 +2646,21 @@ class ComprehensiveDUXBot:
                             self.main_keyboard(user.get('language', 'ar'), user_id))
             return
         
-        # بدء عملية التسجيل
-        welcome_text = """📝 بدء التسجيل في نظام DUX
-
-يرجى إرسال اسمك الكامل للتسجيل:"""
+        # بدء عملية التسجيل — مسح أي حالة سابقة أولاً
+        if user_id in self.user_states:
+            del self.user_states[user_id]
         
-        # كيبورد مع خيار الإلغاء
+        welcome_text = (
+            "📝 بدء التسجيل\n\n"
+            "✍️ اكتب اسمك الكامل:\n"
+            "(مثال: أحمد محمد)\n\n"
+            "⚠️ أرسل اسماً حقيقياً، وليس نص زر"
+        )
+        
         registration_keyboard = {
             'keyboard': [
                 [{'text': '❌ إلغاء التسجيل'}],
-                [{'text': '🔄 إعادة تعيين النظام'}]
+                [{'text': '🏠 القائمة الرئيسية'}]
             ],
             'resize_keyboard': True,
             'one_time_keyboard': True
