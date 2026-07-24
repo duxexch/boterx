@@ -11,6 +11,7 @@ import threading
 import time
 import zipfile
 from datetime import datetime
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
 # تحميل dotenv قبل استخدام أي متغيرات
 from dotenv import load_dotenv
@@ -8415,6 +8416,22 @@ if __name__ == "__main__":
     if not bot_token:
         logger.error("BOT_TOKEN غير موجود في متغيرات البيئة")
         exit(1)
+    
+    # تشغيل HTTP server بسيط على بورت Render (لكي يكتشف Render الخدمة)
+    port = int(os.getenv('PORT', '10000'))
+    class HealthHandler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header('Content-type', 'text/plain')
+            self.end_headers()
+            self.wfile.write(b'Bot is running')
+        def log_message(self, format, *args):
+            pass  # إسكات logs الـ HTTP
+    
+    http_server = HTTPServer(('0.0.0.0', port), HealthHandler)
+    http_thread = threading.Thread(target=http_server.serve_forever, daemon=True)
+    http_thread.start()
+    logger.info(f"Health check server started on port {port}")
     
     # تشغيل البوت
     bot = ComprehensiveDUXBot(bot_token)
