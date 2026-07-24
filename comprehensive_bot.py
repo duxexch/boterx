@@ -597,22 +597,45 @@ class ComprehensiveDUXBot:
             return keyboard
 
 
-    def api_call(self, method, data=None):
-        """استدعاء API مُحسن"""
+    def api_call(self, method, data=None, retries=3):
+        """استدعاء API مُحسن — مع إعادة المحاولة التلقائية"""
         url = f"{self.api_url}/{method}"
-        try:
-            if data:
-                json_data = json.dumps(data).encode('utf-8')
-                req = urllib.request.Request(url, data=json_data)
-                req.add_header('Content-Type', 'application/json')
-            else:
-                req = urllib.request.Request(url)
+        last_error = None
+        
+        for attempt in range(retries):
+            try:
+                if data:
+                    json_data = json.dumps(data).encode('utf-8')
+                    req = urllib.request.Request(url, data=json_data)
+                    req.add_header('Content-Type', 'application/json')
+                else:
+                    req = urllib.request.Request(url)
+                
+                with urllib.request.urlopen(req, timeout=30) as response:
+                    result = json.loads(response.read().decode('utf-8'))
+                    if result.get('ok'):
+                        return result
+                    else:
+                        error_desc = result.get('description', 'unknown')
+                        # أخطاء غير قابلة لإعادة المحاولة
+                        if 'chat not found' in error_desc or 'blocked' in error_desc:
+                            return result
+                        last_error = f"API error: {error_desc}"
+            except urllib.error.HTTPError as e:
+                last_error = f"HTTP {e.code}: {e.reason}"
+                if e.code == 429:  # Rate limited
+                    retry_after = 1
+                    logger.warning(f"Rate limited by Telegram, waiting {retry_after}s")
+                    time.sleep(retry_after)
+                    continue
+            except Exception as e:
+                last_error = str(e)
             
-            with urllib.request.urlopen(req, timeout=10) as response:
-                return json.loads(response.read().decode('utf-8'))
-        except Exception as e:
-            logger.error(f"خطأ في API: {e}")
-            return None
+            if attempt < retries - 1:
+                time.sleep(0.5 * (attempt + 1))  # backoff تدريجي
+        
+        logger.error(f"API call failed after {retries} retries: {method} - {last_error}")
+        return None
     
     def send_message(self, chat_id, text, keyboard=None):
         """إرسال رسالة"""
@@ -4141,52 +4164,106 @@ class ComprehensiveDUXBot:
             logger.error(f"خطأ في معالجة callback: {e}")
     
     def run(self):
-        """تشغيل البوت"""
+        """تشغيل البوت — مع نظام حماية شامل"""
         logger.info(f"✅ نظام DUX الشامل يعمل: @{os.getenv('BOT_TOKEN', 'unknown').split(':')[0] if os.getenv('BOT_TOKEN') else 'unknown'}")
+        
+        # نظام الحماية: تتبع الرسائل المعالجة لمنع التكرار
+        processed_updates = set()
+        MAX_PROCESSED_CACHE = 1000  # حد أقصى للذاكرة
+        
+        # نظام الحماية: تتبع آخر نشاط لكل مستخدم
+        user_last_activity = {}
+        MIN_MESSAGE_INTERVAL = 0.5  # نصف ثانية بين رسائل نفس المستخدم
         
         while True:
             try:
                 updates = self.get_updates()
-                if updates and updates.get('ok'):
-                    for update in updates['result']:
-                        self.offset = update['update_id']
+                if not updates or not updates.get('ok'):
+                    time.sleep(0.5)
+                    continue
+                
+                for update in updates['result']:
+                    update_id = update['update_id']
+                    
+                    # 1. منع التكرار: تخطي الرسائل المعالجة مسبقاً
+                    if update_id in processed_updates:
+                        continue
+                    
+                    # إضافة للذاكرة
+                    processed_updates.add(update_id)
+                    if len(processed_updates) > MAX_PROCESSED_CACHE:
+                        # تنظيف الذاكرة: احتفظ بآخر 500 فقط
+                        processed_updates.clear()
+                    
+                    # تحديث الـ offset فوراً لمنع إعادة استلام نفس الرسالة
+                    self.offset = update_id
+                    
+                    if 'message' in update:
+                        message = update['message']
+                        user_id = message['from']['id']
                         
-                        if 'message' in update:
-                            message = update['message']
-                            # تسجيل الرسائل للتشخيص
-                            if 'text' in message:
-                                logger.info(f"رسالة مستلمة: {message['text']} من {message['from']['id']}")
-                            try:
-                                self.process_message(message)
-                            except Exception as msg_error:
-                                logger.error(f"خطأ في معالجة الرسالة: {msg_error}")
-                                # إرسال رسالة خطأ للمستخدم
+                        # 2. منع السبام: فحص الفاصل الزمني بين رسائل نفس المستخدم
+                        now = time.time()
+                        if user_id in user_last_activity:
+                            elapsed = now - user_last_activity[user_id]
+                            if elapsed < MIN_MESSAGE_INTERVAL:
+                                logger.warning(f"سبام محتمل من {user_id}: {elapsed:.2f}s - تخطي")
+                                continue
+                        user_last_activity[user_id] = now
+                        
+                        # 3. تسجيل الرسالة
+                        if 'text' in message:
+                            logger.info(f"رسالة: {message['text'][:50]} من {user_id}")
+                        
+                        # 4. معالجة الرسالة مع timeout
+                        try:
+                            self.process_message(message)
+                        except Exception as msg_error:
+                            logger.error(f"خطأ في معالجة الرسالة: {msg_error}", exc_info=True)
+                            # تنظيف حالة المستخدم عند الخطأ
+                            if user_id in self.user_states:
                                 try:
-                                    error_keyboard = {
-                                        'keyboard': [
-                                            [{'text': '🔄 إعادة تعيين النظام'}],
-                                            [{'text': '💰 طلب إيداع'}, {'text': '💸 طلب سحب'}],
-                                            [{'text': '🏠 القائمة الرئيسية'}]
-                                        ],
-                                        'resize_keyboard': True
-                                    }
-                                    err_user = self.find_user(message['from']['id'])
-                                    err_lang = err_user.get('language', 'ar') if err_user else 'ar'
-                                    self.send_message(message['chat']['id'], 
-                                                    self.tr('error_occurred', err_lang), 
-                                                    error_keyboard)
+                                    del self.user_states[user_id]
                                 except:
                                     pass
-                        elif 'callback_query' in update:
+                            # إرسال رسالة خطأ للمستخدم
+                            try:
+                                err_user = self.find_user(user_id)
+                                err_lang = err_user.get('language', 'ar') if err_user else 'ar'
+                                error_kb = {
+                                    'keyboard': [
+                                        [{'text': self.tr('reset_system', err_lang)}],
+                                        [{'text': self.tr('main_menu', err_lang)}]
+                                    ],
+                                    'resize_keyboard': True
+                                }
+                                self.send_message(message['chat']['id'],
+                                    self.tr('error_occurred', err_lang), error_kb)
+                            except:
+                                pass
+                    
+                    elif 'callback_query' in update:
+                        try:
                             self.handle_callback_query(update['callback_query'])
-                            
+                        except Exception as cb_error:
+                            logger.error(f"خطأ في معالجة callback: {cb_error}", exc_info=True)
+                            try:
+                                self.answer_callback(update['callback_query'].get('id'), "❌ خطأ")
+                            except:
+                                pass
+                
+                # 5. تنظيف دوري للذاكرة
+                if len(user_last_activity) > 500:
+                    cutoff = time.time() - 300  # احذف نشاط أقدم من 5 دقائق
+                    user_last_activity = {k: v for k, v in user_last_activity.items() if v > cutoff}
+                
             except KeyboardInterrupt:
-                logger.info("تم إيقاف البوت")
+                logger.info("تم إيقاف البوت بواسطة المستخدم")
                 break
             except Exception as e:
-                logger.error(f"خطأ عام: {e}")
-                import time
-                time.sleep(1)  # انتظار قصير قبل المحاولة مرة أخرى
+                logger.error(f"خطأ عام في حلقة التشغيل: {e}", exc_info=True)
+                # انتظار قصير قبل المحاولة مرة أخرى
+                time.sleep(1)
                 continue
 
     def handle_complaint_start(self, message):
