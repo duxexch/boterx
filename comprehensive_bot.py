@@ -8781,7 +8781,7 @@ if __name__ == "__main__":
             self.send_response(200)
             self.send_header('Content-type', 'text/plain')
             self.end_headers()
-            self.wfile.write(b'البوت يعمل بنجاح')
+            self.wfile.write('البوت يعمل بنجاح'.encode('utf-8'))
         def log_message(self, format, *args):
             pass  # إسكات logs الـ HTTP
     
