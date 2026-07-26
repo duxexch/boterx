@@ -995,33 +995,168 @@ class ComprehensiveDUXBot:
     # ==================== Admin: Apps Management ====================
 
     def show_apps_admin_panel(self, message):
-        """لوحة إدارة التطبيقات للأدمن"""
+        """لوحة إدارة التطبيقات — بأزرار inline أنيقة"""
         apps = self.get_all_app_links()
 
         text = (
             f"╔════════════════════╗\n"
             f"║  📱 إدارة التطبيقات  ║\n"
             f"╚════════════════════╝\n\n"
-            f"📊 العدد: {len(apps)}\n\n"
+            f"📊 إجمالي التطبيقات: {len(apps)}\n"
         )
 
+        inline_btns = []
+
         if apps:
+            text += "\n📋 التطبيقات الحالية:\n\n"
             for app in apps:
                 status_icon = '✅' if app.get('is_active') == 'yes' else '⏸️'
                 text += (
                     f"{status_icon} <b>{app['name']}</b>\n"
-                    f"  🆔 {app['id']}\n"
-                    f"  🔗 {app.get('download_url', '')}\n"
-                    f"  📅 {app.get('created_at', '')}\n\n"
+                    f"  🆔 <code>{app['id']}</code>\n"
                 )
-        else:
-            text += "📭 لا توجد تطبيقات بعد.\n\n"
+                if app.get('description'):
+                    text += f"  📝 {app['description']}\n"
+                text += f"  🔗 <a href=\"{app.get('download_url', '')}\">رابط التحميل</a>\n"
+                if app.get('icon_url'):
+                    text += f"  🖼️ <a href=\"{app.get('icon_url', '')}\">الأيقونة</a>\n"
+                text += f"  📅 {app.get('created_at', '')}\n\n"
+                # زر حذف لكل تطبيق
+                inline_btns.append([{
+                    'text': f"🗑️ حذف: {app['name']}",
+                    'callback_data': f"app_delete_{app['id']}"
+                }])
 
-        text += "➕ لإضافة تطبيق، اكتب:\nاضافة_تطبيق [الاسم] | [رابط_الأيقونة] | [رابط_التحميل] | [الوصف]\n\n"
-        text += "🗑️ للحذف: حذف_تطبيق [المعرف]\n"
-        text += "📋 لعرض التطبيقات: عرض_تطبيقات"
+        # أزرار الإجراءات
+        inline_btns.append([{'text': '➕ إضافة تطبيق جديد', 'callback_data': 'app_add_new'}])
+        if apps:
+            inline_btns.append([{'text': '🔄 تحديث القائمة', 'callback_data': 'app_refresh'}])
+        inline_btns.append([{'text': '🔙 العودة للوحة الأدمن', 'callback_data': 'app_back_admin'}])
 
-        self.send_message(message['chat']['id'], text, self.admin_keyboard())
+        if not apps:
+            text += "\n📭 لا توجد تطبيقات بعد.\n"
+
+        self.send_inline_message(message['chat']['id'], text, inline_btns)
+
+    def start_app_wizard(self, message):
+        """بدء معالج إضافة تطبيق — خطوة بخطوة"""
+        user_id = message['from']['id']
+        chat_id = message['chat']['id']
+
+        if not hasattr(self, 'temp_app_data'):
+            self.temp_app_data = {}
+        self.temp_app_data[user_id] = {'step': 'app_name'}
+
+        text = (
+            "╔════════════════════╗\n"
+            "║  ➕ إضافة تطبيق  ║\n"
+            "╚════════════════════╝\n\n"
+            "📝 الخطوة 1 من 4\n\n"
+            "✍️ اكتب اسم التطبيق:\n\n"
+            "مثال: تطبيق المال"
+        )
+        kb = {
+            'keyboard': [[{'text': '❌ إلغاء'}], [{'text': '🔙 لوحة الأدمن'}]],
+            'resize_keyboard': True,
+            'one_time_keyboard': True
+        }
+        self.send_message(chat_id, text, kb)
+        self.user_states[user_id] = 'app_wizard_name'
+
+    def handle_app_wizard(self, message):
+        """معالجة خطوات معالج إضافة تطبيق"""
+        user_id = message['from']['id']
+        chat_id = message['chat']['id']
+        text = message.get('text', '').strip()
+
+        # إلغاء
+        if text in ['❌ إلغاء', '🔙 لوحة الأدمن', 'إلغاء', 'الغاء']:
+            if user_id in self.user_states:
+                del self.user_states[user_id]
+            if hasattr(self, 'temp_app_data') and user_id in self.temp_app_data:
+                del self.temp_app_data[user_id]
+            self.show_apps_admin_panel(message)
+            return
+
+        data = getattr(self, 'temp_app_data', {}).get(user_id, {})
+        step = data.get('step', '')
+
+        if step == 'app_name':
+            if len(text) < 2:
+                self.send_message(chat_id, "❌ الاسم قصير جداً. اكتب اسماً صحيحاً:")
+                return
+            data['name'] = text
+            data['step'] = 'app_icon'
+            self.temp_app_data[user_id] = data
+            self.send_message(chat_id,
+                "✅ تم حفظ الاسم!\n\n"
+                "📝 الخطوة 2 من 4\n\n"
+                "🖼️ اكتب رابط أيقونة التطبيق (صورة PNG/JPG):\n\n"
+                "أو اكتب 'تخطي' لاستخدام أيقونة افتراضية 📱\n\n"
+                "مثال: https://example.com/icon.png")
+
+        elif step == 'app_icon':
+            if text.lower() in ['تخطي', 'skip', 'بدون']:
+                data['icon_url'] = ''
+            else:
+                data['icon_url'] = text
+            data['step'] = 'app_url'
+            self.temp_app_data[user_id] = data
+            self.send_message(chat_id,
+                "✅ تم حفظ الأيقونة!\n\n"
+                "📝 الخطوة 3 من 4\n\n"
+                "🔗 اكتب رابط تحميل التطبيق:\n\n"
+                "مثال: https://play.google.com/store/apps/...")
+
+        elif step == 'app_url':
+            if len(text) < 5 or not text.startswith('http'):
+                self.send_message(chat_id, "❌ رابط غير صحيح. يجب أن يبدأ بـ http:// أو https://\n\nاكتب الرابط مرة أخرى:")
+                return
+            data['download_url'] = text
+            data['step'] = 'app_desc'
+            self.temp_app_data[user_id] = data
+            self.send_message(chat_id,
+                "✅ تم حفظ رابط التحميل!\n\n"
+                "📝 الخطوة 4 من 4 (الأخيرة)\n\n"
+                "📝 اكتب وصفاً قصيراً للتطبيق:\n\n"
+                "أو اكتب 'تخطي' لبدونه")
+
+        elif step == 'app_desc':
+            if text.lower() in ['تخطي', 'skip', 'بدون']:
+                data['description'] = ''
+            else:
+                data['description'] = text
+
+            # حفظ التطبيق
+            app_id = self.add_app_link(data['name'], data.get('icon_url', ''), data['download_url'], data.get('description', ''))
+            if app_id:
+                # عرض ملخص + أزرار تأكيد
+                summary = (
+                    "╔════════════════════╗\n"
+                    "║  ✅ تم الحفظ!  ║\n"
+                    "╚════════════════════╝\n\n"
+                    f"📱 الاسم: <b>{data['name']}</b>\n"
+                    f"🆔 <code>{app_id}</code>\n"
+                )
+                if data.get('icon_url'):
+                    summary += f"🖼️ أيقونة: ✅\n"
+                if data.get('description'):
+                    summary += f"📝 الوصف: {data['description']}\n"
+                summary += f"🔗 التحميل: <a href=\"{data['download_url']}\">رابط</a>\n"
+
+                inline_btns = [
+                    [{'text': '📋 عرض كل التطبيقات', 'callback_data': 'app_refresh'}],
+                    [{'text': '➕ إضافة تطبيق آخر', 'callback_data': 'app_add_new'}],
+                    [{'text': '🔙 لوحة الأدمن', 'callback_data': 'app_back_admin'}]
+                ]
+                self.send_inline_message(chat_id, summary, inline_btns)
+            else:
+                self.send_message(chat_id, "❌ فشل في حفظ التطبيق", self.admin_keyboard())
+
+            if user_id in self.user_states:
+                del self.user_states[user_id]
+            if hasattr(self, 'temp_app_data') and user_id in self.temp_app_data:
+                del self.temp_app_data[user_id]
 
     # ==================== End 📱 التطبيقات ====================
 
@@ -2976,6 +3111,9 @@ class ComprehensiveDUXBot:
         if isinstance(current_state, str) and current_state.startswith('svrp_'):
             self.handle_svrp_state(message, current_state)
             return
+        if isinstance(current_state, str) and current_state.startswith('app_wizard'):
+            self.handle_app_wizard(message)
+            return
         if isinstance(current_state, str) and current_state == 'selecting_language':
             self.handle_language_change(message, text)
             return
@@ -3956,34 +4094,6 @@ class ComprehensiveDUXBot:
         elif text == '💎 استرداد ذكي' and self.svrp:
             self.show_svrp_admin_panel(message)
         elif text == '📱 التطبيقات':
-            self.show_apps_admin_panel(message)
-        elif text.startswith('اضافة_تطبيق '):
-            # تنسيق: اضافة_تطبيق الاسم | رابط_الأيقونة | رابط_التحميل | الوصف
-            parts = text.replace('اضافة_تطبيق ', '', 1).split('|')
-            if len(parts) >= 3:
-                name = parts[0].strip()
-                icon_url = parts[1].strip()
-                download_url = parts[2].strip()
-                desc = parts[3].strip() if len(parts) > 3 else ''
-                app_id = self.add_app_link(name, icon_url, download_url, desc)
-                if app_id:
-                    self.send_message(message['chat']['id'],
-                        f"✅ تم إضافة التطبيق!\n\n📱 الاسم: {name}\n🆔 {app_id}\n🔗 {download_url}",
-                        self.admin_keyboard())
-                else:
-                    self.send_message(message['chat']['id'], "❌ فشل في إضافة التطبيق", self.admin_keyboard())
-            else:
-                self.send_message(message['chat']['id'],
-                    "❌ الصيغة: اضافة_تطبيق الاسم | رابط_الأيقونة | رابط_التحميل | الوصف\n"
-                    "مثال: اضافة_تطبيق تطبيق المال | https://icon.png | https://download.com | وصف قصير",
-                    self.admin_keyboard())
-        elif text.startswith('حذف_تطبيق '):
-            app_id = text.replace('حذف_تطبيق ', '').strip()
-            if self.delete_app_link(app_id):
-                self.send_message(message['chat']['id'], f"✅ تم حذف التطبيق {app_id}", self.admin_keyboard())
-            else:
-                self.send_message(message['chat']['id'], f"❌ لم يتم العثور على التطبيق {app_id}", self.admin_keyboard())
-        elif text == 'عرض_تطبيقات':
             self.show_apps_admin_panel(message)
         elif text == '📧 رسالة لعميل':
             self.start_send_user_message(message)
@@ -5197,6 +5307,49 @@ class ComprehensiveDUXBot:
                 if user_id in self.user_states:
                     del self.user_states[user_id]
                 self.edit_message(chat_id, message.get('message_id'), "❌ تم إلغاء الرفض")
+                return
+
+            # ==================== 📱 التطبيقات ====================
+            elif data == 'app_add_new':
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.start_app_wizard(fake_msg)
+                return
+
+            elif data == 'app_refresh':
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_apps_admin_panel(fake_msg)
+                return
+
+            elif data == 'app_back_admin':
+                if user_id in self.user_states:
+                    del self.user_states[user_id]
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.handle_admin_panel(fake_msg)
+                return
+
+            elif data.startswith('app_delete_'):
+                app_id = data.replace('app_delete_', '')
+                # تأكيد الحذف
+                inline_btns = [
+                    [{'text': '✅ نعم، احذف', 'callback_data': f'app_confirm_delete_{app_id}'},
+                     {'text': '❌ إلغاء', 'callback_data': 'app_refresh'}]
+                ]
+                self.edit_message(chat_id, message.get('message_id'),
+                    f"⚠️ هل أنت متأكد من حذف التطبيق <code>{app_id}</code>؟")
+                self.send_inline_message(chat_id, "🗑️ تأكيد الحذف:", inline_btns)
+                return
+
+            elif data.startswith('app_confirm_delete_'):
+                app_id = data.replace('app_confirm_delete_', '')
+                if self.delete_app_link(app_id):
+                    self.edit_message(chat_id, message.get('message_id'),
+                        f"✅ تم حذف التطبيق {app_id}")
+                else:
+                    self.edit_message(chat_id, message.get('message_id'),
+                        f"❌ لم يتم العثور على التطبيق {app_id}")
+                # إعادة عرض القائمة
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_apps_admin_panel(fake_msg)
                 return
             
             # ==================== مطابقة: تأكيد الكود ====================
