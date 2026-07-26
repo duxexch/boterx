@@ -371,13 +371,29 @@ class SVRPManager:
         return completed >= required
 
     def increment_wagering(self, telegram_id):
-        """زيادة عداد الرهان عند إكمال معاملة"""
+        """زيادة عداد الرهان عند إكمال معاملة — وتفعيل الأرصدة المعلقة عند إكمال الرهان"""
         wallet = self.get_wallet(telegram_id)
         current = int(wallet.get('wagering_completed', 0) or 0)
+        required = int(wallet.get('wagering_required', 3) or 3)
+        new_count = current + 1
         self._update_wallet(telegram_id, {
-            'wagering_completed': current + 1
+            'wagering_completed': new_count
         })
-        return current + 1
+
+        # فك التجميد: تحويل أرصدة 'pending' إلى 'active' عند إكمال الرهان
+        if new_count >= required:
+            rows = self._read_csv('svrp_credits.csv')
+            activated = 0
+            for row in rows:
+                if (row['user_id'] == str(telegram_id) and
+                    row['status'] == 'pending'):
+                    row['status'] = 'active'
+                    activated += 1
+            if activated > 0:
+                self._write_csv('svrp_credits.csv', rows, self.CREDIT_FIELDS)
+                logger.info(f"Recovery: Activated {activated} pending credits for user {telegram_id} (wagering complete: {new_count}/{required})")
+
+        return new_count
 
     # ==================== استخدام الأرصدة ====================
 
@@ -403,12 +419,12 @@ class SVRPManager:
             'total_used': total_used
         })
 
-        # تحديث حالة الأرصدة المستخدمة
+        # تحديث حالة الأرصدة المستخدمة (pending أو active — تم تفعيلها في increment_wagering)
         rows = self._read_csv('svrp_credits.csv')
         remaining = amount
         for row in rows:
             if (row['user_id'] == str(telegram_id) and
-                row['status'] == 'active' and
+                row['status'] in ('active', 'pending') and
                 float(row.get('credit_amount', 0) or 0) > 0):
                 credit_val = float(row['credit_amount'])
                 if remaining >= credit_val:
@@ -427,7 +443,11 @@ class SVRPManager:
     # ==================== الأكواد الترويجية ====================
 
     def create_promo_code(self, telegram_id, amount, currency='SAR'):
-        """إنشاء كود ترويجي من رصيد المحفظة"""
+        """إنشاء كود ترويجي من رصيد المحفظة — يتطلب إكمال الرهان"""
+        # فحص الرهان قبل السماح بإنشاء كود
+        if not self.check_wagering(telegram_id):
+            return None, "لم تكمل متطلبات الرهان بعد — لا يمكنك إنشاء أكواد"
+
         wallet = self.get_wallet(telegram_id)
         balance = float(wallet.get('balance', 0) or 0)
 

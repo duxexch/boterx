@@ -1193,18 +1193,29 @@ class ComprehensiveDUXBot:
         wager_bar_empty = '▱' * max(0, wager_req - wager_done)
         wager_status = f"{'✅' if wager_done >= wager_req else '⏳'} {wager_bar_full}{wager_bar_empty} ({wager_done}/{wager_req})"
 
+        # تمييز الرصيد المجمد عن المتاح
+        if wager_done >= wager_req:
+            frozen_balance = 0
+            available_balance = balance
+            freeze_status = self.tr('svrp_wagering_done', lang)
+        else:
+            frozen_balance = balance
+            available_balance = 0
+            freeze_status = self.tr('svrp_wagering_pending', lang)
+
         panel_text = (
             f"╔════════════════════╗\n"
             f"║  {self.tr('svrp_title', lang)}  ║\n"
             f"╚════════════════════╝\n\n"
             f"┌─────────────────────┐\n"
-            f"│  {self.tr('svrp_balance_amount', lang, amount=f'{balance:.2f}')}\n"
-            f"│  {self.tr('svrp_pending_amount', lang, amount=f'{pending:.2f}')}\n"
-            f"│  {self.tr('svrp_total_earned_amount', lang, amount=f'{total_earned:.2f}')}\n"
-            f"│  {self.tr('svrp_total_used_amount', lang, amount=f'{total_used:.2f}')}\n"
+            f"│  🟢 {self.tr('svrp_balance_amount', lang, amount=f'{available_balance:.2f}')}\n"
+            f"│  🧊 {'Frozen' if lang != 'ar' else 'مجمد'}: {frozen_balance:.2f}\n"
+            f"│  ⏳ {self.tr('svrp_pending_amount', lang, amount=f'{pending:.2f}')}\n"
+            f"│  📈 {self.tr('svrp_total_earned_amount', lang, amount=f'{total_earned:.2f}')}\n"
+            f"│  📉 {self.tr('svrp_total_used_amount', lang, amount=f'{total_used:.2f}')}\n"
             f"└─────────────────────┘\n\n"
             f"{self.tr('svrp_wagering_label', lang)}\n  {wager_status}\n"
-            f"  {self.tr('svrp_wagering_done', lang) if wager_done >= wager_req else self.tr('svrp_wagering_pending', lang)}\n\n"
+            f"  {freeze_status}\n\n"
             f"┌─────────────────────┐\n"
             f"│  {group_icon} {self.tr('svrp_tier_label', lang)}: {group_ar}\n"
             f"│  👥 {self.tr('svrp_referrals_count', lang)}: {ref_count}\n"
