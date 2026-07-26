@@ -846,12 +846,11 @@ class ComprehensiveDUXBot:
         ref_count = self.get_referral_count(message['from']['id'])
 
         ref_text = (
-            f"🎁 نظام الإحالات\n\n"
-            f"📋 كود الإحالة الخاص بك:\n"
+            f"{self.tr('referral_panel_title', lang)}\n\n"
+            f"{self.tr('referral_your_code', lang)}\n"
             f"`{ref_code}`\n\n"
-            f"👥 عدد الإحالات الناجحة: {ref_count}\n\n"
-            f"💡 شارك كودك مع أصدقائك!\n"
-            f"عند تسجيلهم بالكود، تحصل على مكافأة."
+            f"{self.tr('referral_count', lang)}: {ref_count}\n\n"
+            f"{self.tr('referral_hint', lang)}"
         )
         self.send_message(message['chat']['id'], ref_text, self.main_keyboard(lang, message['from']['id']))
 
@@ -1290,32 +1289,21 @@ class ComprehensiveDUXBot:
         lang = user.get('language', 'ar') if user else 'ar'
 
         help_text = (
-            "❓ دليل استخدام البوت\n\n"
-            "💰 طلب إيداع:\n"
-            "  1. اضغط '💰 طلب إيداع'\n"
-            "  2. اختر الشركة\n"
-            "  3. اختر وسيلة الدفع\n"
-            "  4. أدخل رقم محفظتك\n"
-            "  5. أدخل المبلغ\n\n"
-            "💸 طلب سحب:\n"
-            "  1. اضغط '💸 طلب سحب'\n"
-            "  2. اختر الشركة ووسيلة الدفع\n"
-            "  3. أدخل رقم المحفظة والمبلغ\n"
-            "  4. أدخل كود التأكيد\n"
-            "  5. أكد الطلب\n\n"
-            "🔄 مطابقة P2P:\n"
-            "  1. اضغط '🔄 مطابقة'\n"
-            "  2. اختر إيداع أو سحب\n"
-            "  3. أدخل المبلغ واختر الشركة\n"
-            "  4. انتظر مطابقة مع عميل آخر\n\n"
-            "🎁 الإحالات:\n"
-            "  شارك كود الإحالة مع أصدقائك\n\n"
-            "🔔 إشعاراتي:\n"
-            "  تابع حالة طلباتك\n\n"
-            "📨 شكوى:\n"
-            "  أرسل شكواك واستفساراتك\n\n"
-            "🆘 دعم:\n"
-            "  معلومات التواصل مع الدعم"
+            f"{self.tr('help_title', lang)}\n\n"
+            f"{self.tr('help_deposit_title', lang)}\n"
+            f"  {self.tr('help_deposit_steps', lang)}\n\n"
+            f"{self.tr('help_withdraw_title', lang)}\n"
+            f"  {self.tr('help_withdraw_steps', lang)}\n\n"
+            f"{self.tr('help_match_title', lang)}\n"
+            f"  {self.tr('help_match_steps', lang)}\n\n"
+            f"{self.tr('help_referral_title', lang)}\n"
+            f"  {self.tr('help_referral_steps', lang)}\n\n"
+            f"{self.tr('help_notif_title', lang)}\n"
+            f"  {self.tr('help_notif_steps', lang)}\n\n"
+            f"{self.tr('help_complaint_title', lang)}\n"
+            f"  {self.tr('help_complaint_steps', lang)}\n\n"
+            f"{self.tr('help_support_title', lang)}\n"
+            f"  {self.tr('help_support_steps', lang)}"
         )
         self.send_message(message['chat']['id'], help_text, self.main_keyboard(lang, message['from']['id']))
 
@@ -2098,8 +2086,23 @@ class ComprehensiveDUXBot:
         """معالجة تدفق الإيداع الكامل"""
         user_id = message['from']['id']
         state = self.user_states.get(user_id, '')
-        text = message['text']
-        
+        text = message.get('text', '')
+
+        # فحص أزرار الإلغاء والعودة أولاً — قبل أي معالجة للبيانات
+        all_langs = self.get_supported_languages()
+        cancel_texts = {self.tr('cancel_btn', l) for l in all_langs} | {self.tr('cancel_registration', l) for l in all_langs} | {'❌ إلغاء', '❌ Cancel', 'الغاء', 'إلغاء'}
+        main_menu_texts = {self.tr('main_menu', l) for l in all_langs} | {self.tr('main_menu_btn', l) for l in all_langs} | {'🏠 القائمة الرئيسية', '🏠 الرئيسية', '🏠 Main Menu'}
+        back_texts = {self.tr('back_btn', l) for l in all_langs} | {self.tr('back_to_main', l) for l in all_langs} | {'🔙', '🔙 العودة', '🔙 Back'}
+
+        if text in cancel_texts or text in main_menu_texts or text in back_texts:
+            if user_id in self.user_states:
+                del self.user_states[user_id]
+            user = self.find_user(user_id)
+            lang = user.get('language', 'ar') if user else 'ar'
+            welcome = self.tr('choose_service', lang, name=user.get('name', ''), customer_id=user.get('customer_id', '')) if user else self.tr('welcome_new', 'ar', name='')
+            self.send_message(message['chat']['id'], welcome, self.main_keyboard(lang, user_id))
+            return
+
         if state == 'selecting_deposit_company':
             # إزالة الرمز التعبيري من اسم الشركة
             selected_company_name = text
@@ -2305,8 +2308,23 @@ class ComprehensiveDUXBot:
         """معالجة تدفق السحب الكامل"""
         user_id = message['from']['id']
         state = self.user_states.get(user_id, '')
-        text = message['text']
-        
+        text = message.get('text', '')
+
+        # فحص أزرار الإلغاء والعودة أولاً
+        all_langs = self.get_supported_languages()
+        cancel_texts = {self.tr('cancel_btn', l) for l in all_langs} | {self.tr('cancel_registration', l) for l in all_langs} | {'❌ إلغاء', '❌ Cancel', 'الغاء', 'إلغاء'}
+        main_menu_texts = {self.tr('main_menu', l) for l in all_langs} | {self.tr('main_menu_btn', l) for l in all_langs} | {'🏠 القائمة الرئيسية', '🏠 الرئيسية', '🏠 Main Menu'}
+        back_texts = {self.tr('back_btn', l) for l in all_langs} | {self.tr('back_to_main', l) for l in all_langs} | {'🔙', '🔙 العودة', '🔙 Back'}
+
+        if text in cancel_texts or text in main_menu_texts or text in back_texts:
+            if user_id in self.user_states:
+                del self.user_states[user_id]
+            user = self.find_user(user_id)
+            lang = user.get('language', 'ar') if user else 'ar'
+            welcome = self.tr('choose_service', lang, name=user.get('name', ''), customer_id=user.get('customer_id', '')) if user else self.tr('welcome_new', 'ar', name='')
+            self.send_message(message['chat']['id'], welcome, self.main_keyboard(lang, user_id))
+            return
+
         if state == 'selecting_withdraw_company':
             # إزالة الرمز التعبيري من اسم الشركة
             selected_company_name = text
@@ -2631,7 +2649,9 @@ class ComprehensiveDUXBot:
         if not user:
             return
         
-        transactions_text = f"📋 طلبات العميل: {user['name']}\n\n"
+        lang = user.get('language', 'ar')
+        user_currency = user.get('currency', self.get_setting('default_currency') or 'SAR')
+        transactions_text = f"{self.tr('transactions_title', lang)}: {user['name']}\n\n"
         found_transactions = False
         
         try:
@@ -2645,22 +2665,22 @@ class ComprehensiveDUXBot:
                         
                         transactions_text += f"{status_emoji} {type_emoji} {row['id']}\n"
                         transactions_text += f"🏢 {row['company']}\n"
-                        transactions_text += f"💰 {row['amount']} ريال\n"
+                        transactions_text += f"💰 {row['amount']} {user_currency}\n"
                         transactions_text += f"📅 {row['date']}\n"
                         
                         if row['status'] == 'rejected' and row.get('admin_note'):
-                            transactions_text += f"📝 السبب: {row['admin_note']}\n"
+                            transactions_text += f"{self.tr('transactions_reason', lang)}: {row['admin_note']}\n"
                         elif row['status'] == 'approved':
-                            transactions_text += f"✅ تمت الموافقة\n"
+                            transactions_text += f"{self.tr('transactions_approved', lang)}\n"
                         elif row['status'] == 'pending':
-                            transactions_text += f"⏳ قيد المراجعة\n"
+                            transactions_text += f"{self.tr('transactions_pending', lang)}\n"
                         
                         transactions_text += "\n"
         except:
             pass
         
         if not found_transactions:
-            transactions_text += "لا توجد معاملات سابقة"
+            transactions_text += self.tr('transactions_empty', lang)
         
         self.send_message(message['chat']['id'], transactions_text, self.main_keyboard(user.get('language', 'ar')))
     
@@ -3202,17 +3222,15 @@ class ComprehensiveDUXBot:
         self._start_lang[user_id] = selected_lang
 
         # طلب رقم الهاتف
-        share_phone_text = self.tr('share_phone', selected_lang) if self.tr('share_phone', selected_lang) else "📱 شارك رقم هاتفك"
-        manual_text = self.tr('enter_phone_manual', selected_lang) if self.tr('enter_phone_manual', selected_lang) else "✍️ إدخال يدوي"
         prompt = (
-            f"✅ {self.tr('change_success', selected_lang) if self.tr('change_success', selected_lang) else 'تم!'}\n\n"
-            f"📱 {self.tr('enter_phone_prompt', selected_lang) if self.tr('enter_phone_prompt', selected_lang) else 'يرجى إدخال رقم هاتفك'}"
+            f"✅ {self.tr('change_success', selected_lang)}\n\n"
+            f"📱 {self.tr('enter_phone_prompt', selected_lang)}"
         )
         keyboard = {
             'keyboard': [
-                [{'text': f'📱 {share_phone_text}', 'request_contact': True}],
-                [{'text': f'✍️ {manual_text}'}],
-                [{'text': '🏠 القائمة الرئيسية'}]
+                [{'text': self.tr('share_phone_btn', selected_lang), 'request_contact': True}],
+                [{'text': self.tr('enter_phone_manual', selected_lang)}],
+                [{'text': self.tr('main_menu_btn', selected_lang)}]
             ],
             'resize_keyboard': True,
             'one_time_keyboard': True
@@ -3233,16 +3251,16 @@ class ComprehensiveDUXBot:
                 phone = '+' + phone
         elif 'text' in message:
             phone = message['text'].strip()
-            if phone in ['🏠 القائمة الرئيسية', '🏠']:
+            if phone in ['🏠 القائمة الرئيسية', '🏠'] or phone in {self.tr('main_menu_btn', l) for l in all_langs}:
                 if user_id in self.user_states:
                     del self.user_states[user_id]
                 self.handle_start(message)
                 return
             if len(phone) < 10:
-                self.send_message(chat_id, "❌ رقم هاتف غير صحيح. يرجى إدخال رقم صحيح:")
+                self.send_message(chat_id, self.tr('phone_login_invalid', selected_lang))
                 return
         else:
-            self.send_message(chat_id, "❌ يرجى إرسال رقم هاتفك:")
+            self.send_message(chat_id, self.tr('phone_login_send_prompt', selected_lang))
             return
 
         # البحث عن المستخدم برقم الهاتف
@@ -3252,13 +3270,13 @@ class ComprehensiveDUXBot:
             self.link_telegram_to_user(phone, user_id)
             user = self.find_user(user_id)
             if not user:
-                self.send_message(chat_id, "❌ خطأ في استرجاع الحساب. تواصل مع الدعم.")
+                self.send_message(chat_id, self.tr('phone_login_error', selected_lang))
                 if user_id in self.user_states:
                     del self.user_states[user_id]
                 return
 
             if user.get('is_banned') == 'yes':
-                self.send_message(chat_id, f"❌ تم حظر حسابك\nالسبب: {user.get('ban_reason', 'غير محدد')}")
+                self.send_message(chat_id, self.tr('phone_login_banned', selected_lang, reason=user.get('ban_reason', self.tr('unknown_reason', selected_lang))))
                 if user_id in self.user_states:
                     del self.user_states[user_id]
                 return
@@ -3299,17 +3317,19 @@ class ComprehensiveDUXBot:
         """تسجيل الدخول برقم الهاتف — للمستخدمين الذين لديهم حساب سابق"""
         user_id = message['from']['id']
         chat_id = message['chat']['id']
+        user = self.find_user(user_id)
+        lang = user.get('language', 'ar') if user else 'ar'
         
         login_text = (
-            "🔐 تسجيل الدخول برقم الهاتف\n\n"
-            "📱 شارك رقم هاتفك أو اكتبه يدوياً:\n"
-            "مثال: +966501234567"
+            f"{self.tr('phone_login_title', lang)}\n\n"
+            f"{self.tr('phone_login_share_prompt', lang)}\n"
+            f"{self.tr('phone_login_example', lang)}"
         )
         
         keyboard = {
             'keyboard': [
-                [{'text': '📱 مشاركة رقم الهاتف', 'request_contact': True}],
-                [{'text': '🏠 القائمة الرئيسية'}]
+                [{'text': self.tr('share_phone_btn', lang), 'request_contact': True}],
+                [{'text': self.tr('main_menu_btn', lang)}]
             ],
             'resize_keyboard': True,
             'one_time_keyboard': True
@@ -3322,7 +3342,19 @@ class ComprehensiveDUXBot:
         """معالجة تسجيل الدخول برقم الهاتف"""
         user_id = message['from']['id']
         chat_id = message['chat']['id']
-        
+
+        # فحص أزرار الإلغاء والعودة أولاً
+        text = message.get('text', '').strip()
+        all_langs = self.get_supported_languages()
+        main_menu_texts = {self.tr('main_menu', l) for l in all_langs} | {self.tr('main_menu_btn', l) for l in all_langs} | {'🏠 القائمة الرئيسية', '🏠 الرئيسية', '🏠 Main Menu'}
+        cancel_texts = {'❌ إلغاء', '❌ Cancel', 'الغاء', 'إلغاء'}
+
+        if text in main_menu_texts or text in cancel_texts:
+            if user_id in self.user_states:
+                del self.user_states[user_id]
+            self.handle_start(message)
+            return
+
         # استخراج رقم الهاتف
         if 'contact' in message:
             phone = message['contact']['phone_number']
@@ -3331,19 +3363,22 @@ class ComprehensiveDUXBot:
         elif 'text' in message:
             phone = message['text'].strip()
             if len(phone) < 10:
-                self.send_message(chat_id, "❌ رقم هاتف غير صحيح. يرجى إدخال رقم صحيح:")
+                user = self.find_user(user_id)
+                lang = user.get('language', 'ar') if user else 'ar'
+                self.send_message(chat_id, self.tr('phone_login_invalid', lang))
                 return
         else:
-            self.send_message(chat_id, "❌ يرجى إرسال رقم هاتفك:")
+            self.send_message(chat_id, self.tr('phone_login_send_prompt', lang))
             return
         
         # البحث عن المستخدم برقم الهاتف
         existing_user = self.find_user_by_phone(phone)
         if not existing_user:
+            u = self.find_user(user_id)
+            ul = u.get('language', 'ar') if u else 'ar'
             self.send_message(chat_id,
-                "❌ لم يتم العثور على حساب بهذا الرقم.\n\n"
-                "📝 يمكنك تسجيل حساب جديد بدلاً من ذلك.",
-                self.main_keyboard('ar', user_id))
+                self.tr('phone_login_not_found', ul),
+                self.main_keyboard(ul, user_id))
             if user_id in self.user_states:
                 del self.user_states[user_id]
             return
@@ -3353,7 +3388,7 @@ class ComprehensiveDUXBot:
         user = self.find_user(user_id)
         
         if not user:
-            self.send_message(chat_id, "❌ خطأ في استرجاع الحساب. تواصل مع الدعم.")
+            self.send_message(chat_id, self.tr('phone_login_error', 'ar'))
             if user_id in self.user_states:
                 del self.user_states[user_id]
             return
@@ -3362,19 +3397,19 @@ class ComprehensiveDUXBot:
         
         # التحقق من الحظر
         if user.get('is_banned') == 'yes':
-            ban_reason = user.get('ban_reason', 'غير محدد')
-            self.send_message(chat_id, f"❌ تم حظر حسابك\nالسبب: {ban_reason}")
+            ban_reason = user.get('ban_reason', self.tr('unknown_reason', lang))
+            self.send_message(chat_id, self.tr('phone_login_banned', lang, reason=ban_reason))
             if user_id in self.user_states:
                 del self.user_states[user_id]
             return
         
         welcome_text = (
-            f"✅ تم تسجيل الدخول بنجاح!\n\n"
-            f"👤 الاسم: {user['name']}\n"
-            f"📱 الهاتف: {user['phone']}\n"
-            f"🆔 رقم العميل: {user['customer_id']}\n"
-            f"📅 تاريخ التسجيل: {user.get('date', '')}\n\n"
-            f"💡 تم استرجاع حسابك بكل بياناتك."
+            f"{self.tr('phone_login_success', lang)}\n\n"
+            f"{self.tr('phone_login_name', lang)}: {user['name']}\n"
+            f"{self.tr('phone_login_phone', lang)}: {user['phone']}\n"
+            f"{self.tr('phone_login_customer_id', lang)}: {user['customer_id']}\n"
+            f"{self.tr('phone_login_date', lang)}: {user.get('date', '')}\n\n"
+            f"{self.tr('phone_login_restored', lang)}"
         )
         self.send_message(chat_id, welcome_text, self.main_keyboard(lang, user_id))
         if user_id in self.user_states:
@@ -4303,7 +4338,7 @@ class ComprehensiveDUXBot:
         notifs = self.get_user_notifications(user_id, 10)
         
         if not notifs:
-            self.send_message(message['chat']['id'], "🔔 لا توجد إشعارات", self.main_keyboard(lang, user_id))
+            self.send_message(message['chat']['id'], self.tr('notif_empty', lang), self.main_keyboard(lang, user_id))
             return
         
         type_icons = {
@@ -4313,7 +4348,7 @@ class ComprehensiveDUXBot:
             'code_verified': '✅', 'code_rejected': '❌', 'general': '📋'
         }
         
-        notif_text = "🔔 آخر الإشعارات:\n\n"
+        notif_text = f"{self.tr('notif_recent', lang)}\n\n"
         for n in reversed(notifs):
             icon = type_icons.get(n.get('type', ''), '📋')
             notif_text += f"{icon} {n.get('timestamp', '')}\n{n.get('message_preview', '')}\n\n"
@@ -5102,7 +5137,9 @@ class ComprehensiveDUXBot:
 
     def handle_complaint_start(self, message):
         """بدء عملية الشكوى"""
-        self.send_message(message['chat']['id'], "📨 أرسل شكواك أو استفسارك:")
+        user = self.find_user(message['from']['id'])
+        lang = user.get('language', 'ar') if user else 'ar'
+        self.send_message(message['chat']['id'], self.tr('complaint_prompt_custom', lang))
         self.user_states[message['from']['id']] = 'writing_complaint'
     
     def show_language_selection(self, message):
@@ -9079,12 +9116,14 @@ class ComprehensiveDUXBot:
         
     def show_currency_selection(self, message):
             """عرض قائمة العملات للاختيار"""
-            currency_text = """💱 اختيار العملة
-            
-    اختر العملة المفضلة لديك:
-    (ستؤثر على جميع المعاملات والمبالغ في النظام)
-    
-    💰 العملات المتاحة:"""
+            user = self.find_user(message['from']['id'])
+            lang = user.get('language', 'ar') if user else 'ar'
+            currency_text = (
+                f"{self.tr('currency_select_title', lang)}\n\n"
+                f"    {self.tr('currency_select_prompt', lang)}\n"
+                f"    {self.tr('currency_select_note', lang)}\n\n"
+                f"    {self.tr('currency_available', lang)}"
+            )
             
             keyboard = []
             
@@ -9104,7 +9143,7 @@ class ComprehensiveDUXBot:
                     curr_info = self.currencies[currency]
                     keyboard.append([{'text': f"{curr_info['flag']} {curr_info['name']} ({curr_info['symbol']})"}])
             
-            keyboard.append([{'text': '🔙 العودة للقائمة الرئيسية'}])
+            keyboard.append([{'text': self.tr('back_to_main', lang)}])
             
             reply_keyboard = {
                 'keyboard': keyboard,
@@ -9112,15 +9151,15 @@ class ComprehensiveDUXBot:
                 'one_time_keyboard': True
             }
             
-            # حفظ حالة اختيار العملة
             self.user_states[message['from']['id']] = 'selecting_currency'
-            
             self.send_message(message['chat']['id'], currency_text, reply_keyboard)
         
     def handle_currency_selection(self, message, currency_text):
             """معالجة اختيار العملة"""
             try:
                 user_id = message['from']['id']
+                user = self.find_user(user_id)
+                lang = user.get('language', 'ar') if user else 'ar'
                 
                 # البحث عن العملة المحددة
                 selected_currency = None
@@ -9130,7 +9169,7 @@ class ComprehensiveDUXBot:
                         break
                 
                 if not selected_currency:
-                    self.send_message(message['chat']['id'], "❌ عملة غير صحيحة، يرجى المحاولة مرة أخرى", self.main_keyboard())
+                    self.send_message(message['chat']['id'], self.tr('currency_invalid', lang), self.main_keyboard(lang, user_id))
                     return
                 
                 # تحديث عملة المستخدم
@@ -9143,13 +9182,11 @@ class ComprehensiveDUXBot:
                         if row['telegram_id'] == str(user_id):
                             row['currency'] = selected_currency
                             updated = True
-                        # إضافة العملة للمستخدمين الذين لا يملكونها
                         if 'currency' not in row or not row['currency']:
                             row['currency'] = selected_currency if row['telegram_id'] == str(user_id) else 'SAR'
                         users.append(row)
                 
                 if updated:
-                    # إضافة عمود العملة إذا لم يكن موجوداً
                     fieldnames = ['telegram_id', 'name', 'phone', 'customer_id', 'language', 'date', 'is_banned', 'ban_reason', 'currency']
                     
                     with open('users.csv', 'w', newline='', encoding='utf-8-sig') as f:
@@ -9158,26 +9195,26 @@ class ComprehensiveDUXBot:
                         writer.writerows(users)
                     
                     curr_info = self.currencies[selected_currency]
-                    success_msg = f"""✅ تم تغيير العملة بنجاح!
-                    
-    💰 العملة الجديدة: {curr_info['name']}
-    🔣 الرمز: {curr_info['symbol']}
-    {curr_info['flag']} البلد/المنطقة
-    
-    💡 ستظهر هذه العملة في جميع معاملاتك وطلباتك"""
-                    
-                    self.send_message(message['chat']['id'], success_msg, self.main_keyboard())
+                    success_msg = (
+                        f"{self.tr('currency_changed_success', lang)}\n\n"
+                        f"    {self.tr('currency_new', lang)}: {curr_info['name']}\n"
+                        f"    {self.tr('currency_symbol', lang)}: {curr_info['symbol']}\n"
+                        f"    {curr_info['flag']}\n\n"
+                        f"    {self.tr('currency_hint', lang)}"
+                    )
+                    self.send_message(message['chat']['id'], success_msg, self.main_keyboard(lang, user_id))
                     logger.info(f"تم تغيير عملة المستخدم {user_id} إلى {selected_currency}")
                 else:
-                    self.send_message(message['chat']['id'], "❌ حدث خطأ في تحديث العملة", self.main_keyboard())
+                    self.send_message(message['chat']['id'], self.tr('currency_update_error', lang), self.main_keyboard(lang, user_id))
                 
-                # تنظيف الحالة
                 if user_id in self.user_states:
                     del self.user_states[user_id]
                     
             except Exception as e:
                 logger.error(f"خطأ في تغيير العملة: {e}")
-                self.send_message(message['chat']['id'], "❌ حدث خطأ في تغيير العملة", self.main_keyboard())
+                u = self.find_user(message['from']['id'])
+                ul = u.get('language', 'ar') if u else 'ar'
+                self.send_message(message['chat']['id'], self.tr('currency_change_error', ul), self.main_keyboard(ul, message['from']['id']))
         
     def get_currency_symbol(self, user_currency='SAR'):
             """جلب رمز العملة"""
