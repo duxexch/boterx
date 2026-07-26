@@ -861,9 +861,10 @@ class ComprehensiveDUXBot:
         """عرض لوحة 💎 الاسترداد الذكي"""
         user = self.find_user(message['from']['id'])
         if not user or not self.svrp:
+            lang = 'ar'
             self.send_message(message['chat']['id'],
-                "💎 نظام الاسترداد الذكي غير متاح حالياً.",
-                self.main_keyboard('ar', message['from']['id']))
+                self.tr('svrp_not_available', lang),
+                self.main_keyboard(lang, message['from']['id']))
             return
 
         user_id = message['from']['id']
@@ -880,7 +881,7 @@ class ComprehensiveDUXBot:
         wager_done = int(wallet.get('wagering_completed', 0) or 0)
         group_name = group.get('group_name', 'bronze')
         group_icon = {'bronze': '🥉', 'silver': '🥈', 'gold': '🥇', 'platinum': '💎'}.get(group_name, '🥉')
-        group_ar = {'bronze': 'برونزي', 'silver': 'فضي', 'gold': 'ذهبي', 'platinum': 'بلاتيني'}.get(group_name, 'برونزي')
+        group_ar = {'bronze': 'برونزي' if lang=='ar' else 'Bronze', 'silver': 'فضي' if lang=='ar' else 'Silver', 'gold': 'ذهبي' if lang=='ar' else 'Gold', 'platinum': 'بلاتيني' if lang=='ar' else 'Platinum'}.get(group_name, 'برونزي')
         ref_count = self.svrp.count_referrals_recursive(user_id)
 
         wager_bar_full = '▰' * wager_done
@@ -889,29 +890,29 @@ class ComprehensiveDUXBot:
 
         panel_text = (
             f"╔════════════════════╗\n"
-            f"║  💎 الاسترداد الذكي  ║\n"
+            f"║  {self.tr('svrp_title', lang)}  ║\n"
             f"╚════════════════════╝\n\n"
             f"┌─────────────────────┐\n"
-            f"│  💰 الرصيد المتاح: {balance:.2f}\n"
-            f"│  ⏳ الرصيد المعلق: {pending:.2f}\n"
-            f"│  📈 إجمالي المكتسب: {total_earned:.2f}\n"
-            f"│  📉 إجمالي المستخدم: {total_used:.2f}\n"
+            f"│  {self.tr('svrp_balance_amount', lang, amount=f'{balance:.2f}')}\n"
+            f"│  {self.tr('svrp_pending_amount', lang, amount=f'{pending:.2f}')}\n"
+            f"│  {self.tr('svrp_total_earned_amount', lang, amount=f'{total_earned:.2f}')}\n"
+            f"│  {self.tr('svrp_total_used_amount', lang, amount=f'{total_used:.2f}')}\n"
             f"└─────────────────────┘\n\n"
-            f"🎯 تقدم الرهان:\n  {wager_status}\n"
-            f"{'  ✅ أكملت متطلبات الرهان!' if wager_done >= wager_req else '  ⏳ أكمل معاملات إضافية لتفعيل الأرصدة'}\n\n"
+            f"{self.tr('svrp_wagering_label', lang)}\n  {wager_status}\n"
+            f"  {self.tr('svrp_wagering_done', lang) if wager_done >= wager_req else self.tr('svrp_wagering_pending', lang)}\n\n"
             f"┌─────────────────────┐\n"
-            f"│  {group_icon} المستوى: {group_ar}\n"
-            f"│  👥 الإحالات: {ref_count}\n"
+            f"│  {group_icon} {self.tr('svrp_tier_label', lang)}: {group_ar}\n"
+            f"│  👥 {self.tr('svrp_referrals_count', lang)}: {ref_count}\n"
             f"└─────────────────────┘\n\n"
-            f"📌 اختر من القائمة أدناه 👇"
+            f"{self.tr('svrp_select_option', lang)}"
         )
 
         keyboard = {
             'keyboard': [
-                [{'text': '💎 💰 محفظتي'}, {'text': '💎 📋 مهامي'}],
-                [{'text': '🎟️ أكوادي الترويجية'}, {'text': '➕ إنشاء كود جديد'}],
-                [{'text': '📥 استرداد كود'}, {'text': '🌳 شجرة الإحالات'}],
-                [{'text': '🎖️ مستواي'}, {'text': '🏠 القائمة الرئيسية'}]
+                [{'text': self.tr('svrp_my_wallet', lang)}, {'text': self.tr('svrp_my_tasks', lang)}],
+                [{'text': self.tr('svrp_my_codes', lang)}, {'text': self.tr('svrp_create_code_btn', lang)}],
+                [{'text': self.tr('svrp_redeem_code_btn', lang)}, {'text': self.tr('svrp_referral_tree_btn', lang)}],
+                [{'text': self.tr('svrp_my_tier_btn', lang)}, {'text': self.tr('svrp_main_menu', lang)}]
             ],
             'resize_keyboard': True,
             'one_time_keyboard': False
@@ -925,32 +926,38 @@ class ComprehensiveDUXBot:
         if not user or not self.svrp:
             return
 
+        lang = user.get('language', 'ar')
         wallet = self.svrp.get_wallet(user_id)
         credits = self.svrp.get_user_credits_summary(user_id)
 
+        bal = float(wallet.get('balance', 0) or 0)
+        pend = float(wallet.get('pending_balance', 0) or 0)
+        earned = float(wallet.get('total_earned', 0) or 0)
+        used = float(wallet.get('total_used', 0) or 0)
+
         text = (
             f"╔════════════════════╗\n"
-            f"║  💎 محفظتي  ║\n"
+            f"║  {self.tr('svrp_my_wallet', lang)}  ║\n"
             f"╚════════════════════╝\n\n"
             f"┌─────────────────────┐\n"
-            f"│  💵 الرصيد المتاح: {float(wallet.get('balance', 0) or 0):.2f}\n"
-            f"│  ⏳ الرصيد المعلق: {float(wallet.get('pending_balance', 0) or 0):.2f}\n"
-            f"│  📈 إجمالي المكتسب: {float(wallet.get('total_earned', 0) or 0):.2f}\n"
-            f"│  📉 إجمالي المستخدم: {float(wallet.get('total_used', 0) or 0):.2f}\n"
+            f"│  💵 {self.tr('svrp_balance_amount', lang, amount=f'{bal:.2f}')}\n"
+            f"│  ⏳ {self.tr('svrp_pending_amount', lang, amount=f'{pend:.2f}')}\n"
+            f"│  📈 {self.tr('svrp_total_earned_amount', lang, amount=f'{earned:.2f}')}\n"
+            f"│  📉 {self.tr('svrp_total_used_amount', lang, amount=f'{used:.2f}')}\n"
             f"└─────────────────────┘\n\n"
-            f"📋 أرصدة الاحتفاظ:\n"
-            f"  🟢 نشط: {credits['keep']['active']}\n"
-            f"  🟡 معلق: {credits['keep']['pending']}\n"
-            f"  🔴 مستخدم: {credits['keep']['used']}\n"
-            f"  ⚫ منتهي: {credits['keep']['expired']}\n\n"
-            f"📋 أرصدة المشاركة:\n"
-            f"  🟢 نشط: {credits['shared']['active']}\n"
-            f"  🟡 معلق: {credits['shared']['pending']}\n"
-            f"  🔴 مستخدم: {credits['shared']['used']}\n"
-            f"  ⚫ منتهي: {credits['shared']['expired']}\n\n"
-            f"💡 يمكنك إنشاء كود ترويجي من رصيدك\nأو استرداد كود من صديق."
+            f"📋 {self.tr('svrp_keep_credits', lang)}:\n"
+            f"  🟢 {self.tr('svrp_active', lang)}: {credits['keep']['active']}\n"
+            f"  🟡 {self.tr('svrp_pending_status', lang)}: {credits['keep']['pending']}\n"
+            f"  🔴 {self.tr('svrp_used', lang)}: {credits['keep']['used']}\n"
+            f"  ⚫ {self.tr('svrp_expired', lang)}: {credits['keep']['expired']}\n\n"
+            f"📋 {self.tr('svrp_shared_credits', lang)}:\n"
+            f"  🟢 {self.tr('svrp_active', lang)}: {credits['shared']['active']}\n"
+            f"  🟡 {self.tr('svrp_pending_status', lang)}: {credits['shared']['pending']}\n"
+            f"  🔴 {self.tr('svrp_used', lang)}: {credits['shared']['used']}\n"
+            f"  ⚫ {self.tr('svrp_expired', lang)}: {credits['shared']['expired']}\n\n"
+            f"{self.tr('svrp_wallet_hint', lang)}"
         )
-        self.send_message(message['chat']['id'], text, self.main_keyboard(user.get('language', 'ar'), user_id))
+        self.send_message(message['chat']['id'], text, self.main_keyboard(lang, user_id))
 
     def show_svrp_tasks(self, message):
         """عرض مهام 💎 الاسترداد الذكي"""
@@ -959,26 +966,27 @@ class ComprehensiveDUXBot:
         if not user or not self.svrp:
             return
 
+        lang = user.get('language', 'ar')
         self.svrp.create_daily_tasks(user_id)
         tasks = self.svrp.get_user_tasks(user_id)
 
         if not tasks:
             self.send_message(message['chat']['id'],
-                "📋 لا توجد مهام نشطة اليوم.\nعد لاحقاً!",
-                self.main_keyboard(user.get('language', 'ar'), user_id))
+                self.tr('svrp_no_tasks', lang),
+                self.main_keyboard(lang, user_id))
             return
 
         task_labels = {
-            'deposit_count': 'إيداع',
-            'deposit_amount': 'مبلغ الإيداع',
-            'withdraw_count': 'سحب',
-            'referral_count': 'دعوة صديق'
+            'deposit_count': self.tr('svrp_task_deposit', lang),
+            'deposit_amount': self.tr('svrp_task_deposit_amount', lang),
+            'withdraw_count': self.tr('svrp_task_withdraw', lang),
+            'referral_count': self.tr('svrp_task_referral', lang)
         }
 
         text = (
-            "╔════════════════════╗\n"
-            "║  💎 مهام اليوم  ║\n"
-            "╚════════════════════╝\n\n"
+            f"╔════════════════════╗\n"
+            f"║  💎 {self.tr('svrp_tasks_today', lang)}  ║\n"
+            f"╚════════════════════╝\n\n"
         )
         has_claimable = False
         for t in tasks:
@@ -996,11 +1004,11 @@ class ComprehensiveDUXBot:
                 has_claimable = True
 
         if has_claimable:
-            text += "🎁 لديك مهام مكتملة!\nاكتب: استلام [رقم_المهمة]"
+            text += self.tr('svrp_tasks_claimable', lang)
         else:
-            text += "💡 أكمل معاملاتك لإنجاز المهام!"
+            text += self.tr('svrp_tasks_hint', lang)
 
-        self.send_message(message['chat']['id'], text, self.main_keyboard(user.get('language', 'ar'), user_id))
+        self.send_message(message['chat']['id'], text, self.main_keyboard(lang, user_id))
 
     def show_svrp_promo_codes(self, message):
         """عرض أكواد ترويجية للمستخدم"""
@@ -1009,16 +1017,17 @@ class ComprehensiveDUXBot:
         if not user or not self.svrp:
             return
 
+        lang = user.get('language', 'ar')
         codes = self.svrp.get_user_promo_codes(user_id)
         wallet = self.svrp.get_wallet(user_id)
         balance = float(wallet.get('balance', 0) or 0)
 
         text = (
             f"╔════════════════════╗\n"
-            f"║  🎟️ أكوادي الترويجية  ║\n"
+            f"║  {self.tr('svrp_my_codes', lang)}  ║\n"
             f"╚════════════════════╝\n\n"
             f"┌─────────────────────┐\n"
-            f"│  💰 رصيدك: {balance:.2f}\n"
+            f"│  💰 {self.tr('svrp_your_balance', lang)}: {balance:.2f}\n"
             f"└─────────────────────┘\n\n"
         )
         if codes:
@@ -1027,27 +1036,25 @@ class ComprehensiveDUXBot:
                 uses_full = '▰' * int(int(c.get('used_count', 0)) / max(int(c.get('max_uses', 10)), 1) * 5)
                 uses_empty = '▱' * (5 - len(uses_full))
                 text += (
-                    f"{status_icon} الكود: `{c['code']}`\n"
-                    f"  💵 المبلغ: {c['amount']}\n"
-                    f"  📊 الاستخدام: {uses_full}{uses_empty} ({c.get('used_count', '0')}/{c.get('max_uses', '10')})\n"
-                    f"  ⏰ ينتهي: {c.get('expires_at', '')}\n\n"
+                    f"{status_icon} {self.tr('svrp_code_label', lang)}: `{c['code']}`\n"
+                    f"  💵 {self.tr('svrp_code_amount', lang)}: {c['amount']}\n"
+                    f"  📊 {self.tr('svrp_code_usage', lang)}: {uses_full}{uses_empty} ({c.get('used_count', '0')}/{c.get('max_uses', '10')})\n"
+                    f"  ⏰ {self.tr('svrp_code_expires', lang)}: {c.get('expires_at', '')}\n\n"
                 )
         else:
-            text += "📭 لا توجد أكواد بعد.\n\n"
+            text += f"{self.tr('svrp_no_codes', lang)}\n\n"
 
         text += (
-            "┌─────────────────────┐\n"
-            "│  ➕ لإنشاء كود جديد:  │\n"
-            "│  انشاء_كود [المبلغ]   │\n"
-            "│  مثال: انشاء_كود 100   │\n"
-            "└─────────────────────┘\n\n"
-            "┌─────────────────────┐\n"
-            "│  📥 لاسترداد كود:      │\n"
-            "│  استرداد_كود [الكود]   │\n"
-            "│  مثال: استرداد_كود ABC123 │\n"
-            "└─────────────────────┘"
+            f"┌─────────────────────┐\n"
+            f"│  {self.tr('svrp_create_hint', lang)}  │\n"
+            f"│  انشاء_كود [{self.tr('svrp_code_amount', lang)}]   │\n"
+            f"└─────────────────────┘\n\n"
+            f"┌─────────────────────┐\n"
+            f"│  {self.tr('svrp_redeem_hint', lang)}      │\n"
+            f"│  استرداد_كود [{self.tr('svrp_code_label', lang)}]   │\n"
+            f"└─────────────────────┘"
         )
-        self.send_message(message['chat']['id'], text, self.main_keyboard(user.get('language', 'ar'), user_id))
+        self.send_message(message['chat']['id'], text, self.main_keyboard(lang, user_id))
 
     def show_svrp_referral_tree(self, message):
         """عرض شجرة الإحالات"""
@@ -1056,13 +1063,14 @@ class ComprehensiveDUXBot:
         if not user or not self.svrp:
             return
 
+        lang = user.get('language', 'ar')
         tree = self.svrp.get_referral_tree(user_id)
         total = self.svrp.count_referrals_recursive(user_id)
 
         def render_tree(node, prefix="", is_last=True, depth=0):
             lines = []
             if depth == 0:
-                lines.append(f"🌳 أنا ({node['user_id']})")
+                lines.append(f"🌳 {node['user_id']}")
             else:
                 connector = "└── " if is_last else "├── "
                 status = node.get('status', 'unknown')
@@ -1077,15 +1085,15 @@ class ComprehensiveDUXBot:
 
         tree_lines = render_tree(tree)
         text = (
-            "╔════════════════════╗\n"
-            "║  🌳 شجرة الإحالات  ║\n"
-            "╚════════════════════╝\n\n"
+            f"╔════════════════════╗\n"
+            f"║  {self.tr('svrp_referral_tree_btn', lang)}  ║\n"
+            f"╚════════════════════╝\n\n"
             + "\n".join(tree_lines)
         )
-        text += f"\n\n📊 إجمالي الإحالات: {total}"
-        text += f"\n💡 شارك كود الإحالة الخاص بك لزيادة أرصدتك!"
+        text += f"\n\n📊 {self.tr('svrp_total_referrals', lang)}: {total}"
+        text += f"\n{self.tr('svrp_share_hint', lang)}"
 
-        self.send_message(message['chat']['id'], text, self.main_keyboard(user.get('language', 'ar'), user_id))
+        self.send_message(message['chat']['id'], text, self.main_keyboard(lang, user_id))
 
     def show_svrp_group(self, message):
         """عرض مستوى المستخدم في 💎 الاسترداد الذكي"""
@@ -1094,45 +1102,48 @@ class ComprehensiveDUXBot:
         if not user or not self.svrp:
             return
 
+        lang = user.get('language', 'ar')
         self.svrp.update_user_group(user_id)
         group = self.svrp.get_user_group(user_id)
         group_name = group.get('group_name', 'bronze')
         group_icon = {'bronze': '🥉', 'silver': '🥈', 'gold': '🥇', 'platinum': '💎'}.get(group_name, '🥉')
-        group_ar = {'bronze': 'برونزي', 'silver': 'فضي', 'gold': 'ذهبي', 'platinum': 'بلاتيني'}.get(group_name, 'برونزي')
+        group_ar = {'bronze': 'برونزي' if lang=='ar' else 'Bronze', 'silver': 'فضي' if lang=='ar' else 'Silver', 'gold': 'ذهبي' if lang=='ar' else 'Gold', 'platinum': 'بلاتيني' if lang=='ar' else 'Platinum'}.get(group_name, 'برونزي')
         multiplier = {'bronze': '1.0x', 'silver': '1.2x', 'gold': '1.5x', 'platinum': '2.0x'}.get(group_name, '1.0x')
         score = float(group.get('tier_score', 0) or 0)
 
         text = (
             f"╔════════════════════╗\n"
-            f"║  🎖️ مستواي  ║\n"
+            f"║  {self.tr('svrp_my_tier_btn', lang)}  ║\n"
             f"╚════════════════════╝\n\n"
             f"┌─────────────────────┐\n"
-            f"│  {group_icon} المستوى: {group_ar}\n"
-            f"│  ⭐ النقاط: {score:.0f}\n"
-            f"│  🔢 مضاعف الاسترداد: {multiplier}\n"
+            f"│  {group_icon} {self.tr('svrp_tier_label', lang)}: {group_ar}\n"
+            f"│  ⭐ {self.tr('svrp_tier_points', lang)}: {score:.0f}\n"
+            f"│  🔢 {self.tr('svrp_tier_multiplier', lang)}: {multiplier}\n"
             f"└─────────────────────┘\n\n"
         )
 
         thresholds = [
-            ('🥉 برونزي', 'bronze', 0, '1.0x'),
-            ('🥈 فضي', 'silver', 500, '1.2x'),
-            ('🥇 ذهبي', 'gold', 2000, '1.5x'),
-            ('💎 بلاتيني', 'platinum', 5000, '2.0x'),
+            ('🥉 ' + ('برونزي' if lang=='ar' else 'Bronze'), 'bronze', 0, '1.0x'),
+            ('🥈 ' + ('فضي' if lang=='ar' else 'Silver'), 'silver', 500, '1.2x'),
+            ('🥇 ' + ('ذهبي' if lang=='ar' else 'Gold'), 'gold', 2000, '1.5x'),
+            ('💎 ' + ('بلاتيني' if lang=='ar' else 'Platinum'), 'platinum', 5000, '2.0x'),
         ]
-        text += "📋 المستويات:\n"
+        text += f"📋 {self.tr('svrp_tier_levels', lang)}:\n"
         for label, gname, min_score, mult in thresholds:
-            marker = ' ◀ أنت هنا' if group_name == gname else ''
+            marker = f" {self.tr('svrp_tier_here', lang)}" if group_name == gname else ''
             bar = '▰' * 5 if group_name == gname else '▱' * 5
-            text += f"  {label} {bar} {min_score}+ نقطة ({mult}){marker}\n"
+            text += f"  {label} {bar} {min_score}+ {self.tr('svrp_tier_points', lang)} ({mult}){marker}\n"
 
-        text += "\n💡 أكمل معاملاتك وادعُ أصدقاءك للترقية!"
-        self.send_message(message['chat']['id'], text, self.main_keyboard(user.get('language', 'ar'), user_id))
+        text += f"\n{self.tr('svrp_tier_hint', lang)}"
+        self.send_message(message['chat']['id'], text, self.main_keyboard(lang, user_id))
 
     def handle_svrp_state(self, message, state):
         """معالجة حالات 💎 الاسترداد الذكي"""
         user_id = message['from']['id']
         text = message.get('text', '').strip()
         chat_id = message['chat']['id']
+        user = self.find_user(user_id)
+        lang = user.get('language', 'ar') if user else 'ar'
 
         if text in ['🔙', '🏠 القائمة الرئيسية', '❌ إلغاء', 'الغاء', 'إلغاء']:
             if user_id in self.user_states:
@@ -1144,20 +1155,20 @@ class ComprehensiveDUXBot:
             try:
                 amount = float(text)
                 if amount <= 0:
-                    self.send_message(chat_id, "❌ المبلغ يجب أن يكون أكبر من صفر")
+                    self.send_message(chat_id, self.tr('svrp_invalid_amount_err', lang))
                     return
                 code, err = self.svrp.create_promo_code(user_id, amount)
                 if err:
                     self.send_message(chat_id, f"❌ {err}")
                 else:
                     self.send_message(chat_id,
-                        f"✅ تم إنشاء الكود الترويجي!\n\n"
-                        f"🎟️ الكود: `{code}`\n"
-                        f"💰 المبلغ: {amount}\n"
-                        f"📊 أقصى استخدام: {self.svrp._get_config('promo_code_max_uses')}\n"
-                        f"⏰ ينتهي خلال: {self.svrp._get_config('promo_code_expiry_days')} يوم")
+                        f"{self.tr('svrp_code_created_msg', lang)}\n\n"
+                        f"🎟️ {self.tr('svrp_code_label', lang) if self.tr('svrp_code_label', lang) != 'svrp_code_label' else 'Code'}: `{code}`\n"
+                        f"💰 {self.tr('svrp_code_amount', lang)}: {amount}\n"
+                        f"📊 {self.tr('svrp_max_uses', lang)}: {self.svrp._get_config('promo_code_max_uses')}\n"
+                        f"⏰ {self.tr('svrp_expires_in', lang)}: {self.svrp._get_config('promo_code_expiry_days')} {self.tr('svrp_days', lang)}")
             except ValueError:
-                self.send_message(chat_id, "❌ يرجى إدخال مبلغ رقمي صحيح")
+                self.send_message(chat_id, self.tr('svrp_invalid_number_err', lang))
             if user_id in self.user_states:
                 del self.user_states[user_id]
 
@@ -1173,7 +1184,7 @@ class ComprehensiveDUXBot:
     def show_svrp_admin_panel(self, message):
         """لوحة إدارة 💎 الاسترداد الذكي للأدمن"""
         if not self.svrp:
-            self.send_message(message['chat']['id'], "❌ نظام الاسترداد الذكي غير متاح", self.admin_keyboard())
+            self.send_message(message['chat']['id'], self.tr('svrp_not_available', 'ar'), self.admin_keyboard())
             return
 
         stats = self.svrp.get_svrp_stats()
@@ -2972,30 +2983,40 @@ class ComprehensiveDUXBot:
             self.show_referral_panel(message)
         elif text in svrp_texts:
             self.show_svrp_panel(message)
-        elif text == '💎 💰 محفظتي' and self.svrp:
-            self.show_svrp_wallet(message)
-        elif text == '💎 📋 مهامي' and self.svrp:
-            self.show_svrp_tasks(message)
-        elif text == '🎟️ أكوادي الترويجية' and self.svrp:
-            self.show_svrp_promo_codes(message)
-        elif text == '➕ إنشاء كود جديد' and self.svrp:
-            self.user_states[user_id] = 'svrp_create_promo_'
-            self.send_message(chat_id, "➕ اكتب المبلغ لإنشاء كود ترويجي:\n(مثال: 100)\nأو اكتب 'إلغاء' للعودة)")
-        elif text == '📥 استرداد كود' and self.svrp:
-            self.user_states[user_id] = 'svrp_redeem_promo_'
-            self.send_message(chat_id, "📥 اكتب الكود الترويجي للاسترداد:\n(أو اكتب 'إلغاء' للعودة)")
-        elif text == '🌳 شجرة الإحالات' and self.svrp:
-            self.show_svrp_referral_tree(message)
-        elif text == '🎖️ مستواي' and self.svrp:
-            self.show_svrp_group(message)
-        elif text in help_texts:
-            self.show_help_guide(message)
-        elif text in notif_texts:
-            self.show_user_notifications_panel(message)
-        elif text in match_texts:
-            self.start_matching_flow(message)
-        elif text in currency_texts:
-            self.show_currency_selection(message)
+        elif self.svrp:
+            all_langs = self.get_supported_languages()
+            svrp_wallet_texts = {self.tr('svrp_my_wallet', l) for l in all_langs}
+            svrp_tasks_texts = {self.tr('svrp_my_tasks', l) for l in all_langs}
+            svrp_codes_texts = {self.tr('svrp_my_codes', l) for l in all_langs}
+            svrp_create_texts = {self.tr('svrp_create_code_btn', l) for l in all_langs}
+            svrp_redeem_texts = {self.tr('svrp_redeem_code_btn', l) for l in all_langs}
+            svrp_tree_texts = {self.tr('svrp_referral_tree_btn', l) for l in all_langs}
+            svrp_tier_texts = {self.tr('svrp_my_tier_btn', l) for l in all_langs}
+
+            if text in svrp_wallet_texts:
+                self.show_svrp_wallet(message)
+            elif text in svrp_tasks_texts:
+                self.show_svrp_tasks(message)
+            elif text in svrp_codes_texts:
+                self.show_svrp_promo_codes(message)
+            elif text in svrp_create_texts:
+                self.user_states[user_id] = 'svrp_create_promo_'
+                self.send_message(chat_id, self.tr('svrp_enter_amount_prompt', user_lang))
+            elif text in svrp_redeem_texts:
+                self.user_states[user_id] = 'svrp_redeem_promo_'
+                self.send_message(chat_id, self.tr('svrp_enter_code_prompt', user_lang))
+            elif text in svrp_tree_texts:
+                self.show_svrp_referral_tree(message)
+            elif text in svrp_tier_texts:
+                self.show_svrp_group(message)
+            elif text in help_texts:
+                self.show_help_guide(message)
+            elif text in notif_texts:
+                self.show_user_notifications_panel(message)
+            elif text in match_texts:
+                self.start_matching_flow(message)
+            elif text in currency_texts:
+                self.show_currency_selection(message)
         elif text in register_texts or text == '📝 تسجيل حساب جديد':
             self.start_registration(message)
         elif text == '🔐 تسجيل الدخول برقم الهاتف':
