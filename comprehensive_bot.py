@@ -77,6 +77,8 @@ class ComprehensiveDUXBot:
         
         # نظام الإحالات
         self.init_referral_files()
+        # نظام التطبيقات
+        self.init_app_links_file()
         
         # تنظيف المعاملات القديمة عند الإقلاع
         self.cleanup_old_transactions()
@@ -789,6 +791,73 @@ class ComprehensiveDUXBot:
             with open('user_activity.csv', 'w', newline='', encoding='utf-8-sig') as f:
                 writer = csv.writer(f)
                 writer.writerow(['telegram_id', 'last_login', 'total_transactions', 'total_deposits', 'total_withdrawals', 'rating_avg', 'last_activity'])
+
+    def init_app_links_file(self):
+        """إنشاء ملف التطبيقات"""
+        if not os.path.exists('app_links.csv'):
+            with open('app_links.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.writer(f)
+                writer.writerow(['id', 'name', 'icon_url', 'download_url', 'description', 'is_active', 'created_at'])
+
+    def get_app_links(self):
+        """جلب جميع التطبيقات النشطة"""
+        apps = []
+        try:
+            with open('app_links.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row.get('is_active') == 'yes':
+                        apps.append(row)
+        except:
+            pass
+        return apps
+
+    def get_all_app_links(self):
+        """جلب جميع التطبيقات (للأدمن)"""
+        apps = []
+        try:
+            with open('app_links.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    apps.append(row)
+        except:
+            pass
+        return apps
+
+    def add_app_link(self, name, icon_url, download_url, description=''):
+        """إضافة تطبيق جديد"""
+        app_id = f"APP{str(int(datetime.now().timestamp()))[-6:]}"
+        try:
+            with open('app_links.csv', 'a', newline='', encoding='utf-8-sig') as f:
+                writer = csv.writer(f)
+                writer.writerow([app_id, name, icon_url, download_url, description, 'yes', datetime.now().strftime('%Y-%m-%d %H:%M')])
+            return app_id
+        except Exception as e:
+            logger.error(f"خطأ في إضافة تطبيق: {e}")
+            return None
+
+    def delete_app_link(self, app_id):
+        """حذف تطبيق"""
+        try:
+            rows = []
+            found = False
+            with open('app_links.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                fieldnames = reader.fieldnames
+                for row in reader:
+                    if row['id'] == app_id:
+                        found = True
+                        continue
+                    rows.append(row)
+            if found:
+                with open('app_links.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                    writer = csv.DictWriter(f, fieldnames=fieldnames)
+                    writer.writeheader()
+                    writer.writerows(rows)
+            return found
+        except Exception as e:
+            logger.error(f"خطأ في حذف تطبيق: {e}")
+            return False
     
     def cleanup_old_transactions(self):
         """تنظيف المعاملات المعلقة القديمة (أكثر من 72 ساعة)"""
@@ -853,6 +922,108 @@ class ComprehensiveDUXBot:
             f"{self.tr('referral_hint', lang)}"
         )
         self.send_message(message['chat']['id'], ref_text, self.main_keyboard(lang, message['from']['id']))
+
+    # ==================== 📱 التطبيقات — Panel Methods ====================
+
+    def show_apps_panel(self, message):
+        """عرض لوحة التطبيقات للمستخدم"""
+        user = self.find_user(message['from']['id'])
+        lang = user.get('language', 'ar') if user else 'ar'
+        apps = self.get_app_links()
+
+        if not apps:
+            self.send_message(message['chat']['id'],
+                self.tr('apps_empty', lang),
+                self.main_keyboard(lang, message['from']['id']))
+            return
+
+        # رأس اللوحة
+        text = (
+            f"╔════════════════════╗\n"
+            f"║  {self.tr('apps_title', lang)}  ║\n"
+            f"╚════════════════════╝\n\n"
+            f"📱 {self.tr('apps_count', lang)}: {len(apps)}\n\n"
+        )
+
+        # عرض كل تطبيق بشكل منسق
+        for i, app in enumerate(apps, 1):
+            name = app.get('name', '')
+            icon_url = app.get('icon_url', '')
+            download_url = app.get('download_url', '')
+            desc = app.get('description', '')
+
+            text += (
+                f"┌─────────────────────┐\n"
+                f"│  📱 <b>{name}</b>\n"
+            )
+            if desc:
+                text += f"│  📝 {desc}\n"
+            text += (
+                f"│  🔗 <a href=\"{download_url}\">{self.tr('apps_download', lang)}</a>\n"
+                f"└─────────────────────┘\n\n"
+            )
+
+        text += f"💡 {self.tr('apps_hint', lang)}"
+
+        # إرسال الأيقونة الأولى كصورة إن وجدت
+        first_icon = apps[0].get('icon_url', '') if apps else ''
+        if first_icon and first_icon.startswith('http'):
+            try:
+                self.send_photo(message['chat']['id'], first_icon, text, self.main_keyboard(lang, message['from']['id']))
+                return
+            except:
+                pass
+
+        self.send_message(message['chat']['id'], text, self.main_keyboard(lang, message['from']['id']))
+
+    def send_photo(self, chat_id, photo_url, caption='', keyboard=None):
+        """إرسال صورة مع نص"""
+        data = {
+            'chat_id': chat_id,
+            'photo': photo_url,
+            'parse_mode': 'HTML'
+        }
+        if caption:
+            data['caption'] = caption
+        if keyboard:
+            if isinstance(keyboard, dict):
+                data['reply_markup'] = self.transform_keyboard(keyboard)
+            else:
+                data['reply_markup'] = keyboard
+        return self.api_call('sendPhoto', data)
+
+    # ==================== Admin: Apps Management ====================
+
+    def show_apps_admin_panel(self, message):
+        """لوحة إدارة التطبيقات للأدمن"""
+        apps = self.get_all_app_links()
+
+        text = (
+            f"╔════════════════════╗\n"
+            f"║  📱 إدارة التطبيقات  ║\n"
+            f"╚════════════════════╝\n\n"
+            f"📊 العدد: {len(apps)}\n\n"
+        )
+
+        if apps:
+            for app in apps:
+                status_icon = '✅' if app.get('is_active') == 'yes' else '⏸️'
+                text += (
+                    f"{status_icon} <b>{app['name']}</b>\n"
+                    f"  🆔 {app['id']}\n"
+                    f"  🔗 {app.get('download_url', '')}\n"
+                    f"  📅 {app.get('created_at', '')}\n\n"
+                )
+        else:
+            text += "📭 لا توجد تطبيقات بعد.\n\n"
+
+        text += "➕ لإضافة تطبيق، اكتب:\nاضافة_تطبيق [الاسم] | [رابط_الأيقونة] | [رابط_التحميل] | [الوصف]\n\n"
+        text += "🗑️ للحذف: حذف_تطبيق [المعرف]\n"
+        text += "📋 لعرض التطبيقات: عرض_تطبيقات"
+
+        self.send_message(message['chat']['id'], text, self.admin_keyboard())
+
+    # ==================== End 📱 التطبيقات ====================
 
     # ==================== 💎 الاسترداد الذكي — Panel Methods ====================
 
@@ -1681,6 +1852,7 @@ class ComprehensiveDUXBot:
         ref_btn = self.tr('referral_btn', lang) if self.tr('referral_btn', lang) != 'referral_btn' else f"{t.get('btn_referral', '🎁')} إحالة"
         help_btn = self.tr('help_btn_label', lang) if self.tr('help_btn_label', lang) != 'help_btn_label' else f"{t.get('btn_help', '❓')} مساعدة"
         svrp_btn = self.tr('svrp_title', lang)
+        apps_btn = self.tr('apps_btn', lang) if self.tr('apps_btn', lang) != 'apps_btn' else '📱 تطبيقات'
 
         lang_names = self.get_language_names()
         lang_btn_text = f"{t.get('btn_language', '🌐')} {lang_names.get(lang, {}).get('native', 'Language')}"
@@ -1693,12 +1865,15 @@ class ComprehensiveDUXBot:
             [{'text': requests_btn}, {'text': profile_btn}],
             # الصف 3: شكوى + دعم
             [{'text': complaint_btn}, {'text': support_btn}],
-            # الصف 4: مطابقة + العملة
+            # الصف 4: مطابقة + الإشعارات
             [{'text': match_btn}, {'text': notif_btn}],
+            # الصف 5: استرداد + إحالة
             [{'text': svrp_btn}, {'text': ref_btn}],
-            [{'text': help_btn}, {'text': currency_btn}],
-            [{'text': lang_btn_text}],
-            # الصف 6: إعادة تعيين (منفصل لأنه إجراء طوارئ)
+            # الصف 6: تطبيقات + مساعدة
+            [{'text': apps_btn}, {'text': help_btn}],
+            # الصف 7: العملة + اللغة
+            [{'text': currency_btn}, {'text': lang_btn_text}],
+            # الصف 8: إعادة تعيين (منفصل لأنه إجراء طوارئ)
             [{'text': reset_btn}],
         ]
         
@@ -1734,12 +1909,13 @@ class ComprehensiveDUXBot:
             [{'text': '📨 الشكاوى'}, {'text': '🛠️ بيانات الدعم'}],
             # المجموعة 7: الإعدادات والثيمات
             [{'text': '⚙️ الإعدادات'}, {'text': '🎨 الثيمات'}, {'text': '📍 العناوين'}],
+            # المجموعة 7b: التطبيقات
+            [{'text': '📱 التطبيقات'}, {'text': '💎 استرداد ذكي'}, {'text': '📋 أوامر سريعة'}],
             # المجموعة 8: الأدمن والأدوار
             [{'text': '👥 المديرين'}, {'text': '✏️ الأزرار'}],
             # المجموعة 9: الحماية والنسخ
             [{'text': '🔔 الإشعارات'}, {'text': '💾 نسخة احتياطية'}],
-            # المجموعة 10: 💎 الاسترداد الذكي
-            [{'text': '💎 استرداد ذكي'}, {'text': '📋 أوامر سريعة'}],
+            # المجموعة 10: (تم دمجها في المجموعة 7b)
             # صف منفصل: إجراءات المستخدم
             [{'text': '🚫 حظر مستخدم'}, {'text': '✅ إلغاء حظر'}],
             # صف منفصل: إعادة تعيين + الرئيسية
@@ -3023,6 +3199,7 @@ class ComprehensiveDUXBot:
         ref_texts = {self.tr('referral_btn', l) for l in all_langs} | {'🎁 إحالة', '🎁 Referral'}
         help_texts = {self.tr('help_btn_label', l) for l in all_langs} | {'❓ مساعدة', '❓ Help'}
         svrp_texts = {self.tr('svrp_title', l) for l in all_langs} | {'💎 استرداد ذكي', '💎 استرداد'}
+        apps_texts = {self.tr('apps_btn', l) for l in all_langs} | {'📱 تطبيقات', '📱 Apps'}
         register_texts = {self.tr('register_account', l) for l in self.get_supported_languages()}
         register_texts.add('📝 تسجيل حساب جديد')
         reset_texts = {self.tr('reset_system', l) for l in self.get_supported_languages()}
@@ -3052,6 +3229,8 @@ class ComprehensiveDUXBot:
             self.show_referral_panel(message)
         elif text in svrp_texts:
             self.show_svrp_panel(message)
+        elif text in apps_texts:
+            self.show_apps_panel(message)
         elif self.svrp:
             all_langs = self.get_supported_languages()
             svrp_wallet_texts = {self.tr('svrp_my_wallet', l) for l in all_langs}
@@ -3776,6 +3955,36 @@ class ComprehensiveDUXBot:
             self.show_quick_copy_commands(message)
         elif text == '💎 استرداد ذكي' and self.svrp:
             self.show_svrp_admin_panel(message)
+        elif text == '📱 التطبيقات':
+            self.show_apps_admin_panel(message)
+        elif text.startswith('اضافة_تطبيق '):
+            # تنسيق: اضافة_تطبيق الاسم | رابط_الأيقونة | رابط_التحميل | الوصف
+            parts = text.replace('اضافة_تطبيق ', '', 1).split('|')
+            if len(parts) >= 3:
+                name = parts[0].strip()
+                icon_url = parts[1].strip()
+                download_url = parts[2].strip()
+                desc = parts[3].strip() if len(parts) > 3 else ''
+                app_id = self.add_app_link(name, icon_url, download_url, desc)
+                if app_id:
+                    self.send_message(message['chat']['id'],
+                        f"✅ تم إضافة التطبيق!\n\n📱 الاسم: {name}\n🆔 {app_id}\n🔗 {download_url}",
+                        self.admin_keyboard())
+                else:
+                    self.send_message(message['chat']['id'], "❌ فشل في إضافة التطبيق", self.admin_keyboard())
+            else:
+                self.send_message(message['chat']['id'],
+                    "❌ الصيغة: اضافة_تطبيق الاسم | رابط_الأيقونة | رابط_التحميل | الوصف\n"
+                    "مثال: اضافة_تطبيق تطبيق المال | https://icon.png | https://download.com | وصف قصير",
+                    self.admin_keyboard())
+        elif text.startswith('حذف_تطبيق '):
+            app_id = text.replace('حذف_تطبيق ', '').strip()
+            if self.delete_app_link(app_id):
+                self.send_message(message['chat']['id'], f"✅ تم حذف التطبيق {app_id}", self.admin_keyboard())
+            else:
+                self.send_message(message['chat']['id'], f"❌ لم يتم العثور على التطبيق {app_id}", self.admin_keyboard())
+        elif text == 'عرض_تطبيقات':
+            self.show_apps_admin_panel(message)
         elif text == '📧 رسالة لعميل':
             self.start_send_user_message(message)
         elif text == '🔔 الإشعارات':

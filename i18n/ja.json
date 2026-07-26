@@ -235,5 +235,11 @@
   "notif_btn": "🔔 通知",
   "referral_btn": "🎁 紹介",
   "help_btn_label": "❓ ヘルプ",
-  "admin_panel_btn": "🔧 Admin"
+  "admin_panel_btn": "🔧 Admin",
+  "apps_btn": "📱 アプリ",
+  "apps_title": "📱 アプリケーション",
+  "apps_empty": "📭 現在利用可能なアプリはありません。",
+  "apps_count": "アプリ数",
+  "apps_download": "アプリをダウンロード",
+  "apps_hint": "ダウンロードリンクをクリック"
 }

@@ -235,5 +235,11 @@
   "notif_btn": "🔔 通知",
   "referral_btn": "🎁 推荐",
   "help_btn_label": "❓ 帮助",
-  "admin_panel_btn": "🔧 Admin"
+  "admin_panel_btn": "🔧 Admin",
+  "apps_btn": "📱 应用",
+  "apps_title": "📱 应用程序",
+  "apps_empty": "📭 目前没有可用的应用。",
+  "apps_count": "应用数量",
+  "apps_download": "下载应用",
+  "apps_hint": "点击下载链接"
 }

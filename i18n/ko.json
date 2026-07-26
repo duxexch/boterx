@@ -235,5 +235,11 @@
   "notif_btn": "🔔 알림",
   "referral_btn": "🎁 추천",
   "help_btn_label": "❓ 도움말",
-  "admin_panel_btn": "🔧 Admin"
+  "admin_panel_btn": "🔧 Admin",
+  "apps_btn": "📱 앱",
+  "apps_title": "📱 애플리케이션",
+  "apps_empty": "📭 현재 사용 가능한 앱이 없습니다.",
+  "apps_count": "앱 수",
+  "apps_download": "앱 다운로드",
+  "apps_hint": "다운로드 링크를 클릭하세요"
 }

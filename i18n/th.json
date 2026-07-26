@@ -235,5 +235,11 @@
   "notif_btn": "🔔 การแจ้งเตือน",
   "referral_btn": "🎁 แนะนำ",
   "help_btn_label": "❓ ช่วยเหลือ",
-  "admin_panel_btn": "🔧 Admin"
+  "admin_panel_btn": "🔧 Admin",
+  "apps_btn": "📱 แอป",
+  "apps_title": "📱 แอปพลิเคชัน",
+  "apps_empty": "📭 ไม่มีแอปที่พร้อมใช้งานในขณะนี้",
+  "apps_count": "จำนวนแอป",
+  "apps_download": "ดาวน์โหลดแอป",
+  "apps_hint": "คลิกลิงก์ดาวน์โหลด"
 }

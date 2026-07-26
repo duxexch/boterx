@@ -235,5 +235,11 @@
   "notif_btn": "🔔 اطلاعات",
   "referral_btn": "🎁 ریفرل",
   "help_btn_label": "❓ مدد",
-  "admin_panel_btn": "🔧 Admin"
+  "admin_panel_btn": "🔧 Admin",
+  "apps_btn": "📱 ایپس",
+  "apps_title": "📱 ایپلیکیشنز",
+  "apps_empty": "📭 اس وقت کوئی ایپس دستیاب نہیں ہیں۔",
+  "apps_count": "ایپس کی تعداد",
+  "apps_download": "ایپ ڈاؤن لوڈ کریں",
+  "apps_hint": "ڈاؤن لوڈ لنک پر کلک کریں"
 }

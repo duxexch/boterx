@@ -235,5 +235,11 @@
   "notif_btn": "🔔 Notifiche",
   "referral_btn": "🎁 Referral",
   "help_btn_label": "❓ Aiuto",
-  "admin_panel_btn": "🔧 Admin"
+  "admin_panel_btn": "🔧 Admin",
+  "apps_btn": "📱 App",
+  "apps_title": "📱 Applicazioni",
+  "apps_empty": "📭 Nessuna app disponibile al momento.",
+  "apps_count": "Numero di app",
+  "apps_download": "Scarica App",
+  "apps_hint": "Clicca sul link di download"
 }

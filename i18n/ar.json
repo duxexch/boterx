@@ -235,5 +235,11 @@
   "notif_btn": "🔔 إشعاراتي",
   "referral_btn": "🎁 إحالة",
   "help_btn_label": "❓ مساعدة",
-  "admin_panel_btn": "🔧 لوحة الإدارة"
+  "admin_panel_btn": "🔧 لوحة الإدارة",
+  "apps_btn": "📱 تطبيقات",
+  "apps_title": "📱 التطبيقات",
+  "apps_empty": "📭 لا توجد تطبيقات متاحة حالياً.",
+  "apps_count": "عدد التطبيقات",
+  "apps_download": "تحميل التطبيق",
+  "apps_hint": "اضغط على رابط التحميل لتنزيل التطبيق"
 }

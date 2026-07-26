@@ -235,5 +235,11 @@
   "notif_btn": "🔔 اعلان ها",
   "referral_btn": "🎁 معرفی",
   "help_btn_label": "❓ راهنما",
-  "admin_panel_btn": "🔧 Admin"
+  "admin_panel_btn": "🔧 Admin",
+  "apps_btn": "📱 اپلیکیشن‌ها",
+  "apps_title": "📱 اپلیکیشن‌ها",
+  "apps_empty": "📭 در حال حاضر هیچ اپلیکیشنی موجود نیست.",
+  "apps_count": "تعداد اپلیکیشن‌ها",
+  "apps_download": "دانلود اپلیکیشن",
+  "apps_hint": "برای دانلود روی لینک کلیک کنید"
 }

@@ -235,5 +235,11 @@
   "notif_btn": "🔔 Bildirimler",
   "referral_btn": "🎁 Davet",
   "help_btn_label": "❓ Yardım",
-  "admin_panel_btn": "🔧 Admin"
+  "admin_panel_btn": "🔧 Admin",
+  "apps_btn": "📱 Uygulamalar",
+  "apps_title": "📱 Uygulamalar",
+  "apps_empty": "📭 Şu anda kullanılabilir uygulama yok.",
+  "apps_count": "Uygulama sayısı",
+  "apps_download": "Uygulamayı İndir",
+  "apps_hint": "İndirme bağlantısına tıklayın"
 }

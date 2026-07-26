@@ -235,5 +235,11 @@
   "notif_btn": "🔔 Notifikasi",
   "referral_btn": "🎁 Referral",
   "help_btn_label": "❓ Bantuan",
-  "admin_panel_btn": "🔧 Admin"
+  "admin_panel_btn": "🔧 Admin",
+  "apps_btn": "📱 Aplikasi",
+  "apps_title": "📱 Aplikasi",
+  "apps_empty": "📭 Tidak ada aplikasi yang tersedia saat ini.",
+  "apps_count": "Jumlah aplikasi",
+  "apps_download": "Unduh Aplikasi",
+  "apps_hint": "Klik tautan unduhan"
 }
