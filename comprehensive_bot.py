@@ -1488,12 +1488,20 @@ class ComprehensiveDUXBot:
 
     def show_svrp_admin_panel(self, message):
         """لوحة إدارة 💎 الاسترداد الذكي — إدارة كاملة بأزرار inline"""
+        admin_user = self.find_user(message['from']['id'])
+        admin_lang = admin_user.get('language', 'ar') if admin_user else 'ar'
+
         if not self.svrp:
-            self.send_message(message['chat']['id'], self.tr('svrp_not_available', 'ar'), self.admin_keyboard(admin_lang))
+            self.send_message(message['chat']['id'], self.tr('svrp_not_available', admin_lang), self.admin_keyboard(admin_lang))
             return
 
         stats = self.svrp.get_svrp_stats()
-        config = self.svrp.SVRP_CONFIG
+        # قراءة الإعدادات عبر _get_config
+        config = {}
+        for key in ['recovery_multiplier', 'max_recovery_cap', 'credit_expiry_days',
+                     'wagering_requirement', 'promo_code_max_uses',
+                     'promo_code_expiry_days', 'max_recovery_per_month']:
+            config[key] = self.svrp._get_config(key)
 
         text = (
             f"╔════════════════════╗\n"
@@ -1607,7 +1615,9 @@ class ComprehensiveDUXBot:
 
     def svrp_admin_edit_settings(self, chat_id):
         """تعديل إعدادات الاسترداد الذكي"""
-        config = self.svrp.SVRP_CONFIG
+        config_keys = ['recovery_multiplier', 'max_recovery_cap', 'credit_expiry_days',
+                       'wagering_requirement', 'promo_code_max_uses',
+                       'promo_code_expiry_days', 'max_recovery_per_month']
         text = (
             "╔════════════════════╗\n"
             "║  ⚙️ إعدادات الاسترداد  ║\n"
@@ -1615,15 +1625,11 @@ class ComprehensiveDUXBot:
             "للتعديل، اكتب الأمر التالي:\n"
             "تعديل_استرداد [المفتاح] [القيمة]\n\n"
             "المفاتيح المتاحة:\n"
-            f"  • recovery_multiplier = {config['recovery_multiplier']} (مضاعف الاسترداد)\n"
-            f"  • max_recovery_cap = {config['max_recovery_cap']} (الحد الأقصى لكل حدث)\n"
-            f"  • credit_expiry_days = {config['credit_expiry_days']} (مدة انتهاء الرصيد)\n"
-            f"  • wagering_requirement = {config['wagering_requirement']} (متطلبات الرهان)\n"
-            f"  • promo_code_max_uses = {config['promo_code_max_uses']} (حد استخدام الكود)\n"
-            f"  • promo_code_expiry_days = {config['promo_code_expiry_days']} (مدة انتهاء الكود)\n"
-            f"  • max_recovery_per_month = {config['max_recovery_per_month']} (الحد الشهري)\n\n"
-            "مثال: تعديل_استرداد recovery_multiplier 3.0"
         )
+        for key in config_keys:
+            val = self.svrp._get_config(key)
+            text += f"  • {key} = {val}\n"
+        text += "\nمثال: تعديل_استرداد recovery_multiplier 3.0"
         inline_btns = [[{'text': '🔙 العودة', 'callback_data': 'svrp_admin_back'}]]
         self.send_inline_message(chat_id, text, inline_btns)
 
@@ -4365,15 +4371,18 @@ class ComprehensiveDUXBot:
                 key = parts[0].strip()
                 try:
                     val = parts[1].strip()
-                    if key in self.svrp.SVRP_CONFIG:
-                        old_val = self.svrp.SVRP_CONFIG[key]
-                        # تحويل النوع
-                        if isinstance(old_val, float):
-                            self.svrp.SVRP_CONFIG[key] = float(val)
-                        elif isinstance(old_val, int):
-                            self.svrp.SVRP_CONFIG[key] = int(val)
+                    old_val = self.svrp._get_config(key)
+                    if old_val != 0 or key in ['recovery_multiplier', 'max_recovery_cap', 'credit_expiry_days',
+                                               'wagering_requirement', 'promo_code_max_uses',
+                                               'promo_code_expiry_days', 'max_recovery_per_month']:
+                        # تحديث القيمة في SVRP_CONFIG
+                        from svrp import SVRP_CONFIG
+                        if isinstance(SVRP_CONFIG.get(key), float):
+                            SVRP_CONFIG[key] = float(val)
+                        elif isinstance(SVRP_CONFIG.get(key), int):
+                            SVRP_CONFIG[key] = int(val)
                         else:
-                            self.svrp.SVRP_CONFIG[key] = val
+                            SVRP_CONFIG[key] = val
                         self.send_message(message['chat']['id'],
                             f"✅ تم تحديث الإعداد!\n\n{key}: {old_val} → {val}",
                             self.admin_keyboard(admin_lang))
