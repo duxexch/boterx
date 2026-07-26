@@ -1591,6 +1591,47 @@ class ComprehensiveDUXBot:
         theme = self.get_current_theme()
         return theme.get(key, '')
 
+    def fmt_deposit_amount(self, amount, currency=''):
+        """تنسيق مبلغ إيداع — أخضر + Bold + Code"""
+        emoji = self.get_theme_emoji('color_deposit') or '🟢'
+        cur = f' {currency}' if currency else ''
+        return f"{emoji} <b><code>{amount}</code></b>{cur}"
+
+    def fmt_withdraw_amount(self, amount, currency=''):
+        """تنسيق مبلغ سحب — أحمر + Bold + Code"""
+        emoji = self.get_theme_emoji('color_withdraw') or '🔴'
+        cur = f' {currency}' if currency else ''
+        return f"{emoji} <b><code>{amount}</code></b>{cur}"
+
+    def fmt_success(self, text):
+        """تنسيق رسالة نجاح — أخضر + Bold"""
+        emoji = self.get_theme_emoji('color_success') or '🟢'
+        return f"{emoji} <b>{text}</b>"
+
+    def fmt_error(self, text):
+        """تنسيق رسالة خطأ — أحمر + Bold"""
+        emoji = self.get_theme_emoji('color_error') or '🔴'
+        return f"{emoji} <b>{text}</b>"
+
+    def fmt_info(self, text):
+        """تنسيق رسالة معلومات — أزرق"""
+        emoji = self.get_theme_emoji('color_info') or '🔵'
+        return f"{emoji} {text}"
+
+    def fmt_warning(self, text):
+        """تنسيق رسالة تحذير — أصفر"""
+        emoji = self.get_theme_emoji('color_warning') or '🟡'
+        return f"{emoji} {text}"
+
+    def fmt_amount(self, amount, trans_type='deposit', currency=''):
+        """تنسيق مبلغ حسب نوع المعاملة"""
+        if trans_type == 'deposit':
+            return self.fmt_deposit_amount(amount, currency)
+        elif trans_type == 'withdraw':
+            return self.fmt_withdraw_amount(amount, currency)
+        else:
+            return f"<b><code>{amount}</code></b> {currency}".strip()
+
     def save_setting(self, key, value):
         """حفظ أو تحديث إعداد في system_settings.csv"""
         rows = []
@@ -2271,7 +2312,7 @@ class ComprehensiveDUXBot:
                 customer_id=user['customer_id'],
                 company_name=f"{company_icon} {company_name}",
                 wallet_number=wallet_number,
-                amount=self.format_amount_with_currency(amount, user_currency) + method_name_display,
+                amount=self.fmt_deposit_amount(amount, user_currency) + method_name_display,
                 date=datetime.now().strftime('%Y-%m-%d %H:%M')
             )
             
@@ -2579,7 +2620,7 @@ class ComprehensiveDUXBot:
                 pending_msg = self.tr('withdraw_success', lang,
                     trans_id=trans_id, name=user['name'], customer_id=user['customer_id'],
                     company_name=company_name, wallet_number=wallet_number,
-                    amount=self.format_amount_with_currency(amount, user_currency),
+                    amount=self.fmt_withdraw_amount(amount, user_currency),
                     withdrawal_address=withdrawal_address,
                     confirmation_code=confirmation_code,
                     date=datetime.now().strftime('%Y-%m-%d %H:%M'))
@@ -2663,17 +2704,17 @@ class ComprehensiveDUXBot:
                         status_emoji = "⏳" if row['status'] == 'pending' else "✅" if row['status'] == 'approved' else "❌"
                         type_emoji = "💰" if row['type'] == 'deposit' else "💸"
                         
-                        transactions_text += f"{status_emoji} {type_emoji} {row['id']}\n"
+                        transactions_text += f"{status_emoji} {type_emoji} <b>{row['id']}</b>\n"
                         transactions_text += f"🏢 {row['company']}\n"
-                        transactions_text += f"💰 {row['amount']} {user_currency}\n"
+                        transactions_text += f"{self.fmt_amount(row['amount'], row['type'], user_currency)}\n"
                         transactions_text += f"📅 {row['date']}\n"
                         
                         if row['status'] == 'rejected' and row.get('admin_note'):
-                            transactions_text += f"{self.tr('transactions_reason', lang)}: {row['admin_note']}\n"
+                            transactions_text += f"{self.fmt_error(self.tr('transactions_reason', lang) + ': ' + row['admin_note'])}\n"
                         elif row['status'] == 'approved':
-                            transactions_text += f"{self.tr('transactions_approved', lang)}\n"
+                            transactions_text += f"{self.fmt_success(self.tr('transactions_approved', lang))}\n"
                         elif row['status'] == 'pending':
-                            transactions_text += f"{self.tr('transactions_pending', lang)}\n"
+                            transactions_text += f"{self.fmt_warning(self.tr('transactions_pending', lang))}\n"
                         
                         transactions_text += "\n"
         except:
@@ -3937,7 +3978,7 @@ class ComprehensiveDUXBot:
                         pending_text += f"👤 {row['name']} ({row['customer_id']})\n"
                         pending_text += f"🏢 {row['company']}\n"
                         pending_text += f"💳 {row['wallet_number']}\n"
-                        pending_text += f"💰 {row['amount']}\n"
+                        pending_text += f"{self.fmt_amount(row['amount'], row.get('type', 'deposit'))}\n"
                         
                         if row.get('exchange_address'):
                             pending_text += f"📍 {row['exchange_address']}\n"
@@ -4046,9 +4087,10 @@ class ComprehensiveDUXBot:
                                     transaction.get('currency', 'SAR')
                                 )
                                 if result:
+                                    credit_str = f"{result['total_credit']:.2f} {result['currency']}"
                                     svrp_msg = (
                                         f"{self.tr('svrp_recovery_activated', lang)}\n\n"
-                                        f"💰 {self.tr('svrp_recovery_credit', lang)}: {result['total_credit']:.2f} {result['currency']}\n"
+                                        f"{self.fmt_success(self.tr('svrp_recovery_credit', lang) + ': ' + credit_str)}\n"
                                         f"📥 {self.tr('svrp_recovery_keep', lang)}: {result['keep_amount']:.2f}\n"
                                         f"📤 {self.tr('svrp_recovery_share', lang)}: {result['share_amount']:.2f}\n\n"
                                         f"📋 {self.tr('svrp_recovery_requirements', lang)}:\n"
@@ -4845,7 +4887,7 @@ class ComprehensiveDUXBot:
                         confirmation_text = self.tr('withdraw_success', lang,
                             trans_id=trans_id, name=user['name'], customer_id=user['customer_id'],
                             company_name=company_name, wallet_number=wallet_number,
-                            amount=self.format_amount_with_currency(amount, user_currency),
+                            amount=self.fmt_withdraw_amount(amount, user_currency),
                             withdrawal_address=withdrawal_address,
                             confirmation_code=confirmation_code,
                             date=datetime.now().strftime('%Y-%m-%d %H:%M'))

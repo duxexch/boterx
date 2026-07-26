@@ -21,11 +21,18 @@ THEMES = {
         'bar_empty': '▱',
         # فاصل
         'separator': '▫️▫️▫️▫️▫️▫️▫️▫️▫️▫️',
-        # ألوان الحالة (إيموجي)
+        # ألوان الحالة (إيموجي ملونة)
         'status_active': '🟢',
         'status_pending': '🟡',
         'status_used': '🔴',
         'status_expired': '⚫',
+        # ألوان المعاملات
+        'color_deposit': '🟢',     # إيداع = أخضر
+        'color_withdraw': '🔴',    # سحب = أحمر
+        'color_success': '🟢',     # نجاح = أخضر
+        'color_error': '🔴',       # خطأ = أحمر
+        'color_info': '🔵',        # معلومات = أزرق
+        'color_warning': '🟡',     # تحذير = أصفر
         # أزرار رئيسية
         'btn_deposit': '💰',
         'btn_withdraw': '💸',
@@ -83,6 +90,12 @@ THEMES = {
         'status_pending': '🟡',
         'status_used': '🔴',
         'status_expired': '⚪',
+        'color_deposit': '🟢',
+        'color_withdraw': '🔴',
+        'color_success': '🟢',
+        'color_error': '🔴',
+        'color_info': '🔵',
+        'color_warning': '🟡',
         'btn_deposit': '💵',
         'btn_withdraw': '📤',
         'btn_requests': '📄',
@@ -137,6 +150,12 @@ THEMES = {
         'status_pending': '💛',
         'status_used': '💔',
         'status_expired': '🖤',
+        'color_deposit': '🟢',
+        'color_withdraw': '🔴',
+        'color_success': '🟢',
+        'color_error': '🔴',
+        'color_info': '💜',
+        'color_warning': '💛',
         'btn_deposit': '💠',
         'btn_withdraw': '🔮',
         'btn_requests': '📜',
