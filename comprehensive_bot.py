@@ -30,6 +30,13 @@ try:
 except ImportError:
     SVRP_AVAILABLE = False
 
+# استيراد نظام الثيمات
+try:
+    from theme_config import THEMES, get_theme, get_theme_list, get_theme_value
+    THEME_AVAILABLE = True
+except ImportError:
+    THEME_AVAILABLE = False
+
 # تحميل ملف .env من نفس المجلد
 load_dotenv(".env")
 
@@ -1572,9 +1579,55 @@ class ComprehensiveDUXBot:
         except:
             pass
         return None
+
+    def get_current_theme(self):
+        """الحصول على الثيم النشط حالياً"""
+        theme_name = self.get_setting('active_theme') or 'gold'
+        if THEME_AVAILABLE:
+            return get_theme(theme_name)
+        return {}
+
+    def get_theme_emoji(self, key):
+        """الحصول على إيموجي من الثيم النشط"""
+        theme = self.get_current_theme()
+        return theme.get(key, '')
+
+    def save_setting(self, key, value):
+        """حفظ أو تحديث إعداد في system_settings.csv"""
+        rows = []
+        found = False
+        try:
+            with open('system_settings.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                fieldnames = reader.fieldnames or ['setting_key', 'setting_value', 'updated_at']
+                for row in reader:
+                    if row.get('setting_key') == key:
+                        row['setting_value'] = value
+                        if 'updated_at' in row:
+                            row['updated_at'] = datetime.now().strftime('%Y-%m-%d %H:%M')
+                        found = True
+                    rows.append(row)
+        except:
+            fieldnames = ['setting_key', 'setting_value', 'updated_at']
+
+        if not found:
+            rows.append({
+                'setting_key': key,
+                'setting_value': value,
+                'updated_at': datetime.now().strftime('%Y-%m-%d %H:%M')
+            })
+
+        with open('system_settings.csv', 'w', newline='', encoding='utf-8-sig') as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            for row in rows:
+                writer.writerow({k: row.get(k, '') for k in fieldnames})
     
     def main_keyboard(self, lang='ar', user_id=None):
         """القائمة الرئيسية — تصميم أنيق وعملي مع أزرار Reply"""
+        # استخدام إيموجي الثيم النشط
+        t = self.get_current_theme() if THEME_AVAILABLE else {}
+        
         deposit_btn = self.tr('deposit', lang)
         withdraw_btn = self.tr('withdraw', lang)
         requests_btn = self.tr('my_requests', lang)
@@ -1583,14 +1636,14 @@ class ComprehensiveDUXBot:
         support_btn = self.tr('support', lang)
         currency_btn = self.tr('change_currency', lang)
         reset_btn = self.tr('reset_system', lang)
-        match_btn = '🔄 مطابقة'
-        notif_btn = '🔔 إشعاراتي'
-        ref_btn = '🎁 إحالة'
-        help_btn = '❓ مساعدة'
-        svrp_btn = '💎 استرداد ذكي'
+        match_btn = f"{t.get('btn_match', '🔄')} مطابقة"
+        notif_btn = f"{t.get('btn_notifications', '🔔')} إشعاراتي"
+        ref_btn = f"{t.get('btn_referral', '🎁')} إحالة"
+        help_btn = f"{t.get('btn_help', '❓')} مساعدة"
+        svrp_btn = f"{t.get('btn_recovery', '💎')} استرداد ذكي"
 
         lang_names = self.get_language_names()
-        lang_btn_text = f"🌐 {lang_names.get(lang, {}).get('native', 'Language')}"
+        lang_btn_text = f"{t.get('btn_language', '🌐')} {lang_names.get(lang, {}).get('native', 'Language')}"
         
         # تصميم صفوف أنيقة: أزرار رئيسية كبيرة في الأعلى، إعدادات أسفل
         keyboard = [
@@ -1639,8 +1692,8 @@ class ComprehensiveDUXBot:
             [{'text': '📢 إرسال جماعي'}, {'text': '📧 رسالة لعميل'}],
             # المجموعة 6: الشكاوى والدعم
             [{'text': '📨 الشكاوى'}, {'text': '🛠️ بيانات الدعم'}],
-            # المجموعة 7: الإعدادات
-            [{'text': '⚙️ الإعدادات'}, {'text': '📍 العناوين'}],
+            # المجموعة 7: الإعدادات والثيمات
+            [{'text': '⚙️ الإعدادات'}, {'text': '🎨 الثيمات'}, {'text': '📍 العناوين'}],
             # المجموعة 8: الأدمن والأدوار
             [{'text': '👥 المديرين'}, {'text': '✏️ الأزرار'}],
             # المجموعة 9: الحماية والنسخ
@@ -1697,16 +1750,12 @@ class ComprehensiveDUXBot:
         return {'keyboard': keyboard, 'resize_keyboard': True, 'one_time_keyboard': True}
     
     def handle_start(self, message, ref_code=None):
-        """معالج بداية المحادثة"""
+        """معالج بداية المحادثة — اختيار اللغة أولاً ثم رقم الهاتف"""
         chat_id = message['chat']['id']
         user_id = message['from']['id']
         
         # فحص إذا كان المستخدم موجود بـ telegram_id
         user = self.find_user(user_id)
-        if not user:
-            # محاولة العثور برقم الهاتف المرتبط بجهة الاتصال
-            # لو العميل حذف المحادثة ورجع، رقم هاتفه قد يكون محفوظ
-            pass
         
         if user:
             if user.get('is_banned') == 'yes':
@@ -1714,33 +1763,56 @@ class ComprehensiveDUXBot:
                 self.send_message(chat_id, f"❌ تم حظر حسابك\nالسبب: {ban_reason}\n\nللاستفسار تواصل مع الإدارة")
                 return
             
-            welcome_text = f"مرحباً بعودتك {user['name']}! 👋\n🆔 رقم العميل: {user['customer_id']}"
-            self.send_message(chat_id, welcome_text, self.main_keyboard(user.get('language', 'ar'), user_id))
+            lang = user.get('language', 'ar')
+            welcome_text = self.tr('welcome_back', lang, name=user.get('name', ''), customer_id=user.get('customer_id', ''))
+            self.send_message(chat_id, welcome_text, self.main_keyboard(lang, user_id))
         else:
-            # تخزين كود الإحالة مؤقتاً حتى انتهاء التسجيل
+            # تخزين كود الإحالة مؤقتاً
             if ref_code and self.svrp:
                 self._pending_referral = getattr(self, '_pending_referral', {})
                 self._pending_referral[user_id] = ref_code
 
-            # عرض خيارات للمستخدم الجديد: تسجيل جديد أو تسجيل دخول برقم الهاتف
-            welcome_text = self.tr('welcome_new', 'ar', name='')
-            
-            new_user_keyboard = {
-                'keyboard': [
-                    [{'text': '📝 تسجيل حساب جديد'}],
-                    [{'text': '🔐 تسجيل الدخول برقم الهاتف'}],
-                    [{'text': self.tr('skip_registration', 'ar')}]
-                ],
+            # المستخدم الجديد: اختيار اللغة أولاً
+            lang_names = self.get_language_names()
+            lang_codes = list(lang_names.keys())
+
+            welcome_text = (
+                "👋 مرحباً بك في منصتنا المالية!\n\n"
+                "🌍 Please choose your language / اختر لغتك:\n"
+                "👇 اختر من القائمة أدناه"
+            )
+
+            keyboard = []
+            for i in range(0, len(lang_codes), 3):
+                row = []
+                for j in range(3):
+                    if i + j < len(lang_codes):
+                        code = lang_codes[i + j]
+                        info = lang_names[code]
+                        row.append({'text': f"{info['flag']} {info['native']}"})
+                keyboard.append(row)
+
+            reply_keyboard = {
+                'keyboard': keyboard,
                 'resize_keyboard': True,
                 'one_time_keyboard': True
             }
-            
-            self.send_message(chat_id, welcome_text, new_user_keyboard)
+            self.user_states[user_id] = 'choosing_start_language'
+            self.send_message(chat_id, welcome_text, reply_keyboard)
     
     def handle_registration(self, message):
         """معالجة التسجيل"""
         user_id = message['from']['id']
         state = self.user_states.get(user_id)
+        
+        # فحص الحالة الجديدة: registering_name_{lang}_{phone}
+        pre_lang = None
+        pre_phone = None
+        if isinstance(state, str) and state.startswith('registering_name_') and state != 'registering_name':
+            parts = state.replace('registering_name_', '', 1).split('_', 1)
+            if len(parts) == 2:
+                pre_lang, pre_phone = parts[0], parts[1]
+            state = 'registering_name'
         
         if state == 'registering_name':
             name = self.sanitize_input(message['text'])
@@ -1793,6 +1865,50 @@ class ComprehensiveDUXBot:
                     "❌ الاسم يجب أن يحتوي على حروف.\nاكتب اسمك الحقيقي:")
                 return
             
+            # إذا كان لدينا رقم هاتف مسبق (من التدفق الجديد) — انتقل مباشرة لإنشاء الحساب
+            if pre_phone and pre_lang:
+                # كشف الدولة/العملة من رقم الهاتف
+                detected_lang, detected_country = self.detect_language_from_phone(pre_phone)
+                detected_currency = self.detect_currency_from_country(detected_country)
+                final_lang = pre_lang
+
+                # إنشاء رقم عميل
+                customer_id = f"C{str(int(datetime.now().timestamp()))[-6:]}"
+
+                # حفظ المستخدم
+                # حفظ المستخدم مباشرة في users.csv
+                with open('users.csv', 'a', newline='', encoding='utf-8-sig') as f:
+                    writer = csv.writer(f)
+                    writer.writerow([str(user_id), name, pre_phone, customer_id, final_lang,
+                                   datetime.now().strftime('%Y-%m-%d'), 'no', '', detected_currency])
+
+                # معالجة كود الإحالة
+                if self.svrp and hasattr(self, '_pending_referral'):
+                    ref_code = self._pending_referral.pop(user_id, None)
+                    if ref_code:
+                        try:
+                            self.svrp.process_referral_code(ref_code, user_id)
+                        except Exception as e:
+                            logger.error(f"خطأ في معالجة كود الإحالة: {e}")
+
+                lang_names = self.get_language_names()
+                lang_display = lang_names.get(final_lang, {}).get('native', final_lang)
+
+                welcome_text = (
+                    f"✅ {self.tr('registration_success', final_lang, name=name, phone=pre_phone, customer_id=customer_id, date=datetime.now().strftime('%Y-%m-%d'))}\n\n"
+                    f"🌐 {lang_display}\n"
+                    f"🌍 {detected_country}\n"
+                    f"💱 {detected_currency}"
+                )
+                self.send_message(message['chat']['id'], welcome_text, self.main_keyboard(final_lang, user_id))
+                if user_id in self.user_states:
+                    del self.user_states[user_id]
+
+                # إشعار الأدمن بعضو جديد
+                admin_msg = f"🆕 عضو جديد: {name} | {pre_phone} | {customer_id} | {final_lang} | {detected_country}"
+                self.notify_admins(admin_msg, notification_type='new_user')
+                return
+
             self.user_states[user_id] = f'registering_phone_{name}'
             
             # كيبورد مشاركة جهة الاتصال
@@ -2597,6 +2713,12 @@ class ComprehensiveDUXBot:
         if current_state == 'phone_login_waiting':
             self.handle_phone_login(message)
             return
+        if current_state == 'choosing_start_language':
+            self.handle_start_language_choice(message)
+            return
+        if current_state == 'start_phone_input':
+            self.handle_start_phone(message)
+            return
         if isinstance(current_state, str) and current_state.startswith('registering_phone_'):
             self.handle_registration(message)
             return
@@ -3044,7 +3166,121 @@ class ComprehensiveDUXBot:
             error_msg = self.tr('unknown_command', user_lang)
             
             self.send_message(chat_id, error_msg, error_keyboard)
-    
+
+    def handle_start_language_choice(self, message):
+        """معالجة اختيار اللغة في بداية التسجيل"""
+        user_id = message['from']['id']
+        chat_id = message['chat']['id']
+        text = message.get('text', '')
+
+        lang_names = self.get_language_names()
+        selected_lang = None
+        for code, info in lang_names.items():
+            if text.startswith(info['flag']):
+                selected_lang = code
+                break
+
+        if not selected_lang:
+            selected_lang = 'ar'
+
+        # تخزين اللغة المختارة مؤقتاً
+        self._start_lang = getattr(self, '_start_lang', {})
+        self._start_lang[user_id] = selected_lang
+
+        # طلب رقم الهاتف
+        share_phone_text = self.tr('share_phone', selected_lang) if self.tr('share_phone', selected_lang) else "📱 شارك رقم هاتفك"
+        manual_text = self.tr('enter_phone_manual', selected_lang) if self.tr('enter_phone_manual', selected_lang) else "✍️ إدخال يدوي"
+        prompt = (
+            f"✅ {self.tr('change_success', selected_lang) if self.tr('change_success', selected_lang) else 'تم!'}\n\n"
+            f"📱 {self.tr('enter_phone_prompt', selected_lang) if self.tr('enter_phone_prompt', selected_lang) else 'يرجى إدخال رقم هاتفك'}"
+        )
+        keyboard = {
+            'keyboard': [
+                [{'text': f'📱 {share_phone_text}', 'request_contact': True}],
+                [{'text': f'✍️ {manual_text}'}],
+                [{'text': '🏠 القائمة الرئيسية'}]
+            ],
+            'resize_keyboard': True,
+            'one_time_keyboard': True
+        }
+        self.user_states[user_id] = 'start_phone_input'
+        self.send_message(chat_id, prompt, keyboard)
+
+    def handle_start_phone(self, message):
+        """معالجة رقم الهاتف في بداية التسجيل — تسجيل دخول أو تسجيل جديد"""
+        user_id = message['from']['id']
+        chat_id = message['chat']['id']
+        selected_lang = getattr(self, '_start_lang', {}).get(user_id, 'ar')
+
+        # استخراج رقم الهاتف
+        if 'contact' in message:
+            phone = message['contact']['phone_number']
+            if not phone.startswith('+'):
+                phone = '+' + phone
+        elif 'text' in message:
+            phone = message['text'].strip()
+            if phone in ['🏠 القائمة الرئيسية', '🏠']:
+                if user_id in self.user_states:
+                    del self.user_states[user_id]
+                self.handle_start(message)
+                return
+            if len(phone) < 10:
+                self.send_message(chat_id, "❌ رقم هاتف غير صحيح. يرجى إدخال رقم صحيح:")
+                return
+        else:
+            self.send_message(chat_id, "❌ يرجى إرسال رقم هاتفك:")
+            return
+
+        # البحث عن المستخدم برقم الهاتف
+        existing_user = self.find_user_by_phone(phone)
+        if existing_user:
+            # مستخدم قديم — تسجيل دخول تلقائي
+            self.link_telegram_to_user(phone, user_id)
+            user = self.find_user(user_id)
+            if not user:
+                self.send_message(chat_id, "❌ خطأ في استرجاع الحساب. تواصل مع الدعم.")
+                if user_id in self.user_states:
+                    del self.user_states[user_id]
+                return
+
+            if user.get('is_banned') == 'yes':
+                self.send_message(chat_id, f"❌ تم حظر حسابك\nالسبب: {user.get('ban_reason', 'غير محدد')}")
+                if user_id in self.user_states:
+                    del self.user_states[user_id]
+                return
+
+            lang = user.get('language', selected_lang)
+            welcome_text = (
+                f"✅ {self.tr('welcome_back', lang, name=user.get('name', ''), customer_id=user.get('customer_id', ''))}\n\n"
+                f"💡 {self.tr('registration_success', lang, name=user.get('name', ''), phone=user.get('phone', ''), customer_id=user.get('customer_id', ''), date=user.get('date', ''))}"
+            )
+            self.send_message(chat_id, welcome_text, self.main_keyboard(lang, user_id))
+            if user_id in self.user_states:
+                del self.user_states[user_id]
+        else:
+            # مستخدم جديد — بدء التسجيل باللغة المختارة
+            if user_id in self.user_states:
+                del self.user_states[user_id]
+
+            # كشف اللغة/الدولة/العملة من رقم الهاتف
+            detected_lang, detected_country = self.detect_language_from_phone(phone)
+            detected_currency = self.detect_currency_from_country(detected_country)
+            # استخدام اللغة المختارة يدوياً إن اختلفت
+            final_lang = selected_lang if selected_lang else detected_lang
+
+            name_prompt = self.tr('enter_name_prompt', final_lang)
+            reg_keyboard = {
+                'keyboard': [
+                    [{'text': self.tr('cancel_registration', final_lang)}],
+                    [{'text': '🏠 القائمة الرئيسية'}]
+                ],
+                'resize_keyboard': True,
+                'one_time_keyboard': True
+            }
+
+            self.send_message(chat_id, f"📝 {name_prompt}", reg_keyboard)
+            self.user_states[user_id] = f'registering_name_{final_lang}_{phone}'
+
     def start_phone_login(self, message):
         """تسجيل الدخول برقم الهاتف — للمستخدمين الذين لديهم حساب سابق"""
         user_id = message['from']['id']
@@ -3411,6 +3647,17 @@ class ComprehensiveDUXBot:
                 self.handle_admin_panel(message)
         elif text == '📍 العناوين':
             self.show_addresses_management(message)
+        elif text == '🎨 الثيمات' and THEME_AVAILABLE:
+            self.show_theme_panel(message)
+        elif text.startswith('ثيم_') and THEME_AVAILABLE:
+            theme_key = text.replace('ثيم_', '').strip()
+            self.save_setting('active_theme', theme_key)
+            theme = get_theme(theme_key)
+            self.send_message(message['chat']['id'],
+                f"✅ تم تفعيل ثيم: {theme.get('icon', '')} {theme.get('name_ar', theme_key)}\n\n"
+                f"سيتم تطبيق الثيم على جميع الرسائل والأزرار.",
+                self.admin_keyboard())
+            return
         elif text == '🛠️ بيانات الدعم':
             self.show_support_data_editor(message)
         elif text == '📞 تعديل رقم الهاتف':
@@ -5239,7 +5486,7 @@ class ComprehensiveDUXBot:
             'icon': '🏢',
             'buttons': [
                 '🏢 الشركات', '💳 وسائل الدفع',
-                '📍 العناوين', '⚙️ الإعدادات',
+                '📍 العناوين', '⚙️ الإعدادات', '🎨 الثيمات',
             ],
         },
     }
@@ -6488,7 +6735,34 @@ class ComprehensiveDUXBot:
             settings_text += "مثال:\nتعديل_اعداد min_deposit 100"
             
             self.send_message(message['chat']['id'], settings_text, self.admin_keyboard())
-        
+
+    def show_theme_panel(self, message):
+        """عرض لوحة الثيمات للأدمن"""
+        if not THEME_AVAILABLE:
+            self.send_message(message['chat']['id'], "❌ نظام الثيمات غير متاح", self.admin_keyboard())
+            return
+
+        current_theme = self.get_setting('active_theme') or 'gold'
+        theme = get_theme(current_theme)
+
+        text = (
+            f"╔════════════════════╗\n"
+            f"║  🎨 الثيمات  ║\n"
+            f"╚════════════════════╝\n\n"
+            f"الثيم الحالي: {theme.get('icon', '')} {theme.get('name_ar', current_theme)}\n\n"
+            f"اختر ثيماً جديداً:\n"
+        )
+
+        themes = get_theme_list()
+        keyboard = []
+        for key, name_ar, icon in themes:
+            marker = ' ◀ نشط' if key == current_theme else ''
+            keyboard.append([{'text': f"{icon} ثيم_{key}{marker}"}])
+        keyboard.append([{'text': '🔙 العودة'}])
+
+        reply_kb = {'keyboard': keyboard, 'resize_keyboard': True, 'one_time_keyboard': True}
+        self.send_message(message['chat']['id'], text, reply_kb)
+    
     def show_complaints_admin(self, message):
             """عرض الشكاوى مع أزرار inline للرد السريع"""
             try:
