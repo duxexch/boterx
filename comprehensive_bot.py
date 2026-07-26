@@ -2718,8 +2718,8 @@ class ComprehensiveDUXBot:
         chat_id = message['chat']['id']
         user_id = message['from']['id']
         
-        # معالجة حالات التسجيل وتسجيل الدخول أولاً (قبل الـ rate limiter)
-        # لأن رسالة contact لا تحتوي على text
+        # معالجة جميع الحالات أولاً (قبل الـ rate limiter)
+        # لأن المستخدم في حالة نشطة يجب ألا يُحظر
         current_state = self.user_states.get(user_id, '')
         if current_state == 'phone_login_waiting':
             self.handle_phone_login(message)
@@ -2736,10 +2736,24 @@ class ComprehensiveDUXBot:
         if isinstance(current_state, str) and current_state.startswith('registering'):
             self.handle_registration(message)
             return
-        if isinstance(current_state, dict) and 'step' in current_state:
+        if isinstance(current_state, str) and current_state.startswith('svrp_'):
+            self.handle_svrp_state(message, current_state)
+            return
+        if isinstance(current_state, str) and current_state == 'selecting_language':
+            self.handle_language_change(message, text)
+            return
+        if isinstance(current_state, str) and current_state == 'selecting_currency':
+            self.handle_currency_selection(message, text)
+            return
+        if isinstance(current_state, str) and current_state == 'writing_complaint':
+            self.save_complaint(message, text)
+            return
+        if isinstance(current_state, str) and current_state.startswith('awaiting_reject_reason_'):
+            pass  # يُعالج لاحقاً في handle_admin_actions
+        elif isinstance(current_state, dict) and 'step' in current_state:
             self.handle_matching_flow(message)
             return
-        if isinstance(current_state, dict) and current_state.get('step') in ('chatting', 'rating'):
+        elif isinstance(current_state, dict) and current_state.get('step') in ('chatting', 'rating'):
             self.handle_matching_flow(message)
             return
         
@@ -2768,21 +2782,12 @@ class ComprehensiveDUXBot:
             return
         
         # معالجة الحالات المختلفة
+        # معالجة الحالات المتبقية (deposit/withdraw/payment_method — لم تُعالج قبل الـ rate limiter)
         if user_id in self.user_states:
             state = self.user_states[user_id]
             
-            # معالجة التسجيل
-            if isinstance(state, str) and state.startswith('registering'):
-                self.handle_registration(message)
-                return
-            
-            # معالجة حالات 💎 الاسترداد الذكي
-            elif isinstance(state, str) and state.startswith('svrp_'):
-                self.handle_svrp_state(message, state)
-                return
-            
             # معالجة الإيداع والسحب
-            elif isinstance(state, str) and ('deposit' in state or 'withdraw' in state):
+            if isinstance(state, str) and ('deposit' in state or 'withdraw' in state):
                 if 'deposit' in state:
                     self.process_deposit_flow(message)
                 else:
@@ -3029,16 +3034,19 @@ class ComprehensiveDUXBot:
             try:
                 amount = float(amount_str)
                 if amount <= 0:
-                    self.send_message(chat_id, "❌ المبلغ يجب أن يكون أكبر من صفر")
+                    self.send_message(chat_id, self.tr('svrp_invalid_amount_err', user_lang))
                 else:
                     code, err = self.svrp.create_promo_code(user_id, amount)
                     if err:
                         self.send_message(chat_id, f"❌ {err}")
                     else:
                         self.send_message(chat_id,
-                            f"✅ تم إنشاء الكود!\n🎟️ `{code}`\n💰 {amount}\n⏰ ينتهي خلال {self.svrp._get_config('promo_code_expiry_days')} يوم")
+                            f"{self.tr('svrp_code_created_msg', user_lang)}\n🎟️ `{code}`\n"
+                            f"💰 {self.tr('svrp_code_amount', user_lang)}: {amount}\n"
+                            f"📊 {self.tr('svrp_max_uses', user_lang)}: {self.svrp._get_config('promo_code_max_uses')}\n"
+                            f"⏰ {self.tr('svrp_expires_in', user_lang)}: {self.svrp._get_config('promo_code_expiry_days')} {self.tr('svrp_days', user_lang)}")
             except ValueError:
-                self.send_message(chat_id, "❌ مثال: انشاء_كود 100")
+                self.send_message(chat_id, self.tr('svrp_invalid_number_err', user_lang))
         elif text.startswith('استرداد_كود ') and self.svrp:
             code = text.replace('استرداد_كود ', '').strip()
             success, msg = self.svrp.redeem_promo_code(user_id, code)
@@ -3134,21 +3142,6 @@ class ComprehensiveDUXBot:
             # إجراء إعادة تعيين شاملة وقوية
             self.super_reset_user_system(user_id, chat_id, user)
         else:
-            # معالجة حالات المستخدم الخاصة
-            if user_id in self.user_states:
-                state = self.user_states[user_id]
-                if state == 'writing_complaint':
-                    self.save_complaint(message, text)
-                    return
-                elif state == 'selecting_currency':
-                    self.handle_currency_selection(message, text)
-                    return
-                elif state == 'selecting_language':
-                    self.handle_language_change(message, text)
-                    return
-                elif state == 'phone_login_waiting':
-                    self.handle_phone_login(message)
-                    return
 
             # معالجة حالات نظام المطابقة
             if isinstance(state, dict) and 'step' in state:
@@ -4016,14 +4009,14 @@ class ComprehensiveDUXBot:
                                 )
                                 if result:
                                     svrp_msg = (
-                                        f"💎 تم تفعيل نظام الاسترداد الذكي!\n\n"
-                                        f"💰 رصيد الاسترداد: {result['total_credit']:.2f} {result['currency']}\n"
-                                        f"📥 لك: {result['keep_amount']:.2f}\n"
-                                        f"📤 مشاركة مع الأصدقاء: {result['share_amount']:.2f}\n\n"
-                                        f"📋 المتطلبات:\n"
-                                        f"• أكمل {result['wagering_required']} معاملات لتفعيل الرصيد\n"
-                                        f"• ينتهي الرصيد في: {result['expires_at']}\n\n"
-                                        f"💡 شارك كود الإحالة مع أصدقائك لتفعيل الأرصدة المشتركة!"
+                                        f"{self.tr('svrp_recovery_activated', lang)}\n\n"
+                                        f"💰 {self.tr('svrp_recovery_credit', lang)}: {result['total_credit']:.2f} {result['currency']}\n"
+                                        f"📥 {self.tr('svrp_recovery_keep', lang)}: {result['keep_amount']:.2f}\n"
+                                        f"📤 {self.tr('svrp_recovery_share', lang)}: {result['share_amount']:.2f}\n\n"
+                                        f"📋 {self.tr('svrp_recovery_requirements', lang)}:\n"
+                                        f"• {self.tr('svrp_recovery_complete_tx', lang, n=result['wagering_required'])}\n"
+                                        f"• {self.tr('svrp_recovery_expires', lang)}: {result['expires_at']}\n\n"
+                                        f"{self.tr('svrp_recovery_share_hint', lang)}"
                                     )
                                     self.notify_user(int(customer_telegram_id), svrp_msg, 'svrp_recovery')
                         except Exception as e:
