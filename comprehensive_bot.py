@@ -3117,6 +3117,9 @@ class ComprehensiveDUXBot:
         if isinstance(current_state, str) and current_state == 'selecting_language':
             self.handle_language_change(message, text)
             return
+        if isinstance(current_state, str) and current_state == 'selecting_language_admin':
+            self.handle_language_change(message, text, return_to_admin=True)
+            return
         if isinstance(current_state, str) and current_state == 'selecting_currency':
             self.handle_currency_selection(message, text)
             return
@@ -4058,7 +4061,7 @@ class ComprehensiveDUXBot:
         elif text == '📍 العناوين':
             self.show_addresses_management(message)
         elif text == '🌐 تغيير اللغة':
-            self.show_language_selection(message)
+            self.show_language_selection(message, return_to_admin=True)
         elif text == '🎨 الثيمات' and THEME_AVAILABLE:
             self.show_theme_panel(message)
         elif text.startswith('ثيم_') and THEME_AVAILABLE:
@@ -5551,18 +5554,18 @@ class ComprehensiveDUXBot:
         self.send_message(message['chat']['id'], self.tr('complaint_prompt_custom', lang))
         self.user_states[message['from']['id']] = 'writing_complaint'
     
-    def show_language_selection(self, message):
+    def show_language_selection(self, message, return_to_admin=False):
         """عرض قائمة اختيار اللغة لجميع اللغات المدعومة"""
         lang_names = self.get_language_names()
         
         lang_text = self.tr('select_language', 'ar')
         
         keyboard = []
-        # ترتيب اللغات في صفوف من 2
+        # ترتيب اللغات في صفوف من 3
         lang_codes = list(lang_names.keys())
-        for i in range(0, len(lang_codes), 2):
+        for i in range(0, len(lang_codes), 3):
             row = []
-            for j in range(2):
+            for j in range(3):
                 if i + j < len(lang_codes):
                     code = lang_codes[i + j]
                     info = lang_names[code]
@@ -5577,10 +5580,14 @@ class ComprehensiveDUXBot:
             'one_time_keyboard': True
         }
         
-        self.user_states[message['from']['id']] = 'selecting_language'
+        # تخزين ما إذا كان الأدمن هو من طلب تغيير اللغة
+        if return_to_admin:
+            self.user_states[message['from']['id']] = 'selecting_language_admin'
+        else:
+            self.user_states[message['from']['id']] = 'selecting_language'
         self.send_message(message['chat']['id'], lang_text, reply_keyboard)
     
-    def handle_language_change(self, message, text):
+    def handle_language_change(self, message, text, return_to_admin=False):
         """تغيير اللغة — يدعم جميع اللغات"""
         user_id = message['from']['id']
         lang_names = self.get_language_names()
@@ -5615,7 +5622,12 @@ class ComprehensiveDUXBot:
                     writer.writerow({k: row.get(k, '') for k in fieldnames})
             
             welcome_msg = self.tr('language_changed', new_lang)
-            self.send_message(message['chat']['id'], welcome_msg, self.main_keyboard(new_lang))
+            if return_to_admin:
+                # العودة للوحة الأدمن مترجمة
+                admin_msg = self.tr('admin_panel', new_lang)
+                self.send_message(message['chat']['id'], f"{welcome_msg}\n\n{admin_msg}", self.admin_keyboard())
+            else:
+                self.send_message(message['chat']['id'], welcome_msg, self.main_keyboard(new_lang))
             if user_id in self.user_states:
                 del self.user_states[user_id]
         except Exception as e:
