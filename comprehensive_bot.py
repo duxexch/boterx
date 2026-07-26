@@ -2050,11 +2050,11 @@ class ComprehensiveDUXBot:
             [{'text': '👥 المديرين'}, {'text': '✏️ الأزرار'}],
             # المجموعة 9: الحماية والنسخ
             [{'text': '🔔 الإشعارات'}, {'text': '💾 نسخة احتياطية'}],
-            # المجموعة 10: (تم دمجها في المجموعة 7b)
-            # صف منفصل: إجراءات المستخدم
+            # المجموعة 10: إجراءات المستخدم
             [{'text': '🚫 حظر مستخدم'}, {'text': '✅ إلغاء حظر'}],
-            # صف منفصل: إعادة تعيين + الرئيسية
-            [{'text': '🔄 إعادة تعيين النظام'}, {'text': '🏠 القائمة الرئيسية'}],
+            # المجموعة 11: اللغة + إعادة تعيين
+            [{'text': '🌐 تغيير اللغة'}, {'text': '🔄 إعادة تعيين النظام'}],
+            [{'text': '🏠 القائمة الرئيسية'}],
         ]
 
         current_admin_id = getattr(self, 'current_admin_id', None)
@@ -4057,6 +4057,8 @@ class ComprehensiveDUXBot:
                 self.handle_admin_panel(message)
         elif text == '📍 العناوين':
             self.show_addresses_management(message)
+        elif text == '🌐 تغيير اللغة':
+            self.show_language_selection(message)
         elif text == '🎨 الثيمات' and THEME_AVAILABLE:
             self.show_theme_panel(message)
         elif text.startswith('ثيم_') and THEME_AVAILABLE:
@@ -5944,7 +5946,7 @@ class ComprehensiveDUXBot:
             'icon': '🏢',
             'buttons': [
                 '🏢 الشركات', '💳 وسائل الدفع',
-                '📍 العناوين', '⚙️ الإعدادات', '🎨 الثيمات',
+                '📍 العناوين', '⚙️ الإعدادات', '🎨 الثيمات', '🌐 تغيير اللغة',
             ],
         },
     }
