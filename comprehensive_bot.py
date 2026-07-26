@@ -1487,39 +1487,159 @@ class ComprehensiveDUXBot:
                 del self.user_states[user_id]
 
     def show_svrp_admin_panel(self, message):
-        """لوحة إدارة 💎 الاسترداد الذكي للأدمن"""
+        """لوحة إدارة 💎 الاسترداد الذكي — إدارة كاملة بأزرار inline"""
         if not self.svrp:
             self.send_message(message['chat']['id'], self.tr('svrp_not_available', 'ar'), self.admin_keyboard(admin_lang))
             return
 
         stats = self.svrp.get_svrp_stats()
+        config = self.svrp.SVRP_CONFIG
 
         text = (
             f"╔════════════════════╗\n"
             f"║  💎 إدارة الاسترداد الذكي  ║\n"
             f"╚════════════════════╝\n\n"
-            f"┌─────────────────────┐\n"
-            f"│  📊 الإحصائيات:  │\n"
+            f"┌─── 📊 الإحصائيات ───┐\n"
+            f"│  💰 أرصدة مصدرة: {stats['total_credits_issued']:.2f}\n"
+            f"│  📉 أرصدة مستخدمة: {stats['total_credits_used']:.2f}\n"
+            f"│  ✅ أرصدة نشطة: {stats['active_credits']}\n"
+            f"│  ⏰ أرصدة منتهية: {stats['expired_credits']}\n"
+            f"│  👥 المحافظ: {stats['total_wallets']}\n"
+            f"│  💵 إجمالي الأرصدة: {stats['total_balance']:.2f}\n"
+            f"│  ⏳ رصيد معلق: {stats['total_pending']:.2f}\n"
+            f"│  📋 مهام نشطة: {stats['active_tasks']}\n"
+            f"│  ✅ مهام مكتملة: {stats['completed_tasks']}\n"
+            f"│  🎟️ أكواد نشطة: {stats['active_promos']}\n"
+            f"└─────────────────────┘\n\n"
+            f"┌─── ⚙️ الإعدادات الحالية ───┐\n"
+            f"│  🔢 مضاعف الاسترداد: {config['recovery_multiplier']}x\n"
+            f"│  💎 الحد الأقصى لكل حدث: {config['max_recovery_cap']}\n"
+            f"│  📅 انتهاء الرصيد: {config['credit_expiry_days']} يوم\n"
+            f"│  🎯 متطلبات الرهان: {config['wagering_requirement']} معاملة\n"
+            f"│  🎟️ حد استخدام الكود: {config['promo_code_max_uses']}\n"
+            f"│  📅 انتهاء الكود: {config['promo_code_expiry_days']} يوم\n"
+            f"│  📈 الحد الشهري: {config['max_recovery_per_month']}\n"
             f"└─────────────────────┘\n"
-            f"  💰 أرصدة مصدرة: {stats['total_credits_issued']:.2f}\n"
-            f"  📉 أرصدة مستخدمة: {stats['total_credits_used']:.2f}\n"
-            f"  ✅ أرصدة نشطة: {stats['active_credits']}\n"
-            f"  ⏰ أرصدة منتهية: {stats['expired_credits']}\n\n"
-            f"  👥 المحافظ: {stats['total_wallets']}\n"
-            f"  💵 إجمالي الأرصدة: {stats['total_balance']:.2f}\n"
-            f"  ⏳ رصيد معلق: {stats['total_pending']:.2f}\n\n"
-            f"  📋 مهام نشطة: {stats['active_tasks']}\n"
-            f"  ✅ مهام مكتملة: {stats['completed_tasks']}\n"
-            f"  🎉 مهام مستلمة: {stats['claimed_tasks']}\n\n"
-            f"  🎟️ أكواد نشطة: {stats['active_promos']}\n"
         )
 
         if stats.get('top_referrers'):
             text += "\n🏆 أفضل المُحيلين:\n"
             for tid, count in stats['top_referrers']:
-                text += f"  • {tid}: {count} إحالة\n"
+                text += f"  • <code>{tid}</code>: {count} إحالة\n"
 
-        self.send_message(message['chat']['id'], text, self.admin_keyboard(admin_lang))
+        # أزرار inline للإدارة
+        inline_btns = [
+            [{'text': '⚙️ تعديل الإعدادات', 'callback_data': 'svrp_admin_settings'},
+             {'text': '👥 عرض المحافظ', 'callback_data': 'svrp_admin_wallets'}],
+            [{'text': '🎟️ الأكواد الترويجية', 'callback_data': 'svrp_admin_promos'},
+             {'text': '📋 المهام', 'callback_data': 'svrp_admin_tasks'}],
+            [{'text': '🧹 تنظيف الأرصدة المنتهية', 'callback_data': 'svrp_admin_cleanup'},
+             {'text': '📊 إحصائيات تفصيلية', 'callback_data': 'svrp_admin_detailed'}],
+            [{'text': '🔙 العودة للوحة الأدمن', 'callback_data': 'svrp_admin_back'}]
+        ]
+
+        self.send_inline_message(message['chat']['id'], text, inline_btns)
+
+    def svrp_admin_view_wallets(self, chat_id):
+        """عرض جميع محافظ الاسترداد الذكي"""
+        wallets = self.svrp._read_csv('svrp_wallets.csv')
+        if not wallets:
+            self.send_message(chat_id, "📭 لا توجد محافظ بعد.", self.admin_keyboard('ar'))
+            return
+
+        text = "╔════════════════════╗\n║  💎 المحافظ  ║\n╚════════════════════╝\n\n"
+        for w in wallets[:20]:  # أول 20 محفظة
+            text += (
+                f"👤 <code>{w.get('telegram_id', '')}</code>\n"
+                f"  💰 الرصيد: {float(w.get('balance', 0) or 0):.2f}\n"
+                f"  ⏳ معلق: {float(w.get('pending_balance', 0) or 0):.2f}\n"
+                f"  📈 مكتسب: {float(w.get('total_earned', 0) or 0):.2f}\n"
+                f"  🎯 رهان: {w.get('wagering_completed', '0')}/{w.get('wagering_required', '3')}\n\n"
+            )
+        if len(wallets) > 20:
+            text += f"... و {len(wallets) - 20} محفظة أخرى"
+
+        inline_btns = [[{'text': '🔙 العودة', 'callback_data': 'svrp_admin_back'}]]
+        self.send_inline_message(chat_id, text, inline_btns)
+
+    def svrp_admin_view_promos(self, chat_id):
+        """عرض الأكواد الترويجية"""
+        promos = self.svrp._read_csv('svrp_promo_codes.csv')
+        if not promos:
+            self.send_inline_message(chat_id, "📭 لا توجد أكواد ترويجية.",
+                [[{'text': '🔙 العودة', 'callback_data': 'svrp_admin_back'}]])
+            return
+
+        text = "╔════════════════════╗\n║  🎟️ الأكواد الترويجية  ║\n╚════════════════════╝\n\n"
+        for p in promos:
+            status_icon = {'active': '✅', 'fully_used': '🔴', 'expired': '⏰'}.get(p.get('status', ''), '✅')
+            text += (
+                f"{status_icon} <code>{p['code']}</code>\n"
+                f"  💰 {p.get('amount', '')} | 👤 {p.get('creator_id', '')}\n"
+                f"  📊 {p.get('used_count', '0')}/{p.get('max_uses', '10')} | 📅 {p.get('expires_at', '')}\n\n"
+            )
+
+        inline_btns = [[{'text': '🔙 العودة', 'callback_data': 'svrp_admin_back'}]]
+        self.send_inline_message(chat_id, text, inline_btns)
+
+    def svrp_admin_view_tasks(self, chat_id):
+        """عرض المهام"""
+        tasks = self.svrp._read_csv('svrp_tasks.csv')
+        if not tasks:
+            self.send_inline_message(chat_id, "📭 لا توجد مهام.",
+                [[{'text': '🔙 العودة', 'callback_data': 'svrp_admin_back'}]])
+            return
+
+        text = "╔════════════════════╗\n║  📋 المهام  ║\n╚════════════════════╝\n\n"
+        active = [t for t in tasks if t.get('status') == 'active']
+        completed = [t for t in tasks if t.get('status') == 'completed']
+        claimed = [t for t in tasks if t.get('status') == 'claimed']
+
+        text += f"⏳ نشطة: {len(active)} | ✅ مكتملة: {len(completed)} | 🎉 مستلمة: {len(claimed)}\n\n"
+        for t in active[:15]:
+            text += (
+                f"⏳ <code>{t['id']}</code> | {t.get('task_type', '')}\n"
+                f"  {t.get('current_progress', '0')}/{t.get('target_value', '1')} → 🎁 {t.get('reward_amount', '0')}\n"
+            )
+
+        inline_btns = [[{'text': '🔙 العودة', 'callback_data': 'svrp_admin_back'}]]
+        self.send_inline_message(chat_id, text, inline_btns)
+
+    def svrp_admin_edit_settings(self, chat_id):
+        """تعديل إعدادات الاسترداد الذكي"""
+        config = self.svrp.SVRP_CONFIG
+        text = (
+            "╔════════════════════╗\n"
+            "║  ⚙️ إعدادات الاسترداد  ║\n"
+            "╚════════════════════╝\n\n"
+            "للتعديل، اكتب الأمر التالي:\n"
+            "تعديل_استرداد [المفتاح] [القيمة]\n\n"
+            "المفاتيح المتاحة:\n"
+            f"  • recovery_multiplier = {config['recovery_multiplier']} (مضاعف الاسترداد)\n"
+            f"  • max_recovery_cap = {config['max_recovery_cap']} (الحد الأقصى لكل حدث)\n"
+            f"  • credit_expiry_days = {config['credit_expiry_days']} (مدة انتهاء الرصيد)\n"
+            f"  • wagering_requirement = {config['wagering_requirement']} (متطلبات الرهان)\n"
+            f"  • promo_code_max_uses = {config['promo_code_max_uses']} (حد استخدام الكود)\n"
+            f"  • promo_code_expiry_days = {config['promo_code_expiry_days']} (مدة انتهاء الكود)\n"
+            f"  • max_recovery_per_month = {config['max_recovery_per_month']} (الحد الشهري)\n\n"
+            "مثال: تعديل_استرداد recovery_multiplier 3.0"
+        )
+        inline_btns = [[{'text': '🔙 العودة', 'callback_data': 'svrp_admin_back'}]]
+        self.send_inline_message(chat_id, text, inline_btns)
+
+    def svrp_admin_cleanup(self, chat_id):
+        """تنظيف الأرصدة المنتهية"""
+        expired = self.svrp.expire_old_credits()
+        self.edit_or_send(chat_id,
+            f"🧹 تم التنظيف!\n\n⏰ عدد الأرصدة المنتهية: {expired}",
+            [[{'text': '🔙 العودة', 'callback_data': 'svrp_admin_back'}]])
+
+    def edit_or_send(self, chat_id, text, inline_btns=None):
+        """إرسال أو تعديل رسالة"""
+        if inline_btns:
+            self.send_inline_message(chat_id, text, inline_btns)
+        else:
+            self.send_message(chat_id, text)
 
     # ==================== End 💎 الاسترداد الذكي — Panel Methods ====================
 
@@ -4238,6 +4358,35 @@ class ComprehensiveDUXBot:
                 self.send_message(message['chat']['id'], "يرجى كتابة العنوان الجديد. مثال: عنوان شارع الملك فهد", self.admin_keyboard(admin_lang))
         elif text.startswith('تعديل_اعداد '):
             self.update_setting_simple(message, text)
+        elif text.startswith('تعديل_استرداد ') and self.svrp:
+            # تعديل إعدادات الاسترداد الذكي
+            parts = text.replace('تعديل_استرداد ', '').split()
+            if len(parts) == 2:
+                key = parts[0].strip()
+                try:
+                    val = parts[1].strip()
+                    if key in self.svrp.SVRP_CONFIG:
+                        old_val = self.svrp.SVRP_CONFIG[key]
+                        # تحويل النوع
+                        if isinstance(old_val, float):
+                            self.svrp.SVRP_CONFIG[key] = float(val)
+                        elif isinstance(old_val, int):
+                            self.svrp.SVRP_CONFIG[key] = int(val)
+                        else:
+                            self.svrp.SVRP_CONFIG[key] = val
+                        self.send_message(message['chat']['id'],
+                            f"✅ تم تحديث الإعداد!\n\n{key}: {old_val} → {val}",
+                            self.admin_keyboard(admin_lang))
+                    else:
+                        self.send_message(message['chat']['id'],
+                            f"❌ مفتاح غير صالح: {key}", self.admin_keyboard(admin_lang))
+                except ValueError:
+                    self.send_message(message['chat']['id'],
+                        "❌ قيمة غير صحيحة", self.admin_keyboard(admin_lang))
+            else:
+                self.send_message(message['chat']['id'],
+                    "❌ الصيغة: تعديل_استرداد [المفتاح] [القيمة]\nمثال: تعديل_استرداد recovery_multiplier 3.0",
+                    self.admin_keyboard(admin_lang))
         elif text == '✅ حفظ الشركة':
             # التعامل مع حفظ الشركة - تنفيذ مباشر
             if user_id in self.user_states and self.user_states[user_id] == 'confirming_company':
@@ -5363,7 +5512,60 @@ class ComprehensiveDUXBot:
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                 self.show_apps_admin_panel(fake_msg)
                 return
-            
+
+            # ==================== 💎 إدارة الاسترداد الذكي ====================
+            elif data == 'svrp_admin_back':
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_svrp_admin_panel(fake_msg)
+                return
+
+            elif data == 'svrp_admin_wallets':
+                self.svrp_admin_view_wallets(chat_id)
+                return
+
+            elif data == 'svrp_admin_promos':
+                self.svrp_admin_view_promos(chat_id)
+                return
+
+            elif data == 'svrp_admin_tasks':
+                self.svrp_admin_view_tasks(chat_id)
+                return
+
+            elif data == 'svrp_admin_settings':
+                self.svrp_admin_edit_settings(chat_id)
+                return
+
+            elif data == 'svrp_admin_cleanup':
+                self.svrp_admin_cleanup(chat_id)
+                return
+
+            elif data == 'svrp_admin_detailed':
+                # إحصائيات تفصيلية
+                stats = self.svrp.get_svrp_stats()
+                text = (
+                    "╔════════════════════╗\n"
+                    "║  📊 إحصائيات تفصيلية  ║\n"
+                    "╚════════════════════╝\n\n"
+                    f"💰 أرصدة مصدرة: {stats['total_credits_issued']:.2f}\n"
+                    f"📉 أرصدة مستخدمة: {stats['total_credits_used']:.2f}\n"
+                    f"✅ أرصدة نشطة: {stats['active_credits']}\n"
+                    f"⏰ أرصدة منتهية: {stats['expired_credits']}\n"
+                    f"👥 المحافظ: {stats['total_wallets']}\n"
+                    f"💵 إجمالي الأرصدة: {stats['total_balance']:.2f}\n"
+                    f"⏳ رصيد معلق: {stats['total_pending']:.2f}\n"
+                    f"📋 مهام نشطة: {stats['active_tasks']}\n"
+                    f"✅ مهام مكتملة: {stats['completed_tasks']}\n"
+                    f"🎉 مهام مستلمة: {stats['claimed_tasks']}\n"
+                    f"🎟️ أكواد نشطة: {stats['active_promos']}\n"
+                )
+                if stats.get('top_referrers'):
+                    text += "\n🏆 أفضل المُحيلين:\n"
+                    for tid, count in stats['top_referrers']:
+                        text += f"  • <code>{tid}</code>: {count} إحالة\n"
+                self.send_inline_message(chat_id, text,
+                    [[{'text': '🔙 العودة', 'callback_data': 'svrp_admin_back'}]])
+                return
+
             # ==================== مطابقة: تأكيد الكود ====================
             elif data.startswith('match_verify_'):
                 match_id = data.replace('match_verify_', '')
