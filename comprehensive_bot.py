@@ -2220,8 +2220,16 @@ class ComprehensiveDUXBot:
         }
     
     
-    def admin_keyboard(self, lang='ar'):
+    def admin_keyboard(self, lang=None):
         """لوحة أدمن أنيقة — أزرار منظمة في مجموعات منطقية، مترجمة"""
+        # اكتشاف لغة الأدمن تلقائياً إن لم تُمرر
+        if lang is None or lang == 'admin_lang':
+            admin_uid = getattr(self, 'current_admin_id', None)
+            if admin_uid:
+                admin_user = self.find_user(admin_uid)
+                lang = admin_user.get('language', 'ar') if admin_user else 'ar'
+            else:
+                lang = 'ar'
         base_keyboard = [
             # المجموعة 1: المعاملات
             [{'text': self.tr('admin_pending_requests', lang)}, {'text': self.tr('admin_approved_requests', lang)}],
@@ -4064,7 +4072,7 @@ class ComprehensiveDUXBot:
             
             # إرسال الرسالة مع الكيبورد المناسب
             if self.is_admin(user_id):
-                keyboard = self.admin_keyboard(admin_lang)
+                keyboard = self.admin_keyboard(user.get('language', 'ar'))
             else:
                 keyboard = self.main_keyboard(user.get('language', 'ar'))
                 
