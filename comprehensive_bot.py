@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 import os
@@ -1151,7 +1151,7 @@ class ComprehensiveDUXBot:
                 ]
                 self.send_inline_message(chat_id, summary, inline_btns)
             else:
-                self.send_message(chat_id, "❌ فشل في حفظ التطبيق", self.admin_keyboard())
+                self.send_message(chat_id, "❌ فشل في حفظ التطبيق", self.admin_keyboard(admin_lang))
 
             if user_id in self.user_states:
                 del self.user_states[user_id]
@@ -1489,7 +1489,7 @@ class ComprehensiveDUXBot:
     def show_svrp_admin_panel(self, message):
         """لوحة إدارة 💎 الاسترداد الذكي للأدمن"""
         if not self.svrp:
-            self.send_message(message['chat']['id'], self.tr('svrp_not_available', 'ar'), self.admin_keyboard())
+            self.send_message(message['chat']['id'], self.tr('svrp_not_available', 'ar'), self.admin_keyboard(admin_lang))
             return
 
         stats = self.svrp.get_svrp_stats()
@@ -1519,7 +1519,7 @@ class ComprehensiveDUXBot:
             for tid, count in stats['top_referrers']:
                 text += f"  • {tid}: {count} إحالة\n"
 
-        self.send_message(message['chat']['id'], text, self.admin_keyboard())
+        self.send_message(message['chat']['id'], text, self.admin_keyboard(admin_lang))
 
     # ==================== End 💎 الاسترداد الذكي — Panel Methods ====================
 
@@ -1651,7 +1651,7 @@ class ComprehensiveDUXBot:
                 if inline_buttons:
                     self.send_inline_message(admin_id, message, inline_buttons)
                 else:
-                    self.send_message(admin_id, message, self.admin_keyboard())
+                    self.send_message(admin_id, message, self.admin_keyboard(admin_lang))
             except:
                 pass
 
@@ -2027,34 +2027,34 @@ class ComprehensiveDUXBot:
         }
     
     
-    def admin_keyboard(self):
-        """لوحة أدمن أنيقة — أزرار منظمة في مجموعات منطقية"""
+    def admin_keyboard(self, lang='ar'):
+        """لوحة أدمن أنيقة — أزرار منظمة في مجموعات منطقية، مترجمة"""
         base_keyboard = [
-            # المجموعة 1: المعاملات (الأهم)
-            [{'text': '📋 الطلبات المعلقة'}, {'text': '✅ طلبات مُوافقة'}],
+            # المجموعة 1: المعاملات
+            [{'text': self.tr('admin_pending_requests', lang)}, {'text': self.tr('admin_approved_requests', lang)}],
             # المجموعة 2: المستخدمين
-            [{'text': '👥 المستخدمين'}, {'text': '🔍 البحث'}],
+            [{'text': self.tr('admin_users', lang)}, {'text': self.tr('admin_search', lang)}],
             # المجموعة 3: الشركات ووسائل الدفع
-            [{'text': '🏢 الشركات'}, {'text': '💳 وسائل الدفع'}],
+            [{'text': self.tr('admin_companies', lang)}, {'text': self.tr('admin_payment_methods', lang)}],
             # المجموعة 4: الإحصائيات والتقارير
-            [{'text': '📊 الإحصائيات'}, {'text': '📑 تقرير Excel'}],
+            [{'text': self.tr('admin_statistics', lang)}, {'text': self.tr('admin_excel_report', lang)}],
             # المجموعة 5: التواصل
-            [{'text': '📢 إرسال جماعي'}, {'text': '📧 رسالة لعميل'}],
+            [{'text': self.tr('admin_broadcast', lang)}, {'text': self.tr('admin_message_user', lang)}],
             # المجموعة 6: الشكاوى والدعم
-            [{'text': '📨 الشكاوى'}, {'text': '🛠️ بيانات الدعم'}],
+            [{'text': self.tr('admin_complaints', lang)}, {'text': self.tr('admin_support_data', lang)}],
             # المجموعة 7: الإعدادات والثيمات
-            [{'text': '⚙️ الإعدادات'}, {'text': '🎨 الثيمات'}, {'text': '📍 العناوين'}],
-            # المجموعة 7b: التطبيقات
-            [{'text': '📱 التطبيقات'}, {'text': '💎 استرداد ذكي'}, {'text': '📋 أوامر سريعة'}],
+            [{'text': self.tr('admin_settings', lang)}, {'text': self.tr('admin_themes', lang)}, {'text': self.tr('admin_addresses', lang)}],
+            # المجموعة 7b: التطبيقات والاسترداد
+            [{'text': self.tr('admin_apps', lang)}, {'text': self.tr('admin_recovery', lang)}, {'text': self.tr('admin_quick_commands', lang)}],
             # المجموعة 8: الأدمن والأدوار
-            [{'text': '👥 المديرين'}, {'text': '✏️ الأزرار'}],
+            [{'text': self.tr('admin_managers', lang)}, {'text': self.tr('admin_buttons', lang)}],
             # المجموعة 9: الحماية والنسخ
-            [{'text': '🔔 الإشعارات'}, {'text': '💾 نسخة احتياطية'}],
+            [{'text': self.tr('admin_notifications', lang)}, {'text': self.tr('admin_backup', lang)}],
             # المجموعة 10: إجراءات المستخدم
-            [{'text': '🚫 حظر مستخدم'}, {'text': '✅ إلغاء حظر'}],
+            [{'text': self.tr('admin_ban_user', lang)}, {'text': self.tr('admin_unban_user', lang)}],
             # المجموعة 11: اللغة + إعادة تعيين
-            [{'text': '🌐 تغيير اللغة'}, {'text': '🔄 إعادة تعيين النظام'}],
-            [{'text': '🏠 القائمة الرئيسية'}],
+            [{'text': self.tr('admin_change_language', lang)}, {'text': self.tr('admin_reset_system', lang)}],
+            [{'text': self.tr('admin_main_menu', lang)}],
         ]
 
         current_admin_id = getattr(self, 'current_admin_id', None)
@@ -3066,6 +3066,9 @@ class ComprehensiveDUXBot:
         if not self.is_admin(user_id):
             return
 
+        admin_user = self.find_user(user_id)
+        admin_lang = admin_user.get('language', 'ar') if admin_user else 'ar'
+
         # تحديد الأدمن الحالي لتطبيق صلاحيات الأزرار عليه
         self.current_admin_id = user_id
 
@@ -3075,9 +3078,9 @@ class ComprehensiveDUXBot:
         except Exception:
             pass
         
-        admin_welcome = self.tr('admin_panel', 'ar')
+        admin_welcome = self.tr('admin_panel', admin_lang)
         
-        self.send_message(message['chat']['id'], admin_welcome, self.admin_keyboard())
+        self.send_message(message['chat']['id'], admin_welcome, self.admin_keyboard(admin_lang))
     
     def process_message(self, message):
         """معالج الرسائل الرئيسي"""
@@ -3298,15 +3301,15 @@ class ComprehensiveDUXBot:
                         reply_text = text.strip()
                         if reply_text.lower() in ['/cancel', 'الغاء', 'إلغاء']:
                             if user_id in self.user_states: del self.user_states[user_id]
-                            self.send_message(chat_id, "❌ تم الإلغاء", self.admin_keyboard())
+                            self.send_message(chat_id, "❌ تم الإلغاء", self.admin_keyboard(admin_lang))
                             return
                         if reply_text:
                             success = self.save_complaint_reply(complaint_id, reply_text)
                             if success:
-                                self.send_message(chat_id, f"✅ تم إرسال الرد!\n\n📝 {reply_text}", self.admin_keyboard())
+                                self.send_message(chat_id, f"✅ تم إرسال الرد!\n\n📝 {reply_text}", self.admin_keyboard(admin_lang))
                                 self.send_complaint_reply_to_customer(complaint_id, reply_text)
                             else:
-                                self.send_message(chat_id, "❌ فشل في حفظ الرد", self.admin_keyboard())
+                                self.send_message(chat_id, "❌ فشل في حفظ الرد", self.admin_keyboard(admin_lang))
                         if user_id in self.user_states: del self.user_states[user_id]
                         return
                     elif admin_state.startswith('editing_support_'):
@@ -3868,7 +3871,7 @@ class ComprehensiveDUXBot:
             
             # إرسال الرسالة مع الكيبورد المناسب
             if self.is_admin(user_id):
-                keyboard = self.admin_keyboard()
+                keyboard = self.admin_keyboard(admin_lang)
             else:
                 keyboard = self.main_keyboard(user.get('language', 'ar'))
                 
@@ -3925,6 +3928,10 @@ class ComprehensiveDUXBot:
         chat_id = message['chat']['id']
         user_id = message['from']['id']
 
+        admin_user = self.find_user(user_id)
+        admin_lang = admin_user.get('language', 'ar') if admin_user else 'ar'
+        all_langs = self.get_supported_languages()
+
         # أولاً: التحقق مما إذا كان الأدمن في مرحلة إدخال سبب الرفض
         # إذا كان user_state يبدأ بـ 'awaiting_reject_reason_', فهذا يعني أننا بانتظار السبب
         user_state = self.user_states.get(user_id, '')
@@ -3939,7 +3946,7 @@ class ComprehensiveDUXBot:
                 # إزالة السبب المؤقت إن وجد
                 if user_id in self.pending_reject_reasons:
                     del self.pending_reject_reasons[user_id]
-                self.send_message(chat_id, f"❌ تم إلغاء عملية الرفض للمعاملة {trans_id}.", self.admin_keyboard())
+                self.send_message(chat_id, f"❌ تم إلغاء عملية الرفض للمعاملة {trans_id}.", self.admin_keyboard(admin_lang))
                 return
             # إذا كتب السبب
             if reason_text:
@@ -3958,7 +3965,7 @@ class ComprehensiveDUXBot:
                                   inline_btns)
                 return
             # إذا لم يكتب شيئاً، نعيد الطلب
-            self.send_message(chat_id, f"❌ يرجى كتابة سبب الرفض للمعاملة {trans_id} أو اكتب 'إلغاء' لإلغاء العملية.", self.admin_keyboard())
+            self.send_message(chat_id, f"❌ يرجى كتابة سبب الرفض للمعاملة {trans_id} أو اكتب 'إلغاء' لإلغاء العملية.", self.admin_keyboard(admin_lang))
             return
         # معالجة مرحلة تأكيد الرفض
         if isinstance(user_state, str) and user_state.startswith('confirming_reject_'):
@@ -3979,24 +3986,24 @@ class ComprehensiveDUXBot:
                 if user_id in self.pending_reject_reasons:
                     del self.pending_reject_reasons[user_id]
                 del self.user_states[user_id]
-                self.send_message(chat_id, f"❌ تم إلغاء عملية الرفض للمعاملة {trans_id}.", self.admin_keyboard())
+                self.send_message(chat_id, f"❌ تم إلغاء عملية الرفض للمعاملة {trans_id}.", self.admin_keyboard(admin_lang))
                 return
             # أي نص آخر لا يقبل في هذه المرحلة
-            self.send_message(chat_id, f"❌ يرجى الضغط على زر تأكيد الرفض أو اختيار إلغاء.", self.admin_keyboard())
+            self.send_message(chat_id, f"❌ يرجى الضغط على زر تأكيد الرفض أو اختيار إلغاء.", self.admin_keyboard(admin_lang))
             return
         
         # الأزرار الرئيسية
-        if text == '📋 الطلبات المعلقة':
+        if text in {self.tr('admin_pending_requests', l) for l in all_langs}:
             self.show_pending_requests(message)
         elif text == '✅ طلبات مُوافقة':
             self.show_approved_transactions(message)
-        elif text == '👥 المستخدمين':
+        elif text in {self.tr('admin_users', l) for l in all_langs}:
             self.show_users_management(message)
-        elif text == '🔍 البحث':
+        elif text in {self.tr('admin_search', l) for l in all_langs}:
             self.prompt_admin_search(message)
-        elif text == '👥 المديرين':
+        elif text in {self.tr('admin_managers', l) for l in all_langs}:
             self.show_admin_management(message)
-        elif text == '✏️ الأزرار':
+        elif text in {self.tr('admin_buttons', l) for l in all_langs}:
             self.start_button_label_editor(message)
         elif text == '📋 عرض قائمة المديرين':
             self.show_detailed_admin_list(message)
@@ -4011,18 +4018,18 @@ class ComprehensiveDUXBot:
         elif text == '📊 إحصائيات المديرين':
             self.show_admin_statistics(message)
         elif text == '🆔 معرف المستخدم':
-            self.send_message(message['chat']['id'], f"🆔 معرف المستخدم الخاص بك: {message['from']['id']}", self.admin_keyboard())
-        elif text == '💳 وسائل الدفع':
+            self.send_message(message['chat']['id'], f"🆔 معرف المستخدم الخاص بك: {message['from']['id']}", self.admin_keyboard(admin_lang))
+        elif text in {self.tr('admin_payment_methods', l) for l in all_langs}:
             self.show_payment_methods_management(message)
         elif text == '📊 الإحصائيات':
             self.show_detailed_stats(message)
-        elif text == '📑 تقرير Excel':
+        elif text in {self.tr('admin_excel_report', l) for l in all_langs}:
             self.generate_professional_excel_report(message)
-        elif text == '📢 إرسال جماعي':
+        elif text in {self.tr('admin_broadcast', l) for l in all_langs}:
             self.prompt_broadcast(message)
-        elif text == '🚫 حظر مستخدم':
+        elif text in {self.tr('admin_ban_user', l) for l in all_langs}:
             self.prompt_ban_user(message)
-        elif text == '✅ إلغاء حظر':
+        elif text in {self.tr('admin_unban_user', l) for l in all_langs}:
             self.prompt_unban_user(message)
         
         # معالجة أوامر النص المباشرة
@@ -4031,7 +4038,7 @@ class ComprehensiveDUXBot:
             if customer_id:
                 self.unban_user_admin(message, customer_id)
             else:
-                self.send_message(chat_id, "❌ الصيغة الصحيحة:\nالغاء_حظر [رقم_العميل]\nمثال: الغاء_حظر C810563", self.admin_keyboard())
+                self.send_message(chat_id, "❌ الصيغة الصحيحة:\nالغاء_حظر [رقم_العميل]\nمثال: الغاء_حظر C810563", self.admin_keyboard(admin_lang))
         elif text == '📝 إضافة شركة':
             self.start_add_company_wizard(message)
         elif text == '🏢 الشركات':
@@ -4058,11 +4065,11 @@ class ComprehensiveDUXBot:
                     self.handle_admin_panel(message)
             else:
                 self.handle_admin_panel(message)
-        elif text == '📍 العناوين':
+        elif text in {self.tr('admin_addresses', l) for l in all_langs}:
             self.show_addresses_management(message)
-        elif text == '🌐 تغيير اللغة':
+        elif text in {self.tr('admin_change_language', l) for l in all_langs}:
             self.show_language_selection(message, return_to_admin=True)
-        elif text == '🎨 الثيمات' and THEME_AVAILABLE:
+        elif text in {self.tr('admin_themes', l) for l in all_langs} and THEME_AVAILABLE:
             self.show_theme_panel(message)
         elif text.startswith('ثيم_') and THEME_AVAILABLE:
             theme_key = text.replace('ثيم_', '').strip()
@@ -4071,9 +4078,9 @@ class ComprehensiveDUXBot:
             self.send_message(message['chat']['id'],
                 f"✅ تم تفعيل ثيم: {theme.get('icon', '')} {theme.get('name_ar', theme_key)}\n\n"
                 f"سيتم تطبيق الثيم على جميع الرسائل والأزرار.",
-                self.admin_keyboard())
+                self.admin_keyboard(admin_lang))
             return
-        elif text == '🛠️ بيانات الدعم':
+        elif text in {self.tr('admin_support_data', l) for l in all_langs}:
             self.show_support_data_editor(message)
         elif text == '📞 تعديل رقم الهاتف':
             self.start_phone_edit_wizard(message)
@@ -4085,26 +4092,26 @@ class ComprehensiveDUXBot:
             self.start_hours_edit_wizard(message)
         elif text == '🔄 تحديث بيانات الدعم':
             self.show_support_data_editor(message)
-        elif text == '⚙️ الإعدادات':
+        elif text in {self.tr('admin_settings', l) for l in all_langs}:
             self.show_system_settings(message)
-        elif text == '📨 الشكاوى':
+        elif text in {self.tr('admin_complaints', l) for l in all_langs}:
             self.show_complaints_admin(message)
         elif text in ['🔄 تحديث الشكاوى', '🔄 تحديث']:
             self.show_complaints_admin(message)
         elif text.startswith('📞 رد على '):
             complaint_id = text.replace('📞 رد على ', '').strip()
             self.start_complaint_reply_wizard(message, complaint_id)
-        elif text == '📋 أوامر سريعة':
+        elif text in {self.tr('admin_quick_commands', l) for l in all_langs}:
             self.show_quick_copy_commands(message)
-        elif text == '💎 استرداد ذكي' and self.svrp:
+        elif text in {self.tr('admin_recovery', l) for l in all_langs} and self.svrp:
             self.show_svrp_admin_panel(message)
-        elif text == '📱 التطبيقات':
+        elif text in {self.tr('admin_apps', l) for l in all_langs}:
             self.show_apps_admin_panel(message)
-        elif text == '📧 رسالة لعميل':
+        elif text in {self.tr('admin_message_user', l) for l in all_langs}:
             self.start_send_user_message(message)
-        elif text == '🔔 الإشعارات':
+        elif text in {self.tr('admin_notifications', l) for l in all_langs}:
             self.show_notifications_panel(message)
-        elif text == '💾 نسخة احتياطية':
+        elif text in {self.tr('admin_backup', l) for l in all_langs}:
             self.manual_backup_command(message)
         elif text == '➕ إضافة وسيلة دفع':
             self.start_simple_payment_method_wizard(message)
@@ -4118,7 +4125,7 @@ class ComprehensiveDUXBot:
             self.start_disable_payment_method_wizard(message)
         elif text == '▶️ تشغيل وسيلة دفع':
             self.start_enable_payment_method_wizard(message)
-        elif text in ['🏠 القائمة الرئيسية', '🏠 الرئيسية']:
+        elif text in {self.tr('admin_main_menu', l) for l in all_langs}:
             # إنهاء جلسة الأدمن والعودة للقائمة الرئيسية
             if message['from']['id'] in self.user_states:
                 del self.user_states[message['from']['id']]
@@ -4147,7 +4154,7 @@ class ComprehensiveDUXBot:
             if trans_id:
                 self.approve_transaction(message, trans_id)
             else:
-                self.send_message(message['chat']['id'], "❌ لم يتم العثور على رقم المعاملة. مثال: موافقة DEP123456", self.admin_keyboard())
+                self.send_message(message['chat']['id'], "❌ لم يتم العثور على رقم المعاملة. مثال: موافقة DEP123456", self.admin_keyboard(admin_lang))
                 
         elif any(word in text.lower() for word in ['رفض', 'رافض', 'لا', 'مرفوض', 'إلغاء', 'الغاء', 'منع']):
             # استخراج رقم المعاملة والسبب
@@ -4166,12 +4173,12 @@ class ComprehensiveDUXBot:
                 if not reason.strip():
                     # تعيين حالة انتظار السبب لهذا الأدمن
                     self.user_states[user_id] = f'awaiting_reject_reason_{trans_id}'
-                    self.send_message(chat_id, f"📝 يرجى كتابة سبب الرفض للمعاملة {trans_id} ثم إرساله، أو اكتب 'إلغاء' لإلغاء العملية.", self.admin_keyboard())
+                    self.send_message(chat_id, f"📝 يرجى كتابة سبب الرفض للمعاملة {trans_id} ثم إرساله، أو اكتب 'إلغاء' لإلغاء العملية.", self.admin_keyboard(admin_lang))
                     return
                 # إذا تم تقديم السبب، نقوم برفض المعاملة مباشرة
                 self.reject_transaction(message, trans_id, reason)
             else:
-                self.send_message(message['chat']['id'], "❌ لم يتم العثور على رقم المعاملة. مثال: رفض DEP123456 سبب الرفض", self.admin_keyboard())
+                self.send_message(message['chat']['id'], "❌ لم يتم العثور على رقم المعاملة. مثال: رفض DEP123456 سبب الرفض", self.admin_keyboard(admin_lang))
         elif text.startswith('بحث '):
             query = text.replace('بحث ', '')
             self.search_users_admin(message, query)
@@ -4184,7 +4191,7 @@ class ComprehensiveDUXBot:
         elif text.startswith('ادمن_مؤقت '):
             parts = text.replace('ادمن_مؤقت ', '').split()
             if len(parts) < 1:
-                self.send_message(chat_id, "❌ الصيغة: ادمن_مؤقت ID الدور المدة\nمثال: ادمن_مؤقت 123456789 full 24", self.admin_keyboard())
+                self.send_message(chat_id, "❌ الصيغة: ادمن_مؤقت ID الدور المدة\nمثال: ادمن_مؤقت 123456789 full 24", self.admin_keyboard(admin_lang))
                 return
             user_id_to_add = parts[0]
             role = parts[1] if len(parts) > 1 else 'full'
@@ -4200,7 +4207,7 @@ class ComprehensiveDUXBot:
                 role = parts[1]
                 self.set_admin_role(message, admin_id_str, role)
             else:
-                self.send_message(chat_id, "❌ الصيغة: صلاحيات ID_المستخدم الدور\nمثال: صلاحيات 123456789 transactions", self.admin_keyboard())
+                self.send_message(chat_id, "❌ الصيغة: صلاحيات ID_المستخدم الدور\nمثال: صلاحيات 123456789 transactions", self.admin_keyboard(admin_lang))
         elif text.startswith('ازالة_ادمن '):
             user_id_to_remove = text.replace('ازالة_ادمن ', '')
             self.remove_admin_user(message, user_id_to_remove)
@@ -4228,7 +4235,7 @@ class ComprehensiveDUXBot:
             if new_address:
                 self.update_address_simple(message, new_address)
             else:
-                self.send_message(message['chat']['id'], "يرجى كتابة العنوان الجديد. مثال: عنوان شارع الملك فهد", self.admin_keyboard())
+                self.send_message(message['chat']['id'], "يرجى كتابة العنوان الجديد. مثال: عنوان شارع الملك فهد", self.admin_keyboard(admin_lang))
         elif text.startswith('تعديل_اعداد '):
             self.update_setting_simple(message, text)
         elif text == '✅ حفظ الشركة':
@@ -4255,31 +4262,31 @@ class ComprehensiveDUXBot:
 
 الشركة متاحة الآن للعملاء ✅"""
                         
-                        self.send_message(chat_id, success_msg, self.admin_keyboard())
+                        self.send_message(chat_id, success_msg, self.admin_keyboard(admin_lang))
                         
                         # تنظيف البيانات المؤقتة
                         del self.user_states[user_id]
                         del self.temp_company_data[user_id]
                         
                     except Exception as e:
-                        self.send_message(chat_id, f"❌ فشل في حفظ الشركة: {str(e)}", self.admin_keyboard())
+                        self.send_message(chat_id, f"❌ فشل في حفظ الشركة: {str(e)}", self.admin_keyboard(admin_lang))
                 else:
-                    self.send_message(chat_id, "❌ لا توجد بيانات شركة محفوظة", self.admin_keyboard())
+                    self.send_message(chat_id, "❌ لا توجد بيانات شركة محفوظة", self.admin_keyboard(admin_lang))
             else:
-                self.send_message(chat_id, "❌ لا توجد شركة للحفظ. ابدأ بإضافة شركة جديدة أولاً.", self.admin_keyboard())
+                self.send_message(chat_id, "❌ لا توجد شركة للحفظ. ابدأ بإضافة شركة جديدة أولاً.", self.admin_keyboard(admin_lang))
         elif text == '✅ حفظ التغييرات':
             # التعامل مع حفظ تغييرات الشركة
             if user_id in self.user_states and self.user_states[user_id] == 'editing_company_menu':
                 self.save_company_changes(message)
             else:
-                self.send_message(chat_id, "❌ لا توجد تغييرات للحفظ. ابدأ بتعديل شركة أولاً.", self.admin_keyboard())
+                self.send_message(chat_id, "❌ لا توجد تغييرات للحفظ. ابدأ بتعديل شركة أولاً.", self.admin_keyboard(admin_lang))
         elif text in ['❌ إلغاء', 'إلغاء', 'الغاء']:
             # إلغاء العملية الحالية
             if user_id in self.user_states:
                 del self.user_states[user_id]
             if user_id in self.edit_company_data:
                 del self.edit_company_data[user_id]
-            self.send_message(chat_id, "❌ تم إلغاء العملية", self.admin_keyboard())
+            self.send_message(chat_id, "❌ تم إلغاء العملية", self.admin_keyboard(admin_lang))
         else:
             self.send_message(message['chat']['id'], "أمر غير مفهوم. استخدم الأزرار أو الأوامر الصحيحة.", self.main_keyboard('ar', user_id))
     
@@ -4348,7 +4355,7 @@ class ComprehensiveDUXBot:
             pending_text += "📝 **أمثلة أوامر الرفض:**\n"
             pending_text += "`رفض` أو `لا` أو `مرفوض` أو `إلغاء`"
         
-        self.send_message(message['chat']['id'], pending_text, self.admin_keyboard())
+        self.send_message(message['chat']['id'], pending_text, self.admin_keyboard(admin_lang))
     
     def approve_transaction(self, message, trans_id):
         """الموافقة على معاملة"""
@@ -4382,9 +4389,9 @@ class ComprehensiveDUXBot:
                         except Exception as e:
                             logger.error(f"خطأ في تحديث الاسترداد الذكي: {e}")
             
-            self.send_message(message['chat']['id'], self.tr('transaction_approved', 'ar', trans_id=trans_id), self.admin_keyboard())
+            self.send_message(message['chat']['id'], self.tr('transaction_approved', 'ar', trans_id=trans_id), self.admin_keyboard(admin_lang))
         else:
-            self.send_message(message['chat']['id'], f"❌ {trans_id}", self.admin_keyboard())
+            self.send_message(message['chat']['id'], f"❌ {trans_id}", self.admin_keyboard(admin_lang))
     
     def reject_transaction(self, message, trans_id, reason):
         """رفض معاملة"""
@@ -4426,9 +4433,9 @@ class ComprehensiveDUXBot:
                         except Exception as e:
                             logger.error(f"خطأ في تشغيل الاسترداد الذكي: {e}")
             
-            self.send_message(message['chat']['id'], self.tr('transaction_rejected', 'ar', trans_id=trans_id, reason=reason), self.admin_keyboard())
+            self.send_message(message['chat']['id'], self.tr('transaction_rejected', 'ar', trans_id=trans_id, reason=reason), self.admin_keyboard(admin_lang))
         else:
-            self.send_message(message['chat']['id'], f"❌ {trans_id}", self.admin_keyboard())
+            self.send_message(message['chat']['id'], f"❌ {trans_id}", self.admin_keyboard(admin_lang))
     
     def update_transaction_status(self, trans_id, new_status, note='', admin_id=''):
         """تحديث حالة المعاملة"""
@@ -4564,7 +4571,7 @@ class ComprehensiveDUXBot:
         stats_text += f"📨 الشكاوى: {total_complaints}\n\n"
         stats_text += f"📅 {datetime.now().strftime('%Y-%m-%d %H:%M')}"
         
-        self.send_message(message['chat']['id'], stats_text, self.admin_keyboard())
+        self.send_message(message['chat']['id'], stats_text, self.admin_keyboard(admin_lang))
     
     def add_company_simple_with_display(self, message, text):
         """إضافة شركة مع عرض القائمة المحدثة"""
@@ -4594,7 +4601,7 @@ class ComprehensiveDUXBot:
 ▫️ اضافة_شركة فودافون_كاش withdraw محفظة_الكترونية
 ▫️ اضافة_شركة STC_Pay both خدمات_دفع"""
             
-            self.send_message(message['chat']['id'], help_text, self.admin_keyboard())
+            self.send_message(message['chat']['id'], help_text, self.admin_keyboard(admin_lang))
             return
         
         company_name = parts[0].replace('_', ' ')
@@ -4625,7 +4632,7 @@ class ComprehensiveDUXBot:
 مثال صحيح:
 اضافة_شركة مدى both محفظة_رقمية"""
             
-            self.send_message(message['chat']['id'], error_text, self.admin_keyboard())
+            self.send_message(message['chat']['id'], error_text, self.admin_keyboard(admin_lang))
             return
         
         # إنشاء معرف جديد
@@ -4675,11 +4682,11 @@ class ComprehensiveDUXBot:
             except:
                 pass
             
-            self.send_message(message['chat']['id'], success_msg, self.admin_keyboard())
+            self.send_message(message['chat']['id'], success_msg, self.admin_keyboard(admin_lang))
             return True
             
         except Exception as e:
-            self.send_message(message['chat']['id'], f"❌ فشل في إضافة الشركة: {str(e)}", self.admin_keyboard())
+            self.send_message(message['chat']['id'], f"❌ فشل في إضافة الشركة: {str(e)}", self.admin_keyboard(admin_lang))
             return False
     
     def update_address_simple(self, message, new_address):
@@ -4690,9 +4697,9 @@ class ComprehensiveDUXBot:
                 writer.writerow(['id', 'address', 'is_active'])
                 writer.writerow(['1', new_address, 'yes'])
             
-            self.send_message(message['chat']['id'], f"✅ تم تحديث عنوان الصرافة:\n{new_address}", self.admin_keyboard())
+            self.send_message(message['chat']['id'], f"✅ تم تحديث عنوان الصرافة:\n{new_address}", self.admin_keyboard(admin_lang))
         except Exception as e:
-            self.send_message(message['chat']['id'], f"❌ فشل في تحديث العنوان: {str(e)}", self.admin_keyboard())
+            self.send_message(message['chat']['id'], f"❌ فشل في تحديث العنوان: {str(e)}", self.admin_keyboard(admin_lang))
     
     # ==================== نظام المطابقة ====================
 
@@ -5018,7 +5025,7 @@ class ComprehensiveDUXBot:
                     f"👤 المودع: {match['depositor_alias']}\n"
                     f"👤 الساحب: {match['withdrawer_alias']}"
                 )
-                self.send_message(admin_id, admin_msg, self.admin_keyboard())
+                self.send_message(admin_id, admin_msg, self.admin_keyboard(admin_lang))
             except:
                 pass
 
@@ -5623,9 +5630,9 @@ class ComprehensiveDUXBot:
             
             welcome_msg = self.tr('language_changed', new_lang)
             if return_to_admin:
-                # العودة للوحة الأدمن مترجمة
+                # العودة للوحة الأدمن مترجمة باللغة الجديدة
                 admin_msg = self.tr('admin_panel', new_lang)
-                self.send_message(message['chat']['id'], f"{welcome_msg}\n\n{admin_msg}", self.admin_keyboard())
+                self.send_message(message['chat']['id'], f"{welcome_msg}\n\n{admin_msg}", self.admin_keyboard(new_lang))
             else:
                 self.send_message(message['chat']['id'], welcome_msg, self.main_keyboard(new_lang))
             if user_id in self.user_states:
@@ -5646,7 +5653,7 @@ class ComprehensiveDUXBot:
 • رقم الهاتف
 
 مثال: بحث أحمد"""
-        self.send_message(message['chat']['id'], search_help, self.admin_keyboard())
+        self.send_message(message['chat']['id'], search_help, self.admin_keyboard(admin_lang))
         
     def search_users_admin(self, message, query):
         """البحث في المستخدمين للأدمن"""
@@ -5662,7 +5669,7 @@ class ComprehensiveDUXBot:
                         results.append(row)
             
             if not results:
-                self.send_message(message['chat']['id'], f"❌ لم يتم العثور على نتائج للبحث: {query}", self.admin_keyboard())
+                self.send_message(message['chat']['id'], f"❌ لم يتم العثور على نتائج للبحث: {query}", self.admin_keyboard(admin_lang))
                 return
             
             response = f"🔍 نتائج البحث عن: {query}\n\n"
@@ -5676,32 +5683,32 @@ class ComprehensiveDUXBot:
             if len(response) > 4000:
                 response = response[:4000] + "\n... والمزيد من النتائج"
             
-            self.send_message(message['chat']['id'], response, self.admin_keyboard())
+            self.send_message(message['chat']['id'], response, self.admin_keyboard(admin_lang))
             
         except Exception as e:
             logger.error(f"خطأ في البحث: {e}")
-            self.send_message(message['chat']['id'], "❌ حدث خطأ أثناء البحث", self.admin_keyboard())
+            self.send_message(message['chat']['id'], "❌ حدث خطأ أثناء البحث", self.admin_keyboard(admin_lang))
 
     def add_admin_user(self, message, user_id_to_add):
         """إضافة أدمن جديد — مع فحوصات أمنية"""
         try:
             if not user_id_to_add.isdigit():
-                self.send_message(message['chat']['id'], "❌ معرف المستخدم يجب أن يكون رقماً صحيحاً", self.admin_keyboard())
+                self.send_message(message['chat']['id'], "❌ معرف المستخدم يجب أن يكون رقماً صحيحاً", self.admin_keyboard(admin_lang))
                 return
 
             new_admin_id = int(user_id_to_add)
             requester_id = message['from']['id']
 
             if new_admin_id == requester_id:
-                self.send_message(message['chat']['id'], "⚠️ أنت أدمن بالفعل!", self.admin_keyboard())
+                self.send_message(message['chat']['id'], "⚠️ أنت أدمن بالفعل!", self.admin_keyboard(admin_lang))
                 return
 
             if new_admin_id in self.admin_user_ids:
-                self.send_message(message['chat']['id'], f"⚠️ المستخدم {user_id_to_add} أدمن بالفعل", self.admin_keyboard())
+                self.send_message(message['chat']['id'], f"⚠️ المستخدم {user_id_to_add} أدمن بالفعل", self.admin_keyboard(admin_lang))
                 return
 
             if new_admin_id in self.temp_admin_user_ids:
-                self.send_message(message['chat']['id'], f"⚠️ المستخدم {user_id_to_add} مدير مؤقت بالفعل", self.admin_keyboard())
+                self.send_message(message['chat']['id'], f"⚠️ المستخدم {user_id_to_add} مدير مؤقت بالفعل", self.admin_keyboard(admin_lang))
                 return
 
             self.admin_user_ids.append(new_admin_id)
@@ -5715,12 +5722,12 @@ class ComprehensiveDUXBot:
 💡 ملاحظة: هذا الأدمن نشط في الجلسة الحالية فقط.
 للاستمرارية، أضف المعرف إلى متغير البيئة ADMIN_USER_IDS"""
 
-            self.send_message(message['chat']['id'], success_msg, self.admin_keyboard())
+            self.send_message(message['chat']['id'], success_msg, self.admin_keyboard(admin_lang))
             logger.info(f"تم إضافة أدمن جديد: {user_id_to_add} بواسطة: {requester_id}")
 
         except Exception as e:
             logger.error(f"خطأ في إضافة الأدمن: {e}")
-            self.send_message(message['chat']['id'], "❌ حدث خطأ أثناء إضافة الأدمن", self.admin_keyboard())
+            self.send_message(message['chat']['id'], "❌ حدث خطأ أثناء إضافة الأدمن", self.admin_keyboard(admin_lang))
     
     def prompt_add_admin(self, message):
         """طلب إضافة أدمن جديد"""
@@ -5731,7 +5738,7 @@ class ComprehensiveDUXBot:
 مثال: اضافة_ادمن 123456789
 
 💡 لمعرفة معرف المستخدم، اطلب منه إرسال /myid"""
-        self.send_message(message['chat']['id'], add_admin_help, self.admin_keyboard())
+        self.send_message(message['chat']['id'], add_admin_help, self.admin_keyboard(admin_lang))
     
     def show_admin_list(self, message):
         """عرض قائمة الأدمن"""
@@ -5742,7 +5749,7 @@ class ComprehensiveDUXBot:
         
         admin_text += f"\n📊 العدد الإجمالي: {len(self.admin_user_ids)} مدير"
         
-        self.send_message(message['chat']['id'], admin_text, self.admin_keyboard())
+        self.send_message(message['chat']['id'], admin_text, self.admin_keyboard(admin_lang))
     
     
     def start_button_label_editor(self, message):
@@ -5755,7 +5762,7 @@ class ComprehensiveDUXBot:
 
         # 1) أزرار لوحة الأدمن
         try:
-            admin_kb = self.admin_keyboard().get('keyboard', [])
+            admin_kb = self.admin_keyboard(admin_lang).get('keyboard', [])
             for row in admin_kb:
                 for btn in row:
                     if isinstance(btn, dict):
@@ -5798,7 +5805,7 @@ class ComprehensiveDUXBot:
             pass
 
         if not all_buttons:
-            self.send_message(chat_id, "⚠️ لا توجد أزرار متاحة للتعديل حالياً.", self.admin_keyboard())
+            self.send_message(chat_id, "⚠️ لا توجد أزرار متاحة للتعديل حالياً.", self.admin_keyboard(admin_lang))
             return
 
         # ترتيب الأزرار لعرضها بشكل منظم
@@ -5840,13 +5847,13 @@ class ComprehensiveDUXBot:
                 del self.temp_button_label_edit[user_id]
             if user_id in self.user_states:
                 del self.user_states[user_id]
-            self.send_message(chat_id, "❌ تم إلغاء عملية تعديل مسمى الزر.", self.admin_keyboard())
+            self.send_message(chat_id, "❌ تم إلغاء عملية تعديل مسمى الزر.", self.admin_keyboard(admin_lang))
             return
 
         # المرحلة 1: اختيار الزر من القائمة
         if state == 'choose_button_to_edit':
             if not text:
-                self.send_message(chat_id, "❗ يرجى اختيار زر من القائمة.", self.admin_keyboard())
+                self.send_message(chat_id, "❗ يرجى اختيار زر من القائمة.", self.admin_keyboard(admin_lang))
                 return
 
             # حفظ النص القديم مؤقتاً
@@ -5870,7 +5877,7 @@ class ComprehensiveDUXBot:
             old_label = data.get('old')
             if not old_label:
                 # في حالة فقدان السياق نبدأ من جديد
-                self.send_message(chat_id, "⚠️ حدث خطأ بسيط في السياق، لنبدأ من جديد.", self.admin_keyboard())
+                self.send_message(chat_id, "⚠️ حدث خطأ بسيط في السياق، لنبدأ من جديد.", self.admin_keyboard(admin_lang))
                 self.start_button_label_editor(message)
                 return
 
@@ -5898,7 +5905,7 @@ class ComprehensiveDUXBot:
                     "يرجى المحاولة مرة أخرى لاحقًا."
                 )
 
-            self.send_message(chat_id, msg, self.admin_keyboard())
+            self.send_message(chat_id, msg, self.admin_keyboard(admin_lang))
             return
     def show_admin_management(self, message):
             """لوحة إدارة المديرين المتقدمة"""
@@ -5967,17 +5974,17 @@ class ComprehensiveDUXBot:
             """إضافة مدير مؤقت — مع دور ومدة انتهاء"""
             try:
                 if not user_id_to_add.isdigit():
-                    self.send_message(message['chat']['id'], "❌ معرف المستخدم يجب أن يكون رقماً صحيحاً", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], "❌ معرف المستخدم يجب أن يكون رقماً صحيحاً", self.admin_keyboard(admin_lang))
                     return
                 
                 user_id = int(user_id_to_add)
                 
                 if user_id in self.temp_admin_user_ids:
-                    self.send_message(message['chat']['id'], f"⚠️ المستخدم {user_id_to_add} مدير مؤقت بالفعل", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], f"⚠️ المستخدم {user_id_to_add} مدير مؤقت بالفعل", self.admin_keyboard(admin_lang))
                     return
                 
                 if user_id in self.admin_user_ids:
-                    self.send_message(message['chat']['id'], f"⚠️ المستخدم {user_id_to_add} مدير دائم بالفعل", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], f"⚠️ المستخدم {user_id_to_add} مدير دائم بالفعل", self.admin_keyboard(admin_lang))
                     return
 
                 # التحقق من صحة الدور
@@ -6022,20 +6029,20 @@ class ComprehensiveDUXBot:
 
 💡 الصلاحيات حسب الدور المحدد"""
 
-                self.send_message(message['chat']['id'], success_msg, self.admin_keyboard())
+                self.send_message(message['chat']['id'], success_msg, self.admin_keyboard(admin_lang))
                 self.log_admin_action(message['from']['id'], "add_temp_admin",
                     f"user={user_id_to_add}, role={role}, duration={duration_hours}h")
                 logger.info(f"تم إضافة مدير مؤقت: {user_id_to_add} (دور: {role}, مدة: {duration_hours}h)")
                 
             except Exception as e:
                 logger.error(f"خطأ في إضافة المدير المؤقت: {e}")
-                self.send_message(message['chat']['id'], "❌ حدث خطأ أثناء إضافة المدير المؤقت", self.admin_keyboard())
+                self.send_message(message['chat']['id'], "❌ حدث خطأ أثناء إضافة المدير المؤقت", self.admin_keyboard(admin_lang))
         
     def remove_admin_user(self, message, user_id_to_remove):
             """إزالة مدير — مع منع إزالة النفس"""
             try:
                 if not user_id_to_remove.isdigit():
-                    self.send_message(message['chat']['id'], "❌ معرف المستخدم يجب أن يكون رقماً صحيحاً", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], "❌ معرف المستخدم يجب أن يكون رقماً صحيحاً", self.admin_keyboard(admin_lang))
                     return
                 
                 user_id = int(user_id_to_remove)
@@ -6043,12 +6050,12 @@ class ComprehensiveDUXBot:
                 
                 # أمان: منع إزالة النفس
                 if user_id == requester_id:
-                    self.send_message(message['chat']['id'], "⚠️ لا يمكنك إزالة نفسك!", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], "⚠️ لا يمكنك إزالة نفسك!", self.admin_keyboard(admin_lang))
                     return
                 
                 # أمان: منع إزالة آخر أدمن دائم
                 if user_id in self.admin_user_ids and len(self.admin_user_ids) <= 1:
-                    self.send_message(message['chat']['id'], "⚠️ لا يمكن إزالة آخر مدير دائم!", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], "⚠️ لا يمكن إزالة آخر مدير دائم!", self.admin_keyboard(admin_lang))
                     return
                 
                 removed = False
@@ -6074,14 +6081,14 @@ class ComprehensiveDUXBot:
     
     ⚠️ ملاحظة: إذا كان مديراً دائماً، سيتم استعادته عند إعادة تشغيل النظام إلا إذا تم إزالته من متغير البيئة ADMIN_USER_IDS"""
                     
-                    self.send_message(message['chat']['id'], success_msg, self.admin_keyboard())
+                    self.send_message(message['chat']['id'], success_msg, self.admin_keyboard(admin_lang))
                     logger.info(f"تم إزالة مدير {admin_type}: {user_id_to_remove}")
                 else:
-                    self.send_message(message['chat']['id'], f"❌ المستخدم {user_id_to_remove} ليس مديراً", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], f"❌ المستخدم {user_id_to_remove} ليس مديراً", self.admin_keyboard(admin_lang))
                 
             except Exception as e:
                 logger.error(f"خطأ في إزالة المدير: {e}")
-                self.send_message(message['chat']['id'], "❌ حدث خطأ أثناء إزالة المدير", self.admin_keyboard())
+                self.send_message(message['chat']['id'], "❌ حدث خطأ أثناء إزالة المدير", self.admin_keyboard(admin_lang))
         
     def show_detailed_admin_list(self, message):
             """عرض قائمة المديرين المفصلة"""
@@ -6111,7 +6118,7 @@ class ComprehensiveDUXBot:
             total_admins = len(self.admin_user_ids) + len(self.temp_admin_user_ids) + len(self.admin_ids)
             admin_text += f"📈 إجمالي المديرين: {total_admins}"
             
-            self.send_message(message['chat']['id'], admin_text, self.admin_keyboard())
+            self.send_message(message['chat']['id'], admin_text, self.admin_keyboard(admin_lang))
         
     def prompt_add_permanent_admin(self, message):
             """طلب إضافة مدير دائم"""
@@ -6126,7 +6133,7 @@ class ComprehensiveDUXBot:
     • يفقد الصلاحيات عند إعادة التشغيل إلا إذا تم إضافته لمتغير البيئة
     • لمعرفة معرف المستخدم: /myid"""
             
-            self.send_message(message['chat']['id'], help_text, self.admin_keyboard())
+            self.send_message(message['chat']['id'], help_text, self.admin_keyboard(admin_lang))
         
     def prompt_add_temp_admin(self, message):
             """طلب إضافة مدير مؤقت — مع اختيار الدور والمدة"""
@@ -6153,7 +6160,7 @@ class ComprehensiveDUXBot:
 
 💡 اكتب الأمر الآن:"""
             
-            self.send_message(message['chat']['id'], help_text, self.admin_keyboard())
+            self.send_message(message['chat']['id'], help_text, self.admin_keyboard(admin_lang))
         
     def start_permission_editor(self, message):
             """بدء تخصيص صلاحيات مدير"""
@@ -6172,13 +6179,13 @@ class ComprehensiveDUXBot:
             roles_text += "مثال:\n"
             roles_text += "صلاحيات 123456789 transactions"
 
-            self.send_message(message['chat']['id'], roles_text, self.admin_keyboard())
+            self.send_message(message['chat']['id'], roles_text, self.admin_keyboard(admin_lang))
 
     def set_admin_role(self, message, admin_id_str, role):
             """تعيين دور لمدير"""
             try:
                 if role not in self.ADMIN_ROLES:
-                    self.send_message(message['chat']['id'], "❌ دور غير صحيح. استخدم: full, transactions, support, companies", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], "❌ دور غير صحيح. استخدم: full, transactions, support, companies", self.admin_keyboard(admin_lang))
                     return
 
                 role_info = self.ADMIN_ROLES[role]
@@ -6199,11 +6206,11 @@ class ComprehensiveDUXBot:
                     f"admin={admin_id_str}, role={role}")
                 self.send_message(message['chat']['id'],
                     f"✅ تم تعيين دور: {role_info['icon']} {role_info['name']}\nللمدير: {admin_id_str}",
-                    self.admin_keyboard())
+                    self.admin_keyboard(admin_lang))
                 logger.info(f"Set admin role {role} for {admin_id_str}")
             except Exception as e:
                 logger.error(f"خطأ في تعيين دور المدير: {e}")
-                self.send_message(message['chat']['id'], "❌ خطأ في تعيين الدور", self.admin_keyboard())
+                self.send_message(message['chat']['id'], "❌ خطأ في تعيين الدور", self.admin_keyboard(admin_lang))
 
     def prompt_remove_admin(self, message):
             """طلب إزالة مدير"""
@@ -6218,7 +6225,7 @@ class ComprehensiveDUXBot:
     • المديرين الدائمين سيتم استعادتهم عند إعادة التشغيل
     • لإزالة دائمة، يجب تعديل متغير البيئة ADMIN_USER_IDS"""
             
-            self.send_message(message['chat']['id'], help_text, self.admin_keyboard())
+            self.send_message(message['chat']['id'], help_text, self.admin_keyboard(admin_lang))
         
     def show_admin_statistics(self, message):
             """عرض إحصائيات المديرين"""
@@ -6256,7 +6263,7 @@ class ComprehensiveDUXBot:
             if env_count == 0:
                 stats_text += "• إضافة مدير في متغير البيئة للاستمرارية\n"
             
-            self.send_message(message['chat']['id'], stats_text, self.admin_keyboard())
+            self.send_message(message['chat']['id'], stats_text, self.admin_keyboard(admin_lang))
         
     def prompt_broadcast(self, message):
             """طلب الإرسال الجماعي — مع تأكيد"""
@@ -6274,7 +6281,7 @@ class ComprehensiveDUXBot:
     الصيغة: حظر رقم_العميل السبب
     
     مثال: حظر C123456 مخالفة الشروط"""
-            self.send_message(message['chat']['id'], ban_help, self.admin_keyboard())
+            self.send_message(message['chat']['id'], ban_help, self.admin_keyboard(admin_lang))
         
     def prompt_unban_user(self, message):
             """طلب إلغاء حظر مستخدم مع عرض المستخدمين المحظورين"""
@@ -6313,7 +6320,7 @@ class ComprehensiveDUXBot:
             else:
                 unban_help += "\n\n✅ لا يوجد مستخدمين محظورين حالياً"
             
-            self.send_message(message['chat']['id'], unban_help, self.admin_keyboard())
+            self.send_message(message['chat']['id'], unban_help, self.admin_keyboard(admin_lang))
         
     def prompt_add_company(self, message):
             """بدء معالج إضافة شركة التفاعلي"""
@@ -6373,7 +6380,7 @@ class ComprehensiveDUXBot:
                     del self.user_states[user_id]
                     if hasattr(self, 'temp_company_data') and user_id in self.temp_company_data:
                         del self.temp_company_data[user_id]
-                    self.send_message(message['chat']['id'], "❌ تم إلغاء إضافة الشركة", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], "❌ تم إلغاء إضافة الشركة", self.admin_keyboard(admin_lang))
                     return
                 else:
                     self.send_message(message['chat']['id'], "❌ اختر نوع الخدمة من الأزرار المتاحة")
@@ -6448,7 +6455,7 @@ class ComprehensiveDUXBot:
                     del self.user_states[user_id]
                     if user_id in self.temp_company_data:
                         del self.temp_company_data[user_id]
-                    self.send_message(message['chat']['id'], "❌ تم إلغاء إضافة الشركة", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], "❌ تم إلغاء إضافة الشركة", self.admin_keyboard(admin_lang))
                     
                 elif text == '🔄 تعديل الاسم':
                     self.send_message(message['chat']['id'], f"📝 الاسم الحالي: {company_data['name']}\n\nأرسل الاسم الجديد:")
@@ -6591,7 +6598,7 @@ class ComprehensiveDUXBot:
                     del self.user_states[user_id]
                     if user_id in self.edit_company_data:
                         del self.edit_company_data[user_id]
-                    self.send_message(message['chat']['id'], "❌ تم إلغاء تعديل الشركة", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], "❌ تم إلغاء تعديل الشركة", self.admin_keyboard(admin_lang))
                     
             elif state == 'editing_company_name':
                 self.edit_company_data[user_id]['name'] = text
@@ -6688,10 +6695,10 @@ class ComprehensiveDUXBot:
     📋 التفاصيل: {updated_company['details']}
     🔘 الحالة: {'نشط' if updated_company.get('is_active') == 'active' else 'غير نشط'}"""
                 
-                self.send_message(message['chat']['id'], success_msg, self.admin_keyboard())
+                self.send_message(message['chat']['id'], success_msg, self.admin_keyboard(admin_lang))
                 
             except Exception as e:
-                self.send_message(message['chat']['id'], f"❌ فشل في حفظ التغييرات: {str(e)}", self.admin_keyboard())
+                self.send_message(message['chat']['id'], f"❌ فشل في حفظ التغييرات: {str(e)}", self.admin_keyboard(admin_lang))
             
             # تنظيف البيانات المؤقتة
             del self.user_states[user_id]
@@ -6842,15 +6849,15 @@ class ComprehensiveDUXBot:
     🏢 الاسم: {deleted_company['name']}
     📋 النوع: {deleted_company['type']}"""
                         
-                        self.send_message(message['chat']['id'], success_msg, self.admin_keyboard())
+                        self.send_message(message['chat']['id'], success_msg, self.admin_keyboard(admin_lang))
                     else:
-                        self.send_message(message['chat']['id'], "❌ فشل في العثور على الشركة للحذف", self.admin_keyboard())
+                        self.send_message(message['chat']['id'], "❌ فشل في العثور على الشركة للحذف", self.admin_keyboard(admin_lang))
                         
                 except Exception as e:
-                    self.send_message(message['chat']['id'], f"❌ فشل في حذف الشركة: {str(e)}", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], f"❌ فشل في حذف الشركة: {str(e)}", self.admin_keyboard(admin_lang))
             
             elif text == '❌ إلغاء':
-                self.send_message(message['chat']['id'], "❌ تم إلغاء حذف الشركة", self.admin_keyboard())
+                self.send_message(message['chat']['id'], "❌ تم إلغاء حذف الشركة", self.admin_keyboard(admin_lang))
             
             # تنظيف الحالة
             del self.user_states[user_id]
@@ -6902,7 +6909,7 @@ class ComprehensiveDUXBot:
     • غير الأرقام والنصوص حسب الحاجة
     • استخدم _ بدلاً من المسافات في أسماء الشركات"""
             
-            self.send_message(message['chat']['id'], commands_text, self.admin_keyboard())
+            self.send_message(message['chat']['id'], commands_text, self.admin_keyboard(admin_lang))
         
     def get_payment_methods_by_company(self, company_id, transaction_type=None):
             """الحصول على وسائل الدفع لشركة معينة"""
@@ -7090,7 +7097,7 @@ class ComprehensiveDUXBot:
                 company_name = state.replace('adding_company_type_', '')
                 
                 if text == '❌ إلغاء':
-                    self.send_message(message['chat']['id'], "تم إلغاء إضافة الشركة", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], "تم إلغاء إضافة الشركة", self.admin_keyboard(admin_lang))
                     del self.user_states[user_id]
                     return
                 
@@ -7145,11 +7152,11 @@ class ComprehensiveDUXBot:
     
     الشركة أصبحت متاحة الآن للعملاء."""
                     
-                    self.send_message(message['chat']['id'], success_msg, self.admin_keyboard())
+                    self.send_message(message['chat']['id'], success_msg, self.admin_keyboard(admin_lang))
                     del self.user_states[user_id]
                     
                 except Exception as e:
-                    self.send_message(message['chat']['id'], f"❌ فشل في إضافة الشركة: {str(e)}", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], f"❌ فشل في إضافة الشركة: {str(e)}", self.admin_keyboard(admin_lang))
                     del self.user_states[user_id]
         
     def show_companies_management(self, message):
@@ -7170,7 +7177,7 @@ class ComprehensiveDUXBot:
             companies_text += "• اضافة_شركة اسم نوع تفاصيل\n"
             companies_text += "• حذف_شركة رقم_المعرف\n"
             
-            self.send_message(message['chat']['id'], companies_text, self.admin_keyboard())
+            self.send_message(message['chat']['id'], companies_text, self.admin_keyboard(admin_lang))
         
     def show_addresses_management(self, message):
             """عرض إدارة العناوين"""
@@ -7187,7 +7194,7 @@ class ComprehensiveDUXBot:
     مثال:
     عنوان_جديد شارع الملك فهد، الرياض، مقابل برج المملكة"""
             
-            self.send_message(message['chat']['id'], address_text, self.admin_keyboard())
+            self.send_message(message['chat']['id'], address_text, self.admin_keyboard(admin_lang))
         
     def show_system_settings(self, message):
             """عرض إعدادات النظام"""
@@ -7206,12 +7213,12 @@ class ComprehensiveDUXBot:
             settings_text += "تعديل_اعداد مفتاح_الإعداد القيمة_الجديدة\n\n"
             settings_text += "مثال:\nتعديل_اعداد min_deposit 100"
             
-            self.send_message(message['chat']['id'], settings_text, self.admin_keyboard())
+            self.send_message(message['chat']['id'], settings_text, self.admin_keyboard(admin_lang))
 
     def show_theme_panel(self, message):
         """عرض لوحة الثيمات للأدمن"""
         if not THEME_AVAILABLE:
-            self.send_message(message['chat']['id'], "❌ نظام الثيمات غير متاح", self.admin_keyboard())
+            self.send_message(message['chat']['id'], "❌ نظام الثيمات غير متاح", self.admin_keyboard(admin_lang))
             return
 
         current_theme = self.get_setting('active_theme') or 'gold'
@@ -7243,7 +7250,7 @@ class ComprehensiveDUXBot:
                     pending_complaints = [row for row in reader if row['status'] == 'pending']
                 
                 if not pending_complaints:
-                    self.send_message(message['chat']['id'], "✅ لا توجد شكاوى معلقة", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], "✅ لا توجد شكاوى معلقة", self.admin_keyboard(admin_lang))
                     return
                 
                 for complaint in pending_complaints:
@@ -7264,7 +7271,7 @@ class ComprehensiveDUXBot:
                     self.send_inline_message(message['chat']['id'], complaint_text, inline_btns)
                 
             except Exception as e:
-                self.send_message(message['chat']['id'], f"❌ خطأ في قراءة الشكاوى: {e}", self.admin_keyboard())
+                self.send_message(message['chat']['id'], f"❌ خطأ في قراءة الشكاوى: {e}", self.admin_keyboard(admin_lang))
         
     def start_complaint_reply_wizard(self, message, complaint_id):
             """بدء معالج الرد على الشكوى"""
@@ -7284,7 +7291,7 @@ class ComprehensiveDUXBot:
                 pass
             
             if not complaint_found:
-                self.send_message(message['chat']['id'], f"❌ لم يتم العثور على الشكوى {complaint_id}", self.admin_keyboard())
+                self.send_message(message['chat']['id'], f"❌ لم يتم العثور على الشكوى {complaint_id}", self.admin_keyboard(admin_lang))
                 return
             
             # عرض تفاصيل الشكوى مع أزرار ردود سريعة
@@ -7328,7 +7335,7 @@ class ComprehensiveDUXBot:
                 payment_text += f"\n🏢 {company['name']}\n"
                 payment_text += f"   📋 {service_type} - {company['details']}\n"
             
-            self.send_message(message['chat']['id'], payment_text, self.admin_keyboard())
+            self.send_message(message['chat']['id'], payment_text, self.admin_keyboard(admin_lang))
         
     def ban_user_admin(self, message, customer_id, reason):
             """حظر مستخدم من قبل الأدمن"""
@@ -7355,11 +7362,11 @@ class ComprehensiveDUXBot:
                                 row['currency'] = self.get_setting('default_currency') or 'SAR'
                             writer.writerow({k: row.get(k, '') for k in fieldnames})
                     
-                    self.send_message(message['chat']['id'], f"✅ تم حظر العميل {customer_id}\nالسبب: {reason}", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], f"✅ تم حظر العميل {customer_id}\nالسبب: {reason}", self.admin_keyboard(admin_lang))
                 else:
-                    self.send_message(message['chat']['id'], f"❌ لم يتم العثور على العميل {customer_id}", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], f"❌ لم يتم العثور على العميل {customer_id}", self.admin_keyboard(admin_lang))
             except:
-                self.send_message(message['chat']['id'], "❌ فشل في حظر المستخدم", self.admin_keyboard())
+                self.send_message(message['chat']['id'], "❌ فشل في حظر المستخدم", self.admin_keyboard(admin_lang))
         
     def unban_user_admin(self, message, customer_id):
             """إلغاء حظر مستخدم من قبل الأدمن"""
@@ -7386,11 +7393,11 @@ class ComprehensiveDUXBot:
                                 row['currency'] = self.get_setting('default_currency') or 'SAR'
                             writer.writerow({k: row.get(k, '') for k in fieldnames})
                     
-                    self.send_message(message['chat']['id'], f"✅ تم إلغاء حظر العميل {customer_id}", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], f"✅ تم إلغاء حظر العميل {customer_id}", self.admin_keyboard(admin_lang))
                 else:
-                    self.send_message(message['chat']['id'], f"❌ لم يتم العثور على العميل {customer_id}", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], f"❌ لم يتم العثور على العميل {customer_id}", self.admin_keyboard(admin_lang))
             except:
-                self.send_message(message['chat']['id'], "❌ فشل في إلغاء حظر المستخدم", self.admin_keyboard())
+                self.send_message(message['chat']['id'], "❌ فشل في إلغاء حظر المستخدم", self.admin_keyboard(admin_lang))
         
     def delete_company_simple(self, message, company_id):
             """حذف شركة بسيط"""
@@ -7414,11 +7421,11 @@ class ComprehensiveDUXBot:
                         writer.writeheader()
                         writer.writerows(companies)
                     
-                    self.send_message(message['chat']['id'], f"✅ تم حذف الشركة: {deleted_name} (ID: {company_id})", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], f"✅ تم حذف الشركة: {deleted_name} (ID: {company_id})", self.admin_keyboard(admin_lang))
                 else:
-                    self.send_message(message['chat']['id'], f"❌ لم يتم العثور على شركة بالمعرف: {company_id}", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], f"❌ لم يتم العثور على شركة بالمعرف: {company_id}", self.admin_keyboard(admin_lang))
             except:
-                self.send_message(message['chat']['id'], "❌ فشل في حذف الشركة", self.admin_keyboard())
+                self.send_message(message['chat']['id'], "❌ فشل في حذف الشركة", self.admin_keyboard(admin_lang))
         
     def update_setting_simple(self, message, text):
             """تحديث إعداد النظام"""
@@ -7432,7 +7439,7 @@ class ComprehensiveDUXBot:
     
     مثال:
     تعديل_اعداد min_deposit 100"""
-                self.send_message(message['chat']['id'], help_text, self.admin_keyboard())
+                self.send_message(message['chat']['id'], help_text, self.admin_keyboard(admin_lang))
                 return
             
             setting_key = parts[0]
@@ -7457,11 +7464,11 @@ class ComprehensiveDUXBot:
                         writer.writeheader()
                         writer.writerows(settings)
                     
-                    self.send_message(message['chat']['id'], f"✅ تم تحديث الإعداد:\n{setting_key} = {setting_value}", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], f"✅ تم تحديث الإعداد:\n{setting_key} = {setting_value}", self.admin_keyboard(admin_lang))
                 else:
-                    self.send_message(message['chat']['id'], f"❌ لم يتم العثور على الإعداد: {setting_key}", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], f"❌ لم يتم العثور على الإعداد: {setting_key}", self.admin_keyboard(admin_lang))
             except:
-                self.send_message(message['chat']['id'], "❌ فشل في تحديث الإعداد", self.admin_keyboard())
+                self.send_message(message['chat']['id'], "❌ فشل في تحديث الإعداد", self.admin_keyboard(admin_lang))
         
     def save_complaint(self, message, complaint_text):
             """حفظ شكوى المستخدم"""
@@ -7551,10 +7558,10 @@ class ComprehensiveDUXBot:
     
     📝 الرسالة: {broadcast_text}"""
                 
-                self.send_message(message['chat']['id'], summary, self.admin_keyboard())
+                self.send_message(message['chat']['id'], summary, self.admin_keyboard(admin_lang))
                 del self.user_states[message['from']['id']]
             except:
-                self.send_message(message['chat']['id'], "❌ فشل في الإرسال الجماعي", self.admin_keyboard())
+                self.send_message(message['chat']['id'], "❌ فشل في الإرسال الجماعي", self.admin_keyboard(admin_lang))
                 del self.user_states[message['from']['id']]
     
     def show_approved_transactions(self, message):
@@ -7585,7 +7592,7 @@ class ComprehensiveDUXBot:
             if not found_approved:
                 approved_text += "لا توجد معاملات مُوافق عليها"
             
-            self.send_message(message['chat']['id'], approved_text, self.admin_keyboard())
+            self.send_message(message['chat']['id'], approved_text, self.admin_keyboard(admin_lang))
         
     def show_users_management(self, message):
             """عرض إدارة المستخدمين"""
@@ -7614,7 +7621,7 @@ class ComprehensiveDUXBot:
             
             users_text += "مثال:\nبحث أحمد\nحظر C123456 مخالفة_الشروط"
             
-            self.send_message(message['chat']['id'], users_text, self.admin_keyboard())
+            self.send_message(message['chat']['id'], users_text, self.admin_keyboard(admin_lang))
         
     def search_users_admin(self, message, query):
             """البحث في المستخدمين للأدمن"""
@@ -7631,7 +7638,7 @@ class ComprehensiveDUXBot:
                 pass
             
             if not results:
-                self.send_message(message['chat']['id'], f"❌ لم يتم العثور على نتائج للبحث: {query}", self.admin_keyboard())
+                self.send_message(message['chat']['id'], f"❌ لم يتم العثور على نتائج للبحث: {query}", self.admin_keyboard(admin_lang))
                 return
             
             search_text = f"🔍 نتائج البحث عن: {query}\n\n"
@@ -7645,7 +7652,7 @@ class ComprehensiveDUXBot:
                     search_text += f"📝 سبب الحظر: {user['ban_reason']}\n"
                 search_text += "\n"
             
-            self.send_message(message['chat']['id'], search_text, self.admin_keyboard())
+            self.send_message(message['chat']['id'], search_text, self.admin_keyboard(admin_lang))
         
     def start_simple_payment_method_wizard(self, message):
             """معالج مبسط لإضافة وسيلة دفع"""
@@ -7656,7 +7663,7 @@ class ComprehensiveDUXBot:
             if not companies:
                 self.send_message(message['chat']['id'], 
                                 "❌ لا توجد شركات متاحة. يجب إضافة شركة أولاً", 
-                                self.admin_keyboard())
+                                self.admin_keyboard(admin_lang))
                 return
             
             companies_text = "🏢 اختر الشركة لإضافة وسيلة دفع:\n\n"
@@ -7682,7 +7689,7 @@ class ComprehensiveDUXBot:
             """معالج مبسط لتعديل وسيلة دفع"""
             methods = self.get_all_payment_methods()
             if not methods:
-                self.send_message(message['chat']['id'], "❌ لا توجد وسائل دفع متاحة", self.admin_keyboard())
+                self.send_message(message['chat']['id'], "❌ لا توجد وسائل دفع متاحة", self.admin_keyboard(admin_lang))
                 return
             
             methods_text = "✏️ اختر وسيلة الدفع للتعديل:\n\n"
@@ -7714,7 +7721,7 @@ class ComprehensiveDUXBot:
             """معالج مبسط لحذف وسيلة دفع"""
             methods = self.get_all_payment_methods()
             if not methods:
-                self.send_message(message['chat']['id'], "❌ لا توجد وسائل دفع متاحة", self.admin_keyboard())
+                self.send_message(message['chat']['id'], "❌ لا توجد وسائل دفع متاحة", self.admin_keyboard(admin_lang))
                 return
             
             methods_text = "🗑️ اختر وسيلة الدفع للحذف:\n\n"
@@ -7746,7 +7753,7 @@ class ComprehensiveDUXBot:
             methods = self.get_all_payment_methods()
             
             if not methods:
-                self.send_message(message['chat']['id'], "❌ لا توجد وسائل دفع مضافة بعد", self.admin_keyboard())
+                self.send_message(message['chat']['id'], "❌ لا توجد وسائل دفع مضافة بعد", self.admin_keyboard(admin_lang))
                 return
             
             methods_text = "📊 وسائل الدفع المتاحة:\n\n"
@@ -7767,7 +7774,7 @@ class ComprehensiveDUXBot:
             
             methods_text += f"📈 إجمالي وسائل الدفع: {len(methods)}"
             
-            self.send_message(message['chat']['id'], methods_text, self.admin_keyboard())
+            self.send_message(message['chat']['id'], methods_text, self.admin_keyboard(admin_lang))
         
     def handle_simple_payment_company_selection(self, message):
             """معالجة اختيار الشركة في المعالج المبسط"""
@@ -7849,9 +7856,9 @@ class ComprehensiveDUXBot:
     💰 البيانات: {account_data}
     💡 معلومات: {additional_info if additional_info else 'لا توجد'}"""
                         
-                        self.send_message(message['chat']['id'], success_msg, self.admin_keyboard())
+                        self.send_message(message['chat']['id'], success_msg, self.admin_keyboard(admin_lang))
                     else:
-                        self.send_message(message['chat']['id'], "❌ فشل في إضافة وسيلة الدفع", self.admin_keyboard())
+                        self.send_message(message['chat']['id'], "❌ فشل في إضافة وسيلة الدفع", self.admin_keyboard(admin_lang))
                 else:
                     self.send_message(message['chat']['id'], "❌ تنسيق غير صحيح. يجب أن يحتوي على 3 أجزاء على الأقل مفصولة بـ |")
                     return
@@ -7919,7 +7926,7 @@ class ComprehensiveDUXBot:
                 # الحصول على بيانات الوسيلة قبل الحذف
                 method_to_delete = self.get_payment_method_by_id(method_id)
                 if not method_to_delete:
-                    self.send_message(message['chat']['id'], f"❌ لم يتم العثور على وسيلة الدفع {method_id}", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], f"❌ لم يتم العثور على وسيلة الدفع {method_id}", self.admin_keyboard(admin_lang))
                     if user_id in self.user_states:
                         del self.user_states[user_id]
                     return
@@ -7938,9 +7945,9 @@ class ComprehensiveDUXBot:
     📋 الاسم: {deleted_method['method_name']}
     💳 النوع: {deleted_method['method_type']}"""
                     
-                    self.send_message(message['chat']['id'], success_msg, self.admin_keyboard())
+                    self.send_message(message['chat']['id'], success_msg, self.admin_keyboard(admin_lang))
                 else:
-                    self.send_message(message['chat']['id'], f"❌ فشل في حذف وسيلة الدفع {method_id}", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], f"❌ فشل في حذف وسيلة الدفع {method_id}", self.admin_keyboard(admin_lang))
                 
                 # تنظيف الحالة
                 if user_id in self.user_states:
@@ -7969,7 +7976,7 @@ class ComprehensiveDUXBot:
                     # التحقق من وجود الوسيلة قبل التحديث
                     existing_method = self.get_payment_method_by_id(method_id)
                     if not existing_method:
-                        self.send_message(message['chat']['id'], f"❌ لم يتم العثور على وسيلة الدفع رقم {method_id}", self.admin_keyboard())
+                        self.send_message(message['chat']['id'], f"❌ لم يتم العثور على وسيلة الدفع رقم {method_id}", self.admin_keyboard(admin_lang))
                         if user_id in self.user_states:
                             del self.user_states[user_id]
                         return
@@ -7996,9 +8003,9 @@ class ComprehensiveDUXBot:
     💰 البيانات: {new_account}
     💡 معلومات إضافية: {new_info if new_info else 'لا توجد'}"""
                         
-                        self.send_message(message['chat']['id'], success_msg, self.admin_keyboard())
+                        self.send_message(message['chat']['id'], success_msg, self.admin_keyboard(admin_lang))
                     else:
-                        self.send_message(message['chat']['id'], f"❌ فشل في تعديل وسيلة الدفع {method_id}", self.admin_keyboard())
+                        self.send_message(message['chat']['id'], f"❌ فشل في تعديل وسيلة الدفع {method_id}", self.admin_keyboard(admin_lang))
                 else:
                     self.send_message(message['chat']['id'], "❌ تنسيق غير صحيح!\n\nالتنسيق المطلوب:\nاسم_الوسيلة | نوع_الوسيلة | رقم_الحساب | معلومات_إضافية\n\nمثال:\nفودافون كاش | محفظة إلكترونية | 01012345678 | للدفع السريع")
                     return
@@ -8084,7 +8091,7 @@ class ComprehensiveDUXBot:
             active_methods = [m for m in methods if m['status'] == 'active']
             
             if not active_methods:
-                self.send_message(message['chat']['id'], "❌ لا توجد وسائل دفع نشطة لإيقافها", self.admin_keyboard())
+                self.send_message(message['chat']['id'], "❌ لا توجد وسائل دفع نشطة لإيقافها", self.admin_keyboard(admin_lang))
                 return
             
             methods_text = "⏹️ اختر وسيلة الدفع لإيقافها:\n\n"
@@ -8118,7 +8125,7 @@ class ComprehensiveDUXBot:
             inactive_methods = [m for m in methods if m['status'] != 'active']
             
             if not inactive_methods:
-                self.send_message(message['chat']['id'], "❌ جميع وسائل الدفع نشطة بالفعل", self.admin_keyboard())
+                self.send_message(message['chat']['id'], "❌ جميع وسائل الدفع نشطة بالفعل", self.admin_keyboard(admin_lang))
                 return
             
             methods_text = "▶️ اختر وسيلة الدفع لتشغيلها:\n\n"
@@ -8175,11 +8182,11 @@ class ComprehensiveDUXBot:
     💳 النوع: {method['method_type']}
     📊 الحالة: متوقفة ❌"""
                         
-                        self.send_message(message['chat']['id'], success_msg, self.admin_keyboard())
+                        self.send_message(message['chat']['id'], success_msg, self.admin_keyboard(admin_lang))
                     else:
-                        self.send_message(message['chat']['id'], f"❌ لم يتم العثور على وسيلة الدفع {method_id}", self.admin_keyboard())
+                        self.send_message(message['chat']['id'], f"❌ لم يتم العثور على وسيلة الدفع {method_id}", self.admin_keyboard(admin_lang))
                 else:
-                    self.send_message(message['chat']['id'], f"❌ فشل في إيقاف وسيلة الدفع {method_id}", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], f"❌ فشل في إيقاف وسيلة الدفع {method_id}", self.admin_keyboard(admin_lang))
                 
                 if user_id in self.user_states:
                     del self.user_states[user_id]
@@ -8213,11 +8220,11 @@ class ComprehensiveDUXBot:
     💳 النوع: {method['method_type']}
     📊 الحالة: نشطة ✅"""
                         
-                        self.send_message(message['chat']['id'], success_msg, self.admin_keyboard())
+                        self.send_message(message['chat']['id'], success_msg, self.admin_keyboard(admin_lang))
                     else:
-                        self.send_message(message['chat']['id'], f"❌ لم يتم العثور على وسيلة الدفع {method_id}", self.admin_keyboard())
+                        self.send_message(message['chat']['id'], f"❌ لم يتم العثور على وسيلة الدفع {method_id}", self.admin_keyboard(admin_lang))
                 else:
-                    self.send_message(message['chat']['id'], f"❌ فشل في تشغيل وسيلة الدفع {method_id}", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], f"❌ فشل في تشغيل وسيلة الدفع {method_id}", self.admin_keyboard(admin_lang))
                 
                 if user_id in self.user_states:
                     del self.user_states[user_id]
@@ -8341,7 +8348,7 @@ class ComprehensiveDUXBot:
             if not companies:
                 self.send_message(message['chat']['id'], 
                                 "❌ لا توجد شركات متاحة. يجب إضافة شركة أولاً", 
-                                self.admin_keyboard())
+                                self.admin_keyboard(admin_lang))
                 return
             
             companies_text = "🏢 اختر الشركة لإضافة وسيلة دفع لها:\n\n"
@@ -8471,7 +8478,7 @@ class ComprehensiveDUXBot:
             if customer_id == '/cancel' or customer_id.lower() == 'cancel':
                 if user_id in self.user_states:
                     del self.user_states[user_id]
-                self.send_message(message['chat']['id'], "✅ تم إلغاء إرسال الرسالة", self.admin_keyboard())
+                self.send_message(message['chat']['id'], "✅ تم إلغاء إرسال الرسالة", self.admin_keyboard(admin_lang))
                 return
             
             # البحث عن العميل
@@ -8515,7 +8522,7 @@ class ComprehensiveDUXBot:
             if message_content == '/cancel' or message_content.lower() == 'cancel':
                 if user_id in self.user_states:
                     del self.user_states[user_id]
-                self.send_message(message['chat']['id'], "✅ تم إلغاء إرسال الرسالة", self.admin_keyboard())
+                self.send_message(message['chat']['id'], "✅ تم إلغاء إرسال الرسالة", self.admin_keyboard(admin_lang))
                 return
             
             if not message_content:
@@ -8540,7 +8547,7 @@ class ComprehensiveDUXBot:
             if not target_telegram_id:
                 self.send_message(message['chat']['id'], 
                                 f"❌ لم يتم العثور على معرف التليجرام للعميل {customer_id}\n\n💡 تأكد من أن العميل مسجل في النظام", 
-                                self.admin_keyboard())
+                                self.admin_keyboard(admin_lang))
                 if user_id in self.user_states:
                     del self.user_states[user_id]
                 return
@@ -8575,7 +8582,7 @@ class ComprehensiveDUXBot:
     📝 محتوى الرسالة:
     {message_content}"""
                 
-                self.send_message(message['chat']['id'], success_msg, self.admin_keyboard())
+                self.send_message(message['chat']['id'], success_msg, self.admin_keyboard(admin_lang))
                 
             except Exception as e:
                 # فشل في الإرسال
@@ -8588,7 +8595,7 @@ class ComprehensiveDUXBot:
     📱 الهاتف المسجل في النظام
     📧 البريد الإلكتروني (إن وجد)"""
                 
-                self.send_message(message['chat']['id'], error_msg, self.admin_keyboard())
+                self.send_message(message['chat']['id'], error_msg, self.admin_keyboard(admin_lang))
             
             # حذف الحالة
             if user_id in self.user_states:
@@ -8604,7 +8611,7 @@ class ComprehensiveDUXBot:
             if not methods:
                 self.send_message(message['chat']['id'], 
                                 "❌ لا توجد وسائل دفع في النظام حالياً", 
-                                self.admin_keyboard())
+                                self.admin_keyboard(admin_lang))
                 return
             
             methods_text = "✏️ اختر وسيلة الدفع للتعديل:\n\n"
@@ -8639,7 +8646,7 @@ class ComprehensiveDUXBot:
             if not methods:
                 self.send_message(message['chat']['id'], 
                                 "❌ لا توجد وسائل دفع في النظام حالياً", 
-                                self.admin_keyboard())
+                                self.admin_keyboard(admin_lang))
                 return
             
             methods_text = "🗑️ اختر وسيلة الدفع للحذف:\n\n"
@@ -8715,7 +8722,7 @@ class ComprehensiveDUXBot:
             if text in ['🔙 العودة', '⬅️ العودة', '↩️ العودة']:
                 if user_id in self.user_states:
                     del self.user_states[user_id]
-                self.send_message(message['chat']['id'], "تم الإلغاء", self.admin_keyboard())
+                self.send_message(message['chat']['id'], "تم الإلغاء", self.admin_keyboard(admin_lang))
                 return
             
             if text.startswith('تعديل '):
@@ -8755,7 +8762,7 @@ class ComprehensiveDUXBot:
             if text in ['🔙 العودة', '⬅️ العودة', '↩️ العودة']:
                 if user_id in self.user_states:
                     del self.user_states[user_id]
-                self.send_message(message['chat']['id'], "تم الإلغاء", self.admin_keyboard())
+                self.send_message(message['chat']['id'], "تم الإلغاء", self.admin_keyboard(admin_lang))
                 return
             
             if text.startswith('حذف '):
@@ -8776,9 +8783,9 @@ class ComprehensiveDUXBot:
     📋 الاسم: {deleted_method['method_name']}
     💳 النوع: {deleted_method['method_type']}"""
                     
-                    self.send_message(message['chat']['id'], success_msg, self.admin_keyboard())
+                    self.send_message(message['chat']['id'], success_msg, self.admin_keyboard(admin_lang))
                 else:
-                    self.send_message(message['chat']['id'], f"❌ فشل في حذف وسيلة الدفع {method_id}", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], f"❌ فشل في حذف وسيلة الدفع {method_id}", self.admin_keyboard(admin_lang))
                 
                 del self.user_states[user_id]
         
@@ -8789,7 +8796,7 @@ class ComprehensiveDUXBot:
             
             if new_data == '/cancel':
                 del self.user_states[user_id]
-                self.send_message(message['chat']['id'], "تم إلغاء التعديل", self.admin_keyboard())
+                self.send_message(message['chat']['id'], "تم إلغاء التعديل", self.admin_keyboard(admin_lang))
                 return
             
             if not new_data:
@@ -8813,9 +8820,9 @@ class ComprehensiveDUXBot:
     💳 النوع: {method['method_type']}
     📊 البيانات الجديدة: {new_data}"""
                 
-                self.send_message(message['chat']['id'], success_msg, self.admin_keyboard())
+                self.send_message(message['chat']['id'], success_msg, self.admin_keyboard(admin_lang))
             else:
-                self.send_message(message['chat']['id'], "❌ فشل في تحديث وسيلة الدفع", self.admin_keyboard())
+                self.send_message(message['chat']['id'], "❌ فشل في تحديث وسيلة الدفع", self.admin_keyboard(admin_lang))
             
             del self.user_states[user_id]
         
@@ -9130,7 +9137,7 @@ class ComprehensiveDUXBot:
             notifs = self.get_recent_notifications(15)
             
             if not notifs:
-                self.send_message(message['chat']['id'], "🔔 لا توجد إشعارات حالياً", self.admin_keyboard())
+                self.send_message(message['chat']['id'], "🔔 لا توجد إشعارات حالياً", self.admin_keyboard(admin_lang))
                 return
             
             # تصنيف الإشعارات حسب النوع
@@ -9158,7 +9165,7 @@ class ComprehensiveDUXBot:
                 icon = type_icons.get(n.get('type', ''), '📋')
                 summary += f"{icon} {n.get('timestamp', '')} → {n.get('message_preview', '')}\n"
             
-            self.send_message(message['chat']['id'], summary, self.admin_keyboard())
+            self.send_message(message['chat']['id'], summary, self.admin_keyboard(admin_lang))
 
     def manual_backup_command(self, message):
             """أمر يدوي لإنشاء وإرسال نسخة احتياطية فورية"""
@@ -9229,11 +9236,11 @@ class ComprehensiveDUXBot:
             if reply_message:
                 success = self.save_complaint_reply(complaint_id, reply_message)
                 if success:
-                    self.send_message(message['chat']['id'], f"✅ تم إرسال الرد للعميل!\n\n📝 الرد: {reply_message}", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], f"✅ تم إرسال الرد للعميل!\n\n📝 الرد: {reply_message}", self.admin_keyboard(admin_lang))
                     # إرسال الرد للعميل
                     self.send_complaint_reply_to_customer(complaint_id, reply_message)
                 else:
-                    self.send_message(message['chat']['id'], "❌ فشل في حفظ الرد", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], "❌ فشل في حفظ الرد", self.admin_keyboard(admin_lang))
             
             # تنظيف الحالة
             if user_id in self.user_states:
@@ -9472,7 +9479,7 @@ class ComprehensiveDUXBot:
                 success_msg = "❌ خطأ في تحديث البيانات"
             
             # إرسال رسالة التأكيد والعودة لمحرر البيانات
-            self.send_message(message['chat']['id'], success_msg, self.admin_keyboard())
+            self.send_message(message['chat']['id'], success_msg, self.admin_keyboard(admin_lang))
             
             # تنظيف الحالة
             if user_id in self.user_states:
@@ -9677,13 +9684,13 @@ class ComprehensiveDUXBot:
     • إحصائيات مفصلة ونسب مئوية
     • دعم كامل للنصوص العربية"""
                     
-                    self.send_message(chat_id, success_text, self.admin_keyboard())
+                    self.send_message(chat_id, success_text, self.admin_keyboard(admin_lang))
                 else:
-                    self.send_message(chat_id, "❌ فشل في إنشاء التقرير. يرجى المحاولة مرة أخرى.", self.admin_keyboard())
+                    self.send_message(chat_id, "❌ فشل في إنشاء التقرير. يرجى المحاولة مرة أخرى.", self.admin_keyboard(admin_lang))
                     
             except Exception as e:
                 logger.error(f"خطأ في إنشاء تقرير Excel: {e}")
-                self.send_message(chat_id, f"❌ خطأ في إنشاء التقرير: {str(e)}", self.admin_keyboard())
+                self.send_message(chat_id, f"❌ خطأ في إنشاء التقرير: {str(e)}", self.admin_keyboard(admin_lang))
         
     def create_professional_excel_report(self):
             """إنشاء ملف تقرير احترافي منسق"""
