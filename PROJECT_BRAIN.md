@@ -1,7 +1,8 @@
 # LangSense / DUX Telegram Bot — Project Brain 🧠
 
-> **Last updated:** 2026-07-23 · **Analyzed by:** Codely CLI Deep Analysis
+> **Last updated:** 2026-07-26 · **Analyzed by:** Codely CLI
 > **Project root:** `C:\Users\gnz\Downloads\bot2\bot`
+> **Repo:** `github.com/duxexch/boterx`
 
 ---
 
@@ -9,276 +10,211 @@
 
 | Field | Value |
 |-------|-------|
-| **Name** | LangSense / DUX Financial Telegram Bot |
-| **Type** | Telegram Bot — Financial Services (deposit/withdraw/complaints) |
-| **Language** | Python 3.8+ |
-| **Primary UI Language** | Arabic (RTL) + English |
-| **Primary entry point** | `comprehensive_bot.py` (6606 lines — the production bot) |
-| **Secondary entry point** | `main.py` → `bot.py` (Aiogram v3 — incomplete, partial handlers) |
-| **Data storage** | CSV files (primary), SQLite (simple_bot.py only) |
-| **Bot API** | Raw HTTP via `urllib.request` (comprehensive_bot.py), Aiogram v3 (main.py) |
-| **External dependencies** | `python-dotenv` only (comprehensive_bot.py); Aiogram+SQLAlchemy (main.py) |
+| **Name** | LangSense / DUX Financial Telegram Bot ("Boterx") |
+| **Type** | Telegram Bot — Financial Services (deposit/withdraw/complaints/P2P matching) |
+| **Language** | Python 3.11+ |
+| **UI Languages** | 17 languages (ar, en, fr, es, de, it, pt, ru, zh, tr, ur, hi, fa, id, ja, ko, th) |
+| **Primary entry point** | `comprehensive_bot.py` (~10,400 lines — single class `ComprehensiveDUXBot`) |
+| **Data storage** | CSV files (utf-8-sig encoding, threading.Lock per file) |
+| **Bot API** | Raw HTTP via `urllib.request` (long-polling) |
+| **Dependencies** | `python-dotenv`, `openpyxl` (Excel reports) |
+| **Deploy** | Render.com (health check server on PORT env var) |
 
 ---
 
-## 2. File Inventory & Purpose
+## 2. File Inventory
 
 ### 2.1 Production Code (ACTIVE)
 
-| File | Lines | Purpose | Status |
-|------|-------|---------|--------|
-| `comprehensive_bot.py` | 6606 | **THE BOT** — all features, single-file architecture | ✅ Production |
-| `excel_formatter.py` | 347 | Professional Excel/CSV report generator (openpyxl) | ✅ Support |
-| `run_windows.bat` | — | Windows launcher (venv + pip + bot selector) | ✅ |
-| `run_linux.sh` | — | Linux setup + launcher | ✅ |
-| `run_vps.sh.bat` | — | VPS launcher (Windows→Linux bridge) | ✅ |
+| File | Lines | Purpose |
+|------|-------|---------|
+| `comprehensive_bot.py` | ~10,400 | **THE BOT** — all features, single-file architecture |
+| `svrp.py` | ~970 | 💎 Smart Recovery — SVRPManager (credits, wallets, tasks, promo codes, tiers) |
+| `matching.py` | ~600 | 🔄 P2P Matching — MatchManager (requests, matches, chat, ratings, disputes) |
+| `theme_config.py` | ~230 | 🎨 Theme system — 3 themes (Gold, Ocean, Purple) with emoji/color config |
 
-### 2.2 Legacy / Alternative Versions (INACTIVE)
+### 2.2 i18n System
 
-| File | Lines | Purpose | Status |
-|------|-------|---------|--------|
-| `advanced_bot.py` | 1701 | Earlier version with CSV, less features | ⚠️ Legacy |
-| `simple_bot.py` | ~350 | Minimal SQLite version | ⚠️ Legacy |
-| `simple_improved_bot.py` | 884 | Improved CSV version | ⚠️ Legacy |
-| `simple_payment_bot.py` | 706 | Payment-method-focused version | ⚠️ Legacy |
-| `fixed_bot.py` | 527 | Bugfix attempt | ⚠️ Legacy |
-| `excel_bot.py` | 727 | Excel-storage version | ⚠️ Legacy |
-| `test_bot.py` | 124 | DB/API test script | 🔧 Test |
+| File | Keys | Purpose |
+|------|------|---------|
+| `i18n/ar.json` | 270 | Arabic translations (primary) |
+| `i18n/en.json` | 270 | English translations |
+| `i18n/{de,es,fa,fr,hi,id,it,ja,ko,pt,ru,th,tr,ur,zh}.json` | 270 each | 15 other languages |
 
-### 2.3 Aiogram v3 Modular Architecture (INCOMPLETE)
+### 2.3 Data Files (CSV)
 
-| File | Purpose | Status |
-|------|---------|--------|
-| `main.py` | Entry point — DB init + bot start | ⚠️ Partial |
-| `bot.py` | Dispatcher setup + router registration | ⚠️ Partial |
-| `config.py` | Environment config with validation | ✅ Good |
-| `models.py` | SQLAlchemy models (User, Language, Country, Outbox, etc.) | ✅ Good |
-| `handlers/start.py` | /start + registration + deposit/withdraw stubs | ⚠️ Stubs only |
-| `handlers/admin.py` | Admin panel (users, langs, countries, outbox) | ⚠️ Partial |
-| `handlers/broadcast.py` | Mass messaging with targeting | ✅ Good |
-| `handlers/user_settings.py` | Language/country/notifications | ✅ Good |
-| `handlers/announcements.py` | Announcement creation wizard | ✅ Good |
-| `services/i18n.py` | JSON-based translations | ✅ Good |
-| `services/customer_id.py` | Unique customer code generation | ✅ Good |
-| `services/broadcast_service.py` | Async broadcast queue + rate limiting | ✅ Good |
-| `utils/auth.py` | Admin decorator + permission levels | ✅ Good |
-| `utils/keyboards.py` | All keyboard layouts | ✅ Good |
-| `translations/ar.json` | Arabic strings | ✅ Complete |
-| `translations/en.json` | English strings | ✅ Complete |
+| File | Purpose |
+|------|---------|
+| `users.csv` | User accounts (telegram_id, name, phone, customer_id, language, currency, is_banned) |
+| `transactions.csv` | All transactions (deposit/withdraw, status, amounts, currency) |
+| `companies.csv` | Exchange companies (name, type, icon, address) |
+| `payment_methods.csv` | Payment methods per company (method_name, type, icon) |
+| `complaints.csv` | Customer complaints |
+| `referrals.csv` | Referral links (referrer → referred) |
+| `app_links.csv` | App store links (name, icon_url, download_url, description) |
+| `svrp_credits.csv` | Recovery credits (keep/shared, pending/active/used/expired) |
+| `svrp_wallets.csv` | Recovery wallets (balance, pending, wagering progress) |
+| `svrp_tasks.csv` | Daily tasks (deposit_count, deposit_amount, referral_count) |
+| `svrp_promo_codes.csv` | Promo codes (RCV prefix, creator, amount, max_uses) |
+| `svrp_user_groups.csv` | User tiers (bronze/silver/gold/platinum) |
+| `match_requests.csv` | P2P match requests |
+| `matches.csv` | Active P2P matches |
+| `chat_messages.csv` | P2P chat messages |
+| `ratings.csv` | P2P user ratings |
+| `disputes.csv` | P2P disputes |
+| `system_settings.csv` | System settings (min_deposit, active_theme, etc.) |
+| `admin_permissions.json` | Per-admin button visibility |
+| `button_labels.csv` | Editable button labels |
 
-### 2.4 Data Files (CSV/JSON)
+### 2.4 Documentation
 
-| File | Schema | Purpose |
-|------|--------|---------|
-| `users.csv` | `telegram_id, name, phone, customer_id, language, date, is_banned, ban_reason, currency` | User registry |
-| `transactions.csv` | `id, customer_id, telegram_id, name, type, company, wallet_number, amount, exchange_address, status, date, admin_note, processed_by, currency` | All financial transactions |
-| `companies.csv` | `id, name, type, details, is_active` | Registered companies |
-| `payment_methods.csv` | `id, company_id, method_name, method_type, account_data, additional_info, status, created_date` | Payment methods per company |
-| `complaints.csv` | `id, customer_id, subject, message, status, date, admin_response` | User complaints |
-| `exchange_addresses.csv` | `id, address, is_active` | Withdrawal pickup addresses |
-| `system_settings.csv` | `setting_key, setting_value, description` | System configuration |
-| `button_labels.csv` | `original_text, new_text, is_active` | Admin-customizable button labels |
-| `admin_actions_log.csv` | `timestamp, admin_id, action_type, details` | Admin audit trail |
-| `admin_permissions.json` | `{telegram_id: {buttons: {label: bool}}}` | Per-admin button permissions |
+| File | Purpose |
+|------|---------|
+| `PROJECT_BRAIN.md` | This file — full project analysis |
+| `ARCHITECTURE.md` | Architecture maps, data flows, state machines |
+| `DEV_GUIDE.md` | Coding conventions, patterns, testing checklist |
+| `RENDER_GUIDE.md` | Deployment instructions for Render.com |
+| `MATCHING_GUIDE.md` | Admin guide for P2P matching system |
+| `CHANGELOG.md` | Chronological change log |
+| `Procfile` | `web: python comprehensive_bot.py` |
+| `requirements.txt` | `python-dotenv`, `openpyxl` |
 
 ---
 
-## 3. Architecture — comprehensive_bot.py
+## 3. Architecture Overview
 
-### 3.1 Class Structure
+### 3.1 Core Class: `ComprehensiveDUXBot`
 
-```
-ComprehensiveDUXBot
-├── __init__()              # State + currencies + translations + backup thread
-├── API Layer
-│   ├── api_call()          # JSON POST to Telegram API
-│   ├── send_message()      # Text + keyboard
-│   ├── send_document()     # File upload (multipart)
-│   ├── get_updates()       # Long polling
-│   └── send_message_without_keyboard()
-├── Data Layer
-│   ├── init_files()        # Create all CSVs with defaults
-│   ├── find_user()         # Read user from CSV
-│   ├── get_companies()     # Read companies (filter by type/active)
-│   ├── get_payment_methods_by_company()
-│   ├── get_transaction()   # Read single transaction
-│   ├── get_setting()       # Read system_settings.csv
-│   └── get_exchange_address()
-├── Keyboard Layer
-│   ├── main_keyboard()     # User menu (AR/EN)
-│   ├── admin_keyboard()    # Admin panel (permission-filtered)
-│   ├── companies_keyboard()
-│   └── transform_keyboard() # Apply button label overrides
-├── User Flows
-│   ├── handle_start()      # Registration / welcome back
-│   ├── handle_registration() # Name → phone → customer_id
-│   ├── create_deposit_request()  # Company → method → wallet → amount
-│   ├── process_deposit_flow()    # State machine for deposit
-│   ├── create_withdrawal_request() # Company → method → wallet → amount → address → code
-│   ├── process_withdrawal_flow()   # State machine for withdrawal
-│   ├── handle_complaint_start() → save_complaint()
-│   ├── show_currency_selection() → handle_currency_selection()
-│   └── show_user_transactions() / show_user_profile()
-├── Admin Flows (30+ features)
-│   ├── handle_admin_panel() → handle_admin_actions()
-│   ├── Pending requests / Approved transactions
-│   ├── approve/reject transaction (with reason wizard)
-│   ├── Company CRUD wizard (add/edit/delete with confirmation)
-│   ├── Payment method CRUD wizard (add/edit/delete/enable/disable)
-│   ├── User management (ban/unban/search)
-│   ├── Admin management (permanent/temporary/remove)
-│   ├── Broadcast messaging
-│   ├── Complaint management + reply wizard
-│   ├── Support data editor (phone/telegram/email/hours)
-│   ├── System settings viewer/editor
-│   ├── Excel report generator
-│   ├── Quick copy commands
-│   ├── Button label editor
-│   └── Backup system (auto 6h + manual ZIP)
-├── Security
-│   ├── is_admin()          # 3 sources: env, session, temp
-│   ├── admin_permissions   # Per-admin button visibility JSON
-│   └── log_admin_action() # Audit trail CSV
-├── Backup System
-│   ├── start_backup_scheduler()  # Thread, every 6 hours
-│   ├── create_backup_zip()
-│   ├── create_summary_report()
-│   └── send_backup_to_admins()
-└── Main Loop
-    └── run()               # Long polling loop
-```
+Single class with ~60+ methods:
+- **Init:** loads .env, creates CSV files, loads i18n (17 langs), initializes SVRP/Matching/Theme
+- **HTTP layer:** `api_call()`, `send_message()`, `send_inline_message()`, `send_photo()`, `edit_message()`, `answer_callback()`
+- **Message routing:** `process_message()` — state machine with early state checks (before rate limiter)
+- **Inline callbacks:** `handle_callback_query()` — approve/reject, SVRP admin, apps wizard, theme switching
+- **Rate limiter:** 30 messages/min (checks after state handlers)
 
-### 3.2 State Machine
+### 3.2 State Machine (user_states dict)
 
-Uses `self.user_states` dict. Keys = `telegram_id`, values = state strings.
+| State | Flow |
+|-------|------|
+| `choosing_start_language` | New user language selection |
+| `start_phone_input` | New user phone entry → auto-login or register |
+| `registering_name` / `registering_name_{lang}_{phone}` | Registration name entry |
+| `registering_phone_{name}` | Registration phone entry |
+| `selecting_deposit_company` → `deposit_wallet_*` → `deposit_amount_*` | Deposit flow |
+| `selecting_withdraw_company` → `withdraw_wallet_*` → `withdraw_amount_*` → `withdraw_address_*` → `withdraw_confirmation_code_*` → `withdraw_final_confirm_*` | Withdrawal flow |
+| `selecting_language` / `selecting_language_admin` | Language change (user/admin) |
+| `selecting_currency` | Currency change |
+| `writing_complaint` | Complaint submission |
+| `phone_login_waiting` | Phone-based login |
+| `svrp_create_promo_` / `svrp_redeem_promo_` | SVRP promo code creation/redemption |
+| `app_wizard_name` → `app_wizard_*` | Admin app addition wizard (4 steps) |
+| `chatting` / `rating` | P2P matching chat and rating |
+| `match_enter_code` / `match_amount` / `match_company` | P2P matching flow |
+| `awaiting_reject_reason_*` / `confirming_reject_*` | Admin rejection flow |
+| `writing_custom_reply_*` | Admin complaint reply |
+| `admin_broadcasting` | Admin broadcast message |
 
-**Deposit:** `selecting_deposit_company` → `deposit_wallet_<cid>_<cname>_<mid>` → `deposit_amount_<cid>_<cname>_<mid>_<wallet>` → COMMIT
-
-**Withdrawal:** `selecting_withdraw_company` → `withdraw_wallet_<...>` → `withdraw_amount_<...>` → `withdraw_confirmation_code_<...>` → `withdraw_final_confirm_<...>` → COMMIT
-
-**Registration:** `registering_name` → `registering_phone_<name>` → SAVE
-
-**Admin states:** `admin_broadcasting`, `adding_company_*`, `editing_company_*`, `confirming_company_delete`, `deleting_company_<id>`, `sending_user_message_*`, `selecting_method_to_*`, `editing_method_*`, `replying_to_complaint_<id>`, `editing_support_*`, `choose_button_to_edit`, `awaiting_reject_reason_*`
-
-### 3.3 Transaction ID Formats
-
-| Type | Prefix | Format | Example |
-|------|--------|--------|---------|
-| Deposit | `DEP` | `DEPYYYYMMDDHHMMSS` | `DEP20260723143000` |
-| Withdrawal | `WTH` | `WTHYYYYMMDDHHMMSS` | `WTH20260723143000` |
-| Complaint | `COMP` | `COMPYYYYMMDDHHMMSS` | `COMP20260723143000` |
-| Customer ID | `C` | `C<6-digit-timestamp>` | `C824717` |
-
-### 3.4 Currency System
-
-18 currencies: SAR, AED, EGP, KWD, QAR, BHD, OMR, JOD, LBP, IQD, SYP, MAD, TND, DZD, LYD, USD, EUR, TRY. Each has `name` (Arabic), `symbol`, `flag` (emoji).
+### 3.3 Rate Limiter
+- **30 messages/minute** for non-admin users
+- State handlers (registration, language change, SVRP, deposit/withdraw) checked **before** rate limiter
+- Admins exempt from rate limiting
 
 ---
 
-## 4. Two Architectures — Comparison
+## 4. Feature Systems
 
-| Aspect | comprehensive_bot.py | main.py + bot.py |
-|--------|---------------------|------------------|
-| Bot API | Raw urllib HTTP | Aiogram v3 |
-| Storage | CSV files | SQLAlchemy async |
-| FSM | dict (string-based) | Aiogram FSMContext |
-| Structure | Single 6606-line file | Modular handlers/services/utils |
-| Deposit/Withdraw | Full workflow | Stubs only |
-| Admin panel | 30+ features | Basic stats + user list |
-| Companies/Methods | Full CRUD + wizards | Not implemented |
-| Currencies | 18 currencies | Not implemented |
-| Backup | Auto 6h + manual | Not implemented |
-| Button customization | Admin-editable | Not implemented |
-| Admin permissions | Per-button filtering | Not implemented |
-| Maturity | Production-ready | Skeleton |
+### 4.1 💎 Smart Recovery (SVRP)
 
----
+**Purpose:** When a withdrawal is rejected, user gets recovery credits as compensation.
 
-## 5. Known Issues
+**Flow:**
+1. Withdrawal rejected → `trigger_recovery()` creates `pending` credits (50% keep + 50% shared)
+2. Credits are **FROZEN** 🧊 (shown as frozen in panel) until wagering complete
+3. Each approved transaction → `increment_wagering()` +1
+4. When `wagering_completed >= 3` → ALL pending credits auto-activate (UNFROZEN) ✅
+5. Unfrozen credits show as 🟢 Available
+6. User can create promo codes (RCV prefix) or redeem codes from friends
+7. Shared credits activate when a referred friend makes a deposit
+8. Credits expire after 30 days (auto-cleanup on startup)
+9. Monthly cap: 10,000 per user (auto-reset each month)
 
-### Critical
-1. No file locking on CSV writes — concurrent access risk
-2. State strings use `_` separator — breaks on values with underscores
-3. `handle_language_change()` writes users.csv missing `currency` column — data loss
-4. `ban_user_admin()` / `unban_user_admin()` same issue
-5. `BOT_TOKEN` printed to console on startup
+**Admin Panel:** Stats + wallets + promos + tasks + cleanup + interactive settings (➕/➖ buttons)
 
-### Architecture
-6. 7+ duplicate bot implementations — code sprawl
-7. Single 6606-line file — no separation of concerns
-8. No tests, no CI/CD
-9. `pyproject.toml` has empty dependencies
-10. Duplicate `💾 نسخة احتياطية فورية` button in admin keyboard
-11. `get_all_payment_methods()` defined twice with different logic (lines ~4100 filters active only, line ~5300 returns all)
+**Config:** recovery_multiplier=2.0, max_recovery_cap=5000, credit_expiry_days=30, wagering_requirement=3
 
----
+### 4.2 🔄 P2P Matching
 
-## 6. Team Perspective
+MatchManager with 5 CSV files. Matches opposite-type requests (deposit↔withdraw) with fake aliases. Admin verifies codes via inline buttons. Dispute resolution with chat history. Mandatory 1-5 star rating.
 
-### 🏗️ Architect
-- comprehensive_bot.py works but won't scale. Aiogram v3 migration is right direction but incomplete.
-- CSV → SQLite/PostgreSQL migration needed.
-- State machine needs proper FSM (Aiogram's or custom class).
+### 4.3 🎨 Theme System
 
-### 🔧 Backend Developer
-- Deposit/withdraw flows well-designed, need refactoring into separate handlers.
-- `handle_admin_actions()` is 400+ line if/elif chain — needs dispatch table.
-- CSV read/write repeated 30+ times — needs data layer.
+3 themes stored in `theme_config.py`:
+- **Gold** (🥇): `╔══╗` frames, `▰▱` bars, standard emoji
+- **Ocean** (🌊): `╭──╯` frames, `▮▯` bars, blue emoji
+- **Purple** (👑): `★━━★` frames, `⬛⬜` bars, purple emoji
 
-### 🎨 UX Developer
-- Keyboard layouts clean and consistent.
-- Button label customization is powerful.
-- Error recovery (super_reset) well-thought-out.
-- Arabic RTL good but some messages mix AR/EN.
+Each theme controls: decorative frames, progress bars, status emoji, button emoji prefixes, transaction colors (🟢 deposit / 🔴 withdraw), message format (code/bold/plain). Active theme stored in `system_settings.csv`.
 
-### 🔒 Security Engineer
-- Admin from env is good. Temp admin system reasonable.
-- No input sanitization (CSV injection risk).
-- No rate limiting on user actions.
-- Token leaked to console.
+### 4.4 📱 Apps Feature
 
-### 📊 Data Analyst
-- Statistics comprehensive. Excel report well-structured.
-- No historical trends — all point-in-time.
+Admin-managed app download links with icons. Step-by-step wizard (name → icon_url → download_url → description). User panel shows formatted list with clickable download links. First app icon sent as photo.
 
-### 🧪 QA Engineer
-- No automated tests. Manual only.
-- Error handling swallows exceptions silently.
+### 4.5 i18n System
+
+- **270 keys per language** × 17 languages = 4,590 translation strings
+- `self.tr(key, lang, **kwargs)` with `{placeholder}` syntax
+- All user-facing strings translated: main keyboard, admin keyboard, SVRP panels, deposit/withdraw flows, notifications, errors
+- Button routing uses dynamic text sets: `{self.tr('key', l) for l in all_langs}`
+- Admin panel: 27 admin button keys, fully translated
+- Language-first registration: new users select language → phone → auto-login or register
+
+### 4.6 Colored Formatting
+
+HTML formatting with theme-colored emoji:
+- `fmt_deposit_amount()`: 🟢 `<b><code>100.00 SAR</code></b>`
+- `fmt_withdraw_amount()`: 🔴 `<b><code>100.00 SAR</code></b>`
+- `fmt_success()` / `fmt_error()` / `fmt_info()` / `fmt_warning()`
+
+### 4.7 Admin Roles
+
+4 predefined roles: full, transactions, support, companies. Temp admins with auto-expiry. Per-admin button visibility via `admin_permissions.json`. `admin_keyboard(lang)` auto-detects admin's language.
+
+### 4.8 Smart Notifications
+
+`notify_admins()` + `notify_user()` with type tracking. `notifications_log.csv`. Admin panel shows categorized summary. User panel shows personal notifications.
 
 ---
 
-## 7. Environment Variables
+## 5. Registration Flow
 
-```env
-BOT_TOKEN=<telegram_bot_token>
-ADMIN_USER_IDS=123456789,987654321
-DATABASE_URL=sqlite+aiosqlite:///./langsense.db
-BROADCAST_RATE_LIMIT=30
-BROADCAST_CHUNK_SIZE=100
-DEFAULT_LANGUAGE=ar
-DEFAULT_COUNTRY=SA
-CUSTOMER_ID_PREFIX=C
-CUSTOMER_ID_YEAR_FORMAT=2025
-MAX_FILE_SIZE=20
-USERS_PER_PAGE=10
-LOG_LEVEL=INFO
-```
+1. `/start` → Language selection grid (3 columns, 17 languages)
+2. User selects language → Phone number request (contact button or manual)
+3. If phone exists in `users.csv` → auto-login with old data (link_telegram_to_user)
+4. If new → user enters name → account created with detected language/country/currency
+5. Admin notified of new registration
 
 ---
 
-## 8. Quick Commands
+## 6. Key Technical Details
 
-```bash
-# Run production bot
-python comprehensive_bot.py
+- **CSV safety:** `safe_csv_write`/`safe_csv_read` with `threading.Lock` per file
+- **Auto-expire:** `cleanup_old_transactions()` expires pending after 72h on startup
+- **SVRP auto-expire:** `expire_old_credits()` on startup + monthly cap reset
+- **Backup:** Auto-backup every 6 hours (`threading.Timer`)
+- **Health check:** HTTP server on PORT env var for Render
+- **Anti-spam:** Button text rejection as names/phones, regex validation
+- **Back-button safety:** Early intercept in deposit/withdraw/phone_login flows
 
-# Run via launcher
-run_windows.bat          # Windows
-./run_linux.sh           # Linux
+---
 
-# Dependencies (minimal for comprehensive_bot.py)
-pip install python-dotenv openpyxl
+## 7. Deployment
 
-# Dependencies (Aiogram v3 version)
-pip install aiogram sqlalchemy aiosqlite asyncpg python-dotenv aiohttp pillow apscheduler
-```
+| Platform | URL |
+|----------|-----|
+| GitHub | `github.com/duxexch/boterx` |
+| Render | `boterx.onrender.com` (health check) |
+
+**Procfile:** `web: python comprehensive_bot.py`
+**Requirements:** `python-dotenv`, `openpyxl`
+**Env vars:** `BOT_TOKEN`, `ADMIN_USER_IDS`
+**Python:** 3.11.9
