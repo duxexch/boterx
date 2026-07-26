@@ -1614,23 +1614,76 @@ class ComprehensiveDUXBot:
         self.send_inline_message(chat_id, text, inline_btns)
 
     def svrp_admin_edit_settings(self, chat_id):
-        """تعديل إعدادات الاسترداد الذكي"""
-        config_keys = ['recovery_multiplier', 'max_recovery_cap', 'credit_expiry_days',
-                       'wagering_requirement', 'promo_code_max_uses',
-                       'promo_code_expiry_days', 'max_recovery_per_month']
+        """تعديل إعدادات الاسترداد الذكي — بأزرار inline"""
+        config_labels = {
+            'recovery_multiplier': '🔢 مضاعف الاسترداد',
+            'max_recovery_cap': '💎 الحد الأقصى/حدث',
+            'credit_expiry_days': '📅 انتهاء الرصيد (يوم)',
+            'wagering_requirement': '🎯 متطلبات الرهان',
+            'promo_code_max_uses': '🎟️ حد استخدام الكود',
+            'promo_code_expiry_days': '⏰ انتهاء الكود (يوم)',
+            'max_recovery_per_month': '📈 الحد الشهري',
+        }
+
         text = (
             "╔════════════════════╗\n"
             "║  ⚙️ إعدادات الاسترداد  ║\n"
             "╚════════════════════╝\n\n"
-            "للتعديل، اكتب الأمر التالي:\n"
-            "تعديل_استرداد [المفتاح] [القيمة]\n\n"
-            "المفاتيح المتاحة:\n"
+            "اضغط على أي إعداد لتعديله:\n"
         )
-        for key in config_keys:
+
+        inline_btns = []
+        for key, label in config_labels.items():
             val = self.svrp._get_config(key)
-            text += f"  • {key} = {val}\n"
-        text += "\nمثال: تعديل_استرداد recovery_multiplier 3.0"
-        inline_btns = [[{'text': '🔙 العودة', 'callback_data': 'svrp_admin_back'}]]
+            inline_btns.append([{
+                'text': f"{label}: {val} ✏️",
+                'callback_data': f"svrp_edit_{key}"
+            }])
+        inline_btns.append([{'text': '🔙 العودة', 'callback_data': 'svrp_admin_back'}])
+
+        self.send_inline_message(chat_id, text, inline_btns)
+
+    def svrp_admin_edit_one_setting(self, chat_id, message_id, key):
+        """تعديل إعداد واحد — عرض القيمة الحالية وأزرار + و -"""
+        config_labels = {
+            'recovery_multiplier': '🔢 مضاعف الاسترداد',
+            'max_recovery_cap': '💎 الحد الأقصى/حدث',
+            'credit_expiry_days': '📅 انتهاء الرصيد (يوم)',
+            'wagering_requirement': '🎯 متطلبات الرهان',
+            'promo_code_max_uses': '🎟️ حد استخدام الكود',
+            'promo_code_expiry_days': '⏰ انتهاء الكود (يوم)',
+            'max_recovery_per_month': '📈 الحد الشهري',
+        }
+        config_steps = {
+            'recovery_multiplier': 0.5,
+            'max_recovery_cap': 500,
+            'credit_expiry_days': 5,
+            'wagering_requirement': 1,
+            'promo_code_max_uses': 1,
+            'promo_code_expiry_days': 1,
+            'max_recovery_per_month': 1000,
+        }
+
+        current_val = self.svrp._get_config(key)
+        label = config_labels.get(key, key)
+        step = config_steps.get(key, 1)
+
+        text = (
+            f"⚙️ تعديل: {label}\n\n"
+            f"📊 القيمة الحالية: <b>{current_val}</b>\n\n"
+            f"➕ زيادة بمقدار {step}\n"
+            f"➖ نقصان بمقدار {step}\n\n"
+            f"أو اكتب القيمة الجديدة مباشرة:"
+        )
+
+        inline_btns = [
+            [{'text': f'➕ +{step}', 'callback_data': f'svrp_inc_{key}_{step}'},
+             {'text': f'➖ -{step}', 'callback_data': f'svrp_dec_{key}_{step}'}],
+            [{'text': '✅ تم', 'callback_data': 'svrp_admin_settings'},
+             {'text': '🔙 العودة', 'callback_data': 'svrp_admin_back'}]
+        ]
+
+        self.edit_message(chat_id, message_id, text)
         self.send_inline_message(chat_id, text, inline_btns)
 
     def svrp_admin_cleanup(self, chat_id):
@@ -1639,6 +1692,20 @@ class ComprehensiveDUXBot:
         self.edit_or_send(chat_id,
             f"🧹 تم التنظيف!\n\n⏰ عدد الأرصدة المنتهية: {expired}",
             [[{'text': '🔙 العودة', 'callback_data': 'svrp_admin_back'}]])
+
+    def _update_svrp_config(self, key, new_val):
+        """تحديث قيمة في إعدادات الاسترداد الذكي"""
+        try:
+            from svrp import SVRP_CONFIG
+            if isinstance(SVRP_CONFIG.get(key), float):
+                SVRP_CONFIG[key] = float(new_val)
+            elif isinstance(SVRP_CONFIG.get(key), int):
+                SVRP_CONFIG[key] = int(new_val)
+            else:
+                SVRP_CONFIG[key] = new_val
+            logger.info(f"SVRP config updated: {key} = {new_val}")
+        except Exception as e:
+            logger.error(f"خطأ في تحديث إعداد SVRP: {e}")
 
     def edit_or_send(self, chat_id, text, inline_btns=None):
         """إرسال أو تعديل رسالة"""
@@ -5546,6 +5613,35 @@ class ComprehensiveDUXBot:
 
             elif data == 'svrp_admin_cleanup':
                 self.svrp_admin_cleanup(chat_id)
+                return
+
+            elif data.startswith('svrp_edit_'):
+                key = data.replace('svrp_edit_', '')
+                self.svrp_admin_edit_one_setting(chat_id, message.get('message_id'), key)
+                return
+
+            elif data.startswith('svrp_inc_'):
+                # زيادة قيمة إعداد
+                parts = data.replace('svrp_inc_', '').rsplit('_', 1)
+                if len(parts) == 2:
+                    key, step_str = parts
+                    step = float(step_str)
+                    old_val = self.svrp._get_config(key)
+                    new_val = old_val + step
+                    self._update_svrp_config(key, new_val)
+                    self.svrp_admin_edit_one_setting(chat_id, message.get('message_id'), key)
+                return
+
+            elif data.startswith('svrp_dec_'):
+                # نقصان قيمة إعداد
+                parts = data.replace('svrp_dec_', '').rsplit('_', 1)
+                if len(parts) == 2:
+                    key, step_str = parts
+                    step = float(step_str)
+                    old_val = self.svrp._get_config(key)
+                    new_val = max(0, old_val - step)  # لا ينزل تحت صفر
+                    self._update_svrp_config(key, new_val)
+                    self.svrp_admin_edit_one_setting(chat_id, message.get('message_id'), key)
                 return
 
             elif data == 'svrp_admin_detailed':
