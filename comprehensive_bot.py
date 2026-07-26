@@ -1176,7 +1176,6 @@ class ComprehensiveDUXBot:
         lang = user.get('language', 'ar')
         wallet = self.svrp.get_wallet(user_id)
         group = self.svrp.get_user_group(user_id)
-        credits = self.svrp.get_user_credits_summary(user_id)
 
         balance = float(wallet.get('balance', 0) or 0)
         pending = float(wallet.get('pending_balance', 0) or 0)
@@ -1189,38 +1188,74 @@ class ComprehensiveDUXBot:
         group_ar = {'bronze': 'برونزي' if lang=='ar' else 'Bronze', 'silver': 'فضي' if lang=='ar' else 'Silver', 'gold': 'ذهبي' if lang=='ar' else 'Gold', 'platinum': 'بلاتيني' if lang=='ar' else 'Platinum'}.get(group_name, 'برونزي')
         ref_count = self.svrp.count_referrals_recursive(user_id)
 
-        wager_bar_full = '▰' * wager_done
-        wager_bar_empty = '▱' * max(0, wager_req - wager_done)
-        wager_status = f"{'✅' if wager_done >= wager_req else '⏳'} {wager_bar_full}{wager_bar_empty} ({wager_done}/{wager_req})"
+        # شريط التقدم
+        wager_bar = '▰' * min(wager_done, wager_req) + '▱' * max(0, wager_req - min(wager_done, wager_req))
 
-        # تمييز الرصيد المجمد عن المتاح
-        if wager_done >= wager_req:
-            frozen_balance = 0
-            available_balance = balance
-            freeze_status = self.tr('svrp_wagering_done', lang)
+        # تمييز المجمد عن المتاح
+        is_frozen = wager_done < wager_req
+        if is_frozen:
+            frozen = balance
+            available = 0
         else:
-            frozen_balance = balance
-            available_balance = 0
-            freeze_status = self.tr('svrp_wagering_pending', lang)
+            frozen = 0
+            available = balance
+
+        # نص شرح النظام (يظهر مرة واحدة أو دائماً)
+        if lang == 'ar':
+            intro = (
+                "💎 <b>الاسترداد الذكي</b>\n\n"
+                "📌 <b>كيف يعمل النظام؟</b>\n"
+                "• عند رفض طلب سحب ← تحصل على رصيد استرداد\n"
+                "• الرصيد يكون <b>مجمداً</b> 🧊 حتى تكمل 3 معاملات\n"
+                "• بعد إكمال المعاملات ← يُفك التجميد تلقائياً ✅\n"
+                "• يمكنك إنشاء أكواد ترويجية ومشاركتها مع أصدقائك\n\n"
+            )
+            frozen_label = "🧊 <b>مجمد</b>"
+            available_label = "🟢 <b>متاح للاستخدام</b>"
+            pending_label = "⏳ بانتظار الأصدقاء"
+            earned_label = "📈 إجمالي المكتسب"
+            used_label = "📉 إجمالي المستخدم"
+            wager_label = "🎯 <b>تقدم التفعيل</b>"
+            wager_done_text = f"✅ <b>تم تفعيل الرصيد!</b>"
+            wager_pending_text = f"⏳ أكمل <b>{wager_req - wager_done}</b> معاملة لتفعيل الرصيد"
+            tier_label = "المستوى"
+            refs_label = "الإحالات"
+            select_text = "👇 اختر من القائمة"
+        else:
+            intro = (
+                "💎 <b>Smart Recovery</b>\n\n"
+                "📌 <b>How it works:</b>\n"
+                "• When a withdrawal is rejected ← you get recovery credits\n"
+                "• Credits are <b>frozen</b> 🧊 until you complete 3 transactions\n"
+                "• After completing transactions ← auto-unfrozen ✅\n"
+                "• Create promo codes and share with friends\n\n"
+            )
+            frozen_label = "🧊 <b>Frozen</b>"
+            available_label = "🟢 <b>Available</b>"
+            pending_label = "⏳ Pending friends"
+            earned_label = "📈 Total earned"
+            used_label = "📉 Total used"
+            wager_label = "🎯 <b>Activation progress</b>"
+            wager_done_text = f"✅ <b>Credits activated!</b>"
+            wager_pending_text = f"⏳ Complete <b>{wager_req - wager_done}</b> more transactions"
+            tier_label = "Tier"
+            refs_label = "Referrals"
+            select_text = "👇 Select from menu"
 
         panel_text = (
-            f"╔════════════════════╗\n"
-            f"║  {self.tr('svrp_title', lang)}  ║\n"
-            f"╚════════════════════╝\n\n"
-            f"┌─────────────────────┐\n"
-            f"│  🟢 {self.tr('svrp_balance_amount', lang, amount=f'{available_balance:.2f}')}\n"
-            f"│  🧊 {'Frozen' if lang != 'ar' else 'مجمد'}: {frozen_balance:.2f}\n"
-            f"│  ⏳ {self.tr('svrp_pending_amount', lang, amount=f'{pending:.2f}')}\n"
-            f"│  📈 {self.tr('svrp_total_earned_amount', lang, amount=f'{total_earned:.2f}')}\n"
-            f"│  📉 {self.tr('svrp_total_used_amount', lang, amount=f'{total_used:.2f}')}\n"
-            f"└─────────────────────┘\n\n"
-            f"{self.tr('svrp_wagering_label', lang)}\n  {wager_status}\n"
-            f"  {freeze_status}\n\n"
-            f"┌─────────────────────┐\n"
-            f"│  {group_icon} {self.tr('svrp_tier_label', lang)}: {group_ar}\n"
-            f"│  👥 {self.tr('svrp_referrals_count', lang)}: {ref_count}\n"
-            f"└─────────────────────┘\n\n"
-            f"{self.tr('svrp_select_option', lang)}"
+            f"{intro}"
+            f"━━━━━━━━━━━━━━━━━━\n\n"
+            f"{available_label}: <b><code>{available:.2f}</code></b>\n"
+            f"{frozen_label}: <b><code>{frozen:.2f}</code></b>\n"
+            f"{pending_label}: <b><code>{pending:.2f}</code></b>\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"{earned_label}: <b>{total_earned:.2f}</b> | {used_label}: <b>{total_used:.2f}</b>\n\n"
+            f"{wager_label}\n"
+            f"  {wager_bar} ({wager_done}/{wager_req})\n"
+            f"  {wager_done_text if not is_frozen else wager_pending_text}\n\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"{group_icon} {tier_label}: <b>{group_ar}</b> | {refs_label}: <b>{ref_count}</b>\n\n"
+            f"{select_text}"
         )
 
         keyboard = {
@@ -1245,33 +1280,63 @@ class ComprehensiveDUXBot:
         lang = user.get('language', 'ar')
         wallet = self.svrp.get_wallet(user_id)
         credits = self.svrp.get_user_credits_summary(user_id)
+        wager_req = int(wallet.get('wagering_required', 3) or 3)
+        wager_done = int(wallet.get('wagering_completed', 0) or 0)
+        is_frozen = wager_done < wager_req
 
         bal = float(wallet.get('balance', 0) or 0)
         pend = float(wallet.get('pending_balance', 0) or 0)
         earned = float(wallet.get('total_earned', 0) or 0)
         used = float(wallet.get('total_used', 0) or 0)
 
+        if lang == 'ar':
+            title = "💎 <b>محفظتي</b>"
+            frozen_lbl = "🧊 مجمد" if is_frozen else "🟢 متاح"
+            pending_lbl = "⏳ بانتظار الأصدقاء"
+            earned_lbl = "📈 إجمالي المكتسب"
+            used_lbl = "📉 إجمالي المستخدم"
+            keep_lbl = "📥 أرصدة الاحتفاظ"
+            shared_lbl = "📤 أرصدة المشاركة"
+            active_lbl = "نشط"
+            pending_status_lbl = "معلق"
+            used_lbl2 = "مستخدم"
+            expired_lbl = "منتهي"
+            hint = "💡 يمكنك إنشاء كود ترويجي أو استرداد كود من صديق"
+        else:
+            title = "💎 <b>My Wallet</b>"
+            frozen_lbl = "🧊 Frozen" if is_frozen else "🟢 Available"
+            pending_lbl = "⏳ Pending friends"
+            earned_lbl = "📈 Total earned"
+            used_lbl = "📉 Total used"
+            keep_lbl = "📥 Keep credits"
+            shared_lbl = "📤 Shared credits"
+            active_lbl = "Active"
+            pending_status_lbl = "Pending"
+            used_lbl2 = "Used"
+            expired_lbl = "Expired"
+            hint = "💡 Create a promo code or redeem a friend's code"
+
         text = (
-            f"╔════════════════════╗\n"
-            f"║  {self.tr('svrp_my_wallet', lang)}  ║\n"
-            f"╚════════════════════╝\n\n"
-            f"┌─────────────────────┐\n"
-            f"│  💵 {self.tr('svrp_balance_amount', lang, amount=f'{bal:.2f}')}\n"
-            f"│  ⏳ {self.tr('svrp_pending_amount', lang, amount=f'{pend:.2f}')}\n"
-            f"│  📈 {self.tr('svrp_total_earned_amount', lang, amount=f'{earned:.2f}')}\n"
-            f"│  📉 {self.tr('svrp_total_used_amount', lang, amount=f'{used:.2f}')}\n"
-            f"└─────────────────────┘\n\n"
-            f"📋 {self.tr('svrp_keep_credits', lang)}:\n"
-            f"  🟢 {self.tr('svrp_active', lang)}: {credits['keep']['active']}\n"
-            f"  🟡 {self.tr('svrp_pending_status', lang)}: {credits['keep']['pending']}\n"
-            f"  🔴 {self.tr('svrp_used', lang)}: {credits['keep']['used']}\n"
-            f"  ⚫ {self.tr('svrp_expired', lang)}: {credits['keep']['expired']}\n\n"
-            f"📋 {self.tr('svrp_shared_credits', lang)}:\n"
-            f"  🟢 {self.tr('svrp_active', lang)}: {credits['shared']['active']}\n"
-            f"  🟡 {self.tr('svrp_pending_status', lang)}: {credits['shared']['pending']}\n"
-            f"  🔴 {self.tr('svrp_used', lang)}: {credits['shared']['used']}\n"
-            f"  ⚫ {self.tr('svrp_expired', lang)}: {credits['shared']['expired']}\n\n"
-            f"{self.tr('svrp_wallet_hint', lang)}"
+            f"{title}\n\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"{frozen_lbl}: <b><code>{bal:.2f}</code></b>\n"
+            f"{pending_lbl}: <b><code>{pend:.2f}</code></b>\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"{earned_lbl}: <b>{earned:.2f}</b>\n"
+            f"{used_lbl}: <b>{used:.2f}</b>\n\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"<b>{keep_lbl}</b>\n"
+            f"  🟢 {active_lbl}: <b>{credits['keep']['active']}</b> | "
+            f"🟡 {pending_status_lbl}: <b>{credits['keep']['pending']}</b>\n"
+            f"  🔴 {used_lbl2}: <b>{credits['keep']['used']}</b> | "
+            f"⚫ {expired_lbl}: <b>{credits['keep']['expired']}</b>\n\n"
+            f"<b>{shared_lbl}</b>\n"
+            f"  🟢 {active_lbl}: <b>{credits['shared']['active']}</b> | "
+            f"🟡 {pending_status_lbl}: <b>{credits['shared']['pending']}</b>\n"
+            f"  🔴 {used_lbl2}: <b>{credits['shared']['used']}</b> | "
+            f"⚫ {expired_lbl}: <b>{credits['shared']['expired']}</b>\n\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"{hint}"
         )
         self.send_message(message['chat']['id'], text, self.main_keyboard(lang, user_id))
 
@@ -1299,11 +1364,18 @@ class ComprehensiveDUXBot:
             'referral_count': self.tr('svrp_task_referral', lang)
         }
 
-        text = (
-            f"╔════════════════════╗\n"
-            f"║  💎 {self.tr('svrp_tasks_today', lang)}  ║\n"
-            f"╚════════════════════╝\n\n"
-        )
+        if lang == 'ar':
+            title = "📋 <b>مهام اليوم</b>"
+            reward_lbl = "مكافأة"
+            claim_hint = "🎉 لديك مهام مكتملة!\nاكتب: <code>استلام [رقم_المهمة]</code>"
+            pending_hint = "💡 أكمل معاملاتك لإنجاز المهام!"
+        else:
+            title = "📋 <b>Today's Tasks</b>"
+            reward_lbl = "reward"
+            claim_hint = "🎉 You have completed tasks!\nType: <code>claim [task_id]</code>"
+            pending_hint = "💡 Complete your transactions to finish tasks!"
+
+        text = f"{title}\n\n━━━━━━━━━━━━━━━━━━\n\n"
         has_claimable = False
         for t in tasks:
             label = task_labels.get(t['task_type'], t['task_type'])
@@ -1312,17 +1384,18 @@ class ComprehensiveDUXBot:
             status = t.get('status', 'active')
             reward = t.get('reward_amount', '0')
 
-            bar_full = '▰' * int(progress / target * 5) if target > 0 else 0
-            bar_empty = '▱' * (5 - len(bar_full))
+            pct = min(100, int(progress / target * 100)) if target > 0 else 0
+            bar = '▰' * (pct // 20) + '▱' * (5 - pct // 20)
             status_icon = {'active': '⏳', 'completed': '✅', 'claimed': '🎉'}.get(status, '⏳')
-            text += f"{status_icon} {label}\n  {bar_full}{bar_empty} {progress:.0f}/{target:.0f} → 🎁 {reward}\n\n"
+
+            text += f"{status_icon} <b>{label}</b>\n"
+            text += f"   {bar} {progress:.0f}/{target:.0f}\n"
+            text += f"   🎁 {reward_lbl}: <b>{reward}</b>\n\n"
             if status == 'completed':
                 has_claimable = True
 
-        if has_claimable:
-            text += self.tr('svrp_tasks_claimable', lang)
-        else:
-            text += self.tr('svrp_tasks_hint', lang)
+        text += "━━━━━━━━━━━━━━━━━━\n"
+        text += claim_hint if has_claimable else pending_hint
 
         self.send_message(message['chat']['id'], text, self.main_keyboard(lang, user_id))
 
@@ -1337,39 +1410,53 @@ class ComprehensiveDUXBot:
         codes = self.svrp.get_user_promo_codes(user_id)
         wallet = self.svrp.get_wallet(user_id)
         balance = float(wallet.get('balance', 0) or 0)
+        wager_done = int(wallet.get('wagering_completed', 0) or 0)
+        wager_req = int(wallet.get('wagering_required', 3) or 3)
+        is_frozen = wager_done < wager_req
 
-        text = (
-            f"╔════════════════════╗\n"
-            f"║  {self.tr('svrp_my_codes', lang)}  ║\n"
-            f"╚════════════════════╝\n\n"
-            f"┌─────────────────────┐\n"
-            f"│  💰 {self.tr('svrp_your_balance', lang)}: {balance:.2f}\n"
-            f"└─────────────────────┘\n\n"
-        )
+        if lang == 'ar':
+            title = "🎟️ <b>أكوادي الترويجية</b>"
+            balance_lbl = "رصيدك"
+            empty = "📭 لا توجد أكواد بعد"
+            create_hint = "➕ لإنشاء كود جديد:"
+            create_cmd = "<code>انشاء_كود 100</code>"
+            redeem_hint = "📥 لاسترداد كود:"
+            redeem_cmd = "<code>استرداد_كود RCVABC123</code>"
+            frozen_warn = "⚠️ رصيدك مجمد حتى تكمل 3 معاملات" if is_frozen else ""
+        else:
+            title = "🎟️ <b>My Promo Codes</b>"
+            balance_lbl = "Your balance"
+            empty = "📭 No codes yet"
+            create_hint = "➕ To create a new code:"
+            create_cmd = "<code>انشاء_كود 100</code>"
+            redeem_hint = "📥 To redeem a code:"
+            redeem_cmd = "<code>استرداد_كود RCVABC123</code>"
+            frozen_warn = "⚠️ Your balance is frozen until you complete 3 transactions" if is_frozen else ""
+
+        text = f"{title}\n\n━━━━━━━━━━━━━━━━━━\n"
+        text += f"💰 {balance_lbl}: <b><code>{balance:.2f}</code></b>\n"
+        if frozen_warn:
+            text += f"{frozen_warn}\n"
+        text += "━━━━━━━━━━━━━━━━━━\n\n"
+
         if codes:
             for c in codes:
                 status_icon = {'active': '✅', 'fully_used': '🔴', 'expired': '⏰'}.get(c.get('status', 'active'), '✅')
-                uses_full = '▰' * int(int(c.get('used_count', 0)) / max(int(c.get('max_uses', 10)), 1) * 5)
-                uses_empty = '▱' * (5 - len(uses_full))
-                text += (
-                    f"{status_icon} {self.tr('svrp_code_label', lang)}: `{c['code']}`\n"
-                    f"  💵 {self.tr('svrp_code_amount', lang)}: {c['amount']}\n"
-                    f"  📊 {self.tr('svrp_code_usage', lang)}: {uses_full}{uses_empty} ({c.get('used_count', '0')}/{c.get('max_uses', '10')})\n"
-                    f"  ⏰ {self.tr('svrp_code_expires', lang)}: {c.get('expires_at', '')}\n\n"
-                )
-        else:
-            text += f"{self.tr('svrp_no_codes', lang)}\n\n"
+                used = int(c.get('used_count', 0) or 0)
+                max_u = int(c.get('max_uses', 10) or 10)
+                pct = min(100, used * 100 // max_u) if max_u > 0 else 0
+                bar = '▰' * (pct // 20) + '▱' * (5 - pct // 20)
 
-        text += (
-            f"┌─────────────────────┐\n"
-            f"│  {self.tr('svrp_create_hint', lang)}  │\n"
-            f"│  انشاء_كود [{self.tr('svrp_code_amount', lang)}]   │\n"
-            f"└─────────────────────┘\n\n"
-            f"┌─────────────────────┐\n"
-            f"│  {self.tr('svrp_redeem_hint', lang)}      │\n"
-            f"│  استرداد_كود [{self.tr('svrp_code_label', lang)}]   │\n"
-            f"└─────────────────────┘"
-        )
+                text += f"{status_icon} <code>{c['code']}</code>\n"
+                text += f"   💵 <b>{c['amount']}</b> | 📊 {bar} ({used}/{max_u})\n"
+                text += f"   ⏰ {c.get('expires_at', '')}\n\n"
+        else:
+            text += f"{empty}\n\n"
+
+        text += "━━━━━━━━━━━━━━━━━━\n"
+        text += f"{create_hint}\n{create_cmd}\n\n"
+        text += f"{redeem_hint}\n{redeem_cmd}"
+
         self.send_message(message['chat']['id'], text, self.main_keyboard(lang, user_id))
 
     def show_svrp_referral_tree(self, message):
