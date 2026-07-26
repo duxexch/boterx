@@ -230,5 +230,10 @@
   "approve_btn": "✅ Approve",
   "reject_btn": "❌ Reject",
   "details_btn": "👁️ Details",
-  "rate_limit_msg": "⏳ Please wait a moment before sending another message."
+  "rate_limit_msg": "⏳ Please wait a moment before sending another message.",
+  "match_btn": "🔄 Match",
+  "notif_btn": "🔔 Notifications",
+  "referral_btn": "🎁 Referral",
+  "help_btn_label": "❓ Help",
+  "admin_panel_btn": "🔧 Admin"
 }

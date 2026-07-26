@@ -1635,11 +1635,11 @@ class ComprehensiveDUXBot:
         support_btn = self.tr('support', lang)
         currency_btn = self.tr('change_currency', lang)
         reset_btn = self.tr('reset_system', lang)
-        match_btn = f"{t.get('btn_match', '🔄')} مطابقة"
-        notif_btn = f"{t.get('btn_notifications', '🔔')} إشعاراتي"
-        ref_btn = f"{t.get('btn_referral', '🎁')} إحالة"
-        help_btn = f"{t.get('btn_help', '❓')} مساعدة"
-        svrp_btn = f"{t.get('btn_recovery', '💎')} استرداد ذكي"
+        match_btn = self.tr('match_btn', lang) if self.tr('match_btn', lang) != 'match_btn' else f"{t.get('btn_match', '🔄')} مطابقة"
+        notif_btn = self.tr('notif_btn', lang) if self.tr('notif_btn', lang) != 'notif_btn' else f"{t.get('btn_notifications', '🔔')} إشعاراتي"
+        ref_btn = self.tr('referral_btn', lang) if self.tr('referral_btn', lang) != 'referral_btn' else f"{t.get('btn_referral', '🎁')} إحالة"
+        help_btn = self.tr('help_btn_label', lang) if self.tr('help_btn_label', lang) != 'help_btn_label' else f"{t.get('btn_help', '❓')} مساعدة"
+        svrp_btn = self.tr('svrp_title', lang)
 
         lang_names = self.get_language_names()
         lang_btn_text = f"{t.get('btn_language', '🌐')} {lang_names.get(lang, {}).get('native', 'Language')}"
@@ -1668,7 +1668,7 @@ class ComprehensiveDUXBot:
         
         # زر الأدمن مخفي في الأسفل (لا يظهر للعملاء العاديين)
         if user_id and self.is_admin(user_id):
-            keyboard.append([{'text': '🔧 Admin'}])
+            keyboard.append([{'text': self.tr('admin_panel_btn', lang) if self.tr('admin_panel_btn', lang) != 'admin_panel_btn' else '🔧 Admin'}])
         
         return {
             'keyboard': keyboard,
@@ -2867,7 +2867,8 @@ class ComprehensiveDUXBot:
         
         # معالجة أوامر الأدمن
         if self.is_admin(user_id):
-            if text == '/admin' or text == '🔧 Admin':
+            admin_texts = {self.tr('admin_panel_btn', l) for l in all_langs} | {'🔧 Admin', '🔧 لوحة الإدارة'}
+            if text == '/admin' or text in admin_texts:
                 self.handle_admin_panel(message)
                 return
             
@@ -2976,11 +2977,11 @@ class ComprehensiveDUXBot:
         complaint_texts = {self.tr('complaint', l) for l in self.get_supported_languages()}
         support_texts = {self.tr('support', l) for l in self.get_supported_languages()}
         currency_texts = {self.tr('change_currency', l) for l in self.get_supported_languages()}
-        match_texts = {'🔄 مطابقة', '🔄 Match', '🔄 مطابقة'}
-        notif_texts = {'🔔 إشعاراتي', '🔔 Notifications', '🔔 الإشعارات'}
-        ref_texts = {'🎁 إحالة', '🎁 Referral', '🎁 الإحالة'}
-        help_texts = {'❓ مساعدة', '❓ Help', '❓ المساعدة'}
-        svrp_texts = {'💎 استرداد ذكي', '💎 استرداد', '💎 الاسترداد الذكي', '💎 svrp'}
+        match_texts = {self.tr('match_btn', l) for l in all_langs} | {'🔄 مطابقة', '🔄 Match'}
+        notif_texts = {self.tr('notif_btn', l) for l in all_langs} | {'🔔 إشعاراتي', '🔔 Notifications'}
+        ref_texts = {self.tr('referral_btn', l) for l in all_langs} | {'🎁 إحالة', '🎁 Referral'}
+        help_texts = {self.tr('help_btn_label', l) for l in all_langs} | {'❓ مساعدة', '❓ Help'}
+        svrp_texts = {self.tr('svrp_title', l) for l in all_langs} | {'💎 استرداد ذكي', '💎 استرداد'}
         register_texts = {self.tr('register_account', l) for l in self.get_supported_languages()}
         register_texts.add('📝 تسجيل حساب جديد')
         reset_texts = {self.tr('reset_system', l) for l in self.get_supported_languages()}

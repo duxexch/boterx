@@ -230,5 +230,10 @@
   "approve_btn": "✅ Approve",
   "reject_btn": "❌ Reject",
   "details_btn": "👁️ Details",
-  "rate_limit_msg": "⏳ Please wait a moment before sending another message."
+  "rate_limit_msg": "⏳ Please wait a moment before sending another message.",
+  "match_btn": "🔄 จับคู่",
+  "notif_btn": "🔔 การแจ้งเตือน",
+  "referral_btn": "🎁 แนะนำ",
+  "help_btn_label": "❓ ช่วยเหลือ",
+  "admin_panel_btn": "🔧 Admin"
 }

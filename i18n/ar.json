@@ -230,5 +230,10 @@
   "approve_btn": "✅ موافقة",
   "reject_btn": "❌ رفض",
   "details_btn": "👁️ التفاصيل",
-  "rate_limit_msg": "⏳ يرجى الانتظار قليلاً قبل إرسال رسالة أخرى."
+  "rate_limit_msg": "⏳ يرجى الانتظار قليلاً قبل إرسال رسالة أخرى.",
+  "match_btn": "🔄 مطابقة",
+  "notif_btn": "🔔 إشعاراتي",
+  "referral_btn": "🎁 إحالة",
+  "help_btn_label": "❓ مساعدة",
+  "admin_panel_btn": "🔧 لوحة الإدارة"
 }
