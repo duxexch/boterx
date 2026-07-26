@@ -23,7 +23,7 @@ try:
 except ImportError:
     MATCHING_AVAILABLE = False
 
-# استيراد نظام الاسترداد التسويقي الذكي (SVRP)
+# استيراد نظام 💎 الاسترداد الذكي
 try:
     from svrp import SVRPManager
     SVRP_AVAILABLE = True
@@ -74,7 +74,7 @@ class ComprehensiveDUXBot:
         # تنظيف المعاملات القديمة عند الإقلاع
         self.cleanup_old_transactions()
         
-        # تنظيف أرصدة SVRP المنتهية عند الإقلاع
+        # تنظيف أرصدة الاسترداد الذكي المنتهية عند الإقلاع
         if self.svrp:
             self.svrp.expire_old_credits()
         
@@ -848,14 +848,14 @@ class ComprehensiveDUXBot:
         )
         self.send_message(message['chat']['id'], ref_text, self.main_keyboard(lang, message['from']['id']))
 
-    # ==================== SVRP Panel Methods ====================
+    # ==================== 💎 الاسترداد الذكي — Panel Methods ====================
 
     def show_svrp_panel(self, message):
-        """عرض لوحة SVRP الرئيسية"""
+        """عرض لوحة 💎 الاسترداد الذكي"""
         user = self.find_user(message['from']['id'])
         if not user or not self.svrp:
             self.send_message(message['chat']['id'],
-                "🎯 نظام الاسترداد التسويقي غير متاح حالياً.",
+                "💎 نظام الاسترداد الذكي غير متاح حالياً.",
                 self.main_keyboard('ar', message['from']['id']))
             return
 
@@ -876,25 +876,35 @@ class ComprehensiveDUXBot:
         group_ar = {'bronze': 'برونزي', 'silver': 'فضي', 'gold': 'ذهبي', 'platinum': 'بلاتيني'}.get(group_name, 'برونزي')
         ref_count = self.svrp.count_referrals_recursive(user_id)
 
+        wager_bar_full = '▰' * wager_done
+        wager_bar_empty = '▱' * max(0, wager_req - wager_done)
+        wager_status = f"{'✅' if wager_done >= wager_req else '⏳'} {wager_bar_full}{wager_bar_empty} ({wager_done}/{wager_req})"
+
         panel_text = (
-            f"🎯 نظام الاسترداد التسويقي (SVRP)\n\n"
-            f"💰 رصيدك المتاح: {balance:.2f}\n"
-            f"⏳ رصيد معلق (بانتظار أصدقاء): {pending:.2f}\n"
-            f"📊 إجمالي المكتسب: {total_earned:.2f}\n"
-            f"📉 إجمالي المستخدم: {total_used:.2f}\n\n"
-            f"🎯 متطلبات الرهان: {wager_done}/{wager_req} معاملة\n"
-            f"{'✅ أكملت متطلبات الرهان!' if wager_done >= wager_req else '⏳ أكمل معاملات إضافية لتفعيل الأرصدة'}\n\n"
-            f"{group_icon} مجموعتك: {group_ar}\n"
-            f"👥 إجمالي الإحالات: {ref_count}\n\n"
-            f"اختر من القائمة:"
+            f"╔════════════════════╗\n"
+            f"║  💎 الاسترداد الذكي  ║\n"
+            f"╚════════════════════╝\n\n"
+            f"┌─────────────────────┐\n"
+            f"│  💰 الرصيد المتاح: {balance:.2f}\n"
+            f"│  ⏳ الرصيد المعلق: {pending:.2f}\n"
+            f"│  📈 إجمالي المكتسب: {total_earned:.2f}\n"
+            f"│  📉 إجمالي المستخدم: {total_used:.2f}\n"
+            f"└─────────────────────┘\n\n"
+            f"🎯 تقدم الرهان:\n  {wager_status}\n"
+            f"{'  ✅ أكملت متطلبات الرهان!' if wager_done >= wager_req else '  ⏳ أكمل معاملات إضافية لتفعيل الأرصدة'}\n\n"
+            f"┌─────────────────────┐\n"
+            f"│  {group_icon} المستوى: {group_ar}\n"
+            f"│  👥 الإحالات: {ref_count}\n"
+            f"└─────────────────────┘\n\n"
+            f"📌 اختر من القائمة أدناه 👇"
         )
 
         keyboard = {
             'keyboard': [
-                [{'text': '💰 محفظتي'}, {'text': '📋 مهامي'}],
-                [{'text': '🎟️ أكوادي'}, {'text': '➕ إنشاء كود'}],
+                [{'text': '💎 💰 محفظتي'}, {'text': '💎 📋 مهامي'}],
+                [{'text': '🎟️ أكوادي الترويجية'}, {'text': '➕ إنشاء كود جديد'}],
                 [{'text': '📥 استرداد كود'}, {'text': '🌳 شجرة الإحالات'}],
-                [{'text': '🎖️ مجموعتي'}, {'text': '🏠 القائمة الرئيسية'}]
+                [{'text': '🎖️ مستواي'}, {'text': '🏠 القائمة الرئيسية'}]
             ],
             'resize_keyboard': True,
             'one_time_keyboard': False
@@ -902,7 +912,7 @@ class ComprehensiveDUXBot:
         self.send_message(message['chat']['id'], panel_text, keyboard)
 
     def show_svrp_wallet(self, message):
-        """عرض محفظة SVRP"""
+        """عرض محفظة 💎 الاسترداد الذكي"""
         user_id = message['from']['id']
         user = self.find_user(user_id)
         if not user or not self.svrp:
@@ -912,27 +922,31 @@ class ComprehensiveDUXBot:
         credits = self.svrp.get_user_credits_summary(user_id)
 
         text = (
-            f"💰 محفظة SVRP\n\n"
-            f"💵 الرصيد المتاح: {float(wallet.get('balance', 0) or 0):.2f}\n"
-            f"⏳ الرصيد المعلق: {float(wallet.get('pending_balance', 0) or 0):.2f}\n"
-            f"📊 إجمالي المكتسب: {float(wallet.get('total_earned', 0) or 0):.2f}\n"
-            f"📉 إجمالي المستخدم: {float(wallet.get('total_used', 0) or 0):.2f}\n\n"
+            f"╔════════════════════╗\n"
+            f"║  💎 محفظتي  ║\n"
+            f"╚════════════════════╝\n\n"
+            f"┌─────────────────────┐\n"
+            f"│  💵 الرصيد المتاح: {float(wallet.get('balance', 0) or 0):.2f}\n"
+            f"│  ⏳ الرصيد المعلق: {float(wallet.get('pending_balance', 0) or 0):.2f}\n"
+            f"│  📈 إجمالي المكتسب: {float(wallet.get('total_earned', 0) or 0):.2f}\n"
+            f"│  📉 إجمالي المستخدم: {float(wallet.get('total_used', 0) or 0):.2f}\n"
+            f"└─────────────────────┘\n\n"
             f"📋 أرصدة الاحتفاظ:\n"
-            f"  • نشط: {credits['keep']['active']}\n"
-            f"  • معلق: {credits['keep']['pending']}\n"
-            f"  • مستخدم: {credits['keep']['used']}\n"
-            f"  • منتهي: {credits['keep']['expired']}\n\n"
+            f"  🟢 نشط: {credits['keep']['active']}\n"
+            f"  🟡 معلق: {credits['keep']['pending']}\n"
+            f"  🔴 مستخدم: {credits['keep']['used']}\n"
+            f"  ⚫ منتهي: {credits['keep']['expired']}\n\n"
             f"📋 أرصدة المشاركة:\n"
-            f"  • نشط: {credits['shared']['active']}\n"
-            f"  • معلق: {credits['shared']['pending']}\n"
-            f"  • مستخدم: {credits['shared']['used']}\n"
-            f"  • منتهي: {credits['shared']['expired']}\n\n"
-            f"💡 يمكنك إنشاء كود ترويجي من رصيدك أو استرداد كود من صديق."
+            f"  🟢 نشط: {credits['shared']['active']}\n"
+            f"  🟡 معلق: {credits['shared']['pending']}\n"
+            f"  🔴 مستخدم: {credits['shared']['used']}\n"
+            f"  ⚫ منتهي: {credits['shared']['expired']}\n\n"
+            f"💡 يمكنك إنشاء كود ترويجي من رصيدك\nأو استرداد كود من صديق."
         )
         self.send_message(message['chat']['id'], text, self.main_keyboard(user.get('language', 'ar'), user_id))
 
     def show_svrp_tasks(self, message):
-        """عرض مهام SVRP"""
+        """عرض مهام 💎 الاسترداد الذكي"""
         user_id = message['from']['id']
         user = self.find_user(user_id)
         if not user or not self.svrp:
@@ -954,7 +968,11 @@ class ComprehensiveDUXBot:
             'referral_count': 'دعوة صديق'
         }
 
-        text = "📋 مهام اليوم\n\n"
+        text = (
+            "╔════════════════════╗\n"
+            "║  💎 مهام اليوم  ║\n"
+            "╚════════════════════╝\n\n"
+        )
         has_claimable = False
         for t in tasks:
             label = task_labels.get(t['task_type'], t['task_type'])
@@ -963,15 +981,17 @@ class ComprehensiveDUXBot:
             status = t.get('status', 'active')
             reward = t.get('reward_amount', '0')
 
+            bar_full = '▰' * int(progress / target * 5) if target > 0 else 0
+            bar_empty = '▱' * (5 - len(bar_full))
             status_icon = {'active': '⏳', 'completed': '✅', 'claimed': '🎉'}.get(status, '⏳')
-            text += f"{status_icon} {label}: {progress:.0f}/{target:.0f} → مكافأة {reward}\n"
+            text += f"{status_icon} {label}\n  {bar_full}{bar_empty} {progress:.0f}/{target:.0f} → 🎁 {reward}\n\n"
             if status == 'completed':
                 has_claimable = True
 
         if has_claimable:
-            text += "\n🎁 لديك مهام مكتملة! اكتب: استلام [رقم_المهمة]"
+            text += "🎁 لديك مهام مكتملة!\nاكتب: استلام [رقم_المهمة]"
         else:
-            text += "\n💡 أكمل معاملاتك لإنجاز المهام!"
+            text += "💡 أكمل معاملاتك لإنجاز المهام!"
 
         self.send_message(message['chat']['id'], text, self.main_keyboard(user.get('language', 'ar'), user_id))
 
@@ -986,25 +1006,39 @@ class ComprehensiveDUXBot:
         wallet = self.svrp.get_wallet(user_id)
         balance = float(wallet.get('balance', 0) or 0)
 
-        text = f"🎟️ أكوادي الترويجية\n\n💰 رصيدك: {balance:.2f}\n\n"
+        text = (
+            f"╔════════════════════╗\n"
+            f"║  🎟️ أكوادي الترويجية  ║\n"
+            f"╚════════════════════╝\n\n"
+            f"┌─────────────────────┐\n"
+            f"│  💰 رصيدك: {balance:.2f}\n"
+            f"└─────────────────────┘\n\n"
+        )
         if codes:
             for c in codes:
                 status_icon = {'active': '✅', 'fully_used': '🔴', 'expired': '⏰'}.get(c.get('status', 'active'), '✅')
+                uses_full = '▰' * int(int(c.get('used_count', 0)) / max(int(c.get('max_uses', 10)), 1) * 5)
+                uses_empty = '▱' * (5 - len(uses_full))
                 text += (
                     f"{status_icon} الكود: `{c['code']}`\n"
-                    f"  المبلغ: {c['amount']} | مستخدم: {c.get('used_count', '0')}/{c.get('max_uses', '10')}\n"
-                    f"  ينتهي: {c.get('expires_at', '')}\n\n"
+                    f"  💵 المبلغ: {c['amount']}\n"
+                    f"  📊 الاستخدام: {uses_full}{uses_empty} ({c.get('used_count', '0')}/{c.get('max_uses', '10')})\n"
+                    f"  ⏰ ينتهي: {c.get('expires_at', '')}\n\n"
                 )
         else:
-            text += "📭 لا توجد أكواد بعد.\n"
+            text += "📭 لا توجد أكواد بعد.\n\n"
 
         text += (
-            "\n💡 لإنشاء كود جديد، اكتب:\n"
-            "انشاء_كود [المبلغ]\n"
-            "مثال: انشاء_كود 100\n\n"
-            "📥 لاسترداد كود، اكتب:\n"
-            "استرداد_كود [الكود]\n"
-            "مثال: استرداد_كود SVRPABC123"
+            "┌─────────────────────┐\n"
+            "│  ➕ لإنشاء كود جديد:  │\n"
+            "│  انشاء_كود [المبلغ]   │\n"
+            "│  مثال: انشاء_كود 100   │\n"
+            "└─────────────────────┘\n\n"
+            "┌─────────────────────┐\n"
+            "│  📥 لاسترداد كود:      │\n"
+            "│  استرداد_كود [الكود]   │\n"
+            "│  مثال: استرداد_كود ABC123 │\n"
+            "└─────────────────────┘"
         )
         self.send_message(message['chat']['id'], text, self.main_keyboard(user.get('language', 'ar'), user_id))
 
@@ -1035,14 +1069,19 @@ class ComprehensiveDUXBot:
             return lines
 
         tree_lines = render_tree(tree)
-        text = "🌳 شجرة الإحالات\n\n" + "\n".join(tree_lines)
+        text = (
+            "╔════════════════════╗\n"
+            "║  🌳 شجرة الإحالات  ║\n"
+            "╚════════════════════╝\n\n"
+            + "\n".join(tree_lines)
+        )
         text += f"\n\n📊 إجمالي الإحالات: {total}"
         text += f"\n💡 شارك كود الإحالة الخاص بك لزيادة أرصدتك!"
 
         self.send_message(message['chat']['id'], text, self.main_keyboard(user.get('language', 'ar'), user_id))
 
     def show_svrp_group(self, message):
-        """عرض مجموعة المستخدم"""
+        """عرض مستوى المستخدم في 💎 الاسترداد الذكي"""
         user_id = message['from']['id']
         user = self.find_user(user_id)
         if not user or not self.svrp:
@@ -1057,10 +1096,14 @@ class ComprehensiveDUXBot:
         score = float(group.get('tier_score', 0) or 0)
 
         text = (
-            f"🎖️ مجموعتي\n\n"
-            f"{group_icon} المستوى: {group_ar}\n"
-            f"⭐ النقاط: {score:.0f}\n"
-            f"🔢 مضاعف الاسترداد: {multiplier}\n\n"
+            f"╔════════════════════╗\n"
+            f"║  🎖️ مستواي  ║\n"
+            f"╚════════════════════╝\n\n"
+            f"┌─────────────────────┐\n"
+            f"│  {group_icon} المستوى: {group_ar}\n"
+            f"│  ⭐ النقاط: {score:.0f}\n"
+            f"│  🔢 مضاعف الاسترداد: {multiplier}\n"
+            f"└─────────────────────┘\n\n"
         )
 
         thresholds = [
@@ -1071,14 +1114,15 @@ class ComprehensiveDUXBot:
         ]
         text += "📋 المستويات:\n"
         for label, gname, min_score, mult in thresholds:
-            current = ' ← أنت هنا' if group_name == gname else ''
-            text += f"  {label}: {min_score}+ نقطة ({mult}){current}\n"
+            marker = ' ◀ أنت هنا' if group_name == gname else ''
+            bar = '▰' * 5 if group_name == gname else '▱' * 5
+            text += f"  {label} {bar} {min_score}+ نقطة ({mult}){marker}\n"
 
-        text += "\n💡 اكمل معاملاتك وادعُ أصدقاءك للترقية!"
+        text += "\n💡 أكمل معاملاتك وادعُ أصدقاءك للترقية!"
         self.send_message(message['chat']['id'], text, self.main_keyboard(user.get('language', 'ar'), user_id))
 
     def handle_svrp_state(self, message, state):
-        """معالجة حالات SVRP المختلفة"""
+        """معالجة حالات 💎 الاسترداد الذكي"""
         user_id = message['from']['id']
         text = message.get('text', '').strip()
         chat_id = message['chat']['id']
@@ -1120,16 +1164,20 @@ class ComprehensiveDUXBot:
                 del self.user_states[user_id]
 
     def show_svrp_admin_panel(self, message):
-        """لوحة إدارة SVRP للأدمن"""
+        """لوحة إدارة 💎 الاسترداد الذكي للأدمن"""
         if not self.svrp:
-            self.send_message(message['chat']['id'], "❌ نظام SVRP غير متاح", self.admin_keyboard())
+            self.send_message(message['chat']['id'], "❌ نظام الاسترداد الذكي غير متاح", self.admin_keyboard())
             return
 
         stats = self.svrp.get_svrp_stats()
 
         text = (
-            f"🎯 إدارة SVRP\n\n"
-            f"📊 الإحصائيات:\n"
+            f"╔════════════════════╗\n"
+            f"║  💎 إدارة الاسترداد الذكي  ║\n"
+            f"╚════════════════════╝\n\n"
+            f"┌─────────────────────┐\n"
+            f"│  📊 الإحصائيات:  │\n"
+            f"└─────────────────────┘\n"
             f"  💰 أرصدة مصدرة: {stats['total_credits_issued']:.2f}\n"
             f"  📉 أرصدة مستخدمة: {stats['total_credits_used']:.2f}\n"
             f"  ✅ أرصدة نشطة: {stats['active_credits']}\n"
@@ -1150,7 +1198,7 @@ class ComprehensiveDUXBot:
 
         self.send_message(message['chat']['id'], text, self.admin_keyboard())
 
-    # ==================== End SVRP Panel Methods ====================
+    # ==================== End 💎 الاسترداد الذكي — Panel Methods ====================
 
     def track_user_activity(self, telegram_id, activity_type='login'):
         """تتبع نشاط المستخدم"""
@@ -1539,7 +1587,7 @@ class ComprehensiveDUXBot:
         notif_btn = '🔔 إشعاراتي'
         ref_btn = '🎁 إحالة'
         help_btn = '❓ مساعدة'
-        svrp_btn = '🎯 SVRP'
+        svrp_btn = '💎 استرداد ذكي'
 
         lang_names = self.get_language_names()
         lang_btn_text = f"🌐 {lang_names.get(lang, {}).get('native', 'Language')}"
@@ -1597,8 +1645,8 @@ class ComprehensiveDUXBot:
             [{'text': '👥 المديرين'}, {'text': '✏️ الأزرار'}],
             # المجموعة 9: الحماية والنسخ
             [{'text': '🔔 الإشعارات'}, {'text': '💾 نسخة احتياطية'}],
-            # المجموعة 10: SVRP
-            [{'text': '🎯 SVRP'}, {'text': '📋 أوامر سريعة'}],
+            # المجموعة 10: 💎 الاسترداد الذكي
+            [{'text': '💎 استرداد ذكي'}, {'text': '📋 أوامر سريعة'}],
             # صف منفصل: إجراءات المستخدم
             [{'text': '🚫 حظر مستخدم'}, {'text': '✅ إلغاء حظر'}],
             # صف منفصل: إعادة تعيين + الرئيسية
@@ -1849,7 +1897,7 @@ class ComprehensiveDUXBot:
             self.send_message(message['chat']['id'], welcome_text, self.main_keyboard(detected_lang, user_id))
             del self.user_states[user_id]
             
-            # SVRP: معالجة كود الإحالة المخزن مؤقتاً
+            # 💎 الاسترداد الذكي: معالجة كود الإحالة المخزن مؤقتاً
             if self.svrp and hasattr(self, '_pending_referral'):
                 ref_code = self._pending_referral.pop(user_id, None)
                 if ref_code:
@@ -2595,7 +2643,7 @@ class ComprehensiveDUXBot:
                 self.handle_registration(message)
                 return
             
-            # معالجة حالات SVRP
+            # معالجة حالات 💎 الاسترداد الذكي
             elif isinstance(state, str) and state.startswith('svrp_'):
                 self.handle_svrp_state(message, state)
                 return
@@ -2772,7 +2820,7 @@ class ComprehensiveDUXBot:
         notif_texts = {'🔔 إشعاراتي', '🔔 Notifications', '🔔 الإشعارات'}
         ref_texts = {'🎁 إحالة', '🎁 Referral', '🎁 الإحالة'}
         help_texts = {'❓ مساعدة', '❓ Help', '❓ المساعدة'}
-        svrp_texts = {'🎯 SVRP', '🎯 svrp', '🎯 Svrp', '🎯 استرداد'}
+        svrp_texts = {'💎 استرداد ذكي', '💎 استرداد', '💎 الاسترداد الذكي', '💎 svrp'}
         register_texts = {self.tr('register_account', l) for l in self.get_supported_languages()}
         register_texts.add('📝 تسجيل حساب جديد')
         reset_texts = {self.tr('reset_system', l) for l in self.get_supported_languages()}
@@ -2802,13 +2850,13 @@ class ComprehensiveDUXBot:
             self.show_referral_panel(message)
         elif text in svrp_texts:
             self.show_svrp_panel(message)
-        elif text == '💰 محفظتي' and self.svrp:
+        elif text == '💎 💰 محفظتي' and self.svrp:
             self.show_svrp_wallet(message)
-        elif text == '📋 مهامي' and self.svrp:
+        elif text == '💎 📋 مهامي' and self.svrp:
             self.show_svrp_tasks(message)
-        elif text == '🎟️ أكوادي' and self.svrp:
+        elif text == '🎟️ أكوادي الترويجية' and self.svrp:
             self.show_svrp_promo_codes(message)
-        elif text == '➕ إنشاء كود' and self.svrp:
+        elif text == '➕ إنشاء كود جديد' and self.svrp:
             self.user_states[user_id] = 'svrp_create_promo_'
             self.send_message(chat_id, "➕ اكتب المبلغ لإنشاء كود ترويجي:\n(مثال: 100)\nأو اكتب 'إلغاء' للعودة)")
         elif text == '📥 استرداد كود' and self.svrp:
@@ -2816,7 +2864,7 @@ class ComprehensiveDUXBot:
             self.send_message(chat_id, "📥 اكتب الكود الترويجي للاسترداد:\n(أو اكتب 'إلغاء' للعودة)")
         elif text == '🌳 شجرة الإحالات' and self.svrp:
             self.show_svrp_referral_tree(message)
-        elif text == '🎖️ مجموعتي' and self.svrp:
+        elif text == '🎖️ مستواي' and self.svrp:
             self.show_svrp_group(message)
         elif text in help_texts:
             self.show_help_guide(message)
@@ -2832,7 +2880,7 @@ class ComprehensiveDUXBot:
             self.start_phone_login(message)
         elif text == '/myid':
             self.send_message(chat_id, f"🆔 معرف المستخدم الخاص بك: {user_id}")
-        # SVRP text commands
+        # 💎 الاسترداد الذكي — أوامر نصية
         elif text.startswith('انشاء_كود ') and self.svrp:
             amount_str = text.replace('انشاء_كود ', '').strip()
             try:
@@ -3386,7 +3434,7 @@ class ComprehensiveDUXBot:
             self.start_complaint_reply_wizard(message, complaint_id)
         elif text == '📋 أوامر سريعة':
             self.show_quick_copy_commands(message)
-        elif text == '🎯 SVRP' and self.svrp:
+        elif text == '💎 استرداد ذكي' and self.svrp:
             self.show_svrp_admin_panel(message)
         elif text == '📧 رسالة لعميل':
             self.start_send_user_message(message)
@@ -3653,7 +3701,7 @@ class ComprehensiveDUXBot:
                     customer_msg = self.tr('transaction_approved', lang, trans_id=trans_id)
                     self.notify_user(int(customer_telegram_id), customer_msg, 'transaction_approved')
                     
-                    # SVRP: تحديث المهام + تفعيل أرصدة الأصدقاء + زيادة الرهان
+                    # 💎 الاسترداد الذكي: تحديث المهام + تفعيل أرصدة الأصدقاء + زيادة الرهان
                     if self.svrp:
                         try:
                             amount = float(transaction.get('amount', 0) or 0)
@@ -3668,7 +3716,7 @@ class ComprehensiveDUXBot:
                             # تحديث مجموعة المستخدم
                             self.svrp.update_user_group(customer_telegram_id)
                         except Exception as e:
-                            logger.error(f"خطأ في تحديث SVRP: {e}")
+                            logger.error(f"خطأ في تحديث الاسترداد الذكي: {e}")
             
             self.send_message(message['chat']['id'], self.tr('transaction_approved', 'ar', trans_id=trans_id), self.admin_keyboard())
         else:
@@ -3689,7 +3737,7 @@ class ComprehensiveDUXBot:
                     customer_msg = self.tr('transaction_rejected', lang, trans_id=trans_id, reason=reason)
                     self.notify_user(int(customer_telegram_id), customer_msg, 'transaction_rejected')
                     
-                    # SVRP: تشغيل الاسترداد عند رفض السحب
+                    # 💎 الاسترداد الذكي: تشغيل الاسترداد عند رفض السحب
                     if self.svrp and transaction.get('type') == 'withdraw':
                         try:
                             amount = float(transaction.get('amount', 0) or 0)
@@ -3700,7 +3748,7 @@ class ComprehensiveDUXBot:
                                 )
                                 if result:
                                     svrp_msg = (
-                                        f"🎯 تم تفعيل نظام الاسترداد التسويقي!\n\n"
+                                        f"💎 تم تفعيل نظام الاسترداد الذكي!\n\n"
                                         f"💰 رصيد الاسترداد: {result['total_credit']:.2f} {result['currency']}\n"
                                         f"📥 لك: {result['keep_amount']:.2f}\n"
                                         f"📤 مشاركة مع الأصدقاء: {result['share_amount']:.2f}\n\n"
@@ -3711,7 +3759,7 @@ class ComprehensiveDUXBot:
                                     )
                                     self.notify_user(int(customer_telegram_id), svrp_msg, 'svrp_recovery')
                         except Exception as e:
-                            logger.error(f"خطأ في تشغيل SVRP: {e}")
+                            logger.error(f"خطأ في تشغيل الاسترداد الذكي: {e}")
             
             self.send_message(message['chat']['id'], self.tr('transaction_rejected', 'ar', trans_id=trans_id, reason=reason), self.admin_keyboard())
         else:

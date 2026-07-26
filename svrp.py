@@ -1,7 +1,7 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-نظام الاسترداد التسويقي الذكي — Smart Viral Recovery Program (SVRP)
+نظام 💎 الاسترداد الذكي — Smart Recovery
 يحوّل خسائر العملاء (الطلبات المرفوضة) إلى أرصدة ترويجية مرتبطة بالإحالات
 العميل يحصل على رصيد استرداد، يشارك جزء مع أصدقائه، والأصدقاء يجب أن يودعوا لتفعيل الأرصدة
 """
@@ -16,7 +16,7 @@ from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
-# ==================== إعدادات SVRP ====================
+# ==================== إعدادات 💎 الاسترداد الذكي ====================
 SVRP_CONFIG = {
     'recovery_multiplier': 2.0,       # الرصيد = المبلغ المرفوض × المضاعف
     'max_recovery_cap': 5000,          # أقصى رصيد استرداد لكل حدث
@@ -40,7 +40,7 @@ USER_GROUPS = {
 
 
 class SVRPManager:
-    """مدير نظام الاسترداد التسويقي الذكي"""
+    """مدير نظام 💎 الاسترداد الذكي"""
 
     CREDIT_FIELDS = [
         'id', 'user_id', 'trigger_trans_id', 'trigger_amount', 'credit_amount',
@@ -75,7 +75,7 @@ class SVRPManager:
     # ==================== تهيئة الملفات ====================
 
     def init_svrp_files(self):
-        """إنشاء جميع ملفات SVRP"""
+        """إنشاء جميع ملفات الاسترداد الذكي"""
         files = {
             'svrp_credits.csv': self.CREDIT_FIELDS,
             'svrp_wallets.csv': self.WALLET_FIELDS,
@@ -88,7 +88,7 @@ class SVRPManager:
                 with open(filename, 'w', newline='', encoding='utf-8-sig') as f:
                     writer = csv.writer(f)
                     writer.writerow(fields)
-                logger.info(f"Created SVRP file: {filename}")
+                logger.info(f"Created recovery file: {filename}")
 
     # ==================== أدوات مساعدة ====================
 
@@ -199,7 +199,7 @@ class SVRPManager:
         wallet = self.get_wallet(tid)
         monthly_total = float(wallet.get('monthly_recovery_total', 0) or 0)
         if monthly_total >= monthly_cap:
-            logger.info(f"SVRP: User {tid} reached monthly cap ({monthly_cap})")
+            logger.info(f"Recovery: User {tid} reached monthly cap ({monthly_cap})")
             return None, "تم الوصول للحد الشهري للاسترداد"
 
         # حساب الرصيد
@@ -275,7 +275,7 @@ class SVRPManager:
         # 5. تحديث مجموعة المستخدم
         self.update_user_group(tid)
 
-        logger.info(f"SVRP recovery triggered for user {tid}: {credit_amount} {currency} "
+        logger.info(f"Recovery triggered for user {tid}: {credit_amount} {currency} "
                      f"(keep={keep_amount}, share={share_amount})")
 
         return {
@@ -355,7 +355,7 @@ class SVRPManager:
             except Exception as e:
                 logger.error(f"خطأ في تحديث الإحالة: {e}")
 
-            logger.info(f"SVRP: Activated shared credits for referrer {referrer_id} "
+            logger.info(f"Recovery: Activated shared credits for referrer {referrer_id} "
                          f"(friend {tid} deposited)")
             return True
 
@@ -421,7 +421,7 @@ class SVRPManager:
                     break
         self._write_csv('svrp_credits.csv', rows, self.CREDIT_FIELDS)
 
-        logger.info(f"SVRP: User {telegram_id} used {amount} credits")
+        logger.info(f"Recovery: User {telegram_id} used {amount} credits")
         return True, "تم استخدام الأرصدة بنجاح"
 
     # ==================== الأكواد الترويجية ====================
@@ -438,7 +438,7 @@ class SVRPManager:
             return None, "المبلغ يجب أن يكون أكبر من صفر"
 
         # توليد كود فريد
-        code = 'SVRP' + ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+        code = 'RCV' + ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
 
         now = datetime.now()
         expiry = now + timedelta(days=self._get_config('promo_code_expiry_days'))
@@ -464,7 +464,7 @@ class SVRPManager:
             'total_used': total_used
         })
 
-        logger.info(f"SVRP: Promo code {code} created by {telegram_id} for {amount} {currency}")
+        logger.info(f"Recovery: Promo code {code} created by {telegram_id} for {amount} {currency}")
         return code, None
 
     def redeem_promo_code(self, telegram_id, code):
@@ -516,7 +516,7 @@ class SVRPManager:
             return False, "كود ترويجي غير صالح"
 
         self._write_csv('svrp_promo_codes.csv', rows, self.PROMO_CODE_FIELDS)
-        logger.info(f"SVRP: User {telegram_id} redeemed promo code {code}")
+        logger.info(f"Recovery: User {telegram_id} redeemed promo code {code}")
         return True, f"تم استرداد الكود بنجاح! حصلت على {amount} رصيد"
 
     def get_user_promo_codes(self, telegram_id):
@@ -559,7 +559,7 @@ class SVRPManager:
             }
             self._append_csv('svrp_tasks.csv', task, self.TASK_FIELDS)
 
-        logger.info(f"SVRP: Daily tasks created for user {tid}")
+        logger.info(f"Recovery: Daily tasks created for user {tid}")
 
     def update_task_progress(self, telegram_id, task_type, progress):
         """تحديث تقدم مهمة"""
@@ -624,7 +624,7 @@ class SVRPManager:
             'total_earned': current_earned + reward
         })
 
-        logger.info(f"SVRP: User {tid} claimed task {task_id} reward: {reward}")
+        logger.info(f"Recovery: User {tid} claimed task {task_id} reward: {reward}")
         return True, f"تم استلام المكافأة: {reward} رصيد!"
 
     def get_user_tasks(self, telegram_id):
@@ -803,7 +803,7 @@ class SVRPManager:
                               'referred_id', 'referred_phone', 'status',
                               'created_at', 'reward_given'])
 
-            logger.info(f"SVRP: Referral processed — referrer {referrer_tid} → {referred_telegram_id}")
+            logger.info(f"Recovery: Referral processed — referrer {referrer_tid} → {referred_telegram_id}")
             return True, "تم ربط كود الإحالة بنجاح"
 
         except Exception as e:
@@ -830,7 +830,7 @@ class SVRPManager:
 
         if expired_count > 0:
             self._write_csv('svrp_credits.csv', rows, self.CREDIT_FIELDS)
-            logger.info(f"SVRP: Expired {expired_count} old credits")
+            logger.info(f"Recovery: Expired {expired_count} old credits")
 
         # انتهاء صلاحية الأكواد الترويجية
         promo_rows = self._read_csv('svrp_promo_codes.csv')
@@ -847,7 +847,7 @@ class SVRPManager:
 
         if expired_promos > 0:
             self._write_csv('svrp_promo_codes.csv', promo_rows, self.PROMO_CODE_FIELDS)
-            logger.info(f"SVRP: Expired {expired_promos} promo codes")
+            logger.info(f"Recovery: Expired {expired_promos} promo codes")
 
         # إعادة تعيين الحد الشهري (بداية شهر جديد)
         wallets = self._read_csv('svrp_wallets.csv')
@@ -866,14 +866,14 @@ class SVRPManager:
 
         if reset_count > 0:
             self._write_csv('svrp_wallets.csv', wallets, self.WALLET_FIELDS)
-            logger.info(f"SVRP: Reset monthly totals for {reset_count} wallets")
+            logger.info(f"Recovery: Reset monthly totals for {reset_count} wallets")
 
         return expired_count
 
     # ==================== إحصائيات الإدمن ====================
 
     def get_svrp_stats(self):
-        """إحصائيات شاملة لنظام SVRP (للإدمن)"""
+        """إحصائيات شاملة للاسترداد الذكي (للإدمن)"""
         credits = self._read_csv('svrp_credits.csv')
         wallets = self._read_csv('svrp_wallets.csv')
         tasks = self._read_csv('svrp_tasks.csv')
