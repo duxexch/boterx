@@ -229,5 +229,6 @@
   "deposit_wallet_method": "💳 Method",
   "approve_btn": "✅ Approve",
   "reject_btn": "❌ Reject",
-  "details_btn": "👁️ Details"
+  "details_btn": "👁️ Details",
+  "rate_limit_msg": "⏳ Please wait a moment before sending another message."
 }

@@ -538,7 +538,7 @@ class ComprehensiveDUXBot:
         return text.strip()
 
     def check_rate_limit(self, user_id, action_type='general'):
-        """فحص حد المعدل لمنع الإساءة — 5 طلبات لكل دقيقة"""
+        """فحص حد المعدل لمنع الإساءة — 30 طلب لكل دقيقة (مناسب للتدفقات متعددة الخطوات)"""
         if not hasattr(self, 'rate_limit_data'):
             self.rate_limit_data = {}
         key = f"{user_id}_{action_type}"
@@ -547,7 +547,7 @@ class ComprehensiveDUXBot:
             entries = self.rate_limit_data[key]
             # Remove entries older than 60 seconds
             entries = [t for t in entries if now - t < 60]
-            if len(entries) >= 5:
+            if len(entries) >= 30:
                 return False  # Rate limited
             entries.append(now)
             self.rate_limit_data[key] = entries
@@ -2780,7 +2780,9 @@ class ComprehensiveDUXBot:
         # فحص حد المعدل للمستخدمين العاديين (5 طلبات/دقيقة)
         if not self.is_admin(user_id):
             if not self.check_rate_limit(user_id, 'message'):
-                self.send_message(chat_id, "⏳ يرجى الانتظار قليلاً قبل إرسال رسالة أخرى.")
+                u = self.find_user(user_id)
+                ul = u.get('language', 'ar') if u else 'ar'
+                self.send_message(chat_id, self.tr('rate_limit_msg', ul))
                 return
         
         # بداية المحادثة
