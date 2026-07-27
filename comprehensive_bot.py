@@ -3423,6 +3423,46 @@ class ComprehensiveDUXBot:
         if isinstance(current_state, str) and current_state.startswith('app_wizard'):
             self.handle_app_wizard(message)
             return
+        if isinstance(current_state, str) and current_state.startswith('mbot_wizard'):
+            self.mbot_handle_wizard(message)
+            return
+        if isinstance(current_state, str) and current_state.startswith('mbot_freeze_input_'):
+            # معالجة إدخال تاريخ التجميد
+            user_id = message['from']['id']
+            chat_id = message['chat']['id']
+            text = message.get('text', '').strip()
+            bot_id = current_state.replace('mbot_freeze_input_', '')
+
+            if text in ['إلغاء', 'الغاء', 'cancel']:
+                if user_id in self.user_states:
+                    del self.user_states[user_id]
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_multi_bot_panel(fake_msg)
+                return
+
+            if text.lower() in ['الآن', 'now', 'الان']:
+                freeze_date = datetime.now().strftime('%Y-%m-%d')
+            else:
+                try:
+                    datetime.strptime(text, '%Y-%m-%d')
+                    freeze_date = text
+                except ValueError:
+                    self.send_message(chat_id,
+                        "❌ صيغة التاريخ غير صحيحة.\n"
+                        "استخدم: <code>YYYY-MM-DD</code>\n"
+                        "أو اكتب <code>الآن</code> للتجميد الفوري\n"
+                        "أو <code>إلغاء</code>")
+                    return
+
+            manager = MultiBotManager()
+            manager.freeze_bot(bot_id, freeze_date)
+            if user_id in self.user_states:
+                del self.user_states[user_id]
+            self.send_message(chat_id,
+                f"✅ تم تحديد تجميد البوت في: <b>{freeze_date}</b>")
+            fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+            self.show_multi_bot_panel(fake_msg)
+            return
         if isinstance(current_state, str) and current_state == 'selecting_language':
             self.handle_language_change(message, text)
             return
@@ -4377,28 +4417,39 @@ class ComprehensiveDUXBot:
             self.show_language_selection(message, return_to_admin=True)
         elif text == '🤖 البوتات' and MULTI_BOT_AVAILABLE:
             self.show_multi_bot_panel(message)
-        elif text.startswith('اضافة_بوت ') and MULTI_BOT_AVAILABLE:
-            # تنسيق: اضافة_بوت الاسم | التوكن | admin_ids
-            parts = text.replace('اضافة_بوت ', '', 1).split('|')
-            if len(parts) >= 2:
-                name = parts[0].strip()
-                token = parts[1].strip()
-                admin_ids = parts[2].strip() if len(parts) > 2 else '7146701713'
+        elif text.startswith('اضافة_ادمن_بوت ') and MULTI_BOT_AVAILABLE:
+            # اضافة_ادمن_بوت BOT123 99999999
+            parts = text.replace('اضافة_ادمن_بوت ', '').split()
+            if len(parts) == 2:
+                bot_id = parts[0].strip()
+                admin_id = parts[1].strip()
                 manager = MultiBotManager()
-                bot_id = manager.add_bot(name, token, admin_ids)
-                if bot_id:
-                    inline_btns = [
-                        [{'text': f'▶️ تفعيل {name}', 'callback_data': f'mbot_start_{bot_id}'},
-                         {'text': '🔙 العودة', 'callback_data': 'mbot_back'}]
-                    ]
-                    self.send_inline_message(message['chat']['id'],
-                        f"✅ تم إضافة البوت!\n\n🆔 <code>{bot_id}</code>\n📱 الاسم: <b>{name}</b>\n🔑 التوكن: <code>{token[:20]}...</code>\n\nاضغط تفعيل لتشغيله:",
-                        inline_btns)
+                if manager.add_admin(bot_id, admin_id):
+                    self.send_message(message['chat']['id'],
+                        f"✅ تم إضافة الأدمن {admin_id} للبوت {bot_id}",
+                        self.admin_keyboard(admin_lang))
                 else:
-                    self.send_message(message['chat']['id'], "❌ فشل في إضافة البوت", self.admin_keyboard(admin_lang))
+                    self.send_message(message['chat']['id'], f"❌ فشل في إضافة الأدمن", self.admin_keyboard(admin_lang))
             else:
                 self.send_message(message['chat']['id'],
-                    "❌ الصيغة: اضافة_بوت الاسم | التوكن | admin_ids\nمثال: اضافة_بوت بوت السعودية | 123456:ABC-DEF | 7146701713",
+                    "❌ الصيغة: اضافة_ادمن_بوت [BOT_ID] [ADMIN_ID]\nمثال: اضافة_ادمن_بوت BOT123456 99999999",
+                    self.admin_keyboard(admin_lang))
+        elif text.startswith('حذف_ادمن_بوت ') and MULTI_BOT_AVAILABLE:
+            # حذف_ادمن_بوت BOT123 99999999
+            parts = text.replace('حذف_ادمن_بوت ', '').split()
+            if len(parts) == 2:
+                bot_id = parts[0].strip()
+                admin_id = parts[1].strip()
+                manager = MultiBotManager()
+                if manager.remove_admin(bot_id, admin_id):
+                    self.send_message(message['chat']['id'],
+                        f"✅ تم حذف الأدمن {admin_id} من البوت {bot_id}",
+                        self.admin_keyboard(admin_lang))
+                else:
+                    self.send_message(message['chat']['id'], f"❌ فشل في حذف الأدمن (لا يمكن حذف آخر أدمن)", self.admin_keyboard(admin_lang))
+            else:
+                self.send_message(message['chat']['id'],
+                    "❌ الصيغة: حذف_ادمن_بوت [BOT_ID] [ADMIN_ID]",
                     self.admin_keyboard(admin_lang))
         elif text in {self.tr('admin_themes', l) for l in all_langs} and THEME_AVAILABLE:
             self.show_theme_panel(message)
@@ -5738,12 +5789,14 @@ class ComprehensiveDUXBot:
                 self.show_multi_bot_panel(fake_msg)
                 return
 
+            elif data == 'mbot_add_wizard':
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.mbot_start_wizard(fake_msg)
+                return
+
             elif data == 'mbot_add_new':
-                self.send_message(chat_id,
-                    "➕ لإضافة بوت جديد، اكتب:\n\n"
-                    "<code>اضافة_بوت الاسم | التوكن | admin_ids</code>\n\n"
-                    "مثال:\n"
-                    "<code>اضافة_بوت بوت السعودية | 123456:ABC-DEF | 7146701713</code>")
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.mbot_start_wizard(fake_msg)
                 return
 
             elif data.startswith('mbot_start_'):
@@ -5803,6 +5856,33 @@ class ComprehensiveDUXBot:
                 import time as _time; _time.sleep(1)
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                 self.show_multi_bot_panel(fake_msg)
+                return
+
+            elif data.startswith('mbot_freeze_'):
+                bot_id = data.replace('mbot_freeze_', '')
+                # طلب تاريخ التجميد
+                self.send_message(chat_id,
+                    f"🧊 <b>تجميد البوت</b>\n\n"
+                    f"اكتب تاريخ التجميد بصيغة <code>YYYY-MM-DD</code>:\n\n"
+                    f"مثال: <code>2026-12-31</code>\n\n"
+                    f"أو اكتب <code>الآن</code> للتجميد الفوري\n"
+                    f"أو اكتب <code>إلغاء</code> للرجوع")
+                self.user_states[user_id] = f'mbot_freeze_input_{bot_id}'
+                return
+
+            elif data.startswith('mbot_unfreeze_'):
+                bot_id = data.replace('mbot_unfreeze_', '')
+                manager = MultiBotManager()
+                manager.unfreeze_bot(bot_id)
+                self.edit_message(chat_id, message.get('message_id'), f"✅ تم إلغاء تجميد البوت {bot_id}")
+                import time as _time; _time.sleep(1)
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_multi_bot_panel(fake_msg)
+                return
+
+            elif data.startswith('mbot_admins_'):
+                bot_id = data.replace('mbot_admins_', '')
+                self.mbot_show_admins(chat_id, bot_id)
                 return
 
             # ==================== 💎 إدارة الاسترداد الذكي ====================
@@ -7739,48 +7819,225 @@ class ComprehensiveDUXBot:
             self.send_message(message['chat']['id'], settings_text, self.admin_keyboard(admin_lang))
 
     def show_multi_bot_panel(self, message):
-        """لوحة إدارة البوتات المتعددة"""
+        """لوحة إدارة البوتات المتعددة — عرض شامل بأزرار inline"""
         manager = MultiBotManager()
         stats = manager.get_stats()
 
         text = (
-            f"╔════════════════════╗\n"
-            f"║  🤖 إدارة البوتات  ║\n"
-            f"╚════════════════════╝\n\n"
+            f"🤖 <b>إدارة البوتات</b>\n\n"
             f"━━━━━━━━━━━━━━━━━━\n"
-            f"📊 <b>إجمالي البوتات:</b> {stats['total_bots']}\n"
-            f"✅ <b>نشطة:</b> {stats['active_bots']} | ⏸️ <b>متوقفة:</b> {stats['inactive_bots']}\n"
-            f"🟢 <b>تعمل الآن:</b> {stats['running_bots']}\n"
-            f"👥 <b>إجمالي المستخدمين:</b> {stats['total_users']}\n"
-            f"📋 <b>إجمالي المعاملات:</b> {stats['total_transactions']}\n"
+            f"📊 <b>إجمالي:</b> {stats['total_bots']} | "
+            f"🟢 <b>تعمل:</b> {stats['running_bots']} | "
+            f"🧊 <b>مجمدة:</b> {stats['frozen_bots']}\n"
+            f"👥 <b>المستخدمين:</b> {stats['total_users']} | "
+            f"📋 <b>المعاملات:</b> {stats['total_transactions']}\n"
             f"━━━━━━━━━━━━━━━━━━\n\n"
         )
 
         inline_btns = []
         if stats['bots']:
             for b in stats['bots']:
-                is_running = manager.is_running(b['id'])
-                is_active = b.get('is_active') == 'yes'
+                icon = manager.get_bot_status_icon(b)
+                name = b.get('name', '')
+                bid = b.get('id', '')
+                admins = b.get('admin_ids', '')
+                admin_count = len([a for a in admins.split(',') if a.strip()]) if admins else 0
+                freeze = b.get('freeze_until', '')
+
+                text += f"{icon} <b>{name}</b>\n"
+                text += f"   🆔 <code>{bid}</code> | 👥 {b.get('total_users', '0')} | 📋 {b.get('total_transactions', '0')} | 🔑 {admin_count} أدمن\n"
+                if freeze:
+                    text += f"   ⏰ تجميد في: <b>{freeze}</b>\n"
+                text += "\n"
+
+                # أزرار تحكم لكل بوت
+                is_running = manager.is_running(bid)
+                row_buttons = []
                 if is_running:
-                    status = '🟢 يعمل'
-                    action_btn = {'text': f'⏹️ إيقاف: {b["name"]}', 'callback_data': f'mbot_stop_{b["id"]}'}
-                elif is_active:
-                    status = '⏸️ متوقف'
-                    action_btn = {'text': f'▶️ تشغيل: {b["name"]}', 'callback_data': f'mbot_start_{b["id"]}'}
+                    row_buttons.append({'text': f'⏹️ إيقاف', 'callback_data': f'mbot_stop_{bid}'})
+                elif b.get('status') == 'frozen':
+                    row_buttons.append({'text': f'🔓 إلغاء التجميد', 'callback_data': f'mbot_unfreeze_{bid}'})
                 else:
-                    status = '❌ غير مفعل'
-                    action_btn = {'text': f'✅ تفعيل: {b["name"]}', 'callback_data': f'mbot_activate_{b["id"]}'}
+                    row_buttons.append({'text': f'▶️ تشغيل', 'callback_data': f'mbot_start_{bid}'})
 
-                text += f"{status} <b>{b['name']}</b>\n  🆔 <code>{b['id']}</code> | 👥 {b.get('total_users', '0')} | 📋 {b.get('total_transactions', '0')}\n"
-                inline_btns.append([action_btn, {'text': '🗑️', 'callback_data': f'mbot_delete_{b["id"]}'}])
+                row_buttons.append({'text': f'🧊 تجميد', 'callback_data': f'mbot_freeze_{bid}'})
+                row_buttons.append({'text': f'🔑 أدمن', 'callback_data': f'mbot_admins_{bid}'})
+                row_buttons.append({'text': f'🗑️', 'callback_data': f'mbot_delete_{bid}'})
+                inline_btns.append(row_buttons)
 
-            text += "\n━━━━━━━━━━━━━━━━━━\n"
+            text += "━━━━━━━━━━━━━━━━━━\n"
 
-        inline_btns.append([{'text': '➕ إضافة بوت جديد', 'callback_data': 'mbot_add_new'}])
-        inline_btns.append([{'text': '🔄 تحديث', 'callback_data': 'mbot_refresh'}])
+        inline_btns.append([{'text': '➕ إضافة بوت جديد', 'callback_data': 'mbot_add_wizard'}])
+        inline_btns.append([{'text': '🔄 تحديث القائمة', 'callback_data': 'mbot_refresh'}])
         inline_btns.append([{'text': '🔙 العودة للوحة الأدمن', 'callback_data': 'mbot_back_admin'}])
 
         self.send_inline_message(message['chat']['id'], text, inline_btns)
+
+    def mbot_start_wizard(self, message):
+        """معالج إضافة بوت جديد — خطوة بخطوة"""
+        user_id = message['from']['id']
+        chat_id = message['chat']['id']
+
+        if not hasattr(self, 'temp_mbot_data'):
+            self.temp_mbot_data = {}
+        self.temp_mbot_data[user_id] = {'step': 'mbot_name'}
+
+        text = (
+            "🤖 <b>إضافة بوت جديد</b>\n\n"
+            "📝 <b>الخطوة 1 من 4</b>\n\n"
+            "✍️ اكتب اسم البوت:\n\n"
+            "مثال: بوت السعودية"
+        )
+        kb = {
+            'keyboard': [[{'text': '❌ إلغاء'}], [{'text': '🔙 لوحة الأدمن'}]],
+            'resize_keyboard': True,
+            'one_time_keyboard': True
+        }
+        self.send_message(chat_id, text, kb)
+        self.user_states[user_id] = 'mbot_wizard_name'
+
+    def mbot_handle_wizard(self, message):
+        """معالجة خطوات معالج إضافة بوت"""
+        user_id = message['from']['id']
+        chat_id = message['chat']['id']
+        text = message.get('text', '').strip()
+
+        if text in ['❌ إلغاء', '🔙 لوحة الأدمن', 'إلغاء', 'الغاء']:
+            if user_id in self.user_states:
+                del self.user_states[user_id]
+            if hasattr(self, 'temp_mbot_data') and user_id in self.temp_mbot_data:
+                del self.temp_mbot_data[user_id]
+            fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+            self.show_multi_bot_panel(fake_msg)
+            return
+
+        data = getattr(self, 'temp_mbot_data', {}).get(user_id, {})
+        step = data.get('step', '')
+
+        if step == 'mbot_name':
+            if len(text) < 2:
+                self.send_message(chat_id, "❌ الاسم قصير جداً. اكتب اسماً صحيحاً:")
+                return
+            data['name'] = text
+            data['step'] = 'mbot_token'
+            self.temp_mbot_data[user_id] = data
+            self.send_message(chat_id,
+                "✅ تم حفظ الاسم!\n\n"
+                "📝 <b>الخطوة 2 من 4</b>\n\n"
+                "🔑 الصق توكن البوت من @BotFather:\n\n"
+                "مثال: <code>123456789:AAHxxxxx...</code>")
+
+        elif step == 'mbot_token':
+            if len(text) < 20 or ':' not in text:
+                self.send_message(chat_id, "❌ توكن غير صحيح. يجب أن يحتوي على نقطتين (:) ويكون طويلاً.\n\n الصق التوكن مرة أخرى:")
+                return
+            data['token'] = text
+            data['step'] = 'mbot_admins'
+            self.temp_mbot_data[user_id] = data
+            current_admin = str(message['from']['id'])
+            self.send_message(chat_id,
+                "✅ تم حفظ التوكن!\n\n"
+                "📝 <b>الخطوة 3 من 4</b>\n\n"
+                "🔑 اكتب معرفات الأدمن (مفصولة بفاصلة):\n\n"
+                f"أو اكتب 'أنا' لتستخدم معرفك: <code>{current_admin}</code>\n\n"
+                f"أو اكتب عدة معرفات: <code>{current_admin}, 123456789</code>")
+
+        elif step == 'mbot_admins':
+            if text.lower() in ['أنا', 'ana', 'me', 'انا']:
+                admin_ids = str(message['from']['id'])
+            else:
+                admin_ids = text.replace(' ', '')
+            data['admin_ids'] = admin_ids
+            data['step'] = 'mbot_freeze'
+            self.temp_mbot_data[user_id] = data
+            self.send_message(chat_id,
+                "✅ تم حفظ الأدمن!\n\n"
+                "📝 <b>الخطوة 4 من 4 (الأخيرة)</b>\n\n"
+                "🧊 تاريخ تجميد البوت (اختياري):\n\n"
+                "اكتب تاريخاً بصيغة: <code>YYYY-MM-DD</code>\n"
+                "مثال: <code>2026-12-31</code>\n\n"
+                "أو اكتب 'تخطي' لبدونه")
+
+        elif step == 'mbot_freeze':
+            if text.lower() in ['تخطي', 'skip', 'بدون']:
+                freeze_date = ''
+            else:
+                # التحقق من صحة التاريخ
+                try:
+                    from datetime import datetime as dt
+                    dt.strptime(text, '%Y-%m-%d')
+                    freeze_date = text
+                except ValueError:
+                    self.send_message(chat_id,
+                        "❌ صيغة التاريخ غير صحيحة.\n"
+                        "استخدم: <code>YYYY-MM-DD</code>\n"
+                        "مثال: <code>2026-12-31</code>\n\n"
+                        "أو اكتب 'تخطي'")
+                    return
+
+            # حفظ البوت
+            manager = MultiBotManager()
+            bot_id = manager.add_bot(
+                data['name'],
+                data['token'],
+                data['admin_ids'],
+                description='',
+                freeze_until=freeze_date
+            )
+
+            if bot_id:
+                summary = (
+                    "✅ <b>تم إضافة البوت بنجاح!</b>\n\n"
+                    f"📱 الاسم: <b>{data['name']}</b>\n"
+                    f"🆔 <code>{bot_id}</code>\n"
+                    f"🔑 التوكن: <code>{data['token'][:20]}...</code>\n"
+                    f"👥 الأدمن: <code>{data['admin_ids']}</code>\n"
+                )
+                if freeze_date:
+                    summary += f"🧊 تجميد في: <b>{freeze_date}</b>\n"
+
+                inline_btns = [
+                    [{'text': f'▶️ تفعيل وتشغيل', 'callback_data': f'mbot_start_{bot_id}'}],
+                    [{'text': '📋 عرض كل البوتات', 'callback_data': 'mbot_refresh'}],
+                    [{'text': '➕ إضافة بوت آخر', 'callback_data': 'mbot_add_wizard'}],
+                    [{'text': '🔙 لوحة الأدمن', 'callback_data': 'mbot_back_admin'}]
+                ]
+                self.send_inline_message(chat_id, summary, inline_btns)
+            else:
+                self.send_message(chat_id, "❌ فشل في إضافة البوت", self.admin_keyboard())
+
+            if user_id in self.user_states:
+                del self.user_states[user_id]
+            if hasattr(self, 'temp_mbot_data') and user_id in self.temp_mbot_data:
+                del self.temp_mbot_data[user_id]
+
+    def mbot_show_admins(self, chat_id, bot_id):
+        """عرض أدمن البوت وإدارة الأدمن"""
+        manager = MultiBotManager()
+        bot = manager.get_bot_by_id(bot_id)
+        if not bot:
+            self.send_message(chat_id, "❌ البوت غير موجود")
+            return
+
+        admins = bot.get('admin_ids', '')
+        admin_list = [a.strip() for a in admins.split(',') if a.strip()]
+
+        text = (
+            f"🔑 <b>أدمن البوت: {bot['name']}</b>\n\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+        )
+        for i, admin_id in enumerate(admin_list, 1):
+            text += f"  {i}. <code>{admin_id}</code>\n"
+
+        text += f"\n👥 العدد: <b>{len(admin_list)}</b>\n"
+        text += "━━━━━━━━━━━━━━━━━━\n"
+        text += "➕ للإضافة: <code>اضافة_ادمن_بوت BOT123 99999999</code>\n"
+        text += "➖ للحذف: <code>حذف_ادمن_بوت BOT123 99999999</code>"
+
+        inline_btns = [
+            [{'text': '🔙 العودة', 'callback_data': 'mbot_refresh'}]
+        ]
+        self.send_inline_message(chat_id, text, inline_btns)
 
     def show_theme_panel(self, message):
         """عرض لوحة الثيمات للأدمن"""
