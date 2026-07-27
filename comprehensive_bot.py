@@ -73,6 +73,8 @@ class ComprehensiveDUXBot:
         self.load_i18n_translations()
         self.match_manager = MatchManager() if MATCHING_AVAILABLE else None
         self.svrp = SVRPManager() if SVRP_AVAILABLE else None
+        # فحص صلاحية إدارة البوتات: البوت الرئيسي فقط (من .env) يمكنه إدارة البوتات
+        self.can_manage_bots = self._check_bot_management_permission(token)
         self.admin_ids = self.get_admin_ids()
         
         # نظام قفل ملفات CSV لمنع تلف البيانات عند الكتابة المتزامنة
@@ -256,6 +258,24 @@ class ComprehensiveDUXBot:
         """إرجاع قائمة أكواد اللغات المدعومة"""
         return list(self.get_language_names().keys())
         
+    def _check_bot_management_permission(self, token):
+        """فحص ما إذا كان هذا البوت يملك صلاحية إدارة البوتات الأخرى"""
+        # البوت الرئيسي (من .env) دائماً يملك الصلاحية
+        env_token = os.getenv('BOT_TOKEN', '')
+        if token == env_token:
+            return True
+
+        # للبوتات المضافة: فحص bot_tokens.csv
+        try:
+            from multi_bot import MultiBotManager
+            manager = MultiBotManager()
+            for bot in manager.get_all_bots():
+                if bot.get('token') == token:
+                    return bot.get('can_manage_bots', 'no') == 'yes'
+        except:
+            pass
+        return False
+
     def init_files(self):
         """إنشاء جميع ملفات النظام"""
         # ملف المستخدمين
@@ -2366,9 +2386,13 @@ class ComprehensiveDUXBot:
             # المجموعة 10: إجراءات المستخدم
             [{'text': self.tr('admin_ban_user', lang)}, {'text': self.tr('admin_unban_user', lang)}],
             # المجموعة 11: اللغة + البوتات + إعادة تعيين
-            [{'text': self.tr('admin_change_language', lang)}, {'text': '🤖 البوتات'}, {'text': self.tr('admin_reset_system', lang)}],
+            [{'text': self.tr('admin_change_language', lang)}, {'text': self.tr('admin_reset_system', lang)}],
             [{'text': self.tr('admin_main_menu', lang)}],
         ]
+
+        # زر 🤖 البوتات يظهر فقط للبوت الرئيسي (الذي يملك صلاحية الإدارة)
+        if getattr(self, 'can_manage_bots', False) and MULTI_BOT_AVAILABLE:
+            keyboard.insert(-2, [{'text': '🤖 البوتات'}])
 
         current_admin_id = getattr(self, 'current_admin_id', None)
         if not current_admin_id:
@@ -4437,9 +4461,9 @@ class ComprehensiveDUXBot:
             self.show_addresses_management(message)
         elif text in {self.tr('admin_change_language', l) for l in all_langs}:
             self.show_language_selection(message, return_to_admin=True)
-        elif text == '🤖 البوتات' and MULTI_BOT_AVAILABLE:
+        elif text == '🤖 البوتات' and MULTI_BOT_AVAILABLE and getattr(self, 'can_manage_bots', False):
             self.show_multi_bot_panel(message)
-        elif text.startswith('اضافة_ادمن_بوت ') and MULTI_BOT_AVAILABLE:
+        elif text.startswith('اضافة_ادمن_بوت ') and MULTI_BOT_AVAILABLE and getattr(self, 'can_manage_bots', False):
             # اضافة_ادمن_بوت BOT123 99999999
             parts = text.replace('اضافة_ادمن_بوت ', '').split()
             if len(parts) == 2:
@@ -4456,7 +4480,7 @@ class ComprehensiveDUXBot:
                 self.send_message(message['chat']['id'],
                     "❌ الصيغة: اضافة_ادمن_بوت [BOT_ID] [ADMIN_ID]\nمثال: اضافة_ادمن_بوت BOT123456 99999999",
                     self.admin_keyboard(admin_lang))
-        elif text.startswith('حذف_ادمن_بوت ') and MULTI_BOT_AVAILABLE:
+        elif text.startswith('حذف_ادمن_بوت ') and MULTI_BOT_AVAILABLE and getattr(self, 'can_manage_bots', False):
             # حذف_ادمن_بوت BOT123 99999999
             parts = text.replace('حذف_ادمن_بوت ', '').split()
             if len(parts) == 2:
@@ -7997,6 +8021,19 @@ class ComprehensiveDUXBot:
                         "أو اكتب 'تخطي'")
                     return
 
+            data['freeze_date'] = freeze_date
+            data['step'] = 'mbot_manage'
+            self.temp_mbot_data[user_id] = data
+            self.send_message(chat_id,
+                "✅ تم حفظ تاريخ التجميد!\n\n"
+                "📝 <b>الخطوة 5 من 5 (الأخيرة)</b>\n\n"
+                "🤖 هل تريد أن يتمكن هذا البوت من إدارة البوتات الأخرى؟\n\n"
+                "✅ اكتب <code>نعم</code> لمنح صلاحية إدارة البوتات\n"
+                "❌ اكتب <code>لا</code> أو <code>تخطي</code> لبدون")
+
+        elif step == 'mbot_manage':
+            can_manage = 'yes' if text.lower() in ['نعم', 'yes', 'اى', 'اي'] else 'no'
+
             # حفظ البوت
             manager = MultiBotManager()
             bot_id = manager.add_bot(
@@ -8004,7 +8041,8 @@ class ComprehensiveDUXBot:
                 data['token'],
                 data['admin_ids'],
                 description='',
-                freeze_until=freeze_date
+                freeze_until=data.get('freeze_date', ''),
+                can_manage_bots=can_manage
             )
 
             if bot_id:
@@ -8015,8 +8053,9 @@ class ComprehensiveDUXBot:
                     f"🔑 التوكن: <code>{data['token'][:20]}...</code>\n"
                     f"👥 الأدمن: <code>{data['admin_ids']}</code>\n"
                 )
-                if freeze_date:
-                    summary += f"🧊 تجميد في: <b>{freeze_date}</b>\n"
+                if data.get('freeze_date'):
+                    summary += f"🧊 تجميد في: <b>{data['freeze_date']}</b>\n"
+                summary += f"🤖 إدارة البوتات: <b>{'✅ مفعّل' if can_manage == 'yes' else '❌ غير مفعّل'}</b>\n"
 
                 inline_btns = [
                     [{'text': f'▶️ تفعيل وتشغيل', 'callback_data': f'mbot_start_{bot_id}'}],

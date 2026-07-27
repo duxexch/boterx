@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 BOT_TOKEN_FIELDS = [
     'id', 'name', 'token', 'is_active', 'created_at',
     'admin_ids', 'last_started', 'total_users', 'total_transactions',
-    'freeze_until', 'status', 'description'
+    'freeze_until', 'status', 'description', 'can_manage_bots'
 ]
 
 
@@ -61,6 +61,8 @@ class MultiBotManager:
                         row[field] = 'active' if row.get('is_active') == 'yes' else 'inactive'
                     elif field == 'description':
                         row[field] = ''
+                    elif field == 'can_manage_bots':
+                        row[field] = 'no'
                     else:
                         row[field] = row.get(field, '')
 
@@ -149,7 +151,7 @@ class MultiBotManager:
         if changed:
             self._write_tokens(rows)
 
-    def add_bot(self, name, token, admin_ids='7146701713', description='', freeze_until=''):
+    def add_bot(self, name, token, admin_ids='7146701713', description='', freeze_until='', can_manage_bots='no'):
         """إضافة بوت جديد"""
         bot_id = f"BOT{str(int(datetime.now().timestamp()))[-6:]}"
         row = {
@@ -164,7 +166,8 @@ class MultiBotManager:
             'total_transactions': '0',
             'freeze_until': freeze_until,
             'status': 'inactive',
-            'description': description
+            'description': description,
+            'can_manage_bots': can_manage_bots
         }
         if self._append_token(row):
             logger.info(f"Bot added: {bot_id} ({name})")
