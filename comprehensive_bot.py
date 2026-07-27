@@ -2290,23 +2290,30 @@ class ComprehensiveDUXBot:
         lang_names = self.get_language_names()
         lang_btn_text = f"{t.get('btn_language', '🌐')} {lang_names.get(lang, {}).get('native', 'Language')}"
         
-        # تصميم صفوف أنيقة: أزرار رئيسية كبيرة في الأعلى، إعدادات أسفل
+        # تصميم صفوف منظمة: الأهم فوق، الخدمات في الوسط، الإعدادات أسفل
         keyboard = [
-            # الصف 1: أهم خدمتين (إيداع + سحب) — أزرار كبيرة جنباً إلى جنب
+            # ━━━━ الخدمات الأساسية ━━━━
+            # الصف 1: الإيداع والسحب — الأهم، جنباً إلى جنب
             [{'text': deposit_btn}, {'text': withdraw_btn}],
-            # الصف 2: طلباتي + حسابي
+            # الصف 2: طلباتي + الملف الشخصي
             [{'text': requests_btn}, {'text': profile_btn}],
-            # الصف 3: شكوى + دعم
-            [{'text': complaint_btn}, {'text': support_btn}],
-            # الصف 4: مطابقة + الإشعارات
-            [{'text': match_btn}, {'text': notif_btn}],
-            # الصف 5: استرداد + إحالة
-            [{'text': svrp_btn}, {'text': ref_btn}],
-            # الصف 6: تطبيقات + مساعدة
-            [{'text': apps_btn}, {'text': help_btn}],
+            
+            # ━━━━ المزايا ━━━━
+            # الصف 3: مطابقة + استرداد ذكي
+            [{'text': match_btn}, {'text': svrp_btn}],
+            # الصف 4: إحالة + تطبيقات
+            [{'text': ref_btn}, {'text': apps_btn}],
+            
+            # ━━━━ التواصل والإشعارات ━━━━
+            # الصف 5: إشعاراتي + شكوى
+            [{'text': notif_btn}, {'text': complaint_btn}],
+            # الصف 6: دعم + مساعدة
+            [{'text': support_btn}, {'text': help_btn}],
+            
+            # ━━━━ الإعدادات ━━━━
             # الصف 7: العملة + اللغة
             [{'text': currency_btn}, {'text': lang_btn_text}],
-            # الصف 8: إعادة تعيين (منفصل لأنه إجراء طوارئ)
+            # الصف 8: إعادة تعيين (منفرد — إجراء طوارئ)
             [{'text': reset_btn}],
         ]
         
@@ -2421,7 +2428,22 @@ class ComprehensiveDUXBot:
                 return
             
             lang = user.get('language', 'ar')
-            welcome_text = self.tr('welcome_back', lang, name=user.get('name', ''), customer_id=user.get('customer_id', ''))
+            name = user.get('name', '')
+            customer_id = user.get('customer_id', '')
+            if lang == 'ar':
+                welcome_text = (
+                    f"👋 <b>أهلاً وسهلاً، {name}!</b>\n\n"
+                    f"🆔 رقم العميل: <code>{customer_id}</code>\n\n"
+                    f"━━━━━━━━━━━━━━━━━━\n"
+                    f"💰 <b>الخدمات المتاحة:</b>\n"
+                    f"• 💵 إيداع • 💸 سحب\n"
+                    f"• 🔄 مطابقة • 💎 استرداد ذكي\n"
+                    f"• 📱 تطبيقات • 🎁 إحالة\n"
+                    f"━━━━━━━━━━━━━━━━━━\n\n"
+                    f"👇 اختر الخدمة المطلوبة"
+                )
+            else:
+                welcome_text = self.tr('welcome_back', lang, name=name, customer_id=customer_id)
             self.send_message(chat_id, welcome_text, self.main_keyboard(lang, user_id))
         else:
             # تخزين كود الإحالة مؤقتاً
