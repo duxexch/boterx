@@ -37,6 +37,13 @@ try:
 except ImportError:
     THEME_AVAILABLE = False
 
+# استيراد نظام إدارة البوتات المتعددة
+try:
+    from multi_bot import MultiBotManager
+    MULTI_BOT_AVAILABLE = True
+except ImportError:
+    MULTI_BOT_AVAILABLE = False
+
 # تحميل ملف .env من نفس المجلد
 load_dotenv(".env")
 
@@ -2351,8 +2358,8 @@ class ComprehensiveDUXBot:
             [{'text': self.tr('admin_notifications', lang)}, {'text': self.tr('admin_backup', lang)}],
             # المجموعة 10: إجراءات المستخدم
             [{'text': self.tr('admin_ban_user', lang)}, {'text': self.tr('admin_unban_user', lang)}],
-            # المجموعة 11: اللغة + إعادة تعيين
-            [{'text': self.tr('admin_change_language', lang)}, {'text': self.tr('admin_reset_system', lang)}],
+            # المجموعة 11: اللغة + البوتات + إعادة تعيين
+            [{'text': self.tr('admin_change_language', lang)}, {'text': '🤖 البوتات'}, {'text': self.tr('admin_reset_system', lang)}],
             [{'text': self.tr('admin_main_menu', lang)}],
         ]
 
@@ -4368,6 +4375,31 @@ class ComprehensiveDUXBot:
             self.show_addresses_management(message)
         elif text in {self.tr('admin_change_language', l) for l in all_langs}:
             self.show_language_selection(message, return_to_admin=True)
+        elif text == '🤖 البوتات' and MULTI_BOT_AVAILABLE:
+            self.show_multi_bot_panel(message)
+        elif text.startswith('اضافة_بوت ') and MULTI_BOT_AVAILABLE:
+            # تنسيق: اضافة_بوت الاسم | التوكن | admin_ids
+            parts = text.replace('اضافة_بوت ', '', 1).split('|')
+            if len(parts) >= 2:
+                name = parts[0].strip()
+                token = parts[1].strip()
+                admin_ids = parts[2].strip() if len(parts) > 2 else '7146701713'
+                manager = MultiBotManager()
+                bot_id = manager.add_bot(name, token, admin_ids)
+                if bot_id:
+                    inline_btns = [
+                        [{'text': f'▶️ تفعيل {name}', 'callback_data': f'mbot_start_{bot_id}'},
+                         {'text': '🔙 العودة', 'callback_data': 'mbot_back'}]
+                    ]
+                    self.send_inline_message(message['chat']['id'],
+                        f"✅ تم إضافة البوت!\n\n🆔 <code>{bot_id}</code>\n📱 الاسم: <b>{name}</b>\n🔑 التوكن: <code>{token[:20]}...</code>\n\nاضغط تفعيل لتشغيله:",
+                        inline_btns)
+                else:
+                    self.send_message(message['chat']['id'], "❌ فشل في إضافة البوت", self.admin_keyboard(admin_lang))
+            else:
+                self.send_message(message['chat']['id'],
+                    "❌ الصيغة: اضافة_بوت الاسم | التوكن | admin_ids\nمثال: اضافة_بوت بوت السعودية | 123456:ABC-DEF | 7146701713",
+                    self.admin_keyboard(admin_lang))
         elif text in {self.tr('admin_themes', l) for l in all_langs} and THEME_AVAILABLE:
             self.show_theme_panel(message)
         elif text.startswith('ثيم_') and THEME_AVAILABLE:
@@ -5693,6 +5725,84 @@ class ComprehensiveDUXBot:
                 # إعادة عرض القائمة
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                 self.show_apps_admin_panel(fake_msg)
+                return
+
+            # ==================== 🤖 إدارة البوتات المتعددة ====================
+            elif data == 'mbot_back_admin' or data == 'mbot_back':
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.handle_admin_panel(fake_msg)
+                return
+
+            elif data == 'mbot_refresh':
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_multi_bot_panel(fake_msg)
+                return
+
+            elif data == 'mbot_add_new':
+                self.send_message(chat_id,
+                    "➕ لإضافة بوت جديد، اكتب:\n\n"
+                    "<code>اضافة_بوت الاسم | التوكن | admin_ids</code>\n\n"
+                    "مثال:\n"
+                    "<code>اضافة_بوت بوت السعودية | 123456:ABC-DEF | 7146701713</code>")
+                return
+
+            elif data.startswith('mbot_start_'):
+                bot_id = data.replace('mbot_start_', '')
+                manager = MultiBotManager()
+                success, msg = manager.start_bot(bot_id)
+                icon = "✅" if success else "❌"
+                self.edit_message(chat_id, message.get('message_id'), f"{icon} {msg}")
+                # تحديث اللوحة
+                import time as _time; _time.sleep(1)
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_multi_bot_panel(fake_msg)
+                return
+
+            elif data.startswith('mbot_stop_'):
+                bot_id = data.replace('mbot_stop_', '')
+                manager = MultiBotManager()
+                success, msg = manager.stop_bot(bot_id)
+                icon = "✅" if success else "❌"
+                self.edit_message(chat_id, message.get('message_id'), f"{icon} {msg}")
+                import time as _time; _time.sleep(1)
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_multi_bot_panel(fake_msg)
+                return
+
+            elif data.startswith('mbot_activate_'):
+                bot_id = data.replace('mbot_activate_', '')
+                manager = MultiBotManager()
+                manager.toggle_bot(bot_id, activate=True)
+                success, msg = manager.start_bot(bot_id)
+                icon = "✅" if success else "❌"
+                self.edit_message(chat_id, message.get('message_id'), f"{icon} {msg}")
+                import time as _time; _time.sleep(1)
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_multi_bot_panel(fake_msg)
+                return
+
+            elif data.startswith('mbot_delete_'):
+                bot_id = data.replace('mbot_delete_', '')
+                # تأكيد الحذف
+                inline_btns = [
+                    [{'text': '✅ نعم، احذف', 'callback_data': f'mbot_confirm_delete_{bot_id}'},
+                     {'text': '❌ إلغاء', 'callback_data': 'mbot_refresh'}]
+                ]
+                self.edit_message(chat_id, message.get('message_id'),
+                    f"⚠️ هل أنت متأكد من حذف البوت <code>{bot_id}</code>؟")
+                self.send_inline_message(chat_id, "🗑️ تأكيد حذف البوت:", inline_btns)
+                return
+
+            elif data.startswith('mbot_confirm_delete_'):
+                bot_id = data.replace('mbot_confirm_delete_', '')
+                manager = MultiBotManager()
+                if manager.delete_bot(bot_id):
+                    self.edit_message(chat_id, message.get('message_id'), f"✅ تم حذف البوت {bot_id}")
+                else:
+                    self.edit_message(chat_id, message.get('message_id'), f"❌ لم يتم العثور على البوت {bot_id}")
+                import time as _time; _time.sleep(1)
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_multi_bot_panel(fake_msg)
                 return
 
             # ==================== 💎 إدارة الاسترداد الذكي ====================
@@ -7627,6 +7737,50 @@ class ComprehensiveDUXBot:
             settings_text += "مثال:\nتعديل_اعداد min_deposit 100"
             
             self.send_message(message['chat']['id'], settings_text, self.admin_keyboard(admin_lang))
+
+    def show_multi_bot_panel(self, message):
+        """لوحة إدارة البوتات المتعددة"""
+        manager = MultiBotManager()
+        stats = manager.get_stats()
+
+        text = (
+            f"╔════════════════════╗\n"
+            f"║  🤖 إدارة البوتات  ║\n"
+            f"╚════════════════════╝\n\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"📊 <b>إجمالي البوتات:</b> {stats['total_bots']}\n"
+            f"✅ <b>نشطة:</b> {stats['active_bots']} | ⏸️ <b>متوقفة:</b> {stats['inactive_bots']}\n"
+            f"🟢 <b>تعمل الآن:</b> {stats['running_bots']}\n"
+            f"👥 <b>إجمالي المستخدمين:</b> {stats['total_users']}\n"
+            f"📋 <b>إجمالي المعاملات:</b> {stats['total_transactions']}\n"
+            f"━━━━━━━━━━━━━━━━━━\n\n"
+        )
+
+        inline_btns = []
+        if stats['bots']:
+            for b in stats['bots']:
+                is_running = manager.is_running(b['id'])
+                is_active = b.get('is_active') == 'yes'
+                if is_running:
+                    status = '🟢 يعمل'
+                    action_btn = {'text': f'⏹️ إيقاف: {b["name"]}', 'callback_data': f'mbot_stop_{b["id"]}'}
+                elif is_active:
+                    status = '⏸️ متوقف'
+                    action_btn = {'text': f'▶️ تشغيل: {b["name"]}', 'callback_data': f'mbot_start_{b["id"]}'}
+                else:
+                    status = '❌ غير مفعل'
+                    action_btn = {'text': f'✅ تفعيل: {b["name"]}', 'callback_data': f'mbot_activate_{b["id"]}'}
+
+                text += f"{status} <b>{b['name']}</b>\n  🆔 <code>{b['id']}</code> | 👥 {b.get('total_users', '0')} | 📋 {b.get('total_transactions', '0')}\n"
+                inline_btns.append([action_btn, {'text': '🗑️', 'callback_data': f'mbot_delete_{b["id"]}'}])
+
+            text += "\n━━━━━━━━━━━━━━━━━━\n"
+
+        inline_btns.append([{'text': '➕ إضافة بوت جديد', 'callback_data': 'mbot_add_new'}])
+        inline_btns.append([{'text': '🔄 تحديث', 'callback_data': 'mbot_refresh'}])
+        inline_btns.append([{'text': '🔙 العودة للوحة الأدمن', 'callback_data': 'mbot_back_admin'}])
+
+        self.send_inline_message(message['chat']['id'], text, inline_btns)
 
     def show_theme_panel(self, message):
         """عرض لوحة الثيمات للأدمن"""
@@ -10437,6 +10591,33 @@ if __name__ == "__main__":
     http_thread.start()
     logger.info(f"Health check server started on port {port}")
     
-    # تشغيل البوت
-    bot = ComprehensiveDUXBot(bot_token)
-    bot.run()
+    # فحص وضع متعدد البوتات
+    use_multi_bot = os.getenv('MULTI_BOT', 'no').lower() in ('yes', '1', 'true')
+    
+    if use_multi_bot:
+        # وضع متعدد البوتات — تشغيل جميع البوتات النشطة
+        try:
+            from multi_bot import MultiBotManager
+            manager = MultiBotManager()
+            
+            # إضافة البوت الرئيسي إن لم يكن موجوداً
+            all_bots = manager.get_all_bots()
+            if not all_bots:
+                manager.add_bot('البوت الرئيسي', bot_token, os.getenv('ADMIN_USER_IDS', '7146701713'))
+                manager.toggle_bot('BOT' + bot_token[-6:], activate=True)
+            
+            # تشغيل جميع البوتات النشطة
+            started = manager.start_all_active()
+            logger.info(f"Multi-bot mode: started {started} bots")
+            
+            # إبقاء العملية حية
+            while True:
+                time.sleep(60)
+        except Exception as e:
+            logger.error(f"خطأ في وضع متعدد البوتات: {e}")
+            bot = ComprehensiveDUXBot(bot_token)
+            bot.run()
+    else:
+        # وضع البوت الواحد (الافتراضي)
+        bot = ComprehensiveDUXBot(bot_token)
+        bot.run()
