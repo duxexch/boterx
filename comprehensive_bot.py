@@ -2392,7 +2392,7 @@ class ComprehensiveDUXBot:
 
         # زر 🤖 البوتات يظهر فقط للبوت الرئيسي (الذي يملك صلاحية الإدارة)
         if getattr(self, 'can_manage_bots', False) and MULTI_BOT_AVAILABLE:
-            keyboard.insert(-2, [{'text': '🤖 البوتات'}])
+            base_keyboard.insert(-1, [{'text': '🤖 البوتات'}])
 
         current_admin_id = getattr(self, 'current_admin_id', None)
         if not current_admin_id:
