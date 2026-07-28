@@ -1,6 +1,6 @@
 # LangSense / DUX Telegram Bot — Project Brain 🧠
 
-> **Last updated:** 2026-07-26 · **Analyzed by:** Codely CLI
+> **Last updated:** 2026-07-28 · **Analyzed by:** Codely CLI
 > **Project root:** `C:\Users\gnz\Downloads\bot2\bot`
 > **Repo:** `github.com/duxexch/boterx`
 
@@ -28,10 +28,11 @@
 
 | File | Lines | Purpose |
 |------|-------|---------|
-| `comprehensive_bot.py` | ~10,400 | **THE BOT** — all features, single-file architecture |
+| `comprehensive_bot.py` | ~10,900 | **THE BOT** — all features, single-file architecture |
 | `svrp.py` | ~970 | 💎 Smart Recovery — SVRPManager (credits, wallets, tasks, promo codes, tiers) |
 | `matching.py` | ~600 | 🔄 P2P Matching — MatchManager (requests, matches, chat, ratings, disputes) |
 | `theme_config.py` | ~230 | 🎨 Theme system — 3 themes (Gold, Ocean, Purple) with emoji/color config |
+| `multi_bot.py` | ~310 | 🤖 Multi-Bot Manager — manage 10+ bots, freeze scheduling, admin management |
 
 ### 2.2 i18n System
 
@@ -65,6 +66,7 @@
 | `system_settings.csv` | System settings (min_deposit, active_theme, etc.) |
 | `admin_permissions.json` | Per-admin button visibility |
 | `button_labels.csv` | Editable button labels |
+| `bot_tokens.csv` | Multi-bot tokens (id, name, token, is_active, admin_ids, freeze_until, can_manage_bots) |
 
 ### 2.4 Documentation
 
@@ -183,6 +185,24 @@ HTML formatting with theme-colored emoji:
 
 `notify_admins()` + `notify_user()` with type tracking. `notifications_log.csv`. Admin panel shows categorized summary. User panel shows personal notifications.
 
+### 4.9 🤖 Multi-Bot System
+
+MultiBotManager in `multi_bot.py`. Manage 10+ bots from one admin panel:
+- `bot_tokens.csv`: id, name, token, is_active, admin_ids, freeze_until, can_manage_bots
+- Each bot runs in separate thread (daemon)
+- Admin panel: 🤖 البوتات → view all, start/stop/activate/delete
+- 5-step wizard: name → token → admins → freeze_date → can_manage_bots
+- Freeze scheduling: auto-freeze bots on specific date
+- Admin management: add/remove admins per bot
+- Permission: only main bot (from .env) or bots with `can_manage_bots='yes'` see the 🤖 button
+- `MULTI_BOT=yes` in .env enables multi-bot mode at startup
+
+### 4.10 Company Edit Wizard
+
+- 📍 تعديل العنوان: set company address (shown to customer during withdrawal)
+- 💳 ربط وسائل الدفع: view linked/unlinked payment methods per company
+- save_company_changes: preserves original CSV fieldnames, merges updates
+
 ---
 
 ## 5. Registration Flow
@@ -216,5 +236,23 @@ HTML formatting with theme-colored emoji:
 
 **Procfile:** `web: python comprehensive_bot.py`
 **Requirements:** `python-dotenv`, `openpyxl`
-**Env vars:** `BOT_TOKEN`, `ADMIN_USER_IDS`
+**Env vars:** `BOT_TOKEN`, `ADMIN_USER_IDS`, `MULTI_BOT` (optional: `yes` for multi-bot mode)
 **Python:** 3.11.9
+
+---
+
+## 8. Recent Changes (July 26-28, 2026)
+
+| Date | Change |
+|------|--------|
+| Jul 28 | Company edit: address editing + payment method linking + save fix |
+| Jul 28 | Multi-bot: can_manage_bots permission, 5-step wizard, freeze scheduling |
+| Jul 27 | Multi-bot system: MultiBotManager, bot_tokens.csv, admin panel |
+| Jul 27 | Keyboard reorganization: services→features→communication→settings |
+| Jul 26 | SVRP: 4 critical flow bugs fixed (freeze/unfreeze), panel redesign |
+| Jul 26 | Full admin panel i18n: 27 admin button keys × 17 languages |
+| Jul 26 | Apps feature: 📱 تطبيقات with inline wizard |
+| Jul 26 | Theme system: 3 themes with colored formatting |
+| Jul 26 | Language-first registration flow |
+| Jul 26 | Rate limiter: 5→30/min, back-button trap fix |
+| Jul 26 | Comprehensive i18n audit: 60+ hardcoded strings fixed |
