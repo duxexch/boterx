@@ -4510,16 +4510,6 @@ class ComprehensiveDUXBot:
             return
         elif text in {self.tr('admin_support_data', l) for l in all_langs}:
             self.show_support_data_editor(message)
-        elif text == '📞 تعديل رقم الهاتف':
-            self.start_phone_edit_wizard(message)
-        elif text == '💬 تعديل حساب التليجرام':
-            self.start_telegram_edit_wizard(message)
-        elif text == '📧 تعديل البريد الإلكتروني':
-            self.start_email_edit_wizard(message)
-        elif text == '🕒 تعديل ساعات العمل':
-            self.start_hours_edit_wizard(message)
-        elif text == '🔄 تحديث بيانات الدعم':
-            self.show_support_data_editor(message)
         elif text in {self.tr('admin_settings', l) for l in all_langs}:
             self.show_system_settings(message)
         elif text in {self.tr('admin_complaints', l) for l in all_langs}:
@@ -5929,6 +5919,33 @@ class ComprehensiveDUXBot:
             elif data.startswith('mbot_admins_'):
                 bot_id = data.replace('mbot_admins_', '')
                 self.mbot_show_admins(chat_id, bot_id)
+                return
+
+            # ==================== 💎 إدارة الاسترداد الذكي ====================
+            # ==================== 🛠️ بيانات الدعم (inline) ====================
+            elif data == 'support_back_admin':
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.handle_admin_panel(fake_msg)
+                return
+
+            elif data == 'support_edit_phone':
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.start_phone_edit_wizard(fake_msg)
+                return
+
+            elif data == 'support_edit_telegram':
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.start_telegram_edit_wizard(fake_msg)
+                return
+
+            elif data == 'support_edit_email':
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.start_email_edit_wizard(fake_msg)
+                return
+
+            elif data == 'support_edit_hours':
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.start_hours_edit_wizard(fake_msg)
                 return
 
             # ==================== 💎 إدارة الاسترداد الذكي ====================
@@ -10244,188 +10261,119 @@ class ComprehensiveDUXBot:
                     return None
         
     def show_support_data_editor(self, message):
-            """عرض محرر بيانات الدعم"""
-            support_text = """🛠️ محرر بيانات الدعم
-    
-    يمكنك تعديل بيانات الدعم والمساعدة من هنا:
-    
-    📞 رقم الدعم الحالي: {self.get_support_setting('support_phone', '+966123456789')}
-    💬 رابط التليجرام: {self.get_support_setting('support_telegram', '@DUX_support')}
-    📧 البريد الإلكتروني: {self.get_support_setting('support_email', 'support@dux.com')}
-    🕒 ساعات العمل: {self.get_support_setting('support_hours', '9 صباحاً - 6 مساءً')}
-    
-    استخدم الأوامر التالية للتعديل:
-    
-    📞 `تعديل_رقم +966987654321`
-    💬 `تعديل_تليجرام @DUX_support`
-    📧 `تعديل_بريد support@dux.com`
-    🕒 `تعديل_ساعات 8 صباحاً - 10 مساءً`
-    
-    أو استخدم الأزرار أدناه للتعديل التفاعلي:"""
-            
-            keyboard = [
-                [{'text': '📞 تعديل رقم الهاتف'}],
-                [{'text': '💬 تعديل حساب التليجرام'}],
-                [{'text': '📧 تعديل البريد الإلكتروني'}],
-                [{'text': '🕒 تعديل ساعات العمل'}],
-                [{'text': '🔄 تحديث بيانات الدعم'}],
-                [{'text': '↩️ العودة للوحة الأدمن'}]
-            ]
-            
-            reply_keyboard = {
-                'keyboard': keyboard,
-                'resize_keyboard': True,
-                'one_time_keyboard': False
-            }
-            
-            self.send_message(message['chat']['id'], support_text, reply_keyboard)
+        """عرض محرر بيانات الدعم — بأزرار inline"""
+        phone = self.get_support_setting('support_phone', '+966501234567')
+        telegram = self.get_support_setting('support_telegram', '@DUX_support')
+        email = self.get_support_setting('support_email', 'support@dux.com')
+        hours = self.get_support_setting('support_hours', '24/7')
+
+        text = (
+            f"🛠️ <b>بيانات الدعم</b>\n\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"📞 الهاتف: <code>{phone}</code>\n"
+            f"💬 تليجرام: <code>{telegram}</code>\n"
+            f"📧 البريد: <code>{email}</code>\n"
+            f"🕒 ساعات العمل: <b>{hours}</b>\n"
+            f"━━━━━━━━━━━━━━━━━━\n\n"
+            f"اختر ما تريد تعديله:"
+        )
+
+        inline_btns = [
+            [{'text': f'📞 تعديل الهاتف', 'callback_data': 'support_edit_phone'},
+             {'text': f'💬 تعديل تليجرام', 'callback_data': 'support_edit_telegram'}],
+            [{'text': f'📧 تعديل البريد', 'callback_data': 'support_edit_email'},
+             {'text': f'🕒 تعديل الساعات', 'callback_data': 'support_edit_hours'}],
+            [{'text': '🔙 العودة للوحة الأدمن', 'callback_data': 'support_back_admin'}]
+        ]
+        self.send_inline_message(message['chat']['id'], text, inline_btns)
         
     def start_phone_edit_wizard(self, message):
-            """بدء معالج تعديل رقم الهاتف"""
-            edit_text = """📞 تعديل رقم الهاتف
-    
-    الرقم الحالي: +966123456789
-    
-    اكتب الرقم الجديد:
-    مثال: +966987654321
-    
-    ⬅️ /cancel للإلغاء"""
-            
-            self.send_message(message['chat']['id'], edit_text)
-            self.user_states[message['from']['id']] = 'editing_support_phone'
-        
+        """بدء تعديل رقم الهاتف"""
+        current = self.get_support_setting('support_phone', '+966501234567')
+        self.send_message(message['chat']['id'],
+            f"📞 <b>تعديل رقم الهاتف</b>\n\n"
+            f"الرقم الحالي: <code>{current}</code>\n\n"
+            f"✍️ اكتب الرقم الجديد:\n"
+            f"مثال: <code>+966987654321</code>\n\n"
+            f"أو اكتب <code>إلغاء</code> للرجوع")
+        self.user_states[message['from']['id']] = 'editing_support_phone'
+
     def start_telegram_edit_wizard(self, message):
-            """بدء معالج تعديل حساب التليجرام"""
-            edit_text = """💬 تعديل حساب التليجرام
-    
-    الحساب الحالي: @DUX_support
-    
-    اكتب اسم المستخدم الجديد:
-    مثال: @DUX_support
-    
-    ⬅️ /cancel للإلغاء"""
-            
-            self.send_message(message['chat']['id'], edit_text)
-            self.user_states[message['from']['id']] = 'editing_support_telegram'
-        
+        """بدء تعديل حساب التليجرام"""
+        current = self.get_support_setting('support_telegram', '@DUX_support')
+        self.send_message(message['chat']['id'],
+            f"💬 <b>تعديل حساب التليجرام</b>\n\n"
+            f"الحساب الحالي: <code>{current}</code>\n\n"
+            f"✍️ اكتب الحساب الجديد:\n"
+            f"مثال: <code>@DUX_support</code>\n\n"
+            f"أو اكتب <code>إلغاء</code> للرجوع")
+        self.user_states[message['from']['id']] = 'editing_support_telegram'
+
     def start_email_edit_wizard(self, message):
-            """بدء معالج تعديل البريد الإلكتروني"""
-            edit_text = """📧 تعديل البريد الإلكتروني
-    
-    البريد الحالي: support@dux.com
-    
-    اكتب البريد الجديد:
-    مثال: support@dux.com
-    
-    ⬅️ /cancel للإلغاء"""
-            
-            self.send_message(message['chat']['id'], edit_text)
-            self.user_states[message['from']['id']] = 'editing_support_email'
-        
+        """بدء تعديل البريد الإلكتروني"""
+        current = self.get_support_setting('support_email', 'support@dux.com')
+        self.send_message(message['chat']['id'],
+            f"📧 <b>تعديل البريد الإلكتروني</b>\n\n"
+            f"البريد الحالي: <code>{current}</code>\n\n"
+            f"✍️ اكتب البريد الجديد:\n"
+            f"مثال: <code>support@dux.com</code>\n\n"
+            f"أو اكتب <code>إلغاء</code> للرجوع")
+        self.user_states[message['from']['id']] = 'editing_support_email'
+
     def start_hours_edit_wizard(self, message):
-            """بدء معالج تعديل ساعات العمل"""
-            edit_text = """🕒 تعديل ساعات العمل
-    
-    الساعات الحالية: 9 صباحاً - 6 مساءً
-    
-    اكتب ساعات العمل الجديدة:
-    مثال: 8 صباحاً - 10 مساءً
-    
-    ⬅️ /cancel للإلغاء"""
-            
-            self.send_message(message['chat']['id'], edit_text)
-            self.user_states[message['from']['id']] = 'editing_support_hours'
+        """بدء تعديل ساعات العمل"""
+        current = self.get_support_setting('support_hours', '24/7')
+        self.send_message(message['chat']['id'],
+            f"🕒 <b>تعديل ساعات العمل</b>\n\n"
+            f"الساعات الحالية: <b>{current}</b>\n\n"
+            f"✍️ اكتب ساعات العمل الجديدة:\n"
+            f"مثال: <code>8 صباحاً - 10 مساءً</code>\n\n"
+            f"أو اكتب <code>إلغاء</code> للرجوع")
+        self.user_states[message['from']['id']] = 'editing_support_hours'
         
     def handle_support_data_edit(self, message, state):
-            """معالجة تعديل بيانات الدعم"""
-            text = message.get('text', '').strip()
-            user_id = message['from']['id']
-            
-            if text == '/cancel':
-                if user_id in self.user_states:
-                    del self.user_states[user_id]
-                self.show_support_data_editor(message)
-                return
-            
-            # تحديد نوع التعديل
-            if state == 'editing_support_phone':
-                success_msg = f"✅ تم تحديث رقم الهاتف إلى: {text}"
-                self.save_support_setting('support_phone', text)
-            elif state == 'editing_support_telegram':
-                success_msg = f"✅ تم تحديث حساب التليجرام إلى: {text}"
-                self.save_support_setting('support_telegram', text)
-            elif state == 'editing_support_email':
-                success_msg = f"✅ تم تحديث البريد الإلكتروني إلى: {text}"
-                self.save_support_setting('support_email', text)
-            elif state == 'editing_support_hours':
-                success_msg = f"✅ تم تحديث ساعات العمل إلى: {text}"
-                self.save_support_setting('support_hours', text)
-            else:
-                success_msg = "❌ خطأ في تحديث البيانات"
-            
-            # إرسال رسالة التأكيد والعودة لمحرر البيانات
-            self.send_message(message['chat']['id'], success_msg, self.admin_keyboard(admin_lang))
-            
-            # تنظيف الحالة
+        """معالجة تعديل بيانات الدعم"""
+        text = message.get('text', '').strip()
+        user_id = message['from']['id']
+
+        if text in ['/cancel', 'إلغاء', 'الغاء']:
             if user_id in self.user_states:
                 del self.user_states[user_id]
+            self.show_support_data_editor(message)
+            return
+
+        # تحديد نوع التعديل
+        if state == 'editing_support_phone':
+            success_msg = f"✅ تم تحديث رقم الهاتف إلى: <code>{text}</code>"
+            self.save_setting('support_phone', text)
+        elif state == 'editing_support_telegram':
+            success_msg = f"✅ تم تحديث حساب التليجرام إلى: <code>{text}</code>"
+            self.save_setting('support_telegram', text)
+        elif state == 'editing_support_email':
+            success_msg = f"✅ تم تحديث البريد الإلكتروني إلى: <code>{text}</code>"
+            self.save_setting('support_email', text)
+        elif state == 'editing_support_hours':
+            success_msg = f"✅ تم تحديث ساعات العمل إلى: <b>{text}</b>"
+            self.save_setting('support_hours', text)
+        else:
+            success_msg = "❌ خطأ في تحديث البيانات"
+
+        # إرسال رسالة التأكيد والعودة لمحرر البيانات
+        self.send_message(message['chat']['id'], success_msg)
+        # تنظيف الحالة
+        if user_id in self.user_states:
+            del self.user_states[user_id]
+        # إعادة عرض لوحة الدعم
+        self.show_support_data_editor(message)
         
     def save_support_setting(self, key, value):
-            """حفظ إعداد الدعم"""
-            try:
-                # قراءة الإعدادات الموجودة
-                settings = []
-                setting_exists = False
-                
-                try:
-                    with open('system_settings.csv', 'r', encoding='utf-8-sig') as f:
-                        reader = csv.DictReader(f)
-                        for row in reader:
-                            if row['setting_key'] == key:
-                                row['setting_value'] = value
-                                setting_exists = True
-                            settings.append(row)
-                except FileNotFoundError:
-                    pass
-                
-                # إضافة الإعداد الجديد إذا لم يكن موجوداً
-                if not setting_exists:
-                    descriptions = {
-                        'support_phone': 'رقم هاتف الدعم الفني',
-                        'support_telegram': 'حساب التليجرام للدعم',
-                        'support_email': 'بريد إلكتروني للدعم',
-                        'support_hours': 'ساعات عمل خدمة الدعم'
-                    }
-                    
-                    settings.append({
-                        'setting_key': key,
-                        'setting_value': value,
-                        'description': descriptions.get(key, 'إعداد الدعم')
-                    })
-                
-                # حفظ الإعدادات
-                with open('system_settings.csv', 'w', newline='', encoding='utf-8-sig') as f:
-                    fieldnames = ['setting_key', 'setting_value', 'description']
-                    writer = csv.DictWriter(f, fieldnames=fieldnames)
-                    writer.writeheader()
-                    writer.writerows(settings)
-                    
-                logger.info(f"تم حفظ إعداد الدعم: {key} = {value}")
-                
-            except Exception as e:
-                logger.error(f"خطأ في حفظ إعداد الدعم: {e}")
+        """حفظ إعداد الدعم — يستخدم save_setting الموحدة"""
+        self.save_setting(key, value)
         
     def get_support_setting(self, key, default='غير محدد'):
-            """قراءة إعداد الدعم"""
-            try:
-                with open('system_settings.csv', 'r', encoding='utf-8-sig') as f:
-                    reader = csv.DictReader(f)
-                    for row in reader:
-                        if row['setting_key'] == key:
-                            return row['setting_value']
-            except:
-                pass
-            return default
+        """قراءة إعداد الدعم — يستخدم get_setting الموحدة"""
+        val = self.get_setting(key)
+        return val if val else default
         
     def show_currency_selection(self, message):
             """عرض قائمة العملات للاختيار"""
