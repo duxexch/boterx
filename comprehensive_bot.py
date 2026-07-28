@@ -7253,9 +7253,19 @@ class ComprehensiveDUXBot:
                     
                     self.edit_company_data[user_id]['is_active'] = new_status
                     self.send_message(message['chat']['id'], f"✅ تم تغيير حالة الشركة إلى: {status_text}")
-                    
-                    # العودة لقائمة التعديل
                     self.show_edit_menu(message, user_id)
+                    
+                elif text == '📍 تعديل العنوان':
+                    current_address = self.edit_company_data[user_id].get('address', '') or ''
+                    self.send_message(message['chat']['id'],
+                        f"📍 العنوان الحالي: {current_address or 'غير محدد'}\n\n"
+                        "أرسل العنوان الجديد:\n"
+                        "(هذا العنوان يظهر للعميل أثناء عملية السحب)\n\n"
+                        "أو اكتب 'حذف' لإزالة العنوان")
+                    self.user_states[user_id] = 'editing_company_address'
+                    
+                elif text == '💳 ربط وسائل الدفع':
+                    self.show_company_payment_methods_link(message, user_id)
                     
                 elif text == '✅ حفظ التغييرات':
                     self.save_company_changes(message)
@@ -7293,11 +7303,67 @@ class ComprehensiveDUXBot:
                 self.edit_company_data[user_id]['details'] = text
                 self.send_message(message['chat']['id'], f"✅ تم تحديث التفاصيل إلى: {text}")
                 self.show_edit_menu(message, user_id)
+                
+            elif state == 'editing_company_address':
+                if text.lower() in ['حذف', 'delete', 'مسح']:
+                    self.edit_company_data[user_id]['address'] = ''
+                    self.send_message(message['chat']['id'], "✅ تم حذف العنوان")
+                else:
+                    self.edit_company_data[user_id]['address'] = text
+                    self.send_message(message['chat']['id'], f"✅ تم تحديث العنوان إلى: {text}")
+                self.show_edit_menu(message, user_id)
         
+    def show_company_payment_methods_link(self, message, user_id):
+        """عرض وسائل الدفع المرتبطة بالشركة وربط/فصل وسائل"""
+        company = self.edit_company_data.get(user_id, {})
+        company_id = company.get('id', '')
+        
+        # جلب كل وسائل الدفع
+        all_methods = []
+        try:
+            with open('payment_methods.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                all_methods = list(reader)
+        except:
+            pass
+        
+        # وسائل مرتبطة بهذه الشركة
+        linked = [m for m in all_methods if m.get('company_id') == company_id]
+        unlinked = [m for m in all_methods if m.get('company_id') != company_id and m.get('status') == 'active']
+        
+        text = f"💳 وسائل الدفع للشركة: {company.get('name', '')}\n\n"
+        
+        if linked:
+            text += "✅ وسائل مرتبطة:\n"
+            for m in linked:
+                icon = m.get('icon', '💳') or '💳'
+                text += f"  {icon} {m['method_name']} (ID: {m['id']})\n"
+        else:
+            text += "📭 لا توجد وسائل دفع مرتبطة\n"
+        
+        if unlinked:
+            text += "\n📋 وسائل متاحة للربط:\n"
+            for m in unlinked:
+                icon = m.get('icon', '💳') or '💳'
+                text += f"  {icon} {m['method_name']} (ID: {m['id']})\n"
+        
+        text += "\n➕ للربط: اكتب <code>ربط_وسيلة [وسيلة_ID]</code>\n"
+        text += "➖ للفصل: اكتب <code>فصل_وسيلة [وسيلة_ID]</code>\n"
+        text += "أو اكتب 'رجوع' للعودة"
+        
+        kb = {
+            'keyboard': [[{'text': '↩️ رجوع'}]],
+            'resize_keyboard': True,
+            'one_time_keyboard': True
+        }
+        self.send_message(message['chat']['id'], text, kb)
+        self.user_states[user_id] = f'editing_company_payment_link_{company_id}'
+    
     def show_edit_menu(self, message, user_id):
             """عرض قائمة تعديل الشركة"""
             company_data = self.edit_company_data[user_id]
             type_display = {'deposit': 'إيداع فقط', 'withdraw': 'سحب فقط', 'both': 'إيداع وسحب'}.get(company_data['type'], company_data['type'])
+            address = company_data.get('address', '') or 'غير محدد'
             
             edit_options = f"""📊 بيانات الشركة المحدثة:
     
@@ -7305,6 +7371,7 @@ class ComprehensiveDUXBot:
     🏢 الاسم: {company_data['name']}
     ⚡ النوع: {type_display}
     📋 التفاصيل: {company_data['details']}
+    📍 العنوان: {address}
     🔘 الحالة: {'نشط' if company_data.get('is_active') == 'active' else 'غير نشط'}
     
     ماذا تريد تعديل؟"""
@@ -7312,7 +7379,8 @@ class ComprehensiveDUXBot:
             edit_keyboard = {
                 'keyboard': [
                     [{'text': '📝 تعديل الاسم'}, {'text': '🔧 تعديل النوع'}],
-                    [{'text': '📋 تعديل التفاصيل'}, {'text': '🔘 تغيير الحالة'}],
+                    [{'text': '📋 تعديل التفاصيل'}, {'text': '📍 تعديل العنوان'}],
+                    [{'text': '💳 ربط وسائل الدفع'}, {'text': '🔘 تغيير الحالة'}],
                     [{'text': '✅ حفظ التغييرات'}, {'text': '❌ إلغاء'}]
                 ],
                 'resize_keyboard': True,
@@ -7332,33 +7400,31 @@ class ComprehensiveDUXBot:
                 # قراءة جميع الشركات
                 with open('companies.csv', 'r', encoding='utf-8-sig') as f:
                     reader = csv.DictReader(f)
+                    fieldnames = reader.fieldnames or ['id', 'name', 'type', 'details', 'is_active', 'icon', 'address']
                     for row in reader:
                         if row['id'] == updated_company['id']:
-                            companies.append(updated_company)
+                            # دمج التحديثات مع الصف الأصلي
+                            row.update({k: updated_company.get(k, row.get(k, '')) for k in fieldnames})
+                            companies.append(row)
                         else:
                             companies.append(row)
                 
                 # كتابة الملف المحدث
                 with open('companies.csv', 'w', newline='', encoding='utf-8-sig') as f:
-                    fieldnames = ['id', 'name', 'type', 'details', 'is_active', 'icon', 'address']
                     writer = csv.DictWriter(f, fieldnames=fieldnames)
                     writer.writeheader()
                     for row in companies:
-                        # Ensure all new columns exist
-                        if 'icon' not in row or not row.get('icon'):
-                            row['icon'] = '🏢'
-                        if 'address' not in row:
-                            row['address'] = ''
                         writer.writerow({k: row.get(k, '') for k in fieldnames})
                 
                 type_display = {'deposit': 'إيداع فقط', 'withdraw': 'سحب فقط', 'both': 'إيداع وسحب'}.get(updated_company['type'])
                 
-                success_msg = f"""🎉 تم حفظ التغييرات بنجاح!
+                success_msg = f"""✅ تم حفظ التغييرات بنجاح!
     
     🆔 المعرف: {updated_company['id']}
     🏢 الاسم: {updated_company['name']}
     ⚡ النوع: {type_display}
     📋 التفاصيل: {updated_company['details']}
+    📍 العنوان: {updated_company.get('address', 'غير محدد') or 'غير محدد'}
     🔘 الحالة: {'نشط' if updated_company.get('is_active') == 'active' else 'غير نشط'}"""
                 
                 self.send_message(message['chat']['id'], success_msg, self.admin_keyboard(admin_lang))
