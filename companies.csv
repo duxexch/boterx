@@ -1,6 +1,6 @@
-id,name,type,details,is_active,icon,address
-1,STC Pay,both,محفظة إلكترونية,active,📡,
-2,البنك الأهلي,deposit,حساب بنكي رقم: 1234567890,active,🏦,
-3,فودافون كاش,both,محفظة إلكترونية,active,📱,
-4,بنك الراجحي,deposit,حساب بنكي رقم: 0987654321,active,🏦,
-5,مدى البنك الأهلي,withdraw,رقم الحساب للسحب,active,💳,
+﻿id,name,type,details,is_active,icon,address
+1,1XBET,both,"محفظة (فودافون,اتصالات,اورنج,اكسيس)",active,📡,
+2,MELBET,both,"محفظة (فودافون,اتصالات,اورنج,اكسيس)",active,🏦,
+3,MOSTBET,both,"محفظة (فودافون,اتصالات,اورنج,اكسيس)",active,📱,
+4,BETJAM,both,"محفظة (فودافون,اتصالات,اورنج,اكسيس)",active,🏦,
+5,1W,both,"محفظة (فودافون,اتصالات,اورنج,اكسيس)",active,💳,

@@ -1,6 +1,0 @@
-cd "C:\Users\ZeyadaNet\Desktop\TaskFlowAIgggg-main"
-py -3.11 -m venv venv
-.\venv\Scripts\activate
-python -m pip install --upgrade pip
-pip install aiogram python-dotenv aiosqlite
-python comprehensive_bot.py
