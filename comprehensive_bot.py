@@ -6521,17 +6521,34 @@ class ComprehensiveDUXBot:
 
                 method = self.get_payment_method_by_id(method_id) if method_id else None
                 method_name = method['method_name'] if method else ''
+                method_type = method.get('method_type', '') if method else ''
+                account_data = method.get('account_data', '') if method else ''
+                additional_info = method.get('additional_info', '') if method else ''
+                method_icon = method.get('icon', '💳') if method else '💳'
 
-                self.edit_message(chat_id, message.get('message_id'),
+                # عرض بيانات وسيلة الدفع للعميل — قابلة للنسخ
+                method_text = (
                     f"✅ <b>تم اختيار وسيلة الدفع</b>\n\n"
-                    f"🏢 الشركة: {company_name}\n"
-                    f"💳 الوسيلة: {method_name}\n\n"
-                    f"🔐 اكتب رقم المحفظة أو الحساب:")
+                    f"━━━━━━━━━━━━━━━━━━\n"
+                    f"🏢 الشركة: <b>{company_name}</b>\n"
+                    f"{method_icon} الوسيلة: <b>{method_name}</b>\n"
+                )
+                if method_type:
+                    method_text += f"📋 النوع: {method_type}\n"
+                if account_data:
+                    method_text += f"🔢 <b>رقم الحساب / المحفظة:</b>\n<code>{account_data}</code>\n\n"
+                if additional_info:
+                    method_text += f"💡 {additional_info}\n"
+                method_text += f"━━━━━━━━━━━━━━━━━━\n\n"
+                method_text += f"📤 <b>حوّل المال إلى الرقم أعلاه</b>\n"
+                method_text += f"ثم اكتب رقم محفظتك التي أرسلت منها:"
+
+                self.edit_message(chat_id, message.get('message_id'), method_text)
 
                 user = self.find_user(user_id)
                 lang = user.get('language', 'ar') if user else 'ar'
                 kb = {'keyboard': [[{'text': '❌ إلغاء'}, {'text': self.tr('main_menu', lang)}]], 'resize_keyboard': True, 'one_time_keyboard': True}
-                self.send_message(chat_id, self.tr('enter_wallet', lang, min_amount=self.get_setting('min_deposit') or '50', currency=self.get_currency_symbol(user.get('currency','SAR'))), kb)
+                self.send_message(chat_id, "📝 اكتب رقم محفظتك:", kb)
                 self.user_states[user_id] = f'deposit_wallet_{company_id}_{company_name}_{method_id}'
                 return
 
