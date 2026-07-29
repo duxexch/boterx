@@ -1229,6 +1229,46 @@ class SVRPManager:
                 return True, "تم رفض الطلب"
         return False, "الطلب غير موجود"
 
+    def deposit_from_balance(self, user_id, company_id, company_name, amount):
+        """
+        إيداع من الرصيد المتاح — العميل يطلب إيداع رصيده المتاح لحسابه في الشركة
+        يُخصم من المتاح (total_used) → يُسجل كمعاملة إيداع
+        
+        ملاحظة: الرصيد المتاح = total_used (المبلغ الذي تم فك تجميده عبر الإرسال)
+        """
+        tid = str(user_id)
+        wallet = self.get_wallet(tid)
+        
+        # الرصيد المتاح = ما تم فك تجميده (total_used يمثل ما خرج من المجمد)
+        available = float(wallet.get('total_used', 0) or 0)
+        
+        if available < amount:
+            return False, f"رصيدك المتاح غير كافٍ (المتاح: {available:.2f})"
+
+        if amount <= 0:
+            return False, "المبلغ يجب أن يكون أكبر من صفر"
+
+        # خصم من المتاح
+        new_used = available - amount
+        self._update_wallet(tid, {
+            'total_used': new_used
+        })
+
+        # تسجيل معاملة الإيداع
+        deposit_id = self._generate_id('DEP')
+        transfer = {
+            'id': deposit_id,
+            'sender_id': tid,
+            'receiver_id': tid,  # نفس المستخدم
+            'amount': str(amount),
+            'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')
+        }
+        self._append_csv('svrp_transfers.csv', transfer,
+            ['id', 'sender_id', 'receiver_id', 'amount', 'created_at'])
+
+        logger.info(f"SVRP deposit from balance: user {tid} deposited {amount} to {company_name}")
+        return True, deposit_id
+
     def get_svrp_stats(self):
         """إحصائيات شاملة للاسترداد الذكي (للإدمن)"""
         credits = self._read_csv('svrp_credits.csv')

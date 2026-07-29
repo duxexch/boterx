@@ -3611,6 +3611,79 @@ class ComprehensiveDUXBot:
                 del self.user_states[user_id]
             return
 
+        if isinstance(current_state, str) and current_state.startswith('svrp_dep_balance_'):
+            # إيداع من الرصيد المتاح
+            user_id = message['from']['id']
+            chat_id = message['chat']['id']
+            text = message.get('text', '').strip()
+
+            if text in ['إلغاء', 'الغاء', '🔙']:
+                if user_id in self.user_states: del self.user_states[user_id]
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_svrp_panel(fake_msg)
+                return
+
+            parts = current_state.replace('svrp_dep_balance_', '').split('_', 1)
+            if len(parts) != 2:
+                return
+            company_id = parts[0]
+            company_name = parts[1]
+
+            try:
+                amount = float(text)
+                if amount <= 0:
+                    self.send_message(chat_id, "❌ المبلغ يجب أن يكون أكبر من صفر")
+                    return
+            except ValueError:
+                self.send_message(chat_id, "❌ اكتب مبلغاً رقمياً صحيحاً")
+                return
+
+            # الحصول على رقم حساب المستخدم في الشركة
+            account = self.svrp.get_user_company_account(user_id, company_id)
+            if not account:
+                self.send_message(chat_id, "❌ لا يوجد حساب مسجل في هذه الشركة")
+                if user_id in self.user_states: del self.user_states[user_id]
+                return
+
+            # تنفيذ الإيداع من المتاح
+            success, msg = self.svrp.deposit_from_balance(user_id, company_id, company_name, amount)
+            if success:
+                user = self.find_user(user_id)
+                user_currency = user.get('currency', 'SAR') if user else 'SAR'
+
+                self.send_message(chat_id,
+                    f"✅ <b>تم طلب الإيداع!</b>\n\n"
+                    f"🆔 <code>{msg}</code>\n"
+                    f"🏢 الشركة: {company_name}\n"
+                    f"📋 رقم حسابك: <code>{account.get('account_number', '')}</code>\n"
+                    f"💰 المبلغ: <b>{amount:.2f}</b> {user_currency}\n\n"
+                    f"⏳ سيتم مراجعة طلبك من الإدارة")
+
+                # إشعار الأدمن
+                for admin_id in self.admin_ids:
+                    try:
+                        admin_msg = (
+                            f"💰 <b>طلب إيداع من رصيد متاح</b>\n\n"
+                            f"🆔 <code>{msg}</code>\n"
+                            f"👤 العميل: {user.get('name', '')} ({user.get('customer_id', '')})\n"
+                            f"🏢 الشركة: {company_name}\n"
+                            f"📋 رقم الحساب: <code>{account.get('account_number', '')}</code>\n"
+                            f"💰 المبلغ: <b>{amount:.2f}</b> {user_currency}\n\n"
+                        )
+                        inline_btns = [
+                            [{'text': '✅ تأكيد', 'callback_data': f'svrp_dep_approve_{msg}'},
+                             {'text': '❌ رفض', 'callback_data': f'svrp_dep_reject_{msg}'}]
+                        ]
+                        self.send_inline_message(admin_id, admin_msg, inline_btns)
+                    except Exception as e:
+                        logger.error(f"خطأ في إشعار الأدمن بالإيداع: {e}")
+            else:
+                self.send_message(chat_id, f"❌ {msg}")
+
+            if user_id in self.user_states:
+                del self.user_states[user_id]
+            return
+
         if current_state == 'svrp_send_credits_input':
             # إرسال رصيد مجمد — معرف العميل + المبلغ
             user_id = message['from']['id']
@@ -6128,9 +6201,54 @@ class ComprehensiveDUXBot:
                 return
 
             elif data == 'svrp_deposit':
-                self.edit_message(chat_id, message.get('message_id'), "💰 إيداع")
-                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
-                self.create_deposit_request(fake_msg)
+                # إيداع من الرصيد المتاح — يختار شركة مسجل فيها
+                user = self.find_user(user_id)
+                lang = user.get('language', 'ar') if user else 'ar'
+                accounts = self.svrp.get_user_company_accounts(user_id)
+
+                if not accounts:
+                    self.edit_message(chat_id, message.get('message_id'),
+                        "❌ ليس لديك حسابات مسجلة.\n\n"
+                        "اضغط <b>🏢 تسجيل حساب جديد</b> أولاً")
+                    return
+
+                wallet = self.svrp.get_wallet(user_id)
+                available = float(wallet.get('total_used', 0) or 0)
+
+                text = (
+                    f"💰 <b>إيداع من الرصيد المتاح</b>\n\n"
+                    f"🟢 الرصيد المتاح: <b><code>{available:.2f}</code></b>\n\n"
+                    f"اختر الشركة التي تريد الإيداع لحسابك فيها:"
+                )
+                inline_btns = []
+                for acc in accounts:
+                    inline_btns.append([{
+                        'text': f"🏢 {acc.get('company_name', '')} — {acc.get('account_number', '')}",
+                        'callback_data': f'svrp_dep_amt_{acc["company_id"]}_{acc["company_name"]}'
+                    }])
+                inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'svrp_back_panel'}])
+
+                self.edit_message(chat_id, message.get('message_id'), text)
+                self.send_inline_message(chat_id, "اختر الشركة:", inline_btns)
+                return
+
+            elif data.startswith('svrp_dep_amt_'):
+                # طلب المبلغ للإيداع من المتاح
+                parts = data.replace('svrp_dep_amt_', '').split('_', 1)
+                if len(parts) != 2:
+                    return
+                company_id = parts[0]
+                company_name = parts[1]
+
+                wallet = self.svrp.get_wallet(user_id)
+                available = float(wallet.get('total_used', 0) or 0)
+
+                self.edit_message(chat_id, message.get('message_id'),
+                    f"💰 <b>إيداع من الرصيد المتاح</b>\n\n"
+                    f"🏢 الشركة: {company_name}\n"
+                    f"🟢 الرصيد المتاح: <b><code>{available:.2f}</code></b>\n\n"
+                    f"اكتب المبلغ الذي تريد إيداعه:")
+                self.user_states[user_id] = f'svrp_dep_balance_{company_id}_{company_name}'
                 return
 
             elif data == 'svrp_withdraw':
