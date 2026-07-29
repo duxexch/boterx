@@ -1190,7 +1190,7 @@ class ComprehensiveDUXBot:
     # ==================== 💎 الاسترداد الذكي — Panel Methods ====================
 
     def show_svrp_panel(self, message):
-        """عرض لوحة 💎 الاسترداد الذكي"""
+        """عرض لوحة 💎 الاسترداد الذكي — تصميم جديد بأزرار inline + شرح"""
         user = self.find_user(message['from']['id'])
         if not user or not self.svrp:
             lang = 'ar'
@@ -1202,100 +1202,67 @@ class ComprehensiveDUXBot:
         user_id = message['from']['id']
         lang = user.get('language', 'ar')
         wallet = self.svrp.get_wallet(user_id)
-        group = self.svrp.get_user_group(user_id)
 
         balance = float(wallet.get('balance', 0) or 0)
         pending = float(wallet.get('pending_balance', 0) or 0)
         total_earned = float(wallet.get('total_earned', 0) or 0)
         total_used = float(wallet.get('total_used', 0) or 0)
-        wager_req = int(wallet.get('wagering_required', 3) or 3)
-        wager_done = int(wallet.get('wagering_completed', 0) or 0)
-        group_name = group.get('group_name', 'bronze')
-        group_icon = {'bronze': '🥉', 'silver': '🥈', 'gold': '🥇', 'platinum': '💎'}.get(group_name, '🥉')
-        group_ar = {'bronze': 'برونزي' if lang=='ar' else 'Bronze', 'silver': 'فضي' if lang=='ar' else 'Silver', 'gold': 'ذهبي' if lang=='ar' else 'Gold', 'platinum': 'بلاتيني' if lang=='ar' else 'Platinum'}.get(group_name, 'برونزي')
-        ref_count = self.svrp.count_referrals_recursive(user_id)
 
-        # شريط التقدم
-        wager_bar = '▰' * min(wager_done, wager_req) + '▱' * max(0, wager_req - min(wager_done, wager_req))
+        # الرصيد المجمد = كل الرصيد حتى يُفك
+        frozen = balance
+        available = 0  # سيُحدّث في المراحل القادمة بناءً على الإرسال
 
-        # تمييز المجمد عن المتاح
-        is_frozen = wager_done < wager_req
-        if is_frozen:
-            frozen = balance
-            available = 0
-        else:
-            frozen = 0
-            available = balance
-
-        # نص شرح النظام (يظهر مرة واحدة أو دائماً)
         if lang == 'ar':
-            intro = (
+            panel_text = (
                 "💎 <b>الاسترداد الذكي</b>\n\n"
+                "━━━━━━━━━━━━━━━━━━\n"
                 "📌 <b>كيف يعمل النظام؟</b>\n"
-                "• عند رفض طلب سحب ← تحصل على رصيد استرداد\n"
-                "• الرصيد يكون <b>مجمداً</b> 🧊 حتى تكمل 3 معاملات\n"
-                "• بعد إكمال المعاملات ← يُفك التجميد تلقائياً ✅\n"
-                "• يمكنك إنشاء أكواد ترويجية ومشاركتها مع أصدقائك\n\n"
+                "━━━━━━━━━━━━━━━━━━\n"
+                "1️⃣ اضغط <b>💰 إيداع</b> ← أودع في حسابك بالشركة\n"
+                "2️⃣ بعد الإيداع، اختر <b>🔄 استرداد</b> ← أرسل لقطة شاشة برصيدك\n"
+                "3️⃣ يراجع الأدمن ← يُضاف الرصيد لمحفظتك (<b>مجمد 🧊</b>)\n"
+                "4️⃣ أرسل رصيداً لأصدقائك ← يُفك التجميد <b>بنفس النسبة</b>\n"
+                "   مثال: أرسلت 10% ← يُنقل 10% من المجمد إلى المتاح\n"
+                "5️⃣ الرصيد المتاح 🟢 ← اطلب إيداعه لحسابك\n"
+                "━━━━━━━━━━━━━━━━━━\n\n"
+                f"🧊 <b>الرصيد المجمد:</b> <code>{frozen:.2f}</code>\n"
+                f"🟢 <b>الرصيد المتاح:</b> <code>{available:.2f}</code>\n"
+                f"⏳ <b>بانتظار الأصدقاء:</b> <code>{pending:.2f}</code>\n"
+                f"━━━━━━━━━━━━━━━━━━\n"
+                f"📈 المكتسب: <b>{total_earned:.2f}</b> | 📉 المستخدم: <b>{total_used:.2f}</b>\n\n"
+                f"👇 <b>اختر ما تريد:</b>"
             )
-            frozen_label = "🧊 <b>مجمد</b>"
-            available_label = "🟢 <b>متاح للاستخدام</b>"
-            pending_label = "⏳ بانتظار الأصدقاء"
-            earned_label = "📈 إجمالي المكتسب"
-            used_label = "📉 إجمالي المستخدم"
-            wager_label = "🎯 <b>تقدم التفعيل</b>"
-            wager_done_text = f"✅ <b>تم تفعيل الرصيد!</b>"
-            wager_pending_text = f"⏳ أكمل <b>{wager_req - wager_done}</b> معاملة لتفعيل الرصيد"
-            tier_label = "المستوى"
-            refs_label = "الإحالات"
-            select_text = "👇 اختر من القائمة"
         else:
-            intro = (
+            panel_text = (
                 "💎 <b>Smart Recovery</b>\n\n"
+                "━━━━━━━━━━━━━━━━━━\n"
                 "📌 <b>How it works:</b>\n"
-                "• When a withdrawal is rejected ← you get recovery credits\n"
-                "• Credits are <b>frozen</b> 🧊 until you complete 3 transactions\n"
-                "• After completing transactions ← auto-unfrozen ✅\n"
-                "• Create promo codes and share with friends\n\n"
+                "━━━━━━━━━━━━━━━━━━\n"
+                "1️⃣ Press <b>💰 Deposit</b> ← deposit to your company account\n"
+                "2️⃣ After deposit, choose <b>🔄 Recovery</b> ← send screenshot\n"
+                "3️⃣ Admin reviews ← credits added to wallet (<b>frozen 🧊</b>)\n"
+                "4️⃣ Send credits to friends ← unfreeze <b>same ratio</b>\n"
+                "5️⃣ Available balance 🟢 ← request deposit to your account\n"
+                "━━━━━━━━━━━━━━━━━━\n\n"
+                f"🧊 <b>Frozen:</b> <code>{frozen:.2f}</code>\n"
+                f"🟢 <b>Available:</b> <code>{available:.2f}</code>\n"
+                f"⏳ <b>Pending friends:</b> <code>{pending:.2f}</code>\n"
+                f"━━━━━━━━━━━━━━━━━━\n"
+                f"📈 Earned: <b>{total_earned:.2f}</b> | 📉 Used: <b>{total_used:.2f}</b>\n\n"
+                f"👇 <b>Select an option:</b>"
             )
-            frozen_label = "🧊 <b>Frozen</b>"
-            available_label = "🟢 <b>Available</b>"
-            pending_label = "⏳ Pending friends"
-            earned_label = "📈 Total earned"
-            used_label = "📉 Total used"
-            wager_label = "🎯 <b>Activation progress</b>"
-            wager_done_text = f"✅ <b>Credits activated!</b>"
-            wager_pending_text = f"⏳ Complete <b>{wager_req - wager_done}</b> more transactions"
-            tier_label = "Tier"
-            refs_label = "Referrals"
-            select_text = "👇 Select from menu"
 
-        panel_text = (
-            f"{intro}"
-            f"━━━━━━━━━━━━━━━━━━\n\n"
-            f"{available_label}: <b><code>{available:.2f}</code></b>\n"
-            f"{frozen_label}: <b><code>{frozen:.2f}</code></b>\n"
-            f"{pending_label}: <b><code>{pending:.2f}</code></b>\n"
-            f"━━━━━━━━━━━━━━━━━━\n"
-            f"{earned_label}: <b>{total_earned:.2f}</b> | {used_label}: <b>{total_used:.2f}</b>\n\n"
-            f"{wager_label}\n"
-            f"  {wager_bar} ({wager_done}/{wager_req})\n"
-            f"  {wager_done_text if not is_frozen else wager_pending_text}\n\n"
-            f"━━━━━━━━━━━━━━━━━━\n"
-            f"{group_icon} {tier_label}: <b>{group_ar}</b> | {refs_label}: <b>{ref_count}</b>\n\n"
-            f"{select_text}"
-        )
-
-        keyboard = {
-            'keyboard': [
-                [{'text': self.tr('svrp_my_wallet', lang)}, {'text': self.tr('svrp_my_tasks', lang)}],
-                [{'text': self.tr('svrp_my_codes', lang)}, {'text': self.tr('svrp_create_code_btn', lang)}],
-                [{'text': self.tr('svrp_redeem_code_btn', lang)}, {'text': self.tr('svrp_referral_tree_btn', lang)}],
-                [{'text': self.tr('svrp_my_tier_btn', lang)}, {'text': self.tr('svrp_main_menu', lang)}]
-            ],
-            'resize_keyboard': True,
-            'one_time_keyboard': False
-        }
-        self.send_message(message['chat']['id'], panel_text, keyboard)
+        # أزرار inline داخل الدردشة
+        inline_btns = [
+            [{'text': '💰 إيداع', 'callback_data': 'svrp_deposit'},
+             {'text': '💸 سحب', 'callback_data': 'svrp_withdraw'}],
+            [{'text': '🔄 استرداد', 'callback_data': 'svrp_recovery_request'},
+             {'text': '📤 إرسال رصيد', 'callback_data': 'svrp_send_credits'}],
+            [{'text': '💎 محفظتي', 'callback_data': 'svrp_wallet'},
+             {'text': '👥 دعوة صديق', 'callback_data': 'svrp_invite'}],
+            [{'text': '🏠 القائمة الرئيسية', 'callback_data': 'svrp_main_menu'}]
+        ]
+        self.send_inline_message(message['chat']['id'], panel_text, inline_btns)
 
     def show_svrp_wallet(self, message):
         """عرض محفظة 💎 الاسترداد الذكي"""
