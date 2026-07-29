@@ -2288,8 +2288,7 @@ class ComprehensiveDUXBot:
                 writer.writerow({k: row.get(k, '') for k in fieldnames})
     
     def main_keyboard(self, lang='ar', user_id=None):
-        """القائمة الرئيسية — تصميم أنيق وعملي مع أزرار Reply"""
-        # استخدام إيموجي الثيم النشط
+        """القائمة الرئيسية — تصميم احترافي مع رموز مميزة"""
         t = self.get_current_theme() if THEME_AVAILABLE else {}
         
         deposit_btn = self.tr('deposit', lang)
@@ -2309,32 +2308,21 @@ class ComprehensiveDUXBot:
 
         lang_names = self.get_language_names()
         lang_btn_text = f"{t.get('btn_language', '🌐')} {lang_names.get(lang, {}).get('native', 'Language')}"
-        
-        # تصميم صفوف منظمة: الأهم فوق، الخدمات في الوسط، الإعدادات أسفل
+
+        # تصميم احترافي: كل زر له رمز مميز واضح
         keyboard = [
-            # ━━━━ الخدمات الأساسية ━━━━
-            # الصف 1: الإيداع والسحب — الأهم، جنباً إلى جنب
-            [{'text': deposit_btn}, {'text': withdraw_btn}],
-            # الصف 2: طلباتي + الملف الشخصي
-            [{'text': requests_btn}, {'text': profile_btn}],
-            
-            # ━━━━ المزايا ━━━━
-            # الصف 3: مطابقة + استرداد ذكي
-            [{'text': match_btn}, {'text': svrp_btn}],
-            # الصف 4: إحالة + تطبيقات
-            [{'text': ref_btn}, {'text': apps_btn}],
-            
-            # ━━━━ التواصل والإشعارات ━━━━
-            # الصف 5: إشعاراتي + شكوى
-            [{'text': notif_btn}, {'text': complaint_btn}],
-            # الصف 6: دعم + مساعدة
-            [{'text': support_btn}, {'text': help_btn}],
-            
-            # ━━━━ الإعدادات ━━━━
-            # الصف 7: العملة + اللغة
-            [{'text': currency_btn}, {'text': lang_btn_text}],
-            # الصف 8: إعادة تعيين (منفرد — إجراء طوارئ)
-            [{'text': reset_btn}],
+            # 💎 الخدمات الرئيسية
+            [{'text': f"🟢 {deposit_btn}"}, {'text': f"🔴 {withdraw_btn}"}],
+            [{'text': f"📋 {requests_btn}"}, {'text': f"👤 {profile_btn}"}],
+            # ⭐ المزايا
+            [{'text': f"🔄 {match_btn}"}, {'text': f"💎 {svrp_btn}"}],
+            [{'text': f"🎁 {ref_btn}"}, {'text': f"📱 {apps_btn}"}],
+            # 🔔 التواصل
+            [{'text': f"🔔 {notif_btn}"}, {'text': f"📨 {complaint_btn}"}],
+            [{'text': f"🆘 {support_btn}"}, {'text': f"❓ {help_btn}"}],
+            # ⚙️ الإعدادات
+            [{'text': f"💱 {currency_btn}"}, {'text': lang_btn_text}],
+            [{'text': f"♻️ {reset_btn}"}],
         ]
         
         # زر التسجيل للمستخدمين غير المسجلين
@@ -2456,15 +2444,20 @@ class ComprehensiveDUXBot:
             customer_id = user.get('customer_id', '')
             if lang == 'ar':
                 welcome_text = (
-                    f"👋 <b>أهلاً وسهلاً، {name}!</b>\n\n"
-                    f"🆔 رقم العميل: <code>{customer_id}</code>\n\n"
                     f"━━━━━━━━━━━━━━━━━━\n"
-                    f"💰 <b>الخدمات المتاحة:</b>\n"
-                    f"• 💵 إيداع • 💸 سحب\n"
-                    f"• 🔄 مطابقة • 💎 استرداد ذكي\n"
-                    f"• 📱 تطبيقات • 🎁 إحالة\n"
+                    f"👋 <b>أهلاً وسهلاً، {name}!</b>\n"
                     f"━━━━━━━━━━━━━━━━━━\n\n"
-                    f"👇 اختر الخدمة المطلوبة"
+                    f"🆔 رقم العميل: <b><code>{customer_id}</code></b>\n\n"
+                    f"━━━━━━━━━━━━━━━━━━\n"
+                    f"🟢 <b>إيداع</b> — أودع أموالك بسهولة\n"
+                    f"🔴 <b>سحب</b> — اسحب أموالك بسرعة\n"
+                    f"📋 <b>طلباتي</b> — تابع حالة معاملاتك\n"
+                    f"🔄 <b>مطابقة</b> — طابق مع عميل آخر\n"
+                    f"💎 <b>استرداد ذكي</b> — رصيد تعويضي\n"
+                    f"🎁 <b>إحالة</b> — ادعُ أصدقاءك\n"
+                    f"📱 <b>تطبيقات</b> — تحميل التطبيقات\n"
+                    f"━━━━━━━━━━━━━━━━━━\n\n"
+                    f"👇 <b>اختر ما تريد من الأزرار بالأسفل</b>"
                 )
             else:
                 welcome_text = self.tr('welcome_back', lang, name=name, customer_id=customer_id)
