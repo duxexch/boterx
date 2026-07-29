@@ -4013,7 +4013,7 @@ class ComprehensiveDUXBot:
                 phone = '+' + phone
         elif 'text' in message:
             phone = message['text'].strip()
-            if phone in ['🏠 القائمة الرئيسية', '🏠'] or phone in {self.tr('main_menu_btn', l) for l in all_langs}:
+            if phone in ['🏠 القائمة الرئيسية', '🏠'] or phone in {self.tr('main_menu_btn', l) for l in self.get_supported_languages()}:
                 if user_id in self.user_states:
                     del self.user_states[user_id]
                 self.handle_start(message)
