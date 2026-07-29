@@ -3897,10 +3897,35 @@ class ComprehensiveDUXBot:
                 return
 
             self.update_payment_method_field(method_id, 'method_name', text_msg)
-            self.send_message(chat_id,
-                f"✅ تم تحديث الاسم إلى: <b>{text_msg}</b>",
-                self.admin_keyboard())
             if user_id in self.user_states: del self.user_states[user_id]
+            # العودة لتفاصيل الوسيلة المحدّثة بدلاً من لوحة الأدمن
+            self.send_message(chat_id, f"✅ تم تحديث الاسم إلى: <b>{text_msg}</b>")
+            fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+            # إعادة عرض تفاصيل الوسيلة
+            method = self.get_payment_method_by_id(method_id)
+            if method:
+                company = self.get_company_by_id(method.get('company_id', ''))
+                company_name = company['name'] if company else 'غير محدد'
+                status = method.get('status', 'active')
+                status_icon = '✅' if status == 'active' else '⏸️'
+                icon = method.get('icon', '💳') or '💳'
+                detail_text = (
+                    f"💳 <b>{method['method_name']}</b>\n\n"
+                    f"━━━━━━━━━━━━━━━━━━\n"
+                    f"🏢 الشركة: {company_name}\n"
+                    f"📋 النوع: {method.get('method_type', '')}\n"
+                    f"🔢 رقم الحساب: <code>{method.get('account_data', '')}</code>\n"
+                    f"📊 الحالة: {status_icon} {status}\n"
+                    f"━━━━━━━━━━━━━━━━━━\n"
+                )
+                inline_btns = [
+                    [{'text': '✏️ تعديل الاسم', 'callback_data': f'pm_name_{method_id}'},
+                     {'text': '🔢 تعديل الحساب', 'callback_data': f'pm_account_{method_id}'}],
+                    [{'text': '⏹️ إيقاف' if status == 'active' else '▶️ تشغيل', 'callback_data': f'pm_toggle_{method_id}'}],
+                    [{'text': '🗑️ حذف', 'callback_data': f'pm_delete_{method_id}'}],
+                    [{'text': '🔙 رجوع للقائمة', 'callback_data': 'pm_list'}]
+                ]
+                self.send_inline_message(chat_id, detail_text, inline_btns)
             return
 
         # معالجة تعديل رقم حساب وسيلة دفع (pm_input_account_)
@@ -3919,10 +3944,33 @@ class ComprehensiveDUXBot:
                 return
 
             self.update_payment_method_field(method_id, 'account_data', text_msg)
-            self.send_message(chat_id,
-                f"✅ تم تحديث رقم الحساب إلى: <code>{text_msg}</code>",
-                self.admin_keyboard())
             if user_id in self.user_states: del self.user_states[user_id]
+            self.send_message(chat_id, f"✅ تم تحديث رقم الحساب إلى: <code>{text_msg}</code>")
+            # العودة لتفاصيل الوسيلة المحدّثة
+            method = self.get_payment_method_by_id(method_id)
+            if method:
+                company = self.get_company_by_id(method.get('company_id', ''))
+                company_name = company['name'] if company else 'غير محدد'
+                status = method.get('status', 'active')
+                status_icon = '✅' if status == 'active' else '⏸️'
+                icon = method.get('icon', '💳') or '💳'
+                detail_text = (
+                    f"💳 <b>{method['method_name']}</b>\n\n"
+                    f"━━━━━━━━━━━━━━━━━━\n"
+                    f"🏢 الشركة: {company_name}\n"
+                    f"📋 النوع: {method.get('method_type', '')}\n"
+                    f"🔢 رقم الحساب: <code>{method.get('account_data', '')}</code>\n"
+                    f"📊 الحالة: {status_icon} {status}\n"
+                    f"━━━━━━━━━━━━━━━━━━\n"
+                )
+                inline_btns = [
+                    [{'text': '✏️ تعديل الاسم', 'callback_data': f'pm_name_{method_id}'},
+                     {'text': '🔢 تعديل الحساب', 'callback_data': f'pm_account_{method_id}'}],
+                    [{'text': '⏹️ إيقاف' if status == 'active' else '▶️ تشغيل', 'callback_data': f'pm_toggle_{method_id}'}],
+                    [{'text': '🗑️ حذف', 'callback_data': f'pm_delete_{method_id}'}],
+                    [{'text': '🔙 رجوع للقائمة', 'callback_data': 'pm_list'}]
+                ]
+                self.send_inline_message(chat_id, detail_text, inline_btns)
             return
 
         if isinstance(current_state, str) and current_state.startswith('svrp_edit_intro_'):
@@ -9375,7 +9423,7 @@ class ComprehensiveDUXBot:
                     row['status'] = new_status
                     break
             fieldnames = ['id', 'company_id', 'method_name', 'method_type', 'account_data', 'additional_info', 'status', 'created_date', 'icon']
-            self.safe_csv_write('payment_methods.csv', rows, fieldnames)
+            self.safe_csv_write('payment_methods.csv', rows, fieldnames, mode='w')
             return True
         except Exception as e:
             logger.error(f"خطأ في تحديث حالة وسيلة الدفع: {e}")
@@ -9390,7 +9438,7 @@ class ComprehensiveDUXBot:
                     row[field] = value
                     break
             fieldnames = ['id', 'company_id', 'method_name', 'method_type', 'account_data', 'additional_info', 'status', 'created_date', 'icon']
-            self.safe_csv_write('payment_methods.csv', rows, fieldnames)
+            self.safe_csv_write('payment_methods.csv', rows, fieldnames, mode='w')
             return True
         except Exception as e:
             logger.error(f"خطأ في تحديث وسيلة الدفع: {e}")
@@ -11344,7 +11392,7 @@ class ComprehensiveDUXBot:
                     row['status'] = new_status
                     break
             fieldnames = ['id', 'company_id', 'method_name', 'method_type', 'account_data', 'additional_info', 'status', 'created_date', 'icon']
-            self.safe_csv_write('payment_methods.csv', rows, fieldnames)
+            self.safe_csv_write('payment_methods.csv', rows, fieldnames, mode='w')
             return True
         except Exception as e:
             logger.error(f"خطأ في تحديث حالة وسيلة الدفع: {e}")
@@ -11359,7 +11407,7 @@ class ComprehensiveDUXBot:
                     row[field] = value
                     break
             fieldnames = ['id', 'company_id', 'method_name', 'method_type', 'account_data', 'additional_info', 'status', 'created_date', 'icon']
-            self.safe_csv_write('payment_methods.csv', rows, fieldnames)
+            self.safe_csv_write('payment_methods.csv', rows, fieldnames, mode='w')
             return True
         except Exception as e:
             logger.error(f"خطأ في تحديث وسيلة الدفع: {e}")
