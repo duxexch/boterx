@@ -2741,50 +2741,60 @@ class ComprehensiveDUXBot:
             self.notify_admins(admin_msg, notification_type='new_user')
     
     def create_deposit_request(self, message):
-        """إنشاء طلب إيداع"""
+        """إنشاء طلب إيداع — شركات كأزرار inline"""
         user = self.find_user(message['from']['id'])
         if not user:
             return
         
         lang = user.get('language', 'ar')
-        
-        # عرض الشركات المتاحة للإيداع مع تحديث فوري
         deposit_companies = self.get_companies('deposit')
         if not deposit_companies:
-            self.send_message(message['chat']['id'], self.tr('no_companies', lang))
+            self.send_message(message['chat']['id'], self.tr('no_companies', lang), self.main_keyboard(lang, message['from']['id']))
             return
-        
-        companies_text = self.tr('deposit_title', lang) + "\n\n"
+
+        if lang == 'ar':
+            title = "💰 <b>طلب إيداع</b>\n\nاختر الشركة:"
+        else:
+            title = "💰 <b>Deposit Request</b>\n\nSelect company:"
+
+        inline_btns = []
         for company in deposit_companies:
-            companies_text += f"🔹 {company['name']} - {company['details']}\n"
-        
-        companies_text += f"\n📊 {len(deposit_companies)}"
-        
-        self.send_message(message['chat']['id'], companies_text, self.companies_keyboard('deposit'))
-        self.user_states[message['from']['id']] = 'selecting_deposit_company'
+            icon = company.get('icon', '🏢') or '🏢'
+            btn_text = f"{icon} {company['name']}"
+            if company.get('details'):
+                btn_text += f" — {company['details'][:30]}"
+            inline_btns.append([{'text': btn_text, 'callback_data': f'dep_company_{company["id"]}'}])
+
+        inline_btns.append([{'text': self.tr('main_menu', lang), 'callback_data': 'dep_cancel'}])
+        self.send_inline_message(message['chat']['id'], title, inline_btns)
     
     def create_withdrawal_request(self, message):
-        """إنشاء طلب سحب"""
+        """إنشاء طلب سحب — شركات كأزرار inline"""
         user = self.find_user(message['from']['id'])
         if not user:
             return
         
         lang = user.get('language', 'ar')
-        
-        # عرض الشركات المتاحة للسحب مع تحديث فوري
         withdraw_companies = self.get_companies('withdraw')
         if not withdraw_companies:
-            self.send_message(message['chat']['id'], self.tr('no_companies', lang))
+            self.send_message(message['chat']['id'], self.tr('no_companies', lang), self.main_keyboard(lang, message['from']['id']))
             return
-        
-        companies_text = self.tr('withdraw_title', lang) + "\n\n"
+
+        if lang == 'ar':
+            title = "💸 <b>طلب سحب</b>\n\nاختر الشركة:"
+        else:
+            title = "💸 <b>Withdrawal Request</b>\n\nSelect company:"
+
+        inline_btns = []
         for company in withdraw_companies:
-            companies_text += f"🔹 {company['name']} - {company['details']}\n"
-        
-        companies_text += f"\n📊 {len(withdraw_companies)}"
-        
-        self.send_message(message['chat']['id'], companies_text, self.companies_keyboard('withdraw'))
-        self.user_states[message['from']['id']] = 'selecting_withdraw_company'
+            icon = company.get('icon', '🏢') or '🏢'
+            btn_text = f"{icon} {company['name']}"
+            if company.get('details'):
+                btn_text += f" — {company['details'][:30]}"
+            inline_btns.append([{'text': btn_text, 'callback_data': f'wd_company_{company["id"]}'}])
+
+        inline_btns.append([{'text': self.tr('main_menu', lang), 'callback_data': 'wd_cancel'}])
+        self.send_inline_message(message['chat']['id'], title, inline_btns)
     
     def process_deposit_flow(self, message):
         """معالجة تدفق الإيداع الكامل"""
@@ -7743,7 +7753,7 @@ class ComprehensiveDUXBot:
             return methods
         
     def show_payment_method_selection(self, message, company_id, transaction_type):
-            """عرض وسائل الدفع المتاحة للشركة"""
+            """عرض وسائل الدفع المتاحة — كأزرار inline"""
             user_id = message['from']['id']
             user = self.find_user(user_id)
             lang = user.get('language', 'ar') if user else 'ar'
@@ -7752,40 +7762,26 @@ class ComprehensiveDUXBot:
             if not methods:
                 self.send_message(message['chat']['id'], 
                                 self.tr('no_payment_methods', lang),
-                                self.main_keyboard(lang))
+                                self.main_keyboard(lang, user_id))
                 return
-            
-            methods_text = self.tr('select_payment_method', lang) + "\n\n"
-            keyboard = []
-            
+
+            if lang == 'ar':
+                title = "💳 <b>اختر وسيلة الدفع</b>\n\n"
+            else:
+                title = "💳 <b>Select Payment Method</b>\n\n"
+
+            inline_btns = []
             for method in methods:
                 method_icon = method.get('icon', '💳') or '💳'
-                methods_text += f"🔹 {method_icon} {method['method_name']}\n"
-                methods_text += f"   📋 {method['method_type']}\n"
-                if method['additional_info']:
-                    methods_text += f"   💡 {method['additional_info']}\n"
-                methods_text += "\n"
-                
-                keyboard.append([{'text': f"{method_icon} {method['method_name']}"}])
-            
-            back_btn = self.tr('main_menu', lang)
-            keyboard.append([{'text': back_btn}])
-            
-            # حفظ الحالة
-            self.user_states[user_id] = {
-                'step': 'selecting_payment_method',
-                'company_id': company_id,
-                'transaction_type': transaction_type,
-                'methods': methods
-            }
-            
-            reply_keyboard = {
-                'keyboard': keyboard,
-                'resize_keyboard': True,
-                'one_time_keyboard': True
-            }
-            
-            self.send_message(message['chat']['id'], methods_text, reply_keyboard)
+                btn_text = f"{method_icon} {method['method_name']}"
+                if method.get('method_type'):
+                    btn_text += f" — {method['method_type']}"
+                if method.get('additional_info'):
+                    btn_text += f" ({method['additional_info'][:20]})"
+                inline_btns.append([{'text': btn_text, 'callback_data': f'dep_method_{method["id"]}_{company_id}_{transaction_type}'}])
+
+            inline_btns.append([{'text': self.tr('main_menu', lang), 'callback_data': 'dep_cancel'}])
+            self.send_inline_message(message['chat']['id'], title, inline_btns)
         
     def add_payment_method(self, company_id, method_name, method_type, account_data, additional_info="", icon=""):
             """إضافة وسيلة دفع جديدة"""
