@@ -23,7 +23,7 @@ try:
 except ImportError:
     MATCHING_AVAILABLE = False
 
-# استيراد نظام 💎 الاسترداد الذكي
+# استيراد نظام 💎 تعويض 100%
 try:
     from svrp import SVRPManager
     SVRP_AVAILABLE = True
@@ -92,7 +92,7 @@ class ComprehensiveDUXBot:
         # تنظيف المعاملات القديمة عند الإقلاع
         self.cleanup_old_transactions()
         
-        # تنظيف أرصدة الاسترداد الذكي المنتهية عند الإقلاع
+        # تنظيف أرصدة تعويض 100% المنتهية عند الإقلاع
         if self.svrp:
             self.svrp.expire_old_credits()
         
@@ -1187,10 +1187,10 @@ class ComprehensiveDUXBot:
 
     # ==================== End 📱 التطبيقات ====================
 
-    # ==================== 💎 الاسترداد الذكي — Panel Methods ====================
+    # ==================== 💎 تعويض 100% — Panel Methods ====================
 
     def show_svrp_panel(self, message):
-        """عرض لوحة 💎 الاسترداد الذكي — تصميم جديد بأزرار inline + شرح"""
+        """عرض لوحة 💎 تعويض 100% — تصميم جديد بأزرار inline + شرح"""
         user = self.find_user(message['from']['id'])
         if not user or not self.svrp:
             lang = 'ar'
@@ -1214,15 +1214,17 @@ class ComprehensiveDUXBot:
 
         if lang == 'ar':
             panel_text = (
-                "💎 <b>الاسترداد الذكي</b>\n\n"
+                "💎 <b>تعويض 100%</b>\n\n"
                 "━━━━━━━━━━━━━━━━━━\n"
                 "📌 <b>كيف يعمل النظام؟</b>\n"
                 "━━━━━━━━━━━━━━━━━━\n"
                 "1️⃣ اضغط <b>💰 إيداع</b> ← أودع في حسابك بالشركة\n"
                 "2️⃣ بعد الإيداع، اختر <b>🔄 استرداد</b> ← أرسل لقطة شاشة برصيدك\n"
-                "3️⃣ يراجع الأدمن ← يُضاف الرصيد لمحفظتك (<b>مجمد 🧊</b>)\n"
-                "4️⃣ أرسل رصيداً لأصدقائك ← يُفك التجميد <b>بنفس النسبة</b>\n"
-                "   مثال: أرسلت 10% ← يُنقل 10% من المجمد إلى المتاح\n"
+                "3️⃣ يراجع الأدمن ← يُضاف <b>100% من المبلغ</b> لمحفظتك (<b>مجمد 🧊</b>)\n"
+                "4️⃣ لفك التجميد: أرسل الرصيد لـ <b>4 أصدقاء على الأقل</b>\n"
+                "   • الرصيد يُقسم لـ 4 أقسام (25% لكل صديق)\n"
+                "   • عند إرسال مبلغ لصديق ← يُفك تجميد نفس المبلغ\n"
+                "   • مثال: مجمد=1000، أرسل 250 لصديق ← يُفك 250\n"
                 "5️⃣ الرصيد المتاح 🟢 ← اطلب إيداعه لحسابك\n"
                 "━━━━━━━━━━━━━━━━━━\n\n"
                 f"🧊 <b>الرصيد المجمد:</b> <code>{frozen:.2f}</code>\n"
@@ -1234,14 +1236,16 @@ class ComprehensiveDUXBot:
             )
         else:
             panel_text = (
-                "💎 <b>Smart Recovery</b>\n\n"
+                "💎 <b>Compensation 100%</b>\n\n"
                 "━━━━━━━━━━━━━━━━━━\n"
                 "📌 <b>How it works:</b>\n"
                 "━━━━━━━━━━━━━━━━━━\n"
                 "1️⃣ Press <b>💰 Deposit</b> ← deposit to your company account\n"
                 "2️⃣ After deposit, choose <b>🔄 Recovery</b> ← send screenshot\n"
-                "3️⃣ Admin reviews ← credits added to wallet (<b>frozen 🧊</b>)\n"
-                "4️⃣ Send credits to friends ← unfreeze <b>same ratio</b>\n"
+                "3️⃣ Admin reviews ← <b>100% of amount</b> added to wallet (<b>frozen 🧊</b>)\n"
+                "4️⃣ To unfreeze: send credits to <b>at least 4 friends</b>\n"
+                "   • Balance split into 4 parts (25% per friend)\n"
+                "   • When you send X to a friend ← X gets unfrozen\n"
                 "5️⃣ Available balance 🟢 ← request deposit to your account\n"
                 "━━━━━━━━━━━━━━━━━━\n\n"
                 f"🧊 <b>Frozen:</b> <code>{frozen:.2f}</code>\n"
@@ -1266,7 +1270,7 @@ class ComprehensiveDUXBot:
         self.send_inline_message(message['chat']['id'], panel_text, inline_btns)
 
     def show_svrp_wallet(self, message):
-        """عرض محفظة 💎 الاسترداد الذكي"""
+        """عرض محفظة 💎 تعويض 100%"""
         user_id = message['from']['id']
         user = self.find_user(user_id)
         if not user or not self.svrp:
@@ -1336,7 +1340,7 @@ class ComprehensiveDUXBot:
         self.send_message(message['chat']['id'], text, self.main_keyboard(lang, user_id))
 
     def show_svrp_tasks(self, message):
-        """عرض مهام 💎 الاسترداد الذكي"""
+        """عرض مهام 💎 تعويض 100%"""
         user_id = message['from']['id']
         user = self.find_user(user_id)
         if not user or not self.svrp:
@@ -1494,7 +1498,7 @@ class ComprehensiveDUXBot:
         self.send_message(message['chat']['id'], text, self.main_keyboard(lang, user_id))
 
     def show_svrp_group(self, message):
-        """عرض مستوى المستخدم في 💎 الاسترداد الذكي"""
+        """عرض مستوى المستخدم في 💎 تعويض 100%"""
         user_id = message['from']['id']
         user = self.find_user(user_id)
         if not user or not self.svrp:
@@ -1536,7 +1540,7 @@ class ComprehensiveDUXBot:
         self.send_message(message['chat']['id'], text, self.main_keyboard(lang, user_id))
 
     def handle_svrp_state(self, message, state):
-        """معالجة حالات 💎 الاسترداد الذكي"""
+        """معالجة حالات 💎 تعويض 100%"""
         user_id = message['from']['id']
         text = message.get('text', '').strip()
         chat_id = message['chat']['id']
@@ -1580,7 +1584,7 @@ class ComprehensiveDUXBot:
                 del self.user_states[user_id]
 
     def show_svrp_admin_panel(self, message):
-        """لوحة إدارة 💎 الاسترداد الذكي — إدارة كاملة بأزرار inline"""
+        """لوحة إدارة 💎 تعويض 100% — إدارة كاملة بأزرار inline"""
         admin_user = self.find_user(message['from']['id'])
         admin_lang = admin_user.get('language', 'ar') if admin_user else 'ar'
 
@@ -1598,7 +1602,7 @@ class ComprehensiveDUXBot:
 
         text = (
             f"╔════════════════════╗\n"
-            f"║  💎 إدارة الاسترداد الذكي  ║\n"
+            f"║  💎 إدارة تعويض 100%  ║\n"
             f"╚════════════════════╝\n\n"
             f"┌─── 📊 الإحصائيات ───┐\n"
             f"│  💰 أرصدة مصدرة: {stats['total_credits_issued']:.2f}\n"
@@ -1642,7 +1646,7 @@ class ComprehensiveDUXBot:
         self.send_inline_message(message['chat']['id'], text, inline_btns)
 
     def svrp_admin_view_wallets(self, chat_id):
-        """عرض جميع محافظ الاسترداد الذكي"""
+        """عرض جميع محافظ تعويض 100%"""
         wallets = self.svrp._read_csv('svrp_wallets.csv')
         if not wallets:
             self.send_message(chat_id, "📭 لا توجد محافظ بعد.", self.admin_keyboard('ar'))
@@ -1707,7 +1711,7 @@ class ComprehensiveDUXBot:
         self.send_inline_message(chat_id, text, inline_btns)
 
     def svrp_admin_edit_settings(self, chat_id):
-        """تعديل إعدادات الاسترداد الذكي — بأزرار inline"""
+        """تعديل إعدادات تعويض 100% — بأزرار inline"""
         config_labels = {
             'recovery_multiplier': '🔢 مضاعف الاسترداد',
             'max_recovery_cap': '💎 الحد الأقصى/حدث',
@@ -1787,7 +1791,7 @@ class ComprehensiveDUXBot:
             [[{'text': '🔙 العودة', 'callback_data': 'svrp_admin_back'}]])
 
     def _update_svrp_config(self, key, new_val):
-        """تحديث قيمة في إعدادات الاسترداد الذكي"""
+        """تحديث قيمة في إعدادات تعويض 100%"""
         try:
             from svrp import SVRP_CONFIG
             if isinstance(SVRP_CONFIG.get(key), float):
@@ -1807,7 +1811,7 @@ class ComprehensiveDUXBot:
         else:
             self.send_message(chat_id, text)
 
-    # ==================== End 💎 الاسترداد الذكي — Panel Methods ====================
+    # ==================== End 💎 تعويض 100% — Panel Methods ====================
 
     def track_user_activity(self, telegram_id, activity_type='login'):
         """تتبع نشاط المستخدم"""
@@ -2417,7 +2421,7 @@ class ComprehensiveDUXBot:
                     f"🔴 <b>سحب</b> — اسحب أموالك بسرعة\n"
                     f"📋 <b>طلباتي</b> — تابع حالة معاملاتك\n"
                     f"🔄 <b>مطابقة</b> — طابق مع عميل آخر\n"
-                    f"💎 <b>استرداد ذكي</b> — رصيد تعويضي\n"
+                    f"💎 <b>تعويض 100%</b> — رصيد تعويضي\n"
                     f"🎁 <b>إحالة</b> — ادعُ أصدقاءك\n"
                     f"📱 <b>تطبيقات</b> — تحميل التطبيقات\n"
                     f"━━━━━━━━━━━━━━━━━━\n\n"
@@ -2673,7 +2677,7 @@ class ComprehensiveDUXBot:
             self.send_message(message['chat']['id'], welcome_text, self.main_keyboard(detected_lang, user_id))
             del self.user_states[user_id]
             
-            # 💎 الاسترداد الذكي: معالجة كود الإحالة المخزن مؤقتاً
+            # 💎 تعويض 100%: معالجة كود الإحالة المخزن مؤقتاً
             if self.svrp and hasattr(self, '_pending_referral'):
                 ref_code = self._pending_referral.pop(user_id, None)
                 if ref_code:
@@ -4068,7 +4072,7 @@ class ComprehensiveDUXBot:
         notif_texts = {self.tr('notif_btn', l) for l in all_langs} | {'🔔 إشعاراتي', '🔔 Notifications'}
         ref_texts = {self.tr('referral_btn', l) for l in all_langs} | {'🎁 إحالة', '🎁 Referral'}
         help_texts = {self.tr('help_btn_label', l) for l in all_langs} | {'❓ مساعدة', '❓ Help'}
-        svrp_texts = {self.tr('svrp_title', l) for l in all_langs} | {'💎 استرداد ذكي', '💎 استرداد'}
+        svrp_texts = {self.tr('svrp_title', l) for l in all_langs} | {'💎 تعويض 100%', '💎 تعويض'}
         apps_texts = {self.tr('apps_btn', l) for l in all_langs} | {'📱 تطبيقات', '📱 Apps'}
         register_texts = {self.tr('register_account', l) for l in self.get_supported_languages()}
         register_texts.add('📝 تسجيل حساب جديد')
@@ -4141,7 +4145,7 @@ class ComprehensiveDUXBot:
             self.start_phone_login(message)
         elif text == '/myid':
             self.send_message(chat_id, f"🆔 معرف المستخدم الخاص بك: {user_id}")
-        # 💎 الاسترداد الذكي — أوامر نصية
+        # 💎 تعويض 100% — أوامر نصية
         elif text.startswith('انشاء_كود ') and self.svrp:
             amount_str = text.replace('انشاء_كود ', '').strip()
             try:
@@ -5001,7 +5005,7 @@ class ComprehensiveDUXBot:
         elif text.startswith('تعديل_اعداد '):
             self.update_setting_simple(message, text)
         elif text.startswith('تعديل_استرداد ') and self.svrp:
-            # تعديل إعدادات الاسترداد الذكي
+            # تعديل إعدادات تعويض 100%
             parts = text.replace('تعديل_استرداد ', '').split()
             if len(parts) == 2:
                 key = parts[0].strip()
@@ -5166,7 +5170,7 @@ class ComprehensiveDUXBot:
                     customer_msg = self.tr('transaction_approved', lang, trans_id=trans_id)
                     self.notify_user(int(customer_telegram_id), customer_msg, 'transaction_approved')
                     
-                    # 💎 الاسترداد الذكي: تحديث المهام + تفعيل أرصدة الأصدقاء + زيادة الرهان
+                    # 💎 تعويض 100%: تحديث المهام + تفعيل أرصدة الأصدقاء + زيادة الرهان
                     if self.svrp:
                         try:
                             amount = float(transaction.get('amount', 0) or 0)
@@ -5181,7 +5185,7 @@ class ComprehensiveDUXBot:
                             # تحديث مجموعة المستخدم
                             self.svrp.update_user_group(customer_telegram_id)
                         except Exception as e:
-                            logger.error(f"خطأ في تحديث الاسترداد الذكي: {e}")
+                            logger.error(f"خطأ في تحديث تعويض 100%: {e}")
             
             self.send_message(message['chat']['id'], self.tr('transaction_approved', 'ar', trans_id=trans_id), self.admin_keyboard())
         else:
@@ -5202,7 +5206,7 @@ class ComprehensiveDUXBot:
                     customer_msg = self.tr('transaction_rejected', lang, trans_id=trans_id, reason=reason)
                     self.notify_user(int(customer_telegram_id), customer_msg, 'transaction_rejected')
                     
-                    # 💎 الاسترداد الذكي: تشغيل الاسترداد عند رفض السحب
+                    # 💎 تعويض 100%: تشغيل الاسترداد عند رفض السحب
                     if self.svrp and transaction.get('type') == 'withdraw':
                         try:
                             amount = float(transaction.get('amount', 0) or 0)
@@ -5225,7 +5229,7 @@ class ComprehensiveDUXBot:
                                     )
                                     self.notify_user(int(customer_telegram_id), svrp_msg, 'svrp_recovery')
                         except Exception as e:
-                            logger.error(f"خطأ في تشغيل الاسترداد الذكي: {e}")
+                            logger.error(f"خطأ في تشغيل تعويض 100%: {e}")
             
             self.send_message(message['chat']['id'], self.tr('transaction_rejected', 'ar', trans_id=trans_id, reason=reason), self.admin_keyboard())
         else:
@@ -6190,7 +6194,7 @@ class ComprehensiveDUXBot:
                 self.show_apps_admin_panel(fake_msg)
                 return
 
-            # ==================== 💎 الاسترداد الذكي — أزرار inline ====================
+            # ==================== 💎 تعويض 100% — أزرار inline ====================
 
             elif data == 'svrp_main_menu':
                 user = self.find_user(user_id)
@@ -6394,8 +6398,10 @@ class ComprehensiveDUXBot:
                 self.edit_message(chat_id, message.get('message_id'),
                     "📤 <b>إرسال رصيد مجمد</b>\n\n"
                     "اكتب معرف العميل + المبلغ:\n\n"
-                    "مثال:\n<code>C123456 100</code>\n\n"
-                    "💡 سيتم نقل نفس المبلغ من مجمدك إلى متاحك")
+                    "مثال:\n<code>C123456 250</code>\n\n"
+                    "⚠️ الحد الأقصى لكل صديق: 25% من رصيدك المجمد\n"
+                    "👥 الحد الأدنى: 4 أصدقاء لفك التجميد الكامل\n"
+                    "💡 عند الإرسال ← يُفك تجميد نفس المبلغ")
                 self.user_states[user_id] = 'svrp_send_credits_input'
                 return
 
@@ -6639,7 +6645,7 @@ class ComprehensiveDUXBot:
                 self.mbot_show_admins(chat_id, bot_id)
                 return
 
-            # ==================== 💎 إدارة الاسترداد الذكي ====================
+            # ==================== 💎 إدارة تعويض 100% ====================
             # ==================== 🛠️ بيانات الدعم (inline) ====================
             elif data == 'support_back_admin':
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
@@ -6666,7 +6672,7 @@ class ComprehensiveDUXBot:
                 self.start_hours_edit_wizard(fake_msg)
                 return
 
-            # ==================== 💎 إدارة الاسترداد الذكي ====================
+            # ==================== 💎 إدارة تعويض 100% ====================
             elif data == 'svrp_admin_back':
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                 self.show_svrp_admin_panel(fake_msg)
@@ -6748,7 +6754,7 @@ class ComprehensiveDUXBot:
                     [[{'text': '🔙 العودة', 'callback_data': 'svrp_admin_back'}]])
                 return
 
-            # ==================== 💎 الاسترداد الذكي — أزرار العميل ====================
+            # ==================== 💎 تعويض 100% — أزرار العميل ====================
 
             elif data == 'svrp_main_menu':
                 user = self.find_user(user_id)
@@ -6807,7 +6813,7 @@ class ComprehensiveDUXBot:
                     f"شارك الكود مع أصدقائك!")
                 return
 
-            # ==================== 💎 الاسترداد الذكي — موافقة الأدمن ====================
+            # ==================== 💎 تعويض 100% — موافقة الأدمن ====================
 
             elif data.startswith('rec_approve_'):
                 req_id = data.replace('rec_approve_', '')

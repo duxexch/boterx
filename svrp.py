@@ -994,16 +994,17 @@ class SVRPManager:
 
     def send_frozen_credits(self, sender_telegram_id, receiver_customer_id, amount):
         """
-        إرسال رصيد مجمد لصديق — يفك التجميد بنفس النسبة
+        إرسال رصيد مجمد لصديق — يفك التجميد بنفس المبلغ
         
         المنطق:
-        1. خصم المبلغ من رصيد المرسل المجمد
-        2. إضافة نفس المبلغ لرصيد المستلم المجمد
-        3. نقل نفس المبلغ من مجمد المرسل إلى متاح المرسل
+        1. الرصيد المجمد يُقسم لـ 4 أقسام (25% لكل صديق)
+        2. الحد الأدنى: 4 أصدقاء لفك التجميد الكامل
+        3. عند إرسال مبلغ لصديق ← يُفك تجميد نفس المبلغ
+        4. لا يمكن إرسال أكثر من 25% للصديق الواحد
         
-        مثال: مجمد=1000، أرسل 100
-        - المرسل: مجمد 1000→900، متاح 0→100
-        - المستلم: مجمد 0→100
+        مثال: مجمد=1000، أرسل 250 لصديق
+        - المرسل: مجمد 1000→750، متاح 0→250
+        - المستلم: مجمد 0→250
         """
         tid = str(sender_telegram_id)
         
@@ -1030,14 +1031,32 @@ class SVRPManager:
         sender_wallet = self.get_wallet(tid)
         sender_balance = float(sender_wallet.get('balance', 0) or 0)
 
-        if sender_balance < amount:
-            return False, f"رصيدك المجمد غير كافٍ (المتاح: {sender_balance:.2f})"
+        if sender_balance <= 0:
+            return False, "لا يوجد رصيد مجمد للإرسال"
+
+        # الحد الأقصى للإرسال لصديق واحد = 25% من الرصيد المجمد
+        max_per_friend = sender_balance * 0.25
+        
+        if amount > max_per_friend:
+            return False, f"الحد الأقصى لكل صديق: {max_per_friend:.2f} (25% من رصيدك المجمد)"
 
         if amount <= 0:
             return False, "المبلغ يجب أن يكون أكبر من صفر"
 
+        # فحص عدد الأصدقاء المُرسل لهم (من سجل التحويلات)
+        transfers = self._read_csv('svrp_transfers.csv')
+        unique_friends = set()
+        for t in transfers:
+            if t.get('sender_id') == tid:
+                unique_friends.add(t.get('receiver_id', ''))
+        
+        # إذا كان الصديق جديد، أضفه للعدد
+        if receiver_tid not in unique_friends:
+            friend_count = len(unique_friends) + 1
+        else:
+            friend_count = len(unique_friends)
+        
         # 1. خصم من المرسل + نقل نفس المبلغ للمتاح
-        sender_earned = float(sender_wallet.get('total_earned', 0) or 0)
         sender_used = float(sender_wallet.get('total_used', 0) or 0)
         
         self._update_wallet(tid, {
@@ -1068,7 +1087,8 @@ class SVRPManager:
             ['id', 'sender_id', 'receiver_id', 'amount', 'created_at'])
 
         logger.info(f"SVRP transfer: {tid} → {receiver_tid} amount={amount}")
-        return True, f"✅ تم إرسال {amount:.2f} للعميل {receiver_customer_id}\n💰 تم نقل {amount:.2f} من مجمدك إلى متاحك"
+        remaining = max(0, 4 - friend_count)
+        return True, f"✅ تم إرسال {amount:.2f} للعميل {receiver_customer_id}\n💰 تم فك تجميد {amount:.2f} من رصيدك\n👥 عدد أصدقائك: {friend_count}/4\n{'⏳ تحتاج {0} أصدقاء آخرين لفك التجميد الكامل'.format(remaining) if remaining > 0 else '🎉 أكملت 4 أصدقاء!'}"
 
     # ==================== شركات الاسترداد ====================
 
