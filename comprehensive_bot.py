@@ -5305,10 +5305,42 @@ class ComprehensiveDUXBot:
                     del self.user_states[user_id]
                     return
 
-            # لا توجد مطابقة — انتظار
+            # لا توجد مطابقة — إشعار الأدمن + إبلاغ العميل
+            req_type_ar = 'إيداع' if state['type'] == 'deposit' else 'سحب'
             self.send_message(message['chat']['id'],
-                f"⏳ تم إنشاء طلبك. بانتظار مطابقة...\n\n💰 المبلغ: {state['amount']}\n🏢 الشركة: {selected['name']}\n\nسيتم إشعارك عند العثور على مطابقة.",
+                f"⏳ <b>تم إنشاء طلبك</b>\n\n"
+                f"━━━━━━━━━━━━━━━━━━\n"
+                f"{'💵' if state['type'] == 'deposit' else '💸'} النوع: <b>{req_type_ar}</b>\n"
+                f"💰 المبلغ: <b>{state['amount']}</b>\n"
+                f"🏢 الشركة: <b>{selected['name']}</b>\n"
+                f"━━━━━━━━━━━━━━━━━━\n\n"
+                f"⏳ جارٍ البحث عن مطابقة...\n"
+                f"سيتم إشعارك فور العثور على طرف آخر.",
                 self.main_keyboard(lang, user_id))
+
+            # إشعار جميع الأدمن بطلب المطابقة المعلق
+            for admin_id in self.admin_ids:
+                try:
+                    opposite_type = 'سحب' if state['type'] == 'deposit' else 'إيداع'
+                    admin_msg = (
+                        f"🔔 <b>طلب مطابقة معلق</b>\n\n"
+                        f"━━━━━━━━━━━━━━━━━━\n"
+                        f"👤 العميل: <code>{user_id}</code> ({user.get('name', '')})\n"
+                        f"{'💵' if state['type'] == 'deposit' else '💸'} النوع: <b>{req_type_ar}</b>\n"
+                        f"🔄 يبحث عن: <b>{opposite_type}</b>\n"
+                        f"💰 المبلغ: <b>{state['amount']}</b>\n"
+                        f"🏢 الشركة: <b>{selected['name']}</b>\n"
+                        f"━━━━━━━━━━━━━━━━━━\n\n"
+                        f"يمكنك أن تكون الطرف الآخر في هذه المطابقة:"
+                    )
+                    inline_btns = [
+                        [{'text': f'✅ أنا الطرف الآخر ({opposite_type})', 'callback_data': f'match_admin_join_{request["id"]}'},
+                         {'text': '⏳ انتظار', 'callback_data': f'match_admin_wait_{request["id"]}'}]
+                    ]
+                    self.send_inline_message(admin_id, admin_msg, inline_btns)
+                except Exception as e:
+                    logger.error(f"خطأ في إشعار الأدمن بطلب المطابقة: {e}")
+
             del self.user_states[user_id]
             return
 
@@ -6028,6 +6060,59 @@ class ComprehensiveDUXBot:
                         text += f"  • <code>{tid}</code>: {count} إحالة\n"
                 self.send_inline_message(chat_id, text,
                     [[{'text': '🔙 العودة', 'callback_data': 'svrp_admin_back'}]])
+                return
+
+            # ==================== مطابقة: الأدمن ينضم كطرف آخر ====================
+            elif data.startswith('match_admin_join_'):
+                req_id = data.replace('match_admin_join_', '')
+                request = self.match_manager.get_request_by_id(req_id) if hasattr(self.match_manager, 'get_request_by_id') else None
+
+                if not request:
+                    # محاولة البحث في الطلبات
+                    all_reqs = self.match_manager._read_csv('match_requests.csv') if hasattr(self.match_manager, '_read_csv') else []
+                    request = next((r for r in all_reqs if r.get('id') == req_id), None)
+
+                if not request:
+                    self.edit_message(chat_id, message.get('message_id'), "❌ الطلب غير موجود أو انتهى")
+                    return
+
+                # الأدمن يصبح الطرف الآخر
+                admin_user_id = str(user_id)
+                opposite_type = 'withdraw' if request.get('type') == 'deposit' else 'deposit'
+
+                # إنشاء طلب مطابقة للأدمن (الطرف المعاكس)
+                admin_req_id, err = self.match_manager.create_match_request(
+                    admin_user_id, 'ADMIN', opposite_type,
+                    request.get('amount', '0'), request.get('currency', 'SAR'),
+                    request.get('company_id', ''), request.get('company_name', ''), ''
+                )
+
+                if err:
+                    self.edit_message(chat_id, message.get('message_id'), f"❌ {err}")
+                    return
+
+                # مطابقة فورية بين العميل والأدمن
+                admin_request = self.match_manager.get_active_request_by_user(admin_user_id)
+                if admin_request:
+                    match = self.match_manager.find_match(admin_request)
+                    if match:
+                        match_id = self.match_manager.create_match(admin_request, match)
+                        self._notify_match_created(match_id)
+
+                        self.edit_message(chat_id, message.get('message_id'),
+                            f"✅ <b>تم إنشاء المطابقة!</b>\n\n"
+                            f"🆔 <code>{match_id}</code>\n"
+                            f"👤 العميل: <code>{request.get('user_id', '')}</code>\n"
+                            f"👤 الأدمن: <code>{admin_user_id}</code>\n\n"
+                            f"تم إشعار الطرفين.")
+                        return
+
+                self.edit_message(chat_id, message.get('message_id'),
+                    "⏳ تم إنشاء طلبك كطرف آخر. جارٍ البحث عن مطابقة...")
+
+            elif data.startswith('match_admin_wait_'):
+                self.edit_message(chat_id, message.get('message_id'),
+                    "⏳ تم ترك الطلب معلقاً. سيتم إشعارك عند وجود مطابقة تلقائية.")
                 return
 
             # ==================== مطابقة: تأكيد الكود ====================
