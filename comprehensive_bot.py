@@ -4013,12 +4013,22 @@ class ComprehensiveDUXBot:
                 phone = '+' + phone
         elif 'text' in message:
             phone = message['text'].strip()
+
+            # إذا ضغط زر "إدخال يدوي" — اطلب الرقم ولا تغير الحالة
+            if phone in {self.tr('enter_phone_manual', l) for l in self.get_supported_languages()}:
+                self.send_message(chat_id,
+                    f"✍️ {self.tr('enter_phone_prompt', selected_lang)}")
+                return
+
+            # إذا ضغط زر القائمة الرئيسية
             if phone in ['🏠 القائمة الرئيسية', '🏠'] or phone in {self.tr('main_menu_btn', l) for l in self.get_supported_languages()}:
                 if user_id in self.user_states:
                     del self.user_states[user_id]
                 self.handle_start(message)
                 return
-            if len(phone) < 10:
+
+            # التحقق من صحة رقم الهاتف
+            if len(phone) < 10 or not any(c.isdigit() for c in phone):
                 self.send_message(chat_id, self.tr('phone_login_invalid', selected_lang))
                 return
         else:
