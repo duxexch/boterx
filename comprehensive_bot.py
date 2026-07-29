@@ -1212,20 +1212,36 @@ class ComprehensiveDUXBot:
         frozen = balance
         available = 0  # سيُحدّث في المراحل القادمة بناءً على الإرسال
 
+        # جلب نص الشرح من الإعدادات (قابل للتعديل من لوحة الأدمن)
+        intro_ar = self.get_setting('svrp_intro_ar') or (
+            "📌 <b>كيف يعمل النظام؟</b>\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            "1️⃣ اضغط <b>💰 إيداع</b> ← أودع في حسابك بالشركة\n"
+            "2️⃣ بعد الإيداع، اختر <b>🔄 استرداد</b> ← أرسل لقطة شاشة برصيدك\n"
+            "3️⃣ يراجع الأدمن ← يُضاف <b>100% من المبلغ</b> لمحفظتك (<b>مجمد 🧊</b>)\n"
+            "4️⃣ لفك التجميد: أرسل الرصيد لـ <b>4 أصدقاء على الأقل</b>\n"
+            "   • الرصيد يُقسم لـ 4 أقسام (25% لكل صديق)\n"
+            "   • عند إرسال مبلغ لصديق ← يُفك تجميد نفس المبلغ\n"
+            "   • مثال: مجمد=1000، أرسل 250 لصديق ← يُفك 250\n"
+            "5️⃣ الرصيد المتاح 🟢 ← اطلب إيداعه لحسابك"
+        )
+        intro_en = self.get_setting('svrp_intro_en') or (
+            "📌 <b>How it works:</b>\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            "1️⃣ Press <b>💰 Deposit</b> ← deposit to your company account\n"
+            "2️⃣ After deposit, choose <b>🔄 Recovery</b> ← send screenshot\n"
+            "3️⃣ Admin reviews ← <b>100% of amount</b> added to wallet (<b>frozen 🧊</b>)\n"
+            "4️⃣ To unfreeze: send credits to <b>at least 4 friends</b>\n"
+            "   • Balance split into 4 parts (25% per friend)\n"
+            "   • When you send X to a friend ← X gets unfrozen\n"
+            "5️⃣ Available balance 🟢 ← request deposit to your account"
+        )
+
         if lang == 'ar':
             panel_text = (
                 "💎 <b>تعويض 100%</b>\n\n"
                 "━━━━━━━━━━━━━━━━━━\n"
-                "📌 <b>كيف يعمل النظام؟</b>\n"
-                "━━━━━━━━━━━━━━━━━━\n"
-                "1️⃣ اضغط <b>💰 إيداع</b> ← أودع في حسابك بالشركة\n"
-                "2️⃣ بعد الإيداع، اختر <b>🔄 استرداد</b> ← أرسل لقطة شاشة برصيدك\n"
-                "3️⃣ يراجع الأدمن ← يُضاف <b>100% من المبلغ</b> لمحفظتك (<b>مجمد 🧊</b>)\n"
-                "4️⃣ لفك التجميد: أرسل الرصيد لـ <b>4 أصدقاء على الأقل</b>\n"
-                "   • الرصيد يُقسم لـ 4 أقسام (25% لكل صديق)\n"
-                "   • عند إرسال مبلغ لصديق ← يُفك تجميد نفس المبلغ\n"
-                "   • مثال: مجمد=1000، أرسل 250 لصديق ← يُفك 250\n"
-                "5️⃣ الرصيد المتاح 🟢 ← اطلب إيداعه لحسابك\n"
+                f"{intro_ar}\n"
                 "━━━━━━━━━━━━━━━━━━\n\n"
                 f"🧊 <b>الرصيد المجمد:</b> <code>{frozen:.2f}</code>\n"
                 f"🟢 <b>الرصيد المتاح:</b> <code>{available:.2f}</code>\n"
@@ -1238,15 +1254,7 @@ class ComprehensiveDUXBot:
             panel_text = (
                 "💎 <b>Compensation 100%</b>\n\n"
                 "━━━━━━━━━━━━━━━━━━\n"
-                "📌 <b>How it works:</b>\n"
-                "━━━━━━━━━━━━━━━━━━\n"
-                "1️⃣ Press <b>💰 Deposit</b> ← deposit to your company account\n"
-                "2️⃣ After deposit, choose <b>🔄 Recovery</b> ← send screenshot\n"
-                "3️⃣ Admin reviews ← <b>100% of amount</b> added to wallet (<b>frozen 🧊</b>)\n"
-                "4️⃣ To unfreeze: send credits to <b>at least 4 friends</b>\n"
-                "   • Balance split into 4 parts (25% per friend)\n"
-                "   • When you send X to a friend ← X gets unfrozen\n"
-                "5️⃣ Available balance 🟢 ← request deposit to your account\n"
+                f"{intro_en}\n"
                 "━━━━━━━━━━━━━━━━━━\n\n"
                 f"🧊 <b>Frozen:</b> <code>{frozen:.2f}</code>\n"
                 f"🟢 <b>Available:</b> <code>{available:.2f}</code>\n"
@@ -1640,6 +1648,8 @@ class ComprehensiveDUXBot:
              {'text': '📋 المهام', 'callback_data': 'svrp_admin_tasks'}],
             [{'text': '🧹 تنظيف الأرصدة المنتهية', 'callback_data': 'svrp_admin_cleanup'},
              {'text': '📊 إحصائيات تفصيلية', 'callback_data': 'svrp_admin_detailed'}],
+            [{'text': '📝 تعديل نص الشرح (عربي)', 'callback_data': 'svrp_edit_intro_ar'},
+             {'text': '📝 تعديل نص الشرح (إنجليزي)', 'callback_data': 'svrp_edit_intro_en'}],
             [{'text': '🔙 العودة للوحة الأدمن', 'callback_data': 'svrp_admin_back'}]
         ]
 
@@ -3683,6 +3693,34 @@ class ComprehensiveDUXBot:
                         logger.error(f"خطأ في إشعار الأدمن بالإيداع: {e}")
             else:
                 self.send_message(chat_id, f"❌ {msg}")
+
+            if user_id in self.user_states:
+                del self.user_states[user_id]
+            return
+
+        if isinstance(current_state, str) and current_state.startswith('svrp_edit_intro_'):
+            # تعديل نص شرح نظام التعويض
+            user_id = message['from']['id']
+            chat_id = message['chat']['id']
+            text = message.get('text', '').strip()
+
+            if text in ['إلغاء', 'الغاء', 'cancel', '🔙']:
+                if user_id in self.user_states: del self.user_states[user_id]
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_svrp_admin_panel(fake_msg)
+                return
+
+            if len(text) < 10:
+                self.send_message(chat_id, "❌ النص قصير جداً. اكتب شرحاً كاملاً:")
+                return
+
+            lang_key = 'svrp_intro_ar' if 'ar' in current_state else 'svrp_intro_en'
+            self.save_setting(lang_key, text)
+
+            self.send_message(chat_id,
+                f"✅ <b>تم حفظ النص الجديد!</b>\n\n"
+                f"📝 سيظهر النص الجديد في لوحة 💎 تعويض 100% للعملاء.",
+                self.admin_keyboard())
 
             if user_id in self.user_states:
                 del self.user_states[user_id]
@@ -6768,6 +6806,24 @@ class ComprehensiveDUXBot:
                     new_val = max(0, old_val - step)  # لا ينزل تحت صفر
                     self._update_svrp_config(key, new_val)
                     self.svrp_admin_edit_one_setting(chat_id, message.get('message_id'), key)
+                return
+
+            elif data == 'svrp_edit_intro_ar':
+                current = self.get_setting('svrp_intro_ar') or '(النص الافتراضي)'
+                self.edit_message(chat_id, message.get('message_id'),
+                    f"📝 <b>تعديل نص الشرح (عربي)</b>\n\n"
+                    f"📋 النص الحالي:\n<code>{current[:200]}...</code>\n\n"
+                    f"✍️ اكتب النص الجديد كاملاً:")
+                self.user_states[user_id] = 'svrp_edit_intro_ar_input'
+                return
+
+            elif data == 'svrp_edit_intro_en':
+                current = self.get_setting('svrp_intro_en') or '(default text)'
+                self.edit_message(chat_id, message.get('message_id'),
+                    f"📝 <b>Edit intro text (English)</b>\n\n"
+                    f"📋 Current text:\n<code>{current[:200]}...</code>\n\n"
+                    f"✍️ Type the new full text:")
+                self.user_states[user_id] = 'svrp_edit_intro_en_input'
                 return
 
             elif data == 'svrp_admin_detailed':
