@@ -6580,19 +6580,22 @@ class ComprehensiveDUXBot:
                 if method_type:
                     method_text += f"📋 النوع: {method_type}\n"
                 if account_data:
-                    method_text += f"🔢 <b>رقم الحساب / المحفظة:</b>\n<code>{account_data}</code>\n\n"
+                    method_text += f"🔢 <b>رقم الحساب / المحفظة للتحويل:</b>\n<code>{account_data}</code>\n\n"
                 if additional_info:
                     method_text += f"💡 {additional_info}\n"
                 method_text += f"━━━━━━━━━━━━━━━━━━\n\n"
                 method_text += f"📤 <b>حوّل المال إلى الرقم أعلاه</b>\n"
-                method_text += f"ثم اكتب رقم محفظتك التي أرسلت منها:"
+                method_text += f"ثم أرسل بياناتك في رسالة واحدة:\n\n"
+                method_text += f"1️⃣ رقم محفظتك التي أرسلت منها\n"
+                method_text += f"2️⃣ معرف حسابك في التطبيق\n\n"
+                method_text += f"💡 مثال:\n<code>0501234567\nID-789</code>"
 
                 self.edit_message(chat_id, message.get('message_id'), method_text)
 
                 user = self.find_user(user_id)
                 lang = user.get('language', 'ar') if user else 'ar'
                 kb = {'keyboard': [[{'text': '❌ إلغاء'}, {'text': self.tr('main_menu', lang)}]], 'resize_keyboard': True, 'one_time_keyboard': True}
-                self.send_message(chat_id, "📝 اكتب رقم محفظتك:", kb)
+                self.send_message(chat_id, "📝 أرسل رقم محفظتك + معرف حسابك:", kb)
                 self.user_states[user_id] = f'deposit_wallet_{company_id}_{company_name}_{method_id}'
                 return
 
