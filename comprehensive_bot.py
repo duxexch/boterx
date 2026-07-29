@@ -5687,7 +5687,7 @@ class ComprehensiveDUXBot:
         self.send_message(message['chat']['id'], notif_text, self.main_keyboard(lang, user_id))
 
     def start_matching_flow(self, message):
-        """بدء تدفق المطابقة — اختيار إيداع أو سحب"""
+        """بدء تدفق المطابقة — شرح + قواعد + موافقة"""
         user = self.find_user(message['from']['id'])
         if not user:
             return
@@ -5702,17 +5702,51 @@ class ComprehensiveDUXBot:
                     self.main_keyboard(lang, message['from']['id']))
                 return
 
-        keyboard = {
-            'keyboard': [
-                [{'text': '💰 مطابقة إيداع'}, {'text': '💸 مطابقة سحب'}],
-                [{'text': self.tr('main_menu', lang)}]
-            ],
-            'resize_keyboard': True,
-            'one_time_keyboard': True
-        }
-        self.send_message(message['chat']['id'],
-            "🔄 نظام المطابقة\n\nاختر نوع العملية:", keyboard)
-        self.user_states[message['from']['id']] = 'match_select_type'
+        if lang == 'ar':
+            text = (
+                "🔄 <b>نظام المطابقة P2P</b>\n\n"
+                "━━━━━━━━━━━━━━━━━━\n"
+                "📌 <b>كيف يعمل النظام؟</b>\n"
+                "━━━━━━━━━━━━━━━━━━\n"
+                "1️⃣ اختر نوع العملية (إيداع أو سحب)\n"
+                "2️⃣ حدد الشركة ووسيلة الدفع\n"
+                "3️⃣ أرسل بياناتك (رقم محفظتك + معرف حسابك)\n"
+                "4️⃣ انتظر المطابقة — سيصلك إشعار\n"
+                "5️⃣ الأدمن يرسل لك رقم المحفظة للتحويل\n"
+                "6️⃣ حوّل المال ← اضغط <b>تم الإرسال</b>\n"
+                "7️⃣ الأدمن يراجع ويوافق/يرفض\n\n"
+                "⚠️ <b>تحذيرات:</b>\n"
+                "• لا تُرسل المال قبل استلام بيانات المحفظة من الأدمن\n"
+                "• التقييم إلزامي بعد كل عملية\n"
+                "• في حالة نزاع → اضغط <b>🆘 دعم</b>\n"
+                "━━━━━━━━━━━━━━━━━━\n\n"
+                "هل توافق على القواعد؟"
+            )
+        else:
+            text = (
+                "🔄 <b>P2P Matching System</b>\n\n"
+                "━━━━━━━━━━━━━━━━━━\n"
+                "📌 <b>How it works:</b>\n"
+                "1️⃣ Choose operation type (deposit or withdraw)\n"
+                "2️⃣ Select company and payment method\n"
+                "3️⃣ Send your data (wallet number + account ID)\n"
+                "4️⃣ Wait for match — you'll be notified\n"
+                "5️⃣ Admin sends wallet number for transfer\n"
+                "6️⃣ Send money ← press <b>Sent</b>\n"
+                "7️⃣ Admin reviews and approves/rejects\n\n"
+                "⚠️ <b>Warnings:</b>\n"
+                "• Do NOT send money before receiving wallet details\n"
+                "• Rating is mandatory after each operation\n"
+                "• In case of dispute → press <b>🆘 Support</b>\n"
+                "━━━━━━━━━━━━━━━━━━\n\n"
+                "Do you agree to the rules?"
+            )
+
+        inline_btns = [
+            [{'text': '✅ موافقة', 'callback_data': 'match_agree'},
+             {'text': '🔙 العودة', 'callback_data': 'match_cancel'}]
+        ]
+        self.send_inline_message(message['chat']['id'], text, inline_btns)
 
     def handle_matching_flow(self, message):
         """معالجة تدفق المطابقة"""
@@ -5724,7 +5758,110 @@ class ComprehensiveDUXBot:
             return
         lang = user.get('language', 'ar')
 
-        # اختيار النوع
+        # معالجة إدخال بيانات المطابقة (مبلغ + محفظة + معرف)
+        if isinstance(state, dict) and state.get('step') == 'match_enter_data':
+            text_msg = message.get('text', '').strip()
+
+            if text_msg in ['❌ إلغاء', 'إلغاء', 'الغاء', '🔙', '🏠 القائمة الرئيسية']:
+                if user_id in self.user_states: del self.user_states[user_id]
+                self.handle_start(message)
+                return
+
+            lines = [l.strip() for l in text_msg.split('\n') if l.strip()]
+            if len(lines) < 3:
+                self.send_message(chat_id,
+                    "❌ يجب إرسال 3 أسطر:\n\n"
+                    "1️⃣ المبلغ\n"
+                    "2️⃣ رقم محفظتك\n"
+                    "3️⃣ معرف حسابك\n\n"
+                    "💡 مثال:\n<code>500\n0501234567\nID-789</code>")
+                return
+
+            try:
+                amount = float(lines[0])
+                if amount <= 0:
+                    self.send_message(chat_id, "❌ المبلغ يجب أن يكون أكبر من صفر")
+                    return
+            except ValueError:
+                self.send_message(chat_id, "❌ المبلغ غير صحيح (السطر الأول)")
+                return
+
+            wallet_number = lines[1]
+            account_id = lines[2]
+
+            if len(wallet_number) < 5:
+                self.send_message(chat_id, "❌ رقم المحفظة قصير (السطر الثاني)")
+                return
+            if len(account_id) < 2:
+                self.send_message(chat_id, "❌ معرف الحساب قصير (السطر الثالث)")
+                return
+
+            # إنشاء طلب المطابقة
+            req_id, error = self.match_manager.create_match_request(
+                user_id, user.get('customer_id', ''), state['type'],
+                amount, user.get('currency', 'SAR'),
+                state['company_id'], state['company_name'], ''
+            )
+
+            if error:
+                self.send_message(chat_id, f"❌ {error}", self.main_keyboard(lang, user_id))
+                del self.user_states[user_id]
+                return
+
+            # البحث عن مطابقة
+            request = self.match_manager.get_active_request_by_user(user_id)
+            if request:
+                match = self.match_manager.find_match(request)
+                if match:
+                    match_id = self.match_manager.create_match(request, match)
+                    self._notify_match_created(match_id)
+                    del self.user_states[user_id]
+                    return
+
+            # لا توجد مطابقة — إشعار العميل + الأدمن
+            type_ar = 'إيداع' if state['type'] == 'deposit' else 'سحب'
+            self.send_message(chat_id,
+                f"⏳ <b>تم إنشاء طلبك</b>\n\n"
+                f"━━━━━━━━━━━━━━━━━━\n"
+                f"{'💵' if state['type'] == 'deposit' else '💸'} النوع: <b>{type_ar}</b>\n"
+                f"💰 المبلغ: <b>{amount}</b>\n"
+                f"🏢 الشركة: <b>{state['company_name']}</b>\n"
+                f"💳 المحفظة: <code>{wallet_number}</code>\n"
+                f"🆔 معرف الحساب: <code>{account_id}</code>\n"
+                f"━━━━━━━━━━━━━━━━━━\n\n"
+                f"⏳ جارٍ البحث عن مطابقة...\n"
+                f"سيتم إشعارك فور العثور على طرف آخر.",
+                self.main_keyboard(lang, user_id))
+
+            # إشعار الأدمن
+            for admin_id in self.admin_ids:
+                try:
+                    opposite_type = 'سحب' if state['type'] == 'deposit' else 'إيداع'
+                    admin_msg = (
+                        f"🔔 <b>طلب مطابقة معلق</b>\n\n"
+                        f"━━━━━━━━━━━━━━━━━━\n"
+                        f"👤 العميل: <code>{user_id}</code> ({user.get('name', '')})\n"
+                        f"{'💵' if state['type'] == 'deposit' else '💸'} النوع: <b>{type_ar}</b>\n"
+                        f"🔄 يبحث عن: <b>{opposite_type}</b>\n"
+                        f"💰 المبلغ: <b>{amount}</b>\n"
+                        f"🏢 الشركة: <b>{state['company_name']}</b>\n"
+                        f"💳 المحفظة: <code>{wallet_number}</code>\n"
+                        f"🆔 معرف الحساب: <code>{account_id}</code>\n"
+                        f"━━━━━━━━━━━━━━━━━━\n\n"
+                        f"يمكنك أن تكون الطرف الآخر:"
+                    )
+                    inline_btns = [
+                        [{'text': f'✅ أنا الطرف الآخر ({opposite_type})', 'callback_data': f'match_admin_join_{request["id"]}'},
+                         {'text': '⏳ انتظار', 'callback_data': f'match_admin_wait_{request["id"]}'}]
+                    ]
+                    self.send_inline_message(admin_id, admin_msg, inline_btns)
+                except Exception as e:
+                    logger.error(f"خطأ في إشعار الأدمن بطلب المطابقة: {e}")
+
+            del self.user_states[user_id]
+            return
+
+        # معالجة قديمة — اختيار النوع (يُترك للتوافق الخلفي)
         if state == 'match_select_type':
             if text == '💰 مطابقة إيداع':
                 match_type = 'deposit'
@@ -7071,6 +7208,128 @@ class ComprehensiveDUXBot:
                 req = self.svrp.get_recovery_request(req_id)
                 if req:
                     self.notify_user(int(req['user_id']), "❌ تم رفض طلب الاسترداد الخاص بك")
+                return
+
+            # ==================== مطابقة: موافقة + اختيار نوع ====================
+            elif data == 'match_agree':
+                user = self.find_user(user_id)
+                lang = user.get('language', 'ar') if user else 'ar'
+                self.edit_message(chat_id, message.get('message_id'),
+                    "✅ <b>تمت الموافقة!</b>\n\nاختر نوع العملية:")
+                inline_btns = [
+                    [{'text': '💰 مطابقة إيداع', 'callback_data': 'match_type_deposit'},
+                     {'text': '💸 مطابقة سحب', 'callback_data': 'match_type_withdraw'}],
+                    [{'text': '🔙 العودة', 'callback_data': 'match_cancel'}]
+                ]
+                self.send_inline_message(chat_id, "اختر نوع العملية:", inline_btns)
+                return
+
+            elif data == 'match_cancel':
+                user = self.find_user(user_id)
+                lang = user.get('language', 'ar') if user else 'ar'
+                if user_id in self.user_states:
+                    del self.user_states[user_id]
+                self.edit_message(chat_id, message.get('message_id'), "❌ تم الإلغاء")
+                welcome = self.tr('choose_service', lang, name=user.get('name', ''), customer_id=user.get('customer_id', '')) if user else ''
+                self.send_message(chat_id, welcome, self.main_keyboard(lang, user_id))
+                return
+
+            elif data == 'match_type_deposit' or data == 'match_type_withdraw':
+                match_type = 'deposit' if data == 'match_type_deposit' else 'withdraw'
+                self.edit_message(chat_id, message.get('message_id'),
+                    f"{'💰' if match_type == 'deposit' else '💸'} <b>المطابقة — {match_type}</b>\n\n")
+
+                # عرض الشركات كأزرار inline
+                companies = self.get_companies('both')
+                if not companies:
+                    self.send_message(chat_id, "❌ لا توجد شركات متاحة")
+                    return
+
+                inline_btns = []
+                for c in companies:
+                    icon = c.get('icon', '🏢') or '🏢'
+                    inline_btns.append([{'text': f"{icon} {c['name']}", 'callback_data': f'match_company_{c["id"]}_{match_type}'}])
+                inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'match_agree'}])
+
+                self.send_inline_message(chat_id, "🏢 اختر الشركة:", inline_btns)
+                self.user_states[user_id] = {'step': 'match_company_select', 'type': match_type}
+                return
+
+            elif data.startswith('match_company_') and not data.startswith('match_company_select'):
+                parts = data.replace('match_company_', '').rsplit('_', 1)
+                if len(parts) != 2:
+                    return
+                company_id = parts[0]
+                match_type = parts[1]
+
+                company = None
+                for c in self.get_companies('both'):
+                    if c['id'] == company_id:
+                        company = c
+                        break
+                if not company:
+                    self.send_message(chat_id, "❌ الشركة غير موجودة")
+                    return
+
+                icon = company.get('icon', '🏢') or '🏢'
+                self.edit_message(chat_id, message.get('message_id'),
+                    f"{icon} <b>{company['name']}</b>\n📋 {company.get('details', '')}\n\n"
+                    "💳 اختر وسيلة الدفع:")
+
+                methods = self.get_payment_methods_by_company(company_id, match_type)
+                if not methods:
+                    self.send_message(chat_id, "❌ لا توجد وسائل دفع لهذه الشركة")
+                    return
+
+                inline_btns = []
+                for m in methods:
+                    m_icon = m.get('icon', '💳') or '💳'
+                    inline_btns.append([{'text': f"{m_icon} {m['method_name']}", 'callback_data': f'match_method_{m["id"]}_{company_id}_{company["name"]}_{match_type}'}])
+                inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'match_agree'}])
+
+                self.send_inline_message(chat_id, "اختر وسيلة الدفع:", inline_btns)
+                return
+
+            elif data.startswith('match_method_'):
+                parts = data.replace('match_method_', '').split('_', 3)
+                if len(parts) < 4:
+                    return
+                method_id = parts[0]
+                company_id = parts[1]
+                company_name = parts[2]
+                match_type = parts[3]
+
+                method = self.get_payment_method_by_id(method_id) if method_id else None
+                method_name = method['method_name'] if method else ''
+                account_data = method.get('account_data', '') if method else ''
+
+                type_ar = 'إيداع' if match_type == 'deposit' else 'سحب'
+                text = (
+                    f"✅ <b>تم اختيار وسيلة الدفع</b>\n\n"
+                    f"━━━━━━━━━━━━━━━━━━\n"
+                    f"🏢 الشركة: <b>{company_name}</b>\n"
+                    f"💳 الوسيلة: <b>{method_name}</b>\n"
+                )
+                if account_data:
+                    text += f"🔢 رقم الحساب: <code>{account_data}</code>\n"
+                text += (
+                    f"━━━━━━━━━━━━━━━━━━\n\n"
+                    f"📝 أرسل بياناتك في رسالة واحدة:\n\n"
+                    f"1️⃣ المبلغ\n"
+                    f"2️⃣ رقم محفظتك\n"
+                    f"3️⃣ معرف حسابك في التطبيق\n\n"
+                    f"💡 مثال:\n<code>500\n0501234567\nID-789</code>"
+                )
+
+                self.edit_message(chat_id, message.get('message_id'), text)
+                self.user_states[user_id] = {
+                    'step': 'match_enter_data',
+                    'type': match_type,
+                    'company_id': company_id,
+                    'company_name': company_name,
+                    'method_id': method_id,
+                    'method_name': method_name
+                }
                 return
 
             # ==================== مطابقة: الأدمن ينضم كطرف آخر ====================
