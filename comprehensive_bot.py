@@ -3036,6 +3036,119 @@ class ComprehensiveDUXBot:
             # عرض وسائل الدفع للشركة المختارة
             self.show_payment_method_selection(message, selected_company['id'], 'withdraw')
             
+        elif isinstance(state, str) and state.startswith('withdraw_all_data_'):
+            # السحب: العميل يرسل كل البيانات في رسالة واحدة
+            user_id = message['from']['id']
+            chat_id = message['chat']['id']
+            text_msg = message.get('text', '').strip()
+
+            if text_msg in ['❌ إلغاء', 'إلغاء', 'الغاء', '🔙']:
+                if user_id in self.user_states: del self.user_states[user_id]
+                self.handle_start(message)
+                return
+
+            lines = [l.strip() for l in text_msg.split('\n') if l.strip()]
+            if len(lines) < 4:
+                self.send_message(chat_id,
+                    "❌ يجب إرسال 4 أسطر:\n\n"
+                    "1️⃣ رقم المحفظة للاستلام\n"
+                    "2️⃣ معرف حسابك\n"
+                    "3️⃣ كود السحب\n"
+                    "4️⃣ المبلغ\n\n"
+                    "💡 مثال:\n<code>0501234567\nID-789\nABC123\n500</code>")
+                return
+
+            wallet_number = lines[0]
+            account_id = lines[1]
+            confirmation_code = lines[2]
+            amount_str = lines[3]
+
+            try:
+                amount = float(amount_str)
+                if amount <= 0:
+                    self.send_message(chat_id, "❌ المبلغ يجب أن يكون أكبر من صفر")
+                    return
+            except ValueError:
+                self.send_message(chat_id, "❌ المبلغ غير صحيح. السطر الرابع يجب أن يكون رقماً")
+                return
+
+            if len(wallet_number) < 5:
+                self.send_message(chat_id, "❌ رقم المحفظة قصير جداً (السطر الأول)")
+                return
+            if len(account_id) < 2:
+                self.send_message(chat_id, "❌ معرف الحساب قصير جداً (السطر الثاني)")
+                return
+            if len(confirmation_code) < 3:
+                self.send_message(chat_id, "❌ كود السحب قصير جداً (السطر الثالث)")
+                return
+
+            # استخراج بيانات الشركة من الحالة
+            parts = state.replace('withdraw_all_data_', '').split('_', 1)
+            if len(parts) != 2:
+                self.send_message(chat_id, "❌ خطأ في البيانات")
+                if user_id in self.user_states: del self.user_states[user_id]
+                return
+            company_id = parts[0]
+            company_name = parts[1]
+
+            user = self.find_user(user_id)
+            if not user:
+                self.send_message(chat_id, "❌ يجب التسجيل أولاً")
+                return
+
+            user_currency = user.get('currency', self.get_setting('default_currency') or 'SAR')
+            trans_id = f"WTH{datetime.now().strftime('%Y%m%d%H%M%S')}"
+
+            # حفظ المعاملة
+            with open('transactions.csv', 'a', newline='', encoding='utf-8-sig') as f:
+                writer = csv.writer(f)
+                writer.writerow([
+                    trans_id, user['customer_id'], user['telegram_id'], user['name'],
+                    'withdraw', company_name, wallet_number, amount,
+                    account_id, 'pending_code_verification',
+                    datetime.now().strftime('%Y-%m-%d %H:%M'),
+                    confirmation_code, '', user_currency
+                ])
+
+            # رسالة تأكيد للعميل
+            lang = user.get('language', 'ar')
+            self.send_message(chat_id,
+                f"✅ <b>تم تقديم طلب السحب!</b>\n\n"
+                f"🆔 <code>{trans_id}</code>\n"
+                f"🏢 الشركة: <b>{company_name}</b>\n"
+                f"💳 المحفظة: <code>{wallet_number}</code>\n"
+                f"🆔 معرف الحساب: <code>{account_id}</code>\n"
+                f"🔑 الكود: <code>{confirmation_code}</code>\n"
+                f"💰 المبلغ: <b>{amount}</b> {user_currency}\n\n"
+                f"⏳ {self.tr('code_pending_verification', lang)}",
+                self.main_keyboard(lang, user_id))
+
+            # إشعار الأدمن
+            for admin_id in self.admin_ids:
+                try:
+                    admin_msg = (
+                        f"💸 <b>طلب سحب جديد</b>\n\n"
+                        f"🆔 <code>{trans_id}</code>\n"
+                        f"👤 {user.get('name', '')} ({user.get('customer_id', '')})\n"
+                        f"🏢 {company_name}\n"
+                        f"💳 المحفظة: <code>{wallet_number}</code>\n"
+                        f"🆔 معرف الحساب: <code>{account_id}</code>\n"
+                        f"💰 المبلغ: {amount} {user_currency}\n"
+                        f"🔑 الكود: <code>{confirmation_code}</code>\n"
+                        f"📅 {datetime.now().strftime('%Y-%m-%d %H:%M')}\n"
+                    )
+                    inline_btns = [
+                        [{'text': '✅ تأكيد الكود', 'callback_data': f'verify_code_{trans_id}'},
+                         {'text': '❌ رفض الكود', 'callback_data': f'reject_code_{trans_id}'}]
+                    ]
+                    self.send_inline_message(admin_id, admin_msg, inline_btns)
+                except:
+                    pass
+
+            if user_id in self.user_states:
+                del self.user_states[user_id]
+            return
+
         elif state.startswith('withdraw_wallet_'):
             """
             معالجة خطوة إدخال رقم المحفظة للسحب.
@@ -6617,15 +6730,21 @@ class ComprehensiveDUXBot:
                 text = f"{icon} <b>{company['name']}</b>\n📋 {company.get('details', '')}\n"
                 if address:
                     text += f"📍 <b>عنوان السحب:</b>\n<code>{address}</code>\n\n"
-                text += f"\n🔐 اكتب رقم المحفظة:"
+                text += f"━━━━━━━━━━━━━━━━━━\n\n"
+                text += f"📝 أرسل بياناتك في رسالة واحدة:\n\n"
+                text += f"1️⃣ رقم المحفظة التي تريد الاستلام عليها\n"
+                text += f"2️⃣ معرف حسابك في التطبيق\n"
+                text += f"3️⃣ كود السحب\n"
+                text += f"4️⃣ المبلغ الذي تريد سحبه\n\n"
+                text += f"💡 مثال:\n<code>0501234567\nID-789\nABC123\n500</code>"
 
                 self.edit_message(chat_id, message.get('message_id'), text)
 
                 user = self.find_user(user_id)
                 lang = user.get('language', 'ar') if user else 'ar'
                 kb = {'keyboard': [[{'text': '❌ إلغاء'}, {'text': self.tr('main_menu', lang)}]], 'resize_keyboard': True, 'one_time_keyboard': True}
-                self.send_message(chat_id, self.tr('enter_wallet', lang, min_amount=self.get_setting('min_deposit') or '50', currency=self.get_currency_symbol(user.get('currency','SAR'))), kb)
-                self.user_states[user_id] = f'withdraw_wallet_{company_id}_{company["name"]}'
+                self.send_message(chat_id, "📝 أرسل بياناتك الأربعة:", kb)
+                self.user_states[user_id] = f'withdraw_all_data_{company_id}_{company["name"]}'
                 return
 
             # ==================== 🤖 إدارة البوتات المتعددة ====================
