@@ -977,6 +977,84 @@ class SVRPManager:
                 return True, "تم رفض الطلب"
         return False, "الطلب غير موجود"
 
+    def send_frozen_credits(self, sender_telegram_id, receiver_customer_id, amount):
+        """
+        إرسال رصيد مجمد لصديق — يفك التجميد بنفس النسبة
+        
+        المنطق:
+        1. خصم المبلغ من رصيد المرسل المجمد
+        2. إضافة نفس المبلغ لرصيد المستلم المجمد
+        3. نقل نفس المبلغ من مجمد المرسل إلى متاح المرسل
+        
+        مثال: مجمد=1000، أرسل 100
+        - المرسل: مجمد 1000→900، متاح 0→100
+        - المستلم: مجمد 0→100
+        """
+        tid = str(sender_telegram_id)
+        
+        # البحث عن المستلم بمعرف العميل
+        receiver = None
+        try:
+            with open('users.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row.get('customer_id') == receiver_customer_id:
+                        receiver = row
+                        break
+        except:
+            pass
+
+        if not receiver:
+            return False, "معرف العميل غير موجود"
+
+        receiver_tid = receiver.get('telegram_id', '')
+        if receiver_tid == tid:
+            return False, "لا يمكنك إرسال رصيد لنفسك"
+
+        # فحص رصيد المرسل
+        sender_wallet = self.get_wallet(tid)
+        sender_balance = float(sender_wallet.get('balance', 0) or 0)
+
+        if sender_balance < amount:
+            return False, f"رصيدك المجمد غير كافٍ (المتاح: {sender_balance:.2f})"
+
+        if amount <= 0:
+            return False, "المبلغ يجب أن يكون أكبر من صفر"
+
+        # 1. خصم من المرسل + نقل نفس المبلغ للمتاح
+        sender_earned = float(sender_wallet.get('total_earned', 0) or 0)
+        sender_used = float(sender_wallet.get('total_used', 0) or 0)
+        
+        self._update_wallet(tid, {
+            'balance': sender_balance - amount,
+            'total_used': sender_used + amount
+        })
+
+        # 2. إضافة للمستلم (مجمد)
+        receiver_wallet = self.get_wallet(receiver_tid)
+        receiver_balance = float(receiver_wallet.get('balance', 0) or 0)
+        receiver_earned = float(receiver_wallet.get('total_earned', 0) or 0)
+
+        self._update_wallet(receiver_tid, {
+            'balance': receiver_balance + amount,
+            'total_earned': receiver_earned + amount
+        })
+
+        # 3. تسجيل التحويل
+        transfer_id = self._generate_id('TRF')
+        transfer = {
+            'id': transfer_id,
+            'sender_id': tid,
+            'receiver_id': receiver_tid,
+            'amount': str(amount),
+            'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')
+        }
+        self._append_csv('svrp_transfers.csv', transfer,
+            ['id', 'sender_id', 'receiver_id', 'amount', 'created_at'])
+
+        logger.info(f"SVRP transfer: {tid} → {receiver_tid} amount={amount}")
+        return True, f"✅ تم إرسال {amount:.2f} للعميل {receiver_customer_id}\n💰 تم نقل {amount:.2f} من مجمدك إلى متاحك"
+
     def get_svrp_stats(self):
         """إحصائيات شاملة للاسترداد الذكي (للإدمن)"""
         credits = self._read_csv('svrp_credits.csv')
@@ -1056,3 +1134,116 @@ class SVRPManager:
                                     if r['status'] in ('pending', 'active'))
             }
         }
+
+    # ==================== نظام الاسترداد بلقطة شاشة ====================
+
+    RECOVERY_FIELDS = [
+        'id', 'user_id', 'customer_id', 'photo_file_id', 'status',
+        'recovery_amount', 'admin_note', 'admin_id', 'created_at', 'approved_at'
+    ]
+
+    def init_recovery_requests_file(self):
+        """إنشاء ملف طلبات الاسترداد"""
+        if not os.path.exists('recovery_requests.csv'):
+            with open('recovery_requests.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.writer(f)
+                writer.writerow(self.RECOVERY_FIELDS)
+            logger.info("Created recovery_requests.csv")
+
+    def create_recovery_request(self, user_id, customer_id, photo_file_id):
+        """إنشاء طلب استرداد بلقطة شاشة"""
+        self.init_recovery_requests_file()
+        req_id = f"REC{datetime.now().strftime('%Y%m%d%H%M%S')}{random.randint(10,99)}"
+        row = {
+            'id': req_id,
+            'user_id': str(user_id),
+            'customer_id': customer_id,
+            'photo_file_id': photo_file_id,
+            'status': 'pending',
+            'recovery_amount': '0',
+            'admin_note': '',
+            'admin_id': '',
+            'created_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
+            'approved_at': ''
+        }
+        self._append_csv('recovery_requests.csv', row, self.RECOVERY_FIELDS)
+        logger.info(f"Recovery request created: {req_id} for user {user_id}")
+        return req_id
+
+    def get_recovery_request(self, req_id):
+        """الحصول على طلب استرداد"""
+        rows = self._read_csv('recovery_requests.csv')
+        for row in rows:
+            if row['id'] == req_id:
+                return row
+        return None
+
+    def get_pending_recovery_requests(self):
+        """الحصول على طلبات الاسترداد المعلقة"""
+        rows = self._read_csv('recovery_requests.csv')
+        return [r for r in rows if r.get('status') == 'pending']
+
+    def approve_recovery_request(self, req_id, admin_id, amount, note=''):
+        """الموافقة على طلب استرداد — يُضاف الرصيد المجمد"""
+        rows = self._read_csv('recovery_requests.csv')
+        request = None
+        for row in rows:
+            if row['id'] == req_id:
+                row['status'] = 'approved'
+                row['recovery_amount'] = str(amount)
+                row['admin_note'] = note
+                row['admin_id'] = str(admin_id)
+                row['approved_at'] = datetime.now().strftime('%Y-%m-%d %H:%M')
+                request = row
+                break
+
+        if not request:
+            return False, "الطلب غير موجود"
+
+        self._write_csv('recovery_requests.csv', rows, self.RECOVERY_FIELDS)
+
+        # إضافة الرصيد المجمد للمستخدم
+        user_id = request['user_id']
+        wallet = self.get_wallet(user_id)
+        current_balance = float(wallet.get('balance', 0) or 0)
+        current_earned = float(wallet.get('total_earned', 0) or 0)
+
+        self._update_wallet(user_id, {
+            'balance': current_balance + amount,
+            'total_earned': current_earned + amount
+        })
+
+        # إنشاء سجل رصيد مجمد
+        credit = {
+            'id': self._generate_id('FRC'),
+            'user_id': user_id,
+            'trigger_trans_id': req_id,
+            'trigger_amount': str(amount),
+            'credit_amount': str(amount),
+            'credit_type': 'recovery',
+            'status': 'frozen',
+            'friend_id': '',
+            'created_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
+            'expires_at': (datetime.now() + timedelta(days=self._get_config('credit_expiry_days'))).strftime('%Y-%m-%d %H:%M'),
+            'wagering_required': '0',
+            'wagering_completed': '0',
+            'currency': 'SAR'
+        }
+        self._append_csv('svrp_credits.csv', credit, self.CREDIT_FIELDS)
+
+        logger.info(f"Recovery approved: {req_id} → {amount} frozen for user {user_id}")
+        return True, "تمت الموافقة على الاسترداد"
+
+    def reject_recovery_request(self, req_id, admin_id, note=''):
+        """رفض طلب استرداد"""
+        rows = self._read_csv('recovery_requests.csv')
+        for row in rows:
+            if row['id'] == req_id:
+                row['status'] = 'rejected'
+                row['admin_note'] = note
+                row['admin_id'] = str(admin_id)
+                row['approved_at'] = datetime.now().strftime('%Y-%m-%d %H:%M')
+                self._write_csv('recovery_requests.csv', rows, self.RECOVERY_FIELDS)
+                logger.info(f"Recovery rejected: {req_id}")
+                return True, "تم رفض الطلب"
+        return False, "الطلب غير موجود"
