@@ -3810,6 +3810,30 @@ class ComprehensiveDUXBot:
                 del self.user_states[user_id]
             return
 
+        if isinstance(current_state, str) and current_state.startswith('setting_input_'):
+            # تعديل إعداد النظام
+            user_id = message['from']['id']
+            chat_id = message['chat']['id']
+            text = message.get('text', '').strip()
+
+            if text in ['إلغاء', 'الغاء', 'cancel', '🔙']:
+                if user_id in self.user_states: del self.user_states[user_id]
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_system_settings(fake_msg)
+                return
+
+            key = current_state.replace('setting_input_', '')
+            self.save_setting(key, text)
+
+            self.send_message(chat_id,
+                f"✅ <b>تم تحديث الإعداد!</b>\n\n"
+                f"📋 {key}: <code>{text}</code>",
+                self.admin_keyboard())
+
+            if user_id in self.user_states:
+                del self.user_states[user_id]
+            return
+
         if isinstance(current_state, str) and current_state.startswith('svrp_edit_intro_'):
             # تعديل نص شرح نظام التعويض — يدعم كل اللغات
             user_id = message['from']['id']
@@ -6469,6 +6493,25 @@ class ComprehensiveDUXBot:
                     del self.user_states[user_id]
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                 self.handle_admin_panel(fake_msg)
+                return
+
+            # ==================== ⚙️ الإعدادات ====================
+            elif data == 'settings_back':
+                if user_id in self.user_states:
+                    del self.user_states[user_id]
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.handle_admin_panel(fake_msg)
+                return
+
+            elif data.startswith('setting_edit_'):
+                key = data.replace('setting_edit_', '')
+                current = self.get_setting(key) or 'غير محدد'
+                self.edit_message(chat_id, message.get('message_id'),
+                    f"⚙️ <b>تعديل إعداد</b>\n\n"
+                    f"📋 المفتاح: <code>{key}</code>\n"
+                    f"📊 القيمة الحالية: <code>{current}</code>\n\n"
+                    f"✍️ اكتب القيمة الجديدة:")
+                self.user_states[user_id] = f'setting_input_{key}'
                 return
 
             elif data.startswith('btn_edit_') and data != 'btn_edit_cancel':
@@ -9281,23 +9324,55 @@ class ComprehensiveDUXBot:
             self.send_message(message['chat']['id'], address_text, self.admin_keyboard())
         
     def show_system_settings(self, message):
-            """عرض إعدادات النظام"""
-            settings_text = "⚙️ إعدادات النظام:\n\n"
-            
+            """عرض إعدادات النظام بأزرار inline"""
+            settings = {}
             try:
                 with open('system_settings.csv', 'r', encoding='utf-8-sig') as f:
                     reader = csv.DictReader(f)
                     for row in reader:
-                        settings_text += f"🔧 {row['setting_key']}: {row['setting_value']}\n"
-                        settings_text += f"   📝 {row['description']}\n\n"
+                        settings[row['setting_key']] = row.get('setting_value', '')
             except:
                 pass
-            
-            settings_text += "📝 لتعديل إعداد:\n"
-            settings_text += "تعديل_اعداد مفتاح_الإعداد القيمة_الجديدة\n\n"
-            settings_text += "مثال:\nتعديل_اعداد min_deposit 100"
-            
-            self.send_message(message['chat']['id'], settings_text, self.admin_keyboard())
+
+            # تجميع الإعدادات في مجموعات
+            text = "⚙️ <b>إعدادات النظام</b>\n\n"
+            text += "━━━━━━━━━━━━━━━━━━\n\n"
+
+            # المجموعات
+            groups = {
+                '💰 المعاملات': ['min_deposit', 'max_daily_withdrawal', 'default_currency'],
+                '🔐 الأمان': ['rate_limit_per_minute', 'session_timeout'],
+                '🎨 المظهر': ['active_theme'],
+            }
+
+            inline_btns = []
+            for group_name, keys in groups.items():
+                text += f"<b>{group_name}</b>\n"
+                row = []
+                for key in keys:
+                    val = settings.get(key, 'غير محدد')
+                    label = key.replace('_', ' ')
+                    text += f"  • {label}: <code>{val}</code>\n"
+                    row.append({'text': f'✏️ {label}', 'callback_data': f'setting_edit_{key}'})
+                text += "\n"
+                if row:
+                    inline_btns.append(row)
+
+            # إعدادات أخرى
+            other_settings = {k: v for k, v in settings.items()
+                             if k not in sum(groups.values(), [])}
+            if other_settings:
+                text += "<b>📋 أخرى</b>\n"
+                row = []
+                for key, val in list(other_settings.items())[:6]:
+                    text += f"  • {key}: <code>{val}</code>\n"
+                    row.append({'text': f'✏️ {key[:20]}', 'callback_data': f'setting_edit_{key}'})
+                if row:
+                    inline_btns.append(row)
+
+            inline_btns.append([{'text': '🔙 العودة', 'callback_data': 'settings_back'}])
+
+            self.send_inline_message(message['chat']['id'], text, inline_btns)
 
     def show_multi_bot_panel(self, message):
         """لوحة إدارة البوتات المتعددة — عرض شامل بأزرار inline"""
