@@ -3835,50 +3835,68 @@ class ComprehensiveDUXBot:
             return
 
         # معالجة إضافة وسيلة دفع جديدة (pm_add_wizard_)
-        if isinstance(current_state, str) and current_state.startswith('pm_add_wizard_'):
+        # معالجة إضافة وسيلة دفع — خطوة بخطوة
+        if isinstance(current_state, dict) and current_state.get('step', '').startswith('pm_add'):
             user_id = message['from']['id']
             chat_id = message['chat']['id']
             text_msg = message.get('text', '').strip()
 
-            if text_msg in ['إلغاء', 'الغاء', 'cancel', '🔙']:
+            if text_msg in ['إلغاء', 'الغاء', 'cancel', '🔙', '🏠 القائمة الرئيسية']:
                 if user_id in self.user_states: del self.user_states[user_id]
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                 self.show_payment_methods_management(fake_msg)
                 return
 
-            parts = current_state.replace('pm_add_wizard_', '').split('_', 1)
-            if len(parts) != 2:
-                return
-            company_id = parts[0]
-            company_name = parts[1]
+            step = current_state.get('step', '')
 
-            lines = [l.strip() for l in text_msg.split('\n') if l.strip()]
-            if len(lines) < 5:
+            if step == 'pm_add_name':
+                if len(text_msg) < 2:
+                    self.send_message(chat_id, "❌ الاسم قصير جداً. اكتب اسماً:")
+                    return
+                current_state['method_name'] = text_msg
+                current_state['step'] = 'pm_add_account'
+                self.user_states[user_id] = current_state
                 self.send_message(chat_id,
-                    "❌ يجب إرسال 5 أسطر:\n\n"
-                    "1️⃣ اسم الوسيلة\n"
-                    "2️⃣ النوع\n"
-                    "3️⃣ رقم الحساب\n"
-                    "4️⃣ معلومات إضافية (أو 'بدون')\n"
-                    "5️⃣ الأيقونة (أو 'بدون')")
-                return
+                    f"✅ الاسم: <b>{text_msg}</b>\n\n"
+                    f"🔢 الآن اكتب رقم الحساب / المحفظة:\n\n"
+                    f"💡 مثال: 0501234567")
 
-            method_name = lines[0]
-            method_type = lines[1]
-            account_data = lines[2]
-            additional_info = lines[3] if lines[3].lower() not in ['بدون', 'skip', ''] else ''
-            icon = lines[4] if lines[4].lower() not in ['بدون', 'skip', ''] else '💳'
+            elif step == 'pm_add_account':
+                if len(text_msg) < 3:
+                    self.send_message(chat_id, "❌ رقم الحساب قصير جداً. اكتب رقماً:")
+                    return
+                current_state['account_data'] = text_msg
+                current_state['step'] = 'pm_add_info'
+                self.user_states[user_id] = current_state
+                self.send_message(chat_id,
+                    f"✅ رقم الحساب: <code>{text_msg}</code>\n\n"
+                    f"💡 معلومات إضافية؟ (اكتب 'بدون' للتخطي)\n\n"
+                    f"مثال: البنك الأهلي - فرع الرياض")
 
-            self.add_payment_method(company_id, method_name, method_type, account_data, additional_info, icon)
-            self.send_message(chat_id,
-                f"✅ <b>تم إضافة وسيلة الدفع!</b>\n\n"
-                f"💳 {method_name}\n"
-                f"🏢 {company_name}\n"
-                f"🔢 <code>{account_data}</code>",
-                self.admin_keyboard())
+            elif step == 'pm_add_info':
+                info = text_msg if text_msg.lower() not in ['بدون', 'skip', ''] else ''
+                current_state['additional_info'] = info
 
-            if user_id in self.user_states:
-                del self.user_states[user_id]
+                # حفظ الوسيلة
+                company_id = current_state.get('company_id', '')
+                method_name = current_state.get('method_name', '')
+                method_type = current_state.get('method_type', '')
+                account_data = current_state.get('account_data', '')
+                icon = {'mobile': '📱', 'bank': '🏦', 'card': '💳', 'cash': '💵'}.get(
+                    current_state.get('method_type', ''), '💳')
+
+                self.add_payment_method(company_id, method_name, method_type, account_data, info, icon)
+
+                if user_id in self.user_states: del self.user_states[user_id]
+
+                self.send_message(chat_id,
+                    f"✅ <b>تم إضافة وسيلة الدفع بنجاح!</b>\n\n"
+                    f"💳 {method_name}\n"
+                    f"📋 {method_type}\n"
+                    f"🔢 <code>{account_data}</code>")
+                # العودة لقائمة الوسائل
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_payment_methods_management(fake_msg)
             return
 
         # معالجة تعديل اسم وسيلة دفع (pm_input_name_)
@@ -6666,16 +6684,42 @@ class ComprehensiveDUXBot:
                 company_id = data.replace('pm_add_company_', '')
                 company = self.get_company_by_id(company_id)
                 company_name = company['name'] if company else 'غير محدد'
+
+                # عرض أزرار inline لاختيار نوع الوسيلة
                 self.edit_message(chat_id, message.get('message_id'),
                     f"➕ <b>إضافة وسيلة دفع — {company_name}</b>\n\n"
-                    "📝 أرسل البيانات في رسالة واحدة:\n\n"
-                    "1️⃣ اسم الوسيلة\n"
-                    "2️⃣ النوع (محفظة/بنك)\n"
-                    "3️⃣ رقم الحساب\n"
-                    "4️⃣ معلومات إضافية (أو 'بدون')\n"
-                    "5️⃣ الأيقونة (أو 'بدون')\n\n"
-                    "💡 مثال:\n<code>محفظة STC\nمحفظة إلكترونية\n0501234567\nالبنك الأهلي\n📱</code>")
-                self.user_states[user_id] = f'pm_add_wizard_{company_id}_{company_name}'
+                    "📝 اختر نوع الوسيلة:")
+
+                inline_btns = [
+                    [{'text': '📱 محفظة إلكترونية', 'callback_data': f'pm_type_{company_id}_{company_name}_mobile'},
+                     {'text': '🏦 حساب بنكي', 'callback_data': f'pm_type_{company_id}_{company_name}_bank'}],
+                    [{'text': '💳 بطاقة', 'callback_data': f'pm_type_{company_id}_{company_name}_card'},
+                     {'text': '💵 نقد', 'callback_data': f'pm_type_{company_id}_{company_name}_cash'}],
+                    [{'text': '🔙 رجوع', 'callback_data': 'pm_add'}]
+                ]
+                self.send_inline_message(chat_id, "اختر النوع:", inline_btns)
+                return
+
+            elif data.startswith('pm_type_'):
+                parts = data.replace('pm_type_', '').split('_', 2)
+                if len(parts) < 3:
+                    return
+                company_id = parts[0]
+                company_name = parts[1]
+                type_code = parts[2]
+                type_ar = {'mobile': '📱 محفظة إلكترونية', 'bank': '🏦 حساب بنكي', 'card': '💳 بطاقة', 'cash': '💵 نقد'}.get(type_code, '💳 أخرى')
+
+                self.edit_message(chat_id, message.get('message_id'),
+                    f"➕ <b>إضافة — {type_ar}</b>\n\n"
+                    f"🏢 الشركة: {company_name}\n\n"
+                    f"✍️ اكتب اسم الوسيلة:\n\n"
+                    f"💡 مثال: محفظة STC")
+                self.user_states[user_id] = {
+                    'step': 'pm_add_name',
+                    'company_id': company_id,
+                    'company_name': company_name,
+                    'method_type': type_ar
+                }
                 return
 
             elif data.startswith('pm_edit_'):
