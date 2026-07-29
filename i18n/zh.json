@@ -67,7 +67,7 @@
   "code_verified": "代码验证成功！",
   "code_rejected": "代码不正确。请验证代码并重新发送。",
   "processing": "正在处理您的请求...",
-  "svrp_title": "💎 Compensation 100%",
+  "svrp_title": "💎 赔偿 100%",
   "svrp_wallet": "💰 My Wallet",
   "svrp_balance": "💵 Available Balance",
   "svrp_pending": "⏳ Pending Balance",
@@ -268,5 +268,15 @@
   "admin_unban_user": "✅ Unban",
   "admin_change_language": "🌐 Change Language",
   "admin_reset_system": "🔄 Reset System",
-  "admin_main_menu": "🏠 Main Menu"
+  "admin_main_menu": "🏠 Main Menu",
+  "svrp_deposit_btn": "💰 存款",
+  "svrp_withdraw_btn": "💸 取款",
+  "svrp_recovery_btn": "🔄 恢复",
+  "svrp_send_credits_btn": "📤 发送余额",
+  "svrp_wallet_btn": "💎 我的钱包",
+  "svrp_invite_btn": "👥 邀请好友",
+  "svrp_register_btn": "🏢 注册新账户",
+  "svrp_main_menu_btn": "🏠 主菜单",
+  "svrp_recovery_prompt": "🔄 恢复请求\n\n📸 发送截图显示：\n• 您在公司账户的余额\n• 您的账号\n\n您的请求将由管理员审核",
+  "svrp_send_prompt": "📤 发送冻结余额\n\n输入客户ID + 金额：\n例: C123456 250\n\n⚠️ 每位朋友最大: 冻结余额的25%\n👥 最少: 4位朋友才能完全解冻\n💡 当您发送X → X被解冻"
 }

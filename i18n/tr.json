@@ -67,7 +67,7 @@
   "code_verified": "Kod başarıyla doğrulandı!",
   "code_rejected": "Kod yanlış. Lütfen kodu kontrol edin ve tekrar gönderin.",
   "processing": "Talebiniz işleniyor...",
-  "svrp_title": "💎 Compensation 100%",
+  "svrp_title": "💎 Tazminat 100%",
   "svrp_wallet": "💰 My Wallet",
   "svrp_balance": "💵 Available Balance",
   "svrp_pending": "⏳ Pending Balance",
@@ -268,5 +268,15 @@
   "admin_unban_user": "✅ Unban",
   "admin_change_language": "🌐 Change Language",
   "admin_reset_system": "🔄 Reset System",
-  "admin_main_menu": "🏠 Main Menu"
+  "admin_main_menu": "🏠 Main Menu",
+  "svrp_deposit_btn": "💰 Para Yatır",
+  "svrp_withdraw_btn": "💸 Para Çek",
+  "svrp_recovery_btn": "🔄 Kurtarma",
+  "svrp_send_credits_btn": "📤 Bakiye gönder",
+  "svrp_wallet_btn": "💎 Cüzdanım",
+  "svrp_invite_btn": "👥 Arkadaş davet et",
+  "svrp_register_btn": "🏢 Yeni hesap kaydet",
+  "svrp_main_menu_btn": "🏠 Ana menü",
+  "svrp_recovery_prompt": "🔄 Kurtarma Talebi\n\n📸 Bir ekran görüntüsü gönderin：\n• Şirket hesabınızdaki bakiye\n• Hesap numaranız\n\nTalebiniz yönetici tarafından incelenecektir",
+  "svrp_send_prompt": "📤 Dondurulmuş Bakiye Gönder\n\nMüşteri kimliği + tutar girin:\nÖrnek: C123456 250\n\n⚠️ Arkadaş başına maks: Dondurulmuş bakiyenizin %25'i\n👥 Minimum: Tam çözülme için 4 arkadaş\n💡 X gönderdiğinizde → X çözülür"
 }

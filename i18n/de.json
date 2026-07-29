@@ -67,7 +67,7 @@
   "code_verified": "Code erfolgreich verifiziert!",
   "code_rejected": "Der Code ist falsch. Bitte überprüfen Sie den Code und senden Sie ihn erneut.",
   "processing": "Ihre Anfrage wird bearbeitet...",
-  "svrp_title": "💎 Compensation 100%",
+  "svrp_title": "💎 Entschädigung 100%",
   "svrp_wallet": "💰 My Wallet",
   "svrp_balance": "💵 Available Balance",
   "svrp_pending": "⏳ Pending Balance",
@@ -268,5 +268,15 @@
   "admin_unban_user": "✅ Unban",
   "admin_change_language": "🌐 Change Language",
   "admin_reset_system": "🔄 Reset System",
-  "admin_main_menu": "🏠 Main Menu"
+  "admin_main_menu": "🏠 Main Menu",
+  "svrp_deposit_btn": "💰 Einzahlung",
+  "svrp_withdraw_btn": "💸 Auszahlung",
+  "svrp_recovery_btn": "🔄 Rückerstattung",
+  "svrp_send_credits_btn": "📤 Guthaben senden",
+  "svrp_wallet_btn": "💎 Meine Brieftasche",
+  "svrp_invite_btn": "👥 Freund einladen",
+  "svrp_register_btn": "🏢 Neues Konto registrieren",
+  "svrp_main_menu_btn": "🏠 Hauptmenü",
+  "svrp_recovery_prompt": "🔄 Rückerstattungsantrag\n\n📸 Sende einen Screenshot mit:\n• Dein Guthaben im Firmenkonto\n• Deine Kontonummer\n\nDein Antrag wird vom Admin geprüft",
+  "svrp_send_prompt": "📤 Eingefrorenes Guthaben senden\n\nKunden-ID + Betrag eingeben:\nBeispiel: C123456 250\n\n⚠️ Max pro Freund: 25% Ihres eingefrorenen Guthabens\n👥 Minimum: 4 Freunde für vollständige Freigabe\n💡 Wenn Sie X senden → X wird freigegeben"
 }

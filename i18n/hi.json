@@ -67,7 +67,7 @@
   "code_verified": "कोड सफलतापूर्वक सत्यापित हो गया!",
   "code_rejected": "कोड गलत है। कोड की जांच करें और फिर से भेजें।",
   "processing": "आपके अनुरोध पर काम चल रहा है...",
-  "svrp_title": "💎 Compensation 100%",
+  "svrp_title": "💎 मुआवजा 100%",
   "svrp_wallet": "💰 My Wallet",
   "svrp_balance": "💵 Available Balance",
   "svrp_pending": "⏳ Pending Balance",
@@ -268,5 +268,15 @@
   "admin_unban_user": "✅ Unban",
   "admin_change_language": "🌐 Change Language",
   "admin_reset_system": "🔄 Reset System",
-  "admin_main_menu": "🏠 Main Menu"
+  "admin_main_menu": "🏠 Main Menu",
+  "svrp_deposit_btn": "💰 जमा",
+  "svrp_withdraw_btn": "💸 निकासी",
+  "svrp_recovery_btn": "🔄 वसूली",
+  "svrp_send_credits_btn": "📤 क्रेडिट भेजें",
+  "svrp_wallet_btn": "💎 मेरा वॉलेट",
+  "svrp_invite_btn": "👥 दोस्त को आमंत्रित करें",
+  "svrp_register_btn": "🏢 नया खाता रजिस्टर करें",
+  "svrp_main_menu_btn": "🏠 मुख्य मेन्यू",
+  "svrp_recovery_prompt": "🔄 वसूली अनुरोध\n\n📸 स्क्रीनशॉट भेजें जो दिखाए:\n• कंपनी खाते में आपका बैलेंस\n• आपका खाता नंबर\n\nआपका अनुरोध व्यवस्थापक द्वारा समीक्षित किया जाएगा",
+  "svrp_send_prompt": "📤 फ्रोजन क्रेडिट भेजें\n\nग्राहक आईडी + राशि दर्ज करें:\nउदाहरण: C123456 250\n\n⚠️ प्रति दोस्त अधिकतम: आपके फ्रोजन बैलेंस का 25%\n👥 न्यूनतम: पूर्ण अनफ्रीज के लिए 4 दोस्त\n💡 जब आप X भेजते हैं → X अनफ्रीज हो जाता है"
 }

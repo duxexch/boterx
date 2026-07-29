@@ -67,7 +67,7 @@
   "code_verified": "Codice verificato con successo!",
   "code_rejected": "Il codice non è corretto. Verifica il codice e invialo di nuovo.",
   "processing": "Elaborazione della richiesta...",
-  "svrp_title": "💎 Compensation 100%",
+  "svrp_title": "💎 Compensazione 100%",
   "svrp_wallet": "💰 My Wallet",
   "svrp_balance": "💵 Available Balance",
   "svrp_pending": "⏳ Pending Balance",
@@ -268,5 +268,15 @@
   "admin_unban_user": "✅ Unban",
   "admin_change_language": "🌐 Change Language",
   "admin_reset_system": "🔄 Reset System",
-  "admin_main_menu": "🏠 Main Menu"
+  "admin_main_menu": "🏠 Main Menu",
+  "svrp_deposit_btn": "💰 Deposito",
+  "svrp_withdraw_btn": "💸 Prelievo",
+  "svrp_recovery_btn": "🔄 Recupero",
+  "svrp_send_credits_btn": "📤 Invia crediti",
+  "svrp_wallet_btn": "💎 Il mio portafoglio",
+  "svrp_invite_btn": "👥 Invita amico",
+  "svrp_register_btn": "🏢 Registra nuovo account",
+  "svrp_main_menu_btn": "🏠 Menu Principale",
+  "svrp_recovery_prompt": "🔄 Richiesta di recupero\n\n📸 Invia uno screenshot che mostri:\n• Il tuo saldo nel conto aziendale\n• Il tuo numero di conto\n\nLa tua richiesta sarà esaminata dall'amministratore",
+  "svrp_send_prompt": "📤 Invia Crediti Congelati\n\nInserisci ID cliente + importo:\nEsempio: C123456 250\n\n⚠️ Max per amico: 25% del tuo saldo congelato\n👥 Minimo: 4 amici per sblocco completo\n💡 Quando invii X → X viene sbloccato"
 }

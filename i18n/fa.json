@@ -67,7 +67,7 @@
   "code_verified": "کود با موفقیت تأیید شد!",
   "code_rejected": "کود نادرست است. لطفاً کد را بررسی کنید و دوباره ارسال کنید.",
   "processing": "درخواست شما در حال پردازش است...",
-  "svrp_title": "💎 Compensation 100%",
+  "svrp_title": "💎 جبران 100%",
   "svrp_wallet": "💰 My Wallet",
   "svrp_balance": "💵 Available Balance",
   "svrp_pending": "⏳ Pending Balance",
@@ -268,5 +268,15 @@
   "admin_unban_user": "✅ Unban",
   "admin_change_language": "🌐 Change Language",
   "admin_reset_system": "🔄 Reset System",
-  "admin_main_menu": "🏠 Main Menu"
+  "admin_main_menu": "🏠 Main Menu",
+  "svrp_deposit_btn": "💰 واریز",
+  "svrp_withdraw_btn": "💸 برداشت",
+  "svrp_recovery_btn": "🔄 بازیابی",
+  "svrp_send_credits_btn": "📤 ارسال اعتبار",
+  "svrp_wallet_btn": "💎 کیف پول من",
+  "svrp_invite_btn": "👥 دعوت دوست",
+  "svrp_register_btn": "🏢 ثبت حساب جدید",
+  "svrp_main_menu_btn": "🏠 منوی اصلی",
+  "svrp_recovery_prompt": "🔄 درخواست بازیابی\n\n📸 یک اسکرین شات ارسال کنید که نشان دهد:\n• موجودی حساب شرکت شما\n• شماره حساب شما\n\nدرخواست شما توسط مدیر بررسی خواهد شد",
+  "svrp_send_prompt": "📤 ارسال اعتبار مسدود\n\nشناسه مشتری + مبلغ را وارد کنید:\nمثال: C123456 250\n\n⚠️ حداکثر برای هر دوست: 25% از اعتبار مسدود شما\n👥 حداقل: 4 دوست برای آزادسازی کامل\n💡 وقتی X ارسال می‌کنید → X آزاد می‌شود"
 }

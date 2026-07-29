@@ -268,5 +268,15 @@
   "admin_unban_user": "✅ إلغاء حظر",
   "admin_change_language": "🌐 تغيير اللغة",
   "admin_reset_system": "🔄 إعادة تعيين النظام",
-  "admin_main_menu": "🏠 القائمة الرئيسية"
+  "admin_main_menu": "🏠 القائمة الرئيسية",
+  "svrp_deposit_btn": "💰 إيداع",
+  "svrp_withdraw_btn": "💸 سحب",
+  "svrp_recovery_btn": "🔄 استرداد",
+  "svrp_send_credits_btn": "📤 إرسال رصيد",
+  "svrp_wallet_btn": "💎 محفظتي",
+  "svrp_invite_btn": "👥 دعوة صديق",
+  "svrp_register_btn": "🏢 تسجيل حساب جديد",
+  "svrp_main_menu_btn": "🏠 القائمة الرئيسية",
+  "svrp_recovery_prompt": "🔄 طلب استرداد\n\n📸 أرسل لقطة شاشة تظهر:\n• رصيدك في حساب الشركة\n• رقم حسابك\n\nسيتم مراجعة طلبك من الإدارة",
+  "svrp_send_prompt": "📤 إرسال رصيد مجمد\n\nاكتب معرف العميل + المبلغ:\nمثال: C123456 250\n\n⚠️ الحد الأقصى لكل صديق: 25% من رصيدك المجمد\n👥 الحد الأدنى: 4 أصدقاء لفك التجميد الكامل\n💡 عند الإرسال ← يُفك تجميد نفس المبلغ"
 }

@@ -67,7 +67,7 @@
   "code_verified": "Kode berhasil diverifikasi!",
   "code_rejected": "Kode salah. Silakan periksa kode dan kirim ulang.",
   "processing": "Memproses permintaan Anda...",
-  "svrp_title": "💎 Compensation 100%",
+  "svrp_title": "💎 Kompensasi 100%",
   "svrp_wallet": "💰 My Wallet",
   "svrp_balance": "💵 Available Balance",
   "svrp_pending": "⏳ Pending Balance",
@@ -268,5 +268,15 @@
   "admin_unban_user": "✅ Unban",
   "admin_change_language": "🌐 Change Language",
   "admin_reset_system": "🔄 Reset System",
-  "admin_main_menu": "🏠 Main Menu"
+  "admin_main_menu": "🏠 Main Menu",
+  "svrp_deposit_btn": "💰 Deposit",
+  "svrp_withdraw_btn": "💸 Tarik",
+  "svrp_recovery_btn": "🔄 Pemulihan",
+  "svrp_send_credits_btn": "📤 Kirim saldo",
+  "svrp_wallet_btn": "💎 Dompet Saya",
+  "svrp_invite_btn": "👥 Undang teman",
+  "svrp_register_btn": "🏢 Daftar akun baru",
+  "svrp_main_menu_btn": "🏠 Menu Utama",
+  "svrp_recovery_prompt": "🔄 Permintaan Pemulihan\n\n📸 Kirim tangkapan layar yang menunjukkan:\n• Saldo akun perusahaan Anda\n• Nomor akun Anda\n\nPermintaan Anda akan ditinjau oleh admin",
+  "svrp_send_prompt": "📤 Kirim Saldo Beku\n\nMasukkan ID pelanggan + jumlah:\nContoh: C123456 250\n\n⚠️ Maks per teman: 25% dari saldo beku Anda\n👥 Minimum: 4 teman untuk pencairan penuh\n💡 Saat Anda kirim X → X dicairkan"
 }

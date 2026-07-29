@@ -67,7 +67,7 @@
   "code_verified": "코드가 성공적으로 확인되었습니다!",
   "code_rejected": "코드가 잘못되었습니다. 코드를 확인하고 다시 보내주세요.",
   "processing": "요청을 처리 중...",
-  "svrp_title": "💎 Compensation 100%",
+  "svrp_title": "💎 보상 100%",
   "svrp_wallet": "💰 My Wallet",
   "svrp_balance": "💵 Available Balance",
   "svrp_pending": "⏳ Pending Balance",
@@ -268,5 +268,15 @@
   "admin_unban_user": "✅ Unban",
   "admin_change_language": "🌐 Change Language",
   "admin_reset_system": "🔄 Reset System",
-  "admin_main_menu": "🏠 Main Menu"
+  "admin_main_menu": "🏠 Main Menu",
+  "svrp_deposit_btn": "💰 입금",
+  "svrp_withdraw_btn": "💸 출금",
+  "svrp_recovery_btn": "🔄 복구",
+  "svrp_send_credits_btn": "📤 크레딧 보내기",
+  "svrp_wallet_btn": "💎 내 지갑",
+  "svrp_invite_btn": "👥 친구 초대",
+  "svrp_register_btn": "🏢 새 계정 등록",
+  "svrp_main_menu_btn": "🏠 메인 메뉴",
+  "svrp_recovery_prompt": "🔄 복구 요청\n\n📸 스크린샷을 보내주세요：\n• 회사 계정 잔액\n• 계좌 번호\n\n요청은 관리자가 검토합니다",
+  "svrp_send_prompt": "📤 동결 크레딧 보내기\n\n고객 ID + 금액 입력:\n예: C123456 250\n\n⚠️ 친구당 최대: 동결 잔액의 25%\n👥 최소: 전체 해동을 위해 4명의 친구\n💡 X를 보내면 → X가 해동됩니다"
 }

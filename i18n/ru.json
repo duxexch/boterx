@@ -67,7 +67,7 @@
   "code_verified": "Код успешно подтвержден!",
   "code_rejected": "Код неверный. Проверьте код и отправьте его снова.",
   "processing": "Обработка вашего запроса...",
-  "svrp_title": "💎 Compensation 100%",
+  "svrp_title": "💎 Компенсация 100%",
   "svrp_wallet": "💰 My Wallet",
   "svrp_balance": "💵 Available Balance",
   "svrp_pending": "⏳ Pending Balance",
@@ -268,5 +268,15 @@
   "admin_unban_user": "✅ Unban",
   "admin_change_language": "🌐 Change Language",
   "admin_reset_system": "🔄 Reset System",
-  "admin_main_menu": "🏠 Main Menu"
+  "admin_main_menu": "🏠 Main Menu",
+  "svrp_deposit_btn": "💰 Депозит",
+  "svrp_withdraw_btn": "💸 Вывод",
+  "svrp_recovery_btn": "🔄 Восстановление",
+  "svrp_send_credits_btn": "📤 Отправить кредиты",
+  "svrp_wallet_btn": "💎 Мой кошелек",
+  "svrp_invite_btn": "👥 Пригласить друга",
+  "svrp_register_btn": "🏢 Зарегистрировать аккаунт",
+  "svrp_main_menu_btn": "🏠 Главное меню",
+  "svrp_recovery_prompt": "🔄 Запрос на восстановление\n\n📸 Отправьте скриншот, показывающий:\n• Ваш баланс на счету компании\n• Номер вашего счета\n\nВаш запрос будет рассмотрен администратором",
+  "svrp_send_prompt": "📤 Отправить замороженные кредиты\n\nВведите ID клиента + сумму:\nПример: C123456 250\n\n⚠️ Макс на друга: 25% от замороженного баланса\n👥 Минимум: 4 друга для полной разморозки\n💡 Когда отправляете X → X размораживается"
 }

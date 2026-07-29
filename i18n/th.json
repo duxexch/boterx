@@ -67,7 +67,7 @@
   "code_verified": "ยืนยันรหัสสำเร็จ!",
   "code_rejected": "รหัสไม่ถูกต้อง กรุณาตรวจสอบรหัสและส่งอีกครั้ง",
   "processing": "กำลังประมวลผลคำขอของคุณ...",
-  "svrp_title": "💎 Compensation 100%",
+  "svrp_title": "💎 ชดเชย 100%",
   "svrp_wallet": "💰 My Wallet",
   "svrp_balance": "💵 Available Balance",
   "svrp_pending": "⏳ Pending Balance",
@@ -268,5 +268,15 @@
   "admin_unban_user": "✅ Unban",
   "admin_change_language": "🌐 Change Language",
   "admin_reset_system": "🔄 Reset System",
-  "admin_main_menu": "🏠 Main Menu"
+  "admin_main_menu": "🏠 Main Menu",
+  "svrp_deposit_btn": "💰 ฝาก",
+  "svrp_withdraw_btn": "💸 ถอน",
+  "svrp_recovery_btn": "🔄 ฟื้นฟู",
+  "svrp_send_credits_btn": "📤 ส่งเครดิต",
+  "svrp_wallet_btn": "💎 กระเป๋าของฉัน",
+  "svrp_invite_btn": "👥 เชิญเพื่อน",
+  "svrp_register_btn": "🏢 ลงทะเบียนบัญชีใหม่",
+  "svrp_main_menu_btn": "🏠 เมนูหลัก",
+  "svrp_recovery_prompt": "🔄 คำขอฟื้นฟู\n\n📸 ส่งภาพหน้าจอที่แสดง：\n• ยอดคงเหลือในบัญชีบริษัท\n• หมายเลขบัญชีของคุณ\n\nคำขอของคุณจะถูกตรวจสอบโดยผู้ดูแล",
+  "svrp_send_prompt": "📤 ส่งเครดิตที่ถูกแช่แข็ง\n\nป้อนรหัสลูกค้า + จำนวน:\nตัวอย่าง: C123456 250\n\n⚠️ สูงสุดต่อเพื่อน: 25% ของยอดคงเหลือที่ถูกแช่แข็ง\n👥 ขั้นต่ำ: 4 เพื่อนเพื่อปลดล็อกทั้งหมด\n💡 เมื่อคุณส่ง X → X จะถูกปลดล็อก"
 }

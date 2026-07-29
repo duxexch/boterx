@@ -67,7 +67,7 @@
   "code_verified": "¡Código verificado con éxito!",
   "code_rejected": "El código es incorrecto. Verifique el código y envíelo de nuevo.",
   "processing": "Procesando su solicitud...",
-  "svrp_title": "💎 Compensation 100%",
+  "svrp_title": "💎 Compensación 100%",
   "svrp_wallet": "💰 My Wallet",
   "svrp_balance": "💵 Available Balance",
   "svrp_pending": "⏳ Pending Balance",
@@ -268,5 +268,15 @@
   "admin_unban_user": "✅ Unban",
   "admin_change_language": "🌐 Change Language",
   "admin_reset_system": "🔄 Reset System",
-  "admin_main_menu": "🏠 Main Menu"
+  "admin_main_menu": "🏠 Main Menu",
+  "svrp_deposit_btn": "💰 Depósito",
+  "svrp_withdraw_btn": "💸 Retiro",
+  "svrp_recovery_btn": "🔄 Recuperación",
+  "svrp_send_credits_btn": "📤 Enviar saldo",
+  "svrp_wallet_btn": "💎 Mi Billetera",
+  "svrp_invite_btn": "👥 Invitar amigo",
+  "svrp_register_btn": "🏢 Registrar nueva cuenta",
+  "svrp_main_menu_btn": "🏠 Menú Principal",
+  "svrp_recovery_prompt": "🔄 Solicitud de recuperación\n\n📸 Envía una captura que muestre:\n• Tu saldo en la cuenta de la empresa\n• Tu número de cuenta\n\nTu solicitud será revisada por el administrador",
+  "svrp_send_prompt": "📤 Enviar Saldo Congelado\n\nIngresa ID del cliente + monto:\nEjemplo: C123456 250\n\n⚠️ Máx por amigo: 25% de tu saldo congelado\n👥 Mínimo: 4 amigos para descongelar todo\n💡 Cuando envías X → X se descongela"
 }

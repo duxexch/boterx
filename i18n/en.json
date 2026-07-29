@@ -268,5 +268,15 @@
   "admin_unban_user": "✅ Unban",
   "admin_change_language": "🌐 Change Language",
   "admin_reset_system": "🔄 Reset System",
-  "admin_main_menu": "🏠 Main Menu"
+  "admin_main_menu": "🏠 Main Menu",
+  "svrp_deposit_btn": "💰 Deposit",
+  "svrp_withdraw_btn": "💸 Withdraw",
+  "svrp_recovery_btn": "🔄 Recovery",
+  "svrp_send_credits_btn": "📤 Send Credits",
+  "svrp_wallet_btn": "💎 My Wallet",
+  "svrp_invite_btn": "👥 Invite Friend",
+  "svrp_register_btn": "🏢 Register New Account",
+  "svrp_main_menu_btn": "🏠 Main Menu",
+  "svrp_recovery_prompt": "🔄 Recovery Request\n\n📸 Send a screenshot showing:\n• Your balance in company account\n• Your account number\n\nYour request will be reviewed by admin",
+  "svrp_send_prompt": "📤 Send Frozen Credits\n\nEnter customer ID + amount:\nExample: C123456 250\n\n⚠️ Max per friend: 25% of your frozen balance\n👥 Minimum: 4 friends for full unfreezing\n💡 When you send X → X gets unfrozen"
 }

@@ -268,5 +268,15 @@
   "admin_unban_user": "✅ Unban",
   "admin_change_language": "🌐 Change Language",
   "admin_reset_system": "🔄 Reset System",
-  "admin_main_menu": "🏠 Main Menu"
+  "admin_main_menu": "🏠 Main Menu",
+  "svrp_deposit_btn": "💰 Dépôt",
+  "svrp_withdraw_btn": "💸 Retrait",
+  "svrp_recovery_btn": "🔄 Récupération",
+  "svrp_send_credits_btn": "📤 Envoyer des crédits",
+  "svrp_wallet_btn": "💎 Mon portefeuille",
+  "svrp_invite_btn": "👥 Inviter un ami",
+  "svrp_register_btn": "🏢 Créer un nouveau compte",
+  "svrp_main_menu_btn": "🏠 Menu Principal",
+  "svrp_recovery_prompt": "🔄 Demande de récupération\n\n📸 Envoyez une capture d'écran montrant:\n• Votre solde sur le compte de l'entreprise\n• Votre numéro de compte\n\nVotre demande sera examinée par l'administrateur",
+  "svrp_send_prompt": "📤 Envoyer des Crédits Gelés\n\nEntrez l'ID client + montant:\nExemple: C123456 250\n\n⚠️ Max par ami: 25% de votre solde gelé\n👥 Minimum: 4 amis pour dégel complet\n💡 Quand vous envoyez X → X est dégelé"
 }

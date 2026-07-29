@@ -67,7 +67,7 @@
   "code_verified": "کود کامیابی سے تصدیق ہو گیا!",
   "code_rejected": "کود غلط ہے۔ براہ کرم کوڈ کی تصدیق کریں اور دوبارہ بھیجیں۔",
   "processing": "آپ کی درخواست پر کارروائی جاری ہے...",
-  "svrp_title": "💎 Compensation 100%",
+  "svrp_title": "💎 معاوضہ 100%",
   "svrp_wallet": "💰 My Wallet",
   "svrp_balance": "💵 Available Balance",
   "svrp_pending": "⏳ Pending Balance",
@@ -268,5 +268,15 @@
   "admin_unban_user": "✅ Unban",
   "admin_change_language": "🌐 Change Language",
   "admin_reset_system": "🔄 Reset System",
-  "admin_main_menu": "🏠 Main Menu"
+  "admin_main_menu": "🏠 Main Menu",
+  "svrp_deposit_btn": "💰 جمع",
+  "svrp_withdraw_btn": "💸 نکلنا",
+  "svrp_recovery_btn": "🔧 بازیابی",
+  "svrp_send_credits_btn": "📤 کریڈٹ بھیجیں",
+  "svrp_wallet_btn": "💎 میرا پرس",
+  "svrp_invite_btn": "👥 دوست کو مدعو کریں",
+  "svrp_register_btn": "🏢 نئی اکاؤنٹ رجسٹر کریں",
+  "svrp_main_menu_btn": "🏠 مرکزی مینو",
+  "svrp_recovery_prompt": "🔄 بازیابی کی درخواست\n\n📸 اسکرین شاٹ بھیجیں：\n• کمپنی اکاؤنٹ میں آپ کا بیلنس\n• آپ کا اکاؤنٹ نمبر\n\nآپ کی درخواست ایڈمن کے ذریعے جائزہ لی جائے گی",
+  "svrp_send_prompt": "📂 منجمد کریڈٹ بھیجیں\n\nکسٹمر آئی ڈی + رقم درج کریں:\nمثال: C123456 250\n\n⚠️ فی دوست زیادہ سے زیادہ: آپ کے منجمد بیلنس کا 25%\n👥 کم از کم: مکمل غیر منجمد کے لیے 4 دوست\n💡 جب آپ X بھیجتے ہیں → X غیر منجمد ہو جاتا ہے"
 }
