@@ -3834,6 +3834,97 @@ class ComprehensiveDUXBot:
                 del self.user_states[user_id]
             return
 
+        # معالجة إضافة وسيلة دفع جديدة (pm_add_wizard_)
+        if isinstance(current_state, str) and current_state.startswith('pm_add_wizard_'):
+            user_id = message['from']['id']
+            chat_id = message['chat']['id']
+            text_msg = message.get('text', '').strip()
+
+            if text_msg in ['إلغاء', 'الغاء', 'cancel', '🔙']:
+                if user_id in self.user_states: del self.user_states[user_id]
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_payment_methods_management(fake_msg)
+                return
+
+            parts = current_state.replace('pm_add_wizard_', '').split('_', 1)
+            if len(parts) != 2:
+                return
+            company_id = parts[0]
+            company_name = parts[1]
+
+            lines = [l.strip() for l in text_msg.split('\n') if l.strip()]
+            if len(lines) < 5:
+                self.send_message(chat_id,
+                    "❌ يجب إرسال 5 أسطر:\n\n"
+                    "1️⃣ اسم الوسيلة\n"
+                    "2️⃣ النوع\n"
+                    "3️⃣ رقم الحساب\n"
+                    "4️⃣ معلومات إضافية (أو 'بدون')\n"
+                    "5️⃣ الأيقونة (أو 'بدون')")
+                return
+
+            method_name = lines[0]
+            method_type = lines[1]
+            account_data = lines[2]
+            additional_info = lines[3] if lines[3].lower() not in ['بدون', 'skip', ''] else ''
+            icon = lines[4] if lines[4].lower() not in ['بدون', 'skip', ''] else '💳'
+
+            self.add_payment_method(company_id, method_name, method_type, account_data, additional_info, icon)
+            self.send_message(chat_id,
+                f"✅ <b>تم إضافة وسيلة الدفع!</b>\n\n"
+                f"💳 {method_name}\n"
+                f"🏢 {company_name}\n"
+                f"🔢 <code>{account_data}</code>",
+                self.admin_keyboard())
+
+            if user_id in self.user_states:
+                del self.user_states[user_id]
+            return
+
+        # معالجة تعديل اسم وسيلة دفع (pm_input_name_)
+        if isinstance(current_state, str) and current_state.startswith('pm_input_name_'):
+            user_id = message['from']['id']
+            chat_id = message['chat']['id']
+            method_id = current_state.replace('pm_input_name_', '')
+            text_msg = message.get('text', '').strip()
+
+            if text_msg in ['إلغاء', 'الغاء', 'cancel', '🔙']:
+                if user_id in self.user_states: del self.user_states[user_id]
+                return
+
+            if len(text_msg) < 2:
+                self.send_message(chat_id, "❌ الاسم قصير جداً")
+                return
+
+            self.update_payment_method_field(method_id, 'method_name', text_msg)
+            self.send_message(chat_id,
+                f"✅ تم تحديث الاسم إلى: <b>{text_msg}</b>",
+                self.admin_keyboard())
+            if user_id in self.user_states: del self.user_states[user_id]
+            return
+
+        # معالجة تعديل رقم حساب وسيلة دفع (pm_input_account_)
+        if isinstance(current_state, str) and current_state.startswith('pm_input_account_'):
+            user_id = message['from']['id']
+            chat_id = message['chat']['id']
+            method_id = current_state.replace('pm_input_account_', '')
+            text_msg = message.get('text', '').strip()
+
+            if text_msg in ['إلغاء', 'الغاء', 'cancel', '🔙']:
+                if user_id in self.user_states: del self.user_states[user_id]
+                return
+
+            if len(text_msg) < 3:
+                self.send_message(chat_id, "❌ رقم الحساب قصير جداً")
+                return
+
+            self.update_payment_method_field(method_id, 'account_data', text_msg)
+            self.send_message(chat_id,
+                f"✅ تم تحديث رقم الحساب إلى: <code>{text_msg}</code>",
+                self.admin_keyboard())
+            if user_id in self.user_states: del self.user_states[user_id]
+            return
+
         if isinstance(current_state, str) and current_state.startswith('svrp_edit_intro_'):
             # تعديل نص شرح نظام التعويض — يدعم كل اللغات
             user_id = message['from']['id']
@@ -9275,6 +9366,36 @@ class ComprehensiveDUXBot:
                 pass
             return False
         
+    def update_payment_method_status(self, method_id, new_status):
+        """تحديث حالة وسيلة دفع"""
+        try:
+            rows = self.safe_csv_read('payment_methods.csv')
+            for row in rows:
+                if row.get('id') == str(method_id):
+                    row['status'] = new_status
+                    break
+            fieldnames = ['id', 'company_id', 'method_name', 'method_type', 'account_data', 'additional_info', 'status', 'created_date', 'icon']
+            self.safe_csv_write('payment_methods.csv', rows, fieldnames)
+            return True
+        except Exception as e:
+            logger.error(f"خطأ في تحديث حالة وسيلة الدفع: {e}")
+            return False
+
+    def update_payment_method_field(self, method_id, field, value):
+        """تحديث حقل واحد في وسيلة دفع"""
+        try:
+            rows = self.safe_csv_read('payment_methods.csv')
+            for row in rows:
+                if row.get('id') == str(method_id):
+                    row[field] = value
+                    break
+            fieldnames = ['id', 'company_id', 'method_name', 'method_type', 'account_data', 'additional_info', 'status', 'created_date', 'icon']
+            self.safe_csv_write('payment_methods.csv', rows, fieldnames)
+            return True
+        except Exception as e:
+            logger.error(f"خطأ في تحديث وسيلة الدفع: {e}")
+            return False
+
     def delete_payment_method(self, method_id):
             """حذف وسيلة دفع مع إرجاع البيانات المحذوفة"""
             try:
@@ -11214,6 +11335,36 @@ class ComprehensiveDUXBot:
                 pass
             return methods
         
+    def update_payment_method_status(self, method_id, new_status):
+        """تحديث حالة وسيلة دفع"""
+        try:
+            rows = self.safe_csv_read('payment_methods.csv')
+            for row in rows:
+                if row.get('id') == str(method_id):
+                    row['status'] = new_status
+                    break
+            fieldnames = ['id', 'company_id', 'method_name', 'method_type', 'account_data', 'additional_info', 'status', 'created_date', 'icon']
+            self.safe_csv_write('payment_methods.csv', rows, fieldnames)
+            return True
+        except Exception as e:
+            logger.error(f"خطأ في تحديث حالة وسيلة الدفع: {e}")
+            return False
+
+    def update_payment_method_field(self, method_id, field, value):
+        """تحديث حقل واحد في وسيلة دفع"""
+        try:
+            rows = self.safe_csv_read('payment_methods.csv')
+            for row in rows:
+                if row.get('id') == str(method_id):
+                    row[field] = value
+                    break
+            fieldnames = ['id', 'company_id', 'method_name', 'method_type', 'account_data', 'additional_info', 'status', 'created_date', 'icon']
+            self.safe_csv_write('payment_methods.csv', rows, fieldnames)
+            return True
+        except Exception as e:
+            logger.error(f"خطأ في تحديث وسيلة الدفع: {e}")
+            return False
+
     def delete_payment_method(self, method_id):
             """حذف وسيلة دفع"""
             try:
