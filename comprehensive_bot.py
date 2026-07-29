@@ -6169,6 +6169,32 @@ class ComprehensiveDUXBot:
                 self.handle_admin_panel(fake_msg)
                 return
 
+            # ==================== ✏️ تعديل مسميات الأزرار ====================
+            elif data == 'btn_edit_cancel':
+                if user_id in self.user_states:
+                    del self.user_states[user_id]
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.handle_admin_panel(fake_msg)
+                return
+
+            elif data.startswith('btn_edit_') and data != 'btn_edit_cancel':
+                idx = int(data.replace('btn_edit_', ''))
+                buttons = getattr(self, '_editable_buttons', {}).get(user_id, [])
+                if idx >= len(buttons):
+                    self.send_message(chat_id, "❌ خطأ في الاختيار")
+                    return
+
+                old_label = buttons[idx]
+                if not hasattr(self, 'temp_button_label_edit'):
+                    self.temp_button_label_edit = {}
+                self.temp_button_label_edit[user_id] = {'old': old_label}
+
+                self.edit_message(chat_id, message.get('message_id'),
+                    f"✅ <b>تم اختيار الزر:</b>\n<code>{old_label}</code>\n\n"
+                    f"📝 اكتب الاسم <b>الجديد</b> (يمكنك تغيير النص والرمز):")
+                self.user_states[user_id] = 'enter_new_button_label'
+                return
+
             elif data.startswith('app_delete_'):
                 app_id = data.replace('app_delete_', '')
                 # تأكيد الحذف
@@ -7277,82 +7303,93 @@ class ComprehensiveDUXBot:
     
     
     def start_button_label_editor(self, message):
-        """عرض قائمة بالأزرار لاختيار زر لتعديل اسمه"""
+        """عرض قائمة بكل أزرار المشروع لتعديل مسماها"""
         chat_id = message['chat']['id']
         user_id = message['from']['id']
 
-        # تجميع الأزرار من لوحات مختلفة (لوحة الأدمن + القائمة الرئيسية العربية والإنجليزية)
         all_buttons = set()
 
-        # 1) أزرار لوحة الأدمن
+        # 1) أزرار القائمة الرئيسية (كل اللغات)
+        for lang in ['ar', 'en']:
+            try:
+                kb = self.main_keyboard(lang).get('keyboard', [])
+                for row in kb:
+                    for btn in row:
+                        if isinstance(btn, dict):
+                            txt = btn.get('text', '').strip()
+                            if txt:
+                                all_buttons.add(txt)
+            except:
+                pass
+
+        # 2) أزرار لوحة الأدمن
         try:
-            admin_kb = self.admin_keyboard().get('keyboard', [])
+            admin_kb = self.admin_keyboard('ar').get('keyboard', [])
             for row in admin_kb:
                 for btn in row:
                     if isinstance(btn, dict):
                         txt = btn.get('text', '').strip()
                         if txt:
                             all_buttons.add(txt)
-        except Exception:
+        except:
             pass
 
-        # 2) أزرار القائمة الرئيسية العربية
-        try:
-            main_kb_ar = self.main_keyboard('ar').get('keyboard', [])
-            for row in main_kb_ar:
-                for btn in row:
-                    if isinstance(btn, dict):
-                        txt = btn.get('text', '').strip()
-                        if txt:
-                            all_buttons.add(txt)
-        except Exception:
-            pass
+        # 3) أزرار نظام التعويض (inline)
+        svrp_buttons = [
+            '💰 إيداع', '💸 سحب', '🔄 استرداد', '📤 إرسال رصيد',
+            '💎 محفظتي', '👥 دعوة صديق', '🏢 تسجيل حساب جديد', '🏠 القائمة الرئيسية'
+        ]
+        all_buttons.update(svrp_buttons)
 
-        # 3) أزرار القائمة الرئيسية الإنجليزية
-        try:
-            main_kb_en = self.main_keyboard('en').get('keyboard', [])
-            for row in main_kb_en:
-                for btn in row:
-                    if isinstance(btn, dict):
-                        txt = btn.get('text', '').strip()
-                        if txt:
-                            all_buttons.add(txt)
-        except Exception:
-            pass
+        # 4) أزرار نظام التطبيقات (inline)
+        app_buttons = ['➕ إضافة تطبيق جديد', '🔄 تحديث القائمة', '🔙 العودة للوحة الأدمن']
+        all_buttons.update(app_buttons)
 
-        # 4) أزرار سبق تعديلها من قبل (من ملف button_labels)
+        # 5) أزرار نظام البوتات (inline)
+        bot_buttons = ['➕ إضافة بوت جديد', '🔄 تحديث القائمة', '🔙 العودة للوحة الأدمن']
+        all_buttons.update(bot_buttons)
+
+        # 6) أزرار تسجيل الدخول
+        login_buttons = ['📝 تسجيل حساب جديد', '🔐 تسجيل الدخول برقم الهاتف', '⏭️ تخطي التسجيل']
+        all_buttons.update(login_buttons)
+
+        # 7) أزرار تم تعديلها سابقاً
         try:
             for original in getattr(self, 'button_labels', {}).keys():
                 if original:
                     all_buttons.add(original)
-        except Exception:
+        except:
             pass
 
         if not all_buttons:
             self.send_message(chat_id, "⚠️ لا توجد أزرار متاحة للتعديل حالياً.", self.admin_keyboard())
             return
 
-        # ترتيب الأزرار لعرضها بشكل منظم
         sorted_buttons = sorted(all_buttons)
 
-        # إنشاء كيبورد للاختيار من بين الأزرار
-        buttons_keyboard = {
-            'keyboard': [],
-            'resize_keyboard': True,
-            'one_time_keyboard': True
-        }
+        # إنشاء كيبورد inline بدلاً من reply keyboard
+        inline_btns = []
+        for i in range(0, len(sorted_buttons), 2):
+            row = []
+            for j in range(2):
+                if i + j < len(sorted_buttons):
+                    row.append({'text': sorted_buttons[i + j][:50], 'callback_data': f'btn_edit_{i+j}'})
+            inline_btns.append(row)
 
-        for txt in sorted_buttons:
-            buttons_keyboard['keyboard'].append([{'text': txt}])
+        # تخزين الأزرار للاستخدام لاحقاً
+        if not hasattr(self, '_editable_buttons'):
+            self._editable_buttons = {}
+        self._editable_buttons[user_id] = sorted_buttons
 
-        # تخزين الحالة: اختيار زر لتعديله
+        inline_btns.append([{'text': '🔙 العودة', 'callback_data': 'btn_edit_cancel'}])
+
         self.user_states[user_id] = 'choose_button_to_edit'
 
-        intro_text = (
+        self.send_inline_message(chat_id,
             "✏️ <b>تعديل مسميات الأزرار</b>\n\n"
-            "✅ اختر الآن الزر الذي تريد تعديل اسمه من القائمة أدناه."
-        )
-        self.send_message(chat_id, intro_text, buttons_keyboard)
+            f"📊 إجمالي الأزرار: <b>{len(sorted_buttons)}</b>\n\n"
+            "اختر الزر الذي تريد تعديل اسمه أو رمزه:",
+            inline_btns)
 
     def handle_button_label_edit(self, message):
         """معالجة حوار تعديل مسمى زر من الأدمن"""
