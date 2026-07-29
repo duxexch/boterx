@@ -3402,9 +3402,9 @@ class ComprehensiveDUXBot:
     
     def process_message(self, message):
         """معالج الرسائل الرئيسي"""
-        if 'text' not in message and 'contact' not in message:
+        if 'text' not in message and 'contact' not in message and 'photo' not in message:
             return
-        
+
         text = message.get('text', '')
         # تطبيع نص الأزرار المعدلة إلى النص الأصلي حتى يستمر النظام في العمل كما هو
         text = self.normalize_button_text(text)
@@ -3475,6 +3475,93 @@ class ComprehensiveDUXBot:
             fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
             self.show_multi_bot_panel(fake_msg)
             return
+        if isinstance(current_state, str) and current_state == 'svrp_awaiting_screenshot':
+            # معالجة استقبال لقطة الشاشة — يجب أن تكون صورة
+            if 'photo' not in message:
+                self.send_message(chat_id,
+                    "❌ يرجى إرسال <b>صورة</b> (لقطة شاشة).\n\n"
+                    "أو اكتب 'إلغاء' للعودة")
+                return
+
+            # استخراج أكبر صورة
+            photos = message['photo']
+            largest = photos[-1]  # آخر عنصر هو الأكبر
+            file_id = largest['file_id']
+
+            user = self.find_user(user_id)
+            customer_id = user.get('customer_id', '') if user else ''
+
+            req_id = self.svrp.create_recovery_request(user_id, customer_id, file_id)
+            if user_id in self.user_states:
+                del self.user_states[user_id]
+
+            self.send_message(chat_id,
+                f"✅ تم استلام لقطة الشاشة!\n\n"
+                f"🆔 <code>{req_id}</code>\n"
+                f"⏳ سيتم مراجعتها من قبل الإدارة")
+
+            # إشعار جميع الأدمن
+            for admin_id in self.admin_ids:
+                try:
+                    # إرسال الصورة للأدمن
+                    data = {
+                        'chat_id': admin_id,
+                        'photo': file_id,
+                        'caption': (
+                            f"🔄 <b>طلب استرداد جديد</b>\n\n"
+                            f"🆔 <code>{req_id}</code>\n"
+                            f"👤 العميل: {user.get('name', '')}\n"
+                            f"🆔 رقم العميل: {customer_id}\n\n"
+                            f"للموافقة: اضغط الزر وأدخل المبلغ"
+                        ),
+                        'parse_mode': 'HTML'
+                    }
+                    self.api_call('sendPhoto', data)
+
+                    # إرسال أزرار الموافقة/الرفض
+                    inline_btns = [
+                        [{'text': '✅ موافقة', 'callback_data': f'rec_approve_{req_id}'},
+                         {'text': '❌ رفض', 'callback_data': f'rec_reject_{req_id}'}]
+                    ]
+                    self.send_inline_message(admin_id, "🔄 مراجعة الطلب:", inline_btns)
+                except Exception as e:
+                    logger.error(f"خطأ في إشعار الأدمن بطلب الاسترداد: {e}")
+            return
+
+        if isinstance(current_state, str) and current_state == 'svrp_awaiting_send':
+            # معالجة إرسال رصيد مجمد — سيتم في المرحلة 3
+            self.send_message(chat_id, "📤 سيتم تفعيل هذه الميزة في المرحلة القادمة")
+            if user_id in self.user_states:
+                del self.user_states[user_id]
+            return
+
+        if isinstance(current_state, str) and current_state.startswith('svrp_approve_amount_'):
+            # الأدمن يكتب مبلغ الاسترداد للموافقة
+            req_id = current_state.replace('svrp_approve_amount_', '')
+            try:
+                amount = float(text.strip())
+                if amount <= 0:
+                    self.send_message(chat_id, "❌ المبلغ يجب أن يكون أكبر من صفر")
+                    return
+                success, msg = self.svrp.approve_recovery_request(req_id, amount, user_id)
+                if success:
+                    self.send_message(chat_id, f"✅ {msg}", self.admin_keyboard())
+                    # إشعار العميل
+                    req = self.svrp.get_recovery_request(req_id)
+                    if req:
+                        self.notify_user(int(req['user_id']),
+                            f"✅ <b>تمت الموافقة على طلب استردادك!</b>\n\n"
+                            f"💰 تم إضافة <b>{amount:.2f}</b> لرصيدك المجمد 🧊\n\n"
+                            f"💡 أرسل رصيداً لأصدقائك لفك التجميد")
+                else:
+                    self.send_message(chat_id, f"❌ {msg}", self.admin_keyboard())
+            except ValueError:
+                self.send_message(chat_id, "❌ اكتب مبلغاً رقمياً صحيحاً")
+                return
+            if user_id in self.user_states:
+                del self.user_states[user_id]
+            return
+
         if isinstance(current_state, str) and current_state == 'selecting_language':
             self.handle_language_change(message, text)
             return
@@ -6148,6 +6235,87 @@ class ComprehensiveDUXBot:
                         text += f"  • <code>{tid}</code>: {count} إحالة\n"
                 self.send_inline_message(chat_id, text,
                     [[{'text': '🔙 العودة', 'callback_data': 'svrp_admin_back'}]])
+                return
+
+            # ==================== 💎 الاسترداد الذكي — أزرار العميل ====================
+
+            elif data == 'svrp_main_menu':
+                user = self.find_user(user_id)
+                lang = user.get('language', 'ar') if user else 'ar'
+                self.edit_message(chat_id, message.get('message_id'), "🏠 تم العودة للقائمة الرئيسية")
+                welcome = self.tr('choose_service', lang, name=user.get('name',''), customer_id=user.get('customer_id','')) if user else ''
+                self.send_message(chat_id, welcome, self.main_keyboard(lang, user_id))
+                return
+
+            elif data == 'svrp_recovery_request':
+                self.edit_message(chat_id, message.get('message_id'),
+                    "🔄 <b>طلب استرداد</b>\n\n"
+                    "📸 أرسل <b>لقطة شاشة</b> تظهر:\n"
+                    "• رصيدك في حساب الشركة\n"
+                    "• رقم حسابك\n\n"
+                    "سيتم مراجعتها من قبل الإدارة")
+                self.user_states[user_id] = 'svrp_awaiting_screenshot'
+                return
+
+            elif data == 'svrp_deposit':
+                self.edit_message(chat_id, message.get('message_id'), "💰 جارٍ تحويلك للإيداع...")
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.create_deposit_request(fake_msg)
+                return
+
+            elif data == 'svrp_withdraw':
+                self.edit_message(chat_id, message.get('message_id'), "💸 جارٍ تحويلك للسحب...")
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.create_withdrawal_request(fake_msg)
+                return
+
+            elif data == 'svrp_wallet':
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_svrp_wallet(fake_msg)
+                return
+
+            elif data == 'svrp_send_credits':
+                self.edit_message(chat_id, message.get('message_id'),
+                    "📤 <b>إرسال رصيد مجمد</b>\n\n"
+                    "اكتب معرف العميل + المبلغ:\n\n"
+                    "<code>مثال: C123456 100</code>\n\n"
+                    "💡 سيتم خصم المبلغ من رصيدك المجمد\n"
+                    "وإضافته للرصيد المجمد للعميل الآخر\n"
+                    "ونقل نفس المبلغ من مجمده إلى متاحك")
+                self.user_states[user_id] = 'svrp_awaiting_send'
+                return
+
+            elif data == 'svrp_invite':
+                user = self.find_user(user_id)
+                ref_code = self.get_user_referral_code(user) if user else ''
+                ref_count = self.get_referral_count(user_id)
+                self.edit_message(chat_id, message.get('message_id'),
+                    f"👥 <b>دعوة صديق</b>\n\n"
+                    f"📋 كود الإحالة: <code>{ref_code}</code>\n"
+                    f"👥 الإحالات: <b>{ref_count}</b>\n\n"
+                    f"شارك الكود مع أصدقائك!")
+                return
+
+            # ==================== 💎 الاسترداد الذكي — موافقة الأدمن ====================
+
+            elif data.startswith('rec_approve_'):
+                req_id = data.replace('rec_approve_', '')
+                self.edit_message(chat_id, message.get('message_id'),
+                    f"✅ <b>موافقة على طلب استرداد</b>\n\n"
+                    f"🆔 <code>{req_id}</code>\n\n"
+                    f"اكتب مبلغ الاسترداد (الرصيد المجمد):")
+                self.user_states[user_id] = f'svrp_approve_amount_{req_id}'
+                return
+
+            elif data.startswith('rec_reject_'):
+                req_id = data.replace('rec_reject_', '')
+                self.svrp.reject_recovery_request(req_id, 'مرفوض من الإدارة')
+                self.edit_message(chat_id, message.get('message_id'),
+                    f"❌ تم رفض طلب الاسترداد {req_id}")
+                # إشعار العميل
+                req = self.svrp.get_recovery_request(req_id)
+                if req:
+                    self.notify_user(int(req['user_id']), "❌ تم رفض طلب الاسترداد الخاص بك")
                 return
 
             # ==================== مطابقة: الأدمن ينضم كطرف آخر ====================

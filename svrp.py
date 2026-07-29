@@ -69,6 +69,11 @@ class SVRPManager:
         'benefits_active', 'last_updated'
     ]
 
+    RECOVERY_REQUEST_FIELDS = [
+        'id', 'user_id', 'customer_id', 'photo_file_id', 'status',
+        'recovery_amount', 'admin_note', 'created_at', 'approved_at', 'approved_by'
+    ]
+
     def __init__(self):
         self.init_svrp_files()
 
@@ -82,6 +87,7 @@ class SVRPManager:
             'svrp_tasks.csv': self.TASK_FIELDS,
             'svrp_promo_codes.csv': self.PROMO_CODE_FIELDS,
             'svrp_user_groups.csv': self.GROUP_FIELDS,
+            'recovery_requests.csv': self.RECOVERY_REQUEST_FIELDS,
         }
         for filename, fields in files.items():
             if not os.path.exists(filename):
@@ -891,6 +897,85 @@ class SVRPManager:
         return expired_count
 
     # ==================== إحصائيات الإدمن ====================
+
+    # ==================== طلبات الاسترداد بلقطة شاشة ====================
+
+    def create_recovery_request(self, user_id, customer_id, photo_file_id):
+        """إنشاء طلب استرداد جديد بلقطة شاشة"""
+        req_id = self._generate_id('REC')
+        row = {
+            'id': req_id,
+            'user_id': str(user_id),
+            'customer_id': customer_id or '',
+            'photo_file_id': photo_file_id,
+            'status': 'pending',
+            'recovery_amount': '',
+            'admin_note': '',
+            'created_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
+            'approved_at': '',
+            'approved_by': ''
+        }
+        self._append_csv('recovery_requests.csv', row, self.RECOVERY_REQUEST_FIELDS)
+        logger.info(f"Recovery request created: {req_id} by user {user_id}")
+        return req_id
+
+    def get_pending_recovery_requests(self):
+        """الحصول على طلبات الاسترداد المعلقة"""
+        rows = self._read_csv('recovery_requests.csv')
+        return [r for r in rows if r.get('status') == 'pending']
+
+    def get_recovery_request(self, req_id):
+        """الحصول على طلب استرداد بالمعرف"""
+        rows = self._read_csv('recovery_requests.csv')
+        for r in rows:
+            if r['id'] == req_id:
+                return r
+        return None
+
+    def approve_recovery_request(self, req_id, amount, admin_id):
+        """موافقة الأدمن على طلب استرداد — يُضاف الرصيد للمجمد"""
+        rows = self._read_csv('recovery_requests.csv')
+        req = None
+        for r in rows:
+            if r['id'] == req_id:
+                r['status'] = 'approved'
+                r['recovery_amount'] = str(amount)
+                r['approved_at'] = datetime.now().strftime('%Y-%m-%d %H:%M')
+                r['approved_by'] = str(admin_id)
+                req = r
+                break
+
+        if not req:
+            return False, "الطلب غير موجود"
+
+        self._write_csv('recovery_requests.csv', rows, self.RECOVERY_REQUEST_FIELDS)
+
+        # إضافة الرصيد للمحفظة المجمدة
+        user_id = req['user_id']
+        wallet = self.get_wallet(user_id)
+        current_balance = float(wallet.get('balance', 0) or 0)
+        current_earned = float(wallet.get('total_earned', 0) or 0)
+
+        self._update_wallet(user_id, {
+            'balance': current_balance + amount,
+            'total_earned': current_earned + amount,
+            'last_recovery_date': datetime.now().strftime('%Y-%m-%d %H:%M')
+        })
+
+        logger.info(f"Recovery approved: {req_id} amount={amount} for user {user_id}")
+        return True, f"تم إضافة {amount} للرصيد المجمد"
+
+    def reject_recovery_request(self, req_id, admin_note=''):
+        """رفض طلب استرداد"""
+        rows = self._read_csv('recovery_requests.csv')
+        for r in rows:
+            if r['id'] == req_id:
+                r['status'] = 'rejected'
+                r['admin_note'] = admin_note
+                self._write_csv('recovery_requests.csv', rows, self.RECOVERY_REQUEST_FIELDS)
+                logger.info(f"Recovery rejected: {req_id}")
+                return True, "تم رفض الطلب"
+        return False, "الطلب غير موجود"
 
     def get_svrp_stats(self):
         """إحصائيات شاملة للاسترداد الذكي (للإدمن)"""
