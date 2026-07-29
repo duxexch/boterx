@@ -2309,20 +2309,16 @@ class ComprehensiveDUXBot:
         lang_names = self.get_language_names()
         lang_btn_text = f"{t.get('btn_language', '🌐')} {lang_names.get(lang, {}).get('native', 'Language')}"
 
-        # تصميم احترافي: كل زر له رمز مميز واضح
+        # تصميم احترافي: الأزرار بدون بادئات إضافية — الإيموجي موجود في الترجمات
         keyboard = [
-            # 💎 الخدمات الرئيسية
-            [{'text': f"🟢 {deposit_btn}"}, {'text': f"🔴 {withdraw_btn}"}],
-            [{'text': f"📋 {requests_btn}"}, {'text': f"👤 {profile_btn}"}],
-            # ⭐ المزايا
-            [{'text': f"🔄 {match_btn}"}, {'text': f"💎 {svrp_btn}"}],
-            [{'text': f"🎁 {ref_btn}"}, {'text': f"📱 {apps_btn}"}],
-            # 🔔 التواصل
-            [{'text': f"🔔 {notif_btn}"}, {'text': f"📨 {complaint_btn}"}],
-            [{'text': f"🆘 {support_btn}"}, {'text': f"❓ {help_btn}"}],
-            # ⚙️ الإعدادات
-            [{'text': f"💱 {currency_btn}"}, {'text': lang_btn_text}],
-            [{'text': f"♻️ {reset_btn}"}],
+            [{'text': deposit_btn}, {'text': withdraw_btn}],
+            [{'text': requests_btn}, {'text': profile_btn}],
+            [{'text': match_btn}, {'text': svrp_btn}],
+            [{'text': ref_btn}, {'text': apps_btn}],
+            [{'text': notif_btn}, {'text': complaint_btn}],
+            [{'text': support_btn}, {'text': help_btn}],
+            [{'text': currency_btn}, {'text': lang_btn_text}],
+            [{'text': reset_btn}],
         ]
         
         # زر التسجيل للمستخدمين غير المسجلين
