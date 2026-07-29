@@ -5856,6 +5856,118 @@ class ComprehensiveDUXBot:
                 self.show_apps_admin_panel(fake_msg)
                 return
 
+            # ==================== 💰 إيداع/سحب: أزرار inline ====================
+
+            # إلغاء الإيداع/السحب
+            elif data == 'dep_cancel' or data == 'wd_cancel':
+                user = self.find_user(user_id)
+                lang = user.get('language', 'ar') if user else 'ar'
+                self.edit_message(chat_id, message.get('message_id'), "❌ تم الإلغاء")
+                welcome = self.tr('choose_service', lang, name=user.get('name', ''), customer_id=user.get('customer_id', '')) if user else ''
+                self.send_message(chat_id, welcome, self.main_keyboard(lang, user_id))
+                return
+
+            # اختيار شركة للإيداع
+            elif data.startswith('dep_company_'):
+                company_id = data.replace('dep_company_', '')
+                company = None
+                for c in self.get_companies('deposit'):
+                    if c['id'] == company_id:
+                        company = c
+                        break
+                if not company:
+                    self.edit_message(chat_id, message.get('message_id'), "❌ الشركة غير موجودة")
+                    return
+
+                icon = company.get('icon', '🏢') or '🏢'
+                self.edit_message(chat_id, message.get('message_id'),
+                    f"{icon} <b>{company['name']}</b>\n📋 {company.get('details', '')}\n\n💳 اختر وسيلة الدفع:")
+
+                # عرض وسائل الدفع كأزرار inline
+                methods = self.get_payment_methods_by_company(company_id, 'deposit')
+                if not methods:
+                    self.send_message(chat_id, "❌ لا توجد وسائل دفع لهذه الشركة")
+                    return
+
+                inline_btns = []
+                for m in methods:
+                    m_icon = m.get('icon', '💳') or '💳'
+                    btn = f"{m_icon} {m['method_name']}"
+                    if m.get('method_type'):
+                        btn += f" — {m['method_type']}"
+                    inline_btns.append([{'text': btn, 'callback_data': f'dep_method_{m["id"]}_{company_id}_{company["name"]}'}])
+                inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'dep_back_companies'}])
+                self.send_inline_message(chat_id, "💳 <b>وسائل الدفع المتاحة</b>", inline_btns)
+                return
+
+            # الرجوع لقائمة الشركات (إيداع)
+            elif data == 'dep_back_companies':
+                user = self.find_user(user_id)
+                lang = user.get('language', 'ar') if user else 'ar'
+                self.edit_message(chat_id, message.get('message_id'), "💰 <b>طلب إيداع</b>\n\nاختر الشركة:")
+                companies = self.get_companies('deposit')
+                inline_btns = []
+                for c in companies:
+                    icon = c.get('icon', '🏢') or '🏢'
+                    inline_btns.append([{'text': f"{icon} {c['name']}", 'callback_data': f'dep_company_{c["id"]}'}])
+                inline_btns.append([{'text': self.tr('main_menu', lang), 'callback_data': 'dep_cancel'}])
+                self.send_inline_message(chat_id, "💰 <b>طلب إيداع</b>", inline_btns)
+                return
+
+            # اختيار وسيلة دفع للإيداع
+            elif data.startswith('dep_method_'):
+                parts = data.replace('dep_method_', '').split('_', 2)
+                if len(parts) < 3:
+                    return
+                method_id = parts[0]
+                company_id = parts[1]
+                company_name = parts[2]
+
+                method = self.get_payment_method_by_id(method_id) if method_id else None
+                method_name = method['method_name'] if method else ''
+
+                self.edit_message(chat_id, message.get('message_id'),
+                    f"✅ <b>تم اختيار وسيلة الدفع</b>\n\n"
+                    f"🏢 الشركة: {company_name}\n"
+                    f"💳 الوسيلة: {method_name}\n\n"
+                    f"🔐 اكتب رقم المحفظة أو الحساب:")
+
+                user = self.find_user(user_id)
+                lang = user.get('language', 'ar') if user else 'ar'
+                kb = {'keyboard': [[{'text': '❌ إلغاء'}, {'text': self.tr('main_menu', lang)}]], 'resize_keyboard': True, 'one_time_keyboard': True}
+                self.send_message(chat_id, self.tr('enter_wallet', lang, min_amount=self.get_setting('min_deposit') or '50', currency=self.get_currency_symbol(user.get('currency','SAR'))), kb)
+                self.user_states[user_id] = f'deposit_wallet_{company_id}_{company_name}_{method_id}'
+                return
+
+            # اختيار شركة للسحب
+            elif data.startswith('wd_company_'):
+                company_id = data.replace('wd_company_', '')
+                company = None
+                for c in self.get_companies('withdraw'):
+                    if c['id'] == company_id:
+                        company = c
+                        break
+                if not company:
+                    self.edit_message(chat_id, message.get('message_id'), "❌ الشركة غير موجودة")
+                    return
+
+                icon = company.get('icon', '🏢') or '🏢'
+                address = company.get('address', '')
+
+                text = f"{icon} <b>{company['name']}</b>\n📋 {company.get('details', '')}\n"
+                if address:
+                    text += f"📍 <b>عنوان السحب:</b>\n<code>{address}</code>\n\n"
+                text += f"\n🔐 اكتب رقم المحفظة:"
+
+                self.edit_message(chat_id, message.get('message_id'), text)
+
+                user = self.find_user(user_id)
+                lang = user.get('language', 'ar') if user else 'ar'
+                kb = {'keyboard': [[{'text': '❌ إلغاء'}, {'text': self.tr('main_menu', lang)}]], 'resize_keyboard': True, 'one_time_keyboard': True}
+                self.send_message(chat_id, self.tr('enter_wallet', lang, min_amount=self.get_setting('min_deposit') or '50', currency=self.get_currency_symbol(user.get('currency','SAR'))), kb)
+                self.user_states[user_id] = f'withdraw_wallet_{company_id}_{company["name"]}'
+                return
+
             # ==================== 🤖 إدارة البوتات المتعددة ====================
             elif data == 'mbot_back_admin' or data == 'mbot_back':
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
