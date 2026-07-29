@@ -6495,6 +6495,129 @@ class ComprehensiveDUXBot:
                 self.handle_admin_panel(fake_msg)
                 return
 
+            # ==================== 💳 وسائل الدفع ====================
+            elif data == 'pm_back':
+                if user_id in self.user_states:
+                    del self.user_states[user_id]
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.handle_admin_panel(fake_msg)
+                return
+
+            elif data == 'pm_list':
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_payment_methods_management(fake_msg)
+                return
+
+            elif data == 'pm_add':
+                # عرض الشركات لاختيار أي شركة تضاف لها وسيلة
+                companies = self.get_companies()
+                if not companies:
+                    self.send_message(chat_id, "❌ لا توجد شركات. أضف شركة أولاً")
+                    return
+                inline_btns = []
+                for c in companies:
+                    icon = c.get('icon', '🏢') or '🏢'
+                    inline_btns.append([{'text': f"{icon} {c['name']}", 'callback_data': f'pm_add_company_{c["id"]}'}])
+                inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'pm_back'}])
+                self.edit_message(chat_id, message.get('message_id'), "➕ <b>إضافة وسيلة دفع</b>\n\nاختر الشركة:")
+                self.send_inline_message(chat_id, "اختر الشركة:", inline_btns)
+                return
+
+            elif data.startswith('pm_add_company_'):
+                company_id = data.replace('pm_add_company_', '')
+                company = self.get_company_by_id(company_id)
+                company_name = company['name'] if company else 'غير محدد'
+                self.edit_message(chat_id, message.get('message_id'),
+                    f"➕ <b>إضافة وسيلة دفع — {company_name}</b>\n\n"
+                    "📝 أرسل البيانات في رسالة واحدة:\n\n"
+                    "1️⃣ اسم الوسيلة\n"
+                    "2️⃣ النوع (محفظة/بنك)\n"
+                    "3️⃣ رقم الحساب\n"
+                    "4️⃣ معلومات إضافية (أو 'بدون')\n"
+                    "5️⃣ الأيقونة (أو 'بدون')\n\n"
+                    "💡 مثال:\n<code>محفظة STC\nمحفظة إلكترونية\n0501234567\nالبنك الأهلي\n📱</code>")
+                self.user_states[user_id] = f'pm_add_wizard_{company_id}_{company_name}'
+                return
+
+            elif data.startswith('pm_edit_'):
+                method_id = data.replace('pm_edit_', '')
+                method = self.get_payment_method_by_id(method_id) if method_id else None
+                if not method:
+                    self.send_message(chat_id, "❌ الوسيلة غير موجودة")
+                    return
+
+                company = self.get_company_by_id(method.get('company_id', ''))
+                company_name = company['name'] if company else 'غير محدد'
+                status = method.get('status', 'active')
+                status_icon = '✅' if status == 'active' else '⏸️'
+
+                text = (
+                    f"💳 <b>{method['method_name']}</b>\n\n"
+                    f"━━━━━━━━━━━━━━━━━━\n"
+                    f"🏢 الشركة: {company_name}\n"
+                    f"📋 النوع: {method.get('method_type', '')}\n"
+                    f"🔢 رقم الحساب: <code>{method.get('account_data', '')}</code>\n"
+                    f"💡 معلومات: {method.get('additional_info', '')}\n"
+                    f"🖼️ الأيقونة: {method.get('icon', '💳')}\n"
+                    f"📊 الحالة: {status_icon} {status}\n"
+                    f"━━━━━━━━━━━━━━━━━━\n\n"
+                    "اختر الإجراء:"
+                )
+                inline_btns = [
+                    [{'text': '✏️ تعديل الاسم', 'callback_data': f'pm_name_{method_id}'},
+                     {'text': '🔢 تعديل الحساب', 'callback_data': f'pm_account_{method_id}'}],
+                    [{'text': '⏹️ إيقاف' if status == 'active' else '▶️ تشغيل', 'callback_data': f'pm_toggle_{method_id}'}],
+                    [{'text': '🗑️ حذف', 'callback_data': f'pm_delete_{method_id}'}],
+                    [{'text': '🔙 رجوع', 'callback_data': 'pm_list'}]
+                ]
+                self.edit_message(chat_id, message.get('message_id'), text)
+                self.send_inline_message(chat_id, "اختر:", inline_btns)
+                return
+
+            elif data.startswith('pm_toggle_'):
+                method_id = data.replace('pm_toggle_', '')
+                method = self.get_payment_method_by_id(method_id)
+                if method:
+                    new_status = 'inactive' if method.get('status') == 'active' else 'active'
+                    self.update_payment_method_status(method_id, new_status)
+                    action = 'إيقاف' if new_status == 'inactive' else 'تشغيل'
+                    self.edit_message(chat_id, message.get('message_id'), f"✅ تم {action} الوسيلة")
+                # إعادة عرض القائمة
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_payment_methods_management(fake_msg)
+                return
+
+            elif data.startswith('pm_delete_'):
+                method_id = data.replace('pm_delete_', '')
+                inline_btns = [
+                    [{'text': '✅ نعم احذف', 'callback_data': f'pm_confirm_delete_{method_id}'},
+                     {'text': '❌ إلغاء', 'callback_data': f'pm_edit_{method_id}'}]
+                ]
+                self.edit_message(chat_id, message.get('message_id'),
+                    "⚠️ <b>تأكيد الحذف</b>\n\nهل أنت متأكد؟")
+                self.send_inline_message(chat_id, "حذف وسيلة الدفع:", inline_btns)
+                return
+
+            elif data.startswith('pm_confirm_delete_'):
+                method_id = data.replace('pm_confirm_delete_', '')
+                self.delete_payment_method(method_id)
+                self.edit_message(chat_id, message.get('message_id'), "✅ تم حذف الوسيلة")
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_payment_methods_management(fake_msg)
+                return
+
+            elif data.startswith('pm_name_'):
+                method_id = data.replace('pm_name_', '')
+                self.edit_message(chat_id, message.get('message_id'), "✏️ اكتب الاسم الجديد:")
+                self.user_states[user_id] = f'pm_input_name_{method_id}'
+                return
+
+            elif data.startswith('pm_account_'):
+                method_id = data.replace('pm_account_', '')
+                self.edit_message(chat_id, message.get('message_id'), "🔢 اكتب رقم الحساب الجديد:")
+                self.user_states[user_id] = f'pm_input_account_{method_id}'
+                return
+
             # ==================== ⚙️ الإعدادات ====================
             elif data == 'settings_back':
                 if user_id in self.user_states:
@@ -10453,32 +10576,44 @@ class ComprehensiveDUXBot:
                 return False
         
     def show_payment_methods_management(self, message):
-            """عرض لوحة إدارة وسائل الدفع"""
-            methods_text = """💳 إدارة وسائل الدفع
-    
-    🏢 هذا القسم يسمح لك بإدارة وسائل الدفع لكل شركة:
-    • إضافة وسائل دفع جديدة
-    • تعديل بيانات الوسائل الموجودة  
-    • حذف وسائل الدفع
-    • تشغيل/إيقاف وسائل الدفع
-    • عرض جميع الوسائل المتاحة
-    
-    اختر العملية المطلوبة:"""
+            """عرض لوحة إدارة وسائل الدفع — أزرار inline"""
+            methods = self.get_all_payment_methods()
             
-            keyboard = [
-                [{'text': '➕ إضافة وسيلة دفع'}, {'text': '✏️ تعديل وسيلة دفع'}],
-                [{'text': '🗑️ حذف وسيلة دفع'}, {'text': '⏹️ إيقاف وسيلة دفع'}],
-                [{'text': '▶️ تشغيل وسيلة دفع'}, {'text': '📊 عرض وسائل الدفع'}],
-                [{'text': '↩️ العودة للوحة الأدمن'}]
-            ]
+            text = (
+                "💳 <b>إدارة وسائل الدفع</b>\n\n"
+                "━━━━━━━━━━━━━━━━━━\n"
+                f"📊 إجمالي الوسائل: <b>{len(methods)}</b>\n"
+                f"✅ نشطة: <b>{sum(1 for m in methods if m.get('status') == 'active')}</b>\n"
+                f"⏸️ متوقفة: <b>{sum(1 for m in methods if m.get('status') != 'active')}</b>\n"
+                "━━━━━━━━━━━━━━━━━━\n\n"
+            )
+
+            inline_btns = []
+
+            # عرض الوسائل كأزرار
+            if methods:
+                text += "<b>قائمة الوسائل:</b>\n\n"
+                for m in methods[:15]:
+                    company = self.get_company_by_id(m.get('company_id', ''))
+                    company_name = company['name'] if company else 'غير محدد'
+                    icon = m.get('icon', '💳') or '💳'
+                    status_icon = '✅' if m.get('status') == 'active' else '⏸️'
+                    text += f"{status_icon} {icon} <b>{m['method_name']}</b>\n"
+                    text += f"   🏢 {company_name} | 🆔 <code>{m['id']}</code>\n"
+                    text += f"   🔢 <code>{m.get('account_data', '')}</code>\n\n"
+                    inline_btns.append([{
+                        'text': f"{status_icon} {icon} {m['method_name']} — {company_name}",
+                        'callback_data': f'pm_edit_{m["id"]}'
+                    }])
             
-            reply_keyboard = {
-                'keyboard': keyboard,
-                'resize_keyboard': True,
-                'one_time_keyboard': False
-            }
-            
-            self.send_message(message['chat']['id'], methods_text, reply_keyboard)
+            # أزرار الإجراءات
+            inline_btns.append([
+                {'text': '➕ إضافة وسيلة دفع', 'callback_data': 'pm_add'},
+                {'text': '📊 عرض الكل', 'callback_data': 'pm_list'}
+            ])
+            inline_btns.append([{'text': '🔙 العودة', 'callback_data': 'pm_back'}])
+
+            self.send_inline_message(message['chat']['id'], text, inline_btns)
         
     def start_disable_payment_method_wizard(self, message):
             """معالج إيقاف وسيلة دفع"""
