@@ -1648,8 +1648,7 @@ class ComprehensiveDUXBot:
              {'text': '📋 المهام', 'callback_data': 'svrp_admin_tasks'}],
             [{'text': '🧹 تنظيف الأرصدة المنتهية', 'callback_data': 'svrp_admin_cleanup'},
              {'text': '📊 إحصائيات تفصيلية', 'callback_data': 'svrp_admin_detailed'}],
-            [{'text': '📝 تعديل نص الشرح (عربي)', 'callback_data': 'svrp_edit_intro_ar'},
-             {'text': '📝 تعديل نص الشرح (إنجليزي)', 'callback_data': 'svrp_edit_intro_en'}],
+            [{'text': '📝 تعديل النصوص', 'callback_data': 'svrp_edit_texts'}],
             [{'text': '🔙 العودة للوحة الأدمن', 'callback_data': 'svrp_admin_back'}]
         ]
 
@@ -3699,7 +3698,7 @@ class ComprehensiveDUXBot:
             return
 
         if isinstance(current_state, str) and current_state.startswith('svrp_edit_intro_'):
-            # تعديل نص شرح نظام التعويض
+            # تعديل نص شرح نظام التعويض — يدعم كل اللغات
             user_id = message['from']['id']
             chat_id = message['chat']['id']
             text = message.get('text', '').strip()
@@ -3714,12 +3713,19 @@ class ComprehensiveDUXBot:
                 self.send_message(chat_id, "❌ النص قصير جداً. اكتب شرحاً كاملاً:")
                 return
 
-            lang_key = 'svrp_intro_ar' if 'ar' in current_state else 'svrp_intro_en'
+            # استخراج كود اللغة من الحالة: svrp_edit_intro_{lang}_input
+            parts = current_state.replace('svrp_edit_intro_', '').rsplit('_input', 1)
+            lang_code = parts[0] if len(parts) == 2 else 'ar'
+
+            lang_key = f'svrp_intro_{lang_code}'
             self.save_setting(lang_key, text)
 
+            lang_names = self.get_language_names()
+            lang_native = lang_names.get(lang_code, {}).get('native', lang_code)
+
             self.send_message(chat_id,
-                f"✅ <b>تم حفظ النص الجديد!</b>\n\n"
-                f"📝 سيظهر النص الجديد في لوحة 💎 تعويض 100% للعملاء.",
+                f"✅ <b>تم حفظ النص الجديد ({lang_native})!</b>\n\n"
+                f"📝 سيظهر النص الجديد للعملاء الذين اختاروا هذه اللغة.",
                 self.admin_keyboard())
 
             if user_id in self.user_states:
@@ -6808,22 +6814,33 @@ class ComprehensiveDUXBot:
                     self.svrp_admin_edit_one_setting(chat_id, message.get('message_id'), key)
                 return
 
-            elif data == 'svrp_edit_intro_ar':
-                current = self.get_setting('svrp_intro_ar') or '(النص الافتراضي)'
-                self.edit_message(chat_id, message.get('message_id'),
-                    f"📝 <b>تعديل نص الشرح (عربي)</b>\n\n"
-                    f"📋 النص الحالي:\n<code>{current[:200]}...</code>\n\n"
-                    f"✍️ اكتب النص الجديد كاملاً:")
-                self.user_states[user_id] = 'svrp_edit_intro_ar_input'
+            elif data == 'svrp_edit_texts':
+                lang_names = self.get_language_names()
+                text = "📝 <b>تعديل نصوص شرح النظام</b>\n\nاختر اللغة:\n\n"
+                inline_btns = []
+                row = []
+                for code, info in lang_names.items():
+                    row.append({'text': f"{info['flag']} {info['native']}", 'callback_data': f'svrp_edit_intro_{code}'})
+                    if len(row) == 3:
+                        inline_btns.append(row)
+                        row = []
+                if row:
+                    inline_btns.append(row)
+                inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'svrp_admin_back'}])
+                self.edit_message(chat_id, message.get('message_id'), text)
+                self.send_inline_message(chat_id, "اختر اللغة:", inline_btns)
                 return
 
-            elif data == 'svrp_edit_intro_en':
-                current = self.get_setting('svrp_intro_en') or '(default text)'
+            elif data.startswith('svrp_edit_intro_') and data != 'svrp_edit_texts':
+                lang_code = data.replace('svrp_edit_intro_', '')
+                current = self.get_setting(f'svrp_intro_{lang_code}') or '(النص الافتراضي)'
+                lang_names = self.get_language_names()
+                lang_native = lang_names.get(lang_code, {}).get('native', lang_code)
                 self.edit_message(chat_id, message.get('message_id'),
-                    f"📝 <b>Edit intro text (English)</b>\n\n"
-                    f"📋 Current text:\n<code>{current[:200]}...</code>\n\n"
-                    f"✍️ Type the new full text:")
-                self.user_states[user_id] = 'svrp_edit_intro_en_input'
+                    f"📝 <b>تعديل نص الشرح ({lang_native})</b>\n\n"
+                    f"📋 النص الحالي:\n<code>{current[:200]}...</code>\n\n"
+                    f"✍️ اكتب النص الجديد كاملاً:")
+                self.user_states[user_id] = f'svrp_edit_intro_{lang_code}_input'
                 return
 
             elif data == 'svrp_admin_detailed':
