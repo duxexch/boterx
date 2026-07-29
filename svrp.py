@@ -74,6 +74,18 @@ class SVRPManager:
         'recovery_amount', 'admin_note', 'created_at', 'approved_at', 'approved_by'
     ]
 
+    SVRP_COMPANY_FIELDS = [
+        'id', 'name', 'registration_url', 'bonus_percentage', 'is_active', 'created_at'
+    ]
+
+    USER_COMPANY_ACCOUNT_FIELDS = [
+        'id', 'user_id', 'company_id', 'company_name', 'account_number', 'status', 'created_at'
+    ]
+
+    BONUS_REQUEST_FIELDS = [
+        'id', 'user_id', 'company_id', 'company_name', 'account_number', 'bonus_amount', 'status', 'created_at', 'approved_by'
+    ]
+
     def __init__(self):
         self.init_svrp_files()
 
@@ -88,6 +100,9 @@ class SVRPManager:
             'svrp_promo_codes.csv': self.PROMO_CODE_FIELDS,
             'svrp_user_groups.csv': self.GROUP_FIELDS,
             'recovery_requests.csv': self.RECOVERY_REQUEST_FIELDS,
+            'svrp_companies.csv': self.SVRP_COMPANY_FIELDS,
+            'user_company_accounts.csv': self.USER_COMPANY_ACCOUNT_FIELDS,
+            'bonus_requests.csv': self.BONUS_REQUEST_FIELDS,
         }
         for filename, fields in files.items():
             if not os.path.exists(filename):
@@ -1054,6 +1069,165 @@ class SVRPManager:
 
         logger.info(f"SVRP transfer: {tid} → {receiver_tid} amount={amount}")
         return True, f"✅ تم إرسال {amount:.2f} للعميل {receiver_customer_id}\n💰 تم نقل {amount:.2f} من مجمدك إلى متاحك"
+
+    # ==================== شركات الاسترداد ====================
+
+    def add_recovery_company(self, name, registration_url, bonus_percentage=10):
+        """إضافة شركة استرداد جديدة"""
+        company_id = self._generate_id('SVC')
+        row = {
+            'id': company_id,
+            'name': name,
+            'registration_url': registration_url,
+            'bonus_percentage': str(bonus_percentage),
+            'is_active': 'yes',
+            'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')
+        }
+        if self._append_csv('svrp_companies.csv', row, self.SVRP_COMPANY_FIELDS):
+            logger.info(f"Recovery company added: {company_id} ({name})")
+            return company_id
+        return None
+
+    def get_recovery_companies(self, active_only=True):
+        """جلب شركات الاسترداد"""
+        rows = self._read_csv('svrp_companies.csv')
+        if active_only:
+            return [r for r in rows if r.get('is_active') == 'yes']
+        return rows
+
+    def delete_recovery_company(self, company_id):
+        """حذف شركة استرداد"""
+        rows = self._read_csv('svrp_companies.csv')
+        new_rows = [r for r in rows if r['id'] != company_id]
+        if len(new_rows) < len(rows):
+            return self._write_csv('svrp_companies.csv', new_rows, self.SVRP_COMPANY_FIELDS)
+        return False
+
+    # ==================== حسابات المستخدمين في الشركات ====================
+
+    def add_user_company_account(self, user_id, company_id, company_name, account_number):
+        """إضافة رقم حساب المستخدم في شركة"""
+        # فحص إذا كان لديه حساب بالفعل في هذه الشركة
+        rows = self._read_csv('user_company_accounts.csv')
+        for row in rows:
+            if row.get('user_id') == str(user_id) and row.get('company_id') == company_id:
+                return False, "لديك حساب مسجل بالفعل في هذه الشركة. لتغييره، أرسل طلباً للإدارة"
+
+        account_id = self._generate_id('UAC')
+        row = {
+            'id': account_id,
+            'user_id': str(user_id),
+            'company_id': company_id,
+            'company_name': company_name,
+            'account_number': account_number,
+            'status': 'active',
+            'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')
+        }
+        if self._append_csv('user_company_accounts.csv', row, self.USER_COMPANY_ACCOUNT_FIELDS):
+            return True, f"✅ تم تسجيل حسابك في {company_name}"
+        return False, "❌ فشل في التسجيل"
+
+    def get_user_company_accounts(self, user_id):
+        """حسابات المستخدم في الشركات"""
+        rows = self._read_csv('user_company_accounts.csv')
+        return [r for r in rows if r.get('user_id') == str(user_id)]
+
+    def get_user_company_account(self, user_id, company_id):
+        """حساب مستخدم في شركة محددة"""
+        rows = self._read_csv('user_company_accounts.csv')
+        for row in rows:
+            if row.get('user_id') == str(user_id) and row.get('company_id') == company_id:
+                return row
+        return None
+
+    # ==================== طلبات المكافآت ====================
+
+    def create_bonus_request(self, user_id, company_id, company_name, account_number):
+        """إنشاء طلب مكافأة"""
+        # فحص إذا كان لديه طلب سابق معلق
+        rows = self._read_csv('bonus_requests.csv')
+        for row in rows:
+            if (row.get('user_id') == str(user_id) and
+                row.get('company_id') == company_id and
+                row.get('status') == 'pending'):
+                return None, "لديك طلب مكافأة معلق بالفعل في هذه الشركة"
+
+        # فحص إذا كان لديه حساب مسجل
+        account = self.get_user_company_account(user_id, company_id)
+        if not account:
+            return None, "يجب تسجيل رقم حسابك أولاً"
+
+        # جلب نسبة المكافأة من الشركة
+        companies = self._read_csv('svrp_companies.csv')
+        bonus_pct = 10
+        for c in companies:
+            if c['id'] == company_id:
+                bonus_pct = float(c.get('bonus_percentage', 10) or 10)
+                break
+
+        request_id = self._generate_id('BNR')
+        row = {
+            'id': request_id,
+            'user_id': str(user_id),
+            'company_id': company_id,
+            'company_name': company_name,
+            'account_number': account_number,
+            'bonus_amount': '',  # يحددها الأدمن
+            'status': 'pending',
+            'created_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
+            'approved_by': ''
+        }
+        if self._append_csv('bonus_requests.csv', row, self.BONUS_REQUEST_FIELDS):
+            logger.info(f"Bonus request created: {request_id} by user {user_id} for {company_name}")
+            return request_id, None
+        return None, "❌ فشل في إنشاء الطلب"
+
+    def get_pending_bonus_requests(self):
+        """طلبات المكافآت المعلقة"""
+        rows = self._read_csv('bonus_requests.csv')
+        return [r for r in rows if r.get('status') == 'pending']
+
+    def approve_bonus_request(self, request_id, bonus_amount, admin_id):
+        """موافقة الأدمن على مكافأة"""
+        rows = self._read_csv('bonus_requests.csv')
+        req = None
+        for r in rows:
+            if r['id'] == request_id:
+                r['status'] = 'approved'
+                r['bonus_amount'] = str(bonus_amount)
+                r['approved_by'] = str(admin_id)
+                req = r
+                break
+
+        if not req:
+            return False, "الطلب غير موجود"
+
+        self._write_csv('bonus_requests.csv', rows, self.BONUS_REQUEST_FIELDS)
+
+        # إضافة المكافأة للرصيد المجمد
+        user_id = req['user_id']
+        wallet = self.get_wallet(user_id)
+        current_balance = float(wallet.get('balance', 0) or 0)
+        current_earned = float(wallet.get('total_earned', 0) or 0)
+
+        self._update_wallet(user_id, {
+            'balance': current_balance + bonus_amount,
+            'total_earned': current_earned + bonus_amount
+        })
+
+        logger.info(f"Bonus approved: {request_id} amount={bonus_amount} for user {user_id}")
+        return True, f"تم إضافة {bonus_amount} للرصيد المجمد"
+
+    def reject_bonus_request(self, request_id, admin_id):
+        """رفض طلب مكافأة"""
+        rows = self._read_csv('bonus_requests.csv')
+        for r in rows:
+            if r['id'] == request_id:
+                r['status'] = 'rejected'
+                r['approved_by'] = str(admin_id)
+                self._write_csv('bonus_requests.csv', rows, self.BONUS_REQUEST_FIELDS)
+                return True, "تم رفض الطلب"
+        return False, "الطلب غير موجود"
 
     def get_svrp_stats(self):
         """إحصائيات شاملة للاسترداد الذكي (للإدمن)"""

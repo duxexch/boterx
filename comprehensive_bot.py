@@ -1260,6 +1260,7 @@ class ComprehensiveDUXBot:
              {'text': '📤 إرسال رصيد', 'callback_data': 'svrp_send_credits'}],
             [{'text': '💎 محفظتي', 'callback_data': 'svrp_wallet'},
              {'text': '👥 دعوة صديق', 'callback_data': 'svrp_invite'}],
+            [{'text': '🏢 تسجيل حساب جديد', 'callback_data': 'svrp_companies'}],
             [{'text': '🏠 القائمة الرئيسية', 'callback_data': 'svrp_main_menu'}]
         ]
         self.send_inline_message(message['chat']['id'], panel_text, inline_btns)
@@ -3530,6 +3531,81 @@ class ComprehensiveDUXBot:
                     f"🧊 حالة الرصيد: <b>مجمد</b>\n\n"
                     f"💡 أرسل رصيداً لأصدقائك لفك التجميد",
                     'recovery_approved')
+
+            if user_id in self.user_states:
+                del self.user_states[user_id]
+            return
+
+        if isinstance(current_state, str) and current_state.startswith('svrp_enter_account_'):
+            # إدخال رقم حساب في شركة استرداد
+            user_id = message['from']['id']
+            chat_id = message['chat']['id']
+            text = message.get('text', '').strip()
+
+            if text in ['إلغاء', 'الغاء', '🔙']:
+                if user_id in self.user_states: del self.user_states[user_id]
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_svrp_panel(fake_msg)
+                return
+
+            parts = current_state.replace('svrp_enter_account_', '').split('_', 1)
+            if len(parts) != 2:
+                return
+            company_id = parts[0]
+            company_name = parts[1]
+
+            if len(text) < 3:
+                self.send_message(chat_id, "❌ رقم الحساب قصير جداً. اكتب رقم حسابك:")
+                return
+
+            success, msg = self.svrp.add_user_company_account(user_id, company_id, company_name, text)
+            if success:
+                self.send_message(chat_id,
+                    f"✅ {msg}\n\n"
+                    f"🏆 يمكنك الآن طلب المكافأة من الأدمن.\n"
+                    f"اضغط الزر بالأسفل:")
+                inline_btns = [
+                    [{'text': '🏆 طلب مكافأة', 'callback_data': f'svrp_bonus_{company_id}_{company_name}'}],
+                    [{'text': '🔙 رجوع', 'callback_data': 'svrp_companies'}]
+                ]
+                self.send_inline_message(chat_id, "طلب المكافأة:", inline_btns)
+            else:
+                self.send_message(chat_id, f"❌ {msg}")
+
+            if user_id in self.user_states:
+                del self.user_states[user_id]
+            return
+
+        if isinstance(current_state, str) and current_state.startswith('svrp_bonus_amount_'):
+            # الأدمن يكتب مبلغ المكافأة
+            user_id = message['from']['id']
+            chat_id = message['chat']['id']
+            req_id = current_state.replace('svrp_bonus_amount_', '')
+            text = message.get('text', '').strip()
+
+            try:
+                amount = float(text)
+                if amount <= 0:
+                    self.send_message(chat_id, "❌ المبلغ يجب أن يكون أكبر من صفر")
+                    return
+            except ValueError:
+                self.send_message(chat_id, "❌ اكتب مبلغاً رقمياً:")
+                return
+
+            success, msg = self.svrp.approve_bonus_request(req_id, amount, user_id)
+            icon = "✅" if success else "❌"
+            self.send_message(chat_id, f"{icon} {msg}", self.admin_keyboard())
+
+            # إشعار المستخدم
+            if success:
+                rows = self.svrp._read_csv('bonus_requests.csv')
+                for r in rows:
+                    if r['id'] == req_id:
+                        self.notify_user(int(r['user_id']),
+                            f"🏆 <b>تمت الموافقة على مكافأتك!</b>\n\n"
+                            f"💰 تم إضافة <b>{amount:.2f}</b> لرصيدك المجمد 🧊\n\n"
+                            f"💡 أرسل رصيداً لأصدقائك لفك التجميد")
+                        break
 
             if user_id in self.user_states:
                 del self.user_states[user_id]
@@ -6073,6 +6149,113 @@ class ComprehensiveDUXBot:
                 self.edit_message(chat_id, message.get('message_id'), "👥 دعوة صديق")
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                 self.show_referral_panel(fake_msg)
+                return
+
+            elif data == 'svrp_companies':
+                # عرض شركات الاسترداد للتسجيل
+                companies = self.svrp.get_recovery_companies()
+                if not companies:
+                    self.edit_message(chat_id, message.get('message_id'), "📭 لا توجد شركات متاحة حالياً")
+                    return
+
+                text = "🏢 <b>شركات الاسترداد</b>\n\n"
+                text += "اختر شركة للتسجيل:\n\n"
+                inline_btns = []
+                for c in companies:
+                    text += f"• <b>{c['name']}</b>\n  🔗 <a href=\"{c.get('registration_url', '')}\">رابط التسجيل</a>\n  💰 نسبة المكافأة: {c.get('bonus_percentage', '10')}%\n\n"
+                    inline_btns.append([{'text': f"📝 تسجيل حساب — {c['name']}", 'callback_data': f'svrp_reg_{c["id"]}'}])
+
+                inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'svrp_back_panel'}])
+                self.edit_message(chat_id, message.get('message_id'), text)
+                self.send_inline_message(chat_id, "اختر شركة:", inline_btns)
+                return
+
+            elif data.startswith('svrp_reg_'):
+                # تسجيل رقم حساب في شركة
+                company_id = data.replace('svrp_reg_', '')
+                companies = self.svrp.get_recovery_companies()
+                company = None
+                for c in companies:
+                    if c['id'] == company_id:
+                        company = c
+                        break
+                if not company:
+                    self.send_message(chat_id, "❌ الشركة غير موجودة")
+                    return
+
+                self.edit_message(chat_id, message.get('message_id'),
+                    f"📝 <b>تسجيل حساب في {company['name']}</b>\n\n"
+                    f"🔗 رابط التسجيل: <a href=\"{company.get('registration_url', '')}\">اضغط هنا</a>\n\n"
+                    f"بعد التسجيل، اكتب رقم حسابك:")
+                self.user_states[user_id] = f'svrp_enter_account_{company_id}_{company["name"]}'
+                return
+
+            elif data == 'svrp_back_panel':
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_svrp_panel(fake_msg)
+                return
+
+            elif data.startswith('svrp_bonus_'):
+                # طلب مكافأة
+                parts = data.replace('svrp_bonus_', '').split('_', 1)
+                if len(parts) != 2:
+                    return
+                company_id = parts[0]
+                company_name = parts[1]
+
+                user = self.find_user(user_id)
+                account = self.svrp.get_user_company_account(user_id, company_id)
+
+                if not account:
+                    self.send_message(chat_id, "❌ يجب تسجيل رقم حسابك أولاً")
+                    return
+
+                req_id, err = self.svrp.create_bonus_request(
+                    user_id, company_id, company_name, account.get('account_number', '')
+                )
+                if err:
+                    self.edit_message(chat_id, message.get('message_id'), f"❌ {err}")
+                else:
+                    self.edit_message(chat_id, message.get('message_id'),
+                        f"✅ <b>تم إرسال طلب المكافأة!</b>\n\n"
+                        f"🆔 <code>{req_id}</code>\n"
+                        f"🏢 الشركة: {company_name}\n"
+                        f"📋 رقم الحساب: <code>{account.get('account_number', '')}</code>\n\n"
+                        f"⏳ بانتظار موافقة الإدارة")
+
+                    # إشعار الأدمن
+                    for admin_id in self.admin_ids:
+                        try:
+                            admin_msg = (
+                                f"🏆 <b>طلب مكافأة جديد</b>\n\n"
+                                f"🆔 <code>{req_id}</code>\n"
+                                f"👤 العميل: {user.get('name', '')} ({user.get('customer_id', '')})\n"
+                                f"🏢 الشركة: {company_name}\n"
+                                f"📋 رقم الحساب: <code>{account.get('account_number', '')}</code>\n\n"
+                                f"للموافقة: اكتب المبلغ"
+                            )
+                            inline_btns = [
+                                [{'text': '✅ موافقة', 'callback_data': f'svrp_bonus_approve_{req_id}'},
+                                 {'text': '❌ رفض', 'callback_data': f'svrp_bonus_reject_{req_id}'}]
+                            ]
+                            self.send_inline_message(admin_id, admin_msg, inline_btns)
+                        except Exception as e:
+                            logger.error(f"خطأ في إشعار الأدمن بطلب المكافأة: {e}")
+                return
+
+            elif data.startswith('svrp_bonus_approve_'):
+                # الأدمن يكتب مبلغ المكافأة
+                req_id = data.replace('svrp_bonus_approve_', '')
+                self.edit_message(chat_id, message.get('message_id'),
+                    f"✅ اكتب مبلغ المكافأة لطلب <code>{req_id}</code>:")
+                self.user_states[user_id] = f'svrp_bonus_amount_{req_id}'
+                return
+
+            elif data.startswith('svrp_bonus_reject_'):
+                req_id = data.replace('svrp_bonus_reject_', '')
+                success, msg = self.svrp.reject_bonus_request(req_id, user_id)
+                icon = "✅" if success else "❌"
+                self.edit_message(chat_id, message.get('message_id'), f"{icon} {msg}")
                 return
 
             elif data == 'svrp_recovery_request':
