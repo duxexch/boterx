@@ -854,28 +854,8 @@ class SVRPManager:
     # ==================== انتهاء الأرصدة ====================
 
     def expire_old_credits(self):
-    def expire_old_credits(self):
         """معطل — لا تنتهي صلاحية أي أرصدة أو أكواد. تبقى حتى يتدخل الأدمن."""
         pass
-        wallets = self._read_csv('svrp_wallets.csv')
-        now_month = datetime.now().strftime('%Y-%m')
-        reset_count = 0
-        for row in wallets:
-            last_date = row.get('last_recovery_date', '')
-            if last_date:
-                try:
-                    last_month = datetime.strptime(last_date, '%Y-%m-%d %H:%M').strftime('%Y-%m')
-                    if last_month != now_month and float(row.get('monthly_recovery_total', 0) or 0) > 0:
-                        row['monthly_recovery_total'] = '0'
-                        reset_count += 1
-                except:
-                    pass
-
-        if reset_count > 0:
-            self._write_csv('svrp_wallets.csv', wallets, self.WALLET_FIELDS)
-            logger.info(f"Recovery: Reset monthly totals for {reset_count} wallets")
-
-        return expired_count
 
     # ==================== إحصائيات الإدمن ====================
 
