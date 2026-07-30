@@ -2940,16 +2940,15 @@ class ComprehensiveDUXBot:
                 if c['name'] == company_name:
                     company_icon = c.get('icon', '🏢') or '🏢'
                     break
-            confirmation = self.tr(
-                'deposit_success',
-                lang,
-                trans_id=trans_id,
-                name=user['name'],
-                customer_id=user['customer_id'],
-                company_name=f"{company_icon} {company_name}",
-                wallet_number=wallet_number,
-                amount=self.fmt_deposit_amount(amount, user_currency) + method_name_display,
-                date=datetime.now().strftime('%Y-%m-%d %H:%M')
+            confirmation = (
+                f"✅ <b>تم تقديم طلب الإيداع!</b>\n\n"
+                f"🆔 رقم العملية: <code>{trans_id}</code> 👈 اضغط للنسخ\n"
+                f"👤 {user['name']} — <code>{user['customer_id']}</code>\n"
+                f"🏢 الشركة: {company_icon} {company_name}\n"
+                f"💳 المحفظة: <code>{wallet_number}</code> 👈 اضغط للنسخ\n"
+                f"💰 المبلغ: <code>{amount}</code> {user_currency}{method_name_display}\n"
+                f"📅 {datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n"
+                f"⏳ بانتظار مراجعة الإدارة"
             )
             
             self.send_message(message['chat']['id'], confirmation, self.main_keyboard(lang))
@@ -2962,13 +2961,12 @@ class ComprehensiveDUXBot:
                 try:
                     admin_notification = (
                         f"🔔 {self.tr('deposit_title', 'ar')}\n\n"
-                        f"🆔 {trans_id}\n"
-                        f"👤 {user['name']} ({user['customer_id']})\n"
+                        f"🆔 رقم العملية: <code>{trans_id}</code> 👈 اضغط للنسخ\n"
+                        f"👤 {user['name']} — <code>{user['customer_id']}</code>\n"
                         f"🏢 {company_name}\n"
-                        f"💳 {wallet_number}\n"
-                        f"💰 {self.format_amount_with_currency(amount, user_currency)}{method_name_display}\n"
-                        f"📅 {datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n"
-                        f"✅ {trans_id}  |  ❌ {trans_id}"
+                        f"💳 المحفظة: <code>{wallet_number}</code> 👈 اضغط للنسخ\n"
+                        f"💰 المبلغ: <code>{amount}</code> {user_currency}{method_name_display}\n"
+                        f"📅 {datetime.now().strftime('%Y-%m-%d %H:%M')}\n"
                     )
                     # لوحة مفاتيح للتأكيد أو الرفض بنقرة واحدة
                     # أزرار inline داخل الدردشة للموافقة/الرفض
@@ -3028,9 +3026,9 @@ class ComprehensiveDUXBot:
             
             # عرض وسائل الدفع للشركة المختارة
             self.show_payment_method_selection(message, selected_company['id'], 'withdraw')
-            
-        elif isinstance(state, str) and state.startswith('withdraw_all_data_'):
-            # السحب: العميل يرسل كل البيانات في رسالة واحدة
+
+        elif isinstance(state, str) and state.startswith('wd_step_amount_'):
+            # السحب خطوة 1: المبلغ
             user_id = message['from']['id']
             chat_id = message['chat']['id']
             text_msg = message.get('text', '').strip()
@@ -3040,49 +3038,110 @@ class ComprehensiveDUXBot:
                 self.handle_start(message)
                 return
 
-            lines = [l.strip() for l in text_msg.split('\n') if l.strip()]
-            if len(lines) < 4:
-                self.send_message(chat_id,
-                    "❌ يجب إرسال 4 أسطر:\n\n"
-                    "1️⃣ رقم المحفظة للاستلام\n"
-                    "2️⃣ معرف حسابك\n"
-                    "3️⃣ كود السحب\n"
-                    "4️⃣ المبلغ\n\n"
-                    "💡 مثال:\n<code>0501234567\nID-789\nABC123\n500</code>")
-                return
-
-            wallet_number = lines[0]
-            account_id = lines[1]
-            confirmation_code = lines[2]
-            amount_str = lines[3]
-
             try:
-                amount = float(amount_str)
+                amount = float(text_msg)
                 if amount <= 0:
                     self.send_message(chat_id, "❌ المبلغ يجب أن يكون أكبر من صفر")
                     return
             except ValueError:
-                self.send_message(chat_id, "❌ المبلغ غير صحيح. السطر الرابع يجب أن يكون رقماً")
+                self.send_message(chat_id, "❌ اكتب مبلغاً رقمياً صحيحاً:")
                 return
 
-            if len(wallet_number) < 5:
-                self.send_message(chat_id, "❌ رقم المحفظة قصير جداً (السطر الأول)")
-                return
-            if len(account_id) < 2:
-                self.send_message(chat_id, "❌ معرف الحساب قصير جداً (السطر الثاني)")
-                return
-            if len(confirmation_code) < 3:
-                self.send_message(chat_id, "❌ كود السحب قصير جداً (السطر الثالث)")
-                return
-
-            # استخراج بيانات الشركة من الحالة
-            parts = state.replace('withdraw_all_data_', '').split('_', 1)
+            parts = state.replace('wd_step_amount_', '').split('_', 1)
             if len(parts) != 2:
-                self.send_message(chat_id, "❌ خطأ في البيانات")
-                if user_id in self.user_states: del self.user_states[user_id]
                 return
             company_id = parts[0]
             company_name = parts[1]
+
+            kb = {'keyboard': [[{'text': '❌ إلغاء'}]], 'resize_keyboard': True, 'one_time_keyboard': True}
+            self.send_message(chat_id,
+                f"✅ المبلغ: <code>{amount}</code>\n\n"
+                f"2️⃣ اكتب <b>رقم المحفظة</b> للاستلام:", kb)
+            self.user_states[user_id] = f'wd_step_wallet_{company_id}_{company_name}_{amount}'
+
+        elif isinstance(state, str) and state.startswith('wd_step_wallet_'):
+            # السحب خطوة 2: رقم المحفظة
+            user_id = message['from']['id']
+            chat_id = message['chat']['id']
+            text_msg = message.get('text', '').strip()
+
+            if text_msg in ['❌ إلغاء', 'إلغاء', 'الغاء', '🔙']:
+                if user_id in self.user_states: del self.user_states[user_id]
+                self.handle_start(message)
+                return
+
+            wallet_number = self.sanitize_input(text_msg)
+            if len(wallet_number) < 5:
+                self.send_message(chat_id, "❌ رقم المحفظة قصير جداً. اكتب رقم المحفظة:")
+                return
+
+            parts = state.replace('wd_step_wallet_', '').split('_', 2)
+            if len(parts) != 3:
+                return
+            company_id = parts[0]
+            company_name = parts[1]
+            amount = parts[2]
+
+            kb = {'keyboard': [[{'text': '❌ إلغاء'}]], 'resize_keyboard': True, 'one_time_keyboard': True}
+            self.send_message(chat_id,
+                f"✅ المحفظة: <code>{wallet_number}</code> 👈 اضغط للنسخ\n\n"
+                f"3️⃣ اكتب <b>معرف حسابك</b> (ID):", kb)
+            self.user_states[user_id] = f'wd_step_account_{company_id}_{company_name}_{amount}_{wallet_number}'
+
+        elif isinstance(state, str) and state.startswith('wd_step_account_'):
+            # السحب خطوة 3: معرف الحساب
+            user_id = message['from']['id']
+            chat_id = message['chat']['id']
+            text_msg = message.get('text', '').strip()
+
+            if text_msg in ['❌ إلغاء', 'إلغاء', 'الغاء', '🔙']:
+                if user_id in self.user_states: del self.user_states[user_id]
+                self.handle_start(message)
+                return
+
+            account_id = self.sanitize_input(text_msg)
+            if len(account_id) < 2:
+                self.send_message(chat_id, "❌ معرف الحساب قصير جداً. اكتب معرف الحساب:")
+                return
+
+            parts = state.replace('wd_step_account_', '').split('_', 3)
+            if len(parts) != 4:
+                return
+            company_id = parts[0]
+            company_name = parts[1]
+            amount = parts[2]
+            wallet_number = parts[3]
+
+            kb = {'keyboard': [[{'text': '❌ إلغاء'}]], 'resize_keyboard': True, 'one_time_keyboard': True}
+            self.send_message(chat_id,
+                f"✅ معرف الحساب: <code>{account_id}</code> 👈 اضغط للنسخ\n\n"
+                f"4️⃣ اكتب <b>كود السحب</b>:", kb)
+            self.user_states[user_id] = f'wd_step_code_{company_id}_{company_name}_{amount}_{wallet_number}_{account_id}'
+
+        elif isinstance(state, str) and state.startswith('wd_step_code_'):
+            # السحب خطوة 4: كود السحب — إنشاء المعاملة
+            user_id = message['from']['id']
+            chat_id = message['chat']['id']
+            text_msg = message.get('text', '').strip()
+
+            if text_msg in ['❌ إلغاء', 'إلغاء', 'الغاء', '🔙']:
+                if user_id in self.user_states: del self.user_states[user_id]
+                self.handle_start(message)
+                return
+
+            confirmation_code = self.sanitize_input(text_msg)
+            if len(confirmation_code) < 3:
+                self.send_message(chat_id, "❌ كود السحب قصير جداً. اكتب الكود:")
+                return
+
+            parts = state.replace('wd_step_code_', '').split('_', 4)
+            if len(parts) != 5:
+                return
+            company_id = parts[0]
+            company_name = parts[1]
+            amount = float(parts[2])
+            wallet_number = parts[3]
+            account_id = parts[4]
 
             user = self.find_user(user_id)
             if not user:
@@ -3092,7 +3151,6 @@ class ComprehensiveDUXBot:
             user_currency = user.get('currency', self.get_setting('default_currency') or 'SAR')
             trans_id = f"WTH{datetime.now().strftime('%Y%m%d%H%M%S')}"
 
-            # حفظ المعاملة
             with open('transactions.csv', 'a', newline='', encoding='utf-8-sig') as f:
                 writer = csv.writer(f)
                 writer.writerow([
@@ -3103,31 +3161,29 @@ class ComprehensiveDUXBot:
                     confirmation_code, '', user_currency
                 ])
 
-            # رسالة تأكيد للعميل
             lang = user.get('language', 'ar')
             self.send_message(chat_id,
                 f"✅ <b>تم تقديم طلب السحب!</b>\n\n"
-                f"🆔 <code>{trans_id}</code>\n"
+                f"🆔 رقم العملية: <code>{trans_id}</code> 👈 اضغط للنسخ\n"
                 f"🏢 الشركة: <b>{company_name}</b>\n"
                 f"💳 المحفظة: <code>{wallet_number}</code> 👈 اضغط للنسخ\n"
                 f"🆔 معرف الحساب: <code>{account_id}</code> 👈 اضغط للنسخ\n"
-                f"🔑 الكود: <code>{confirmation_code}</code>\n"
-                f"💰 المبلغ: <b>{amount}</b> {user_currency}\n\n"
+                f"🔑 الكود: <code>{confirmation_code}</code> 👈 اضغط للنسخ\n"
+                f"💰 المبلغ: <code>{amount}</code> {user_currency}\n\n"
                 f"⏳ {self.tr('code_pending_verification', lang)}",
                 self.main_keyboard(lang, user_id))
 
-            # إشعار الأدمن
             for admin_id in self.admin_ids:
                 try:
                     admin_msg = (
                         f"💸 <b>طلب سحب جديد</b>\n\n"
-                        f"🆔 <code>{trans_id}</code>\n"
-                        f"👤 {user.get('name', '')} ({user.get('customer_id', '')})\n"
+                        f"🆔 رقم العملية: <code>{trans_id}</code> 👈 اضغط للنسخ\n"
+                        f"👤 {user.get('name', '')} — <code>{user.get('customer_id', '')}</code>\n"
                         f"🏢 {company_name}\n"
                         f"💳 المحفظة: <code>{wallet_number}</code> 👈 اضغط للنسخ\n"
                         f"🆔 معرف الحساب: <code>{account_id}</code> 👈 اضغط للنسخ\n"
-                        f"💰 المبلغ: {amount} {user_currency}\n"
-                        f"🔑 الكود: <code>{confirmation_code}</code>\n"
+                        f"💰 المبلغ: <code>{amount}</code> {user_currency}\n"
+                        f"🔑 الكود: <code>{confirmation_code}</code> 👈 اضغط للنسخ\n"
                         f"📅 {datetime.now().strftime('%Y-%m-%d %H:%M')}\n"
                     )
                     inline_btns = [
@@ -3808,8 +3864,8 @@ class ComprehensiveDUXBot:
                 del self.user_states[user_id]
             return
 
-        if isinstance(current_state, str) and current_state == 'svrp_awaiting_send':
-            # معالجة إرسال رصيد مجمد
+        if isinstance(current_state, str) and current_state == 'svrp_send_customer':
+            # إرسال رصيد مجمد خطوة 1: معرف العميل
             user_id = message['from']['id']
             chat_id = message['chat']['id']
             text = message.get('text', '').strip()
@@ -3818,25 +3874,36 @@ class ComprehensiveDUXBot:
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                 self.show_svrp_panel(fake_msg)
                 return
-            # تنسيق: معرف_العميل المبلغ
-            parts = text.split()
-            if len(parts) < 2:
-                self.send_message(chat_id, "❌ الصيغة: معرف_العميل المبلغ\nمثال: C123456 100")
+            target_customer_id = text
+            kb = {'keyboard': [[{'text': '❌ إلغاء'}]], 'resize_keyboard': True, 'one_time_keyboard': True}
+            self.send_message(chat_id,
+                f"✅ معرف العميل: <code>{target_customer_id}</code> 👈 اضغط للنسخ\n\n"
+                f"2️⃣ اكتب <b>المبلغ</b>:", kb)
+            self.user_states[user_id] = f'svrp_send_amount_{target_customer_id}'
+
+        if isinstance(current_state, str) and current_state.startswith('svrp_send_amount_'):
+            # إرسال رصيد مجمد خطوة 2: المبلغ
+            user_id = message['from']['id']
+            chat_id = message['chat']['id']
+            text = message.get('text', '').strip()
+            if text in ['إلغاء', 'الغاء', '🔙']:
+                if user_id in self.user_states: del self.user_states[user_id]
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_svrp_panel(fake_msg)
                 return
-            target_customer_id = parts[0]
+            target_customer_id = current_state.replace('svrp_send_amount_', '')
             try:
-                amount = float(parts[1])
+                amount = float(text)
                 if amount <= 0:
                     self.send_message(chat_id, "❌ المبلغ يجب أن يكون أكبر من صفر")
                     return
             except ValueError:
-                self.send_message(chat_id, "❌ اكتب مبلغاً رقمياً صحيحاً")
+                self.send_message(chat_id, "❌ اكتب مبلغاً رقمياً صحيحاً:")
                 return
             success, msg = self.svrp.send_frozen_credits(str(user_id), target_customer_id, amount)
             icon = "✅" if success else "❌"
             self.send_message(chat_id, f"{icon} {msg}")
             if success:
-                # البحث عن telegram_id للمستلم للإشعار
                 try:
                     with open('users.csv', 'r', encoding='utf-8-sig') as f:
                         reader = csv.DictReader(f)
@@ -3846,7 +3913,7 @@ class ComprehensiveDUXBot:
                                 if recv_tid:
                                     self.notify_user(int(recv_tid),
                                         f"📥 <b>تم استلام رصيد مجمد!</b>\n\n"
-                                        f"💰 المبلغ: <code>{amount:.2f}</code>\n"
+                                        f"💰 المبلغ: <code>{amount:.2f}</code> 👈 اضغط للنسخ\n"
                                         f"🧊 حالة الرصيد: <b>مجمد</b>\n\n"
                                         f"💡 أرسل رصيداً لأصدقائك لفك التجميد")
                                 break
@@ -4107,39 +4174,9 @@ class ComprehensiveDUXBot:
             return
 
         if current_state == 'svrp_send_credits_input':
-            # إرسال رصيد مجمد — معرف العميل + المبلغ
-            user_id = message['from']['id']
-            chat_id = message['chat']['id']
-            text = message.get('text', '').strip()
-
-            if text in ['إلغاء', 'الغاء', '🔙', '❌ إلغاء']:
-                if user_id in self.user_states: del self.user_states[user_id]
-                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
-                self.show_svrp_panel(fake_msg)
-                return
-
-            # تنسيق: C123456 100
-            parts = text.split()
-            if len(parts) != 2:
-                self.send_message(chat_id,
-                    "❌ الصيغة: <code>[معرف_العميل] [المبلغ]</code>\n\n"
-                    "مثال: <code>C123456 100</code>")
-                return
-
-            receiver_customer_id = parts[0].strip()
-            try:
-                amount = float(parts[1].strip())
-            except ValueError:
-                self.send_message(chat_id, "❌ المبلغ يجب أن يكون رقماً")
-                return
-
-            success, msg = self.svrp.send_frozen_credits(user_id, receiver_customer_id, amount)
-            icon = "✅" if success else "❌"
-            self.send_message(chat_id, f"{icon} {msg}")
-
-            if user_id in self.user_states:
-                del self.user_states[user_id]
-            return
+            # redirect to new step-by-step
+            self.user_states[user_id] = 'svrp_send_customer'
+            current_state = 'svrp_send_customer'
 
         if isinstance(current_state, str) and current_state.startswith('mbot_freeze_input_'):
             # معالجة إدخال تاريخ التجميد
@@ -5986,7 +6023,7 @@ class ComprehensiveDUXBot:
             return
         lang = user.get('language', 'ar')
 
-        # معالجة إدخال بيانات المطابقة (مبلغ + محفظة + معرف)
+        # معالجة إدخال بيانات المطابقة — خطوة بخطوة
         if isinstance(state, dict) and state.get('step') == 'match_enter_data':
             text_msg = message.get('text', '').strip()
 
@@ -5995,99 +6032,109 @@ class ComprehensiveDUXBot:
                 self.handle_start(message)
                 return
 
-            lines = [l.strip() for l in text_msg.split('\n') if l.strip()]
-            if len(lines) < 3:
-                self.send_message(chat_id,
-                    "❌ يجب إرسال 3 أسطر:\n\n"
-                    "1️⃣ المبلغ\n"
-                    "2️⃣ رقم محفظتك\n"
-                    "3️⃣ معرف حسابك\n\n"
-                    "💡 مثال:\n<code>500\n0501234567\nID-789</code>")
-                return
-
-            try:
-                amount = float(lines[0])
-                if amount <= 0:
-                    self.send_message(chat_id, "❌ المبلغ يجب أن يكون أكبر من صفر")
+            # خطوة 1: المبلغ
+            state['substep'] = state.get('substep', 'amount')
+            if state['substep'] == 'amount':
+                try:
+                    amount = float(text_msg)
+                    if amount <= 0:
+                        self.send_message(chat_id, "❌ المبلغ يجب أن يكون أكبر من صفر")
+                        return
+                except ValueError:
+                    self.send_message(chat_id, "❌ اكتب مبلغاً رقمياً صحيحاً:")
                     return
-            except ValueError:
-                self.send_message(chat_id, "❌ المبلغ غير صحيح (السطر الأول)")
+                state['amount'] = amount
+                state['substep'] = 'wallet'
+                kb = {'keyboard': [[{'text': '❌ إلغاء'}]], 'resize_keyboard': True, 'one_time_keyboard': True}
+                self.send_message(chat_id,
+                    f"✅ المبلغ: <code>{amount}</code>\n\n"
+                    f"2️⃣ اكتب <b>رقم محفظتك</b>:", kb)
+                self.user_states[user_id] = state
                 return
 
-            wallet_number = lines[1]
-            account_id = lines[2]
-
-            if len(wallet_number) < 5:
-                self.send_message(chat_id, "❌ رقم المحفظة قصير (السطر الثاني)")
-                return
-            if len(account_id) < 2:
-                self.send_message(chat_id, "❌ معرف الحساب قصير (السطر الثالث)")
-                return
-
-            # إنشاء طلب المطابقة
-            req_id, error = self.match_manager.create_match_request(
-                user_id, user.get('customer_id', ''), state['type'],
-                amount, user.get('currency', 'SAR'),
-                state['company_id'], state['company_name'], ''
-            )
-
-            if error:
-                self.send_message(chat_id, f"❌ {error}", self.main_keyboard(lang, user_id))
-                del self.user_states[user_id]
+            if state['substep'] == 'wallet':
+                wallet_number = self.sanitize_input(text_msg)
+                if len(wallet_number) < 5:
+                    self.send_message(chat_id, "❌ رقم المحفظة قصير جداً. اكتب رقم المحفظة:")
+                    return
+                state['wallet_number'] = wallet_number
+                state['substep'] = 'account'
+                kb = {'keyboard': [[{'text': '❌ إلغاء'}]], 'resize_keyboard': True, 'one_time_keyboard': True}
+                self.send_message(chat_id,
+                    f"✅ المحفظة: <code>{wallet_number}</code> 👈 اضغط للنسخ\n\n"
+                    f"3️⃣ اكتب <b>معرف حسابك</b> (ID):", kb)
+                self.user_states[user_id] = state
                 return
 
-            # البحث عن مطابقة
-            request = self.match_manager.get_active_request_by_user(user_id)
-            if request:
-                match = self.match_manager.find_match(request)
-                if match:
-                    match_id = self.match_manager.create_match(request, match)
-                    self._notify_match_created(match_id)
+            if state['substep'] == 'account':
+                account_id = self.sanitize_input(text_msg)
+                if len(account_id) < 2:
+                    self.send_message(chat_id, "❌ معرف الحساب قصير. اكتب معرف الحساب:")
+                    return
+
+                amount = state['amount']
+                wallet_number = state['wallet_number']
+
+                # إنشاء طلب المطابقة
+                req_id, error = self.match_manager.create_match_request(
+                    user_id, user.get('customer_id', ''), state['type'],
+                    amount, user.get('currency', 'SAR'),
+                    state['company_id'], state['company_name'], ''
+                )
+
+                if error:
+                    self.send_message(chat_id, f"❌ {error}", self.main_keyboard(lang, user_id))
                     del self.user_states[user_id]
                     return
 
-            # لا توجد مطابقة — إشعار العميل + الأدمن
-            type_ar = 'إيداع' if state['type'] == 'deposit' else 'سحب'
-            self.send_message(chat_id,
-                f"⏳ <b>تم إنشاء طلبك</b>\n\n"
-                f"━━━━━━━━━━━━━━━━━━\n"
-                f"{'💵' if state['type'] == 'deposit' else '💸'} النوع: <b>{type_ar}</b>\n"
-                f"💰 المبلغ: <b>{amount}</b>\n"
-                f"🏢 الشركة: <b>{state['company_name']}</b>\n"
-                f"💳 المحفظة: <code>{wallet_number}</code> 👈 اضغط للنسخ\n"
-                f"🆔 معرف الحساب: <code>{account_id}</code> 👈 اضغط للنسخ\n"
-                f"━━━━━━━━━━━━━━━━━━\n\n"
-                f"⏳ جارٍ البحث عن مطابقة...\n"
-                f"سيتم إشعارك فور العثور على طرف آخر.",
-                self.main_keyboard(lang, user_id))
+                request = self.match_manager.get_active_request_by_user(user_id)
+                if request:
+                    match = self.match_manager.find_match(request)
+                    if match:
+                        match_id = self.match_manager.create_match(request, match)
+                        self._notify_match_created(match_id)
+                        del self.user_states[user_id]
+                        return
 
-            # إشعار الأدمن
-            for admin_id in self.admin_ids:
-                try:
-                    opposite_type = 'سحب' if state['type'] == 'deposit' else 'إيداع'
-                    admin_msg = (
-                        f"🔔 <b>طلب مطابقة معلق</b>\n\n"
-                        f"━━━━━━━━━━━━━━━━━━\n"
-                        f"👤 العميل: <code>{user_id}</code> ({user.get('name', '')})\n"
-                        f"{'💵' if state['type'] == 'deposit' else '💸'} النوع: <b>{type_ar}</b>\n"
-                        f"🔄 يبحث عن: <b>{opposite_type}</b>\n"
-                        f"💰 المبلغ: <b>{amount}</b>\n"
-                        f"🏢 الشركة: <b>{state['company_name']}</b>\n"
-                        f"💳 المحفظة: <code>{wallet_number}</code> 👈 اضغط للنسخ\n"
-                        f"🆔 معرف الحساب: <code>{account_id}</code> 👈 اضغط للنسخ\n"
-                        f"━━━━━━━━━━━━━━━━━━\n\n"
-                        f"يمكنك أن تكون الطرف الآخر:"
-                    )
-                    inline_btns = [
-                        [{'text': f'✅ أنا الطرف الآخر ({opposite_type})', 'callback_data': f'match_admin_join_{request["id"]}'},
-                         {'text': '⏳ انتظار', 'callback_data': f'match_admin_wait_{request["id"]}'}]
-                    ]
-                    self.send_inline_message(admin_id, admin_msg, inline_btns)
-                except Exception as e:
-                    logger.error(f"خطأ في إشعار الأدمن بطلب المطابقة: {e}")
+                type_ar = 'إيداع' if state['type'] == 'deposit' else 'سحب'
+                self.send_message(chat_id,
+                    f"⏳ <b>تم إنشاء طلبك</b>\n\n"
+                    f"━━━━━━━━━━━━━━━━━━\n"
+                    f"{'💵' if state['type'] == 'deposit' else '💸'} النوع: <b>{type_ar}</b>\n"
+                    f"💰 المبلغ: <code>{amount}</code>\n"
+                    f"🏢 الشركة: <b>{state['company_name']}</b>\n"
+                    f"💳 المحفظة: <code>{wallet_number}</code> 👈 اضغط للنسخ\n"
+                    f"🆔 معرف الحساب: <code>{account_id}</code> 👈 اضغط للنسخ\n"
+                    f"━━━━━━━━━━━━━━━━━━\n\n"
+                    f"⏳ جارٍ البحث عن مطابقة...",
+                    self.main_keyboard(lang, user_id))
 
-            del self.user_states[user_id]
-            return
+                for admin_id in self.admin_ids:
+                    try:
+                        opposite_type = 'سحب' if state['type'] == 'deposit' else 'إيداع'
+                        admin_msg = (
+                            f"🔔 <b>طلب مطابقة معلق</b>\n\n"
+                            f"━━━━━━━━━━━━━━━━━━\n"
+                            f"👤 العميل: <code>{user_id}</code> ({user.get('name', '')})\n"
+                            f"{'💵' if state['type'] == 'deposit' else '💸'} النوع: <b>{type_ar}</b>\n"
+                            f"🔄 يبحث عن: <b>{opposite_type}</b>\n"
+                            f"💰 المبلغ: <code>{amount}</code>\n"
+                            f"🏢 الشركة: <b>{state['company_name']}</b>\n"
+                            f"💳 المحفظة: <code>{wallet_number}</code> 👈 اضغط للنسخ\n"
+                            f"🆔 معرف الحساب: <code>{account_id}</code> 👈 اضغط للنسخ\n"
+                            f"━━━━━━━━━━━━━━━━━━\n\n"
+                            f"يمكنك أن تكون الطرف الآخر:"
+                        )
+                        inline_btns = [
+                            [{'text': f'✅ أنا الطرف الآخر ({opposite_type})', 'callback_data': f'match_admin_join_{request["id"]}'},
+                             {'text': '⏳ انتظار', 'callback_data': f'match_admin_wait_{request["id"]}'}]
+                        ]
+                        self.send_inline_message(admin_id, admin_msg, inline_btns)
+                    except Exception as e:
+                        logger.error(f"خطأ في إشعار الأدمن بطلب المطابقة: {e}")
+
+                del self.user_states[user_id]
+                return
 
         # معالجة قديمة — اختيار النوع (يُترك للتوافق الخلفي)
         if state == 'match_select_type':
@@ -6214,74 +6261,107 @@ class ComprehensiveDUXBot:
             del self.user_states[user_id]
             return
 
-        # إدخال كود السحب + معرف الحساب + رقم المحفظة + وسيلة الدفع
+        # إدخال كود السحب + البيانات — خطوة بخطوة
         if isinstance(state, dict) and state.get('step') == 'match_enter_code':
-            # تقسيم الرسالة إلى أسطر
-            lines = [l.strip() for l in text.split('\n') if l.strip()]
-            if len(lines) < 4:
+            state['substep'] = state.get('substep', 'code')
+
+            if text in ['❌ إلغاء', 'إلغاء', 'الغاء', '🔙']:
+                if user_id in self.user_states: del self.user_states[user_id]
+                self.handle_start(message)
+                return
+
+            if state['substep'] == 'code':
+                code = self.sanitize_input(text)
+                if len(code) < 3:
+                    self.send_message(message['chat']['id'], "❌ الكود قصير جداً. اكتب كود السحب:")
+                    return
+                state['code'] = code
+                state['substep'] = 'account'
+                kb = {'keyboard': [[{'text': '❌ إلغاء'}]], 'resize_keyboard': True, 'one_time_keyboard': True}
                 self.send_message(message['chat']['id'],
-                    "❌ يجب إرسال 4 أسطر:\n\n1️⃣ كود السحب\n2️⃣ معرف حسابك (ID)\n3️⃣ رقم محفظتك\n4️⃣ وسيلة الدفع\n\n💡 مثال:\nABC123\nID-789\n0501234567\nحساب بنكي")
+                    f"✅ الكود: <code>{code}</code> 👈 اضغط للنسخ\n\n"
+                    f"2️⃣ اكتب <b>معرف حسابك</b> (ID):", kb)
+                self.user_states[user_id] = state
                 return
 
-            code = self.sanitize_input(lines[0])
-            account_id = self.sanitize_input(lines[1])
-            wallet_number = self.sanitize_input(lines[2])
-            payment_method_name = self.sanitize_input(lines[3])
-
-            if len(code) < 3:
-                self.send_message(message['chat']['id'], "❌ الكود قصير جداً. السطر الأول غير صحيح:")
-                return
-            if len(account_id) < 2:
-                self.send_message(message['chat']['id'], "❌ معرف الحساب قصير جداً. السطر الثاني غير صحيح:")
-                return
-            if len(wallet_number) < 5:
-                self.send_message(message['chat']['id'], "❌ رقم المحفظة قصير جداً. السطر الثالث غير صحيح:")
-                return
-            if len(payment_method_name) < 2:
-                self.send_message(message['chat']['id'], "❌ وسيلة الدفع غير واضحة. السطر الرابع غير صحيح:")
+            if state['substep'] == 'account':
+                account_id = self.sanitize_input(text)
+                if len(account_id) < 2:
+                    self.send_message(message['chat']['id'], "❌ معرف الحساب قصير. اكتب معرف الحساب:")
+                    return
+                state['account_id'] = account_id
+                state['substep'] = 'wallet'
+                kb = {'keyboard': [[{'text': '❌ إلغاء'}]], 'resize_keyboard': True, 'one_time_keyboard': True}
+                self.send_message(message['chat']['id'],
+                    f"✅ معرف الحساب: <code>{account_id}</code> 👈 اضغط للنسخ\n\n"
+                    f"3️⃣ اكتب <b>رقم محفظتك</b>:", kb)
+                self.user_states[user_id] = state
                 return
 
-            # إزالة أيقونة وسيلة الدفع إن وجدت
-            for emoji in ['💳', '🏦', '📱', '👛', '💵', '📡', '🏷️']:
-                if payment_method_name.startswith(emoji):
-                    payment_method_name = payment_method_name[len(emoji):].strip()
-                    break
+            if state['substep'] == 'wallet':
+                wallet_number = self.sanitize_input(text)
+                if len(wallet_number) < 5:
+                    self.send_message(message['chat']['id'], "❌ رقم المحفظة قصير. اكتب رقم المحفظة:")
+                    return
+                state['wallet_number'] = wallet_number
+                state['substep'] = 'method'
+                kb = {'keyboard': [[{'text': '❌ إلغاء'}]], 'resize_keyboard': True, 'one_time_keyboard': True}
+                self.send_message(message['chat']['id'],
+                    f"✅ المحفظة: <code>{wallet_number}</code> 👈 اضغط للنسخ\n\n"
+                    f"4️⃣ اكتب <b>وسيلة الدفع</b>:", kb)
+                self.user_states[user_id] = state
+                return
 
-            match_id = state['match_id']
+            if state['substep'] == 'method':
+                payment_method_name = self.sanitize_input(text)
+                if len(payment_method_name) < 2:
+                    self.send_message(message['chat']['id'], "❌ وسيلة الدفع غير واضحة. اكتب وسيلة الدفع:")
+                    return
 
-            # حفظ الكود + البيانات في المطابقة
-            combined_code = f"{code} | ID:{account_id} | Wallet:{wallet_number} | Method:{payment_method_name}"
-            self.match_manager.set_confirmation_code(match_id, combined_code)
+                for emoji in ['💳', '🏦', '📱', '👛', '💵', '📡', '🏷️']:
+                    if payment_method_name.startswith(emoji):
+                        payment_method_name = payment_method_name[len(emoji):].strip()
+                        break
 
-            # إشعار الإدمن فقط (لا يصل للطرف الآخر)
-            match = self.match_manager.get_match_by_id(match_id)
-            for admin_id in self.admin_ids:
-                try:
-                    admin_msg = (
-                        f"🔐 طلب سحب جديد — مطابقة\n\n"
-                        f"🆔 المطابقة: {match_id}\n"
-                        f"💰 المبلغ: {match['amount']} {match['currency']}\n"
-                        f"🏢 الشركة: {match['company_name']}\n\n"
-                        f"🔑 كود السحب: {code}\n"
-                        f"🆔 معرف الحساب: {account_id}\n"
-                        f"💳 رقم المحفظة: {wallet_number}\n"
-                        f"📋 وسيلة الدفع: {payment_method_name}\n\n"
-                        f"بانتظار تأكيدك"
-                    )
-                    inline_btns = [
-                        [{'text': '✅ تأكيد الكود', 'callback_data': f'match_verify_{match_id}'},
-                         {'text': '❌ رفض الكود', 'callback_data': f'match_reject_code_{match_id}'}]
-                    ]
-                    self.send_inline_message(admin_id, admin_msg, inline_btns)
-                except:
-                    pass
+                match_id = state['match_id']
+                code = state['code']
+                account_id = state['account_id']
+                wallet_number = state['wallet_number']
 
-            # إشعار الساحب أن البيانات تم إرسالها
-            self.send_message(message['chat']['id'],
-                "✅ تم إرسال بياناتك للتحقق. سيتم إشعارك فور التأكيد.\n\n🔑 الكود: " + code + "\n🆔 ID: " + account_id + "\n💳 المحفظة: " + wallet_number + "\n📋 الوسيلة: " + payment_method_name,
-                self.main_keyboard(lang, user_id))
-            del self.user_states[user_id]
-            return
+                combined_code = f"{code} | ID:{account_id} | Wallet:{wallet_number} | Method:{payment_method_name}"
+                self.match_manager.set_confirmation_code(match_id, combined_code)
+
+                match = self.match_manager.get_match_by_id(match_id)
+                for admin_id in self.admin_ids:
+                    try:
+                        admin_msg = (
+                            f"🔐 <b>طلب سحب — مطابقة</b>\n\n"
+                            f"🆔 رقم المطابقة: <code>{match_id}</code> 👈 اضغط للنسخ\n"
+                            f"💰 المبلغ: <code>{match['amount']}</code> {match['currency']}\n"
+                            f"🏢 الشركة: <b>{match['company_name']}</b>\n\n"
+                            f"🔑 الكود: <code>{code}</code> 👈 اضغط للنسخ\n"
+                            f"🆔 معرف الحساب: <code>{account_id}</code> 👈 اضغط للنسخ\n"
+                            f"💳 المحفظة: <code>{wallet_number}</code> 👈 اضغط للنسخ\n"
+                            f"📋 الوسيلة: <b>{payment_method_name}</b>\n"
+                        )
+                        inline_btns = [
+                            [{'text': '✅ تأكيد الكود', 'callback_data': f'match_verify_{match_id}'},
+                             {'text': '❌ رفض الكود', 'callback_data': f'match_reject_code_{match_id}'}]
+                        ]
+                        self.send_inline_message(admin_id, admin_msg, inline_btns)
+                    except:
+                        pass
+
+                self.send_message(message['chat']['id'],
+                    f"✅ <b>تم إرسال بياناتك للتحقق</b>\n\n"
+                    f"🔑 الكود: <code>{code}</code> 👈 اضغط للنسخ\n"
+                    f"🆔 معرف الحساب: <code>{account_id}</code> 👈 اضغط للنسخ\n"
+                    f"💳 المحفظة: <code>{wallet_number}</code> 👈 اضغط للنسخ\n"
+                    f"📋 الوسيلة: <b>{payment_method_name}</b>\n\n"
+                    f"⏳ سيتم إشعارك فور التأكيد",
+                    self.main_keyboard(lang, user_id))
+                del self.user_states[user_id]
+                return
 
         # دردشة
         if isinstance(state, dict) and state.get('step') == 'chatting':
@@ -7209,12 +7289,11 @@ class ComprehensiveDUXBot:
                 # إرسال رصيد مجمد — المرحلة 3
                 self.edit_message(chat_id, message.get('message_id'),
                     "📤 <b>إرسال رصيد مجمد</b>\n\n"
-                    "اكتب معرف العميل + المبلغ:\n\n"
-                    "مثال:\n<code>C123456 250</code>\n\n"
                     "⚠️ الحد الأقصى لكل صديق: 25% من رصيدك المجمد\n"
                     "👥 الحد الأدنى: 4 أصدقاء لفك التجميد الكامل\n"
-                    "💡 عند الإرسال ← يُفك تجميد نفس المبلغ")
-                self.user_states[user_id] = 'svrp_send_credits_input'
+                    "💡 عند الإرسال ← يُفك تجميد نفس المبلغ\n\n"
+                    "1️⃣ اكتب <b>معرف العميل</b> (مثل: C123456):")
+                self.user_states[user_id] = 'svrp_send_customer'
                 return
 
             elif data == 'svrp_recovery_approve':
@@ -7358,22 +7437,16 @@ class ComprehensiveDUXBot:
 
                 text = f"{icon} <b>{company['name']}</b>\n📋 {company.get('details', '')}\n"
                 if address:
-                    text += f"📍 <b>عنوان السحب:</b>\n<code>{address}</code>\n\n"
-                text += f"━━━━━━━━━━━━━━━━━━\n\n"
-                text += f"📝 أرسل بياناتك في رسالة واحدة:\n\n"
-                text += f"1️⃣ رقم المحفظة التي تريد الاستلام عليها\n"
-                text += f"2️⃣ معرف حسابك في التطبيق\n"
-                text += f"3️⃣ كود السحب\n"
-                text += f"4️⃣ المبلغ الذي تريد سحبه\n\n"
-                text += f"💡 مثال:\n<code>0501234567\nID-789\nABC123\n500</code>"
+                    text += f"📍 <b>عنوان السحب:</b>\n<code>{address}</code>\n"
+                text += f"👈 اضغط للنسخ\n\n"
 
                 self.edit_message(chat_id, message.get('message_id'), text)
 
                 user = self.find_user(user_id)
                 lang = user.get('language', 'ar') if user else 'ar'
                 kb = {'keyboard': [[{'text': '❌ إلغاء'}, {'text': self.tr('main_menu', lang)}]], 'resize_keyboard': True, 'one_time_keyboard': True}
-                self.send_message(chat_id, "📝 أرسل بياناتك الأربعة:", kb)
-                self.user_states[user_id] = f'withdraw_all_data_{company_id}_{company["name"]}'
+                self.send_message(chat_id, "1️⃣ اكتب <b>المبلغ</b> الذي تريد سحبه:", kb)
+                self.user_states[user_id] = f'wd_step_amount_{company_id}_{company["name"]}'
                 return
 
             # ==================== 🤖 إدارة البوتات المتعددة ====================
@@ -7661,12 +7734,11 @@ class ComprehensiveDUXBot:
             elif data == 'svrp_send_credits':
                 self.edit_message(chat_id, message.get('message_id'),
                     "📤 <b>إرسال رصيد مجمد</b>\n\n"
-                    "اكتب معرف العميل + المبلغ:\n\n"
-                    "<code>مثال: C123456 100</code>\n\n"
                     "💡 سيتم خصم المبلغ من رصيدك المجمد\n"
                     "وإضافته للرصيد المجمد للعميل الآخر\n"
-                    "ونقل نفس المبلغ من مجمده إلى متاحك")
-                self.user_states[user_id] = 'svrp_awaiting_send'
+                    "ونقل نفس المبلغ من مجمده إلى متاحك\n\n"
+                    "1️⃣ اكتب <b>معرف العميل</b> (مثل: C123456):")
+                self.user_states[user_id] = 'svrp_send_customer'
                 return
 
             elif data == 'svrp_invite':
