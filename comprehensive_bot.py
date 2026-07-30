@@ -819,11 +819,42 @@ class ComprehensiveDUXBot:
                 writer.writerow(['telegram_id', 'last_login', 'total_transactions', 'total_deposits', 'total_withdrawals', 'rating_avg', 'last_activity'])
 
     def init_app_links_file(self):
-        """إنشاء ملف التطبيقات"""
+        """إنشاء وترحيل ملف التطبيقات"""
         if not os.path.exists('app_links.csv'):
             with open('app_links.csv', 'w', newline='', encoding='utf-8-sig') as f:
                 writer = csv.writer(f)
                 writer.writerow(['id', 'name', 'icon_url', 'icon_file_id', 'download_url', 'apk_file_id', 'download_type', 'description', 'is_active', 'created_at'])
+        else:
+            self.migrate_app_links_csv()
+
+    def migrate_app_links_csv(self):
+        """ترحيل app_links.csv لإضافة الأعمدة الجديدة"""
+        try:
+            with open('app_links.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                fieldnames = reader.fieldnames or []
+                rows = list(reader)
+            need_migration = 'icon_file_id' not in fieldnames or 'apk_file_id' not in fieldnames or 'download_type' not in fieldnames
+            if not need_migration:
+                return
+            new_fields = ['id', 'name', 'icon_url', 'icon_file_id', 'download_url', 'apk_file_id', 'download_type', 'description', 'is_active', 'created_at']
+            for row in rows:
+                if 'icon_file_id' not in row:
+                    row['icon_file_id'] = ''
+                if 'apk_file_id' not in row:
+                    row['apk_file_id'] = ''
+                if 'download_type' not in row:
+                    row['download_type'] = 'url'
+                if 'is_active' not in row:
+                    row['is_active'] = 'yes'
+            with open('app_links.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.DictWriter(f, fieldnames=new_fields)
+                writer.writeheader()
+                for row in rows:
+                    writer.writerow({k: row.get(k, '') for k in new_fields})
+            logger.info("تم ترحيل app_links.csv لإضافة الأعمدة الجديدة")
+        except Exception as e:
+            logger.error(f"خطأ في ترحيل app_links.csv: {e}")
 
     def get_app_links(self):
         """جلب جميع التطبيقات النشطة"""
@@ -988,7 +1019,7 @@ class ComprehensiveDUXBot:
     # ==================== 📱 التطبيقات — Panel Methods ====================
 
     def show_apps_panel(self, message):
-        """عرض لوحة التطبيقات للمستخدم — أزرار inline مع أيقونات"""
+        """عرض التطبيقات للمستخدم — كل تطبيق بصورته + زر تحميل مرفق"""
         user = self.find_user(message['from']['id'])
         lang = user.get('language', 'ar') if user else 'ar'
         apps = self.get_app_links()
@@ -999,48 +1030,64 @@ class ComprehensiveDUXBot:
                 self.main_keyboard(lang, message['from']['id']))
             return
 
-        inline_btns = []
         for app in apps:
             name = app.get('name', '')
+            desc = app.get('description', '')
             dl_type = app.get('download_type', 'url')
             icon_url = app.get('icon_url', '')
             icon_file_id = app.get('icon_file_id', '')
             download_url = app.get('download_url', '')
             apk_file_id = app.get('apk_file_id', '')
 
-            # إرسال أيقونة التطبيق كصورة إن وجدت
+            # بناء caption
+            caption = f"📱 <b>{name}</b>\n"
+            if desc:
+                caption += f"📝 {desc}\n"
+
+            # بناء زر التحميل
+            inline_btns = []
+            if dl_type == 'apk' and apk_file_id:
+                inline_btns.append([{'text': f"⬇️ تحميل {name}", 'callback_data': f"app_dl_{app['id']}"}])
+            elif download_url:
+                inline_btns.append([{'text': f"⬇️ تحميل {name}", 'url': download_url}])
+            else:
+                caption += "\n❌ لا يوجد رابط تحميل"
+
+            keyboard = {'inline_keyboard': inline_btns} if inline_btns else None
+
+            # إرسال الأيقونة + الزر معاً
+            sent = False
             if icon_file_id:
                 try:
                     self.api_call('sendPhoto', {
                         'chat_id': message['chat']['id'],
                         'photo': icon_file_id,
-                        'caption': f"📱 <b>{name}</b>",
-                        'parse_mode': 'HTML'
+                        'caption': caption,
+                        'parse_mode': 'HTML',
+                        'reply_markup': self.transform_keyboard(keyboard) if keyboard else None
                     })
+                    sent = True
                 except:
                     pass
-            elif icon_url and icon_url.startswith('http'):
+            if not sent and icon_url and icon_url.startswith('http'):
                 try:
                     self.api_call('sendPhoto', {
                         'chat_id': message['chat']['id'],
                         'photo': icon_url,
-                        'caption': f"📱 <b>{name}</b>",
-                        'parse_mode': 'HTML'
+                        'caption': caption,
+                        'parse_mode': 'HTML',
+                        'reply_markup': self.transform_keyboard(keyboard) if keyboard else None
                     })
+                    sent = True
                 except:
                     pass
+            if not sent:
+                # لا يوجد أيقونة — إرسال نص مع زر inline
+                caption += "\n👇 اضغط للتحميل"
+                self.send_inline_message(message['chat']['id'], caption, inline_btns if inline_btns else [[{'text': '🔙 رجوع', 'callback_data': 'apps_back_main'}]])
 
-            # زر التحميل حسب النوع
-            if dl_type == 'apk' and apk_file_id:
-                inline_btns.append([{'text': f"⬇️ تحميل {name}", 'callback_data': f"app_dl_{app['id']}"}])
-            elif download_url:
-                inline_btns.append([{'text': f"⬇️ تحميل {name}", 'url': download_url}])
-
-        inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'apps_back_main'}])
-
-        self.send_inline_message(message['chat']['id'],
-            f"📱 <b>التطبيقات</b>\n\nاختر تطبيقاً للتحميل:",
-            inline_btns)
+        # زر الرجوع في النهاية
+        self.send_inline_message(message['chat']['id'], "📱 تم عرض كل التطبيقات", [[{'text': '🔙 رجوع', 'callback_data': 'apps_back_main'}]])
 
     # ==================== Admin: Apps Management ====================
 
