@@ -1585,16 +1585,15 @@ class ComprehensiveDUXBot:
                 del self.user_states[user_id]
 
     def show_svrp_admin_panel(self, message):
-        """لوحة إدارة 💎 تعويض 100% — إدارة كاملة بأزرار inline"""
+        """لوحة إدارة 💎 التعويض — إدارة كاملة"""
         admin_user = self.find_user(message['from']['id'])
         admin_lang = admin_user.get('language', 'ar') if admin_user else 'ar'
 
         if not self.svrp:
-            self.send_message(message['chat']['id'], self.tr('svrp_not_available', admin_lang), self.admin_keyboard())
+            self.send_message(message['chat']['id'], "❌ نظام التعويض غير متاح", self.admin_keyboard())
             return
 
         stats = self.svrp.get_svrp_stats()
-        # قراءة الإعدادات عبر _get_config
         config = {}
         for key in ['recovery_multiplier', 'max_recovery_cap', 'credit_expiry_days',
                      'wagering_requirement', 'promo_code_max_uses',
@@ -1602,46 +1601,34 @@ class ComprehensiveDUXBot:
             config[key] = self.svrp._get_config(key)
 
         text = (
-            f"╔════════════════════╗\n"
-            f"║  💎 إدارة تعويض 100%  ║\n"
-            f"╚════════════════════╝\n\n"
-            f"┌─── 📊 الإحصائيات ───┐\n"
-            f"│  💰 أرصدة مصدرة: {stats['total_credits_issued']:.2f}\n"
-            f"│  📉 أرصدة مستخدمة: {stats['total_credits_used']:.2f}\n"
-            f"│  ✅ أرصدة نشطة: {stats['active_credits']}\n"
-            f"│  ⏰ أرصدة منتهية: {stats['expired_credits']}\n"
-            f"│  👥 المحافظ: {stats['total_wallets']}\n"
-            f"│  💵 إجمالي الأرصدة: {stats['total_balance']:.2f}\n"
-            f"│  ⏳ رصيد معلق: {stats['total_pending']:.2f}\n"
-            f"│  📋 مهام نشطة: {stats['active_tasks']}\n"
-            f"│  ✅ مهام مكتملة: {stats['completed_tasks']}\n"
-            f"│  🎟️ أكواد نشطة: {stats['active_promos']}\n"
-            f"└─────────────────────┘\n\n"
-            f"┌─── ⚙️ الإعدادات الحالية ───┐\n"
-            f"│  🔢 مضاعف الاسترداد: {config['recovery_multiplier']}x\n"
-            f"│  💎 الحد الأقصى لكل حدث: {config['max_recovery_cap']}\n"
-            f"│  📅 انتهاء الرصيد: {config['credit_expiry_days']} يوم\n"
-            f"│  🎯 متطلبات الرهان: {config['wagering_requirement']} معاملة\n"
-            f"│  🎟️ حد استخدام الكود: {config['promo_code_max_uses']}\n"
-            f"│  📅 انتهاء الكود: {config['promo_code_expiry_days']} يوم\n"
-            f"│  📈 الحد الشهري: {config['max_recovery_per_month']}\n"
-            f"└─────────────────────┘\n"
+            f"💎 <b>إدارة التعويض</b>\n\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"📊 <b>الإحصائيات</b>\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"💰 أرصدة مصدرة: <code>{stats['total_credits_issued']:.2f}</code>\n"
+            f"📉 أرصدة مستخدمة: <code>{stats['total_credits_used']:.2f}</code>\n"
+            f"✅ أرصدة نشطة: <code>{stats['active_credits']}</code>\n"
+            f"👥 المحافظ: <code>{stats['total_wallets']}</code>\n"
+            f"💵 إجمالي الأرصدة: <code>{stats['total_balance']:.2f}</code>\n"
+            f"⏳ رصيد معلق: <code>{stats['total_pending']:.2f}</code>\n\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"⚙️ <b>الإعدادات الحالية</b>\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"🔢 مضاعف التعويض: <code>{config['recovery_multiplier']}x</code>\n"
+            f"💎 الحد الأقصى لكل حدث: <code>{config['max_recovery_cap']}</code>\n"
+            f"🎯 متطلبات الرهان: <code>{config['wagering_requirement']}</code> معاملة\n"
+            f"📈 الحد الشهري: <code>{config['max_recovery_per_month']}</code>\n"
         )
 
-        if stats.get('top_referrers'):
-            text += "\n🏆 أفضل المُحيلين:\n"
-            for tid, count in stats['top_referrers']:
-                text += f"  • <code>{tid}</code>: {count} إحالة\n"
-
-        # أزرار inline للإدارة
         inline_btns = [
-            [{'text': '⚙️ تعديل الإعدادات', 'callback_data': 'svrp_admin_settings'},
-             {'text': '👥 عرض المحافظ', 'callback_data': 'svrp_admin_wallets'}],
-            [{'text': '🎟️ الأكواد الترويجية', 'callback_data': 'svrp_admin_promos'},
-             {'text': '📋 المهام', 'callback_data': 'svrp_admin_tasks'}],
-            [{'text': '🧹 تنظيف الأرصدة المنتهية', 'callback_data': 'svrp_admin_cleanup'},
+            [{'text': '⚙️ الإعدادات', 'callback_data': 'svrp_admin_settings'},
+             {'text': '👥 المحافظ', 'callback_data': 'svrp_admin_wallets'}],
+            [{'text': '🏢 الشركات والحسابات', 'callback_data': 'svrp_admin_companies'},
+             {'text': '🏆 طلبات المكافآت', 'callback_data': 'svrp_admin_bonus_reqs'}],
+            [{'text': '📸 طلبات الاسترداد', 'callback_data': 'svrp_admin_recovery_reqs'},
+             {'text': '💰 طلبات الإيداع', 'callback_data': 'svrp_admin_dep_reqs'}],
+            [{'text': '📝 تعديل النصوص', 'callback_data': 'svrp_edit_texts'},
              {'text': '📊 إحصائيات تفصيلية', 'callback_data': 'svrp_admin_detailed'}],
-            [{'text': '📝 تعديل النصوص', 'callback_data': 'svrp_edit_texts'}],
             [{'text': '🔙 العودة للوحة الأدمن', 'callback_data': 'svrp_admin_back'}]
         ]
 
@@ -7215,13 +7202,23 @@ class ComprehensiveDUXBot:
                     pass
 
                 if not has_lost_deposit:
-                    self.edit_message(chat_id, message.get('message_id'),
-                        "⚠️ <b>لا يمكن المطالبة بالمكافأة بعد</b>\n\n"
-                        "📋 للمطالبة بالمكافأة يجب أولاً:\n"
-                        "1️⃣ تسجيل حسابك في الشركة ✅\n"
-                        "2️⃣ عمل إيداع وخسارته ❌\n\n"
-                        f"💡 بعد خسارة إيداع، يمكنك المطالبة بالمكافأة.\n"
-                        f"اضغط 💰 إيداع لبدء عملية إيداع.")
+                    # فحص هل سجل حساب
+                    has_account = account is not None
+                    inline_btns = []
+                    msg = "⚠️ <b>لا يمكن المطالبة بالمكافأة بعد</b>\n\n📋 <b>الشروط:</b>\n\n"
+
+                    if has_account:
+                        msg += "1️⃣ تسجيل حسابك في الشركة ✅\n"
+                    else:
+                        msg += "1️⃣ تسجيل حسابك في الشركة ❌\n"
+                        inline_btns.append([{'text': '🏢 تسجيل حساب', 'callback_data': 'svrp_companies'}])
+
+                    msg += "2️⃣ عمل إيداع وخسارته ❌\n\n"
+                    msg += "💡 أكمل الخطوات أولاً ثم اطلب المكافأة."
+                    inline_btns.append([{'text': '💰 إيداع', 'callback_data': 'svrp_deposit'}])
+                    inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'svrp_back_panel'}])
+                    self.edit_message(chat_id, message.get('message_id'), msg)
+                    self.send_inline_message(chat_id, "اختر:", inline_btns)
                     return
 
                 req_id, err = self.svrp.create_bonus_request(
@@ -7603,6 +7600,77 @@ class ComprehensiveDUXBot:
 
             elif data == 'svrp_admin_settings':
                 self.svrp_admin_edit_settings(chat_id)
+                return
+
+            elif data == 'svrp_admin_companies':
+                # عرض الشركات المسجلة في النظام + روابط الإفيليت
+                companies = self.svrp.get_recovery_companies(active_only=False)
+                if not companies:
+                    self.send_message(chat_id, "📭 لا توجد شركات. أضف شركات من قسم إدارة الشركات.")
+                    return
+                text = "🏢 <b>شركات التعويض</b>\n\n"
+                for c in companies:
+                    aff = c.get('affiliate_link', '') or '❌ غير محدد'
+                    status = '✅' if c.get('is_active') == 'yes' else '❌'
+                    text += f"{status} <b>{c['name']}</b>\n"
+                    text += f"   🔗 <code>{aff}</code>\n" if aff != '❌ غير محدد' else f"   🔗 {aff}\n"
+                    text += "\n"
+                text += "💡 لتعديل رابط الإفيليت: اذهب لإدارة الشركات ← اختر شركة ← 🔗 تعديل رابط الإحالة"
+                inline_btns = [[{'text': '🔙 رجوع', 'callback_data': 'svrp_admin_back'}]]
+                self.send_inline_message(chat_id, text, inline_btns)
+                return
+
+            elif data == 'svrp_admin_bonus_reqs':
+                # عرض طلبات المكافآت المعلقة
+                bonus_reqs = self.svrp._read_csv('bonus_requests.csv')
+                pending = [r for r in bonus_reqs if r.get('status') == 'pending']
+                if not pending:
+                    self.send_message(chat_id, "✅ لا توجد طلبات مكافآت معلقة")
+                    return
+                text = f"🏆 <b>طلبات المكافآت المعلقة ({len(pending)})</b>\n\n"
+                for r in pending[:10]:
+                    text += f"🆔 <code>{r.get('id', '')}</code> 👈 اضغط للنسخ\n"
+                    text += f"👤 <code>{r.get('user_id', '')}</code>\n"
+                    text += f"🏢 {r.get('company_name', '')}\n"
+                    text += f"📋 <code>{r.get('account_number', '')}</code>\n\n"
+                inline_btns = [[{'text': '🔙 رجوع', 'callback_data': 'svrp_admin_back'}]]
+                self.send_inline_message(chat_id, text, inline_btns)
+                return
+
+            elif data == 'svrp_admin_recovery_reqs':
+                # عرض طلبات الاسترداد بلقطة شاشة
+                recovery_reqs = self.svrp._read_csv('recovery_requests.csv')
+                pending = [r for r in recovery_reqs if r.get('status') == 'pending']
+                if not pending:
+                    self.send_message(chat_id, "✅ لا توجد طلبات استرداد معلقة")
+                    return
+                text = f"📸 <b>طلبات الاسترداد المعلقة ({len(pending)})</b>\n\n"
+                for r in pending[:10]:
+                    text += f"🆔 <code>{r.get('id', '')}</code> 👈 اضغط للنسخ\n"
+                    text += f"👤 <code>{r.get('user_id', '')}</code>\n"
+                    text += f"📊 الحالة: {r.get('status', '')}\n\n"
+                inline_btns = [[{'text': '🔙 رجوع', 'callback_data': 'svrp_admin_back'}]]
+                self.send_inline_message(chat_id, text, inline_btns)
+                return
+
+            elif data == 'svrp_admin_dep_reqs':
+                # عرض طلبات الإيداع من الرصيد المتاح
+                dep_reqs = self.svrp._read_csv('svrp_deposits.csv') if os.path.exists('svrp_deposits.csv') else []
+                if not dep_reqs:
+                    self.send_message(chat_id, "✅ لا توجد طلبات إيداع من الرصيد المتاح")
+                    return
+                pending = [r for r in dep_reqs if r.get('status') == 'pending']
+                if not pending:
+                    self.send_message(chat_id, "✅ لا توجد طلبات إيداع معلقة")
+                    return
+                text = f"💰 <b>طلبات الإيداع المعلقة ({len(pending)})</b>\n\n"
+                for r in pending[:10]:
+                    text += f"🆔 <code>{r.get('id', '')}</code> 👈 اضغط للنسخ\n"
+                    text += f"👤 <code>{r.get('user_id', '')}</code>\n"
+                    text += f"🏢 {r.get('company_name', '')}\n"
+                    text += f"💰 <code>{r.get('amount', '')}</code>\n\n"
+                inline_btns = [[{'text': '🔙 رجوع', 'callback_data': 'svrp_admin_back'}]]
+                self.send_inline_message(chat_id, text, inline_btns)
                 return
 
             elif data == 'svrp_admin_cleanup':
