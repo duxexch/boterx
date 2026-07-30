@@ -818,41 +818,47 @@ class ComprehensiveDUXBot:
                 writer = csv.writer(f)
                 writer.writerow(['telegram_id', 'last_login', 'total_transactions', 'total_deposits', 'total_withdrawals', 'rating_avg', 'last_activity'])
 
+    APP_FIELDS = ['id', 'name', 'icon_url', 'icon_file_id', 'android_url', 'android_file_id', 'ios_url', 'ios_file_id', 'description', 'is_active', 'created_at']
+
     def init_app_links_file(self):
         """إنشاء وترحيل ملف التطبيقات"""
         if not os.path.exists('app_links.csv'):
             with open('app_links.csv', 'w', newline='', encoding='utf-8-sig') as f:
                 writer = csv.writer(f)
-                writer.writerow(['id', 'name', 'icon_url', 'icon_file_id', 'download_url', 'apk_file_id', 'download_type', 'description', 'is_active', 'created_at'])
+                writer.writerow(self.APP_FIELDS)
         else:
             self.migrate_app_links_csv()
 
     def migrate_app_links_csv(self):
-        """ترحيل app_links.csv لإضافة الأعمدة الجديدة"""
+        """ترحيل app_links.csv — يدعم كل إصدارات الملف"""
         try:
             with open('app_links.csv', 'r', encoding='utf-8-sig') as f:
                 reader = csv.DictReader(f)
                 fieldnames = reader.fieldnames or []
                 rows = list(reader)
-            need_migration = 'icon_file_id' not in fieldnames or 'apk_file_id' not in fieldnames or 'download_type' not in fieldnames
-            if not need_migration:
-                return
-            new_fields = ['id', 'name', 'icon_url', 'icon_file_id', 'download_url', 'apk_file_id', 'download_type', 'description', 'is_active', 'created_at']
+            if 'android_url' in fieldnames:
+                return  # أحدث إصدار
             for row in rows:
+                # ترحيل من download_url/apk_file_id إلى android_url/android_file_id
+                if 'android_url' not in row:
+                    old_url = row.get('download_url', '')
+                    old_apk = row.get('apk_file_id', '')
+                    row['android_url'] = old_url if old_url else ''
+                    row['android_file_id'] = old_apk if old_apk else ''
+                if 'ios_url' not in row:
+                    row['ios_url'] = ''
+                if 'ios_file_id' not in row:
+                    row['ios_file_id'] = ''
                 if 'icon_file_id' not in row:
                     row['icon_file_id'] = ''
-                if 'apk_file_id' not in row:
-                    row['apk_file_id'] = ''
-                if 'download_type' not in row:
-                    row['download_type'] = 'url'
                 if 'is_active' not in row:
                     row['is_active'] = 'yes'
             with open('app_links.csv', 'w', newline='', encoding='utf-8-sig') as f:
-                writer = csv.DictWriter(f, fieldnames=new_fields)
+                writer = csv.DictWriter(f, fieldnames=self.APP_FIELDS)
                 writer.writeheader()
                 for row in rows:
-                    writer.writerow({k: row.get(k, '') for k in new_fields})
-            logger.info("تم ترحيل app_links.csv لإضافة الأعمدة الجديدة")
+                    writer.writerow({k: row.get(k, '') for k in self.APP_FIELDS})
+            logger.info("تم ترحيل app_links.csv لإضافة أعمدة android/ios")
         except Exception as e:
             logger.error(f"خطأ في ترحيل app_links.csv: {e}")
 
@@ -881,13 +887,13 @@ class ComprehensiveDUXBot:
             pass
         return apps
 
-    def add_app_link(self, name, icon_url='', icon_file_id='', download_url='', apk_file_id='', download_type='url', description=''):
+    def add_app_link(self, name, icon_url='', icon_file_id='', android_url='', android_file_id='', ios_url='', ios_file_id='', description=''):
         """إضافة تطبيق جديد"""
         app_id = f"APP{str(int(datetime.now().timestamp()))[-6:]}"
         try:
             with open('app_links.csv', 'a', newline='', encoding='utf-8-sig') as f:
                 writer = csv.writer(f)
-                writer.writerow([app_id, name, icon_url, icon_file_id, download_url, apk_file_id, download_type, description, 'yes', datetime.now().strftime('%Y-%m-%d %H:%M')])
+                writer.writerow([app_id, name, icon_url, icon_file_id, android_url, android_file_id, ios_url, ios_file_id, description, 'yes', datetime.now().strftime('%Y-%m-%d %H:%M')])
             return app_id
         except Exception as e:
             logger.error(f"خطأ في إضافة تطبيق: {e}")
@@ -960,9 +966,10 @@ class ComprehensiveDUXBot:
                         row['name'] = data.get('name', row.get('name', ''))
                         row['icon_url'] = data.get('icon_url', '')
                         row['icon_file_id'] = data.get('icon_file_id', '')
-                        row['download_url'] = data.get('download_url', '')
-                        row['apk_file_id'] = data.get('apk_file_id', '')
-                        row['download_type'] = data.get('download_type', 'url')
+                        row['android_url'] = data.get('android_url', '')
+                        row['android_file_id'] = data.get('android_file_id', '')
+                        row['ios_url'] = data.get('ios_url', '')
+                        row['ios_file_id'] = data.get('ios_file_id', '')
                         row['description'] = data.get('description', '')
                     rows.append(row)
             with open('app_links.csv', 'w', newline='', encoding='utf-8-sig') as f:
@@ -1019,7 +1026,7 @@ class ComprehensiveDUXBot:
     # ==================== 📱 التطبيقات — Panel Methods ====================
 
     def show_apps_panel(self, message):
-        """عرض التطبيقات للمستخدم — كل تطبيق بصورته + زر تحميل مرفق"""
+        """عرض التطبيقات للمستخدم — كل تطبيق بصورته + زرين أندرويد وآيفون"""
         user = self.find_user(message['from']['id'])
         lang = user.get('language', 'ar') if user else 'ar'
         apps = self.get_app_links()
@@ -1033,29 +1040,36 @@ class ComprehensiveDUXBot:
         for app in apps:
             name = app.get('name', '')
             desc = app.get('description', '')
-            dl_type = app.get('download_type', 'url')
             icon_url = app.get('icon_url', '')
             icon_file_id = app.get('icon_file_id', '')
-            download_url = app.get('download_url', '')
-            apk_file_id = app.get('apk_file_id', '')
+            android_url = app.get('android_url', '')
+            android_file_id = app.get('android_file_id', '')
+            ios_url = app.get('ios_url', '')
+            ios_file_id = app.get('ios_file_id', '')
 
             # بناء caption
             caption = f"📱 <b>{name}</b>\n"
             if desc:
                 caption += f"📝 {desc}\n"
 
-            # بناء زر التحميل
+            # بناء أزرار التحميل — صف واحد لزر الأندرويد وآيفون جنب بعض
+            dl_btns = []
+            if android_file_id:
+                dl_btns.append({'text': '🤖 أندرويد', 'callback_data': f"app_dl_android_{app['id']}"})
+            elif android_url:
+                dl_btns.append({'text': '🤖 أندرويد', 'url': android_url})
+            if ios_file_id:
+                dl_btns.append({'text': '🍎 آيفون', 'callback_data': f"app_dl_ios_{app['id']}"})
+            elif ios_url:
+                dl_btns.append({'text': '🍎 آيفون', 'url': ios_url})
+
             inline_btns = []
-            if dl_type == 'apk' and apk_file_id:
-                inline_btns.append([{'text': f"⬇️ تحميل {name}", 'callback_data': f"app_dl_{app['id']}"}])
-            elif download_url:
-                inline_btns.append([{'text': f"⬇️ تحميل {name}", 'url': download_url}])
-            else:
-                caption += "\n❌ لا يوجد رابط تحميل"
+            if dl_btns:
+                inline_btns.append(dl_btns)
 
             keyboard = {'inline_keyboard': inline_btns} if inline_btns else None
 
-            # إرسال الأيقونة + الزر معاً
+            # إرسال الأيقونة + الأزرار
             sent = False
             if icon_file_id:
                 try:
@@ -1082,11 +1096,14 @@ class ComprehensiveDUXBot:
                 except:
                     pass
             if not sent:
-                # لا يوجد أيقونة — إرسال نص مع زر inline
-                caption += "\n👇 اضغط للتحميل"
-                self.send_inline_message(message['chat']['id'], caption, inline_btns if inline_btns else [[{'text': '🔙 رجوع', 'callback_data': 'apps_back_main'}]])
+                if dl_btns:
+                    caption += "\n👇 اختر نظام التشغيل"
+                    self.send_inline_message(message['chat']['id'], caption, inline_btns)
+                else:
+                    caption += "\n❌ لا توجد روابط تحميل"
+                    self.send_message(message['chat']['id'], caption)
 
-        # زر الرجوع في النهاية
+        # زر الرجوع
         self.send_inline_message(message['chat']['id'], "📱 تم عرض كل التطبيقات", [[{'text': '🔙 رجوع', 'callback_data': 'apps_back_main'}]])
 
     # ==================== Admin: Apps Management ====================
@@ -1101,22 +1118,22 @@ class ComprehensiveDUXBot:
         if apps:
             for app in apps:
                 status = '✅' if app.get('is_active') == 'yes' else '⏸️'
-                dl_type = app.get('download_type', 'url')
-                dl_icon = '📦 APK' if dl_type == 'apk' else '🔗 رابط'
-                icon_icon = '🖼️' if (app.get('icon_file_id') or app.get('icon_url')) else '❌'
+                android = '🤖' if (app.get('android_url') or app.get('android_file_id')) else '➖'
+                ios = '🍎' if (app.get('ios_url') or app.get('ios_file_id')) else '➖'
+                icon = '🖼️' if (app.get('icon_file_id') or app.get('icon_url')) else '➖'
                 text += (
                     f"\n{status} <b>{app['name']}</b>\n"
                     f"  🆔 <code>{app['id']}</code> 👈 اضغط للنسخ\n"
-                    f"  {dl_icon} | {icon_icon} أيقونة\n"
+                    f"  {icon} أيقونة | {android} أندرويد | {ios} آيفون\n"
                 )
                 inline_btns.append([{
                     'text': f"✏️ تعديل: {app['name']}",
                     'callback_data': f"app_edit_{app['id']}"
                 }, {
-                    'text': f"{'⏸️ إيقاف' if app.get('is_active') == 'yes' else '▶️ تفعيل'}",
+                    'text': f"{'⏸️' if app.get('is_active') == 'yes' else '▶️'}",
                     'callback_data': f"app_toggle_{app['id']}"
                 }, {
-                    'text': f"🗑️ حذف",
+                    'text': f"🗑️",
                     'callback_data': f"app_delete_{app['id']}"
                 }])
 
@@ -1175,7 +1192,6 @@ class ComprehensiveDUXBot:
                 f"• أو اكتب 'تخطي' بدون أيقونة")
 
         elif step == 'app_icon':
-            # يمكن أن يكون صورة مرفوعة أو رابط نصي
             if 'photo' in message:
                 photo = message['photo'][-1]
                 data['icon_file_id'] = photo['file_id']
@@ -1193,38 +1209,57 @@ class ComprehensiveDUXBot:
                 self.send_message(chat_id, "❌ أرسل صورة أو رابط. أو اكتب 'تخطي':")
                 return
 
-            data['step'] = 'app_download'
+            data['step'] = 'app_android'
             self.temp_app_data[user_id] = data
             self.send_message(chat_id,
-                f"\n📦 الخطوة 3: أرسل <b>ملف APK</b> أو <b>رابط تحميل</b>:\n\n"
-                f"• ارفع ملف .apk — سيُحفظ ويُرسل للمستخدمين عند الطلب\n"
-                f"• أو اكتب رابط تحميل (http/https)")
+                f"\n🤖 الخطوة 3: أرسل <b>رابط تحميل أندرويد</b> أو <b>ملف APK</b>:\n\n"
+                f"• ارفع ملف .apk\n"
+                f"• أو اكتب رابط تحميل (http/https)\n"
+                f"• أو اكتب 'تخطي'")
 
-        elif step == 'app_download':
-            # يمكن أن يكون ملف APK مرفوع أو رابط نصي
+        elif step == 'app_android':
             if 'document' in message:
                 doc = message['document']
                 file_name = doc.get('file_name', '')
-                if not file_name.lower().endswith('.apk'):
-                    self.send_message(chat_id, "❌ يجب أن يكون الملف بصيغة .apk\nأرسل ملف APK أو رابط تحميل:")
-                    return
-                data['apk_file_id'] = doc['file_id']
-                data['download_url'] = ''
-                data['download_type'] = 'apk'
+                data['android_file_id'] = doc['file_id']
+                data['android_url'] = ''
                 self.send_message(chat_id, f"✅ تم حفظ ملف APK: <code>{file_name}</code>")
             elif text.startswith('http'):
-                data['download_url'] = text
-                data['apk_file_id'] = ''
-                data['download_type'] = 'url'
-                self.send_message(chat_id, "✅ تم حفظ رابط التحميل!")
+                data['android_url'] = text
+                data['android_file_id'] = ''
+                self.send_message(chat_id, "✅ تم حفظ رابط أندرويد!")
+            elif text.lower() in ['تخطي', 'skip', 'بدون']:
+                data['android_url'] = ''
+                data['android_file_id'] = ''
+                self.send_message(chat_id, "⏭️ بدون رابط أندرويد")
             else:
-                self.send_message(chat_id, "❌ أرسل ملف APK أو رابط تحميل (http/https):")
+                self.send_message(chat_id, "❌ أرسل ملف APK أو رابط (http/https). أو اكتب 'تخطي':")
+                return
+
+            data['step'] = 'app_ios'
+            self.temp_app_data[user_id] = data
+            self.send_message(chat_id,
+                f"\n🍎 الخطوة 4: أرسل <b>رابط تحميل آيفون</b> (App Store):\n\n"
+                f"• اكتب رابط App Store (http/https)\n"
+                f"• أو اكتب 'تخطي'")
+
+        elif step == 'app_ios':
+            if text.startswith('http'):
+                data['ios_url'] = text
+                data['ios_file_id'] = ''
+                self.send_message(chat_id, "✅ تم حفظ رابط آيفون!")
+            elif text.lower() in ['تخطي', 'skip', 'بدون']:
+                data['ios_url'] = ''
+                data['ios_file_id'] = ''
+                self.send_message(chat_id, "⏭️ بدون رابط آيفون")
+            else:
+                self.send_message(chat_id, "❌ اكتب رابط App Store (http/https). أو اكتب 'تخطي':")
                 return
 
             data['step'] = 'app_desc'
             self.temp_app_data[user_id] = data
             self.send_message(chat_id,
-                f"\n📝 الخطوة 4 (الأخيرة): اكتب <b>وصفاً قصيراً</b>:\nأو اكتب 'تخطي'")
+                f"\n📝 الخطوة 5 (الأخيرة): اكتب <b>وصفاً قصيراً</b>:\nأو اكتب 'تخطي'")
 
         elif step == 'app_desc':
             if text.lower() in ['تخطي', 'skip', 'بدون']:
@@ -1234,30 +1269,31 @@ class ComprehensiveDUXBot:
 
             edit_id = data.get('edit_id', '')
             if edit_id:
-                # وضع التعديل: تحديث السجل الموجود
                 self._update_app_link(edit_id, data)
                 app_id = edit_id
             else:
-                # وضع الإضافة: إنشاء جديد
                 app_id = self.add_app_link(
                     data['name'],
                     data.get('icon_url', ''),
                     data.get('icon_file_id', ''),
-                    data.get('download_url', ''),
-                    data.get('apk_file_id', ''),
-                    data.get('download_type', 'url'),
+                    data.get('android_url', ''),
+                    data.get('android_file_id', ''),
+                    data.get('ios_url', ''),
+                    data.get('ios_file_id', ''),
                     data.get('description', '')
                 )
 
             if app_id:
-                dl_info = '📦 APK مرفوع' if data.get('download_type') == 'apk' else f"🔗 رابط"
-                icon_info = '🖼️ أيقونة مرفوعة' if data.get('icon_file_id') else ('🖼️ رابط أيقونة' if data.get('icon_url') else '❌ بدون أيقونة')
+                android_info = '📦 APK مرفوع' if data.get('android_file_id') else ('🔗 رابط أندرويد' if data.get('android_url') else '➖ بدون أندرويد')
+                ios_info = '🔗 رابط آيفون' if data.get('ios_url') else '➖ بدون آيفون'
+                icon_info = '🖼️ أيقونة مرفوعة' if data.get('icon_file_id') else ('🖼️ رابط أيقونة' if data.get('icon_url') else '➖ بدون أيقونة')
                 summary = (
                     f"✅ <b>تم حفظ التطبيق!</b>\n\n"
                     f"📱 الاسم: <b>{data['name']}</b>\n"
                     f"🆔 <code>{app_id}</code> 👈 اضغط للنسخ\n"
                     f"{icon_info}\n"
-                    f"{dl_info}\n"
+                    f"{android_info}\n"
+                    f"{ios_info}\n"
                 )
                 if data.get('description'):
                     summary += f"📝 {data['description']}\n"
@@ -7143,30 +7179,40 @@ class ComprehensiveDUXBot:
                 self.user_states[user_id] = 'app_wizard_name'
                 return
 
-            elif data.startswith('app_dl_'):
-                # المستخدم يضغط تحميل تطبيق APK
-                app_id = data.replace('app_dl_', '')
+            elif data.startswith('app_dl_android_'):
+                app_id = data.replace('app_dl_android_', '')
                 app = self.get_app_by_id(app_id)
                 if not app:
                     self.answer_callback(callback_id, "❌ التطبيق غير موجود")
                     return
-                apk_file_id = app.get('apk_file_id', '')
-                if apk_file_id:
+                android_file_id = app.get('android_file_id', '')
+                if android_file_id:
                     self.answer_callback(callback_id, "📦 جارٍ إرسال الملف...")
                     self.api_call('sendDocument', {
                         'chat_id': chat_id,
-                        'document': apk_file_id,
-                        'caption': f"📦 {app.get('name', '')}\n\n👈 اضغط لتحميل الملف"
+                        'document': android_file_id,
+                        'caption': f"🤖 {app.get('name', '')} — أندرويد\n\n👈 اضغط لتحميل الملف"
                     })
                 else:
-                    url = app.get('download_url', '')
-                    if url:
-                        self.answer_callback(callback_id, "🔗 افتح الرابط")
-                        self.send_message(chat_id,
-                            f"⬇️ <b>{app.get('name', '')}</b>\n\n"
-                            f"🔗 <a href=\"{url}\">اضغط هنا للتحميل</a>")
-                    else:
-                        self.answer_callback(callback_id, "❌ لا يوجد ملف للتحميل")
+                    self.answer_callback(callback_id, "✅")
+                return
+
+            elif data.startswith('app_dl_ios_'):
+                app_id = data.replace('app_dl_ios_', '')
+                app = self.get_app_by_id(app_id)
+                if not app:
+                    self.answer_callback(callback_id, "❌ التطبيق غير موجود")
+                    return
+                ios_file_id = app.get('ios_file_id', '')
+                if ios_file_id:
+                    self.answer_callback(callback_id, "📦 جارٍ إرسال الملف...")
+                    self.api_call('sendDocument', {
+                        'chat_id': chat_id,
+                        'document': ios_file_id,
+                        'caption': f"🍎 {app.get('name', '')} — آيفون\n\n👈 اضغط لتحميل الملف"
+                    })
+                else:
+                    self.answer_callback(callback_id, "✅")
                 return
 
             elif data == 'apps_back_main':
