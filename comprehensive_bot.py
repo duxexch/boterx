@@ -1966,20 +1966,19 @@ class ComprehensiveDUXBot:
     
     def is_admin(self, telegram_id):
         """فحص صلاحية الأدمن — مع التحقق من انتهاء الصلاحية"""
+        tid_str = str(telegram_id)
         # المدراء الدائمين من متغيرات البيئة
-        if str(telegram_id) in self.admin_ids:
+        if tid_str in self.admin_ids:
             return True
-        # المدراء الدائمين من الجلسة
         try:
             tid = int(telegram_id)
+            # المدراء الدائمين من الجلسة
             if tid in self.admin_user_ids:
                 return True
             # المدراء المؤقتين — فحص انتهاء الصلاحية
             if tid in self.temp_admin_user_ids:
-                # فحص وقت الانتهاء
                 if tid in self.temp_admin_expiry:
                     if self.temp_admin_expiry[tid] <= time.time():
-                        # انتهت الصلاحية — إزالة تلقائية
                         self.temp_admin_user_ids.remove(tid)
                         del self.temp_admin_expiry[tid]
                         logger.info(f"انتهت صلاحية المدير المؤقت: {tid}")
@@ -1994,10 +1993,11 @@ class ComprehensiveDUXBot:
         self.log_notification('admin', 'all', notification_type, message)
         for admin_id in self.admin_ids:
             try:
+                tid = int(admin_id)
                 if inline_buttons:
-                    self.send_inline_message(admin_id, message, inline_buttons)
+                    self.send_inline_message(tid, message, inline_buttons)
                 else:
-                    self.send_message(admin_id, message, self.admin_keyboard())
+                    self.send_message(tid, message, self.admin_keyboard())
             except:
                 pass
 
@@ -4370,12 +4370,18 @@ class ComprehensiveDUXBot:
             self.handle_start(message, ref_code)
             return
             
-        # معالجة زر إعادة التعيين أولاً (أولوية عالية)
+        # معالجة زر إعادة التعيين أولاً (أولوية عالية) — يعمل حتى بدون تسجيل
         if text in ['🔄 إعادة تعيين النظام', '🔄 Reset System', '🔄 إعادة تعيين', '🆘 إصلاح شامل']:
             user = self.find_user(user_id)
             if user:
                 self.super_reset_user_system(user_id, chat_id, user)
             else:
+                # حتى لو غير مسجل — نظف الحالة وابدأ من جديد
+                if user_id in self.user_states:
+                    del self.user_states[user_id]
+                for attr in ['temp_company_data', 'edit_company_data', 'temp_app_data', 'temp_button_label_edit']:
+                    if hasattr(self, attr) and user_id in getattr(self, attr, {}):
+                        del getattr(self, attr)[user_id]
                 self.handle_start(message)
             return
         
