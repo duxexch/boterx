@@ -1264,17 +1264,33 @@ class ComprehensiveDUXBot:
                 f"👇 <b>Select an option:</b>"
             )
 
+        # فحص التسجيل: هل سجّل العميل حسابات في الشركات؟
+        user_accounts = self.svrp.get_user_company_accounts(user_id) if self.svrp else []
+        is_registered = len(user_accounts) > 0
+
         # أزرار inline داخل الدردشة
-        inline_btns = [
-            [{'text': '💰 إيداع', 'callback_data': 'svrp_deposit'},
-             {'text': '💸 سحب', 'callback_data': 'svrp_withdraw'}],
-            [{'text': '🔄 استرداد', 'callback_data': 'svrp_recovery_request'},
-             {'text': '📤 إرسال رصيد', 'callback_data': 'svrp_send_credits'}],
-            [{'text': '💎 محفظتي', 'callback_data': 'svrp_wallet'},
-             {'text': '👥 دعوة صديق', 'callback_data': 'svrp_invite'}],
-            [{'text': '🏢 تسجيل حساب جديد', 'callback_data': 'svrp_companies'}],
-            [{'text': '🏠 القائمة الرئيسية', 'callback_data': 'svrp_main_menu'}]
-        ]
+        if not is_registered:
+            # العميل غير مسجل — يظهر زر تسجيل فقط
+            inline_btns = [
+                [{'text': '📝 انقر لتسجيل حساب', 'callback_data': 'svrp_companies'}],
+                [{'text': '🏠 القائمة الرئيسية', 'callback_data': 'svrp_main_menu'}]
+            ]
+            panel_text += (
+                "\n\n⚠️ <b>لم تسجل حسابك بعد!</b>\n"
+                "📝 اضغط الزر بالأسفل لتسجيل حسابك في الشركات المتاحة."
+            )
+        else:
+            # العميل مسجل — تظهر كل الأزرار
+            inline_btns = [
+                [{'text': '💰 إيداع', 'callback_data': 'svrp_deposit'},
+                 {'text': '💸 سحب', 'callback_data': 'svrp_withdraw'}],
+                [{'text': '🔄 استرداد', 'callback_data': 'svrp_recovery_request'},
+                 {'text': '📤 إرسال رصيد', 'callback_data': 'svrp_send_credits'}],
+                [{'text': '💎 محفظتي', 'callback_data': 'svrp_wallet'},
+                 {'text': '👥 دعوة صديق', 'callback_data': 'svrp_invite'}],
+                [{'text': '🏢 تسجيل / تعديل الحسابات', 'callback_data': 'svrp_companies'}],
+                [{'text': '🏠 القائمة الرئيسية', 'callback_data': 'svrp_main_menu'}]
+            ]
         self.send_inline_message(message['chat']['id'], panel_text, inline_btns)
 
     def show_svrp_wallet(self, message):
@@ -6874,24 +6890,29 @@ class ComprehensiveDUXBot:
                 return
 
             elif data == 'svrp_deposit':
-                # إيداع من الرصيد المتاح — يختار شركة مسجل فيها
-                user = self.find_user(user_id)
-                lang = user.get('language', 'ar') if user else 'ar'
-                accounts = self.svrp.get_user_company_accounts(user_id)
+                # إيداع — فحص التسجيل أولاً
+                accounts = self.svrp.get_user_company_accounts(user_id) if self.svrp else []
 
                 if not accounts:
                     self.edit_message(chat_id, message.get('message_id'),
-                        "❌ ليس لديك حسابات مسجلة.\n\n"
-                        "اضغط <b>🏢 تسجيل حساب جديد</b> أولاً")
+                        "⚠️ <b>لم تسجل حسابك بعد!</b>\n\n"
+                        "📝 اضغط الزر بالأسفل لتسجيل حسابك في الشركات المتاحة.\n"
+                        "بعد التسجيل يمكنك الإيداع والسحب.")
+                    inline_btns = [
+                        [{'text': '📝 تسجيل حساب جديد', 'callback_data': 'svrp_companies'}],
+                        [{'text': '🔙 رجوع', 'callback_data': 'svrp_back_panel'}]
+                    ]
+                    self.send_inline_message(chat_id, "اضغط للتسجيل:", inline_btns)
                     return
 
+                # عرض الشركات التي سجّل فيها العميل فقط
                 wallet = self.svrp.get_wallet(user_id)
                 available = float(wallet.get('total_used', 0) or 0)
 
                 text = (
-                    f"💰 <b>إيداع من الرصيد المتاح</b>\n\n"
+                    f"💰 <b>إيداع</b>\n\n"
                     f"🟢 الرصيد المتاح: <b><code>{available:.2f}</code></b>\n\n"
-                    f"اختر الشركة التي تريد الإيداع لحسابك فيها:"
+                    f"اختر الشركة التي تريد الإيداع فيها:"
                 )
                 inline_btns = []
                 for acc in accounts:
@@ -6925,9 +6946,33 @@ class ComprehensiveDUXBot:
                 return
 
             elif data == 'svrp_withdraw':
-                self.edit_message(chat_id, message.get('message_id'), "💸 سحب")
-                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
-                self.create_withdrawal_request(fake_msg)
+                # سحب — فحص التسجيل أولاً
+                accounts = self.svrp.get_user_company_accounts(user_id) if self.svrp else []
+
+                if not accounts:
+                    self.edit_message(chat_id, message.get('message_id'),
+                        "⚠️ <b>لم تسجل حسابك بعد!</b>\n\n"
+                        "📝 اضغط الزر بالأسفل لتسجيل حسابك في الشركات المتاحة.\n"
+                        "بعد التسجيل يمكنك الإيداع والسحب.")
+                    inline_btns = [
+                        [{'text': '📝 تسجيل حساب جديد', 'callback_data': 'svrp_companies'}],
+                        [{'text': '🔙 رجوع', 'callback_data': 'svrp_back_panel'}]
+                    ]
+                    self.send_inline_message(chat_id, "اضغط للتسجيل:", inline_btns)
+                    return
+
+                # عرض الشركات المسجّل فيها للسحب
+                text = "💸 <b>السحب</b>\n\nاختر الشركة للسحب منها:"
+                inline_btns = []
+                for acc in accounts:
+                    inline_btns.append([{
+                        'text': f"🏢 {acc.get('company_name', '')} — {acc.get('account_number', '')}",
+                        'callback_data': f'svrp_wd_company_{acc["company_id"]}'
+                    }])
+                inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'svrp_back_panel'}])
+
+                self.edit_message(chat_id, message.get('message_id'), text)
+                self.send_inline_message(chat_id, "اختر الشركة:", inline_btns)
                 return
 
             elif data == 'svrp_wallet':
