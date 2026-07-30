@@ -823,7 +823,7 @@ class ComprehensiveDUXBot:
         if not os.path.exists('app_links.csv'):
             with open('app_links.csv', 'w', newline='', encoding='utf-8-sig') as f:
                 writer = csv.writer(f)
-                writer.writerow(['id', 'name', 'icon_url', 'download_url', 'description', 'is_active', 'created_at'])
+                writer.writerow(['id', 'name', 'icon_url', 'icon_file_id', 'download_url', 'apk_file_id', 'download_type', 'description', 'is_active', 'created_at'])
 
     def get_app_links(self):
         """جلب جميع التطبيقات النشطة"""
@@ -850,13 +850,13 @@ class ComprehensiveDUXBot:
             pass
         return apps
 
-    def add_app_link(self, name, icon_url, download_url, description=''):
+    def add_app_link(self, name, icon_url='', icon_file_id='', download_url='', apk_file_id='', download_type='url', description=''):
         """إضافة تطبيق جديد"""
         app_id = f"APP{str(int(datetime.now().timestamp()))[-6:]}"
         try:
             with open('app_links.csv', 'a', newline='', encoding='utf-8-sig') as f:
                 writer = csv.writer(f)
-                writer.writerow([app_id, name, icon_url, download_url, description, 'yes', datetime.now().strftime('%Y-%m-%d %H:%M')])
+                writer.writerow([app_id, name, icon_url, icon_file_id, download_url, apk_file_id, download_type, description, 'yes', datetime.now().strftime('%Y-%m-%d %H:%M')])
             return app_id
         except Exception as e:
             logger.error(f"خطأ في إضافة تطبيق: {e}")
@@ -883,6 +883,64 @@ class ComprehensiveDUXBot:
             return found
         except Exception as e:
             logger.error(f"خطأ في حذف تطبيق: {e}")
+            return False
+
+    def toggle_app_link(self, app_id):
+        """تفعيل/إيقاف تطبيق"""
+        try:
+            rows = []
+            with open('app_links.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                fieldnames = reader.fieldnames
+                for row in reader:
+                    if row['id'] == app_id:
+                        row['is_active'] = 'no' if row.get('is_active') == 'yes' else 'yes'
+                    rows.append(row)
+            with open('app_links.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer.writeheader()
+                writer.writerows(rows)
+            return True
+        except Exception as e:
+            logger.error(f"خطأ في تبديل حالة تطبيق: {e}")
+            return False
+
+    def get_app_by_id(self, app_id):
+        """جلب تطبيق بالمعرف"""
+        try:
+            with open('app_links.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row['id'] == app_id:
+                        return row
+        except:
+            pass
+        return None
+
+    def _update_app_link(self, app_id, data):
+        """تحديث تطبيق موجود"""
+        try:
+            rows = []
+            with open('app_links.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                fieldnames = reader.fieldnames
+                for row in reader:
+                    if row['id'] == app_id:
+                        row['name'] = data.get('name', row.get('name', ''))
+                        row['icon_url'] = data.get('icon_url', '')
+                        row['icon_file_id'] = data.get('icon_file_id', '')
+                        row['download_url'] = data.get('download_url', '')
+                        row['apk_file_id'] = data.get('apk_file_id', '')
+                        row['download_type'] = data.get('download_type', 'url')
+                        row['description'] = data.get('description', '')
+                    rows.append(row)
+            with open('app_links.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer.writeheader()
+                writer.writerows(rows)
+            return True
+        except Exception as e:
+            logger.error(f"خطأ في تحديث تطبيق: {e}")
             return False
     
     def cleanup_old_transactions(self):
@@ -930,7 +988,7 @@ class ComprehensiveDUXBot:
     # ==================== 📱 التطبيقات — Panel Methods ====================
 
     def show_apps_panel(self, message):
-        """عرض لوحة التطبيقات للمستخدم"""
+        """عرض لوحة التطبيقات للمستخدم — أزرار inline مع أيقونات"""
         user = self.find_user(message['from']['id'])
         lang = user.get('language', 'ar') if user else 'ar'
         apps = self.get_app_links()
@@ -941,109 +999,90 @@ class ComprehensiveDUXBot:
                 self.main_keyboard(lang, message['from']['id']))
             return
 
-        # رأس اللوحة
-        text = (
-            f"╔════════════════════╗\n"
-            f"║  {self.tr('apps_title', lang)}  ║\n"
-            f"╚════════════════════╝\n\n"
-            f"📱 {self.tr('apps_count', lang)}: {len(apps)}\n\n"
-        )
-
-        # عرض كل تطبيق بشكل منسق
-        for i, app in enumerate(apps, 1):
+        inline_btns = []
+        for app in apps:
             name = app.get('name', '')
+            dl_type = app.get('download_type', 'url')
             icon_url = app.get('icon_url', '')
+            icon_file_id = app.get('icon_file_id', '')
             download_url = app.get('download_url', '')
-            desc = app.get('description', '')
+            apk_file_id = app.get('apk_file_id', '')
 
-            text += (
-                f"┌─────────────────────┐\n"
-                f"│  📱 <b>{name}</b>\n"
-            )
-            if desc:
-                text += f"│  📝 {desc}\n"
-            text += (
-                f"│  🔗 <a href=\"{download_url}\">{self.tr('apps_download', lang)}</a>\n"
-                f"└─────────────────────┘\n\n"
-            )
+            # إرسال أيقونة التطبيق كصورة إن وجدت
+            if icon_file_id:
+                try:
+                    self.api_call('sendPhoto', {
+                        'chat_id': message['chat']['id'],
+                        'photo': icon_file_id,
+                        'caption': f"📱 <b>{name}</b>",
+                        'parse_mode': 'HTML'
+                    })
+                except:
+                    pass
+            elif icon_url and icon_url.startswith('http'):
+                try:
+                    self.api_call('sendPhoto', {
+                        'chat_id': message['chat']['id'],
+                        'photo': icon_url,
+                        'caption': f"📱 <b>{name}</b>",
+                        'parse_mode': 'HTML'
+                    })
+                except:
+                    pass
 
-        text += f"💡 {self.tr('apps_hint', lang)}"
+            # زر التحميل حسب النوع
+            if dl_type == 'apk' and apk_file_id:
+                inline_btns.append([{'text': f"⬇️ تحميل {name}", 'callback_data': f"app_dl_{app['id']}"}])
+            elif download_url:
+                inline_btns.append([{'text': f"⬇️ تحميل {name}", 'url': download_url}])
 
-        # إرسال الأيقونة الأولى كصورة إن وجدت
-        first_icon = apps[0].get('icon_url', '') if apps else ''
-        if first_icon and first_icon.startswith('http'):
-            try:
-                self.send_photo(message['chat']['id'], first_icon, text, self.main_keyboard(lang, message['from']['id']))
-                return
-            except:
-                pass
+        inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'apps_back_main'}])
 
-        self.send_message(message['chat']['id'], text, self.main_keyboard(lang, message['from']['id']))
-
-    def send_photo(self, chat_id, photo_url, caption='', keyboard=None):
-        """إرسال صورة مع نص"""
-        data = {
-            'chat_id': chat_id,
-            'photo': photo_url,
-            'parse_mode': 'HTML'
-        }
-        if caption:
-            data['caption'] = caption
-        if keyboard:
-            if isinstance(keyboard, dict):
-                data['reply_markup'] = self.transform_keyboard(keyboard)
-            else:
-                data['reply_markup'] = keyboard
-        return self.api_call('sendPhoto', data)
+        self.send_inline_message(message['chat']['id'],
+            f"📱 <b>التطبيقات</b>\n\nاختر تطبيقاً للتحميل:",
+            inline_btns)
 
     # ==================== Admin: Apps Management ====================
 
     def show_apps_admin_panel(self, message):
-        """لوحة إدارة التطبيقات — بأزرار inline أنيقة"""
+        """لوحة إدارة التطبيقات"""
         apps = self.get_all_app_links()
 
-        text = (
-            f"╔════════════════════╗\n"
-            f"║  📱 إدارة التطبيقات  ║\n"
-            f"╚════════════════════╝\n\n"
-            f"📊 إجمالي التطبيقات: {len(apps)}\n"
-        )
-
+        text = f"📱 <b>إدارة التطبيقات</b>\n\n📊 الإجمالي: <code>{len(apps)}</code>\n"
         inline_btns = []
 
         if apps:
-            text += "\n📋 التطبيقات الحالية:\n\n"
             for app in apps:
-                status_icon = '✅' if app.get('is_active') == 'yes' else '⏸️'
+                status = '✅' if app.get('is_active') == 'yes' else '⏸️'
+                dl_type = app.get('download_type', 'url')
+                dl_icon = '📦 APK' if dl_type == 'apk' else '🔗 رابط'
+                icon_icon = '🖼️' if (app.get('icon_file_id') or app.get('icon_url')) else '❌'
                 text += (
-                    f"{status_icon} <b>{app['name']}</b>\n"
-                    f"  🆔 <code>{app['id']}</code>\n"
+                    f"\n{status} <b>{app['name']}</b>\n"
+                    f"  🆔 <code>{app['id']}</code> 👈 اضغط للنسخ\n"
+                    f"  {dl_icon} | {icon_icon} أيقونة\n"
                 )
-                if app.get('description'):
-                    text += f"  📝 {app['description']}\n"
-                text += f"  🔗 <a href=\"{app.get('download_url', '')}\">رابط التحميل</a>\n"
-                if app.get('icon_url'):
-                    text += f"  🖼️ <a href=\"{app.get('icon_url', '')}\">الأيقونة</a>\n"
-                text += f"  📅 {app.get('created_at', '')}\n\n"
-                # زر حذف لكل تطبيق
                 inline_btns.append([{
-                    'text': f"🗑️ حذف: {app['name']}",
+                    'text': f"✏️ تعديل: {app['name']}",
+                    'callback_data': f"app_edit_{app['id']}"
+                }, {
+                    'text': f"{'⏸️ إيقاف' if app.get('is_active') == 'yes' else '▶️ تفعيل'}",
+                    'callback_data': f"app_toggle_{app['id']}"
+                }, {
+                    'text': f"🗑️ حذف",
                     'callback_data': f"app_delete_{app['id']}"
                 }])
 
-        # أزرار الإجراءات
         inline_btns.append([{'text': '➕ إضافة تطبيق جديد', 'callback_data': 'app_add_new'}])
-        if apps:
-            inline_btns.append([{'text': '🔄 تحديث القائمة', 'callback_data': 'app_refresh'}])
         inline_btns.append([{'text': '🔙 العودة للوحة الأدمن', 'callback_data': 'app_back_admin'}])
 
         if not apps:
-            text += "\n📭 لا توجد تطبيقات بعد.\n"
+            text += "\n📭 لا توجد تطبيقات بعد."
 
         self.send_inline_message(message['chat']['id'], text, inline_btns)
 
     def start_app_wizard(self, message):
-        """بدء معالج إضافة تطبيق — خطوة بخطوة"""
+        """بدء معالج إضافة تطبيق"""
         user_id = message['from']['id']
         chat_id = message['chat']['id']
 
@@ -1051,29 +1090,18 @@ class ComprehensiveDUXBot:
             self.temp_app_data = {}
         self.temp_app_data[user_id] = {'step': 'app_name'}
 
-        text = (
-            "╔════════════════════╗\n"
-            "║  ➕ إضافة تطبيق  ║\n"
-            "╚════════════════════╝\n\n"
-            "📝 الخطوة 1 من 4\n\n"
-            "✍️ اكتب اسم التطبيق:\n\n"
-            "مثال: تطبيق المال"
-        )
-        kb = {
-            'keyboard': [[{'text': '❌ إلغاء'}], [{'text': '🔙 لوحة الأدمن'}]],
-            'resize_keyboard': True,
-            'one_time_keyboard': True
-        }
-        self.send_message(chat_id, text, kb)
+        self.send_message(chat_id,
+            "➕ <b>إضافة تطبيق</b>\n\n"
+            "📝 الخطوة 1: اكتب <b>اسم التطبيق</b>:",
+            {'keyboard': [[{'text': '❌ إلغاء'}]], 'resize_keyboard': True, 'one_time_keyboard': True})
         self.user_states[user_id] = 'app_wizard_name'
 
     def handle_app_wizard(self, message):
-        """معالجة خطوات معالج إضافة تطبيق"""
+        """معالجة معالج إضافة تطبيق — يدعم رفع APK وصور"""
         user_id = message['from']['id']
         chat_id = message['chat']['id']
         text = message.get('text', '').strip()
 
-        # إلغاء
         if text in ['❌ إلغاء', '🔙 لوحة الأدمن', 'إلغاء', 'الغاء']:
             if user_id in self.user_states:
                 del self.user_states[user_id]
@@ -1093,37 +1121,63 @@ class ComprehensiveDUXBot:
             data['step'] = 'app_icon'
             self.temp_app_data[user_id] = data
             self.send_message(chat_id,
-                "✅ تم حفظ الاسم!\n\n"
-                "📝 الخطوة 2 من 4\n\n"
-                "🖼️ اكتب رابط أيقونة التطبيق (صورة PNG/JPG):\n\n"
-                "أو اكتب 'تخطي' لاستخدام أيقونة افتراضية 📱\n\n"
-                "مثال: https://example.com/icon.png")
+                f"✅ الاسم: <code>{text}</code>\n\n"
+                f"🖼️ الخطوة 2: أرسل <b>أيقونة التطبيق</b>:\n\n"
+                f"• ارفع صورة (PNG/JPG) — ستُحفظ كأيقونة\n"
+                f"• أو اكتب رابط صورة\n"
+                f"• أو اكتب 'تخطي' بدون أيقونة")
 
         elif step == 'app_icon':
-            if text.lower() in ['تخطي', 'skip', 'بدون']:
+            # يمكن أن يكون صورة مرفوعة أو رابط نصي
+            if 'photo' in message:
+                photo = message['photo'][-1]
+                data['icon_file_id'] = photo['file_id']
                 data['icon_url'] = ''
-            else:
+                self.send_message(chat_id, "✅ تم حفظ الأيقونة!")
+            elif text.lower() in ['تخطي', 'skip', 'بدون']:
+                data['icon_file_id'] = ''
+                data['icon_url'] = ''
+                self.send_message(chat_id, "⏭️ بدون أيقونة")
+            elif text.startswith('http'):
                 data['icon_url'] = text
-            data['step'] = 'app_url'
+                data['icon_file_id'] = ''
+                self.send_message(chat_id, "✅ تم حفظ رابط الأيقونة!")
+            else:
+                self.send_message(chat_id, "❌ أرسل صورة أو رابط. أو اكتب 'تخطي':")
+                return
+
+            data['step'] = 'app_download'
             self.temp_app_data[user_id] = data
             self.send_message(chat_id,
-                "✅ تم حفظ الأيقونة!\n\n"
-                "📝 الخطوة 3 من 4\n\n"
-                "🔗 اكتب رابط تحميل التطبيق:\n\n"
-                "مثال: https://play.google.com/store/apps/...")
+                f"\n📦 الخطوة 3: أرسل <b>ملف APK</b> أو <b>رابط تحميل</b>:\n\n"
+                f"• ارفع ملف .apk — سيُحفظ ويُرسل للمستخدمين عند الطلب\n"
+                f"• أو اكتب رابط تحميل (http/https)")
 
-        elif step == 'app_url':
-            if len(text) < 5 or not text.startswith('http'):
-                self.send_message(chat_id, "❌ رابط غير صحيح. يجب أن يبدأ بـ http:// أو https://\n\nاكتب الرابط مرة أخرى:")
+        elif step == 'app_download':
+            # يمكن أن يكون ملف APK مرفوع أو رابط نصي
+            if 'document' in message:
+                doc = message['document']
+                file_name = doc.get('file_name', '')
+                if not file_name.lower().endswith('.apk'):
+                    self.send_message(chat_id, "❌ يجب أن يكون الملف بصيغة .apk\nأرسل ملف APK أو رابط تحميل:")
+                    return
+                data['apk_file_id'] = doc['file_id']
+                data['download_url'] = ''
+                data['download_type'] = 'apk'
+                self.send_message(chat_id, f"✅ تم حفظ ملف APK: <code>{file_name}</code>")
+            elif text.startswith('http'):
+                data['download_url'] = text
+                data['apk_file_id'] = ''
+                data['download_type'] = 'url'
+                self.send_message(chat_id, "✅ تم حفظ رابط التحميل!")
+            else:
+                self.send_message(chat_id, "❌ أرسل ملف APK أو رابط تحميل (http/https):")
                 return
-            data['download_url'] = text
+
             data['step'] = 'app_desc'
             self.temp_app_data[user_id] = data
             self.send_message(chat_id,
-                "✅ تم حفظ رابط التحميل!\n\n"
-                "📝 الخطوة 4 من 4 (الأخيرة)\n\n"
-                "📝 اكتب وصفاً قصيراً للتطبيق:\n\n"
-                "أو اكتب 'تخطي' لبدونه")
+                f"\n📝 الخطوة 4 (الأخيرة): اكتب <b>وصفاً قصيراً</b>:\nأو اكتب 'تخطي'")
 
         elif step == 'app_desc':
             if text.lower() in ['تخطي', 'skip', 'بدون']:
@@ -1131,22 +1185,35 @@ class ComprehensiveDUXBot:
             else:
                 data['description'] = text
 
-            # حفظ التطبيق
-            app_id = self.add_app_link(data['name'], data.get('icon_url', ''), data['download_url'], data.get('description', ''))
-            if app_id:
-                # عرض ملخص + أزرار تأكيد
-                summary = (
-                    "╔════════════════════╗\n"
-                    "║  ✅ تم الحفظ!  ║\n"
-                    "╚════════════════════╝\n\n"
-                    f"📱 الاسم: <b>{data['name']}</b>\n"
-                    f"🆔 <code>{app_id}</code>\n"
+            edit_id = data.get('edit_id', '')
+            if edit_id:
+                # وضع التعديل: تحديث السجل الموجود
+                self._update_app_link(edit_id, data)
+                app_id = edit_id
+            else:
+                # وضع الإضافة: إنشاء جديد
+                app_id = self.add_app_link(
+                    data['name'],
+                    data.get('icon_url', ''),
+                    data.get('icon_file_id', ''),
+                    data.get('download_url', ''),
+                    data.get('apk_file_id', ''),
+                    data.get('download_type', 'url'),
+                    data.get('description', '')
                 )
-                if data.get('icon_url'):
-                    summary += f"🖼️ أيقونة: ✅\n"
+
+            if app_id:
+                dl_info = '📦 APK مرفوع' if data.get('download_type') == 'apk' else f"🔗 رابط"
+                icon_info = '🖼️ أيقونة مرفوعة' if data.get('icon_file_id') else ('🖼️ رابط أيقونة' if data.get('icon_url') else '❌ بدون أيقونة')
+                summary = (
+                    f"✅ <b>تم حفظ التطبيق!</b>\n\n"
+                    f"📱 الاسم: <b>{data['name']}</b>\n"
+                    f"🆔 <code>{app_id}</code> 👈 اضغط للنسخ\n"
+                    f"{icon_info}\n"
+                    f"{dl_info}\n"
+                )
                 if data.get('description'):
-                    summary += f"📝 الوصف: {data['description']}\n"
-                summary += f"🔗 التحميل: <a href=\"{data['download_url']}\">رابط</a>\n"
+                    summary += f"📝 {data['description']}\n"
 
                 inline_btns = [
                     [{'text': '📋 عرض كل التطبيقات', 'callback_data': 'app_refresh'}],
@@ -3565,7 +3632,7 @@ class ComprehensiveDUXBot:
     
     def process_message(self, message):
         """معالج الرسائل الرئيسي"""
-        if 'text' not in message and 'contact' not in message and 'photo' not in message:
+        if 'text' not in message and 'contact' not in message and 'photo' not in message and 'document' not in message:
             return
 
         text = message.get('text', '')
@@ -3942,6 +4009,16 @@ class ComprehensiveDUXBot:
         # باقي حالات svrp_ (أكواد ترويجية، إلخ)
         if isinstance(current_state, str) and current_state.startswith('svrp_'):
             self.handle_svrp_state(message, current_state)
+            return
+
+        # معالج التطبيقات — يدعم رفع ملفات APK وصور
+        if isinstance(current_state, str) and current_state.startswith('app_wizard'):
+            self.handle_app_wizard(message)
+            return
+
+        # معالج البوتات المتعددة
+        if isinstance(current_state, str) and current_state.startswith('mbot_wizard'):
+            self.mbot_handle_wizard(message)
             return
 
         if isinstance(current_state, str) and current_state.startswith('setting_input_'):
@@ -6969,13 +7046,82 @@ class ComprehensiveDUXBot:
                 app_id = data.replace('app_confirm_delete_', '')
                 if self.delete_app_link(app_id):
                     self.edit_message(chat_id, message.get('message_id'),
-                        f"✅ تم حذف التطبيق {app_id}")
+                        f"✅ تم حذف التطبيق <code>{app_id}</code>")
                 else:
                     self.edit_message(chat_id, message.get('message_id'),
-                        f"❌ لم يتم العثور على التطبيق {app_id}")
-                # إعادة عرض القائمة
+                        f"❌ لم يتم العثور على التطبيق")
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                 self.show_apps_admin_panel(fake_msg)
+                return
+
+            elif data.startswith('app_toggle_'):
+                app_id = data.replace('app_toggle_', '')
+                self.toggle_app_link(app_id)
+                self.edit_message(chat_id, message.get('message_id'), "✅ تم تبديل الحالة")
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_apps_admin_panel(fake_msg)
+                return
+
+            elif data.startswith('app_edit_'):
+                app_id = data.replace('app_edit_', '')
+                app = self.get_app_by_id(app_id)
+                if not app:
+                    self.edit_message(chat_id, message.get('message_id'), "❌ التطبيق غير موجود")
+                    return
+                # بدء تعديل التطبيق
+                if not hasattr(self, 'temp_app_data'):
+                    self.temp_app_data = {}
+                self.temp_app_data[user_id] = {'step': 'app_name', 'edit_id': app_id,
+                    'name': app.get('name', ''),
+                    'icon_url': app.get('icon_url', ''),
+                    'icon_file_id': app.get('icon_file_id', ''),
+                    'download_url': app.get('download_url', ''),
+                    'apk_file_id': app.get('apk_file_id', ''),
+                    'download_type': app.get('download_type', 'url'),
+                    'description': app.get('description', '')}
+                dl_info = '📦 APK' if app.get('download_type') == 'apk' else '🔗 رابط'
+                self.edit_message(chat_id, message.get('message_id'),
+                    f"✏️ <b>تعديل التطبيق</b>\n\n"
+                    f"📱 الاسم: <code>{app.get('name', '')}</code>\n"
+                    f"🆔 <code>{app_id}</code>\n"
+                    f"{dl_info}\n\n"
+                    f"📝 اكتب <b>الاسم الجديد</b> (أو نفسه للإبقاء):\n\n"
+                    f"ثم ستعدل: الأيقونة ← التحميل ← الوصف")
+                self.user_states[user_id] = 'app_wizard_name'
+                return
+
+            elif data.startswith('app_dl_'):
+                # المستخدم يضغط تحميل تطبيق APK
+                app_id = data.replace('app_dl_', '')
+                app = self.get_app_by_id(app_id)
+                if not app:
+                    self.answer_callback(callback_id, "❌ التطبيق غير موجود")
+                    return
+                apk_file_id = app.get('apk_file_id', '')
+                if apk_file_id:
+                    self.answer_callback(callback_id, "📦 جارٍ إرسال الملف...")
+                    self.api_call('sendDocument', {
+                        'chat_id': chat_id,
+                        'document': apk_file_id,
+                        'caption': f"📦 {app.get('name', '')}\n\n👈 اضغط لتحميل الملف"
+                    })
+                else:
+                    url = app.get('download_url', '')
+                    if url:
+                        self.answer_callback(callback_id, "🔗 افتح الرابط")
+                        self.send_message(chat_id,
+                            f"⬇️ <b>{app.get('name', '')}</b>\n\n"
+                            f"🔗 <a href=\"{url}\">اضغط هنا للتحميل</a>")
+                    else:
+                        self.answer_callback(callback_id, "❌ لا يوجد ملف للتحميل")
+                return
+
+            elif data == 'apps_back_main':
+                user = self.find_user(user_id)
+                lang = user.get('language', 'ar') if user else 'ar'
+                self.edit_message(chat_id, message.get('message_id'), "🔙 تم العودة")
+                welcome = self.tr('choose_service', lang, name=user.get('name', ''), customer_id=user.get('customer_id', '')) if user else ''
+                self.send_message(chat_id, welcome, self.main_keyboard(lang, user_id))
                 return
 
             # ==================== 💎 تعويض 100% — أزرار inline ====================
