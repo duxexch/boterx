@@ -854,43 +854,9 @@ class SVRPManager:
     # ==================== انتهاء الأرصدة ====================
 
     def expire_old_credits(self):
-        """انتهاء صلاحية الأرصدة القديمة"""
-        now = datetime.now()
-        rows = self._read_csv('svrp_credits.csv')
-        expired_count = 0
-
-        for row in rows:
-            if row['status'] in ('pending', 'active'):
-                try:
-                    expiry = datetime.strptime(row.get('expires_at', ''), '%Y-%m-%d %H:%M')
-                    if now > expiry:
-                        row['status'] = 'expired'
-                        expired_count += 1
-                except:
-                    pass
-
-        if expired_count > 0:
-            self._write_csv('svrp_credits.csv', rows, self.CREDIT_FIELDS)
-            logger.info(f"Recovery: Expired {expired_count} old credits")
-
-        # انتهاء صلاحية الأكواد الترويجية
-        promo_rows = self._read_csv('svrp_promo_codes.csv')
-        expired_promos = 0
-        for row in promo_rows:
-            if row['status'] == 'active':
-                try:
-                    expiry = datetime.strptime(row.get('expires_at', ''), '%Y-%m-%d %H:%M')
-                    if now > expiry:
-                        row['status'] = 'expired'
-                        expired_promos += 1
-                except:
-                    pass
-
-        if expired_promos > 0:
-            self._write_csv('svrp_promo_codes.csv', promo_rows, self.PROMO_CODE_FIELDS)
-            logger.info(f"Recovery: Expired {expired_promos} promo codes")
-
-        # إعادة تعيين الحد الشهري (بداية شهر جديد)
+    def expire_old_credits(self):
+        """معطل — لا تنتهي صلاحية أي أرصدة أو أكواد. تبقى حتى يتدخل الأدمن."""
+        pass
         wallets = self._read_csv('svrp_wallets.csv')
         now_month = datetime.now().strftime('%Y-%m')
         reset_count = 0

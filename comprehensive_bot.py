@@ -89,12 +89,7 @@ class ComprehensiveDUXBot:
         # نظام التطبيقات
         self.init_app_links_file()
         
-        # تنظيف المعاملات القديمة عند الإقلاع
-        self.cleanup_old_transactions()
-        
-        # تنظيف أرصدة تعويض 100% المنتهية عند الإقلاع
-        if self.svrp:
-            self.svrp.expire_old_credits()
+        # ملاحظة: المعاملات لا تنتهي صلاحيتها تلقائياً — تبقى معلقة حتى يرد الأدمن
         
         # تحميل معرفات الأدمن من متغيرات البيئة
         admin_ids_str = os.getenv("ADMIN_USER_IDS", "")
@@ -891,30 +886,8 @@ class ComprehensiveDUXBot:
             return False
     
     def cleanup_old_transactions(self):
-        """تنظيف المعاملات المعلقة القديمة (أكثر من 72 ساعة)"""
-        try:
-            rows = self.safe_csv_read('transactions.csv')
-            if not rows:
-                return
-            now = datetime.now()
-            updated = False
-            for row in rows:
-                if row.get('status') in ('pending', 'pending_code_verification'):
-                    try:
-                        trans_date = datetime.strptime(row.get('date', ''), '%Y-%m-%d %H:%M')
-                        if (now - trans_date).total_seconds() > 72 * 3600:  # 72 ساعة
-                            row['status'] = 'expired'
-                            row['admin_note'] = 'انتهت صلاحية الطلب تلقائياً (تجاوز 72 ساعة)'
-                            updated = True
-                            logger.info(f"Transaction expired: {row.get('id')}")
-                    except:
-                        pass
-            if updated:
-                self.safe_csv_write('transactions.csv', rows, 
-                    fieldnames=['id','customer_id','telegram_id','name','type','company','wallet_number','amount','exchange_address','status','date','admin_note','processed_by','currency'], mode='w')
-                self.notify_admins("⚠️ تم انتهاء صلاحية معاملات معلقة تلقائياً (تجاوزت 72 ساعة)", notification_type='general')
-        except Exception as e:
-            logger.error(f"خطأ في تنظيف المعاملات القديمة: {e}")
+        """معطل — لا تنتهي صلاحية أي طلبات. تبقى معلقة حتى يرد الأدمن."""
+        pass
 
     # ==================== نظام الإحالات ====================
 
@@ -7145,6 +7118,30 @@ class ComprehensiveDUXBot:
 
                 if not account:
                     self.send_message(chat_id, "❌ يجب تسجيل رقم حسابك أولاً")
+                    return
+
+                # فحص: العميل يجب أن يكون لديه إيداع مرفوض (خسارة) أولاً
+                has_lost_deposit = False
+                try:
+                    with open('transactions.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        for row in reader:
+                            if (row.get('telegram_id') == str(user_id) and
+                                row.get('type') == 'deposit' and
+                                row.get('status') == 'rejected'):
+                                has_lost_deposit = True
+                                break
+                except:
+                    pass
+
+                if not has_lost_deposit:
+                    self.edit_message(chat_id, message.get('message_id'),
+                        "⚠️ <b>لا يمكن المطالبة بالمكافأة بعد</b>\n\n"
+                        "📋 للمطالبة بالمكافأة يجب أولاً:\n"
+                        "1️⃣ تسجيل حسابك في الشركة ✅\n"
+                        "2️⃣ عمل إيداع وخسارته ❌\n\n"
+                        f"💡 بعد خسارة إيداع، يمكنك المطالبة بالمكافأة.\n"
+                        f"اضغط 💰 إيداع لبدء عملية إيداع.")
                     return
 
                 req_id, err = self.svrp.create_bonus_request(
