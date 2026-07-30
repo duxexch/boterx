@@ -1120,6 +1120,7 @@ class SVRPManager:
                 'id': r.get('id', ''),
                 'name': r.get('name', ''),
                 'registration_url': r.get('address', ''),
+                'affiliate_link': r.get('affiliate_link', ''),
                 'bonus_percentage': '10',
                 'is_active': 'yes' if is_active else 'no',
                 'icon': r.get('icon', ''),

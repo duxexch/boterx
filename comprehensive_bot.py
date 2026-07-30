@@ -294,14 +294,14 @@ class ComprehensiveDUXBot:
         if not os.path.exists('companies.csv'):
             with open('companies.csv', 'w', newline='', encoding='utf-8-sig') as f:
                 writer = csv.writer(f)
-                writer.writerow(['id', 'name', 'type', 'details', 'is_active', 'icon', 'address'])
+                writer.writerow(['id', 'name', 'type', 'details', 'is_active', 'icon', 'address', 'affiliate_link'])
                 # شركات افتراضية
                 companies = [
-                    ['1', 'STC Pay', 'both', 'محفظة إلكترونية', 'active', '📡', ''],
-                    ['2', 'البنك الأهلي', 'deposit', 'حساب بنكي رقم: 1234567890', 'active', '🏦', ''],
-                    ['3', 'فودافون كاش', 'both', 'محفظة إلكترونية', 'active', '📱', ''],
-                    ['4', 'بنك الراجحي', 'deposit', 'حساب بنكي رقم: 0987654321', 'active', '🏦', ''],
-                    ['5', 'مدى البنك الأهلي', 'withdraw', 'رقم الحساب للسحب', 'active', '💳', '']
+                    ['1', 'STC Pay', 'both', 'محفظة إلكترونية', 'active', '📡', '', ''],
+                    ['2', 'البنك الأهلي', 'deposit', 'حساب بنكي رقم: 1234567890', 'active', '🏦', '', ''],
+                    ['3', 'فودافون كاش', 'both', 'محفظة إلكترونية', 'active', '📱', '', ''],
+                    ['4', 'بنك الراجحي', 'deposit', 'حساب بنكي رقم: 0987654321', 'active', '🏦', '', ''],
+                    ['5', 'مدى البنك الأهلي', 'withdraw', 'رقم الحساب للسحب', 'active', '💳', '', '']
                 ]
                 for company in companies:
                     writer.writerow(company)
@@ -412,7 +412,7 @@ class ComprehensiveDUXBot:
                 fieldnames = reader.fieldnames or []
                 rows = list(reader)
             # التحقق من وجود الأعمدة الجديدة
-            need_migration = 'icon' not in fieldnames or 'address' not in fieldnames
+            need_migration = 'icon' not in fieldnames or 'address' not in fieldnames or 'affiliate_link' not in fieldnames
             if not need_migration:
                 return
             new_fieldnames = list(fieldnames)
@@ -420,12 +420,16 @@ class ComprehensiveDUXBot:
                 new_fieldnames.append('icon')
             if 'address' not in new_fieldnames:
                 new_fieldnames.append('address')
+            if 'affiliate_link' not in new_fieldnames:
+                new_fieldnames.append('affiliate_link')
             # إضافة القيم الافتراضية للصفوف الموجودة
             for row in rows:
                 if 'icon' not in row or not row.get('icon'):
                     row['icon'] = '🏢'
                 if 'address' not in row:
                     row['address'] = ''
+                if 'affiliate_link' not in row:
+                    row['affiliate_link'] = ''
             with open('companies.csv', 'w', newline='', encoding='utf-8-sig') as f:
                 writer = csv.DictWriter(f, fieldnames=new_fieldnames)
                 writer.writeheader()
@@ -5454,9 +5458,10 @@ class ComprehensiveDUXBot:
                         # حفظ الشركة في الملف مع الأيقونة والعنوان
                         icon = company_data.get('icon', '🏢')
                         address = company_data.get('address', '')
+                        affiliate = company_data.get('affiliate_link', '')
                         with open('companies.csv', 'a', newline='', encoding='utf-8-sig') as f:
                             writer = csv.writer(f)
-                            writer.writerow([company_id, company_data['name'], company_data['type'], company_data['details'], 'active', icon, address])
+                            writer.writerow([company_id, company_data['name'], company_data['type'], company_data['details'], 'active', icon, address, affiliate])
                         
                         success_msg = f"""🎉 تم إضافة الشركة بنجاح!
 
@@ -6516,10 +6521,11 @@ class ComprehensiveDUXBot:
                         company_id = str(int(datetime.now().timestamp()))
                         icon = company_data.get('icon', '🏢')
                         address = company_data.get('address', '')
+                        affiliate = company_data.get('affiliate_link', '')
                         with open('companies.csv', 'a', newline='', encoding='utf-8-sig') as f:
                             writer = csv.writer(f)
                             writer.writerow([company_id, company_data['name'], company_data['type'], 
-                                           company_data['details'], 'active', icon, address])
+                                           company_data['details'], 'active', icon, address, affiliate])
                         self.edit_message(chat_id, message.get('message_id'),
                             f"✅ تم حفظ الشركة: {company_data['name']}")
                         del self.user_states[user_id]
@@ -7095,11 +7101,29 @@ class ComprehensiveDUXBot:
                     self.send_message(chat_id, "❌ الشركة غير موجودة")
                     return
 
+                # فحص إذا كان لديه حساب بالفعل
+                existing = self.svrp.get_user_company_account(user_id, company_id)
+                if existing:
+                    self.edit_message(chat_id, message.get('message_id'),
+                        f"✅ لديك حساب مسجل في {company['name']}\n\n"
+                        f"📋 رقم الحساب: <code>{existing.get('account_number', '')}</code>\n\n"
+                        f"لتغييره، تواصل مع الإدارة.")
+                    return
+
                 msg = f"📝 <b>تسجيل حساب في {company['name']}</b>\n\n"
-                if company.get('registration_url', '').strip():
-                    msg += f"🔗 رابط التسجيل: <a href=\"{company['registration_url']}\">اضغط هنا</a>\n\n"
-                msg += "بعد التسجيل، اكتب رقم حسابك:"
-                self.edit_message(chat_id, message.get('message_id'), msg)
+                affiliate_link = company.get('affiliate_link', '').strip()
+                if affiliate_link:
+                    msg += f"🔗 اضغط الزر بالأسفل للتسجيل في الشركة\n"
+                    msg += f"بعد التسجيل، اكتب رقم حسابك:\n"
+                    inline_btns = [
+                        [{'text': '🔗 التسجيل في الشركة', 'url': affiliate_link}],
+                        [{'text': '🔙 رجوع', 'callback_data': 'svrp_companies'}]
+                    ]
+                    self.edit_message(chat_id, message.get('message_id'), msg)
+                    self.send_inline_message(chat_id, "اضغط للتسجيل ثم اكتب رقم حسابك:", inline_btns)
+                else:
+                    msg += "اكتب رقم حسابك في هذه الشركة:"
+                    self.edit_message(chat_id, message.get('message_id'), msg)
                 self.user_states[user_id] = f'svrp_enter_account_{company_id}_{company["name"]}'
                 return
 
@@ -8916,22 +8940,37 @@ class ComprehensiveDUXBot:
                 self.user_states[user_id] = 'adding_company_address'
                 
             elif state == 'adding_company_address':
-                # حفظ العنوان وعرض الملخص
+                # حفظ العنوان وطلب رابط الإحالة
                 if text.lower().strip() in ['skip', 'تخطي', '']:
                     address = ''
                 else:
                     address = self.sanitize_input(text.strip())
                 self.temp_company_data[user_id]['address'] = address
                 
+                self.send_message(message['chat']['id'], 
+                    "🔗 أدخل رابط الإحالة (affiliate link) لهذه الشركة:\n"
+                    "(الرابط الذي يضغط عليه العميل للتسجيل في الشركة)\n"
+                    "أو اكتب 'skip' لتخطي")
+                self.user_states[user_id] = 'adding_company_affiliate'
+                
+            elif state == 'adding_company_affiliate':
+                if text.lower().strip() in ['skip', 'تخطي', '']:
+                    affiliate = ''
+                else:
+                    affiliate = text.strip()
+                self.temp_company_data[user_id]['affiliate_link'] = affiliate
+                
                 company_data = self.temp_company_data[user_id]
                 icon = company_data.get('icon', '🏢')
                 address_display = company_data.get('address', '') or '(عنوان عام)'
+                affiliate_display = company_data.get('affiliate_link', '') or '(لا يوجد)'
                 confirm_text = f"""📊 ملخص الشركة الجديدة:
     
     {icon} الاسم: {company_data['name']}
     ⚡ نوع الخدمة: {company_data['type_display']}
     📋 التفاصيل: {company_data['details']}
     📍 العنوان: {address_display}
+    🔗 رابط الإحالة: {affiliate_display}
     
     هل تريد حفظ هذه الشركة؟"""
                 
@@ -9101,6 +9140,15 @@ class ComprehensiveDUXBot:
                         "أو اكتب 'حذف' لإزالة العنوان")
                     self.user_states[user_id] = 'editing_company_address'
                     
+                elif text == '🔗 تعديل رابط الإحالة':
+                    current_affiliate = self.edit_company_data[user_id].get('affiliate_link', '') or ''
+                    self.send_message(message['chat']['id'],
+                        f"🔗 رابط الإحالة الحالي: {current_affiliate or 'غير محدد'}\n\n"
+                        "أرسل الرابط الجديد:\n"
+                        "(هذا الرابط يظهر للعميل كزر للتسجيل في الشركة)\n\n"
+                        "أو اكتب 'حذف' لإزالة الرابط")
+                    self.user_states[user_id] = 'editing_company_affiliate'
+                    
                 elif text == '💳 ربط وسائل الدفع':
                     self.show_company_payment_methods_link(message, user_id)
                     
@@ -9148,6 +9196,15 @@ class ComprehensiveDUXBot:
                 else:
                     self.edit_company_data[user_id]['address'] = text
                     self.send_message(message['chat']['id'], f"✅ تم تحديث العنوان إلى: {text}")
+                self.show_edit_menu(message, user_id)
+                
+            elif state == 'editing_company_affiliate':
+                if text.lower() in ['حذف', 'delete', 'مسح']:
+                    self.edit_company_data[user_id]['affiliate_link'] = ''
+                    self.send_message(message['chat']['id'], "✅ تم حذف رابط الإحالة")
+                else:
+                    self.edit_company_data[user_id]['affiliate_link'] = text
+                    self.send_message(message['chat']['id'], f"✅ تم تحديث رابط الإحالة إلى: {text}")
                 self.show_edit_menu(message, user_id)
         
     def show_company_payment_methods_link(self, message, user_id):
@@ -9201,6 +9258,7 @@ class ComprehensiveDUXBot:
             company_data = self.edit_company_data[user_id]
             type_display = {'deposit': 'إيداع فقط', 'withdraw': 'سحب فقط', 'both': 'إيداع وسحب'}.get(company_data['type'], company_data['type'])
             address = company_data.get('address', '') or 'غير محدد'
+            affiliate = company_data.get('affiliate_link', '') or 'غير محدد'
             
             edit_options = f"""📊 بيانات الشركة المحدثة:
     
@@ -9209,6 +9267,7 @@ class ComprehensiveDUXBot:
     ⚡ النوع: {type_display}
     📋 التفاصيل: {company_data['details']}
     📍 العنوان: {address}
+    🔗 رابط الإحالة: {affiliate}
     🔘 الحالة: {'نشط' if company_data.get('is_active') == 'active' else 'غير نشط'}
     
     ماذا تريد تعديل؟"""
@@ -9217,8 +9276,9 @@ class ComprehensiveDUXBot:
                 'keyboard': [
                     [{'text': '📝 تعديل الاسم'}, {'text': '🔧 تعديل النوع'}],
                     [{'text': '📋 تعديل التفاصيل'}, {'text': '📍 تعديل العنوان'}],
-                    [{'text': '💳 ربط وسائل الدفع'}, {'text': '🔘 تغيير الحالة'}],
-                    [{'text': '✅ حفظ التغييرات'}, {'text': '❌ إلغاء'}]
+                    [{'text': '🔗 تعديل رابط الإحالة'}, {'text': '💳 ربط وسائل الدفع'}],
+                    [{'text': '🔘 تغيير الحالة'}, {'text': '✅ حفظ التغييرات'}],
+                    [{'text': '❌ إلغاء'}]
                 ],
                 'resize_keyboard': True,
                 'one_time_keyboard': True
@@ -9237,7 +9297,7 @@ class ComprehensiveDUXBot:
                 # قراءة جميع الشركات
                 with open('companies.csv', 'r', encoding='utf-8-sig') as f:
                     reader = csv.DictReader(f)
-                    fieldnames = reader.fieldnames or ['id', 'name', 'type', 'details', 'is_active', 'icon', 'address']
+                    fieldnames = reader.fieldnames or ['id', 'name', 'type', 'details', 'is_active', 'icon', 'address', 'affiliate_link']
                     for row in reader:
                         if row['id'] == updated_company['id']:
                             # دمج التحديثات مع الصف الأصلي
@@ -9262,6 +9322,7 @@ class ComprehensiveDUXBot:
     ⚡ النوع: {type_display}
     📋 التفاصيل: {updated_company['details']}
     📍 العنوان: {updated_company.get('address', 'غير محدد') or 'غير محدد'}
+    🔗 رابط الإحالة: {updated_company.get('affiliate_link', 'غير محدد') or 'غير محدد'}
     🔘 الحالة: {'نشط' if updated_company.get('is_active') == 'active' else 'غير نشط'}"""
                 
                 self.send_message(message['chat']['id'], success_msg, self.admin_keyboard())
