@@ -818,7 +818,7 @@ class ComprehensiveDUXBot:
                 writer = csv.writer(f)
                 writer.writerow(['telegram_id', 'last_login', 'total_transactions', 'total_deposits', 'total_withdrawals', 'rating_avg', 'last_activity'])
 
-    APP_FIELDS = ['id', 'name', 'icon_url', 'icon_file_id', 'android_url', 'android_file_id', 'ios_url', 'ios_file_id', 'description', 'is_active', 'created_at']
+    APP_FIELDS = ['id', 'name', 'icon_url', 'icon_file_id', 'android_url', 'android_file_id', 'ios_url', 'ios_file_id', 'promo_code', 'referral_link', 'description', 'is_active', 'created_at']
 
     def init_app_links_file(self):
         """إنشاء وترحيل ملف التطبيقات"""
@@ -836,10 +836,9 @@ class ComprehensiveDUXBot:
                 reader = csv.DictReader(f)
                 fieldnames = reader.fieldnames or []
                 rows = list(reader)
-            if 'android_url' in fieldnames:
+            if 'promo_code' in fieldnames:
                 return  # أحدث إصدار
             for row in rows:
-                # ترحيل من download_url/apk_file_id إلى android_url/android_file_id
                 if 'android_url' not in row:
                     old_url = row.get('download_url', '')
                     old_apk = row.get('apk_file_id', '')
@@ -851,6 +850,10 @@ class ComprehensiveDUXBot:
                     row['ios_file_id'] = ''
                 if 'icon_file_id' not in row:
                     row['icon_file_id'] = ''
+                if 'promo_code' not in row:
+                    row['promo_code'] = ''
+                if 'referral_link' not in row:
+                    row['referral_link'] = ''
                 if 'is_active' not in row:
                     row['is_active'] = 'yes'
             with open('app_links.csv', 'w', newline='', encoding='utf-8-sig') as f:
@@ -858,7 +861,7 @@ class ComprehensiveDUXBot:
                 writer.writeheader()
                 for row in rows:
                     writer.writerow({k: row.get(k, '') for k in self.APP_FIELDS})
-            logger.info("تم ترحيل app_links.csv لإضافة أعمدة android/ios")
+            logger.info("تم ترحيل app_links.csv لإضافة أعمدة promo_code/referral_link")
         except Exception as e:
             logger.error(f"خطأ في ترحيل app_links.csv: {e}")
 
@@ -887,13 +890,13 @@ class ComprehensiveDUXBot:
             pass
         return apps
 
-    def add_app_link(self, name, icon_url='', icon_file_id='', android_url='', android_file_id='', ios_url='', ios_file_id='', description=''):
+    def add_app_link(self, name, icon_url='', icon_file_id='', android_url='', android_file_id='', ios_url='', ios_file_id='', promo_code='', referral_link='', description=''):
         """إضافة تطبيق جديد"""
         app_id = f"APP{str(int(datetime.now().timestamp()))[-6:]}"
         try:
             with open('app_links.csv', 'a', newline='', encoding='utf-8-sig') as f:
                 writer = csv.writer(f)
-                writer.writerow([app_id, name, icon_url, icon_file_id, android_url, android_file_id, ios_url, ios_file_id, description, 'yes', datetime.now().strftime('%Y-%m-%d %H:%M')])
+                writer.writerow([app_id, name, icon_url, icon_file_id, android_url, android_file_id, ios_url, ios_file_id, promo_code, referral_link, description, 'yes', datetime.now().strftime('%Y-%m-%d %H:%M')])
             return app_id
         except Exception as e:
             logger.error(f"خطأ في إضافة تطبيق: {e}")
@@ -970,6 +973,8 @@ class ComprehensiveDUXBot:
                         row['android_file_id'] = data.get('android_file_id', '')
                         row['ios_url'] = data.get('ios_url', '')
                         row['ios_file_id'] = data.get('ios_file_id', '')
+                        row['promo_code'] = data.get('promo_code', '')
+                        row['referral_link'] = data.get('referral_link', '')
                         row['description'] = data.get('description', '')
                     rows.append(row)
             with open('app_links.csv', 'w', newline='', encoding='utf-8-sig') as f:
@@ -1026,7 +1031,7 @@ class ComprehensiveDUXBot:
     # ==================== 📱 التطبيقات — Panel Methods ====================
 
     def show_apps_panel(self, message):
-        """عرض التطبيقات للمستخدم — كل تطبيق بصورته + زرين أندرويد وآيفون"""
+        """عرض قائمة التطبيقات — النقر يعرض التفاصيل"""
         user = self.find_user(message['from']['id'])
         lang = user.get('language', 'ar') if user else 'ar'
         apps = self.get_app_links()
@@ -1037,74 +1042,85 @@ class ComprehensiveDUXBot:
                 self.main_keyboard(lang, message['from']['id']))
             return
 
+        inline_btns = []
         for app in apps:
             name = app.get('name', '')
-            desc = app.get('description', '')
-            icon_url = app.get('icon_url', '')
             icon_file_id = app.get('icon_file_id', '')
-            android_url = app.get('android_url', '')
-            android_file_id = app.get('android_file_id', '')
-            ios_url = app.get('ios_url', '')
-            ios_file_id = app.get('ios_file_id', '')
-
-            # بناء caption
-            caption = f"📱 <b>{name}</b>\n"
-            if desc:
-                caption += f"📝 {desc}\n"
-
-            # بناء أزرار التحميل — صف واحد لزر الأندرويد وآيفون جنب بعض
-            dl_btns = []
-            if android_file_id:
-                dl_btns.append({'text': '🤖 أندرويد', 'callback_data': f"app_dl_android_{app['id']}"})
-            elif android_url:
-                dl_btns.append({'text': '🤖 أندرويد', 'url': android_url})
-            if ios_file_id:
-                dl_btns.append({'text': '🍎 آيفون', 'callback_data': f"app_dl_ios_{app['id']}"})
-            elif ios_url:
-                dl_btns.append({'text': '🍎 آيفون', 'url': ios_url})
-
-            inline_btns = []
-            if dl_btns:
-                inline_btns.append(dl_btns)
-
-            keyboard = {'inline_keyboard': inline_btns} if inline_btns else None
-
-            # إرسال الأيقونة + الأزرار
-            sent = False
+            icon_url = app.get('icon_url', '')
+            # محاولة إرسال أيقونة التطبيق
             if icon_file_id:
                 try:
                     self.api_call('sendPhoto', {
                         'chat_id': message['chat']['id'],
                         'photo': icon_file_id,
-                        'caption': caption,
-                        'parse_mode': 'HTML',
-                        'reply_markup': self.transform_keyboard(keyboard) if keyboard else None
+                        'caption': f"📱 <b>{name}</b>",
+                        'parse_mode': 'HTML'
                     })
-                    sent = True
                 except:
                     pass
-            if not sent and icon_url and icon_url.startswith('http'):
+            elif icon_url and icon_url.startswith('http'):
                 try:
                     self.api_call('sendPhoto', {
                         'chat_id': message['chat']['id'],
                         'photo': icon_url,
-                        'caption': caption,
-                        'parse_mode': 'HTML',
-                        'reply_markup': self.transform_keyboard(keyboard) if keyboard else None
+                        'caption': f"📱 <b>{name}</b>",
+                        'parse_mode': 'HTML'
                     })
-                    sent = True
                 except:
                     pass
-            if not sent:
-                if dl_btns:
-                    caption += "\n👇 اختر نظام التشغيل"
-                    self.send_inline_message(message['chat']['id'], caption, inline_btns)
-                else:
-                    caption += "\n❌ لا توجد روابط تحميل"
-                    self.send_message(message['chat']['id'], caption)
+            inline_btns.append([{'text': f"📱 {name}", 'callback_data': f"app_view_{app['id']}"}])
 
-        # زر الرجوع
-        self.send_inline_message(message['chat']['id'], "📱 تم عرض كل التطبيقات", [[{'text': '🔙 رجوع', 'callback_data': 'apps_back_main'}]])
+        inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'apps_back_main'}])
+        self.send_inline_message(message['chat']['id'], "📱 <b>التطبيقات</b>\n\nاختر تطبيقاً:", inline_btns)
+
+    def show_app_detail(self, chat_id, app_id):
+        """عرض تفاصيل تطبيق للمستخدم"""
+        app = self.get_app_by_id(app_id)
+        if not app:
+            self.send_message(chat_id, "❌ التطبيق غير موجود")
+            return
+
+        name = app.get('name', '')
+        desc = app.get('description', '')
+        android_url = app.get('android_url', '')
+        android_file_id = app.get('android_file_id', '')
+        ios_url = app.get('ios_url', '')
+        ios_file_id = app.get('ios_file_id', '')
+        promo_code = app.get('promo_code', '').strip()
+        referral_link = app.get('referral_link', '').strip()
+
+        # بناء النص
+        text = f"📱 <b>{name}</b>\n"
+        text += f"━━━━━━━━━━━━━━━━━━\n"
+        if desc:
+            text += f"📝 {desc}\n\n"
+
+        # أزرار التحميل
+        dl_btns = []
+        if android_file_id:
+            dl_btns.append({'text': '🤖 أندرويد', 'callback_data': f"app_dl_android_{app_id}"})
+        elif android_url:
+            dl_btns.append({'text': '🤖 أندرويد', 'url': android_url})
+        if ios_file_id:
+            dl_btns.append({'text': '🍎 آيفون', 'callback_data': f"app_dl_ios_{app_id}"})
+        elif ios_url:
+            dl_btns.append({'text': '🍎 آيفون', 'url': ios_url})
+
+        inline_btns = []
+        if dl_btns:
+            inline_btns.append(dl_btns)
+
+        # البرومو كود
+        if promo_code:
+            text += f"🎁 <b>كود الخصم:</b>\n<code>{promo_code}</code> 👈 اضغط للنسخ\n\n"
+
+        # رابط الإحالة
+        if referral_link:
+            inline_btns.append([{'text': '🔗 رابط الإحالة', 'url': referral_link}])
+
+        inline_btns.append([{'text': '🔙 رجوع للتطبيقات', 'callback_data': 'app_list_back'}])
+
+        self.send_inline_message(chat_id, text, inline_btns)
 
     # ==================== Admin: Apps Management ====================
 
@@ -1256,10 +1272,38 @@ class ComprehensiveDUXBot:
                 self.send_message(chat_id, "❌ اكتب رابط App Store (http/https). أو اكتب 'تخطي':")
                 return
 
+            data['step'] = 'app_promo'
+            self.temp_app_data[user_id] = data
+            self.send_message(chat_id,
+                f"\n🎁 الخطوة 5: اكتب <b>برومو كود</b> للتطبيق:\n\n"
+                f"• يظهر للعميل بالأزرق قابل للنسخ\n"
+                f"• أو اكتب 'تخطي'")
+
+        elif step == 'app_promo':
+            if text.lower() in ['تخطي', 'skip', 'بدون']:
+                data['promo_code'] = ''
+            else:
+                data['promo_code'] = text.strip()
+            data['step'] = 'app_referral'
+            self.temp_app_data[user_id] = data
+            self.send_message(chat_id,
+                f"\n🔗 الخطوة 6: اكتب <b>رابط الإحالة</b> للتطبيق:\n\n"
+                f"• يظهر للعميل كزر يفتح الرابط\n"
+                f"• أو اكتب 'تخطي'")
+
+        elif step == 'app_referral':
+            if text.lower() in ['تخطي', 'skip', 'بدون']:
+                data['referral_link'] = ''
+            elif text.startswith('http'):
+                data['referral_link'] = text.strip()
+            else:
+                self.send_message(chat_id, "❌ اكتب رابط صحيح (http/https). أو اكتب 'تخطي':")
+                return
+
             data['step'] = 'app_desc'
             self.temp_app_data[user_id] = data
             self.send_message(chat_id,
-                f"\n📝 الخطوة 5 (الأخيرة): اكتب <b>وصفاً قصيراً</b>:\nأو اكتب 'تخطي'")
+                f"\n📝 الخطوة 7 (الأخيرة): اكتب <b>وصفاً قصيراً</b>:\nأو اكتب 'تخطي'")
 
         elif step == 'app_desc':
             if text.lower() in ['تخطي', 'skip', 'بدون']:
@@ -1280,12 +1324,16 @@ class ComprehensiveDUXBot:
                     data.get('android_file_id', ''),
                     data.get('ios_url', ''),
                     data.get('ios_file_id', ''),
+                    data.get('promo_code', ''),
+                    data.get('referral_link', ''),
                     data.get('description', '')
                 )
 
             if app_id:
                 android_info = '📦 APK مرفوع' if data.get('android_file_id') else ('🔗 رابط أندرويد' if data.get('android_url') else '➖ بدون أندرويد')
                 ios_info = '🔗 رابط آيفون' if data.get('ios_url') else '➖ بدون آيفون'
+                promo_info = f"🎁 كود: <code>{data.get('promo_code', '')}</code>" if data.get('promo_code') else '➖ بدون كود'
+                ref_info = '🔗 رابط إحالة' if data.get('referral_link') else '➖ بدون رابط إحالة'
                 icon_info = '🖼️ أيقونة مرفوعة' if data.get('icon_file_id') else ('🖼️ رابط أيقونة' if data.get('icon_url') else '➖ بدون أيقونة')
                 summary = (
                     f"✅ <b>تم حفظ التطبيق!</b>\n\n"
@@ -1294,6 +1342,8 @@ class ComprehensiveDUXBot:
                     f"{icon_info}\n"
                     f"{android_info}\n"
                     f"{ios_info}\n"
+                    f"{promo_info}\n"
+                    f"{ref_info}\n"
                 )
                 if data.get('description'):
                     summary += f"📝 {data['description']}\n"
@@ -7213,6 +7263,18 @@ class ComprehensiveDUXBot:
                     })
                 else:
                     self.answer_callback(callback_id, "✅")
+                return
+
+            elif data.startswith('app_view_'):
+                app_id = data.replace('app_view_', '')
+                self.edit_message(chat_id, message.get('message_id'), "📱")
+                self.show_app_detail(chat_id, app_id)
+                return
+
+            elif data == 'app_list_back':
+                self.edit_message(chat_id, message.get('message_id'), "📱")
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_apps_panel(fake_msg)
                 return
 
             elif data == 'apps_back_main':
