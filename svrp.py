@@ -1109,11 +1109,23 @@ class SVRPManager:
         return None
 
     def get_recovery_companies(self, active_only=True):
-        """جلب شركات الاسترداد"""
-        rows = self._read_csv('svrp_companies.csv')
-        if active_only:
-            return [r for r in rows if r.get('is_active') == 'yes']
-        return rows
+        """جلب شركات الاسترداد من ملف الشركات الرئيسي companies.csv"""
+        rows = self._read_csv('companies.csv')
+        result = []
+        for r in rows:
+            is_active = r.get('is_active', '').lower() in ['active', 'yes', '1', 'true']
+            if active_only and not is_active:
+                continue
+            result.append({
+                'id': r.get('id', ''),
+                'name': r.get('name', ''),
+                'registration_url': r.get('address', ''),
+                'bonus_percentage': '10',
+                'is_active': 'yes' if is_active else 'no',
+                'icon': r.get('icon', ''),
+                'details': r.get('details', '')
+            })
+        return result
 
     def delete_recovery_company(self, company_id):
         """حذف شركة استرداد"""
@@ -1177,13 +1189,8 @@ class SVRPManager:
         if not account:
             return None, "يجب تسجيل رقم حسابك أولاً"
 
-        # جلب نسبة المكافأة من الشركة
-        companies = self._read_csv('svrp_companies.csv')
+        # نسبة المكافأة الافتراضية
         bonus_pct = 10
-        for c in companies:
-            if c['id'] == company_id:
-                bonus_pct = float(c.get('bonus_percentage', 10) or 10)
-                break
 
         request_id = self._generate_id('BNR')
         row = {

@@ -6998,7 +6998,10 @@ class ComprehensiveDUXBot:
                 text += "اختر شركة للتسجيل:\n\n"
                 inline_btns = []
                 for c in companies:
-                    text += f"• <b>{c['name']}</b>\n  🔗 <a href=\"{c.get('registration_url', '')}\">رابط التسجيل</a>\n  💰 نسبة المكافأة: {c.get('bonus_percentage', '10')}%\n\n"
+                    text += f"• <b>{c['name']}</b>\n"
+                    if c.get('registration_url', '').strip():
+                        text += f"  🔗 <a href=\"{c['registration_url']}\">رابط التسجيل</a>\n"
+                    text += "\n"
                     inline_btns.append([{'text': f"📝 تسجيل حساب — {c['name']}", 'callback_data': f'svrp_reg_{c["id"]}'}])
 
                 inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'svrp_back_panel'}])
@@ -7019,10 +7022,11 @@ class ComprehensiveDUXBot:
                     self.send_message(chat_id, "❌ الشركة غير موجودة")
                     return
 
-                self.edit_message(chat_id, message.get('message_id'),
-                    f"📝 <b>تسجيل حساب في {company['name']}</b>\n\n"
-                    f"🔗 رابط التسجيل: <a href=\"{company.get('registration_url', '')}\">اضغط هنا</a>\n\n"
-                    f"بعد التسجيل، اكتب رقم حسابك:")
+                msg = f"📝 <b>تسجيل حساب في {company['name']}</b>\n\n"
+                if company.get('registration_url', '').strip():
+                    msg += f"🔗 رابط التسجيل: <a href=\"{company['registration_url']}\">اضغط هنا</a>\n\n"
+                msg += "بعد التسجيل، اكتب رقم حسابك:"
+                self.edit_message(chat_id, message.get('message_id'), msg)
                 self.user_states[user_id] = f'svrp_enter_account_{company_id}_{company["name"]}'
                 return
 
