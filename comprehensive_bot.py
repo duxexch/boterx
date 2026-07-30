@@ -4453,7 +4453,7 @@ class ComprehensiveDUXBot:
                 admin_state = self.user_states[user_id]
                 if isinstance(admin_state, str):
                     if admin_state == 'admin_broadcasting':
-                        self.send_broadcast_message(message, text)
+                        self.send_broadcast_message(message, text if text else None)
                         return
                     elif admin_state.startswith('adding_company_'):
                         self.handle_company_wizard(message)
@@ -9076,11 +9076,19 @@ class ComprehensiveDUXBot:
             self.send_message(message['chat']['id'], stats_text, self.admin_keyboard())
         
     def prompt_broadcast(self, message):
-            """طلب الإرسال الجماعي — مع تأكيد"""
+            """طلب الإرسال الجماعي — يدعم جميع أنواع الوسائط"""
             broadcast_help = """📢 الإرسال الجماعي
 
 ⚠️ سيتم إرسال الرسالة لجميع المستخدمين النشطين.
-اكتب رسالتك الآن:"""
+
+✅ يمكنك إرسال:
+• 📝 نص بأي لغة
+• 🖼️ صورة (PNG/JPG/WebP)
+• 🎥 فيديو (MP4)
+• 🃏 ملصق (Sticker)
+• 📄 ملف/مستند
+
+أرسل المحتوى الآن:"""
             self.send_message(message['chat']['id'], broadcast_help)
             self.user_states[message['from']['id']] = 'admin_broadcasting'
         
@@ -10717,49 +10725,104 @@ class ComprehensiveDUXBot:
                 if message['from']['id'] in self.user_states:
                     del self.user_states[message['from']['id']]
         
-    def send_broadcast_message(self, message, broadcast_text):
-            """إرسال رسالة جماعية"""
+    def send_broadcast_message(self, message, broadcast_text=None):
+            """إرسال رسالة جماعية — تدعم جميع أنواع الوسائط"""
             sent_count = 0
             failed_count = 0
+            
+            # تحديد نوع الرسالة
+            media_type = None
+            media_data = {}
+            
+            if 'photo' in message:
+                media_type = 'photo'
+                photo = message['photo'][-1]  # أكبر حجم
+                media_data['photo'] = photo['file_id']
+                media_data['caption'] = broadcast_text or message.get('caption', '')
+            elif 'video' in message:
+                media_type = 'video'
+                media_data['video'] = message['video']['file_id']
+                media_data['caption'] = broadcast_text or message.get('caption', '')
+            elif 'sticker' in message:
+                media_type = 'sticker'
+                media_data['sticker'] = message['sticker']['file_id']
+            elif 'document' in message:
+                media_type = 'document'
+                media_data['document'] = message['document']['file_id']
+                media_data['caption'] = broadcast_text or message.get('caption', '')
+            elif broadcast_text:
+                media_type = 'text'
+                media_data['text'] = broadcast_text
+            else:
+                self.send_message(message['chat']['id'], "❌ لا يوجد محتوى للإرسال", self.admin_keyboard())
+                if message['from']['id'] in self.user_states:
+                    del self.user_states[message['from']['id']]
+                return
             
             try:
                 with open('users.csv', 'r', encoding='utf-8-sig') as f:
                     reader = csv.DictReader(f)
                     users = list(reader)
                 
-                # إرسال للمستخدمين النشطين فقط
                 for user in users:
-                    if user.get('is_banned') != 'yes':
-                        try:
-                            broadcast_msg = f"""📢 رسالة من الإدارة
-    
-    {broadcast_text}
-    
-    📅 {datetime.now().strftime('%Y-%m-%d %H:%M')}"""
-                            
-                            # إرسال الرسالة بدون لوحة مفاتيح حتى لا تؤثر على الأزرار الحالية
-                            result = self.send_message(user['telegram_id'], broadcast_msg, None)
-                            if result and result.get('ok'):
-                                sent_count += 1
-                            else:
-                                failed_count += 1
-                        except:
+                    if user.get('is_banned') == 'yes':
+                        continue
+                    try:
+                        tid = user['telegram_id']
+                        
+                        if media_type == 'photo':
+                            result = self.api_call('sendPhoto', {
+                                'chat_id': tid,
+                                'photo': media_data['photo'],
+                                'caption': f"📢 {media_data['caption']}" if media_data['caption'] else None,
+                                'parse_mode': 'HTML'
+                            })
+                        elif media_type == 'video':
+                            result = self.api_call('sendVideo', {
+                                'chat_id': tid,
+                                'video': media_data['video'],
+                                'caption': f"📢 {media_data['caption']}" if media_data['caption'] else None,
+                                'parse_mode': 'HTML'
+                            })
+                        elif media_type == 'sticker':
+                            result = self.api_call('sendSticker', {
+                                'chat_id': tid,
+                                'sticker': media_data['sticker']
+                            })
+                        elif media_type == 'document':
+                            result = self.api_call('sendDocument', {
+                                'chat_id': tid,
+                                'document': media_data['document'],
+                                'caption': f"📢 {media_data['caption']}" if media_data['caption'] else None,
+                                'parse_mode': 'HTML'
+                            })
+                        else:
+                            msg = f"📢 رسالة من الإدارة\n\n{media_data['text']}\n\n📅 {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+                            result = self.send_message(tid, msg, None)
+                        
+                        if result and result.get('ok'):
+                            sent_count += 1
+                        else:
                             failed_count += 1
+                    except:
+                        failed_count += 1
                 
-                summary = f"""✅ تم إرسال الرسالة الجماعية
-    
-    📊 الإحصائيات:
-    • تم الإرسال بنجاح: {sent_count}
-    • فشل في الإرسال: {failed_count}
-    • إجمالي المحاولات: {sent_count + failed_count}
-    
-    📝 الرسالة: {broadcast_text}"""
+                media_label = {'photo': '🖼️ صورة', 'video': '🎥 فيديو', 'sticker': '🃏 ملصق', 'document': '📄 ملف', 'text': '📝 نص'}.get(media_type, 'محتوى')
+                summary = f"""✅ تم الإرسال الجماعي
+
+📊 الإحصائيات:
+• النوع: {media_label}
+• تم الإرسال: <code>{sent_count}</code>
+• فشل: <code>{failed_count}</code>
+• الإجمالي: <code>{sent_count + failed_count}</code>"""
                 
                 self.send_message(message['chat']['id'], summary, self.admin_keyboard())
-                del self.user_states[message['from']['id']]
+                if message['from']['id'] in self.user_states:
+                    del self.user_states[message['from']['id']]
             except:
                 self.send_message(message['chat']['id'], "❌ فشل في الإرسال الجماعي", self.admin_keyboard())
-                del self.user_states[message['from']['id']]
+                if message['from']['id'] in self.user_states:
+                    del self.user_states[message['from']['id']]
     
     def show_approved_transactions(self, message):
             """عرض المعاملات المُوافق عليها"""
@@ -11672,7 +11735,7 @@ class ComprehensiveDUXBot:
     
     مثال: C824717
     
-    💡 تأكد من كتابة الرقم بشكل صحيح (مع الحرف C)
+    💡 يمكنك إرسال: نص، صورة، فيديو، ملصق، ملف
     
     ⬅️ /cancel للإلغاء"""
             
@@ -11716,7 +11779,8 @@ class ComprehensiveDUXBot:
     📅 تاريخ التسجيل: {user_found.get('registration_date', 'غير محدد')}
     🚫 الحالة: {'محظور' if user_found.get('is_banned') == 'yes' else 'نشط'}
     
-    📝 الآن أدخل الرسالة التي تريد إرسالها لهذا العميل:
+    📝 أرسل المحتوى الآن:
+    • نص / صورة / فيديو / ملصق / ملف
     
     ⬅️ /cancel للإلغاء"""
             
@@ -11724,18 +11788,14 @@ class ComprehensiveDUXBot:
             self.user_states[user_id] = f'sending_user_message_{customer_id}'
         
     def handle_user_message_content(self, message, customer_id):
-            """معالجة محتوى الرسالة وإرسالها"""
+            """معالجة محتوى الرسالة وإرسالها — يدعم جميع أنواع الوسائط"""
             user_id = message['from']['id']
             message_content = message.get('text', '').strip()
             
             if message_content == '/cancel' or message_content.lower() == 'cancel':
                 if user_id in self.user_states:
                     del self.user_states[user_id]
-                self.send_message(message['chat']['id'], "✅ تم إلغاء إرسال الرسالة", self.admin_keyboard())
-                return
-            
-            if not message_content:
-                self.send_message(message['chat']['id'], "❌ الرسالة فارغة. يرجى كتابة الرسالة:")
+                self.send_message(message['chat']['id'], "✅ تم الإلغاء", self.admin_keyboard())
                 return
             
             # البحث عن معرف التليجرام للعميل
@@ -11755,58 +11815,74 @@ class ComprehensiveDUXBot:
             
             if not target_telegram_id:
                 self.send_message(message['chat']['id'], 
-                                f"❌ لم يتم العثور على معرف التليجرام للعميل {customer_id}\n\n💡 تأكد من أن العميل مسجل في النظام", 
-                                self.admin_keyboard())
+                    f"❌ لم يتم العثور على العميل <code>{customer_id}</code>", 
+                    self.admin_keyboard())
                 if user_id in self.user_states:
                     del self.user_states[user_id]
                 return
             
-            # إرسال الرسالة للعميل بدون لوحة مفاتيح حتى لا تؤثر على الأزرار
             admin_info = self.find_user(user_id)
             admin_name = admin_info.get('name', 'الإدارة') if admin_info else 'الإدارة'
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M')
+            header = f"📧 رسالة من الإدارة\n\n👤 {admin_name}\n📅 {timestamp}\n\n━━━━━━━━━━━━━━━━━━━\n\n"
             
-            customer_message = f"""📧 رسالة من الإدارة
-    
-    من: {admin_name}
-    التاريخ: {datetime.now().strftime('%Y-%m-%d %H:%M')}
-    
-    ━━━━━━━━━━━━━━━━━━━━
-    
-    {message_content}
-    
-    ━━━━━━━━━━━━━━━━━━━━
-    
-    💬 للرد على هذه الرسالة، استخدم قسم الشكاوى في النظام"""
+            sent = False
             
-            # محاولة إرسال الرسالة بدون لوحة مفاتيح
             try:
-                response = self.send_message(int(target_telegram_id), customer_message, None)
-                
-                # إشعار الأدمن بنجاح الإرسال
-                success_msg = f"""✅ تم إرسال الرسالة بنجاح!
-    
-    📧 إلى العميل: {customer_name} ({customer_id})
-    📅 وقت الإرسال: {datetime.now().strftime('%Y-%m-%d %H:%M')}
-    
-    📝 محتوى الرسالة:
-    {message_content}"""
-                
-                self.send_message(message['chat']['id'], success_msg, self.admin_keyboard())
-                
+                if 'photo' in message:
+                    photo = message['photo'][-1]
+                    caption = message.get('caption', '')
+                    result = self.api_call('sendPhoto', {
+                        'chat_id': int(target_telegram_id),
+                        'photo': photo['file_id'],
+                        'caption': header + caption if caption else header.rstrip(),
+                        'parse_mode': 'HTML'
+                    })
+                    sent = result and result.get('ok')
+                elif 'video' in message:
+                    caption = message.get('caption', '')
+                    result = self.api_call('sendVideo', {
+                        'chat_id': int(target_telegram_id),
+                        'video': message['video']['file_id'],
+                        'caption': header + caption if caption else header.rstrip(),
+                        'parse_mode': 'HTML'
+                    })
+                    sent = result and result.get('ok')
+                elif 'sticker' in message:
+                    result = self.api_call('sendSticker', {
+                        'chat_id': int(target_telegram_id),
+                        'sticker': message['sticker']['file_id']
+                    })
+                    sent = result and result.get('ok')
+                    if sent:
+                        self.send_message(int(target_telegram_id), header.rstrip(), None)
+                elif 'document' in message:
+                    caption = message.get('caption', '')
+                    result = self.api_call('sendDocument', {
+                        'chat_id': int(target_telegram_id),
+                        'document': message['document']['file_id'],
+                        'caption': header + caption if caption else header.rstrip(),
+                        'parse_mode': 'HTML'
+                    })
+                    sent = result and result.get('ok')
+                elif message_content:
+                    msg = header + message_content + "\n\n━━━━━━━━━━━━━━━━━━━\n\n💬 للرد استخدم قسم الشكاوى"
+                    result = self.send_message(int(target_telegram_id), msg, None)
+                    sent = result and result.get('ok')
+                else:
+                    self.send_message(message['chat']['id'], "❌ لا يوجد محتوى. أرسل نصاً/صورة/فيديو/ملصق/ملف:")
+                    return
             except Exception as e:
-                # فشل في الإرسال
-                error_msg = f"""❌ فشل في إرسال الرسالة!
-    
-    🎯 العميل: {customer_name} ({customer_id})
-    ⚠️ السبب: العميل قد يكون حظر البوت أو حذف المحادثة
-    
-    💡 يمكنك التواصل معه عبر:
-    📱 الهاتف المسجل في النظام
-    📧 البريد الإلكتروني (إن وجد)"""
-                
-                self.send_message(message['chat']['id'], error_msg, self.admin_keyboard())
+                logger.error(f"خطأ في إرسال رسالة لعميل: {e}")
+                sent = False
             
-            # حذف الحالة
+            if sent:
+                self.send_message(message['chat']['id'],
+                    f"✅ تم الإرسال!\n\n📧 إلى: <b>{customer_name}</b>\n🆔 <code>{customer_id}</code> 👈 اضغط للنسخ\n📅 {timestamp}",
+                    self.admin_keyboard())
+            else:
+                self.send_message(message['chat']['id'], "❌ فشل في الإرسال", self.admin_keyboard())
+            
             if user_id in self.user_states:
                 del self.user_states[user_id]
         
