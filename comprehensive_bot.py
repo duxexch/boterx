@@ -3132,8 +3132,8 @@ class ComprehensiveDUXBot:
                 f"✅ <b>تم تقديم طلب السحب!</b>\n\n"
                 f"🆔 <code>{trans_id}</code>\n"
                 f"🏢 الشركة: <b>{company_name}</b>\n"
-                f"💳 المحفظة: <code>{wallet_number}</code>\n"
-                f"🆔 معرف الحساب: <code>{account_id}</code>\n"
+                f"💳 المحفظة: <code>{wallet_number}</code> 👈 اضغط للنسخ\n"
+                f"🆔 معرف الحساب: <code>{account_id}</code> 👈 اضغط للنسخ\n"
                 f"🔑 الكود: <code>{confirmation_code}</code>\n"
                 f"💰 المبلغ: <b>{amount}</b> {user_currency}\n\n"
                 f"⏳ {self.tr('code_pending_verification', lang)}",
@@ -3147,8 +3147,8 @@ class ComprehensiveDUXBot:
                         f"🆔 <code>{trans_id}</code>\n"
                         f"👤 {user.get('name', '')} ({user.get('customer_id', '')})\n"
                         f"🏢 {company_name}\n"
-                        f"💳 المحفظة: <code>{wallet_number}</code>\n"
-                        f"🆔 معرف الحساب: <code>{account_id}</code>\n"
+                        f"💳 المحفظة: <code>{wallet_number}</code> 👈 اضغط للنسخ\n"
+                        f"🆔 معرف الحساب: <code>{account_id}</code> 👈 اضغط للنسخ\n"
                         f"💰 المبلغ: {amount} {user_currency}\n"
                         f"🔑 الكود: <code>{confirmation_code}</code>\n"
                         f"📅 {datetime.now().strftime('%Y-%m-%d %H:%M')}\n"
@@ -3948,7 +3948,7 @@ class ComprehensiveDUXBot:
                     f"━━━━━━━━━━━━━━━━━━\n"
                     f"🏢 الشركة: {company_name}\n"
                     f"📋 النوع: {method.get('method_type', '')}\n"
-                    f"🔢 رقم الحساب: <code>{method.get('account_data', '')}</code>\n"
+                    f"🔢 رقم الحساب: <code>{method.get('account_data', '')}</code> 👈 اضغط للنسخ\n"
                     f"📊 الحالة: {status_icon} {status}\n"
                     f"━━━━━━━━━━━━━━━━━━\n"
                 )
@@ -3993,7 +3993,7 @@ class ComprehensiveDUXBot:
                     f"━━━━━━━━━━━━━━━━━━\n"
                     f"🏢 الشركة: {company_name}\n"
                     f"📋 النوع: {method.get('method_type', '')}\n"
-                    f"🔢 رقم الحساب: <code>{method.get('account_data', '')}</code>\n"
+                    f"🔢 رقم الحساب: <code>{method.get('account_data', '')}</code> 👈 اضغط للنسخ\n"
                     f"📊 الحالة: {status_icon} {status}\n"
                     f"━━━━━━━━━━━━━━━━━━\n"
                 )
@@ -6023,8 +6023,8 @@ class ComprehensiveDUXBot:
                 f"{'💵' if state['type'] == 'deposit' else '💸'} النوع: <b>{type_ar}</b>\n"
                 f"💰 المبلغ: <b>{amount}</b>\n"
                 f"🏢 الشركة: <b>{state['company_name']}</b>\n"
-                f"💳 المحفظة: <code>{wallet_number}</code>\n"
-                f"🆔 معرف الحساب: <code>{account_id}</code>\n"
+                f"💳 المحفظة: <code>{wallet_number}</code> 👈 اضغط للنسخ\n"
+                f"🆔 معرف الحساب: <code>{account_id}</code> 👈 اضغط للنسخ\n"
                 f"━━━━━━━━━━━━━━━━━━\n\n"
                 f"⏳ جارٍ البحث عن مطابقة...\n"
                 f"سيتم إشعارك فور العثور على طرف آخر.",
@@ -6042,8 +6042,8 @@ class ComprehensiveDUXBot:
                         f"🔄 يبحث عن: <b>{opposite_type}</b>\n"
                         f"💰 المبلغ: <b>{amount}</b>\n"
                         f"🏢 الشركة: <b>{state['company_name']}</b>\n"
-                        f"💳 المحفظة: <code>{wallet_number}</code>\n"
-                        f"🆔 معرف الحساب: <code>{account_id}</code>\n"
+                        f"💳 المحفظة: <code>{wallet_number}</code> 👈 اضغط للنسخ\n"
+                        f"🆔 معرف الحساب: <code>{account_id}</code> 👈 اضغط للنسخ\n"
                         f"━━━━━━━━━━━━━━━━━━\n\n"
                         f"يمكنك أن تكون الطرف الآخر:"
                     )
@@ -6755,7 +6755,7 @@ class ComprehensiveDUXBot:
                     f"━━━━━━━━━━━━━━━━━━\n"
                     f"🏢 الشركة: {company_name}\n"
                     f"📋 النوع: {method.get('method_type', '')}\n"
-                    f"🔢 رقم الحساب: <code>{method.get('account_data', '')}</code>\n"
+                    f"🔢 رقم الحساب: <code>{method.get('account_data', '')}</code> 👈 اضغط للنسخ\n"
                     f"💡 معلومات: {method.get('additional_info', '')}\n"
                     f"🖼️ الأيقونة: {method.get('icon', '💳')}\n"
                     f"📊 الحالة: {status_icon} {status}\n"
@@ -7224,7 +7224,7 @@ class ComprehensiveDUXBot:
                 if method_type:
                     method_text += f"📋 النوع: {method_type}\n"
                 if account_data:
-                    method_text += f"🔢 <b>رقم الحساب / المحفظة للتحويل:</b>\n<code>{account_data}</code>\n\n"
+                    method_text += f"🔢 <b>رقم الحساب / المحفظة للتحويل:</b>\n<code>{account_data}</code> 👈 اضغط للنسخ\n\n"
                 if additional_info:
                     method_text += f"💡 {additional_info}\n"
                 method_text += f"━━━━━━━━━━━━━━━━━━\n\n"
@@ -7705,7 +7705,7 @@ class ComprehensiveDUXBot:
                     f"💳 الوسيلة: <b>{method_name}</b>\n"
                 )
                 if account_data:
-                    text += f"🔢 رقم الحساب: <code>{account_data}</code>\n"
+                    text += f"🔢 رقم الحساب: <code>{account_data}</code> 👈 اضغط للنسخ\n"
                 text += (
                     f"━━━━━━━━━━━━━━━━━━\n\n"
                     f"📝 أرسل بياناتك في رسالة واحدة:\n\n"
