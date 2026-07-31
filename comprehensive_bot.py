@@ -324,6 +324,12 @@ class ComprehensiveDUXBot:
             with open('company_payment_links.csv', 'w', newline='', encoding='utf-8-sig') as f:
                 writer = csv.writer(f)
                 writer.writerow(['id', 'company_id', 'method_id', 'created_at'])
+
+        # ملف خطوات وسائل الدفع المخصصة (deposit/withdraw)
+        if not os.path.exists('payment_method_steps.csv'):
+            with open('payment_method_steps.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.writer(f)
+                writer.writerow(['id', 'method_id', 'flow_type', 'step_order', 'step_type', 'step_label'])
         
         # ملف عناوين الصرافة
         if not os.path.exists('exchange_addresses.csv'):
@@ -358,26 +364,54 @@ class ComprehensiveDUXBot:
         
     # خريطة الأيقونات: تحويل نص/إيموجي إلى أيقونة مناسبة
     ICON_MAP = {
-        'bank': '🏦', 'banks': '🏦', 'بنك': '🏦', 'مصرف': '🏦', 'البنك': '🏦',
+        'bank': '🏦', 'banks': '🏦', 'بنك': '🏦', 'مصرف': '🏦', 'البنك': '🏦', 'بنكي': '🏦',
         'wallet': '👛', 'e-wallet': '👛', 'ewallet': '👛', 'محفظة': '👛', 'محفظه': '👛',
-        'phone': '📱', 'mobile': '📱', 'هاتف': '📱', 'جوال': '📱',
-        'cash': '💵', 'نقدي': '💵', 'كاش': '💵', 'نقد': '💵',
-        'card': '💳', 'credit': '💳', 'debit': '💳', 'بطاقة': '💳', 'بطاقه': '💳', 'مدى': '💳',
-        'crypto': '₿', 'bitcoin': '₿', 'بيتكوين': '₿',
-        'paypal': '🅿️',
-        'stc': '📡', 'stc pay': '📡', 'stcpay': '📡',
-        'vodafone': '📱', 'فودافون': '📱',
-        'company': '🏢', 'شركة': '🏢', 'business': '🏢',
-        'exchange': '🔄', 'صرافة': '🔄', 'صرافه': '🔄',
-        'money': '💰', 'مال': '💰', 'أموال': '💰',
-        'transfer': '📤', 'تحويل': '📤',
-        'store': '🏬', 'متجر': '🏬', 'shop': '🏬',
-        'online': '🌐', 'أونلاين': '🌐',
-        'gift': '🎁', 'هدية': '🎁',
-        'gold': '🥇', 'ذهب': '🥇',
-        'rocket': '🚀', 'صاروخ': '🚀',
-        'star': '⭐', 'نجمة': '⭐',
-        'check': '✅', 'صح': '✅',
+        'phone': '📱', 'mobile': '📱', 'هاتف': '📱', 'جوال': '📱', 'موبايل': '📱',
+        'cash': '💵', 'نقدي': '💵', 'كاش': '💵', 'نقد': '💵', 'مبلغ': '💵',
+        'card': '💳', 'credit': '💳', 'debit': '💳', 'بطاقة': '💳', 'بطاقه': '💳', 'مدى': '💳', 'visa': '💳', 'mastercard': '💳',
+        'crypto': '₿', 'bitcoin': '₿', 'بيتكوين': '₿', 'عملة': '₿', 'كريبتو': '₿', 'usdt': '₿', 'ethereum': '₿',
+        'paypal': '🅿️', 'باي بال': '🅿️',
+        'stc': '📡', 'stc pay': '📡', 'stcpay': '📡', 'اس تي سي': '📡',
+        'vodafone': '📱', 'فودافون': '📱', 'فودافون كاش': '📱',
+        'company': '🏢', 'شركة': '🏢', 'business': '🏢', 'مؤسسة': '🏢', 'مؤسسه': '🏢',
+        'exchange': '🔄', 'صرافة': '🔄', 'صرافه': '🔄', 'مقايضة': '🔄',
+        'money': '💰', 'مال': '💰', 'أموال': '💰', 'رصيد': '💰',
+        'transfer': '📤', 'تحويل': '📤', 'ارسال': '📤', 'إرسال': '📤',
+        'store': '🏬', 'متجر': '🏬', 'shop': '🏬', 'سوق': '🏬',
+        'online': '🌐', 'أونلاين': '🌐', 'انترنت': '🌐', 'موقع': '🌐',
+        'gift': '🎁', 'هدية': '🎁', 'هدية': '🎁', 'مكافأة': '🎁',
+        'gold': '🥇', 'ذهب': '🥇', 'ذهبية': '🥇',
+        'rocket': '🚀', 'صاروخ': '🚀', 'سريع': '🚀',
+        'star': '⭐', 'نجمة': '⭐', 'نجم': '⭐', 'مميز': '⭐',
+        'check': '✅', 'صح': '✅', 'موافق': '✅',
+        'invest': '📈', 'استثمار': '📈', 'استثمار': '📈',
+        'shield': '🛡️', 'حماية': '🛡️', 'أمان': '🛡️',
+        'crown': '👑', 'ملك': '👑', 'ملكي': '👑',
+        'diamond': '💎', 'ماس': '💎', 'الماسة': '💎',
+        'fire': '🔥', 'نار': '🔥', 'حار': '🔥',
+        'bolt': '⚡', 'برق': '⚡', 'سريع': '⚡',
+        'chart': '📊', 'رسم': '📊', 'إحصائيات': '📊', 'احصائيات': '📊',
+        'bell': '🔔', 'جرس': '🔔', 'تنبيه': '🔔', 'إشعار': '🔔',
+        'lock': '🔐', 'قفل': '🔐', 'مغلق': '🔐',
+        'key': '🔑', 'مفتاح': '🔑', 'كود': '🔑',
+        'user': '👤', 'مستخدم': '👤', 'عميل': '👤', 'شخص': '👤',
+        'users': '👥', 'مستخدمين': '👥', 'عملاء': '👥', 'مجموعة': '👥',
+        'gear': '⚙️', 'ترس': '⚙️', 'إعدادات': '⚙️', 'اعدادات': '⚙️',
+        'robot': '🤖', 'بوت': '🤖', 'روبوت': '🤖',
+        'game': '🎮', 'لعبة': '🎮', 'ألعاب': '🎮',
+        'car': '🚗', 'سيارة': '🚗', 'سياره': '🚗',
+        'plane': '✈️', 'طائرة': '✈️', 'طيران': '✈️', 'سفر': '✈️',
+        'house': '🏠', 'منزل': '🏠', 'عقار': '🏠', 'عقارات': '🏠',
+        'food': '🍔', 'طعام': '🍔', 'مطعم': '🍔', 'اكل': '🍔',
+        'coffee': '☕', 'قهوة': '☕', 'كافيه': '☕',
+        'book': '📚', 'كتاب': '📚', 'كتب': '📚', 'مكتبة': '📚',
+        'globe': '🌍', 'عالم': '🌍', 'دولي': '🌍',
+        'sun': '☀️', 'شمس': '☀️', 'صيف': '☀️',
+        'moon': '🌙', 'قمر': '🌙', 'ليل': '🌙',
+        'heart': '❤️', 'قلب': '❤️', 'حب': '❤️',
+        'thumbsup': '👍', 'اعجاب': '👍', 'جيد': '👍',
+        'warning': '⚠️', 'تحذير': '⚠️', 'انتباه': '⚠️',
+        'screenshot': '📸', 'لقطة': '📸', 'صورة': '📸', 'صوره': '📸',
     }
 
     def normalize_icon(self, icon_input, default='🏢'):
@@ -406,24 +440,20 @@ class ComprehensiveDUXBot:
         return default
 
     def migrate_companies_csv(self):
-        """ترحيل companies.csv لإضافة أعمدة icon و address"""
+        """ترحيل companies.csv لإضافة أعمدة icon, address, affiliate_link, icon_file_id"""
         try:
             with open('companies.csv', 'r', encoding='utf-8-sig') as f:
                 reader = csv.DictReader(f)
                 fieldnames = reader.fieldnames or []
                 rows = list(reader)
-            # التحقق من وجود الأعمدة الجديدة
-            need_migration = 'icon' not in fieldnames or 'address' not in fieldnames or 'affiliate_link' not in fieldnames
+            need_migration = ('icon' not in fieldnames or 'address' not in fieldnames or
+                              'affiliate_link' not in fieldnames or 'icon_file_id' not in fieldnames)
             if not need_migration:
                 return
             new_fieldnames = list(fieldnames)
-            if 'icon' not in new_fieldnames:
-                new_fieldnames.append('icon')
-            if 'address' not in new_fieldnames:
-                new_fieldnames.append('address')
-            if 'affiliate_link' not in new_fieldnames:
-                new_fieldnames.append('affiliate_link')
-            # إضافة القيم الافتراضية للصفوف الموجودة
+            for col in ['icon', 'address', 'affiliate_link', 'icon_file_id']:
+                if col not in new_fieldnames:
+                    new_fieldnames.append(col)
             for row in rows:
                 if 'icon' not in row or not row.get('icon'):
                     row['icon'] = '🏢'
@@ -431,33 +461,43 @@ class ComprehensiveDUXBot:
                     row['address'] = ''
                 if 'affiliate_link' not in row:
                     row['affiliate_link'] = ''
+                if 'icon_file_id' not in row:
+                    row['icon_file_id'] = ''
             with open('companies.csv', 'w', newline='', encoding='utf-8-sig') as f:
                 writer = csv.DictWriter(f, fieldnames=new_fieldnames)
                 writer.writeheader()
                 for row in rows:
                     writer.writerow({k: row.get(k, '') for k in new_fieldnames})
-            logger.info("تم ترحيل companies.csv لإضافة أعمدة icon و address")
+            logger.info("تم ترحيل companies.csv لإضافة أعمدة icon_file_id")
         except Exception as e:
             logger.error(f"خطأ في ترحيل companies.csv: {e}")
 
     def migrate_payment_methods_csv(self):
-        """ترحيل payment_methods.csv لإضافة عمود icon"""
+        """ترحيل payment_methods.csv لإضافة عمود icon و icon_file_id"""
         try:
             with open('payment_methods.csv', 'r', encoding='utf-8-sig') as f:
                 reader = csv.DictReader(f)
                 fieldnames = reader.fieldnames or []
                 rows = list(reader)
-            if 'icon' in fieldnames:
+            need_migration = 'icon' not in fieldnames or 'icon_file_id' not in fieldnames
+            if not need_migration:
                 return
-            new_fieldnames = list(fieldnames) + ['icon']
+            new_fieldnames = list(fieldnames)
+            if 'icon' not in new_fieldnames:
+                new_fieldnames.append('icon')
+            if 'icon_file_id' not in new_fieldnames:
+                new_fieldnames.append('icon_file_id')
             for row in rows:
-                row['icon'] = self.normalize_icon(row.get('method_type', ''), default='💳')
+                if 'icon' not in row or not row.get('icon'):
+                    row['icon'] = self.normalize_icon(row.get('method_type', ''), default='💳')
+                if 'icon_file_id' not in row:
+                    row['icon_file_id'] = ''
             with open('payment_methods.csv', 'w', newline='', encoding='utf-8-sig') as f:
                 writer = csv.DictWriter(f, fieldnames=new_fieldnames)
                 writer.writeheader()
                 for row in rows:
                     writer.writerow({k: row.get(k, '') for k in new_fieldnames})
-            logger.info("تم ترحيل payment_methods.csv لإضافة عمود icon")
+            logger.info("تم ترحيل payment_methods.csv لإضافة أعمدة icon و icon_file_id")
         except Exception as e:
             logger.error(f"خطأ في ترحيل payment_methods.csv: {e}")
         
@@ -4541,6 +4581,11 @@ class ComprehensiveDUXBot:
             elif isinstance(state, dict) and state.get('step') == 'selecting_payment_method':
                 self.handle_payment_method_selection(message, text)
                 return
+
+            # معالجة التدفق المخصص لوسائل الدفع (خطوة بخطوة)
+            elif isinstance(state, dict) and state.get('step') == 'custom_flow':
+                self.handle_custom_flow_step(message, state)
+                return
         
         # فحص المستخدم المسجل
         user = self.find_user(user_id)
@@ -7068,6 +7113,44 @@ class ComprehensiveDUXBot:
                 self.show_edit_menu(fake_msg, user_id)
                 return
 
+            # ==================== التدفق المخصص لوسائل الدفع ====================
+            elif data == 'custom_flow_confirm':
+                state = self.user_states.get(user_id, {})
+                if isinstance(state, dict) and state.get('step') == 'custom_flow_confirm':
+                    self.edit_message(chat_id, message.get('message_id'), "✅ جارٍ المعالجة...")
+                    self._finalize_custom_flow(chat_id, user_id, state)
+                return
+
+            elif data == 'custom_flow_cancel':
+                if user_id in self.user_states:
+                    del self.user_states[user_id]
+                self.edit_message(chat_id, message.get('message_id'), "❌ تم الإلغاء")
+                user = self.find_user(user_id)
+                lang = user.get('language', 'ar') if user else 'ar'
+                welcome = self.tr('choose_service', lang, name=user.get('name', ''), customer_id=user.get('customer_id', '')) if user else ''
+                self.send_message(chat_id, welcome, self.main_keyboard(lang, user_id))
+                return
+
+            elif data == 'custom_flow_continue':
+                # خطوة info — متابعة للخطوة التالية
+                state = self.user_states.get(user_id, {})
+                if isinstance(state, dict) and state.get('step') == 'custom_flow':
+                    method_id = state.get('method_id', '')
+                    flow_type = state.get('flow_type', 'deposit')
+                    current_idx = state.get('current_step_idx', 0)
+                    lang = state.get('lang', 'ar')
+                    steps = self.get_method_steps(method_id, flow_type)
+                    next_idx = current_idx + 1
+                    if next_idx < len(steps):
+                        state['current_step_idx'] = next_idx
+                        self.user_states[user_id] = state
+                        self.edit_message(chat_id, message.get('message_id'), "✅")
+                        self._show_custom_step(chat_id, steps[next_idx], next_idx + 1, len(steps), lang)
+                    else:
+                        collected = state.get('collected_data', [])
+                        self._complete_custom_flow(message, state, collected, steps)
+                return
+
             elif data.startswith('pm_type_'):
                 # معالج قديم — redirect للمعالج الجديد
                 parts = data.replace('pm_type_', '').split('_', 2)
@@ -7755,6 +7838,13 @@ class ComprehensiveDUXBot:
                 method_text += f"2️⃣ معرف حسابك في التطبيق\n\n"
                 method_text += f"💡 مثال:\n<code>0501234567\nID-789</code>"
 
+                # فحص هل لوسيلة الدفع خطوات مخصصة للإيداع
+                if self.has_custom_steps(method_id, 'deposit'):
+                    self.edit_message(chat_id, message.get('message_id'), method_text)
+                    fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                    self.start_custom_flow(fake_msg, method_id, 'deposit', company_id, company_name)
+                    return
+
                 self.edit_message(chat_id, message.get('message_id'), method_text)
 
                 user = self.find_user(user_id)
@@ -7790,7 +7880,39 @@ class ComprehensiveDUXBot:
                 lang = user.get('language', 'ar') if user else 'ar'
                 kb = {'keyboard': [[{'text': '❌ إلغاء'}, {'text': self.tr('main_menu', lang)}]], 'resize_keyboard': True, 'one_time_keyboard': True}
                 self.send_message(chat_id, "1️⃣ اكتب <b>المبلغ</b> الذي تريد سحبه:", kb)
+                # فحص هل للشركة وسائل دفع مرتبطة بخطوات مخصصة للسحب
+                methods = self.get_payment_methods_by_company(company_id, 'withdraw')
+                has_custom = False
+                for m in methods:
+                    if self.has_custom_steps(m.get('id', ''), 'withdraw'):
+                        has_custom = True
+                        break
+                if has_custom and methods:
+                    # عرض وسائل الدفع للاختيار
+                    inline_btns = []
+                    for m in methods:
+                        icon = m.get('icon', '💳') or '💳'
+                        inline_btns.append([{'text': f"{icon} {m['method_name']}", 'callback_data': f'wd_method_{m["id"]}_{company_id}_{company["name"]}'}])
+                    inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'wd_cancel'}])
+                    self.send_inline_message(chat_id, "💳 اختر وسيلة الدفع:", inline_btns)
+                    return
                 self.user_states[user_id] = f'wd_step_amount_{company_id}_{company["name"]}'
+                return
+
+            # اختيار وسيلة دفع للسحب (مع خطوات مخصصة)
+            elif data.startswith('wd_method_'):
+                parts = data.replace('wd_method_', '').split('_', 2)
+                if len(parts) < 3:
+                    return
+                method_id = parts[0]
+                company_id = parts[1]
+                company_name = parts[2]
+
+                if self.has_custom_steps(method_id, 'withdraw'):
+                    fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                    self.start_custom_flow(fake_msg, method_id, 'withdraw', company_id, company_name)
+                else:
+                    self.user_states[user_id] = f'wd_step_amount_{company_id}_{company_name}'
                 return
 
             # ==================== 🤖 إدارة البوتات المتعددة ====================
@@ -10079,6 +10201,57 @@ class ComprehensiveDUXBot:
         except:
             return False
 
+    # ==================== خطوات وسائل الدفع المخصصة ====================
+
+    PM_STEP_FIELDS = ['id', 'method_id', 'flow_type', 'step_order', 'step_type', 'step_label']
+
+    def get_method_steps(self, method_id, flow_type):
+        """جلب خطوات وسيلة دفع لنوع تدفق (deposit/withdraw)"""
+        steps = []
+        try:
+            with open('payment_method_steps.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row.get('method_id') == str(method_id) and row.get('flow_type') == flow_type:
+                        steps.append(row)
+            steps.sort(key=lambda s: int(s.get('step_order', 0)))
+        except:
+            pass
+        return steps
+
+    def add_method_step(self, method_id, flow_type, step_type, step_label, step_order):
+        """إضافة خطوة لوسيلة دفع"""
+        step_id = f"STP{str(int(datetime.now().timestamp()))[-6:]}_{step_order}"
+        try:
+            with open('payment_method_steps.csv', 'a', newline='', encoding='utf-8-sig') as f:
+                writer = csv.writer(f)
+                writer.writerow([step_id, method_id, flow_type, step_order, step_type, step_label])
+            return step_id
+        except:
+            return None
+
+    def delete_method_steps(self, method_id):
+        """حذف كل خطوط وسيلة دفع"""
+        try:
+            rows = []
+            with open('payment_method_steps.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                fieldnames = reader.fieldnames
+                for row in reader:
+                    if row.get('method_id') != str(method_id):
+                        rows.append(row)
+            with open('payment_method_steps.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer.writeheader()
+                writer.writerows(rows)
+            return True
+        except:
+            return False
+
+    def has_custom_steps(self, method_id, flow_type):
+        """فحص هل لوسيلة الدفع خطوات مخصصة"""
+        return len(self.get_method_steps(method_id, flow_type)) > 0
+
     def get_payment_methods_by_company(self, company_id, transaction_type=None):
             """الحصول على وسائل الدفع لشركة معينة — من جدول الربط + السجل القديم"""
             methods = []
@@ -10108,7 +10281,247 @@ class ComprehensiveDUXBot:
                 except:
                     pass
             return methods
-        
+
+    def start_custom_flow(self, message, method_id, flow_type, company_id, company_name):
+        """بدء تدفق مخصص لوسيلة دفع"""
+        user_id = message['from']['id']
+        chat_id = message['chat']['id']
+        steps = self.get_method_steps(method_id, flow_type)
+        if not steps:
+            return False
+
+        user = self.find_user(user_id)
+        lang = user.get('language', 'ar') if user else 'ar'
+
+        self.user_states[user_id] = {
+            'step': 'custom_flow',
+            'method_id': method_id,
+            'flow_type': flow_type,
+            'company_id': company_id,
+            'company_name': company_name,
+            'current_step_idx': 0,
+            'collected_data': [],
+            'lang': lang
+        }
+        # عرض الخطوة الأولى
+        self._show_custom_step(chat_id, steps[0], 1, len(steps), lang)
+        return True
+
+    def _show_custom_step(self, chat_id, step, current, total, lang):
+        """عرض خطوة من التدفق المخصص"""
+        step_type = step.get('step_type', 'text')
+        label = step.get('step_label', '')
+        type_icons = {'text': '📝', 'amount': '💰', 'screenshot': '📸', 'info': 'ℹ️'}
+        icon = type_icons.get(step_type, '📝')
+
+        text = f"━━━━━━━━━━━━━━━━━━\n"
+        text += f"الخطوة <code>{current}</code> من <code>{total}</code>\n"
+        text += f"━━━━━━━━━━━━━━━━━━\n\n"
+        text += f"{icon} <b>{label}</b>\n"
+
+        if step_type == 'screenshot':
+            text += f"\n📸 أرسل <b>لقطة شاشة</b> (صورة)"
+        elif step_type == 'amount':
+            text += f"\n💰 اكتب <b>المبلغ</b>:"
+        elif step_type == 'info':
+            text += f"\nℹ️ اقرأ المعلومات ثم اضغط Continue"
+        else:
+            text += f"\n✍️ اكتب إجابتك:"
+
+        if step_type == 'info':
+            inline_btns = [[{'text': '✅ متابعة', 'callback_data': 'custom_flow_continue'}]]
+            self.send_inline_message(chat_id, text, inline_btns)
+        else:
+            kb = {'keyboard': [[{'text': '❌ إلغاء'}]], 'resize_keyboard': True, 'one_time_keyboard': True}
+            self.send_message(chat_id, text, kb)
+
+    def handle_custom_flow_step(self, message, state):
+        """معالجة خطوة من التدفق المخصص"""
+        user_id = message['from']['id']
+        chat_id = message['chat']['id']
+        text = message.get('text', '').strip()
+
+        if text in ['❌ إلغاء', 'إلغاء', 'الغاء', '🔙']:
+            if user_id in self.user_states:
+                del self.user_states[user_id]
+            self.handle_start(message)
+            return
+
+        method_id = state.get('method_id', '')
+        flow_type = state.get('flow_type', 'deposit')
+        company_id = state.get('company_id', '')
+        company_name = state.get('company_name', '')
+        lang = state.get('lang', 'ar')
+        current_idx = state.get('current_step_idx', 0)
+        collected = state.get('collected_data', [])
+
+        steps = self.get_method_steps(method_id, flow_type)
+        if not steps or current_idx >= len(steps):
+            if user_id in self.user_states:
+                del self.user_states[user_id]
+            return
+
+        current_step = steps[current_idx]
+        step_type = current_step.get('step_type', 'text')
+
+        # التحقق من الإدخال حسب نوع الخطوة
+        if step_type == 'screenshot':
+            if 'photo' not in message:
+                self.send_message(chat_id, "❌ أرسل صورة (لقطة شاشة):")
+                return
+            photo = message['photo'][-1]
+            collected.append({'type': 'screenshot', 'value': photo['file_id'], 'label': current_step.get('step_label', '')})
+        elif step_type == 'amount':
+            try:
+                amount = float(text)
+                if amount <= 0:
+                    self.send_message(chat_id, "❌ المبلغ يجب أن يكون أكبر من صفر:")
+                    return
+                collected.append({'type': 'amount', 'value': text, 'label': current_step.get('step_label', '')})
+            except ValueError:
+                self.send_message(chat_id, "❌ اكتب مبلغاً رقمياً:")
+                return
+        elif step_type == 'info':
+            # info steps are handled by callback, not text
+            return
+        else:
+            if len(text) < 2:
+                self.send_message(chat_id, "❌ الإجابة قصيرة جداً. اكتب إجابة صحيحة:")
+                return
+            collected.append({'type': 'text', 'value': text, 'label': current_step.get('step_label', '')})
+
+        # الانتقال للخطوة التالية
+        next_idx = current_idx + 1
+        if next_idx < len(steps):
+            state['current_step_idx'] = next_idx
+            state['collected_data'] = collected
+            self.user_states[user_id] = state
+            self._show_custom_step(chat_id, steps[next_idx], next_idx + 1, len(steps), lang)
+        else:
+            # اكتمال كل الخطوات — تأكيد
+            self._complete_custom_flow(message, state, collected, steps)
+
+    def _complete_custom_flow(self, message, state, collected_data, steps):
+        """إكمال التدفق المخصص — عرض ملخص + تأكيد"""
+        user_id = message['from']['id']
+        chat_id = message['chat']['id']
+        company_name = state.get('company_name', '')
+        flow_type = state.get('flow_type', 'deposit')
+        lang = state.get('lang', 'ar')
+
+        summary = f"✅ <b>مراجعة البيانات</b>\n\n"
+        summary += f"🏢 الشركة: <b>{company_name}</b>\n"
+        summary += f"{'💰 إيداع' if flow_type == 'deposit' else '💸 سحب'}\n"
+        summary += f"━━━━━━━━━━━━━━━━━━\n\n"
+
+        for i, item in enumerate(collected_data, 1):
+            label = item.get('label', f'خطوة {i}')
+            value = item.get('value', '')
+            if item.get('type') == 'screenshot':
+                summary += f"📸 {label}: ✅ تم استلام لقطة الشاشة\n"
+            elif item.get('type') == 'amount':
+                summary += f"💰 {label}: <code>{value}</code> 👈 اضغط للنسخ\n"
+            else:
+                summary += f"📝 {label}: <code>{value}</code> 👈 اضغط للنسخ\n"
+
+        summary += f"\n━━━━━━━━━━━━━━━━━━\n"
+        summary += f"هل تريد تأكيد الطلب؟"
+
+        # حفظ البيانات في الحالة للتأكيد
+        state['collected_data'] = collected_data
+        state['step'] = 'custom_flow_confirm'
+        self.user_states[user_id] = state
+
+        inline_btns = [
+            [{'text': '✅ تأكيد', 'callback_data': 'custom_flow_confirm'},
+             {'text': '❌ إلغاء', 'callback_data': 'custom_flow_cancel'}]
+        ]
+        self.send_inline_message(chat_id, summary, inline_btns)
+
+    def _finalize_custom_flow(self, chat_id, user_id, state):
+        """إنشاء المعاملة بعد التأكيد"""
+        user = self.find_user(user_id)
+        if not user:
+            return
+
+        company_name = state.get('company_name', '')
+        flow_type = state.get('flow_type', 'deposit')
+        method_id = state.get('method_id', '')
+        collected_data = state.get('collected_data', [])
+        user_currency = user.get('currency', 'SAR')
+
+        # بناء حقل exchange_address من البيانات المجمعة
+        data_parts = []
+        amount = 0
+        screenshot_file_id = ''
+        for item in collected_data:
+            if item.get('type') == 'amount':
+                amount = float(item.get('value', 0))
+            elif item.get('type') == 'screenshot':
+                screenshot_file_id = item.get('value', '')
+            data_parts.append(f"{item.get('label', '')}: {item.get('value', '')}")
+
+        combined_data = ' | '.join(data_parts)
+        trans_id = f"{'DEP' if flow_type == 'deposit' else 'WTH'}{datetime.now().strftime('%Y%m%d%H%M%S')}"
+
+        with open('transactions.csv', 'a', newline='', encoding='utf-8-sig') as f:
+            writer = csv.writer(f)
+            writer.writerow([
+                trans_id, user['customer_id'], user['telegram_id'], user['name'],
+                flow_type, company_name,
+                collected_data[0].get('value', '') if collected_data else '',  # wallet_number (first text input)
+                amount,
+                combined_data,  # exchange_address = كل البيانات
+                'pending',
+                datetime.now().strftime('%Y-%m-%d %H:%M'),
+                screenshot_file_id,  # admin_note = screenshot file_id
+                '', user_currency
+            ])
+
+        # رسالة تأكيد للعميل
+        self.send_message(chat_id,
+            f"✅ <b>تم تقديم طلبك!</b>\n\n"
+            f"🆔 رقم العملية: <code>{trans_id}</code> 👈 اضغط للنسخ\n"
+            f"🏢 الشركة: <b>{company_name}</b>\n"
+            f"💰 المبلغ: <code>{amount}</code> {user_currency}\n\n"
+            f"⏳ بانتظار مراجعة الإدارة",
+            self.main_keyboard(user.get('language', 'ar'), user_id))
+
+        # إشعار الأدمن
+        for admin_id in self.admin_ids:
+            try:
+                admin_msg = (
+                    f"🔔 <b>طلب جديد</b>\n\n"
+                    f"🆔 رقم العملية: <code>{trans_id}</code> 👈 اضغط للنسخ\n"
+                    f"👤 {user.get('name', '')} — <code>{user.get('customer_id', '')}</code>\n"
+                    f"🏢 {company_name}\n"
+                    f"{'💰 إيداع' if flow_type == 'deposit' else '💸 سحب'}\n"
+                    f"💰 المبلغ: <code>{amount}</code> {user_currency}\n\n"
+                )
+                # إضافة تفاصيل كل خطوة
+                for item in collected_data:
+                    if item.get('type') != 'screenshot':
+                        admin_msg += f"📝 {item.get('label', '')}: <code>{item.get('value', '')}</code>\n"
+
+                inline_btns = [
+                    [{'text': '✅ موافقة', 'callback_data': f'approve_{trans_id}'},
+                     {'text': '❌ رفض', 'callback_data': f'reject_{trans_id}'}]
+                ]
+                self.send_inline_message(int(admin_id), admin_msg, inline_btns)
+
+                # إرسال لقطة الشاشة إن وجدت
+                if screenshot_file_id:
+                    self.api_call('sendPhoto', {
+                        'chat_id': int(admin_id),
+                        'photo': screenshot_file_id,
+                        'caption': f"📸 لقطة شاشة — {trans_id}"
+                    })
+            except:
+                pass
+
+        if user_id in self.user_states:
+            del self.user_states[user_id]
+
     def show_payment_method_selection(self, message, company_id, transaction_type):
             """عرض وسائل الدفع المتاحة — كأزرار inline"""
             user_id = message['from']['id']
