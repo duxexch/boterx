@@ -330,6 +330,15 @@ class ComprehensiveDUXBot:
             with open('payment_method_steps.csv', 'w', newline='', encoding='utf-8-sig') as f:
                 writer = csv.writer(f)
                 writer.writerow(['id', 'method_id', 'flow_type', 'step_order', 'step_type', 'step_label'])
+
+        # ملف طلبات التداول (USDT/MoneyGo)
+        if not os.path.exists('trade_orders.csv'):
+            with open('trade_orders.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.writer(f)
+                writer.writerow(['id', 'buyer_id', 'buyer_name', 'customer_id', 'order_type', 'asset_type',
+                                 'network', 'account_address', 'payment_method', 'amount', 'currency',
+                                 'usdt_amount', 'admin_payment_method', 'status', 'screenshot_payment',
+                                 'screenshot_transfer', 'admin_id', 'created_at', 'completed_at'])
         
         # ملف عناوين الصرافة
         if not os.path.exists('exchange_addresses.csv'):
@@ -2519,11 +2528,11 @@ class ComprehensiveDUXBot:
         # تصميم احترافي: الأزرار بدون بادئات إضافية — الإيموجي موجود في الترجمات
         keyboard = [
             [{'text': deposit_btn}, {'text': withdraw_btn}],
+            [{'text': '💱 تداول USDT'}, {'text': svrp_btn}],
             [{'text': requests_btn}, {'text': profile_btn}],
-            [{'text': match_btn}, {'text': svrp_btn}],
-            [{'text': ref_btn}, {'text': apps_btn}],
-            [{'text': notif_btn}, {'text': complaint_btn}],
-            [{'text': support_btn}, {'text': help_btn}],
+            [{'text': match_btn}, {'text': apps_btn}],
+            [{'text': ref_btn}, {'text': notif_btn}],
+            [{'text': complaint_btn}, {'text': help_btn}],
             [{'text': currency_btn}, {'text': lang_btn_text}],
             [{'text': reset_btn}],
         ]
@@ -2568,8 +2577,8 @@ class ComprehensiveDUXBot:
             [{'text': self.tr('admin_complaints', lang)}, {'text': self.tr('admin_support_data', lang)}],
             # المجموعة 7: الإعدادات والثيمات
             [{'text': self.tr('admin_settings', lang)}, {'text': self.tr('admin_themes', lang)}, {'text': self.tr('admin_addresses', lang)}],
-            # المجموعة 7b: التطبيقات والاسترداد
-            [{'text': self.tr('admin_apps', lang)}, {'text': self.tr('admin_recovery', lang)}, {'text': self.tr('admin_quick_commands', lang)}],
+            # المجموعة 7b: التطبيقات والاسترداد والتداول
+            [{'text': self.tr('admin_apps', lang)}, {'text': self.tr('admin_recovery', lang)}, {'text': '💱 تداول'}],
             # المجموعة 8: الأدمن والأدوار
             [{'text': self.tr('admin_managers', lang)}, {'text': self.tr('admin_buttons', lang)}],
             # المجموعة 9: الحماية والنسخ
@@ -4743,6 +4752,58 @@ class ComprehensiveDUXBot:
             elif isinstance(state, dict) and state.get('step') == 'custom_flow':
                 self.handle_custom_flow_step(message, state)
                 return
+
+            # ==================== 💱 تداول USDT/MoneyGo — حالات العميل ====================
+            elif isinstance(state, dict) and state.get('step', '').startswith('trade_buy_'):
+                self.handle_trade_buy_step(message, state)
+                return
+
+            # ==================== 💱 تداول — حالات الأدمن ====================
+            elif isinstance(state, dict) and state.get('step', '').startswith('trade_admin_'):
+                self.handle_trade_admin_step(message, state)
+                return
+
+            # العميل يرسل لقطة شاشة الدفع
+            elif isinstance(state, dict) and state.get('step') == 'trade_buyer_screenshot':
+                user_id = message['from']['id']
+                chat_id = message['chat']['id']
+                order_id = state.get('order_id', '')
+
+                if 'photo' not in message:
+                    self.send_message(chat_id, "❌ أرسل لقطة شاشة (صورة) لإثبات الدفع:")
+                    return
+
+                photo = message['photo'][-1]
+                self.update_trade_order(order_id,
+                    status='buyer_sends_screenshot', screenshot_payment=photo['file_id'])
+
+                del self.user_states[user_id]
+                self.send_message(chat_id,
+                    f"✅ تم إرسال لقطة الشاشة\n\n🆔 <code>{order_id}</code> 👈 اضغط للنسخ\n"
+                    f"⏳ سيتم مراجعتها من الإدارة")
+
+                # إشعار الأدمن
+                for admin_id in self.admin_ids:
+                    try:
+                        self.send_inline_message(int(admin_id),
+                            f"📸 <b>لقطة شاشة دعم وصلت</b>\n\n"
+                            f"🆔 <code>{order_id}</code> 👈 اضغط للنسخ\n"
+                            f"👤 العميل أرسل لقطة شاشة الدفع\n\n"
+                            f"راجع الطلب:",
+                            [[{'text': '👁️ مراجعة', 'callback_data': f'trade_admin_view_{order_id}'}]])
+                        # إرسال الصورة
+                        try:
+                            self.api_call('sendPhoto', {
+                                'chat_id': int(admin_id),
+                                'photo': photo['file_id'],
+                                'caption': f"📸 لقطة شاشة دفع — <code>{order_id}</code>",
+                                'parse_mode': 'HTML'
+                            })
+                        except:
+                            pass
+                    except:
+                        pass
+                return
         
         # فحص المستخدم المسجل
         user = self.find_user(user_id)
@@ -4937,6 +4998,8 @@ class ComprehensiveDUXBot:
             self.show_svrp_panel(message)
         elif text in apps_texts:
             self.show_apps_panel(message)
+        elif text == '💱 تداول USDT':
+            self.show_trade_panel(message)
         elif self.svrp:
             all_langs = self.get_supported_languages()
             svrp_wallet_texts = {self.tr('svrp_my_wallet', l) for l in all_langs}
@@ -5705,6 +5768,8 @@ class ComprehensiveDUXBot:
             self.show_svrp_admin_panel(message)
         elif text in {self.tr('admin_apps', l) for l in all_langs}:
             self.show_apps_admin_panel(message)
+        elif text == '💱 تداول':
+            self.show_trade_admin_queue(message)
         elif text in {self.tr('admin_message_user', l) for l in all_langs}:
             self.start_send_user_message(message)
         elif text in {self.tr('admin_notifications', l) for l in all_langs}:
@@ -7563,6 +7628,294 @@ class ComprehensiveDUXBot:
                 self.edit_message(chat_id, message.get('message_id'), "🔙 تم العودة")
                 welcome = self.tr('choose_service', lang, name=user.get('name', ''), customer_id=user.get('customer_id', '')) if user else ''
                 self.send_message(chat_id, welcome, self.main_keyboard(lang, user_id))
+                return
+
+            # ==================== 💎 تعويض 100% — أزرار inline ====================
+
+            # ==================== 💱 التداول USDT/MoneyGo ====================
+            elif data == 'trade_back_main':
+                user = self.find_user(user_id)
+                lang = user.get('language', 'ar') if user else 'ar'
+                self.edit_message(chat_id, message.get('message_id'), "🏠 العودة")
+                welcome = self.tr('choose_service', lang, name=user.get('name', ''), customer_id=user.get('customer_id', '')) if user else ''
+                self.send_message(chat_id, welcome, self.main_keyboard(lang, user_id))
+                return
+
+            elif data == 'trade_back_panel':
+                self.edit_message(chat_id, message.get('message_id'), "💱")
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_trade_panel(fake_msg)
+                return
+
+            elif data == 'trade_buy':
+                self.start_trade_buy(chat_id, user_id)
+                return
+
+            elif data.startswith('trade_asset_'):
+                asset_type = data.replace('trade_asset_', '')
+                if asset_type == 'usdt':
+                    self.edit_message(chat_id, message.get('message_id'),
+                        "🪙 <b>شراء USDT</b>\n\n"
+                        "⚠️ <b>اختر الشبكة بعناية!</b>\n"
+                        "💡 يجب إنشاء العنوان بنفس الشبكة المختارة.\n\n"
+                        "اختر الشبكة:")
+                    self.send_inline_message(chat_id, "الشبكات:",
+                        [[{'text': '🔗 TRC20', 'callback_data': 'trade_network_TRC20'},
+                          {'text': '🔗 ERC20', 'callback_data': 'trade_network_ERC20'}],
+                         [{'text': '🔗 BNB20', 'callback_data': 'trade_network_BNB20'}],
+                         [{'text': '🔙 رجوع', 'callback_data': 'trade_buy'}]])
+                elif asset_type == 'moneygo':
+                    self.edit_message(chat_id, message.get('message_id'),
+                        "💎 <b>شراء MoneyGo</b>\n\n"
+                        "📝 اكتب <b>رقم حسابك</b> في MoneyGo:")
+                    self.user_states[user_id] = {'step': 'trade_buy_account', 'asset_type': 'moneygo', 'network': ''}
+                return
+
+            elif data.startswith('trade_network_'):
+                network = data.replace('trade_network_', '')
+                self.edit_message(chat_id, message.get('message_id'),
+                    f"✅ الشبكة: <code>{network}</code>\n\n"
+                    f"📝 اكتب <b>عنوان محفظتك</b> على شبكة {network}:")
+                self.user_states[user_id] = {'step': 'trade_buy_account', 'asset_type': 'usdt', 'network': network}
+                return
+
+            # اختيار وسيلة الدفع للشراء
+            elif data.startswith('trade_method_'):
+                method_id = data.replace('trade_method_', '')
+                state = self.user_states.get(user_id, {})
+                if isinstance(state, dict) and state.get('step') == 'trade_buy_method':
+                    state['payment_method'] = method_id
+                    state['step'] = 'trade_buy_amount'
+                    self.user_states[user_id] = state
+                    self.edit_message(chat_id, message.get('message_id'), "💰")
+                    self.send_message(chat_id, "💰 اكتب <b>المبلغ</b> الذي تريد الشراء به:")
+                return
+
+            # شراء — تأكيد الطلب
+            elif data == 'trade_buy_confirm':
+                state = self.user_states.get(user_id, {})
+                if isinstance(state, dict) and state.get('step') == 'trade_buy_confirm':
+                    user = self.find_user(user_id)
+                    order_id = self.create_trade_order(
+                        user_id, user.get('name', ''), user.get('customer_id', ''),
+                        'buy', state.get('asset_type', ''),
+                        state.get('network', ''), state.get('account_address', ''),
+                        state.get('payment_method', ''), state.get('amount', ''),
+                        state.get('currency', 'SAR'))
+                    if order_id:
+                        del self.user_states[user_id]
+                        self.edit_message(chat_id, message.get('message_id'),
+                            f"✅ <b>تم إنشاء طلب الشراء!</b>\n\n"
+                            f"🆔 رقم الطلب: <code>{order_id}</code> 👈 اضغط للنسخ\n"
+                            f"⏳ بانتظار موافقة الإدارة\n\n"
+                            f"سيتم إشعارك فور قبول الطلب.")
+                        # إشعار الأدمن
+                        for admin_id in self.admin_ids:
+                            try:
+                                self.send_inline_message(int(admin_id),
+                                    f"💱 <b>طلب شراء جديد</b>\n\n"
+                                    f"🆔 <code>{order_id}</code> 👈 اضغط للنسخ\n"
+                                    f"👤 {user.get('name', '')} — <code>{user.get('customer_id', '')}</code>\n"
+                                    f"{'🪙 USDT' if state.get('asset_type') == 'usdt' else '💎 MoneyGo'}\n"
+                                    f"{'🔗 شبكة: ' + state.get('network', '') + chr(10) if state.get('network') else ''}"
+                                    f"📍 العنوان: <code>{state.get('account_address', '')}</code>\n"
+                                    f"💰 المبلغ: <code>{state.get('amount', '')}</code> {state.get('currency', '')}\n\n"
+                                    f"⏳ بانتظار مراجعتك",
+                                    [[{'text': '👁️ عرض التفاصيل', 'callback_data': f'trade_admin_view_{order_id}'}]])
+                            except:
+                                pass
+                return
+
+            elif data == 'trade_buy_cancel':
+                if user_id in self.user_states:
+                    del self.user_states[user_id]
+                self.edit_message(chat_id, message.get('message_id'), "❌ تم الإلغاء")
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_trade_panel(fake_msg)
+                return
+
+            elif data.startswith('trade_currency_'):
+                currency = data.replace('trade_currency_', '')
+                state = self.user_states.get(user_id, {})
+                if isinstance(state, dict) and state.get('step') == 'trade_buy_currency':
+                    state['currency'] = currency
+                    state['step'] = 'trade_buy_confirm'
+                    self.user_states[user_id] = state
+
+                    asset = '🪙 USDT' if state.get('asset_type') == 'usdt' else '💎 MoneyGo'
+                    summary = (
+                        f"📦 <b>مراجعة طلب الشراء</b>\n\n"
+                        f"━━━━━━━━━━━━━━━━━━\n"
+                        f"{asset}\n"
+                    )
+                    if state.get('network'):
+                        summary += f"🔗 الشبكة: <code>{state['network']}</code>\n"
+                    summary += f"📍 العنوان: <code>{state.get('account_address', '')}</code> 👈 اضغط للنسخ\n"
+                    summary += f"💳 وسيلة الدفع: <code>{state.get('payment_method', '')}</code>\n"
+                    summary += f"💰 المبلغ: <code>{state.get('amount', '')}</code> {currency}\n"
+                    summary += f"━━━━━━━━━━━━━━━━━━\n\n"
+                    summary += f"هل تريد تأكيد الطلب؟"
+                    self.edit_message(chat_id, message.get('message_id'), summary)
+                    self.send_inline_message(chat_id, "تأكيد:", [
+                        [{'text': '✅ تأكيد', 'callback_data': 'trade_buy_confirm'},
+                         {'text': '❌ إلغاء', 'callback_data': 'trade_buy_cancel'}]
+                    ])
+                return
+
+            # العميل يؤكد استلام USDT
+            elif data.startswith('trade_confirm_receipt_'):
+                order_id = data.replace('trade_confirm_receipt_', '')
+                self.update_trade_order(order_id, status='completed', completed_at=datetime.now().strftime('%Y-%m-%d %H:%M'))
+                self.edit_message(chat_id, message.get('message_id'),
+                    f"✅ <b>تم إغلاق الصفقة بنجاح!</b>\n\n"
+                    f"🆔 <code>{order_id}</code> 👈 اضغط للنسخ\n"
+                    f"🎉 تم استلام USDT بنجاح\n"
+                    f"تم حفظ الصفقة في السجلات")
+                # إشعار الأدمن
+                for admin_id in self.admin_ids:
+                    try:
+                        self.send_message(int(admin_id),
+                            f"✅ <b>تم إغلاق صفقة</b>\n\n🆔 <code>{order_id}</code>\nالعميل أكد الاستلام")
+                    except:
+                        pass
+                return
+
+            # ==================== أدمن: لوحة التداول ====================
+            elif data == 'trade_admin_refresh':
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.edit_message(chat_id, message.get('message_id'), "🔄")
+                self.show_trade_admin_queue(fake_msg)
+                return
+
+            elif data == 'trade_admin_back':
+                if user_id in self.user_states:
+                    del self.user_states[user_id]
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.handle_admin_panel(fake_msg)
+                return
+
+            elif data.startswith('trade_admin_view_'):
+                order_id = data.replace('trade_admin_view_', '')
+                order = self.get_trade_order(order_id)
+                if not order:
+                    self.send_message(chat_id, "❌ الطلب غير موجود")
+                    return
+                status = order.get('status', 'pending')
+                text = (
+                    f"💱 <b>طلب تداول</b>\n\n"
+                    f"━━━━━━━━━━━━━━━━━━\n"
+                    f"🆔 <code>{order['id']}</code> 👈 اضغط للنسخ\n"
+                    f"👤 {order.get('buyer_name', '')} — <code>{order.get('customer_id', '')}</code>\n"
+                    f"{'📦 شراء' if order.get('order_type') == 'buy' else '💰 بيع'} "
+                    f"{'🪙 USDT' if order.get('asset_type') == 'usdt' else '💎 MoneyGo'}\n"
+                )
+                if order.get('network'):
+                    text += f"🔗 الشبكة: <code>{order['network']}</code>\n"
+                text += f"📍 العنوان: <code>{order.get('account_address', '')}</code> 👈 اضغط للنسخ\n"
+                text += f"💳 وسيلة الدفع: <code>{order.get('payment_method', '')}</code>\n"
+                text += f"💰 المبلغ: <code>{order.get('amount', '')}</code> {order.get('currency', '')}\n"
+                if order.get('usdt_amount'):
+                    text += f"🪙 USDT للمشتري: <code>{order.get('usdt_amount', '')}</code>\n"
+                if order.get('admin_payment_method'):
+                    text += f"🏦 وسيلة دفع الأدمن: <code>{order.get('admin_payment_method', '')}</code>\n"
+                text += f"📊 الحالة: <b>{status}</b>\n"
+                text += f"📅 {order.get('created_at', '')}\n"
+                text += f"━━━━━━━━━━━━━━━━━━\n\n"
+
+                inline_btns = []
+                if status == 'pending':
+                    inline_btns.append([
+                        {'text': '✅ قبول', 'callback_data': f'trade_admin_accept_{order_id}'},
+                        {'text': '❌ رفض', 'callback_data': f'trade_admin_reject_{order_id}'}
+                    ])
+                elif status == 'admin_accepted':
+                    text += "📝 اكتب وسيلة الدفع للاستلام + عدد الدولارات USDT:"
+                    self.user_states[user_id] = {'step': 'trade_admin_rate', 'order_id': order_id}
+                elif status == 'buyer_sends_screenshot':
+                    if order.get('screenshot_payment'):
+                        # إرسال لقطة الشاشة
+                        try:
+                            self.api_call('sendPhoto', {
+                                'chat_id': chat_id,
+                                'photo': order['screenshot_payment'],
+                                'caption': f"📸 لقطة شاشة الدفع — <code>{order_id}</code>",
+                                'parse_mode': 'HTML'
+                            })
+                        except:
+                            pass
+                        inline_btns.append([
+                            {'text': '✅ تأكدت من الدفع', 'callback_data': f'trade_admin_confirm_pay_{order_id}'},
+                            {'text': '❌ رفض', 'callback_data': f'trade_admin_reject_{order_id}'}
+                        ])
+                elif status == 'admin_confirms_payment':
+                    text += "📤 حوّل USDT إلى العميل وأرسل لقطة شاشة:"
+                    self.user_states[user_id] = {'step': 'trade_admin_transfer', 'order_id': order_id}
+                elif status == 'admin_sends_screenshot':
+                    if order.get('screenshot_transfer'):
+                        inline_btns.append([{'text': '✅ تم', 'callback_data': f'trade_admin_done_{order_id}'}])
+
+                inline_btns.append([{'text': '🔙 القائمة', 'callback_data': 'trade_admin_refresh'}])
+                self.edit_message(chat_id, message.get('message_id'), text)
+                if inline_btns:
+                    self.send_inline_message(chat_id, "اختر:", inline_btns)
+                return
+
+            elif data.startswith('trade_admin_accept_'):
+                order_id = data.replace('trade_admin_accept_', '')
+                self.update_trade_order(order_id, status='admin_accepted', admin_id=user_id)
+                self.edit_message(chat_id, message.get('message_id'),
+                    f"✅ تم قبول الطلب <code>{order_id}</code>\n\n"
+                    f"📝 اكتب <b>وسيلة الدفع</b> للاستلام و <b>عدد USDT</b> للمشتري:\n\n"
+                    f"💡 مثال: <code>STC Pay 0501234567 100</code>\n"
+                    f"(وسيلة الدفع + الرقم + كمية USDT)")
+                self.user_states[user_id] = {'step': 'trade_admin_rate', 'order_id': order_id}
+                return
+
+            elif data.startswith('trade_admin_reject_'):
+                order_id = data.replace('trade_admin_reject_', '')
+                self.update_trade_order(order_id, status='rejected')
+                self.edit_message(chat_id, message.get('message_id'), f"❌ تم رفض الطلب <code>{order_id}</code>")
+                order = self.get_trade_order(order_id)
+                if order:
+                    self.notify_user(int(order.get('buyer_id', 0)),
+                        f"❌ <b>تم رفض طلب التداول</b>\n\n🆔 <code>{order_id}</code>")
+                return
+
+            elif data.startswith('trade_admin_confirm_pay_'):
+                order_id = data.replace('trade_admin_confirm_pay_', '')
+                self.update_trade_order(order_id, status='admin_confirms_payment')
+                self.edit_message(chat_id, message.get('message_id'),
+                    f"✅ تأكد الدفع\n\n📤 حوّل USDT إلى العميل وأرسل لقطة شاشة:")
+                self.user_states[user_id] = {'step': 'trade_admin_transfer', 'order_id': order_id}
+                return
+
+            elif data.startswith('trade_admin_done_'):
+                order_id = data.replace('trade_admin_done_', '')
+                self.update_trade_order(order_id, status='admin_sends_screenshot')
+                order = self.get_trade_order(order_id)
+                if order:
+                    # إرسال لقطة شاشة التحويل للعميل + زر تأكيد
+                    self.notify_user(int(order.get('buyer_id', 0)),
+                        f"📤 <b>تم تحويل USDT إليك!</b>\n\n"
+                        f"🆔 <code>{order_id}</code> 👈 اضغط للنسخ\n"
+                        f"🪙 الكمية: <code>{order.get('usdt_amount', '')}</code> USDT\n\n"
+                        f"📸 لقطة شاشة التحويل سيتم إرسالها:\n"
+                        f"تأكد من استلام USDT ثم اضغط تأكيد")
+                    if order.get('screenshot_transfer'):
+                        try:
+                            self.api_call('sendPhoto', {
+                                'chat_id': int(order.get('buyer_id', 0)),
+                                'photo': order['screenshot_transfer'],
+                                'caption': f"📸 لقطة شاشة تحويل USDT — <code>{order_id}</code>",
+                                'parse_mode': 'HTML',
+                                'reply_markup': self.transform_keyboard({'inline_keyboard': [
+                                    [{'text': '✅ تأكيد الاستلام', 'callback_data': f'trade_confirm_receipt_{order_id}'}]
+                                ]})
+                            })
+                        except:
+                            pass
+                self.edit_message(chat_id, message.get('message_id'),
+                    f"✅ تم إرسال لقطة الشاشة للعميل\n\n🆔 <code>{order_id}</code>\n⏳ بانتظار تأكيد العميل")
                 return
 
             # ==================== 💎 تعويض 100% — أزرار inline ====================
@@ -10408,6 +10761,301 @@ class ComprehensiveDUXBot:
     def has_custom_steps(self, method_id, flow_type):
         """فحص هل لوسيلة الدفع خطوات مخصصة"""
         return len(self.get_method_steps(method_id, flow_type)) > 0
+
+    # ==================== نظام التداول USDT/MoneyGo ====================
+
+    TRADE_FIELDS = ['id', 'buyer_id', 'buyer_name', 'customer_id', 'order_type', 'asset_type',
+                    'network', 'account_address', 'payment_method', 'amount', 'currency',
+                    'usdt_amount', 'admin_payment_method', 'status', 'screenshot_payment',
+                    'screenshot_transfer', 'admin_id', 'created_at', 'completed_at']
+
+    def create_trade_order(self, buyer_id, buyer_name, customer_id, order_type, asset_type,
+                           network, account_address, payment_method, amount, currency):
+        """إنشاء طلب تداول"""
+        order_id = f"TRD{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        try:
+            with open('trade_orders.csv', 'a', newline='', encoding='utf-8-sig') as f:
+                writer = csv.writer(f)
+                writer.writerow([order_id, buyer_id, buyer_name, customer_id, order_type, asset_type,
+                                network, account_address, payment_method, amount, currency,
+                                '', '', 'pending', '', '', '', datetime.now().strftime('%Y-%m-%d %H:%M'), ''])
+            return order_id
+        except Exception as e:
+            logger.error(f"خطأ في إنشاء طلب تداول: {e}")
+            return None
+
+    def get_trade_order(self, order_id):
+        """جلب طلب تداول بالمعرف"""
+        try:
+            with open('trade_orders.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row['id'] == order_id:
+                        return row
+        except:
+            pass
+        return None
+
+    def get_pending_trade_orders(self):
+        """جلب كل طلبات التداول المعلقة (للأدمن)"""
+        orders = []
+        try:
+            with open('trade_orders.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row.get('status') not in ('completed', 'rejected', 'cancelled'):
+                        orders.append(row)
+        except:
+            pass
+        return orders
+
+    def update_trade_order(self, order_id, **kwargs):
+        """تحديث حقل في طلب تداول"""
+        try:
+            rows = []
+            with open('trade_orders.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                fieldnames = reader.fieldnames
+                for row in reader:
+                    if row['id'] == order_id:
+                        for k, v in kwargs.items():
+                            if k in row:
+                                row[k] = str(v)
+                    rows.append(row)
+            with open('trade_orders.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer.writeheader()
+                writer.writerows(rows)
+            return True
+        except Exception as e:
+            logger.error(f"خطأ في تحديث طلب تداول: {e}")
+            return False
+
+    def show_trade_panel(self, message):
+        """لوحة التداول للعميل"""
+        user = self.find_user(message['from']['id'])
+        lang = user.get('language', 'ar') if user else 'ar'
+
+        text = (
+            f"💱 <b>بيع وشراء USDT / MoneyGo</b>\n\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"📦 <b>شراء</b> — اشترِ USDT أو MoneyGo\n"
+            f"💰 <b>بيع</b> — بِع USDT أو MoneyGo\n"
+            f"━━━━━━━━━━━━━━━━━━\n\n"
+            f"اختر العملية:"
+        )
+        inline_btns = [
+            [{'text': '📦 شراء', 'callback_data': 'trade_buy'},
+             {'text': '💰 بيع', 'callback_data': 'trade_sell'}],
+            [{'text': '🔙 رجوع', 'callback_data': 'trade_back_main'}]
+        ]
+        self.send_inline_message(message['chat']['id'], text, inline_btns)
+
+    def start_trade_buy(self, chat_id, user_id):
+        """بدء تدفق الشراء"""
+        self.send_inline_message(chat_id,
+            "📦 <b>شراء USDT / MoneyGo</b>\n\n"
+            "اختر العملة الرقمية:",
+            [
+                [{'text': '🪙 USDT', 'callback_data': 'trade_asset_usdt'},
+                 {'text': '💎 MoneyGo', 'callback_data': 'trade_asset_moneygo'}],
+                [{'text': '🔙 رجوع', 'callback_data': 'trade_back_panel'}]
+            ])
+
+    def show_trade_admin_queue(self, message):
+        """لوحة طلبات التداول للأدمن — قائمة منظمة"""
+        orders = self.get_pending_trade_orders()
+        if not orders:
+            self.send_message(message['chat']['id'],
+                "✅ لا توجد طلبات تداول معلقة",
+                self.admin_keyboard())
+            return
+
+        text = f"💱 <b>طلبات التداول المعلقة ({len(orders)})</b>\n\n"
+        text += f"━━━━━━━━━━━━━━━━━━\n"
+        inline_btns = []
+
+        for order in orders:
+            status = order.get('status', 'pending')
+            status_icons = {
+                'pending': '🟡', 'admin_accepted': '🔵', 'admin_sets_rate': '🔢',
+                'buyer_pays': '💸', 'buyer_sends_screenshot': '📸',
+                'admin_confirms_payment': '✅', 'admin_transfers': '📤',
+                'admin_sends_screenshot': '📸'
+            }
+            icon = status_icons.get(status, '🟡')
+            otype = 'شراء' if order.get('order_type') == 'buy' else 'بيع'
+            asset = order.get('asset_type', '').upper()
+            amount = order.get('amount', '')
+            currency = order.get('currency', '')
+
+            text += f"{icon} <code>{order['id']}</code> | {otype} {asset}\n"
+            text += f"   💰 {amount} {currency} | 👤 {order.get('buyer_name', '')}\n"
+            text += f"   📊 الحالة: {status}\n\n"
+
+            inline_btns.append([{'text': f"{icon} {order['id']} — {otype} {asset} {amount}",
+                                 'callback_data': f"trade_admin_view_{order['id']}"}])
+
+        inline_btns.append([{'text': '🔄 تحديث', 'callback_data': 'trade_admin_refresh'},
+                            {'text': '🔙 العودة', 'callback_data': 'trade_admin_back'}])
+
+        self.send_inline_message(message['chat']['id'], text, inline_btns)
+
+    def handle_trade_buy_step(self, message, state):
+        """معالجة خطوات تدفق شراء العميل"""
+        user_id = message['from']['id']
+        chat_id = message['chat']['id']
+        text = message.get('text', '').strip()
+        step = state.get('step', '')
+
+        if text in ['❌ إلغاء', 'إلغاء', 'الغاء', '🔙']:
+            if user_id in self.user_states: del self.user_states[user_id]
+            self.handle_start(message)
+            return
+
+        if step == 'trade_buy_account':
+            if len(text) < 3:
+                self.send_message(chat_id, "❌ العنوان/الحساب قصير. اكتب مرة أخرى:")
+                return
+            state['account_address'] = text
+            state['step'] = 'trade_buy_method'
+            self.user_states[user_id] = state
+
+            # عرض وسائل الدفع النشطة (المجموعة العامة)
+            methods = self.get_all_payment_methods()
+            active = [m for m in methods if m.get('status') == 'active']
+            if not active:
+                self.send_message(chat_id, "❌ لا توجد وسائل دفع. تواصل مع الإدارة.")
+                return
+            inline_btns = []
+            for m in active:
+                icon = m.get('icon', '💳') or '💳'
+                inline_btns.append([{'text': f"{icon} {m['method_name']} — <code>{m.get('account_data', '')}</code>",
+                                     'callback_data': f"trade_method_{m['id']}"}])
+            inline_btns.append([{'text': '🔙 إلغاء', 'callback_data': 'trade_buy_cancel'}])
+            self.send_inline_message(chat_id, "💳 اختر وسيلة الدفع:", inline_btns)
+
+        elif step == 'trade_buy_amount':
+            try:
+                amount = float(text)
+                if amount <= 0:
+                    self.send_message(chat_id, "❌ المبلغ يجب أن يكون أكبر من صفر:")
+                    return
+            except ValueError:
+                self.send_message(chat_id, "❌ اكتب مبلغاً رقمياً:")
+                return
+            state['amount'] = amount
+            state['step'] = 'trade_buy_currency'
+            self.user_states[user_id] = state
+
+            # عرض قائمة العملات
+            currencies = self.currencies
+            inline_btns = []
+            row = []
+            for code, info in currencies.items():
+                row.append({'text': f"{info.get('flag', '')} {code}", 'callback_data': f'trade_currency_{code}'})
+                if len(row) >= 3:
+                    inline_btns.append(row)
+                    row = []
+            if row:
+                inline_btns.append(row)
+            inline_btns.append([{'text': '🔙 إلغاء', 'callback_data': 'trade_buy_cancel'}])
+            self.send_inline_message(chat_id, "💱 اختر العملة:", inline_btns)
+
+        elif step == 'trade_buy_currency':
+            # يتم معالجته عبر callback في handle_callback_query
+            pass
+
+    def handle_trade_admin_step(self, message, state):
+        """معالجة خطوات تدفق الأدمن للتداول"""
+        user_id = message['from']['id']
+        chat_id = message['chat']['id']
+        text = message.get('text', '').strip()
+        step = state.get('step', '')
+        order_id = state.get('order_id', '')
+
+        if text in ['❌ إلغاء', 'إلغاء', 'الغاء']:
+            if user_id in self.user_states: del self.user_states[user_id]
+            self.show_trade_admin_queue(message)
+            return
+
+        if step == 'trade_admin_rate':
+            # الأدمن يكتب: وسيلة الدفع + كمية USDT
+            parts = text.split()
+            if len(parts) < 2:
+                self.send_message(chat_id, "❌ الصيغة: [وسيلة الدفع] [كمية USDT]\n💡 مثال: STC_Pay 100")
+                return
+            usdt_amount = parts[-1]
+            payment_method = ' '.join(parts[:-1])
+            try:
+                float(usdt_amount)
+            except ValueError:
+                self.send_message(chat_id, "❌ كمية USDT يجب أن تكون رقماً\n💡 مثال: STC_Pay 100")
+                return
+
+            self.update_trade_order(order_id,
+                status='buyer_pays', usdt_amount=usdt_amount, admin_payment_method=payment_method)
+
+            # إشعار العميل
+            order = self.get_trade_order(order_id)
+            if order:
+                buyer_msg = (
+                    f"✅ <b>تم قبول طلبك!</b>\n\n"
+                    f"🆔 <code>{order_id}</code> 👈 اضغط للنسخ\n"
+                    f"{'📦 شراء' if order.get('order_type') == 'buy' else '💰 بيع'} "
+                    f"{'🪙 USDT' if order.get('asset_type') == 'usdt' else '💎 MoneyGo'}\n\n"
+                    f"💰 المبلغ المطلوب: <code>{order.get('amount', '')}</code> {order.get('currency', '')}\n"
+                    f"🏦 وسيلة الدفع: <code>{payment_method}</code>\n"
+                    f"🪙 ستحصل على: <code>{usdt_amount}</code> USDT\n\n"
+                    f"📤 حوّل المال إلى وسيلة الدفع أعلاه\n"
+                    f"📸 ثم أرسل لقطة شاشة الدفع"
+                )
+                self.notify_user(int(order.get('buyer_id', 0)), buyer_msg)
+                # تعيين حالة العميل لانتظار لقطة الشاشة
+                self.user_states[int(order.get('buyer_id', 0))] = {
+                    'step': 'trade_buyer_screenshot', 'order_id': order_id
+                }
+
+            del self.user_states[user_id]
+            self.send_message(chat_id,
+                f"✅ تم إرسال تعليمات الدفع للعميل\n\n"
+                f"🆔 <code>{order_id}</code>\n⏳ بانتظار لقطة شاشة الدفع من العميل\n\n"
+                f"📋 ستظهر في قائمة طلبات التداول عند وصولها",
+                self.admin_keyboard())
+
+        elif step == 'trade_admin_transfer':
+            # الأدمن يرسل لقطة شاشة التحويل
+            if 'photo' not in message:
+                self.send_message(chat_id, "❌ أرسل لقطة شاشة (صورة) لتحويل USDT:")
+                return
+            photo = message['photo'][-1]
+            self.update_trade_order(order_id, status='admin_sends_screenshot',
+                                    screenshot_transfer=photo['file_id'])
+            del self.user_states[user_id]
+            # إرسال لقطة الشاشة للعميل + زر تأكيد
+            order = self.get_trade_order(order_id)
+            if order:
+                self.notify_user(int(order.get('buyer_id', 0)),
+                    f"📤 <b>تم تحويل USDT إليك!</b>\n\n"
+                    f"🆔 <code>{order_id}</code> 👈 اضغط للنسخ\n"
+                    f"🪙 الكمية: <code>{order.get('usdt_amount', '')}</code> USDT\n\n"
+                    f"📸 لقطة شاشة التحويل:\n"
+                    f"تأكد من استلام USDT ثم اضغط تأكيد")
+                try:
+                    self.api_call('sendPhoto', {
+                        'chat_id': int(order.get('buyer_id', 0)),
+                        'photo': photo['file_id'],
+                        'caption': f"📸 تحويل USDT — <code>{order_id}</code>",
+                        'parse_mode': 'HTML',
+                        'reply_markup': self.transform_keyboard({'inline_keyboard': [
+                            [{'text': '✅ تأكيد الاستلام', 'callback_data': f'trade_confirm_receipt_{order_id}'}]
+                        ]})
+                    })
+                except:
+                    pass
+            self.send_message(chat_id,
+                f"✅ تم إرسال لقطة الشاشة للعميل\n\n🆔 <code>{order_id}</code>\n⏳ بانتظار تأكيد العميل",
+                self.admin_keyboard())
 
     def get_payment_methods_by_company(self, company_id, transaction_type=None):
             """الحصول على وسائل الدفع لشركة معينة — من جدول الربط + السجل القديم"""
