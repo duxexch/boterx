@@ -1399,6 +1399,132 @@ class ComprehensiveDUXBot:
             {'keyboard': [[{'text': '❌ إلغاء'}]], 'resize_keyboard': True, 'one_time_keyboard': True})
         self.user_states[user_id] = 'app_wizard_name'
 
+    def handle_app_field_edit(self, message, state):
+        """تعديل حقل واحد في التطبيق — مستقل عن باقي الحقول"""
+        user_id = message['from']['id']
+        chat_id = message['chat']['id']
+        text = message.get('text', '').strip()
+        field = state.get('field', '')
+        app_id = state.get('app_id', '')
+
+        if text in ['❌ إلغاء', 'إلغاء', 'الغاء', '🔙']:
+            del self.user_states[user_id]
+            fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+            self.show_apps_admin_panel(fake_msg)
+            return
+
+        app = self.get_app_by_id(app_id)
+        if not app:
+            self.send_message(chat_id, "❌ التطبيق غير موجود")
+            del self.user_states[user_id]
+            return
+
+        # تحضير التحديث
+        updates = {}
+
+        if field == 'name':
+            if len(text) < 2:
+                self.send_message(chat_id, "❌ الاسم قصير:")
+                return
+            updates['name'] = text
+
+        elif field == 'icon':
+            if 'photo' in message:
+                photo = message['photo'][-1]
+                updates['icon_file_id'] = photo['file_id']
+                updates['icon_url'] = ''
+            elif text.lower() in ['حذف', 'delete', 'مسح']:
+                updates['icon_file_id'] = ''
+                updates['icon_url'] = ''
+            elif text.startswith('http'):
+                updates['icon_url'] = text
+                updates['icon_file_id'] = ''
+            else:
+                self.send_message(chat_id, "❌ أرسل صورة أو رابط. أو 'حذف':")
+                return
+
+        elif field == 'android':
+            if 'document' in message:
+                updates['android_file_id'] = message['document']['file_id']
+                updates['android_url'] = ''
+            elif text.lower() in ['حذف', 'delete', 'مسح']:
+                updates['android_file_id'] = ''
+                updates['android_url'] = ''
+            elif text.startswith('http'):
+                updates['android_url'] = text
+                updates['android_file_id'] = ''
+            else:
+                self.send_message(chat_id, "❌ أرسل ملف APK أو رابط. أو 'حذف':")
+                return
+
+        elif field == 'ios':
+            if text.lower() in ['حذف', 'delete', 'مسح']:
+                updates['ios_url'] = ''
+            elif text.startswith('http'):
+                updates['ios_url'] = text
+            else:
+                self.send_message(chat_id, "❌ اكتب رابط صحيح. أو 'حذف':")
+                return
+
+        elif field == 'promo_code':
+            if text.lower() in ['حذف', 'delete', 'مسح']:
+                updates['promo_code'] = ''
+            else:
+                updates['promo_code'] = text
+
+        elif field == 'referral_link':
+            if text.lower() in ['حذف', 'delete', 'مسح']:
+                updates['referral_link'] = ''
+            elif text.startswith('http'):
+                updates['referral_link'] = text
+            else:
+                self.send_message(chat_id, "❌ اكتب رابط صحيح. أو 'حذف':")
+                return
+
+        elif field == 'description':
+            if text.lower() in ['حذف', 'delete', 'مسح']:
+                updates['description'] = ''
+            else:
+                updates['description'] = text
+
+        # حفظ التحديث
+        if updates:
+            self._update_app_link(app_id, updates)
+            field_labels = {'name': '📝 الاسم', 'icon': '🖼️ الأيقونة', 'android': '🤖 أندرويد',
+                          'ios': '🍎 آيفون', 'promo_code': '🎁 البرومو كود',
+                          'referral_link': '🔗 رابط الإحالة', 'description': '📋 الوصف'}
+            label = field_labels.get(field, field)
+            self.send_message(chat_id, f"✅ تم تحديث {label} بنجاح!")
+        else:
+            self.send_message(chat_id, "⚠️ لم يتم تغيير شيء")
+
+        del self.user_states[user_id]
+        # العودة لقائمة تعديل التطبيق
+        fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': f'app_edit_{app_id}'}
+        # إعادة عرض قائمة التعديل
+        app = self.get_app_by_id(app_id)
+        if app:
+            dl_android = '📦 APK' if app.get('android_file_id') else ('🔗 رابط' if app.get('android_url') else '➖')
+            dl_ios = '🔗 رابط' if app.get('ios_url') else '➖'
+            icon = '🖼️' if (app.get('icon_file_id') or app.get('icon_url')) else '➖'
+            promo = '🎁' if app.get('promo_code') else '➖'
+            ref = '🔗' if app.get('referral_link') else '➖'
+            status = '✅' if app.get('is_active') == 'yes' else '⏸️'
+            text = f"✏️ <b>تعديل التطبيق</b>\n\n📱 الاسم: <b>{app.get('name', '')}</b>\n🆔 <code>{app_id}</code>\n\nاختر الحقل:"
+            inline_btns = [
+                [{'text': f'📝 الاسم: {app.get("name", "")}', 'callback_data': f'app_edit_name_{app_id}'}],
+                [{'text': f'{icon} الأيقونة', 'callback_data': f'app_edit_icon_{app_id}'}],
+                [{'text': f'🤖 أندرويد: {dl_android}', 'callback_data': f'app_edit_android_{app_id}'}],
+                [{'text': f'🍎 آيفون: {dl_ios}', 'callback_data': f'app_edit_ios_{app_id}'}],
+                [{'text': f'{promo} برومو كود', 'callback_data': f'app_edit_promo_{app_id}'}],
+                [{'text': f'{ref} رابط إحالة', 'callback_data': f'app_edit_reflink_{app_id}'}],
+                [{'text': f'📋 الوصف: {app.get("description", "") or "بدون"}', 'callback_data': f'app_edit_desc_{app_id}'}],
+                [{'text': f'{status} التفعيل', 'callback_data': f'app_toggle_{app_id}'},
+                 {'text': '🗑️ حذف', 'callback_data': f'app_delete_{app_id}'}],
+                [{'text': '🔙 رجوع', 'callback_data': 'app_refresh'}]
+            ]
+            self.send_inline_message(chat_id, text, inline_btns)
+
     def handle_app_wizard(self, message):
         """معالجة معالج إضافة تطبيق — يدعم رفع APK وصور"""
         user_id = message['from']['id']
@@ -4394,6 +4520,11 @@ class ComprehensiveDUXBot:
         # معالج التطبيقات — يدعم رفع ملفات APK وصور
         if isinstance(current_state, str) and current_state.startswith('app_wizard'):
             self.handle_app_wizard(message)
+            return
+
+        # معالج تعديل حقل واحد في التطبيق
+        if isinstance(current_state, dict) and current_state.get('step') == 'app_field_edit':
+            self.handle_app_field_edit(message, current_state)
             return
 
         # معالج البوتات المتعددة
@@ -7818,26 +7949,84 @@ class ComprehensiveDUXBot:
                 if not app:
                     self.edit_message(chat_id, message.get('message_id'), "❌ التطبيق غير موجود")
                     return
-                # بدء تعديل التطبيق
-                if not hasattr(self, 'temp_app_data'):
-                    self.temp_app_data = {}
-                self.temp_app_data[user_id] = {'step': 'app_name', 'edit_id': app_id,
-                    'name': app.get('name', ''),
-                    'icon_url': app.get('icon_url', ''),
-                    'icon_file_id': app.get('icon_file_id', ''),
-                    'download_url': app.get('download_url', ''),
-                    'apk_file_id': app.get('apk_file_id', ''),
-                    'download_type': app.get('download_type', 'url'),
-                    'description': app.get('description', '')}
-                dl_info = '📦 APK' if app.get('download_type') == 'apk' else '🔗 رابط'
-                self.edit_message(chat_id, message.get('message_id'),
+                # تعديل التطبيق — كل حقل منفصل بأزرار inline
+                dl_android = '📦 APK' if app.get('android_file_id') else ('🔗 رابط' if app.get('android_url') else '➖')
+                dl_ios = '🔗 رابط' if app.get('ios_url') else '➖'
+                icon = '🖼️' if (app.get('icon_file_id') or app.get('icon_url')) else '➖'
+                promo = '🎁' if app.get('promo_code') else '➖'
+                ref = '🔗' if app.get('referral_link') else '➖'
+                status = '✅' if app.get('is_active') == 'yes' else '⏸️'
+
+                text = (
                     f"✏️ <b>تعديل التطبيق</b>\n\n"
-                    f"📱 الاسم: <code>{app.get('name', '')}</code>\n"
-                    f"🆔 <code>{app_id}</code>\n"
-                    f"{dl_info}\n\n"
-                    f"📝 اكتب <b>الاسم الجديد</b> (أو نفسه للإبقاء):\n\n"
-                    f"ثم ستعدل: الأيقونة ← التحميل ← الوصف")
-                self.user_states[user_id] = 'app_wizard_name'
+                    f"📱 الاسم: <b>{app.get('name', '')}</b>\n"
+                    f"🆔 <code>{app_id}</code>\n\n"
+                    f"اختر الحقل الذي تريد تعديله:\n"
+                    f"كل تعديل مستقل — لا حاجة للبدء من البداية"
+                )
+                inline_btns = [
+                    [{'text': f'📝 الاسم: {app.get("name", "")}', 'callback_data': f'app_edit_name_{app_id}'}],
+                    [{'text': f'{icon} الأيقونة', 'callback_data': f'app_edit_icon_{app_id}'}],
+                    [{'text': f'🤖 أندرويد: {dl_android}', 'callback_data': f'app_edit_android_{app_id}'}],
+                    [{'text': f'🍎 آيفون: {dl_ios}', 'callback_data': f'app_edit_ios_{app_id}'}],
+                    [{'text': f'{promo} برومو كود', 'callback_data': f'app_edit_promo_{app_id}'}],
+                    [{'text': f'{ref} رابط إحالة', 'callback_data': f'app_edit_reflink_{app_id}'}],
+                    [{'text': f'📋 الوصف: {app.get("description", "") or "بدون"}', 'callback_data': f'app_edit_desc_{app_id}'}],
+                    [{'text': f'{status} التفعيل', 'callback_data': f'app_toggle_{app_id}'},
+                     {'text': '🗑️ حذف', 'callback_data': f'app_delete_{app_id}'}],
+                    [{'text': '🔙 رجوع', 'callback_data': 'app_refresh'}]
+                ]
+                self.edit_message(chat_id, message.get('message_id'), text)
+                self.send_inline_message(chat_id, "اختر الحقل:", inline_btns)
+                return
+
+            # === تعديل حقول التطبيق بشكل منفصل ===
+            elif data.startswith('app_edit_name_'):
+                app_id = data.replace('app_edit_name_', '')
+                self.edit_message(chat_id, message.get('message_id'), "📝 اكتب <b>الاسم الجديد</b>:")
+                self.user_states[user_id] = {'step': 'app_field_edit', 'field': 'name', 'app_id': app_id}
+                return
+
+            elif data.startswith('app_edit_icon_'):
+                app_id = data.replace('app_edit_icon_', '')
+                self.edit_message(chat_id, message.get('message_id'),
+                    "🖼️ أرسل <b>صورة الأيقونة الجديدة</b>:\nأو اكتب رابط صورة\nأو 'حذف' للإزالة")
+                self.user_states[user_id] = {'step': 'app_field_edit', 'field': 'icon', 'app_id': app_id}
+                return
+
+            elif data.startswith('app_edit_android_'):
+                app_id = data.replace('app_edit_android_', '')
+                self.edit_message(chat_id, message.get('message_id'),
+                    "🤖 أرسل <b>ملف APK جديد</b> أو <b>رابط أندرويد جديد</b>:\nأو 'حذف' للإزالة")
+                self.user_states[user_id] = {'step': 'app_field_edit', 'field': 'android', 'app_id': app_id}
+                return
+
+            elif data.startswith('app_edit_ios_'):
+                app_id = data.replace('app_edit_ios_', '')
+                self.edit_message(chat_id, message.get('message_id'),
+                    "🍎 اكتب <b>رابط آيفون جديد</b>:\nأو 'حذف' للإزالة")
+                self.user_states[user_id] = {'step': 'app_field_edit', 'field': 'ios', 'app_id': app_id}
+                return
+
+            elif data.startswith('app_edit_promo_'):
+                app_id = data.replace('app_edit_promo_', '')
+                self.edit_message(chat_id, message.get('message_id'),
+                    "🎁 اكتب <b>برومو كود جديد</b>:\nأو 'حذف' للإزالة")
+                self.user_states[user_id] = {'step': 'app_field_edit', 'field': 'promo_code', 'app_id': app_id}
+                return
+
+            elif data.startswith('app_edit_reflink_'):
+                app_id = data.replace('app_edit_reflink_', '')
+                self.edit_message(chat_id, message.get('message_id'),
+                    "🔗 اكتب <b>رابط إحالة جديد</b>:\nأو 'حذف' للإزالة")
+                self.user_states[user_id] = {'step': 'app_field_edit', 'field': 'referral_link', 'app_id': app_id}
+                return
+
+            elif data.startswith('app_edit_desc_'):
+                app_id = data.replace('app_edit_desc_', '')
+                self.edit_message(chat_id, message.get('message_id'),
+                    "📋 اكتب <b>وصفاً جديداً</b>:\nأو 'حذف' للإزالة")
+                self.user_states[user_id] = {'step': 'app_field_edit', 'field': 'description', 'app_id': app_id}
                 return
 
             elif data.startswith('app_dl_android_'):
