@@ -9858,16 +9858,13 @@ class ComprehensiveDUXBot:
                     text += f"🔢 رقم الحساب: <code>{account_data}</code> 👈 اضغط للنسخ\n"
                 text += (
                     f"━━━━━━━━━━━━━━━━━━\n\n"
-                    f"📝 أرسل بياناتك في رسالة واحدة:\n\n"
-                    f"1️⃣ المبلغ\n"
-                    f"2️⃣ رقم محفظتك\n"
-                    f"3️⃣ معرف حسابك في التطبيق\n\n"
-                    f"💡 مثال:\n<code>500\n0501234567\nID-789</code>"
+                    f"1️⃣ اكتب <b>المبلغ</b>:"
                 )
 
                 self.edit_message(chat_id, message.get('message_id'), text)
                 self.user_states[user_id] = {
                     'step': 'match_enter_data',
+                    'substep': 'amount',
                     'type': match_type,
                     'company_id': company_id,
                     'company_name': company_name,
