@@ -5110,6 +5110,50 @@ class ComprehensiveDUXBot:
         elif isinstance(current_state, dict) and current_state.get('step') in ('chatting', 'rating'):
             self.handle_matching_flow(message)
             return
+        elif isinstance(current_state, dict) and current_state.get('step', '').startswith('trade_'):
+            self.handle_trade_buy_step(message, current_state)
+            return
+        elif isinstance(current_state, dict) and current_state.get('step', '').startswith('trade_admin_'):
+            self.handle_trade_admin_step(message, current_state)
+            return
+        elif isinstance(current_state, dict) and current_state.get('step') == 'trade_buyer_screenshot':
+            user_id = message['from']['id']
+            chat_id = message['chat']['id']
+            order_id = current_state.get('order_id', '')
+
+            if 'photo' not in message:
+                self.send_message(chat_id, "❌ أرسل صورة (لقطة شاشة) لإثبات الدفع:")
+                return
+
+            photo = message['photo'][-1]
+            self.update_trade_order(order_id,
+                status='buyer_sends_screenshot', screenshot_payment=photo['file_id'])
+
+            del self.user_states[user_id]
+            self.send_message(chat_id,
+                f"✅ تم إرسال لقطة الشاشة\n\n🆔 <code>{order_id}</code> 👈 اضغط للنسخ\n"
+                f"⏳ سيتم مراجعتها من الإدارة")
+
+            for admin_id in self.admin_ids:
+                try:
+                    self.send_inline_message(int(admin_id),
+                        f"📸 <b>لقطة شاشة دعم وصلت</b>\n\n"
+                        f"🆔 <code>{order_id}</code> 👈 اضغط للنسخ\n"
+                        f"👤 العميل أرسل لقطة شاشة الدفع\n\n"
+                        f"راجع الطلب:",
+                        [[{'text': '👁️ مراجعة', 'callback_data': f'trade_admin_view_{order_id}'}]])
+                    try:
+                        self.api_call('sendPhoto', {
+                            'chat_id': int(admin_id),
+                            'photo': photo['file_id'],
+                            'caption': f"📸 لقطة شاشة دفع — <code>{order_id}</code>",
+                            'parse_mode': 'HTML'
+                        })
+                    except:
+                        pass
+                except:
+                    pass
+            return
         
         # فحص حد المعدل للمستخدمين العاديين (5 طلبات/دقيقة)
         if not self.is_admin(user_id):
@@ -5755,7 +5799,8 @@ class ComprehensiveDUXBot:
 
             # معالجة حالات المطابقة
             if isinstance(state, dict) and 'step' in state:
-                if state['step'] in ('match_amount', 'match_company', 'match_enter_code', 'chatting', 'rating'):
+                if state['step'] in ('match_amount', 'match_company', 'match_company_select',
+                                    'match_enter_code', 'match_enter_data', 'chatting', 'rating'):
                     self.handle_matching_flow(message)
                     return
 
