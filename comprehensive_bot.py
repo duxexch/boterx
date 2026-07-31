@@ -7159,59 +7159,73 @@ class ComprehensiveDUXBot:
                         self.send_message(chat_id, f"❌ {error}", self.main_keyboard(lang, user_id))
                         del self.user_states[user_id]
                         return
-
-                    request = self.match_manager.get_active_request_by_user(str(user_id))
-                    if request:
-                        match = self.match_manager.find_match(request)
-                        if match:
-                            match_id = self.match_manager.create_match(request, match)
-                            self._notify_match_created(match_id)
-                            del self.user_states[user_id]
-                            return
                 except Exception as e:
                     logger.error(f"خطأ في إنشاء طلب المطابقة: {e}")
                     self.send_message(chat_id,
-                        f"❌ حدث خطأ أثناء إنشاء الطلب. حاول مرة أخرى.",
+                        f"❌ حدث خطأ. حاول مرة أخرى.",
                         self.main_keyboard(lang, user_id))
                     del self.user_states[user_id]
                     return
 
+                # البحث عن مطابقة
+                request = None
+                match = None
+                try:
+                    request = self.match_manager.get_active_request_by_user(str(user_id))
+                    if request:
+                        match = self.match_manager.find_match(request)
+                except Exception as e:
+                    logger.error(f"خطأ في البحث عن مطابقة: {e}")
+
+                if request and match:
+                    try:
+                        match_id = self.match_manager.create_match(request, match)
+                        self._notify_match_created(match_id)
+                        del self.user_states[user_id]
+                        return
+                    except Exception as e:
+                        logger.error(f"خطأ في إنشاء المطابقة: {e}")
+
+                # لا توجد مطابقة — إشعار العميل + الأدمن تلقائياً
                 type_ar = 'إيداع' if state['type'] == 'deposit' else 'سحب'
                 self.send_message(chat_id,
                     f"⏳ <b>تم إنشاء طلبك</b>\n\n"
                     f"━━━━━━━━━━━━━━━━━━\n"
                     f"{'💵' if state['type'] == 'deposit' else '💸'} النوع: <b>{type_ar}</b>\n"
                     f"💰 المبلغ: <code>{amount}</code>\n"
-                    f"🏢 الشركة: <b>{state['company_name']}</b>\n"
+                    f"🏢 الشركة: <b>{state.get('company_name', '')}</b>\n"
                     f"💳 المحفظة: <code>{wallet_number}</code> 👈 اضغط للنسخ\n"
                     f"🆔 معرف الحساب: <code>{account_id}</code> 👈 اضغط للنسخ\n"
                     f"━━━━━━━━━━━━━━━━━━\n\n"
-                    f"⏳ جارٍ البحث عن مطابقة...",
+                    f"⏳ جارٍ البحث عن مطابقة...\n"
+                    f"سيتم إشعارك فور العثور على طرف آخر.",
                     self.main_keyboard(lang, user_id))
 
-                for admin_id in self.admin_ids:
-                    try:
-                        opposite_type = 'سحب' if state['type'] == 'deposit' else 'إيداع'
-                        admin_msg = (
-                            f"🔔 <b>طلب مطابقة معلق</b>\n\n"
-                            f"━━━━━━━━━━━━━━━━━━\n"
-                            f"👤 العميل: <code>{user_id}</code> ({user.get('name', '')})\n"
-                            f"{'💵' if state['type'] == 'deposit' else '💸'} النوع: <b>{type_ar}</b>\n"
-                            f"🔄 يبحث عن: <b>{opposite_type}</b>\n"
-                            f"💰 المبلغ: <code>{amount}</code>\n"
-                            f"🏢 الشركة: <b>{state['company_name']}</b>\n"
-                            f"💳 المحفظة: <code>{wallet_number}</code> 👈 اضغط للنسخ\n"
-                            f"🆔 معرف الحساب: <code>{account_id}</code> 👈 اضغط للنسخ\n"
-                            f"━━━━━━━━━━━━━━━━━━\n\n"
-                            f"يمكنك أن تكون الطرف الآخر:"
-                        )
-                        inline_btns = [
-                            [{'text': f'✅ أنا الطرف الآخر ({opposite_type})', 'callback_data': f'match_admin_join_{request["id"]}'},
-                             {'text': '⏳ انتظار', 'callback_data': f'match_admin_wait_{request["id"]}'}]
-                        ]
-                        self.send_inline_message(admin_id, admin_msg, inline_btns)
-                    except Exception as e:
-                        logger.error(f"خطأ في إشعار الأدمن بطلب المطابقة: {e}")
+                # إشعار الأدمن تلقائياً — يمكنه القبول كطرف آخر
+                if request:
+                    for admin_id in self.admin_ids:
+                        try:
+                            opposite_type = 'سحب' if state['type'] == 'deposit' else 'إيداع'
+                            admin_msg = (
+                                f"🔔 <b>طلب مطابقة معلق</b>\n\n"
+                                f"━━━━━━━━━━━━━━━━━━\n"
+                                f"👤 العميل: <code>{user_id}</code> ({user.get('name', '')})\n"
+                                f"{'💵' if state['type'] == 'deposit' else '💸'} النوع: <b>{type_ar}</b>\n"
+                                f"🔄 يبحث عن: <b>{opposite_type}</b>\n"
+                                f"💰 المبلغ: <code>{amount}</code>\n"
+                                f"🏢 الشركة: <b>{state.get('company_name', '')}</b>\n"
+                                f"💳 المحفظة: <code>{wallet_number}</code> 👈 اضغط للنسخ\n"
+                                f"🆔 معرف الحساب: <code>{account_id}</code> 👈 اضغط للنسخ\n"
+                                f"━━━━━━━━━━━━━━━━━━\n\n"
+                                f"يمكنك أن تكون الطرف الآخر:"
+                            )
+                            inline_btns = [
+                                [{'text': f'✅ أنا الطرف الآخر ({opposite_type})', 'callback_data': f'match_admin_join_{request["id"]}'},
+                                 {'text': '⏳ انتظار', 'callback_data': f'match_admin_wait_{request["id"]}'}]
+                            ]
+                            self.send_inline_message(admin_id, admin_msg, inline_btns)
+                        except Exception as e:
+                            logger.error(f"خطأ في إشعار الأدمن: {e}")
 
                 del self.user_states[user_id]
                 return
