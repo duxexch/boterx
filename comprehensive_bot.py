@@ -5820,23 +5820,10 @@ class ComprehensiveDUXBot:
             # إجراء إعادة تعيين شاملة وقوية
             self.super_reset_user_system(user_id, chat_id, user)
         else:
-
-            # معالجة حالات نظام المطابقة
+            # معالجة حالات نظام المطابقة (بعد rate limiter)
             if isinstance(state, dict) and 'step' in state:
                 self.handle_matching_flow(message)
                 return
-
-            # معالجة حالة المطابقة (نص عادي)
-            if state == 'match_select_type':
-                self.handle_matching_flow(message)
-                return
-
-            # معالجة حالات المطابقة
-            if isinstance(state, dict) and 'step' in state:
-                if state['step'] in ('match_amount', 'match_company', 'match_company_select',
-                                    'match_enter_code', 'match_enter_data', 'chatting', 'rating'):
-                    self.handle_matching_flow(message)
-                    return
 
             # رسالة خطأ محسنة مع زر إصلاح قوي
             reset_btn = self.tr('reset_system', user_lang)
