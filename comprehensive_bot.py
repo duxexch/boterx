@@ -354,6 +354,28 @@ class ComprehensiveDUXBot:
                 writer = csv.writer(f)
                 writer.writerow(['id', 'name', 'url', 'is_active', 'created_at'])
 
+        # ملف جولات اليانصيب
+        if not os.path.exists('lottery_rounds.csv'):
+            with open('lottery_rounds.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.writer(f)
+                writer.writerow(['id', 'name', 'status', 'ticket_price', 'currency', 'min_tickets',
+                               'max_tickets_per_user', 'total_prize', 'admin_profit_pct',
+                               'start_time', 'draw_time', 'winner_count', 'created_at'])
+
+        # ملف تذاكر اليانصيب
+        if not os.path.exists('lottery_tickets.csv'):
+            with open('lottery_tickets.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.writer(f)
+                writer.writerow(['id', 'round_id', 'user_id', 'user_name', 'customer_id',
+                               'ticket_number', 'purchase_time', 'payment_method', 'payment_verified'])
+
+        # ملف الفائزين باليانصيب
+        if not os.path.exists('lottery_winners.csv'):
+            with open('lottery_winners.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.writer(f)
+                writer.writerow(['id', 'round_id', 'user_id', 'user_name', 'ticket_number',
+                               'prize_amount', 'currency', 'rank', 'draw_time'])
+
         # ملف عناوين الصرافة
         if not os.path.exists('exchange_addresses.csv'):
             with open('exchange_addresses.csv', 'w', newline='', encoding='utf-8-sig') as f:
@@ -2825,10 +2847,10 @@ class ComprehensiveDUXBot:
             [{'text': '💱 تداول USDT'}, {'text': svrp_btn}],
             [{'text': requests_btn}, {'text': profile_btn}],
             [{'text': match_btn}, {'text': apps_btn}],
-            [{'text': ref_btn}, {'text': notif_btn}],
-            [{'text': complaint_btn}, {'text': help_btn}],
-            [{'text': currency_btn}, {'text': lang_btn_text}],
-            [{'text': reset_btn}],
+            [{'text': ref_btn}, {'text': '🎰 يانصيب'}],
+            [{'text': notif_btn}, {'text': complaint_btn}],
+            [{'text': help_btn}, {'text': currency_btn}],
+            [{'text': lang_btn_text}, {'text': reset_btn}],
         ]
         
         # زر التسجيل للمستخدمين غير المسجلين
@@ -2873,9 +2895,9 @@ class ComprehensiveDUXBot:
             [{'text': self.tr('admin_settings', lang)}, {'text': self.tr('admin_themes', lang)}, {'text': self.tr('admin_addresses', lang)}],
             # المجموعة 7b: التطبيقات والاسترداد والتداول
             [{'text': self.tr('admin_apps', lang)}, {'text': self.tr('admin_recovery', lang)}, {'text': '💱 تداول'}],
-            # المجموعة 7c: الطلبات الموحدة + روابط الإحالة + أرباح الإحالة
+            # المجموعة 7c: الطلبات الموحدة + روابط الإحالة + أرباح الإحالة + اليانصيب
             [{'text': '📋 كل الطلبات'}, {'text': '🎁 روابط الإحالة'}],
-            [{'text': '🏆 أرباح الإحالة'}],
+            [{'text': '🏆 أرباح الإحالة'}, {'text': '🎰 اليانصيب'}],
             # المجموعة 8: الأدمن والأدوار
             [{'text': self.tr('admin_managers', lang)}, {'text': self.tr('admin_buttons', lang)}],
             # المجموعة 9: الحماية والنسخ
@@ -5154,6 +5176,179 @@ class ComprehensiveDUXBot:
                 self.handle_trade_admin_step(message, state)
                 return
 
+            # ==================== 🎰 اليانصيب — حالات ===
+            if isinstance(current_state, str) and current_state == 'lot_name':
+                user_id = message['from']['id']
+                chat_id = message['chat']['id']
+                text_msg = message.get('text', '').strip()
+                if len(text_msg) < 2:
+                    self.send_message(chat_id, "❌ الاسم قصير:")
+                    return
+                self.temp_lottery = getattr(self, 'temp_lottery', {})
+                self.temp_lottery[user_id] = {'name': text_msg}
+                self.user_states[user_id] = 'lot_price'
+                self.send_message(chat_id, f"✅ الاسم: <b>{text_msg}</b>\n\n💰 اكتب <b>سعر التذكرة</b>:")
+                return
+
+            if isinstance(current_state, str) and current_state == 'lot_price':
+                user_id = message['from']['id']
+                chat_id = message['chat']['id']
+                text_msg = message.get('text', '').strip()
+                try:
+                    price = float(text_msg)
+                    if price <= 0:
+                        self.send_message(chat_id, "❌ السعر يجب أن يكون أكبر من صفر:")
+                        return
+                except ValueError:
+                    self.send_message(chat_id, "❌ اكتب رقماً:")
+                    return
+                self.temp_lottery[user_id]['price'] = str(price)
+                self.user_states[user_id] = 'lot_currency'
+                self.send_message(chat_id, f"✅ السعر: <code>{price}</code>\n\n💱 اكتب <b>العملة</b> (مثال: SAR, USD):")
+                return
+
+            if isinstance(current_state, str) and current_state == 'lot_currency':
+                user_id = message['from']['id']
+                chat_id = message['chat']['id']
+                text_msg = message.get('text', '').strip().upper()
+                self.temp_lottery[user_id]['currency'] = text_msg
+                self.user_states[user_id] = 'lot_winners'
+                self.send_message(chat_id, f"✅ العملة: {text_msg}\n\n🏆 اكتب <b>عدد الفائزين</b>:")
+                return
+
+            if isinstance(current_state, str) and current_state == 'lot_winners':
+                user_id = message['from']['id']
+                chat_id = message['chat']['id']
+                text_msg = message.get('text', '').strip()
+                try:
+                    winners = int(text_msg)
+                    if winners < 1 or winners > 10:
+                        self.send_message(chat_id, "❌ بين 1 و 10:")
+                        return
+                except ValueError:
+                    self.send_message(chat_id, "❌ اكتب رقماً:")
+                    return
+                self.temp_lottery[user_id]['winners'] = str(winners)
+                self.user_states[user_id] = 'lot_max'
+                self.send_message(chat_id, f"✅ الفائزون: {winners}\n\n🎫 اكتب <b>الحد الأقصى للتذاكر لكل مستخدم</b>:")
+                return
+
+            if isinstance(current_state, str) and current_state == 'lot_max':
+                user_id = message['from']['id']
+                chat_id = message['chat']['id']
+                text_msg = message.get('text', '').strip()
+                try:
+                    max_t = int(text_msg)
+                    if max_t < 1:
+                        self.send_message(chat_id, "❌ يجب أن يكون 1 على الأقل:")
+                        return
+                except ValueError:
+                    self.send_message(chat_id, "❌ اكتب رقماً:")
+                    return
+                self.temp_lottery[user_id]['max'] = str(max_t)
+                self.user_states[user_id] = 'lot_admin_pct'
+                self.send_message(chat_id, f"✅ الحد الأقصى: {max_t}\n\n💰 اكتب <b>نسبة ربح الأدمن %</b> (0-100):")
+                return
+
+            if isinstance(current_state, str) and current_state == 'lot_admin_pct':
+                user_id = message['from']['id']
+                chat_id = message['chat']['id']
+                text_msg = message.get('text', '').strip()
+                try:
+                    pct = float(text_msg)
+                    if pct < 0 or pct > 100:
+                        self.send_message(chat_id, "❌ بين 0 و 100:")
+                        return
+                except ValueError:
+                    self.send_message(chat_id, "❌ اكتب رقماً:")
+                    return
+                self.temp_lottery[user_id]['admin_pct'] = str(pct)
+                self.user_states[user_id] = 'lot_drawtime'
+                self.send_message(chat_id, f"✅ النسبة: {pct}%\n\n⏰ اكتب <b>موعد السحب</b> (YYYY-MM-DD HH:MM):")
+                return
+
+            if isinstance(current_state, str) and current_state == 'lot_drawtime':
+                user_id = message['from']['id']
+                chat_id = message['chat']['id']
+                text_msg = message.get('text', '').strip()
+                # حفظ الجولة
+                data = getattr(self, 'temp_lottery', {}).get(user_id, {})
+                round_id = f"LOT{str(int(datetime.now().timestamp()))[-6:]}"
+                try:
+                    with open('lottery_rounds.csv', 'a', newline='', encoding='utf-8-sig') as f:
+                        writer = csv.writer(f)
+                        writer.writerow([round_id, data.get('name', ''), 'active', data.get('price', '10'),
+                                       data.get('currency', 'SAR'), '1', data.get('max', '1'),
+                                       '0', data.get('admin_pct', '0'), datetime.now().strftime('%Y-%m-%d %H:%M'),
+                                       text_msg, data.get('winners', '1'), datetime.now().strftime('%Y-%m-%d %H:%M')])
+                except:
+                    pass
+                del self.user_states[user_id]
+                if hasattr(self, 'temp_lottery') and user_id in self.temp_lottery:
+                    del self.temp_lottery[user_id]
+                self.send_message(chat_id,
+                    f"✅ <b>تم إنشاء جولة اليانصيب!</b>\n\n"
+                    f"🆔 <code>{round_id}</code>\n"
+                    f"🎰 {data.get('name', '')}\n"
+                    f"🎫 {data.get('price', '')} {data.get('currency', '')}\n"
+                    f"🏆 {data.get('winners', '1')} فائزين\n"
+                    f"⏰ السحب: {text_msg}", self.admin_keyboard())
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_lottery_admin(fake_msg)
+                return
+
+            # تأكيد شراء تذكرة
+            if isinstance(current_state, dict) and current_state.get('step') == 'lot_confirm':
+                user_id = message['from']['id']
+                chat_id = message['chat']['id']
+                text_msg = message.get('text', '').strip()
+
+                if text_msg.lower() in ['إلغاء', 'الغاء', 'cancel']:
+                    del self.user_states[user_id]
+                    fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                    self.show_lottery_panel(fake_msg)
+                    return
+
+                if text_msg.lower() not in ['تم', 'done', 'ok', 'نعم']:
+                    self.send_message(chat_id, "اكتب <b>'تم'</b> للتأكيد أو <b>'إلغاء'</b>")
+                    return
+
+                # شراء التذكرة
+                round_id = current_state.get('round_id', '')
+                method_id = current_state.get('method_id', '')
+                user = self.find_user(user_id)
+
+                # توليد رقم التذكرة
+                import random as _r
+                ticket_number = f"{_r.randint(1000, 9999)}"
+
+                try:
+                    with open('lottery_tickets.csv', 'a', newline='', encoding='utf-8-sig') as f:
+                        writer = csv.writer(f)
+                        writer.writerow([f"TKT{str(int(datetime.now().timestamp()))[-6:]}",
+                                       round_id, str(user_id), user.get('name', ''), user.get('customer_id', ''),
+                                       ticket_number, datetime.now().strftime('%Y-%m-%d %H:%M'),
+                                       method_id, 'pending'])
+                except:
+                    pass
+
+                del self.user_states[user_id]
+                self.send_message(chat_id,
+                    f"🎫 <b>تم شراء تذكرة!</b>\n\n"
+                    f"🎰 رقم التذكرة: <code>#{ticket_number}</code> 👈 اضغط للنسخ\n"
+                    f"⏳ بانتظار تأكيد الدفع من الإدارة\n\n"
+                    f"حظاً موفقاً! 🍀")
+                # إشعار الأدمن
+                for admin_id in self.admin_ids:
+                    try:
+                        self.send_message(int(admin_id),
+                            f"🎫 <b>تذكرة يانصيب جديدة</b>\n\n"
+                            f"🔢 التذكرة: <code>#{ticket_number}</code>\n"
+                            f"👤 {user.get('name', '')} — <code>{user.get('customer_id', '')}</code>")
+                    except:
+                        pass
+                return
+
             # العميل يرسل لقطة شاشة الدفع
             elif isinstance(state, dict) and state.get('step') == 'trade_buyer_screenshot':
                 user_id = message['from']['id']
@@ -5391,6 +5586,8 @@ class ComprehensiveDUXBot:
             self.show_apps_panel(message)
         elif text == '💱 تداول USDT':
             self.show_trade_panel(message)
+        elif text == '🎰 يانصيب':
+            self.show_lottery_panel(message)
         elif self.svrp:
             all_langs = self.get_supported_languages()
             svrp_wallet_texts = {self.tr('svrp_my_wallet', l) for l in all_langs}
@@ -6167,6 +6364,8 @@ class ComprehensiveDUXBot:
             self.show_referral_links_admin(message)
         elif text == '🏆 أرباح الإحالة':
             self.show_referral_earnings_admin(message)
+        elif text == '🎰 اليانصيب':
+            self.show_lottery_admin(message)
         elif text in {self.tr('admin_message_user', l) for l in all_langs}:
             self.start_send_user_message(message)
         elif text in {self.tr('admin_notifications', l) for l in all_langs}:
@@ -8094,6 +8293,78 @@ class ComprehensiveDUXBot:
                 self.edit_message(chat_id, message.get('message_id'), "🏠 العودة")
                 welcome = self.tr('choose_service', lang, name=user.get('name', ''), customer_id=user.get('customer_id', '')) if user else ''
                 self.send_message(chat_id, welcome, self.main_keyboard(lang, user_id))
+                return
+
+            # ==================== 🎰 اليانصيب ====================
+            elif data == 'lot_back_main':
+                user = self.find_user(user_id)
+                lang = user.get('language', 'ar') if user else 'ar'
+                self.edit_message(chat_id, message.get('message_id'), "🏠 العودة")
+                welcome = self.tr('choose_service', lang, name=user.get('name', ''), customer_id=user.get('customer_id', '')) if user else ''
+                self.send_message(chat_id, welcome, self.main_keyboard(lang, user_id))
+                return
+
+            elif data == 'lot_create':
+                self.edit_message(chat_id, message.get('message_id'),
+                    "🎰 <b>إنشاء جولة يانصيب</b>\n\n📝 اكتب <b>اسم الجولة</b>:")
+                self.user_states[user_id] = 'lot_name'
+                return
+
+            elif data.startswith('lot_buy_'):
+                round_id = data.replace('lot_buy_', '')
+                # عرض وسائل الدفع
+                methods = self.get_all_payment_methods()
+                active_methods = [m for m in methods if m.get('status') == 'active']
+                if not active_methods:
+                    self.send_message(chat_id, "❌ لا توجد وسائل دفع متاحة")
+                    return
+                inline_btns = []
+                for m in active_methods:
+                    icon = m.get('icon', '💳') or '💳'
+                    inline_btns.append([{'text': f"{icon} {m['method_name']}", 'callback_data': f'lot_method_{round_id}_{m["id"]}'}])
+                inline_btns.append([{'text': '🔙 رجوع', 'callback_data': f'lot_back_{round_id}'}])
+                self.edit_message(chat_id, message.get('message_id'), "💳 اختر وسيلة الدفع:")
+                self.send_inline_message(chat_id, "💳 اختر وسيلة الدفع:", inline_btns)
+                return
+
+            elif data.startswith('lot_method_'):
+                parts = data.replace('lot_method_', '').split('_', 1)
+                if len(parts) != 2:
+                    return
+                round_id, method_id = parts
+                method = self.get_payment_method_by_id(method_id)
+                method_name = method.get('method_name', '') if method else ''
+                # قراءة سعر التذكرة
+                try:
+                    with open('lottery_rounds.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        for row in reader:
+                            if row['id'] == round_id:
+                                price = row.get('ticket_price', '0')
+                                currency = row.get('currency', 'SAR')
+                                account = method.get('account_data', '') if method else ''
+                                self.edit_message(chat_id, message.get('message_id'),
+                                    f"🎫 <b>شراء تذكرة</b>\n\n"
+                                    f"💰 السعر: <code>{price}</code> {currency}\n"
+                                    f"💳 الوسيلة: {method_name}\n"
+                                    f"🔢 الحساب: <code>{account}</code> 👈 اضغط للنسخ\n\n"
+                                    f"📤 حوّل المبلغ ثم اكتب <b>'تم'</b> للتأكيد\n"
+                                    f"أو اكتب <b>'إلغاء'</b>")
+                                self.user_states[user_id] = {'step': 'lot_confirm', 'round_id': round_id, 'method_id': method_id}
+                                return
+                except:
+                    pass
+                return
+
+            elif data.startswith('lot_draw_'):
+                round_id = data.replace('lot_draw_', '')
+                self.execute_lottery_draw(chat_id, user_id, round_id)
+                return
+
+            elif data.startswith('lot_back_'):
+                round_id = data.replace('lot_back_', '')
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_lottery_panel(fake_msg)
                 return
 
             # ==================== 🎁 لوحة اربح ====================
@@ -11539,6 +11810,305 @@ class ComprehensiveDUXBot:
                  {'text': '💎 MoneyGo', 'callback_data': 'trade_sell_asset_moneygo'}],
                 [{'text': '🔙 رجوع', 'callback_data': 'trade_back_panel'}]
             ])
+
+    # ==================== 🎰 اليانصيب ====================
+
+    def show_lottery_panel(self, message):
+        """لوحة اليانصيب للعميل"""
+        user = self.find_user(message['from']['id'])
+        if not user:
+            self.handle_start(message)
+            return
+
+        # جلب الجولة النشطة
+        active_round = None
+        try:
+            with open('lottery_rounds.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row.get('status') == 'active':
+                        active_round = row
+                        break
+        except:
+            pass
+
+        if not active_round:
+            self.send_message(message['chat']['id'],
+                "🎰 <b>يانصيب</b>\n\n📭 لا توجد جولة يانصيب نشطة حالياً\n\n⏳ ترقبوا الجولة القادمة!",
+                self.main_keyboard(user.get('language', 'ar'), message['from']['id']))
+            return
+
+        # عد التذاكر المباعة
+        tickets_sold = 0
+        my_tickets = []
+        try:
+            with open('lottery_tickets.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row.get('round_id') == active_round['id']:
+                        tickets_sold += 1
+                        if row.get('user_id') == str(message['from']['id']):
+                            my_tickets.append(row.get('ticket_number', ''))
+        except:
+            pass
+
+        prize_pool = float(active_round.get('ticket_price', 0)) * tickets_sold
+        admin_pct = float(active_round.get('admin_profit_pct', 0))
+        net_prize = prize_pool * (1 - admin_pct / 100)
+
+        text = (
+            f"🎰 <b>يانصيب — {active_round.get('name', '')}</b>\n\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"🎫 سعر التذكرة: <code>{active_round.get('ticket_price', '')}</code> {active_round.get('currency', '')}\n"
+            f"📊 التذاكر المباعة: <code>{tickets_sold}</code>\n"
+            f"💰 إجمالي الجائزة: <code>{net_prize:.2f}</code> {active_round.get('currency', '')}\n"
+            f"🏆 عدد الفائزين: <code>{active_round.get('winner_count', '1')}</code>\n"
+            f"⏰ موعد السحب: <code>{active_round.get('draw_time', '')}</code>\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+        )
+
+        if my_tickets:
+            text += f"\n🎫 تذاكري ({len(my_tickets)}):\n"
+            for t in my_tickets:
+                text += f"  • <code>#{t}</code>\n"
+
+        inline_btns = []
+        # فحص الهاتف
+        phone_verified = user.get('phone_verified', 'unknown')
+        if phone_verified == 'yes':
+            max_per_user = int(active_round.get('max_tickets_per_user', 1))
+            if len(my_tickets) < max_per_user:
+                inline_btns.append([{'text': '🎫 شراء تذكرة', 'callback_data': f'lot_buy_{active_round["id"]}'}])
+            else:
+                text += f"\n⚠️ وصلت للحد الأقصى ({max_per_user} تذاكر)"
+        else:
+            text += f"\n⚠️ <b>يجب التسجيل برقم هاتف حقيقي للمشاركة</b>"
+
+        inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'lot_back_main'}])
+        self.send_inline_message(message['chat']['id'], text, inline_btns)
+
+    def show_lottery_admin(self, message):
+        """لوحة إدارة اليانصيب للأدمن"""
+        rounds_list = []
+        try:
+            with open('lottery_rounds.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                rounds_list = list(reader)
+        except:
+            pass
+
+        active = [r for r in rounds_list if r.get('status') == 'active']
+        completed = [r for r in rounds_list if r.get('status') == 'completed']
+
+        text = f"🎰 <b>إدارة اليانصيب</b>\n\n"
+        text += f"📊 نشطة: <code>{len(active)}</code> | مكتملة: <code>{len(completed)}</code>\n"
+
+        inline_btns = []
+        if active:
+            text += "\n━━━━━━━━━━━━━━━━━━\n🎮 <b>الجولات النشطة:</b>\n"
+            for r in active:
+                # عد التذاكر
+                ticket_count = 0
+                try:
+                    with open('lottery_tickets.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        for t in reader:
+                            if t.get('round_id') == r['id']:
+                                ticket_count += 1
+                except:
+                    pass
+                text += f"\n🎰 <b>{r.get('name', '')}</b>\n"
+                text += f"  🆔 <code>{r['id']}</code>\n"
+                text += f"  🎫 {ticket_count} تذكرة | 💰 {r.get('ticket_price', '')} {r.get('currency', '')}\n"
+                text += f"  ⏰ السحب: {r.get('draw_time', '')}\n"
+                inline_btns.append([{'text': f"🎲 سحب الآن: {r.get('name', '')}", 'callback_data': f'lot_draw_{r["id"]}'}])
+
+        inline_btns.append([{'text': '➕ إنشاء جولة جديدة', 'callback_data': 'lot_create'}])
+
+        if completed:
+            text += f"\n━━━━━━━━━━━━━━━━━━\n📜 <b>الجولات المكتملة:</b> {len(completed)}\n"
+
+        inline_btns.append([{'text': '🔙 العودة', 'callback_data': 'app_back_admin'}])
+        self.send_inline_message(message['chat']['id'], text, inline_btns)
+
+    def execute_lottery_draw(self, chat_id, admin_id, round_id):
+        """تنفيذ السحب — خوارزمية عشوائية عادلة + عرض مبهر"""
+        import random as _r
+        import hashlib
+
+        # قراءة الجولة
+        round_data = None
+        try:
+            with open('lottery_rounds.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row['id'] == round_id:
+                        round_data = row
+                        break
+        except:
+            pass
+
+        if not round_data:
+            self.send_message(chat_id, "❌ الجولة غير موجودة")
+            return
+
+        # قراءة كل التذاكر
+        tickets = []
+        try:
+            with open('lottery_tickets.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row.get('round_id') == round_id:
+                        tickets.append(row)
+        except:
+            pass
+
+        if not tickets:
+            self.send_message(chat_id, "❌ لا توجد تذاكر للبيع")
+            return
+
+        winner_count = int(round_data.get('winner_count', 1))
+        if winner_count > len(tickets):
+            winner_count = len(tickets)
+
+        # === العرض المبهر ===
+        self.send_message(chat_id,
+            f"🎰 <b>جارٍ السحب...</b>\n\n"
+            f"🎲 التذاكر: <code>{len(tickets)}</code>\n"
+            f"🏆 الفائزون: <code>{winner_count}</code>\n\n"
+            f"⏳ 3...")
+
+        import time as _time
+        _time.sleep(1)
+        self.send_message(chat_id, "⏳ 2...")
+        _time.sleep(1)
+        self.send_message(chat_id, "⏳ 1...")
+        _time.sleep(1)
+        self.send_message(chat_id, "🎲 الأرقام تتدااااور...")
+
+        # === الخوارزمية العشوائية العادلة ===
+        seed_string = f"{round_id}_{datetime.now().strftime('%Y%m%d%H%M%S')}_{len(tickets)}"
+        seed = int(hashlib.sha256(seed_string.encode()).hexdigest(), 16)
+        _r.seed(seed)
+
+        shuffled = tickets.copy()
+        _r.shuffle(shuffled)
+        winners = shuffled[:winner_count]
+
+        # حساب الجوائز
+        ticket_price = float(round_data.get('ticket_price', 0))
+        total_pool = ticket_price * len(tickets)
+        admin_pct = float(round_data.get('admin_profit_pct', 0))
+        admin_profit = total_pool * admin_pct / 100
+        net_prize = total_pool - admin_profit
+
+        # توزيع الجوائز: 50% / 30% / 20% / متساوي للباقي
+        if winner_count == 1:
+            shares = [1.0]
+        elif winner_count == 2:
+            shares = [0.6, 0.4]
+        elif winner_count == 3:
+            shares = [0.5, 0.3, 0.2]
+        else:
+            shares = [0.4, 0.25, 0.15] + [0.2 / (winner_count - 3)] * (winner_count - 3)
+
+        _time.sleep(1)
+
+        # === إعلان الفائزين ===
+        results_text = (
+            f"🎉🎉🎉 <b>النتائج النهائية!</b> 🎉🎉🎉\n\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"🎰 الجولة: <b>{round_data.get('name', '')}</b>\n"
+            f"🎫 التذاكر المباعة: <code>{len(tickets)}</code>\n"
+            f"💰 إجمالي الجائزة: <code>{net_prize:.2f}</code> {round_data.get('currency', '')}\n"
+            f"━━━━━━━━━━━━━━━━━━\n\n"
+        )
+
+        for i, winner in enumerate(winners):
+            rank = i + 1
+            prize = net_prize * shares[i]
+            rank_emojis = ['🥇', '🥈', '🥉'] + ['🏅'] * (winner_count - 3)
+            emoji = rank_emojis[i] if i < len(rank_emojis) else '🏅'
+
+            results_text += f"{emoji} <b>الفائز #{rank}</b>\n"
+            results_text += f"👤 {winner.get('user_name', '')}\n"
+            results_text += f"🎫 التذكرة: <code>#{winner.get('ticket_number', '')}</code>\n"
+            results_text += f"💰 الجائزة: <code>{prize:.2f}</code> {round_data.get('currency', '')}\n\n"
+
+            # حفظ الفائز
+            try:
+                with open('lottery_winners.csv', 'a', newline='', encoding='utf-8-sig') as f:
+                    writer = csv.writer(f)
+                    writer.writerow([f"WIN{str(int(datetime.now().timestamp()))[-6:]}_{rank}",
+                                   round_id, winner.get('user_id', ''), winner.get('user_name', ''),
+                                   winner.get('ticket_number', ''), f"{prize:.2f}",
+                                   round_data.get('currency', ''), str(rank),
+                                   datetime.now().strftime('%Y-%m-%d %H:%M')])
+            except:
+                pass
+
+            # إضافة الجائزة للمحفظة المجمدة
+            if self.svrp:
+                self.svrp.add_frozen_balance(winner.get('user_id', ''), prize)
+
+            # إشعار الفائز
+            try:
+                self.notify_user(int(winner.get('user_id', 0)),
+                    f"🎉 <b>مبروك! ربحت في اليانصيب!</b>\n\n"
+                    f"{emoji} المرتبة: #{rank}\n"
+                    f"🎫 التذكرة: <code>#{winner.get('ticket_number', '')}</code>\n"
+                    f"💰 الجائزة: <code>{prize:.2f}</code> {round_data.get('currency', '')}\n\n"
+                    f"💎 تم إضافة الجائزة لرصيدك المجمد")
+            except:
+                pass
+
+        results_text += f"━━━━━━━━━━━━━━━━━━\n"
+        results_text += f"📊 ربح الأدمن: <code>{admin_profit:.2f}</code> {round_data.get('currency', '')}\n"
+        results_text += f"祝贺 للفائزين! 🎊"
+
+        self.send_message(chat_id, results_text, self.admin_keyboard())
+
+        # بث النتائج لكل المستخدمين
+        broadcast_text = (
+            f"🎉 <b>نتائج اليانصيب!</b>\n\n"
+            f"🎰 {round_data.get('name', '')}\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+        )
+        for i, winner in enumerate(winners):
+            rank_emojis = ['🥇', '🥈', '🥉'] + ['🏅'] * (winner_count - 3)
+            emoji = rank_emojis[i] if i < len(rank_emojis) else '🏅'
+            prize = net_prize * shares[i]
+            broadcast_text += f"{emoji} {winner.get('user_name', '')} — <code>#{winner.get('ticket_number', '')}</code> — {prize:.2f} {round_data.get('currency', '')}\n"
+
+        try:
+            with open('users.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    tid = row.get('telegram_id', '')
+                    if tid:
+                        try:
+                            self.send_message(int(tid), broadcast_text, None)
+                        except:
+                            pass
+        except:
+            pass
+
+        # تحديث حالة الجولة
+        try:
+            rows = []
+            with open('lottery_rounds.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                fieldnames = reader.fieldnames
+                for row in reader:
+                    if row['id'] == round_id:
+                        row['status'] = 'completed'
+                    rows.append(row)
+            with open('lottery_rounds.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer.writeheader()
+                writer.writerows(rows)
+        except:
+            pass
 
     def show_unified_orders(self, message):
         """لوحة موحدة لكل الطلبات المعلقة — إيداع + سحب + تداول + استرداد"""
