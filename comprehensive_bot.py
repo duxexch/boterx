@@ -7151,8 +7151,8 @@ class ComprehensiveDUXBot:
                 try:
                     req_id, error = self.match_manager.create_match_request(
                         str(user_id), user.get('customer_id', ''), state['type'],
-                        amount, user.get('currency', 'SAR'),
-                        state['company_id'], state['company_name'], ''
+                        str(amount), user.get('currency', 'SAR'),
+                        state.get('company_id', ''), state.get('company_name', ''), ''
                     )
 
                     if error:
@@ -9908,8 +9908,8 @@ class ComprehensiveDUXBot:
                     # إنشاء طلب مطابقة للأدمن
                     admin_req_id, err = self.match_manager.create_match_request(
                         admin_user_id, 'ADMIN', opposite_type,
-                        request.get('amount', '0'), request.get('currency', 'SAR'),
-                        request.get('company_id', ''), request.get('company_name', ''), ''
+                        str(request.get('amount', '0')), request.get('currency', 'SAR'),
+                        str(request.get('company_id', '')), request.get('company_name', ''), ''
                     )
 
                     if err:
