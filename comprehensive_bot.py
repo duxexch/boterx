@@ -304,20 +304,26 @@ class ComprehensiveDUXBot:
         # ترحيل ملف الشركات الموجود (إضافة أعمدة icon و address)
         self.migrate_companies_csv()
         
-        # ملف وسائل الدفع
+        # ملف وسائل الدفع — مجموعة عامة (غير مرتبطة بشركة محددة)
         if not os.path.exists('payment_methods.csv'):
             with open('payment_methods.csv', 'w', newline='', encoding='utf-8-sig') as f:
                 writer = csv.writer(f)
                 writer.writerow(['id', 'company_id', 'method_name', 'method_type', 'account_data', 'additional_info', 'status', 'created_date', 'icon'])
                 defaults = [
-                    ['1', '1', 'حساب بنكي', 'حساب بنكي', '1234567890', 'البنك الأهلي', 'active', '2024-01-01', '🏦'],
-                    ['2', '1', 'محفظة STC', 'محفظة إلكترونية', '0501234567', 'STC Pay', 'active', '2024-01-01', '📱'],
-                    ['3', '3', 'فودافون كاش', 'محفظة إلكترونية', '01012345678', 'فودافون', 'active', '2024-01-01', '📱'],
-                    ['4', '4', 'حساب جاري', 'حساب بنكي', '0987654321', 'بنك الراجحي', 'active', '2024-01-01', '🏦'],
+                    ['1', '', 'حساب بنكي', 'حساب بنكي', '1234567890', 'البنك الأهلي', 'active', '2024-01-01', '🏦'],
+                    ['2', '', 'محفظة STC', 'محفظة إلكترونية', '0501234567', 'STC Pay', 'active', '2024-01-01', '📱'],
+                    ['3', '', 'فودافون كاش', 'محفظة إلكترونية', '01012345678', 'فودافون', 'active', '2024-01-01', '📱'],
+                    ['4', '', 'حساب جاري', 'حساب بنكي', '0987654321', 'بنك الراجحي', 'active', '2024-01-01', '🏦'],
                 ]
                 for m in defaults:
                     writer.writerow(m)
         self.migrate_payment_methods_csv()
+
+        # ملف ربط وسائل الدفع بالشركات (علاقة متعدد لمتعدد)
+        if not os.path.exists('company_payment_links.csv'):
+            with open('company_payment_links.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.writer(f)
+                writer.writerow(['id', 'company_id', 'method_id', 'created_at'])
         
         # ملف عناوين الصرافة
         if not os.path.exists('exchange_addresses.csv'):
@@ -6997,59 +7003,93 @@ class ComprehensiveDUXBot:
                 return
 
             elif data == 'pm_add':
-                # عرض الشركات لاختيار أي شركة تضاف لها وسيلة
-                companies = self.get_companies()
-                if not companies:
-                    self.send_message(chat_id, "❌ لا توجد شركات. أضف شركة أولاً")
-                    return
-                inline_btns = []
-                for c in companies:
-                    icon = c.get('icon', '🏢') or '🏢'
-                    inline_btns.append([{'text': f"{icon} {c['name']}", 'callback_data': f'pm_add_company_{c["id"]}'}])
-                inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'pm_back'}])
-                self.edit_message(chat_id, message.get('message_id'), "➕ <b>إضافة وسيلة دفع</b>\n\nاختر الشركة:")
-                self.send_inline_message(chat_id, "اختر الشركة:", inline_btns)
-                return
-
-            elif data.startswith('pm_add_company_'):
-                company_id = data.replace('pm_add_company_', '')
-                company = self.get_company_by_id(company_id)
-                company_name = company['name'] if company else 'غير محدد'
-
-                # عرض أزرار inline لاختيار نوع الوسيلة
+                # إضافة وسيلة دفع للمجموعة العامة (بدون ربط بشركة)
                 self.edit_message(chat_id, message.get('message_id'),
-                    f"➕ <b>إضافة وسيلة دفع — {company_name}</b>\n\n"
+                    "➕ <b>إضافة وسيلة دفع</b>\n\n"
                     "📝 اختر نوع الوسيلة:")
 
                 inline_btns = [
-                    [{'text': '📱 محفظة إلكترونية', 'callback_data': f'pm_type_{company_id}_{company_name}_mobile'},
-                     {'text': '🏦 حساب بنكي', 'callback_data': f'pm_type_{company_id}_{company_name}_bank'}],
-                    [{'text': '💳 بطاقة', 'callback_data': f'pm_type_{company_id}_{company_name}_card'},
-                     {'text': '💵 نقد', 'callback_data': f'pm_type_{company_id}_{company_name}_cash'}],
-                    [{'text': '🔙 رجوع', 'callback_data': 'pm_add'}]
+                    [{'text': '📱 محفظة إلكترونية', 'callback_data': 'pm_type_mobile'},
+                     {'text': '🏦 حساب بنكي', 'callback_data': 'pm_type_bank'}],
+                    [{'text': '💳 بطاقة', 'callback_data': 'pm_type_card'},
+                     {'text': '💵 نقد', 'callback_data': 'pm_type_cash'}],
+                    [{'text': '🔙 رجوع', 'callback_data': 'pm_back'}]
                 ]
                 self.send_inline_message(chat_id, "اختر النوع:", inline_btns)
                 return
 
-            elif data.startswith('pm_type_'):
-                parts = data.replace('pm_type_', '').split('_', 2)
-                if len(parts) < 3:
-                    return
-                company_id = parts[0]
-                company_name = parts[1]
-                type_code = parts[2]
-                type_ar = {'mobile': '📱 محفظة إلكترونية', 'bank': '🏦 حساب بنكي', 'card': '💳 بطاقة', 'cash': '💵 نقد'}.get(type_code, '💳 أخرى')
+            elif data.startswith('pm_type_') and not data.startswith('pm_type_company'):
+                # اختيار نوع وسيلة الدفع — للمجموعة العامة
+                type_key = data.replace('pm_type_', '')
+                type_names = {'mobile': 'محفظة إلكترونية', 'bank': 'حساب بنكي', 'card': 'بطاقة', 'cash': 'نقد'}
+                type_icons = {'mobile': '📱', 'bank': '🏦', 'card': '💳', 'cash': '💵'}
+                method_type = type_names.get(type_key, type_key)
+                method_icon = type_icons.get(type_key, '💳')
 
                 self.edit_message(chat_id, message.get('message_id'),
-                    f"➕ <b>إضافة — {type_ar}</b>\n\n"
-                    f"🏢 الشركة: {company_name}\n\n"
-                    f"✍️ اكتب اسم الوسيلة:\n\n"
-                    f"💡 مثال: محفظة STC")
+                    f"✅ النوع: {method_icon} {method_type}\n\n"
+                    f"📝 الخطوة 1: اكتب <b>اسم الوسيلة</b>:\n\n"
+                    f"💡 مثال: STC Pay")
                 self.user_states[user_id] = {
                     'step': 'pm_add_name',
-                    'company_id': company_id,
-                    'company_name': company_name,
-                    'method_type': type_ar
+                    'method_type': method_type,
+                    'method_icon': method_icon,
+                    'company_id': ''
+                }
+                return
+
+            # ربط/فصل وسيلة دفع عن شركة (من داخل تعديل الشركة)
+            elif data.startswith('pm_link_'):
+                parts = data.replace('pm_link_', '').split('_', 1)
+                if len(parts) == 2:
+                    company_id, method_id = parts
+                    self.link_payment_method(company_id, method_id)
+                    self.answer_callback(callback_id, "✅ تم الربط")
+                    # إعادة عرض القائمة
+                    fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                    self.show_company_payment_methods_link(fake_msg, user_id)
+                return
+
+            elif data.startswith('pm_unlink_'):
+                parts = data.replace('pm_unlink_', '').split('_', 1)
+                if len(parts) == 2:
+                    company_id, method_id = parts
+                    self.unlink_payment_method(company_id, method_id)
+                    self.answer_callback(callback_id, "✅ تم الفصل")
+                    fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                    self.show_company_payment_methods_link(fake_msg, user_id)
+                return
+
+            elif data == 'pm_link_back':
+                # العودة من ربط الوسائل لقائمة تعديل الشركة
+                if user_id in self.user_states:
+                    del self.user_states[user_id]
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_edit_menu(fake_msg, user_id)
+                return
+
+            elif data.startswith('pm_type_'):
+                # معالج قديم — redirect للمعالج الجديد
+                parts = data.replace('pm_type_', '').split('_', 2)
+                if len(parts) == 3:
+                    type_code = parts[2]
+                else:
+                    type_code = parts[0] if parts else 'mobile'
+                type_key = type_code
+                type_names = {'mobile': 'محفظة إلكترونية', 'bank': 'حساب بنكي', 'card': 'بطاقة', 'cash': 'نقد'}
+                type_icons = {'mobile': '📱', 'bank': '🏦', 'card': '💳', 'cash': '💵'}
+                method_type = type_names.get(type_key, type_key)
+                method_icon = type_icons.get(type_key, '💳')
+
+                self.edit_message(chat_id, message.get('message_id'),
+                    f"✅ النوع: {method_icon} {method_type}\n\n"
+                    f"📝 الخطوة 1: اكتب <b>اسم الوسيلة</b>:\n\n"
+                    f"💡 مثال: STC Pay")
+                self.user_states[user_id] = {
+                    'step': 'pm_add_name',
+                    'method_type': method_type,
+                    'method_icon': method_icon,
+                    'company_id': ''
                 }
                 return
 
@@ -9660,50 +9700,47 @@ class ComprehensiveDUXBot:
                 self.show_edit_menu(message, user_id)
         
     def show_company_payment_methods_link(self, message, user_id):
-        """عرض وسائل الدفع المرتبطة بالشركة وربط/فصل وسائل"""
+        """عرض وسائل الدفع المرتبطة بالشركة — أزرار toggle للربط/فصل"""
         company = self.edit_company_data.get(user_id, {})
         company_id = company.get('id', '')
-        
-        # جلب كل وسائل الدفع
+
+        # جلب كل وسائل الدفع النشطة (المجموعة العامة)
         all_methods = []
         try:
             with open('payment_methods.csv', 'r', encoding='utf-8-sig') as f:
                 reader = csv.DictReader(f)
-                all_methods = list(reader)
+                for row in reader:
+                    if row.get('status') == 'active':
+                        all_methods.append(row)
         except:
             pass
-        
-        # وسائل مرتبطة بهذه الشركة
-        linked = [m for m in all_methods if m.get('company_id') == company_id]
-        unlinked = [m for m in all_methods if m.get('company_id') != company_id and m.get('status') == 'active']
-        
-        text = f"💳 وسائل الدفع للشركة: {company.get('name', '')}\n\n"
-        
-        if linked:
-            text += "✅ وسائل مرتبطة:\n"
-            for m in linked:
-                icon = m.get('icon', '💳') or '💳'
-                text += f"  {icon} {m['method_name']} (ID: {m['id']})\n"
+
+        # الوسائل المرتبطة بهذه الشركة
+        linked_ids = self.get_linked_method_ids(company_id)
+
+        text = f"💳 <b>وسائل الدفع — {company.get('name', '')}</b>\n\n"
+        text += f"━━━━━━━━━━━━━━━━━━\n"
+        text += f"✅ = مرتبطة | ⬜ = متاحة\n\n"
+
+        inline_btns = []
+        if not all_methods:
+            text += "📭 لا توجد وسائل دفع. أضف وسائل من قسم 💳 وسائل الدفع أولاً."
         else:
-            text += "📭 لا توجد وسائل دفع مرتبطة\n"
-        
-        if unlinked:
-            text += "\n📋 وسائل متاحة للربط:\n"
-            for m in unlinked:
+            for m in all_methods:
                 icon = m.get('icon', '💳') or '💳'
-                text += f"  {icon} {m['method_name']} (ID: {m['id']})\n"
-        
-        text += "\n➕ للربط: اكتب <code>ربط_وسيلة [وسيلة_ID]</code>\n"
-        text += "➖ للفصل: اكتب <code>فصل_وسيلة [وسيلة_ID]</code>\n"
-        text += "أو اكتب 'رجوع' للعودة"
-        
-        kb = {
-            'keyboard': [[{'text': '↩️ رجوع'}]],
-            'resize_keyboard': True,
-            'one_time_keyboard': True
-        }
-        self.send_message(message['chat']['id'], text, kb)
-        self.user_states[user_id] = f'editing_company_payment_link_{company_id}'
+                name = m.get('method_name', '')
+                mid = m.get('id', '')
+                is_linked = mid in linked_ids
+                prefix = '✅' if is_linked else '⬜'
+                text += f"{prefix} {icon} {name} — <code>{m.get('account_data', '')}</code>\n"
+                btn_text = f"{prefix} {icon} {name}"[:50]
+                if is_linked:
+                    inline_btns.append([{'text': btn_text, 'callback_data': f'pm_unlink_{company_id}_{mid}'}])
+                else:
+                    inline_btns.append([{'text': btn_text, 'callback_data': f'pm_link_{company_id}_{mid}'}])
+
+        inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'pm_link_back'}])
+        self.send_inline_message(message['chat']['id'], text, inline_btns)
     
     def show_edit_menu(self, message, user_id):
             """عرض قائمة تعديل الشركة"""
@@ -9993,18 +10030,83 @@ class ComprehensiveDUXBot:
             
             self.send_message(message['chat']['id'], commands_text, self.admin_keyboard())
         
+    def get_linked_method_ids(self, company_id):
+        """جلب معرفات وسائل الدفع المرتبطة بشركة"""
+        ids = set()
+        try:
+            with open('company_payment_links.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row.get('company_id') == str(company_id):
+                        ids.add(row.get('method_id', ''))
+        except:
+            pass
+        return ids
+
+    def link_payment_method(self, company_id, method_id):
+        """ربط وسيلة دفع بشركة"""
+        linked = self.get_linked_method_ids(company_id)
+        if method_id in linked:
+            return False
+        link_id = f"LNK{str(int(datetime.now().timestamp()))[-6:]}"
+        try:
+            with open('company_payment_links.csv', 'a', newline='', encoding='utf-8-sig') as f:
+                writer = csv.writer(f)
+                writer.writerow([link_id, company_id, method_id, datetime.now().strftime('%Y-%m-%d %H:%M')])
+            return True
+        except:
+            return False
+
+    def unlink_payment_method(self, company_id, method_id):
+        """فصل وسيلة دفع عن شركة"""
+        try:
+            rows = []
+            found = False
+            with open('company_payment_links.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                fieldnames = reader.fieldnames
+                for row in reader:
+                    if row.get('company_id') == str(company_id) and row.get('method_id') == str(method_id):
+                        found = True
+                        continue
+                    rows.append(row)
+            if found:
+                with open('company_payment_links.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                    writer = csv.DictWriter(f, fieldnames=fieldnames)
+                    writer.writeheader()
+                    writer.writerows(rows)
+            return found
+        except:
+            return False
+
     def get_payment_methods_by_company(self, company_id, transaction_type=None):
-            """الحصول على وسائل الدفع لشركة معينة"""
+            """الحصول على وسائل الدفع لشركة معينة — من جدول الربط + السجل القديم"""
             methods = []
-            try:
-                with open('payment_methods.csv', 'r', encoding='utf-8-sig') as f:
-                    reader = csv.DictReader(f)
-                    for row in reader:
-                        if (row['company_id'] == str(company_id) and 
-                            row['status'] == 'active'):
-                            methods.append(row)
-            except:
-                pass
+            seen_ids = set()
+            # 1) من جدول الربط الجديد
+            linked_ids = self.get_linked_method_ids(company_id)
+            if linked_ids:
+                try:
+                    with open('payment_methods.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        for row in reader:
+                            if row['id'] in linked_ids and row.get('status') == 'active' and row['id'] not in seen_ids:
+                                methods.append(row)
+                                seen_ids.add(row['id'])
+                except:
+                    pass
+            # 2) من السجل القديم (company_id مباشر) — للتوافق الخلفي
+            if not methods:
+                try:
+                    with open('payment_methods.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        for row in reader:
+                            if (row.get('company_id') == str(company_id) and
+                                row.get('status') == 'active' and row['id'] not in seen_ids):
+                                methods.append(row)
+                                seen_ids.add(row['id'])
+                except:
+                    pass
             return methods
         
     def show_payment_method_selection(self, message, company_id, transaction_type):
