@@ -204,6 +204,41 @@ class SVRPManager:
                     break
         return self._write_csv('svrp_wallets.csv', rows, self.WALLET_FIELDS)
 
+    def add_frozen_balance(self, telegram_id, amount):
+        """إضافة رصيد مجمد للمحفظة (لأرباح الإحالة)"""
+        tid = str(telegram_id)
+        wallet = self.get_wallet(tid)
+        current_balance = float(wallet.get('balance', 0) or 0)
+        current_earned = float(wallet.get('total_earned', 0) or 0)
+        new_balance = current_balance + float(amount)
+        new_earned = current_earned + float(amount)
+        self._update_wallet(tid, {
+            'balance': new_balance,
+            'total_earned': new_earned
+        })
+        logger.info(f"Referral bonus added to {tid}: +{amount} frozen")
+        return True
+
+    def unfreeze_balance(self, telegram_id, amount=None):
+        """تحويل رصيد من مجمد إلى متاح (للأدمن)"""
+        tid = str(telegram_id)
+        wallet = self.get_wallet(tid)
+        frozen = float(wallet.get('balance', 0) or 0)
+        available = float(wallet.get('total_used', 0) or 0)
+        if amount is None:
+            amount = frozen
+        amount = float(amount)
+        if amount > frozen:
+            amount = frozen
+        new_frozen = frozen - amount
+        new_available = available + amount
+        self._update_wallet(tid, {
+            'balance': new_frozen,
+            'total_used': new_available
+        })
+        logger.info(f"Balance unfrozen for {tid}: {amount} -> available")
+        return True, new_frozen, new_available
+
     # ==================== تشغيل الاسترداد ====================
 
     def trigger_recovery(self, user_id, trans_id, amount, currency='SAR'):

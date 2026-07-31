@@ -277,7 +277,15 @@ class ComprehensiveDUXBot:
         if not os.path.exists('users.csv'):
             with open('users.csv', 'w', newline='', encoding='utf-8-sig') as f:
                 writer = csv.writer(f)
-                writer.writerow(['telegram_id', 'name', 'phone', 'customer_id', 'language', 'date', 'is_banned', 'ban_reason', 'currency'])
+                writer.writerow(['telegram_id', 'name', 'phone', 'customer_id', 'language', 'date', 'is_banned', 'ban_reason', 'currency', 'phone_verified', 'referral_earnings'])
+        else:
+            self.migrate_users_csv()
+
+        # ملف سجل الإحالات التفصيلي
+        if not os.path.exists('referral_log.csv'):
+            with open('referral_log.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.writer(f)
+                writer.writerow(['id', 'referrer_id', 'referred_id', 'referred_name', 'referred_phone', 'phone_verified', 'bonus_amount', 'currency', 'status', 'created_at'])
         
         # ملف المعاملات المتقدم
         if not os.path.exists('transactions.csv'):
@@ -453,6 +461,28 @@ class ComprehensiveDUXBot:
         if len(icon_input) <= 20:
             return f"🏷️"
         return default
+
+    def migrate_users_csv(self):
+        """ترحيل users.csv لإضافة أعمدة phone_verified و referral_earnings"""
+        try:
+            with open('users.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                fieldnames = reader.fieldnames or []
+                rows = list(reader)
+            if 'phone_verified' in fieldnames:
+                return
+            new_fields = list(fieldnames) + ['phone_verified', 'referral_earnings']
+            for row in rows:
+                row['phone_verified'] = 'unknown'
+                row['referral_earnings'] = '0'
+            with open('users.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.DictWriter(f, fieldnames=new_fields)
+                writer.writeheader()
+                for row in rows:
+                    writer.writerow({k: row.get(k, '') for k in new_fields})
+            logger.info("تم ترحيل users.csv لإضافة أعمدة phone_verified و referral_earnings")
+        except Exception as e:
+            logger.error(f"خطأ في ترحيل users.csv: {e}")
 
     def migrate_companies_csv(self):
         """ترحيل companies.csv لإضافة أعمدة icon, address, affiliate_link, icon_file_id"""
@@ -1129,6 +1159,61 @@ class ComprehensiveDUXBot:
             pass
 
         inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'ref_back_main'}])
+        self.send_inline_message(message['chat']['id'], text, inline_btns)
+
+    def show_referral_earnings_admin(self, message):
+        """لوحة أرباح الإحالة — عرض الإحالات + إعدادات + تحرير الأرصدة"""
+        # قراءة الإعدادات
+        bonus_amount = self.get_setting('referral_bonus_amount') or '10'
+        bonus_currency = self.get_setting('referral_bonus_currency') or 'SAR'
+
+        # قراءة سجل الإحالات
+        referrals = []
+        try:
+            with open('referral_log.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                referrals = list(reader)
+        except:
+            pass
+
+        # إحصائيات
+        total = len(referrals)
+        verified = sum(1 for r in referrals if r.get('phone_verified') == 'yes')
+        manual = sum(1 for r in referrals if r.get('phone_verified') == 'no')
+        total_bonus = sum(float(r.get('bonus_amount', 0) or 0) for r in referrals)
+
+        text = (
+            f"🏆 <b>أرباح الإحالة</b>\n\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"⚙️ <b>الإعدادات الحالية:</b>\n"
+            f"💰 ربح كل تسجيل: <code>{bonus_amount}</code> {bonus_currency}\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"📊 <b>الإحصائيات:</b>\n"
+            f"👥 إجمالي الإحالات: <code>{total}</code>\n"
+            f"✅ هاتف حقيقي: <code>{verified}</code>\n"
+            f"⚠️ رقم مكتوب: <code>{manual}</code>\n"
+            f"💰 إجمالي الأرباح: <code>{total_bonus:.2f}</code> {bonus_currency}\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+        )
+
+        inline_btns = [
+            [{'text': '⚙️ تعديل ربح الإحالة', 'callback_data': 'ref_earnings_settings'}],
+        ]
+
+        # عرض آخر 10 إحالات
+        if referrals:
+            text += "\n📋 <b>آخر الإحالات:</b>\n\n"
+            for r in referrals[-10:]:
+                phone_icon = '✅' if r.get('phone_verified') == 'yes' else '⚠️'
+                text += f"{phone_icon} <code>{r.get('referred_name', '')}</code> — {r.get('referred_phone', '')}\n"
+                text += f"   💰 {r.get('bonus_amount', '')} {r.get('currency', '')} | 📊 {r.get('status', '')}\n"
+                text += f"   📅 {r.get('created_at', '')}\n\n"
+                # زر تحرير الرصيد لو الحالة earned
+                if r.get('status') == 'earned':
+                    inline_btns.append([{'text': f"🔓 تحرير رصيد {r.get('referred_name', '')}",
+                                         'callback_data': f"ref_unfreeze_{r.get('referred_id', '')}"}])
+
+        inline_btns.append([{'text': '🔙 العودة', 'callback_data': 'app_back_admin'}])
         self.send_inline_message(message['chat']['id'], text, inline_btns)
 
     def show_referral_links_admin(self, message):
@@ -2662,8 +2747,9 @@ class ComprehensiveDUXBot:
             [{'text': self.tr('admin_settings', lang)}, {'text': self.tr('admin_themes', lang)}, {'text': self.tr('admin_addresses', lang)}],
             # المجموعة 7b: التطبيقات والاسترداد والتداول
             [{'text': self.tr('admin_apps', lang)}, {'text': self.tr('admin_recovery', lang)}, {'text': '💱 تداول'}],
-            # المجموعة 7c: الطلبات الموحدة + روابط الإحالة
+            # المجموعة 7c: الطلبات الموحدة + روابط الإحالة + أرباح الإحالة
             [{'text': '📋 كل الطلبات'}, {'text': '🎁 روابط الإحالة'}],
+            [{'text': '🏆 أرباح الإحالة'}],
             # المجموعة 8: الأدمن والأدوار
             [{'text': self.tr('admin_managers', lang)}, {'text': self.tr('admin_buttons', lang)}],
             # المجموعة 9: الحماية والنسخ
@@ -2924,13 +3010,15 @@ class ComprehensiveDUXBot:
             
         elif state.startswith('registering_phone_'):
             name = state.replace('registering_phone_', '')
-            
+            phone_verified = 'no'
+
             # التحقق من نوع الرسالة
             if 'contact' in message:
-                # مشاركة جهة الاتصال
+                # مشاركة جهة الاتصال — هاتف حقيقي
                 phone = message['contact']['phone_number']
                 if not phone.startswith('+'):
                     phone = '+' + phone
+                phone_verified = 'yes'
             elif 'text' in message:
                 text = message['text'].strip()
                 
@@ -2979,11 +3067,12 @@ class ComprehensiveDUXBot:
             # حفظ مستخدم جديد — مع تحديد اللغة والدولة والعملة تلقائياً من رقم الهاتف
             detected_lang, detected_country = self.detect_language_from_phone(phone)
             detected_currency = self.detect_currency_from_country(detected_country)
-            
+
             with open('users.csv', 'a', newline='', encoding='utf-8-sig') as f:
                 writer = csv.writer(f)
-                writer.writerow([user_id, name, phone, customer_id, detected_lang, 
-                               datetime.now().strftime('%Y-%m-%d'), 'no', '', detected_currency])
+                writer.writerow([user_id, name, phone, customer_id, detected_lang,
+                               datetime.now().strftime('%Y-%m-%d'), 'no', '', detected_currency,
+                               phone_verified, '0'])
             
             lang_names = self.get_language_names()
             lang_display = lang_names.get(detected_lang, {}).get('native', detected_lang)
@@ -3013,16 +3102,34 @@ class ComprehensiveDUXBot:
                     try:
                         success, msg = self.svrp.process_referral_code(ref_code, user_id)
                         if success:
+                            # منح ربح الإحالة للمُحيل
+                            bonus_amount = float(self.get_setting('referral_bonus_amount') or '10')
+                            bonus_currency = self.get_setting('referral_bonus_currency') or 'SAR'
+                            # إضافة للرصيد المجمد في محفظة التعويض
+                            self.svrp.add_frozen_balance(str(user_id), bonus_amount)
+                            # تسجيل في سجل الإحالات
+                            log_id = f"REF{str(int(datetime.now().timestamp()))[-6:]}"
+                            try:
+                                with open('referral_log.csv', 'a', newline='', encoding='utf-8-sig') as f:
+                                    writer = csv.writer(f)
+                                    writer.writerow([log_id, ref_code, str(user_id), name, phone,
+                                                   phone_verified, bonus_amount, bonus_currency,
+                                                   'earned', datetime.now().strftime('%Y-%m-%d %H:%M')])
+                            except:
+                                pass
                             self.send_message(message['chat']['id'],
-                                f"🎁 تم ربطك بكود الإحالة!\nمُحيلك: {ref_code}\nأكمل إيداعك لتفعيل الأرصدة المشتركة.")
+                                f"🎁 تم ربطك بكود الإحالة!\nمُحيلك: <code>{ref_code}</code>\n\n"
+                                f"💎 ربحت <code>{bonus_amount}</code> {bonus_currency} (مجمد)\n"
+                                f"⏳ سيتم تفعيله من الإدارة")
                     except Exception as e:
                         logger.error(f"خطأ في معالجة كود الإحالة: {e}")
 
             # إشعار الأدمن بعضو جديد
+            phone_status = '✅ هاتف حقيقي' if phone_verified == 'yes' else '⚠️ رقم مكتوب يدوياً'
             admin_msg = f"""🆕 عضو جديد انضم للنظام
 
 👤 الاسم: {name}
-📱 الهاتف: {phone}
+📱 الهاتف: {phone} ({phone_status})
 🆔 رقم العميل: {customer_id}
 🌐 اللغة: {detected_lang}
 🌍 الدولة: {detected_country}
@@ -4582,6 +4689,32 @@ class ComprehensiveDUXBot:
             self.show_referral_links_admin(fake_msg)
             return
 
+        # ==================== 🏆 معالج إعدادات أرباح الإحالة ====================
+        if isinstance(current_state, str) and current_state == 'ref_earnings_input':
+            user_id = message['from']['id']
+            chat_id = message['chat']['id']
+            text_msg = message.get('text', '').strip()
+            parts = text_msg.split()
+            if len(parts) < 2:
+                self.send_message(chat_id, "❌ الصيغة: [المبلغ] [العملة]\n💡 مثال: 10 SAR")
+                return
+            try:
+                amount = float(parts[0])
+            except ValueError:
+                self.send_message(chat_id, "❌ المبلغ يجب أن يكون رقماً\n💡 مثال: 10 SAR")
+                return
+            currency = parts[1].upper()
+            self.save_setting('referral_bonus_amount', str(amount))
+            self.save_setting('referral_bonus_currency', currency)
+            del self.user_states[user_id]
+            self.send_message(chat_id,
+                f"✅ <b>تم حفظ إعدادات أرباح الإحالة</b>\n\n"
+                f"💰 ربح كل تسجيل: <code>{amount}</code> {currency}\n\n"
+                f"سيتم منح هذا المبلغ لكل عميل يسجل عبر رابط إحالة.")
+            fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+            self.show_referral_earnings_admin(fake_msg)
+            return
+
                     # معالجة تعديل اسم وسيلة دفع (pm_input_name_)
         if isinstance(current_state, str) and current_state.startswith('pm_input_name_'):
             user_id = message['from']['id']
@@ -5901,6 +6034,8 @@ class ComprehensiveDUXBot:
             self.show_unified_orders(message)
         elif text == '🎁 روابط الإحالة':
             self.show_referral_links_admin(message)
+        elif text == '🏆 أرباح الإحالة':
+            self.show_referral_earnings_admin(message)
         elif text in {self.tr('admin_message_user', l) for l in all_langs}:
             self.start_send_user_message(message)
         elif text in {self.tr('admin_notifications', l) for l in all_langs}:
@@ -7785,6 +7920,50 @@ class ComprehensiveDUXBot:
             elif data == 'ref_admin_panel':
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                 self.show_referral_links_admin(fake_msg)
+                return
+
+            elif data == 'ref_earnings_settings':
+                self.edit_message(chat_id, message.get('message_id'),
+                    "⚙️ <b>إعدادات ربح الإحالة</b>\n\n"
+                    "اكتب <b>ربح كل تسجيل</b> + <b>العملة</b>:\n\n"
+                    "💡 مثال: <code>10 SAR</code>\n"
+                    "💡 مثال: <code>5 USD</code>")
+                self.user_states[user_id] = 'ref_earnings_input'
+                return
+
+            elif data.startswith('ref_unfreeze_'):
+                target_id = data.replace('ref_unfreeze_', '')
+                if self.svrp:
+                    success, frozen, available = self.svrp.unfreeze_balance(target_id)
+                    if success:
+                        # تحديث حالة السجل
+                        try:
+                            rows = []
+                            with open('referral_log.csv', 'r', encoding='utf-8-sig') as f:
+                                reader = csv.DictReader(f)
+                                fieldnames = reader.fieldnames
+                                for row in reader:
+                                    if row.get('referred_id') == target_id:
+                                        row['status'] = 'unfrozen'
+                                    rows.append(row)
+                            with open('referral_log.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                                writer.writeheader()
+                                writer.writerows(rows)
+                        except:
+                            pass
+                        self.edit_message(chat_id, message.get('message_id'),
+                            f"✅ <b>تم تحرير الرصيد!</b>\n\n"
+                            f"👤 <code>{target_id}</code>\n"
+                            f"🧊 الرصيد المجمد المتبقي: <code>{frozen:.2f}</code>\n"
+                            f"🟢 الرصيد المتاح: <code>{available:.2f}</code>")
+                        # إشعار المستخدم
+                        self.notify_user(int(target_id),
+                            f"✅ <b>تم تحرير رصيدك!</b>\n\n"
+                            f"🟢 الرصيد المتاح الآن: <code>{available:.2f}</code>\n"
+                            f"💰 يمكنك الآن السحب")
+                    else:
+                        self.edit_message(chat_id, message.get('message_id'), "❌ فشل في تحرير الرصيد")
                 return
 
             elif data == 'ref_admin_add':
