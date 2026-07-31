@@ -2579,6 +2579,8 @@ class ComprehensiveDUXBot:
             [{'text': self.tr('admin_settings', lang)}, {'text': self.tr('admin_themes', lang)}, {'text': self.tr('admin_addresses', lang)}],
             # المجموعة 7b: التطبيقات والاسترداد والتداول
             [{'text': self.tr('admin_apps', lang)}, {'text': self.tr('admin_recovery', lang)}, {'text': '💱 تداول'}],
+            # المجموعة 7c: لوحة الطلبات الموحدة
+            [{'text': '📋 كل الطلبات'}],
             # المجموعة 8: الأدمن والأدوار
             [{'text': self.tr('admin_managers', lang)}, {'text': self.tr('admin_buttons', lang)}],
             # المجموعة 9: الحماية والنسخ
@@ -5770,6 +5772,8 @@ class ComprehensiveDUXBot:
             self.show_apps_admin_panel(message)
         elif text == '💱 تداول':
             self.show_trade_admin_queue(message)
+        elif text == '📋 كل الطلبات':
+            self.show_unified_orders(message)
         elif text in {self.tr('admin_message_user', l) for l in all_langs}:
             self.start_send_user_message(message)
         elif text in {self.tr('admin_notifications', l) for l in all_langs}:
@@ -7783,6 +7787,65 @@ class ComprehensiveDUXBot:
                 return
 
             # ==================== أدمن: لوحة التداول ====================
+            # ==================== لوحة الطلبات الموحدة ====================
+            elif data == 'uni_refresh':
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.edit_message(chat_id, message.get('message_id'), "🔄")
+                self.show_unified_orders(fake_msg)
+                return
+
+            elif data == 'uni_back':
+                if user_id in self.user_states:
+                    del self.user_states[user_id]
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.handle_admin_panel(fake_msg)
+                return
+
+            elif data.startswith('uni_view_trans_'):
+                trans_id = data.replace('uni_view_trans_', '')
+                # عرض تفاصيل المعاملة + أزرار
+                try:
+                    with open('transactions.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        for row in reader:
+                            if row['id'] == trans_id:
+                                type_emoji = "💰" if row['type'] == 'deposit' else "💸"
+                                text = (
+                                    f"{type_emoji} <b>طلب {('إيداع' if row['type'] == 'deposit' else 'سحب')}</b>\n\n"
+                                    f"🆔 <code>{row['id']}</code> 👈 اضغط للنسخ\n"
+                                    f"👤 {row.get('name', '')} — <code>{row.get('customer_id', '')}</code>\n"
+                                    f"🏢 {row.get('company', '')}\n"
+                                    f"💳 <code>{row.get('wallet_number', '')}</code> 👈 اضغط للنسخ\n"
+                                    f"💰 <code>{row.get('amount', '')}</code> {row.get('currency', '')}\n"
+                                    f"📊 الحالة: <b>{row.get('status', '')}</b>\n"
+                                    f"📅 {row.get('date', '')}\n"
+                                )
+                                if row.get('exchange_address'):
+                                    text += f"📍 <code>{row['exchange_address']}</code> 👈 اضغط للنسخ\n"
+                                if row.get('admin_note') and row['status'] == 'pending_code_verification':
+                                    text += f"🔐 الكود: <code>{row['admin_note']}</code> 👈 اضغط للنسخ\n"
+
+                                inline_btns = []
+                                if row['status'] == 'pending':
+                                    inline_btns.append([
+                                        {'text': '✅ موافقة', 'callback_data': f'approve_{trans_id}'},
+                                        {'text': '❌ رفض', 'callback_data': f'reject_{trans_id}'}
+                                    ])
+                                elif row['status'] == 'pending_code_verification':
+                                    inline_btns.append([
+                                        {'text': '✅ تأكيد الكود', 'callback_data': f'verify_code_{trans_id}'},
+                                        {'text': '❌ رفض الكود', 'callback_data': f'reject_code_{trans_id}'}
+                                    ])
+                                inline_btns.append([{'text': '🔙 القائمة', 'callback_data': 'uni_refresh'}])
+                                self.edit_message(chat_id, message.get('message_id'), text)
+                                if inline_btns:
+                                    self.send_inline_message(chat_id, "اختر:", inline_btns)
+                                return
+                except:
+                    pass
+                self.send_message(chat_id, "❌ المعاملة غير موجودة")
+                return
+
             elif data == 'trade_admin_refresh':
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                 self.edit_message(chat_id, message.get('message_id'), "🔄")
@@ -7793,7 +7856,7 @@ class ComprehensiveDUXBot:
                 if user_id in self.user_states:
                     del self.user_states[user_id]
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
-                self.handle_admin_panel(fake_msg)
+                self.show_unified_orders(fake_msg)
                 return
 
             elif data.startswith('trade_admin_view_'):
@@ -7856,7 +7919,7 @@ class ComprehensiveDUXBot:
                     if order.get('screenshot_transfer'):
                         inline_btns.append([{'text': '✅ تم', 'callback_data': f'trade_admin_done_{order_id}'}])
 
-                inline_btns.append([{'text': '🔙 القائمة', 'callback_data': 'trade_admin_refresh'}])
+                inline_btns.append([{'text': '🔙 القائمة', 'callback_data': 'uni_refresh'}])
                 self.edit_message(chat_id, message.get('message_id'), text)
                 if inline_btns:
                     self.send_inline_message(chat_id, "اختر:", inline_btns)
@@ -10864,6 +10927,135 @@ class ComprehensiveDUXBot:
                 [{'text': '🔙 رجوع', 'callback_data': 'trade_back_panel'}]
             ])
 
+    def show_unified_orders(self, message):
+        """لوحة موحدة لكل الطلبات المعلقة — إيداع + سحب + تداول + استرداد"""
+        all_orders = []
+
+        # 1) طلبات الإيداع والسحب المعلقة
+        try:
+            with open('transactions.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row.get('status') in ('pending', 'pending_code_verification'):
+                        all_orders.append({
+                            'id': row['id'],
+                            'type': 'deposit' if row['type'] == 'deposit' else 'withdraw',
+                            'icon': '💰' if row['type'] == 'deposit' else '💸',
+                            'name': row.get('name', ''),
+                            'amount': row.get('amount', ''),
+                            'currency': row.get('currency', 'SAR'),
+                            'company': row.get('company', ''),
+                            'status': row.get('status', ''),
+                            'date': row.get('date', ''),
+                            'callback': f'approve_{row["id"]}' if row['status'] == 'pending' else f'verify_code_{row["id"]}',
+                            'callback_view': f'uni_view_trans_{row["id"]}'
+                        })
+        except:
+            pass
+
+        # 2) طلبات التداول المعلقة
+        try:
+            with open('trade_orders.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row.get('status') not in ('completed', 'rejected', 'cancelled'):
+                        all_orders.append({
+                            'id': row['id'],
+                            'type': 'trade',
+                            'icon': '💱',
+                            'name': row.get('buyer_name', ''),
+                            'amount': row.get('amount', ''),
+                            'currency': row.get('currency', ''),
+                            'company': f"{row.get('asset_type', '').upper()} {row.get('order_type', '')}",
+                            'status': row.get('status', ''),
+                            'date': row.get('created_at', ''),
+                            'callback_view': f'trade_admin_view_{row["id"]}'
+                        })
+        except:
+            pass
+
+        # 3) طلبات الاسترداد المعلقة
+        if self.svrp:
+            try:
+                for row in self.svrp._read_csv('recovery_requests.csv'):
+                    if row.get('status') == 'pending':
+                        all_orders.append({
+                            'id': row['id'],
+                            'type': 'recovery',
+                            'icon': '📸',
+                            'name': row.get('user_id', ''),
+                            'amount': '',
+                            'currency': '',
+                            'company': 'استرداد',
+                            'status': row.get('status', ''),
+                            'date': row.get('created_at', ''),
+                            'callback_view': f'svrp_recovery_approve_{row["id"]}'
+                        })
+            except:
+                pass
+
+        # 4) طلبات المكافآت المعلقة
+        if self.svrp:
+            try:
+                for row in self.svrp._read_csv('bonus_requests.csv'):
+                    if row.get('status') == 'pending':
+                        all_orders.append({
+                            'id': row['id'],
+                            'type': 'bonus',
+                            'icon': '🏆',
+                            'name': row.get('user_id', ''),
+                            'amount': '',
+                            'currency': '',
+                            'company': row.get('company_name', ''),
+                            'status': row.get('status', ''),
+                            'date': row.get('created_at', ''),
+                            'callback_view': f'svrp_bonus_approve_{row["id"]}'
+                        })
+            except:
+                pass
+
+        if not all_orders:
+            self.send_message(message['chat']['id'],
+                "✅ <b>لا توجد طلبات معلقة</b>\n\nكل شيء مكتمل!",
+                self.admin_keyboard())
+            return
+
+        # ترتيب حسب التاريخ (الأقدم أولاً)
+        all_orders.sort(key=lambda o: o.get('date', ''))
+
+        # بناء النص والأزرار
+        text = f"📋 <b>كل الطلبات المعلقة ({len(all_orders)})</b>\n"
+        text += f"━━━━━━━━━━━━━━━━━━\n\n"
+
+        inline_btns = []
+        for i, order in enumerate(all_orders, 1):
+            status_short = {
+                'pending': '🟡', 'pending_code_verification': '🔐',
+                'admin_accepted': '🔵', 'buyer_pays': '💸',
+                'buyer_sends_screenshot': '📸', 'admin_confirms_payment': '✅',
+                'admin_transfers': '📤', 'admin_sends_screenshot': '📤'
+            }.get(order['status'], '🟡')
+
+            type_label = {'deposit': 'إيداع', 'withdraw': 'سحب', 'trade': 'تداول',
+                         'recovery': 'استرداد', 'bonus': 'مكافأة'}.get(order['type'], '')
+
+            text += f"{status_short} {order['icon']} <code>{order['id']}</code> | {type_label}\n"
+            if order['amount']:
+                text += f"   💰 {order['amount']} {order['currency']}\n"
+            if order['company']:
+                text += f"   🏢 {order['company']}\n"
+            text += f"   👤 {order['name']}\n\n"
+
+            inline_btns.append([{
+                'text': f"{status_short} {order['icon']} {order['id']} — {type_label}",
+                'callback_data': order['callback_view']
+            }])
+
+        inline_btns.append([{'text': '🔄 تحديث', 'callback_data': 'uni_refresh'}])
+        inline_btns.append([{'text': '🔙 العودة', 'callback_data': 'uni_back'}])
+
+        self.send_inline_message(message['chat']['id'], text, inline_btns)
+
     def show_trade_admin_queue(self, message):
         """لوحة طلبات التداول للأدمن — قائمة منظمة"""
         orders = self.get_pending_trade_orders()
@@ -10899,7 +11091,7 @@ class ComprehensiveDUXBot:
                                  'callback_data': f"trade_admin_view_{order['id']}"}])
 
         inline_btns.append([{'text': '🔄 تحديث', 'callback_data': 'trade_admin_refresh'},
-                            {'text': '🔙 العودة', 'callback_data': 'trade_admin_back'}])
+                            {'text': '🔙 العودة', 'callback_data': 'uni_back'}])
 
         self.send_inline_message(message['chat']['id'], text, inline_btns)
 
@@ -11022,8 +11214,10 @@ class ComprehensiveDUXBot:
             self.send_message(chat_id,
                 f"✅ تم إرسال تعليمات الدفع للعميل\n\n"
                 f"🆔 <code>{order_id}</code>\n⏳ بانتظار لقطة شاشة الدفع من العميل\n\n"
-                f"📋 ستظهر في قائمة طلبات التداول عند وصولها",
-                self.admin_keyboard())
+                f"📋 الطلب محفوظ — يمكنك معالجة طلبات أخرى والعودة له لاحقاً")
+            # العودة للوحة الموحدة
+            fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+            self.show_unified_orders(fake_msg)
 
         elif step == 'trade_admin_transfer':
             # الأدمن يرسل لقطة شاشة التحويل
@@ -11056,8 +11250,9 @@ class ComprehensiveDUXBot:
                 except:
                     pass
             self.send_message(chat_id,
-                f"✅ تم إرسال لقطة الشاشة للعميل\n\n🆔 <code>{order_id}</code>\n⏳ بانتظار تأكيد العميل",
-                self.admin_keyboard())
+                f"✅ تم إرسال لقطة الشاشة للعميل\n\n🆔 <code>{order_id}</code>\n⏳ بانتظار تأكيد العميل")
+            fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+            self.show_unified_orders(fake_msg)
 
     def get_payment_methods_by_company(self, company_id, transaction_type=None):
             """الحصول على وسائل الدفع لشركة معينة — من جدول الربط + السجل القديم"""
