@@ -583,10 +583,14 @@ class ComprehensiveDUXBot:
             return False
 
     def apply_button_label(self, text):
-        """إرجاع النص المعدل للزر إن وجد، أو النص الأصلي"""
+        """إرجاع النص المعدل للزر إن وجد، أو النص الأصلي — مع اقتطاع لحد تليجرام"""
         try:
             mapping = getattr(self, 'button_labels', None) or {}
-            return mapping.get(text, text)
+            result = mapping.get(text, text)
+            # تليجرام حد 64 حرف لنص الزر
+            if len(result) > 60:
+                result = result[:57] + '...'
+            return result
         except Exception:
             return text
 
@@ -9484,9 +9488,14 @@ class ComprehensiveDUXBot:
         # 3) أزرار نظام التعويض (inline)
         svrp_buttons = [
             '💰 إيداع', '💸 سحب', '🔄 استرداد', '📤 إرسال رصيد',
-            '💎 محفظتي', '👥 دعوة صديق', '🏢 تسجيل حساب جديد', '🏠 القائمة الرئيسية'
+            '💎 محفظتي', '👥 دعوة صديق', '🏢 تسجيل حساب جديد', '🏠 القائمة الرئيسية',
+            '🏢 تسجيل / تعديل الحسابات', '🔙 رجوع'
         ]
         all_buttons.update(svrp_buttons)
+
+        # 3b) أزرار التداول
+        trade_buttons = ['💱 تداول USDT', '📦 شراء', '💰 بيع', '📋 كل الطلبات']
+        all_buttons.update(trade_buttons)
 
         # 4) أزرار نظام التطبيقات (inline)
         app_buttons = ['➕ إضافة تطبيق جديد', '🔄 تحديث القائمة', '🔙 العودة للوحة الأدمن']
@@ -9605,7 +9614,7 @@ class ComprehensiveDUXBot:
                     "✅ <b>تم حفظ مسمى الزر الجديد بنجاح</b>\n\n"
                     f"النص القديم: <code>{old_label}</code>\n"
                     f"النص الجديد: <code>{text}</code>\n\n"
-                    "سيتم استخدام الاسم الجديد في جميع القوائم القادمة التي تحتوي على هذا الزر. ✨"
+                    "✨ التغيير فعال فوراً — سيظهر للمستخدمين في الرسالة القادمة."
                 )
             else:
                 msg = (
