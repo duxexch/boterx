@@ -7659,6 +7659,37 @@ class ComprehensiveDUXBot:
                 self.start_trade_buy(chat_id, user_id)
                 return
 
+            elif data == 'trade_sell':
+                self.start_trade_sell(chat_id, user_id)
+                return
+
+            elif data.startswith('trade_sell_asset_'):
+                asset_type = data.replace('trade_sell_asset_', '')
+                if asset_type == 'usdt':
+                    self.edit_message(chat_id, message.get('message_id'),
+                        "🪙 <b>بيع USDT</b>\n\n"
+                        "⚠️ <b>اختر الشبكة بعناية!</b>\n\n"
+                        "اختر الشبكة:")
+                    self.send_inline_message(chat_id, "الشبكات:",
+                        [[{'text': '🔗 TRC20', 'callback_data': 'trade_sell_network_TRC20'},
+                          {'text': '🔗 ERC20', 'callback_data': 'trade_sell_network_ERC20'}],
+                         [{'text': '🔗 BNB20', 'callback_data': 'trade_sell_network_BNB20'}],
+                         [{'text': '🔙 رجوع', 'callback_data': 'trade_sell'}]])
+                elif asset_type == 'moneygo':
+                    self.edit_message(chat_id, message.get('message_id'),
+                        "💎 <b>بيع MoneyGo</b>\n\n"
+                        "📝 اكتب <b>رقم حسابك</b> في MoneyGo:")
+                    self.user_states[user_id] = {'step': 'trade_buy_account', 'asset_type': 'moneygo', 'network': '', 'order_type': 'sell'}
+                return
+
+            elif data.startswith('trade_sell_network_'):
+                network = data.replace('trade_sell_network_', '')
+                self.edit_message(chat_id, message.get('message_id'),
+                    f"✅ الشبكة: <code>{network}</code>\n\n"
+                    f"📝 اكتب <b>عنوان محفظتك</b> على شبكة {network}:")
+                self.user_states[user_id] = {'step': 'trade_buy_account', 'asset_type': 'usdt', 'network': network, 'order_type': 'sell'}
+                return
+
             elif data.startswith('trade_asset_'):
                 asset_type = data.replace('trade_asset_', '')
                 if asset_type == 'usdt':
@@ -7698,7 +7729,11 @@ class ComprehensiveDUXBot:
                     state['step'] = 'trade_buy_amount'
                     self.user_states[user_id] = state
                     self.edit_message(chat_id, message.get('message_id'), "💰")
-                    self.send_message(chat_id, "💰 اكتب <b>المبلغ</b> الذي تريد الشراء به:")
+                    order_type = state.get('order_type', 'buy')
+                    if order_type == 'sell':
+                        self.send_message(chat_id, "💰 اكتب <b>كمية USDT</b> التي تريد بيعها:")
+                    else:
+                        self.send_message(chat_id, "💰 اكتب <b>المبلغ</b> الذي تريد الشراء به:")
                 return
 
             # شراء — تأكيد الطلب
@@ -7706,24 +7741,25 @@ class ComprehensiveDUXBot:
                 state = self.user_states.get(user_id, {})
                 if isinstance(state, dict) and state.get('step') == 'trade_buy_confirm':
                     user = self.find_user(user_id)
+                    order_type = state.get('order_type', 'buy')
                     order_id = self.create_trade_order(
                         user_id, user.get('name', ''), user.get('customer_id', ''),
-                        'buy', state.get('asset_type', ''),
+                        order_type, state.get('asset_type', ''),
                         state.get('network', ''), state.get('account_address', ''),
                         state.get('payment_method', ''), state.get('amount', ''),
                         state.get('currency', 'SAR'))
                     if order_id:
                         del self.user_states[user_id]
+                        action_label = 'الشراء' if order_type == 'buy' else 'البيع'
                         self.edit_message(chat_id, message.get('message_id'),
-                            f"✅ <b>تم إنشاء طلب الشراء!</b>\n\n"
+                            f"✅ <b>تم إنشاء طلب {action_label}!</b>\n\n"
                             f"🆔 رقم الطلب: <code>{order_id}</code> 👈 اضغط للنسخ\n"
                             f"⏳ بانتظار موافقة الإدارة\n\n"
                             f"سيتم إشعارك فور قبول الطلب.")
-                        # إشعار الأدمن
                         for admin_id in self.admin_ids:
                             try:
                                 self.send_inline_message(int(admin_id),
-                                    f"💱 <b>طلب شراء جديد</b>\n\n"
+                                    f"💱 <b>طلب {action_label} جديد</b>\n\n"
                                     f"🆔 <code>{order_id}</code> 👈 اضغط للنسخ\n"
                                     f"👤 {user.get('name', '')} — <code>{user.get('customer_id', '')}</code>\n"
                                     f"{'🪙 USDT' if state.get('asset_type') == 'usdt' else '💎 MoneyGo'}\n"
@@ -7752,9 +7788,11 @@ class ComprehensiveDUXBot:
                     state['step'] = 'trade_buy_confirm'
                     self.user_states[user_id] = state
 
+                    order_type = state.get('order_type', 'buy')
+                    action_label = 'الشراء' if order_type == 'buy' else 'البيع'
                     asset = '🪙 USDT' if state.get('asset_type') == 'usdt' else '💎 MoneyGo'
                     summary = (
-                        f"📦 <b>مراجعة طلب الشراء</b>\n\n"
+                        f"📦 <b>مراجعة طلب {action_label}</b>\n\n"
                         f"━━━━━━━━━━━━━━━━━━\n"
                         f"{asset}\n"
                     )
@@ -10933,6 +10971,17 @@ class ComprehensiveDUXBot:
             [
                 [{'text': '🪙 USDT', 'callback_data': 'trade_asset_usdt'},
                  {'text': '💎 MoneyGo', 'callback_data': 'trade_asset_moneygo'}],
+                [{'text': '🔙 رجوع', 'callback_data': 'trade_back_panel'}]
+            ])
+
+    def start_trade_sell(self, chat_id, user_id):
+        """بدء تدفق البيع — العميل يبيع USDT/MoneyGo للأدمن"""
+        self.send_inline_message(chat_id,
+            "💰 <b>بيع USDT / MoneyGo</b>\n\n"
+            "اختر العملة الرقمية التي تريد بيعها:",
+            [
+                [{'text': '🪙 USDT', 'callback_data': 'trade_sell_asset_usdt'},
+                 {'text': '💎 MoneyGo', 'callback_data': 'trade_sell_asset_moneygo'}],
                 [{'text': '🔙 رجوع', 'callback_data': 'trade_back_panel'}]
             ])
 
