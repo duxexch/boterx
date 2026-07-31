@@ -4275,19 +4275,176 @@ class ComprehensiveDUXBot:
                 icon = {'mobile': '📱', 'bank': '🏦', 'card': '💳', 'cash': '💵'}.get(
                     current_state.get('method_type', ''), '💳')
 
-                self.add_payment_method(company_id, method_name, method_type, account_data, info, icon)
+                method_id = self.add_payment_method(company_id, method_name, method_type, account_data, info, icon)
+                current_state['method_id'] = method_id
 
-                if user_id in self.user_states: del self.user_states[user_id]
-
+                # سؤال: هل تريد إضافة خطوات مخصصة للإيداع؟
+                current_state['step'] = 'pm_add_custom_deposit'
+                current_state['custom_steps'] = {'deposit': [], 'withdraw': []}
+                self.user_states[user_id] = current_state
                 self.send_message(chat_id,
-                    f"✅ <b>تم إضافة وسيلة الدفع بنجاح!</b>\n\n"
-                    f"💳 {method_name}\n"
-                    f"📋 {method_type}\n"
-                    f"🔢 <code>{account_data}</code>")
-                # العودة لقائمة الوسائل
-                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
-                self.show_payment_methods_management(fake_msg)
-            return
+                    f"✅ <b>تم حفظ وسيلة الدفع!</b>\n\n"
+                    f"💳 {method_name} — <code>{account_data}</code>\n\n"
+                    f"━━━━━━━━━━━━━━━━━━\n"
+                    f"🔧 <b>خطوات مخصصة للإيداع</b>\n"
+                    f"━━━━━━━━━━━━━━━━━━\n\n"
+                    f"هل تريد إضافة خطوات مخصصة لعملية الإيداع بهذه الوسيلة؟\n\n"
+                    f"💡 الخطوات تظهر للعميل خطوة بخطوة عند الإيداع",
+                    {'keyboard': [[{'text': '✅ نعم، أضف خطوات'}, {'text': '⏭️ تخطي'}]], 'resize_keyboard': True, 'one_time_keyboard': True})
+
+            # === خطوات مخصصة: اختيار نعم/تخطي للإيداع ===
+            elif step == 'pm_add_custom_deposit':
+                if text_msg == '✅ نعم، أضف خطوات':
+                    current_state['step'] = 'pm_step_type_deposit'
+                    current_state['step_order'] = 1
+                    self.user_states[user_id] = current_state
+                    self.send_message(chat_id,
+                        f"📝 <b>خطوة إيداع #1</b>\n\n"
+                        f"اختر نوع الخطوة:",
+                        {'keyboard': [
+                            [{'text': '📝 نص'}, {'text': '💰 مبلغ'}],
+                            [{'text': '📸 لقطة شاشة'}, {'text': 'ℹ️ معلومة'}],
+                            [{'text': '✅ انتهيت'}]
+                        ], 'resize_keyboard': True, 'one_time_keyboard': True})
+                elif text_msg == '⏭️ تخطي':
+                    current_state['step'] = 'pm_add_custom_withdraw'
+                    self.user_states[user_id] = current_state
+                    self.send_message(chat_id,
+                        f"━━━━━━━━━━━━━━━━━━\n"
+                        f"🔧 <b>خطوات مخصصة للسحب</b>\n"
+                        f"━━━━━━━━━━━━━━━━━━\n\n"
+                        f"هل تريد إضافة خطوات مخصصة لعملية السحب بهذه الوسيلة؟",
+                        {'keyboard': [[{'text': '✅ نعم، أضف خطوات'}, {'text': '⏭️ تخطي'}]], 'resize_keyboard': True, 'one_time_keyboard': True})
+
+            # === اختيار نوع الخطوة للإيداع ===
+            elif step == 'pm_step_type_deposit':
+                step_types = {'📝 نص': 'text', '💰 مبلغ': 'amount', '📸 لقطة شاشة': 'screenshot', 'ℹ️ معلومة': 'info'}
+                if text_msg == '✅ انتهيت':
+                    # حفظ خطوات الإيداع
+                    method_id = current_state.get('method_id', '')
+                    for i, s in enumerate(current_state.get('custom_steps', {}).get('deposit', [])):
+                        self.add_method_step(method_id, 'deposit', s['type'], s['label'], i + 1)
+                    current_state['step'] = 'pm_add_custom_withdraw'
+                    self.user_states[user_id] = current_state
+                    self.send_message(chat_id,
+                        f"✅ تم حفظ خطوات الإيداع\n\n"
+                        f"━━━━━━━━━━━━━━━━━━\n"
+                        f"🔧 <b>خطوات مخصصة للسحب</b>\n"
+                        f"━━━━━━━━━━━━━━━━━━\n\n"
+                        f"هل تريد إضافة خطوات مخصصة لعملية السحب؟",
+                        {'keyboard': [[{'text': '✅ نعم، أضف خطوات'}, {'text': '⏭️ تخطي'}]], 'resize_keyboard': True, 'one_time_keyboard': True})
+                elif text_msg in step_types:
+                    current_state['current_step_type'] = step_types[text_msg]
+                    current_state['step'] = 'pm_step_label_deposit'
+                    self.user_states[user_id] = current_state
+                    self.send_message(chat_id, f"✍️ اكتب <b>نص الخطوة</b> (ما يظهر للعميل):\n\n💡 مثال: اكتب رقم محفظتك")
+
+            # === كتابة نص الخطوة للإيداع ===
+            elif step == 'pm_step_label_deposit':
+                if len(text_msg) < 2:
+                    self.send_message(chat_id, "❌ النص قصير. اكتب نص الخطوة:")
+                    return
+                step_order = current_state.get('step_order', 1)
+                current_state.setdefault('custom_steps', {'deposit': [], 'withdraw': []})['deposit'].append({
+                    'type': current_state.get('current_step_type', 'text'),
+                    'label': text_msg
+                })
+                current_state['step_order'] = step_order + 1
+                current_state['step'] = 'pm_step_type_deposit'
+                self.user_states[user_id] = current_state
+                self.send_message(chat_id,
+                    f"✅ تم حفظ الخطوة #{step_order}\n\n"
+                    f"📝 <b>خطوة إيداع #{step_order + 1}</b>\n\n"
+                    f"اختر نوع الخطوة التالية أو اضغط 'انتهيت':",
+                    {'keyboard': [
+                        [{'text': '📝 نص'}, {'text': '💰 مبلغ'}],
+                        [{'text': '📸 لقطة شاشة'}, {'text': 'ℹ️ معلومة'}],
+                        [{'text': '✅ انتهيت'}]
+                    ], 'resize_keyboard': True, 'one_time_keyboard': True})
+
+            # === اختيار نعم/تخطي للسحب ===
+            elif step == 'pm_add_custom_withdraw':
+                if text_msg == '✅ نعم، أضف خطوات':
+                    current_state['step'] = 'pm_step_type_withdraw'
+                    current_state['step_order'] = 1
+                    self.user_states[user_id] = current_state
+                    self.send_message(chat_id,
+                        f"📝 <b>خطوة سحب #1</b>\n\n"
+                        f"اختر نوع الخطوة:",
+                        {'keyboard': [
+                            [{'text': '📝 نص'}, {'text': '💰 مبلغ'}],
+                            [{'text': '📸 لقطة شاشة'}, {'text': 'ℹ️ معلومة'}],
+                            [{'text': '✅ انتهيت'}]
+                        ], 'resize_keyboard': True, 'one_time_keyboard': True})
+                elif text_msg == '⏭️ تخطي':
+                    # إنهاء — حفظ كل شيء
+                    method_id = current_state.get('method_id', '')
+                    method_name = current_state.get('method_name', '')
+                    account_data = current_state.get('account_data', '')
+
+                    deposit_count = len(current_state.get('custom_steps', {}).get('deposit', []))
+                    withdraw_count = len(current_state.get('custom_steps', {}).get('withdraw', []))
+
+                    summary = (
+                        f"✅ <b>تم حفظ وسيلة الدفع!</b>\n\n"
+                        f"💳 {method_name} — <code>{account_data}</code>\n"
+                        f"📝 خطوات الإيداع: <code>{deposit_count}</code>\n"
+                        f"📝 خطوات السحب: <code>{withdraw_count}</code>\n"
+                    )
+                    if user_id in self.user_states: del self.user_states[user_id]
+                    self.send_message(chat_id, summary, self.admin_keyboard())
+                    fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                    self.show_payment_methods_management(fake_msg)
+
+            # === اختيار نوع الخطوة للسحب ===
+            elif step == 'pm_step_type_withdraw':
+                step_types = {'📝 نص': 'text', '💰 مبلغ': 'amount', '📸 لقطة شاشة': 'screenshot', 'ℹ️ معلومة': 'info'}
+                if text_msg == '✅ انتهيت':
+                    method_id = current_state.get('method_id', '')
+                    for i, s in enumerate(current_state.get('custom_steps', {}).get('withdraw', [])):
+                        self.add_method_step(method_id, 'withdraw', s['type'], s['label'], i + 1)
+                    method_name = current_state.get('method_name', '')
+                    account_data = current_state.get('account_data', '')
+                    deposit_count = len(current_state.get('custom_steps', {}).get('deposit', []))
+                    withdraw_count = len(current_state.get('custom_steps', {}).get('withdraw', []))
+                    summary = (
+                        f"✅ <b>تم حفظ وسيلة الدفع!</b>\n\n"
+                        f"💳 {method_name} — <code>{account_data}</code>\n"
+                        f"📝 خطوات الإيداع: <code>{deposit_count}</code>\n"
+                        f"📝 خطوات السحب: <code>{withdraw_count}</code>\n"
+                    )
+                    if user_id in self.user_states: del self.user_states[user_id]
+                    self.send_message(chat_id, summary, self.admin_keyboard())
+                    fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                    self.show_payment_methods_management(fake_msg)
+                elif text_msg in step_types:
+                    current_state['current_step_type'] = step_types[text_msg]
+                    current_state['step'] = 'pm_step_label_withdraw'
+                    self.user_states[user_id] = current_state
+                    self.send_message(chat_id, f"✍️ اكتب <b>نص الخطوة</b> (ما يظهر للعميل):\n\n💡 مثال: اكتب كود السحب")
+
+            # === كتابة نص الخطوة للسحب ===
+            elif step == 'pm_step_label_withdraw':
+                if len(text_msg) < 2:
+                    self.send_message(chat_id, "❌ النص قصير. اكتب نص الخطوة:")
+                    return
+                step_order = current_state.get('step_order', 1)
+                current_state.setdefault('custom_steps', {'deposit': [], 'withdraw': []})['withdraw'].append({
+                    'type': current_state.get('current_step_type', 'text'),
+                    'label': text_msg
+                })
+                current_state['step_order'] = step_order + 1
+                current_state['step'] = 'pm_step_type_withdraw'
+                self.user_states[user_id] = current_state
+                self.send_message(chat_id,
+                    f"✅ تم حفظ الخطوة #{step_order}\n\n"
+                    f"📝 <b>خطوة سحب #{step_order + 1}</b>\n\n"
+                    f"اختر نوع الخطوة التالية أو اضغط 'انتهيت':",
+                    {'keyboard': [
+                        [{'text': '📝 نص'}, {'text': '💰 مبلغ'}],
+                        [{'text': '📸 لقطة شاشة'}, {'text': 'ℹ️ معلومة'}],
+                        [{'text': '✅ انتهيت'}]
+                    ], 'resize_keyboard': True, 'one_time_keyboard': True})
 
         # معالجة تعديل اسم وسيلة دفع (pm_input_name_)
         if isinstance(current_state, str) and current_state.startswith('pm_input_name_'):
