@@ -340,6 +340,12 @@ class ComprehensiveDUXBot:
                                  'usdt_amount', 'admin_payment_method', 'status', 'screenshot_payment',
                                  'screenshot_transfer', 'admin_id', 'created_at', 'completed_at'])
         
+        # ملف روابط الإحالة (إدارية)
+        if not os.path.exists('referral_links.csv'):
+            with open('referral_links.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.writer(f)
+                writer.writerow(['id', 'name', 'url', 'is_active', 'created_at'])
+
         # ملف عناوين الصرافة
         if not os.path.exists('exchange_addresses.csv'):
             with open('exchange_addresses.csv', 'w', newline='', encoding='utf-8-sig') as f:
@@ -1070,7 +1076,7 @@ class ComprehensiveDUXBot:
             return 0
 
     def show_referral_panel(self, message):
-        """عرض لوحة الإحالات"""
+        """عرض لوحة اربح — كود الإحالة + روابط مشاركة"""
         user = self.find_user(message['from']['id'])
         if not user:
             return
@@ -1078,14 +1084,87 @@ class ComprehensiveDUXBot:
         ref_code = self.get_user_referral_code(user)
         ref_count = self.get_referral_count(message['from']['id'])
 
-        ref_text = (
-            f"{self.tr('referral_panel_title', lang)}\n\n"
-            f"{self.tr('referral_your_code', lang)}\n"
-            f"`{ref_code}`\n\n"
-            f"{self.tr('referral_count', lang)}: {ref_count}\n\n"
-            f"{self.tr('referral_hint', lang)}"
+        # كود الإحالة
+        bot_username = ''
+        try:
+            me = self.api_call('getMe', {})
+            if me and me.get('ok'):
+                bot_username = me['result'].get('username', '')
+        except:
+            pass
+
+        ref_url = f"https://t.me/{bot_username}?start={ref_code}" if bot_username else f"Code: {ref_code}"
+
+        text = (
+            f"🎁 <b>اربح</b>\n\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"📋 كود الإحالة الخاص بك:\n"
+            f"<code>{ref_code}</code> 👈 اضغط للنسخ\n\n"
+            f"🔗 رابط الإحالة:\n"
+            f"<code>{ref_url}</code> 👈 اضغط للنسخ\n\n"
+            f"👥 عدد الدعوات: <code>{ref_count}</code>\n"
+            f"━━━━━━━━━━━━━━━━━━\n\n"
         )
-        self.send_message(message['chat']['id'], ref_text, self.main_keyboard(lang, message['from']['id']))
+
+        # عرض رصيد الإحالات من محفظة التعويض
+        if self.svrp:
+            wallet = self.svrp.get_wallet(message['from']['id'])
+            frozen = float(wallet.get('balance', 0) or 0)
+            available = float(wallet.get('total_used', 0) or 0)
+            text += f"🧊 رصيد مجمد: <code>{frozen:.2f}</code>\n"
+            text += f"🟢 رصيد متاح: <code>{available:.2f}</code>\n\n"
+
+        # أزرار المشاركة (روابط إحالة من الأدمن)
+        inline_btns = []
+        try:
+            with open('referral_links.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row.get('is_active') == 'yes':
+                        name = row.get('name', '')
+                        url = row.get('url', '')
+                        if url:
+                            inline_btns.append([{'text': f"📤 {name}", 'url': url}])
+        except:
+            pass
+
+        inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'ref_back_main'}])
+        self.send_inline_message(message['chat']['id'], text, inline_btns)
+
+    def show_referral_links_admin(self, message):
+        """لوحة إدارة روابط الإحالة للأدمن"""
+        links = []
+        try:
+            with open('referral_links.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                links = list(reader)
+        except:
+            pass
+
+        text = f"🎁 <b>إدارة روابط الإحالة</b>\n\n📊 الإجمالي: <code>{len(links)}</code>\n"
+        inline_btns = []
+
+        if links:
+            text += "\n━━━━━━━━━━━━━━━━━━\n"
+            for link in links:
+                status = '✅' if link.get('is_active') == 'yes' else '⏸️'
+                text += f"\n{status} <b>{link.get('name', '')}</b>\n"
+                text += f"  🔗 <code>{link.get('url', '')}</code>\n"
+                inline_btns.append([{
+                    'text': f"{status} {link.get('name', '')}",
+                    'callback_data': f"ref_admin_toggle_{link['id']}"
+                }, {
+                    'text': '🗑️',
+                    'callback_data': f"ref_admin_delete_{link['id']}"
+                }])
+
+        inline_btns.append([{'text': '➕ إضافة رابط', 'callback_data': 'ref_admin_add'}])
+        inline_btns.append([{'text': '🔙 العودة', 'callback_data': 'app_back_admin'}])
+
+        if not links:
+            text += "\n📭 لا توجد روابط بعد."
+
+        self.send_inline_message(message['chat']['id'], text, inline_btns)
 
     # ==================== 📱 التطبيقات — Panel Methods ====================
 
@@ -2521,7 +2600,7 @@ class ComprehensiveDUXBot:
         reset_btn = self.tr('reset_system', lang)
         match_btn = self.tr('match_btn', lang) if self.tr('match_btn', lang) != 'match_btn' else f"{t.get('btn_match', '🔄')} مطابقة"
         notif_btn = self.tr('notif_btn', lang) if self.tr('notif_btn', lang) != 'notif_btn' else f"{t.get('btn_notifications', '🔔')} إشعاراتي"
-        ref_btn = self.tr('referral_btn', lang) if self.tr('referral_btn', lang) != 'referral_btn' else f"{t.get('btn_referral', '🎁')} إحالة"
+        ref_btn = self.tr('referral_btn', lang) if self.tr('referral_btn', lang) != 'referral_btn' else f"{t.get('btn_referral', '🎁')} اربح"
         help_btn = self.tr('help_btn_label', lang) if self.tr('help_btn_label', lang) != 'help_btn_label' else f"{t.get('btn_help', '❓')} مساعدة"
         svrp_btn = self.tr('svrp_title', lang)
         apps_btn = self.tr('apps_btn', lang) if self.tr('apps_btn', lang) != 'apps_btn' else '📱 تطبيقات'
@@ -2583,8 +2662,8 @@ class ComprehensiveDUXBot:
             [{'text': self.tr('admin_settings', lang)}, {'text': self.tr('admin_themes', lang)}, {'text': self.tr('admin_addresses', lang)}],
             # المجموعة 7b: التطبيقات والاسترداد والتداول
             [{'text': self.tr('admin_apps', lang)}, {'text': self.tr('admin_recovery', lang)}, {'text': '💱 تداول'}],
-            # المجموعة 7c: لوحة الطلبات الموحدة
-            [{'text': '📋 كل الطلبات'}],
+            # المجموعة 7c: الطلبات الموحدة + روابط الإحالة
+            [{'text': '📋 كل الطلبات'}, {'text': '🎁 روابط الإحالة'}],
             # المجموعة 8: الأدمن والأدوار
             [{'text': self.tr('admin_managers', lang)}, {'text': self.tr('admin_buttons', lang)}],
             # المجموعة 9: الحماية والنسخ
@@ -4461,6 +4540,48 @@ class ComprehensiveDUXBot:
                                         [{'text': '✅ انتهيت'}, {'text': '❌ إلغاء'}]
                                     ], 'resize_keyboard': True, 'one_time_keyboard': True})
 
+        # ==================== 🎁 معالج روابط الإحالة ====================
+        if isinstance(current_state, str) and current_state == 'ref_link_name':
+            user_id = message['from']['id']
+            chat_id = message['chat']['id']
+            text_msg = message.get('text', '').strip()
+            if len(text_msg) < 2:
+                self.send_message(chat_id, "❌ الاسم قصير. اكتب اسماً:")
+                return
+            self.temp_button_label_edit = getattr(self, 'temp_button_label_edit', {})
+            self.temp_button_label_edit[user_id] = {'ref_name': text_msg}
+            self.user_states[user_id] = 'ref_link_url'
+            self.send_message(chat_id,
+                f"✅ الاسم: <b>{text_msg}</b>\n\n"
+                f"🔗 اكتب <b>الرابط</b> (http/https):")
+            return
+
+        if isinstance(current_state, str) and current_state == 'ref_link_url':
+            user_id = message['from']['id']
+            chat_id = message['chat']['id']
+            text_msg = message.get('text', '').strip()
+            if not text_msg.startswith('http'):
+                self.send_message(chat_id, "❌ الرابط يجب أن يبدأ بـ http:// أو https://")
+                return
+            data = getattr(self, 'temp_button_label_edit', {}).get(user_id, {})
+            name = data.get('ref_name', 'رابط')
+            link_id = f"REF{str(int(datetime.now().timestamp()))[-6:]}"
+            try:
+                with open('referral_links.csv', 'a', newline='', encoding='utf-8-sig') as f:
+                    writer = csv.writer(f)
+                    writer.writerow([link_id, name, text_msg, 'yes', datetime.now().strftime('%Y-%m-%d %H:%M')])
+            except:
+                pass
+            del self.user_states[user_id]
+            if hasattr(self, 'temp_button_label_edit') and user_id in self.temp_button_label_edit:
+                del self.temp_button_label_edit[user_id]
+            self.send_message(chat_id,
+                f"✅ <b>تم إضافة رابط الإحالة!</b>\n\n"
+                f"📤 {name}\n🔗 <code>{text_msg}</code>")
+            fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+            self.show_referral_links_admin(fake_msg)
+            return
+
                     # معالجة تعديل اسم وسيلة دفع (pm_input_name_)
         if isinstance(current_state, str) and current_state.startswith('pm_input_name_'):
             user_id = message['from']['id']
@@ -4969,7 +5090,7 @@ class ComprehensiveDUXBot:
         currency_texts = {self.tr('change_currency', l) for l in self.get_supported_languages()}
         match_texts = {self.tr('match_btn', l) for l in all_langs} | {'🔄 مطابقة', '🔄 Match'}
         notif_texts = {self.tr('notif_btn', l) for l in all_langs} | {'🔔 إشعاراتي', '🔔 Notifications'}
-        ref_texts = {self.tr('referral_btn', l) for l in all_langs} | {'🎁 إحالة', '🎁 Referral'}
+        ref_texts = {self.tr('referral_btn', l) for l in all_langs} | {'🎁 اربح', '🎁 إحالة', '🎁 Referral'}
         help_texts = {self.tr('help_btn_label', l) for l in all_langs} | {'❓ مساعدة', '❓ Help'}
         svrp_texts = {self.tr('svrp_title', l) for l in all_langs} | {'💎 تعويض 100%', '💎 تعويض'}
         apps_texts = {self.tr('apps_btn', l) for l in all_langs} | {'📱 تطبيقات', '📱 Apps'}
@@ -5778,6 +5899,8 @@ class ComprehensiveDUXBot:
             self.show_trade_admin_queue(message)
         elif text == '📋 كل الطلبات':
             self.show_unified_orders(message)
+        elif text == '🎁 روابط الإحالة':
+            self.show_referral_links_admin(message)
         elif text in {self.tr('admin_message_user', l) for l in all_langs}:
             self.start_send_user_message(message)
         elif text in {self.tr('admin_notifications', l) for l in all_langs}:
@@ -7647,6 +7770,70 @@ class ComprehensiveDUXBot:
                 self.edit_message(chat_id, message.get('message_id'), "🏠 العودة")
                 welcome = self.tr('choose_service', lang, name=user.get('name', ''), customer_id=user.get('customer_id', '')) if user else ''
                 self.send_message(chat_id, welcome, self.main_keyboard(lang, user_id))
+                return
+
+            # ==================== 🎁 لوحة اربح ====================
+            elif data == 'ref_back_main':
+                user = self.find_user(user_id)
+                lang = user.get('language', 'ar') if user else 'ar'
+                self.edit_message(chat_id, message.get('message_id'), "🏠 العودة")
+                welcome = self.tr('choose_service', lang, name=user.get('name', ''), customer_id=user.get('customer_id', '')) if user else ''
+                self.send_message(chat_id, welcome, self.main_keyboard(lang, user_id))
+                return
+
+            # ==================== أدمن: روابط الإحالة ====================
+            elif data == 'ref_admin_panel':
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_referral_links_admin(fake_msg)
+                return
+
+            elif data == 'ref_admin_add':
+                self.edit_message(chat_id, message.get('message_id'),
+                    "➕ <b>إضافة رابط إحالة</b>\n\n📝 اكتب <b>اسم الزر</b>:")
+                self.user_states[user_id] = 'ref_link_name'
+                return
+
+            elif data.startswith('ref_admin_delete_'):
+                link_id = data.replace('ref_admin_delete_', '')
+                try:
+                    rows = []
+                    with open('referral_links.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        fieldnames = reader.fieldnames
+                        for row in reader:
+                            if row['id'] != link_id:
+                                rows.append(row)
+                    with open('referral_links.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                        writer = csv.DictWriter(f, fieldnames=fieldnames)
+                        writer.writeheader()
+                        writer.writerows(rows)
+                except:
+                    pass
+                self.edit_message(chat_id, message.get('message_id'), f"✅ تم حذف الرابط")
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_referral_links_admin(fake_msg)
+                return
+
+            elif data.startswith('ref_admin_toggle_'):
+                link_id = data.replace('ref_admin_toggle_', '')
+                try:
+                    rows = []
+                    with open('referral_links.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        fieldnames = reader.fieldnames
+                        for row in reader:
+                            if row['id'] == link_id:
+                                row['is_active'] = 'no' if row.get('is_active') == 'yes' else 'yes'
+                            rows.append(row)
+                    with open('referral_links.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                        writer = csv.DictWriter(f, fieldnames=fieldnames)
+                        writer.writeheader()
+                        writer.writerows(rows)
+                except:
+                    pass
+                self.edit_message(chat_id, message.get('message_id'), "✅ تم التبديل")
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_referral_links_admin(fake_msg)
                 return
 
             elif data == 'trade_back_panel':
