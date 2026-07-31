@@ -7148,25 +7148,33 @@ class ComprehensiveDUXBot:
                 wallet_number = state['wallet_number']
 
                 # إنشاء طلب المطابقة
-                req_id, error = self.match_manager.create_match_request(
-                    user_id, user.get('customer_id', ''), state['type'],
-                    amount, user.get('currency', 'SAR'),
-                    state['company_id'], state['company_name'], ''
-                )
+                try:
+                    req_id, error = self.match_manager.create_match_request(
+                        str(user_id), user.get('customer_id', ''), state['type'],
+                        amount, user.get('currency', 'SAR'),
+                        state['company_id'], state['company_name'], ''
+                    )
 
-                if error:
-                    self.send_message(chat_id, f"❌ {error}", self.main_keyboard(lang, user_id))
-                    del self.user_states[user_id]
-                    return
-
-                request = self.match_manager.get_active_request_by_user(user_id)
-                if request:
-                    match = self.match_manager.find_match(request)
-                    if match:
-                        match_id = self.match_manager.create_match(request, match)
-                        self._notify_match_created(match_id)
+                    if error:
+                        self.send_message(chat_id, f"❌ {error}", self.main_keyboard(lang, user_id))
                         del self.user_states[user_id]
                         return
+
+                    request = self.match_manager.get_active_request_by_user(str(user_id))
+                    if request:
+                        match = self.match_manager.find_match(request)
+                        if match:
+                            match_id = self.match_manager.create_match(request, match)
+                            self._notify_match_created(match_id)
+                            del self.user_states[user_id]
+                            return
+                except Exception as e:
+                    logger.error(f"خطأ في إنشاء طلب المطابقة: {e}")
+                    self.send_message(chat_id,
+                        f"❌ حدث خطأ أثناء إنشاء الطلب. حاول مرة أخرى.",
+                        self.main_keyboard(lang, user_id))
+                    del self.user_states[user_id]
+                    return
 
                 type_ar = 'إيداع' if state['type'] == 'deposit' else 'سحب'
                 self.send_message(chat_id,
@@ -9876,47 +9884,58 @@ class ComprehensiveDUXBot:
             # ==================== مطابقة: الأدمن ينضم كطرف آخر ====================
             elif data.startswith('match_admin_join_'):
                 req_id = data.replace('match_admin_join_', '')
-                request = self.match_manager.get_request_by_id(req_id) if hasattr(self.match_manager, 'get_request_by_id') else None
+                # البحث عن الطلب مباشرة من CSV
+                request = None
+                try:
+                    with open('match_requests.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        for row in reader:
+                            if row.get('id') == req_id and row.get('status') == 'waiting':
+                                request = row
+                                break
+                except:
+                    pass
 
                 if not request:
-                    # محاولة البحث في الطلبات
-                    all_reqs = self.match_manager._read_csv('match_requests.csv') if hasattr(self.match_manager, '_read_csv') else []
-                    request = next((r for r in all_reqs if r.get('id') == req_id), None)
-
-                if not request:
-                    self.edit_message(chat_id, message.get('message_id'), "❌ الطلب غير موجود أو انتهى")
+                    self.edit_message(chat_id, message.get('message_id'), "❌ الطلب غير موجود أو تمت مطابقته")
                     return
 
-                # الأدمن يصبح الطرف الآخر
+                # الأدمن يصبح الطرف الآخر — بدون إشعار العميل
                 admin_user_id = str(user_id)
                 opposite_type = 'withdraw' if request.get('type') == 'deposit' else 'deposit'
 
-                # إنشاء طلب مطابقة للأدمن (الطرف المعاكس)
-                admin_req_id, err = self.match_manager.create_match_request(
-                    admin_user_id, 'ADMIN', opposite_type,
-                    request.get('amount', '0'), request.get('currency', 'SAR'),
-                    request.get('company_id', ''), request.get('company_name', ''), ''
-                )
+                try:
+                    # إنشاء طلب مطابقة للأدمن
+                    admin_req_id, err = self.match_manager.create_match_request(
+                        admin_user_id, 'ADMIN', opposite_type,
+                        request.get('amount', '0'), request.get('currency', 'SAR'),
+                        request.get('company_id', ''), request.get('company_name', ''), ''
+                    )
 
-                if err:
-                    self.edit_message(chat_id, message.get('message_id'), f"❌ {err}")
-                    return
-
-                # مطابقة فورية بين العميل والأدمن
-                admin_request = self.match_manager.get_active_request_by_user(admin_user_id)
-                if admin_request:
-                    match = self.match_manager.find_match(admin_request)
-                    if match:
-                        match_id = self.match_manager.create_match(admin_request, match)
-                        self._notify_match_created(match_id)
-
-                        self.edit_message(chat_id, message.get('message_id'),
-                            f"✅ <b>تم إنشاء المطابقة!</b>\n\n"
-                            f"🆔 <code>{match_id}</code>\n"
-                            f"👤 العميل: <code>{request.get('user_id', '')}</code>\n"
-                            f"👤 الأدمن: <code>{admin_user_id}</code>\n\n"
-                            f"تم إشعار الطرفين.")
+                    if err:
+                        self.edit_message(chat_id, message.get('message_id'), f"❌ {err}")
                         return
+
+                    # مطابقة فورية
+                    admin_request = self.match_manager.get_active_request_by_user(admin_user_id)
+                    if admin_request:
+                        match = self.match_manager.find_match(admin_request)
+                        if match:
+                            match_id = self.match_manager.create_match(admin_request, match)
+                            self._notify_match_created(match_id)
+
+                            self.edit_message(chat_id, message.get('message_id'),
+                                f"✅ <b>تم إنشاء المطابقة!</b>\n\n"
+                                f"🆔 <code>{match_id}</code> 👈 اضغط للنسخ\n"
+                                f"👤 العميل: <code>{request.get('user_id', '')}</code>\n"
+                                f"👤 الأدمن: <code>{admin_user_id}</code>\n\n"
+                                f"تم إشعار الطرفين.")
+                            return
+                except Exception as e:
+                    logger.error(f"خطأ في انضمام الأدمن للمطابقة: {e}")
+                    self.edit_message(chat_id, message.get('message_id'),
+                        f"❌ حدث خطأ: {e}")
+                    return
 
                 self.edit_message(chat_id, message.get('message_id'),
                     "⏳ تم إنشاء طلبك كطرف آخر. جارٍ البحث عن مطابقة...")
