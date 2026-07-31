@@ -5105,19 +5105,53 @@ class ComprehensiveDUXBot:
         if isinstance(current_state, str) and current_state.startswith('awaiting_reject_reason_'):
             pass  # يُعالج لاحقاً في handle_admin_actions
         elif isinstance(current_state, dict) and 'step' in current_state:
-            self.handle_matching_flow(message)
-            return
-        elif isinstance(current_state, dict) and current_state.get('step') in ('chatting', 'rating'):
-            self.handle_matching_flow(message)
-            return
-        elif isinstance(current_state, dict) and current_state.get('step', '').startswith('trade_'):
-            self.handle_trade_buy_step(message, current_state)
-            return
-        elif isinstance(current_state, dict) and current_state.get('step', '').startswith('trade_admin_'):
-            self.handle_trade_admin_step(message, current_state)
-            return
-        elif isinstance(current_state, dict) and current_state.get('step') == 'trade_buyer_screenshot':
-            user_id = message['from']['id']
+            step = current_state.get('step', '')
+            if step in ('match_enter_data', 'match_enter_code', 'match_amount',
+                       'match_company', 'match_company_select', 'chatting', 'rating',
+                       'selecting_payment_method'):
+                self.handle_matching_flow(message)
+                return
+            elif step == 'custom_flow':
+                self.handle_custom_flow_step(message, current_state)
+                return
+            elif step == 'app_field_edit':
+                self.handle_app_field_edit(message, current_state)
+                return
+            elif step == 'lot_confirm':
+                text_msg = message.get('text', '').strip()
+                if text_msg.lower() in ['إلغاء', 'الغاء', 'cancel']:
+                    del self.user_states[user_id]
+                    fake_msg = {'chat': {'id': message['chat']['id']}, 'from': {'id': user_id}, 'text': ''}
+                    self.show_lottery_panel(fake_msg)
+                    return
+                if text_msg.lower() in ['تم', 'done', 'ok', 'نعم']:
+                    round_id = current_state.get('round_id', '')
+                    method_id = current_state.get('method_id', '')
+                    user_obj = self.find_user(user_id)
+                    import random as _r
+                    ticket_number = f"{_r.randint(1000, 9999)}"
+                    try:
+                        with open('lottery_tickets.csv', 'a', newline='', encoding='utf-8-sig') as f:
+                            writer = csv.writer(f)
+                            writer.writerow([f"TKT{str(int(datetime.now().timestamp()))[-6:]}",
+                                           round_id, str(user_id), user_obj.get('name', ''), user_obj.get('customer_id', ''),
+                                           ticket_number, datetime.now().strftime('%Y-%m-%d %H:%M'),
+                                           method_id, 'pending'])
+                    except:
+                        pass
+                    del self.user_states[user_id]
+                    self.send_message(message['chat']['id'],
+                        f"🎫 <b>تم شراء تذكرة!</b>\n\n"
+                        f"🎰 رقم التذكرة: <code>#{ticket_number}</code> 👈 اضغط للنسخ\n"
+                        f"⏳ بانتظار تأكيد الدفع من الإدارة\n\n"
+                        f"حظاً موفقاً! 🍀")
+                return
+            elif step.startswith('trade_buy_') or step == 'trade_buyer_screenshot':
+                self.handle_trade_buy_step(message, current_state)
+                return
+            elif step.startswith('trade_admin_'):
+                self.handle_trade_admin_step(message, current_state)
+                return
             chat_id = message['chat']['id']
             order_id = current_state.get('order_id', '')
 
