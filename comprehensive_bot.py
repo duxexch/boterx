@@ -4234,8 +4234,8 @@ class ComprehensiveDUXBot:
             return
 
         # معالجة إضافة وسيلة دفع جديدة (pm_add_wizard_)
-        # معالجة إضافة وسيلة دفع — خطوة بخطوة
-        if isinstance(current_state, dict) and current_state.get('step', '').startswith('pm_add'):
+        # معالجة إضافة وسيلة دفع — خطوة بخطوة + خطوات مخصصة
+        if isinstance(current_state, dict) and current_state.get('step', '').startswith('pm_'):
             user_id = message['from']['id']
             chat_id = message['chat']['id']
             text_msg = message.get('text', '').strip()
@@ -4313,7 +4313,7 @@ class ComprehensiveDUXBot:
                         {'keyboard': [
                             [{'text': '📝 نص'}, {'text': '💰 مبلغ'}],
                             [{'text': '📸 لقطة شاشة'}, {'text': 'ℹ️ معلومة'}],
-                            [{'text': '✅ انتهيت'}]
+                            [{'text': '✅ انتهيت'}, {'text': '❌ إلغاء'}]
                         ], 'resize_keyboard': True, 'one_time_keyboard': True})
                 elif text_msg == '⏭️ تخطي':
                     current_state['step'] = 'pm_add_custom_withdraw'
@@ -4368,7 +4368,7 @@ class ComprehensiveDUXBot:
                     {'keyboard': [
                         [{'text': '📝 نص'}, {'text': '💰 مبلغ'}],
                         [{'text': '📸 لقطة شاشة'}, {'text': 'ℹ️ معلومة'}],
-                        [{'text': '✅ انتهيت'}]
+                        [{'text': '✅ انتهيت'}, {'text': '❌ إلغاء'}]
                     ], 'resize_keyboard': True, 'one_time_keyboard': True})
 
             # === اختيار نعم/تخطي للسحب ===
@@ -4383,7 +4383,7 @@ class ComprehensiveDUXBot:
                         {'keyboard': [
                             [{'text': '📝 نص'}, {'text': '💰 مبلغ'}],
                             [{'text': '📸 لقطة شاشة'}, {'text': 'ℹ️ معلومة'}],
-                            [{'text': '✅ انتهيت'}]
+                            [{'text': '✅ انتهيت'}, {'text': '❌ إلغاء'}]
                         ], 'resize_keyboard': True, 'one_time_keyboard': True})
                 elif text_msg == '⏭️ تخطي':
                     # إنهاء — حفظ كل شيء
@@ -4449,13 +4449,13 @@ class ComprehensiveDUXBot:
                     f"✅ تم حفظ الخطوة #{step_order}\n\n"
                     f"📝 <b>خطوة سحب #{step_order + 1}</b>\n\n"
                     f"اختر نوع الخطوة التالية أو اضغط 'انتهيت':",
-                    {'keyboard': [
-                        [{'text': '📝 نص'}, {'text': '💰 مبلغ'}],
-                        [{'text': '📸 لقطة شاشة'}, {'text': 'ℹ️ معلومة'}],
-                        [{'text': '✅ انتهيت'}]
-                    ], 'resize_keyboard': True, 'one_time_keyboard': True})
+                                    {'keyboard': [
+                                        [{'text': '📝 نص'}, {'text': '💰 مبلغ'}],
+                                        [{'text': '📸 لقطة شاشة'}, {'text': 'ℹ️ معلومة'}],
+                                        [{'text': '✅ انتهيت'}, {'text': '❌ إلغاء'}]
+                                    ], 'resize_keyboard': True, 'one_time_keyboard': True})
 
-        # معالجة تعديل اسم وسيلة دفع (pm_input_name_)
+                    # معالجة تعديل اسم وسيلة دفع (pm_input_name_)
         if isinstance(current_state, str) and current_state.startswith('pm_input_name_'):
             user_id = message['from']['id']
             chat_id = message['chat']['id']
@@ -7684,7 +7684,9 @@ class ComprehensiveDUXBot:
                 method_id = data.replace('trade_method_', '')
                 state = self.user_states.get(user_id, {})
                 if isinstance(state, dict) and state.get('step') == 'trade_buy_method':
-                    state['payment_method'] = method_id
+                    method = self.get_payment_method_by_id(method_id)
+                    state['payment_method'] = method.get('method_name', method_id) if method else method_id
+                    state['payment_method_id'] = method_id
                     state['step'] = 'trade_buy_amount'
                     self.user_states[user_id] = state
                     self.edit_message(chat_id, message.get('message_id'), "💰")
@@ -10930,7 +10932,7 @@ class ComprehensiveDUXBot:
             inline_btns = []
             for m in active:
                 icon = m.get('icon', '💳') or '💳'
-                inline_btns.append([{'text': f"{icon} {m['method_name']} — <code>{m.get('account_data', '')}</code>",
+                inline_btns.append([{'text': f"{icon} {m['method_name']} — {m.get('account_data', '')}",
                                      'callback_data': f"trade_method_{m['id']}"}])
             inline_btns.append([{'text': '🔙 إلغاء', 'callback_data': 'trade_buy_cancel'}])
             self.send_inline_message(chat_id, "💳 اختر وسيلة الدفع:", inline_btns)
