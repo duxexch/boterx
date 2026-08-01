@@ -5467,6 +5467,74 @@ class ComprehensiveDUXBot:
                 self.handle_trade_admin_step(message, state)
                 return
 
+            # ==================== 🎡 عجلة الحظ — حالات الإنشاء ===
+            if isinstance(current_state, str) and current_state == 'wheel_name':
+                user_id = message['from']['id']
+                chat_id = message['chat']['id']
+                text_msg = message.get('text', '').strip()
+                if len(text_msg) < 2:
+                    self.send_message(chat_id, "❌ الاسم قصير:")
+                    return
+                self.temp_wheel = getattr(self, 'temp_wheel', {})
+                self.temp_wheel[user_id] = {'name': text_msg}
+                self.user_states[user_id] = 'wheel_prizes'
+                self.send_message(chat_id,
+                    f"✅ الاسم: <b>{text_msg}</b>\n\n"
+                    f"🎁 اكتب <b>الجوائز</b> (مفصولة بـ |):\n\n"
+                    f"💡 مثال: <code>100 ريال | 50 ريال | دورة مجانية | جائزة مفاجئة</code>")
+                return
+
+            if isinstance(current_state, str) and current_state == 'wheel_prizes':
+                user_id = message['from']['id']
+                chat_id = message['chat']['id']
+                text_msg = message.get('text', '').strip()
+                if '|' not in text_msg or len(text_msg) < 3:
+                    self.send_message(chat_id, "❌ اكتب الجوائز مفصولة بـ |")
+                    return
+                self.temp_wheel[user_id]['prizes'] = text_msg
+                self.user_states[user_id] = 'wheel_max'
+                self.send_message(chat_id,
+                    f"✅ الجوائز محفوظة\n\n"
+                    f"🎯 اكتب <b>الحد الأقصى للدورات لكل مستخدم</b>:")
+                return
+
+            if isinstance(current_state, str) and current_state == 'wheel_max':
+                user_id = message['from']['id']
+                chat_id = message['chat']['id']
+                text_msg = message.get('text', '').strip()
+                try:
+                    max_spins = int(text_msg)
+                    if max_spins < 1:
+                        self.send_message(chat_id, "❌ يجب أن يكون 1 على الأقل:")
+                        return
+                except ValueError:
+                    self.send_message(chat_id, "❌ اكتب رقماً:")
+                    return
+
+                data = self.temp_wheel.get(user_id, {})
+                wheel_id = f"WHL{str(int(datetime.now().timestamp()))[-6:]}"
+                try:
+                    with open('wheel_rounds.csv', 'a', newline='', encoding='utf-8-sig') as f:
+                        writer = csv.writer(f)
+                        writer.writerow([wheel_id, data.get('name', ''), data.get('prizes', ''),
+                                       'active', '0', 'SAR', '1', str(max_spins),
+                                       datetime.now().strftime('%Y-%m-%d %H:%M')])
+                except:
+                    pass
+                del self.user_states[user_id]
+                if hasattr(self, 'temp_wheel') and user_id in self.temp_wheel:
+                    del self.temp_wheel[user_id]
+                self.send_message(chat_id,
+                    f"✅ <b>تم إنشاء جولة عجلة الحظ!</b>\n\n"
+                    f"🆔 <code>{wheel_id}</code> 👈 اضغط للنسخ\n"
+                    f"🎡 {data.get('name', '')}\n"
+                    f"🎁 الجوائز: {data.get('prizes', '')}\n"
+                    f"🎯 حد الدورات: {max_spins}",
+                    self.admin_keyboard())
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_wheel_admin(fake_msg)
+                return
+
             # ==================== 🎰 اليانصيب — حالات ===
             if isinstance(current_state, str) and current_state == 'lot_name':
                 user_id = message['from']['id']
@@ -8802,6 +8870,25 @@ class ComprehensiveDUXBot:
                     f"🎯 دوراتك: <code>{my_spins + 1}/{max_spins}</code>\n\n"
                     f"🎁 مبروك! تواصل مع الإدارة لاستلام جائزتك",
                     self.main_keyboard('ar', user_id))
+
+                # إشعار الأدمن بالفائز
+                user_obj = self.find_user(user_id)
+                for admin_id in self.admin_ids:
+                    try:
+                        self.send_message(int(admin_id),
+                            f"🎁 <b>فائز في عجلة الحظ!</b>\n\n"
+                            f"🆔 الجولة: <code>{round_id}</code> 👈 اضغط للنسخ\n"
+                            f"👤 العميل: {user_obj.get('name', '') if user_obj else ''} — <code>{user_id}</code>\n"
+                            f"🎁 الجائزة: <b>{prize_won}</b>\n"
+                            f"📅 {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+                    except:
+                        pass
+
+                # نشر النتيجة في القنوات
+                self.post_to_channels(
+                    f"🎡 <b>نتيجة عجلة الحظ!</b>\n\n"
+                    f"🎁 الفائز: {user_obj.get('name', '') if user_obj else 'عميل'}\n"
+                    f"🏆 الجائزة: <b>{prize_won}</b>")
                 return
 
             elif data.startswith('wheel_end_'):
