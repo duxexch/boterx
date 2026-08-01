@@ -13897,6 +13897,24 @@ class ComprehensiveDUXBot:
         prize_pool = float(active_round.get('ticket_price', 0)) * tickets_sold
         admin_pct = float(active_round.get('admin_profit_pct', 0))
         net_prize = prize_pool * (1 - admin_pct / 100)
+        winner_count = int(active_round.get('winner_count', 1))
+
+        # حساب نسب التوزيع
+        if winner_count == 1:
+            shares = [100]
+            share_labels = ['100%']
+        elif winner_count == 2:
+            shares = [60, 40]
+            share_labels = ['60%', '40%']
+        elif winner_count == 3:
+            shares = [50, 30, 20]
+            share_labels = ['50%', '30%', '20%']
+        else:
+            extra = round(20 / (winner_count - 3), 1)
+            shares = [40, 25, 15] + [round(100 * 0.2 / (winner_count - 3))] * (winner_count - 3)
+            share_labels = ['40%', '25%', '15%'] + [f'{extra}%'] * (winner_count - 3)
+
+        rank_emojis = ['🥇', '🥈', '🥉'] + ['🏅'] * max(0, winner_count - 3)
 
         text = (
             f"🎰 <b>يانصيب — {active_round.get('name', '')}</b>\n\n"
@@ -13905,10 +13923,23 @@ class ComprehensiveDUXBot:
             f"👥 المشاركين: <code>{len(unique_participants)}</code>\n"
             f"📊 التذاكر المباعة: <code>{tickets_sold}</code>\n"
             f"💰 إجمالي الجائزة: <code>{net_prize:.2f}</code> {active_round.get('currency', '')}\n"
-            f"🏆 عدد الفائزين: <code>{active_round.get('winner_count', '1')}</code>\n"
+            f"🏆 عدد الفائزين: <code>{winner_count}</code>\n"
             f"⏰ موعد السحب: <code>{active_round.get('draw_time', '')}</code>\n"
-            f"━━━━━━━━━━━━━━━━━━\n"
+            f"━━━━━━━━━━━━━━━━━━\n\n"
+            f"📊 <b>كيف تتوزع الأرباح؟</b>\n"
+            f"💰 كل تذكرة = <code>{active_round.get('ticket_price', '')}</code> {active_round.get('currency', '')}\n"
         )
+        if admin_pct > 0:
+            text += f"🏢 رسوم الإدارة: <code>{admin_pct:.0f}%</code>\n"
+        text += f"💎 للمشاركين: <code>{100 - admin_pct:.0f}%</code>\n\n"
+
+        # شرح نصيب كل فائز
+        for i in range(winner_count):
+            emoji = rank_emojis[i] if i < len(rank_emojis) else '🏅'
+            prize_amount = net_prize * shares[i] / 100
+            text += f"{emoji} الفائز #{i+1}: <code>{share_labels[i]}</code> ← <code>{prize_amount:.2f}</code> {active_round.get('currency', '')}\n"
+
+        text += f"\n━━━━━━━━━━━━━━━━━━\n"
 
         if my_tickets:
             text += f"\n🎫 تذاكري ({len(my_tickets)}):\n"
