@@ -3128,6 +3128,125 @@ class ComprehensiveDUXBot:
         
         return {'keyboard': keyboard, 'resize_keyboard': True, 'one_time_keyboard': True}
     
+    def get_live_stats(self):
+        """إحصائيات حية — مشاركين اليانصيب + عجلة الحظ + الفائزين + الجوائز الموزعة"""
+        stats = {
+            'lottery_participants': 0,
+            'lottery_winners_count': 0,
+            'lottery_prize_pool': 0.0,
+            'lottery_currency': '',
+            'wheel_participants': 0,
+            'total_distributed': 0.0,
+            'distributed_currency': ''
+        }
+
+        # عد مشاركين اليانصيب (تذاكر موثقة في الجولة النشطة)
+        try:
+            active_lot_id = ''
+            with open('lottery_rounds.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row.get('status') == 'active':
+                        active_lot_id = row.get('id', '')
+                        stats['lottery_currency'] = row.get('currency', '')
+                        stats['lottery_winners_count'] = int(row.get('winner_count', 1))
+                        break
+
+            if active_lot_id:
+                with open('lottery_tickets.csv', 'r', encoding='utf-8-sig') as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        if row.get('round_id') == active_lot_id and row.get('payment_verified') == 'yes':
+                            stats['lottery_participants'] += 1
+        except:
+            pass
+
+        # عد مشاركين عجلة الحظ (في الجولة النشطة)
+        try:
+            active_wheel_id = ''
+            with open('wheel_rounds.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row.get('status') == 'active':
+                        active_wheel_id = row.get('id', '')
+                        break
+
+            if active_wheel_id:
+                seen_users = set()
+                with open('wheel_spins.csv', 'r', encoding='utf-8-sig') as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        if row.get('round_id') == active_wheel_id:
+                            seen_users.add(row.get('user_id', ''))
+                stats['wheel_participants'] = len(seen_users)
+        except:
+            pass
+
+        # إجمالي الجوائز الموزعة (من lottery_winners + wheel_spins)
+        try:
+            with open('lottery_winners.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    try:
+                        stats['total_distributed'] += float(row.get('prize_amount', 0))
+                        if not stats['distributed_currency']:
+                            stats['distributed_currency'] = row.get('currency', '')
+                    except:
+                        pass
+        except:
+            pass
+
+        return stats
+
+    def format_stats_bar(self):
+        """شريط إحصائيات مختصر — يظهر أعلى البوت"""
+        s = self.get_live_stats()
+        parts = []
+
+        if s['lottery_participants'] > 0 or s['lottery_winners_count'] > 0:
+            parts.append(f"🎰 {s['lottery_participants']} مشارك")
+            if s['lottery_winners_count'] > 0:
+                parts.append(f"🏆 {s['lottery_winners_count']} فائزين")
+
+        if s['wheel_participants'] > 0:
+            parts.append(f"🎡 {s['wheel_participants']} لاعب")
+
+        if s['total_distributed'] > 0:
+            cur = s['distributed_currency'] or 'SAR'
+            parts.append(f"💰 {s['total_distributed']:.0f} {cur} موزّعة")
+
+        if not parts:
+            return ''
+
+        return f"📊 {' | '.join(parts)}"
+
+    def send_welcome(self, chat_id, lang, user_id=None):
+        """إرسال رسالة الترحيب مع شريط الإحصائيات الحية"""
+        user = self.find_user(user_id) if user_id else None
+        name = user.get('name', '') if user else ''
+        customer_id = user.get('customer_id', '') if user else ''
+        stats_bar = self.format_stats_bar()
+
+        if lang == 'ar':
+            text = (
+                f"━━━━━━━━━━━━━━━━━━\n"
+                f"👋 <b>أهلاً وسهلاً، {name}!</b>\n"
+                f"━━━━━━━━━━━━━━━━━━\n\n"
+                f"🆔 رقم العميل: <b><code>{customer_id}</code></b>\n"
+            )
+            if stats_bar:
+                text += f"\n{stats_bar}\n"
+            text += (
+                f"\n━━━━━━━━━━━━━━━━━━\n"
+                f"👇 <b>اختر ما تريد من الأزرار بالأسفل</b>"
+            )
+        else:
+            text = self.tr('choose_service', lang, name=name, customer_id=customer_id)
+            if stats_bar:
+                text = f"{stats_bar}\n\n" + text
+
+        self.send_message(chat_id, text, self.main_keyboard(lang, user_id))
+
     def handle_start(self, message, ref_code=None):
         """معالج بداية المحادثة — اختيار اللغة أولاً ثم رقم الهاتف"""
         chat_id = message['chat']['id']
@@ -3145,13 +3264,18 @@ class ComprehensiveDUXBot:
             lang = user.get('language', 'ar')
             name = user.get('name', '')
             customer_id = user.get('customer_id', '')
+            stats_bar = self.format_stats_bar()
             if lang == 'ar':
                 welcome_text = (
                     f"━━━━━━━━━━━━━━━━━━\n"
                     f"👋 <b>أهلاً وسهلاً، {name}!</b>\n"
                     f"━━━━━━━━━━━━━━━━━━\n\n"
-                    f"🆔 رقم العميل: <b><code>{customer_id}</code></b>\n\n"
-                    f"━━━━━━━━━━━━━━━━━━\n"
+                    f"🆔 رقم العميل: <b><code>{customer_id}</code></b>\n"
+                )
+                if stats_bar:
+                    welcome_text += f"\n{stats_bar}\n"
+                welcome_text += (
+                    f"\n━━━━━━━━━━━━━━━━━━\n"
                     f"🟢 <b>إيداع</b> — أودع أموالك بسهولة\n"
                     f"🔴 <b>سحب</b> — اسحب أموالك بسرعة\n"
                     f"📋 <b>طلباتي</b> — تابع حالة معاملاتك\n"
@@ -3163,7 +3287,9 @@ class ComprehensiveDUXBot:
                     f"👇 <b>اختر ما تريد من الأزرار بالأسفل</b>"
                 )
             else:
-                welcome_text = self.tr('welcome_back', lang, name=name, customer_id=customer_id)
+                welcome_text = self.tr('choose_service', lang, name=name, customer_id=customer_id)
+                if stats_bar:
+                    welcome_text = f"{stats_bar}\n\n" + welcome_text
             self.send_message(chat_id, welcome_text, self.main_keyboard(lang, user_id))
         else:
             # تخزين كود الإحالة مؤقتاً
@@ -9109,8 +9235,19 @@ class ComprehensiveDUXBot:
                 user = self.find_user(user_id)
                 lang = user.get('language', 'ar') if user else 'ar'
                 self.edit_message(chat_id, message.get('message_id'), "🏠 العودة")
-                welcome = self.tr('choose_service', lang, name=user.get('name', ''), customer_id=user.get('customer_id', '')) if user else ''
-                self.send_message(chat_id, welcome, self.main_keyboard(lang, user_id))
+                self.send_welcome(chat_id, lang, user_id)
+                return
+
+            elif data == 'wheel_refresh':
+                self.edit_message(chat_id, message.get('message_id'), "🔄 جارٍ التحديث...")
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_wheel_panel(fake_msg)
+                return
+
+            elif data == 'lot_refresh':
+                self.edit_message(chat_id, message.get('message_id'), "🔄 جارٍ التحديث...")
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_lottery_panel(fake_msg)
                 return
 
             elif data == 'wheel_create':
@@ -9309,8 +9446,7 @@ class ComprehensiveDUXBot:
                 user = self.find_user(user_id)
                 lang = user.get('language', 'ar') if user else 'ar'
                 self.edit_message(chat_id, message.get('message_id'), "🏠 العودة")
-                welcome = self.tr('choose_service', lang, name=user.get('name', ''), customer_id=user.get('customer_id', '')) if user else ''
-                self.send_message(chat_id, welcome, self.main_keyboard(lang, user_id))
+                self.send_welcome(chat_id, lang, user_id)
                 return
 
             elif data == 'lot_create':
@@ -13611,14 +13747,17 @@ class ComprehensiveDUXBot:
                 self.main_keyboard(lang, message['from']['id']))
             return
 
-        # عد دورات المستخدم
+        # عد دورات المستخدم + إجمالي المشاركين
         my_spins = 0
+        total_participants = set()
         try:
             with open('wheel_spins.csv', 'r', encoding='utf-8-sig') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    if row.get('round_id') == active_round['id'] and row.get('user_id') == str(message['from']['id']):
-                        my_spins += 1
+                    if row.get('round_id') == active_round['id']:
+                        total_participants.add(row.get('user_id', ''))
+                        if row.get('user_id') == str(message['from']['id']):
+                            my_spins += 1
         except:
             pass
 
@@ -13628,6 +13767,7 @@ class ComprehensiveDUXBot:
         text = (
             f"🎡 <b>عجلة الحظ — {active_round.get('name', '')}</b>\n\n"
             f"━━━━━━━━━━━━━━━━━━\n"
+            f"👥 المشاركين: <code>{len(total_participants)}</code>\n"
             f"🎁 الجوائز:\n"
         )
         for i, prize in enumerate(prizes, 1):
@@ -13643,6 +13783,7 @@ class ComprehensiveDUXBot:
         else:
             text += "⚠️ وصلت للحد الأقصى من الدورات"
 
+        inline_btns.append([{'text': '🔄 تحديث', 'callback_data': 'wheel_refresh'}])
         inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'wheel_back_main'}])
         self.send_inline_message(message['chat']['id'], text, inline_btns)
 
@@ -13737,8 +13878,9 @@ class ComprehensiveDUXBot:
                 self.main_keyboard(user.get('language', 'ar'), message['from']['id']))
             return
 
-        # عد التذاكر المباعة
+        # عد التذاكر المباعة + المشاركين الفريدين
         tickets_sold = 0
+        unique_participants = set()
         my_tickets = []
         try:
             with open('lottery_tickets.csv', 'r', encoding='utf-8-sig') as f:
@@ -13746,6 +13888,7 @@ class ComprehensiveDUXBot:
                 for row in reader:
                     if row.get('round_id') == active_round['id']:
                         tickets_sold += 1
+                        unique_participants.add(row.get('user_id', ''))
                         if row.get('user_id') == str(message['from']['id']):
                             my_tickets.append(row.get('ticket_number', ''))
         except:
@@ -13759,6 +13902,7 @@ class ComprehensiveDUXBot:
             f"🎰 <b>يانصيب — {active_round.get('name', '')}</b>\n\n"
             f"━━━━━━━━━━━━━━━━━━\n"
             f"🎫 سعر التذكرة: <code>{active_round.get('ticket_price', '')}</code> {active_round.get('currency', '')}\n"
+            f"👥 المشاركين: <code>{len(unique_participants)}</code>\n"
             f"📊 التذاكر المباعة: <code>{tickets_sold}</code>\n"
             f"💰 إجمالي الجائزة: <code>{net_prize:.2f}</code> {active_round.get('currency', '')}\n"
             f"🏆 عدد الفائزين: <code>{active_round.get('winner_count', '1')}</code>\n"
@@ -13784,6 +13928,7 @@ class ComprehensiveDUXBot:
             text += f"\n⚠️ <b>يجب التسجيل برقم هاتف حقيقي للمشاركة</b>"
             inline_btns.append([{'text': '📱 تسجيل برقم هاتفي الحقيقي', 'callback_data': 'verify_phone_start'}])
 
+        inline_btns.append([{'text': '🔄 تحديث', 'callback_data': 'lot_refresh'}])
         inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'lot_back_main'}])
         self.send_inline_message(message['chat']['id'], text, inline_btns)
 
