@@ -5756,7 +5756,7 @@ class ComprehensiveDUXBot:
                 self.show_lottery_admin(fake_msg)
                 return
 
-            # تأكيد شراء تذكرة
+            # تأكيد شراء تذكرة — لا يُولد رقم حتى توافق الإدارة
             if isinstance(current_state, dict) and current_state.get('step') == 'lot_confirm':
                 user_id = message['from']['id']
                 chat_id = message['chat']['id']
@@ -5772,38 +5772,57 @@ class ComprehensiveDUXBot:
                     self.send_message(chat_id, "اكتب <b>'تم'</b> للتأكيد أو <b>'إلغاء'</b>")
                     return
 
-                # شراء التذكرة
+                # إنشاء طلب تذكرة — بدون توليد رقم حتى توافق الإدارة
                 round_id = current_state.get('round_id', '')
                 method_id = current_state.get('method_id', '')
                 user = self.find_user(user_id)
-
-                # توليد رقم التذكرة
-                import random as _r
-                ticket_number = f"{_r.randint(1000, 9999)}"
+                ticket_req_id = f"LTR{str(int(datetime.now().timestamp()))[-6:]}"
 
                 try:
                     with open('lottery_tickets.csv', 'a', newline='', encoding='utf-8-sig') as f:
                         writer = csv.writer(f)
-                        writer.writerow([f"TKT{str(int(datetime.now().timestamp()))[-6:]}",
-                                       round_id, str(user_id), user.get('name', ''), user.get('customer_id', ''),
-                                       ticket_number, datetime.now().strftime('%Y-%m-%d %H:%M'),
-                                       method_id, 'pending'])
+                        writer.writerow([ticket_req_id, round_id, str(user_id), user.get('name', ''), user.get('customer_id', ''),
+                                       '', datetime.now().strftime('%Y-%m-%d %H:%M'),
+                                       method_id, 'pending_admin'])
                 except:
                     pass
 
                 del self.user_states[user_id]
                 self.send_message(chat_id,
-                    f"🎫 <b>تم شراء تذكرة!</b>\n\n"
-                    f"🎰 رقم التذكرة: <code>#{ticket_number}</code> 👈 اضغط للنسخ\n"
-                    f"⏳ بانتظار تأكيد الدفع من الإدارة\n\n"
-                    f"حظاً موفقاً! 🍀")
-                # إشعار الأدمن
+                    f"⏳ <b>تم استلام طلب تذكرتك!</b>\n\n"
+                    f"🆔 طلبك: <code>{ticket_req_id}</code> 👈 اضغط للنسخ\n"
+                    f"🏢 الجولة: <code>{round_id}</code>\n\n"
+                    f"⏳ بانتظار موافقة الإدارة\n"
+                    f"🔒 بياناتك محفوظة بأمان\n\n"
+                    f"سيتم إرسال رقم تذكرتك فور تأكيد الإدارة")
+                # إشعار الأدمن — موافقة/رفض
                 for admin_id in self.admin_ids:
                     try:
-                        self.send_message(int(admin_id),
-                            f"🎫 <b>تذكرة يانصيب جديدة</b>\n\n"
-                            f"🔢 التذكرة: <code>#{ticket_number}</code>\n"
-                            f"👤 {user.get('name', '')} — <code>{user.get('customer_id', '')}</code>")
+                        # قراءة تفاصيل الجولة
+                        round_name = ''
+                        ticket_price = ''
+                        currency = ''
+                        try:
+                            with open('lottery_rounds.csv', 'r', encoding='utf-8-sig') as f:
+                                reader = csv.DictReader(f)
+                                for row in reader:
+                                    if row['id'] == round_id:
+                                        round_name = row.get('name', '')
+                                        ticket_price = row.get('ticket_price', '')
+                                        currency = row.get('currency', '')
+                                        break
+                        except:
+                            pass
+                        self.send_inline_message(int(admin_id),
+                            f"🎫 <b>طلب تذكرة يانصيب</b>\n\n"
+                            f"🆔 الطلب: <code>{ticket_req_id}</code> 👈 اضغط للنسخ\n"
+                            f"👤 العميل: {user.get('name', '')} — <code>{user.get('customer_id', '')}</code>\n"
+                            f"🎰 الجولة: {round_name}\n"
+                            f"💰 السعر: <code>{ticket_price}</code> {currency}\n\n"
+                            f"✅ اضغط موافقة لتأكيد الدفع وإصدار رقم التذكرة\n"
+                            f"❌ أو رفض لإلغاء الطلب",
+                            [[{'text': '✅ موافقة وإصدار', 'callback_data': f'lot_admin_approve_{ticket_req_id}'},
+                              {'text': '❌ رفض', 'callback_data': f'lot_admin_reject_{ticket_req_id}'}]])
                     except:
                         pass
                 return
@@ -9038,6 +9057,75 @@ class ComprehensiveDUXBot:
                 return
 
             # ==================== 🎰 اليانصيب ====================
+            # ==================== 🎰 اليانصيب: موافقة/رفض الأدمن على التذاكر ====================
+            elif data.startswith('lot_admin_approve_'):
+                ticket_req_id = data.replace('lot_admin_approve_', '')
+                # توليد رقم تذكرة فريد
+                import random as _r
+                ticket_number = f"{_r.randint(10000, 99999)}"
+                # تحديث التذكرة في CSV
+                try:
+                    rows = []
+                    with open('lottery_tickets.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        fieldnames = reader.fieldnames
+                        for row in reader:
+                            if row.get('id') == ticket_req_id:
+                                row['ticket_number'] = ticket_number
+                                row['payment_verified'] = 'yes'
+                            rows.append(row)
+                    with open('lottery_tickets.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                        writer = csv.DictWriter(f, fieldnames=fieldnames)
+                        writer.writeheader()
+                        writer.writerows(rows)
+                except:
+                    pass
+                self.edit_message(chat_id, message.get('message_id'),
+                    f"✅ <b>تم إصدار التذكرة!</b>\n\n"
+                    f"🎫 رقم التذكرة: <code>#{ticket_number}</code> 👈 اضغط للنسخ\n"
+                    f"🆔 الطلب: <code>{ticket_req_id}</code>")
+                # إشعار العميل
+                try:
+                    rows = []
+                    with open('lottery_tickets.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        for row in reader:
+                            if row.get('id') == ticket_req_id:
+                                self.notify_user(int(row.get('user_id', 0)),
+                                    f"✅ <b>تم تأكيد تذكرتك!</b>\n\n"
+                                    f"🎫 رقم التذكرة: <code>#{ticket_number}</code> 👈 اضغط للنسخ\n\n"
+                                    f"حظاً موفقاً! 🍀")
+                                break
+                except:
+                    pass
+                return
+
+            elif data.startswith('lot_admin_reject_'):
+                ticket_req_id = data.replace('lot_admin_reject_', '')
+                # حذف الطلب
+                try:
+                    rows = []
+                    target_user_id = None
+                    with open('lottery_tickets.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        fieldnames = reader.fieldnames
+                        for row in reader:
+                            if row.get('id') == ticket_req_id:
+                                target_user_id = row.get('user_id', '')
+                                continue
+                            rows.append(row)
+                    with open('lottery_tickets.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                        writer = csv.DictWriter(f, fieldnames=fieldnames)
+                        writer.writeheader()
+                        writer.writerows(rows)
+                except:
+                    pass
+                self.edit_message(chat_id, message.get('message_id'), f"❌ تم رفض الطلب")
+                if target_user_id:
+                    self.notify_user(int(target_user_id),
+                        "❌ <b>تم رفض طلب تذكرتك</b>\n\nيمكنك المحاولة مرة أخرى لاحقاً")
+                return
+
             elif data == 'lot_back_main':
                 user = self.find_user(user_id)
                 lang = user.get('language', 'ar') if user else 'ar'
