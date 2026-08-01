@@ -7337,10 +7337,10 @@ class ComprehensiveDUXBot:
                     except Exception as e:
                         logger.error(f"خطأ في create_match: {e}")
 
-                # لا توجد مطابقة — العميل ينتظر + إشعار الأدمن
+                # لا توجد مطابقة — العميل ينتظر موافقة الإدارة + الأدمن يصبح الطرف الآخر تلقائياً
                 type_ar = 'إيداع' if match_type == 'deposit' else 'سحب'
                 self.send_message(chat_id,
-                    f"⏳ <b>تم إنشاء طلبك</b>\n\n"
+                    f"⏳ <b>تم إنشاء طلبك بنجاح!</b>\n\n"
                     f"━━━━━━━━━━━━━━━━━━\n"
                     f"{'💵' if match_type == 'deposit' else '💸'} النوع: <b>{type_ar}</b>\n"
                     f"💰 المبلغ: <code>{amount}</code>\n"
@@ -7348,29 +7348,31 @@ class ComprehensiveDUXBot:
                     f"💳 المحفظة: <code>{wallet_number}</code> 👈 اضغط للنسخ\n"
                     f"🆔 معرف الحساب: <code>{account_id}</code> 👈 اضغط للنسخ\n"
                     f"━━━━━━━━━━━━━━━━━━\n\n"
-                    f"⏳ جارٍ البحث عن مطابقة...\n"
-                    f"سيتم إشعارك فور العثور على طرف آخر.",
+                    f"🔒 <b>بياناتك محفوظة بأمان</b>\n"
+                    f"⏳ بانتظار موافقة الإدارة على طلبك\n\n"
+                    f"⚠️ <b>لا ترسل المال قبل أن يؤكد لك ذلك</b>",
                     self.main_keyboard(lang, user_id))
 
-                # إشعار الأدمن تلقائياً
+                # الأدمن يصبح الطرف الآخر تلقائياً + يرى كل البيانات + يوافق/يرفض
                 if request:
                     for admin_id in self.admin_ids:
                         try:
                             opposite_type = 'سحب' if match_type == 'deposit' else 'إيداع'
                             self.send_inline_message(int(admin_id),
-                                f"🔔 <b>طلب مطابقة معلق</b>\n\n"
+                                f"🔔 <b>طلب مطابقة جديد</b>\n\n"
                                 f"━━━━━━━━━━━━━━━━━━\n"
                                 f"👤 العميل: <code>{user_id}</code> ({user.get('name', '')})\n"
                                 f"{'💵' if match_type == 'deposit' else '💸'} النوع: <b>{type_ar}</b>\n"
-                                f"🔄 يبحث عن: <b>{opposite_type}</b>\n"
+                                f"🔄 سيكون الطرف الآخر: <b>{opposite_type}</b>\n"
                                 f"💰 المبلغ: <code>{amount}</code>\n"
                                 f"🏢 الشركة: <b>{company_name}</b>\n"
                                 f"💳 المحفظة: <code>{wallet_number}</code> 👈 اضغط للنسخ\n"
                                 f"🆔 معرف الحساب: <code>{account_id}</code> 👈 اضغط للنسخ\n"
                                 f"━━━━━━━━━━━━━━━━━━\n\n"
-                                f"يمكنك أن تكون الطرف الآخر:",
-                                [[{'text': f'✅ أنا الطرف الآخر ({opposite_type})', 'callback_data': f'match_admin_join_{request["id"]}'},
-                                  {'text': '⏳ انتظار', 'callback_data': f'match_admin_wait_{request["id"]}'}]])
+                                f"✅ اضغط موافقة لتأكيد الطلب للعميل\n"
+                                f"❌ أو رفض لإلغاء الطلب",
+                                [[{'text': '✅ موافقة', 'callback_data': f'match_admin_approve_req_{request["id"]}'},
+                                  {'text': '❌ رفض', 'callback_data': f'match_admin_reject_req_{request["id"]}'}]])
                         except Exception as e:
                             logger.error(f"خطأ في إشعار الأدمن: {e}")
 
@@ -10042,7 +10044,85 @@ class ComprehensiveDUXBot:
                 }
                 return
 
-            # ==================== مطابقة: الأدمن ينضم كطرف آخر ====================
+            # ==================== مطابقة: موافقة/رفض الأدمن على الطلب ====================
+            elif data.startswith('match_admin_approve_req_'):
+                req_id = data.replace('match_admin_approve_req_', '')
+                # قراءة الطلب
+                request = None
+                try:
+                    with open('match_requests.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        for row in reader:
+                            if row.get('id') == req_id and row.get('status') == 'waiting':
+                                request = row
+                                break
+                except:
+                    pass
+
+                if not request:
+                    self.edit_message(chat_id, message.get('message_id'), "❌ الطلب غير موجود أو تمت معالجته")
+                    return
+
+                # الأدمن يوافق → يصبح الطرف الآخر تلقائياً
+                admin_id_str = str(user_id)
+                opposite_type = 'withdraw' if request.get('type') == 'deposit' else 'deposit'
+
+                try:
+                    admin_req_id, err = self.match_manager.create_match_request(
+                        admin_id_str, 'ADMIN', opposite_type,
+                        str(request.get('amount', '0')), request.get('currency', 'SAR'),
+                        str(request.get('company_id', '')), request.get('company_name', ''), ''
+                    )
+                    if err:
+                        self.edit_message(chat_id, message.get('message_id'), f"❌ {err}")
+                        return
+
+                    admin_request = self.match_manager.get_active_request_by_user(admin_id_str)
+                    if admin_request:
+                        match = self.match_manager.find_match(admin_request)
+                        if match:
+                            match_id = self.match_manager.create_match(admin_request, match)
+                            self._notify_match_created(match_id)
+
+                            self.edit_message(chat_id, message.get('message_id'),
+                                f"✅ <b>تم تأكيد الطلب وإنشاء المطابقة!</b>\n\n"
+                                f"🆔 <code>{match_id}</code> 👈 اضغط للنسخ\n"
+                                f"👤 العميل: <code>{request.get('user_id', '')}</code>\n"
+                                f"👤 الأدمن: <code>{admin_id_str}</code>\n\n"
+                                f"تم إشعار العميل بالمتابعة.")
+                            return
+                except Exception as e:
+                    logger.error(f"خطأ في موافقة الأدمن: {e}")
+                    self.edit_message(chat_id, message.get('message_id'), f"❌ خطأ: {e}")
+                    return
+
+                self.edit_message(chat_id, message.get('message_id'), "⏳ جارٍ المعالجة...")
+                return
+
+            elif data.startswith('match_admin_reject_req_'):
+                req_id = data.replace('match_admin_reject_req_', '')
+                # حذف الطلب
+                try:
+                    rows = []
+                    with open('match_requests.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        fieldnames = reader.fieldnames
+                        for row in reader:
+                            if row.get('id') != req_id:
+                                rows.append(row)
+                    with open('match_requests.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                        writer = csv.DictWriter(f, fieldnames=fieldnames)
+                        writer.writeheader()
+                        writer.writerows(rows)
+                except:
+                    pass
+                self.edit_message(chat_id, message.get('message_id'), f"❌ تم رفض الطلب")
+                # إشعار العميل
+                self.notify_user(int(request.get('user_id', 0)) if 'request' in dir() else 0,
+                    "❌ <b>تم رفض طلب المطابقة</b>\n\nيمكنك المحاولة مرة أخرى لاحقاً")
+                return
+
+            # ==================== مطابقة: الأدمن ينضم كطرف آخر (قديم) ====================
             elif data.startswith('match_admin_join_'):
                 req_id = data.replace('match_admin_join_', '')
                 # البحث عن الطلب مباشرة من CSV
