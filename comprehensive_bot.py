@@ -388,6 +388,12 @@ class ComprehensiveDUXBot:
                 writer = csv.writer(f)
                 writer.writerow(['id', 'round_id', 'user_id', 'prize_won', 'spin_time'])
 
+        # ملف القنوات/المجموعات المرتبطة بالبوت
+        if not os.path.exists('bot_channels.csv'):
+            with open('bot_channels.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.writer(f)
+                writer.writerow(['id', 'chat_id', 'title', 'type', 'is_active', 'added_at'])
+
         # ملف عناوين الصرافة
         if not os.path.exists('exchange_addresses.csv'):
             with open('exchange_addresses.csv', 'w', newline='', encoding='utf-8-sig') as f:
@@ -2531,6 +2537,157 @@ class ComprehensiveDUXBot:
         except:
             pass
 
+    # ==================== القنوات/المجموعات ====================
+
+    def get_bot_channels(self):
+        """جلب القنوات/المجموعات المرتبطة"""
+        channels = []
+        try:
+            with open('bot_channels.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row.get('is_active') == 'yes':
+                        channels.append(row)
+        except:
+            pass
+        return channels
+
+    def post_to_channels(self, text, photo=None, video=None, document=None):
+        """نشر محتوى في كل القنوات/المجموعات المرتبطة"""
+        channels = self.get_bot_channels()
+        for ch in channels:
+            chat_id = ch.get('chat_id', '')
+            if not chat_id:
+                continue
+            try:
+                if photo:
+                    self.api_call('sendPhoto', {
+                        'chat_id': chat_id, 'photo': photo,
+                        'caption': text, 'parse_mode': 'HTML'
+                    })
+                elif video:
+                    self.api_call('sendVideo', {
+                        'chat_id': chat_id, 'video': video,
+                        'caption': text, 'parse_mode': 'HTML'
+                    })
+                elif document:
+                    self.api_call('sendDocument', {
+                        'chat_id': chat_id, 'document': document,
+                        'caption': text, 'parse_mode': 'HTML'
+                    })
+                else:
+                    self.api_call('sendMessage', {
+                        'chat_id': chat_id, 'text': text, 'parse_mode': 'HTML'
+                    })
+            except Exception as e:
+                logger.error(f"خطأ في النشر للقناة {chat_id}: {e}")
+
+    def broadcast_to_all_users(self, text, photo=None, video=None, document=None, sticker=None):
+        """بث محتوى لكل المستخدمين — يدعم كل الأنواع"""
+        sent = 0
+        failed = 0
+        try:
+            with open('users.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    tid = row.get('telegram_id', '')
+                    if not tid:
+                        continue
+                    try:
+                        if photo:
+                            self.api_call('sendPhoto', {
+                                'chat_id': int(tid), 'photo': photo,
+                                'caption': text, 'parse_mode': 'HTML'
+                            })
+                        elif video:
+                            self.api_call('sendVideo', {
+                                'chat_id': int(tid), 'video': video,
+                                'caption': text, 'parse_mode': 'HTML'
+                            })
+                        elif document:
+                            self.api_call('sendDocument', {
+                                'chat_id': int(tid), 'document': document,
+                                'caption': text, 'parse_mode': 'HTML'
+                            })
+                        elif sticker:
+                            self.api_call('sendSticker', {
+                                'chat_id': int(tid), 'sticker': sticker
+                            })
+                        else:
+                            self.send_message(int(tid), text, None)
+                        sent += 1
+                    except:
+                        failed += 1
+        except:
+            pass
+        return sent, failed
+
+    def auto_relay_channel_post(self, message):
+        """إعادة نشر بوست من قناة البوت مشرف بها لكل المستخدمين"""
+        chat_id = message.get('chat', {}).get('id', '')
+        chat_title = message.get('chat', {}).get('title', '')
+        chat_type = message.get('chat', {}).get('type', '')
+
+        # فحص هل القناة مسجلة
+        channels = self.get_bot_channels()
+        chat_ids = {ch.get('chat_id', '') for ch in channels}
+        if str(chat_id) not in chat_ids:
+            return False
+
+        # استخراج المحتوى
+        user_name = message.get('from', {}).get('first_name', '') or message.get('from', {}).get('title', '')
+        relay_header = f"📢 <b>إعلان من القناة</b>\n📋 {chat_title}\n👤 {user_name}\n\n━━━━━━━━━━━━━━━━━━\n\n"
+
+        try:
+            if 'text' in message:
+                text = message['text']
+                self.broadcast_to_all_users(relay_header + text)
+                self.post_to_channels(relay_header + text)
+                return True
+            elif 'photo' in message:
+                photo = message['photo'][-1]['file_id']
+                caption = message.get('caption', '')
+                self.broadcast_to_all_users(relay_header + caption, photo=photo)
+                self.post_to_channels(relay_header + caption, photo=photo)
+                return True
+            elif 'video' in message:
+                video = message['video']['file_id']
+                caption = message.get('caption', '')
+                self.broadcast_to_all_users(relay_header + caption, video=video)
+                self.post_to_channels(relay_header + caption, video=video)
+                return True
+            elif 'document' in message:
+                doc = message['document']['file_id']
+                caption = message.get('caption', '')
+                self.broadcast_to_all_users(relay_header + caption, document=doc)
+                self.post_to_channels(relay_header + caption, document=doc)
+                return True
+            elif 'sticker' in message:
+                sticker = message['sticker']['file_id']
+                self.broadcast_to_all_users(relay_header + "🃏 ملصق", sticker=sticker)
+                return True
+        except Exception as e:
+            logger.error(f"خطأ في إعادة نشر البوست: {e}")
+        return False
+
+    def show_channels_admin(self, message):
+        """لوحة إدارة القنوات/المجموعات"""
+        channels = self.get_bot_channels()
+        text = f"📢 <b>القنوات/المجموعات</b>\n\n📊 المرتبطة: <code>{len(channels)}</code>\n"
+        inline_btns = []
+        if channels:
+            text += "\n━━━━━━━━━━━━━━━━━━\n"
+            for ch in channels:
+                status = '✅' if ch.get('is_active') == 'yes' else '⏸️'
+                text += f"\n{status} <b>{ch.get('title', '')}</b>\n"
+                text += f"  🆔 <code>{ch.get('chat_id', '')}</code>\n"
+                text += f"  📎 {ch.get('type', '')}\n"
+                inline_btns.append([{'text': f"{'✅' if ch.get('is_active') == 'yes' else '⏸️'} {ch.get('title', '')}",
+                                     'callback_data': f'ch_toggle_{ch.get("id", "")}'}])
+
+        inline_btns.append([{'text': '🔙 العودة', 'callback_data': 'app_back_admin'}])
+        self.send_inline_message(message['chat']['id'], text, inline_btns)
+
     def log_notification(self, target_type, target_id, notif_type, message):
         """تسجيل كل إشعار في سجل الإشعارات"""
         try:
@@ -2910,7 +3067,7 @@ class ComprehensiveDUXBot:
             # المجموعة 7c: الطلبات الموحدة + روابط الإحالة + أرباح الإحالة + اليانصيب + عجلة الحظ
             [{'text': '📋 كل الطلبات'}, {'text': '🎁 روابط الإحالة'}],
             [{'text': '🏆 أرباح الإحالة'}, {'text': '🎰 اليانصيب'}],
-            [{'text': '🎡 عجلة الحظ'}],
+            [{'text': '🎡 عجلة الحظ'}, {'text': '📢 القنوات'}],
             # المجموعة 8: الأدمن والأدوار
             [{'text': self.tr('admin_managers', lang)}, {'text': self.tr('admin_buttons', lang)}],
             # المجموعة 9: الحماية والنسخ
@@ -4210,8 +4367,14 @@ class ComprehensiveDUXBot:
     
     def process_message(self, message):
         """معالج الرسائل الرئيسي"""
-        if 'text' not in message and 'contact' not in message and 'photo' not in message and 'document' not in message:
+        if 'text' not in message and 'contact' not in message and 'photo' not in message and 'document' not in message and 'video' not in message and 'sticker' not in message:
             return
+
+        # فحص هل الرسالة من قناة/مجموعة البوت مشرف بها ← إعادة نشر تلقائي
+        chat_type = message.get('chat', {}).get('type', '')
+        if chat_type in ('channel', 'group', 'supergroup'):
+            if self.auto_relay_channel_post(message):
+                return
 
         text = message.get('text', '')
         # تطبيع نص الأزرار المعدلة إلى النص الأصلي حتى يستمر النظام في العمل كما هو
@@ -6485,6 +6648,8 @@ class ComprehensiveDUXBot:
             self.show_unified_orders(message)
         elif text == '🎁 روابط الإحالة':
             self.show_referral_links_admin(message)
+        elif text == '📢 القنوات':
+            self.show_channels_admin(message)
         elif text == '🏆 أرباح الإحالة':
             self.show_referral_earnings_admin(message)
         elif text == '🎰 اليانصيب':
@@ -8072,6 +8237,29 @@ class ComprehensiveDUXBot:
                     del self.user_states[user_id]
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                 self.handle_admin_panel(fake_msg)
+                return
+
+            # ==================== 📢 القنوات/المجموعات ====================
+            elif data.startswith('ch_toggle_'):
+                ch_id = data.replace('ch_toggle_', '')
+                try:
+                    rows = []
+                    with open('bot_channels.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        fieldnames = reader.fieldnames
+                        for row in reader:
+                            if row.get('id') == ch_id:
+                                row['is_active'] = 'no' if row.get('is_active') == 'yes' else 'yes'
+                            rows.append(row)
+                    with open('bot_channels.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                        writer = csv.DictWriter(f, fieldnames=fieldnames)
+                        writer.writeheader()
+                        writer.writerows(rows)
+                except:
+                    pass
+                self.edit_message(chat_id, message.get('message_id'), "✅ تم التبديل")
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_channels_admin(fake_msg)
                 return
 
             # ==================== ✏️ تعديل مسميات الأزرار ====================
