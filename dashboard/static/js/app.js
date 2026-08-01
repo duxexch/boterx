@@ -1,6 +1,6 @@
-/* Boterx Dashboard — App JS */
+/* Boterx Dashboard — App JS v3 */
 
-// Global helpers
+// Global API helper
 async function api(url, options = {}) {
     const res = await fetch(url, {
         ...options,
@@ -17,6 +17,7 @@ function statusBadge(status) {
         'approved': '<span class="badge badge-approved">موافق</span>',
         'rejected': '<span class="badge badge-rejected">مرفوض</span>',
         'active': '<span class="badge badge-active">نشطة</span>',
+        'inactive': '<span class="badge badge-cancelled">متوقفة</span>',
         'completed': '<span class="badge badge-completed">مكتملة</span>',
         'cancelled': '<span class="badge badge-cancelled">ملغاة</span>',
         'waiting': '<span class="badge badge-pending">بانتظار</span>',
@@ -25,6 +26,10 @@ function statusBadge(status) {
         'awaiting_admin_review': '<span class="badge badge-pending">مراجعة الإدارة</span>',
         'admin_received': '<span class="badge badge-approved">الإدارة استلمت</span>',
         'transfer_confirmed': '<span class="badge badge-approved">تحويل مؤكد</span>',
+        'disputed': '<span class="badge badge-rejected">نزاع مفتوح</span>',
+        'resolved': '<span class="badge badge-approved">تم الحل</span>',
+        'open': '<span class="badge badge-pending">مفتوحة</span>',
+        'scheduled_freeze': '<span class="badge badge-pending">⏰ مجمد</span>',
         'yes': '<span class="badge badge-approved">نعم</span>',
         'no': '<span class="badge badge-rejected">لا</span>',
     };
@@ -33,12 +38,12 @@ function statusBadge(status) {
 
 // Format number
 function fmtNum(n) {
-    return new Number(n || 0).toLocaleString('ar-EG');
+    return (n || 0).toLocaleString('ar-EG');
 }
 
 // Format amount
 function fmtAmount(n, currency = '') {
-    return `${new Number(n || 0).toLocaleString('ar-EG', {maximumFractionDigits: 2})} ${currency}`;
+    return `${(n || 0).toLocaleString('ar-EG', {maximumFractionDigits: 2})} ${currency}`;
 }
 
 // Escape HTML
@@ -51,11 +56,167 @@ function esc(text) {
 // Toast notification
 function toast(message, type = 'info') {
     const colors = { info: 'bg-blue-500', success: 'bg-green-500', error: 'bg-red-500', warning: 'bg-amber-500' };
+    const icons = { info: 'ℹ️', success: '✅', error: '❌', warning: '⚠️' };
+    const container = document.getElementById('toastContainer') || createToastContainer();
     const t = document.createElement('div');
-    t.className = `fixed bottom-4 left-4 ${colors[type]} text-white px-4 py-2 rounded-lg shadow-lg z-[200] text-sm fade-in`;
-    t.textContent = message;
-    document.body.appendChild(t);
-    setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity 0.3s'; setTimeout(() => t.remove(), 300); }, 3000);
+    t.className = `${colors[type]} text-white px-4 py-3 rounded-lg shadow-2xl text-sm fade-in flex items-center gap-2 mb-2 min-w-[250px]`;
+    t.innerHTML = `<span>${icons[type]}</span> ${message}`;
+    container.appendChild(t);
+    setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity 0.3s'; setTimeout(() => t.remove(), 300); }, 3500);
+}
+
+function createToastContainer() {
+    const c = document.createElement('div');
+    c.id = 'toastContainer';
+    c.className = 'fixed bottom-4 left-4 z-[300] flex flex-col';
+    document.body.appendChild(c);
+    return c;
+}
+
+// ===== Notification System with Sound =====
+
+const Notifier = {
+    enabled: true,
+    soundEnabled: true,
+    audioContext: null,
+    lastPendingCount: 0,
+    lastMatchCount: 0,
+
+    init() {
+        // Load saved preferences
+        this.soundEnabled = localStorage.getItem('boterx_sound') !== 'false';
+        this.enabled = localStorage.getItem('boterx_notif') !== 'false';
+
+        // Create audio context on first user interaction
+        document.addEventListener('click', () => {
+            if (!this.audioContext) {
+                this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }, { once: true });
+    },
+
+    toggleSound() {
+        this.soundEnabled = !this.soundEnabled;
+        localStorage.setItem('boterx_sound', this.soundEnabled);
+        toast(this.soundEnabled ? '🔊 الصوت مفعل' : '🔇 الصوت مكتوم', 'info');
+    },
+
+    async check() {
+        try {
+            const res = await fetch('/api/stats');
+            const stats = await res.json();
+            const pendingNow = stats.transactions?.pending || 0;
+            const matchesNow = stats.matches?.pending || 0;
+            const activeMatches = stats.matches?.active || 0;
+
+            // New pending transactions
+            if (pendingNow > this.lastPendingCount && this.lastPendingCount > 0) {
+                const diff = pendingNow - this.lastPendingCount;
+                this.notify(`📥 ${diff} طلب جديد معلق`, 'new_txn');
+                this.playSound('notification');
+            }
+
+            // New match requests
+            if (matchesNow > this.lastMatchCount && this.lastMatchCount > 0) {
+                const diff = matchesNow - this.lastMatchCount;
+                this.notify(`🔄 ${diff} طلب مطابقة جديد`, 'new_match');
+                this.playSound('alert');
+            }
+
+            this.lastPendingCount = pendingNow;
+            this.lastMatchCount = matchesNow;
+
+            // Update badge
+            const badge = document.getElementById('notifBadge');
+            if (badge) {
+                const total = pendingNow + matchesNow;
+                badge.textContent = total || '';
+                badge.style.display = total > 0 ? 'flex' : 'none';
+            }
+
+            // Update live stats bar
+            const liveBar = document.getElementById('liveStats');
+            if (liveBar) {
+                const parts = [];
+                if (stats.users?.total) parts.push(`👥 ${fmtNum(stats.users.total)}`);
+                if (pendingNow) parts.push(`⏳ ${pendingNow} معلقة`);
+                if (activeMatches) parts.push(`🔄 ${activeMatches} مطابقة`);
+                if (stats.lottery?.participants) parts.push(`🎰 ${stats.lottery.participants} مشارك`);
+                if (stats.wheel?.participants) parts.push(`🎡 ${stats.wheel.participants} لاعب`);
+                if (stats.lottery?.distributed) parts.push(`💰 ${fmtNum(stats.lottery.distributed)} موزّع`);
+                liveBar.textContent = parts.join(' | ') || 'متصل';
+            }
+        } catch (e) { /* silent */ }
+    },
+
+    notify(message, type) {
+        if (!this.enabled) return;
+
+        // Browser notification
+        if (Notification.permission === 'granted') {
+            new Notification('🔔 Boterx', { body: message, icon: '/static/img/icon.png', tag: type });
+        }
+
+        // In-page notification
+        const container = document.getElementById('notificationsList');
+        if (container) {
+            const item = document.createElement('div');
+            item.className = 'flex items-center gap-2 p-2 rounded-lg bg-slate-700/50 text-sm animate-fade-in';
+            item.innerHTML = `<span>${message}</span> <span class="text-xs text-slate-500">${new Date().toLocaleTimeString('ar-EG')}</span>`;
+            container.prepend(item);
+            if (container.children.length > 20) container.lastElementChild.remove();
+        }
+
+        // Sound
+        this.playSound(type === 'new_match' ? 'alert' : 'notification');
+    },
+
+    playSound(type = 'notification') {
+        if (!this.soundEnabled || !this.audioContext) return;
+        try {
+            const ctx = this.audioContext;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            gain.gain.value = 0.08;
+
+            if (type === 'alert') {
+                osc.frequency.value = 800;
+                osc.type = 'square';
+                osc.start();
+                osc.stop(ctx.currentTime + 0.15);
+            } else if (type === 'success') {
+                osc.frequency.value = 523;
+                osc.type = 'sine';
+                osc.start();
+                osc.frequency.setValueAtTime(659, ctx.currentTime + 0.1);
+                osc.frequency.setValueAtTime(784, ctx.currentTime + 0.2);
+                osc.stop(ctx.currentTime + 0.3);
+            } else {
+                osc.frequency.value = 660;
+                osc.type = 'sine';
+                osc.start();
+                osc.stop(ctx.currentTime + 0.1);
+            }
+        } catch (e) { /* audio not available */ }
+    },
+
+    playSuccessSound() { this.playSound('success'); },
+};
+
+// Request notification permission
+function requestNotificationPermission() {
+    if (Notification.permission === 'default') {
+        Notification.requestPermission();
+    }
+}
+
+// ===== Action Confirmation Helper =====
+function confirmAction(message, callback) {
+    if (confirm(message)) {
+        callback();
+    }
 }
 
 // Keyboard shortcut: Ctrl+K
@@ -65,4 +226,21 @@ document.addEventListener('keydown', (e) => {
         const search = document.getElementById('globalSearch');
         if (search) search.focus();
     }
+    // Ctrl+N = toggle notifications
+    if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+        e.preventDefault();
+        Notifier.toggleSound();
+    }
+});
+
+// Initialize on load
+document.addEventListener('DOMContentLoaded', () => {
+    Notifier.init();
+    requestNotificationPermission();
+    // Check for updates every 5 seconds
+    setInterval(() => Notifier.check(), 5000);
+    Notifier.check();
+
+    // Click handler for notification permission request
+    document.addEventListener('click', requestNotificationPermission, { once: true });
 });
