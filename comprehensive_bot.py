@@ -7182,13 +7182,14 @@ class ComprehensiveDUXBot:
                 "━━━━━━━━━━━━━━━━━━\n"
                 "1️⃣ اختر نوع العملية (إيداع أو سحب)\n"
                 "2️⃣ حدد الشركة ووسيلة الدفع\n"
-                "3️⃣ أرسل بياناتك (رقم محفظتك + معرف حسابك)\n"
-                "4️⃣ انتظر المطابقة — سيصلك إشعار\n"
-                "5️⃣ الأدمن يرسل لك رقم المحفظة للتحويل\n"
-                "6️⃣ حوّل المال ← اضغط <b>تم الإرسال</b>\n"
-                "7️⃣ الأدمن يراجع ويوافق/يرفض\n\n"
+                "3️⃣ أدخل بياناتك خطوة بخطوة\n"
+                "4️⃣ الإدارة تراجع وتؤكد طلبك\n"
+                "5️⃣ بعد تأكيد الإدارة ← تتابع العملية\n"
+                "6️⃣ حوّل المال ← أرسل لقطة شاشة\n"
+                "7️⃣ الإدارة تؤكد الاستلام ← تحوّل لك ← تؤكد الاستلام\n\n"
                 "⚠️ <b>تحذيرات:</b>\n"
-                "• لا تُرسل المال قبل استلام بيانات المحفظة من الأدمن\n"
+                "• 🚫 <b>لا ترسل المال قبل أن يؤكد لك ذلك</b>\n"
+                "• ✅ بياناتك محفوظة بأمان ولن تُفقد\n"
                 "• التقييم إلزامي بعد كل عملية\n"
                 "• في حالة نزاع → اضغط <b>🆘 دعم</b>\n"
                 "━━━━━━━━━━━━━━━━━━\n\n"
@@ -7201,13 +7202,14 @@ class ComprehensiveDUXBot:
                 "📌 <b>How it works:</b>\n"
                 "1️⃣ Choose operation type (deposit or withdraw)\n"
                 "2️⃣ Select company and payment method\n"
-                "3️⃣ Send your data (wallet number + account ID)\n"
-                "4️⃣ Wait for match — you'll be notified\n"
-                "5️⃣ Admin sends wallet number for transfer\n"
-                "6️⃣ Send money ← press <b>Sent</b>\n"
-                "7️⃣ Admin reviews and approves/rejects\n\n"
+                "3️⃣ Enter your data step by step\n"
+                "4️⃣ Admin reviews and confirms your request\n"
+                "5️⃣ After admin approval ← proceed\n"
+                "6️⃣ Send money ← send screenshot\n"
+                "7️⃣ Admin confirms receipt ← sends to you ← you confirm\n\n"
                 "⚠️ <b>Warnings:</b>\n"
-                "• Do NOT send money before receiving wallet details\n"
+                "• 🚫 <b>Do NOT send money before confirmed by admin</b>\n"
+                "• ✅ Your data is safely stored\n"
                 "• Rating is mandatory after each operation\n"
                 "• In case of dispute → press <b>🆘 Support</b>\n"
                 "━━━━━━━━━━━━━━━━━━\n\n"
@@ -7256,8 +7258,10 @@ class ComprehensiveDUXBot:
                 self.user_states[user_id] = state
                 kb = {'keyboard': [[{'text': '❌ إلغاء'}]], 'resize_keyboard': True, 'one_time_keyboard': True}
                 self.send_message(chat_id,
-                    f"✅ المبلغ: <code>{amount}</code>\n\n"
-                    f"2️⃣ اكتب <b>رقم محفظتك</b>:", kb)
+                    f"✅ المبلغ: <code>{amount}</code>\n"
+                    f"🔒 <b>بياناتك محفوظة بأمان</b>\n\n"
+                    f"2️⃣ اكتب <b>رقم محفظتك</b>:\n\n"
+                    f"⚠️ <b>لا ترسل المال قبل أن يؤكد لك ذلك</b>", kb)
                 return
 
             if substep == 'wallet':
@@ -7270,8 +7274,10 @@ class ComprehensiveDUXBot:
                 self.user_states[user_id] = state
                 kb = {'keyboard': [[{'text': '❌ إلغاء'}]], 'resize_keyboard': True, 'one_time_keyboard': True}
                 self.send_message(chat_id,
-                    f"✅ المحفظة: <code>{wallet_number}</code> 👈 اضغط للنسخ\n\n"
-                    f"3️⃣ اكتب <b>معرف حسابك</b> (ID):", kb)
+                    f"✅ المحفظة: <code>{wallet_number}</code> 👈 اضغط للنسخ\n"
+                    f"🔒 <b>بياناتك محفوظة بأمان</b>\n\n"
+                    f"3️⃣ اكتب <b>معرف حسابك</b> (ID):\n\n"
+                    f"⚠️ <b>لا ترسل المال قبل أن يؤكد لك ذلك</b>", kb)
                 return
 
             if substep == 'account':
@@ -7279,6 +7285,13 @@ class ComprehensiveDUXBot:
                 if len(account_id) < 2:
                     self.send_message(chat_id, "❌ معرف الحساب قصير. اكتب معرف الحساب:")
                     return
+
+                # ✅ تأكيد حفظ البيانات
+                self.send_message(chat_id,
+                    f"✅ معرف الحساب: <code>{account_id}</code> 👈 اضغط للنسخ\n"
+                    f"🔒 <b>جميع بياناتك محفوظة بأمان</b>\n\n"
+                    f"⏳ جارٍ إنشاء طلبك ومراجعته من الإدارة...\n\n"
+                    f"⚠️ <b>لا ترسل المال قبل أن يؤكد لك ذلك</b>")
 
                 amount = state.get('amount', '0')
                 wallet_number = state.get('wallet_number', '')
