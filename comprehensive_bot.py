@@ -7096,6 +7096,28 @@ class ComprehensiveDUXBot:
             return
         lang = user.get('language', 'ar')
 
+        # فحص وجود طلب مطابقة معلق (waiting) — حذف القديم وعرضه
+        if self.match_manager:
+            # فحص طلبات waiting القديمة
+            waiting_req = self.match_manager.get_active_request_by_user(str(message['from']['id']))
+            if waiting_req:
+                # حذف الطلب القديم المعلق
+                try:
+                    rows = []
+                    with open('match_requests.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        fieldnames = reader.fieldnames
+                        for row in reader:
+                            if not (row.get('id') == waiting_req.get('id') and row.get('status') == 'waiting'):
+                                rows.append(row)
+                    with open('match_requests.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                        writer = csv.DictWriter(f, fieldnames=fieldnames)
+                        writer.writeheader()
+                        writer.writerows(rows)
+                    logger.info(f"Cleaned old waiting request: {waiting_req.get('id')}")
+                except:
+                    pass
+
         # فحص وجود مطابقة نشطة — عرضها إن وجدت
         if self.match_manager:
             active_match = self.match_manager.get_match_by_user(message['from']['id'])
@@ -7134,13 +7156,19 @@ class ComprehensiveDUXBot:
                         text += "⏳ بانتظار قيام الطرف الآخر بإرسال الكود\n"
 
                 if match_status == 'code_verified':
-                    # المودع: عليه التحويل
                     if str(match.get('depositor_id', '')) == str(message['from']['id']):
                         text += "📤 حوّل المال ثم أكد الإرسال\n"
                         inline_btns.append([{'text': '✅ تم الإرسال', 'callback_data': f'match_sent_{match["id"]}'}])
+                        inline_btns.append([{'text': '❌ إلغاء', 'callback_data': f'match_cancel_warn_{match["id"]}'}])
+                    elif str(match.get('withdrawer_id', '')) == str(message['from']['id']):
+                        text += "⏳ بانتظار قيام المودع بتحويل المال\n"
+
+                if match_status in ('active', 'awaiting_code') and str(match.get('depositor_id', '')) == str(message['from']['id']):
+                    if not any('cancel' in b.get('callback_data', '') for row in inline_btns for b in row):
+                        inline_btns.append([{'text': '❌ إلغاء', 'callback_data': f'match_cancel_warn_{match["id"]}'}])
 
                 inline_btns.append([{'text': '🆘 دعم', 'callback_data': f'match_support_{match["id"]}'}])
-                inline_btns.append([{'text': '🔙 القائمة الرئيسية', 'callback_data': 'match_cancel'}])
+                inline_btns.append([{'text': '🔙 القائمة الرئيسية', 'callback_data': 'match_back_main'}])
 
                 self.send_inline_message(message['chat']['id'], text, inline_btns)
                 return
