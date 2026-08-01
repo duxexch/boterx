@@ -713,6 +713,13 @@ def api_edit_company(company_id):
 @api_auth
 def api_payment_methods():
     methods = read_csv('payment_methods.csv')
+    links = read_csv('company_payment_links.csv')
+    # إضافة قائمة الشركات المرتبطة لكل وسيلة
+    for m in methods:
+        mid = m.get('id', '')
+        linked_companies = [l.get('company_id') for l in links if l.get('method_id') == mid]
+        m['linked_company_ids'] = linked_companies
+        m['linked_count'] = len(linked_companies)
     return jsonify({'methods': methods})
 
 @app.route('/api/payment-methods', methods=['POST'])
@@ -758,6 +765,40 @@ def api_edit_payment_method(method_id):
                 break
         write_csv('payment_methods.csv', methods, fieldnames)
         return jsonify({'success': True})
+
+# ===== API — Payment Links (company_payment_links.csv) =====
+
+@app.route('/api/payment-links')
+@api_auth
+def api_payment_links():
+    links = read_csv('company_payment_links.csv')
+    return jsonify({'links': links})
+
+@app.route('/api/payment-links', methods=['POST'])
+@api_auth
+def api_save_payment_links():
+    """حفظ روابط وسيلة دفع مع شركات (استبدال كامل)"""
+    data = request.json
+    method_id = data.get('method_id', '')
+    company_ids = data.get('company_ids', [])
+
+    # حذف الروابط القديمة لهذه الوسيلة
+    links = read_csv('company_payment_links.csv')
+    fieldnames = get_fieldnames('company_payment_links.csv', ['id','company_id','method_id','created_at'])
+    links = [l for l in links if l.get('method_id') != str(method_id)]
+
+    # إضافة الروابط الجديدة
+    for cid in company_ids:
+        links.append({
+            'id': f"LNK{secrets.token_hex(3).upper()}",
+            'company_id': str(cid),
+            'method_id': str(method_id),
+            'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')
+        })
+
+    write_csv('company_payment_links.csv', links, fieldnames)
+    log_action('save_payment_links', f'method={method_id}, companies={len(company_ids)}')
+    return jsonify({'success': True, 'linked_count': len(company_ids)})
 
 # ===== API — Matching =====
 

@@ -5,59 +5,165 @@
 {% block content %}
 <div x-data="paymentMethodsApp()" x-init="init()" class="space-y-6">
 
-    <!-- Header -->
+    <!-- Stats -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div class="bg-slate-800 rounded-lg border border-slate-700 p-3">
+            <p class="text-xs text-slate-400">إجمالي الوسائل</p>
+            <p class="text-xl font-bold text-amber-400" x-text="methods.length">0</p>
+        </div>
+        <div class="bg-slate-800 rounded-lg border border-slate-700 p-3">
+            <p class="text-xs text-slate-400">نشطة</p>
+            <p class="text-xl font-bold text-green-400" x-text="methods.filter(m => m.status === 'active').length">0</p>
+        </div>
+        <div class="bg-slate-800 rounded-lg border border-slate-700 p-3">
+            <p class="text-xs text-slate-400">موقوفة</p>
+            <p class="text-xl font-bold text-red-400" x-text="methods.filter(m => m.status !== 'active').length">0</p>
+        </div>
+        <div class="bg-slate-800 rounded-lg border border-slate-700 p-3">
+            <p class="text-xs text-slate-400">شركات مرتبطة</p>
+            <p class="text-xl font-bold text-blue-400" x-text="companies.length">0</p>
+        </div>
+    </div>
+
+    <!-- Add button + refresh -->
     <div class="flex items-center justify-between">
-        <p class="text-slate-400 text-sm">إدارة وسائل الدفع للشركات</p>
-        <button @click="loadData()" class="btn btn-primary btn-sm">
+        <button @click="showAddModal = true" class="btn btn-primary">
+            <i class="fas fa-plus ml-1"></i> إضافة وسيلة دفع
+        </button>
+        <button @click="loadData()" class="btn btn-sm" style="background:#475569">
             <i class="fas fa-rotate ml-1"></i> تحديث
         </button>
     </div>
+
+    <!-- Search -->
+    <input type="text" x-model="search" @input.debounce.300ms="filterMethods()" placeholder="بحث بالاسم أو البيانات..." class="input w-full">
 
     <!-- Payment methods table -->
     <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
         <div class="overflow-x-auto">
             <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>المعرف</th>
-                        <th>اسم الوسيلة</th>
-                        <th>النوع</th>
-                        <th>بيانات الحساب</th>
-                        <th>معلومات إضافية</th>
-                        <th>الأيقونة</th>
-                        <th>الشركة</th>
-                        <th>الحالة</th>
-                    </tr>
-                </thead>
+                <thead><tr>
+                    <th></th>
+                    <th>الاسم</th><th>النوع</th><th>بيانات الحساب</th><th>معلومات</th>
+                    <th>الشركات المرتبطة</th><th>الحالة</th><th>إجراءات</th>
+                </tr></thead>
                 <tbody>
-                    <template x-if="loading">
-                        <tr><td colspan="8" class="text-center p-8 text-slate-400">
-                            <i class="fas fa-spinner fa-spin text-2xl"></i>
-                            <p class="mt-2">جارٍ التحميل...</p>
-                        </td></tr>
-                    </template>
-                    <template x-if="!loading && methods.length === 0">
-                        <tr><td colspan="8" class="text-center p-8 text-slate-400">
-                            <i class="fas fa-inbox text-3xl mb-2"></i>
-                            <p>لا توجد وسائل دفع</p>
-                        </td></tr>
-                    </template>
-                    <template x-for="m in methods" :key="m.id">
-                        <tr>
-                            <td class="font-mono text-xs" x-text="m.id || '—'"></td>
-                            <td class="font-medium" x-text="m.method_name || '—'"></td>
-                            <td>
-                                <span class="px-2 py-0.5 rounded text-xs bg-slate-700 text-slate-300" x-text="m.method_type || '—'"></span>
-                            </td>
-                            <td class="font-mono text-xs text-slate-400 max-w-xs truncate" x-text="m.account_data || '—'"></td>
-                            <td class="text-sm text-slate-400 max-w-xs truncate" x-text="m.additional_info || '—'"></td>
+                    <template x-for="m in filteredMethods" :key="m.id">
+                        <tr class="hover:bg-slate-700/50">
                             <td class="text-xl" x-text="m.icon || '💳'"></td>
-                            <td class="font-mono text-xs text-slate-500" x-text="m.company_id || '—'"></td>
-                            <td x-html="statusBadge(m.status)"></td>
+                            <td class="font-medium" x-text="m.method_name"></td>
+                            <td>
+                                <span class="px-2 py-0.5 rounded text-xs bg-slate-700 text-slate-300" x-text="m.method_type"></span>
+                            </td>
+                            <td class="font-mono text-xs">
+                                <code class="bg-slate-900 px-2 py-0.5 rounded text-amber-400" x-text="m.account_data" @click="copyToClipboard(m.account_data)"></code>
+                            </td>
+                            <td class="text-xs text-slate-400" x-text="m.additional_info || '—'"></td>
+                            <td>
+                                <div class="flex flex-wrap gap-1">
+                                    <template x-for="c in getLinkedCompanies(m.id)" :key="c.id">
+                                        <span class="px-1.5 py-0.5 rounded text-xs bg-blue-500/20 text-blue-400" x-text="c.name"></span>
+                                    </template>
+                                    <span x-show="getLinkedCompanies(m.id).length === 0" class="text-xs text-slate-500">غير مرتبطة</span>
+                                </div>
+                            </td>
+                            <td>
+                                <button @click="toggleStatus(m)" class="badge" :class="m.status === 'active' ? 'badge-active' : 'badge-cancelled'"
+                                    x-text="m.status === 'active' ? 'نشطة' : 'متوقفة'"></button>
+                            </td>
+                            <td>
+                                <div class="flex gap-1">
+                                    <button @click="editMethod(m)" class="btn btn-sm" style="background:#3B82F6" title="تعديل">
+                                        <i class="fas fa-pen text-xs"></i>
+                                    </button>
+                                    <button @click="linkModal(m)" class="btn btn-sm" style="background:#8B5CF6" title="ربط بشركات">
+                                        <i class="fas fa-link text-xs"></i>
+                                    </button>
+                                    <button @click="deleteMethod(m)" class="btn btn-danger btn-sm" title="حذف">
+                                        <i class="fas fa-trash text-xs"></i>
+                                    </button>
+                                </div>
+                            </td>
                         </tr>
                     </template>
+                    <tr x-show="filteredMethods.length === 0 && !loading">
+                        <td colspan="8" class="text-center p-8 text-slate-400">
+                            <i class="fas fa-inbox text-3xl mb-2"></i>
+                            <p>لا توجد وسائل دفع — أضف واحدة جديدة</p>
+                        </td>
+                    </tr>
+                    <tr x-show="loading">
+                        <td colspan="8" class="text-center p-8 text-slate-400">
+                            <i class="fas fa-spinner fa-spin text-2xl"></i>
+                            <p class="mt-2">جارٍ التحميل...</p>
+                        </td>
+                    </tr>
                 </tbody>
             </table>
+        </div>
+    </div>
+
+    <!-- Add/Edit Modal -->
+    <div x-show="showAddModal" x-transition class="modal-overlay" @click.self="showAddModal = false" style="display:none">
+        <div class="modal">
+            <h3 class="font-bold text-lg mb-4" x-text="editing ? 'تعديل وسيلة دفع' : 'إضافة وسيلة دفع'"></h3>
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">اسم الوسيلة</label>
+                    <input type="text" x-model="form.name" class="input w-full" placeholder="مثال: فودافون كاش">
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">النوع</label>
+                    <select x-model="form.type" class="input w-full">
+                        <option value="mobile">📱 محفظة إلكترونية</option>
+                        <option value="bank">🏦 حساب بنكي</option>
+                        <option value="card">💳 بطاقة</option>
+                        <option value="cash">💵 نقد</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">بيانات الحساب (التي ينسخها العميل)</label>
+                    <input type="text" x-model="form.account_data" class="input w-full" placeholder="مثال: 01012345678">
+                    <p class="text-xs text-slate-500 mt-1">هذه البيانات التي ينسخها العميل ويرسل لها المال</p>
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">معلومات إضافية</label>
+                    <input type="text" x-model="form.info" class="input w-full" placeholder="مثال: فرع الرياض (اختياري)">
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">الأيقونة (إيموجي)</label>
+                    <input type="text" x-model="form.icon" class="input w-full" placeholder="💳" maxlength="2">
+                </div>
+            </div>
+            <div class="flex gap-2 justify-end mt-4">
+                <button @click="showAddModal = false" class="btn btn-sm" style="background:#475569">إلغاء</button>
+                <button @click="saveMethod()" class="btn btn-primary btn-sm">حفظ</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Link Modal -->
+    <div x-show="showLinkModal" x-transition class="modal-overlay" @click.self="showLinkModal = false" style="display:none">
+        <div class="modal">
+            <h3 class="font-bold text-lg mb-2">ربط وسيلة الدفع بالشركات</h3>
+            <p class="text-sm text-slate-400 mb-4">
+                <span x-text="selectedMethod?.method_name"></span> —
+                <code class="text-amber-400" x-text="selectedMethod?.account_data"></code>
+            </p>
+            <div class="space-y-2 max-h-60 overflow-y-auto">
+                <template x-for="c in companies" :key="c.id">
+                    <label class="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-700 cursor-pointer">
+                        <input type="checkbox" :value="c.id" x-model="selectedCompanies"
+                               :checked="isLinked(c.id, selectedMethod?.id)">
+                        <span x-text="c.icon || '🏢'"></span>
+                        <span x-text="c.name"></span>
+                    </label>
+                </template>
+            </div>
+            <div class="flex gap-2 justify-end mt-4">
+                <button @click="showLinkModal = false" class="btn btn-sm" style="background:#475569">إلغاء</button>
+                <button @click="saveLinks()" class="btn btn-primary btn-sm">حفظ الروابط</button>
+            </div>
         </div>
     </div>
 
@@ -68,39 +174,124 @@
 <script>
 function paymentMethodsApp() {
     return {
-        methods: [],
-        loading: true,
+        methods: [], filteredMethods: [], companies: [], links: [],
+        search: '', loading: true,
+        showAddModal: false, showLinkModal: false,
+        editing: false, selectedMethod: null, selectedCompanies: [],
+        form: { name: '', type: 'mobile', account_data: '', info: '', icon: '💳' },
 
-        init() {
-            this.loadData();
-        },
+        async init() { await this.loadData(); },
 
         async loadData() {
             this.loading = true;
             try {
-                const res = await fetch('/api/companies');
-                const data = await res.json();
-                // The API returns companies; we fetch payment methods from the same data context.
-                // Since there's no dedicated endpoint, we fetch payment_methods.csv data via companies endpoint.
-                // The companies endpoint may include payment methods or we use the companies list.
-                this.methods = data.payment_methods || data.methods || [];
-                // If no payment methods in response, try fetching directly
-                if (this.methods.length === 0) {
-                    try {
-                        const res2 = await fetch('/api/payment-methods');
-                        const data2 = await res2.json();
-                        this.methods = data2.methods || data2.payment_methods || [];
-                    } catch (e2) {
-                        // Fallback: no payment methods endpoint available
-                        this.methods = [];
-                    }
-                }
-            } catch (e) {
-                console.error(e);
-                toast('فشل تحميل وسائل الدفع', 'error');
-            } finally {
-                this.loading = false;
+                const [pmRes, compRes] = await Promise.all([
+                    fetch('/api/payment-methods').then(r => r.json()),
+                    fetch('/api/companies').then(r => r.json())
+                ]);
+                this.methods = pmRes.methods || [];
+                this.companies = compRes.companies || [];
+                // load links from a dedicated API
+                try {
+                    const linkRes = await fetch('/api/payment-links').then(r => r.json());
+                    this.links = linkRes.links || [];
+                } catch { this.links = []; }
+                this.filterMethods();
+            } catch(e) { console.error(e); toast('فشل تحميل البيانات', 'error'); }
+            this.loading = false;
+        },
+
+        filterMethods() {
+            if (!this.search) { this.filteredMethods = this.methods; return; }
+            const s = this.search.toLowerCase();
+            this.filteredMethods = this.methods.filter(m =>
+                (m.method_name || '').toLowerCase().includes(s) ||
+                (m.account_data || '').toLowerCase().includes(s)
+            );
+        },
+
+        getLinkedCompanies(methodId) {
+            const linkedIds = this.links.filter(l => l.method_id == methodId).map(l => l.company_id);
+            return this.companies.filter(c => linkedIds.includes(c.id));
+        },
+
+        isLinked(companyId, methodId) {
+            return this.links.some(l => l.company_id == companyId && l.method_id == methodId);
+        },
+
+        copyToClipboard(text) {
+            navigator.clipboard.writeText(text);
+            toast('تم النسخ: ' + text, 'success');
+        },
+
+        editMethod(m) {
+            this.editing = true;
+            this.form = { name: m.method_name, type: m.method_type, account_data: m.account_data, info: m.additional_info || '', icon: m.icon || '💳' };
+            this.selectedMethod = m;
+            this.showAddModal = true;
+        },
+
+        linkModal(m) {
+            this.selectedMethod = m;
+            this.selectedCompanies = this.companies
+                .filter(c => this.isLinked(c.id, m.id))
+                .map(c => c.id);
+            this.showLinkModal = true;
+        },
+
+        async saveMethod() {
+            if (!this.form.name || !this.form.account_data) {
+                toast('املأ الاسم والبيانات', 'warning');
+                return;
             }
+            if (this.editing && this.selectedMethod) {
+                await api(`/api/payment-methods/${this.selectedMethod.id}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(this.form)
+                });
+                toast('تم التعديل', 'success');
+            } else {
+                await api('/api/payment-methods', {
+                    method: 'POST',
+                    body: JSON.stringify(this.form)
+                });
+                toast('تمت الإضافة', 'success');
+            }
+            this.showAddModal = false;
+            this.editing = false;
+            this.form = { name: '', type: 'mobile', account_data: '', info: '', icon: '💳' };
+            await this.loadData();
+        },
+
+        async toggleStatus(m) {
+            const newStatus = m.status === 'active' ? 'inactive' : 'active';
+            await api(`/api/payment-methods/${m.id}`, {
+                method: 'PUT',
+                body: JSON.stringify({ status: newStatus })
+            });
+            toast('تم التبديل', 'success');
+            await this.loadData();
+        },
+
+        async deleteMethod(m) {
+            if (!confirm('حذف وسيلة الدفع: ' + m.method_name + '؟')) return;
+            await api(`/api/payment-methods/${m.id}`, { method: 'DELETE' });
+            toast('تم الحذف', 'warning');
+            await this.loadData();
+        },
+
+        async saveLinks() {
+            if (!this.selectedMethod) return;
+            await api('/api/payment-links', {
+                method: 'POST',
+                body: JSON.stringify({
+                    method_id: this.selectedMethod.id,
+                    company_ids: this.selectedCompanies
+                })
+            });
+            toast('تم حفظ الروابط', 'success');
+            this.showLinkModal = false;
+            await this.loadData();
         }
     }
 }

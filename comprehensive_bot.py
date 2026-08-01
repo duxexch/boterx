@@ -14815,18 +14815,27 @@ class ComprehensiveDUXBot:
             self.send_inline_message(message['chat']['id'], title, inline_btns)
         
     def add_payment_method(self, company_id, method_name, method_type, account_data, additional_info="", icon=""):
-            """إضافة وسيلة دفع جديدة"""
+            """إضافة وسيلة دفع جديدة — بدون تكرار (نفس الاسم + نفس البيانات = نفس الوسيلة)"""
             try:
+                # فحص التكرار: لو نفس الاسم + نفس account_data = return existing ID
+                existing_methods = self.get_all_payment_methods()
+                for m in existing_methods:
+                    if (m.get('method_name', '').strip().lower() == method_name.strip().lower() and
+                        m.get('account_data', '').strip() == account_data.strip()):
+                        # وسيلة موجودة بالفعل بنفس البيانات — نرجع ID بتاعها
+                        logger.info(f"Payment method '{method_name}' with same data already exists: {m['id']}")
+                        return m['id']
+                
                 # إنشاء ID جديد  
                 new_id = int(datetime.now().timestamp() * 1000) % 1000000
                 # تطبيع الأيقونة
                 method_icon = self.normalize_icon(icon or method_type, default='💳')
-                # إضافة الوسيلة الجديدة
+                # إضافة الوسيلة الجديدة (company_id فارغ = pool عام)
                 with open('payment_methods.csv', 'a', encoding='utf-8-sig', newline='') as f:
                     writer = csv.writer(f)
                     writer.writerow([
                         new_id,
-                        company_id,
+                        '',  # company_id فارغ — الربط يتم عبر company_payment_links.csv
                         method_name,
                         method_type,
                         account_data,
@@ -14835,8 +14844,10 @@ class ComprehensiveDUXBot:
                         datetime.now().strftime('%Y-%m-%d'),
                         method_icon
                     ])
-                return True
-            except:
+                logger.info(f"Payment method added: {new_id} ({method_name})")
+                return new_id
+            except Exception as e:
+                logger.error(f"خطأ في إضافة وسيلة دفع: {e}")
                 return False
         
     def edit_payment_method(self, method_id, new_data):
