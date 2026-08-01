@@ -7096,15 +7096,56 @@ class ComprehensiveDUXBot:
             return
         lang = user.get('language', 'ar')
 
-        # فحص وجود مطابقة نشطة
+        # فحص وجود مطابقة نشطة — عرضها إن وجدت
         if self.match_manager:
             active_match = self.match_manager.get_match_by_user(message['from']['id'])
             if active_match:
-                self.send_message(message['chat']['id'],
-                    f"⚠️ لديك مطابقة نشطة: {active_match['id']}\n\nاكمل العملية الحالية أولاً.",
-                    self.main_keyboard(lang, message['from']['id']))
+                # عرض المطابقة النشطة مع تفاصيلها
+                match = active_match
+                match_status = match.get('status', 'active')
+                status_ar = {
+                    'active': '🟢 نشطة',
+                    'awaiting_code': '🔐 بانتظار الكود',
+                    'code_verified': '✅ تم تأكيد الكود',
+                    'awaiting_payment': '💸 بانتظار التحويل',
+                    'completed': '✅ مكتملة',
+                    'disputed': '⚖️ نزاع مفتوح'
+                }.get(match_status, match_status)
+
+                text = (
+                    f"⚠️ <b>لديك مطابقة نشطة</b>\n\n"
+                    f"━━━━━━━━━━━━━━━━━━\n"
+                    f"🆔 المطابقة: <code>{match['id']}</code> 👈 اضغط للنسخ\n"
+                    f"📊 الحالة: <b>{status_ar}</b>\n"
+                    f"💰 المبلغ: <code>{match.get('amount', '')}</code> {match.get('currency', '')}\n"
+                    f"🏢 الشركة: <b>{match.get('company_name', '')}</b>\n"
+                    f"━━━━━━━━━━━━━━━━━━\n\n"
+                )
+
+                # عرض الأزرار المناسبة حسب الحالة
+                inline_btns = []
+                if match_status in ('active', 'awaiting_code'):
+                    # الساحب: عليه إرسال الكود
+                    if str(match.get('withdrawer_id', '')) == str(message['from']['id']):
+                        text += "📝 عليك إرسال كود السحب وبياناتك\n"
+                        inline_btns.append([{'text': '📝 إرسال الكود', 'callback_data': f'match_enter_code_btn_{match["id"]}'}])
+                    # المودع: بانتظار الساحب
+                    elif str(match.get('depositor_id', '')) == str(message['from']['id']):
+                        text += "⏳ بانتظار قيام الطرف الآخر بإرسال الكود\n"
+
+                if match_status == 'code_verified':
+                    # المودع: عليه التحويل
+                    if str(match.get('depositor_id', '')) == str(message['from']['id']):
+                        text += "📤 حوّل المال ثم أكد الإرسال\n"
+                        inline_btns.append([{'text': '✅ تم الإرسال', 'callback_data': f'match_sent_{match["id"]}'}])
+
+                inline_btns.append([{'text': '🆘 دعم', 'callback_data': f'match_support_{match["id"]}'}])
+                inline_btns.append([{'text': '🔙 القائمة الرئيسية', 'callback_data': 'match_cancel'}])
+
+                self.send_inline_message(message['chat']['id'], text, inline_btns)
                 return
 
+        # لا توجد مطابقة نشطة — عرض شروط المطابقة + بدء
         if lang == 'ar':
             text = (
                 "🔄 <b>نظام المطابقة P2P</b>\n\n"
