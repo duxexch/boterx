@@ -1,0 +1,250 @@
+{% extends 'base.html' %}
+{% block title %}الشركات — Boterx{% endblock %}
+{% block page_title %}🏢 الشركات{% endblock %}
+
+{% block content %}
+<div x-data="companiesApp()" x-init="init()" class="space-y-6">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <p class="text-slate-400 text-sm">إدارة الشركات ووسائل الدفع</p>
+        <div class="flex gap-2">
+            <button @click="loadData()" class="btn btn-primary btn-sm">
+                <i class="fas fa-rotate ml-1"></i> تحديث
+            </button>
+            <button @click="openAddModal()" class="btn btn-success">
+                <i class="fas fa-plus ml-1"></i> إضافة شركة
+            </button>
+        </div>
+    </div>
+
+    <!-- Companies table -->
+    <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>المعرف</th>
+                        <th>الاسم</th>
+                        <th>النوع</th>
+                        <th>التفاصيل</th>
+                        <th>الأيقونة</th>
+                        <th>العنوان</th>
+                        <th>الحالة</th>
+                        <th>إجراءات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-if="loading">
+                        <tr><td colspan="8" class="text-center p-8 text-slate-400">
+                            <i class="fas fa-spinner fa-spin text-2xl"></i>
+                            <p class="mt-2">جارٍ التحميل...</p>
+                        </td></tr>
+                    </template>
+                    <template x-if="!loading && companies.length === 0">
+                        <tr><td colspan="8" class="text-center p-8 text-slate-400">
+                            <i class="fas fa-inbox text-3xl mb-2"></i>
+                            <p>لا توجد شركات</p>
+                        </td></tr>
+                    </template>
+                    <template x-for="c in companies" :key="c.id">
+                        <tr>
+                            <td class="font-mono text-xs" x-text="c.id || '—'"></td>
+                            <td class="font-medium" x-text="c.name || '—'"></td>
+                            <td>
+                                <span class="px-2 py-0.5 rounded text-xs bg-slate-700 text-slate-300"
+                                      x-text="c.type === 'deposit' ? 'إيداع' : c.type === 'withdraw' ? 'سحب' : c.type === 'both' ? 'إيداع وسحب' : (c.type || '—')"></span>
+                            </td>
+                            <td class="text-sm text-slate-400 max-w-xs truncate" x-text="c.details || '—'"></td>
+                            <td class="text-xl" x-text="c.icon || '🏢'"></td>
+                            <td class="text-sm text-slate-400" x-text="c.address || '—'"></td>
+                            <td x-html="statusBadge(c.is_active)"></td>
+                            <td>
+                                <div class="flex gap-1">
+                                    <button @click="openEditModal(c)" class="btn btn-primary btn-sm">
+                                        <i class="fas fa-pen"></i>
+                                    </button>
+                                    <button @click="deleteCompany(c.id, c.name)" class="btn btn-danger btn-sm">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Add/Edit modal -->
+    <div x-show="showModal" x-transition class="modal-overlay" style="display:none" @click.self="closeModal()">
+        <div class="modal">
+            <h3 class="text-lg font-bold mb-4" x-text="editingId ? 'تعديل شركة' : 'إضافة شركة جديدة'"></h3>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">اسم الشركة</label>
+                    <input type="text" x-model="form.name" class="input w-full" placeholder="مثال: 1XBET">
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">النوع</label>
+                    <select x-model="form.type" class="input w-full">
+                        <option value="both">إيداع وسحب</option>
+                        <option value="deposit">إيداع فقط</option>
+                        <option value="withdraw">سحب فقط</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">التفاصيل</label>
+                    <textarea x-model="form.details" rows="2" class="input w-full" placeholder="محفظة (فودافون, اتصالات, اورنج, اكسيس)"></textarea>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm text-slate-400 mb-1">الأيقونة</label>
+                        <input type="text" x-model="form.icon" class="input w-full" placeholder="📡">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-slate-400 mb-1">العنوان</label>
+                        <input type="text" x-model="form.address" class="input w-full" placeholder="عنوان الشركة">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">رابط التسويق</label>
+                    <input type="text" x-model="form.affiliate_link" class="input w-full" placeholder="https://...">
+                </div>
+                <div x-show="editingId">
+                    <label class="block text-sm text-slate-400 mb-1">الحالة</label>
+                    <select x-model="form.is_active" class="input w-full">
+                        <option value="yes">نشطة</option>
+                        <option value="no">غير نشطة</option>
+                        <option value="active">نشطة</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="flex gap-2 justify-end mt-6">
+                <button @click="closeModal()" class="btn bg-slate-700 text-slate-300 hover:bg-slate-600">إلغاء</button>
+                <button @click="saveCompany()" class="btn btn-success" x-text="editingId ? 'حفظ التعديلات' : 'إضافة'"></button>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function companiesApp() {
+    return {
+        companies: [],
+        loading: true,
+        showModal: false,
+        editingId: '',
+        form: {
+            name: '',
+            type: 'both',
+            details: '',
+            icon: '🏢',
+            address: '',
+            affiliate_link: '',
+            is_active: 'yes'
+        },
+
+        init() {
+            this.loadData();
+        },
+
+        async loadData() {
+            this.loading = true;
+            try {
+                const res = await fetch('/api/companies');
+                const data = await res.json();
+                this.companies = data.companies || [];
+            } catch (e) {
+                console.error(e);
+                toast('فشل تحميل الشركات', 'error');
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        resetForm() {
+            this.form = {
+                name: '',
+                type: 'both',
+                details: '',
+                icon: '🏢',
+                address: '',
+                affiliate_link: '',
+                is_active: 'yes'
+            };
+        },
+
+        openAddModal() {
+            this.editingId = '';
+            this.resetForm();
+            this.showModal = true;
+        },
+
+        openEditModal(c) {
+            this.editingId = c.id;
+            this.form = {
+                name: c.name || '',
+                type: c.type || 'both',
+                details: c.details || '',
+                icon: c.icon || '🏢',
+                address: c.address || '',
+                affiliate_link: c.affiliate_link || '',
+                is_active: c.is_active || 'yes'
+            };
+            this.showModal = true;
+        },
+
+        closeModal() {
+            this.showModal = false;
+            this.editingId = '';
+        },
+
+        async saveCompany() {
+            if (!this.form.name.trim()) {
+                toast('يرجى إدخال اسم الشركة', 'warning');
+                return;
+            }
+
+            try {
+                if (this.editingId) {
+                    await fetch('/api/companies/' + this.editingId, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(this.form)
+                    });
+                    toast('تم تحديث الشركة', 'success');
+                } else {
+                    await fetch('/api/companies', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(this.form)
+                    });
+                    toast('تمت إضافة الشركة', 'success');
+                }
+                this.closeModal();
+                this.loadData();
+            } catch (e) {
+                toast('فشل الحفظ', 'error');
+            }
+        },
+
+        async deleteCompany(id, name) {
+            if (!confirm('هل أنت متأكد من حذف الشركة "' + (name || id) + '"؟')) return;
+            try {
+                await fetch('/api/companies/' + id, { method: 'DELETE' });
+                toast('تم حذف الشركة', 'success');
+                this.loadData();
+            } catch (e) {
+                toast('فشل الحذف', 'error');
+            }
+        }
+    }
+}
+</script>
+{% endblock %}

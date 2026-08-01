@@ -1,0 +1,285 @@
+{% extends 'base.html' %}
+{% block title %}المطابقات — Boterx{% endblock %}
+{% block page_title %}🔄 المطابقات{% endblock %}
+
+{% block content %}
+<div x-data="matchingApp()" x-init="init()" class="space-y-6">
+
+    <!-- Tabs -->
+    <div class="flex gap-1 bg-slate-800 rounded-xl border border-slate-700 p-1 w-fit">
+        <button @click="setTab('active')" :class="tab === 'active' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'"
+                class="px-5 py-2 rounded-lg text-sm font-medium transition">
+            <i class="fas fa-circle-check ml-1"></i> نشطة
+            <span class="ml-1 px-1.5 py-0.5 rounded text-xs bg-slate-700" x-text="activeCount"></span>
+        </button>
+        <button @click="setTab('pending')" :class="tab === 'pending' ? 'bg-amber-600 text-white' : 'text-slate-400 hover:text-white'"
+                class="px-5 py-2 rounded-lg text-sm font-medium transition">
+            <i class="fas fa-clock ml-1"></i> معلقة
+            <span class="ml-1 px-1.5 py-0.5 rounded text-xs bg-slate-700" x-text="pendingCount"></span>
+        </button>
+        <button @click="setTab('logs')" :class="tab === 'logs' ? 'bg-green-600 text-white' : 'text-slate-400 hover:text-white'"
+                class="px-5 py-2 rounded-lg text-sm font-medium transition">
+            <i class="fas fa-list ml-1"></i> السجلات
+        </button>
+    </div>
+
+    <!-- Active matches tab -->
+    <div x-show="tab === 'active'" class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+        <div class="p-4 border-b border-slate-700">
+            <h3 class="font-semibold"><i class="fas fa-circle-check text-green-400 ml-1"></i> المطابقات النشطة</h3>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>المعرف</th>
+                        <th>المودع</th>
+                        <th>الساحب</th>
+                        <th>المبلغ</th>
+                        <th>الشركة</th>
+                        <th>الحالة</th>
+                        <th>تاريخ الإنشاء</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-if="loading">
+                        <tr><td colspan="7" class="text-center p-8 text-slate-400">
+                            <i class="fas fa-spinner fa-spin text-2xl"></i>
+                            <p class="mt-2">جارٍ التحميل...</p>
+                        </td></tr>
+                    </template>
+                    <template x-if="!loading && activeMatches.length === 0">
+                        <tr><td colspan="7" class="text-center p-8 text-slate-400">
+                            <i class="fas fa-inbox text-3xl mb-2"></i>
+                            <p>لا توجد مطابقات نشطة</p>
+                        </td></tr>
+                    </template>
+                    <template x-for="m in activeMatches" :key="m.id">
+                        <tr>
+                            <td class="font-mono text-xs" x-text="m.id || '—'"></td>
+                            <td>
+                                <div class="font-medium" x-text="m.depositor_alias || '—'"></div>
+                                <div class="text-xs text-slate-500" x-text="m.depositor_id || ''"></div>
+                            </td>
+                            <td>
+                                <div class="font-medium" x-text="m.withdrawer_alias || '—'"></div>
+                                <div class="text-xs text-slate-500" x-text="m.withdrawer_id || ''"></div>
+                            </td>
+                            <td class="font-bold" x-text="fmtAmount(m.amount, m.currency)"></td>
+                            <td>
+                                <span class="px-2 py-0.5 rounded text-xs bg-purple-500/20 text-purple-400" x-text="m.company_name || '—'"></span>
+                            </td>
+                            <td x-html="statusBadge(m.status)"></td>
+                            <td class="text-xs text-slate-400" x-text="m.created_at || '—'"></td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Pending requests tab -->
+    <div x-show="tab === 'pending'" class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+        <div class="p-4 border-b border-slate-700">
+            <h3 class="font-semibold"><i class="fas fa-clock text-amber-400 ml-1"></i> الطلبات المعلقة</h3>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>المعرف</th>
+                        <th>المستخدم</th>
+                        <th>النوع</th>
+                        <th>المبلغ</th>
+                        <th>الشركة</th>
+                        <th>الاسم المستعار</th>
+                        <th>التاريخ</th>
+                        <th>إجراءات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-if="loading">
+                        <tr><td colspan="8" class="text-center p-8 text-slate-400">
+                            <i class="fas fa-spinner fa-spin text-2xl"></i>
+                            <p class="mt-2">جارٍ التحميل...</p>
+                        </td></tr>
+                    </template>
+                    <template x-if="!loading && pendingRequests.length === 0">
+                        <tr><td colspan="8" class="text-center p-8 text-slate-400">
+                            <i class="fas fa-inbox text-3xl mb-2"></i>
+                            <p>لا توجد طلبات معلقة</p>
+                        </td></tr>
+                    </template>
+                    <template x-for="r in pendingRequests" :key="r.id">
+                        <tr>
+                            <td class="font-mono text-xs" x-text="r.id || '—'"></td>
+                            <td>
+                                <div class="font-medium" x-text="r.customer_id || '—'"></div>
+                                <div class="text-xs text-slate-500" x-text="r.user_id || ''"></div>
+                            </td>
+                            <td>
+                                <span x-text="r.type === 'deposit' ? '💵 إيداع' : '💸 سحب'"
+                                      :class="r.type === 'deposit' ? 'text-green-400' : 'text-red-400'"></span>
+                            </td>
+                            <td class="font-bold" x-text="fmtAmount(r.amount, r.currency)"></td>
+                            <td>
+                                <span class="px-2 py-0.5 rounded text-xs bg-purple-500/20 text-purple-400" x-text="r.company_name || '—'"></span>
+                            </td>
+                            <td class="text-sm" x-text="r.alias || '—'"></td>
+                            <td class="text-xs text-slate-400" x-text="r.created_at || '—'"></td>
+                            <td>
+                                <div class="flex gap-1">
+                                    <button @click="approveRequest(r.id)" class="btn btn-success btn-sm">
+                                        <i class="fas fa-check"></i> قبول
+                                    </button>
+                                    <button @click="rejectRequest(r.id)" class="btn btn-danger btn-sm">
+                                        <i class="fas fa-xmark"></i> رفض
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Logs tab -->
+    <div x-show="tab === 'logs'" class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+        <div class="p-4 border-b border-slate-700">
+            <h3 class="font-semibold"><i class="fas fa-list text-blue-400 ml-1"></i> سجل المطابقات (مكتملة / ملغاة)</h3>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>المعرف</th>
+                        <th>المودع</th>
+                        <th>الساحب</th>
+                        <th>المبلغ</th>
+                        <th>الشركة</th>
+                        <th>الحالة</th>
+                        <th>تاريخ الإكمال</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-if="loading">
+                        <tr><td colspan="7" class="text-center p-8 text-slate-400">
+                            <i class="fas fa-spinner fa-spin text-2xl"></i>
+                            <p class="mt-2">جارٍ التحميل...</p>
+                        </td></tr>
+                    </template>
+                    <template x-if="!loading && logs.length === 0">
+                        <tr><td colspan="7" class="text-center p-8 text-slate-400">
+                            <i class="fas fa-inbox text-3xl mb-2"></i>
+                            <p>لا توجد سجلات</p>
+                        </td></tr>
+                    </template>
+                    <template x-for="m in logs" :key="m.id">
+                        <tr>
+                            <td class="font-mono text-xs" x-text="m.id || '—'"></td>
+                            <td>
+                                <div class="font-medium" x-text="m.depositor_alias || '—'"></div>
+                                <div class="text-xs text-slate-500" x-text="m.depositor_id || ''"></div>
+                            </td>
+                            <td>
+                                <div class="font-medium" x-text="m.withdrawer_alias || '—'"></div>
+                                <div class="text-xs text-slate-500" x-text="m.withdrawer_id || ''"></div>
+                            </td>
+                            <td class="font-bold" x-text="fmtAmount(m.amount, m.currency)"></td>
+                            <td>
+                                <span class="px-2 py-0.5 rounded text-xs bg-purple-500/20 text-purple-400" x-text="m.company_name || '—'"></span>
+                            </td>
+                            <td x-html="statusBadge(m.status)"></td>
+                            <td class="text-xs text-slate-400" x-text="m.completed_at || m.created_at || '—'"></td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function matchingApp() {
+    return {
+        tab: 'active',
+        activeMatches: [],
+        pendingRequests: [],
+        logs: [],
+        activeCount: 0,
+        pendingCount: 0,
+        loading: true,
+
+        init() {
+            this.loadAll();
+        },
+
+        setTab(t) {
+            this.tab = t;
+        },
+
+        async loadAll() {
+            this.loading = true;
+            await Promise.all([
+                this.loadActive(),
+                this.loadPending(),
+                this.loadLogs()
+            ]);
+            this.loading = false;
+        },
+
+        async loadActive() {
+            try {
+                const res = await fetch('/api/matching/active');
+                const data = await res.json();
+                this.activeMatches = data.matches || [];
+                this.activeCount = data.count || 0;
+            } catch (e) { console.error(e); }
+        },
+
+        async loadPending() {
+            try {
+                const res = await fetch('/api/matching/pending');
+                const data = await res.json();
+                this.pendingRequests = data.requests || [];
+                this.pendingCount = data.count || 0;
+            } catch (e) { console.error(e); }
+        },
+
+        async loadLogs() {
+            try {
+                const res = await fetch('/api/matching/logs');
+                const data = await res.json();
+                this.logs = data.matches || [];
+            } catch (e) { console.error(e); }
+        },
+
+        async approveRequest(id) {
+            if (!confirm('هل أنت متأكد من قبول هذا الطلب؟')) return;
+            try {
+                await fetch('/api/matching/pending/' + id + '/approve', { method: 'POST' });
+                toast('تم قبول الطلب', 'success');
+                this.loadAll();
+            } catch (e) {
+                toast('فشل قبول الطلب', 'error');
+            }
+        },
+
+        async rejectRequest(id) {
+            if (!confirm('هل أنت متأكد من رفض هذا الطلب؟')) return;
+            try {
+                await fetch('/api/matching/pending/' + id + '/reject', { method: 'POST' });
+                toast('تم رفض الطلب', 'success');
+                this.loadAll();
+            } catch (e) {
+                toast('فشل رفض الطلب', 'error');
+            }
+        }
+    }
+}
+</script>
+{% endblock %}

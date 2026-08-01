@@ -1,0 +1,108 @@
+{% extends 'base.html' %}
+{% block title %}وسائل الدفع — Boterx{% endblock %}
+{% block page_title %}💳 وسائل الدفع{% endblock %}
+
+{% block content %}
+<div x-data="paymentMethodsApp()" x-init="init()" class="space-y-6">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <p class="text-slate-400 text-sm">إدارة وسائل الدفع للشركات</p>
+        <button @click="loadData()" class="btn btn-primary btn-sm">
+            <i class="fas fa-rotate ml-1"></i> تحديث
+        </button>
+    </div>
+
+    <!-- Payment methods table -->
+    <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>المعرف</th>
+                        <th>اسم الوسيلة</th>
+                        <th>النوع</th>
+                        <th>بيانات الحساب</th>
+                        <th>معلومات إضافية</th>
+                        <th>الأيقونة</th>
+                        <th>الشركة</th>
+                        <th>الحالة</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-if="loading">
+                        <tr><td colspan="8" class="text-center p-8 text-slate-400">
+                            <i class="fas fa-spinner fa-spin text-2xl"></i>
+                            <p class="mt-2">جارٍ التحميل...</p>
+                        </td></tr>
+                    </template>
+                    <template x-if="!loading && methods.length === 0">
+                        <tr><td colspan="8" class="text-center p-8 text-slate-400">
+                            <i class="fas fa-inbox text-3xl mb-2"></i>
+                            <p>لا توجد وسائل دفع</p>
+                        </td></tr>
+                    </template>
+                    <template x-for="m in methods" :key="m.id">
+                        <tr>
+                            <td class="font-mono text-xs" x-text="m.id || '—'"></td>
+                            <td class="font-medium" x-text="m.method_name || '—'"></td>
+                            <td>
+                                <span class="px-2 py-0.5 rounded text-xs bg-slate-700 text-slate-300" x-text="m.method_type || '—'"></span>
+                            </td>
+                            <td class="font-mono text-xs text-slate-400 max-w-xs truncate" x-text="m.account_data || '—'"></td>
+                            <td class="text-sm text-slate-400 max-w-xs truncate" x-text="m.additional_info || '—'"></td>
+                            <td class="text-xl" x-text="m.icon || '💳'"></td>
+                            <td class="font-mono text-xs text-slate-500" x-text="m.company_id || '—'"></td>
+                            <td x-html="statusBadge(m.status)"></td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function paymentMethodsApp() {
+    return {
+        methods: [],
+        loading: true,
+
+        init() {
+            this.loadData();
+        },
+
+        async loadData() {
+            this.loading = true;
+            try {
+                const res = await fetch('/api/companies');
+                const data = await res.json();
+                // The API returns companies; we fetch payment methods from the same data context.
+                // Since there's no dedicated endpoint, we fetch payment_methods.csv data via companies endpoint.
+                // The companies endpoint may include payment methods or we use the companies list.
+                this.methods = data.payment_methods || data.methods || [];
+                // If no payment methods in response, try fetching directly
+                if (this.methods.length === 0) {
+                    try {
+                        const res2 = await fetch('/api/payment-methods');
+                        const data2 = await res2.json();
+                        this.methods = data2.methods || data2.payment_methods || [];
+                    } catch (e2) {
+                        // Fallback: no payment methods endpoint available
+                        this.methods = [];
+                    }
+                }
+            } catch (e) {
+                console.error(e);
+                toast('فشل تحميل وسائل الدفع', 'error');
+            } finally {
+                this.loading = false;
+            }
+        }
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,182 @@
+{% extends 'base.html' %}
+{% block title %}الإحالات — Boterx{% endblock %}
+{% block page_title %}🎁 الإحالات{% endblock %}
+
+{% block content %}
+<div x-data="referralsApp()" x-init="init()" class="space-y-6">
+
+    <!-- Summary card -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-slate-400 text-sm">إجمالي الإحالات</p>
+                    <p class="text-3xl font-bold mt-1 text-blue-400" x-text="totalReferrals">0</p>
+                </div>
+                <div class="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400 text-xl">
+                    <i class="fas fa-users"></i>
+                </div>
+            </div>
+        </div>
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-slate-400 text-sm">روابط نشطة</p>
+                    <p class="text-3xl font-bold mt-1 text-green-400" x-text="links.filter(l => l.is_active === 'yes' || l.is_active === 'active').length">0</p>
+                </div>
+                <div class="w-12 h-12 rounded-xl bg-green-500/10 flex items-center justify-center text-green-400 text-xl">
+                    <i class="fas fa-link"></i>
+                </div>
+            </div>
+        </div>
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-slate-400 text-sm">مكافآت ممنوحة</p>
+                    <p class="text-3xl font-bold mt-1 text-amber-400" x-text="log.filter(l => l.reward_given === 'yes' || l.reward_given === 'true').length">0</p>
+                </div>
+                <div class="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-400 text-xl">
+                    <i class="fas fa-gift"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Referral links table -->
+    <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+        <div class="p-4 border-b border-slate-700 flex items-center justify-between">
+            <h3 class="font-semibold"><i class="fas fa-link text-green-400 ml-1"></i> روابط الإحالة</h3>
+            <button @click="loadData()" class="btn btn-primary btn-sm">
+                <i class="fas fa-rotate ml-1"></i> تحديث
+            </button>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>الاسم</th>
+                        <th>الرابط</th>
+                        <th>الحالة</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-if="loading">
+                        <tr><td colspan="3" class="text-center p-8 text-slate-400">
+                            <i class="fas fa-spinner fa-spin text-2xl"></i>
+                            <p class="mt-2">جارٍ التحميل...</p>
+                        </td></tr>
+                    </template>
+                    <template x-if="!loading && links.length === 0">
+                        <tr><td colspan="3" class="text-center p-8 text-slate-400">
+                            <i class="fas fa-inbox text-3xl mb-2"></i>
+                            <p>لا توجد روابط إحالة</p>
+                        </td></tr>
+                    </template>
+                    <template x-for="l in links" :key="l.id">
+                        <tr>
+                            <td class="font-medium" x-text="l.name || l.id || '—'"></td>
+                            <td>
+                                <a x-show="l.url" :href="l.url" target="_blank"
+                                   class="text-blue-400 hover:underline text-sm font-mono" x-text="l.url || '—'"></a>
+                                <span x-show="!l.url" class="text-slate-600">—</span>
+                            </td>
+                            <td x-html="statusBadge(l.is_active)"></td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Referral log table -->
+    <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+        <div class="p-4 border-b border-slate-700">
+            <h3 class="font-semibold"><i class="fas fa-list text-blue-400 ml-1"></i> سجل الإحالات</h3>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>المُحيل</th>
+                        <th>المُحال</th>
+                        <th>الهاتف</th>
+                        <th>الحالة</th>
+                        <th>المكافأة</th>
+                        <th>التاريخ</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-if="loading">
+                        <tr><td colspan="6" class="text-center p-8 text-slate-400">
+                            <i class="fas fa-spinner fa-spin text-2xl"></i>
+                            <p class="mt-2">جارٍ التحميل...</p>
+                        </td></tr>
+                    </template>
+                    <template x-if="!loading && log.length === 0">
+                        <tr><td colspan="6" class="text-center p-8 text-slate-400">
+                            <i class="fas fa-inbox text-3xl mb-2"></i>
+                            <p>لا يوجد سجل إحالات</p>
+                        </td></tr>
+                    </template>
+                    <template x-for="(r, idx) in log" :key="idx">
+                        <tr>
+                            <td>
+                                <div class="font-medium" x-text="r.referrer_id || '—'"></div>
+                                <div class="text-xs text-slate-500" x-text="r.referrer_customer_id || ''"></div>
+                            </td>
+                            <td class="font-mono text-xs" x-text="r.referred_id || '—'"></td>
+                            <td class="text-sm" x-text="r.referred_phone || '—'"></td>
+                            <td x-html="statusBadge(r.status)"></td>
+                            <td>
+                                <span x-show="r.reward_given === 'yes' || r.reward_given === 'true'"
+                                      class="px-2 py-0.5 rounded text-xs bg-green-500/20 text-green-400">
+                                    <i class="fas fa-check ml-0.5"></i> ممنوحة
+                                </span>
+                                <span x-show="r.reward_given !== 'yes' && r.reward_given !== 'true'"
+                                      class="px-2 py-0.5 rounded text-xs bg-slate-700 text-slate-400">
+                                    <i class="fas fa-xmark ml-0.5"></i> لم تُمنح
+                                </span>
+                            </td>
+                            <td class="text-xs text-slate-400" x-text="r.created_at || '—'"></td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function referralsApp() {
+    return {
+        links: [],
+        log: [],
+        totalReferrals: 0,
+        loading: true,
+
+        init() {
+            this.loadData();
+        },
+
+        async loadData() {
+            this.loading = true;
+            try {
+                const res = await fetch('/api/referrals');
+                const data = await res.json();
+                this.links = data.links || [];
+                this.log = data.log || [];
+                this.totalReferrals = data.total_referrals || 0;
+            } catch (e) {
+                console.error(e);
+                toast('فشل تحميل الإحالات', 'error');
+            } finally {
+                this.loading = false;
+            }
+        }
+    }
+}
+</script>
+{% endblock %}

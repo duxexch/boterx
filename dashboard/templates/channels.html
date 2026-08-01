@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+{% block title %}القنوات — Boterx{% endblock %}
+{% block page_title %}📢 القنوات{% endblock %}
+
+{% block content %}
+<div x-data="channelsApp()" x-init="init()" class="space-y-6">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <p class="text-slate-400 text-sm">إدارة قنوات التيليجرام المرتبطة بالبوت</p>
+        <button @click="loadData()" class="btn btn-primary btn-sm">
+            <i class="fas fa-rotate ml-1"></i> تحديث
+        </button>
+    </div>
+
+    <!-- Channels table -->
+    <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>المعرف</th>
+                        <th>العنوان</th>
+                        <th>معرف المحادثة</th>
+                        <th>النوع</th>
+                        <th>الحالة</th>
+                        <th>تاريخ الإضافة</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-if="loading">
+                        <tr><td colspan="6" class="text-center p-8 text-slate-400">
+                            <i class="fas fa-spinner fa-spin text-2xl"></i>
+                            <p class="mt-2">جارٍ التحميل...</p>
+                        </td></tr>
+                    </template>
+                    <template x-if="!loading && channels.length === 0">
+                        <tr><td colspan="6" class="text-center p-8 text-slate-400">
+                            <i class="fas fa-inbox text-3xl mb-2"></i>
+                            <p>لا توجد قنوات</p>
+                        </td></tr>
+                    </template>
+                    <template x-for="c in channels" :key="c.id || c.chat_id">
+                        <tr>
+                            <td class="font-mono text-xs" x-text="c.id || '—'"></td>
+                            <td>
+                                <div class="flex items-center gap-2">
+                                    <i class="fab fa-telegram text-blue-400"></i>
+                                    <span class="font-medium" x-text="c.title || c.name || '—'"></span>
+                                </div>
+                            </td>
+                            <td class="font-mono text-xs text-slate-400" x-text="c.chat_id || '—'"></td>
+                            <td>
+                                <span class="px-2 py-0.5 rounded text-xs bg-slate-700 text-slate-300"
+                                      x-text="c.type === 'channel' ? 'قناة' : c.type === 'group' ? 'مجموعة' : (c.type || '—')"></span>
+                            </td>
+                            <td x-html="statusBadge(c.is_active)"></td>
+                            <td class="text-xs text-slate-400" x-text="c.created_at || c.added_date || '—'"></td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function channelsApp() {
+    return {
+        channels: [],
+        loading: true,
+
+        init() {
+            this.loadData();
+        },
+
+        async loadData() {
+            this.loading = true;
+            try {
+                const res = await fetch('/api/channels');
+                const data = await res.json();
+                this.channels = data.channels || [];
+            } catch (e) {
+                console.error(e);
+                toast('فشل تحميل القنوات', 'error');
+            } finally {
+                this.loading = false;
+            }
+        }
+    }
+}
+</script>
+{% endblock %}

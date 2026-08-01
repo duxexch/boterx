@@ -1,0 +1,169 @@
+{% extends 'base.html' %}
+{% block title %}التعويض (SVRP) — Boterx{% endblock %}
+{% block page_title %}💎 التعويض (SVRP){% endblock %}
+
+{% block content %}
+<div x-data="svrpApp()" x-init="init()" class="space-y-6">
+
+    <!-- Wallets table -->
+    <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+        <div class="p-4 border-b border-slate-700 flex items-center justify-between">
+            <h3 class="font-semibold"><i class="fas fa-wallet text-green-400 ml-1"></i> محافظ التعويض</h3>
+            <button @click="loadData()" class="btn btn-primary btn-sm">
+                <i class="fas fa-rotate ml-1"></i> تحديث
+            </button>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>معرف المستخدم</th>
+                        <th>معرف العميل</th>
+                        <th>الرصيد</th>
+                        <th>المعلق</th>
+                        <th>إجمالي المكتسب</th>
+                        <th>إجمالي المستخدم</th>
+                        <th>مطلوب رهان</th>
+                        <th>رهان مكتمل</th>
+                        <th>آخر استرداد</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-if="loading">
+                        <tr><td colspan="9" class="text-center p-8 text-slate-400">
+                            <i class="fas fa-spinner fa-spin text-2xl"></i>
+                            <p class="mt-2">جارٍ التحميل...</p>
+                        </td></tr>
+                    </template>
+                    <template x-if="!loading && wallets.length === 0">
+                        <tr><td colspan="9" class="text-center p-8 text-slate-400">
+                            <i class="fas fa-inbox text-3xl mb-2"></i>
+                            <p>لا توجد محافظ</p>
+                        </td></tr>
+                    </template>
+                    <template x-for="w in wallets" :key="w.telegram_id">
+                        <tr>
+                            <td class="font-mono text-xs" x-text="w.telegram_id || '—'"></td>
+                            <td class="font-mono text-xs text-slate-400" x-text="w.customer_id || '—'"></td>
+                            <td>
+                                <span class="font-bold text-green-400" x-text="fmtNum(w.balance)"></span>
+                            </td>
+                            <td>
+                                <span class="text-amber-400" x-text="fmtNum(w.pending_balance)"></span>
+                            </td>
+                            <td>
+                                <span class="text-blue-400" x-text="fmtNum(w.total_earned)"></span>
+                            </td>
+                            <td>
+                                <span class="text-red-400" x-text="fmtNum(w.total_used)"></span>
+                            </td>
+                            <td>
+                                <span class="px-2 py-0.5 rounded text-xs bg-slate-700 text-slate-300" x-text="w.wagering_required || '0'"></span>
+                            </td>
+                            <td>
+                                <span class="px-2 py-0.5 rounded text-xs bg-green-500/20 text-green-400" x-text="w.wagering_completed || '0'"></span>
+                            </td>
+                            <td class="text-xs text-slate-400" x-text="w.last_recovery_date || '—'"></td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Recovery requests table -->
+    <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+        <div class="p-4 border-b border-slate-700">
+            <h3 class="font-semibold"><i class="fas fa-hand-holding-dollar text-amber-400 ml-1"></i> طلبات الاسترداد</h3>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>المعرف</th>
+                        <th>المستخدم</th>
+                        <th>معرف العميل</th>
+                        <th>المبلغ</th>
+                        <th>الحالة</th>
+                        <th>التاريخ</th>
+                        <th>ملاحظة الإدارة</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-if="loading">
+                        <tr><td colspan="7" class="text-center p-8 text-slate-400">
+                            <i class="fas fa-spinner fa-spin text-2xl"></i>
+                            <p class="mt-2">جارٍ التحميل...</p>
+                        </td></tr>
+                    </template>
+                    <template x-if="!loading && requests.length === 0">
+                        <tr><td colspan="7" class="text-center p-8 text-slate-400">
+                            <i class="fas fa-inbox text-3xl mb-2"></i>
+                            <p>لا توجد طلبات استرداد</p>
+                        </td></tr>
+                    </template>
+                    <template x-for="r in requests" :key="r.id">
+                        <tr>
+                            <td class="font-mono text-xs" x-text="r.id || '—'"></td>
+                            <td class="font-medium" x-text="r.user_id || '—'"></td>
+                            <td class="font-mono text-xs text-slate-400" x-text="r.customer_id || '—'"></td>
+                            <td class="font-bold text-amber-400" x-text="fmtNum(r.recovery_amount)"></td>
+                            <td x-html="statusBadge(r.status)"></td>
+                            <td class="text-xs text-slate-400" x-text="r.created_at || '—'"></td>
+                            <td class="text-xs text-slate-400" x-text="r.admin_note || '—'"></td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function svrpApp() {
+    return {
+        wallets: [],
+        requests: [],
+        loading: true,
+
+        init() {
+            this.loadData();
+        },
+
+        async loadData() {
+            this.loading = true;
+            await Promise.all([
+                this.loadWallets(),
+                this.loadRequests()
+            ]);
+            this.loading = false;
+        },
+
+        async loadWallets() {
+            try {
+                const res = await fetch('/api/svrp/wallets');
+                const data = await res.json();
+                this.wallets = data.wallets || [];
+            } catch (e) {
+                console.error(e);
+                toast('فشل تحميل المحافظ', 'error');
+            }
+        },
+
+        async loadRequests() {
+            try {
+                const res = await fetch('/api/svrp/requests');
+                const data = await res.json();
+                this.requests = data.requests || [];
+            } catch (e) {
+                console.error(e);
+                toast('فشل تحميل الطلبات', 'error');
+            }
+        }
+    }
+}
+</script>
+{% endblock %}

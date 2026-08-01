@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تسجيل الدخول — Boterx</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="bg-slate-900 text-slate-100 font-cairo min-h-screen flex items-center justify-center">
+    <div class="absolute inset-0 overflow-hidden">
+        <div class="absolute top-0 right-0 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl"></div>
+        <div class="absolute bottom-0 left-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl"></div>
+    </div>
+    
+    <div class="relative w-full max-w-md">
+        <div class="bg-slate-800/80 backdrop-blur-xl border border-slate-700 rounded-2xl shadow-2xl p-8">
+            <!-- Logo -->
+            <div class="text-center mb-8">
+                <div class="inline-flex w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 items-center justify-center text-slate-900 font-bold text-3xl mb-3">B</div>
+                <h1 class="text-2xl font-bold text-amber-400">Boterx</h1>
+                <p class="text-sm text-slate-400 mt-1">لوحة التحكم الإدارية</p>
+            </div>
+
+            {% if error %}
+            <div class="bg-red-900/50 border border-red-700 text-red-300 rounded-lg p-3 mb-4 text-sm text-center">
+                <i class="fas fa-exclamation-circle ml-1"></i> {{ error }}
+            </div>
+            {% endif %}
+
+            <form method="POST" class="space-y-4">
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">معرف الأدمن</label>
+                    <div class="relative">
+                        <i class="fas fa-user-shield absolute right-3 top-3.5 text-slate-500"></i>
+                        <input type="text" name="admin_id" required
+                               class="w-full bg-slate-700 border border-slate-600 rounded-lg pr-10 pl-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                               placeholder="أدخل معرف الأدمن">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">كلمة المرور</label>
+                    <div class="relative">
+                        <i class="fas fa-lock absolute right-3 top-3.5 text-slate-500"></i>
+                        <input type="password" name="password" required
+                               class="w-full bg-slate-700 border border-slate-600 rounded-lg pr-10 pl-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                               placeholder="••••••••">
+                    </div>
+                </div>
+                <button type="submit"
+                        class="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-900 font-bold py-3 rounded-lg transition shadow-lg shadow-amber-500/20">
+                    <i class="fas fa-right-to-bracket ml-1"></i> دخول
+                </button>
+            </form>
+        </div>
+        <p class="text-center text-xs text-slate-500 mt-4">© 2026 Boterx — جميع الحقوق محفوظة</p>
+    </div>
+</body>
+</html>

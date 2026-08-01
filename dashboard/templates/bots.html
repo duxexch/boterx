@@ -1,0 +1,119 @@
+{% extends 'base.html' %}
+{% block title %}البوتات — Boterx{% endblock %}
+{% block page_title %}🤖 البوتات{% endblock %}
+
+{% block content %}
+<div x-data="botsApp()" x-init="init()" class="space-y-6">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <p class="text-slate-400 text-sm">إدارة البوتات المتعددة</p>
+        <button @click="loadData()" class="btn btn-primary btn-sm">
+            <i class="fas fa-rotate ml-1"></i> تحديث
+        </button>
+    </div>
+
+    <!-- Bots table -->
+    <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>المعرف</th>
+                        <th>الاسم</th>
+                        <th>التوكن</th>
+                        <th>الحالة</th>
+                        <th>المستخدمون</th>
+                        <th>المعاملات</th>
+                        <th>التشغيل</th>
+                        <th>تاريخ الإنشاء</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-if="loading">
+                        <tr><td colspan="8" class="text-center p-8 text-slate-400">
+                            <i class="fas fa-spinner fa-spin text-2xl"></i>
+                            <p class="mt-2">جارٍ التحميل...</p>
+                        </td></tr>
+                    </template>
+                    <template x-if="!loading && bots.length === 0">
+                        <tr><td colspan="8" class="text-center p-8 text-slate-400">
+                            <i class="fas fa-inbox text-3xl mb-2"></i>
+                            <p>لا توجد بوتات</p>
+                        </td></tr>
+                    </template>
+                    <template x-for="b in bots" :key="b.id">
+                        <tr>
+                            <td class="font-mono text-xs" x-text="b.id || '—'"></td>
+                            <td>
+                                <div class="flex items-center gap-2">
+                                    <i class="fas fa-robot text-blue-400"></i>
+                                    <span class="font-medium" x-text="b.name || '—'"></span>
+                                </div>
+                                <div class="text-xs text-slate-500" x-text="b.description || ''"></div>
+                            </td>
+                            <td>
+                                <span class="font-mono text-xs text-slate-500" x-text="maskToken(b.token)"></span>
+                            </td>
+                            <td x-html="statusBadge(b.is_active)"></td>
+                            <td>
+                                <span class="font-bold text-blue-400" x-text="fmtNum(b.total_users)"></span>
+                            </td>
+                            <td>
+                                <span class="font-bold text-amber-400" x-text="fmtNum(b.total_transactions)"></span>
+                            </td>
+                            <td>
+                                <span x-show="b.status === 'running' || b.is_active === 'yes'"
+                                      class="px-2 py-0.5 rounded text-xs bg-green-500/20 text-green-400">
+                                    <i class="fas fa-circle text-[6px] ml-1"></i> يعمل
+                                </span>
+                                <span x-show="b.status !== 'running' && b.is_active !== 'yes'"
+                                      class="px-2 py-0.5 rounded text-xs bg-red-500/20 text-red-400">
+                                    <i class="fas fa-circle text-[6px] ml-1"></i> متوقف
+                                </span>
+                            </td>
+                            <td class="text-xs text-slate-400" x-text="b.created_at || '—'"></td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function botsApp() {
+    return {
+        bots: [],
+        loading: true,
+
+        init() {
+            this.loadData();
+        },
+
+        async loadData() {
+            this.loading = true;
+            try {
+                const res = await fetch('/api/bots');
+                const data = await res.json();
+                this.bots = data.bots || [];
+            } catch (e) {
+                console.error(e);
+                toast('فشل تحميل البوتات', 'error');
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        maskToken(token) {
+            if (!token) return '—';
+            if (token.length <= 10) return token.substring(0, 4) + '****';
+            return token.substring(0, 8) + '••••••••' + token.substring(token.length - 4);
+        }
+    }
+}
+</script>
+{% endblock %}

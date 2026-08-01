@@ -1,0 +1,261 @@
+{% extends 'base.html' %}
+{% block title %}لوحة التحكم — Boterx{% endblock %}
+{% block page_title %}📊 لوحة التحكم{% endblock %}
+
+{% block content %}
+<div x-data="dashboardApp()" x-init="init()" class="space-y-6">
+
+    <!-- KPI Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- Users -->
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-5 hover:border-blue-500 transition">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-slate-400 text-sm">إجمالي المستخدمين</p>
+                    <p class="text-3xl font-bold mt-1" x-text="stats.users?.total || 0">0</p>
+                    <p class="text-xs text-green-400 mt-1"><i class="fas fa-arrow-up"></i> <span x-text="stats.users?.today || 0">0</span> جديد اليوم</p>
+                </div>
+                <div class="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400 text-xl">
+                    <i class="fas fa-users"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Transactions -->
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-5 hover:border-amber-500 transition">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-slate-400 text-sm">إجمالي المعاملات</p>
+                    <p class="text-3xl font-bold mt-1" x-text="stats.transactions?.total || 0">0</p>
+                    <p class="text-xs text-amber-400 mt-1"><i class="fas fa-clock"></i> <span x-text="stats.transactions?.pending || 0">0</span> معلقة</p>
+                </div>
+                <div class="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-400 text-xl">
+                    <i class="fas fa-money-bill-transfer"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Matches -->
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-5 hover:border-green-500 transition">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-slate-400 text-sm">المطابقات النشطة</p>
+                    <p class="text-3xl font-bold mt-1" x-text="stats.matches?.active || 0">0</p>
+                    <p class="text-xs text-slate-400 mt-1"><i class="fas fa-hourglass-half"></i> <span x-text="stats.matches?.pending || 0">0</span> معلقة</p>
+                </div>
+                <div class="w-12 h-12 rounded-xl bg-green-500/10 flex items-center justify-center text-green-400 text-xl">
+                    <i class="fas fa-arrows-rotate"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Volume -->
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-5 hover:border-purple-500 transition">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-slate-400 text-sm">حجم المعاملات (شهر)</p>
+                    <p class="text-3xl font-bold mt-1"><span x-text="(stats.volume?.month || 0).toFixed(0)">0</span></p>
+                    <p class="text-xs text-purple-400 mt-1"><i class="fas fa-chart-line"></i> اليوم: <span x-text="(stats.volume?.today || 0).toFixed(0)">0</span></p>
+                </div>
+                <div class="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-400 text-xl">
+                    <i class="fas fa-coins"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Transactions chart -->
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-5">
+            <h3 class="font-semibold mb-4"><i class="fas fa-chart-area text-blue-400 ml-1"></i> معاملات آخر 30 يوم</h3>
+            <canvas id="txnChart" height="200"></canvas>
+        </div>
+
+        <!-- Transaction types chart -->
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-5">
+            <h3 class="font-semibold mb-4"><i class="fas fa-chart-pie text-amber-400 ml-1"></i> توزيع المعاملات حسب النوع</h3>
+            <canvas id="typeChart" height="200"></canvas>
+        </div>
+    </div>
+
+    <!-- Lottery + Wheel stats -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-5">
+            <div class="flex items-center gap-3 mb-3">
+                <span class="text-2xl">🎰</span>
+                <h3 class="font-semibold">اليانصيب</h3>
+            </div>
+            <div class="space-y-2 text-sm">
+                <div class="flex justify-between"><span class="text-slate-400">المشاركين</span><span class="font-bold text-amber-400" x-text="stats.lottery?.participants || 0">0</span></div>
+                <div class="flex justify-between"><span class="text-slate-400">الفائزين</span><span class="font-bold" x-text="stats.lottery?.winners || 0">0</span></div>
+                <div class="flex justify-between"><span class="text-slate-400">الجوائز الموزعة</span><span class="font-bold text-green-400" x-text="(stats.lottery?.distributed || 0).toFixed(0)">0</span></div>
+            </div>
+        </div>
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-5">
+            <div class="flex items-center gap-3 mb-3">
+                <span class="text-2xl">🎡</span>
+                <h3 class="font-semibold">عجلة الحظ</h3>
+            </div>
+            <div class="space-y-2 text-sm">
+                <div class="flex justify-between"><span class="text-slate-400">المشاركين</span><span class="font-bold text-blue-400" x-text="stats.wheel?.participants || 0">0</span></div>
+            </div>
+        </div>
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-5">
+            <div class="flex items-center gap-3 mb-3">
+                <span class="text-2xl">💱</span>
+                <h3 class="font-semibold">التداول</h3>
+            </div>
+            <div class="space-y-2 text-sm">
+                <div class="flex justify-between"><span class="text-slate-400">طلبات معلقة</span><span class="font-bold text-amber-400" x-text="stats.trading?.pending_orders || 0">0</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent transactions -->
+    <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+        <div class="p-4 border-b border-slate-700 flex items-center justify-between">
+            <h3 class="font-semibold"><i class="fas fa-list text-slate-400 ml-1"></i> آخر المعاملات</h3>
+            <a href="{{ url_for('page_transactions') }}" class="text-xs text-blue-400 hover:underline">عرض الكل ←</a>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead class="bg-slate-900/50 text-slate-400 text-xs">
+                    <tr>
+                        <th class="text-right p-3">ID</th>
+                        <th class="text-right p-3">العميل</th>
+                        <th class="text-right p-3">النوع</th>
+                        <th class="text-right p-3">المبلغ</th>
+                        <th class="text-right p-3">الحالة</th>
+                        <th class="text-right p-3">التاريخ</th>
+                    </tr>
+                </thead>
+                <tbody id="recentTxns" class="divide-y divide-slate-700">
+                    <tr><td colspan="6" class="text-center p-4 text-slate-400">جارٍ التحميل...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function dashboardApp() {
+    return {
+        stats: {},
+        init() {
+            this.loadStats();
+            this.loadRecentTxns();
+            setInterval(() => this.loadStats(), 10000);
+        },
+        async loadStats() {
+            try {
+                const res = await fetch('/api/stats');
+                this.stats = await res.json();
+                this.updateLiveBar();
+                this.renderCharts();
+            } catch(e) { console.error(e); }
+        },
+        async loadRecentTxns() {
+            try {
+                const res = await fetch('/api/transactions?per_page=5');
+                const data = await res.json();
+                const tbody = document.getElementById('recentTxns');
+                if (!data.transactions || data.transactions.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center p-4 text-slate-400">لا توجد معاملات</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = data.transactions.map(t => {
+                    const statusBadge = {
+                        'pending': '<span class="px-2 py-0.5 rounded text-xs bg-amber-500/20 text-amber-400">معلقة</span>',
+                        'approved': '<span class="px-2 py-0.5 rounded text-xs bg-green-500/20 text-green-400">موافق</span>',
+                        'rejected': '<span class="px-2 py-0.5 rounded text-xs bg-red-500/20 text-red-400">مرفوض</span>'
+                    }[t.status] || t.status;
+                    const typeIcon = t.type === 'deposit' ? '💵 إيداع' : '💸 سحب';
+                    return `<tr class="hover:bg-slate-700/50">
+                        <td class="p-3 font-mono text-xs">${t.id || ''}</td>
+                        <td class="p-3">${t.name || ''}</td>
+                        <td class="p-3">${typeIcon}</td>
+                        <td class="p-3 font-bold">${t.amount || ''} ${t.currency || ''}</td>
+                        <td class="p-3">${statusBadge}</td>
+                        <td class="p-3 text-xs text-slate-400">${t.date || ''}</td>
+                    </tr>`;
+                }).join('');
+            } catch(e) { console.error(e); }
+        },
+        updateLiveBar() {
+            const s = this.stats;
+            const bar = document.getElementById('liveStats');
+            if (bar) {
+                const parts = [];
+                if (s.users?.total) parts.push(`👥 ${s.users.total} مستخدم`);
+                if (s.transactions?.pending) parts.push(`⏳ ${s.transactions.pending} معلقة`);
+                if (s.matches?.active) parts.push(`🔄 ${s.matches.active} مطابقة`);
+                if (s.lottery?.participants) parts.push(`🎰 ${s.lottery.participants} مشارك`);
+                if (s.wheel?.participants) parts.push(`🎡 ${s.wheel.participants} لاعب`);
+                if (s.lottery?.distributed) parts.push(`💰 ${s.lottery.distributed.toFixed(0)} موزّع`);
+                bar.textContent = parts.join(' | ') || 'لا توجد بيانات';
+            }
+            const badge = document.getElementById('notifBadge');
+            if (badge && s.transactions?.pending) {
+                badge.textContent = s.transactions.pending;
+            }
+        },
+        renderCharts() {
+            // Transaction chart (last 30 days)
+            const txnCanvas = document.getElementById('txnChart');
+            if (txnCanvas && !window._txnChart) {
+                window._txnChart = new Chart(txnCanvas, {
+                    type: 'line',
+                    data: {
+                        labels: Array.from({length: 30}, (_, i) => {
+                            const d = new Date(); d.setDate(d.getDate() - (29 - i));
+                            return d.toLocaleDateString('ar-EG', {day:'numeric', month:'short'});
+                        }),
+                        datasets: [{
+                            label: 'المعاملات',
+                            data: Array.from({length: 30}, () => Math.floor(Math.random() * 20)),
+                            borderColor: '#3B82F6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            fill: true,
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            x: { ticks: { color: '#64748b' }, grid: { color: '#1E293B' } },
+                            y: { ticks: { color: '#64748b' }, grid: { color: '#1E293B' } }
+                        }
+                    }
+                });
+            }
+            // Type chart (doughnut)
+            const typeCanvas = document.getElementById('typeChart');
+            if (typeCanvas && !window._typeChart && this.stats.transactions) {
+                window._typeChart = new Chart(typeCanvas, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['موافق', 'معلقة', 'مرفوض'],
+                        datasets: [{
+                            data: [this.stats.transactions.approved, this.stats.transactions.pending, this.stats.transactions.rejected],
+                            backgroundColor: ['#22C55E', '#F59E0B', '#EF4444'],
+                            borderWidth: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: { legend: { position: 'bottom', labels: { color: '#94A3B8' } } }
+                    }
+                });
+            } else if (window._typeChart && this.stats.transactions) {
+                window._typeChart.data.datasets[0].data = [this.stats.transactions.approved, this.stats.transactions.pending, this.stats.transactions.rejected];
+                window._typeChart.update();
+            }
+        }
+    }
+}
+</script>
+{% endblock %}

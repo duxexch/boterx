@@ -1,0 +1,108 @@
+{% extends 'base.html' %}
+{% block title %}التطبيقات — Boterx{% endblock %}
+{% block page_title %}📱 التطبيقات{% endblock %}
+
+{% block content %}
+<div x-data="appsApp()" x-init="init()" class="space-y-6">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <p class="text-slate-400 text-sm">إدارة التطبيقات وروابط التحميل</p>
+        <button @click="loadData()" class="btn btn-primary btn-sm">
+            <i class="fas fa-rotate ml-1"></i> تحديث
+        </button>
+    </div>
+
+    <!-- Apps table -->
+    <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>المعرف</th>
+                        <th>الاسم</th>
+                        <th>الأيقونة</th>
+                        <th>نوع التحميل</th>
+                        <th>الرابط</th>
+                        <th>الوصف</th>
+                        <th>الحالة</th>
+                        <th>التاريخ</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-if="loading">
+                        <tr><td colspan="8" class="text-center p-8 text-slate-400">
+                            <i class="fas fa-spinner fa-spin text-2xl"></i>
+                            <p class="mt-2">جارٍ التحميل...</p>
+                        </td></tr>
+                    </template>
+                    <template x-if="!loading && apps.length === 0">
+                        <tr><td colspan="8" class="text-center p-8 text-slate-400">
+                            <i class="fas fa-inbox text-3xl mb-2"></i>
+                            <p>لا توجد تطبيقات</p>
+                        </td></tr>
+                    </template>
+                    <template x-for="a in apps" :key="a.id">
+                        <tr>
+                            <td class="font-mono text-xs" x-text="a.id || '—'"></td>
+                            <td class="font-medium" x-text="a.name || '—'"></td>
+                            <td>
+                                <template x-if="a.icon_url">
+                                    <img :src="a.icon_url" :alt="a.name" class="w-8 h-8 rounded-lg object-cover">
+                                </template>
+                                <template x-if="!a.icon_url">
+                                    <span class="text-2xl">📱</span>
+                                </template>
+                            </td>
+                            <td>
+                                <span class="px-2 py-0.5 rounded text-xs bg-slate-700 text-slate-300"
+                                      x-text="a.download_type || a.download_url ? 'مباشر' : '—'"></span>
+                            </td>
+                            <td class="max-w-xs truncate">
+                                <a x-show="a.download_url" :href="a.download_url" target="_blank"
+                                   class="text-blue-400 hover:underline text-sm">
+                                    <i class="fas fa-download ml-1"></i> تحميل
+                                </a>
+                                <span x-show="!a.download_url" class="text-slate-600 text-sm">—</span>
+                            </td>
+                            <td class="text-sm text-slate-400 max-w-xs truncate" x-text="a.description || '—'"></td>
+                            <td x-html="statusBadge(a.is_active)"></td>
+                            <td class="text-xs text-slate-400" x-text="a.created_at || '—'"></td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function appsApp() {
+    return {
+        apps: [],
+        loading: true,
+
+        init() {
+            this.loadData();
+        },
+
+        async loadData() {
+            this.loading = true;
+            try {
+                const res = await fetch('/api/apps');
+                const data = await res.json();
+                this.apps = data.apps || [];
+            } catch (e) {
+                console.error(e);
+                toast('فشل تحميل التطبيقات', 'error');
+            } finally {
+                this.loading = false;
+            }
+        }
+    }
+}
+</script>
+{% endblock %}

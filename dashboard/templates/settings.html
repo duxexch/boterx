@@ -1,0 +1,167 @@
+{% extends 'base.html' %}
+{% block title %}الإعدادات — Boterx{% endblock %}
+{% block page_title %}⚙️ الإعدادات{% endblock %}
+
+{% block content %}
+<div x-data="settingsApp()" x-init="init()" class="space-y-6">
+
+    <!-- System settings -->
+    <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+        <div class="p-4 border-b border-slate-700 flex items-center justify-between">
+            <h3 class="font-semibold"><i class="fas fa-sliders text-blue-400 ml-1"></i> إعدادات النظام</h3>
+            <div class="flex gap-2">
+                <button @click="loadData()" class="btn btn-primary btn-sm">
+                    <i class="fas fa-rotate ml-1"></i> تحديث
+                </button>
+                <button @click="saveSettings()" class="btn btn-success btn-sm">
+                    <i class="fas fa-floppy-disk ml-1"></i> حفظ الكل
+                </button>
+            </div>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>المفتاح</th>
+                        <th>القيمة</th>
+                        <th>الوصف</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-if="loading">
+                        <tr><td colspan="3" class="text-center p-8 text-slate-400">
+                            <i class="fas fa-spinner fa-spin text-2xl"></i>
+                            <p class="mt-2">جارٍ التحميل...</p>
+                        </td></tr>
+                    </template>
+                    <template x-if="!loading && settings.length === 0">
+                        <tr><td colspan="3" class="text-center p-8 text-slate-400">
+                            <i class="fas fa-inbox text-3xl mb-2"></i>
+                            <p>لا توجد إعدادات</p>
+                        </td></tr>
+                    </template>
+                    <template x-for="(s, idx) in settings" :key="idx">
+                        <tr>
+                            <td class="font-mono text-xs text-slate-400" x-text="s.setting_key || '—'"></td>
+                            <td>
+                                <input type="text" x-model="s.setting_value"
+                                       class="input w-full"
+                                       :placeholder="s.setting_key || ''">
+                            </td>
+                            <td class="text-sm text-slate-400" x-text="s.description || '—'"></td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Audit log -->
+    <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+        <div class="p-4 border-b border-slate-700">
+            <h3 class="font-semibold"><i class="fas fa-clipboard-list text-amber-400 ml-1"></i> سجل الإجراءات (آخر 100)</h3>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>التوقيت</th>
+                        <th>الأدمن</th>
+                        <th>نوع الإجراء</th>
+                        <th>التفاصيل</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-if="loadingLogs">
+                        <tr><td colspan="4" class="text-center p-8 text-slate-400">
+                            <i class="fas fa-spinner fa-spin text-2xl"></i>
+                            <p class="mt-2">جارٍ التحميل...</p>
+                        </td></tr>
+                    </template>
+                    <template x-if="!loadingLogs && logs.length === 0">
+                        <tr><td colspan="4" class="text-center p-8 text-slate-400">
+                            <i class="fas fa-inbox text-3xl mb-2"></i>
+                            <p>لا توجد سجلات</p>
+                        </td></tr>
+                    </template>
+                    <template x-for="(l, idx) in logs" :key="idx">
+                        <tr>
+                            <td class="text-xs text-slate-400 whitespace-nowrap" x-text="l.timestamp || '—'"></td>
+                            <td class="font-mono text-xs" x-text="l.admin_id || '—'"></td>
+                            <td>
+                                <span class="px-2 py-0.5 rounded text-xs bg-slate-700 text-slate-300" x-text="l.action_type || '—'"></span>
+                            </td>
+                            <td class="text-sm text-slate-400" x-text="l.details || '—'"></td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function settingsApp() {
+    return {
+        settings: [],
+        logs: [],
+        loading: true,
+        loadingLogs: true,
+
+        init() {
+            this.loadData();
+            this.loadLogs();
+        },
+
+        async loadData() {
+            this.loading = true;
+            try {
+                const res = await fetch('/api/settings');
+                const data = await res.json();
+                this.settings = data.settings || [];
+            } catch (e) {
+                console.error(e);
+                toast('فشل تحميل الإعدادات', 'error');
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        async loadLogs() {
+            this.loadingLogs = true;
+            try {
+                const res = await fetch('/api/audit-log');
+                const data = await res.json();
+                this.logs = data.logs || [];
+            } catch (e) {
+                console.error(e);
+            } finally {
+                this.loadingLogs = false;
+            }
+        },
+
+        async saveSettings() {
+            const payload = {};
+            for (const s of this.settings) {
+                if (s.setting_key) {
+                    payload[s.setting_key] = s.setting_value;
+                }
+            }
+            try {
+                await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                toast('تم حفظ الإعدادات', 'success');
+            } catch (e) {
+                toast('فشل حفظ الإعدادات', 'error');
+            }
+        }
+    }
+}
+</script>
+{% endblock %}

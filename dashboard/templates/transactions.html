@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+{% block title %}المعاملات — Boterx{% endblock %}
+{% block page_title %}💼 المعاملات{% endblock %}
+
+{% block content %}
+<div x-data="transactionsApp()" x-init="init()" class="space-y-4">
+    <!-- Filters -->
+    <div class="flex flex-wrap gap-2 items-center">
+        <div class="flex gap-1 bg-slate-800 rounded-lg p-1">
+            <button @click="filterStatus=''" :class="filterStatus==='' ? 'bg-blue-500 text-white' : 'text-slate-400'" class="px-3 py-1.5 rounded text-sm transition">الكل</button>
+            <button @click="filterStatus='pending'" :class="filterStatus==='pending' ? 'bg-amber-500 text-slate-900' : 'text-slate-400'" class="px-3 py-1.5 rounded text-sm transition">معلقة</button>
+            <button @click="filterStatus='approved'" :class="filterStatus==='approved' ? 'bg-green-500 text-white' : 'text-slate-400'" class="px-3 py-1.5 rounded text-sm transition">موافق</button>
+            <button @click="filterStatus='rejected'" :class="filterStatus==='rejected' ? 'bg-red-500 text-white' : 'text-slate-400'" class="px-3 py-1.5 rounded text-sm transition">مرفوض</button>
+        </div>
+        <input type="text" x-model="search" @input.debounce.300ms="load()" placeholder="بحث..." class="input flex-1 min-w-[200px]">
+        <span class="text-sm text-slate-400">الإجمالي: <span x-text="total" class="font-bold text-amber-400">0</span></span>
+    </div>
+
+    <!-- Table -->
+    <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="data-table">
+                <thead><tr>
+                    <th>ID</th><th>العميل</th><th>النوع</th><th>الشركة</th><th>المبلغ</th><th>الحالة</th><th>التاريخ</th><th>إجراءات</th>
+                </tr></thead>
+                <tbody>
+                    <template x-for="t in transactions" :key="t.id">
+                        <tr class="hover:bg-slate-700/50">
+                            <td class="font-mono text-xs" x-text="t.id"></td>
+                            <td x-text="t.name"></td>
+                            <td>
+                                <span x-text="t.type === 'deposit' ? '💵 إيداع' : '💸 سحب'"></span>
+                            </td>
+                            <td x-text="t.company"></td>
+                            <td class="font-bold" x-text="`${t.amount} ${t.currency || ''}`"></td>
+                            <td x-html="statusBadge(t.status)"></td>
+                            <td class="text-xs text-slate-400" x-text="t.date"></td>
+                            <td>
+                                <template x-if="t.status === 'pending'">
+                                    <div class="flex gap-1">
+                                        <button @click="approve(t.id)" class="btn btn-success btn-sm">✅</button>
+                                        <button @click="reject(t.id)" class="btn btn-danger btn-sm">❌</button>
+                                    </div>
+                                </template>
+                            </td>
+                        </tr>
+                    </template>
+                    <tr x-show="transactions.length === 0">
+                        <td colspan="8" class="text-center p-8 text-slate-400">لا توجد معاملات</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Pagination -->
+    <div class="flex items-center justify-between">
+        <button @click="page > 1 && (page--, load())" :disabled="page <= 1" class="btn btn-primary btn-sm">السابق</button>
+        <span class="text-sm text-slate-400">صفحة <span x-text="page"></span> من <span x-text="pages"></span></span>
+        <button @click="page < pages && (page++, load())" :disabled="page >= pages" class="btn btn-primary btn-sm">التالي</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function transactionsApp() {
+    return {
+        transactions: [], total: 0, page: 1, pages: 1,
+        filterStatus: '', search: '',
+        init() { this.load(); },
+        async load() {
+            const params = new URLSearchParams({ page: this.page, per_page: 20 });
+            if (this.filterStatus) params.set('status', this.filterStatus);
+            if (this.search) params.set('search', this.search);
+            const data = await api(`/api/transactions?${params}`);
+            this.transactions = data.transactions || [];
+            this.total = data.total;
+            this.pages = data.pages;
+        },
+        async approve(id) {
+            if (!confirm('موافقة على المعاملة ' + id + '؟')) return;
+            await api(`/api/transactions/${id}/approve`, { method: 'POST', body: '{}' });
+            toast('تمت الموافقة', 'success');
+            this.load();
+        },
+        async reject(id) {
+            const reason = prompt('سبب الرفض:') || '';
+            await api(`/api/transactions/${id}/reject`, { method: 'POST', body: JSON.stringify({ reason }) });
+            toast('تم الرفض', 'warning');
+            this.load();
+        }
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,83 @@
+{% extends 'base.html' %}
+{% block title %}المستخدمين — Boterx{% endblock %}
+{% block page_title %}👥 المستخدمين{% endblock %}
+
+{% block content %}
+<div x-data="usersApp()" x-init="init()" class="space-y-4">
+    <div class="flex flex-wrap gap-2 items-center">
+        <input type="text" x-model="search" @input.debounce.300ms="page=1; load()" placeholder="بحث بالاسم/الهاتف/ID..." class="input flex-1 min-w-[200px]">
+        <span class="text-sm text-slate-400">الإجمالي: <span x-text="total" class="font-bold text-blue-400">0</span></span>
+    </div>
+
+    <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="data-table">
+                <thead><tr>
+                    <th>Telegram ID</th><th>الاسم</th><th>الهاتف</th><th>رقم العميل</th><th>اللغة</th><th>العملة</th><th>محظور</th><th>التاريخ</th><th>إجراءات</th>
+                </tr></thead>
+                <tbody>
+                    <template x-for="u in users" :key="u.telegram_id">
+                        <tr class="hover:bg-slate-700/50">
+                            <td class="font-mono text-xs" x-text="u.telegram_id"></td>
+                            <td x-text="u.name"></td>
+                            <td class="text-xs" x-text="u.phone || '—'"></td>
+                            <td class="font-mono text-xs text-amber-400" x-text="u.customer_id"></td>
+                            <td x-text="u.language"></td>
+                            <td x-text="u.currency"></td>
+                            <td x-html="statusBadge(u.is_banned === 'yes' ? 'yes' : 'no')"></td>
+                            <td class="text-xs text-slate-400" x-text="u.date"></td>
+                            <td>
+                                <template x-if="u.is_banned === 'yes'">
+                                    <button @click="unban(u.telegram_id)" class="btn btn-success btn-sm">إلغاء الحظر</button>
+                                </template>
+                                <template x-if="u.is_banned !== 'yes'">
+                                    <button @click="ban(u.telegram_id)" class="btn btn-danger btn-sm">حظر</button>
+                                </template>
+                            </td>
+                        </tr>
+                    </template>
+                    <tr x-show="users.length === 0">
+                        <td colspan="9" class="text-center p-8 text-slate-400">لا يوجد مستخدمين</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="flex items-center justify-between">
+        <button @click="page > 1 && (page--, load())" :disabled="page <= 1" class="btn btn-primary btn-sm">السابق</button>
+        <span class="text-sm text-slate-400">صفحة <span x-text="page"></span> من <span x-text="pages"></span></span>
+        <button @click="page < pages && (page++, load())" :disabled="page >= pages" class="btn btn-primary btn-sm">التالي</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function usersApp() {
+    return {
+        users: [], total: 0, page: 1, pages: 1, search: '',
+        init() { this.load(); },
+        async load() {
+            const params = new URLSearchParams({ page: this.page, per_page: 20 });
+            if (this.search) params.set('search', this.search);
+            const data = await api(`/api/users?${params}`);
+            this.users = data.users || [];
+            this.total = data.total;
+            this.pages = data.pages;
+        },
+        async ban(id) {
+            if (!confirm('حظر المستخدم ' + id + '؟')) return;
+            await api(`/api/users/${id}/ban`, { method: 'POST', body: '{}' });
+            toast('تم الحظر', 'warning');
+            this.load();
+        },
+        async unban(id) {
+            await api(`/api/users/${id}/unban`, { method: 'POST', body: '{}' });
+            toast('تم إلغاء الحظر', 'success');
+            this.load();
+        }
+    }
+}
+</script>
+{% endblock %}
