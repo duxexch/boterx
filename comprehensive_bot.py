@@ -4413,11 +4413,15 @@ class ComprehensiveDUXBot:
                 except:
                     pass
                 del self.user_states[user_id]
+                # فحص هل قادم من اليانصيب ← عرض لوحة اليانصيب
+                fake_msg = {'chat': {'id': message['chat']['id']}, 'from': {'id': message['from']['id']}, 'text': ''}
                 self.send_message(message['chat']['id'],
                     f"✅ <b>تم تسجيل رقم هاتفك الحقيقي بنجاح!</b>\n\n"
                     f"📱 الرقم: <code>{phone}</code>\n"
                     f"✅ تم التحقق: <b>نعم</b>\n\n"
                     f"يمكنك الآن المشاركة في اليانصيب وعجلة الحظ")
+                self.show_lottery_panel(fake_msg)
+                return
             elif message.get('text', '').strip().lower() in ['إلغاء', 'الغاء', 'cancel', '🔙']:
                 del self.user_states[user_id]
                 self.handle_start(message)
@@ -5366,34 +5370,94 @@ class ComprehensiveDUXBot:
             elif step == 'app_field_edit':
                 self.handle_app_field_edit(message, current_state)
                 return
-            elif step == 'lot_confirm':
+            elif step == 'lot_count':
+                chat_id = message['chat']['id']
                 text_msg = message.get('text', '').strip()
-                if text_msg.lower() in ['إلغاء', 'الغاء', 'cancel']:
+                if text_msg.lower() in ['❌ إلغاء', 'إلغاء', 'الغاء', 'cancel', '🔙']:
                     del self.user_states[user_id]
-                    fake_msg = {'chat': {'id': message['chat']['id']}, 'from': {'id': user_id}, 'text': ''}
+                    fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                    self.show_lottery_panel(fake_msg)
+                    return
+                try:
+                    count = int(text_msg)
+                    max_remaining = current_state.get('max_remaining', 1)
+                    if count < 1 or count > max_remaining:
+                        self.send_message(chat_id, f"❌ اكتب رقماً بين 1 و {max_remaining}:")
+                        return
+                except ValueError:
+                    self.send_message(chat_id, "❌ اكتب رقماً صحيحاً:")
+                    return
+                price = float(current_state.get('price', 0))
+                currency = current_state.get('currency', 'SAR')
+                total = price * count
+                current_state['count'] = count
+                current_state['total'] = str(total)
+                self.user_states[user_id] = current_state
+
+                # عرض وسائل الدفع
+                methods = self.get_all_payment_methods()
+                active_methods = [m for m in methods if m.get('status') == 'active']
+                if not active_methods:
+                    self.send_message(chat_id, "❌ لا توجد وسائل دفع متاحة")
+                    return
+                inline_btns = []
+                for m in active_methods:
+                    icon = m.get('icon', '💳') or '💳'
+                    inline_btns.append([{'text': f"{icon} {m['method_name']}", 'callback_data': f'lot_method_{current_state["round_id"]}_{m["id"]}'}])
+                inline_btns.append([{'text': '🔙 إلغاء', 'callback_data': 'lot_back_main'}])
+                self.send_inline_message(chat_id,
+                    f"✅ عدد التذاكر: <code>{count}</code>\n"
+                    f"💰 المبلغ المستحق: <code>{total}</code> {currency}\n\n"
+                    f"💳 اختر وسيلة الدفع:",
+                    inline_btns)
+                return
+
+            elif step == 'lot_confirm':
+                chat_id = message['chat']['id']
+                text_msg = message.get('text', '').strip()
+                if text_msg.lower() in ['إلغاء', 'الغاء', 'cancel', '🔙']:
+                    del self.user_states[user_id]
+                    fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                     self.show_lottery_panel(fake_msg)
                     return
                 if text_msg.lower() in ['تم', 'done', 'ok', 'نعم']:
                     round_id = current_state.get('round_id', '')
                     method_id = current_state.get('method_id', '')
+                    count = int(current_state.get('count', 1))
                     user_obj = self.find_user(user_id)
                     import random as _r
-                    ticket_number = f"{_r.randint(1000, 9999)}"
-                    try:
-                        with open('lottery_tickets.csv', 'a', newline='', encoding='utf-8-sig') as f:
-                            writer = csv.writer(f)
-                            writer.writerow([f"TKT{str(int(datetime.now().timestamp()))[-6:]}",
-                                           round_id, str(user_id), user_obj.get('name', ''), user_obj.get('customer_id', ''),
-                                           ticket_number, datetime.now().strftime('%Y-%m-%d %H:%M'),
-                                           method_id, 'pending'])
-                    except:
-                        pass
+                    ticket_numbers = []
+                    for i in range(count):
+                        tn = f"{_r.randint(1000, 9999)}"
+                        ticket_numbers.append(tn)
+                        try:
+                            with open('lottery_tickets.csv', 'a', newline='', encoding='utf-8-sig') as f:
+                                writer = csv.writer(f)
+                                writer.writerow([f"TKT{str(int(datetime.now().timestamp()))[-6:]}_{i}",
+                                               round_id, str(user_id), user_obj.get('name', ''), user_obj.get('customer_id', ''),
+                                               tn, datetime.now().strftime('%Y-%m-%d %H:%M'),
+                                               method_id, 'pending'])
+                        except:
+                            pass
                     del self.user_states[user_id]
-                    self.send_message(message['chat']['id'],
-                        f"🎫 <b>تم شراء تذكرة!</b>\n\n"
-                        f"🎰 رقم التذكرة: <code>#{ticket_number}</code> 👈 اضغط للنسخ\n"
+                    tickets_text = "\n".join([f"  • <code>#{tn}</code> 👈 اضغط للنسخ" for tn in ticket_numbers])
+                    self.send_message(chat_id,
+                        f"🎫 <b>تم شراء {count} تذكرة!</b>\n\n"
+                        f"🎰 أرقام التذاكر:\n{tickets_text}\n\n"
                         f"⏳ بانتظار تأكيد الدفع من الإدارة\n\n"
-                        f"حظاً موفقاً! 🍀")
+                        f"حظاً موفقاً! 🍀",
+                        self.main_keyboard('ar', user_id))
+                    # إشعار الأدمن
+                    for admin_id in self.admin_ids:
+                        try:
+                            self.send_message(int(admin_id),
+                                f"🎫 <b>شراء تذاكر يانصيب جديد</b>\n\n"
+                                f"👤 {user_obj.get('name', '')} — <code>{user_id}</code>\n"
+                                f"🎫 العدد: <code>{count}</code>\n"
+                                f"🎰 الأرقام: {', '.join(['#'+tn for tn in ticket_numbers])}\n"
+                                f"📅 {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+                        except:
+                            pass
                 return
             elif step.startswith('trade_buy_') or step == 'trade_buyer_screenshot':
                 self.handle_trade_buy_step(message, current_state)
@@ -8990,19 +9054,55 @@ class ComprehensiveDUXBot:
 
             elif data.startswith('lot_buy_'):
                 round_id = data.replace('lot_buy_', '')
-                # عرض وسائل الدفع
-                methods = self.get_all_payment_methods()
-                active_methods = [m for m in methods if m.get('status') == 'active']
-                if not active_methods:
-                    self.send_message(chat_id, "❌ لا توجد وسائل دفع متاحة")
+                # قراءة سعر التذكرة والحد الأقصى
+                try:
+                    with open('lottery_rounds.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        round_data = None
+                        for row in reader:
+                            if row['id'] == round_id and row.get('status') == 'active':
+                                round_data = row
+                                break
+                    if not round_data:
+                        self.send_message(chat_id, "❌ الجولة غير موجودة")
+                        return
+                except:
+                    self.send_message(chat_id, "❌ خطأ في قراءة الجولة")
                     return
-                inline_btns = []
-                for m in active_methods:
-                    icon = m.get('icon', '💳') or '💳'
-                    inline_btns.append([{'text': f"{icon} {m['method_name']}", 'callback_data': f'lot_method_{round_id}_{m["id"]}'}])
-                inline_btns.append([{'text': '🔙 رجوع', 'callback_data': f'lot_back_{round_id}'}])
-                self.edit_message(chat_id, message.get('message_id'), "💳 اختر وسيلة الدفع:")
-                self.send_inline_message(chat_id, "💳 اختر وسيلة الدفع:", inline_btns)
+
+                price = round_data.get('ticket_price', '0')
+                currency = round_data.get('currency', 'SAR')
+                max_per = int(round_data.get('max_tickets_per_user', 1))
+
+                # عد تذاكر المستخدم الحالية
+                my_count = 0
+                try:
+                    with open('lottery_tickets.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        for row in reader:
+                            if row.get('round_id') == round_id and row.get('user_id') == str(user_id):
+                                my_count += 1
+                except:
+                    pass
+
+                remaining = max_per - my_count
+                if remaining <= 0:
+                    self.send_message(chat_id, "⚠️ وصلت للحد الأقصى من التذاكر")
+                    return
+
+                self.edit_message(chat_id, message.get('message_id'),
+                    f"🎫 <b>شراء تذاكر يانصيب</b>\n\n"
+                    f"━━━━━━━━━━━━━━━━━━\n"
+                    f"💰 سعر التذكرة: <code>{price}</code> {currency}\n"
+                    f"🎫 تذاكرك الحالية: <code>{my_count}</code>\n"
+                    f"🎯 الحد الأقصى: <code>{max_per}</code>\n"
+                    f"📊 المتاح: <code>{remaining}</code> تذاكر\n"
+                    f"━━━━━━━━━━━━━━━━━━\n\n"
+                    f"1️⃣ اكتب <b>عدد التذاكر</b> التي تريد شراءها (1-{remaining}):")
+
+                kb = {'keyboard': [[{'text': '❌ إلغاء'}]], 'resize_keyboard': True, 'one_time_keyboard': True}
+                self.send_message(chat_id, f"اكتب عدد التذاكر:", kb)
+                self.user_states[user_id] = {'step': 'lot_count', 'round_id': round_id, 'price': price, 'currency': currency, 'max_remaining': remaining}
                 return
 
             elif data.startswith('lot_method_'):
@@ -9012,6 +9112,7 @@ class ComprehensiveDUXBot:
                 round_id, method_id = parts
                 method = self.get_payment_method_by_id(method_id)
                 method_name = method.get('method_name', '') if method else ''
+                account = method.get('account_data', '') if method else ''
                 # قراءة سعر التذكرة
                 try:
                     with open('lottery_rounds.csv', 'r', encoding='utf-8-sig') as f:
@@ -9020,7 +9121,6 @@ class ComprehensiveDUXBot:
                             if row['id'] == round_id:
                                 price = row.get('ticket_price', '0')
                                 currency = row.get('currency', 'SAR')
-                                account = method.get('account_data', '') if method else ''
                                 self.edit_message(chat_id, message.get('message_id'),
                                     f"🎫 <b>شراء تذكرة</b>\n\n"
                                     f"💰 السعر: <code>{price}</code> {currency}\n"
