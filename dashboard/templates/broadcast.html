@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+{% block title %}بث رسالة — Boterx{% endblock %}
+{% block page_title %}📢 بث رسالة{% endblock %}
+
+{% block content %}
+<div x-data="broadcastApp()" class="space-y-4 max-w-2xl">
+    <div class="bg-slate-800 rounded-xl border border-slate-700 p-6">
+        <h3 class="font-semibold mb-4">إرسال رسالة لكل المستخدمين</h3>
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm text-slate-400 mb-1">نوع الرسالة</label>
+                <select x-model="type" class="input w-full">
+                    <option value="text">📝 نص</option>
+                    <option value="photo">📷 صورة</option>
+                    <option value="video">🎥 فيديو</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm text-slate-400 mb-1">نص الرسالة</label>
+                <textarea x-model="message" rows="6" class="input w-full" placeholder="اكتب الرسالة هنا..."></textarea>
+            </div>
+            <div class="flex items-center gap-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+                <i class="fas fa-info-circle text-amber-400"></i>
+                <p class="text-xs text-amber-300">سيتم إضافة الرسالة لقائمة البث — البوت سيرسلها تلقائياً</p>
+            </div>
+            <button @click="send()" :disabled="sending" class="btn btn-primary w-full">
+                <span x-show="!sending">📢 إرسال البث</span>
+                <span x-show="sending">⏳ جارٍ الإرسال...</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Preview -->
+    <div x-show="message" class="bg-slate-800 rounded-xl border border-slate-700 p-4">
+        <p class="text-xs text-slate-400 mb-2">معاينة:</p>
+        <div class="bg-slate-700 rounded-lg p-4 text-sm" x-text="message"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function broadcastApp() {
+    return {
+        message: '', type: 'text', sending: false,
+        async send() {
+            if (!this.message.trim()) return toast('اكتب رسالة', 'warning');
+            this.sending = true;
+            try {
+                await api('/api/broadcast', { method: 'POST', body: JSON.stringify({ message: this.message, type: this.type }) });
+                toast('تم إضافة البث للقائمة', 'success');
+                this.message = '';
+            } catch(e) { toast('خطأ', 'error'); }
+            this.sending = false;
+        }
+    }
+}
+</script>
+{% endblock %}

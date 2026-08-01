@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+{% block title %}الشكاوى — Boterx{% endblock %}
+{% block page_title %}📢 الشكاوى{% endblock %}
+
+{% block content %}
+<div x-data="complaintsApp()" x-init="init()" class="space-y-4">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
+            <p class="text-slate-400 text-sm">إجمالي الشكاوى</p>
+            <p class="text-2xl font-bold text-amber-400" x-text="stats.total || 0">0</p>
+        </div>
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
+            <p class="text-slate-400 text-sm">شكاوى مفتوحة</p>
+            <p class="text-2xl font-bold text-red-400" x-text="stats.open || 0">0</p>
+        </div>
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
+            <p class="text-slate-400 text-sm">تم حلها</p>
+            <p class="text-2xl font-bold text-green-400" x-text="(stats.total || 0) - (stats.open || 0)">0</p>
+        </div>
+    </div>
+
+    <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="data-table">
+                <thead><tr>
+                    <th>ID</th><th>العميل</th><th>الرسالة</th><th>الحالة</th><th>التاريخ</th><th>رد الأدمن</th><th>إجراءات</th>
+                </tr></thead>
+                <tbody>
+                    <template x-for="c in complaints" :key="c.id">
+                        <tr class="hover:bg-slate-700/50">
+                            <td class="font-mono text-xs" x-text="c.id"></td>
+                            <td class="text-xs" x-text="c.customer_id"></td>
+                            <td class="max-w-xs truncate" x-text="c.message"></td>
+                            <td x-html="statusBadge(c.status === 'resolved' ? 'approved' : 'pending')"></td>
+                            <td class="text-xs text-slate-400" x-text="c.date"></td>
+                            <td class="max-w-xs truncate text-xs" x-text="c.admin_response || '—'"></td>
+                            <td>
+                                <button @click="openReply(c)" class="btn btn-primary btn-sm">رد</button>
+                            </td>
+                        </tr>
+                    </template>
+                    <tr x-show="complaints.length === 0">
+                        <td colspan="7" class="text-center p-8 text-slate-400">لا توجد شكاوى</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Reply Modal -->
+    <div x-show="showModal" x-transition class="modal-overlay" @click.self="showModal = false" style="display:none">
+        <div class="modal">
+            <h3 class="font-bold text-lg mb-4">الرد على الشكوى</h3>
+            <div class="mb-4 p-3 bg-slate-700 rounded-lg">
+                <p class="text-xs text-slate-400 mb-1">الرسالة الأصلية:</p>
+                <p class="text-sm" x-text="selected?.message"></p>
+            </div>
+            <textarea x-model="replyText" rows="4" class="input w-full mb-4" placeholder="اكتب ردك هنا..."></textarea>
+            <div class="flex gap-2 justify-end">
+                <button @click="showModal = false" class="btn btn-sm" style="background:#475569">إلغاء</button>
+                <button @click="sendReply()" class="btn btn-primary btn-sm">إرسال</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function complaintsApp() {
+    return {
+        complaints: [], stats: {}, showModal: false, selected: null, replyText: '',
+        init() { this.load(); },
+        async load() {
+            const data = await api('/api/complaints');
+            this.complaints = data.complaints || [];
+            this.stats = data.stats || {};
+        },
+        openReply(c) { this.selected = c; this.replyText = c.admin_response || ''; this.showModal = true; },
+        async sendReply() {
+            if (!this.replyText.trim()) return toast('اكتب رداً', 'warning');
+            await api(`/api/complaints/${this.selected.id}/reply`, { method: 'POST', body: JSON.stringify({ reply: this.replyText }) });
+            toast('تم الرد', 'success');
+            this.showModal = false;
+            this.load();
+        }
+    }
+}
+</script>
+{% endblock %}

@@ -4,50 +4,220 @@
 
 {% block content %}
 <div x-data="usersApp()" x-init="init()" class="space-y-4">
-    <div class="flex flex-wrap gap-2 items-center">
-        <input type="text" x-model="search" @input.debounce.300ms="page=1; load()" placeholder="بحث بالاسم/الهاتف/ID..." class="input flex-1 min-w-[200px]">
-        <span class="text-sm text-slate-400">الإجمالي: <span x-text="total" class="font-bold text-blue-400">0</span></span>
+
+    <!-- Stats -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
+            <p class="text-slate-400 text-xs">إجمالي المستخدمين</p>
+            <p class="text-2xl font-bold mt-1 text-blue-400" x-text="fmtNum(stats.total || total)">0</p>
+        </div>
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
+            <p class="text-slate-400 text-xs">جدد اليوم</p>
+            <p class="text-2xl font-bold mt-1 text-green-400" x-text="fmtNum(stats.today || 0)">0</p>
+        </div>
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
+            <p class="text-slate-400 text-xs">محظورون</p>
+            <p class="text-2xl font-bold mt-1 text-red-400" x-text="fmtNum(stats.banned || 0)">0</p>
+        </div>
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
+            <p class="text-slate-400 text-xs">هواتف مؤكدة</p>
+            <p class="text-2xl font-bold mt-1 text-amber-400" x-text="fmtNum(stats.verified || 0)">0</p>
+        </div>
     </div>
 
+    <!-- Filters -->
+    <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
+        <div class="flex flex-wrap gap-3 items-center">
+            <input type="text" x-model="search" @input.debounce.300ms="page=1; load()" placeholder="بحث بالاسم / الهاتف / رقم العميل / Telegram ID..." class="input flex-1 min-w-[200px] text-sm">
+            <select x-model="filterBanned" @change="page=1; load()" class="input text-sm">
+                <option value="">الكل</option>
+                <option value="yes">محظور</option>
+                <option value="no">غير محظور</option>
+            </select>
+            <select x-model="filterLanguage" @change="page=1; load()" class="input text-sm">
+                <option value="">كل اللغات</option>
+                <option value="ar">العربية</option>
+                <option value="en">English</option>
+                <option value="fr">Français</option>
+            </select>
+            <select x-model="filterCurrency" @change="page=1; load()" class="input text-sm">
+                <option value="">كل العملات</option>
+                <option value="EGP">EGP</option>
+                <option value="USD">USD</option>
+                <option value="SAR">SAR</option>
+                <option value="AED">AED</option>
+            </select>
+            <button @click="exportCSV()" class="btn btn-primary btn-sm">
+                <i class="fas fa-file-csv ml-1"></i> تصدير CSV
+            </button>
+            <button @click="load()" class="btn btn-primary btn-sm">
+                <i class="fas fa-rotate ml-1"></i> تحديث
+            </button>
+        </div>
+    </div>
+
+    <!-- Table -->
     <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
         <div class="overflow-x-auto">
             <table class="data-table">
                 <thead><tr>
-                    <th>Telegram ID</th><th>الاسم</th><th>الهاتف</th><th>رقم العميل</th><th>اللغة</th><th>العملة</th><th>محظور</th><th>التاريخ</th><th>إجراءات</th>
+                    <th>Telegram ID</th>
+                    <th>الاسم</th>
+                    <th>الهاتف</th>
+                    <th>رقم العميل</th>
+                    <th>اللغة</th>
+                    <th>العملة</th>
+                    <th>محظور</th>
+                    <th>التاريخ</th>
+                    <th>إجراءات</th>
                 </tr></thead>
                 <tbody>
+                    <template x-if="loading">
+                        <tr><td colspan="9" class="text-center p-8 text-slate-400">
+                            <i class="fas fa-spinner fa-spin text-2xl"></i>
+                            <p class="mt-2">جارٍ التحميل...</p>
+                        </td></tr>
+                    </template>
+                    <template x-if="!loading && users.length === 0">
+                        <tr><td colspan="9" class="text-center p-8 text-slate-400">
+                            <i class="fas fa-inbox text-3xl mb-2"></i>
+                            <p>لا توجد بيانات</p>
+                        </td></tr>
+                    </template>
                     <template x-for="u in users" :key="u.telegram_id">
                         <tr class="hover:bg-slate-700/50">
-                            <td class="font-mono text-xs" x-text="u.telegram_id"></td>
-                            <td x-text="u.name"></td>
+                            <td class="font-mono text-xs cursor-pointer text-blue-400 hover:underline" @click="openDetail(u)" x-text="u.telegram_id"></td>
+                            <td class="cursor-pointer hover:text-blue-400" @click="openDetail(u)" x-text="u.name"></td>
                             <td class="text-xs" x-text="u.phone || '—'"></td>
                             <td class="font-mono text-xs text-amber-400" x-text="u.customer_id"></td>
-                            <td x-text="u.language"></td>
-                            <td x-text="u.currency"></td>
+                            <td>
+                                <span class="px-2 py-0.5 rounded text-xs bg-slate-700 text-slate-300" x-text="u.language || '—'"></span>
+                            </td>
+                            <td x-text="u.currency || '—'"></td>
                             <td x-html="statusBadge(u.is_banned === 'yes' ? 'yes' : 'no')"></td>
                             <td class="text-xs text-slate-400" x-text="u.date"></td>
                             <td>
-                                <template x-if="u.is_banned === 'yes'">
-                                    <button @click="unban(u.telegram_id)" class="btn btn-success btn-sm">إلغاء الحظر</button>
-                                </template>
-                                <template x-if="u.is_banned !== 'yes'">
-                                    <button @click="ban(u.telegram_id)" class="btn btn-danger btn-sm">حظر</button>
-                                </template>
+                                <div class="flex gap-1">
+                                    <button @click="openDetail(u)" class="btn btn-primary btn-sm" title="تفاصيل"><i class="fas fa-eye"></i></button>
+                                    <template x-if="u.is_banned === 'yes'">
+                                        <button @click="unban(u.telegram_id)" class="btn btn-success btn-sm" title="إلغاء الحظر"><i class="fas fa-unlock"></i></button>
+                                    </template>
+                                    <template x-if="u.is_banned !== 'yes'">
+                                        <button @click="openBanModal(u)" class="btn btn-danger btn-sm" title="حظر"><i class="fas fa-ban"></i></button>
+                                    </template>
+                                </div>
                             </td>
                         </tr>
                     </template>
-                    <tr x-show="users.length === 0">
-                        <td colspan="9" class="text-center p-8 text-slate-400">لا يوجد مستخدمين</td>
-                    </tr>
                 </tbody>
             </table>
         </div>
     </div>
 
-    <div class="flex items-center justify-between">
-        <button @click="page > 1 && (page--, load())" :disabled="page <= 1" class="btn btn-primary btn-sm">السابق</button>
-        <span class="text-sm text-slate-400">صفحة <span x-text="page"></span> من <span x-text="pages"></span></span>
-        <button @click="page < pages && (page++, load())" :disabled="page >= pages" class="btn btn-primary btn-sm">التالي</button>
+    <!-- Pagination -->
+    <div class="flex items-center justify-between flex-wrap gap-2">
+        <button @click="page > 1 && (page--, load())" :disabled="page <= 1" class="btn btn-primary btn-sm">
+            <i class="fas fa-chevron-right ml-1"></i> السابق
+        </button>
+        <span class="text-sm text-slate-400">صفحة <span x-text="page"></span> من <span x-text="pages"></span> (إجمالي: <span x-text="total"></span>)</span>
+        <button @click="page < pages && (page++, load())" :disabled="page >= pages" class="btn btn-primary btn-sm">
+            التالي <i class="fas fa-chevron-left mr-1"></i>
+        </button>
+    </div>
+
+    <!-- User Detail Modal -->
+    <div x-show="showDetail" x-transition class="modal-overlay" style="display:none" @click.self="showDetail = false">
+        <div class="modal max-w-3xl">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-bold"><i class="fas fa-user text-blue-400 ml-1"></i> تفاصيل المستخدم</h3>
+                <button @click="showDetail = false" class="text-slate-400 hover:text-white"><i class="fas fa-times"></i></button>
+            </div>
+            <template x-if="detail">
+                <div class="space-y-4">
+                    <!-- User Info -->
+                    <div class="flex items-center gap-4 p-4 bg-slate-900/50 rounded-lg">
+                        <div class="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-xl font-bold" x-text="(detail.name || 'U').substring(0, 2).toUpperCase()"></div>
+                        <div class="flex-1">
+                            <h4 class="text-lg font-semibold" x-text="detail.name || '—'"></h4>
+                            <p class="text-sm text-slate-400 font-mono" x-text="detail.telegram_id || '—'"></p>
+                        </div>
+                        <div x-html="statusBadge(detail.is_banned === 'yes' ? 'yes' : 'no')"></div>
+                    </div>
+                    <!-- User Details Grid -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div><label class="block text-xs text-slate-500 mb-1">رقم العميل</label><p class="text-sm font-mono text-amber-400" x-text="detail.customer_id || '—'"></p></div>
+                        <div><label class="block text-xs text-slate-500 mb-1">الهاتف</label><p class="text-sm" x-text="detail.phone || '—'"></p></div>
+                        <div><label class="block text-xs text-slate-500 mb-1">اللغة</label><p class="text-sm" x-text="detail.language || '—'"></p></div>
+                        <div><label class="block text-xs text-slate-500 mb-1">العملة</label><p class="text-sm" x-text="detail.currency || '—'"></p></div>
+                        <div><label class="block text-xs text-slate-500 mb-1">تاريخ التسجيل</label><p class="text-sm" x-text="detail.date || '—'"></p></div>
+                        <div x-show="detail.ban_reason"><label class="block text-xs text-slate-500 mb-1">سبب الحظر</label><p class="text-sm text-red-400" x-text="detail.ban_reason || '—'"></p></div>
+                    </div>
+                    <!-- User Transactions -->
+                    <div>
+                        <h4 class="font-semibold text-sm mb-2"><i class="fas fa-money-bill-transfer text-amber-400 ml-1"></i> آخر المعاملات</h4>
+                        <div class="overflow-x-auto">
+                            <table class="data-table">
+                                <thead><tr><th>ID</th><th>النوع</th><th>المبلغ</th><th>الحالة</th><th>التاريخ</th></tr></thead>
+                                <tbody>
+                                    <template x-if="detailLoading">
+                                        <tr><td colspan="5" class="text-center p-4 text-slate-400"><i class="fas fa-spinner fa-spin"></i></td></tr>
+                                    </template>
+                                    <template x-if="!detailLoading && (!detailTxns || detailTxns.length === 0)">
+                                        <tr><td colspan="5" class="text-center p-4 text-slate-400">لا توجد معاملات</td></tr>
+                                    </template>
+                                    <template x-for="t in detailTxns" :key="t.id">
+                                        <tr>
+                                            <td class="font-mono text-xs" x-text="t.id"></td>
+                                            <td x-text="t.type === 'deposit' ? '💵 إيداع' : '💸 سحب'"></td>
+                                            <td class="font-bold" x-text="fmtAmount(t.amount, t.currency || '')"></td>
+                                            <td x-html="statusBadge(t.status)"></td>
+                                            <td class="text-xs text-slate-400" x-text="t.date"></td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <!-- SVRP Wallet -->
+                    <div x-show="detailWallet">
+                        <h4 class="font-semibold text-sm mb-2"><i class="fas fa-gem text-purple-400 ml-1"></i> محفظة التعويض</h4>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            <div class="p-2 bg-slate-900/50 rounded"><p class="text-xs text-slate-500">الرصيد</p><p class="font-bold text-green-400" x-text="fmtNum(detailWallet?.balance || 0)"></p></div>
+                            <div class="p-2 bg-slate-900/50 rounded"><p class="text-xs text-slate-500">معلق</p><p class="font-bold text-amber-400" x-text="fmtNum(detailWallet?.pending_balance || 0)"></p></div>
+                            <div class="p-2 bg-slate-900/50 rounded"><p class="text-xs text-slate-500">إجمالي المكتسب</p><p class="font-bold text-blue-400" x-text="fmtNum(detailWallet?.total_earned || 0)"></p></div>
+                            <div class="p-2 bg-slate-900/50 rounded"><p class="text-xs text-slate-500">مجمّد</p><p class="font-bold text-red-400" x-text="fmtNum(detailWallet?.frozen || 0)"></p></div>
+                        </div>
+                    </div>
+                    <div class="flex gap-2 justify-end pt-2 border-t border-slate-700">
+                        <button @click="showDetail = false" class="btn bg-slate-700 text-slate-300 hover:bg-slate-600 btn-sm">إغلاق</button>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </div>
+
+    <!-- Ban Modal -->
+    <div x-show="showBanModal" x-transition class="modal-overlay" style="display:none" @click.self="showBanModal = false">
+        <div class="modal max-w-md">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-bold text-red-400"><i class="fas fa-ban ml-1"></i> حظر مستخدم</h3>
+                <button @click="showBanModal = false" class="text-slate-400 hover:text-white"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <p class="text-sm text-slate-400 mb-1">المستخدم: <span class="font-bold text-white" x-text="banUser?.name || ''"></span></p>
+                    <p class="text-xs text-slate-500 font-mono" x-text="banUser?.telegram_id || ''"></p>
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">سبب الحظر</label>
+                    <textarea x-model="banReason" rows="3" class="input w-full" placeholder="أدخل سبب الحظر..."></textarea>
+                </div>
+                <div class="flex gap-2 justify-end">
+                    <button @click="showBanModal = false" class="btn bg-slate-700 text-slate-300 hover:bg-slate-600">إلغاء</button>
+                    <button @click="confirmBan()" class="btn btn-danger"><i class="fas fa-ban ml-1"></i> تأكيد الحظر</button>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}
@@ -56,26 +226,93 @@
 <script>
 function usersApp() {
     return {
-        users: [], total: 0, page: 1, pages: 1, search: '',
-        init() { this.load(); },
+        users: [], total: 0, page: 1, pages: 1, perPage: 20,
+        search: '', filterBanned: '', filterLanguage: '', filterCurrency: '',
+        loading: true, stats: {},
+        showDetail: false, detail: null, detailTxns: [], detailWallet: null, detailLoading: false,
+        showBanModal: false, banUser: null, banReason: '',
+
+        init() { this.load(); this.loadStats(); },
+
         async load() {
-            const params = new URLSearchParams({ page: this.page, per_page: 20 });
-            if (this.search) params.set('search', this.search);
-            const data = await api(`/api/users?${params}`);
-            this.users = data.users || [];
-            this.total = data.total;
-            this.pages = data.pages;
+            this.loading = true;
+            try {
+                const params = new URLSearchParams({ page: this.page, per_page: this.perPage });
+                if (this.search) params.set('search', this.search);
+                if (this.filterBanned) params.set('banned', this.filterBanned);
+                if (this.filterLanguage) params.set('language', this.filterLanguage);
+                if (this.filterCurrency) params.set('currency', this.filterCurrency);
+                const data = await api('/api/users?' + params);
+                this.users = data.users || [];
+                this.total = data.total || 0;
+                this.pages = data.pages || 1;
+            } catch(e) {
+                toast('فشل تحميل المستخدمين', 'error');
+                this.users = [];
+            } finally {
+                this.loading = false;
+            }
         },
-        async ban(id) {
-            if (!confirm('حظر المستخدم ' + id + '؟')) return;
-            await api(`/api/users/${id}/ban`, { method: 'POST', body: '{}' });
-            toast('تم الحظر', 'warning');
-            this.load();
+
+        async loadStats() {
+            try {
+                const data = await api('/api/stats');
+                this.stats = { total: data.users?.total, today: data.users?.today, banned: data.users?.banned, verified: data.users?.verified };
+            } catch(e) {}
         },
+
+        async openDetail(u) {
+            this.detail = u;
+            this.showDetail = true;
+            this.detailTxns = [];
+            this.detailWallet = null;
+            this.detailLoading = true;
+            try {
+                const txnData = await api('/api/transactions?user_id=' + u.telegram_id + '&per_page=10');
+                this.detailTxns = txnData.transactions || [];
+            } catch(e) { this.detailTxns = []; }
+            try {
+                const walletData = await api('/api/svrp/wallets?user_id=' + u.telegram_id);
+                this.detailWallet = walletData.wallet || walletData.wallets?.[0] || null;
+            } catch(e) { this.detailWallet = null; }
+            this.detailLoading = false;
+        },
+
+        openBanModal(u) {
+            this.banUser = u;
+            this.banReason = '';
+            this.showBanModal = true;
+        },
+
+        async confirmBan() {
+            if (!this.banUser) return;
+            try {
+                await api('/api/users/' + this.banUser.telegram_id + '/ban', { method: 'POST', body: JSON.stringify({ reason: this.banReason }) });
+                toast('تم حظر المستخدم', 'warning');
+                this.showBanModal = false;
+                this.load();
+            } catch(e) { toast('فشل الحظر', 'error'); }
+        },
+
         async unban(id) {
-            await api(`/api/users/${id}/unban`, { method: 'POST', body: '{}' });
-            toast('تم إلغاء الحظر', 'success');
-            this.load();
+            if (!confirm('إلغاء حظر المستخدم ' + id + '؟')) return;
+            try {
+                await api('/api/users/' + id + '/unban', { method: 'POST', body: '{}' });
+                toast('تم إلغاء الحظر', 'success');
+                this.load();
+            } catch(e) { toast('فشلت العملية', 'error'); }
+        },
+
+        exportCSV() {
+            const headers = ['Telegram ID', 'الاسم', 'الهاتف', 'رقم العميل', 'اللغة', 'العملة', 'محظور', 'التاريخ'];
+            const rows = this.users.map(u => [u.telegram_id, u.name, u.phone, u.customer_id, u.language, u.currency, u.is_banned, u.date]);
+            const csv = [headers, ...rows].map(r => r.map(c => '"' + (c || '') + '"').join(',')).join('\n');
+            const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'users_' + new Date().toISOString().slice(0, 10) + '.csv';
+            link.click();
+            toast('تم تصدير ' + this.users.length + ' مستخدم', 'success');
         }
     }
 }

@@ -4,60 +4,218 @@
 
 {% block content %}
 <div x-data="transactionsApp()" x-init="init()" class="space-y-4">
-    <!-- Filters -->
-    <div class="flex flex-wrap gap-2 items-center">
-        <div class="flex gap-1 bg-slate-800 rounded-lg p-1">
-            <button @click="filterStatus=''" :class="filterStatus==='' ? 'bg-blue-500 text-white' : 'text-slate-400'" class="px-3 py-1.5 rounded text-sm transition">الكل</button>
-            <button @click="filterStatus='pending'" :class="filterStatus==='pending' ? 'bg-amber-500 text-slate-900' : 'text-slate-400'" class="px-3 py-1.5 rounded text-sm transition">معلقة</button>
-            <button @click="filterStatus='approved'" :class="filterStatus==='approved' ? 'bg-green-500 text-white' : 'text-slate-400'" class="px-3 py-1.5 rounded text-sm transition">موافق</button>
-            <button @click="filterStatus='rejected'" :class="filterStatus==='rejected' ? 'bg-red-500 text-white' : 'text-slate-400'" class="px-3 py-1.5 rounded text-sm transition">مرفوض</button>
+
+    <!-- Stats Summary -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
+            <p class="text-slate-400 text-xs">إجمالي المبلغ</p>
+            <p class="text-2xl font-bold mt-1 text-blue-400" x-text="fmtAmount(summary.totalAmount, '')">0</p>
         </div>
-        <input type="text" x-model="search" @input.debounce.300ms="load()" placeholder="بحث..." class="input flex-1 min-w-[200px]">
-        <span class="text-sm text-slate-400">الإجمالي: <span x-text="total" class="font-bold text-amber-400">0</span></span>
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
+            <p class="text-slate-400 text-xs">متوسط المبلغ</p>
+            <p class="text-2xl font-bold mt-1 text-purple-400" x-text="fmtAmount(summary.avgAmount, '')">0</p>
+        </div>
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
+            <p class="text-slate-400 text-xs">معلقة</p>
+            <p class="text-2xl font-bold mt-1 text-amber-400" x-text="fmtNum(summary.pendingCount)">0</p>
+        </div>
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
+            <p class="text-slate-400 text-xs">حجم الموافق عليها</p>
+            <p class="text-2xl font-bold mt-1 text-green-400" x-text="fmtAmount(summary.approvedVolume, '')">0</p>
+        </div>
+    </div>
+
+    <!-- Advanced Filters -->
+    <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
+        <div class="flex flex-wrap gap-3 items-center">
+            <!-- Status filter -->
+            <div class="flex gap-1 bg-slate-700 rounded-lg p-1">
+                <button @click="filterStatus=''; page=1; load()" :class="filterStatus==='' ? 'bg-blue-500 text-white' : 'text-slate-400'" class="px-3 py-1.5 rounded text-sm transition">الكل</button>
+                <button @click="filterStatus='pending'; page=1; load()" :class="filterStatus==='pending' ? 'bg-amber-500 text-slate-900' : 'text-slate-400'" class="px-3 py-1.5 rounded text-sm transition">معلقة</button>
+                <button @click="filterStatus='approved'; page=1; load()" :class="filterStatus==='approved' ? 'bg-green-500 text-white' : 'text-slate-400'" class="px-3 py-1.5 rounded text-sm transition">موافق</button>
+                <button @click="filterStatus='rejected'; page=1; load()" :class="filterStatus==='rejected' ? 'bg-red-500 text-white' : 'text-slate-400'" class="px-3 py-1.5 rounded text-sm transition">مرفوض</button>
+            </div>
+            <!-- Type filter -->
+            <select x-model="filterType" @change="page=1; load()" class="input text-sm">
+                <option value="">كل الأنواع</option>
+                <option value="deposit">💵 إيداع</option>
+                <option value="withdraw">💸 سحب</option>
+            </select>
+            <!-- Date range -->
+            <input type="date" x-model="dateFrom" @change="load()" class="input text-sm" placeholder="من تاريخ">
+            <input type="date" x-model="dateTo" @change="load()" class="input text-sm" placeholder="إلى تاريخ">
+            <!-- Amount range -->
+            <input type="number" x-model="amountMin" @change="load()" class="input text-sm w-28" placeholder="أقل مبلغ">
+            <input type="number" x-model="amountMax" @change="load()" class="input text-sm w-28" placeholder="أعلى مبلغ">
+            <!-- Search -->
+            <input type="text" x-model="search" @input.debounce.300ms="page=1; load()" placeholder="بحث..." class="input flex-1 min-w-[150px] text-sm">
+            <!-- Auto-refresh toggle -->
+            <label class="flex items-center gap-2 text-sm text-slate-400 cursor-pointer">
+                <input type="checkbox" x-model="autoRefresh" @change="toggleAutoRefresh()" class="rounded">
+                تحديث تلقائي
+            </label>
+            <!-- Export CSV -->
+            <button @click="exportCSV()" class="btn btn-primary btn-sm">
+                <i class="fas fa-file-csv ml-1"></i> تصدير CSV
+            </button>
+        </div>
+        <!-- Bulk actions bar -->
+        <div x-show="selectedIds.length > 0" x-transition class="mt-3 flex items-center gap-3 p-2 bg-blue-500/10 rounded-lg" style="display:none">
+            <span class="text-sm text-blue-400"><i class="fas fa-check-square ml-1"></i> تم تحديد <span x-text="selectedIds.length"></span> معاملة</span>
+            <button @click="bulkApprove()" class="btn btn-success btn-sm"><i class="fas fa-check ml-1"></i> موافقة جماعية</button>
+            <button @click="bulkReject()" class="btn btn-danger btn-sm"><i class="fas fa-xmark ml-1"></i> رفض جماعي</button>
+            <button @click="selectedIds = []" class="text-sm text-slate-400 hover:text-white mr-auto">إلغاء التحديد</button>
+        </div>
     </div>
 
     <!-- Table -->
     <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
         <div class="overflow-x-auto">
             <table class="data-table">
-                <thead><tr>
-                    <th>ID</th><th>العميل</th><th>النوع</th><th>الشركة</th><th>المبلغ</th><th>الحالة</th><th>التاريخ</th><th>إجراءات</th>
-                </tr></thead>
+                <thead>
+                    <tr>
+                        <th class="w-10">
+                            <input type="checkbox" @change="toggleSelectAll($event)" class="rounded">
+                        </th>
+                        <th>ID</th>
+                        <th>العميل</th>
+                        <th>النوع</th>
+                        <th>الشركة</th>
+                        <th>المبلغ</th>
+                        <th>الحالة</th>
+                        <th>التاريخ</th>
+                        <th>إجراءات</th>
+                    </tr>
+                </thead>
                 <tbody>
+                    <template x-if="loading">
+                        <tr><td colspan="9" class="text-center p-8 text-slate-400">
+                            <i class="fas fa-spinner fa-spin text-2xl"></i>
+                            <p class="mt-2">جارٍ التحميل...</p>
+                        </td></tr>
+                    </template>
+                    <template x-if="!loading && transactions.length === 0">
+                        <tr><td colspan="9" class="text-center p-8 text-slate-400">
+                            <i class="fas fa-inbox text-3xl mb-2"></i>
+                            <p>لا توجد بيانات</p>
+                        </td></tr>
+                    </template>
                     <template x-for="t in transactions" :key="t.id">
                         <tr class="hover:bg-slate-700/50">
-                            <td class="font-mono text-xs" x-text="t.id"></td>
-                            <td x-text="t.name"></td>
                             <td>
-                                <span x-text="t.type === 'deposit' ? '💵 إيداع' : '💸 سحب'"></span>
+                                <input type="checkbox" :value="t.id" x-model="selectedIds" class="rounded">
+                            </td>
+                            <td class="font-mono text-xs cursor-pointer text-blue-400 hover:underline" @click="openDetail(t)" x-text="t.id"></td>
+                            <td class="cursor-pointer hover:text-blue-400" @click="openDetail(t)" x-text="t.name"></td>
+                            <td>
+                                <span x-text="t.type === 'deposit' ? '💵 إيداع' : '💸 سحب'"
+                                      :class="t.type === 'deposit' ? 'text-green-400' : 'text-red-400'"></span>
                             </td>
                             <td x-text="t.company"></td>
-                            <td class="font-bold" x-text="`${t.amount} ${t.currency || ''}`"></td>
+                            <td class="font-bold" x-text="fmtAmount(t.amount, t.currency || '')"></td>
                             <td x-html="statusBadge(t.status)"></td>
                             <td class="text-xs text-slate-400" x-text="t.date"></td>
                             <td>
-                                <template x-if="t.status === 'pending'">
-                                    <div class="flex gap-1">
-                                        <button @click="approve(t.id)" class="btn btn-success btn-sm">✅</button>
-                                        <button @click="reject(t.id)" class="btn btn-danger btn-sm">❌</button>
-                                    </div>
-                                </template>
+                                <div class="flex gap-1">
+                                    <button @click="openDetail(t)" class="btn btn-primary btn-sm" title="تفاصيل"><i class="fas fa-eye"></i></button>
+                                    <template x-if="t.status === 'pending'">
+                                        <button @click="approve(t.id)" class="btn btn-success btn-sm" title="موافقة"><i class="fas fa-check"></i></button>
+                                    </template>
+                                    <template x-if="t.status === 'pending'">
+                                        <button @click="reject(t.id)" class="btn btn-danger btn-sm" title="رفض"><i class="fas fa-xmark"></i></button>
+                                    </template>
+                                </div>
                             </td>
                         </tr>
                     </template>
-                    <tr x-show="transactions.length === 0">
-                        <td colspan="8" class="text-center p-8 text-slate-400">لا توجد معاملات</td>
-                    </tr>
                 </tbody>
             </table>
         </div>
     </div>
 
     <!-- Pagination -->
-    <div class="flex items-center justify-between">
-        <button @click="page > 1 && (page--, load())" :disabled="page <= 1" class="btn btn-primary btn-sm">السابق</button>
-        <span class="text-sm text-slate-400">صفحة <span x-text="page"></span> من <span x-text="pages"></span></span>
-        <button @click="page < pages && (page++, load())" :disabled="page >= pages" class="btn btn-primary btn-sm">التالي</button>
+    <div class="flex items-center justify-between flex-wrap gap-2">
+        <button @click="page > 1 && (page--, load())" :disabled="page <= 1" class="btn btn-primary btn-sm">
+            <i class="fas fa-chevron-right ml-1"></i> السابق
+        </button>
+        <div class="flex items-center gap-1">
+            <template x-for="p in pageNumbers" :key="p">
+                <button @click="page = p; load()" :class="p === page ? 'bg-amber-500 text-slate-900' : 'bg-slate-700 text-slate-400 hover:text-white'" class="w-8 h-8 rounded text-sm transition" x-text="p"></button>
+            </template>
+        </div>
+        <button @click="page < pages && (page++, load())" :disabled="page >= pages" class="btn btn-primary btn-sm">
+            التالي <i class="fas fa-chevron-left mr-1"></i>
+        </button>
+    </div>
+    <p class="text-center text-xs text-slate-500">إجمالي: <span x-text="total"></span> معاملة | صفحة <span x-text="page"></span> من <span x-text="pages"></span></p>
+
+    <!-- Transaction Detail Modal -->
+    <div x-show="showDetail" x-transition class="modal-overlay" style="display:none" @click.self="showDetail = false">
+        <div class="modal max-w-2xl">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-bold"><i class="fas fa-receipt text-blue-400 ml-1"></i> تفاصيل المعاملة</h3>
+                <button @click="showDetail = false" class="text-slate-400 hover:text-white"><i class="fas fa-times"></i></button>
+            </div>
+            <template x-if="detail">
+                <div class="space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs text-slate-500 mb-1">رقم المعاملة</label>
+                            <p class="font-mono text-sm bg-slate-900/50 p-2 rounded" x-text="detail.id"></p>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-500 mb-1">الحالة</label>
+                            <div x-html="statusBadge(detail.status)"></div>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-500 mb-1">اسم العميل</label>
+                            <p class="text-sm bg-slate-900/50 p-2 rounded" x-text="detail.name || '—'"></p>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-500 mb-1">رقم العميل</label>
+                            <p class="font-mono text-sm bg-slate-900/50 p-2 rounded" x-text="detail.customer_id || '—'"></p>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-500 mb-1">النوع</label>
+                            <p class="text-sm bg-slate-900/50 p-2 rounded" x-text="detail.type === 'deposit' ? '💵 إيداع' : '💸 سحب'"></p>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-500 mb-1">المبلغ</label>
+                            <p class="font-bold text-lg text-amber-400" x-text="fmtAmount(detail.amount, detail.currency || '')"></p>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-500 mb-1">الشركة</label>
+                            <p class="text-sm bg-slate-900/50 p-2 rounded" x-text="detail.company || '—'"></p>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-500 mb-1">التاريخ</label>
+                            <p class="text-sm bg-slate-900/50 p-2 rounded" x-text="detail.date || '—'"></p>
+                        </div>
+                    </div>
+                    <div x-show="detail.admin_note">
+                        <label class="block text-xs text-slate-500 mb-1">ملاحظة الإدارة</label>
+                        <p class="text-sm bg-slate-900/50 p-2 rounded" x-text="detail.admin_note || '—'"></p>
+                    </div>
+                    <div x-show="detail.phone">
+                        <label class="block text-xs text-slate-500 mb-1">رقم الهاتف</label>
+                        <p class="text-sm bg-slate-900/50 p-2 rounded" x-text="detail.phone || '—'"></p>
+                    </div>
+                    <div x-show="detail.reject_reason">
+                        <label class="block text-xs text-slate-500 mb-1">سبب الرفض</label>
+                        <p class="text-sm bg-red-900/20 p-2 rounded text-red-400" x-text="detail.reject_reason || '—'"></p>
+                    </div>
+                    <div class="flex gap-2 justify-end pt-2 border-t border-slate-700">
+                        <template x-if="detail.status === 'pending'">
+                            <button @click="approve(detail.id); showDetail = false" class="btn btn-success btn-sm"><i class="fas fa-check ml-1"></i> موافقة</button>
+                        </template>
+                        <template x-if="detail.status === 'pending'">
+                            <button @click="reject(detail.id); showDetail = false" class="btn btn-danger btn-sm"><i class="fas fa-xmark ml-1"></i> رفض</button>
+                        </template>
+                        <button @click="showDetail = false" class="btn bg-slate-700 text-slate-300 hover:bg-slate-600 btn-sm">إغلاق</button>
+                    </div>
+                </div>
+            </template>
+        </div>
     </div>
 </div>
 {% endblock %}
@@ -66,29 +224,131 @@
 <script>
 function transactionsApp() {
     return {
-        transactions: [], total: 0, page: 1, pages: 1,
-        filterStatus: '', search: '',
+        transactions: [], total: 0, page: 1, pages: 1, perPage: 20,
+        filterStatus: '', filterType: '', search: '',
+        dateFrom: '', dateTo: '', amountMin: '', amountMax: '',
+        loading: true, selectedIds: [], autoRefresh: false, refreshTimer: null,
+        showDetail: false, detail: null,
+        summary: { totalAmount: 0, avgAmount: 0, pendingCount: 0, approvedVolume: 0 },
+
         init() { this.load(); },
-        async load() {
-            const params = new URLSearchParams({ page: this.page, per_page: 20 });
-            if (this.filterStatus) params.set('status', this.filterStatus);
-            if (this.search) params.set('search', this.search);
-            const data = await api(`/api/transactions?${params}`);
-            this.transactions = data.transactions || [];
-            this.total = data.total;
-            this.pages = data.pages;
+
+        get pageNumbers() {
+            const nums = [];
+            const start = Math.max(1, this.page - 2);
+            const end = Math.min(this.pages, this.page + 2);
+            for (let i = start; i <= end; i++) nums.push(i);
+            return nums;
         },
+
+        async load() {
+            this.loading = true;
+            try {
+                const params = new URLSearchParams({ page: this.page, per_page: this.perPage });
+                if (this.filterStatus) params.set('status', this.filterStatus);
+                if (this.filterType) params.set('type', this.filterType);
+                if (this.search) params.set('search', this.search);
+                if (this.dateFrom) params.set('date_from', this.dateFrom);
+                if (this.dateTo) params.set('date_to', this.dateTo);
+                if (this.amountMin) params.set('amount_min', this.amountMin);
+                if (this.amountMax) params.set('amount_max', this.amountMax);
+                const data = await api('/api/transactions?' + params);
+                this.transactions = data.transactions || [];
+                this.total = data.total || 0;
+                this.pages = data.pages || 1;
+                this.updateSummary(data);
+            } catch(e) {
+                toast('فشل تحميل المعاملات', 'error');
+                this.transactions = [];
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        updateSummary(data) {
+            if (data.summary) {
+                this.summary = data.summary;
+            } else {
+                const txns = this.transactions;
+                this.summary.totalAmount = txns.reduce((s, t) => s + (parseFloat(t.amount) || 0), 0);
+                this.summary.avgAmount = txns.length > 0 ? this.summary.totalAmount / txns.length : 0;
+                this.summary.pendingCount = txns.filter(t => t.status === 'pending').length;
+                this.summary.approvedVolume = txns.filter(t => t.status === 'approved').reduce((s, t) => s + (parseFloat(t.amount) || 0), 0);
+            }
+        },
+
+        toggleSelectAll(e) {
+            if (e.target.checked) {
+                this.selectedIds = this.transactions.map(t => t.id);
+            } else {
+                this.selectedIds = [];
+            }
+        },
+
         async approve(id) {
             if (!confirm('موافقة على المعاملة ' + id + '؟')) return;
-            await api(`/api/transactions/${id}/approve`, { method: 'POST', body: '{}' });
-            toast('تمت الموافقة', 'success');
-            this.load();
+            try {
+                await api('/api/transactions/' + id + '/approve', { method: 'POST', body: '{}' });
+                toast('تمت الموافقة', 'success');
+                this.load();
+            } catch(e) { toast('فشلت العملية', 'error'); }
         },
+
         async reject(id) {
             const reason = prompt('سبب الرفض:') || '';
-            await api(`/api/transactions/${id}/reject`, { method: 'POST', body: JSON.stringify({ reason }) });
-            toast('تم الرفض', 'warning');
-            this.load();
+            if (reason === null) return;
+            try {
+                await api('/api/transactions/' + id + '/reject', { method: 'POST', body: JSON.stringify({ reason }) });
+                toast('تم الرفض', 'warning');
+                this.load();
+            } catch(e) { toast('فشلت العملية', 'error'); }
+        },
+
+        async bulkApprove() {
+            if (!confirm('موافقة على ' + this.selectedIds.length + ' معاملة؟')) return;
+            try {
+                await api('/api/transactions/bulk-approve', { method: 'POST', body: JSON.stringify({ ids: this.selectedIds }) });
+                toast('تمت الموافقة على ' + this.selectedIds.length + ' معاملة', 'success');
+                this.selectedIds = [];
+                this.load();
+            } catch(e) { toast('فشلت العملية', 'error'); }
+        },
+
+        async bulkReject() {
+            if (!confirm('رفض ' + this.selectedIds.length + ' معاملة؟')) return;
+            try {
+                await api('/api/transactions/bulk-reject', { method: 'POST', body: JSON.stringify({ ids: this.selectedIds }) });
+                toast('تم رفض ' + this.selectedIds.length + ' معاملة', 'warning');
+                this.selectedIds = [];
+                this.load();
+            } catch(e) { toast('فشلت العملية', 'error'); }
+        },
+
+        openDetail(t) {
+            this.detail = t;
+            this.showDetail = true;
+        },
+
+        toggleAutoRefresh() {
+            if (this.autoRefresh) {
+                this.refreshTimer = setInterval(() => this.load(), 10000);
+                toast('تم تفعيل التحديث التلقائي كل 10 ثواني', 'info');
+            } else {
+                if (this.refreshTimer) { clearInterval(this.refreshTimer); this.refreshTimer = null; }
+                toast('تم إيقاف التحديث التلقائي', 'info');
+            }
+        },
+
+        exportCSV() {
+            const headers = ['ID', 'العميل', 'النوع', 'الشركة', 'المبلغ', 'العملة', 'الحالة', 'التاريخ'];
+            const rows = this.transactions.map(t => [t.id, t.name, t.type, t.company, t.amount, t.currency, t.status, t.date]);
+            const csv = [headers, ...rows].map(r => r.map(c => '"' + (c || '') + '"').join(',')).join('\n');
+            const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'transactions_' + new Date().toISOString().slice(0, 10) + '.csv';
+            link.click();
+            toast('تم تصدير ' + this.transactions.length + ' معاملة', 'success');
         }
     }
 }
