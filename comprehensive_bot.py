@@ -3068,6 +3068,8 @@ class ComprehensiveDUXBot:
             [{'text': '📋 كل الطلبات'}, {'text': '🎁 روابط الإحالة'}],
             [{'text': '🏆 أرباح الإحالة'}, {'text': '🎰 اليانصيب'}],
             [{'text': '🎡 عجلة الحظ'}, {'text': '📢 القنوات'}],
+            # المجموعة 7d: المطابقات
+            [{'text': '🔄 المطابقات'}],
             # المجموعة 8: الأدمن والأدوار
             [{'text': self.tr('admin_managers', lang)}, {'text': self.tr('admin_buttons', lang)}],
             # المجموعة 9: الحماية والنسخ
@@ -4365,6 +4367,58 @@ class ComprehensiveDUXBot:
         
         self.send_message(message['chat']['id'], admin_welcome, self.admin_keyboard())
     
+    def show_match_admin_panel(self, message):
+        """لوحة أدمن المطابقات — نشطة + معلقة + سجلات + بوتات"""
+        chat_id = message['chat']['id']
+        active_count = 0
+        pending_count = 0
+        completed_count = 0
+
+        try:
+            with open('matches.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row.get('status') not in ('completed', 'cancelled'):
+                        active_count += 1
+                    else:
+                        completed_count += 1
+        except:
+            pass
+
+        try:
+            with open('match_requests.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row.get('status') == 'waiting':
+                        pending_count += 1
+        except:
+            pass
+
+        # عد بوتات المطابقة
+        match_bots = []
+        if self.match_manager:
+            match_bots = self.match_manager.get_match_bot_config()
+        active_bots_count = sum(1 for b in match_bots if b.get('is_active') == 'yes')
+
+        text = (
+            f"🔄 <b>لوحة المطابقات</b>\n\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"🟢 نشطة: <b>{active_count}</b>\n"
+            f"⏳ معلقة: <b>{pending_count}</b>\n"
+            f"✅ مكتملة: <b>{completed_count}</b>\n"
+            f"🤖 بوتات المطابقة: <b>{active_bots_count}/{len(match_bots)}</b>\n"
+            f"━━━━━━━━━━━━━━━━━━"
+        )
+
+        inline_btns = [
+            [{'text': '🟢 المطابقات النشطة', 'callback_data': 'match_admin_active'}],
+            [{'text': '⏳ الطلبات المعلقة', 'callback_data': 'match_admin_pending'}],
+            [{'text': '📜 السجلات', 'callback_data': 'match_admin_logs'}],
+            [{'text': '🤖 بوتات المطابقة', 'callback_data': 'match_admin_bots'}],
+            [{'text': '🔙 لوحة الأدمن', 'callback_data': 'match_back_admin'}]
+        ]
+        self.send_inline_message(chat_id, text, inline_btns)
+    
     def process_message(self, message):
         """معالج الرسائل الرئيسي"""
         if 'text' not in message and 'contact' not in message and 'photo' not in message and 'document' not in message and 'video' not in message and 'sticker' not in message:
@@ -5361,7 +5415,7 @@ class ComprehensiveDUXBot:
             step = current_state.get('step', '')
             if step in ('match_enter_data', 'match_enter_code', 'match_amount',
                        'match_company', 'match_company_select', 'chatting', 'rating',
-                       'selecting_payment_method'):
+                       'selecting_payment_method', 'match_upload_screenshot'):
                 self.handle_matching_flow(message)
                 return
             elif step == 'custom_flow':
@@ -6837,6 +6891,8 @@ class ComprehensiveDUXBot:
             self.show_referral_links_admin(message)
         elif text == '📢 القنوات':
             self.show_channels_admin(message)
+        elif text == '🔄 المطابقات':
+            self.show_match_admin_panel(message)
         elif text == '🏆 أرباح الإحالة':
             self.show_referral_earnings_admin(message)
         elif text == '🎰 اليانصيب':
@@ -7541,8 +7597,12 @@ class ComprehensiveDUXBot:
                     'awaiting_code': '🔐 بانتظار الكود',
                     'code_verified': '✅ تم تأكيد الكود',
                     'awaiting_payment': '💸 بانتظار التحويل',
+                    'awaiting_admin_review': '⏳ بانتظار مراجعة الإدارة',
+                    'admin_received': '✅ الإدارة استلمت المال',
+                    'transfer_confirmed': '✅ تم تأكيد التحويل',
                     'completed': '✅ مكتملة',
-                    'disputed': '⚖️ نزاع مفتوح'
+                    'disputed': '⚖️ نزاع مفتوح',
+                    'cancelled': '❌ ملغاة'
                 }.get(match_status, match_status)
 
                 text = (
@@ -7573,6 +7633,14 @@ class ComprehensiveDUXBot:
                         inline_btns.append([{'text': '❌ إلغاء', 'callback_data': f'match_cancel_warn_{match["id"]}'}])
                     elif str(match.get('withdrawer_id', '')) == str(message['from']['id']):
                         text += "⏳ بانتظار قيام المودع بتحويل المال\n"
+
+                if match_status in ('awaiting_admin_review', 'admin_received', 'transfer_confirmed'):
+                    text += "⏳ بانتظار مراجعة الإدارة\n"
+
+                if match_status == 'transfer_confirmed' and str(match.get('depositor_id', '')) == str(message['from']['id']):
+                    text += "✅ تأكد من استلام المال\n"
+                    inline_btns.append([{'text': '✅ تأكيد الاستلام', 'callback_data': f'match_confirm_received_{match["id"]}'}])
+                    inline_btns.append([{'text': '❌ لم يصل', 'callback_data': f'match_not_received_{match["id"]}'}])
 
                 if match_status in ('active', 'awaiting_code') and str(match.get('depositor_id', '')) == str(message['from']['id']):
                     if not any('cancel' in b.get('callback_data', '') for row in inline_btns for b in row):
@@ -8017,6 +8085,116 @@ class ComprehensiveDUXBot:
                 del self.user_states[user_id]
                 return
 
+        # رفع لقطة شاشة (تحويل مال)
+        if isinstance(state, dict) and state.get('step') == 'match_upload_screenshot':
+            match_id = state.get('match_id', '')
+            role = state.get('role', '')
+            match = self.match_manager.get_match_by_id(match_id)
+            if not match:
+                self.send_message(chat_id, "❌ المطابقة غير موجودة", self.main_keyboard(lang, user_id))
+                del self.user_states[user_id]
+                return
+
+            # قبول صورة أو مستند
+            photo = message.get('photo', [])
+            document = message.get('document', {})
+
+            if not photo and not document:
+                self.send_message(chat_id,
+                    "📸 <b>أرسل لقطة شاشة التحويل</b>\n\n"
+                    f"🆔 <code>{match_id}</code> 👈 اضغط للنسخ\n"
+                    f"📤 أرسل صورة أو مستند إثبات التحويل\n\n"
+                    f"🔒 <b>بياناتك محفوظة بأمان</b>")
+                return
+
+            # الحصول على file_id
+            if photo:
+                file_id = photo[-1]['file_id']  # أعلى جودة
+            else:
+                file_id = document.get('file_id', '')
+
+            if not file_id:
+                self.send_message(chat_id, "❌ تعذّر استلام الملف. حاول مرة أخرى:")
+                return
+
+            if role == 'admin':
+                # الأدمن رفع لقطة شاشة تحويله للعميل → إرسال للمودع لتأكيد الاستلام
+                dep_id = int(match['depositor_id'])
+                dep_user = self.find_user(dep_id)
+                dep_lang = dep_user.get('language', 'ar') if dep_user else 'ar'
+
+                caption = (
+                    f"📸 <b>لقطة شاشة تحويل — من الإدارة</b>\n\n"
+                    f"━━━━━━━━━━━━━━━━━━\n"
+                    f"🆔 المطابقة: <code>{match_id}</code> 👈 اضغط للنسخ\n"
+                    f"💰 المبلغ: <code>{match.get('amount', '')}</code> {match.get('currency', '')}\n"
+                    f"🏢 الشركة: <b>{match.get('company_name', '')}</b>\n"
+                    f"━━━━━━━━━━━━━━━━━━\n\n"
+                    f"✅ تأكد من وصول المال ثم اضغط تأكيد الاستلام\n\n"
+                    f"🔒 <b>بياناتك محفوظة بأمان</b>"
+                )
+                # إرسال الصورة للمودع
+                url = f"{self.api_url}sendPhoto"
+                payload = {'chat_id': dep_id, 'photo': file_id, 'caption': caption, 'parse_mode': 'HTML'}
+                try:
+                    import requests
+                    requests.post(url, json=payload, timeout=10)
+                except:
+                    pass
+
+                # إرسال أزرار inline بعد الصورة
+                inline_btns = [
+                    [{'text': '✅ تأكيد الاستلام', 'callback_data': f'match_confirm_received_{match_id}'}],
+                    [{'text': '❌ لم يصل', 'callback_data': f'match_not_received_{match_id}'}]
+                ]
+                self.send_inline_message(dep_id, "هل وصل المال؟", inline_btns)
+
+                self.send_message(chat_id,
+                    f"✅ <b>تم إرسال لقطة الشاشة للعميل</b>\n\n"
+                    f"🆔 <code>{match_id}</code>\n"
+                    f"⏳ بانتظار تأكيد العميل للاستلام",
+                    self.admin_keyboard())
+            else:
+                # العميل رفع لقطة شاشة تحويله → إرسال للأدمن للمراجعة
+                for admin_id in self.admin_ids:
+                    try:
+                        caption = (
+                            f"📸 <b>لقطة شاشة تحويل — مطابقة</b>\n\n"
+                            f"━━━━━━━━━━━━━━━━━━\n"
+                            f"🆔 المطابقة: <code>{match_id}</code> 👈 اضغط للنسخ\n"
+                            f"💰 المبلغ: <code>{match.get('amount', '')}</code> {match.get('currency', '')}\n"
+                            f"🏢 الشركة: <b>{match.get('company_name', '')}</b>\n"
+                            f"👤 المرسل: <code>{user_id}</code> ({role})\n"
+                            f"━━━━━━━━━━━━━━━━━━"
+                        )
+                        # إرسال الصورة للأدمن
+                        url = f"{self.api_url}sendPhoto"
+                        payload = {'chat_id': int(admin_id), 'photo': file_id, 'caption': caption, 'parse_mode': 'HTML'}
+                        try:
+                            import requests
+                            requests.post(url, json=payload, timeout=10)
+                        except:
+                            pass
+
+                        # إرسال أزرار inline بعد الصورة
+                        inline_btns = [
+                            [{'text': '✅ تأكيد التحويل', 'callback_data': f'match_admin_screenshot_ok_{match_id}'},
+                             {'text': '❌ رفض', 'callback_data': f'match_admin_screenshot_no_{match_id}'}]
+                        ]
+                        self.send_inline_message(int(admin_id), "مراجعة لقطة الشاشة:", inline_btns)
+                    except Exception as e:
+                        logger.error(f"خطأ في إرسال لقطة الشاشة للأدمن: {e}")
+
+                self.send_message(chat_id,
+                    f"✅ <b>تم إرسال لقطة الشاشة للإدارة</b>\n\n"
+                    f"🆔 <code>{match_id}</code> 👈 اضغط للنسخ\n"
+                    f"⏳ بانتظار مراجعة الإدارة\n\n"
+                    f"🔒 <b>بياناتك محفوظة بأمان</b>",
+                    self.main_keyboard(lang, user_id))
+
+            del self.user_states[user_id]
+            return
+
         # دردشة
         if isinstance(state, dict) and state.get('step') == 'chatting':
             match_id = state['match_id']
@@ -8055,7 +8233,7 @@ class ComprehensiveDUXBot:
             return
 
     def _notify_match_created(self, match_id):
-        """إشعار الطرفين بإنشاء مطابقة"""
+        """إشعار الطرفين بإنشاء مطابقة — الساحب يرسل الكود، المودع ينتظر"""
         match = self.match_manager.get_match_by_id(match_id)
         if not match:
             return
@@ -8063,42 +8241,43 @@ class ComprehensiveDUXBot:
         depositor_id = int(match['depositor_id'])
         withdrawer_id = int(match['withdrawer_id'])
 
-        # إشعار المودع
+        # إشعار المودع: بانتظار الساحب
         dep_user = self.find_user(depositor_id)
         dep_lang = dep_user.get('language', 'ar') if dep_user else 'ar'
         dep_msg = (
-            f"✅ تم العثور على مطابقة!\n\n"
-            f"🆔 {match_id}\n"
-            f"💰 المبلغ: {match['amount']} {match['currency']}\n"
-            f"🏢 الشركة: {match['company_name']}\n"
-            f"👤 الطرف الآخر: {match['withdrawer_alias']}\n\n"
-            f"💡 اكتب رسالة للتواصل مع الطرف الآخر.\n"
-            f"أو اضغط ✅ تأكيد للبدء."
+            f"✅ <b>تم تأكيد طلبك وإنشاء المطابقة!</b>\n\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"🆔 <code>{match_id}</code> 👈 اضغط للنسخ\n"
+            f"💰 المبلغ: <code>{match['amount']}</code> {match['currency']}\n"
+            f"🏢 الشركة: <b>{match['company_name']}</b>\n"
+            f"━━━━━━━━━━━━━━━━━━\n\n"
+            f"⏳ بانتظار قيام الطرف الآخر بإرسال بيانات السحب\n\n"
+            f"⚠️ <b>لا ترسل المال قبل أن يؤكد لك ذلك</b>\n"
+            f"🔒 <b>بياناتك محفوظة بأمان</b>"
         )
-        chat_kb = {
-            'keyboard': [
-                [{'text': '✅ تأكيد البدء'}, {'text': '❌ إلغاء'}],
-                [{'text': '🆘 دعم'}]
-            ],
-            'resize_keyboard': True
-        }
-        self.send_message(depositor_id, dep_msg, chat_kb)
-        self.user_states[depositor_id] = {'step': 'chatting', 'match_id': match_id}
+        self.send_message(depositor_id, dep_msg, self.main_keyboard(dep_lang, depositor_id))
 
-        # إشعار الساحب
+        # إشعار الساحب: أرسل بياناتك (كود + معرف + محفظة + وسيلة)
         wit_user = self.find_user(withdrawer_id)
         wit_lang = wit_user.get('language', 'ar') if wit_user else 'ar'
         wit_msg = (
-            f"✅ تم العثور على مطابقة!\n\n"
-            f"🆔 {match_id}\n"
-            f"💰 المبلغ: {match['amount']} {match['currency']}\n"
-            f"🏢 الشركة: {match['company_name']}\n"
-            f"👤 الطرف الآخر: {match['depositor_alias']}\n\n"
-            f"💡 اكتب رسالة للتواصل مع الطرف الآخر.\n"
-            f"أو اضغط ✅ تأكيد للبدء."
+            f"✅ <b>تم تأكيد طلبك وإنشاء المطابقة!</b>\n\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"🆔 <code>{match_id}</code> 👈 اضغط للنسخ\n"
+            f"💰 المبلغ: <code>{match['amount']}</code> {match['currency']}\n"
+            f"🏢 الشركة: <b>{match['company_name']}</b>\n"
+            f"━━━━━━━━━━━━━━━━━━\n\n"
+            f"📝 <b>أرسل بياناتك الآن:</b>\n"
+            f"1️⃣ كود السحب\n"
+            f"2️⃣ معرف حسابك (ID)\n"
+            f"3️⃣ رقم محفظتك\n"
+            f"4️⃣ وسيلة الدفع\n\n"
+            f"⚠️ <b>لا ترسل المال قبل أن يؤكد لك ذلك</b>\n"
+            f"🔒 <b>بياناتك محفوظة بأمان</b>"
         )
-        self.send_message(withdrawer_id, wit_msg, chat_kb)
-        self.user_states[withdrawer_id] = {'step': 'chatting', 'match_id': match_id}
+        kb = {'keyboard': [[{'text': '❌ إلغاء'}]], 'resize_keyboard': True, 'one_time_keyboard': True}
+        self.send_message(withdrawer_id, wit_msg, kb)
+        self.user_states[withdrawer_id] = {'step': 'match_enter_code', 'match_id': match_id, 'substep': 'code'}
 
         # إشعار الإدمن
         for admin_id in self.admin_ids:
@@ -10812,14 +10991,17 @@ class ComprehensiveDUXBot:
 
             elif data.startswith('match_admin_reject_req_'):
                 req_id = data.replace('match_admin_reject_req_', '')
-                # حذف الطلب
+                # قراءة الطلب قبل الحذف لإشعار العميل
+                rejected_user_id = ''
                 try:
                     rows = []
                     with open('match_requests.csv', 'r', encoding='utf-8-sig') as f:
                         reader = csv.DictReader(f)
                         fieldnames = reader.fieldnames
                         for row in reader:
-                            if row.get('id') != req_id:
+                            if row.get('id') == req_id:
+                                rejected_user_id = row.get('user_id', '')
+                            else:
                                 rows.append(row)
                     with open('match_requests.csv', 'w', newline='', encoding='utf-8-sig') as f:
                         writer = csv.DictWriter(f, fieldnames=fieldnames)
@@ -10829,8 +11011,13 @@ class ComprehensiveDUXBot:
                     pass
                 self.edit_message(chat_id, message.get('message_id'), f"❌ تم رفض الطلب")
                 # إشعار العميل
-                self.notify_user(int(request.get('user_id', 0)) if 'request' in dir() else 0,
-                    "❌ <b>تم رفض طلب المطابقة</b>\n\nيمكنك المحاولة مرة أخرى لاحقاً")
+                if rejected_user_id:
+                    try:
+                        self.send_message(int(rejected_user_id),
+                            "❌ <b>تم رفض طلب المطابقة</b>\n\nيمكنك المحاولة مرة أخرى لاحقاً",
+                            self.main_keyboard('ar', int(rejected_user_id)))
+                    except:
+                        pass
                 return
 
             # ==================== مطابقة: الأدمن ينضم كطرف آخر (قديم) ====================
@@ -10904,7 +11091,7 @@ class ComprehensiveDUXBot:
 
                 match = self.match_manager.get_match_by_id(match_id)
                 if match:
-                    # إشعار المودع: أرسل المال
+                    # إشعار المودع: أرسل المال الآن
                     dep_id = int(match['depositor_id'])
                     dep_user = self.find_user(dep_id)
                     dep_lang = dep_user.get('language', 'ar') if dep_user else 'ar'
@@ -10912,25 +11099,34 @@ class ComprehensiveDUXBot:
                     company_icon = company.get('icon', '🏢') if company else '🏢'
 
                     pay_msg = (
-                        f"✅ تم تأكيد الكود!\n\n"
-                        f"{company_icon} {match['company_name']}\n"
-                        f"💰 المبلغ: {match['amount']} {match['currency']}\n\n"
-                        f"📤 أرسل المال الآن ثم أكد الإرسال."
+                        f"✅ <b>تم تأكيد الكود!</b>\n\n"
+                        f"━━━━━━━━━━━━━━━━━━\n"
+                        f"{company_icon} <b>{match['company_name']}</b>\n"
+                        f"💰 المبلغ: <code>{match['amount']}</code> {match['currency']}\n"
+                        f"🆔 <code>{match_id}</code> 👈 اضغط للنسخ\n"
+                        f"━━━━━━━━━━━━━━━━━━\n\n"
+                        f"📤 <b>أرسل المال الآن ثم اضغط تأكيد الإرسال</b>\n\n"
+                        f"⚠️ <b>لا ترسل المال قبل أن يؤكد لك ذلك</b>\n"
+                        f"🔒 <b>بياناتك محفوظة بأمان</b>"
                     )
-                    pay_kb = {
-                        'keyboard': [
-                            [{'text': '✅ تم الإرسال'}, {'text': '❌ إلغاء'}],
-                            [{'text': '🆘 دعم'}]
-                        ],
-                        'resize_keyboard': True
-                    }
-                    self.send_message(dep_id, pay_msg, pay_kb)
+                    inline_btns = [
+                        [{'text': '✅ تم الإرسال', 'callback_data': f'match_sent_{match_id}'}],
+                        [{'text': '❌ إلغاء', 'callback_data': f'match_cancel_warn_{match_id}'}],
+                        [{'text': '🆘 دعم', 'callback_data': f'match_support_{match_id}'}]
+                    ]
+                    self.send_inline_message(dep_id, pay_msg, inline_btns)
 
                     # إشعار الساحب: الكود مؤكد
                     wit_id = int(match['withdrawer_id'])
-                    self.send_message(wit_id, "✅ تم تأكيد الكود! بانتظار استلام المال من الطرف الآخر.")
+                    self.send_message(wit_id,
+                        f"✅ <b>تم تأكيد الكود!</b>\n\n"
+                        f"🆔 <code>{match_id}</code> 👈 اضغط للنسخ\n"
+                        f"⏳ بانتظار استلام المال من الطرف الآخر\n\n"
+                        f"🔒 <b>بياناتك محفوظة بأمان</b>",
+                        self.main_keyboard('ar', wit_id))
 
-                self.edit_message(chat_id, message.get('message_id'), f"✅ تم تأكيد الكود لـ {match_id}")
+                self.edit_message(chat_id, message.get('message_id'),
+                    f"✅ تم تأكيد الكود لـ <code>{match_id}</code>")
                 return
 
             # ==================== مطابقة: رفض الكود ====================
@@ -10942,15 +11138,17 @@ class ComprehensiveDUXBot:
                     wit_user = self.find_user(wit_id)
                     wit_lang = wit_user.get('language', 'ar') if wit_user else 'ar'
                     self.send_message(wit_id,
-                        f"❌ الكود أو البيانات غير صحيحة. أرسل البيانات مرة أخرى:\n\n"
-                        f"1️⃣ كود السحب\n"
-                        f"2️⃣ معرف حسابك (ID)\n"
-                        f"3️⃣ رقم محفظتك\n"
-                        f"4️⃣ وسيلة الدفع\n\n"
-                        f"💡 في 4 أسطر منفصلة")
-                    self.user_states[wit_id] = {'step': 'match_enter_code', 'match_id': match_id}
+                        f"❌ <b>الكود أو البيانات غير صحيحة</b>\n\n"
+                        f"أرسل البيانات مرة أخرى خطوة بخطوة:\n\n"
+                        f"1️⃣ اكتب <b>كود السحب</b>:\n\n"
+                        f"⚠️ <b>لا ترسل المال قبل أن يؤكد لك ذلك</b>\n"
+                        f"🔒 <b>بياناتك محفوظة بأمان</b>")
+                    self.user_states[wit_id] = {'step': 'match_enter_code', 'match_id': match_id, 'substep': 'code'}
+                    kb = {'keyboard': [[{'text': '❌ إلغاء'}]], 'resize_keyboard': True, 'one_time_keyboard': True}
+                    self.send_message(wit_id, "1️⃣ اكتب <b>كود السحب</b>:", kb)
 
-                self.edit_message(chat_id, message.get('message_id'), f"🔁 تم طلب كود جديد لـ {match_id}")
+                self.edit_message(chat_id, message.get('message_id'),
+                    f"🔁 تم طلب كود جديد لـ <code>{match_id}</code>")
                 return
 
             # ==================== مطابقة: حل نزاع ====================
@@ -10970,6 +11168,601 @@ class ComprehensiveDUXBot:
                 dispute_id = data.replace('dispute_cancel_', '')
                 self.match_manager.resolve_dispute(dispute_id, 'إلغاء العملية')
                 self.edit_message(chat_id, message.get('message_id'), "❌ تم إلغاء العملية")
+                return
+
+            # ==================== مطابقة: إرسال الكود (زر) ====================
+            elif data.startswith('match_enter_code_btn_'):
+                match_id = data.replace('match_enter_code_btn_', '')
+                match = self.match_manager.get_match_by_id(match_id)
+                if not match:
+                    self.edit_message(chat_id, message.get('message_id'), "❌ المطابقة غير موجودة")
+                    return
+                # الساحب يدخل بياناته خطوة بخطوة
+                self.user_states[user_id] = {'step': 'match_enter_code', 'match_id': match_id, 'substep': 'code'}
+                kb = {'keyboard': [[{'text': '❌ إلغاء'}]], 'resize_keyboard': True, 'one_time_keyboard': True}
+                self.edit_message(chat_id, message.get('message_id'),
+                    f"📝 <b>أدخل بياناتك خطوة بخطوة</b>\n\n"
+                    f"1️⃣ اكتب <b>كود السحب</b>:\n\n"
+                    f"⚠️ <b>لا ترسل المال قبل أن يؤكد لك ذلك</b>")
+                self.send_message(chat_id, "1️⃣ اكتب <b>كود السحب</b>:", kb)
+                return
+
+            # ==================== مطابقة: تأكيد الإرسال (المودع أرسل المال) ====================
+            elif data.startswith('match_sent_'):
+                match_id = data.replace('match_sent_', '')
+                match = self.match_manager.get_match_by_id(match_id)
+                if not match:
+                    self.edit_message(chat_id, message.get('message_id'), "❌ المطابقة غير موجودة")
+                    return
+
+                # تحديث حالة المطابقة: بانتظار مراجعة الإدارة
+                self.match_manager.update_match_status(match_id, 'awaiting_admin_review')
+
+                self.edit_message(chat_id, message.get('message_id'),
+                    "✅ <b>تم تأكيد إرسال المال</b>\n\n"
+                    f"🆔 <code>{match_id}</code> 👈 اضغط للنسخ\n"
+                    f"⏳ بانتظار مراجعة الإدارة لاستلام المال\n\n"
+                    f"🔒 <b>بياناتك محفوظة بأمان</b>")
+
+                # إشعار الأدمن بمراجعة الاستلام
+                for admin_id in self.admin_ids:
+                    try:
+                        admin_msg = (
+                            f"💸 <b>مراجعة استلام — مطابقة</b>\n\n"
+                            f"━━━━━━━━━━━━━━━━━━\n"
+                            f"🆔 المطابقة: <code>{match_id}</code> 👈 اضغط للنسخ\n"
+                            f"💰 المبلغ: <code>{match['amount']}</code> {match['currency']}\n"
+                            f"🏢 الشركة: <b>{match.get('company_name', '')}</b>\n"
+                            f"👤 المودع: <code>{match.get('depositor_id', '')}</code>\n"
+                            f"👤 الساحب: <code>{match.get('withdrawer_id', '')}</code>\n"
+                            f"━━━━━━━━━━━━━━━━━━\n\n"
+                            f"✅ أكد الاستلام ← ليرسل الساحب المال للعميل\n"
+                            f"❌ أو رفض ← لطلب لقطة شاشة أخرى"
+                        )
+                        inline_btns = [
+                            [{'text': '✅ تم الاستلام', 'callback_data': f'match_admin_receipt_{match_id}'},
+                             {'text': '❌ لم يصل', 'callback_data': f'match_admin_no_receipt_{match_id}'}]
+                        ]
+                        self.send_inline_message(int(admin_id), admin_msg, inline_btns)
+                    except Exception as e:
+                        logger.error(f"خطأ في إشعار الأدمن بالإرسال: {e}")
+                return
+
+            # ==================== مطابقة: الأدمن يؤكد استلام المال ====================
+            elif data.startswith('match_admin_receipt_'):
+                match_id = data.replace('match_admin_receipt_', '')
+                match = self.match_manager.get_match_by_id(match_id)
+                if not match:
+                    self.edit_message(chat_id, message.get('message_id'), "❌ المطابقة غير موجودة")
+                    return
+
+                # تحديث الحالة: الأدمن استلم المال، الآن يحول للعميل
+                self.match_manager.update_match_status(match_id, 'admin_received')
+
+                self.edit_message(chat_id, message.get('message_id'),
+                    f"✅ <b>تم تأكيد الاستلام</b>\n\n"
+                    f"🆔 <code>{match_id}</code>\n"
+                    f"📤 <b>الآن حوّل المال للعميل وأرسل لقطة شاشة التحويل</b>")
+
+                # إشعار المودع: المال وصل، الأدمن سيحول لك
+                dep_id = int(match['depositor_id'])
+                dep_user = self.find_user(dep_id)
+                dep_lang = dep_user.get('language', 'ar') if dep_user else 'ar'
+                self.send_message(dep_id,
+                    f"✅ <b>تم تأكيد استلام مالك من الإدارة</b>\n\n"
+                    f"🆔 <code>{match_id}</code> 👈 اضغط للنسخ\n"
+                    f"⏳ جارٍ تحويل المال إليك...\n\n"
+                    f"🔒 <b>بياناتك محفوظة بأمان</b>",
+                    self.main_keyboard(dep_lang, dep_id))
+
+                # إشعار الساحب: المال وصل للإدارة
+                wit_id = int(match['withdrawer_id'])
+                self.send_message(wit_id,
+                    f"✅ <b>تم تأكيد وصول مال العميل للإدارة</b>\n\n"
+                    f"🆔 <code>{match_id}</code> 👈 اضغط للنسخ\n"
+                    f"⏳ الإدارة تحوّل المال للعميل الآن\n\n"
+                    f"🔒 <b>بياناتك محفوظة بأمان</b>",
+                    self.main_keyboard('ar', wit_id))
+
+                # الأدمن: ارفع لقطة شاشة تحويلك للعميل
+                self.user_states[user_id] = {'step': 'match_upload_screenshot', 'match_id': match_id, 'role': 'admin'}
+                self.send_message(chat_id,
+                    f"📸 <b>أرسل لقطة شاشة تحويلك للعميل</b>\n\n"
+                    f"🆔 <code>{match_id}</code> 👈 اضغط للنسخ\n"
+                    f"📤 الصورة ستُرسل للعميل لتأكيد الاستلام",
+                    self.admin_keyboard())
+                return
+
+            # ==================== مطابقة: الأدمن لم يستلم المال ====================
+            elif data.startswith('match_admin_no_receipt_'):
+                match_id = data.replace('match_admin_no_receipt_', '')
+                match = self.match_manager.get_match_by_id(match_id)
+                if not match:
+                    self.edit_message(chat_id, message.get('message_id'), "❌ المطابقة غير موجودة")
+                    return
+
+                self.edit_message(chat_id, message.get('message_id'),
+                    f"❌ <b>لم يصل المال بعد</b>\n\n"
+                    f"🆔 <code>{match_id}</code>\n"
+                    f"⏳ تم إشعار العميل بإرسال لقطة شاشة التحويل")
+
+                # إشعار المودع: أرسل لقطة شاشة التحويل
+                dep_id = int(match['depositor_id'])
+                self.user_states[dep_id] = {'step': 'match_upload_screenshot', 'match_id': match_id, 'role': 'depositor'}
+                self.send_message(dep_id,
+                    f"⚠️ <b>لم يصل المال بعد</b>\n\n"
+                    f"🆔 <code>{match_id}</code> 👈 اضغط للنسخ\n"
+                    f"📸 <b>أرسل لقطة شاشة التحويل الآن</b>\n\n"
+                    f"🔒 <b>بياناتك محفوظة بأمان</b>",
+                    self.main_keyboard('ar', dep_id))
+                return
+
+            # ==================== مطابقة: تحذير الإلغاء ====================
+            elif data.startswith('match_cancel_warn_'):
+                match_id = data.replace('match_cancel_warn_', '')
+                self.edit_message(chat_id, message.get('message_id'),
+                    f"⚠️ <b>هل أنت متأكد من إلغاء المطابقة؟</b>\n\n"
+                    f"🆔 <code>{match_id}</code> 👈 اضغط للنسخ\n\n"
+                    f"سيتم إلغاء العملية بالكامل.")
+                inline_btns = [
+                    [{'text': '✅ نعم، ألغِ', 'callback_data': f'match_cancel_confirm_{match_id}'},
+                     {'text': '❌ تراجع', 'callback_data': f'match_cancel_back_{match_id}'}]
+                ]
+                self.send_inline_message(chat_id, "تأكيد الإلغاء:", inline_btns)
+                return
+
+            # ==================== مطابقة: تأكيد الإلغاء ====================
+            elif data.startswith('match_cancel_confirm_'):
+                match_id = data.replace('match_cancel_confirm_', '')
+                match = self.match_manager.get_match_by_id(match_id)
+                if match:
+                    self.match_manager.cancel_match(match_id, user_id)
+                    # إشعار الطرف الآخر
+                    other_id = None
+                    if str(match.get('depositor_id', '')) == str(user_id):
+                        other_id = int(match.get('withdrawer_id', 0))
+                    elif str(match.get('withdrawer_id', '')) == str(user_id):
+                        other_id = int(match.get('depositor_id', 0))
+                    if other_id:
+                        self.send_message(other_id,
+                            f"❌ <b>تم إلغاء المطابقة</b>\n\n"
+                            f"🆔 <code>{match_id}</code> 👈 اضغط للنسخ\n"
+                            f"تم إلغاء العملية من قبل الطرف الآخر.",
+                            self.main_keyboard('ar', other_id))
+                self.edit_message(chat_id, message.get('message_id'), f"❌ تم إلغاء المطابقة {match_id}")
+                if user_id in self.user_states:
+                    del self.user_states[user_id]
+                user = self.find_user(user_id)
+                lang = user.get('language', 'ar') if user else 'ar'
+                self.send_message(chat_id, self.tr('choose_service', lang,
+                    name=user.get('name','') if user else '',
+                    customer_id=user.get('customer_id','') if user else ''),
+                    self.main_keyboard(lang, user_id))
+                return
+
+            # ==================== مطابقة: تراجع عن الإلغاء ====================
+            elif data.startswith('match_cancel_back_'):
+                match_id = data.replace('match_cancel_back_', '')
+                self.edit_message(chat_id, message.get('message_id'), "✅ تم التراجع عن الإلغاء")
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': '🔄 مطابقة'}
+                self.start_matching_flow(fake_msg)
+                return
+
+            # ==================== مطابقة: دعم/نزاع ====================
+            elif data.startswith('match_support_'):
+                match_id = data.replace('match_support_', '')
+                match = self.match_manager.get_match_by_id(match_id)
+                if not match:
+                    self.edit_message(chat_id, message.get('message_id'), "❌ المطابقة غير موجودة")
+                    return
+
+                dispute_id = self.match_manager.open_dispute(match_id, user_id, 'طلب دعم من العميل')
+                self.edit_message(chat_id, message.get('message_id'),
+                    f"🆘 <b>تم فتح تذكرة دعم</b>\n\n"
+                    f"🆔 المطابقة: <code>{match_id}</code> 👈 اضغط للنسخ\n"
+                    f"🎫 التذكرة: <code>{dispute_id}</code> 👈 اضغط للنسخ\n"
+                    f"⏳ سيتم مراجعة طلبك من الإدارة\n\n"
+                    f"🔒 <b>بياناتك محفوظة بأمان</b>")
+
+                # إشعار الأدمن
+                for admin_id in self.admin_ids:
+                    try:
+                        self.send_inline_message(int(admin_id),
+                            f"🆘 <b>طلب دعم — مطابقة</b>\n\n"
+                            f"━━━━━━━━━━━━━━━━━━\n"
+                            f"🆔 المطابقة: <code>{match_id}</code> 👈 اضغط للنسخ\n"
+                            f"🎫 التذكرة: <code>{dispute_id}</code> 👈 اضغط للنسخ\n"
+                            f"👤 من: <code>{user_id}</code>\n"
+                            f"💰 المبلغ: <code>{match.get('amount', '')}</code> {match.get('currency', '')}\n"
+                            f"🏢 الشركة: <b>{match.get('company_name', '')}</b>\n"
+                            f"━━━━━━━━━━━━━━━━━━",
+                            [[{'text': '✅ حل لصالح المودع', 'callback_data': f'dispute_resolve_dep_{dispute_id}'},
+                              {'text': '✅ حل لصالح الساحب', 'callback_data': f'dispute_resolve_wit_{dispute_id}'}],
+                             [{'text': '❌ إلغاء العملية', 'callback_data': f'dispute_cancel_{dispute_id}'}]])
+                    except:
+                        pass
+                return
+
+            # ==================== مطابقة: الأدمن يؤكد استلام العميل ====================
+            elif data.startswith('match_admin_confirm_delivery_'):
+                match_id = data.replace('match_admin_confirm_delivery_', '')
+                match = self.match_manager.get_match_by_id(match_id)
+                if not match:
+                    self.edit_message(chat_id, message.get('message_id'), "❌ المطابقة غير موجودة")
+                    return
+
+                self.match_manager.update_match_status(match_id, 'completed')
+
+                # إشعار الطرفين بإتمام العملية
+                dep_id = int(match['depositor_id'])
+                wit_id = int(match['withdrawer_id'])
+
+                for party_id in [dep_id, wit_id]:
+                    party_user = self.find_user(party_id)
+                    party_lang = party_user.get('language', 'ar') if party_user else 'ar'
+                    self.send_message(party_id,
+                        f"✅ <b>تم إتمام المطابقة بنجاح!</b>\n\n"
+                        f"🆔 <code>{match_id}</code> 👈 اضغط للنسخ\n"
+                        f"🎉 شكراً لاستخدامك نظام المطابقة\n\n"
+                        f"📊 يرجى تقييم التجربة (1-5):",
+                        {'keyboard': [[{'text': '⭐⭐⭐⭐⭐'}, {'text': '⭐⭐⭐⭐'}, {'text': '⭐⭐⭐'}],
+                                       [{'text': '⭐⭐'}, {'text': '⭐'}]],
+                         'resize_keyboard': True, 'one_time_keyboard': True})
+                    self.user_states[party_id] = {'step': 'rating', 'match_id': match_id}
+
+                self.edit_message(chat_id, message.get('message_id'),
+                    f"✅ <b>تم إتمام المطابقة</b>\n\n🆔 <code>{match_id}</code>\nتم إشعار الطرفين بإكمال التقييم.")
+                return
+
+            # ==================== مطابقة: العميل يؤكد استلام المال ====================
+            elif data.startswith('match_confirm_received_'):
+                match_id = data.replace('match_confirm_received_', '')
+                match = self.match_manager.get_match_by_id(match_id)
+                if not match:
+                    self.edit_message(chat_id, message.get('message_id'), "❌ المطابقة غير موجودة")
+                    return
+
+                self.edit_message(chat_id, message.get('message_id'),
+                    f"✅ <b>تم تأكيد الاستلام!</b>\n\n"
+                    f"🆔 <code>{match_id}</code> 👈 اضغط للنسخ\n"
+                    f"⏳ بانتظار تأكيد الإدارة لإتمام العملية")
+
+                # إشعار الأدمن: العميل استلم المال، أكد الإتمام
+                for admin_id in self.admin_ids:
+                    try:
+                        self.send_inline_message(int(admin_id),
+                            f"✅ <b>العميل أكد الاستلام</b>\n\n"
+                            f"🆔 المطابقة: <code>{match_id}</code> 👈 اضغط للنسخ\n"
+                            f"💰 المبلغ: <code>{match.get('amount', '')}</code> {match.get('currency', '')}\n\n"
+                            f"اضغط للتأكيد النهائي وإغلاق المطابقة:",
+                            [[{'text': '✅ إتمام المطابقة', 'callback_data': f'match_admin_confirm_delivery_{match_id}'}]])
+                    except:
+                        pass
+                return
+
+            # ==================== مطابقة: العميل لم يستلم المال ====================
+            elif data.startswith('match_not_received_'):
+                match_id = data.replace('match_not_received_', '')
+                match = self.match_manager.get_match_by_id(match_id)
+                if not match:
+                    self.edit_message(chat_id, message.get('message_id'), "❌ المطابقة غير موجودة")
+                    return
+
+                self.edit_message(chat_id, message.get('message_id'),
+                    f"❌ <b>تم إبلاغ الإدارة بعدم الاستلام</b>\n\n"
+                    f"🆔 <code>{match_id}</code> 👈 اضغط للنسخ\n"
+                    f"⏳ سيتم مراجعة التحويل")
+
+                # إشعار الأدمن: العميل لم يستلم
+                for admin_id in self.admin_ids:
+                    try:
+                        self.send_inline_message(int(admin_id),
+                            f"❌ <b>العميل لم يستلم المال</b>\n\n"
+                            f"🆔 المطابقة: <code>{match_id}</code> 👈 اضغط للنسخ\n"
+                            f"💰 المبلغ: <code>{match.get('amount', '')}</code> {match.get('currency', '')}\n"
+                            f"👤 العميل: <code>{match.get('depositor_id', '')}</code>\n\n"
+                            f"راجع التحويل وأعد الإرسال أو افتح نزاع:",
+                            [[{'text': '🆘 فتح نزاع', 'callback_data': f'match_support_{match_id}'}],
+                             [{'text': '✅ إغلاق المطابقة', 'callback_data': f'match_admin_confirm_delivery_{match_id}'}]])
+                    except:
+                        pass
+                return
+
+            # ==================== مطابقة: رجوع للقائمة الرئيسية ====================
+            elif data == 'match_back_main':
+                if user_id in self.user_states:
+                    del self.user_states[user_id]
+                user = self.find_user(user_id)
+                lang = user.get('language', 'ar') if user else 'ar'
+                welcome = self.tr('choose_service', lang, name=user.get('name','') if user else '',
+                    customer_id=user.get('customer_id','') if user else '')
+                self.send_message(chat_id, welcome, self.main_keyboard(lang, user_id))
+                return
+
+            # ==================== لوحة أدمن المطابقات ====================
+            elif data == 'match_admin_panel':
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_match_admin_panel(fake_msg)
+                return
+
+            elif data == 'match_admin_active':
+                matches = self.match_manager.get_active_matches() if self.match_manager else []
+                if not matches:
+                    self.edit_message(chat_id, message.get('message_id'), "📭 لا توجد مطابقات نشطة")
+                    return
+                text = f"🟢 <b>المطابقات النشطة ({len(matches)})</b>\n\n━━━━━━━━━━━━━━━━━━\n"
+                for m in matches[:15]:
+                    text += (
+                        f"🆔 <code>{m['id']}</code>\n"
+                        f"💰 {m.get('amount', '')} {m.get('currency', '')} | "
+                        f"📊 {m.get('status', '')}\n"
+                        f"🏢 {m.get('company_name', '')}\n"
+                        f"👤 مودع: <code>{m.get('depositor_id', '')}</code>\n"
+                        f"👤 ساحب: <code>{m.get('withdrawer_id', '')}</code>\n"
+                        f"━━━━━━━━━━━━━━━━━━\n"
+                    )
+                self.edit_message(chat_id, message.get('message_id'), text)
+                return
+
+            elif data == 'match_admin_pending':
+                pending = []
+                try:
+                    with open('match_requests.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        for row in reader:
+                            if row.get('status') == 'waiting':
+                                pending.append(row)
+                except:
+                    pass
+                if not pending:
+                    self.edit_message(chat_id, message.get('message_id'), "✅ لا توجد طلبات معلقة")
+                    return
+                text = f"⏳ <b>طلبات معلقة ({len(pending)})</b>\n\n━━━━━━━━━━━━━━━━━━\n"
+                for r in pending[:15]:
+                    type_ar = 'إيداع' if r.get('type') == 'deposit' else 'سحب'
+                    text += (
+                        f"🆔 <code>{r.get('id', '')}</code>\n"
+                        f"{'💵' if r.get('type') == 'deposit' else '💸'} {type_ar}\n"
+                        f"💰 {r.get('amount', '')} {r.get('currency', '')}\n"
+                        f"🏢 {r.get('company_name', '')}\n"
+                        f"👤 <code>{r.get('user_id', '')}</code>\n"
+                    )
+                    inline_btns_row = [
+                        {'text': '✅ موافقة', 'callback_data': f'match_admin_approve_req_{r["id"]}'},
+                        {'text': '❌ رفض', 'callback_data': f'match_admin_reject_req_{r["id"]}'}
+                    ]
+                    text += "---\n"
+                    # إرسال أزرار inline لكل طلب
+                    self.send_inline_message(chat_id,
+                        f"طلب: <code>{r.get('id', '')}</code> | {type_ar} | {r.get('amount', '')} {r.get('currency', '')}",
+                        [inline_btns_row])
+                self.edit_message(chat_id, message.get('message_id'), text)
+                return
+
+            elif data == 'match_admin_logs':
+                matches = []
+                try:
+                    with open('matches.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        for row in reader:
+                            if row.get('status') in ('completed', 'cancelled'):
+                                matches.append(row)
+                except:
+                    pass
+                if not matches:
+                    self.edit_message(chat_id, message.get('message_id'), "📭 لا توجد سجلات")
+                    return
+                text = f"📜 <b>السجلات ({len(matches)})</b>\n\n━━━━━━━━━━━━━━━━━━\n"
+                for m in matches[-15:]:
+                    status_icon = '✅' if m.get('status') == 'completed' else '❌'
+                    text += (
+                        f"{status_icon} <code>{m.get('id', '')}</code>\n"
+                        f"💰 {m.get('amount', '')} {m.get('currency', '')}\n"
+                        f"🏢 {m.get('company_name', '')}\n"
+                        f"📅 {m.get('completed_at', m.get('created_at', ''))}\n"
+                        f"━━━━━━━━━━━━━━━━━━\n"
+                    )
+                self.edit_message(chat_id, message.get('message_id'), text)
+                return
+
+            # ==================== مطابقة: الأدمن يؤكد/يرفض لقطة الشاشة ====================
+            elif data.startswith('match_admin_screenshot_ok_'):
+                match_id = data.replace('match_admin_screenshot_ok_', '')
+                match = self.match_manager.get_match_by_id(match_id)
+                if not match:
+                    self.edit_message(chat_id, message.get('message_id'), "❌ المطابقة غير موجودة")
+                    return
+
+                # تحديث الحالة: تم تأكيد التحويل
+                self.match_manager.update_match_status(match_id, 'transfer_confirmed')
+
+                self.edit_message(chat_id, message.get('message_id'),
+                    f"✅ <b>تم تأكيد التحويل</b>\n\n🆔 <code>{match_id}</code>")
+
+                # إشعار المودع والساحب
+                dep_id = int(match['depositor_id'])
+                wit_id = int(match['withdrawer_id'])
+
+                # المودع: العميل أكد التحويل، الآن الأدمن يحول لك
+                self.send_message(dep_id,
+                    f"✅ <b>تم تأكيد تحويل المال من الطرف الآخر</b>\n\n"
+                    f"🆔 <code>{match_id}</code> 👈 اضغط للنسخ\n"
+                    f"⏳ جارٍ تحويل المال إليك من الإدارة\n\n"
+                    f"🔒 <b>بياناتك محفوظة بأمان</b>",
+                    self.main_keyboard('ar', dep_id))
+
+                # الساحب: تحويلك مؤكد، الآن انتظر استلام العميل
+                self.send_message(wit_id,
+                    f"✅ <b>تم تأكيد تحويلك</b>\n\n"
+                    f"🆔 <code>{match_id}</code> 👈 اضغط للنسخ\n"
+                    f"⏳ بانتظار أن يحول لك الإدارة المال\n\n"
+                    f"🔒 <b>بياناتك محفوظة بأمان</b>",
+                    self.main_keyboard('ar', wit_id))
+                return
+
+            elif data.startswith('match_admin_screenshot_no_'):
+                match_id = data.replace('match_admin_screenshot_no_', '')
+                match = self.match_manager.get_match_by_id(match_id)
+                if not match:
+                    self.edit_message(chat_id, message.get('message_id'), "❌ المطابقة غير موجودة")
+                    return
+
+                self.edit_message(chat_id, message.get('message_id'),
+                    f"❌ <b>تم رفض لقطة الشاشة</b>\n\n🆔 <code>{match_id}</code>\nتم إشعار العميل بإعادة الإرسال")
+
+                # إشعار المودع بإعادة إرسال لقطة شاشة
+                dep_id = int(match['depositor_id'])
+                self.user_states[dep_id] = {'step': 'match_upload_screenshot', 'match_id': match_id, 'role': 'depositor'}
+                self.send_message(dep_id,
+                    f"❌ <b>لم يتم قبول لقطة الشاشة</b>\n\n"
+                    f"🆔 <code>{match_id}</code> 👈 اضغط للنسخ\n"
+                    f"📸 <b>أرسل لقطة شاشة صحيحة للتحويل</b>\n\n"
+                    f"🔒 <b>بياناتك محفوظة بأمان</b>",
+                    self.main_keyboard('ar', dep_id))
+                return
+
+            # ==================== مطابقة: إدارة بوتات المطابقة ====================
+            elif data == 'match_admin_bots':
+                match_bots = self.match_manager.get_match_bot_config() if self.match_manager else []
+                if not match_bots:
+                    # عرض بوتات من bot_tokens.csv لإضافتها كمطابقة
+                    all_bots = []
+                    try:
+                        with open('bot_tokens.csv', 'r', encoding='utf-8-sig') as f:
+                            reader = csv.DictReader(f)
+                            for row in reader:
+                                all_bots.append(row)
+                    except:
+                        pass
+                    if all_bots:
+                        text = "🤖 <b>بوتات المطابقة</b>\n\nلا توجد بوتات مطابقة مفعّلة.\n\nاختر بوتاً لإضافته:\n\n"
+                        inline_btns = []
+                        for b in all_bots:
+                            inline_btns.append([{'text': f"➕ {b.get('name', b.get('id', ''))}",
+                                                 'callback_data': f'match_bot_add_{b["id"]}'}])
+                        inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'match_admin_panel'}])
+                        self.edit_message(chat_id, message.get('message_id'), text)
+                        self.send_inline_message(chat_id, "إضافة بوت مطابقة:", inline_btns)
+                    else:
+                        self.edit_message(chat_id, message.get('message_id'),
+                            "🤖 <b>بوتات المطابقة</b>\n\nلا توجد بوتات متاحة.\nأضف بوتات أولاً من قسم 🤖 البوتات.")
+                    return
+
+                text = f"🤖 <b>بوتات المطابقة ({len(match_bots)})</b>\n\n━━━━━━━━━━━━━━━━━━\n"
+                inline_btns = []
+                for b in match_bots:
+                    active_icon = '🟢' if b.get('is_active') == 'yes' else '🔴'
+                    text += (
+                        f"{active_icon} <b>{b.get('bot_name', '')}</b>\n"
+                        f"🆔 <code>{b.get('bot_id', '')}</code>\n"
+                        f"📊 مطابقات: <b>{b.get('match_count', '0')}</b>\n"
+                        f"━━━━━━━━━━━━━━━━━━\n"
+                    )
+                    toggle_text = '⏹️ إيقاف' if b.get('is_active') == 'yes' else '▶️ تفعيل'
+                    inline_btns.append([
+                        {'text': toggle_text, 'callback_data': f'match_bot_toggle_{b["bot_id"]}'},
+                        {'text': '🗑️ حذف', 'callback_data': f'match_bot_remove_{b["bot_id"]}'}
+                    ])
+                inline_btns.append([{'text': '➕ إضافة بوت', 'callback_data': 'match_bot_add_list'}])
+                inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'match_admin_panel'}])
+                self.edit_message(chat_id, message.get('message_id'), text)
+                self.send_inline_message(chat_id, "إجراءات:", inline_btns)
+                return
+
+            elif data.startswith('match_bot_toggle_'):
+                bot_id = data.replace('match_bot_toggle_', '')
+                if self.match_manager:
+                    self.match_manager.toggle_match_bot(bot_id)
+                self.edit_message(chat_id, message.get('message_id'), "✅ تم التبديل")
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': 'match_bots'}
+                # إعادة عرض القائمة
+                match_bots = self.match_manager.get_match_bot_config() if self.match_manager else []
+                text = f"🤖 <b>بوتات المطابقة ({len(match_bots)})</b>\n\n━━━━━━━━━━━━━━━━━━\n"
+                inline_btns = []
+                for b in match_bots:
+                    active_icon = '🟢' if b.get('is_active') == 'yes' else '🔴'
+                    text += (
+                        f"{active_icon} <b>{b.get('bot_name', '')}</b>\n"
+                        f"🆔 <code>{b.get('bot_id', '')}</code>\n"
+                        f"📊 مطابقات: <b>{b.get('match_count', '0')}</b>\n"
+                        f"━━━━━━━━━━━━━━━━━━\n"
+                    )
+                    toggle_text = '⏹️ إيقاف' if b.get('is_active') == 'yes' else '▶️ تفعيل'
+                    inline_btns.append([
+                        {'text': toggle_text, 'callback_data': f'match_bot_toggle_{b["bot_id"]}'},
+                        {'text': '🗑️ حذف', 'callback_data': f'match_bot_remove_{b["bot_id"]}'}
+                    ])
+                inline_btns.append([{'text': '➕ إضافة بوت', 'callback_data': 'match_bot_add_list'}])
+                inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'match_admin_panel'}])
+                self.send_inline_message(chat_id, text, inline_btns)
+                return
+
+            elif data.startswith('match_bot_remove_'):
+                bot_id = data.replace('match_bot_remove_', '')
+                if self.match_manager:
+                    self.match_manager.remove_match_bot(bot_id)
+                self.edit_message(chat_id, message.get('message_id'), f"🗑️ تم حذف البوت {bot_id}")
+                return
+
+            elif data == 'match_bot_add_list' or data.startswith('match_bot_add_'):
+                if data.startswith('match_bot_add_'):
+                    bot_id = data.replace('match_bot_add_', '')
+                    # إضافة البوت من bot_tokens.csv
+                    bot_info = None
+                    try:
+                        with open('bot_tokens.csv', 'r', encoding='utf-8-sig') as f:
+                            reader = csv.DictReader(f)
+                            for row in reader:
+                                if row.get('id') == bot_id:
+                                    bot_info = row
+                                    break
+                    except:
+                        pass
+                    if bot_info and self.match_manager:
+                        success, err = self.match_manager.add_match_bot(
+                            bot_info['id'], bot_info.get('name', ''), bot_info.get('token', ''))
+                        if success:
+                            self.edit_message(chat_id, message.get('message_id'),
+                                f"✅ تم إضافة <b>{bot_info.get('name', '')}</b> كبوت مطابقة")
+                        else:
+                            self.edit_message(chat_id, message.get('message_id'), f"❌ {err}")
+                    else:
+                        self.edit_message(chat_id, message.get('message_id'), "❌ البوت غير موجود")
+                    return
+
+                # عرض قائمة البوتات المتاحة
+                all_bots = []
+                match_bot_ids = set()
+                if self.match_manager:
+                    for b in self.match_manager.get_match_bot_config():
+                        match_bot_ids.add(b.get('bot_id'))
+
+                try:
+                    with open('bot_tokens.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        for row in reader:
+                            if row.get('id') not in match_bot_ids:
+                                all_bots.append(row)
+                except:
+                    pass
+
+                if not all_bots:
+                    self.edit_message(chat_id, message.get('message_id'),
+                        "📭 لا توجد بوتات متاحة لإضافتها")
+                    return
+
+                inline_btns = []
+                for b in all_bots:
+                    inline_btns.append([{'text': f"➕ {b.get('name', b.get('id', ''))}",
+                                         'callback_data': f'match_bot_add_{b["id"]}'}])
+                inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'match_admin_bots'}])
+                self.edit_message(chat_id, message.get('message_id'), "اختر بوتاً لإضافته:")
+                self.send_inline_message(chat_id, "البوتات المتاحة:", inline_btns)
+                return
+
+            elif data == 'match_back_admin':
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.handle_admin_panel(fake_msg)
                 return
 
             # القائمة الرئيسية

@@ -21,13 +21,13 @@ class MatchManager:
 
     MATCH_REQUEST_FIELDS = ['id', 'user_id', 'customer_id', 'type', 'amount', 'currency',
                             'company_id', 'company_name', 'payment_method_id', 'status',
-                            'created_at', 'matched_at', 'match_id', 'alias']
+                            'created_at', 'matched_at', 'match_id', 'alias', 'bot_id']
 
     MATCH_FIELDS = ['id', 'deposit_request_id', 'withdraw_request_id', 'depositor_id',
                     'withdrawer_id', 'depositor_alias', 'withdrawer_alias', 'amount',
                     'currency', 'company_id', 'company_name', 'status', 'confirmation_code',
                     'created_at', 'completed_at', 'depositor_rated', 'withdrawer_rated',
-                    'dispute_status']
+                    'dispute_status', 'bot_id']
 
     CHAT_FIELDS = ['id', 'match_id', 'sender_id', 'sender_alias', 'message', 'timestamp']
 
@@ -35,6 +35,9 @@ class MatchManager:
 
     DISPUTE_FIELDS = ['id', 'match_id', 'raised_by', 'reason', 'status', 'admin_response',
                       'created_at', 'resolved_at']
+
+    MATCH_BOT_CONFIG_FIELDS = ['bot_id', 'bot_name', 'token', 'is_active', 'match_count',
+                               'created_at']
 
     def __init__(self):
         self.init_matching_files()
@@ -47,6 +50,7 @@ class MatchManager:
             'chat_messages.csv': self.CHAT_FIELDS,
             'ratings.csv': self.RATING_FIELDS,
             'disputes.csv': self.DISPUTE_FIELDS,
+            'match_bot_config.csv': self.MATCH_BOT_CONFIG_FIELDS,
         }
         for filename, fields in files.items():
             if not os.path.exists(filename):
@@ -54,18 +58,147 @@ class MatchManager:
                     writer = csv.writer(f)
                     writer.writerow(fields)
                 logger.info(f"Created matching file: {filename}")
+            else:
+                self._migrate_file(filename, fields)
 
     def generate_alias(self):
         """توليد اسم وهمي مؤقت"""
         random_part = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
         return f"عميل-{random_part}"
 
+    def _migrate_file(self, filename, expected_fields):
+        """ترحيل ملف CSV لإضافة الأعمدة الجديدة"""
+        try:
+            with open(filename, 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                old_fields = reader.fieldnames or []
+                rows = list(reader)
+
+            missing = [f for f in expected_fields if f not in old_fields]
+            if not missing:
+                return
+
+            for row in rows:
+                for field in missing:
+                    row[field] = ''
+
+            with open(filename, 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.DictWriter(f, fieldnames=expected_fields)
+                writer.writeheader()
+                for row in rows:
+                    writer.writerow({k: row.get(k, '') for k in expected_fields})
+
+            logger.info(f"Migrated {filename}: added {len(missing)} columns: {missing}")
+        except Exception as e:
+            logger.error(f"خطأ في ترحيل {filename}: {e}")
+
+    def get_match_bot_config(self):
+        """قراءة إعدادات بوتات المطابقة"""
+        rows = []
+        try:
+            with open('match_bot_config.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    rows.append(row)
+        except:
+            pass
+        return rows
+
+    def get_active_match_bots(self):
+        """الحصول على بوتات المطابقة النشطة"""
+        return [b for b in self.get_match_bot_config() if b.get('is_active') == 'yes']
+
+    def assign_bot(self):
+        """توزيع بوت للمطابقة (round-robin)"""
+        bots = self.get_active_match_bots()
+        if not bots:
+            return ''
+        # اختيار البوت بأقل عدد مطابقات
+        bots.sort(key=lambda b: int(b.get('match_count', 0) or 0))
+        selected = bots[0]
+        # زيادة العداد
+        self._increment_bot_match_count(selected['bot_id'])
+        return selected['bot_id']
+
+    def _increment_bot_match_count(self, bot_id):
+        """زيادة عداد مطابقات البوت"""
+        rows = self.get_match_bot_config()
+        for row in rows:
+            if row.get('bot_id') == bot_id:
+                row['match_count'] = str(int(row.get('match_count', 0) or 0) + 1)
+                break
+        try:
+            with open('match_bot_config.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.DictWriter(f, fieldnames=self.MATCH_BOT_CONFIG_FIELDS)
+                writer.writeheader()
+                for row in rows:
+                    writer.writerow({k: row.get(k, '') for k in self.MATCH_BOT_CONFIG_FIELDS})
+        except Exception as e:
+            logger.error(f"خطأ في تحديث عداد البوت: {e}")
+
+    def add_match_bot(self, bot_id, bot_name, token):
+        """إضافة بوت مطابقة"""
+        rows = self.get_match_bot_config()
+        for row in rows:
+            if row.get('bot_id') == bot_id:
+                return False, "البوت موجود بالفعل"
+        rows.append({
+            'bot_id': bot_id,
+            'bot_name': bot_name,
+            'token': token,
+            'is_active': 'yes',
+            'match_count': '0',
+            'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')
+        })
+        try:
+            with open('match_bot_config.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.DictWriter(f, fieldnames=self.MATCH_BOT_CONFIG_FIELDS)
+                writer.writeheader()
+                for row in rows:
+                    writer.writerow({k: row.get(k, '') for k in self.MATCH_BOT_CONFIG_FIELDS})
+            return True, None
+        except Exception as e:
+            return False, str(e)
+
+    def toggle_match_bot(self, bot_id):
+        """تفعيل/إيقاف بوت مطابقة"""
+        rows = self.get_match_bot_config()
+        for row in rows:
+            if row.get('bot_id') == bot_id:
+                row['is_active'] = 'no' if row.get('is_active') == 'yes' else 'yes'
+                try:
+                    with open('match_bot_config.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                        writer = csv.DictWriter(f, fieldnames=self.MATCH_BOT_CONFIG_FIELDS)
+                        writer.writeheader()
+                        for r in rows:
+                            writer.writerow({k: r.get(k, '') for k in self.MATCH_BOT_CONFIG_FIELDS})
+                    return True
+                except:
+                    return False
+        return False
+
+    def remove_match_bot(self, bot_id):
+        """حذف بوت مطابقة"""
+        rows = self.get_match_bot_config()
+        new_rows = [r for r in rows if r.get('bot_id') != bot_id]
+        if len(new_rows) == len(rows):
+            return False
+        try:
+            with open('match_bot_config.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.DictWriter(f, fieldnames=self.MATCH_BOT_CONFIG_FIELDS)
+                writer.writeheader()
+                for row in new_rows:
+                    writer.writerow({k: row.get(k, '') for k in self.MATCH_BOT_CONFIG_FIELDS})
+            return True
+        except:
+            return False
+
     def generate_id(self, prefix):
         """توليد ID فريد"""
         return f"{prefix}{datetime.now().strftime('%Y%m%d%H%M%S')}{random.randint(10,99)}"
 
     def create_match_request(self, user_id, customer_id, req_type, amount, currency,
-                               company_id, company_name, payment_method_id):
+                               company_id, company_name, payment_method_id, bot_id=''):
         """إنشاء طلب مطابقة جديد"""
         # فحص عدم وجود طلب نشط لنفس المستخدم
         existing = self.get_active_request_by_user(user_id)
@@ -75,13 +208,17 @@ class MatchManager:
         req_id = self.generate_id('REQ')
         alias = self.generate_alias()
 
+        # توزيع بوت تلقائياً إذا لم يُحدد
+        if not bot_id:
+            bot_id = self.assign_bot()
+
         with open('match_requests.csv', 'a', newline='', encoding='utf-8-sig') as f:
             writer = csv.writer(f)
             writer.writerow([req_id, user_id, customer_id, req_type, amount, currency,
                            company_id, company_name, payment_method_id, 'waiting',
-                           datetime.now().strftime('%Y-%m-%d %H:%M'), '', '', alias])
+                           datetime.now().strftime('%Y-%m-%d %H:%M'), '', '', alias, bot_id])
 
-        logger.info(f"Match request created: {req_id} by user {user_id}")
+        logger.info(f"Match request created: {req_id} by user {user_id} (bot: {bot_id or 'none'})")
         return req_id, None
 
     def get_active_request_by_user(self, user_id):
@@ -120,6 +257,7 @@ class MatchManager:
         match_id = self.generate_id('MTCH')
         depositor_alias = self.generate_alias()
         withdrawer_alias = self.generate_alias()
+        bot_id = deposit_req.get('bot_id', '') or withdraw_req.get('bot_id', '')
 
         with open('matches.csv', 'a', newline='', encoding='utf-8-sig') as f:
             writer = csv.writer(f)
@@ -133,7 +271,8 @@ class MatchManager:
                 'active', '',  # confirmation_code empty, status=active
                 datetime.now().strftime('%Y-%m-%d %H:%M'), '',  # completed_at
                 'no', 'no',  # rated flags
-                'none'  # dispute_status
+                'none',  # dispute_status
+                bot_id  # bot_id
             ])
 
         # تحديث حالة الطلبين إلى matched
