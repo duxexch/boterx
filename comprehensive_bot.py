@@ -7152,8 +7152,9 @@ class ComprehensiveDUXBot:
         self.send_inline_message(message['chat']['id'], text, inline_btns)
 
     def handle_matching_flow(self, message):
-        """معالجة تدفق المطابقة"""
+        """معالجة تدفق المطابقة — كل الخطوات في مكان واحد"""
         user_id = message['from']['id']
+        chat_id = message['chat']['id']
         state = self.user_states.get(user_id, '')
         text = message.get('text', '').strip()
         user = self.find_user(user_id)
@@ -7161,18 +7162,18 @@ class ComprehensiveDUXBot:
             return
         lang = user.get('language', 'ar')
 
-        # معالجة إدخال بيانات المطابقة — خطوة بخطوة
+        # === match_enter_data: المبلغ ← المحفظة ← المعرف ===
         if isinstance(state, dict) and state.get('step') == 'match_enter_data':
             text_msg = message.get('text', '').strip()
 
             if text_msg in ['❌ إلغاء', 'إلغاء', 'الغاء', '🔙', '🏠 القائمة الرئيسية']:
-                if user_id in self.user_states: del self.user_states[user_id]
+                del self.user_states[user_id]
                 self.handle_start(message)
                 return
 
-            # خطوة 1: المبلغ
-            state['substep'] = state.get('substep', 'amount')
-            if state['substep'] == 'amount':
+            substep = state.get('substep', 'amount')
+
+            if substep == 'amount':
                 try:
                     amount = float(text_msg)
                     if amount <= 0:
@@ -7181,54 +7182,56 @@ class ComprehensiveDUXBot:
                 except ValueError:
                     self.send_message(chat_id, "❌ اكتب مبلغاً رقمياً صحيحاً:")
                     return
-                state['amount'] = amount
+                state['amount'] = str(amount)
                 state['substep'] = 'wallet'
+                self.user_states[user_id] = state
                 kb = {'keyboard': [[{'text': '❌ إلغاء'}]], 'resize_keyboard': True, 'one_time_keyboard': True}
                 self.send_message(chat_id,
                     f"✅ المبلغ: <code>{amount}</code>\n\n"
                     f"2️⃣ اكتب <b>رقم محفظتك</b>:", kb)
-                self.user_states[user_id] = state
                 return
 
-            if state['substep'] == 'wallet':
+            if substep == 'wallet':
                 wallet_number = self.sanitize_input(text_msg)
                 if len(wallet_number) < 5:
                     self.send_message(chat_id, "❌ رقم المحفظة قصير جداً. اكتب رقم المحفظة:")
                     return
                 state['wallet_number'] = wallet_number
                 state['substep'] = 'account'
+                self.user_states[user_id] = state
                 kb = {'keyboard': [[{'text': '❌ إلغاء'}]], 'resize_keyboard': True, 'one_time_keyboard': True}
                 self.send_message(chat_id,
                     f"✅ المحفظة: <code>{wallet_number}</code> 👈 اضغط للنسخ\n\n"
                     f"3️⃣ اكتب <b>معرف حسابك</b> (ID):", kb)
-                self.user_states[user_id] = state
                 return
 
-            if state['substep'] == 'account':
+            if substep == 'account':
                 account_id = self.sanitize_input(text_msg)
                 if len(account_id) < 2:
                     self.send_message(chat_id, "❌ معرف الحساب قصير. اكتب معرف الحساب:")
                     return
 
-                amount = state['amount']
-                wallet_number = state['wallet_number']
+                amount = state.get('amount', '0')
+                wallet_number = state.get('wallet_number', '')
+                match_type = state.get('type', 'deposit')
+                company_id = state.get('company_id', '')
+                company_name = state.get('company_name', '')
 
                 # إنشاء طلب المطابقة
                 try:
                     req_id, error = self.match_manager.create_match_request(
-                        str(user_id), user.get('customer_id', ''), state['type'],
+                        str(user_id), user.get('customer_id', ''), match_type,
                         str(amount), user.get('currency', 'SAR'),
-                        state.get('company_id', ''), state.get('company_name', ''), ''
+                        str(company_id), company_name, ''
                     )
-
                     if error:
                         self.send_message(chat_id, f"❌ {error}", self.main_keyboard(lang, user_id))
                         del self.user_states[user_id]
                         return
                 except Exception as e:
-                    logger.error(f"خطأ في إنشاء طلب المطابقة: {e}")
+                    logger.error(f"خطأ في create_match_request: {e}")
                     self.send_message(chat_id,
-                        f"❌ حدث خطأ. حاول مرة أخرى.",
+                        "❌ حدث خطأ. حاول مرة أخرى.",
                         self.main_keyboard(lang, user_id))
                     del self.user_states[user_id]
                     return
@@ -7241,7 +7244,7 @@ class ComprehensiveDUXBot:
                     if request:
                         match = self.match_manager.find_match(request)
                 except Exception as e:
-                    logger.error(f"خطأ في البحث عن مطابقة: {e}")
+                    logger.error(f"خطأ في find_match: {e}")
 
                 if request and match:
                     try:
@@ -7250,16 +7253,16 @@ class ComprehensiveDUXBot:
                         del self.user_states[user_id]
                         return
                     except Exception as e:
-                        logger.error(f"خطأ في إنشاء المطابقة: {e}")
+                        logger.error(f"خطأ في create_match: {e}")
 
-                # لا توجد مطابقة — إشعار العميل + الأدمن تلقائياً
-                type_ar = 'إيداع' if state['type'] == 'deposit' else 'سحب'
+                # لا توجد مطابقة — العميل ينتظر + إشعار الأدمن
+                type_ar = 'إيداع' if match_type == 'deposit' else 'سحب'
                 self.send_message(chat_id,
                     f"⏳ <b>تم إنشاء طلبك</b>\n\n"
                     f"━━━━━━━━━━━━━━━━━━\n"
-                    f"{'💵' if state['type'] == 'deposit' else '💸'} النوع: <b>{type_ar}</b>\n"
+                    f"{'💵' if match_type == 'deposit' else '💸'} النوع: <b>{type_ar}</b>\n"
                     f"💰 المبلغ: <code>{amount}</code>\n"
-                    f"🏢 الشركة: <b>{state.get('company_name', '')}</b>\n"
+                    f"🏢 الشركة: <b>{company_name}</b>\n"
                     f"💳 المحفظة: <code>{wallet_number}</code> 👈 اضغط للنسخ\n"
                     f"🆔 معرف الحساب: <code>{account_id}</code> 👈 اضغط للنسخ\n"
                     f"━━━━━━━━━━━━━━━━━━\n\n"
@@ -7267,29 +7270,25 @@ class ComprehensiveDUXBot:
                     f"سيتم إشعارك فور العثور على طرف آخر.",
                     self.main_keyboard(lang, user_id))
 
-                # إشعار الأدمن تلقائياً — يمكنه القبول كطرف آخر
+                # إشعار الأدمن تلقائياً
                 if request:
                     for admin_id in self.admin_ids:
                         try:
-                            opposite_type = 'سحب' if state['type'] == 'deposit' else 'إيداع'
-                            admin_msg = (
+                            opposite_type = 'سحب' if match_type == 'deposit' else 'إيداع'
+                            self.send_inline_message(int(admin_id),
                                 f"🔔 <b>طلب مطابقة معلق</b>\n\n"
                                 f"━━━━━━━━━━━━━━━━━━\n"
                                 f"👤 العميل: <code>{user_id}</code> ({user.get('name', '')})\n"
-                                f"{'💵' if state['type'] == 'deposit' else '💸'} النوع: <b>{type_ar}</b>\n"
+                                f"{'💵' if match_type == 'deposit' else '💸'} النوع: <b>{type_ar}</b>\n"
                                 f"🔄 يبحث عن: <b>{opposite_type}</b>\n"
                                 f"💰 المبلغ: <code>{amount}</code>\n"
-                                f"🏢 الشركة: <b>{state.get('company_name', '')}</b>\n"
+                                f"🏢 الشركة: <b>{company_name}</b>\n"
                                 f"💳 المحفظة: <code>{wallet_number}</code> 👈 اضغط للنسخ\n"
                                 f"🆔 معرف الحساب: <code>{account_id}</code> 👈 اضغط للنسخ\n"
                                 f"━━━━━━━━━━━━━━━━━━\n\n"
-                                f"يمكنك أن تكون الطرف الآخر:"
-                            )
-                            inline_btns = [
-                                [{'text': f'✅ أنا الطرف الآخر ({opposite_type})', 'callback_data': f'match_admin_join_{request["id"]}'},
-                                 {'text': '⏳ انتظار', 'callback_data': f'match_admin_wait_{request["id"]}'}]
-                            ]
-                            self.send_inline_message(admin_id, admin_msg, inline_btns)
+                                f"يمكنك أن تكون الطرف الآخر:",
+                                [[{'text': f'✅ أنا الطرف الآخر ({opposite_type})', 'callback_data': f'match_admin_join_{request["id"]}'},
+                                  {'text': '⏳ انتظار', 'callback_data': f'match_admin_wait_{request["id"]}'}]])
                         except Exception as e:
                             logger.error(f"خطأ في إشعار الأدمن: {e}")
 
