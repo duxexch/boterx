@@ -376,6 +376,18 @@ class ComprehensiveDUXBot:
                 writer.writerow(['id', 'round_id', 'user_id', 'user_name', 'ticket_number',
                                'prize_amount', 'currency', 'rank', 'draw_time'])
 
+        # ملف عجلة الحظ
+        if not os.path.exists('wheel_rounds.csv'):
+            with open('wheel_rounds.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.writer(f)
+                writer.writerow(['id', 'name', 'prizes', 'status', 'spin_cost',
+                               'currency', 'min_spins', 'max_spins_per_user', 'created_at'])
+
+        if not os.path.exists('wheel_spins.csv'):
+            with open('wheel_spins.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.writer(f)
+                writer.writerow(['id', 'round_id', 'user_id', 'prize_won', 'spin_time'])
+
         # ملف عناوين الصرافة
         if not os.path.exists('exchange_addresses.csv'):
             with open('exchange_addresses.csv', 'w', newline='', encoding='utf-8-sig') as f:
@@ -2841,15 +2853,15 @@ class ComprehensiveDUXBot:
         lang_names = self.get_language_names()
         lang_btn_text = f"{t.get('btn_language', '🌐')} {lang_names.get(lang, {}).get('native', 'Language')}"
 
-        # تصميم احترافي: الأزرار بدون بادئات إضافية — الإيموجي موجود في الترجمات
+        # تصميم منظم: أزرار مجمعة لتقليل العدد — كل مجموعة تفتح أزرارها داخل الدردشة
         keyboard = [
             [{'text': deposit_btn}, {'text': withdraw_btn}],
             [{'text': '💱 تداول USDT'}, {'text': svrp_btn}],
-            [{'text': requests_btn}, {'text': profile_btn}],
-            [{'text': match_btn}, {'text': apps_btn}],
-            [{'text': ref_btn}, {'text': '🎰 يانصيب'}],
-            [{'text': notif_btn}, {'text': complaint_btn}],
-            [{'text': help_btn}, {'text': currency_btn}],
+            [{'text': '💎 محفظتي'}, {'text': profile_btn}],
+            [{'text': match_btn}, {'text': '🎰 يانصيب'}],
+            [{'text': '🎡 عجلة الحظ'}, {'text': apps_btn}],
+            [{'text': ref_btn}, {'text': notif_btn}],
+            [{'text': complaint_btn}, {'text': '⚙️ المزيد'}],
             [{'text': lang_btn_text}, {'text': reset_btn}],
         ]
         
@@ -2895,9 +2907,10 @@ class ComprehensiveDUXBot:
             [{'text': self.tr('admin_settings', lang)}, {'text': self.tr('admin_themes', lang)}, {'text': self.tr('admin_addresses', lang)}],
             # المجموعة 7b: التطبيقات والاسترداد والتداول
             [{'text': self.tr('admin_apps', lang)}, {'text': self.tr('admin_recovery', lang)}, {'text': '💱 تداول'}],
-            # المجموعة 7c: الطلبات الموحدة + روابط الإحالة + أرباح الإحالة + اليانصيب
+            # المجموعة 7c: الطلبات الموحدة + روابط الإحالة + أرباح الإحالة + اليانصيب + عجلة الحظ
             [{'text': '📋 كل الطلبات'}, {'text': '🎁 روابط الإحالة'}],
             [{'text': '🏆 أرباح الإحالة'}, {'text': '🎰 اليانصيب'}],
+            [{'text': '🎡 عجلة الحظ'}],
             # المجموعة 8: الأدمن والأدوار
             [{'text': self.tr('admin_managers', lang)}, {'text': self.tr('admin_buttons', lang)}],
             # المجموعة 9: الحماية والنسخ
@@ -4121,19 +4134,56 @@ class ComprehensiveDUXBot:
         lang = user.get('language', 'ar')
         lang_names = self.get_language_names()
         lang_display = lang_names.get(lang, {}).get('native', lang)
-        
-        profile_text = f"👤 {user['customer_id']}\n\n"
-        profile_text += f"📛 {user['name']}\n"
-        profile_text += f"📱 {user['phone']}\n"
-        profile_text += f"📅 {user['date']}\n"
-        profile_text += f"🌐 {lang_display}\n"
-        profile_text += f"💱 {user.get('currency', 'SAR')}\n"
-        profile_text += f"{'🚫' if user.get('is_banned') == 'yes' else '✅'}"
-        
+
+        phone_verified = user.get('phone_verified', 'unknown')
+        phone_icon = '✅' if phone_verified == 'yes' else '⚠️'
+
+        profile_text = f"👤 <b>الملف الشخصي</b>\n\n"
+        profile_text += f"━━━━━━━━━━━━━━━━━━\n"
+        profile_text += f"🆔 رقم العميل: <code>{user['customer_id']}</code> 👈 اضغط للنسخ\n"
+        profile_text += f"📛 الاسم: <b>{user['name']}</b>\n"
+        profile_text += f"📱 الهاتف: <code>{user['phone']}</code> {phone_icon}\n"
+        profile_text += f"📅 تاريخ التسجيل: {user['date']}\n"
+        profile_text += f"🌐 اللغة: {lang_display}\n"
+        profile_text += f"💱 العملة: {user.get('currency', 'SAR')}\n"
+        profile_text += f"{'🚫 محظور' if user.get('is_banned') == 'yes' else '✅ نشط'}\n"
         if user.get('is_banned') == 'yes' and user.get('ban_reason'):
-            profile_text += f"\n📝 {user['ban_reason']}"
-        
-        self.send_message(message['chat']['id'], profile_text, self.main_keyboard(lang))
+            profile_text += f"📝 السبب: {user['ban_reason']}\n"
+
+        # عرض المحفظة (من قسم التعويض)
+        if self.svrp:
+            wallet = self.svrp.get_wallet(message['from']['id'])
+            balance = float(wallet.get('balance', 0) or 0)
+            available = float(wallet.get('total_used', 0) or 0)
+            total_earned = float(wallet.get('total_earned', 0) or 0)
+            profile_text += f"━━━━━━━━━━━━━━━━━━\n"
+            profile_text += f"💎 <b>المحفظة</b>\n"
+            profile_text += f"🧊 مجمد: <code>{balance:.2f}</code>\n"
+            profile_text += f"🟢 متاح: <code>{available:.2f}</code>\n"
+            profile_text += f"💰 إجمالي مكتسب: <code>{total_earned:.2f}</code>\n"
+
+        # عرض حسابات الشركات المسجلة
+        profile_text += f"━━━━━━━━━━━━━━━━━━\n"
+        profile_text += f"🏢 <b>حسابات الشركات</b>\n"
+        try:
+            accounts = self.svrp.get_user_company_accounts(message['from']['id']) if self.svrp else []
+            if accounts:
+                for acc in accounts:
+                    profile_text += f"  • {acc.get('company_name', '')}: <code>{acc.get('account_number', '')}</code> 👈 اضغط للنسخ\n"
+            else:
+                profile_text += "  📭 لا توجد حسابات مسجلة\n"
+        except:
+            profile_text += "  📭 لا توجد حسابات مسجلة\n"
+
+        profile_text += f"━━━━━━━━━━━━━━━━━━\n"
+
+        # أزرار inline
+        inline_btns = [
+            [{'text': '💎 محفظتي', 'callback_data': 'svrp_wallet'},
+             {'text': '🏢 تسجيل حساب جديد', 'callback_data': 'svrp_companies'}],
+            [{'text': '🔙 رجوع', 'callback_data': 'profile_back_main'}]
+        ]
+        self.send_inline_message(message['chat']['id'], profile_text, inline_btns)
     
 
     def handle_admin_panel(self, message):
@@ -5666,6 +5716,13 @@ class ComprehensiveDUXBot:
             self.show_trade_panel(message)
         elif text == '🎰 يانصيب':
             self.show_lottery_panel(message)
+        elif text == '🎡 عجلة الحظ':
+            self.show_wheel_panel(message)
+        elif text == '💎 محفظتي':
+            fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+            self.show_svrp_wallet(fake_msg)
+        elif text == '⚙️ المزيد':
+            self.show_more_menu(message)
         elif self.svrp:
             all_langs = self.get_supported_languages()
             svrp_wallet_texts = {self.tr('svrp_my_wallet', l) for l in all_langs}
@@ -6432,6 +6489,8 @@ class ComprehensiveDUXBot:
             self.show_referral_earnings_admin(message)
         elif text == '🎰 اليانصيب':
             self.show_lottery_admin(message)
+        elif text == '🎡 عجلة الحظ':
+            self.show_wheel_admin(message)
         elif text in {self.tr('admin_message_user', l) for l in all_langs}:
             self.start_send_user_message(message)
         elif text in {self.tr('admin_notifications', l) for l in all_langs}:
@@ -8467,6 +8526,119 @@ class ComprehensiveDUXBot:
                 return
 
             # ==================== 🎰 اليانصيب ====================
+            # ==================== 🎡 عجلة الحظ ====================
+            elif data == 'wheel_back_main':
+                user = self.find_user(user_id)
+                lang = user.get('language', 'ar') if user else 'ar'
+                self.edit_message(chat_id, message.get('message_id'), "🏠 العودة")
+                welcome = self.tr('choose_service', lang, name=user.get('name', ''), customer_id=user.get('customer_id', '')) if user else ''
+                self.send_message(chat_id, welcome, self.main_keyboard(lang, user_id))
+                return
+
+            elif data == 'wheel_create':
+                self.edit_message(chat_id, message.get('message_id'),
+                    "🎡 <b>إنشاء جولة عجلة الحظ</b>\n\n"
+                    "📝 اكتب <b>اسم الجولة</b>:")
+                self.user_states[user_id] = 'wheel_name'
+                return
+
+            elif data.startswith('wheel_spin_'):
+                import random as _r
+                round_id = data.replace('wheel_spin_', '')
+                # قراءة الجولة
+                round_data = None
+                try:
+                    with open('wheel_rounds.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        for row in reader:
+                            if row['id'] == round_id and row.get('status') == 'active':
+                                round_data = row
+                                break
+                except:
+                    pass
+                if not round_data:
+                    self.answer_callback(callback_id, "❌ الجولة غير موجودة")
+                    return
+
+                # عد دورات المستخدم
+                my_spins = 0
+                try:
+                    with open('wheel_spins.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        for row in reader:
+                            if row.get('round_id') == round_id and row.get('user_id') == str(user_id):
+                                my_spins += 1
+                except:
+                    pass
+
+                max_spins = int(round_data.get('max_spins_per_user', 1))
+                if my_spins >= max_spins:
+                    self.answer_callback(callback_id, "⚠️ وصلت للحد الأقصى")
+                    return
+
+                # عرض الرسوم المتحركة
+                self.answer_callback(callback_id, "🎡 جارٍ الدوران...")
+                self.send_message(chat_id, "🎡 العجلة تدوووور...")
+
+                import time as _time
+                _time.sleep(1)
+                self.send_message(chat_id, "⏳ 3...")
+                _time.sleep(1)
+                self.send_message(chat_id, "⏳ 2...")
+                _time.sleep(1)
+                self.send_message(chat_id, "⏳ 1...")
+                _time.sleep(1)
+
+                # اختيار الجائزة عشوائياً
+                prizes = round_data.get('prizes', '').split('|')
+                prizes = [p.strip() for p in prizes if p.strip()]
+                if not prizes:
+                    self.send_message(chat_id, "❌ لا توجد جوائز")
+                    return
+                prize_won = _r.choice(prizes)
+
+                # حفظ الدورة
+                spin_id = f"SPN{str(int(datetime.now().timestamp()))[-6:]}"
+                try:
+                    with open('wheel_spins.csv', 'a', newline='', encoding='utf-8-sig') as f:
+                        writer = csv.writer(f)
+                        writer.writerow([spin_id, round_id, str(user_id), prize_won, datetime.now().strftime('%Y-%m-%d %H:%M')])
+                except:
+                    pass
+
+                self.send_message(chat_id,
+                    f"🎉🎉🎉 <b>النتيجة!</b> 🎉🎉🎉\n\n"
+                    f"━━━━━━━━━━━━━━━━━━\n"
+                    f"🎁 <b>ربحت: {prize_won}</b>\n"
+                    f"━━━━━━━━━━━━━━━━━━\n\n"
+                    f"🎯 دوراتك: <code>{my_spins + 1}/{max_spins}</code>\n\n"
+                    f"🎁 مبروك! تواصل مع الإدارة لاستلام جائزتك",
+                    self.main_keyboard('ar', user_id))
+                return
+
+            elif data.startswith('wheel_end_'):
+                round_id = data.replace('wheel_end_', '')
+                try:
+                    rows = []
+                    with open('wheel_rounds.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        fieldnames = reader.fieldnames
+                        for row in reader:
+                            if row['id'] == round_id:
+                                row['status'] = 'completed'
+                            rows.append(row)
+                    with open('wheel_rounds.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                        writer = csv.DictWriter(f, fieldnames=fieldnames)
+                        writer.writeheader()
+                        writer.writerows(rows)
+                except:
+                    pass
+                self.edit_message(chat_id, message.get('message_id'), f"✅ تم إنهاء الجولة")
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_wheel_admin(fake_msg)
+                return
+
+            # ==================== 🎰 اليانصيب ====================
             elif data == 'lot_back_main':
                 user = self.find_user(user_id)
                 lang = user.get('language', 'ar') if user else 'ar'
@@ -9116,6 +9288,14 @@ class ComprehensiveDUXBot:
 
                 self.edit_message(chat_id, message.get('message_id'), text)
                 self.send_inline_message(chat_id, "اختر الشركة:", inline_btns)
+                return
+
+            elif data == 'profile_back_main':
+                user = self.find_user(user_id)
+                lang = user.get('language', 'ar') if user else 'ar'
+                self.edit_message(chat_id, message.get('message_id'), "🔙 العودة")
+                welcome = self.tr('choose_service', lang, name=user.get('name', ''), customer_id=user.get('customer_id', '')) if user else ''
+                self.send_message(chat_id, welcome, self.main_keyboard(lang, user_id))
                 return
 
             elif data == 'svrp_wallet':
@@ -9875,6 +10055,14 @@ class ComprehensiveDUXBot:
                 self.edit_message(chat_id, message.get('message_id'), "💸 جارٍ تحويلك للسحب...")
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                 self.create_withdrawal_request(fake_msg)
+                return
+
+            elif data == 'profile_back_main':
+                user = self.find_user(user_id)
+                lang = user.get('language', 'ar') if user else 'ar'
+                self.edit_message(chat_id, message.get('message_id'), "🔙 العودة")
+                welcome = self.tr('choose_service', lang, name=user.get('name', ''), customer_id=user.get('customer_id', '')) if user else ''
+                self.send_message(chat_id, welcome, self.main_keyboard(lang, user_id))
                 return
 
             elif data == 'svrp_wallet':
@@ -12067,6 +12255,139 @@ class ComprehensiveDUXBot:
                  {'text': '💎 MoneyGo', 'callback_data': 'trade_sell_asset_moneygo'}],
                 [{'text': '🔙 رجوع', 'callback_data': 'trade_back_panel'}]
             ])
+
+    # ==================== 🎡 عجلة الحظ ====================
+
+    def show_wheel_panel(self, message):
+        """لوحة عجلة الحظ للعميل"""
+        user = self.find_user(message['from']['id'])
+        if not user:
+            return
+        lang = user.get('language', 'ar')
+
+        # فحص الهاتف الحقيقي
+        phone_verified = user.get('phone_verified', 'unknown')
+        if phone_verified != 'yes':
+            self.send_message(message['chat']['id'],
+                "🎡 <b>عجلة الحظ</b>\n\n⚠️ <b>يجب التسجيل برقم هاتف حقيقي للمشاركة</b>")
+            return
+
+        # جلب الجولة النشطة
+        active_round = None
+        try:
+            with open('wheel_rounds.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row.get('status') == 'active':
+                        active_round = row
+                        break
+        except:
+            pass
+
+        if not active_round:
+            self.send_message(message['chat']['id'],
+                "🎡 <b>عجلة الحظ</b>\n\n📭 لا توجد جولة نشطة حالياً\n\n⏳ ترقبوا الجولة القادمة!",
+                self.main_keyboard(lang, message['from']['id']))
+            return
+
+        # عد دورات المستخدم
+        my_spins = 0
+        try:
+            with open('wheel_spins.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row.get('round_id') == active_round['id'] and row.get('user_id') == str(message['from']['id']):
+                        my_spins += 1
+        except:
+            pass
+
+        max_spins = int(active_round.get('max_spins_per_user', 1))
+        prizes = active_round.get('prizes', '').split('|')
+
+        text = (
+            f"🎡 <b>عجلة الحظ — {active_round.get('name', '')}</b>\n\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"🎁 الجوائز:\n"
+        )
+        for i, prize in enumerate(prizes, 1):
+            text += f"  {i}️⃣ {prize.strip()}\n"
+        text += (
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"🎯 دوراتك: <code>{my_spins}/{max_spins}</code>\n\n"
+        )
+
+        inline_btns = []
+        if my_spins < max_spins:
+            inline_btns.append([{'text': '🎡 أدر العجلة!', 'callback_data': f'wheel_spin_{active_round["id"]}'}])
+        else:
+            text += "⚠️ وصلت للحد الأقصى من الدورات"
+
+        inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'wheel_back_main'}])
+        self.send_inline_message(message['chat']['id'], text, inline_btns)
+
+    def show_more_menu(self, message):
+        """قائمة المزيد — أزرار إضافية منظمة"""
+        user = self.find_user(message['from']['id'])
+        lang = user.get('language', 'ar') if user else 'ar'
+
+        all_langs = self.get_supported_languages()
+        requests_btn = self.tr('my_requests', lang)
+        help_btn = self.tr('help_btn_label', lang) if self.tr('help_btn_label', lang) != 'help_btn_label' else '❓ مساعدة'
+        currency_btn = self.tr('change_currency', lang)
+        complaint_btn = self.tr('complaint', lang)
+        notif_btn = self.tr('notif_btn', lang) if self.tr('notif_btn', lang) != 'notif_btn' else '🔔 إشعاراتي'
+
+        text = (
+            f"⚙️ <b>المزيد</b>\n\n"
+            f"اختر ما تريد:"
+        )
+        inline_btns = [
+            [{'text': requests_btn}, {'text': currency_btn}],
+            [{'text': notif_btn}, {'text': complaint_btn}],
+            [{'text': help_btn}, {'text': self.tr('main_menu', lang)}],
+        ]
+        self.send_inline_message(message['chat']['id'], text, inline_btns)
+
+    def show_wheel_admin(self, message):
+        """لوحة إدارة عجلة الحظ للأدمن"""
+        rounds_list = []
+        try:
+            with open('wheel_rounds.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                rounds_list = list(reader)
+        except:
+            pass
+
+        active = [r for r in rounds_list if r.get('status') == 'active']
+
+        text = f"🎡 <b>إدارة عجلة الحظ</b>\n\n📊 نشطة: <code>{len(active)}</code>\n"
+
+        inline_btns = []
+        if active:
+            text += "\n━━━━━━━━━━━━━━━━━━\n🎮 <b>الجولات النشطة:</b>\n"
+            for r in active:
+                spin_count = 0
+                try:
+                    with open('wheel_spins.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        for s in reader:
+                            if s.get('round_id') == r['id']:
+                                spin_count += 1
+                except:
+                    pass
+                text += f"\n🎡 <b>{r.get('name', '')}</b>\n"
+                text += f"  🆔 <code>{r['id']}</code>\n"
+                text += f"  🎁 {r.get('prizes', '')}\n"
+                text += f"  🎯 {spin_count} دورة\n"
+                inline_btns.append([{'text': f"🏁 إنهاء: {r.get('name', '')}", 'callback_data': f'wheel_end_{r["id"]}'}])
+
+        inline_btns.append([{'text': '➕ إنشاء جولة جديدة', 'callback_data': 'wheel_create'}])
+        inline_btns.append([{'text': '🔙 العودة', 'callback_data': 'app_back_admin'}])
+
+        if not active:
+            text += "\n📭 لا توجد جولات نشطة."
+
+        self.send_inline_message(message['chat']['id'], text, inline_btns)
 
     # ==================== 🎰 اليانصيب ====================
 
