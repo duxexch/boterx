@@ -1,167 +1,302 @@
-{% extends 'base.html' %}
-{% block title %}الإعدادات — Boterx{% endblock %}
-{% block page_title %}⚙️ الإعدادات{% endblock %}
+{% extends "base.html" %}
+{% block title %}الإعدادات - Boterx{% endblock %}
+{% block page_title %}الإعدادات{% endblock %}
 
 {% block content %}
-<div x-data="settingsApp()" x-init="init()" class="space-y-6">
+<div x-data="settingsPage()" x-init="init()">
+    <!-- Tab Navigation -->
+    <div class="flex flex-wrap gap-2 mb-6 border-b border-slate-700 pb-0">
+        <button @click="activeTab = 'system'" :class="activeTab === 'system' ? 'bg-slate-800 text-white border-b-2 border-blue-500' : 'text-slate-400 hover:text-white'"
+            class="px-5 py-3 rounded-t-lg text-sm font-semibold transition">
+            <i class="fas fa-cogs ml-1"></i> إعدادات النظام
+        </button>
+        <button @click="activeTab = 'labels'" :class="activeTab === 'labels' ? 'bg-slate-800 text-white border-b-2 border-blue-500' : 'text-slate-400 hover:text-white'"
+            class="px-5 py-3 rounded-t-lg text-sm font-semibold transition">
+            <i class="fas fa-tags ml-1"></i> مسميات الأزرار
+        </button>
+        <button @click="activeTab = 'audit'; loadAuditLog()" :class="activeTab === 'audit' ? 'bg-slate-800 text-white border-b-2 border-blue-500' : 'text-slate-400 hover:text-white'"
+            class="px-5 py-3 rounded-t-lg text-sm font-semibold transition">
+            <i class="fas fa-history ml-1"></i> سجل الإجراءات
+        </button>
+    </div>
 
-    <!-- System settings -->
-    <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
-        <div class="p-4 border-b border-slate-700 flex items-center justify-between">
-            <h3 class="font-semibold"><i class="fas fa-sliders text-blue-400 ml-1"></i> إعدادات النظام</h3>
-            <div class="flex gap-2">
-                <button @click="loadData()" class="btn btn-primary btn-sm">
-                    <i class="fas fa-rotate ml-1"></i> تحديث
-                </button>
-                <button @click="saveSettings()" class="btn btn-success btn-sm">
-                    <i class="fas fa-floppy-disk ml-1"></i> حفظ الكل
-                </button>
+    <!-- Tab 1: System Settings -->
+    <div x-show="activeTab === 'system'" class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+        <div class="p-5 border-b border-slate-700">
+            <h3 class="font-bold text-lg">إعدادات النظام</h3>
+            <p class="text-xs text-slate-400 mt-1">تعديل الإعدادات العامة للنظام</p>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="border-b border-slate-700 bg-slate-800/80">
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400 w-1/3">المفتاح (Key)</th>
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400">القيمة (Value)</th>
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400 w-24">الإجراءات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-for="s in settings" :key="s.setting_key">
+                        <tr class="border-b border-slate-700/50 hover:bg-slate-700/30 transition">
+                            <td class="px-4 py-3">
+                                <span class="font-mono text-xs bg-slate-700 px-2 py-1 rounded text-slate-300" x-text="s.setting_key"></span>
+                            </td>
+                            <td class="px-4 py-3">
+                                <template x-if="s.editing">
+                                    <input x-model="s.edit_value" type="text"
+                                        class="w-full bg-slate-700 border border-blue-500 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        @keydown.enter.prevent="saveSetting(s)"
+                                        @keydown.escape="s.editing = false; s.edit_value = s.setting_value">
+                                </template>
+                                <template x-if="!s.editing">
+                                    <span class="text-slate-300" x-text="s.setting_value || '-'"></span>
+                                </template>
+                            </td>
+                            <td class="px-4 py-3">
+                                <template x-if="!s.editing">
+                                    <button @click="editSetting(s)"
+                                        class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition flex items-center gap-1">
+                                        <i class="fas fa-edit text-xs"></i> تعديل
+                                    </button>
+                                </template>
+                                <template x-if="s.editing">
+                                    <div class="flex items-center gap-1">
+                                        <button @click="saveSetting(s)"
+                                            class="p-1.5 rounded hover:bg-green-500/20 text-green-400 transition" title="حفظ">
+                                            <i class="fas fa-check text-sm"></i>
+                                        </button>
+                                        <button @click="s.editing = false; s.edit_value = s.setting_value"
+                                            class="p-1.5 rounded hover:bg-red-500/20 text-red-400 transition" title="إلغاء">
+                                            <i class="fas fa-times text-sm"></i>
+                                        </button>
+                                    </div>
+                                </template>
+                            </td>
+                        </tr>
+                    </template>
+                    <tr x-show="settings.length === 0">
+                        <td colspan="3" class="px-4 py-8 text-center text-slate-500">
+                            <i class="fas fa-cogs text-3xl mb-2 block"></i>
+                            لا توجد إعدادات
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Tab 2: Button Labels -->
+    <div x-show="activeTab === 'labels'" class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+        <div class="p-5 border-b border-slate-700">
+            <h3 class="font-bold text-lg">مسميات الأزرار</h3>
+            <p class="text-xs text-slate-400 mt-1">تعديل النصوص الظاهرة على أزرار البوت</p>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="border-b border-slate-700 bg-slate-800/80">
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400">النص الأصلي</th>
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400">النص الجديد</th>
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400 w-24">الإجراءات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-for="lbl in labels" :key="lbl.original_text">
+                        <tr class="border-b border-slate-700/50 hover:bg-slate-700/30 transition">
+                            <td class="px-4 py-3">
+                                <span class="font-semibold text-slate-300" x-text="lbl.original_text"></span>
+                            </td>
+                            <td class="px-4 py-3">
+                                <template x-if="lbl.editing">
+                                    <input x-model="lbl.edit_value" type="text"
+                                        class="w-full bg-slate-700 border border-blue-500 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        @keydown.enter.prevent="saveLabel(lbl)"
+                                        @keydown.escape="lbl.editing = false; lbl.edit_value = lbl.new_text">
+                                </template>
+                                <template x-if="!lbl.editing">
+                                    <span class="text-slate-300" x-text="lbl.new_text || '-'"></span>
+                                </template>
+                            </td>
+                            <td class="px-4 py-3">
+                                <template x-if="!lbl.editing">
+                                    <button @click="editLabel(lbl)"
+                                        class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition flex items-center gap-1">
+                                        <i class="fas fa-edit text-xs"></i> تعديل
+                                    </button>
+                                </template>
+                                <template x-if="lbl.editing">
+                                    <div class="flex items-center gap-1">
+                                        <button @click="saveLabel(lbl)"
+                                            class="p-1.5 rounded hover:bg-green-500/20 text-green-400 transition" title="حفظ">
+                                            <i class="fas fa-check text-sm"></i>
+                                        </button>
+                                        <button @click="lbl.editing = false; lbl.edit_value = lbl.new_text"
+                                            class="p-1.5 rounded hover:bg-red-500/20 text-red-400 transition" title="إلغاء">
+                                            <i class="fas fa-times text-sm"></i>
+                                        </button>
+                                    </div>
+                                </template>
+                            </td>
+                        </tr>
+                    </template>
+                    <tr x-show="labels.length === 0">
+                        <td colspan="3" class="px-4 py-8 text-center text-slate-500">
+                            <i class="fas fa-tags text-3xl mb-2 block"></i>
+                            لا توجد مسميات أزرار
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Tab 3: Audit Log -->
+    <div x-show="activeTab === 'audit'" class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+        <div class="p-5 border-b border-slate-700">
+            <h3 class="font-bold text-lg">سجل الإجراءات</h3>
+            <p class="text-xs text-slate-400 mt-1">سجل نشاطات المدراء في لوحة التحكم</p>
+        </div>
+
+        <!-- Timeline -->
+        <div class="p-5 space-y-0">
+            <template x-for="(entry, idx) in auditLog" :key="entry.id || idx">
+                <div class="flex gap-4">
+                    <!-- Timeline line and dot -->
+                    <div class="flex flex-col items-center">
+                        <div class="w-3 h-3 rounded-full border-2 flex-shrink-0 mt-1"
+                            :class="{
+                                'bg-blue-500 border-blue-400': entry.action_type === 'update' || entry.action_type === 'edit',
+                                'bg-green-500 border-green-400': entry.action_type === 'create' || entry.action_type === 'add',
+                                'bg-red-500 border-red-400': entry.action_type === 'delete' || entry.action_type === 'remove',
+                                'bg-amber-500 border-amber-400': entry.action_type === 'toggle' || entry.action_type === 'status_change',
+                                'bg-purple-500 border-purple-400': entry.action_type === 'login' || entry.action_type === 'auth',
+                                'bg-slate-500 border-slate-400': true
+                            }"></div>
+                        <div class="w-0.5 flex-1 bg-slate-700"
+                            x-show="idx < auditLog.length - 1"></div>
+                    </div>
+                    <!-- Entry content -->
+                    <div class="pb-5 flex-1 min-w-0">
+                        <div class="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 mb-1">
+                            <span class="px-2 py-0.5 rounded text-[10px] font-semibold uppercase"
+                                :class="{
+                                    'bg-blue-500/20 text-blue-400': entry.action_type === 'update' || entry.action_type === 'edit',
+                                    'bg-green-500/20 text-green-400': entry.action_type === 'create' || entry.action_type === 'add',
+                                    'bg-red-500/20 text-red-400': entry.action_type === 'delete' || entry.action_type === 'remove',
+                                    'bg-amber-500/20 text-amber-400': entry.action_type === 'toggle' || entry.action_type === 'status_change',
+                                    'bg-purple-500/20 text-purple-400': entry.action_type === 'login' || entry.action_type === 'auth',
+                                    'bg-slate-500/20 text-slate-400': true
+                                }"
+                                x-text="entry.action_type || 'action'"></span>
+                            <span class="text-xs text-slate-500" x-text="entry.timestamp || '-'"></span>
+                        </div>
+                        <p class="text-sm text-slate-300" x-text="entry.details || '-'"></p>
+                        <p class="text-[10px] text-slate-500 mt-1">
+                            <span x-show="entry.admin_id">المدير: <span class="font-mono" x-text="entry.admin_id"></span></span>
+                            <span x-show="!entry.admin_id">النظام</span>
+                        </p>
+                    </div>
+                </div>
+            </template>
+            <div x-show="auditLog.length === 0" class="text-center py-10">
+                <i class="fas fa-history text-4xl text-slate-600 mb-3 block"></i>
+                <p class="text-slate-400">لا توجد إجراءات مسجلة بعد</p>
             </div>
         </div>
-        <div class="overflow-x-auto">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>المفتاح</th>
-                        <th>القيمة</th>
-                        <th>الوصف</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <template x-if="loading">
-                        <tr><td colspan="3" class="text-center p-8 text-slate-400">
-                            <i class="fas fa-spinner fa-spin text-2xl"></i>
-                            <p class="mt-2">جارٍ التحميل...</p>
-                        </td></tr>
-                    </template>
-                    <template x-if="!loading && settings.length === 0">
-                        <tr><td colspan="3" class="text-center p-8 text-slate-400">
-                            <i class="fas fa-inbox text-3xl mb-2"></i>
-                            <p>لا توجد إعدادات</p>
-                        </td></tr>
-                    </template>
-                    <template x-for="(s, idx) in settings" :key="idx">
-                        <tr>
-                            <td class="font-mono text-xs text-slate-400" x-text="s.setting_key || '—'"></td>
-                            <td>
-                                <input type="text" x-model="s.setting_value"
-                                       class="input w-full"
-                                       :placeholder="s.setting_key || ''">
-                            </td>
-                            <td class="text-sm text-slate-400" x-text="s.description || '—'"></td>
-                        </tr>
-                    </template>
-                </tbody>
-            </table>
-        </div>
     </div>
-
-    <!-- Audit log -->
-    <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
-        <div class="p-4 border-b border-slate-700">
-            <h3 class="font-semibold"><i class="fas fa-clipboard-list text-amber-400 ml-1"></i> سجل الإجراءات (آخر 100)</h3>
-        </div>
-        <div class="overflow-x-auto">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>التوقيت</th>
-                        <th>الأدمن</th>
-                        <th>نوع الإجراء</th>
-                        <th>التفاصيل</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <template x-if="loadingLogs">
-                        <tr><td colspan="4" class="text-center p-8 text-slate-400">
-                            <i class="fas fa-spinner fa-spin text-2xl"></i>
-                            <p class="mt-2">جارٍ التحميل...</p>
-                        </td></tr>
-                    </template>
-                    <template x-if="!loadingLogs && logs.length === 0">
-                        <tr><td colspan="4" class="text-center p-8 text-slate-400">
-                            <i class="fas fa-inbox text-3xl mb-2"></i>
-                            <p>لا توجد سجلات</p>
-                        </td></tr>
-                    </template>
-                    <template x-for="(l, idx) in logs" :key="idx">
-                        <tr>
-                            <td class="text-xs text-slate-400 whitespace-nowrap" x-text="l.timestamp || '—'"></td>
-                            <td class="font-mono text-xs" x-text="l.admin_id || '—'"></td>
-                            <td>
-                                <span class="px-2 py-0.5 rounded text-xs bg-slate-700 text-slate-300" x-text="l.action_type || '—'"></span>
-                            </td>
-                            <td class="text-sm text-slate-400" x-text="l.details || '—'"></td>
-                        </tr>
-                    </template>
-                </tbody>
-            </table>
-        </div>
-    </div>
-
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-function settingsApp() {
+function settingsPage() {
     return {
+        activeTab: 'system',
         settings: [],
-        logs: [],
-        loading: true,
-        loadingLogs: true,
+        labels: [],
+        auditLog: [],
 
-        init() {
-            this.loadData();
-            this.loadLogs();
+        async init() {
+            await Promise.all([this.loadSettings(), this.loadLabels()]);
         },
 
-        async loadData() {
-            this.loading = true;
+        // ─── Settings ───
+        async loadSettings() {
             try {
-                const res = await fetch('/api/settings');
-                const data = await res.json();
-                this.settings = data.settings || [];
+                const data = await api('/api/settings');
+                this.settings = (data.settings || data || []).map(s => ({
+                    ...s,
+                    editing: false,
+                    edit_value: s.setting_value || '',
+                }));
             } catch (e) {
-                console.error(e);
                 toast('فشل تحميل الإعدادات', 'error');
-            } finally {
-                this.loading = false;
             }
         },
 
-        async loadLogs() {
-            this.loadingLogs = true;
-            try {
-                const res = await fetch('/api/audit-log');
-                const data = await res.json();
-                this.logs = data.logs || [];
-            } catch (e) {
-                console.error(e);
-            } finally {
-                this.loadingLogs = false;
-            }
+        editSetting(s) {
+            s.edit_value = s.setting_value || '';
+            s.editing = true;
         },
 
-        async saveSettings() {
-            const payload = {};
-            for (const s of this.settings) {
-                if (s.setting_key) {
-                    payload[s.setting_key] = s.setting_value;
-                }
-            }
+        async saveSetting(s) {
             try {
-                await fetch('/api/settings', {
+                await api('/api/settings', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify({ setting_key: s.setting_key, setting_value: s.edit_value }),
                 });
-                toast('تم حفظ الإعدادات', 'success');
+                s.setting_value = s.edit_value;
+                s.editing = false;
+                toast('تم حفظ الإعداد بنجاح', 'success');
             } catch (e) {
-                toast('فشل حفظ الإعدادات', 'error');
+                toast('فشل حفظ الإعداد', 'error');
             }
-        }
-    }
+        },
+
+        // ─── Labels ───
+        async loadLabels() {
+            try {
+                const data = await api('/api/button-labels');
+                this.labels = (data.labels || data || []).map(l => ({
+                    ...l,
+                    editing: false,
+                    edit_value: l.new_text || '',
+                }));
+            } catch (e) {
+                toast('فشل تحميل مسميات الأزرار', 'error');
+            }
+        },
+
+        editLabel(l) {
+            l.edit_value = l.new_text || '';
+            l.editing = true;
+        },
+
+        async saveLabel(l) {
+            try {
+                await api('/api/button-labels', {
+                    method: 'POST',
+                    body: JSON.stringify({ original_text: l.original_text, new_text: l.edit_value }),
+                });
+                l.new_text = l.edit_value;
+                l.editing = false;
+                toast('تم حفظ التسمية بنجاح', 'success');
+            } catch (e) {
+                toast('فشل حفظ التسمية', 'error');
+            }
+        },
+
+        // ─── Audit Log ───
+        async loadAuditLog() {
+            if (this.auditLog.length > 0) return;
+            try {
+                const data = await api('/api/audit-log');
+                this.auditLog = data.log || data.audit_log || data || [];
+            } catch (e) {
+                toast('فشل تحميل سجل الإجراءات', 'error');
+            }
+        },
+    };
 }
 </script>
 {% endblock %}

@@ -1,169 +1,515 @@
-{% extends 'base.html' %}
-{% block title %}التعويض (SVRP) — Boterx{% endblock %}
-{% block page_title %}💎 التعويض (SVRP){% endblock %}
+{% extends "base.html" %}
+{% block title %}التعويض (SVRP) - Boterx{% endblock %}
+{% block page_title %}التعويض (SVRP){% endblock %}
 
 {% block content %}
-<div x-data="svrpApp()" x-init="init()" class="space-y-6">
+<div x-data="svrpPage()" x-init="init()">
+    <!-- Tab Navigation -->
+    <div class="flex flex-wrap gap-2 mb-6 border-b border-slate-700 pb-0">
+        <button @click="activeTab = 'wallets'" :class="activeTab === 'wallets' ? 'bg-slate-800 text-white border-b-2 border-blue-500' : 'text-slate-400 hover:text-white'"
+            class="px-5 py-3 rounded-t-lg text-sm font-semibold transition">
+            <i class="fas fa-wallet ml-1"></i> المحافظ
+        </button>
+        <button @click="activeTab = 'recovery'" :class="activeTab === 'recovery' ? 'bg-slate-800 text-white border-b-2 border-blue-500' : 'text-slate-400 hover:text-white'"
+            class="px-5 py-3 rounded-t-lg text-sm font-semibold transition">
+            <i class="fas fa-rotate-left ml-1"></i> طلبات الاسترداد
+        </button>
+        <button @click="activeTab = 'bonus'" :class="activeTab === 'bonus' ? 'bg-slate-800 text-white border-b-2 border-blue-500' : 'text-slate-400 hover:text-white'"
+            class="px-5 py-3 rounded-t-lg text-sm font-semibold transition">
+            <i class="fas fa-gift ml-1"></i> طلبات المكافآت
+        </button>
+        <button @click="activeTab = 'promo'" :class="activeTab === 'promo' ? 'bg-slate-800 text-white border-b-2 border-blue-500' : 'text-slate-400 hover:text-white'"
+            class="px-5 py-3 rounded-t-lg text-sm font-semibold transition">
+            <i class="fas fa-ticket ml-1"></i> الرموز الترويجية
+        </button>
+    </div>
 
-    <!-- Wallets table -->
-    <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
-        <div class="p-4 border-b border-slate-700 flex items-center justify-between">
-            <h3 class="font-semibold"><i class="fas fa-wallet text-green-400 ml-1"></i> محافظ التعويض</h3>
-            <button @click="loadData()" class="btn btn-primary btn-sm">
-                <i class="fas fa-rotate ml-1"></i> تحديث
+    <!-- ==================== TAB 1: Wallets ==================== -->
+    <div x-show="activeTab === 'wallets'">
+        <!-- Stats -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+            <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+                <p class="text-xs text-slate-400">إجمالي الرصيد</p>
+                <p class="text-2xl font-bold text-green-400 mt-1" x-text="fmtAmount(walletStats.total_balance, 'USD')"></p>
+            </div>
+            <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+                <p class="text-xs text-slate-400">إجمالي المجمّد</p>
+                <p class="text-2xl font-bold text-amber-400 mt-1" x-text="fmtAmount(walletStats.total_frozen, 'USD')"></p>
+            </div>
+        </div>
+
+        <!-- Search -->
+        <div class="mb-4">
+            <div class="relative max-w-md">
+                <i class="fas fa-search absolute right-3 top-3 text-slate-400 text-sm"></i>
+                <input x-model="walletSearch" type="text" placeholder="بحث عن مستخدم..."
+                    class="w-full bg-slate-800 border border-slate-700 rounded-lg pr-10 pl-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+        </div>
+
+        <!-- Table -->
+        <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-slate-700 bg-slate-800/80">
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">المستخدم</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">User ID</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">الرصيد</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">المجمّد</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">العملة</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">آخر تحديث</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="w in filteredWallets" :key="w.id || w.user_id">
+                            <tr class="border-b border-slate-700/50 hover:bg-slate-700/30 transition">
+                                <td class="px-4 py-3 font-medium" x-text="w.user_name || w.username || '-'"></td>
+                                <td class="px-4 py-3 font-mono text-xs text-slate-400" x-text="w.user_id || '-'"></td>
+                                <td class="px-4 py-3 font-semibold font-mono text-sm text-green-400" x-text="fmtAmount(w.balance, w.currency)"></td>
+                                <td class="px-4 py-3 font-semibold font-mono text-sm text-amber-400" x-text="fmtAmount(w.frozen, w.currency)"></td>
+                                <td class="px-4 py-3" x-text="w.currency || '-'"></td>
+                                <td class="px-4 py-3 text-slate-400 text-xs" x-text="w.updated_at || '-'"></td>
+                            </tr>
+                        </template>
+                        <tr x-show="filteredWallets.length === 0">
+                            <td colspan="6" class="px-4 py-10 text-center text-slate-500">
+                                <i class="fas fa-wallet text-4xl mb-3 block opacity-30"></i>
+                                <p x-show="walletSearch">لا توجد نتائج مطابقة للبحث</p>
+                                <p x-show="!walletSearch">لا توجد محافظ</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== TAB 2: Recovery Requests ==================== -->
+    <div x-show="activeTab === 'recovery'">
+        <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-slate-700 bg-slate-800/80">
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">#</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">المستخدم</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">النوع</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">المبلغ</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">الحالة</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">التاريخ</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">الإجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="r in recoveryRequests" :key="r.id">
+                            <tr class="border-b border-slate-700/50 hover:bg-slate-700/30 transition">
+                                <td class="px-4 py-3 text-slate-500 text-xs" x-text="r.id"></td>
+                                <td class="px-4 py-3 font-medium">
+                                    <span x-text="r.user_name || r.user_id || '-'"></span>
+                                </td>
+                                <td class="px-4 py-3 text-xs" x-text="r.type || '-'"></td>
+                                <td class="px-4 py-3 font-semibold" x-text="fmtAmount(r.amount, r.currency)"></td>
+                                <td class="px-4 py-3">
+                                    <span x-html="statusBadge(r.status || 'pending')"></span>
+                                </td>
+                                <td class="px-4 py-3 text-slate-400 text-xs" x-text="r.created_at || '-'"></td>
+                                <td class="px-4 py-3">
+                                    <template x-if="r.status === 'pending'">
+                                        <div class="flex items-center gap-1">
+                                            <button @click="approveItem(r, 'recovery')"
+                                                class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-green-500/20 text-green-400 hover:bg-green-500/30 transition flex items-center gap-1">
+                                                <i class="fas fa-check text-xs"></i> قبول
+                                            </button>
+                                            <button @click="rejectItem(r, 'recovery')"
+                                                class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-500/20 text-red-400 hover:bg-red-500/30 transition flex items-center gap-1">
+                                                <i class="fas fa-times text-xs"></i> رفض
+                                            </button>
+                                        </div>
+                                    </template>
+                                    <span x-show="r.status !== 'pending'" class="text-xs text-slate-500">-</span>
+                                </td>
+                            </tr>
+                        </template>
+                        <tr x-show="recoveryRequests.length === 0">
+                            <td colspan="7" class="px-4 py-10 text-center text-slate-500">
+                                <i class="fas fa-rotate-left text-4xl mb-3 block opacity-30"></i>
+                                <p>لا توجد طلبات استرداد</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Approval amount modal -->
+        <div x-show="showApprovalModal" x-transition.opacity class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" style="display:none" @click.self="showApprovalModal = false">
+            <div class="bg-slate-800 rounded-2xl border border-slate-700 w-full max-w-sm shadow-2xl" @click.stop="">
+                <div class="flex items-center justify-between p-5 border-b border-slate-700">
+                    <h3 class="text-lg font-bold">تأكيد القبول</h3>
+                    <button @click="showApprovalModal = false" class="text-slate-400 hover:text-white transition">
+                        <i class="fas fa-times text-lg"></i>
+                    </button>
+                </div>
+                <div class="p-5 space-y-4">
+                    <div>
+                        <label class="block text-sm text-slate-400 mb-1">المبلغ المعتمد</label>
+                        <input x-model="approvalAmount" type="number" step="any" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="أدخل المبلغ">
+                    </div>
+                    <div class="flex gap-3">
+                        <button @click="confirmApproval()" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-lg text-sm font-semibold transition">تأكيد القبول</button>
+                        <button @click="showApprovalModal = false" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-lg text-sm transition">إلغاء</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== TAB 3: Bonus Requests ==================== -->
+    <div x-show="activeTab === 'bonus'">
+        <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-slate-700 bg-slate-800/80">
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">#</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">المستخدم</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">النوع</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">المبلغ</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">الحالة</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">التاريخ</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">الإجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="b in bonusRequests" :key="b.id">
+                            <tr class="border-b border-slate-700/50 hover:bg-slate-700/30 transition">
+                                <td class="px-4 py-3 text-slate-500 text-xs" x-text="b.id"></td>
+                                <td class="px-4 py-3 font-medium">
+                                    <span x-text="b.user_name || b.user_id || '-'"></span>
+                                </td>
+                                <td class="px-4 py-3 text-xs" x-text="b.type || '-'"></td>
+                                <td class="px-4 py-3 font-semibold" x-text="fmtAmount(b.amount, b.currency)"></td>
+                                <td class="px-4 py-3">
+                                    <span x-html="statusBadge(b.status || 'pending')"></span>
+                                </td>
+                                <td class="px-4 py-3 text-slate-400 text-xs" x-text="b.created_at || '-'"></td>
+                                <td class="px-4 py-3">
+                                    <template x-if="b.status === 'pending'">
+                                        <div class="flex items-center gap-1">
+                                            <button @click="approveItem(b, 'bonus')"
+                                                class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-green-500/20 text-green-400 hover:bg-green-500/30 transition flex items-center gap-1">
+                                                <i class="fas fa-check text-xs"></i> قبول
+                                            </button>
+                                            <button @click="rejectItem(b, 'bonus')"
+                                                class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-500/20 text-red-400 hover:bg-red-500/30 transition flex items-center gap-1">
+                                                <i class="fas fa-times text-xs"></i> رفض
+                                            </button>
+                                        </div>
+                                    </template>
+                                    <span x-show="b.status !== 'pending'" class="text-xs text-slate-500">-</span>
+                                </td>
+                            </tr>
+                        </template>
+                        <tr x-show="bonusRequests.length === 0">
+                            <td colspan="7" class="px-4 py-10 text-center text-slate-500">
+                                <i class="fas fa-gift text-4xl mb-3 block opacity-30"></i>
+                                <p>لا توجد طلبات مكافآت</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== TAB 4: Promo Codes ==================== -->
+    <div x-show="activeTab === 'promo'">
+        <!-- Create button -->
+        <div class="flex justify-end mb-4">
+            <button @click="openPromoModal()"
+                class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2">
+                <i class="fas fa-plus"></i> إنشاء رمز ترويجي
             </button>
         </div>
-        <div class="overflow-x-auto">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>معرف المستخدم</th>
-                        <th>معرف العميل</th>
-                        <th>الرصيد</th>
-                        <th>المعلق</th>
-                        <th>إجمالي المكتسب</th>
-                        <th>إجمالي المستخدم</th>
-                        <th>مطلوب رهان</th>
-                        <th>رهان مكتمل</th>
-                        <th>آخر استرداد</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <template x-if="loading">
-                        <tr><td colspan="9" class="text-center p-8 text-slate-400">
-                            <i class="fas fa-spinner fa-spin text-2xl"></i>
-                            <p class="mt-2">جارٍ التحميل...</p>
-                        </td></tr>
-                    </template>
-                    <template x-if="!loading && wallets.length === 0">
-                        <tr><td colspan="9" class="text-center p-8 text-slate-400">
-                            <i class="fas fa-inbox text-3xl mb-2"></i>
-                            <p>لا توجد محافظ</p>
-                        </td></tr>
-                    </template>
-                    <template x-for="w in wallets" :key="w.telegram_id">
-                        <tr>
-                            <td class="font-mono text-xs" x-text="w.telegram_id || '—'"></td>
-                            <td class="font-mono text-xs text-slate-400" x-text="w.customer_id || '—'"></td>
-                            <td>
-                                <span class="font-bold text-green-400" x-text="fmtNum(w.balance)"></span>
-                            </td>
-                            <td>
-                                <span class="text-amber-400" x-text="fmtNum(w.pending_balance)"></span>
-                            </td>
-                            <td>
-                                <span class="text-blue-400" x-text="fmtNum(w.total_earned)"></span>
-                            </td>
-                            <td>
-                                <span class="text-red-400" x-text="fmtNum(w.total_used)"></span>
-                            </td>
-                            <td>
-                                <span class="px-2 py-0.5 rounded text-xs bg-slate-700 text-slate-300" x-text="w.wagering_required || '0'"></span>
-                            </td>
-                            <td>
-                                <span class="px-2 py-0.5 rounded text-xs bg-green-500/20 text-green-400" x-text="w.wagering_completed || '0'"></span>
-                            </td>
-                            <td class="text-xs text-slate-400" x-text="w.last_recovery_date || '—'"></td>
+
+        <!-- Promo codes list -->
+        <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-slate-700 bg-slate-800/80">
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">الرمز</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">المبلغ</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">العملة</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">الاستخدامات</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">الحد الأقصى</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">ينتهي في</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">الحالة</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">الإجراءات</th>
                         </tr>
-                    </template>
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        <template x-for="p in promoCodes" :key="p.id">
+                            <tr class="border-b border-slate-700/50 hover:bg-slate-700/30 transition">
+                                <td class="px-4 py-3">
+                                    <span class="font-mono font-bold text-amber-400" x-text="p.code"></span>
+                                </td>
+                                <td class="px-4 py-3 font-semibold" x-text="fmtAmount(p.amount, p.currency)"></td>
+                                <td class="px-4 py-3" x-text="p.currency || '-'"></td>
+                                <td class="px-4 py-3">
+                                    <span class="text-sm" x-text="(p.used_count || 0) + ' / ' + (p.max_uses || '∞')"></span>
+                                </td>
+                                <td class="px-4 py-3 text-xs" x-text="p.max_uses || 'غير محدود'"></td>
+                                <td class="px-4 py-3 text-xs" x-text="p.expires_at || 'بدون تاريخ'"></td>
+                                <td class="px-4 py-3">
+                                    <span x-html="statusBadge(p.is_active ? 'active' : 'inactive')"></span>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <button @click="togglePromo(p)"
+                                        class="p-1.5 rounded hover:bg-slate-600 text-slate-400 hover:text-amber-400 transition" title="تبديل الحالة">
+                                        <i class="fas fa-power-off text-sm"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        </template>
+                        <tr x-show="promoCodes.length === 0">
+                            <td colspan="8" class="px-4 py-10 text-center text-slate-500">
+                                <i class="fas fa-ticket text-4xl mb-3 block opacity-30"></i>
+                                <p>لا توجد رموز ترويجية</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Create Promo Modal -->
+        <div x-show="showPromoModal" x-transition.opacity class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" style="display:none" @click.self="showPromoModal = false">
+            <div class="bg-slate-800 rounded-2xl border border-slate-700 w-full max-w-lg shadow-2xl" @click.stop="">
+                <div class="flex items-center justify-between p-5 border-b border-slate-700">
+                    <h3 class="text-lg font-bold">إنشاء رمز ترويجي</h3>
+                    <button @click="showPromoModal = false" class="text-slate-400 hover:text-white transition">
+                        <i class="fas fa-times text-lg"></i>
+                    </button>
+                </div>
+                <form @submit.prevent="createPromo()" class="p-5 space-y-4">
+                    <div>
+                        <label class="block text-sm text-slate-400 mb-1">الرمز <span class="text-red-400">*</span></label>
+                        <input x-model="promoForm.code" required type="text" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono" placeholder="WELCOME2024">
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm text-slate-400 mb-1">المبلغ <span class="text-red-400">*</span></label>
+                            <input x-model="promoForm.amount" required type="number" step="any" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="10">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-slate-400 mb-1">العملة <span class="text-red-400">*</span></label>
+                            <select x-model="promoForm.currency" required class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="USD">USD</option>
+                                <option value="EUR">EUR</option>
+                                <option value="USDT">USDT</option>
+                                <option value="BTC">BTC</option>
+                                <option value="ETH">ETH</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm text-slate-400 mb-1">الحد الأقصى للاستخدام</label>
+                        <input x-model="promoForm.max_uses" type="number" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="اتركه فارغاً لغير محدود">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-slate-400 mb-1">تاريخ الانتهاء</label>
+                        <input x-model="promoForm.expires_at" type="datetime-local" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div class="flex gap-3 pt-2">
+                        <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg text-sm font-semibold transition">إنشاء</button>
+                        <button type="button" @click="showPromoModal = false" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-lg text-sm transition">إلغاء</button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
-
-    <!-- Recovery requests table -->
-    <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
-        <div class="p-4 border-b border-slate-700">
-            <h3 class="font-semibold"><i class="fas fa-hand-holding-dollar text-amber-400 ml-1"></i> طلبات الاسترداد</h3>
-        </div>
-        <div class="overflow-x-auto">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>المعرف</th>
-                        <th>المستخدم</th>
-                        <th>معرف العميل</th>
-                        <th>المبلغ</th>
-                        <th>الحالة</th>
-                        <th>التاريخ</th>
-                        <th>ملاحظة الإدارة</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <template x-if="loading">
-                        <tr><td colspan="7" class="text-center p-8 text-slate-400">
-                            <i class="fas fa-spinner fa-spin text-2xl"></i>
-                            <p class="mt-2">جارٍ التحميل...</p>
-                        </td></tr>
-                    </template>
-                    <template x-if="!loading && requests.length === 0">
-                        <tr><td colspan="7" class="text-center p-8 text-slate-400">
-                            <i class="fas fa-inbox text-3xl mb-2"></i>
-                            <p>لا توجد طلبات استرداد</p>
-                        </td></tr>
-                    </template>
-                    <template x-for="r in requests" :key="r.id">
-                        <tr>
-                            <td class="font-mono text-xs" x-text="r.id || '—'"></td>
-                            <td class="font-medium" x-text="r.user_id || '—'"></td>
-                            <td class="font-mono text-xs text-slate-400" x-text="r.customer_id || '—'"></td>
-                            <td class="font-bold text-amber-400" x-text="fmtNum(r.recovery_amount)"></td>
-                            <td x-html="statusBadge(r.status)"></td>
-                            <td class="text-xs text-slate-400" x-text="r.created_at || '—'"></td>
-                            <td class="text-xs text-slate-400" x-text="r.admin_note || '—'"></td>
-                        </tr>
-                    </template>
-                </tbody>
-            </table>
-        </div>
-    </div>
-
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-function svrpApp() {
+function svrpPage() {
     return {
+        activeTab: 'wallets',
+        // Wallets
         wallets: [],
-        requests: [],
-        loading: true,
+        walletSearch: '',
+        walletStats: { total_balance: 0, total_frozen: 0 },
+        // Recovery
+        recoveryRequests: [],
+        // Bonus
+        bonusRequests: [],
+        // Promo
+        promoCodes: [],
+        showPromoModal: false,
+        promoForm: { code: '', amount: '', currency: 'USD', max_uses: '', expires_at: '' },
+        // Approval
+        showApprovalModal: false,
+        approvalAmount: '',
+        approvalTarget: null,
+        approvalType: null,
 
-        init() {
-            this.loadData();
+        get filteredWallets() {
+            const q = (this.walletSearch || '').toLowerCase();
+            if (!q) return this.wallets;
+            return this.wallets.filter(w =>
+                (w.user_name || '').toLowerCase().includes(q) ||
+                (w.username || '').toLowerCase().includes(q) ||
+                String(w.user_id || '').includes(q)
+            );
         },
 
-        async loadData() {
-            this.loading = true;
-            await Promise.all([
-                this.loadWallets(),
-                this.loadRequests()
-            ]);
-            this.loading = false;
+        async init() {
+            await this.loadWallets();
         },
 
+        // ─── Wallets ───
         async loadWallets() {
             try {
-                const res = await fetch('/api/svrp/wallets');
-                const data = await res.json();
-                this.wallets = data.wallets || [];
+                const data = await api('/api/svrp/wallets');
+                this.wallets = data.wallets || data || [];
+                this.walletStats.total_balance = this.wallets.reduce((s, w) => s + (parseFloat(w.balance) || 0), 0);
+                this.walletStats.total_frozen = this.wallets.reduce((s, w) => s + (parseFloat(w.frozen) || 0), 0);
             } catch (e) {
-                console.error(e);
                 toast('فشل تحميل المحافظ', 'error');
             }
         },
 
-        async loadRequests() {
+        // ─── Recovery ───
+        async loadRecovery() {
+            if (this.recoveryRequests.length > 0) return;
             try {
-                const res = await fetch('/api/svrp/requests');
-                const data = await res.json();
-                this.requests = data.requests || [];
+                const data = await api('/api/svrp/recovery');
+                this.recoveryRequests = data.requests || data || [];
             } catch (e) {
-                console.error(e);
-                toast('فشل تحميل الطلبات', 'error');
+                toast('فشل تحميل طلبات الاسترداد', 'error');
             }
-        }
-    }
+        },
+
+        // ─── Bonus ───
+        async loadBonus() {
+            if (this.bonusRequests.length > 0) return;
+            try {
+                const data = await api('/api/svrp/bonus');
+                this.bonusRequests = data.requests || data || [];
+            } catch (e) {
+                toast('فشل تحميل طلبات المكافآت', 'error');
+            }
+        },
+
+        // ─── Promo ───
+        async loadPromo() {
+            if (this.promoCodes.length > 0) return;
+            try {
+                const data = await api('/api/svrp/promo');
+                this.promoCodes = data.promos || data.codes || data || [];
+            } catch (e) {
+                toast('فشل تحميل الرموز الترويجية', 'error');
+            }
+        },
+
+        openPromoModal() {
+            this.promoForm = { code: '', amount: '', currency: 'USD', max_uses: '', expires_at: '' };
+            this.showPromoModal = true;
+        },
+
+        async createPromo() {
+            try {
+                await api('/api/svrp/promo', {
+                    method: 'POST',
+                    body: JSON.stringify(this.promoForm),
+                });
+                toast('تم إنشاء الرمز الترويجي بنجاح', 'success');
+                this.showPromoModal = false;
+                this.promoCodes = [];
+                await this.loadPromo();
+            } catch (e) {
+                toast('فشل إنشاء الرمز الترويجي', 'error');
+            }
+        },
+
+        async togglePromo(p) {
+            try {
+                const body = JSON.stringify({ is_active: !p.is_active });
+                await api(`/api/svrp/promo/${p.id}/toggle`, { method: 'POST', body });
+                toast(p.is_active ? 'تم تعطيل الرمز' : 'تم تفعيل الرمز', 'success');
+                this.promoCodes = [];
+                await this.loadPromo();
+            } catch (e) {
+                toast('فشل تغيير الحالة', 'error');
+            }
+        },
+
+        // ─── Approval ───
+        approveItem(item, type) {
+            this.approvalTarget = item;
+            this.approvalType = type;
+            this.approvalAmount = item.amount || '';
+            this.showApprovalModal = true;
+        },
+
+        async confirmApproval() {
+            if (!this.approvalTarget) return;
+            try {
+                const url = this.approvalType === 'recovery' ?
+                    `/api/svrp/recovery/${this.approvalTarget.id}/approve` :
+                    `/api/svrp/bonus/${this.approvalTarget.id}/approve`;
+                await api(url, {
+                    method: 'POST',
+                    body: JSON.stringify({ amount: this.approvalAmount }),
+                });
+                toast('تمت الموافقة بنجاح', 'success');
+                this.showApprovalModal = false;
+                this.approvalTarget = null;
+                this.approvalType = null;
+                // Reload the relevant list
+                if (this.approvalType === 'recovery') {
+                    this.recoveryRequests = [];
+                    await this.loadRecovery();
+                } else {
+                    this.bonusRequests = [];
+                    await this.loadBonus();
+                }
+            } catch (e) {
+                toast('فشلت الموافقة', 'error');
+            }
+        },
+
+        async rejectItem(item, type) {
+            if (!confirm('هل أنت متأكد من رفض هذا الطلب؟')) return;
+            try {
+                const url = type === 'recovery' ?
+                    `/api/svrp/recovery/${item.id}/reject` :
+                    `/api/svrp/bonus/${item.id}/reject`;
+                await api(url, { method: 'POST' });
+                toast('تم الرفض بنجاح', 'success');
+                if (type === 'recovery') {
+                    this.recoveryRequests = [];
+                    await this.loadRecovery();
+                } else {
+                    this.bonusRequests = [];
+                    await this.loadBonus();
+                }
+            } catch (e) {
+                toast('فشل الرفض', 'error');
+            }
+        },
+
+        // ─── Tab switching with lazy loading ───
+        async switchTab(tab) {
+            this.activeTab = tab;
+            if (tab === 'recovery') await this.loadRecovery();
+            if (tab === 'bonus') await this.loadBonus();
+            if (tab === 'promo') await this.loadPromo();
+        },
+    };
 }
 </script>
 {% endblock %}

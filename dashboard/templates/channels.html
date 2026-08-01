@@ -1,96 +1,154 @@
-{% extends 'base.html' %}
-{% block title %}القنوات — Boterx{% endblock %}
-{% block page_title %}📢 القنوات{% endblock %}
+{% extends "base.html" %}
+{% block title %}القنوات - Boterx{% endblock %}
+{% block page_title %}القنوات{% endblock %}
 
 {% block content %}
-<div x-data="channelsApp()" x-init="init()" class="space-y-6">
-
+<div x-data="channelsPage()" x-init="init()">
     <!-- Header -->
-    <div class="flex items-center justify-between">
-        <p class="text-slate-400 text-sm">إدارة قنوات التيليجرام المرتبطة بالبوت</p>
-        <button @click="loadData()" class="btn btn-primary btn-sm">
-            <i class="fas fa-rotate ml-1"></i> تحديث
-        </button>
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div>
+            <h2 class="text-xl font-bold">إدارة القنوات</h2>
+            <p class="text-sm text-slate-400 mt-1">قائمة القنوات المرتبطة بالبوت مع إمكانية تفعيلها أو حذفها</p>
+        </div>
+        <div class="flex items-center gap-2">
+            <span class="text-sm text-slate-400">إجمالي القنوات:</span>
+            <span class="text-sm font-bold bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700" x-text="channels.length"></span>
+        </div>
     </div>
 
-    <!-- Channels table -->
+    <!-- Table -->
     <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
         <div class="overflow-x-auto">
-            <table class="data-table">
+            <table class="w-full text-sm">
                 <thead>
-                    <tr>
-                        <th>المعرف</th>
-                        <th>العنوان</th>
-                        <th>معرف المحادثة</th>
-                        <th>النوع</th>
-                        <th>الحالة</th>
-                        <th>تاريخ الإضافة</th>
+                    <tr class="border-b border-slate-700 bg-slate-800/80">
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400 w-16">#</th>
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400">العنوان</th>
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400">Chat ID</th>
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400">النوع</th>
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400">الحالة</th>
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400">تاريخ الإضافة</th>
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400">الإجراءات</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <template x-if="loading">
-                        <tr><td colspan="6" class="text-center p-8 text-slate-400">
-                            <i class="fas fa-spinner fa-spin text-2xl"></i>
-                            <p class="mt-2">جارٍ التحميل...</p>
-                        </td></tr>
-                    </template>
-                    <template x-if="!loading && channels.length === 0">
-                        <tr><td colspan="6" class="text-center p-8 text-slate-400">
-                            <i class="fas fa-inbox text-3xl mb-2"></i>
-                            <p>لا توجد قنوات</p>
-                        </td></tr>
-                    </template>
-                    <template x-for="c in channels" :key="c.id || c.chat_id">
-                        <tr>
-                            <td class="font-mono text-xs" x-text="c.id || '—'"></td>
-                            <td>
-                                <div class="flex items-center gap-2">
-                                    <i class="fab fa-telegram text-blue-400"></i>
-                                    <span class="font-medium" x-text="c.title || c.name || '—'"></span>
+                    <template x-for="(ch, idx) in channels" :key="ch.id">
+                        <tr class="border-b border-slate-700/50 hover:bg-slate-700/30 transition">
+                            <td class="px-4 py-3 text-slate-500 text-xs" x-text="ch.id"></td>
+                            <td class="px-4 py-3 font-medium" x-text="ch.title || '-'"></td>
+                            <td class="px-4 py-3 font-mono text-xs text-slate-300" x-text="ch.chat_id || '-'"></td>
+                            <td class="px-4 py-3">
+                                <span class="px-2 py-1 rounded-full text-xs font-semibold"
+                                    :class="ch.type === 'channel' ? 'bg-blue-500/20 text-blue-400' : (ch.type === 'group' ? 'bg-green-500/20 text-green-400' : 'bg-purple-500/20 text-purple-400')"
+                                    x-text="ch.type || 'قناة'"></span>
+                            </td>
+                            <td class="px-4 py-3">
+                                <span x-html="statusBadge(ch.is_active ? 'active' : 'inactive')"></span>
+                            </td>
+                            <td class="px-4 py-3 text-slate-400 text-xs" x-text="ch.added_at || '-'"></td>
+                            <td class="px-4 py-3">
+                                <div class="flex items-center gap-1">
+                                    <button @click="toggleActive(ch)"
+                                        class="px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1"
+                                        :class="ch.is_active ? 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30' : 'bg-green-500/20 text-green-400 hover:bg-green-500/30'">
+                                        <i class="fas fa-power-off text-xs"></i>
+                                        <span x-text="ch.is_active ? 'تعطيل' : 'تفعيل'"></span>
+                                    </button>
+                                    <button @click="confirmDelete(ch)"
+                                        class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-500/20 text-red-400 hover:bg-red-500/30 transition flex items-center gap-1">
+                                        <i class="fas fa-trash text-xs"></i>
+                                        <span>حذف</span>
+                                    </button>
                                 </div>
                             </td>
-                            <td class="font-mono text-xs text-slate-400" x-text="c.chat_id || '—'"></td>
-                            <td>
-                                <span class="px-2 py-0.5 rounded text-xs bg-slate-700 text-slate-300"
-                                      x-text="c.type === 'channel' ? 'قناة' : c.type === 'group' ? 'مجموعة' : (c.type || '—')"></span>
-                            </td>
-                            <td x-html="statusBadge(c.is_active)"></td>
-                            <td class="text-xs text-slate-400" x-text="c.created_at || c.added_date || '—'"></td>
                         </tr>
                     </template>
+                    <tr x-show="channels.length === 0">
+                        <td colspan="7" class="px-4 py-10 text-center text-slate-500">
+                            <i class="fas fa-bullhorn text-4xl mb-3 block opacity-30"></i>
+                            <p>لا توجد قنوات مرتبطة بالبوت</p>
+                            <p class="text-xs mt-1">ستظهر القنوات تلقائياً عند إضافة البوت إليها</p>
+                        </td>
+                    </tr>
                 </tbody>
             </table>
         </div>
     </div>
 
+    <!-- Delete Confirmation Modal -->
+    <div x-show="showDeleteModal" x-transition.opacity class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" style="display:none" @click.self="showDeleteModal = false">
+        <div class="bg-slate-800 rounded-2xl border border-slate-700 w-full max-w-sm shadow-2xl" @click.stop="">
+            <div class="p-6 text-center">
+                <div class="w-14 h-14 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4">
+                    <i class="fas fa-exclamation-triangle text-red-400 text-2xl"></i>
+                </div>
+                <h3 class="text-lg font-bold mb-2">تأكيد الحذف</h3>
+                <p class="text-sm text-slate-400">هل أنت متأكد من حذف قناة "<span class="text-white font-semibold" x-text="deleteTarget?.title"></span>"؟</p>
+                <p class="text-xs text-slate-500 mt-2">Chat ID: <span class="font-mono text-slate-300" x-text="deleteTarget?.chat_id"></span></p>
+                <p class="text-xs text-red-400 mt-2">هذا الإجراء لا يمكن التراجع عنه.</p>
+                <div class="flex gap-3 mt-6">
+                    <button @click="deleteChannel()" class="flex-1 bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-lg text-sm font-semibold transition">حذف</button>
+                    <button @click="showDeleteModal = false" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-lg text-sm transition">إلغاء</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-function channelsApp() {
+function channelsPage() {
     return {
         channels: [],
-        loading: true,
+        showDeleteModal: false,
+        deleteTarget: null,
 
-        init() {
-            this.loadData();
+        async init() {
+            await this.loadChannels();
         },
 
-        async loadData() {
-            this.loading = true;
+        async loadChannels() {
             try {
-                const res = await fetch('/api/channels');
-                const data = await res.json();
-                this.channels = data.channels || [];
+                const data = await api('/api/channels');
+                this.channels = data.channels || data || [];
             } catch (e) {
-                console.error(e);
                 toast('فشل تحميل القنوات', 'error');
-            } finally {
-                this.loading = false;
             }
-        }
-    }
+        },
+
+        async toggleActive(channel) {
+            const newState = !channel.is_active;
+            try {
+                const data = await api(`/api/channels/${channel.id}/toggle`, {
+                    method: 'POST',
+                    body: JSON.stringify({ is_active: newState }),
+                });
+                toast(newState ? 'تم تفعيل القناة' : 'تم تعطيل القناة', 'success');
+                await this.loadChannels();
+            } catch (e) {
+                toast('فشل تغيير الحالة', 'error');
+            }
+        },
+
+        confirmDelete(channel) {
+            this.deleteTarget = channel;
+            this.showDeleteModal = true;
+        },
+
+        async deleteChannel() {
+            if (!this.deleteTarget) return;
+            try {
+                await api(`/api/channels/${this.deleteTarget.id}`, { method: 'DELETE' });
+                toast('تم حذف القناة بنجاح', 'success');
+                this.showDeleteModal = false;
+                this.deleteTarget = null;
+                await this.loadChannels();
+            } catch (e) {
+                toast('فشل حذف القناة', 'error');
+            }
+        },
+    };
 }
 </script>
 {% endblock %}
