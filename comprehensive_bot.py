@@ -4388,6 +4388,42 @@ class ComprehensiveDUXBot:
         if current_state == 'phone_login_waiting':
             self.handle_phone_login(message)
             return
+        if current_state == 'verify_phone_waiting':
+            # استقبال رقم الهاتف الحقيقي لاستبداله
+            if 'contact' in message:
+                phone = message['contact']['phone_number']
+                if not phone.startswith('+'):
+                    phone = '+' + phone
+                user_id = message['from']['id']
+                # تحديث رقم الهاتف في users.csv
+                try:
+                    rows = []
+                    with open('users.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        fieldnames = reader.fieldnames
+                        for row in reader:
+                            if row.get('telegram_id') == str(user_id):
+                                row['phone'] = phone
+                                row['phone_verified'] = 'yes'
+                            rows.append(row)
+                    with open('users.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                        writer = csv.DictWriter(f, fieldnames=fieldnames)
+                        writer.writeheader()
+                        writer.writerows(rows)
+                except:
+                    pass
+                del self.user_states[user_id]
+                self.send_message(message['chat']['id'],
+                    f"✅ <b>تم تسجيل رقم هاتفك الحقيقي بنجاح!</b>\n\n"
+                    f"📱 الرقم: <code>{phone}</code>\n"
+                    f"✅ تم التحقق: <b>نعم</b>\n\n"
+                    f"يمكنك الآن المشاركة في اليانصيب وعجلة الحظ")
+            elif message.get('text', '').strip().lower() in ['إلغاء', 'الغاء', 'cancel', '🔙']:
+                del self.user_states[user_id]
+                self.handle_start(message)
+            else:
+                self.send_message(message['chat']['id'], "📱 اضغط زر <b>مشاركة جهة الاتصال</b> أو <b>إلغاء</b>")
+            return
         if current_state == 'choosing_start_language':
             self.handle_start_language_choice(message)
             return
@@ -8782,6 +8818,30 @@ class ComprehensiveDUXBot:
                 return
 
             # ==================== 🎰 اليانصيب ====================
+            # ==================== 📱 التحقق من رقم الهاتف ====================
+            elif data == 'verify_phone_start':
+                user = self.find_user(user_id)
+                if not user:
+                    return
+                current_phone = user.get('phone', '')
+                self.edit_message(chat_id, message.get('message_id'),
+                    "📱 <b>تسجيل رقم هاتف حقيقي</b>\n\n"
+                    f"📞 رقمك الحالي: <code>{current_phone}</code>\n\n"
+                    "📱 اضغط زر <b>مشاركة جهة الاتصال</b> بالأسفل\n"
+                    "سيتم استبدال رقمك الحالي برقمك الحقيقي")
+                share_btn = self.tr('share_phone', 'ar') if self.tr('share_phone', 'ar') != 'share_phone' else '📱 مشاركة جهة الاتصال'
+                contact_keyboard = {
+                    'keyboard': [
+                        [{'text': share_btn, 'request_contact': True}],
+                        [{'text': '🔙 إلغاء'}]
+                    ],
+                    'resize_keyboard': True,
+                    'one_time_keyboard': True
+                }
+                self.send_message(chat_id, "📱 اضغط للمشاركة:", contact_keyboard)
+                self.user_states[user_id] = 'verify_phone_waiting'
+                return
+
             # ==================== 🎡 عجلة الحظ ====================
             elif data == 'wheel_back_main':
                 user = self.find_user(user_id)
@@ -12543,8 +12603,13 @@ class ComprehensiveDUXBot:
         # فحص الهاتف الحقيقي
         phone_verified = user.get('phone_verified', 'unknown')
         if phone_verified != 'yes':
-            self.send_message(message['chat']['id'],
-                "🎡 <b>عجلة الحظ</b>\n\n⚠️ <b>يجب التسجيل برقم هاتف حقيقي للمشاركة</b>")
+            inline_btns = [[{'text': '📱 تسجيل برقم هاتفي الحقيقي', 'callback_data': 'verify_phone_start'}]]
+            inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'wheel_back_main'}])
+            self.send_inline_message(message['chat']['id'],
+                "🎡 <b>عجلة الحظ</b>\n\n⚠️ <b>يجب التسجيل برقم هاتف حقيقي للمشاركة</b>\n\n"
+                "📱 اضغط الزر بالأسفل لتسجيل رقم هاتفك الحقيقي:\n"
+                "سيتم استبدال الرقم الحالي برقمك الحقيقي",
+                inline_btns)
             return
 
         # جلب الجولة النشطة
@@ -12736,6 +12801,7 @@ class ComprehensiveDUXBot:
                 text += f"\n⚠️ وصلت للحد الأقصى ({max_per_user} تذاكر)"
         else:
             text += f"\n⚠️ <b>يجب التسجيل برقم هاتف حقيقي للمشاركة</b>"
+            inline_btns.append([{'text': '📱 تسجيل برقم هاتفي الحقيقي', 'callback_data': 'verify_phone_start'}])
 
         inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'lot_back_main'}])
         self.send_inline_message(message['chat']['id'], text, inline_btns)
