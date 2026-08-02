@@ -6682,8 +6682,13 @@ class ComprehensiveDUXBot:
                     inline_btns.append([{'text': f"{icon} {m['method_name']}", 'callback_data': f'lot_method_{current_state["round_id"]}_{m["id"]}'}])
                 inline_btns.append([{'text': '🔙 إلغاء', 'callback_data': 'lot_back_main'}])
                 self.send_inline_message(chat_id,
-                    f"✅ عدد التذاكر: <code>{count}</code>\n"
-                    f"💰 المبلغ المستحق: <code>{total}</code> {currency}\n\n"
+                    f"🎫 <b>فاتورة الشراء</b>\n\n"
+                    f"━━━━━━━━━━━━━━━━━━\n"
+                    f"🎟️ سعر التذكرة: <code>{price}</code> {currency}\n"
+                    f"🔢 عدد التذاكر: <code>{count}</code>\n"
+                    f"━━━━━━━━━━━━━━━━━━\n"
+                    f"💰 <b>المبلغ المستحق: <code>{total}</code> {currency}</b>\n"
+                    f"━━━━━━━━━━━━━━━━━━\n\n"
                     f"💳 اختر وسيلة الدفع:",
                     inline_btns)
                 return
