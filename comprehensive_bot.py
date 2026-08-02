@@ -14304,11 +14304,12 @@ class ComprehensiveDUXBot:
     # ==================== 🎰 اليانصيب ====================
 
     def show_lottery_panel(self, message):
-        """لوحة اليانصيب للعميل"""
+        """لوحة اليانصيب للعميل — تصميم احترافي مع FOMO وأرقام حقيقية"""
         user = self.find_user(message['from']['id'])
         if not user:
             self.handle_start(message)
             return
+        lang = user.get('language', 'ar')
 
         # جلب الجولة النشطة
         active_round = None
@@ -14324,32 +14325,72 @@ class ComprehensiveDUXBot:
 
         if not active_round:
             self.send_message(message['chat']['id'],
-                "🎰 <b>يانصيب</b>\n\n📭 لا توجد جولة يانصيب نشطة حالياً\n\n⏳ ترقبوا الجولة القادمة!",
-                self.main_keyboard(user.get('language', 'ar'), message['from']['id']))
+                "🎰 <b>يانصيب</b>\n\n"
+                "━━━━━━━━━━━━━━━━━━\n"
+                "📭 لا توجد جولة نشطة حالياً\n"
+                "⏳ ترقبوا الجولة القادمة!\n"
+                "━━━━━━━━━━━━━━━━━━\n\n"
+                "💡 سيتم إشعارك فور بدء جولة جديدة",
+                self.main_keyboard(lang, message['from']['id']))
             return
 
-        # عد التذاكر المباعة + المشاركين الفريدين
-        tickets_sold = 0
+        # قراءة كل البيانات الحقيقية
+        all_tickets = []
         unique_participants = set()
         my_tickets = []
+        recent_buyers = []
         try:
             with open('lottery_tickets.csv', 'r', encoding='utf-8-sig') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
                     if row.get('round_id') == active_round['id']:
-                        tickets_sold += 1
+                        all_tickets.append(row)
                         unique_participants.add(row.get('user_id', ''))
                         if row.get('user_id') == str(message['from']['id']):
                             my_tickets.append(row.get('ticket_number', ''))
+                        if row.get('payment_verified') == 'yes':
+                            recent_buyers.append(row)
         except:
             pass
 
-        prize_pool = float(active_round.get('ticket_price', 0)) * tickets_sold
+        verified_tickets = [t for t in all_tickets if t.get('payment_verified') == 'yes']
+        tickets_sold = len(verified_tickets)
+        participants_count = len(unique_participants)
+
+        # الأرقام الحقيقية من بيانات الأدمن
+        ticket_price = float(active_round.get('ticket_price', 0))
+        currency = active_round.get('currency', 'SAR')
+        prize_pool = ticket_price * tickets_sold
         admin_pct = float(active_round.get('admin_profit_pct', 0))
         net_prize = prize_pool * (1 - admin_pct / 100)
         winner_count = int(active_round.get('winner_count', 1))
+        max_per_user = int(active_round.get('max_tickets_per_user', 1))
+        draw_time = active_round.get('draw_time', '')
+        round_name = active_round.get('name', '')
 
-        # حساب نسب التوزيع
+        # حساب العد التنازلي
+        countdown_text = ''
+        if draw_time:
+            try:
+                draw_dt = datetime.strptime(draw_time, '%Y-%m-%d %H:%M')
+                now = datetime.now()
+                if draw_dt > now:
+                    diff = draw_dt - now
+                    days = diff.days
+                    hours = diff.seconds // 3600
+                    minutes = (diff.seconds % 3600) // 60
+                    if days > 0:
+                        countdown_text = f"⏰ <b>السحب بعد {days} يوم و {hours} ساعة</b>"
+                    elif hours > 0:
+                        countdown_text = f"⏰ <b>السحب بعد {hours} ساعة و {minutes} دقيقة</b>"
+                    else:
+                        countdown_text = f"⏰ <b>السحب بعد {minutes} دقيقة!</b>"
+                else:
+                    countdown_text = "⏰ <b>السحب قريباً — تذاكركم تحت المراجعة!</b>"
+            except:
+                countdown_text = f"⏰ موعد السحب: <code>{draw_time}</code>"
+
+        # حساب نسب التوزيع — أرقام حقيقية
         if winner_count == 1:
             shares = [100]
             share_labels = ['100%']
@@ -14366,50 +14407,87 @@ class ComprehensiveDUXBot:
 
         rank_emojis = ['🥇', '🥈', '🥉'] + ['🏅'] * max(0, winner_count - 3)
 
-        text = (
-            f"🎰 <b>يانصيب — {active_round.get('name', '')}</b>\n\n"
+        # حساب فرصة الفوز
+        my_ticket_count = len([t for t in my_tickets])
+        total_odds = 0
+        if tickets_sold > 0 and my_ticket_count > 0:
+            total_odds = (my_ticket_count / tickets_sold) * 100
+
+        # === بناء النص الاحترافي ===
+        text = f"🎰 <b>{round_name}</b>\n\n"
+
+        # العد التنازلي — إثارة
+        if countdown_text:
+            text += f"{countdown_text}\n\n"
+
+        text += (
             f"━━━━━━━━━━━━━━━━━━\n"
-            f"🎫 سعر التذكرة: <code>{active_round.get('ticket_price', '')}</code> {active_round.get('currency', '')}\n"
-            f"👥 المشاركين: <code>{len(unique_participants)}</code>\n"
-            f"📊 التذاكر المباعة: <code>{tickets_sold}</code>\n"
-            f"💰 إجمالي الجائزة: <code>{net_prize:.2f}</code> {active_round.get('currency', '')}\n"
-            f"🏆 عدد الفائزين: <code>{winner_count}</code>\n"
-            f"⏰ موعد السحب: <code>{active_round.get('draw_time', '')}</code>\n"
+            f"🔥 <b>الجائزة الكبرى الآن: <code>{net_prize:.0f}</code> {currency}</b>\n"
             f"━━━━━━━━━━━━━━━━━━\n\n"
-            f"📊 <b>كيف تتوزع الأرباح؟</b>\n"
-            f"💰 كل تذكرة = <code>{active_round.get('ticket_price', '')}</code> {active_round.get('currency', '')}\n"
+            f"👥 <b>المشاركين:</b> <code>{participants_count}</code> شخص\n"
+            f"🎫 <b>التذاكر المباعة:</b> <code>{tickets_sold}</code>\n"
+            f"🎟️ <b>سعر التذكرة:</b> <code>{ticket_price:.0f}</code> {currency}\n"
+            f"🏆 <b>عدد الفائزين:</b> <code>{winner_count}</code>\n"
         )
+
+        # شريط التقدم
+        if tickets_sold > 0:
+            bar_length = min(tickets_sold * 2, 20)
+            progress_bar = '█' * bar_length + '░' * (20 - bar_length)
+            text += f"📊 <code>{progress_bar}</code>\n"
+
+        text += f"━━━━━━━━━━━━━━━━━━\n\n"
+
+        # توزيع الأرباح — أرقام حقيقية
+        text += f"💰 <b>توزيع الجوائز</b>\n"
+        text += f"💵 كل تذكرة = <code>{ticket_price:.0f}</code> {currency}\n"
         if admin_pct > 0:
             text += f"🏢 رسوم الإدارة: <code>{admin_pct:.0f}%</code>\n"
         text += f"💎 للمشاركين: <code>{100 - admin_pct:.0f}%</code>\n\n"
 
-        # شرح نصيب كل فائز
         for i in range(winner_count):
             emoji = rank_emojis[i] if i < len(rank_emojis) else '🏅'
             prize_amount = net_prize * shares[i] / 100
-            text += f"{emoji} الفائز #{i+1}: <code>{share_labels[i]}</code> ← <code>{prize_amount:.2f}</code> {active_round.get('currency', '')}\n"
+            text += f"{emoji} الفائز #{i+1}: <code>{share_labels[i]}</code> ← <code>{prize_amount:.0f}</code> {currency}\n"
+
+        # تذاكري — أرقام حقيقية
+        if my_ticket_count > 0:
+            text += f"\n━━━━━━━━━━━━━━━━━━\n"
+            text += f"🍀 <b>أرقامك المحظوظة ({my_ticket_count}):</b>\n"
+            for t in my_tickets:
+                if t:
+                    text += f"  🎫 <code>#{t}</code>\n"
+            if total_odds > 0:
+                text += f"\n📊 فرصة فوزك: <code>{total_odds:.1f}%</code>\n"
+                text += f"💡 كلما زادت تذاكرك، زادت فرصتك!\n"
+
+        # آخر المشترين — social proof
+        if len(recent_buyers) >= 2:
+            text += f"\n━━━━━━━━━━━━━━━━━━\n"
+            text += f"🟢 <b>آخر المشاركين:</b>\n"
+            for buyer in recent_buyers[-3:]:
+                name = buyer.get('user_name', 'مستخدم')
+                if name and len(name) > 15:
+                    name = name[:12] + '...'
+                text += f"  • {name} 🎫\n"
 
         text += f"\n━━━━━━━━━━━━━━━━━━\n"
 
-        if my_tickets:
-            text += f"\n🎫 تذاكري ({len(my_tickets)}):\n"
-            for t in my_tickets:
-                text += f"  • <code>#{t}</code>\n"
-
+        # أزرار الإجراءات
         inline_btns = []
-        # فحص الهاتف
         phone_verified = user.get('phone_verified', 'unknown')
         if phone_verified == 'yes':
-            max_per_user = int(active_round.get('max_tickets_per_user', 1))
-            if len(my_tickets) < max_per_user:
-                inline_btns.append([{'text': '🎫 شراء تذكرة', 'callback_data': f'lot_buy_{active_round["id"]}'}])
+            if my_ticket_count < max_per_user:
+                remaining = max_per_user - my_ticket_count
+                inline_btns.append([{'text': f'🎫 شراء تذكرة ({remaining} متبقية)',
+                                     'callback_data': f'lot_buy_{active_round["id"]}'}])
             else:
-                text += f"\n⚠️ وصلت للحد الأقصى ({max_per_user} تذاكر)"
+                text += f"\n✅ <b>وصلت للحد الأقصى ({max_per_user} تذاكر) — حظ أوفر!</b>\n"
         else:
-            text += f"\n⚠️ <b>يجب التسجيل برقم هاتف حقيقي للمشاركة</b>"
+            text += f"\n⚠️ <b>سجّل برقم هاتفك الحقيقي للمشاركة</b>\n"
             inline_btns.append([{'text': '📱 تسجيل برقم هاتفي الحقيقي', 'callback_data': 'verify_phone_start'}])
 
-        inline_btns.append([{'text': '🔄 تحديث', 'callback_data': 'lot_refresh'}])
+        inline_btns.append([{'text': '🔄 تحديث الأرقام', 'callback_data': 'lot_refresh'}])
         inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'lot_back_main'}])
         self.send_inline_message(message['chat']['id'], text, inline_btns)
 
@@ -14478,19 +14556,19 @@ class ComprehensiveDUXBot:
             self.send_message(chat_id, "❌ الجولة غير موجودة")
             return
 
-        # قراءة كل التذاكر
+        # قراءة كل التذاكر — فقط الموثقة (payment_verified = yes)
         tickets = []
         try:
             with open('lottery_tickets.csv', 'r', encoding='utf-8-sig') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    if row.get('round_id') == round_id:
+                    if row.get('round_id') == round_id and row.get('payment_verified') == 'yes':
                         tickets.append(row)
         except:
             pass
 
         if not tickets:
-            self.send_message(chat_id, "❌ لا توجد تذاكر للبيع")
+            self.send_message(chat_id, "❌ لا توجد تذاكر موثقة للبيع")
             return
 
         winner_count = int(round_data.get('winner_count', 1))
