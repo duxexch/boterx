@@ -12,7 +12,6 @@ commands = [
     "systemctl restart boterx-dashboard",
     "sleep 2",
     "systemctl status boterx --no-pager | head -3",
-    "systemctl status boterx-dashboard --no-pager | head -3",
 ]
 
 for cmd in commands:
