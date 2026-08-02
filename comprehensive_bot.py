@@ -5627,6 +5627,79 @@ class ComprehensiveDUXBot:
             self._handle_lottery_edit_input(message, current_state)
             return
 
+        # معالج استبدال النصوص — الخطوة 1: البحث عن النص
+        if isinstance(current_state, str) and current_state == 'tr_waiting_find':
+            text = message.get('text', '').strip()
+            if not text or len(text) < 2:
+                self.send_message(chat_id, "❌ النص قصير جداً. اكتب النص المراد البحث عنه:")
+                return
+            self.user_states[user_id] = {'step': 'tr_waiting_replace', 'find_text': text}
+            self.send_message(chat_id,
+                f"✅ النص المراد البحث عنه: <code>{text}</code>\n\n"
+                f"الآن اكتب <b>النص البديل</b>:")
+            return
+
+        # معالج استبدال النصوص — الخطوة 2: النص البديل
+        if isinstance(current_state, dict) and current_state.get('step') == 'tr_waiting_replace':
+            text = message.get('text', '').strip()
+            find_text = current_state.get('find_text', '')
+            if not text:
+                self.send_message(chat_id, "❌ اكتب النص البديل:")
+                return
+            # حفظ القاعدة
+            rule_id = f"TR{str(int(datetime.now().timestamp()))[-6:]}"
+            try:
+                with open('text_replacements.csv', 'a', newline='', encoding='utf-8-sig') as f:
+                    writer = csv.writer(f)
+                    writer.writerow([rule_id, find_text, text, 'no', '', 'yes', datetime.now().strftime('%Y-%m-%d %H:%M')])
+            except:
+                pass
+            del self.user_states[user_id]
+            self.send_message(chat_id,
+                f"✅ <b>تم حفظ قاعدة الاستبدال!</b>\n\n"
+                f"🔍 البحث عن: <code>{find_text}</code>\n"
+                f"✨ استبدال بـ: <code>{text}</code>\n\n"
+                f"ستُطبّق على كل القنوات تلقائياً")
+            return
+
+        # معالج تعليمات AI
+        if isinstance(current_state, str) and current_state == 'ai_waiting_instructions':
+            text = message.get('text', '').strip()
+            if not text or len(text) < 10:
+                self.send_message(chat_id, "❌ التعليمات قصيرة جداً. اكتب تعليمات أوضح:")
+                return
+            # حفظ في system_settings.csv
+            try:
+                rows = []
+                with open('system_settings.csv', 'r', encoding='utf-8-sig') as f:
+                    reader = csv.DictReader(f)
+                    fieldnames = reader.fieldnames
+                    rows = list(reader)
+                found = False
+                for row in rows:
+                    if row.get('setting_key') == 'ai_instructions':
+                        row['setting_value'] = text
+                        found = True
+                        break
+                if not found:
+                    rows.append({'setting_key': 'ai_instructions', 'setting_value': text, 'description': 'تعليمات AI لإعادة صياغة البوستات'})
+                    if 'ai_instructions' not in fieldnames:
+                        fieldnames = list(fieldnames) + ['ai_instructions']
+                with open('system_settings.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                    writer = csv.DictWriter(f, fieldnames=fieldnames)
+                    writer.writeheader()
+                    for row in rows:
+                        writer.writerow({k: row.get(k, '') for k in fieldnames})
+            except Exception as e:
+                self.send_message(chat_id, f"❌ خطأ في الحفظ: {e}")
+                return
+            del self.user_states[user_id]
+            self.send_message(chat_id,
+                f"✅ <b>تم حفظ تعليمات AI!</b>\n\n"
+                f"📝 التعليمات: <i>{text[:100]}...</i>\n\n"
+                f"سيقوم AI بإعادة صياغة كل بوست قبل نشره")
+            return
+
         # معالج التطبيقات — يدعم رفع ملفات APK وصور
         if isinstance(current_state, str) and current_state.startswith('app_wizard'):
             self.handle_app_wizard(message)
