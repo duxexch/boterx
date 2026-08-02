@@ -316,12 +316,12 @@ class ComprehensiveDUXBot:
         if not os.path.exists('payment_methods.csv'):
             with open('payment_methods.csv', 'w', newline='', encoding='utf-8-sig') as f:
                 writer = csv.writer(f)
-                writer.writerow(['id', 'company_id', 'method_name', 'method_type', 'account_data', 'additional_info', 'status', 'created_date', 'icon'])
+                writer.writerow(['id', 'company_id', 'method_name', 'method_type', 'account_data', 'additional_info', 'status', 'created_date', 'icon', 'currency'])
                 defaults = [
-                    ['1', '', 'حساب بنكي', 'حساب بنكي', '1234567890', 'البنك الأهلي', 'active', '2024-01-01', '🏦'],
-                    ['2', '', 'محفظة STC', 'محفظة إلكترونية', '0501234567', 'STC Pay', 'active', '2024-01-01', '📱'],
-                    ['3', '', 'فودافون كاش', 'محفظة إلكترونية', '01012345678', 'فودافون', 'active', '2024-01-01', '📱'],
-                    ['4', '', 'حساب جاري', 'حساب بنكي', '0987654321', 'بنك الراجحي', 'active', '2024-01-01', '🏦'],
+                    ['1', '', 'حساب بنكي', 'حساب بنكي', '1234567890', 'البنك الأهلي', 'active', '2024-01-01', '🏦', 'SAR'],
+                    ['2', '', 'محفظة STC', 'محفظة إلكترونية', '0501234567', 'STC Pay', 'active', '2024-01-01', '📱', 'SAR'],
+                    ['3', '', 'فودافون كاش', 'محفظة إلكترونية', '01012345678', 'فودافون', 'active', '2024-01-01', '📱', 'EGP'],
+                    ['4', '', 'حساب جاري', 'حساب بنكي', '0987654321', 'بنك الراجحي', 'active', '2024-01-01', '🏦', 'SAR'],
                 ]
                 for m in defaults:
                     writer.writerow(m)
@@ -6149,31 +6149,49 @@ class ComprehensiveDUXBot:
             elif step == 'pm_add_info':
                 info = text_msg if text_msg.lower() not in ['بدون', 'skip', ''] else ''
                 current_state['additional_info'] = info
+                current_state['step'] = 'pm_add_currency'
+                self.user_states[user_id] = current_state
+                self.send_message(chat_id,
+                    f"✅ معلومات: {info or 'بدون'}\n\n"
+                    f"💱 الآن حدد عملة وسيلة الدفع:\n"
+                    f"اكتب رمز العملة (مثال: SAR, EGP, USD, USDT)\n"
+                    f"أو اكتب <b>'كل العملات'</b> إذا تعمل بكل العملات")
+
+            elif step == 'pm_add_currency':
+                currency_input = text_msg.strip()
+                if currency_input.lower() in ['كل العملات', 'all', 'الكل', '']:
+                    currency = ''
+                else:
+                    currency = currency_input.upper()
+                current_state['currency'] = currency
 
                 # حفظ الوسيلة
                 company_id = current_state.get('company_id', '')
                 method_name = current_state.get('method_name', '')
                 method_type = current_state.get('method_type', '')
                 account_data = current_state.get('account_data', '')
+                info = current_state.get('additional_info', '')
                 icon = {'mobile': '📱', 'bank': '🏦', 'card': '💳', 'cash': '💵'}.get(
                     current_state.get('method_type', ''), '💳')
 
-                method_id = self.add_payment_method(company_id, method_name, method_type, account_data, info, icon)
+                method_id = self.add_payment_method(company_id, method_name, method_type, account_data, info, icon, currency)
                 current_state['method_id'] = method_id
-
-                # سؤال: هل تريد إضافة خطوات مخصصة للإيداع؟
-                current_state['step'] = 'pm_add_custom_deposit'
                 current_state['custom_steps'] = {'deposit': [], 'withdraw': []}
                 self.user_states[user_id] = current_state
+
+                cur_display = currency or 'كل العملات'
                 self.send_message(chat_id,
                     f"✅ <b>تم حفظ وسيلة الدفع!</b>\n\n"
-                    f"💳 {method_name} — <code>{account_data}</code>\n\n"
+                    f"💳 {method_name} — <code>{account_data}</code>\n"
+                    f"💱 العملة: <b>{cur_display}</b>\n\n"
                     f"━━━━━━━━━━━━━━━━━━\n"
                     f"🔧 <b>خطوات مخصصة للإيداع</b>\n"
                     f"━━━━━━━━━━━━━━━━━━\n\n"
                     f"هل تريد إضافة خطوات مخصصة لعملية الإيداع بهذه الوسيلة؟\n\n"
                     f"💡 الخطوات تظهر للعميل خطوة بخطوة عند الإيداع",
                     {'keyboard': [[{'text': '✅ نعم، أضف خطوات'}, {'text': '⏭️ تخطي'}]], 'resize_keyboard': True, 'one_time_keyboard': True})
+
+                current_state['step'] = 'pm_add_custom_deposit'
 
             # === خطوات مخصصة: اختيار نعم/تخطي للإيداع ===
             elif step == 'pm_add_custom_deposit':
@@ -6670,17 +6688,9 @@ class ComprehensiveDUXBot:
                 current_state['total'] = str(total)
                 self.user_states[user_id] = current_state
 
-                # عرض وسائل الدفع — بدون تكرار (unique by method_name)
-                methods = self.get_all_payment_methods()
-                active_methods = [m for m in methods if m.get('status') == 'active']
-                # إزالة التكرار — كل وسيلة تظهر مرة واحدة فقط
-                seen_names = set()
-                unique_methods = []
-                for m in active_methods:
-                    name = m.get('method_name', '').strip().lower()
-                    if name not in seen_names:
-                        seen_names.add(name)
-                        unique_methods.append(m)
+                # عرض وسائل الدفع — مفلترة حسب عملة العميل + بدون تكرار
+                user_currency = user.get('currency', 'EGP') if user else 'EGP'
+                unique_methods = self.get_payment_methods_by_currency(user_currency)
                 if not unique_methods:
                     self.send_message(chat_id, "❌ لا توجد وسائل دفع متاحة")
                     return
@@ -17014,7 +17024,7 @@ class ComprehensiveDUXBot:
             inline_btns.append([{'text': self.tr('main_menu', lang), 'callback_data': 'dep_cancel'}])
             self.send_inline_message(message['chat']['id'], title, inline_btns)
         
-    def add_payment_method(self, company_id, method_name, method_type, account_data, additional_info="", icon=""):
+    def add_payment_method(self, company_id, method_name, method_type, account_data, additional_info="", icon="", currency=""):
             """إضافة وسيلة دفع جديدة — بدون تكرار (نفس الاسم + نفس البيانات = نفس الوسيلة)"""
             try:
                 # فحص التكرار: لو نفس الاسم + نفس account_data = return existing ID
@@ -17022,7 +17032,6 @@ class ComprehensiveDUXBot:
                 for m in existing_methods:
                     if (m.get('method_name', '').strip().lower() == method_name.strip().lower() and
                         m.get('account_data', '').strip() == account_data.strip()):
-                        # وسيلة موجودة بالفعل بنفس البيانات — نرجع ID بتاعها
                         logger.info(f"Payment method '{method_name}' with same data already exists: {m['id']}")
                         return m['id']
                 
@@ -17042,9 +17051,10 @@ class ComprehensiveDUXBot:
                         additional_info,
                         'active',
                         datetime.now().strftime('%Y-%m-%d'),
-                        method_icon
+                        method_icon,
+                        currency.upper() if currency else ''
                     ])
-                logger.info(f"Payment method added: {new_id} ({method_name})")
+                logger.info(f"Payment method added: {new_id} ({method_name}) currency: {currency}")
                 return new_id
             except Exception as e:
                 logger.error(f"خطأ في إضافة وسيلة دفع: {e}")
@@ -18686,6 +18696,29 @@ class ComprehensiveDUXBot:
                     reader = csv.DictReader(f)
                     for row in reader:
                         methods.append(row)
+            except:
+                pass
+            return methods
+
+    def get_payment_methods_by_currency(self, currency):
+            """الحصول على وسائل الدفع لعملة محددة — بدون تكرار"""
+            methods = []
+            seen_names = set()
+            try:
+                with open('payment_methods.csv', 'r', encoding='utf-8-sig') as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        if row.get('status') != 'active':
+                            continue
+                        # فلترة بالعملة: لو الوسيلة لها عملة محددة، طابقها. لو فارغة = تعمل بكل العملات
+                        method_currency = row.get('currency', '').strip().upper()
+                        if method_currency and method_currency != currency.strip().upper():
+                            continue
+                        # إزالة التكرار
+                        name = row.get('method_name', '').strip().lower()
+                        if name not in seen_names:
+                            seen_names.add(name)
+                            methods.append(row)
             except:
                 pass
             return methods
