@@ -214,7 +214,8 @@ const Notifier = {
 
         // Browser notification
         if (Notification.permission === 'granted') {
-            new Notification('🔔 Boterx', { body: message, icon: '/static/img/icon.png', tag: type });
+            const n = new Notification('🔔 Boterx', { body: message, icon: '/static/img/icon.png', tag: type, requireInteraction: false });
+            setTimeout(() => n.close(), 4000);
         }
 
         // In-page notification
@@ -227,37 +228,95 @@ const Notifier = {
             if (container.children.length > 20) container.lastElementChild.remove();
         }
 
-        // Sound
-        this.playSound(type === 'new_match' ? 'alert' : 'notification');
+        // Large popup notification (1 second visible)
+        this.showPopup(message, type);
+
+        // Sound (1 second, loud)
+        this.playSound(type === 'new_match' || type === 'new_complaint' ? 'alert' : 'notification');
+    },
+
+    showPopup(message, type) {
+        // Remove any existing popup
+        const existing = document.getElementById('bigPopup');
+        if (existing) existing.remove();
+
+        const colors = {
+            'new_txn': { bg: 'bg-blue-600', icon: '📥' },
+            'new_match': { bg: 'bg-green-600', icon: '🔄' },
+            'new_complaint': { bg: 'bg-red-600', icon: '📢' },
+            'new_trade': { bg: 'bg-amber-600', icon: '💱' },
+            'new_svrp': { bg: 'bg-purple-600', icon: '💎' },
+        };
+        const c = colors[type] || { bg: 'bg-blue-600', icon: '🔔' };
+
+        const popup = document.createElement('div');
+        popup.id = 'bigPopup';
+        popup.className = `fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 ${c.bg} text-white px-8 py-6 rounded-2xl shadow-2xl z-[500] text-center`;
+        popup.innerHTML = `
+            <div class="text-4xl mb-2">${c.icon}</div>
+            <div class="text-lg font-bold">${message}</div>
+            <div class="text-xs opacity-75 mt-1">${new Date().toLocaleTimeString('ar-EG')}</div>
+        `;
+        document.body.appendChild(popup);
+
+        // Show for 1 second then fade out
+        setTimeout(() => {
+            popup.style.transition = 'opacity 0.3s, transform 0.3s';
+            popup.style.opacity = '0';
+            popup.style.transform = 'translate(-50%, -60%) scale(0.9)';
+            setTimeout(() => popup.remove(), 300);
+        }, 1000);
     },
 
     playSound(type = 'notification') {
         if (!this.soundEnabled || !this.audioContext) return;
         try {
             const ctx = this.audioContext;
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            gain.gain.value = 0.08;
+            const now = ctx.currentTime;
 
             if (type === 'alert') {
-                osc.frequency.value = 800;
-                osc.type = 'square';
-                osc.start();
-                osc.stop(ctx.currentTime + 0.15);
+                // Alert: 3 beeps over 1 second, loud
+                for (let i = 0; i < 3; i++) {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.frequency.value = 880;
+                    osc.type = 'square';
+                    gain.gain.setValueAtTime(0.3, now + i * 0.3);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.3 + 0.25);
+                    osc.start(now + i * 0.3);
+                    osc.stop(now + i * 0.3 + 0.25);
+                }
             } else if (type === 'success') {
-                osc.frequency.value = 523;
-                osc.type = 'sine';
-                osc.start();
-                osc.frequency.setValueAtTime(659, ctx.currentTime + 0.1);
-                osc.frequency.setValueAtTime(784, ctx.currentTime + 0.2);
-                osc.stop(ctx.currentTime + 0.3);
+                // Success: rising notes, 1 second, loud
+                const notes = [523, 659, 784, 1047];
+                notes.forEach((freq, i) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.frequency.value = freq;
+                    osc.type = 'sine';
+                    gain.gain.setValueAtTime(0.3, now + i * 0.25);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.25 + 0.2);
+                    osc.start(now + i * 0.25);
+                    osc.stop(now + i * 0.25 + 0.2);
+                });
             } else {
-                osc.frequency.value = 660;
-                osc.type = 'sine';
-                osc.start();
-                osc.stop(ctx.currentTime + 0.1);
+                // Notification: 2 beeps, 1 second, loud
+                for (let i = 0; i < 2; i++) {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.frequency.value = 740;
+                    osc.type = 'sine';
+                    gain.gain.setValueAtTime(0.3, now + i * 0.5);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.5 + 0.4);
+                    osc.start(now + i * 0.5);
+                    osc.stop(now + i * 0.5 + 0.4);
+                }
             }
         } catch (e) { /* audio not available */ }
     },
