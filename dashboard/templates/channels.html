@@ -7,274 +7,153 @@
 
     <!-- Tabs -->
     <div class="flex flex-wrap gap-1 bg-slate-800 rounded-xl border border-slate-700 p-1">
-        <button @click="setTab('channels')" :class="tab === 'channels' ? 'bg-blue-600 text-white' : 'text-slate-400'"
-                class="px-4 py-2 rounded-lg text-sm font-medium transition">📡 القنوات</button>
-        <button @click="setTab('groups')" :class="tab === 'groups' ? 'bg-blue-600 text-white' : 'text-slate-400'"
-                class="px-4 py-2 rounded-lg text-sm font-medium transition">📂 المجموعات</button>
-        <button @click="setTab('vault')" :class="tab === 'vault' ? 'bg-blue-600 text-white' : 'text-slate-400'"
-                class="px-4 py-2 rounded-lg text-sm font-medium transition">📦 الأرشيف</button>
-        <button @click="setTab('ai')" :class="tab === 'ai' ? 'bg-blue-600 text-white' : 'text-slate-400'"
-                class="px-4 py-2 rounded-lg text-sm font-medium transition">🤖 إعدادات AI</button>
-        <button @click="setTab('report')" :class="tab === 'report' ? 'bg-blue-600 text-white' : 'text-slate-400'"
-                class="px-4 py-2 rounded-lg text-sm font-medium transition">📊 التقرير</button>
+        <button @click="setTab('channels')" :class="tab === 'channels' ? 'bg-blue-600 text-white' : 'text-slate-400'" class="px-4 py-2 rounded-lg text-sm font-medium transition">📡 القنوات</button>
+        <button @click="setTab('groups')" :class="tab === 'groups' ? 'bg-blue-600 text-white' : 'text-slate-400'" class="px-4 py-2 rounded-lg text-sm font-medium transition">📂 المجموعات</button>
+        <button @click="setTab('vault')" :class="tab === 'vault' ? 'bg-blue-600 text-white' : 'text-slate-400'" class="px-4 py-2 rounded-lg text-sm font-medium transition">📦 الأرشيف</button>
+        <button @click="setTab('ai')" :class="tab === 'ai' ? 'bg-blue-600 text-white' : 'text-slate-400'" class="px-4 py-2 rounded-lg text-sm font-medium transition">🤖 AI</button>
+        <button @click="setTab('report')" :class="tab === 'report' ? 'bg-blue-600 text-white' : 'text-slate-400'" class="px-4 py-2 rounded-lg text-sm font-medium transition">📊 التقرير</button>
     </div>
 
     <!-- TAB: Channels -->
     <div x-show="tab === 'channels'" class="space-y-4">
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3">
-                <p class="text-xs text-slate-400">إجمالي القنوات</p>
-                <p class="text-xl font-bold text-amber-400" x-text="channels.length">0</p>
+        <div class="flex justify-between items-center flex-wrap gap-2">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">إجمالي</p><p class="text-xl font-bold text-amber-400" x-text="channels.length">0</p></div>
+                <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">نشطة</p><p class="text-xl font-bold text-green-400" x-text="channels.filter(c => c.is_active === 'yes').length">0</p></div>
+                <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">فئات</p><p class="text-xl font-bold text-blue-400" x-text="Object.keys(categoryGroups).length">0</p></div>
+                <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">AI</p><p class="text-xl font-bold text-purple-400" x-text="channels.filter(c => c.ai_enabled === 'yes').length">0</p></div>
             </div>
-            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3">
-                <p class="text-xs text-slate-400">نشطة</p>
-                <p class="text-xl font-bold text-green-400" x-text="channels.filter(c => c.is_active === 'yes').length">0</p>
-            </div>
-            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3">
-                <p class="text-xs text-slate-400">AI مفعّل</p>
-                <p class="text-xl font-bold text-blue-400" x-text="channels.filter(c => c.ai_enabled === 'yes').length">0</p>
-            </div>
-            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3">
-                <p class="text-xs text-slate-400">ترحيل للمستخدمين</p>
-                <p class="text-xl font-bold text-purple-400" x-text="channels.filter(c => c.relay_to_users === 'yes').length">0</p>
-            </div>
+            <button @click="showAddChannelModal = true" class="btn btn-primary btn-sm">➕ إضافة قناة</button>
         </div>
 
+        <!-- Category filter -->
+        <div class="flex flex-wrap gap-2">
+            <button @click="filterCategory = ''" :class="filterCategory === '' ? 'bg-amber-500 text-slate-900' : 'bg-slate-700 text-slate-400'" class="px-3 py-1.5 rounded-lg text-xs font-medium transition">الكل</button>
+            <template x-for="(data, cat) in categoryGroups" :key="cat">
+                <button @click="filterCategory = cat" :class="filterCategory === cat ? 'bg-amber-500 text-slate-900' : 'bg-slate-700 text-slate-400'" class="px-3 py-1.5 rounded-lg text-xs font-medium transition" x-text="cat + ' (' + data.count + ')'"></button>
+            </template>
+        </div>
+
+        <!-- Channel cards -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <template x-for="ch in channels" :key="ch.id">
-                <div class="bg-slate-800 rounded-xl border border-slate-700 p-5"
-                     :class="ch.is_active === 'yes' ? 'border-green-500/30' : 'opacity-60'">
+            <template x-for="ch in filteredChannels" :key="ch.id">
+                <div class="bg-slate-800 rounded-xl border border-slate-700 p-5" :class="ch.is_active === 'yes' ? 'border-green-500/30' : 'opacity-60'">
                     <div class="flex items-start justify-between mb-3">
                         <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center text-xl"
-                                 x-text="ch.type === 'channel' ? '📢' : (ch.type === 'group' ? '👥' : '💬')"></div>
+                            <div class="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center text-xl" x-text="ch.type === 'channel' ? '📢' : (ch.type === 'group' ? '👥' : '💬')"></div>
                             <div>
                                 <h3 class="font-bold" x-text="ch.title || 'غير معروف'"></h3>
                                 <p class="text-xs text-slate-500 font-mono" x-text="ch.chat_id"></p>
+                                <span x-show="ch.category" class="text-xs px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400" x-text="ch.category"></span>
                             </div>
                         </div>
-                        <div class="flex gap-1">
-                            <span x-show="ch.ai_enabled === 'yes'" class="px-1.5 py-0.5 rounded text-xs bg-blue-500/20 text-blue-400">🤖 AI</span>
-                            <span x-html="statusBadge(ch.is_active === 'yes' ? 'active' : 'inactive')"></span>
-                        </div>
+                        <span x-html="statusBadge(ch.is_active === 'yes' ? 'active' : 'inactive')"></span>
                     </div>
                     <div class="space-y-2 text-sm">
                         <div class="flex justify-between p-2 bg-slate-900/50 rounded">
                             <span class="text-slate-400">⚙️ تفعيل</span>
-                            <button @click="toggleChannel(ch.id)" class="relative inline-flex h-6 w-11 items-center rounded-full transition"
-                                    :class="ch.is_active === 'yes' ? 'bg-green-500' : 'bg-slate-600'">
-                                <span class="inline-block h-4 w-4 transform rounded-full bg-white transition"
-                                      :class="ch.is_active === 'yes' ? 'translate-x-6' : 'translate-x-1'"></span>
-                            </button>
+                            <button @click="toggleChannel(ch.id)" class="relative inline-flex h-6 w-11 items-center rounded-full transition" :class="ch.is_active === 'yes' ? 'bg-green-500' : 'bg-slate-600'"><span class="inline-block h-4 w-4 transform rounded-full bg-white transition" :class="ch.is_active === 'yes' ? 'translate-x-6' : 'translate-x-1'"></span></button>
                         </div>
                         <div class="flex justify-between p-2 bg-slate-900/50 rounded">
                             <span class="text-slate-400">👥 للمستخدمين</span>
-                            <button @click="toggleSetting(ch, 'relay_to_users')" class="relative inline-flex h-6 w-11 items-center rounded-full transition"
-                                    :class="ch.relay_to_users === 'yes' ? 'bg-green-500' : 'bg-slate-600'">
-                                <span class="inline-block h-4 w-4 transform rounded-full bg-white transition"
-                                      :class="ch.relay_to_users === 'yes' ? 'translate-x-6' : 'translate-x-1'"></span>
-                            </button>
+                            <button @click="toggleSetting(ch, 'relay_to_users')" class="relative inline-flex h-6 w-11 items-center rounded-full transition" :class="ch.relay_to_users === 'yes' ? 'bg-green-500' : 'bg-slate-600'"><span class="inline-block h-4 w-4 transform rounded-full bg-white transition" :class="ch.relay_to_users === 'yes' ? 'translate-x-6' : 'translate-x-1'"></span></button>
                         </div>
                         <div class="flex justify-between p-2 bg-slate-900/50 rounded">
                             <span class="text-slate-400">📢 للقنوات</span>
-                            <button @click="toggleSetting(ch, 'relay_to_channels')" class="relative inline-flex h-6 w-11 items-center rounded-full transition"
-                                    :class="ch.relay_to_channels === 'yes' ? 'bg-green-500' : 'bg-slate-600'">
-                                <span class="inline-block h-4 w-4 transform rounded-full bg-white transition"
-                                      :class="ch.relay_to_channels === 'yes' ? 'translate-x-6' : 'translate-x-1'"></span>
-                            </button>
+                            <button @click="toggleSetting(ch, 'relay_to_channels')" class="relative inline-flex h-6 w-11 items-center rounded-full transition" :class="ch.relay_to_channels === 'yes' ? 'bg-green-500' : 'bg-slate-600'"><span class="inline-block h-4 w-4 transform rounded-full bg-white transition" :class="ch.relay_to_channels === 'yes' ? 'translate-x-6' : 'translate-x-1'"></span></button>
                         </div>
                         <div class="flex justify-between p-2 bg-slate-900/50 rounded">
-                            <span class="text-slate-400">🤖 AI معالجة</span>
-                            <button @click="toggleAI(ch.id)" class="relative inline-flex h-6 w-11 items-center rounded-full transition"
-                                    :class="ch.ai_enabled === 'yes' ? 'bg-blue-500' : 'bg-slate-600'">
-                                <span class="inline-block h-4 w-4 transform rounded-full bg-white transition"
-                                      :class="ch.ai_enabled === 'yes' ? 'translate-x-6' : 'translate-x-1'"></span>
-                            </button>
-                        </div>
-                        <div class="p-2 bg-slate-900/50 rounded">
-                            <label class="block text-xs text-slate-400 mb-1">🎛️ نوع المحتوى</label>
-                            <select x-model="ch.forward_mode" @change="saveSetting(ch.id, 'forward_mode', ch.forward_mode)" class="input text-sm py-1 w-full">
-                                <option value="all">📋 الكل</option>
-                                <option value="text_only">📝 نص فقط</option>
-                                <option value="media_only">📷 ميديا فقط</option>
-                            </select>
+                            <span class="text-slate-400">🤖 AI</span>
+                            <button @click="toggleAI(ch.id)" class="relative inline-flex h-6 w-11 items-center rounded-full transition" :class="ch.ai_enabled === 'yes' ? 'bg-blue-500' : 'bg-slate-600'"><span class="inline-block h-4 w-4 transform rounded-full bg-white transition" :class="ch.ai_enabled === 'yes' ? 'translate-x-6' : 'translate-x-1'"></span></button>
                         </div>
                         <div class="p-2 bg-slate-900/50 rounded">
                             <label class="block text-xs text-slate-400 mb-1">📂 الفئة</label>
                             <select x-model="ch.category" @change="setCategory(ch.id, ch.category)" class="input text-sm py-1 w-full">
                                 <option value="">غير مصنف</option>
+                                <option value="رياضة">⚽ رياضة</option>
                                 <option value="مال">💰 مال</option>
                                 <option value="تداول">💱 تداول</option>
                                 <option value="ألعاب">🎮 ألعاب</option>
                                 <option value="أخبار">📰 أخبار</option>
                                 <option value="تسويق">📣 تسويق</option>
+                                <option value="ترفيه">🎬 ترفيه</option>
                                 <option value="أخرى">📦 أخرى</option>
                             </select>
                         </div>
-                        <div class="p-2 bg-slate-900/50 rounded">
-                            <label class="block text-xs text-slate-400 mb-1">📝 نص ترحيب</label>
-                            <input type="text" x-model="ch.welcome_text" @change="saveSetting(ch.id, 'welcome_text', ch.welcome_text)" class="input text-sm py-1 w-full" placeholder="نص قبل كل ترحيل">
-                        </div>
                         <div class="p-2 bg-slate-900/50 rounded flex gap-2">
-                            <input type="text" x-model="ch.postText" class="input text-sm py-1 flex-1" placeholder="📨 رسالة للقناة">
+                            <input type="text" x-model="ch.postText" class="input text-sm py-1 flex-1" placeholder="📨 رسالة">
                             <button @click="postToChannel(ch)" class="btn btn-primary btn-sm">إرسال</button>
                         </div>
                     </div>
                     <div class="mt-3 pt-3 border-t border-slate-700 flex justify-between items-center">
                         <span class="text-xs text-slate-500" x-text="ch.added_at"></span>
-                        <button @click="deleteChannel(ch)" class="btn btn-danger btn-sm">🗑️ حذف</button>
+                        <button @click="deleteChannel(ch)" class="btn btn-danger btn-sm">🗑️</button>
                     </div>
                 </div>
             </template>
         </div>
-        <template x-if="channels.length === 0">
-            <div class="bg-slate-800 rounded-xl border border-slate-700 p-8 text-center text-slate-400">
-                <i class="fas fa-bullhorn text-4xl mb-2"></i>
-                <p>لا توجد قنوات. أضف البوت كمشرف في قناة وسيظهر هنا تلقائياً.</p>
+
+        <!-- Add Channel Modal -->
+        <div x-show="showAddChannelModal" x-transition class="modal-overlay" @click.self="showAddChannelModal = false" style="display:none">
+            <div class="modal">
+                <h3 class="font-bold text-lg mb-4">➕ إضافة قناة / مجموعة</h3>
+                <div class="space-y-3">
+                    <div><label class="block text-xs text-slate-400 mb-1">اسم القناة</label><input type="text" x-model="addChannelForm.title" class="input w-full" placeholder="مثال: قناة الأخبار"></div>
+                    <div><label class="block text-xs text-slate-400 mb-1">Chat ID (معرف القناة)</label><input type="text" x-model="addChannelForm.chat_id" class="input w-full" placeholder="-1001234567890" dir="ltr"></div>
+                    <div><label class="block text-xs text-slate-400 mb-1">النوع</label><select x-model="addChannelForm.type" class="input w-full"><option value="channel">📢 قناة</option><option value="group">👥 مجموعة</option><option value="supergroup">💬 مجموعة خارقة</option></select></div>
+                    <div><label class="block text-xs text-slate-400 mb-1">الفئة</label><select x-model="addChannelForm.category" class="input w-full"><option value="">غير مصنف</option><option value="رياضة">⚽ رياضة</option><option value="مال">💰 مال</option><option value="تداول">💱 تداول</option><option value="ألعاب">🎮 ألعاب</option><option value="أخبار">📰 أخبار</option><option value="تسويق">📣 تسويق</option><option value="ترفيه">🎬 ترفيه</option><option value="أخرى">📦 أخرى</option></select></div>
+                </div>
+                <div class="flex gap-2 justify-end mt-4">
+                    <button @click="showAddChannelModal = false" class="btn btn-sm" style="background:#475569">إلغاء</button>
+                    <button @click="addChannel()" class="btn btn-primary btn-sm">إضافة</button>
+                </div>
             </div>
-        </template>
+        </div>
     </div>
 
     <!-- TAB: Groups -->
     <div x-show="tab === 'groups'" class="space-y-4">
-        <button @click="showGroupModal = true" class="btn btn-primary">➕ إنشاء مجموعة</button>
+        <button @click="showGroupModal = true" class="btn btn-primary btn-sm">➕ إنشاء مجموعة</button>
         <template x-for="g in groups" :key="g.id">
             <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
-                <div class="flex justify-between items-start">
-                    <div>
-                        <h3 class="font-bold" x-text="g.name"></h3>
-                        <p class="text-xs text-slate-400" x-text="g.description || '—'"></p>
-                        <p class="text-xs text-slate-500 mt-1" x-text="'القنوات: ' + (g.channel_ids || '').split('|').length"></p>
-                    </div>
-                    <button @click="deleteGroup(g.id)" class="btn btn-danger btn-sm">حذف</button>
-                </div>
+                <div class="flex justify-between items-start"><div><h3 class="font-bold" x-text="g.name"></h3><p class="text-xs text-slate-400" x-text="g.description || '—'"></p><p class="text-xs text-slate-500 mt-1" x-text="'القنوات: ' + (g.channel_ids || '').split('|').length"></p></div><button @click="deleteGroup(g.id)" class="btn btn-danger btn-sm">حذف</button></div>
             </div>
         </template>
         <p x-show="groups.length === 0" class="text-center text-slate-400 p-8">لا توجد مجموعات</p>
-        <!-- Group Modal -->
-        <div x-show="showGroupModal" x-transition class="modal-overlay" @click.self="showGroupModal = false" style="display:none">
-            <div class="modal">
-                <h3 class="font-bold text-lg mb-4">إنشاء مجموعة قنوات</h3>
-                <input type="text" x-model="groupForm.name" class="input w-full mb-2" placeholder="اسم المجموعة">
-                <input type="text" x-model="groupForm.description" class="input w-full mb-2" placeholder="الوصف">
-                <div class="max-h-40 overflow-y-auto space-y-1 mb-3">
-                    <template x-for="ch in channels" :key="ch.id">
-                        <label class="flex items-center gap-2 p-1 hover:bg-slate-700 rounded cursor-pointer">
-                            <input type="checkbox" :value="ch.id" x-model="groupForm.selectedIds">
-                            <span x-text="ch.title"></span>
-                        </label>
-                    </template>
-                </div>
-                <div class="flex gap-2 justify-end">
-                    <button @click="showGroupModal = false" class="btn btn-sm" style="background:#475569">إلغاء</button>
-                    <button @click="createGroup()" class="btn btn-primary btn-sm">إنشاء</button>
-                </div>
-            </div>
-        </div>
+        <div x-show="showGroupModal" x-transition class="modal-overlay" @click.self="showGroupModal = false" style="display:none"><div class="modal"><h3 class="font-bold text-lg mb-4">إنشاء مجموعة قنوات</h3><input type="text" x-model="groupForm.name" class="input w-full mb-2" placeholder="اسم المجموعة"><input type="text" x-model="groupForm.description" class="input w-full mb-2" placeholder="الوصف"><div class="max-h-40 overflow-y-auto space-y-1 mb-3"><template x-for="ch in channels" :key="ch.id"><label class="flex items-center gap-2 p-1 hover:bg-slate-700 rounded cursor-pointer"><input type="checkbox" :value="ch.id" x-model="groupForm.selectedIds"><span x-text="ch.title"></span></label></template></div><div class="flex gap-2 justify-end"><button @click="showGroupModal = false" class="btn btn-sm" style="background:#475569">إلغاء</button><button @click="createGroup()" class="btn btn-primary btn-sm">إنشاء</button></div></div></div>
     </div>
 
-    <!-- TAB: Post Vault -->
+    <!-- TAB: Vault -->
     <div x-show="tab === 'vault'" class="space-y-4">
-        <input type="text" x-model="vaultSearch" @input.debounce.300ms="loadVault()" class="input w-full" placeholder="🔍 بحث في الأرشيف...">
+        <input type="text" x-model="vaultSearch" @input.debounce.300ms="loadVault()" class="input w-full" placeholder="🔍 بحث...">
         <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
-            <table class="data-table">
-                <thead><tr><th>التاريخ</th><th>المزود</th><th>النص الأصلي</th><th>النص المعالج</th><th>إجراءات</th></tr></thead>
-                <tbody>
-                    <template x-for="p in vaultPosts" :key="p.id">
-                        <tr class="hover:bg-slate-700/50">
-                            <td class="text-xs text-slate-400" x-text="p.created_at"></td>
-                            <td><span class="text-xs px-2 py-0.5 rounded bg-blue-500/20 text-blue-400" x-text="p.ai_provider || 'manual'"></span></td>
-                            <td class="text-xs max-w-xs truncate" x-text="(p.original_text || '').substring(0, 50) + '...'"></td>
-                            <td class="text-xs max-w-xs truncate" x-text="(p.processed_text || '').substring(0, 50) + '...'"></td>
-                            <td>
-                                <button @click="repost(p.id)" class="btn btn-primary btn-sm">↻ إعادة</button>
-                                <button @click="deleteVaultPost(p.id)" class="btn btn-danger btn-sm">🗑️</button>
-                            </td>
-                        </tr>
-                    </template>
-                    <tr x-show="vaultPosts.length === 0"><td colspan="5" class="text-center p-6 text-slate-400">لا توجد بوستات في الأرشيف</td></tr>
-                </tbody>
-            </table>
+            <table class="data-table"><thead><tr><th>التاريخ</th><th>المزود</th><th>الأصلي</th><th>المعالج</th><th>إجراءات</th></tr></thead><tbody>
+                <template x-for="p in vaultPosts" :key="p.id"><tr class="hover:bg-slate-700/50"><td class="text-xs text-slate-400" x-text="p.created_at"></td><td><span class="text-xs px-2 py-0.5 rounded bg-blue-500/20 text-blue-400" x-text="p.ai_provider || 'manual'"></span></td><td class="text-xs max-w-xs truncate" x-text="(p.original_text || '').substring(0,50) + '...'"></td><td class="text-xs max-w-xs truncate" x-text="(p.processed_text || '').substring(0,50) + '...'"></td><td><button @click="repost(p.id)" class="btn btn-primary btn-sm">↻</button><button @click="deleteVaultPost(p.id)" class="btn btn-danger btn-sm">🗑️</button></td></tr></template>
+                <tr x-show="vaultPosts.length === 0"><td colspan="5" class="text-center p-6 text-slate-400">لا توجد بوستات</td></tr>
+            </tbody></table>
         </div>
     </div>
 
-    <!-- TAB: AI Settings -->
+    <!-- TAB: AI -->
     <div x-show="tab === 'ai'" class="space-y-4">
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <template x-for="p in aiProviders" :key="p.name">
-                <div class="bg-slate-800 rounded-xl border border-slate-700 p-4" :class="p.available ? 'border-green-500/30' : 'opacity-50'">
-                    <p class="font-bold" x-text="p.display_name"></p>
-                    <p class="text-xs mt-1" :class="p.available ? 'text-green-400' : 'text-red-400'" x-text="p.available ? '✅ متاح' : '❌ غير مفعّل'"></p>
-                    <p x-show="aiActive === p.name" class="text-xs text-blue-400 mt-1">⭐ نشط</p>
-                </div>
-            </template>
+            <template x-for="p in aiProviders" :key="p.name"><div class="bg-slate-800 rounded-xl border border-slate-700 p-4" :class="p.available ? 'border-green-500/30' : 'opacity-50'"><p class="font-bold" x-text="p.display_name"></p><p class="text-xs mt-1" :class="p.available ? 'text-green-400' : 'text-red-400'" x-text="p.available ? '✅ متاح' : '❌ غير مفعّل'"></p><p x-show="aiActive === p.name" class="text-xs text-blue-400 mt-1">⭐ نشط</p></div></template>
         </div>
-        <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
-            <label class="block text-sm text-slate-400 mb-2">📝 تعليمات AI</label>
-            <textarea x-model="aiInstructions" rows="5" class="input w-full mb-2" placeholder="أعد صياغة البوست بأسلوب جذاب..."></textarea>
-            <button @click="saveAIInstructions()" class="btn btn-primary btn-sm">💾 حفظ</button>
-            <button @click="testAI()" class="btn btn-sm ml-2" style="background:#8B5CF6">🧪 اختبار</button>
-        </div>
-        <div x-show="aiTestResult" class="bg-slate-800 rounded-xl border border-slate-700 p-4">
-            <p class="text-sm text-slate-400 mb-1">نتيجة الاختبار:</p>
-            <p class="text-sm" x-text="aiTestResult"></p>
-        </div>
-        <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
-            <h3 class="font-bold mb-2">🔁 استبدال النصوص</h3>
-            <div class="flex gap-2 mb-2">
-                <input type="text" x-model="trForm.find_text" class="input flex-1" placeholder="بحث عن...">
-                <input type="text" x-model="trForm.replace_text" class="input flex-1" placeholder="استبدال بـ...">
-                <button @click="addReplacement()" class="btn btn-primary btn-sm">➕</button>
-            </div>
-            <template x-for="r in replacements" :key="r.id">
-                <div class="flex items-center gap-2 p-2 bg-slate-900/50 rounded mb-1 text-sm">
-                    <span class="flex-1 truncate"><code x-text="r.find_text"></code> → <code x-text="r.replace_text"></code></span>
-                    <button @click="toggleReplacement(r.id)" class="badge" :class="r.is_active === 'yes' ? 'badge-active' : 'badge-cancelled'" x-text="r.is_active === 'yes' ? '✅' : '⏸️'"></button>
-                    <button @click="deleteReplacement(r.id)" class="btn btn-danger btn-sm">🗑️</button>
-                </div>
-            </template>
-        </div>
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-4"><label class="block text-sm text-slate-400 mb-2">📝 تعليمات AI</label><textarea x-model="aiInstructions" rows="5" class="input w-full mb-2" placeholder="أعد صياغة البوست..."></textarea><button @click="saveAIInstructions()" class="btn btn-primary btn-sm">💾 حفظ</button><button @click="testAI()" class="btn btn-sm ml-2" style="background:#8B5CF6">🧪 اختبار</button></div>
+        <div x-show="aiTestResult" class="bg-slate-800 rounded-xl border border-slate-700 p-4"><p class="text-sm" x-text="aiTestResult"></p></div>
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-4"><h3 class="font-bold mb-2">🔁 استبدال نصوص</h3><div class="flex gap-2 mb-2"><input type="text" x-model="trForm.find_text" class="input flex-1" placeholder="بحث عن..."><input type="text" x-model="trForm.replace_text" class="input flex-1" placeholder="استبدال بـ..."><button @click="addReplacement()" class="btn btn-primary btn-sm">➕</button></div><template x-for="r in replacements" :key="r.id"><div class="flex items-center gap-2 p-2 bg-slate-900/50 rounded mb-1 text-sm"><span class="flex-1 truncate"><code x-text="r.find_text"></code> → <code x-text="r.replace_text"></code></span><button @click="toggleReplacement(r.id)" class="badge" :class="r.is_active === 'yes' ? 'badge-active' : 'badge-cancelled'" x-text="r.is_active === 'yes' ? '✅' : '⏸️'"></button><button @click="deleteReplacement(r.id)" class="btn btn-danger btn-sm">🗑️</button></div></template></div>
     </div>
 
-    <!-- TAB: Daily Report -->
+    <!-- TAB: Report -->
     <div x-show="tab === 'report'" class="space-y-4">
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3">
-                <p class="text-xs text-slate-400">بوستات اليوم</p>
-                <p class="text-2xl font-bold text-amber-400" x-text="report.total_posts || 0">0</p>
-            </div>
-            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3">
-                <p class="text-xs text-slate-400">معالجة بـ AI</p>
-                <p class="text-2xl font-bold text-blue-400" x-text="report.total_ai_processed || 0">0</p>
-            </div>
-            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3">
-                <p class="text-xs text-slate-400">وصل للمستخدمين</p>
-                <p class="text-2xl font-bold text-green-400" x-text="report.total_users_reached || 0">0</p>
-            </div>
-            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3">
-                <p class="text-xs text-slate-400">قنوات نشطة</p>
-                <p class="text-2xl font-bold text-purple-400" x-text="report.active_channels || 0">0</p>
-            </div>
+            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">بوستات اليوم</p><p class="text-2xl font-bold text-amber-400" x-text="report.total_posts || 0">0</p></div>
+            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">معالجة AI</p><p class="text-2xl font-bold text-blue-400" x-text="report.total_ai_processed || 0">0</p></div>
+            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">وصل للمستخدمين</p><p class="text-2xl font-bold text-green-400" x-text="report.total_users_reached || 0">0</p></div>
+            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">قنوات نشطة</p><p class="text-2xl font-bold text-purple-400" x-text="report.active_channels || 0">0</p></div>
         </div>
-        <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
-            <h3 class="font-bold mb-2">📜 آخر عمليات الترحيل</h3>
-            <table class="data-table">
-                <thead><tr><th>الوقت</th><th>المصدر</th><th>المعاينة</th><th>مستخدمين</th><th>قنوات</th></tr></thead>
-                <tbody>
-                    <template x-for="log in relayLogs" :key="log.timestamp">
-                        <tr class="hover:bg-slate-700/50">
-                            <td class="text-xs text-slate-400" x-text="log.timestamp"></td>
-                            <td class="text-xs" x-text="log.source_type === 'broadcast' ? 'بث' : 'قناة'"></td>
-                            <td class="text-xs max-w-xs truncate" x-text="log.preview"></td>
-                            <td class="font-bold text-green-400" x-text="log.users_relayed || 0"></td>
-                            <td class="font-bold text-amber-400" x-text="log.channels_relayed || 0"></td>
-                        </tr>
-                    </template>
-                </tbody>
-            </table>
-        </div>
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-4"><h3 class="font-bold mb-2">📜 آخر الترحيلات</h3><table class="data-table"><thead><tr><th>الوقت</th><th>المصدر</th><th>المعاينة</th><th>مستخدمين</th><th>قنوات</th></tr></thead><tbody><template x-for="log in relayLogs" :key="log.timestamp"><tr class="hover:bg-slate-700/50"><td class="text-xs text-slate-400" x-text="log.timestamp"></td><td class="text-xs" x-text="log.source_type === 'broadcast' ? 'بث' : 'قناة'"></td><td class="text-xs max-w-xs truncate" x-text="log.preview"></td><td class="font-bold text-green-400" x-text="log.users_relayed || 0"></td><td class="font-bold text-amber-400" x-text="log.channels_relayed || 0"></td></tr></template></tbody></table></div>
     </div>
-
 </div>
 {% endblock %}
 
@@ -282,111 +161,70 @@
 <script>
 function channelsApp() {
     return {
-        tab: 'channels',
-        channels: [], groups: [], vaultPosts: [], relayLogs: [],
+        tab: 'channels', channels: [], groups: [], vaultPosts: [], relayLogs: [],
         aiProviders: [], aiActive: '', aiInstructions: '', aiTestResult: '',
-        replacements: [], vaultSearch: '',
-        showGroupModal: false,
+        replacements: [], vaultSearch: '', filterCategory: '',
+        showGroupModal: false, showAddChannelModal: false,
         groupForm: { name: '', description: '', selectedIds: [] },
+        addChannelForm: { title: '', chat_id: '', type: 'channel', category: '' },
         trForm: { find_text: '', replace_text: '' },
         report: {},
 
         async init() { await this.loadAll(); },
-
         setTab(t) { this.tab = t; if (t === 'vault') this.loadVault(); if (t === 'ai') this.loadAI(); if (t === 'report') this.loadReport(); if (t === 'groups') this.loadGroups(); },
+        async loadAll() { await Promise.all([this.loadChannels(), this.loadGroups(), this.loadAI(), this.loadReport(), this.loadReplacements(), this.loadVault(), this.loadRelayLogs()]); },
 
-        async loadAll() {
-            await Promise.all([this.loadChannels(), this.loadGroups(), this.loadAI(), this.loadReport(), this.loadReplacements(), this.loadVault(), this.loadRelayLogs()]);
+        get filteredChannels() {
+            if (!this.filterCategory) return this.channels;
+            return this.channels.filter(c => (c.category || 'غير مصنف') === this.filterCategory);
+        },
+        get categoryGroups() {
+            const cats = {};
+            this.channels.forEach(ch => {
+                const cat = ch.category || 'غير مصنف';
+                if (!cats[cat]) cats[cat] = { count: 0, channels: [] };
+                cats[cat].count++;
+                cats[cat].channels.push(ch);
+            });
+            return cats;
         },
 
-        async loadChannels() {
-            try { const d = await api('/api/channels'); this.channels = d.channels || []; } catch(e) {}
-        },
-        async loadGroups() {
-            try { const d = await api('/api/channel-groups'); this.groups = d.groups || []; } catch(e) {}
-        },
-        async loadVault() {
-            const params = this.vaultSearch ? '?search=' + encodeURIComponent(this.vaultSearch) : '';
-            try { const d = await api('/api/post-vault' + params); this.vaultPosts = d.posts || []; } catch(e) {}
-        },
-        async loadRelayLogs() {
-            try { const d = await api('/api/relay-log'); this.relayLogs = d.logs || []; } catch(e) {}
-        },
-        async loadAI() {
+        async loadChannels() { try { const d = await api('/api/channels'); this.channels = d.channels || []; } catch(e) {} },
+        async loadGroups() { try { const d = await api('/api/channel-groups'); this.groups = d.groups || []; } catch(e) {} },
+        async loadVault() { const params = this.vaultSearch ? '?search=' + encodeURIComponent(this.vaultSearch) : ''; try { const d = await api('/api/post-vault' + params); this.vaultPosts = d.posts || []; } catch(e) {} },
+        async loadRelayLogs() { try { const d = await api('/api/relay-log'); this.relayLogs = d.logs || []; } catch(e) {} },
+        async loadAI() { try { const [prov, instr] = await Promise.all([api('/api/ai-providers'), api('/api/ai-instructions')]); this.aiProviders = prov.providers || []; this.aiActive = prov.active || ''; this.aiInstructions = instr.instructions || ''; } catch(e) {} },
+        async loadReport() { try { const d = await api('/api/channels/daily-report'); this.report = d; } catch(e) {} },
+        async loadReplacements() { try { const d = await api('/api/text-replacements'); this.replacements = d.rules || []; } catch(e) {} },
+
+        async addChannel() {
+            if (!this.addChannelForm.chat_id) return toast('اكتب Chat ID', 'warning');
             try {
-                const [prov, instr] = await Promise.all([api('/api/ai-providers'), api('/api/ai-instructions')]);
-                this.aiProviders = prov.providers || [];
-                this.aiActive = prov.active || '';
-                this.aiInstructions = instr.instructions || '';
-            } catch(e) {}
+                await api('/api/channels', { method: 'POST', body: JSON.stringify(this.addChannelForm) });
+                toast('تمت الإضافة', 'success');
+                this.showAddChannelModal = false;
+                this.addChannelForm = { title: '', chat_id: '', type: 'channel', category: '' };
+                await this.loadChannels();
+            } catch(e) { toast('فشل', 'error'); }
         },
-        async loadReport() {
-            try { const d = await api('/api/channels/daily-report'); this.report = d; } catch(e) {}
-        },
-        async loadReplacements() {
-            try { const d = await api('/api/text-replacements'); this.replacements = d.rules || []; } catch(e) {}
-        },
+        async toggleChannel(id) { try { await api(`/api/channels/${id}/toggle`, { method: 'POST', body: '{}' }); await this.loadChannels(); } catch(e) {} },
+        async toggleSetting(ch, key) { ch[key] = ch[key] === 'yes' ? 'no' : 'yes'; try { await api(`/api/channels/${ch.id}/settings`, { method: 'POST', body: JSON.stringify({ [key]: ch[key] }) }); } catch(e) { ch[key] = ch[key] === 'yes' ? 'no' : 'yes'; } },
+        async toggleAI(id) { try { await api(`/api/channels/${id}/ai-toggle`, { method: 'POST', body: '{}' }); await this.loadChannels(); } catch(e) {} },
+        async saveSetting(id, key, value) { try { await api(`/api/channels/${id}/settings`, { method: 'POST', body: JSON.stringify({ [key]: value }) }); } catch(e) {} },
+        async setCategory(id, cat) { try { await api(`/api/channels/${id}/category`, { method: 'POST', body: JSON.stringify({ category: cat }) }); } catch(e) {} },
+        async postToChannel(ch) { if (!ch.postText) return toast('اكتب رسالة', 'warning'); try { await api(`/api/channels/${ch.id}/post`, { method: 'POST', body: JSON.stringify({ message: ch.postText }) }); ch.postText = ''; toast('تم الإرسال', 'success'); } catch(e) {} },
+        async deleteChannel(ch) { if (!confirm('حذف؟')) return; try { await api(`/api/channels/${ch.id}`, { method: 'DELETE' }); await this.loadChannels(); } catch(e) {} },
 
-        async toggleChannel(id) {
-            try { await api(`/api/channels/${id}/toggle`, { method: 'POST', body: '{}' }); await this.loadChannels(); } catch(e) {}
-        },
-        async toggleSetting(ch, key) {
-            ch[key] = ch[key] === 'yes' ? 'no' : 'yes';
-            try { await api(`/api/channels/${ch.id}/settings`, { method: 'POST', body: JSON.stringify({ [key]: ch[key] }) }); } catch(e) { ch[key] = ch[key] === 'yes' ? 'no' : 'yes'; }
-        },
-        async toggleAI(id) {
-            try { await api(`/api/channels/${id}/ai-toggle`, { method: 'POST', body: '{}' }); await this.loadChannels(); } catch(e) {}
-        },
-        async saveSetting(id, key, value) {
-            try { await api(`/api/channels/${id}/settings`, { method: 'POST', body: JSON.stringify({ [key]: value }) }); } catch(e) {}
-        },
-        async setCategory(id, cat) {
-            try { await api(`/api/channels/${id}/category`, { method: 'POST', body: JSON.stringify({ category: cat }) }); } catch(e) {}
-        },
-        async postToChannel(ch) {
-            if (!ch.postText) return toast('اكتب رسالة', 'warning');
-            try { await api(`/api/channels/${ch.id}/post`, { method: 'POST', body: JSON.stringify({ message: ch.postText }) }); ch.postText = ''; toast('تم الإرسال', 'success'); } catch(e) {}
-        },
-        async deleteChannel(ch) {
-            if (!confirm('حذف القناة؟')) return;
-            try { await api(`/api/channels/${ch.id}`, { method: 'DELETE' }); await this.loadChannels(); } catch(e) {}
-        },
+        async createGroup() { if (!this.groupForm.name) return toast('اكتب اسم', 'warning'); const ids = this.groupForm.selectedIds.join('|'); try { await api('/api/channel-groups', { method: 'POST', body: JSON.stringify({ name: this.groupForm.name, description: this.groupForm.description, channel_ids: ids }) }); this.showGroupModal = false; this.groupForm = { name: '', description: '', selectedIds: [] }; await this.loadGroups(); } catch(e) {} },
+        async deleteGroup(id) { if (!confirm('حذف؟')) return; try { await api(`/api/channel-groups/${id}`, { method: 'DELETE' }); await this.loadGroups(); } catch(e) {} },
 
-        async createGroup() {
-            if (!this.groupForm.name) return toast('اكتب اسم المجموعة', 'warning');
-            const ids = this.groupForm.selectedIds.join('|');
-            try { await api('/api/channel-groups', { method: 'POST', body: JSON.stringify({ name: this.groupForm.name, description: this.groupForm.description, channel_ids: ids }) }); this.showGroupModal = false; this.groupForm = { name: '', description: '', selectedIds: [] }; await this.loadGroups(); } catch(e) {}
-        },
-        async deleteGroup(id) {
-            if (!confirm('حذف المجموعة؟')) return;
-            try { await api(`/api/channel-groups/${id}`, { method: 'DELETE' }); await this.loadGroups(); } catch(e) {}
-        },
-
-        async repost(id) {
-            try { await api(`/api/post-vault/${id}/repost`, { method: 'POST', body: '{}' }); toast('تمت إعادة النشر', 'success'); } catch(e) {}
-        },
-        async deleteVaultPost(id) {
-            if (!confirm('حذف البوست؟')) return;
-            try { await api(`/api/post-vault/${id}`, { method: 'DELETE' }); await this.loadVault(); } catch(e) {}
-        },
-
-        async saveAIInstructions() {
-            try { await api('/api/ai-instructions', { method: 'POST', body: JSON.stringify({ instructions: this.aiInstructions }) }); toast('تم الحفظ', 'success'); } catch(e) {}
-        },
-        async testAI() {
-            try { const d = await api('/api/ai-providers/test', { method: 'POST', body: '{}' }); this.aiTestResult = d.result || d.error; if (d.success) toast('نجح الاختبار', 'success'); else toast('فشل الاختبار', 'error'); } catch(e) { this.aiTestResult = 'خطأ: ' + e.message; }
-        },
-
-        async addReplacement() {
-            if (!this.trForm.find_text || !this.trForm.replace_text) return toast('املأ الحقلين', 'warning');
-            try { await api('/api/text-replacements', { method: 'POST', body: JSON.stringify(this.trForm) }); this.trForm = { find_text: '', replace_text: '' }; await this.loadReplacements(); } catch(e) {}
-        },
-        async toggleReplacement(id) {
-            try { await api(`/api/text-replacements/${id}/toggle`, { method: 'POST', body: '{}' }); await this.loadReplacements(); } catch(e) {}
-        },
-        async deleteReplacement(id) {
-            try { await api(`/api/text-replacements/${id}`, { method: 'DELETE' }); await this.loadReplacements(); } catch(e) {}
-        }
+        async repost(id) { try { await api(`/api/post-vault/${id}/repost`, { method: 'POST', body: '{}' }); toast('تمت الإعادة', 'success'); } catch(e) {} },
+        async deleteVaultPost(id) { if (!confirm('حذف؟')) return; try { await api(`/api/post-vault/${id}`, { method: 'DELETE' }); await this.loadVault(); } catch(e) {} },
+        async saveAIInstructions() { try { await api('/api/ai-instructions', { method: 'POST', body: JSON.stringify({ instructions: this.aiInstructions }) }); toast('تم الحفظ', 'success'); } catch(e) {} },
+        async testAI() { try { const d = await api('/api/ai-providers/test', { method: 'POST', body: '{}' }); this.aiTestResult = d.result || d.error; if (d.success) toast('نجح', 'success'); else toast('فشل', 'error'); } catch(e) { this.aiTestResult = 'خطأ'; } },
+        async addReplacement() { if (!this.trForm.find_text || !this.trForm.replace_text) return toast('املأ الحقلين', 'warning'); try { await api('/api/text-replacements', { method: 'POST', body: JSON.stringify(this.trForm) }); this.trForm = { find_text: '', replace_text: '' }; await this.loadReplacements(); } catch(e) {} },
+        async toggleReplacement(id) { try { await api(`/api/text-replacements/${id}/toggle`, { method: 'POST', body: '{}' }); await this.loadReplacements(); } catch(e) {} },
+        async deleteReplacement(id) { try { await api(`/api/text-replacements/${id}`, { method: 'DELETE' }); await this.loadReplacements(); } catch(e) {} }
     }
 }
 </script>

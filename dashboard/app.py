@@ -1526,6 +1526,72 @@ def api_post_to_channel(channel_id):
     log_action('post_to_channel', f'{channel_id}: {message_text[:50]}')
     return jsonify({'success': True, 'message': 'تم إضافة الرسالة لقائمة الإرسال'})
 
+@app.route('/api/channels', methods=['POST'])
+@api_auth
+def api_add_channel_manual():
+    """إضافة قناة يدوياً (البوت ليس مشرفاً فيها)"""
+    data = request.json
+    chat_id = data.get('chat_id', '').strip()
+    title = data.get('title', '').strip()
+    ch_type = data.get('type', 'channel')
+
+    if not chat_id:
+        return jsonify({'error': 'chat_id required'}), 400
+
+    # فحص عدم التكرار
+    channels = read_csv('bot_channels.csv')
+    for ch in channels:
+        if ch.get('chat_id') == str(chat_id):
+            return jsonify({'error': 'Channel already exists'}), 400
+
+    ch_id = f"CH{secrets.token_hex(3).upper()}"
+    fieldnames = get_fieldnames('bot_channels.csv', ['id','chat_id','title','type','is_active','added_at','relay_to_users','relay_to_channels','forward_mode','welcome_text','category','ai_enabled'])
+    new_channel = {
+        'id': ch_id,
+        'chat_id': str(chat_id),
+        'title': title,
+        'type': ch_type,
+        'is_active': 'yes',
+        'added_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
+        'relay_to_users': 'no',
+        'relay_to_channels': 'no',
+        'forward_mode': 'all',
+        'welcome_text': '',
+        'category': data.get('category', ''),
+        'ai_enabled': 'no'
+    }
+    append_csv('bot_channels.csv', new_channel, fieldnames)
+    log_action('add_channel_manual', f'{ch_id}: {title} ({chat_id})')
+    return jsonify({'success': True, 'id': ch_id})
+
+@app.route('/api/channels/<channel_id>/category', methods=['POST'])
+@api_auth
+def api_set_channel_category_api(channel_id):
+    data = request.json
+    category = data.get('category', '')
+    channels = read_csv('bot_channels.csv')
+    fieldnames = get_fieldnames('bot_channels.csv', ['id','chat_id','title','type','is_active','added_at','relay_to_users','relay_to_channels','forward_mode','welcome_text','category','ai_enabled'])
+    for c in channels:
+        if c.get('id') == channel_id:
+            c['category'] = category
+            break
+    write_csv('bot_channels.csv', channels, fieldnames)
+    return jsonify({'success': True})
+
+@app.route('/api/channel-categories')
+@api_auth
+def api_channel_categories_list():
+    """قائمة كل الفئات مع عدد القنوات في كل فئة"""
+    channels = read_csv('bot_channels.csv')
+    cats = {}
+    for ch in channels:
+        cat = ch.get('category', '') or 'غير مصنف'
+        if cat not in cats:
+            cats[cat] = {'count': 0, 'channels': []}
+        cats[cat]['count'] += 1
+        cats[cat]['channels'].append({'id': ch.get('id', ''), 'title': ch.get('title', ''), 'chat_id': ch.get('chat_id', '')})
+    return jsonify({'categories': cats})
+
 # ===== API — Bots =====
 
 @app.route('/api/bots')
