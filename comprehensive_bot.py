@@ -2928,73 +2928,124 @@ class ComprehensiveDUXBot:
             return []
 
     def process_source_channel_post(self, message):
-        """معالجة بوست من قناة مصدرية — تكييفه على البراند ونشره"""
+        """معالجة بوست من قناة — حسب دور القناة وإعدادات المحتوى"""
         chat_id = message.get('chat', {}).get('id', '')
         chat_title = message.get('chat', {}).get('title', '')
 
-        # فحص هل القناة مصدرية
-        source_channels = []
-        try:
-            with open('source_channels.csv', 'r', encoding='utf-8-sig') as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    if row.get('is_active') == 'yes' and row.get('chat_id') == str(chat_id):
-                        source_channels.append(row)
-                        break
-        except:
-            pass
+        # فحص هل القناة مسجلة (سواء مصدرية أو مدارة)
+        channel_settings = self.get_channel_settings(chat_id)
+        source_channel = None
 
-        if not source_channels:
-            return False
+        if not channel_settings:
+            # فحص source_channels
+            try:
+                with open('source_channels.csv', 'r', encoding='utf-8-sig') as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        if row.get('is_active') == 'yes' and row.get('chat_id') == str(chat_id):
+                            source_channel = row
+                            break
+            except:
+                pass
+            if not source_channel:
+                return False
+            # استخدام إعدادات source_channels
+            source = source_channel
+            brand_voice = source.get('brand_voice', '')
+            target_ids = source.get('target_channel_ids', '').split('|') if source.get('target_channel_ids') else []
+            content_filter = source.get('content_filter', 'all')  # all, text_only, photo_only, video_only, text_photo, text_photo_video
+            ai_edit_text = source.get('ai_edit_text', 'no') == 'yes'
+            ai_edit_media = source.get('ai_edit_media', 'no') == 'yes'
+            ai_provider = source.get('ai_provider', '')
+            text_replacements_enabled = True
+        else:
+            # قناة مدارة (البوت مشرف)
+            if channel_settings.get('channel_role', 'both') not in ('source', 'both'):
+                return False  # قناة نشر فقط — لا نأخذ منها
+            source = channel_settings
+            brand_voice = source.get('brand_voice', '')
+            target_ids = []  # النشر يتم عبر relay_to_users/relay_to_channels
+            content_filter = source.get('forward_mode', 'all')
+            ai_edit_text = source.get('ai_enabled', 'no') == 'yes'
+            ai_edit_media = False  # تعديل الصور متاح فقط في القنوات المصدرية
+            ai_provider = source.get('ai_provider', '')
+            text_replacements_enabled = True
 
-        source = source_channels[0]
-        brand_voice = source.get('brand_voice', '')
-        target_ids = source.get('target_channel_ids', '').split('|') if source.get('target_channel_ids') else []
-
-        # استخراج النص
+        # تطبيق فلتر المحتوى — تحديد ما نأخذه
         text = ''
         media_type = ''
         media_file_id = ''
-        if 'text' in message:
-            text = message['text']
-            media_type = 'text'
-        elif 'caption' in message:
-            text = message['caption']
-            if 'photo' in message:
-                media_type = 'photo'
-                media_file_id = message['photo'][-1].get('file_id', '')
-            elif 'video' in message:
-                media_type = 'video'
-                media_file_id = message['video'].get('file_id', '')
+        has_text = 'text' in message
+        has_caption = 'caption' in message
+        has_photo = 'photo' in message
+        has_video = 'video' in message
+        has_document = 'document' in message
 
-        if not text or len(text) < 10:
+        if has_text:
+            text = message['text']
+        elif has_caption:
+            text = message['caption']
+
+        if has_photo:
+            media_type = 'photo'
+            media_file_id = message['photo'][-1].get('file_id', '')
+        elif has_video:
+            media_type = 'video'
+            media_file_id = message['video'].get('file_id', '')
+        elif has_document:
+            media_type = 'document'
+            media_file_id = message['document'].get('file_id', '')
+
+        # فلترة حسب نوع المحتوى المطلوب
+        if content_filter == 'text_only':
+            if not text or (has_photo or has_video):
+                media_type = ''
+                media_file_id = ''
+        elif content_filter == 'photo_only':
+            if not has_photo:
+                return False
+        elif content_filter == 'video_only':
+            if not has_video:
+                return False
+        elif content_filter == 'text_photo':
+            if not text or not has_photo:
+                return False
+        elif content_filter == 'text_photo_video':
+            if not text or (not has_photo and not has_video):
+                return False
+
+        if not text and not media_file_id:
             return False
 
-        # تكييف المحتوى على البراند باستخدام AI
-        processed = None
-        if brand_voice:
+        # استبدال النصوص المخصصة
+        if text and text_replacements_enabled:
+            text = self._apply_text_replacements(text, str(chat_id))
+
+        # تكييف النص بـ AI
+        final_text = text
+        used_provider = 'none'
+        if ai_edit_text and text and len(text) > 10:
             try:
                 from ai_providers import AIManager
                 ai_manager = AIManager()
-                instructions = (
-                    f"أعد صياغة هذا المحتوى بأسلوب البراند التالي:\n\n"
-                    f"أسلوب البراند: {brand_voice}\n\n"
-                    f"المحتوى الأصلي:\n{text}\n\n"
-                    f"أعد كتابته بأسلوب احترافي جذاب مع الحفاظ على المعلومات الأساسية."
+                instructions = brand_voice or (
+                    "أنت محرر محتوى احترافي للقنوات التيليجرام. "
+                    "أعد صياغة البوست بأسلوب جذاب ومحترف. "
+                    "حافظ على المعنى والروابط. أضف إيموجي مناسب."
                 )
                 processed, used_provider = ai_manager.process(text, instructions)
-            except:
-                pass
-
-        final_text = processed or text
+                if processed and len(processed) > 10:
+                    final_text = processed
+            except Exception as e:
+                logger.error(f"خطأ في AI للنص: {e}")
 
         # حفظ في post_vault
         post_id = f"SCR{str(int(datetime.now().timestamp()))[-6:]}"
         try:
             with open('post_vault.csv', 'a', newline='', encoding='utf-8-sig') as f:
                 writer = csv.writer(f)
-                writer.writerow([post_id, chat_title, str(chat_id), text[:500], final_text[:500],
-                               media_type, media_file_id, used_provider or 'none', 'processed',
+                writer.writerow([post_id, chat_title, str(chat_id), (text or '')[:500], final_text[:500],
+                               media_type, media_file_id, used_provider, 'published',
                                datetime.now().strftime('%Y-%m-%d %H:%M'), 0, 0, 0, 'scraped'])
         except:
             pass
@@ -3017,6 +3068,11 @@ class ComprehensiveDUXBot:
                             'chat_id': tid, 'video': media_file_id,
                             'caption': final_text[:1024], 'parse_mode': 'HTML'
                         })
+                    elif media_type == 'document' and media_file_id:
+                        self.api_call('sendDocument', {
+                            'chat_id': tid, 'document': media_file_id,
+                            'caption': final_text[:1024], 'parse_mode': 'HTML'
+                        })
                     else:
                         self.api_call('sendMessage', {
                             'chat_id': tid, 'text': final_text[:4096], 'parse_mode': 'HTML'
@@ -3025,13 +3081,14 @@ class ComprehensiveDUXBot:
                 except:
                     pass
 
-        # نشر لكل المستخدمين
+        # نشر لكل المستخدمين (لو relay_to_users)
         users_reached = 0
-        try:
-            sent, _ = self.broadcast_to_all_users(final_text)
-            users_reached = sent
-        except:
-            pass
+        if source.get('relay_to_users', 'no') == 'yes' or (channel_settings and channel_settings.get('relay_to_users', 'no') == 'yes'):
+            try:
+                sent, _ = self.broadcast_to_all_users(final_text)
+                users_reached = sent
+            except:
+                pass
 
         # تحديث post_vault بأرقام النشر
         try:
