@@ -1737,6 +1737,52 @@ def api_channel_categories_list():
         cats[cat]['channels'].append({'id': ch.get('id', ''), 'title': ch.get('title', ''), 'chat_id': ch.get('chat_id', '')})
     return jsonify({'categories': cats})
 
+# ===== API — Wheel Gifts =====
+
+@app.route('/api/wheel-gifts')
+@api_auth
+def api_wheel_gifts():
+    gifts = read_csv('wheel_gifts.csv')
+    return jsonify({'gifts': gifts})
+
+@app.route('/api/wheel-gifts', methods=['POST'])
+@api_auth
+def api_add_wheel_gift():
+    data = request.json
+    gifts = read_csv('wheel_gifts.csv')
+    fieldnames = get_fieldnames('wheel_gifts.csv', ['id','gift_text','affiliate_link','is_active','created_at'])
+    new_id = f"GIFT{secrets.token_hex(3).upper()}"
+    gift = {
+        'id': new_id,
+        'gift_text': data.get('gift_text', ''),
+        'affiliate_link': data.get('affiliate_link', ''),
+        'is_active': 'yes',
+        'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')
+    }
+    append_csv('wheel_gifts.csv', gift, fieldnames)
+    log_action('add_wheel_gift', new_id)
+    return jsonify({'success': True, 'id': new_id})
+
+@app.route('/api/wheel-gifts/<gift_id>', methods=['PUT', 'DELETE'])
+@api_auth
+def api_edit_wheel_gift(gift_id):
+    gifts = read_csv('wheel_gifts.csv')
+    fieldnames = get_fieldnames('wheel_gifts.csv', ['id','gift_text','affiliate_link','is_active','created_at'])
+    if request.method == 'DELETE':
+        gifts = [g for g in gifts if g.get('id') != gift_id]
+        write_csv('wheel_gifts.csv', gifts, fieldnames)
+        return jsonify({'success': True})
+    elif request.method == 'PUT':
+        data = request.json
+        for g in gifts:
+            if g.get('id') == gift_id:
+                for k, v in data.items():
+                    if k in fieldnames:
+                        g[k] = v
+                break
+        write_csv('wheel_gifts.csv', gifts, fieldnames)
+        return jsonify({'success': True})
+
 # ===== API — Bots =====
 
 @app.route('/api/bots')

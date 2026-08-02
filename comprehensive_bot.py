@@ -388,6 +388,11 @@ class ComprehensiveDUXBot:
                 writer = csv.writer(f)
                 writer.writerow(['id', 'round_id', 'user_id', 'prize_won', 'spin_time'])
 
+        if not os.path.exists('wheel_gifts.csv'):
+            with open('wheel_gifts.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.writer(f)
+                writer.writerow(['id', 'gift_text', 'affiliate_link', 'is_active', 'created_at'])
+
         # ملف القنوات/المجموعات المرتبطة بالبوت
         if not os.path.exists('bot_channels.csv'):
             with open('bot_channels.csv', 'w', newline='', encoding='utf-8-sig') as f:
@@ -10671,6 +10676,223 @@ class ComprehensiveDUXBot:
                 self.show_wheel_panel(fake_msg)
                 return
 
+            elif data == 'wheel_start_game':
+                # قراءة الهدايا من wheel_gifts.csv
+                gifts = []
+                try:
+                    with open('wheel_gifts.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        for row in reader:
+                            if row.get('is_active') == 'yes':
+                                gifts.append(row)
+                except:
+                    pass
+
+                if not gifts:
+                    self.answer_callback(callback_id, "❌ لا توجد هدايا متاحة")
+                    return
+
+                # قراءة الجولة النشطة
+                active_round = None
+                try:
+                    with open('wheel_rounds.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        for row in reader:
+                            if row.get('status') == 'active':
+                                active_round = row
+                                break
+                except:
+                    pass
+
+                if not active_round:
+                    self.answer_callback(callback_id, "❌ لا توجد جولة نشطة")
+                    return
+
+                # فحص حدود الدورات
+                my_spins = 0
+                try:
+                    with open('wheel_spins.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        for row in reader:
+                            if row.get('round_id') == active_round['id'] and row.get('user_id') == str(user_id):
+                                my_spins += 1
+                except:
+                    pass
+
+                max_spins = int(active_round.get('max_spins_per_user', 1))
+                if my_spins >= max_spins:
+                    # فحص الرصيد للدورات الإضافية
+                    spin_cost = float(active_round.get('spin_cost', 0) or 0)
+                    wallet_balance = 0.0
+                    if self.svrp:
+                        try:
+                            wallets = self.svrp.get_all_wallets()
+                            for w in wallets:
+                                if str(w.get('telegram_id', '')) == str(user_id):
+                                    wallet_balance = float(w.get('balance', 0) or 0)
+                                    break
+                        except:
+                            pass
+                    if spin_cost > 0 and wallet_balance >= spin_cost:
+                        # خصم تكلفة الدورة
+                        try:
+                            rows = []
+                            with open('svrp_wallets.csv', 'r', encoding='utf-8-sig') as f:
+                                reader = csv.DictReader(f)
+                                fieldnames = reader.fieldnames
+                                rows = list(reader)
+                            for row in rows:
+                                if row.get('telegram_id') == str(user_id):
+                                    row['balance'] = str(wallet_balance - spin_cost)
+                                    break
+                            with open('svrp_wallets.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                                writer.writeheader()
+                                for row in rows:
+                                    writer.writerow({k: row.get(k, '') for k in fieldnames})
+                        except:
+                            pass
+                    else:
+                        self.answer_callback(callback_id, "❌ وصلت للحد الأقصى")
+                        return
+
+                # خلط الهدايا عشوائياً
+                import random as _r
+                _r.shuffle(gifts)
+                # أخذ 4-6 هدايا عشوائية
+                num_gifts = min(len(gifts), _r.randint(4, 6))
+                game_gifts = gifts[:num_gifts]
+
+                # حفظ بيانات اللعبة في حالة المستخدم
+                self.user_states[user_id] = {
+                    'step': 'wheel_game_active',
+                    'round_id': active_round['id'],
+                    'gifts': [{'id': g.get('id', ''), 'text': g.get('gift_text', ''), 'link': g.get('affiliate_link', '')} for g in game_gifts],
+                    'round': 0,
+                    'message_id': message.get('message_id', 0
+                    )
+                }
+
+                # عرض الهدايا كأزرار — مع أزرار وهمية
+                inline_btns = []
+                # إضافة هدايا حقيقية + أزرار وهمية في ترتيب عشوائي
+                all_buttons = []
+                for g in game_gifts:
+                    all_buttons.append({'type': 'gift', 'id': g.get('id', ''), 'text': g.get('gift_text', ''), 'link': g.get('affiliate_link', '')})
+                # إضافة أزرار وهمية
+                for i in range(num_gifts):
+                    all_buttons.append({'type': 'fake', 'text': '🎁 ???', 'id': f'fake_{i}'})
+
+                _r.shuffle(all_buttons)
+
+                # ترتيب في صفوف (2 لكل صف)
+                for i in range(0, len(all_buttons), 2):
+                    row = []
+                    for j in range(2):
+                        if i + j < len(all_buttons):
+                            btn = all_buttons[i + j]
+                            if btn['type'] == 'gift':
+                                row.append({'text': f"🎁 {btn['text'][:20]}", 'callback_data': f'wheel_catch_{btn["id"]}'})
+                            else:
+                                row.append({'text': btn['text'], 'callback_data': 'wheel_miss'})
+                    inline_btns.append(row)
+
+                inline_btns.append([{'text': '❌ خروج', 'callback_data': 'wheel_back_main'}])
+
+                self.edit_message(chat_id, message.get('message_id'),
+                    f"🎡 <b>العبة بدأت!</b>\n\n"
+                    f"⚡ <b>اضغط بسرعة على الهدية!</b>\n"
+                    f"⏰ الأزرار ستختفي بعد ثوانٍ!\n\n"
+                    f"🎯 اختر هديتك بسرعة!")
+
+                self.send_inline_message(chat_id,
+                    "🎁 <b>اقبض هديتك!</b>\n\nاضغط بسرعة قبل ما تختفي!",
+                    inline_btns)
+
+                # جدولة إخفاء الأزرار بعد 3 ثوانٍ
+                import threading
+                def hide_gifts():
+                    import time
+                    time.sleep(3)
+                    try:
+                        state = self.user_states.get(user_id, {})
+                        if isinstance(state, dict) and state.get('step') == 'wheel_game_active':
+                            # تعديل الرسالة لإزالة الأزرار
+                            self.edit_message(chat_id, state.get('message_id2', 0),
+                                "⏰ <b>انتهى الوقت!</b>\n\nالأزرار اختفت!\nاستخدم زر التحديث للمحاولة مرة أخرى")
+                    except:
+                        pass
+
+                t = threading.Thread(target=hide_gifts, daemon=True)
+                t.start()
+                return
+
+            elif data.startswith('wheel_catch_'):
+                gift_id = data.replace('wheel_catch_', '')
+                state = self.user_states.get(user_id, {})
+
+                if not isinstance(state, dict) or state.get('step') != 'wheel_game_active':
+                    self.answer_callback(callback_id, "⏰ انتهت اللعبة")
+                    return
+
+                gifts = state.get('gifts', [])
+                caught = None
+                for g in gifts:
+                    if g.get('id') == gift_id:
+                        caught = g
+                        break
+
+                if not caught:
+                    self.answer_callback(callback_id, "❌ خطأ")
+                    return
+
+                # تسجيل الدوران
+                round_id = state.get('round_id', '')
+                spin_id = f"SPN{str(int(datetime.now().timestamp()))[-6:]}"
+                try:
+                    with open('wheel_spins.csv', 'a', newline='', encoding='utf-8-sig') as f:
+                        writer = csv.writer(f)
+                        writer.writerow([spin_id, round_id, str(user_id), caught.get('text', ''), datetime.now().strftime('%Y-%m-%d %H:%M')])
+                except:
+                    pass
+
+                del self.user_states[user_id]
+
+                self.answer_callback(callback_id, "🎉")
+
+                # عرض الهدية مع رابط الإحالة
+                inline_btns = []
+                if caught.get('link'):
+                    inline_btns.append([{'text': '🔗 اضغط هنا للOpening', 'url': caught['link']}])
+                inline_btns.append([{'text': '🔙 القائمة الرئيسية', 'callback_data': 'wheel_back_main'}])
+
+                self.edit_message(chat_id, message.get('message_id'),
+                    f"🎉🎉🎉 <b>مبروك! قبضت هديتك!</b>\n\n"
+                    f"━━━━━━━━━━━━━━━━━━\n"
+                    f"🎁 الهدية: <b>{caught.get('text', '')}</b>\n"
+                    f"━━━━━━━━━━━━━━━━━━\n\n"
+                    f"🔗 اضغط الزر بالأسفل للتسجيل واستلام هديتك!",
+                    )
+                self.send_inline_message(chat_id,
+                    f"🎁 <b>تهانينا!</b>\n\nالهدية: <b>{caught.get('text', '')}</b>",
+                    inline_btns)
+
+                # إشعار الأدمن
+                user_obj = self.find_user(user_id)
+                for admin_id in self.admin_ids:
+                    try:
+                        self.send_message(int(admin_id),
+                            f"🎡 <b>عجلة الحظ — فائز!</b>\n\n"
+                            f"👤 {user_obj.get('name', '')} ({user_id})\n"
+                            f"🎁 الهدية: {caught.get('text', '')}")
+                    except:
+                        pass
+                return
+
+            elif data == 'wheel_miss':
+                self.answer_callback(callback_id, "💨 خاطئة!")
+                return
+
             elif data == 'lot_refresh':
                 self.edit_message(chat_id, message.get('message_id'), "🔄 جارٍ التحديث...")
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
@@ -15880,32 +16102,13 @@ class ComprehensiveDUXBot:
             text += f"🎟️ دورة إضافية: <code>{spin_cost:.0f}</code> {currency}\n"
         text += f"━━━━━━━━━━━━━━━━━━\n\n"
 
-        # إرسال زر Web App للعجلة الحقيقية
-        url = f"{self.api_url.replace('https://api.telegram.org/bot', '').strip()}"
-        # بناء URL للـ Web App
-        webapp_url = os.getenv('DASHBOARD_HOST', 'http://69.169.108.197:8080') + f'/webapp/wheel?round_id={active_round["id"]}'
-
+        # إرسال زر "ابدأ" للعبة القبض على الهدايا
         inline_btns = []
         if free_spins_left > 0 or can_spin_paid:
-            # زر عادي يفتح العجلة كـ Web App
-            keyboard = {
-                'inline_keyboard': [
-                    [{'text': '🎡 أدر العجلة!', 'web_app': {'url': webapp_url}}],
-                    [{'text': '🔄 تحديث', 'callback_data': 'wheel_refresh'},
-                     {'text': '🔙 رجوع', 'callback_data': 'wheel_back_main'}]
-                ]
-            }
-            import urllib.request
-            payload = json.dumps({
-                'chat_id': message['chat']['id'],
-                'text': text,
-                'parse_mode': 'HTML',
-                'reply_markup': keyboard
-            }).encode('utf-8')
-            url = f"{self.api_url}sendMessage"
-            req = urllib.request.Request(url, data=payload, headers={'Content-Type': 'application/json'})
-            urllib.request.urlopen(req, timeout=10)
-            return
+            inline_btns.append([{'text': '🎮 ابدأ — اقبض هديتك!', 'callback_data': 'wheel_start_game'}])
+            inline_btns.append([{'text': '🔄 تحديث', 'callback_data': 'wheel_refresh'},
+                                {'text': '🔙 رجوع', 'callback_data': 'wheel_back_main'}])
+            self.send_inline_message(message['chat']['id'], text, inline_btns)
         else:
             text += "⚠️ وصلت للحد الأقصى ولا يوجد رصيد كافٍ للدورات الإضافية"
             inline_btns.append([{'text': '🔄 تحديث', 'callback_data': 'wheel_refresh'}])
