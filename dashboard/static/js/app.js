@@ -403,3 +403,46 @@ document.addEventListener('DOMContentLoaded', () => {
     // Click handler for notification permission request
     document.addEventListener('click', requestNotificationPermission, { once: true });
 });
+
+// ===== Global Search =====
+function globalSearchApp() {
+    return {
+        query: '', results: [], loading: false, showResults: false,
+
+        async search() {
+            if (this.query.length < 2) { this.results = []; return; }
+            this.loading = true;
+            const q = this.query.toLowerCase();
+            const results = [];
+
+            try {
+                // Search transactions
+                const txnRes = await fetch('/api/transactions?search=' + encodeURIComponent(this.query) + '&per_page=5');
+                const txnData = await txnRes.json();
+                (txnData.transactions || []).forEach(t => {
+                    results.push({
+                        type: 'معاملة', icon: t.type === 'deposit' ? '💵' : '💸',
+                        title: t.name + ' — ' + t.amount + ' ' + (t.currency || ''),
+                        subtitle: t.id + ' | ' + t.company + ' | ' + (t.wallet_number || ''),
+                        url: '/transactions'
+                    });
+                });
+
+                // Search users
+                const userRes = await fetch('/api/users?search=' + encodeURIComponent(this.query) + '&per_page=5');
+                const userData = await userRes.json();
+                (userData.users || []).forEach(u => {
+                    results.push({
+                        type: 'مستخدم', icon: '👤',
+                        title: u.name + ' — ' + (u.customer_id || ''),
+                        subtitle: u.phone || '' + ' | ' + (u.currency || ''),
+                        url: '/users'
+                    });
+                });
+            } catch(e) { /* silent */ }
+
+            this.results = results.slice(0, 10);
+            this.loading = false;
+        }
+    };
+}
