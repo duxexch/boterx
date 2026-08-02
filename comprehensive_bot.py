@@ -9787,6 +9787,191 @@ class ComprehensiveDUXBot:
                 self.execute_lottery_draw(chat_id, user_id, round_id)
                 return
 
+            # عرض تذاكر جولة محددة
+            elif data.startswith('lot_tickets_'):
+                round_id = data.replace('lot_tickets_', '')
+                tickets = []
+                try:
+                    with open('lottery_tickets.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        for t in reader:
+                            if t.get('round_id') == round_id:
+                                tickets.append(t)
+                except:
+                    pass
+                text = f"🎫 <b>تذاكر الجولة</b> (<code>{len(tickets)}</code>)\n\n━━━━━━━━━━━━━━━━━━\n"
+                for t in tickets[:30]:
+                    status_icon = '✅' if t.get('payment_verified') == 'yes' else '⏳' if t.get('payment_verified') == 'pending_admin' else '❌'
+                    text += f"{status_icon} <code>#{t.get('ticket_number', '—')}</code> | {t.get('user_name', '—')}\n"
+                if len(tickets) > 30:
+                    text += f"\n... و {len(tickets) - 30} تذكرة أخرى"
+                inline_btns = [[{'text': '🔙 رجوع', 'callback_data': 'lot_admin_back'}]]
+                self.edit_message(chat_id, message.get('message_id'), text)
+                self.send_inline_message(chat_id, f"إجمالي: {len(tickets)} تذكرة", inline_btns)
+                return
+
+            # عرض التذاكر المعلقة للموافقة
+            elif data.startswith('lot_pending_'):
+                round_id = data.replace('lot_pending_', '')
+                pending = []
+                try:
+                    with open('lottery_tickets.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        for t in reader:
+                            if t.get('round_id') == round_id and t.get('payment_verified') == 'pending_admin':
+                                pending.append(t)
+                except:
+                    pass
+                text = f"⏳ <b>تذاكر معلقة ({len(pending)})</b>\n\n━━━━━━━━━━━━━━━━━━\n"
+                inline_btns = []
+                for t in pending[:15]:
+                    text += f"🎫 {t.get('user_name', '—')} | <code>{t.get('id', '')}</code>\n"
+                    inline_btns.append([
+                        {'text': '✅ موافقة', 'callback_data': f'lot_admin_approve_{t.get("id", "")}'},
+                        {'text': '❌ رفض', 'callback_data': f'lot_admin_reject_{t.get("id", "")}'},
+                    ])
+                inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'lot_admin_back'}])
+                self.edit_message(chat_id, message.get('message_id'), text)
+                self.send_inline_message(chat_id, f"{len(pending)} تذكرة معلقة", inline_btns)
+                return
+
+            # إلغاء جولة
+            elif data.startswith('lot_cancel_'):
+                round_id = data.replace('lot_cancel_', '')
+                if not confirm_action_str:
+                    self.edit_message(chat_id, message.get('message_id'),
+                        f"⚠️ <b>تأكيد إلغاء الجولة؟</b>\n\nسيتم إشعار جميع المشاركين.")
+                    self.send_inline_message(chat_id, "تأكيد الإلغاء:", [
+                        [{'text': '✅ نعم، ألغِ', 'callback_data': f'lot_cancel_confirm_{round_id}'},
+                         {'text': '❌ تراجع', 'callback_data': 'lot_admin_back'}]
+                    ])
+                    return
+                elif data.startswith('lot_cancel_confirm_'):
+                    round_id = data.replace('lot_cancel_confirm_', '')
+                    try:
+                        rows = []
+                        with open('lottery_rounds.csv', 'r', encoding='utf-8-sig') as f:
+                            reader = csv.DictReader(f)
+                            fieldnames = reader.fieldnames
+                            for row in reader:
+                                if row.get('id') == round_id:
+                                    row['status'] = 'cancelled'
+                                rows.append(row)
+                        with open('lottery_rounds.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                            writer = csv.DictWriter(f, fieldnames=fieldnames)
+                            writer.writeheader()
+                            writer.writerows(rows)
+                    except:
+                        pass
+                    # إشعار المشاركين
+                    try:
+                        with open('lottery_tickets.csv', 'r', encoding='utf-8-sig') as f:
+                            reader = csv.DictReader(f)
+                            notified = set()
+                            for t in reader:
+                                if t.get('round_id') == round_id and t.get('user_id') not in notified:
+                                    self.send_message(int(t.get('user_id', 0)),
+                                        f"❌ <b>تم إلغاء جولة اليانصيب</b>\n\nنعتذر عن الإلغاء. سيتم إرجاع المبالغ.")
+                                    notified.add(t.get('user_id'))
+                    except:
+                        pass
+                    toast_msg = "تم إلغاء الجولة"
+                    fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                    self.show_lottery_admin(fake_msg)
+                    return
+
+            # تعديل جولة
+            elif data.startswith('lot_edit_'):
+                round_id = data.replace('lot_edit_', '')
+                round_data = None
+                try:
+                    with open('lottery_rounds.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        for row in reader:
+                            if row.get('id') == round_id:
+                                round_data = row
+                                break
+                except:
+                    pass
+                if not round_data:
+                    self.edit_message(chat_id, message.get('message_id'), "❌ الجولة غير موجودة")
+                    return
+                text = (
+                    f"✏️ <b>تعديل الجولة</b>\n\n"
+                    f"━━━━━━━━━━━━━━━━━━\n"
+                    f"📋 الاسم: <b>{round_data.get('name', '')}</b>\n"
+                    f"🎫 السعر: <code>{round_data.get('ticket_price', '')}</code> {round_data.get('currency', '')}\n"
+                    f"🏆 الفائزين: <code>{round_data.get('winner_count', '')}</code>\n"
+                    f"📊 حد/مستخدم: <code>{round_data.get('max_tickets_per_user', '')}</code>\n"
+                    f"🏢 نسبة الإدارة: <code>{round_data.get('admin_profit_pct', '')}%</code>\n"
+                    f"⏰ السحب: <code>{round_data.get('draw_time', '')}</code>\n"
+                    f"━━━━━━━━━━━━━━━━━━\n\n"
+                    f"اختر ما تريد تعديله:"
+                )
+                inline_btns = [
+                    [{'text': '📋 الاسم', 'callback_data': f'lot_edit_name_{round_id}'},
+                     {'text': '🎫 السعر', 'callback_data': f'lot_edit_price_{round_id}'}],
+                    [{'text': '🏆 الفائزين', 'callback_data': f'lot_edit_winners_{round_id}'},
+                     {'text': '⏰ السحب', 'callback_data': f'lot_edit_drawtime_{round_id}'}],
+                    [{'text': '🔙 رجوع', 'callback_data': 'lot_admin_back'}]
+                ]
+                self.edit_message(chat_id, message.get('message_id'), text)
+                self.send_inline_message(chat_id, "تعديل:", inline_btns)
+                return
+
+            # تعديل اسم الجولة
+            elif data.startswith('lot_edit_name_'):
+                round_id = data.replace('lot_edit_name_', '')
+                self.edit_message(chat_id, message.get('message_id'), "✏️ اكتب الاسم الجديد:")
+                self.user_states[user_id] = f'lot_edit_name_input_{round_id}'
+                return
+
+            # تعديل سعر التذكرة
+            elif data.startswith('lot_edit_price_'):
+                round_id = data.replace('lot_edit_price_', '')
+                self.edit_message(chat_id, message.get('message_id'), "✏️ اكتب السعر الجديد:")
+                self.user_states[user_id] = f'lot_edit_price_input_{round_id}'
+                return
+
+            # تعديل عدد الفائزين
+            elif data.startswith('lot_edit_winners_'):
+                round_id = data.replace('lot_edit_winners_', '')
+                self.edit_message(chat_id, message.get('message_id'), "✏️ اكتب عدد الفائزين الجديد (1-10):")
+                self.user_states[user_id] = f'lot_edit_winners_input_{round_id}'
+                return
+
+            # تعديل وقت السحب
+            elif data.startswith('lot_edit_drawtime_'):
+                round_id = data.replace('lot_edit_drawtime_', '')
+                self.edit_message(chat_id, message.get('message_id'), "✏️ اكتب وقت السحب الجديد:\n\nمثال: 2026-08-15 20:00")
+                self.user_states[user_id] = f'lot_edit_drawtime_input_{round_id}'
+                return
+
+            # العودة للوحة اليانصيب
+            elif data == 'lot_admin_back':
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_lottery_admin(fake_msg)
+                return
+
+            # عرض كل الجولات
+            elif data == 'lot_history':
+                rounds_list = []
+                try:
+                    with open('lottery_rounds.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        rounds_list = list(reader)
+                except:
+                    pass
+                completed = [r for r in rounds_list if r.get('status') in ('completed', 'cancelled')]
+                text = f"📜 <b>كل الجولات ({len(completed)})</b>\n\n━━━━━━━━━━━━━━━━━━\n"
+                for r in completed[-20:]:
+                    status = '✅' if r.get('status') == 'completed' else '❌'
+                    text += f"{status} <b>{r.get('name', '')}</b>\n  🎫 {r.get('ticket_price', '')} {r.get('currency', '')} | ⏰ {r.get('draw_time', '')}\n"
+                inline_btns = [[{'text': '🔙 رجوع', 'callback_data': 'lot_admin_back'}]]
+                self.edit_message(chat_id, message.get('message_id'), text)
+                self.send_inline_message(chat_id, f"إجمالي: {len(completed)} جولة", inline_btns)
+                return
+
             elif data.startswith('lot_back_'):
                 round_id = data.replace('lot_back_', '')
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
@@ -14492,7 +14677,7 @@ class ComprehensiveDUXBot:
         self.send_inline_message(message['chat']['id'], text, inline_btns)
 
     def show_lottery_admin(self, message):
-        """لوحة إدارة اليانصيب للأدمن"""
+        """لوحة إدارة اليانصيب — تحكم كامل"""
         rounds_list = []
         try:
             with open('lottery_rounds.csv', 'r', encoding='utf-8-sig') as f:
@@ -14504,33 +14689,97 @@ class ComprehensiveDUXBot:
         active = [r for r in rounds_list if r.get('status') == 'active']
         completed = [r for r in rounds_list if r.get('status') == 'completed']
 
-        text = f"🎰 <b>إدارة اليانصيب</b>\n\n"
-        text += f"📊 نشطة: <code>{len(active)}</code> | مكتملة: <code>{len(completed)}</code>\n"
+        # إحصائيات شاملة
+        total_revenue = 0
+        total_profit = 0
+        total_tickets_all = 0
+        for r in completed:
+            try:
+                tc = 0
+                with open('lottery_tickets.csv', 'r', encoding='utf-8-sig') as f:
+                    reader = csv.DictReader(f)
+                    for t in reader:
+                        if t.get('round_id') == r.get('id') and t.get('payment_verified') == 'yes':
+                            tc += 1
+                price = float(r.get('ticket_price', 0))
+                admin_pct = float(r.get('admin_profit_pct', 0))
+                total_revenue += price * tc
+                total_profit += price * tc * admin_pct / 100
+                total_tickets_all += tc
+            except:
+                pass
+
+        text = (
+            f"🎰 <b>إدارة اليانصيب</b>\n\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"📊 <b>الإحصائيات</b>\n"
+            f"🎯 نشطة: <code>{len(active)}</code> | ✅ مكتملة: <code>{len(completed)}</code>\n"
+            f"💰 إجمالي الإيرادات: <code>{total_revenue:.0f}</code>\n"
+            f"🏢 إجمالي الأرباح: <code>{total_profit:.0f}</code>\n"
+            f"🎫 إجمالي التذاكر: <code>{total_tickets_all}</code>\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+        )
 
         inline_btns = []
+
         if active:
-            text += "\n━━━━━━━━━━━━━━━━━━\n🎮 <b>الجولات النشطة:</b>\n"
+            text += "\n🎮 <b>الجولات النشطة:</b>\n"
             for r in active:
-                # عد التذاكر
-                ticket_count = 0
+                # عد التذاكر الموثقة + المشاركين
+                verified_count = 0
+                pending_count = 0
+                participants = set()
                 try:
                     with open('lottery_tickets.csv', 'r', encoding='utf-8-sig') as f:
                         reader = csv.DictReader(f)
                         for t in reader:
                             if t.get('round_id') == r['id']:
-                                ticket_count += 1
+                                participants.add(t.get('user_id', ''))
+                                if t.get('payment_verified') == 'yes':
+                                    verified_count += 1
+                                elif t.get('payment_verified') == 'pending_admin':
+                                    pending_count += 1
                 except:
                     pass
-                text += f"\n🎰 <b>{r.get('name', '')}</b>\n"
-                text += f"  🆔 <code>{r['id']}</code>\n"
-                text += f"  🎫 {ticket_count} تذكرة | 💰 {r.get('ticket_price', '')} {r.get('currency', '')}\n"
-                text += f"  ⏰ السحب: {r.get('draw_time', '')}\n"
-                inline_btns.append([{'text': f"🎲 سحب الآن: {r.get('name', '')}", 'callback_data': f'lot_draw_{r["id"]}'}])
+
+                price = float(r.get('ticket_price', 0))
+                admin_pct = float(r.get('admin_profit_pct', 0))
+                pool = price * verified_count
+                profit = pool * admin_pct / 100
+                net = pool - profit
+
+                text += (
+                    f"\n🎰 <b>{r.get('name', '')}</b>\n"
+                    f"  🆔 <code>{r['id']}</code>\n"
+                    f"  🎫 موثقة: <code>{verified_count}</code>"
+                )
+                if pending_count > 0:
+                    text += f" | ⏳ معلقة: <code>{pending_count}</code>"
+                text += (
+                    f"\n  👥 مشاركين: <code>{len(participants)}</code>\n"
+                    f"  💰 الجائزة: <code>{net:.0f}</code> {r.get('currency', '')}\n"
+                    f"  🏢 ربحك: <code>{profit:.0f}</code> {r.get('currency', '')}\n"
+                    f"  ⏰ السحب: {r.get('draw_time', '—')}\n"
+                )
+
+                # أزرار لكل جولة
+                row_btns = [{'text': f'🎲 سحب', 'callback_data': f'lot_draw_{r["id"]}'}]
+                if pending_count > 0:
+                    row_btns.append({'text': f'⏳ موافقة ({pending_count})', 'callback_data': f'lot_pending_{r["id"]}'})
+                row_btns.append({'text': '🎫 تذاكر', 'callback_data': f'lot_tickets_{r["id"]}'})
+                inline_btns.append(row_btns)
+                inline_btns.append([
+                    {'text': '✏️ تعديل', 'callback_data': f'lot_edit_{r["id"]}'},
+                    {'text': '❌ إلغاء', 'callback_data': f'lot_cancel_{r["id"]}'},
+                ])
 
         inline_btns.append([{'text': '➕ إنشاء جولة جديدة', 'callback_data': 'lot_create'}])
 
         if completed:
             text += f"\n━━━━━━━━━━━━━━━━━━\n📜 <b>الجولات المكتملة:</b> {len(completed)}\n"
+            for r in completed[-3:]:
+                text += f"  ✅ {r.get('name', '')} — {r.get('draw_time', '')}\n"
+            inline_btns.append([{'text': '📜 كل الجولات', 'callback_data': 'lot_history'}])
 
         inline_btns.append([{'text': '🔙 العودة', 'callback_data': 'app_back_admin'}])
         self.send_inline_message(message['chat']['id'], text, inline_btns)
