@@ -2207,21 +2207,210 @@ def api_edit_user(user_id):
     data = request.json
     users = read_csv('users.csv')
     fieldnames = get_fieldnames('users.csv', ['telegram_id','name','phone','customer_id','language','date','is_banned','ban_reason','currency'])
-    editable_fields = ['name', 'phone', 'currency', 'language']
+    editable_fields = ['name', 'phone', 'currency', 'language', 'phone_verified', 'is_banned', 'ban_reason']
     for u in users:
         if u.get('telegram_id') == user_id:
             for k, v in data.items():
                 if k in editable_fields:
-                    if k in fieldnames:
-                        u[k] = v
-                    else:
+                    if k not in fieldnames:
                         fieldnames.append(k)
-                        u[k] = v
+                    u[k] = v
             break
     write_csv('users.csv', users, fieldnames)
     log_action('edit_user', f'{user_id}: {json.dumps(data)[:100]}')
     return jsonify({'success': True})
 
+# ===== API — Company Toggle =====
+
+@app.route('/api/companies/<company_id>/toggle', methods=['POST'])
+@api_auth
+def api_toggle_company(company_id):
+    companies = read_csv('companies.csv')
+    fieldnames = get_fieldnames('companies.csv', ['id','name','type','details','is_active','icon','address','affiliate_link'])
+    for c in companies:
+        if c.get('id') == company_id:
+            c['is_active'] = 'no' if c.get('is_active') == 'yes' else 'yes'
+            break
+    write_csv('companies.csv', companies, fieldnames)
+    log_action('toggle_company', company_id)
+    return jsonify({'success': True})
+
+# ===== API — User Activity =====
+
+@app.route('/api/users/<user_id>/activity')
+@api_auth
+def api_user_activity(user_id):
+    activity = read_csv('user_activity.csv')
+    user_act = [a for a in activity if a.get('telegram_id') == user_id]
+    return jsonify({'activity': user_act})
+
+# ===== API — SVRP Freeze/Unfreeze =====
+
+@app.route('/api/svrp/wallets/<user_id>/freeze', methods=['POST'])
+@api_auth
+def api_svrp_freeze(user_id):
+    wallets = read_csv('svrp_wallets.csv')
+    fieldnames = get_fieldnames('svrp_wallets.csv', ['telegram_id','customer_id','balance','pending_balance','total_earned','total_used','wagering_required','wagering_completed','last_recovery_date','monthly_recovery_total'])
+    for w in wallets:
+        if w.get('telegram_id') == user_id:
+            # نقل كل الرصيد إلى مجمد
+            balance = float(w.get('balance', 0) or 0)
+            frozen = float(w.get('pending_balance', 0) or 0)
+            w['pending_balance'] = str(balance + frozen)
+            w['balance'] = '0'
+            break
+    write_csv('svrp_wallets.csv', wallets, fieldnames)
+    log_action('svrp_freeze', user_id)
+    return jsonify({'success': True, 'message': 'تم تجميد الرصيد'})
+
+@app.route('/api/svrp/wallets/<user_id>/unfreeze', methods=['POST'])
+@api_auth
+def api_svrp_unfreeze(user_id):
+    data = request.json or {}
+    amount = float(data.get('amount', 0))
+    wallets = read_csv('svrp_wallets.csv')
+    fieldnames = get_fieldnames('svrp_wallets.csv', ['telegram_id','customer_id','balance','pending_balance','total_earned','total_used','wagering_required','wagering_completed','last_recovery_date','monthly_recovery_total'])
+    for w in wallets:
+        if w.get('telegram_id') == user_id:
+            frozen = float(w.get('pending_balance', 0) or 0)
+            balance = float(w.get('balance', 0) or 0)
+            if amount <= 0:
+                amount = frozen  # فك تجميد كامل
+            amount = min(amount, frozen)
+            w['balance'] = str(balance + amount)
+            w['pending_balance'] = str(frozen - amount)
+            break
+    write_csv('svrp_wallets.csv', wallets, fieldnames)
+    log_action('svrp_unfreeze', f'{user_id}: {amount}')
+    return jsonify({'success': True, 'message': f'تم فك تجميد {amount}'})
+
+# ===== API — SVRP Credits =====
+
+@app.route('/api/svrp/credits')
+@api_auth
+def api_svrp_credits():
+    credits = read_csv('svrp_credits.csv')
+    return jsonify({'credits': credits[:100], 'total': len(credits)})
+
+# ===== API — SVRP Tasks =====
+
+@app.route('/api/svrp/tasks')
+@api_auth
+def api_svrp_tasks():
+    tasks = read_csv('svrp_tasks.csv')
+    return jsonify({'tasks': tasks[:100]})
+
+# ===== API — User Company Accounts =====
+
+@app.route('/api/users/<user_id>/company-accounts')
+@api_auth
+def api_user_company_accounts(user_id):
+    accounts = read_csv('user_company_accounts.csv')
+    user_accounts = [a for a in accounts if a.get('user_id') == user_id]
+    return jsonify({'accounts': user_accounts})
+
+# ===== API — Match Ratings =====
+
+@app.route('/api/matching/ratings')
+@api_auth
+def api_match_ratings():
+    ratings = read_csv('ratings.csv')
+    ratings.reverse()
+    return jsonify({'ratings': ratings[:50]})
+
+# ===== API — Referral Earnings Per User =====
+
+@app.route('/api/referrals/earnings')
+@api_auth
+def api_referral_earnings():
+    log = read_csv('referral_log.csv')
+    # تجميع الأرباح لكل مستخدم
+    earnings = {}
+    for r in log:
+        referrer = r.get('referrer_id', '')
+        bonus = float(r.get('bonus', 0) or 0)
+        if referrer:
+            if referrer not in earnings:
+                earnings[referrer] = {'total': 0, 'count': 0, 'verified': 0}
+            earnings[referrer]['total'] += bonus
+            earnings[referrer]['count'] += 1
+            if r.get('phone_verified') == 'yes':
+                earnings[referrer]['verified'] += 1
+    return jsonify({'earnings': earnings, 'total_log': len(log)})
+
+# ===== API — Broadcast Queue =====
+
+@app.route('/api/broadcast/queue')
+@api_auth
+def api_broadcast_queue():
+    queue = read_csv('broadcast_queue.csv')
+    queue.reverse()
+    return jsonify({'queue': queue[:50]})
+
+# ===== API — Edit Transaction =====
+
+@app.route('/api/transactions/<txn_id>', methods=['PUT'])
+@api_auth
+def api_edit_transaction(txn_id):
+    data = request.json
+    txns = read_csv('transactions.csv')
+    fieldnames = get_fieldnames('transactions.csv', ['id','customer_id','telegram_id','name','type','company','wallet_number','amount','exchange_address','status','date','admin_note','processed_by','currency'])
+    editable = ['amount', 'company', 'wallet_number', 'admin_note', 'currency', 'status']
+    for t in txns:
+        if t.get('id') == txn_id:
+            for k, v in data.items():
+                if k in editable:
+                    if k not in fieldnames:
+                        fieldnames.append(k)
+                    t[k] = v
+            break
+    write_csv('transactions.csv', txns, fieldnames)
+    log_action('edit_transaction', f'{txn_id}: {json.dumps(data)[:100]}')
+    return jsonify({'success': True})
+
+# ===== API — Delete Lottery Round =====
+
+@app.route('/api/lottery/<round_id>', methods=['DELETE'])
+@api_auth
+def api_delete_lottery_round(round_id):
+    rounds = read_csv('lottery_rounds.csv')
+    fieldnames = get_fieldnames('lottery_rounds.csv', ['id','name','status','ticket_price','currency','min_tickets','max_tickets_per_user','total_prize','admin_profit_pct','start_time','draw_time','winner_count','created_at'])
+    rounds = [r for r in rounds if r.get('id') != round_id]
+    write_csv('lottery_rounds.csv', rounds, fieldnames)
+    log_action('delete_lottery_round', round_id)
+    return jsonify({'success': True})
+
+# ===== API — Delete Wheel Round =====
+
+@app.route('/api/wheel/<round_id>', methods=['DELETE'])
+@api_auth
+def api_delete_wheel_round(round_id):
+    rounds = read_csv('wheel_rounds.csv')
+    fieldnames = get_fieldnames('wheel_rounds.csv', ['id','name','prizes','status','spin_cost','currency','min_spins','max_spins_per_user','created_at'])
+    rounds = [r for r in rounds if r.get('id') != round_id]
+    write_csv('wheel_rounds.csv', rounds, fieldnames)
+    log_action('delete_wheel_round', round_id)
+    return jsonify({'success': True})
+
+# ===== API — Restore Backup =====
+
+@app.route('/api/backup/restore', methods=['POST'])
+@api_auth
+def api_restore_backup():
+    filename = request.json.get('filename', '') if request.json else ''
+    if not filename:
+        return jsonify({'error': 'No filename'}), 400
+    import zipfile
+    backup_path = os.path.join(BASE_DIR, 'backups', filename)
+    if not os.path.exists(backup_path):
+        return jsonify({'error': 'Backup not found'}), 404
+    try:
+        with zipfile.ZipFile(backup_path, 'r') as zf:
+            zf.extractall(BASE_DIR)
+        log_action('restore_backup', filename)
+        return jsonify({'success': True, 'message': 'تم استعادة النسخة'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 # ===== Main =====
 

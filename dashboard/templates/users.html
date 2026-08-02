@@ -143,14 +143,30 @@
                         </div>
                         <div x-html="statusBadge(detail.is_banned === 'yes' ? 'yes' : 'no')"></div>
                     </div>
-                    <!-- User Details Grid -->
+                    <!-- User Details Grid — Editable -->
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
                         <div><label class="block text-xs text-slate-500 mb-1">رقم العميل</label><p class="text-sm font-mono text-amber-400" x-text="detail.customer_id || '—'"></p></div>
-                        <div><label class="block text-xs text-slate-500 mb-1">الهاتف</label><p class="text-sm" x-text="detail.phone || '—'"></p></div>
-                        <div><label class="block text-xs text-slate-500 mb-1">اللغة</label><p class="text-sm" x-text="detail.language || '—'"></p></div>
-                        <div><label class="block text-xs text-slate-500 mb-1">العملة</label><p class="text-sm" x-text="detail.currency || '—'"></p></div>
+                        <div><label class="block text-xs text-slate-500 mb-1">الهاتف</label>
+                            <input x-model="detail.phone" @change="saveUserField(detail.telegram_id, 'phone', detail.phone)" class="input text-sm py-1"></div>
+                        <div><label class="block text-xs text-slate-500 mb-1">اللغة</label>
+                            <select x-model="detail.language" @change="saveUserField(detail.telegram_id, 'language', detail.language)" class="input text-sm py-1">
+                                <option value="ar">العربية</option><option value="en">English</option><option value="fr">Français</option>
+                                <option value="es">Español</option><option value="de">Deutsch</option><option value="tr">Türkçe</option>
+                                <option value="ur">اردو</option><option value="hi">हिन्दी</option><option value="fa">فارسی</option>
+                                <option value="id">Indonesia</option><option value="pt">Português</option><option value="ru">Русский</option>
+                                <option value="zh">中文</option><option value="ja">日本語</option><option value="ko">한국어</option>
+                                <option value="th">ไทย</option><option value="it">Italiano</option>
+                            </select></div>
+                        <div><label class="block text-xs text-slate-500 mb-1">العملة</label>
+                            <select x-model="detail.currency" @change="saveUserField(detail.telegram_id, 'currency', detail.currency)" class="input text-sm py-1">
+                                <option value="SAR">SAR</option><option value="USD">USD</option><option value="EGP">EGP</option>
+                                <option value="AED">AED</option><option value="EUR">EUR</option><option value="TRY">TRY</option>
+                            </select></div>
                         <div><label class="block text-xs text-slate-500 mb-1">تاريخ التسجيل</label><p class="text-sm" x-text="detail.date || '—'"></p></div>
+                        <div><label class="block text-xs text-slate-500 mb-1">الاسم</label>
+                            <input x-model="detail.name" @change="saveUserField(detail.telegram_id, 'name', detail.name)" class="input text-sm py-1"></div>
                         <div x-show="detail.ban_reason"><label class="block text-xs text-slate-500 mb-1">سبب الحظر</label><p class="text-sm text-red-400" x-text="detail.ban_reason || '—'"></p></div>
+                        <div><label class="block text-xs text-slate-500 mb-1">تحقق الهاتف</label><p class="text-sm" x-text="detail.phone_verified === 'yes' ? '✅ نعم' : '❌ لا'"></p></div>
                     </div>
                     <!-- User Transactions -->
                     <div>
@@ -185,7 +201,11 @@
                             <div class="p-2 bg-slate-900/50 rounded"><p class="text-xs text-slate-500">الرصيد</p><p class="font-bold text-green-400" x-text="fmtNum(detailWallet?.balance || 0)"></p></div>
                             <div class="p-2 bg-slate-900/50 rounded"><p class="text-xs text-slate-500">معلق</p><p class="font-bold text-amber-400" x-text="fmtNum(detailWallet?.pending_balance || 0)"></p></div>
                             <div class="p-2 bg-slate-900/50 rounded"><p class="text-xs text-slate-500">إجمالي المكتسب</p><p class="font-bold text-blue-400" x-text="fmtNum(detailWallet?.total_earned || 0)"></p></div>
-                            <div class="p-2 bg-slate-900/50 rounded"><p class="text-xs text-slate-500">مجمّد</p><p class="font-bold text-red-400" x-text="fmtNum(detailWallet?.frozen || 0)"></p></div>
+                            <div class="p-2 bg-slate-900/50 rounded"><p class="text-xs text-slate-500">مجمّد</p><p class="font-bold text-red-400" x-text="fmtNum(detailWallet?.pending_balance || 0)"></p></div>
+                        </div>
+                        <div class="flex gap-2 mt-2">
+                            <button @click="freezeBalance(detail.telegram_id)" class="btn btn-warning btn-sm">🧊 تجميد الرصيد</button>
+                            <button @click="unfreezeBalance(detail.telegram_id)" class="btn btn-success btn-sm">🔓 فك التجميد</button>
                         </div>
                     </div>
                     <div class="flex gap-2 justify-end pt-2 border-t border-slate-700">
@@ -301,6 +321,33 @@ function usersApp() {
                 toast('تم إلغاء الحظر', 'success');
                 this.load();
             } catch(e) { toast('فشلت العملية', 'error'); }
+        },
+
+        async saveUserField(id, field, value) {
+            try {
+                await api('/api/users/' + id, { method: 'PUT', body: JSON.stringify({ [field]: value }) });
+                toast('تم تحديث ' + field, 'success');
+                Notifier?.playSuccessSound?.();
+            } catch(e) { toast('فشل التحديث', 'error'); }
+        },
+
+        async freezeBalance(id) {
+            if (!confirm('تجميد كل رصيد المستخدم؟')) return;
+            try {
+                await api('/api/svrp/wallets/' + id + '/freeze', { method: 'POST', body: '{}' });
+                toast('تم تجميد الرصيد', 'warning');
+                this.openDetail(this.detail);
+            } catch(e) { toast('فشل التجميد', 'error'); }
+        },
+
+        async unfreezeBalance(id) {
+            const amount = prompt('كم تريد فك تجميده؟ (اتركه فارغاً لفك الكل):');
+            const body = amount ? JSON.stringify({ amount: parseFloat(amount) }) : '{}';
+            try {
+                await api('/api/svrp/wallets/' + id + '/unfreeze', { method: 'POST', body });
+                toast('تم فك التجميد', 'success');
+                this.openDetail(this.detail);
+            } catch(e) { toast('فشل فك التجميد', 'error'); }
         },
 
         exportCSV() {

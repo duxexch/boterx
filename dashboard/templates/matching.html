@@ -39,6 +39,7 @@
                         <th>الشركة</th>
                         <th>الحالة</th>
                         <th>تاريخ الإنشاء</th>
+                        <th>إجراءات</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -71,6 +72,11 @@
                             </td>
                             <td x-html="statusBadge(m.status)"></td>
                             <td class="text-xs text-slate-400" x-text="m.created_at || '—'"></td>
+                            <td>
+                                <button @click="openMatchDetail(m)" class="btn btn-primary btn-sm">
+                                    <i class="fas fa-eye"></i> تفاصيل
+                                </button>
+                            </td>
                         </tr>
                     </template>
                 </tbody>
@@ -199,6 +205,61 @@
         </div>
     </div>
 
+    <!-- Match Detail Modal -->
+    <div x-show="showDetail" x-transition class="modal-overlay" @click.self="showDetail = false" style="display:none">
+        <div class="modal" style="max-width:600px">
+            <h3 class="font-bold text-lg mb-3">تفاصيل المطابقة</h3>
+            <template x-if="selectedMatch">
+                <div class="space-y-4">
+                    <div class="grid grid-cols-2 gap-3 text-sm">
+                        <div><span class="text-slate-400">ID:</span> <span class="font-mono" x-text="selectedMatch.id"></span></div>
+                        <div><span class="text-slate-400">المبلغ:</span> <span class="font-bold" x-text="fmtAmount(selectedMatch.amount, selectedMatch.currency)"></span></div>
+                        <div><span class="text-slate-400">المودع:</span> <span x-text="selectedMatch.depositor_id"></span></div>
+                        <div><span class="text-slate-400">الساحب:</span> <span x-text="selectedMatch.withdrawer_id"></span></div>
+                        <div><span class="text-slate-400">الشركة:</span> <span x-text="selectedMatch.company_name"></span></div>
+                        <div><span class="text-slate-400">الحالة:</span> <span x-html="statusBadge(selectedMatch.status)"></span></div>
+                        <div><span class="text-slate-400">الكود:</span> <span class="font-mono text-xs" x-text="selectedMatch.confirmation_code || '—'"></span></div>
+                        <div><span class="text-slate-400">النزاع:</span> <span x-text="selectedMatch.dispute_status || 'none'"></span></div>
+                    </div>
+                    
+                    <!-- Chat messages -->
+                    <div>
+                        <h4 class="text-sm font-semibold mb-2">💬 رسائل الدردشة</h4>
+                        <div class="bg-slate-900/50 rounded-lg p-3 max-h-48 overflow-y-auto space-y-2">
+                            <template x-if="chatLoading">
+                                <p class="text-center text-slate-400 text-sm"><i class="fas fa-spinner fa-spin"></i></p>
+                            </template>
+                            <template x-if="!chatLoading && chatMessages.length === 0">
+                                <p class="text-center text-slate-500 text-sm">لا توجد رسائل</p>
+                            </template>
+                            <template x-for="msg in chatMessages" :key="msg.id">
+                                <div class="text-sm p-2 rounded-lg" :class="msg.sender_id === selectedMatch.depositor_id ? 'bg-blue-500/10' : 'bg-green-500/10'">
+                                    <span class="text-xs text-slate-400" x-text="msg.sender_alias"></span>
+                                    <p x-text="msg.message"></p>
+                                    <span class="text-xs text-slate-500" x-text="msg.timestamp"></span>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- Dispute resolution -->
+                    <div x-show="selectedMatch.dispute_status === 'open'">
+                        <h4 class="text-sm font-semibold mb-2">⚖️ حل النزاع</h4>
+                        <div class="flex gap-2">
+                            <button @click="resolveDispute(selectedMatch.id, 'depositor')" class="btn btn-primary btn-sm flex-1">✅ لصالح المودع</button>
+                            <button @click="resolveDispute(selectedMatch.id, 'withdrawer')" class="btn btn-success btn-sm flex-1">✅ لصالح الساحب</button>
+                            <button @click="resolveDispute(selectedMatch.id, 'cancel')" class="btn btn-danger btn-sm flex-1">❌ إلغاء</button>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end pt-2 border-t border-slate-700">
+                        <button @click="showDetail = false" class="btn btn-sm" style="background:#475569">إغلاق</button>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </div>
+
 </div>
 {% endblock %}
 
@@ -278,6 +339,33 @@ function matchingApp() {
             } catch (e) {
                 toast('فشل رفض الطلب', 'error');
             }
+        },
+
+        showDetail: false,
+        selectedMatch: null,
+        chatMessages: [],
+        chatLoading: false,
+
+        async openMatchDetail(m) {
+            this.selectedMatch = m;
+            this.showDetail = true;
+            this.chatMessages = [];
+            this.chatLoading = true;
+            try {
+                const data = await api('/api/matching/' + m.id + '/chat');
+                this.chatMessages = data.messages || [];
+            } catch(e) { this.chatMessages = []; }
+            this.chatLoading = false;
+        },
+
+        async resolveDispute(matchId, favor) {
+            if (!confirm('حل النزاع: ' + favor + '؟')) return;
+            try {
+                await api('/api/matching/' + matchId + '/resolve-dispute', { method: 'POST', body: JSON.stringify({ favor }) });
+                toast('تم حل النزاع', 'success');
+                this.showDetail = false;
+                this.loadAll();
+            } catch(e) { toast('فشل حل النزاع', 'error'); }
         }
     }
 }
