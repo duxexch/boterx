@@ -10874,9 +10874,14 @@ class ComprehensiveDUXBot:
                                     f"💰 السعر: <code>{price}</code> {currency}\n"
                                     f"💳 الوسيلة: {method_name}\n"
                                     f"🔢 الحساب: <code>{account}</code> 👈 اضغط للنسخ\n\n"
-                                    f"📤 حوّل المبلغ ثم اكتب <b>'تم'</b> للتأكيد\n"
-                                    f"أو اكتب <b>'إلغاء'</b>")
-                                self.user_states[user_id] = {'step': 'lot_confirm', 'round_id': round_id, 'method_id': method_id}
+                                    f"📤 حوّل المبلغ ثم اضغط زر التأكيد\n")
+                                # زر inline بدل كتابة "تم"
+                                self.send_inline_message(chat_id,
+                                    "✅ بعد تحويل المبلغ، اضغط الزر للتأكيد:",
+                                    [
+                                        [{'text': '✅ تم التحويل', 'callback_data': f'lot_confirm_paid_{round_id}_{method_id}'}],
+                                        [{'text': '❌ إلغاء', 'callback_data': 'lot_back_main'}]
+                                    ])
                                 return
                 except:
                     pass
@@ -10885,6 +10890,100 @@ class ComprehensiveDUXBot:
             elif data.startswith('lot_draw_'):
                 round_id = data.replace('lot_draw_', '')
                 self.execute_lottery_draw(chat_id, user_id, round_id)
+                return
+
+            # تأكيد دفع التذكرة — زر inline بدل كتابة "تم"
+            elif data.startswith('lot_confirm_paid_'):
+                parts = data.replace('lot_confirm_paid_', '').split('_', 1)
+                if len(parts) != 2:
+                    return
+                round_id, method_id = parts
+
+                # قراءة بيانات الجولة
+                round_data = None
+                try:
+                    with open('lottery_rounds.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        for row in reader:
+                            if row['id'] == round_id and row.get('status') == 'active':
+                                round_data = row
+                                break
+                except:
+                    pass
+                if not round_data:
+                    self.answer_callback(callback_id, "❌ الجولة غير موجودة")
+                    return
+
+                price = float(round_data.get('ticket_price', 0))
+                currency = round_data.get('currency', 'SAR')
+                user_obj = self.find_user(user_id)
+                if not user_obj:
+                    return
+
+                # عد التذاكر الحالية
+                my_count = 0
+                try:
+                    with open('lottery_tickets.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        for row in reader:
+                            if row.get('round_id') == round_id and row.get('user_id') == str(user_id):
+                                my_count += 1
+                except:
+                    pass
+
+                max_per = int(round_data.get('max_tickets_per_user', 1))
+                if my_count >= max_per:
+                    self.answer_callback(callback_id, "❌ وصلت للحد الأقصى")
+                    return
+
+                # إنشاء طلب تذكرة — بدون رقم تذكرة، بانتظار موافقة الأدمن
+                ticket_req_id = f"TKT{str(int(datetime.now().timestamp()))[-6:]}"
+                try:
+                    with open('lottery_tickets.csv', 'a', newline='', encoding='utf-8-sig') as f:
+                        writer = csv.writer(f)
+                        writer.writerow([ticket_req_id, round_id, str(user_id),
+                                       user_obj.get('name', ''), user_obj.get('customer_id', ''),
+                                       '',  # رقم التذكرة فارغ — يُصدر بعد موافقة الأدمن
+                                       datetime.now().strftime('%Y-%m-%d %H:%M'),
+                                       method_id, 'pending_admin'])
+                except:
+                    pass
+
+                # رسالة العميل — بدون رقم تذكرة
+                self.edit_message(chat_id, message.get('message_id'),
+                    f"⏳ <b>تم إرسال طلبك بنجاح!</b>\n\n"
+                    f"━━━━━━━━━━━━━━━━━━\n"
+                    f"🎫 الطلب: <code>{ticket_req_id}</code> 👈 اضغط للنسخ\n"
+                    f"💰 المبلغ: <code>{price}</code> {currency}\n"
+                    f"━━━━━━━━━━━━━━━━━━\n\n"
+                    f"⏳ بانتظار موافقة الإدارة على الدفع\n"
+                    f"🎫 سيتم إصدار رقم تذكرتك بعد الموافقة\n\n"
+                    f"🔒 <b>بياناتك محفوظة بأمان</b>")
+                self.answer_callback(callback_id, "✅ تم إرسال الطلب")
+
+                # إشعار الأدمن — بأزرار موافقة/رفض
+                method = self.get_payment_method_by_id(method_id) if method_id else None
+                method_name = method.get('method_name', '') if method else ''
+                for admin_id in self.admin_ids:
+                    try:
+                        self.send_inline_message(int(admin_id),
+                            f"🎫 <b>طلب شراء تذكرة يانصيب</b>\n\n"
+                            f"━━━━━━━━━━━━━━━━━━\n"
+                            f"👤 العميل: <b>{user_obj.get('name', '')}</b>\n"
+                            f"🆔 <code>{user_id}</code>\n"
+                            f"🎫 الطلب: <code>{ticket_req_id}</code>\n"
+                            f"💰 المبلغ: <code>{price}</code> {currency}\n"
+                            f"💳 الوسيلة: {method_name}\n"
+                            f"🎰 الجولة: <b>{round_data.get('name', '')}</b>\n"
+                            f"━━━━━━━━━━━━━━━━━━\n\n"
+                            f"✅ موافقة ← إصدار رقم تذكرة\n"
+                            f"❌ رفض ← حذف الطلب",
+                            [
+                                [{'text': '✅ موافقة وإصدار', 'callback_data': f'lot_admin_approve_{ticket_req_id}'},
+                                 {'text': '❌ رفض', 'callback_data': f'lot_admin_reject_{ticket_req_id}'}]
+                            ])
+                    except:
+                        pass
                 return
 
             # عرض تذاكر جولة محددة
