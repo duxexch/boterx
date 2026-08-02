@@ -386,7 +386,7 @@ function svrpPage() {
         async loadRecovery() {
             if (this.recoveryRequests.length > 0) return;
             try {
-                const data = await api('/api/svrp/recovery');
+                const data = await api('/api/svrp/requests');
                 this.recoveryRequests = data.requests || data || [];
             } catch (e) {
                 toast('فشل تحميل طلبات الاسترداد', 'error');
@@ -397,7 +397,7 @@ function svrpPage() {
         async loadBonus() {
             if (this.bonusRequests.length > 0) return;
             try {
-                const data = await api('/api/svrp/bonus');
+                const data = await api('/api/svrp/bonus-requests');
                 this.bonusRequests = data.requests || data || [];
             } catch (e) {
                 toast('فشل تحميل طلبات المكافآت', 'error');
@@ -408,8 +408,8 @@ function svrpPage() {
         async loadPromo() {
             if (this.promoCodes.length > 0) return;
             try {
-                const data = await api('/api/svrp/promo');
-                this.promoCodes = data.promos || data.codes || data || [];
+                const data = await api('/api/svrp/promo-codes');
+                this.promoCodes = data.codes || data || [];
             } catch (e) {
                 toast('فشل تحميل الرموز الترويجية', 'error');
             }
@@ -422,7 +422,7 @@ function svrpPage() {
 
         async createPromo() {
             try {
-                await api('/api/svrp/promo', {
+                await api('/api/svrp/promo-codes', {
                     method: 'POST',
                     body: JSON.stringify(this.promoForm),
                 });
@@ -437,9 +437,8 @@ function svrpPage() {
 
         async togglePromo(p) {
             try {
-                const body = JSON.stringify({ is_active: !p.is_active });
-                await api(`/api/svrp/promo/${p.id}/toggle`, { method: 'POST', body });
-                toast(p.is_active ? 'تم تعطيل الرمز' : 'تم تفعيل الرمز', 'success');
+                await api('/api/svrp/promo-codes', { method: 'POST', body: JSON.stringify({ code: p.code, status: p.status === 'active' ? 'inactive' : 'active' }) });
+                toast('تم تغيير الحالة', 'success');
                 this.promoCodes = [];
                 await this.loadPromo();
             } catch (e) {
@@ -459,8 +458,8 @@ function svrpPage() {
             if (!this.approvalTarget) return;
             try {
                 const url = this.approvalType === 'recovery' ?
-                    `/api/svrp/recovery/${this.approvalTarget.id}/approve` :
-                    `/api/svrp/bonus/${this.approvalTarget.id}/approve`;
+                    `/api/svrp/requests/${this.approvalTarget.id}/approve` :
+                    `/api/svrp/bonus-requests/${this.approvalTarget.id}/approve`;
                 await api(url, {
                     method: 'POST',
                     body: JSON.stringify({ amount: this.approvalAmount }),
@@ -469,7 +468,6 @@ function svrpPage() {
                 this.showApprovalModal = false;
                 this.approvalTarget = null;
                 this.approvalType = null;
-                // Reload the relevant list
                 if (this.approvalType === 'recovery') {
                     this.recoveryRequests = [];
                     await this.loadRecovery();
@@ -486,9 +484,9 @@ function svrpPage() {
             if (!confirm('هل أنت متأكد من رفض هذا الطلب؟')) return;
             try {
                 const url = type === 'recovery' ?
-                    `/api/svrp/recovery/${item.id}/reject` :
-                    `/api/svrp/bonus/${item.id}/reject`;
-                await api(url, { method: 'POST' });
+                    `/api/svrp/requests/${item.id}/reject` :
+                    `/api/svrp/bonus-requests/${item.id}/reject`;
+                await api(url, { method: 'POST', body: '{}' });
                 toast('تم الرفض بنجاح', 'success');
                 if (type === 'recovery') {
                     this.recoveryRequests = [];

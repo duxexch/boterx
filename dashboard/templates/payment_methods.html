@@ -110,11 +110,11 @@
             <div class="space-y-3">
                 <div>
                     <label class="block text-xs text-slate-400 mb-1">اسم الوسيلة</label>
-                    <input type="text" x-model="form.name" class="input w-full" placeholder="مثال: فودافون كاش">
+                    <input type="text" x-model="form.method_name" class="input w-full" placeholder="مثال: فودافون كاش">
                 </div>
                 <div>
                     <label class="block text-xs text-slate-400 mb-1">النوع</label>
-                    <select x-model="form.type" class="input w-full">
+                    <select x-model="form.method_type" class="input w-full">
                         <option value="mobile">📱 محفظة إلكترونية</option>
                         <option value="bank">🏦 حساب بنكي</option>
                         <option value="card">💳 بطاقة</option>
@@ -128,7 +128,7 @@
                 </div>
                 <div>
                     <label class="block text-xs text-slate-400 mb-1">معلومات إضافية</label>
-                    <input type="text" x-model="form.info" class="input w-full" placeholder="مثال: فرع الرياض (اختياري)">
+                    <input type="text" x-model="form.additional_info" class="input w-full" placeholder="مثال: فرع الرياض (اختياري)">
                 </div>
                 <div>
                     <label class="block text-xs text-slate-400 mb-1">الأيقونة (إيموجي)</label>
@@ -178,7 +178,7 @@ function paymentMethodsApp() {
         search: '', loading: true,
         showAddModal: false, showLinkModal: false,
         editing: false, selectedMethod: null, selectedCompanies: [],
-        form: { name: '', type: 'mobile', account_data: '', info: '', icon: '💳' },
+        form: { method_name: '', method_type: 'mobile', account_data: '', additional_info: '', icon: '💳' },
 
         async init() { await this.loadData(); },
 
@@ -226,7 +226,7 @@ function paymentMethodsApp() {
 
         editMethod(m) {
             this.editing = true;
-            this.form = { name: m.method_name, type: m.method_type, account_data: m.account_data, info: m.additional_info || '', icon: m.icon || '💳' };
+            this.form = { method_name: m.method_name, method_type: m.method_type, account_data: m.account_data, additional_info: m.additional_info || '', icon: m.icon || '💳' };
             this.selectedMethod = m;
             this.showAddModal = true;
         },
@@ -240,7 +240,7 @@ function paymentMethodsApp() {
         },
 
         async saveMethod() {
-            if (!this.form.name || !this.form.account_data) {
+            if (!this.form.method_name || !this.form.account_data) {
                 toast('املأ الاسم والبيانات', 'warning');
                 return;
             }
@@ -259,7 +259,7 @@ function paymentMethodsApp() {
             }
             this.showAddModal = false;
             this.editing = false;
-            this.form = { name: '', type: 'mobile', account_data: '', info: '', icon: '💳' };
+            this.form = { method_name: '', method_type: 'mobile', account_data: '', additional_info: '', icon: '💳' };
             await this.loadData();
         },
 

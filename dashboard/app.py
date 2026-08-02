@@ -2178,6 +2178,12 @@ def api_detailed_stats():
         complaint_stats['resolution_rate'] = round(complaint_stats['resolved'] / complaint_stats['total'] * 100, 2)
 
     return jsonify({
+        'kpis': {
+            'total_users': user_stats['total'],
+            'total_volume': round(volume_stats['all_time'], 2),
+            'avg_transaction': round(avg_amount, 2),
+            'completion_rate': match_stats['completion_rate'],
+        },
         'users': user_stats,
         'transactions': txn_stats,
         'volume': volume_stats,
@@ -2185,7 +2191,12 @@ def api_detailed_stats():
         'top_users': top_users_data,
         'top_companies': top_companies_data,
         'matches': match_stats,
-        'complaints': complaint_stats
+        'complaints': complaint_stats,
+        # Chart data (reuse /api/stats/charts format)
+        'transactions_chart': None,  # will be filled by /api/stats/charts
+        'status_chart': txn_stats,
+        'companies_chart': {'labels': [c['name'] for c in top_companies_data], 'data': [c['volume'] for c in top_companies_data]},
+        'users_chart': None,
     })
 
 
@@ -2411,6 +2422,29 @@ def api_restore_backup():
         return jsonify({'success': True, 'message': 'تم استعادة النسخة'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+# ===== API — Backup Download =====
+
+@app.route('/api/backups/<filename>/download')
+@api_auth
+def api_download_backup(filename):
+    import zipfile
+    backup_path = os.path.join(BASE_DIR, 'backups', filename)
+    if not os.path.exists(backup_path):
+        return jsonify({'error': 'Backup not found'}), 404
+    return send_file(backup_path, as_attachment=True, download_name=filename)
+
+# ===== API — Send Message Recent =====
+
+@app.route('/api/send-message/recent')
+@api_auth
+def api_send_message_recent():
+    """رسائل مرسلة لمستخدمين محددين"""
+    queue = read_csv('broadcast_queue.csv')
+    # رسائل لها target_user_id (ليست بث عام)
+    targeted = [q for q in queue if q.get('target_user_id', '')]
+    targeted.reverse()
+    return jsonify({'messages': targeted[:50]})
 
 # ===== Main =====
 

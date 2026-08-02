@@ -322,7 +322,7 @@ function matchingApp() {
         async approveRequest(id) {
             if (!confirm('هل أنت متأكد من قبول هذا الطلب؟')) return;
             try {
-                await fetch('/api/matching/pending/' + id + '/approve', { method: 'POST' });
+                await api('/api/matching/' + id + '/approve', { method: 'POST', body: '{}' });
                 toast('تم قبول الطلب', 'success');
                 this.loadAll();
             } catch (e) {
@@ -333,7 +333,7 @@ function matchingApp() {
         async rejectRequest(id) {
             if (!confirm('هل أنت متأكد من رفض هذا الطلب؟')) return;
             try {
-                await fetch('/api/matching/pending/' + id + '/reject', { method: 'POST' });
+                await api('/api/matching/' + id + '/reject', { method: 'POST', body: '{}' });
                 toast('تم رفض الطلب', 'success');
                 this.loadAll();
             } catch (e) {

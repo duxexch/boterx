@@ -202,8 +202,8 @@ function lotteryApp() {
         async endRound(id) {
             if (!confirm('إنهاء الجولة؟')) return;
             try {
-                await api(`/api/wheel/${id}/end`, { method: 'POST', body: '{}' });
-                toast('تم الإنهاء', 'warning');
+                await api('/api/lottery/' + id, { method: 'DELETE' });
+                toast('تم الحذف', 'warning');
                 await this.loadData();
             } catch(e) { toast('خطأ', 'error'); }
         }
