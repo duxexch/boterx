@@ -499,16 +499,26 @@ def api_transactions():
 @app.route('/api/transactions/<txn_id>/approve', methods=['POST'])
 @api_auth
 def api_approve_txn(txn_id):
+    data = request.json or {}
+    new_amount = data.get('amount', '')
     txns = read_csv('transactions.csv')
     fieldnames = get_fieldnames('transactions.csv', ['id','customer_id','telegram_id','name','type','company','wallet_number','amount','exchange_address','status','date','admin_note','processed_by','currency'])
+    old_amount = ''
+    customer_tid = ''
+    trans = None
     for t in txns:
         if t.get('id') == txn_id:
+            old_amount = t.get('amount', '')
+            customer_tid = t.get('telegram_id', '')
+            trans = t
             t['status'] = 'approved'
             t['processed_by'] = session.get('admin_id', '')
+            if new_amount:
+                t['amount'] = str(new_amount)
             break
     write_csv('transactions.csv', txns, fieldnames)
-    log_action('approve_transaction', txn_id)
-    return jsonify({'success': True})
+    log_action('approve_transaction', f'{txn_id} amount: {old_amount} -> {new_amount or old_amount}')
+    return jsonify({'success': True, 'old_amount': old_amount, 'new_amount': new_amount or old_amount})
 
 @app.route('/api/transactions/<txn_id>/reject', methods=['POST'])
 @api_auth

@@ -149,6 +149,27 @@
     </div>
     <p class="text-center text-xs text-slate-500">إجمالي: <span x-text="total"></span> معاملة | صفحة <span x-text="page"></span> من <span x-text="pages"></span></p>
 
+    <!-- Approve Modal with Amount Edit -->
+    <div x-show="showApproveModal" x-transition class="modal-overlay" style="display:none" @click.self="showApproveModal = false">
+        <div class="modal">
+            <h3 class="font-bold text-lg mb-4"><i class="fas fa-check-circle text-green-400 ml-1"></i> موافقة على المعاملة</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">🆔 رقم المعاملة</label>
+                    <p class="font-mono text-sm bg-slate-900/50 p-2 rounded" x-text="approveTarget"></p>
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">💰 المبلغ (يمكنك تعديله)</label>
+                    <input type="number" step="any" x-model="approveAmount" class="input w-full text-lg font-bold" placeholder="المبلغ">
+                </div>
+            </div>
+            <div class="flex gap-2 justify-end mt-4">
+                <button @click="showApproveModal = false" class="btn btn-sm" style="background:#475569">إلغاء</button>
+                <button @click="confirmApprove()" class="btn btn-success btn-sm"><i class="fas fa-check ml-1"></i> موافقة وتأكيد المبلغ</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Transaction Detail Modal -->
     <div x-show="showDetail" x-transition class="modal-overlay" style="display:none" @click.self="showDetail = false">
         <div class="modal max-w-2xl">
@@ -285,11 +306,24 @@ function transactionsApp() {
             }
         },
 
+        showApproveModal: false, approveTarget: null, approveAmount: '',
+
         async approve(id) {
-            if (!confirm('موافقة على المعاملة ' + id + '؟')) return;
+            // البحث عن المعاملة لعرض المبلغ الحالي
+            const txn = this.transactions.find(t => t.id === id);
+            this.approveTarget = id;
+            this.approveAmount = txn ? txn.amount : '';
+            this.showApproveModal = true;
+        },
+
+        async confirmApprove() {
+            const id = this.approveTarget;
+            const amount = this.approveAmount;
             try {
-                await api('/api/transactions/' + id + '/approve', { method: 'POST', body: '{}' });
-                toast('تمت الموافقة', 'success');
+                await api('/api/transactions/' + id + '/approve', { method: 'POST', body: JSON.stringify({ amount }) });
+                toast('تمت الموافقة — المبلغ: ' + amount, 'success');
+                Notifier?.playSuccessSound?.();
+                this.showApproveModal = false;
                 this.load();
             } catch(e) { toast('فشلت العملية', 'error'); }
         },
