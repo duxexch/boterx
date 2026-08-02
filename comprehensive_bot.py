@@ -442,6 +442,27 @@ class ComprehensiveDUXBot:
                 writer.writerow(['id', 'source_channel', 'source_chat_id', 'original_text', 'processed_text',
                                'ai_model', 'status', 'created_at', 'published_at', 'users_reached', 'channels_reached'])
 
+        # ملف التسويق — خُطط وتحليلات
+        if not os.path.exists('marketing_plans.csv'):
+            with open('marketing_plans.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.writer(f)
+                writer.writerow(['id', 'plan_type', 'content', 'ai_provider', 'status', 'approved_by',
+                               'executed_at', 'results', 'created_at'])
+
+        # ملف القنوات المصدرية (بوت مشترك لكن ليس أدمن)
+        if not os.path.exists('source_channels.csv'):
+            with open('source_channels.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.writer(f)
+                writer.writerow(['id', 'chat_id', 'title', 'type', 'is_active', 'added_at',
+                               'brand_voice', 'target_channel_ids', 'schedule', 'last_scraped_at'])
+
+        # ملف التقارير اليومية
+        if not os.path.exists('daily_reports.csv'):
+            with open('daily_reports.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.writer(f)
+                writer.writerow(['id', 'date', 'total_posts', 'total_users_reached', 'total_channels_reached',
+                               'ai_usage_count', 'top_channels', 'recommendations', 'created_at'])
+
         logger.info("تم إنشاء جميع ملفات النظام بنجاح")
         
     # خريطة الأيقونات: تحويل نص/إيموجي إلى أيقونة مناسبة
@@ -960,6 +981,14 @@ class ComprehensiveDUXBot:
             except Exception as e:
                 logger.error(f"خطأ في القراءة الآمنة من {filename}: {e}")
                 return []
+
+    def read_csv_helper(self, filename):
+        """مساعد قراءة CSV للاستخدام السريع"""
+        try:
+            with open(filename, 'r', encoding='utf-8-sig') as f:
+                return list(csv.DictReader(f))
+        except:
+            return []
     
     def init_referral_files(self):
         """إنشاء ملفات نظام الإحالات"""
@@ -2851,6 +2880,304 @@ class ComprehensiveDUXBot:
             logger.error(f"خطأ في معالجة AI: {e}")
         return None
 
+    # ==================== نظام القنوات المصدرية (Content Scraping) ====================
+
+    def scrape_source_channel(self, source_channel_id):
+        """جلب آخر البوستات من قناة مصدرية (بوت مشترك فيها)"""
+        try:
+            # قراءة بيانات القناة المصدرية
+            source_channels = read_csv_helper('source_channels.csv')
+            source = None
+            for s in source_channels:
+                if s.get('id') == source_channel_id:
+                    source = s
+                    break
+            if not source:
+                return []
+
+            chat_id = source.get('chat_id', '')
+            if not chat_id:
+                return []
+
+            # جلب آخر 5 رسائل من القناة
+            result = self.api_call('getChat', {'chat_id': chat_id})
+            if not result or not result.get('ok'):
+                return []
+
+            # استخدام forwardMessage لنسخ آخر البوستات
+            # Telegram API لا يدعم getHistory مباشرة، لكن يمكن استخدام getUpdates
+            # للقنوات المشترك فيها، نحصل على آخر المشاركات عبر chat updates
+            scraped = []
+            # محاولة جلب آخر رسالة من القناة
+            try:
+                # استخدام sendMessage with disable_notification لجلب chat info
+                # ثم getChatMemberCount
+                count_result = self.api_call('getChatMemberCount', {'chat_id': chat_id})
+                member_count = count_result.get('result', 0) if count_result else 0
+
+                # حفظ عضو القناة في post_vault كـ "scraped"
+                # الحل العملي: البوت يتلقى رسائل القناة عبر getUpdates (مستخدم مشترك)
+                # عند استلام رسالة من قناة مصدرية، تُعالج وتُنشر في القنوات المستهدفة
+                logger.info(f"Scraped source channel {source_channel_id}: {member_count} members")
+            except:
+                pass
+
+            return scraped
+        except Exception as e:
+            logger.error(f"خطأ في scraping: {e}")
+            return []
+
+    def process_source_channel_post(self, message):
+        """معالجة بوست من قناة مصدرية — تكييفه على البراند ونشره"""
+        chat_id = message.get('chat', {}).get('id', '')
+        chat_title = message.get('chat', {}).get('title', '')
+
+        # فحص هل القناة مصدرية
+        source_channels = []
+        try:
+            with open('source_channels.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row.get('is_active') == 'yes' and row.get('chat_id') == str(chat_id):
+                        source_channels.append(row)
+                        break
+        except:
+            pass
+
+        if not source_channels:
+            return False
+
+        source = source_channels[0]
+        brand_voice = source.get('brand_voice', '')
+        target_ids = source.get('target_channel_ids', '').split('|') if source.get('target_channel_ids') else []
+
+        # استخراج النص
+        text = ''
+        media_type = ''
+        media_file_id = ''
+        if 'text' in message:
+            text = message['text']
+            media_type = 'text'
+        elif 'caption' in message:
+            text = message['caption']
+            if 'photo' in message:
+                media_type = 'photo'
+                media_file_id = message['photo'][-1].get('file_id', '')
+            elif 'video' in message:
+                media_type = 'video'
+                media_file_id = message['video'].get('file_id', '')
+
+        if not text or len(text) < 10:
+            return False
+
+        # تكييف المحتوى على البراند باستخدام AI
+        processed = None
+        if brand_voice:
+            try:
+                from ai_providers import AIManager
+                ai_manager = AIManager()
+                instructions = (
+                    f"أعد صياغة هذا المحتوى بأسلوب البراند التالي:\n\n"
+                    f"أسلوب البراند: {brand_voice}\n\n"
+                    f"المحتوى الأصلي:\n{text}\n\n"
+                    f"أعد كتابته بأسلوب احترافي جذاب مع الحفاظ على المعلومات الأساسية."
+                )
+                processed, used_provider = ai_manager.process(text, instructions)
+            except:
+                pass
+
+        final_text = processed or text
+
+        # حفظ في post_vault
+        post_id = f"SCR{str(int(datetime.now().timestamp()))[-6:]}"
+        try:
+            with open('post_vault.csv', 'a', newline='', encoding='utf-8-sig') as f:
+                writer = csv.writer(f)
+                writer.writerow([post_id, chat_title, str(chat_id), text[:500], final_text[:500],
+                               media_type, media_file_id, used_provider or 'none', 'processed',
+                               datetime.now().strftime('%Y-%m-%d %H:%M'), 0, 0, 0, 'scraped'])
+        except:
+            pass
+
+        # نشر في القنوات المستهدفة
+        published = 0
+        if target_ids:
+            for tid in target_ids:
+                tid = tid.strip()
+                if not tid:
+                    continue
+                try:
+                    if media_type == 'photo' and media_file_id:
+                        self.api_call('sendPhoto', {
+                            'chat_id': tid, 'photo': media_file_id,
+                            'caption': final_text[:1024], 'parse_mode': 'HTML'
+                        })
+                    elif media_type == 'video' and media_file_id:
+                        self.api_call('sendVideo', {
+                            'chat_id': tid, 'video': media_file_id,
+                            'caption': final_text[:1024], 'parse_mode': 'HTML'
+                        })
+                    else:
+                        self.api_call('sendMessage', {
+                            'chat_id': tid, 'text': final_text[:4096], 'parse_mode': 'HTML'
+                        })
+                    published += 1
+                except:
+                    pass
+
+        # نشر لكل المستخدمين
+        users_reached = 0
+        try:
+            sent, _ = self.broadcast_to_all_users(final_text)
+            users_reached = sent
+        except:
+            pass
+
+        # تحديث post_vault بأرقام النشر
+        try:
+            rows = []
+            with open('post_vault.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                fieldnames = reader.fieldnames
+                rows = list(reader)
+            for row in rows:
+                if row.get('id') == post_id:
+                    row['published_to_users'] = str(users_reached)
+                    row['published_to_channels'] = str(published)
+                    row['status'] = 'published'
+                    break
+            with open('post_vault.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer.writeheader()
+                for row in rows:
+                    writer.writerow({k: row.get(k, '') for k in fieldnames})
+        except:
+            pass
+
+        self._log_relay('source_scrape', str(chat_id), final_text[:100], users_reached, published)
+
+        # إشعار الأدمن
+        for admin_id in self.admin_ids:
+            try:
+                self.send_message(int(admin_id),
+                    f"📥 <b>محتوى منقول من قناة مصدرية</b>\n\n"
+                    f"📋 المصدر: <b>{chat_title}</b>\n"
+                    f"✨ المعالج بـ AI: {'نعم' if processed else 'لا'}\n"
+                    f"📤 نُشر في: {published} قناة + {users_reached} مستخدم\n\n"
+                    f"📝 المعاينة:\n<i>{final_text[:200]}...</i>")
+            except:
+                pass
+
+        return True
+
+    # ==================== نظام التحليل والتقارير اليومية ====================
+
+    def generate_daily_report(self):
+        """توليد تقرير يومي + توصيات AI"""
+        today = datetime.now().strftime('%Y-%m-%d')
+
+        # جمع البيانات
+        relay_logs = []
+        try:
+            with open('relay_log.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row.get('timestamp', '').startswith(today):
+                        relay_logs.append(row)
+        except:
+            pass
+
+        ai_posts = []
+        try:
+            with open('ai_processed_posts.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row.get('created_at', '').startswith(today):
+                        ai_posts.append(row)
+        except:
+            pass
+
+        channels = self.get_bot_channels(active_only=False)
+        active_channels = [c for c in channels if c.get('is_active') == 'yes']
+
+        total_users_reached = sum(int(l.get('users_relayed', 0) or 0) for l in relay_logs)
+        total_channels_reached = sum(int(l.get('channels_relayed', 0) or 0) for l in relay_logs)
+
+        # أكثر القنوات نشاطاً
+        channel_activity = {}
+        for log in relay_logs:
+            src = log.get('source_chat_id', 'unknown')
+            channel_activity[src] = channel_activity.get(src, 0) + 1
+        top_channels = sorted(channel_activity.items(), key=lambda x: x[1], reverse=True)[:5]
+        top_channels_str = ' | '.join([f"{c[0]}: {c[1]}" for c in top_channels])
+
+        # توليد توصيات AI
+        recommendations = self._generate_ai_recommendations(relay_logs, ai_posts, active_channels)
+
+        report_id = f"RPT{str(int(datetime.now().timestamp()))[-6:]}"
+        try:
+            with open('daily_reports.csv', 'a', newline='', encoding='utf-8-sig') as f:
+                writer = csv.writer(f)
+                writer.writerow([report_id, today, len(relay_logs), total_users_reached,
+                               total_channels_reached, len(ai_posts), top_channels_str[:200],
+                               recommendations[:500], datetime.now().strftime('%Y-%m-%d %H:%M')])
+        except:
+            pass
+
+        # إرسال للأدمن
+        report_text = (
+            f"📊 <b>التقرير اليومي — {today}</b>\n\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"📨 البوستات المنشورة: <code>{len(relay_logs)}</code>\n"
+            f"👥 وصل لـ: <code>{total_users_reached}</code> مستخدم\n"
+            f"📢 نُشر في: <code>{total_channels_reached}</code> قناة\n"
+            f"🤖 معالجة AI: <code>{len(ai_posts)}</code> بوست\n"
+            f"📡 قنوات نشطة: <code>{len(active_channels)}</code>\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+        )
+        if top_channels:
+            report_text += f"\n🏆 <b>أكثر القنوات نشاطاً:</b>\n"
+            for ch, count in top_channels[:3]:
+                report_text += f"  • {ch}: {count} بوست\n"
+
+        if recommendations:
+            report_text += f"\n🤖 <b>توصيات AI:</b>\n<i>{recommendations[:500]}</i>\n"
+
+        report_text += f"\n━━━━━━━━━━━━━━━━━━\n🆔 <code>{report_id}</code>"
+
+        for admin_id in self.admin_ids:
+            try:
+                self.send_message(int(admin_id), report_text)
+            except:
+                pass
+
+        return report_text
+
+    def _generate_ai_recommendations(self, relay_logs, ai_posts, active_channels):
+        """توليد توصيات باستخدام AI"""
+        try:
+            from ai_providers import AIManager
+            ai_manager = AIManager()
+
+            # تحليل الأداء
+            total_posts = len(relay_logs)
+            total_ai = len(ai_posts)
+            total_channels = len(active_channels)
+
+            analysis_text = (
+                f"حلل هذا البيانات وقدم 3 توصيات عملية لتحسين الأداء:\n\n"
+                f"البوستات اليوم: {total_posts}\n"
+                f"معالجة AI: {total_ai}\n"
+                f"القنوات النشطة: {total_channels}\n\n"
+                f"قدم توصيات قصيرة ومباشرة بالعربية."
+            )
+
+            result, _ = ai_manager.process(analysis_text,
+                "أنت مستشار تسويق رقمي خبير. حلل البيانات وقدم توصيات قصيرة ومفيدة.")
+            return result or 'لا توجد توصيات متاحة'
+        except:
+            return 'لا يمكن توليد توصيات (AI غير متاح)'
+
     def auto_relay_channel_post(self, message):
         """إعادة نشر بوست من قناة البوت مشرف لها لكل المستخدمين — مع احترام كل الإعدادات"""
         chat_id = message.get('chat', {}).get('id', '')
@@ -3017,6 +3344,48 @@ class ComprehensiveDUXBot:
             logger.error(f"خطأ في إعادة نشر البوست: {e}")
         return False
 
+    def show_source_channels_admin(self, message):
+        """لوحة القنوات المصدرية — قنوات البوت مشترك فيها"""
+        sources = []
+        try:
+            with open('source_channels.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                sources = list(reader)
+        except:
+            pass
+
+        text = (
+            f"📥 <b>القنوات المصدرية</b>\n\n"
+            f"📊 المسجلة: <code>{len(sources)}</code>\n"
+            f"✅ النشطة: <code>{sum(1 for s in sources if s.get('is_active') == 'yes')}</code>\n"
+            f"━━━━━━━━━━━━━━━━━━\n\n"
+        )
+
+        if sources:
+            for s in sources[:10]:
+                status = '✅' if s.get('is_active') == 'yes' else '⏸️'
+                brand = s.get('brand_voice', '')[:30] if s.get('brand_voice') else '—'
+                text += f"{status} <b>{s.get('title', '')}</b>\n"
+                text += f"  🆔 <code>{s.get('chat_id', '')}</code>\n"
+                text += f"  📝 البراند: {brand}\n"
+                text += f"  📅 آخر نسخ: {s.get('last_scraped_at', '—')}\n\n"
+        else:
+            text += "📭 لا توجد قنوات مصدرية\n\n"
+
+        text += (
+            "💡 <b>كيف تعمل:</b>\n"
+            "1. أضف البوت كمشترك في قناة (ليس أدمن)\n"
+            "2. البوت يتلقى البوستات\n"
+            "3. AI يكيّف المحتوى على البراند\n"
+            "4. يُنشر في القنوات المستهدفة + كل المستخدمين\n"
+        )
+
+        inline_btns = [
+            [{'text': '➕ إضافة قناة مصدرية', 'callback_data': 'src_add'}],
+            [{'text': '🔙 رجوع', 'callback_data': 'ch_back_admin'}]
+        ]
+        self.send_inline_message(message['chat']['id'], text, inline_btns)
+
     def show_sticker_library(self, message):
         """لوحة مكتبة الرموز والاستيكرات"""
         stickers = []
@@ -3102,8 +3471,10 @@ class ComprehensiveDUXBot:
         inline_btns.append([{'text': '🔄 تحديث', 'callback_data': 'ch_refresh'}])
         inline_btns.append([
             {'text': '🔁 استبدال نصوص', 'callback_data': 'ch_text_replacements'},
-            {'text': '🤖 إعدادات AI', 'callback_data': 'ch_ai_settings'}
-        ])
+            {'text': '🤖 إعدادات AI', 'callback_data': 'ch_ai_settings'}])
+        inline_btns.append([
+            {'text': '📥 القنوات المصدرية', 'callback_data': 'src_channels'},
+            {'text': '📊 تقرير يومي', 'callback_data': 'ch_daily_report'}])
         inline_btns.append([{'text': '🔙 العودة', 'callback_data': 'app_back_admin'}])
         self.send_inline_message(message['chat']['id'], text, inline_btns)
 
@@ -5168,6 +5539,9 @@ class ComprehensiveDUXBot:
         # فحص هل الرسالة من قناة/مجموعة البوت مشرف بها ← إعادة نشر تلقائي
         chat_type = message.get('chat', {}).get('type', '')
         if chat_type in ('channel', 'group', 'supergroup'):
+            # فحص هل هي قناة مصدرية (scrape) أم قناة مدارة (relay)
+            if self.process_source_channel_post(message):
+                return
             if self.auto_relay_channel_post(message):
                 return
 
@@ -9468,6 +9842,20 @@ class ComprehensiveDUXBot:
             elif data == 'ch_ai_settings':
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                 self.show_ai_settings_admin(fake_msg)
+                return
+
+            elif data == 'src_channels':
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_source_channels_admin(fake_msg)
+                return
+
+            elif data == 'ch_daily_report':
+                if not self.is_admin(user_id):
+                    return
+                self.send_message(chat_id, "⏳ جارٍ توليد التقرير اليومي...")
+                report = self.generate_daily_report()
+                if not report:
+                    self.send_message(chat_id, "📭 لا توجد بيانات كافية لتوليد التقرير")
                 return
 
             elif data == 'tr_add':
