@@ -423,6 +423,12 @@ class ComprehensiveDUXBot:
                 for setting in settings:
                     writer.writerow(setting)
         
+        # ملف مكتبة الرموز والاستيكرات
+        if not os.path.exists('sticker_library.csv'):
+            with open('sticker_library.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.writer(f)
+                writer.writerow(['id', 'type', 'file_id', 'emoji', 'set_name', 'category', 'added_by', 'added_at'])
+
         logger.info("تم إنشاء جميع ملفات النظام بنجاح")
         
     # خريطة الأيقونات: تحويل نص/إيموجي إلى أيقونة مناسبة
@@ -2129,6 +2135,96 @@ class ComprehensiveDUXBot:
         text += f"\n{self.tr('svrp_tier_hint', lang)}"
         self.send_message(message['chat']['id'], text, self.main_keyboard(lang, user_id))
 
+    def _handle_sticker_input(self, message, state):
+        """حفظ استيكر أو رمز في المكتبة"""
+        user_id = message['from']['id']
+        chat_id = message['chat']['id']
+        category = state.replace('stk_waiting_', '')
+        del self.user_states[user_id]
+
+        sticker = message.get('sticker')
+        emoji = message.get('text', '').strip() if message.get('text') else ''
+
+        if sticker:
+            file_id = sticker.get('file_id', '')
+            set_name = sticker.get('set_name', '')
+            emoji_val = sticker.get('emoji', '🎨') or '🎨'
+            item_type = 'sticker'
+        elif emoji and len(emoji) <= 10:
+            file_id = ''
+            set_name = ''
+            emoji_val = emoji
+            item_type = 'emoji'
+        else:
+            self.send_message(chat_id, "❌ أرسل استيكر أو رمز (emoji) صحيح")
+            return
+
+        item_id = f"STK{str(int(datetime.now().timestamp()))[-6:]}"
+        try:
+            with open('sticker_library.csv', 'a', newline='', encoding='utf-8-sig') as f:
+                writer = csv.writer(f)
+                writer.writerow([item_id, item_type, file_id, emoji_val, set_name, category, user_id, datetime.now().strftime('%Y-%m-%d %H:%M')])
+        except:
+            pass
+
+        self.send_message(chat_id,
+            f"✅ <b>تم الحفظ في المكتبة!</b>\n\n"
+            f"📂 الفئة: <b>{category}</b>\n"
+            f"📦 النوع: {item_type}\n"
+            f"🎨 الرمز: {emoji_val}\n"
+            f"🆔 <code>{item_id}</code>")
+
+        if sticker:
+            self.send_message(chat_id, "📊 المحفوظ:")
+
+    def _handle_lottery_edit_input(self, message, state):
+        """معالجة تعديل حقول جولة اليانصيب"""
+        user_id = message['from']['id']
+        chat_id = message['chat']['id']
+        text = message.get('text', '').strip()
+        del self.user_states[user_id]
+
+        parts = state.replace('lot_edit_', '').split('_input_')
+        if len(parts) != 2:
+            return
+        field = parts[0]
+        round_id = parts[1]
+
+        field_map = {
+            'name': ('name', text),
+            'price': ('ticket_price', text),
+            'winners': ('winner_count', text),
+            'drawtime': ('draw_time', text),
+        }
+
+        if field not in field_map:
+            return
+
+        csv_field, value = field_map[field]
+
+        try:
+            rows = []
+            with open('lottery_rounds.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                fieldnames = reader.fieldnames
+                rows = list(reader)
+            for row in rows:
+                if row.get('id') == round_id:
+                    row[csv_field] = value
+                    break
+            with open('lottery_rounds.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer.writeheader()
+                for row in rows:
+                    writer.writerow({k: row.get(k, '') for k in fieldnames})
+        except Exception as e:
+            self.send_message(chat_id, f"❌ خطأ: {e}")
+            return
+
+        self.send_message(chat_id, f"✅ تم تعديل {field} = {value}")
+        fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+        self.show_lottery_admin(fake_msg)
+
     def handle_svrp_state(self, message, state):
         """معالجة حالات 💎 تعويض 100%"""
         user_id = message['from']['id']
@@ -2812,6 +2908,50 @@ class ComprehensiveDUXBot:
             logger.error(f"خطأ في إعادة نشر البوست: {e}")
         return False
 
+    def show_sticker_library(self, message):
+        """لوحة مكتبة الرموز والاستيكرات"""
+        stickers = []
+        try:
+            with open('sticker_library.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                stickers = list(reader)
+        except:
+            pass
+
+        emojis = [s for s in stickers if s.get('type') == 'emoji']
+        sti = [s for s in stickers if s.get('type') == 'sticker']
+
+        text = (
+            f"🗃️ <b>مكتبة الرموز والاستيكرات</b>\n\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"😀 رموز (Emoji): <code>{len(emojis)}</code>\n"
+            f"🎨 استيكرات: <code>{len(sti)}</code>\n"
+            f"📦 الإجمالي: <code>{len(stickers)}</code>\n"
+            f"━━━━━━━━━━━━━━━━━━\n\n"
+        )
+
+        if stickers:
+            text += "<b>آخر الإضافات:</b>\n"
+            for s in stickers[-5:]:
+                icon = s.get('emoji', '📦') or '📦'
+                cat = s.get('category', '—')
+                text += f"  {icon} {s.get('type', '')} | {cat}\n"
+
+        text += (
+            f"\n💡 <b>كيفية الاستخدام:</b>\n"
+            f"• أرسل استيكر أو رمز → يُحفظ تلقائياً\n"
+            f"• اختر فئة عند الحفظ\n"
+            f"• استخدم الرموز في البث والإشعارات\n"
+        )
+
+        inline_btns = [
+            [{'text': '➕ إضافة رمز/استيكر', 'callback_data': 'stk_add'}],
+            [{'text': '📋 عرض الكل', 'callback_data': 'stk_list'},
+             {'text': '📂 حسب الفئة', 'callback_data': 'stk_categories'}],
+            [{'text': '🔙 العودة', 'callback_data': 'app_back_admin'}]
+        ]
+        self.send_inline_message(message['chat']['id'], text, inline_btns)
+
     def show_channels_admin(self, message):
         """لوحة إدارة القنوات/المجموعات — مع كل الإعدادات"""
         channels = self.get_bot_channels(active_only=False)
@@ -3240,6 +3380,8 @@ class ComprehensiveDUXBot:
             [{'text': self.tr('admin_managers', lang)}, {'text': self.tr('admin_buttons', lang)}],
             # المجموعة 9: الحماية والنسخ
             [{'text': self.tr('admin_notifications', lang)}, {'text': self.tr('admin_backup', lang)}],
+            # المجموعة 9b: مكتبة الرموز
+            [{'text': '🗃️ مكتبة الرموز'}],
             # المجموعة 10: إجراءات المستخدم
             [{'text': self.tr('admin_ban_user', lang)}, {'text': self.tr('admin_unban_user', lang)}],
             # المجموعة 11: اللغة + البوتات + إعادة تعيين
@@ -4722,6 +4864,28 @@ class ComprehensiveDUXBot:
             if self.auto_relay_channel_post(message):
                 return
 
+        # فحص هل الأدمن أرسل استيكر لحفظه في المكتبة (بدون فئة محددة)
+        if 'sticker' in message and self.is_admin(message['from']['id']):
+            current_state_check = self.user_states.get(message['from']['id'], '')
+            if not isinstance(current_state_check, str) or not current_state_check.startswith('stk_waiting_'):
+                # حفظ مباشر بدون فئة
+                sticker = message['sticker']
+                item_id = f"STK{str(int(datetime.now().timestamp()))[-6:]}"
+                try:
+                    with open('sticker_library.csv', 'a', newline='', encoding='utf-8-sig') as f:
+                        writer = csv.writer(f)
+                        writer.writerow([item_id, 'sticker', sticker.get('file_id', ''),
+                                       sticker.get('emoji', '🎨'), sticker.get('set_name', ''),
+                                       'أخرى', message['from']['id'], datetime.now().strftime('%Y-%m-%d %H:%M')])
+                except:
+                    pass
+                self.send_message(message['chat']['id'],
+                    f"✅ <b>تم حفظ الاستيكر في المكتبة!</b>\n"
+                    f"🎨 {sticker.get('emoji', '🎨')}\n"
+                    f"🆔 <code>{item_id}</code>\n"
+                    f"📂 فئة: أخرى")
+                return
+
         text = message.get('text', '')
         # تطبيع نص الأزرار المعدلة إلى النص الأصلي حتى يستمر النظام في العمل كما هو
         text = self.normalize_button_text(text)
@@ -5136,6 +5300,16 @@ class ComprehensiveDUXBot:
         # باقي حالات svrp_ (أكواد ترويجية، إلخ)
         if isinstance(current_state, str) and current_state.startswith('svrp_'):
             self.handle_svrp_state(message, current_state)
+            return
+
+        # معالج مكتبة الرموز — استقبال استيكر أو رمز من الأدمن
+        if isinstance(current_state, str) and current_state.startswith('stk_waiting_'):
+            self._handle_sticker_input(message, current_state)
+            return
+
+        # معالج تعديل اليانصيب
+        if isinstance(current_state, str) and current_state.startswith('lot_edit_'):
+            self._handle_lottery_edit_input(message, current_state)
             return
 
         # معالج التطبيقات — يدعم رفع ملفات APK وصور
@@ -7183,6 +7357,8 @@ class ComprehensiveDUXBot:
             self.show_referral_links_admin(message)
         elif text == '📢 القنوات':
             self.show_channels_admin(message)
+        elif text == '🗃️ مكتبة الرموز':
+            self.show_sticker_library(message)
         elif text == '🔄 المطابقات':
             self.show_match_admin_panel(message)
         elif text == '🏆 أرباح الإحالة':
@@ -8895,6 +9071,117 @@ class ComprehensiveDUXBot:
                     del self.user_states[user_id]
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                 self.handle_admin_panel(fake_msg)
+                return
+
+            # ==================== 📢 القنوات/المجموعات ====================
+            elif data == 'ch_refresh':
+                self.edit_message(chat_id, message.get('message_id'), "🔄 تم التحديث")
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_channels_admin(fake_msg)
+                return
+
+            # ==================== 🗃️ مكتبة الرموز ====================
+            elif data == 'stk_add':
+                self.edit_message(chat_id, message.get('message_id'),
+                    "➕ <b>إضافة رمز/استيكر</b>\n\n"
+                    "📝 <b>الطريقة الأولى:</b> أرسل أي استيكر أو رمز الآن وسيُحفظ تلقائياً\n\n"
+                    "📋 <b>الطريقة الثانية:</b> اختر فئة ثم أرسل:")
+                self.send_inline_message(chat_id, "اختر الفئة:", [
+                    [{'text': '🎉 احتفال', 'callback_data': 'stk_cat_احتفال'},
+                     {'text': '💰 مال', 'callback_data': 'stk_cat_مال'}],
+                    [{'text': '✅ موافقة', 'callback_data': 'stk_cat_موافقة'},
+                     {'text': '❌ رفض', 'callback_data': 'stk_cat_رفض'}],
+                    [{'text': '📢 إعلان', 'callback_data': 'stk_cat_إعلان'},
+                     {'text': '🎁 جائزة', 'callback_data': 'stk_cat_جائزة'}],
+                    [{'text': '👤 مستخدم', 'callback_data': 'stk_cat_مستخدم'},
+                     {'text': '📦 أخرى', 'callback_data': 'stk_cat_أخرى'}],
+                    [{'text': '🔙 رجوع', 'callback_data': 'stk_back'}]
+                ])
+                return
+
+            elif data.startswith('stk_cat_'):
+                category = data.replace('stk_cat_', '')
+                self.user_states[user_id] = f'stk_waiting_{category}'
+                self.edit_message(chat_id, message.get('message_id'),
+                    f"📂 الفئة: <b>{category}</b>\n\n"
+                    f"📝 أرسل الآن الاستيكر أو الرمز (emoji) وسيُحفظ في هذه الفئة\n\n"
+                    f"💡 للاستيكرات: أرسل الاستيكر مباشرة\n💡 للرموز: اكتب الإيموجي")
+                return
+
+            elif data == 'stk_list':
+                stickers = []
+                try:
+                    with open('sticker_library.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        stickers = list(reader)
+                except:
+                    pass
+                if not stickers:
+                    self.edit_message(chat_id, message.get('message_id'), "📭 المكتبة فارغة")
+                    return
+                text = f"📋 <b>مكتبة الرموز ({len(stickers)})</b>\n\n━━━━━━━━━━━━━━━━━━\n"
+                for s in stickers:
+                    icon = s.get('emoji', '📦') or '📦'
+                    text += f"{icon} {s.get('type', '')} | {s.get('category', '—')} | <code>{s.get('id', '')}</code>\n"
+                inline_btns = [[{'text': '🔙 رجوع', 'callback_data': 'stk_back'}]]
+                self.edit_message(chat_id, message.get('message_id'), text[:4000])
+                self.send_inline_message(chat_id, f"إجمالي: {len(stickers)}", inline_btns)
+                return
+
+            elif data == 'stk_categories':
+                stickers = []
+                try:
+                    with open('sticker_library.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        stickers = list(reader)
+                except:
+                    pass
+                cats = {}
+                for s in stickers:
+                    c = s.get('category', 'أخرى')
+                    if c not in cats:
+                        cats[c] = 0
+                    cats[c] += 1
+                text = f"📂 <b>الفئات</b>\n\n━━━━━━━━━━━━━━━━━━\n"
+                inline_btns = []
+                for cat, count in cats.items():
+                    text += f"  📁 {cat}: <code>{count}</code>\n"
+                    inline_btns.append([{'text': f'{cat} ({count})', 'callback_data': f'stk_filter_{cat}'}])
+                inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'stk_back'}])
+                self.edit_message(chat_id, message.get('message_id'), text)
+                self.send_inline_message(chat_id, "اختر فئة:", inline_btns)
+                return
+
+            elif data.startswith('stk_filter_'):
+                cat = data.replace('stk_filter_', '')
+                stickers = []
+                try:
+                    with open('sticker_library.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        for s in reader:
+                            if s.get('category') == cat:
+                                stickers.append(s)
+                except:
+                    pass
+                text = f"📂 <b>فئة: {cat} ({len(stickers)})</b>\n\n━━━━━━━━━━━━━━━━━━\n"
+                for s in stickers:
+                    icon = s.get('emoji', '📦') or '📦'
+                    text += f"{icon} {s.get('type', '')} | <code>{s.get('id', '')}</code>\n"
+                # إرسال الاستيكرات فعلياً
+                for s in stickers[:10]:
+                    if s.get('type') == 'sticker' and s.get('file_id'):
+                        try:
+                            self.api_call('sendSticker', {'chat_id': chat_id, 'sticker': s['file_id']})
+                        except:
+                            pass
+                inline_btns = [[{'text': '🔙 رجوع', 'callback_data': 'stk_categories'}]]
+                self.send_message(chat_id, text[:4000])
+                self.send_inline_message(chat_id, f"{len(stickers)} عنصر", inline_btns)
+                return
+
+            elif data == 'stk_back':
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_sticker_library(fake_msg)
                 return
 
             # ==================== 📢 القنوات/المجموعات ====================
