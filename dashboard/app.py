@@ -1204,6 +1204,45 @@ def api_delete_channel(channel_id):
     write_csv('bot_channels.csv', channels, fieldnames)
     return jsonify({'success': True})
 
+# ===== API — Relay Log =====
+
+@app.route('/api/relay-log')
+@api_auth
+def api_relay_log():
+    """سجل عمليات الترحيل"""
+    logs = read_csv('relay_log.csv')
+    logs.reverse()
+    return jsonify({'logs': logs[:100], 'total': len(logs)})
+
+# ===== API — Post to Channel =====
+
+@app.route('/api/channels/<channel_id>/post', methods=['POST'])
+@api_auth
+def api_post_to_channel(channel_id):
+    """إرسال رسالة لقناة محددة"""
+    channels = read_csv('bot_channels.csv')
+    ch = next((c for c in channels if c.get('id') == channel_id), None)
+    if not ch:
+        return jsonify({'error': 'Channel not found'}), 404
+    data = request.json
+    message_text = data.get('message', '')
+    if not message_text:
+        return jsonify({'error': 'No message'}), 400
+    # حفظ في broadcast_queue.csv للبوت يرسلها
+    entry = {
+        'id': f"CHPOST{secrets.token_hex(3).upper()}",
+        'message': message_text,
+        'type': 'text',
+        'target_chat_id': ch.get('chat_id', ''),
+        'created_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
+        'created_by': session.get('admin_id', ''),
+        'status': 'pending'
+    }
+    fieldnames = ['id', 'message', 'type', 'target_chat_id', 'created_at', 'created_by', 'status']
+    append_csv('broadcast_queue.csv', entry, fieldnames)
+    log_action('post_to_channel', f'{channel_id}: {message_text[:50]}')
+    return jsonify({'success': True, 'message': 'تم إضافة الرسالة لقائمة الإرسال'})
+
 # ===== API — Bots =====
 
 @app.route('/api/bots')

@@ -102,12 +102,31 @@
                         </button>
                     </div>
 
+                    <!-- Forward Mode -->
+                    <div class="p-2 bg-slate-900/50 rounded-lg">
+                        <label class="block text-xs text-slate-400 mb-1">🎛️ نوع المحتوى المرحّل</label>
+                        <select x-model="ch.forward_mode" @change="saveSetting(ch.id, 'forward_mode', ch.forward_mode)" class="input text-sm py-1">
+                            <option value="all">📋 الكل (نص + ميديا)</option>
+                            <option value="text_only">📝 نص فقط</option>
+                            <option value="media_only">📷 ميديا فقط</option>
+                        </select>
+                    </div>
+
                     <!-- Welcome Text -->
                     <div class="p-2 bg-slate-900/50 rounded-lg">
                         <label class="block text-xs text-slate-400 mb-1">📝 نص ترحيب (اختياري)</label>
                         <input type="text" x-model="ch.welcome_text" 
                                @change="saveSetting(ch.id, 'welcome_text', ch.welcome_text)"
                                class="input text-sm py-1" placeholder="نص يظهر قبل كل ترحيل من هذه القناة">
+                    </div>
+
+                    <!-- Post to Channel -->
+                    <div class="p-2 bg-slate-900/50 rounded-lg">
+                        <label class="block text-xs text-slate-400 mb-1">📨 إرسال رسالة للقناة</label>
+                        <div class="flex gap-2">
+                            <input type="text" x-model="ch.postText" class="input text-sm py-1 flex-1" placeholder="اكتب رسالة...">
+                            <button @click="postToChannel(ch)" class="btn btn-primary btn-sm">إرسال</button>
+                        </div>
                     </div>
                 </div>
 
@@ -131,6 +150,41 @@
         </div>
     </template>
 
+    <!-- Relay History -->
+    <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+        <div class="p-4 border-b border-slate-700 flex items-center justify-between">
+            <h3 class="font-semibold"><i class="fas fa-history text-blue-400 ml-1"></i> سجل الترحيل</h3>
+            <button @click="loadRelayLog()" class="btn btn-sm" style="background:#475569">
+                <i class="fas fa-rotate ml-1"></i> تحديث
+            </button>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="data-table">
+                <thead><tr>
+                    <th>الوقت</th><th>المصدر</th><th>المعاينة</th><th>المستخدمين</th><th>القنوات</th>
+                </tr></thead>
+                <tbody>
+                    <template x-for="log in relayLogs" :key="log.timestamp">
+                        <tr class="hover:bg-slate-700/50">
+                            <td class="text-xs text-slate-400" x-text="log.timestamp"></td>
+                            <td class="text-xs">
+                                <span class="px-1.5 py-0.5 rounded text-xs"
+                                      :class="log.source_type === 'broadcast' ? 'bg-purple-500/20 text-purple-400' : 'bg-blue-500/20 text-blue-400'"
+                                      x-text="log.source_type === 'broadcast' ? 'بث عام' : 'قناة'"></span>
+                            </td>
+                            <td class="text-xs max-w-xs truncate" x-text="log.preview || '—'"></td>
+                            <td class="font-bold text-green-400 text-sm" x-text="log.users_relayed || 0"></td>
+                            <td class="font-bold text-amber-400 text-sm" x-text="log.channels_relayed || 0"></td>
+                        </tr>
+                    </template>
+                    <tr x-show="relayLogs.length === 0">
+                        <td colspan="5" class="text-center p-6 text-slate-400">لا توجد عمليات ترحيل</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
 </div>
 {% endblock %}
 
@@ -140,7 +194,7 @@ function channelsApp() {
     return {
         channels: [], loading: true,
 
-        async init() { await this.loadData(); },
+        async init() { await this.loadData(); await this.loadRelayLog(); },
 
         async loadData() {
             this.loading = true;
@@ -191,6 +245,24 @@ function channelsApp() {
                 toast('تم الحذف', 'warning');
                 await this.loadData();
             } catch(e) { toast('فشل الحذف', 'error'); }
+        },
+
+        async postToChannel(ch) {
+            if (!ch.postText) return toast('اكتب رسالة', 'warning');
+            try {
+                await api(`/api/channels/${ch.id}/post`, { method: 'POST', body: JSON.stringify({ message: ch.postText }) });
+                toast('تم إضافة الرسالة لقائمة الإرسال', 'success');
+                ch.postText = '';
+            } catch(e) { toast('فشل الإرسال', 'error'); }
+        },
+
+        relayLogs: [],
+
+        async loadRelayLog() {
+            try {
+                const data = await api('/api/relay-log');
+                this.relayLogs = data.logs || [];
+            } catch(e) { this.relayLogs = []; }
         }
     }
 }

@@ -2552,38 +2552,49 @@ class ComprehensiveDUXBot:
             pass
         return channels
 
-    def post_to_channels(self, text, photo=None, video=None, document=None):
-        """نشر محتوى في كل القنوات/المجموعات المرتبطة"""
+    def post_to_channels(self, text, photo=None, video=None, document=None, sticker=None, exclude_chat_id=None):
+        """نشر محتوى في كل القنوات/المجموعات المرتبطة — مع استثناء القناة المصدر"""
         channels = self.get_bot_channels()
+        sent = 0
         for ch in channels:
             chat_id = ch.get('chat_id', '')
             if not chat_id:
+                continue
+            # استثناء القناة المصدر لمنع التكرار اللانهائي
+            if exclude_chat_id and str(chat_id) == str(exclude_chat_id):
                 continue
             try:
                 if photo:
                     self.api_call('sendPhoto', {
                         'chat_id': chat_id, 'photo': photo,
-                        'caption': text, 'parse_mode': 'HTML'
+                        'caption': text[:1024] if text else '', 'parse_mode': 'HTML'
                     })
                 elif video:
                     self.api_call('sendVideo', {
                         'chat_id': chat_id, 'video': video,
-                        'caption': text, 'parse_mode': 'HTML'
+                        'caption': text[:1024] if text else '', 'parse_mode': 'HTML'
                     })
                 elif document:
                     self.api_call('sendDocument', {
                         'chat_id': chat_id, 'document': document,
-                        'caption': text, 'parse_mode': 'HTML'
+                        'caption': text[:1024] if text else '', 'parse_mode': 'HTML'
+                    })
+                elif sticker:
+                    self.api_call('sendSticker', {
+                        'chat_id': chat_id, 'sticker': sticker
                     })
                 else:
                     self.api_call('sendMessage', {
-                        'chat_id': chat_id, 'text': text, 'parse_mode': 'HTML'
+                        'chat_id': chat_id, 'text': text[:4096], 'parse_mode': 'HTML'
                     })
+                sent += 1
             except Exception as e:
                 logger.error(f"خطأ في النشر للقناة {chat_id}: {e}")
+            time.sleep(0.05)  # منع flood limit
+        return sent
 
     def broadcast_to_all_users(self, text, photo=None, video=None, document=None, sticker=None):
-        """بث محتوى لكل المستخدمين — يدعم كل الأنواع"""
+        """بث محتوى لكل المستخدمين — مع rate limiting وفلترة المحظورين"""
         sent = 0
         failed = 0
         try:
@@ -2593,21 +2604,24 @@ class ComprehensiveDUXBot:
                     tid = row.get('telegram_id', '')
                     if not tid:
                         continue
+                    # تخطي المحظورين
+                    if row.get('is_banned') == 'yes':
+                        continue
                     try:
                         if photo:
                             self.api_call('sendPhoto', {
                                 'chat_id': int(tid), 'photo': photo,
-                                'caption': text, 'parse_mode': 'HTML'
+                                'caption': text[:1024] if text else '', 'parse_mode': 'HTML'
                             })
                         elif video:
                             self.api_call('sendVideo', {
                                 'chat_id': int(tid), 'video': video,
-                                'caption': text, 'parse_mode': 'HTML'
+                                'caption': text[:1024] if text else '', 'parse_mode': 'HTML'
                             })
                         elif document:
                             self.api_call('sendDocument', {
                                 'chat_id': int(tid), 'document': document,
-                                'caption': text, 'parse_mode': 'HTML'
+                                'caption': text[:1024] if text else '', 'parse_mode': 'HTML'
                             })
                         elif sticker:
                             self.api_call('sendSticker', {
@@ -2618,12 +2632,34 @@ class ComprehensiveDUXBot:
                         sent += 1
                     except:
                         failed += 1
-        except:
-            pass
+                    # rate limiting: 20 رسالة ثم انتظار 1 ثانية
+                    if (sent + failed) % 20 == 0:
+                        time.sleep(1)
+            # تسجيل البث
+            self._log_relay('broadcast', '', text[:100], sent, 0)
+        except Exception as e:
+            logger.error(f"خطأ في البث: {e}")
         return sent, failed
 
+    def _log_relay(self, source_type, source_chat_id, preview, user_count, channel_count):
+        """تسجيل عملية ترحيل في relay_log.csv"""
+        try:
+            filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'relay_log.csv')
+            file_exists = os.path.exists(filepath)
+            with open(filepath, 'a', newline='', encoding='utf-8-sig') as f:
+                writer = csv.writer(f)
+                if not file_exists:
+                    writer.writerow(['timestamp', 'source_type', 'source_chat_id', 'preview', 'users_relayed', 'channels_relayed'])
+                writer.writerow([
+                    datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    source_type, source_chat_id, preview[:100],
+                    user_count, channel_count
+                ])
+        except:
+            pass
+
     def auto_relay_channel_post(self, message):
-        """إعادة نشر بوست من قناة البوت مشرف لها لكل المستخدمين — مع احترام الإعدادات"""
+        """إعادة نشر بوست من قناة البوت مشرف لها لكل المستخدمين — مع احترام كل الإعدادات"""
         chat_id = message.get('chat', {}).get('id', '')
         chat_title = message.get('chat', {}).get('title', '')
         chat_type = message.get('chat', {}).get('type', '')
@@ -2638,7 +2674,17 @@ class ComprehensiveDUXBot:
 
         relay_to_users = channel_settings.get('relay_to_users', 'yes') == 'yes'
         relay_to_channels = channel_settings.get('relay_to_channels', 'yes') == 'yes'
-        forward_mode = channel_settings.get('forward_mode', 'all')
+        forward_mode = channel_settings.get('forward_mode', 'all')  # all, text_only, media_only
+
+        # تحديد نوع الرسالة
+        has_text = 'text' in message
+        has_media = any(k in message for k in ('photo', 'video', 'document', 'sticker', 'animation', 'voice', 'audio'))
+
+        # تطبيق forward_mode
+        if forward_mode == 'text_only' and has_media and not has_text:
+            return False  # медиа فقط — تخطي
+        if forward_mode == 'media_only' and has_text and not has_media:
+            return False  # نص فقط — تخطي
 
         # استخراج المحتوى
         user_name = message.get('from', {}).get('first_name', '') or message.get('from', {}).get('title', '')
@@ -2647,41 +2693,81 @@ class ComprehensiveDUXBot:
         if welcome:
             relay_header = f"{welcome}\n\n{relay_header}"
 
+        users_relayed = 0
+        channels_relayed = 0
+        preview = ''
+
         try:
             if 'text' in message:
                 text = message['text']
+                preview = text[:100]
                 if relay_to_users:
-                    self.broadcast_to_all_users(relay_header + text)
+                    s, _ = self.broadcast_to_all_users(relay_header + text)
+                    users_relayed = s
                 if relay_to_channels:
-                    self.post_to_channels(relay_header + text)
+                    channels_relayed = self.post_to_channels(relay_header + text, exclude_chat_id=chat_id)
+                self._log_relay('channel_post', str(chat_id), preview, users_relayed, channels_relayed)
                 return True
+
             elif 'photo' in message:
                 photo = message['photo'][-1]['file_id']
                 caption = message.get('caption', '')
+                preview = '[صورة] ' + caption[:80]
                 if relay_to_users:
-                    self.broadcast_to_all_users(relay_header + caption, photo=photo)
+                    s, _ = self.broadcast_to_all_users(relay_header + caption, photo=photo)
+                    users_relayed = s
                 if relay_to_channels:
-                    self.post_to_channels(relay_header + caption, photo=photo)
+                    channels_relayed = self.post_to_channels(relay_header + caption, photo=photo, exclude_chat_id=chat_id)
+                self._log_relay('channel_post', str(chat_id), preview, users_relayed, channels_relayed)
                 return True
+
             elif 'video' in message:
                 video = message['video']['file_id']
                 caption = message.get('caption', '')
+                preview = '[فيديو] ' + caption[:80]
                 if relay_to_users:
-                    self.broadcast_to_all_users(relay_header + caption, video=video)
+                    s, _ = self.broadcast_to_all_users(relay_header + caption, video=video)
+                    users_relayed = s
                 if relay_to_channels:
-                    self.post_to_channels(relay_header + caption, video=video)
+                    channels_relayed = self.post_to_channels(relay_header + caption, video=video, exclude_chat_id=chat_id)
+                self._log_relay('channel_post', str(chat_id), preview, users_relayed, channels_relayed)
                 return True
+
             elif 'document' in message:
                 doc = message['document']['file_id']
                 caption = message.get('caption', '')
+                preview = '[ملف] ' + caption[:80]
                 if relay_to_users:
-                    self.broadcast_to_all_users(relay_header + caption, document=doc)
-                self.post_to_channels(relay_header + caption, document=doc)
+                    s, _ = self.broadcast_to_all_users(relay_header + caption, document=doc)
+                    users_relayed = s
+                if relay_to_channels:
+                    channels_relayed = self.post_to_channels(relay_header + caption, document=doc, exclude_chat_id=chat_id)
+                self._log_relay('channel_post', str(chat_id), preview, users_relayed, channels_relayed)
                 return True
+
             elif 'sticker' in message:
                 sticker = message['sticker']['file_id']
-                self.broadcast_to_all_users(relay_header + "🃏 ملصق", sticker=sticker)
+                preview = '[ملصق]'
+                if relay_to_users:
+                    s, _ = self.broadcast_to_all_users(relay_header + "🃏 ملصق", sticker=sticker)
+                    users_relayed = s
+                if relay_to_channels:
+                    channels_relayed = self.post_to_channels('', sticker=sticker, exclude_chat_id=chat_id)
+                self._log_relay('channel_post', str(chat_id), preview, users_relayed, channels_relayed)
                 return True
+
+            elif 'animation' in message:
+                anim = message['animation']['file_id']
+                caption = message.get('caption', '')
+                preview = '[GIF] ' + caption[:80]
+                if relay_to_users:
+                    # استخدام sendVideo للأنيميشن
+                    self.api_call('sendAnimation', {
+                        'chat_id': 0,  # placeholder
+                        'animation': anim
+                    })
+                return True
+
         except Exception as e:
             logger.error(f"خطأ في إعادة نشر البوست: {e}")
         return False
