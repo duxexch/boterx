@@ -1243,7 +1243,149 @@ def api_relay_log():
     logs.reverse()
     return jsonify({'logs': logs[:100], 'total': len(logs)})
 
-# ===== API — Post Vault =====
+# ===== API — Post Library =====
+
+@app.route('/api/post-library')
+@api_auth
+def api_post_library():
+    """مكتبة المنشورات — كل المنشورات"""
+    search = request.args.get('search', '')
+    posts = read_csv('post_library.csv')
+    if search:
+        sl = search.lower()
+        posts = [p for p in posts if sl in (p.get('content', '') + p.get('title', '')).lower()]
+    posts.reverse()
+    return jsonify({'posts': posts[:100], 'total': len(posts)})
+
+@app.route('/api/post-library', methods=['POST'])
+@api_auth
+def api_add_post():
+    """إنشاء منشور جديد"""
+    data = request.json
+    posts = read_csv('post_library.csv')
+    fieldnames = get_fieldnames('post_library.csv', ['id','title','content','media_type','media_file_id','target_channels','schedule','status','created_by','created_at'])
+    new_id = f"POST{secrets.token_hex(3).upper()}"
+    post = {
+        'id': new_id,
+        'title': data.get('title', ''),
+        'content': data.get('content', ''),
+        'media_type': data.get('media_type', 'text'),  # text, photo, video, both
+        'media_file_id': data.get('media_file_id', ''),
+        'target_channels': data.get('target_channels', ''),  # pipe-separated channel IDs
+        'schedule': data.get('schedule', ''),  # datetime or 'now'
+        'status': 'pending' if data.get('schedule') else 'ready',
+        'created_by': session.get('admin_id', ''),
+        'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')
+    }
+    append_csv('post_library.csv', post, fieldnames)
+    log_action('create_post', new_id)
+
+    # If schedule is 'now' — add to broadcast_queue for immediate publishing
+    if data.get('schedule', 'now') == 'now' and post['content']:
+        target_channels = data.get('target_channels', '').split('|') if data.get('target_channels') else []
+        if target_channels:
+            for ch_id in target_channels:
+                ch_id = ch_id.strip()
+                if ch_id:
+                    channels = read_csv('bot_channels.csv')
+                    ch = next((c for c in channels if c.get('id') == ch_id), None)
+                    if ch:
+                        entry = {
+                            'id': f"PUB{secrets.token_hex(3).upper()}",
+                            'message': post['content'],
+                            'type': post['media_type'],
+                            'target_chat_id': ch.get('chat_id', ''),
+                            'created_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
+                            'created_by': session.get('admin_id', ''),
+                            'status': 'pending'
+                        }
+                        bq_fields = get_fieldnames('broadcast_queue.csv', ['id','message','type','target_chat_id','created_at','created_by','status'])
+                        append_csv('broadcast_queue.csv', entry, bq_fields)
+        # Also broadcast to all users if content exists
+        entry_all = {
+            'id': f"PUB{secrets.token_hex(3).upper()}",
+            'message': post['content'],
+            'type': post['media_type'],
+            'target_chat_id': '',
+            'created_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
+            'created_by': session.get('admin_id', ''),
+            'status': 'pending'
+        }
+        bq_fields = get_fieldnames('broadcast_queue.csv', ['id','message','type','target_chat_id','created_at','created_by','status'])
+        append_csv('broadcast_queue.csv', entry_all, bq_fields)
+        post['status'] = 'published'
+        # Update status in CSV
+        for p in posts:
+            if p.get('id') == new_id:
+                p['status'] = 'published'
+                break
+        write_csv('post_library.csv', posts, fieldnames)
+
+    return jsonify({'success': True, 'id': new_id, 'status': post['status']})
+
+@app.route('/api/post-library/<post_id>', methods=['DELETE'])
+@api_auth
+def api_delete_post(post_id):
+    posts = read_csv('post_library.csv')
+    fieldnames = get_fieldnames('post_library.csv', ['id','title','content','media_type','media_file_id','target_channels','schedule','status','created_by','created_at'])
+    posts = [p for p in posts if p.get('id') != post_id]
+    write_csv('post_library.csv', posts, fieldnames)
+    log_action('delete_post', post_id)
+    return jsonify({'success': True})
+
+@app.route('/api/post-library/<post_id>/publish', methods=['POST'])
+@api_auth
+def api_publish_post(post_id):
+    """نشر منشور من المكتبة"""
+    posts = read_csv('post_library.csv')
+    post = next((p for p in posts if p.get('id') == post_id), None)
+    if not post:
+        return jsonify({'error': 'Post not found'}), 404
+
+    # Add to broadcast queue
+    target_channels = post.get('target_channels', '').split('|') if post.get('target_channels') else []
+    for ch_id in target_channels:
+        ch_id = ch_id.strip()
+        if ch_id:
+            channels = read_csv('bot_channels.csv')
+            ch = next((c for c in channels if c.get('id') == ch_id), None)
+            if ch:
+                entry = {
+                    'id': f"PUB{secrets.token_hex(3).upper()}",
+                    'message': post.get('content', ''),
+                    'type': post.get('media_type', 'text'),
+                    'target_chat_id': ch.get('chat_id', ''),
+                    'created_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
+                    'created_by': session.get('admin_id', ''),
+                    'status': 'pending'
+                }
+                bq_fields = get_fieldnames('broadcast_queue.csv', ['id','message','type','target_chat_id','created_at','created_by','status'])
+                append_csv('broadcast_queue.csv', entry, bq_fields)
+
+    # Also broadcast to all users
+    entry_all = {
+        'id': f"PUB{secrets.token_hex(3).upper()}",
+        'message': post.get('content', ''),
+        'type': post.get('media_type', 'text'),
+        'target_chat_id': '',
+        'created_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
+        'created_by': session.get('admin_id', ''),
+        'status': 'pending'
+    }
+    bq_fields = get_fieldnames('broadcast_queue.csv', ['id','message','type','target_chat_id','created_at','created_by','status'])
+    append_csv('broadcast_queue.csv', entry_all, bq_fields)
+
+    # Update post status
+    fieldnames = get_fieldnames('post_library.csv', ['id','title','content','media_type','media_file_id','target_channels','schedule','status','created_by','created_at'])
+    for p in posts:
+        if p.get('id') == post_id:
+            p['status'] = 'published'
+            break
+    write_csv('post_library.csv', posts, fieldnames)
+    log_action('publish_post', post_id)
+    return jsonify({'success': True, 'message': 'تم النشر'})
+
+# ===== API — Post Vault (Legacy archive) =====
 
 @app.route('/api/post-vault')
 @api_auth
@@ -1529,7 +1671,7 @@ def api_post_to_channel(channel_id):
 @app.route('/api/channels', methods=['POST'])
 @api_auth
 def api_add_channel_manual():
-    """إضافة قناة يدوياً (البوت ليس مشرفاً فيها)"""
+    """إضافة قناة يدوياً — مع تحديد الدور"""
     data = request.json
     chat_id = data.get('chat_id', '').strip()
     title = data.get('title', '').strip()
@@ -1545,7 +1687,7 @@ def api_add_channel_manual():
             return jsonify({'error': 'Channel already exists'}), 400
 
     ch_id = f"CH{secrets.token_hex(3).upper()}"
-    fieldnames = get_fieldnames('bot_channels.csv', ['id','chat_id','title','type','is_active','added_at','relay_to_users','relay_to_channels','forward_mode','welcome_text','category','ai_enabled'])
+    fieldnames = get_fieldnames('bot_channels.csv', ['id','chat_id','title','type','is_active','added_at','relay_to_users','relay_to_channels','forward_mode','welcome_text','category','ai_enabled','channel_role','ai_provider','brand_voice'])
     new_channel = {
         'id': ch_id,
         'chat_id': str(chat_id),
@@ -1558,10 +1700,13 @@ def api_add_channel_manual():
         'forward_mode': 'all',
         'welcome_text': '',
         'category': data.get('category', ''),
-        'ai_enabled': 'no'
+        'ai_enabled': 'no',
+        'channel_role': data.get('channel_role', 'both'),  # source, publish, both
+        'ai_provider': data.get('ai_provider', ''),
+        'brand_voice': data.get('brand_voice', '')
     }
     append_csv('bot_channels.csv', new_channel, fieldnames)
-    log_action('add_channel_manual', f'{ch_id}: {title} ({chat_id})')
+    log_action('add_channel_manual', f'{ch_id}: {title} ({chat_id}) role={new_channel["channel_role"]}')
     return jsonify({'success': True, 'id': ch_id})
 
 @app.route('/api/channels/<channel_id>/category', methods=['POST'])
