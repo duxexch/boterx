@@ -8,11 +8,11 @@ ssh.connect('69.169.108.197', username='root', password='M12122099m@@@@', timeou
 commands = [
     "cd /opt/bot && git fetch origin && git reset --hard origin/main",
     "cd /opt/bot && git log --oneline -1",
-    "systemctl restart boterx-dashboard",
     "systemctl restart boterx",
+    "systemctl restart boterx-dashboard",
     "sleep 2",
-    "systemctl status boterx-dashboard --no-pager | head -3",
     "systemctl status boterx --no-pager | head -3",
+    "systemctl status boterx-dashboard --no-pager | head -3",
 ]
 
 for cmd in commands:

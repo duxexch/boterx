@@ -84,6 +84,9 @@ const Notifier = {
     lastComplaintsCount: 0,
     lastTradingCount: 0,
     lastSvrpCount: 0,
+    lastLotteryCount: 0,
+    lastWheelCount: 0,
+    lastNewUsers: 0,
 
     init() {
         // Load saved preferences
@@ -114,38 +117,55 @@ const Notifier = {
             const complaintsNow = stats.complaints?.open || 0;
             const tradingNow = stats.trading?.pending_orders || 0;
             const svrpNow = stats.svrp?.pending_requests || 0;
+            const lotteryTickets = stats.lottery?.tickets_sold || 0;
+            const wheelSpins = stats.wheel?.total_spins || 0;
+            const newUsers = stats.users?.today || 0;
+            const pendingLottery = 0; // TODO: add pending lottery tickets to stats
 
             // New pending transactions
-            if (pendingNow > this.lastPendingCount && this.lastPendingCount > 0) {
+            if (pendingNow > this.lastPendingCount && this.lastPendingCount >= 0) {
                 const diff = pendingNow - this.lastPendingCount;
                 this.notify(`📥 ${diff} طلب معاملة جديد`, 'new_txn');
-                this.playSound('notification');
             }
 
             // New match requests
-            if (matchesNow > this.lastMatchCount && this.lastMatchCount > 0) {
+            if (matchesNow > this.lastMatchCount && this.lastMatchCount >= 0) {
                 const diff = matchesNow - this.lastMatchCount;
                 this.notify(`🔄 ${diff} طلب مطابقة جديد`, 'new_match');
-                this.playSound('alert');
             }
 
             // New complaints
-            if (complaintsNow > this.lastComplaintsCount && this.lastComplaintsCount > 0) {
+            if (complaintsNow > this.lastComplaintsCount && this.lastComplaintsCount >= 0) {
                 const diff = complaintsNow - this.lastComplaintsCount;
                 this.notify(`📢 ${diff} شكوى جديدة`, 'new_complaint');
-                this.playSound('alert');
             }
 
             // New trade orders
-            if (tradingNow > this.lastTradingCount && this.lastTradingCount > 0) {
+            if (tradingNow > this.lastTradingCount && this.lastTradingCount >= 0) {
                 this.notify(`💱 طلب تداول جديد`, 'new_trade');
-                this.playSound('notification');
             }
 
             // New SVRP requests
-            if (svrpNow > this.lastSvrpCount && this.lastSvrpCount > 0) {
+            if (svrpNow > this.lastSvrpCount && this.lastSvrpCount >= 0) {
                 this.notify(`💎 طلب استرداد جديد`, 'new_svrp');
-                this.playSound('notification');
+            }
+
+            // New lottery ticket purchases
+            if (lotteryTickets > this.lastLotteryCount && this.lastLotteryCount >= 0) {
+                const diff = lotteryTickets - this.lastLotteryCount;
+                this.notify(`🎰 ${diff} تذكرة يانصيب جديدة`, 'new_lottery');
+            }
+
+            // New wheel spins
+            if (wheelSpins > this.lastWheelCount && this.lastWheelCount >= 0) {
+                const diff = wheelSpins - this.lastWheelCount;
+                this.notify(`🎡 ${diff} دورة عجلة حظ جديدة`, 'new_wheel');
+            }
+
+            // New user registrations
+            if (newUsers > this.lastNewUsers && this.lastNewUsers >= 0) {
+                const diff = newUsers - this.lastNewUsers;
+                this.notify(`👤 ${diff} مستخدم جديد`, 'new_user');
             }
 
             this.lastPendingCount = pendingNow;
@@ -153,6 +173,9 @@ const Notifier = {
             this.lastComplaintsCount = complaintsNow;
             this.lastTradingCount = tradingNow;
             this.lastSvrpCount = svrpNow;
+            this.lastLotteryCount = lotteryTickets;
+            this.lastWheelCount = wheelSpins;
+            this.lastNewUsers = newUsers;
 
             // Update notification badge (total)
             const total = pendingNow + matchesNow + complaintsNow + tradingNow + svrpNow;
@@ -163,7 +186,7 @@ const Notifier = {
             }
 
             // Update sidebar red dots
-            this.updateSidebarDots(pendingNow, matchesNow, complaintsNow, tradingNow, svrpNow);
+            this.updateSidebarDots(pendingNow, matchesNow, complaintsNow, tradingNow, svrpNow, lotteryTickets, wheelSpins, newUsers);
 
             // Update live stats bar
             const liveBar = document.getElementById('liveStats');
@@ -182,13 +205,16 @@ const Notifier = {
         } catch (e) { /* silent */ }
     },
 
-    updateSidebarDots(txns, matches, complaints, trading, svrp) {
+    updateSidebarDots(txns, matches, complaints, trading, svrp, lottery, wheel, users) {
         const dots = {
             'transactions': txns,
             'matching': matches,
             'complaints': complaints,
             'trading': trading,
             'svrp': svrp,
+            'lottery': lottery,
+            'wheel': wheel,
+            'users': users,
         };
         for (const [page, count] of Object.entries(dots)) {
             const link = document.querySelector(`a[href="/${page}"]`);
@@ -198,11 +224,17 @@ const Notifier = {
                 if (!dot) {
                     dot = document.createElement('span');
                     dot.className = 'sidebar-dot';
-                    dot.style.cssText = 'position:absolute;top:8px;left:8px;width:8px;height:8px;background:#EF4444;border-radius:50%;animation:pulse 2s infinite';
+                    dot.style.cssText = 'position:absolute;top:8px;left:8px;width:8px;height:8px;background:#EF4444;border-radius:50%;animation:pulse 2s infinite;cursor:pointer';
                     link.style.position = 'relative';
                     link.appendChild(dot);
                 }
                 dot.style.display = 'block';
+                // Click on dot navigates to the page
+                dot.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    window.location.href = '/' + page;
+                };
             } else if (dot) {
                 dot.style.display = 'none';
             }
@@ -241,31 +273,39 @@ const Notifier = {
         if (existing) existing.remove();
 
         const colors = {
-            'new_txn': { bg: 'bg-blue-600', icon: '📥' },
-            'new_match': { bg: 'bg-green-600', icon: '🔄' },
-            'new_complaint': { bg: 'bg-red-600', icon: '📢' },
-            'new_trade': { bg: 'bg-amber-600', icon: '💱' },
-            'new_svrp': { bg: 'bg-purple-600', icon: '💎' },
+            'new_txn': { bg: 'bg-blue-600', icon: '📥', url: '/transactions' },
+            'new_match': { bg: 'bg-green-600', icon: '🔄', url: '/matching' },
+            'new_complaint': { bg: 'bg-red-600', icon: '📢', url: '/complaints' },
+            'new_trade': { bg: 'bg-amber-600', icon: '💱', url: '/trading' },
+            'new_svrp': { bg: 'bg-purple-600', icon: '💎', url: '/svrp' },
+            'new_lottery': { bg: 'bg-amber-600', icon: '🎰', url: '/lottery' },
+            'new_wheel': { bg: 'bg-blue-600', icon: '🎡', url: '/wheel' },
+            'new_user': { bg: 'bg-green-600', icon: '👤', url: '/users' },
         };
-        const c = colors[type] || { bg: 'bg-blue-600', icon: '🔔' };
+        const c = colors[type] || { bg: 'bg-blue-600', icon: '🔔', url: '/dashboard' };
 
         const popup = document.createElement('div');
         popup.id = 'bigPopup';
-        popup.className = `fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 ${c.bg} text-white px-8 py-6 rounded-2xl shadow-2xl z-[500] text-center`;
+        popup.className = `fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 ${c.bg} text-white px-8 py-6 rounded-2xl shadow-2xl z-[500] text-center cursor-pointer`;
         popup.innerHTML = `
             <div class="text-4xl mb-2">${c.icon}</div>
             <div class="text-lg font-bold">${message}</div>
             <div class="text-xs opacity-75 mt-1">${new Date().toLocaleTimeString('ar-EG')}</div>
+            <div class="text-xs mt-2 opacity-50">اضغط للانتقال ←</div>
         `;
+        // Click on popup navigates to the relevant section
+        popup.onclick = () => {
+            window.location.href = c.url;
+        };
         document.body.appendChild(popup);
 
-        // Show for 1 second then fade out
+        // Show for 3 seconds then fade out
         setTimeout(() => {
             popup.style.transition = 'opacity 0.3s, transform 0.3s';
             popup.style.opacity = '0';
             popup.style.transform = 'translate(-50%, -60%) scale(0.9)';
             setTimeout(() => popup.remove(), 300);
-        }, 1000);
+        }, 3000);
     },
 
     playSound(type = 'notification') {
