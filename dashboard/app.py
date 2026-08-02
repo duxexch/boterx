@@ -163,6 +163,25 @@ def page_lottery():
 def page_wheel():
     return render_template('wheel.html', active_page='wheel')
 
+@app.route('/webapp/wheel')
+def webapp_wheel():
+    """صفحة عجلة الحظ — تفتح داخل تيليجرام (Web App)"""
+    return render_template('wheel_app.html')
+
+@app.route('/api/wheel/my-spins')
+@api_auth
+def api_wheel_my_spins():
+    """عدد دورات المستخدم في جولة محددة"""
+    round_id = request.args.get('round_id', '')
+    # محاولة الحصول على user_id من session
+    admin_id = session.get('admin_id', '')
+    spins = read_csv('wheel_spins.csv')
+    user_spins = [s for s in spins if s.get('round_id') == round_id]
+    return jsonify({
+        'total_spins': len(user_spins),
+        'spins': user_spins[-10:]
+    })
+
 @app.route('/companies')
 @login_required
 def page_companies():

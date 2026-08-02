@@ -12438,6 +12438,13 @@ class ComprehensiveDUXBot:
                             self.handle_my_chat_member(update['my_chat_member'])
                         except Exception as e:
                             logger.error(f"خطأ في my_chat_member: {e}", exc_info=True)
+                    
+                    elif 'web_app_data' in update.get('message', {}):
+                        """استقبال بيانات عجلة الحظ من Web App"""
+                        try:
+                            self.handle_wheel_webapp_data(update['message'])
+                        except Exception as e:
+                            logger.error(f"خطأ في web_app_data: {e}", exc_info=True)
                 
                 # 5. تنظيف دوري للذاكرة
                 if len(user_last_activity) > 500:
@@ -12459,6 +12466,156 @@ class ComprehensiveDUXBot:
                 # انتظار قصير قبل المحاولة مرة أخرى
                 time.sleep(1)
                 continue
+
+    def handle_wheel_webapp_data(self, message):
+        """معالجة نتيجة عجلة الحظ من Web App — توزيع الجائزة على المحفظة"""
+        user_id = message.get('from', {}).get('id', '')
+        chat_id = message.get('chat', {}).get('id', '')
+        
+        try:
+            raw = message.get('web_app_data', {}).get('data', '{}')
+            data = json.loads(raw)
+            round_id = data.get('round_id', '')
+            prize = data.get('prize', '')
+            used_free = data.get('used_free', True)
+            cost = float(data.get('cost', 0))
+        except:
+            return
+
+        # قراءة بيانات الجولة
+        round_data = None
+        try:
+            with open('wheel_rounds.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row.get('id') == round_id and row.get('status') == 'active':
+                        round_data = row
+                        break
+        except:
+            pass
+
+        if not round_data:
+            self.send_message(chat_id, "❌ الجولة غير موجودة أو منتهية")
+            return
+
+        # فحص حد الدورات
+        my_spins = 0
+        try:
+            with open('wheel_spins.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row.get('round_id') == round_id and row.get('user_id') == str(user_id):
+                        my_spins += 1
+        except:
+            pass
+
+        max_spins = int(round_data.get('max_spins_per_user', 1))
+        spin_cost = float(round_data.get('spin_cost', 0) or 0)
+        currency = round_data.get('currency', 'SAR')
+
+        free_left = max(0, max_spins - my_spins)
+        is_free = used_free and free_left > 0
+
+        # خصم تكلفة الدورة لو مدفوعة
+        if not is_free and spin_cost > 0 and self.svrp:
+            wallet = None
+            try:
+                wallets = self.svrp.get_all_wallets()
+                for w in wallets:
+                    if str(w.get('telegram_id', '')) == str(user_id):
+                        wallet = w
+                        break
+            except:
+                pass
+
+            if not wallet:
+                self.send_message(chat_id, "❌ لا يوجد محفظة لحسابك")
+                return
+
+            balance = float(wallet.get('balance', 0) or 0)
+            if balance < spin_cost:
+                self.send_message(chat_id, f"❌ رصيدك غير كافٍ\n💰 رصيدك: {balance:.0f} {currency}\n🎟️ التكلفة: {spin_cost:.0f} {currency}")
+                return
+
+            # خصم الرصيد
+            try:
+                rows = []
+                with open('svrp_wallets.csv', 'r', encoding='utf-8-sig') as f:
+                    reader = csv.DictReader(f)
+                    fieldnames = reader.fieldnames
+                    rows = list(reader)
+                for row in rows:
+                    if row.get('telegram_id') == str(user_id):
+                        row['balance'] = str(balance - spin_cost)
+                        break
+                with open('svrp_wallets.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                    writer = csv.DictWriter(f, fieldnames=fieldnames)
+                    writer.writeheader()
+                    for row in rows:
+                        writer.writerow({k: row.get(k, '') for k in fieldnames})
+            except Exception as e:
+                logger.error(f"خطأ في خصم رصيد العجلة: {e}")
+
+        # حفظ الدوران
+        spin_id = f"SPN{str(int(datetime.now().timestamp()))[-6:]}"
+        try:
+            with open('wheel_spins.csv', 'a', newline='', encoding='utf-8-sig') as f:
+                writer = csv.writer(f)
+                writer.writerow([spin_id, round_id, user_id, prize, datetime.now().strftime('%Y-%m-%d %H:%M')])
+        except:
+            pass
+
+        # توزيع الجائزة على المحفظة — استخراج المبلغ من النص
+        prize_distributed = 0.0
+        try:
+            # محاولة استخراج رقم من نص الجائزة
+            import re
+            numbers = re.findall(r'[\d,.]+', prize.replace(',', ''))
+            if numbers:
+                prize_amount = float(numbers[0])
+                if prize_amount > 0 and self.svrp:
+                    self.svrp.add_frozen_balance(str(user_id), prize_amount)
+                    prize_distributed = prize_amount
+        except:
+            pass
+
+        # رسالة للعميل
+        result_text = (
+            f"🎉 <b>نتيجة عجلة الحظ!</b>\n\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"🎁 الجائزة: <b>{prize}</b>\n"
+        )
+        if prize_distributed > 0:
+            result_text += f"💎 تم إضافة <code>{prize_distributed:.0f}</code> {currency} لمحفظتك المجمدة\n"
+        if not is_free and spin_cost > 0:
+            result_text += f"🎟️ تم خصم <code>{spin_cost:.0f}</code> {currency} من رصيدك\n"
+        result_text += f"━━━━━━━━━━━━━━━━━━\n\n"
+        
+        free_after = max(0, max_spins - my_spins - 1)
+        result_text += f"🎯 دوراتك المجانية المتبقية: <code>{free_after}</code>\n"
+
+        self.send_message(chat_id, result_text, self.main_keyboard('ar', user_id))
+
+        # إشعار الأدمن
+        user = self.find_user(user_id)
+        user_name = user.get('name', '') if user else str(user_id)
+        for admin_id in self.admin_ids:
+            try:
+                self.send_message(int(admin_id),
+                    f"🎡 <b>عجلة الحظ — نتيجة</b>\n\n"
+                    f"👤 {user_name} (<code>{user_id}</code>)\n"
+                    f"🎁 الجائزة: <b>{prize}</b>\n"
+                    f"{'💎 مبلغ: ' + str(prize_distributed) + ' ' + currency if prize_distributed > 0 else ''}\n"
+                    f"{'🎟️ مدفوعة: ' + str(spin_cost) + ' ' + currency if not is_free and spin_cost > 0 else '🆓 مجانية'}\n"
+                    f"🎯 الجولة: {round_data.get('name', '')}")
+            except:
+                pass
+
+        # نشر في القنوات
+        try:
+            self.post_to_channels(f"🎡 عجلة الحظ!\n👤 {user_name}\n🎁 ربح: {prize}")
+        except:
+            pass
 
     def handle_my_chat_member(self, update_data):
         """معالجة إضافة/إزالة البوت من القنوات/المجموعات"""
@@ -14399,6 +14556,23 @@ class ComprehensiveDUXBot:
         max_spins = int(active_round.get('max_spins_per_user', 1))
         prizes = active_round.get('prizes', '').split('|')
 
+        # قراءة الرصيد من المحفظة
+        wallet_balance = 0.0
+        if self.svrp:
+            try:
+                wallets = self.svrp.get_all_wallets()
+                for w in wallets:
+                    if str(w.get('telegram_id', '')) == str(message['from']['id']):
+                        wallet_balance = float(w.get('balance', 0) or 0)
+                        break
+            except:
+                pass
+
+        spin_cost = float(active_round.get('spin_cost', 0) or 0)
+        currency = active_round.get('currency', 'SAR')
+        free_spins_left = max(0, max_spins - my_spins)
+        can_spin_paid = spin_cost > 0 and wallet_balance >= spin_cost
+
         text = (
             f"🎡 <b>عجلة الحظ — {active_round.get('name', '')}</b>\n\n"
             f"━━━━━━━━━━━━━━━━━━\n"
@@ -14409,18 +14583,44 @@ class ComprehensiveDUXBot:
             text += f"  {i}️⃣ {prize.strip()}\n"
         text += (
             f"━━━━━━━━━━━━━━━━━━\n"
-            f"🎯 دوراتك: <code>{my_spins}/{max_spins}</code>\n\n"
+            f"🎯 دوراتك المجانية: <code>{free_spins_left}</code>\n"
         )
+        if spin_cost > 0:
+            text += f"💰 رصيدك: <code>{wallet_balance:.0f}</code> {currency}\n"
+            text += f"🎟️ دورة إضافية: <code>{spin_cost:.0f}</code> {currency}\n"
+        text += f"━━━━━━━━━━━━━━━━━━\n\n"
+
+        # إرسال زر Web App للعجلة الحقيقية
+        url = f"{self.api_url.replace('https://api.telegram.org/bot', '').strip()}"
+        # بناء URL للـ Web App
+        webapp_url = os.getenv('DASHBOARD_HOST', 'http://69.169.108.197:8080') + f'/webapp/wheel?round_id={active_round["id"]}'
 
         inline_btns = []
-        if my_spins < max_spins:
-            inline_btns.append([{'text': '🎡 أدر العجلة!', 'callback_data': f'wheel_spin_{active_round["id"]}'}])
+        if free_spins_left > 0 or can_spin_paid:
+            # زر عادي يفتح العجلة كـ Web App
+            keyboard = {
+                'inline_keyboard': [
+                    [{'text': '🎡 أدر العجلة!', 'web_app': {'url': webapp_url}}],
+                    [{'text': '🔄 تحديث', 'callback_data': 'wheel_refresh'},
+                     {'text': '🔙 رجوع', 'callback_data': 'wheel_back_main'}]
+                ]
+            }
+            import urllib.request
+            payload = json.dumps({
+                'chat_id': message['chat']['id'],
+                'text': text,
+                'parse_mode': 'HTML',
+                'reply_markup': keyboard
+            }).encode('utf-8')
+            url = f"{self.api_url}sendMessage"
+            req = urllib.request.Request(url, data=payload, headers={'Content-Type': 'application/json'})
+            urllib.request.urlopen(req, timeout=10)
+            return
         else:
-            text += "⚠️ وصلت للحد الأقصى من الدورات"
-
-        inline_btns.append([{'text': '🔄 تحديث', 'callback_data': 'wheel_refresh'}])
-        inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'wheel_back_main'}])
-        self.send_inline_message(message['chat']['id'], text, inline_btns)
+            text += "⚠️ وصلت للحد الأقصى ولا يوجد رصيد كافٍ للدورات الإضافية"
+            inline_btns.append([{'text': '🔄 تحديث', 'callback_data': 'wheel_refresh'}])
+            inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'wheel_back_main'}])
+            self.send_inline_message(message['chat']['id'], text, inline_btns)
 
     def show_more_menu(self, message):
         """قائمة المزيد — أزرار إضافية منظمة"""
