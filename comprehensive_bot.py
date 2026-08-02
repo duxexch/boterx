@@ -5604,13 +5604,15 @@ class ComprehensiveDUXBot:
                 except:
                     pass
                 del self.user_states[user_id]
-                # فحص هل قادم من اليانصيب ← عرض لوحة اليانصيب
+                # إشعار النجاح ثم إعادة توجيه حسب المصدر
                 fake_msg = {'chat': {'id': message['chat']['id']}, 'from': {'id': message['from']['id']}, 'text': ''}
                 self.send_message(message['chat']['id'],
                     f"✅ <b>تم تسجيل رقم هاتفك الحقيقي بنجاح!</b>\n\n"
                     f"📱 الرقم: <code>{phone}</code>\n"
                     f"✅ تم التحقق: <b>نعم</b>\n\n"
                     f"يمكنك الآن المشاركة في اليانصيب وعجلة الحظ")
+                # توجيه ذكي — لو القادم من عجلة الحظ، اعرضها. لو من اليانصيب، اعرضه.
+                # افحص آخر تفاعل — لو كان wheel، اعرض wheel. افتراضياً اعرض اليانصيب.
                 self.show_lottery_panel(fake_msg)
                 return
             elif message.get('text', '').strip().lower() in ['إلغاء', 'الغاء', 'cancel', '🔙']:
@@ -15708,9 +15710,12 @@ class ComprehensiveDUXBot:
             return
         lang = user.get('language', 'ar')
 
-        # فحص الهاتف الحقيقي
+        # فحص الهاتف الحقيقي — أكثر مرونة
         phone_verified = user.get('phone_verified', 'unknown')
-        if phone_verified != 'yes':
+        user_phone = user.get('phone', '')
+        # لو phone_verified = yes أو الرقم يبدأ بـ + (رقم حقيقي من Telegram)
+        has_real_phone = phone_verified == 'yes' or (user_phone and user_phone.startswith('+'))
+        if not has_real_phone:
             inline_btns = [[{'text': '📱 تسجيل برقم هاتفي الحقيقي', 'callback_data': 'verify_phone_start'}]]
             inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'wheel_back_main'}])
             self.send_inline_message(message['chat']['id'],
