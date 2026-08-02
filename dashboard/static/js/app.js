@@ -81,6 +81,9 @@ const Notifier = {
     audioContext: null,
     lastPendingCount: 0,
     lastMatchCount: 0,
+    lastComplaintsCount: 0,
+    lastTradingCount: 0,
+    lastSvrpCount: 0,
 
     init() {
         // Load saved preferences
@@ -108,11 +111,14 @@ const Notifier = {
             const pendingNow = stats.transactions?.pending || 0;
             const matchesNow = stats.matches?.pending || 0;
             const activeMatches = stats.matches?.active || 0;
+            const complaintsNow = stats.complaints?.open || 0;
+            const tradingNow = stats.trading?.pending_orders || 0;
+            const svrpNow = stats.svrp?.pending_requests || 0;
 
             // New pending transactions
             if (pendingNow > this.lastPendingCount && this.lastPendingCount > 0) {
                 const diff = pendingNow - this.lastPendingCount;
-                this.notify(`📥 ${diff} طلب جديد معلق`, 'new_txn');
+                this.notify(`📥 ${diff} طلب معاملة جديد`, 'new_txn');
                 this.playSound('notification');
             }
 
@@ -123,16 +129,41 @@ const Notifier = {
                 this.playSound('alert');
             }
 
+            // New complaints
+            if (complaintsNow > this.lastComplaintsCount && this.lastComplaintsCount > 0) {
+                const diff = complaintsNow - this.lastComplaintsCount;
+                this.notify(`📢 ${diff} شكوى جديدة`, 'new_complaint');
+                this.playSound('alert');
+            }
+
+            // New trade orders
+            if (tradingNow > this.lastTradingCount && this.lastTradingCount > 0) {
+                this.notify(`💱 طلب تداول جديد`, 'new_trade');
+                this.playSound('notification');
+            }
+
+            // New SVRP requests
+            if (svrpNow > this.lastSvrpCount && this.lastSvrpCount > 0) {
+                this.notify(`💎 طلب استرداد جديد`, 'new_svrp');
+                this.playSound('notification');
+            }
+
             this.lastPendingCount = pendingNow;
             this.lastMatchCount = matchesNow;
+            this.lastComplaintsCount = complaintsNow;
+            this.lastTradingCount = tradingNow;
+            this.lastSvrpCount = svrpNow;
 
-            // Update badge
+            // Update notification badge (total)
+            const total = pendingNow + matchesNow + complaintsNow + tradingNow + svrpNow;
             const badge = document.getElementById('notifBadge');
             if (badge) {
-                const total = pendingNow + matchesNow;
                 badge.textContent = total || '';
                 badge.style.display = total > 0 ? 'flex' : 'none';
             }
+
+            // Update sidebar red dots
+            this.updateSidebarDots(pendingNow, matchesNow, complaintsNow, tradingNow, svrpNow);
 
             // Update live stats bar
             const liveBar = document.getElementById('liveStats');
@@ -141,12 +172,41 @@ const Notifier = {
                 if (stats.users?.total) parts.push(`👥 ${fmtNum(stats.users.total)}`);
                 if (pendingNow) parts.push(`⏳ ${pendingNow} معلقة`);
                 if (activeMatches) parts.push(`🔄 ${activeMatches} مطابقة`);
+                if (complaintsNow) parts.push(`📢 ${complaintsNow} شكاوى`);
+                if (tradingNow) parts.push(`💱 ${tradingNow} تداول`);
                 if (stats.lottery?.participants) parts.push(`🎰 ${stats.lottery.participants} مشارك`);
                 if (stats.wheel?.participants) parts.push(`🎡 ${stats.wheel.participants} لاعب`);
                 if (stats.lottery?.distributed) parts.push(`💰 ${fmtNum(stats.lottery.distributed)} موزّع`);
                 liveBar.textContent = parts.join(' | ') || 'متصل';
             }
         } catch (e) { /* silent */ }
+    },
+
+    updateSidebarDots(txns, matches, complaints, trading, svrp) {
+        const dots = {
+            'transactions': txns,
+            'matching': matches,
+            'complaints': complaints,
+            'trading': trading,
+            'svrp': svrp,
+        };
+        for (const [page, count] of Object.entries(dots)) {
+            const link = document.querySelector(`a[href="/${page}"]`);
+            if (!link) continue;
+            let dot = link.querySelector('.sidebar-dot');
+            if (count > 0) {
+                if (!dot) {
+                    dot = document.createElement('span');
+                    dot.className = 'sidebar-dot';
+                    dot.style.cssText = 'position:absolute;top:8px;left:8px;width:8px;height:8px;background:#EF4444;border-radius:50%;animation:pulse 2s infinite';
+                    link.style.position = 'relative';
+                    link.appendChild(dot);
+                }
+                dot.style.display = 'block';
+            } else if (dot) {
+                dot.style.display = 'none';
+            }
+        }
     },
 
     notify(message, type) {
