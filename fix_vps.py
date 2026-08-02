@@ -5,17 +5,14 @@ ssh = paramiko.SSHClient()
 ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 ssh.connect('69.169.108.197', username='root', password='M12122099m@@@@', timeout=15)
 
-# Force pull — the "Already up to date" means /opt/bot might have local changes blocking the pull
 commands = [
-    "cd /opt/bot && git fetch origin",
-    "cd /opt/bot && git reset --hard origin/main",
-    "cd /opt/bot && git log --oneline -3",
-    "head -1 /opt/bot/dashboard/static/js/app.js",
-    "wc -l /opt/bot/dashboard/static/js/app.js",
+    "cd /opt/bot && git fetch origin && git reset --hard origin/main",
+    "cd /opt/bot && git log --oneline -1",
     "systemctl restart boterx-dashboard",
     "systemctl restart boterx",
     "sleep 2",
     "systemctl status boterx-dashboard --no-pager | head -3",
+    "systemctl status boterx --no-pager | head -3",
 ]
 
 for cmd in commands:

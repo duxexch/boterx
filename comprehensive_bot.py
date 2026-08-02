@@ -6670,14 +6670,22 @@ class ComprehensiveDUXBot:
                 current_state['total'] = str(total)
                 self.user_states[user_id] = current_state
 
-                # عرض وسائل الدفع
+                # عرض وسائل الدفع — بدون تكرار (unique by method_name)
                 methods = self.get_all_payment_methods()
                 active_methods = [m for m in methods if m.get('status') == 'active']
-                if not active_methods:
+                # إزالة التكرار — كل وسيلة تظهر مرة واحدة فقط
+                seen_names = set()
+                unique_methods = []
+                for m in active_methods:
+                    name = m.get('method_name', '').strip().lower()
+                    if name not in seen_names:
+                        seen_names.add(name)
+                        unique_methods.append(m)
+                if not unique_methods:
                     self.send_message(chat_id, "❌ لا توجد وسائل دفع متاحة")
                     return
                 inline_btns = []
-                for m in active_methods:
+                for m in unique_methods:
                     icon = m.get('icon', '💳') or '💳'
                     inline_btns.append([{'text': f"{icon} {m['method_name']}", 'callback_data': f'lot_method_{current_state["round_id"]}_{m["id"]}'}])
                 inline_btns.append([{'text': '🔙 إلغاء', 'callback_data': 'lot_back_main'}])
