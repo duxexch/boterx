@@ -2797,10 +2797,13 @@ class ComprehensiveDUXBot:
         return text
 
     def _process_with_ai(self, text, chat_id=''):
-        """معالجة نص بوست باستخدام OpenAI API"""
-        api_key = os.getenv('OPENAI_API_KEY', '')
-        if not api_key:
+        """معالجة نص بوست باستخدام نظام AI متعدد المزودين"""
+        try:
+            from ai_providers import AIManager
+        except ImportError:
             return None
+
+        ai_manager = AIManager()
 
         # قراءة تعليمات AI من الإعدادات
         ai_instructions = ''
@@ -2825,36 +2828,25 @@ class ComprehensiveDUXBot:
             )
 
         try:
-            import urllib.request
-            url = 'https://api.openai.com/v1/chat/completions'
-            payload = json.dumps({
-                'model': 'gpt-4o-mini',
-                'messages': [
-                    {'role': 'system', 'content': ai_instructions},
-                    {'role': 'user', 'content': f'أعد صياغة هذا البوست:\n\n{text}'}
-                ],
-                'max_tokens': 1500,
-                'temperature': 0.7
-            }).encode('utf-8')
-            req = urllib.request.Request(url, data=payload, headers={
-                'Content-Type': 'application/json',
-                'Authorization': f'Bearer {api_key}'
-            })
-            with urllib.request.urlopen(req, timeout=30) as response:
-                result = json.loads(response.read().decode('utf-8'))
-                processed = result.get('choices', [{}])[0].get('message', {}).get('content', '').strip()
-                if processed and len(processed) > 10:
-                    # تسجيل البوست المُعالج
-                    post_id = f"AIP{str(int(datetime.now().timestamp()))[-6:]}"
-                    try:
-                        with open('ai_processed_posts.csv', 'a', newline='', encoding='utf-8-sig') as f:
-                            writer = csv.writer(f)
-                            writer.writerow([post_id, '', chat_id, text[:200], processed[:200],
-                                           'gpt-4o-mini', 'processed', datetime.now().strftime('%Y-%m-%d %H:%M'),
-                                           '', 0, 0])
-                    except:
-                        pass
-                    return processed
+            processed, used_provider = ai_manager.process(text, ai_instructions)
+            if processed and len(processed) > 10:
+                # حفظ في post_vault + ai_processed_posts
+                post_id = f"AIP{str(int(datetime.now().timestamp()))[-6:]}"
+                try:
+                    with open('ai_processed_posts.csv', 'a', newline='', encoding='utf-8-sig') as f:
+                        writer = csv.writer(f)
+                        writer.writerow([post_id, '', chat_id, text[:200], processed[:200],
+                                       used_provider or 'unknown', 'processed', datetime.now().strftime('%Y-%m-%d %H:%M'),
+                                       '', 0, 0])
+                    # حفظ في post_vault أيضاً
+                    with open('post_vault.csv', 'a', newline='', encoding='utf-8-sig') as f:
+                        writer = csv.writer(f)
+                        writer.writerow([post_id, '', chat_id, text[:500], processed[:500],
+                                       'text', '', used_provider or 'unknown', 'published',
+                                       datetime.now().strftime('%Y-%m-%d %H:%M'), 0, 0, 0, ''])
+                except:
+                    pass
+                return processed
         except Exception as e:
             logger.error(f"خطأ في معالجة AI: {e}")
         return None
