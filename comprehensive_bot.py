@@ -10964,7 +10964,7 @@ class ComprehensiveDUXBot:
                 except:
                     pass
 
-                # رسالة العميل — بدون رقم تذكرة
+                # رسالة العميل — بدون رقم تذكرة + لوحة مفاتيح رئيسية
                 self.edit_message(chat_id, message.get('message_id'),
                     f"⏳ <b>تم إرسال طلبك بنجاح!</b>\n\n"
                     f"━━━━━━━━━━━━━━━━━━\n"
@@ -10975,6 +10975,12 @@ class ComprehensiveDUXBot:
                     f"🎫 سيتم إصدار رقم تذكرتك بعد الموافقة\n\n"
                     f"🔒 <b>بياناتك محفوظة بأمان</b>")
                 self.answer_callback(callback_id, "✅ تم إرسال الطلب")
+
+                # إرسال لوحة المفاتيح الرئيسية لتحل محل "❌ إلغاء"
+                lang = user_obj.get('language', 'ar')
+                self.send_message(chat_id,
+                    f"✅ تم تسجيل طلبك!\n\nيمكنك المتابعة من القائمة الرئيسية أو الانتظار حتى يصلك إشعار بالموافقة.",
+                    self.main_keyboard(lang, user_id))
 
                 # إشعار الأدمن — بأزرار موافقة/رفض
                 method = self.get_payment_method_by_id(method_id) if method_id else None
