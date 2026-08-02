@@ -103,6 +103,26 @@
         <a href="{{ url_for('page_broadcast') }}" class="sidebar-link {% if active_page == 'broadcast' %}active{% endif %}">
             <i class="fas fa-tower-broadcast w-5 text-center"></i> <span>بث رسالة</span>
         </a>
+        
+        <p class="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 mt-4">النظام المتقدم</p>
+        <a href="{{ url_for('page_statistics') }}" class="sidebar-link {% if active_page == 'statistics' %}active{% endif %}">
+            <i class="fas fa-chart-bar w-5 text-center"></i> <span>الإحصائيات</span>
+        </a>
+        <a href="{{ url_for('page_admins') }}" class="sidebar-link {% if active_page == 'admins' %}active{% endif %}">
+            <i class="fas fa-user-shield w-5 text-center"></i> <span>إدارة الأدمن</span>
+        </a>
+        <a href="{{ url_for('page_themes') }}" class="sidebar-link {% if active_page == 'themes' %}active{% endif %}">
+            <i class="fas fa-palette w-5 text-center"></i> <span>الثيمات</span>
+        </a>
+        <a href="{{ url_for('page_exchange_addresses') }}" class="sidebar-link {% if active_page == 'exchange_addresses' %}active{% endif %}">
+            <i class="fas fa-location-dot w-5 text-center"></i> <span>عناوين الصرافة</span>
+        </a>
+        <a href="{{ url_for('page_send_message') }}" class="sidebar-link {% if active_page == 'send_message' %}active{% endif %}">
+            <i class="fas fa-paper-plane w-5 text-center"></i> <span>رسالة لمستخدم</span>
+        </a>
+        <a href="{{ url_for('page_backup') }}" class="sidebar-link {% if active_page == 'backup' %}active{% endif %}">
+            <i class="fas fa-database w-5 text-center"></i> <span>النسخ الاحتياطي</span>
+        </a>
         <a href="{{ url_for('page_settings') }}" class="sidebar-link {% if active_page == 'settings' %}active{% endif %}">
             <i class="fas fa-gear w-5 text-center"></i> <span>الإعدادات</span>
         </a>

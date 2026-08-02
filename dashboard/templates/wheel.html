@@ -5,81 +5,119 @@
 {% block content %}
 <div x-data="wheelApp()" x-init="init()" class="space-y-6">
 
-    <!-- Refresh button -->
     <div class="flex justify-between items-center">
-        <p class="text-slate-400 text-sm">إدارة جولات عجلة الحظ</p>
-        <button @click="loadData()" class="btn btn-primary btn-sm">
-            <i class="fas fa-rotate ml-1"></i> تحديث
-        </button>
+        <p class="text-slate-400 text-sm">إدارة عجلة الحظ — إنشاء + إنهاء</p>
+        <div class="flex gap-2">
+            <button @click="showCreateModal = true" class="btn btn-primary btn-sm">
+                <i class="fas fa-plus ml-1"></i> إنشاء جولة
+            </button>
+            <button @click="loadData()" class="btn btn-sm" style="background:#475569">
+                <i class="fas fa-rotate ml-1"></i> تحديث
+            </button>
+        </div>
     </div>
 
-    <!-- Loading -->
     <template x-if="loading">
         <div class="text-center p-12 text-slate-400">
             <i class="fas fa-spinner fa-spin text-3xl"></i>
-            <p class="mt-2">جارٍ التحميل...</p>
         </div>
     </template>
 
-    <!-- Empty -->
-    <template x-if="!loading && rounds.length === 0">
-        <div class="bg-slate-800 rounded-xl border border-slate-700 p-12 text-center">
-            <i class="fas fa-circle-notch text-5xl text-slate-600 mb-3"></i>
-            <p class="text-slate-400 text-lg">لا توجد جولات عجلة الحظ</p>
-        </div>
-    </template>
-
-    <!-- Rounds cards -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <template x-for="r in rounds" :key="r.id">
-            <div class="bg-slate-800 rounded-xl border border-slate-700 p-5 hover:border-blue-500 transition card-hover">
-                <!-- Card header -->
+            <div class="bg-slate-800 rounded-xl border border-slate-700 p-5 hover:border-blue-500 transition card-hover"
+                 :class="r.status === 'active' ? 'border-blue-500/50 ring-1 ring-blue-500/20' : ''">
                 <div class="flex items-start justify-between mb-4">
                     <div class="flex items-center gap-3">
                         <div class="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center text-2xl">🎡</div>
                         <div>
-                            <h3 class="font-bold text-lg" x-text="r.name || r.id || 'جولة'"></h3>
-                            <p class="text-xs text-slate-500 font-mono" x-text="r.id || ''"></p>
+                            <h3 class="font-bold text-lg" x-text="r.name || r.id"></h3>
+                            <p class="text-xs text-slate-500 font-mono" x-text="r.id"></p>
                         </div>
                     </div>
                     <span x-html="statusBadge(r.status)"></span>
                 </div>
 
-                <!-- Stats -->
-                <div class="space-y-3">
-                    <div class="flex items-center justify-between p-3 bg-slate-900/50 rounded-lg">
-                        <span class="text-sm text-slate-400 flex items-center gap-2">
-                            <i class="fas fa-arrows-spin text-blue-400"></i> إجمالي الدورات
-                        </span>
-                        <span class="font-bold text-lg text-blue-400" x-text="fmtNum(r.total_spins || 0)"></span>
+                <div class="space-y-2">
+                    <div class="flex justify-between p-2 bg-slate-900/50 rounded text-sm">
+                        <span class="text-slate-400">🎯 إجمالي الأدوار</span>
+                        <span class="font-bold text-blue-400" x-text="fmtNum(r.total_spins || 0)"></span>
                     </div>
-                    <div class="flex items-center justify-between p-3 bg-slate-900/50 rounded-lg">
-                        <span class="text-sm text-slate-400 flex items-center gap-2">
-                            <i class="fas fa-users text-green-400"></i> المشاركون
-                        </span>
-                        <span class="font-bold text-lg text-green-400" x-text="fmtNum(r.participants || 0)"></span>
+                    <div class="flex justify-between p-2 bg-slate-900/50 rounded text-sm">
+                        <span class="text-slate-400">👥 المشاركون</span>
+                        <span class="font-bold text-amber-400" x-text="fmtNum(r.participants || 0)"></span>
                     </div>
-                    <div class="flex items-center justify-between p-3 bg-slate-900/50 rounded-lg">
-                        <span class="text-sm text-slate-400 flex items-center gap-2">
-                            <i class="fas fa-gift text-amber-400"></i> الجوائز
-                        </span>
-                        <span class="font-bold text-lg text-amber-400" x-text="fmtNum(r.prize_count || r.prizes || 0)"></span>
-                    </div>
-                    <div class="flex items-center justify-between p-3 bg-slate-900/50 rounded-lg">
-                        <span class="text-sm text-slate-400 flex items-center gap-2">
-                            <i class="fas fa-coins text-purple-400"></i> تكلفة الدورة
-                        </span>
-                        <span class="font-bold text-lg text-purple-400" x-text="fmtAmount(r.spin_cost || r.cost || 0, r.currency || '')"></span>
+                    <div class="flex justify-between p-2 bg-slate-900/50 rounded text-sm">
+                        <span class="text-slate-400">🔄 حد الدوران للمستخدم</span>
+                        <span class="font-bold" x-text="r.max_spins_per_user || '—'"></span>
                     </div>
                 </div>
 
-                <!-- Dates -->
-                <div class="mt-4 pt-4 border-t border-slate-700 flex items-center justify-between text-xs text-slate-500">
-                    <span x-text="r.start_date || r.created_at || ''"></span>
-                    <span x-show="r.end_date" x-text="'← ' + r.end_date"></span>
+                <!-- Prizes -->
+                <div class="mt-3 pt-3 border-t border-slate-700">
+                    <p class="text-xs text-slate-400 mb-2">🎁 الجوائز:</p>
+                    <div class="flex flex-wrap gap-1">
+                        <template x-for="(prize, i) in (r.prizes || '').split('|')" :key="i">
+                            <span class="px-2 py-1 rounded text-xs bg-purple-500/20 text-purple-400" x-text="prize.trim()"></span>
+                        </template>
+                    </div>
                 </div>
+
+                <!-- Recent spins -->
+                <template x-if="r.recent_spins && r.recent_spins.length > 0">
+                    <div class="mt-3 pt-3 border-t border-slate-700">
+                        <p class="text-xs text-slate-400 mb-1">آخر الأدوار:</p>
+                        <div class="space-y-1 max-h-32 overflow-y-auto">
+                            <template x-for="s in (r.recent_spins || []).slice(-5)" :key="s.id">
+                                <div class="flex justify-between text-xs p-1.5 bg-slate-900/30 rounded">
+                                    <span class="text-slate-400" x-text="s.user_id || '—'"></span>
+                                    <span class="font-bold text-green-400" x-text="s.prize_won || '—'"></span>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- Actions -->
+                <template x-if="r.status === 'active'">
+                    <div class="mt-4 pt-4 border-t border-slate-700">
+                        <button @click="endRound(r.id)" class="btn btn-danger btn-sm w-full">🏁 إنهاء الجولة</button>
+                    </div>
+                </template>
             </div>
         </template>
+    </div>
+
+    <template x-if="!loading && rounds.length === 0">
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-12 text-center">
+            <i class="fas fa-circle-notch text-5xl text-slate-600 mb-3"></i>
+            <p class="text-slate-400 text-lg">لا توجد جولات</p>
+        </div>
+    </template>
+
+    <!-- Create Modal -->
+    <div x-show="showCreateModal" x-transition class="modal-overlay" @click.self="showCreateModal = false" style="display:none">
+        <div class="modal">
+            <h3 class="font-bold text-lg mb-4">إنشاء جولة عجلة حظ</h3>
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">اسم الجولة</label>
+                    <input type="text" x-model="form.name" class="input w-full" placeholder="مثال: عجلة أغسطس">
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">الجوائز (افصل بـ |)</label>
+                    <input type="text" x-model="form.prizes" class="input w-full" placeholder="100 SAR | 50 SAR | 25 SAR | حظ أوفر">
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">حد الدوران لكل مستخدم</label>
+                    <input type="number" x-model="form.max_spins_per_user" class="input w-full" placeholder="3" min="1">
+                </div>
+            </div>
+            <div class="flex gap-2 justify-end mt-4">
+                <button @click="showCreateModal = false" class="btn btn-sm" style="background:#475569">إلغاء</button>
+                <button @click="createRound()" class="btn btn-primary btn-sm">إنشاء</button>
+            </div>
+        </div>
     </div>
 
 </div>
@@ -89,25 +127,39 @@
 <script>
 function wheelApp() {
     return {
-        rounds: [],
-        loading: true,
+        rounds: [], loading: true, showCreateModal: false,
+        form: { name: '', prizes: '', max_spins_per_user: 3 },
 
-        init() {
-            this.loadData();
-        },
+        init() { this.loadData(); },
 
         async loadData() {
             this.loading = true;
             try {
-                const res = await fetch('/api/wheel/rounds');
-                const data = await res.json();
+                const data = await api('/api/wheel/rounds');
                 this.rounds = data.rounds || [];
-            } catch (e) {
-                console.error(e);
-                toast('فشل تحميل جولات عجلة الحظ', 'error');
-            } finally {
-                this.loading = false;
-            }
+            } catch(e) { toast('فشل التحميل', 'error'); }
+            this.loading = false;
+        },
+
+        async createRound() {
+            if (!this.form.name || !this.form.prizes) return toast('املأ الاسم والجوائز', 'warning');
+            try {
+                await api('/api/wheel/create', { method: 'POST', body: JSON.stringify(this.form) });
+                toast('تم إنشاء الجولة', 'success');
+                Notifier?.playSuccessSound?.();
+                this.showCreateModal = false;
+                this.form = { name: '', prizes: '', max_spins_per_user: 3 };
+                await this.loadData();
+            } catch(e) { toast('خطأ', 'error'); }
+        },
+
+        async endRound(id) {
+            if (!confirm('إنهاء الجولة؟')) return;
+            try {
+                await api(`/api/wheel/${id}/end`, { method: 'POST', body: '{}' });
+                toast('تم الإنهاء', 'warning');
+                await this.loadData();
+            } catch(e) { toast('خطأ', 'error'); }
         }
     }
 }

@@ -1,0 +1,258 @@
+{% extends "base.html" %}
+{% block title %}النسخ الاحتياطي - Boterx{% endblock %}
+{% block page_title %}النسخ الاحتياطي{% endblock %}
+
+{% block content %}
+<div x-data="backupPage()" x-init="init()">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div>
+            <h2 class="text-xl font-bold">إدارة النسخ الاحتياطي</h2>
+            <p class="text-sm text-slate-400 mt-1">إنشاء واستعادة وإدارة نسخ البيانات الاحتياطية</p>
+        </div>
+        <button @click="createBackup()"
+            class="bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition flex items-center gap-2 self-start"
+            :disabled="creating">
+            <i class="fas fa-spinner fa-spin" x-show="creating"></i>
+            <i class="fas fa-download" x-show="!creating"></i>
+            <span x-text="creating ? 'جارٍ الإنشاء...' : 'إنشاء نسخة احتياطية'"></span>
+        </button>
+    </div>
+
+    <!-- System Info -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+            <div class="flex items-center gap-2 mb-1">
+                <i class="fas fa-file-csv text-blue-400"></i>
+                <p class="text-xs text-slate-400">ملفات CSV</p>
+            </div>
+            <p class="text-2xl font-bold mt-1" x-text="fmtNum(systemInfo.totalFiles)"></p>
+        </div>
+        <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+            <div class="flex items-center gap-2 mb-1">
+                <i class="fas fa-database text-green-400"></i>
+                <p class="text-xs text-slate-400">الحجم الإجمالي</p>
+            </div>
+            <p class="text-2xl font-bold text-green-400 mt-1" x-text="formatSize(systemInfo.totalSize)"></p>
+        </div>
+        <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+            <div class="flex items-center gap-2 mb-1">
+                <i class="fas fa-clock-rotate-left text-amber-400"></i>
+                <p class="text-xs text-slate-400">آخر نسخة احتياطية</p>
+            </div>
+            <p class="text-sm font-bold text-amber-400 mt-1" x-text="systemInfo.lastBackup || '—'"></p>
+        </div>
+        <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+            <div class="flex items-center gap-2 mb-1">
+                <i class="fas fa-folder-open text-purple-400"></i>
+                <p class="text-xs text-slate-400">عدد النسخ</p>
+            </div>
+            <p class="text-2xl font-bold text-purple-400 mt-1" x-text="fmtNum(backups.length)"></p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Backups List -->
+        <div class="lg:col-span-2">
+            <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+                <div class="flex items-center justify-between p-4 border-b border-slate-700">
+                    <h3 class="text-sm font-semibold flex items-center gap-2">
+                        <i class="fas fa-archive text-slate-400"></i> النسخ الاحتياطية
+                    </h3>
+                    <button @click="loadBackups()" class="text-xs text-blue-400 hover:underline">
+                        <i class="fas fa-rotate ml-1"></i>تحديث
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-slate-700 bg-slate-800/80">
+                                <th class="text-right px-4 py-3 font-semibold text-slate-400">اسم الملف</th>
+                                <th class="text-right px-4 py-3 font-semibold text-slate-400">الحجم</th>
+                                <th class="text-right px-4 py-3 font-semibold text-slate-400">التاريخ</th>
+                                <th class="text-right px-4 py-3 font-semibold text-slate-400">الإجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="b in backups" :key="b.filename">
+                                <tr class="border-b border-slate-700/50 hover:bg-slate-700/30 transition">
+                                    <td class="px-4 py-3">
+                                        <div class="flex items-center gap-2">
+                                            <i class="fas fa-file-zipper text-amber-400"></i>
+                                            <span class="font-mono text-xs" x-text="b.filename"></span>
+                                        </div>
+                                    </td>
+                                    <td class="px-4 py-3 text-slate-300" x-text="formatSize(b.size)"></td>
+                                    <td class="px-4 py-3 text-slate-400 text-xs" x-text="b.date || '—'"></td>
+                                    <td class="px-4 py-3">
+                                        <a :href="'/api/backups/' + b.filename + '/download'"
+                                           class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition text-xs font-medium">
+                                            <i class="fas fa-download"></i> تحميل
+                                        </a>
+                                    </td>
+                                </tr>
+                            </template>
+                            <tr x-show="backups.length === 0">
+                                <td colspan="4" class="px-4 py-8 text-center text-slate-500">
+                                    <i class="fas fa-archive text-3xl mb-2 block"></i>
+                                    لا توجد نسخ احتياطية بعد
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Auto-Backup Settings -->
+        <div class="lg:col-span-1">
+            <div class="bg-slate-800 rounded-xl border border-slate-700 p-5">
+                <h3 class="text-sm font-semibold mb-4 flex items-center gap-2">
+                    <i class="fas fa-gear text-slate-400"></i> إعدادات النسخ التلقائي
+                </h3>
+                <div class="space-y-4">
+                    <!-- Enable/Disable -->
+                    <div class="flex items-center justify-between p-3 bg-slate-900/50 rounded-lg">
+                        <div class="flex items-center gap-2">
+                            <i class="fas fa-power-off text-sm" :class="autoBackup.enabled ? 'text-green-400' : 'text-slate-500'"></i>
+                            <span class="text-sm">النسخ التلقائي</span>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" x-model="autoBackup.enabled" @change="saveAutoBackup()" class="sr-only peer">
+                            <div class="w-10 h-5 bg-slate-600 peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-5 rtl:peer-checked:after:-translate-x-5 peer-checked:bg-green-500 after:content-[''] after:absolute after:top-0.5 after:start-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all"></div>
+                        </label>
+                    </div>
+
+                    <!-- Frequency -->
+                    <div :class="autoBackup.enabled ? '' : 'opacity-50 pointer-events-none'">
+                        <label class="block text-sm text-slate-400 mb-2">التكرار</label>
+                        <select x-model="autoBackup.frequency" @change="saveAutoBackup()"
+                            class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="hourly">كل ساعة</option>
+                            <option value="daily">يومياً</option>
+                            <option value="weekly">أسبوعياً</option>
+                            <option value="monthly">شهرياً</option>
+                        </select>
+                    </div>
+
+                    <!-- Next backup info -->
+                    <div x-show="autoBackup.enabled" x-transition class="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                        <p class="text-xs text-blue-300">
+                            <i class="fas fa-info-circle ml-1"></i>
+                            النسخة التلقائية القادمة ستُنشأ حسب التكرار المحدد
+                        </p>
+                    </div>
+
+                    <!-- Retention -->
+                    <div>
+                        <label class="block text-sm text-slate-400 mb-2">الحد الأقصى للنسخ المحفوظة</label>
+                        <input type="number" x-model.number="autoBackup.maxBackups" @change="saveAutoBackup()" min="1" max="100"
+                            class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <p class="text-xs text-slate-500 mt-1">يتم حذف النسخ الأقدم تلقائياً</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="mt-4 space-y-2">
+                <button @click="createBackup()" :disabled="creating"
+                    class="w-full bg-slate-700 hover:bg-slate-600 text-slate-200 py-2.5 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2">
+                    <i class="fas fa-download" x-show="!creating"></i>
+                    <i class="fas fa-spinner fa-spin" x-show="creating"></i>
+                    <span x-text="creating ? 'جارٍ الإنشاء...' : 'نسخة فورية'"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading overlay -->
+    <div x-show="loading" class="fixed inset-0 bg-slate-900/50 z-40 flex items-center justify-center" style="display:none">
+        <div class="bg-slate-800 rounded-xl p-4 flex items-center gap-3">
+            <i class="fas fa-spinner fa-spin text-blue-400 text-xl"></i>
+            <span class="text-sm">جارٍ التحميل...</span>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function backupPage() {
+    return {
+        backups: [],
+        systemInfo: { totalFiles: 0, totalSize: 0, lastBackup: '' },
+        autoBackup: { enabled: false, frequency: 'daily', maxBackups: 10 },
+        loading: false,
+        creating: false,
+
+        async init() {
+            await this.loadBackups();
+        },
+
+        async loadBackups() {
+            this.loading = true;
+            try {
+                const data = await api('/api/backups');
+                this.backups = data.backups || [];
+                this.systemInfo = {
+                    totalFiles: data.system_info?.total_files || 0,
+                    totalSize: data.system_info?.total_size || 0,
+                    lastBackup: data.system_info?.last_backup || '',
+                };
+                if (data.auto_backup) {
+                    this.autoBackup = {
+                        enabled: data.auto_backup.enabled || false,
+                        frequency: data.auto_backup.frequency || 'daily',
+                        maxBackups: data.auto_backup.max_backups || 10,
+                    };
+                }
+            } catch (e) {
+                toast('فشل تحميل بيانات النسخ الاحتياطي', 'error');
+            }
+            this.loading = false;
+        },
+
+        async createBackup() {
+            this.creating = true;
+            try {
+                await api('/api/backup', { method: 'POST' });
+                toast('تم إنشاء النسخة الاحتياطية بنجاح', 'success');
+                await this.loadBackups();
+            } catch (e) {
+                toast('فشل إنشاء النسخة الاحتياطية: ' + (e.message || 'خطأ غير معروف'), 'error');
+            }
+            this.creating = false;
+        },
+
+        async saveAutoBackup() {
+            try {
+                await api('/api/backups/settings', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        enabled: this.autoBackup.enabled,
+                        frequency: this.autoBackup.frequency,
+                        max_backups: this.autoBackup.maxBackups,
+                    }),
+                });
+                toast('تم حفظ إعدادات النسخ التلقائي', 'success');
+            } catch (e) {
+                toast('فشل حفظ الإعدادات', 'error');
+            }
+        },
+
+        formatSize(bytes) {
+            bytes = bytes || 0;
+            if (bytes === 0) return '0 B';
+            const units = ['B', 'KB', 'MB', 'GB'];
+            let i = 0;
+            let size = bytes;
+            while (size >= 1024 && i < units.length - 1) {
+                size /= 1024;
+                i++;
+            }
+            return size.toFixed(1) + ' ' + units[i];
+        },
+    };
+}
+</script>
+{% endblock %}

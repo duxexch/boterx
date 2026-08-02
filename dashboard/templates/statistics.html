@@ -1,0 +1,397 @@
+{% extends "base.html" %}
+{% block title %}الإحصائيات التفصيلية - Boterx{% endblock %}
+{% block page_title %}الإحصائيات التفصيلية{% endblock %}
+
+{% block content %}
+<div x-data="statisticsPage()" x-init="init()">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div>
+            <h2 class="text-xl font-bold">الإحصائيات التفصيلية</h2>
+            <p class="text-sm text-slate-400 mt-1">تحليل شامل لأداء النظام والمعاملات والمستخدمين</p>
+        </div>
+
+        <!-- Date Range Selector -->
+        <div class="flex items-center gap-2 bg-slate-800 rounded-lg border border-slate-700 p-1">
+            <button @click="setRange('today')"
+                class="px-3 py-1.5 rounded-md text-xs font-medium transition"
+                :class="dateRange === 'today' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'">
+                اليوم
+            </button>
+            <button @click="setRange('week')"
+                class="px-3 py-1.5 rounded-md text-xs font-medium transition"
+                :class="dateRange === 'week' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'">
+                الأسبوع
+            </button>
+            <button @click="setRange('month')"
+                class="px-3 py-1.5 rounded-md text-xs font-medium transition"
+                :class="dateRange === 'month' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'">
+                الشهر
+            </button>
+            <button @click="setRange('all')"
+                class="px-3 py-1.5 rounded-md text-xs font-medium transition"
+                :class="dateRange === 'all' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'">
+                الكل
+            </button>
+        </div>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div class="bg-slate-800 rounded-xl p-5 border border-slate-700">
+            <div class="flex items-center justify-between mb-2">
+                <div class="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                    <i class="fas fa-users text-blue-400"></i>
+                </div>
+                <span class="text-xs text-slate-500" x-text="rangeLabel"></span>
+            </div>
+            <p class="text-xs text-slate-400">إجمالي المستخدمين</p>
+            <p class="text-2xl font-bold mt-1" x-text="fmtNum(kpis.totalUsers)"></p>
+        </div>
+        <div class="bg-slate-800 rounded-xl p-5 border border-slate-700">
+            <div class="flex items-center justify-between mb-2">
+                <div class="w-10 h-10 rounded-lg bg-green-500/20 flex items-center justify-center">
+                    <i class="fas fa-dollar-sign text-green-400"></i>
+                </div>
+                <span class="text-xs text-slate-500" x-text="rangeLabel"></span>
+            </div>
+            <p class="text-xs text-slate-400">إجمالي الحجم</p>
+            <p class="text-2xl font-bold text-green-400 mt-1" x-text="fmtNum(kpis.totalVolume.toFixed(0))"></p>
+        </div>
+        <div class="bg-slate-800 rounded-xl p-5 border border-slate-700">
+            <div class="flex items-center justify-between mb-2">
+                <div class="w-10 h-10 rounded-lg bg-amber-500/20 flex items-center justify-center">
+                    <i class="fas fa-chart-line text-amber-400"></i>
+                </div>
+                <span class="text-xs text-slate-500" x-text="rangeLabel"></span>
+            </div>
+            <p class="text-xs text-slate-400">متوسط المعاملة</p>
+            <p class="text-2xl font-bold text-amber-400 mt-1" x-text="fmtNum(kpis.avgTransaction.toFixed(0))"></p>
+        </div>
+        <div class="bg-slate-800 rounded-xl p-5 border border-slate-700">
+            <div class="flex items-center justify-between mb-2">
+                <div class="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center">
+                    <i class="fas fa-check-circle text-purple-400"></i>
+                </div>
+                <span class="text-xs text-slate-500" x-text="rangeLabel"></span>
+            </div>
+            <p class="text-xs text-slate-400">معدل الإكمال</p>
+            <p class="text-2xl font-bold text-purple-400 mt-1" x-text="kpis.completionRate.toFixed(1) + '%'"></p>
+        </div>
+    </div>
+
+    <!-- Charts Row 1 -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        <!-- Transactions over time (line chart) -->
+        <div class="lg:col-span-2 bg-slate-800 rounded-xl border border-slate-700 p-5">
+            <h3 class="text-sm font-semibold mb-4 flex items-center gap-2">
+                <i class="fas fa-chart-line text-blue-400"></i> المعاملات عبر الزمن
+            </h3>
+            <div class="relative" style="height: 280px;">
+                <canvas id="txnChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Transaction types distribution (doughnut) -->
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-5">
+            <h3 class="text-sm font-semibold mb-4 flex items-center gap-2">
+                <i class="fas fa-chart-pie text-purple-400"></i> توزيع أنواع المعاملات
+            </h3>
+            <div class="relative" style="height: 280px;">
+                <canvas id="typeChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row 2 -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <!-- User growth (area chart) -->
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-5">
+            <h3 class="text-sm font-semibold mb-4 flex items-center gap-2">
+                <i class="fas fa-user-plus text-green-400"></i> نمو المستخدمين
+            </h3>
+            <div class="relative" style="height: 280px;">
+                <canvas id="userGrowthChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Top 5 companies by volume (bar chart) -->
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-5">
+            <h3 class="text-sm font-semibold mb-4 flex items-center gap-2">
+                <i class="fas fa-building text-amber-400"></i> أعلى 5 شركات حسب الحجم
+            </h3>
+            <div class="relative" style="height: 280px;">
+                <canvas id="companiesChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tables Row -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <!-- Top 10 Users -->
+        <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+            <div class="p-4 border-b border-slate-700">
+                <h3 class="text-sm font-semibold flex items-center gap-2">
+                    <i class="fas fa-trophy text-amber-400"></i> أعلى 10 مستخدمين بالمعاملات
+                </h3>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-slate-700 bg-slate-800/80">
+                            <th class="text-right px-4 py-2.5 font-semibold text-slate-400">#</th>
+                            <th class="text-right px-4 py-2.5 font-semibold text-slate-400">المستخدم</th>
+                            <th class="text-right px-4 py-2.5 font-semibold text-slate-400">المعاملات</th>
+                            <th class="text-right px-4 py-2.5 font-semibold text-slate-400">الحجم</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="(u, i) in topUsers" :key="u.telegram_id || i">
+                            <tr class="border-b border-slate-700/50 hover:bg-slate-700/30 transition">
+                                <td class="px-4 py-2.5">
+                                    <span class="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold"
+                                        :class="i < 3 ? 'bg-amber-500/20 text-amber-400' : 'bg-slate-600/40 text-slate-400'"
+                                        x-text="i + 1"></span>
+                                </td>
+                                <td class="px-4 py-2.5">
+                                    <p class="font-medium text-xs" x-text="u.name || '—'"></p>
+                                    <p class="text-xs text-slate-500 font-mono" x-text="u.telegram_id"></p>
+                                </td>
+                                <td class="px-4 py-2.5 font-semibold" x-text="fmtNum(u.transaction_count || 0)"></td>
+                                <td class="px-4 py-2.5 text-green-400" x-text="fmtNum((u.volume || 0).toFixed(0))"></td>
+                            </tr>
+                        </template>
+                        <tr x-show="topUsers.length === 0">
+                            <td colspan="4" class="px-4 py-6 text-center text-slate-500 text-sm">لا توجد بيانات</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Complaint Stats -->
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-5">
+            <h3 class="text-sm font-semibold mb-4 flex items-center gap-2">
+                <i class="fas fa-exclamation-circle text-red-400"></i> إحصائيات الشكاوى
+            </h3>
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <div class="bg-slate-900/50 rounded-lg p-4 text-center">
+                    <p class="text-xs text-slate-400 mb-1">إجمالي الشكاوى</p>
+                    <p class="text-2xl font-bold" x-text="fmtNum(complaints.total)"></p>
+                </div>
+                <div class="bg-slate-900/50 rounded-lg p-4 text-center">
+                    <p class="text-xs text-slate-400 mb-1">تم حلها</p>
+                    <p class="text-2xl font-bold text-green-400" x-text="fmtNum(complaints.resolved)"></p>
+                </div>
+                <div class="bg-slate-900/50 rounded-lg p-4 text-center">
+                    <p class="text-xs text-slate-400 mb-1">معلقة</p>
+                    <p class="text-2xl font-bold text-amber-400" x-text="fmtNum(complaints.pending)"></p>
+                </div>
+                <div class="bg-slate-900/50 rounded-lg p-4 text-center">
+                    <p class="text-xs text-slate-400 mb-1">معدل الحل</p>
+                    <p class="text-2xl font-bold text-blue-400" x-text="complaints.resolutionRate.toFixed(1) + '%'"></p>
+                </div>
+            </div>
+            <!-- Resolution progress bar -->
+            <div>
+                <div class="flex items-center justify-between text-xs text-slate-400 mb-1">
+                    <span>تقدم الحل</span>
+                    <span x-text="complaints.resolutionRate.toFixed(1) + '%'"></span>
+                </div>
+                <div class="w-full bg-slate-700 rounded-full h-2.5 overflow-hidden">
+                    <div class="h-full bg-gradient-to-r from-green-500 to-green-400 rounded-full transition-all duration-500"
+                        :style="'width: ' + complaints.resolutionRate + '%'"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading overlay -->
+    <div x-show="loading" class="fixed inset-0 bg-slate-900/50 z-40 flex items-center justify-center" style="display:none">
+        <div class="bg-slate-800 rounded-xl p-4 flex items-center gap-3">
+            <i class="fas fa-spinner fa-spin text-blue-400 text-xl"></i>
+            <span class="text-sm">جارٍ تحميل الإحصائيات...</span>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function statisticsPage() {
+    return {
+        dateRange: 'week',
+        rangeLabel: 'الأسبوع',
+        loading: false,
+        kpis: { totalUsers: 0, totalVolume: 0, avgTransaction: 0, completionRate: 0 },
+        topUsers: [],
+        complaints: { total: 0, resolved: 0, pending: 0, resolutionRate: 0 },
+        charts: { txn: null, userGrowth: null, type: null, companies: null },
+        rawData: {},
+
+        async init() {
+            await this.loadData();
+        },
+
+        async setRange(range) {
+            this.dateRange = range;
+            const labels = { today: 'اليوم', week: 'الأسبوع', month: 'الشهر', all: 'الكل' };
+            this.rangeLabel = labels[range] || range;
+            await this.loadData();
+        },
+
+        async loadData() {
+            this.loading = true;
+            try {
+                const data = await api(`/api/detailed-stats?range=${this.dateRange}`);
+                this.rawData = data;
+                this.kpis = {
+                    totalUsers: data.kpis?.total_users || 0,
+                    totalVolume: data.kpis?.total_volume || 0,
+                    avgTransaction: data.kpis?.avg_transaction || 0,
+                    completionRate: data.kpis?.completion_rate || 0,
+                };
+                this.topUsers = data.top_users || [];
+                this.complaints = {
+                    total: data.complaints?.total || 0,
+                    resolved: data.complaints?.resolved || 0,
+                    pending: data.complaints?.pending || 0,
+                    resolutionRate: data.complaints?.resolution_rate || 0,
+                };
+                this.$nextTick(() => this.renderCharts(data));
+            } catch (e) {
+                toast('فشل تحميل الإحصائيات', 'error');
+            }
+            this.loading = false;
+        },
+
+        renderCharts(data) {
+            this.destroyCharts();
+
+            const chartTextColor = '#94A3B8';
+            const chartGridColor = 'rgba(51, 65, 85, 0.5)';
+
+            // Chart 1: Transactions over time (line chart)
+            const txnCanvas = document.getElementById('txnChart');
+            if (txnCanvas && data.transactions_chart) {
+                this.charts.txn = new Chart(txnCanvas, {
+                    type: 'line',
+                    data: {
+                        labels: data.transactions_chart.labels || [],
+                        datasets: [{
+                            label: 'المعاملات',
+                            data: data.transactions_chart.data || [],
+                            borderColor: '#3B82F6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            tension: 0.4,
+                            fill: true,
+                            pointRadius: 3,
+                            pointBackgroundColor: '#3B82F6',
+                            pointBorderColor: '#1E293B',
+                            pointBorderWidth: 2,
+                        }],
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { labels: { color: chartTextColor } } },
+                        scales: {
+                            x: { ticks: { color: chartTextColor }, grid: { color: chartGridColor } },
+                            y: { ticks: { color: chartTextColor }, grid: { color: chartGridColor }, beginAtZero: true },
+                        },
+                    },
+                });
+            }
+
+            // Chart 2: User growth (area chart)
+            const userCanvas = document.getElementById('userGrowthChart');
+            if (userCanvas && data.user_growth_chart) {
+                this.charts.userGrowth = new Chart(userCanvas, {
+                    type: 'line',
+                    data: {
+                        labels: data.user_growth_chart.labels || [],
+                        datasets: [{
+                            label: 'المستخدمون الجدد',
+                            data: data.user_growth_chart.data || [],
+                            borderColor: '#22C55E',
+                            backgroundColor: 'rgba(34, 197, 94, 0.15)',
+                            tension: 0.4,
+                            fill: true,
+                            pointRadius: 3,
+                            pointBackgroundColor: '#22C55E',
+                            pointBorderColor: '#1E293B',
+                            pointBorderWidth: 2,
+                        }],
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { labels: { color: chartTextColor } } },
+                        scales: {
+                            x: { ticks: { color: chartTextColor }, grid: { color: chartGridColor } },
+                            y: { ticks: { color: chartTextColor }, grid: { color: chartGridColor }, beginAtZero: true },
+                        },
+                    },
+                });
+            }
+
+            // Chart 3: Transaction types distribution (doughnut)
+            const typeCanvas = document.getElementById('typeChart');
+            if (typeCanvas && data.type_distribution) {
+                this.charts.type = new Chart(typeCanvas, {
+                    type: 'doughnut',
+                    data: {
+                        labels: data.type_distribution.labels || [],
+                        datasets: [{
+                            data: data.type_distribution.data || [],
+                            backgroundColor: ['#3B82F6', '#A855F7', '#F59E0B', '#22C55E', '#EF4444'],
+                            borderColor: '#1E293B',
+                            borderWidth: 2,
+                        }],
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { position: 'bottom', labels: { color: chartTextColor, padding: 10 } } },
+                    },
+                });
+            }
+
+            // Chart 4: Top 5 companies by volume (bar chart)
+            const compCanvas = document.getElementById('companiesChart');
+            if (compCanvas && data.companies_chart) {
+                this.charts.companies = new Chart(compCanvas, {
+                    type: 'bar',
+                    data: {
+                        labels: data.companies_chart.labels || [],
+                        datasets: [{
+                            label: 'الحجم',
+                            data: data.companies_chart.data || [],
+                            backgroundColor: 'rgba(251, 191, 36, 0.6)',
+                            borderColor: '#FBBF24',
+                            borderWidth: 2,
+                            borderRadius: 6,
+                        }],
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        indexAxis: 'y',
+                        plugins: { legend: { labels: { color: chartTextColor } } },
+                        scales: {
+                            x: { ticks: { color: chartTextColor }, grid: { color: chartGridColor }, beginAtZero: true },
+                            y: { ticks: { color: chartTextColor }, grid: { color: chartGridColor } },
+                        },
+                    },
+                });
+            }
+        },
+
+        destroyCharts() {
+            Object.values(this.charts).forEach(c => { if (c) c.destroy(); });
+            this.charts = { txn: null, userGrowth: null, type: null, companies: null };
+        },
+    };
+}
+</script>
+{% endblock %}

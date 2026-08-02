@@ -1,0 +1,223 @@
+{% extends "base.html" %}
+{% block title %}السمات - Boterx{% endblock %}
+{% block page_title %}السمات{% endblock %}
+
+{% block content %}
+<div x-data="themesPage()" x-init="init()">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div>
+            <h2 class="text-xl font-bold">إدارة السمات</h2>
+            <p class="text-sm text-slate-400 mt-1">اختر مظهر لوحة التحكم المفضل لديك</p>
+        </div>
+    </div>
+
+    <!-- Theme Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <!-- Dark Gold -->
+        <div class="bg-slate-800 rounded-2xl border-2 p-6 transition-all cursor-pointer"
+             :class="activeTheme === 'gold' ? 'border-amber-400 shadow-lg shadow-amber-400/10' : 'border-slate-700 hover:border-slate-600'"
+             @click="selectTheme('gold')">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-2">
+                    <span class="text-2xl">🥇</span>
+                    <h3 class="text-lg font-bold">الذهبي الداكن</h3>
+                </div>
+                <span x-show="activeTheme === 'gold'" class="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-xs font-semibold">
+                    <i class="fas fa-check-circle ml-1"></i>نشط
+                </span>
+            </div>
+            <!-- Preview -->
+            <div class="rounded-xl overflow-hidden mb-4 border border-slate-700">
+                <div class="h-10 flex items-center px-3" style="background: #1E293B;">
+                    <div class="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold" style="background: #FBBF24; color: #0F172A;">B</div>
+                    <span class="text-xs mr-2 font-semibold" style="color: #FBBF24;">Boterx</span>
+                </div>
+                <div class="p-3 space-y-2" style="background: #0F172A;">
+                    <div class="h-6 rounded-lg flex items-center px-2 text-[10px]" style="background: #1E293B; color: #FBBF24;">قائمة التنقل</div>
+                    <div class="grid grid-cols-3 gap-2">
+                        <div class="h-8 rounded-lg flex items-center justify-center text-[10px] font-bold" style="background: #1E293B; color: #FBBF24;">12</div>
+                        <div class="h-8 rounded-lg flex items-center justify-center text-[10px] font-bold" style="background: #1E293B; color: #FBBF24;">5</div>
+                        <div class="h-8 rounded-lg flex items-center justify-center text-[10px] font-bold" style="background: #1E293B; color: #FBBF24;">8</div>
+                    </div>
+                    <div class="h-5 rounded-lg" style="background: #1E293B;"></div>
+                    <div class="h-5 rounded-lg w-3/4" style="background: #1E293B;"></div>
+                </div>
+            </div>
+            <!-- Color swatches -->
+            <div class="flex items-center gap-2 mb-4">
+                <div class="w-6 h-6 rounded-full border border-slate-600" style="background: #0F172A;" title="خلفية"></div>
+                <div class="w-6 h-6 rounded-full border border-slate-600" style="background: #1E293B;" title="بطاقة"></div>
+                <div class="w-6 h-6 rounded-full border border-slate-600" style="background: #FBBF24;" title="لون أساسي"></div>
+                <div class="w-6 h-6 rounded-full border border-slate-600" style="background: #334155;" title="حدود"></div>
+            </div>
+            <button @click.stop="activateTheme('gold')"
+                class="w-full py-2.5 rounded-lg text-sm font-semibold transition"
+                :class="activeTheme === 'gold' ? 'bg-amber-500/20 text-amber-400 cursor-default' : 'bg-amber-600 hover:bg-amber-700 text-white'"
+                :disabled="activeTheme === 'gold'">
+                <span x-show="activeTheme !== 'gold'"><i class="fas fa-check ml-1"></i>تفعيل</span>
+                <span x-show="activeTheme === 'gold'">مُفعّل</span>
+            </button>
+        </div>
+
+        <!-- Ocean Blue -->
+        <div class="bg-slate-800 rounded-2xl border-2 p-6 transition-all cursor-pointer"
+             :class="activeTheme === 'ocean' ? 'border-blue-400 shadow-lg shadow-blue-400/10' : 'border-slate-700 hover:border-slate-600'"
+             @click="selectTheme('ocean')">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-2">
+                    <span class="text-2xl">🌊</span>
+                    <h3 class="text-lg font-bold">أزرق المحيط</h3>
+                </div>
+                <span x-show="activeTheme === 'ocean'" class="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 text-xs font-semibold">
+                    <i class="fas fa-check-circle ml-1"></i>نشط
+                </span>
+            </div>
+            <!-- Preview -->
+            <div class="rounded-xl overflow-hidden mb-4 border border-slate-700">
+                <div class="h-10 flex items-center px-3" style="background: #1E3A5F;">
+                    <div class="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold" style="background: #3B82F6; color: #0F172A;">B</div>
+                    <span class="text-xs mr-2 font-semibold" style="color: #3B82F6;">Boterx</span>
+                </div>
+                <div class="p-3 space-y-2" style="background: #0C1929;">
+                    <div class="h-6 rounded-lg flex items-center px-2 text-[10px]" style="background: #1E3A5F; color: #3B82F6;">قائمة التنقل</div>
+                    <div class="grid grid-cols-3 gap-2">
+                        <div class="h-8 rounded-lg flex items-center justify-center text-[10px] font-bold" style="background: #1E3A5F; color: #3B82F6;">12</div>
+                        <div class="h-8 rounded-lg flex items-center justify-center text-[10px] font-bold" style="background: #1E3A5F; color: #3B82F6;">5</div>
+                        <div class="h-8 rounded-lg flex items-center justify-center text-[10px] font-bold" style="background: #1E3A5F; color: #3B82F6;">8</div>
+                    </div>
+                    <div class="h-5 rounded-lg" style="background: #1E3A5F;"></div>
+                    <div class="h-5 rounded-lg w-3/4" style="background: #1E3A5F;"></div>
+                </div>
+            </div>
+            <!-- Color swatches -->
+            <div class="flex items-center gap-2 mb-4">
+                <div class="w-6 h-6 rounded-full border border-slate-600" style="background: #0C1929;" title="خلفية"></div>
+                <div class="w-6 h-6 rounded-full border border-slate-600" style="background: #1E3A5F;" title="بطاقة"></div>
+                <div class="w-6 h-6 rounded-full border border-slate-600" style="background: #3B82F6;" title="لون أساسي"></div>
+                <div class="w-6 h-6 rounded-full border border-slate-600" style="background: #2A4A6B;" title="حدود"></div>
+            </div>
+            <button @click.stop="activateTheme('ocean')"
+                class="w-full py-2.5 rounded-lg text-sm font-semibold transition"
+                :class="activeTheme === 'ocean' ? 'bg-blue-500/20 text-blue-400 cursor-default' : 'bg-blue-600 hover:bg-blue-700 text-white'"
+                :disabled="activeTheme === 'ocean'">
+                <span x-show="activeTheme !== 'ocean'"><i class="fas fa-check ml-1"></i>تفعيل</span>
+                <span x-show="activeTheme === 'ocean'">مُفعّل</span>
+            </button>
+        </div>
+
+        <!-- Royal Purple -->
+        <div class="bg-slate-800 rounded-2xl border-2 p-6 transition-all cursor-pointer"
+             :class="activeTheme === 'purple' ? 'border-purple-400 shadow-lg shadow-purple-400/10' : 'border-slate-700 hover:border-slate-600'"
+             @click="selectTheme('purple')">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-2">
+                    <span class="text-2xl">👑</span>
+                    <h3 class="text-lg font-bold">الأرجواني الملكي</h3>
+                </div>
+                <span x-show="activeTheme === 'purple'" class="px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-400 text-xs font-semibold">
+                    <i class="fas fa-check-circle ml-1"></i>نشط
+                </span>
+            </div>
+            <!-- Preview -->
+            <div class="rounded-xl overflow-hidden mb-4 border border-slate-700">
+                <div class="h-10 flex items-center px-3" style="background: #2D1B4E;">
+                    <div class="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold" style="background: #A855F7; color: #0F172A;">B</div>
+                    <span class="text-xs mr-2 font-semibold" style="color: #A855F7;">Boterx</span>
+                </div>
+                <div class="p-3 space-y-2" style="background: #1A0F2E;">
+                    <div class="h-6 rounded-lg flex items-center px-2 text-[10px]" style="background: #2D1B4E; color: #A855F7;">قائمة التنقل</div>
+                    <div class="grid grid-cols-3 gap-2">
+                        <div class="h-8 rounded-lg flex items-center justify-center text-[10px] font-bold" style="background: #2D1B4E; color: #A855F7;">12</div>
+                        <div class="h-8 rounded-lg flex items-center justify-center text-[10px] font-bold" style="background: #2D1B4E; color: #A855F7;">5</div>
+                        <div class="h-8 rounded-lg flex items-center justify-center text-[10px] font-bold" style="background: #2D1B4E; color: #A855F7;">8</div>
+                    </div>
+                    <div class="h-5 rounded-lg" style="background: #2D1B4E;"></div>
+                    <div class="h-5 rounded-lg w-3/4" style="background: #2D1B4E;"></div>
+                </div>
+            </div>
+            <!-- Color swatches -->
+            <div class="flex items-center gap-2 mb-4">
+                <div class="w-6 h-6 rounded-full border border-slate-600" style="background: #1A0F2E;" title="خلفية"></div>
+                <div class="w-6 h-6 rounded-full border border-slate-600" style="background: #2D1B4E;" title="بطاقة"></div>
+                <div class="w-6 h-6 rounded-full border border-slate-600" style="background: #A855F7;" title="لون أساسي"></div>
+                <div class="w-6 h-6 rounded-full border border-slate-600" style="background: #4C2D6E;" title="حدود"></div>
+            </div>
+            <button @click.stop="activateTheme('purple')"
+                class="w-full py-2.5 rounded-lg text-sm font-semibold transition"
+                :class="activeTheme === 'purple' ? 'bg-purple-500/20 text-purple-400 cursor-default' : 'bg-purple-600 hover:bg-purple-700 text-white'"
+                :disabled="activeTheme === 'purple'">
+                <span x-show="activeTheme !== 'purple'"><i class="fas fa-check ml-1"></i>تفعيل</span>
+                <span x-show="activeTheme === 'purple'">مُفعّل</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Info note -->
+    <div class="bg-slate-800/50 rounded-xl border border-slate-700 p-4 flex items-start gap-3">
+        <i class="fas fa-info-circle text-blue-400 mt-0.5"></i>
+        <div class="text-sm text-slate-300">
+            <p class="font-semibold mb-1">معلومات عن السمات</p>
+            <p class="text-slate-400 text-xs">يتم حفظ السمة المختارة وتطبيقها على جميع صفحات لوحة التحكم. يمكن تغيير السمة في أي وقت.</p>
+        </div>
+    </div>
+
+    <!-- Loading overlay -->
+    <div x-show="loading" class="fixed inset-0 bg-slate-900/50 z-40 flex items-center justify-center" style="display:none">
+        <div class="bg-slate-800 rounded-xl p-4 flex items-center gap-3">
+            <i class="fas fa-spinner fa-spin text-blue-400 text-xl"></i>
+            <span class="text-sm" x-text="loadingText"></span>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function themesPage() {
+    return {
+        activeTheme: 'gold',
+        loading: false,
+        loadingText: 'جارٍ التحميل...',
+
+        async init() {
+            await this.loadThemes();
+        },
+
+        async loadThemes() {
+            this.loading = true;
+            this.loadingText = 'جارٍ تحميل السمات...';
+            try {
+                const data = await api('/api/themes');
+                this.activeTheme = data.active_theme || 'gold';
+            } catch (e) {
+                toast('فشل تحميل السمات', 'error');
+            }
+            this.loading = false;
+        },
+
+        selectTheme(theme) {
+            // Preview selection only — activation happens on button click
+        },
+
+        async activateTheme(theme) {
+            if (theme === this.activeTheme) return;
+            this.loading = true;
+            this.loadingText = 'جارٍ تفعيل السمة...';
+            try {
+                await api('/api/themes', {
+                    method: 'POST',
+                    body: JSON.stringify({ theme: theme }),
+                });
+                this.activeTheme = theme;
+                const names = { gold: 'الذهبي الداكن', ocean: 'أزرق المحيط', purple: 'الأرجواني الملكي' };
+                toast(`تم تفعيل سمة ${names[theme] || theme}`, 'success');
+            } catch (e) {
+                toast('فشل تفعيل السمة', 'error');
+            }
+            this.loading = false;
+        },
+    };
+}
+</script>
+{% endblock %}
