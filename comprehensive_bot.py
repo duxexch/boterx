@@ -3254,6 +3254,110 @@ class ComprehensiveDUXBot:
         emoji = self.get_theme_emoji('color_warning') or '🟡'
         return f"{emoji} {text}"
 
+    # ==================== نظام التصميم الموحد (UI Design System) ====================
+
+    def ui_header(self, title, icon='📋'):
+        """رأس البطاقة — عنوان أنيق"""
+        return f"<blockquote><b>{icon} {title}</b></blockquote>"
+
+    def ui_separator(self):
+        """فاصل أنيق"""
+        return f"\n<b>━━━━━━━━━━━━━━━━━━</b>\n"
+
+    def ui_stat_row(self, label, value, icon=''):
+        """صف إحصائية — تسمية + قيمة في كود"""
+        if icon:
+            return f"{icon} {label}: <code>{value}</code>"
+        return f"📊 {label}: <code>{value}</code>"
+
+    def ui_stat_grid(self, stats):
+        """شبكة إحصائيات — صفين متوازيين"""
+        lines = []
+        for i in range(0, len(stats), 2):
+            left = stats[i]
+            right = stats[i+1] if i+1 < len(stats) else ''
+            left_text = f"{left.get('icon','📊')} <b>{left.get('label','')}</b>\n<code>{left.get('value','')}</code>"
+            if right:
+                right_text = f"{right.get('icon','📊')} <b>{right.get('label','')}</b>\n<code>{right.get('value','')}</code>"
+                lines.append(f"<code>{left_text}</code>  ┃  <code>{right_text}</code>")
+            else:
+                lines.append(f"<code>{left_text}</code>")
+        return '\n'.join(lines)
+
+    def ui_table(self, headers, rows):
+        """جدول محاكى باستخدام Monospace — يظهر كأنه جدول حقيقي"""
+        # حساب عرض كل عمود
+        col_widths = [len(h) for h in headers]
+        for row in rows:
+            for i, cell in enumerate(row):
+                col_widths[i] = max(col_widths[i], len(str(cell)))
+
+        # بناء الجدول
+        def format_row(cells):
+            return '│ '.join(str(c).ljust(col_widths[i]) for i, c in enumerate(cells))
+
+        top = '┌' + '┬'.join('─' * (w + 2) for w in col_widths) + '┐'
+        header_line = '│ ' + format_row(headers) + ' │'
+        mid = '├' + '┼'.join('─' * (w + 2) for w in col_widths) + '┤'
+        data_lines = ['│ ' + format_row(row) + ' │' for row in rows]
+        bottom = '└' + '┴'.join('─' * (w + 2) for w in col_widths) + '┘'
+
+        return '<pre>' + '\n'.join([top, header_line, mid] + data_lines + [bottom]) + '</pre>'
+
+    def ui_card(self, title, items, icon='📋'):
+        """بطاقة كاملة — رأس + فاصل + صفوف"""
+        lines = [self.ui_header(title, icon)]
+        for item in items:
+            label = item.get('label', '')
+            value = item.get('value', '')
+            item_icon = item.get('icon', '•')
+            if value:
+                lines.append(f"{item_icon} {label}: <code>{value}</code>")
+            else:
+                lines.append(f"{item_icon} {label}")
+        return '\n'.join(lines)
+
+    def ui_progress_bar(self, current, total, length=20):
+        """شريط تقدم أنيق"""
+        if total <= 0:
+            return '░' * length
+        filled = int((current / total) * length)
+        filled = min(filled, length)
+        return '█' * filled + '░' * (length - filled)
+
+    def ui_status_badge(self, status):
+        """شارة حالة ملونة"""
+        badges = {
+            'pending': '🟡 معلق',
+            'approved': '🟢 موافق',
+            'rejected': '🔴 مرفوض',
+            'active': '🟢 نشط',
+            'completed': '✅ مكتمل',
+            'cancelled': '❌ ملغي',
+            'waiting': '⏳ بانتظار',
+            'yes': '✅ نعم',
+            'no': '❌ لا',
+        }
+        return badges.get(status, f'⬜ {status}')
+
+    def ui_section(self, title, icon='📌'):
+        """عنوان قسم"""
+        return f"\n<b>{icon} {title}</b>\n<b>━━━━━━━━━━━━━━━━━━</b>\n"
+
+    def ui_value_box(self, value, currency=''):
+        """صندوق قيمة بارز"""
+        if currency:
+            return f"┃ 💰 <code>{value}</code> {currency} ┃"
+        return f"┃ <code>{value}</code> ┃"
+
+    def ui_two_col(self, left_label, left_value, right_label, right_value):
+        """صف من عمودين متوازنين"""
+        return f"│ {left_label}: <code>{left_value}</code> │ {right_label}: <code>{right_value}</code> │"
+
+    def ui_copy_hint(self, value):
+        """قيمة قابلة للنسخ مع تلميح"""
+        return f"<code>{value}</code> 👈 اضغط للنسخ"
+
     def fmt_amount(self, amount, trans_type='deposit', currency=''):
         """تنسيق مبلغ حسب نوع المعاملة"""
         if trans_type == 'deposit':
@@ -3574,26 +3678,29 @@ class ComprehensiveDUXBot:
             customer_id = user.get('customer_id', '')
             stats_bar = self.format_stats_bar()
             if lang == 'ar':
-                welcome_text = (
-                    f"━━━━━━━━━━━━━━━━━━\n"
-                    f"👋 <b>أهلاً وسهلاً، {name}!</b>\n"
-                    f"━━━━━━━━━━━━━━━━━━\n\n"
-                    f"🆔 رقم العميل: <b><code>{customer_id}</code></b>\n"
-                )
+                welcome_text = self.ui_header(f'أهلاً وسهلاً، {name}!', '👋')
+                welcome_text += '\n'
+                # بطاقة العميل
+                welcome_text += self.ui_card('بيانات العميل', [
+                    {'label': 'رقم العميل', 'value': customer_id, 'icon': '🆔'},
+                ], '🪪')
                 if stats_bar:
-                    welcome_text += f"\n{stats_bar}\n"
+                    welcome_text += f"\n\n{stats_bar}\n"
+                # قائمة الخدمات
+                welcome_text += self.ui_section('الخدمات المتاحة', '⚡')
                 welcome_text += (
-                    f"\n━━━━━━━━━━━━━━━━━━\n"
-                    f"🟢 <b>إيداع</b> — أودع أموالك بسهولة\n"
-                    f"🔴 <b>سحب</b> — اسحب أموالك بسرعة\n"
-                    f"📋 <b>طلباتي</b> — تابع حالة معاملاتك\n"
-                    f"🔄 <b>مطابقة</b> — طابق مع عميل آخر\n"
-                    f"💎 <b>تعويض 100%</b> — رصيد تعويضي\n"
-                    f"🎁 <b>إحالة</b> — ادعُ أصدقاءك\n"
-                    f"📱 <b>تطبيقات</b> — تحميل التطبيقات\n"
-                    f"━━━━━━━━━━━━━━━━━━\n\n"
-                    f"👇 <b>اختر ما تريد من الأزرار بالأسفل</b>"
+                    "🟢 <b>إيداع</b> — أودع أموالك بسهولة\n"
+                    "🔴 <b>سحب</b> — اسحب أموالك بسرعة\n"
+                    "📋 <b>طلباتي</b> — تابع حالة معاملاتك\n"
+                    "🔄 <b>مطابقة</b> — طابق مع عميل آخر\n"
+                    "💱 <b>تداول</b> — بيع وشراء USDT\n"
+                    "💎 <b>تعويض 100%</b> — رصيد تعويضي\n"
+                    "🎰 <b>يانصيب</b> — جوائز كبرى\n"
+                    "🎡 <b>عجلة الحظ</b> — أدر واربح\n"
+                    "🎁 <b>اربح</b> — ادعُ أصدقاءك\n"
+                    "📱 <b>تطبيقات</b> — تحميل التطبيقات\n"
                 )
+                welcome_text += "\n👇 <b>اختر ما تريد من الأزرار بالأسفل</b>"
             else:
                 welcome_text = self.tr('choose_service', lang, name=name, customer_id=customer_id)
                 if stats_bar:
@@ -4719,7 +4826,7 @@ class ComprehensiveDUXBot:
         self.send_message(message['chat']['id'], transactions_text, self.main_keyboard(user.get('language', 'ar')))
     
     def show_user_profile(self, message):
-        """عرض ملف المستخدم"""
+        """عرض ملف المستخدم — تصميم احترافي ببطاقات"""
         user = self.find_user(message['from']['id'])
         if not user:
             return
@@ -4731,44 +4838,48 @@ class ComprehensiveDUXBot:
         phone_verified = user.get('phone_verified', 'unknown')
         phone_icon = '✅' if phone_verified == 'yes' else '⚠️'
 
-        profile_text = f"👤 <b>الملف الشخصي</b>\n\n"
-        profile_text += f"━━━━━━━━━━━━━━━━━━\n"
-        profile_text += f"🆔 رقم العميل: <code>{user['customer_id']}</code> 👈 اضغط للنسخ\n"
-        profile_text += f"📛 الاسم: <b>{user['name']}</b>\n"
-        profile_text += f"📱 الهاتف: <code>{user['phone']}</code> {phone_icon}\n"
-        profile_text += f"📅 تاريخ التسجيل: {user['date']}\n"
-        profile_text += f"🌐 اللغة: {lang_display}\n"
-        profile_text += f"💱 العملة: {user.get('currency', 'SAR')}\n"
-        profile_text += f"{'🚫 محظور' if user.get('is_banned') == 'yes' else '✅ نشط'}\n"
-        if user.get('is_banned') == 'yes' and user.get('ban_reason'):
-            profile_text += f"📝 السبب: {user['ban_reason']}\n"
+        # بطاقة البيانات الأساسية
+        profile_text = self.ui_header('الملف الشخصي', '👤')
+        profile_text += '\n'
+        profile_text += self.ui_card('البيانات الأساسية', [
+            {'label': 'رقم العميل', 'value': user['customer_id'], 'icon': '🆔'},
+            {'label': 'الاسم', 'value': user['name'], 'icon': '📛'},
+            {'label': 'الهاتف', 'value': user.get('phone', '—'), 'icon': f'📱 {phone_icon}'},
+            {'label': 'تاريخ التسجيل', 'value': user.get('date', '—'), 'icon': '📅'},
+            {'label': 'اللغة', 'value': lang_display, 'icon': '🌐'},
+            {'label': 'العملة', 'value': user.get('currency', 'SAR'), 'icon': '💱'},
+        ], '🪪')
 
-        # عرض المحفظة (من قسم التعويض)
+        # بطاقة المحفظة — جدول أنيق
         if self.svrp:
             wallet = self.svrp.get_wallet(message['from']['id'])
             balance = float(wallet.get('balance', 0) or 0)
             available = float(wallet.get('total_used', 0) or 0)
             total_earned = float(wallet.get('total_earned', 0) or 0)
-            profile_text += f"━━━━━━━━━━━━━━━━━━\n"
-            profile_text += f"💎 <b>المحفظة</b>\n"
-            profile_text += f"🧊 مجمد: <code>{balance:.2f}</code>\n"
-            profile_text += f"🟢 متاح: <code>{available:.2f}</code>\n"
-            profile_text += f"💰 إجمالي مكتسب: <code>{total_earned:.2f}</code>\n"
+            currency = user.get('currency', 'SAR')
+            profile_text += self.ui_section('المحفظة', '💎')
+            profile_text += self.ui_table(
+                ['الحالة', 'المبلغ', 'العملة'],
+                [
+                    ['🧊 مجمد', f'{balance:.2f}', currency],
+                    ['🟢 متاح', f'{available:.2f}', currency],
+                    ['💰 مكتسب', f'{total_earned:.2f}', currency],
+                ]
+            )
 
-        # عرض حسابات الشركات المسجلة
-        profile_text += f"━━━━━━━━━━━━━━━━━━\n"
-        profile_text += f"🏢 <b>حسابات الشركات</b>\n"
+        # بطاقة حسابات الشركات
+        profile_text += self.ui_section('حسابات الشركات', '🏢')
         try:
             accounts = self.svrp.get_user_company_accounts(message['from']['id']) if self.svrp else []
             if accounts:
+                company_rows = []
                 for acc in accounts:
-                    profile_text += f"  • {acc.get('company_name', '')}: <code>{acc.get('account_number', '')}</code> 👈 اضغط للنسخ\n"
+                    company_rows.append([acc.get('company_name', ''), acc.get('account_number', '')])
+                profile_text += self.ui_table(['الشركة', 'رقم الحساب'], company_rows)
             else:
-                profile_text += "  📭 لا توجد حسابات مسجلة\n"
+                profile_text += "📭 لا توجد حسابات مسجلة\n"
         except:
-            profile_text += "  📭 لا توجد حسابات مسجلة\n"
-
-        profile_text += f"━━━━━━━━━━━━━━━━━━\n"
+            profile_text += "📭 لا توجد حسابات مسجلة\n"
 
         # أزرار inline
         inline_btns = [
