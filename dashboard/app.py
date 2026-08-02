@@ -1233,6 +1233,260 @@ def api_relay_log():
     logs.reverse()
     return jsonify({'logs': logs[:100], 'total': len(logs)})
 
+# ===== API — Post Vault =====
+
+@app.route('/api/post-vault')
+@api_auth
+def api_post_vault():
+    """أرشيف البوستات المحفوظة"""
+    search = request.args.get('search', '')
+    posts = read_csv('post_vault.csv')
+    if search:
+        sl = search.lower()
+        posts = [p for p in posts if sl in (p.get('original_text', '') + p.get('processed_text', '')).lower()]
+    posts.reverse()
+    return jsonify({'posts': posts[:100], 'total': len(posts)})
+
+@app.route('/api/post-vault/<post_id>/repost', methods=['POST'])
+@api_auth
+def api_repost_from_vault(post_id):
+    """إعادة نشر بوست من الأرشيف"""
+    posts = read_csv('post_vault.csv')
+    post = next((p for p in posts if p.get('id') == post_id), None)
+    if not post:
+        return jsonify({'error': 'Post not found'}), 404
+    text = post.get('processed_text') or post.get('original_text', '')
+    entry = {
+        'id': f"CHPOST{secrets.token_hex(3).upper()}",
+        'message': text,
+        'type': 'text',
+        'target_chat_id': '',
+        'created_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
+        'created_by': session.get('admin_id', ''),
+        'status': 'pending'
+    }
+    fieldnames = ['id', 'message', 'type', 'target_chat_id', 'created_at', 'created_by', 'status']
+    append_csv('broadcast_queue.csv', entry, fieldnames)
+    log_action('repost_from_vault', post_id)
+    return jsonify({'success': True, 'message': 'تمت إضافة البوست لقائمة الإرسال'})
+
+@app.route('/api/post-vault/<post_id>', methods=['DELETE'])
+@api_auth
+def api_delete_vault_post(post_id):
+    posts = read_csv('post_vault.csv')
+    posts = [p for p in posts if p.get('id') != post_id]
+    fieldnames = get_fieldnames('post_vault.csv', ['id','source_channel','source_chat_id','original_text','processed_text','media_type','media_file_id','ai_provider','status','created_at','published_to_users','published_to_channels','views','category'])
+    write_csv('post_vault.csv', posts, fieldnames)
+    return jsonify({'success': True})
+
+# ===== API — Text Replacements =====
+
+@app.route('/api/text-replacements')
+@api_auth
+def api_text_replacements():
+    rules = read_csv('text_replacements.csv')
+    return jsonify({'rules': rules})
+
+@app.route('/api/text-replacements', methods=['POST'])
+@api_auth
+def api_add_text_replacement():
+    data = request.json
+    rules = read_csv('text_replacements.csv')
+    fieldnames = get_fieldnames('text_replacements.csv', ['id','find_text','replace_text','is_regex','channel_id','is_active','created_at'])
+    new_id = f"TR{secrets.token_hex(3).upper()}"
+    rule = {
+        'id': new_id,
+        'find_text': data.get('find_text', ''),
+        'replace_text': data.get('replace_text', ''),
+        'is_regex': data.get('is_regex', 'no'),
+        'channel_id': data.get('channel_id', ''),
+        'is_active': 'yes',
+        'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')
+    }
+    append_csv('text_replacements.csv', rule, fieldnames)
+    log_action('add_text_replacement', new_id)
+    return jsonify({'success': True, 'id': new_id})
+
+@app.route('/api/text-replacements/<rule_id>/toggle', methods=['POST'])
+@api_auth
+def api_toggle_replacement(rule_id):
+    rules = read_csv('text_replacements.csv')
+    fieldnames = get_fieldnames('text_replacements.csv', ['id','find_text','replace_text','is_regex','channel_id','is_active','created_at'])
+    for r in rules:
+        if r.get('id') == rule_id:
+            r['is_active'] = 'no' if r.get('is_active') == 'yes' else 'yes'
+            break
+    write_csv('text_replacements.csv', rules, fieldnames)
+    return jsonify({'success': True})
+
+@app.route('/api/text-replacements/<rule_id>', methods=['DELETE'])
+@api_auth
+def api_delete_replacement(rule_id):
+    rules = read_csv('text_replacements.csv')
+    fieldnames = get_fieldnames('text_replacements.csv', ['id','find_text','replace_text','is_regex','channel_id','is_active','created_at'])
+    rules = [r for r in rules if r.get('id') != rule_id]
+    write_csv('text_replacements.csv', rules, fieldnames)
+    return jsonify({'success': True})
+
+# ===== API — AI Providers =====
+
+@app.route('/api/ai-providers')
+@api_auth
+def api_ai_providers():
+    try:
+        from ai_providers import AIManager
+        manager = AIManager()
+        providers = manager.get_available_providers()
+        active = manager.get_active_provider_name()
+        return jsonify({'providers': providers, 'active': active})
+    except ImportError:
+        return jsonify({'providers': [], 'active': None, 'error': 'ai_providers not available'})
+
+@app.route('/api/ai-providers/test', methods=['POST'])
+@api_auth
+def api_test_ai():
+    try:
+        from ai_providers import AIManager
+        manager = AIManager()
+        provider = request.json.get('provider', None) if request.json else None
+        result = manager.test_provider(provider)
+        return jsonify(result)
+    except ImportError:
+        return jsonify({'success': False, 'error': 'ai_providers not available'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/ai-instructions', methods=['GET', 'POST'])
+@api_auth
+def api_ai_instructions():
+    if request.method == 'GET':
+        settings = read_csv('system_settings.csv')
+        instr = next((s.get('setting_value', '') for s in settings if s.get('setting_key') == 'ai_instructions'), '')
+        return jsonify({'instructions': instr})
+    else:
+        data = request.json
+        text = data.get('instructions', '')
+        settings = read_csv('system_settings.csv')
+        fieldnames = get_fieldnames('system_settings.csv', ['setting_key','setting_value','description'])
+        found = False
+        for s in settings:
+            if s.get('setting_key') == 'ai_instructions':
+                s['setting_value'] = text
+                found = True
+                break
+        if not found:
+            settings.append({'setting_key': 'ai_instructions', 'setting_value': text, 'description': 'AI instructions'})
+        write_csv('system_settings.csv', settings, fieldnames)
+        log_action('update_ai_instructions', text[:50])
+        return jsonify({'success': True})
+
+@app.route('/api/ai-processed-posts')
+@api_auth
+def api_ai_posts():
+    posts = read_csv('ai_processed_posts.csv')
+    posts.reverse()
+    return jsonify({'posts': posts[:50], 'total': len(posts)})
+
+# ===== API — Channel Categories =====
+
+@app.route('/api/channel-categories')
+@api_auth
+def api_channel_categories():
+    channels = read_csv('bot_channels.csv')
+    cats = {}
+    for ch in channels:
+        cat = ch.get('category', 'غير مصنف')
+        if not cat:
+            cat = 'غير مصنف'
+        if cat not in cats:
+            cats[cat] = 0
+        cats[cat] += 1
+    return jsonify({'categories': cats})
+
+@app.route('/api/channels/<channel_id>/category', methods=['POST'])
+@api_auth
+def api_set_channel_category(channel_id):
+    data = request.json
+    category = data.get('category', 'غير مصنف')
+    channels = read_csv('bot_channels.csv')
+    fieldnames = get_fieldnames('bot_channels.csv', ['id','chat_id','title','type','is_active','added_at','relay_to_users','relay_to_channels','forward_mode','welcome_text','category','ai_enabled'])
+    for c in channels:
+        if c.get('id') == channel_id:
+            c['category'] = category
+            break
+    write_csv('bot_channels.csv', channels, fieldnames)
+    return jsonify({'success': True})
+
+@app.route('/api/channels/<channel_id>/ai-toggle', methods=['POST'])
+@api_auth
+def api_toggle_channel_ai(channel_id):
+    channels = read_csv('bot_channels.csv')
+    fieldnames = get_fieldnames('bot_channels.csv', ['id','chat_id','title','type','is_active','added_at','relay_to_users','relay_to_channels','forward_mode','welcome_text','category','ai_enabled'])
+    for c in channels:
+        if c.get('id') == channel_id:
+            c['ai_enabled'] = 'no' if c.get('ai_enabled') == 'yes' else 'yes'
+            break
+    write_csv('bot_channels.csv', channels, fieldnames)
+    return jsonify({'success': True})
+
+# ===== API — Channel Groups =====
+
+@app.route('/api/channel-groups')
+@api_auth
+def api_channel_groups():
+    groups = read_csv('channel_groups.csv')
+    return jsonify({'groups': groups})
+
+@app.route('/api/channel-groups', methods=['POST'])
+@api_auth
+def api_add_channel_group():
+    data = request.json
+    groups = read_csv('channel_groups.csv')
+    fieldnames = get_fieldnames('channel_groups.csv', ['id','name','description','channel_ids','created_at'])
+    new_id = f"GRP{secrets.token_hex(3).upper()}"
+    group = {
+        'id': new_id,
+        'name': data.get('name', ''),
+        'description': data.get('description', ''),
+        'channel_ids': data.get('channel_ids', ''),
+        'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')
+    }
+    append_csv('channel_groups.csv', group, fieldnames)
+    return jsonify({'success': True, 'id': new_id})
+
+@app.route('/api/channel-groups/<group_id>', methods=['DELETE'])
+@api_auth
+def api_delete_channel_group(group_id):
+    groups = read_csv('channel_groups.csv')
+    fieldnames = get_fieldnames('channel_groups.csv', ['id','name','description','channel_ids','created_at'])
+    groups = [g for g in groups if g.get('id') != group_id]
+    write_csv('channel_groups.csv', groups, fieldnames)
+    return jsonify({'success': True})
+
+# ===== API — Daily Report =====
+
+@app.route('/api/channels/daily-report')
+@api_auth
+def api_daily_report():
+    today = datetime.now().strftime('%Y-%m-%d')
+    relay_logs = read_csv('relay_log.csv')
+    today_logs = [l for l in relay_logs if l.get('timestamp', '').startswith(today)]
+    ai_posts = read_csv('ai_processed_posts.csv')
+    today_ai = [p for p in ai_posts if p.get('created_at', '').startswith(today)]
+    channels = read_csv('bot_channels.csv')
+    active_channels = [c for c in channels if c.get('is_active') == 'yes']
+    total_users_reached = sum(int(l.get('users_relayed', 0) or 0) for l in today_logs)
+    total_channels_reached = sum(int(l.get('channels_relayed', 0) or 0) for l in today_logs)
+    return jsonify({
+        'date': today,
+        'total_posts': len(today_logs),
+        'total_ai_processed': len(today_ai),
+        'total_users_reached': total_users_reached,
+        'total_channels_reached': total_channels_reached,
+        'active_channels': len(active_channels),
+        'total_channels': len(channels),
+    })
+
 # ===== API — Post to Channel =====
 
 @app.route('/api/channels/<channel_id>/post', methods=['POST'])
