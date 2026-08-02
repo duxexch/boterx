@@ -429,6 +429,19 @@ class ComprehensiveDUXBot:
                 writer = csv.writer(f)
                 writer.writerow(['id', 'type', 'file_id', 'emoji', 'set_name', 'category', 'added_by', 'added_at'])
 
+        # ملف استبدال النصوص في القنوات
+        if not os.path.exists('text_replacements.csv'):
+            with open('text_replacements.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.writer(f)
+                writer.writerow(['id', 'find_text', 'replace_text', 'is_regex', 'channel_id', 'is_active', 'created_at'])
+
+        # ملف بوستات AI المُعالجة
+        if not os.path.exists('ai_processed_posts.csv'):
+            with open('ai_processed_posts.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.writer(f)
+                writer.writerow(['id', 'source_channel', 'source_chat_id', 'original_text', 'processed_text',
+                               'ai_model', 'status', 'created_at', 'published_at', 'users_reached', 'channels_reached'])
+
         logger.info("تم إنشاء جميع ملفات النظام بنجاح")
         
     # خريطة الأيقونات: تحويل نص/إيموجي إلى أيقونة مناسبة
@@ -2755,6 +2768,97 @@ class ComprehensiveDUXBot:
         except:
             pass
 
+    def _apply_text_replacements(self, text, chat_id=''):
+        """استبدال النصوص وفقاً لقواعد المسؤول"""
+        import re
+        try:
+            with open('text_replacements.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row.get('is_active') != 'yes':
+                        continue
+                    # فلترة بالقناة (فارغ = كل القنوات)
+                    row_channel = row.get('channel_id', '')
+                    if row_channel and row_channel != chat_id:
+                        continue
+                    find_text = row.get('find_text', '')
+                    replace_text = row.get('replace_text', '')
+                    if not find_text:
+                        continue
+                    if row.get('is_regex') == 'yes':
+                        try:
+                            text = re.sub(find_text, replace_text, text)
+                        except:
+                            pass
+                    else:
+                        text = text.replace(find_text, replace_text)
+        except:
+            pass
+        return text
+
+    def _process_with_ai(self, text, chat_id=''):
+        """معالجة نص بوست باستخدام OpenAI API"""
+        api_key = os.getenv('OPENAI_API_KEY', '')
+        if not api_key:
+            return None
+
+        # قراءة تعليمات AI من الإعدادات
+        ai_instructions = ''
+        try:
+            with open('system_settings.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row.get('setting_key') == 'ai_instructions':
+                        ai_instructions = row.get('setting_value', '')
+                        break
+        except:
+            pass
+
+        if not ai_instructions:
+            ai_instructions = (
+                "أنت محرر محتوى احترافي للقنوات التيليجرام. "
+                "أعد صياغة البوست التالي بأسلوب جذاب ومحترف. "
+                "حافظ على المعنى والروابط. "
+                "أضف إيموجي مناسب. "
+                "اجعل العنوان بارزاً. "
+                "لا تضف معلومات غير موجودة في النص الأصلي."
+            )
+
+        try:
+            import urllib.request
+            url = 'https://api.openai.com/v1/chat/completions'
+            payload = json.dumps({
+                'model': 'gpt-4o-mini',
+                'messages': [
+                    {'role': 'system', 'content': ai_instructions},
+                    {'role': 'user', 'content': f'أعد صياغة هذا البوست:\n\n{text}'}
+                ],
+                'max_tokens': 1500,
+                'temperature': 0.7
+            }).encode('utf-8')
+            req = urllib.request.Request(url, data=payload, headers={
+                'Content-Type': 'application/json',
+                'Authorization': f'Bearer {api_key}'
+            })
+            with urllib.request.urlopen(req, timeout=30) as response:
+                result = json.loads(response.read().decode('utf-8'))
+                processed = result.get('choices', [{}])[0].get('message', {}).get('content', '').strip()
+                if processed and len(processed) > 10:
+                    # تسجيل البوست المُعالج
+                    post_id = f"AIP{str(int(datetime.now().timestamp()))[-6:]}"
+                    try:
+                        with open('ai_processed_posts.csv', 'a', newline='', encoding='utf-8-sig') as f:
+                            writer = csv.writer(f)
+                            writer.writerow([post_id, '', chat_id, text[:200], processed[:200],
+                                           'gpt-4o-mini', 'processed', datetime.now().strftime('%Y-%m-%d %H:%M'),
+                                           '', 0, 0])
+                    except:
+                        pass
+                    return processed
+        except Exception as e:
+            logger.error(f"خطأ في معالجة AI: {e}")
+        return None
+
     def auto_relay_channel_post(self, message):
         """إعادة نشر بوست من قناة البوت مشرف لها لكل المستخدمين — مع احترام كل الإعدادات"""
         chat_id = message.get('chat', {}).get('id', '')
@@ -2805,6 +2909,19 @@ class ComprehensiveDUXBot:
         relay_header = f"📢 <b>إعلان من القناة</b>\n📋 {chat_title}\n👤 {user_name}\n\n━━━━━━━━━━━━━━━━━━\n\n"
         if welcome:
             relay_header = f"{welcome}\n\n{relay_header}"
+
+        # === نظام استبدال النصوص ===
+        if 'text' in message:
+            message['text'] = self._apply_text_replacements(message['text'], str(chat_id))
+        if 'caption' in message and message['caption']:
+            message['caption'] = self._apply_text_replacements(message['caption'], str(chat_id))
+
+        # === نظام AI — معالجة البوست قبل النشر ===
+        ai_enabled = channel_settings.get('ai_enabled', 'no') == 'yes'
+        if ai_enabled and 'text' in message:
+            processed = self._process_with_ai(message['text'], str(chat_id))
+            if processed:
+                message['text'] = processed
 
         users_relayed = 0
         channels_relayed = 0
@@ -2991,7 +3108,94 @@ class ComprehensiveDUXBot:
             text += "\n📭 لا توجد قنوات مرتبطة.\nأضف البوت كمشرف في قناة وسيتم تسجيلها تلقائياً."
 
         inline_btns.append([{'text': '🔄 تحديث', 'callback_data': 'ch_refresh'}])
+        inline_btns.append([
+            {'text': '🔁 استبدال نصوص', 'callback_data': 'ch_text_replacements'},
+            {'text': '🤖 إعدادات AI', 'callback_data': 'ch_ai_settings'}
+        ])
         inline_btns.append([{'text': '🔙 العودة', 'callback_data': 'app_back_admin'}])
+        self.send_inline_message(message['chat']['id'], text, inline_btns)
+
+    def show_text_replacements_admin(self, message):
+        """لوحة استبدال النصوص"""
+        replacements = []
+        try:
+            with open('text_replacements.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                replacements = list(reader)
+        except:
+            pass
+
+        text = (
+            f"🔁 <b>استبدال النصوص</b>\n\n"
+            f"📊 القواعد النشطة: <code>{sum(1 for r in replacements if r.get('is_active') == 'yes')}</code>\n"
+            f"📦 الإجمالي: <code>{len(replacements)}</code>\n"
+            f"━━━━━━━━━━━━━━━━━━\n\n"
+        )
+        if replacements:
+            for r in replacements[:10]:
+                status = '✅' if r.get('is_active') == 'yes' else '⏸️'
+                text += f"{status} <code>{r.get('find_text', '')[:30]}</code> → <code>{r.get('replace_text', '')[:30]}</code>\n"
+        else:
+            text += "📭 لا توجد قواعد استبدال\n"
+
+        text += "\n💡 أضف قاعدة: أرسل النص المراد البحث عنه\nسيطلب منك النص البديل"
+
+        inline_btns = [
+            [{'text': '➕ إضافة قاعدة', 'callback_data': 'tr_add'}],
+            [{'text': '🔙 رجوع', 'callback_data': 'ch_back_admin'}]
+        ]
+        self.send_inline_message(message['chat']['id'], text, inline_btns)
+
+    def show_ai_settings_admin(self, message):
+        """لوحة إعدادات AI"""
+        api_key = os.getenv('OPENAI_API_KEY', '')
+        ai_instructions = ''
+        ai_enabled_count = 0
+        try:
+            with open('system_settings.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row.get('setting_key') == 'ai_instructions':
+                        ai_instructions = row.get('setting_value', '')
+        except:
+            pass
+        try:
+            with open('bot_channels.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row.get('ai_enabled') == 'yes':
+                        ai_enabled_count += 1
+        except:
+            pass
+
+        key_status = '✅ مفعّل' if api_key else '❌ غير مفعّل'
+        text = (
+            f"🤖 <b>إعدادات الذكاء الاصطناعي</b>\n\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"🔑 OpenAI API: <b>{key_status}</b>\n"
+            f"📡 القنوات المفعّل فيها AI: <code>{ai_enabled_count}</code>\n"
+            f"━━━━━━━━━━━━━━━━━━\n\n"
+        )
+        if ai_instructions:
+            text += f"📝 <b>تعليمات AI:</b>\n<i>{ai_instructions[:200]}</i>\n\n"
+        else:
+            text += "📝 لم يتم ضبط تعليمات AI بعد\n\n"
+
+        text += (
+            "💡 <b>كيف يعمل:</b>\n"
+            "1. القناة تنشر بوست\n"
+            "2. AI يعيد صياغته حسب تعليماتك\n"
+            "3. البوست المُعالج يُنشر للمستخدمين والقنوات\n\n"
+            "⚙️ للتفعيل:\n"
+            "• أضف OPENAI_API_KEY في ملف .env\n"
+            "• فعّل AI لقناة محددة من إعدادات القناة\n"
+        )
+
+        inline_btns = [
+            [{'text': '📝 تعديل تعليمات AI', 'callback_data': 'ai_edit_instructions'}],
+            [{'text': '📜 سجل البوستات', 'callback_data': 'ai_log'}],
+            [{'text': '🔙 رجوع', 'callback_data': 'ch_back_admin'}]
+        ]
         self.send_inline_message(message['chat']['id'], text, inline_btns)
 
     def log_notification(self, target_type, target_id, notif_type, message):
@@ -9189,6 +9393,51 @@ class ComprehensiveDUXBot:
                 self.edit_message(chat_id, message.get('message_id'), "🔄 تم التحديث")
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                 self.show_channels_admin(fake_msg)
+                return
+
+            elif data == 'ch_text_replacements':
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_text_replacements_admin(fake_msg)
+                return
+
+            elif data == 'ch_ai_settings':
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_ai_settings_admin(fake_msg)
+                return
+
+            elif data == 'tr_add':
+                self.edit_message(chat_id, message.get('message_id'),
+                    "🔁 <b>إضافة قاعدة استبدال</b>\n\n"
+                    "اكتب <b>النص المراد البحث عنه</b>:\n\n"
+                    "💡 مثال: <code>السعر 100</code>")
+                self.user_states[user_id] = 'tr_waiting_find'
+                return
+
+            elif data == 'ai_edit_instructions':
+                self.edit_message(chat_id, message.get('message_id'),
+                    "🤖 <b>تعديل تعليمات AI</b>\n\n"
+                    "اكتب التعليمات الجديدة لـ AI:\n\n"
+                    "💡 مثال: <code>أعد صياغة البوست بأسلوب تسويقي جذاب. أضف إيموجي. حافظ على الروابط.</code>")
+                self.user_states[user_id] = 'ai_waiting_instructions'
+                return
+
+            elif data == 'ai_log':
+                posts = []
+                try:
+                    with open('ai_processed_posts.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        posts = list(reader)
+                except:
+                    pass
+                text = f"📜 <b>سجل بوستات AI ({len(posts)})</b>\n\n━━━━━━━━━━━━━━━━━━\n"
+                for p in posts[-10:]:
+                    text += f"🆔 <code>{p.get('id', '')}</code>\n"
+                    text += f"📋 الأصلي: <i>{p.get('original_text', '')[:50]}...</i>\n"
+                    text += f"✨ المُعالج: <i>{p.get('processed_text', '')[:50]}...</i>\n"
+                    text += f"📅 {p.get('created_at', '')}\n\n"
+                inline_btns = [[{'text': '🔙 رجوع', 'callback_data': 'ch_ai_settings'}]]
+                self.edit_message(chat_id, message.get('message_id'), text[:4000])
+                self.send_inline_message(chat_id, f"إجمالي: {len(posts)}", inline_btns)
                 return
 
             # ==================== 🗃️ مكتبة الرموز ====================
