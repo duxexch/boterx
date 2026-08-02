@@ -1155,13 +1155,19 @@ def api_edit_referral_link(link_id):
 @api_auth
 def api_channels():
     channels = read_csv('bot_channels.csv')
+    # التأكد من وجود أعمدة الإعدادات
+    for ch in channels:
+        if 'relay_to_users' not in ch: ch['relay_to_users'] = 'yes'
+        if 'relay_to_channels' not in ch: ch['relay_to_channels'] = 'yes'
+        if 'forward_mode' not in ch: ch['forward_mode'] = 'all'
+        if 'welcome_text' not in ch: ch['welcome_text'] = ''
     return jsonify({'channels': channels})
 
 @app.route('/api/channels/<channel_id>/toggle', methods=['POST'])
 @api_auth
 def api_toggle_channel(channel_id):
     channels = read_csv('bot_channels.csv')
-    fieldnames = get_fieldnames('bot_channels.csv', ['id','chat_id','title','type','is_active','added_at'])
+    fieldnames = get_fieldnames('bot_channels.csv', ['id','chat_id','title','type','is_active','added_at','relay_to_users','relay_to_channels','forward_mode','welcome_text'])
     for c in channels:
         if c.get('id') == channel_id:
             c['is_active'] = 'no' if c.get('is_active') == 'yes' else 'yes'
@@ -1169,11 +1175,31 @@ def api_toggle_channel(channel_id):
     write_csv('bot_channels.csv', channels, fieldnames)
     return jsonify({'success': True})
 
+@app.route('/api/channels/<channel_id>/settings', methods=['POST'])
+@api_auth
+def api_channel_settings(channel_id):
+    """تحديث إعدادات قناة محددة"""
+    data = request.json
+    channels = read_csv('bot_channels.csv')
+    fieldnames = get_fieldnames('bot_channels.csv', ['id','chat_id','title','type','is_active','added_at','relay_to_users','relay_to_channels','forward_mode','welcome_text'])
+    editable = ['relay_to_users', 'relay_to_channels', 'forward_mode', 'welcome_text', 'is_active', 'title']
+    for c in channels:
+        if c.get('id') == channel_id:
+            for k, v in data.items():
+                if k in editable:
+                    if k not in fieldnames:
+                        fieldnames.append(k)
+                    c[k] = v
+            break
+    write_csv('bot_channels.csv', channels, fieldnames)
+    log_action('update_channel_settings', f'{channel_id}: {json.dumps(data)[:100]}')
+    return jsonify({'success': True})
+
 @app.route('/api/channels/<channel_id>', methods=['DELETE'])
 @api_auth
 def api_delete_channel(channel_id):
     channels = read_csv('bot_channels.csv')
-    fieldnames = get_fieldnames('bot_channels.csv', ['id','chat_id','title','type','is_active','added_at'])
+    fieldnames = get_fieldnames('bot_channels.csv', ['id','chat_id','title','type','is_active','added_at','relay_to_users','relay_to_channels','forward_mode','welcome_text'])
     channels = [c for c in channels if c.get('id') != channel_id]
     write_csv('bot_channels.csv', channels, fieldnames)
     return jsonify({'success': True})

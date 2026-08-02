@@ -884,8 +884,8 @@ class ComprehensiveDUXBot:
         return keyboard
     
     def get_updates(self):
-        """جلب التحديثات"""
-        url = f"{self.api_url}/getUpdates?offset={self.offset + 1}&timeout=10"
+        """جلب التحديثات — يشمل my_chat_member لتسجيل القنوات تلقائياً"""
+        url = f"{self.api_url}/getUpdates?offset={self.offset + 1}&timeout=10&allowed_updates=%5B%22message%22%2C%22callback_query%22%2C%22my_chat_member%22%2C%22chat_member%22%5D"
         try:
             with urllib.request.urlopen(url, timeout=15) as response:
                 return json.loads(response.read().decode('utf-8'))
@@ -2623,43 +2623,59 @@ class ComprehensiveDUXBot:
         return sent, failed
 
     def auto_relay_channel_post(self, message):
-        """إعادة نشر بوست من قناة البوت مشرف بها لكل المستخدمين"""
+        """إعادة نشر بوست من قناة البوت مشرف لها لكل المستخدمين — مع احترام الإعدادات"""
         chat_id = message.get('chat', {}).get('id', '')
         chat_title = message.get('chat', {}).get('title', '')
         chat_type = message.get('chat', {}).get('type', '')
 
         # فحص هل القناة مسجلة
-        channels = self.get_bot_channels()
-        chat_ids = {ch.get('chat_id', '') for ch in channels}
-        if str(chat_id) not in chat_ids:
+        channel_settings = self.get_channel_settings(chat_id)
+        if not channel_settings:
             return False
+
+        if channel_settings.get('is_active') != 'yes':
+            return False
+
+        relay_to_users = channel_settings.get('relay_to_users', 'yes') == 'yes'
+        relay_to_channels = channel_settings.get('relay_to_channels', 'yes') == 'yes'
+        forward_mode = channel_settings.get('forward_mode', 'all')
 
         # استخراج المحتوى
         user_name = message.get('from', {}).get('first_name', '') or message.get('from', {}).get('title', '')
+        welcome = channel_settings.get('welcome_text', '')
         relay_header = f"📢 <b>إعلان من القناة</b>\n📋 {chat_title}\n👤 {user_name}\n\n━━━━━━━━━━━━━━━━━━\n\n"
+        if welcome:
+            relay_header = f"{welcome}\n\n{relay_header}"
 
         try:
             if 'text' in message:
                 text = message['text']
-                self.broadcast_to_all_users(relay_header + text)
-                self.post_to_channels(relay_header + text)
+                if relay_to_users:
+                    self.broadcast_to_all_users(relay_header + text)
+                if relay_to_channels:
+                    self.post_to_channels(relay_header + text)
                 return True
             elif 'photo' in message:
                 photo = message['photo'][-1]['file_id']
                 caption = message.get('caption', '')
-                self.broadcast_to_all_users(relay_header + caption, photo=photo)
-                self.post_to_channels(relay_header + caption, photo=photo)
+                if relay_to_users:
+                    self.broadcast_to_all_users(relay_header + caption, photo=photo)
+                if relay_to_channels:
+                    self.post_to_channels(relay_header + caption, photo=photo)
                 return True
             elif 'video' in message:
                 video = message['video']['file_id']
                 caption = message.get('caption', '')
-                self.broadcast_to_all_users(relay_header + caption, video=video)
-                self.post_to_channels(relay_header + caption, video=video)
+                if relay_to_users:
+                    self.broadcast_to_all_users(relay_header + caption, video=video)
+                if relay_to_channels:
+                    self.post_to_channels(relay_header + caption, video=video)
                 return True
             elif 'document' in message:
                 doc = message['document']['file_id']
                 caption = message.get('caption', '')
-                self.broadcast_to_all_users(relay_header + caption, document=doc)
+                if relay_to_users:
+                    self.broadcast_to_all_users(relay_header + caption, document=doc)
                 self.post_to_channels(relay_header + caption, document=doc)
                 return True
             elif 'sticker' in message:
@@ -2671,20 +2687,36 @@ class ComprehensiveDUXBot:
         return False
 
     def show_channels_admin(self, message):
-        """لوحة إدارة القنوات/المجموعات"""
+        """لوحة إدارة القنوات/المجموعات — مع إعدادات لكل قناة"""
         channels = self.get_bot_channels()
-        text = f"📢 <b>القنوات/المجموعات</b>\n\n📊 المرتبطة: <code>{len(channels)}</code>\n"
+        text = (
+            f"📢 <b>القنوات/المجموعات</b>\n\n"
+            f"📊 المرتبطة: <code>{len(channels)}</code>\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+        )
         inline_btns = []
         if channels:
-            text += "\n━━━━━━━━━━━━━━━━━━\n"
             for ch in channels:
                 status = '✅' if ch.get('is_active') == 'yes' else '⏸️'
-                text += f"\n{status} <b>{ch.get('title', '')}</b>\n"
-                text += f"  🆔 <code>{ch.get('chat_id', '')}</code>\n"
-                text += f"  📎 {ch.get('type', '')}\n"
-                inline_btns.append([{'text': f"{'✅' if ch.get('is_active') == 'yes' else '⏸️'} {ch.get('title', '')}",
-                                     'callback_data': f'ch_toggle_{ch.get("id", "")}'}])
+                relay_u = '👥✅' if ch.get('relay_to_users', 'yes') == 'yes' else '👥❌'
+                relay_c = '📢✅' if ch.get('relay_to_channels', 'yes') == 'yes' else '📢❌'
+                text += (
+                    f"\n{status} <b>{ch.get('title', '')}</b>\n"
+                    f"  🆔 <code>{ch.get('chat_id', '')}</code> | 📎 {ch.get('type', '')}\n"
+                    f"  {relay_u} للمستخدمين | {relay_c} للقنوات\n"
+                )
+                inline_btns.append([
+                    {'text': f"{'✅' if ch.get('is_active') == 'yes' else '⏸️'} تفعيل",
+                     'callback_data': f'ch_toggle_{ch.get("id", "")}'},
+                    {'text': f"{'👥✅' if ch.get('relay_to_users', 'yes') == 'yes' else '👥❌'} للمستخدمين",
+                     'callback_data': f'ch_relay_u_{ch.get("id", "")}'},
+                    {'text': f"{'📢✅' if ch.get('relay_to_channels', 'yes') == 'yes' else '📢❌'} للقنوات",
+                     'callback_data': f'ch_relay_c_{ch.get("id", "")}'},
+                ])
+        else:
+            text += "\n📭 لا توجد قنوات مرتبطة.\nأضف البوت كمشرف في قناة وسيتم تسجيلها تلقائياً."
 
+        inline_btns.append([{'text': '🔄 تحديث', 'callback_data': 'ch_refresh'}])
         inline_btns.append([{'text': '🔙 العودة', 'callback_data': 'app_back_admin'}])
         self.send_inline_message(message['chat']['id'], text, inline_btns)
 
@@ -8732,24 +8764,78 @@ class ComprehensiveDUXBot:
                 return
 
             # ==================== 📢 القنوات/المجموعات ====================
+            elif data == 'ch_refresh':
+                self.edit_message(chat_id, message.get('message_id'), "🔄 تم التحديث")
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_channels_admin(fake_msg)
+                return
+
+            elif data.startswith('ch_relay_u_'):
+                ch_id = data.replace('ch_relay_u_', '')
+                # toggle relay_to_users
+                try:
+                    rows = []
+                    with open('bot_channels.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        fieldnames = reader.fieldnames or ['id','chat_id','title','type','is_active','added_at','relay_to_users','relay_to_channels','forward_mode','welcome_text']
+                        rows = list(reader)
+                    for row in rows:
+                        if row.get('id') == ch_id:
+                            row['relay_to_users'] = 'no' if row.get('relay_to_users', 'yes') == 'yes' else 'yes'
+                            break
+                    with open('bot_channels.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                        writer = csv.DictWriter(f, fieldnames=fieldnames)
+                        writer.writeheader()
+                        for row in rows:
+                            writer.writerow({k: row.get(k, '') for k in fieldnames})
+                except:
+                    pass
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_channels_admin(fake_msg)
+                return
+
+            elif data.startswith('ch_relay_c_'):
+                ch_id = data.replace('ch_relay_c_', '')
+                # toggle relay_to_channels
+                try:
+                    rows = []
+                    with open('bot_channels.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        fieldnames = reader.fieldnames or ['id','chat_id','title','type','is_active','added_at','relay_to_users','relay_to_channels','forward_mode','welcome_text']
+                        rows = list(reader)
+                    for row in rows:
+                        if row.get('id') == ch_id:
+                            row['relay_to_channels'] = 'no' if row.get('relay_to_channels', 'yes') == 'yes' else 'yes'
+                            break
+                    with open('bot_channels.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                        writer = csv.DictWriter(f, fieldnames=fieldnames)
+                        writer.writeheader()
+                        for row in rows:
+                            writer.writerow({k: row.get(k, '') for k in fieldnames})
+                except:
+                    pass
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_channels_admin(fake_msg)
+                return
+
             elif data.startswith('ch_toggle_'):
                 ch_id = data.replace('ch_toggle_', '')
                 try:
                     rows = []
                     with open('bot_channels.csv', 'r', encoding='utf-8-sig') as f:
                         reader = csv.DictReader(f)
-                        fieldnames = reader.fieldnames
-                        for row in reader:
-                            if row.get('id') == ch_id:
-                                row['is_active'] = 'no' if row.get('is_active') == 'yes' else 'yes'
-                            rows.append(row)
+                        fieldnames = reader.fieldnames or ['id','chat_id','title','type','is_active','added_at','relay_to_users','relay_to_channels','forward_mode','welcome_text']
+                        rows = list(reader)
+                    for row in rows:
+                        if row.get('id') == ch_id:
+                            row['is_active'] = 'no' if row.get('is_active') == 'yes' else 'yes'
                     with open('bot_channels.csv', 'w', newline='', encoding='utf-8-sig') as f:
                         writer = csv.DictWriter(f, fieldnames=fieldnames)
                         writer.writeheader()
-                        writer.writerows(rows)
+                        for row in rows:
+                            writer.writerow({k: row.get(k, '') for k in fieldnames})
                 except:
                     pass
-                self.edit_message(chat_id, message.get('message_id'), "✅ تم التبديل")
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                 self.show_channels_admin(fake_msg)
                 return
@@ -12001,6 +12087,13 @@ class ComprehensiveDUXBot:
                                 self.answer_callback(update['callback_query'].get('id'), "❌ خطأ")
                             except:
                                 pass
+                    
+                    elif 'my_chat_member' in update:
+                        """تسجيل تلقائي للقنوات/المجموعات عند إضافة البوت كمشرف"""
+                        try:
+                            self.handle_my_chat_member(update['my_chat_member'])
+                        except Exception as e:
+                            logger.error(f"خطأ في my_chat_member: {e}", exc_info=True)
                 
                 # 5. تنظيف دوري للذاكرة
                 if len(user_last_activity) > 500:
@@ -12015,6 +12108,148 @@ class ComprehensiveDUXBot:
                 # انتظار قصير قبل المحاولة مرة أخرى
                 time.sleep(1)
                 continue
+
+    def handle_my_chat_member(self, update_data):
+        """معالجة إضافة/إزالة البوت من القنوات/المجموعات"""
+        chat = update_data.get('chat', {})
+        chat_id = str(chat.get('id', ''))
+        chat_title = chat.get('title', '')
+        chat_type = chat.get('type', '')  # channel, group, supergroup
+
+        old_status = update_data.get('old_chat_member', {}).get('status', '')
+        new_status = update_data.get('new_chat_member', {}).get('status', '')
+
+        # البوت أصبح مشرفاً/عضواً
+        if new_status in ('member', 'administrator') and old_status not in ('member', 'administrator'):
+            # تسجيل القناة تلقائياً
+            self._register_channel(chat_id, chat_title, chat_type)
+            logger.info(f"تم تسجيل قناة تلقائياً: {chat_title} ({chat_id})")
+            # إشعار الأدمن
+            for admin_id in self.admin_ids:
+                try:
+                    self.send_message(int(admin_id),
+                        f"📢 <b>قناة جديدة مرتبطة!</b>\n\n"
+                        f"📋 الاسم: <b>{chat_title}</b>\n"
+                        f"🆔 <code>{chat_id}</code>\n"
+                        f"📎 النوع: {chat_type}\n"
+                        f"✅ تم التسجيل تلقائياً")
+                except:
+                    pass
+
+        # البوت تمت إزالته
+        elif new_status in ('left', 'kicked') and old_status not in ('left', 'kicked'):
+            self._unregister_channel(chat_id)
+            logger.info(f"تم إلغاء تسجيل قناة: {chat_title} ({chat_id})")
+            for admin_id in self.admin_ids:
+                try:
+                    self.send_message(int(admin_id),
+                        f"❌ <b>تمت إزالة البوت من قناة</b>\n\n📋 {chat_title} ({chat_id})")
+                except:
+                    pass
+
+    def _register_channel(self, chat_id, title, chat_type):
+        """تسجيل قناة في bot_channels.csv"""
+        # فحص عدم التكرار
+        existing = self.get_bot_channels()
+        for ch in existing:
+            if ch.get('chat_id') == chat_id:
+                return  # موجودة بالفعل
+
+        ch_id = f"CH{str(int(datetime.now().timestamp()))[-6:]}"
+        try:
+            # قراءة fieldnames الحالية + ترحيل
+            fieldnames = ['id', 'chat_id', 'title', 'type', 'is_active', 'added_at',
+                         'relay_to_users', 'relay_to_channels', 'forward_mode', 'welcome_text']
+            rows = []
+            need_header = True
+            if os.path.exists('bot_channels.csv'):
+                with open('bot_channels.csv', 'r', encoding='utf-8-sig') as f:
+                    reader = csv.DictReader(f)
+                    old_fields = reader.fieldnames or fieldnames
+                    rows = list(reader)
+                    # ترحيل: إضافة أعمدة جديدة
+                    for row in rows:
+                        for col in fieldnames:
+                            if col not in row:
+                                row[col] = 'yes' if col in ('relay_to_users', 'relay_to_channels') else ('all' if col == 'forward_mode' else '')
+                    # دمج fieldnames
+                    merged = list(old_fields)
+                    for col in fieldnames:
+                        if col not in merged:
+                            merged.append(col)
+                    fieldnames = merged
+
+            with open('bot_channels.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer.writeheader()
+                for row in rows:
+                    writer.writerow({k: row.get(k, '') for k in fieldnames})
+                # إضافة القناة الجديدة
+                writer.writerow({
+                    'id': ch_id, 'chat_id': chat_id, 'title': title, 'type': chat_type,
+                    'is_active': 'yes', 'added_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
+                    'relay_to_users': 'yes', 'relay_to_channels': 'yes',
+                    'forward_mode': 'all', 'welcome_text': ''
+                })
+        except Exception as e:
+            logger.error(f"خطأ في تسجيل القناة: {e}")
+
+    def _unregister_channel(self, chat_id):
+        """حذف قناة من bot_channels.csv"""
+        try:
+            rows = []
+            fieldnames = ['id', 'chat_id', 'title', 'type', 'is_active', 'added_at',
+                         'relay_to_users', 'relay_to_channels', 'forward_mode', 'welcome_text']
+            if os.path.exists('bot_channels.csv'):
+                with open('bot_channels.csv', 'r', encoding='utf-8-sig') as f:
+                    reader = csv.DictReader(f)
+                    old_fields = reader.fieldnames or fieldnames
+                    rows = [r for r in reader if r.get('chat_id') != chat_id]
+                    fieldnames = old_fields
+            with open('bot_channels.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer.writeheader()
+                for row in rows:
+                    writer.writerow({k: row.get(k, '') for k in fieldnames})
+        except Exception as e:
+            logger.error(f"خطأ في حذف القناة: {e}")
+
+    def get_channel_settings(self, chat_id):
+        """جلب إعدادات قناة محددة"""
+        try:
+            with open('bot_channels.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row.get('chat_id') == str(chat_id):
+                        return row
+        except:
+            pass
+        return None
+
+    def update_channel_settings(self, ch_id, key, value):
+        """تحديث إعداد قناة"""
+        try:
+            rows = []
+            fieldnames = ['id', 'chat_id', 'title', 'type', 'is_active', 'added_at',
+                         'relay_to_users', 'relay_to_channels', 'forward_mode', 'welcome_text']
+            with open('bot_channels.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                old_fields = reader.fieldnames or fieldnames
+                rows = list(reader)
+                fieldnames = old_fields
+            for row in rows:
+                if row.get('id') == ch_id:
+                    row[key] = value
+                    break
+            with open('bot_channels.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer.writeheader()
+                for row in rows:
+                    writer.writerow({k: row.get(k, '') for k in fieldnames})
+            return True
+        except Exception as e:
+            logger.error(f"خطأ في تحديث إعداد القناة: {e}")
+            return False
 
     def handle_complaint_start(self, message):
         """بدء عملية الشكوى"""
