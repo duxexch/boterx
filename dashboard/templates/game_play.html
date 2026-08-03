@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>{{ game.name }}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
+body{overflow:hidden;font-family:system-ui,sans-serif;background:#0f172a;color:#fff}
+#app{position:fixed;inset:0;display:flex;flex-direction:column}
+/* Top bar */
+#topbar{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:rgba(0,0,0,0.3);backdrop-filter:blur(10px);position:sticky;top:0;z-index:100}
+.balance{font-size:18px;font-weight:900;color:#fbbf24}
+.vex-btn{background:linear-gradient(135deg,#a78bfa,#8b5cf6);color:#fff;border:none;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;display:none}
+.vex-btn.show{display:block}
+.back-btn{background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer}
+/* Game area */
+#game-area{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;position:relative;overflow:hidden}
+.game-title{font-size:28px;font-weight:900;margin-bottom:8px}
+.game-icon-big{font-size:64px;margin-bottom:16px;animation:bounce 2s ease-in-out infinite}
+@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+.result-display{font-size:32px;font-weight:900;margin:16px 0;min-height:40px}
+.result-win{color:#34d399;animation:winPulse 0.5s ease-out}
+.result-lose{color:#ef4444}
+@keyframes winPulse{0%{transform:scale(0.5);opacity:0}50%{transform:scale(1.2)}100%{transform:scale(1);opacity:1}}
+.motivational{font-size:14px;opacity:0.7;margin-bottom:8px;min-height:20px}
+/* Bet bar */
+#betbar{padding:12px 14px;background:rgba(0,0,0,0.3);backdrop-filter:blur(10px);position:sticky;bottom:0;z-index:100}
+.bet-input-row{display:flex;gap:8px;margin-bottom:8px}
+.bet-input{flex:1;background:#1e293b;border:1px solid #334155;border-radius:10px;padding:10px 14px;color:#fff;font-size:18px;font-weight:700;text-align:center;outline:none}
+.bet-input:focus{border-color:#fbbf24}
+.play-btn{background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#000;border:none;padding:10px 24px;border-radius:10px;font-size:18px;font-weight:900;cursor:pointer;transition:transform 0.15s}
+.play-btn:active{transform:scale(0.95)}
+.play-btn:disabled{opacity:0.4;cursor:not-allowed}
+.quick-bets{display:flex;gap:6px;justify-content:center}
+.quick-bet{background:#1e293b;border:1px solid #334155;border-radius:8px;padding:6px 12px;color:#94a3b8;font-size:13px;cursor:pointer}
+.quick-bet:active{background:#334155}
+/* Modal */
+#modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.7);z-index:200;backdrop-filter:blur(5px)}
+.modal-box{background:linear-gradient(145deg,#1e293b,#0f172a);border:1px solid #334155;border-radius:20px;padding:24px;width:90%;max-width:360px;text-align:center}
+.modal-title{font-size:24px;font-weight:900;margin-bottom:8px}
+.modal-subtitle{font-size:14px;opacity:0.6;margin-bottom:16px}
+.modal-balance{font-size:20px;color:#fbbf24;font-weight:700;margin-bottom:16px}
+.modal-input{width:100%;background:#0f172a;border:1px solid #334155;border-radius:10px;padding:12px;color:#fff;font-size:18px;text-align:center;outline:none;margin-bottom:12px}
+.modal-btn{width:100%;background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#000;border:none;padding:12px;border-radius:10px;font-size:16px;font-weight:900;cursor:pointer;margin-bottom:8px}
+.modal-btn.secondary{background:#334155;color:#fff}
+/* Other games scroll */
+.other-games{margin-top:16px;border-top:1px solid #334155;padding-top:12px}
+.other-games-title{font-size:12px;opacity:0.5;margin-bottom:8px}
+.games-scroll{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
+.games-scroll::-webkit-scrollbar{height:3px}
+.games-scroll::-webkit-scrollbar-thumb{background:#334155;border-radius:3px}
+.mini-game{flex-shrink:0;background:#1e293b;border:1px solid #334155;border-radius:10px;padding:8px 12px;text-align:center;cursor:pointer;min-width:70px}
+.mini-game-icon{font-size:24px}
+.mini-game-name{font-size:10px;margin-top:2px}
+/* Confetti */
+.confetti{position:absolute;width:8px;height:8px;pointer-events:none;z-index:150}
+/* Deposit */
+.deposit-methods{display:flex;flex-direction:column;gap:8px;margin:12px 0}
+.deposit-method{background:#1e293b;border:1px solid #334155;border-radius:10px;padding:10px;display:flex;align-items:center;gap:8px;cursor:pointer}
+.deposit-method.selected{border-color:#fbbf24}
+.copy-box{background:#0f172a;border:1px solid #334155;border-radius:8px;padding:8px;margin:8px 0;display:flex;align-items:center;justify-content:space-between;cursor:pointer}
+.copy-box code{color:#fbbf24;font-size:13px}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="topbar">
+    <button class="back-btn" onclick="goBack()">‹</button>
+    <div class="balance">💰 <span id="bal">0</span></div>
+    <button class="vex-btn" id="vexBtn">💎</button>
+  </div>
+  <div id="game-area">
+    <div class="game-icon-big" id="gameIcon">{{ game.icon }}</div>
+    <div class="game-title">{{ game.name }}</div>
+    <div class="result-display" id="resultDisplay"></div>
+    <div class="motivational" id="motivational"></div>
+  </div>
+  <div id="betbar">
+    <div class="bet-input-row">
+      <input type="number" class="bet-input" id="betInput" value="{{ game.min_bet }}" min="{{ game.min_bet }}" max="{{ game.max_bet }}">
+      <button class="play-btn" id="playBtn" onclick="playRound()">▶️ العب</button>
+    </div>
+    <div class="quick-bets" id="quickBets"></div>
+  </div>
+</div>
+<!-- Continue Modal -->
+<div id="modal">
+  <div class="modal-box" id="modalBox"></div>
+</div>
+<script>
+const tg = window.Telegram?.WebApp;
+if (tg) { tg.expand(); tg.ready(); }
+const uid = new URLSearchParams(location.search).get('uid') || '';
+const gameId = '{{ game.id }}';
+const gameName = '{{ game.name }}';
+const gameIcon = '{{ game.icon }}';
+const minBet = {{ game.min_bet }};
+const maxBet = {{ game.max_bet }};
+const BASE = location.origin;
+let isPlaying = false;
+let lastResult = null;
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+function beep(f, d, t='sine', v=0.2) {
+  const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+  o.connect(g);g.connect(audioCtx.destination);
+  o.frequency.value=f;o.type=t;
+  g.gain.setValueAtTime(v,audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+d);
+  o.start();o.stop(audioCtx.currentTime+d);
+}
+function soundWin(){beep(523,0.1);setTimeout(()=>beep(784,0.15),80);setTimeout(()=>beep(1047,0.2),160)}
+function soundLose(){beep(300,0.2,'sawtooth',0.15)}
+function haptic(t='light'){if(tg?.HapticFeedback?.impactOccurred)tg.HapticFeedback.impactOccurred(t)}
+
+async function loadBalance() {
+  try {
+    const r = await fetch(`${BASE}/api/wallet/balance?uid=${uid}`);
+    const d = await r.json();
+    document.getElementById('bal').textContent = (d.balance||0).toLocaleString();
+  } catch(e) {}
+}
+
+// Quick bet buttons
+function initQuickBets() {
+  const bets = [minBet, minBet*5, minBet*10, maxBet];
+  const labels = ['Min', '×5', '×10', 'Max'];
+  const container = document.getElementById('quickBets');
+  bets.forEach((b, i) => {
+    const btn = document.createElement('div');
+    btn.className = 'quick-bet';
+    btn.textContent = `${b}`;
+    btn.onclick = () => { document.getElementById('betInput').value = b; };
+    container.appendChild(btn);
+  });
+}
+
+async function playRound() {
+  if (isPlaying) return;
+  const bet = parseFloat(document.getElementById('betInput').value) || 0;
+  if (bet < minBet || bet > maxBet) {
+    document.getElementById('resultDisplay').textContent = `الحد ${minBet}-${maxBet}`;
+    document.getElementById('resultDisplay').className = 'result-display result-lose';
+    return;
+  }
+  
+  isPlaying = true;
+  document.getElementById('playBtn').disabled = true;
+  document.getElementById('resultDisplay').textContent = '';
+  document.getElementById('motivational').textContent = '⏳ جارٍ اللعب...';
+  
+  try {
+    const r = await fetch(`${BASE}/api/engine/result`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({uid, game_id: gameId, bet_amount: bet})
+    });
+    const d = await r.json();
+    lastResult = d;
+    
+    if (!d.success) {
+      if (d.need_deposit) {
+        showDepositModal(bet);
+      } else {
+        document.getElementById('resultDisplay').textContent = d.error || 'خطأ';
+        document.getElementById('resultDisplay').className = 'result-display result-lose';
+      }
+      isPlaying = false;
+      document.getElementById('playBtn').disabled = false;
+      return;
+    }
+    
+    // Show result
+    const rd = document.getElementById('resultDisplay');
+    const mo = document.getElementById('motivational');
+    
+    if (d.result === 'win') {
+      rd.textContent = `🎉 +${d.payout}`;
+      rd.className = 'result-display result-win';
+      soundWin();
+      haptic('medium');
+      confettiBurst();
+    } else {
+      if (d.near_miss) {
+        rd.textContent = '💨 كادت!';
+        mo.textContent = '🔥 كنت قريباً جداً! حاول مرة أخرى!';
+      } else {
+        rd.textContent = `❌ -${bet}`;
+        mo.textContent = '💪 حظ أوفر!';
+      }
+      rd.className = 'result-display result-lose';
+      soundLose();
+      haptic('heavy');
+    }
+    
+    // Psych hints
+    const psych = d.psychological_hints || {};
+    if (psych.motivational_text) {
+      mo.textContent = psych.motivational_text;
+    }
+    
+    // Update balance
+    document.getElementById('bal').textContent = (d.balance_after||0).toLocaleString();
+    
+    // Show continue modal
+    setTimeout(() => showContinueModal(d, bet), 800);
+    
+  } catch(e) {
+    document.getElementById('resultDisplay').textContent = '❌ خطأ';
+    document.getElementById('resultDisplay').className = 'result-display result-lose';
+  }
+  
+  isPlaying = false;
+  document.getElementById('playBtn').disabled = false;
+}
+
+function showContinueModal(result, lastBet) {
+  const balance = result.balance_after || 0;
+  const modal = document.getElementById('modal');
+  const box = document.getElementById('modalBox');
+  
+  let html = `
+    <div class="modal-title">${result.result === 'win' ? '🎉 ربحت!' : '😔 خسرت'}</div>
+    <div class="modal-balance">💰 رصيدك: ${balance.toLocaleString()}</div>
+  `;
+  
+  if (balance >= minBet) {
+    html += `
+      <input type="number" class="modal-input" id="modalBet" value="${lastBet}" min="${minBet}" max="${maxBet}">
+      <button class="modal-btn" onclick="continuePlay()">▶️ العب مرة أخرى</button>
+    `;
+  } else {
+    html += `
+      <div class="modal-subtitle">⚠️ رصيدك غير كافٍ</div>
+      <button class="modal-btn" onclick="showDepositModal(${minBet})">💰 إيداع سريع</button>
+    `;
+  }
+  
+  // Other games
+  html += `
+    <div class="other-games">
+      <div class="other-games-title">🎮 جرّب ألعاب أخرى</div>
+      <div class="games-scroll" id="otherGames"></div>
+    </div>
+    <button class="modal-btn secondary" onclick="goBack()" style="margin-top:8px">🏠 القائمة</button>
+  `;
+  
+  box.innerHTML = html;
+  modal.style.display = 'flex';
+  
+  // Load other games
+  loadOtherGames();
+}
+
+function continuePlay() {
+  const bet = parseFloat(document.getElementById('modalBet').value) || minBet;
+  document.getElementById('betInput').value = bet;
+  document.getElementById('modal').style.display = 'none';
+  document.getElementById('resultDisplay').textContent = '';
+  document.getElementById('motivational').textContent = '';
+  playRound();
+}
+
+async function loadOtherGames() {
+  try {
+    const r = await fetch(`${BASE}/api/games/list`);
+    const d = await r.json();
+    const container = document.getElementById('otherGames');
+    if (!container) return;
+    container.innerHTML = '';
+    (d.games || []).forEach(g => {
+      if (g.id === gameId) return;
+      const el = document.createElement('div');
+      el.className = 'mini-game';
+      el.innerHTML = `<div class="mini-game-icon">${g.icon}</div><div class="mini-game-name">${g.name}</div>`;
+      el.onclick = () => { window.location.href = `${BASE}/webapp/play/${g.id}?uid=${uid}&lang=ar`; };
+      container.appendChild(el);
+    });
+  } catch(e) {}
+}
+
+async function showDepositModal(required) {
+  const modal = document.getElementById('modal');
+  const box = document.getElementById('modalBox');
+  
+  // Load payment methods
+  let methodsHtml = '';
+  try {
+    const r = await fetch(`${BASE}/api/player/methods?uid=${uid}`);
+    const d = await r.json();
+    methodsHtml = (d.methods || []).map(m => 
+      `<div class="deposit-method" onclick="selectMethod(this, '${m.account_number}', '${m.id}')">
+        ${m.icon||'💳'} ${m.method_name} — ${m.account_number}
+      </div>`
+    ).join('');
+  } catch(e) {}
+  
+  if (!methodsHtml) {
+    methodsHtml = '<div class="modal-subtitle">لا توجد وسائل دفع محفوظة<br>أضف وسيلة دفع من الإعدادات</div>';
+  }
+  
+  box.innerHTML = `
+    <div class="modal-title">💰 إيداع سريع</div>
+    <div class="modal-subtitle">رصيدك غير كافٍ للعب</div>
+    <div class="modal-balance">المطلوب: ${required || minBet}</div>
+    <div class="deposit-methods">${methodsHtml}</div>
+    <div id="copyBox" style="display:none">
+      <div class="copy-box" onclick="copyAccount()">
+        <code id="accountNum"></code>
+        <span>📋 نسخ</span>
+      </div>
+    </div>
+    <input type="number" class="modal-input" id="depAmount" placeholder="المبلغ" value="${required || minBet}">
+    <button class="modal-btn" onclick="submitDeposit()">✅ تأكيد الإيداع</button>
+    <button class="modal-btn secondary" onclick="document.getElementById('modal').style.display='none'">إلغاء</button>
+  `;
+  modal.style.display = 'flex';
+}
+
+let selectedAccount = '';
+let selectedMethodId = '';
+
+function selectMethod(el, account, methodId) {
+  document.querySelectorAll('.deposit-method').forEach(m => m.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedAccount = account;
+  selectedMethodId = methodId;
+  document.getElementById('copyBox').style.display = 'block';
+  document.getElementById('accountNum').textContent = account;
+}
+
+function copyAccount() {
+  navigator.clipboard.writeText(selectedAccount).then(() => {
+    haptic('light');
+  });
+}
+
+async function submitDeposit() {
+  const amount = parseFloat(document.getElementById('depAmount').value) || 0;
+  if (amount <= 0 || !selectedAccount) {
+    alert('أدخل المبلغ واختر وسيلة الدفع');
+    return;
+  }
+  try {
+    const r = await fetch(`${BASE}/api/deposit/quick`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({uid, amount, method_id: selectedMethodId, account_number: selectedAccount})
+    });
+    const d = await r.json();
+    if (d.success) {
+      document.getElementById('modalBox').innerHTML = `
+        <div class="modal-title">⏳ بانتظار التأكيد</div>
+        <div class="modal-subtitle">تم إرسال طلب الإيداع<br>سيتم إضافة الرصيد بعد موافقة الإدارة</div>
+        <button class="modal-btn" onclick="document.getElementById('modal').style.display='none'">إغلاق</button>
+      `;
+    }
+  } catch(e) {}
+}
+
+function confettiBurst() {
+  const colors = ['#fbbf24','#06b6d4','#a78bfa','#34d399','#ef4444'];
+  const area = document.getElementById('game-area');
+  for (let i = 0; i < 20; i++) {
+    const c = document.createElement('div');
+    c.className = 'confetti';
+    c.style.left = '50%';
+    c.style.top = '50%';
+    c.style.background = colors[Math.floor(Math.random()*colors.length)];
+    c.style.borderRadius = Math.random()>0.5?'50%':'2px';
+    area.appendChild(c);
+    const angle = Math.random()*Math.PI*2;
+    const dist = 60+Math.random()*120;
+    c.animate([
+      {transform:'translate(0,0) rotate(0)',opacity:1},
+      {transform:`translate(${Math.cos(angle)*dist}px,${Math.sin(angle)*dist}px) rotate(${Math.random()*720}deg)`,opacity:0}
+    ],{duration:600+Math.random()*400,easing:'ease-out'});
+    setTimeout(()=>c.remove(),1000);
+  }
+}
+
+function goBack() {
+  window.location.href = `${BASE}/webapp/games?uid=${uid}&lang=ar`;
+}
+
+// Init
+loadBalance();
+initQuickBets();
+setInterval(loadBalance, 5000);
+</script>
+</body>
+</html>

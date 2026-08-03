@@ -3065,10 +3065,382 @@ def api_download_backup(filename):
 def api_send_message_recent():
     """رسائل مرسلة لمستخدمين محددين"""
     queue = read_csv('broadcast_queue.csv')
-    # رسائل لها target_user_id (ليست بث عام)
     targeted = [q for q in queue if q.get('target_user_id', '')]
     targeted.reverse()
     return jsonify({'messages': targeted[:50]})
+
+# =====================================================
+# ===== VEX GAMES PLATFORM — API =====
+# =====================================================
+
+# تهيئة محرك الألعاب
+try:
+    import sys as _sys
+    _sys.path.insert(0, BASE_DIR)
+    from game_engine import GameManager
+    _gm = GameManager()
+    _VEX_GAMES = True
+except Exception as e:
+    print(f"VEX Games init error: {e}")
+    _VEX_GAMES = False
+
+# ===== Games Catalog =====
+
+@app.route('/api/games/list')
+def api_games_list():
+    """قائمة الألعاب النشطة"""
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    games = _gm.get_games(active_only=True)
+    return jsonify({'games': games, 'count': len(games)})
+
+@app.route('/api/games/all')
+@api_auth
+def api_games_all():
+    """كل الألعاب (للأدمن)"""
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    games = _gm.get_games(active_only=False)
+    return jsonify({'games': games})
+
+@app.route('/api/games/create', methods=['POST'])
+@api_auth
+def api_games_create():
+    """إضافة لعبة جديدة"""
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    data = request.json
+    game_id = _gm.add_game(
+        name=data.get('name', ''),
+        icon=data.get('icon', '🎮'),
+        description=data.get('description', ''),
+        category=data.get('category', 'arcade'),
+        min_bet=data.get('min_bet', 10),
+        max_bet=data.get('max_bet', 1000),
+        base_win_chance=data.get('base_win_chance', 0.45),
+        house_edge_pct=data.get('house_edge_pct', 15),
+        rtp_target=data.get('rtp_target', 85),
+        volatility=data.get('volatility', 'medium')
+    )
+    return jsonify({'success': True, 'id': game_id})
+
+@app.route('/api/games/<game_id>/toggle', methods=['POST'])
+@api_auth
+def api_games_toggle(game_id):
+    """تفعيل/إيقاف لعبة"""
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    try:
+        rows = []
+        with open(os.path.join(BASE_DIR, 'games_catalog.csv'), 'r', encoding='utf-8-sig') as f:
+            reader = csv.DictReader(f)
+            fieldnames = reader.fieldnames
+            for row in reader:
+                if row.get('id') == game_id:
+                    row['is_active'] = 'no' if row.get('is_active') == 'yes' else 'yes'
+                rows.append(row)
+        with open(os.path.join(BASE_DIR, 'games_catalog.csv'), 'w', newline='', encoding='utf-8-sig') as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(rows)
+    except:
+        pass
+    return jsonify({'success': True})
+
+# ===== Wallet =====
+
+@app.route('/api/wallet/balance')
+def api_wallet_balance():
+    """رصيد اللاعب"""
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    uid = request.args.get('uid', '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    balance = _gm.get_balance(uid)
+    return jsonify({'balance': balance, 'uid': uid})
+
+@app.route('/api/wallet/add', methods=['POST'])
+@api_auth
+def api_wallet_add():
+    """إضافة رصيد (أدمن)"""
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    data = request.json
+    uid = data.get('uid', '')
+    amount = float(data.get('amount', 0))
+    reason = data.get('reason', 'admin_adjustment')
+    if not uid or amount <= 0:
+        return jsonify({'error': 'Invalid params'}), 400
+    new_balance = _gm.add_balance(uid, amount, reason)
+    return jsonify({'success': True, 'new_balance': new_balance})
+
+# ===== Game Engine =====
+
+@app.route('/api/engine/start', methods=['POST'])
+def api_engine_start():
+    """بدء جلسة لعب"""
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    data = request.json
+    uid = data.get('uid', '')
+    game_id = data.get('game_id', '')
+    bet_amount = float(data.get('bet_amount', 0))
+    if not uid or not game_id or bet_amount <= 0:
+        return jsonify({'error': 'Missing params'}), 400
+    result = _gm.start_session(uid, game_id, bet_amount)
+    return jsonify(result)
+
+@app.route('/api/engine/end', methods=['POST'])
+def api_engine_end():
+    """إنهاء جلسة لعب"""
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    data = request.json
+    result = _gm.end_session(
+        session_id=data.get('session_id', ''),
+        user_id=data.get('uid', ''),
+        game_id=data.get('game_id', ''),
+        bet_amount=float(data.get('bet_amount', 0)),
+        result=data.get('result', 'lose'),
+        payout=float(data.get('payout', 0))
+    )
+    return jsonify(result)
+
+@app.route('/api/engine/result', methods=['POST'])
+def api_engine_result():
+    """تسجيل نتيجة من WebApp — يحسب الفوز/الخسارة server-side"""
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    data = request.json
+    uid = data.get('uid', '')
+    game_id = data.get('game_id', '')
+    bet_amount = float(data.get('bet_amount', 0))
+    session_id = data.get('session_id', '')
+
+    # بدء الجلسة (خصم + حساب الاحتمال)
+    start_result = _gm.start_session(uid, game_id, bet_amount)
+    if not start_result.get('success'):
+        return jsonify(start_result)
+
+    # تطبيق النتيجة
+    decision = start_result.get('decision', 'force_lose')
+    if decision == 'allow_win':
+        # حساب المكسب — 2x المراهنة (قابل للتطوير حسب اللعبة)
+        game = _gm.get_game(game_id)
+        multiplier = 2.0
+        if game:
+            # RTP target يؤثر على المضاعف
+            rtp = float(game.get('rtp_target', 85) or 85)
+            multiplier = max(1.5, rtp / 50)
+        payout = bet_amount * multiplier
+        result_str = 'win'
+    elif decision == 'near_miss':
+        payout = 0
+        result_str = 'lose'
+    else:
+        payout = 0
+        result_str = 'lose'
+
+    # إنهاء الجلسة
+    end_result = _gm.end_session(
+        session_id=start_result['session_id'],
+        user_id=uid,
+        game_id=game_id,
+        bet_amount=bet_amount,
+        result=result_str,
+        payout=payout
+    )
+
+    # الأنماط النفسية
+    psych = start_result.get('psychological_hints', {})
+
+    return jsonify({
+        'success': True,
+        'result': result_str,
+        'payout': payout,
+        'balance_before': end_result['balance_before'],
+        'balance_after': end_result['balance_after'],
+        'decision': decision,
+        'psychological_hints': psych,
+        'near_miss': decision == 'near_miss',
+        'session_id': start_result['session_id'],
+    })
+
+# ===== Quick Deposits =====
+
+@app.route('/api/deposit/quick', methods=['POST'])
+def api_deposit_quick():
+    """طلب إيداع سريع أثناء اللعب"""
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    data = request.json
+    uid = data.get('uid', '')
+    amount = float(data.get('amount', 0))
+    method_id = data.get('method_id', '')
+    account_number = data.get('account_number', '')
+    if not uid or amount <= 0:
+        return jsonify({'error': 'Missing params'}), 400
+    dep_id = _gm.create_quick_deposit(uid, amount, method_id, account_number)
+    return jsonify({'success': True, 'deposit_id': dep_id, 'status': 'pending'})
+
+@app.route('/api/deposit/pending')
+@api_auth
+def api_deposit_pending():
+    """طلبات الإيداع المعلقة"""
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    deposits = _gm.get_pending_deposits()
+    return jsonify({'deposits': deposits, 'count': len(deposits)})
+
+@app.route('/api/deposit/<dep_id>/approve', methods=['POST'])
+@api_auth
+def api_deposit_approve(dep_id):
+    """موافقة على إيداع سريع"""
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    admin_id = session.get('admin_id', '')
+    result = _gm.approve_deposit(dep_id, admin_id)
+    if result:
+        return jsonify({'success': True, 'deposit': result})
+    return jsonify({'error': 'Deposit not found or already processed'}), 404
+
+@app.route('/api/deposit/<dep_id>/reject', methods=['POST'])
+@api_auth
+def api_deposit_reject(dep_id):
+    """رفض إيداع سريع"""
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    admin_id = session.get('admin_id', '')
+    _gm.reject_deposit(dep_id, admin_id)
+    return jsonify({'success': True})
+
+# ===== Player Payment Methods =====
+
+@app.route('/api/player/methods')
+def api_player_methods():
+    """وسائل دفع اللاعب المحفوظة"""
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    uid = request.args.get('uid', '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    methods = _gm.get_payment_methods(uid)
+    return jsonify({'methods': methods})
+
+@app.route('/api/player/methods/add', methods=['POST'])
+def api_player_methods_add():
+    """إضافة وسيلة دفع للاعب"""
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    data = request.json
+    uid = data.get('uid', '')
+    method_id = _gm.add_payment_method(
+        user_id=uid,
+        method_name=data.get('method_name', ''),
+        account_number=data.get('account_number', ''),
+        method_type=data.get('method_type', 'bank'),
+        icon=data.get('icon', '💳')
+    )
+    return jsonify({'success': True, 'method_id': method_id})
+
+# ===== Player Profile =====
+
+@app.route('/api/player/profile')
+def api_player_profile():
+    """ملف اللاعب"""
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    uid = request.args.get('uid', '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    profile = _gm.tracker.get_profile(uid)
+    segment = _gm.tracker.get_segment(profile)
+    return jsonify({'profile': profile, 'segment': segment})
+
+@app.route('/api/player/vex-status', methods=['POST'])
+@api_auth
+def api_player_vex_status():
+    """تعيين شريك VEX"""
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    data = request.json
+    uid = data.get('uid', '')
+    is_partner = data.get('is_partner', False)
+    _gm.tracker.set_vex_partner(uid, is_partner)
+    return jsonify({'success': True})
+
+# ===== Admin: Platform Stats =====
+
+@app.route('/api/games/stats')
+@api_auth
+def api_games_stats():
+    """إحصائيات المنصة"""
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    stats = _gm.get_platform_stats()
+    health = _gm.risk.check_platform_health()
+    return jsonify({**stats, 'health': health})
+
+@app.route('/api/games/alerts')
+@api_auth
+def api_games_alerts():
+    """تنبيهات المخاطر"""
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    alerts = _gm.risk.get_active_alerts()
+    return jsonify({'alerts': alerts, 'count': len(alerts)})
+
+@app.route('/api/games/top-players')
+@api_auth
+def api_games_top_players():
+    """أعلى اللاعبين"""
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    sort_by = request.args.get('sort', 'total_wagered')
+    players = _gm.tracker.get_top_players(limit=20, sort_by=sort_by)
+    return jsonify({'players': players})
+
+@app.route('/api/games/config', methods=['GET', 'POST'])
+@api_auth
+def api_games_config():
+    """قراءة/تحديث إعدادات الخوارزمية"""
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    if request.method == 'POST':
+        data = request.json
+        for key, value in data.items():
+            _gm.algorithm.update_config(key, value)
+        return jsonify({'success': True})
+    else:
+        return jsonify({'config': _gm.algorithm.config})
+
+# ===== Games WebApp Pages =====
+
+@app.route('/webapp/games')
+def webapp_games():
+    """مركز الألعاب — WebApp"""
+    uid = request.args.get('uid', '')
+    lang = request.args.get('lang', 'ar')
+    return render_template('games_hub.html', uid=uid, lang=lang)
+
+@app.route('/webapp/play/<game_id>')
+def webapp_play(game_id):
+    """شاشة اللعبة — WebApp"""
+    uid = request.args.get('uid', '')
+    lang = request.args.get('lang', 'ar')
+    if not _VEX_GAMES:
+        return "Games engine not available", 500
+    game = _gm.get_game(game_id)
+    if not game:
+        return "Game not found", 404
+    return render_template('game_play.html', uid=uid, lang=lang, game=game)
+
+@app.route('/games-admin')
+@login_required
+def page_games_admin():
+    """لوحة إدارة الألعاب"""
+    return render_template('games_admin.html', active_page='games_admin')
 
 # ===== Main =====
 
