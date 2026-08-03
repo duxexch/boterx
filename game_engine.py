@@ -62,6 +62,10 @@ class GameManager:
                      'min_bet': '20', 'max_bet': '2000', 'base_win_chance': '0.35', 'house_edge_pct': '20',
                      'rtp_target': '80', 'volatility': 'high', 'max_payout_per_session': '10000', 'is_active': 'yes',
                      'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')},
+                    {'id': 'GAME004', 'name': 'Aviator', 'icon': '✈️', 'description': 'اسحب قبل ما تطير الطائرة!', 'category': 'crash',
+                     'min_bet': '10', 'max_bet': '5000', 'base_win_chance': '0.40', 'house_edge_pct': '18',
+                     'rtp_target': '82', 'volatility': 'high', 'max_payout_per_session': '50000', 'is_active': 'yes',
+                     'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')},
                 ]
                 for g in games:
                     writer.writerow({k: g.get(k, '') for k in fieldnames})

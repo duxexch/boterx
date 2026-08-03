@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Aviator</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
+body{overflow:hidden;font-family:system-ui,sans-serif;background:#0f172a;color:#fff}
+#app{position:fixed;inset:0;display:flex;flex-direction:column}
+
+/* Top bar */
+#topbar{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:rgba(0,0,0,0.3);backdrop-filter:blur(10px)}
+.balance{font-size:18px;font-weight:900;color:#fbbf24}
+.back-btn{background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer}
+
+/* Game area — Canvas */
+#game-area{flex:1;position:relative;overflow:hidden;background:radial-gradient(ellipse at center,#1a1f2e 0%,#0f172a 100%)}
+#canvas{position:absolute;inset:0;width:100%;height:100%}
+.multiplier-display{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:56px;font-weight:900;z-index:10;text-shadow:0 0 30px rgba(251,191,36,0.5);transition:color 0.3s}
+.multiplier-display.flying{color:#fbbf24}
+.multiplier-display.crashed{color:#ef4444;animation:crashShake 0.3s}
+.multiplier-display.cashed{color:#34d399}
+@keyframes crashShake{0%,100%{transform:translate(-50%,-50%) rotate(0)}25%{transform:translate(-52%,-50%) rotate(-2deg)}75%{transform:translate(-48%,-50%) rotate(2deg)}}
+
+/* Status text */
+.status-text{position:absolute;top:20%;left:50%;transform:translateX(-50%);font-size:14px;opacity:0.6;z-index:10}
+.crash-text{position:absolute;top:60%;left:50%;transform:translateX(-50%);font-size:18px;color:#ef4444;font-weight:700;z-index:10;display:none}
+.cashout-text{position:absolute;top:60%;left:50%;transform:translateX(-50%);font-size:18px;color:#34d399;font-weight:700;z-index:10;display:none}
+
+/* History bar */
+#history{display:flex;gap:4px;padding:6px 10px;overflow-x:auto;background:rgba(0,0,0,0.2)}
+.history-item{flex-shrink:0;font-size:11px;padding:3px 8px;border-radius:6px;font-weight:700}
+.history-win{background:rgba(52,211,153,0.2);color:#34d399}
+.history-lose{background:rgba(239,68,68,0.2);color:#ef4444}
+
+/* Bet bar */
+#betbar{padding:12px 14px;background:rgba(0,0,0,0.3);backdrop-filter:blur(10px)}
+.bet-row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.bet-input{width:80px;background:#1e293b;border:1px solid #334155;border-radius:10px;padding:10px;color:#fff;font-size:16px;font-weight:700;text-align:center;outline:none}
+.bet-input:focus{border-color:#fbbf24}
+.bet-btn{flex:1;border:none;padding:12px;border-radius:12px;font-size:16px;font-weight:900;cursor:pointer;transition:all 0.2s}
+.bet-btn.bet{background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#000}
+.bet-btn.bet:active{transform:scale(0.97)}
+.bet-btn.cashout{background:linear-gradient(135deg,#34d399,#10b981);color:#000;animation:cashoutPulse 1s infinite}
+.bet-btn:disabled{opacity:0.3;cursor:not-allowed}
+@keyframes cashoutPulse{0%,100%{box-shadow:0 0 0 0 rgba(52,211,153,0.4)}50%{box-shadow:0 0 0 8px rgba(52,211,153,0)}}
+.quick-bets{display:flex;gap:6px;justify-content:center}
+.quick-bet{background:#1e293b;border:1px solid #334155;border-radius:8px;padding:5px 10px;color:#94a3b8;font-size:12px;cursor:pointer}
+
+/* Auto cashout */
+.auto-row{display:flex;gap:8px;align-items:center;margin-top:6px}
+.auto-label{font-size:11px;color:#64748b}
+.auto-input{width:60px;background:#1e293b;border:1px solid #334155;border-radius:6px;padding:4px 6px;color:#fff;font-size:12px;text-align:center}
+
+/* Loading */
+#loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0f172a;z-index:200}
+.spinner{width:40px;height:40px;border:3px solid #334155;border-top:3px solid #fbbf24;border-radius:50%;animation:spin 0.8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div id="loading"><div class="spinner"></div></div>
+<div id="app" style="display:none">
+  <div id="topbar">
+    <button class="back-btn" onclick="goBack()">‹</button>
+    <div class="balance">💰 <span id="bal">0</span></div>
+    <div style="width:20px"></div>
+  </div>
+  <div id="history"></div>
+  <div id="game-area">
+    <canvas id="canvas"></canvas>
+    <div class="status-text" id="statusText">ضع رهانك وانتظر الإقلاع!</div>
+    <div class="multiplier-display" id="multiplier">1.00x</div>
+    <div class="crash-text" id="crashText">💥 الطائرة طارت!</div>
+    <div class="cashout-text" id="cashoutText">✅ سحبت ربحك!</div>
+  </div>
+  <div id="betbar">
+    <div class="bet-row">
+      <input type="number" class="bet-input" id="betInput" value="10" min="1">
+      <button class="bet-btn bet" id="betBtn" onclick="placeBet()">🎯 راهن</button>
+      <button class="bet-btn cashout" id="cashoutBtn" onclick="cashOut()" style="display:none">💰 سحب</button>
+    </div>
+    <div class="quick-bets">
+      <div class="quick-bet" onclick="setBet(10)">10</div>
+      <div class="quick-bet" onclick="setBet(50)">50</div>
+      <div class="quick-bet" onclick="setBet(100)">100</div>
+      <div class="quick-bet" onclick="setBet(500)">500</div>
+    </div>
+    <div class="auto-row">
+      <span class="auto-label">سحب تلقائي عند:</span>
+      <input type="number" class="auto-input" id="autoCashout" placeholder="2.00" step="0.1" min="1.1">
+      <span class="auto-label">x</span>
+    </div>
+  </div>
+</div>
+<script>
+const tg = window.Telegram?.WebApp;
+if (tg) { tg.expand(); tg.ready(); }
+const uid = new URLSearchParams(location.search).get('uid') || '';
+const BASE = location.origin;
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+let state = 'waiting'; // waiting | flying | crashed | cashed
+let multiplier = 1.0;
+let crashPoint = 1.0;
+let betAmount = 0;
+let hasBet = false;
+let cashedOut = false;
+let cashoutMultiplier = 0;
+let sessionId = '';
+let animFrame = null;
+let startTime = 0;
+let history = [];
+let autoCashoutVal = 0;
+
+// Sounds
+function beep(f, d, t='sine', v=0.15) {
+  const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+  o.connect(g);g.connect(audioCtx.destination);
+  o.frequency.value=f;o.type=t;
+  g.gain.setValueAtTime(v,audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+d);
+  o.start();o.stop(audioCtx.currentTime+d);
+}
+function soundFly(){beep(440,0.05,'sine',0.05)}
+function soundCrash(){beep(200,0.3,'sawtooth',0.3);setTimeout(()=>beep(100,0.2,'square',0.2),100)}
+function soundCash(){beep(523,0.1);setTimeout(()=>beep(784,0.15),80);setTimeout(()=>beep(1047,0.2),160)}
+function haptic(t='light'){if(tg?.HapticFeedback?.impactOccurred)tg.HapticFeedback.impactOccurred(t)}
+
+// Canvas setup
+function resizeCanvas() {
+  canvas.width = canvas.clientWidth;
+  canvas.height = canvas.clientHeight;
+}
+window.addEventListener('resize', resizeCanvas);
+
+// Draw
+function draw(plane_x, plane_y, trail) {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+  // Grid
+  ctx.strokeStyle = 'rgba(51,65,85,0.3)';
+  ctx.lineWidth = 1;
+  for (let x = 0; x < canvas.width; x += 40) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+  }
+  for (let y = 0; y < canvas.height; y += 40) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+  }
+
+  // Trail
+  if (trail.length > 1) {
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(trail[0].x, trail[0].y);
+    for (let i = 1; i < trail.length; i++) {
+      ctx.lineTo(trail[i].x, trail[i].y);
+    }
+    ctx.stroke();
+
+    // Fill under trail
+    ctx.lineTo(trail[trail.length-1].x, canvas.height);
+    ctx.lineTo(trail[0].x, canvas.height);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(251,191,36,0.1)';
+    ctx.fill();
+  }
+
+  // Plane
+  if (state === 'flying') {
+    ctx.font = '32px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('✈️', plane_x, plane_y);
+  }
+}
+
+// Animation loop
+let trail = [];
+function animate() {
+  if (state !== 'flying') return;
+  
+  const elapsed = (Date.now() - startTime) / 1000;
+  // Exponential growth: multiplier = e^(0.06 * elapsed)
+  multiplier = Math.exp(0.08 * elapsed);
+  
+  // Update display
+  document.getElementById('multiplier').textContent = multiplier.toFixed(2) + 'x';
+  
+  // Check auto cashout
+  if (!cashedOut && hasBet && autoCashoutVal > 0 && multiplier >= autoCashoutVal) {
+    cashOut();
+  }
+  
+  // Check crash
+  if (multiplier >= crashPoint) {
+    crash();
+    return;
+  }
+  
+  // Plane position
+  const progress = Math.min(1, elapsed / 10);
+  const px = 50 + progress * (canvas.width - 100);
+  const py = canvas.height - 50 - progress * (canvas.height - 150);
+  
+  trail.push({x: px, y: py});
+  if (trail.length > 200) trail.shift();
+  
+  draw(px, py, trail);
+  
+  // Tick sound
+  if (Math.floor(elapsed * 4) !== Math.floor((elapsed - 0.016) * 4)) {
+    soundFly();
+  }
+  
+  animFrame = requestAnimationFrame(animate);
+}
+
+function placeBet() {
+  if (state !== 'waiting' || hasBet) return;
+  
+  betAmount = parseFloat(document.getElementById('betInput').value) || 0;
+  autoCashoutVal = parseFloat(document.getElementById('autoCashout').value) || 0;
+  
+  if (betAmount < 1) return;
+  
+  // Call API to start session
+  fetch(`${BASE}/api/engine/aviator/start`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({uid, bet_amount: betAmount})
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (!d.success) {
+      if (d.need_deposit) {
+        alert('رصيدك غير كافٍ! أودع أولاً');
+      } else {
+        alert(d.error || 'خطأ');
+      }
+      return;
+    }
+    hasBet = true;
+    cashedOut = false;
+    sessionId = d.session_id;
+    crashPoint = d.crash_point;
+    
+    // Update balance
+    document.getElementById('bal').textContent = (d.balance_after || 0).toLocaleString();
+    
+    // Disable bet button
+    document.getElementById('betBtn').disabled = true;
+    document.getElementById('betBtn').textContent = '⏳ انتظر...';
+    
+    // Show status
+    document.getElementById('statusText').textContent = '⏳ جاهز للإقلاع...';
+  })
+  .catch(e => alert('خطأ في الاتصال'));
+}
+
+function startFlight() {
+  state = 'flying';
+  multiplier = 1.0;
+  trail = [];
+  startTime = Date.now();
+  
+  document.getElementById('multiplier').textContent = '1.00x';
+  document.getElementById('multiplier').className = 'multiplier-display flying';
+  document.getElementById('statusText').textContent = '';
+  document.getElementById('crashText').style.display = 'none';
+  document.getElementById('cashoutText').style.display = 'none';
+  
+  // Show cashout button
+  document.getElementById('betBtn').style.display = 'none';
+  document.getElementById('cashoutBtn').style.display = 'block';
+  document.getElementById('cashoutBtn').textContent = `💰 سحب (${betAmount * multiplier > 0 ? '...' : ''})`;
+  
+  haptic('light');
+  animate();
+}
+
+function cashOut() {
+  if (state !== 'flying' || cashedOut || !hasBet) return;
+  cashedOut = true;
+  cashoutMultiplier = multiplier;
+  
+  const payout = betAmount * cashoutMultiplier;
+  
+  // Call API to cashout
+  fetch(`${BASE}/api/engine/aviator/cashout`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({session_id: sessionId, uid, multiplier: cashoutMultiplier, bet_amount: betAmount})
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.success) {
+      document.getElementById('bal').textContent = (d.balance_after || 0).toLocaleString();
+      document.getElementById('cashoutText').textContent = `✅ سحبت ${(payout).toFixed(0)} عند ${cashoutMultiplier.toFixed(2)}x`;
+      document.getElementById('cashoutText').style.display = 'block';
+      document.getElementById('multiplier').className = 'multiplier-display cashed';
+      soundCash();
+      haptic('medium');
+      
+      // Hide cashout button
+      document.getElementById('cashoutBtn').style.display = 'none';
+    }
+  })
+  .catch(e => {});
+}
+
+function crash() {
+  state = 'crashed';
+  cancelAnimationFrame(animFrame);
+  
+  document.getElementById('multiplier').textContent = crashPoint.toFixed(2) + 'x';
+  document.getElementById('multiplier').className = 'multiplier-display crashed';
+  document.getElementById('crashText').textContent = `💥 انفجرت عند ${crashPoint.toFixed(2)}x`;
+  document.getElementById('crashText').style.display = 'block';
+  document.getElementById('cashoutBtn').style.display = 'none';
+  
+  soundCrash();
+  haptic('heavy');
+  
+  // Add to history
+  history.unshift({value: crashPoint, win: cashedOut});
+  if (history.length > 15) history.pop();
+  updateHistory();
+  
+  // Notify server
+  fetch(`${BASE}/api/engine/aviator/end`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({session_id: sessionId, uid, crash_point: crashPoint, cashed_out: cashedOut, multiplier: cashoutMultiplier, bet_amount: betAmount})
+  }).catch(e => {});
+  
+  // Reset after 3s
+  setTimeout(resetGame, 3000);
+}
+
+function resetGame() {
+  state = 'waiting';
+  hasBet = false;
+  cashedOut = false;
+  multiplier = 1.0;
+  trail = [];
+  
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  document.getElementById('multiplier').textContent = '1.00x';
+  document.getElementById('multiplier').className = 'multiplier-display';
+  document.getElementById('statusText').textContent = 'ضع رهانك وانتظر الإقلاع!';
+  document.getElementById('crashText').style.display = 'none';
+  document.getElementById('cashoutText').style.display = 'none';
+  document.getElementById('betBtn').disabled = false;
+  document.getElementById('betBtn').textContent = '🎯 راهن';
+  document.getElementById('betBtn').style.display = 'block';
+  document.getElementById('cashoutBtn').style.display = 'none';
+}
+
+function updateHistory() {
+  const container = document.getElementById('history');
+  container.innerHTML = '';
+  history.forEach(h => {
+    const el = document.createElement('div');
+    el.className = 'history-item ' + (h.win ? 'history-win' : 'history-lose');
+    el.textContent = h.value.toFixed(2) + 'x';
+    container.appendChild(el);
+  });
+}
+
+function setBet(val) {
+  document.getElementById('betInput').value = val;
+}
+
+function goBack() {
+  window.location.href = `${BASE}/webapp/games?uid=${uid}&lang=ar`;
+}
+
+// Auto-start flight after bet placed (simulated round)
+let roundTimer = null;
+function startRoundTimer() {
+  // Round starts 5s after page load or after previous crash
+  if (roundTimer) clearTimeout(roundTimer);
+  roundTimer = setTimeout(() => {
+    if (state === 'waiting') {
+      // Auto-start flight (whether or not user bet)
+      startFlight();
+    }
+  }, 5000);
+}
+
+// Load balance
+async function loadBalance() {
+  try {
+    const r = await fetch(`${BASE}/api/wallet/balance?uid=${uid}`);
+    const d = await r.json();
+    document.getElementById('bal').textContent = (d.balance || 0).toLocaleString();
+  } catch(e) {}
+}
+
+// Init
+resizeCanvas();
+loadBalance();
+document.getElementById('loading').style.display = 'none';
+document.getElementById('app').style.display = 'flex';
+setInterval(loadBalance, 5000);
+
+// Start round cycle
+startRoundTimer();
+</script>
+</body>
+</html>
