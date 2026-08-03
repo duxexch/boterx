@@ -324,38 +324,6 @@ function baseApp() {
         activityTicker: [],
         liveSource: null,
         lang: localStorage.getItem('lang') || 'ar',
-        i18n: {
-            ar: {
-                dashboard: 'لوحة التحكم', transactions: 'المعاملات', users: 'المستخدمين',
-                matching: 'المطابقات', svrp: 'التعويض', trading: 'التداول',
-                lottery: 'اليانصيب', wheel: 'عجلة الحظ', companies: 'الشركات',
-                payment_methods: 'وسائل الدفع', apps: 'التطبيقات', referrals: 'الإحالات',
-                channels: 'القنوات', bots: 'البوتات', complaints: 'الشكاوى',
-                broadcast: 'بث رسالة', statistics: 'الإحصائيات', admins: 'إدارة الأدمن',
-                themes: 'الثيمات', exchange_addresses: 'عناوين الصرافة',
-                send_message: 'رسالة لمستخدم', backup: 'النسخ الاحتياطي', settings: 'الإعدادات',
-                search_placeholder: 'بحث سريع... Ctrl+K', connected: 'متصل',
-                operations: 'العمليات', management: 'الإدارة', system: 'النظام',
-                advanced_system: 'النظام المتقدم', no_data: 'لا توجد بيانات',
-                notifications_title: 'الإشعارات', mark_read: 'تعليم كمقروء',
-                page_title: 'لوحة التحكم', admin_panel: 'لوحة التحكم'
-            },
-            en: {
-                dashboard: 'Dashboard', transactions: 'Transactions', users: 'Users',
-                matching: 'Matching', svrp: 'Compensation', trading: 'Trading',
-                lottery: 'Lottery', wheel: 'Wheel of Fortune', companies: 'Companies',
-                payment_methods: 'Payment Methods', apps: 'Apps', referrals: 'Referrals',
-                channels: 'Channels', bots: 'Bots', complaints: 'Complaints',
-                broadcast: 'Broadcast', statistics: 'Statistics', admins: 'Admin Management',
-                themes: 'Themes', exchange_addresses: 'Exchange Addresses',
-                send_message: 'Send Message', backup: 'Backup', settings: 'Settings',
-                search_placeholder: 'Quick search... Ctrl+K', connected: 'Connected',
-                operations: 'Operations', management: 'Management', system: 'System',
-                advanced_system: 'Advanced System', no_data: 'No data',
-                notifications_title: 'Notifications', mark_read: 'Mark as read',
-                page_title: 'Dashboard', admin_panel: 'Dashboard'
-            }
-        },
 
         init() {
             this.applyDarkMode();
@@ -363,15 +331,13 @@ function baseApp() {
             this.startLiveStats();
         },
 
-        t(key) {
-            const dict = this.i18n[this.lang] || this.i18n.ar;
-            return dict[key] || key;
-        },
+        t(key) { return tr(key); },
 
         toggleLang() {
             this.lang = this.lang === 'ar' ? 'en' : 'ar';
             localStorage.setItem('lang', this.lang);
             this.applyLang();
+            window.location.reload();
         },
 
         applyLang() {
