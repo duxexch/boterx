@@ -14638,9 +14638,16 @@ class ComprehensiveDUXBot:
                         try:
                             wa_msg = update['message']
                             wa_data_raw = wa_msg.get('web_app_data', {}).get('data', '')
-                            if 'gifts' in wa_data_raw:
-                                self.handle_snatch_webapp_data(wa_msg)
-                            else:
+                            logger.info(f"WebApp data received: {wa_data_raw[:200]}")
+                            # محاولة parse JSON لتحديد نوع البيانات
+                            try:
+                                wa_parsed = json.loads(wa_data_raw)
+                                if 'gifts' in wa_parsed or 'score' in wa_parsed:
+                                    self.handle_snatch_webapp_data(wa_msg)
+                                else:
+                                    self.handle_wheel_webapp_data(wa_msg)
+                            except json.JSONDecodeError:
+                                # لو مش JSON، اعتبره بيانات العجلة القديمة
                                 self.handle_wheel_webapp_data(wa_msg)
                         except Exception as e:
                             logger.error(f"خطأ في web_app_data: {e}", exc_info=True)
@@ -14673,12 +14680,17 @@ class ComprehensiveDUXBot:
         user_obj = self.find_user(user_id)
         lang = user_obj.get('language', 'ar') if user_obj else 'ar'
 
+        logger.info(f"Snatch WebApp data from user {user_id}")
+
         try:
             raw = message.get('web_app_data', {}).get('data', '{}')
             data = json.loads(raw)
             caught_gifts = data.get('gifts', [])
             score = data.get('score', 0)
-        except:
+            logger.info(f"Snatch results: score={score}, gifts={len(caught_gifts)}")
+        except Exception as e:
+            logger.error(f"Snatch data parse error: {e}")
+            self.send_message(chat_id, "❌ خطأ في معالجة نتائج اللعبة", self.main_keyboard(lang, user_id))
             return
 
         if not caught_gifts:
@@ -14690,25 +14702,26 @@ class ComprehensiveDUXBot:
             return
 
         # قراءة الجولة النشطة
-        active_round = None
+        round_id = ''
         try:
             with open('wheel_rounds.csv', 'r', encoding='utf-8-sig') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
                     if row.get('status') == 'active':
-                        active_round = row
+                        round_id = row.get('id', '')
                         break
         except:
             pass
 
-        round_id = active_round['id'] if active_round else ''
-
-        # تسجيل كل هدية مُصطادة
-        wallet_msg = ''
-        total_prize = 0
+        # تسجيل كل هدية + إضافة الرصيد
+        total_prize = 0.0
+        processed_gifts = []
         for gift in caught_gifts:
             gift_text = gift.get('text', '')
             gift_id = gift.get('id', '')
+            gift_link = gift.get('link', '')
+
+            # تسجيل في wheel_spins.csv
             spin_id = f"SPN{str(int(datetime.now().timestamp()))[-6:]}_{gift_id[-4:]}"
             try:
                 with open('wheel_spins.csv', 'a', newline='', encoding='utf-8-sig') as f:
@@ -14716,36 +14729,55 @@ class ComprehensiveDUXBot:
                     writer.writerow([spin_id, round_id, str(user_id), gift_text, datetime.now().strftime('%Y-%m-%d %H:%M')])
             except:
                 pass
-            # محاولة استخراج مبلغ رقمي
+
+            # استخراج المبلغ الرقمي وإضافته للمحفظة
+            prize_amount = 0.0
             try:
                 import re as _re
                 numbers = _re.findall(r'[\d,.]+', gift_text.replace(',', ''))
                 if numbers:
                     prize_amount = float(numbers[0])
-                    if prize_amount > 0 and self.svrp:
-                        self.svrp.add_frozen_balance(str(user_id), prize_amount)
-                        total_prize += prize_amount
             except:
                 pass
 
-        if total_prize > 0:
-            wallet_msg = f"\n💎 تم إضافة <code>{total_prize:.0f}</code> لرصيدك المجمد!"
+            if prize_amount > 0 and self.svrp:
+                try:
+                    self.svrp.add_frozen_balance(str(user_id), prize_amount)
+                    total_prize += prize_amount
+                    logger.info(f"Added {prize_amount} to user {user_id} wallet")
+                except Exception as e:
+                    logger.error(f"Error adding frozen balance: {e}")
+
+            processed_gifts.append({'text': gift_text, 'link': gift_link, 'amount': prize_amount})
+
+        # التحقق من الرصيد بعد الإضافة
+        wallet_balance = 0.0
+        if self.svrp:
+            try:
+                wallet = self.svrp.get_wallet(str(user_id))
+                wallet_balance = float(wallet.get('balance', 0) or 0)
+            except:
+                pass
 
         # عرض النتائج
         result_text = f"🎉🎉🎉 <b>اخترفت {score} هدية!</b> 🎉🎉🎉\n\n"
         result_text += f"━━━━━━━━━━━━━━━━━━\n"
-        for i, gift in enumerate(caught_gifts, 1):
-            result_text += f"{i}️⃣ 🎁 {gift.get('text', '')}\n"
+        for i, gift in enumerate(processed_gifts, 1):
+            result_text += f"{i}️⃣ 🎁 {gift['text']}\n"
+            if gift['amount'] > 0:
+                result_text += f"   💰 +{gift['amount']:.0f} لرصيدك\n"
         result_text += f"━━━━━━━━━━━━━━━━━━\n"
-        result_text += wallet_msg + "\n"
+        if total_prize > 0:
+            result_text += f"💎 <b>تم إضافة {total_prize:.0f} لرصيدك المجمد!</b>\n"
+        result_text += f"💰 رصيدك الحالي: <code>{wallet_balance:.0f}</code>\n\n"
+        result_text += f"💡 يمكنك سحب الرصيد أو استخدامه في الإيداع"
 
         # أزرار الاستلام
         inline_btns = []
-        # زر لكل هدية لها رابط
-        for gift in caught_gifts:
-            link = gift.get('link', '')
-            if link:
-                inline_btns.append([{'text': f"🔗 استلام: {gift.get('text', '')[:20]}", 'url': link}])
+        for gift in processed_gifts:
+            if gift['link'] and gift['link'] != 'https://example.com':
+                inline_btns.append([{'text': f"🔗 استلام: {gift['text'][:20]}", 'url': gift['link']}])
+        inline_btns.append([{'text': '💎 محفظتي', 'callback_data': 'svrp_wallet'}])
         inline_btns.append([{'text': self.tr('a0141_الرئيسية', lang), 'callback_data': 'wheel_back_main'}])
 
         self.send_message(chat_id, result_text, self.main_keyboard(lang, user_id))
@@ -14760,18 +14792,9 @@ class ComprehensiveDUXBot:
                     f"🎁 <b>اختطف — فائز!</b>\n\n"
                     f"👤 {user_name} ({user_id})\n"
                     f"🎁 اصطاد {score} هدية:\n"
-                    + "\n".join([f"  • {g.get('text','')}" for g in caught_gifts]))
+                    + "\n".join([f"  • {g['text']}" for g in processed_gifts]))
             except:
                 pass
-
-        # نشر في القنوات
-        try:
-            self.post_to_channels(
-                f"🎁 <b>اختطف — نتيجة!</b>\n\n"
-                f"👤 {user_name}\n"
-                f"🏆 اصطاد {score} هدية!")
-        except:
-            pass
 
     def handle_wheel_webapp_data(self, message):
         """معالجة نتيجة صيد الجوائز من Web App — اختيار الجائزة server-side لمنع الغش"""
