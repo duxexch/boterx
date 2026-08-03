@@ -11280,162 +11280,28 @@ class ComprehensiveDUXBot:
                         self.answer_callback(callback_id, self.tr('a0482_وصلت_للحد', lang))
                         return
 
-                # إرسال رسالة البداية
-                resp = self.send_inline_message(chat_id,
+                # فتح لعبة اختطف كـ WebApp
+                base_url = self.get_setting('dashboard_url') or 'https://69.169.108.197.sslip.io'
+                snatch_url = f"{base_url}/webapp/snatch?uid={user_id}&lang={lang}"
+
+                # التحقق من دعم WebApp
+                webapp_button = {
+                    'text': '🎁 العب الآن!',
+                    'web_app': {'url': snatch_url}
+                }
+
+                self.edit_message(chat_id, message.get('message_id'),
                     f"🎁 <b>اختطف!</b>\n\n"
                     f"⚡ هدية ستظهر — <b>اخطفها بسرعة!</b>\n"
                     f"🎯 أحياناً تظهر وتختفي بسرعة!\n"
-                    f"🟢 أحياناً تنتظرك!\n\n"
-                    f"3️⃣ استعد...\n2️⃣ ركّز...\n1️⃣ الآن!",
-                    [[{'text': '⏳ جارٍ التحضير...', 'callback_data': 'wheel_miss'}]])
-                game_msg_id = 0
-                if resp and isinstance(resp, dict):
-                    game_msg_id = resp.get('result', {}).get('message_id', 0)
+                    f"🟢 أحياناً تنتظرك!\n"
+                    f"🔴 احذر القنابل!\n\n"
+                    f"👆 اضغط الزر بالأسفل للعب!")
 
-                # حفظ حالة اللعبة
-                self.user_states[user_id] = {
-                    'step': 'wheel_game_active',
-                    'round_id': active_round['id'],
-                    'gifts': [{'id': g.get('id', ''), 'text': g.get('gift_text', ''), 'link': g.get('affiliate_link', '')} for g in gifts],
-                    'game_msg_id': game_msg_id,
-                    'chat_id': chat_id,
-                    'lang': lang,
-                    'clicked': False,
-                    'round_num': 0,
-                    'max_rounds': 7,
-                    'current_gift': None,
-                    'current_is_real': False,
-                }
-
-                # ===== خيط اللعبة — ظهور واختفاء الزر =====
-                def game_loop():
-                    """خيط اللعبة — يظهر ويخفي زر واحد في كل مرة"""
-                    max_rounds = 7
-                    colors = ['🟢', '🔵', '🟡', '🟣', '🔴', '🟠', '⚪']
-
-                    for rnd in range(max_rounds):
-                        st = self.user_states.get(user_id, {})
-                        if not isinstance(st, dict) or st.get('step') != 'wheel_game_active':
-                            return  # اللعبة انتهت
-
-                        st['round_num'] = rnd + 1
-                        st['clicked'] = False
-                        self.user_states[user_id] = st
-                        gmid = st.get('game_msg_id', 0)
-                        chat = st.get('chat_id', chat_id)
-                        st_lang = st.get('lang', 'ar')
-                        all_gifts = st.get('gifts', [])
-
-                        # اختيار سلوك عشوائي
-                        behavior = _r.choice(['tease', 'tease', 'catchable_real', 'catchable_real', 'fake', 'catchable_real', 'tease'])
-
-                        # اختيار هدية ولون
-                        gift = _r.choice(all_gifts) if all_gifts else None
-                        color = _r.choice(colors)
-                        gift_text = gift.get('text', 'هدية')[:20] if gift else '???'
-                        gift_id = gift.get('id', '') if gift else ''
-
-                        if behavior == 'tease':
-                            # ===== تيسر: يظهر ويختفي بسرعة =====
-                            st['current_is_real'] = True
-                            st['current_gift'] = gift
-                            self.user_states[user_id] = st
-                            try:
-                                self.edit_message(chat, gmid,
-                                    f"⚡ <b>سريع!</b>\n\n{color} <b>اخطفها!</b>",
-                                    [[{'text': f'{color} {gift_text}', 'callback_data': f'wheel_catch_{gift_id}'},
-                                      {'text': '❌', 'callback_data': 'wheel_miss'}]])
-                            except:
-                                pass
-                            # وقت قصير جداً — تيسر
-                            _time.sleep(_r.uniform(0.4, 0.9))
-                            # تحقق إذا العميل نقر
-                            st = self.user_states.get(user_id, {})
-                            if st.get('clicked'):
-                                return  # العميل اصطادها — wheel_catch_ سيعالج
-                            # اختفى!
-                            try:
-                                self.edit_message(chat, gmid,
-                                    f"💨 <b>فوتتك!</b> 😜\n\nانتظر التالية...")
-                            except:
-                                pass
-                            _time.sleep(_r.uniform(0.3, 0.6))
-
-                        elif behavior == 'catchable_real':
-                            # ===== قابل للاصطياد: ينتظر العميل =====
-                            st['current_is_real'] = True
-                            st['current_gift'] = gift
-                            self.user_states[user_id] = st
-                            try:
-                                self.edit_message(chat, gmid,
-                                    f"{color} <b>اختطف الهدية!</b>\n\n🎁 <b>{gift_text}</b>\n\n"
-                                    f"⏰ انقر بسرعة قبل ما تختفي!",
-                                    [[{'text': f'{color} 🎁 {gift_text}', 'callback_data': f'wheel_catch_{gift_id}'},
-                                      {'text': '❌', 'callback_data': 'wheel_miss'}]])
-                            except:
-                                pass
-                            # وقت أطول — قابل للإمساك
-                            _time.sleep(_r.uniform(1.5, 3.0))
-                            st = self.user_states.get(user_id, {})
-                            if st.get('clicked'):
-                                return  # العميل اصطادها
-                            # فوتته!
-                            try:
-                                self.edit_message(chat, gmid,
-                                    f"💨 <b>فوتتها!</b> 😅\n\nكانت هدية حقيقية!\nانتظر التالية...")
-                            except:
-                                pass
-                            _time.sleep(_r.uniform(0.4, 0.7))
-
-                        elif behavior == 'fake':
-                            # ===== فخ: يبدو كهدية لكنه فخ =====
-                            st['current_is_real'] = False
-                            st['current_gift'] = None
-                            self.user_states[user_id] = st
-                            try:
-                                self.edit_message(chat, gmid,
-                                    f"🔴 <b>احذر!</b>\n\nهل هي حقيقية أم فخ؟",
-                                    [[{'text': f'{color} 🎁 ???', 'callback_data': 'wheel_catch_fake'},
-                                      {'text': '🚫 تخطي', 'callback_data': 'wheel_miss'}]])
-                            except:
-                                pass
-                            _time.sleep(_r.uniform(0.8, 1.5))
-                            st = self.user_states.get(user_id, {})
-                            if st.get('clicked'):
-                                # العميل نقر الفخ!
-                                try:
-                                    self.edit_message(chat, gmid,
-                                        f"😜 <b>خداع!</b>\n\nكان فخاً!\nاستمر في المحاولة...")
-                                except:
-                                    pass
-                                st['clicked'] = False
-                                self.user_states[user_id] = st
-                                _time.sleep(0.8)
-                                continue
-                            try:
-                                self.edit_message(chat, gmid,
-                                    f"✅ <b>تجنبت الفخ!</b> 😎\n\nانتظر التالية...")
-                            except:
-                                pass
-                            _time.sleep(_r.uniform(0.3, 0.5))
-
-                    # انتهت الجولات دون اصطياد
-                    st = self.user_states.get(user_id, {})
-                    if isinstance(st, dict) and st.get('step') == 'wheel_game_active':
-                        try:
-                            self.edit_message(chat, gmid if 'gmid' in dir() else st.get('game_msg_id', 0),
-                                f"😔 <b>انتهت اللعبة!</b>\n\n"
-                                f"لم تتمكن من اصطياد أي هدية هذه المرة\n"
-                                f"🍀 حظ أوفر في المرة القادمة!",
-                                [[{'text': self.tr('a0141_الرئيسية', st_lang), 'callback_data': 'wheel_back_main'}]])
-                        except:
-                            pass
-                        self.user_states.pop(user_id, None)
-
-                # بدء خيط اللعبة
-                _time.sleep(1.5)  # مهلة العد التنازلي
-                t = threading.Thread(target=game_loop, daemon=True)
-                t.start()
+                self.send_inline_message(chat_id,
+                    f"🎮 <b>جاهز للعب؟</b>\n👆 اضغط للبدء!",
+                    [[webapp_button],
+                     [{'text': self.tr('a0142_العودة', lang), 'callback_data': 'wheel_back_main'}]])
                 return
 
             elif data.startswith('wheel_catch_') and data != 'wheel_catch_fake':
