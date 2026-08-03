@@ -11276,19 +11276,26 @@ class ComprehensiveDUXBot:
                 base_url = self.get_setting('dashboard_url') or 'https://69.169.108.197.sslip.io'
                 snatch_url = f"{base_url}/webapp/snatch?uid={user_id}&lang={lang}"
 
-                # استخدام edit_message مع web_app button مباشرة
-                self.edit_message(chat_id, message.get('message_id'),
+                # إرسال رسالة جديدة بـ WebApp button — لا نستخدم edit_message
+                self.answer_callback(callback_id)
+                self.send_message(chat_id,
                     f"🎁 <b>اختطف!</b>\n\n"
                     f"⚡ هدية ستظهر — <b>اخطفها بسرعة!</b>\n"
                     f"🎯 أحياناً تظهر وتختفي بسرعة!\n"
                     f"🟢 أحياناً تنتظرك!\n"
                     f"🔴 احذر القنابل!\n\n"
-                    f"👆 اضغط الزر بالأسفل للعب!",
-                    inline_buttons=[
-                        [{'text': '🎁 العب الآن!', 'web_app': {'url': snatch_url}}],
-                        [{'text': self.tr('a0142_العودة', lang), 'callback_data': 'wheel_back_main'}]
-                    ])
-                self.answer_callback(callback_id)
+                    f"👆 اضغط الزر بالأسفل للعب!")
+                
+                # إرسال زر WebApp كرسالة منفصلة
+                kb = json.dumps({'inline_keyboard': [[
+                    {'text': '🎁 العب الآن!', 'web_app': {'url': snatch_url}}
+                ]]})
+                self.api_call('sendMessage', {
+                    'chat_id': chat_id,
+                    'text': '🎮 اضغط للبدء!',
+                    'parse_mode': 'HTML',
+                    'reply_markup': kb
+                })
                 return
 
             elif data.startswith('wheel_catch_') and data != 'wheel_catch_fake':
