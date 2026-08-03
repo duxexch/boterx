@@ -15613,6 +15613,7 @@ class ComprehensiveDUXBot:
             self.send_message(message['chat']['id'], admin_text, reply_keyboard)
             
     # أدوار جاهزة — كل دور يحدد أي أزرار يراها المدير
+    # ملاحظة: buttons تُعبأ ديناميكياً في admin_keyboard() وليس هنا (self غير متاح على مستوى الكلاس)
     ADMIN_ROLES = {
         'full': {
             'name': 'مدير كامل',
@@ -15622,27 +15623,17 @@ class ComprehensiveDUXBot:
         'transactions': {
             'name': 'مشرف معاملات',
             'icon': '💰',
-            'buttons': [
-                self.tr('a0684_الطلبات_المعلقة', 'ar'), self.tr('a0267_طلبات_مُوافقة', 'ar'),
-                self.tr('a0685_المستخدمين', 'ar'), self.tr('a0686_البحث', 'ar'),
-                self.tr('a0275_الإحصائيات', 'ar'), self.tr('a0687_تقرير', 'ar'),
-            ],
+            'buttons': ['pending', 'approved', 'users', 'search', 'stats', 'excel'],
         },
         'support': {
             'name': 'مشرف دعم',
             'icon': '🆘',
-            'buttons': [
-                self.tr('a0688_الشكاوى', 'ar'), self.tr('a0689_بيانات_الدعم', 'ar'),
-                self.tr('a0685_المستخدمين', 'ar'), self.tr('a0686_البحث', 'ar'),
-            ],
+            'buttons': ['complaints', 'support', 'users', 'search'],
         },
         'companies': {
             'name': 'مشرف شركات',
             'icon': '🏢',
-            'buttons': [
-                self.tr('a0280_الشركات', 'ar'), self.tr('a0690_وسائل_الدفع', 'ar'),
-                self.tr('a0691_العناوين', 'ar'), self.tr('a0692_الإعدادات', 'ar'), self.tr('a0693_الثيمات', 'ar'), self.tr('a0694_تغيير_اللغة', 'ar'),
-            ],
+            'buttons': ['companies', 'payment_methods', 'addresses', 'settings', 'themes', 'language'],
         },
     }
 
