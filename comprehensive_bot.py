@@ -10046,6 +10046,10 @@ class ComprehensiveDUXBot:
             # الرد على الـ callback لإزالة loading
             self.answer_callback(callback_id)
             
+            # تعريف lang للاستخدام في كل المعالجات
+            user_obj_cb = self.find_user(user_id)
+            lang = user_obj_cb.get('language', 'ar') if user_obj_cb else 'ar'
+            
             # معالجة الموافقة على معاملة
             if data.startswith('approve_'):
                 trans_id = data.replace('approve_', '')
