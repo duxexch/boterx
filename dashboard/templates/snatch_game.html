@@ -290,19 +290,30 @@ function endGame() {
   if (caughtGifts.length === 0) prizesHTML = '<div>لم تتمكن من اصطياد أي هدية</div>';
   document.getElementById('result-prizes').innerHTML = prizesHTML;
   
-  // Send data to bot
+  // إرسال البيانات للبوت تلقائياً بدون انتظار ضغط زر
   const resultData = JSON.stringify({ gifts: caughtGifts, score: score });
   if (tg) {
-    // Show main button
-    tg.MainButton.setText('استلام الجوائز');
-    tg.MainButton.show();
-    tg.MainButton.onClick(() => {
+    // إرسال مباشر ثم إغلاق
+    try {
       tg.sendData(resultData);
-      tg.close();
-    });
+    } catch(e) {
+      // لو sendData فشلت، استخدم MainButton كحل بديل
+      tg.MainButton.setText('🎁 استلام الجوائز');
+      tg.MainButton.show();
+      tg.MainButton.offClick(sendResult);
+      tg.MainButton.onClick(sendResult);
+    }
   }
   
   beep(523, 0.1); setTimeout(()=>beep(659,0.1),100); setTimeout(()=>beep(784,0.2),200);
+}
+
+function sendResult() {
+  const resultData = JSON.stringify({ gifts: caughtGifts, score: score });
+  if (tg) {
+    tg.sendData(resultData);
+    tg.close();
+  }
 }
 </script>
 <script>
