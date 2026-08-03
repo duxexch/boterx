@@ -11573,6 +11573,42 @@ class ComprehensiveDUXBot:
                 self.show_edit_menu(fake_msg, user_id) if hasattr(self, 'show_edit_menu') else None
                 return
 
+            # ===== إيداع سريع — ألعاب =====
+            elif data.startswith('gamedep_approve_'):
+                dep_id = data.replace('gamedep_approve_', '')
+                try:
+                    from game_engine import GameManager
+                    gm = GameManager()
+                    result = gm.approve_deposit(dep_id, user_id)
+                    if result:
+                        # إشعار العميل
+                        target_uid = result.get('user_id', '')
+                        amount = result.get('amount', '0')
+                        if target_uid:
+                            self.send_message(int(target_uid),
+                                f"✅ <b>تم تأكيد إيداعك!</b>\n\n"
+                                f"💰 المبلغ: <code>{amount}</code>\n"
+                                f"💎 تم إضافة الرصيد لمحفظة الألعاب\n\n"
+                                f"🎮 يمكنك الآن مواصلة اللعب!")
+                        self.edit_message(chat_id, message.get('message_id'),
+                            f"✅ تمت الموافقة وإضافة {amount} لرصيد اللاعب")
+                    else:
+                        self.edit_message(chat_id, message.get('message_id'), "❌ الطلب غير موجود أو تمت معالجته")
+                except Exception as e:
+                    self.edit_message(chat_id, message.get('message_id'), f"❌ خطأ: {e}")
+                return
+
+            elif data.startswith('gamedep_reject_'):
+                dep_id = data.replace('gamedep_reject_', '')
+                try:
+                    from game_engine import GameManager
+                    gm = GameManager()
+                    gm.reject_deposit(dep_id, user_id)
+                    self.edit_message(chat_id, message.get('message_id'), "❌ تم رفض الطلب")
+                except:
+                    pass
+                return
+
             # ===== إدارة الهدايا =====
             elif data == 'wheel_gifts_menu':
                 gifts = []
@@ -14639,15 +14675,15 @@ class ComprehensiveDUXBot:
                             wa_msg = update['message']
                             wa_data_raw = wa_msg.get('web_app_data', {}).get('data', '')
                             logger.info(f"WebApp data received: {wa_data_raw[:200]}")
-                            # محاولة parse JSON لتحديد نوع البيانات
                             try:
                                 wa_parsed = json.loads(wa_data_raw)
                                 if 'gifts' in wa_parsed or 'score' in wa_parsed:
                                     self.handle_snatch_webapp_data(wa_msg)
+                                elif 'deposit' in wa_parsed or 'amount' in wa_parsed:
+                                    self.handle_game_deposit_request(wa_msg)
                                 else:
                                     self.handle_wheel_webapp_data(wa_msg)
                             except json.JSONDecodeError:
-                                # لو مش JSON، اعتبره بيانات العجلة القديمة
                                 self.handle_wheel_webapp_data(wa_msg)
                         except Exception as e:
                             logger.error(f"خطأ في web_app_data: {e}", exc_info=True)
@@ -14672,6 +14708,62 @@ class ComprehensiveDUXBot:
                 # انتظار قصير قبل المحاولة مرة أخرى
                 time.sleep(1)
                 continue
+
+    def handle_game_deposit_request(self, message):
+        """معالجة طلب إيداع سريع من الألعاب"""
+        user_id = message.get('from', {}).get('id', '')
+        chat_id = message.get('chat', {}).get('id', '')
+        user_obj = self.find_user(user_id)
+        lang = user_obj.get('language', 'ar') if user_obj else 'ar'
+        user_name = user_obj.get('name', '') if user_obj else str(user_id)
+
+        try:
+            raw = message.get('web_app_data', {}).get('data', '{}')
+            data = json.loads(raw)
+            amount = float(data.get('amount', 0))
+            account_number = data.get('account_number', '')
+            method_name = data.get('method_name', '')
+        except:
+            return
+
+        if amount <= 0:
+            return
+
+        # إنشاء طلب إيداع عبر game_engine
+        dep_id = ''
+        try:
+            from game_engine import GameManager
+            gm = GameManager()
+            dep_id = gm.create_quick_deposit(user_id, amount, '', account_number)
+        except:
+            pass
+
+        # إشعار العميل
+        self.send_message(chat_id,
+            f"⏳ <b>طلب إيداع سريع</b>\n\n"
+            f"💰 المبلغ: <code>{amount}</code>\n"
+            f"🏦 الحساب: <code>{account_number}</code>\n"
+            f"🆔 الطلب: <code>{dep_id}</code>\n\n"
+            f"⏳ بانتظار تأكيد الإدارة...",
+            self.main_keyboard(lang, user_id))
+
+        # إشعار الأدمن بأزرار موافقة/رفض
+        for admin_id in self.admin_ids:
+            try:
+                self.send_inline_message(int(admin_id),
+                    f"💰 <b>طلب إيداع سريع — ألعاب</b>\n\n"
+                    f"👤 {user_name} (<code>{user_id}</code>)\n"
+                    f"💰 المبلغ: <code>{amount}</code>\n"
+                    f"🏦 الحساب: <code>{account_number}</code>\n"
+                    f"📱 الوسيلة: {method_name}\n"
+                    f"🆔 الطلب: <code>{dep_id}</code>\n"
+                    f"📅 {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+                    [
+                        [{'text': '✅ موافقة وإضافة الرصيد', 'callback_data': f'gamedep_approve_{dep_id}'}],
+                        [{'text': '❌ رفض', 'callback_data': f'gamedep_reject_{dep_id}'}]
+                    ])
+            except:
+                pass
 
     def handle_snatch_webapp_data(self, message):
         """معالجة نتيجة لعبة اختطف من Web App"""
@@ -16829,46 +16921,64 @@ class ComprehensiveDUXBot:
         lang = user.get('language', 'ar')
         user_id = message['from']['id']
 
-        # قراءة رصيد المحفظة
+        # قراءة رصيد محفظة الألعاب
         wallet_balance = 0.0
-        if self.svrp:
-            try:
-                for w in self.svrp.get_all_wallets():
-                    if str(w.get('telegram_id', '')) == str(user_id):
-                        wallet_balance = float(w.get('balance', 0) or 0)
-                        break
-            except:
-                pass
-
-        text = self.ui_card_pro('مركز الألعاب', '🎮', items=[
-            {'label': 'رصيدك', 'value': f"{wallet_balance:.0f}", 'icon': '💰', 'highlight': True},
-        ])
-        text += "\nاختر لعبة وابدأ الربح!\n\n"
-        text += "⚡ كل لعبة مرتبطة بمحفظتك\n"
-        text += "💰 اربح → يُضاف لمحفظتك\n"
-        text += "💸 تخسر → يُخصم من محفظتك\n"
-
-        # بناء رابط WebApp
-        base_url = self.get_setting('dashboard_url') or 'https://69.169.108.197.sslip.io'
-        games_url = f"{base_url}/webapp/games?uid={user_id}&lang={lang}&balance={wallet_balance:.0f}"
-
-        inline_btns = [
-            [{'text': '🎁 اختطف', 'url': f"{base_url}/webapp/snatch?uid={user_id}&lang={lang}"}],
-            [{'text': '🎮 كل الألعاب', 'url': games_url}],
-            [{'text': self.tr('a0142_العودة', lang), 'callback_data': 'wheel_back_main'}],
-        ]
-
-        # استخدام WebApp button
         try:
-            webapp_btn = {
-                'text': '🚀 افتح مركز الألعاب',
-                'web_app': {'url': games_url}
+            from game_engine import GameManager
+            gm = GameManager()
+            wallet_balance = gm.get_balance(user_id)
+        except:
+            if self.svrp:
+                try:
+                    for w in self.svrp.get_all_wallets():
+                        if str(w.get('telegram_id', '')) == str(user_id):
+                            wallet_balance = float(w.get('balance', 0) or 0)
+                            break
+                except:
+                    pass
+
+        # قراءة شريحة اللاعب
+        player_segment = 'جديد'
+        is_vex_partner = False
+        try:
+            from player_tracker import PlayerTracker
+            pt = PlayerTracker()
+            profile = pt.get_profile(user_id)
+            segment = pt.get_segment(profile)
+            seg_labels = {
+                'new': '🟢 جديد', 'winner': '🔴 رابح', 'loser': '🟡 خاسر',
+                'hot': '🔥 ساخن', 'churning': '⚠️ قد يغادر',
+                'vip': '💎 VIP', 'regular': '👤 عادي'
             }
-            inline_btns.insert(0, [webapp_btn])
+            player_segment = seg_labels.get(segment, '👤 عادي')
+            is_vex_partner = profile.get('is_vex_partner') == 'yes'
         except:
             pass
 
-        self.send_inline_message(message['chat']['id'], text, inline_btns)
+        text = self.ui_card_pro('مركز الألعاب', '🎮', items=[
+            {'label': 'رصيدك', 'value': f"{wallet_balance:.0f}", 'icon': '💰', 'highlight': True},
+            {'label': 'شريحتك', 'value': player_segment, 'icon': '📊'},
+        ])
+        text += "\n⚡ كل لعبة مرتبطة بمحفظتك\n"
+        text += "💰 اربح → يُضاف فوراً\n"
+        text += "💸 تخسر → يُخصم فوراً\n"
+        if is_vex_partner:
+            text += "💎 تعويض متاح أثناء اللعب!\n"
+        text += "\n👆 اضغط الزر بالأسفل للدخول"
+
+        base_url = self.get_setting('dashboard_url') or 'https://69.169.108.197.sslip.io'
+        games_url = f"{base_url}/webapp/games?uid={user_id}&lang={lang}"
+
+        # إرسال زر WebApp مباشرة
+        kb = json.dumps({'inline_keyboard': [[
+            {'text': '🎮 ادخل مركز الألعاب', 'web_app': {'url': games_url}}
+        ]]})
+        self.api_call('sendMessage', {
+            'chat_id': message['chat']['id'],
+            'text': text,
+            'parse_mode': 'HTML',
+            'reply_markup': kb
+        })
 
     def show_more_menu(self, message):
         """قائمة المزيد — أزرار إضافية منظمة"""
