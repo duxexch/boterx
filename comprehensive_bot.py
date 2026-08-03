@@ -16891,6 +16891,12 @@ class ComprehensiveDUXBot:
         free_spins_left = max(0, max_spins - my_spins)
         can_spin_paid = spin_cost > 0 and wallet_balance >= spin_cost
 
+        # قراءة إعدادات اللعبة من الجولة
+        game_speed_ms = int(active_round.get('game_speed_ms', 2500) or 2500)
+        max_relocations = int(active_round.get('max_relocations', 1) or 1)
+        speed_sec = game_speed_ms / 1000.0
+        reloc_text = "مرة" if max_relocations == 1 else "مرتين"
+
         text = self.ui_card_pro(
             f"صيد الجوائز — {active_round.get('name', '')}",
             icon='🎯',
