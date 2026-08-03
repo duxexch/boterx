@@ -4935,6 +4935,9 @@ class ComprehensiveDUXBot:
         user_id = message['from']['id']
         state = self.user_states.get(user_id, '')
         text = message.get('text', '')
+        
+        user = self.find_user(user_id)
+        lang = user.get('language', 'ar') if user else 'ar'
 
         # فحص أزرار الإلغاء والعودة أولاً — قبل أي معالجة للبيانات
         all_langs = self.get_supported_languages()
