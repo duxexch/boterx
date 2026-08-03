@@ -6303,6 +6303,94 @@ class ComprehensiveDUXBot:
             return
 
         # معالج إضافة إيموجي جديد
+        # ===== إيداع لمحفظة الألعاب =====
+        if isinstance(current_state, str) and current_state.startswith('gamewal_amount_'):
+            user_id = message['from']['id']
+            chat_id = message['chat']['id']
+            text = message.get('text', '').strip()
+            method_id = current_state.replace('gamewal_amount_', '')
+            del self.user_states[user_id]
+
+            try:
+                amount = float(text)
+                if amount <= 0:
+                    raise ValueError
+            except ValueError:
+                self.send_message(chat_id, "❌ اكتب مبلغاً رقمياً صحيحاً:")
+                self.user_states[user_id] = current_state
+                return
+
+            # قراءة بيانات وسيلة الدفع
+            user_obj = self.find_user(user_id)
+            currency = user_obj.get('currency', 'SAR') if user_obj else 'SAR'
+            account_number = ''
+            method_name = ''
+
+            # ابحث في وسائل العميل المحفوظة
+            try:
+                from game_engine import GameManager
+                gm = GameManager()
+                methods = gm.get_payment_methods(user_id)
+                for m in methods:
+                    if m.get('id') == method_id:
+                        account_number = m.get('account_number', '')
+                        method_name = m.get('method_name', '')
+                        break
+                # ابحث في وسائل النظام
+                if not account_number:
+                    with open('payment_methods.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        for row in reader:
+                            if row.get('id') == method_id:
+                                account_number = row.get('account_data', '')
+                                method_name = row.get('method_name', '')
+                                break
+            except:
+                pass
+
+            if not account_number:
+                account_number = 'غير محدد'
+
+            # إنشاء طلب إيداع
+            dep_id = ''
+            try:
+                from game_engine import GameManager
+                gm = GameManager()
+                dep_id = gm.create_quick_deposit(user_id, amount, method_id, account_number)
+            except:
+                pass
+
+            # إشعار العميل
+            self.send_message(chat_id,
+                f"⏳ <b>طلب إيداع لمحفظة الألعاب</b>\n\n"
+                f"💰 المبلغ: <code>{amount} {currency}</code>\n"
+                f"📱 الوسيلة: {method_name}\n"
+                f"🏦 الحساب: <code>{account_number}</code> 👈 اضغط للنسخ\n"
+                f"🆔 الطلب: <code>{dep_id}</code>\n\n"
+                f"⏳ بانتظار تأكيد الإدارة...\n"
+                f"💎 سيُضاف الرصيد لمحفظتك فور الموافقة",
+                self.main_keyboard('ar', user_id))
+
+            # إشعار الأدمن
+            user_name = user_obj.get('name', '') if user_obj else str(user_id)
+            for admin_id in self.admin_ids:
+                try:
+                    self.send_inline_message(int(admin_id),
+                        f"💰 <b>إيداع محفظة ألعاب</b>\n\n"
+                        f"👤 {user_name} (<code>{user_id}</code>)\n"
+                        f"💰 المبلغ: <code>{amount} {currency}</code>\n"
+                        f"📱 الوسيلة: {method_name}\n"
+                        f"🏦 الحساب: <code>{account_number}</code>\n"
+                        f"🆔 الطلب: <code>{dep_id}</code>\n"
+                        f"📅 {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+                        [
+                            [{'text': '✅ موافقة وإضافة الرصيد', 'callback_data': f'gamedep_approve_{dep_id}'}],
+                            [{'text': '❌ رفض', 'callback_data': f'gamedep_reject_{dep_id}'}]
+                        ])
+                except:
+                    pass
+            return
+
         if isinstance(current_state, str) and current_state == 'stk_emoji_input':
             user_id = message['from']['id']
             chat_id = message['chat']['id']
@@ -11577,6 +11665,81 @@ class ComprehensiveDUXBot:
                 return
 
             # ===== إيداع سريع — ألعاب =====
+            elif data == 'game_wallet_deposit':
+                # عرض وسائل الدفع المتاحة للإيداع في المحفظة
+                user_obj = self.find_user(user_id)
+                currency = user_obj.get('currency', 'SAR') if user_obj else 'SAR'
+                
+                # قراءة وسائل دفع العميل المحفوظة
+                methods = []
+                try:
+                    from game_engine import GameManager
+                    gm = GameManager()
+                    methods = gm.get_payment_methods(user_id)
+                except:
+                    pass
+
+                # قراءة وسائل دفع النظام العامة
+                sys_methods = []
+                try:
+                    with open('payment_methods.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        for row in reader:
+                            if row.get('status') == 'active':
+                                mc = row.get('currency', '')
+                                if not mc or mc == currency or mc == 'كل العملات':
+                                    sys_methods.append(row)
+                except:
+                    pass
+
+                text = f"💰 <b>إيداع لمحفظة الألعاب</b>\n\n"
+                text += f"💱 عملتك: <code>{currency}</code>\n\n"
+                text += "اختر وسيلة الدفع:\n\n"
+
+                inline_btns = []
+                # وسائل العميل المحفوظة
+                if methods:
+                    text += "<b>وسائلك المحفوظة:</b>\n"
+                    for m in methods:
+                        mid = m.get('id', '')
+                        name = m.get('method_name', '')
+                        acct = m.get('account_number', '')
+                        icon = m.get('icon', '💳')
+                        text += f"  {icon} {name}: <code>{acct}</code>\n"
+                        inline_btns.append([{'text': f"{icon} {name}", 'callback_data': f'gamewal_method_{mid}'}])
+
+                # وسائل النظام
+                if sys_methods:
+                    text += "\n<b>وسائل أخرى متاحة:</b>\n"
+                    for m in sys_methods[:6]:
+                        mid = m.get('id', '')
+                        name = m.get('method_name', '')
+                        acct = m.get('account_data', '')
+                        icon = m.get('icon', '💳') or '💳'
+                        text += f"  {icon} {name}: <code>{acct}</code> 👈 اضغط للنسخ\n"
+                        inline_btns.append([{'text': f"{icon} {name}", 'callback_data': f'gamewal_sys_{mid}'}])
+
+                if not methods and not sys_methods:
+                    text += "⚠️ لا توجد وسائل دفع متاحة\n"
+
+                text += f"\n💡 اكتب المبلغ بعد اختيار الوسيلة"
+
+                inline_btns.append([{'text': self.tr('a0142_العودة', lang), 'callback_data': 'wheel_back_main'}])
+                self.edit_message(chat_id, message.get('message_id'), text, inline_btns)
+                return
+
+            elif data.startswith('gamewal_method_') or data.startswith('gamewal_sys_'):
+                # العميل اختار وسيلة دفع — اطلب المبلغ
+                method_id = data.replace('gamewal_method_', '').replace('gamewal_sys_', '')
+                self.edit_message(chat_id, message.get('message_id'),
+                    f"💰 <b>إيداع لمحفظة الألعاب</b>\n\n"
+                    f"✅ تم اختيار وسيلة الدفع\n\n"
+                    f"اكتب <b>المبلغ</b> الذي تود إيداعه:\n\n"
+                    f"💡 مثال: 100\n"
+                    f"💡 سيتم تحويل الرصيد لمحفظتك بعد موافقة الإدارة")
+                self.user_states[user_id] = f'gamewal_amount_{method_id}'
+                return
+
             elif data.startswith('gamedep_approve_'):
                 dep_id = data.replace('gamedep_approve_', '')
                 try:
@@ -16923,6 +17086,7 @@ class ComprehensiveDUXBot:
             return
         lang = user.get('language', 'ar')
         user_id = message['from']['id']
+        currency = user.get('currency', 'SAR')
 
         # قراءة رصيد محفظة الألعاب
         wallet_balance = 0.0
@@ -16955,27 +17119,29 @@ class ComprehensiveDUXBot:
             }
             player_segment = seg_labels.get(segment, '👤 عادي')
             is_vex_partner = profile.get('is_vex_partner') == 'yes'
+            # مزامنة العملة
+            if 'currency' not in profile or profile.get('currency') != currency:
+                pt._save_profile({**profile, 'currency': currency})
         except:
             pass
 
         text = self.ui_card_pro('مركز الألعاب', '🎮', items=[
-            {'label': 'رصيدك', 'value': f"{wallet_balance:.0f}", 'icon': '💰', 'highlight': True},
+            {'label': 'رصيدك', 'value': f"{wallet_balance:.0f} {currency}", 'icon': '💰', 'highlight': True},
             {'label': 'شريحتك', 'value': player_segment, 'icon': '📊'},
         ])
         text += "\n⚡ كل لعبة مرتبطة بمحفظتك\n"
-        text += "💰 اربح → يُضاف فوراً\n"
-        text += "💸 تخسر → يُخصم فوراً\n"
+        text += f"💰 عملتك: {currency}\n"
         if is_vex_partner:
             text += "💎 تعويض متاح أثناء اللعب!\n"
-        text += "\n👆 اضغط الزر بالأسفل للدخول"
 
         base_url = self.get_setting('dashboard_url') or 'https://69.169.108.197.sslip.io'
-        games_url = f"{base_url}/webapp/games?uid={user_id}&lang={lang}"
+        games_url = f"{base_url}/webapp/games?uid={user_id}&lang={lang}&currency={currency}"
 
-        # إرسال زر WebApp مباشرة
-        kb = json.dumps({'inline_keyboard': [[
-            {'text': '🎮 ادخل مركز الألعاب', 'web_app': {'url': games_url}}
-        ]]})
+        # زر WebApp للألعاب + زر إيداع للمحفظة
+        kb = json.dumps({'inline_keyboard': [
+            [{'text': '🎮 ادخل مركز الألعاب', 'web_app': {'url': games_url}}],
+            [{'text': '💰 إيداع للمحفظة', 'callback_data': 'game_wallet_deposit'}]
+        ]})
         self.api_call('sendMessage', {
             'chat_id': message['chat']['id'],
             'text': text,

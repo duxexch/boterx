@@ -171,9 +171,23 @@ class GameManager:
         # 4. فحص المخاطر
         risk_check = self.risk.check_risk(player, bet_amount, game)
         if not risk_check['allowed']:
+            # تحقق من نوع الحظر — لو بسبب رصيد منخفض، اعرض خيار الإيداع
+            risk_types = [a.get('type','') for a in risk_check['alerts']]
+            if 'insufficient_balance' in risk_types and 'cooldown_active' not in risk_types and 'daily_loss_exceeded' not in risk_types:
+                # رصيد منخفض فقط — اعرض خيار الإيداع
+                balance = float(player.get('balance', 0) or 0)
+                return {
+                    'success': False,
+                    'error': 'رصيد غير كافٍ',
+                    'need_deposit': True,
+                    'balance': balance,
+                    'required': bet_amount
+                }
+            # حظر فعلي (تبريد/خسارة يومية)
+            alert_msg = risk_check['alerts'][0]['message'] if risk_check['alerts'] else 'محظور مؤقتاً'
             return {
                 'success': False,
-                'error': 'محظور مؤقتاً',
+                'error': alert_msg,
                 'alerts': risk_check['alerts'],
                 'risk_actions': risk_check['actions']
             }

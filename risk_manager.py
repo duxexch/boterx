@@ -129,17 +129,17 @@ class RiskManager:
             })
             actions.append('reduce_win_chance')
 
-        # 6. رصيد منخفض
+        # 6. رصيد منخفض — لا نحجب، نتركه لـ game_engine يعرض خيار الإيداع
         balance = float(player.get('balance', 0) or 0)
         min_balance = self.get_limit('min_balance_to_play')
         if balance < bet_amount:
+            # لا نحجب هنا — نتركها لـ start_session تعرض need_deposit
             alerts.append({
                 'type': 'insufficient_balance',
-                'severity': 'high',
+                'severity': 'low',
                 'message': f'رصيد غير كافٍ: {balance:.0f} < {bet_amount}'
             })
-            actions.append('block_play')
-            allowed = False
+            # لا نضيف block_play — نتركها تمر لتعرض خيار الإيداع
 
         # 7. خسارة كبيرة — تبريد تلقائي
         last_loss = float(player.get('last_loss_amount', 0) or 0)
