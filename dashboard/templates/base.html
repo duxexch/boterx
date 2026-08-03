@@ -107,6 +107,9 @@
         <a href="{{ url_for('page_apps') }}" class="sidebar-link {% if active_page == 'apps' %}active{% endif %}">
             <i class="fas fa-mobile-screen w-5 text-center"></i> <span x-text="t('apps')"></span>
         </a>
+        <a href="{{ url_for('page_games_admin') }}" class="sidebar-link {% if active_page == 'games_admin' %}active{% endif %}">
+            <i class="fas fa-gamepad w-5 text-center"></i> <span>VEX Games</span>
+        </a>
         <a href="{{ url_for('page_referrals') }}" class="sidebar-link {% if active_page == 'referrals' %}active{% endif %}">
             <i class="fas fa-gift w-5 text-center"></i> <span x-text="t('referrals')"></span>
         </a>
