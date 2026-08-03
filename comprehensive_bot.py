@@ -1030,18 +1030,8 @@ class ComprehensiveDUXBot:
                 data['reply_markup'] = keyboard
         return self.api_call('sendMessage', data)
     
-    def send_inline_message(self, chat_id, text, inline_buttons):
-        """إرسال رسالة بأزرار Inline (داخل الدردشة)
-        
-        inline_buttons: قائمة صفوف، كل صف قائمة أزرار
-        كل زر: {'text': 'نص الزر', 'callback_data': 'بيانات_الكالباك'}
-        
-        مثال:
-        buttons = [
-            [{'text': '✅ موافقة', 'callback_data': 'approve_DEP123'}, {'text': '❌ رفض', 'callback_data': 'reject_DEP123'}],
-            [{'text': '🏠 القائمة', 'callback_data': 'main_menu'}]
-        ]
-        """
+    def send_inline_message(self, chat_id, text, inline_buttons, web_app_button=None):
+        """إرسال رسالة بأزرار Inline (داخل الدردشة)"""
         inline_keyboard = {'inline_keyboard': inline_buttons}
         data = {
             'chat_id': chat_id, 
@@ -1058,7 +1048,7 @@ class ComprehensiveDUXBot:
             data['text'] = text
         return self.api_call('answerCallbackQuery', data)
     
-    def edit_message(self, chat_id, message_id, text=None, inline_buttons=None):
+    def edit_message(self, chat_id, message_id, text=None, inline_buttons=None, web_app_button=None):
         """تعديل رسالة موجودة (لتحديث الأزرار بعد الضغط)"""
         data = {'chat_id': chat_id, 'message_id': message_id}
         if text:
@@ -1066,6 +1056,8 @@ class ComprehensiveDUXBot:
             data['parse_mode'] = 'HTML'
         if inline_buttons:
             data['reply_markup'] = json.dumps({'inline_keyboard': inline_buttons})
+        elif web_app_button:
+            data['reply_markup'] = json.dumps({'inline_keyboard': [[web_app_button]]})
         return self.api_call('editMessageText', data)
     
     def make_inline_btn(self, text, callback_data):
@@ -11284,24 +11276,19 @@ class ComprehensiveDUXBot:
                 base_url = self.get_setting('dashboard_url') or 'https://69.169.108.197.sslip.io'
                 snatch_url = f"{base_url}/webapp/snatch?uid={user_id}&lang={lang}"
 
-                # التحقق من دعم WebApp
-                webapp_button = {
-                    'text': '🎁 العب الآن!',
-                    'web_app': {'url': snatch_url}
-                }
-
+                # استخدام edit_message مع web_app button مباشرة
                 self.edit_message(chat_id, message.get('message_id'),
                     f"🎁 <b>اختطف!</b>\n\n"
                     f"⚡ هدية ستظهر — <b>اخطفها بسرعة!</b>\n"
                     f"🎯 أحياناً تظهر وتختفي بسرعة!\n"
                     f"🟢 أحياناً تنتظرك!\n"
                     f"🔴 احذر القنابل!\n\n"
-                    f"👆 اضغط الزر بالأسفل للعب!")
-
-                self.send_inline_message(chat_id,
-                    f"🎮 <b>جاهز للعب؟</b>\n👆 اضغط للبدء!",
-                    [[webapp_button],
-                     [{'text': self.tr('a0142_العودة', lang), 'callback_data': 'wheel_back_main'}]])
+                    f"👆 اضغط الزر بالأسفل للعب!",
+                    inline_buttons=[
+                        [{'text': '🎁 العب الآن!', 'web_app': {'url': snatch_url}}],
+                        [{'text': self.tr('a0142_العودة', lang), 'callback_data': 'wheel_back_main'}]
+                    ])
+                self.answer_callback(callback_id)
                 return
 
             elif data.startswith('wheel_catch_') and data != 'wheel_catch_fake':
