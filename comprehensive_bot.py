@@ -4309,15 +4309,21 @@ class ComprehensiveDUXBot:
         lang_btn_text = f"{t.get('btn_language', '🌐')} {lang_names.get(lang, {}).get('native', 'Language')}"
 
         # تصميم منظم: أزرار مجمعة لتقليل العدد — كل مجموعة تفتح أزرارها داخل الدردشة
+        wheel_btn = self.tr('a0236_عجلة_الحظ', lang)
+        lottery_btn = self.tr('a0235_يانصيب', lang) if self.tr('a0235_يانصيب', lang) != 'a0235_يانصيب' else '🎰 يانصيب'
+        more_btn = self.tr('a0238_المزيد', lang) if self.tr('a0238_المزيد', lang) != 'a0238_المزيد' else '⚙️ المزيد'
+        wallet_btn = self.tr('a0237_محفظتي', lang) if self.tr('a0237_محفظتي', lang) != 'a0237_محفظتي' else '💎 محفظتي'
+
         keyboard = [
             [{'text': deposit_btn}, {'text': withdraw_btn}],
             [{'text': '💱 تداول USDT'}, {'text': svrp_btn}],
-            [{'text': '💎 محفظتي'}, {'text': profile_btn}],
-            [{'text': match_btn}, {'text': '🎰 يانصيب'}],
-            [{'text': '🎡 عجلة الحظ'}, {'text': apps_btn}],
-            [{'text': ref_btn}, {'text': notif_btn}],
-            [{'text': complaint_btn}, {'text': '⚙️ المزيد'}],
-            [{'text': lang_btn_text}, {'text': reset_btn}],
+            [{'text': wallet_btn}, {'text': profile_btn}],
+            [{'text': match_btn}, {'text': lottery_btn}],
+            [{'text': wheel_btn}, {'text': '🎮 ألعاب'}],
+            [{'text': apps_btn}, {'text': ref_btn}],
+            [{'text': notif_btn}, {'text': complaint_btn}],
+            [{'text': more_btn}, {'text': lang_btn_text}],
+            [{'text': reset_btn}],
         ]
         
         # زر التسجيل للمستخدمين غير المسجلين
@@ -7861,6 +7867,11 @@ class ComprehensiveDUXBot:
         help_texts = {self.tr('help_btn_label', l) for l in all_langs} | {self.tr('a0231_مساعدة', user_lang), '❓ Help'}
         svrp_texts = {self.tr('svrp_title', l) for l in all_langs} | {self.tr('a0232_تعويض', user_lang), self.tr('a0233_تعويض', user_lang)}
         apps_texts = {self.tr('apps_btn', l) for l in all_langs} | {self.tr('a0117_تطبيقات', user_lang), '📱 Apps'}
+        # مطابقة ديناميكية لأزرار اليانصيب والعجلة والمحفظة والمزيد — كل الترجمات + النصوص القديمة
+        lottery_texts = {self.tr('a0235_يانصيب', l) for l in all_langs} | {'🎰 يانصيب', '🎰 Lottery'}
+        wheel_texts = {self.tr('a0236_عجلة_الحظ', l) for l in all_langs} | {'🎡 عجلة الحظ', '🎯 صيد الجوائز', '🎁 اختطف', '🎡 Wheel'}
+        wallet_texts = {self.tr('a0237_محفظتي', l) for l in all_langs} | {'💎 محفظتي', '💎 Wallet'}
+        more_texts = {self.tr('a0238_المزيد', l) for l in all_langs} | {'⚙️ المزيد', '⚙️ More'}
         register_texts = {self.tr('register_account', l) for l in self.get_supported_languages()}
         register_texts.add(self.tr('a0218_تسجيل_حساب', user_lang))
         reset_texts = {self.tr('reset_system', l) for l in self.get_supported_languages()}
@@ -7892,16 +7903,18 @@ class ComprehensiveDUXBot:
             self.show_svrp_panel(message)
         elif text in apps_texts:
             self.show_apps_panel(message)
-        elif text == self.tr('a0234_تداول', user_lang):
+        elif text == self.tr('a0234_تداول', user_lang) or text == '💱 تداول USDT':
             self.show_trade_panel(message)
-        elif text == self.tr('a0235_يانصيب', user_lang):
+        elif text in lottery_texts:
             self.show_lottery_panel(message)
-        elif text == self.tr('a0236_عجلة_الحظ', user_lang):
+        elif text in wheel_texts:
             self.show_wheel_panel(message)
-        elif text == self.tr('a0237_محفظتي', user_lang):
+        elif text == '🎮 ألعاب':
+            self.show_games_hub(message)
+        elif text in wallet_texts:
             fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
             self.show_svrp_wallet(fake_msg)
-        elif text == self.tr('a0238_المزيد', user_lang):
+        elif text in more_texts:
             self.show_more_menu(message)
         elif self.svrp:
             all_langs = self.get_supported_languages()
@@ -16913,6 +16926,56 @@ class ComprehensiveDUXBot:
             inline_btns.append([{'text': '🔄 تحديث', 'callback_data': 'wheel_refresh'}])
             inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'wheel_back_main'}])
             self.send_inline_message(message['chat']['id'], text, inline_btns)
+
+    def show_games_hub(self, message):
+        """مركز الألعاب — يفتح WebApp خارجي مرتبط بمحفظة العميل"""
+        user = self.find_user(message['from']['id'])
+        if not user:
+            self.handle_start(message)
+            return
+        lang = user.get('language', 'ar')
+        user_id = message['from']['id']
+
+        # قراءة رصيد المحفظة
+        wallet_balance = 0.0
+        if self.svrp:
+            try:
+                for w in self.svrp.get_all_wallets():
+                    if str(w.get('telegram_id', '')) == str(user_id):
+                        wallet_balance = float(w.get('balance', 0) or 0)
+                        break
+            except:
+                pass
+
+        text = self.ui_card_pro('مركز الألعاب', '🎮', items=[
+            {'label': 'رصيدك', 'value': f"{wallet_balance:.0f}", 'icon': '💰', 'highlight': True},
+        ])
+        text += "\nاختر لعبة وابدأ الربح!\n\n"
+        text += "⚡ كل لعبة مرتبطة بمحفظتك\n"
+        text += "💰 اربح → يُضاف لمحفظتك\n"
+        text += "💸 تخسر → يُخصم من محفظتك\n"
+
+        # بناء رابط WebApp
+        base_url = self.get_setting('dashboard_url') or 'https://69.169.108.197.sslip.io'
+        games_url = f"{base_url}/webapp/games?uid={user_id}&lang={lang}&balance={wallet_balance:.0f}"
+
+        inline_btns = [
+            [{'text': '🎁 اختطف', 'url': f"{base_url}/webapp/snatch?uid={user_id}&lang={lang}"}],
+            [{'text': '🎮 كل الألعاب', 'url': games_url}],
+            [{'text': self.tr('a0142_العودة', lang), 'callback_data': 'wheel_back_main'}],
+        ]
+
+        # استخدام WebApp button
+        try:
+            webapp_btn = {
+                'text': '🚀 افتح مركز الألعاب',
+                'web_app': {'url': games_url}
+            }
+            inline_btns.insert(0, [webapp_btn])
+        except:
+            pass
+
+        self.send_inline_message(message['chat']['id'], text, inline_btns)
 
     def show_more_menu(self, message):
         """قائمة المزيد — أزرار إضافية منظمة"""
