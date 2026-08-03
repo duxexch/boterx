@@ -20947,8 +20947,10 @@ class ComprehensiveDUXBot:
         """حفظ إعداد الدعم — يستخدم save_setting الموحدة"""
         self.save_setting(key, value)
         
-    def get_support_setting(self, key, default=self.tr('a0122_غير_محدد', 'ar')):
+    def get_support_setting(self, key, default=None):
         """قراءة إعداد الدعم — يستخدم get_setting الموحدة"""
+        if default is None:
+            default = self.tr('a0122_غير_محدد', 'ar')
         val = self.get_setting(key)
         return val if val else default
         
