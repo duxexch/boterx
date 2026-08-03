@@ -23,7 +23,7 @@
     <!-- Tab 1: System Settings -->
     <div x-show="activeTab === 'system'" class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
         <div class="p-5 border-b border-slate-700">
-            <h3 class="font-bold text-lg">إعدادات النظام</h3>
+            <h3 class="font-bold text-lg" data-i18n="system_settings">System Settings</h3>
             <p class="text-xs text-slate-400 mt-1">تعديل الإعدادات العامة للنظام</p>
         </div>
         <div class="overflow-x-auto">
@@ -62,11 +62,11 @@
                                 <template x-if="s.editing">
                                     <div class="flex items-center gap-1">
                                         <button @click="saveSetting(s)"
-                                            class="p-1.5 rounded hover:bg-green-500/20 text-green-400 transition" title="حفظ">
+                                            class="p-1.5 rounded hover:bg-green-500/20 text-green-400 transition" title="Save" data-i18n-title="save">
                                             <i class="fas fa-check text-sm"></i>
                                         </button>
                                         <button @click="s.editing = false; s.edit_value = s.setting_value"
-                                            class="p-1.5 rounded hover:bg-red-500/20 text-red-400 transition" title="إلغاء">
+                                            class="p-1.5 rounded hover:bg-red-500/20 text-red-400 transition" title="Cancel" data-i18n-title="cancel">
                                             <i class="fas fa-times text-sm"></i>
                                         </button>
                                     </div>
@@ -88,15 +88,15 @@
     <!-- Tab 2: Button Labels -->
     <div x-show="activeTab === 'labels'" class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
         <div class="p-5 border-b border-slate-700">
-            <h3 class="font-bold text-lg">مسميات الأزرار</h3>
+            <h3 class="font-bold text-lg" data-i18n="button_labels">Button Labels</h3>
             <p class="text-xs text-slate-400 mt-1">تعديل النصوص الظاهرة على أزرار البوت</p>
         </div>
         <div class="overflow-x-auto">
             <table class="w-full text-sm">
                 <thead>
                     <tr class="border-b border-slate-700 bg-slate-800/80">
-                        <th class="text-right px-4 py-3 font-semibold text-slate-400">النص الأصلي</th>
-                        <th class="text-right px-4 py-3 font-semibold text-slate-400">النص الجديد</th>
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="original_text">Original Text</th>
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="new_text">New Text</th>
                         <th class="text-right px-4 py-3 font-semibold text-slate-400 w-24">الإجراءات</th>
                     </tr>
                 </thead>
@@ -127,11 +127,11 @@
                                 <template x-if="lbl.editing">
                                     <div class="flex items-center gap-1">
                                         <button @click="saveLabel(lbl)"
-                                            class="p-1.5 rounded hover:bg-green-500/20 text-green-400 transition" title="حفظ">
+                                            class="p-1.5 rounded hover:bg-green-500/20 text-green-400 transition" title="Save" data-i18n-title="save">
                                             <i class="fas fa-check text-sm"></i>
                                         </button>
                                         <button @click="lbl.editing = false; lbl.edit_value = lbl.new_text"
-                                            class="p-1.5 rounded hover:bg-red-500/20 text-red-400 transition" title="إلغاء">
+                                            class="p-1.5 rounded hover:bg-red-500/20 text-red-400 transition" title="Cancel" data-i18n-title="cancel">
                                             <i class="fas fa-times text-sm"></i>
                                         </button>
                                     </div>
@@ -153,7 +153,7 @@
     <!-- Tab 3: Audit Log -->
     <div x-show="activeTab === 'audit'" class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
         <div class="p-5 border-b border-slate-700">
-            <h3 class="font-bold text-lg">سجل الإجراءات</h3>
+            <h3 class="font-bold text-lg" data-i18n="audit_log">Audit Log</h3>
             <p class="text-xs text-slate-400 mt-1">سجل نشاطات المدراء في لوحة التحكم</p>
         </div>
 
@@ -193,14 +193,14 @@
                         <p class="text-sm text-slate-300" x-text="entry.details || '-'"></p>
                         <p class="text-[10px] text-slate-500 mt-1">
                             <span x-show="entry.admin_id">المدير: <span class="font-mono" x-text="entry.admin_id"></span></span>
-                            <span x-show="!entry.admin_id">النظام</span>
+                            <span x-show="!entry.admin_id" data-i18n="system">System</span>
                         </p>
                     </div>
                 </div>
             </template>
             <div x-show="auditLog.length === 0" class="text-center py-10">
                 <i class="fas fa-history text-4xl text-slate-600 mb-3 block"></i>
-                <p class="text-slate-400">لا توجد إجراءات مسجلة بعد</p>
+                <p class="text-slate-400" data-i18n="no_audit_log">No audit logs yet</p>
             </div>
         </div>
     </div>

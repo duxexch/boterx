@@ -6,15 +6,15 @@
 <div x-data="complaintsApp()" x-init="init()" class="space-y-4">
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
         <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
-            <p class="text-slate-400 text-sm">إجمالي الشكاوى</p>
+            <p class="text-slate-400 text-sm" data-i18n="total_complaints">Total Complaints</p>
             <p class="text-2xl font-bold text-amber-400" x-text="stats.total || 0">0</p>
         </div>
         <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
-            <p class="text-slate-400 text-sm">شكاوى مفتوحة</p>
+            <p class="text-slate-400 text-sm" data-i18n="open_complaints">Open Complaints</p>
             <p class="text-2xl font-bold text-red-400" x-text="stats.open || 0">0</p>
         </div>
         <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
-            <p class="text-slate-400 text-sm">تم حلها</p>
+            <p class="text-slate-400 text-sm" data-i18n="resolved">Resolved</p>
             <p class="text-2xl font-bold text-green-400" x-text="(stats.total || 0) - (stats.open || 0)">0</p>
         </div>
     </div>
@@ -23,7 +23,7 @@
         <div class="overflow-x-auto">
             <table class="data-table">
                 <thead><tr>
-                    <th>ID</th><th>العميل</th><th>الرسالة</th><th>الحالة</th><th>التاريخ</th><th>رد الأدمن</th><th>إجراءات</th>
+                    <th>ID</th><th data-i18n="client">Client</th><th data-i18n="message_text">Message</th><th data-i18n="status">Status</th><th data-i18n="date">Date</th><th data-i18n="admin_reply">Admin Reply</th><th data-i18n="actions">Actions</th>
                 </tr></thead>
                 <tbody>
                     <template x-for="c in complaints" :key="c.id">
@@ -40,7 +40,7 @@
                         </tr>
                     </template>
                     <tr x-show="complaints.length === 0">
-                        <td colspan="7" class="text-center p-8 text-slate-400">لا توجد شكاوى</td>
+                        <td colspan="7" class="text-center p-8 text-slate-400" data-i18n="no_complaints">No complaints</td>
                     </tr>
                 </tbody>
             </table>
@@ -50,15 +50,15 @@
     <!-- Reply Modal -->
     <div x-show="showModal" x-transition class="modal-overlay" @click.self="showModal = false" style="display:none">
         <div class="modal">
-            <h3 class="font-bold text-lg mb-4">الرد على الشكوى</h3>
+            <h3 class="font-bold text-lg mb-4" data-i18n="reply_to_complaint">Reply to Complaint</h3>
             <div class="mb-4 p-3 bg-slate-700 rounded-lg">
-                <p class="text-xs text-slate-400 mb-1">الرسالة الأصلية:</p>
+                <p class="text-xs text-slate-400 mb-1" data-i18n="original_message">Original message:</p>
                 <p class="text-sm" x-text="selected?.message"></p>
             </div>
-            <textarea x-model="replyText" rows="4" class="input w-full mb-4" placeholder="اكتب ردك هنا..."></textarea>
+            <textarea x-model="replyText" rows="4" class="input w-full mb-4" placeholder="Write your reply here..." data-i18n-placeholder="write_reply_here"></textarea>
             <div class="flex gap-2 justify-end">
-                <button @click="showModal = false" class="btn btn-sm" style="background:#475569">إلغاء</button>
-                <button @click="sendReply()" class="btn btn-primary btn-sm">إرسال</button>
+                <button @click="showModal = false" class="btn btn-sm" style="background:#475569" data-i18n="cancel">Cancel</button>
+                <button @click="sendReply()" class="btn btn-primary btn-sm" data-i18n="send">Send</button>
             </div>
         </div>
     </div>

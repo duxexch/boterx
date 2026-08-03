@@ -168,6 +168,20 @@ def webapp_wheel():
     """صفحة عجلة الحظ — تفتح داخل تيليجرام (Web App)"""
     return render_template('wheel_app.html')
 
+@app.route('/webapp/snatch')
+def webapp_snatch():
+    """صفحة لعبة اختطف — Web App ديناميكي داخل تيليجرام"""
+    gifts = []
+    try:
+        with open('wheel_gifts.csv', 'r', encoding='utf-8-sig') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                if row.get('is_active') == 'yes':
+                    gifts.append({'id': row.get('id',''), 'text': row.get('gift_text',''), 'link': row.get('affiliate_link','')})
+    except:
+        pass
+    return render_template('snatch_game.html', gifts_json=json.dumps(gifts))
+
 @app.route('/api/wheel/my-spins')
 @api_auth
 def api_wheel_my_spins():
@@ -2406,17 +2420,22 @@ def api_lottery_draw(round_id):
 def api_wheel_create():
     data = request.json
     rounds = read_csv('wheel_rounds.csv')
-    fieldnames = get_fieldnames('wheel_rounds.csv', ['id','name','prizes','max_spins','status','created_at'])
+    fieldnames = get_fieldnames('wheel_rounds.csv', ['id','name','prizes','status','spin_cost','currency','min_spins','max_spins_per_user','game_speed_ms','max_relocations','created_at'])
     new_id = f"WHL{str(int(datetime.now().timestamp()))[-6:]}"
     prizes = data.get('prizes', '')
     if isinstance(prizes, list):
-        prizes = json.dumps(prizes)
+        prizes = '|'.join(prizes) if len(prizes) > 1 else (prizes[0] if prizes else '')
     new_round = {
         'id': new_id,
         'name': data.get('name', ''),
         'prizes': prizes,
-        'max_spins': data.get('max_spins', '100'),
         'status': 'active',
+        'spin_cost': data.get('spin_cost', '0'),
+        'currency': data.get('currency', 'SAR'),
+        'min_spins': '1',
+        'max_spins_per_user': data.get('max_spins_per_user', data.get('max_spins', '1')),
+        'game_speed_ms': data.get('game_speed_ms', '2500'),
+        'max_relocations': data.get('max_relocations', '1'),
         'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')
     }
     append_csv('wheel_rounds.csv', new_round, fieldnames)
@@ -2428,10 +2447,10 @@ def api_wheel_create():
 @api_auth
 def api_wheel_end(round_id):
     rounds = read_csv('wheel_rounds.csv')
-    fieldnames = get_fieldnames('wheel_rounds.csv', ['id','name','prizes','max_spins','status','created_at'])
+    fieldnames = get_fieldnames('wheel_rounds.csv', ['id','name','prizes','status','spin_cost','currency','min_spins','max_spins_per_user','game_speed_ms','max_relocations','created_at'])
     for r in rounds:
         if r.get('id') == round_id:
-            r['status'] = 'ended'
+            r['status'] = 'completed'
             break
     write_csv('wheel_rounds.csv', rounds, fieldnames)
     log_action('wheel_end', round_id)
@@ -3002,7 +3021,7 @@ def api_delete_lottery_round(round_id):
 @api_auth
 def api_delete_wheel_round(round_id):
     rounds = read_csv('wheel_rounds.csv')
-    fieldnames = get_fieldnames('wheel_rounds.csv', ['id','name','prizes','status','spin_cost','currency','min_spins','max_spins_per_user','created_at'])
+    fieldnames = get_fieldnames('wheel_rounds.csv', ['id','name','prizes','status','spin_cost','currency','min_spins','max_spins_per_user','game_speed_ms','max_relocations','created_at'])
     rounds = [r for r in rounds if r.get('id') != round_id]
     write_csv('wheel_rounds.csv', rounds, fieldnames)
     log_action('delete_wheel_round', round_id)

@@ -79,7 +79,7 @@
 
                 <!-- Message Type Selector -->
                 <div class="mb-4">
-                    <label class="block text-sm text-slate-400 mb-2">نوع الرسالة</label>
+                    <label class="block text-sm text-slate-400 mb-2" data-i18n="message_type">Message Type</label>
                     <div class="grid grid-cols-3 gap-2">
                         <button @click="msgType = 'text'"
                             class="py-2.5 rounded-lg text-sm font-medium transition border-2"
@@ -143,11 +143,11 @@
                 <thead>
                     <tr class="border-b border-slate-700 bg-slate-800/80">
                         <th class="text-right px-4 py-3 font-semibold text-slate-400">المعرف</th>
-                        <th class="text-right px-4 py-3 font-semibold text-slate-400">المستخدم</th>
-                        <th class="text-right px-4 py-3 font-semibold text-slate-400">النوع</th>
-                        <th class="text-right px-4 py-3 font-semibold text-slate-400">الرسالة</th>
-                        <th class="text-right px-4 py-3 font-semibold text-slate-400">التاريخ</th>
-                        <th class="text-right px-4 py-3 font-semibold text-slate-400">الحالة</th>
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="user">User</th>
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="type">Type</th>
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="message_text">Message</th>
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="date">Date</th>
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="status">Status</th>
                     </tr>
                 </thead>
                 <tbody>

@@ -73,7 +73,7 @@
                 <div class="px-5 py-3 bg-slate-900/40 border-t border-slate-700/50 flex items-center justify-between">
                     <div class="flex items-center gap-1">
                         <button @click="openEditModal(app)"
-                            class="p-1.5 rounded hover:bg-slate-700 text-slate-400 hover:text-blue-400 transition" title="تعديل">
+                            class="p-1.5 rounded hover:bg-slate-700 text-slate-400 hover:text-blue-400 transition" title="Edit" data-i18n-title="edit">
                             <i class="fas fa-edit text-sm"></i>
                         </button>
                         <button @click="toggleActive(app)"
@@ -81,7 +81,7 @@
                             <i class="fas fa-power-off text-sm"></i>
                         </button>
                         <button @click="confirmDelete(app)"
-                            class="p-1.5 rounded hover:bg-slate-700 text-slate-400 hover:text-red-400 transition" title="حذف">
+                            class="p-1.5 rounded hover:bg-slate-700 text-slate-400 hover:text-red-400 transition" title="Delete" data-i18n-title="delete">
                             <i class="fas fa-trash text-sm"></i>
                         </button>
                     </div>
@@ -143,7 +143,7 @@
                 </div>
                 <div class="flex gap-3 pt-2">
                     <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg text-sm font-semibold transition" x-text="editingId ? 'حفظ التعديلات' : 'إضافة'"></button>
-                    <button type="button" @click="showModal = false" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-lg text-sm transition">إلغاء</button>
+                    <button type="button" @click="showModal = false" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-lg text-sm transition" data-i18n="cancel">Cancel</button>
                 </div>
             </form>
         </div>
@@ -160,8 +160,8 @@
                 <p class="text-sm text-slate-400">هل أنت متأكد من حذف تطبيق "<span class="text-white font-semibold" x-text="deleteTarget?.name"></span>"؟</p>
                 <p class="text-xs text-red-400 mt-2">هذا الإجراء لا يمكن التراجع عنه.</p>
                 <div class="flex gap-3 mt-6">
-                    <button @click="deleteApp()" class="flex-1 bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-lg text-sm font-semibold transition">حذف</button>
-                    <button @click="showDeleteModal = false" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-lg text-sm transition">إلغاء</button>
+                    <button @click="deleteApp()" class="flex-1 bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-lg text-sm font-semibold transition" data-i18n="delete">Delete</button>
+                    <button @click="showDeleteModal = false" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-lg text-sm transition" data-i18n="cancel">Cancel</button>
                 </div>
             </div>
         </div>

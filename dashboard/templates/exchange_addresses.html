@@ -28,7 +28,7 @@
         <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
             <div class="flex items-center gap-2 mb-1">
                 <i class="fas fa-circle-check text-green-400"></i>
-                <p class="text-xs text-slate-400">نشطة</p>
+                <p class="text-xs text-slate-400" data-i18n="active_count">Active</p>
             </div>
             <p class="text-2xl font-bold text-green-400 mt-1" x-text="fmtNum(stats.active)"></p>
         </div>
@@ -49,7 +49,7 @@
                     <tr class="border-b border-slate-700 bg-slate-800/80">
                         <th class="text-right px-4 py-3 font-semibold text-slate-400">المعرف</th>
                         <th class="text-right px-4 py-3 font-semibold text-slate-400">العنوان</th>
-                        <th class="text-right px-4 py-3 font-semibold text-slate-400">الحالة</th>
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="status">Status</th>
                         <th class="text-right px-4 py-3 font-semibold text-slate-400">تاريخ الإضافة</th>
                         <th class="text-right px-4 py-3 font-semibold text-slate-400">الإجراءات</th>
                     </tr>
@@ -75,7 +75,7 @@
                                     <button @click="toggleStatus(addr)" class="p-1.5 rounded hover:bg-slate-600 text-slate-400 hover:text-amber-400 transition" :title="addr.status === 'active' ? 'تعطيل' : 'تفعيل'">
                                         <i class="fas fa-power-off text-sm"></i>
                                     </button>
-                                    <button @click="confirmDelete(addr)" class="p-1.5 rounded hover:bg-slate-600 text-slate-400 hover:text-red-400 transition" title="حذف">
+                                    <button @click="confirmDelete(addr)" class="p-1.5 rounded hover:bg-slate-600 text-slate-400 hover:text-red-400 transition" title="Delete" data-i18n-title="delete">
                                         <i class="fas fa-trash text-sm"></i>
                                     </button>
                                 </div>
@@ -116,8 +116,8 @@
                     </label>
                 </div>
                 <div class="flex gap-3 pt-2">
-                    <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg text-sm font-semibold transition">إضافة</button>
-                    <button type="button" @click="showAddModal = false" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-lg text-sm transition">إلغاء</button>
+                    <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg text-sm font-semibold transition" data-i18n="add">Add</button>
+                    <button type="button" @click="showAddModal = false" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-lg text-sm transition" data-i18n="cancel">Cancel</button>
                 </div>
             </form>
         </div>
@@ -135,8 +135,8 @@
                 <p class="text-xs text-slate-500 mt-2 font-mono truncate" x-text="deleteTarget?.address"></p>
                 <p class="text-xs text-red-400 mt-2">هذا الإجراء لا يمكن التراجع عنه.</p>
                 <div class="flex gap-3 mt-6">
-                    <button @click="deleteAddress()" class="flex-1 bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-lg text-sm font-semibold transition">حذف</button>
-                    <button @click="showDeleteModal = false" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-lg text-sm transition">إلغاء</button>
+                    <button @click="deleteAddress()" class="flex-1 bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-lg text-sm font-semibold transition" data-i18n="delete">Delete</button>
+                    <button @click="showDeleteModal = false" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-lg text-sm transition" data-i18n="cancel">Cancel</button>
                 </div>
             </div>
         </div>
@@ -146,7 +146,7 @@
     <div x-show="loading" class="fixed inset-0 bg-slate-900/50 z-40 flex items-center justify-center" style="display:none">
         <div class="bg-slate-800 rounded-xl p-4 flex items-center gap-3">
             <i class="fas fa-spinner fa-spin text-blue-400 text-xl"></i>
-            <span class="text-sm">جارٍ التحميل...</span>
+            <span class="text-sm" data-i18n="loading">Loading...</span>
         </div>
     </div>
 </div>

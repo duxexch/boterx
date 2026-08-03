@@ -4,6 +4,7 @@
 import os
 import json
 import csv
+import secrets
 import urllib.request
 import urllib.parse
 import logging
@@ -311,6 +312,7 @@ class ComprehensiveDUXBot:
         
         # ترحيل ملف الشركات الموجود (إضافة أعمدة icon و address)
         self.migrate_companies_csv()
+        self.migrate_wheel_rounds_csv()
         
         # ملف وسائل الدفع — مجموعة عامة (غير مرتبطة بشركة محددة)
         if not os.path.exists('payment_methods.csv'):
@@ -380,8 +382,8 @@ class ComprehensiveDUXBot:
         if not os.path.exists('wheel_rounds.csv'):
             with open('wheel_rounds.csv', 'w', newline='', encoding='utf-8-sig') as f:
                 writer = csv.writer(f)
-                writer.writerow(['id', 'name', 'prizes', 'status', 'spin_cost',
-                               'currency', 'min_spins', 'max_spins_per_user', 'created_at'])
+                writer.writerow(['id', 'name', 'prizes', 'status', 'spin_cost', 'currency',
+                               'min_spins', 'max_spins_per_user', 'game_speed_ms', 'max_relocations', 'created_at'])
 
         if not os.path.exists('wheel_spins.csv'):
             with open('wheel_spins.csv', 'w', newline='', encoding='utf-8-sig') as f:
@@ -477,7 +479,7 @@ class ComprehensiveDUXBot:
         'phone': '📱', 'mobile': '📱', 'هاتف': '📱', 'جوال': '📱', 'موبايل': '📱',
         'cash': '💵', 'نقدي': '💵', 'كاش': '💵', 'نقد': '💵', 'مبلغ': '💵',
         'card': '💳', 'credit': '💳', 'debit': '💳', 'بطاقة': '💳', 'بطاقه': '💳', 'مدى': '💳', 'visa': '💳', 'mastercard': '💳',
-        'crypto': '₿', 'bitcoin': '₿', 'بيتكوين': '₿', 'عملة': '₿', 'كريبتو': '₿', 'usdt': '₿', 'ethereum': '₿',
+        'crypto': '🪙', 'bitcoin': '🪙', 'بيتكوين': '🪙', 'عملة': '🪙', 'كريبتو': '🪙', 'usdt': '🪙', 'ethereum': '🪙', 'usd': '🪙',
         'paypal': '🅿️', 'باي بال': '🅿️',
         'stc': '📡', 'stc pay': '📡', 'stcpay': '📡', 'اس تي سي': '📡',
         'vodafone': '📱', 'فودافون': '📱', 'فودافون كاش': '📱',
@@ -520,6 +522,51 @@ class ComprehensiveDUXBot:
         'thumbsup': '👍', 'اعجاب': '👍', 'جيد': '👍',
         'warning': '⚠️', 'تحذير': '⚠️', 'انتباه': '⚠️',
         'screenshot': '📸', 'لقطة': '📸', 'صورة': '📸', 'صوره': '📸',
+        # Animated/lively emoji for services
+        'deposit': '⬇️', 'إيداع': '⬇️', 'ايداع': '⬇️', 'ايداع_فقط': '⬇️',
+        'withdraw': '⬆️', 'سحب': '⬆️', 'سحب_فقط': '⬆️',
+        'both': '🔄', 'كلاهما': '🔄', 'ايداع_وسحب': '🔄',
+        'lottery': '🎰', 'يانصيب': '🎰',
+        'wheel': '🎡', 'عجلة': '🎡', 'صيد': '🎯',
+        'hunt': '🎯', 'جوائز': '🎯',
+        'match': '🔗', 'مطابقة': '🔗',
+        'trade': '💱', 'تداول': '💱',
+        'compensation': '💎', 'تعويض': '💎', 'استرداد': '💎',
+        'referral': '🎁', 'إحالة': '🎁', 'اربح': '🎁',
+        'support': '🆘', 'دعم': '🆘', 'مساعدة': '❓',
+        'notification': '🔔', 'إشعارات': '🔔', 'إشعاراتي': '🔔',
+        'profile': '👤', 'الملف': '👤',
+        'admin': '🔧', 'الإدارة': '🔧', 'الأدمن': '🔧',
+        'apps': '📱', 'تطبيقات': '📱',
+        'bots': '🤖', 'البوتات': '🤖',
+        'channels': '📢', 'القنوات': '📢',
+        'statistics': '📊', 'الإحصائيات': '📊', 'احصائيات': '📊',
+        'excel': '📑', 'تقرير': '📑',
+        'broadcast': '📢', 'إرسال': '📢', 'الإرسال': '📢',
+        'complaints': '📨', 'الشكاوى': '📨', 'شكاوى': '📨',
+        'payment': '💳', 'الدفع': '💳', 'وسائل_الدفع': '💳',
+        'companies': '🏢', 'الشركات': '🏢',
+        'addresses': '📍', 'العناوين': '📍',
+        'themes': '🎨', 'الثيمات': '🎨',
+        'settings': '⚙️', 'الإعدادات': '⚙️',
+        'language': '🌐', 'اللغة': '🌐',
+        'backup': '💾', 'نسخة': '💾', 'احتياطية': '💾',
+        'stickers': '🗃️', 'الرموز': '🗃️', 'الاستيكرات': '🗃️',
+        'manager': '👥', 'المديرين': '👥',
+        'buttons': '✏️', 'الأزرار': '✏️',
+        'trading': '💱', 'التداول': '💱',
+        'matching': '🔗', 'المطابقات': '🔗',
+        # Payment methods specific
+        'mada': '💳', 'مدى': '💳',
+        'iban': '🏦', 'ايبان': '🏦',
+        'binance': '🟡', 'بايننس': '🟡',
+        'binance_pay': '🟡', 'بايننس_باي': '🟡',
+        'western_union': '🌍', 'ويسترن_يونيون': '🌍',
+        'moneygram': '🌍', 'موني_جرام': '🌍',
+        'moneygo': '🌍', 'موني_جو': '🌍',
+        # Service types
+        'deposit_service': '⬇️', 'withdraw_service': '⬆️',
+        'deposit_withdraw': '🔄',
     }
 
     def normalize_icon(self, icon_input, default='🏢'):
@@ -542,10 +589,85 @@ class ComprehensiveDUXBot:
         for key, val in self.ICON_MAP.items():
             if key.replace(' ', '').replace('-', '').replace('_', '') == no_space:
                 return val
-        # إذا لم يوجد، استخدم النص كما هو مع إضافة 🏷️
-        if len(icon_input) <= 20:
-            return f"🏷️"
+        # محاولة المطابقة الجزئية — ابحث عن أي كلمة في الاسم
+        for key, val in self.ICON_MAP.items():
+            if key in lower or lower in key:
+                return val
+        # إذا لم يوجد، استخدم 🏢
         return default
+
+    def get_company_icon(self, company_name='', company_icon='', company_id=''):
+        """
+        الحصول على أيقونة الشركة — ذكي ومتطور
+        1) إذا كان icon إيموجي صالح → استخدمه مباشرة
+        2) إذا كان icon URL → استخدمه
+        3) ابحث في sticker_library.csv عن إيموجي مرتبط بالشركة
+        4) ابحث في ICON_MAP عن مطابقة لاسم الشركة
+        5) استخدم 🏢 كافتراضي
+        """
+        # 1) إيموجي صالح من حقل icon
+        if company_icon and company_icon.strip():
+            icon = company_icon.strip()
+            if len(icon) <= 4 and any(ord(c) > 127 for c in icon):
+                return icon
+            if icon.startswith('http'):
+                return icon
+            # حاول normalizing
+            normalized = self.normalize_icon(icon, None)
+            if normalized and normalized != '🏷️':
+                return normalized
+
+        # 2) ابحث في المكتبة
+        if company_id:
+            try:
+                with open('sticker_library.csv', 'r', encoding='utf-8-sig') as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        if row.get('category') == f'company_{company_id}' and row.get('type') == 'emoji':
+                            emoji = row.get('emoji', '').strip()
+                            if emoji:
+                                return emoji
+            except:
+                pass
+
+        # 3) ابحث في ICON_MAP باسم الشركة
+        if company_name:
+            icon = self.normalize_icon(company_name, None)
+            if icon and icon != '🏷️':
+                return icon
+
+        return '🏢'
+
+    def get_method_icon(self, method_name='', method_type='', method_id=''):
+        """
+        الحصول على أيقونة وسيلة الدفع — ذكي
+        """
+        # ابحث في ICON_MAP باسم الوسيلة
+        if method_name:
+            icon = self.normalize_icon(method_name, None)
+            if icon and icon != '🏷️':
+                return icon
+
+        # ابحث في ICON_MAP بنوع الوسيلة
+        if method_type:
+            icon = self.normalize_icon(method_type, None)
+            if icon and icon != '🏷️':
+                return icon
+
+        # ابحث في المكتبة
+        if method_id:
+            try:
+                with open('sticker_library.csv', 'r', encoding='utf-8-sig') as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        if row.get('category') == f'method_{method_id}' and row.get('type') == 'emoji':
+                            emoji = row.get('emoji', '').strip()
+                            if emoji:
+                                return emoji
+            except:
+                pass
+
+        return '💳'
 
     def migrate_users_csv(self):
         """ترحيل users.csv لإضافة أعمدة phone_verified و referral_earnings"""
@@ -601,6 +723,36 @@ class ComprehensiveDUXBot:
             logger.info("تم ترحيل companies.csv لإضافة أعمدة icon_file_id")
         except Exception as e:
             logger.error(f"خطأ في ترحيل companies.csv: {e}")
+
+    def migrate_wheel_rounds_csv(self):
+        """ترحيل wheel_rounds.csv لإضافة أعمدة game_speed_ms و max_relocations"""
+        try:
+            if not os.path.exists('wheel_rounds.csv'):
+                return
+            with open('wheel_rounds.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                fieldnames = reader.fieldnames or []
+                rows = list(reader)
+            need_migration = 'game_speed_ms' not in fieldnames or 'max_relocations' not in fieldnames
+            if not need_migration:
+                return
+            new_fieldnames = list(fieldnames)
+            for col in ['game_speed_ms', 'max_relocations']:
+                if col not in new_fieldnames:
+                    new_fieldnames.append(col)
+            for row in rows:
+                if not row.get('game_speed_ms'):
+                    row['game_speed_ms'] = '2500'
+                if not row.get('max_relocations'):
+                    row['max_relocations'] = '1'
+            with open('wheel_rounds.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.DictWriter(f, fieldnames=new_fieldnames)
+                writer.writeheader()
+                for row in rows:
+                    writer.writerow({k: row.get(k, '') for k in new_fieldnames})
+            logger.info("تم ترحيل wheel_rounds.csv لإضافة أعمدة game_speed_ms و max_relocations")
+        except Exception as e:
+            logger.error(f"خطأ في ترحيل wheel_rounds.csv: {e}")
 
     def migrate_payment_methods_csv(self):
         """ترحيل payment_methods.csv لإضافة عمود icon و icon_file_id"""
@@ -1234,8 +1386,8 @@ class ComprehensiveDUXBot:
             wallet = self.svrp.get_wallet(message['from']['id'])
             frozen = float(wallet.get('balance', 0) or 0)
             available = float(wallet.get('total_used', 0) or 0)
-            text += f"🧊 رصيد مجمد: <code>{frozen:.2f}</code>\n"
-            text += f"🟢 رصيد متاح: <code>{available:.2f}</code>\n\n"
+            text += self.tr('a0001_رصيد_مجمد', lang, frozen=frozen)
+            text += self.tr('a0002_رصيد_متاح', lang, available=available)
 
         # أزرار المشاركة (روابط إحالة من الأدمن)
         inline_btns = []
@@ -1295,7 +1447,7 @@ class ComprehensiveDUXBot:
 
         # عرض آخر 10 إحالات
         if referrals:
-            text += "\n📋 <b>آخر الإحالات:</b>\n\n"
+            text += self.tr('a0003_آخر_الإحالات', 'ar')
             for r in referrals[-10:]:
                 phone_icon = '✅' if r.get('phone_verified') == 'yes' else '⚠️'
                 text += f"{phone_icon} <code>{r.get('referred_name', '')}</code> — {r.get('referred_phone', '')}\n"
@@ -1340,14 +1492,14 @@ class ComprehensiveDUXBot:
         inline_btns.append([{'text': '🔙 العودة', 'callback_data': 'app_back_admin'}])
 
         if not links:
-            text += "\n📭 لا توجد روابط بعد."
+            text += self.tr('a0004_لا_توجد', 'ar')
 
         self.send_inline_message(message['chat']['id'], text, inline_btns)
 
     # ==================== 📱 التطبيقات — Panel Methods ====================
 
     def show_apps_panel(self, message):
-        """عرض قائمة التطبيقات — النقر يعرض التفاصيل"""
+        """عرض التطبيقات كشبكة أيقونات — مثل هاتف"""
         user = self.find_user(message['from']['id'])
         lang = user.get('language', 'ar') if user else 'ar'
         apps = self.get_app_links()
@@ -1358,43 +1510,46 @@ class ComprehensiveDUXBot:
                 self.main_keyboard(lang, message['from']['id']))
             return
 
+        # بناء شبكة أزرار inline — 3 لكل صف (مثل شبكة هاتف)
+        # كل زر = أيقونة التطبيق + اسمه
         inline_btns = []
-        for app in apps:
-            name = app.get('name', '')
-            icon_file_id = app.get('icon_file_id', '')
-            icon_url = app.get('icon_url', '')
-            # محاولة إرسال أيقونة التطبيق
-            if icon_file_id:
-                try:
-                    self.api_call('sendPhoto', {
-                        'chat_id': message['chat']['id'],
-                        'photo': icon_file_id,
-                        'caption': f"📱 <b>{name}</b>",
-                        'parse_mode': 'HTML'
-                    })
-                except:
-                    pass
-            elif icon_url and icon_url.startswith('http'):
-                try:
-                    self.api_call('sendPhoto', {
-                        'chat_id': message['chat']['id'],
-                        'photo': icon_url,
-                        'caption': f"📱 <b>{name}</b>",
-                        'parse_mode': 'HTML'
-                    })
-                except:
-                    pass
-            inline_btns.append([{'text': f"📱 {name}", 'callback_data': f"app_view_{app['id']}"}])
+        for i in range(0, len(apps), 3):
+            row = []
+            for j in range(3):
+                if i + j < len(apps):
+                    app = apps[i + j]
+                    name = app.get('name', '')[:12]  # اسم قصير
+                    # استخدام أيقونة من المكتبة أو افتراضية
+                    icon = app.get('icon_url', '') or app.get('icon_file_id', '')
+                    # لو عنده icon_file_id نرسل صورة لاحقاً، لكن في الأزرار نستخدم إيموجي
+                    app_icon = '📱'  # افتراضي
+                    # محاولة استخراج إيموجي من اسم التطبيق
+                    guessed = self.normalize_icon(name, None)
+                    if guessed and guessed != '🏷️':
+                        app_icon = guessed
+                    row.append({'text': f"{app_icon}\n{name}", 'callback_data': f"app_view_{app['id']}"})
+            if row:
+                inline_btns.append(row)
 
-        inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'apps_back_main'}])
-        self.send_inline_message(message['chat']['id'], "📱 <b>التطبيقات</b>\n\nاختر تطبيقاً:", inline_btns)
+        inline_btns.append([{'text': self.tr('a0142_العودة', lang), 'callback_data': 'apps_back_main'}])
 
-    def show_app_detail(self, chat_id, app_id):
-        """عرض تفاصيل تطبيق للمستخدم"""
+        # إرسال نص بسيط + شبكة الأزرار
+        self.send_inline_message(message['chat']['id'],
+            f"📱 <b>التطبيقات</b>\n\n"
+            f"👇 اختر تطبيقاً:",
+            inline_btns)
+
+    def show_app_detail(self, chat_id, app_id, user_id=None):
+        """عرض تفاصيل تطبيق — 4 أزرار فقط"""
         app = self.get_app_by_id(app_id)
         if not app:
-            self.send_message(chat_id, "❌ التطبيق غير موجود")
+            user_obj = self.find_user(user_id) if user_id else None
+            lang = user_obj.get('language', 'ar') if user_obj else 'ar'
+            self.send_message(chat_id, self.tr('a0006_التطبيق_غير', lang))
             return
+
+        user_obj = self.find_user(user_id) if user_id else None
+        lang = user_obj.get('language', 'ar') if user_obj else 'ar'
 
         name = app.get('name', '')
         desc = app.get('description', '')
@@ -1405,37 +1560,60 @@ class ComprehensiveDUXBot:
         promo_code = app.get('promo_code', '').strip()
         referral_link = app.get('referral_link', '').strip()
 
-        # بناء النص
+        # نص بسيط — اسم التطبيق فقط
         text = f"📱 <b>{name}</b>\n"
-        text += f"━━━━━━━━━━━━━━━━━━\n"
         if desc:
-            text += f"📝 {desc}\n\n"
+            text += f"📝 {desc}\n"
 
-        # أزرار التحميل
-        dl_btns = []
-        if android_file_id:
-            dl_btns.append({'text': '🤖 أندرويد', 'callback_data': f"app_dl_android_{app_id}"})
-        elif android_url:
-            dl_btns.append({'text': '🤖 أندرويد', 'url': android_url})
-        if ios_file_id:
-            dl_btns.append({'text': '🍎 آيفون', 'callback_data': f"app_dl_ios_{app_id}"})
-        elif ios_url:
-            dl_btns.append({'text': '🍎 آيفون', 'url': ios_url})
+        # بناء 4 أزرار
+        row1 = []
+        row2 = []
+
+        # 1) أندرويد
+        if android_url:
+            row1.append({'text': '🤖 أندرويد', 'url': android_url})
+        elif android_file_id:
+            row1.append({'text': '🤖 أندرويد', 'callback_data': f"app_dl_android_{app_id}"})
+
+        # 2) آيفون
+        if ios_url:
+            row1.append({'text': '🍎 آيفون', 'url': ios_url})
+        elif ios_file_id:
+            row1.append({'text': '🍎 آيفون', 'callback_data': f"app_dl_ios_{app_id}"})
+
+        # 3) متصفح (رابط الموقع)
+        if referral_link:
+            row1.append({'text': '🌐 متصفح', 'url': referral_link})
+
+        # 4) البرومو كود — زر يفتح صفحة نسخ
+        if promo_code:
+            row2.append({'text': f'🎟️ البرومو كود', 'callback_data': f"app_promo_{app_id}"})
 
         inline_btns = []
-        if dl_btns:
-            inline_btns.append(dl_btns)
+        if row1:
+            inline_btns.append(row1)
+        if row2:
+            inline_btns.append(row2)
+        inline_btns.append([{'text': self.tr('a0142_العودة', lang), 'callback_data': 'app_list_back'}])
 
-        # البرومو كود
-        if promo_code:
-            text += f"🎁 <b>كود الخصم:</b>\n<code>{promo_code}</code> 👈 اضغط للنسخ\n\n"
+        # إرسال أيقونة التطبيق كصورة إن وجدت
+        icon_file_id = app.get('icon_file_id', '')
+        icon_url = app.get('icon_url', '')
+        if icon_file_id or icon_url:
+            try:
+                photo = icon_file_id if icon_file_id else icon_url
+                self.api_call('sendPhoto', {
+                    'chat_id': chat_id,
+                    'photo': photo,
+                    'caption': text,
+                    'parse_mode': 'HTML',
+                    'reply_markup': json.dumps({'inline_keyboard': inline_btns})
+                })
+                return
+            except:
+                pass
 
-        # رابط الإحالة
-        if referral_link:
-            inline_btns.append([{'text': '🔗 رابط الإحالة', 'url': referral_link}])
-
-        inline_btns.append([{'text': '🔙 رجوع للتطبيقات', 'callback_data': 'app_list_back'}])
-
+        # بدون صورة — نص فقط
         self.send_inline_message(chat_id, text, inline_btns)
 
     # ==================== Admin: Apps Management ====================
@@ -1473,7 +1651,7 @@ class ComprehensiveDUXBot:
         inline_btns.append([{'text': '🔙 العودة للوحة الأدمن', 'callback_data': 'app_back_admin'}])
 
         if not apps:
-            text += "\n📭 لا توجد تطبيقات بعد."
+            text += self.tr('a0008_لا_توجد', 'ar')
 
         self.send_inline_message(message['chat']['id'], text, inline_btns)
 
@@ -1500,7 +1678,7 @@ class ComprehensiveDUXBot:
         field = state.get('field', '')
         app_id = state.get('app_id', '')
 
-        if text in ['❌ إلغاء', 'إلغاء', 'الغاء', '🔙']:
+        if text in [self.tr('a0009_إلغاء', 'ar'), self.tr('a0010_إلغاء', 'ar'), self.tr('a0011_الغاء', 'ar'), '🔙']:
             del self.user_states[user_id]
             fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
             self.show_apps_admin_panel(fake_msg)
@@ -1508,7 +1686,7 @@ class ComprehensiveDUXBot:
 
         app = self.get_app_by_id(app_id)
         if not app:
-            self.send_message(chat_id, "❌ التطبيق غير موجود")
+            self.send_message(chat_id, self.tr('a0006_التطبيق_غير', 'ar'))
             del self.user_states[user_id]
             return
 
@@ -1517,7 +1695,7 @@ class ComprehensiveDUXBot:
 
         if field == 'name':
             if len(text) < 2:
-                self.send_message(chat_id, "❌ الاسم قصير:")
+                self.send_message(chat_id, self.tr('a0012_الاسم_قصير', 'ar'))
                 return
             updates['name'] = text
 
@@ -1526,56 +1704,56 @@ class ComprehensiveDUXBot:
                 photo = message['photo'][-1]
                 updates['icon_file_id'] = photo['file_id']
                 updates['icon_url'] = ''
-            elif text.lower() in ['حذف', 'delete', 'مسح']:
+            elif text.lower() in [self.tr('a0013_حذف', 'ar'), 'delete', self.tr('a0014_مسح', 'ar')]:
                 updates['icon_file_id'] = ''
                 updates['icon_url'] = ''
             elif text.startswith('http'):
                 updates['icon_url'] = text
                 updates['icon_file_id'] = ''
             else:
-                self.send_message(chat_id, "❌ أرسل صورة أو رابط. أو 'حذف':")
+                self.send_message(chat_id, self.tr('a0015_أرسل_صورة', 'ar'))
                 return
 
         elif field == 'android':
             if 'document' in message:
                 updates['android_file_id'] = message['document']['file_id']
                 updates['android_url'] = ''
-            elif text.lower() in ['حذف', 'delete', 'مسح']:
+            elif text.lower() in [self.tr('a0013_حذف', 'ar'), 'delete', self.tr('a0014_مسح', 'ar')]:
                 updates['android_file_id'] = ''
                 updates['android_url'] = ''
             elif text.startswith('http'):
                 updates['android_url'] = text
                 updates['android_file_id'] = ''
             else:
-                self.send_message(chat_id, "❌ أرسل ملف APK أو رابط. أو 'حذف':")
+                self.send_message(chat_id, self.tr('a0016_أرسل_ملف', 'ar'))
                 return
 
         elif field == 'ios':
-            if text.lower() in ['حذف', 'delete', 'مسح']:
+            if text.lower() in [self.tr('a0013_حذف', 'ar'), 'delete', self.tr('a0014_مسح', 'ar')]:
                 updates['ios_url'] = ''
             elif text.startswith('http'):
                 updates['ios_url'] = text
             else:
-                self.send_message(chat_id, "❌ اكتب رابط صحيح. أو 'حذف':")
+                self.send_message(chat_id, self.tr('a0017_اكتب_رابط', 'ar'))
                 return
 
         elif field == 'promo_code':
-            if text.lower() in ['حذف', 'delete', 'مسح']:
+            if text.lower() in [self.tr('a0013_حذف', 'ar'), 'delete', self.tr('a0014_مسح', 'ar')]:
                 updates['promo_code'] = ''
             else:
                 updates['promo_code'] = text
 
         elif field == 'referral_link':
-            if text.lower() in ['حذف', 'delete', 'مسح']:
+            if text.lower() in [self.tr('a0013_حذف', 'ar'), 'delete', self.tr('a0014_مسح', 'ar')]:
                 updates['referral_link'] = ''
             elif text.startswith('http'):
                 updates['referral_link'] = text
             else:
-                self.send_message(chat_id, "❌ اكتب رابط صحيح. أو 'حذف':")
+                self.send_message(chat_id, self.tr('a0017_اكتب_رابط', 'ar'))
                 return
 
         elif field == 'description':
-            if text.lower() in ['حذف', 'delete', 'مسح']:
+            if text.lower() in [self.tr('a0013_حذف', 'ar'), 'delete', self.tr('a0014_مسح', 'ar')]:
                 updates['description'] = ''
             else:
                 updates['description'] = text
@@ -1587,9 +1765,9 @@ class ComprehensiveDUXBot:
                           'ios': '🍎 آيفون', 'promo_code': '🎁 البرومو كود',
                           'referral_link': '🔗 رابط الإحالة', 'description': '📋 الوصف'}
             label = field_labels.get(field, field)
-            self.send_message(chat_id, f"✅ تم تحديث {label} بنجاح!")
+            self.send_message(chat_id, self.tr('a0018_تم_تحديث', 'ar', label=label))
         else:
-            self.send_message(chat_id, "⚠️ لم يتم تغيير شيء")
+            self.send_message(chat_id, self.tr('a0019_لم_يتم', 'ar'))
 
         del self.user_states[user_id]
         # العودة لقائمة تعديل التطبيق
@@ -1597,8 +1775,8 @@ class ComprehensiveDUXBot:
         # إعادة عرض قائمة التعديل
         app = self.get_app_by_id(app_id)
         if app:
-            dl_android = '📦 APK' if app.get('android_file_id') else ('🔗 رابط' if app.get('android_url') else '➖')
-            dl_ios = '🔗 رابط' if app.get('ios_url') else '➖'
+            dl_android = '📦 APK' if app.get('android_file_id') else (self.tr('a0020_رابط', 'ar') if app.get('android_url') else '➖')
+            dl_ios = self.tr('a0020_رابط', 'ar') if app.get('ios_url') else '➖'
             icon = '🖼️' if (app.get('icon_file_id') or app.get('icon_url')) else '➖'
             promo = '🎁' if app.get('promo_code') else '➖'
             ref = '🔗' if app.get('referral_link') else '➖'
@@ -1624,7 +1802,7 @@ class ComprehensiveDUXBot:
         chat_id = message['chat']['id']
         text = message.get('text', '').strip()
 
-        if text in ['❌ إلغاء', '🔙 لوحة الأدمن', 'إلغاء', 'الغاء']:
+        if text in [self.tr('a0009_إلغاء', 'ar'), self.tr('a0021_لوحة_الأدمن', 'ar'), self.tr('a0010_إلغاء', 'ar'), self.tr('a0011_الغاء', 'ar')]:
             if user_id in self.user_states:
                 del self.user_states[user_id]
             if hasattr(self, 'temp_app_data') and user_id in self.temp_app_data:
@@ -1637,7 +1815,7 @@ class ComprehensiveDUXBot:
 
         if step == 'app_name':
             if len(text) < 2:
-                self.send_message(chat_id, "❌ الاسم قصير جداً. اكتب اسماً صحيحاً:")
+                self.send_message(chat_id, self.tr('a0022_الاسم_قصير', 'ar'))
                 return
             data['name'] = text
             data['step'] = 'app_icon'
@@ -1654,17 +1832,17 @@ class ComprehensiveDUXBot:
                 photo = message['photo'][-1]
                 data['icon_file_id'] = photo['file_id']
                 data['icon_url'] = ''
-                self.send_message(chat_id, "✅ تم حفظ الأيقونة!")
-            elif text.lower() in ['تخطي', 'skip', 'بدون']:
+                self.send_message(chat_id, self.tr('a0023_تم_حفظ', 'ar'))
+            elif text.lower() in [self.tr('a0024_تخطي', 'ar'), 'skip', self.tr('a0025_بدون', 'ar')]:
                 data['icon_file_id'] = ''
                 data['icon_url'] = ''
-                self.send_message(chat_id, "⏭️ بدون أيقونة")
+                self.send_message(chat_id, self.tr('a0026_بدون_أيقونة', 'ar'))
             elif text.startswith('http'):
                 data['icon_url'] = text
                 data['icon_file_id'] = ''
-                self.send_message(chat_id, "✅ تم حفظ رابط الأيقونة!")
+                self.send_message(chat_id, self.tr('a0027_تم_حفظ', 'ar'))
             else:
-                self.send_message(chat_id, "❌ أرسل صورة أو رابط. أو اكتب 'تخطي':")
+                self.send_message(chat_id, self.tr('a0028_أرسل_صورة', 'ar'))
                 return
 
             data['step'] = 'app_android'
@@ -1681,17 +1859,17 @@ class ComprehensiveDUXBot:
                 file_name = doc.get('file_name', '')
                 data['android_file_id'] = doc['file_id']
                 data['android_url'] = ''
-                self.send_message(chat_id, f"✅ تم حفظ ملف APK: <code>{file_name}</code>")
+                self.send_message(chat_id, self.tr('a0029_تم_حفظ', 'ar', file_name=file_name))
             elif text.startswith('http'):
                 data['android_url'] = text
                 data['android_file_id'] = ''
-                self.send_message(chat_id, "✅ تم حفظ رابط أندرويد!")
-            elif text.lower() in ['تخطي', 'skip', 'بدون']:
+                self.send_message(chat_id, self.tr('a0030_تم_حفظ', 'ar'))
+            elif text.lower() in [self.tr('a0024_تخطي', 'ar'), 'skip', self.tr('a0025_بدون', 'ar')]:
                 data['android_url'] = ''
                 data['android_file_id'] = ''
-                self.send_message(chat_id, "⏭️ بدون رابط أندرويد")
+                self.send_message(chat_id, self.tr('a0031_بدون_رابط', 'ar'))
             else:
-                self.send_message(chat_id, "❌ أرسل ملف APK أو رابط (http/https). أو اكتب 'تخطي':")
+                self.send_message(chat_id, self.tr('a0032_أرسل_ملف', 'ar'))
                 return
 
             data['step'] = 'app_ios'
@@ -1705,13 +1883,13 @@ class ComprehensiveDUXBot:
             if text.startswith('http'):
                 data['ios_url'] = text
                 data['ios_file_id'] = ''
-                self.send_message(chat_id, "✅ تم حفظ رابط آيفون!")
-            elif text.lower() in ['تخطي', 'skip', 'بدون']:
+                self.send_message(chat_id, self.tr('a0033_تم_حفظ', 'ar'))
+            elif text.lower() in [self.tr('a0024_تخطي', 'ar'), 'skip', self.tr('a0025_بدون', 'ar')]:
                 data['ios_url'] = ''
                 data['ios_file_id'] = ''
-                self.send_message(chat_id, "⏭️ بدون رابط آيفون")
+                self.send_message(chat_id, self.tr('a0034_بدون_رابط', 'ar'))
             else:
-                self.send_message(chat_id, "❌ اكتب رابط App Store (http/https). أو اكتب 'تخطي':")
+                self.send_message(chat_id, self.tr('a0035_اكتب_رابط', 'ar'))
                 return
 
             data['step'] = 'app_promo'
@@ -1722,7 +1900,7 @@ class ComprehensiveDUXBot:
                 f"• أو اكتب 'تخطي'")
 
         elif step == 'app_promo':
-            if text.lower() in ['تخطي', 'skip', 'بدون']:
+            if text.lower() in [self.tr('a0024_تخطي', 'ar'), 'skip', self.tr('a0025_بدون', 'ar')]:
                 data['promo_code'] = ''
             else:
                 data['promo_code'] = text.strip()
@@ -1734,21 +1912,21 @@ class ComprehensiveDUXBot:
                 f"• أو اكتب 'تخطي'")
 
         elif step == 'app_referral':
-            if text.lower() in ['تخطي', 'skip', 'بدون']:
+            if text.lower() in [self.tr('a0024_تخطي', 'ar'), 'skip', self.tr('a0025_بدون', 'ar')]:
                 data['referral_link'] = ''
             elif text.startswith('http'):
                 data['referral_link'] = text.strip()
             else:
-                self.send_message(chat_id, "❌ اكتب رابط صحيح (http/https). أو اكتب 'تخطي':")
+                self.send_message(chat_id, self.tr('a0036_اكتب_رابط', 'ar'))
                 return
 
             data['step'] = 'app_desc'
             self.temp_app_data[user_id] = data
             self.send_message(chat_id,
-                f"\n📝 الخطوة 7 (الأخيرة): اكتب <b>وصفاً قصيراً</b>:\nأو اكتب 'تخطي'")
+                self.tr('a0037_الخطوة_الأخيرة', 'ar'))
 
         elif step == 'app_desc':
-            if text.lower() in ['تخطي', 'skip', 'بدون']:
+            if text.lower() in [self.tr('a0024_تخطي', 'ar'), 'skip', self.tr('a0025_بدون', 'ar')]:
                 data['description'] = ''
             else:
                 data['description'] = text
@@ -1772,11 +1950,11 @@ class ComprehensiveDUXBot:
                 )
 
             if app_id:
-                android_info = '📦 APK مرفوع' if data.get('android_file_id') else ('🔗 رابط أندرويد' if data.get('android_url') else '➖ بدون أندرويد')
-                ios_info = '🔗 رابط آيفون' if data.get('ios_url') else '➖ بدون آيفون'
-                promo_info = f"🎁 كود: <code>{data.get('promo_code', '')}</code>" if data.get('promo_code') else '➖ بدون كود'
-                ref_info = '🔗 رابط إحالة' if data.get('referral_link') else '➖ بدون رابط إحالة'
-                icon_info = '🖼️ أيقونة مرفوعة' if data.get('icon_file_id') else ('🖼️ رابط أيقونة' if data.get('icon_url') else '➖ بدون أيقونة')
+                android_info = self.tr('a0038_مرفوع', 'ar') if data.get('android_file_id') else (self.tr('a0039_رابط_أندرويد', 'ar') if data.get('android_url') else self.tr('a0040_بدون_أندرويد', 'ar'))
+                ios_info = self.tr('a0041_رابط_آيفون', 'ar') if data.get('ios_url') else self.tr('a0042_بدون_آيفون', 'ar')
+                promo_info = f"🎁 كود: <code>{data.get('promo_code', '')}</code>" if data.get('promo_code') else self.tr('a0043_بدون_كود', 'ar')
+                ref_info = self.tr('a0044_رابط_إحالة', 'ar') if data.get('referral_link') else self.tr('a0045_بدون_رابط', 'ar')
+                icon_info = self.tr('a0046_أيقونة_مرفوعة', 'ar') if data.get('icon_file_id') else (self.tr('a0047_رابط_أيقونة', 'ar') if data.get('icon_url') else self.tr('a0048_بدون_أيقونة', 'ar'))
                 summary = (
                     f"✅ <b>تم حفظ التطبيق!</b>\n\n"
                     f"📱 الاسم: <b>{data['name']}</b>\n"
@@ -1797,7 +1975,7 @@ class ComprehensiveDUXBot:
                 ]
                 self.send_inline_message(chat_id, summary, inline_btns)
             else:
-                self.send_message(chat_id, "❌ فشل في حفظ التطبيق", self.admin_keyboard())
+                self.send_message(chat_id, self.tr('a0049_فشل_في', 'ar'), self.admin_keyboard())
 
             if user_id in self.user_states:
                 del self.user_states[user_id]
@@ -1857,31 +2035,27 @@ class ComprehensiveDUXBot:
         )
 
         if lang == 'ar':
-            panel_text = (
-                "💎 <b>تعويض 100%</b>\n\n"
-                "━━━━━━━━━━━━━━━━━━\n"
-                f"{intro_ar}\n"
-                "━━━━━━━━━━━━━━━━━━\n\n"
-                f"🧊 <b>الرصيد المجمد:</b> <code>{frozen:.2f}</code>\n"
-                f"🟢 <b>الرصيد المتاح:</b> <code>{available:.2f}</code>\n"
-                f"⏳ <b>بانتظار الأصدقاء:</b> <code>{pending:.2f}</code>\n"
-                f"━━━━━━━━━━━━━━━━━━\n"
-                f"📈 المكتسب: <b>{total_earned:.2f}</b> | 📉 المستخدم: <b>{total_used:.2f}</b>\n\n"
-                f"👇 <b>اختر ما تريد:</b>"
-            )
+            panel_text = self.ui_card_pro('تعويض 100%', '💎', items=[
+                {'label': 'الرصيد المجمد', 'value': f"{frozen:.2f}", 'icon': '🧊', 'highlight': True},
+                {'label': 'الرصيد المتاح', 'value': f"{available:.2f}", 'icon': '🟢', 'highlight': True},
+                {'label': 'بانتظار الأصدقاء', 'value': f"{pending:.2f}", 'icon': '⏳', 'highlight': True},
+                {'label': 'إجمالي المكتسب', 'value': f"{total_earned:.2f}", 'icon': '📈'},
+                {'label': 'إجمالي المستخدم', 'value': f"{total_used:.2f}", 'icon': '📉'},
+            ])
+            panel_text += self.ui_card_section('كيف يعمل النظام؟', '📌', color='blue')
+            panel_text += intro_ar + "\n\n"
+            panel_text += "👇 <b>اختر ما تريد:</b>"
         else:
-            panel_text = (
-                "💎 <b>Compensation 100%</b>\n\n"
-                "━━━━━━━━━━━━━━━━━━\n"
-                f"{intro_en}\n"
-                "━━━━━━━━━━━━━━━━━━\n\n"
-                f"🧊 <b>Frozen:</b> <code>{frozen:.2f}</code>\n"
-                f"🟢 <b>Available:</b> <code>{available:.2f}</code>\n"
-                f"⏳ <b>Pending friends:</b> <code>{pending:.2f}</code>\n"
-                f"━━━━━━━━━━━━━━━━━━\n"
-                f"📈 Earned: <b>{total_earned:.2f}</b> | 📉 Used: <b>{total_used:.2f}</b>\n\n"
-                f"👇 <b>Select an option:</b>"
-            )
+            panel_text = self.ui_card_pro('Compensation 100%', '💎', items=[
+                {'label': 'Frozen', 'value': f"{frozen:.2f}", 'icon': '🧊', 'highlight': True},
+                {'label': 'Available', 'value': f"{available:.2f}", 'icon': '🟢', 'highlight': True},
+                {'label': 'Pending friends', 'value': f"{pending:.2f}", 'icon': '⏳', 'highlight': True},
+                {'label': 'Total earned', 'value': f"{total_earned:.2f}", 'icon': '📈'},
+                {'label': 'Total used', 'value': f"{total_used:.2f}", 'icon': '📉'},
+            ])
+            panel_text += self.ui_card_section('How it works', '📌', color='blue')
+            panel_text += intro_en + "\n\n"
+            panel_text += "👇 <b>Select an option:</b>"
 
         # فحص التسجيل: هل سجّل العميل حسابات في الشركات؟
         user_accounts = self.svrp.get_user_company_accounts(user_id) if self.svrp else []
@@ -1932,18 +2106,18 @@ class ComprehensiveDUXBot:
         used = float(wallet.get('total_used', 0) or 0)
 
         if lang == 'ar':
-            title = "💎 <b>محفظتي</b>"
-            frozen_lbl = "🧊 مجمد" if is_frozen else "🟢 متاح"
-            pending_lbl = "⏳ بانتظار الأصدقاء"
-            earned_lbl = "📈 إجمالي المكتسب"
-            used_lbl = "📉 إجمالي المستخدم"
-            keep_lbl = "📥 أرصدة الاحتفاظ"
-            shared_lbl = "📤 أرصدة المشاركة"
-            active_lbl = "نشط"
-            pending_status_lbl = "معلق"
-            used_lbl2 = "مستخدم"
-            expired_lbl = "منتهي"
-            hint = "💡 يمكنك إنشاء كود ترويجي أو استرداد كود من صديق"
+            title = self.tr('a0050_محفظتي', lang)
+            frozen_lbl = self.tr('a0051_مجمد', lang) if is_frozen else self.tr('a0052_متاح', lang)
+            pending_lbl = self.tr('a0053_بانتظار_الأصدقاء', lang)
+            earned_lbl = self.tr('a0054_إجمالي_المكتسب', lang)
+            used_lbl = self.tr('a0055_إجمالي_المستخدم', lang)
+            keep_lbl = self.tr('a0056_أرصدة_الاحتفاظ', lang)
+            shared_lbl = self.tr('a0057_أرصدة_المشاركة', lang)
+            active_lbl = self.tr('a0058_نشط', lang)
+            pending_status_lbl = self.tr('a0059_معلق', lang)
+            used_lbl2 = self.tr('a0060_مستخدم', lang)
+            expired_lbl = self.tr('a0061_منتهي', lang)
+            hint = self.tr('a0062_يمكنك_إنشاء', lang)
         else:
             title = "💎 <b>My Wallet</b>"
             frozen_lbl = "🧊 Frozen" if is_frozen else "🟢 Available"
@@ -2007,10 +2181,10 @@ class ComprehensiveDUXBot:
         }
 
         if lang == 'ar':
-            title = "📋 <b>مهام اليوم</b>"
-            reward_lbl = "مكافأة"
-            claim_hint = "🎉 لديك مهام مكتملة!\nاكتب: <code>استلام [رقم_المهمة]</code>"
-            pending_hint = "💡 أكمل معاملاتك لإنجاز المهام!"
+            title = self.tr('a0063_مهام_اليوم', lang)
+            reward_lbl = self.tr('a0064_مكافأة', lang)
+            claim_hint = self.tr('a0065_لديك_مهام', lang)
+            pending_hint = self.tr('a0066_أكمل_معاملاتك', lang)
         else:
             title = "📋 <b>Today's Tasks</b>"
             reward_lbl = "reward"
@@ -2057,22 +2231,22 @@ class ComprehensiveDUXBot:
         is_frozen = wager_done < wager_req
 
         if lang == 'ar':
-            title = "🎟️ <b>أكوادي الترويجية</b>"
-            balance_lbl = "رصيدك"
-            empty = "📭 لا توجد أكواد بعد"
-            create_hint = "➕ لإنشاء كود جديد:"
-            create_cmd = "<code>انشاء_كود 100</code>"
-            redeem_hint = "📥 لاسترداد كود:"
-            redeem_cmd = "<code>استرداد_كود RCVABC123</code>"
-            frozen_warn = "⚠️ رصيدك مجمد حتى تكمل 3 معاملات" if is_frozen else ""
+            title = self.tr('a0067_أكوادي_الترويجية', lang)
+            balance_lbl = self.tr('a0068_رصيدك', lang)
+            empty = self.tr('a0069_لا_توجد', lang)
+            create_hint = self.tr('a0070_لإنشاء_كود', lang)
+            create_cmd = self.tr('a0071_انشاء_كود', lang)
+            redeem_hint = self.tr('a0072_لاسترداد_كود', lang)
+            redeem_cmd = self.tr('a0073_استرداد_كود', lang)
+            frozen_warn = self.tr('a0074_رصيدك_مجمد', lang) if is_frozen else ""
         else:
             title = "🎟️ <b>My Promo Codes</b>"
             balance_lbl = "Your balance"
             empty = "📭 No codes yet"
             create_hint = "➕ To create a new code:"
-            create_cmd = "<code>انشاء_كود 100</code>"
+            create_cmd = self.tr('a0071_انشاء_كود', lang)
             redeem_hint = "📥 To redeem a code:"
-            redeem_cmd = "<code>استرداد_كود RCVABC123</code>"
+            redeem_cmd = self.tr('a0073_استرداد_كود', lang)
             frozen_warn = "⚠️ Your balance is frozen until you complete 3 transactions" if is_frozen else ""
 
         text = f"{title}\n\n━━━━━━━━━━━━━━━━━━\n"
@@ -2152,7 +2326,7 @@ class ComprehensiveDUXBot:
         group = self.svrp.get_user_group(user_id)
         group_name = group.get('group_name', 'bronze')
         group_icon = {'bronze': '🥉', 'silver': '🥈', 'gold': '🥇', 'platinum': '💎'}.get(group_name, '🥉')
-        group_ar = {'bronze': 'برونزي' if lang=='ar' else 'Bronze', 'silver': 'فضي' if lang=='ar' else 'Silver', 'gold': 'ذهبي' if lang=='ar' else 'Gold', 'platinum': 'بلاتيني' if lang=='ar' else 'Platinum'}.get(group_name, 'برونزي')
+        group_ar = {'bronze': 'برونزي' if lang=='ar' else 'Bronze', 'silver': 'فضي' if lang=='ar' else 'Silver', 'gold': 'ذهبي' if lang=='ar' else 'Gold', 'platinum': 'بلاتيني' if lang=='ar' else 'Platinum'}.get(group_name, self.tr('a0075_برونزي', lang))
         multiplier = {'bronze': '1.0x', 'silver': '1.2x', 'gold': '1.5x', 'platinum': '2.0x'}.get(group_name, '1.0x')
         score = float(group.get('tier_score', 0) or 0)
 
@@ -2168,10 +2342,10 @@ class ComprehensiveDUXBot:
         )
 
         thresholds = [
-            ('🥉 ' + ('برونزي' if lang=='ar' else 'Bronze'), 'bronze', 0, '1.0x'),
-            ('🥈 ' + ('فضي' if lang=='ar' else 'Silver'), 'silver', 500, '1.2x'),
-            ('🥇 ' + ('ذهبي' if lang=='ar' else 'Gold'), 'gold', 2000, '1.5x'),
-            ('💎 ' + ('بلاتيني' if lang=='ar' else 'Platinum'), 'platinum', 5000, '2.0x'),
+            ('🥉 ' + (self.tr('a0075_برونزي', lang) if lang=='ar' else 'Bronze'), 'bronze', 0, '1.0x'),
+            ('🥈 ' + (self.tr('a0076_فضي', lang) if lang=='ar' else 'Silver'), 'silver', 500, '1.2x'),
+            ('🥇 ' + (self.tr('a0077_ذهبي', lang) if lang=='ar' else 'Gold'), 'gold', 2000, '1.5x'),
+            ('💎 ' + (self.tr('a0078_بلاتيني', lang) if lang=='ar' else 'Platinum'), 'platinum', 5000, '2.0x'),
         ]
         text += f"📋 {self.tr('svrp_tier_levels', lang)}:\n"
         for label, gname, min_score, mult in thresholds:
@@ -2203,7 +2377,7 @@ class ComprehensiveDUXBot:
             emoji_val = emoji
             item_type = 'emoji'
         else:
-            self.send_message(chat_id, "❌ أرسل استيكر أو رمز (emoji) صحيح")
+            self.send_message(chat_id, self.tr('a0079_أرسل_استيكر', lang))
             return
 
         item_id = f"STK{str(int(datetime.now().timestamp()))[-6:]}"
@@ -2222,7 +2396,7 @@ class ComprehensiveDUXBot:
             f"🆔 <code>{item_id}</code>")
 
         if sticker:
-            self.send_message(chat_id, "📊 المحفوظ:")
+            self.send_message(chat_id, self.tr('a0080_المحفوظ', lang))
 
     def _handle_lottery_edit_input(self, message, state):
         """معالجة تعديل حقول جولة اليانصيب"""
@@ -2265,10 +2439,10 @@ class ComprehensiveDUXBot:
                 for row in rows:
                     writer.writerow({k: row.get(k, '') for k in fieldnames})
         except Exception as e:
-            self.send_message(chat_id, f"❌ خطأ: {e}")
+            self.send_message(chat_id, self.tr('a0081_خطأ', 'ar', e=e))
             return
 
-        self.send_message(chat_id, f"✅ تم تعديل {field} = {value}")
+        self.send_message(chat_id, self.tr('a0082_تم_تعديل', 'ar', field=field, value=value))
         fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
         self.show_lottery_admin(fake_msg)
 
@@ -2280,7 +2454,7 @@ class ComprehensiveDUXBot:
         user = self.find_user(user_id)
         lang = user.get('language', 'ar') if user else 'ar'
 
-        if text in ['🔙', '🏠 القائمة الرئيسية', '❌ إلغاء', 'الغاء', 'إلغاء']:
+        if text in ['🔙', self.tr('a0083_القائمة_الرئيسية', lang), self.tr('a0009_إلغاء', lang), self.tr('a0011_الغاء', lang), self.tr('a0010_إلغاء', lang)]:
             if user_id in self.user_states:
                 del self.user_states[user_id]
             self.show_svrp_panel(message)
@@ -2322,7 +2496,7 @@ class ComprehensiveDUXBot:
         admin_lang = admin_user.get('language', 'ar') if admin_user else 'ar'
 
         if not self.svrp:
-            self.send_message(message['chat']['id'], "❌ نظام التعويض غير متاح", self.admin_keyboard())
+            self.send_message(message['chat']['id'], self.tr('a0084_نظام_التعويض', lang), self.admin_keyboard())
             return
 
         stats = self.svrp.get_svrp_stats()
@@ -2370,10 +2544,10 @@ class ComprehensiveDUXBot:
         """عرض جميع محافظ تعويض 100%"""
         wallets = self.svrp._read_csv('svrp_wallets.csv')
         if not wallets:
-            self.send_message(chat_id, "📭 لا توجد محافظ بعد.", self.admin_keyboard('ar'))
+            self.send_message(chat_id, self.tr('a0085_لا_توجد', 'ar'), self.admin_keyboard('ar'))
             return
 
-        text = "╔════════════════════╗\n║  💎 المحافظ  ║\n╚════════════════════╝\n\n"
+        text = self.tr('a0086_المحافظ', 'ar')
         for w in wallets[:20]:  # أول 20 محفظة
             text += (
                 f"👤 <code>{w.get('telegram_id', '')}</code>\n"
@@ -2392,11 +2566,11 @@ class ComprehensiveDUXBot:
         """عرض الأكواد الترويجية"""
         promos = self.svrp._read_csv('svrp_promo_codes.csv')
         if not promos:
-            self.send_inline_message(chat_id, "📭 لا توجد أكواد ترويجية.",
+            self.send_inline_message(chat_id, self.tr('a0087_لا_توجد', 'ar'),
                 [[{'text': '🔙 العودة', 'callback_data': 'svrp_admin_back'}]])
             return
 
-        text = "╔════════════════════╗\n║  🎟️ الأكواد الترويجية  ║\n╚════════════════════╝\n\n"
+        text = self.tr('a0088_الأكواد_الترويجية', 'ar')
         for p in promos:
             status_icon = {'active': '✅', 'fully_used': '🔴', 'expired': '⏰'}.get(p.get('status', ''), '✅')
             text += (
@@ -2412,11 +2586,11 @@ class ComprehensiveDUXBot:
         """عرض المهام"""
         tasks = self.svrp._read_csv('svrp_tasks.csv')
         if not tasks:
-            self.send_inline_message(chat_id, "📭 لا توجد مهام.",
+            self.send_inline_message(chat_id, self.tr('a0089_لا_توجد', 'ar'),
                 [[{'text': '🔙 العودة', 'callback_data': 'svrp_admin_back'}]])
             return
 
-        text = "╔════════════════════╗\n║  📋 المهام  ║\n╚════════════════════╝\n\n"
+        text = self.tr('a0090_المهام', 'ar')
         active = [t for t in tasks if t.get('status') == 'active']
         completed = [t for t in tasks if t.get('status') == 'completed']
         claimed = [t for t in tasks if t.get('status') == 'claimed']
@@ -2508,7 +2682,7 @@ class ComprehensiveDUXBot:
         """تنظيف الأرصدة المنتهية"""
         expired = self.svrp.expire_old_credits()
         self.edit_or_send(chat_id,
-            f"🧹 تم التنظيف!\n\n⏰ عدد الأرصدة المنتهية: {expired}",
+            self.tr('a0091_تم_التنظيف', 'ar', expired=expired),
             [[{'text': '🔙 العودة', 'callback_data': 'svrp_admin_back'}]])
 
     def _update_svrp_config(self, key, new_val):
@@ -3198,9 +3372,9 @@ class ComprehensiveDUXBot:
             f"━━━━━━━━━━━━━━━━━━\n"
         )
         if top_channels:
-            report_text += f"\n🏆 <b>أكثر القنوات نشاطاً:</b>\n"
+            report_text += self.tr('a0092_أكثر_القنوات', 'ar')
             for ch, count in top_channels[:3]:
-                report_text += f"  • {ch}: {count} بوست\n"
+                report_text += self.tr('a0093_بوست', 'ar', ch=ch, count=count)
 
         if recommendations:
             report_text += f"\n🤖 <b>توصيات AI:</b>\n<i>{recommendations[:500]}</i>\n"
@@ -3235,10 +3409,10 @@ class ComprehensiveDUXBot:
             )
 
             result, _ = ai_manager.process(analysis_text,
-                "أنت مستشار تسويق رقمي خبير. حلل البيانات وقدم توصيات قصيرة ومفيدة.")
-            return result or 'لا توجد توصيات متاحة'
+                self.tr('a0094_أنت_مستشار', 'ar'))
+            return result or self.tr('a0095_لا_توجد', 'ar')
         except:
-            return 'لا يمكن توليد توصيات (AI غير متاح)'
+            return self.tr('a0096_لا_يمكن', 'ar')
 
     def auto_relay_channel_post(self, message):
         """إعادة نشر بوست من قناة البوت مشرف لها لكل المستخدمين — مع احترام كل الإعدادات"""
@@ -3287,7 +3461,7 @@ class ComprehensiveDUXBot:
         # استخراج المحتوى
         user_name = message.get('from', {}).get('first_name', '') or message.get('from', {}).get('title', '')
         welcome = channel_settings.get('welcome_text', '')
-        relay_header = f"📢 <b>إعلان من القناة</b>\n📋 {chat_title}\n👤 {user_name}\n\n━━━━━━━━━━━━━━━━━━\n\n"
+        relay_header = self.tr('a0097_إعلان_من', 'ar', chat_title=chat_title, user_name=user_name)
         if welcome:
             relay_header = f"{welcome}\n\n{relay_header}"
 
@@ -3323,7 +3497,7 @@ class ComprehensiveDUXBot:
             elif 'photo' in message:
                 photo = message['photo'][-1]['file_id']
                 caption = message.get('caption', '')
-                preview = '[صورة] ' + caption[:80]
+                preview = self.tr('a0098_صورة', 'ar') + caption[:80]
                 if relay_to_users:
                     s, _ = self.broadcast_to_all_users(relay_header + caption, photo=photo)
                     users_relayed = s
@@ -3335,7 +3509,7 @@ class ComprehensiveDUXBot:
             elif 'video' in message:
                 video = message['video']['file_id']
                 caption = message.get('caption', '')
-                preview = '[فيديو] ' + caption[:80]
+                preview = self.tr('a0099_فيديو', 'ar') + caption[:80]
                 if relay_to_users:
                     s, _ = self.broadcast_to_all_users(relay_header + caption, video=video)
                     users_relayed = s
@@ -3347,7 +3521,7 @@ class ComprehensiveDUXBot:
             elif 'document' in message:
                 doc = message['document']['file_id']
                 caption = message.get('caption', '')
-                preview = '[ملف] ' + caption[:80]
+                preview = self.tr('a0100_ملف', 'ar') + caption[:80]
                 if relay_to_users:
                     s, _ = self.broadcast_to_all_users(relay_header + caption, document=doc)
                     users_relayed = s
@@ -3358,9 +3532,9 @@ class ComprehensiveDUXBot:
 
             elif 'sticker' in message:
                 sticker = message['sticker']['file_id']
-                preview = '[ملصق]'
+                preview = self.tr('a0101_ملصق', 'ar')
                 if relay_to_users:
-                    s, _ = self.broadcast_to_all_users(relay_header + "🃏 ملصق", sticker=sticker)
+                    s, _ = self.broadcast_to_all_users(relay_header + self.tr('a0102_ملصق', 'ar'), sticker=sticker)
                     users_relayed = s
                 if relay_to_channels:
                     channels_relayed = self.post_to_channels('', sticker=sticker, exclude_chat_id=chat_id)
@@ -3381,19 +3555,19 @@ class ComprehensiveDUXBot:
 
             elif 'voice' in message:
                 voice = message['voice']['file_id']
-                preview = '[رسالة صوتية]'
+                preview = self.tr('a0103_رسالة_صوتية', 'ar')
                 if relay_to_users:
-                    s, _ = self.broadcast_to_all_users(relay_header + "🎤 رسالة صوتية")
+                    s, _ = self.broadcast_to_all_users(relay_header + self.tr('a0104_رسالة_صوتية', 'ar'))
                     users_relayed = s
                 if relay_to_channels:
-                    channels_relayed = self.post_to_channels(relay_header + "🎤 رسالة صوتية", document=voice, exclude_chat_id=chat_id)
+                    channels_relayed = self.post_to_channels(relay_header + self.tr('a0104_رسالة_صوتية', 'ar'), document=voice, exclude_chat_id=chat_id)
                 self._log_relay('channel_post', str(chat_id), preview, users_relayed, channels_relayed)
                 return True
 
             elif 'audio' in message:
                 audio = message['audio']['file_id']
                 caption = message.get('caption', '')
-                preview = '[صوت] ' + caption[:80]
+                preview = self.tr('a0105_صوت', 'ar') + caption[:80]
                 if relay_to_users:
                     s, _ = self.broadcast_to_all_users(relay_header + caption)
                     users_relayed = s
@@ -3429,10 +3603,10 @@ class ComprehensiveDUXBot:
                 brand = s.get('brand_voice', '')[:30] if s.get('brand_voice') else '—'
                 text += f"{status} <b>{s.get('title', '')}</b>\n"
                 text += f"  🆔 <code>{s.get('chat_id', '')}</code>\n"
-                text += f"  📝 البراند: {brand}\n"
+                text += self.tr('a0106_البراند', 'ar', brand=brand)
                 text += f"  📅 آخر نسخ: {s.get('last_scraped_at', '—')}\n\n"
         else:
-            text += "📭 لا توجد قنوات مصدرية\n\n"
+            text += self.tr('a0107_لا_توجد', 'ar')
 
         text += (
             "💡 <b>كيف تعمل:</b>\n"
@@ -3449,7 +3623,11 @@ class ComprehensiveDUXBot:
         self.send_inline_message(message['chat']['id'], text, inline_btns)
 
     def show_sticker_library(self, message):
-        """لوحة مكتبة الرموز والاستيكرات"""
+        """لوحة مكتبة الرموز والاستيكرات — محسّنة"""
+        user_id = message['from']['id']
+        admin_obj = self.find_user(user_id)
+        lang = admin_obj.get('language', 'ar') if admin_obj else 'ar'
+
         stickers = []
         try:
             with open('sticker_library.csv', 'r', encoding='utf-8-sig') as f:
@@ -3459,37 +3637,43 @@ class ComprehensiveDUXBot:
             pass
 
         emojis = [s for s in stickers if s.get('type') == 'emoji']
-        sti = [s for s in stickers if s.get('type') == 'sticker']
+        stickers_only = [s for s in stickers if s.get('type') == 'sticker']
+        photos = [s for s in stickers if s.get('type') == 'photo']
 
-        text = (
-            f"🗃️ <b>مكتبة الرموز والاستيكرات</b>\n\n"
-            f"━━━━━━━━━━━━━━━━━━\n"
-            f"😀 رموز (Emoji): <code>{len(emojis)}</code>\n"
-            f"🎨 استيكرات: <code>{len(sti)}</code>\n"
-            f"📦 الإجمالي: <code>{len(stickers)}</code>\n"
-            f"━━━━━━━━━━━━━━━━━━\n\n"
-        )
+        text = self.ui_card_pro('مكتبة الرموز', '🗃️', items=[
+            {'label': 'إيموجي', 'value': str(len(emojis)), 'icon': '😀', 'highlight': True},
+            {'label': 'استيكرات', 'value': str(len(stickers_only)), 'icon': '🎨', 'highlight': True},
+            {'label': 'صور مخصصة', 'value': str(len(photos)), 'icon': '🖼️', 'highlight': True},
+            {'label': 'الإجمالي', 'value': str(len(stickers)), 'icon': '📦'},
+        ])
+        text += "\n💡 <b>كيفية الاستخدام:</b>\n"
+        text += "• ➕ <b>إضافة إيموجي</b> — اكتب أو الصق إيموجي\n"
+        text += "• 📸 <b>رفع صورة</b> — أرسل صورة تتحول لأيقونة\n"
+        text += "• 🎨 <b>استيكر جاهز</b> — أرسل استيكر يُضاف مباشرة\n"
+        text += "• 🗑️ <b>حذف</b> — اختر أي عنصر واحذفه\n"
 
-        if stickers:
-            text += "<b>آخر الإضافات:</b>\n"
-            for s in stickers[-5:]:
-                icon = s.get('emoji', '📦') or '📦'
-                cat = s.get('category', '—')
-                text += f"  {icon} {s.get('type', '')} | {cat}\n"
+        # بناء شبكة الإيموجي من المكتبة (آخر 30)
+        inline_btns = []
+        if emojis:
+            text += self.ui_card_section('آخر الإيموجي المضافة', '✨', color='blue')
+            # شبكة 5 أعمدة
+            recent_emojis = emojis[-30:]
+            for i in range(0, len(recent_emojis), 5):
+                row = []
+                for j in range(5):
+                    if i + j < len(recent_emojis):
+                        em = recent_emojis[i + j].get('emoji', '❓').strip()
+                        sid = recent_emojis[i + j].get('id', '')
+                        if em:
+                            row.append({'text': em, 'callback_data': f'stk_del_{sid}'})
+                if row:
+                    inline_btns.append(row)
 
-        text += (
-            f"\n💡 <b>كيفية الاستخدام:</b>\n"
-            f"• أرسل استيكر أو رمز → يُحفظ تلقائياً\n"
-            f"• اختر فئة عند الحفظ\n"
-            f"• استخدم الرموز في البث والإشعارات\n"
-        )
-
-        inline_btns = [
-            [{'text': '➕ إضافة رمز/استيكر', 'callback_data': 'stk_add'}],
-            [{'text': '📋 عرض الكل', 'callback_data': 'stk_list'},
-             {'text': '📂 حسب الفئة', 'callback_data': 'stk_categories'}],
-            [{'text': '🔙 العودة', 'callback_data': 'app_back_admin'}]
-        ]
+        inline_btns.append([{'text': '➕ إضافة إيموجي', 'callback_data': 'stk_add_emoji'}])
+        inline_btns.append([{'text': '📸 رفع صورة كأيقونة', 'callback_data': 'stk_add_photo'},
+                            {'text': '🎨 إضافة استيكر', 'callback_data': 'stk_add_sticker'}])
+        inline_btns.append([{'text': '📋 عرض الكل', 'callback_data': 'stk_list'},
+                            {'text': '🔙 العودة', 'callback_data': 'app_back_admin'}])
         self.send_inline_message(message['chat']['id'], text, inline_btns)
 
     def show_channels_admin(self, message):
@@ -3528,7 +3712,7 @@ class ComprehensiveDUXBot:
                      'callback_data': f'ch_fwd_{ch.get("id", "")}'},
                 ])
         else:
-            text += "\n📭 لا توجد قنوات مرتبطة.\nأضف البوت كمشرف في قناة وسيتم تسجيلها تلقائياً."
+            text += self.tr('a0109_لا_توجد', 'ar')
 
         inline_btns.append([{'text': '🔄 تحديث', 'callback_data': 'ch_refresh'}])
         inline_btns.append([
@@ -3561,9 +3745,9 @@ class ComprehensiveDUXBot:
                 status = '✅' if r.get('is_active') == 'yes' else '⏸️'
                 text += f"{status} <code>{r.get('find_text', '')[:30]}</code> → <code>{r.get('replace_text', '')[:30]}</code>\n"
         else:
-            text += "📭 لا توجد قواعد استبدال\n"
+            text += self.tr('a0110_لا_توجد', 'ar')
 
-        text += "\n💡 أضف قاعدة: أرسل النص المراد البحث عنه\nسيطلب منك النص البديل"
+        text += self.tr('a0111_أضف_قاعدة', 'ar')
 
         inline_btns = [
             [{'text': '➕ إضافة قاعدة', 'callback_data': 'tr_add'}],
@@ -3593,7 +3777,7 @@ class ComprehensiveDUXBot:
         except:
             pass
 
-        key_status = '✅ مفعّل' if api_key else '❌ غير مفعّل'
+        key_status = self.tr('a0112_مفعّل', 'ar') if api_key else self.tr('a0113_غير_مفعّل', 'ar')
         text = (
             f"🤖 <b>إعدادات الذكاء الاصطناعي</b>\n\n"
             f"━━━━━━━━━━━━━━━━━━\n"
@@ -3604,7 +3788,7 @@ class ComprehensiveDUXBot:
         if ai_instructions:
             text += f"📝 <b>تعليمات AI:</b>\n<i>{ai_instructions[:200]}</i>\n\n"
         else:
-            text += "📝 لم يتم ضبط تعليمات AI بعد\n\n"
+            text += self.tr('a0114_لم_يتم', 'ar')
 
         text += (
             "💡 <b>كيف يعمل:</b>\n"
@@ -3825,7 +4009,7 @@ class ComprehensiveDUXBot:
                         return row['address']
         except:
             pass
-        return "العنوان غير متوفر حالياً"
+        return self.tr('a0115_العنوان_غير', 'ar')
     
     def get_setting(self, key):
         """جلب إعداد النظام"""
@@ -3983,9 +4167,84 @@ class ComprehensiveDUXBot:
         """صف من عمودين متوازنين"""
         return f"│ {left_label}: <code>{left_value}</code> │ {right_label}: <code>{right_value}</code> │"
 
+    def ui_card_pro(self, title, icon='📋', items=None, actions=None):
+        """
+        كرت احترافي ثنائي الألوان — تصميم عصري موحّد
+        
+        items: قائمة dict بـ:
+          - {'label': '...', 'value': '...', 'icon': '🔧', 'highlight': True/False}
+          - highlight=True → الصف يظهر بلون بارز (code block)
+          - highlight=False → الصف يظهر بلون عادي (bold)
+        actions: نص أزرار الإجراءات
+        
+        التصميم:
+        ┌─ blockquote header (title)
+        │  🔧 label: <code>value</code>   ← highlighted rows
+        │  📌 label: value               ← normal rows
+        └─ separator + actions
+        """
+        lines = []
+        # رأس الكرت — blockquote يعطي خلفية مميزة
+        lines.append(f"<blockquote><b>{icon} {title}</b></blockquote>")
+        
+        if items:
+            for item in items:
+                label = item.get('label', '')
+                value = item.get('value', '')
+                item_icon = item.get('icon', '•')
+                highlight = item.get('highlight', False)
+                
+                if value:
+                    if highlight:
+                        # صف بارز — code block (لون مختلف)
+                        lines.append(f"<code>{item_icon} {label}: {value}</code>")
+                    else:
+                        # صف عادي — bold (لون آخر)
+                        lines.append(f"{item_icon} <b>{label}:</b> <code>{value}</code>")
+                else:
+                    lines.append(f"{item_icon} {label}")
+        
+        # فاصل
+        lines.append("<b>━━━━━━━━━━━━━━━━━━</b>")
+        
+        if actions:
+            lines.append(actions)
+        
+        return '\n'.join(lines)
+
+    def ui_card_row(self, label, value, icon='•', highlight=False, lang='ar'):
+        """
+        صف واحد في الكرت — بلونين مختلفين حسب نوعه
+        highlight=True → أزرق (code block كامل)
+        highlight=False → عادي (bold label + code value)
+        """
+        if highlight:
+            return f"<code>{icon} {label}: {value}</code>"
+        else:
+            return f"{icon} <b>{label}:</b> <code>{value}</code>"
+
+    def ui_card_section(self, title, icon='📌', color='blue'):
+        """
+        عنوان قسم داخل الكرت — بلون مختلف حسب color
+        blue → code block (أزرق في بعض الثيمات)
+        red → bold (أحمر/أسود حسب الثيم)
+        """
+        if color == 'blue':
+            return f"\n<code>{icon} {title}</code>\n<b>━━━━━━━━━━━━━━━━━━</b>\n"
+        else:
+            return f"\n<b>{icon} {title}</b>\n<b>━━━━━━━━━━━━━━━━━━</b>\n"
+
+    def ui_card_alert(self, text, icon='⚠️'):
+        """صف تنبيه — يظهر بلون مختلف (code block مميز)"""
+        return f"<code>{icon} {text}</code>"
+
+    def ui_card_success(self, text, icon='✅'):
+        """صف نجاح — يظهر بلون بارز"""
+        return f"<code>{icon} {text}</code>"
+
     def ui_copy_hint(self, value):
         """قيمة قابلة للنسخ مع تلميح"""
-        return f"<code>{value}</code> 👈 اضغط للنسخ"
+        return self.tr('a0116_اضغط_للنسخ', 'ar', value=value)
 
     def fmt_amount(self, amount, trans_type='deposit', currency=''):
         """تنسيق مبلغ حسب نوع المعاملة"""
@@ -4044,7 +4303,7 @@ class ComprehensiveDUXBot:
         ref_btn = self.tr('referral_btn', lang) if self.tr('referral_btn', lang) != 'referral_btn' else f"{t.get('btn_referral', '🎁')} اربح"
         help_btn = self.tr('help_btn_label', lang) if self.tr('help_btn_label', lang) != 'help_btn_label' else f"{t.get('btn_help', '❓')} مساعدة"
         svrp_btn = self.tr('svrp_title', lang)
-        apps_btn = self.tr('apps_btn', lang) if self.tr('apps_btn', lang) != 'apps_btn' else '📱 تطبيقات'
+        apps_btn = self.tr('apps_btn', lang) if self.tr('apps_btn', lang) != 'apps_btn' else self.tr('a0117_تطبيقات', lang)
 
         lang_names = self.get_language_names()
         lang_btn_text = f"{t.get('btn_language', '🌐')} {lang_names.get(lang, {}).get('native', 'Language')}"
@@ -4155,16 +4414,18 @@ class ComprehensiveDUXBot:
         }
 
     def companies_keyboard(self, service_type):
-        """لوحة اختيار الشركات مع أيقونات مخصصة"""
+        """لوحة اختيار الشركات مع أيقونات ذكية"""
         companies = self.get_companies(service_type)
         keyboard = []
         
-        # أزرار الشركات بأيقوناتها — كل شركة في صف منفصل لوضوح أكبر
         for company in companies:
-            icon = company.get('icon', '🏢') or '🏢'
+            icon = self.get_company_icon(
+                company.get('name', ''),
+                company.get('icon', ''),
+                company.get('id', '')
+            )
             keyboard.append([{'text': f"{icon} {company['name']}"}])
         
-        # زر العودة فقط (نظيف وبسيط)
         keyboard.append([{'text': '🔙'}])
         
         return {'keyboard': keyboard, 'resize_keyboard': True, 'one_time_keyboard': True}
@@ -4245,16 +4506,16 @@ class ComprehensiveDUXBot:
         parts = []
 
         if s['lottery_participants'] > 0 or s['lottery_winners_count'] > 0:
-            parts.append(f"🎰 {s['lottery_participants']} مشارك")
+            parts.append(self.tr('a0118_مشارك', 'ar', s_lottery_participants=s['lottery_participants']))
             if s['lottery_winners_count'] > 0:
-                parts.append(f"🏆 {s['lottery_winners_count']} فائزين")
+                parts.append(self.tr('a0119_فائزين', 'ar', s_lottery_winners_count=s['lottery_winners_count']))
 
         if s['wheel_participants'] > 0:
-            parts.append(f"🎡 {s['wheel_participants']} لاعب")
+            parts.append(self.tr('a0120_لاعب', 'ar', s_wheel_participants=s['wheel_participants']))
 
         if s['total_distributed'] > 0:
             cur = s['distributed_currency'] or 'SAR'
-            parts.append(f"💰 {s['total_distributed']:.0f} {cur} موزّعة")
+            parts.append(self.tr('a0121_موزّعة', 'ar', s_total_distributed=s['total_distributed'], cur=cur))
 
         if not parts:
             return ''
@@ -4298,8 +4559,8 @@ class ComprehensiveDUXBot:
         
         if user:
             if user.get('is_banned') == 'yes':
-                ban_reason = user.get('ban_reason', 'غير محدد')
-                self.send_message(chat_id, f"❌ تم حظر حسابك\nالسبب: {ban_reason}\n\nللاستفسار تواصل مع الإدارة")
+                ban_reason = user.get('ban_reason', self.tr('a0122_غير_محدد', lang))
+                self.send_message(chat_id, self.tr('a0123_تم_حظر', lang, ban_reason=ban_reason))
                 return
             
             lang = user.get('language', 'ar')
@@ -4307,16 +4568,16 @@ class ComprehensiveDUXBot:
             customer_id = user.get('customer_id', '')
             stats_bar = self.format_stats_bar()
             if lang == 'ar':
-                welcome_text = self.ui_header(f'أهلاً وسهلاً، {name}!', '👋')
+                welcome_text = self.ui_header(self.tr('a0124_أهلاً_وسهلاً،', lang, name=name), '👋')
                 welcome_text += '\n'
                 # بطاقة العميل
-                welcome_text += self.ui_card('بيانات العميل', [
+                welcome_text += self.ui_card(self.tr('a0125_بيانات_العميل', lang), [
                     {'label': 'رقم العميل', 'value': customer_id, 'icon': '🆔'},
                 ], '🪪')
                 if stats_bar:
                     welcome_text += f"\n\n{stats_bar}\n"
                 # قائمة الخدمات
-                welcome_text += self.ui_section('الخدمات المتاحة', '⚡')
+                welcome_text += self.ui_section(self.tr('a0126_الخدمات_المتاحة', lang), '⚡')
                 welcome_text += (
                     "🟢 <b>إيداع</b> — أودع أموالك بسهولة\n"
                     "🔴 <b>سحب</b> — اسحب أموالك بسرعة\n"
@@ -4329,7 +4590,7 @@ class ComprehensiveDUXBot:
                     "🎁 <b>اربح</b> — ادعُ أصدقاءك\n"
                     "📱 <b>تطبيقات</b> — تحميل التطبيقات\n"
                 )
-                welcome_text += "\n👇 <b>اختر ما تريد من الأزرار بالأسفل</b>"
+                welcome_text += self.tr('a0127_اختر_ما', lang)
             else:
                 welcome_text = self.tr('choose_service', lang, name=name, customer_id=customer_id)
                 if stats_bar:
@@ -4393,14 +4654,7 @@ class ComprehensiveDUXBot:
                 if user_id in self.user_states:
                     del self.user_states[user_id]
                 
-                skip_text = """✅ تم تخطي التسجيل!
-
-يمكنك استخدام النظام كزائر. لاحقاً يمكنك التسجيل لحفظ بياناتك.
-
-⚠️ ملاحظة: بدون تسجيل، لن تتمكن من:
-• حفظ طلباتك
-• تتبع حالة المعاملات
-• الوصول للدعم الفني المخصص"""
+                skip_text = self.tr('a0128_تم_تخطي', 'ar')
 
                 self.send_message(message['chat']['id'], skip_text, self.main_keyboard('ar', user_id))
                 return
@@ -4409,29 +4663,27 @@ class ComprehensiveDUXBot:
                 if user_id in self.user_states:
                     del self.user_states[user_id]
                 
-                cancel_text = """❌ تم إلغاء التسجيل
-
-يمكنك إعادة المحاولة في أي وقت باستخدام زر "📝 تسجيل حساب" """
+                cancel_text = self.tr('a0129_تم_إلغاء', 'ar')
 
                 self.send_message(message['chat']['id'], cancel_text, self.main_keyboard('ar', user_id))
                 return
             
             if len(name) < 2:
-                self.send_message(message['chat']['id'], "❌ اسم قصير جداً. يرجى إدخال اسم صحيح:")
+                self.send_message(message['chat']['id'], self.tr('a0130_اسم_قصير', 'ar'))
                 return
             
             # منع استخدام نصوص الأزرار كأسماء
             button_prefixes = ['📝', '🔐', '⏭️', '❌', '✅', '🔄', '🏠', '💰', '💸', '📋', '👤', '📨', '🆘', '💱', '🌐', '🎁', '❓', '🔔']
             if any(name.startswith(p) for p in button_prefixes):
                 self.send_message(message['chat']['id'], 
-                    "❌ هذا نص زر وليس اسماً.\nاكتب اسمك الحقيقي:")
+                    self.tr('a0131_هذا_نص', 'ar'))
                 return
             
             # منع الأسماء التي تحتوي على رموز فقط
             import re
             if not re.search(r'[\u0600-\u06FFa-zA-Z]', name):
                 self.send_message(message['chat']['id'], 
-                    "❌ الاسم يجب أن يحتوي على حروف.\nاكتب اسمك الحقيقي:")
+                    self.tr('a0132_الاسم_يجب', 'ar'))
                 return
             
             # إذا كان لدينا رقم هاتف مسبق (من التدفق الجديد) — انتقل مباشرة لإنشاء الحساب
@@ -4474,7 +4726,7 @@ class ComprehensiveDUXBot:
                     del self.user_states[user_id]
 
                 # إشعار الأدمن بعضو جديد
-                admin_msg = f"🆕 عضو جديد: {name} | {pre_phone} | {customer_id} | {final_lang} | {detected_country}"
+                admin_msg = self.tr('a0133_عضو_جديد', 'ar', name=name, pre_phone=pre_phone, customer_id=customer_id, final_lang=final_lang, detected_country=detected_country)
                 self.notify_admins(admin_msg, notification_type='new_user')
                 return
 
@@ -4513,10 +4765,7 @@ class ComprehensiveDUXBot:
                 text = message['text'].strip()
                 
                 if text in {self.tr('enter_phone_manual', l) for l in self.get_supported_languages()}:
-                    manual_text = """✍️ اكتب رقم هاتفك مع رمز البلد:
-
-مثال: +966501234567
-مثال: +201234567890"""
+                    manual_text = self.tr('a0134_اكتب_رقم', 'ar')
                     self.send_message(message['chat']['id'], manual_text)
                     return
                 
@@ -4524,10 +4773,10 @@ class ComprehensiveDUXBot:
                 # منع استخدام نصوص الأزرار كأرقام هاتف
                 if not self.validate_phone_number(phone):
                     self.send_message(message['chat']['id'], 
-                        "❌ رقم هاتف غير صحيح.\nيجب أن يحتوي على أرقام فقط مع رمز البلد.\nمثال: +966501234567")
+                        self.tr('a0135_رقم_هاتف', 'ar'))
                     return
             else:
-                self.send_message(message['chat']['id'], "❌ يرجى مشاركة جهة الاتصال أو كتابة الرقم:")
+                self.send_message(message['chat']['id'], self.tr('a0136_يرجى_مشاركة', 'ar'))
                 return
             
             # إنشاء رقم عميل تلقائي
@@ -4615,7 +4864,7 @@ class ComprehensiveDUXBot:
                         logger.error(f"خطأ في معالجة كود الإحالة: {e}")
 
             # إشعار الأدمن بعضو جديد
-            phone_status = '✅ هاتف حقيقي' if phone_verified == 'yes' else '⚠️ رقم مكتوب يدوياً'
+            phone_status = self.tr('a0137_هاتف_حقيقي', lang) if phone_verified == 'yes' else self.tr('a0138_رقم_مكتوب', lang)
             admin_msg = f"""🆕 عضو جديد انضم للنظام
 
 👤 الاسم: {name}
@@ -4640,7 +4889,7 @@ class ComprehensiveDUXBot:
             return
 
         if lang == 'ar':
-            title = "💰 <b>طلب إيداع</b>\n\nاختر الشركة:"
+            title = self.tr('a0139_طلب_إيداع', lang)
         else:
             title = "💰 <b>Deposit Request</b>\n\nSelect company:"
 
@@ -4668,7 +4917,7 @@ class ComprehensiveDUXBot:
             return
 
         if lang == 'ar':
-            title = "💸 <b>طلب سحب</b>\n\nاختر الشركة:"
+            title = self.tr('a0140_طلب_سحب', lang)
         else:
             title = "💸 <b>Withdrawal Request</b>\n\nSelect company:"
 
@@ -4691,9 +4940,9 @@ class ComprehensiveDUXBot:
 
         # فحص أزرار الإلغاء والعودة أولاً — قبل أي معالجة للبيانات
         all_langs = self.get_supported_languages()
-        cancel_texts = {self.tr('cancel_btn', l) for l in all_langs} | {self.tr('cancel_registration', l) for l in all_langs} | {'❌ إلغاء', '❌ Cancel', 'الغاء', 'إلغاء'}
-        main_menu_texts = {self.tr('main_menu', l) for l in all_langs} | {self.tr('main_menu_btn', l) for l in all_langs} | {'🏠 القائمة الرئيسية', '🏠 الرئيسية', '🏠 Main Menu'}
-        back_texts = {self.tr('back_btn', l) for l in all_langs} | {self.tr('back_to_main', l) for l in all_langs} | {'🔙', '🔙 العودة', '🔙 Back'}
+        cancel_texts = {self.tr('cancel_btn', l) for l in all_langs} | {self.tr('cancel_registration', l) for l in all_langs} | {self.tr('a0009_إلغاء', lang), '❌ Cancel', self.tr('a0011_الغاء', lang), self.tr('a0010_إلغاء', lang)}
+        main_menu_texts = {self.tr('main_menu', l) for l in all_langs} | {self.tr('main_menu_btn', l) for l in all_langs} | {self.tr('a0083_القائمة_الرئيسية', lang), self.tr('a0141_الرئيسية', lang), '🏠 Main Menu'}
+        back_texts = {self.tr('back_btn', l) for l in all_langs} | {self.tr('back_to_main', l) for l in all_langs} | {'🔙', self.tr('a0142_العودة', lang), '🔙 Back'}
 
         if text in cancel_texts or text in main_menu_texts or text in back_texts:
             if user_id in self.user_states:
@@ -4831,7 +5080,7 @@ class ComprehensiveDUXBot:
                     # نضيف اسم الوسيلة ونوعها إذا كانت متاحة
                     name = method.get('method_name') or ''
                     mtype = method.get('method_type') or ''
-                    method_name_display = f"\n💳 الوسيلة: {name} ({mtype})"
+                    method_name_display = self.tr('a0143_الوسيلة', lang, name=name, mtype=mtype)
 
             # إنشاء معرف المعاملة
             trans_id = f"DEP{datetime.now().strftime('%Y%m%d%H%M%S')}"
@@ -4911,9 +5160,9 @@ class ComprehensiveDUXBot:
 
         # فحص أزرار الإلغاء والعودة أولاً
         all_langs = self.get_supported_languages()
-        cancel_texts = {self.tr('cancel_btn', l) for l in all_langs} | {self.tr('cancel_registration', l) for l in all_langs} | {'❌ إلغاء', '❌ Cancel', 'الغاء', 'إلغاء'}
-        main_menu_texts = {self.tr('main_menu', l) for l in all_langs} | {self.tr('main_menu_btn', l) for l in all_langs} | {'🏠 القائمة الرئيسية', '🏠 الرئيسية', '🏠 Main Menu'}
-        back_texts = {self.tr('back_btn', l) for l in all_langs} | {self.tr('back_to_main', l) for l in all_langs} | {'🔙', '🔙 العودة', '🔙 Back'}
+        cancel_texts = {self.tr('cancel_btn', l) for l in all_langs} | {self.tr('cancel_registration', l) for l in all_langs} | {self.tr('a0009_إلغاء', lang), '❌ Cancel', self.tr('a0011_الغاء', lang), self.tr('a0010_إلغاء', lang)}
+        main_menu_texts = {self.tr('main_menu', l) for l in all_langs} | {self.tr('main_menu_btn', l) for l in all_langs} | {self.tr('a0083_القائمة_الرئيسية', lang), self.tr('a0141_الرئيسية', lang), '🏠 Main Menu'}
+        back_texts = {self.tr('back_btn', l) for l in all_langs} | {self.tr('back_to_main', l) for l in all_langs} | {'🔙', self.tr('a0142_العودة', lang), '🔙 Back'}
 
         if text in cancel_texts or text in main_menu_texts or text in back_texts:
             if user_id in self.user_states:
@@ -4957,7 +5206,7 @@ class ComprehensiveDUXBot:
             chat_id = message['chat']['id']
             text_msg = message.get('text', '').strip()
 
-            if text_msg in ['❌ إلغاء', 'إلغاء', 'الغاء', '🔙']:
+            if text_msg in [self.tr('a0009_إلغاء', lang), self.tr('a0010_إلغاء', lang), self.tr('a0011_الغاء', lang), '🔙']:
                 if user_id in self.user_states: del self.user_states[user_id]
                 self.handle_start(message)
                 return
@@ -4965,10 +5214,10 @@ class ComprehensiveDUXBot:
             try:
                 amount = float(text_msg)
                 if amount <= 0:
-                    self.send_message(chat_id, "❌ المبلغ يجب أن يكون أكبر من صفر")
+                    self.send_message(chat_id, self.tr('a0144_المبلغ_يجب', lang))
                     return
             except ValueError:
-                self.send_message(chat_id, "❌ اكتب مبلغاً رقمياً صحيحاً:")
+                self.send_message(chat_id, self.tr('a0145_اكتب_مبلغاً', lang))
                 return
 
             parts = state.replace('wd_step_amount_', '').split('_', 1)
@@ -4989,14 +5238,14 @@ class ComprehensiveDUXBot:
             chat_id = message['chat']['id']
             text_msg = message.get('text', '').strip()
 
-            if text_msg in ['❌ إلغاء', 'إلغاء', 'الغاء', '🔙']:
+            if text_msg in [self.tr('a0009_إلغاء', lang), self.tr('a0010_إلغاء', lang), self.tr('a0011_الغاء', lang), '🔙']:
                 if user_id in self.user_states: del self.user_states[user_id]
                 self.handle_start(message)
                 return
 
             wallet_number = self.sanitize_input(text_msg)
             if len(wallet_number) < 5:
-                self.send_message(chat_id, "❌ رقم المحفظة قصير جداً. اكتب رقم المحفظة:")
+                self.send_message(chat_id, self.tr('a0146_رقم_المحفظة', lang))
                 return
 
             parts = state.replace('wd_step_wallet_', '').split('_', 2)
@@ -5018,14 +5267,14 @@ class ComprehensiveDUXBot:
             chat_id = message['chat']['id']
             text_msg = message.get('text', '').strip()
 
-            if text_msg in ['❌ إلغاء', 'إلغاء', 'الغاء', '🔙']:
+            if text_msg in [self.tr('a0009_إلغاء', lang), self.tr('a0010_إلغاء', lang), self.tr('a0011_الغاء', lang), '🔙']:
                 if user_id in self.user_states: del self.user_states[user_id]
                 self.handle_start(message)
                 return
 
             account_id = self.sanitize_input(text_msg)
             if len(account_id) < 2:
-                self.send_message(chat_id, "❌ معرف الحساب قصير جداً. اكتب معرف الحساب:")
+                self.send_message(chat_id, self.tr('a0147_معرف_الحساب', 'ar'))
                 return
 
             parts = state.replace('wd_step_account_', '').split('_', 3)
@@ -5048,14 +5297,14 @@ class ComprehensiveDUXBot:
             chat_id = message['chat']['id']
             text_msg = message.get('text', '').strip()
 
-            if text_msg in ['❌ إلغاء', 'إلغاء', 'الغاء', '🔙']:
+            if text_msg in [self.tr('a0009_إلغاء', 'ar'), self.tr('a0010_إلغاء', 'ar'), self.tr('a0011_الغاء', 'ar'), '🔙']:
                 if user_id in self.user_states: del self.user_states[user_id]
                 self.handle_start(message)
                 return
 
             confirmation_code = self.sanitize_input(text_msg)
             if len(confirmation_code) < 3:
-                self.send_message(chat_id, "❌ كود السحب قصير جداً. اكتب الكود:")
+                self.send_message(chat_id, self.tr('a0148_كود_السحب', 'ar'))
                 return
 
             parts = state.replace('wd_step_code_', '').split('_', 4)
@@ -5069,7 +5318,7 @@ class ComprehensiveDUXBot:
 
             user = self.find_user(user_id)
             if not user:
-                self.send_message(chat_id, "❌ يجب التسجيل أولاً")
+                self.send_message(chat_id, self.tr('a0149_يجب_التسجيل', 'ar'))
                 return
 
             user_currency = user.get('currency', self.get_setting('default_currency') or 'SAR')
@@ -5404,8 +5653,8 @@ class ComprehensiveDUXBot:
                 welcome_text = self.tr(
                     'choose_service',
                     lang,
-                    name=user.get('name', 'غير محدد') if user else 'غير محدد',
-                    customer_id=user.get('customer_id', 'غير محدد') if user else 'غير محدد'
+                    name=user.get('name', self.tr('a0122_غير_محدد', lang)) if user else self.tr('a0122_غير_محدد', lang),
+                    customer_id=user.get('customer_id', self.tr('a0122_غير_محدد', lang)) if user else self.tr('a0122_غير_محدد', lang)
                 )
                 self.send_message(message['chat']['id'], welcome_text, self.main_keyboard(lang))
             else:
@@ -5468,9 +5717,9 @@ class ComprehensiveDUXBot:
         phone_icon = '✅' if phone_verified == 'yes' else '⚠️'
 
         # بطاقة البيانات الأساسية
-        profile_text = self.ui_header('الملف الشخصي', '👤')
+        profile_text = self.ui_header(self.tr('a0150_الملف_الشخصي', lang), '👤')
         profile_text += '\n'
-        profile_text += self.ui_card('البيانات الأساسية', [
+        profile_text += self.ui_card(self.tr('a0151_البيانات_الأساسية', lang), [
             {'label': 'رقم العميل', 'value': user['customer_id'], 'icon': '🆔'},
             {'label': 'الاسم', 'value': user['name'], 'icon': '📛'},
             {'label': 'الهاتف', 'value': user.get('phone', '—'), 'icon': f'📱 {phone_icon}'},
@@ -5486,7 +5735,7 @@ class ComprehensiveDUXBot:
             available = float(wallet.get('total_used', 0) or 0)
             total_earned = float(wallet.get('total_earned', 0) or 0)
             currency = user.get('currency', 'SAR')
-            profile_text += self.ui_section('المحفظة', '💎')
+            profile_text += self.ui_section(self.tr('a0152_المحفظة', lang), '💎')
             profile_text += self.ui_table(
                 ['الحالة', 'المبلغ', 'العملة'],
                 [
@@ -5497,18 +5746,18 @@ class ComprehensiveDUXBot:
             )
 
         # بطاقة حسابات الشركات
-        profile_text += self.ui_section('حسابات الشركات', '🏢')
+        profile_text += self.ui_section(self.tr('a0153_حسابات_الشركات', lang), '🏢')
         try:
             accounts = self.svrp.get_user_company_accounts(message['from']['id']) if self.svrp else []
             if accounts:
                 company_rows = []
                 for acc in accounts:
                     company_rows.append([acc.get('company_name', ''), acc.get('account_number', '')])
-                profile_text += self.ui_table(['الشركة', 'رقم الحساب'], company_rows)
+                profile_text += self.ui_table([self.tr('a0154_الشركة', lang), self.tr('a0155_رقم_الحساب', lang)], company_rows)
             else:
-                profile_text += "📭 لا توجد حسابات مسجلة\n"
+                profile_text += self.tr('a0156_لا_توجد', lang)
         except:
-            profile_text += "📭 لا توجد حسابات مسجلة\n"
+            profile_text += self.tr('a0156_لا_توجد', lang)
 
         # أزرار inline
         inline_btns = [
@@ -5619,7 +5868,7 @@ class ComprehensiveDUXBot:
                         writer = csv.writer(f)
                         writer.writerow([item_id, 'sticker', sticker.get('file_id', ''),
                                        sticker.get('emoji', '🎨'), sticker.get('set_name', ''),
-                                       'أخرى', message['from']['id'], datetime.now().strftime('%Y-%m-%d %H:%M')])
+                                       self.tr('a0157_أخرى', 'ar'), message['from']['id'], datetime.now().strftime('%Y-%m-%d %H:%M')])
                 except:
                     pass
                 self.send_message(message['chat']['id'],
@@ -5677,11 +5926,11 @@ class ComprehensiveDUXBot:
                 # افحص آخر تفاعل — لو كان wheel، اعرض wheel. افتراضياً اعرض اليانصيب.
                 self.show_lottery_panel(fake_msg)
                 return
-            elif message.get('text', '').strip().lower() in ['إلغاء', 'الغاء', 'cancel', '🔙']:
+            elif message.get('text', '').strip().lower() in [self.tr('a0010_إلغاء', 'ar'), self.tr('a0011_الغاء', 'ar'), 'cancel', '🔙']:
                 del self.user_states[user_id]
                 self.handle_start(message)
             else:
-                self.send_message(message['chat']['id'], "📱 اضغط زر <b>مشاركة جهة الاتصال</b> أو <b>إلغاء</b>")
+                self.send_message(message['chat']['id'], self.tr('a0158_اضغط_زر', 'ar'))
             return
         if current_state == 'choosing_start_language':
             self.handle_start_language_choice(message)
@@ -5702,7 +5951,7 @@ class ComprehensiveDUXBot:
             chat_id = message['chat']['id']
             text = message.get('text', '').strip()
 
-            if text in ['إلغاء', 'الغاء', '🔙']:
+            if text in [self.tr('a0010_إلغاء', 'ar'), self.tr('a0011_الغاء', 'ar'), '🔙']:
                 if user_id in self.user_states: del self.user_states[user_id]
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                 self.show_svrp_panel(fake_msg)
@@ -5715,7 +5964,7 @@ class ComprehensiveDUXBot:
             company_name = parts[1]
 
             if len(text) < 3:
-                self.send_message(chat_id, "❌ رقم الحساب قصير جداً. اكتب رقم حسابك:")
+                self.send_message(chat_id, self.tr('a0159_رقم_الحساب', 'ar'))
                 return
 
             success, msg = self.svrp.add_user_company_account(user_id, company_id, company_name, text)
@@ -5738,7 +5987,7 @@ class ComprehensiveDUXBot:
                 else:
                     inline_btns.append([{'text': '🏆 طلب مكافأة', 'callback_data': f'svrp_bonus_{company_id}_{company_name}'}])
                 inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'svrp_back_panel'}])
-                self.send_inline_message(chat_id, "اختر شركة أخرى أو اطلب المكافأة:", inline_btns)
+                self.send_inline_message(chat_id, self.tr('a0160_اختر_شركة', 'ar'), inline_btns)
             else:
                 self.send_message(chat_id, f"❌ {msg}")
 
@@ -5756,10 +6005,10 @@ class ComprehensiveDUXBot:
             try:
                 amount = float(text)
                 if amount <= 0:
-                    self.send_message(chat_id, "❌ المبلغ يجب أن يكون أكبر من صفر")
+                    self.send_message(chat_id, self.tr('a0144_المبلغ_يجب', 'ar'))
                     return
             except ValueError:
-                self.send_message(chat_id, "❌ اكتب مبلغاً رقمياً صحيحاً:")
+                self.send_message(chat_id, self.tr('a0145_اكتب_مبلغاً', 'ar'))
                 return
 
             success, msg = self.svrp.approve_bonus_request(req_id, amount, user_id)
@@ -5791,7 +6040,7 @@ class ComprehensiveDUXBot:
             user = self.find_user(user_id)
 
             if 'photo' not in message:
-                self.send_message(chat_id, "❌ يرجى إرسال صورة (لقطة شاشة). أعد المحاولة:")
+                self.send_message(chat_id, self.tr('a0161_يرجى_إرسال', 'ar'))
                 return
 
             # الحصول على أكبر حجم صورة
@@ -5799,7 +6048,7 @@ class ComprehensiveDUXBot:
             photo_file_id = photo['file_id']
 
             if not user:
-                self.send_message(chat_id, "❌ يجب التسجيل أولاً")
+                self.send_message(chat_id, self.tr('a0149_يجب_التسجيل', 'ar'))
                 if user_id in self.user_states: del self.user_states[user_id]
                 return
 
@@ -5857,10 +6106,10 @@ class ComprehensiveDUXBot:
             try:
                 amount = float(text)
                 if amount <= 0:
-                    self.send_message(chat_id, "❌ المبلغ يجب أن يكون أكبر من صفر")
+                    self.send_message(chat_id, self.tr('a0144_المبلغ_يجب', 'ar'))
                     return
             except ValueError:
-                self.send_message(chat_id, "❌ اكتب مبلغاً رقمياً صحيحاً:")
+                self.send_message(chat_id, self.tr('a0145_اكتب_مبلغاً', 'ar'))
                 return
 
             success, msg = self.svrp.approve_recovery_request(req_id, user_id, amount)
@@ -5887,7 +6136,7 @@ class ComprehensiveDUXBot:
             chat_id = message['chat']['id']
             text = message.get('text', '').strip()
 
-            if text in ['إلغاء', 'الغاء', '🔙']:
+            if text in [self.tr('a0010_إلغاء', 'ar'), self.tr('a0011_الغاء', 'ar'), '🔙']:
                 if user_id in self.user_states: del self.user_states[user_id]
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                 self.show_svrp_panel(fake_msg)
@@ -5902,16 +6151,16 @@ class ComprehensiveDUXBot:
             try:
                 amount = float(text)
                 if amount <= 0:
-                    self.send_message(chat_id, "❌ المبلغ يجب أن يكون أكبر من صفر")
+                    self.send_message(chat_id, self.tr('a0144_المبلغ_يجب', 'ar'))
                     return
             except ValueError:
-                self.send_message(chat_id, "❌ اكتب مبلغاً رقمياً صحيحاً")
+                self.send_message(chat_id, self.tr('a0162_اكتب_مبلغاً', 'ar'))
                 return
 
             # الحصول على رقم حساب المستخدم في الشركة
             account = self.svrp.get_user_company_account(user_id, company_id)
             if not account:
-                self.send_message(chat_id, "❌ لا يوجد حساب مسجل في هذه الشركة")
+                self.send_message(chat_id, self.tr('a0163_لا_يوجد', 'ar'))
                 if user_id in self.user_states: del self.user_states[user_id]
                 return
 
@@ -5959,7 +6208,7 @@ class ComprehensiveDUXBot:
             user_id = message['from']['id']
             chat_id = message['chat']['id']
             text = message.get('text', '').strip()
-            if text in ['إلغاء', 'الغاء', '🔙']:
+            if text in [self.tr('a0010_إلغاء', 'ar'), self.tr('a0011_الغاء', 'ar'), '🔙']:
                 if user_id in self.user_states: del self.user_states[user_id]
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                 self.show_svrp_panel(fake_msg)
@@ -5976,7 +6225,7 @@ class ComprehensiveDUXBot:
             user_id = message['from']['id']
             chat_id = message['chat']['id']
             text = message.get('text', '').strip()
-            if text in ['إلغاء', 'الغاء', '🔙']:
+            if text in [self.tr('a0010_إلغاء', 'ar'), self.tr('a0011_الغاء', 'ar'), '🔙']:
                 if user_id in self.user_states: del self.user_states[user_id]
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                 self.show_svrp_panel(fake_msg)
@@ -5985,10 +6234,10 @@ class ComprehensiveDUXBot:
             try:
                 amount = float(text)
                 if amount <= 0:
-                    self.send_message(chat_id, "❌ المبلغ يجب أن يكون أكبر من صفر")
+                    self.send_message(chat_id, self.tr('a0144_المبلغ_يجب', 'ar'))
                     return
             except ValueError:
-                self.send_message(chat_id, "❌ اكتب مبلغاً رقمياً صحيحاً:")
+                self.send_message(chat_id, self.tr('a0145_اكتب_مبلغاً', 'ar'))
                 return
             success, msg = self.svrp.send_frozen_credits(str(user_id), target_customer_id, amount)
             icon = "✅" if success else "❌"
@@ -6022,7 +6271,7 @@ class ComprehensiveDUXBot:
             try:
                 amount = float(text)
                 if amount <= 0:
-                    self.send_message(chat_id, "❌ المبلغ يجب أن يكون أكبر من صفر")
+                    self.send_message(chat_id, self.tr('a0144_المبلغ_يجب', 'ar'))
                     return
                 success, msg = self.svrp.approve_recovery_request(req_id, amount, user_id)
                 if success:
@@ -6036,7 +6285,7 @@ class ComprehensiveDUXBot:
                 else:
                     self.send_message(chat_id, f"❌ {msg}", self.admin_keyboard())
             except ValueError:
-                self.send_message(chat_id, "❌ اكتب مبلغاً رقمياً صحيحاً")
+                self.send_message(chat_id, self.tr('a0162_اكتب_مبلغاً', 'ar'))
                 return
             if user_id in self.user_states:
                 del self.user_states[user_id]
@@ -6052,6 +6301,114 @@ class ComprehensiveDUXBot:
             self._handle_sticker_input(message, current_state)
             return
 
+        # معالج إضافة إيموجي جديد
+        if isinstance(current_state, str) and current_state == 'stk_emoji_input':
+            user_id = message['from']['id']
+            chat_id = message['chat']['id']
+            text = message.get('text', '').strip()
+            del self.user_states[user_id]
+            if not text:
+                self.send_message(chat_id, "❌ أرسل إيموجي صحيح:")
+                return
+            # استخراج كل الإيموجي من النص
+            import re as _re
+            emoji_pattern = _re.compile(
+                "[\U0001F000-\U0001FFFF"
+                "\u2600-\u27BF"
+                "\uFE0F\u200D"
+                "\u2700-\u27BF"
+                "\u2300-\u23FF"
+                "\u2B00-\u2BFF"
+                "]+", flags=_re.UNICODE)
+            emojis_found = emoji_pattern.findall(text)
+            if not emojis_found:
+                # ربما إيموجي واحد قصير
+                if len(text) <= 4 and any(ord(c) > 127 for c in text):
+                    emojis_found = [text]
+                else:
+                    self.send_message(chat_id, "❌ لم يتم العثور على إيموجي صحيح. أرسل إيموجي:")
+                    return
+            added = 0
+            for em in emojis_found:
+                em = em.strip()
+                if not em:
+                    continue
+                item_id = f"EMJ{str(int(datetime.now().timestamp()))[-6:]}_{added}"
+                try:
+                    with open('sticker_library.csv', 'a', newline='', encoding='utf-8-sig') as f:
+                        writer = csv.writer(f)
+                        writer.writerow([item_id, 'emoji', '', em, '', 'عام', user_id, datetime.now().strftime('%Y-%m-%d %H:%M')])
+                    added += 1
+                except:
+                    pass
+            self.send_message(chat_id,
+                f"✅ <b>تم إضافة {added} إيموجي للمكتبة!</b>\n\n"
+                + " ".join(emojis_found) + "\n\n"
+                f"📊 الإيموجي متاحة الآن في شبكة الأيقونات")
+            fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+            self.show_sticker_library(fake_msg)
+            return
+
+        # معالج رفع صورة كأيقونة
+        if isinstance(current_state, str) and current_state == 'stk_photo_input':
+            user_id = message['from']['id']
+            chat_id = message['chat']['id']
+            del self.user_states[user_id]
+            if 'photo' not in message:
+                self.send_message(chat_id, "❌ أرسل صورة (وليست نصاً):")
+                return
+            # أخذ أكبر حجم صورة
+            photo = message['photo'][-1]
+            file_id = photo.get('file_id', '')
+            item_id = f"PHO{str(int(datetime.now().timestamp()))[-6:]}"
+            try:
+                with open('sticker_library.csv', 'a', newline='', encoding='utf-8-sig') as f:
+                    writer = csv.writer(f)
+                    writer.writerow([item_id, 'photo', file_id, '🖼️', '', 'صورة مخصصة', user_id, datetime.now().strftime('%Y-%m-%d %H:%M')])
+            except:
+                pass
+            self.send_message(chat_id,
+                f"✅ <b>تم حفظ الصورة في المكتبة!</b>\n\n"
+                f"🖼️ النوع: صورة مخصصة\n"
+                f"🆔 <code>{item_id}</code>\n\n"
+                f"💡 يمكن استخدام هذه الصورة كأيقونة للشركات ووسائل الدفع")
+            fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+            self.show_sticker_library(fake_msg)
+            return
+
+        # معالج إضافة استيكر
+        if isinstance(current_state, str) and current_state == 'stk_sticker_input':
+            user_id = message['from']['id']
+            chat_id = message['chat']['id']
+            del self.user_states[user_id]
+            if 'sticker' not in message:
+                self.send_message(chat_id, "❌ أرسل استيكر (وليست نصاً):")
+                return
+            sticker = message['sticker']
+            file_id = sticker.get('file_id', '')
+            emoji_val = sticker.get('emoji', '🎨') or '🎨'
+            set_name = sticker.get('set_name', '')
+            # التحقق من التوافق — يجب أن يكون استيكر PNG أو TGS
+            is_animated = sticker.get('is_animated', False)
+            is_video = sticker.get('is_video', False)
+            item_type = 'sticker'
+            item_id = f"STK{str(int(datetime.now().timestamp()))[-6:]}"
+            try:
+                with open('sticker_library.csv', 'a', newline='', encoding='utf-8-sig') as f:
+                    writer = csv.writer(f)
+                    writer.writerow([item_id, item_type, file_id, emoji_val, set_name, 'استيكر', user_id, datetime.now().strftime('%Y-%m-%d %H:%M')])
+            except:
+                pass
+            self.send_message(chat_id,
+                f"✅ <b>تم حفظ الاستيكر!</b>\n\n"
+                f"🎨 {emoji_val}\n"
+                f"📦 النوع: {'متحرك' if is_animated else 'فيديو' if is_video else 'ثابت'}\n"
+                f"🆔 <code>{item_id}</code>\n"
+                f"📋 المجموعة: {set_name or 'بدون'}")
+            fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+            self.show_sticker_library(fake_msg)
+            return
+
         # معالج تعديل اليانصيب
         if isinstance(current_state, str) and current_state.startswith('lot_edit_'):
             self._handle_lottery_edit_input(message, current_state)
@@ -6061,7 +6418,7 @@ class ComprehensiveDUXBot:
         if isinstance(current_state, str) and current_state == 'tr_waiting_find':
             text = message.get('text', '').strip()
             if not text or len(text) < 2:
-                self.send_message(chat_id, "❌ النص قصير جداً. اكتب النص المراد البحث عنه:")
+                self.send_message(chat_id, self.tr('a0164_النص_قصير', 'ar'))
                 return
             self.user_states[user_id] = {'step': 'tr_waiting_replace', 'find_text': text}
             self.send_message(chat_id,
@@ -6074,7 +6431,7 @@ class ComprehensiveDUXBot:
             text = message.get('text', '').strip()
             find_text = current_state.get('find_text', '')
             if not text:
-                self.send_message(chat_id, "❌ اكتب النص البديل:")
+                self.send_message(chat_id, self.tr('a0165_اكتب_النص', 'ar'))
                 return
             # حفظ القاعدة
             rule_id = f"TR{str(int(datetime.now().timestamp()))[-6:]}"
@@ -6096,7 +6453,7 @@ class ComprehensiveDUXBot:
         if isinstance(current_state, str) and current_state == 'ai_waiting_instructions':
             text = message.get('text', '').strip()
             if not text or len(text) < 10:
-                self.send_message(chat_id, "❌ التعليمات قصيرة جداً. اكتب تعليمات أوضح:")
+                self.send_message(chat_id, self.tr('a0166_التعليمات_قصيرة', 'ar'))
                 return
             # حفظ في system_settings.csv
             try:
@@ -6121,7 +6478,7 @@ class ComprehensiveDUXBot:
                     for row in rows:
                         writer.writerow({k: row.get(k, '') for k in fieldnames})
             except Exception as e:
-                self.send_message(chat_id, f"❌ خطأ في الحفظ: {e}")
+                self.send_message(chat_id, self.tr('a0167_خطأ_في', 'ar', e=e))
                 return
             del self.user_states[user_id]
             self.send_message(chat_id,
@@ -6151,7 +6508,7 @@ class ComprehensiveDUXBot:
             chat_id = message['chat']['id']
             text = message.get('text', '').strip()
 
-            if text in ['إلغاء', 'الغاء', 'cancel', '🔙']:
+            if text in [self.tr('a0010_إلغاء', 'ar'), self.tr('a0011_الغاء', 'ar'), 'cancel', '🔙']:
                 if user_id in self.user_states: del self.user_states[user_id]
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                 self.show_system_settings(fake_msg)
@@ -6176,7 +6533,7 @@ class ComprehensiveDUXBot:
             chat_id = message['chat']['id']
             text_msg = message.get('text', '').strip()
 
-            if text_msg in ['إلغاء', 'الغاء', 'cancel', '🔙', '🏠 القائمة الرئيسية']:
+            if text_msg in [self.tr('a0010_إلغاء', 'ar'), self.tr('a0011_الغاء', 'ar'), 'cancel', '🔙', self.tr('a0083_القائمة_الرئيسية', 'ar')]:
                 if user_id in self.user_states: del self.user_states[user_id]
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                 self.show_payment_methods_management(fake_msg)
@@ -6186,7 +6543,7 @@ class ComprehensiveDUXBot:
 
             if step == 'pm_add_name':
                 if len(text_msg) < 2:
-                    self.send_message(chat_id, "❌ الاسم قصير جداً. اكتب اسماً:")
+                    self.send_message(chat_id, self.tr('a0168_الاسم_قصير', 'ar'))
                     return
                 current_state['method_name'] = text_msg
                 current_state['step'] = 'pm_add_account'
@@ -6198,7 +6555,7 @@ class ComprehensiveDUXBot:
 
             elif step == 'pm_add_account':
                 if len(text_msg) < 3:
-                    self.send_message(chat_id, "❌ رقم الحساب قصير جداً. اكتب رقماً:")
+                    self.send_message(chat_id, self.tr('a0169_رقم_الحساب', 'ar'))
                     return
                 current_state['account_data'] = text_msg
                 current_state['step'] = 'pm_add_info'
@@ -6209,7 +6566,7 @@ class ComprehensiveDUXBot:
                     f"مثال: البنك الأهلي - فرع الرياض")
 
             elif step == 'pm_add_info':
-                info = text_msg if text_msg.lower() not in ['بدون', 'skip', ''] else ''
+                info = text_msg if text_msg.lower() not in [self.tr('a0025_بدون', 'ar'), 'skip', ''] else ''
                 current_state['additional_info'] = info
                 current_state['step'] = 'pm_add_currency'
                 self.user_states[user_id] = current_state
@@ -6221,7 +6578,7 @@ class ComprehensiveDUXBot:
 
             elif step == 'pm_add_currency':
                 currency_input = text_msg.strip()
-                if currency_input.lower() in ['كل العملات', 'all', 'الكل', '']:
+                if currency_input.lower() in [self.tr('a0170_كل_العملات', 'ar'), 'all', self.tr('a0171_الكل', 'ar'), '']:
                     currency = ''
                 else:
                     currency = currency_input.upper()
@@ -6241,7 +6598,7 @@ class ComprehensiveDUXBot:
                 current_state['custom_steps'] = {'deposit': [], 'withdraw': []}
                 self.user_states[user_id] = current_state
 
-                cur_display = currency or 'كل العملات'
+                cur_display = currency or self.tr('a0170_كل_العملات', 'ar')
                 self.send_message(chat_id,
                     f"✅ <b>تم حفظ وسيلة الدفع!</b>\n\n"
                     f"💳 {method_name} — <code>{account_data}</code>\n"
@@ -6257,7 +6614,7 @@ class ComprehensiveDUXBot:
 
             # === خطوات مخصصة: اختيار نعم/تخطي للإيداع ===
             elif step == 'pm_add_custom_deposit':
-                if text_msg == '✅ نعم، أضف خطوات':
+                if text_msg == self.tr('a0172_نعم،_أضف', 'ar'):
                     current_state['step'] = 'pm_step_type_deposit'
                     current_state['step_order'] = 1
                     self.user_states[user_id] = current_state
@@ -6269,7 +6626,7 @@ class ComprehensiveDUXBot:
                             [{'text': '📸 لقطة شاشة'}, {'text': 'ℹ️ معلومة'}],
                             [{'text': '✅ انتهيت'}, {'text': '❌ إلغاء'}]
                         ], 'resize_keyboard': True, 'one_time_keyboard': True})
-                elif text_msg == '⏭️ تخطي':
+                elif text_msg == self.tr('a0173_تخطي', 'ar'):
                     current_state['step'] = 'pm_add_custom_withdraw'
                     self.user_states[user_id] = current_state
                     self.send_message(chat_id,
@@ -6281,8 +6638,8 @@ class ComprehensiveDUXBot:
 
             # === اختيار نوع الخطوة للإيداع ===
             elif step == 'pm_step_type_deposit':
-                step_types = {'📝 نص': 'text', '💰 مبلغ': 'amount', '📸 لقطة شاشة': 'screenshot', 'ℹ️ معلومة': 'info'}
-                if text_msg == '✅ انتهيت':
+                step_types = {'📝 نص': 'text', self.tr('a0174_مبلغ', 'ar'): 'amount', self.tr('a0175_لقطة_شاشة', 'ar'): 'screenshot', self.tr('a0176_معلومة', 'ar'): 'info'}
+                if text_msg == self.tr('a0177_انتهيت', 'ar'):
                     # حفظ خطوات الإيداع
                     method_id = current_state.get('method_id', '')
                     for i, s in enumerate(current_state.get('custom_steps', {}).get('deposit', [])):
@@ -6300,12 +6657,12 @@ class ComprehensiveDUXBot:
                     current_state['current_step_type'] = step_types[text_msg]
                     current_state['step'] = 'pm_step_label_deposit'
                     self.user_states[user_id] = current_state
-                    self.send_message(chat_id, f"✍️ اكتب <b>نص الخطوة</b> (ما يظهر للعميل):\n\n💡 مثال: اكتب رقم محفظتك")
+                    self.send_message(chat_id, self.tr('a0178_اكتب_نص', 'ar'))
 
             # === كتابة نص الخطوة للإيداع ===
             elif step == 'pm_step_label_deposit':
                 if len(text_msg) < 2:
-                    self.send_message(chat_id, "❌ النص قصير. اكتب نص الخطوة:")
+                    self.send_message(chat_id, self.tr('a0179_النص_قصير', 'ar'))
                     return
                 step_order = current_state.get('step_order', 1)
                 current_state.setdefault('custom_steps', {'deposit': [], 'withdraw': []})['deposit'].append({
@@ -6327,7 +6684,7 @@ class ComprehensiveDUXBot:
 
             # === اختيار نعم/تخطي للسحب ===
             elif step == 'pm_add_custom_withdraw':
-                if text_msg == '✅ نعم، أضف خطوات':
+                if text_msg == self.tr('a0172_نعم،_أضف', 'ar'):
                     current_state['step'] = 'pm_step_type_withdraw'
                     current_state['step_order'] = 1
                     self.user_states[user_id] = current_state
@@ -6339,7 +6696,7 @@ class ComprehensiveDUXBot:
                             [{'text': '📸 لقطة شاشة'}, {'text': 'ℹ️ معلومة'}],
                             [{'text': '✅ انتهيت'}, {'text': '❌ إلغاء'}]
                         ], 'resize_keyboard': True, 'one_time_keyboard': True})
-                elif text_msg == '⏭️ تخطي':
+                elif text_msg == self.tr('a0173_تخطي', 'ar'):
                     # إنهاء — حفظ كل شيء
                     method_id = current_state.get('method_id', '')
                     method_name = current_state.get('method_name', '')
@@ -6361,8 +6718,8 @@ class ComprehensiveDUXBot:
 
             # === اختيار نوع الخطوة للسحب ===
             elif step == 'pm_step_type_withdraw':
-                step_types = {'📝 نص': 'text', '💰 مبلغ': 'amount', '📸 لقطة شاشة': 'screenshot', 'ℹ️ معلومة': 'info'}
-                if text_msg == '✅ انتهيت':
+                step_types = {'📝 نص': 'text', self.tr('a0174_مبلغ', 'ar'): 'amount', self.tr('a0175_لقطة_شاشة', 'ar'): 'screenshot', self.tr('a0176_معلومة', 'ar'): 'info'}
+                if text_msg == self.tr('a0177_انتهيت', 'ar'):
                     method_id = current_state.get('method_id', '')
                     for i, s in enumerate(current_state.get('custom_steps', {}).get('withdraw', [])):
                         self.add_method_step(method_id, 'withdraw', s['type'], s['label'], i + 1)
@@ -6384,12 +6741,12 @@ class ComprehensiveDUXBot:
                     current_state['current_step_type'] = step_types[text_msg]
                     current_state['step'] = 'pm_step_label_withdraw'
                     self.user_states[user_id] = current_state
-                    self.send_message(chat_id, f"✍️ اكتب <b>نص الخطوة</b> (ما يظهر للعميل):\n\n💡 مثال: اكتب كود السحب")
+                    self.send_message(chat_id, self.tr('a0180_اكتب_نص', 'ar'))
 
             # === كتابة نص الخطوة للسحب ===
             elif step == 'pm_step_label_withdraw':
                 if len(text_msg) < 2:
-                    self.send_message(chat_id, "❌ النص قصير. اكتب نص الخطوة:")
+                    self.send_message(chat_id, self.tr('a0179_النص_قصير', 'ar'))
                     return
                 step_order = current_state.get('step_order', 1)
                 current_state.setdefault('custom_steps', {'deposit': [], 'withdraw': []})['withdraw'].append({
@@ -6415,7 +6772,7 @@ class ComprehensiveDUXBot:
             chat_id = message['chat']['id']
             text_msg = message.get('text', '').strip()
             if len(text_msg) < 2:
-                self.send_message(chat_id, "❌ الاسم قصير. اكتب اسماً:")
+                self.send_message(chat_id, self.tr('a0181_الاسم_قصير', 'ar'))
                 return
             self.temp_button_label_edit = getattr(self, 'temp_button_label_edit', {})
             self.temp_button_label_edit[user_id] = {'ref_name': text_msg}
@@ -6430,10 +6787,10 @@ class ComprehensiveDUXBot:
             chat_id = message['chat']['id']
             text_msg = message.get('text', '').strip()
             if not text_msg.startswith('http'):
-                self.send_message(chat_id, "❌ الرابط يجب أن يبدأ بـ http:// أو https://")
+                self.send_message(chat_id, self.tr('a0182_الرابط_يجب', 'ar'))
                 return
             data = getattr(self, 'temp_button_label_edit', {}).get(user_id, {})
-            name = data.get('ref_name', 'رابط')
+            name = data.get('ref_name', self.tr('a0183_رابط', 'ar'))
             link_id = f"REF{str(int(datetime.now().timestamp()))[-6:]}"
             try:
                 with open('referral_links.csv', 'a', newline='', encoding='utf-8-sig') as f:
@@ -6458,12 +6815,12 @@ class ComprehensiveDUXBot:
             text_msg = message.get('text', '').strip()
             parts = text_msg.split()
             if len(parts) < 2:
-                self.send_message(chat_id, "❌ الصيغة: [المبلغ] [العملة]\n💡 مثال: 10 SAR")
+                self.send_message(chat_id, self.tr('a0184_الصيغة_المبلغ', 'ar'))
                 return
             try:
                 amount = float(parts[0])
             except ValueError:
-                self.send_message(chat_id, "❌ المبلغ يجب أن يكون رقماً\n💡 مثال: 10 SAR")
+                self.send_message(chat_id, self.tr('a0185_المبلغ_يجب', 'ar'))
                 return
             currency = parts[1].upper()
             self.save_setting('referral_bonus_amount', str(amount))
@@ -6484,24 +6841,24 @@ class ComprehensiveDUXBot:
             method_id = current_state.replace('pm_input_name_', '')
             text_msg = message.get('text', '').strip()
 
-            if text_msg in ['إلغاء', 'الغاء', 'cancel', '🔙']:
+            if text_msg in [self.tr('a0010_إلغاء', 'ar'), self.tr('a0011_الغاء', 'ar'), 'cancel', '🔙']:
                 if user_id in self.user_states: del self.user_states[user_id]
                 return
 
             if len(text_msg) < 2:
-                self.send_message(chat_id, "❌ الاسم قصير جداً")
+                self.send_message(chat_id, self.tr('a0186_الاسم_قصير', 'ar'))
                 return
 
             self.update_payment_method_field(method_id, 'method_name', text_msg)
             if user_id in self.user_states: del self.user_states[user_id]
             # العودة لتفاصيل الوسيلة المحدّثة بدلاً من لوحة الأدمن
-            self.send_message(chat_id, f"✅ تم تحديث الاسم إلى: <b>{text_msg}</b>")
+            self.send_message(chat_id, self.tr('a0187_تم_تحديث', 'ar', text_msg=text_msg))
             fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
             # إعادة عرض تفاصيل الوسيلة
             method = self.get_payment_method_by_id(method_id)
             if method:
                 company = self.get_company_by_id(method.get('company_id', ''))
-                company_name = company['name'] if company else 'غير محدد'
+                company_name = company['name'] if company else self.tr('a0122_غير_محدد', 'ar')
                 status = method.get('status', 'active')
                 status_icon = '✅' if status == 'active' else '⏸️'
                 icon = method.get('icon', '💳') or '💳'
@@ -6531,22 +6888,22 @@ class ComprehensiveDUXBot:
             method_id = current_state.replace('pm_input_account_', '')
             text_msg = message.get('text', '').strip()
 
-            if text_msg in ['إلغاء', 'الغاء', 'cancel', '🔙']:
+            if text_msg in [self.tr('a0010_إلغاء', 'ar'), self.tr('a0011_الغاء', 'ar'), 'cancel', '🔙']:
                 if user_id in self.user_states: del self.user_states[user_id]
                 return
 
             if len(text_msg) < 3:
-                self.send_message(chat_id, "❌ رقم الحساب قصير جداً")
+                self.send_message(chat_id, self.tr('a0188_رقم_الحساب', 'ar'))
                 return
 
             self.update_payment_method_field(method_id, 'account_data', text_msg)
             if user_id in self.user_states: del self.user_states[user_id]
-            self.send_message(chat_id, f"✅ تم تحديث رقم الحساب إلى: <code>{text_msg}</code>")
+            self.send_message(chat_id, self.tr('a0189_تم_تحديث', 'ar', text_msg=text_msg))
             # العودة لتفاصيل الوسيلة المحدّثة
             method = self.get_payment_method_by_id(method_id)
             if method:
                 company = self.get_company_by_id(method.get('company_id', ''))
-                company_name = company['name'] if company else 'غير محدد'
+                company_name = company['name'] if company else self.tr('a0122_غير_محدد', 'ar')
                 status = method.get('status', 'active')
                 status_icon = '✅' if status == 'active' else '⏸️'
                 icon = method.get('icon', '💳') or '💳'
@@ -6575,14 +6932,14 @@ class ComprehensiveDUXBot:
             chat_id = message['chat']['id']
             text = message.get('text', '').strip()
 
-            if text in ['إلغاء', 'الغاء', 'cancel', '🔙']:
+            if text in [self.tr('a0010_إلغاء', 'ar'), self.tr('a0011_الغاء', 'ar'), 'cancel', '🔙']:
                 if user_id in self.user_states: del self.user_states[user_id]
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                 self.show_svrp_admin_panel(fake_msg)
                 return
 
             if len(text) < 10:
-                self.send_message(chat_id, "❌ النص قصير جداً. اكتب شرحاً كاملاً:")
+                self.send_message(chat_id, self.tr('a0190_النص_قصير', 'ar'))
                 return
 
             # استخراج كود اللغة من الحالة: svrp_edit_intro_{lang}_input
@@ -6616,14 +6973,14 @@ class ComprehensiveDUXBot:
             text = message.get('text', '').strip()
             bot_id = current_state.replace('mbot_freeze_input_', '')
 
-            if text in ['إلغاء', 'الغاء', 'cancel']:
+            if text in [self.tr('a0010_إلغاء', 'ar'), self.tr('a0011_الغاء', 'ar'), 'cancel']:
                 if user_id in self.user_states:
                     del self.user_states[user_id]
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                 self.show_multi_bot_panel(fake_msg)
                 return
 
-            if text.lower() in ['الآن', 'now', 'الان']:
+            if text.lower() in [self.tr('a0191_الآن', 'ar'), 'now', self.tr('a0192_الان', 'ar')]:
                 freeze_date = datetime.now().strftime('%Y-%m-%d')
             else:
                 try:
@@ -6642,7 +6999,7 @@ class ComprehensiveDUXBot:
             if user_id in self.user_states:
                 del self.user_states[user_id]
             self.send_message(chat_id,
-                f"✅ تم تحديد تجميد البوت في: <b>{freeze_date}</b>")
+                self.tr('a0193_تم_تحديد', 'ar', freeze_date=freeze_date))
             fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
             self.show_multi_bot_panel(fake_msg)
             return
@@ -6694,7 +7051,7 @@ class ComprehensiveDUXBot:
                         [{'text': '✅ موافقة', 'callback_data': f'rec_approve_{req_id}'},
                          {'text': '❌ رفض', 'callback_data': f'rec_reject_{req_id}'}]
                     ]
-                    self.send_inline_message(admin_id, "🔄 مراجعة الطلب:", inline_btns)
+                    self.send_inline_message(admin_id, self.tr('a0194_مراجعة_الطلب', 'ar'), inline_btns)
                 except Exception as e:
                     logger.error(f"خطأ في إشعار الأدمن بطلب الاسترداد: {e}")
             return
@@ -6729,7 +7086,7 @@ class ComprehensiveDUXBot:
             elif step == 'lot_count':
                 chat_id = message['chat']['id']
                 text_msg = message.get('text', '').strip()
-                if text_msg.lower() in ['❌ إلغاء', 'إلغاء', 'الغاء', 'cancel', '🔙']:
+                if text_msg.lower() in [self.tr('a0009_إلغاء', 'ar'), self.tr('a0010_إلغاء', 'ar'), self.tr('a0011_الغاء', 'ar'), 'cancel', '🔙']:
                     del self.user_states[user_id]
                     fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                     self.show_lottery_panel(fake_msg)
@@ -6738,10 +7095,10 @@ class ComprehensiveDUXBot:
                     count = int(text_msg)
                     max_remaining = current_state.get('max_remaining', 1)
                     if count < 1 or count > max_remaining:
-                        self.send_message(chat_id, f"❌ اكتب رقماً بين 1 و {max_remaining}:")
+                        self.send_message(chat_id, self.tr('a0195_اكتب_رقماً', 'ar', max_remaining=max_remaining))
                         return
                 except ValueError:
-                    self.send_message(chat_id, "❌ اكتب رقماً صحيحاً:")
+                    self.send_message(chat_id, self.tr('a0196_اكتب_رقماً', 'ar'))
                     return
                 price = float(current_state.get('price', 0))
                 currency = current_state.get('currency', 'SAR')
@@ -6754,7 +7111,7 @@ class ComprehensiveDUXBot:
                 user_currency = user.get('currency', 'EGP') if user else 'EGP'
                 unique_methods = self.get_payment_methods_by_currency(user_currency)
                 if not unique_methods:
-                    self.send_message(chat_id, "❌ لا توجد وسائل دفع متاحة")
+                    self.send_message(chat_id, self.tr('a0197_لا_توجد', 'ar'))
                     return
                 inline_btns = []
                 for m in unique_methods:
@@ -6776,46 +7133,43 @@ class ComprehensiveDUXBot:
             elif step == 'lot_confirm':
                 chat_id = message['chat']['id']
                 text_msg = message.get('text', '').strip()
-                if text_msg.lower() in ['إلغاء', 'الغاء', 'cancel', '🔙']:
+                user_obj = self.find_user(user_id)
+                lang = user_obj.get('language', 'ar') if user_obj else 'ar'
+                if text_msg.lower() in [self.tr('a0010_إلغاء', lang), self.tr('a0011_الغاء', lang), 'cancel', '🔙']:
                     del self.user_states[user_id]
                     fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                     self.show_lottery_panel(fake_msg)
                     return
-                if text_msg.lower() in ['تم', 'done', 'ok', 'نعم']:
+                if text_msg.lower() in ['تم', 'done', 'ok', self.tr('a0198_نعم', lang)]:
                     round_id = current_state.get('round_id', '')
                     method_id = current_state.get('method_id', '')
                     count = int(current_state.get('count', 1))
-                    user_obj = self.find_user(user_id)
-                    import random as _r
-                    ticket_numbers = []
-                    for i in range(count):
-                        tn = f"{_r.randint(1000, 9999)}"
-                        ticket_numbers.append(tn)
-                        try:
-                            with open('lottery_tickets.csv', 'a', newline='', encoding='utf-8-sig') as f:
-                                writer = csv.writer(f)
-                                writer.writerow([f"TKT{str(int(datetime.now().timestamp()))[-6:]}_{i}",
-                                               round_id, str(user_id), user_obj.get('name', ''), user_obj.get('customer_id', ''),
-                                               tn, datetime.now().strftime('%Y-%m-%d %H:%M'),
-                                               method_id, 'pending'])
-                        except:
-                            pass
+                    # Flow B: إنشاء طلب تذكرة بدون رقم — الرقم يُولّد عند الموافقة فقط
+                    ticket_req_id = f"TKR{str(int(datetime.now().timestamp()))[-6:]}"
+                    try:
+                        with open('lottery_tickets.csv', 'a', newline='', encoding='utf-8-sig') as f:
+                            writer = csv.writer(f)
+                            writer.writerow([ticket_req_id, round_id, str(user_id),
+                                           user_obj.get('name', ''), user_obj.get('customer_id', ''),
+                                           '', datetime.now().strftime('%Y-%m-%d %H:%M'),
+                                           method_id, 'pending_admin'])
+                    except:
+                        pass
                     del self.user_states[user_id]
-                    tickets_text = "\n".join([f"  • <code>#{tn}</code> 👈 اضغط للنسخ" for tn in ticket_numbers])
                     self.send_message(chat_id,
-                        f"🎫 <b>تم شراء {count} تذكرة!</b>\n\n"
-                        f"🎰 أرقام التذاكر:\n{tickets_text}\n\n"
-                        f"⏳ بانتظار تأكيد الدفع من الإدارة\n\n"
-                        f"حظاً موفقاً! 🍀",
-                        self.main_keyboard('ar', user_id))
+                        f"🎫 <b>تم إرسال طلب شراء {count} تذكرة!</b>\n\n"
+                        f"⏳ بانتظار موافقة الإدارة على الدفع\n"
+                        f"🔢 سيتم توليد أرقام التذاكر بعد التأكيد\n\n"
+                        f"🍀 حظاً موفقاً!",
+                        self.main_keyboard(lang, user_id))
                     # إشعار الأدمن
                     for admin_id in self.admin_ids:
                         try:
                             self.send_message(int(admin_id),
-                                f"🎫 <b>شراء تذاكر يانصيب جديد</b>\n\n"
+                                f"🎫 <b>طلب شراء تذاكر يانصيب</b>\n\n"
                                 f"👤 {user_obj.get('name', '')} — <code>{user_id}</code>\n"
                                 f"🎫 العدد: <code>{count}</code>\n"
-                                f"🎰 الأرقام: {', '.join(['#'+tn for tn in ticket_numbers])}\n"
+                                f"🆔 الطلب: <code>{ticket_req_id}</code>\n"
                                 f"📅 {datetime.now().strftime('%Y-%m-%d %H:%M')}")
                         except:
                             pass
@@ -6830,7 +7184,7 @@ class ComprehensiveDUXBot:
             order_id = current_state.get('order_id', '')
 
             if 'photo' not in message:
-                self.send_message(chat_id, "❌ أرسل صورة (لقطة شاشة) لإثبات الدفع:")
+                self.send_message(chat_id, self.tr('a0200_أرسل_صورة', 'ar'))
                 return
 
             photo = message['photo'][-1]
@@ -6881,7 +7235,7 @@ class ComprehensiveDUXBot:
             return
             
         # معالجة زر إعادة التعيين أولاً (أولوية عالية) — يعمل حتى بدون تسجيل
-        if text in ['🔄 إعادة تعيين النظام', '🔄 Reset System', '🔄 إعادة تعيين', '🆘 إصلاح شامل']:
+        if text in [self.tr('a0201_إعادة_تعيين', 'ar'), '🔄 Reset System', self.tr('a0202_إعادة_تعيين', 'ar'), self.tr('a0203_إصلاح_شامل', 'ar')]:
             user = self.find_user(user_id)
             if user:
                 self.super_reset_user_system(user_id, chat_id, user)
@@ -6928,13 +7282,41 @@ class ComprehensiveDUXBot:
                 self.handle_trade_admin_step(message, state)
                 return
 
-            # ==================== 🎡 عجلة الحظ — حالات الإنشاء ===
+            # ===== صيد الجوائز: إضافة هدية =====
+            if isinstance(current_state, str) and current_state == 'wheel_gift_add_text':
+                user_id = message['from']['id']
+                chat_id = message['chat']['id']
+                text_msg = message.get('text', '').strip()
+                if len(text_msg) < 3:
+                    self.send_message(chat_id, "❌ النص قصير جداً. اكتب نص الهدية:")
+                    return
+                parts = text_msg.split('|', 1)
+                gift_text = parts[0].strip()
+                gift_link = parts[1].strip() if len(parts) > 1 else ''
+                if gift_link.lower() in ('بدون', 'none', 'no'):
+                    gift_link = ''
+                gift_id = f"GFT{str(int(datetime.now().timestamp()))[-6:]}"
+                try:
+                    with open('wheel_gifts.csv', 'a', newline='', encoding='utf-8-sig') as f:
+                        writer = csv.writer(f)
+                        writer.writerow([gift_id, gift_text, gift_link, 'yes', datetime.now().strftime('%Y-%m-%d %H:%M')])
+                except:
+                    pass
+                del self.user_states[user_id]
+                self.send_message(chat_id,
+                    f"✅ <b>تم إضافة الهدية!</b>\n\n"
+                    f"🎁 {gift_text}\n"
+                    f"🔗 {gift_link if gift_link else 'بدون رابط'}")
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_wheel_admin(fake_msg)
+                return
+
             if isinstance(current_state, str) and current_state == 'wheel_name':
                 user_id = message['from']['id']
                 chat_id = message['chat']['id']
                 text_msg = message.get('text', '').strip()
                 if len(text_msg) < 2:
-                    self.send_message(chat_id, "❌ الاسم قصير:")
+                    self.send_message(chat_id, self.tr('a0012_الاسم_قصير', 'ar'))
                     return
                 self.temp_wheel = getattr(self, 'temp_wheel', {})
                 self.temp_wheel[user_id] = {'name': text_msg}
@@ -6950,13 +7332,48 @@ class ComprehensiveDUXBot:
                 chat_id = message['chat']['id']
                 text_msg = message.get('text', '').strip()
                 if '|' not in text_msg or len(text_msg) < 3:
-                    self.send_message(chat_id, "❌ اكتب الجوائز مفصولة بـ |")
+                    self.send_message(chat_id, self.tr('a0204_اكتب_الجوائز', 'ar'))
                     return
                 self.temp_wheel[user_id]['prizes'] = text_msg
-                self.user_states[user_id] = 'wheel_max'
+                self.user_states[user_id] = 'wheel_cost'
                 self.send_message(chat_id,
                     f"✅ الجوائز محفوظة\n\n"
-                    f"🎯 اكتب <b>الحد الأقصى للدورات لكل مستخدم</b>:")
+                    f"💰 اكتب <b>تكلفة الدورة الإضافية</b> (0 = مجاني):\n\n"
+                    f"💡 مثال: <code>0</code> للدورات المجانية\n"
+                    f"💡 مثال: <code>5</code> لخصم 5 من الرصيد لكل دورة إضافية")
+                return
+
+            if isinstance(current_state, str) and current_state == 'wheel_cost':
+                user_id = message['from']['id']
+                chat_id = message['chat']['id']
+                text_msg = message.get('text', '').strip()
+                try:
+                    spin_cost = float(text_msg)
+                    if spin_cost < 0:
+                        self.send_message(chat_id, "❌ التكلفة يجب أن تكون 0 أو أكثر:")
+                        return
+                except ValueError:
+                    self.send_message(chat_id, "❌ اكتب رقماً صحيحاً:")
+                    return
+                self.temp_wheel[user_id]['spin_cost'] = str(spin_cost)
+                self.user_states[user_id] = 'wheel_currency'
+                self.send_message(chat_id,
+                    f"✅ التكلفة: <code>{spin_cost}</code>\n\n"
+                    f"💱 اكتب <b>العملة</b> (مثال: SAR, USD, USDT):")
+                return
+
+            if isinstance(current_state, str) and current_state == 'wheel_currency':
+                user_id = message['from']['id']
+                chat_id = message['chat']['id']
+                text_msg = message.get('text', '').strip().upper()
+                if len(text_msg) < 2 or len(text_msg) > 5:
+                    self.send_message(chat_id, "❌ اكتب رمز عملة صحيح (2-5 أحرف):")
+                    return
+                self.temp_wheel[user_id]['currency'] = text_msg
+                self.user_states[user_id] = 'wheel_max'
+                self.send_message(chat_id,
+                    f"✅ العملة: <code>{text_msg}</code>\n\n"
+                    f"🎯 اكتب <b>الحد الأقصى للدورات المجانية لكل مستخدم</b>:")
                 return
 
             if isinstance(current_state, str) and current_state == 'wheel_max':
@@ -6966,19 +7383,68 @@ class ComprehensiveDUXBot:
                 try:
                     max_spins = int(text_msg)
                     if max_spins < 1:
-                        self.send_message(chat_id, "❌ يجب أن يكون 1 على الأقل:")
+                        self.send_message(chat_id, self.tr('a0205_يجب_أن', 'ar'))
                         return
                 except ValueError:
-                    self.send_message(chat_id, "❌ اكتب رقماً:")
+                    self.send_message(chat_id, self.tr('a0206_اكتب_رقماً', 'ar'))
+                    return
+                self.temp_wheel[user_id]['max_spins'] = str(max_spins)
+                self.user_states[user_id] = 'wheel_speed'
+                self.send_message(chat_id,
+                    f"✅ الحد الأقصى: <code>{max_spins}</code>\n\n"
+                    f"⚡ اكتب <b>سرعة اللعبة بالملي ثانية</b>:\n\n"
+                    f"💡 <b>كلما قلّ الرقم، زاد التحدي!</b>\n"
+                    f"⚡ مثال سريع: <code>1500</code> (1.5 ثانية)\n"
+                    f"🎯 مثال متوسط: <code>2500</code> (2.5 ثانية)\n"
+                    f"🐢 مثال بطيء: <code>4000</code> (4 ثوانٍ)")
+                return
+
+            if isinstance(current_state, str) and current_state == 'wheel_speed':
+                user_id = message['from']['id']
+                chat_id = message['chat']['id']
+                text_msg = message.get('text', '').strip()
+                try:
+                    game_speed = int(text_msg)
+                    if game_speed < 500 or game_speed > 10000:
+                        self.send_message(chat_id, "❌ اكتب رقماً بين 500 و 10000 (ملي ثانية):")
+                        return
+                except ValueError:
+                    self.send_message(chat_id, "❌ اكتب رقماً صحيحاً:")
+                    return
+                self.temp_wheel[user_id]['game_speed_ms'] = str(game_speed)
+                self.user_states[user_id] = 'wheel_relocations'
+                self.send_message(chat_id,
+                    f"✅ السرعة: <code>{game_speed}ms</code>\n\n"
+                    f"🏃 اكتب <b>عدد حركات هروب الهدية</b> (1 أو 2):\n\n"
+                    f"💡 <b>1</b> = الهدية تهرب مرة واحدة ثم تُصطاد\n"
+                    f"💡 <b>2</b> = الهدية تهرب مرتين — تحدي أصعب!")
+                return
+
+            if isinstance(current_state, str) and current_state == 'wheel_relocations':
+                user_id = message['from']['id']
+                chat_id = message['chat']['id']
+                text_msg = message.get('text', '').strip()
+                try:
+                    max_reloc = int(text_msg)
+                    if max_reloc < 1 or max_reloc > 2:
+                        self.send_message(chat_id, "❌ اكتب 1 أو 2 فقط:")
+                        return
+                except ValueError:
+                    self.send_message(chat_id, "❌ اكتب رقماً صحيحاً:")
                     return
 
                 data = self.temp_wheel.get(user_id, {})
                 wheel_id = f"WHL{str(int(datetime.now().timestamp()))[-6:]}"
+                spin_cost = data.get('spin_cost', '0')
+                currency = data.get('currency', 'SAR')
+                max_spins = data.get('max_spins', '1')
+                game_speed = data.get('game_speed_ms', '2500')
                 try:
                     with open('wheel_rounds.csv', 'a', newline='', encoding='utf-8-sig') as f:
                         writer = csv.writer(f)
                         writer.writerow([wheel_id, data.get('name', ''), data.get('prizes', ''),
-                                       'active', '0', 'SAR', '1', str(max_spins),
+                                       'active', spin_cost, currency, '1', max_spins,
+                                       game_speed, str(max_reloc),
                                        datetime.now().strftime('%Y-%m-%d %H:%M')])
                 except:
                     pass
@@ -6986,11 +7452,14 @@ class ComprehensiveDUXBot:
                 if hasattr(self, 'temp_wheel') and user_id in self.temp_wheel:
                     del self.temp_wheel[user_id]
                 self.send_message(chat_id,
-                    f"✅ <b>تم إنشاء جولة عجلة الحظ!</b>\n\n"
+                    f"✅ <b>تم إنشاء جولة صيد الجوائز!</b>\n\n"
                     f"🆔 <code>{wheel_id}</code> 👈 اضغط للنسخ\n"
-                    f"🎡 {data.get('name', '')}\n"
+                    f"🎯 {data.get('name', '')}\n"
                     f"🎁 الجوائز: {data.get('prizes', '')}\n"
-                    f"🎯 حد الدورات: {max_spins}",
+                    f"💰 التكلفة: <code>{spin_cost} {currency}</code>\n"
+                    f"🎯 حد الدورات المجانية: {max_spins}\n"
+                    f"⚡ سرعة اللعبة: <code>{game_speed}ms</code>\n"
+                    f"🏃 حركات الهروب: <code>{max_reloc}</code>",
                     self.admin_keyboard())
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                 self.show_wheel_admin(fake_msg)
@@ -7002,12 +7471,12 @@ class ComprehensiveDUXBot:
                 chat_id = message['chat']['id']
                 text_msg = message.get('text', '').strip()
                 if len(text_msg) < 2:
-                    self.send_message(chat_id, "❌ الاسم قصير:")
+                    self.send_message(chat_id, self.tr('a0012_الاسم_قصير', 'ar'))
                     return
                 self.temp_lottery = getattr(self, 'temp_lottery', {})
                 self.temp_lottery[user_id] = {'name': text_msg}
                 self.user_states[user_id] = 'lot_price'
-                self.send_message(chat_id, f"✅ الاسم: <b>{text_msg}</b>\n\n💰 اكتب <b>سعر التذكرة</b>:")
+                self.send_message(chat_id, self.tr('a0207_الاسم_اكتب', 'ar', text_msg=text_msg))
                 return
 
             if isinstance(current_state, str) and current_state == 'lot_price':
@@ -7017,14 +7486,14 @@ class ComprehensiveDUXBot:
                 try:
                     price = float(text_msg)
                     if price <= 0:
-                        self.send_message(chat_id, "❌ السعر يجب أن يكون أكبر من صفر:")
+                        self.send_message(chat_id, self.tr('a0208_السعر_يجب', 'ar'))
                         return
                 except ValueError:
-                    self.send_message(chat_id, "❌ اكتب رقماً:")
+                    self.send_message(chat_id, self.tr('a0206_اكتب_رقماً', 'ar'))
                     return
                 self.temp_lottery[user_id]['price'] = str(price)
                 self.user_states[user_id] = 'lot_currency'
-                self.send_message(chat_id, f"✅ السعر: <code>{price}</code>\n\n💱 اكتب <b>العملة</b> (مثال: SAR, USD):")
+                self.send_message(chat_id, self.tr('a0209_السعر_اكتب', 'ar', price=price))
                 return
 
             if isinstance(current_state, str) and current_state == 'lot_currency':
@@ -7033,7 +7502,7 @@ class ComprehensiveDUXBot:
                 text_msg = message.get('text', '').strip().upper()
                 self.temp_lottery[user_id]['currency'] = text_msg
                 self.user_states[user_id] = 'lot_winners'
-                self.send_message(chat_id, f"✅ العملة: {text_msg}\n\n🏆 اكتب <b>عدد الفائزين</b>:")
+                self.send_message(chat_id, self.tr('a0210_العملة_اكتب', 'ar', text_msg=text_msg))
                 return
 
             if isinstance(current_state, str) and current_state == 'lot_winners':
@@ -7043,14 +7512,14 @@ class ComprehensiveDUXBot:
                 try:
                     winners = int(text_msg)
                     if winners < 1 or winners > 10:
-                        self.send_message(chat_id, "❌ بين 1 و 10:")
+                        self.send_message(chat_id, self.tr('a0211_بين_و', 'ar'))
                         return
                 except ValueError:
-                    self.send_message(chat_id, "❌ اكتب رقماً:")
+                    self.send_message(chat_id, self.tr('a0206_اكتب_رقماً', 'ar'))
                     return
                 self.temp_lottery[user_id]['winners'] = str(winners)
                 self.user_states[user_id] = 'lot_max'
-                self.send_message(chat_id, f"✅ الفائزون: {winners}\n\n🎫 اكتب <b>الحد الأقصى للتذاكر لكل مستخدم</b>:")
+                self.send_message(chat_id, self.tr('a0212_الفائزون_اكتب', 'ar', winners=winners))
                 return
 
             if isinstance(current_state, str) and current_state == 'lot_max':
@@ -7060,14 +7529,14 @@ class ComprehensiveDUXBot:
                 try:
                     max_t = int(text_msg)
                     if max_t < 1:
-                        self.send_message(chat_id, "❌ يجب أن يكون 1 على الأقل:")
+                        self.send_message(chat_id, self.tr('a0205_يجب_أن', 'ar'))
                         return
                 except ValueError:
-                    self.send_message(chat_id, "❌ اكتب رقماً:")
+                    self.send_message(chat_id, self.tr('a0206_اكتب_رقماً', 'ar'))
                     return
                 self.temp_lottery[user_id]['max'] = str(max_t)
                 self.user_states[user_id] = 'lot_admin_pct'
-                self.send_message(chat_id, f"✅ الحد الأقصى: {max_t}\n\n💰 اكتب <b>نسبة ربح الأدمن %</b> (0-100):")
+                self.send_message(chat_id, self.tr('a0213_الحد_الأقصى', 'ar', max_t=max_t))
                 return
 
             if isinstance(current_state, str) and current_state == 'lot_admin_pct':
@@ -7077,14 +7546,14 @@ class ComprehensiveDUXBot:
                 try:
                     pct = float(text_msg)
                     if pct < 0 or pct > 100:
-                        self.send_message(chat_id, "❌ بين 0 و 100:")
+                        self.send_message(chat_id, self.tr('a0214_بين_و', 'ar'))
                         return
                 except ValueError:
-                    self.send_message(chat_id, "❌ اكتب رقماً:")
+                    self.send_message(chat_id, self.tr('a0206_اكتب_رقماً', 'ar'))
                     return
                 self.temp_lottery[user_id]['admin_pct'] = str(pct)
                 self.user_states[user_id] = 'lot_drawtime'
-                self.send_message(chat_id, f"✅ النسبة: {pct}%\n\n⏰ اكتب <b>موعد السحب</b> (YYYY-MM-DD HH:MM):")
+                self.send_message(chat_id, self.tr('a0215_النسبة_اكتب', 'ar', pct=pct))
                 return
 
             if isinstance(current_state, str) and current_state == 'lot_drawtime':
@@ -7123,14 +7592,14 @@ class ComprehensiveDUXBot:
                 chat_id = message['chat']['id']
                 text_msg = message.get('text', '').strip()
 
-                if text_msg.lower() in ['إلغاء', 'الغاء', 'cancel']:
+                if text_msg.lower() in [self.tr('a0010_إلغاء', 'ar'), self.tr('a0011_الغاء', 'ar'), 'cancel']:
                     del self.user_states[user_id]
                     fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                     self.show_lottery_panel(fake_msg)
                     return
 
-                if text_msg.lower() not in ['تم', 'done', 'ok', 'نعم']:
-                    self.send_message(chat_id, "اكتب <b>'تم'</b> للتأكيد أو <b>'إلغاء'</b>")
+                if text_msg.lower() not in ['تم', 'done', 'ok', self.tr('a0198_نعم', 'ar')]:
+                    self.send_message(chat_id, self.tr('a0216_اكتب_تم', 'ar'))
                     return
 
                 # إنشاء طلب تذكرة — بدون توليد رقم حتى توافق الإدارة
@@ -7195,7 +7664,7 @@ class ComprehensiveDUXBot:
                 order_id = state.get('order_id', '')
 
                 if 'photo' not in message:
-                    self.send_message(chat_id, "❌ أرسل لقطة شاشة (صورة) لإثبات الدفع:")
+                    self.send_message(chat_id, self.tr('a0217_أرسل_لقطة', 'ar'))
                     return
 
                 photo = message['photo'][-1]
@@ -7237,27 +7706,27 @@ class ComprehensiveDUXBot:
         all_langs = self.get_supported_languages()
         skip_texts = {self.tr('skip_registration', l) for l in all_langs}
         register_texts_new = {self.tr('register_account', l) for l in all_langs}
-        register_texts_new.add('📝 تسجيل حساب جديد')
+        register_texts_new.add(self.tr('a0218_تسجيل_حساب', 'ar'))
         reset_texts = {self.tr('reset_system', l) for l in all_langs}
-        back_texts = {'🔙', '🔙 العودة', '🔙 العودة للقائمة الرئيسية', '🏠 القائمة الرئيسية', '🏠 الرئيسية'}
+        back_texts = {'🔙', self.tr('a0142_العودة', 'ar'), self.tr('a0219_العودة_للقائمة', 'ar'), self.tr('a0083_القائمة_الرئيسية', 'ar'), self.tr('a0141_الرئيسية', 'ar')}
         back_texts.add(self.tr('main_menu', 'ar'))
         
         if not user:
             # فحص أزرار التسجيل أولاً قبل إعادة عرض handle_start
             skip_texts = {self.tr('skip_registration', l) for l in self.get_supported_languages()}
             register_texts_new = {self.tr('register_account', l) for l in self.get_supported_languages()}
-            register_texts_new.add('📝 تسجيل حساب جديد')
+            register_texts_new.add(self.tr('a0218_تسجيل_حساب', 'ar'))
             
             if text in register_texts_new:
                 self.start_registration(message)
                 return
-            elif text == '🔐 تسجيل الدخول برقم الهاتف':
+            elif text == self.tr('a0220_تسجيل_الدخول', 'ar'):
                 self.start_phone_login(message)
                 return
             elif text in skip_texts:
                 # المستخدم تخطى التسجيل — عرض القائمة الرئيسية كزائر
                 self.send_message(chat_id, 
-                    "✅ تم تخطي التسجيل!\n\n⚠️ بدون تسجيل، لن تتمكن من حفظ طلباتك.\nيمكنك التسجيل لاحقاً.",
+                    self.tr('a0221_تم_تخطي', 'ar'),
                     self.main_keyboard('ar', user_id))
                 return
             elif text in reset_texts or text in back_texts or text == self.tr('main_menu', 'ar'):
@@ -7270,13 +7739,13 @@ class ComprehensiveDUXBot:
         
         # فحص الحظر
         if user.get('is_banned') == 'yes':
-            ban_reason = user.get('ban_reason', 'غير محدد')
-            self.send_message(chat_id, f"❌ تم حظر حسابك\nالسبب: {ban_reason}")
+            ban_reason = user.get('ban_reason', self.tr('a0122_غير_محدد', 'ar'))
+            self.send_message(chat_id, self.tr('a0222_تم_حظر', 'ar', ban_reason=ban_reason))
             return
         
         # معالجة أوامر الأدمن
         if self.is_admin(user_id):
-            admin_texts = {self.tr('admin_panel_btn', l) for l in all_langs} | {'🔧 Admin', '🔧 لوحة الإدارة'}
+            admin_texts = {self.tr('admin_panel_btn', l) for l in all_langs} | {'🔧 Admin', self.tr('a0223_لوحة_الإدارة', 'ar')}
             if text == '/admin' or text in admin_texts:
                 self.handle_admin_panel(message)
                 return
@@ -7347,17 +7816,17 @@ class ComprehensiveDUXBot:
                     elif admin_state.startswith('writing_custom_reply_'):
                         complaint_id = admin_state.replace('writing_custom_reply_', '')
                         reply_text = text.strip()
-                        if reply_text.lower() in ['/cancel', 'الغاء', 'إلغاء']:
+                        if reply_text.lower() in ['/cancel', self.tr('a0011_الغاء', 'ar'), self.tr('a0010_إلغاء', 'ar')]:
                             if user_id in self.user_states: del self.user_states[user_id]
-                            self.send_message(chat_id, "❌ تم الإلغاء", self.admin_keyboard())
+                            self.send_message(chat_id, self.tr('a0224_تم_الإلغاء', 'ar'), self.admin_keyboard())
                             return
                         if reply_text:
                             success = self.save_complaint_reply(complaint_id, reply_text)
                             if success:
-                                self.send_message(chat_id, f"✅ تم إرسال الرد!\n\n📝 {reply_text}", self.admin_keyboard())
+                                self.send_message(chat_id, self.tr('a0225_تم_إرسال', 'ar', reply_text=reply_text), self.admin_keyboard())
                                 self.send_complaint_reply_to_customer(complaint_id, reply_text)
                             else:
-                                self.send_message(chat_id, "❌ فشل في حفظ الرد", self.admin_keyboard())
+                                self.send_message(chat_id, self.tr('a0226_فشل_في', 'ar'), self.admin_keyboard())
                         if user_id in self.user_states: del self.user_states[user_id]
                         return
                     elif admin_state.startswith('editing_support_'):
@@ -7386,14 +7855,14 @@ class ComprehensiveDUXBot:
         complaint_texts = {self.tr('complaint', l) for l in self.get_supported_languages()}
         support_texts = {self.tr('support', l) for l in self.get_supported_languages()}
         currency_texts = {self.tr('change_currency', l) for l in self.get_supported_languages()}
-        match_texts = {self.tr('match_btn', l) for l in all_langs} | {'🔄 مطابقة', '🔄 Match'}
-        notif_texts = {self.tr('notif_btn', l) for l in all_langs} | {'🔔 إشعاراتي', '🔔 Notifications'}
-        ref_texts = {self.tr('referral_btn', l) for l in all_langs} | {'🎁 اربح', '🎁 إحالة', '🎁 Referral'}
-        help_texts = {self.tr('help_btn_label', l) for l in all_langs} | {'❓ مساعدة', '❓ Help'}
-        svrp_texts = {self.tr('svrp_title', l) for l in all_langs} | {'💎 تعويض 100%', '💎 تعويض'}
-        apps_texts = {self.tr('apps_btn', l) for l in all_langs} | {'📱 تطبيقات', '📱 Apps'}
+        match_texts = {self.tr('match_btn', l) for l in all_langs} | {self.tr('a0227_مطابقة', user_lang), '🔄 Match'}
+        notif_texts = {self.tr('notif_btn', l) for l in all_langs} | {self.tr('a0228_إشعاراتي', user_lang), '🔔 Notifications'}
+        ref_texts = {self.tr('referral_btn', l) for l in all_langs} | {self.tr('a0229_اربح', user_lang), self.tr('a0230_إحالة', user_lang), '🎁 Referral'}
+        help_texts = {self.tr('help_btn_label', l) for l in all_langs} | {self.tr('a0231_مساعدة', user_lang), '❓ Help'}
+        svrp_texts = {self.tr('svrp_title', l) for l in all_langs} | {self.tr('a0232_تعويض', user_lang), self.tr('a0233_تعويض', user_lang)}
+        apps_texts = {self.tr('apps_btn', l) for l in all_langs} | {self.tr('a0117_تطبيقات', user_lang), '📱 Apps'}
         register_texts = {self.tr('register_account', l) for l in self.get_supported_languages()}
-        register_texts.add('📝 تسجيل حساب جديد')
+        register_texts.add(self.tr('a0218_تسجيل_حساب', user_lang))
         reset_texts = {self.tr('reset_system', l) for l in self.get_supported_languages()}
         skip_texts = {self.tr('skip_registration', l) for l in self.get_supported_languages()}
         
@@ -7423,16 +7892,16 @@ class ComprehensiveDUXBot:
             self.show_svrp_panel(message)
         elif text in apps_texts:
             self.show_apps_panel(message)
-        elif text == '💱 تداول USDT':
+        elif text == self.tr('a0234_تداول', user_lang):
             self.show_trade_panel(message)
-        elif text == '🎰 يانصيب':
+        elif text == self.tr('a0235_يانصيب', user_lang):
             self.show_lottery_panel(message)
-        elif text == '🎡 عجلة الحظ':
+        elif text == self.tr('a0236_عجلة_الحظ', user_lang):
             self.show_wheel_panel(message)
-        elif text == '💎 محفظتي':
+        elif text == self.tr('a0237_محفظتي', user_lang):
             fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
             self.show_svrp_wallet(fake_msg)
-        elif text == '⚙️ المزيد':
+        elif text == self.tr('a0238_المزيد', user_lang):
             self.show_more_menu(message)
         elif self.svrp:
             all_langs = self.get_supported_languages()
@@ -7468,15 +7937,15 @@ class ComprehensiveDUXBot:
                 self.start_matching_flow(message)
             elif text in currency_texts:
                 self.show_currency_selection(message)
-        elif text in register_texts or text == '📝 تسجيل حساب جديد':
+        elif text in register_texts or text == self.tr('a0218_تسجيل_حساب', 'ar'):
             self.start_registration(message)
-        elif text == '🔐 تسجيل الدخول برقم الهاتف':
+        elif text == self.tr('a0220_تسجيل_الدخول', 'ar'):
             self.start_phone_login(message)
         elif text == '/myid':
-            self.send_message(chat_id, f"🆔 معرف المستخدم الخاص بك: {user_id}")
+            self.send_message(chat_id, self.tr('a0239_معرف_المستخدم', 'ar', user_id=user_id))
         # 💎 تعويض 100% — أوامر نصية
-        elif text.startswith('انشاء_كود ') and self.svrp:
-            amount_str = text.replace('انشاء_كود ', '').strip()
+        elif text.startswith(self.tr('a0240_انشاء_كود', 'ar')) and self.svrp:
+            amount_str = text.replace(self.tr('a0240_انشاء_كود', 'ar'), '').strip()
             try:
                 amount = float(amount_str)
                 if amount <= 0:
@@ -7493,18 +7962,18 @@ class ComprehensiveDUXBot:
                             f"⏰ {self.tr('svrp_expires_in', user_lang)}: {self.svrp._get_config('promo_code_expiry_days')} {self.tr('svrp_days', user_lang)}")
             except ValueError:
                 self.send_message(chat_id, self.tr('svrp_invalid_number_err', user_lang))
-        elif text.startswith('استرداد_كود ') and self.svrp:
-            code = text.replace('استرداد_كود ', '').strip()
+        elif text.startswith(self.tr('a0241_استرداد_كود', 'ar')) and self.svrp:
+            code = text.replace(self.tr('a0241_استرداد_كود', 'ar'), '').strip()
             success, msg = self.svrp.redeem_promo_code(user_id, code)
             icon = "✅" if success else "❌"
             self.send_message(chat_id, f"{icon} {msg}")
-        elif text.startswith('استلام ') and self.svrp:
-            task_id = text.replace('استلام ', '').strip()
+        elif text.startswith(self.tr('a0242_استلام', 'ar')) and self.svrp:
+            task_id = text.replace(self.tr('a0242_استلام', 'ar'), '').strip()
             success, msg = self.svrp.claim_task_reward(user_id, task_id)
             icon = "✅" if success else "❌"
             self.send_message(chat_id, f"{icon} {msg}")
         # أزرار نظام المطابقة
-        elif text == '✅ تأكيد البدء' and self.match_manager:
+        elif text == self.tr('a0243_تأكيد_البدء', 'ar') and self.match_manager:
             active_match = self.match_manager.get_match_by_user(user_id)
             if active_match:
                 # تحديد من هو الساحب لطلب الكود + بياناته الكاملة
@@ -7521,33 +7990,33 @@ class ComprehensiveDUXBot:
                         f"4️⃣ وسيلة الدفع (اكتب اسمها من القائمة)\n\n"
                     )
                     if methods:
-                        methods_text += "💳 وسائل الدفع المتاحة:\n"
+                        methods_text += self.tr('a0244_وسائل_الدفع', 'ar')
                         for m in methods:
                             icon = m.get('icon', '💳') or '💳'
                             methods_text += f"  {icon} {m['method_name']}\n"
                     else:
-                        methods_text += "⚠️ لا توجد وسائل دفع محددة لهذه الشركة — اكتب الوسيلة يدوياً"
-                    methods_text += f"\n💡 مثال:\nABC123\nID-789\n0501234567\nحساب بنكي"
+                        methods_text += self.tr('a0245_لا_توجد', 'ar')
+                    methods_text += self.tr('a0246_مثال_حساب', 'ar')
                     self.send_message(chat_id, methods_text)
                 else:
-                    self.send_message(chat_id, "⏳ بانتظار إنشاء الكود من الطرف الآخر...")
+                    self.send_message(chat_id, self.tr('a0247_بانتظار_إنشاء', 'ar'))
             return
-        elif text == '✅ تم الإرسال' and self.match_manager:
+        elif text == self.tr('a0248_تم_الإرسال', 'ar') and self.match_manager:
             active_match = self.match_manager.get_match_by_user(user_id)
             if active_match:
                 self.match_manager.update_match_status(active_match['id'], 'completed')
                 # إشعار الطرفين
                 dep_id = int(active_match['depositor_id'])
                 wit_id = int(active_match['withdrawer_id'])
-                self.send_message(dep_id, "✅ اكتملت العملية!\n\n⭐ قيّم الطرف الآخر (1-5):")
-                self.send_message(wit_id, "✅ اكتملت العملية!\n\n⭐ قيّم الطرف الآخر (1-5):")
+                self.send_message(dep_id, self.tr('a0249_اكتملت_العملية', 'ar'))
+                self.send_message(wit_id, self.tr('a0249_اكتملت_العملية', 'ar'))
                 self.user_states[dep_id] = {'step': 'rating', 'match_id': active_match['id']}
                 self.user_states[wit_id] = {'step': 'rating', 'match_id': active_match['id']}
             return
-        elif text == '🆘 دعم' and self.match_manager:
+        elif text == self.tr('a0250_دعم', 'ar') and self.match_manager:
             active_match = self.match_manager.get_match_by_user(user_id)
             if active_match:
-                dispute_id = self.match_manager.open_dispute(active_match['id'], user_id, 'طلب دعم')
+                dispute_id = self.match_manager.open_dispute(active_match['id'], user_id, self.tr('a0251_طلب_دعم', 'ar'))
                 # إشعار الإدمن
                 for admin_id in self.admin_ids:
                     try:
@@ -7571,20 +8040,20 @@ class ComprehensiveDUXBot:
                         self.send_inline_message(admin_id, dispute_msg, inline_btns)
                     except:
                         pass
-                self.send_message(chat_id, "🆘 تم فتح طلب دعم. سيقوم الإدمن بالتدخل.")
+                self.send_message(chat_id, self.tr('a0252_تم_فتح', 'ar'))
             return
-        elif text == '❌ إلغاء' and self.match_manager:
+        elif text == self.tr('a0009_إلغاء', 'ar') and self.match_manager:
             active_match = self.match_manager.get_match_by_user(user_id)
             if active_match:
                 self.match_manager.cancel_match(active_match['id'], user_id)
                 dep_id = int(active_match['depositor_id'])
                 wit_id = int(active_match['withdrawer_id'])
-                self.send_message(dep_id, "❌ تم إلغاء المطابقة", self.main_keyboard(user.get('language','ar'), dep_id))
-                self.send_message(wit_id, "❌ تم إلغاء المطابقة", self.main_keyboard(user.get('language','ar'), wit_id))
+                self.send_message(dep_id, self.tr('a0253_تم_إلغاء', 'ar'), self.main_keyboard(user.get('language','ar'), dep_id))
+                self.send_message(wit_id, self.tr('a0253_تم_إلغاء', 'ar'), self.main_keyboard(user.get('language','ar'), wit_id))
                 if dep_id in self.user_states: del self.user_states[dep_id]
                 if wit_id in self.user_states: del self.user_states[wit_id]
             return
-        elif text in reset_texts or text in ['🔙 العودة للقائمة الرئيسية', '🔙 العودة', '⬅️ العودة', '🏠 الرئيسية', '🏠 القائمة الرئيسية', '🔄 إعادة تعيين النظام', '🆘 إصلاح', 'reset', 'fix', '🆘 إصلاح شامل'] or text == self.tr('main_menu', user_lang):
+        elif text in reset_texts or text in [self.tr('a0219_العودة_للقائمة', 'ar'), self.tr('a0142_العودة', 'ar'), self.tr('a0254_العودة', 'ar'), self.tr('a0141_الرئيسية', 'ar'), self.tr('a0083_القائمة_الرئيسية', 'ar'), self.tr('a0201_إعادة_تعيين', 'ar'), self.tr('a0255_إصلاح', 'ar'), 'reset', 'fix', self.tr('a0203_إصلاح_شامل', 'ar')] or text == self.tr('main_menu', user_lang):
             # إجراء إعادة تعيين شاملة وقوية
             self.super_reset_user_system(user_id, chat_id, user)
         else:
@@ -7673,7 +8142,7 @@ class ComprehensiveDUXBot:
                 return
 
             # إذا ضغط زر القائمة الرئيسية
-            if phone in ['🏠 القائمة الرئيسية', '🏠'] or phone in {self.tr('main_menu_btn', l) for l in self.get_supported_languages()}:
+            if phone in [self.tr('a0083_القائمة_الرئيسية', 'ar'), '🏠'] or phone in {self.tr('main_menu_btn', l) for l in self.get_supported_languages()}:
                 if user_id in self.user_states:
                     del self.user_states[user_id]
                 self.handle_start(message)
@@ -7770,8 +8239,8 @@ class ComprehensiveDUXBot:
         # فحص أزرار الإلغاء والعودة أولاً
         text = message.get('text', '').strip()
         all_langs = self.get_supported_languages()
-        main_menu_texts = {self.tr('main_menu', l) for l in all_langs} | {self.tr('main_menu_btn', l) for l in all_langs} | {'🏠 القائمة الرئيسية', '🏠 الرئيسية', '🏠 Main Menu'}
-        cancel_texts = {'❌ إلغاء', '❌ Cancel', 'الغاء', 'إلغاء'}
+        main_menu_texts = {self.tr('main_menu', l) for l in all_langs} | {self.tr('main_menu_btn', l) for l in all_langs} | {self.tr('a0083_القائمة_الرئيسية', lang), self.tr('a0141_الرئيسية', lang), '🏠 Main Menu'}
+        cancel_texts = {self.tr('a0009_إلغاء', lang), '❌ Cancel', self.tr('a0011_الغاء', lang), self.tr('a0010_إلغاء', lang)}
 
         if text in main_menu_texts or text in cancel_texts:
             if user_id in self.user_states:
@@ -7847,7 +8316,7 @@ class ComprehensiveDUXBot:
         # التحقق إذا كان المستخدم مسجل بالفعل
         user = self.find_user(user_id)
         if user:
-            self.send_message(chat_id, f"✅ أنت مسجل بالفعل!\n🆔 رقم العميل: {user['customer_id']}", 
+            self.send_message(chat_id, self.tr('a0256_أنت_مسجل', lang, user_customer_id=user['customer_id']), 
                             self.main_keyboard(user.get('language', 'ar'), user_id))
             return
         
@@ -7939,11 +8408,7 @@ class ComprehensiveDUXBot:
             logger.error(f"خطأ في إعادة التعيين الشاملة للمستخدم {user_id}: {e}")
             
             # في حالة فشل إعادة التعيين، إرسال رسالة طوارئ
-            emergency_text = """🚨 حدث خطأ في إعادة التعيين
-
-🔧 يرجى المحاولة مرة أخرى أو التواصل مع الدعم الفني
-
-⚡ رقم الدعم: +966501234567"""
+            emergency_text = self.tr('a0257_حدث_خطأ', 'ar')
             
             emergency_keyboard = {
                 'keyboard': [
@@ -7997,13 +8462,13 @@ class ComprehensiveDUXBot:
             trans_id = user_state.replace('awaiting_reject_reason_', '')
             reason_text = text.strip()
             # إذا كتب الأدمن كلمة إلغاء أو لا يريد المتابعة
-            if reason_text.lower() in ['الغاء', 'إلغاء', 'الغاء العملية', 'cancel', 'الغاء الرفض']:
+            if reason_text.lower() in [self.tr('a0011_الغاء', 'ar'), self.tr('a0010_إلغاء', 'ar'), self.tr('a0258_الغاء_العملية', 'ar'), 'cancel', self.tr('a0259_الغاء_الرفض', 'ar')]:
                 # إلغاء العملية
                 del self.user_states[user_id]
                 # إزالة السبب المؤقت إن وجد
                 if user_id in self.pending_reject_reasons:
                     del self.pending_reject_reasons[user_id]
-                self.send_message(chat_id, f"❌ تم إلغاء عملية الرفض للمعاملة {trans_id}.", self.admin_keyboard())
+                self.send_message(chat_id, self.tr('a0260_تم_إلغاء', 'ar', trans_id=trans_id), self.admin_keyboard())
                 return
             # إذا كتب السبب
             if reason_text:
@@ -8018,17 +8483,17 @@ class ComprehensiveDUXBot:
                      {'text': '❌ إلغاء', 'callback_data': 'cancel_reject'}]
                 ]
                 self.send_inline_message(chat_id,
-                                  f"📝 تم حفظ سبب الرفض: {reason_text}\n\nاضغط على زر تأكيد الرفض أدناه لإرسال الرفض للعميل، أو اختر إلغاء.",
+                                  self.tr('a0261_تم_حفظ', 'ar', reason_text=reason_text),
                                   inline_btns)
                 return
             # إذا لم يكتب شيئاً، نعيد الطلب
-            self.send_message(chat_id, f"❌ يرجى كتابة سبب الرفض للمعاملة {trans_id} أو اكتب 'إلغاء' لإلغاء العملية.", self.admin_keyboard())
+            self.send_message(chat_id, self.tr('a0262_يرجى_كتابة', 'ar', trans_id=trans_id), self.admin_keyboard())
             return
         # معالجة مرحلة تأكيد الرفض
         if isinstance(user_state, str) and user_state.startswith('confirming_reject_'):
             trans_id = user_state.replace('confirming_reject_', '')
             # تأكيد الرفض
-            if text.strip().startswith('📤') or 'تأكيد' in text or 'تاكيد' in text:
+            if text.strip().startswith('📤') or self.tr('a0263_تأكيد', 'ar') in text or self.tr('a0264_تاكيد', 'ar') in text:
                 pending = self.pending_reject_reasons.get(user_id)
                 reason = pending['reason'] if pending else ''
                 # إزالة السجلات المؤقتة
@@ -8038,21 +8503,21 @@ class ComprehensiveDUXBot:
                 self.reject_transaction(message, trans_id, reason)
                 return
             # إلغاء الرفض خلال مرحلة التأكيد
-            if text.strip().lower() in ['الغاء', 'إلغاء', 'إلغاء الرفض', 'cancel', '❌ إلغاء']:
+            if text.strip().lower() in [self.tr('a0011_الغاء', 'ar'), self.tr('a0010_إلغاء', 'ar'), self.tr('a0265_إلغاء_الرفض', 'ar'), 'cancel', self.tr('a0009_إلغاء', 'ar')]:
                 # إزالة السجلات المؤقتة
                 if user_id in self.pending_reject_reasons:
                     del self.pending_reject_reasons[user_id]
                 del self.user_states[user_id]
-                self.send_message(chat_id, f"❌ تم إلغاء عملية الرفض للمعاملة {trans_id}.", self.admin_keyboard())
+                self.send_message(chat_id, self.tr('a0260_تم_إلغاء', 'ar', trans_id=trans_id), self.admin_keyboard())
                 return
             # أي نص آخر لا يقبل في هذه المرحلة
-            self.send_message(chat_id, f"❌ يرجى الضغط على زر تأكيد الرفض أو اختيار إلغاء.", self.admin_keyboard())
+            self.send_message(chat_id, self.tr('a0266_يرجى_الضغط', 'ar'), self.admin_keyboard())
             return
         
         # الأزرار الرئيسية
         if text in {self.tr('admin_pending_requests', l) for l in all_langs}:
             self.show_pending_requests(message)
-        elif text == '✅ طلبات مُوافقة':
+        elif text == self.tr('a0267_طلبات_مُوافقة', 'ar'):
             self.show_approved_transactions(message)
         elif text in {self.tr('admin_users', l) for l in all_langs}:
             self.show_users_management(message)
@@ -8062,23 +8527,23 @@ class ComprehensiveDUXBot:
             self.show_admin_management(message)
         elif text in {self.tr('admin_buttons', l) for l in all_langs}:
             self.start_button_label_editor(message)
-        elif text == '📋 عرض قائمة المديرين':
+        elif text == self.tr('a0268_عرض_قائمة', 'ar'):
             self.show_detailed_admin_list(message)
-        elif text == '➕ إضافة مدير دائم':
+        elif text == self.tr('a0269_إضافة_مدير', 'ar'):
             self.prompt_add_permanent_admin(message)
-        elif text == '🕐 إضافة مدير مؤقت':
+        elif text == self.tr('a0270_إضافة_مدير', 'ar'):
             self.prompt_add_temp_admin(message)
-        elif text == '➖ إزالة مدير':
+        elif text == self.tr('a0271_إزالة_مدير', 'ar'):
             self.prompt_remove_admin(message)
-        elif text == '🎭 تخصيص صلاحيات':
+        elif text == self.tr('a0272_تخصيص_صلاحيات', 'ar'):
             self.start_permission_editor(message)
-        elif text == '📊 إحصائيات المديرين':
+        elif text == self.tr('a0273_إحصائيات_المديرين', 'ar'):
             self.show_admin_statistics(message)
-        elif text == '🆔 معرف المستخدم':
+        elif text == self.tr('a0274_معرف_المستخدم', 'ar'):
             self.send_message(message['chat']['id'], f"🆔 معرف المستخدم الخاص بك: {message['from']['id']}", self.admin_keyboard())
         elif text in {self.tr('admin_payment_methods', l) for l in all_langs}:
             self.show_payment_methods_management(message)
-        elif text == '📊 الإحصائيات':
+        elif text == self.tr('a0275_الإحصائيات', 'ar'):
             self.show_detailed_stats(message)
         elif text in {self.tr('admin_excel_report', l) for l in all_langs}:
             self.generate_professional_excel_report(message)
@@ -8090,27 +8555,27 @@ class ComprehensiveDUXBot:
             self.prompt_unban_user(message)
         
         # معالجة أوامر النص المباشرة
-        elif text.startswith('الغاء_حظر ') or text.startswith('الغاء حظر '):
-            customer_id = text.replace('الغاء_حظر ', '').replace('الغاء حظر ', '').strip()
+        elif text.startswith(self.tr('a0276_الغاء_حظر', 'ar')) or text.startswith(self.tr('a0277_الغاء_حظر', 'ar')):
+            customer_id = text.replace(self.tr('a0276_الغاء_حظر', 'ar'), '').replace(self.tr('a0277_الغاء_حظر', 'ar'), '').strip()
             if customer_id:
                 self.unban_user_admin(message, customer_id)
             else:
-                self.send_message(chat_id, "❌ الصيغة الصحيحة:\nالغاء_حظر [رقم_العميل]\nمثال: الغاء_حظر C810563", self.admin_keyboard())
-        elif text == '📝 إضافة شركة':
+                self.send_message(chat_id, self.tr('a0278_الصيغة_الصحيحة', 'ar'), self.admin_keyboard())
+        elif text == self.tr('a0279_إضافة_شركة', 'ar'):
             self.start_add_company_wizard(message)
-        elif text == '🏢 الشركات':
+        elif text == self.tr('a0280_الشركات', 'ar'):
             self.show_companies_management_enhanced(message)
-        elif text == '🔄 تحديث القائمة':
+        elif text == self.tr('a0281_تحديث_القائمة', 'ar'):
             self.show_companies_management_enhanced(message)
-        elif text == '➕ إضافة شركة جديدة':
+        elif text == self.tr('a0282_إضافة_شركة', 'ar'):
             self.prompt_add_company(message)
-        elif text == '✏️ تعديل شركة':
+        elif text == self.tr('a0283_تعديل_شركة', 'ar'):
             self.prompt_edit_company(message)
-        elif text == '🗑️ حذف شركة':
+        elif text == self.tr('a0284_حذف_شركة', 'ar'):
             self.prompt_delete_company(message)
-        elif text in ['↩️ العودة للوحة الأدمن', '🏠 لوحة الأدمن']:
+        elif text in [self.tr('a0285_العودة_للوحة', 'ar'), self.tr('a0286_لوحة_الأدمن', 'ar')]:
             self.handle_admin_panel(message)
-        elif text in ['↩️ العودة', '🔙 العودة', '⬅️ العودة']:
+        elif text in [self.tr('a0287_العودة', 'ar'), self.tr('a0142_العودة', 'ar'), self.tr('a0254_العودة', 'ar')]:
             # تحديد السياق المناسب للعودة حسب الحالة
             user_state = self.user_states.get(message['from']['id'])
             if user_state:
@@ -8126,46 +8591,46 @@ class ComprehensiveDUXBot:
             self.show_addresses_management(message)
         elif text in {self.tr('admin_change_language', l) for l in all_langs}:
             self.show_language_selection(message, return_to_admin=True)
-        elif text == '🤖 البوتات' and MULTI_BOT_AVAILABLE and getattr(self, 'can_manage_bots', False):
+        elif text == self.tr('a0288_البوتات', 'ar') and MULTI_BOT_AVAILABLE and getattr(self, 'can_manage_bots', False):
             self.show_multi_bot_panel(message)
-        elif text.startswith('اضافة_ادمن_بوت ') and MULTI_BOT_AVAILABLE and getattr(self, 'can_manage_bots', False):
+        elif text.startswith(self.tr('a0289_اضافة_ادمن', 'ar')) and MULTI_BOT_AVAILABLE and getattr(self, 'can_manage_bots', False):
             # اضافة_ادمن_بوت BOT123 99999999
-            parts = text.replace('اضافة_ادمن_بوت ', '').split()
+            parts = text.replace(self.tr('a0289_اضافة_ادمن', 'ar'), '').split()
             if len(parts) == 2:
                 bot_id = parts[0].strip()
                 admin_id = parts[1].strip()
                 manager = MultiBotManager()
                 if manager.add_admin(bot_id, admin_id):
                     self.send_message(message['chat']['id'],
-                        f"✅ تم إضافة الأدمن {admin_id} للبوت {bot_id}",
+                        self.tr('a0290_تم_إضافة', 'ar', admin_id=admin_id, bot_id=bot_id),
                         self.admin_keyboard())
                 else:
-                    self.send_message(message['chat']['id'], f"❌ فشل في إضافة الأدمن", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], self.tr('a0291_فشل_في', 'ar'), self.admin_keyboard())
             else:
                 self.send_message(message['chat']['id'],
-                    "❌ الصيغة: اضافة_ادمن_بوت [BOT_ID] [ADMIN_ID]\nمثال: اضافة_ادمن_بوت BOT123456 99999999",
+                    self.tr('a0292_الصيغة_اضافة', 'ar'),
                     self.admin_keyboard())
-        elif text.startswith('حذف_ادمن_بوت ') and MULTI_BOT_AVAILABLE and getattr(self, 'can_manage_bots', False):
+        elif text.startswith(self.tr('a0293_حذف_ادمن', 'ar')) and MULTI_BOT_AVAILABLE and getattr(self, 'can_manage_bots', False):
             # حذف_ادمن_بوت BOT123 99999999
-            parts = text.replace('حذف_ادمن_بوت ', '').split()
+            parts = text.replace(self.tr('a0293_حذف_ادمن', 'ar'), '').split()
             if len(parts) == 2:
                 bot_id = parts[0].strip()
                 admin_id = parts[1].strip()
                 manager = MultiBotManager()
                 if manager.remove_admin(bot_id, admin_id):
                     self.send_message(message['chat']['id'],
-                        f"✅ تم حذف الأدمن {admin_id} من البوت {bot_id}",
+                        self.tr('a0294_تم_حذف', 'ar', admin_id=admin_id, bot_id=bot_id),
                         self.admin_keyboard())
                 else:
-                    self.send_message(message['chat']['id'], f"❌ فشل في حذف الأدمن (لا يمكن حذف آخر أدمن)", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], self.tr('a0295_فشل_في', 'ar'), self.admin_keyboard())
             else:
                 self.send_message(message['chat']['id'],
-                    "❌ الصيغة: حذف_ادمن_بوت [BOT_ID] [ADMIN_ID]",
+                    self.tr('a0296_الصيغة_حذف', 'ar'),
                     self.admin_keyboard())
         elif text in {self.tr('admin_themes', l) for l in all_langs} and THEME_AVAILABLE:
             self.show_theme_panel(message)
-        elif text.startswith('ثيم_') and THEME_AVAILABLE:
-            theme_key = text.replace('ثيم_', '').strip()
+        elif text.startswith(self.tr('a0297_ثيم', 'ar')) and THEME_AVAILABLE:
+            theme_key = text.replace(self.tr('a0297_ثيم', 'ar'), '').strip()
             self.save_setting('active_theme', theme_key)
             theme = get_theme(theme_key)
             self.send_message(message['chat']['id'],
@@ -8179,10 +8644,10 @@ class ComprehensiveDUXBot:
             self.show_system_settings(message)
         elif text in {self.tr('admin_complaints', l) for l in all_langs}:
             self.show_complaints_admin(message)
-        elif text in ['🔄 تحديث الشكاوى', '🔄 تحديث']:
+        elif text in [self.tr('a0298_تحديث_الشكاوى', 'ar'), self.tr('a0299_تحديث', 'ar')]:
             self.show_complaints_admin(message)
-        elif text.startswith('📞 رد على '):
-            complaint_id = text.replace('📞 رد على ', '').strip()
+        elif text.startswith(self.tr('a0300_رد_على', 'ar')):
+            complaint_id = text.replace(self.tr('a0300_رد_على', 'ar'), '').strip()
             self.start_complaint_reply_wizard(message, complaint_id)
         elif text in {self.tr('admin_quick_commands', l) for l in all_langs}:
             self.show_quick_copy_commands(message)
@@ -8190,23 +8655,23 @@ class ComprehensiveDUXBot:
             self.show_svrp_admin_panel(message)
         elif text in {self.tr('admin_apps', l) for l in all_langs}:
             self.show_apps_admin_panel(message)
-        elif text == '💱 تداول':
+        elif text == self.tr('a0301_تداول', 'ar'):
             self.show_trade_admin_queue(message)
-        elif text == '📋 كل الطلبات':
+        elif text == self.tr('a0302_كل_الطلبات', 'ar'):
             self.show_unified_orders(message)
-        elif text == '🎁 روابط الإحالة':
+        elif text == self.tr('a0303_روابط_الإحالة', 'ar'):
             self.show_referral_links_admin(message)
-        elif text == '📢 القنوات':
+        elif text == self.tr('a0304_القنوات', 'ar'):
             self.show_channels_admin(message)
-        elif text == '🗃️ مكتبة الرموز':
+        elif text == self.tr('a0305_مكتبة_الرموز', 'ar'):
             self.show_sticker_library(message)
-        elif text == '🔄 المطابقات':
+        elif text == self.tr('a0306_المطابقات', 'ar'):
             self.show_match_admin_panel(message)
-        elif text == '🏆 أرباح الإحالة':
+        elif text == self.tr('a0307_أرباح_الإحالة', 'ar'):
             self.show_referral_earnings_admin(message)
-        elif text == '🎰 اليانصيب':
+        elif text == self.tr('a0308_اليانصيب', 'ar'):
             self.show_lottery_admin(message)
-        elif text == '🎡 عجلة الحظ':
+        elif text == self.tr('a0236_عجلة_الحظ', 'ar'):
             self.show_wheel_admin(message)
         elif text in {self.tr('admin_message_user', l) for l in all_langs}:
             self.start_send_user_message(message)
@@ -8214,17 +8679,17 @@ class ComprehensiveDUXBot:
             self.show_notifications_panel(message)
         elif text in {self.tr('admin_backup', l) for l in all_langs}:
             self.manual_backup_command(message)
-        elif text == '➕ إضافة وسيلة دفع':
+        elif text == self.tr('a0309_إضافة_وسيلة', 'ar'):
             self.start_simple_payment_method_wizard(message)
-        elif text == '✏️ تعديل وسيلة دفع':
+        elif text == self.tr('a0310_تعديل_وسيلة', 'ar'):
             self.start_edit_payment_method_wizard(message)
-        elif text == '🗑️ حذف وسيلة دفع':
+        elif text == self.tr('a0311_حذف_وسيلة', 'ar'):
             self.start_delete_payment_method_wizard(message)
-        elif text == '📊 عرض وسائل الدفع':
+        elif text == self.tr('a0312_عرض_وسائل', 'ar'):
             self.show_all_payment_methods_simplified(message)
-        elif text == '⏹️ إيقاف وسيلة دفع':
+        elif text == self.tr('a0313_إيقاف_وسيلة', 'ar'):
             self.start_disable_payment_method_wizard(message)
-        elif text == '▶️ تشغيل وسيلة دفع':
+        elif text == self.tr('a0314_تشغيل_وسيلة', 'ar'):
             self.start_enable_payment_method_wizard(message)
         elif text in {self.tr('admin_main_menu', l) for l in all_langs}:
             # إنهاء جلسة الأدمن والعودة للقائمة الرئيسية
@@ -8237,13 +8702,13 @@ class ComprehensiveDUXBot:
                 welcome_text = self.tr(
                     'choose_service',
                     lang,
-                    name=user.get('name', 'غير محدد'),
-                    customer_id=user.get('customer_id', 'غير محدد')
+                    name=user.get('name', self.tr('a0122_غير_محدد', lang)),
+                    customer_id=user.get('customer_id', self.tr('a0122_غير_محدد', lang))
                 )
                 self.send_message(chat_id, welcome_text, self.main_keyboard(lang))
         
         # أوامر نصية للأدمن (مبسطة مع احتمالات متعددة)
-        elif any(word in text.lower() for word in ['موافقة', 'موافق', 'اوافق', 'أوافق', 'قبول', 'مقبول', 'تأكيد', 'تاكيد', 'نعم']):
+        elif any(word in text.lower() for word in [self.tr('a0315_موافقة', lang), self.tr('a0316_موافق', lang), self.tr('a0317_اوافق', lang), self.tr('a0318_أوافق', lang), self.tr('a0319_قبول', lang), self.tr('a0320_مقبول', lang), self.tr('a0263_تأكيد', lang), self.tr('a0264_تاكيد', lang), self.tr('a0198_نعم', lang)]):
             # استخراج رقم المعاملة
             words = text.split()
             trans_id = None
@@ -8255,9 +8720,9 @@ class ComprehensiveDUXBot:
             if trans_id:
                 self.approve_transaction(message, trans_id)
             else:
-                self.send_message(message['chat']['id'], "❌ لم يتم العثور على رقم المعاملة. مثال: موافقة DEP123456", self.admin_keyboard())
+                self.send_message(message['chat']['id'], self.tr('a0321_لم_يتم', lang), self.admin_keyboard())
                 
-        elif any(word in text.lower() for word in ['رفض', 'رافض', 'لا', 'مرفوض', 'إلغاء', 'الغاء', 'منع']):
+        elif any(word in text.lower() for word in [self.tr('a0322_رفض', lang), self.tr('a0323_رافض', lang), 'لا', self.tr('a0324_مرفوض', lang), self.tr('a0010_إلغاء', lang), self.tr('a0011_الغاء', lang), self.tr('a0325_منع', lang)]):
             # استخراج رقم المعاملة والسبب
             words = text.split()
             trans_id = None
@@ -8274,25 +8739,25 @@ class ComprehensiveDUXBot:
                 if not reason.strip():
                     # تعيين حالة انتظار السبب لهذا الأدمن
                     self.user_states[user_id] = f'awaiting_reject_reason_{trans_id}'
-                    self.send_message(chat_id, f"📝 يرجى كتابة سبب الرفض للمعاملة {trans_id} ثم إرساله، أو اكتب 'إلغاء' لإلغاء العملية.", self.admin_keyboard())
+                    self.send_message(chat_id, self.tr('a0326_يرجى_كتابة', lang, trans_id=trans_id), self.admin_keyboard())
                     return
                 # إذا تم تقديم السبب، نقوم برفض المعاملة مباشرة
                 self.reject_transaction(message, trans_id, reason)
             else:
-                self.send_message(message['chat']['id'], "❌ لم يتم العثور على رقم المعاملة. مثال: رفض DEP123456 سبب الرفض", self.admin_keyboard())
-        elif text.startswith('بحث '):
-            query = text.replace('بحث ', '')
+                self.send_message(message['chat']['id'], self.tr('a0327_لم_يتم', lang), self.admin_keyboard())
+        elif text.startswith(self.tr('a0328_بحث', lang)):
+            query = text.replace(self.tr('a0328_بحث', lang), '')
             self.search_users_admin(message, query)
-        elif text.startswith('اضافة_ادمن '):
-            user_id_to_add = text.replace('اضافة_ادمن ', '')
+        elif text.startswith(self.tr('a0329_اضافة_ادمن', lang)):
+            user_id_to_add = text.replace(self.tr('a0329_اضافة_ادمن', lang), '')
             self.add_admin_user(message, user_id_to_add)
-        elif text.startswith('اضافة ادمن '):
-            user_id_to_add = text.replace('اضافة ادمن ', '')
+        elif text.startswith(self.tr('a0330_اضافة_ادمن', lang)):
+            user_id_to_add = text.replace(self.tr('a0330_اضافة_ادمن', lang), '')
             self.add_admin_user(message, user_id_to_add)
-        elif text.startswith('ادمن_مؤقت '):
-            parts = text.replace('ادمن_مؤقت ', '').split()
+        elif text.startswith(self.tr('a0331_ادمن_مؤقت', lang)):
+            parts = text.replace(self.tr('a0331_ادمن_مؤقت', lang), '').split()
             if len(parts) < 1:
-                self.send_message(chat_id, "❌ الصيغة: ادمن_مؤقت ID الدور المدة\nمثال: ادمن_مؤقت 123456789 full 24", self.admin_keyboard())
+                self.send_message(chat_id, self.tr('a0332_الصيغة_ادمن', lang), self.admin_keyboard())
                 return
             user_id_to_add = parts[0]
             role = parts[1] if len(parts) > 1 else 'full'
@@ -8301,47 +8766,47 @@ class ComprehensiveDUXBot:
             except ValueError:
                 duration = 0
             self.add_temp_admin(message, user_id_to_add, role=role, duration_hours=duration)
-        elif text.startswith('صلاحيات '):
-            parts = text.replace('صلاحيات ', '').split()
+        elif text.startswith(self.tr('a0333_صلاحيات', lang)):
+            parts = text.replace(self.tr('a0333_صلاحيات', lang), '').split()
             if len(parts) >= 2:
                 admin_id_str = parts[0]
                 role = parts[1]
                 self.set_admin_role(message, admin_id_str, role)
             else:
-                self.send_message(chat_id, "❌ الصيغة: صلاحيات ID_المستخدم الدور\nمثال: صلاحيات 123456789 transactions", self.admin_keyboard())
-        elif text.startswith('ازالة_ادمن '):
-            user_id_to_remove = text.replace('ازالة_ادمن ', '')
+                self.send_message(chat_id, self.tr('a0334_الصيغة_صلاحيات', lang), self.admin_keyboard())
+        elif text.startswith(self.tr('a0335_ازالة_ادمن', lang)):
+            user_id_to_remove = text.replace(self.tr('a0335_ازالة_ادمن', lang), '')
             self.remove_admin_user(message, user_id_to_remove)
-        elif text.startswith('حظر '):
-            parts = text.replace('حظر ', '').split(' ', 1)
+        elif text.startswith(self.tr('a0336_حظر', lang)):
+            parts = text.replace(self.tr('a0336_حظر', 'ar'), '').split(' ', 1)
             customer_id = parts[0]
-            reason = parts[1] if len(parts) > 1 else 'مخالفة الشروط'
+            reason = parts[1] if len(parts) > 1 else self.tr('a0337_مخالفة_الشروط', 'ar')
             self.ban_user_admin(message, customer_id, reason)
-        elif text.startswith('الغاء_حظر '):
-            customer_id = text.replace('الغاء_حظر ', '')
+        elif text.startswith(self.tr('a0276_الغاء_حظر', 'ar')):
+            customer_id = text.replace(self.tr('a0276_الغاء_حظر', 'ar'), '')
             self.unban_user_admin(message, customer_id)
-        elif text.startswith('اضافة_شركة '):
+        elif text.startswith(self.tr('a0338_اضافة_شركة', 'ar')):
             self.add_company_simple_with_display(message, text)
-        elif text.startswith('حذف_شركة '):
-            company_id = text.replace('حذف_شركة ', '')
+        elif text.startswith(self.tr('a0339_حذف_شركة', 'ar')):
+            company_id = text.replace(self.tr('a0339_حذف_شركة', 'ar'), '')
             self.delete_company_simple(message, company_id)
-        elif text.startswith('عنوان_جديد '):
-            new_address = text.replace('عنوان_جديد ', '')
+        elif text.startswith(self.tr('a0340_عنوان_جديد', 'ar')):
+            new_address = text.replace(self.tr('a0340_عنوان_جديد', 'ar'), '')
             self.update_address_simple(message, new_address)
-        elif any(word in text.lower() for word in ['عنوان', 'العنوان', 'تحديث_عنوان']):
+        elif any(word in text.lower() for word in [self.tr('a0341_عنوان', 'ar'), self.tr('a0342_العنوان', 'ar'), self.tr('a0343_تحديث_عنوان', 'ar')]):
             # استخراج العنوان الجديد
             new_address = text
-            for word in ['عنوان', 'العنوان', 'تحديث_عنوان']:
+            for word in [self.tr('a0341_عنوان', 'ar'), self.tr('a0342_العنوان', 'ar'), self.tr('a0343_تحديث_عنوان', 'ar')]:
                 new_address = new_address.replace(word, '').strip()
             if new_address:
                 self.update_address_simple(message, new_address)
             else:
-                self.send_message(message['chat']['id'], "يرجى كتابة العنوان الجديد. مثال: عنوان شارع الملك فهد", self.admin_keyboard())
-        elif text.startswith('تعديل_اعداد '):
+                self.send_message(message['chat']['id'], self.tr('a0344_يرجى_كتابة', 'ar'), self.admin_keyboard())
+        elif text.startswith(self.tr('a0345_تعديل_اعداد', 'ar')):
             self.update_setting_simple(message, text)
-        elif text.startswith('تعديل_استرداد ') and self.svrp:
+        elif text.startswith(self.tr('a0346_تعديل_استرداد', 'ar')) and self.svrp:
             # تعديل إعدادات تعويض 100%
-            parts = text.replace('تعديل_استرداد ', '').split()
+            parts = text.replace(self.tr('a0346_تعديل_استرداد', 'ar'), '').split()
             if len(parts) == 2:
                 key = parts[0].strip()
                 try:
@@ -8359,19 +8824,19 @@ class ComprehensiveDUXBot:
                         else:
                             SVRP_CONFIG[key] = val
                         self.send_message(message['chat']['id'],
-                            f"✅ تم تحديث الإعداد!\n\n{key}: {old_val} → {val}",
+                            self.tr('a0347_تم_تحديث', 'ar', key=key, old_val=old_val, val=val),
                             self.admin_keyboard())
                     else:
                         self.send_message(message['chat']['id'],
-                            f"❌ مفتاح غير صالح: {key}", self.admin_keyboard())
+                            self.tr('a0348_مفتاح_غير', 'ar', key=key), self.admin_keyboard())
                 except ValueError:
                     self.send_message(message['chat']['id'],
-                        "❌ قيمة غير صحيحة", self.admin_keyboard())
+                        self.tr('a0349_قيمة_غير', 'ar'), self.admin_keyboard())
             else:
                 self.send_message(message['chat']['id'],
-                    "❌ الصيغة: تعديل_استرداد [المفتاح] [القيمة]\nمثال: تعديل_استرداد recovery_multiplier 3.0",
+                    self.tr('a0350_الصيغة_تعديل', 'ar'),
                     self.admin_keyboard())
-        elif text == '✅ حفظ الشركة':
+        elif text == self.tr('a0351_حفظ_الشركة', 'ar'):
             # التعامل مع حفظ الشركة - تنفيذ مباشر
             if user_id in self.user_states and self.user_states[user_id] == 'confirming_company':
                 if user_id in self.temp_company_data:
@@ -8387,14 +8852,7 @@ class ComprehensiveDUXBot:
                             writer = csv.writer(f)
                             writer.writerow([company_id, company_data['name'], company_data['type'], company_data['details'], 'active', icon, address, affiliate])
                         
-                        success_msg = f"""🎉 تم إضافة الشركة بنجاح!
-
-🆔 المعرف: {company_id}
-🏢 الاسم: {company_data['name']}
-⚡ النوع: {company_data['type_display']}
-📋 التفاصيل: {company_data['details']}
-
-الشركة متاحة الآن للعملاء ✅"""
+                        success_msg = self.tr('a0352_تم_إضافة', 'ar', company_id=company_id, company_data_name=company_data['name'], company_data_type_display=company_data['type_display'], company_data_details=company_data['details'])
                         
                         self.send_message(chat_id, success_msg, self.admin_keyboard())
                         
@@ -8405,28 +8863,28 @@ class ComprehensiveDUXBot:
                     except Exception as e:
                         self.send_message(chat_id, f"❌ فشل في حفظ الشركة: {str(e)}", self.admin_keyboard())
                 else:
-                    self.send_message(chat_id, "❌ لا توجد بيانات شركة محفوظة", self.admin_keyboard())
+                    self.send_message(chat_id, self.tr('a0353_لا_توجد', 'ar'), self.admin_keyboard())
             else:
-                self.send_message(chat_id, "❌ لا توجد شركة للحفظ. ابدأ بإضافة شركة جديدة أولاً.", self.admin_keyboard())
-        elif text == '✅ حفظ التغييرات':
+                self.send_message(chat_id, self.tr('a0354_لا_توجد', 'ar'), self.admin_keyboard())
+        elif text == self.tr('a0355_حفظ_التغييرات', 'ar'):
             # التعامل مع حفظ تغييرات الشركة
             if user_id in self.user_states and self.user_states[user_id] == 'editing_company_menu':
                 self.save_company_changes(message)
             else:
-                self.send_message(chat_id, "❌ لا توجد تغييرات للحفظ. ابدأ بتعديل شركة أولاً.", self.admin_keyboard())
-        elif text in ['❌ إلغاء', 'إلغاء', 'الغاء']:
+                self.send_message(chat_id, self.tr('a0356_لا_توجد', 'ar'), self.admin_keyboard())
+        elif text in [self.tr('a0009_إلغاء', 'ar'), self.tr('a0010_إلغاء', 'ar'), self.tr('a0011_الغاء', 'ar')]:
             # إلغاء العملية الحالية
             if user_id in self.user_states:
                 del self.user_states[user_id]
             if user_id in self.edit_company_data:
                 del self.edit_company_data[user_id]
-            self.send_message(chat_id, "❌ تم إلغاء العملية", self.admin_keyboard())
+            self.send_message(chat_id, self.tr('a0357_تم_إلغاء', 'ar'), self.admin_keyboard())
         else:
-            self.send_message(message['chat']['id'], "أمر غير مفهوم. استخدم الأزرار أو الأوامر الصحيحة.", self.main_keyboard('ar', user_id))
+            self.send_message(message['chat']['id'], self.tr('a0358_أمر_غير', 'ar'), self.main_keyboard('ar', user_id))
     
     def show_pending_requests(self, message):
         """عرض الطلبات المعلقة للأدمن — تشمل pending و pending_code_verification"""
-        pending_text = "📋 الطلبات المعلقة:\n\n"
+        pending_text = self.tr('a0359_الطلبات_المعلقة', 'ar')
         found_pending = False
         copy_commands = []
         
@@ -8449,14 +8907,14 @@ class ComprehensiveDUXBot:
                             pending_text += f"📍 {row['exchange_address']}\n"
                         
                         if row.get('admin_note') and row['status'] == 'pending_code_verification':
-                            pending_text += f"🔐 الكود: {row['admin_note']}\n"
+                            pending_text += self.tr('a0360_الكود', 'ar', row_admin_note=row['admin_note'])
                         
                         pending_text += f"📅 {row['date']}\n"
                         
                         # إضافة أوامر النسخ السريع
-                        pending_text += f"\n📋 أوامر سريعة:\n"
-                        pending_text += f"✅ `موافقة {row['id']}`\n"
-                        pending_text += f"❌ `رفض {row['id']} السبب_هنا`\n"
+                        pending_text += self.tr('a0361_أوامر_سريعة', 'ar')
+                        pending_text += self.tr('a0362_موافقة', 'ar', row_id=row['id'])
+                        pending_text += self.tr('a0363_رفض_السبب', 'ar', row_id=row['id'])
                         pending_text += f"▫️▫️▫️▫️▫️▫️▫️▫️▫️▫️\n\n"
                         
                         copy_commands.append({
@@ -8468,26 +8926,26 @@ class ComprehensiveDUXBot:
             pass
         
         if not found_pending:
-            pending_text += "✅ لا توجد طلبات معلقة"
+            pending_text += self.tr('a0364_لا_توجد', 'ar')
         else:
             # إضافة قسم الأوامر الجاهزة للنسخ
-            pending_text += "\n🔥 **أوامر جاهزة للنسخ المباشر:**\n\n"
+            pending_text += self.tr('a0365_أوامر_جاهزة', 'ar')
             
             for cmd in copy_commands:
                 pending_text += f"**{cmd['id']}:**\n"
                 pending_text += f"✅ `{cmd['approve']}`\n"
                 pending_text += f"❌ `{cmd['reject']}`\n\n"
             
-            pending_text += "💡 **طرق سهلة للاستخدام:**\n"
-            pending_text += "• انقر على الأمر واختر 'نسخ'\n"
-            pending_text += "• أو اكتب مباشرة: موافقة + رقم المعاملة\n"
-            pending_text += "• للرفض: رفض + رقم المعاملة + السبب\n\n"
+            pending_text += self.tr('a0366_طرق_سهلة', 'ar')
+            pending_text += self.tr('a0367_انقر_على', 'ar')
+            pending_text += self.tr('a0368_أو_اكتب', 'ar')
+            pending_text += self.tr('a0369_للرفض_رفض', 'ar')
             
-            pending_text += "📝 **أمثلة أوامر الموافقة:**\n"
-            pending_text += "`موافقة` أو `موافق` أو `تأكيد` أو `نعم`\n\n"
+            pending_text += self.tr('a0370_أمثلة_أوامر', 'ar')
+            pending_text += self.tr('a0371_موافقة_أو', 'ar')
             
-            pending_text += "📝 **أمثلة أوامر الرفض:**\n"
-            pending_text += "`رفض` أو `لا` أو `مرفوض` أو `إلغاء`"
+            pending_text += self.tr('a0372_أمثلة_أوامر', 'ar')
+            pending_text += self.tr('a0373_رفض_أو', 'ar')
         
         self.send_message(message['chat']['id'], pending_text, self.admin_keyboard())
     
@@ -8630,7 +9088,7 @@ class ComprehensiveDUXBot:
     
     def show_detailed_stats(self, message):
         """عرض إحصائيات مفصلة"""
-        stats_text = "📊 إحصائيات النظام الشاملة\n\n"
+        stats_text = self.tr('a0374_إحصائيات_النظام', 'ar')
         
         # إحصائيات المستخدمين
         total_users = 0
@@ -8685,24 +9143,24 @@ class ComprehensiveDUXBot:
         except:
             pass
         
-        stats_text += f"👥 المستخدمون:\n"
-        stats_text += f"├ الإجمالي: {total_users}\n"
+        stats_text += self.tr('a0375_المستخدمون', 'ar')
+        stats_text += self.tr('a0376_الإجمالي', 'ar', total_users=total_users)
         stats_text += f"├ النشطون: {total_users - banned_users}\n"
-        stats_text += f"└ المحظورون: {banned_users}\n\n"
+        stats_text += self.tr('a0377_المحظورون', 'ar', banned_users=banned_users)
         
-        stats_text += f"💰 المعاملات:\n"
-        stats_text += f"├ الإجمالي: {total_transactions}\n"
-        stats_text += f"├ معلقة: {pending_count}\n"
-        stats_text += f"├ بانتظار تأكيد الكود: {code_verification_count}\n"
-        stats_text += f"├ مُوافق عليها: {approved_count}\n"
-        stats_text += f"└ مرفوضة: {rejected_count}\n\n"
+        stats_text += self.tr('a0378_المعاملات', 'ar')
+        stats_text += self.tr('a0379_الإجمالي', 'ar', total_transactions=total_transactions)
+        stats_text += self.tr('a0380_معلقة', 'ar', pending_count=pending_count)
+        stats_text += self.tr('a0381_بانتظار_تأكيد', 'ar', code_verification_count=code_verification_count)
+        stats_text += self.tr('a0382_مُوافق_عليها', 'ar', approved_count=approved_count)
+        stats_text += self.tr('a0383_مرفوضة', 'ar', rejected_count=rejected_count)
         
-        stats_text += f"💵 المبالغ المُوافق عليها:\n"
-        stats_text += f"├ الإيداعات: {total_deposit_amount:,.0f}\n"
-        stats_text += f"├ السحوبات: {total_withdraw_amount:,.0f}\n"
+        stats_text += self.tr('a0384_المبالغ_المُوافق', 'ar')
+        stats_text += self.tr('a0385_الإيداعات', 'ar', total_deposit_amount=total_deposit_amount)
+        stats_text += self.tr('a0386_السحوبات', 'ar', total_withdraw_amount=total_withdraw_amount)
         stats_text += f"└ الفرق: {total_deposit_amount - total_withdraw_amount:,.0f}\n\n"
         
-        stats_text += f"📨 الشكاوى: {total_complaints}\n\n"
+        stats_text += self.tr('a0387_الشكاوى', 'ar', total_complaints=total_complaints)
         stats_text += f"📅 {datetime.now().strftime('%Y-%m-%d %H:%M')}"
         
         self.send_message(message['chat']['id'], stats_text, self.admin_keyboard())
@@ -8717,23 +9175,9 @@ class ComprehensiveDUXBot:
     def add_company_simple(self, message, text):
         """إضافة شركة بصيغة مبسطة"""
         # تنسيق: اضافة_شركة اسم نوع تفاصيل
-        parts = text.replace('اضافة_شركة ', '').split(' ', 2)
+        parts = text.replace(self.tr('a0338_اضافة_شركة', 'ar'), '').split(' ', 2)
         if len(parts) < 3:
-            help_text = """❌ طريقة إضافة الشركة:
-
-📝 اكتب بالضبط:
-اضافة_شركة اسم_الشركة نوع_الخدمة التفاصيل
-
-🔹 أنواع الخدمة (بالإنجليزي):
-• ايداع → deposit
-• سحب → withdraw  
-• ايداع وسحب → both
-
-📋 أمثلة صحيحة:
-▫️ اضافة_شركة مدى both محفظة_رقمية
-▫️ اضافة_شركة البنك_الأهلي deposit حساب_بنكي
-▫️ اضافة_شركة فودافون_كاش withdraw محفظة_الكترونية
-▫️ اضافة_شركة STC_Pay both خدمات_دفع"""
+            help_text = self.tr('a0388_طريقة_إضافة', 'ar')
             
             self.send_message(message['chat']['id'], help_text, self.admin_keyboard())
             return
@@ -8743,28 +9187,15 @@ class ComprehensiveDUXBot:
         details = parts[2].replace('_', ' ')
         
         # قبول الكلمات العربية وتحويلها
-        if service_type in ['ايداع', 'إيداع']:
+        if service_type in [self.tr('a0389_ايداع', 'ar'), self.tr('a0390_إيداع', 'ar')]:
             service_type = 'deposit'
-        elif service_type in ['سحب']:
+        elif service_type in [self.tr('a0391_سحب', 'ar')]:
             service_type = 'withdraw'
-        elif service_type in ['كلاهما', 'الكل', 'ايداع_وسحب']:
+        elif service_type in [self.tr('a0392_كلاهما', 'ar'), self.tr('a0171_الكل', 'ar'), self.tr('a0393_ايداع_وسحب', 'ar')]:
             service_type = 'both'
         
         if service_type not in ['deposit', 'withdraw', 'both']:
-            error_text = """❌ نوع الخدمة خطأ!
-
-✅ الأنواع المقبولة:
-• deposit (للإيداع فقط)
-• withdraw (للسحب فقط)
-• both (للإيداع والسحب)
-
-أو بالعربي:
-• ايداع → deposit
-• سحب → withdraw
-• كلاهما → both
-
-مثال صحيح:
-اضافة_شركة مدى both محفظة_رقمية"""
+            error_text = self.tr('a0394_نوع_الخدمة', 'ar')
             
             self.send_message(message['chat']['id'], error_text, self.admin_keyboard())
             return
@@ -8794,12 +9225,7 @@ class ComprehensiveDUXBot:
                 writer.writerow([company_id, company_name, service_type, details, 'active', company_icon, ''])
             
             # رسالة النجاح مع عرض قائمة الشركات المحدثة
-            success_msg = f"""✅ تم إضافة الشركة بنجاح!
-
-🆔 {company_id}
-{company_icon} {company_name}
-⚡ {service_type}
-📋 {details}"""
+            success_msg = self.tr('a0395_تم_إضافة', 'ar', company_id=company_id, company_icon=company_icon, company_name=company_name, service_type=service_type, details=details)
             
             # عرض جميع الشركات
             try:
@@ -8812,7 +9238,7 @@ class ComprehensiveDUXBot:
                         type_display = {'deposit': 'إيداع', 'withdraw': 'سحب', 'both': 'الكل'}.get(row['type'], row['type'])
                         success_msg += f"\n{status} {row['name']} (ID: {row['id']}) - {type_display}"
                     
-                    success_msg += f"\n\n📊 إجمالي الشركات: {company_count}"
+                    success_msg += self.tr('a0396_إجمالي_الشركات', 'ar', company_count=company_count)
             except:
                 pass
             
@@ -8831,7 +9257,7 @@ class ComprehensiveDUXBot:
                 writer.writerow(['id', 'address', 'is_active'])
                 writer.writerow(['1', new_address, 'yes'])
             
-            self.send_message(message['chat']['id'], f"✅ تم تحديث عنوان الصرافة:\n{new_address}", self.admin_keyboard())
+            self.send_message(message['chat']['id'], self.tr('a0397_تم_تحديث', 'ar', new_address=new_address), self.admin_keyboard())
         except Exception as e:
             self.send_message(message['chat']['id'], f"❌ فشل في تحديث العنوان: {str(e)}", self.admin_keyboard())
     
@@ -8929,25 +9355,25 @@ class ComprehensiveDUXBot:
                 if match_status in ('active', 'awaiting_code'):
                     # الساحب: عليه إرسال الكود
                     if str(match.get('withdrawer_id', '')) == str(message['from']['id']):
-                        text += "📝 عليك إرسال كود السحب وبياناتك\n"
+                        text += self.tr('a0398_عليك_إرسال', lang)
                         inline_btns.append([{'text': '📝 إرسال الكود', 'callback_data': f'match_enter_code_btn_{match["id"]}'}])
                     # المودع: بانتظار الساحب
                     elif str(match.get('depositor_id', '')) == str(message['from']['id']):
-                        text += "⏳ بانتظار قيام الطرف الآخر بإرسال الكود\n"
+                        text += self.tr('a0399_بانتظار_قيام', lang)
 
                 if match_status == 'code_verified':
                     if str(match.get('depositor_id', '')) == str(message['from']['id']):
-                        text += "📤 حوّل المال ثم أكد الإرسال\n"
+                        text += self.tr('a0400_حوّل_المال', lang)
                         inline_btns.append([{'text': '✅ تم الإرسال', 'callback_data': f'match_sent_{match["id"]}'}])
                         inline_btns.append([{'text': '❌ إلغاء', 'callback_data': f'match_cancel_warn_{match["id"]}'}])
                     elif str(match.get('withdrawer_id', '')) == str(message['from']['id']):
-                        text += "⏳ بانتظار قيام المودع بتحويل المال\n"
+                        text += self.tr('a0401_بانتظار_قيام', lang)
 
                 if match_status in ('awaiting_admin_review', 'admin_received', 'transfer_confirmed'):
-                    text += "⏳ بانتظار مراجعة الإدارة\n"
+                    text += self.tr('a0402_بانتظار_مراجعة', lang)
 
                 if match_status == 'transfer_confirmed' and str(match.get('depositor_id', '')) == str(message['from']['id']):
-                    text += "✅ تأكد من استلام المال\n"
+                    text += self.tr('a0403_تأكد_من', lang)
                     inline_btns.append([{'text': '✅ تأكيد الاستلام', 'callback_data': f'match_confirm_received_{match["id"]}'}])
                     inline_btns.append([{'text': '❌ لم يصل', 'callback_data': f'match_not_received_{match["id"]}'}])
 
@@ -9025,7 +9451,7 @@ class ComprehensiveDUXBot:
         if isinstance(state, dict) and state.get('step') == 'match_enter_data':
             text_msg = message.get('text', '').strip()
 
-            if text_msg in ['❌ إلغاء', 'إلغاء', 'الغاء', '🔙', '🏠 القائمة الرئيسية']:
+            if text_msg in [self.tr('a0009_إلغاء', lang), self.tr('a0010_إلغاء', lang), self.tr('a0011_الغاء', lang), '🔙', self.tr('a0083_القائمة_الرئيسية', lang)]:
                 del self.user_states[user_id]
                 self.handle_start(message)
                 return
@@ -9036,10 +9462,10 @@ class ComprehensiveDUXBot:
                 try:
                     amount = float(text_msg)
                     if amount <= 0:
-                        self.send_message(chat_id, "❌ المبلغ يجب أن يكون أكبر من صفر")
+                        self.send_message(chat_id, self.tr('a0144_المبلغ_يجب', lang))
                         return
                 except ValueError:
-                    self.send_message(chat_id, "❌ اكتب مبلغاً رقمياً صحيحاً:")
+                    self.send_message(chat_id, self.tr('a0145_اكتب_مبلغاً', lang))
                     return
                 state['amount'] = str(amount)
                 state['substep'] = 'wallet'
@@ -9055,7 +9481,7 @@ class ComprehensiveDUXBot:
             if substep == 'wallet':
                 wallet_number = self.sanitize_input(text_msg)
                 if len(wallet_number) < 5:
-                    self.send_message(chat_id, "❌ رقم المحفظة قصير جداً. اكتب رقم المحفظة:")
+                    self.send_message(chat_id, self.tr('a0146_رقم_المحفظة', lang))
                     return
                 state['wallet_number'] = wallet_number
                 state['substep'] = 'account'
@@ -9071,7 +9497,7 @@ class ComprehensiveDUXBot:
             if substep == 'account':
                 account_id = self.sanitize_input(text_msg)
                 if len(account_id) < 2:
-                    self.send_message(chat_id, "❌ معرف الحساب قصير. اكتب معرف الحساب:")
+                    self.send_message(chat_id, self.tr('a0404_معرف_الحساب', lang))
                     return
 
                 # ✅ تأكيد حفظ البيانات
@@ -9101,7 +9527,7 @@ class ComprehensiveDUXBot:
                 except Exception as e:
                     logger.error(f"خطأ في create_match_request: {e}")
                     self.send_message(chat_id,
-                        "❌ حدث خطأ. حاول مرة أخرى.",
+                        self.tr('a0405_حدث_خطأ', 'ar'),
                         self.main_keyboard(lang, user_id))
                     del self.user_states[user_id]
                     return
@@ -9126,7 +9552,7 @@ class ComprehensiveDUXBot:
                         logger.error(f"خطأ في create_match: {e}")
 
                 # لا توجد مطابقة — العميل ينتظر موافقة الإدارة + الأدمن يصبح الطرف الآخر تلقائياً
-                type_ar = 'إيداع' if match_type == 'deposit' else 'سحب'
+                type_ar = self.tr('a0390_إيداع', 'ar') if match_type == 'deposit' else self.tr('a0391_سحب', 'ar')
                 self.send_message(chat_id,
                     f"⏳ <b>تم إنشاء طلبك بنجاح!</b>\n\n"
                     f"━━━━━━━━━━━━━━━━━━\n"
@@ -9145,7 +9571,7 @@ class ComprehensiveDUXBot:
                 if request:
                     for admin_id in self.admin_ids:
                         try:
-                            opposite_type = 'سحب' if match_type == 'deposit' else 'إيداع'
+                            opposite_type = self.tr('a0391_سحب', 'ar') if match_type == 'deposit' else self.tr('a0390_إيداع', 'ar')
                             self.send_inline_message(int(admin_id),
                                 f"🔔 <b>طلب مطابقة جديد</b>\n\n"
                                 f"━━━━━━━━━━━━━━━━━━\n"
@@ -9169,23 +9595,23 @@ class ComprehensiveDUXBot:
 
         # معالجة قديمة — اختيار النوع (يُترك للتوافق الخلفي)
         if state == 'match_select_type':
-            if text == '💰 مطابقة إيداع':
+            if text == self.tr('a0406_مطابقة_إيداع', 'ar'):
                 match_type = 'deposit'
-            elif text == '💸 مطابقة سحب':
+            elif text == self.tr('a0407_مطابقة_سحب', 'ar'):
                 match_type = 'withdraw'
             else:
                 return
 
             # حفظ النوع وطلب المبلغ
             self.user_states[user_id] = {'step': 'match_amount', 'type': match_type}
-            self.send_message(message['chat']['id'], "💰 أدخل المبلغ:")
+            self.send_message(message['chat']['id'], self.tr('a0408_أدخل_المبلغ', 'ar'))
             return
 
         # إدخال المبلغ
         if isinstance(state, dict) and state.get('step') == 'match_amount':
             amount = self.validate_amount(text)
             if amount is None:
-                self.send_message(message['chat']['id'], "❌ مبلغ غير صحيح. أدخل رقماً:")
+                self.send_message(message['chat']['id'], self.tr('a0409_مبلغ_غير', 'ar'))
                 return
 
             state['amount'] = amount
@@ -9194,7 +9620,7 @@ class ComprehensiveDUXBot:
             # عرض الشركات
             companies = self.get_companies('both')
             if not companies:
-                self.send_message(message['chat']['id'], "❌ لا توجد شركات متاحة")
+                self.send_message(message['chat']['id'], self.tr('a0410_لا_توجد', 'ar'))
                 return
 
             keyboard = []
@@ -9203,7 +9629,7 @@ class ComprehensiveDUXBot:
                 keyboard.append([{'text': f"{icon} {c['name']}"}])
             keyboard.append([{'text': self.tr('main_menu', lang)}])
 
-            self.send_message(message['chat']['id'], "🏢 اختر الشركة:",
+            self.send_message(message['chat']['id'], self.tr('a0411_اختر_الشركة', 'ar'),
                 {'keyboard': keyboard, 'resize_keyboard': True, 'one_time_keyboard': True})
             self.user_states[user_id] = state
             return
@@ -9224,7 +9650,7 @@ class ComprehensiveDUXBot:
                     break
 
             if not selected:
-                self.send_message(message['chat']['id'], "❌ شركة غير صحيحة")
+                self.send_message(message['chat']['id'], self.tr('a0412_شركة_غير', 'ar'))
                 return
 
             state['company_id'] = selected['id']
@@ -9254,7 +9680,7 @@ class ComprehensiveDUXBot:
                     return
 
             # لا توجد مطابقة — إشعار الأدمن + إبلاغ العميل
-            req_type_ar = 'إيداع' if state['type'] == 'deposit' else 'سحب'
+            req_type_ar = self.tr('a0390_إيداع', 'ar') if state['type'] == 'deposit' else self.tr('a0391_سحب', 'ar')
             self.send_message(message['chat']['id'],
                 f"⏳ <b>تم إنشاء طلبك</b>\n\n"
                 f"━━━━━━━━━━━━━━━━━━\n"
@@ -9269,7 +9695,7 @@ class ComprehensiveDUXBot:
             # إشعار جميع الأدمن بطلب المطابقة المعلق
             for admin_id in self.admin_ids:
                 try:
-                    opposite_type = 'سحب' if state['type'] == 'deposit' else 'إيداع'
+                    opposite_type = self.tr('a0391_سحب', 'ar') if state['type'] == 'deposit' else self.tr('a0390_إيداع', 'ar')
                     admin_msg = (
                         f"🔔 <b>طلب مطابقة معلق</b>\n\n"
                         f"━━━━━━━━━━━━━━━━━━\n"
@@ -9296,7 +9722,7 @@ class ComprehensiveDUXBot:
         if isinstance(state, dict) and state.get('step') == 'match_enter_code':
             state['substep'] = state.get('substep', 'code')
 
-            if text in ['❌ إلغاء', 'إلغاء', 'الغاء', '🔙']:
+            if text in [self.tr('a0009_إلغاء', 'ar'), self.tr('a0010_إلغاء', 'ar'), self.tr('a0011_الغاء', 'ar'), '🔙']:
                 if user_id in self.user_states: del self.user_states[user_id]
                 self.handle_start(message)
                 return
@@ -9304,7 +9730,7 @@ class ComprehensiveDUXBot:
             if state['substep'] == 'code':
                 code = self.sanitize_input(text)
                 if len(code) < 3:
-                    self.send_message(message['chat']['id'], "❌ الكود قصير جداً. اكتب كود السحب:")
+                    self.send_message(message['chat']['id'], self.tr('a0413_الكود_قصير', 'ar'))
                     return
                 state['code'] = code
                 state['substep'] = 'account'
@@ -9318,7 +9744,7 @@ class ComprehensiveDUXBot:
             if state['substep'] == 'account':
                 account_id = self.sanitize_input(text)
                 if len(account_id) < 2:
-                    self.send_message(message['chat']['id'], "❌ معرف الحساب قصير. اكتب معرف الحساب:")
+                    self.send_message(message['chat']['id'], self.tr('a0404_معرف_الحساب', 'ar'))
                     return
                 state['account_id'] = account_id
                 state['substep'] = 'wallet'
@@ -9332,7 +9758,7 @@ class ComprehensiveDUXBot:
             if state['substep'] == 'wallet':
                 wallet_number = self.sanitize_input(text)
                 if len(wallet_number) < 5:
-                    self.send_message(message['chat']['id'], "❌ رقم المحفظة قصير. اكتب رقم المحفظة:")
+                    self.send_message(message['chat']['id'], self.tr('a0414_رقم_المحفظة', 'ar'))
                     return
                 state['wallet_number'] = wallet_number
                 state['substep'] = 'method'
@@ -9346,7 +9772,7 @@ class ComprehensiveDUXBot:
             if state['substep'] == 'method':
                 payment_method_name = self.sanitize_input(text)
                 if len(payment_method_name) < 2:
-                    self.send_message(message['chat']['id'], "❌ وسيلة الدفع غير واضحة. اكتب وسيلة الدفع:")
+                    self.send_message(message['chat']['id'], self.tr('a0415_وسيلة_الدفع', 'ar'))
                     return
 
                 for emoji in ['💳', '🏦', '📱', '👛', '💵', '📡', '🏷️']:
@@ -9400,7 +9826,7 @@ class ComprehensiveDUXBot:
             role = state.get('role', '')
             match = self.match_manager.get_match_by_id(match_id)
             if not match:
-                self.send_message(chat_id, "❌ المطابقة غير موجودة", self.main_keyboard(lang, user_id))
+                self.send_message(chat_id, self.tr('a0416_المطابقة_غير', 'ar'), self.main_keyboard(lang, user_id))
                 del self.user_states[user_id]
                 return
 
@@ -9423,7 +9849,7 @@ class ComprehensiveDUXBot:
                 file_id = document.get('file_id', '')
 
             if not file_id:
-                self.send_message(chat_id, "❌ تعذّر استلام الملف. حاول مرة أخرى:")
+                self.send_message(chat_id, self.tr('a0417_تعذّر_استلام', 'ar'))
                 return
 
             if role == 'admin':
@@ -9456,7 +9882,7 @@ class ComprehensiveDUXBot:
                     [{'text': '✅ تأكيد الاستلام', 'callback_data': f'match_confirm_received_{match_id}'}],
                     [{'text': '❌ لم يصل', 'callback_data': f'match_not_received_{match_id}'}]
                 ]
-                self.send_inline_message(dep_id, "هل وصل المال؟", inline_btns)
+                self.send_inline_message(dep_id, self.tr('a0418_هل_وصل', 'ar'), inline_btns)
 
                 self.send_message(chat_id,
                     f"✅ <b>تم إرسال لقطة الشاشة للعميل</b>\n\n"
@@ -9490,7 +9916,7 @@ class ComprehensiveDUXBot:
                             [{'text': '✅ تأكيد التحويل', 'callback_data': f'match_admin_screenshot_ok_{match_id}'},
                              {'text': '❌ رفض', 'callback_data': f'match_admin_screenshot_no_{match_id}'}]
                         ]
-                        self.send_inline_message(int(admin_id), "مراجعة لقطة الشاشة:", inline_btns)
+                        self.send_inline_message(int(admin_id), self.tr('a0419_مراجعة_لقطة', 'ar'), inline_btns)
                     except Exception as e:
                         logger.error(f"خطأ في إرسال لقطة الشاشة للأدمن: {e}")
 
@@ -9533,11 +9959,11 @@ class ComprehensiveDUXBot:
                 if rating < 1 or rating > 5:
                     raise ValueError()
             except (ValueError, TypeError):
-                self.send_message(message['chat']['id'], "❌ أدخل رقم من 1 إلى 5:")
+                self.send_message(message['chat']['id'], self.tr('a0420_أدخل_رقم', 'ar'))
                 return
 
             self.match_manager.rate_user(state['match_id'], user_id, rating)
-            self.send_message(message['chat']['id'], "✅ شكراً لتقييمك!", self.main_keyboard(lang, user_id))
+            self.send_message(message['chat']['id'], self.tr('a0421_شكراً_لتقييمك', 'ar'), self.main_keyboard(lang, user_id))
             del self.user_states[user_id]
             return
 
@@ -9627,14 +10053,14 @@ class ComprehensiveDUXBot:
                 self.approve_transaction(fake_msg, trans_id)
                 # تحديث الرسالة لإزالة الأزرار
                 self.edit_message(chat_id, message.get('message_id'), 
-                    f"✅ تمت الموافقة على {trans_id}")
+                    self.tr('a0422_تمت_الموافقة', 'ar', trans_id=trans_id))
                 return
             
             # معالجة الرفض
             elif data.startswith('reject_'):
                 trans_id = data.replace('reject_', '')
                 # طلب سبب الرفض
-                self.send_message(chat_id, f"📝 اكتب سبب الرفض لـ {trans_id}:\nأو اكتب 'بدون سبب'")
+                self.send_message(chat_id, self.tr('a0423_اكتب_سبب', 'ar', trans_id=trans_id))
                 self.user_states[user_id] = f'awaiting_reject_reason_{trans_id}'
                 return
             
@@ -9658,13 +10084,13 @@ class ComprehensiveDUXBot:
                         self.send_message(customer_tid, msg, self.main_keyboard(lang))
                 # تحديث رسالة الأدمن
                 self.edit_message(chat_id, message.get('message_id'),
-                    f"✅ تم تأكيد الكود لـ {trans_id}\n\nالمعاملة الآن بانتظار المعالجة.\n✅ موافقة | ❌ رفض")
+                    self.tr('a0424_تم_تأكيد', lang, trans_id=trans_id))
                 # إرسال أزرار الموافقة/الرفض الجديدة
                 inline_btns = [
                     [{'text': '✅ موافقة', 'callback_data': f'approve_{trans_id}'},
                      {'text': '❌ رفض', 'callback_data': f'reject_{trans_id}'}]
                 ]
-                self.send_inline_message(chat_id, f"📋 {trans_id} — جاهزة للموافقة", inline_btns)
+                self.send_inline_message(chat_id, self.tr('a0425_جاهزة_للموافقة', lang, trans_id=trans_id), inline_btns)
                 return
             
             # رفض الكود (للسحب) — يطلب من العميل إرسال كود جديد
@@ -9683,10 +10109,10 @@ class ComprehensiveDUXBot:
                         )
                         self.send_message(customer_tid, msg, self.main_keyboard(lang))
                     # تحديث حالة المعاملة إلى code_rejected
-                    self.update_transaction_status(trans_id, 'code_rejected', 'الكود غير صحيح', str(user_id))
+                    self.update_transaction_status(trans_id, 'code_rejected', self.tr('a0426_الكود_غير', lang), str(user_id))
                 # تحديث رسالة الأدمن
                 self.edit_message(chat_id, message.get('message_id'),
-                    f"🔁 تم طلب كود جديد لـ {trans_id}\n\nتم إشعار العميل.")
+                    self.tr('a0427_تم_طلب', lang, trans_id=trans_id))
                 return
             
             # عرض تفاصيل المعاملة
@@ -9722,7 +10148,7 @@ class ComprehensiveDUXBot:
                             writer.writerow([company_id, company_data['name'], company_data['type'], 
                                            company_data['details'], 'active', icon, address, affiliate])
                         self.edit_message(chat_id, message.get('message_id'),
-                            f"✅ تم حفظ الشركة: {company_data['name']}")
+                            self.tr('a0428_تم_حفظ', lang, company_data_name=company_data['name']))
                         del self.user_states[user_id]
                         del self.temp_company_data[user_id]
                 return
@@ -9733,7 +10159,7 @@ class ComprehensiveDUXBot:
                     del self.user_states[user_id]
                 if hasattr(self, 'temp_company_data') and user_id in self.temp_company_data:
                     del self.temp_company_data[user_id]
-                self.edit_message(chat_id, message.get('message_id'), "❌ تم الإلغاء")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0224_تم_الإلغاء', lang))
                 return
             
             # تأكيد حذف شركة
@@ -9741,14 +10167,14 @@ class ComprehensiveDUXBot:
                 company_id = data.replace('confirm_delete_company_', '')
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': '🗑️ نعم، احذف'}
                 self.finalize_company_delete(fake_msg, company_id)
-                self.edit_message(chat_id, message.get('message_id'), "✅ تم الحذف")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0429_تم_الحذف', lang))
                 return
             
             # إلغاء حذف شركة
             elif data == 'cancel_delete_company':
                 if user_id in self.user_states:
                     del self.user_states[user_id]
-                self.edit_message(chat_id, message.get('message_id'), "❌ تم الإلغاء")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0224_تم_الإلغاء', lang))
                 return
             
             # تأكيد طلب السحب (inline button)
@@ -9845,31 +10271,31 @@ class ComprehensiveDUXBot:
             # الرد على الشكاوى (inline buttons)
             elif data.startswith('complaint_resolve_'):
                 complaint_id = data.replace('complaint_resolve_', '')
-                reply_msg = "شكراً لتواصلك معنا. تم حل مشكلتك بنجاح ونعتذر عن أي إزعاج."
+                reply_msg = self.tr('a0430_شكراً_لتواصلك', lang)
                 self.save_complaint_reply(complaint_id, reply_msg)
                 self.send_complaint_reply_to_customer(complaint_id, reply_msg)
-                self.edit_message(chat_id, message.get('message_id'), f"✅ تم حل الشكوى {complaint_id}")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0431_تم_حل', lang, complaint_id=complaint_id))
                 return
             
             elif data.startswith('complaint_review_'):
                 complaint_id = data.replace('complaint_review_', '')
-                reply_msg = "نحن نراجع طلبك بعناية وسنرد عليك خلال 24 ساعة. شكراً لصبرك."
+                reply_msg = self.tr('a0432_نحن_نراجع', lang)
                 self.save_complaint_reply(complaint_id, reply_msg)
                 self.send_complaint_reply_to_customer(complaint_id, reply_msg)
-                self.edit_message(chat_id, message.get('message_id'), f"🔍 قيد المراجعة {complaint_id}")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0433_قيد_المراجعة', lang, complaint_id=complaint_id))
                 return
             
             elif data.startswith('complaint_contact_'):
                 complaint_id = data.replace('complaint_contact_', '')
-                reply_msg = "سنتواصل معك قريباً عبر الهاتف أو الرسائل. شكراً لتواصلك معنا."
+                reply_msg = self.tr('a0434_سنتواصل_معك', lang)
                 self.save_complaint_reply(complaint_id, reply_msg)
                 self.send_complaint_reply_to_customer(complaint_id, reply_msg)
-                self.edit_message(chat_id, message.get('message_id'), f"📞 سنتواصل {complaint_id}")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0435_سنتواصل', lang, complaint_id=complaint_id))
                 return
             
             elif data.startswith('complaint_custom_'):
                 complaint_id = data.replace('complaint_custom_', '')
-                self.send_message(chat_id, f"💡 اكتب ردك المخصص للشكوى {complaint_id}:\n\n⬅️ /cancel للإلغاء")
+                self.send_message(chat_id, self.tr('a0436_اكتب_ردك', lang, complaint_id=complaint_id))
                 self.user_states[user_id] = f'replying_to_complaint_{complaint_id}'
                 return
             
@@ -9884,7 +10310,7 @@ class ComprehensiveDUXBot:
                     del self.user_states[user_id]
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': f'رفض {trans_id} {reason}'}
                 self.reject_transaction(fake_msg, trans_id, reason)
-                self.edit_message(chat_id, message.get('message_id'), f"❌ تم رفض {trans_id}")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0437_تم_رفض', lang, trans_id=trans_id))
                 return
             
             # إلغاء رفض المعاملة
@@ -9893,7 +10319,7 @@ class ComprehensiveDUXBot:
                     del self.pending_reject_reasons[user_id]
                 if user_id in self.user_states:
                     del self.user_states[user_id]
-                self.edit_message(chat_id, message.get('message_id'), "❌ تم إلغاء الرفض")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0438_تم_إلغاء', lang))
                 return
 
             # ==================== 📱 التطبيقات ====================
@@ -9916,7 +10342,7 @@ class ComprehensiveDUXBot:
 
             # ==================== 📢 القنوات/المجموعات ====================
             elif data == 'ch_refresh':
-                self.edit_message(chat_id, message.get('message_id'), "🔄 تم التحديث")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0439_تم_التحديث', 'ar'))
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                 self.show_channels_admin(fake_msg)
                 return
@@ -9939,10 +10365,10 @@ class ComprehensiveDUXBot:
             elif data == 'ch_daily_report':
                 if not self.is_admin(user_id):
                     return
-                self.send_message(chat_id, "⏳ جارٍ توليد التقرير اليومي...")
+                self.send_message(chat_id, self.tr('a0440_جارٍ_توليد', 'ar'))
                 report = self.generate_daily_report()
                 if not report:
-                    self.send_message(chat_id, "📭 لا توجد بيانات كافية لتوليد التقرير")
+                    self.send_message(chat_id, self.tr('a0441_لا_توجد', 'ar'))
                 return
 
             elif data == 'tr_add':
@@ -9981,22 +10407,65 @@ class ComprehensiveDUXBot:
                 return
 
             # ==================== 🗃️ مكتبة الرموز ====================
-            elif data == 'stk_add':
+            # ===== مكتبة الرموز — النظام المحسّن =====
+            elif data == 'stk_add_emoji':
                 self.edit_message(chat_id, message.get('message_id'),
-                    "➕ <b>إضافة رمز/استيكر</b>\n\n"
-                    "📝 <b>الطريقة الأولى:</b> أرسل أي استيكر أو رمز الآن وسيُحفظ تلقائياً\n\n"
-                    "📋 <b>الطريقة الثانية:</b> اختر فئة ثم أرسل:")
-                self.send_inline_message(chat_id, "اختر الفئة:", [
-                    [{'text': '🎉 احتفال', 'callback_data': 'stk_cat_احتفال'},
-                     {'text': '💰 مال', 'callback_data': 'stk_cat_مال'}],
-                    [{'text': '✅ موافقة', 'callback_data': 'stk_cat_موافقة'},
-                     {'text': '❌ رفض', 'callback_data': 'stk_cat_رفض'}],
-                    [{'text': '📢 إعلان', 'callback_data': 'stk_cat_إعلان'},
-                     {'text': '🎁 جائزة', 'callback_data': 'stk_cat_جائزة'}],
-                    [{'text': '👤 مستخدم', 'callback_data': 'stk_cat_مستخدم'},
-                     {'text': '📦 أخرى', 'callback_data': 'stk_cat_أخرى'}],
-                    [{'text': '🔙 رجوع', 'callback_data': 'stk_back'}]
-                ])
+                    "➕ <b>إضافة إيموجي جديد</b>\n\n"
+                    "📝 اكتب أو الصق الإيموجي مباشرة:\n\n"
+                    "💡 <b>مصادر الإيموجي:</b>\n"
+                    "• ✂️ انسخ من emojikeyboard.com\n"
+                    "• 📱 لوحة مفاتيح إيموجي بهاتفك\n"
+                    "• 🎨 ارسل عدة إيموجي دفعة واحدة\n\n"
+                    "⚡ سيُضاف فوراً للمكتبة ويظهر في شبكة الأيقونات")
+                self.user_states[user_id] = 'stk_emoji_input'
+                return
+
+            elif data == 'stk_add_photo':
+                self.edit_message(chat_id, message.get('message_id'),
+                    "📸 <b>رفع صورة كأيقونة</b>\n\n"
+                    "📤 أرسل صورة الآن:\n\n"
+                    "💡 <b>المواصفات المثالية:</b>\n"
+                    "• 📐 مربعة (مثل 512×512)\n"
+                    "• 🎨 خلفية شفافة (PNG) إن أمكن\n"
+                    "• 📏 حجم صغير (أقل من 512KB)\n"
+                    "• ✅ سيتم حفظها واستخدامها كلوجو للشركات")
+                self.user_states[user_id] = 'stk_photo_input'
+                return
+
+            elif data == 'stk_add_sticker':
+                self.edit_message(chat_id, message.get('message_id'),
+                    "🎨 <b>إضافة استيكر</b>\n\n"
+                    "📤 أرسل الاستيكر الآن:\n\n"
+                    "💡 سيتم حفظ file_id الخاص بالاستيكر\n"
+                    "ويمكن استخدامه في البث والإشعارات")
+                self.user_states[user_id] = 'stk_sticker_input'
+                return
+
+            elif data == 'stk_add':
+                # القديم — إعادة توجيه للنظام الجديد
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': '', 'message': {'message_id': message.get('message_id', 0)}}
+                self.show_sticker_library(fake_msg)
+                return
+
+            elif data.startswith('stk_del_'):
+                stk_id = data.replace('stk_del_', '')
+                # حذف من المكتبة
+                try:
+                    rows = []
+                    with open('sticker_library.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        fieldnames = reader.fieldnames
+                        rows = list(reader)
+                    rows = [r for r in rows if r.get('id') != stk_id]
+                    with open('sticker_library.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                        writer = csv.DictWriter(f, fieldnames=fieldnames)
+                        writer.writeheader()
+                        writer.writerows(rows)
+                except:
+                    pass
+                self.answer_callback(callback_id, "🗑️ تم الحذف")
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_sticker_library(fake_msg)
                 return
 
             elif data.startswith('stk_cat_'):
@@ -10017,7 +10486,7 @@ class ComprehensiveDUXBot:
                 except:
                     pass
                 if not stickers:
-                    self.edit_message(chat_id, message.get('message_id'), "📭 المكتبة فارغة")
+                    self.edit_message(chat_id, message.get('message_id'), self.tr('a0443_المكتبة_فارغة', 'ar'))
                     return
                 text = f"📋 <b>مكتبة الرموز ({len(stickers)})</b>\n\n━━━━━━━━━━━━━━━━━━\n"
                 for s in stickers:
@@ -10038,18 +10507,18 @@ class ComprehensiveDUXBot:
                     pass
                 cats = {}
                 for s in stickers:
-                    c = s.get('category', 'أخرى')
+                    c = s.get('category', self.tr('a0157_أخرى', 'ar'))
                     if c not in cats:
                         cats[c] = 0
                     cats[c] += 1
-                text = f"📂 <b>الفئات</b>\n\n━━━━━━━━━━━━━━━━━━\n"
+                text = self.tr('a0444_الفئات', 'ar')
                 inline_btns = []
                 for cat, count in cats.items():
                     text += f"  📁 {cat}: <code>{count}</code>\n"
                     inline_btns.append([{'text': f'{cat} ({count})', 'callback_data': f'stk_filter_{cat}'}])
                 inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'stk_back'}])
                 self.edit_message(chat_id, message.get('message_id'), text)
-                self.send_inline_message(chat_id, "اختر فئة:", inline_btns)
+                self.send_inline_message(chat_id, self.tr('a0445_اختر_فئة', 'ar'), inline_btns)
                 return
 
             elif data.startswith('stk_filter_'):
@@ -10086,7 +10555,7 @@ class ComprehensiveDUXBot:
 
             # ==================== 📢 القنوات/المجموعات ====================
             elif data == 'ch_refresh':
-                self.edit_message(chat_id, message.get('message_id'), "🔄 تم التحديث")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0439_تم_التحديث', 'ar'))
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                 self.show_channels_admin(fake_msg)
                 return
@@ -10220,7 +10689,7 @@ class ComprehensiveDUXBot:
                      {'text': '💵 نقد', 'callback_data': 'pm_type_cash'}],
                     [{'text': '🔙 رجوع', 'callback_data': 'pm_back'}]
                 ]
-                self.send_inline_message(chat_id, "اختر النوع:", inline_btns)
+                self.send_inline_message(chat_id, self.tr('a0446_اختر_النوع', 'ar'), inline_btns)
                 return
 
             elif data.startswith('pm_type_') and not data.startswith('pm_type_company'):
@@ -10249,7 +10718,7 @@ class ComprehensiveDUXBot:
                 if len(parts) == 2:
                     company_id, method_id = parts
                     self.link_payment_method(company_id, method_id)
-                    self.answer_callback(callback_id, "✅ تم الربط")
+                    self.answer_callback(callback_id, self.tr('a0447_تم_الربط', 'ar'))
                     # إعادة عرض القائمة
                     fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                     self.show_company_payment_methods_link(fake_msg, user_id)
@@ -10260,7 +10729,7 @@ class ComprehensiveDUXBot:
                 if len(parts) == 2:
                     company_id, method_id = parts
                     self.unlink_payment_method(company_id, method_id)
-                    self.answer_callback(callback_id, "✅ تم الفصل")
+                    self.answer_callback(callback_id, self.tr('a0448_تم_الفصل', 'ar'))
                     fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                     self.show_company_payment_methods_link(fake_msg, user_id)
                 return
@@ -10277,14 +10746,14 @@ class ComprehensiveDUXBot:
             elif data == 'custom_flow_confirm':
                 state = self.user_states.get(user_id, {})
                 if isinstance(state, dict) and state.get('step') == 'custom_flow_confirm':
-                    self.edit_message(chat_id, message.get('message_id'), "✅ جارٍ المعالجة...")
+                    self.edit_message(chat_id, message.get('message_id'), self.tr('a0449_جارٍ_المعالجة', 'ar'))
                     self._finalize_custom_flow(chat_id, user_id, state)
                 return
 
             elif data == 'custom_flow_cancel':
                 if user_id in self.user_states:
                     del self.user_states[user_id]
-                self.edit_message(chat_id, message.get('message_id'), "❌ تم الإلغاء")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0224_تم_الإلغاء', 'ar'))
                 user = self.find_user(user_id)
                 lang = user.get('language', 'ar') if user else 'ar'
                 welcome = self.tr('choose_service', lang, name=user.get('name', ''), customer_id=user.get('customer_id', '')) if user else ''
@@ -10340,11 +10809,11 @@ class ComprehensiveDUXBot:
                 method_id = data.replace('pm_edit_', '')
                 method = self.get_payment_method_by_id(method_id) if method_id else None
                 if not method:
-                    self.send_message(chat_id, "❌ الوسيلة غير موجودة")
+                    self.send_message(chat_id, self.tr('a0450_الوسيلة_غير', lang))
                     return
 
                 company = self.get_company_by_id(method.get('company_id', ''))
-                company_name = company['name'] if company else 'غير محدد'
+                company_name = company['name'] if company else self.tr('a0122_غير_محدد', lang)
                 status = method.get('status', 'active')
                 status_icon = '✅' if status == 'active' else '⏸️'
 
@@ -10368,7 +10837,7 @@ class ComprehensiveDUXBot:
                     [{'text': '🔙 رجوع', 'callback_data': 'pm_list'}]
                 ]
                 self.edit_message(chat_id, message.get('message_id'), text)
-                self.send_inline_message(chat_id, "اختر:", inline_btns)
+                self.send_inline_message(chat_id, self.tr('a0451_اختر', lang), inline_btns)
                 return
 
             elif data.startswith('pm_toggle_'):
@@ -10377,8 +10846,8 @@ class ComprehensiveDUXBot:
                 if method:
                     new_status = 'inactive' if method.get('status') == 'active' else 'active'
                     self.update_payment_method_status(method_id, new_status)
-                    action = 'إيقاف' if new_status == 'inactive' else 'تشغيل'
-                    self.edit_message(chat_id, message.get('message_id'), f"✅ تم {action} الوسيلة")
+                    action = self.tr('a0452_إيقاف', lang) if new_status == 'inactive' else self.tr('a0453_تشغيل', lang)
+                    self.edit_message(chat_id, message.get('message_id'), self.tr('a0454_تم_الوسيلة', 'ar', action=action))
                 # إعادة عرض القائمة
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                 self.show_payment_methods_management(fake_msg)
@@ -10391,27 +10860,27 @@ class ComprehensiveDUXBot:
                      {'text': '❌ إلغاء', 'callback_data': f'pm_edit_{method_id}'}]
                 ]
                 self.edit_message(chat_id, message.get('message_id'),
-                    "⚠️ <b>تأكيد الحذف</b>\n\nهل أنت متأكد؟")
-                self.send_inline_message(chat_id, "حذف وسيلة الدفع:", inline_btns)
+                    self.tr('a0455_تأكيد_الحذف', 'ar'))
+                self.send_inline_message(chat_id, self.tr('a0456_حذف_وسيلة', 'ar'), inline_btns)
                 return
 
             elif data.startswith('pm_confirm_delete_'):
                 method_id = data.replace('pm_confirm_delete_', '')
                 self.delete_payment_method(method_id)
-                self.edit_message(chat_id, message.get('message_id'), "✅ تم حذف الوسيلة")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0457_تم_حذف', 'ar'))
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                 self.show_payment_methods_management(fake_msg)
                 return
 
             elif data.startswith('pm_name_'):
                 method_id = data.replace('pm_name_', '')
-                self.edit_message(chat_id, message.get('message_id'), "✏️ اكتب الاسم الجديد:")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0458_اكتب_الاسم', 'ar'))
                 self.user_states[user_id] = f'pm_input_name_{method_id}'
                 return
 
             elif data.startswith('pm_account_'):
                 method_id = data.replace('pm_account_', '')
-                self.edit_message(chat_id, message.get('message_id'), "🔢 اكتب رقم الحساب الجديد:")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0459_اكتب_رقم', 'ar'))
                 self.user_states[user_id] = f'pm_input_account_{method_id}'
                 return
 
@@ -10425,7 +10894,7 @@ class ComprehensiveDUXBot:
 
             elif data.startswith('setting_edit_'):
                 key = data.replace('setting_edit_', '')
-                current = self.get_setting(key) or 'غير محدد'
+                current = self.get_setting(key) or self.tr('a0122_غير_محدد', 'ar')
                 self.edit_message(chat_id, message.get('message_id'),
                     f"⚙️ <b>تعديل إعداد</b>\n\n"
                     f"📋 المفتاح: <code>{key}</code>\n"
@@ -10438,7 +10907,7 @@ class ComprehensiveDUXBot:
                 idx = int(data.replace('btn_edit_', ''))
                 buttons = getattr(self, '_editable_buttons', {}).get(user_id, [])
                 if idx >= len(buttons):
-                    self.send_message(chat_id, "❌ خطأ في الاختيار")
+                    self.send_message(chat_id, self.tr('a0460_خطأ_في', 'ar'))
                     return
 
                 old_label = buttons[idx]
@@ -10460,18 +10929,18 @@ class ComprehensiveDUXBot:
                      {'text': '❌ إلغاء', 'callback_data': 'app_refresh'}]
                 ]
                 self.edit_message(chat_id, message.get('message_id'),
-                    f"⚠️ هل أنت متأكد من حذف التطبيق <code>{app_id}</code>؟")
-                self.send_inline_message(chat_id, "🗑️ تأكيد الحذف:", inline_btns)
+                    self.tr('a0461_هل_أنت', 'ar', app_id=app_id))
+                self.send_inline_message(chat_id, self.tr('a0462_تأكيد_الحذف', 'ar'), inline_btns)
                 return
 
             elif data.startswith('app_confirm_delete_'):
                 app_id = data.replace('app_confirm_delete_', '')
                 if self.delete_app_link(app_id):
                     self.edit_message(chat_id, message.get('message_id'),
-                        f"✅ تم حذف التطبيق <code>{app_id}</code>")
+                        self.tr('a0463_تم_حذف', 'ar', app_id=app_id))
                 else:
                     self.edit_message(chat_id, message.get('message_id'),
-                        f"❌ لم يتم العثور على التطبيق")
+                        self.tr('a0464_لم_يتم', 'ar'))
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                 self.show_apps_admin_panel(fake_msg)
                 return
@@ -10479,7 +10948,7 @@ class ComprehensiveDUXBot:
             elif data.startswith('app_toggle_'):
                 app_id = data.replace('app_toggle_', '')
                 self.toggle_app_link(app_id)
-                self.edit_message(chat_id, message.get('message_id'), "✅ تم تبديل الحالة")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0465_تم_تبديل', 'ar'))
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                 self.show_apps_admin_panel(fake_msg)
                 return
@@ -10488,11 +10957,11 @@ class ComprehensiveDUXBot:
                 app_id = data.replace('app_edit_', '')
                 app = self.get_app_by_id(app_id)
                 if not app:
-                    self.edit_message(chat_id, message.get('message_id'), "❌ التطبيق غير موجود")
+                    self.edit_message(chat_id, message.get('message_id'), self.tr('a0006_التطبيق_غير', 'ar'))
                     return
                 # تعديل التطبيق — كل حقل منفصل بأزرار inline
-                dl_android = '📦 APK' if app.get('android_file_id') else ('🔗 رابط' if app.get('android_url') else '➖')
-                dl_ios = '🔗 رابط' if app.get('ios_url') else '➖'
+                dl_android = '📦 APK' if app.get('android_file_id') else (self.tr('a0020_رابط', 'ar') if app.get('android_url') else '➖')
+                dl_ios = self.tr('a0020_رابط', 'ar') if app.get('ios_url') else '➖'
                 icon = '🖼️' if (app.get('icon_file_id') or app.get('icon_url')) else '➖'
                 promo = '🎁' if app.get('promo_code') else '➖'
                 ref = '🔗' if app.get('referral_link') else '➖'
@@ -10518,55 +10987,55 @@ class ComprehensiveDUXBot:
                     [{'text': '🔙 رجوع', 'callback_data': 'app_refresh'}]
                 ]
                 self.edit_message(chat_id, message.get('message_id'), text)
-                self.send_inline_message(chat_id, "اختر الحقل:", inline_btns)
+                self.send_inline_message(chat_id, self.tr('a0466_اختر_الحقل', 'ar'), inline_btns)
                 return
 
             # === تعديل حقول التطبيق بشكل منفصل ===
             elif data.startswith('app_edit_name_'):
                 app_id = data.replace('app_edit_name_', '')
-                self.edit_message(chat_id, message.get('message_id'), "📝 اكتب <b>الاسم الجديد</b>:")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0467_اكتب_الاسم', 'ar'))
                 self.user_states[user_id] = {'step': 'app_field_edit', 'field': 'name', 'app_id': app_id}
                 return
 
             elif data.startswith('app_edit_icon_'):
                 app_id = data.replace('app_edit_icon_', '')
                 self.edit_message(chat_id, message.get('message_id'),
-                    "🖼️ أرسل <b>صورة الأيقونة الجديدة</b>:\nأو اكتب رابط صورة\nأو 'حذف' للإزالة")
+                    self.tr('a0468_أرسل_صورة', 'ar'))
                 self.user_states[user_id] = {'step': 'app_field_edit', 'field': 'icon', 'app_id': app_id}
                 return
 
             elif data.startswith('app_edit_android_'):
                 app_id = data.replace('app_edit_android_', '')
                 self.edit_message(chat_id, message.get('message_id'),
-                    "🤖 أرسل <b>ملف APK جديد</b> أو <b>رابط أندرويد جديد</b>:\nأو 'حذف' للإزالة")
+                    self.tr('a0469_أرسل_ملف', 'ar'))
                 self.user_states[user_id] = {'step': 'app_field_edit', 'field': 'android', 'app_id': app_id}
                 return
 
             elif data.startswith('app_edit_ios_'):
                 app_id = data.replace('app_edit_ios_', '')
                 self.edit_message(chat_id, message.get('message_id'),
-                    "🍎 اكتب <b>رابط آيفون جديد</b>:\nأو 'حذف' للإزالة")
+                    self.tr('a0470_اكتب_رابط', 'ar'))
                 self.user_states[user_id] = {'step': 'app_field_edit', 'field': 'ios', 'app_id': app_id}
                 return
 
             elif data.startswith('app_edit_promo_'):
                 app_id = data.replace('app_edit_promo_', '')
                 self.edit_message(chat_id, message.get('message_id'),
-                    "🎁 اكتب <b>برومو كود جديد</b>:\nأو 'حذف' للإزالة")
+                    self.tr('a0471_اكتب_برومو', 'ar'))
                 self.user_states[user_id] = {'step': 'app_field_edit', 'field': 'promo_code', 'app_id': app_id}
                 return
 
             elif data.startswith('app_edit_reflink_'):
                 app_id = data.replace('app_edit_reflink_', '')
                 self.edit_message(chat_id, message.get('message_id'),
-                    "🔗 اكتب <b>رابط إحالة جديد</b>:\nأو 'حذف' للإزالة")
+                    self.tr('a0472_اكتب_رابط', 'ar'))
                 self.user_states[user_id] = {'step': 'app_field_edit', 'field': 'referral_link', 'app_id': app_id}
                 return
 
             elif data.startswith('app_edit_desc_'):
                 app_id = data.replace('app_edit_desc_', '')
                 self.edit_message(chat_id, message.get('message_id'),
-                    "📋 اكتب <b>وصفاً جديداً</b>:\nأو 'حذف' للإزالة")
+                    self.tr('a0473_اكتب_وصفاً', 'ar'))
                 self.user_states[user_id] = {'step': 'app_field_edit', 'field': 'description', 'app_id': app_id}
                 return
 
@@ -10574,11 +11043,11 @@ class ComprehensiveDUXBot:
                 app_id = data.replace('app_dl_android_', '')
                 app = self.get_app_by_id(app_id)
                 if not app:
-                    self.answer_callback(callback_id, "❌ التطبيق غير موجود")
+                    self.answer_callback(callback_id, self.tr('a0006_التطبيق_غير', 'ar'))
                     return
                 android_file_id = app.get('android_file_id', '')
                 if android_file_id:
-                    self.answer_callback(callback_id, "📦 جارٍ إرسال الملف...")
+                    self.answer_callback(callback_id, self.tr('a0474_جارٍ_إرسال', 'ar'))
                     self.api_call('sendDocument', {
                         'chat_id': chat_id,
                         'document': android_file_id,
@@ -10592,11 +11061,11 @@ class ComprehensiveDUXBot:
                 app_id = data.replace('app_dl_ios_', '')
                 app = self.get_app_by_id(app_id)
                 if not app:
-                    self.answer_callback(callback_id, "❌ التطبيق غير موجود")
+                    self.answer_callback(callback_id, self.tr('a0006_التطبيق_غير', 'ar'))
                     return
                 ios_file_id = app.get('ios_file_id', '')
                 if ios_file_id:
-                    self.answer_callback(callback_id, "📦 جارٍ إرسال الملف...")
+                    self.answer_callback(callback_id, self.tr('a0474_جارٍ_إرسال', 'ar'))
                     self.api_call('sendDocument', {
                         'chat_id': chat_id,
                         'document': ios_file_id,
@@ -10609,7 +11078,41 @@ class ComprehensiveDUXBot:
             elif data.startswith('app_view_'):
                 app_id = data.replace('app_view_', '')
                 self.edit_message(chat_id, message.get('message_id'), "📱")
-                self.show_app_detail(chat_id, app_id)
+                self.show_app_detail(chat_id, app_id, user_id)
+                return
+
+            elif data.startswith('app_promo_'):
+                app_id = data.replace('app_promo_', '')
+                app = self.get_app_by_id(app_id)
+                if not app:
+                    self.answer_callback(callback_id, "❌")
+                    return
+                promo_code = app.get('promo_code', '').strip()
+                referral_link = app.get('referral_link', '').strip()
+
+                if not promo_code:
+                    self.answer_callback(callback_id, "❌ لا يوجد كود")
+                    return
+
+                # عرض البرومو كود مع زر نسخ + زر فتح الرابط
+                text = (
+                    f"🎟️ <b>البرومو كود</b>\n\n"
+                    f"━━━━━━━━━━━━━━━━━━\n"
+                    f"🎫 الكود: <code>{promo_code}</code> 👈 اضغط للنسخ\n"
+                    f"━━━━━━━━━━━━━━━━━━\n\n"
+                    f"⚡ <b>تم نسخ الكود تلقائياً!</b>\n"
+                    f"🔗 اضغط الزر بالأسفل للتسجيل بالكود\n\n"
+                    f"💡 سيتم فتح رابط التسجيل\n"
+                    f"   الصق الكود عند التسجيل"
+                )
+
+                inline_btns = []
+                if referral_link:
+                    inline_btns.append([{'text': '🔗 تسجيل بالكود', 'url': referral_link}])
+                inline_btns.append([{'text': self.tr('a0142_العودة', lang), 'callback_data': f'app_view_{app_id}'}])
+
+                self.edit_message(chat_id, message.get('message_id'), text, inline_btns)
+                self.answer_callback(callback_id, f"🎟️ {promo_code}")
                 return
 
             elif data == 'app_list_back':
@@ -10621,7 +11124,7 @@ class ComprehensiveDUXBot:
             elif data == 'apps_back_main':
                 user = self.find_user(user_id)
                 lang = user.get('language', 'ar') if user else 'ar'
-                self.edit_message(chat_id, message.get('message_id'), "🔙 تم العودة")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0475_تم_العودة', lang))
                 welcome = self.tr('choose_service', lang, name=user.get('name', ''), customer_id=user.get('customer_id', '')) if user else ''
                 self.send_message(chat_id, welcome, self.main_keyboard(lang, user_id))
                 return
@@ -10632,7 +11135,7 @@ class ComprehensiveDUXBot:
             elif data == 'trade_back_main':
                 user = self.find_user(user_id)
                 lang = user.get('language', 'ar') if user else 'ar'
-                self.edit_message(chat_id, message.get('message_id'), "🏠 العودة")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0476_العودة', lang))
                 welcome = self.tr('choose_service', lang, name=user.get('name', ''), customer_id=user.get('customer_id', '')) if user else ''
                 self.send_message(chat_id, welcome, self.main_keyboard(lang, user_id))
                 return
@@ -10649,7 +11152,7 @@ class ComprehensiveDUXBot:
                     f"📞 رقمك الحالي: <code>{current_phone}</code>\n\n"
                     "📱 اضغط زر <b>مشاركة جهة الاتصال</b> بالأسفل\n"
                     "سيتم استبدال رقمك الحالي برقمك الحقيقي")
-                share_btn = self.tr('share_phone', 'ar') if self.tr('share_phone', 'ar') != 'share_phone' else '📱 مشاركة جهة الاتصال'
+                share_btn = self.tr('share_phone', 'ar') if self.tr('share_phone', 'ar') != 'share_phone' else self.tr('a0477_مشاركة_جهة', lang)
                 contact_keyboard = {
                     'keyboard': [
                         [{'text': share_btn, 'request_contact': True}],
@@ -10658,26 +11161,40 @@ class ComprehensiveDUXBot:
                     'resize_keyboard': True,
                     'one_time_keyboard': True
                 }
-                self.send_message(chat_id, "📱 اضغط للمشاركة:", contact_keyboard)
+                self.send_message(chat_id, self.tr('a0478_اضغط_للمشاركة', lang), contact_keyboard)
                 self.user_states[user_id] = 'verify_phone_waiting'
                 return
 
             # ==================== 🎡 عجلة الحظ ====================
             elif data == 'wheel_back_main':
+                # مسح حالة اللعبة إن كانت نشطة
+                state = self.user_states.get(user_id, {})
+                if isinstance(state, dict) and state.get('step') == 'wheel_game_active':
+                    self.user_states.pop(user_id, None)
                 user = self.find_user(user_id)
                 lang = user.get('language', 'ar') if user else 'ar'
-                self.edit_message(chat_id, message.get('message_id'), "🏠 العودة")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0476_العودة', lang))
                 self.send_welcome(chat_id, lang, user_id)
                 return
 
             elif data == 'wheel_refresh':
-                self.edit_message(chat_id, message.get('message_id'), "🔄 جارٍ التحديث...")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0479_جارٍ_التحديث', lang))
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                 self.show_wheel_panel(fake_msg)
                 return
 
             elif data == 'wheel_start_game':
-                # قراءة الهدايا من wheel_gifts.csv
+                import random as _r
+                import threading
+                import time as _time
+
+                # منع النقر المزدوج
+                existing_state = self.user_states.get(user_id, {})
+                if isinstance(existing_state, dict) and existing_state.get('step') == 'wheel_game_active':
+                    self.answer_callback(callback_id, "⚡ اللعبة جارية!")
+                    return
+
+                # قراءة الهدايا
                 gifts = []
                 try:
                     with open('wheel_gifts.csv', 'r', encoding='utf-8-sig') as f:
@@ -10687,9 +11204,8 @@ class ComprehensiveDUXBot:
                                 gifts.append(row)
                 except:
                     pass
-
                 if not gifts:
-                    self.answer_callback(callback_id, "❌ لا توجد هدايا متاحة")
+                    self.answer_callback(callback_id, self.tr('a0480_لا_توجد', lang))
                     return
 
                 # قراءة الجولة النشطة
@@ -10703,9 +11219,8 @@ class ComprehensiveDUXBot:
                                 break
                 except:
                     pass
-
                 if not active_round:
-                    self.answer_callback(callback_id, "❌ لا توجد جولة نشطة")
+                    self.answer_callback(callback_id, self.tr('a0481_لا_توجد', lang))
                     return
 
                 # فحص حدود الدورات
@@ -10718,23 +11233,19 @@ class ComprehensiveDUXBot:
                                 my_spins += 1
                 except:
                     pass
-
                 max_spins = int(active_round.get('max_spins_per_user', 1))
                 if my_spins >= max_spins:
-                    # فحص الرصيد للدورات الإضافية
                     spin_cost = float(active_round.get('spin_cost', 0) or 0)
                     wallet_balance = 0.0
                     if self.svrp:
                         try:
-                            wallets = self.svrp.get_all_wallets()
-                            for w in wallets:
+                            for w in self.svrp.get_all_wallets():
                                 if str(w.get('telegram_id', '')) == str(user_id):
                                     wallet_balance = float(w.get('balance', 0) or 0)
                                     break
                         except:
                             pass
                     if spin_cost > 0 and wallet_balance >= spin_cost:
-                        # خصم تكلفة الدورة
                         try:
                             rows = []
                             with open('svrp_wallets.csv', 'r', encoding='utf-8-sig') as f:
@@ -10753,128 +11264,229 @@ class ComprehensiveDUXBot:
                         except:
                             pass
                     else:
-                        self.answer_callback(callback_id, "❌ وصلت للحد الأقصى")
+                        self.answer_callback(callback_id, self.tr('a0482_وصلت_للحد', lang))
                         return
 
-                # خلط الهدايا عشوائياً
-                import random as _r
-                _r.shuffle(gifts)
-                # أخذ 4-6 هدايا عشوائية
-                num_gifts = min(len(gifts), _r.randint(4, 6))
-                game_gifts = gifts[:num_gifts]
+                # إرسال رسالة البداية
+                resp = self.send_inline_message(chat_id,
+                    f"🎁 <b>اختطف!</b>\n\n"
+                    f"⚡ هدية ستظهر — <b>اخطفها بسرعة!</b>\n"
+                    f"🎯 أحياناً تظهر وتختفي بسرعة!\n"
+                    f"🟢 أحياناً تنتظرك!\n\n"
+                    f"3️⃣ استعد...\n2️⃣ ركّز...\n1️⃣ الآن!",
+                    [[{'text': '⏳ جارٍ التحضير...', 'callback_data': 'wheel_miss'}]])
+                game_msg_id = 0
+                if resp and isinstance(resp, dict):
+                    game_msg_id = resp.get('result', {}).get('message_id', 0)
 
-                # حفظ بيانات اللعبة في حالة المستخدم
+                # حفظ حالة اللعبة
                 self.user_states[user_id] = {
                     'step': 'wheel_game_active',
                     'round_id': active_round['id'],
-                    'gifts': [{'id': g.get('id', ''), 'text': g.get('gift_text', ''), 'link': g.get('affiliate_link', '')} for g in game_gifts],
-                    'round': 0,
-                    'message_id': message.get('message_id', 0
-                    )
+                    'gifts': [{'id': g.get('id', ''), 'text': g.get('gift_text', ''), 'link': g.get('affiliate_link', '')} for g in gifts],
+                    'game_msg_id': game_msg_id,
+                    'chat_id': chat_id,
+                    'lang': lang,
+                    'clicked': False,
+                    'round_num': 0,
+                    'max_rounds': 7,
+                    'current_gift': None,
+                    'current_is_real': False,
                 }
 
-                # عرض الهدايا كأزرار — مع أزرار وهمية
-                inline_btns = []
-                # إضافة هدايا حقيقية + أزرار وهمية في ترتيب عشوائي
-                all_buttons = []
-                for g in game_gifts:
-                    all_buttons.append({'type': 'gift', 'id': g.get('id', ''), 'text': g.get('gift_text', ''), 'link': g.get('affiliate_link', '')})
-                # إضافة أزرار وهمية
-                for i in range(num_gifts):
-                    all_buttons.append({'type': 'fake', 'text': '🎁 ???', 'id': f'fake_{i}'})
+                # ===== خيط اللعبة — ظهور واختفاء الزر =====
+                def game_loop():
+                    """خيط اللعبة — يظهر ويخفي زر واحد في كل مرة"""
+                    max_rounds = 7
+                    colors = ['🟢', '🔵', '🟡', '🟣', '🔴', '🟠', '⚪']
 
-                _r.shuffle(all_buttons)
+                    for rnd in range(max_rounds):
+                        st = self.user_states.get(user_id, {})
+                        if not isinstance(st, dict) or st.get('step') != 'wheel_game_active':
+                            return  # اللعبة انتهت
 
-                # ترتيب في صفوف (2 لكل صف)
-                for i in range(0, len(all_buttons), 2):
-                    row = []
-                    for j in range(2):
-                        if i + j < len(all_buttons):
-                            btn = all_buttons[i + j]
-                            if btn['type'] == 'gift':
-                                row.append({'text': f"🎁 {btn['text'][:20]}", 'callback_data': f'wheel_catch_{btn["id"]}'})
-                            else:
-                                row.append({'text': btn['text'], 'callback_data': 'wheel_miss'})
-                    inline_btns.append(row)
+                        st['round_num'] = rnd + 1
+                        st['clicked'] = False
+                        self.user_states[user_id] = st
+                        gmid = st.get('game_msg_id', 0)
+                        chat = st.get('chat_id', chat_id)
+                        st_lang = st.get('lang', 'ar')
+                        all_gifts = st.get('gifts', [])
 
-                inline_btns.append([{'text': '❌ خروج', 'callback_data': 'wheel_back_main'}])
+                        # اختيار سلوك عشوائي
+                        behavior = _r.choice(['tease', 'tease', 'catchable_real', 'catchable_real', 'fake', 'catchable_real', 'tease'])
 
-                self.edit_message(chat_id, message.get('message_id'),
-                    f"🎡 <b>العبة بدأت!</b>\n\n"
-                    f"⚡ <b>اضغط بسرعة على الهدية!</b>\n"
-                    f"⏰ الأزرار ستختفي بعد ثوانٍ!\n\n"
-                    f"🎯 اختر هديتك بسرعة!")
+                        # اختيار هدية ولون
+                        gift = _r.choice(all_gifts) if all_gifts else None
+                        color = _r.choice(colors)
+                        gift_text = gift.get('text', 'هدية')[:20] if gift else '???'
+                        gift_id = gift.get('id', '') if gift else ''
 
-                self.send_inline_message(chat_id,
-                    "🎁 <b>اقبض هديتك!</b>\n\nاضغط بسرعة قبل ما تختفي!",
-                    inline_btns)
+                        if behavior == 'tease':
+                            # ===== تيسر: يظهر ويختفي بسرعة =====
+                            st['current_is_real'] = True
+                            st['current_gift'] = gift
+                            self.user_states[user_id] = st
+                            try:
+                                self.edit_message(chat, gmid,
+                                    f"⚡ <b>سريع!</b>\n\n{color} <b>اخطفها!</b>",
+                                    [[{'text': f'{color} {gift_text}', 'callback_data': f'wheel_catch_{gift_id}'},
+                                      {'text': '❌', 'callback_data': 'wheel_miss'}]])
+                            except:
+                                pass
+                            # وقت قصير جداً — تيسر
+                            _time.sleep(_r.uniform(0.4, 0.9))
+                            # تحقق إذا العميل نقر
+                            st = self.user_states.get(user_id, {})
+                            if st.get('clicked'):
+                                return  # العميل اصطادها — wheel_catch_ سيعالج
+                            # اختفى!
+                            try:
+                                self.edit_message(chat, gmid,
+                                    f"💨 <b>فوتتك!</b> 😜\n\nانتظر التالية...")
+                            except:
+                                pass
+                            _time.sleep(_r.uniform(0.3, 0.6))
 
-                # جدولة إخفاء الأزرار بعد 3 ثوانٍ
-                import threading
-                def hide_gifts():
-                    import time
-                    time.sleep(3)
-                    try:
-                        state = self.user_states.get(user_id, {})
-                        if isinstance(state, dict) and state.get('step') == 'wheel_game_active':
-                            # تعديل الرسالة لإزالة الأزرار
-                            self.edit_message(chat_id, state.get('message_id2', 0),
-                                "⏰ <b>انتهى الوقت!</b>\n\nالأزرار اختفت!\nاستخدم زر التحديث للمحاولة مرة أخرى")
-                    except:
-                        pass
+                        elif behavior == 'catchable_real':
+                            # ===== قابل للاصطياد: ينتظر العميل =====
+                            st['current_is_real'] = True
+                            st['current_gift'] = gift
+                            self.user_states[user_id] = st
+                            try:
+                                self.edit_message(chat, gmid,
+                                    f"{color} <b>اختطف الهدية!</b>\n\n🎁 <b>{gift_text}</b>\n\n"
+                                    f"⏰ انقر بسرعة قبل ما تختفي!",
+                                    [[{'text': f'{color} 🎁 {gift_text}', 'callback_data': f'wheel_catch_{gift_id}'},
+                                      {'text': '❌', 'callback_data': 'wheel_miss'}]])
+                            except:
+                                pass
+                            # وقت أطول — قابل للإمساك
+                            _time.sleep(_r.uniform(1.5, 3.0))
+                            st = self.user_states.get(user_id, {})
+                            if st.get('clicked'):
+                                return  # العميل اصطادها
+                            # فوتته!
+                            try:
+                                self.edit_message(chat, gmid,
+                                    f"💨 <b>فوتتها!</b> 😅\n\nكانت هدية حقيقية!\nانتظر التالية...")
+                            except:
+                                pass
+                            _time.sleep(_r.uniform(0.4, 0.7))
 
-                t = threading.Thread(target=hide_gifts, daemon=True)
+                        elif behavior == 'fake':
+                            # ===== فخ: يبدو كهدية لكنه فخ =====
+                            st['current_is_real'] = False
+                            st['current_gift'] = None
+                            self.user_states[user_id] = st
+                            try:
+                                self.edit_message(chat, gmid,
+                                    f"🔴 <b>احذر!</b>\n\nهل هي حقيقية أم فخ؟",
+                                    [[{'text': f'{color} 🎁 ???', 'callback_data': 'wheel_catch_fake'},
+                                      {'text': '🚫 تخطي', 'callback_data': 'wheel_miss'}]])
+                            except:
+                                pass
+                            _time.sleep(_r.uniform(0.8, 1.5))
+                            st = self.user_states.get(user_id, {})
+                            if st.get('clicked'):
+                                # العميل نقر الفخ!
+                                try:
+                                    self.edit_message(chat, gmid,
+                                        f"😜 <b>خداع!</b>\n\nكان فخاً!\nاستمر في المحاولة...")
+                                except:
+                                    pass
+                                st['clicked'] = False
+                                self.user_states[user_id] = st
+                                _time.sleep(0.8)
+                                continue
+                            try:
+                                self.edit_message(chat, gmid,
+                                    f"✅ <b>تجنبت الفخ!</b> 😎\n\nانتظر التالية...")
+                            except:
+                                pass
+                            _time.sleep(_r.uniform(0.3, 0.5))
+
+                    # انتهت الجولات دون اصطياد
+                    st = self.user_states.get(user_id, {})
+                    if isinstance(st, dict) and st.get('step') == 'wheel_game_active':
+                        try:
+                            self.edit_message(chat, gmid if 'gmid' in dir() else st.get('game_msg_id', 0),
+                                f"😔 <b>انتهت اللعبة!</b>\n\n"
+                                f"لم تتمكن من اصطياد أي هدية هذه المرة\n"
+                                f"🍀 حظ أوفر في المرة القادمة!",
+                                [[{'text': self.tr('a0141_الرئيسية', st_lang), 'callback_data': 'wheel_back_main'}]])
+                        except:
+                            pass
+                        self.user_states.pop(user_id, None)
+
+                # بدء خيط اللعبة
+                _time.sleep(1.5)  # مهلة العد التنازلي
+                t = threading.Thread(target=game_loop, daemon=True)
                 t.start()
                 return
 
-            elif data.startswith('wheel_catch_'):
+            elif data.startswith('wheel_catch_') and data != 'wheel_catch_fake':
+                # العميل اصطاد هدية حقيقية!
                 gift_id = data.replace('wheel_catch_', '')
                 state = self.user_states.get(user_id, {})
 
                 if not isinstance(state, dict) or state.get('step') != 'wheel_game_active':
-                    self.answer_callback(callback_id, "⏰ انتهت اللعبة")
+                    self.answer_callback(callback_id, self.tr('a0485_انتهت_اللعبة', lang))
                     return
 
-                gifts = state.get('gifts', [])
-                caught = None
-                for g in gifts:
-                    if g.get('id') == gift_id:
-                        caught = g
-                        break
-
-                if not caught:
-                    self.answer_callback(callback_id, "❌ خطأ")
+                gift = state.get('current_gift')
+                if not gift or gift.get('id') != gift_id:
+                    self.answer_callback(callback_id, "❌")
                     return
 
-                # تسجيل الدوران
+                # تسجيل الإصطياد
+                state['clicked'] = True
+                self.user_states[user_id] = state
+                game_msg_id = state.get('game_msg_id', 0)
+                chat = state.get('chat_id', chat_id)
+                st_lang = state.get('lang', 'ar')
                 round_id = state.get('round_id', '')
+
                 spin_id = f"SPN{str(int(datetime.now().timestamp()))[-6:]}"
                 try:
                     with open('wheel_spins.csv', 'a', newline='', encoding='utf-8-sig') as f:
                         writer = csv.writer(f)
-                        writer.writerow([spin_id, round_id, str(user_id), caught.get('text', ''), datetime.now().strftime('%Y-%m-%d %H:%M')])
+                        writer.writerow([spin_id, round_id, str(user_id), gift.get('text', ''), datetime.now().strftime('%Y-%m-%d %H:%M')])
                 except:
                     pass
 
-                del self.user_states[user_id]
+                # محاولة استخراج مبلغ رقمي
+                wallet_msg = ''
+                try:
+                    prize_text = gift.get('text', '')
+                    import re as _re
+                    numbers = _re.findall(r'[\d,.]+', prize_text.replace(',', ''))
+                    if numbers:
+                        prize_amount = float(numbers[0])
+                        if prize_amount > 0 and self.svrp:
+                            self.svrp.add_frozen_balance(str(user_id), prize_amount)
+                            wallet_msg = f"\n💎 تم إضافة <code>{prize_amount:.0f}</code> لرصيدك المجمد!"
+                except:
+                    pass
 
-                self.answer_callback(callback_id, "🎉")
+                # مسح الحالة
+                self.user_states.pop(user_id, None)
+                self.answer_callback(callback_id, "🎉🎉🎉")
 
-                # عرض الهدية مع رابط الإحالة
+                # عرض الهدية
                 inline_btns = []
-                if caught.get('link'):
-                    inline_btns.append([{'text': '🔗 اضغط هنا للOpening', 'url': caught['link']}])
-                inline_btns.append([{'text': '🔙 القائمة الرئيسية', 'callback_data': 'wheel_back_main'}])
+                if gift.get('link'):
+                    inline_btns.append([{'text': '🔗 اضغط للاستلام', 'url': gift['link']}])
+                inline_btns.append([{'text': self.tr('a0141_الرئيسية', st_lang), 'callback_data': 'wheel_back_main'}])
 
-                self.edit_message(chat_id, message.get('message_id'),
-                    f"🎉🎉🎉 <b>مبروك! قبضت هديتك!</b>\n\n"
+                self.edit_message(chat, game_msg_id,
+                    f"🎉🎉🎉 <b>اخترفتها!</b> 🎉🎉🎉\n\n"
                     f"━━━━━━━━━━━━━━━━━━\n"
-                    f"🎁 الهدية: <b>{caught.get('text', '')}</b>\n"
+                    f"🎁 الهدية: <b>{gift.get('text', '')}</b>\n"
                     f"━━━━━━━━━━━━━━━━━━\n\n"
+                    f"⚡ سرعة رد فعل خارقة!\n"
+                    f"{wallet_msg}\n"
                     f"🔗 اضغط الزر بالأسفل للتسجيل واستلام هديتك!",
-                    )
-                self.send_inline_message(chat_id,
-                    f"🎁 <b>تهانينا!</b>\n\nالهدية: <b>{caught.get('text', '')}</b>",
                     inline_btns)
 
                 # إشعار الأدمن
@@ -10882,19 +11494,44 @@ class ComprehensiveDUXBot:
                 for admin_id in self.admin_ids:
                     try:
                         self.send_message(int(admin_id),
-                            f"🎡 <b>عجلة الحظ — فائز!</b>\n\n"
+                            f"🎁 <b>اختطف — فائز!</b>\n\n"
                             f"👤 {user_obj.get('name', '')} ({user_id})\n"
-                            f"🎁 الهدية: {caught.get('text', '')}")
+                            f"🎁 الهدية: {gift.get('text', '')}")
                     except:
                         pass
                 return
 
+            elif data == 'wheel_catch_fake':
+                # العميل نقر على فخ!
+                state = self.user_states.get(user_id, {})
+                if isinstance(state, dict) and state.get('step') == 'wheel_game_active':
+                    state['clicked'] = True
+                    self.user_states[user_id] = state
+                self.answer_callback(callback_id, "😜 فخ!")
+                return
+
             elif data == 'wheel_miss':
-                self.answer_callback(callback_id, "💨 خاطئة!")
+                state = self.user_states.get(user_id, {})
+                if isinstance(state, dict) and state.get('step') == 'wheel_game_active':
+                    # عدّ الأخطاء
+                    misses = state.get('misses', 0) + 1
+                    state['misses'] = misses
+                    self.user_states[user_id] = state
+                    # بعد 3 أخطاء — انتهت اللعبة
+                    if misses >= 3:
+                        game_msg_id = state.get('game_msg_id', 0)
+                        self.user_states.pop(user_id, None)
+                        if game_msg_id:
+                            self.edit_message(chat_id, game_msg_id,
+                                f"❌ <b>خسرت! أخطأت 3 مرات</b>\n\n"
+                                f"🎯 حظ أوفر في المرة القادمة!")
+                        self.answer_callback(callback_id, self.tr('a0485_انتهت_اللعبة', lang))
+                        return
+                self.answer_callback(callback_id, self.tr('a0487_خاطئة', lang))
                 return
 
             elif data == 'lot_refresh':
-                self.edit_message(chat_id, message.get('message_id'), "🔄 جارٍ التحديث...")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0479_جارٍ_التحديث', 'ar'))
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                 self.show_lottery_panel(fake_msg)
                 return
@@ -10921,7 +11558,7 @@ class ComprehensiveDUXBot:
                 except:
                     pass
                 if not round_data:
-                    self.answer_callback(callback_id, "❌ الجولة غير موجودة")
+                    self.answer_callback(callback_id, self.tr('a0488_الجولة_غير', lang))
                     return
 
                 # عد دورات المستخدم
@@ -10937,27 +11574,19 @@ class ComprehensiveDUXBot:
 
                 max_spins = int(round_data.get('max_spins_per_user', 1))
                 if my_spins >= max_spins:
-                    self.answer_callback(callback_id, "⚠️ وصلت للحد الأقصى")
+                    self.answer_callback(callback_id, self.tr('a0489_وصلت_للحد', lang))
                     return
 
-                # عرض الرسوم المتحركة
-                self.answer_callback(callback_id, "🎡 جارٍ الدوران...")
-                self.send_message(chat_id, "🎡 العجلة تدوووور...")
-
-                import time as _time
-                _time.sleep(1)
-                self.send_message(chat_id, "⏳ 3...")
-                _time.sleep(1)
-                self.send_message(chat_id, "⏳ 2...")
-                _time.sleep(1)
-                self.send_message(chat_id, "⏳ 1...")
-                _time.sleep(1)
+                # نتيجة فورية — بدون time.sleep المكدّس
+                self.answer_callback(callback_id, self.tr('a0490_جارٍ_الدوران', lang))
+                self.edit_message(chat_id, message.get('message_id'),
+                    self.tr('a0491_العجلة_تدوووور', lang))
 
                 # اختيار الجائزة عشوائياً
                 prizes = round_data.get('prizes', '').split('|')
                 prizes = [p.strip() for p in prizes if p.strip()]
                 if not prizes:
-                    self.send_message(chat_id, "❌ لا توجد جوائز")
+                    self.send_message(chat_id, self.tr('a0492_لا_توجد', lang))
                     return
                 prize_won = _r.choice(prizes)
 
@@ -10977,14 +11606,14 @@ class ComprehensiveDUXBot:
                     f"━━━━━━━━━━━━━━━━━━\n\n"
                     f"🎯 دوراتك: <code>{my_spins + 1}/{max_spins}</code>\n\n"
                     f"🎁 مبروك! تواصل مع الإدارة لاستلام جائزتك",
-                    self.main_keyboard('ar', user_id))
+                    self.main_keyboard(lang, user_id))
 
                 # إشعار الأدمن بالفائز
                 user_obj = self.find_user(user_id)
                 for admin_id in self.admin_ids:
                     try:
                         self.send_message(int(admin_id),
-                            f"🎁 <b>فائز في عجلة الحظ!</b>\n\n"
+                            f"🎯 <b>صيد الجوائز — فائز!</b>\n\n"
                             f"🆔 الجولة: <code>{round_id}</code> 👈 اضغط للنسخ\n"
                             f"👤 العميل: {user_obj.get('name', '') if user_obj else ''} — <code>{user_id}</code>\n"
                             f"🎁 الجائزة: <b>{prize_won}</b>\n"
@@ -10994,7 +11623,7 @@ class ComprehensiveDUXBot:
 
                 # نشر النتيجة في القنوات
                 self.post_to_channels(
-                    f"🎡 <b>نتيجة عجلة الحظ!</b>\n\n"
+                    f"🎯 <b>صيد الجوائز — نتيجة!</b>\n\n"
                     f"🎁 الفائز: {user_obj.get('name', '') if user_obj else 'عميل'}\n"
                     f"🏆 الجائزة: <b>{prize_won}</b>")
                 return
@@ -11016,7 +11645,169 @@ class ComprehensiveDUXBot:
                         writer.writerows(rows)
                 except:
                     pass
-                self.edit_message(chat_id, message.get('message_id'), f"✅ تم إنهاء الجولة")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0493_تم_إنهاء', lang))
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_wheel_admin(fake_msg)
+                return
+
+            # ===== أيقونة الشركة =====
+            elif data.startswith('company_icon_') and data != 'company_icon_back':
+                parts = data.split('_', 3)  # company_icon_{emoji}_{company_id}
+                if len(parts) >= 4:
+                    emoji = parts[2]
+                    company_id = parts[3]
+                    # حفظ في edit_company_data
+                    if user_id in self.edit_company_data:
+                        self.edit_company_data[user_id]['icon'] = emoji
+                    # حفظ مباشر في CSV
+                    try:
+                        rows = []
+                        with open('companies.csv', 'r', encoding='utf-8-sig') as f:
+                            reader = csv.DictReader(f)
+                            fieldnames = reader.fieldnames
+                            for row in reader:
+                                if row.get('id') == company_id:
+                                    row['icon'] = emoji
+                                rows.append(row)
+                        with open('companies.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                            writer = csv.DictWriter(f, fieldnames=fieldnames)
+                            writer.writeheader()
+                            for row in rows:
+                                writer.writerow({k: row.get(k, '') for k in fieldnames})
+                    except:
+                        pass
+                    self.answer_callback(callback_id, f"✅ {emoji}")
+                    self.edit_message(chat_id, message.get('message_id'),
+                        f"✅ <b>تم تحديث الأيقونة!</b>\n\n"
+                        f"🏷️ الأيقونة الجديدة: {emoji}\n\n"
+                        f"ستظهر بجانب اسم الشركة في كل مكان.")
+                    # العودة لقائمة التعديل
+                    fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                    if user_id in self.user_states:
+                        del self.user_states[user_id]
+                    self.show_edit_menu(fake_msg, user_id) if hasattr(self, 'show_edit_menu') else None
+                return
+
+            elif data == 'company_icon_back':
+                self.edit_message(chat_id, message.get('message_id'), "🏷️ العودة")
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                if user_id in self.user_states:
+                    del self.user_states[user_id]
+                self.show_edit_menu(fake_msg, user_id) if hasattr(self, 'show_edit_menu') else None
+                return
+
+            # ===== إدارة الهدايا =====
+            elif data == 'wheel_gifts_menu':
+                gifts = []
+                try:
+                    with open('wheel_gifts.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        gifts = list(reader)
+                except:
+                    pass
+
+                text = "🎁 <b>إدارة الهدايا</b>\n\n"
+                if gifts:
+                    text += "━━━━━━━━━━━━━━━━━━\n"
+                    for g in gifts:
+                        status = "✅" if g.get('is_active') == 'yes' else "❌"
+                        text += f"{status} <code>{g.get('id', '')}</code> — {g.get('gift_text', '')[:40]}\n"
+                        if g.get('affiliate_link'):
+                            text += f"  🔗 {g.get('affiliate_link', '')[:50]}\n"
+                else:
+                    text += "📭 لا توجد هدايا بعد\n"
+
+                inline_btns = []
+                inline_btns.append([{'text': '➕ إضافة هدية', 'callback_data': 'wheel_gift_add'}])
+                # أزرار تبديل/حذف لكل هدية
+                for g in gifts:
+                    gid = g.get('id', '')
+                    status_btn = "⏹️ إيقاف" if g.get('is_active') == 'yes' else "▶️ تفعيل"
+                    inline_btns.append([
+                        {'text': f"{status_btn}: {g.get('gift_text', '')[:20]}", 'callback_data': f'wheel_gift_toggle_{gid}'},
+                        {'text': '🗑️', 'callback_data': f'wheel_gift_del_{gid}'},
+                    ])
+                inline_btns.append([{'text': '🔙 العودة', 'callback_data': 'wheel_admin_back'}])
+
+                self.edit_message(chat_id, message.get('message_id'), text, inline_btns) if len(text) < 4000 else self.send_inline_message(chat_id, text, inline_btns)
+                return
+
+            elif data == 'wheel_admin_back':
+                self.edit_message(chat_id, message.get('message_id'), "🎯 <b>صيد الجوائز — الإدارة</b>")
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_wheel_admin(fake_msg)
+                return
+
+            elif data == 'wheel_gift_add':
+                self.edit_message(chat_id, message.get('message_id'),
+                    "➕ <b>إضافة هدية جديدة</b>\n\n"
+                    "📝 اكتب <b>نص الهدية</b> ثم | ثم <b>رابط الإحالة</b> (أو اكتب 'بدون'):\n\n"
+                    "💡 مثال: <code>100 ريال خصم|https://example.com/register</code>\n"
+                    "💡 مثال: <code>دورة مجانية|بدون</code>")
+                self.user_states[user_id] = 'wheel_gift_add_text'
+                return
+
+            elif data.startswith('wheel_gift_toggle_'):
+                gift_id = data.replace('wheel_gift_toggle_', '')
+                try:
+                    rows = []
+                    with open('wheel_gifts.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        fieldnames = reader.fieldnames
+                        rows = list(reader)
+                    for row in rows:
+                        if row.get('id') == gift_id:
+                            row['is_active'] = 'no' if row.get('is_active') == 'yes' else 'yes'
+                    with open('wheel_gifts.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                        writer = csv.DictWriter(f, fieldnames=fieldnames)
+                        writer.writeheader()
+                        writer.writerows(rows)
+                except:
+                    pass
+                # Refresh gifts menu
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': '', 'message': {'message_id': message.get('message_id', 0)}}
+                # Simulate callback
+                gifts = []
+                try:
+                    with open('wheel_gifts.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        gifts = list(reader)
+                except:
+                    pass
+                text = "🎁 <b>إدارة الهدايا</b> — تم التحديث\n\n"
+                if gifts:
+                    for g in gifts:
+                        status = "✅" if g.get('is_active') == 'yes' else "❌"
+                        text += f"{status} {g.get('gift_text', '')[:40]}\n"
+                inline_btns = []
+                inline_btns.append([{'text': '➕ إضافة هدية', 'callback_data': 'wheel_gift_add'}])
+                for g in gifts:
+                    gid = g.get('id', '')
+                    status_btn = "⏹️ إيقاف" if g.get('is_active') == 'yes' else "▶️ تفعيل"
+                    inline_btns.append([
+                        {'text': f"{status_btn}: {g.get('gift_text', '')[:20]}", 'callback_data': f'wheel_gift_toggle_{gid}'},
+                        {'text': '🗑️', 'callback_data': f'wheel_gift_del_{gid}'},
+                    ])
+                inline_btns.append([{'text': '🔙 العودة', 'callback_data': 'wheel_admin_back'}])
+                self.edit_message(chat_id, message.get('message_id'), text, inline_btns)
+                return
+
+            elif data.startswith('wheel_gift_del_'):
+                gift_id = data.replace('wheel_gift_del_', '')
+                try:
+                    rows = []
+                    with open('wheel_gifts.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        fieldnames = reader.fieldnames
+                        rows = list(reader)
+                    rows = [r for r in rows if r.get('id') != gift_id]
+                    with open('wheel_gifts.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                        writer = csv.DictWriter(f, fieldnames=fieldnames)
+                        writer.writeheader()
+                        writer.writerows(rows)
+                except:
+                    pass
+                self.answer_callback(callback_id, "✅ تم الحذف")
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                 self.show_wheel_admin(fake_msg)
                 return
@@ -11025,9 +11816,26 @@ class ComprehensiveDUXBot:
             # ==================== 🎰 اليانصيب: موافقة/رفض الأدمن على التذاكر ====================
             elif data.startswith('lot_admin_approve_'):
                 ticket_req_id = data.replace('lot_admin_approve_', '')
-                # توليد رقم تذكرة فريد
                 import random as _r
-                ticket_number = f"{_r.randint(10000, 99999)}"
+
+                # قراءة كل أرقام التذاكر الموجودة لفحص التفرّد
+                existing_numbers = set()
+                try:
+                    with open('lottery_tickets.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        for row in reader:
+                            tn = row.get('ticket_number', '').strip()
+                            if tn:
+                                existing_numbers.add(tn)
+                except:
+                    pass
+
+                # توليد رقم تذكرة فريد (6-digit) مع فحص التفرّد
+                for _ in range(100):
+                    ticket_number = f"{_r.randint(100000, 999999)}"
+                    if ticket_number not in existing_numbers:
+                        break
+
                 # تحديث التذكرة في CSV
                 try:
                     rows = []
@@ -11059,7 +11867,7 @@ class ComprehensiveDUXBot:
                                 self.notify_user(int(row.get('user_id', 0)),
                                     f"✅ <b>تم تأكيد تذكرتك!</b>\n\n"
                                     f"🎫 رقم التذكرة: <code>#{ticket_number}</code> 👈 اضغط للنسخ\n\n"
-                                    f"حظاً موفقاً! 🍀")
+                                    f"🍀 حظاً موفقاً!")
                                 break
                 except:
                     pass
@@ -11085,22 +11893,22 @@ class ComprehensiveDUXBot:
                         writer.writerows(rows)
                 except:
                     pass
-                self.edit_message(chat_id, message.get('message_id'), f"❌ تم رفض الطلب")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0494_تم_رفض', 'ar'))
                 if target_user_id:
                     self.notify_user(int(target_user_id),
-                        "❌ <b>تم رفض طلب تذكرتك</b>\n\nيمكنك المحاولة مرة أخرى لاحقاً")
+                        self.tr('a0495_تم_رفض', 'ar'))
                 return
 
             elif data == 'lot_back_main':
                 user = self.find_user(user_id)
                 lang = user.get('language', 'ar') if user else 'ar'
-                self.edit_message(chat_id, message.get('message_id'), "🏠 العودة")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0476_العودة', lang))
                 self.send_welcome(chat_id, lang, user_id)
                 return
 
             elif data == 'lot_create':
                 self.edit_message(chat_id, message.get('message_id'),
-                    "🎰 <b>إنشاء جولة يانصيب</b>\n\n📝 اكتب <b>اسم الجولة</b>:")
+                    self.tr('a0496_إنشاء_جولة', lang))
                 self.user_states[user_id] = 'lot_name'
                 return
 
@@ -11116,10 +11924,10 @@ class ComprehensiveDUXBot:
                                 round_data = row
                                 break
                     if not round_data:
-                        self.send_message(chat_id, "❌ الجولة غير موجودة")
+                        self.send_message(chat_id, self.tr('a0488_الجولة_غير', lang))
                         return
                 except:
-                    self.send_message(chat_id, "❌ خطأ في قراءة الجولة")
+                    self.send_message(chat_id, self.tr('a0497_خطأ_في', lang))
                     return
 
                 price = round_data.get('ticket_price', '0')
@@ -11139,7 +11947,7 @@ class ComprehensiveDUXBot:
 
                 remaining = max_per - my_count
                 if remaining <= 0:
-                    self.send_message(chat_id, "⚠️ وصلت للحد الأقصى من التذاكر")
+                    self.send_message(chat_id, self.tr('a0498_وصلت_للحد', lang))
                     return
 
                 self.edit_message(chat_id, message.get('message_id'),
@@ -11153,7 +11961,7 @@ class ComprehensiveDUXBot:
                     f"1️⃣ اكتب <b>عدد التذاكر</b> التي تريد شراءها (1-{remaining}):")
 
                 kb = {'keyboard': [[{'text': '❌ إلغاء'}]], 'resize_keyboard': True, 'one_time_keyboard': True}
-                self.send_message(chat_id, f"اكتب عدد التذاكر:", kb)
+                self.send_message(chat_id, self.tr('a0499_اكتب_عدد', lang), kb)
                 self.user_states[user_id] = {'step': 'lot_count', 'round_id': round_id, 'price': price, 'currency': currency, 'max_remaining': remaining}
                 return
 
@@ -11181,7 +11989,7 @@ class ComprehensiveDUXBot:
                                     f"📤 حوّل المبلغ ثم اضغط زر التأكيد\n")
                                 # زر inline بدل كتابة "تم"
                                 self.send_inline_message(chat_id,
-                                    "✅ بعد تحويل المبلغ، اضغط الزر للتأكيد:",
+                                    self.tr('a0500_بعد_تحويل', 'ar'),
                                     [
                                         [{'text': '✅ تم التحويل', 'callback_data': f'lot_confirm_paid_{round_id}_{method_id}'}],
                                         [{'text': '❌ إلغاء', 'callback_data': 'lot_back_main'}]
@@ -11215,7 +12023,7 @@ class ComprehensiveDUXBot:
                 except:
                     pass
                 if not round_data:
-                    self.answer_callback(callback_id, "❌ الجولة غير موجودة")
+                    self.answer_callback(callback_id, self.tr('a0488_الجولة_غير', 'ar'))
                     return
 
                 price = float(round_data.get('ticket_price', 0))
@@ -11237,7 +12045,7 @@ class ComprehensiveDUXBot:
 
                 max_per = int(round_data.get('max_tickets_per_user', 1))
                 if my_count >= max_per:
-                    self.answer_callback(callback_id, "❌ وصلت للحد الأقصى")
+                    self.answer_callback(callback_id, self.tr('a0482_وصلت_للحد', 'ar'))
                     return
 
                 # إنشاء طلب تذكرة — بدون رقم تذكرة، بانتظار موافقة الأدمن
@@ -11263,12 +12071,12 @@ class ComprehensiveDUXBot:
                     f"⏳ بانتظار موافقة الإدارة على الدفع\n"
                     f"🎫 سيتم إصدار رقم تذكرتك بعد الموافقة\n\n"
                     f"🔒 <b>بياناتك محفوظة بأمان</b>")
-                self.answer_callback(callback_id, "✅ تم إرسال الطلب")
+                self.answer_callback(callback_id, self.tr('a0501_تم_إرسال', 'ar'))
 
                 # إرسال لوحة المفاتيح الرئيسية لتحل محل "❌ إلغاء"
                 lang = user_obj.get('language', 'ar')
                 self.send_message(chat_id,
-                    f"✅ تم تسجيل طلبك!\n\nيمكنك المتابعة من القائمة الرئيسية أو الانتظار حتى يصلك إشعار بالموافقة.",
+                    self.tr('a0502_تم_تسجيل', lang),
                     self.main_keyboard(lang, user_id))
 
                 # إشعار الأدمن — بأزرار موافقة/رفض
@@ -11349,8 +12157,8 @@ class ComprehensiveDUXBot:
                 round_id = data.replace('lot_cancel_', '')
                 if not confirm_action_str:
                     self.edit_message(chat_id, message.get('message_id'),
-                        f"⚠️ <b>تأكيد إلغاء الجولة؟</b>\n\nسيتم إشعار جميع المشاركين.")
-                    self.send_inline_message(chat_id, "تأكيد الإلغاء:", [
+                        self.tr('a0503_تأكيد_إلغاء', 'ar'))
+                    self.send_inline_message(chat_id, self.tr('a0504_تأكيد_الإلغاء', 'ar'), [
                         [{'text': '✅ نعم، ألغِ', 'callback_data': f'lot_cancel_confirm_{round_id}'},
                          {'text': '❌ تراجع', 'callback_data': 'lot_admin_back'}]
                     ])
@@ -11380,11 +12188,11 @@ class ComprehensiveDUXBot:
                             for t in reader:
                                 if t.get('round_id') == round_id and t.get('user_id') not in notified:
                                     self.send_message(int(t.get('user_id', 0)),
-                                        f"❌ <b>تم إلغاء جولة اليانصيب</b>\n\nنعتذر عن الإلغاء. سيتم إرجاع المبالغ.")
+                                        self.tr('a0505_تم_إلغاء', 'ar'))
                                     notified.add(t.get('user_id'))
                     except:
                         pass
-                    toast_msg = "تم إلغاء الجولة"
+                    toast_msg = self.tr('a0506_تم_إلغاء', 'ar')
                     fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                     self.show_lottery_admin(fake_msg)
                     return
@@ -11403,7 +12211,7 @@ class ComprehensiveDUXBot:
                 except:
                     pass
                 if not round_data:
-                    self.edit_message(chat_id, message.get('message_id'), "❌ الجولة غير موجودة")
+                    self.edit_message(chat_id, message.get('message_id'), self.tr('a0488_الجولة_غير', 'ar'))
                     return
                 text = (
                     f"✏️ <b>تعديل الجولة</b>\n\n"
@@ -11425,34 +12233,34 @@ class ComprehensiveDUXBot:
                     [{'text': '🔙 رجوع', 'callback_data': 'lot_admin_back'}]
                 ]
                 self.edit_message(chat_id, message.get('message_id'), text)
-                self.send_inline_message(chat_id, "تعديل:", inline_btns)
+                self.send_inline_message(chat_id, self.tr('a0507_تعديل', 'ar'), inline_btns)
                 return
 
             # تعديل اسم الجولة
             elif data.startswith('lot_edit_name_'):
                 round_id = data.replace('lot_edit_name_', '')
-                self.edit_message(chat_id, message.get('message_id'), "✏️ اكتب الاسم الجديد:")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0458_اكتب_الاسم', 'ar'))
                 self.user_states[user_id] = f'lot_edit_name_input_{round_id}'
                 return
 
             # تعديل سعر التذكرة
             elif data.startswith('lot_edit_price_'):
                 round_id = data.replace('lot_edit_price_', '')
-                self.edit_message(chat_id, message.get('message_id'), "✏️ اكتب السعر الجديد:")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0508_اكتب_السعر', 'ar'))
                 self.user_states[user_id] = f'lot_edit_price_input_{round_id}'
                 return
 
             # تعديل عدد الفائزين
             elif data.startswith('lot_edit_winners_'):
                 round_id = data.replace('lot_edit_winners_', '')
-                self.edit_message(chat_id, message.get('message_id'), "✏️ اكتب عدد الفائزين الجديد (1-10):")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0509_اكتب_عدد', 'ar'))
                 self.user_states[user_id] = f'lot_edit_winners_input_{round_id}'
                 return
 
             # تعديل وقت السحب
             elif data.startswith('lot_edit_drawtime_'):
                 round_id = data.replace('lot_edit_drawtime_', '')
-                self.edit_message(chat_id, message.get('message_id'), "✏️ اكتب وقت السحب الجديد:\n\nمثال: 2026-08-15 20:00")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0510_اكتب_وقت', 'ar'))
                 self.user_states[user_id] = f'lot_edit_drawtime_input_{round_id}'
                 return
 
@@ -11491,7 +12299,7 @@ class ComprehensiveDUXBot:
             elif data == 'ref_back_main':
                 user = self.find_user(user_id)
                 lang = user.get('language', 'ar') if user else 'ar'
-                self.edit_message(chat_id, message.get('message_id'), "🏠 العودة")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0476_العودة', lang))
                 welcome = self.tr('choose_service', lang, name=user.get('name', ''), customer_id=user.get('customer_id', '')) if user else ''
                 self.send_message(chat_id, welcome, self.main_keyboard(lang, user_id))
                 return
@@ -11543,12 +12351,12 @@ class ComprehensiveDUXBot:
                             f"🟢 الرصيد المتاح الآن: <code>{available:.2f}</code>\n"
                             f"💰 يمكنك الآن السحب")
                     else:
-                        self.edit_message(chat_id, message.get('message_id'), "❌ فشل في تحرير الرصيد")
+                        self.edit_message(chat_id, message.get('message_id'), self.tr('a0511_فشل_في', lang))
                 return
 
             elif data == 'ref_admin_add':
                 self.edit_message(chat_id, message.get('message_id'),
-                    "➕ <b>إضافة رابط إحالة</b>\n\n📝 اكتب <b>اسم الزر</b>:")
+                    self.tr('a0512_إضافة_رابط', lang))
                 self.user_states[user_id] = 'ref_link_name'
                 return
 
@@ -11568,7 +12376,7 @@ class ComprehensiveDUXBot:
                         writer.writerows(rows)
                 except:
                     pass
-                self.edit_message(chat_id, message.get('message_id'), f"✅ تم حذف الرابط")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0513_تم_حذف', lang))
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                 self.show_referral_links_admin(fake_msg)
                 return
@@ -11590,7 +12398,7 @@ class ComprehensiveDUXBot:
                         writer.writerows(rows)
                 except:
                     pass
-                self.edit_message(chat_id, message.get('message_id'), "✅ تم التبديل")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0514_تم_التبديل', 'ar'))
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                 self.show_referral_links_admin(fake_msg)
                 return
@@ -11616,7 +12424,7 @@ class ComprehensiveDUXBot:
                         "🪙 <b>بيع USDT</b>\n\n"
                         "⚠️ <b>اختر الشبكة بعناية!</b>\n\n"
                         "اختر الشبكة:")
-                    self.send_inline_message(chat_id, "الشبكات:",
+                    self.send_inline_message(chat_id, self.tr('a0515_الشبكات', 'ar'),
                         [[{'text': '🔗 TRC20', 'callback_data': 'trade_sell_network_TRC20'},
                           {'text': '🔗 ERC20', 'callback_data': 'trade_sell_network_ERC20'}],
                          [{'text': '🔗 BNB20', 'callback_data': 'trade_sell_network_BNB20'}],
@@ -11644,7 +12452,7 @@ class ComprehensiveDUXBot:
                         "⚠️ <b>اختر الشبكة بعناية!</b>\n"
                         "💡 يجب إنشاء العنوان بنفس الشبكة المختارة.\n\n"
                         "اختر الشبكة:")
-                    self.send_inline_message(chat_id, "الشبكات:",
+                    self.send_inline_message(chat_id, self.tr('a0515_الشبكات', 'ar'),
                         [[{'text': '🔗 TRC20', 'callback_data': 'trade_network_TRC20'},
                           {'text': '🔗 ERC20', 'callback_data': 'trade_network_ERC20'}],
                          [{'text': '🔗 BNB20', 'callback_data': 'trade_network_BNB20'}],
@@ -11677,9 +12485,9 @@ class ComprehensiveDUXBot:
                     self.edit_message(chat_id, message.get('message_id'), "💰")
                     order_type = state.get('order_type', 'buy')
                     if order_type == 'sell':
-                        self.send_message(chat_id, "💰 اكتب <b>كمية USDT</b> التي تريد بيعها:")
+                        self.send_message(chat_id, self.tr('a0516_اكتب_كمية', 'ar'))
                     else:
-                        self.send_message(chat_id, "💰 اكتب <b>المبلغ</b> الذي تريد الشراء به:")
+                        self.send_message(chat_id, self.tr('a0517_اكتب_المبلغ', 'ar'))
                 return
 
             # شراء — تأكيد الطلب
@@ -11696,7 +12504,7 @@ class ComprehensiveDUXBot:
                         state.get('currency', 'SAR'))
                     if order_id:
                         del self.user_states[user_id]
-                        action_label = 'الشراء' if order_type == 'buy' else 'البيع'
+                        action_label = self.tr('a0518_الشراء', 'ar') if order_type == 'buy' else self.tr('a0519_البيع', 'ar')
                         self.edit_message(chat_id, message.get('message_id'),
                             f"✅ <b>تم إنشاء طلب {action_label}!</b>\n\n"
                             f"🆔 رقم الطلب: <code>{order_id}</code> 👈 اضغط للنسخ\n"
@@ -11721,7 +12529,7 @@ class ComprehensiveDUXBot:
             elif data == 'trade_buy_cancel':
                 if user_id in self.user_states:
                     del self.user_states[user_id]
-                self.edit_message(chat_id, message.get('message_id'), "❌ تم الإلغاء")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0224_تم_الإلغاء', 'ar'))
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                 self.show_trade_panel(fake_msg)
                 return
@@ -11735,7 +12543,7 @@ class ComprehensiveDUXBot:
                     self.user_states[user_id] = state
 
                     order_type = state.get('order_type', 'buy')
-                    action_label = 'الشراء' if order_type == 'buy' else 'البيع'
+                    action_label = self.tr('a0518_الشراء', 'ar') if order_type == 'buy' else self.tr('a0519_البيع', 'ar')
                     asset = '🪙 USDT' if state.get('asset_type') == 'usdt' else '💎 MoneyGo'
                     summary = (
                         f"📦 <b>مراجعة طلب {action_label}</b>\n\n"
@@ -11743,14 +12551,14 @@ class ComprehensiveDUXBot:
                         f"{asset}\n"
                     )
                     if state.get('network'):
-                        summary += f"🔗 الشبكة: <code>{state['network']}</code>\n"
+                        summary += self.tr('a0520_الشبكة', 'ar', state_network=state['network'])
                     summary += f"📍 العنوان: <code>{state.get('account_address', '')}</code> 👈 اضغط للنسخ\n"
                     summary += f"💳 وسيلة الدفع: <code>{state.get('payment_method', '')}</code>\n"
                     summary += f"💰 المبلغ: <code>{state.get('amount', '')}</code> {currency}\n"
                     summary += f"━━━━━━━━━━━━━━━━━━\n\n"
-                    summary += f"هل تريد تأكيد الطلب؟"
+                    summary += self.tr('a0521_هل_تريد', 'ar')
                     self.edit_message(chat_id, message.get('message_id'), summary)
-                    self.send_inline_message(chat_id, "تأكيد:", [
+                    self.send_inline_message(chat_id, self.tr('a0522_تأكيد', 'ar'), [
                         [{'text': '✅ تأكيد', 'callback_data': 'trade_buy_confirm'},
                          {'text': '❌ إلغاء', 'callback_data': 'trade_buy_cancel'}]
                     ])
@@ -11769,7 +12577,7 @@ class ComprehensiveDUXBot:
                 for admin_id in self.admin_ids:
                     try:
                         self.send_message(int(admin_id),
-                            f"✅ <b>تم إغلاق صفقة</b>\n\n🆔 <code>{order_id}</code>\nالعميل أكد الاستلام")
+                            self.tr('a0523_تم_إغلاق', 'ar', order_id=order_id))
                     except:
                         pass
                 return
@@ -11809,9 +12617,9 @@ class ComprehensiveDUXBot:
                                     f"📅 {row.get('date', '')}\n"
                                 )
                                 if row.get('exchange_address'):
-                                    text += f"📍 <code>{row['exchange_address']}</code> 👈 اضغط للنسخ\n"
+                                    text += self.tr('a0524_اضغط_للنسخ', 'ar', row_exchange_address=row['exchange_address'])
                                 if row.get('admin_note') and row['status'] == 'pending_code_verification':
-                                    text += f"🔐 الكود: <code>{row['admin_note']}</code> 👈 اضغط للنسخ\n"
+                                    text += self.tr('a0525_الكود_اضغط', 'ar', row_admin_note=row['admin_note'])
 
                                 inline_btns = []
                                 if row['status'] == 'pending':
@@ -11827,11 +12635,11 @@ class ComprehensiveDUXBot:
                                 inline_btns.append([{'text': '🔙 القائمة', 'callback_data': 'uni_refresh'}])
                                 self.edit_message(chat_id, message.get('message_id'), text)
                                 if inline_btns:
-                                    self.send_inline_message(chat_id, "اختر:", inline_btns)
+                                    self.send_inline_message(chat_id, self.tr('a0451_اختر', 'ar'), inline_btns)
                                 return
                 except:
                     pass
-                self.send_message(chat_id, "❌ المعاملة غير موجودة")
+                self.send_message(chat_id, self.tr('a0526_المعاملة_غير', 'ar'))
                 return
 
             elif data == 'trade_admin_refresh':
@@ -11851,7 +12659,7 @@ class ComprehensiveDUXBot:
                 order_id = data.replace('trade_admin_view_', '')
                 order = self.get_trade_order(order_id)
                 if not order:
-                    self.send_message(chat_id, "❌ الطلب غير موجود")
+                    self.send_message(chat_id, self.tr('a0527_الطلب_غير', 'ar'))
                     return
                 status = order.get('status', 'pending')
                 text = (
@@ -11863,7 +12671,7 @@ class ComprehensiveDUXBot:
                     f"{'🪙 USDT' if order.get('asset_type') == 'usdt' else '💎 MoneyGo'}\n"
                 )
                 if order.get('network'):
-                    text += f"🔗 الشبكة: <code>{order['network']}</code>\n"
+                    text += self.tr('a0528_الشبكة', 'ar', order_network=order['network'])
                 text += f"📍 العنوان: <code>{order.get('account_address', '')}</code> 👈 اضغط للنسخ\n"
                 text += f"💳 وسيلة الدفع: <code>{order.get('payment_method', '')}</code>\n"
                 text += f"💰 المبلغ: <code>{order.get('amount', '')}</code> {order.get('currency', '')}\n"
@@ -11871,7 +12679,7 @@ class ComprehensiveDUXBot:
                     text += f"🪙 USDT للمشتري: <code>{order.get('usdt_amount', '')}</code>\n"
                 if order.get('admin_payment_method'):
                     text += f"🏦 وسيلة دفع الأدمن: <code>{order.get('admin_payment_method', '')}</code>\n"
-                text += f"📊 الحالة: <b>{status}</b>\n"
+                text += self.tr('a0529_الحالة', 'ar', status=status)
                 text += f"📅 {order.get('created_at', '')}\n"
                 text += f"━━━━━━━━━━━━━━━━━━\n\n"
 
@@ -11882,7 +12690,7 @@ class ComprehensiveDUXBot:
                         {'text': '❌ رفض', 'callback_data': f'trade_admin_reject_{order_id}'}
                     ])
                 elif status == 'admin_accepted':
-                    text += "📝 اكتب وسيلة الدفع للاستلام + عدد الدولارات USDT:"
+                    text += self.tr('a0530_اكتب_وسيلة', 'ar')
                     self.user_states[user_id] = {'step': 'trade_admin_rate', 'order_id': order_id}
                 elif status == 'buyer_sends_screenshot':
                     if order.get('screenshot_payment'):
@@ -11901,7 +12709,7 @@ class ComprehensiveDUXBot:
                             {'text': '❌ رفض', 'callback_data': f'trade_admin_reject_{order_id}'}
                         ])
                 elif status == 'admin_confirms_payment':
-                    text += "📤 حوّل USDT إلى العميل وأرسل لقطة شاشة:"
+                    text += self.tr('a0531_حوّل_إلى', 'ar')
                     self.user_states[user_id] = {'step': 'trade_admin_transfer', 'order_id': order_id}
                 elif status == 'admin_sends_screenshot':
                     if order.get('screenshot_transfer'):
@@ -11910,7 +12718,7 @@ class ComprehensiveDUXBot:
                 inline_btns.append([{'text': '🔙 القائمة', 'callback_data': 'uni_refresh'}])
                 self.edit_message(chat_id, message.get('message_id'), text)
                 if inline_btns:
-                    self.send_inline_message(chat_id, "اختر:", inline_btns)
+                    self.send_inline_message(chat_id, self.tr('a0451_اختر', 'ar'), inline_btns)
                 return
 
             elif data.startswith('trade_admin_accept_'):
@@ -11927,18 +12735,18 @@ class ComprehensiveDUXBot:
             elif data.startswith('trade_admin_reject_'):
                 order_id = data.replace('trade_admin_reject_', '')
                 self.update_trade_order(order_id, status='rejected')
-                self.edit_message(chat_id, message.get('message_id'), f"❌ تم رفض الطلب <code>{order_id}</code>")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0532_تم_رفض', 'ar', order_id=order_id))
                 order = self.get_trade_order(order_id)
                 if order:
                     self.notify_user(int(order.get('buyer_id', 0)),
-                        f"❌ <b>تم رفض طلب التداول</b>\n\n🆔 <code>{order_id}</code>")
+                        self.tr('a0533_تم_رفض', 'ar', order_id=order_id))
                 return
 
             elif data.startswith('trade_admin_confirm_pay_'):
                 order_id = data.replace('trade_admin_confirm_pay_', '')
                 self.update_trade_order(order_id, status='admin_confirms_payment')
                 self.edit_message(chat_id, message.get('message_id'),
-                    f"✅ تأكد الدفع\n\n📤 حوّل USDT إلى العميل وأرسل لقطة شاشة:")
+                    self.tr('a0534_تأكد_الدفع', 'ar'))
                 self.user_states[user_id] = {'step': 'trade_admin_transfer', 'order_id': order_id}
                 return
 
@@ -11968,7 +12776,7 @@ class ComprehensiveDUXBot:
                         except:
                             pass
                 self.edit_message(chat_id, message.get('message_id'),
-                    f"✅ تم إرسال لقطة الشاشة للعميل\n\n🆔 <code>{order_id}</code>\n⏳ بانتظار تأكيد العميل")
+                    self.tr('a0535_تم_إرسال', 'ar', order_id=order_id))
                 return
 
             # ==================== 💎 تعويض 100% — أزرار inline ====================
@@ -11976,7 +12784,7 @@ class ComprehensiveDUXBot:
             elif data == 'svrp_main_menu':
                 user = self.find_user(user_id)
                 lang = user.get('language', 'ar') if user else 'ar'
-                self.edit_message(chat_id, message.get('message_id'), "🏠 العودة للقائمة الرئيسية")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0536_العودة_للقائمة', lang))
                 welcome = self.tr('choose_service', lang, name=user.get('name', ''), customer_id=user.get('customer_id', '')) if user else ''
                 self.send_message(chat_id, welcome, self.main_keyboard(lang, user_id))
                 return
@@ -11994,7 +12802,7 @@ class ComprehensiveDUXBot:
                         [{'text': '📝 تسجيل حساب جديد', 'callback_data': 'svrp_companies'}],
                         [{'text': '🔙 رجوع', 'callback_data': 'svrp_back_panel'}]
                     ]
-                    self.send_inline_message(chat_id, "اضغط للتسجيل:", inline_btns)
+                    self.send_inline_message(chat_id, self.tr('a0537_اضغط_للتسجيل', lang), inline_btns)
                     return
 
                 # عرض الشركات التي سجّل فيها العميل فقط
@@ -12015,7 +12823,7 @@ class ComprehensiveDUXBot:
                 inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'svrp_back_panel'}])
 
                 self.edit_message(chat_id, message.get('message_id'), text)
-                self.send_inline_message(chat_id, "اختر الشركة:", inline_btns)
+                self.send_inline_message(chat_id, self.tr('a0538_اختر_الشركة', lang), inline_btns)
                 return
 
             elif data.startswith('svrp_dep_amt_'):
@@ -12050,11 +12858,11 @@ class ComprehensiveDUXBot:
                         [{'text': '📝 تسجيل حساب جديد', 'callback_data': 'svrp_companies'}],
                         [{'text': '🔙 رجوع', 'callback_data': 'svrp_back_panel'}]
                     ]
-                    self.send_inline_message(chat_id, "اضغط للتسجيل:", inline_btns)
+                    self.send_inline_message(chat_id, self.tr('a0537_اضغط_للتسجيل', lang), inline_btns)
                     return
 
                 # عرض الشركات المسجّل فيها للسحب
-                text = "💸 <b>السحب</b>\n\nاختر الشركة للسحب منها:"
+                text = self.tr('a0539_السحب_اختر', lang)
                 inline_btns = []
                 for acc in accounts:
                     inline_btns.append([{
@@ -12064,25 +12872,25 @@ class ComprehensiveDUXBot:
                 inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'svrp_back_panel'}])
 
                 self.edit_message(chat_id, message.get('message_id'), text)
-                self.send_inline_message(chat_id, "اختر الشركة:", inline_btns)
+                self.send_inline_message(chat_id, self.tr('a0538_اختر_الشركة', 'ar'), inline_btns)
                 return
 
             elif data == 'profile_back_main':
                 user = self.find_user(user_id)
                 lang = user.get('language', 'ar') if user else 'ar'
-                self.edit_message(chat_id, message.get('message_id'), "🔙 العودة")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0142_العودة', lang))
                 welcome = self.tr('choose_service', lang, name=user.get('name', ''), customer_id=user.get('customer_id', '')) if user else ''
                 self.send_message(chat_id, welcome, self.main_keyboard(lang, user_id))
                 return
 
             elif data == 'svrp_wallet':
-                self.edit_message(chat_id, message.get('message_id'), "💎 محفظتي")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0237_محفظتي', lang))
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                 self.show_svrp_wallet(fake_msg)
                 return
 
             elif data == 'svrp_invite':
-                self.edit_message(chat_id, message.get('message_id'), "👥 دعوة صديق")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0540_دعوة_صديق', lang))
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                 self.show_referral_panel(fake_msg)
                 return
@@ -12091,30 +12899,30 @@ class ComprehensiveDUXBot:
                 # عرض شركات الاسترداد للتسجيل
                 companies = self.svrp.get_recovery_companies()
                 if not companies:
-                    self.edit_message(chat_id, message.get('message_id'), "📭 لا توجد شركات متاحة حالياً")
+                    self.edit_message(chat_id, message.get('message_id'), self.tr('a0541_لا_توجد', lang))
                     return
 
                 accounts = self.svrp.get_user_company_accounts(user_id)
                 registered_ids = {a['company_id'] for a in accounts}
 
-                text = "🏢 <b>شركات الاسترداد</b>\n\n"
+                text = self.tr('a0542_شركات_الاسترداد', lang)
 
                 if accounts:
-                    text += "✅ <b>حساباتك المسجلة:</b>\n"
+                    text += self.tr('a0543_حساباتك_المسجلة', lang)
                     for a in accounts:
                         text += f"  • {a.get('company_name', '')} — <code>{a.get('account_number', '')}</code>\n"
                     text += "\n"
 
                 unregistered = [c for c in companies if c['id'] not in registered_ids]
                 if unregistered:
-                    text += "📝 <b>شركات متاحة للتسجيل:</b>\n"
+                    text += self.tr('a0544_شركات_متاحة', lang)
                     for c in unregistered:
                         text += f"  • <b>{c['name']}</b>\n"
                         if c.get('registration_url', '').strip():
-                            text += f"    🔗 <a href=\"{c['registration_url']}\">رابط التسجيل</a>\n"
+                            text += self.tr('a0545_رابط_التسجيل', lang, c_registration_url=c['registration_url'])
                     text += "\n"
                 else:
-                    text += "✅ تم تسجيل حسابك في جميع الشركات المتاحة!\n\n"
+                    text += self.tr('a0546_تم_تسجيل', lang)
 
                 inline_btns = []
                 for c in unregistered:
@@ -12126,7 +12934,7 @@ class ComprehensiveDUXBot:
 
                 inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'svrp_back_panel'}])
                 self.edit_message(chat_id, message.get('message_id'), text)
-                self.send_inline_message(chat_id, "اختر شركة:", inline_btns)
+                self.send_inline_message(chat_id, self.tr('a0547_اختر_شركة', lang), inline_btns)
                 return
 
             elif data.startswith('svrp_reg_'):
@@ -12139,7 +12947,7 @@ class ComprehensiveDUXBot:
                         company = c
                         break
                 if not company:
-                    self.send_message(chat_id, "❌ الشركة غير موجودة")
+                    self.send_message(chat_id, self.tr('a0548_الشركة_غير', lang))
                     return
 
                 # فحص إذا كان لديه حساب بالفعل
@@ -12151,19 +12959,19 @@ class ComprehensiveDUXBot:
                         f"لتغييره، تواصل مع الإدارة.")
                     return
 
-                msg = f"📝 <b>تسجيل حساب في {company['name']}</b>\n\n"
+                msg = self.tr('a0549_تسجيل_حساب', 'ar', company_name=company['name'])
                 affiliate_link = company.get('affiliate_link', '').strip()
                 if affiliate_link:
-                    msg += f"🔗 اضغط الزر بالأسفل للتسجيل في الشركة\n"
-                    msg += f"بعد التسجيل، اكتب رقم حسابك:\n"
+                    msg += self.tr('a0550_اضغط_الزر', 'ar')
+                    msg += self.tr('a0551_بعد_التسجيل،', 'ar')
                     inline_btns = [
                         [{'text': '🔗 التسجيل في الشركة', 'url': affiliate_link}],
                         [{'text': '🔙 رجوع', 'callback_data': 'svrp_companies'}]
                     ]
                     self.edit_message(chat_id, message.get('message_id'), msg)
-                    self.send_inline_message(chat_id, "اضغط للتسجيل ثم اكتب رقم حسابك:", inline_btns)
+                    self.send_inline_message(chat_id, self.tr('a0552_اضغط_للتسجيل', 'ar'), inline_btns)
                 else:
-                    msg += "اكتب رقم حسابك في هذه الشركة:"
+                    msg += self.tr('a0553_اكتب_رقم', 'ar')
                     self.edit_message(chat_id, message.get('message_id'), msg)
                 self.user_states[user_id] = f'svrp_enter_account_{company_id}_{company["name"]}'
                 return
@@ -12185,7 +12993,7 @@ class ComprehensiveDUXBot:
                 account = self.svrp.get_user_company_account(user_id, company_id)
 
                 if not account:
-                    self.send_message(chat_id, "❌ يجب تسجيل رقم حسابك أولاً")
+                    self.send_message(chat_id, self.tr('a0554_يجب_تسجيل', 'ar'))
                     return
 
                 # فحص: العميل يجب أن يكون لديه إيداع مرفوض (خسارة) أولاً
@@ -12206,20 +13014,20 @@ class ComprehensiveDUXBot:
                     # فحص هل سجل حساب
                     has_account = account is not None
                     inline_btns = []
-                    msg = "⚠️ <b>لا يمكن المطالبة بالمكافأة بعد</b>\n\n📋 <b>الشروط:</b>\n\n"
+                    msg = self.tr('a0555_لا_يمكن', 'ar')
 
                     if has_account:
-                        msg += "1️⃣ تسجيل حسابك في الشركة ✅\n"
+                        msg += self.tr('a0556_تسجيل_حسابك', 'ar')
                     else:
-                        msg += "1️⃣ تسجيل حسابك في الشركة ❌\n"
+                        msg += self.tr('a0557_تسجيل_حسابك', 'ar')
                         inline_btns.append([{'text': '🏢 تسجيل حساب', 'callback_data': 'svrp_companies'}])
 
-                    msg += "2️⃣ عمل إيداع وخسارته ❌\n\n"
-                    msg += "💡 أكمل الخطوات أولاً ثم اطلب المكافأة."
+                    msg += self.tr('a0558_عمل_إيداع', 'ar')
+                    msg += self.tr('a0559_أكمل_الخطوات', 'ar')
                     inline_btns.append([{'text': '💰 إيداع', 'callback_data': 'svrp_deposit'}])
                     inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'svrp_back_panel'}])
                     self.edit_message(chat_id, message.get('message_id'), msg)
-                    self.send_inline_message(chat_id, "اختر:", inline_btns)
+                    self.send_inline_message(chat_id, self.tr('a0451_اختر', 'ar'), inline_btns)
                     return
 
                 req_id, err = self.svrp.create_bonus_request(
@@ -12259,7 +13067,7 @@ class ComprehensiveDUXBot:
                 # الأدمن يكتب مبلغ المكافأة
                 req_id = data.replace('svrp_bonus_approve_', '')
                 self.edit_message(chat_id, message.get('message_id'),
-                    f"✅ اكتب مبلغ المكافأة لطلب <code>{req_id}</code>:")
+                    self.tr('a0560_اكتب_مبلغ', 'ar', req_id=req_id))
                 self.user_states[user_id] = f'svrp_bonus_amount_{req_id}'
                 return
 
@@ -12300,7 +13108,7 @@ class ComprehensiveDUXBot:
                 if not req_id:
                     req_id = ''
                 self.send_message(chat_id,
-                    "✅ اكتب مبلغ الاسترداد الذي تريد إضافته للمستخدم:")
+                    self.tr('a0561_اكتب_مبلغ', lang))
                 self.user_states[user_id] = f'svrp_recovery_amount_{req_id}'
                 return
 
@@ -12308,11 +13116,11 @@ class ComprehensiveDUXBot:
                 req_id = data.replace('svrp_recovery_reject_', '') if data.startswith('svrp_recovery_reject_') else ''
                 if self.svrp:
                     self.svrp.reject_recovery_request(req_id, user_id)
-                self.edit_message(chat_id, message.get('message_id'), "❌ تم رفض طلب الاسترداد")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0562_تم_رفض', lang))
                 # إشعار المستخدم
                 req = self.svrp.get_recovery_request(req_id) if self.svrp else None
                 if req:
-                    self.notify_user(int(req['user_id']), "❌ تم رفض طلب الاسترداد الخاص بك", 'recovery_rejected')
+                    self.notify_user(int(req['user_id']), self.tr('a0563_تم_رفض', lang), 'recovery_rejected')
                 return
 
             # ==================== 💰 إيداع/سحب: أزرار inline ====================
@@ -12321,7 +13129,7 @@ class ComprehensiveDUXBot:
             elif data == 'dep_cancel' or data == 'wd_cancel':
                 user = self.find_user(user_id)
                 lang = user.get('language', 'ar') if user else 'ar'
-                self.edit_message(chat_id, message.get('message_id'), "❌ تم الإلغاء")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0224_تم_الإلغاء', lang))
                 welcome = self.tr('choose_service', lang, name=user.get('name', ''), customer_id=user.get('customer_id', '')) if user else ''
                 self.send_message(chat_id, welcome, self.main_keyboard(lang, user_id))
                 return
@@ -12335,7 +13143,7 @@ class ComprehensiveDUXBot:
                         company = c
                         break
                 if not company:
-                    self.edit_message(chat_id, message.get('message_id'), "❌ الشركة غير موجودة")
+                    self.edit_message(chat_id, message.get('message_id'), self.tr('a0548_الشركة_غير', lang))
                     return
 
                 icon = company.get('icon', '🏢') or '🏢'
@@ -12345,7 +13153,7 @@ class ComprehensiveDUXBot:
                 # عرض وسائل الدفع كأزرار inline
                 methods = self.get_payment_methods_by_company(company_id, 'deposit')
                 if not methods:
-                    self.send_message(chat_id, "❌ لا توجد وسائل دفع لهذه الشركة")
+                    self.send_message(chat_id, self.tr('a0564_لا_توجد', lang))
                     return
 
                 inline_btns = []
@@ -12356,21 +13164,21 @@ class ComprehensiveDUXBot:
                         btn += f" — {m['method_type']}"
                     inline_btns.append([{'text': btn, 'callback_data': f'dep_method_{m["id"]}_{company_id}_{company["name"]}'}])
                 inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'dep_back_companies'}])
-                self.send_inline_message(chat_id, "💳 <b>وسائل الدفع المتاحة</b>", inline_btns)
+                self.send_inline_message(chat_id, self.tr('a0565_وسائل_الدفع', lang), inline_btns)
                 return
 
             # الرجوع لقائمة الشركات (إيداع)
             elif data == 'dep_back_companies':
                 user = self.find_user(user_id)
                 lang = user.get('language', 'ar') if user else 'ar'
-                self.edit_message(chat_id, message.get('message_id'), "💰 <b>طلب إيداع</b>\n\nاختر الشركة:")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0139_طلب_إيداع', lang))
                 companies = self.get_companies('deposit')
                 inline_btns = []
                 for c in companies:
                     icon = c.get('icon', '🏢') or '🏢'
                     inline_btns.append([{'text': f"{icon} {c['name']}", 'callback_data': f'dep_company_{c["id"]}'}])
                 inline_btns.append([{'text': self.tr('main_menu', lang), 'callback_data': 'dep_cancel'}])
-                self.send_inline_message(chat_id, "💰 <b>طلب إيداع</b>", inline_btns)
+                self.send_inline_message(chat_id, self.tr('a0566_طلب_إيداع', lang), inline_btns)
                 return
 
             # اختيار وسيلة دفع للإيداع
@@ -12397,17 +13205,17 @@ class ComprehensiveDUXBot:
                     f"{method_icon} الوسيلة: <b>{method_name}</b>\n"
                 )
                 if method_type:
-                    method_text += f"📋 النوع: {method_type}\n"
+                    method_text += self.tr('a0567_النوع', lang, method_type=method_type)
                 if account_data:
-                    method_text += f"🔢 <b>رقم الحساب / المحفظة للتحويل:</b>\n<code>{account_data}</code> 👈 اضغط للنسخ\n\n"
+                    method_text += self.tr('a0568_رقم_الحساب', lang, account_data=account_data)
                 if additional_info:
                     method_text += f"💡 {additional_info}\n"
                 method_text += f"━━━━━━━━━━━━━━━━━━\n\n"
-                method_text += f"📤 <b>حوّل المال إلى الرقم أعلاه</b>\n"
-                method_text += f"ثم أرسل بياناتك في رسالة واحدة:\n\n"
-                method_text += f"1️⃣ رقم محفظتك التي أرسلت منها\n"
-                method_text += f"2️⃣ معرف حسابك في التطبيق\n\n"
-                method_text += f"💡 مثال:\n<code>0501234567\nID-789</code>"
+                method_text += self.tr('a0569_حوّل_المال', lang)
+                method_text += self.tr('a0570_ثم_أرسل', lang)
+                method_text += self.tr('a0571_رقم_محفظتك', lang)
+                method_text += self.tr('a0572_معرف_حسابك', lang)
+                method_text += self.tr('a0573_مثال', lang)
 
                 # فحص هل لوسيلة الدفع خطوات مخصصة للإيداع
                 if self.has_custom_steps(method_id, 'deposit'):
@@ -12421,7 +13229,7 @@ class ComprehensiveDUXBot:
                 user = self.find_user(user_id)
                 lang = user.get('language', 'ar') if user else 'ar'
                 kb = {'keyboard': [[{'text': '❌ إلغاء'}, {'text': self.tr('main_menu', lang)}]], 'resize_keyboard': True, 'one_time_keyboard': True}
-                self.send_message(chat_id, "📝 أرسل رقم محفظتك + معرف حسابك:", kb)
+                self.send_message(chat_id, self.tr('a0574_أرسل_رقم', lang), kb)
                 self.user_states[user_id] = f'deposit_wallet_{company_id}_{company_name}_{method_id}'
                 return
 
@@ -12434,7 +13242,7 @@ class ComprehensiveDUXBot:
                         company = c
                         break
                 if not company:
-                    self.edit_message(chat_id, message.get('message_id'), "❌ الشركة غير موجودة")
+                    self.edit_message(chat_id, message.get('message_id'), self.tr('a0548_الشركة_غير', lang))
                     return
 
                 icon = company.get('icon', '🏢') or '🏢'
@@ -12442,15 +13250,15 @@ class ComprehensiveDUXBot:
 
                 text = f"{icon} <b>{company['name']}</b>\n📋 {company.get('details', '')}\n"
                 if address:
-                    text += f"📍 <b>عنوان السحب:</b>\n<code>{address}</code>\n"
-                text += f"👈 اضغط للنسخ\n\n"
+                    text += self.tr('a0575_عنوان_السحب', lang, address=address)
+                text += self.tr('a0576_اضغط_للنسخ', lang)
 
                 self.edit_message(chat_id, message.get('message_id'), text)
 
                 user = self.find_user(user_id)
                 lang = user.get('language', 'ar') if user else 'ar'
                 kb = {'keyboard': [[{'text': '❌ إلغاء'}, {'text': self.tr('main_menu', lang)}]], 'resize_keyboard': True, 'one_time_keyboard': True}
-                self.send_message(chat_id, "1️⃣ اكتب <b>المبلغ</b> الذي تريد سحبه:", kb)
+                self.send_message(chat_id, self.tr('a0577_اكتب_المبلغ', lang), kb)
                 # فحص هل للشركة وسائل دفع مرتبطة بخطوات مخصصة للسحب
                 methods = self.get_payment_methods_by_company(company_id, 'withdraw')
                 has_custom = False
@@ -12465,7 +13273,7 @@ class ComprehensiveDUXBot:
                         icon = m.get('icon', '💳') or '💳'
                         inline_btns.append([{'text': f"{icon} {m['method_name']}", 'callback_data': f'wd_method_{m["id"]}_{company_id}_{company["name"]}'}])
                     inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'wd_cancel'}])
-                    self.send_inline_message(chat_id, "💳 اختر وسيلة الدفع:", inline_btns)
+                    self.send_inline_message(chat_id, self.tr('a0578_اختر_وسيلة', lang), inline_btns)
                     return
                 self.user_states[user_id] = f'wd_step_amount_{company_id}_{company["name"]}'
                 return
@@ -12550,17 +13358,17 @@ class ComprehensiveDUXBot:
                      {'text': '❌ إلغاء', 'callback_data': 'mbot_refresh'}]
                 ]
                 self.edit_message(chat_id, message.get('message_id'),
-                    f"⚠️ هل أنت متأكد من حذف البوت <code>{bot_id}</code>؟")
-                self.send_inline_message(chat_id, "🗑️ تأكيد حذف البوت:", inline_btns)
+                    self.tr('a0579_هل_أنت', 'ar', bot_id=bot_id))
+                self.send_inline_message(chat_id, self.tr('a0580_تأكيد_حذف', 'ar'), inline_btns)
                 return
 
             elif data.startswith('mbot_confirm_delete_'):
                 bot_id = data.replace('mbot_confirm_delete_', '')
                 manager = MultiBotManager()
                 if manager.delete_bot(bot_id):
-                    self.edit_message(chat_id, message.get('message_id'), f"✅ تم حذف البوت {bot_id}")
+                    self.edit_message(chat_id, message.get('message_id'), self.tr('a0581_تم_حذف', 'ar', bot_id=bot_id))
                 else:
-                    self.edit_message(chat_id, message.get('message_id'), f"❌ لم يتم العثور على البوت {bot_id}")
+                    self.edit_message(chat_id, message.get('message_id'), self.tr('a0582_لم_يتم', 'ar', bot_id=bot_id))
                 import time as _time; _time.sleep(1)
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                 self.show_multi_bot_panel(fake_msg)
@@ -12582,7 +13390,7 @@ class ComprehensiveDUXBot:
                 bot_id = data.replace('mbot_unfreeze_', '')
                 manager = MultiBotManager()
                 manager.unfreeze_bot(bot_id)
-                self.edit_message(chat_id, message.get('message_id'), f"✅ تم إلغاء تجميد البوت {bot_id}")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0583_تم_إلغاء', 'ar', bot_id=bot_id))
                 import time as _time; _time.sleep(1)
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                 self.show_multi_bot_panel(fake_msg)
@@ -12646,16 +13454,16 @@ class ComprehensiveDUXBot:
                 # عرض الشركات المسجلة في النظام + روابط الإفيليت
                 companies = self.svrp.get_recovery_companies(active_only=False)
                 if not companies:
-                    self.send_message(chat_id, "📭 لا توجد شركات. أضف شركات من قسم إدارة الشركات.")
+                    self.send_message(chat_id, self.tr('a0584_لا_توجد', 'ar'))
                     return
-                text = "🏢 <b>شركات التعويض</b>\n\n"
+                text = self.tr('a0585_شركات_التعويض', 'ar')
                 for c in companies:
-                    aff = c.get('affiliate_link', '') or '❌ غير محدد'
+                    aff = c.get('affiliate_link', '') or self.tr('a0586_غير_محدد', 'ar')
                     status = '✅' if c.get('is_active') == 'yes' else '❌'
                     text += f"{status} <b>{c['name']}</b>\n"
-                    text += f"   🔗 <code>{aff}</code>\n" if aff != '❌ غير محدد' else f"   🔗 {aff}\n"
+                    text += f"   🔗 <code>{aff}</code>\n" if aff != self.tr('a0586_غير_محدد', 'ar') else f"   🔗 {aff}\n"
                     text += "\n"
-                text += "💡 لتعديل رابط الإفيليت: اذهب لإدارة الشركات ← اختر شركة ← 🔗 تعديل رابط الإحالة"
+                text += self.tr('a0587_لتعديل_رابط', 'ar')
                 inline_btns = [[{'text': '🔙 رجوع', 'callback_data': 'svrp_admin_back'}]]
                 self.send_inline_message(chat_id, text, inline_btns)
                 return
@@ -12665,7 +13473,7 @@ class ComprehensiveDUXBot:
                 bonus_reqs = self.svrp._read_csv('bonus_requests.csv')
                 pending = [r for r in bonus_reqs if r.get('status') == 'pending']
                 if not pending:
-                    self.send_message(chat_id, "✅ لا توجد طلبات مكافآت معلقة")
+                    self.send_message(chat_id, self.tr('a0588_لا_توجد', 'ar'))
                     return
                 text = f"🏆 <b>طلبات المكافآت المعلقة ({len(pending)})</b>\n\n"
                 for r in pending[:10]:
@@ -12682,7 +13490,7 @@ class ComprehensiveDUXBot:
                 recovery_reqs = self.svrp._read_csv('recovery_requests.csv')
                 pending = [r for r in recovery_reqs if r.get('status') == 'pending']
                 if not pending:
-                    self.send_message(chat_id, "✅ لا توجد طلبات استرداد معلقة")
+                    self.send_message(chat_id, self.tr('a0589_لا_توجد', 'ar'))
                     return
                 text = f"📸 <b>طلبات الاسترداد المعلقة ({len(pending)})</b>\n\n"
                 for r in pending[:10]:
@@ -12697,11 +13505,11 @@ class ComprehensiveDUXBot:
                 # عرض طلبات الإيداع من الرصيد المتاح
                 dep_reqs = self.svrp._read_csv('svrp_deposits.csv') if os.path.exists('svrp_deposits.csv') else []
                 if not dep_reqs:
-                    self.send_message(chat_id, "✅ لا توجد طلبات إيداع من الرصيد المتاح")
+                    self.send_message(chat_id, self.tr('a0590_لا_توجد', 'ar'))
                     return
                 pending = [r for r in dep_reqs if r.get('status') == 'pending']
                 if not pending:
-                    self.send_message(chat_id, "✅ لا توجد طلبات إيداع معلقة")
+                    self.send_message(chat_id, self.tr('a0591_لا_توجد', 'ar'))
                     return
                 text = f"💰 <b>طلبات الإيداع المعلقة ({len(pending)})</b>\n\n"
                 for r in pending[:10]:
@@ -12748,7 +13556,7 @@ class ComprehensiveDUXBot:
 
             elif data == 'svrp_edit_texts':
                 lang_names = self.get_language_names()
-                text = "📝 <b>تعديل نصوص شرح النظام</b>\n\nاختر اللغة:\n\n"
+                text = self.tr('a0592_تعديل_نصوص', 'ar')
                 inline_btns = []
                 row = []
                 for code, info in lang_names.items():
@@ -12760,12 +13568,12 @@ class ComprehensiveDUXBot:
                     inline_btns.append(row)
                 inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'svrp_admin_back'}])
                 self.edit_message(chat_id, message.get('message_id'), text)
-                self.send_inline_message(chat_id, "اختر اللغة:", inline_btns)
+                self.send_inline_message(chat_id, self.tr('a0593_اختر_اللغة', 'ar'), inline_btns)
                 return
 
             elif data.startswith('svrp_edit_intro_') and data != 'svrp_edit_texts':
                 lang_code = data.replace('svrp_edit_intro_', '')
-                current = self.get_setting(f'svrp_intro_{lang_code}') or '(النص الافتراضي)'
+                current = self.get_setting(f'svrp_intro_{lang_code}') or self.tr('a0594_النص_الافتراضي', 'ar')
                 lang_names = self.get_language_names()
                 lang_native = lang_names.get(lang_code, {}).get('native', lang_code)
                 self.edit_message(chat_id, message.get('message_id'),
@@ -12795,9 +13603,9 @@ class ComprehensiveDUXBot:
                     f"🎟️ أكواد نشطة: {stats['active_promos']}\n"
                 )
                 if stats.get('top_referrers'):
-                    text += "\n🏆 أفضل المُحيلين:\n"
+                    text += self.tr('a0595_أفضل_المُحيلين', 'ar')
                     for tid, count in stats['top_referrers']:
-                        text += f"  • <code>{tid}</code>: {count} إحالة\n"
+                        text += self.tr('a0596_إحالة', 'ar', tid=tid, count=count)
                 self.send_inline_message(chat_id, text,
                     [[{'text': '🔙 العودة', 'callback_data': 'svrp_admin_back'}]])
                 return
@@ -12807,7 +13615,7 @@ class ComprehensiveDUXBot:
             elif data == 'svrp_main_menu':
                 user = self.find_user(user_id)
                 lang = user.get('language', 'ar') if user else 'ar'
-                self.edit_message(chat_id, message.get('message_id'), "🏠 تم العودة للقائمة الرئيسية")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0597_تم_العودة', lang))
                 welcome = self.tr('choose_service', lang, name=user.get('name',''), customer_id=user.get('customer_id','')) if user else ''
                 self.send_message(chat_id, welcome, self.main_keyboard(lang, user_id))
                 return
@@ -12823,13 +13631,13 @@ class ComprehensiveDUXBot:
                 return
 
             elif data == 'svrp_deposit':
-                self.edit_message(chat_id, message.get('message_id'), "💰 جارٍ تحويلك للإيداع...")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0598_جارٍ_تحويلك', lang))
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                 self.create_deposit_request(fake_msg)
                 return
 
             elif data == 'svrp_withdraw':
-                self.edit_message(chat_id, message.get('message_id'), "💸 جارٍ تحويلك للسحب...")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0599_جارٍ_تحويلك', lang))
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                 self.create_withdrawal_request(fake_msg)
                 return
@@ -12837,7 +13645,7 @@ class ComprehensiveDUXBot:
             elif data == 'profile_back_main':
                 user = self.find_user(user_id)
                 lang = user.get('language', 'ar') if user else 'ar'
-                self.edit_message(chat_id, message.get('message_id'), "🔙 العودة")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0142_العودة', lang))
                 welcome = self.tr('choose_service', lang, name=user.get('name', ''), customer_id=user.get('customer_id', '')) if user else ''
                 self.send_message(chat_id, welcome, self.main_keyboard(lang, user_id))
                 return
@@ -12881,13 +13689,13 @@ class ComprehensiveDUXBot:
 
             elif data.startswith('rec_reject_'):
                 req_id = data.replace('rec_reject_', '')
-                self.svrp.reject_recovery_request(req_id, 'مرفوض من الإدارة')
+                self.svrp.reject_recovery_request(req_id, self.tr('a0600_مرفوض_من', lang))
                 self.edit_message(chat_id, message.get('message_id'),
-                    f"❌ تم رفض طلب الاسترداد {req_id}")
+                    self.tr('a0601_تم_رفض', lang, req_id=req_id))
                 # إشعار العميل
                 req = self.svrp.get_recovery_request(req_id)
                 if req:
-                    self.notify_user(int(req['user_id']), "❌ تم رفض طلب الاسترداد الخاص بك")
+                    self.notify_user(int(req['user_id']), self.tr('a0563_تم_رفض', lang))
                 return
 
             # ==================== مطابقة: موافقة + اختيار نوع ====================
@@ -12895,13 +13703,13 @@ class ComprehensiveDUXBot:
                 user = self.find_user(user_id)
                 lang = user.get('language', 'ar') if user else 'ar'
                 self.edit_message(chat_id, message.get('message_id'),
-                    "✅ <b>تمت الموافقة!</b>\n\nاختر نوع العملية:")
+                    self.tr('a0602_تمت_الموافقة', lang))
                 inline_btns = [
                     [{'text': '💰 مطابقة إيداع', 'callback_data': 'match_type_deposit'},
                      {'text': '💸 مطابقة سحب', 'callback_data': 'match_type_withdraw'}],
                     [{'text': '🔙 العودة', 'callback_data': 'match_cancel'}]
                 ]
-                self.send_inline_message(chat_id, "اختر نوع العملية:", inline_btns)
+                self.send_inline_message(chat_id, self.tr('a0603_اختر_نوع', lang), inline_btns)
                 return
 
             elif data == 'match_cancel':
@@ -12909,7 +13717,7 @@ class ComprehensiveDUXBot:
                 lang = user.get('language', 'ar') if user else 'ar'
                 if user_id in self.user_states:
                     del self.user_states[user_id]
-                self.edit_message(chat_id, message.get('message_id'), "❌ تم الإلغاء")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0224_تم_الإلغاء', lang))
                 welcome = self.tr('choose_service', lang, name=user.get('name', ''), customer_id=user.get('customer_id', '')) if user else ''
                 self.send_message(chat_id, welcome, self.main_keyboard(lang, user_id))
                 return
@@ -12922,7 +13730,7 @@ class ComprehensiveDUXBot:
                 # عرض الشركات كأزرار inline
                 companies = self.get_companies('both')
                 if not companies:
-                    self.send_message(chat_id, "❌ لا توجد شركات متاحة")
+                    self.send_message(chat_id, self.tr('a0410_لا_توجد', lang))
                     return
 
                 inline_btns = []
@@ -12931,7 +13739,7 @@ class ComprehensiveDUXBot:
                     inline_btns.append([{'text': f"{icon} {c['name']}", 'callback_data': f'match_company_{c["id"]}_{match_type}'}])
                 inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'match_agree'}])
 
-                self.send_inline_message(chat_id, "🏢 اختر الشركة:", inline_btns)
+                self.send_inline_message(chat_id, self.tr('a0411_اختر_الشركة', lang), inline_btns)
                 self.user_states[user_id] = {'step': 'match_company_select', 'type': match_type}
                 return
 
@@ -12948,7 +13756,7 @@ class ComprehensiveDUXBot:
                         company = c
                         break
                 if not company:
-                    self.send_message(chat_id, "❌ الشركة غير موجودة")
+                    self.send_message(chat_id, self.tr('a0548_الشركة_غير', lang))
                     return
 
                 icon = company.get('icon', '🏢') or '🏢'
@@ -12958,7 +13766,7 @@ class ComprehensiveDUXBot:
 
                 methods = self.get_payment_methods_by_company(company_id, match_type)
                 if not methods:
-                    self.send_message(chat_id, "❌ لا توجد وسائل دفع لهذه الشركة")
+                    self.send_message(chat_id, self.tr('a0564_لا_توجد', lang))
                     return
 
                 inline_btns = []
@@ -12967,7 +13775,7 @@ class ComprehensiveDUXBot:
                     inline_btns.append([{'text': f"{m_icon} {m['method_name']}", 'callback_data': f'match_method_{m["id"]}_{company_id}_{company["name"]}_{match_type}'}])
                 inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'match_agree'}])
 
-                self.send_inline_message(chat_id, "اختر وسيلة الدفع:", inline_btns)
+                self.send_inline_message(chat_id, self.tr('a0604_اختر_وسيلة', lang), inline_btns)
                 return
 
             elif data.startswith('match_method_'):
@@ -12983,7 +13791,7 @@ class ComprehensiveDUXBot:
                 method_name = method['method_name'] if method else ''
                 account_data = method.get('account_data', '') if method else ''
 
-                type_ar = 'إيداع' if match_type == 'deposit' else 'سحب'
+                type_ar = self.tr('a0390_إيداع', lang) if match_type == 'deposit' else self.tr('a0391_سحب', lang)
                 text = (
                     f"✅ <b>تم اختيار وسيلة الدفع</b>\n\n"
                     f"━━━━━━━━━━━━━━━━━━\n"
@@ -12991,7 +13799,7 @@ class ComprehensiveDUXBot:
                     f"💳 الوسيلة: <b>{method_name}</b>\n"
                 )
                 if account_data:
-                    text += f"🔢 رقم الحساب: <code>{account_data}</code> 👈 اضغط للنسخ\n"
+                    text += self.tr('a0605_رقم_الحساب', 'ar', account_data=account_data)
                 text += (
                     f"━━━━━━━━━━━━━━━━━━\n\n"
                     f"1️⃣ اكتب <b>المبلغ</b>:"
@@ -13025,7 +13833,7 @@ class ComprehensiveDUXBot:
                     pass
 
                 if not request:
-                    self.edit_message(chat_id, message.get('message_id'), "❌ الطلب غير موجود أو تمت معالجته")
+                    self.edit_message(chat_id, message.get('message_id'), self.tr('a0606_الطلب_غير', 'ar'))
                     return
 
                 # الأدمن يوافق → يصبح الطرف الآخر تلقائياً
@@ -13058,10 +13866,10 @@ class ComprehensiveDUXBot:
                             return
                 except Exception as e:
                     logger.error(f"خطأ في موافقة الأدمن: {e}")
-                    self.edit_message(chat_id, message.get('message_id'), f"❌ خطأ: {e}")
+                    self.edit_message(chat_id, message.get('message_id'), self.tr('a0081_خطأ', 'ar', e=e))
                     return
 
-                self.edit_message(chat_id, message.get('message_id'), "⏳ جارٍ المعالجة...")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0607_جارٍ_المعالجة', 'ar'))
                 return
 
             elif data.startswith('match_admin_reject_req_'):
@@ -13084,12 +13892,12 @@ class ComprehensiveDUXBot:
                         writer.writerows(rows)
                 except:
                     pass
-                self.edit_message(chat_id, message.get('message_id'), f"❌ تم رفض الطلب")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0494_تم_رفض', 'ar'))
                 # إشعار العميل
                 if rejected_user_id:
                     try:
                         self.send_message(int(rejected_user_id),
-                            "❌ <b>تم رفض طلب المطابقة</b>\n\nيمكنك المحاولة مرة أخرى لاحقاً",
+                            self.tr('a0608_تم_رفض', 'ar'),
                             self.main_keyboard('ar', int(rejected_user_id)))
                     except:
                         pass
@@ -13111,7 +13919,7 @@ class ComprehensiveDUXBot:
                     pass
 
                 if not request:
-                    self.edit_message(chat_id, message.get('message_id'), "❌ الطلب غير موجود أو تمت مطابقته")
+                    self.edit_message(chat_id, message.get('message_id'), self.tr('a0609_الطلب_غير', 'ar'))
                     return
 
                 # الأدمن يصبح الطرف الآخر — بدون إشعار العميل
@@ -13148,15 +13956,15 @@ class ComprehensiveDUXBot:
                 except Exception as e:
                     logger.error(f"خطأ في انضمام الأدمن للمطابقة: {e}")
                     self.edit_message(chat_id, message.get('message_id'),
-                        f"❌ حدث خطأ: {e}")
+                        self.tr('a0610_حدث_خطأ', 'ar', e=e))
                     return
 
                 self.edit_message(chat_id, message.get('message_id'),
-                    "⏳ تم إنشاء طلبك كطرف آخر. جارٍ البحث عن مطابقة...")
+                    self.tr('a0611_تم_إنشاء', 'ar'))
 
             elif data.startswith('match_admin_wait_'):
                 self.edit_message(chat_id, message.get('message_id'),
-                    "⏳ تم ترك الطلب معلقاً. سيتم إشعارك عند وجود مطابقة تلقائية.")
+                    self.tr('a0612_تم_ترك', 'ar'))
                 return
 
             # ==================== مطابقة: تأكيد الكود ====================
@@ -13201,7 +14009,7 @@ class ComprehensiveDUXBot:
                         self.main_keyboard('ar', wit_id))
 
                 self.edit_message(chat_id, message.get('message_id'),
-                    f"✅ تم تأكيد الكود لـ <code>{match_id}</code>")
+                    self.tr('a0613_تم_تأكيد', 'ar', match_id=match_id))
                 return
 
             # ==================== مطابقة: رفض الكود ====================
@@ -13220,29 +14028,29 @@ class ComprehensiveDUXBot:
                         f"🔒 <b>بياناتك محفوظة بأمان</b>")
                     self.user_states[wit_id] = {'step': 'match_enter_code', 'match_id': match_id, 'substep': 'code'}
                     kb = {'keyboard': [[{'text': '❌ إلغاء'}]], 'resize_keyboard': True, 'one_time_keyboard': True}
-                    self.send_message(wit_id, "1️⃣ اكتب <b>كود السحب</b>:", kb)
+                    self.send_message(wit_id, self.tr('a0614_اكتب_كود', 'ar'), kb)
 
                 self.edit_message(chat_id, message.get('message_id'),
-                    f"🔁 تم طلب كود جديد لـ <code>{match_id}</code>")
+                    self.tr('a0615_تم_طلب', 'ar', match_id=match_id))
                 return
 
             # ==================== مطابقة: حل نزاع ====================
             elif data.startswith('dispute_resolve_dep_'):
                 dispute_id = data.replace('dispute_resolve_dep_', '')
-                self.match_manager.resolve_dispute(dispute_id, 'حل لصالح المودع')
-                self.edit_message(chat_id, message.get('message_id'), "✅ تم الحل لصالح المودع")
+                self.match_manager.resolve_dispute(dispute_id, self.tr('a0616_حل_لصالح', 'ar'))
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0617_تم_الحل', 'ar'))
                 return
 
             elif data.startswith('dispute_resolve_wit_'):
                 dispute_id = data.replace('dispute_resolve_wit_', '')
-                self.match_manager.resolve_dispute(dispute_id, 'حل لصالح الساحب')
-                self.edit_message(chat_id, message.get('message_id'), "✅ تم الحل لصالح الساحب")
+                self.match_manager.resolve_dispute(dispute_id, self.tr('a0618_حل_لصالح', 'ar'))
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0619_تم_الحل', 'ar'))
                 return
 
             elif data.startswith('dispute_cancel_'):
                 dispute_id = data.replace('dispute_cancel_', '')
-                self.match_manager.resolve_dispute(dispute_id, 'إلغاء العملية')
-                self.edit_message(chat_id, message.get('message_id'), "❌ تم إلغاء العملية")
+                self.match_manager.resolve_dispute(dispute_id, self.tr('a0620_إلغاء_العملية', 'ar'))
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0357_تم_إلغاء', 'ar'))
                 return
 
             # ==================== مطابقة: إرسال الكود (زر) ====================
@@ -13250,7 +14058,7 @@ class ComprehensiveDUXBot:
                 match_id = data.replace('match_enter_code_btn_', '')
                 match = self.match_manager.get_match_by_id(match_id)
                 if not match:
-                    self.edit_message(chat_id, message.get('message_id'), "❌ المطابقة غير موجودة")
+                    self.edit_message(chat_id, message.get('message_id'), self.tr('a0416_المطابقة_غير', 'ar'))
                     return
                 # الساحب يدخل بياناته خطوة بخطوة
                 self.user_states[user_id] = {'step': 'match_enter_code', 'match_id': match_id, 'substep': 'code'}
@@ -13259,7 +14067,7 @@ class ComprehensiveDUXBot:
                     f"📝 <b>أدخل بياناتك خطوة بخطوة</b>\n\n"
                     f"1️⃣ اكتب <b>كود السحب</b>:\n\n"
                     f"⚠️ <b>لا ترسل المال قبل أن يؤكد لك ذلك</b>")
-                self.send_message(chat_id, "1️⃣ اكتب <b>كود السحب</b>:", kb)
+                self.send_message(chat_id, self.tr('a0614_اكتب_كود', 'ar'), kb)
                 return
 
             # ==================== مطابقة: تأكيد الإرسال (المودع أرسل المال) ====================
@@ -13267,7 +14075,7 @@ class ComprehensiveDUXBot:
                 match_id = data.replace('match_sent_', '')
                 match = self.match_manager.get_match_by_id(match_id)
                 if not match:
-                    self.edit_message(chat_id, message.get('message_id'), "❌ المطابقة غير موجودة")
+                    self.edit_message(chat_id, message.get('message_id'), self.tr('a0416_المطابقة_غير', 'ar'))
                     return
 
                 # تحديث حالة المطابقة: بانتظار مراجعة الإدارة
@@ -13308,7 +14116,7 @@ class ComprehensiveDUXBot:
                 match_id = data.replace('match_admin_receipt_', '')
                 match = self.match_manager.get_match_by_id(match_id)
                 if not match:
-                    self.edit_message(chat_id, message.get('message_id'), "❌ المطابقة غير موجودة")
+                    self.edit_message(chat_id, message.get('message_id'), self.tr('a0416_المطابقة_غير', 'ar'))
                     return
 
                 # تحديث الحالة: الأدمن استلم المال، الآن يحول للعميل
@@ -13353,7 +14161,7 @@ class ComprehensiveDUXBot:
                 match_id = data.replace('match_admin_no_receipt_', '')
                 match = self.match_manager.get_match_by_id(match_id)
                 if not match:
-                    self.edit_message(chat_id, message.get('message_id'), "❌ المطابقة غير موجودة")
+                    self.edit_message(chat_id, message.get('message_id'), self.tr('a0416_المطابقة_غير', 'ar'))
                     return
 
                 self.edit_message(chat_id, message.get('message_id'),
@@ -13383,7 +14191,7 @@ class ComprehensiveDUXBot:
                     [{'text': '✅ نعم، ألغِ', 'callback_data': f'match_cancel_confirm_{match_id}'},
                      {'text': '❌ تراجع', 'callback_data': f'match_cancel_back_{match_id}'}]
                 ]
-                self.send_inline_message(chat_id, "تأكيد الإلغاء:", inline_btns)
+                self.send_inline_message(chat_id, self.tr('a0504_تأكيد_الإلغاء', 'ar'), inline_btns)
                 return
 
             # ==================== مطابقة: تأكيد الإلغاء ====================
@@ -13404,7 +14212,7 @@ class ComprehensiveDUXBot:
                             f"🆔 <code>{match_id}</code> 👈 اضغط للنسخ\n"
                             f"تم إلغاء العملية من قبل الطرف الآخر.",
                             self.main_keyboard('ar', other_id))
-                self.edit_message(chat_id, message.get('message_id'), f"❌ تم إلغاء المطابقة {match_id}")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0621_تم_إلغاء', 'ar', match_id=match_id))
                 if user_id in self.user_states:
                     del self.user_states[user_id]
                 user = self.find_user(user_id)
@@ -13418,7 +14226,7 @@ class ComprehensiveDUXBot:
             # ==================== مطابقة: تراجع عن الإلغاء ====================
             elif data.startswith('match_cancel_back_'):
                 match_id = data.replace('match_cancel_back_', '')
-                self.edit_message(chat_id, message.get('message_id'), "✅ تم التراجع عن الإلغاء")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0622_تم_التراجع', lang))
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': '🔄 مطابقة'}
                 self.start_matching_flow(fake_msg)
                 return
@@ -13428,10 +14236,10 @@ class ComprehensiveDUXBot:
                 match_id = data.replace('match_support_', '')
                 match = self.match_manager.get_match_by_id(match_id)
                 if not match:
-                    self.edit_message(chat_id, message.get('message_id'), "❌ المطابقة غير موجودة")
+                    self.edit_message(chat_id, message.get('message_id'), self.tr('a0416_المطابقة_غير', lang))
                     return
 
-                dispute_id = self.match_manager.open_dispute(match_id, user_id, 'طلب دعم من العميل')
+                dispute_id = self.match_manager.open_dispute(match_id, user_id, self.tr('a0623_طلب_دعم', lang))
                 self.edit_message(chat_id, message.get('message_id'),
                     f"🆘 <b>تم فتح تذكرة دعم</b>\n\n"
                     f"🆔 المطابقة: <code>{match_id}</code> 👈 اضغط للنسخ\n"
@@ -13463,7 +14271,7 @@ class ComprehensiveDUXBot:
                 match_id = data.replace('match_admin_confirm_delivery_', '')
                 match = self.match_manager.get_match_by_id(match_id)
                 if not match:
-                    self.edit_message(chat_id, message.get('message_id'), "❌ المطابقة غير موجودة")
+                    self.edit_message(chat_id, message.get('message_id'), self.tr('a0416_المطابقة_غير', lang))
                     return
 
                 self.match_manager.update_match_status(match_id, 'completed')
@@ -13486,7 +14294,7 @@ class ComprehensiveDUXBot:
                     self.user_states[party_id] = {'step': 'rating', 'match_id': match_id}
 
                 self.edit_message(chat_id, message.get('message_id'),
-                    f"✅ <b>تم إتمام المطابقة</b>\n\n🆔 <code>{match_id}</code>\nتم إشعار الطرفين بإكمال التقييم.")
+                    self.tr('a0624_تم_إتمام', lang, match_id=match_id))
                 return
 
             # ==================== مطابقة: العميل يؤكد استلام المال ====================
@@ -13494,7 +14302,7 @@ class ComprehensiveDUXBot:
                 match_id = data.replace('match_confirm_received_', '')
                 match = self.match_manager.get_match_by_id(match_id)
                 if not match:
-                    self.edit_message(chat_id, message.get('message_id'), "❌ المطابقة غير موجودة")
+                    self.edit_message(chat_id, message.get('message_id'), self.tr('a0416_المطابقة_غير', 'ar'))
                     return
 
                 self.edit_message(chat_id, message.get('message_id'),
@@ -13520,7 +14328,7 @@ class ComprehensiveDUXBot:
                 match_id = data.replace('match_not_received_', '')
                 match = self.match_manager.get_match_by_id(match_id)
                 if not match:
-                    self.edit_message(chat_id, message.get('message_id'), "❌ المطابقة غير موجودة")
+                    self.edit_message(chat_id, message.get('message_id'), self.tr('a0416_المطابقة_غير', 'ar'))
                     return
 
                 self.edit_message(chat_id, message.get('message_id'),
@@ -13563,7 +14371,7 @@ class ComprehensiveDUXBot:
             elif data == 'match_admin_active':
                 matches = self.match_manager.get_active_matches() if self.match_manager else []
                 if not matches:
-                    self.edit_message(chat_id, message.get('message_id'), "📭 لا توجد مطابقات نشطة")
+                    self.edit_message(chat_id, message.get('message_id'), self.tr('a0625_لا_توجد', lang))
                     return
                 text = f"🟢 <b>المطابقات النشطة ({len(matches)})</b>\n\n━━━━━━━━━━━━━━━━━━\n"
                 for m in matches[:15]:
@@ -13590,11 +14398,11 @@ class ComprehensiveDUXBot:
                 except:
                     pass
                 if not pending:
-                    self.edit_message(chat_id, message.get('message_id'), "✅ لا توجد طلبات معلقة")
+                    self.edit_message(chat_id, message.get('message_id'), self.tr('a0364_لا_توجد', lang))
                     return
                 text = f"⏳ <b>طلبات معلقة ({len(pending)})</b>\n\n━━━━━━━━━━━━━━━━━━\n"
                 for r in pending[:15]:
-                    type_ar = 'إيداع' if r.get('type') == 'deposit' else 'سحب'
+                    type_ar = self.tr('a0390_إيداع', lang) if r.get('type') == 'deposit' else self.tr('a0391_سحب', lang)
                     text += (
                         f"🆔 <code>{r.get('id', '')}</code>\n"
                         f"{'💵' if r.get('type') == 'deposit' else '💸'} {type_ar}\n"
@@ -13625,7 +14433,7 @@ class ComprehensiveDUXBot:
                 except:
                     pass
                 if not matches:
-                    self.edit_message(chat_id, message.get('message_id'), "📭 لا توجد سجلات")
+                    self.edit_message(chat_id, message.get('message_id'), self.tr('a0626_لا_توجد', lang))
                     return
                 text = f"📜 <b>السجلات ({len(matches)})</b>\n\n━━━━━━━━━━━━━━━━━━\n"
                 for m in matches[-15:]:
@@ -13645,14 +14453,14 @@ class ComprehensiveDUXBot:
                 match_id = data.replace('match_admin_screenshot_ok_', '')
                 match = self.match_manager.get_match_by_id(match_id)
                 if not match:
-                    self.edit_message(chat_id, message.get('message_id'), "❌ المطابقة غير موجودة")
+                    self.edit_message(chat_id, message.get('message_id'), self.tr('a0416_المطابقة_غير', 'ar'))
                     return
 
                 # تحديث الحالة: تم تأكيد التحويل
                 self.match_manager.update_match_status(match_id, 'transfer_confirmed')
 
                 self.edit_message(chat_id, message.get('message_id'),
-                    f"✅ <b>تم تأكيد التحويل</b>\n\n🆔 <code>{match_id}</code>")
+                    self.tr('a0627_تم_تأكيد', 'ar', match_id=match_id))
 
                 # إشعار المودع والساحب
                 dep_id = int(match['depositor_id'])
@@ -13679,11 +14487,11 @@ class ComprehensiveDUXBot:
                 match_id = data.replace('match_admin_screenshot_no_', '')
                 match = self.match_manager.get_match_by_id(match_id)
                 if not match:
-                    self.edit_message(chat_id, message.get('message_id'), "❌ المطابقة غير موجودة")
+                    self.edit_message(chat_id, message.get('message_id'), self.tr('a0416_المطابقة_غير', 'ar'))
                     return
 
                 self.edit_message(chat_id, message.get('message_id'),
-                    f"❌ <b>تم رفض لقطة الشاشة</b>\n\n🆔 <code>{match_id}</code>\nتم إشعار العميل بإعادة الإرسال")
+                    self.tr('a0628_تم_رفض', 'ar', match_id=match_id))
 
                 # إشعار المودع بإعادة إرسال لقطة شاشة
                 dep_id = int(match['depositor_id'])
@@ -13710,17 +14518,17 @@ class ComprehensiveDUXBot:
                     except:
                         pass
                     if all_bots:
-                        text = "🤖 <b>بوتات المطابقة</b>\n\nلا توجد بوتات مطابقة مفعّلة.\n\nاختر بوتاً لإضافته:\n\n"
+                        text = self.tr('a0629_بوتات_المطابقة', 'ar')
                         inline_btns = []
                         for b in all_bots:
                             inline_btns.append([{'text': f"➕ {b.get('name', b.get('id', ''))}",
                                                  'callback_data': f'match_bot_add_{b["id"]}'}])
                         inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'match_admin_panel'}])
                         self.edit_message(chat_id, message.get('message_id'), text)
-                        self.send_inline_message(chat_id, "إضافة بوت مطابقة:", inline_btns)
+                        self.send_inline_message(chat_id, self.tr('a0630_إضافة_بوت', 'ar'), inline_btns)
                     else:
                         self.edit_message(chat_id, message.get('message_id'),
-                            "🤖 <b>بوتات المطابقة</b>\n\nلا توجد بوتات متاحة.\nأضف بوتات أولاً من قسم 🤖 البوتات.")
+                            self.tr('a0631_بوتات_المطابقة', 'ar'))
                     return
 
                 text = f"🤖 <b>بوتات المطابقة ({len(match_bots)})</b>\n\n━━━━━━━━━━━━━━━━━━\n"
@@ -13733,7 +14541,7 @@ class ComprehensiveDUXBot:
                         f"📊 مطابقات: <b>{b.get('match_count', '0')}</b>\n"
                         f"━━━━━━━━━━━━━━━━━━\n"
                     )
-                    toggle_text = '⏹️ إيقاف' if b.get('is_active') == 'yes' else '▶️ تفعيل'
+                    toggle_text = self.tr('a0632_إيقاف', 'ar') if b.get('is_active') == 'yes' else self.tr('a0633_تفعيل', 'ar')
                     inline_btns.append([
                         {'text': toggle_text, 'callback_data': f'match_bot_toggle_{b["bot_id"]}'},
                         {'text': '🗑️ حذف', 'callback_data': f'match_bot_remove_{b["bot_id"]}'}
@@ -13741,14 +14549,14 @@ class ComprehensiveDUXBot:
                 inline_btns.append([{'text': '➕ إضافة بوت', 'callback_data': 'match_bot_add_list'}])
                 inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'match_admin_panel'}])
                 self.edit_message(chat_id, message.get('message_id'), text)
-                self.send_inline_message(chat_id, "إجراءات:", inline_btns)
+                self.send_inline_message(chat_id, self.tr('a0634_إجراءات', 'ar'), inline_btns)
                 return
 
             elif data.startswith('match_bot_toggle_'):
                 bot_id = data.replace('match_bot_toggle_', '')
                 if self.match_manager:
                     self.match_manager.toggle_match_bot(bot_id)
-                self.edit_message(chat_id, message.get('message_id'), "✅ تم التبديل")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0514_تم_التبديل', 'ar'))
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': 'match_bots'}
                 # إعادة عرض القائمة
                 match_bots = self.match_manager.get_match_bot_config() if self.match_manager else []
@@ -13762,7 +14570,7 @@ class ComprehensiveDUXBot:
                         f"📊 مطابقات: <b>{b.get('match_count', '0')}</b>\n"
                         f"━━━━━━━━━━━━━━━━━━\n"
                     )
-                    toggle_text = '⏹️ إيقاف' if b.get('is_active') == 'yes' else '▶️ تفعيل'
+                    toggle_text = self.tr('a0632_إيقاف', 'ar') if b.get('is_active') == 'yes' else self.tr('a0633_تفعيل', 'ar')
                     inline_btns.append([
                         {'text': toggle_text, 'callback_data': f'match_bot_toggle_{b["bot_id"]}'},
                         {'text': '🗑️ حذف', 'callback_data': f'match_bot_remove_{b["bot_id"]}'}
@@ -13776,7 +14584,7 @@ class ComprehensiveDUXBot:
                 bot_id = data.replace('match_bot_remove_', '')
                 if self.match_manager:
                     self.match_manager.remove_match_bot(bot_id)
-                self.edit_message(chat_id, message.get('message_id'), f"🗑️ تم حذف البوت {bot_id}")
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0635_تم_حذف', 'ar', bot_id=bot_id))
                 return
 
             elif data == 'match_bot_add_list' or data.startswith('match_bot_add_'):
@@ -13802,7 +14610,7 @@ class ComprehensiveDUXBot:
                         else:
                             self.edit_message(chat_id, message.get('message_id'), f"❌ {err}")
                     else:
-                        self.edit_message(chat_id, message.get('message_id'), "❌ البوت غير موجود")
+                        self.edit_message(chat_id, message.get('message_id'), self.tr('a0636_البوت_غير', 'ar'))
                     return
 
                 # عرض قائمة البوتات المتاحة
@@ -13823,7 +14631,7 @@ class ComprehensiveDUXBot:
 
                 if not all_bots:
                     self.edit_message(chat_id, message.get('message_id'),
-                        "📭 لا توجد بوتات متاحة لإضافتها")
+                        self.tr('a0637_لا_توجد', 'ar'))
                     return
 
                 inline_btns = []
@@ -13831,8 +14639,8 @@ class ComprehensiveDUXBot:
                     inline_btns.append([{'text': f"➕ {b.get('name', b.get('id', ''))}",
                                          'callback_data': f'match_bot_add_{b["id"]}'}])
                 inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'match_admin_bots'}])
-                self.edit_message(chat_id, message.get('message_id'), "اختر بوتاً لإضافته:")
-                self.send_inline_message(chat_id, "البوتات المتاحة:", inline_btns)
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0638_اختر_بوتاً', 'ar'))
+                self.send_inline_message(chat_id, self.tr('a0639_البوتات_المتاحة', 'ar'), inline_btns)
                 return
 
             elif data == 'match_back_admin':
@@ -13937,7 +14745,7 @@ class ComprehensiveDUXBot:
                         except Exception as cb_error:
                             logger.error(f"خطأ في معالجة callback: {cb_error}", exc_info=True)
                             try:
-                                self.answer_callback(update['callback_query'].get('id'), "❌ خطأ")
+                                self.answer_callback(update['callback_query'].get('id'), self.tr('a0486_خطأ', 'ar'))
                             except:
                                 pass
                     
@@ -13949,9 +14757,14 @@ class ComprehensiveDUXBot:
                             logger.error(f"خطأ في my_chat_member: {e}", exc_info=True)
                     
                     elif 'web_app_data' in update.get('message', {}):
-                        """استقبال بيانات عجلة الحظ من Web App"""
+                        """استقبال بيانات Web App"""
                         try:
-                            self.handle_wheel_webapp_data(update['message'])
+                            wa_msg = update['message']
+                            wa_data_raw = wa_msg.get('web_app_data', {}).get('data', '')
+                            if 'gifts' in wa_data_raw:
+                                self.handle_snatch_webapp_data(wa_msg)
+                            else:
+                                self.handle_wheel_webapp_data(wa_msg)
                         except Exception as e:
                             logger.error(f"خطأ في web_app_data: {e}", exc_info=True)
                 
@@ -13976,18 +14789,125 @@ class ComprehensiveDUXBot:
                 time.sleep(1)
                 continue
 
-    def handle_wheel_webapp_data(self, message):
-        """معالجة نتيجة عجلة الحظ من Web App — توزيع الجائزة على المحفظة"""
+    def handle_snatch_webapp_data(self, message):
+        """معالجة نتيجة لعبة اختطف من Web App"""
         user_id = message.get('from', {}).get('id', '')
         chat_id = message.get('chat', {}).get('id', '')
-        
+        user_obj = self.find_user(user_id)
+        lang = user_obj.get('language', 'ar') if user_obj else 'ar'
+
+        try:
+            raw = message.get('web_app_data', {}).get('data', '{}')
+            data = json.loads(raw)
+            caught_gifts = data.get('gifts', [])
+            score = data.get('score', 0)
+        except:
+            return
+
+        if not caught_gifts:
+            self.send_message(chat_id,
+                f"😔 <b>انتهت اللعبة!</b>\n\n"
+                f"لم تتمكن من اصطياد أي هدية هذه المرة\n"
+                f"🍀 حظ أوفر في المرة القادمة!",
+                self.main_keyboard(lang, user_id))
+            return
+
+        # قراءة الجولة النشطة
+        active_round = None
+        try:
+            with open('wheel_rounds.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row.get('status') == 'active':
+                        active_round = row
+                        break
+        except:
+            pass
+
+        round_id = active_round['id'] if active_round else ''
+
+        # تسجيل كل هدية مُصطادة
+        wallet_msg = ''
+        total_prize = 0
+        for gift in caught_gifts:
+            gift_text = gift.get('text', '')
+            gift_id = gift.get('id', '')
+            spin_id = f"SPN{str(int(datetime.now().timestamp()))[-6:]}_{gift_id[-4:]}"
+            try:
+                with open('wheel_spins.csv', 'a', newline='', encoding='utf-8-sig') as f:
+                    writer = csv.writer(f)
+                    writer.writerow([spin_id, round_id, str(user_id), gift_text, datetime.now().strftime('%Y-%m-%d %H:%M')])
+            except:
+                pass
+            # محاولة استخراج مبلغ رقمي
+            try:
+                import re as _re
+                numbers = _re.findall(r'[\d,.]+', gift_text.replace(',', ''))
+                if numbers:
+                    prize_amount = float(numbers[0])
+                    if prize_amount > 0 and self.svrp:
+                        self.svrp.add_frozen_balance(str(user_id), prize_amount)
+                        total_prize += prize_amount
+            except:
+                pass
+
+        if total_prize > 0:
+            wallet_msg = f"\n💎 تم إضافة <code>{total_prize:.0f}</code> لرصيدك المجمد!"
+
+        # عرض النتائج
+        result_text = f"🎉🎉🎉 <b>اخترفت {score} هدية!</b> 🎉🎉🎉\n\n"
+        result_text += f"━━━━━━━━━━━━━━━━━━\n"
+        for i, gift in enumerate(caught_gifts, 1):
+            result_text += f"{i}️⃣ 🎁 {gift.get('text', '')}\n"
+        result_text += f"━━━━━━━━━━━━━━━━━━\n"
+        result_text += wallet_msg + "\n"
+
+        # أزرار الاستلام
+        inline_btns = []
+        # زر لكل هدية لها رابط
+        for gift in caught_gifts:
+            link = gift.get('link', '')
+            if link:
+                inline_btns.append([{'text': f"🔗 استلام: {gift.get('text', '')[:20]}", 'url': link}])
+        inline_btns.append([{'text': self.tr('a0141_الرئيسية', lang), 'callback_data': 'wheel_back_main'}])
+
+        self.send_message(chat_id, result_text, self.main_keyboard(lang, user_id))
+        if inline_btns:
+            self.send_inline_message(chat_id, "🔗 استلم جوائزك:", inline_btns)
+
+        # إشعار الأدمن
+        user_name = user_obj.get('name', '') if user_obj else str(user_id)
+        for admin_id in self.admin_ids:
+            try:
+                self.send_message(int(admin_id),
+                    f"🎁 <b>اختطف — فائز!</b>\n\n"
+                    f"👤 {user_name} ({user_id})\n"
+                    f"🎁 اصطاد {score} هدية:\n"
+                    + "\n".join([f"  • {g.get('text','')}" for g in caught_gifts]))
+            except:
+                pass
+
+        # نشر في القنوات
+        try:
+            self.post_to_channels(
+                f"🎁 <b>اختطف — نتيجة!</b>\n\n"
+                f"👤 {user_name}\n"
+                f"🏆 اصطاد {score} هدية!")
+        except:
+            pass
+
+    def handle_wheel_webapp_data(self, message):
+        """معالجة نتيجة صيد الجوائز من Web App — اختيار الجائزة server-side لمنع الغش"""
+        user_id = message.get('from', {}).get('id', '')
+        chat_id = message.get('chat', {}).get('id', '')
+        user_obj = self.find_user(user_id)
+        lang = user_obj.get('language', 'ar') if user_obj else 'ar'
+
         try:
             raw = message.get('web_app_data', {}).get('data', '{}')
             data = json.loads(raw)
             round_id = data.get('round_id', '')
-            prize = data.get('prize', '')
-            used_free = data.get('used_free', True)
-            cost = float(data.get('cost', 0))
+            # تجاهل prize من العميل — نختاره server-side
         except:
             return
 
@@ -14004,7 +14924,7 @@ class ComprehensiveDUXBot:
             pass
 
         if not round_data:
-            self.send_message(chat_id, "❌ الجولة غير موجودة أو منتهية")
+            self.send_message(chat_id, self.tr('a0640_الجولة_غير', lang))
             return
 
         # فحص حد الدورات
@@ -14023,9 +14943,9 @@ class ComprehensiveDUXBot:
         currency = round_data.get('currency', 'SAR')
 
         free_left = max(0, max_spins - my_spins)
-        is_free = used_free and free_left > 0
+        is_free = free_left > 0
 
-        # خصم تكلفة الدورة لو مدفوعة
+        # خصم تكلفة الدورة لو مدفوعة — التحقق server-side
         if not is_free and spin_cost > 0 and self.svrp:
             wallet = None
             try:
@@ -14038,12 +14958,12 @@ class ComprehensiveDUXBot:
                 pass
 
             if not wallet:
-                self.send_message(chat_id, "❌ لا يوجد محفظة لحسابك")
+                self.send_message(chat_id, self.tr('a0641_لا_يوجد', lang))
                 return
 
             balance = float(wallet.get('balance', 0) or 0)
             if balance < spin_cost:
-                self.send_message(chat_id, f"❌ رصيدك غير كافٍ\n💰 رصيدك: {balance:.0f} {currency}\n🎟️ التكلفة: {spin_cost:.0f} {currency}")
+                self.send_message(chat_id, self.tr('a0642_رصيدك_غير', lang, balance=balance, currency=currency, spin_cost=spin_cost))
                 return
 
             # خصم الرصيد
@@ -14065,6 +14985,15 @@ class ComprehensiveDUXBot:
             except Exception as e:
                 logger.error(f"خطأ في خصم رصيد العجلة: {e}")
 
+        # ===== اختيار الجائزة server-side (منع الغش) =====
+        import random
+        prizes = round_data.get('prizes', '').split('|')
+        prizes = [p.strip() for p in prizes if p.strip()]
+        if not prizes:
+            self.send_message(chat_id, self.tr('a0492_لا_توجد', lang))
+            return
+        prize = random.choice(prizes)
+
         # حفظ الدوران
         spin_id = f"SPN{str(int(datetime.now().timestamp()))[-6:]}"
         try:
@@ -14077,7 +15006,6 @@ class ComprehensiveDUXBot:
         # توزيع الجائزة على المحفظة — استخراج المبلغ من النص
         prize_distributed = 0.0
         try:
-            # محاولة استخراج رقم من نص الجائزة
             import re
             numbers = re.findall(r'[\d,.]+', prize.replace(',', ''))
             if numbers:
@@ -14090,28 +15018,27 @@ class ComprehensiveDUXBot:
 
         # رسالة للعميل
         result_text = (
-            f"🎉 <b>نتيجة عجلة الحظ!</b>\n\n"
+            f"🎯 <b>نتيجة صيد الجوائز!</b>\n\n"
             f"━━━━━━━━━━━━━━━━━━\n"
             f"🎁 الجائزة: <b>{prize}</b>\n"
         )
         if prize_distributed > 0:
-            result_text += f"💎 تم إضافة <code>{prize_distributed:.0f}</code> {currency} لمحفظتك المجمدة\n"
+            result_text += self.tr('a0643_تم_إضافة', lang, prize_distributed=prize_distributed, currency=currency)
         if not is_free and spin_cost > 0:
-            result_text += f"🎟️ تم خصم <code>{spin_cost:.0f}</code> {currency} من رصيدك\n"
+            result_text += self.tr('a0644_تم_خصم', lang, spin_cost=spin_cost, currency=currency)
         result_text += f"━━━━━━━━━━━━━━━━━━\n\n"
-        
-        free_after = max(0, max_spins - my_spins - 1)
-        result_text += f"🎯 دوراتك المجانية المتبقية: <code>{free_after}</code>\n"
 
-        self.send_message(chat_id, result_text, self.main_keyboard('ar', user_id))
+        free_after = max(0, max_spins - my_spins - 1)
+        result_text += self.tr('a0645_دوراتك_المجانية', lang, free_after=free_after)
+
+        self.send_message(chat_id, result_text, self.main_keyboard(lang, user_id))
 
         # إشعار الأدمن
-        user = self.find_user(user_id)
-        user_name = user.get('name', '') if user else str(user_id)
+        user_name = user_obj.get('name', '') if user_obj else str(user_id)
         for admin_id in self.admin_ids:
             try:
                 self.send_message(int(admin_id),
-                    f"🎡 <b>عجلة الحظ — نتيجة</b>\n\n"
+                    f"🎯 <b>صيد الجوائز — نتيجة</b>\n\n"
                     f"👤 {user_name} (<code>{user_id}</code>)\n"
                     f"🎁 الجائزة: <b>{prize}</b>\n"
                     f"{'💎 مبلغ: ' + str(prize_distributed) + ' ' + currency if prize_distributed > 0 else ''}\n"
@@ -14122,7 +15049,7 @@ class ComprehensiveDUXBot:
 
         # نشر في القنوات
         try:
-            self.post_to_channels(f"🎡 عجلة الحظ!\n👤 {user_name}\n🎁 ربح: {prize}")
+            self.post_to_channels(self.tr('a0646_عجلة_الحظ', lang, user_name=user_name, prize=prize))
         except:
             pass
 
@@ -14160,7 +15087,7 @@ class ComprehensiveDUXBot:
             for admin_id in self.admin_ids:
                 try:
                     self.send_message(int(admin_id),
-                        f"❌ <b>تمت إزالة البوت من قناة</b>\n\n📋 {chat_title} ({chat_id})")
+                        self.tr('a0647_تمت_إزالة', 'ar', chat_title=chat_title, chat_id=chat_id))
                 except:
                     pass
 
@@ -14402,20 +15329,11 @@ class ComprehensiveDUXBot:
                 del self.user_states[user_id]
         except Exception as e:
             logger.error(f"خطأ في تغيير اللغة: {e}")
-            self.send_message(message['chat']['id'], "❌ حدث خطأ أثناء تغيير اللغة", self.main_keyboard('ar'))
+            self.send_message(message['chat']['id'], self.tr('a0648_حدث_خطأ', 'ar'), self.main_keyboard('ar'))
     
     def prompt_admin_search(self, message):
         """طلب البحث من الأدمن"""
-        search_help = """🔍 البحث في النظام
-
-أرسل: بحث متبوعاً بالنص المطلوب
-
-يمكنك البحث بـ:
-• اسم العميل
-• رقم العميل
-• رقم الهاتف
-
-مثال: بحث أحمد"""
+        search_help = self.tr('a0649_البحث_في', 'ar')
         self.send_message(message['chat']['id'], search_help, self.admin_keyboard())
         
     def search_users_admin(self, message, query):
@@ -14432,80 +15350,68 @@ class ComprehensiveDUXBot:
                         results.append(row)
             
             if not results:
-                self.send_message(message['chat']['id'], f"❌ لم يتم العثور على نتائج للبحث: {query}", self.admin_keyboard())
+                self.send_message(message['chat']['id'], self.tr('a0650_لم_يتم', 'ar', query=query), self.admin_keyboard())
                 return
             
-            response = f"🔍 نتائج البحث عن: {query}\n\n"
+            response = self.tr('a0651_نتائج_البحث', 'ar', query=query)
             for user in results:
-                ban_status = "🚫 محظور" if user.get('is_banned') == 'yes' else "✅ نشط"
+                ban_status = self.tr('a0652_محظور', 'ar') if user.get('is_banned') == 'yes' else self.tr('a0653_نشط', 'ar')
                 response += f"👤 {user.get('name', 'غير محدد')}\n"
                 response += f"🆔 {user.get('customer_id', 'غير محدد')}\n"
                 response += f"📱 {user.get('phone', 'غير محدد')}\n"
                 response += f"🔸 {ban_status}\n\n"
             
             if len(response) > 4000:
-                response = response[:4000] + "\n... والمزيد من النتائج"
+                response = response[:4000] + self.tr('a0654_والمزيد_من', 'ar')
             
             self.send_message(message['chat']['id'], response, self.admin_keyboard())
             
         except Exception as e:
             logger.error(f"خطأ في البحث: {e}")
-            self.send_message(message['chat']['id'], "❌ حدث خطأ أثناء البحث", self.admin_keyboard())
+            self.send_message(message['chat']['id'], self.tr('a0655_حدث_خطأ', 'ar'), self.admin_keyboard())
 
     def add_admin_user(self, message, user_id_to_add):
         """إضافة أدمن جديد — مع فحوصات أمنية"""
         try:
             if not user_id_to_add.isdigit():
-                self.send_message(message['chat']['id'], "❌ معرف المستخدم يجب أن يكون رقماً صحيحاً", self.admin_keyboard())
+                self.send_message(message['chat']['id'], self.tr('a0656_معرف_المستخدم', 'ar'), self.admin_keyboard())
                 return
 
             new_admin_id = int(user_id_to_add)
             requester_id = message['from']['id']
 
             if new_admin_id == requester_id:
-                self.send_message(message['chat']['id'], "⚠️ أنت أدمن بالفعل!", self.admin_keyboard())
+                self.send_message(message['chat']['id'], self.tr('a0657_أنت_أدمن', 'ar'), self.admin_keyboard())
                 return
 
             if new_admin_id in self.admin_user_ids:
-                self.send_message(message['chat']['id'], f"⚠️ المستخدم {user_id_to_add} أدمن بالفعل", self.admin_keyboard())
+                self.send_message(message['chat']['id'], self.tr('a0658_المستخدم_أدمن', 'ar', user_id_to_add=user_id_to_add), self.admin_keyboard())
                 return
 
             if new_admin_id in self.temp_admin_user_ids:
-                self.send_message(message['chat']['id'], f"⚠️ المستخدم {user_id_to_add} مدير مؤقت بالفعل", self.admin_keyboard())
+                self.send_message(message['chat']['id'], self.tr('a0659_المستخدم_مدير', 'ar', user_id_to_add=user_id_to_add), self.admin_keyboard())
                 return
 
             self.admin_user_ids.append(new_admin_id)
             self.log_admin_action(requester_id, "add_admin", f"added admin: {user_id_to_add}")
 
-            success_msg = f"""✅ تم إضافة أدمن جديد بنجاح!
-
-🆔 {user_id_to_add}
-🔐 تم منح صلاحيات الإدارة
-
-💡 ملاحظة: هذا الأدمن نشط في الجلسة الحالية فقط.
-للاستمرارية، أضف المعرف إلى متغير البيئة ADMIN_USER_IDS"""
+            success_msg = self.tr('a0660_تم_إضافة', 'ar', user_id_to_add=user_id_to_add)
 
             self.send_message(message['chat']['id'], success_msg, self.admin_keyboard())
             logger.info(f"تم إضافة أدمن جديد: {user_id_to_add} بواسطة: {requester_id}")
 
         except Exception as e:
             logger.error(f"خطأ في إضافة الأدمن: {e}")
-            self.send_message(message['chat']['id'], "❌ حدث خطأ أثناء إضافة الأدمن", self.admin_keyboard())
+            self.send_message(message['chat']['id'], self.tr('a0661_حدث_خطأ', 'ar'), self.admin_keyboard())
     
     def prompt_add_admin(self, message):
         """طلب إضافة أدمن جديد"""
-        add_admin_help = """👥 إضافة أدمن جديد
-        
-الصيغة: اضافة_ادمن معرف_المستخدم
-
-مثال: اضافة_ادمن 123456789
-
-💡 لمعرفة معرف المستخدم، اطلب منه إرسال /myid"""
+        add_admin_help = self.tr('a0662_إضافة_أدمن', 'ar')
         self.send_message(message['chat']['id'], add_admin_help, self.admin_keyboard())
     
     def show_admin_list(self, message):
         """عرض قائمة الأدمن"""
-        admin_text = "📋 قائمة المديرين:\n\n"
+        admin_text = self.tr('a0663_قائمة_المديرين', 'ar')
         
         for i, admin_id in enumerate(self.admin_user_ids, 1):
             admin_text += f"{i}. 🆔 {admin_id}\n"
@@ -14549,26 +15455,26 @@ class ComprehensiveDUXBot:
 
         # 3) أزرار نظام التعويض (inline)
         svrp_buttons = [
-            '💰 إيداع', '💸 سحب', '🔄 استرداد', '📤 إرسال رصيد',
-            '💎 محفظتي', '👥 دعوة صديق', '🏢 تسجيل حساب جديد', '🏠 القائمة الرئيسية',
-            '🏢 تسجيل / تعديل الحسابات', '🔙 رجوع'
+            self.tr('a0664_إيداع', 'ar'), self.tr('a0665_سحب', 'ar'), self.tr('a0666_استرداد', 'ar'), self.tr('a0667_إرسال_رصيد', 'ar'),
+            self.tr('a0237_محفظتي', 'ar'), self.tr('a0540_دعوة_صديق', 'ar'), self.tr('a0668_تسجيل_حساب', 'ar'), self.tr('a0083_القائمة_الرئيسية', 'ar'),
+            self.tr('a0669_تسجيل_تعديل', 'ar'), self.tr('a0670_رجوع', 'ar')
         ]
         all_buttons.update(svrp_buttons)
 
         # 3b) أزرار التداول
-        trade_buttons = ['💱 تداول USDT', '📦 شراء', '💰 بيع', '📋 كل الطلبات']
+        trade_buttons = [self.tr('a0234_تداول', 'ar'), self.tr('a0671_شراء', 'ar'), self.tr('a0672_بيع', 'ar'), self.tr('a0302_كل_الطلبات', 'ar')]
         all_buttons.update(trade_buttons)
 
         # 4) أزرار نظام التطبيقات (inline)
-        app_buttons = ['➕ إضافة تطبيق جديد', '🔄 تحديث القائمة', '🔙 العودة للوحة الأدمن']
+        app_buttons = [self.tr('a0673_إضافة_تطبيق', 'ar'), self.tr('a0281_تحديث_القائمة', 'ar'), self.tr('a0674_العودة_للوحة', 'ar')]
         all_buttons.update(app_buttons)
 
         # 5) أزرار نظام البوتات (inline)
-        bot_buttons = ['➕ إضافة بوت جديد', '🔄 تحديث القائمة', '🔙 العودة للوحة الأدمن']
+        bot_buttons = [self.tr('a0675_إضافة_بوت', 'ar'), self.tr('a0281_تحديث_القائمة', 'ar'), self.tr('a0674_العودة_للوحة', 'ar')]
         all_buttons.update(bot_buttons)
 
         # 6) أزرار تسجيل الدخول
-        login_buttons = ['📝 تسجيل حساب جديد', '🔐 تسجيل الدخول برقم الهاتف', '⏭️ تخطي التسجيل']
+        login_buttons = [self.tr('a0218_تسجيل_حساب', 'ar'), self.tr('a0220_تسجيل_الدخول', 'ar'), self.tr('a0676_تخطي_التسجيل', 'ar')]
         all_buttons.update(login_buttons)
 
         # 7) أزرار تم تعديلها سابقاً
@@ -14580,7 +15486,7 @@ class ComprehensiveDUXBot:
             pass
 
         if not all_buttons:
-            self.send_message(chat_id, "⚠️ لا توجد أزرار متاحة للتعديل حالياً.", self.admin_keyboard())
+            self.send_message(chat_id, self.tr('a0677_لا_توجد', 'ar'), self.admin_keyboard())
             return
 
         sorted_buttons = sorted(all_buttons)
@@ -14621,18 +15527,18 @@ class ComprehensiveDUXBot:
             self.temp_button_label_edit = {}
 
         # إلغاء العملية في أي مرحلة
-        if text in ['إلغاء', 'الغاء', '❌ إلغاء', '❌ الغاء', 'cancel', 'الغاء العملية']:
+        if text in [self.tr('a0010_إلغاء', 'ar'), self.tr('a0011_الغاء', 'ar'), self.tr('a0009_إلغاء', 'ar'), self.tr('a0678_الغاء', 'ar'), 'cancel', self.tr('a0258_الغاء_العملية', 'ar')]:
             if user_id in self.temp_button_label_edit:
                 del self.temp_button_label_edit[user_id]
             if user_id in self.user_states:
                 del self.user_states[user_id]
-            self.send_message(chat_id, "❌ تم إلغاء عملية تعديل مسمى الزر.", self.admin_keyboard())
+            self.send_message(chat_id, self.tr('a0679_تم_إلغاء', 'ar'), self.admin_keyboard())
             return
 
         # المرحلة 1: اختيار الزر من القائمة
         if state == 'choose_button_to_edit':
             if not text:
-                self.send_message(chat_id, "❗ يرجى اختيار زر من القائمة.", self.admin_keyboard())
+                self.send_message(chat_id, self.tr('a0680_يرجى_اختيار', 'ar'), self.admin_keyboard())
                 return
 
             # حفظ النص القديم مؤقتاً
@@ -14649,14 +15555,14 @@ class ComprehensiveDUXBot:
         # المرحلة 2: استلام الاسم الجديد
         if state in ['enter_new_button_label', 'editing_button_label_new']:
             if not text:
-                self.send_message(chat_id, "❗ يرجى إرسال الاسم الجديد للزر.")
+                self.send_message(chat_id, self.tr('a0681_يرجى_إرسال', 'ar'))
                 return
 
             data = self.temp_button_label_edit.get(user_id, {})
             old_label = data.get('old')
             if not old_label:
                 # في حالة فقدان السياق نبدأ من جديد
-                self.send_message(chat_id, "⚠️ حدث خطأ بسيط في السياق، لنبدأ من جديد.", self.admin_keyboard())
+                self.send_message(chat_id, self.tr('a0682_حدث_خطأ', 'ar'), self.admin_keyboard())
                 self.start_button_label_editor(message)
                 return
 
@@ -14688,16 +15594,7 @@ class ComprehensiveDUXBot:
             return
     def show_admin_management(self, message):
             """لوحة إدارة المديرين المتقدمة"""
-            admin_text = """👥 إدارة المديرين
-            
-🔧 الخيارات:
-
-📋 عرض المديرين الحاليين
-➕ إضافة مدير دائم
-🕐 إضافة مدير مؤقت (بدور ومدة)
-🎭 تخصيص صلاحيات مدير
-➖ إزالة مدير
-📊 إحصائيات المديرين"""
+            admin_text = self.tr('a0683_إدارة_المديرين', 'ar')
 
             keyboard = [
                 [{'text': '📋 عرض قائمة المديرين'}, {'text': '➕ إضافة مدير دائم'}],
@@ -14726,25 +15623,25 @@ class ComprehensiveDUXBot:
             'name': 'مشرف معاملات',
             'icon': '💰',
             'buttons': [
-                '📋 الطلبات المعلقة', '✅ طلبات مُوافقة',
-                '👥 المستخدمين', '🔍 البحث',
-                '📊 الإحصائيات', '📑 تقرير Excel',
+                self.tr('a0684_الطلبات_المعلقة', 'ar'), self.tr('a0267_طلبات_مُوافقة', 'ar'),
+                self.tr('a0685_المستخدمين', 'ar'), self.tr('a0686_البحث', 'ar'),
+                self.tr('a0275_الإحصائيات', 'ar'), self.tr('a0687_تقرير', 'ar'),
             ],
         },
         'support': {
             'name': 'مشرف دعم',
             'icon': '🆘',
             'buttons': [
-                '📨 الشكاوى', '🛠️ بيانات الدعم',
-                '👥 المستخدمين', '🔍 البحث',
+                self.tr('a0688_الشكاوى', 'ar'), self.tr('a0689_بيانات_الدعم', 'ar'),
+                self.tr('a0685_المستخدمين', 'ar'), self.tr('a0686_البحث', 'ar'),
             ],
         },
         'companies': {
             'name': 'مشرف شركات',
             'icon': '🏢',
             'buttons': [
-                '🏢 الشركات', '💳 وسائل الدفع',
-                '📍 العناوين', '⚙️ الإعدادات', '🎨 الثيمات', '🌐 تغيير اللغة',
+                self.tr('a0280_الشركات', 'ar'), self.tr('a0690_وسائل_الدفع', 'ar'),
+                self.tr('a0691_العناوين', 'ar'), self.tr('a0692_الإعدادات', 'ar'), self.tr('a0693_الثيمات', 'ar'), self.tr('a0694_تغيير_اللغة', 'ar'),
             ],
         },
     }
@@ -14753,17 +15650,17 @@ class ComprehensiveDUXBot:
             """إضافة مدير مؤقت — مع دور ومدة انتهاء"""
             try:
                 if not user_id_to_add.isdigit():
-                    self.send_message(message['chat']['id'], "❌ معرف المستخدم يجب أن يكون رقماً صحيحاً", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], self.tr('a0656_معرف_المستخدم', 'ar'), self.admin_keyboard())
                     return
                 
                 user_id = int(user_id_to_add)
                 
                 if user_id in self.temp_admin_user_ids:
-                    self.send_message(message['chat']['id'], f"⚠️ المستخدم {user_id_to_add} مدير مؤقت بالفعل", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], self.tr('a0659_المستخدم_مدير', 'ar', user_id_to_add=user_id_to_add), self.admin_keyboard())
                     return
                 
                 if user_id in self.admin_user_ids:
-                    self.send_message(message['chat']['id'], f"⚠️ المستخدم {user_id_to_add} مدير دائم بالفعل", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], self.tr('a0695_المستخدم_مدير', 'ar', user_id_to_add=user_id_to_add), self.admin_keyboard())
                     return
 
                 # التحقق من صحة الدور
@@ -14777,9 +15674,9 @@ class ComprehensiveDUXBot:
                 if duration_hours > 0:
                     expiry_ts = time.time() + (duration_hours * 3600)
                     self.temp_admin_expiry[user_id] = expiry_ts
-                    expiry_display = f"{duration_hours} ساعة"
+                    expiry_display = self.tr('a0696_ساعة', 'ar', duration_hours=duration_hours)
                 else:
-                    expiry_display = "حتى إعادة تشغيل النظام"
+                    expiry_display = self.tr('a0697_حتى_إعادة', 'ar')
 
                 # ضبط الصلاحيات حسب الدور
                 role_info = self.ADMIN_ROLES[role]
@@ -14800,13 +15697,7 @@ class ComprehensiveDUXBot:
                 role_name = role_info['name']
                 role_icon = role_info['icon']
 
-                success_msg = f"""✅ تم إضافة مدير مؤقت بنجاح!
-                
-🆔 {user_id_to_add}
-🎭 الدور: {role_icon} {role_name}
-⏰ المدة: {expiry_display}
-
-💡 الصلاحيات حسب الدور المحدد"""
+                success_msg = self.tr('a0698_تم_إضافة', 'ar', user_id_to_add=user_id_to_add, role_icon=role_icon, role_name=role_name, expiry_display=expiry_display)
 
                 self.send_message(message['chat']['id'], success_msg, self.admin_keyboard())
                 self.log_admin_action(message['from']['id'], "add_temp_admin",
@@ -14815,13 +15706,13 @@ class ComprehensiveDUXBot:
                 
             except Exception as e:
                 logger.error(f"خطأ في إضافة المدير المؤقت: {e}")
-                self.send_message(message['chat']['id'], "❌ حدث خطأ أثناء إضافة المدير المؤقت", self.admin_keyboard())
+                self.send_message(message['chat']['id'], self.tr('a0699_حدث_خطأ', 'ar'), self.admin_keyboard())
         
     def remove_admin_user(self, message, user_id_to_remove):
             """إزالة مدير — مع منع إزالة النفس"""
             try:
                 if not user_id_to_remove.isdigit():
-                    self.send_message(message['chat']['id'], "❌ معرف المستخدم يجب أن يكون رقماً صحيحاً", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], self.tr('a0656_معرف_المستخدم', 'ar'), self.admin_keyboard())
                     return
                 
                 user_id = int(user_id_to_remove)
@@ -14829,12 +15720,12 @@ class ComprehensiveDUXBot:
                 
                 # أمان: منع إزالة النفس
                 if user_id == requester_id:
-                    self.send_message(message['chat']['id'], "⚠️ لا يمكنك إزالة نفسك!", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], self.tr('a0700_لا_يمكنك', 'ar'), self.admin_keyboard())
                     return
                 
                 # أمان: منع إزالة آخر أدمن دائم
                 if user_id in self.admin_user_ids and len(self.admin_user_ids) <= 1:
-                    self.send_message(message['chat']['id'], "⚠️ لا يمكن إزالة آخر مدير دائم!", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], self.tr('a0701_لا_يمكن', 'ar'), self.admin_keyboard())
                     return
                 
                 removed = False
@@ -14844,119 +15735,84 @@ class ComprehensiveDUXBot:
                 if user_id in self.temp_admin_user_ids:
                     self.temp_admin_user_ids.remove(user_id)
                     removed = True
-                    admin_type = "مؤقت"
+                    admin_type = self.tr('a0702_مؤقت', 'ar')
                 
                 # إزالة من المديرين الدائمين (للجلسة الحالية فقط)
                 elif user_id in self.admin_user_ids:
                     self.admin_user_ids.remove(user_id)
                     removed = True
-                    admin_type = "دائم (من الجلسة الحالية)"
+                    admin_type = self.tr('a0703_دائم_من', 'ar')
                 
                 if removed:
-                    success_msg = f"""✅ تم إزالة المدير بنجاح!
-                    
-    🆔 معرف المستخدم: {user_id_to_remove}
-    🔧 نوع المدير: {admin_type}
-    
-    ⚠️ ملاحظة: إذا كان مديراً دائماً، سيتم استعادته عند إعادة تشغيل النظام إلا إذا تم إزالته من متغير البيئة ADMIN_USER_IDS"""
+                    success_msg = self.tr('a0704_تم_إزالة', 'ar', user_id_to_remove=user_id_to_remove, admin_type=admin_type)
                     
                     self.send_message(message['chat']['id'], success_msg, self.admin_keyboard())
                     logger.info(f"تم إزالة مدير {admin_type}: {user_id_to_remove}")
                 else:
-                    self.send_message(message['chat']['id'], f"❌ المستخدم {user_id_to_remove} ليس مديراً", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], self.tr('a0705_المستخدم_ليس', 'ar', user_id_to_remove=user_id_to_remove), self.admin_keyboard())
                 
             except Exception as e:
                 logger.error(f"خطأ في إزالة المدير: {e}")
-                self.send_message(message['chat']['id'], "❌ حدث خطأ أثناء إزالة المدير", self.admin_keyboard())
+                self.send_message(message['chat']['id'], self.tr('a0706_حدث_خطأ', 'ar'), self.admin_keyboard())
         
     def show_detailed_admin_list(self, message):
             """عرض قائمة المديرين المفصلة"""
-            admin_text = "📋 قائمة المديرين المفصلة\n\n"
+            admin_text = self.tr('a0707_قائمة_المديرين', 'ar')
             
             # المديرين الدائمين
             if self.admin_user_ids:
-                admin_text += "🔒 المديرين الدائمين:\n"
+                admin_text += self.tr('a0708_المديرين_الدائمين', 'ar')
                 for i, admin_id in enumerate(self.admin_user_ids, 1):
-                    admin_text += f"   {i}. 🆔 {admin_id} (دائم)\n"
+                    admin_text += self.tr('a0709_دائم', 'ar', i=i, admin_id=admin_id)
                 admin_text += f"   📊 العدد: {len(self.admin_user_ids)}\n\n"
             
             # المديرين المؤقتين
             if self.temp_admin_user_ids:
-                admin_text += "🕐 المديرين المؤقتين:\n"
+                admin_text += self.tr('a0710_المديرين_المؤقتين', 'ar')
                 for i, admin_id in enumerate(self.temp_admin_user_ids, 1):
-                    admin_text += f"   {i}. 🆔 {admin_id} (مؤقت)\n"
+                    admin_text += self.tr('a0711_مؤقت', 'ar', i=i, admin_id=admin_id)
                 admin_text += f"   📊 العدد: {len(self.temp_admin_user_ids)}\n\n"
             
             # المديرين من متغيرات البيئة
             if self.admin_ids:
-                admin_text += "🌐 مديرين البيئة:\n"
+                admin_text += self.tr('a0712_مديرين_البيئة', 'ar')
                 for i, admin_id in enumerate(self.admin_ids, 1):
-                    admin_text += f"   {i}. 🆔 {admin_id} (بيئة)\n"
+                    admin_text += self.tr('a0713_بيئة', 'ar', i=i, admin_id=admin_id)
                 admin_text += f"   📊 العدد: {len(self.admin_ids)}\n\n"
             
             total_admins = len(self.admin_user_ids) + len(self.temp_admin_user_ids) + len(self.admin_ids)
-            admin_text += f"📈 إجمالي المديرين: {total_admins}"
+            admin_text += self.tr('a0714_إجمالي_المديرين', 'ar', total_admins=total_admins)
             
             self.send_message(message['chat']['id'], admin_text, self.admin_keyboard())
         
     def prompt_add_permanent_admin(self, message):
             """طلب إضافة مدير دائم"""
-            help_text = """➕ إضافة مدير دائم
-            
-    الصيغة: اضافة_ادمن معرف_المستخدم
-    
-    مثال: اضافة_ادمن 123456789
-    
-    💡 المدير الدائم:
-    • يحتفظ بصلاحياته في الجلسة الحالية
-    • يفقد الصلاحيات عند إعادة التشغيل إلا إذا تم إضافته لمتغير البيئة
-    • لمعرفة معرف المستخدم: /myid"""
+            help_text = self.tr('a0715_إضافة_مدير', 'ar')
             
             self.send_message(message['chat']['id'], help_text, self.admin_keyboard())
         
     def prompt_add_temp_admin(self, message):
             """طلب إضافة مدير مؤقت — مع اختيار الدور والمدة"""
-            help_text = """🕐 إضافة مدير مؤقت
-
-الصيغة: ادمن_مؤقت معرف_المستخدم الدور المدة_بالساعات
-
-🎭 الأدوار المتاحة:
-• full — مدير كامل (كل الصلاحيات)
-• transactions — مشرف معاملات (طلبات + موافقة/رفض + إحصائيات)
-• support — مشرف دعم (شكاوى + دعم + بحث)
-• companies — مشرف شركات (شركات + وسائل دفع + إعدادات)
-
-⏰ المدة بالساعات (0 = حتى إعادة التشغيل):
-• 1 = ساعة واحدة
-• 24 = يوم كامل
-• 168 = أسبوع
-
-📋 أمثلة:
-ادمن_مؤقت 123456789 full 24
-ادمن_مؤقت 123456789 transactions 8
-ادمن_مؤقت 123456789 support 0
-ادمن_مؤقت 123456789 companies 48
-
-💡 اكتب الأمر الآن:"""
+            help_text = self.tr('a0716_إضافة_مدير', 'ar')
             
             self.send_message(message['chat']['id'], help_text, self.admin_keyboard())
         
     def start_permission_editor(self, message):
             """بدء تخصيص صلاحيات مدير"""
             # عرض الأدوار الجاهزة
-            roles_text = "🎭 تخصيص صلاحيات مدير\n\n"
-            roles_text += "اختر دوراً جاهزاً أو خصص يدوياً:\n\n"
+            roles_text = self.tr('a0717_تخصيص_صلاحيات', 'ar')
+            roles_text += self.tr('a0718_اختر_دوراً', 'ar')
             for code, info in self.ADMIN_ROLES.items():
                 icon = info['icon']
                 name = info['name']
                 if info['buttons'] is None:
-                    roles_text += f"{icon} {name} ({code}) — كل الأزرار\n"
+                    roles_text += self.tr('a0719_كل_الأزرار', 'ar', icon=icon, name=name, code=code)
                 else:
                     roles_text += f"{icon} {name} ({code}) — {len(info['buttons'])} أزرار\n"
-            roles_text += "\n📋 الصيغة:\n"
-            roles_text += "صلاحيات ID_المستخدم الدور\n\n"
-            roles_text += "مثال:\n"
-            roles_text += "صلاحيات 123456789 transactions"
+            roles_text += self.tr('a0720_الصيغة', 'ar')
+            roles_text += self.tr('a0721_صلاحيات_المستخدم', 'ar')
+            roles_text += self.tr('a0722_مثال', 'ar')
+            roles_text += self.tr('a0723_صلاحيات', 'ar')
 
             self.send_message(message['chat']['id'], roles_text, self.admin_keyboard())
 
@@ -14964,7 +15820,7 @@ class ComprehensiveDUXBot:
             """تعيين دور لمدير"""
             try:
                 if role not in self.ADMIN_ROLES:
-                    self.send_message(message['chat']['id'], "❌ دور غير صحيح. استخدم: full, transactions, support, companies", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], self.tr('a0724_دور_غير', 'ar'), self.admin_keyboard())
                     return
 
                 role_info = self.ADMIN_ROLES[role]
@@ -14984,34 +15840,22 @@ class ComprehensiveDUXBot:
                 self.log_admin_action(message['from']['id'], "set_admin_role",
                     f"admin={admin_id_str}, role={role}")
                 self.send_message(message['chat']['id'],
-                    f"✅ تم تعيين دور: {role_info['icon']} {role_info['name']}\nللمدير: {admin_id_str}",
+                    self.tr('a0725_تم_تعيين', 'ar', role_info_icon=role_info['icon'], role_info_name=role_info['name'], admin_id_str=admin_id_str),
                     self.admin_keyboard())
                 logger.info(f"Set admin role {role} for {admin_id_str}")
             except Exception as e:
                 logger.error(f"خطأ في تعيين دور المدير: {e}")
-                self.send_message(message['chat']['id'], "❌ خطأ في تعيين الدور", self.admin_keyboard())
+                self.send_message(message['chat']['id'], self.tr('a0726_خطأ_في', 'ar'), self.admin_keyboard())
 
     def prompt_remove_admin(self, message):
             """طلب إزالة مدير"""
-            help_text = """➖ إزالة مدير
-            
-    الصيغة: ازالة_ادمن معرف_المستخدم
-    
-    مثال: ازالة_ادمن 123456789
-    
-    ⚠️ ملاحظات مهمة:
-    • يمكن إزالة المديرين المؤقتين والدائمين
-    • المديرين الدائمين سيتم استعادتهم عند إعادة التشغيل
-    • لإزالة دائمة، يجب تعديل متغير البيئة ADMIN_USER_IDS"""
+            help_text = self.tr('a0727_إزالة_مدير', 'ar')
             
             self.send_message(message['chat']['id'], help_text, self.admin_keyboard())
         
     def show_admin_statistics(self, message):
             """عرض إحصائيات المديرين"""
-            stats_text = """📊 إحصائيات المديرين
-            
-    📈 الإحصائيات العامة:
-    """
+            stats_text = self.tr('a0728_إحصائيات_المديرين', 'ar')
             
             # إحصائيات المديرين
             permanent_count = len(self.admin_user_ids)
@@ -15019,55 +15863,40 @@ class ComprehensiveDUXBot:
             env_count = len(self.admin_ids)
             total_count = permanent_count + temp_count + env_count
             
-            stats_text += f"🔒 مديرين دائمين: {permanent_count}\n"
-            stats_text += f"🕐 مديرين مؤقتين: {temp_count}\n"
-            stats_text += f"🌐 mديرين البيئة: {env_count}\n"
-            stats_text += f"📊 إجمالي المديرين: {total_count}\n\n"
+            stats_text += self.tr('a0729_مديرين_دائمين', 'ar', permanent_count=permanent_count)
+            stats_text += self.tr('a0730_مديرين_مؤقتين', 'ar', temp_count=temp_count)
+            stats_text += self.tr('a0731_ديرين_البيئة', 'ar', env_count=env_count)
+            stats_text += self.tr('a0732_إجمالي_المديرين', 'ar', total_count=total_count)
             
             # إحصائيات الأمان
-            stats_text += "🔐 مستوى الأمان:\n"
+            stats_text += self.tr('a0733_مستوى_الأمان', 'ar')
             if total_count >= 3:
-                stats_text += "🟢 ممتاز - عدد كافٍ من المديرين\n"
+                stats_text += self.tr('a0734_ممتاز_عدد', 'ar')
             elif total_count >= 2:
-                stats_text += "🟡 جيد - يُنصح بإضافة مدير إضافي\n"
+                stats_text += self.tr('a0735_جيد_يُنصح', 'ar')
             else:
-                stats_text += "🔴 منخفض - يُنصح بإضافة مديرين إضافيين\n"
+                stats_text += self.tr('a0736_منخفض_يُنصح', 'ar')
             
             # توصيات
-            stats_text += "\n💡 التوصيات:\n"
+            stats_text += self.tr('a0737_التوصيات', 'ar')
             if temp_count > permanent_count:
-                stats_text += "• تحويل بعض المديرين المؤقتين إلى دائمين\n"
+                stats_text += self.tr('a0738_تحويل_بعض', 'ar')
             if total_count < 2:
-                stats_text += "• إضافة مديرين احتياطيين للطوارئ\n"
+                stats_text += self.tr('a0739_إضافة_مديرين', 'ar')
             if env_count == 0:
-                stats_text += "• إضافة مدير في متغير البيئة للاستمرارية\n"
+                stats_text += self.tr('a0740_إضافة_مدير', 'ar')
             
             self.send_message(message['chat']['id'], stats_text, self.admin_keyboard())
         
     def prompt_broadcast(self, message):
             """طلب الإرسال الجماعي — يدعم جميع أنواع الوسائط"""
-            broadcast_help = """📢 الإرسال الجماعي
-
-⚠️ سيتم إرسال الرسالة لجميع المستخدمين النشطين.
-
-✅ يمكنك إرسال:
-• 📝 نص بأي لغة
-• 🖼️ صورة (PNG/JPG/WebP)
-• 🎥 فيديو (MP4)
-• 🃏 ملصق (Sticker)
-• 📄 ملف/مستند
-
-أرسل المحتوى الآن:"""
+            broadcast_help = self.tr('a0741_الإرسال_الجماعي', 'ar')
             self.send_message(message['chat']['id'], broadcast_help)
             self.user_states[message['from']['id']] = 'admin_broadcasting'
         
     def prompt_ban_user(self, message):
             """طلب حظر مستخدم"""
-            ban_help = """🚫 حظر مستخدم
-    
-    الصيغة: حظر رقم_العميل السبب
-    
-    مثال: حظر C123456 مخالفة الشروط"""
+            ban_help = self.tr('a0742_حظر_مستخدم', 'ar')
             self.send_message(message['chat']['id'], ban_help, self.admin_keyboard())
         
     def prompt_unban_user(self, message):
@@ -15082,41 +15911,29 @@ class ComprehensiveDUXBot:
                             banned_users.append({
                                 'customer_id': row['customer_id'],
                                 'name': row['name'],
-                                'ban_reason': row.get('ban_reason', 'غير محدد')
+                                'ban_reason': row.get('ban_reason', self.tr('a0122_غير_محدد', 'ar'))
                             })
             except:
                 pass
             
-            unban_help = """✅ إلغاء حظر مستخدم
-    
-    📝 الصيغة الصحيحة:
-    الغاء_حظر [رقم_العميل]
-    أو: الغاء حظر [رقم_العميل]
-    
-    مثال:
-    الغاء_حظر C810563"""
+            unban_help = self.tr('a0743_إلغاء_حظر', 'ar')
             
             if banned_users:
-                unban_help += "\n\n🚫 المستخدمين المحظورين حالياً:\n"
+                unban_help += self.tr('a0744_المستخدمين_المحظورين', 'ar')
                 for user in banned_users:
                     unban_help += f"\n🆔 {user['customer_id']}\n"
                     unban_help += f"👤 {user['name']}\n"
-                    unban_help += f"📝 السبب: {user['ban_reason']}\n"
-                    unban_help += f"⚡ `الغاء_حظر {user['customer_id']}`\n"
+                    unban_help += self.tr('a0745_السبب', 'ar', user_ban_reason=user['ban_reason'])
+                    unban_help += self.tr('a0746_الغاء_حظر', 'ar', user_customer_id=user['customer_id'])
                     unban_help += "▫️▫️▫️▫️▫️▫️▫️▫️▫️▫️\n"
             else:
-                unban_help += "\n\n✅ لا يوجد مستخدمين محظورين حالياً"
+                unban_help += self.tr('a0747_لا_يوجد', 'ar')
             
             self.send_message(message['chat']['id'], unban_help, self.admin_keyboard())
         
     def prompt_add_company(self, message):
             """بدء معالج إضافة شركة التفاعلي"""
-            help_text = """🏢 معالج إضافة شركة جديدة
-            
-    سأطلب منك المعلومات خطوة بخطوة:
-    
-    📝 أولاً، أرسل اسم الشركة:
-    مثال: البنك الأهلي، مدى، STC Pay، فودافون كاش"""
+            help_text = self.tr('a0748_معالج_إضافة', 'ar')
             
             self.send_message(message['chat']['id'], help_text)
             self.user_states[message['from']['id']] = 'adding_company_name'
@@ -15148,29 +15965,29 @@ class ComprehensiveDUXBot:
                 }
                 
                 self.send_message(message['chat']['id'], 
-                    f"✅ تم حفظ اسم الشركة: {text}\n\n🔧 الآن اختر نوع الخدمة:", 
+                    self.tr('a0749_تم_حفظ', 'ar', text=text), 
                     service_keyboard)
                 self.user_states[user_id] = 'adding_company_type'
                 
             elif state == 'adding_company_type':
                 # حفظ نوع الخدمة
-                if text == '💳 إيداع فقط':
+                if text == self.tr('a0750_إيداع_فقط', 'ar'):
                     service_type = 'deposit'
-                    service_display = 'إيداع فقط'
-                elif text == '💰 سحب فقط':
+                    service_display = self.tr('a0751_إيداع_فقط', 'ar')
+                elif text == self.tr('a0752_سحب_فقط', 'ar'):
                     service_type = 'withdraw'
-                    service_display = 'سحب فقط'
-                elif text == '🔄 إيداع وسحب معاً':
+                    service_display = self.tr('a0753_سحب_فقط', 'ar')
+                elif text == self.tr('a0754_إيداع_وسحب', 'ar'):
                     service_type = 'both'
-                    service_display = 'إيداع وسحب'
-                elif text == '❌ إلغاء':
+                    service_display = self.tr('a0755_إيداع_وسحب', 'ar')
+                elif text == self.tr('a0009_إلغاء', 'ar'):
                     del self.user_states[user_id]
                     if hasattr(self, 'temp_company_data') and user_id in self.temp_company_data:
                         del self.temp_company_data[user_id]
-                    self.send_message(message['chat']['id'], "❌ تم إلغاء إضافة الشركة", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], self.tr('a0756_تم_إلغاء', 'ar'), self.admin_keyboard())
                     return
                 else:
-                    self.send_message(message['chat']['id'], "❌ اختر نوع الخدمة من الأزرار المتاحة")
+                    self.send_message(message['chat']['id'], self.tr('a0757_اختر_نوع', 'ar'))
                     return
                 
                 self.temp_company_data[user_id]['type'] = service_type
@@ -15178,30 +15995,30 @@ class ComprehensiveDUXBot:
                 
                 # طلب التفاصيل
                 self.send_message(message['chat']['id'], 
-                    f"✅ نوع الخدمة: {service_display}\n\n📋 الآن أرسل تفاصيل الشركة:\nمثال: محفظة إلكترونية، حساب بنكي رقم 1234567890، خدمة دفع رقمية")
+                    self.tr('a0758_نوع_الخدمة', 'ar', service_display=service_display))
                 self.user_states[user_id] = 'adding_company_details'
                 
             elif state == 'adding_company_details':
                 # حفظ التفاصيل وطلب الأيقونة
                 self.temp_company_data[user_id]['details'] = text
                 self.send_message(message['chat']['id'], 
-                    "🏷️ اختر أيقونة للشركة:\n\nاكتب اسم النوع أو الصق إيموجي:\n• bank → 🏦\n• wallet → 👛\n• phone → 📱\n• cash → 💵\n• card → 💳\n• stc → 📡\n• أو اكتب 'skip' للأيقونة الافتراضية")
+                    self.tr('a0759_اختر_أيقونة', 'ar'))
                 self.user_states[user_id] = 'adding_company_icon'
                 
             elif state == 'adding_company_icon':
                 # حفظ الأيقونة وطلب العنوان
-                if text.lower().strip() in ['skip', 'تخطي', '']:
+                if text.lower().strip() in ['skip', self.tr('a0024_تخطي', 'ar'), '']:
                     icon = '🏢'
                 else:
                     icon = self.normalize_icon(text.strip(), default='🏢')
                 self.temp_company_data[user_id]['icon'] = icon
                 self.send_message(message['chat']['id'], 
-                    "📍 أدخل عنوان السحب لهذه الشركة:\n(أو اكتب 'skip' لاستخدام العنوان العام)")
+                    self.tr('a0760_أدخل_عنوان', 'ar'))
                 self.user_states[user_id] = 'adding_company_address'
                 
             elif state == 'adding_company_address':
                 # حفظ العنوان وطلب رابط الإحالة
-                if text.lower().strip() in ['skip', 'تخطي', '']:
+                if text.lower().strip() in ['skip', self.tr('a0024_تخطي', 'ar'), '']:
                     address = ''
                 else:
                     address = self.sanitize_input(text.strip())
@@ -15214,7 +16031,7 @@ class ComprehensiveDUXBot:
                 self.user_states[user_id] = 'adding_company_affiliate'
                 
             elif state == 'adding_company_affiliate':
-                if text.lower().strip() in ['skip', 'تخطي', '']:
+                if text.lower().strip() in ['skip', self.tr('a0024_تخطي', 'ar'), '']:
                     affiliate = ''
                 else:
                     affiliate = text.strip()
@@ -15222,17 +16039,9 @@ class ComprehensiveDUXBot:
                 
                 company_data = self.temp_company_data[user_id]
                 icon = company_data.get('icon', '🏢')
-                address_display = company_data.get('address', '') or '(عنوان عام)'
-                affiliate_display = company_data.get('affiliate_link', '') or '(لا يوجد)'
-                confirm_text = f"""📊 ملخص الشركة الجديدة:
-    
-    {icon} الاسم: {company_data['name']}
-    ⚡ نوع الخدمة: {company_data['type_display']}
-    📋 التفاصيل: {company_data['details']}
-    📍 العنوان: {address_display}
-    🔗 رابط الإحالة: {affiliate_display}
-    
-    هل تريد حفظ هذه الشركة؟"""
+                address_display = company_data.get('address', '') or self.tr('a0761_عنوان_عام', 'ar')
+                affiliate_display = company_data.get('affiliate_link', '') or self.tr('a0762_لا_يوجد', 'ar')
+                confirm_text = self.tr('a0763_ملخص_الشركة', 'ar', icon=icon, company_data_name=company_data['name'], company_data_type_display=company_data['type_display'], company_data_details=company_data['details'], address_display=address_display, affiliate_display=affiliate_display)
                 
                 # أزرار inline للتأكيد
                 inline_btns = [
@@ -15249,21 +16058,21 @@ class ComprehensiveDUXBot:
             elif state == 'confirming_company':
                 company_data = self.temp_company_data[user_id]
                 
-                if text == '✅ حفظ الشركة':
+                if text == self.tr('a0351_حفظ_الشركة', 'ar'):
                     # تجنب تشغيل نفس الكود مرتين - هذا يُعالج الآن في handle_admin_actions
                     pass
                         
-                elif text == '❌ إلغاء':
+                elif text == self.tr('a0009_إلغاء', 'ar'):
                     del self.user_states[user_id]
                     if user_id in self.temp_company_data:
                         del self.temp_company_data[user_id]
-                    self.send_message(message['chat']['id'], "❌ تم إلغاء إضافة الشركة", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], self.tr('a0756_تم_إلغاء', 'ar'), self.admin_keyboard())
                     
-                elif text == '🔄 تعديل الاسم':
-                    self.send_message(message['chat']['id'], f"📝 الاسم الحالي: {company_data['name']}\n\nأرسل الاسم الجديد:")
+                elif text == self.tr('a0764_تعديل_الاسم', 'ar'):
+                    self.send_message(message['chat']['id'], self.tr('a0765_الاسم_الحالي', 'ar', company_data_name=company_data['name']))
                     self.user_states[user_id] = 'adding_company_name'
                     
-                elif text == '🔧 تعديل النوع':
+                elif text == self.tr('a0766_تعديل_النوع', 'ar'):
                     service_keyboard = {
                         'keyboard': [
                             [{'text': '💳 إيداع فقط'}, {'text': '💰 سحب فقط'}],
@@ -15273,20 +16082,20 @@ class ComprehensiveDUXBot:
                         'resize_keyboard': True,
                         'one_time_keyboard': True
                     }
-                    self.send_message(message['chat']['id'], f"🔧 النوع الحالي: {company_data['type_display']}\n\nاختر النوع الجديد:", service_keyboard)
+                    self.send_message(message['chat']['id'], self.tr('a0767_النوع_الحالي', 'ar', company_data_type_display=company_data['type_display']), service_keyboard)
                     self.user_states[user_id] = 'adding_company_type'
                     
-                elif text == '📝 تعديل التفاصيل':
-                    self.send_message(message['chat']['id'], f"📋 التفاصيل الحالية: {company_data['details']}\n\nأرسل التفاصيل الجديدة:")
+                elif text == self.tr('a0768_تعديل_التفاصيل', 'ar'):
+                    self.send_message(message['chat']['id'], self.tr('a0769_التفاصيل_الحالية', 'ar', company_data_details=company_data['details']))
                     self.user_states[user_id] = 'adding_company_details'
                     
                 else:
-                    self.send_message(message['chat']['id'], "❌ اختر من الأزرار المتاحة")
+                    self.send_message(message['chat']['id'], self.tr('a0770_اختر_من', 'ar'))
         
     def prompt_edit_company(self, message):
             """بدء معالج تعديل الشركة"""
             # عرض الشركات المتاحة للتعديل
-            companies_text = "🔧 تعديل الشركات:\n\n"
+            companies_text = self.tr('a0771_تعديل_الشركات', 'ar')
             
             try:
                 with open('companies.csv', 'r', encoding='utf-8-sig') as f:
@@ -15296,9 +16105,9 @@ class ComprehensiveDUXBot:
                         companies_text += f"{status} {row['id']} - {row['name']}\n"
                         companies_text += f"   📋 {row['type']} - {row['details']}\n\n"
             except:
-                companies_text += "❌ لا توجد شركات\n\n"
+                companies_text += self.tr('a0772_لا_توجد', 'ar')
             
-            companies_text += "📝 أرسل رقم معرف الشركة التي تريد تعديلها:"
+            companies_text += self.tr('a0773_أرسل_رقم', 'ar')
             
             self.send_message(message['chat']['id'], companies_text)
             self.user_states[message['from']['id']] = 'selecting_company_edit'
@@ -15323,7 +16132,7 @@ class ComprehensiveDUXBot:
                     pass
                 
                 if not company_found:
-                    self.send_message(message['chat']['id'], f"❌ لم يتم العثور على شركة بالمعرف: {text}")
+                    self.send_message(message['chat']['id'], self.tr('a0774_لم_يتم', 'ar', text=text))
                     return
                 
                 # حفظ بيانات الشركة للتعديل
@@ -15358,12 +16167,12 @@ class ComprehensiveDUXBot:
                 self.user_states[user_id] = 'editing_company_menu'
                 
             elif state == 'editing_company_menu':
-                if text == '📝 تعديل الاسم':
+                if text == self.tr('a0775_تعديل_الاسم', 'ar'):
                     current_name = self.edit_company_data[user_id]['name']
-                    self.send_message(message['chat']['id'], f"📝 الاسم الحالي: {current_name}\n\nأرسل الاسم الجديد:")
+                    self.send_message(message['chat']['id'], self.tr('a0776_الاسم_الحالي', 'ar', current_name=current_name))
                     self.user_states[user_id] = 'editing_company_name'
                     
-                elif text == '🔧 تعديل النوع':
+                elif text == self.tr('a0766_تعديل_النوع', 'ar'):
                     service_keyboard = {
                         'keyboard': [
                             [{'text': '💳 إيداع فقط'}, {'text': '💰 سحب فقط'}],
@@ -15374,24 +16183,24 @@ class ComprehensiveDUXBot:
                         'one_time_keyboard': True
                     }
                     current_type = {'deposit': 'إيداع فقط', 'withdraw': 'سحب فقط', 'both': 'إيداع وسحب'}.get(self.edit_company_data[user_id]['type'])
-                    self.send_message(message['chat']['id'], f"🔧 النوع الحالي: {current_type}\n\nاختر النوع الجديد:", service_keyboard)
+                    self.send_message(message['chat']['id'], self.tr('a0777_النوع_الحالي', 'ar', current_type=current_type), service_keyboard)
                     self.user_states[user_id] = 'editing_company_type'
                     
-                elif text == '📋 تعديل التفاصيل':
+                elif text == self.tr('a0778_تعديل_التفاصيل', 'ar'):
                     current_details = self.edit_company_data[user_id]['details']
-                    self.send_message(message['chat']['id'], f"📋 التفاصيل الحالية: {current_details}\n\nأرسل التفاصيل الجديدة:")
+                    self.send_message(message['chat']['id'], self.tr('a0779_التفاصيل_الحالية', 'ar', current_details=current_details))
                     self.user_states[user_id] = 'editing_company_details'
                     
-                elif text == '🔘 تغيير الحالة':
+                elif text == self.tr('a0780_تغيير_الحالة', 'ar'):
                     current_status = self.edit_company_data[user_id].get('is_active', 'active')
                     new_status = 'inactive' if current_status == 'active' else 'active'
-                    status_text = 'نشط' if new_status == 'active' else 'غير نشط'
+                    status_text = self.tr('a0058_نشط', 'ar') if new_status == 'active' else self.tr('a0781_غير_نشط', 'ar')
                     
                     self.edit_company_data[user_id]['is_active'] = new_status
-                    self.send_message(message['chat']['id'], f"✅ تم تغيير حالة الشركة إلى: {status_text}")
+                    self.send_message(message['chat']['id'], self.tr('a0782_تم_تغيير', 'ar', status_text=status_text))
                     self.show_edit_menu(message, user_id)
                     
-                elif text == '📍 تعديل العنوان':
+                elif text == self.tr('a0783_تعديل_العنوان', 'ar'):
                     current_address = self.edit_company_data[user_id].get('address', '') or ''
                     self.send_message(message['chat']['id'],
                         f"📍 العنوان الحالي: {current_address or 'غير محدد'}\n\n"
@@ -15400,7 +16209,7 @@ class ComprehensiveDUXBot:
                         "أو اكتب 'حذف' لإزالة العنوان")
                     self.user_states[user_id] = 'editing_company_address'
                     
-                elif text == '🔗 تعديل رابط الإحالة':
+                elif text == self.tr('a0784_تعديل_رابط', 'ar'):
                     current_affiliate = self.edit_company_data[user_id].get('affiliate_link', '') or ''
                     self.send_message(message['chat']['id'],
                         f"🔗 رابط الإحالة الحالي: {current_affiliate or 'غير محدد'}\n\n"
@@ -15409,63 +16218,118 @@ class ComprehensiveDUXBot:
                         "أو اكتب 'حذف' لإزالة الرابط")
                     self.user_states[user_id] = 'editing_company_affiliate'
                     
-                elif text == '💳 ربط وسائل الدفع':
+                elif text == self.tr('a0785_ربط_وسائل', 'ar'):
                     self.show_company_payment_methods_link(message, user_id)
                     
-                elif text == '✅ حفظ التغييرات':
+                elif text == '🏷️ أيقونة الشركة':
+                    # عرض شبكة إيموجي من المكتبة + افتراضية
+                    company_id = self.edit_company_data[user_id].get('id', '')
+                    current_icon = self.edit_company_data[user_id].get('icon', '🏢') or '🏢'
+                    # قراءة كل الإيموجي من المكتبة
+                    lib_emojis = []
+                    try:
+                        with open('sticker_library.csv', 'r', encoding='utf-8-sig') as f:
+                            reader = csv.DictReader(f)
+                            for row in reader:
+                                if row.get('type') == 'emoji' and row.get('emoji', '').strip():
+                                    lib_emojis.append(row.get('emoji', '').strip())
+                    except:
+                        pass
+
+                    # إيموجي افتراضية شائعة للشركات
+                    default_emojis = ['🏦', '💳', '📱', '💵', '👛', '🏢', '💰', '💱', '🪙', '📡',
+                                     '🌍', '🟡', '✈️', '🚀', '⭐', '🏪', '🏬', '🛒', '💎', '🔗']
+                    # دمج بدون تكرار
+                    all_emojis = list(dict.fromkeys(lib_emojis + default_emojis))[:50]
+
+                    # بناء أزرار inline — 5 لكل صف
+                    inline_btns = []
+                    for i in range(0, len(all_emojis), 5):
+                        row = []
+                        for j in range(5):
+                            if i + j < len(all_emojis):
+                                em = all_emojis[i + j]
+                                marker = '✅' if em == current_icon else ''
+                                row.append({'text': f"{em}{marker}", 'callback_data': f'company_icon_{em}_{company_id}'})
+                        if row:
+                            inline_btns.append(row)
+                    inline_btns.append([{'text': '🖼️ رفع صورة مخصصة', 'callback_data': f'company_photo_{company_id}'}])
+                    inline_btns.append([{'text': '↩️ العودة', 'callback_data': 'company_icon_back'}])
+
+                    self.send_inline_message(message['chat']['id'],
+                        f"🏷️ <b>اختر أيقونة للشركة</b>\n\n"
+                        f"الأيقونة الحالية: {current_icon}\n\n"
+                        f"💡 اختر من الشبكة أو اضغط <b>🖼️ رفع صورة</b> لأيقونة مخصصة\n"
+                        f"📊 المتاح: <code>{len(all_emojis)}</code> إيموجي",
+                        inline_btns)
+                    self.user_states[user_id] = 'editing_company_icon'
+                    
+                elif text == self.tr('a0355_حفظ_التغييرات', 'ar'):
                     self.save_company_changes(message)
                     
-                elif text == '❌ إلغاء':
+                elif text == self.tr('a0009_إلغاء', 'ar'):
                     del self.user_states[user_id]
                     if user_id in self.edit_company_data:
                         del self.edit_company_data[user_id]
-                    self.send_message(message['chat']['id'], "❌ تم إلغاء تعديل الشركة", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], self.tr('a0786_تم_إلغاء', 'ar'), self.admin_keyboard())
                     
             elif state == 'editing_company_name':
                 self.edit_company_data[user_id]['name'] = text
-                self.send_message(message['chat']['id'], f"✅ تم تحديث الاسم إلى: {text}")
+                self.send_message(message['chat']['id'], self.tr('a0787_تم_تحديث', 'ar', text=text))
                 self.show_edit_menu(message, user_id)
                 
             elif state == 'editing_company_type':
-                if text == '💳 إيداع فقط':
+                if text == self.tr('a0750_إيداع_فقط', 'ar'):
                     self.edit_company_data[user_id]['type'] = 'deposit'
-                    self.send_message(message['chat']['id'], "✅ تم تحديث النوع إلى: إيداع فقط")
-                elif text == '💰 سحب فقط':
+                    self.send_message(message['chat']['id'], self.tr('a0788_تم_تحديث', 'ar'))
+                elif text == self.tr('a0752_سحب_فقط', 'ar'):
                     self.edit_company_data[user_id]['type'] = 'withdraw'
-                    self.send_message(message['chat']['id'], "✅ تم تحديث النوع إلى: سحب فقط")
-                elif text == '🔄 إيداع وسحب معاً':
+                    self.send_message(message['chat']['id'], self.tr('a0789_تم_تحديث', 'ar'))
+                elif text == self.tr('a0754_إيداع_وسحب', 'ar'):
                     self.edit_company_data[user_id]['type'] = 'both'
-                    self.send_message(message['chat']['id'], "✅ تم تحديث النوع إلى: إيداع وسحب")
-                elif text == '↩️ العودة للقائمة':
+                    self.send_message(message['chat']['id'], self.tr('a0790_تم_تحديث', 'ar'))
+                elif text == self.tr('a0791_العودة_للقائمة', 'ar'):
                     pass
                 else:
-                    self.send_message(message['chat']['id'], "❌ اختر نوع الخدمة من الأزرار المتاحة")
+                    self.send_message(message['chat']['id'], self.tr('a0757_اختر_نوع', 'ar'))
                     return
                 
                 self.show_edit_menu(message, user_id)
                 
             elif state == 'editing_company_details':
                 self.edit_company_data[user_id]['details'] = text
-                self.send_message(message['chat']['id'], f"✅ تم تحديث التفاصيل إلى: {text}")
+                self.send_message(message['chat']['id'], self.tr('a0792_تم_تحديث', 'ar', text=text))
                 self.show_edit_menu(message, user_id)
                 
             elif state == 'editing_company_address':
-                if text.lower() in ['حذف', 'delete', 'مسح']:
+                if text.lower() in [self.tr('a0013_حذف', 'ar'), 'delete', self.tr('a0014_مسح', 'ar')]:
                     self.edit_company_data[user_id]['address'] = ''
-                    self.send_message(message['chat']['id'], "✅ تم حذف العنوان")
+                    self.send_message(message['chat']['id'], self.tr('a0793_تم_حذف', 'ar'))
                 else:
                     self.edit_company_data[user_id]['address'] = text
-                    self.send_message(message['chat']['id'], f"✅ تم تحديث العنوان إلى: {text}")
+                    self.send_message(message['chat']['id'], self.tr('a0794_تم_تحديث', 'ar', text=text))
                 self.show_edit_menu(message, user_id)
                 
             elif state == 'editing_company_affiliate':
-                if text.lower() in ['حذف', 'delete', 'مسح']:
+                if text.lower() in [self.tr('a0013_حذف', 'ar'), 'delete', self.tr('a0014_مسح', 'ar')]:
                     self.edit_company_data[user_id]['affiliate_link'] = ''
-                    self.send_message(message['chat']['id'], "✅ تم حذف رابط الإحالة")
+                    self.send_message(message['chat']['id'], self.tr('a0795_تم_حذف', 'ar'))
                 else:
                     self.edit_company_data[user_id]['affiliate_link'] = text
-                    self.send_message(message['chat']['id'], f"✅ تم تحديث رابط الإحالة إلى: {text}")
+                    self.send_message(message['chat']['id'], self.tr('a0796_تم_تحديث', 'ar', text=text))
                 self.show_edit_menu(message, user_id)
+                
+            elif state == 'editing_company_icon':
+                # العميل أرسل إيموجي مخصص يدوياً
+                if text and len(text) <= 4 and any(ord(c) > 127 for c in text):
+                    self.edit_company_data[user_id]['icon'] = text
+                    self.send_message(message['chat']['id'],
+                        f"✅ تم تحديث الأيقونة: {text}")
+                    self.show_edit_menu(message, user_id)
+                else:
+                    self.send_message(message['chat']['id'],
+                        "❌ أرسل إيموجي صحيح فقط:\n\n"
+                        "💡 مثال: 🏦 📱 💳 💰")
         
     def show_company_payment_methods_link(self, message, user_id):
         """عرض وسائل الدفع المرتبطة بالشركة — أزرار toggle للربط/فصل"""
@@ -15488,11 +16352,11 @@ class ComprehensiveDUXBot:
 
         text = f"💳 <b>وسائل الدفع — {company.get('name', '')}</b>\n\n"
         text += f"━━━━━━━━━━━━━━━━━━\n"
-        text += f"✅ = مرتبطة | ⬜ = متاحة\n\n"
+        text += self.tr('a0797_مرتبطة_متاحة', 'ar')
 
         inline_btns = []
         if not all_methods:
-            text += "📭 لا توجد وسائل دفع. أضف وسائل من قسم 💳 وسائل الدفع أولاً."
+            text += self.tr('a0798_لا_توجد', 'ar')
         else:
             for m in all_methods:
                 icon = m.get('icon', '💳') or '💳'
@@ -15514,8 +16378,8 @@ class ComprehensiveDUXBot:
             """عرض قائمة تعديل الشركة"""
             company_data = self.edit_company_data[user_id]
             type_display = {'deposit': 'إيداع فقط', 'withdraw': 'سحب فقط', 'both': 'إيداع وسحب'}.get(company_data['type'], company_data['type'])
-            address = company_data.get('address', '') or 'غير محدد'
-            affiliate = company_data.get('affiliate_link', '') or 'غير محدد'
+            address = company_data.get('address', '') or self.tr('a0122_غير_محدد', 'ar')
+            affiliate = company_data.get('affiliate_link', '') or self.tr('a0122_غير_محدد', 'ar')
             
             edit_options = f"""📊 بيانات الشركة المحدثة:
     
@@ -15534,8 +16398,8 @@ class ComprehensiveDUXBot:
                     [{'text': '📝 تعديل الاسم'}, {'text': '🔧 تعديل النوع'}],
                     [{'text': '📋 تعديل التفاصيل'}, {'text': '📍 تعديل العنوان'}],
                     [{'text': '🔗 تعديل رابط الإحالة'}, {'text': '💳 ربط وسائل الدفع'}],
-                    [{'text': '🔘 تغيير الحالة'}, {'text': '✅ حفظ التغييرات'}],
-                    [{'text': '❌ إلغاء'}]
+                    [{'text': '🏷️ أيقونة الشركة'}, {'text': '🔘 تغيير الحالة'}],
+                    [{'text': '✅ حفظ التغييرات'}, {'text': '❌ إلغاء'}]
                 ],
                 'resize_keyboard': True,
                 'one_time_keyboard': True
@@ -15594,7 +16458,7 @@ class ComprehensiveDUXBot:
         
     def show_companies_management_enhanced(self, message):
             """عرض إدارة الشركات — مع الأيقونات والعناوين"""
-            companies_text = "🏢 إدارة الشركات\n\n"
+            companies_text = self.tr('a0799_إدارة_الشركات', 'ar')
             
             try:
                 companies = []
@@ -15603,7 +16467,7 @@ class ComprehensiveDUXBot:
                     companies = list(reader)
                 
                 if len(companies) == 0:
-                    companies_text += "❌ لا توجد شركات مسجلة\n\n"
+                    companies_text += self.tr('a0800_لا_توجد', 'ar')
                 else:
                     companies_text += f"📊 الإجمالي: {len(companies)}\n\n"
                     
@@ -15632,17 +16496,13 @@ class ComprehensiveDUXBot:
                 'one_time_keyboard': True
             }
             
-            companies_text += """🔧 خيارات الإدارة:
-    • ➕ إضافة شركة جديدة - معالج تفاعلي خطوة بخطوة
-    • ✏️ تعديل شركة - تعديل البيانات الموجودة
-    • 🗑️ حذف شركة - حذف نهائي بأمان
-    • 🔄 تحديث القائمة - إعادة تحميل البيانات"""
+            companies_text += self.tr('a0801_خيارات_الإدارة', 'ar')
             
             self.send_message(message['chat']['id'], companies_text, management_keyboard)
         
     def prompt_delete_company(self, message):
             """بدء معالج حذف الشركة بأمان"""
-            companies_text = "🗑️ حذف الشركات:\n\n"
+            companies_text = self.tr('a0802_حذف_الشركات', 'ar')
             
             try:
                 with open('companies.csv', 'r', encoding='utf-8-sig') as f:
@@ -15652,9 +16512,9 @@ class ComprehensiveDUXBot:
                         companies_text += f"{status} {row['id']} - {row['name']}\n"
                         companies_text += f"   📋 {row['type']} - {row['details']}\n\n"
             except:
-                companies_text += "❌ لا توجد شركات\n\n"
+                companies_text += self.tr('a0772_لا_توجد', 'ar')
             
-            companies_text += "⚠️ أرسل رقم معرف الشركة للحذف:\n(تحذير: الحذف نهائي ولا يمكن التراجع عنه)"
+            companies_text += self.tr('a0803_أرسل_رقم', 'ar')
             
             self.send_message(message['chat']['id'], companies_text)
             self.user_states[message['from']['id']] = 'confirming_company_delete'
@@ -15678,20 +16538,12 @@ class ComprehensiveDUXBot:
                 pass
             
             if not company_found:
-                self.send_message(message['chat']['id'], f"❌ لم يتم العثور على شركة بالمعرف: {company_id}")
+                self.send_message(message['chat']['id'], self.tr('a0804_لم_يتم', 'ar', company_id=company_id))
                 del self.user_states[user_id]
                 return
             
             # عرض تأكيد الحذف
-            confirm_text = f"""⚠️ تأكيد حذف الشركة:
-    
-    🆔 المعرف: {company_found['id']}
-    🏢 الاسم: {company_found['name']}
-    📋 النوع: {company_found['type']}
-    📝 التفاصيل: {company_found['details']}
-    
-    ⚠️ هذا الإجراء نهائي ولا يمكن التراجع عنه!
-    هل أنت متأكد من الحذف؟"""
+            confirm_text = self.tr('a0805_تأكيد_حذف', 'ar', company_found_id=company_found['id'], company_found_name=company_found['name'], company_found_type=company_found['type'], company_found_details=company_found['details'])
             
             # أزرار inline لتأكيد الحذف
             inline_btns = [
@@ -15707,7 +16559,7 @@ class ComprehensiveDUXBot:
             user_id = message['from']['id']
             text = message.get('text', '').strip()
             
-            if text == '🗑️ نعم، احذف الشركة':
+            if text == self.tr('a0806_نعم،_احذف', 'ar'):
                 # تنفيذ الحذف
                 companies = []
                 deleted_company = None
@@ -15729,72 +16581,24 @@ class ComprehensiveDUXBot:
                         writer.writerows(companies)
                     
                     if deleted_company:
-                        success_msg = f"""✅ تم حذف الشركة بنجاح!
-    
-    🗑️ الشركة المحذوفة:
-    🆔 المعرف: {deleted_company['id']}
-    🏢 الاسم: {deleted_company['name']}
-    📋 النوع: {deleted_company['type']}"""
+                        success_msg = self.tr('a0807_تم_حذف', 'ar', deleted_company_id=deleted_company['id'], deleted_company_name=deleted_company['name'], deleted_company_type=deleted_company['type'])
                         
                         self.send_message(message['chat']['id'], success_msg, self.admin_keyboard())
                     else:
-                        self.send_message(message['chat']['id'], "❌ فشل في العثور على الشركة للحذف", self.admin_keyboard())
+                        self.send_message(message['chat']['id'], self.tr('a0808_فشل_في', 'ar'), self.admin_keyboard())
                         
                 except Exception as e:
                     self.send_message(message['chat']['id'], f"❌ فشل في حذف الشركة: {str(e)}", self.admin_keyboard())
             
-            elif text == '❌ إلغاء':
-                self.send_message(message['chat']['id'], "❌ تم إلغاء حذف الشركة", self.admin_keyboard())
+            elif text == self.tr('a0009_إلغاء', 'ar'):
+                self.send_message(message['chat']['id'], self.tr('a0809_تم_إلغاء', 'ar'), self.admin_keyboard())
             
             # تنظيف الحالة
             del self.user_states[user_id]
         
     def show_quick_copy_commands(self, message):
             """عرض أوامر نسخ سريعة للأدمن"""
-            commands_text = """📋 أوامر نسخ سريعة:
-    
-    🔥 **أوامر الموافقة والرفض:**
-    • `موافقة DEP123456`
-    • `موافق DEP123456`
-    • `تأكيد DEP123456`
-    • `نعم DEP123456`
-    
-    • `رفض DEP123456 مبلغ غير صحيح`
-    • `لا DEP123456 بيانات ناقصة`
-    • `مرفوض WTH789012 رقم محفظة خطأ`
-    
-    💼 **أوامر إدارة الشركات:**
-    • `اضافة_شركة البنك_الأهلي deposit حساب_بنكي_123456789`
-    • `اضافة_شركة فودافون_كاش both محفظة_الكترونية`
-    • `حذف_شركة 1737570855`
-    
-    💳 **أوامر وسائل الدفع:**
-    • `اضافة_وسيلة_دفع 1 بنك_الأهلي حساب_بنكي SA123456789012345678`
-    • `حذف_وسيلة_دفع 123456`
-    • `تعديل_وسيلة_دفع 123456 SA987654321098765432`
-    
-    📧 **أوامر الرسائل:**
-    • النقر على "📧 إرسال رسالة لعميل" ثم إدخال رقم العميل
-    
-    👥 **أوامر إدارة المستخدمين:**
-    • `بحث أحمد`
-    • `بحث C123456`
-    • `حظر C123456 مخالفة الشروط`
-    • `الغاء_حظر C123456`
-    
-    📨 **أوامر الشكاوى:**
-    • `رد_شكوى 123 شكراً لتواصلك`
-    • `رد_شكوى 456 تم حل مشكلتك`
-    • `رد_شكوى 789 نراجع طلبك`
-    
-    🏢 **أوامر أخرى:**
-    • `عنوان_جديد شارع الملك فهد الرياض`
-    • `تعديل_اعداد min_deposit 100`
-    
-    💡 **نصائح للاستخدام:**
-    • انقر على أي أمر واختر 'نسخ'
-    • غير الأرقام والنصوص حسب الحاجة
-    • استخدم _ بدلاً من المسافات في أسماء الشركات"""
+            commands_text = self.tr('a0810_أوامر_نسخ', 'ar')
             
             self.send_message(message['chat']['id'], commands_text, self.admin_keyboard())
         
@@ -16012,24 +16816,22 @@ class ComprehensiveDUXBot:
     # ==================== 🎡 عجلة الحظ ====================
 
     def show_wheel_panel(self, message):
-        """لوحة عجلة الحظ للعميل"""
+        """لوحة صيد الجوائز للعميل"""
         user = self.find_user(message['from']['id'])
         if not user:
             return
         lang = user.get('language', 'ar')
 
-        # فحص الهاتف الحقيقي — أكثر مرونة
+        # فحص الهاتف الحقيقي
         phone_verified = user.get('phone_verified', 'unknown')
         user_phone = user.get('phone', '')
-        # لو phone_verified = yes أو الرقم يبدأ بـ + (رقم حقيقي من Telegram)
         has_real_phone = phone_verified == 'yes' or (user_phone and user_phone.startswith('+'))
         if not has_real_phone:
             inline_btns = [[{'text': '📱 تسجيل برقم هاتفي الحقيقي', 'callback_data': 'verify_phone_start'}]]
-            inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'wheel_back_main'}])
+            inline_btns.append([{'text': self.tr('a0142_العودة', lang), 'callback_data': 'wheel_back_main'}])
             self.send_inline_message(message['chat']['id'],
-                "🎡 <b>عجلة الحظ</b>\n\n⚠️ <b>يجب التسجيل برقم هاتف حقيقي للمشاركة</b>\n\n"
-                "📱 اضغط الزر بالأسفل لتسجيل رقم هاتفك الحقيقي:\n"
-                "سيتم استبدال الرقم الحالي برقمك الحقيقي",
+                f"🎯 <b>صيد الجوائز</b>\n\n⚠️ <b>يجب التسجيل برقم هاتف حقيقي للمشاركة</b>\n\n"
+                f"📱 اضغط الزر بالأسفل لتسجيل رقم هاتفك الحقيقي",
                 inline_btns)
             return
 
@@ -16047,7 +16849,7 @@ class ComprehensiveDUXBot:
 
         if not active_round:
             self.send_message(message['chat']['id'],
-                "🎡 <b>عجلة الحظ</b>\n\n📭 لا توجد جولة نشطة حالياً\n\n⏳ ترقبوا الجولة القادمة!",
+                self.tr('a0811_عجلة_الحظ', lang),
                 self.main_keyboard(lang, message['from']['id']))
             return
 
@@ -16085,32 +16887,38 @@ class ComprehensiveDUXBot:
         free_spins_left = max(0, max_spins - my_spins)
         can_spin_paid = spin_cost > 0 and wallet_balance >= spin_cost
 
-        text = (
-            f"🎡 <b>عجلة الحظ — {active_round.get('name', '')}</b>\n\n"
-            f"━━━━━━━━━━━━━━━━━━\n"
-            f"👥 المشاركين: <code>{len(total_participants)}</code>\n"
-            f"🎁 الجوائز:\n"
+        text = self.ui_card_pro(
+            f"صيد الجوائز — {active_round.get('name', '')}",
+            icon='🎯',
+            items=[
+                {'label': 'المشاركين', 'value': str(len(total_participants)), 'icon': '👥', 'highlight': True},
+            ]
         )
+        text += "\n"
+        # الجوائز — صفوف عادية
         for i, prize in enumerate(prizes, 1):
             text += f"  {i}️⃣ {prize.strip()}\n"
-        text += (
-            f"━━━━━━━━━━━━━━━━━━\n"
-            f"🎯 دوراتك المجانية: <code>{free_spins_left}</code>\n"
-        )
+        text += self.ui_card_section('معلومات اللعب', '📊', color='blue')
+        text += self.ui_card_row('دوراتك المجانية', str(free_spins_left), '🎯', lang=lang) + "\n"
         if spin_cost > 0:
-            text += f"💰 رصيدك: <code>{wallet_balance:.0f}</code> {currency}\n"
-            text += f"🎟️ دورة إضافية: <code>{spin_cost:.0f}</code> {currency}\n"
-        text += f"━━━━━━━━━━━━━━━━━━\n\n"
+            text += self.ui_card_row('رصيدك', f"{wallet_balance:.0f} {currency}", '💰', lang=lang) + "\n"
+            text += self.ui_card_row('دورة إضافية', f"{spin_cost:.0f} {currency}", '🎟️', lang=lang) + "\n"
+        text += self.ui_card_row('سرعة اللعبة', f"{speed_sec:.1f} ثانية", '⚡', highlight=True, lang=lang) + "\n"
+        text += self.ui_card_row('هروب الهدية', reloc_text, '🏃', highlight=True, lang=lang) + "\n"
+        text += self.ui_card_section('كيف تلعب؟', '⚡', color='red')
+        text += "  🎁 اضغط <b>ابدأ</b> → تظهر أزرار\n"
+        text += f"  ⚡ اصطد الهدية بسرعة في <b>{speed_sec:.1f} ثانية</b>\n"
+        text += f"  🏃 الهدية تهرب <b>{reloc_text}</b> — اتبعها!\n"
+        text += f"  🎯 الهدايا الحقيقية مخلوطة مع فخاخ!\n\n"
 
-        # إرسال زر "ابدأ" للعبة القبض على الهدايا
         inline_btns = []
         if free_spins_left > 0 or can_spin_paid:
-            inline_btns.append([{'text': '🎮 ابدأ — اقبض هديتك!', 'callback_data': 'wheel_start_game'}])
-            inline_btns.append([{'text': '🔄 تحديث', 'callback_data': 'wheel_refresh'},
-                                {'text': '🔙 رجوع', 'callback_data': 'wheel_back_main'}])
+            inline_btns.append([{'text': '🎮 ابدأ — اصطد هديتك!', 'callback_data': 'wheel_start_game'}])
+            inline_btns.append([{'text': self.tr('a0299_تحديث', lang), 'callback_data': 'wheel_refresh'},
+                                {'text': self.tr('a0142_العودة', lang), 'callback_data': 'wheel_back_main'}])
             self.send_inline_message(message['chat']['id'], text, inline_btns)
         else:
-            text += "⚠️ وصلت للحد الأقصى ولا يوجد رصيد كافٍ للدورات الإضافية"
+            text += self.tr('a0814_وصلت_للحد', lang)
             inline_btns.append([{'text': '🔄 تحديث', 'callback_data': 'wheel_refresh'}])
             inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'wheel_back_main'}])
             self.send_inline_message(message['chat']['id'], text, inline_btns)
@@ -16122,10 +16930,10 @@ class ComprehensiveDUXBot:
 
         all_langs = self.get_supported_languages()
         requests_btn = self.tr('my_requests', lang)
-        help_btn = self.tr('help_btn_label', lang) if self.tr('help_btn_label', lang) != 'help_btn_label' else '❓ مساعدة'
+        help_btn = self.tr('help_btn_label', lang) if self.tr('help_btn_label', lang) != 'help_btn_label' else self.tr('a0231_مساعدة', lang)
         currency_btn = self.tr('change_currency', lang)
         complaint_btn = self.tr('complaint', lang)
-        notif_btn = self.tr('notif_btn', lang) if self.tr('notif_btn', lang) != 'notif_btn' else '🔔 إشعاراتي'
+        notif_btn = self.tr('notif_btn', lang) if self.tr('notif_btn', lang) != 'notif_btn' else self.tr('a0228_إشعاراتي', lang)
 
         text = (
             f"⚙️ <b>المزيد</b>\n\n"
@@ -16139,7 +16947,11 @@ class ComprehensiveDUXBot:
         self.send_inline_message(message['chat']['id'], text, inline_btns)
 
     def show_wheel_admin(self, message):
-        """لوحة إدارة عجلة الحظ للأدمن"""
+        """لوحة إدارة صيد الجوائز للأدمن"""
+        user_id = message['from']['id']
+        admin_obj = self.find_user(user_id)
+        lang = admin_obj.get('language', 'ar') if admin_obj else 'ar'
+
         rounds_list = []
         try:
             with open('wheel_rounds.csv', 'r', encoding='utf-8-sig') as f:
@@ -16150,11 +16962,24 @@ class ComprehensiveDUXBot:
 
         active = [r for r in rounds_list if r.get('status') == 'active']
 
-        text = f"🎡 <b>إدارة عجلة الحظ</b>\n\n📊 نشطة: <code>{len(active)}</code>\n"
+        # عد الهدايا المتاحة
+        gift_count = 0
+        try:
+            with open('wheel_gifts.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row.get('is_active') == 'yes':
+                        gift_count += 1
+        except:
+            pass
+
+        text = f"🎯 <b>صيد الجوائز — الإدارة</b>\n\n"
+        text += f"📊 جولات نشطة: <code>{len(active)}</code>\n"
+        text += f"🎁 هدايا متاحة: <code>{gift_count}</code>\n\n"
 
         inline_btns = []
         if active:
-            text += "\n━━━━━━━━━━━━━━━━━━\n🎮 <b>الجولات النشطة:</b>\n"
+            text += "━━━━━━━━━━━━━━━━━━\n"
             for r in active:
                 spin_count = 0
                 try:
@@ -16165,17 +16990,19 @@ class ComprehensiveDUXBot:
                                 spin_count += 1
                 except:
                     pass
-                text += f"\n🎡 <b>{r.get('name', '')}</b>\n"
+                text += f"🎯 <b>{r.get('name', '')}</b>\n"
                 text += f"  🆔 <code>{r['id']}</code>\n"
                 text += f"  🎁 {r.get('prizes', '')}\n"
-                text += f"  🎯 {spin_count} دورة\n"
+                text += f"  🎫 دورات: <code>{spin_count}</code>\n"
+                text += f"  💰 تكلفة: <code>{r.get('spin_cost', '0')} {r.get('currency', 'SAR')}</code>\n\n"
                 inline_btns.append([{'text': f"🏁 إنهاء: {r.get('name', '')}", 'callback_data': f'wheel_end_{r["id"]}'}])
 
-        inline_btns.append([{'text': '➕ إنشاء جولة جديدة', 'callback_data': 'wheel_create'}])
+        inline_btns.append([{'text': '➕ إنشاء جولة', 'callback_data': 'wheel_create'}])
+        inline_btns.append([{'text': '🎁 إدارة الهدايا', 'callback_data': 'wheel_gifts_menu'}])
         inline_btns.append([{'text': '🔙 العودة', 'callback_data': 'app_back_admin'}])
 
         if not active:
-            text += "\n📭 لا توجد جولات نشطة."
+            text += "📭 لا توجد جولات نشطة"
 
         self.send_inline_message(message['chat']['id'], text, inline_btns)
 
@@ -16225,7 +17052,7 @@ class ComprehensiveDUXBot:
                         all_tickets.append(row)
                         unique_participants.add(row.get('user_id', ''))
                         if row.get('user_id') == str(message['from']['id']):
-                            my_tickets.append(row.get('ticket_number', ''))
+                            my_tickets.append(row)
                         if row.get('payment_verified') == 'yes':
                             recent_buyers.append(row)
         except:
@@ -16258,15 +17085,15 @@ class ComprehensiveDUXBot:
                     hours = diff.seconds // 3600
                     minutes = (diff.seconds % 3600) // 60
                     if days > 0:
-                        countdown_text = f"⏰ <b>السحب بعد {days} يوم و {hours} ساعة</b>"
+                        countdown_text = self.tr('a0818_السحب_بعد', lang, days=days, hours=hours)
                     elif hours > 0:
-                        countdown_text = f"⏰ <b>السحب بعد {hours} ساعة و {minutes} دقيقة</b>"
+                        countdown_text = self.tr('a0819_السحب_بعد', lang, hours=hours, minutes=minutes)
                     else:
-                        countdown_text = f"⏰ <b>السحب بعد {minutes} دقيقة!</b>"
+                        countdown_text = self.tr('a0820_السحب_بعد', lang, minutes=minutes)
                 else:
-                    countdown_text = "⏰ <b>السحب قريباً — تذاكركم تحت المراجعة!</b>"
+                    countdown_text = self.tr('a0821_السحب_قريباً', lang)
             except:
-                countdown_text = f"⏰ موعد السحب: <code>{draw_time}</code>"
+                countdown_text = self.tr('a0822_موعد_السحب', lang, draw_time=draw_time)
 
         # حساب نسب التوزيع — أرقام حقيقية
         if winner_count == 1:
@@ -16285,71 +17112,66 @@ class ComprehensiveDUXBot:
 
         rank_emojis = ['🥇', '🥈', '🥉'] + ['🏅'] * max(0, winner_count - 3)
 
-        # حساب فرصة الفوز
-        my_ticket_count = len([t for t in my_tickets])
+        # حساب فرصة الفوز — فقط التذاكر الموثقة
+        my_verified_tickets = [t for t in my_tickets if t.get('payment_verified') == 'yes']
+        my_ticket_count = len(my_verified_tickets)
         total_odds = 0
         if tickets_sold > 0 and my_ticket_count > 0:
             total_odds = (my_ticket_count / tickets_sold) * 100
 
-        # === بناء النص الاحترافي ===
-        text = f"🎰 <b>{round_name}</b>\n\n"
+        # === بناء النص الاحترافي — تصميم كرت ثنائي الألوان ===
+        text = self.ui_card_pro(round_name, icon='🎰', items=[
+            {'label': 'الجائزة الكبرى', 'value': f"{net_prize:.0f} {currency}", 'icon': '🔥', 'highlight': True},
+        ])
+        text += "\n"
 
-        # العد التنازلي — إثارة
+        # العد التنازلي
         if countdown_text:
-            text += f"{countdown_text}\n\n"
+            text += self.ui_card_alert(countdown_text, '⏰') + "\n\n"
 
-        text += (
-            f"━━━━━━━━━━━━━━━━━━\n"
-            f"🔥 <b>الجائزة الكبرى الآن: <code>{net_prize:.0f}</code> {currency}</b>\n"
-            f"━━━━━━━━━━━━━━━━━━\n\n"
-            f"👥 <b>المشاركين:</b> <code>{participants_count}</code> شخص\n"
-            f"🎫 <b>التذاكر المباعة:</b> <code>{tickets_sold}</code>\n"
-            f"🎟️ <b>سعر التذكرة:</b> <code>{ticket_price:.0f}</code> {currency}\n"
-            f"🏆 <b>عدد الفائزين:</b> <code>{winner_count}</code>\n"
-        )
+        # إحصائيات — صفوف بارزة (code block)
+        text += self.ui_card_row('المشاركين', f"{participants_count} شخص", '👥', highlight=True, lang=lang) + "\n"
+        text += self.ui_card_row('التذاكر المباعة', str(tickets_sold), '🎫', highlight=True, lang=lang) + "\n"
+        text += self.ui_card_row('سعر التذكرة', f"{ticket_price:.0f} {currency}", '🎟️', lang=lang) + "\n"
+        text += self.ui_card_row('عدد الفائزين', str(winner_count), '🏆', lang=lang) + "\n"
 
         # شريط التقدم
         if tickets_sold > 0:
-            bar_length = min(tickets_sold * 2, 20)
-            progress_bar = '█' * bar_length + '░' * (20 - bar_length)
-            text += f"📊 <code>{progress_bar}</code>\n"
+            text += f"📊 <code>{self.ui_progress_bar(tickets_sold, max(tickets_sold * 2, 20))}</code>\n"
 
-        text += f"━━━━━━━━━━━━━━━━━━\n\n"
-
-        # توزيع الأرباح — أرقام حقيقية
-        text += f"💰 <b>توزيع الجوائز</b>\n"
-        text += f"💵 كل تذكرة = <code>{ticket_price:.0f}</code> {currency}\n"
+        text += self.ui_card_section('توزيع الجوائز', '💰', color='blue')
+        text += self.tr('a0824_كل_تذكرة', lang, ticket_price=ticket_price, currency=currency)
         if admin_pct > 0:
-            text += f"🏢 رسوم الإدارة: <code>{admin_pct:.0f}%</code>\n"
+            text += self.tr('a0825_رسوم_الإدارة', lang, admin_pct=admin_pct)
         text += f"💎 للمشاركين: <code>{100 - admin_pct:.0f}%</code>\n\n"
 
         for i in range(winner_count):
             emoji = rank_emojis[i] if i < len(rank_emojis) else '🏅'
             prize_amount = net_prize * shares[i] / 100
-            text += f"{emoji} الفائز #{i+1}: <code>{share_labels[i]}</code> ← <code>{prize_amount:.0f}</code> {currency}\n"
+            text += self.ui_card_row(f"الفائز #{i+1}", f"{share_labels[i]} ← {prize_amount:.0f} {currency}", emoji, lang=lang) + "\n"
 
-        # تذاكري — أرقام حقيقية
+        # تذاكري
         if my_ticket_count > 0:
-            text += f"\n━━━━━━━━━━━━━━━━━━\n"
-            text += f"🍀 <b>أرقامك المحظوظة ({my_ticket_count}):</b>\n"
-            for t in my_tickets:
-                if t:
-                    text += f"  🎫 <code>#{t}</code>\n"
+            text += self.ui_card_section('تذاكري', '🍀', color='red')
+            text += self.tr('a0826_أرقامك_المحظوظة', lang, my_ticket_count=my_ticket_count)
+            for t in my_verified_tickets:
+                tn = t.get('ticket_number', '')
+                if tn:
+                    text += f"  🎫 <code>#{tn}</code>\n"
             if total_odds > 0:
-                text += f"\n📊 فرصة فوزك: <code>{total_odds:.1f}%</code>\n"
-                text += f"💡 كلما زادت تذاكرك، زادت فرصتك!\n"
+                text += self.tr('a0827_فرصة_فوزك', lang, total_odds=total_odds)
+                text += self.tr('a0828_كلما_زادت', lang)
 
-        # آخر المشترين — social proof
+        # آخر المشترين
         if len(recent_buyers) >= 2:
-            text += f"\n━━━━━━━━━━━━━━━━━━\n"
-            text += f"🟢 <b>آخر المشاركين:</b>\n"
+            text += self.ui_card_section('آخر المشاركين', '🟢', color='blue')
             for buyer in recent_buyers[-3:]:
-                name = buyer.get('user_name', 'مستخدم')
+                name = buyer.get('user_name', self.tr('a0060_مستخدم', lang))
                 if name and len(name) > 15:
                     name = name[:12] + '...'
                 text += f"  • {name} 🎫\n"
 
-        text += f"\n━━━━━━━━━━━━━━━━━━\n"
+        text += "<b>━━━━━━━━━━━━━━━━━━</b>\n"
 
         # أزرار الإجراءات
         inline_btns = []
@@ -16360,9 +17182,9 @@ class ComprehensiveDUXBot:
                 inline_btns.append([{'text': f'🎫 شراء تذكرة ({remaining} متبقية)',
                                      'callback_data': f'lot_buy_{active_round["id"]}'}])
             else:
-                text += f"\n✅ <b>وصلت للحد الأقصى ({max_per_user} تذاكر) — حظ أوفر!</b>\n"
+                text += self.tr('a0830_وصلت_للحد', lang, max_per_user=max_per_user)
         else:
-            text += f"\n⚠️ <b>سجّل برقم هاتفك الحقيقي للمشاركة</b>\n"
+            text += self.tr('a0831_سجّل_برقم', lang)
             inline_btns.append([{'text': '📱 تسجيل برقم هاتفي الحقيقي', 'callback_data': 'verify_phone_start'}])
 
         inline_btns.append([{'text': '🔄 تحديث الأرقام', 'callback_data': 'lot_refresh'}])
@@ -16416,7 +17238,7 @@ class ComprehensiveDUXBot:
         inline_btns = []
 
         if active:
-            text += "\n🎮 <b>الجولات النشطة:</b>\n"
+            text += self.tr('a0832_الجولات_النشطة', 'ar')
             for r in active:
                 # عد التذاكر الموثقة + المشاركين
                 verified_count = 0
@@ -16447,7 +17269,7 @@ class ComprehensiveDUXBot:
                     f"  🎫 موثقة: <code>{verified_count}</code>"
                 )
                 if pending_count > 0:
-                    text += f" | ⏳ معلقة: <code>{pending_count}</code>"
+                    text += self.tr('a0833_معلقة', 'ar', pending_count=pending_count)
                 text += (
                     f"\n  👥 مشاركين: <code>{len(participants)}</code>\n"
                     f"  💰 الجائزة: <code>{net:.0f}</code> {r.get('currency', '')}\n"
@@ -16478,9 +17300,13 @@ class ComprehensiveDUXBot:
         self.send_inline_message(message['chat']['id'], text, inline_btns)
 
     def execute_lottery_draw(self, chat_id, admin_id, round_id):
-        """تنفيذ السحب — خوارزمية عشوائية عادلة + عرض مبهر"""
+        """تنفيذ السحب — خوارزمية عادلة + seed commitment + بدون blocking"""
         import random as _r
         import hashlib
+        import threading
+
+        admin_obj = self.find_user(admin_id)
+        lang = admin_obj.get('language', 'ar') if admin_obj else 'ar'
 
         # قراءة الجولة
         round_data = None
@@ -16495,7 +17321,7 @@ class ComprehensiveDUXBot:
             pass
 
         if not round_data:
-            self.send_message(chat_id, "❌ الجولة غير موجودة")
+            self.send_message(chat_id, self.tr('a0488_الجولة_غير', lang))
             return
 
         # قراءة كل التذاكر — فقط الموثقة (payment_verified = yes)
@@ -16510,30 +17336,29 @@ class ComprehensiveDUXBot:
             pass
 
         if not tickets:
-            self.send_message(chat_id, "❌ لا توجد تذاكر موثقة للبيع")
+            self.send_message(chat_id, self.tr('a0834_لا_توجد', lang))
             return
 
         winner_count = int(round_data.get('winner_count', 1))
         if winner_count > len(tickets):
             winner_count = len(tickets)
 
-        # === العرض المبهر ===
+        # === Provably Fair: seed commitment ===
+        # 1. توليد server seed قبل السحب
+        server_seed = secrets.token_hex(16)
+        server_seed_hash = hashlib.sha256(server_seed.encode()).hexdigest()
+
+        # 2. إعلان hash للشفافية
         self.send_message(chat_id,
             f"🎰 <b>جارٍ السحب...</b>\n\n"
             f"🎲 التذاكر: <code>{len(tickets)}</code>\n"
-            f"🏆 الفائزون: <code>{winner_count}</code>\n\n"
-            f"⏳ 3...")
+            f"🏆 الفائزون: <code>{winner_count}</code>\n"
+            f"🔐 Seed Hash: <code>{server_seed_hash[:16]}...</code>\n\n"
+            f"⚡ جارٍ اختيار الفائزين...")
 
-        import time as _time
-        _time.sleep(1)
-        self.send_message(chat_id, "⏳ 2...")
-        _time.sleep(1)
-        self.send_message(chat_id, "⏳ 1...")
-        _time.sleep(1)
-        self.send_message(chat_id, "🎲 الأرقام تتدااااور...")
-
-        # === الخوارزمية العشوائية العادلة ===
-        seed_string = f"{round_id}_{datetime.now().strftime('%Y%m%d%H%M%S')}_{len(tickets)}"
+        # === بدون time.sleep — نتيجة فورية ===
+        # 3. توليد seed من server_seed + round_id + ticket_count
+        seed_string = f"{server_seed}_{round_id}_{len(tickets)}"
         seed = int(hashlib.sha256(seed_string.encode()).hexdigest(), 16)
         _r.seed(seed)
 
@@ -16548,7 +17373,7 @@ class ComprehensiveDUXBot:
         admin_profit = total_pool * admin_pct / 100
         net_prize = total_pool - admin_profit
 
-        # توزيع الجوائز: 50% / 30% / 20% / متساوي للباقي
+        # توزيع الجوائز
         if winner_count == 1:
             shares = [1.0]
         elif winner_count == 2:
@@ -16557,8 +17382,6 @@ class ComprehensiveDUXBot:
             shares = [0.5, 0.3, 0.2]
         else:
             shares = [0.4, 0.25, 0.15] + [0.2 / (winner_count - 3)] * (winner_count - 3)
-
-        _time.sleep(1)
 
         # === إعلان الفائزين ===
         results_text = (
@@ -16576,7 +17399,7 @@ class ComprehensiveDUXBot:
             rank_emojis = ['🥇', '🥈', '🥉'] + ['🏅'] * (winner_count - 3)
             emoji = rank_emojis[i] if i < len(rank_emojis) else '🏅'
 
-            results_text += f"{emoji} <b>الفائز #{rank}</b>\n"
+            results_text += self.tr('a0836_الفائز', lang, emoji=emoji, rank=rank)
             results_text += f"👤 {winner.get('user_name', '')}\n"
             results_text += f"🎫 التذكرة: <code>#{winner.get('ticket_number', '')}</code>\n"
             results_text += f"💰 الجائزة: <code>{prize:.2f}</code> {round_data.get('currency', '')}\n\n"
@@ -16594,27 +17417,37 @@ class ComprehensiveDUXBot:
                 pass
 
             # إضافة الجائزة للمحفظة المجمدة
-            if self.svrp:
-                self.svrp.add_frozen_balance(winner.get('user_id', ''), prize)
+            if self.svrp and winner.get('user_id'):
+                try:
+                    self.svrp.add_frozen_balance(str(winner.get('user_id', '')), prize)
+                except Exception as e:
+                    logger.error(f"خطأ في إضافة جائزة اليانصيب: {e}")
 
             # إشعار الفائز
             try:
-                self.notify_user(int(winner.get('user_id', 0)),
-                    f"🎉 <b>مبروك! ربحت في اليانصيب!</b>\n\n"
-                    f"{emoji} المرتبة: #{rank}\n"
-                    f"🎫 التذكرة: <code>#{winner.get('ticket_number', '')}</code>\n"
-                    f"💰 الجائزة: <code>{prize:.2f}</code> {round_data.get('currency', '')}\n\n"
-                    f"💎 تم إضافة الجائزة لرصيدك المجمد")
+                uid = winner.get('user_id', '0')
+                if uid and uid != '0':
+                    self.notify_user(int(uid),
+                        f"🎉 <b>مبروك! ربحت في اليانصيب!</b>\n\n"
+                        f"{emoji} المرتبة: #{rank}\n"
+                        f"🎫 التذكرة: <code>#{winner.get('ticket_number', '')}</code>\n"
+                        f"💰 الجائزة: <code>{prize:.2f}</code> {round_data.get('currency', '')}\n\n"
+                        f"💎 تم إضافة الجائزة لرصيدك المجمد")
             except:
                 pass
 
         results_text += f"━━━━━━━━━━━━━━━━━━\n"
         results_text += f"📊 ربح الأدمن: <code>{admin_profit:.2f}</code> {round_data.get('currency', '')}\n"
-        results_text += f"祝贺 للفائزين! 🎊"
+        results_text += f"🔐 Server Seed: <code>{server_seed}</code>\n"
+        results_text += f"🔐 Hash: <code>{server_seed_hash[:32]}...</code>\n"
+        results_text += self.tr('a0837_للفائزين', lang)
 
         self.send_message(chat_id, results_text, self.admin_keyboard())
 
-        # بث النتائج لكل المستخدمين
+        # تسجيل السحب
+        logger.info(f"Lottery draw executed — Round: {round_id}, Admin: {admin_id}, Tickets: {len(tickets)}, Winners: {winner_count}")
+
+        # بث النتائج لكل المستخدمين — في thread منفصل
         broadcast_text = (
             f"🎉 <b>نتائج اليانصيب!</b>\n\n"
             f"🎰 {round_data.get('name', '')}\n"
@@ -16626,18 +17459,23 @@ class ComprehensiveDUXBot:
             prize = net_prize * shares[i]
             broadcast_text += f"{emoji} {winner.get('user_name', '')} — <code>#{winner.get('ticket_number', '')}</code> — {prize:.2f} {round_data.get('currency', '')}\n"
 
-        try:
-            with open('users.csv', 'r', encoding='utf-8-sig') as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    tid = row.get('telegram_id', '')
-                    if tid:
-                        try:
-                            self.send_message(int(tid), broadcast_text, None)
-                        except:
-                            pass
-        except:
-            pass
+        def broadcast_results():
+            """بث النتائج في thread منفصل — بدون blocking"""
+            try:
+                with open('users.csv', 'r', encoding='utf-8-sig') as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        tid = row.get('telegram_id', '')
+                        if tid:
+                            try:
+                                self.send_message(int(tid), broadcast_text, None)
+                            except:
+                                pass
+            except:
+                pass
+
+        t = threading.Thread(target=broadcast_results, daemon=True)
+        t.start()
 
         # تحديث حالة الجولة
         try:
@@ -16745,7 +17583,7 @@ class ComprehensiveDUXBot:
 
         if not all_orders:
             self.send_message(message['chat']['id'],
-                "✅ <b>لا توجد طلبات معلقة</b>\n\nكل شيء مكتمل!",
+                self.tr('a0838_لا_توجد', 'ar'),
                 self.admin_keyboard())
             return
 
@@ -16790,7 +17628,7 @@ class ComprehensiveDUXBot:
         orders = self.get_pending_trade_orders()
         if not orders:
             self.send_message(message['chat']['id'],
-                "✅ لا توجد طلبات تداول معلقة",
+                self.tr('a0839_لا_توجد', 'ar'),
                 self.admin_keyboard())
             return
 
@@ -16807,14 +17645,14 @@ class ComprehensiveDUXBot:
                 'admin_sends_screenshot': '📸'
             }
             icon = status_icons.get(status, '🟡')
-            otype = 'شراء' if order.get('order_type') == 'buy' else 'بيع'
+            otype = self.tr('a0840_شراء', 'ar') if order.get('order_type') == 'buy' else self.tr('a0841_بيع', 'ar')
             asset = order.get('asset_type', '').upper()
             amount = order.get('amount', '')
             currency = order.get('currency', '')
 
             text += f"{icon} <code>{order['id']}</code> | {otype} {asset}\n"
             text += f"   💰 {amount} {currency} | 👤 {order.get('buyer_name', '')}\n"
-            text += f"   📊 الحالة: {status}\n\n"
+            text += self.tr('a0842_الحالة', 'ar', status=status)
 
             inline_btns.append([{'text': f"{icon} {order['id']} — {otype} {asset} {amount}",
                                  'callback_data': f"trade_admin_view_{order['id']}"}])
@@ -16831,14 +17669,14 @@ class ComprehensiveDUXBot:
         text = message.get('text', '').strip()
         step = state.get('step', '')
 
-        if text in ['❌ إلغاء', 'إلغاء', 'الغاء', '🔙']:
+        if text in [self.tr('a0009_إلغاء', 'ar'), self.tr('a0010_إلغاء', 'ar'), self.tr('a0011_الغاء', 'ar'), '🔙']:
             if user_id in self.user_states: del self.user_states[user_id]
             self.handle_start(message)
             return
 
         if step == 'trade_buy_account':
             if len(text) < 3:
-                self.send_message(chat_id, "❌ العنوان/الحساب قصير. اكتب مرة أخرى:")
+                self.send_message(chat_id, self.tr('a0843_العنوان_الحساب', 'ar'))
                 return
             state['account_address'] = text
             state['step'] = 'trade_buy_method'
@@ -16848,7 +17686,7 @@ class ComprehensiveDUXBot:
             methods = self.get_all_payment_methods()
             active = [m for m in methods if m.get('status') == 'active']
             if not active:
-                self.send_message(chat_id, "❌ لا توجد وسائل دفع. تواصل مع الإدارة.")
+                self.send_message(chat_id, self.tr('a0844_لا_توجد', 'ar'))
                 return
             inline_btns = []
             for m in active:
@@ -16856,16 +17694,16 @@ class ComprehensiveDUXBot:
                 inline_btns.append([{'text': f"{icon} {m['method_name']} — {m.get('account_data', '')}",
                                      'callback_data': f"trade_method_{m['id']}"}])
             inline_btns.append([{'text': '🔙 إلغاء', 'callback_data': 'trade_buy_cancel'}])
-            self.send_inline_message(chat_id, "💳 اختر وسيلة الدفع:", inline_btns)
+            self.send_inline_message(chat_id, self.tr('a0578_اختر_وسيلة', 'ar'), inline_btns)
 
         elif step == 'trade_buy_amount':
             try:
                 amount = float(text)
                 if amount <= 0:
-                    self.send_message(chat_id, "❌ المبلغ يجب أن يكون أكبر من صفر:")
+                    self.send_message(chat_id, self.tr('a0845_المبلغ_يجب', 'ar'))
                     return
             except ValueError:
-                self.send_message(chat_id, "❌ اكتب مبلغاً رقمياً:")
+                self.send_message(chat_id, self.tr('a0846_اكتب_مبلغاً', 'ar'))
                 return
             state['amount'] = amount
             state['step'] = 'trade_buy_currency'
@@ -16883,7 +17721,7 @@ class ComprehensiveDUXBot:
             if row:
                 inline_btns.append(row)
             inline_btns.append([{'text': '🔙 إلغاء', 'callback_data': 'trade_buy_cancel'}])
-            self.send_inline_message(chat_id, "💱 اختر العملة:", inline_btns)
+            self.send_inline_message(chat_id, self.tr('a0847_اختر_العملة', 'ar'), inline_btns)
 
         elif step == 'trade_buy_currency':
             # يتم معالجته عبر callback في handle_callback_query
@@ -16897,7 +17735,7 @@ class ComprehensiveDUXBot:
         step = state.get('step', '')
         order_id = state.get('order_id', '')
 
-        if text in ['❌ إلغاء', 'إلغاء', 'الغاء']:
+        if text in [self.tr('a0009_إلغاء', 'ar'), self.tr('a0010_إلغاء', 'ar'), self.tr('a0011_الغاء', 'ar')]:
             if user_id in self.user_states: del self.user_states[user_id]
             self.show_trade_admin_queue(message)
             return
@@ -16906,14 +17744,14 @@ class ComprehensiveDUXBot:
             # الأدمن يكتب: وسيلة الدفع + كمية USDT
             parts = text.split()
             if len(parts) < 2:
-                self.send_message(chat_id, "❌ الصيغة: [وسيلة الدفع] [كمية USDT]\n💡 مثال: STC_Pay 100")
+                self.send_message(chat_id, self.tr('a0848_الصيغة_وسيلة', 'ar'))
                 return
             usdt_amount = parts[-1]
             payment_method = ' '.join(parts[:-1])
             try:
                 float(usdt_amount)
             except ValueError:
-                self.send_message(chat_id, "❌ كمية USDT يجب أن تكون رقماً\n💡 مثال: STC_Pay 100")
+                self.send_message(chat_id, self.tr('a0849_كمية_يجب', 'ar'))
                 return
 
             self.update_trade_order(order_id,
@@ -16951,7 +17789,7 @@ class ComprehensiveDUXBot:
         elif step == 'trade_admin_transfer':
             # الأدمن يرسل لقطة شاشة التحويل
             if 'photo' not in message:
-                self.send_message(chat_id, "❌ أرسل لقطة شاشة (صورة) لتحويل USDT:")
+                self.send_message(chat_id, self.tr('a0850_أرسل_لقطة', 'ar'))
                 return
             photo = message['photo'][-1]
             self.update_trade_order(order_id, status='admin_sends_screenshot',
@@ -16979,7 +17817,7 @@ class ComprehensiveDUXBot:
                 except:
                     pass
             self.send_message(chat_id,
-                f"✅ تم إرسال لقطة الشاشة للعميل\n\n🆔 <code>{order_id}</code>\n⏳ بانتظار تأكيد العميل")
+                self.tr('a0535_تم_إرسال', 'ar', order_id=order_id))
             fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
             self.show_unified_orders(fake_msg)
 
@@ -17046,18 +17884,18 @@ class ComprehensiveDUXBot:
         icon = type_icons.get(step_type, '📝')
 
         text = f"━━━━━━━━━━━━━━━━━━\n"
-        text += f"الخطوة <code>{current}</code> من <code>{total}</code>\n"
+        text += self.tr('a0851_الخطوة_من', lang, current=current, total=total)
         text += f"━━━━━━━━━━━━━━━━━━\n\n"
         text += f"{icon} <b>{label}</b>\n"
 
         if step_type == 'screenshot':
-            text += f"\n📸 أرسل <b>لقطة شاشة</b> (صورة)"
+            text += self.tr('a0852_أرسل_لقطة', lang)
         elif step_type == 'amount':
-            text += f"\n💰 اكتب <b>المبلغ</b>:"
+            text += self.tr('a0853_اكتب_المبلغ', lang)
         elif step_type == 'info':
-            text += f"\nℹ️ اقرأ المعلومات ثم اضغط Continue"
+            text += self.tr('a0854_اقرأ_المعلومات', lang)
         else:
-            text += f"\n✍️ اكتب إجابتك:"
+            text += self.tr('a0855_اكتب_إجابتك', lang)
 
         if step_type == 'info':
             inline_btns = [[{'text': '✅ متابعة', 'callback_data': 'custom_flow_continue'}]]
@@ -17072,7 +17910,7 @@ class ComprehensiveDUXBot:
         chat_id = message['chat']['id']
         text = message.get('text', '').strip()
 
-        if text in ['❌ إلغاء', 'إلغاء', 'الغاء', '🔙']:
+        if text in [self.tr('a0009_إلغاء', lang), self.tr('a0010_إلغاء', lang), self.tr('a0011_الغاء', lang), '🔙']:
             if user_id in self.user_states:
                 del self.user_states[user_id]
             self.handle_start(message)
@@ -17098,7 +17936,7 @@ class ComprehensiveDUXBot:
         # التحقق من الإدخال حسب نوع الخطوة
         if step_type == 'screenshot':
             if 'photo' not in message:
-                self.send_message(chat_id, "❌ أرسل صورة (لقطة شاشة):")
+                self.send_message(chat_id, self.tr('a0856_أرسل_صورة', lang))
                 return
             photo = message['photo'][-1]
             collected.append({'type': 'screenshot', 'value': photo['file_id'], 'label': current_step.get('step_label', '')})
@@ -17106,18 +17944,18 @@ class ComprehensiveDUXBot:
             try:
                 amount = float(text)
                 if amount <= 0:
-                    self.send_message(chat_id, "❌ المبلغ يجب أن يكون أكبر من صفر:")
+                    self.send_message(chat_id, self.tr('a0845_المبلغ_يجب', lang))
                     return
                 collected.append({'type': 'amount', 'value': text, 'label': current_step.get('step_label', '')})
             except ValueError:
-                self.send_message(chat_id, "❌ اكتب مبلغاً رقمياً:")
+                self.send_message(chat_id, self.tr('a0846_اكتب_مبلغاً', lang))
                 return
         elif step_type == 'info':
             # info steps are handled by callback, not text
             return
         else:
             if len(text) < 2:
-                self.send_message(chat_id, "❌ الإجابة قصيرة جداً. اكتب إجابة صحيحة:")
+                self.send_message(chat_id, self.tr('a0857_الإجابة_قصيرة', lang))
                 return
             collected.append({'type': 'text', 'value': text, 'label': current_step.get('step_label', '')})
 
@@ -17140,23 +17978,23 @@ class ComprehensiveDUXBot:
         flow_type = state.get('flow_type', 'deposit')
         lang = state.get('lang', 'ar')
 
-        summary = f"✅ <b>مراجعة البيانات</b>\n\n"
-        summary += f"🏢 الشركة: <b>{company_name}</b>\n"
+        summary = self.tr('a0858_مراجعة_البيانات', lang)
+        summary += self.tr('a0859_الشركة', lang, company_name=company_name)
         summary += f"{'💰 إيداع' if flow_type == 'deposit' else '💸 سحب'}\n"
         summary += f"━━━━━━━━━━━━━━━━━━\n\n"
 
         for i, item in enumerate(collected_data, 1):
-            label = item.get('label', f'خطوة {i}')
+            label = item.get('label', self.tr('a0860_خطوة', lang, i=i))
             value = item.get('value', '')
             if item.get('type') == 'screenshot':
-                summary += f"📸 {label}: ✅ تم استلام لقطة الشاشة\n"
+                summary += self.tr('a0861_تم_استلام', lang, label=label)
             elif item.get('type') == 'amount':
-                summary += f"💰 {label}: <code>{value}</code> 👈 اضغط للنسخ\n"
+                summary += self.tr('a0862_اضغط_للنسخ', lang, label=label, value=value)
             else:
-                summary += f"📝 {label}: <code>{value}</code> 👈 اضغط للنسخ\n"
+                summary += self.tr('a0863_اضغط_للنسخ', lang, label=label, value=value)
 
         summary += f"\n━━━━━━━━━━━━━━━━━━\n"
-        summary += f"هل تريد تأكيد الطلب؟"
+        summary += self.tr('a0521_هل_تريد', lang)
 
         # حفظ البيانات في الحالة للتأكيد
         state['collected_data'] = collected_data
@@ -17267,7 +18105,7 @@ class ComprehensiveDUXBot:
                 return
 
             if lang == 'ar':
-                title = "💳 <b>اختر وسيلة الدفع</b>\n\n"
+                title = self.tr('a0864_اختر_وسيلة', lang)
             else:
                 title = "💳 <b>Select Payment Method</b>\n\n"
 
@@ -17413,12 +18251,7 @@ class ComprehensiveDUXBot:
         
     def start_add_company_wizard(self, message):
             """بدء معالج إضافة شركة تفاعلي"""
-            wizard_text = """🧙‍♂️ معالج إضافة الشركة
-    
-    سأساعدك في إضافة شركة بطريقة سهلة!
-    
-    📝 أولاً: ما اسم الشركة؟
-    (مثال: بنك الراجحي، فودافون كاش، مدى)"""
+            wizard_text = self.tr('a0865_معالج_إضافة', 'ar')
             
             self.send_message(message['chat']['id'], wizard_text)
             self.user_states[message['from']['id']] = 'adding_company_name'
@@ -17431,7 +18264,7 @@ class ComprehensiveDUXBot:
             if state == 'adding_company_name':
                 company_name = text.strip()
                 if len(company_name) < 2:
-                    self.send_message(message['chat']['id'], "❌ اسم قصير جداً. أدخل اسم الشركة:")
+                    self.send_message(message['chat']['id'], self.tr('a0866_اسم_قصير', 'ar'))
                     return
                 
                 # عرض أنواع الخدمة
@@ -17445,35 +18278,32 @@ class ComprehensiveDUXBot:
                     'one_time_keyboard': True
                 }
                 
-                self.send_message(message['chat']['id'], f"✅ اسم الشركة: {company_name}\n\n🔹 اختر نوع الخدمة:", service_keyboard)
+                self.send_message(message['chat']['id'], self.tr('a0867_اسم_الشركة', 'ar', company_name=company_name), service_keyboard)
                 self.user_states[user_id] = f'adding_company_type_{company_name}'
                 
             elif state.startswith('adding_company_type_'):
                 company_name = state.replace('adding_company_type_', '')
                 
-                if text == '❌ إلغاء':
-                    self.send_message(message['chat']['id'], "تم إلغاء إضافة الشركة", self.admin_keyboard())
+                if text == self.tr('a0009_إلغاء', 'ar'):
+                    self.send_message(message['chat']['id'], self.tr('a0868_تم_إلغاء', 'ar'), self.admin_keyboard())
                     del self.user_states[user_id]
                     return
                 
                 # تحديد نوع الخدمة
-                if text == '💰 إيداع فقط':
+                if text == self.tr('a0869_إيداع_فقط', 'ar'):
                     service_type = 'deposit'
-                    service_ar = 'إيداع فقط'
-                elif text == '💸 سحب فقط':
+                    service_ar = self.tr('a0751_إيداع_فقط', 'ar')
+                elif text == self.tr('a0870_سحب_فقط', 'ar'):
                     service_type = 'withdraw'
-                    service_ar = 'سحب فقط'
-                elif text == '🔄 إيداع وسحب معاً':
+                    service_ar = self.tr('a0753_سحب_فقط', 'ar')
+                elif text == self.tr('a0754_إيداع_وسحب', 'ar'):
                     service_type = 'both'
-                    service_ar = 'إيداع وسحب'
+                    service_ar = self.tr('a0755_إيداع_وسحب', 'ar')
                 else:
-                    self.send_message(message['chat']['id'], "❌ اختر من الأزرار المتاحة:")
+                    self.send_message(message['chat']['id'], self.tr('a0871_اختر_من', 'ar'))
                     return
                 
-                self.send_message(message['chat']['id'], f"""✅ تم اختيار: {service_ar}
-    
-    📝 الآن أدخل تفاصيل الشركة:
-    (مثال: حساب بنكي رقم 1234567890، محفظة إلكترونية، خدمات دفع متعددة)""")
+                self.send_message(message['chat']['id'], self.tr('a0872_تم_اختيار', 'ar', service_ar=service_ar))
                 
                 self.user_states[user_id] = f'adding_company_details_{company_name}_{service_type}'
                 
@@ -17484,7 +18314,7 @@ class ComprehensiveDUXBot:
                 details = text.strip()
                 
                 if len(details) < 3:
-                    self.send_message(message['chat']['id'], "❌ تفاصيل قصيرة جداً. أدخل وصف مناسب:")
+                    self.send_message(message['chat']['id'], self.tr('a0873_تفاصيل_قصيرة', 'ar'))
                     return
                 
                 # إنشاء الشركة
@@ -17495,7 +18325,7 @@ class ComprehensiveDUXBot:
                         writer = csv.writer(f)
                         writer.writerow([company_id, company_name, service_type, details, 'active', '🏢', ''])
                     
-                    service_ar = "إيداع فقط" if service_type == 'deposit' else "سحب فقط" if service_type == 'withdraw' else "إيداع وسحب"
+                    service_ar = self.tr('a0751_إيداع_فقط', 'ar') if service_type == 'deposit' else self.tr('a0753_سحب_فقط', 'ar') if service_type == 'withdraw' else self.tr('a0755_إيداع_وسحب', 'ar')
                     
                     success_msg = f"""✅ تم إضافة الشركة بنجاح!
     
@@ -17516,7 +18346,7 @@ class ComprehensiveDUXBot:
         
     def show_companies_management(self, message):
             """عرض إدارة الشركات"""
-            companies_text = "🏢 إدارة الشركات:\n\n"
+            companies_text = self.tr('a0874_إدارة_الشركات', 'ar')
             
             try:
                 with open('companies.csv', 'r', encoding='utf-8-sig') as f:
@@ -17528,9 +18358,9 @@ class ComprehensiveDUXBot:
             except:
                 pass
             
-            companies_text += "📝 الأوامر:\n"
-            companies_text += "• اضافة_شركة اسم نوع تفاصيل\n"
-            companies_text += "• حذف_شركة رقم_المعرف\n"
+            companies_text += self.tr('a0875_الأوامر', 'ar')
+            companies_text += self.tr('a0876_اضافة_شركة', 'ar')
+            companies_text += self.tr('a0877_حذف_شركة', 'ar')
             
             self.send_message(message['chat']['id'], companies_text, self.admin_keyboard())
         
@@ -17538,16 +18368,7 @@ class ComprehensiveDUXBot:
             """عرض إدارة العناوين"""
             current_address = self.get_exchange_address()
             
-            address_text = f"""📍 إدارة عناوين الصرافة
-    
-    العنوان الحالي:
-    {current_address}
-    
-    لتغيير العنوان:
-    عنوان_جديد النص_الجديد_للعنوان
-    
-    مثال:
-    عنوان_جديد شارع الملك فهد، الرياض، مقابل برج المملكة"""
+            address_text = self.tr('a0878_إدارة_عناوين', 'ar', current_address=current_address)
             
             self.send_message(message['chat']['id'], address_text, self.admin_keyboard())
         
@@ -17563,14 +18384,14 @@ class ComprehensiveDUXBot:
                 pass
 
             # تجميع الإعدادات في مجموعات
-            text = "⚙️ <b>إعدادات النظام</b>\n\n"
+            text = self.tr('a0879_إعدادات_النظام', 'ar')
             text += "━━━━━━━━━━━━━━━━━━\n\n"
 
             # المجموعات
             groups = {
-                '💰 المعاملات': ['min_deposit', 'max_daily_withdrawal', 'default_currency'],
-                '🔐 الأمان': ['rate_limit_per_minute', 'session_timeout'],
-                '🎨 المظهر': ['active_theme'],
+                self.tr('a0880_المعاملات', 'ar'): ['min_deposit', 'max_daily_withdrawal', 'default_currency'],
+                self.tr('a0881_الأمان', 'ar'): ['rate_limit_per_minute', 'session_timeout'],
+                self.tr('a0882_المظهر', 'ar'): ['active_theme'],
             }
 
             inline_btns = []
@@ -17578,7 +18399,7 @@ class ComprehensiveDUXBot:
                 text += f"<b>{group_name}</b>\n"
                 row = []
                 for key in keys:
-                    val = settings.get(key, 'غير محدد')
+                    val = settings.get(key, self.tr('a0122_غير_محدد', 'ar'))
                     label = key.replace('_', ' ')
                     text += f"  • {label}: <code>{val}</code>\n"
                     row.append({'text': f'✏️ {label}', 'callback_data': f'setting_edit_{key}'})
@@ -17590,7 +18411,7 @@ class ComprehensiveDUXBot:
             other_settings = {k: v for k, v in settings.items()
                              if k not in sum(groups.values(), [])}
             if other_settings:
-                text += "<b>📋 أخرى</b>\n"
+                text += self.tr('a0883_أخرى', 'ar')
                 row = []
                 for key, val in list(other_settings.items())[:6]:
                     text += f"  • {key}: <code>{val}</code>\n"
@@ -17631,7 +18452,7 @@ class ComprehensiveDUXBot:
                 text += f"{icon} <b>{name}</b>\n"
                 text += f"   🆔 <code>{bid}</code> | 👥 {b.get('total_users', '0')} | 📋 {b.get('total_transactions', '0')} | 🔑 {admin_count} أدمن\n"
                 if freeze:
-                    text += f"   ⏰ تجميد في: <b>{freeze}</b>\n"
+                    text += self.tr('a0884_تجميد_في', 'ar', freeze=freeze)
                 text += "\n"
 
                 # أزرار تحكم لكل بوت
@@ -17686,7 +18507,7 @@ class ComprehensiveDUXBot:
         chat_id = message['chat']['id']
         text = message.get('text', '').strip()
 
-        if text in ['❌ إلغاء', '🔙 لوحة الأدمن', 'إلغاء', 'الغاء']:
+        if text in [self.tr('a0009_إلغاء', 'ar'), self.tr('a0021_لوحة_الأدمن', 'ar'), self.tr('a0010_إلغاء', 'ar'), self.tr('a0011_الغاء', 'ar')]:
             if user_id in self.user_states:
                 del self.user_states[user_id]
             if hasattr(self, 'temp_mbot_data') and user_id in self.temp_mbot_data:
@@ -17700,7 +18521,7 @@ class ComprehensiveDUXBot:
 
         if step == 'mbot_name':
             if len(text) < 2:
-                self.send_message(chat_id, "❌ الاسم قصير جداً. اكتب اسماً صحيحاً:")
+                self.send_message(chat_id, self.tr('a0022_الاسم_قصير', 'ar'))
                 return
             data['name'] = text
             data['step'] = 'mbot_token'
@@ -17713,7 +18534,7 @@ class ComprehensiveDUXBot:
 
         elif step == 'mbot_token':
             if len(text) < 20 or ':' not in text:
-                self.send_message(chat_id, "❌ توكن غير صحيح. يجب أن يحتوي على نقطتين (:) ويكون طويلاً.\n\n الصق التوكن مرة أخرى:")
+                self.send_message(chat_id, self.tr('a0885_توكن_غير', 'ar'))
                 return
             data['token'] = text
             data['step'] = 'mbot_admins'
@@ -17727,7 +18548,7 @@ class ComprehensiveDUXBot:
                 f"أو اكتب عدة معرفات: <code>{current_admin}, 123456789</code>")
 
         elif step == 'mbot_admins':
-            if text.lower() in ['أنا', 'ana', 'me', 'انا']:
+            if text.lower() in [self.tr('a0886_أنا', 'ar'), 'ana', 'me', self.tr('a0887_انا', 'ar')]:
                 admin_ids = str(message['from']['id'])
             else:
                 admin_ids = text.replace(' ', '')
@@ -17743,7 +18564,7 @@ class ComprehensiveDUXBot:
                 "أو اكتب 'تخطي' لبدونه")
 
         elif step == 'mbot_freeze':
-            if text.lower() in ['تخطي', 'skip', 'بدون']:
+            if text.lower() in [self.tr('a0024_تخطي', 'ar'), 'skip', self.tr('a0025_بدون', 'ar')]:
                 freeze_date = ''
             else:
                 # التحقق من صحة التاريخ
@@ -17770,7 +18591,7 @@ class ComprehensiveDUXBot:
                 "❌ اكتب <code>لا</code> أو <code>تخطي</code> لبدون")
 
         elif step == 'mbot_manage':
-            can_manage = 'yes' if text.lower() in ['نعم', 'yes', 'اى', 'اي'] else 'no'
+            can_manage = 'yes' if text.lower() in [self.tr('a0198_نعم', 'ar'), 'yes', 'اى', 'اي'] else 'no'
 
             # حفظ البوت
             manager = MultiBotManager()
@@ -17792,7 +18613,7 @@ class ComprehensiveDUXBot:
                     f"👥 الأدمن: <code>{data['admin_ids']}</code>\n"
                 )
                 if data.get('freeze_date'):
-                    summary += f"🧊 تجميد في: <b>{data['freeze_date']}</b>\n"
+                    summary += self.tr('a0888_تجميد_في', 'ar', data_freeze_date=data['freeze_date'])
                 summary += f"🤖 إدارة البوتات: <b>{'✅ مفعّل' if can_manage == 'yes' else '❌ غير مفعّل'}</b>\n"
 
                 inline_btns = [
@@ -17803,7 +18624,7 @@ class ComprehensiveDUXBot:
                 ]
                 self.send_inline_message(chat_id, summary, inline_btns)
             else:
-                self.send_message(chat_id, "❌ فشل في إضافة البوت", self.admin_keyboard())
+                self.send_message(chat_id, self.tr('a0889_فشل_في', 'ar'), self.admin_keyboard())
 
             if user_id in self.user_states:
                 del self.user_states[user_id]
@@ -17815,7 +18636,7 @@ class ComprehensiveDUXBot:
         manager = MultiBotManager()
         bot = manager.get_bot_by_id(bot_id)
         if not bot:
-            self.send_message(chat_id, "❌ البوت غير موجود")
+            self.send_message(chat_id, self.tr('a0636_البوت_غير', 'ar'))
             return
 
         admins = bot.get('admin_ids', '')
@@ -17830,8 +18651,8 @@ class ComprehensiveDUXBot:
 
         text += f"\n👥 العدد: <b>{len(admin_list)}</b>\n"
         text += "━━━━━━━━━━━━━━━━━━\n"
-        text += "➕ للإضافة: <code>اضافة_ادمن_بوت BOT123 99999999</code>\n"
-        text += "➖ للحذف: <code>حذف_ادمن_بوت BOT123 99999999</code>"
+        text += self.tr('a0890_للإضافة_اضافة', 'ar')
+        text += self.tr('a0891_للحذف_حذف', 'ar')
 
         inline_btns = [
             [{'text': '🔙 العودة', 'callback_data': 'mbot_refresh'}]
@@ -17841,7 +18662,7 @@ class ComprehensiveDUXBot:
     def show_theme_panel(self, message):
         """عرض لوحة الثيمات للأدمن"""
         if not THEME_AVAILABLE:
-            self.send_message(message['chat']['id'], "❌ نظام الثيمات غير متاح", self.admin_keyboard())
+            self.send_message(message['chat']['id'], self.tr('a0892_نظام_الثيمات', 'ar'), self.admin_keyboard())
             return
 
         current_theme = self.get_setting('active_theme') or 'gold'
@@ -17858,7 +18679,7 @@ class ComprehensiveDUXBot:
         themes = get_theme_list()
         keyboard = []
         for key, name_ar, icon in themes:
-            marker = ' ◀ نشط' if key == current_theme else ''
+            marker = self.tr('a0893_نشط', 'ar') if key == current_theme else ''
             keyboard.append([{'text': f"{icon} ثيم_{key}{marker}"}])
         keyboard.append([{'text': '🔙 العودة'}])
 
@@ -17873,7 +18694,7 @@ class ComprehensiveDUXBot:
                     pending_complaints = [row for row in reader if row['status'] == 'pending']
                 
                 if not pending_complaints:
-                    self.send_message(message['chat']['id'], "✅ لا توجد شكاوى معلقة", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], self.tr('a0894_لا_توجد', 'ar'), self.admin_keyboard())
                     return
                 
                 for complaint in pending_complaints:
@@ -17894,7 +18715,7 @@ class ComprehensiveDUXBot:
                     self.send_inline_message(message['chat']['id'], complaint_text, inline_btns)
                 
             except Exception as e:
-                self.send_message(message['chat']['id'], f"❌ خطأ في قراءة الشكاوى: {e}", self.admin_keyboard())
+                self.send_message(message['chat']['id'], self.tr('a0895_خطأ_في', 'ar', e=e), self.admin_keyboard())
         
     def start_complaint_reply_wizard(self, message, complaint_id):
             """بدء معالج الرد على الشكوى"""
@@ -17914,7 +18735,7 @@ class ComprehensiveDUXBot:
                 pass
             
             if not complaint_found:
-                self.send_message(message['chat']['id'], f"❌ لم يتم العثور على الشكوى {complaint_id}", self.admin_keyboard())
+                self.send_message(message['chat']['id'], self.tr('a0896_لم_يتم', 'ar', complaint_id=complaint_id), self.admin_keyboard())
                 return
             
             # عرض تفاصيل الشكوى مع أزرار ردود سريعة
@@ -17947,14 +18768,11 @@ class ComprehensiveDUXBot:
         
     def show_payment_methods_admin(self, message):
             """عرض وسائل الدفع للأدمن"""
-            payment_text = """💳 وسائل الدفع المتاحة
-    
-    هذا القسم يعرض الشركات المتاحة للإيداع والسحب.
-    استخدم 'إدارة الشركات' لإضافة أو تعديل وسائل الدفع."""
+            payment_text = self.tr('a0897_وسائل_الدفع', 'ar')
             
             companies = self.get_companies()
             for company in companies:
-                service_type = "إيداع وسحب" if company['type'] == 'both' else "إيداع" if company['type'] == 'deposit' else "سحب"
+                service_type = self.tr('a0755_إيداع_وسحب', 'ar') if company['type'] == 'both' else self.tr('a0390_إيداع', 'ar') if company['type'] == 'deposit' else self.tr('a0391_سحب', 'ar')
                 payment_text += f"\n🏢 {company['name']}\n"
                 payment_text += f"   📋 {service_type} - {company['details']}\n"
             
@@ -17985,11 +18803,11 @@ class ComprehensiveDUXBot:
                                 row['currency'] = self.get_setting('default_currency') or 'SAR'
                             writer.writerow({k: row.get(k, '') for k in fieldnames})
                     
-                    self.send_message(message['chat']['id'], f"✅ تم حظر العميل {customer_id}\nالسبب: {reason}", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], self.tr('a0898_تم_حظر', 'ar', customer_id=customer_id, reason=reason), self.admin_keyboard())
                 else:
-                    self.send_message(message['chat']['id'], f"❌ لم يتم العثور على العميل {customer_id}", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], self.tr('a0899_لم_يتم', 'ar', customer_id=customer_id), self.admin_keyboard())
             except:
-                self.send_message(message['chat']['id'], "❌ فشل في حظر المستخدم", self.admin_keyboard())
+                self.send_message(message['chat']['id'], self.tr('a0900_فشل_في', 'ar'), self.admin_keyboard())
         
     def unban_user_admin(self, message, customer_id):
             """إلغاء حظر مستخدم من قبل الأدمن"""
@@ -18016,11 +18834,11 @@ class ComprehensiveDUXBot:
                                 row['currency'] = self.get_setting('default_currency') or 'SAR'
                             writer.writerow({k: row.get(k, '') for k in fieldnames})
                     
-                    self.send_message(message['chat']['id'], f"✅ تم إلغاء حظر العميل {customer_id}", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], self.tr('a0901_تم_إلغاء', 'ar', customer_id=customer_id), self.admin_keyboard())
                 else:
-                    self.send_message(message['chat']['id'], f"❌ لم يتم العثور على العميل {customer_id}", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], self.tr('a0899_لم_يتم', 'ar', customer_id=customer_id), self.admin_keyboard())
             except:
-                self.send_message(message['chat']['id'], "❌ فشل في إلغاء حظر المستخدم", self.admin_keyboard())
+                self.send_message(message['chat']['id'], self.tr('a0902_فشل_في', 'ar'), self.admin_keyboard())
         
     def delete_company_simple(self, message, company_id):
             """حذف شركة بسيط"""
@@ -18044,24 +18862,18 @@ class ComprehensiveDUXBot:
                         writer.writeheader()
                         writer.writerows(companies)
                     
-                    self.send_message(message['chat']['id'], f"✅ تم حذف الشركة: {deleted_name} (ID: {company_id})", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], self.tr('a0903_تم_حذف', 'ar', deleted_name=deleted_name, company_id=company_id), self.admin_keyboard())
                 else:
-                    self.send_message(message['chat']['id'], f"❌ لم يتم العثور على شركة بالمعرف: {company_id}", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], self.tr('a0804_لم_يتم', 'ar', company_id=company_id), self.admin_keyboard())
             except:
-                self.send_message(message['chat']['id'], "❌ فشل في حذف الشركة", self.admin_keyboard())
+                self.send_message(message['chat']['id'], self.tr('a0904_فشل_في', 'ar'), self.admin_keyboard())
         
     def update_setting_simple(self, message, text):
             """تحديث إعداد النظام"""
             # تنسيق: تعديل_اعداد مفتاح_الإعداد القيمة_الجديدة
-            parts = text.replace('تعديل_اعداد ', '').split(' ', 1)
+            parts = text.replace(self.tr('a0345_تعديل_اعداد', 'ar'), '').split(' ', 1)
             if len(parts) < 2:
-                help_text = """❌ تنسيق خاطئ
-    
-    الصيغة الصحيحة:
-    تعديل_اعداد مفتاح_الإعداد القيمة_الجديدة
-    
-    مثال:
-    تعديل_اعداد min_deposit 100"""
+                help_text = self.tr('a0905_تنسيق_خاطئ', 'ar')
                 self.send_message(message['chat']['id'], help_text, self.admin_keyboard())
                 return
             
@@ -18087,11 +18899,11 @@ class ComprehensiveDUXBot:
                         writer.writeheader()
                         writer.writerows(settings)
                     
-                    self.send_message(message['chat']['id'], f"✅ تم تحديث الإعداد:\n{setting_key} = {setting_value}", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], self.tr('a0906_تم_تحديث', 'ar', setting_key=setting_key, setting_value=setting_value), self.admin_keyboard())
                 else:
-                    self.send_message(message['chat']['id'], f"❌ لم يتم العثور على الإعداد: {setting_key}", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], self.tr('a0907_لم_يتم', 'ar', setting_key=setting_key), self.admin_keyboard())
             except:
-                self.send_message(message['chat']['id'], "❌ فشل في تحديث الإعداد", self.admin_keyboard())
+                self.send_message(message['chat']['id'], self.tr('a0908_فشل_في', 'ar'), self.admin_keyboard())
         
     def save_complaint(self, message, complaint_text):
             """حفظ شكوى المستخدم"""
@@ -18139,7 +18951,7 @@ class ComprehensiveDUXBot:
                 
             except Exception as e:
                 logger.error(f"خطأ في حفظ الشكوى: {e}")
-                self.send_message(message['chat']['id'], "❌ فشل في إرسال الشكوى. حاول مرة أخرى", self.main_keyboard(user.get('language', 'ar')))
+                self.send_message(message['chat']['id'], self.tr('a0909_فشل_في', 'ar'), self.main_keyboard(user.get('language', 'ar')))
                 if message['from']['id'] in self.user_states:
                     del self.user_states[message['from']['id']]
         
@@ -18172,7 +18984,7 @@ class ComprehensiveDUXBot:
                 media_type = 'text'
                 media_data['text'] = broadcast_text
             else:
-                self.send_message(message['chat']['id'], "❌ لا يوجد محتوى للإرسال", self.admin_keyboard())
+                self.send_message(message['chat']['id'], self.tr('a0910_لا_يوجد', 'ar'), self.admin_keyboard())
                 if message['from']['id'] in self.user_states:
                     del self.user_states[message['from']['id']]
                 return
@@ -18225,7 +19037,7 @@ class ComprehensiveDUXBot:
                     except:
                         failed_count += 1
                 
-                media_label = {'photo': '🖼️ صورة', 'video': '🎥 فيديو', 'sticker': '🃏 ملصق', 'document': '📄 ملف', 'text': '📝 نص'}.get(media_type, 'محتوى')
+                media_label = {'photo': '🖼️ صورة', 'video': '🎥 فيديو', 'sticker': '🃏 ملصق', 'document': '📄 ملف', 'text': '📝 نص'}.get(media_type, self.tr('a0911_محتوى', 'ar'))
                 summary = f"""✅ تم الإرسال الجماعي
 
 📊 الإحصائيات:
@@ -18238,13 +19050,13 @@ class ComprehensiveDUXBot:
                 if message['from']['id'] in self.user_states:
                     del self.user_states[message['from']['id']]
             except:
-                self.send_message(message['chat']['id'], "❌ فشل في الإرسال الجماعي", self.admin_keyboard())
+                self.send_message(message['chat']['id'], self.tr('a0912_فشل_في', 'ar'), self.admin_keyboard())
                 if message['from']['id'] in self.user_states:
                     del self.user_states[message['from']['id']]
     
     def show_approved_transactions(self, message):
             """عرض المعاملات المُوافق عليها"""
-            approved_text = "✅ المعاملات المُوافق عليها (آخر 20 معاملة):\n\n"
+            approved_text = self.tr('a0913_المعاملات_المُوافق', 'ar')
             found_approved = False
             count = 0
             
@@ -18262,19 +19074,19 @@ class ComprehensiveDUXBot:
                             
                             approved_text += f"{type_emoji} {row['id']}\n"
                             approved_text += f"👤 {row['name']}\n"
-                            approved_text += f"💰 {row['amount']} ريال\n"
+                            approved_text += self.tr('a0914_ريال', 'ar', row_amount=row['amount'])
                             approved_text += f"📅 {row['date']}\n\n"
             except:
                 pass
             
             if not found_approved:
-                approved_text += "لا توجد معاملات مُوافق عليها"
+                approved_text += self.tr('a0915_لا_توجد', 'ar')
             
             self.send_message(message['chat']['id'], approved_text, self.admin_keyboard())
         
     def show_users_management(self, message):
             """عرض إدارة المستخدمين"""
-            users_text = "👥 إدارة المستخدمين:\n\n"
+            users_text = self.tr('a0916_إدارة_المستخدمين', 'ar')
             active_count = 0
             banned_count = 0
             
@@ -18289,15 +19101,15 @@ class ComprehensiveDUXBot:
             except:
                 pass
             
-            users_text += f"✅ مستخدمون نشطون: {active_count}\n"
-            users_text += f"🚫 مستخدمون محظورون: {banned_count}\n\n"
+            users_text += self.tr('a0917_مستخدمون_نشطون', 'ar', active_count=active_count)
+            users_text += self.tr('a0918_مستخدمون_محظورون', 'ar', banned_count=banned_count)
             
-            users_text += "📝 الأوامر المتاحة:\n"
-            users_text += "• بحث اسم_أو_رقم_العميل\n"
-            users_text += "• حظر رقم_العميل السبب\n"
-            users_text += "• الغاء_حظر رقم_العميل\n\n"
+            users_text += self.tr('a0919_الأوامر_المتاحة', 'ar')
+            users_text += self.tr('a0920_بحث_اسم', 'ar')
+            users_text += self.tr('a0921_حظر_رقم', 'ar')
+            users_text += self.tr('a0922_الغاء_حظر', 'ar')
             
-            users_text += "مثال:\nبحث أحمد\nحظر C123456 مخالفة_الشروط"
+            users_text += self.tr('a0923_مثال_بحث', 'ar')
             
             self.send_message(message['chat']['id'], users_text, self.admin_keyboard())
         
@@ -18316,18 +19128,18 @@ class ComprehensiveDUXBot:
                 pass
             
             if not results:
-                self.send_message(message['chat']['id'], f"❌ لم يتم العثور على نتائج للبحث: {query}", self.admin_keyboard())
+                self.send_message(message['chat']['id'], self.tr('a0650_لم_يتم', 'ar', query=query), self.admin_keyboard())
                 return
             
-            search_text = f"🔍 نتائج البحث عن: {query}\n\n"
+            search_text = self.tr('a0651_نتائج_البحث', 'ar', query=query)
             for user in results[:10]:  # أول 10 نتائج فقط
-                status = "🚫 محظور" if user.get('is_banned') == 'yes' else "✅ نشط"
+                status = self.tr('a0652_محظور', 'ar') if user.get('is_banned') == 'yes' else self.tr('a0653_نشط', 'ar')
                 search_text += f"👤 {user['name']}\n"
                 search_text += f"🆔 {user['customer_id']}\n"
                 search_text += f"📱 {user['phone']}\n"
                 search_text += f"🔸 {status}\n"
                 if user.get('is_banned') == 'yes' and user.get('ban_reason'):
-                    search_text += f"📝 سبب الحظر: {user['ban_reason']}\n"
+                    search_text += self.tr('a0924_سبب_الحظر', 'ar', user_ban_reason=user['ban_reason'])
                 search_text += "\n"
             
             self.send_message(message['chat']['id'], search_text, self.admin_keyboard())
@@ -18340,11 +19152,11 @@ class ComprehensiveDUXBot:
             companies = self.get_companies()
             if not companies:
                 self.send_message(message['chat']['id'], 
-                                "❌ لا توجد شركات متاحة. يجب إضافة شركة أولاً", 
+                                self.tr('a0925_لا_توجد', 'ar'), 
                                 self.admin_keyboard())
                 return
             
-            companies_text = "🏢 اختر الشركة لإضافة وسيلة دفع:\n\n"
+            companies_text = self.tr('a0926_اختر_الشركة', 'ar')
             keyboard = []
             
             for company in companies:
@@ -18367,15 +19179,15 @@ class ComprehensiveDUXBot:
             """معالج مبسط لتعديل وسيلة دفع"""
             methods = self.get_all_payment_methods()
             if not methods:
-                self.send_message(message['chat']['id'], "❌ لا توجد وسائل دفع متاحة", self.admin_keyboard())
+                self.send_message(message['chat']['id'], self.tr('a0197_لا_توجد', 'ar'), self.admin_keyboard())
                 return
             
-            methods_text = "✏️ اختر وسيلة الدفع للتعديل:\n\n"
+            methods_text = self.tr('a0927_اختر_وسيلة', 'ar')
             keyboard = []
             
             for method in methods:
                 company = self.get_company_by_id(method['company_id'])
-                company_name = company['name'] if company else 'غير محدد'
+                company_name = company['name'] if company else self.tr('a0122_غير_محدد', 'ar')
                 
                 methods_text += f"🆔 {method['id']} - {method['method_name']}\n"
                 methods_text += f"   🏢 {company_name}\n"
@@ -18399,15 +19211,15 @@ class ComprehensiveDUXBot:
             """معالج مبسط لحذف وسيلة دفع"""
             methods = self.get_all_payment_methods()
             if not methods:
-                self.send_message(message['chat']['id'], "❌ لا توجد وسائل دفع متاحة", self.admin_keyboard())
+                self.send_message(message['chat']['id'], self.tr('a0197_لا_توجد', 'ar'), self.admin_keyboard())
                 return
             
-            methods_text = "🗑️ اختر وسيلة الدفع للحذف:\n\n"
+            methods_text = self.tr('a0928_اختر_وسيلة', 'ar')
             keyboard = []
             
             for method in methods:
                 company = self.get_company_by_id(method['company_id'])
-                company_name = company['name'] if company else 'غير محدد'
+                company_name = company['name'] if company else self.tr('a0122_غير_محدد', 'ar')
                 
                 methods_text += f"🆔 {method['id']} - {method['method_name']}\n"
                 methods_text += f"   🏢 {company_name}\n\n"
@@ -18431,23 +19243,23 @@ class ComprehensiveDUXBot:
             methods = self.get_all_payment_methods()
             
             if not methods:
-                self.send_message(message['chat']['id'], "❌ لا توجد وسائل دفع مضافة بعد", self.admin_keyboard())
+                self.send_message(message['chat']['id'], self.tr('a0929_لا_توجد', 'ar'), self.admin_keyboard())
                 return
             
-            methods_text = "📊 وسائل الدفع المتاحة:\n\n"
+            methods_text = self.tr('a0930_وسائل_الدفع', 'ar')
             
             for method in methods:
                 company = self.get_company_by_id(method['company_id'])
-                company_name = company['name'] if company else 'غير محدد'
-                status = "✅ نشط" if method['status'] == 'active' else "❌ متوقف"
+                company_name = company['name'] if company else self.tr('a0122_غير_محدد', 'ar')
+                status = self.tr('a0653_نشط', 'ar') if method['status'] == 'active' else self.tr('a0931_متوقف', 'ar')
                 
                 methods_text += f"🆔 {method['id']} - {method['method_name']}\n"
-                methods_text += f"🏢 الشركة: {company_name}\n"
-                methods_text += f"💳 النوع: {method['method_type']}\n"
-                methods_text += f"💰 البيانات: {method['account_data']}\n"
-                methods_text += f"📊 الحالة: {status}\n"
+                methods_text += self.tr('a0932_الشركة', 'ar', company_name=company_name)
+                methods_text += self.tr('a0933_النوع', 'ar', method_method_type=method['method_type'])
+                methods_text += self.tr('a0934_البيانات', 'ar', method_account_data=method['account_data'])
+                methods_text += self.tr('a0935_الحالة', 'ar', status=status)
                 if method['additional_info']:
-                    methods_text += f"💡 معلومات: {method['additional_info']}\n"
+                    methods_text += self.tr('a0936_معلومات', 'ar', method_additional_info=method['additional_info'])
                 methods_text += "─────────────\n\n"
             
             methods_text += f"📈 إجمالي وسائل الدفع: {len(methods)}"
@@ -18459,7 +19271,7 @@ class ComprehensiveDUXBot:
             user_id = message['from']['id']
             text = message.get('text', '').strip()
             
-            if text in ['🔙 العودة', '⬅️ العودة']:
+            if text in [self.tr('a0142_العودة', 'ar'), self.tr('a0254_العودة', 'ar')]:
                 if user_id in self.user_states:
                     del self.user_states[user_id]
                 self.show_payment_methods_management(message)
@@ -18476,21 +19288,11 @@ class ComprehensiveDUXBot:
                     break
             
             if not selected_company:
-                self.send_message(message['chat']['id'], "❌ شركة غير صحيحة. اختر من القائمة أعلاه")
+                self.send_message(message['chat']['id'], self.tr('a0937_شركة_غير', 'ar'))
                 return
             
             # طلب بيانات وسيلة الدفع
-            input_text = f"""📋 إضافة وسيلة دفع للشركة: {selected_company['name']}
-    
-    أدخل البيانات بالتنسيق التالي:
-    اسم_الوسيلة | نوع_الوسيلة | رقم_الحساب | معلومات_إضافية
-    
-    مثال:
-    بنك الأهلي | حساب بنكي | SA1234567890123456789 | حساب رئيسي
-    أو
-    فودافون كاش | محفظة إلكترونية | 01012345678 | للدفع السريع
-    
-    ⬅️ /cancel للإلغاء"""
+            input_text = self.tr('a0938_إضافة_وسيلة', 'ar', selected_company_name=selected_company['name'])
             
             self.send_message(message['chat']['id'], input_text)
             self.user_states[user_id] = f'adding_payment_method_{selected_company["id"]}'
@@ -18524,7 +19326,7 @@ class ComprehensiveDUXBot:
                     
                     if success:
                         company = self.get_company_by_id(company_id)
-                        company_name = company['name'] if company else 'غير محدد'
+                        company_name = company['name'] if company else self.tr('a0122_غير_محدد', 'ar')
                         
                         success_msg = f"""✅ تم إضافة وسيلة الدفع بنجاح!
     
@@ -18536,12 +19338,12 @@ class ComprehensiveDUXBot:
                         
                         self.send_message(message['chat']['id'], success_msg, self.admin_keyboard())
                     else:
-                        self.send_message(message['chat']['id'], "❌ فشل في إضافة وسيلة الدفع", self.admin_keyboard())
+                        self.send_message(message['chat']['id'], self.tr('a0939_فشل_في', 'ar'), self.admin_keyboard())
                 else:
-                    self.send_message(message['chat']['id'], "❌ تنسيق غير صحيح. يجب أن يحتوي على 3 أجزاء على الأقل مفصولة بـ |")
+                    self.send_message(message['chat']['id'], self.tr('a0940_تنسيق_غير', 'ar'))
                     return
             else:
-                self.send_message(message['chat']['id'], "❌ تنسيق غير صحيح. استخدم | للفصل بين البيانات")
+                self.send_message(message['chat']['id'], self.tr('a0941_تنسيق_غير', 'ar'))
                 return
             
             # تنظيف الحالة
@@ -18553,36 +19355,24 @@ class ComprehensiveDUXBot:
             user_id = message['from']['id']
             text = message.get('text', '').strip()
             
-            if text in ['🔙 العودة', '⬅️ العودة']:
+            if text in [self.tr('a0142_العودة', 'ar'), self.tr('a0254_العودة', 'ar')]:
                 if user_id in self.user_states:
                     del self.user_states[user_id]
                 self.show_payment_methods_management(message)
                 return
             
-            if text.startswith('تعديل '):
-                method_id = text.replace('تعديل ', '').strip()
+            if text.startswith(self.tr('a0942_تعديل', 'ar')):
+                method_id = text.replace(self.tr('a0942_تعديل', 'ar'), '').strip()
                 method = self.get_payment_method_by_id(method_id)
                 
                 if not method:
-                    self.send_message(message['chat']['id'], "❌ وسيلة دفع غير موجودة")
+                    self.send_message(message['chat']['id'], self.tr('a0943_وسيلة_دفع', 'ar'))
                     return
                 
                 company = self.get_company_by_id(method['company_id'])
-                company_name = company['name'] if company else 'غير محدد'
+                company_name = company['name'] if company else self.tr('a0122_غير_محدد', 'ar')
                 
-                edit_text = f"""✏️ تعديل وسيلة الدفع
-    
-    🆔 المعرف: {method['id']}
-    🏢 الشركة: {company_name}
-    📋 الاسم الحالي: {method['method_name']}
-    💳 النوع الحالي: {method['method_type']}
-    💰 البيانات الحالية: {method['account_data']}
-    💡 المعلومات الحالية: {method['additional_info']}
-    
-    أدخل البيانات الجديدة بالتنسيق:
-    اسم_جديد | نوع_جديد | رقم_حساب_جديد | معلومات_جديدة
-    
-    ⬅️ /cancel للإلغاء"""
+                edit_text = self.tr('a0944_تعديل_وسيلة', 'ar', method_id=method['id'], company_name=company_name, method_method_name=method['method_name'], method_method_type=method['method_type'], method_account_data=method['account_data'], method_additional_info=method['additional_info'])
                 
                 self.send_message(message['chat']['id'], edit_text)
                 self.user_states[user_id] = f'editing_method_simple_{method_id}'
@@ -18592,19 +19382,19 @@ class ComprehensiveDUXBot:
             user_id = message['from']['id']
             text = message.get('text', '').strip()
             
-            if text in ['🔙 العودة', '⬅️ العودة']:
+            if text in [self.tr('a0142_العودة', 'ar'), self.tr('a0254_العودة', 'ar')]:
                 if user_id in self.user_states:
                     del self.user_states[user_id]
                 self.show_payment_methods_management(message)
                 return
             
-            if text.startswith('حذف '):
-                method_id = text.replace('حذف ', '').strip()
+            if text.startswith(self.tr('a0945_حذف', 'ar')):
+                method_id = text.replace(self.tr('a0945_حذف', 'ar'), '').strip()
                 
                 # الحصول على بيانات الوسيلة قبل الحذف
                 method_to_delete = self.get_payment_method_by_id(method_id)
                 if not method_to_delete:
-                    self.send_message(message['chat']['id'], f"❌ لم يتم العثور على وسيلة الدفع {method_id}", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], self.tr('a0946_لم_يتم', 'ar', method_id=method_id), self.admin_keyboard())
                     if user_id in self.user_states:
                         del self.user_states[user_id]
                     return
@@ -18614,18 +19404,13 @@ class ComprehensiveDUXBot:
                 
                 if success and deleted_method:
                     company = self.get_company_by_id(deleted_method['company_id'])
-                    company_name = company['name'] if company else 'غير محدد'
+                    company_name = company['name'] if company else self.tr('a0122_غير_محدد', 'ar')
                     
-                    success_msg = f"""✅ تم حذف وسيلة الدفع بنجاح!
-    
-    🆔 المحذوفة: {deleted_method['id']}
-    🏢 الشركة: {company_name}
-    📋 الاسم: {deleted_method['method_name']}
-    💳 النوع: {deleted_method['method_type']}"""
+                    success_msg = self.tr('a0947_تم_حذف', 'ar', deleted_method_id=deleted_method['id'], company_name=company_name, deleted_method_method_name=deleted_method['method_name'], deleted_method_method_type=deleted_method['method_type'])
                     
                     self.send_message(message['chat']['id'], success_msg, self.admin_keyboard())
                 else:
-                    self.send_message(message['chat']['id'], f"❌ فشل في حذف وسيلة الدفع {method_id}", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], self.tr('a0948_فشل_في', 'ar', method_id=method_id), self.admin_keyboard())
                 
                 # تنظيف الحالة
                 if user_id in self.user_states:
@@ -18654,7 +19439,7 @@ class ComprehensiveDUXBot:
                     # التحقق من وجود الوسيلة قبل التحديث
                     existing_method = self.get_payment_method_by_id(method_id)
                     if not existing_method:
-                        self.send_message(message['chat']['id'], f"❌ لم يتم العثور على وسيلة الدفع رقم {method_id}", self.admin_keyboard())
+                        self.send_message(message['chat']['id'], self.tr('a0949_لم_يتم', 'ar', method_id=method_id), self.admin_keyboard())
                         if user_id in self.user_states:
                             del self.user_states[user_id]
                         return
@@ -18670,7 +19455,7 @@ class ComprehensiveDUXBot:
                     if success:
                         # الحصول على بيانات الشركة
                         company = self.get_company_by_id(existing_method['company_id'])
-                        company_name = company['name'] if company else 'غير محدد'
+                        company_name = company['name'] if company else self.tr('a0122_غير_محدد', 'ar')
                         
                         success_msg = f"""✅ تم تعديل وسيلة الدفع بنجاح!
     
@@ -18683,12 +19468,12 @@ class ComprehensiveDUXBot:
                         
                         self.send_message(message['chat']['id'], success_msg, self.admin_keyboard())
                     else:
-                        self.send_message(message['chat']['id'], f"❌ فشل في تعديل وسيلة الدفع {method_id}", self.admin_keyboard())
+                        self.send_message(message['chat']['id'], self.tr('a0950_فشل_في', 'ar', method_id=method_id), self.admin_keyboard())
                 else:
-                    self.send_message(message['chat']['id'], "❌ تنسيق غير صحيح!\n\nالتنسيق المطلوب:\nاسم_الوسيلة | نوع_الوسيلة | رقم_الحساب | معلومات_إضافية\n\nمثال:\nفودافون كاش | محفظة إلكترونية | 01012345678 | للدفع السريع")
+                    self.send_message(message['chat']['id'], self.tr('a0951_تنسيق_غير', 'ar'))
                     return
             else:
-                self.send_message(message['chat']['id'], "❌ يجب استخدام | للفصل بين البيانات!\n\nمثال:\nفودافون كاش | محفظة إلكترونية | 01012345678 | للدفع السريع")
+                self.send_message(message['chat']['id'], self.tr('a0952_يجب_استخدام', 'ar'))
                 return
             
             # تنظيف الحالة
@@ -18752,10 +19537,10 @@ class ComprehensiveDUXBot:
 
             # عرض الوسائل كأزرار
             if methods:
-                text += "<b>قائمة الوسائل:</b>\n\n"
+                text += self.tr('a0953_قائمة_الوسائل', 'ar')
                 for m in methods[:15]:
                     company = self.get_company_by_id(m.get('company_id', ''))
-                    company_name = company['name'] if company else 'غير محدد'
+                    company_name = company['name'] if company else self.tr('a0122_غير_محدد', 'ar')
                     icon = m.get('icon', '💳') or '💳'
                     status_icon = '✅' if m.get('status') == 'active' else '⏸️'
                     text += f"{status_icon} {icon} <b>{m['method_name']}</b>\n"
@@ -18781,15 +19566,15 @@ class ComprehensiveDUXBot:
             active_methods = [m for m in methods if m['status'] == 'active']
             
             if not active_methods:
-                self.send_message(message['chat']['id'], "❌ لا توجد وسائل دفع نشطة لإيقافها", self.admin_keyboard())
+                self.send_message(message['chat']['id'], self.tr('a0954_لا_توجد', 'ar'), self.admin_keyboard())
                 return
             
-            methods_text = "⏹️ اختر وسيلة الدفع لإيقافها:\n\n"
+            methods_text = self.tr('a0955_اختر_وسيلة', 'ar')
             keyboard = []
             
             for method in active_methods:
                 company = self.get_company_by_id(method['company_id'])
-                company_name = company['name'] if company else 'غير محدد'
+                company_name = company['name'] if company else self.tr('a0122_غير_محدد', 'ar')
                 
                 methods_text += f"🆔 {method['id']} - {method['method_name']}\n"
                 methods_text += f"   🏢 {company_name}\n"
@@ -18815,15 +19600,15 @@ class ComprehensiveDUXBot:
             inactive_methods = [m for m in methods if m['status'] != 'active']
             
             if not inactive_methods:
-                self.send_message(message['chat']['id'], "❌ جميع وسائل الدفع نشطة بالفعل", self.admin_keyboard())
+                self.send_message(message['chat']['id'], self.tr('a0956_جميع_وسائل', 'ar'), self.admin_keyboard())
                 return
             
-            methods_text = "▶️ اختر وسيلة الدفع لتشغيلها:\n\n"
+            methods_text = self.tr('a0957_اختر_وسيلة', 'ar')
             keyboard = []
             
             for method in inactive_methods:
                 company = self.get_company_by_id(method['company_id'])
-                company_name = company['name'] if company else 'غير محدد'
+                company_name = company['name'] if company else self.tr('a0122_غير_محدد', 'ar')
                 
                 methods_text += f"🆔 {method['id']} - {method['method_name']}\n"
                 methods_text += f"   🏢 {company_name}\n"
@@ -18848,35 +19633,29 @@ class ComprehensiveDUXBot:
             user_id = message['from']['id']
             text = message.get('text', '').strip()
             
-            if text in ['🔙 العودة', '⬅️ العودة']:
+            if text in [self.tr('a0142_العودة', 'ar'), self.tr('a0254_العودة', 'ar')]:
                 if user_id in self.user_states:
                     del self.user_states[user_id]
                 self.show_payment_methods_management(message)
                 return
             
-            if text.startswith('إيقاف '):
-                method_id = text.replace('إيقاف ', '').strip()
+            if text.startswith(self.tr('a0958_إيقاف', 'ar')):
+                method_id = text.replace(self.tr('a0958_إيقاف', 'ar'), '').strip()
                 success = self.toggle_payment_method_status(method_id, 'inactive')
                 
                 if success:
                     method = self.get_payment_method_by_id(method_id)
                     if method:
                         company = self.get_company_by_id(method['company_id'])
-                        company_name = company['name'] if company else 'غير محدد'
+                        company_name = company['name'] if company else self.tr('a0122_غير_محدد', 'ar')
                         
-                        success_msg = f"""⏹️ تم إيقاف وسيلة الدفع بنجاح!
-    
-    🆔 المعرف: {method_id}
-    🏢 الشركة: {company_name}
-    📋 الاسم: {method['method_name']}
-    💳 النوع: {method['method_type']}
-    📊 الحالة: متوقفة ❌"""
+                        success_msg = self.tr('a0959_تم_إيقاف', 'ar', method_id=method_id, company_name=company_name, method_method_name=method['method_name'], method_method_type=method['method_type'])
                         
                         self.send_message(message['chat']['id'], success_msg, self.admin_keyboard())
                     else:
-                        self.send_message(message['chat']['id'], f"❌ لم يتم العثور على وسيلة الدفع {method_id}", self.admin_keyboard())
+                        self.send_message(message['chat']['id'], self.tr('a0946_لم_يتم', 'ar', method_id=method_id), self.admin_keyboard())
                 else:
-                    self.send_message(message['chat']['id'], f"❌ فشل في إيقاف وسيلة الدفع {method_id}", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], self.tr('a0960_فشل_في', 'ar', method_id=method_id), self.admin_keyboard())
                 
                 if user_id in self.user_states:
                     del self.user_states[user_id]
@@ -18886,35 +19665,29 @@ class ComprehensiveDUXBot:
             user_id = message['from']['id']
             text = message.get('text', '').strip()
             
-            if text in ['🔙 العودة', '⬅️ العودة']:
+            if text in [self.tr('a0142_العودة', 'ar'), self.tr('a0254_العودة', 'ar')]:
                 if user_id in self.user_states:
                     del self.user_states[user_id]
                 self.show_payment_methods_management(message)
                 return
             
-            if text.startswith('تشغيل '):
-                method_id = text.replace('تشغيل ', '').strip()
+            if text.startswith(self.tr('a0961_تشغيل', 'ar')):
+                method_id = text.replace(self.tr('a0961_تشغيل', 'ar'), '').strip()
                 success = self.toggle_payment_method_status(method_id, 'active')
                 
                 if success:
                     method = self.get_payment_method_by_id(method_id)
                     if method:
                         company = self.get_company_by_id(method['company_id'])
-                        company_name = company['name'] if company else 'غير محدد'
+                        company_name = company['name'] if company else self.tr('a0122_غير_محدد', 'ar')
                         
-                        success_msg = f"""▶️ تم تشغيل وسيلة الدفع بنجاح!
-    
-    🆔 المعرف: {method_id}
-    🏢 الشركة: {company_name}
-    📋 الاسم: {method['method_name']}
-    💳 النوع: {method['method_type']}
-    📊 الحالة: نشطة ✅"""
+                        success_msg = self.tr('a0962_تم_تشغيل', 'ar', method_id=method_id, company_name=company_name, method_method_name=method['method_name'], method_method_type=method['method_type'])
                         
                         self.send_message(message['chat']['id'], success_msg, self.admin_keyboard())
                     else:
-                        self.send_message(message['chat']['id'], f"❌ لم يتم العثور على وسيلة الدفع {method_id}", self.admin_keyboard())
+                        self.send_message(message['chat']['id'], self.tr('a0946_لم_يتم', 'ar', method_id=method_id), self.admin_keyboard())
                 else:
-                    self.send_message(message['chat']['id'], f"❌ فشل في تشغيل وسيلة الدفع {method_id}", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], self.tr('a0963_فشل_في', 'ar', method_id=method_id), self.admin_keyboard())
                 
                 if user_id in self.user_states:
                     del self.user_states[user_id]
@@ -18997,7 +19770,7 @@ class ComprehensiveDUXBot:
         
     def show_all_payment_methods(self, message):
             """عرض جميع وسائل الدفع المتاحة"""
-            methods_text = "💳 جميع وسائل الدفع:\n\n"
+            methods_text = self.tr('a0964_جميع_وسائل', 'ar')
             
             try:
                 companies = self.get_companies()
@@ -19014,30 +19787,30 @@ class ComprehensiveDUXBot:
                         methods_by_company[company_id].append(row)
                     
                     for company_id, methods in methods_by_company.items():
-                        company_name = company_names.get(company_id, f"شركة #{company_id}")
+                        company_name = company_names.get(company_id, self.tr('a0965_شركة', 'ar', company_id=company_id))
                         methods_text += f"🏢 **{company_name}**:\n"
                         
                         for method in methods:
                             status_emoji = "✅" if method['status'] == 'active' else "⏹️"
-                            status_text = "نشطة" if method['status'] == 'active' else "متوقفة"
+                            status_text = self.tr('a0966_نشطة', 'ar') if method['status'] == 'active' else self.tr('a0967_متوقفة', 'ar')
                             methods_text += f"  {status_emoji} {method['method_name']} (#{method['id']}) - {status_text}\n"
-                            methods_text += f"      📋 النوع: {method['method_type']}\n"
-                            methods_text += f"      💳 البيانات: {method['account_data']}\n"
+                            methods_text += self.tr('a0968_النوع', 'ar', method_method_type=method['method_type'])
+                            methods_text += self.tr('a0969_البيانات', 'ar', method_account_data=method['account_data'])
                             if method['additional_info']:
-                                methods_text += f"      💡 ملاحظات: {method['additional_info']}\n"
+                                methods_text += self.tr('a0970_ملاحظات', 'ar', method_additional_info=method['additional_info'])
                             methods_text += "\n"
                         methods_text += "▫️▫️▫️▫️▫️▫️▫️▫️\n\n"
             except:
-                methods_text += "❌ خطأ في قراءة البيانات"
+                methods_text += self.tr('a0971_خطأ_في', 'ar')
             
             # إضافة أوامر النسخ السريع
-            methods_text += "\n📋 **أوامر إدارة سريعة:**\n"
-            methods_text += "• `اضافة_وسيلة_دفع ID_الشركة اسم_الوسيلة نوع_الوسيلة البيانات`\n"
-            methods_text += "• `تعديل_وسيلة_دفع ID_الوسيلة البيانات_الجديدة`\n"
-            methods_text += "• `حذف_وسيلة_دفع ID_الوسيلة`\n\n"
+            methods_text += self.tr('a0972_أوامر_إدارة', 'ar')
+            methods_text += self.tr('a0973_اضافة_وسيلة', 'ar')
+            methods_text += self.tr('a0974_تعديل_وسيلة', 'ar')
+            methods_text += self.tr('a0975_حذف_وسيلة', 'ar')
             
-            methods_text += "💡 **مثال:**\n"
-            methods_text += "`اضافة_وسيلة_دفع 1 حساب_مدى bank_account رقم:1234567890`"
+            methods_text += self.tr('a0976_مثال', 'ar')
+            methods_text += self.tr('a0977_اضافة_وسيلة', 'ar')
             
             keyboard = [
                 [{'text': '➕ إضافة وسيلة دفع'}, {'text': '✏️ تعديل وسيلة دفع'}],
@@ -19060,11 +19833,11 @@ class ComprehensiveDUXBot:
             companies = self.get_companies()
             if not companies:
                 self.send_message(message['chat']['id'], 
-                                "❌ لا توجد شركات متاحة. يجب إضافة شركة أولاً", 
+                                self.tr('a0925_لا_توجد', 'ar'), 
                                 self.admin_keyboard())
                 return
             
-            companies_text = "🏢 اختر الشركة لإضافة وسيلة دفع لها:\n\n"
+            companies_text = self.tr('a0978_اختر_الشركة', 'ar')
             keyboard = []
             
             for company in companies:
@@ -19092,7 +19865,7 @@ class ComprehensiveDUXBot:
             state = self.user_states.get(user_id, {})
             
             back_texts = {self.tr('main_menu', l) for l in self.get_supported_languages()}
-            if text in back_texts or text in ['🔙 العودة', '⬅️ العودة', '🔙 العودة لاختيار الشركة']:
+            if text in back_texts or text in [self.tr('a0142_العودة', 'ar'), self.tr('a0254_العودة', 'ar'), self.tr('a0979_العودة_لاختيار', 'ar')]:
                 # العودة لاختيار الشركة
                 transaction_type = state.get('transaction_type')
                 if transaction_type == 'deposit':
@@ -19170,15 +19943,7 @@ class ComprehensiveDUXBot:
             """بدء إرسال رسالة لعميل محدد"""
             user_id = message['from']['id']
             
-            instruction_text = """📧 إرسال رسالة لعميل محدد
-            
-    📝 أدخل رقم العميل الذي تريد إرسال رسالة إليه:
-    
-    مثال: C824717
-    
-    💡 يمكنك إرسال: نص، صورة، فيديو، ملصق، ملف
-    
-    ⬅️ /cancel للإلغاء"""
+            instruction_text = self.tr('a0980_إرسال_رسالة', lang)
             
             self.send_message(message['chat']['id'], instruction_text)
             self.user_states[user_id] = 'sending_user_message_id'
@@ -19191,7 +19956,7 @@ class ComprehensiveDUXBot:
             if customer_id == '/cancel' or customer_id.lower() == 'cancel':
                 if user_id in self.user_states:
                     del self.user_states[user_id]
-                self.send_message(message['chat']['id'], "✅ تم إلغاء إرسال الرسالة", self.admin_keyboard())
+                self.send_message(message['chat']['id'], self.tr('a0981_تم_إلغاء', lang), self.admin_keyboard())
                 return
             
             # البحث عن العميل
@@ -19208,7 +19973,7 @@ class ComprehensiveDUXBot:
             
             if not user_found:
                 self.send_message(message['chat']['id'], 
-                                f"❌ لم يتم العثور على عميل برقم: {customer_id}\n\nيرجى التحقق من الرقم والمحاولة مرة أخرى:\n\n⬅️ /cancel للإلغاء")
+                                self.tr('a0982_لم_يتم', 'ar', customer_id=customer_id))
                 return
             
             # عرض معلومات العميل وطلب الرسالة
@@ -19236,7 +20001,7 @@ class ComprehensiveDUXBot:
             if message_content == '/cancel' or message_content.lower() == 'cancel':
                 if user_id in self.user_states:
                     del self.user_states[user_id]
-                self.send_message(message['chat']['id'], "✅ تم الإلغاء", self.admin_keyboard())
+                self.send_message(message['chat']['id'], self.tr('a0983_تم_الإلغاء', 'ar'), self.admin_keyboard())
                 return
             
             # البحث عن معرف التليجرام للعميل
@@ -19256,16 +20021,16 @@ class ComprehensiveDUXBot:
             
             if not target_telegram_id:
                 self.send_message(message['chat']['id'], 
-                    f"❌ لم يتم العثور على العميل <code>{customer_id}</code>", 
+                    self.tr('a0984_لم_يتم', 'ar', customer_id=customer_id), 
                     self.admin_keyboard())
                 if user_id in self.user_states:
                     del self.user_states[user_id]
                 return
             
             admin_info = self.find_user(user_id)
-            admin_name = admin_info.get('name', 'الإدارة') if admin_info else 'الإدارة'
+            admin_name = admin_info.get('name', self.tr('a0985_الإدارة', 'ar')) if admin_info else self.tr('a0985_الإدارة', 'ar')
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M')
-            header = f"📧 رسالة من الإدارة\n\n👤 {admin_name}\n📅 {timestamp}\n\n━━━━━━━━━━━━━━━━━━━\n\n"
+            header = self.tr('a0986_رسالة_من', 'ar', admin_name=admin_name, timestamp=timestamp)
             
             sent = False
             
@@ -19307,11 +20072,11 @@ class ComprehensiveDUXBot:
                     })
                     sent = result and result.get('ok')
                 elif message_content:
-                    msg = header + message_content + "\n\n━━━━━━━━━━━━━━━━━━━\n\n💬 للرد استخدم قسم الشكاوى"
+                    msg = header + message_content + self.tr('a0987_للرد_استخدم', 'ar')
                     result = self.send_message(int(target_telegram_id), msg, None)
                     sent = result and result.get('ok')
                 else:
-                    self.send_message(message['chat']['id'], "❌ لا يوجد محتوى. أرسل نصاً/صورة/فيديو/ملصق/ملف:")
+                    self.send_message(message['chat']['id'], self.tr('a0988_لا_يوجد', 'ar'))
                     return
             except Exception as e:
                 logger.error(f"خطأ في إرسال رسالة لعميل: {e}")
@@ -19319,10 +20084,10 @@ class ComprehensiveDUXBot:
             
             if sent:
                 self.send_message(message['chat']['id'],
-                    f"✅ تم الإرسال!\n\n📧 إلى: <b>{customer_name}</b>\n🆔 <code>{customer_id}</code> 👈 اضغط للنسخ\n📅 {timestamp}",
+                    self.tr('a0989_تم_الإرسال', 'ar', customer_name=customer_name, customer_id=customer_id, timestamp=timestamp),
                     self.admin_keyboard())
             else:
-                self.send_message(message['chat']['id'], "❌ فشل في الإرسال", self.admin_keyboard())
+                self.send_message(message['chat']['id'], self.tr('a0990_فشل_في', 'ar'), self.admin_keyboard())
             
             if user_id in self.user_states:
                 del self.user_states[user_id]
@@ -19336,16 +20101,16 @@ class ComprehensiveDUXBot:
             
             if not methods:
                 self.send_message(message['chat']['id'], 
-                                "❌ لا توجد وسائل دفع في النظام حالياً", 
+                                self.tr('a0991_لا_توجد', 'ar'), 
                                 self.admin_keyboard())
                 return
             
-            methods_text = "✏️ اختر وسيلة الدفع للتعديل:\n\n"
+            methods_text = self.tr('a0927_اختر_وسيلة', 'ar')
             
             keyboard_buttons = []
             for method in methods:
                 company = self.get_company_by_id(method['company_id'])
-                company_name = company['name'] if company else 'غير محدد'
+                company_name = company['name'] if company else self.tr('a0122_غير_محدد', 'ar')
                 
                 method_info = f"🆔 {method['id']} | {method['method_name']} | {company_name}"
                 methods_text += f"{method_info}\n"
@@ -19371,16 +20136,16 @@ class ComprehensiveDUXBot:
             
             if not methods:
                 self.send_message(message['chat']['id'], 
-                                "❌ لا توجد وسائل دفع في النظام حالياً", 
+                                self.tr('a0991_لا_توجد', 'ar'), 
                                 self.admin_keyboard())
                 return
             
-            methods_text = "🗑️ اختر وسيلة الدفع للحذف:\n\n"
+            methods_text = self.tr('a0928_اختر_وسيلة', 'ar')
             
             keyboard_buttons = []
             for method in methods:
                 company = self.get_company_by_id(method['company_id'])
-                company_name = company['name'] if company else 'غير محدد'
+                company_name = company['name'] if company else self.tr('a0122_غير_محدد', 'ar')
                 
                 method_info = f"🆔 {method['id']} | {method['method_name']} | {company_name}"
                 methods_text += f"{method_info}\n"
@@ -19475,37 +20240,26 @@ class ComprehensiveDUXBot:
             user_id = message['from']['id']
             text = message.get('text', '').strip()
             
-            if text in ['🔙 العودة', '⬅️ العودة', '↩️ العودة']:
+            if text in [self.tr('a0142_العودة', 'ar'), self.tr('a0254_العودة', 'ar'), self.tr('a0287_العودة', 'ar')]:
                 if user_id in self.user_states:
                     del self.user_states[user_id]
-                self.send_message(message['chat']['id'], "تم الإلغاء", self.admin_keyboard())
+                self.send_message(message['chat']['id'], self.tr('a0992_تم_الإلغاء', 'ar'), self.admin_keyboard())
                 return
             
-            if text.startswith('تعديل '):
-                method_id = text.replace('تعديل ', '').strip()
+            if text.startswith(self.tr('a0942_تعديل', 'ar')):
+                method_id = text.replace(self.tr('a0942_تعديل', 'ar'), '').strip()
                 
                 # البحث عن وسيلة الدفع
                 method = self.get_payment_method_by_id(method_id)
                 if not method:
-                    self.send_message(message['chat']['id'], f"❌ لم يتم العثور على وسيلة الدفع {method_id}")
+                    self.send_message(message['chat']['id'], self.tr('a0946_لم_يتم', 'ar', method_id=method_id))
                     return
                 
                 company = self.get_company_by_id(method['company_id'])
-                company_name = company['name'] if company else 'غير محدد'
+                company_name = company['name'] if company else self.tr('a0122_غير_محدد', 'ar')
                 
                 # عرض تفاصيل الوسيلة وطلب البيانات الجديدة
-                edit_text = f"""✏️ تعديل وسيلة الدفع:
-    
-    🆔 المعرف: {method['id']}
-    🏢 الشركة: {company_name}
-    📋 الاسم: {method['method_name']}
-    💳 النوع: {method['method_type']}
-    📊 البيانات الحالية: {method['account_data']}
-    💡 معلومات إضافية: {method['additional_info']}
-    
-    📝 أدخل البيانات الجديدة (رقم الحساب/المحفظة):
-    
-    ⬅️ /cancel للإلغاء"""
+                edit_text = self.tr('a0993_تعديل_وسيلة', 'ar', method_id=method['id'], company_name=company_name, method_method_name=method['method_name'], method_method_type=method['method_type'], method_account_data=method['account_data'], method_additional_info=method['additional_info'])
                 
                 self.send_message(message['chat']['id'], edit_text)
                 self.user_states[user_id] = f'editing_method_{method_id}'
@@ -19515,33 +20269,27 @@ class ComprehensiveDUXBot:
             user_id = message['from']['id']
             text = message.get('text', '').strip()
             
-            if text in ['🔙 العودة', '⬅️ العودة', '↩️ العودة']:
+            if text in [self.tr('a0142_العودة', 'ar'), self.tr('a0254_العودة', 'ar'), self.tr('a0287_العودة', 'ar')]:
                 if user_id in self.user_states:
                     del self.user_states[user_id]
-                self.send_message(message['chat']['id'], "تم الإلغاء", self.admin_keyboard())
+                self.send_message(message['chat']['id'], self.tr('a0992_تم_الإلغاء', 'ar'), self.admin_keyboard())
                 return
             
-            if text.startswith('حذف '):
-                method_id = text.replace('حذف ', '').strip()
+            if text.startswith(self.tr('a0945_حذف', 'ar')):
+                method_id = text.replace(self.tr('a0945_حذف', 'ar'), '').strip()
                 
                 # حذف وسيلة الدفع
                 success, deleted_method = self.delete_payment_method(method_id)
                 
                 if success:
                     company = self.get_company_by_id(deleted_method['company_id'])
-                    company_name = company['name'] if company else 'غير محدد'
+                    company_name = company['name'] if company else self.tr('a0122_غير_محدد', 'ar')
                     
-                    success_msg = f"""✅ تم حذف وسيلة الدفع بنجاح!
-    
-    🗑️ المحذوفة:
-    🆔 المعرف: {deleted_method['id']}
-    🏢 الشركة: {company_name}
-    📋 الاسم: {deleted_method['method_name']}
-    💳 النوع: {deleted_method['method_type']}"""
+                    success_msg = self.tr('a0994_تم_حذف', 'ar', deleted_method_id=deleted_method['id'], company_name=company_name, deleted_method_method_name=deleted_method['method_name'], deleted_method_method_type=deleted_method['method_type'])
                     
                     self.send_message(message['chat']['id'], success_msg, self.admin_keyboard())
                 else:
-                    self.send_message(message['chat']['id'], f"❌ فشل في حذف وسيلة الدفع {method_id}", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], self.tr('a0948_فشل_في', 'ar', method_id=method_id), self.admin_keyboard())
                 
                 del self.user_states[user_id]
         
@@ -19552,11 +20300,11 @@ class ComprehensiveDUXBot:
             
             if new_data == '/cancel':
                 del self.user_states[user_id]
-                self.send_message(message['chat']['id'], "تم إلغاء التعديل", self.admin_keyboard())
+                self.send_message(message['chat']['id'], self.tr('a0995_تم_إلغاء', 'ar'), self.admin_keyboard())
                 return
             
             if not new_data:
-                self.send_message(message['chat']['id'], "❌ البيانات فارغة. يرجى إدخال البيانات الجديدة:")
+                self.send_message(message['chat']['id'], self.tr('a0996_البيانات_فارغة', 'ar'))
                 return
             
             # تحديث وسيلة الدفع
@@ -19565,20 +20313,13 @@ class ComprehensiveDUXBot:
             if success:
                 method = self.get_payment_method_by_id(method_id)
                 company = self.get_company_by_id(method['company_id'])
-                company_name = company['name'] if company else 'غير محدد'
+                company_name = company['name'] if company else self.tr('a0122_غير_محدد', 'ar')
                 
-                success_msg = f"""✅ تم تحديث وسيلة الدفع بنجاح!
-    
-    📝 المُحدّثة:
-    🆔 المعرف: {method['id']}
-    🏢 الشركة: {company_name}
-    📋 الاسم: {method['method_name']}
-    💳 النوع: {method['method_type']}
-    📊 البيانات الجديدة: {new_data}"""
+                success_msg = self.tr('a0997_تم_تحديث', 'ar', method_id=method['id'], company_name=company_name, method_method_name=method['method_name'], method_method_type=method['method_type'], new_data=new_data)
                 
                 self.send_message(message['chat']['id'], success_msg, self.admin_keyboard())
             else:
-                self.send_message(message['chat']['id'], "❌ فشل في تحديث وسيلة الدفع", self.admin_keyboard())
+                self.send_message(message['chat']['id'], self.tr('a0998_فشل_في', 'ar'), self.admin_keyboard())
             
             del self.user_states[user_id]
         
@@ -19715,7 +20456,7 @@ class ComprehensiveDUXBot:
                 # إحصائيات المستخدمين
                 with open('users.csv', 'r', encoding='utf-8-sig') as f:
                     users_count = len(list(csv.DictReader(f)))
-                    report_content += f"• عدد المستخدمين المسجلين: {users_count}\n"
+                    report_content += self.tr('a0999_عدد_المستخدمين', 'ar', users_count=users_count)
                     
                 # إحصائيات المعاملات
                 with open('transactions.csv', 'r', encoding='utf-8-sig') as f:
@@ -19726,21 +20467,21 @@ class ComprehensiveDUXBot:
                     approved = sum(1 for t in transactions if t['status'] == 'approved')
                     rejected = sum(1 for t in transactions if t['status'] == 'rejected')
                     
-                    report_content += f"• إجمالي المعاملات: {total_transactions}\n"
-                    report_content += f"  - معلقة: {pending}\n"
-                    report_content += f"  - موافقة: {approved}\n"
-                    report_content += f"  - مرفوضة: {rejected}\n"
+                    report_content += self.tr('a1000_إجمالي_المعاملات', 'ar', total_transactions=total_transactions)
+                    report_content += self.tr('a1001_معلقة', 'ar', pending=pending)
+                    report_content += self.tr('a1002_موافقة', 'ar', approved=approved)
+                    report_content += self.tr('a1003_مرفوضة', 'ar', rejected=rejected)
                     
                 # إحصائيات الشركات
                 with open('companies.csv', 'r', encoding='utf-8-sig') as f:
                     companies_count = len(list(csv.DictReader(f)))
-                    report_content += f"• عدد الشركات: {companies_count}\n"
+                    report_content += self.tr('a1004_عدد_الشركات', 'ar', companies_count=companies_count)
                     
             except Exception as e:
-                report_content += f"خطأ في جمع الإحصائيات: {e}\n"
+                report_content += self.tr('a1005_خطأ_في', 'ar', e=e)
                 
             report_content += f"\n📅 تاريخ النسخة: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-            report_content += f"🤖 البوت: @depositbettingbot\n"
+            report_content += self.tr('a1006_البوت', 'ar')
             
             # حفظ التقرير كملف نصي داخل الـ ZIP
             zipf.writestr('backup_report.txt', report_content.encode('utf-8'))
@@ -19893,7 +20634,7 @@ class ComprehensiveDUXBot:
             notifs = self.get_recent_notifications(15)
             
             if not notifs:
-                self.send_message(message['chat']['id'], "🔔 لا توجد إشعارات حالياً", self.admin_keyboard())
+                self.send_message(message['chat']['id'], self.tr('a1007_لا_توجد', 'ar'), self.admin_keyboard())
                 return
             
             # تصنيف الإشعارات حسب النوع
@@ -19904,7 +20645,7 @@ class ComprehensiveDUXBot:
                     by_type[ntype] = 0
                 by_type[ntype] += 1
             
-            summary = "🔔 لوحة الإشعارات\n\n📊 ملخص حسب النوع:\n"
+            summary = self.tr('a1008_لوحة_الإشعارات', 'ar')
             type_icons = {
                 'new_deposit': '💰', 'new_withdraw': '💸', 'new_complaint': '📨',
                 'new_user': '🆕', 'new_match': '🔄', 'dispute': '⚖️',
@@ -19928,7 +20669,7 @@ class ComprehensiveDUXBot:
             if not self.is_admin(message['from']['id']):
                 return
                 
-            self.send_message(message['chat']['id'], "🔄 جاري إنشاء النسخة الاحتياطية...")
+            self.send_message(message['chat']['id'], self.tr('a1009_جاري_إنشاء', 'ar'))
             
             # إنشاء وإرسال النسخة
             backup_file = self.create_backup_zip()
@@ -19945,9 +20686,9 @@ class ComprehensiveDUXBot:
                 result = self.send_document(message['chat']['id'], backup_file, caption)
                 
                 if result and result.get('ok'):
-                    self.send_message(message['chat']['id'], "✅ تم إرسال النسخة الاحتياطية بنجاح!")
+                    self.send_message(message['chat']['id'], self.tr('a1010_تم_إرسال', 'ar'))
                 else:
-                    self.send_message(message['chat']['id'], "❌ فشل في إرسال النسخة الاحتياطية")
+                    self.send_message(message['chat']['id'], self.tr('a1011_فشل_في', 'ar'))
                     
                 # حذف الملف المؤقت
                 try:
@@ -19955,14 +20696,14 @@ class ComprehensiveDUXBot:
                 except:
                     pass
             else:
-                self.send_message(message['chat']['id'], "❌ فشل في إنشاء النسخة الاحتياطية")
+                self.send_message(message['chat']['id'], self.tr('a1012_فشل_في', 'ar'))
         
     def handle_complaint_reply_buttons(self, message, complaint_id):
             """معالجة أزرار الرد على الشكاوى"""
             user_id = message['from']['id']
             text = message.get('text', '').strip()
             
-            if text == '🔙 العودة للشكاوى':
+            if text == self.tr('a1013_العودة_للشكاوى', 'ar'):
                 if user_id in self.user_states:
                     del self.user_states[user_id]
                 self.show_complaints_admin(message)
@@ -19970,19 +20711,15 @@ class ComprehensiveDUXBot:
             
             # تحديد نوع الرد
             reply_message = ""
-            if text.startswith('✅ تم الحل'):
-                reply_message = "شكراً لتواصلك معنا. تم حل مشكلتك بنجاح ونعتذر عن أي إزعاج."
-            elif text.startswith('🔍 قيد المراجعة'):
-                reply_message = "نحن نراجع طلبك بعناية وسنرد عليك خلال 24 ساعة. شكراً لصبرك."
-            elif text.startswith('📞 سنتواصل معك'):
-                reply_message = "سنتواصل معك قريباً عبر الهاتف أو الرسائل. شكراً لتواصلك معنا."
-            elif text.startswith('💡 رد مخصص'):
+            if text.startswith(self.tr('a1014_تم_الحل', 'ar')):
+                reply_message = self.tr('a0430_شكراً_لتواصلك', 'ar')
+            elif text.startswith(self.tr('a1015_قيد_المراجعة', 'ar')):
+                reply_message = self.tr('a0432_نحن_نراجع', 'ar')
+            elif text.startswith(self.tr('a1016_سنتواصل_معك', 'ar')):
+                reply_message = self.tr('a0434_سنتواصل_معك', 'ar')
+            elif text.startswith(self.tr('a1017_رد_مخصص', 'ar')):
                 # طلب رد مخصص
-                custom_text = """💡 اكتب ردك المخصص:
-                
-    مثال: شكراً لتواصلك، تم حل المشكلة...
-    
-    ⬅️ /cancel للإلغاء"""
+                custom_text = self.tr('a1018_اكتب_ردك', 'ar')
                 
                 self.send_message(message['chat']['id'], custom_text)
                 self.user_states[user_id] = f'writing_custom_reply_{complaint_id}'
@@ -19992,11 +20729,11 @@ class ComprehensiveDUXBot:
             if reply_message:
                 success = self.save_complaint_reply(complaint_id, reply_message)
                 if success:
-                    self.send_message(message['chat']['id'], f"✅ تم إرسال الرد للعميل!\n\n📝 الرد: {reply_message}", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], self.tr('a1019_تم_إرسال', 'ar', reply_message=reply_message), self.admin_keyboard())
                     # إرسال الرد للعميل
                     self.send_complaint_reply_to_customer(complaint_id, reply_message)
                 else:
-                    self.send_message(message['chat']['id'], "❌ فشل في حفظ الرد", self.admin_keyboard())
+                    self.send_message(message['chat']['id'], self.tr('a0226_فشل_في', 'ar'), self.admin_keyboard())
             
             # تنظيف الحالة
             if user_id in self.user_states:
@@ -20063,12 +20800,7 @@ class ComprehensiveDUXBot:
                             break
                 
                 if customer_telegram_id:
-                    customer_message = f"""📞 رد على شكواك:
-    
-    🆔 رقم الشكوى: {complaint_id}
-    💬 الرد: {reply_message}
-    
-    شكراً لتواصلك معنا ونتطلع لخدمتك دائماً 🙏"""
+                    customer_message = self.tr('a1020_رد_على', 'ar', complaint_id=complaint_id, reply_message=reply_message)
                     
                     # إرسال الرد للعميل بدون كيبورد لعدم التداخل
                     result = self.send_message_without_keyboard(customer_telegram_id, customer_message)
@@ -20190,7 +20922,7 @@ class ComprehensiveDUXBot:
         text = message.get('text', '').strip()
         user_id = message['from']['id']
 
-        if text in ['/cancel', 'إلغاء', 'الغاء']:
+        if text in ['/cancel', self.tr('a0010_إلغاء', 'ar'), self.tr('a0011_الغاء', 'ar')]:
             if user_id in self.user_states:
                 del self.user_states[user_id]
             self.show_support_data_editor(message)
@@ -20198,19 +20930,19 @@ class ComprehensiveDUXBot:
 
         # تحديد نوع التعديل
         if state == 'editing_support_phone':
-            success_msg = f"✅ تم تحديث رقم الهاتف إلى: <code>{text}</code>"
+            success_msg = self.tr('a1021_تم_تحديث', 'ar', text=text)
             self.save_setting('support_phone', text)
         elif state == 'editing_support_telegram':
-            success_msg = f"✅ تم تحديث حساب التليجرام إلى: <code>{text}</code>"
+            success_msg = self.tr('a1022_تم_تحديث', 'ar', text=text)
             self.save_setting('support_telegram', text)
         elif state == 'editing_support_email':
-            success_msg = f"✅ تم تحديث البريد الإلكتروني إلى: <code>{text}</code>"
+            success_msg = self.tr('a1023_تم_تحديث', 'ar', text=text)
             self.save_setting('support_email', text)
         elif state == 'editing_support_hours':
-            success_msg = f"✅ تم تحديث ساعات العمل إلى: <b>{text}</b>"
+            success_msg = self.tr('a1024_تم_تحديث', 'ar', text=text)
             self.save_setting('support_hours', text)
         else:
-            success_msg = "❌ خطأ في تحديث البيانات"
+            success_msg = self.tr('a1025_خطأ_في', 'ar')
 
         # إرسال رسالة التأكيد والعودة لمحرر البيانات
         self.send_message(message['chat']['id'], success_msg)
@@ -20224,7 +20956,7 @@ class ComprehensiveDUXBot:
         """حفظ إعداد الدعم — يستخدم save_setting الموحدة"""
         self.save_setting(key, value)
         
-    def get_support_setting(self, key, default='غير محدد'):
+    def get_support_setting(self, key, default=self.tr('a0122_غير_محدد', 'ar')):
         """قراءة إعداد الدعم — يستخدم get_setting الموحدة"""
         val = self.get_setting(key)
         return val if val else default
@@ -20345,35 +21077,20 @@ class ComprehensiveDUXBot:
             chat_id = message['chat']['id']
             
             try:
-                self.send_message(chat_id, "🔄 جاري إنشاء التقرير الاحترافي...")
+                self.send_message(chat_id, self.tr('a1026_جاري_إنشاء', lang))
                 
                 # إنشاء ملف تقرير احترافي
                 filename = self.create_professional_excel_report()
                 
                 if filename and os.path.exists(filename):
                     # إرسال الملف
-                    self.send_document(chat_id, filename, "📊 تقرير Excel احترافي للنظام")
+                    self.send_document(chat_id, filename, self.tr('a1027_تقرير_احترافي', lang))
                     
-                    success_text = f"""✅ تم إنشاء التقرير الاحترافي بنجاح!
-    
-    📊 الملف يحتوي على:
-    • بيانات المستخدمين مع تنسيق ملون
-    • المعاملات مع تمييز الحالات
-    • الشكاوى مع تصنيف الحالة  
-    • الشركات وبياناتها
-    • وسائل الدفع المتاحة
-    • إحصائيات شاملة ومفصلة
-    
-    🎨 التنسيق الاحترافي:
-    • ملف CSV منسق ومرتب
-    • عناوين واضحة ومميزة
-    • فواصل جميلة بين الأقسام
-    • إحصائيات مفصلة ونسب مئوية
-    • دعم كامل للنصوص العربية"""
+                    success_text = self.tr('a1028_تم_إنشاء', 'ar')
                     
                     self.send_message(chat_id, success_text, self.admin_keyboard())
                 else:
-                    self.send_message(chat_id, "❌ فشل في إنشاء التقرير. يرجى المحاولة مرة أخرى.", self.admin_keyboard())
+                    self.send_message(chat_id, self.tr('a1029_فشل_في', 'ar'), self.admin_keyboard())
                     
             except Exception as e:
                 logger.error(f"خطأ في إنشاء تقرير Excel: {e}")
@@ -20493,18 +21210,18 @@ class ComprehensiveDUXBot:
                             language_stats[language] = language_stats.get(language, 0) + 1
                         
                         user_stats = {
-                            'إجمالي المستخدمين': len(users),
-                            'المستخدمين النشطين': len([u for u in users if u.get('is_banned', 'no').lower() != 'yes']),
-                            'المستخدمين المحظورين': len([u for u in users if u.get('is_banned', 'no').lower() == 'yes']),
-                            'نسبة المستخدمين النشطين': f"{(len([u for u in users if u.get('is_banned', 'no').lower() != 'yes'])/len(users)*100):.1f}%" if users else "0%"
+                            self.tr('a1030_إجمالي_المستخدمين', 'ar'): len(users),
+                            self.tr('a1031_المستخدمين_النشطين', 'ar'): len([u for u in users if u.get('is_banned', 'no').lower() != 'yes']),
+                            self.tr('a1032_المستخدمين_المحظورين', 'ar'): len([u for u in users if u.get('is_banned', 'no').lower() == 'yes']),
+                            self.tr('a1033_نسبة_المستخدمين', 'ar'): f"{(len([u for u in users if u.get('is_banned', 'no').lower() != 'yes'])/len(users)*100):.1f}%" if users else "0%"
                         }
                         
                         # إضافة إحصائيات العملات
                         for currency, count in currency_stats.items():
                             currency_name = self.currencies.get(currency, {}).get('name', currency)
-                            user_stats[f'مستخدمي {currency_name}'] = f"{count} ({(count/len(users)*100):.1f}%)"
+                            user_stats[self.tr('a1034_مستخدمي', 'ar', currency_name=currency_name)] = f"{count} ({(count/len(users)*100):.1f}%)"
                         
-                        stats['إحصائيات المستخدمين'] = user_stats
+                        stats[self.tr('a1035_إحصائيات_المستخدمين', 'ar')] = user_stats
                 
                 # إحصائيات المعاملات
                 if os.path.exists('transactions.csv'):
@@ -20528,21 +21245,21 @@ class ComprehensiveDUXBot:
                         total_withdrawal_amount = sum(safe_float(t.get('amount', 0)) for t in withdrawals if t.get('status') == 'approved')
                         
                         transaction_stats = {
-                            'إجمالي المعاملات': len(transactions),
-                            'المعاملات المُوافقة': f"{len(approved)} ({(len(approved)/len(transactions)*100):.1f}%)" if transactions else "0",
-                            'المعاملات المرفوضة': f"{len(rejected)} ({(len(rejected)/len(transactions)*100):.1f}%)" if transactions else "0",
-                            'المعاملات المعلقة': f"{len(pending)} ({(len(pending)/len(transactions)*100):.1f}%)" if transactions else "0",
-                            'طلبات الإيداع': f"{len(deposits)} ({(len(deposits)/len(transactions)*100):.1f}%)" if transactions else "0",
-                            'طلبات السحب': f"{len(withdrawals)} ({(len(withdrawals)/len(transactions)*100):.1f}%)" if transactions else "0",
-                            'معدل الموافقة': f"{(len(approved)/len(transactions)*100):.1f}%" if transactions else "0%",
-                            'إجمالي المبالغ المُوافقة': f"{total_approved_amount:,.2f}",
-                            'إجمالي الإيداعات المُوافقة': f"{total_deposit_amount:,.2f}",
-                            'إجمالي السحوبات المُوافقة': f"{total_withdrawal_amount:,.2f}",
-                            'صافي الحركة': f"{total_deposit_amount - total_withdrawal_amount:,.2f}",
-                            'متوسط قيمة المعاملة': f"{(total_approved_amount/len(approved)):,.2f}" if approved else "0"
+                            self.tr('a1036_إجمالي_المعاملات', 'ar'): len(transactions),
+                            self.tr('a1037_المعاملات_المُوافقة', 'ar'): f"{len(approved)} ({(len(approved)/len(transactions)*100):.1f}%)" if transactions else "0",
+                            self.tr('a1038_المعاملات_المرفوضة', 'ar'): f"{len(rejected)} ({(len(rejected)/len(transactions)*100):.1f}%)" if transactions else "0",
+                            self.tr('a1039_المعاملات_المعلقة', 'ar'): f"{len(pending)} ({(len(pending)/len(transactions)*100):.1f}%)" if transactions else "0",
+                            self.tr('a1040_طلبات_الإيداع', 'ar'): f"{len(deposits)} ({(len(deposits)/len(transactions)*100):.1f}%)" if transactions else "0",
+                            self.tr('a1041_طلبات_السحب', 'ar'): f"{len(withdrawals)} ({(len(withdrawals)/len(transactions)*100):.1f}%)" if transactions else "0",
+                            self.tr('a1042_معدل_الموافقة', 'ar'): f"{(len(approved)/len(transactions)*100):.1f}%" if transactions else "0%",
+                            self.tr('a1043_إجمالي_المبالغ', 'ar'): f"{total_approved_amount:,.2f}",
+                            self.tr('a1044_إجمالي_الإيداعات', 'ar'): f"{total_deposit_amount:,.2f}",
+                            self.tr('a1045_إجمالي_السحوبات', 'ar'): f"{total_withdrawal_amount:,.2f}",
+                            self.tr('a1046_صافي_الحركة', 'ar'): f"{total_deposit_amount - total_withdrawal_amount:,.2f}",
+                            self.tr('a1047_متوسط_قيمة', 'ar'): f"{(total_approved_amount/len(approved)):,.2f}" if approved else "0"
                         }
                         
-                        stats['إحصائيات المعاملات'] = transaction_stats
+                        stats[self.tr('a1048_إحصائيات_المعاملات', 'ar')] = transaction_stats
                 
                 # إحصائيات الشكاوى والشركات
                 if os.path.exists('complaints.csv'):
@@ -20551,11 +21268,11 @@ class ComprehensiveDUXBot:
                         resolved = [c for c in complaints if c.get('status') == 'resolved']
                         pending_complaints = [c for c in complaints if c.get('status') == 'pending']
                         
-                        stats['إحصائيات الشكاوى'] = {
-                            'إجمالي الشكاوى': len(complaints),
-                            'الشكاوى المحلولة': f"{len(resolved)} ({(len(resolved)/len(complaints)*100):.1f}%)" if complaints else "0",
-                            'الشكاوى المعلقة': f"{len(pending_complaints)} ({(len(pending_complaints)/len(complaints)*100):.1f}%)" if complaints else "0",
-                            'معدل الحل': f"{(len(resolved)/len(complaints)*100):.1f}%" if complaints else "0%"
+                        stats[self.tr('a1049_إحصائيات_الشكاوى', 'ar')] = {
+                            self.tr('a1050_إجمالي_الشكاوى', 'ar'): len(complaints),
+                            self.tr('a1051_الشكاوى_المحلولة', 'ar'): f"{len(resolved)} ({(len(resolved)/len(complaints)*100):.1f}%)" if complaints else "0",
+                            self.tr('a1052_الشكاوى_المعلقة', 'ar'): f"{len(pending_complaints)} ({(len(pending_complaints)/len(complaints)*100):.1f}%)" if complaints else "0",
+                            self.tr('a1053_معدل_الحل', 'ar'): f"{(len(resolved)/len(complaints)*100):.1f}%" if complaints else "0%"
                         }
                 
                 if os.path.exists('companies.csv'):
@@ -20563,10 +21280,10 @@ class ComprehensiveDUXBot:
                         companies = list(csv.DictReader(f))
                         active = [c for c in companies if c.get('is_active', '').lower() == 'active']
                         
-                        stats['إحصائيات الشركات'] = {
-                            'إجمالي الشركات': len(companies),
-                            'الشركات النشطة': f"{len(active)} ({(len(active)/len(companies)*100):.1f}%)" if companies else "0",
-                            'الشركات غير النشطة': f"{len(companies) - len(active)}"
+                        stats[self.tr('a1054_إحصائيات_الشركات', 'ar')] = {
+                            self.tr('a1055_إجمالي_الشركات', 'ar'): len(companies),
+                            self.tr('a1056_الشركات_النشطة', 'ar'): f"{len(active)} ({(len(active)/len(companies)*100):.1f}%)" if companies else "0",
+                            self.tr('a1057_الشركات_غير', 'ar'): f"{len(companies) - len(active)}"
                         }
             
             except Exception as e:
@@ -20702,7 +21419,7 @@ if __name__ == "__main__":
             self.send_response(200)
             self.send_header('Content-type', 'text/plain')
             self.end_headers()
-            self.wfile.write('البوت يعمل بنجاح'.encode('utf-8'))
+            self.wfile.write(self.tr('a1058_البوت_يعمل', 'ar').encode('utf-8'))
         def log_message(self, format, *args):
             pass  # إسكات logs الـ HTTP
     
@@ -20723,7 +21440,7 @@ if __name__ == "__main__":
             # إضافة البوت الرئيسي إن لم يكن موجوداً
             all_bots = manager.get_all_bots()
             if not all_bots:
-                manager.add_bot('البوت الرئيسي', bot_token, os.getenv('ADMIN_USER_IDS', '7146701713'))
+                manager.add_bot(self.tr('a1059_البوت_الرئيسي', 'ar'), bot_token, os.getenv('ADMIN_USER_IDS', '7146701713'))
                 manager.toggle_bot('BOT' + bot_token[-6:], activate=True)
             
             # تشغيل جميع البوتات النشطة

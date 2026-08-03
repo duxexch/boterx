@@ -54,9 +54,9 @@
             <table class="w-full text-sm">
                 <thead>
                     <tr class="border-b border-slate-700 bg-slate-800/80">
-                        <th class="text-right px-4 py-3 font-semibold text-slate-400">الاسم</th>
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="name">Name</th>
                         <th class="text-right px-4 py-3 font-semibold text-slate-400">الرابط</th>
-                        <th class="text-right px-4 py-3 font-semibold text-slate-400">الحالة</th>
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="status">Status</th>
                         <th class="text-right px-4 py-3 font-semibold text-slate-400">تاريخ الإنشاء</th>
                         <th class="text-right px-4 py-3 font-semibold text-slate-400">الإجراءات</th>
                     </tr>
@@ -74,13 +74,13 @@
                             <td class="px-4 py-3 text-slate-400 text-xs" x-text="link.created_at || '-'"></td>
                             <td class="px-4 py-3">
                                 <div class="flex items-center gap-1">
-                                    <button @click="openEditLinkModal(link)" class="p-1.5 rounded hover:bg-slate-600 text-slate-400 hover:text-blue-400 transition" title="تعديل">
+                                    <button @click="openEditLinkModal(link)" class="p-1.5 rounded hover:bg-slate-600 text-slate-400 hover:text-blue-400 transition" title="Edit" data-i18n-title="edit">
                                         <i class="fas fa-edit text-sm"></i>
                                     </button>
                                     <button @click="toggleLink(link)" class="p-1.5 rounded hover:bg-slate-600 text-slate-400 hover:text-amber-400 transition" title="تبديل الحالة">
                                         <i class="fas fa-power-off text-sm"></i>
                                     </button>
-                                    <button @click="confirmDeleteLink(link)" class="p-1.5 rounded hover:bg-slate-600 text-slate-400 hover:text-red-400 transition" title="حذف">
+                                    <button @click="confirmDeleteLink(link)" class="p-1.5 rounded hover:bg-slate-600 text-slate-400 hover:text-red-400 transition" title="Delete" data-i18n-title="delete">
                                         <i class="fas fa-trash text-sm"></i>
                                     </button>
                                 </div>
@@ -109,10 +109,10 @@
                     <tr class="border-b border-slate-700 bg-slate-800/80">
                         <th class="text-right px-4 py-3 font-semibold text-slate-400">المُحيل</th>
                         <th class="text-right px-4 py-3 font-semibold text-slate-400">المُحال</th>
-                        <th class="text-right px-4 py-3 font-semibold text-slate-400">رقم الهاتف</th>
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="phone_number">Phone Number</th>
                         <th class="text-right px-4 py-3 font-semibold text-slate-400">توثيق الهاتف</th>
                         <th class="text-right px-4 py-3 font-semibold text-slate-400">المكافأة</th>
-                        <th class="text-right px-4 py-3 font-semibold text-slate-400">التاريخ</th>
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="date">Date</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -167,7 +167,7 @@
                 </div>
                 <div class="flex gap-3 pt-2">
                     <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg text-sm font-semibold transition" x-text="editingLinkId ? 'حفظ التعديلات' : 'إضافة'"></button>
-                    <button type="button" @click="showLinkModal = false" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-lg text-sm transition">إلغاء</button>
+                    <button type="button" @click="showLinkModal = false" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-lg text-sm transition" data-i18n="cancel">Cancel</button>
                 </div>
             </form>
         </div>
@@ -184,8 +184,8 @@
                 <p class="text-sm text-slate-400">هل أنت متأكد من حذف رابط "<span class="text-white font-semibold" x-text="deleteLinkTarget?.name"></span>"؟</p>
                 <p class="text-xs text-red-400 mt-2">هذا الإجراء لا يمكن التراجع عنه.</p>
                 <div class="flex gap-3 mt-6">
-                    <button @click="deleteLink()" class="flex-1 bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-lg text-sm font-semibold transition">حذف</button>
-                    <button @click="showDeleteLinkModal = false" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-lg text-sm transition">إلغاء</button>
+                    <button @click="deleteLink()" class="flex-1 bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-lg text-sm font-semibold transition" data-i18n="delete">Delete</button>
+                    <button @click="showDeleteLinkModal = false" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-lg text-sm transition" data-i18n="cancel">Cancel</button>
                 </div>
             </div>
         </div>

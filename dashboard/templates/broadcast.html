@@ -5,10 +5,10 @@
 {% block content %}
 <div x-data="broadcastApp()" class="space-y-4 max-w-2xl">
     <div class="bg-slate-800 rounded-xl border border-slate-700 p-6">
-        <h3 class="font-semibold mb-4">إرسال رسالة لكل المستخدمين</h3>
+        <h3 class="font-semibold mb-4" data-i18n="send_to_all">Send message to all users</h3>
         <div class="space-y-4">
             <div>
-                <label class="block text-sm text-slate-400 mb-1">نوع الرسالة</label>
+                <label class="block text-sm text-slate-400 mb-1" data-i18n="message_type">Message Type</label>
                 <select x-model="type" class="input w-full">
                     <option value="text">📝 نص</option>
                     <option value="photo">📷 صورة</option>
@@ -16,8 +16,8 @@
                 </select>
             </div>
             <div>
-                <label class="block text-sm text-slate-400 mb-1">نص الرسالة</label>
-                <textarea x-model="message" rows="6" class="input w-full" placeholder="اكتب الرسالة هنا..."></textarea>
+                <label class="block text-sm text-slate-400 mb-1" data-i18n="message_text_label">Message Text</label>
+                <textarea x-model="message" rows="6" class="input w-full" placeholder="Write message here..." data-i18n-placeholder="write_message_here"></textarea>
             </div>
             <div class="flex items-center gap-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
                 <i class="fas fa-info-circle text-amber-400"></i>
@@ -32,7 +32,7 @@
 
     <!-- Preview -->
     <div x-show="message" class="bg-slate-800 rounded-xl border border-slate-700 p-4">
-        <p class="text-xs text-slate-400 mb-2">معاينة:</p>
+        <p class="text-xs text-slate-400 mb-2" data-i18n="preview_label">Preview:</p>
         <div class="bg-slate-700 rounded-lg p-4 text-sm" x-text="message"></div>
     </div>
 </div>

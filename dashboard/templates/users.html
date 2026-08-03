@@ -8,19 +8,19 @@
     <!-- Stats -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
-            <p class="text-slate-400 text-xs">إجمالي المستخدمين</p>
+            <p class="text-slate-400 text-xs" data-i18n="total_users">Total Users</p>
             <p class="text-2xl font-bold mt-1 text-blue-400" x-text="fmtNum(stats.total || total)">0</p>
         </div>
         <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
-            <p class="text-slate-400 text-xs">جدد اليوم</p>
+            <p class="text-slate-400 text-xs" data-i18n="new_today">New Today</p>
             <p class="text-2xl font-bold mt-1 text-green-400" x-text="fmtNum(stats.today || 0)">0</p>
         </div>
         <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
-            <p class="text-slate-400 text-xs">محظورون</p>
+            <p class="text-slate-400 text-xs" data-i18n="banned_count">Banned</p>
             <p class="text-2xl font-bold mt-1 text-red-400" x-text="fmtNum(stats.banned || 0)">0</p>
         </div>
         <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
-            <p class="text-slate-400 text-xs">هواتف مؤكدة</p>
+            <p class="text-slate-400 text-xs" data-i18n="verified_phones">Verified Phones</p>
             <p class="text-2xl font-bold mt-1 text-amber-400" x-text="fmtNum(stats.verified || 0)">0</p>
         </div>
     </div>
@@ -28,11 +28,11 @@
     <!-- Filters -->
     <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
         <div class="flex flex-wrap gap-3 items-center">
-            <input type="text" x-model="search" @input.debounce.300ms="page=1; load()" placeholder="بحث بالاسم / الهاتف / رقم العميل / Telegram ID..." class="input flex-1 min-w-[200px] text-sm">
+            <input type="text" x-model="search" @input.debounce.300ms="page=1; load()" placeholder="Search by name/phone/customer ID/Telegram ID..." data-i18n-placeholder="user_search_placeholder" class="input flex-1 min-w-[200px] text-sm">
             <select x-model="filterBanned" @change="page=1; load()" class="input text-sm">
-                <option value="">الكل</option>
-                <option value="yes">محظور</option>
-                <option value="no">غير محظور</option>
+                <option value="" data-i18n="all">All</option>
+                <option value="yes" data-i18n="banned">Banned</option>
+                <option value="no" data-i18n="not_banned">Not Banned</option>
             </select>
             <select x-model="filterLanguage" @change="page=1; load()" class="input text-sm">
                 <option value="">كل اللغات</option>
@@ -62,26 +62,26 @@
             <table class="data-table">
                 <thead><tr>
                     <th>Telegram ID</th>
-                    <th>الاسم</th>
-                    <th>الهاتف</th>
-                    <th>رقم العميل</th>
-                    <th>اللغة</th>
-                    <th>العملة</th>
-                    <th>محظور</th>
-                    <th>التاريخ</th>
-                    <th>إجراءات</th>
+                    <th data-i18n="name">Name</th>
+                    <th data-i18n="phone">Phone</th>
+                    <th data-i18n="customer_id">Customer ID</th>
+                    <th data-i18n="language">Language</th>
+                    <th data-i18n="currency">Currency</th>
+                    <th data-i18n="banned">Banned</th>
+                    <th data-i18n="date">Date</th>
+                    <th data-i18n="actions">Actions</th>
                 </tr></thead>
                 <tbody>
                     <template x-if="loading">
                         <tr><td colspan="9" class="text-center p-8 text-slate-400">
                             <i class="fas fa-spinner fa-spin text-2xl"></i>
-                            <p class="mt-2">جارٍ التحميل...</p>
+                            <p class="mt-2" data-i18n="loading">Loading...</p>
                         </td></tr>
                     </template>
                     <template x-if="!loading && users.length === 0">
                         <tr><td colspan="9" class="text-center p-8 text-slate-400">
                             <i class="fas fa-inbox text-3xl mb-2"></i>
-                            <p>لا توجد بيانات</p>
+                            <p data-i18n="no_data">No data</p>
                         </td></tr>
                     </template>
                     <template x-for="u in users" :key="u.telegram_id">
@@ -145,10 +145,10 @@
                     </div>
                     <!-- User Details Grid — Editable -->
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        <div><label class="block text-xs text-slate-500 mb-1">رقم العميل</label><p class="text-sm font-mono text-amber-400" x-text="detail.customer_id || '—'"></p></div>
-                        <div><label class="block text-xs text-slate-500 mb-1">الهاتف</label>
+                        <div><label class="block text-xs text-slate-500 mb-1" data-i18n="customer_id">Customer ID</label><p class="text-sm font-mono text-amber-400" x-text="detail.customer_id || '—'"></p></div>
+                        <div><label class="block text-xs text-slate-500 mb-1" data-i18n="phone">Phone</label>
                             <input x-model="detail.phone" @change="saveUserField(detail.telegram_id, 'phone', detail.phone)" class="input text-sm py-1"></div>
-                        <div><label class="block text-xs text-slate-500 mb-1">اللغة</label>
+                        <div><label class="block text-xs text-slate-500 mb-1" data-i18n="language">Language</label>
                             <select x-model="detail.language" @change="saveUserField(detail.telegram_id, 'language', detail.language)" class="input text-sm py-1">
                                 <option value="ar">العربية</option><option value="en">English</option><option value="fr">Français</option>
                                 <option value="es">Español</option><option value="de">Deutsch</option><option value="tr">Türkçe</option>
@@ -157,29 +157,29 @@
                                 <option value="zh">中文</option><option value="ja">日本語</option><option value="ko">한국어</option>
                                 <option value="th">ไทย</option><option value="it">Italiano</option>
                             </select></div>
-                        <div><label class="block text-xs text-slate-500 mb-1">العملة</label>
+                        <div><label class="block text-xs text-slate-500 mb-1" data-i18n="currency">Currency</label>
                             <select x-model="detail.currency" @change="saveUserField(detail.telegram_id, 'currency', detail.currency)" class="input text-sm py-1">
                                 <option value="SAR">SAR</option><option value="USD">USD</option><option value="EGP">EGP</option>
                                 <option value="AED">AED</option><option value="EUR">EUR</option><option value="TRY">TRY</option>
                             </select></div>
-                        <div><label class="block text-xs text-slate-500 mb-1">تاريخ التسجيل</label><p class="text-sm" x-text="detail.date || '—'"></p></div>
-                        <div><label class="block text-xs text-slate-500 mb-1">الاسم</label>
+                        <div><label class="block text-xs text-slate-500 mb-1" data-i18n="registration_date">Registration Date</label><p class="text-sm" x-text="detail.date || '—'"></p></div>
+                        <div><label class="block text-xs text-slate-500 mb-1" data-i18n="name">Name</label>
                             <input x-model="detail.name" @change="saveUserField(detail.telegram_id, 'name', detail.name)" class="input text-sm py-1"></div>
-                        <div x-show="detail.ban_reason"><label class="block text-xs text-slate-500 mb-1">سبب الحظر</label><p class="text-sm text-red-400" x-text="detail.ban_reason || '—'"></p></div>
-                        <div><label class="block text-xs text-slate-500 mb-1">تحقق الهاتف</label><p class="text-sm" x-text="detail.phone_verified === 'yes' ? '✅ نعم' : '❌ لا'"></p></div>
+                        <div x-show="detail.ban_reason"><label class="block text-xs text-slate-500 mb-1" data-i18n="ban_reason">Ban Reason</label><p class="text-sm text-red-400" x-text="detail.ban_reason || '—'"></p></div>
+                        <div><label class="block text-xs text-slate-500 mb-1" data-i18n="phone_verified">Phone Verified</label><p class="text-sm" x-text="detail.phone_verified === 'yes' ? '✅ نعم' : '❌ لا'"></p></div>
                     </div>
                     <!-- User Transactions -->
                     <div>
                         <h4 class="font-semibold text-sm mb-2"><i class="fas fa-money-bill-transfer text-amber-400 ml-1"></i> آخر المعاملات</h4>
                         <div class="overflow-x-auto">
                             <table class="data-table">
-                                <thead><tr><th>ID</th><th>النوع</th><th>المبلغ</th><th>الحالة</th><th>التاريخ</th></tr></thead>
+                                <thead><tr><th>ID</th><th data-i18n="type">Type</th><th data-i18n="amount">Amount</th><th data-i18n="status">Status</th><th data-i18n="date">Date</th></tr></thead>
                                 <tbody>
                                     <template x-if="detailLoading">
                                         <tr><td colspan="5" class="text-center p-4 text-slate-400"><i class="fas fa-spinner fa-spin"></i></td></tr>
                                     </template>
                                     <template x-if="!detailLoading && (!detailTxns || detailTxns.length === 0)">
-                                        <tr><td colspan="5" class="text-center p-4 text-slate-400">لا توجد معاملات</td></tr>
+                                        <tr><td colspan="5" class="text-center p-4 text-slate-400" data-i18n="no_transactions">No transactions</td></tr>
                                     </template>
                                     <template x-for="t in detailTxns" :key="t.id">
                                         <tr>
@@ -198,10 +198,10 @@
                     <div x-show="detailWallet">
                         <h4 class="font-semibold text-sm mb-2"><i class="fas fa-gem text-purple-400 ml-1"></i> محفظة التعويض</h4>
                         <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                            <div class="p-2 bg-slate-900/50 rounded"><p class="text-xs text-slate-500">الرصيد</p><p class="font-bold text-green-400" x-text="fmtNum(detailWallet?.balance || 0)"></p></div>
-                            <div class="p-2 bg-slate-900/50 rounded"><p class="text-xs text-slate-500">معلق</p><p class="font-bold text-amber-400" x-text="fmtNum(detailWallet?.pending_balance || 0)"></p></div>
-                            <div class="p-2 bg-slate-900/50 rounded"><p class="text-xs text-slate-500">إجمالي المكتسب</p><p class="font-bold text-blue-400" x-text="fmtNum(detailWallet?.total_earned || 0)"></p></div>
-                            <div class="p-2 bg-slate-900/50 rounded"><p class="text-xs text-slate-500">مجمّد</p><p class="font-bold text-red-400" x-text="fmtNum(detailWallet?.pending_balance || 0)"></p></div>
+                            <div class="p-2 bg-slate-900/50 rounded"><p class="text-xs text-slate-500" data-i18n="balance">Balance</p><p class="font-bold text-green-400" x-text="fmtNum(detailWallet?.balance || 0)"></p></div>
+                            <div class="p-2 bg-slate-900/50 rounded"><p class="text-xs text-slate-500" data-i18n="pending_balance">Pending</p><p class="font-bold text-amber-400" x-text="fmtNum(detailWallet?.pending_balance || 0)"></p></div>
+                            <div class="p-2 bg-slate-900/50 rounded"><p class="text-xs text-slate-500" data-i18n="total_earned">Total Earned</p><p class="font-bold text-blue-400" x-text="fmtNum(detailWallet?.total_earned || 0)"></p></div>
+                            <div class="p-2 bg-slate-900/50 rounded"><p class="text-xs text-slate-500" data-i18n="frozen">Frozen</p><p class="font-bold text-red-400" x-text="fmtNum(detailWallet?.pending_balance || 0)"></p></div>
                         </div>
                         <div class="flex gap-2 mt-2">
                             <button @click="freezeBalance(detail.telegram_id)" class="btn btn-warning btn-sm">🧊 تجميد الرصيد</button>
@@ -209,7 +209,7 @@
                         </div>
                     </div>
                     <div class="flex gap-2 justify-end pt-2 border-t border-slate-700">
-                        <button @click="showDetail = false" class="btn bg-slate-700 text-slate-300 hover:bg-slate-600 btn-sm">إغلاق</button>
+                        <button @click="showDetail = false" class="btn bg-slate-700 text-slate-300 hover:bg-slate-600 btn-sm" data-i18n="close">Close</button>
                     </div>
                 </div>
             </template>
@@ -229,11 +229,11 @@
                     <p class="text-xs text-slate-500 font-mono" x-text="banUser?.telegram_id || ''"></p>
                 </div>
                 <div>
-                    <label class="block text-sm text-slate-400 mb-1">سبب الحظر</label>
+                    <label class="block text-sm text-slate-400 mb-1" data-i18n="ban_reason">Ban Reason</label>
                     <textarea x-model="banReason" rows="3" class="input w-full" placeholder="أدخل سبب الحظر..."></textarea>
                 </div>
                 <div class="flex gap-2 justify-end">
-                    <button @click="showBanModal = false" class="btn bg-slate-700 text-slate-300 hover:bg-slate-600">إلغاء</button>
+                    <button @click="showBanModal = false" class="btn bg-slate-700 text-slate-300 hover:bg-slate-600" data-i18n="cancel">Cancel</button>
                     <button @click="confirmBan()" class="btn btn-danger"><i class="fas fa-ban ml-1"></i> تأكيد الحظر</button>
                 </div>
             </div>

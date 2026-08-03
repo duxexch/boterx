@@ -12,7 +12,7 @@
             <p class="text-xl font-bold text-amber-400" x-text="methods.length">0</p>
         </div>
         <div class="bg-slate-800 rounded-lg border border-slate-700 p-3">
-            <p class="text-xs text-slate-400">نشطة</p>
+            <p class="text-xs text-slate-400" data-i18n="active_count">Active</p>
             <p class="text-xl font-bold text-green-400" x-text="methods.filter(m => m.status === 'active').length">0</p>
         </div>
         <div class="bg-slate-800 rounded-lg border border-slate-700 p-3">
@@ -44,8 +44,8 @@
             <table class="data-table">
                 <thead><tr>
                     <th></th>
-                    <th>الاسم</th><th>النوع</th><th>بيانات الحساب</th><th>معلومات</th>
-                    <th>الشركات المرتبطة</th><th>الحالة</th><th>إجراءات</th>
+                    <th data-i18n="name">Name</th><th data-i18n="type">Type</th><th>بيانات الحساب</th><th>معلومات</th>
+                    <th>الشركات المرتبطة</th><th data-i18n="status">Status</th><th data-i18n="actions">Actions</th>
                 </tr></thead>
                 <tbody>
                     <template x-for="m in filteredMethods" :key="m.id">
@@ -73,13 +73,13 @@
                             </td>
                             <td>
                                 <div class="flex gap-1">
-                                    <button @click="editMethod(m)" class="btn btn-sm" style="background:#3B82F6" title="تعديل">
+                                    <button @click="editMethod(m)" class="btn btn-sm" style="background:#3B82F6" title="Edit" data-i18n-title="edit">
                                         <i class="fas fa-pen text-xs"></i>
                                     </button>
                                     <button @click="linkModal(m)" class="btn btn-sm" style="background:#8B5CF6" title="ربط بشركات">
                                         <i class="fas fa-link text-xs"></i>
                                     </button>
-                                    <button @click="deleteMethod(m)" class="btn btn-danger btn-sm" title="حذف">
+                                    <button @click="deleteMethod(m)" class="btn btn-danger btn-sm" title="Delete" data-i18n-title="delete">
                                         <i class="fas fa-trash text-xs"></i>
                                     </button>
                                 </div>
@@ -95,7 +95,7 @@
                     <tr x-show="loading">
                         <td colspan="8" class="text-center p-8 text-slate-400">
                             <i class="fas fa-spinner fa-spin text-2xl"></i>
-                            <p class="mt-2">جارٍ التحميل...</p>
+                            <p class="mt-2" data-i18n="loading">Loading...</p>
                         </td>
                     </tr>
                 </tbody>
@@ -113,7 +113,7 @@
                     <input type="text" x-model="form.method_name" class="input w-full" placeholder="مثال: فودافون كاش">
                 </div>
                 <div>
-                    <label class="block text-xs text-slate-400 mb-1">النوع</label>
+                    <label class="block text-xs text-slate-400 mb-1" data-i18n="type">Type</label>
                     <select x-model="form.method_type" class="input w-full">
                         <option value="mobile">📱 محفظة إلكترونية</option>
                         <option value="bank">🏦 حساب بنكي</option>
@@ -136,8 +136,8 @@
                 </div>
             </div>
             <div class="flex gap-2 justify-end mt-4">
-                <button @click="showAddModal = false" class="btn btn-sm" style="background:#475569">إلغاء</button>
-                <button @click="saveMethod()" class="btn btn-primary btn-sm">حفظ</button>
+                <button @click="showAddModal = false" class="btn btn-sm" style="background:#475569" data-i18n="cancel">Cancel</button>
+                <button @click="saveMethod()" class="btn btn-primary btn-sm" data-i18n="save">Save</button>
             </div>
         </div>
     </div>
@@ -161,7 +161,7 @@
                 </template>
             </div>
             <div class="flex gap-2 justify-end mt-4">
-                <button @click="showLinkModal = false" class="btn btn-sm" style="background:#475569">إلغاء</button>
+                <button @click="showLinkModal = false" class="btn btn-sm" style="background:#475569" data-i18n="cancel">Cancel</button>
                 <button @click="saveLinks()" class="btn btn-primary btn-sm">حفظ الروابط</button>
             </div>
         </div>

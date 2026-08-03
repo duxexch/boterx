@@ -69,7 +69,7 @@
     
     <!-- Navigation with grouping -->
     <nav class="p-3 flex-1 overflow-y-auto">
-        <p class="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 mt-2">العمليات</p>
+        <p class="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 mt-2" data-i18n="operations">Operations</p>
         <a href="{{ url_for('dashboard') }}" class="sidebar-link {% if active_page == 'dashboard' %}active{% endif %}">
             <i class="fas fa-chart-pie w-5 text-center"></i> <span x-text="t('dashboard')"></span>
         </a>
@@ -83,7 +83,7 @@
             <i class="fas fa-coins w-5 text-center"></i> <span x-text="t('trading')"></span>
         </a>
 
-        <p class="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 mt-4">الإدارة</p>
+        <p class="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 mt-4" data-i18n="management">Management</p>
         <a href="{{ url_for('page_users') }}" class="sidebar-link {% if active_page == 'users' %}active{% endif %}">
             <i class="fas fa-users w-5 text-center"></i> <span x-text="t('users')"></span>
         </a>
@@ -97,7 +97,7 @@
             <i class="fas fa-circle-notch w-5 text-center"></i> <span x-text="t('wheel')"></span>
         </a>
 
-        <p class="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 mt-4">النظام</p>
+        <p class="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 mt-4" data-i18n="system">System</p>
         <a href="{{ url_for('page_companies') }}" class="sidebar-link {% if active_page == 'companies' %}active{% endif %}">
             <i class="fas fa-building w-5 text-center"></i> <span x-text="t('companies')"></span>
         </a>
@@ -123,7 +123,7 @@
             <i class="fas fa-tower-broadcast w-5 text-center"></i> <span x-text="t('broadcast')"></span>
         </a>
         
-        <p class="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 mt-4">النظام المتقدم</p>
+        <p class="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 mt-4" data-i18n="advanced_system">Advanced System</p>
         <a href="{{ url_for('page_statistics') }}" class="sidebar-link {% if active_page == 'statistics' %}active{% endif %}">
             <i class="fas fa-chart-bar w-5 text-center"></i> <span x-text="t('statistics')"></span>
         </a>
@@ -155,9 +155,9 @@
             </div>
             <div class="flex-1 min-w-0">
                 <p class="text-sm font-medium truncate">{{ session.get('admin_name', 'Admin') }}</p>
-                <p class="text-xs text-slate-500">مدير عام</p>
+                <p class="text-xs text-slate-500" data-i18n="general_manager">General Manager</p>
             </div>
-            <a href="{{ url_for('logout') }}" class="text-slate-400 hover:text-red-400 transition" title="تسجيل الخروج">
+            <a href="{{ url_for('logout') }}" class="text-slate-400 hover:text-red-400 transition" title="Logout" data-i18n-title="logout">
                 <i class="fas fa-right-from-bracket"></i>
             </a>
         </div>
@@ -252,7 +252,7 @@
                                     </div>
                                 </div>
                             </template>
-                            <p x-show="notifications.length === 0" class="text-xs text-slate-400 text-center py-4">لا توجد إشعارات</p>
+                            <p x-show="notifications.length === 0" class="text-xs text-slate-400 text-center py-4" data-i18n="no_notifications">No notifications</p>
                         </div>
                     </div>
                 </div>
@@ -264,7 +264,7 @@
                     </div>
                     <div class="hidden md:block">
                         <p class="text-sm font-medium">{{ session.get('admin_name', 'Admin') }}</p>
-                        <p class="text-xs text-slate-500">مدير</p>
+                        <p class="text-xs text-slate-500" data-i18n="manager">Manager</p>
                     </div>
                 </div>
             </div>
@@ -275,10 +275,10 @@
                 <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
                 متصل
             </span>
-            <span id="liveStats" class="flex-shrink-0">جارٍ التحميل...</span>
+            <span id="liveStats" class="flex-shrink-0" data-i18n="loading">Loading...</span>
             <div class="flex-1 overflow-hidden hidden lg:block">
                 <div class="flex items-center gap-2" x-show="activityTicker.length > 0" style="display:none">
-                    <span class="text-slate-500 flex-shrink-0">آخر نشاط:</span>
+                    <span class="text-slate-500 flex-shrink-0" data-i18n="last_activity">Last activity:</span>
                     <div class="overflow-hidden whitespace-nowrap">
                         <template x-for="(a, i) in activityTicker" :key="i">
                             <span class="inline-flex items-center gap-1 ml-4">
@@ -405,13 +405,13 @@ function baseApp() {
             const bar = document.getElementById('liveStats');
             if (bar) {
                 const parts = [];
-                if (s.users?.total !== undefined) parts.push('👥 ' + s.users.total + ' مستخدم');
-                if (s.transactions?.pending !== undefined) parts.push('⏳ ' + s.transactions.pending + ' معلقة');
-                if (s.matches?.active !== undefined) parts.push('🔄 ' + s.matches.active + ' مطابقة');
-                if (s.lottery?.participants !== undefined) parts.push('🎰 ' + s.lottery.participants + ' مشارك');
-                if (s.wheel?.participants !== undefined) parts.push('🎡 ' + s.wheel.participants + ' لاعب');
-                if (s.lottery?.distributed) parts.push('💰 ' + s.lottery.distributed.toFixed(0) + ' موزّع');
-                bar.textContent = parts.join(' | ') || 'لا توجد بيانات';
+                if (s.users?.total !== undefined) parts.push('👥 ' + s.users.total + ' ' + tr('users'));
+                if (s.transactions?.pending !== undefined) parts.push('⏳ ' + s.transactions.pending + ' ' + tr('pending'));
+                if (s.matches?.active !== undefined) parts.push('🔄 ' + s.matches.active + ' ' + tr('matching'));
+                if (s.lottery?.participants !== undefined) parts.push('🎰 ' + s.lottery.participants + ' ' + tr('participants'));
+                if (s.wheel?.participants !== undefined) parts.push('🎡 ' + s.wheel.participants + ' ' + tr('wheel_players'));
+                if (s.lottery?.distributed) parts.push('💰 ' + s.lottery.distributed.toFixed(0) + ' ' + tr('distributed'));
+                bar.textContent = parts.join(' | ') || tr('no_data');
             }
             // Update notification count
             const pending = (s.transactions?.pending || 0) + (s.matches?.pending || 0);

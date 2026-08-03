@@ -27,11 +27,11 @@
             <p class="text-2xl font-bold text-green-400 mt-1" x-text="stats.active"></p>
         </div>
         <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
-            <p class="text-xs text-slate-400">إيداع</p>
+            <p class="text-xs text-slate-400" data-i18n="deposit">Deposit</p>
             <p class="text-2xl font-bold text-blue-400 mt-1" x-text="stats.deposit"></p>
         </div>
         <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
-            <p class="text-xs text-slate-400">سحب</p>
+            <p class="text-xs text-slate-400" data-i18n="withdraw">Withdraw</p>
             <p class="text-2xl font-bold text-purple-400 mt-1" x-text="stats.withdraw"></p>
         </div>
     </div>
@@ -43,13 +43,13 @@
                 <thead>
                     <tr class="border-b border-slate-700 bg-slate-800/80">
                         <th class="text-right px-4 py-3 font-semibold text-slate-400">الأيقونة</th>
-                        <th class="text-right px-4 py-3 font-semibold text-slate-400">الاسم</th>
-                        <th class="text-right px-4 py-3 font-semibold text-slate-400">النوع</th>
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="name">Name</th>
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="type">Type</th>
                         <th class="text-right px-4 py-3 font-semibold text-slate-400">التفاصيل</th>
                         <th class="text-right px-4 py-3 font-semibold text-slate-400">العنوان</th>
                         <th class="text-right px-4 py-3 font-semibold text-slate-400">رابط التسويق</th>
-                        <th class="text-right px-4 py-3 font-semibold text-slate-400">المعاملات</th>
-                        <th class="text-right px-4 py-3 font-semibold text-slate-400">الحالة</th>
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="transactions_label">Transactions</th>
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="status">Status</th>
                         <th class="text-right px-4 py-3 font-semibold text-slate-400">الإجراءات</th>
                     </tr>
                 </thead>
@@ -64,8 +64,8 @@
                                 <span class="px-2 py-1 rounded-full text-xs font-semibold"
                                     :class="c.type === 'deposit' ? 'bg-blue-500/20 text-blue-400' : (c.type === 'withdraw' ? 'bg-purple-500/20 text-purple-400' : 'bg-amber-500/20 text-amber-400')">
                                     <span x-show="c.type === 'both'">إيداع وسحب</span>
-                                    <span x-show="c.type === 'deposit'">إيداع</span>
-                                    <span x-show="c.type === 'withdraw'">سحب</span>
+                                    <span x-show="c.type === 'deposit'" data-i18n="deposit">Deposit</span>
+                                    <span x-show="c.type === 'withdraw'" data-i18n="withdraw">Withdraw</span>
                                 </span>
                             </td>
                             <td class="px-4 py-3 text-slate-300 max-w-[200px] truncate" x-text="c.details || '-'"></td>
@@ -85,13 +85,13 @@
                             </td>
                             <td class="px-4 py-3">
                                 <div class="flex items-center gap-1">
-                                    <button @click="openEditModal(c)" class="p-1.5 rounded hover:bg-slate-600 text-slate-400 hover:text-blue-400 transition" title="تعديل">
+                                    <button @click="openEditModal(c)" class="p-1.5 rounded hover:bg-slate-600 text-slate-400 hover:text-blue-400 transition" title="Edit" data-i18n-title="edit">
                                         <i class="fas fa-edit text-sm"></i>
                                     </button>
                                     <button @click="toggleActive(c)" class="p-1.5 rounded hover:bg-slate-600 text-slate-400 hover:text-amber-400 transition" title="تبديل الحالة">
                                         <i class="fas fa-power-off text-sm"></i>
                                     </button>
-                                    <button @click="confirmDelete(c)" class="p-1.5 rounded hover:bg-slate-600 text-slate-400 hover:text-red-400 transition" title="حذف">
+                                    <button @click="confirmDelete(c)" class="p-1.5 rounded hover:bg-slate-600 text-slate-400 hover:text-red-400 transition" title="Delete" data-i18n-title="delete">
                                         <i class="fas fa-trash text-sm"></i>
                                     </button>
                                 </div>
@@ -156,7 +156,7 @@
                 </div>
                 <div class="flex gap-3 pt-2">
                     <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg text-sm font-semibold transition" x-text="editingId ? 'حفظ التعديلات' : 'إضافة'"></button>
-                    <button type="button" @click="showModal = false" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-lg text-sm transition">إلغاء</button>
+                    <button type="button" @click="showModal = false" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-lg text-sm transition" data-i18n="cancel">Cancel</button>
                 </div>
             </form>
         </div>
@@ -173,8 +173,8 @@
                 <p class="text-sm text-slate-400">هل أنت متأكد من حذف شركة "<span class="text-white font-semibold" x-text="deleteTarget?.name"></span>"؟</p>
                 <p class="text-xs text-red-400 mt-2">هذا الإجراء لا يمكن التراجع عنه.</p>
                 <div class="flex gap-3 mt-6">
-                    <button @click="deleteCompany()" class="flex-1 bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-lg text-sm font-semibold transition">حذف</button>
-                    <button @click="showDeleteModal = false" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-lg text-sm transition">إلغاء</button>
+                    <button @click="deleteCompany()" class="flex-1 bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-lg text-sm font-semibold transition" data-i18n="delete">Delete</button>
+                    <button @click="showDeleteModal = false" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-lg text-sm transition" data-i18n="cancel">Cancel</button>
                 </div>
             </div>
         </div>
@@ -184,7 +184,7 @@
     <div x-show="loading" class="fixed inset-0 bg-slate-900/50 z-40 flex items-center justify-center" style="display:none">
         <div class="bg-slate-800 rounded-xl p-4 flex items-center gap-3">
             <i class="fas fa-spinner fa-spin text-blue-400 text-xl"></i>
-            <span class="text-sm">جارٍ التحميل...</span>
+            <span class="text-sm" data-i18n="loading">Loading...</span>
         </div>
     </div>
 </div>

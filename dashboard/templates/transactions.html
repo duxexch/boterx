@@ -8,19 +8,19 @@
     <!-- Stats Summary -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
-            <p class="text-slate-400 text-xs">إجمالي المبلغ</p>
+            <p class="text-slate-400 text-xs" data-i18n="total_amount">Total Amount</p>
             <p class="text-2xl font-bold mt-1 text-blue-400" x-text="fmtAmount(summary.totalAmount, '')">0</p>
         </div>
         <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
-            <p class="text-slate-400 text-xs">متوسط المبلغ</p>
+            <p class="text-slate-400 text-xs" data-i18n="avg_amount">Average Amount</p>
             <p class="text-2xl font-bold mt-1 text-purple-400" x-text="fmtAmount(summary.avgAmount, '')">0</p>
         </div>
         <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
-            <p class="text-slate-400 text-xs">معلقة</p>
+            <p class="text-slate-400 text-xs" data-i18n="pending">Pending</p>
             <p class="text-2xl font-bold mt-1 text-amber-400" x-text="fmtNum(summary.pendingCount)">0</p>
         </div>
         <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
-            <p class="text-slate-400 text-xs">حجم الموافق عليها</p>
+            <p class="text-slate-400 text-xs" data-i18n="approved_volume">Approved Volume</p>
             <p class="text-2xl font-bold mt-1 text-green-400" x-text="fmtAmount(summary.approvedVolume, '')">0</p>
         </div>
     </div>
@@ -30,25 +30,25 @@
         <div class="flex flex-wrap gap-3 items-center">
             <!-- Status filter -->
             <div class="flex gap-1 bg-slate-700 rounded-lg p-1">
-                <button @click="filterStatus=''; page=1; load()" :class="filterStatus==='' ? 'bg-blue-500 text-white' : 'text-slate-400'" class="px-3 py-1.5 rounded text-sm transition">الكل</button>
-                <button @click="filterStatus='pending'; page=1; load()" :class="filterStatus==='pending' ? 'bg-amber-500 text-slate-900' : 'text-slate-400'" class="px-3 py-1.5 rounded text-sm transition">معلقة</button>
-                <button @click="filterStatus='approved'; page=1; load()" :class="filterStatus==='approved' ? 'bg-green-500 text-white' : 'text-slate-400'" class="px-3 py-1.5 rounded text-sm transition">موافق</button>
-                <button @click="filterStatus='rejected'; page=1; load()" :class="filterStatus==='rejected' ? 'bg-red-500 text-white' : 'text-slate-400'" class="px-3 py-1.5 rounded text-sm transition">مرفوض</button>
+                <button @click="filterStatus=''; page=1; load()" :class="filterStatus==='' ? 'bg-blue-500 text-white' : 'text-slate-400'" class="px-3 py-1.5 rounded text-sm transition" data-i18n="all">All</button>
+                <button @click="filterStatus='pending'; page=1; load()" :class="filterStatus==='pending' ? 'bg-amber-500 text-slate-900' : 'text-slate-400'" class="px-3 py-1.5 rounded text-sm transition" data-i18n="pending">Pending</button>
+                <button @click="filterStatus='approved'; page=1; load()" :class="filterStatus==='approved' ? 'bg-green-500 text-white' : 'text-slate-400'" class="px-3 py-1.5 rounded text-sm transition" data-i18n="approved">Approved</button>
+                <button @click="filterStatus='rejected'; page=1; load()" :class="filterStatus==='rejected' ? 'bg-red-500 text-white' : 'text-slate-400'" class="px-3 py-1.5 rounded text-sm transition" data-i18n="rejected">Rejected</button>
             </div>
             <!-- Type filter -->
             <select x-model="filterType" @change="page=1; load()" class="input text-sm">
-                <option value="">كل الأنواع</option>
+                <option value="" data-i18n="all_types">All Types</option>
                 <option value="deposit">💵 إيداع</option>
                 <option value="withdraw">💸 سحب</option>
             </select>
             <!-- Date range -->
-            <input type="date" x-model="dateFrom" @change="load()" class="input text-sm" placeholder="من تاريخ">
-            <input type="date" x-model="dateTo" @change="load()" class="input text-sm" placeholder="إلى تاريخ">
+            <input type="date" x-model="dateFrom" @change="load()" class="input text-sm" placeholder="From Date" data-i18n-placeholder="date_from">
+            <input type="date" x-model="dateTo" @change="load()" class="input text-sm" placeholder="To Date" data-i18n-placeholder="date_to">
             <!-- Amount range -->
-            <input type="number" x-model="amountMin" @change="load()" class="input text-sm w-28" placeholder="أقل مبلغ">
-            <input type="number" x-model="amountMax" @change="load()" class="input text-sm w-28" placeholder="أعلى مبلغ">
+            <input type="number" x-model="amountMin" @change="load()" class="input text-sm w-28" placeholder="Min Amount" data-i18n-placeholder="min_amount">
+            <input type="number" x-model="amountMax" @change="load()" class="input text-sm w-28" placeholder="Max Amount" data-i18n-placeholder="max_amount">
             <!-- Search -->
-            <input type="text" x-model="search" @input.debounce.300ms="page=1; load()" placeholder="بحث..." class="input flex-1 min-w-[150px] text-sm">
+            <input type="text" x-model="search" @input.debounce.300ms="page=1; load()" placeholder="Search..." data-i18n-placeholder="search_dots" class="input flex-1 min-w-[150px] text-sm">
             <!-- Auto-refresh toggle -->
             <label class="flex items-center gap-2 text-sm text-slate-400 cursor-pointer">
                 <input type="checkbox" x-model="autoRefresh" @change="toggleAutoRefresh()" class="rounded">
@@ -64,7 +64,7 @@
             <span class="text-sm text-blue-400"><i class="fas fa-check-square ml-1"></i> تم تحديد <span x-text="selectedIds.length"></span> معاملة</span>
             <button @click="bulkApprove()" class="btn btn-success btn-sm"><i class="fas fa-check ml-1"></i> موافقة جماعية</button>
             <button @click="bulkReject()" class="btn btn-danger btn-sm"><i class="fas fa-xmark ml-1"></i> رفض جماعي</button>
-            <button @click="selectedIds = []" class="text-sm text-slate-400 hover:text-white mr-auto">إلغاء التحديد</button>
+            <button @click="selectedIds = []" class="text-sm text-slate-400 hover:text-white mr-auto" data-i18n="deselect_all">Deselect All</button>
         </div>
     </div>
 
@@ -78,27 +78,27 @@
                             <input type="checkbox" @change="toggleSelectAll($event)" class="rounded">
                         </th>
                         <th>ID</th>
-                        <th>العميل</th>
-                        <th>النوع</th>
-                        <th>الشركة</th>
-                        <th>المحفظة</th>
-                        <th>المبلغ</th>
-                        <th>الحالة</th>
-                        <th>التاريخ</th>
-                        <th>إجراءات</th>
+                        <th data-i18n="client">Client</th>
+                        <th data-i18n="type">Type</th>
+                        <th data-i18n="company">Company</th>
+                        <th data-i18n="wallet">Wallet</th>
+                        <th data-i18n="amount">Amount</th>
+                        <th data-i18n="status">Status</th>
+                        <th data-i18n="date">Date</th>
+                        <th data-i18n="actions">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     <template x-if="loading">
                         <tr><td colspan="10" class="text-center p-8 text-slate-400">
                             <i class="fas fa-spinner fa-spin text-2xl"></i>
-                            <p class="mt-2">جارٍ التحميل...</p>
+                            <p class="mt-2" data-i18n="loading">Loading...</p>
                         </td></tr>
                     </template>
                     <template x-if="!loading && transactions.length === 0">
                         <tr><td colspan="10" class="text-center p-8 text-slate-400">
                             <i class="fas fa-inbox text-3xl mb-2"></i>
-                            <p>لا توجد بيانات</p>
+                            <p data-i18n="no_data">No data</p>
                         </td></tr>
                     </template>
                     <template x-for="t in transactions" :key="t.id">
@@ -121,10 +121,10 @@
                                 <div class="flex gap-1">
                                     <button @click="openDetail(t)" class="btn btn-primary btn-sm" title="تفاصيل"><i class="fas fa-eye"></i></button>
                                     <template x-if="t.status === 'pending'">
-                                        <button @click="approve(t.id)" class="btn btn-success btn-sm" title="موافقة"><i class="fas fa-check"></i></button>
+                                        <button @click="approve(t.id)" class="btn btn-success btn-sm" title="Approve" data-i18n-title="approve"><i class="fas fa-check"></i></button>
                                     </template>
                                     <template x-if="t.status === 'pending'">
-                                        <button @click="reject(t.id)" class="btn btn-danger btn-sm" title="رفض"><i class="fas fa-xmark"></i></button>
+                                        <button @click="reject(t.id)" class="btn btn-danger btn-sm" title="Reject" data-i18n-title="reject"><i class="fas fa-xmark"></i></button>
                                     </template>
                                 </div>
                             </td>
@@ -162,11 +162,11 @@
                 </div>
                 <div>
                     <label class="block text-xs text-slate-400 mb-1">💰 المبلغ (يمكنك تعديله)</label>
-                    <input type="number" step="any" x-model="approveAmount" class="input w-full text-lg font-bold" placeholder="المبلغ">
+                    <input type="number" step="any" x-model="approveAmount" class="input w-full text-lg font-bold" placeholder="Amount" data-i18n-placeholder="amount">
                 </div>
             </div>
             <div class="flex gap-2 justify-end mt-4">
-                <button @click="showApproveModal = false" class="btn btn-sm" style="background:#475569">إلغاء</button>
+                <button @click="showApproveModal = false" class="btn btn-sm" style="background:#475569" data-i18n="cancel">Cancel</button>
                 <button @click="confirmApprove()" class="btn btn-success btn-sm"><i class="fas fa-check ml-1"></i> موافقة وتأكيد المبلغ</button>
             </div>
         </div>
@@ -183,48 +183,48 @@
                 <div class="space-y-4">
                     <div class="grid grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-xs text-slate-500 mb-1">رقم المعاملة</label>
+                            <label class="block text-xs text-slate-500 mb-1" data-i18n="tx_id">Transaction ID</label>
                             <p class="font-mono text-sm bg-slate-900/50 p-2 rounded" x-text="detail.id"></p>
                         </div>
                         <div>
-                            <label class="block text-xs text-slate-500 mb-1">الحالة</label>
+                            <label class="block text-xs text-slate-500 mb-1" data-i18n="status">Status</label>
                             <div x-html="statusBadge(detail.status)"></div>
                         </div>
                         <div>
-                            <label class="block text-xs text-slate-500 mb-1">اسم العميل</label>
+                            <label class="block text-xs text-slate-500 mb-1" data-i18n="client_name">Client Name</label>
                             <p class="text-sm bg-slate-900/50 p-2 rounded" x-text="detail.name || '—'"></p>
                         </div>
                         <div>
-                            <label class="block text-xs text-slate-500 mb-1">رقم العميل</label>
+                            <label class="block text-xs text-slate-500 mb-1" data-i18n="customer_id">Customer ID</label>
                             <p class="font-mono text-sm bg-slate-900/50 p-2 rounded" x-text="detail.customer_id || '—'"></p>
                         </div>
                         <div>
-                            <label class="block text-xs text-slate-500 mb-1">النوع</label>
+                            <label class="block text-xs text-slate-500 mb-1" data-i18n="type">Type</label>
                             <p class="text-sm bg-slate-900/50 p-2 rounded" x-text="detail.type === 'deposit' ? '💵 إيداع' : '💸 سحب'"></p>
                         </div>
                         <div>
-                            <label class="block text-xs text-slate-500 mb-1">المبلغ</label>
+                            <label class="block text-xs text-slate-500 mb-1" data-i18n="amount">Amount</label>
                             <p class="font-bold text-lg text-amber-400" x-text="fmtAmount(detail.amount, detail.currency || '')"></p>
                         </div>
                         <div>
-                            <label class="block text-xs text-slate-500 mb-1">الشركة</label>
+                            <label class="block text-xs text-slate-500 mb-1" data-i18n="company">Company</label>
                             <p class="text-sm bg-slate-900/50 p-2 rounded" x-text="detail.company || '—'"></p>
                         </div>
                         <div>
-                            <label class="block text-xs text-slate-500 mb-1">التاريخ</label>
+                            <label class="block text-xs text-slate-500 mb-1" data-i18n="date">Date</label>
                             <p class="text-sm bg-slate-900/50 p-2 rounded" x-text="detail.date || '—'"></p>
                         </div>
                     </div>
                     <div x-show="detail.admin_note">
-                        <label class="block text-xs text-slate-500 mb-1">ملاحظة الإدارة</label>
+                        <label class="block text-xs text-slate-500 mb-1" data-i18n="admin_note">Admin Note</label>
                         <p class="text-sm bg-slate-900/50 p-2 rounded" x-text="detail.admin_note || '—'"></p>
                     </div>
                     <div x-show="detail.phone">
-                        <label class="block text-xs text-slate-500 mb-1">رقم الهاتف</label>
+                        <label class="block text-xs text-slate-500 mb-1" data-i18n="phone_number">Phone Number</label>
                         <p class="text-sm bg-slate-900/50 p-2 rounded" x-text="detail.phone || '—'"></p>
                     </div>
                     <div x-show="detail.reject_reason">
-                        <label class="block text-xs text-slate-500 mb-1">سبب الرفض</label>
+                        <label class="block text-xs text-slate-500 mb-1" data-i18n="reject_reason">Reject Reason</label>
                         <p class="text-sm bg-red-900/20 p-2 rounded text-red-400" x-text="detail.reject_reason || '—'"></p>
                     </div>
                     <div class="flex gap-2 justify-end pt-2 border-t border-slate-700">
@@ -234,7 +234,7 @@
                         <template x-if="detail.status === 'pending'">
                             <button @click="reject(detail.id); showDetail = false" class="btn btn-danger btn-sm"><i class="fas fa-xmark ml-1"></i> رفض</button>
                         </template>
-                        <button @click="showDetail = false" class="btn bg-slate-700 text-slate-300 hover:bg-slate-600 btn-sm">إغلاق</button>
+                        <button @click="showDetail = false" class="btn bg-slate-700 text-slate-300 hover:bg-slate-600 btn-sm" data-i18n="close">Close</button>
                     </div>
                 </div>
             </template>

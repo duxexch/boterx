@@ -18,9 +18,9 @@
     <div x-show="tab === 'channels'" class="space-y-4">
         <div class="flex justify-between items-center flex-wrap gap-2">
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">إجمالي</p><p class="text-xl font-bold text-amber-400" x-text="channels.length">0</p></div>
-                <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">نشطة</p><p class="text-xl font-bold text-green-400" x-text="channels.filter(c => c.is_active === 'yes').length">0</p></div>
-                <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">فئات</p><p class="text-xl font-bold text-blue-400" x-text="Object.keys(categoryGroups).length">0</p></div>
+                <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400" data-i18n="total">Total</p><p class="text-xl font-bold text-amber-400" x-text="channels.length">0</p></div>
+                <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400" data-i18n="active_count">Active</p><p class="text-xl font-bold text-green-400" x-text="channels.filter(c => c.is_active === 'yes').length">0</p></div>
+                <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400" data-i18n="categories">Categories</p><p class="text-xl font-bold text-blue-400" x-text="Object.keys(categoryGroups).length">0</p></div>
                 <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">AI</p><p class="text-xl font-bold text-purple-400" x-text="channels.filter(c => c.ai_enabled === 'yes').length">0</p></div>
             </div>
             <button @click="showAddChannelModal = true" class="btn btn-primary btn-sm">➕ إضافة قناة</button>
@@ -28,7 +28,7 @@
 
         <!-- Category filter -->
         <div class="flex flex-wrap gap-2">
-            <button @click="filterCategory = ''" :class="filterCategory === '' ? 'bg-amber-500 text-slate-900' : 'bg-slate-700 text-slate-400'" class="px-3 py-1.5 rounded-lg text-xs font-medium transition">الكل</button>
+            <button @click="filterCategory = ''" :class="filterCategory === '' ? 'bg-amber-500 text-slate-900' : 'bg-slate-700 text-slate-400'" class="px-3 py-1.5 rounded-lg text-xs font-medium transition" data-i18n="all">All</button>
             <template x-for="(data, cat) in categoryGroups" :key="cat">
                 <button @click="filterCategory = cat" :class="filterCategory === cat ? 'bg-amber-500 text-slate-900' : 'bg-slate-700 text-slate-400'" class="px-3 py-1.5 rounded-lg text-xs font-medium transition" x-text="cat + ' (' + data.count + ')'"></button>
             </template>
@@ -69,7 +69,7 @@
                         <div class="p-2 bg-slate-900/50 rounded">
                             <label class="block text-xs text-slate-400 mb-1">📂 الفئة</label>
                             <select x-model="ch.category" @change="setCategory(ch.id, ch.category)" class="input text-sm py-1 w-full">
-                                <option value="">غير مصنف</option>
+                                <option value="" data-i18n="uncategorized">Uncategorized</option>
                                 <option value="رياضة">⚽ رياضة</option>
                                 <option value="مال">💰 مال</option>
                                 <option value="تداول">💱 تداول</option>
@@ -82,7 +82,7 @@
                         </div>
                         <div class="p-2 bg-slate-900/50 rounded flex gap-2">
                             <input type="text" x-model="ch.postText" class="input text-sm py-1 flex-1" placeholder="📨 رسالة">
-                            <button @click="postToChannel(ch)" class="btn btn-primary btn-sm">إرسال</button>
+                            <button @click="postToChannel(ch)" class="btn btn-primary btn-sm" data-i18n="send">Send</button>
                         </div>
                     </div>
                     <div class="mt-3 pt-3 border-t border-slate-700 flex justify-between items-center">
@@ -98,14 +98,14 @@
             <div class="modal">
                 <h3 class="font-bold text-lg mb-4">➕ إضافة قناة / مجموعة</h3>
                 <div class="space-y-3">
-                    <div><label class="block text-xs text-slate-400 mb-1">اسم القناة</label><input type="text" x-model="addChannelForm.title" class="input w-full" placeholder="مثال: قناة الأخبار"></div>
+                    <div><label class="block text-xs text-slate-400 mb-1" data-i18n="channel_name">Channel Name</label><input type="text" x-model="addChannelForm.title" class="input w-full" placeholder="Example: News Channel" data-i18n-placeholder="channel_example"></div>
                     <div><label class="block text-xs text-slate-400 mb-1">Chat ID (معرف القناة)</label><input type="text" x-model="addChannelForm.chat_id" class="input w-full" placeholder="-1001234567890" dir="ltr"></div>
-                    <div><label class="block text-xs text-slate-400 mb-1">النوع</label><select x-model="addChannelForm.type" class="input w-full"><option value="channel">📢 قناة</option><option value="group">👥 مجموعة</option><option value="supergroup">💬 مجموعة خارقة</option></select></div>
-                    <div><label class="block text-xs text-slate-400 mb-1">الفئة</label><select x-model="addChannelForm.category" class="input w-full"><option value="">غير مصنف</option><option value="رياضة">⚽ رياضة</option><option value="مال">💰 مال</option><option value="تداول">💱 تداول</option><option value="ألعاب">🎮 ألعاب</option><option value="أخبار">📰 أخبار</option><option value="تسويق">📣 تسويق</option><option value="ترفيه">🎬 ترفيه</option><option value="أخرى">📦 أخرى</option></select></div>
+                    <div><label class="block text-xs text-slate-400 mb-1" data-i18n="type">Type</label><select x-model="addChannelForm.type" class="input w-full"><option value="channel">📢 قناة</option><option value="group">👥 مجموعة</option><option value="supergroup">💬 مجموعة خارقة</option></select></div>
+                    <div><label class="block text-xs text-slate-400 mb-1" data-i18n="category">Category</label><select x-model="addChannelForm.category" class="input w-full"><option value="" data-i18n="uncategorized">Uncategorized</option><option value="رياضة">⚽ رياضة</option><option value="مال">💰 مال</option><option value="تداول">💱 تداول</option><option value="ألعاب">🎮 ألعاب</option><option value="أخبار">📰 أخبار</option><option value="تسويق">📣 تسويق</option><option value="ترفيه">🎬 ترفيه</option><option value="أخرى">📦 أخرى</option></select></div>
                 </div>
                 <div class="flex gap-2 justify-end mt-4">
-                    <button @click="showAddChannelModal = false" class="btn btn-sm" style="background:#475569">إلغاء</button>
-                    <button @click="addChannel()" class="btn btn-primary btn-sm">إضافة</button>
+                    <button @click="showAddChannelModal = false" class="btn btn-sm" style="background:#475569" data-i18n="cancel">Cancel</button>
+                    <button @click="addChannel()" class="btn btn-primary btn-sm" data-i18n="add">Add</button>
                 </div>
             </div>
         </div>
@@ -116,18 +116,18 @@
         <button @click="showGroupModal = true" class="btn btn-primary btn-sm">➕ إنشاء مجموعة</button>
         <template x-for="g in groups" :key="g.id">
             <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
-                <div class="flex justify-between items-start"><div><h3 class="font-bold" x-text="g.name"></h3><p class="text-xs text-slate-400" x-text="g.description || '—'"></p><p class="text-xs text-slate-500 mt-1" x-text="'القنوات: ' + (g.channel_ids || '').split('|').length"></p></div><button @click="deleteGroup(g.id)" class="btn btn-danger btn-sm">حذف</button></div>
+                <div class="flex justify-between items-start"><div><h3 class="font-bold" x-text="g.name"></h3><p class="text-xs text-slate-400" x-text="g.description || '—'"></p><p class="text-xs text-slate-500 mt-1" x-text="'القنوات: ' + (g.channel_ids || '').split('|').length"></p></div><button @click="deleteGroup(g.id)" class="btn btn-danger btn-sm" data-i18n="delete">Delete</button></div>
             </div>
         </template>
         <p x-show="groups.length === 0" class="text-center text-slate-400 p-8">لا توجد مجموعات</p>
-        <div x-show="showGroupModal" x-transition class="modal-overlay" @click.self="showGroupModal = false" style="display:none"><div class="modal"><h3 class="font-bold text-lg mb-4">إنشاء مجموعة قنوات</h3><input type="text" x-model="groupForm.name" class="input w-full mb-2" placeholder="اسم المجموعة"><input type="text" x-model="groupForm.description" class="input w-full mb-2" placeholder="الوصف"><div class="max-h-40 overflow-y-auto space-y-1 mb-3"><template x-for="ch in channels" :key="ch.id"><label class="flex items-center gap-2 p-1 hover:bg-slate-700 rounded cursor-pointer"><input type="checkbox" :value="ch.id" x-model="groupForm.selectedIds"><span x-text="ch.title"></span></label></template></div><div class="flex gap-2 justify-end"><button @click="showGroupModal = false" class="btn btn-sm" style="background:#475569">إلغاء</button><button @click="createGroup()" class="btn btn-primary btn-sm">إنشاء</button></div></div></div>
+        <div x-show="showGroupModal" x-transition class="modal-overlay" @click.self="showGroupModal = false" style="display:none"><div class="modal"><h3 class="font-bold text-lg mb-4">إنشاء مجموعة قنوات</h3><input type="text" x-model="groupForm.name" class="input w-full mb-2" placeholder="اسم المجموعة"><input type="text" x-model="groupForm.description" class="input w-full mb-2" placeholder="الوصف"><div class="max-h-40 overflow-y-auto space-y-1 mb-3"><template x-for="ch in channels" :key="ch.id"><label class="flex items-center gap-2 p-1 hover:bg-slate-700 rounded cursor-pointer"><input type="checkbox" :value="ch.id" x-model="groupForm.selectedIds"><span x-text="ch.title"></span></label></template></div><div class="flex gap-2 justify-end"><button @click="showGroupModal = false" class="btn btn-sm" style="background:#475569" data-i18n="cancel">Cancel</button><button @click="createGroup()" class="btn btn-primary btn-sm">إنشاء</button></div></div></div>
     </div>
 
     <!-- TAB: Vault -->
     <div x-show="tab === 'vault'" class="space-y-4">
         <input type="text" x-model="vaultSearch" @input.debounce.300ms="loadVault()" class="input w-full" placeholder="🔍 بحث...">
         <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
-            <table class="data-table"><thead><tr><th>التاريخ</th><th>المزود</th><th>الأصلي</th><th>المعالج</th><th>إجراءات</th></tr></thead><tbody>
+            <table class="data-table"><thead><tr><th data-i18n="date">Date</th><th>المزود</th><th>الأصلي</th><th>المعالج</th><th data-i18n="actions">Actions</th></tr></thead><tbody>
                 <template x-for="p in vaultPosts" :key="p.id"><tr class="hover:bg-slate-700/50"><td class="text-xs text-slate-400" x-text="p.created_at"></td><td><span class="text-xs px-2 py-0.5 rounded bg-blue-500/20 text-blue-400" x-text="p.ai_provider || 'manual'"></span></td><td class="text-xs max-w-xs truncate" x-text="(p.original_text || '').substring(0,50) + '...'"></td><td class="text-xs max-w-xs truncate" x-text="(p.processed_text || '').substring(0,50) + '...'"></td><td><button @click="repost(p.id)" class="btn btn-primary btn-sm">↻</button><button @click="deleteVaultPost(p.id)" class="btn btn-danger btn-sm">🗑️</button></td></tr></template>
                 <tr x-show="vaultPosts.length === 0"><td colspan="5" class="text-center p-6 text-slate-400">لا توجد بوستات</td></tr>
             </tbody></table>
@@ -141,18 +141,18 @@
         </div>
         <div class="bg-slate-800 rounded-xl border border-slate-700 p-4"><label class="block text-sm text-slate-400 mb-2">📝 تعليمات AI</label><textarea x-model="aiInstructions" rows="5" class="input w-full mb-2" placeholder="أعد صياغة البوست..."></textarea><button @click="saveAIInstructions()" class="btn btn-primary btn-sm">💾 حفظ</button><button @click="testAI()" class="btn btn-sm ml-2" style="background:#8B5CF6">🧪 اختبار</button></div>
         <div x-show="aiTestResult" class="bg-slate-800 rounded-xl border border-slate-700 p-4"><p class="text-sm" x-text="aiTestResult"></p></div>
-        <div class="bg-slate-800 rounded-xl border border-slate-700 p-4"><h3 class="font-bold mb-2">🔁 استبدال نصوص</h3><div class="flex gap-2 mb-2"><input type="text" x-model="trForm.find_text" class="input flex-1" placeholder="بحث عن..."><input type="text" x-model="trForm.replace_text" class="input flex-1" placeholder="استبدال بـ..."><button @click="addReplacement()" class="btn btn-primary btn-sm">➕</button></div><template x-for="r in replacements" :key="r.id"><div class="flex items-center gap-2 p-2 bg-slate-900/50 rounded mb-1 text-sm"><span class="flex-1 truncate"><code x-text="r.find_text"></code> → <code x-text="r.replace_text"></code></span><button @click="toggleReplacement(r.id)" class="badge" :class="r.is_active === 'yes' ? 'badge-active' : 'badge-cancelled'" x-text="r.is_active === 'yes' ? '✅' : '⏸️'"></button><button @click="deleteReplacement(r.id)" class="btn btn-danger btn-sm">🗑️</button></div></template></div>
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-4"><h3 class="font-bold mb-2">🔁 استبدال نصوص</h3><div class="flex gap-2 mb-2"><input type="text" x-model="trForm.find_text" class="input flex-1" placeholder="Search for..." data-i18n-placeholder="find_text"><input type="text" x-model="trForm.replace_text" class="input flex-1" placeholder="Replace with..." data-i18n-placeholder="replace_with"><button @click="addReplacement()" class="btn btn-primary btn-sm">➕</button></div><template x-for="r in replacements" :key="r.id"><div class="flex items-center gap-2 p-2 bg-slate-900/50 rounded mb-1 text-sm"><span class="flex-1 truncate"><code x-text="r.find_text"></code> → <code x-text="r.replace_text"></code></span><button @click="toggleReplacement(r.id)" class="badge" :class="r.is_active === 'yes' ? 'badge-active' : 'badge-cancelled'" x-text="r.is_active === 'yes' ? '✅' : '⏸️'"></button><button @click="deleteReplacement(r.id)" class="btn btn-danger btn-sm">🗑️</button></div></template></div>
     </div>
 
     <!-- TAB: Report -->
     <div x-show="tab === 'report'" class="space-y-4">
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">بوستات اليوم</p><p class="text-2xl font-bold text-amber-400" x-text="report.total_posts || 0">0</p></div>
-            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">معالجة AI</p><p class="text-2xl font-bold text-blue-400" x-text="report.total_ai_processed || 0">0</p></div>
-            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">وصل للمستخدمين</p><p class="text-2xl font-bold text-green-400" x-text="report.total_users_reached || 0">0</p></div>
-            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">قنوات نشطة</p><p class="text-2xl font-bold text-purple-400" x-text="report.active_channels || 0">0</p></div>
+            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400" data-i18n="today_posts">Today Posts</p><p class="text-2xl font-bold text-amber-400" x-text="report.total_posts || 0">0</p></div>
+            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400" data-i18n="ai_processed">AI Processed</p><p class="text-2xl font-bold text-blue-400" x-text="report.total_ai_processed || 0">0</p></div>
+            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400" data-i18n="users_reached">Users Reached</p><p class="text-2xl font-bold text-green-400" x-text="report.total_users_reached || 0">0</p></div>
+            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400" data-i18n="active_channels">Active Channels</p><p class="text-2xl font-bold text-purple-400" x-text="report.active_channels || 0">0</p></div>
         </div>
-        <div class="bg-slate-800 rounded-xl border border-slate-700 p-4"><h3 class="font-bold mb-2">📜 آخر الترحيلات</h3><table class="data-table"><thead><tr><th>الوقت</th><th>المصدر</th><th>المعاينة</th><th>مستخدمين</th><th>قنوات</th></tr></thead><tbody><template x-for="log in relayLogs" :key="log.timestamp"><tr class="hover:bg-slate-700/50"><td class="text-xs text-slate-400" x-text="log.timestamp"></td><td class="text-xs" x-text="log.source_type === 'broadcast' ? 'بث' : 'قناة'"></td><td class="text-xs max-w-xs truncate" x-text="log.preview"></td><td class="font-bold text-green-400" x-text="log.users_relayed || 0"></td><td class="font-bold text-amber-400" x-text="log.channels_relayed || 0"></td></tr></template></tbody></table></div>
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-4"><h3 class="font-bold mb-2">📜 آخر الترحيلات</h3><table class="data-table"><thead><tr><th data-i18n="time">Time</th><th data-i18n="source">Source</th><th data-i18n="preview">Preview</th><th data-i18n="users_count">Users</th><th data-i18n="channels_count">Channels</th></tr></thead><tbody><template x-for="log in relayLogs" :key="log.timestamp"><tr class="hover:bg-slate-700/50"><td class="text-xs text-slate-400" x-text="log.timestamp"></td><td class="text-xs" x-text="log.source_type === 'broadcast' ? 'بث' : 'قناة'"></td><td class="text-xs max-w-xs truncate" x-text="log.preview"></td><td class="font-bold text-green-400" x-text="log.users_relayed || 0"></td><td class="font-bold text-amber-400" x-text="log.channels_relayed || 0"></td></tr></template></tbody></table></div>
     </div>
 </div>
 {% endblock %}

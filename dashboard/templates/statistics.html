@@ -7,8 +7,8 @@
     <!-- Header -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-            <h2 class="text-xl font-bold">الإحصائيات التفصيلية</h2>
-            <p class="text-sm text-slate-400 mt-1">تحليل شامل لأداء النظام والمعاملات والمستخدمين</p>
+            <h2 class="text-xl font-bold" data-i18n="detailed_stats">Detailed Statistics</h2>
+            <p class="text-sm text-slate-400 mt-1" data-i18n="stats_description">Comprehensive analysis of system performance, transactions, and users</p>
         </div>
 
         <!-- Date Range Selector -->
@@ -45,7 +45,7 @@
                 </div>
                 <span class="text-xs text-slate-500" x-text="rangeLabel"></span>
             </div>
-            <p class="text-xs text-slate-400">إجمالي المستخدمين</p>
+            <p class="text-xs text-slate-400" data-i18n="total_users">Total Users</p>
             <p class="text-2xl font-bold mt-1" x-text="fmtNum(kpis.totalUsers)"></p>
         </div>
         <div class="bg-slate-800 rounded-xl p-5 border border-slate-700">
@@ -65,7 +65,7 @@
                 </div>
                 <span class="text-xs text-slate-500" x-text="rangeLabel"></span>
             </div>
-            <p class="text-xs text-slate-400">متوسط المعاملة</p>
+            <p class="text-xs text-slate-400" data-i18n="avg_transaction">Average Transaction</p>
             <p class="text-2xl font-bold text-amber-400 mt-1" x-text="fmtNum(kpis.avgTransaction.toFixed(0))"></p>
         </div>
         <div class="bg-slate-800 rounded-xl p-5 border border-slate-700">
@@ -75,7 +75,7 @@
                 </div>
                 <span class="text-xs text-slate-500" x-text="rangeLabel"></span>
             </div>
-            <p class="text-xs text-slate-400">معدل الإكمال</p>
+            <p class="text-xs text-slate-400" data-i18n="completion_rate">Completion Rate</p>
             <p class="text-2xl font-bold text-purple-400 mt-1" x-text="kpis.completionRate.toFixed(1) + '%'"></p>
         </div>
     </div>
@@ -140,8 +140,8 @@
                     <thead>
                         <tr class="border-b border-slate-700 bg-slate-800/80">
                             <th class="text-right px-4 py-2.5 font-semibold text-slate-400">#</th>
-                            <th class="text-right px-4 py-2.5 font-semibold text-slate-400">المستخدم</th>
-                            <th class="text-right px-4 py-2.5 font-semibold text-slate-400">المعاملات</th>
+                            <th class="text-right px-4 py-2.5 font-semibold text-slate-400" data-i18n="user">User</th>
+                            <th class="text-right px-4 py-2.5 font-semibold text-slate-400" data-i18n="transactions_label">Transactions</th>
                             <th class="text-right px-4 py-2.5 font-semibold text-slate-400">الحجم</th>
                         </tr>
                     </thead>
@@ -162,7 +162,7 @@
                             </tr>
                         </template>
                         <tr x-show="topUsers.length === 0">
-                            <td colspan="4" class="px-4 py-6 text-center text-slate-500 text-sm">لا توجد بيانات</td>
+                            <td colspan="4" class="px-4 py-6 text-center text-slate-500 text-sm" data-i18n="no_data">No data</td>
                         </tr>
                     </tbody>
                 </table>
@@ -176,26 +176,26 @@
             </h3>
             <div class="grid grid-cols-2 gap-4 mb-4">
                 <div class="bg-slate-900/50 rounded-lg p-4 text-center">
-                    <p class="text-xs text-slate-400 mb-1">إجمالي الشكاوى</p>
+                    <p class="text-xs text-slate-400 mb-1" data-i18n="total_complaints">Total Complaints</p>
                     <p class="text-2xl font-bold" x-text="fmtNum(complaints.total)"></p>
                 </div>
                 <div class="bg-slate-900/50 rounded-lg p-4 text-center">
-                    <p class="text-xs text-slate-400 mb-1">تم حلها</p>
+                    <p class="text-xs text-slate-400 mb-1" data-i18n="resolved">Resolved</p>
                     <p class="text-2xl font-bold text-green-400" x-text="fmtNum(complaints.resolved)"></p>
                 </div>
                 <div class="bg-slate-900/50 rounded-lg p-4 text-center">
-                    <p class="text-xs text-slate-400 mb-1">معلقة</p>
+                    <p class="text-xs text-slate-400 mb-1" data-i18n="pending">Pending</p>
                     <p class="text-2xl font-bold text-amber-400" x-text="fmtNum(complaints.pending)"></p>
                 </div>
                 <div class="bg-slate-900/50 rounded-lg p-4 text-center">
-                    <p class="text-xs text-slate-400 mb-1">معدل الحل</p>
+                    <p class="text-xs text-slate-400 mb-1" data-i18n="resolution_rate">Resolution Rate</p>
                     <p class="text-2xl font-bold text-blue-400" x-text="complaints.resolutionRate.toFixed(1) + '%'"></p>
                 </div>
             </div>
             <!-- Resolution progress bar -->
             <div>
                 <div class="flex items-center justify-between text-xs text-slate-400 mb-1">
-                    <span>تقدم الحل</span>
+                    <span data-i18n="resolution_progress">Resolution Progress</span>
                     <span x-text="complaints.resolutionRate.toFixed(1) + '%'"></span>
                 </div>
                 <div class="w-full bg-slate-700 rounded-full h-2.5 overflow-hidden">
@@ -210,7 +210,7 @@
     <div x-show="loading" class="fixed inset-0 bg-slate-900/50 z-40 flex items-center justify-center" style="display:none">
         <div class="bg-slate-800 rounded-xl p-4 flex items-center gap-3">
             <i class="fas fa-spinner fa-spin text-blue-400 text-xl"></i>
-            <span class="text-sm">جارٍ تحميل الإحصائيات...</span>
+            <span class="text-sm" data-i18n="loading_stats">Loading statistics...</span>
         </div>
     </div>
 </div>

@@ -11,7 +11,7 @@
         <div class="bg-slate-800 rounded-xl border border-slate-700 p-4 hover:border-blue-500 transition kpi-card">
             <div class="flex items-start justify-between">
                 <div class="flex-1">
-                    <p class="text-slate-400 text-xs">المستخدمين</p>
+                    <p class="text-slate-400 text-xs" data-i18n="total_users_label">Users</p>
                     <p class="text-2xl font-bold mt-1" x-text="fmtNum(stats.users?.total || 0)">0</p>
                     <p class="text-[10px] text-green-400 mt-1"><i class="fas fa-arrow-up"></i> <span x-text="stats.users?.today || 0">0</span> جديد اليوم</p>
                 </div>
@@ -24,7 +24,7 @@
         <div class="bg-slate-800 rounded-xl border border-slate-700 p-4 hover:border-amber-500 transition kpi-card">
             <div class="flex items-start justify-between">
                 <div class="flex-1">
-                    <p class="text-slate-400 text-xs">المعاملات</p>
+                    <p class="text-slate-400 text-xs" data-i18n="transactions_label">Transactions</p>
                     <p class="text-2xl font-bold mt-1" x-text="fmtNum((stats.transactions?.pending || 0) + (stats.transactions?.approved || 0))">0</p>
                     <p class="text-[10px] text-amber-400 mt-1"><i class="fas fa-clock"></i> <span x-text="stats.transactions?.pending || 0">0</span> معلقة</p>
                 </div>
@@ -37,7 +37,7 @@
         <div class="bg-slate-800 rounded-xl border border-slate-700 p-4 hover:border-purple-500 transition kpi-card">
             <div class="flex items-start justify-between">
                 <div class="flex-1">
-                    <p class="text-slate-400 text-xs">حجم المعاملات</p>
+                    <p class="text-slate-400 text-xs" data-i18n="transaction_volume">Transaction Volume</p>
                     <p class="text-2xl font-bold mt-1" x-text="fmtNum(stats.volume?.month || 0)">0</p>
                     <p class="text-[10px] text-purple-400 mt-1"><i class="fas fa-chart-line"></i> اليوم: <span x-text="fmtNum(stats.volume?.today || 0)">0</span></p>
                 </div>
@@ -50,7 +50,7 @@
         <div class="bg-slate-800 rounded-xl border border-slate-700 p-4 hover:border-green-500 transition kpi-card">
             <div class="flex items-start justify-between">
                 <div class="flex-1">
-                    <p class="text-slate-400 text-xs">المطابقات</p>
+                    <p class="text-slate-400 text-xs" data-i18n="matches_label">Matches</p>
                     <p class="text-2xl font-bold mt-1" x-text="fmtNum(stats.matches?.active || 0)">0</p>
                     <p class="text-[10px] text-slate-400 mt-1"><i class="fas fa-hourglass-half"></i> <span x-text="stats.matches?.pending || 0">0</span> معلقة</p>
                 </div>
@@ -63,7 +63,7 @@
         <div class="bg-slate-800 rounded-xl border border-slate-700 p-4 hover:border-pink-500 transition kpi-card">
             <div class="flex items-start justify-between">
                 <div class="flex-1">
-                    <p class="text-slate-400 text-xs">مشاركو اليانصيب</p>
+                    <p class="text-slate-400 text-xs" data-i18n="lottery_participants">Lottery Participants</p>
                     <p class="text-2xl font-bold mt-1" x-text="fmtNum(stats.lottery?.participants || 0)">0</p>
                     <p class="text-[10px] text-pink-400 mt-1"><i class="fas fa-trophy"></i> <span x-text="stats.lottery?.winners || 0">0</span> فائزون</p>
                 </div>
@@ -76,7 +76,7 @@
         <div class="bg-slate-800 rounded-xl border border-slate-700 p-4 hover:border-cyan-500 transition kpi-card">
             <div class="flex items-start justify-between">
                 <div class="flex-1">
-                    <p class="text-slate-400 text-xs">طلبات التداول</p>
+                    <p class="text-slate-400 text-xs" data-i18n="trading_orders">Trading Orders</p>
                     <p class="text-2xl font-bold mt-1" x-text="fmtNum(stats.trading?.pending_orders || 0)">0</p>
                     <p class="text-[10px] text-cyan-400 mt-1"><i class="fas fa-chart-line"></i> معلقة</p>
                 </div>
@@ -94,28 +94,28 @@
             <div class="p-3 bg-slate-900/50 rounded-lg flex items-center gap-3">
                 <div class="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-400"><i class="fas fa-money-bill-transfer"></i></div>
                 <div>
-                    <p class="text-xs text-slate-400">معاملات معلقة</p>
+                    <p class="text-xs text-slate-400" data-i18n="pending_transactions">Pending Transactions</p>
                     <p class="text-xl font-bold text-amber-400" x-text="stats.transactions?.pending || 0">0</p>
                 </div>
             </div>
             <div class="p-3 bg-slate-900/50 rounded-lg flex items-center gap-3">
                 <div class="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center text-green-400"><i class="fas fa-arrows-rotate"></i></div>
                 <div>
-                    <p class="text-xs text-slate-400">مطابقات معلقة</p>
+                    <p class="text-xs text-slate-400" data-i18n="pending_matches">Pending Matches</p>
                     <p class="text-xl font-bold text-green-400" x-text="stats.matches?.pending || 0">0</p>
                 </div>
             </div>
             <div class="p-3 bg-slate-900/50 rounded-lg flex items-center gap-3">
                 <div class="w-10 h-10 rounded-lg bg-cyan-500/10 flex items-center justify-center text-cyan-400"><i class="fas fa-chart-line"></i></div>
                 <div>
-                    <p class="text-xs text-slate-400">طلبات تداول معلقة</p>
+                    <p class="text-xs text-slate-400" data-i18n="pending_trading">Pending Trading</p>
                     <p class="text-xl font-bold text-cyan-400" x-text="stats.trading?.pending_orders || 0">0</p>
                 </div>
             </div>
             <div class="p-3 bg-slate-900/50 rounded-lg flex items-center gap-3">
                 <div class="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-400"><i class="fas fa-gem"></i></div>
                 <div>
-                    <p class="text-xs text-slate-400">طلبات تعويض معلقة</p>
+                    <p class="text-xs text-slate-400" data-i18n="pending_svrp">Pending Compensation</p>
                     <p class="text-xl font-bold text-purple-400" x-text="stats.svrp?.pending || 0">0</p>
                 </div>
             </div>
@@ -168,11 +168,11 @@
                     <thead class="bg-slate-900/50 text-slate-400 text-xs">
                         <tr>
                             <th class="text-right p-3">ID</th>
-                            <th class="text-right p-3">العميل</th>
-                            <th class="text-right p-3">النوع</th>
-                            <th class="text-right p-3">المبلغ</th>
-                            <th class="text-right p-3">الحالة</th>
-                            <th class="text-right p-3">التاريخ</th>
+                            <th class="text-right p-3" data-i18n="client">Client</th>
+                            <th class="text-right p-3" data-i18n="type">Type</th>
+                            <th class="text-right p-3" data-i18n="amount">Amount</th>
+                            <th class="text-right p-3" data-i18n="status">Status</th>
+                            <th class="text-right p-3" data-i18n="date">Date</th>
                         </tr>
                     </thead>
                     <tbody id="recentTxns" class="divide-y divide-slate-700">
@@ -231,7 +231,7 @@ function dashboardApp() {
             try {
                 const data = await api('/api/transactions?per_page=10');
                 if (!data.transactions || data.transactions.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="6" class="text-center p-4 text-slate-400"><i class="fas fa-inbox text-2xl mb-2 block"></i>لا توجد معاملات</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center p-4 text-slate-400"><i class="fas fa-inbox text-2xl mb-2 block"></i data-i18n="no_transactions">No transactions</td></tr>';
                     return;
                 }
                 tbody.innerHTML = data.transactions.map(t => {
@@ -256,7 +256,7 @@ function dashboardApp() {
             try {
                 const data = await api('/api/users?per_page=5');
                 if (!data.users || data.users.length === 0) {
-                    el.innerHTML = '<div class="p-4 text-center text-slate-400"><i class="fas fa-inbox text-2xl mb-2 block"></i>لا يوجد مستخدمين</div>';
+                    el.innerHTML = '<div class="p-4 text-center text-slate-400"><i class="fas fa-inbox text-2xl mb-2 block"></i data-i18n="no_users">No users</div>';
                     return;
                 }
                 el.innerHTML = data.users.map(u => {
@@ -271,7 +271,7 @@ function dashboardApp() {
                         '</div>';
                 }).join('');
             } catch(e) {
-                el.innerHTML = '<div class="p-4 text-center text-red-400">فشل التحميل</div>';
+                el.innerHTML = '<div class="p-4 text-center text-red-400" data-i18n="load_failed">Failed to load</div>';
             }
         },
 
@@ -280,7 +280,7 @@ function dashboardApp() {
             try {
                 const data = await api('/api/audit-log?per_page=10');
                 if (!data.logs || data.logs.length === 0) {
-                    el.innerHTML = '<div class="text-center text-slate-400 py-4"><i class="fas fa-inbox text-2xl mb-2 block"></i>لا يوجد نشاط</div>';
+                    el.innerHTML = '<div class="text-center text-slate-400 py-4"><i class="fas fa-inbox text-2xl mb-2 block"></i data-i18n="no_activity">No activity</div>';
                     return;
                 }
                 const iconMap = { 'approve': 'fa-check text-green-400', 'reject': 'fa-xmark text-red-400', 'ban': 'fa-ban text-red-400', 'unban': 'fa-unlock text-green-400', 'login': 'fa-right-to-bracket text-blue-400', 'create': 'fa-plus text-blue-400', 'delete': 'fa-trash text-red-400', 'edit': 'fa-pen text-amber-400' };
@@ -296,7 +296,7 @@ function dashboardApp() {
                         '</div>';
                 }).join('');
             } catch(e) {
-                el.innerHTML = '<div class="text-center text-slate-400 py-4">لا يوجد نشاط</div>';
+                el.innerHTML = '<div class="text-center text-slate-400 py-4" data-i18n="no_activity">No activity</div>';
             }
         },
 
