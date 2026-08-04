@@ -26,7 +26,7 @@
                 <div class="flex-1">
                     <p class="kpi-label text-amber-400" data-i18n="total_transactions">Transactions</p>
                     <p class="kpi-value text-bright mt-1" x-text="fmtNum((stats.transactions?.pending || 0) + (stats.transactions?.approved || 0))">0</p>
-                    <p class="kpi-sub text-warning"><i class="fas fa-clock"></i> <span x-text="stats.transactions?.pending || 0">0</span> معلقة</p>
+                    <p class="kpi-sub text-warning"><i class="fas fa-clock"></i> <span x-text="stats.transactions?.pending || 0">0</span> <span data-i18n="pending">Pending</span></p>
                 </div>
                 <div class="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-400">
                     <i class="fas fa-money-bill-transfer"></i>
@@ -39,7 +39,7 @@
                 <div class="flex-1">
                     <p class="kpi-label text-purple-400" data-i18n="transaction_volume">Transaction Volume</p>
                     <p class="kpi-value text-bright mt-1" x-text="fmtNum(stats.volume?.month || 0)">0</p>
-                    <p class="kpi-sub text-info"><i class="fas fa-chart-line"></i> اليوم: <span x-text="fmtNum(stats.volume?.today || 0)" class="num-positive">0</span></p>
+                    <p class="kpi-sub text-info"><i class="fas fa-chart-line"></i> <span data-i18n="today">Today</span>: <span x-text="fmtNum(stats.volume?.today || 0)" class="num-positive">0</span></p>
                 </div>
                 <div class="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-400">
                     <i class="fas fa-coins"></i>
@@ -52,7 +52,7 @@
                 <div class="flex-1">
                     <p class="kpi-label text-green-400" data-i18n="active_matches">Matches</p>
                     <p class="kpi-value text-bright mt-1" x-text="fmtNum(stats.matches?.active || 0)">0</p>
-                    <p class="kpi-sub text-warning"><i class="fas fa-hourglass-half"></i> <span x-text="stats.matches?.pending || 0">0</span> معلقة</p>
+                    <p class="kpi-sub text-warning"><i class="fas fa-hourglass-half"></i> <span x-text="stats.matches?.pending || 0">0</span> <span data-i18n="pending">Pending</span></p>
                 </div>
                 <div class="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center text-green-400">
                     <i class="fas fa-arrows-rotate"></i>
@@ -65,7 +65,7 @@
                 <div class="flex-1">
                     <p class="kpi-label text-pink-400" data-i18n="lottery_participants">Lottery Participants</p>
                     <p class="kpi-value text-bright mt-1" x-text="fmtNum(stats.lottery?.participants || 0)">0</p>
-                    <p class="kpi-sub text-success"><i class="fas fa-trophy"></i> <span x-text="stats.lottery?.winners || 0">0</span> فائزون</p>
+                    <p class="kpi-sub text-success"><i class="fas fa-trophy"></i> <span x-text="stats.lottery?.winners || 0">0</span> <span data-i18n="winners">Winners</span></p>
                 </div>
                 <div class="w-10 h-10 rounded-lg bg-pink-500/10 flex items-center justify-center text-pink-400">
                     <i class="fas fa-dice"></i>
@@ -78,7 +78,7 @@
                 <div class="flex-1">
                     <p class="kpi-label text-cyan-400" data-i18n="trading_orders">Trading Orders</p>
                     <p class="kpi-value text-bright mt-1" x-text="fmtNum(stats.trading?.pending_orders || 0)">0</p>
-                    <p class="kpi-sub text-warning"><i class="fas fa-chart-line"></i> معلقة</p>
+                    <p class="kpi-sub text-warning"><i class="fas fa-chart-line"></i> <span data-i18n="pending">Pending</span></p>
                 </div>
                 <div class="w-10 h-10 rounded-lg bg-cyan-500/10 flex items-center justify-center text-cyan-400">
                     <i class="fas fa-chart-line"></i>
@@ -89,7 +89,7 @@
 
     <!-- Pending Items Summary -->
     <div class="bg-slate-800 rounded-xl border border-slate-700 p-5">
-        <h3 class="font-semibold mb-4"><i class="fas fa-clipboard-list text-amber-400 ml-1"></i> العناصر المعلقة</h3>
+        <h3 class="font-semibold mb-4"><i class="fas fa-clipboard-list text-amber-400 ml-1"></i> <span data-i18n="pending_items">Pending Items</span></h3>
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <div class="p-3 bg-slate-900/50 rounded-lg flex items-center gap-3">
                 <div class="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-400"><i class="fas fa-money-bill-transfer"></i></div>
@@ -123,10 +123,10 @@
         <!-- Quick action buttons -->
         <div class="mt-4 flex flex-wrap gap-2">
             <button @click="bulkApproveTxns()" class="btn btn-success btn-sm">
-                <i class="fas fa-check-double ml-1"></i> موافقة جماعية على المعاملات
+                <i class="fas fa-check-double ml-1"></i> <span data-i18n="bulk_approve">Bulk Approve</span>
             </button>
             <button @click="bulkRejectTxns()" class="btn btn-danger btn-sm">
-                <i class="fas fa-xmark ml-1"></i> رفض جماعي للمعاملات
+                <i class="fas fa-xmark ml-1"></i> <span data-i18n="bulk_reject">Bulk Reject</span>
             </button>
         </div>
     </div>
@@ -135,12 +135,12 @@
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <!-- Transactions line chart -->
         <div class="bg-slate-800 rounded-xl border border-slate-700 p-5">
-            <h3 class="font-semibold mb-4"><i class="fas fa-chart-area text-blue-400 ml-1"></i> معاملات آخر 30 يوم</h3>
+            <h3 class="font-semibold mb-4"><i class="fas fa-chart-area text-blue-400 ml-1"></i> <span data-i18n="tx_last_30">Transactions Last 30 Days</span></h3>
             <canvas id="txnChart" height="200"></canvas>
         </div>
         <!-- Transaction status doughnut -->
         <div class="bg-slate-800 rounded-xl border border-slate-700 p-5">
-            <h3 class="font-semibold mb-4"><i class="fas fa-chart-pie text-amber-400 ml-1"></i> توزيع حالات المعاملات</h3>
+            <h3 class="font-semibold mb-4"><i class="fas fa-chart-pie text-amber-400 ml-1"></i> <span data-i18n="tx_distribution">Transaction Status Distribution</span></h3>
             <canvas id="statusChart" height="200"></canvas>
         </div>
         <!-- Top 5 companies bar chart -->
@@ -301,7 +301,7 @@ function dashboardApp() {
         },
 
         async bulkApproveTxns() {
-            if (!confirm('الموافقة الجماعية على جميع المعاملات المعلقة؟')) return;
+            if (!confirm(tr('bulk_approve') + '?')) return;
             try {
                 await api('/api/transactions/bulk-approve', { method: 'POST', body: '{}' });
                 toast('تمت الموافقة الجماعية', 'success');
@@ -311,7 +311,7 @@ function dashboardApp() {
         },
 
         async bulkRejectTxns() {
-            if (!confirm('رفض جميع المعاملات المعلقة؟')) return;
+            if (!confirm(tr('bulk_reject') + '?')) return;
             try {
                 await api('/api/transactions/bulk-reject', { method: 'POST', body: '{}' });
                 toast('تم الرفض الجماعي', 'warning');
@@ -358,7 +358,7 @@ function dashboardApp() {
             } else {
                 window._statusChart = new Chart(canvas, {
                     type: 'doughnut',
-                    data: { labels: ['موافق', 'معلقة', 'مرفوض'], datasets: [{ data: data, backgroundColor: ['#22C55E', '#F59E0B', '#EF4444'], borderWidth: 0 }] },
+                    data: { labels: [tr('approved'), tr('pending'), tr('rejected')], datasets: [{ data: data, backgroundColor: ['#22C55E', '#F59E0B', '#EF4444'], borderWidth: 0 }] },
                     options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { color: '#94A3B8' } } } }
                 });
             }
