@@ -6391,6 +6391,52 @@ class ComprehensiveDUXBot:
                     pass
             return
 
+        # ===== سحب من محفظة الألعاب =====
+        if isinstance(current_state, str) and current_state == 'game_wallet_withdraw_amount':
+            user_id = message['from']['id']
+            chat_id = message['chat']['id']
+            text = message.get('text', '').strip()
+            del self.user_states[user_id]
+            try:
+                amount = float(text)
+                if amount <= 0:
+                    raise ValueError
+            except ValueError:
+                self.send_message(chat_id, '❌ اكتب مبلغاً رقمياً:')
+                self.user_states[user_id] = 'game_wallet_withdraw_amount'
+                return
+            try:
+                from game_engine import GameManager
+                gm = GameManager()
+                balance = gm.get_balance(user_id)
+                currency = gm.get_user_currency(user_id)
+                methods = gm.get_payment_methods(user_id)
+            except:
+                balance = 0
+                currency = 'SAR'
+                methods = []
+            if balance < amount:
+                self.send_message(chat_id, f'❌ رصيد غير كافٍ: {balance:.0f} < {amount}')
+                return
+            sys_methods = []
+            try:
+                with open('payment_methods.csv', 'r', encoding='utf-8-sig') as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        if row.get('status') == 'active':
+                            sys_methods.append(row)
+            except:
+                pass
+            text_msg = f'💸 <b>تأكيد السحب</b>\n\n💰 المبلغ: <code>{amount} {currency}</code>\n\nاختر وسيلة الاستلام:\n\n'
+            inline_btns = []
+            for m in methods:
+                inline_btns.append([{'text': f"{m.get('icon','💳')} {m.get('method_name','')}", 'callback_data': f"gamewal_wdr_{m.get('id','')}_{amount}"}])
+            for m in sys_methods[:4]:
+                inline_btns.append([{'text': f"{m.get('icon','💳') or '💳'} {m.get('method_name','')}", 'callback_data': f"gamewal_wdrs_{m.get('id','')}_{amount}"}])
+            inline_btns.append([{'text': '❌ إلغاء', 'callback_data': 'wheel_back_main'}])
+            self.send_inline_message(chat_id, text_msg, inline_btns)
+            return
+
         if isinstance(current_state, str) and current_state == 'stk_emoji_input':
             user_id = message['from']['id']
             chat_id = message['chat']['id']
@@ -11665,6 +11711,23 @@ class ComprehensiveDUXBot:
                 return
 
             # ===== إيداع سريع — ألعاب =====
+            elif data == 'game_wallet_withdraw':
+                try:
+                    from game_engine import GameManager
+                    gm = GameManager()
+                    balance = gm.get_balance(user_id)
+                    currency = gm.get_user_currency(user_id)
+                except:
+                    balance = 0
+                    currency = 'SAR'
+                self.edit_message(chat_id, message.get('message_id'),
+                    f'💸 <b>سحب من محفظة الألعاب</b>\n\n'
+                    f'💰 رصيدك: <code>{balance:.0f} {currency}</code>\n\n'
+                    f'اكتب <b>المبلغ</b> الذي تريد سحبه:\n'
+                    f'💡 سيتم خصم المبلغ فوراً وتحويله بعد موافقة الإدارة')
+                self.user_states[user_id] = 'game_wallet_withdraw_amount'
+                return
+
             elif data == 'game_wallet_deposit':
                 # عرض وسائل الدفع المتاحة للإيداع في المحفظة
                 user_obj = self.find_user(user_id)
@@ -11738,6 +11801,71 @@ class ComprehensiveDUXBot:
                     f"💡 مثال: 100\n"
                     f"💡 سيتم تحويل الرصيد لمحفظتك بعد موافقة الإدارة")
                 self.user_states[user_id] = f'gamewal_amount_{method_id}'
+                return
+
+            elif data.startswith('gamewal_wdr_') or data.startswith('gamewal_wdrs_'):
+                # اختيار وسيلة استلام للسحب
+                parts = data.split('_')
+                method_id = parts[2] if len(parts) > 2 else ''
+                amount = float(parts[3]) if len(parts) > 3 else 0
+                account_number = ''
+                method_name = ''
+                try:
+                    from game_engine import GameManager
+                    gm = GameManager()
+                    for m in gm.get_payment_methods(user_id):
+                        if m.get('id') == method_id:
+                            account_number = m.get('account_number', '')
+                            method_name = m.get('method_name', '')
+                            break
+                    if not account_number:
+                        with open('payment_methods.csv', 'r', encoding='utf-8-sig') as f:
+                            for row in csv.DictReader(f):
+                                if row.get('id') == method_id:
+                                    account_number = row.get('account_data', '')
+                                    method_name = row.get('method_name', '')
+                                    break
+                except:
+                    pass
+                if not account_number:
+                    account_number = 'غير محدد'
+                user_obj_w = self.find_user(user_id)
+                currency_w = user_obj_w.get('currency', 'SAR') if user_obj_w else 'SAR'
+                user_name_w = user_obj_w.get('name', '') if user_obj_w else str(user_id)
+                wth_id = ''
+                try:
+                    from game_engine import GameManager
+                    gm = GameManager()
+                    wth_id, err = gm.create_withdrawal(user_id, amount, method_id, account_number)
+                    if err:
+                        self.answer_callback(callback_id, f'❌ {err}')
+                        return
+                except:
+                    pass
+                self.edit_message(chat_id, message.get('message_id'),
+                    f'⏳ <b>طلب سحب</b>\n\n💸 المبلغ: <code>{amount} {currency_w}</code>\n📱 {method_name}\n🏦 <code>{account_number}</code>\n🆔 <code>{wth_id}</code>\n\n⏳ سيتم التحويل بعد موافقة الإدارة')
+                for admin_id in self.admin_ids:
+                    try:
+                        self.send_inline_message(int(admin_id),
+                            f'💸 <b>طلب سحب محفظة ألعاب</b>\n\n👤 {user_name_w} (<code>{user_id}</code>)\n💸 <code>{amount} {currency_w}</code>\n📱 {method_name}\n🏦 <code>{account_number}</code>\n🆔 <code>{wth_id}</code>\n📅 {datetime.now().strftime("%Y-%m-%d %H:%M")}',
+                            [[{'text': '✅ تم التحويل', 'callback_data': f'gamedep_approve_{wth_id}'}],
+                             [{'text': '❌ رفض (إعادة الرصيد)', 'callback_data': f'gamewal_rejw_{wth_id}'}]])
+                    except:
+                        pass
+                return
+
+            elif data.startswith('gamewal_rejw_'):
+                wth_id = data.replace('gamewal_rejw_', '')
+                try:
+                    from game_engine import GameManager
+                    gm = GameManager()
+                    result = gm.reject_withdrawal(wth_id, user_id)
+                    if result:
+                        self.edit_message(chat_id, message.get('message_id'), '❌ تم رفض السحب — تم إعادة الرصيد')
+                    else:
+                        self.edit_message(chat_id, message.get('message_id'), '❌ الطلب غير موجود')
+                except:
+                    pass
                 return
 
             elif data.startswith('gamedep_approve_'):
@@ -17137,10 +17265,11 @@ class ComprehensiveDUXBot:
         base_url = self.get_setting('dashboard_url') or 'https://69.169.108.197.sslip.io'
         games_url = f"{base_url}/webapp/games?uid={user_id}&lang={lang}&currency={currency}"
 
-        # زر WebApp للألعاب + زر إيداع للمحفظة
+        # زر WebApp للألعاب + إيداع + سحب
         kb = json.dumps({'inline_keyboard': [
             [{'text': '🎮 ادخل مركز الألعاب', 'web_app': {'url': games_url}}],
-            [{'text': '💰 إيداع للمحفظة', 'callback_data': 'game_wallet_deposit'}]
+            [{'text': '💰 إيداع للمحفظة', 'callback_data': 'game_wallet_deposit'},
+             {'text': '💸 سحب من المحفظة', 'callback_data': 'game_wallet_withdraw'}]
         ]})
         self.api_call('sendMessage', {
             'chat_id': message['chat']['id'],
