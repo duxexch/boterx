@@ -11,7 +11,7 @@
         <div class="bg-slate-800 rounded-xl border border-slate-700 p-4 hover:border-blue-500 transition kpi-card">
             <div class="flex items-start justify-between">
                 <div class="flex-1">
-                    <p class="kpi-label text-blue-400" data-i18n="total_users_label">Users</p>
+                    <p class="kpi-label text-blue-400" data-i18n="total_users">Users</p>
                     <p class="kpi-value text-bright mt-1" x-text="fmtNum(stats.users?.total || 0)">0</p>
                     <p class="kpi-sub text-success"><i class="fas fa-arrow-up"></i> +<span x-text="stats.users?.today || 0">0</span></p>
                 </div>
@@ -24,7 +24,7 @@
         <div class="bg-slate-800 rounded-xl border border-slate-700 p-4 hover:border-amber-500 transition kpi-card">
             <div class="flex items-start justify-between">
                 <div class="flex-1">
-                    <p class="kpi-label text-amber-400" data-i18n="transactions_label">Transactions</p>
+                    <p class="kpi-label text-amber-400" data-i18n="total_transactions">Transactions</p>
                     <p class="kpi-value text-bright mt-1" x-text="fmtNum((stats.transactions?.pending || 0) + (stats.transactions?.approved || 0))">0</p>
                     <p class="kpi-sub text-warning"><i class="fas fa-clock"></i> <span x-text="stats.transactions?.pending || 0">0</span> معلقة</p>
                 </div>
@@ -50,7 +50,7 @@
         <div class="bg-slate-800 rounded-xl border border-slate-700 p-4 hover:border-green-500 transition kpi-card">
             <div class="flex items-start justify-between">
                 <div class="flex-1">
-                    <p class="kpi-label text-green-400" data-i18n="matches_label">Matches</p>
+                    <p class="kpi-label text-green-400" data-i18n="active_matches">Matches</p>
                     <p class="kpi-value text-bright mt-1" x-text="fmtNum(stats.matches?.active || 0)">0</p>
                     <p class="kpi-sub text-warning"><i class="fas fa-hourglass-half"></i> <span x-text="stats.matches?.pending || 0">0</span> معلقة</p>
                 </div>

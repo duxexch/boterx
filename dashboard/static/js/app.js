@@ -76,7 +76,6 @@ const I18N = {
         // Settings
         system_settings: 'إعدادات النظام', button_labels: 'مسميات الأزرار',
         audit_log: 'سجل الإجراءات', setting_key: 'المفتاح', setting_value: 'القيمة',
-            tota
         // Sidebar
         dashboard: 'Dashboard', transactions: 'Transactions', users: 'Users',
         matching: 'Matching', svrp: 'Compensation', trading: 'Trading',
