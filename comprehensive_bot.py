@@ -8839,16 +8839,18 @@ class ComprehensiveDUXBot:
             if user:
                 # استخدام الترجمة لعرض شاشة اختيار الخدمة كاملة بلغته
                 lang = user.get('language', 'ar')
+            else:
+                lang = admin_lang
                 welcome_text = self.tr(
                     'choose_service',
                     lang,
-                    name=user.get('name', self.tr('a0122_غير_محدد', lang)),
-                    customer_id=user.get('customer_id', self.tr('a0122_غير_محدد', lang))
+                    name=user.get('name', self.tr('a0122_غير_محدد', lang)) if user else '',
+                    customer_id=user.get('customer_id', self.tr('a0122_غير_محدد', lang)) if user else ''
                 )
                 self.send_message(chat_id, welcome_text, self.main_keyboard(lang))
         
         # أوامر نصية للأدمن (مبسطة مع احتمالات متعددة)
-        elif any(word in text.lower() for word in [self.tr('a0315_موافقة', lang), self.tr('a0316_موافق', lang), self.tr('a0317_اوافق', lang), self.tr('a0318_أوافق', lang), self.tr('a0319_قبول', lang), self.tr('a0320_مقبول', lang), self.tr('a0263_تأكيد', lang), self.tr('a0264_تاكيد', lang), self.tr('a0198_نعم', lang)]):
+        elif any(word in text.lower() for word in [self.tr('a0315_موافقة', admin_lang), self.tr('a0316_موافق', admin_lang), self.tr('a0317_اوافق', admin_lang), self.tr('a0318_أوافق', admin_lang), self.tr('a0319_قبول', admin_lang), self.tr('a0320_مقبول', admin_lang), self.tr('a0263_تأكيد', admin_lang), self.tr('a0264_تاكيد', admin_lang), self.tr('a0198_نعم', admin_lang)]):
             # استخراج رقم المعاملة
             words = text.split()
             trans_id = None

@@ -581,6 +581,7 @@ class GameManager:
 
     def reject_deposit(self, dep_id, admin_id):
         rows = []
+        rejected = None
         try:
             with open(self.quick_deposits_file, 'r', encoding=CSV_ENCODING) as f:
                 reader = csv.DictReader(f)
@@ -590,6 +591,7 @@ class GameManager:
                         row['status'] = 'rejected'
                         row['approved_by'] = str(admin_id)
                         row['approved_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                        rejected = row
                     rows.append(row)
             with open(self.quick_deposits_file, 'w', newline='', encoding=CSV_ENCODING) as f:
                 writer = csv.DictWriter(f, fieldnames=fieldnames)
@@ -597,6 +599,7 @@ class GameManager:
                 writer.writerows(rows)
         except:
             pass
+        return rejected
 
     def get_pending_deposits(self):
         deposits = []

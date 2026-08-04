@@ -3526,25 +3526,56 @@ def api_deposit_pending():
 @app.route('/api/deposit/<dep_id>/approve', methods=['POST'])
 @api_auth
 def api_deposit_approve(dep_id):
-    """موافقة على إيداع سريع"""
+    """موافقة على إيداع سريع — يضيف الرصيد + يرسل إشعار لللاعب"""
     if not _VEX_GAMES:
         return jsonify({'error': 'Games engine not available'}), 500
     admin_id = session.get('admin_id', '')
     result = _gm.approve_deposit(dep_id, admin_id)
     if result:
         push_notification('deposit_approved', '✅ تمت الموافقة على إيداع', f'إيداع {dep_id} تمت الموافقة', {'deposit_id': dep_id})
+        # إرسال إشعار لللاعب في Telegram
+        try:
+            uid = result.get('user_id', '')
+            amount = float(result.get('amount', 0))
+            # Send Telegram notification via bot API
+            import urllib.request
+            token = BOT_TOKEN
+            if token:
+                msg = f"✅ تمت الموافقة على إيداعك!\n\n💰 المبلغ: {amount:.0f}\n🎮 تم إضافته لمحفظة VEX\n🆔 رقم العملية: {dep_id}"
+                url = f'https://api.telegram.org/bot{token}/sendMessage'
+                data = json.dumps({'chat_id': int(uid), 'text': msg, 'parse_mode': 'HTML'}).encode('utf-8')
+                req = urllib.request.Request(url, data=data)
+                req.add_header('Content-Type', 'application/json')
+                urllib.request.urlopen(req, timeout=10)
+        except Exception as e:
+            print(f"Telegram notification error: {e}")
         return jsonify({'success': True, 'deposit': result})
     return jsonify({'error': 'Deposit not found or already processed'}), 404
 
 @app.route('/api/deposit/<dep_id>/reject', methods=['POST'])
 @api_auth
 def api_deposit_reject(dep_id):
-    """رفض إيداع سريع"""
+    """رفض إيداع سريع — يرسل إشعار لللاعب"""
     if not _VEX_GAMES:
         return jsonify({'error': 'Games engine not available'}), 500
     admin_id = session.get('admin_id', '')
-    _gm.reject_deposit(dep_id, admin_id)
+    result = _gm.reject_deposit(dep_id, admin_id)
     push_notification('deposit_rejected', '❌ تم رفض إيداع', f'إيداع {dep_id} تم رفض', {'deposit_id': dep_id})
+    # إرسال إشعار لللاعب في Telegram
+    try:
+        if result and result.get('user_id'):
+            uid = result.get('user_id', '')
+            import urllib.request
+            token = BOT_TOKEN
+            if token:
+                msg = f"❌ تم رفض إيداعك\n\n🆔 رقم العملية: {dep_id}\n\nللمساعدة، تواصل مع الدعم."
+                url = f'https://api.telegram.org/bot{token}/sendMessage'
+                data = json.dumps({'chat_id': int(uid), 'text': msg, 'parse_mode': 'HTML'}).encode('utf-8')
+                req = urllib.request.Request(url, data=data)
+                req.add_header('Content-Type', 'application/json')
+                urllib.request.urlopen(req, timeout=10)
+    except Exception as e:
+        print(f"Telegram notification error: {e}")
     return jsonify({'success': True})
 
 # ===== Player Payment Methods =====
