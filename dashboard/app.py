@@ -678,6 +678,23 @@ def api_approve_txn(txn_id):
             break
     write_csv('transactions.csv', txns, fieldnames)
     log_action('approve_transaction', f'{txn_id} amount: {old_amount} -> {new_amount or old_amount}')
+    # VEX deposit: add game_balance + update quick_deposits + notify player
+    if trans and 'VEX' in trans.get('admin_note', ''):
+        try:
+            uid = trans.get('telegram_id', '')
+            amount = float(new_amount or old_amount or 0)
+            if _VEX_GAMES and uid and amount > 0:
+                new_bal = _gm.add_balance(uid, amount)
+                print(f"VEX txn approve: added {amount} to {uid}, balance: {new_bal}")
+                _gm.approve_deposit(txn_id, session.get('admin_id', ''))
+                token = BOT_TOKEN
+                if token:
+                    import urllib.request as _u
+                    msg = f"✅ تمت الموافقة على إيداعك!\n\n💰 المبلغ: {amount:.0f}\n🎮 تم إضافته لمحفظة VEX\n🆔 {txn_id}"
+                    _u.urlopen(_u.Request(f'https://api.telegram.org/bot{token}/sendMessage', data=json.dumps({'chat_id': int(uid), 'text': msg, 'parse_mode': 'HTML'}).encode('utf-8'), headers={'Content-Type': 'application/json'}), timeout=10)
+                push_notification('vex_deposit', '✅ إيداع VEX', f'{uid}: {amount}', {'uid': uid, 'amount': amount})
+        except Exception as e:
+            print(f"VEX approve error: {e}")
     return jsonify({'success': True, 'old_amount': old_amount, 'new_amount': new_amount or old_amount})
 
 @app.route('/api/transactions/<txn_id>/reject', methods=['POST'])
