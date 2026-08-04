@@ -128,6 +128,41 @@ input[type="number"], input[type="email"] { direction: ltr; text-align: right; }
     padding: 0.625rem 0.875rem;
     color: #F1F5F9;
     font-size: 0.875rem;
+    outline: none;
+    transition: border-color 0.2s;
+}
+.input:focus { border-color: #FBBF24; }
+
+/* ===== Trading-style Number Colors ===== */
+.num-positive { color: #4ADE80; font-weight: 700; }
+.num-negative { color: #F87171; font-weight: 700; }
+.num-neutral { color: #FBBF24; font-weight: 700; }
+.num-pending { color: #FBBF24; font-weight: 700; }
+
+/* ===== KPI Card Enhancements ===== */
+.kpi-card { position: relative; overflow: hidden; }
+.kpi-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    opacity: 0.6; transition: opacity 0.2s;
+}
+.kpi-card:hover::before { opacity: 1; }
+.kpi-card .kpi-value { font-size: 1.75rem; font-weight: 900; }
+.kpi-card .kpi-label { font-size: 0.7rem; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.5px; }
+.kpi-card .kpi-sub { font-size: 0.65rem; margin-top: 0.25rem; }
+
+/* ===== Enhanced Text Contrast ===== */
+.text-bright { color: #F1F5F9 !important; }
+.text-dim { color: #94A3B8 !important; }
+.text-success { color: #4ADE80 !important; }
+.text-danger { color: #F87171 !important; }
+.text-warning { color: #FBBF24 !important; }
+.text-info { color: #60A5FA !important; }
+
+/* ===== Chart placeholder ===== */
+.chart-placeholder {
+    display: flex; align-items: center; justify-content: center;
+    height: 200px; color: #475569; font-size: 0.875rem;
+}
     transition: border-color 0.2s;
     width: 100%;
 }

@@ -11,9 +11,9 @@
         <div class="bg-slate-800 rounded-xl border border-slate-700 p-4 hover:border-blue-500 transition kpi-card">
             <div class="flex items-start justify-between">
                 <div class="flex-1">
-                    <p class="text-slate-400 text-xs" data-i18n="total_users_label">Users</p>
-                    <p class="text-2xl font-bold mt-1" x-text="fmtNum(stats.users?.total || 0)">0</p>
-                    <p class="text-[10px] text-green-400 mt-1"><i class="fas fa-arrow-up"></i> <span x-text="stats.users?.today || 0">0</span> جديد اليوم</p>
+                    <p class="kpi-label text-blue-400" data-i18n="total_users_label">Users</p>
+                    <p class="kpi-value text-bright mt-1" x-text="fmtNum(stats.users?.total || 0)">0</p>
+                    <p class="kpi-sub text-success"><i class="fas fa-arrow-up"></i> +<span x-text="stats.users?.today || 0">0</span></p>
                 </div>
                 <div class="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-400">
                     <i class="fas fa-users"></i>
@@ -24,9 +24,9 @@
         <div class="bg-slate-800 rounded-xl border border-slate-700 p-4 hover:border-amber-500 transition kpi-card">
             <div class="flex items-start justify-between">
                 <div class="flex-1">
-                    <p class="text-slate-400 text-xs" data-i18n="transactions_label">Transactions</p>
-                    <p class="text-2xl font-bold mt-1" x-text="fmtNum((stats.transactions?.pending || 0) + (stats.transactions?.approved || 0))">0</p>
-                    <p class="text-[10px] text-amber-400 mt-1"><i class="fas fa-clock"></i> <span x-text="stats.transactions?.pending || 0">0</span> معلقة</p>
+                    <p class="kpi-label text-amber-400" data-i18n="transactions_label">Transactions</p>
+                    <p class="kpi-value text-bright mt-1" x-text="fmtNum((stats.transactions?.pending || 0) + (stats.transactions?.approved || 0))">0</p>
+                    <p class="kpi-sub text-warning"><i class="fas fa-clock"></i> <span x-text="stats.transactions?.pending || 0">0</span> معلقة</p>
                 </div>
                 <div class="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-400">
                     <i class="fas fa-money-bill-transfer"></i>
@@ -37,9 +37,9 @@
         <div class="bg-slate-800 rounded-xl border border-slate-700 p-4 hover:border-purple-500 transition kpi-card">
             <div class="flex items-start justify-between">
                 <div class="flex-1">
-                    <p class="text-slate-400 text-xs" data-i18n="transaction_volume">Transaction Volume</p>
-                    <p class="text-2xl font-bold mt-1" x-text="fmtNum(stats.volume?.month || 0)">0</p>
-                    <p class="text-[10px] text-purple-400 mt-1"><i class="fas fa-chart-line"></i> اليوم: <span x-text="fmtNum(stats.volume?.today || 0)">0</span></p>
+                    <p class="kpi-label text-purple-400" data-i18n="transaction_volume">Transaction Volume</p>
+                    <p class="kpi-value text-bright mt-1" x-text="fmtNum(stats.volume?.month || 0)">0</p>
+                    <p class="kpi-sub text-info"><i class="fas fa-chart-line"></i> اليوم: <span x-text="fmtNum(stats.volume?.today || 0)" class="num-positive">0</span></p>
                 </div>
                 <div class="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-400">
                     <i class="fas fa-coins"></i>
@@ -50,9 +50,9 @@
         <div class="bg-slate-800 rounded-xl border border-slate-700 p-4 hover:border-green-500 transition kpi-card">
             <div class="flex items-start justify-between">
                 <div class="flex-1">
-                    <p class="text-slate-400 text-xs" data-i18n="matches_label">Matches</p>
-                    <p class="text-2xl font-bold mt-1" x-text="fmtNum(stats.matches?.active || 0)">0</p>
-                    <p class="text-[10px] text-slate-400 mt-1"><i class="fas fa-hourglass-half"></i> <span x-text="stats.matches?.pending || 0">0</span> معلقة</p>
+                    <p class="kpi-label text-green-400" data-i18n="matches_label">Matches</p>
+                    <p class="kpi-value text-bright mt-1" x-text="fmtNum(stats.matches?.active || 0)">0</p>
+                    <p class="kpi-sub text-warning"><i class="fas fa-hourglass-half"></i> <span x-text="stats.matches?.pending || 0">0</span> معلقة</p>
                 </div>
                 <div class="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center text-green-400">
                     <i class="fas fa-arrows-rotate"></i>
@@ -63,9 +63,9 @@
         <div class="bg-slate-800 rounded-xl border border-slate-700 p-4 hover:border-pink-500 transition kpi-card">
             <div class="flex items-start justify-between">
                 <div class="flex-1">
-                    <p class="text-slate-400 text-xs" data-i18n="lottery_participants">Lottery Participants</p>
-                    <p class="text-2xl font-bold mt-1" x-text="fmtNum(stats.lottery?.participants || 0)">0</p>
-                    <p class="text-[10px] text-pink-400 mt-1"><i class="fas fa-trophy"></i> <span x-text="stats.lottery?.winners || 0">0</span> فائزون</p>
+                    <p class="kpi-label text-pink-400" data-i18n="lottery_participants">Lottery Participants</p>
+                    <p class="kpi-value text-bright mt-1" x-text="fmtNum(stats.lottery?.participants || 0)">0</p>
+                    <p class="kpi-sub text-success"><i class="fas fa-trophy"></i> <span x-text="stats.lottery?.winners || 0">0</span> فائزون</p>
                 </div>
                 <div class="w-10 h-10 rounded-lg bg-pink-500/10 flex items-center justify-center text-pink-400">
                     <i class="fas fa-dice"></i>
@@ -76,9 +76,9 @@
         <div class="bg-slate-800 rounded-xl border border-slate-700 p-4 hover:border-cyan-500 transition kpi-card">
             <div class="flex items-start justify-between">
                 <div class="flex-1">
-                    <p class="text-slate-400 text-xs" data-i18n="trading_orders">Trading Orders</p>
-                    <p class="text-2xl font-bold mt-1" x-text="fmtNum(stats.trading?.pending_orders || 0)">0</p>
-                    <p class="text-[10px] text-cyan-400 mt-1"><i class="fas fa-chart-line"></i> معلقة</p>
+                    <p class="kpi-label text-cyan-400" data-i18n="trading_orders">Trading Orders</p>
+                    <p class="kpi-value text-bright mt-1" x-text="fmtNum(stats.trading?.pending_orders || 0)">0</p>
+                    <p class="kpi-sub text-warning"><i class="fas fa-chart-line"></i> معلقة</p>
                 </div>
                 <div class="w-10 h-10 rounded-lg bg-cyan-500/10 flex items-center justify-center text-cyan-400">
                     <i class="fas fa-chart-line"></i>
