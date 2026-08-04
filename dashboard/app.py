@@ -288,11 +288,6 @@ def page_lottery():
 def page_wheel():
     return render_template('wheel.html', active_page='wheel')
 
-@app.route('/webapp/wheel')
-def webapp_wheel():
-    """صفحة عجلة الحظ — تفتح داخل تيليجرام (Web App)"""
-    return render_template('wheel_app.html')
-
 @app.route('/webapp/snatch')
 def webapp_snatch():
     """صفحة لعبة اختطف — Web App ديناميكي داخل تيليجرام"""
