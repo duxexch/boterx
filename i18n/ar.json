@@ -1356,5 +1356,17 @@
   "aviator_title": "✈️ Aviator",
   "aviator_cashout_before": "اسحب قبل ما تطير الطائرة!",
   "aviator_crashed": "💥 الطائرة طارت!",
-  "aviator_auto_cashout": "سحب تلقائي عند:"
+  "aviator_auto_cashout": "سحب تلقائي عند:",
+  "game_wallet_withdraw_title": "💸 سحب من محفظة الألعاب",
+  "game_wallet_deposit_title": "💰 إيداع للمحفظة",
+  "game_wallet_balance_label": "رصيدك الحالي",
+  "game_wallet_enter_amount": "اكتب المبلغ الذي تريد سحبه",
+  "game_wallet_select_method": "اختر وسيلة الاستلام",
+  "game_wallet_pending_withdrawal": "⏳ سيتم التحويل بعد موافقة الإدارة",
+  "game_wallet_insufficient": "❌ رصيد غير كافٍ",
+  "game_wallet_approved": "✅ تمت الموافقة على طلبك",
+  "game_wallet_rejected": "❌ تم رفض طلبك — تم إعادة الرصيد",
+  "game_wallet_manual_entry": "✍️ أو اكتب وسيلة دفع يدوياً",
+  "game_wallet_save_permanent": "حفظ كوسيلة دفع دائمة",
+  "game_wallet_confirm_withdrawal": "💸 تأكيد السحب"
 }

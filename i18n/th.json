@@ -2159,5 +2159,17 @@
   "aviator_title": "✈️ อเวียเตอร์",
   "aviator_cashout_before": "ถอนก่อนเครื่องบินบินไป!",
   "aviator_crashed": "💥 บินไปแล้ว!",
-  "aviator_auto_cashout": "ถอนอัตโนมัติที่:"
+  "aviator_auto_cashout": "ถอนอัตโนมัติที่:",
+  "game_wallet_withdraw_title": "💸 ถอน",
+  "game_wallet_deposit_title": "💰 ฝาก",
+  "game_wallet_balance_label": "ยอดเงิน",
+  "game_wallet_enter_amount": "ป้อนจำนวน",
+  "game_wallet_select_method": "เลือกวิธี",
+  "game_wallet_pending_withdrawal": "⏳ รออนุมัติ",
+  "game_wallet_insufficient": "❌ ยอดไม่พอ",
+  "game_wallet_approved": "✅ อนุมัติแล้ว",
+  "game_wallet_rejected": "❌ ปฏิเสธ — คืนยอด",
+  "game_wallet_manual_entry": "✍️ หรือป้อนเอง",
+  "game_wallet_save_permanent": "บันทึกเป็นวิธีถาวร",
+  "game_wallet_confirm_withdrawal": "💸 ยืนยันถอน"
 }

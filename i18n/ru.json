@@ -2159,5 +2159,17 @@
   "aviator_title": "✈️ Авиатор",
   "aviator_cashout_before": "Заберите до вылета самолета!",
   "aviator_crashed": "💥 Улетел!",
-  "aviator_auto_cashout": "Авто-вывод при:"
+  "aviator_auto_cashout": "Авто-вывод при:",
+  "game_wallet_withdraw_title": "💸 Вывод",
+  "game_wallet_deposit_title": "💰 Депозит",
+  "game_wallet_balance_label": "Баланс",
+  "game_wallet_enter_amount": "Введите сумму",
+  "game_wallet_select_method": "Выберите метод",
+  "game_wallet_pending_withdrawal": "⏳ Ожидание",
+  "game_wallet_insufficient": "❌ Недостаточно средств",
+  "game_wallet_approved": "✅ Одобрено",
+  "game_wallet_rejected": "❌ Отклонено — баланс возвращён",
+  "game_wallet_manual_entry": "✍️ Или введите вручную",
+  "game_wallet_save_permanent": "Сохранить как постоянный метод",
+  "game_wallet_confirm_withdrawal": "💸 Подтвердить вывод"
 }

@@ -444,6 +444,7 @@ document.addEventListener('DOMContentLoaded', () => {
 async function api(url, options = {}) {
     const res = await fetch(url, {
         ...options,
+        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json', ...options.headers }
     });
     if (!res.ok) throw new Error(`API error: ${res.status}`);

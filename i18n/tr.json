@@ -2159,5 +2159,17 @@
   "aviator_title": "✈️ Aviator",
   "aviator_cashout_before": "Uçak uçmadan çek!",
   "aviator_crashed": "💥 Uçtu gitti!",
-  "aviator_auto_cashout": "Otomatik çek:"
+  "aviator_auto_cashout": "Otomatik çek:",
+  "game_wallet_withdraw_title": "💸 Çek",
+  "game_wallet_deposit_title": "💰 Para Yatır",
+  "game_wallet_balance_label": "Bakiye",
+  "game_wallet_enter_amount": "Tutar girin",
+  "game_wallet_select_method": "Yöntem seç",
+  "game_wallet_pending_withdrawal": "⏳ Onay bekleniyor",
+  "game_wallet_insufficient": "❌ Yetersiz bakiye",
+  "game_wallet_approved": "✅ Onaylandı",
+  "game_wallet_rejected": "❌ Reddedildi — bakiye iade",
+  "game_wallet_manual_entry": "✍️ Veya manuel gir",
+  "game_wallet_save_permanent": "Kalıcı yöntem olarak kaydet",
+  "game_wallet_confirm_withdrawal": "💸 Çekimi onayla"
 }

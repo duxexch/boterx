@@ -2159,5 +2159,17 @@
   "aviator_title": "✈️ アビエイター",
   "aviator_cashout_before": "飛行機が飛び去る前に引き出せ!",
   "aviator_crashed": "💥 飛び去った!",
-  "aviator_auto_cashout": "自動引出:"
+  "aviator_auto_cashout": "自動引出:",
+  "game_wallet_withdraw_title": "💸 引出",
+  "game_wallet_deposit_title": "💰 入金",
+  "game_wallet_balance_label": "残高",
+  "game_wallet_enter_amount": "金額を入力",
+  "game_wallet_select_method": "方法を選択",
+  "game_wallet_pending_withdrawal": "⏳ 承認待ち",
+  "game_wallet_insufficient": "❌ 残高不足",
+  "game_wallet_approved": "✅ 承認",
+  "game_wallet_rejected": "❌ 拒否 — 残高返金",
+  "game_wallet_manual_entry": "✍️ または手動入力",
+  "game_wallet_save_permanent": "永続的な支払い方法として保存",
+  "game_wallet_confirm_withdrawal": "💸 引出確認"
 }

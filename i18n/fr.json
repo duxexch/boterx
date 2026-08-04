@@ -2159,5 +2159,17 @@
   "aviator_title": "✈️ Aviator",
   "aviator_cashout_before": "Encaissez avant que l'avion décolle!",
   "aviator_crashed": "💥 L'avion est parti!",
-  "aviator_auto_cashout": "Encaissement auto à:"
+  "aviator_auto_cashout": "Encaissement auto à:",
+  "game_wallet_withdraw_title": "💸 Retirer",
+  "game_wallet_deposit_title": "💰 Dépôt",
+  "game_wallet_balance_label": "Solde",
+  "game_wallet_enter_amount": "Entrez le montant",
+  "game_wallet_select_method": "Sélectionner méthode",
+  "game_wallet_pending_withdrawal": "⏳ En attente",
+  "game_wallet_insufficient": "❌ Solde insuffisant",
+  "game_wallet_approved": "✅ Approuvé",
+  "game_wallet_rejected": "❌ Rejeté — solde remboursé",
+  "game_wallet_manual_entry": "✍️ Ou saisir manuellement",
+  "game_wallet_save_permanent": "Enregistrer comme méthode permanente",
+  "game_wallet_confirm_withdrawal": "💸 Confirmer le retrait"
 }

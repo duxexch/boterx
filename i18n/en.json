@@ -1356,5 +1356,17 @@
   "aviator_title": "✈️ Aviator",
   "aviator_cashout_before": "Cash out before the plane flies away!",
   "aviator_crashed": "💥 Plane flew away!",
-  "aviator_auto_cashout": "Auto cashout at:"
+  "aviator_auto_cashout": "Auto cashout at:",
+  "game_wallet_withdraw_title": "💸 Withdraw from Game Wallet",
+  "game_wallet_deposit_title": "💰 Deposit to Game Wallet",
+  "game_wallet_balance_label": "Your Balance",
+  "game_wallet_enter_amount": "Enter amount to withdraw",
+  "game_wallet_select_method": "Select withdrawal method",
+  "game_wallet_pending_withdrawal": "⏳ Pending admin approval",
+  "game_wallet_insufficient": "❌ Insufficient balance",
+  "game_wallet_approved": "✅ Request approved",
+  "game_wallet_rejected": "❌ Request rejected — balance refunded",
+  "game_wallet_manual_entry": "✍️ Or enter payment method manually",
+  "game_wallet_save_permanent": "Save as permanent payment method",
+  "game_wallet_confirm_withdrawal": "💸 Confirm Withdrawal"
 }

@@ -2159,5 +2159,17 @@
   "aviator_title": "✈️ एविएटर",
   "aviator_cashout_before": "विमान उड़ने से पहले निकालें!",
   "aviator_crashed": "💥 विमान उड़ गया!",
-  "aviator_auto_cashout": "स्वतः निकासी पर:"
+  "aviator_auto_cashout": "स्वतः निकासी पर:",
+  "game_wallet_withdraw_title": "💸 निकासी",
+  "game_wallet_deposit_title": "💰 जमा",
+  "game_wallet_balance_label": "बैलेंस",
+  "game_wallet_enter_amount": "राशि दर्ज करें",
+  "game_wallet_select_method": "विधि चुनें",
+  "game_wallet_pending_withdrawal": "⏳ अनुमोदन की प्रतीक्षा",
+  "game_wallet_insufficient": "❌ अपर्याप्त बैलेंस",
+  "game_wallet_approved": "✅ स्वीकृत",
+  "game_wallet_rejected": "❌ अस्वीकृत — राशि वापस",
+  "game_wallet_manual_entry": "✍️ या मैन्युअल दर्ज करें",
+  "game_wallet_save_permanent": "स्थायी विधि के रूप में सहेजें",
+  "game_wallet_confirm_withdrawal": "💸 निकासी की पुष्टि"
 }

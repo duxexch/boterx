@@ -2159,5 +2159,17 @@
   "aviator_title": "✈️ 에비에이터",
   "aviator_cashout_before": "비행기가 날아가기 전에 인출하세요!",
   "aviator_crashed": "💥 날아갔다!",
-  "aviator_auto_cashout": "자동 인출:"
+  "aviator_auto_cashout": "자동 인출:",
+  "game_wallet_withdraw_title": "💸 인출",
+  "game_wallet_deposit_title": "💰 입금",
+  "game_wallet_balance_label": "잔액",
+  "game_wallet_enter_amount": "금액 입력",
+  "game_wallet_select_method": "방법 선택",
+  "game_wallet_pending_withdrawal": "⏳ 승인 대기",
+  "game_wallet_insufficient": "❌ 잔액 부족",
+  "game_wallet_approved": "✅ 승인됨",
+  "game_wallet_rejected": "❌ 거부 — 잔액 환불",
+  "game_wallet_manual_entry": "✍️ 또는 수동 입력",
+  "game_wallet_save_permanent": "영구 결제 방법으로 저장",
+  "game_wallet_confirm_withdrawal": "💸 인출 확인"
 }

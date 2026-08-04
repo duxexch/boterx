@@ -2159,5 +2159,17 @@
   "aviator_title": "✈️ ایوی ایٹر",
   "aviator_cashout_before": "طیارہ اڑنے سے پہلے نکلو!",
   "aviator_crashed": "💥 طیارہ اڑ گیا!",
-  "aviator_auto_cashout": "خودکار نکلو:"
+  "aviator_auto_cashout": "خودکار نکلو:",
+  "game_wallet_withdraw_title": "💸 نکلو",
+  "game_wallet_deposit_title": "💰 جمع",
+  "game_wallet_balance_label": "بیلنس",
+  "game_wallet_enter_amount": "رقم درج کریں",
+  "game_wallet_select_method": "طریقہ منتخب کریں",
+  "game_wallet_pending_withdrawal": "⏳ منظوری کا انتظار",
+  "game_wallet_insufficient": "❌ بیلنس ناکافی",
+  "game_wallet_approved": "✅ منظور",
+  "game_wallet_rejected": "❌ مسترد — بیلنس واپس",
+  "game_wallet_manual_entry": "✍️ یا دستی درج کریں",
+  "game_wallet_save_permanent": "مستقل طریقہ کے طور پر محفوظ کریں",
+  "game_wallet_confirm_withdrawal": "💸 نکلو کی تصدیق"
 }

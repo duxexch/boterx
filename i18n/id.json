@@ -2159,5 +2159,17 @@
   "aviator_title": "✈️ Aviator",
   "aviator_cashout_before": "Tarik sebelum pesawat terbang!",
   "aviator_crashed": "💥 Pesawat terbang!",
-  "aviator_auto_cashout": "Tarik otomatis di:"
+  "aviator_auto_cashout": "Tarik otomatis di:",
+  "game_wallet_withdraw_title": "💸 Tarik",
+  "game_wallet_deposit_title": "💰 Deposit",
+  "game_wallet_balance_label": "Saldo",
+  "game_wallet_enter_amount": "Masukkan jumlah",
+  "game_wallet_select_method": "Pilih metode",
+  "game_wallet_pending_withdrawal": "⏳ Menunggu persetujuan",
+  "game_wallet_insufficient": "❌ Saldo tidak cukup",
+  "game_wallet_approved": "✅ Disetujui",
+  "game_wallet_rejected": "❌ Ditolak — saldo dikembalikan",
+  "game_wallet_manual_entry": "✍️ Atau masukkan manual",
+  "game_wallet_save_permanent": "Simpan sebagai metode permanen",
+  "game_wallet_confirm_withdrawal": "💸 Konfirmasi penarikan"
 }

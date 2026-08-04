@@ -2159,5 +2159,17 @@
   "aviator_title": "✈️ 飞行员",
   "aviator_cashout_before": "在飞机飞走之前提现!",
   "aviator_crashed": "💥 飞走了!",
-  "aviator_auto_cashout": "自动提现:"
+  "aviator_auto_cashout": "自动提现:",
+  "game_wallet_withdraw_title": "💸 提现",
+  "game_wallet_deposit_title": "💰 存款",
+  "game_wallet_balance_label": "余额",
+  "game_wallet_enter_amount": "输入金额",
+  "game_wallet_select_method": "选择方式",
+  "game_wallet_pending_withdrawal": "⏳ 等待批准",
+  "game_wallet_insufficient": "❌ 余额不足",
+  "game_wallet_approved": "✅ 已批准",
+  "game_wallet_rejected": "❌ 拒绝 — 余额退还",
+  "game_wallet_manual_entry": "✍️ 或手动输入",
+  "game_wallet_save_permanent": "保存为永久支付方式",
+  "game_wallet_confirm_withdrawal": "💸 确认提现"
 }

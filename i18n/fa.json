@@ -2159,5 +2159,17 @@
   "aviator_title": "✈️ آویاتور",
   "aviator_cashout_before": "قبل از پرواز هواپیما برداشت کنید!",
   "aviator_crashed": "💥 هواپیما پرواز کرد!",
-  "aviator_auto_cashout": "برداشت خودکار در:"
+  "aviator_auto_cashout": "برداشت خودکار در:",
+  "game_wallet_withdraw_title": "💸 برداشت",
+  "game_wallet_deposit_title": "💰 واریز",
+  "game_wallet_balance_label": "موجودی",
+  "game_wallet_enter_amount": "مبلغ را وارد کنید",
+  "game_wallet_select_method": "روش را انتخاب کنید",
+  "game_wallet_pending_withdrawal": "⏳ در انتظار تأیید",
+  "game_wallet_insufficient": "❌ موجودی کافی نیست",
+  "game_wallet_approved": "✅ تأیید شد",
+  "game_wallet_rejected": "❌ رد شد — موجودی برگشت",
+  "game_wallet_manual_entry": "✍️ یا دستی وارد کنید",
+  "game_wallet_save_permanent": "ذخیره به عنوان روش دائمی",
+  "game_wallet_confirm_withdrawal": "💸 تأیید برداشت"
 }

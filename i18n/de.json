@@ -2159,5 +2159,17 @@
   "aviator_title": "✈️ Aviator",
   "aviator_cashout_before": "Auszahlen bevor das Flugzeug wegfliegt!",
   "aviator_crashed": "💥 Weggeflogen!",
-  "aviator_auto_cashout": "Auto-Auszahlung bei:"
+  "aviator_auto_cashout": "Auto-Auszahlung bei:",
+  "game_wallet_withdraw_title": "💸 Auszahlung",
+  "game_wallet_deposit_title": "💰 Einzahlung",
+  "game_wallet_balance_label": "Guthaben",
+  "game_wallet_enter_amount": "Betrag eingeben",
+  "game_wallet_select_method": "Auszahlungsmethode",
+  "game_wallet_pending_withdrawal": "⏳ Wartet auf Genehmigung",
+  "game_wallet_insufficient": "❌ Nicht genug Guthaben",
+  "game_wallet_approved": "✅ Genehmigt",
+  "game_wallet_rejected": "❌ Abgelehnt — Guthaben zurückerstattet",
+  "game_wallet_manual_entry": "✍️ Oder manuell eingeben",
+  "game_wallet_save_permanent": "Als dauerhafte Zahlungsmethode speichern",
+  "game_wallet_confirm_withdrawal": "💸 Auszahlung bestätigen"
 }
