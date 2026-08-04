@@ -4862,6 +4862,7 @@ class ComprehensiveDUXBot:
                         logger.error(f"خطأ في معالجة كود الإحالة: {e}")
 
             # إشعار الأدمن بعضو جديد
+            lang = detected_lang
             phone_status = self.tr('a0137_هاتف_حقيقي', lang) if phone_verified == 'yes' else self.tr('a0138_رقم_مكتوب', lang)
             admin_msg = f"""🆕 عضو جديد انضم للنظام
 
