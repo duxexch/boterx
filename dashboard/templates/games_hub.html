@@ -39,12 +39,20 @@ body{overflow:hidden;font-family:system-ui,sans-serif;background:#0f172a;color:#
 <div id="app" style="display:none">
   <div id="topbar">
     <div>
-      <div class="balance">💰 <span id="bal">0</span> <span>SAR</span></div>
+      <div class="balance">💰 <span id="bal">0</span> <span id="cur">SAR</span></div>
       <div class="stats" id="stats"></div>
     </div>
-    <button class="vex-btn" id="vexBtn">💎 تعويض</button>
+    <div style="display:flex;gap:6px">
+      <button class="vex-btn" id="vexBtn" style="background:linear-gradient(135deg,#a78bfa,#8b5cf6)">💎</button>
+      <button class="vex-btn" id="depBtn" style="background:linear-gradient(135deg,#34d399,#10b981)" onclick="showDeposit()">💰</button>
+      <button class="vex-btn" id="wdrBtn" style="background:linear-gradient(135deg,#fbbf24,#f59e0b)" onclick="showWithdraw()">💸</button>
+    </div>
   </div>
   <div id="grid"></div>
+</div>
+<!-- Modal -->
+<div id="modal" style="position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.7);z-index:200">
+  <div id="modalBox" style="background:#1e293b;border:1px solid #334155;border-radius:16px;padding:20px;width:90%;max-width:340px;max-height:80vh;overflow-y:auto"></div>
 </div>
 <div id="empty" style="display:none">
   <div style="font-size:48px;margin-bottom:12px">🎮</div>
@@ -123,6 +131,127 @@ function playGame(gameId) {
 document.getElementById('vexBtn').onclick = () => {
   alert('💎 تعويض — سيتم تحويلك لصفحة التعويض');
 };
+
+// ===== Deposit Modal =====
+async function showDeposit() {
+  const box = document.getElementById('modalBox');
+  let methodsHtml = '';
+  try {
+    const r = await fetch(`${BASE}/api/player/methods?uid=${uid}`);
+    const d = await r.json();
+    if (d.methods && d.methods.length > 0) {
+      methodsHtml = '<div style="font-size:11px;color:#64748b;margin-bottom:6px">📋 وسائلك المحفوظة:</div>';
+      methodsHtml += d.methods.map(m =>
+        `<div class="dep-method" onclick="selectDep(this,'${m.account_number}','${m.id}')">${m.icon||'💳'} ${m.method_name} — ${m.account_number}</div>`
+      ).join('');
+    }
+  } catch(e) {}
+  methodsHtml += `
+    <div style="font-size:11px;color:#64748b;margin:10px 0 6px">✍️ أو اكتب يدوياً:</div>
+    <input id="depManualName" placeholder="اسم الوسيلة" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:8px;color:#fff;font-size:12px;margin-bottom:4px;outline:none">
+    <input id="depManualAcct" placeholder="رقم الحساب" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:8px;color:#fff;font-size:12px;margin-bottom:4px;outline:none">
+    <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:#64748b;margin-bottom:8px;cursor:pointer">
+      <input type="checkbox" id="depSave" style="accent-color:#34d399"> حفظ كوسيلة دائمة
+    </label>
+  `;
+  box.innerHTML = `
+    <div style="font-size:16px;font-weight:700;margin-bottom:8px">💰 إيداع سريع</div>
+    ${methodsHtml}
+    <input id="depAmount" type="number" placeholder="المبلغ" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px;color:#fff;font-size:16px;text-align:center;margin:8px 0;outline:none">
+    <button onclick="submitDep()" style="width:100%;background:linear-gradient(135deg,#34d399,#10b981);color:#000;border:none;padding:12px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer">✅ تأكيد</button>
+    <button onclick="closeModal()" style="width:100%;background:#334155;color:#94a3b8;border:none;padding:8px;border-radius:10px;font-size:12px;cursor:pointer;margin-top:4px">إلغاء</button>
+  `;
+  document.getElementById('modal').style.display = 'flex';
+}
+
+let depAccount = '', depMethodId = '';
+function selectDep(el, acct, mid) {
+  document.querySelectorAll('.dep-method').forEach(m => m.style.borderColor = '#334155');
+  el.style.borderColor = '#34d399';
+  depAccount = acct; depMethodId = mid;
+}
+
+async function submitDep() {
+  const amount = parseFloat(document.getElementById('depAmount').value) || 0;
+  if (amount <= 0) { alert('أدخل المبلغ'); return; }
+  let acct = depAccount, mid = depMethodId;
+  const mName = document.getElementById('depManualName')?.value?.trim() || '';
+  const mAcct = document.getElementById('depManualAcct')?.value?.trim() || '';
+  if (mName && mAcct) {
+    acct = mAcct; mid = '';
+    if (document.getElementById('depSave')?.checked) {
+      try { await fetch(`${BASE}/api/player/methods/add`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({uid,method_name:mName,account_number:mAcct,method_type:'manual'})}); } catch(e){}
+    }
+  }
+  if (!acct) { alert('اختر وسيلة أو اكتب يدوياً'); return; }
+  try {
+    const r = await fetch(`${BASE}/api/deposit/quick`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({uid,amount,method_id:mid,account_number:acct})});
+    const d = await r.json();
+    if (d.success) {
+      document.getElementById('modalBox').innerHTML = `<div style="text-align:center;padding:20px"><div style="font-size:32px;margin-bottom:8px">⏳</div><div style="font-size:14px;font-weight:700">تم إرسال الطلب</div><div style="font-size:11px;color:#64748b;margin-top:4px">بانتظار تأكيد الإدارة</div><button onclick="closeModal()" style="margin-top:12px;background:#334155;color:#fff;border:none;padding:8px 20px;border-radius:8px;cursor:pointer">إغلاق</button></div>`;
+    }
+  } catch(e) { alert('خطأ'); }
+}
+
+// ===== Withdraw Modal =====
+async function showWithdraw() {
+  const bal = parseFloat(document.getElementById('bal').textContent.replace(/,/g,'')) || 0;
+  const box = document.getElementById('modalBox');
+  let methodsHtml = '';
+  try {
+    const r = await fetch(`${BASE}/api/player/methods?uid=${uid}`);
+    const d = await r.json();
+    if (d.methods && d.methods.length > 0) {
+      methodsHtml = '<div style="font-size:11px;color:#64748b;margin-bottom:6px">اختر وسيلة الاستلام:</div>';
+      methodsHtml += d.methods.map(m =>
+        `<div class="wdr-method" onclick="selectWdr(this,'${m.account_number}','${m.id}')" style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:8px;margin-bottom:4px;cursor:pointer">${m.icon||'💳'} ${m.method_name} — ${m.account_number}</div>`
+      ).join('');
+    }
+  } catch(e) {}
+  methodsHtml += `
+    <div style="font-size:11px;color:#64748b;margin:10px 0 6px">✍️ أو اكتب يدوياً:</div>
+    <input id="wdrManualName" placeholder="اسم الوسيلة" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:8px;color:#fff;font-size:12px;margin-bottom:4px;outline:none">
+    <input id="wdrManualAcct" placeholder="رقم الحساب" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:8px;color:#fff;font-size:12px;margin-bottom:4px;outline:none">
+  `;
+  box.innerHTML = `
+    <div style="font-size:16px;font-weight:700;margin-bottom:4px">💸 سحب</div>
+    <div style="font-size:12px;color:#fbbf24;margin-bottom:8px">💰 رصيدك: ${bal.toLocaleString()}</div>
+    ${methodsHtml}
+    <input id="wdrAmount" type="number" placeholder="المبلغ" max="${bal}" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px;color:#fff;font-size:16px;text-align:center;margin:8px 0;outline:none">
+    <button onclick="submitWdr()" style="width:100%;background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#000;border:none;padding:12px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer">✅ تأكيد السحب</button>
+    <button onclick="closeModal()" style="width:100%;background:#334155;color:#94a3b8;border:none;padding:8px;border-radius:10px;font-size:12px;cursor:pointer;margin-top:4px">إلغاء</button>
+  `;
+  document.getElementById('modal').style.display = 'flex';
+}
+
+let wdrAccount = '', wdrMethodId = '';
+function selectWdr(el, acct, mid) {
+  document.querySelectorAll('.wdr-method').forEach(m => m.style.borderColor = '#334155');
+  el.style.borderColor = '#fbbf24';
+  wdrAccount = acct; wdrMethodId = mid;
+}
+
+async function submitWdr() {
+  const amount = parseFloat(document.getElementById('wdrAmount').value) || 0;
+  if (amount <= 0) { alert('أدخل المبلغ'); return; }
+  let acct = wdrAccount, mid = wdrMethodId;
+  const mName = document.getElementById('wdrManualName')?.value?.trim() || '';
+  const mAcct = document.getElementById('wdrManualAcct')?.value?.trim() || '';
+  if (mName && mAcct) { acct = mAcct; mid = ''; }
+  if (!acct) { alert('اختر وسيلة أو اكتب يدوياً'); return; }
+  try {
+    const r = await fetch(`${BASE}/api/wallet/withdraw`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({uid,amount,method_id:mid,account_number:acct})});
+    const d = await r.json();
+    if (d.success) {
+      document.getElementById('modalBox').innerHTML = `<div style="text-align:center;padding:20px"><div style="font-size:32px;margin-bottom:8px">⏳</div><div style="font-size:14px;font-weight:700">تم إرسال طلب السحب</div><div style="font-size:11px;color:#64748b;margin-top:4px">سيتم التحويل بعد موافقة الإدارة</div><button onclick="closeModal()" style="margin-top:12px;background:#334155;color:#fff;border:none;padding:8px 20px;border-radius:8px;cursor:pointer">إغلاق</button></div>`;
+      loadBalance();
+    } else {
+      alert(d.error || 'خطأ');
+    }
+  } catch(e) { alert('خطأ'); }
+}
+
+function closeModal() { document.getElementById('modal').style.display = 'none'; }
 
 // Init
 loadBalance();
