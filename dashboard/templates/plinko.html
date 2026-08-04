@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Plinko</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
+body{overflow:hidden;font-family:system-ui,sans-serif;background:#0f172a;color:#fff}
+#app{position:fixed;inset:0;display:flex;flex-direction:column}
+#topbar{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:rgba(0,0,0,0.3);backdrop-filter:blur(10px)}
+.balance{font-size:18px;font-weight:900;color:#fbbf24}
+.back-btn{background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer}
+#game-area{flex:1;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center}
+#canvas{width:100%;height:100%}
+.result-display{position:absolute;top:40%;left:50%;transform:translate(-50%,-50%);font-size:48px;font-weight:900;z-index:10;text-shadow:0 0 30px rgba(251,191,36,0.5);opacity:0;transition:all 0.3s}
+.result-display.show{opacity:1}
+.result-display.win{color:#34d399}
+.result-display.lose{color:#ef4444}
+#betbar{padding:12px 14px;background:rgba(0,0,0,0.3);backdrop-filter:blur(10px)}
+.bet-row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.bet-input{width:80px;background:#1e293b;border:1px solid #334155;border-radius:10px;padding:10px;color:#fff;font-size:16px;font-weight:700;text-align:center;outline:none}
+.bet-input:focus{border-color:#fbbf24}
+.bet-btn{flex:1;border:none;padding:12px;border-radius:12px;font-size:16px;font-weight:900;cursor:pointer;transition:all 0.2s}
+.bet-btn{background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#000}
+.bet-btn:active{transform:scale(0.97)}
+.bet-btn:disabled{opacity:0.3;cursor:not-allowed}
+.quick-bets{display:flex;gap:6px;justify-content:center;margin-top:6px}
+.quick-bet{background:#1e293b;border:1px solid #334155;border-radius:8px;padding:5px 10px;color:#94a3b8;font-size:12px;cursor:pointer}
+#history{display:flex;gap:4px;padding:6px 10px;overflow-x:auto;background:rgba(0,0,0,0.2)}
+.history-item{flex-shrink:0;font-size:11px;padding:3px 8px;border-radius:6px;font-weight:700}
+.history-win{background:rgba(52,211,153,0.2);color:#34d399}
+.history-lose{background:rgba(239,68,68,0.2);color:#ef4444}
+#loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0f172a;z-index:200}
+.spinner{width:40px;height:40px;border:3px solid #334155;border-top:3px solid #fbbf24;border-radius:50%;animation:spin 0.8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#livePlayers{max-height:100px;overflow-y:auto;background:rgba(0,0,0,0.25);border-top:1px solid #1e293b}
+#livePlayers::-webkit-scrollbar{width:3px}
+#livePlayers::-webkit-scrollbar-thumb{background:#334155;border-radius:3px}
+.lp-header{display:flex;justify-content:space-between;align-items:center;padding:4px 10px;font-size:10px;color:#64748b;border-bottom:1px solid #1e293b}
+.lp-count{color:#fbbf24;font-weight:700}
+.lp-list{padding:2px 8px}
+.lp-row{display:flex;align-items:center;justify-content:space-between;padding:3px 6px;border-radius:6px;margin:2px 0;font-size:11px}
+.lp-row.playing{background:rgba(148,163,184,0.1);color:#94a3b8}
+.lp-row.win{background:rgba(52,211,153,0.15);color:#34d399}
+.lp-row.lose{background:rgba(239,68,68,0.1);color:#ef4444;opacity:0.7}
+.lp-user{display:flex;align-items:center;gap:4px}
+.lp-avatar{width:18px;height:18px;border-radius:50%;background:#334155;display:flex;align-items:center;justify-content:center;font-size:9px}
+</style>
+</head>
+<body>
+<div id="loading"><div class="spinner"></div></div>
+<div id="app" style="display:none">
+  <div id="topbar">
+    <button class="back-btn" onclick="goBack()">‹</button>
+    <div class="balance">💰 <span id="bal">0</span></div>
+    <div style="width:20px"></div>
+  </div>
+  <div id="history"></div>
+  <div id="game-area">
+    <canvas id="canvas"></canvas>
+    <div class="result-display" id="resultDisplay"></div>
+  </div>
+  <div id="betbar">
+    <div class="bet-row">
+      <input type="number" class="bet-input" id="betInput" value="10" min="1">
+      <button class="bet-btn" id="dropBtn" onclick="dropBall()">🔮 أفقط الكرة</button>
+    </div>
+    <div class="quick-bets">
+      <div class="quick-bet" onclick="setBet(10)">10</div>
+      <div class="quick-bet" onclick="setBet(50)">50</div>
+      <div class="quick-bet" onclick="setBet(100)">100</div>
+      <div class="quick-bet" onclick="setBet(500)">500</div>
+    </div>
+  </div>
+</div>
+<div id="livePlayers">
+  <div class="lp-header">
+    <span>👥 <span class="lp-count" id="lpCount">0</span> لاعب</span>
+    <span id="lpTotal">💰 0</span>
+  </div>
+  <div class="lp-list" id="lpList"></div>
+</div>
+<script>
+const tg = window.Telegram?.WebApp;
+if (tg) { tg.expand(); tg.ready(); }
+const uid = new URLSearchParams(location.search).get('uid') || '';
+const BASE = location.origin;
+const initData = tg?.initData || '';
+async function apiFetch(url, opts = {}) {
+  opts.headers = opts.headers || {};
+  opts.headers['X-Telegram-Init-Data'] = initData;
+  if (opts.body && typeof opts.body === 'string') { opts.headers['Content-Type'] = 'application/json'; }
+  return fetch(url, opts);
+}
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+let isDropping = false;
+let history = [];
+let ball = null;
+let animFrame = null;
+
+// Plinko config
+const ROWS = 12;
+const SLOTS = ROWS + 1;
+const MULTIPLIERS = [10, 3, 1.5, 1, 0.5, 0.3, 0.2, 0.3, 0.5, 1, 1.5, 3, 10];
+
+function beep(f, d, t='sine', v=0.15) {
+  const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+  o.connect(g);g.connect(audioCtx.destination);
+  o.frequency.value=f;o.type=t;
+  g.gain.setValueAtTime(v,audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+d);
+  o.start();o.stop(audioCtx.currentTime+d);
+}
+function soundBounce(){beep(300+Math.random()*200,0.03,'sine',0.04)}
+function soundWin(m){const f=m>=3?880:660;beep(f,0.1);setTimeout(()=>beep(f*1.5,0.15),80);setTimeout(()=>beep(f*2,0.2),160)}
+function soundLose(){beep(200,0.2,'sawtooth',0.1)}
+function haptic(t='light'){if(tg?.HapticFeedback?.impactOccurred)tg.HapticFeedback.impactOccurred(t)}
+
+function resizeCanvas() { canvas.width = canvas.clientWidth; canvas.height = canvas.clientHeight; }
+window.addEventListener('resize', () => { resizeCanvas(); drawBoard(); });
+
+function drawBoard() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const w = canvas.width;
+  const h = canvas.height;
+  const topPad = 40;
+  const botPad = 50;
+  const playH = h - topPad - botPad;
+  const pegSpacing = playH / ROWS;
+
+  // Draw pegs
+  for (let row = 0; row < ROWS; row++) {
+    const pegsInRow = row + 2;
+    const rowY = topPad + row * pegSpacing;
+    const spacing = w / (pegsInRow + 1);
+    for (let i = 0; i < pegsInRow; i++) {
+      const px = spacing * (i + 1);
+      ctx.beginPath();
+      ctx.arc(px, rowY, 3, 0, Math.PI * 2);
+      ctx.fillStyle = '#475569';
+      ctx.fill();
+    }
+  }
+
+  // Draw slot multipliers at bottom
+  const slotW = w / SLOTS;
+  for (let i = 0; i < SLOTS; i++) {
+    const x = i * slotW;
+    const mult = MULTIPLIERS[i];
+    const color = mult >= 3 ? '#34d399' : mult >= 1 ? '#fbbf24' : '#64748b';
+    ctx.fillStyle = color;
+    ctx.fillRect(x + 2, h - botPad + 4, slotW - 4, botPad - 8);
+    ctx.fillStyle = '#000';
+    ctx.font = 'bold 11px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(mult + 'x', x + slotW / 2, h - botPad / 2 + 4);
+  }
+}
+
+function dropBall() {
+  if (isDropping) return;
+  const betAmount = parseFloat(document.getElementById('betInput').value) || 0;
+  if (betAmount < 1) return;
+
+  apiFetch(`${BASE}/api/engine/plinko/start`, {
+    method: 'POST', body: JSON.stringify({uid, bet_amount: betAmount})
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (!d.success) {
+      if (d.need_deposit) alert('رصيدك غير كافٍ! أودع أولاً');
+      else alert(d.error || 'خطأ');
+      return;
+    }
+    isDropping = true;
+    document.getElementById('dropBtn').disabled = true;
+    document.getElementById('bal').textContent = (d.balance_after || 0).toLocaleString();
+
+    // Animate ball falling
+    const targetSlot = d.target_slot;
+    const path = calculatePath(targetSlot);
+    animateBall(path, d.multiplier, d.payout, d.result, d.session_id, betAmount);
+  })
+  .catch(e => { isDropping = false; document.getElementById('dropBtn').disabled = false; });
+}
+
+function calculatePath(targetSlot) {
+  // Generate path: each row, ball goes left or right
+  // targetSlot = number of right bounces (0 = leftmost, ROWS = rightmost)
+  const path = [];
+  let currentSlot = 0;
+  for (let row = 0; row < ROWS; row++) {
+    const pegsInRow = row + 2;
+    const spacing = canvas.width / (pegsInRow + 1);
+    const rowY = 40 + row * ((canvas.height - 90) / ROWS);
+    // Decide direction
+    if (currentSlot < targetSlot && Math.random() < 0.5 + (targetSlot - currentSlot) / (ROWS - row) * 0.5) {
+      currentSlot++;
+    }
+    const pegIdx = row + 1 - currentSlot; // left peg index
+    const px = spacing * (pegIdx + 1);
+    path.push({x: px, y: rowY});
+  }
+  // Final position
+  const slotW = canvas.width / SLOTS;
+  const finalX = targetSlot * slotW + slotW / 2;
+  path.push({x: finalX, y: canvas.height - 50});
+  return path;
+}
+
+function animateBall(path, multiplier, payout, result, sessionId, betAmount) {
+  let pathIdx = 0;
+  ball = {x: canvas.width / 2, y: 20};
+
+  function step() {
+    if (pathIdx >= path.length) {
+      finishBall(multiplier, payout, result, sessionId, betAmount);
+      return;
+    }
+    const target = path[pathIdx];
+    const dx = target.x - ball.x;
+    const dy = target.y - ball.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < 3) {
+      pathIdx++;
+      if (pathIdx < path.length) soundBounce();
+      haptic('light');
+    } else {
+      ball.x += dx * 0.15;
+      ball.y += dy * 0.15;
+    }
+    drawBoard();
+    // Draw ball
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, 7, 0, Math.PI * 2);
+    const grad = ctx.createRadialGradient(ball.x - 2, ball.y - 2, 1, ball.x, ball.y, 7);
+    grad.addColorStop(0, '#fde68a');
+    grad.addColorStop(1, '#f59e0b');
+    ctx.fillStyle = grad;
+    ctx.fill();
+    animFrame = requestAnimationFrame(step);
+  }
+  step();
+}
+
+function finishBall(multiplier, payout, result, sessionId, betAmount) {
+  isDropping = false;
+  document.getElementById('dropBtn').disabled = false;
+  const rd = document.getElementById('resultDisplay');
+  if (result === 'win') {
+    rd.textContent = `🎉 ${(payout).toFixed(0)} (${multiplier}x)`;
+    rd.className = 'result-display show win';
+    soundWin(multiplier);
+    haptic('medium');
+  } else {
+    rd.textContent = `💔 ${multiplier}x`;
+    rd.className = 'result-display show lose';
+    soundLose();
+    haptic('heavy');
+  }
+  // Update balance
+  loadBalance();
+  // Add to history
+  history.unshift({value: multiplier, win: result === 'win'});
+  if (history.length > 15) history.pop();
+  updateHistory();
+  // End session
+  apiFetch(`${BASE}/api/engine/plinko/end`, {
+    method: 'POST', body: JSON.stringify({session_id: sessionId, uid, multiplier, payout, result, bet_amount: betAmount})
+  }).catch(e => {});
+  setTimeout(() => { rd.classList.remove('show'); }, 2500);
+}
+
+function updateHistory() {
+  const container = document.getElementById('history');
+  container.innerHTML = '';
+  history.forEach(h => {
+    const el = document.createElement('div');
+    el.className = 'history-item ' + (h.win ? 'history-win' : 'history-lose');
+    el.textContent = h.value + 'x';
+    container.appendChild(el);
+  });
+}
+
+function setBet(val) { document.getElementById('betInput').value = val; }
+function goBack() { window.location.href = `${BASE}/webapp/games?uid=${uid}&lang=ar`; }
+
+async function loadBalance() {
+  try {
+    const r = await apiFetch(`${BASE}/api/wallet/balance?uid=${uid}`);
+    const d = await r.json();
+    document.getElementById('bal').textContent = (d.balance || 0).toLocaleString();
+  } catch(e) {}
+}
+
+// Live Players
+const livePlayers = [];
+function addLivePlayer(data) {
+  const existing = livePlayers.findIndex(p => p.uid === data.uid);
+  if (existing >= 0) livePlayers[existing] = data;
+  else { livePlayers.unshift(data); if (livePlayers.length > 30) livePlayers.pop(); }
+  renderLivePlayers();
+}
+function renderLivePlayers() {
+  const list = document.getElementById('lpList');
+  document.getElementById('lpCount').textContent = livePlayers.length;
+  const totalBet = livePlayers.reduce((s, p) => s + (p.bet || 0), 0);
+  document.getElementById('lpTotal').textContent = '💰 ' + totalBet.toLocaleString();
+  list.innerHTML = '';
+  livePlayers.forEach(p => {
+    const row = document.createElement('div');
+    row.className = 'lp-row ' + (p.status || 'playing');
+    const avatar = p.name ? p.name[0].toUpperCase() : '?';
+    row.innerHTML = `<div class="lp-user"><div class="lp-avatar">${avatar}</div><span>${p.name || '???'}${p.isMe ? ' (أنت)' : ''}</span></div><span style="font-weight:700">${p.bet}</span>`;
+    list.appendChild(row);
+  });
+}
+function simulatePlayers() {
+  const names = ['أحمد','عمر','محمد','خالد','سعد','فهد','ناصر','يوسف','علي','حسن'];
+  if (Math.random() < 0.6 && livePlayers.length < 15) {
+    addLivePlayer({ uid: 'bot_'+Math.random().toString(36).substr(2,5), name: names[Math.floor(Math.random()*names.length)], bet: [10,20,50,100,200][Math.floor(Math.random()*5)], status: 'playing', isMe: false });
+  }
+  livePlayers.forEach(p => { if (p.status === 'playing' && Math.random() < 0.12) { p.status = Math.random() < 0.4 ? 'win' : 'lose'; } });
+  renderLivePlayers();
+}
+
+resizeCanvas(); drawBoard(); loadBalance();
+document.getElementById('loading').style.display = 'none';
+document.getElementById('app').style.display = 'flex';
+setInterval(loadBalance, 5000);
+setInterval(simulatePlayers, 2500);
+simulatePlayers(); renderLivePlayers();
+</script>
+</body>
+</html>

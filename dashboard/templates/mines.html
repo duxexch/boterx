@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Mines</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
+body{font-family:system-ui,sans-serif;background:#0f172a;color:#fff}
+#app{position:fixed;inset:0;display:flex;flex-direction:column}
+#topbar{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:rgba(0,0,0,0.3);backdrop-filter:blur(10px)}
+.balance{font-size:18px;font-weight:900;color:#fbbf24}
+.back-btn{background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer}
+#game-area{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px;overflow-y:auto}
+#grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;max-width:360px;width:100%}
+.tile{aspect-ratio:1;background:#1e293b;border:2px solid #334155;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:28px;cursor:pointer;transition:all 0.2s}
+.tile:active{transform:scale(0.92)}
+.tile.revealed{cursor:default}
+.tile.gem{background:rgba(52,211,153,0.15);border-color:#34d399}
+.tile.mine{background:rgba(239,68,68,0.15);border-color:#ef4444;animation:shake 0.3s}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+.tile.pulsing{animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(251,191,36,0.3)}50%{box-shadow:0 0 0 6px rgba(251,191,36,0)}}
+#status{font-size:14px;color:#94a3b8;margin:10px 0;text-align:center}
+#multiplier-display{font-size:24px;font-weight:900;color:#fbbf24;margin:6px 0}
+#betbar{padding:12px 14px;background:rgba(0,0,0,0.3);backdrop-filter:blur(10px)}
+.bet-row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.bet-input{width:80px;background:#1e293b;border:1px solid #334155;border-radius:10px;padding:10px;color:#fff;font-size:16px;font-weight:700;text-align:center;outline:none}
+.bet-input:focus{border-color:#fbbf24}
+.bet-btn{flex:1;border:none;padding:12px;border-radius:12px;font-size:16px;font-weight:900;cursor:pointer;transition:all 0.2s}
+.bet-btn.bet{background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#000}
+.bet-btn.bet:active{transform:scale(0.97)}
+.bet-btn.cashout{background:linear-gradient(135deg,#34d399,#10b981);color:#000}
+.bet-btn:disabled{opacity:0.3;cursor:not-allowed}
+.quick-bets{display:flex;gap:6px;justify-content:center;margin-top:6px}
+.quick-bet{background:#1e293b;border:1px solid #334155;border-radius:8px;padding:5px 10px;color:#94a3b8;font-size:12px;cursor:pointer}
+.mines-select{display:flex;gap:6px;justify-content:center;margin-top:6px}
+.mine-opt{background:#1e293b;border:1px solid #334155;border-radius:8px;padding:5px 12px;color:#94a3b8;font-size:12px;cursor:pointer}
+.mine-opt.active{background:#fbbf24;color:#000;border-color:#fbbf24}
+#loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0f172a;z-index:200}
+.spinner{width:40px;height:40px;border:3px solid #334155;border-top:3px solid #fbbf24;border-radius:50%;animation:spin 0.8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#livePlayers{max-height:100px;overflow-y:auto;background:rgba(0,0,0,0.25);border-top:1px solid #1e293b}
+#livePlayers::-webkit-scrollbar{width:3px}
+#livePlayers::-webkit-scrollbar-thumb{background:#334155;border-radius:3px}
+.lp-header{display:flex;justify-content:space-between;align-items:center;padding:4px 10px;font-size:10px;color:#64748b;border-bottom:1px solid #1e293b}
+.lp-count{color:#fbbf24;font-weight:700}
+.lp-list{padding:2px 8px}
+.lp-row{display:flex;align-items:center;justify-content:space-between;padding:3px 6px;border-radius:6px;margin:2px 0;font-size:11px}
+.lp-row.playing{background:rgba(148,163,184,0.1);color:#94a3b8}
+.lp-row.win{background:rgba(52,211,153,0.15);color:#34d399}
+.lp-row.lose{background:rgba(239,68,68,0.1);color:#ef4444;opacity:0.7}
+.lp-user{display:flex;align-items:center;gap:4px}
+.lp-avatar{width:18px;height:18px;border-radius:50%;background:#334155;display:flex;align-items:center;justify-content:center;font-size:9px}
+</style>
+</head>
+<body>
+<div id="loading"><div class="spinner"></div></div>
+<div id="app" style="display:none">
+  <div id="topbar">
+    <button class="back-btn" onclick="goBack()">‹</button>
+    <div class="balance">💰 <span id="bal">0</span></div>
+    <div style="width:20px"></div>
+  </div>
+  <div id="game-area">
+    <div id="multiplier-display">1.00x</div>
+    <div id="status">ضع رهانك وابدأ اللعب!</div>
+    <div id="grid"></div>
+  </div>
+  <div id="betbar">
+    <div class="bet-row">
+      <input type="number" class="bet-input" id="betInput" value="10" min="1">
+      <button class="bet-btn bet" id="betBtn" onclick="startGame()">💣 ابدأ</button>
+      <button class="bet-btn cashout" id="cashoutBtn" onclick="cashOut()" style="display:none">💰 سحب</button>
+    </div>
+    <div class="quick-bets">
+      <div class="quick-bet" onclick="setBet(10)">10</div>
+      <div class="quick-bet" onclick="setBet(50)">50</div>
+      <div class="quick-bet" onclick="setBet(100)">100</div>
+      <div class="quick-bet" onclick="setBet(500)">500</div>
+    </div>
+    <div class="mines-select">
+      <span style="font-size:11px;color:#64748b;align-self:center">عدد الألغام:</span>
+      <div class="mine-opt active" data-mines="3" onclick="setMines(3)">3</div>
+      <div class="mine-opt" data-mines="5" onclick="setMines(5)">5</div>
+      <div class="mine-opt" data-mines="7" onclick="setMines(7)">7</div>
+      <div class="mine-opt" data-mines="10" onclick="setMines(10)">10</div>
+    </div>
+  </div>
+</div>
+<div id="livePlayers">
+  <div class="lp-header">
+    <span>👥 <span class="lp-count" id="lpCount">0</span> لاعب</span>
+    <span id="lpTotal">💰 0</span>
+  </div>
+  <div class="lp-list" id="lpList"></div>
+</div>
+<script>
+const tg = window.Telegram?.WebApp;
+if (tg) { tg.expand(); tg.ready(); }
+const uid = new URLSearchParams(location.search).get('uid') || '';
+const BASE = location.origin;
+const initData = tg?.initData || '';
+async function apiFetch(url, opts = {}) {
+  opts.headers = opts.headers || {};
+  opts.headers['X-Telegram-Init-Data'] = initData;
+  if (opts.body && typeof opts.body === 'string') { opts.headers['Content-Type'] = 'application/json'; }
+  return fetch(url, opts);
+}
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+const GRID_SIZE = 25;
+let mineCount = 3;
+let gameState = 'waiting';
+let betAmount = 0;
+let revealedCount = 0;
+let minePositions = [];
+let sessionId = '';
+let currentMultiplier = 1.0;
+let tiles = [];
+
+function beep(f, d, t='sine', v=0.15) {
+  const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+  o.connect(g);g.connect(audioCtx.destination);
+  o.frequency.value=f;o.type=t;
+  g.gain.setValueAtTime(v,audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+d);
+  o.start();o.stop(audioCtx.currentTime+d);
+}
+function soundGem(){beep(659,0.08,'sine',0.12);setTimeout(()=>beep(880,0.08,'sine',0.1),60)}
+function soundMine(){beep(150,0.4,'sawtooth',0.3);setTimeout(()=>beep(80,0.3,'square',0.2),150)}
+function soundCash(){beep(523,0.1);setTimeout(()=>beep(784,0.15),80);setTimeout(()=>beep(1047,0.2),160)}
+function haptic(t='light'){if(tg?.HapticFeedback?.impactOccurred)tg.HapticFeedback.impactOccurred(t)}
+
+function setMines(n) {
+  if (gameState !== 'waiting') return;
+  mineCount = n;
+  document.querySelectorAll('.mine-opt').forEach(el => el.classList.remove('active'));
+  document.querySelector(`.mine-opt[data-mines="${n}"]`).classList.add('active');
+}
+
+function setBet(val) { document.getElementById('betInput').value = val; }
+
+function renderGrid() {
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+  tiles = [];
+  for (let i = 0; i < GRID_SIZE; i++) {
+    const tile = document.createElement('div');
+    tile.className = 'tile';
+    tile.dataset.idx = i;
+    tile.onclick = () => revealTile(i);
+    grid.appendChild(tile);
+    tiles.push(tile);
+  }
+}
+
+function startGame() {
+  if (gameState !== 'waiting') return;
+  betAmount = parseFloat(document.getElementById('betInput').value) || 0;
+  if (betAmount < 1) return;
+  apiFetch(`${BASE}/api/engine/mines/start`, {
+    method: 'POST', body: JSON.stringify({uid, bet_amount: betAmount, mine_count: mineCount})
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (!d.success) {
+      if (d.need_deposit) alert('رصيدك غير كافٍ! أودع أولاً');
+      else alert(d.error || 'خطأ');
+      return;
+    }
+    gameState = 'playing';
+    sessionId = d.session_id;
+    revealedCount = 0;
+    currentMultiplier = 1.0;
+    minePositions = [];
+    document.getElementById('bal').textContent = (d.balance_after || 0).toLocaleString();
+    document.getElementById('betBtn').style.display = 'none';
+    document.getElementById('cashoutBtn').style.display = 'block';
+    document.getElementById('cashoutBtn').textContent = '💰 سحب (0)';
+    document.getElementById('status').textContent = `اكشف المربعات وتجنب ${mineCount} ألغام!`;
+    document.querySelectorAll('.mine-opt').forEach(el => el.style.opacity = '0.3');
+    renderGrid();
+  })
+  .catch(e => alert('خطأ في الاتصال'));
+}
+
+function revealTile(idx) {
+  if (gameState !== 'playing') return;
+  if (tiles[idx].classList.contains('revealed')) return;
+  apiFetch(`${BASE}/api/engine/mines/reveal`, {
+    method: 'POST', body: JSON.stringify({session_id: sessionId, uid, tile_index: idx})
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (!d.success) return;
+    const tile = tiles[idx];
+    tile.classList.add('revealed');
+    if (d.is_mine) {
+      tile.classList.add('mine');
+      tile.textContent = '💣';
+      soundMine(); haptic('heavy');
+      endGame(false);
+    } else {
+      tile.classList.add('gem');
+      tile.textContent = '💎';
+      revealedCount++;
+      currentMultiplier = d.multiplier;
+      document.getElementById('multiplier-display').textContent = d.multiplier.toFixed(2) + 'x';
+      document.getElementById('cashoutBtn').textContent = `💰 سحب (${(betAmount * d.multiplier).toFixed(0)})`;
+      soundGem(); haptic('light');
+      if (d.game_over) endGame(true);
+    }
+  })
+  .catch(e => {});
+}
+
+function cashOut() {
+  if (gameState !== 'playing' || revealedCount === 0) return;
+  apiFetch(`${BASE}/api/engine/mines/cashout`, {
+    method: 'POST', body: JSON.stringify({session_id: sessionId, uid, multiplier: currentMultiplier, bet_amount: betAmount, revealed: revealedCount})
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.success) {
+      document.getElementById('bal').textContent = (d.balance_after || 0).toLocaleString();
+      document.getElementById('status').textContent = `✅ سحبت ${(d.payout).toFixed(0)} عند ${currentMultiplier.toFixed(2)}x`;
+      soundCash(); haptic('medium');
+      endGame(true, true);
+    }
+  })
+  .catch(e => {});
+}
+
+function endGame(won, cashedOut) {
+  gameState = 'ended';
+  if (!cashedOut) {
+    // Reveal all mines
+    apiFetch(`${BASE}/api/engine/mines/end`, {
+      method: 'POST', body: JSON.stringify({session_id: sessionId, uid, won, multiplier: currentMultiplier, bet_amount: betAmount})
+    }).catch(e => {});
+  }
+  // Show all mines
+  tiles.forEach((tile, i) => {
+    if (!tile.classList.contains('revealed')) {
+      // We don't have mine positions client-side; server decides
+    }
+  });
+  document.getElementById('cashoutBtn').style.display = 'none';
+  setTimeout(resetGame, 3000);
+}
+
+function resetGame() {
+  gameState = 'waiting';
+  revealedCount = 0;
+  currentMultiplier = 1.0;
+  document.getElementById('multiplier-display').textContent = '1.00x';
+  document.getElementById('status').textContent = 'ضع رهانك وابدأ اللعب!';
+  document.getElementById('betBtn').style.display = 'block';
+  document.getElementById('cashoutBtn').style.display = 'none';
+  document.querySelectorAll('.mine-opt').forEach(el => el.style.opacity = '1');
+  renderGrid();
+}
+
+function goBack() { window.location.href = `${BASE}/webapp/games?uid=${uid}&lang=ar`; }
+
+async function loadBalance() {
+  try {
+    const r = await apiFetch(`${BASE}/api/wallet/balance?uid=${uid}`);
+    const d = await r.json();
+    document.getElementById('bal').textContent = (d.balance || 0).toLocaleString();
+  } catch(e) {}
+}
+
+// Live Players
+const livePlayers = [];
+function addLivePlayer(data) {
+  const existing = livePlayers.findIndex(p => p.uid === data.uid);
+  if (existing >= 0) livePlayers[existing] = data;
+  else { livePlayers.unshift(data); if (livePlayers.length > 30) livePlayers.pop(); }
+  renderLivePlayers();
+}
+function renderLivePlayers() {
+  const list = document.getElementById('lpList');
+  document.getElementById('lpCount').textContent = livePlayers.length;
+  const totalBet = livePlayers.reduce((s, p) => s + (p.bet || 0), 0);
+  document.getElementById('lpTotal').textContent = '💰 ' + totalBet.toLocaleString();
+  list.innerHTML = '';
+  livePlayers.forEach(p => {
+    const row = document.createElement('div');
+    row.className = 'lp-row ' + (p.status || 'playing');
+    const avatar = p.name ? p.name[0].toUpperCase() : '?';
+    row.innerHTML = `<div class="lp-user"><div class="lp-avatar">${avatar}</div><span>${p.name || '???'}${p.isMe ? ' (أنت)' : ''}</span></div><span style="font-weight:700">${p.bet}</span>`;
+    list.appendChild(row);
+  });
+}
+function simulatePlayers() {
+  const names = ['أحمد','عمر','محمد','خالد','سعد','فهد','ناصر','يوسف','علي','حسن'];
+  if (Math.random() < 0.6 && livePlayers.length < 15) {
+    addLivePlayer({ uid: 'bot_'+Math.random().toString(36).substr(2,5), name: names[Math.floor(Math.random()*names.length)], bet: [10,20,50,100,200][Math.floor(Math.random()*5)], status: 'playing', isMe: false });
+  }
+  livePlayers.forEach(p => { if (p.status === 'playing' && Math.random() < 0.12) { p.status = Math.random() < 0.45 ? 'win' : 'lose'; } });
+  renderLivePlayers();
+}
+
+renderGrid(); loadBalance();
+document.getElementById('loading').style.display = 'none';
+document.getElementById('app').style.display = 'flex';
+setInterval(loadBalance, 5000);
+setInterval(simulatePlayers, 2500);
+simulatePlayers(); renderLivePlayers();
+</script>
+</body>
+</html>

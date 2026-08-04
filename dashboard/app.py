@@ -9,14 +9,19 @@ import os
 import csv
 import json
 import io
+import hmac
+import hashlib
 import secrets
 import random
 import zipfile
+import threading
+import queue as _queue
 from datetime import datetime, timedelta
 from functools import wraps
+from urllib.parse import parse_qs
 
 from flask import (Flask, render_template, request, redirect, url_for,
-                   session, jsonify, Response, flash, send_file)
+                   session, jsonify, Response, flash, send_file, g)
 
 # ===== Configuration =====
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -32,6 +37,26 @@ app.secret_key = SECRET_KEY
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=2)
+
+# ===== Real-time Notification Queue =====
+_notification_queues = []  # list of queue.Queue, one per connected SSE client
+_nq_lock = threading.Lock()
+
+def push_notification(notif_type, title, message, data=None):
+    """Push a real-time notification to all connected dashboard clients."""
+    payload = json.dumps({
+        'type': notif_type,
+        'title': title,
+        'message': message,
+        'data': data or {},
+        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    })
+    with _nq_lock:
+        for q in _notification_queues:
+            try:
+                q.put_nowait(payload)
+            except:
+                pass
 
 # ===== CSV Helpers =====
 def read_csv(filename):
@@ -91,6 +116,85 @@ def api_auth(f):
             return jsonify({'error': 'Unauthorized'}), 401
         return f(*args, **kwargs)
     return decorated
+
+# ===== Telegram WebApp Auth =====
+BOT_TOKEN = os.getenv('BOT_TOKEN', '')
+
+def validate_telegram_init_data(init_data_str):
+    """Validate Telegram WebApp initData using HMAC-SHA256.
+    Returns (user_id_str, user_dict) if valid, (None, None) if invalid.
+    """
+    if not init_data_str:
+        return None, None
+    try:
+        parsed = parse_qs(init_data_str)
+        hash_from_client = parsed.get('hash', [None])[0]
+        if not hash_from_client:
+            return None, None
+        # Build data-check string: sorted key=value pairs (excluding 'hash')
+        data_check = {}
+        for k, v in parsed.items():
+            if k != 'hash':
+                data_check[k] = v[0]
+        data_check_string = '\n'.join(f'{k}={v}' for k, v in sorted(data_check.items()))
+        # secret_key = HMAC_SHA256(bot_token, "WebAppData")
+        secret_key = hmac.new(BOT_TOKEN.encode(), b'WebAppData', hashlib.sha256).digest()
+        # calculated_hash = HMAC_SHA256(secret_key, data_check_string)
+        calculated_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+        # Compare
+        if not hmac.compare_digest(calculated_hash, hash_from_client):
+            return None, None
+        # Extract user
+        user_json = data_check.get('user', '')
+        if user_json:
+            user_obj = json.loads(user_json)
+            return str(user_obj.get('id', '')), user_obj
+        return None, None
+    except Exception:
+        return None, None
+
+def webapp_auth(f):
+    """Decorator: validates Telegram WebApp initData on game-facing API endpoints.
+    Reads initData from 'X-Telegram-Init-Data' header or 'initData' body/query param.
+    Sets g.telegram_user_id and g.telegram_user on success.
+    Falls back to uid param if BOT_TOKEN not configured (dev mode).
+    """
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not BOT_TOKEN:
+            # Dev mode — no token configured, allow through with uid
+            g.telegram_user_id = request.args.get('uid', '') or (request.json or {}).get('uid', '') if request.is_json else request.args.get('uid', '')
+            g.telegram_user = None
+            return f(*args, **kwargs)
+        # Try header first, then body/query
+        init_data = request.headers.get('X-Telegram-Init-Data', '')
+        if not init_data:
+            if request.is_json:
+                init_data = (request.json or {}).get('initData', '')
+            else:
+                init_data = request.args.get('initData', '')
+        if not init_data:
+            return jsonify({'error': 'Missing authentication', 'code': 'NO_INIT_DATA'}), 403
+        uid, user_obj = validate_telegram_init_data(init_data)
+        if not uid:
+            return jsonify({'error': 'Invalid authentication', 'code': 'INVALID_INIT_DATA'}), 403
+        g.telegram_user_id = uid
+        g.telegram_user = user_obj
+        return f(*args, **kwargs)
+    return decorated
+
+def get_request_uid():
+    """Get the authenticated user ID from request context.
+    Uses g.telegram_user_id if set by webapp_auth, otherwise falls back to uid param.
+    """
+    uid = getattr(g, 'telegram_user_id', None)
+    if uid:
+        return uid
+    # Fallback for admin endpoints or dev mode
+    uid = request.args.get('uid', '')
+    if not uid and request.is_json:
+        uid = (request.json or {}).get('uid', '')
+    return uid
 
 # ===== Routes — Pages =====
 
@@ -405,6 +509,32 @@ def api_stats_live():
             yield f"data: {json.dumps(data)}\n\n"
             time.sleep(5)
     return Response(generate(), mimetype='text/event-stream')
+
+@app.route('/api/notifications/stream')
+@api_auth
+def api_notifications_stream():
+    """SSE stream for real-time deposit/withdrawal notifications."""
+    q = _queue.Queue()
+    with _nq_lock:
+        _notification_queues.append(q)
+    def generate():
+        import time
+        # Send initial connection confirmation
+        yield f"data: {json.dumps({'type': 'connected', 'message': 'Connected'})}\n\n"
+        while True:
+            try:
+                payload = q.get(timeout=15)
+                yield f"data: {payload}\n\n"
+            except _queue.Empty:
+                # Heartbeat to keep connection alive
+                yield f"data: {json.dumps({'type': 'heartbeat'})}\n\n"
+    try:
+        return Response(generate(), mimetype='text/event-stream',
+                        headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
+    finally:
+        with _nq_lock:
+            if q in _notification_queues:
+                _notification_queues.remove(q)
 
 @app.route('/api/stats/charts')
 @api_auth
@@ -3087,6 +3217,7 @@ except Exception as e:
 # ===== Games Catalog =====
 
 @app.route('/api/games/list')
+@webapp_auth
 def api_games_list():
     """قائمة الألعاب النشطة"""
     if not _VEX_GAMES:
@@ -3150,11 +3281,12 @@ def api_games_toggle(game_id):
 # ===== Wallet =====
 
 @app.route('/api/wallet/balance')
+@webapp_auth
 def api_wallet_balance():
     """رصيد اللاعب"""
     if not _VEX_GAMES:
         return jsonify({'error': 'Games engine not available'}), 500
-    uid = request.args.get('uid', '')
+    uid = get_request_uid()
     if not uid:
         return jsonify({'error': 'Missing uid'}), 400
     balance = _gm.get_balance(uid)
@@ -3178,6 +3310,7 @@ def api_wallet_add():
 # ===== Live Players =====
 
 @app.route('/api/games/live-players')
+@webapp_auth
 def api_live_players():
     """قائمة اللاعبين المباشرين"""
     if not _VEX_GAMES:
@@ -3210,12 +3343,13 @@ def api_live_players():
 # ===== Game Engine =====
 
 @app.route('/api/engine/start', methods=['POST'])
+@webapp_auth
 def api_engine_start():
     """بدء جلسة لعب"""
     if not _VEX_GAMES:
         return jsonify({'error': 'Games engine not available'}), 500
     data = request.json
-    uid = data.get('uid', '')
+    uid = get_request_uid()
     game_id = data.get('game_id', '')
     bet_amount = float(data.get('bet_amount', 0))
     if not uid or not game_id or bet_amount <= 0:
@@ -3224,14 +3358,16 @@ def api_engine_start():
     return jsonify(result)
 
 @app.route('/api/engine/end', methods=['POST'])
+@webapp_auth
 def api_engine_end():
     """إنهاء جلسة لعب"""
     if not _VEX_GAMES:
         return jsonify({'error': 'Games engine not available'}), 500
     data = request.json
+    uid = get_request_uid()
     result = _gm.end_session(
         session_id=data.get('session_id', ''),
-        user_id=data.get('uid', ''),
+        user_id=uid,
         game_id=data.get('game_id', ''),
         bet_amount=float(data.get('bet_amount', 0)),
         result=data.get('result', 'lose'),
@@ -3240,12 +3376,13 @@ def api_engine_end():
     return jsonify(result)
 
 @app.route('/api/engine/result', methods=['POST'])
+@webapp_auth
 def api_engine_result():
     """تسجيل نتيجة من WebApp — يحسب الفوز/الخسارة server-side"""
     if not _VEX_GAMES:
         return jsonify({'error': 'Games engine not available'}), 500
     data = request.json
-    uid = data.get('uid', '')
+    uid = get_request_uid()
     game_id = data.get('game_id', '')
     bet_amount = float(data.get('bet_amount', 0))
     session_id = data.get('session_id', '')
@@ -3301,18 +3438,20 @@ def api_engine_result():
 # ===== Quick Deposits =====
 
 @app.route('/api/deposit/quick', methods=['POST'])
+@webapp_auth
 def api_deposit_quick():
     """طلب إيداع سريع أثناء اللعب"""
     if not _VEX_GAMES:
         return jsonify({'error': 'Games engine not available'}), 500
     data = request.json
-    uid = data.get('uid', '')
+    uid = get_request_uid()
     amount = float(data.get('amount', 0))
     method_id = data.get('method_id', '')
     account_number = data.get('account_number', '')
     if not uid or amount <= 0:
         return jsonify({'error': 'Missing params'}), 400
     dep_id = _gm.create_quick_deposit(uid, amount, method_id, account_number)
+    push_notification('game_deposit', '💰 إيداع جديد', f'لاعب {uid} طلب إيداع {amount}', {'deposit_id': dep_id, 'uid': uid, 'amount': amount})
     return jsonify({'success': True, 'deposit_id': dep_id, 'status': 'pending'})
 
 @app.route('/api/deposit/pending')
@@ -3333,6 +3472,7 @@ def api_deposit_approve(dep_id):
     admin_id = session.get('admin_id', '')
     result = _gm.approve_deposit(dep_id, admin_id)
     if result:
+        push_notification('deposit_approved', '✅ تمت الموافقة على إيداع', f'إيداع {dep_id} تمت الموافقة', {'deposit_id': dep_id})
         return jsonify({'success': True, 'deposit': result})
     return jsonify({'error': 'Deposit not found or already processed'}), 404
 
@@ -3344,28 +3484,31 @@ def api_deposit_reject(dep_id):
         return jsonify({'error': 'Games engine not available'}), 500
     admin_id = session.get('admin_id', '')
     _gm.reject_deposit(dep_id, admin_id)
+    push_notification('deposit_rejected', '❌ تم رفض إيداع', f'إيداع {dep_id} تم رفض', {'deposit_id': dep_id})
     return jsonify({'success': True})
 
 # ===== Player Payment Methods =====
 
 @app.route('/api/player/methods')
+@webapp_auth
 def api_player_methods():
     """وسائل دفع اللاعب المحفوظة"""
     if not _VEX_GAMES:
         return jsonify({'error': 'Games engine not available'}), 500
-    uid = request.args.get('uid', '')
+    uid = get_request_uid()
     if not uid:
         return jsonify({'error': 'Missing uid'}), 400
     methods = _gm.get_payment_methods(uid)
     return jsonify({'methods': methods})
 
 @app.route('/api/player/methods/add', methods=['POST'])
+@webapp_auth
 def api_player_methods_add():
     """إضافة وسيلة دفع للاعب"""
     if not _VEX_GAMES:
         return jsonify({'error': 'Games engine not available'}), 500
     data = request.json
-    uid = data.get('uid', '')
+    uid = get_request_uid()
     method_id = _gm.add_payment_method(
         user_id=uid,
         method_name=data.get('method_name', ''),
@@ -3378,11 +3521,12 @@ def api_player_methods_add():
 # ===== Player Profile =====
 
 @app.route('/api/player/profile')
+@webapp_auth
 def api_player_profile():
     """ملف اللاعب"""
     if not _VEX_GAMES:
         return jsonify({'error': 'Games engine not available'}), 500
-    uid = request.args.get('uid', '')
+    uid = get_request_uid()
     if not uid:
         return jsonify({'error': 'Missing uid'}), 400
     profile = _gm.tracker.get_profile(uid)
@@ -3483,12 +3627,13 @@ def webapp_aviator():
     return render_template('aviator.html', uid=uid, lang=lang)
 
 @app.route('/api/engine/aviator/start', methods=['POST'])
+@webapp_auth
 def api_aviator_start():
     """بدء جلسة Aviator — خصم الرهان + حساب نقطة الانفجار"""
     if not _VEX_GAMES:
         return jsonify({'error': 'Games engine not available'}), 500
     data = request.json
-    uid = data.get('uid', '')
+    uid = get_request_uid()
     bet_amount = float(data.get('bet_amount', 0))
     if not uid or bet_amount <= 0:
         return jsonify({'error': 'Missing params'}), 400
@@ -3566,13 +3711,14 @@ def api_aviator_start():
     })
 
 @app.route('/api/engine/aviator/cashout', methods=['POST'])
+@webapp_auth
 def api_aviator_cashout():
     """سحب الرهان في Aviator"""
     if not _VEX_GAMES:
         return jsonify({'error': 'Games engine not available'}), 500
     data = request.json
     session_id = data.get('session_id', '')
-    uid = data.get('uid', '')
+    uid = get_request_uid()
     multiplier = float(data.get('multiplier', 1.0))
     bet_amount = float(data.get('bet_amount', 0))
 
@@ -3587,12 +3733,13 @@ def api_aviator_cashout():
     })
 
 @app.route('/api/engine/aviator/end', methods=['POST'])
+@webapp_auth
 def api_aviator_end():
     """إنهاء جلسة Aviator — تسجيل النتيجة"""
     if not _VEX_GAMES:
         return jsonify({'error': 'Games engine not available'}), 500
     data = request.json
-    uid = data.get('uid', '')
+    uid = get_request_uid()
     crash_point = float(data.get('crash_point', 1.0))
     cashed_out = data.get('cashed_out', False)
     multiplier = float(data.get('multiplier', 0))
@@ -3629,12 +3776,13 @@ def api_aviator_end():
 # ===== Wallet Withdrawal =====
 
 @app.route('/api/wallet/withdraw', methods=['POST'])
+@webapp_auth
 def api_wallet_withdraw():
     """طلب سحب من محفظة الألعاب"""
     if not _VEX_GAMES:
         return jsonify({'error': 'Games engine not available'}), 500
     data = request.json
-    uid = data.get('uid', '')
+    uid = get_request_uid()
     amount = float(data.get('amount', 0))
     method_id = data.get('method_id', '')
     account_number = data.get('account_number', '')
@@ -3643,6 +3791,7 @@ def api_wallet_withdraw():
     dep_id, error = _gm.create_withdrawal(uid, amount, method_id, account_number)
     if error:
         return jsonify({'success': False, 'error': error})
+    push_notification('game_withdrawal', '💸 طلب سحب جديد', f'لاعب {uid} طلب سحب {amount}', {'withdrawal_id': dep_id, 'uid': uid, 'amount': amount})
     return jsonify({'success': True, 'withdrawal_id': dep_id, 'status': 'pending'})
 
 @app.route('/api/withdrawal/pending')
@@ -3663,6 +3812,7 @@ def api_withdrawal_approve(wth_id):
     admin_id = session.get('admin_id', '')
     result = _gm.approve_withdrawal(wth_id, admin_id)
     if result:
+        push_notification('withdrawal_approved', '✅ تمت الموافقة على سحب', f'سحب {wth_id} تمت الموافقة', {'withdrawal_id': wth_id})
         return jsonify({'success': True, 'withdrawal': result})
     return jsonify({'error': 'Not found'}), 404
 
@@ -3675,6 +3825,7 @@ def api_withdrawal_reject(wth_id):
     admin_id = session.get('admin_id', '')
     result = _gm.reject_withdrawal(wth_id, admin_id)
     if result:
+        push_notification('withdrawal_rejected', '❌ تم رفض سحب', f'سحب {wth_id} تم رفض — الرصيد مُرتجع', {'withdrawal_id': wth_id})
         return jsonify({'success': True, 'withdrawal': result})
     return jsonify({'error': 'Not found'}), 404
 
@@ -3738,6 +3889,415 @@ def api_admin_vex_partner(uid):
     is_partner = data.get('is_partner', False)
     _gm.tracker.set_vex_partner(uid, is_partner)
     return jsonify({'success': True})
+
+# ===== Crash — WebApp + API =====
+
+@app.route('/webapp/crash')
+def webapp_crash():
+    uid = request.args.get('uid', '')
+    lang = request.args.get('lang', 'ar')
+    return render_template('crash.html', uid=uid, lang=lang)
+
+@app.route('/api/engine/crash/start', methods=['POST'])
+@webapp_auth
+def api_crash_start():
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    data = request.json
+    uid = get_request_uid()
+    bet_amount = float(data.get('bet_amount', 0))
+    if not uid or bet_amount <= 0:
+        return jsonify({'error': 'Missing params'}), 400
+
+    player = _gm.tracker.get_profile(uid)
+    game = _gm.get_game('GAME005')
+    if not game:
+        game = {'id': 'GAME005', 'base_win_chance': '0.42', 'house_edge_pct': '17', 'min_bet': '10', 'max_bet': '5000'}
+
+    risk_check = _gm.risk.check_risk(player, bet_amount, game)
+    if not risk_check['allowed']:
+        return jsonify({'success': False, 'error': risk_check['alerts'][0]['message'] if risk_check['alerts'] else 'محظور'})
+
+    balance = float(player.get('balance', 0) or 0)
+    if balance < bet_amount:
+        return jsonify({'success': False, 'error': 'رصيد غير كافٍ', 'need_deposit': True, 'balance': balance})
+
+    import random as _rng
+    house_edge = float(game.get('house_edge_pct', 17)) / 100
+    algo_result = _gm.algorithm.calculate_win_chance(player, game, bet_amount)
+    win_chance = algo_result['win_chance']
+
+    if win_chance > 0.8:
+        crash_point = _rng.uniform(3.0, 15.0)
+    elif win_chance > 0.6:
+        crash_point = _rng.uniform(2.0, 6.0)
+    elif win_chance > 0.4:
+        crash_point = _rng.uniform(1.3, 3.5)
+    elif win_chance > 0.2:
+        crash_point = _rng.uniform(1.05, 2.0)
+    else:
+        crash_point = _rng.uniform(1.00, 1.3)
+    crash_point = max(1.0, crash_point * (1 - house_edge * 0.3))
+
+    balance_after = balance - bet_amount
+    player['balance'] = f"{balance_after:.2f}"
+    _gm.tracker._save_profile(player)
+
+    session_id = f"CRSH{str(int(datetime.now().timestamp()))[-8:]}"
+    _gm.algorithm.log_decision(
+        session_id=session_id, user_id=uid, game_id='GAME005',
+        base_chance=float(game.get('base_win_chance', 0.42)),
+        adjusted_chance=win_chance, factors=algo_result['factors'],
+        decision=algo_result['decision'],
+        reason=f"Crash crash_point={crash_point:.2f}; {algo_result['reason']}"
+    )
+    return jsonify({'success': True, 'session_id': session_id, 'crash_point': round(crash_point, 2), 'balance_before': balance, 'balance_after': balance_after})
+
+@app.route('/api/engine/crash/cashout', methods=['POST'])
+@webapp_auth
+def api_crash_cashout():
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    data = request.json
+    session_id = data.get('session_id', '')
+    uid = get_request_uid()
+    multiplier = float(data.get('multiplier', 1.0))
+    bet_amount = float(data.get('bet_amount', 0))
+    payout = bet_amount * multiplier
+    new_balance = _gm.add_balance(uid, payout)
+    return jsonify({'success': True, 'payout': payout, 'multiplier': multiplier, 'balance_after': new_balance})
+
+@app.route('/api/engine/crash/end', methods=['POST'])
+@webapp_auth
+def api_crash_end():
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    data = request.json
+    uid = get_request_uid()
+    crash_point = float(data.get('crash_point', 1.0))
+    cashed_out = data.get('cashed_out', False)
+    multiplier = float(data.get('multiplier', 0))
+    bet_amount = float(data.get('bet_amount', 0))
+    session_id = data.get('session_id', '')
+    result = 'win' if cashed_out else 'lose'
+    payout = bet_amount * multiplier if cashed_out else 0
+    _gm.tracker.log_session({'session_id': session_id, 'game_id': 'GAME005', 'user_id': uid, 'bet_amount': bet_amount, 'payout': payout, 'result': result, 'balance_before': 0, 'balance_after': _gm.get_balance(uid), 'multiplier': multiplier})
+    _gm.tracker.update_profile(uid, {'bet_amount': bet_amount, 'payout': payout, 'result': result, 'game_id': 'GAME005', 'balance_after': _gm.get_balance(uid)})
+    return jsonify({'success': True, 'result': result, 'payout': payout})
+
+# ===== Mines — WebApp + API =====
+
+@app.route('/webapp/mines')
+def webapp_mines():
+    uid = request.args.get('uid', '')
+    lang = request.args.get('lang', 'ar')
+    return render_template('mines.html', uid=uid, lang=lang)
+
+@app.route('/api/engine/mines/start', methods=['POST'])
+@webapp_auth
+def api_mines_start():
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    data = request.json
+    uid = get_request_uid()
+    bet_amount = float(data.get('bet_amount', 0))
+    mine_count = int(data.get('mine_count', 3))
+    if not uid or bet_amount <= 0:
+        return jsonify({'error': 'Missing params'}), 400
+    mine_count = max(1, min(24, mine_count))
+
+    player = _gm.tracker.get_profile(uid)
+    game = _gm.get_game('GAME006')
+    if not game:
+        game = {'id': 'GAME006', 'base_win_chance': '0.45', 'house_edge_pct': '15', 'min_bet': '10', 'max_bet': '2000'}
+
+    risk_check = _gm.risk.check_risk(player, bet_amount, game)
+    if not risk_check['allowed']:
+        return jsonify({'success': False, 'error': risk_check['alerts'][0]['message'] if risk_check['alerts'] else 'محظور'})
+
+    balance = float(player.get('balance', 0) or 0)
+    if balance < bet_amount:
+        return jsonify({'success': False, 'error': 'رصيد غير كافٍ', 'need_deposit': True, 'balance': balance})
+
+    import random as _rng
+    # Place mines randomly
+    all_positions = list(range(25))
+    _rng.shuffle(all_positions)
+    mine_positions = all_positions[:mine_count]
+
+    # Algorithm decides if player should win overall
+    algo_result = _gm.algorithm.calculate_win_chance(player, game, bet_amount)
+    win_chance = algo_result['win_chance']
+
+    # If algorithm says lose, ensure first revealed tile near mines
+    # If algorithm says win, keep mines away from common first picks (center)
+    if algo_result['decision'] == 'force_lose' and _rng.random() < 0.6:
+        # Bias: move a mine near center (positions 6,7,8,11,12,13,16,17,18)
+        center_positions = [6,7,8,11,12,13,16,17,18]
+        non_center_mines = [m for m in mine_positions if m not in center_positions]
+        if non_center_mines:
+            swap_out = _rng.choice(non_center_mines)
+            swap_in = _rng.choice([c for c in center_positions if c not in mine_positions])
+            mine_positions.remove(swap_out)
+            mine_positions.append(swap_in)
+
+    balance_after = balance - bet_amount
+    player['balance'] = f"{balance_after:.2f}"
+    _gm.tracker._save_profile(player)
+
+    session_id = f"MINE{str(int(datetime.now().timestamp()))[-8:]}"
+    _gm.algorithm.log_decision(
+        session_id=session_id, user_id=uid, game_id='GAME006',
+        base_chance=float(game.get('base_win_chance', 0.45)),
+        adjusted_chance=win_chance, factors=algo_result['factors'],
+        decision=algo_result['decision'],
+        reason=f"Mines count={mine_count}; {algo_result['reason']}"
+    )
+
+    # Store mine positions in a temp file keyed by session
+    import json as _json
+    mines_state_file = os.path.join(BASE_DIR, 'mines_sessions.json')
+    mines_state = {}
+    try:
+        if os.path.exists(mines_state_file):
+            with open(mines_state_file, 'r') as f:
+                mines_state = _json.load(f)
+    except:
+        pass
+    mines_state[session_id] = {
+        'uid': uid, 'mine_positions': mine_positions, 'bet_amount': bet_amount,
+        'mine_count': mine_count, 'revealed': [], 'multiplier': 1.0,
+        'game_over': False, 'created_at': datetime.now().isoformat()
+    }
+    with open(mines_state_file, 'w') as f:
+        _json.dump(mines_state, f)
+
+    return jsonify({'success': True, 'session_id': session_id, 'balance_before': balance, 'balance_after': balance_after})
+
+@app.route('/api/engine/mines/reveal', methods=['POST'])
+@webapp_auth
+def api_mines_reveal():
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    data = request.json
+    uid = get_request_uid()
+    session_id = data.get('session_id', '')
+    tile_index = int(data.get('tile_index', -1))
+    if tile_index < 0 or tile_index > 24:
+        return jsonify({'error': 'Invalid tile'}), 400
+
+    import json as _json
+    mines_state_file = os.path.join(BASE_DIR, 'mines_sessions.json')
+    if not os.path.exists(mines_state_file):
+        return jsonify({'error': 'Session not found'}), 404
+    try:
+        with open(mines_state_file, 'r') as f:
+            mines_state = _json.load(f)
+    except:
+        return jsonify({'error': 'State error'}), 500
+
+    state = mines_state.get(session_id)
+    if not state or state.get('uid') != uid or state.get('game_over'):
+        return jsonify({'error': 'Invalid session'}), 400
+
+    if tile_index in state['revealed']:
+        return jsonify({'error': 'Already revealed'}), 400
+
+    mine_positions = state['mine_positions']
+    is_mine = tile_index in mine_positions
+    state['revealed'].append(tile_index)
+
+    if is_mine:
+        state['game_over'] = True
+        state['multiplier'] = 0
+        with open(mines_state_file, 'w') as f:
+            _json.dump(mines_state, f)
+        return jsonify({'success': True, 'is_mine': True, 'multiplier': 0, 'game_over': True})
+
+    # Calculate multiplier based on revealed count and mine count
+    revealed_count = len(state['revealed'])
+    safe_count = 25 - state['mine_count']
+    # Multiplier grows with each safe reveal: product of (25-i)/(25-mine_count-i) for each step
+    mult = 1.0
+    for i in range(revealed_count):
+        mult *= (25 - i) / (25 - state['mine_count'] - i)
+    # Apply house edge
+    game = _gm.get_game('GAME006')
+    house_edge = float(game.get('house_edge_pct', 15)) / 100 if game else 0.15
+    mult *= (1 - house_edge * 0.5)
+    state['multiplier'] = round(mult, 4)
+
+    game_over = revealed_count >= safe_count
+    if game_over:
+        state['game_over'] = True
+
+    with open(mines_state_file, 'w') as f:
+        _json.dump(mines_state, f)
+
+    return jsonify({'success': True, 'is_mine': False, 'multiplier': state['multiplier'], 'game_over': game_over})
+
+@app.route('/api/engine/mines/cashout', methods=['POST'])
+@webapp_auth
+def api_mines_cashout():
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    data = request.json
+    uid = get_request_uid()
+    session_id = data.get('session_id', '')
+    multiplier = float(data.get('multiplier', 1.0))
+    bet_amount = float(data.get('bet_amount', 0))
+
+    import json as _json
+    mines_state_file = os.path.join(BASE_DIR, 'mines_sessions.json')
+    try:
+        with open(mines_state_file, 'r') as f:
+            mines_state = _json.load(f)
+        state = mines_state.get(session_id)
+        if state:
+            state['game_over'] = True
+            with open(mines_state_file, 'w') as f:
+                _json.dump(mines_state, f)
+    except:
+        pass
+
+    payout = bet_amount * multiplier
+    new_balance = _gm.add_balance(uid, payout)
+    return jsonify({'success': True, 'payout': payout, 'multiplier': multiplier, 'balance_after': new_balance})
+
+@app.route('/api/engine/mines/end', methods=['POST'])
+@webapp_auth
+def api_mines_end():
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    data = request.json
+    uid = get_request_uid()
+    won = data.get('won', False)
+    multiplier = float(data.get('multiplier', 0))
+    bet_amount = float(data.get('bet_amount', 0))
+    session_id = data.get('session_id', '')
+    result = 'win' if won else 'lose'
+    payout = bet_amount * multiplier if won else 0
+    _gm.tracker.log_session({'session_id': session_id, 'game_id': 'GAME006', 'user_id': uid, 'bet_amount': bet_amount, 'payout': payout, 'result': result, 'balance_before': 0, 'balance_after': _gm.get_balance(uid), 'multiplier': multiplier})
+    _gm.tracker.update_profile(uid, {'bet_amount': bet_amount, 'payout': payout, 'result': result, 'game_id': 'GAME006', 'balance_after': _gm.get_balance(uid)})
+    return jsonify({'success': True, 'result': result, 'payout': payout})
+
+# ===== Plinko — WebApp + API =====
+
+@app.route('/webapp/plinko')
+def webapp_plinko():
+    uid = request.args.get('uid', '')
+    lang = request.args.get('lang', 'ar')
+    return render_template('plinko.html', uid=uid, lang=lang)
+
+@app.route('/api/engine/plinko/start', methods=['POST'])
+@webapp_auth
+def api_plinko_start():
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    data = request.json
+    uid = get_request_uid()
+    bet_amount = float(data.get('bet_amount', 0))
+    if not uid or bet_amount <= 0:
+        return jsonify({'error': 'Missing params'}), 400
+
+    player = _gm.tracker.get_profile(uid)
+    game = _gm.get_game('GAME007')
+    if not game:
+        game = {'id': 'GAME007', 'base_win_chance': '0.40', 'house_edge_pct': '16', 'min_bet': '10', 'max_bet': '2000'}
+
+    risk_check = _gm.risk.check_risk(player, bet_amount, game)
+    if not risk_check['allowed']:
+        return jsonify({'success': False, 'error': risk_check['alerts'][0]['message'] if risk_check['alerts'] else 'محظور'})
+
+    balance = float(player.get('balance', 0) or 0)
+    if balance < bet_amount:
+        return jsonify({'success': False, 'error': 'رصيد غير كافٍ', 'need_deposit': True, 'balance': balance})
+
+    import random as _rng
+    # 13 slots (0-12), multipliers: [10, 3, 1.5, 1, 0.5, 0.3, 0.2, 0.3, 0.5, 1, 1.5, 3, 10]
+    MULTIPLIERS = [10, 3, 1.5, 1, 0.5, 0.3, 0.2, 0.3, 0.5, 1, 1.5, 3, 10]
+
+    algo_result = _gm.algorithm.calculate_win_chance(player, game, bet_amount)
+    win_chance = algo_result['win_chance']
+
+    # Weight slot selection based on win_chance
+    # High win_chance → bias toward edges (high multipliers)
+    # Low win_chance → bias toward center (low multipliers)
+    if win_chance > 0.6:
+        # Bias toward edge slots (0, 12 = 10x)
+        weights = [5, 4, 3, 2, 1, 1, 1, 1, 1, 2, 3, 4, 5]
+    elif win_chance > 0.4:
+        weights = [2, 3, 3, 3, 2, 2, 2, 2, 2, 3, 3, 3, 2]
+    else:
+        # Bias toward center (low multipliers)
+        weights = [1, 1, 2, 2, 3, 4, 5, 4, 3, 2, 2, 1, 1]
+
+    total_weight = sum(weights)
+    rand_val = _rng.uniform(0, total_weight)
+    target_slot = 0
+    cumulative = 0
+    for i, w in enumerate(weights):
+        cumulative += w
+        if rand_val <= cumulative:
+            target_slot = i
+            break
+
+    multiplier = MULTIPLIERS[target_slot]
+    payout = bet_amount * multiplier
+    result = 'win' if multiplier >= 1 else 'lose'
+
+    # Apply disguised loss: if bet > 50 and multiplier < 1, sometimes show as small win
+    if bet_amount > 50 and multiplier < 1 and _rng.random() < 0.3 and algo_result['decision'] != 'force_lose':
+        # Find a nearby slot with multiplier 0.5-0.9
+        for offset in range(1, 4):
+            for direction in [1, -1]:
+                check_slot = target_slot + direction * offset
+                if 0 <= check_slot < len(MULTIPLIERS) and MULTIPLIERS[check_slot] >= 0.5:
+                    target_slot = check_slot
+                    multiplier = MULTIPLIERS[check_slot]
+                    payout = bet_amount * multiplier
+                    break
+            else:
+                continue
+            break
+
+    balance_after = balance - bet_amount
+    player['balance'] = f"{balance_after:.2f}"
+    _gm.tracker._save_profile(player)
+
+    session_id = f"PLNK{str(int(datetime.now().timestamp()))[-8:]}"
+    _gm.algorithm.log_decision(
+        session_id=session_id, user_id=uid, game_id='GAME007',
+        base_chance=float(game.get('base_win_chance', 0.40)),
+        adjusted_chance=win_chance, factors=algo_result['factors'],
+        decision=algo_result['decision'],
+        reason=f"Plinko slot={target_slot} mult={multiplier}; {algo_result['reason']}"
+    )
+
+    return jsonify({
+        'success': True, 'session_id': session_id, 'target_slot': target_slot,
+        'multiplier': multiplier, 'payout': round(payout, 2), 'result': result,
+        'balance_before': balance, 'balance_after': balance_after
+    })
+
+@app.route('/api/engine/plinko/end', methods=['POST'])
+@webapp_auth
+def api_plinko_end():
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    data = request.json
+    uid = get_request_uid()
+    multiplier = float(data.get('multiplier', 0))
+    payout = float(data.get('payout', 0))
+    result = data.get('result', 'lose')
+    bet_amount = float(data.get('bet_amount', 0))
+    session_id = data.get('session_id', '')
+    # Add payout to balance (already calculated in start, but we add on end for consistency)
+    if payout > 0:
+        _gm.add_balance(uid, payout)
+    _gm.tracker.log_session({'session_id': session_id, 'game_id': 'GAME007', 'user_id': uid, 'bet_amount': bet_amount, 'payout': payout, 'result': result, 'balance_before': 0, 'balance_after': _gm.get_balance(uid), 'multiplier': multiplier})
+    _gm.tracker.update_profile(uid, {'bet_amount': bet_amount, 'payout': payout, 'result': result, 'game_id': 'GAME007', 'balance_after': _gm.get_balance(uid)})
+    return jsonify({'success': True, 'result': result, 'payout': payout})
 
 # ===== Main =====
 
