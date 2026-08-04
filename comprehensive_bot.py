@@ -17265,7 +17265,7 @@ class ComprehensiveDUXBot:
             games_url = f"{base_url}/webapp/games?uid={user_id}&lang={lang}&currency={currency}"
 
             kb = {'inline_keyboard': [
-                [{'text': '🎮 ادخل مركز الألعاب', 'web_app': {'url': games_url}}],
+                [{'text': '🎮 ادخل مركز الألعاب', 'url': games_url}],
                 [{'text': '💰 إيداع للمحفظة', 'callback_data': 'game_wallet_deposit'},
                  {'text': '💸 سحب من المحفظة', 'callback_data': 'game_wallet_withdraw'}]
             ]}
