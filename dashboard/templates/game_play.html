@@ -315,21 +315,32 @@ async function showDepositModal(required) {
   const modal = document.getElementById('modal');
   const box = document.getElementById('modalBox');
   
-  // Load payment methods
+  // Load saved payment methods
   let methodsHtml = '';
+  let hasMethods = false;
   try {
     const r = await fetch(`${BASE}/api/player/methods?uid=${uid}`);
     const d = await r.json();
-    methodsHtml = (d.methods || []).map(m => 
-      `<div class="deposit-method" onclick="selectMethod(this, '${m.account_number}', '${m.id}')">
-        ${m.icon||'💳'} ${m.method_name} — ${m.account_number}
-      </div>`
-    ).join('');
+    if (d.methods && d.methods.length > 0) {
+      hasMethods = true;
+      methodsHtml = '<div class="modal-subtitle">📋 وسائلك المحفوظة:</div>';
+      methodsHtml += (d.methods || []).map(m => 
+        `<div class="deposit-method" onclick="selectMethod(this, '${m.account_number}', '${m.id}')">
+          ${m.icon||'💳'} ${m.method_name} — ${m.account_number}
+        </div>`
+      ).join('');
+    }
   } catch(e) {}
   
-  if (!methodsHtml) {
-    methodsHtml = '<div class="modal-subtitle">لا توجد وسائل دفع محفوظة<br>أضف وسيلة دفع من الإعدادات</div>';
-  }
+  // Always show manual entry option
+  methodsHtml += `
+    <div class="modal-subtitle" style="margin-top:12px">✍️ أو اكتب وسيلة دفع يدوياً:</div>
+    <input type="text" id="manualMethodName" placeholder="اسم الوسيلة (مثال: فودافون كاش)" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:8px;color:#fff;font-size:13px;margin-bottom:6px;outline:none">
+    <input type="text" id="manualAccount" placeholder="رقم الحساب / المحفظة" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:8px;color:#fff;font-size:13px;margin-bottom:6px;outline:none">
+    <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#64748b;margin-bottom:8px;cursor:pointer">
+      <input type="checkbox" id="saveMethod" style="accent-color:#fbbf24"> حفظ كوسيلة دفع دائمة
+    </label>
+  `;
   
   box.innerHTML = `
     <div class="modal-title">💰 إيداع سريع</div>
@@ -343,7 +354,7 @@ async function showDepositModal(required) {
       </div>
     </div>
     <input type="number" class="modal-input" id="depAmount" placeholder="المبلغ" value="${required || minBet}">
-    <button class="modal-btn" onclick="submitDeposit()">✅ تأكيد الإيداع</button>
+    <button class="modal-btn" onclick="submitDepositWithManual()">✅ تأكيد الإيداع</button>
     <button class="modal-btn secondary" onclick="document.getElementById('modal').style.display='none'">إلغاء</button>
   `;
   modal.style.display = 'flex';
@@ -367,17 +378,47 @@ function copyAccount() {
   });
 }
 
-async function submitDeposit() {
+async function submitDepositWithManual() {
   const amount = parseFloat(document.getElementById('depAmount').value) || 0;
-  if (amount <= 0 || !selectedAccount) {
-    alert('أدخل المبلغ واختر وسيلة الدفع');
+  if (amount <= 0) {
+    alert('أدخل المبلغ');
     return;
   }
+  
+  // تحديد وسيلة الدفع: المحفوظة أو اليدوية
+  let account = selectedAccount;
+  let methodId = selectedMethodId;
+  let methodName = '';
+  
+  // لو العميل كتب وسيلة يدوية
+  const manualName = document.getElementById('manualMethodName')?.value?.trim() || '';
+  const manualAccount = document.getElementById('manualAccount')?.value?.trim() || '';
+  
+  if (manualName && manualAccount) {
+    account = manualAccount;
+    methodName = manualName;
+    
+    // حفظ الوسيلة لو طلب ذلك
+    const saveMethod = document.getElementById('saveMethod')?.checked;
+    if (saveMethod) {
+      try {
+        await fetch(`${BASE}/api/player/methods/add`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({uid, method_name: manualName, account_number: manualAccount, method_type: 'manual', icon: '💳'})
+        });
+      } catch(e) {}
+    }
+  } else if (!account) {
+    alert('اختر وسيلة دفع محفوظة أو اكتب وسيلة يدوياً');
+    return;
+  }
+  
   try {
     const r = await fetch(`${BASE}/api/deposit/quick`, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({uid, amount, method_id: selectedMethodId, account_number: selectedAccount})
+      body: JSON.stringify({uid, amount, method_id: methodId, account_number: account})
     });
     const d = await r.json();
     if (d.success) {
