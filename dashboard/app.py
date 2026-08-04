@@ -3437,22 +3437,66 @@ def api_engine_result():
 
 # ===== Quick Deposits =====
 
+@app.route('/api/games/payment-methods')
+@webapp_auth
+def api_games_payment_methods():
+    """وسائل الدفع النشطة المتاحة للألعاب من payment_methods.csv"""
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    uid = get_request_uid()
+    methods = _gm.get_games_payment_methods()
+    saved_methods = _gm.get_payment_methods(uid)
+    return jsonify({
+        'methods': methods,
+        'saved_methods': saved_methods,
+        'count': len(methods)
+    })
+
 @app.route('/api/deposit/quick', methods=['POST'])
 @webapp_auth
 def api_deposit_quick():
-    """طلب إيداع سريع أثناء اللعب"""
+    """طلب إيداع سريع — ينشئ معاملة حقيقية في transactions.csv بملاحظة VEX"""
     if not _VEX_GAMES:
         return jsonify({'error': 'Games engine not available'}), 500
     data = request.json
     uid = get_request_uid()
     amount = float(data.get('amount', 0))
     method_id = data.get('method_id', '')
-    account_number = data.get('account_number', '')
-    if not uid or amount <= 0:
+    method_name = data.get('method_name', '')
+    method_account_data = data.get('method_account_data', '')
+    player_wallet = data.get('player_wallet', '')
+    save_method = data.get('save_method', False)
+    if not uid or amount <= 0 or not method_id:
         return jsonify({'error': 'Missing params'}), 400
-    dep_id = _gm.create_quick_deposit(uid, amount, method_id, account_number)
-    push_notification('game_deposit', '💰 إيداع جديد', f'لاعب {uid} طلب إيداع {amount}', {'deposit_id': dep_id, 'uid': uid, 'amount': amount})
-    return jsonify({'success': True, 'deposit_id': dep_id, 'status': 'pending'})
+
+    # Get user info for admin notification
+    user_info = _gm.get_user_info(uid)
+    user_name = user_info.get('name', '')
+    customer_id = user_info.get('customer_id', '')
+    currency = user_info.get('currency', 'SAR')
+
+    dep_id = _gm.create_quick_deposit(
+        uid, amount, method_id, method_account_data,
+        method_name=method_name,
+        method_account_data=method_account_data,
+        player_wallet=player_wallet,
+        save_method=save_method
+    )
+
+    # Push to dashboard
+    push_notification(
+        'game_deposit',
+        f'💰 إيداع محفظة VEX',
+        f'اللاعب {user_name} ({customer_id}) طلب إيداع {amount} {currency}\nالوسيلة: {method_name}\nمحفظة اللاعب: {player_wallet}',
+        {'deposit_id': dep_id, 'uid': uid, 'amount': amount, 'method': method_name}
+    )
+
+    return jsonify({
+        'success': True,
+        'deposit_id': dep_id,
+        'trans_id': f"DEP{datetime.now().strftime('%Y%m%d%H%M%S')}",
+        'status': 'pending'
+    })
 
 @app.route('/api/deposit/pending')
 @api_auth

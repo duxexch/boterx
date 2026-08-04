@@ -96,6 +96,8 @@ class GameManager:
 
         # ترحيل users.csv لإضافة game_balance
         self._migrate_users_csv()
+        # ترحيل payment_methods.csv لإضافة available_for_games
+        self._migrate_payment_methods_for_games()
 
     def _migrate_users_csv(self):
         """إضافة عمود game_balance إلى users.csv"""
@@ -119,6 +121,51 @@ class GameManager:
             print(f"Migration error: {e}")
 
     # ===== المحفظة الموحدة (users.csv) =====
+
+    def _migrate_payment_methods_for_games(self):
+        """إضافة عمود available_for_games إلى payment_methods.csv"""
+        try:
+            with open('payment_methods.csv', 'r', encoding=CSV_ENCODING) as f:
+                reader = csv.DictReader(f)
+                fieldnames = reader.fieldnames or []
+                if 'available_for_games' in fieldnames:
+                    return
+                rows = list(reader)
+            new_fields = list(fieldnames) + ['available_for_games']
+            for row in rows:
+                row['available_for_games'] = 'yes'
+            with open('payment_methods.csv', 'w', newline='', encoding=CSV_ENCODING) as f:
+                writer = csv.DictWriter(f, fieldnames=new_fields)
+                writer.writeheader()
+                for row in rows:
+                    writer.writerow({k: row.get(k, '') for k in new_fields})
+        except Exception as e:
+            print(f"Payment methods migration error: {e}")
+
+    def get_games_payment_methods(self, user_currency=None):
+        """قراءة وسائل الدفع النشطة والمتاحة للألعاب من payment_methods.csv"""
+        methods = []
+        try:
+            with open('payment_methods.csv', 'r', encoding=CSV_ENCODING) as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row.get('status') == 'active' and row.get('available_for_games', 'yes') == 'yes':
+                        methods.append(row)
+        except:
+            pass
+        return methods
+
+    def get_user_info(self, user_id):
+        """قراءة بيانات المستخدم من users.csv"""
+        try:
+            with open('users.csv', 'r', encoding=CSV_ENCODING) as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row.get('telegram_id') == str(user_id):
+                        return row
+        except:
+            pass
+        return {}
 
     def get_balance(self, user_id):
         """قراءة رصيد محفظة الألعاب من users.csv"""
@@ -357,8 +404,14 @@ class GameManager:
 
     # ===== الإيداع السريع =====
 
-    def create_quick_deposit(self, user_id, amount, payment_method_id, account_number):
+    def create_quick_deposit(self, user_id, amount, payment_method_id, account_number,
+                             method_name='', method_account_data='', player_wallet='',
+                             save_method=False):
+        """إنشاء إيداع سريع — يكتب في quick_deposits.csv + transactions.csv كمعاملة حقيقية"""
         dep_id = f"DEP{str(int(datetime.now().timestamp()))[-8:]}"
+        now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        # 1. كتابة في quick_deposits.csv
         fieldnames = ['id', 'user_id', 'amount', 'payment_method_id',
                       'account_number', 'status', 'approved_by', 'approved_at',
                       'game_session_id', 'created_at']
@@ -366,7 +419,7 @@ class GameManager:
             'id': dep_id, 'user_id': str(user_id), 'amount': str(amount),
             'payment_method_id': payment_method_id, 'account_number': account_number,
             'status': 'pending', 'approved_by': '', 'approved_at': '',
-            'game_session_id': '', 'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'game_session_id': '', 'created_at': now_str,
         }
         try:
             with open(self.quick_deposits_file, 'a', newline='', encoding=CSV_ENCODING) as f:
@@ -374,6 +427,52 @@ class GameManager:
                 writer.writerow(row)
         except:
             pass
+
+        # 2. كتابة معاملة حقيقية في transactions.csv
+        user_info = self.get_user_info(user_id)
+        trans_id = f"DEP{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        currency = user_info.get('currency', 'SAR')
+        customer_id = user_info.get('customer_id', '')
+        user_name = user_info.get('name', '')
+        company_field = f"{method_name}__{method_account_data}" if method_name else payment_method_id
+
+        try:
+            txn_fields = ['id', 'customer_id', 'telegram_id', 'name', 'type', 'company',
+                          'wallet_number', 'amount', 'exchange_address', 'status',
+                          'date', 'admin_note', 'processed_by', 'currency']
+            txn_row = {
+                'id': trans_id,
+                'customer_id': customer_id,
+                'telegram_id': str(user_id),
+                'name': user_name,
+                'type': 'deposit',
+                'company': company_field,
+                'wallet_number': player_wallet or account_number,
+                'amount': str(amount),
+                'exchange_address': '',
+                'status': 'pending',
+                'date': now_str,
+                'admin_note': 'إيداع محفظة VEX',
+                'processed_by': '',
+                'currency': currency,
+            }
+            txn_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'transactions.csv')
+            with open(txn_file, 'a', newline='', encoding=CSV_ENCODING) as f:
+                writer = csv.DictWriter(f, fieldnames=txn_fields)
+                writer.writerow(txn_row)
+        except Exception as e:
+            print(f"Transaction write error: {e}")
+
+        # 3. حفظ محفظة اللاعب لو طلب ذلك
+        if save_method and player_wallet:
+            self.add_payment_method(
+                user_id=user_id,
+                method_name=method_name or 'محفظة',
+                account_number=player_wallet,
+                method_type='game_wallet',
+                icon='🎮'
+            )
+
         return dep_id
 
     def create_withdrawal(self, user_id, amount, payment_method_id, account_number):

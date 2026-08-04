@@ -323,119 +323,138 @@ async function loadOtherGames() {
 async function showDepositModal(required) {
   const modal = document.getElementById('modal');
   const box = document.getElementById('modalBox');
-  
-  // Load saved payment methods
+
+  // Load bot payment methods (active + available for games)
   let methodsHtml = '';
-  let hasMethods = false;
+  let botMethods = [];
+  let savedWallets = [];
   try {
-    const r = await apiFetch(`${BASE}/api/player/methods?uid=${uid}`);
+    const r = await apiFetch(`${BASE}/api/games/payment-methods?uid=${uid}`);
     const d = await r.json();
-    if (d.methods && d.methods.length > 0) {
-      hasMethods = true;
-      methodsHtml = '<div class="modal-subtitle">📋 وسائلك المحفوظة:</div>';
-      methodsHtml += (d.methods || []).map(m => 
-        `<div class="deposit-method" onclick="selectMethod(this, '${m.account_number}', '${m.id}')">
-          ${m.icon||'💳'} ${m.method_name} — ${m.account_number}
-        </div>`
-      ).join('');
-    }
+    botMethods = d.methods || [];
+    savedWallets = d.saved_methods || [];
   } catch(e) {}
-  
-  // Always show manual entry option
-  methodsHtml += `
-    <div class="modal-subtitle" style="margin-top:12px">✍️ أو اكتب وسيلة دفع يدوياً:</div>
-    <input type="text" id="manualMethodName" placeholder="اسم الوسيلة (مثال: فودافون كاش)" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:8px;color:#fff;font-size:13px;margin-bottom:6px;outline:none">
-    <input type="text" id="manualAccount" placeholder="رقم الحساب / المحفظة" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:8px;color:#fff;font-size:13px;margin-bottom:6px;outline:none">
-    <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#64748b;margin-bottom:8px;cursor:pointer">
-      <input type="checkbox" id="saveMethod" style="accent-color:#fbbf24"> حفظ كوسيلة دفع دائمة
-    </label>
-  `;
-  
-  box.innerHTML = `
-    <div class="modal-title">💰 إيداع سريع</div>
-    <div class="modal-subtitle">رصيدك غير كافٍ للعب</div>
-    <div class="modal-balance">المطلوب: ${required || minBet}</div>
-    <div class="deposit-methods">${methodsHtml}</div>
-    <div id="copyBox" style="display:none">
-      <div class="copy-box" onclick="copyAccount()">
-        <code id="accountNum"></code>
-        <span>📋 نسخ</span>
+
+  if (botMethods.length === 0) {
+    box.innerHTML = `
+      <div class="modal-title">💰 إيداع محفظة VEX</div>
+      <div class="modal-subtitle">لا توجد وسائل دفع متاحة حالياً</div>
+      <button class="modal-btn" onclick="document.getElementById('modal').style.display='none'">إغلاق</button>
+    `;
+    modal.style.display = 'flex';
+    return;
+  }
+
+  // Build method selection list
+  methodsHtml = botMethods.map(m => `
+    <div class="dep-method" onclick="selectGameMethod('${m.id}','${(m.method_name||'').replace(/'/g,"\\'")}','${(m.account_data||'').replace(/'/g,"\\'")}','${(m.icon||'💳')}')">
+      <span style="font-size:18px">${m.icon||'💳'}</span>
+      <div style="flex:1">
+        <div style="font-weight:600;font-size:13px">${m.method_name||''}</div>
+        <div style="font-size:11px;color:#64748b">${m.method_type||''}</div>
       </div>
+      <span style="color:#fbbf24;font-size:14px">‹</span>
     </div>
-    <input type="number" class="modal-input" id="depAmount" placeholder="المبلغ" value="${required || minBet}">
-    <button class="modal-btn" onclick="submitDepositWithManual()">✅ تأكيد الإيداع</button>
-    <button class="modal-btn secondary" onclick="document.getElementById('modal').style.display='none'">إلغاء</button>
+  `).join('');
+
+  box.innerHTML = `
+    <div class="modal-title">💰 إيداع محفظة VEX</div>
+    <div class="modal-subtitle">${required ? `رصيدك غير كافٍ — تحتاج ${required}` : 'اختر وسيلة الدفع'}</div>
+    <div id="depMethodsList">${methodsHtml}</div>
+    <div id="depStep2" style="display:none">
+      <div style="font-size:11px;color:#64748b;margin:10px 0 6px">📋 بيانات الوسيلة:</div>
+      <div class="copy-box" onclick="copyMethodData()" style="display:flex;align-items:center;justify-content:space-between;background:#0f172a;border:1px solid #334155;border-radius:10px;padding:10px 12px;cursor:pointer;margin-bottom:10px">
+        <code id="methodDataDisplay" style="font-size:13px;color:#fbbf24;word-break:break-all"></code>
+        <span style="font-size:12px;color:#94a3b8;flex-shrink:0;margin-right:8px">📋 نسخ</span>
+      </div>
+      <div style="font-size:11px;color:#64748b;margin:8px 0 4px">💵 المبلغ الذي سترسله:</div>
+      <input type="number" id="depAmount" placeholder="المبلغ" value="${required || minBet}" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px;color:#fff;font-size:15px;font-weight:700;outline:none;margin-bottom:8px">
+      <div style="font-size:11px;color:#64748b;margin:8px 0 4px">🔐 رقم محفظتك (التي سترسل منها):</div>
+      <input type="text" id="playerWallet" placeholder="رقم محفظتك" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px;color:#fff;font-size:15px;font-weight:700;outline:none;margin-bottom:8px">
+      <div id="savedWalletsHint" style="display:none;font-size:11px;color:#34d399;margin-bottom:6px"></div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#64748b;margin-bottom:10px;cursor:pointer">
+        <input type="checkbox" id="saveMethod" style="accent-color:#fbbf24"> حفظ كوسيلة دفع دائمة
+      </label>
+      <button class="modal-btn" onclick="submitGameDeposit()">✅ تأكيد الإيداع</button>
+      <button class="modal-btn secondary" onclick="backToMethods()" style="margin-top:6px">‹ رجوع</button>
+    </div>
+    <button class="modal-btn secondary" onclick="document.getElementById('modal').style.display='none'" style="margin-top:6px">إلغاء</button>
   `;
   modal.style.display = 'flex';
 }
 
-let selectedAccount = '';
-let selectedMethodId = '';
+let selectedMethod = null;
 
-function selectMethod(el, account, methodId) {
-  document.querySelectorAll('.deposit-method').forEach(m => m.classList.remove('selected'));
-  el.classList.add('selected');
-  selectedAccount = account;
-  selectedMethodId = methodId;
-  document.getElementById('copyBox').style.display = 'block';
-  document.getElementById('accountNum').textContent = account;
+function selectGameMethod(methodId, methodName, methodAccountData, icon) {
+  selectedMethod = { id: methodId, name: methodName, account_data: methodAccountData, icon: icon };
+
+  // Pre-fill saved wallet if exists
+  let savedWallet = '';
+  let savedHint = '';
+  if (savedWallets.length > 0) {
+    const match = savedWallets.find(w => w.method_name && w.method_name.includes(methodName));
+    if (match) {
+      savedWallet = match.account_number;
+      savedHint = `✓ محفظتك المحفوظة: ${savedWallet}`;
+    }
+  }
+
+  document.getElementById('depMethodsList').style.display = 'none';
+  document.getElementById('depStep2').style.display = 'block';
+  document.getElementById('methodDataDisplay').textContent = methodAccountData;
+  if (savedWallet) {
+    document.getElementById('playerWallet').value = savedWallet;
+    document.getElementById('savedWalletsHint').style.display = 'block';
+    document.getElementById('savedWalletsHint').textContent = savedHint;
+  }
 }
 
-function copyAccount() {
-  navigator.clipboard.writeText(selectedAccount).then(() => {
+function copyMethodData() {
+  const data = document.getElementById('methodDataDisplay').textContent;
+  navigator.clipboard.writeText(data).then(() => {
     haptic('light');
+    const btn = document.querySelector('.copy-box span');
+    if (btn) { btn.textContent = '✓ تم النسخ'; setTimeout(() => btn.textContent = '📋 نسخ', 1500); }
   });
 }
 
-async function submitDepositWithManual() {
+function backToMethods() {
+  document.getElementById('depMethodsList').style.display = 'block';
+  document.getElementById('depStep2').style.display = 'none';
+}
+
+async function submitGameDeposit() {
   const amount = parseFloat(document.getElementById('depAmount').value) || 0;
-  if (amount <= 0) {
-    alert('أدخل المبلغ');
-    return;
-  }
-  
-  // تحديد وسيلة الدفع: المحفوظة أو اليدوية
-  let account = selectedAccount;
-  let methodId = selectedMethodId;
-  let methodName = '';
-  
-  // لو العميل كتب وسيلة يدوية
-  const manualName = document.getElementById('manualMethodName')?.value?.trim() || '';
-  const manualAccount = document.getElementById('manualAccount')?.value?.trim() || '';
-  
-  if (manualName && manualAccount) {
-    account = manualAccount;
-    methodName = manualName;
-    
-    // حفظ الوسيلة لو طلب ذلك
-    const saveMethod = document.getElementById('saveMethod')?.checked;
-    if (saveMethod) {
-      try {
-        await apiFetch(`${BASE}/api/player/methods/add`, {
-          method: 'POST',
-          body: JSON.stringify({uid, method_name: manualName, account_number: manualAccount, method_type: 'manual', icon: '💳'})
-        });
-      } catch(e) {}
-    }
-  } else if (!account) {
-    alert('اختر وسيلة دفع محفوظة أو اكتب وسيلة يدوياً');
-    return;
-  }
-  
+  const playerWallet = document.getElementById('playerWallet').value.trim();
+  const saveMethod = document.getElementById('saveMethod').checked;
+
+  if (amount <= 0) { alert('أدخل المبلغ'); return; }
+  if (!playerWallet) { alert('أدخل رقم محفظتك'); return; }
+  if (!selectedMethod) { alert('اختر وسيلة دفع'); return; }
+
   try {
     const r = await apiFetch(`${BASE}/api/deposit/quick`, {
       method: 'POST',
-      body: JSON.stringify({uid, amount, method_id: methodId, account_number: account})
+      body: JSON.stringify({
+        uid, amount,
+        method_id: selectedMethod.id,
+        method_name: selectedMethod.name,
+        method_account_data: selectedMethod.account_data,
+        player_wallet: playerWallet,
+        save_method: saveMethod
+      })
     });
     const d = await r.json();
     if (d.success) {
       document.getElementById('modalBox').innerHTML = `
         <div class="modal-title">⏳ بانتظار التأكيد</div>
-        <div class="modal-subtitle">تم إرسال طلب الإيداع<br>سيتم إضافة الرصيد بعد موافقة الإدارة</div>
-        <button class="modal-btn" onclick="document.getElementById('modal').style.display='none'">إغلاق</button>
+        <div class="modal-subtitle">تم إرسال طلب الإيداع<br>سيتم إضافة الرصيد لمحفظة VEX بعد موافقة الإدارة</div>
+        <button class="modal-btn" onclick="document.getElementById('modal').style.display='none';loadBalance();">إغلاق</button>
       `;
+    } else {
+      alert(d.error || 'خطأ في الإيداع');
     }
-  } catch(e) {}
+  } catch(e) { alert('خطأ في الاتصال'); }
 }
 
 function confettiBurst() {
