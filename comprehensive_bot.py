@@ -17267,11 +17267,11 @@ class ComprehensiveDUXBot:
         games_url = f"{base_url}/webapp/games?uid={user_id}&lang={lang}&currency={currency}"
 
         # زر WebApp للألعاب + إيداع + سحب
-        kb = json.dumps({'inline_keyboard': [
+        kb = {'inline_keyboard': [
             [{'text': '🎮 ادخل مركز الألعاب', 'web_app': {'url': games_url}}],
             [{'text': '💰 إيداع للمحفظة', 'callback_data': 'game_wallet_deposit'},
              {'text': '💸 سحب من المحفظة', 'callback_data': 'game_wallet_withdraw'}]
-        ]})
+        ]}
         self.api_call('sendMessage', {
             'chat_id': message['chat']['id'],
             'text': text,
