@@ -97,7 +97,7 @@ def api_auth(f):
 @app.route('/')
 @login_required
 def index():
-    return redirect(url_for('dashboard'))
+    return redirect(url_for('dashboard'), code=303)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -110,7 +110,7 @@ def login():
             session['admin_id'] = admin_id
             session['login_time'] = datetime.now().isoformat()
             log_action('login', f'Admin {admin_id} logged in')
-            return redirect(url_for('dashboard'))
+            return redirect(url_for('dashboard'), code=303)
         elif admin_id not in ADMIN_IDS:
             error = 'معرف الأدمن غير صحيح'
         else:
