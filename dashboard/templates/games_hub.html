@@ -39,7 +39,7 @@ body{overflow:hidden;font-family:system-ui,sans-serif;background:#0f172a;color:#
 <div id="app" style="display:none">
   <div id="topbar">
     <div>
-      <div class="balance">💰 <span id="bal">0</span> <span id="cur">SAR</span></div>
+      <div class="balance">💰 <span id="bal">0</span> <span id="cur" style="font-size:12px;cursor:pointer" onclick="showCurrencyPicker()" title="تغيير العملة">EGP</span></div>
       <div class="stats" id="stats"></div>
     </div>
     <div style="display:flex;gap:6px">
@@ -84,7 +84,49 @@ async function loadBalance() {
     const r = await apiFetch(`${BASE}/api/wallet/balance?uid=${uid}`);
     const d = await r.json();
     document.getElementById('bal').textContent = (d.balance || 0).toLocaleString();
+    if (d.currency) document.getElementById('cur').textContent = d.currency;
   } catch(e) {}
+}
+
+function showCurrencyPicker() {
+  const currencies = [
+    {code:'EGP', name:'جنيه مصري 🇪🇬', flag:'🇪🇬'},
+    {code:'SAR', name:'ريال سعودي 🇸🇦', flag:'🇸🇦'},
+    {code:'USD', name:'دولار أمريكي 🇺🇸', flag:'🇺🇸'},
+    {code:'USDT', name:'تيذر 🪙', flag:'🪙'},
+    {code:'AED', name:'درهم إماراتي 🇦🇪', flag:'🇦🇪'},
+    {code:'KWD', name:'دينار كويتي 🇰🇼', flag:'🇰🇼'},
+    {code:'QAR', name:'ريال قطري 🇶🇦', flag:'🇶🇦'},
+    {code:'BHD', name:'دينار بحريني 🇧🇭', flag:'🇧🇭'},
+    {code:'OMR', name:'ريال عماني 🇴🇲', flag:'🇴🇲'},
+    {code:'JOD', name:'دينار أردني 🇯🇴', flag:'🇯🇴'},
+    {code:'MAD', name:'درهم مغربي 🇲🇦', flag:'🇲🇦'},
+    {code:'DZD', name:'دينار جزائري 🇩🇿', flag:'🇩🇿'},
+    {code:'TND', name:'دينار تونسي 🇹🇳', flag:'🇹🇳'},
+    {code:'LYD', name:'دينار ليبي 🇱🇾', flag:'🇱🇾'},
+    {code:'IQD', name:'دينار عراقي 🇮🇶', flag:'🇮🇶'},
+    {code:'YER', name:'ريال يمني 🇾🇪', flag:'🇾🇪'},
+    {code:'SDG', name:'جنيه سوداني 🇸🇩', flag:'🇸🇩'},
+  ];
+  const box = document.getElementById('modalBox');
+  box.innerHTML = `<div style="font-size:16px;font-weight:700;margin-bottom:8px">💱 اختر عملتك</div>
+    <div style="font-size:11px;color:#64748b;margin-bottom:10px">العملة الحالية: ${document.getElementById('cur').textContent}</div>
+    ${currencies.map(c => `<div onclick="changeCurrency('${c.code}')" style="display:flex;align-items:center;gap:8px;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px;margin-bottom:4px;cursor:pointer"><span style="font-size:18px">${c.flag}</span><span style="font-size:13px">${c.name}</span></div>`).join('')}
+    <button onclick="closeModal()" style="width:100%;background:#334155;color:#94a3b8;border:none;padding:8px;border-radius:10px;font-size:12px;cursor:pointer;margin-top:8px">إلغاء</button>`;
+  document.getElementById('modal').style.display = 'flex';
+}
+
+async function changeCurrency(newCurrency) {
+  try {
+    await apiFetch(`${BASE}/api/player/currency`, {
+      method: 'POST',
+      body: JSON.stringify({uid, currency: newCurrency})
+    });
+    document.getElementById('cur').textContent = newCurrency;
+    closeModal();
+    loadBalance();
+    loadGames();
+  } catch(e) { alert('خطأ في تغيير العملة'); }
 }
 
 async function loadProfile() {

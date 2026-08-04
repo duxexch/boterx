@@ -3299,14 +3299,16 @@ def api_games_toggle(game_id):
 @app.route('/api/wallet/balance')
 @webapp_auth
 def api_wallet_balance():
-    """رصيد اللاعب"""
+    """رصيد اللاعب + عملته"""
     if not _VEX_GAMES:
         return jsonify({'error': 'Games engine not available'}), 500
     uid = get_request_uid()
     if not uid:
         return jsonify({'error': 'Missing uid'}), 400
     balance = _gm.get_balance(uid)
-    return jsonify({'balance': balance, 'uid': uid})
+    user_info = _gm.get_user_info(uid)
+    currency = user_info.get('currency', 'EGP')
+    return jsonify({'balance': balance, 'uid': uid, 'currency': currency})
 
 @app.route('/api/wallet/add', methods=['POST'])
 @api_auth
@@ -3456,16 +3458,19 @@ def api_engine_result():
 @app.route('/api/games/payment-methods')
 @webapp_auth
 def api_games_payment_methods():
-    """وسائل الدفع النشطة المتاحة للألعاب من payment_methods.csv"""
+    """وسائل الدفع النشطة المتاحة للألعاب — مفلترة حسب عملة المستخدم"""
     if not _VEX_GAMES:
         return jsonify({'error': 'Games engine not available'}), 500
     uid = get_request_uid()
-    methods = _gm.get_games_payment_methods()
+    user_info = _gm.get_user_info(uid)
+    user_currency = user_info.get('currency', 'EGP')
+    methods = _gm.get_games_payment_methods(user_currency)
     saved_methods = _gm.get_payment_methods(uid)
     return jsonify({
         'methods': methods,
         'saved_methods': saved_methods,
-        'count': len(methods)
+        'count': len(methods),
+        'currency': user_currency
     })
 
 @app.route('/api/deposit/quick', methods=['POST'])
@@ -3579,6 +3584,32 @@ def api_deposit_reject(dep_id):
     return jsonify({'success': True})
 
 # ===== Player Payment Methods =====
+
+@app.route('/api/player/currency', methods=['POST'])
+@webapp_auth
+def api_player_change_currency():
+    """تغيير عملة المستخدم في users.csv"""
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    data = request.json
+    uid = get_request_uid()
+    new_currency = data.get('currency', 'EGP')
+    try:
+        rows = []
+        with open(os.path.join(BASE_DIR, 'users.csv'), 'r', encoding='utf-8-sig') as f:
+            reader = csv.DictReader(f)
+            fieldnames = reader.fieldnames
+            for row in reader:
+                if row.get('telegram_id') == str(uid):
+                    row['currency'] = new_currency
+                rows.append(row)
+        with open(os.path.join(BASE_DIR, 'users.csv'), 'w', newline='', encoding='utf-8-sig') as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(rows)
+        return jsonify({'success': True, 'currency': new_currency})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/player/methods')
 @webapp_auth

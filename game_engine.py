@@ -151,14 +151,18 @@ class GameManager:
             print(f"Payment methods migration error: {e}")
 
     def get_games_payment_methods(self, user_currency=None):
-        """قراءة وسائل الدفع النشطة والمتاحة للألعاب من payment_methods.csv"""
+        """قراءة وسائل الدفع النشطة والمتاحة للألعاب — مفلترة حسب العملة"""
         methods = []
         try:
             with open('payment_methods.csv', 'r', encoding=CSV_ENCODING) as f:
                 reader = csv.DictReader(f)
                 for row in reader:
                     if row.get('status') == 'active' and row.get('available_for_games', 'yes') == 'yes':
-                        methods.append(row)
+                        method_currency = row.get('currency', '').strip()
+                        if not method_currency or method_currency == 'كل العملات' or not user_currency:
+                            methods.append(row)
+                        elif method_currency == user_currency:
+                            methods.append(row)
         except:
             pass
         return methods
@@ -508,6 +512,7 @@ class GameManager:
         return dep_id, None
 
     def approve_deposit(self, dep_id, admin_id):
+        """موافقة على إيداع — يضيف الرصيد لمحفظة VEX"""
         rows = []
         approved = None
         try:
@@ -525,10 +530,14 @@ class GameManager:
                 writer = csv.DictWriter(f, fieldnames=fieldnames)
                 writer.writeheader()
                 writer.writerows(rows)
-        except:
-            pass
+        except Exception as e:
+            print(f"approve_deposit CSV error: {e}")
         if approved:
-            self.add_balance(approved['user_id'], float(approved['amount']))
+            try:
+                new_bal = self.add_balance(approved['user_id'], float(approved['amount']))
+                print(f"approve_deposit: added {approved['amount']} to {approved['user_id']}, new balance: {new_bal}")
+            except Exception as e:
+                print(f"approve_deposit add_balance error: {e}")
         return approved
 
     def approve_withdrawal(self, dep_id, admin_id):

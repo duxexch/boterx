@@ -3926,7 +3926,7 @@ class ComprehensiveDUXBot:
             'KR': 'KRW', 'TH': 'THB', 'DE': 'EUR', 'FR': 'EUR', 'ES': 'EUR',
             'IT': 'EUR', 'BR': 'BRL', 'US': 'USD', 'GB': 'GBP',
         }
-        return COUNTRY_TO_CURRENCY.get(country_code, 'USD')
+        return COUNTRY_TO_CURRENCY.get(country_code, 'EGP')
     
     def link_telegram_to_user(self, phone, new_telegram_id):
         """ربط telegram_id جديد بحساب موجود برقم الهاتف — عند إعادة التسجيل"""
