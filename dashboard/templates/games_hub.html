@@ -72,6 +72,10 @@ async function apiFetch(url, opts = {}) {
   if (opts.body && typeof opts.body === 'string') {
     opts.headers['Content-Type'] = 'application/json';
   }
+  // Auto-append uid if not present in URL
+  if (uid && !url.includes('uid=')) {
+    url += (url.includes('?') ? '&' : '?') + 'uid=' + uid;
+  }
   return fetch(url, opts);
 }
 

@@ -87,6 +87,7 @@ async function apiFetch(url, opts = {}) {
   opts.headers = opts.headers || {};
   opts.headers['X-Telegram-Init-Data'] = initData;
   if (opts.body && typeof opts.body === 'string') { opts.headers['Content-Type'] = 'application/json'; }
+  if (uid && !url.includes('uid=')) { url += (url.includes('?') ? '&' : '?') + 'uid=' + uid; }
   return fetch(url, opts);
 }
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
