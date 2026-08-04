@@ -17206,75 +17206,81 @@ class ComprehensiveDUXBot:
 
     def show_games_hub(self, message):
         """مركز الألعاب — يفتح WebApp خارجي مرتبط بمحفظة العميل"""
-        user = self.find_user(message['from']['id'])
-        if not user:
-            self.handle_start(message)
-            return
-        lang = user.get('language', 'ar')
-        user_id = message['from']['id']
-        currency = user.get('currency', 'SAR')
-
-        # قراءة رصيد محفظة الألعاب
-        wallet_balance = 0.0
         try:
-            from game_engine import GameManager
-            gm = GameManager()
-            wallet_balance = gm.get_balance(user_id)
-        except:
-            if self.svrp:
-                try:
-                    for w in self.svrp.get_all_wallets():
-                        if str(w.get('telegram_id', '')) == str(user_id):
-                            wallet_balance = float(w.get('balance', 0) or 0)
-                            break
-                except:
-                    pass
+            user = self.find_user(message['from']['id'])
+            if not user:
+                self.handle_start(message)
+                return
+            lang = user.get('language', 'ar')
+            user_id = message['from']['id']
+            currency = user.get('currency', 'SAR')
 
-        # قراءة شريحة اللاعب
-        player_segment = 'جديد'
-        is_vex_partner = False
-        try:
-            from player_tracker import PlayerTracker
-            pt = PlayerTracker()
-            profile = pt.get_profile(user_id)
-            segment = pt.get_segment(profile)
-            seg_labels = {
-                'new': '🟢 جديد', 'winner': '🔴 رابح', 'loser': '🟡 خاسر',
-                'hot': '🔥 ساخن', 'churning': '⚠️ قد يغادر',
-                'vip': '💎 VIP', 'regular': '👤 عادي'
-            }
-            player_segment = seg_labels.get(segment, '👤 عادي')
-            is_vex_partner = profile.get('is_vex_partner') == 'yes'
-            # مزامنة العملة
-            if 'currency' not in profile or profile.get('currency') != currency:
-                pt._save_profile({**profile, 'currency': currency})
-        except:
-            pass
+            # قراءة رصيد محفظة الألعاب
+            wallet_balance = 0.0
+            try:
+                from game_engine import GameManager
+                gm = GameManager()
+                wallet_balance = gm.get_balance(user_id)
+            except Exception as e:
+                logger.error(f"games_hub balance error: {e}")
+                if self.svrp:
+                    try:
+                        for w in self.svrp.get_all_wallets():
+                            if str(w.get('telegram_id', '')) == str(user_id):
+                                wallet_balance = float(w.get('balance', 0) or 0)
+                                break
+                    except:
+                        pass
 
-        text = self.ui_card_pro('مركز الألعاب', '🎮', items=[
-            {'label': 'رصيدك', 'value': f"{wallet_balance:.0f} {currency}", 'icon': '💰', 'highlight': True},
-            {'label': 'شريحتك', 'value': player_segment, 'icon': '📊'},
-        ])
-        text += "\n⚡ كل لعبة مرتبطة بمحفظتك\n"
-        text += f"💰 عملتك: {currency}\n"
-        if is_vex_partner:
-            text += "💎 تعويض متاح أثناء اللعب!\n"
+            # قراءة شريحة اللاعب
+            player_segment = 'جديد'
+            is_vex_partner = False
+            try:
+                from player_tracker import PlayerTracker
+                pt = PlayerTracker()
+                profile = pt.get_profile(user_id)
+                segment = pt.get_segment(profile)
+                seg_labels = {
+                    'new': '🟢 جديد', 'winner': '🔴 رابح', 'loser': '🟡 خاسر',
+                    'hot': '🔥 ساخن', 'churning': '⚠️ قد يغادر',
+                    'vip': '💎 VIP', 'regular': '👤 عادي'
+                }
+                player_segment = seg_labels.get(segment, '👤 عادي')
+                is_vex_partner = profile.get('is_vex_partner') == 'yes'
+                if 'currency' not in profile or profile.get('currency') != currency:
+                    pt._save_profile({**profile, 'currency': currency})
+            except:
+                pass
 
-        base_url = self.get_setting('dashboard_url') or 'https://69.169.108.197.sslip.io'
-        games_url = f"{base_url}/webapp/games?uid={user_id}&lang={lang}&currency={currency}"
+            text = self.ui_card_pro('مركز الألعاب', '🎮', items=[
+                {'label': 'رصيدك', 'value': f"{wallet_balance:.0f} {currency}", 'icon': '💰', 'highlight': True},
+                {'label': 'شريحتك', 'value': player_segment, 'icon': '📊'},
+            ])
+            text += "\n⚡ كل لعبة مرتبطة بمحفظتك\n"
+            text += f"💰 عملتك: {currency}\n"
+            if is_vex_partner:
+                text += "💎 تعويض متاح أثناء اللعب!\n"
 
-        # زر WebApp للألعاب + إيداع + سحب
-        kb = {'inline_keyboard': [
-            [{'text': '🎮 ادخل مركز الألعاب', 'web_app': {'url': games_url}}],
-            [{'text': '💰 إيداع للمحفظة', 'callback_data': 'game_wallet_deposit'},
-             {'text': '💸 سحب من المحفظة', 'callback_data': 'game_wallet_withdraw'}]
-        ]}
-        self.api_call('sendMessage', {
-            'chat_id': message['chat']['id'],
-            'text': text,
-            'parse_mode': 'HTML',
-            'reply_markup': kb
-        })
+            base_url = self.get_setting('dashboard_url') or 'https://69.169.108.197.sslip.io'
+            games_url = f"{base_url}/webapp/games?uid={user_id}&lang={lang}&currency={currency}"
+
+            kb = {'inline_keyboard': [
+                [{'text': '🎮 ادخل مركز الألعاب', 'web_app': {'url': games_url}}],
+                [{'text': '💰 إيداع للمحفظة', 'callback_data': 'game_wallet_deposit'},
+                 {'text': '💸 سحب من المحفظة', 'callback_data': 'game_wallet_withdraw'}]
+            ]}
+            result = self.api_call('sendMessage', {
+                'chat_id': message['chat']['id'],
+                'text': text,
+                'parse_mode': 'HTML',
+                'reply_markup': kb
+            })
+            if not result or not result.get('ok'):
+                logger.error(f"games_hub sendMessage failed: {result.get('description', 'unknown') if result else 'no response'}")
+            else:
+                logger.info(f"games_hub sent to {user_id}")
+        except Exception as e:
+            logger.error(f"show_games_hub crashed: {e}")
 
     def show_more_menu(self, message):
         """قائمة المزيد — أزرار إضافية منظمة"""
