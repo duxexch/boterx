@@ -4300,9 +4300,7 @@ class ComprehensiveDUXBot:
         lang_names = self.get_language_names()
         lang_btn_text = f"{t.get('btn_language', '🌐')} {lang_names.get(lang, {}).get('native', 'Language')}"
 
-        # تصميم منظم: أزرار مجمعة لتقليل العدد — كل مجموعة تفتح أزرارها داخل الدردشة
-        wheel_btn = self.tr('a0236_عجلة_الحظ', lang)
-        lottery_btn = self.tr('a0235_يانصيب', lang) if self.tr('a0235_يانصيب', lang) != 'a0235_يانصيب' else '🎰 يانصيب'
+        # تصميم منظم — اليانصيب وعجلة الحظ داخل مركز الألعاب
         more_btn = self.tr('a0238_المزيد', lang) if self.tr('a0238_المزيد', lang) != 'a0238_المزيد' else '⚙️ المزيد'
         wallet_btn = self.tr('a0237_محفظتي', lang) if self.tr('a0237_محفظتي', lang) != 'a0237_محفظتي' else '💎 محفظتي'
 
@@ -4310,8 +4308,7 @@ class ComprehensiveDUXBot:
             [{'text': deposit_btn}, {'text': withdraw_btn}],
             [{'text': '💱 تداول USDT'}, {'text': svrp_btn}],
             [{'text': wallet_btn}, {'text': profile_btn}],
-            [{'text': match_btn}, {'text': lottery_btn}],
-            [{'text': wheel_btn}, {'text': '🎮 ألعاب'}],
+            [{'text': match_btn}, {'text': '🎮 ألعاب'}],
             [{'text': apps_btn}, {'text': ref_btn}],
             [{'text': notif_btn}, {'text': complaint_btn}],
             [{'text': more_btn}, {'text': lang_btn_text}],
