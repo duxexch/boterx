@@ -1,213 +1,227 @@
-{% extends 'base.html' %}
-{% block title %}اليانصيب — Boterx{% endblock %}
-{% block page_title %}🎰 اليانصيب{% endblock %}
-
-{% block content %}
-<div x-data="lotteryApp()" x-init="init()" class="space-y-6">
-
-    <div class="flex justify-between items-center">
-        <p class="text-slate-400 text-sm">إدارة جولات اليانصيب — إنشاء + سحب</p>
-        <div class="flex gap-2">
-            <button @click="showCreateModal = true" class="btn btn-primary btn-sm">
-                <i class="fas fa-plus ml-1"></i> إنشاء جولة
-            </button>
-            <button @click="loadData()" class="btn btn-sm" style="background:#475569">
-                <i class="fas fa-rotate ml-1"></i> تحديث
-            </button>
-        </div>
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>اليانصيب</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
+body{font-family:system-ui,sans-serif;background:#0f172a;color:#fff}
+#app{position:fixed;inset:0;display:flex;flex-direction:column}
+#topbar{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:rgba(0,0,0,0.3);backdrop-filter:blur(10px)}
+.balance{font-size:18px;font-weight:900;color:#fbbf24}
+.back-btn{background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer}
+#game-area{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;overflow-y:auto}
+.lottery-title{font-size:28px;font-weight:900;margin-bottom:8px;background:linear-gradient(135deg,#fbbf24,#f59e0b);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.lottery-sub{font-size:13px;color:#64748b;margin-bottom:20px;text-align:center}
+.ticket-display{background:linear-gradient(135deg,#1e293b,#0f172a);border:2px solid #fbbf24;border-radius:16px;padding:20px;margin-bottom:16px;width:100%;max-width:320px;text-align:center;position:relative;overflow:hidden}
+.ticket-display::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 50% 0%,rgba(251,191,36,0.1),transparent);pointer-events:none}
+.ticket-number{font-size:36px;font-weight:900;color:#fbbf24;letter-spacing:4px;margin:8px 0}
+.ticket-label{font-size:12px;color:#64748b}
+.prize-pool{background:rgba(52,211,153,0.1);border:1px solid #34d399;border-radius:12px;padding:10px 20px;margin-bottom:16px}
+.prize-pool-label{font-size:11px;color:#34d399}
+.prize-pool-amount{font-size:24px;font-weight:900;color:#34d399}
+.ticket-count{font-size:12px;color:#64748b;margin-bottom:16px}
+.result-display{font-size:20px;font-weight:700;margin:10px 0;text-align:center;display:none}
+.result-display.show{display:block}
+.result-display.win{color:#34d399}
+.result-display.lose{color:#ef4444}
+#betbar{padding:12px 14px;background:rgba(0,0,0,0.3);backdrop-filter:blur(10px)}
+.bet-row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.bet-input{width:80px;background:#1e293b;border:1px solid #334155;border-radius:10px;padding:10px;color:#fff;font-size:16px;font-weight:700;text-align:center;outline:none}
+.bet-input:focus{border-color:#fbbf24}
+.bet-btn{flex:1;border:none;padding:12px;border-radius:12px;font-size:16px;font-weight:900;cursor:pointer;transition:all 0.2s;background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#000}
+.bet-btn:active{transform:scale(0.97)}
+.bet-btn:disabled{opacity:0.3;cursor:not-allowed}
+.quick-bets{display:flex;gap:6px;justify-content:center}
+.quick-bet{background:#1e293b;border:1px solid #334155;border-radius:8px;padding:5px 10px;color:#94a3b8;font-size:12px;cursor:pointer}
+#history{display:flex;gap:4px;padding:6px 10px;overflow-x:auto;background:rgba(0,0,0,0.2)}
+.history-item{flex-shrink:0;font-size:11px;padding:3px 8px;border-radius:6px;font-weight:700}
+.history-win{background:rgba(52,211,153,0.2);color:#34d399}
+.history-lose{background:rgba(239,68,68,0.2);color:#ef4444}
+#loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0f172a;z-index:200}
+.spinner{width:40px;height:40px;border:3px solid #334155;border-top:3px solid #fbbf24;border-radius:50%;animation:spin 0.8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#livePlayers{max-height:100px;overflow-y:auto;background:rgba(0,0,0,0.25);border-top:1px solid #1e293b}
+.lp-header{display:flex;justify-content:space-between;align-items:center;padding:4px 10px;font-size:10px;color:#64748b;border-bottom:1px solid #1e293b}
+.lp-count{color:#fbbf24;font-weight:700}
+.lp-list{padding:2px 8px}
+.lp-row{display:flex;align-items:center;justify-content:space-between;padding:3px 6px;border-radius:6px;margin:2px 0;font-size:11px}
+.lp-row.win{background:rgba(52,211,153,0.15);color:#34d399}
+.lp-row.lose{background:rgba(239,68,68,0.1);color:#ef4444;opacity:0.7}
+.lp-user{display:flex;align-items:center;gap:4px}
+.lp-avatar{width:18px;height:18px;border-radius:50%;background:#334155;display:flex;align-items:center;justify-content:center;font-size:9px}
+</style>
+</head>
+<body>
+<div id="loading"><div class="spinner"></div></div>
+<div id="app" style="display:none">
+  <div id="topbar">
+    <button class="back-btn" onclick="goBack()">‹</button>
+    <div class="balance">💰 <span id="bal">0</span></div>
+    <div style="width:20px"></div>
+  </div>
+  <div id="history"></div>
+  <div id="game-area">
+    <div class="lottery-title">🎟️ اليانصيب</div>
+    <div class="lottery-sub">اشترِ تذكرة واربح الجائزة الكبرى!</div>
+    <div class="prize-pool">
+      <div class="prize-pool-label">💰 جائزة هذا الدور</div>
+      <div class="prize-pool-amount" id="prizePool">10,000</div>
     </div>
-
-    <template x-if="loading">
-        <div class="text-center p-12 text-slate-400">
-            <i class="fas fa-spinner fa-spin text-3xl"></i>
-            <p class="mt-2" data-i18n="loading">Loading...</p>
-        </div>
-    </template>
-
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <template x-for="r in rounds" :key="r.id">
-            <div class="bg-slate-800 rounded-xl border border-slate-700 p-5 hover:border-amber-500 transition card-hover"
-                 :class="r.status === 'active' ? 'border-amber-500/50 ring-1 ring-amber-500/20' : ''">
-                <div class="flex items-start justify-between mb-4">
-                    <div class="flex items-center gap-3">
-                        <div class="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center text-2xl">🎰</div>
-                        <div>
-                            <h3 class="font-bold text-lg" x-text="r.name || r.id"></h3>
-                            <p class="text-xs text-slate-500 font-mono" x-text="r.id"></p>
-                        </div>
-                    </div>
-                    <span x-html="statusBadge(r.status)"></span>
-                </div>
-
-                <div class="space-y-2">
-                    <div class="flex justify-between p-2 bg-slate-900/50 rounded text-sm">
-                        <span class="text-slate-400">🎫 سعر التذكرة</span>
-                        <span class="font-bold" x-text="`${r.ticket_price || ''} ${r.currency || ''}`"></span>
-                    </div>
-                    <div class="flex justify-between p-2 bg-slate-900/50 rounded text-sm">
-                        <span class="text-slate-400">📊 التذاكر المباعة</span>
-                        <span class="font-bold text-amber-400" x-text="fmtNum(r.tickets_sold || 0)"></span>
-                    </div>
-                    <div class="flex justify-between p-2 bg-slate-900/50 rounded text-sm">
-                        <span class="text-slate-400">👥 المشاركون</span>
-                        <span class="font-bold text-blue-400" x-text="fmtNum(r.participants || 0)"></span>
-                    </div>
-                    <div class="flex justify-between p-2 bg-slate-900/50 rounded text-sm">
-                        <span class="text-slate-400">🏆 الفائزون</span>
-                        <span class="font-bold text-green-400" x-text="r.winner_count || r.winners_count || 0"></span>
-                    </div>
-                    <div class="flex justify-between p-2 bg-slate-900/50 rounded text-sm">
-                        <span class="text-slate-400">🏢 نسبة الإدارة</span>
-                        <span class="font-bold" x-text="(r.admin_profit_pct || 0) + '%'"></span>
-                    </div>
-                    <div class="flex justify-between p-2 bg-slate-900/50 rounded text-sm">
-                        <span class="text-slate-400">⏰ موعد السحب</span>
-                        <span class="font-bold text-xs" x-text="r.draw_time || '—'"></span>
-                    </div>
-                </div>
-
-                <!-- Winners list for completed -->
-                <template x-if="r.status === 'completed' && r.winners_list && r.winners_list.length > 0">
-                    <div class="mt-3 pt-3 border-t border-slate-700">
-                        <p class="text-xs text-slate-400 mb-2">الفائزون:</p>
-                        <div class="space-y-1">
-                            <template x-for="w in r.winners_list" :key="w.id || w.ticket_number">
-                                <div class="flex justify-between text-xs p-1.5 bg-slate-900/30 rounded">
-                                    <span x-text="w.user_name || '—'"></span>
-                                    <span class="font-bold text-green-400" x-text="fmtAmount(w.prize_amount, w.currency)"></span>
-                                </div>
-                            </template>
-                        </div>
-                    </div>
-                </template>
-
-                <!-- Actions -->
-                <div class="mt-4 pt-4 border-t border-slate-700 flex gap-2">
-                    <template x-if="r.status === 'active'">
-                        <button @click="drawRound(r.id)" class="btn btn-warning btn-sm flex-1">
-                            🎲 تنفيذ السحب
-                        </button>
-                    </template>
-                    <template x-if="r.status === 'active'">
-                        <button @click="endRound(r.id)" class="btn btn-danger btn-sm">
-                            🏁 إنهاء
-                        </button>
-                    </template>
-                </div>
-            </div>
-        </template>
+    <div class="ticket-display">
+      <div class="ticket-label">رقم تذكرتك</div>
+      <div class="ticket-number" id="ticketNum">------</div>
+      <div class="ticket-label" id="ticketStatus">لم تشترِ تذكرة بعد</div>
     </div>
-
-    <template x-if="!loading && rounds.length === 0">
-        <div class="bg-slate-800 rounded-xl border border-slate-700 p-12 text-center">
-            <i class="fas fa-dice text-5xl text-slate-600 mb-3"></i>
-            <p class="text-slate-400 text-lg">لا توجد جولات — أنشئ واحدة جديدة</p>
-        </div>
-    </template>
-
-    <!-- Create Modal -->
-    <div x-show="showCreateModal" x-transition class="modal-overlay" @click.self="showCreateModal = false" style="display:none">
-        <div class="modal">
-            <h3 class="font-bold text-lg mb-4">إنشاء جولة يانصيب جديدة</h3>
-            <div class="space-y-3">
-                <div>
-                    <label class="block text-xs text-slate-400 mb-1">اسم الجولة</label>
-                    <input type="text" x-model="form.name" class="input w-full" placeholder="مثال: جولة الصيف">
-                </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-xs text-slate-400 mb-1" data-i18n="ticket_price">Ticket Price</label>
-                        <input type="number" x-model="form.ticket_price" class="input w-full" placeholder="10">
-                    </div>
-                    <div>
-                        <label class="block text-xs text-slate-400 mb-1" data-i18n="currency">Currency</label>
-                        <select x-model="form.currency" class="input w-full">
-                            <option value="SAR">SAR</option>
-                            <option value="USD">USD</option>
-                            <option value="EGP">EGP</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-xs text-slate-400 mb-1">عدد الفائزين</label>
-                        <input type="number" x-model="form.winner_count" class="input w-full" placeholder="3" min="1" max="10">
-                    </div>
-                    <div>
-                        <label class="block text-xs text-slate-400 mb-1">حد التذاكر لكل مستخدم</label>
-                        <input type="number" x-model="form.max_tickets_per_user" class="input w-full" placeholder="5" min="1">
-                    </div>
-                </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-xs text-slate-400 mb-1">نسبة ربح الإدارة %</label>
-                        <input type="number" x-model="form.admin_profit_pct" class="input w-full" placeholder="10" min="0" max="100">
-                    </div>
-                    <div>
-                        <label class="block text-xs text-slate-400 mb-1" data-i18n="draw_time">Draw Time</label>
-                        <input type="text" x-model="form.draw_time" class="input w-full" placeholder="2026-08-15 20:00">
-                    </div>
-                </div>
-            </div>
-            <div class="flex gap-2 justify-end mt-4">
-                <button @click="showCreateModal = false" class="btn btn-sm" style="background:#475569" data-i18n="cancel">Cancel</button>
-                <button @click="createRound()" class="btn btn-primary btn-sm">إنشاء</button>
-            </div>
-        </div>
+    <div class="result-display" id="resultDisplay"></div>
+    <div class="ticket-count" id="ticketCount">تذاكرك المشتراة: 0</div>
+  </div>
+  <div id="betbar">
+    <div class="bet-row">
+      <input type="number" class="bet-input" id="betInput" value="10" min="5" max="500">
+      <button class="bet-btn" id="buyBtn" onclick="buyTicket()">🎟️ اشتري تذكرة</button>
     </div>
-
+    <div class="quick-bets">
+      <div class="quick-bet" onclick="setBet(5)">5</div>
+      <div class="quick-bet" onclick="setBet(10)">10</div>
+      <div class="quick-bet" onclick="setBet(50)">50</div>
+      <div class="quick-bet" onclick="setBet(100)">100</div>
+    </div>
+  </div>
 </div>
-{% endblock %}
-
-{% block scripts %}
+<div id="livePlayers">
+  <div class="lp-header"><span>👥 <span class="lp-count" id="lpCount">0</span> لاعب</span><span id="lpTotal">💰 0</span></div>
+  <div class="lp-list" id="lpList"></div>
+</div>
 <script>
-function lotteryApp() {
-    return {
-        rounds: [], loading: true, showCreateModal: false,
-        form: { name: '', ticket_price: 10, currency: 'SAR', winner_count: 3, max_tickets_per_user: 5, admin_profit_pct: 10, draw_time: '' },
-
-        init() { this.loadData(); },
-
-        async loadData() {
-            this.loading = true;
-            try {
-                const data = await api('/api/lottery/rounds');
-                this.rounds = data.rounds || [];
-            } catch(e) { toast('فشل التحميل', 'error'); }
-            this.loading = false;
-        },
-
-        async createRound() {
-            if (!this.form.name) return toast('اكتب اسم الجولة', 'warning');
-            try {
-                await api('/api/lottery/create', { method: 'POST', body: JSON.stringify(this.form) });
-                toast('تم إنشاء الجولة', 'success');
-                Notifier?.playSuccessSound?.();
-                this.showCreateModal = false;
-                this.form = { name: '', ticket_price: 10, currency: 'SAR', winner_count: 3, max_tickets_per_user: 5, admin_profit_pct: 10, draw_time: '' };
-                await this.loadData();
-            } catch(e) { toast('خطأ في الإنشاء', 'error'); }
-        },
-
-        async drawRound(id) {
-            if (!confirm('تنفيذ السحب الآن؟ لا يمكن التراجع.')) return;
-            try {
-                await api(`/api/lottery/${id}/draw`, { method: 'POST', body: '{}' });
-                toast('تم السحب بنجاح!', 'success');
-                Notifier?.playSuccessSound?.();
-                await this.loadData();
-            } catch(e) { toast('خطأ في السحب', 'error'); }
-        },
-
-        async endRound(id) {
-            if (!confirm('إنهاء الجولة؟')) return;
-            try {
-                await api('/api/lottery/' + id, { method: 'DELETE' });
-                toast('تم الحذف', 'warning');
-                await this.loadData();
-            } catch(e) { toast('خطأ', 'error'); }
-        }
-    }
+const tg = window.Telegram?.WebApp;
+if (tg) { tg.expand(); tg.ready(); }
+const uid = new URLSearchParams(location.search).get('uid') || '';
+const BASE = location.origin;
+const initData = tg?.initData || '';
+async function apiFetch(url, opts = {}) {
+  opts.headers = opts.headers || {};
+  opts.headers['X-Telegram-Init-Data'] = initData;
+  if (opts.body && typeof opts.body === 'string') { opts.headers['Content-Type'] = 'application/json'; }
+  return fetch(url, opts);
 }
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+let isBuying = false;
+let history = [];
+let ticketsBought = 0;
+
+function beep(f, d, t='sine', v=0.15) {
+  const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+  o.connect(g);g.connect(audioCtx.destination);
+  o.frequency.value=f;o.type=t;
+  g.gain.setValueAtTime(v,audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+d);
+  o.start();o.stop(audioCtx.currentTime+d);
+}
+function soundWin(){beep(523,0.1);setTimeout(()=>beep(784,0.15),80);setTimeout(()=>beep(1047,0.2),160);setTimeout(()=>beep(1568,0.3),240)}
+function soundLose(){beep(200,0.3,'sawtooth',0.15)}
+function soundBuy(){beep(440,0.08,'sine',0.1);setTimeout(()=>beep(660,0.1,'sine',0.08),60)}
+function haptic(t='light'){if(tg?.HapticFeedback?.impactOccurred)tg.HapticFeedback.impactOccurred(t)}
+
+function buyTicket() {
+  if (isBuying) return;
+  const betAmount = parseFloat(document.getElementById('betInput').value) || 0;
+  if (betAmount < 5) { alert('الحد الأدنى 5'); return; }
+
+  isBuying = true;
+  document.getElementById('buyBtn').disabled = true;
+
+  apiFetch(`${BASE}/api/engine/result`, {
+    method: 'POST',
+    body: JSON.stringify({uid, game_id: 'GAME008', bet_amount: betAmount})
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (!d.success) {
+      if (d.need_deposit) showVexDepositModal(betAmount);
+      else alert(d.error || 'خطأ');
+      isBuying = false;
+      document.getElementById('buyBtn').disabled = false;
+      return;
+    }
+
+    // Generate ticket number
+    const ticketNum = Math.floor(100000 + Math.random() * 900000);
+    document.getElementById('ticketNum').textContent = ticketNum;
+    ticketsBought++;
+    document.getElementById('ticketCount').textContent = `تذاكرك المشتراة: ${ticketsBought}`;
+    document.getElementById('bal').textContent = (d.balance_after || 0).toLocaleString();
+    soundBuy();
+    haptic('light');
+
+    const rd = document.getElementById('resultDisplay');
+    if (d.result === 'win') {
+      rd.textContent = `🎉 ربحت ${d.payout.toFixed(0)}!`;
+      rd.className = 'result-display show win';
+      soundWin();
+      haptic('medium');
+    } else {
+      rd.textContent = `💔 حظ أوفر المرة القادمة`;
+      rd.className = 'result-display show lose';
+      soundLose();
+    }
+
+    history.unshift({value: d.payout / betAmount, win: d.result === 'win'});
+    if (history.length > 10) history.pop();
+    updateHistory();
+
+    isBuying = false;
+    document.getElementById('buyBtn').disabled = false;
+  })
+  .catch(e => {
+    isBuying = false;
+    document.getElementById('buyBtn').disabled = false;
+    alert('خطأ في الاتصال');
+  });
+}
+
+function updateHistory() {
+  const container = document.getElementById('history');
+  container.innerHTML = '';
+  history.forEach(h => {
+    const el = document.createElement('div');
+    el.className = 'history-item ' + (h.win ? 'history-win' : 'history-lose');
+    el.textContent = h.win ? `${h.value.toFixed(1)}x` : '—';
+    container.appendChild(el);
+  });
+}
+
+function setBet(val) { document.getElementById('betInput').value = val; }
+function goBack() { window.location.href = `${BASE}/webapp/games?uid=${uid}&lang=ar`; }
+
+async function loadBalance() {
+  try {
+    const r = await apiFetch(`${BASE}/api/wallet/balance?uid=${uid}`);
+    const d = await r.json();
+    document.getElementById('bal').textContent = (d.balance || 0).toLocaleString();
+  } catch(e) {}
+}
+
+// VEX Deposit Modal (shared)
+async function showVexDepositModal(required){const box=document.createElement('div');box.id='modal';box.style.cssText='position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.7);z-index:200;backdrop-filter:blur(5px)';box.innerHTML='<div id="modalBox" style="background:#1e293b;border:1px solid #334155;border-radius:16px;padding:16px;max-width:340px;width:90%;max-height:85vh;overflow-y:auto"></div>';document.body.appendChild(box);const mb=document.getElementById('modalBox');try{const r=await apiFetch(`${BASE}/api/games/payment-methods?uid=${uid}`);const d=await r.json();vexBotMethods=d.methods||[];vexSavedWallets=d.saved_methods||[];}catch(e){}if(vexBotMethods.length===0){mb.innerHTML='<div style="text-align:center;padding:16px"><div style="font-size:28px;margin-bottom:6px">😢</div><div style="font-size:13px;font-weight:700">لا توجد وسائل دفع متاحة</div><button onclick="document.getElementById(\'modal\').remove()" style="margin-top:10px;background:#334155;color:#fff;border:none;padding:8px 20px;border-radius:8px;cursor:pointer">إغلاق</button></div>';return;}const mHtml=vexBotMethods.map(m=>`<div onclick="vexSelectMethod('${m.id}','${(m.method_name||'').replace(/'/g,"\\'")}','${(m.account_data||'').replace(/'/g,"\\'")}')" style="display:flex;align-items:center;gap:8px;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px;margin-bottom:4px;cursor:pointer"><span style="font-size:18px">${m.icon||'💳'}</span><div style="flex:1"><div style="font-weight:600;font-size:13px">${m.method_name||''}</div><div style="font-size:11px;color:#64748b">${m.method_type||''}</div></div><span style="color:#fbbf24">‹</span></div>`).join('');mb.innerHTML=`<div style="font-size:16px;font-weight:700;margin-bottom:8px">💰 إيداع محفظة VEX</div><div style="font-size:11px;color:#64748b;margin-bottom:8px">${required?`رصيدك غير كافٍ — تحتاج ${required}`:'اختر وسيلة الدفع'}</div><div id="vexMethods">${mHtml}</div><div id="vexStep2" style="display:none"><div style="font-size:11px;color:#64748b;margin:8px 0 4px">📋 بيانات الوسيلة:</div><div onclick="vexCopyData()" style="display:flex;align-items:center;justify-content:space-between;background:#0f172a;border:1px solid #fbbf24;border-radius:8px;padding:10px;cursor:pointer;margin-bottom:8px"><code id="vexMethodData" style="font-size:13px;color:#fbbf24;word-break:break-all"></code><span id="vexCopyLabel" style="font-size:12px;color:#94a3b8;flex-shrink:0;margin-right:8px">📋 نسخ</span></div><div style="font-size:11px;color:#64748b;margin:6px 0 4px">💵 المبلغ:</div><input id="vexAmount" type="number" placeholder="المبلغ" value="${required||10}" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px;color:#fff;font-size:15px;text-align:center;margin-bottom:6px;outline:none"><div style="font-size:11px;color:#64748b;margin:6px 0 4px">🔐 رقم محفظتك:</div><input id="vexWallet" type="text" placeholder="رقم محفظتك" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px;color:#fff;font-size:15px;text-align:center;margin-bottom:4px;outline:none"><div id="vexSavedHint" style="display:none;font-size:11px;color:#34d399;margin-bottom:4px"></div><label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#64748b;margin-bottom:8px;cursor:pointer"><input type="checkbox" id="vexSave" style="accent-color:#fbbf24"> حفظ كوسيلة دفع دائمة</label><button onclick="vexSubmit()" style="width:100%;background:linear-gradient(135deg,#34d399,#10b981);color:#000;border:none;padding:12px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer">✅ تأكيد الإيداع</button><button onclick="document.getElementById('vexMethods').style.display='block';document.getElementById('vexStep2').style.display='none'" style="width:100%;background:#334155;color:#94a3b8;border:none;padding:8px;border-radius:10px;font-size:12px;cursor:pointer;margin-top:4px">‹ رجوع</button></div><button onclick="document.getElementById('modal').remove()" style="width:100%;background:#334155;color:#94a3b8;border:none;padding:8px;border-radius:10px;font-size:12px;cursor:pointer;margin-top:4px">إغلاق</button>`;}
+let vexBotMethods=[],vexSavedWallets=[],vexSelectedMethod=null;
+function vexSelectMethod(mid,mname,mdata){vexSelectedMethod={id:mid,name:mname,account_data:mdata};let sw='',hint='';if(vexSavedWallets.length>0){const match=vexSavedWallets.find(w=>w.method_name&&w.method_name.includes(mname));if(match){sw=match.account_number;hint='✓ محفظتك المحفوظة: '+sw;}}document.getElementById('vexMethods').style.display='none';document.getElementById('vexStep2').style.display='block';document.getElementById('vexMethodData').textContent=mdata;if(sw){document.getElementById('vexWallet').value=sw;document.getElementById('vexSavedHint').style.display='block';document.getElementById('vexSavedHint').textContent=hint;}}
+function vexCopyData(){navigator.clipboard.writeText(document.getElementById('vexMethodData').textContent).then(()=>{if(tg?.HapticFeedback?.impactOccurred)tg.HapticFeedback.impactOccurred('light');const lbl=document.getElementById('vexCopyLabel');if(lbl){lbl.textContent='✓ تم النسخ';setTimeout(()=>lbl.textContent='📋 نسخ',1500);}});}
+async function vexSubmit(){const amt=parseFloat(document.getElementById('vexAmount').value)||0;const wlt=document.getElementById('vexWallet').value.trim();const sv=document.getElementById('vexSave').checked;if(amt<=0){alert('أدخل المبلغ');return;}if(!wlt){alert('أدخل رقم محفظتك');return;}if(!vexSelectedMethod){alert('اختر وسيلة دفع');return;}try{const r=await apiFetch(`${BASE}/api/deposit/quick`,{method:'POST',body:JSON.stringify({uid,amount:amt,method_id:vexSelectedMethod.id,method_name:vexSelectedMethod.name,method_account_data:vexSelectedMethod.account_data,player_wallet:wlt,save_method:sv})});const d=await r.json();if(d.success){document.getElementById('modalBox').innerHTML='<div style="text-align:center;padding:16px"><div style="font-size:28px;margin-bottom:6px">⏳</div><div style="font-size:14px;font-weight:700">تم إرسال طلب الإيداع</div><div style="font-size:11px;color:#64748b;margin-top:4px">سيتم إضافة الرصيد لمحفظة VEX بعد موافقة الإدارة</div><button onclick="document.getElementById(\'modal\').remove();loadBalance();" style="margin-top:10px;background:#334155;color:#fff;border:none;padding:8px 20px;border-radius:8px;cursor:pointer">إغلاق</button></div>';}else{alert(d.error||'خطأ');}}catch(e){alert('خطأ في الاتصال');}}
+
+// Live Players
+const livePlayers=[];
+function addLivePlayer(data){const existing=livePlayers.findIndex(p=>p.uid===data.uid);if(existing>=0)livePlayers[existing]=data;else{livePlayers.unshift(data);if(livePlayers.length>20)livePlayers.pop();}renderLivePlayers();}
+function renderLivePlayers(){const list=document.getElementById('lpList');document.getElementById('lpCount').textContent=livePlayers.length;const totalBet=livePlayers.reduce((s,p)=>s+(p.bet||0),0);document.getElementById('lpTotal').textContent='💰 '+totalBet.toLocaleString();list.innerHTML='';livePlayers.forEach(p=>{const row=document.createElement('div');row.className='lp-row '+(p.status||'');const avatar=p.name?p.name[0].toUpperCase():'?';row.innerHTML=`<div class="lp-user"><div class="lp-avatar">${avatar}</div><span>${p.name||'???'}${p.isMe?' (أنت)':''}</span></div><span style="font-weight:700">${p.bet}</span>`;list.appendChild(row);});}
+function simulatePlayers(){const names=['أحمد','عمر','محمد','خالد','سعد','فهد','ناصر','يوسف','علي','حسن'];if(Math.random()<0.5&&livePlayers.length<15){addLivePlayer({uid:'bot_'+Math.random().toString(36).substr(2,5),name:names[Math.floor(Math.random()*names.length)],bet:[5,10,20,50,100][Math.floor(Math.random()*5)],status:Math.random()<0.15?'win':'lose',isMe:false});}renderLivePlayers();}
+
+loadBalance();
+document.getElementById('loading').style.display='none';
+document.getElementById('app').style.display='flex';
+setInterval(loadBalance,5000);
+setInterval(simulatePlayers,3000);
+simulatePlayers();renderLivePlayers();
 </script>
-{% endblock %}
+</body>
+</html>

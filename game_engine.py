@@ -75,6 +75,14 @@ class GameManager:
                      'min_bet': '10', 'max_bet': '2000', 'base_win_chance': '0.40', 'house_edge_pct': '16',
                      'rtp_target': '84', 'volatility': 'medium', 'max_payout_per_session': '8000', 'is_active': 'yes',
                      'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')},
+                    {'id': 'GAME008', 'name': 'اليانصيب', 'icon': '🎟️', 'description': 'اشترِ تذكرة واربح الجائزة الكبرى!', 'category': 'lottery',
+                     'min_bet': '5', 'max_bet': '500', 'base_win_chance': '0.15', 'house_edge_pct': '25',
+                     'rtp_target': '75', 'volatility': 'high', 'max_payout_per_session': '50000', 'is_active': 'yes',
+                     'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')},
+                    {'id': 'GAME009', 'name': 'عجلة الحظ', 'icon': '🎡', 'description': 'أدر العجلة واربح جوائز نقدية!', 'category': 'wheel',
+                     'min_bet': '10', 'max_bet': '1000', 'base_win_chance': '0.40', 'house_edge_pct': '15',
+                     'rtp_target': '85', 'volatility': 'medium', 'max_payout_per_session': '5000', 'is_active': 'yes',
+                     'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')},
                 ]
                 for g in games:
                     writer.writerow({k: g.get(k, '') for k in fieldnames})

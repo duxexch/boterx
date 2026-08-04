@@ -130,7 +130,19 @@ async function loadGames() {
 }
 
 function playGame(gameId) {
-  const url = `${BASE}/webapp/play/${gameId}?uid=${uid}&lang=${lang}`;
+  const gameRoutes = {
+    'GAME001': '/webapp/play/GAME001',
+    'GAME002': '/webapp/play/GAME002',
+    'GAME003': '/webapp/play/GAME003',
+    'GAME004': '/webapp/aviator',
+    'GAME005': '/webapp/crash',
+    'GAME006': '/webapp/mines',
+    'GAME007': '/webapp/plinko',
+    'GAME008': '/webapp/lottery',
+    'GAME009': '/webapp/wheel',
+  };
+  const path = gameRoutes[gameId] || `/webapp/play/${gameId}`;
+  const url = `${BASE}${path}?uid=${uid}&lang=${lang}`;
   if (tg) {
     tg.openTelegramLink(url);
   } else {

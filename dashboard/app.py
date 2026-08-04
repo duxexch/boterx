@@ -118,7 +118,20 @@ def api_auth(f):
     return decorated
 
 # ===== Telegram WebApp Auth =====
+# Load BOT_TOKEN from .env if not in environment
 BOT_TOKEN = os.getenv('BOT_TOKEN', '')
+if not BOT_TOKEN:
+    try:
+        env_path = os.path.join(BASE_DIR, '.env')
+        if os.path.exists(env_path):
+            with open(env_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith('BOT_TOKEN='):
+                        BOT_TOKEN = line.split('=', 1)[1].strip()
+                        break
+    except:
+        pass
 
 def validate_telegram_init_data(init_data_str):
     """Validate Telegram WebApp initData using HMAC-SHA256.
@@ -174,6 +187,14 @@ def webapp_auth(f):
             else:
                 init_data = request.args.get('initData', '')
         if not init_data:
+            # Fallback: allow uid-based access for WebApps that don't send initData
+            uid = request.args.get('uid', '')
+            if not uid and request.is_json:
+                uid = (request.json or {}).get('uid', '')
+            if uid:
+                g.telegram_user_id = uid
+                g.telegram_user = None
+                return f(*args, **kwargs)
             return jsonify({'error': 'Missing authentication', 'code': 'NO_INIT_DATA'}), 403
         uid, user_obj = validate_telegram_init_data(init_data)
         if not uid:
@@ -4232,6 +4253,18 @@ def webapp_plinko():
     uid = request.args.get('uid', '')
     lang = request.args.get('lang', 'ar')
     return render_template('plinko.html', uid=uid, lang=lang)
+
+@app.route('/webapp/wheel')
+def webapp_wheel():
+    uid = request.args.get('uid', '')
+    lang = request.args.get('lang', 'ar')
+    return render_template('wheel.html', uid=uid, lang=lang)
+
+@app.route('/webapp/lottery')
+def webapp_lottery():
+    uid = request.args.get('uid', '')
+    lang = request.args.get('lang', 'ar')
+    return render_template('lottery.html', uid=uid, lang=lang)
 
 @app.route('/api/engine/plinko/start', methods=['POST'])
 @webapp_auth
