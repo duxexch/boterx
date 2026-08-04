@@ -61,6 +61,26 @@ body{overflow:hidden;font-family:system-ui,sans-serif;background:#0f172a;color:#
 .deposit-method.selected{border-color:#fbbf24}
 .copy-box{background:#0f172a;border:1px solid #334155;border-radius:8px;padding:8px;margin:8px 0;display:flex;align-items:center;justify-content:space-between;cursor:pointer}
 .copy-box code{color:#fbbf24;font-size:13px}
+
+/* Live Players Bar */
+#livePlayers{max-height:110px;overflow-y:auto;background:rgba(0,0,0,0.25);border-top:1px solid #1e293b}
+#livePlayers::-webkit-scrollbar{width:3px}
+#livePlayers::-webkit-scrollbar-thumb{background:#334155;border-radius:3px}
+.lp-header{display:flex;justify-content:space-between;align-items:center;padding:4px 10px;font-size:10px;color:#64748b;border-bottom:1px solid #1e293b}
+.lp-count{color:#fbbf24;font-weight:700}
+.lp-list{padding:2px 8px}
+.lp-row{display:flex;align-items:center;justify-content:space-between;padding:3px 6px;border-radius:6px;margin:2px 0;font-size:11px;animation:lpSlideIn 0.3s ease-out}
+@keyframes lpSlideIn{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:translateX(0)}}
+.lp-row.playing{background:rgba(148,163,184,0.08);color:#94a3b8}
+.lp-row.win{background:rgba(52,211,153,0.12);color:#34d399}
+.lp-row.lose{background:rgba(239,68,68,0.08);color:#ef4444;opacity:0.6}
+.lp-user{display:flex;align-items:center;gap:4px}
+.lp-avatar{width:18px;height:18px;border-radius:50%;background:#334155;display:flex;align-items:center;justify-content:center;font-size:9px}
+.lp-name{font-weight:600}
+.lp-bet{font-weight:700}
+.lp-result{font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px}
+.lp-result.win{background:#34d399;color:#000}
+.lp-result.lose{background:#ef4444;color:#fff}
 </style>
 </head>
 <body>
@@ -86,7 +106,15 @@ body{overflow:hidden;font-family:system-ui,sans-serif;background:#0f172a;color:#
 </div>
 <!-- Continue Modal -->
 <div id="modal">
-  <div class="modal-box" id="modalBox"></div>
+  <div class="modal-box" id="modalBox">  </div>
+</div>
+<!-- Live Players Bar -->
+<div id="livePlayers">
+  <div class="lp-header">
+    <span>👥 <span class="lp-count" id="lpCount">0</span> لاعب</span>
+    <span id="lpTotal">💰 0</span>
+  </div>
+  <div class="lp-list" id="lpList"></div>
 </div>
 <script>
 const tg = window.Telegram?.WebApp;
@@ -202,6 +230,9 @@ async function playRound() {
     
     // Update balance
     document.getElementById('bal').textContent = (d.balance_after||0).toLocaleString();
+    
+    // Update live player status
+    updateMyLiveStatus(d.result, d.payout);
     
     // Show continue modal
     setTimeout(() => showContinueModal(d, bet), 800);
@@ -388,6 +419,107 @@ function goBack() {
 loadBalance();
 initQuickBets();
 setInterval(loadBalance, 5000);
+
+// Live Players System
+const livePlayers = [];
+
+function addLivePlayer(data) {
+  const existing = livePlayers.findIndex(p => p.uid === data.uid);
+  if (existing >= 0) {
+    livePlayers[existing] = data;
+  } else {
+    livePlayers.unshift(data);
+    if (livePlayers.length > 30) livePlayers.pop();
+  }
+  renderLivePlayers();
+}
+
+function renderLivePlayers() {
+  const list = document.getElementById('lpList');
+  if (!list) return;
+  const count = document.getElementById('lpCount');
+  const total = document.getElementById('lpTotal');
+  
+  count.textContent = livePlayers.length;
+  const totalBet = livePlayers.reduce((s, p) => s + (p.bet || 0), 0);
+  total.textContent = '💰 ' + totalBet.toLocaleString();
+  
+  list.innerHTML = '';
+  livePlayers.forEach(p => {
+    const row = document.createElement('div');
+    row.className = 'lp-row ' + (p.status || 'playing');
+    const avatar = p.name ? p.name[0].toUpperCase() : '?';
+    let resultBadge = '';
+    if (p.status === 'win') resultBadge = `<span class="lp-result win">+${(p.payout || 0).toFixed(0)}</span>`;
+    else if (p.status === 'lose') resultBadge = `<span class="lp-result lose">-${p.bet}</span>`;
+    row.innerHTML = `
+      <div class="lp-user">
+        <div class="lp-avatar">${avatar}</div>
+        <span class="lp-name">${p.name || '???'}${p.isMe ? ' (أنت)' : ''}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <span class="lp-bet">${p.bet}</span>
+        ${resultBadge}
+      </div>
+    `;
+    list.appendChild(row);
+  });
+}
+
+// Simulate live players (in production: fetch from /api/games/live-players)
+const fakeNames = ['أحمد','عمر','محمد','خالد','سعد','فهد','ناصر','يوسف','علي','حسن','ماجد','وليد','طارق','بدر','راشد','عبدالله','مازن','تركي','فيصل','سلمان'];
+
+function simulatePlayers() {
+  if (Math.random() < 0.6 && livePlayers.length < 15) {
+    const name = fakeNames[Math.floor(Math.random()*fakeNames.length)];
+    const bet = [10,20,50,100,200,500][Math.floor(Math.random()*6)];
+    addLivePlayer({
+      uid: 'bot_' + Math.random().toString(36).substr(2,5),
+      name: name, bet: bet, status: 'playing', payout: 0, isMe: false
+    });
+  }
+  
+  livePlayers.forEach(p => {
+    if (p.status === 'playing' && !p.isMe && Math.random() < 0.2) {
+      if (Math.random() < 0.45) {
+        p.status = 'win';
+        p.payout = p.bet * (1.5 + Math.random() * 2);
+      } else {
+        p.status = 'lose';
+        p.payout = 0;
+      }
+    }
+  });
+  
+  renderLivePlayers();
+}
+
+// Add self when playing
+const originalPlayRound = playRound;
+playRound = function() {
+  const bet = parseFloat(document.getElementById('betInput').value) || 0;
+  if (bet > 0 && !isPlaying) {
+    addLivePlayer({
+      uid: uid, name: 'أنت', bet: bet,
+      status: 'playing', payout: 0, isMe: true
+    });
+  }
+  originalPlayRound();
+};
+
+// Update self after result
+function updateMyLiveStatus(result, payout) {
+  const me = livePlayers.find(p => p.uid === uid);
+  if (me) {
+    me.status = result === 'win' ? 'win' : 'lose';
+    me.payout = payout;
+    renderLivePlayers();
+  }
+}
+
+setInterval(simulatePlayers, 2500);
+simulatePlayers();
+renderLivePlayers();
 </script>
 </body>
 </html>

@@ -3175,6 +3175,38 @@ def api_wallet_add():
     new_balance = _gm.add_balance(uid, amount, reason)
     return jsonify({'success': True, 'new_balance': new_balance})
 
+# ===== Live Players =====
+
+@app.route('/api/games/live-players')
+def api_live_players():
+    """قائمة اللاعبين المباشرين"""
+    if not _VEX_GAMES:
+        return jsonify({'players': [], 'count': 0})
+    # قراءة آخر جلسات نشطة
+    players = []
+    try:
+        import os
+        sessions_file = os.path.join(BASE_DIR, 'game_sessions.csv')
+        if os.path.exists(sessions_file):
+            rows = []
+            with open(sessions_file, 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                rows = list(reader)
+            # آخر 20 جلسة
+            for row in rows[-20:]:
+                players.append({
+                    'uid': row.get('user_id', ''),
+                    'name': '',  # يتم جلب الاسم من users.csv
+                    'bet': float(row.get('bet_amount', 0) or 0),
+                    'status': 'win' if row.get('result') == 'win' else 'lose',
+                    'payout': float(row.get('payout', 0) or 0),
+                    'multiplier': float(row.get('multiplier', 0) or 0),
+                    'timestamp': row.get('timestamp', '')
+                })
+    except:
+        pass
+    return jsonify({'players': players, 'count': len(players)})
+
 # ===== Game Engine =====
 
 @app.route('/api/engine/start', methods=['POST'])
