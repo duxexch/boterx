@@ -5886,6 +5886,19 @@ class ComprehensiveDUXBot:
         # معالجة جميع الحالات أولاً (قبل الـ rate limiter)
         # لأن المستخدم في حالة نشطة يجب ألا يُحظر
         current_state = self.user_states.get(user_id, '')
+        
+        # زر إعادة التعيين يعمل من أي حالة — أولوية قصوى
+        _all_langs_reset = {self.tr('reset_system', l) for l in self.get_supported_languages()}
+        _all_langs_reset |= {self.tr('main_menu', l) for l in self.get_supported_languages()}
+        _all_langs_reset |= {'🔄 إعادة ضبط النظام', '🔄 Reset', '🏠 الرئيسية', '🏠', 'reset', 'fix', 'إصلاح'}
+        if text in _all_langs_reset:
+            user = self.find_user(user_id)
+            if user:
+                self.super_reset_user_system(user_id, chat_id, user)
+            else:
+                self.handle_start(message)
+            return
+        
         if current_state == 'phone_login_waiting':
             self.handle_phone_login(message)
             return
@@ -8193,8 +8206,8 @@ class ComprehensiveDUXBot:
                 if dep_id in self.user_states: del self.user_states[dep_id]
                 if wit_id in self.user_states: del self.user_states[wit_id]
             return
-        elif text in reset_texts or text in [self.tr('a0219_العودة_للقائمة', 'ar'), self.tr('a0142_العودة', 'ar'), self.tr('a0254_العودة', 'ar'), self.tr('a0141_الرئيسية', 'ar'), self.tr('a0083_القائمة_الرئيسية', 'ar'), self.tr('a0201_إعادة_تعيين', 'ar'), self.tr('a0255_إصلاح', 'ar'), 'reset', 'fix', self.tr('a0203_إصلاح_شامل', 'ar')] or text == self.tr('main_menu', user_lang):
-            # إجراء إعادة تعيين شاملة وقوية
+        elif text in reset_texts or text in [self.tr('a0219_العودة_للقائمة', 'ar'), self.tr('a0142_العودة', 'ar'), self.tr('a0254_العودة', 'ar'), self.tr('a0141_الرئيسية', 'ar'), self.tr('a0083_القائمة_الرئيسية', 'ar'), self.tr('a0201_إعادة_تعيين', 'ar'), self.tr('a0255_إصلاح', 'ar'), 'reset', 'fix', self.tr('a0203_إصلاح_شامل', 'ar'), self.tr('main_menu', user_lang)]:
+            # إعادة تعيين فورية وقوية — تنظيف كل الحالات + الرجوع للقائمة الرئيسية
             self.super_reset_user_system(user_id, chat_id, user)
         else:
             # معالجة حالات نظام المطابقة (بعد rate limiter)
