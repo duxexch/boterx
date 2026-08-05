@@ -678,23 +678,50 @@ def api_approve_txn(txn_id):
             break
     write_csv('transactions.csv', txns, fieldnames)
     log_action('approve_transaction', f'{txn_id} amount: {old_amount} -> {new_amount or old_amount}')
-    # VEX deposit: add game_balance + update quick_deposits + notify player
+    # VEX deposit: async add balance + notify player (non-blocking)
     if trans and 'VEX' in trans.get('admin_note', ''):
-        try:
-            uid = trans.get('telegram_id', '')
-            amount = float(new_amount or old_amount or 0)
-            if _VEX_GAMES and uid and amount > 0:
-                new_bal = _gm.add_balance(uid, amount)
-                print(f"VEX txn approve: added {amount} to {uid}, balance: {new_bal}")
-                _gm.approve_deposit(txn_id, session.get('admin_id', ''))
-                token = BOT_TOKEN
-                if token:
-                    import urllib.request as _u
-                    msg = f"✅ تمت الموافقة على إيداعك!\n\n💰 المبلغ: {amount:.0f}\n🎮 تم إضافته لمحفظة VEX\n🆔 {txn_id}"
-                    _u.urlopen(_u.Request(f'https://api.telegram.org/bot{token}/sendMessage', data=json.dumps({'chat_id': int(uid), 'text': msg, 'parse_mode': 'HTML'}).encode('utf-8'), headers={'Content-Type': 'application/json'}), timeout=10)
-                push_notification('vex_deposit', '✅ إيداع VEX', f'{uid}: {amount}', {'uid': uid, 'amount': amount})
-        except Exception as e:
-            print(f"VEX approve error: {e}")
+        import threading as _th
+        # Capture all values BEFORE starting thread (session is thread-local)
+        _uid = trans.get('telegram_id', '')
+        _amt = float(new_amount or old_amount or 0)
+        _txn = txn_id
+        _admin = session.get('admin_id', '')
+        def _vex_bg():
+            try:
+                if _VEX_GAMES and _uid and _amt > 0:
+                    _gm.add_balance(_uid, _amt)
+                    # Update quick_deposits.csv
+                    try:
+                        import csv as _csv2
+                        _rows = []
+                        _qd = os.path.join(BASE_DIR, 'quick_deposits.csv')
+                        with open(_qd, 'r', encoding='utf-8-sig') as _f:
+                            _r = _csv2.DictReader(_f)
+                            _fn = _r.fieldnames
+                            _rows = list(_r)
+                        for _row in _rows:
+                            if _row.get('user_id') == str(_uid) and _row.get('status') == 'pending':
+                                _row['status'] = 'approved'
+                                _row['approved_by'] = str(_admin)
+                                _row['approved_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                        with open(_qd, 'w', newline='', encoding='utf-8-sig') as _f:
+                            _w = _csv2.DictWriter(_f, fieldnames=_fn)
+                            _w.writeheader()
+                            _w.writerows(_rows)
+                    except: pass
+                    # Telegram notify
+                    if BOT_TOKEN:
+                        try:
+                            import urllib.request as _u2
+                            _msg = f"✅ تمت الموافقة على إيداعك!\n\n💰 المبلغ: {_amt:.0f}\n🎮 تم إضافته لمحفظة VEX\n🆔 {_txn}"
+                            _u2.urlopen(_u2.Request(f'https://api.telegram.org/bot{BOT_TOKEN}/sendMessage',
+                                data=json.dumps({'chat_id': int(_uid), 'text': _msg, 'parse_mode': 'HTML'}).encode('utf-8'),
+                                headers={'Content-Type': 'application/json'}), timeout=5)
+                        except: pass
+                    push_notification('vex_deposit', '✅ إيداع VEX', f'{_uid}: {_amt}', {'uid': _uid, 'amount': _amt})
+            except Exception as _e:
+                print(f"VEX bg error: {_e}")
+        _th.Thread(target=_vex_bg, daemon=True).start()
     return jsonify({'success': True, 'old_amount': old_amount, 'new_amount': new_amount or old_amount})
 
 @app.route('/api/transactions/<txn_id>/reject', methods=['POST'])
@@ -3548,56 +3575,55 @@ def api_deposit_pending():
 @app.route('/api/deposit/<dep_id>/approve', methods=['POST'])
 @api_auth
 def api_deposit_approve(dep_id):
-    """موافقة على إيداع سريع — يضيف الرصيد + يرسل إشعار لللاعب"""
+    """موافقة على إيداع سريع — async: يضيف الرصيد + يرسل إشعار"""
     if not _VEX_GAMES:
         return jsonify({'error': 'Games engine not available'}), 500
     admin_id = session.get('admin_id', '')
     result = _gm.approve_deposit(dep_id, admin_id)
     if result:
-        push_notification('deposit_approved', '✅ تمت الموافقة على إيداع', f'إيداع {dep_id} تمت الموافقة', {'deposit_id': dep_id})
-        # إرسال إشعار لللاعب في Telegram
-        try:
-            uid = result.get('user_id', '')
-            amount = float(result.get('amount', 0))
-            # Send Telegram notification via bot API
-            import urllib.request
-            token = BOT_TOKEN
-            if token:
-                msg = f"✅ تمت الموافقة على إيداعك!\n\n💰 المبلغ: {amount:.0f}\n🎮 تم إضافته لمحفظة VEX\n🆔 رقم العملية: {dep_id}"
-                url = f'https://api.telegram.org/bot{token}/sendMessage'
-                data = json.dumps({'chat_id': int(uid), 'text': msg, 'parse_mode': 'HTML'}).encode('utf-8')
-                req = urllib.request.Request(url, data=data)
-                req.add_header('Content-Type', 'application/json')
-                urllib.request.urlopen(req, timeout=10)
-        except Exception as e:
-            print(f"Telegram notification error: {e}")
+        push_notification('deposit_approved', '✅ تمت الموافقة على إيداع', f'إيداع {dep_id}', {'deposit_id': dep_id})
+        # async Telegram notification (non-blocking)
+        import threading as _th
+        _uid = result.get('user_id', '')
+        _amt = float(result.get('amount', 0))
+        _dep = dep_id
+        def _notify():
+            try:
+                if BOT_TOKEN and _uid:
+                    import urllib.request as _u
+                    _msg = f"✅ تمت الموافقة على إيداعك!\n\n💰 المبلغ: {_amt:.0f}\n🎮 تم إضافته لمحفظة VEX\n🆔 {_dep}"
+                    _u.urlopen(_u.Request(f'https://api.telegram.org/bot{BOT_TOKEN}/sendMessage',
+                        data=json.dumps({'chat_id': int(_uid), 'text': _msg, 'parse_mode': 'HTML'}).encode('utf-8'),
+                        headers={'Content-Type': 'application/json'}), timeout=5)
+            except: pass
+        _th.Thread(target=_notify, daemon=True).start()
         return jsonify({'success': True, 'deposit': result})
     return jsonify({'error': 'Deposit not found or already processed'}), 404
 
 @app.route('/api/deposit/<dep_id>/reject', methods=['POST'])
 @api_auth
 def api_deposit_reject(dep_id):
-    """رفض إيداع سريع — يرسل إشعار لللاعب"""
+    """رفض إيداع سريع — async notification"""
     if not _VEX_GAMES:
         return jsonify({'error': 'Games engine not available'}), 500
     admin_id = session.get('admin_id', '')
     result = _gm.reject_deposit(dep_id, admin_id)
-    push_notification('deposit_rejected', '❌ تم رفض إيداع', f'إيداع {dep_id} تم رفض', {'deposit_id': dep_id})
-    # إرسال إشعار لللاعب في Telegram
-    try:
-        if result and result.get('user_id'):
-            uid = result.get('user_id', '')
-            import urllib.request
-            token = BOT_TOKEN
-            if token:
-                msg = f"❌ تم رفض إيداعك\n\n🆔 رقم العملية: {dep_id}\n\nللمساعدة، تواصل مع الدعم."
-                url = f'https://api.telegram.org/bot{token}/sendMessage'
-                data = json.dumps({'chat_id': int(uid), 'text': msg, 'parse_mode': 'HTML'}).encode('utf-8')
-                req = urllib.request.Request(url, data=data)
-                req.add_header('Content-Type', 'application/json')
-                urllib.request.urlopen(req, timeout=10)
-    except Exception as e:
-        print(f"Telegram notification error: {e}")
+    push_notification('deposit_rejected', '❌ تم رفض إيداع', f'إيداع {dep_id}', {'deposit_id': dep_id})
+    # async Telegram notification
+    if result and result.get('user_id'):
+        import threading as _th
+        _uid = result.get('user_id', '')
+        _dep = dep_id
+        def _notify_r():
+            try:
+                if BOT_TOKEN and _uid:
+                    import urllib.request as _u
+                    _msg = f"❌ تم رفض إيداعك\n\n🆔 {_dep}\n\nللمساعدة، تواصل مع الدعم."
+                    _u.urlopen(_u.Request(f'https://api.telegram.org/bot{BOT_TOKEN}/sendMessage',
+                        data=json.dumps({'chat_id': int(_uid), 'text': _msg, 'parse_mode': 'HTML'}).encode('utf-8'),
+                        headers={'Content-Type': 'application/json'}), timeout=5)
+            except: pass
+        _th.Thread(target=_notify_r, daemon=True).start()
     return jsonify({'success': True})
 
 # ===== Player Payment Methods =====
