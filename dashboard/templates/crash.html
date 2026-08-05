@@ -2,283 +2,54 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Crash</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
-:root{--bg:#0a0e17;--surface:#131826;--surface2:#1a2032;--border:#2a3142;--gold:#fbbf24;--green:#00e701;--red:#ff4757;--blue:#3b82f6;--text:#e8eaed;--muted:#6b7280;--radius:12px}
-body{overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text)}
-#app{position:fixed;inset:0;display:flex;flex-direction:column}
-
-/* Top Bar */
-#topbar{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--surface);border-bottom:1px solid var(--border)}
-.back-btn{background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;padding:4px 8px}
-.balance-wrap{display:flex;align-items:center;gap:6px;background:var(--surface2);padding:6px 12px;border-radius:20px}
-.balance-icon{font-size:14px;color:var(--gold)}
-.balance-val{font-size:16px;font-weight:800;color:var(--text)}
-.balance-cur{font-size:11px;color:var(--muted)}
-.sound-toggle{background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;padding:4px}
-
-/* History Bar */
-#history{display:flex;gap:3px;padding:4px 8px;background:var(--surface);overflow-x:auto;border-bottom:1px solid var(--border)}
-#history::-webkit-scrollbar{display:none}
-.hist-item{flex-shrink:0;font-size:10px;padding:2px 8px;border-radius:4px;font-weight:700;min-width:40px;text-align:center}
-.hist-win{background:rgba(0,231,1,0.12);color:var(--green)}
-.hist-lose{background:rgba(255,71,87,0.12);color:var(--red)}
-
-/* Game Area */
-#game-area{flex:1;position:relative;overflow:hidden;background:radial-gradient(ellipse at 50% 100%,#0d1521 0%,var(--bg) 70%)}
-#canvas{position:absolute;inset:0;width:100%;height:100%}
-
-/* Multiplier Display */
-.mult-wrap{position:absolute;top:35%;left:50%;transform:translate(-50%,-50%);text-align:center;z-index:10;pointer-events:none}
-.mult-val{font-size:64px;font-weight:900;font-family:'Courier New',monospace;letter-spacing:-2px;transition:color 0.3s,text-shadow 0.3s}
-.mult-val.flying{color:var(--green);text-shadow:0 0 40px rgba(0,231,1,0.4)}
-.mult-val.crashed{color:var(--red);text-shadow:0 0 40px rgba(255,71,87,0.4);animation:shake 0.4s}
-.mult-val.cashed{color:var(--gold);text-shadow:0 0 40px rgba(251,191,36,0.4)}
-.mult-label{font-size:11px;color:var(--muted);margin-top:4px;letter-spacing:1px;text-transform:uppercase}
-@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
-
-/* Status */
-.game-status{position:absolute;top:18%;left:50%;transform:translateX(-50%);font-size:12px;color:var(--muted);z-index:5}
-.crash-msg{position:absolute;top:62%;left:50%;transform:translateX(-50%);font-size:14px;font-weight:700;z-index:10;display:none}
-.crash-msg.show{display:block;animation:fadeIn 0.3s}
-@keyframes fadeIn{from{opacity:0;transform:translate(-50%,10px)}to{opacity:1;transform:translate(-50%,0)}}
-
-/* Bet Panel */
-#betbar{background:var(--surface);border-top:1px solid var(--border);padding:8px 12px}
-.bet-row{display:flex;gap:6px;align-items:center}
-.bet-input-wrap{position:relative;flex:1}
-.bet-input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 40px 10px 12px;color:var(--text);font-size:16px;font-weight:700;text-align:center;outline:none;font-family:'Courier New',monospace}
-.bet-input:focus{border-color:var(--gold)}
-.bet-cur{position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:11px;color:var(--muted);pointer-events:none}
-
-/* Bet Controls */
-.bet-controls{display:flex;gap:4px;margin-top:6px}
-.bet-btn{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:6px;color:var(--muted);font-size:11px;font-weight:600;cursor:pointer;transition:all 0.15s}
-.bet-btn:active{transform:scale(0.95);background:var(--border)}
-.bet-btn.active{background:var(--gold);color:#000;border-color:var(--gold)}
-
-/* Main Buttons */
-.action-row{display:flex;gap:6px;margin-top:8px}
-.btn-bet{flex:1;border:none;padding:14px;border-radius:var(--radius);font-size:15px;font-weight:800;cursor:pointer;transition:all 0.15s;background:linear-gradient(135deg,#1a5c2e,#0d7a1f);color:#fff;text-transform:uppercase;letter-spacing:1px}
-.btn-bet:active{transform:scale(0.97)}
-.btn-bet:disabled{opacity:0.3;cursor:not-allowed}
-.btn-cashout{flex:1;border:none;padding:14px;border-radius:var(--radius);font-size:15px;font-weight:800;cursor:pointer;transition:all 0.15s;background:linear-gradient(135deg,#b8860b,#daa520);color:#000;text-transform:uppercase;letter-spacing:1px;animation:pulse 0.8s infinite}
-.btn-cashout:active{transform:scale(0.97)}
-@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(218,165,32,0.3)}50%{box-shadow:0 0 0 8px rgba(218,165,32,0)}}
-
-/* Auto Row */
-.auto-row{display:flex;gap:6px;align-items:center;margin-top:6px;padding:4px 0}
-.auto-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px}
-.auto-input{width:50px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:4px 6px;color:var(--text);font-size:12px;text-align:center;outline:none;font-family:'Courier New',monospace}
-.auto-checkbox{accent-color:var(--gold);width:14px;height:14px}
-
-/* Potential Win */
-.potential{display:flex;justify-content:space-between;align-items:center;margin-top:4px;padding:4px 8px;background:var(--surface2);border-radius:6px}
-.pot-label{font-size:10px;color:var(--muted)}
-.pot-val{font-size:13px;font-weight:700;color:var(--green);font-family:'Courier New',monospace}
-
-/* Loading */
-#loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg);z-index:200}
-.spinner{width:36px;height:36px;border:3px solid var(--border);border-top:3px solid var(--gold);border-radius:50%;animation:spin 0.7s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
-
-/* Live Players */
-#lp{max-height:80px;overflow-y:auto;background:var(--surface);border-top:1px solid var(--border)}
-#lp::-webkit-scrollbar{width:2px}
-.lp-header{display:flex;justify-content:space-between;padding:3px 8px;font-size:9px;color:var(--muted);border-bottom:1px solid var(--border)}
-.lp-list{padding:2px 6px}
-.lp-row{display:flex;align-items:center;justify-content:space-between;padding:2px 4px;border-radius:4px;margin:1px 0;font-size:10px}
-.lp-row.win{background:rgba(0,231,1,0.08)}
-.lp-row.lose{background:rgba(255,71,87,0.06)}
-.lp-ava{width:16px;height:16px;border-radius:50%;background:var(--border);display:flex;align-items:center;justify-content:center;font-size:8px;margin-left:4px}
-</style>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>Crash — VEX</title>
+<link rel="stylesheet" href="/static/css/game-base.css">
+<style>#canvas{position:absolute;inset:0;width:100%;height:100%}</style>
 </head>
 <body>
-<div id="loading"><div class="spinner"></div></div>
+<div class="loader-screen" id="loading"><div class="spinner"></div></div>
 <div id="app" style="display:none">
-  <div id="topbar">
-    <button class="back-btn" onclick="goBack()">‹</button>
-    <div class="balance-wrap">
-      <span class="balance-icon">💰</span>
-      <span class="balance-val" id="bal">0</span>
-      <span class="balance-cur" id="cur">EGP</span>
+  <div class="game-topbar">
+    <div class="topbar-left">
+      <button class="btn-back" onclick="goBack()">‹</button>
+      <div class="bal-pill"><span class="bal-icon">💰</span><span class="bal-val" id="bal">0</span><span class="bal-cur" id="cur">EGP</span></div>
     </div>
-    <button class="sound-toggle" id="soundBtn" onclick="toggleSound()">🔊</button>
+    <div class="topbar-right"><span class="streak-badge" id="streak" style="display:none">🔥 0</span><button class="btn-sound" id="soundBtn" onclick="toggleSound()">🔊</button></div>
   </div>
-  <div id="history"></div>
-  <div id="game-area">
+  <div class="hist-bar" id="history"></div>
+  <div class="game-area" id="gameArea">
+    <div class="stars-bg" id="stars"></div>
     <canvas id="canvas"></canvas>
     <div class="game-status" id="statusText">ضع رهانك وانتظر الإقلاع</div>
-    <div class="mult-wrap"><div class="mult-val" id="mult">1.00<span style="font-size:32px">x</span></div></div>
-    <div class="crash-msg" id="crashMsg"></div>
+    <div class="mult-display"><div class="mult-val" id="mult">1.00x</div></div>
+    <div class="result-msg" id="crashMsg"></div>
   </div>
-  <div id="betbar">
-    <div class="bet-row">
-      <div class="bet-input-wrap">
-        <input type="number" class="bet-input" id="betInput" value="10" min="1" oninput="updatePotential()">
-        <span class="bet-cur" id="betCur">EGP</span>
-      </div>
-    </div>
-    <div class="bet-controls">
-      <div class="bet-btn" onclick="adjustBet(0.5)">½</div>
-      <div class="bet-btn" onclick="adjustBet(2)">2×</div>
-      <div class="bet-btn" onclick="setBet('min')">Min</div>
-      <div class="bet-btn" onclick="setBet('max')">Max</div>
-    </div>
+  <div class="bet-panel">
+    <div class="bet-row"><div class="bet-input-wrap"><input type="number" class="bet-input" id="betInput" value="10" min="1" oninput="updatePotential()"><span class="bet-cur" id="betCur">EGP</span></div></div>
+    <div class="bet-controls"><div class="bet-ctrl" onclick="adjustBet(0.5)">½</div><div class="bet-ctrl" onclick="adjustBet(2)">2×</div><div class="bet-ctrl" onclick="setBet('min')">Min</div><div class="bet-ctrl" onclick="setBet('max')">Max</div></div>
     <div class="auto-row">
-      <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" class="auto-checkbox" id="autoCashout" onchange="updatePotential()"> <span class="auto-label">Auto</span></label>
-      <input type="number" class="auto-input" id="autoVal" placeholder="2.0" step="0.1" min="1.1" value="2.0" oninput="updatePotential()">
-      <span class="auto-label">x</span>
-      <div style="flex:1"></div>
-      <div class="potential"><span class="pot-label">ربح محتمل:</span><span class="pot-val" id="potVal">0.00</span></div>
+      <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" class="auto-checkbox" id="autoCashout" onchange="updatePotential()"><span class="auto-label">Auto</span></label>
+      <input type="number" class="auto-input" id="autoVal" placeholder="2.0" step="0.1" min="1.1" value="2.0" oninput="updatePotential()"><span class="auto-label">x</span>
+      <div style="flex:1"></div><div class="potential"><span class="pot-label">ربح:</span><span class="pot-val" id="potVal">0.00</span></div>
     </div>
-    <div class="action-row">
-      <button class="btn-bet" id="betBtn" onclick="placeBet()">رهان</button>
-      <button class="btn-cashout" id="cashBtn" onclick="cashOut()" style="display:none">سحب</button>
-    </div>
+    <div class="action-row"><button class="btn-action btn-bet-green" id="betBtn" onclick="placeBet()">رهان</button><button class="btn-action btn-cashout-gold" id="cashBtn" onclick="cashOut()" style="display:none">سحب</button></div>
   </div>
 </div>
-<div id="lp"><div class="lp-header"><span>👥 <span id="lpCount">0</span></span><span id="lpTotal">💰 0</span></div><div class="lp-list" id="lpList"></div></div>
+<div class="lp-bar"><div class="lp-header"><span>👥 <span class="lp-count" id="lpCount">0</span></span><span id="lpTotal">💰 0</span></div><div class="lp-list" id="lpList"></div></div>
+<script src="/static/js/game-base.js"></script>
 <script>
-const tg=window.Telegram?.WebApp;if(tg){tg.expand();tg.ready();}
-const uid=new URLSearchParams(location.search).get('uid')||'';
-const BASE=location.origin;const initData=tg?.initData||'';let soundOn=true;
-async function apiFetch(url,opts={}){opts.headers=opts.headers||{};opts.headers['X-Telegram-Init-Data']=initData;if(opts.body&&typeof opts.body==='string'){opts.headers['Content-Type']='application/json';}if(uid&&!url.includes('uid=')){url+=(url.includes('?')?'&':'?')+'uid='+uid;}return fetch(url,opts);}
-const canvas=document.getElementById('canvas');const ctx=canvas.getContext('2d');const audioCtx=new(window.AudioContext||window.webkitAudioContext)();
-let state='waiting',mult=1.0,crashPoint=1.0,betAmt=0,hasBet=false,cashedOut=false,cashoutMult=0,sessionId='',animFrame=null,startTime=0,history=[],autoVal=2.0,trail=[];
-function beep(f,d,t='sine',v=0.12){if(!soundOn)return;const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.connect(g);g.connect(audioCtx.destination);o.frequency.value=f;o.type=t;g.gain.setValueAtTime(v,audioCtx.currentTime);g.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+d);o.start();o.stop(audioCtx.currentTime+d);}
-function soundFly(){beep(440,0.04,'sine',0.04)}function soundCrash(){beep(200,0.3,'sawtooth',0.25);setTimeout(()=>beep(100,0.2,'square',0.15),100)}
-function soundCash(){beep(523,0.08);setTimeout(()=>beep(784,0.12),60);setTimeout(()=>beep(1047,0.15),120)}
-function haptic(t='light'){if(tg?.HapticFeedback?.impactOccurred)tg.HapticFeedback.impactOccurred(t)}
-function toggleSound(){soundOn=!soundOn;document.getElementById('soundBtn').textContent=soundOn?'🔊':'🔇';}
-function resizeCanvas(){canvas.width=canvas.clientWidth;canvas.height=canvas.clientHeight;}
-window.addEventListener('resize',resizeCanvas);
-function draw(px,py,tr){
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  ctx.strokeStyle='rgba(42,49,66,0.4)';ctx.lineWidth=1;
-  for(let x=0;x<canvas.width;x+=50){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,canvas.height);ctx.stroke();}
-  for(let y=0;y<canvas.height;y+=50){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(canvas.width,y);ctx.stroke();}
-  if(tr.length>1){
-    ctx.strokeStyle='#00e701';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(tr[0].x,tr[0].y);
-    for(let i=1;i<tr.length;i++)ctx.lineTo(tr[i].x,tr[i].y);ctx.stroke();
-    ctx.lineTo(tr[tr.length-1].x,canvas.height);ctx.lineTo(tr[0].x,canvas.height);ctx.closePath();
-    const grad=ctx.createLinearGradient(0,0,0,canvas.height);grad.addColorStop(0,'rgba(0,231,1,0.15)');grad.addColorStop(1,'rgba(0,231,1,0)');ctx.fillStyle=grad;ctx.fill();
-  }
-  if(state==='flying'){ctx.font='36px sans-serif';ctx.textAlign='center';ctx.fillText('🚀',px,py);}
-}
-function animate(){
-  if(state!=='flying')return;
-  const elapsed=(Date.now()-startTime)/1000;
-  mult=Math.exp(0.08*elapsed);
-  document.getElementById('mult').innerHTML=mult.toFixed(2)+'<span style="font-size:32px">x</span>';
-  document.getElementById('mult').className='mult-val flying';
-  if(!cashedOut&&hasBet&&autoVal>0&&mult>=autoVal&&document.getElementById('autoCashout').checked)cashOut();
-  if(mult>=crashPoint){crash();return;}
-  const progress=Math.min(1,elapsed/10);
-  const px=50+progress*(canvas.width-100);
-  const py=canvas.height-50-progress*(canvas.height-150);
-  trail.push({x:px,y:py});if(trail.length>200)trail.shift();
-  draw(px,py,trail);
-  if(Math.floor(elapsed*4)!==Math.floor((elapsed-0.016)*4))soundFly();
-  animFrame=requestAnimationFrame(animate);
-}
-function placeBet(){
-  if(state!=='waiting'||hasBet)return;
-  betAmt=parseFloat(document.getElementById('betInput').value)||0;
-  autoVal=parseFloat(document.getElementById('autoVal').value)||0;
-  if(betAmt<1)return;
-  apiFetch(`${BASE}/api/engine/crash/start`,{method:'POST',body:JSON.stringify({uid,bet_amount:betAmt})})
-  .then(r=>r.json()).then(d=>{
-    if(!d.success){if(d.need_deposit)showVexDepositModal(betAmt);else alert(d.error||'خطأ');return;}
-    hasBet=true;cashedOut=false;sessionId=d.session_id;crashPoint=d.crash_point;
-    document.getElementById('bal').textContent=(d.balance_after||0).toLocaleString();
-    document.getElementById('betBtn').disabled=true;document.getElementById('betBtn').textContent='⏳ انتظر';
-    document.getElementById('statusText').textContent='⏳ جاهز للإقلاع...';
-    updatePotential();
-  }).catch(()=>alert('خطأ في الاتصال'));
-}
-function startFlight(){
-  state='flying';mult=1.0;trail=[];startTime=Date.now();
-  document.getElementById('mult').innerHTML='1.00<span style="font-size:32px">x</span>';
-  document.getElementById('mult').className='mult-val flying';
-  document.getElementById('statusText').textContent='';
-  document.getElementById('crashMsg').classList.remove('show');
-  document.getElementById('betBtn').style.display='none';
-  document.getElementById('cashBtn').style.display='block';
-  document.getElementById('cashBtn').textContent='سحب';
-  haptic('light');animate();
-}
-function cashOut(){
-  if(state!=='flying'||cashedOut||!hasBet)return;
-  cashedOut=true;cashoutMult=mult;const payout=betAmt*cashoutMult;
-  apiFetch(`${BASE}/api/engine/crash/cashout`,{method:'POST',body:JSON.stringify({session_id:sessionId,uid,multiplier:cashoutMult,bet_amount:betAmt})})
-  .then(r=>r.json()).then(d=>{
-    if(d.success){
-      document.getElementById('bal').textContent=(d.balance_after||0).toLocaleString();
-      const msg=document.getElementById('crashMsg');
-      msg.textContent=`✅ +${payout.toFixed(2)} @ ${cashoutMult.toFixed(2)}x`;
-      msg.style.color='var(--gold)';msg.classList.add('show');
-      document.getElementById('mult').className='mult-val cashed';
-      document.getElementById('cashBtn').style.display='none';
-      soundCash();haptic('medium');
-    }
-  }).catch(()=>{});
-}
-function crash(){
-  state='crashed';cancelAnimationFrame(animFrame);
-  document.getElementById('mult').innerHTML=crashPoint.toFixed(2)+'<span style="font-size:32px">x</span>';
-  document.getElementById('mult').className='mult-val crashed';
-  const msg=document.getElementById('crashMsg');
-  msg.textContent=`💥 ${crashPoint.toFixed(2)}x`;msg.style.color='var(--red)';msg.classList.add('show');
-  document.getElementById('cashBtn').style.display='none';
-  soundCrash();haptic('heavy');
-  history.unshift({v:crashPoint,win:cashedOut});if(history.length>15)history.pop();updateHistory();
-  apiFetch(`${BASE}/api/engine/crash/end`,{method:'POST',body:JSON.stringify({session_id:sessionId,uid,crash_point:crashPoint,cashed_out:cashedOut,multiplier:cashoutMult,bet_amount:betAmt})}).catch(()=>{});
-  setTimeout(resetGame,3000);
-}
-function resetGame(){
-  state='waiting';hasBet=false;cashedOut=false;mult=1.0;trail=[];
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  document.getElementById('mult').innerHTML='1.00<span style="font-size:32px">x</span>';
-  document.getElementById('mult').className='mult-val';
-  document.getElementById('statusText').textContent='ضع رهانك وانتظر الإقلاع';
-  document.getElementById('crashMsg').classList.remove('show');
-  document.getElementById('betBtn').disabled=false;document.getElementById('betBtn').textContent='رهان';
-  document.getElementById('betBtn').style.display='block';
-  document.getElementById('cashBtn').style.display='none';
-  updatePotential();
-}
-function updateHistory(){
-  const c=document.getElementById('history');c.innerHTML='';
-  history.forEach(h=>{const el=document.createElement('div');el.className='hist-item '+(h.win?'hist-win':'hist-lose');el.textContent=h.v.toFixed(2)+'x';c.appendChild(el);});
-}
-function updatePotential(){
-  const bet=parseFloat(document.getElementById('betInput').value)||0;
-  const auto=parseFloat(document.getElementById('autoVal').value)||0;
-  const pot=document.getElementById('autoCashout').checked&&auto>1?(bet*auto):bet*2;
-  document.getElementById('potVal').textContent=pot.toFixed(2);
-}
-function adjustBet(factor){const inp=document.getElementById('betInput');let v=parseFloat(inp.value)||0;v=Math.max(1,Math.floor(v*factor));inp.value=v;updatePotential();}
-function setBet(type){const inp=document.getElementById('betInput');inp.value=type==='min'?10:5000;updatePotential();}
-function goBack(){window.location.href=`${BASE}/webapp/games?uid=${uid}&lang=ar`;}
-async function loadBalance(){try{const r=await apiFetch(`${BASE}/api/wallet/balance?uid=${uid}`);const d=await r.json();document.getElementById('bal').textContent=(d.balance||0).toLocaleString();if(d.currency)document.getElementById('cur').textContent=d.currency;}catch(e){}}
-// VEX Deposit
-let vbm=[],vsw=[],vsm=null;
-async function showVexDepositModal(req){const box=document.createElement('div');box.id='modal';box.style.cssText='position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.8);z-index:200';box.innerHTML='<div id="mb" style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;max-width:340px;width:90%;max-height:85vh;overflow-y:auto"></div>';document.body.appendChild(box);const mb=document.getElementById('mb');try{const r=await apiFetch(`${BASE}/api/games/payment-methods?uid=${uid}`);const d=await r.json();vbm=d.methods||[];vsw=d.saved_methods||[];}catch(e){}if(vbm.length===0){mb.innerHTML='<div style="text-align:center;padding:16px"><div style="font-size:28px;margin-bottom:6px">😢</div><div style="font-size:13px;font-weight:700">لا توجد وسائل دفع</div><button onclick="document.getElementById(\'modal\').remove()" style="margin-top:10px;background:var(--border);color:#fff;border:none;padding:8px 20px;border-radius:8px;cursor:pointer">إغلاق</button></div>';return;}const mh=vbm.map(m=>`<div onclick="vsm=\'${m.id}\';vsM('${(m.method_name||'').replace(/'/g,"\\'")}','${(m.account_data||'').replace(/'/g,"\\'")}')" style="display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:4px;cursor:pointer"><span style="font-size:18px">${m.icon||'💳'}</span><div style="flex:1"><div style="font-weight:600;font-size:13px">${m.method_name||''}</div><div style="font-size:11px;color:var(--muted)">${m.method_type||''}</div></div><span style="color:var(--gold)">‹</span></div>`).join('');mb.innerHTML=`<div style="font-size:16px;font-weight:700;margin-bottom:8px">💰 إيداع محفظة VEX</div><div style="font-size:11px;color:var(--muted);margin-bottom:8px">${req?`تحتاج ${req}`:'اختر وسيلة الدفع'}</div><div id="vm">${mh}</div><div id="vs2" style="display:none"><div style="font-size:11px;color:var(--muted);margin:8px 0 4px">📋 بيانات الوسيلة:</div><div onclick="vCopy()" style="display:flex;align-items:center;justify-content:space-between;background:var(--surface2);border:1px solid var(--gold);border-radius:8px;padding:10px;cursor:pointer;margin-bottom:8px"><code id="vMD" style="font-size:13px;color:var(--gold);word-break:break-all"></code><span id="vCL" style="font-size:12px;color:var(--muted);flex-shrink:0;margin-right:8px">📋 نسخ</span></div><div style="font-size:11px;color:var(--muted);margin:6px 0 4px">💵 المبلغ:</div><input id="vAm" type="number" value="${req||10}" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font-size:15px;text-align:center;margin-bottom:6px;outline:none"><div style="font-size:11px;color:var(--muted);margin:6px 0 4px">🔐 رقم محفظتك:</div><input id="vW" type="text" placeholder="رقم محفظتك" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font-size:15px;text-align:center;margin-bottom:4px;outline:none"><div id="vSH" style="display:none;font-size:11px;color:var(--green);margin-bottom:4px"></div><label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-bottom:8px;cursor:pointer"><input type="checkbox" id="vSv" style="accent-color:var(--gold)"> حفظ دائم</label><button onclick="vSub()" style="width:100%;background:linear-gradient(135deg,#0d7a1f,#1a5c2e);color:#fff;border:none;padding:12px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer">✅ تأكيد الإيداع</button><button onclick="document.getElementById('vm').style.display='block';document.getElementById('vs2').style.display='none'" style="width:100%;background:var(--border);color:var(--muted);border:none;padding:8px;border-radius:10px;font-size:12px;cursor:pointer;margin-top:4px">‹ رجوع</button></div><button onclick="document.getElementById('modal').remove()" style="width:100%;background:var(--border);color:var(--muted);border:none;padding:8px;border-radius:10px;font-size:12px;cursor:pointer;margin-top:4px">إغلاق</button>`;}
-let vsMn='',vsMd='';
-function vsM(n,d){vsMn=n;vsMd=d;let sw='',h='';if(vsw.length>0){const m=vsw.find(w=>w.method_name&&w.method_name.includes(n));if(m){sw=m.account_number;h='✓ محفظتك: '+sw;}}document.getElementById('vm').style.display='none';document.getElementById('vs2').style.display='block';document.getElementById('vMD').textContent=d;if(sw){document.getElementById('vW').value=sw;document.getElementById('vSH').style.display='block';document.getElementById('vSH').textContent=h;}}
-function vCopy(){navigator.clipboard.writeText(document.getElementById('vMD').textContent).then(()=>{if(tg?.HapticFeedback?.impactOccurred)tg.HapticFeedback.impactOccurred('light');document.getElementById('vCL').textContent='✓';setTimeout(()=>document.getElementById('vCL').textContent='📋 نسخ',1500);});}
-async function vSub(){const a=parseFloat(document.getElementById('vAm').value)||0;const w=document.getElementById('vW').value.trim();const s=document.getElementById('vSv').checked;if(a<=0){alert('أدخل المبلغ');return;}if(!w){alert('أدخل رقم محفظتك');return;}if(!vsm){alert('اختر وسيلة');return;}try{const r=await apiFetch(`${BASE}/api/deposit/quick`,{method:'POST',body:JSON.stringify({uid,amount:a,method_id:vsm,method_name:vsMn,method_account_data:vsMd,player_wallet:w,save_method:s})});const d=await r.json();if(d.success){document.getElementById('mb').innerHTML='<div style="text-align:center;padding:16px"><div style="font-size:28px;margin-bottom:6px">⏳</div><div style="font-size:14px;font-weight:700">تم الإيداع</div><div style="font-size:11px;color:var(--muted);margin-top:4px">بانتظار موافقة الإدارة</div><button onclick="document.getElementById(\'modal\').remove();loadBalance();" style="margin-top:10px;background:var(--border);color:#fff;border:none;padding:8px 20px;border-radius:8px;cursor:pointer">إغلاق</button></div>';}else{alert(d.error||'خطأ');}}catch(e){alert('خطأ');}}
-// Live Players
-const lp=[];
-function addLP(d){const i=lp.findIndex(p=>p.uid===d.uid);if(i>=0)lp[i]=d;else{lp.unshift(d);if(lp.length>20)lp.pop();}renderLP();}
-function renderLP(){document.getElementById('lpCount').textContent=lp.length;document.getElementById('lpTotal').textContent='💰 '+lp.reduce((s,p)=>s+(p.bet||0),0).toLocaleString();const l=document.getElementById('lpList');l.innerHTML='';lp.forEach(p=>{const r=document.createElement('div');r.className='lp-row '+(p.status||'');r.innerHTML=`<div style="display:flex;align-items:center;gap:4px"><div class="lp-ava">${(p.name||'?')[0].toUpperCase()}</div><span>${p.name||'???'}${p.isMe?' (أنت)':''}</span></div><span style="font-weight:700">${p.bet||0}</span>`;l.appendChild(r);});}
-function simLP(){const n=['أحمد','عمر','محمد','خالد','سعد','فهد','ناصر','يوسف'];if(Math.random()<0.6&&lp.length<15)addLP({uid:'b'+Math.random().toString(36).substr(2,5),name:n[Math.floor(Math.random()*n.length)],bet:[10,20,50,100,200][Math.floor(Math.random()*5)],status:Math.random()<0.4?'win':'lose',isMe:false});renderLP();}
-resizeCanvas();loadBalance();updatePotential();document.getElementById('loading').style.display='none';document.getElementById('app').style.display='flex';setInterval(loadBalance,5000);setInterval(simLP,2500);simLP();renderLP();
-let rt;function startRound(){if(rt)clearTimeout(rt);rt=setTimeout(()=>{if(state==='waiting')startFlight();},4000);}
-startRound();
+const canvas=document.getElementById('canvas'),ctx=canvas.getContext('2d');
+let state='waiting',mult=1,crashPt=1,betAmt=0,hasBet=0,cashedOut=0,cashMult=0,sid='',animF=null,startT=0,trail=[],autoVal=2.0;
+function resizeCanvas(){canvas.width=canvas.clientWidth;canvas.height=canvas.clientHeight;}window.addEventListener('resize',resizeCanvas);
+function draw(px,py,tr){ctx.clearRect(0,0,canvas.width,canvas.height);ctx.strokeStyle='rgba(42,49,66,0.3)';ctx.lineWidth=1;for(let x=0;x<canvas.width;x+=50){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,canvas.height);ctx.stroke();}for(let y=0;y<canvas.height;y+=50){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(canvas.width,y);ctx.stroke();}if(tr.length>1){ctx.strokeStyle='#00e701';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(tr[0].x,tr[0].y);for(let i=1;i<tr.length;i++)ctx.lineTo(tr[i].x,tr[i].y);ctx.stroke();ctx.lineTo(tr[tr.length-1].x,canvas.height);ctx.lineTo(tr[0].x,canvas.height);ctx.closePath();const g=ctx.createLinearGradient(0,0,0,canvas.height);g.addColorStop(0,'rgba(0,231,1,0.15)');g.addColorStop(1,'rgba(0,231,1,0)');ctx.fillStyle=g;ctx.fill();}if(state==='flying'){ctx.font='36px sans-serif';ctx.textAlign='center';ctx.fillText('🚀',px,py);}}
+function animate(){if(state!=='flying')return;const e=(Date.now()-startT)/1000;mult=Math.exp(0.08*e);document.getElementById('mult').textContent=mult.toFixed(2)+'x';document.getElementById('mult').className='mult-val flying';if(!cashedOut&&hasBet&&autoVal>0&&mult>=autoVal&&document.getElementById('autoCashout').checked)cashOut();if(mult>=crashPt){crash();return;}const p=Math.min(1,e/10),px=50+p*(canvas.width-100),py=canvas.height-50-p*(canvas.height-150);trail.push({x:px,y:py});if(trail.length>200)trail.shift();draw(px,py,trail);if(Math.floor(e*4)!==Math.floor((e-0.016)*4))soundTick();animF=requestAnimationFrame(animate);}
+function placeBet(){if(state!=='waiting'||hasBet)return;betAmt=parseFloat(document.getElementById('betInput').value)||0;autoVal=parseFloat(document.getElementById('autoVal').value)||0;if(betAmt<1)return;apiFetch(`${BASE}/api/engine/crash/start`,{method:'POST',body:JSON.stringify({uid,bet_amount:betAmt})}).then(r=>r.json()).then(d=>{if(!d.success){if(d.need_deposit)showVexDepositModal(betAmt);else showToast(d.error||'خطأ','error');return;}hasBet=1;cashedOut=0;sid=d.session_id;crashPt=d.crash_point;document.getElementById('bal').textContent=(d.balance_after||0).toLocaleString();document.getElementById('betBtn').disabled=1;document.getElementById('betBtn').textContent='⏳';document.getElementById('statusText').textContent='⏳ جاهز للإقلاع...';updatePotential();}).catch(()=>showToast('خطأ','error'));}
+function startFlight(){state='flying';mult=1;trail=[];startT=Date.now();document.getElementById('mult').textContent='1.00x';document.getElementById('mult').className='mult-val flying';document.getElementById('statusText').textContent='';document.getElementById('crashMsg').classList.remove('show');document.getElementById('betBtn').style.display='none';document.getElementById('cashBtn').style.display='block';document.getElementById('cashBtn').textContent='سحب';haptic('light');animate();}
+function cashOut(){if(state!=='flying'||cashedOut||!hasBet)return;cashedOut=1;cashMult=mult;const payout=betAmt*cashMult;apiFetch(`${BASE}/api/engine/crash/cashout`,{method:'POST',body:JSON.stringify({session_id:sid,uid,multiplier:cashMult,bet_amount:betAmt})}).then(r=>r.json()).then(d=>{if(d.success){document.getElementById('bal').textContent=(d.balance_after||0).toLocaleString();const m=document.getElementById('crashMsg');m.textContent=`✅ +${payout.toFixed(2)} @ ${cashMult.toFixed(2)}x`;m.style.color='var(--gold)';m.classList.add('show');document.getElementById('mult').className='mult-val cashed';document.getElementById('cashBtn').style.display='none';soundCashOut();haptic('medium');fireConfetti(document.getElementById('gameArea'));streakWin++;updateStreak(document.getElementById('streak'));}}).catch(()=>{});}
+function crash(){state='crashed';cancelAnimationFrame(animF);document.getElementById('mult').textContent=crashPt.toFixed(2)+'x';document.getElementById('mult').className='mult-val crashed';const m=document.getElementById('crashMsg');m.textContent=`💥 ${crashPt.toFixed(2)}x`;m.style.color='var(--red)';m.classList.add('show');document.getElementById('cashBtn').style.display='none';soundCrash();haptic('heavy');if(!cashedOut){streakWin=0;updateStreak(document.getElementById('streak'));}addHistory('history',crashPt,cashedOut,crashPt>=3);apiFetch(`${BASE}/api/engine/crash/end`,{method:'POST',body:JSON.stringify({session_id:sid,uid,crash_point:crashPt,cashed_out:cashedOut,multiplier:cashMult,bet_amount:betAmt})}).catch(()=>{});setTimeout(resetGame,3000);}
+function resetGame(){state='waiting';hasBet=0;cashedOut=0;mult=1;trail=[];ctx.clearRect(0,0,canvas.width,canvas.height);document.getElementById('mult').textContent='1.00x';document.getElementById('mult').className='mult-val';document.getElementById('statusText').textContent='ضع رهانك وانتظر الإقلاع';document.getElementById('crashMsg').classList.remove('show');document.getElementById('betBtn').disabled=0;document.getElementById('betBtn').textContent='رهان';document.getElementById('betBtn').style.display='block';document.getElementById('cashBtn').style.display='none';updatePotential();}
+createStars('stars');resizeCanvas();loadBalance();updatePotential();document.getElementById('loading').style.display='none';document.getElementById('app').style.display='flex';setInterval(loadBalance,5000);setInterval(simulatePlayers,2500);simulatePlayers();renderPlayers();let rt;function startRound(){if(rt)clearTimeout(rt);rt=setTimeout(()=>{if(state==='waiting')startFlight();},4000);}startRound();
 </script>
 </body>
 </html>

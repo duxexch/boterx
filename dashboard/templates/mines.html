@@ -2,420 +2,57 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Mines</title>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>Mines — VEX</title>
+<link rel="stylesheet" href="/static/css/game-base.css">
 <style>
-*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
-:root{--bg:#0a0e17;--surface:#131826;--surface2:#1a2032;--border:#2a3142;--gold:#fbbf24;--green:#00e701;--red:#ff4757;--blue:#3b82f6;--text:#e8eaed;--muted:#6b7280;--radius:12px}
-body{overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text)}
-#app{position:fixed;inset:0;display:flex;flex-direction:column}
-
-/* Top Bar */
-#topbar{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--surface);border-bottom:1px solid var(--border)}
-.back-btn{background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;padding:4px 8px}
-.balance-wrap{display:flex;align-items:center;gap:6px;background:var(--surface2);padding:6px 12px;border-radius:20px}
-.balance-icon{font-size:14px;color:var(--gold)}
-.balance-val{font-size:16px;font-weight:800;color:var(--text)}
-.balance-cur{font-size:11px;color:var(--muted)}
-.sound-toggle{background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;padding:4px}
-
-/* History Bar */
-#history{display:flex;gap:3px;padding:4px 8px;background:var(--surface);overflow-x:auto;border-bottom:1px solid var(--border)}
-#history::-webkit-scrollbar{display:none}
-.hist-item{flex-shrink:0;font-size:10px;padding:2px 8px;border-radius:4px;font-weight:700;min-width:40px;text-align:center}
-.hist-win{background:rgba(0,231,1,0.12);color:var(--green)}
-.hist-lose{background:rgba(255,71,87,0.12);color:var(--red)}
-
-/* Game Area */
-#game-area{flex:1;position:relative;overflow-y:auto;overflow-x:hidden;background:radial-gradient(ellipse at 50% 100%,#0d1521 0%,var(--bg) 70%);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 12px}
-
-/* Multiplier Display */
-.mines-mult-wrap{text-align:center;margin-bottom:4px;flex-shrink:0}
-.mines-mult-val{font-size:38px;font-weight:900;font-family:'Courier New',monospace;letter-spacing:-1px;transition:color 0.3s,text-shadow 0.3s;color:var(--muted)}
-.mines-mult-val.playing{color:var(--green);text-shadow:0 0 20px rgba(0,231,1,0.3)}
-.mines-mult-val.cashed{color:var(--gold);text-shadow:0 0 25px rgba(251,191,36,0.4)}
-.mines-mult-val.bombed{color:var(--red);text-shadow:0 0 20px rgba(255,71,87,0.4)}
-.mines-mult-label{font-size:9px;color:var(--muted);margin-top:2px;letter-spacing:1px;text-transform:uppercase}
-
-/* Status */
-.mines-status{font-size:12px;color:var(--muted);margin-bottom:8px;text-align:center;min-height:16px;flex-shrink:0}
-
-/* Grid */
-#grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;width:100%;max-width:320px;flex-shrink:0}
-
-/* Tiles */
-.tile{aspect-ratio:1;perspective:600px;cursor:pointer}
-.tile.revealed{pointer-events:none}
-.tile-inner{position:relative;width:100%;height:100%;transition:transform 0.4s cubic-bezier(0.4,0,0.2,1);transform-style:preserve-3d;-webkit-transform-style:preserve-3d;will-change:transform}
-.tile.revealed .tile-inner{transform:rotateY(180deg)}
-.tile-front,.tile-back{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:clamp(18px,5vw,26px)}
-.tile-front{background:linear-gradient(135deg,var(--surface2) 0%,var(--surface) 100%);border:1px solid var(--border);transition:all 0.15s}
-.tile:not(.revealed):active .tile-front{transform:scale(0.92);border-color:rgba(251,191,36,0.4)}
-.tile-back{transform:rotateY(180deg);pointer-events:none}
-.tile.gem .tile-back{background:rgba(0,231,1,0.12);border:1px solid var(--green);box-shadow:0 0 15px rgba(0,231,1,0.3);animation:gemGlow 0.4s ease}
-.tile.mine .tile-back{background:rgba(255,71,87,0.15);border:1px solid var(--red);box-shadow:0 0 20px rgba(255,71,87,0.4);animation:mineExplode 0.4s ease}
-@keyframes gemGlow{0%{box-shadow:0 0 0 0 rgba(0,231,1,0.6)}100%{box-shadow:0 0 15px rgba(0,231,1,0.3)}}
-@keyframes mineExplode{0%{box-shadow:0 0 0 0 rgba(255,71,87,0.8)}100%{box-shadow:0 0 20px rgba(255,71,87,0.4)}}
-.tile.mine{animation:shake 0.4s}
-@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
-
-/* Bet Panel */
-#betbar{background:var(--surface);border-top:1px solid var(--border);padding:8px 12px}
-.bet-row{display:flex;gap:6px;align-items:center}
-.bet-input-wrap{position:relative;flex:1}
-.bet-input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 40px 10px 12px;color:var(--text);font-size:16px;font-weight:700;text-align:center;outline:none;font-family:'Courier New',monospace}
-.bet-input:focus{border-color:var(--gold)}
-.bet-input:disabled{opacity:0.4}
-.bet-cur{position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:11px;color:var(--muted);pointer-events:none}
-
-/* Bet Controls */
-.bet-controls{display:flex;gap:4px;margin-top:6px}
-.bet-btn{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:6px;color:var(--muted);font-size:11px;font-weight:600;cursor:pointer;transition:all 0.15s;text-align:center}
-.bet-btn:active{transform:scale(0.95);background:var(--border)}
-.bet-btn.active{background:var(--gold);color:#000;border-color:var(--gold)}
-
-/* Mine Row */
-.mine-row{display:flex;gap:4px;align-items:center;margin-top:6px;padding:4px 0}
-.mine-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;flex-shrink:0;margin-left:2px}
-.mine-row .bet-btn{flex:0 0 auto;min-width:32px;padding:6px 10px}
-
-/* Potential Win */
-.potential{display:flex;justify-content:space-between;align-items:center;margin-top:4px;padding:4px 8px;background:var(--surface2);border-radius:6px;flex-shrink:0}
-.pot-label{font-size:10px;color:var(--muted)}
-.pot-val{font-size:13px;font-weight:700;color:var(--green);font-family:'Courier New',monospace}
-
-/* Main Buttons */
-.action-row{display:flex;gap:6px;margin-top:8px}
-.btn-bet{flex:1;border:none;padding:14px;border-radius:var(--radius);font-size:15px;font-weight:800;cursor:pointer;transition:all 0.15s;background:linear-gradient(135deg,#1a5c2e,#0d7a1f);color:#fff;text-transform:uppercase;letter-spacing:1px}
-.btn-bet:active{transform:scale(0.97)}
-.btn-bet:disabled{opacity:0.3;cursor:not-allowed}
-.btn-cashout{flex:1;border:none;padding:14px;border-radius:var(--radius);font-size:15px;font-weight:800;cursor:pointer;transition:all 0.15s;background:linear-gradient(135deg,#b8860b,#daa520);color:#000;text-transform:uppercase;letter-spacing:1px;animation:pulse 0.8s infinite}
-.btn-cashout:active{transform:scale(0.97)}
-.btn-cashout:disabled{opacity:0.35;cursor:not-allowed;animation:none}
-@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(218,165,32,0.3)}50%{box-shadow:0 0 0 8px rgba(218,165,32,0)}}
-
-/* Loading */
-#loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg);z-index:200}
-.spinner{width:36px;height:36px;border:3px solid var(--border);border-top:3px solid var(--gold);border-radius:50%;animation:spin 0.7s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
-
-/* Live Players */
-#lp{max-height:70px;overflow-y:auto;background:var(--surface);border-top:1px solid var(--border)}
-#lp::-webkit-scrollbar{width:2px}
-.lp-header{display:flex;justify-content:space-between;padding:3px 8px;font-size:9px;color:var(--muted);border-bottom:1px solid var(--border)}
-.lp-list{padding:2px 6px}
-.lp-row{display:flex;align-items:center;justify-content:space-between;padding:2px 4px;border-radius:4px;margin:1px 0;font-size:10px}
-.lp-row.win{background:rgba(0,231,1,0.08)}
-.lp-row.lose{background:rgba(255,71,87,0.06)}
-.lp-ava{width:16px;height:16px;border-radius:50%;background:var(--border);display:flex;align-items:center;justify-content:center;font-size:8px;margin-left:4px}
+#game-area{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px;overflow-y:auto}
+#grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;max-width:360px;width:100%}
+.tile{aspect-ratio:1;background:var(--surface-2);border:2px solid var(--border);border-radius:var(--radius);display:flex;align-items:center;justify-content:center;font-size:28px;cursor:pointer;transition:all 0.2s var(--ease)}
+.tile:active{transform:scale(0.92)}
+.tile.revealed{cursor:default}
+.tile.gem{background:rgba(0,231,1,0.1);border-color:var(--green);animation:gemPop 0.3s var(--ease-spring)}
+.tile.mine{background:rgba(255,71,87,0.1);border-color:var(--red);animation:shake 0.3s}
+@keyframes gemPop{0%{transform:scale(0.5)}50%{transform:scale(1.1)}100%{transform:scale(1)}}
+#mult-text{font-size:24px;font-weight:900;font-family:'Courier New',monospace;color:var(--gold);margin:8px 0}
+#game-status{font-size:12px;color:var(--muted);margin:4px 0;text-align:center}
+.mine-select{display:flex;gap:4px;justify-content:center;margin-top:6px}
+.mine-opt{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 14px;color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;transition:all 0.15s}
+.mine-opt.active{background:var(--gold);color:#000;border-color:var(--gold)}
 </style>
 </head>
 <body>
-<div id="loading"><div class="spinner"></div></div>
+<div class="loader-screen" id="loading"><div class="spinner"></div></div>
 <div id="app" style="display:none">
-  <div id="topbar">
-    <button class="back-btn" onclick="goBack()">‹</button>
-    <div class="balance-wrap">
-      <span class="balance-icon">💰</span>
-      <span class="balance-val" id="bal">0</span>
-      <span class="balance-cur" id="cur">EGP</span>
-    </div>
-    <button class="sound-toggle" id="soundBtn" onclick="toggleSound()">🔊</button>
+  <div class="game-topbar">
+    <div class="topbar-left"><button class="btn-back" onclick="goBack()">‹</button><div class="bal-pill"><span class="bal-icon">💰</span><span class="bal-val" id="bal">0</span><span class="bal-cur" id="cur">EGP</span></div></div>
+    <div class="topbar-right"><span class="streak-badge" id="streak" style="display:none">🔥 0</span><button class="btn-sound" id="soundBtn" onclick="toggleSound()">🔊</button></div>
   </div>
-  <div id="history"></div>
-  <div id="game-area">
-    <div class="mines-mult-wrap">
-      <div class="mines-mult-val" id="mult">1.00<span style="font-size:20px">x</span></div>
-      <div class="mines-mult-label">المضاعف الحالي</div>
-    </div>
-    <div class="mines-status" id="status">ضع رهانك وابدأ اللعب</div>
+  <div class="hist-bar" id="history"></div>
+  <div class="game-area" id="gameArea">
+    <div id="mult-text">1.00x</div>
+    <div id="game-status">ضع رهانك وابدأ اللعب!</div>
     <div id="grid"></div>
   </div>
-  <div id="betbar">
-    <div class="bet-row">
-      <div class="bet-input-wrap">
-        <input type="number" class="bet-input" id="betInput" value="10" min="1" oninput="updatePotential()">
-        <span class="bet-cur" id="betCur">EGP</span>
-      </div>
-    </div>
-    <div class="bet-controls">
-      <div class="bet-btn" onclick="adjustBet(0.5)">½</div>
-      <div class="bet-btn" onclick="adjustBet(2)">2×</div>
-      <div class="bet-btn" onclick="setBet('min')">Min</div>
-      <div class="bet-btn" onclick="setBet('max')">Max</div>
-    </div>
-    <div class="mine-row">
-      <span class="mine-label">ألغام</span>
-      <div class="bet-btn mine-opt active" data-mines="3" onclick="setMines(3)">3</div>
-      <div class="bet-btn mine-opt" data-mines="5" onclick="setMines(5)">5</div>
-      <div class="bet-btn mine-opt" data-mines="7" onclick="setMines(7)">7</div>
-      <div class="bet-btn mine-opt" data-mines="10" onclick="setMines(10)">10</div>
-      <div style="flex:1"></div>
-      <div class="potential">
-        <span class="pot-label">ربح محتمل</span>
-        <span class="pot-val" id="potVal">10.00</span>
-      </div>
-    </div>
-    <div class="action-row">
-      <button class="btn-bet" id="betBtn" onclick="startGame()">ابدأ</button>
-      <button class="btn-cashout" id="cashBtn" onclick="cashOut()" style="display:none">سحب</button>
-    </div>
-  </div>
-  <div id="lp">
-    <div class="lp-header">
-      <span>👥 <span id="lpCount">0</span></span>
-      <span id="lpTotal">💰 0</span>
-    </div>
-    <div class="lp-list" id="lpList"></div>
+  <div class="bet-panel">
+    <div class="bet-row"><div class="bet-input-wrap"><input type="number" class="bet-input" id="betInput" value="10" min="1" oninput="updatePotential()"><span class="bet-cur" id="betCur">EGP</span></div></div>
+    <div class="bet-controls"><div class="bet-ctrl" onclick="adjustBet(0.5)">½</div><div class="bet-ctrl" onclick="adjustBet(2)">2×</div><div class="bet-ctrl" onclick="setBet('min')">Min</div><div class="bet-ctrl" onclick="setBet('max')">Max</div></div>
+    <div class="mine-select"><span style="font-size:10px;color:var(--muted);align-self:center">الألغام:</span><div class="mine-opt active" data-mines="3" onclick="setMines(3)">3</div><div class="mine-opt" data-mines="5" onclick="setMines(5)">5</div><div class="mine-opt" data-mines="7" onclick="setMines(7)">7</div><div class="mine-opt" data-mines="10" onclick="setMines(10)">10</div></div>
+    <div class="action-row"><button class="btn-action btn-bet-green" id="betBtn" onclick="startGame()">ابدأ</button><button class="btn-action btn-cashout-gold" id="cashBtn" onclick="cashOut()" style="display:none">سحب</button></div>
   </div>
 </div>
+<div class="lp-bar"><div class="lp-header"><span>👥 <span class="lp-count" id="lpCount">0</span></span><span id="lpTotal">💰 0</span></div><div class="lp-list" id="lpList"></div></div>
+<script src="/static/js/game-base.js"></script>
 <script>
-const tg=window.Telegram?.WebApp;if(tg){tg.expand();tg.ready();}
-const uid=new URLSearchParams(location.search).get('uid')||'';
-const BASE=location.origin;const initData=tg?.initData||'';let soundOn=true;
-async function apiFetch(url,opts={}){opts.headers=opts.headers||{};opts.headers['X-Telegram-Init-Data']=initData;if(opts.body&&typeof opts.body==='string'){opts.headers['Content-Type']='application/json';}if(uid&&!url.includes('uid=')){url+=(url.includes('?')?'&':'?')+'uid='+uid;}return fetch(url,opts);}
-const audioCtx=new(window.AudioContext||window.webkitAudioContext)();
-const GRID_SIZE=25;
-let mineCount=3,gameState='waiting',betAmount=0,revealedCount=0,minePositions=[],sessionId='',currentMultiplier=1.0,tiles=[],revealing=false,history=[];
-
-/* Sound */
-function beep(f,d,t='sine',v=0.12){if(!soundOn)return;const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.connect(g);g.connect(audioCtx.destination);o.frequency.value=f;o.type=t;g.gain.setValueAtTime(v,audioCtx.currentTime);g.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+d);o.start();o.stop(audioCtx.currentTime+d);}
-function soundGem(){beep(659,0.08,'sine',0.1);setTimeout(()=>beep(880,0.08,'sine',0.08),60);}
-function soundMine(){beep(150,0.4,'sawtooth',0.25);setTimeout(()=>beep(80,0.3,'square',0.15),150);}
-function soundCash(){beep(523,0.08);setTimeout(()=>beep(784,0.12),60);setTimeout(()=>beep(1047,0.15),120);}
-function soundStart(){beep(440,0.06,'sine',0.08);setTimeout(()=>beep(660,0.08,'sine',0.08),40);}
-function haptic(t='light'){if(tg?.HapticFeedback?.impactOccurred)tg.HapticFeedback.impactOccurred(t);}
-function toggleSound(){soundOn=!soundOn;document.getElementById('soundBtn').textContent=soundOn?'🔊':'🔇';}
-
-/* Grid */
-function renderGrid(){
-  const grid=document.getElementById('grid');
-  grid.innerHTML='';
-  tiles=[];
-  for(let i=0;i<GRID_SIZE;i++){
-    const tile=document.createElement('div');
-    tile.className='tile';
-    tile.innerHTML='<div class="tile-inner"><div class="tile-front"></div><div class="tile-back"></div></div>';
-    tile.onclick=()=>revealTile(i);
-    grid.appendChild(tile);
-    tiles.push(tile);
-  }
-}
-
-function setMines(n){
-  if(gameState!=='waiting')return;
-  mineCount=n;
-  document.querySelectorAll('.mine-opt').forEach(el=>el.classList.remove('active'));
-  document.querySelector('.mine-opt[data-mines="'+n+'"]').classList.add('active');
-  updatePotential();
-}
-
-/* Game Logic */
-function startGame(){
-  if(gameState!=='waiting')return;
-  betAmount=parseFloat(document.getElementById('betInput').value)||0;
-  if(betAmount<1)return;
-  apiFetch(BASE+'/api/engine/mines/start',{method:'POST',body:JSON.stringify({uid,bet_amount:betAmount,mine_count:mineCount})})
-  .then(r=>r.json()).then(d=>{
-    if(!d.success){if(d.need_deposit)showVexDepositModal(betAmount);else alert(d.error||'خطأ');return;}
-    gameState='playing';sessionId=d.session_id;revealedCount=0;currentMultiplier=1.0;minePositions=[];
-    document.getElementById('bal').textContent=(d.balance_after||0).toLocaleString();
-    document.getElementById('betBtn').style.display='none';
-    document.getElementById('cashBtn').style.display='block';
-    document.getElementById('cashBtn').textContent='💰 سحب';
-    document.getElementById('cashBtn').disabled=true;
-    document.getElementById('mult').className='mines-mult-val playing';
-    document.getElementById('mult').innerHTML='1.00<span style="font-size:20px">x</span>';
-    document.getElementById('status').textContent='💎 0 | 💣 '+mineCount+' ألغام';
-    document.getElementById('betInput').disabled=true;
-    document.querySelectorAll('.bet-controls .bet-btn').forEach(el=>el.style.opacity='0.3');
-    document.querySelectorAll('.mine-opt').forEach(el=>el.style.opacity='0.3');
-    soundStart();haptic('light');
-    renderGrid();updatePotential();
-  }).catch(()=>alert('خطأ في الاتصال'));
-}
-
-function revealTile(idx){
-  if(gameState!=='playing'||revealing)return;
-  if(tiles[idx].classList.contains('revealed'))return;
-  revealing=true;
-  apiFetch(BASE+'/api/engine/mines/reveal',{method:'POST',body:JSON.stringify({session_id:sessionId,uid,tile_index:idx})})
-  .then(r=>r.json()).then(d=>{
-    revealing=false;
-    if(!d.success)return;
-    const tile=tiles[idx];
-    tile.classList.add('revealed');
-    const back=tile.querySelector('.tile-back');
-    if(d.is_mine){
-      tile.classList.add('mine');
-      back.textContent='💣';
-      soundMine();haptic('heavy');
-      if(d.mine_positions){minePositions=d.mine_positions;revealAllMines();}
-      else{
-        apiFetch(BASE+'/api/engine/mines/end',{method:'POST',body:JSON.stringify({session_id:sessionId,uid,won:false,multiplier:currentMultiplier,bet_amount:betAmount})})
-        .then(r=>r.json()).then(d2=>{if(d2.mine_positions){minePositions=d2.mine_positions;revealAllMines();}}).catch(()=>{});
-      }
-      endGame(false);
-    }else{
-      tile.classList.add('gem');
-      back.textContent='💎';
-      revealedCount++;
-      currentMultiplier=d.multiplier||currentMultiplier;
-      document.getElementById('mult').innerHTML=currentMultiplier.toFixed(2)+'<span style="font-size:20px">x</span>';
-      document.getElementById('status').textContent='💎 '+revealedCount+' | 💣 '+mineCount+' ألغام';
-      const payout=betAmount*currentMultiplier;
-      document.getElementById('cashBtn').disabled=false;
-      document.getElementById('cashBtn').textContent='💰 سحب ('+payout.toFixed(0)+')';
-      soundGem();haptic('light');
-      updatePotential();
-      if(d.game_over){
-        setTimeout(()=>{if(gameState==='playing')cashOut();},600);
-      }
-    }
-  }).catch(()=>{revealing=false;});
-}
-
-function revealAllMines(){
-  tiles.forEach((tile,i)=>{
-    if(!tile.classList.contains('revealed')){
-      setTimeout(()=>{
-        tile.classList.add('revealed');
-        const back=tile.querySelector('.tile-back');
-        if(minePositions.includes(i)){tile.classList.add('mine');back.textContent='💣';}
-        else{tile.classList.add('gem');back.textContent='💎';}
-      },i*30);
-    }
-  });
-}
-
-function cashOut(){
-  if(gameState!=='playing'||revealedCount===0)return;
-  apiFetch(BASE+'/api/engine/mines/cashout',{method:'POST',body:JSON.stringify({session_id:sessionId,uid,multiplier:currentMultiplier,bet_amount:betAmount,revealed:revealedCount})})
-  .then(r=>r.json()).then(d=>{
-    if(!d.success)return;
-    const payout=d.payout||(betAmount*currentMultiplier);
-    document.getElementById('bal').textContent=(d.balance_after||0).toLocaleString();
-    document.getElementById('mult').className='mines-mult-val cashed';
-    document.getElementById('status').textContent='✅ +'+payout.toFixed(2)+' @ '+currentMultiplier.toFixed(2)+'x';
-    document.getElementById('cashBtn').style.display='none';
-    if(d.mine_positions){minePositions=d.mine_positions;revealAllMines();}
-    else{
-      apiFetch(BASE+'/api/engine/mines/end',{method:'POST',body:JSON.stringify({session_id:sessionId,uid,won:true,multiplier:currentMultiplier,bet_amount:betAmount})})
-      .then(r=>r.json()).then(d2=>{if(d2.mine_positions){minePositions=d2.mine_positions;revealAllMines();}}).catch(()=>{});
-    }
-    soundCash();haptic('medium');
-    history.unshift({v:currentMultiplier,win:true});if(history.length>15)history.pop();updateHistory();
-    gameState='ended';
-    setTimeout(resetGame,3500);
-  }).catch(()=>{});
-}
-
-function endGame(won){
-  gameState='ended';
-  if(!won){
-    document.getElementById('mult').className='mines-mult-val bombed';
-    document.getElementById('status').textContent='💥 انفجار! خسرت '+betAmount;
-    document.getElementById('cashBtn').style.display='none';
-    history.unshift({v:currentMultiplier,win:false});if(history.length>15)history.pop();updateHistory();
-    apiFetch(BASE+'/api/engine/mines/end',{method:'POST',body:JSON.stringify({session_id:sessionId,uid,won:false,multiplier:currentMultiplier,bet_amount:betAmount})}).catch(()=>{});
-  }
-  setTimeout(resetGame,3500);
-}
-
-function resetGame(){
-  gameState='waiting';revealedCount=0;currentMultiplier=1.0;minePositions=[];revealing=false;
-  document.getElementById('mult').className='mines-mult-val';
-  document.getElementById('mult').innerHTML='1.00<span style="font-size:20px">x</span>';
-  document.getElementById('status').textContent='ضع رهانك وابدأ اللعب';
-  document.getElementById('betBtn').style.display='block';
-  document.getElementById('betBtn').disabled=false;
-  document.getElementById('betBtn').textContent='ابدأ';
-  document.getElementById('cashBtn').style.display='none';
-  document.getElementById('betInput').disabled=false;
-  document.querySelectorAll('.bet-controls .bet-btn').forEach(el=>el.style.opacity='');
-  document.querySelectorAll('.mine-opt').forEach(el=>el.style.opacity='');
-  renderGrid();updatePotential();
-}
-
-/* History */
-function updateHistory(){
-  const c=document.getElementById('history');c.innerHTML='';
-  history.forEach(h=>{const el=document.createElement('div');el.className='hist-item '+(h.win?'hist-win':'hist-lose');el.textContent=h.win?h.v.toFixed(2)+'x':'💥';c.appendChild(el);});
-}
-
-/* Bet Controls */
-function updatePotential(){
-  const bet=parseFloat(document.getElementById('betInput').value)||0;
-  const mult=gameState==='playing'?currentMultiplier:1.0;
-  document.getElementById('potVal').textContent=(bet*mult).toFixed(2);
-}
-function adjustBet(factor){const inp=document.getElementById('betInput');let v=parseFloat(inp.value)||0;v=Math.max(1,Math.floor(v*factor));inp.value=v;updatePotential();}
-function setBet(type){const inp=document.getElementById('betInput');inp.value=type==='min'?10:5000;updatePotential();}
-function goBack(){window.location.href=BASE+'/webapp/games?uid='+uid+'&lang=ar';}
-
-/* Balance */
-async function loadBalance(){try{const r=await apiFetch(BASE+'/api/wallet/balance?uid='+uid);const d=await r.json();document.getElementById('bal').textContent=(d.balance||0).toLocaleString();if(d.currency)document.getElementById('cur').textContent=d.currency;}catch(e){}}
-
-/* VEX Deposit Modal */
-let vbm=[],vsw=[],vsm=null;
-async function showVexDepositModal(req){
-  const box=document.createElement('div');box.id='modal';
-  box.style.cssText='position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.8);z-index:200';
-  box.innerHTML='<div id="mb" style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;max-width:340px;width:90%;max-height:85vh;overflow-y:auto"></div>';
-  document.body.appendChild(box);
-  const mb=document.getElementById('mb');
-  try{const r=await apiFetch(BASE+'/api/games/payment-methods?uid='+uid);const d=await r.json();vbm=d.methods||[];vsw=d.saved_methods||[];}catch(e){}
-  if(vbm.length===0){
-    mb.innerHTML='<div style="text-align:center;padding:16px"><div style="font-size:28px;margin-bottom:6px">😢</div><div style="font-size:13px;font-weight:700">لا توجد وسائل دفع</div><button onclick="document.getElementById(\'modal\').remove()" style="margin-top:10px;background:var(--border);color:#fff;border:none;padding:8px 20px;border-radius:8px;cursor:pointer">إغلاق</button></div>';
-    return;
-  }
-  const mh=vbm.map(m=>'<div onclick="vsm=\''+m.id+'\';vsM(\''+(m.method_name||'').replace(/'/g,"\\'")+'\',\''+(m.account_data||'').replace(/'/g,"\\'")+'\')" style="display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:4px;cursor:pointer"><span style="font-size:18px">'+(m.icon||'💳')+'</span><div style="flex:1"><div style="font-weight:600;font-size:13px">'+(m.method_name||'')+'</div><div style="font-size:11px;color:var(--muted)">'+(m.method_type||'')+'</div></div><span style="color:var(--gold)">‹</span></div>').join('');
-  mb.innerHTML='<div style="font-size:16px;font-weight:700;margin-bottom:8px">💰 إيداع محفظة VEX</div><div style="font-size:11px;color:var(--muted);margin-bottom:8px">'+(req?'تحتاج '+req:'اختر وسيلة الدفع')+'</div><div id="vm">'+mh+'</div><div id="vs2" style="display:none"><div style="font-size:11px;color:var(--muted);margin:8px 0 4px">📋 بيانات الوسيلة</div><div style="display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px;margin-bottom:6px"><div id="vMD" style="flex:1;font-size:12px;word-break:break-all;font-family:\'Courier New\',monospace"></div><button onclick="vCopy()" style="background:var(--border);border:none;color:var(--text);padding:4px 8px;border-radius:6px;cursor:pointer;font-size:11px"><span id="vCL">📋 نسخ</span></button></div><div id="vSH" style="display:none;font-size:11px;color:var(--green);margin-bottom:6px"></div><div style="font-size:11px;color:var(--muted);margin:4px 0">رقم محفظتك</div><input type="text" id="vW" placeholder="01xxxxxxxxx" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font-size:14px;outline:none;margin-bottom:6px"><div style="font-size:11px;color:var(--muted);margin:4px 0">المبلغ</div><input type="number" id="vAm" placeholder="100" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font-size:14px;outline:none;margin-bottom:6px"><label style="display:flex;align-items:center;gap:6px;margin-bottom:8px"><input type="checkbox" id="vSv" style="accent-color:var(--gold)"><span style="font-size:11px;color:var(--muted)">حفظ المحفظة</span></label><button onclick="vSub()" style="width:100%;background:linear-gradient(135deg,#b8860b,#daa520);border:none;color:#000;padding:12px;border-radius:8px;font-weight:800;font-size:14px;cursor:pointer">إيداع</button></div>';
-}
-let vsMn='',vsMd='';
-function vsM(n,d){
-  vsMn=n;vsMd=d;let sw='',h='';
-  if(vsw.length>0){const m=vsw.find(w=>w.method_name&&w.method_name.includes(n));if(m){sw=m.account_number;h='✓ محفظتك: '+sw;}}
-  document.getElementById('vm').style.display='none';
-  document.getElementById('vs2').style.display='block';
-  document.getElementById('vMD').textContent=d;
-  if(sw){document.getElementById('vW').value=sw;document.getElementById('vSH').style.display='block';document.getElementById('vSH').textContent=h;}
-}
-function vCopy(){navigator.clipboard.writeText(document.getElementById('vMD').textContent).then(()=>{if(tg?.HapticFeedback?.impactOccurred)tg.HapticFeedback.impactOccurred('light');document.getElementById('vCL').textContent='✓';setTimeout(()=>document.getElementById('vCL').textContent='📋 نسخ',1500);});}
-async function vSub(){
-  const a=parseFloat(document.getElementById('vAm').value)||0;const w=document.getElementById('vW').value.trim();const s=document.getElementById('vSv').checked;
-  if(a<=0){alert('أدخل المبلغ');return;}if(!w){alert('أدخل رقم محفظتك');return;}if(!vsm){alert('اختر وسيلة');return;}
-  try{
-    const r=await apiFetch(BASE+'/api/deposit/quick',{method:'POST',body:JSON.stringify({uid,amount:a,method_id:vsm,method_name:vsMn,method_account_data:vsMd,player_wallet:w,save_method:s})});
-    const d=await r.json();
-    if(d.success){
-      document.getElementById('mb').innerHTML='<div style="text-align:center;padding:16px"><div style="font-size:28px;margin-bottom:6px">⏳</div><div style="font-size:14px;font-weight:700">تم الإيداع</div><div style="font-size:11px;color:var(--muted);margin-top:4px">بانتظار موافقة الإدارة</div><button onclick="document.getElementById(\'modal\').remove();loadBalance();" style="margin-top:10px;background:var(--border);color:#fff;border:none;padding:8px 20px;border-radius:8px;cursor:pointer">إغلاق</button></div>';
-    }else{alert(d.error||'خطأ');}
-  }catch(e){alert('خطأ');}
-}
-
-/* Live Players */
-const lp=[];
-function addLP(d){const i=lp.findIndex(p=>p.uid===d.uid);if(i>=0)lp[i]=d;else{lp.unshift(d);if(lp.length>20)lp.pop();}renderLP();}
-function renderLP(){
-  document.getElementById('lpCount').textContent=lp.length;
-  document.getElementById('lpTotal').textContent='💰 '+lp.reduce((s,p)=>s+(p.bet||0),0).toLocaleString();
-  const l=document.getElementById('lpList');l.innerHTML='';
-  lp.forEach(p=>{const r=document.createElement('div');r.className='lp-row '+(p.status||'');r.innerHTML='<div style="display:flex;align-items:center;gap:4px"><div class="lp-ava">'+((p.name||'?')[0].toUpperCase())+'</div><span>'+(p.name||'???')+(p.isMe?' (أنت)':'')+'</span></div><span style="font-weight:700">'+(p.bet||0)+'</span>';l.appendChild(r);});
-}
-function simLP(){
-  const n=['أحمد','عمر','محمد','خالد','سعد','فهد','ناصر','يوسف'];
-  if(Math.random()<0.6&&lp.length<15)addLP({uid:'b'+Math.random().toString(36).substr(2,5),name:n[Math.floor(Math.random()*n.length)],bet:[10,20,50,100,200][Math.floor(Math.random()*5)],status:Math.random()<0.4?'win':'lose',isMe:false});
-  renderLP();
-}
-
-/* Init */
-renderGrid();loadBalance();updatePotential();
-document.getElementById('loading').style.display='none';
-document.getElementById('app').style.display='flex';
-setInterval(loadBalance,5000);
-setInterval(simLP,2500);
-simLP();renderLP();
+let gameState='waiting',mineCount=3,revealed=0,sid='',mult=1,gameId='GAME006',betAmt=0,tiles=[];
+function setMines(n){if(gameState!=='waiting')return;mineCount=n;document.querySelectorAll('.mine-opt').forEach(e=>e.classList.remove('active'));document.querySelector(`.mine-opt[data-mines="${n}"]`).classList.add('active');}
+function renderGrid(){const g=document.getElementById('grid');g.innerHTML='';tiles=[];for(let i=0;i<25;i++){const t=document.createElement('div');t.className='tile';t.dataset.idx=i;t.onclick=()=>revealTile(i);g.appendChild(t);tiles.push(t);}}
+function startGame(){if(gameState!=='waiting')return;betAmt=parseFloat(document.getElementById('betInput').value)||0;if(betAmt<1)return;apiFetch(`${BASE}/api/engine/mines/start`,{method:'POST',body:JSON.stringify({uid,bet_amount:betAmt,mine_count:mineCount})}).then(r=>r.json()).then(d=>{if(!d.success){if(d.need_deposit)showVexDepositModal(betAmt);else showToast(d.error||'خطأ','error');return;}gameState='playing';sid=d.session_id;revealed=0;mult=1;document.getElementById('bal').textContent=(d.balance_after||0).toLocaleString();document.getElementById('betBtn').style.display='none';document.getElementById('cashBtn').style.display='block';document.getElementById('cashBtn').textContent='💰 سحب';document.getElementById('game-status').textContent=`اكشف المربعات وتجنب ${mineCount} ألغام!`;document.querySelectorAll('.mine-opt').forEach(e=>e.style.opacity='0.3');renderGrid();}).catch(()=>showToast('خطأ','error'));}
+function revealTile(i){if(gameState!=='playing'||tiles[i].classList.contains('revealed'))return;apiFetch(`${BASE}/api/engine/mines/reveal`,{method:'POST',body:JSON.stringify({session_id:sid,uid,tile_index:i})}).then(r=>r.json()).then(d=>{if(!d.success)return;tiles[i].classList.add('revealed');if(d.is_mine){tiles[i].classList.add('mine');tiles[i].textContent='💣';soundLose();haptic('heavy');endGame(false);}else{tiles[i].classList.add('gem');tiles[i].textContent='💎';revealed++;mult=d.multiplier;document.getElementById('mult-text').textContent=d.multiplier.toFixed(2)+'x';document.getElementById('cashBtn').textContent=`💰 سحب (${(betAmt*d.multiplier).toFixed(0)})`;beep(659,0.08);haptic('light');if(d.game_over)endGame(true);}}).catch(()=>{});}
+function cashOut(){if(gameState!=='playing'||revealed===0)return;apiFetch(`${BASE}/api/engine/mines/cashout`,{method:'POST',body:JSON.stringify({session_id:sid,uid,multiplier:mult,bet_amount:betAmt,revealed})}).then(r=>r.json()).then(d=>{if(d.success){document.getElementById('bal').textContent=(d.balance_after||0).toLocaleString();document.getElementById('game-status').textContent=`✅ +${(d.payout).toFixed(0)} @ ${mult.toFixed(2)}x`;soundCashOut();haptic('medium');fireConfetti(document.getElementById('gameArea'));streakWin++;updateStreak(document.getElementById('streak'));endGame(true,true);}}).catch(()=>{});}
+function endGame(won,cashed){gameState='ended';if(!cashed){apiFetch(`${BASE}/api/engine/mines/end`,{method:'POST',body:JSON.stringify({session_id:sid,uid,won,multiplier:mult,bet_amount:betAmt})}).catch(()=>{});}if(!won){streakWin=0;updateStreak(document.getElementById('streak'));}addHistory('history',won?mult:0,won,won&&mult>=5);document.getElementById('cashBtn').style.display='none';setTimeout(resetGame,3000);}
+function resetGame(){gameState='waiting';revealed=0;mult=1;document.getElementById('mult-text').textContent='1.00x';document.getElementById('game-status').textContent='ضع رهانك وابدأ اللعب!';document.getElementById('betBtn').style.display='block';document.getElementById('cashBtn').style.display='none';document.querySelectorAll('.mine-opt').forEach(e=>e.style.opacity='1');renderGrid();}
+renderGrid();loadBalance();updatePotential();document.getElementById('loading').style.display='none';document.getElementById('app').style.display='flex';setInterval(loadBalance,5000);setInterval(simulatePlayers,2500);simulatePlayers();renderPlayers();
 </script>
 </body>
 </html>
