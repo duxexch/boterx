@@ -4946,7 +4946,7 @@ def api_aviator_bet():
     return jsonify({'success': True, 'balance_after': balance})
 
 @app.route('/api/aviator/cashout', methods=['POST'])
-def api_aviator_cashout():
+def api_aviator_cashout_global():
     """Cash out during flying phase (global round)"""
     uid = get_request_uid()
     if not uid: return jsonify({'error': 'No uid'}), 400
