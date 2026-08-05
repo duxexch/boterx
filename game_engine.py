@@ -260,9 +260,14 @@ class GameManager:
             with open(self.catalog_file, 'r', encoding=CSV_ENCODING) as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    if active_only and row.get('is_active') != 'yes':
+                    # Strip BOM from keys if present
+                    clean = {}
+                    for k, v in (row or {}).items():
+                        ck = k.lstrip('\ufeff').strip() if k else k
+                        clean[ck] = v
+                    if active_only and clean.get('is_active') != 'yes':
                         continue
-                    games.append(row)
+                    games.append(clean)
         except:
             pass
         return games
