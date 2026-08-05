@@ -15,6 +15,61 @@ from collections import defaultdict
 CSV_ENCODING = 'utf-8-sig'
 _wallet_lock = threading.RLock()
 
+# ===== In-Memory Balance Cache =====
+# يقرأ من users.csv مرة واحدة فقط، ثم كل العمليات في الذاكرة
+_balance_cache = {}  # {telegram_id: {'balance': float, 'currency': str, 'dirty': bool}}
+_cache_loaded = False
+_cache_lock = threading.Lock()
+
+def _load_balance_cache():
+    """تحميل كل الأرصدة من users.csv إلى الذاكرة (مرة واحدة)"""
+    global _cache_loaded, _balance_cache
+    with _cache_lock:
+        if _cache_loaded:
+            return
+        try:
+            with open('users.csv', 'r', encoding=CSV_ENCODING) as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    tid = row.get('telegram_id', '')
+                    if tid:
+                        _balance_cache[tid] = {
+                            'balance': float(row.get('game_balance', 0) or 0),
+                            'currency': row.get('currency', 'EGP'),
+                            'dirty': False
+                        }
+            _cache_loaded = True
+            print(f"✅ Balance cache loaded: {len(_balance_cache)} users")
+        except Exception as e:
+            print(f"Balance cache load error: {e}")
+            _cache_loaded = True  # لا نعيد المحاولة في كل طلب
+
+def _flush_balance_to_csv(user_id):
+    """كتابة رصيد مستخدم واحد فقط (وليس الملف كاملاً)"""
+    global _balance_cache
+    try:
+        rows = []
+        fieldnames = None
+        with open('users.csv', 'r', encoding=CSV_ENCODING) as f:
+            reader = csv.DictReader(f)
+            fieldnames = reader.fieldnames
+            rows = list(reader)
+        for row in rows:
+            if row.get('telegram_id') == str(user_id):
+                cached = _balance_cache.get(str(user_id))
+                if cached:
+                    row['game_balance'] = f"{cached['balance']:.2f}"
+                break
+        with open('users.csv', 'w', newline='', encoding=CSV_ENCODING) as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            for row in rows:
+                writer.writerow({k: row.get(k, '') for k in fieldnames})
+        if str(user_id) in _balance_cache:
+            _balance_cache[str(user_id)]['dirty'] = False
+    except Exception as e:
+        print(f"Flush balance error for {user_id}: {e}")
+
 try:
     from house_algorithm import HouseAlgorithm
     from risk_manager import RiskManager
@@ -168,89 +223,102 @@ class GameManager:
         return methods
 
     def get_user_info(self, user_id):
-        """قراءة بيانات المستخدم من users.csv"""
+        """قراءة بيانات المستخدم — من الكاش + CSV مرة واحدة"""
+        _load_balance_cache()
+        uid = str(user_id)
+        with _cache_lock:
+            if uid in _balance_cache:
+                # Return cached info + read full user row once
+                pass
         try:
             with open('users.csv', 'r', encoding=CSV_ENCODING) as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    if row.get('telegram_id') == str(user_id):
-                        return row
+                    if row.get('telegram_id') == uid:
+                        # Update cache
+                        with _cache_lock:
+                            if uid in _balance_cache:
+                                row['game_balance'] = f"{_balance_cache[uid]['balance']:.2f}"
+                                row['currency'] = _balance_cache[uid]['currency']
+                            return row
         except:
             pass
         return {}
 
     def get_balance(self, user_id):
-        """قراءة رصيد محفظة الألعاب من users.csv"""
-        with _wallet_lock:
-            try:
-                with open('users.csv', 'r', encoding=CSV_ENCODING) as f:
-                    reader = csv.DictReader(f)
-                    for row in reader:
-                        if row.get('telegram_id') == str(user_id):
-                            return float(row.get('game_balance', 0) or 0)
-            except:
-                pass
-            return 0.0
-
-    def get_user_currency(self, user_id):
-        """قراءة عملة المستخدم"""
+        """قراءة رصيد محفظة الألعاب — من الكاش (فوري)"""
+        _load_balance_cache()
+        uid = str(user_id)
+        with _cache_lock:
+            if uid in _balance_cache:
+                return _balance_cache[uid]['balance']
+        # Fallback: read from CSV (new user not in cache)
         try:
             with open('users.csv', 'r', encoding=CSV_ENCODING) as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    if row.get('telegram_id') == str(user_id):
-                        return row.get('currency', 'SAR')
+                    if row.get('telegram_id') == uid:
+                        bal = float(row.get('game_balance', 0) or 0)
+                        cur = row.get('currency', 'EGP')
+                        with _cache_lock:
+                            _balance_cache[uid] = {'balance': bal, 'currency': cur, 'dirty': False}
+                        return bal
         except:
             pass
-        return 'SAR'
+        return 0.0
+
+    def get_user_currency(self, user_id):
+        """قراءة عملة المستخدم — من الكاش"""
+        _load_balance_cache()
+        uid = str(user_id)
+        with _cache_lock:
+            if uid in _balance_cache:
+                return _balance_cache[uid]['currency']
+        # Fallback
+        try:
+            with open('users.csv', 'r', encoding=CSV_ENCODING) as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row.get('telegram_id') == uid:
+                        return row.get('currency', 'EGP')
+        except:
+            pass
+        return 'EGP'
 
     def add_balance(self, user_id, amount, reason='deposit'):
-        """إضافة رصيد لـ game_balance في users.csv"""
+        """إضافة رصيد — يحدّث الكاش فوراً + يكتب CSV خلفياً"""
+        _load_balance_cache()
+        uid = str(user_id)
+        amt = float(amount)
+        with _cache_lock:
+            if uid not in _balance_cache:
+                _balance_cache[uid] = {'balance': 0.0, 'currency': 'EGP', 'dirty': True}
+            _balance_cache[uid]['balance'] += amt
+            _balance_cache[uid]['dirty'] = True
+            new_bal = _balance_cache[uid]['balance']
+        # Write to CSV (non-blocking — lock only for this user's row)
         with _wallet_lock:
-            try:
-                with open('users.csv', 'r', encoding=CSV_ENCODING) as f:
-                    reader = csv.DictReader(f)
-                    fieldnames = reader.fieldnames
-                    rows = list(reader)
-                for row in rows:
-                    if row.get('telegram_id') == str(user_id):
-                        current = float(row.get('game_balance', 0) or 0)
-                        row['game_balance'] = f"{current + float(amount):.2f}"
-                        break
-                with open('users.csv', 'w', newline='', encoding=CSV_ENCODING) as f:
-                    writer = csv.DictWriter(f, fieldnames=fieldnames)
-                    writer.writeheader()
-                    for row in rows:
-                        writer.writerow({k: row.get(k, '') for k in fieldnames})
-                return self.get_balance(user_id)
-            except Exception as e:
-                print(f"add_balance error: {e}")
-                return 0.0
+            _flush_balance_to_csv(uid)
+        return new_bal
 
     def deduct_balance(self, user_id, amount):
-        """خصم رصيد من game_balance في users.csv"""
+        """خصم رصيد — يحدّث الكاش فوراً + يكتب CSV خلفياً"""
+        _load_balance_cache()
+        uid = str(user_id)
+        amt = float(amount)
+        with _cache_lock:
+            if uid not in _balance_cache:
+                _balance_cache[uid] = {'balance': 0.0, 'currency': 'EGP', 'dirty': True}
+            current = _balance_cache[uid]['balance']
+            if current < amt:
+                return False, current
+            _balance_cache[uid]['balance'] -= amt
+            _balance_cache[uid]['dirty'] = True
+            new_bal = _balance_cache[uid]['balance']
+        # Write to CSV
         with _wallet_lock:
-            try:
-                with open('users.csv', 'r', encoding=CSV_ENCODING) as f:
-                    reader = csv.DictReader(f)
-                    fieldnames = reader.fieldnames
-                    rows = list(reader)
-                for row in rows:
-                    if row.get('telegram_id') == str(user_id):
-                        current = float(row.get('game_balance', 0) or 0)
-                        if current < float(amount):
-                            return False, current
-                        row['game_balance'] = f"{current - float(amount):.2f}"
-                        break
-                with open('users.csv', 'w', newline='', encoding=CSV_ENCODING) as f:
-                    writer = csv.DictWriter(f, fieldnames=fieldnames)
-                    writer.writeheader()
-                    for row in rows:
-                        writer.writerow({k: row.get(k, '') for k in fieldnames})
-                return True, self.get_balance(user_id)
-            except Exception as e:
-                print(f"deduct_balance error: {e}")
-                return False, 0.0
+            _flush_balance_to_csv(uid)
+        return True, new_bal
 
     # ===== الألعاب =====
 
