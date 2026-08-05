@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="/static/css/game-base.css">
 <style>
 #app{overflow-y:auto}
-#hub{flex:1;padding:12px;display:grid;grid-template-columns:repeat(2,1fr);gap:10px;overflow-y:auto;align-content:start}
+#hub{padding:12px;display:grid;grid-template-columns:repeat(2,1fr);gap:10px;overflow-y:auto;align-content:start}
 .game-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 10px;cursor:pointer;transition:all 0.2s var(--ease);text-align:center;position:relative;overflow:hidden}
 .game-card:active{transform:scale(0.95);border-color:var(--gold)}
 .game-card:hover{border-color:var(--gold)}
@@ -28,6 +28,23 @@
 .hub-btn.dep{background:linear-gradient(135deg,var(--green-dim),#1a8a2e);color:#fff}
 .hub-btn.wdr{background:linear-gradient(135deg,var(--gold-dim),var(--gold));color:#000}
 .hub-btn.vex{background:linear-gradient(135deg,var(--purple),#7c3aed);color:#fff}
+/* Leaderboard */
+.lb-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin:8px 12px 4px;overflow:hidden}
+.lb-header{display:flex;align-items:center;gap:6px;padding:8px 12px;background:var(--surface-2);border-bottom:1px solid var(--border)}
+.lb-header-icon{font-size:16px}
+.lb-header-text{font-size:12px;font-weight:700;color:var(--gold)}
+.lb-list{max-height:220px;overflow-y:auto}
+.lb-list::-webkit-scrollbar{width:2px}
+.lb-list::-webkit-scrollbar-thumb{background:var(--border)}
+.lb-row{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid rgba(42,49,66,0.3);font-size:11px;transition:background 0.15s}
+.lb-row:active{background:var(--surface-2)}
+.lb-row.win .lb-profit{color:var(--green)}
+.lb-row.lose .lb-profit{color:var(--red)}
+.lb-rank{width:24px;text-align:center;font-weight:700;font-size:14px}
+.lb-name{flex:1;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lb-profit{font-weight:800;font-family:'Courier New',monospace}
+.lb-games{font-size:9px;color:var(--muted)}
+.lb-empty{text-align:center;padding:16px;color:var(--muted);font-size:12px}
 </style>
 </head>
 <body>
@@ -40,11 +57,19 @@
     </div>
     <div class="topbar-btns">
       <button class="hub-btn vex" id="vexBtn" style="display:none" onclick="alert('💎 تعويض')">💎</button>
+      <button class="hub-btn dep" onclick="window.location.href=BASE+'/webapp/stats?uid='+uid" style="background:linear-gradient(135deg,#06b6d4,#0891b2);color:#fff">📊</button>
       <button class="hub-btn dep" onclick="showDeposit()">💰</button>
       <button class="hub-btn wdr" onclick="showWithdraw()">💸</button>
     </div>
   </div>
   <div id="hub"></div>
+  <div class="lb-section">
+    <div class="lb-header">
+      <span class="lb-header-icon">🏆</span>
+      <span class="lb-header-text">قائمة الأبطال</span>
+    </div>
+    <div class="lb-list" id="leaderboard"><div class="lb-empty">جاري التحميل...</div></div>
+  </div>
   <div class="empty-state" id="empty"><div class="empty-icon">🎮</div><p>لا توجد ألعاب متاحة</p></div>
 </div>
 <div class="modal-overlay" id="modal"><div class="modal-box" id="modalBox"></div></div>
@@ -62,6 +87,7 @@ async function showWithdraw(){const bal=parseFloat(document.getElementById('bal'
 function showCurrencyPicker(){const cs=[{code:'EGP',name:'جنيه مصري 🇪🇬'},{code:'SAR',name:'ريال سعودي 🇸🇦'},{code:'USD',name:'دولار 🇺🇸'},{code:'USDT',name:'تيذر 🪙'},{code:'AED',name:'درهم 🇦🇪'},{code:'KWD',name:'دينار كويتي 🇰🇼'}];document.getElementById('modal').style.display='flex';document.getElementById('modalBox').innerHTML=`<div class="modal-title">💱 اختر العملة</div><div class="modal-subtitle">الحالية: ${document.getElementById('cur').textContent}</div>${cs.map(c=>`<div class="method-item" onclick="chCur('${c.code}')"><span style="font-size:18px">${c.name.slice(-2)}</span><div class="method-info"><div class="method-name">${c.name.slice(0,-3)}</div></div></div>`).join('')}<button class="modal-btn-secondary" onclick="closeModal()">إلغاء</button>`;}
 window.chCur=async function(c){try{await apiFetch(`${BASE}/api/player/currency`,{method:'POST',body:JSON.stringify({uid,currency:c})});document.getElementById('cur').textContent=c;closeModal();loadBalance();loadGames();}catch(e){alert('خطأ');}};
 loadBalance();loadProfile();loadGames();setInterval(loadBalance,5000);
+connectLeaderboardStream('leaderboard');
 </script>
 </body>
 </html>

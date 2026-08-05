@@ -64,6 +64,25 @@ function toggleSound() {
 // Load sound pref
 soundOn = localStorage.getItem('vex_sound') !== '0';
 
+// ---- Provably Fair badge auto-inject ----
+function injectPFBadge() {
+  const topbar = document.querySelector('.topbar-right');
+  if (topbar && !document.getElementById('pfBadge')) {
+    const badge = document.createElement('span');
+    badge.id = 'pfBadge';
+    badge.className = 'pf-badge';
+    badge.onclick = showProvablyFairModal;
+    topbar.insertBefore(badge, topbar.firstChild);
+  }
+}
+
+// Auto-init provably fair when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => { injectPFBadge(); initProvablyFair(); });
+} else {
+  injectPFBadge(); initProvablyFair();
+}
+
 // ---- Haptics ----
 function haptic(t = 'light') {
   if (tg?.HapticFeedback?.impactOccurred) {
@@ -150,6 +169,123 @@ function fireConfetti(gameAreaEl) {
   }
 }
 
+// ---- Chat / Emoji Reactions ----
+let _chatSSE = null;
+const QUICK_EMOJIS = ['🔥', '💎', '🚀', '💰', '😱', '😂', '💪', '🎉'];
+
+function connectChatStream() {
+  const container = document.querySelector('.chat-messages');
+  if (!container) return;
+  try {
+    const url = BASE + '/api/games/chat/stream?uid=' + uid;
+    _chatSSE = new EventSource(url);
+    _chatSSE.onmessage = function(e) {
+      try {
+        const d = JSON.parse(e.data);
+        if (d.type === 'chat' && d.data) {
+          addChatMessage(d.data);
+        }
+      } catch(err) { /* ignore */ }
+    };
+    _chatSSE.onerror = function() {
+      _chatSSE.close();
+      _chatSSE = null;
+      // Fallback: poll history
+      setTimeout(pollChatHistory, 3000);
+    };
+  } catch(e) {
+    pollChatHistory();
+  }
+}
+
+async function pollChatHistory() {
+  try {
+    const r = await apiFetch(BASE + '/api/games/chat/history?uid=' + uid);
+    const d = await r.json();
+    if (d.messages) {
+      d.messages.forEach(m => addChatMessage(m, false));
+    }
+  } catch(e) { /* ignore */ }
+}
+
+function addChatMessage(msg, animate = true) {
+  const container = document.querySelector('.chat-messages');
+  if (!container) return;
+  const el = document.createElement('div');
+  el.className = 'chat-msg';
+  if (msg.emoji && !msg.message) {
+    el.innerHTML = `<span class="chat-name">${msg.name}:</span> <span class="chat-emoji">${msg.emoji}</span>`;
+  } else {
+    el.innerHTML = `<span class="chat-name">${msg.name}:</span> <span class="chat-text">${msg.message || ''}</span>${msg.emoji ? ' <span class="chat-emoji">' + msg.emoji + '</span>' : ''}`;
+  }
+  container.appendChild(el);
+  if (container.children.length > 30) container.removeChild(container.firstChild);
+  container.scrollTop = container.scrollHeight;
+}
+
+async function sendChatMessage() {
+  const input = document.querySelector('.chat-input');
+  if (!input) return;
+  const msg = input.value.trim();
+  if (!msg) return;
+  input.value = '';
+  try {
+    await apiFetch(BASE + '/api/games/chat/send', {
+      method: 'POST',
+      body: JSON.stringify({ uid, message: msg })
+    });
+  } catch(e) { /* ignore */ }
+}
+
+async function sendEmoji(emoji) {
+  try {
+    await apiFetch(BASE + '/api/games/chat/send', {
+      method: 'POST',
+      body: JSON.stringify({ uid, emoji: emoji })
+    });
+    haptic('light');
+  } catch(e) { /* ignore */ }
+}
+
+function toggleChat() {
+  const bar = document.querySelector('.chat-bar');
+  if (bar) {
+    const isHidden = bar.style.display === 'none';
+    bar.style.display = isHidden ? 'flex' : 'none';
+  }
+}
+
+// Auto-inject chat bar into game pages
+function injectChatBar() {
+  const app = document.getElementById('app');
+  if (!app || document.querySelector('.chat-bar')) return;
+  const bar = document.createElement('div');
+  bar.className = 'chat-bar';
+  bar.innerHTML = `
+    <div class="chat-header">
+      <span>💬 الدردشة</span>
+      <button class="chat-toggle" onclick="toggleChat()">‒</button>
+    </div>
+    <div class="chat-messages"></div>
+    <div class="chat-input-row">
+      <button class="chat-emoji-btn" onclick="sendEmoji('🔥')">🔥</button>
+      <button class="chat-emoji-btn" onclick="sendEmoji('💎')">💎</button>
+      <button class="chat-emoji-btn" onclick="sendEmoji('🚀')">🚀</button>
+      <input class="chat-input" placeholder="اكتب رسالة..." onkeypress="if(event.key==='Enter')sendChatMessage()">
+      <button class="chat-send-btn" onclick="sendChatMessage()">➤</button>
+    </div>
+  `;
+  app.appendChild(bar);
+  connectChatStream();
+}
+
+// Auto-inject chat on DOM ready (after PF badge)
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => { setTimeout(injectChatBar, 100); });
+} else {
+  setTimeout(injectChatBar, 100);
+}
+
 // ---- Stars Background ----
 function createStars(containerId) {
   const container = document.getElementById(containerId);
@@ -166,6 +302,8 @@ function createStars(containerId) {
 
 // ---- Live Players (shared) ----
 const livePlayers = [];
+let _lpSSE = null;
+let _lpSSEFallback = null;
 
 function addPlayer(data) {
   const idx = livePlayers.findIndex(p => p.uid === data.uid);
@@ -194,11 +332,82 @@ function renderPlayers() {
   });
 }
 
+// Connect to real SSE live players stream
+function connectLivePlayersStream() {
+  try {
+    if (_lpSSE) _lpSSE.close();
+    const url = BASE + '/api/games/live-players/stream?uid=' + uid;
+    _lpSSE = new EventSource(url);
+    _lpSSE.onmessage = function(e) {
+      try {
+        const d = JSON.parse(e.data);
+        if (d.type === 'live_players' && d.players) {
+          livePlayers.length = 0;
+          d.players.forEach(p => {
+            livePlayers.push({
+              uid: p.uid,
+              name: p.name || '',
+              bet: p.bet || 0,
+              status: p.status || 'lose',
+              multiplier: p.multiplier || 0,
+              isMe: p.uid === uid
+            });
+          });
+          renderPlayers();
+        }
+      } catch(err) { /* ignore parse errors */ }
+    };
+    _lpSSE.onerror = function() {
+      _lpSSE.close();
+      _lpSSE = null;
+      // Fallback to polling API every 3s
+      if (!_lpSSEFallback) {
+        _lpSSEFallback = setInterval(pollLivePlayers, 3000);
+        pollLivePlayers();
+      }
+    };
+  } catch(e) {
+    // SSE not supported, use polling fallback
+    if (!_lpSSEFallback) {
+      _lpSSEFallback = setInterval(pollLivePlayers, 3000);
+      pollLivePlayers();
+    }
+  }
+}
+
+// Polling fallback for live players
+async function pollLivePlayers() {
+  try {
+    const r = await apiFetch(BASE + '/api/games/live-players?uid=' + uid);
+    const d = await r.json();
+    if (d.players) {
+      livePlayers.length = 0;
+      d.players.forEach(p => {
+        livePlayers.push({
+          uid: p.uid,
+          name: p.name || '',
+          bet: p.bet || 0,
+          status: p.status || 'lose',
+          multiplier: p.multiplier || 0,
+          isMe: p.uid === uid
+        });
+      });
+      renderPlayers();
+    }
+  } catch(e) { /* ignore */ }
+}
+
+// Simulated players (fallback only when no real data available)
 function simulatePlayers() {
-  const names = ['أحمد', 'عمر', 'محمد', 'خالد', 'سعد', 'فهد', 'ناصر', 'يوسف', 'علي', 'حسن', 'ماجد', 'وليد', 'طارق', 'بدر', 'راشد'];
-  if (Math.random() < 0.6 && livePlayers.length < 18) {
+  // Try SSE first, fallback to simulation
+  if (!_lpSSE && !_lpSSEFallback) {
+    connectLivePlayersStream();
+  }
+  // Add a fake player occasionally if list is empty
+  if (livePlayers.length < 3) {
+    const names = ['أحمد', 'عمر', 'محمد', 'خالد', 'سعد', 'فهد', 'ناصر', 'يوسف', 'علي', 'حسن'];
     addPlayer({
-      uid: 'b' + Math.random().toString(36).substr(2, 5),
+      uid: 'sim_' + Math.random().toString(36).substr(2, 5),
       name: names[Math.floor(Math.random() * names.length)],
       bet: [10, 20, 50, 100, 200, 500][Math.floor(Math.random() * 6)],
       status: Math.random() < 0.4 ? 'win' : 'lose',
@@ -207,6 +416,57 @@ function simulatePlayers() {
     });
   }
   renderPlayers();
+}
+
+// ---- Leaderboard (for games hub) ----
+function connectLeaderboardStream(containerId) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  try {
+    const url = BASE + '/api/games/leaderboard/stream?uid=' + uid;
+    const es = new EventSource(url);
+    es.onmessage = function(e) {
+      try {
+        const d = JSON.parse(e.data);
+        if (d.type === 'leaderboard' && d.leaderboard) {
+          renderLeaderboard(containerId, d.leaderboard);
+        }
+      } catch(err) { /* ignore */ }
+    };
+    es.onerror = function() {
+      es.close();
+      // Fallback: poll once
+      apiFetch(BASE + '/api/games/leaderboard?uid=' + uid).then(r => r.json()).then(d => {
+        if (d.leaderboard) renderLeaderboard(containerId, d.leaderboard);
+      }).catch(() => {});
+    };
+  } catch(e) {
+    apiFetch(BASE + '/api/games/leaderboard?uid=' + uid).then(r => r.json()).then(d => {
+      if (d.leaderboard) renderLeaderboard(containerId, d.leaderboard);
+    }).catch(() => {});
+  }
+}
+
+function renderLeaderboard(containerId, players) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  if (!players || players.length === 0) {
+    el.innerHTML = '<div style="text-align:center;color:var(--muted);padding:16px;font-size:12px">لا يوجد لاعبون بعد</div>';
+    return;
+  }
+  el.innerHTML = players.map((p, i) => {
+    const rank = i + 1;
+    const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `<span style="color:var(--muted)">${rank}</span>`;
+    const profit = p.profit || 0;
+    const profitClass = profit > 0 ? 'win' : profit < 0 ? 'lose' : '';
+    const profitStr = (profit >= 0 ? '+' : '') + profit.toFixed(0);
+    return `<div class="lb-row ${profitClass}">
+      <span class="lb-rank">${medal}</span>
+      <span class="lb-name">${p.name || '???'}${p.uid === uid ? ' (أنت)' : ''}</span>
+      <span class="lb-profit">${profitStr}</span>
+      <span class="lb-games">${p.games || 0} لعبة</span>
+    </div>`;
+  }).join('');
 }
 
 // ---- Bet Panel Helpers ----
@@ -231,6 +491,134 @@ function setBet(type, inputId, min, max) {
   const inp = document.getElementById(inputId || 'betInput');
   inp.value = type === 'min' ? (min || 10) : (max || 5000);
   updatePotential();
+}
+
+// ---- Provably Fair (shared) ----
+let pfSessionId = null;
+let pfSeedHash = null;
+let pfClientSeed = null;
+let pfNonce = 0;
+let pfRevealedSeed = null;
+
+async function initProvablyFair() {
+  try {
+    const r = await apiFetch(`${BASE}/api/provably-fair/seed?uid=${uid}`);
+    const d = await r.json();
+    if (d.seed_hash) {
+      pfSessionId = d.session_id;
+      pfSeedHash = d.seed_hash;
+      pfClientSeed = d.client_seed;
+      pfNonce = 0;
+      updatePFBadge();
+    }
+  } catch (e) { /* ignore */ }
+}
+
+function updatePFBadge() {
+  const badge = document.getElementById('pfBadge');
+  if (badge && pfSeedHash) {
+    badge.style.display = 'block';
+    badge.textContent = '🔐 Fair';
+    badge.title = 'Provably Fair: ' + pfSeedHash.substring(0, 16) + '...';
+  }
+}
+
+function showProvablyFairModal() {
+  const overlay = document.createElement('div');
+  overlay.id = 'pfModal';
+  overlay.className = 'modal-overlay';
+  overlay.style.display = 'flex';
+  overlay.innerHTML = `<div class="modal-box" id="pfBox"></div>`;
+  document.body.appendChild(overlay);
+  const box = document.getElementById('pfBox');
+
+  const hashShort = pfSeedHash ? pfSeedHash.substring(0, 32) + '...' : '---';
+  const seedShort = pfRevealedSeed ? pfRevealedSeed.substring(0, 32) + '...' : 'مخفي (سيكشف بعد الجولة)';
+
+  box.innerHTML = `
+    <div class="modal-title">🔐 Provably Fair</div>
+    <div class="modal-subtitle">نظام عدالة قابل للتحقق</div>
+    <div style="background:var(--surface-2);border-radius:8px;padding:10px;margin:6px 0">
+      <div style="font-size:10px;color:var(--muted);margin-bottom:4px">🔐 Server Seed Hash:</div>
+      <code style="font-size:11px;color:var(--gold);word-break:break-all">${hashShort}</code>
+    </div>
+    <div style="background:var(--surface-2);border-radius:8px;padding:10px;margin:6px 0">
+      <div style="font-size:10px;color:var(--muted);margin-bottom:4px">🔑 Client Seed:</div>
+      <code style="font-size:12px;color:var(--cyan)">${pfClientSeed || '---'}</code>
+    </div>
+    <div style="background:var(--surface-2);border-radius:8px;padding:10px;margin:6px 0">
+      <div style="font-size:10px;color:var(--muted);margin-bottom:4px">🎲 Nonce (rolls):</div>
+      <code style="font-size:14px;color:var(--green)">${pfNonce}</code>
+    </div>
+    <div style="background:var(--surface-2);border-radius:8px;padding:10px;margin:6px 0">
+      <div style="font-size:10px;color:var(--muted);margin-bottom:4px">🔓 Server Seed (revealed):</div>
+      <code style="font-size:11px;color:${pfRevealedSeed ? 'var(--green)' : 'var(--muted)'};word-break:break-all">${seedShort}</code>
+    </div>
+    ${pfRevealedSeed ? `
+    <div style="background:rgba(0,231,1,0.08);border:1px solid rgba(0,231,1,0.3);border-radius:8px;padding:8px;margin:6px 0;text-align:center">
+      <div style="font-size:11px;color:var(--green)">✅ يمكنك التحقق من النتيجة</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:4px">SHA256(server_seed) = seed_hash</div>
+    </div>
+    <button class="modal-btn-primary" onclick="verifyPF()">🔍 تحقق</button>
+    ` : `
+    <div style="font-size:11px;color:var(--muted);text-align:center;padding:8px">
+      سيتم كشف server seed بعد انتهاء الجولة للتحقق
+    </div>
+    `}
+    <div style="font-size:10px;color:var(--muted);text-align:center;margin-top:8px;line-height:1.5">
+      🔐 يتم استخدام HMAC-SHA256 لتوليد نتائج عادلة<br>
+      لا يمكن للخادم التلاعب بالنتيجة بعد إرسال seed hash
+    </div>
+    <button class="modal-btn-secondary" onclick="document.getElementById('pfModal').remove()">إغلاق</button>
+  `;
+}
+
+async function verifyPF() {
+  if (!pfRevealedSeed) {
+    showToast('لا يوجد seed مكشوف للتحقق', 'error');
+    return;
+  }
+  try {
+    const r = await apiFetch(`${BASE}/api/provably-fair/verify`, {
+      method: 'POST',
+      body: JSON.stringify({
+        server_seed: pfRevealedSeed,
+        client_seed: pfClientSeed,
+        nonce: pfNonce,
+        max_value: 10000
+      })
+    });
+    const d = await r.json();
+    if (d.valid) {
+      const box = document.getElementById('pfBox');
+      box.innerHTML = `
+        <div class="modal-title">✅ تم التحقق</div>
+        <div style="background:rgba(0,231,1,0.08);border:1px solid rgba(0,231,1,0.3);border-radius:8px;padding:12px;margin:8px 0;text-align:center">
+          <div style="font-size:28px">✅</div>
+          <div style="font-size:13px;color:var(--green);font-weight:700">النتيجة صحيحة!</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px">SHA256 matched ✓</div>
+          <div style="font-size:11px;color:var(--muted)">Results: ${d.results.join(', ')}</div>
+        </div>
+        <button class="modal-btn-secondary" onclick="document.getElementById('pfModal').remove()">إغلاق</button>
+      `;
+      soundWin();
+    } else {
+      showToast('فشل التحقق!', 'error');
+    }
+  } catch (e) {
+    showToast('خطأ في التحقق', 'error');
+  }
+}
+
+async function revealPFSession() {
+  if (!pfSessionId) return;
+  try {
+    const r = await apiFetch(`${BASE}/api/provably-fair/reveal/${pfSessionId}?uid=${uid}`);
+    const d = await r.json();
+    if (d.server_seed) {
+      pfRevealedSeed = d.server_seed;
+    }
+  } catch (e) { /* ignore */ }
 }
 
 // ---- Deposit URL ----

@@ -4663,6 +4663,353 @@ def api_admin_platform_stats():
         'active_games': len([g for g in games if g.get('is_active') == 'yes']),
     })
 
+# ===== Chat / Emoji Reactions =====
+
+_chat_messages = []  # In-memory chat (last 50)
+_chat_lock = threading.Lock()
+_chat_queues = []  # SSE subscriber queues
+_chat_q_lock = threading.Lock()
+
+@app.route('/api/games/chat/send', methods=['POST'])
+@webapp_auth
+def api_games_chat_send():
+    """Send a chat message or emoji reaction"""
+    data = request.json
+    uid_val = get_request_uid()
+    msg = data.get('message', '').strip()[:200]  # Max 200 chars
+    emoji = data.get('emoji', '')
+    if not msg and not emoji:
+        return jsonify({'error': 'Empty message'}), 400
+
+    # Get user name
+    user_name = ''
+    try:
+        with open(os.path.join(BASE_DIR, 'users.csv'), 'r', encoding='utf-8-sig') as f:
+            for row in csv.DictReader(f):
+                if row.get('telegram_id') == str(uid_val):
+                    user_name = row.get('name', '')
+                    break
+    except:
+        pass
+
+    entry = {
+        'uid': uid_val,
+        'name': user_name or '???',
+        'message': msg,
+        'emoji': emoji,
+        'timestamp': datetime.now().isoformat(),
+    }
+
+    with _chat_lock:
+        _chat_messages.append(entry)
+        if len(_chat_messages) > 50:
+            _chat_messages.pop(0)
+
+    # Broadcast to SSE subscribers
+    payload = json.dumps({'type': 'chat', 'data': entry})
+    with _chat_q_lock:
+        for q in _chat_queues:
+            try:
+                q.put_nowait(payload)
+            except:
+                pass
+
+    return jsonify({'success': True})
+
+@app.route('/api/games/chat/history')
+@webapp_auth
+def api_games_chat_history():
+    """Get recent chat messages"""
+    with _chat_lock:
+        return jsonify({'messages': list(_chat_messages[-30:])})
+
+@app.route('/api/games/chat/stream')
+@webapp_auth
+def api_games_chat_stream():
+    """SSE stream for live chat"""
+    q = _queue.Queue()
+    with _chat_q_lock:
+        _chat_queues.append(q)
+    def generate():
+        import time
+        # Send recent messages on connect
+        with _chat_lock:
+            for m in _chat_messages[-10:]:
+                yield f"data: {json.dumps({'type': 'chat', 'data': m})}\n\n"
+        yield f"data: {json.dumps({'type': 'connected'})}\n\n"
+        while True:
+            try:
+                payload = q.get(timeout=15)
+                yield f"data: {payload}\n\n"
+            except _queue.Empty:
+                yield f"data: {json.dumps({'type': 'heartbeat'})}\n\n"
+    try:
+        return Response(generate(), mimetype='text/event-stream',
+                        headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
+    finally:
+        with _chat_q_lock:
+            if q in _chat_queues:
+                _chat_queues.remove(q)
+
+# ===== Player Statistics API =====
+
+@app.route('/api/player/stats')
+@webapp_auth
+def api_player_stats():
+    """Player statistics — win rate, P/L, bet history, game distribution"""
+    uid_val = get_request_uid()
+    if not uid_val:
+        return jsonify({'error': 'No uid'}), 400
+
+    # Try SQLite first
+    try:
+        import sys as _sys
+        _sys.path.insert(0, BASE_DIR)
+        from db_manager import _gdb as _ldb
+        sessions = _ldb.get_user_sessions(uid_val, limit=100)
+        if not sessions:
+            return jsonify({
+                'total_bets': 0, 'total_wagered': 0, 'total_won': 0,
+                'net_profit': 0, 'win_rate': 0, 'total_rounds': 0,
+                'games': [], 'recent': [], 'chart_data': []
+            })
+        total_bets = len(sessions)
+        total_wagered = sum(s.get('bet_amount', 0) for s in sessions)
+        total_won = sum(s.get('payout', 0) for s in sessions)
+        total_wins = sum(1 for s in sessions if s.get('result') == 'win')
+        net_profit = total_won - total_wagered
+        win_rate = round(total_wins / max(total_bets, 1) * 100, 1)
+
+        # Game distribution
+        game_dist = {}
+        for s in sessions:
+            gid = s.get('game_id', 'unknown')
+            if gid not in game_dist:
+                game_dist[gid] = {'games': 0, 'wagered': 0, 'won': 0, 'wins': 0}
+            game_dist[gid]['games'] += 1
+            game_dist[gid]['wagered'] += s.get('bet_amount', 0)
+            game_dist[gid]['won'] += s.get('payout', 0)
+            if s.get('result') == 'win':
+                game_dist[gid]['wins'] += 1
+
+        # Chart data (last 20 rounds P/L)
+        chart_data = []
+        for s in reversed(sessions[-20:]):
+            pl = s.get('payout', 0) - s.get('bet_amount', 0)
+            chart_data.append({
+                'round': len(chart_data) + 1,
+                'pl': round(pl, 2),
+                'bet': s.get('bet_amount', 0),
+                'payout': s.get('payout', 0),
+                'game': s.get('game_id', ''),
+                'result': s.get('result', '')
+            })
+
+        return jsonify({
+            'total_bets': total_bets,
+            'total_wagered': round(total_wagered, 2),
+            'total_won': round(total_won, 2),
+            'net_profit': round(net_profit, 2),
+            'win_rate': win_rate,
+            'total_rounds': total_bets,
+            'total_wins': total_wins,
+            'games': [{'game_id': k, **v} for k, v in game_dist.items()],
+            'recent': sessions[:20],
+            'chart_data': chart_data
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/webapp/stats')
+def webapp_stats():
+    """Player statistics page — WebApp"""
+    return render_template('stats.html')
+
+# ===== Provably Fair System =====
+
+try:
+    import sys as _sys
+    _sys.path.insert(0, BASE_DIR)
+    from provably_fair import _pf
+    _PROVABLY_FAIR = True
+except:
+    _PROVABLY_FAIR = False
+    _pf = None
+
+@app.route('/api/provably-fair/seed')
+@webapp_auth
+def api_provably_fair_seed():
+    """Get or create provably fair seed hash for a session"""
+    if not _PROVABLY_FAIR:
+        return jsonify({'error': 'Provably fair not available'}), 500
+    session_id = request.args.get('session_id', '')
+    client_seed = request.args.get('client_seed', '')
+    if not session_id:
+        session_id = f"pf_{secrets.token_hex(8)}"
+    result = _pf.create_session(session_id, client_seed or None)
+    return jsonify({
+        'session_id': session_id,
+        'seed_hash': result['seed_hash'],
+        'client_seed': result['client_seed'],
+    })
+
+@app.route('/api/provably-fair/verify', methods=['POST'])
+@webapp_auth
+def api_provably_fair_verify():
+    """Verify a provably fair result"""
+    if not _PROVABLY_FAIR:
+        return jsonify({'error': 'Provably fair not available'}), 500
+    data = request.json
+    server_seed = data.get('server_seed', '')
+    client_seed = data.get('client_seed', '')
+    nonce = int(data.get('nonce', 0))
+    max_value = int(data.get('max_value', 10000))
+    if not server_seed or not client_seed or nonce <= 0:
+        return jsonify({'error': 'Missing params'}), 400
+    result = _pf.verify(server_seed, client_seed, nonce, max_value)
+    return jsonify(result)
+
+@app.route('/api/provably-fair/reveal/<session_id>')
+@webapp_auth
+def api_provably_fair_reveal(session_id):
+    """Reveal server seed for a completed session"""
+    if not _PROVABLY_FAIR:
+        return jsonify({'error': 'Provably fair not available'}), 500
+    result = _pf.reveal_seed(session_id)
+    if not result:
+        return jsonify({'error': 'Session not found or already revealed'}), 404
+    return jsonify(result)
+
+# ===== Real-time SSE: Leaderboard + Live Players =====
+
+def _get_leaderboard_data(limit=10):
+    """Compute top players by profit — uses SQLite if available"""
+    # Try SQLite first (much faster)
+    try:
+        import sys as _sys
+        _sys.path.insert(0, BASE_DIR)
+        from db_manager import _gdb as _ldb
+        return _ldb.get_leaderboard(limit)
+    except:
+        pass
+    # Fallback: CSV
+    import os as _os
+    sessions_file = _os.path.join(BASE_DIR, 'game_sessions.csv')
+    users_file = _os.path.join(BASE_DIR, 'users.csv')
+    if not _os.path.exists(sessions_file):
+        return []
+    profit_map = {}
+    try:
+        with open(sessions_file, 'r', encoding='utf-8-sig') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                uid = row.get('user_id', '')
+                if not uid:
+                    continue
+                bet = float(row.get('bet_amount', 0) or 0)
+                payout = float(row.get('payout', 0) or 0)
+                result = row.get('result', '')
+                if uid not in profit_map:
+                    profit_map[uid] = {'uid': uid, 'name': '', 'total_bet': 0, 'total_payout': 0, 'games': 0, 'wins': 0}
+                profit_map[uid]['total_bet'] += bet
+                profit_map[uid]['total_payout'] += payout
+                profit_map[uid]['games'] += 1
+                if result == 'win':
+                    profit_map[uid]['wins'] += 1
+    except:
+        pass
+    try:
+        with open(users_file, 'r', encoding='utf-8-sig') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                tid = row.get('telegram_id', '')
+                if tid in profit_map:
+                    profit_map[tid]['name'] = row.get('name', '')
+    except:
+        pass
+    for p in profit_map.values():
+        p['profit'] = p['total_payout'] - p['total_bet']
+        p['win_rate'] = round(p['wins'] / max(p['games'], 1) * 100, 1)
+    sorted_players = sorted(profit_map.values(), key=lambda x: x['profit'], reverse=True)[:limit]
+    return sorted_players
+
+def _get_live_players_data(limit=20):
+    """Get recent active players from game_sessions.csv"""
+    import os as _os
+    sessions_file = _os.path.join(BASE_DIR, 'game_sessions.csv')
+    users_file = _os.path.join(BASE_DIR, 'users.csv')
+    if not _os.path.exists(sessions_file):
+        return []
+    # Get user names
+    user_names = {}
+    try:
+        with open(users_file, 'r', encoding='utf-8-sig') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                user_names[row.get('telegram_id', '')] = row.get('name', '')
+    except:
+        pass
+    players = []
+    try:
+        with open(sessions_file, 'r', encoding='utf-8-sig') as f:
+            rows = list(csv.DictReader(f))
+        for row in rows[-limit:]:
+            uid = row.get('user_id', '')
+            players.append({
+                'uid': uid,
+                'name': user_names.get(uid, ''),
+                'bet': float(row.get('bet_amount', 0) or 0),
+                'status': 'win' if row.get('result') == 'win' else 'lose',
+                'payout': float(row.get('payout', 0) or 0),
+                'multiplier': float(row.get('multiplier', 0) or 0),
+                'game_id': row.get('game_id', ''),
+            })
+    except:
+        pass
+    return players
+
+@app.route('/api/games/leaderboard')
+@webapp_auth
+def api_games_leaderboard():
+    """Top 10 players by profit (JSON)"""
+    return jsonify({'leaderboard': _get_leaderboard_data(10)})
+
+@app.route('/api/games/leaderboard/stream')
+@webapp_auth
+def api_games_leaderboard_stream():
+    """SSE stream: top 10 players by profit, updated every 5 seconds"""
+    def generate():
+        import time
+        yield f"data: {json.dumps({'type': 'connected'})}\n\n"
+        while True:
+            try:
+                data = _get_leaderboard_data(10)
+                payload = json.dumps({'type': 'leaderboard', 'leaderboard': data})
+                yield f"data: {payload}\n\n"
+            except:
+                pass
+            time.sleep(5)
+    return Response(generate(), mimetype='text/event-stream',
+                    headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
+
+@app.route('/api/games/live-players/stream')
+@webapp_auth
+def api_games_live_players_stream():
+    """SSE stream: real live players, updated every 3 seconds"""
+    def generate():
+        import time
+        yield f"data: {json.dumps({'type': 'connected'})}\n\n"
+        while True:
+            try:
+                data = _get_live_players_data(20)
+                payload = json.dumps({'type': 'live_players', 'players': data, 'count': len(data)})
+                yield f"data: {payload}\n\n"
+            except:
+                pass
+            time.sleep(3)
+    return Response(generate(), mimetype='text/event-stream',
+                    headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
+
 # ===== Main =====
 
 if __name__ == '__main__':

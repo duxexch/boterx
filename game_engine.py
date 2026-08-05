@@ -1,6 +1,7 @@
 """
 VEX Games Platform — Game Engine v2
 محرك الألعاب المحسّن — محفظة موحدة + خوارزمية مضاعفة + مضاعف ديناميكي
+Uses SQLite for balance storage (eliminates CSV corruption risk)
 """
 
 import csv
@@ -9,21 +10,33 @@ import json
 import random
 import uuid
 import threading
+import time
 from datetime import datetime, timedelta
 from collections import defaultdict
 
 CSV_ENCODING = 'utf-8-sig'
 _wallet_lock = threading.RLock()
 
-# ===== In-Memory Balance Cache =====
-# يقرأ من users.csv مرة واحدة فقط، ثم كل العمليات في الذاكرة
-_balance_cache = {}  # {telegram_id: {'balance': float, 'currency': str, 'dirty': bool}}
+# ===== SQLite Database (replaces CSV balance cache) =====
+try:
+    from db_manager import _gdb as _db
+    _USE_SQLITE = True
+    print("✅ Game Engine: Using SQLite for balance operations")
+except ImportError:
+    _USE_SQLITE = False
+    _db = None
+    print("⚠️ Game Engine: SQLite not available, falling back to CSV cache")
+
+# ===== Fallback: In-Memory Balance Cache (only if SQLite unavailable) =====
+_balance_cache = {}
 _cache_loaded = False
 _cache_lock = threading.Lock()
 
 def _load_balance_cache():
-    """تحميل كل الأرصدة من users.csv إلى الذاكرة (مرة واحدة)"""
+    """تحميل كل الأرصدة من users.csv إلى الذاكرة (fallback only)"""
     global _cache_loaded, _balance_cache
+    if _USE_SQLITE:
+        return
     with _cache_lock:
         if _cache_loaded:
             return
@@ -42,10 +55,10 @@ def _load_balance_cache():
             print(f"✅ Balance cache loaded: {len(_balance_cache)} users")
         except Exception as e:
             print(f"Balance cache load error: {e}")
-            _cache_loaded = True  # لا نعيد المحاولة في كل طلب
+            _cache_loaded = True
 
 def _flush_balance_to_csv(user_id):
-    """كتابة رصيد مستخدم واحد فقط — باستخدام ملف مؤقت (atomic write)"""
+    """كتابة رصيد مستخدم واحد فقط — fallback only"""
     global _balance_cache
     try:
         rows = []
@@ -60,7 +73,6 @@ def _flush_balance_to_csv(user_id):
                 if cached:
                     row['game_balance'] = f"{cached['balance']:.2f}"
                 break
-        # Atomic write: write to temp file, then rename
         import tempfile
         fd, tmp_path = tempfile.mkstemp(dir='.', suffix='.tmp')
         with os.fdopen(fd, 'w', newline='', encoding=CSV_ENCODING) as f:
@@ -68,17 +80,25 @@ def _flush_balance_to_csv(user_id):
             writer.writeheader()
             for row in rows:
                 writer.writerow({k: row.get(k, '') for k in fieldnames})
-        os.replace(tmp_path, 'users.csv')  # atomic on same filesystem
+        os.replace(tmp_path, 'users.csv')
         if str(user_id) in _balance_cache:
             _balance_cache[str(user_id)]['dirty'] = False
     except Exception as e:
         print(f"Flush balance error for {user_id}: {e}")
 
-# Background flush: writes dirty balances to CSV every 5 seconds
 _flush_stop = False
 def _background_flush_loop():
-    """يكتب الأرصدة المتغيرة إلى CSV كل 5 ثواني"""
+    """يكتب الأرصدة المتغيرة إلى CSV كل 5 ثواني — fallback only"""
     global _balance_cache
+    if _USE_SQLITE:
+        # SQLite sync: periodically sync balances back to CSV for bot compatibility
+        while not _flush_stop:
+            time.sleep(30)
+            try:
+                _db.sync_to_csv()
+            except:
+                pass
+        return
     while not _flush_stop:
         time.sleep(5)
         dirty_uids = []
@@ -86,10 +106,10 @@ def _background_flush_loop():
             for uid, info in _balance_cache.items():
                 if info.get('dirty'):
                     dirty_uids.append(uid)
-                    info['dirty'] = False  # mark as being written
+                    info['dirty'] = False
         if dirty_uids:
             with _wallet_lock:
-                for uid in dirty_uids[:50]:  # max 50 per cycle
+                for uid in dirty_uids[:50]:
                     try:
                         _flush_balance_to_csv(uid)
                     except:
@@ -255,19 +275,20 @@ class GameManager:
         return methods
 
     def get_user_info(self, user_id):
-        """قراءة بيانات المستخدم — من الكاش + CSV مرة واحدة"""
+        """قراءة بيانات المستخدم — SQLite"""
+        if _USE_SQLITE:
+            return _db.get_user_row(user_id)
+        # Fallback: CSV cache
         _load_balance_cache()
         uid = str(user_id)
         with _cache_lock:
             if uid in _balance_cache:
-                # Return cached info + read full user row once
                 pass
         try:
             with open('users.csv', 'r', encoding=CSV_ENCODING) as f:
                 reader = csv.DictReader(f)
                 for row in reader:
                     if row.get('telegram_id') == uid:
-                        # Update cache
                         with _cache_lock:
                             if uid in _balance_cache:
                                 row['game_balance'] = f"{_balance_cache[uid]['balance']:.2f}"
@@ -278,13 +299,15 @@ class GameManager:
         return {}
 
     def get_balance(self, user_id):
-        """قراءة رصيد محفظة الألعاب — من الكاش (فوري)"""
+        """قراءة رصيد محفظة الألعاب — SQLite (فوري)"""
+        if _USE_SQLITE:
+            return _db.get_balance(user_id)
+        # Fallback: CSV cache
         _load_balance_cache()
         uid = str(user_id)
         with _cache_lock:
             if uid in _balance_cache:
                 return _balance_cache[uid]['balance']
-        # Fallback: read from CSV (new user not in cache)
         try:
             with open('users.csv', 'r', encoding=CSV_ENCODING) as f:
                 reader = csv.DictReader(f)
@@ -300,13 +323,14 @@ class GameManager:
         return 0.0
 
     def get_user_currency(self, user_id):
-        """قراءة عملة المستخدم — من الكاش"""
+        """قراءة عملة المستخدم"""
+        if _USE_SQLITE:
+            return _db.get_user_currency(user_id)
         _load_balance_cache()
         uid = str(user_id)
         with _cache_lock:
             if uid in _balance_cache:
                 return _balance_cache[uid]['currency']
-        # Fallback
         try:
             with open('users.csv', 'r', encoding=CSV_ENCODING) as f:
                 reader = csv.DictReader(f)
@@ -318,7 +342,10 @@ class GameManager:
         return 'EGP'
 
     def add_balance(self, user_id, amount, reason='deposit'):
-        """إضافة رصيد — يحدّث الكاش فوراً (الـ CSV يُكتب خلفياً)"""
+        """إضافة رصيد — SQLite (atomic transaction)"""
+        if _USE_SQLITE:
+            return _db.add_balance(user_id, amount)
+        # Fallback: CSV cache
         _load_balance_cache()
         uid = str(user_id)
         amt = float(amount)
@@ -330,7 +357,10 @@ class GameManager:
             return _balance_cache[uid]['balance']
 
     def deduct_balance(self, user_id, amount):
-        """خصم رصيد — يحدّث الكاش فوراً (الـ CSV يُكتب خلفياً)"""
+        """خصم رصيد — SQLite (atomic transaction)"""
+        if _USE_SQLITE:
+            return _db.deduct_balance(user_id, amount)
+        # Fallback: CSV cache
         _load_balance_cache()
         uid = str(user_id)
         amt = float(amount)

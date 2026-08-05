@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>إحصائيات — VEX</title>
+<link rel="stylesheet" href="/static/css/game-base.css">
+<style>
+#app{overflow-y:auto}
+.stats-content{flex:1;padding:12px;overflow-y:auto}
+.stats-title{font-size:22px;font-weight:900;background:linear-gradient(135deg,var(--gold),var(--gold-dim));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:12px;text-align:center}
+
+/* KPI grid */
+.kpi-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:12px}
+.kpi-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px;text-align:center;position:relative;overflow:hidden}
+.kpi-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.kpi-card.profit::before{background:var(--green)}
+.kpi-card.loss::before{background:var(--red)}
+.kpi-card.bets::before{background:var(--cyan)}
+.kpi-card.rate::before{background:var(--gold)}
+.kpi-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px}
+.kpi-value{font-size:22px;font-weight:900;font-family:'Courier New',monospace}
+.kpi-value.green{color:var(--green)}
+.kpi-value.red{color:var(--red)}
+.kpi-value.gold{color:var(--gold)}
+.kpi-value.cyan{color:var(--cyan)}
+
+/* Chart */
+.chart-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:12px}
+.chart-title{font-size:12px;font-weight:700;color:var(--text);margin-bottom:8px;display:flex;align-items:center;gap:4px}
+#plChart{width:100%;height:120px;background:var(--surface-2);border-radius:var(--radius-sm)}
+
+/* Game distribution */
+.game-dist{display:flex;flex-direction:column;gap:4px}
+.game-dist-row{display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--surface-2);border-radius:var(--radius-xs);font-size:11px}
+.game-dist-bar{flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden}
+.game-dist-fill{height:100%;border-radius:3px;transition:width 0.5s}
+.game-dist-name{font-weight:600;min-width:60px}
+.game-dist-val{font-weight:700;font-family:'Courier New',monospace;min-width:50px;text-align:left}
+
+/* Recent table */
+.recent-table{width:100%;font-size:10px;border-collapse:collapse}
+.recent-table th{text-align:right;padding:6px 4px;color:var(--muted);border-bottom:1px solid var(--border);font-size:9px;text-transform:uppercase}
+.recent-table td{padding:6px 4px;border-bottom:1px solid rgba(42,49,66,0.3)}
+.recent-table .win{color:var(--green)}
+.recent-table .lose{color:var(--red);opacity:0.7}
+
+/* Empty state */
+.empty{text-align:center;padding:40px;color:var(--muted)}
+.empty-icon{font-size:48px;margin-bottom:8px}
+</style>
+</head>
+<body>
+<div class="loader-screen" id="loading"><div class="spinner"></div></div>
+<div id="app" style="display:none">
+  <div class="game-topbar">
+    <div class="topbar-left">
+      <button class="btn-back" onclick="goBack()">‹</button>
+      <div class="bal-pill"><span class="bal-icon">💰</span><span class="bal-val" id="bal">0</span><span class="bal-cur" id="cur">EGP</span></div>
+    </div>
+    <div class="topbar-right">
+      <button class="btn-sound" id="soundBtn" onclick="toggleSound()">🔊</button>
+    </div>
+  </div>
+
+  <div class="stats-content">
+    <div class="stats-title">📊 إحصائياتي</div>
+
+    <div class="kpi-grid">
+      <div class="kpi-card profit">
+        <div class="kpi-label">صافي الربح</div>
+        <div class="kpi-value green" id="netProfit">0.00</div>
+      </div>
+      <div class="kpi-card bets">
+        <div class="kpi-label">إجمالي الرهانات</div>
+        <div class="kpi-value cyan" id="totalBets">0</div>
+      </div>
+      <div class="kpi-card rate">
+        <div class="kpi-label">نسبة الفوز</div>
+        <div class="kpi-value gold" id="winRate">0%</div>
+      </div>
+      <div class="kpi-card loss">
+        <div class="kpi-label">إجمالي المراهنات</div>
+        <div class="kpi-value red" id="totalWagered">0</div>
+      </div>
+    </div>
+
+    <div class="chart-section">
+      <div class="chart-title">📈 آخر 20 جولة (P/L)</div>
+      <canvas id="plChart"></canvas>
+    </div>
+
+    <div class="chart-section">
+      <div class="chart-title">🎮 توزيع الألعاب</div>
+      <div class="game-dist" id="gameDist"></div>
+    </div>
+
+    <div class="chart-section">
+      <div class="chart-title">📋 آخر الجولات</div>
+      <table class="recent-table">
+        <thead><tr><th>اللعبة</th><th>الرهان</th><th>النتيجة</th><th>المكسب</th></tr></thead>
+        <tbody id="recentBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="/static/js/game-base.js"></script>
+<script>
+async function loadStats() {
+  try {
+    const r = await apiFetch(BASE + '/api/player/stats?uid=' + uid);
+    const d = await r.json();
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+
+    if (d.error || d.total_bets === 0) {
+      document.querySelector('.stats-content').innerHTML = '<div class="empty"><div class="empty-icon">📊</div><p>لا توجد إحصائيات بعد</p><p style="font-size:12px;color:var(--muted)">العب بعض الألعاب أولاً!</p></div>';
+      return;
+    }
+
+    const np = d.net_profit || 0;
+    const npEl = document.getElementById('netProfit');
+    npEl.textContent = (np >= 0 ? '+' : '') + np.toFixed(2);
+    npEl.className = 'kpi-value ' + (np >= 0 ? 'green' : 'red');
+
+    document.getElementById('totalBets').textContent = d.total_bets || 0;
+    document.getElementById('winRate').textContent = (d.win_rate || 0) + '%';
+    document.getElementById('totalWagered').textContent = (d.total_wagered || 0).toFixed(0);
+
+    // P/L Chart
+    drawPLChart(d.chart_data || []);
+
+    // Game distribution
+    drawGameDist(d.games || []);
+
+    // Recent table
+    const tb = document.getElementById('recentBody');
+    const recent = d.recent || [];
+    tb.innerHTML = recent.slice(0, 15).map(s => {
+      const pl = (s.payout || 0) - (s.bet_amount || 0);
+      return `<tr>
+        <td>${s.game_id || '---'}</td>
+        <td>${(s.bet_amount || 0).toFixed(0)}</td>
+        <td class="${s.result === 'win' ? 'win' : 'lose'}">${s.result === 'win' ? '✅' : '❌'}</td>
+        <td class="${pl >= 0 ? 'win' : 'lose'}">${pl >= 0 ? '+' : ''}${pl.toFixed(0)}</td>
+      </tr>`;
+    }).join('');
+  } catch(e) {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    showToast('خطأ في تحميل الإحصائيات', 'error');
+  }
+}
+
+function drawPLChart(data) {
+  const cv = document.getElementById('plChart');
+  const w = cv.clientWidth, h = cv.clientHeight;
+  cv.width = w; cv.height = h;
+  const ctx = cv.getContext('2d');
+  ctx.clearRect(0, 0, w, h);
+
+  if (!data || data.length === 0) return;
+
+  const values = data.map(d => d.pl || 0);
+  const maxAbs = Math.max(...values.map(Math.abs), 1);
+  const barW = w / values.length;
+  const midY = h / 2;
+
+  // Zero line
+  ctx.strokeStyle = 'rgba(42,49,66,0.5)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, midY); ctx.lineTo(w, midY); ctx.stroke();
+
+  // Bars
+  values.forEach((v, i) => {
+    const barH = (Math.abs(v) / maxAbs) * (h / 2 - 4);
+    const x = i * barW + 1;
+    const isWin = v >= 0;
+    ctx.fillStyle = isWin ? '#00e701' : '#ff4757';
+    ctx.globalAlpha = 0.7;
+    if (isWin) {
+      ctx.fillRect(x, midY - barH, barW - 2, barH);
+    } else {
+      ctx.fillRect(x, midY, barW - 2, barH);
+    }
+    ctx.globalAlpha = 1;
+  });
+
+  // Running P/L line
+  let running = 0;
+  const cumValues = values.map(v => running += v);
+  const cumMax = Math.max(...cumValues.map(Math.abs), 1);
+  ctx.strokeStyle = '#fbbf24';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  cumValues.forEach((v, i) => {
+    const x = i * barW + barW / 2;
+    const y = midY - (v / cumMax) * (h / 2 - 4);
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+}
+
+function drawGameDist(games) {
+  const el = document.getElementById('gameDist');
+  if (!games || games.length === 0) {
+    el.innerHTML = '<div style="text-align:center;color:var(--muted);padding:12px;font-size:12px">لا توجد بيانات</div>';
+    return;
+  }
+  const colors = ['#fbbf24', '#00e701', '#3b82f6', '#a78bfa', '#06b6d4', '#ff4757', '#ec4899'];
+  const maxGames = Math.max(...games.map(g => g.games), 1);
+  el.innerHTML = games.map((g, i) => {
+    const pct = (g.games / maxGames) * 100;
+    const c = colors[i % colors.length];
+    const wr = g.games > 0 ? Math.round(g.wins / g.games * 100) : 0;
+    const pl = g.won - g.wagered;
+    return `<div class="game-dist-row">
+      <span class="game-dist-name">${g.game_id}</span>
+      <div class="game-dist-bar"><div class="game-dist-fill" style="width:${pct}%;background:${c}"></div></div>
+      <span class="game-dist-val ${pl >= 0 ? 'win' : 'lose'}">${pl >= 0 ? '+' : ''}${pl.toFixed(0)}</span>
+    </div>`;
+  }).join('');
+}
+
+loadBalance();loadStats();setInterval(loadBalance,5000);
+</script>
+</body>
+</html>
