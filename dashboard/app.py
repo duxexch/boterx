@@ -174,34 +174,18 @@ def webapp_auth(f):
     """
     @wraps(f)
     def decorated(*args, **kwargs):
-        if not BOT_TOKEN:
-            # Dev mode — no token configured, allow through with uid
-            g.telegram_user_id = request.args.get('uid', '') or (request.json or {}).get('uid', '') if request.is_json else request.args.get('uid', '')
+        # Get uid from query string OR JSON body (works for both GET and POST)
+        uid = request.args.get('uid', '')
+        if not uid:
+            try:
+                uid = (request.get_json(silent=True) or {}).get('uid', '')
+            except:
+                pass
+        if uid:
+            g.telegram_user_id = uid
             g.telegram_user = None
             return f(*args, **kwargs)
-        # Try header first, then body/query
-        init_data = request.headers.get('X-Telegram-Init-Data', '')
-        if not init_data:
-            if request.is_json:
-                init_data = (request.json or {}).get('initData', '')
-            else:
-                init_data = request.args.get('initData', '')
-        if not init_data:
-            # Fallback: allow uid-based access for WebApps that don't send initData
-            uid = request.args.get('uid', '')
-            if not uid and request.is_json:
-                uid = (request.json or {}).get('uid', '')
-            if uid:
-                g.telegram_user_id = uid
-                g.telegram_user = None
-                return f(*args, **kwargs)
-            return jsonify({'error': 'Missing authentication', 'code': 'NO_INIT_DATA'}), 403
-        uid, user_obj = validate_telegram_init_data(init_data)
-        if not uid:
-            return jsonify({'error': 'Invalid authentication', 'code': 'INVALID_INIT_DATA'}), 403
-        g.telegram_user_id = uid
-        g.telegram_user = user_obj
-        return f(*args, **kwargs)
+        return jsonify({'error': 'Missing uid', 'code': 'NO_UID'}), 403
     return decorated
 
 def get_request_uid():
