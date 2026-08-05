@@ -43,15 +43,27 @@
 
 /* Parachutes layer (all players) */
 .parachutes-layer { position: absolute; inset: 0; z-index: 8; pointer-events: none; overflow: hidden; }
-.parachute-item { position: absolute; display: flex; flex-direction: column; align-items: center; animation: parachuteDescend 2.5s ease-out forwards; }
-.parachute-icon { font-size: 28px; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.4)); }
-.parachute-amount { font-size: 11px; font-weight: 800; color: #fbbf24; font-family: 'Courier New', monospace; text-shadow: 0 0 8px rgba(251,191,36,0.4); background: rgba(0,0,0,0.5); padding: 1px 6px; border-radius: 6px; margin-top: -2px; white-space: nowrap; }
-.parachute-name { font-size: 8px; color: var(--muted); margin-top: 1px; }
+.parachute-item { position: absolute; display: flex; flex-direction: column; align-items: center; animation: parachuteDescend 3s ease-out forwards; z-index: 11; }
+.parachute-icon { font-size: 32px; filter: drop-shadow(0 3px 8px rgba(0,0,0,0.5)); animation: parachuteSway 1.5s ease-in-out infinite; }
+@keyframes parachuteSway { 0%, 100% { transform: translateX(-3px) rotate(-5deg); } 50% { transform: translateX(3px) rotate(5deg); } }
+.parachute-amount {
+  font-size: 13px; font-weight: 900; color: #fbbf24;
+  font-family: 'Courier New', monospace;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+  background: linear-gradient(135deg, rgba(251,191,36,0.9), rgba(245,158,11,0.9));
+  color: #000;
+  padding: 2px 10px; border-radius: 10px; margin-top: -4px; white-space: nowrap;
+  box-shadow: 0 2px 10px rgba(251,191,36,0.3);
+}
+.parachute-name {
+  font-size: 10px; color: #fbbf24; margin-top: 2px; font-weight: 700;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+}
 @keyframes parachuteDescend {
-  0% { transform: translateY(-10px) scale(0.5); opacity: 0; }
-  15% { transform: translateY(0) scale(1); opacity: 1; }
-  70% { opacity: 1; }
-  100% { transform: translateY(200px) scale(0.7); opacity: 0; }
+  0% { transform: translateY(-15px) scale(0.3); opacity: 0; }
+  10% { transform: translateY(0) scale(1); opacity: 1; }
+  80% { opacity: 1; }
+  100% { transform: translateY(250px) scale(0.5); opacity: 0; }
 }
 
 /* Session stats */
@@ -584,21 +596,21 @@ function drawTrail() {
   ctx.fillStyle = g; ctx.fill();
 }
 
-// ===== Parachute spawn (shown ONCE, disappears in 2.5s) =====
+// ===== Parachute spawn — beautiful, visible to all, disappears in 3s =====
 function spawnParachute(name, amount, fromLeft) {
   const layer = document.getElementById('parachutesLayer');
   const el = document.createElement('div');
   el.className = 'parachute-item';
   el.style.left = (fromLeft !== undefined ? fromLeft : (20 + Math.random() * 60)) + '%';
-  el.style.top = '38%';
+  el.style.top = '36%';
   el.innerHTML = `
     <div class="parachute-icon">🪂</div>
-    <div class="parachute-amount">+${amount.toFixed(0)}</div>
+    <div class="parachute-amount">+${amount.toLocaleString(undefined,{maximumFractionDigits:0})}</div>
     <div class="parachute-name">${name}</div>
   `;
   layer.appendChild(el);
-  // Remove after exactly 2.5s (matches CSS animation)
-  setTimeout(() => el.remove(), 2500);
+  // Remove after 3s (matches CSS animation duration)
+  setTimeout(() => el.remove(), 3000);
 }
 
 // ===== Countdown =====
@@ -662,16 +674,16 @@ function animate() {
   drawRunway(altitude);
   drawTrail();
 
-  // Plane angle — 42 degrees during takeoff, levels to ~15 degrees during flight
-  const angle42 = 42 * Math.PI / 180; // 42 degrees in radians
+  // Plane angle — 25 degrees during takeoff, levels to ~10 degrees during flight
+  const angleTakeoff = 25 * Math.PI / 180; // 25 degrees
   let angle;
   if (e < takeoffDur) {
-    // During takeoff: gradually rotate from 42° to ~20°
+    // During takeoff: gradually rotate from 25° to ~12°
     const p = e / takeoffDur;
-    angle = -(angle42 * (1 - p * 0.5)); // Start at -42°, ease to -21°
+    angle = -(angleTakeoff * (1 - p * 0.5)); // Start at -25°, ease to -12°
   } else {
-    // During flight: gentle bobbing around -15°
-    angle = -(15 * Math.PI / 180) + Math.sin(e * 1.5) * 0.04;
+    // During flight: gentle bobbing around -8°
+    angle = -(8 * Math.PI / 180) + Math.sin(e * 1.5) * 0.03;
   }
   drawPlane(planeX, planeY, angle, false);
 
@@ -817,8 +829,8 @@ function simulateFakeBets() {
     const cashMult = mult;
     const payout = bet * cashMult;
     addPlayer({ uid: 'fake_' + Math.random().toString(36).substr(2, 5), name, bet, status: 'win', multiplier: cashMult, isMe: false });
-    // Spawn parachute for this fake player too!
-    spawnParachute(name, payout, 20 + Math.random() * 60);
+    // All players see this parachute jump
+    spawnParachute(name, payout, 15 + Math.random() * 70);
   }
 }
 
