@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 from collections import defaultdict
 
 CSV_ENCODING = 'utf-8-sig'
-_wallet_lock = threading.Lock()
+_wallet_lock = threading.RLock()
 
 try:
     from house_algorithm import HouseAlgorithm
