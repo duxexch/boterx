@@ -3456,14 +3456,11 @@ def api_engine_result():
 
     # تطبيق النتيجة — مضاعف ديناميكي
     decision = start_result.get('decision', 'force_lose')
+    game_obj = _gm.get_game(game_id) or {}
     if decision == 'allow_win':
         player_profile = _gm.tracker.get_profile(uid)
-        multiplier = _gm.calculate_payout_multiplier(game, player_profile)
+        multiplier = _gm.calculate_payout_multiplier(game_obj, player_profile)
         payout = bet_amount * multiplier
-        result_str = 'win'
-    elif decision == 'disguised_loss':
-        import random as _rng
-        payout = bet_amount * _rng.uniform(0.5, 0.9)
         result_str = 'win'
     elif decision == 'near_miss':
         payout = 0
@@ -3816,7 +3813,7 @@ def api_aviator_start():
         return jsonify({'success': False, 'error': risk_check['alerts'][0]['message'] if risk_check['alerts'] else 'محظور'})
 
     # التحقق من الرصيد
-    balance = float(player.get('balance', 0) or 0)
+    balance = _gm.get_balance(uid)
     if balance < bet_amount:
         return jsonify({'success': False, 'error': 'رصيد غير كافٍ', 'need_deposit': True, 'balance': balance})
 
@@ -3850,9 +3847,9 @@ def api_aviator_start():
     crash_point = max(1.0, crash_point * (1 - house_edge * 0.3))
 
     # خصم الرصيد
-    balance_after = balance - bet_amount
-    player['balance'] = f"{balance_after:.2f}"
-    _gm.tracker._save_profile(player)
+    success, balance_after = _gm.deduct_balance(uid, bet_amount)
+    if not success:
+        return jsonify({'success': False, 'error': 'رصيد غير كافٍ', 'need_deposit': True, 'balance': 0})
 
     # تسجيل الجلسة
     session_id = f"AVI{str(int(datetime.now().timestamp()))[-8:]}"
@@ -4083,7 +4080,7 @@ def api_crash_start():
     if not risk_check['allowed']:
         return jsonify({'success': False, 'error': risk_check['alerts'][0]['message'] if risk_check['alerts'] else 'محظور'})
 
-    balance = float(player.get('balance', 0) or 0)
+    balance = _gm.get_balance(uid)
     if balance < bet_amount:
         return jsonify({'success': False, 'error': 'رصيد غير كافٍ', 'need_deposit': True, 'balance': balance})
 
@@ -4104,9 +4101,9 @@ def api_crash_start():
         crash_point = _rng.uniform(1.00, 1.3)
     crash_point = max(1.0, crash_point * (1 - house_edge * 0.3))
 
-    balance_after = balance - bet_amount
-    player['balance'] = f"{balance_after:.2f}"
-    _gm.tracker._save_profile(player)
+    success, balance_after = _gm.deduct_balance(uid, bet_amount)
+    if not success:
+        return jsonify({'success': False, 'error': 'رصيد غير كافٍ', 'need_deposit': True, 'balance': 0})
 
     session_id = f"CRSH{str(int(datetime.now().timestamp()))[-8:]}"
     _gm.algorithm.log_decision(
@@ -4180,7 +4177,7 @@ def api_mines_start():
     if not risk_check['allowed']:
         return jsonify({'success': False, 'error': risk_check['alerts'][0]['message'] if risk_check['alerts'] else 'محظور'})
 
-    balance = float(player.get('balance', 0) or 0)
+    balance = _gm.get_balance(uid)
     if balance < bet_amount:
         return jsonify({'success': False, 'error': 'رصيد غير كافٍ', 'need_deposit': True, 'balance': balance})
 
@@ -4206,9 +4203,9 @@ def api_mines_start():
             mine_positions.remove(swap_out)
             mine_positions.append(swap_in)
 
-    balance_after = balance - bet_amount
-    player['balance'] = f"{balance_after:.2f}"
-    _gm.tracker._save_profile(player)
+    success, balance_after = _gm.deduct_balance(uid, bet_amount)
+    if not success:
+        return jsonify({'success': False, 'error': 'رصيد غير كافٍ', 'need_deposit': True, 'balance': 0})
 
     session_id = f"MINE{str(int(datetime.now().timestamp()))[-8:]}"
     _gm.algorithm.log_decision(
@@ -4386,7 +4383,7 @@ def api_plinko_start():
     if not risk_check['allowed']:
         return jsonify({'success': False, 'error': risk_check['alerts'][0]['message'] if risk_check['alerts'] else 'محظور'})
 
-    balance = float(player.get('balance', 0) or 0)
+    balance = _gm.get_balance(uid)
     if balance < bet_amount:
         return jsonify({'success': False, 'error': 'رصيد غير كافٍ', 'need_deposit': True, 'balance': balance})
 
@@ -4438,9 +4435,9 @@ def api_plinko_start():
                 continue
             break
 
-    balance_after = balance - bet_amount
-    player['balance'] = f"{balance_after:.2f}"
-    _gm.tracker._save_profile(player)
+    success, balance_after = _gm.deduct_balance(uid, bet_amount)
+    if not success:
+        return jsonify({'success': False, 'error': 'رصيد غير كافٍ', 'need_deposit': True, 'balance': 0})
 
     session_id = f"PLNK{str(int(datetime.now().timestamp()))[-8:]}"
     _gm.algorithm.log_decision(
