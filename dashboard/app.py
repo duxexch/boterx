@@ -4867,15 +4867,16 @@ def _av_get_name(uid):
     except: return ''
 
 def _aviator_loop():
-    GROWTH = 1.003
+    GROWTH = 1.012  # Faster growth — multiplier actually moves
+    BETTING_DURATION = 6  # 6 second countdown
     while True:
         with _aviator_lock:
             _aviator['phase'] = 'waiting'
             _aviator['multiplier'] = 1.0
             _aviator['round_id'] += 1
             _aviator['bets'] = {}
-        _av_broadcast({'type': 'waiting', 'round_id': _aviator['round_id'], 'duration': 5, 'history': list(_aviator['history'][-15:])})
-        _avtime.sleep(5)
+        _av_broadcast({'type': 'waiting', 'round_id': _aviator['round_id'], 'duration': BETTING_DURATION, 'history': list(_aviator['history'][-15:])})
+        _avtime.sleep(BETTING_DURATION)
 
         crash_pt = _av_calc_crash()
         with _aviator_lock:
@@ -4884,6 +4885,11 @@ def _aviator_loop():
         _av_broadcast({'type': 'flying'})
 
         mult = 1.0
+        total_distributed = 0.0
+        total_cashed_out = 0
+        total_bets = 0
+        with _aviator_lock:
+            total_bets = len(_aviator['bets'])
         while mult < crash_pt:
             mult *= GROWTH
             with _aviator_lock:
@@ -4895,16 +4901,25 @@ def _aviator_loop():
                         except: bal = 0
                         bet['cashed_out'] = True
                         bet['cash_mult'] = mult
+                        total_distributed += payout
+                        total_cashed_out += 1
                         _av_broadcast({'type': 'cashout', 'uid': uid, 'name': _av_get_name(uid), 'amount': round(payout, 2), 'multiplier': round(mult, 2), 'auto': True})
             _av_broadcast({'type': 'mult', 'multiplier': round(mult, 2)})
             _avtime.sleep(0.05)
 
+        # Count remaining cashouts from manual cashout that happened
         with _aviator_lock:
+            for uid, bet in _aviator['bets'].items():
+                if bet['cashed_out']:
+                    if bet.get('cash_mult', 0) > 0:
+                        # Already counted in loop or manual
+                        pass
             _aviator['phase'] = 'crashed'
             _aviator['history'].append(round(crash_pt, 2))
             if len(_aviator['history']) > 50: _aviator['history'].pop(0)
-        _av_broadcast({'type': 'crash', 'crash_point': round(crash_pt, 2)})
-        _avtime.sleep(4)
+        # Broadcast crash with total distributed profits
+        _av_broadcast({'type': 'crash', 'crash_point': round(crash_pt, 2), 'total_distributed': round(total_distributed, 2), 'total_cashed_out': total_cashed_out, 'total_bets': total_bets})
+        _avtime.sleep(5)
 
 _aviator_thread = threading.Thread(target=_aviator_loop, daemon=True)
 _aviator_thread.start()

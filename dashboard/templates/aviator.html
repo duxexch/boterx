@@ -284,15 +284,16 @@ function onWaiting(d) {
   }
   // Update history
   if (d.history) { const h = document.getElementById('history'); h.innerHTML = ''; d.history.forEach(v => { const el = document.createElement('div'); el.className = 'hist-item '+(v>=1.5?'hist-win':'hist-lose')+(v>=3?' hist-big':''); el.textContent = v.toFixed(2)+'x'; h.appendChild(el); }); }
-  // Countdown
-  let c = 5;
+  // Countdown — 6 seconds
+  let c = 6;
   const tick = () => {
     if (roundPhase !== 'waiting') return;
+    // Show countdown number
     const el = document.createElement('div'); el.className = 'countdown'; el.textContent = c;
     document.getElementById('gameArea').appendChild(el);
     soundTick(); haptic('light');
     setTimeout(() => el.remove(), 850);
-    c--; if (c > 0) setTimeout(tick, 900);
+    c--; if (c > 0) setTimeout(tick, 1000);
   };
   setTimeout(tick, 200);
 }
@@ -338,6 +339,14 @@ function onCrash(d) {
   const msg = document.getElementById('crashMsg');
   msg.textContent = '💥 ' + d.crash_point.toFixed(2) + 'x'; msg.style.color = 'var(--red)'; msg.classList.add('show');
   createExplosion();
+  // Show total distributed profits to ALL players
+  if (d.total_distributed !== undefined && d.total_distributed > 0) {
+    const distEl = document.getElementById('recoveryMsg');
+    distEl.innerHTML = '💰 إجمالي الأرباح الموزعة: <span style="color:#00e701;font-weight:900">' + d.total_distributed.toLocaleString() + '</span><br><span style="font-size:10px;color:var(--muted)">' + d.total_cashed_out + ' لاعب ربح من ' + d.total_bets + ' لاعب</span>';
+    distEl.style.color = '#fbbf24';
+    distEl.classList.add('show');
+    setTimeout(() => distEl.classList.remove('show'), 5000);
+  }
   // Check my bets
   for (const s of [1,2]) {
     const btn = document.getElementById('btn'+s); btn.style.display = 'none';
@@ -345,7 +354,6 @@ function onCrash(d) {
   }
   soundCrash(); haptic('heavy');
   if (myBets[1].placed && !myBets[1].cashed && myBets[2].placed && !myBets[2].cashed) { streakWin = 0; updateStreak(document.getElementById('streak')); }
-  // Add to history
   addHistory('history', d.crash_point, false, d.crash_point >= 3);
   updateSessionStats();
 }
@@ -371,8 +379,8 @@ function animate() {
   } else { planeX = cx; planeY = cy; bgScroll += 2 + mult * 0.3; }
   const alt = Math.min(1, e / 10);
   ctx.clearRect(0,0,canvas.width,canvas.height); drawBackground(alt); drawRunway(alt); drawTrail();
-  const angle25 = 25 * Math.PI / 180;
-  let angle = e < takeoffDur ? -(angle25 * (1 - (e/takeoffDur) * 0.5)) : -(8 * Math.PI / 180) + Math.sin(e * 1.5) * 0.03;
+  const angle22 = 22 * Math.PI / 180; // exactly 22 degrees
+  let angle = e < takeoffDur ? -(angle22 * (1 - (e/takeoffDur) * 0.5)) : -(8 * Math.PI / 180) + Math.sin(e * 1.5) * 0.03;
   drawPlane(planeX, planeY, angle);
   const pm = document.getElementById('planeMult');
   pm.style.left = planeX + 'px'; pm.style.top = planeY + 'px';
@@ -380,9 +388,15 @@ function animate() {
   animF = requestAnimationFrame(animate);
 }
 
-// ===== Place Bet (during waiting phase) =====
+// ===== Place Bet (ONLY during waiting phase — 6 second window) =====
 function placeBet(slot) {
-  if (roundPhase !== 'waiting' || !myBets[slot].active) return;
+  if (!myBets[slot].active) return;
+  // If flying or crashed — can't bet, show waiting message
+  if (roundPhase === 'flying' || roundPhase === 'crashed') {
+    showToast('⏳ انتظر نهاية الجولة الحالية!', 'info');
+    return;
+  }
+  if (roundPhase !== 'waiting') return;
   const amt = parseFloat(document.getElementById('bet'+slot).value) || 0;
   if (amt < 1) return;
   const autoVal = parseFloat(document.getElementById('autoVal'+slot).value) || 0;
@@ -396,7 +410,8 @@ function placeBet(slot) {
     if (d.success) {
       myBets[slot].placed = true; myBets[slot].amount = amt; myBets[slot].autoVal = autoVal; myBets[slot].cashed = false;
       document.getElementById('bal').textContent = d.balance_after.toLocaleString();
-      btn.textContent = '⏳ بانتظار الإقلاع'; btn.className = 'bet-slot-btn bet';
+      btn.textContent = '✓ راهنت'; btn.className = 'bet-slot-btn bet';
+      btn.style.background = 'linear-gradient(135deg,#1a5c2e,#0d7a1f)';
       addOtherBet(slot, amt);
     } else {
       btn.disabled = false; btn.textContent = 'رهان'; btn.className = 'bet-slot-btn bet';
