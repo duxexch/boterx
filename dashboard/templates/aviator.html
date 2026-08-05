@@ -43,15 +43,15 @@
 
 /* Parachutes layer (all players) */
 .parachutes-layer { position: absolute; inset: 0; z-index: 8; pointer-events: none; overflow: hidden; }
-.parachute-item { position: absolute; display: flex; flex-direction: column; align-items: center; animation: parachuteDescend 4s ease-in forwards; }
+.parachute-item { position: absolute; display: flex; flex-direction: column; align-items: center; animation: parachuteDescend 2.5s ease-out forwards; }
 .parachute-icon { font-size: 28px; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.4)); }
 .parachute-amount { font-size: 11px; font-weight: 800; color: #fbbf24; font-family: 'Courier New', monospace; text-shadow: 0 0 8px rgba(251,191,36,0.4); background: rgba(0,0,0,0.5); padding: 1px 6px; border-radius: 6px; margin-top: -2px; white-space: nowrap; }
 .parachute-name { font-size: 8px; color: var(--muted); margin-top: 1px; }
 @keyframes parachuteDescend {
-  0% { transform: translateY(-20px) scale(0.3); opacity: 0; }
-  10% { transform: translateY(0) scale(1); opacity: 1; }
-  90% { opacity: 1; }
-  100% { transform: translateY(calc(100vh - 200px)) scale(0.8); opacity: 0; }
+  0% { transform: translateY(-10px) scale(0.5); opacity: 0; }
+  15% { transform: translateY(0) scale(1); opacity: 1; }
+  70% { opacity: 1; }
+  100% { transform: translateY(200px) scale(0.7); opacity: 0; }
 }
 
 /* Session stats */
@@ -175,164 +175,392 @@ function pickWeather() {
   if (weather === 'night') { bgStars = []; for (let i = 0; i < 80; i++) bgStars.push({x: Math.random()*canvas.width, y: Math.random()*canvas.height*0.7, r: Math.random()*1.5, tw: Math.random()*Math.PI*2}); }
 }
 
-// ===== Draw background =====
+// ===== Draw background (realistic sky + airport + houses) =====
 function drawBackground(altitude) {
   const w = canvas.width, h = canvas.height;
   const alt = Math.min(1, altitude);
-  const scroll = bgScroll; // Background moves to simulate plane movement
+  const scroll = bgScroll;
 
   if (weather === 'day') {
-    // Blue sky → darker as altitude increases
+    // Realistic blue sky gradient (lighter at horizon, deeper above)
     const grad = ctx.createLinearGradient(0, 0, 0, h);
-    if (alt < 0.3) {
-      grad.addColorStop(0, '#1a3a5c'); grad.addColorStop(0.5, '#2d5a8a'); grad.addColorStop(1, '#4a8ab5');
+    if (alt < 0.4) {
+      // Low altitude — bright blue sky
+      grad.addColorStop(0, '#4a90d9');
+      grad.addColorStop(0.4, '#7eb8e8');
+      grad.addColorStop(0.7, '#b3d9f2');
+      grad.addColorStop(1, '#d4e8f5');
     } else {
-      grad.addColorStop(0, '#0a0e17'); grad.addColorStop(0.5, '#0d1a2e'); grad.addColorStop(1, '#1a3a5c');
+      // Higher — sky darkens
+      grad.addColorStop(0, '#0a0e17');
+      grad.addColorStop(0.4, '#1a3a5c');
+      grad.addColorStop(0.8, '#3a6a9c');
+      grad.addColorStop(1, '#5a8abc');
     }
-    ctx.fillStyle = grad; ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
 
-    // Clouds that scroll (gives sense of movement)
-    const cloudAlpha = alt < 0.5 ? (1 - alt * 2) * 0.2 : 0;
+    // Realistic clouds (puffy, layered)
+    const cloudAlpha = alt < 0.6 ? (1 - alt * 1.2) * 0.25 : 0;
     if (cloudAlpha > 0) {
-      ctx.fillStyle = `rgba(255,255,255,${cloudAlpha})`;
-      for (let i = 0; i < 6; i++) {
-        const cx = ((i * 150 - scroll * 0.7) % (w + 120)) - 60;
-        const cy = h * 0.15 + i * 35;
+      for (let i = 0; i < 8; i++) {
+        const cx = ((i * 120 - scroll * 0.8) % (w + 150)) - 75;
+        const cy = h * 0.1 + (i % 3) * 40;
+        const cs = 15 + (i % 3) * 8;
+        ctx.fillStyle = `rgba(255,255,255,${cloudAlpha})`;
+        // Multi-circle puffy cloud
         ctx.beginPath();
-        ctx.arc(cx, cy, 22, 0, Math.PI * 2);
-        ctx.arc(cx + 22, cy, 18, 0, Math.PI * 2);
-        ctx.arc(cx - 18, cy + 4, 16, 0, Math.PI * 2);
+        ctx.arc(cx, cy, cs, 0, Math.PI * 2);
+        ctx.arc(cx + cs * 0.8, cy, cs * 0.7, 0, Math.PI * 2);
+        ctx.arc(cx - cs * 0.7, cy + 3, cs * 0.6, 0, Math.PI * 2);
+        ctx.arc(cx + cs * 0.3, cy - cs * 0.5, cs * 0.5, 0, Math.PI * 2);
+        ctx.fill();
+        // Cloud shadow (bottom darker)
+        ctx.fillStyle = `rgba(180,190,200,${cloudAlpha * 0.4})`;
+        ctx.beginPath();
+        ctx.arc(cx, cy + cs * 0.3, cs * 0.6, 0, Math.PI * 2);
         ctx.fill();
       }
     }
   } else if (weather === 'night') {
     const grad = ctx.createLinearGradient(0, 0, 0, h);
-    grad.addColorStop(0, '#050810'); grad.addColorStop(0.5, '#0a0e1f'); grad.addColorStop(1, '#0d1525');
-    ctx.fillStyle = grad; ctx.fillRect(0, 0, w, h);
-    // Stars (twinkle + scroll slightly)
+    grad.addColorStop(0, '#020410');
+    grad.addColorStop(0.4, '#080d20');
+    grad.addColorStop(0.8, '#0c1530');
+    grad.addColorStop(1, '#101a3a');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+
     const starAlpha = 0.3 + alt * 0.5;
     bgStars.forEach(s => {
       s.tw += 0.05;
-      const twinkle = 0.5 + Math.sin(s.tw) * 0.5;
+      const twinkle = 0.4 + Math.sin(s.tw) * 0.6;
       const sx = (s.x - scroll * 0.1) % w; if (sx < 0) sx += w;
       ctx.beginPath(); ctx.arc(sx, s.y, s.r, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(255,255,255,${starAlpha * twinkle})`; ctx.fill();
+      ctx.fillStyle = `rgba(255,255,255,${starAlpha * twinkle})`;
+      ctx.fill();
+      // Some stars have glow
+      if (s.r > 1.2) {
+        ctx.fillStyle = `rgba(200,220,255,${starAlpha * twinkle * 0.3})`;
+        ctx.beginPath(); ctx.arc(sx, s.y, s.r * 3, 0, Math.PI * 2); ctx.fill();
+      }
     });
-    // Moon
-    ctx.beginPath(); ctx.arc(w * 0.8, h * 0.15, 18, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(251,191,36,0.3)'; ctx.fill();
-    ctx.beginPath(); ctx.arc(w * 0.8, h * 0.15, 13, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(251,191,36,0.5)'; ctx.fill();
+    // Moon with glow
+    ctx.fillStyle = 'rgba(251,191,36,0.15)';
+    ctx.beginPath(); ctx.arc(w * 0.78, h * 0.12, 30, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(251,191,36,0.3)';
+    ctx.beginPath(); ctx.arc(w * 0.78, h * 0.12, 20, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,250,240,0.6)';
+    ctx.beginPath(); ctx.arc(w * 0.78, h * 0.12, 14, 0, Math.PI * 2); ctx.fill();
+    // Moon craters
+    ctx.fillStyle = 'rgba(200,190,180,0.3)';
+    ctx.beginPath(); ctx.arc(w * 0.78 - 4, h * 0.12 - 2, 3, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(w * 0.78 + 5, h * 0.12 + 3, 2, 0, Math.PI * 2); ctx.fill();
   } else if (weather === 'storm') {
     const grad = ctx.createLinearGradient(0, 0, 0, h);
-    grad.addColorStop(0, '#1a1a2e'); grad.addColorStop(0.5, '#16213e'); grad.addColorStop(1, '#0f3460');
-    ctx.fillStyle = grad; ctx.fillRect(0, 0, w, h);
-    if (lightningFlash > 0) { ctx.fillStyle = `rgba(255,255,255,${lightningFlash * 0.3})`; ctx.fillRect(0, 0, w, h); lightningFlash -= 0.05; }
-    ctx.strokeStyle = 'rgba(150,170,200,0.4)'; ctx.lineWidth = 1;
+    grad.addColorStop(0, '#1a1a2e');
+    grad.addColorStop(0.4, '#16213e');
+    grad.addColorStop(0.8, '#0f3460');
+    grad.addColorStop(1, '#1a4a70');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+
+    // Dark storm clouds
+    ctx.fillStyle = 'rgba(30,35,50,0.4)';
+    for (let i = 0; i < 6; i++) {
+      const cx = ((i * 100 - scroll * 0.6) % (w + 120)) - 60;
+      ctx.beginPath();
+      ctx.arc(cx, h * 0.12, 30, 0, Math.PI * 2);
+      ctx.arc(cx + 25, h * 0.12, 25, 0, Math.PI * 2);
+      ctx.arc(cx - 20, h * 0.12 + 5, 22, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    if (lightningFlash > 0) {
+      ctx.fillStyle = `rgba(255,255,255,${lightningFlash * 0.4})`;
+      ctx.fillRect(0, 0, w, h);
+      // Lightning bolt
+      if (lightningFlash > 0.7) {
+        ctx.strokeStyle = `rgba(255,255,200,${lightningFlash})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        const lx = w * 0.3 + Math.random() * w * 0.4;
+        ctx.moveTo(lx, 0);
+        ctx.lineTo(lx + 15, h * 0.2);
+        ctx.lineTo(lx + 5, h * 0.25);
+        ctx.lineTo(lx + 20, h * 0.4);
+        ctx.stroke();
+      }
+      lightningFlash -= 0.05;
+    }
+
+    ctx.strokeStyle = 'rgba(150,170,200,0.5)';
+    ctx.lineWidth = 1.5;
     rainDrops.forEach(d => {
-      d.y += d.spd; d.x -= 3; if (d.y > h) { d.y = -10; d.x = Math.random() * w; } if (d.x < 0) d.x = w;
+      d.y += d.spd; d.x -= 4;
+      if (d.y > h) { d.y = -10; d.x = Math.random() * w; }
+      if (d.x < 0) d.x = w;
       ctx.beginPath(); ctx.moveTo(d.x, d.y); ctx.lineTo(d.x - 3, d.y + d.len); ctx.stroke();
     });
-    if (Math.random() < 0.005) { lightningFlash = 1; beep(100, 0.1, 'sawtooth', 0.08); }
+    if (Math.random() < 0.008) { lightningFlash = 1; beep(80, 0.15, 'sawtooth', 0.1); }
   }
 }
 
-// ===== Draw runway (visible at ground, disappears as plane climbs) =====
+// ===== Draw airport + runway + distant houses =====
 function drawRunway(altitude) {
   const w = canvas.width, h = canvas.height;
-  const runwayY = h - 25;
-  const alpha = Math.max(0, 1 - altitude * 4);
+  const alpha = Math.max(0, 1 - altitude * 3.5);
   if (alpha <= 0) return;
 
-  // Runway surface
-  ctx.fillStyle = `rgba(35,40,55,${alpha})`;
-  ctx.fillRect(0, runwayY, w, 25);
-  // Center stripes
-  ctx.fillStyle = `rgba(251,191,36,${alpha * 0.8})`;
+  const groundY = h - 30;
+  const scroll = bgScroll;
+
+  // ===== Distant houses (far away, small) =====
+  const houseAlpha = alpha * 0.6;
+  for (let i = 0; i < 12; i++) {
+    const hx = ((i * 80 - scroll * 0.3) % (w + 100)) - 50;
+    const hy = groundY - 12 - (i % 2) * 3;
+    const hw = 14, hh = 10 + (i % 3) * 3;
+    // House body
+    ctx.fillStyle = `rgba(${180 - (i%4)*15},${160 - (i%3)*10},${140},${houseAlpha})`;
+    ctx.fillRect(hx, hy, hw, hh);
+    // Roof (triangle)
+    ctx.fillStyle = `rgba(${120 - (i%3)*15},${80},${60},${houseAlpha})`;
+    ctx.beginPath();
+    ctx.moveTo(hx - 1, hy);
+    ctx.lineTo(hx + hw / 2, hy - 5);
+    ctx.lineTo(hx + hw + 1, hy);
+    ctx.closePath();
+    ctx.fill();
+    // Window (small lit square)
+    if (weather === 'night' || weather === 'storm') {
+      ctx.fillStyle = `rgba(251,191,36,${houseAlpha * 0.8})`;
+      ctx.fillRect(hx + 4, hy + 3, 3, 3);
+    }
+  }
+
+  // ===== Airport building (control tower) =====
+  const towerX = w * 0.7 - (scroll * 0.3) % 400;
+  if (towerX > -50 && towerX < w + 50) {
+    const ty = groundY - 30;
+    // Tower base
+    ctx.fillStyle = `rgba(200,200,210,${alpha * 0.7})`;
+    ctx.fillRect(towerX - 4, ty, 8, 20);
+    // Tower top (control room)
+    ctx.fillStyle = `rgba(60,70,90,${alpha * 0.8})`;
+    ctx.fillRect(towerX - 7, ty - 8, 14, 8);
+    // Tower light (red beacon)
+    ctx.fillStyle = `rgba(239,68,68,${alpha})`;
+    ctx.beginPath();
+    ctx.arc(towerX, ty - 10, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // ===== Runway =====
+  // Grass on sides
+  const grassGrad = ctx.createLinearGradient(0, groundY - 8, 0, groundY + 2);
+  grassGrad.addColorStop(0, `rgba(40,80,50,${alpha})`);
+  grassGrad.addColorStop(1, `rgba(60,100,60,${alpha})`);
+  ctx.fillStyle = grassGrad;
+  ctx.fillRect(0, groundY - 8, w, 10);
+
+  // Runway surface (dark asphalt)
+  ctx.fillStyle = `rgba(30,32,40,${alpha})`;
+  ctx.fillRect(0, groundY, w, 30);
+
+  // Runway edge lights (blue lights on edges)
+  for (let i = 0; i < 20; i++) {
+    const lx = ((i * 30 - scroll) % (w + 60)) - 30;
+    ctx.fillStyle = `rgba(100,150,255,${alpha})`;
+    ctx.beginPath(); ctx.arc(lx, groundY + 2, 1.5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = `rgba(100,150,255,${alpha * 0.3})`;
+    ctx.beginPath(); ctx.arc(lx, groundY + 2, 4, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // Center dashed yellow stripes
+  ctx.fillStyle = `rgba(251,191,36,${alpha * 0.9})`;
   const stripeW = 25, gap = 20;
-  const off = bgScroll % (stripeW + gap);
-  for (let x = -off; x < w; x += stripeW + gap) { ctx.fillRect(x, runwayY + 10, stripeW, 3); }
-  // Grass
-  ctx.fillStyle = `rgba(20,60,30,${alpha})`;
-  ctx.fillRect(0, runwayY - 4, w, 4);
+  const off = scroll % (stripeW + gap);
+  for (let x = -off; x < w; x += stripeW + gap) {
+    ctx.fillRect(x, groundY + 13, stripeW, 3.5);
+  }
+
+  // Runway threshold markings (white stripes at start)
+  ctx.fillStyle = `rgba(255,255,255,${alpha * 0.5})`;
+  for (let i = 0; i < 6; i++) {
+    const tx = ((i * 8 - scroll * 0.5) % (w + 100)) - 50;
+    ctx.fillRect(tx, groundY + 5, 3, 18);
+  }
 }
 
-// ===== Draw plane (AIRPLANE shape — NOT a rocket) =====
+// ===== Draw plane (REALISTIC airplane — white body, blue stripe, open rear door) =====
 function drawPlane(px, py, angle, isCashed) {
   ctx.save();
   ctx.translate(px, py);
   ctx.rotate(angle);
+  const S = 1.8; // Scale — bigger plane
 
   // Engine glow trail (behind plane)
   if (state === 'flying') {
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 5; i++) {
       ctx.beginPath();
-      ctx.arc(-14 - i * 6, 0, 4 - i, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(255,140,60,${0.4 - i * 0.1})`;
+      ctx.arc((-16 - i * 8) * S, 0, (5 - i) * S, 0, Math.PI * 2);
+      const alpha = 0.35 - i * 0.06;
+      ctx.fillStyle = `rgba(255,${140 + i * 20},${60 + i * 30},${alpha})`;
+      ctx.fill();
+    }
+    // Smoke trail
+    for (let i = 0; i < 8; i++) {
+      ctx.beginPath();
+      ctx.arc((-20 - i * 10) * S + Math.random() * 4, Math.random() * 6 - 3, (3 + Math.random() * 3) * S, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(200,200,200,${0.1 - i * 0.01})`;
       ctx.fill();
     }
   }
 
-  // Main fuselage (airplane body — rounded, not pointy like rocket)
-  ctx.fillStyle = '#e2e8f0';
+  ctx.scale(S, S);
+
+  // ===== Main fuselage (white body — realistic airplane) =====
+  // Body gradient (light from top)
+  const bodyGrad = ctx.createLinearGradient(0, -6, 0, 6);
+  bodyGrad.addColorStop(0, '#f8fafc');
+  bodyGrad.addColorStop(0.4, '#e2e8f0');
+  bodyGrad.addColorStop(1, '#94a3b8');
+  ctx.fillStyle = bodyGrad;
   ctx.beginPath();
-  ctx.moveTo(16, 0);            // nose (rounded)
-  ctx.quadraticCurveTo(14, -5, 8, -5);  // cockpit curve
-  ctx.lineTo(-8, -5);           // top of body
-  ctx.quadraticCurveTo(-12, -5, -12, -2); // tail top curve
-  ctx.lineTo(-12, 2);           // tail
-  ctx.quadraticCurveTo(-12, 5, -8, 5);   // tail bottom curve
-  ctx.lineTo(8, 5);             // bottom of body
-  ctx.quadraticCurveTo(14, 5, 16, 0);    // nose bottom curve
+  ctx.moveTo(18, 0);                    // nose tip
+  ctx.quadraticCurveTo(17, -6, 10, -6); // cockpit curve top
+  ctx.lineTo(-10, -6);                  // top of body
+  ctx.quadraticCurveTo(-14, -6, -14, -3); // tail top
+  ctx.lineTo(-14, 3);                   // tail
+  ctx.quadraticCurveTo(-14, 6, -10, 6); // tail bottom curve
+  ctx.lineTo(10, 6);                    // bottom of body
+  ctx.quadraticCurveTo(17, 6, 18, 0);   // nose bottom curve
   ctx.closePath();
   ctx.fill();
 
-  // Wing (large, flat — airplane style)
+  // Blue stripe along the body (like real airlines)
+  ctx.fillStyle = '#1e40af';
+  ctx.beginPath();
+  ctx.moveTo(16, -1);
+  ctx.lineTo(-12, -1);
+  ctx.lineTo(-12, 1);
+  ctx.lineTo(16, 1);
+  ctx.closePath();
+  ctx.fill();
+
+  // Windows (passenger windows — row of small rectangles)
+  ctx.fillStyle = '#1e3a5f';
+  for (let i = 0; i < 6; i++) {
+    ctx.fillRect(2 + i * 2.2, -4, 1.2, 1.8);
+  }
+
+  // Cockpit window (windshield — dark glass)
+  ctx.fillStyle = '#0f172a';
+  ctx.beginPath();
+  ctx.ellipse(12, -1.5, 3.5, 2, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Cockpit shine
+  ctx.fillStyle = 'rgba(0,231,1,0.3)';
+  ctx.beginPath();
+  ctx.ellipse(12, -2, 2, 1, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // ===== Open rear door (at the back of fuselage) =====
+  // Door frame
+  ctx.fillStyle = '#cbd5e1';
+  ctx.beginPath();
+  ctx.roundRect ? ctx.roundRect(-10, -5, 4, 8, 1) : ctx.rect(-10, -5, 4, 8);
+  ctx.fill();
+  // Door is OPEN (dark interior visible)
+  ctx.fillStyle = '#1a1a2e';
+  ctx.beginPath();
+  ctx.roundRect ? ctx.roundRect(-9.5, -4.5, 3, 7, 0.8) : ctx.rect(-9.5, -4.5, 3, 7);
+  ctx.fill();
+  // Door opening (hinged open — the door panel swung out)
   ctx.fillStyle = '#94a3b8';
   ctx.beginPath();
-  ctx.moveTo(2, -1);
-  ctx.lineTo(-4, -14);       // wing tip top
-  ctx.lineTo(-8, -14);
-  ctx.lineTo(-6, -1);
-  ctx.lineTo(-8, 14);        // wing tip bottom
-  ctx.lineTo(-4, 14);
-  ctx.lineTo(2, 1);
+  ctx.moveTo(-6, -4);
+  ctx.lineTo(-3, -6);
+  ctx.lineTo(-3, 4);
+  ctx.lineTo(-6, 2);
+  ctx.closePath();
+  ctx.fill();
+  // Light inside (passengers can be seen)
+  ctx.fillStyle = 'rgba(251,191,36,0.3)';
+  ctx.beginPath();
+  ctx.arc(-8, 0, 1.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  // ===== Wing (large, swept back — realistic) =====
+  const wingGrad = ctx.createLinearGradient(0, -16, 0, 16);
+  wingGrad.addColorStop(0, '#cbd5e1');
+  wingGrad.addColorStop(0.5, '#94a3b8');
+  wingGrad.addColorStop(1, '#64748b');
+  ctx.fillStyle = wingGrad;
+  ctx.beginPath();
+  ctx.moveTo(4, 0);
+  ctx.lineTo(-2, -16);    // wing tip top (swept)
+  ctx.lineTo(-6, -16);
+  ctx.lineTo(-5, 0);
+  ctx.lineTo(-6, 16);     // wing tip bottom
+  ctx.lineTo(-2, 16);
+  ctx.lineTo(4, 0);
   ctx.closePath();
   ctx.fill();
 
-  // Tail fin (vertical stabilizer)
-  ctx.fillStyle = '#64748b';
+  // Wing tip lights (red on left, green on right — FAA regulation)
+  ctx.fillStyle = '#ef4444';
   ctx.beginPath();
-  ctx.moveTo(-8, -5);
-  ctx.lineTo(-13, -12);
-  ctx.lineTo(-9, -12);
-  ctx.lineTo(-6, -5);
+  ctx.arc(-4, -15, 1, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#00e701';
+  ctx.beginPath();
+  ctx.arc(-4, 15, 1, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Engine under wing
+  ctx.fillStyle = '#475569';
+  ctx.beginPath();
+  ctx.ellipse(-2, -8, 3, 1.5, 0.1, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#1e293b';
+  ctx.beginPath();
+  ctx.arc(-4, -8, 1, 0, Math.PI * 2);
+  ctx.fill();
+
+  // ===== Tail fin (vertical stabilizer — with airline logo area) =====
+  ctx.fillStyle = '#1e40af';
+  ctx.beginPath();
+  ctx.moveTo(-10, -6);
+  ctx.lineTo(-16, -14);
+  ctx.lineTo(-11, -14);
+  ctx.lineTo(-7, -6);
   ctx.closePath();
+  ctx.fill();
+  // White star/logo on tail
+  ctx.fillStyle = '#f8fafc';
+  ctx.beginPath();
+  ctx.arc(-12, -11, 1.5, 0, Math.PI * 2);
   ctx.fill();
 
   // Horizontal stabilizer (tail wings)
-  ctx.fillStyle = '#64748b';
+  ctx.fillStyle = '#94a3b8';
   ctx.beginPath();
-  ctx.moveTo(-10, 0);
-  ctx.lineTo(-14, -5);
-  ctx.lineTo(-12, -5);
-  ctx.lineTo(-10, -1);
-  ctx.lineTo(-10, 1);
-  ctx.lineTo(-12, 5);
-  ctx.lineTo(-14, 5);
+  ctx.moveTo(-11, 0);
+  ctx.lineTo(-15, -4);
+  ctx.lineTo(-13, -4);
+  ctx.lineTo(-11, -1);
+  ctx.lineTo(-11, 1);
+  ctx.lineTo(-13, 4);
+  ctx.lineTo(-15, 4);
   ctx.closePath();
   ctx.fill();
 
-  // Cockpit window (green glass)
-  ctx.fillStyle = '#00e701';
+  // Nose cone (radar dome — slightly different color)
+  ctx.fillStyle = '#cbd5e1';
   ctx.beginPath();
-  ctx.ellipse(7, -1, 4, 2, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Nose tip (red — like real planes)
-  ctx.fillStyle = '#ef4444';
-  ctx.beginPath();
-  ctx.arc(15, 0, 2, 0, Math.PI * 2);
+  ctx.arc(17, 0, 1.5, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.restore();
@@ -356,20 +584,21 @@ function drawTrail() {
   ctx.fillStyle = g; ctx.fill();
 }
 
-// ===== Parachute spawn (for ANY player — me or others) =====
+// ===== Parachute spawn (shown ONCE, disappears in 2.5s) =====
 function spawnParachute(name, amount, fromLeft) {
   const layer = document.getElementById('parachutesLayer');
   const el = document.createElement('div');
   el.className = 'parachute-item';
-  el.style.left = (fromLeft || (20 + Math.random() * 60)) + '%';
-  el.style.top = '40%';
+  el.style.left = (fromLeft !== undefined ? fromLeft : (20 + Math.random() * 60)) + '%';
+  el.style.top = '38%';
   el.innerHTML = `
     <div class="parachute-icon">🪂</div>
     <div class="parachute-amount">+${amount.toFixed(0)}</div>
     <div class="parachute-name">${name}</div>
   `;
   layer.appendChild(el);
-  setTimeout(() => el.remove(), 4000);
+  // Remove after exactly 2.5s (matches CSS animation)
+  setTimeout(() => el.remove(), 2500);
 }
 
 // ===== Countdown =====
@@ -408,34 +637,42 @@ function animate() {
   const cx = canvas.width * PLANE_CENTER_X_RATIO;
   const cy = canvas.height * PLANE_CENTER_Y_RATIO;
 
-  // Phase 1: Plane takes off from runway (0-2s) — moves up to center
-  // Phase 2: Plane stays at center, background scrolls (2s+)
-  const takeoffDur = 2.0;
+  // Phase 1: Plane takes off from runway (0-3.5s) — moves up to center
+  // Phase 2: Plane stays at center, background scrolls (3.5s+)
+  const takeoffDur = 3.5;
   if (e < takeoffDur) {
-    // Taking off — plane moves from bottom-left to center
+    // Taking off — plane moves from bottom-left to center with gradual acceleration
     const p = e / takeoffDur;
-    planeX = 40 + p * (cx - 40);
-    planeY = canvas.height - 30 - p * (canvas.height - 30 - cy);
-    // Trail builds during takeoff
+    const eased = p * p * (3 - 2 * p); // smoothstep — gradual acceleration
+    planeX = 40 + eased * (cx - 40);
+    planeY = canvas.height - 30 - eased * (canvas.height - 30 - cy);
     trail.push({ x: planeX, y: planeY });
-    if (trail.length > 100) trail.shift();
-    bgScroll = 0;
+    if (trail.length > 120) trail.shift();
+    bgScroll = eased * 20; // Slight scroll during takeoff
   } else {
     // Plane is at center — background scrolls to simulate movement
     planeX = cx; planeY = cy;
-    // Trail stays as a curve from takeoff
-    bgScroll += 3 + mult * 0.5;
+    bgScroll += 2 + mult * 0.3; // Slower scroll (was too fast)
   }
 
   // Draw scene
-  const altitude = Math.min(1, e / 8);
+  const altitude = Math.min(1, e / 10); // Slower altitude gain (was 8s)
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   drawBackground(altitude);
   drawRunway(altitude);
   drawTrail();
 
-  // Plane angle — tilted up during takeoff, level during flight
-  const angle = e < takeoffDur ? -0.3 + 0.3 * (e / takeoffDur) : -0.1 + Math.sin(e * 2) * 0.03;
+  // Plane angle — 42 degrees during takeoff, levels to ~15 degrees during flight
+  const angle42 = 42 * Math.PI / 180; // 42 degrees in radians
+  let angle;
+  if (e < takeoffDur) {
+    // During takeoff: gradually rotate from 42° to ~20°
+    const p = e / takeoffDur;
+    angle = -(angle42 * (1 - p * 0.5)); // Start at -42°, ease to -21°
+  } else {
+    // During flight: gentle bobbing around -15°
+    angle = -(15 * Math.PI / 180) + Math.sin(e * 1.5) * 0.04;
+  }
   drawPlane(planeX, planeY, angle, false);
 
   // Update multiplier position to follow plane
@@ -586,6 +823,20 @@ function simulateFakeBets() {
 }
 
 // Init
+// roundRect polyfill for older browsers
+if (!CanvasRenderingContext2D.prototype.roundRect) {
+  CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
+    if (typeof r === 'number') r = [r, r, r, r];
+    this.beginPath();
+    this.moveTo(x + r[0], y);
+    this.arcTo(x + w, y, x + w, y + h, r[1]);
+    this.arcTo(x + w, y + h, x, y + h, r[2]);
+    this.arcTo(x, y + h, x, y, r[3]);
+    this.arcTo(x, y, x + w, y, r[0]);
+    this.closePath();
+    return this;
+  };
+}
 resizeCanvas(); pickWeather(); drawBackground(0); drawRunway(0);
 loadBalance(); updatePotential();
 document.getElementById('loading').style.display = 'none';
