@@ -2,385 +2,66 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
 <title>VEX Games</title>
+<link rel="stylesheet" href="/static/css/game-base.css">
 <style>
-*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
-body{overflow:hidden;font-family:system-ui,sans-serif;background:#0f172a;color:#fff}
-#app{position:fixed;inset:0;display:flex;flex-direction:column}
-/* Top bar */
-#topbar{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:rgba(0,0,0,0.3);backdrop-filter:blur(10px);position:sticky;top:0;z-index:100}
-.balance{font-size:22px;font-weight:900;color:#fbbf24}
-.balance span{font-size:14px;opacity:0.6;font-weight:400}
-.vex-btn{background:linear-gradient(135deg,#a78bfa,#8b5cf6);color:#fff;border:none;padding:8px 14px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;display:none}
-.vex-btn.show{display:block}
-.stats{font-size:11px;opacity:0.6;margin-top:2px}
-/* Game grid */
-#grid{flex:1;overflow-y:auto;padding:16px;display:grid;grid-template-columns:repeat(2,1fr);gap:14px;align-content:start}
-.game-card{background:linear-gradient(145deg,#1e293b,#0f172a);border:1px solid #334155;border-radius:18px;padding:18px 12px;text-align:center;cursor:pointer;transition:transform 0.15s,box-shadow 0.15s;position:relative;overflow:hidden}
-.game-card:active{transform:scale(0.95)}
-.game-card.hot::after{content:'🔥';position:absolute;top:8px;left:8px;font-size:14px;animation:pulse 1.5s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
-.game-icon{font-size:42px;margin-bottom:8px}
-.game-name{font-size:14px;font-weight:700;margin-bottom:4px}
-.game-desc{font-size:10px;opacity:0.5;margin-bottom:6px;line-height:1.3}
-.game-bets{font-size:10px;color:#fbbf24;opacity:0.8}
-.game-rtp{font-size:9px;opacity:0.4;margin-top:2px}
-/* Loading */
-#loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0f172a;z-index:200}
-.spinner{width:40px;height:40px;border:3px solid #334155;border-top:3px solid #fbbf24;border-radius:50%;animation:spin 0.8s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
-/* Empty */
-#empty{text-align:center;padding:40px;opacity:0.5}
+#app{overflow-y:auto}
+#hub{flex:1;padding:12px;display:grid;grid-template-columns:repeat(2,1fr);gap:10px;overflow-y:auto;align-content:start}
+.game-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 10px;cursor:pointer;transition:all 0.2s var(--ease);text-align:center;position:relative;overflow:hidden}
+.game-card:active{transform:scale(0.95);border-color:var(--gold)}
+.game-card:hover{border-color:var(--gold)}
+.game-card .hot-badge{position:absolute;top:6px;right:6px;background:var(--red);color:#fff;font-size:8px;padding:2px 6px;border-radius:6px;font-weight:700;animation:pulse 0.8s infinite}
+.game-icon{font-size:36px;margin-bottom:6px}
+.game-name{font-size:13px;font-weight:700;margin-bottom:2px;color:var(--text)}
+.game-desc{font-size:10px;color:var(--muted);margin-bottom:6px;line-height:1.3}
+.game-rtp{font-size:10px;color:var(--gold);font-weight:600}
+.empty-state{text-align:center;padding:40px;color:var(--muted);display:none}
+.empty-icon{font-size:48px;margin-bottom:12px}
+#topbar{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0}
+.topbar-info{display:flex;flex-direction:column}
+.topbar-name{font-size:14px;font-weight:700}
+.topbar-seg{font-size:10px;color:var(--muted)}
+.topbar-btns{display:flex;gap:6px}
+.hub-btn{width:38px;height:38px;border-radius:50%;border:none;font-size:16px;cursor:pointer;transition:all 0.15s}
+.hub-btn:active{transform:scale(0.9)}
+.hub-btn.dep{background:linear-gradient(135deg,var(--green-dim),#1a8a2e);color:#fff}
+.hub-btn.wdr{background:linear-gradient(135deg,var(--gold-dim),var(--gold));color:#000}
+.hub-btn.vex{background:linear-gradient(135deg,var(--purple),#7c3aed);color:#fff}
 </style>
 </head>
 <body>
-<div id="loading"><div class="spinner"></div></div>
+<div class="loader-screen" id="loading"><div class="spinner"></div></div>
 <div id="app" style="display:none">
   <div id="topbar">
-    <div>
-      <div class="balance">💰 <span id="bal">0</span> <span id="cur" style="font-size:12px;cursor:pointer" onclick="showCurrencyPicker()" title="تغيير العملة">EGP</span></div>
-      <div class="stats" id="stats"></div>
+    <div class="topbar-info">
+      <div class="topbar-name">💰 <span id="bal">0</span> <span id="cur" style="font-size:11px;color:var(--muted);cursor:pointer" onclick="showCurrencyPicker()">EGP</span></div>
+      <div class="topbar-seg" id="stats"></div>
     </div>
-    <div style="display:flex;gap:6px">
-      <button class="vex-btn" id="vexBtn" style="background:linear-gradient(135deg,#a78bfa,#8b5cf6)">💎</button>
-      <button class="vex-btn" id="depBtn" style="background:linear-gradient(135deg,#34d399,#10b981)" onclick="showDeposit()">💰</button>
-      <button class="vex-btn" id="wdrBtn" style="background:linear-gradient(135deg,#fbbf24,#f59e0b)" onclick="showWithdraw()">💸</button>
+    <div class="topbar-btns">
+      <button class="hub-btn vex" id="vexBtn" style="display:none" onclick="alert('💎 تعويض')">💎</button>
+      <button class="hub-btn dep" onclick="showDeposit()">💰</button>
+      <button class="hub-btn wdr" onclick="showWithdraw()">💸</button>
     </div>
   </div>
-  <div id="grid"></div>
+  <div id="hub"></div>
+  <div class="empty-state" id="empty"><div class="empty-icon">🎮</div><p>لا توجد ألعاب متاحة</p></div>
 </div>
-<!-- Modal -->
-<div id="modal" style="position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.7);z-index:200">
-  <div id="modalBox" style="background:#1e293b;border:1px solid #334155;border-radius:16px;padding:20px;width:90%;max-width:340px;max-height:80vh;overflow-y:auto"></div>
-</div>
-<div id="empty" style="display:none">
-  <div style="font-size:48px;margin-bottom:12px">🎮</div>
-  <p>لا توجد ألعاب متاحة حالياً</p>
-</div>
+<div class="modal-overlay" id="modal"><div class="modal-box" id="modalBox"></div></div>
+<script src="/static/js/game-base.js"></script>
 <script>
-const tg = window.Telegram?.WebApp;
-if (tg) { tg.expand(); tg.ready(); }
-const uid = new URLSearchParams(location.search).get('uid') || '';
-const lang = new URLSearchParams(location.search).get('lang') || 'ar';
-const BASE = location.origin;
-const initData = tg?.initData || '';
-
-async function apiFetch(url, opts = {}) {
-  opts.headers = opts.headers || {};
-  opts.headers['X-Telegram-Init-Data'] = initData;
-  if (opts.body && typeof opts.body === 'string') {
-    opts.headers['Content-Type'] = 'application/json';
-  }
-  // Auto-append uid if not present in URL
-  if (uid && !url.includes('uid=')) {
-    url += (url.includes('?') ? '&' : '?') + 'uid=' + uid;
-  }
-  return fetch(url, opts);
-}
-
-async function loadBalance() {
-  try {
-    const r = await apiFetch(`${BASE}/api/wallet/balance?uid=${uid}`);
-    const d = await r.json();
-    document.getElementById('bal').textContent = (d.balance || 0).toLocaleString();
-    if (d.currency) document.getElementById('cur').textContent = d.currency;
-  } catch(e) {}
-}
-
-function showCurrencyPicker() {
-  const currencies = [
-    {code:'EGP', name:'جنيه مصري 🇪🇬', flag:'🇪🇬'},
-    {code:'SAR', name:'ريال سعودي 🇸🇦', flag:'🇸🇦'},
-    {code:'USD', name:'دولار أمريكي 🇺🇸', flag:'🇺🇸'},
-    {code:'USDT', name:'تيذر 🪙', flag:'🪙'},
-    {code:'AED', name:'درهم إماراتي 🇦🇪', flag:'🇦🇪'},
-    {code:'KWD', name:'دينار كويتي 🇰🇼', flag:'🇰🇼'},
-    {code:'QAR', name:'ريال قطري 🇶🇦', flag:'🇶🇦'},
-    {code:'BHD', name:'دينار بحريني 🇧🇭', flag:'🇧🇭'},
-    {code:'OMR', name:'ريال عماني 🇴🇲', flag:'🇴🇲'},
-    {code:'JOD', name:'دينار أردني 🇯🇴', flag:'🇯🇴'},
-    {code:'MAD', name:'درهم مغربي 🇲🇦', flag:'🇲🇦'},
-    {code:'DZD', name:'دينار جزائري 🇩🇿', flag:'🇩🇿'},
-    {code:'TND', name:'دينار تونسي 🇹🇳', flag:'🇹🇳'},
-    {code:'LYD', name:'دينار ليبي 🇱🇾', flag:'🇱🇾'},
-    {code:'IQD', name:'دينار عراقي 🇮🇶', flag:'🇮🇶'},
-    {code:'YER', name:'ريال يمني 🇾🇪', flag:'🇾🇪'},
-    {code:'SDG', name:'جنيه سوداني 🇸🇩', flag:'🇸🇩'},
-  ];
-  const box = document.getElementById('modalBox');
-  box.innerHTML = `<div style="font-size:16px;font-weight:700;margin-bottom:8px">💱 اختر عملتك</div>
-    <div style="font-size:11px;color:#64748b;margin-bottom:10px">العملة الحالية: ${document.getElementById('cur').textContent}</div>
-    ${currencies.map(c => `<div onclick="changeCurrency('${c.code}')" style="display:flex;align-items:center;gap:8px;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px;margin-bottom:4px;cursor:pointer"><span style="font-size:18px">${c.flag}</span><span style="font-size:13px">${c.name}</span></div>`).join('')}
-    <button onclick="closeModal()" style="width:100%;background:#334155;color:#94a3b8;border:none;padding:8px;border-radius:10px;font-size:12px;cursor:pointer;margin-top:8px">إلغاء</button>`;
-  document.getElementById('modal').style.display = 'flex';
-}
-
-async function changeCurrency(newCurrency) {
-  try {
-    await apiFetch(`${BASE}/api/player/currency`, {
-      method: 'POST',
-      body: JSON.stringify({uid, currency: newCurrency})
-    });
-    document.getElementById('cur').textContent = newCurrency;
-    closeModal();
-    loadBalance();
-    loadGames();
-  } catch(e) { alert('خطأ في تغيير العملة'); }
-}
-
-async function loadProfile() {
-  try {
-    const r = await apiFetch(`${BASE}/api/player/profile?uid=${uid}`);
-    const d = await r.json();
-    const p = d.profile || {};
-    const seg = d.segment || 'new';
-    const segLabels = {new:'🟢 جديد',winner:'🔴 رابح',loser:'🟡 خاسر',hot:'🔥 ساخن',churning:'⚠️ قد يغادر',vip:'💎 VIP',regular:'👤 عادي'};
-    document.getElementById('stats').textContent = `${segLabels[seg]||seg} | فوز: ${p.win_rate||0}%`;
-    if (p.is_vex_partner === 'yes') {
-      document.getElementById('vexBtn').classList.add('show');
-    }
-  } catch(e) {}
-}
-
-async function loadGames() {
-  try {
-    const r = await apiFetch(`${BASE}/api/games/list`);
-    const d = await r.json();
-    const games = d.games || [];
-    document.getElementById('loading').style.display = 'none';
-    if (games.length === 0) {
-      document.getElementById('empty').style.display = 'block';
-      return;
-    }
-    document.getElementById('app').style.display = 'flex';
-    const grid = document.getElementById('grid');
-    grid.innerHTML = '';
-    games.forEach((g, i) => {
-      const card = document.createElement('div');
-      card.className = 'game-card' + (i % 4 === 0 ? ' hot' : '');
-      card.innerHTML = `
-        <div class="game-icon">${g.icon||'🎮'}</div>
-        <div class="game-name">${g.name||''}</div>
-        <div class="game-desc">${g.description||''}</div>
-        <div class="game-bets">${g.min_bet} - ${g.max_bet}</div>
-        <div class="game-rtp">RTP: ${g.rtp_target||85}%</div>
-      `;
-      card.onclick = () => playGame(g.id);
-      grid.appendChild(card);
-    });
-  } catch(e) {
-    document.getElementById('loading').style.display = 'none';
-    document.getElementById('empty').style.display = 'block';
-  }
-}
-
-function playGame(gameId) {
-  const gameRoutes = {
-    'GAME001': '/webapp/play/GAME001',
-    'GAME002': '/webapp/play/GAME002',
-    'GAME003': '/webapp/play/GAME003',
-    'GAME004': '/webapp/aviator',
-    'GAME005': '/webapp/crash',
-    'GAME006': '/webapp/mines',
-    'GAME007': '/webapp/plinko',
-    'GAME008': '/webapp/lottery',
-    'GAME009': '/webapp/wheel',
-  };
-  const path = gameRoutes[gameId] || `/webapp/play/${gameId}`;
-  const url = `${BASE}${path}?uid=${uid}&lang=${lang}`;
-  if (tg) {
-    tg.openTelegramLink(url);
-  } else {
-    window.location.href = url;
-  }
-}
-
-document.getElementById('vexBtn').onclick = () => {
-  alert('💎 تعويض — سيتم تحويلك لصفحة التعويض');
-};
-
-// ===== Deposit Modal =====
-let botPaymentMethods = [];
-let savedPlayerWallets = [];
-let selectedGameMethod = null;
-
-async function showDeposit() {
-  const box = document.getElementById('modalBox');
-  try {
-    const r = await apiFetch(`${BASE}/api/games/payment-methods?uid=${uid}`);
-    const d = await r.json();
-    botPaymentMethods = d.methods || [];
-    savedPlayerWallets = d.saved_methods || [];
-  } catch(e) {}
-
-  if (botPaymentMethods.length === 0) {
-    box.innerHTML = `<div style="text-align:center;padding:20px"><div style="font-size:32px;margin-bottom:8px">😢</div><div style="font-size:14px;font-weight:700">لا توجد وسائل دفع متاحة</div><button onclick="closeModal()" style="margin-top:12px;background:#334155;color:#fff;border:none;padding:8px 20px;border-radius:8px;cursor:pointer">إغلاق</button></div>`;
-    document.getElementById('modal').style.display = 'flex';
-    return;
-  }
-
-  const methodsHtml = botPaymentMethods.map(m => `
-    <div class="dep-method" onclick="selectGameMethodHub('${m.id}','${(m.method_name||'').replace(/'/g,"\\'")}','${(m.account_data||'').replace(/'/g,"\\'")}','${m.icon||'💳'}')" style="display:flex;align-items:center;gap:8px;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px;margin-bottom:4px;cursor:pointer">
-      <span style="font-size:18px">${m.icon||'💳'}</span>
-      <div style="flex:1">
-        <div style="font-weight:600;font-size:13px">${m.method_name||''}</div>
-        <div style="font-size:11px;color:#64748b">${m.method_type||''}</div>
-      </div>
-      <span style="color:#fbbf24">‹</span>
-    </div>
-  `).join('');
-
-  box.innerHTML = `
-    <div style="font-size:16px;font-weight:700;margin-bottom:8px">💰 إيداع محفظة VEX</div>
-    <div style="font-size:11px;color:#64748b;margin-bottom:8px">اختر وسيلة الدفع:</div>
-    <div id="depMethodsList">${methodsHtml}</div>
-    <div id="depStep2" style="display:none">
-      <div style="font-size:11px;color:#64748b;margin:10px 0 6px">📋 بيانات الوسيلة:</div>
-      <div onclick="copyMethodDataHub()" style="display:flex;align-items:center;justify-content:space-between;background:#0f172a;border:1px solid #fbbf24;border-radius:8px;padding:10px;cursor:pointer;margin-bottom:8px">
-        <code id="methodDataDisplay" style="font-size:13px;color:#fbbf24;word-break:break-all"></code>
-        <span id="copyBtnLabel" style="font-size:12px;color:#94a3b8;flex-shrink:0;margin-right:8px">📋 نسخ</span>
-      </div>
-      <div style="font-size:11px;color:#64748b;margin:8px 0 4px">💵 المبلغ الذي سترسله:</div>
-      <input id="depAmount" type="number" placeholder="المبلغ" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px;color:#fff;font-size:16px;text-align:center;margin-bottom:8px;outline:none">
-      <div style="font-size:11px;color:#64748b;margin:8px 0 4px">🔐 رقم محفظتك (التي سترسل منها):</div>
-      <input id="playerWallet" type="text" placeholder="رقم محفظتك" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px;color:#fff;font-size:15px;text-align:center;margin-bottom:6px;outline:none">
-      <div id="savedWalletHint" style="display:none;font-size:11px;color:#34d399;margin-bottom:6px"></div>
-      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#64748b;margin-bottom:10px;cursor:pointer">
-        <input type="checkbox" id="depSave" style="accent-color:#34d399"> حفظ كوسيلة دفع دائمة
-      </label>
-      <button onclick="submitGameDepositHub()" style="width:100%;background:linear-gradient(135deg,#34d399,#10b981);color:#000;border:none;padding:12px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer">✅ تأكيد الإيداع</button>
-      <button onclick="backToMethodsHub()" style="width:100%;background:#334155;color:#94a3b8;border:none;padding:8px;border-radius:10px;font-size:12px;cursor:pointer;margin-top:4px">‹ رجوع للوسائل</button>
-    </div>
-    <button onclick="closeModal()" style="width:100%;background:#334155;color:#94a3b8;border:none;padding:8px;border-radius:10px;font-size:12px;cursor:pointer;margin-top:4px">إغلاق</button>
-  `;
-  document.getElementById('modal').style.display = 'flex';
-}
-
-function selectGameMethodHub(methodId, methodName, methodAccountData, icon) {
-  selectedGameMethod = { id: methodId, name: methodName, account_data: methodAccountData, icon: icon };
-  let savedW = '';
-  let hint = '';
-  if (savedPlayerWallets.length > 0) {
-    const match = savedPlayerWallets.find(w => w.method_name && w.method_name.includes(methodName));
-    if (match) { savedW = match.account_number; hint = '✓ محفظتك المحفوظة: ' + savedW; }
-  }
-  document.getElementById('depMethodsList').style.display = 'none';
-  document.getElementById('depStep2').style.display = 'block';
-  document.getElementById('methodDataDisplay').textContent = methodAccountData;
-  if (savedW) {
-    document.getElementById('playerWallet').value = savedW;
-    document.getElementById('savedWalletHint').style.display = 'block';
-    document.getElementById('savedWalletHint').textContent = hint;
-  }
-}
-
-function copyMethodDataHub() {
-  const data = document.getElementById('methodDataDisplay').textContent;
-  navigator.clipboard.writeText(data).then(() => {
-    if (tg?.HapticFeedback?.impactOccurred) tg.HapticFeedback.impactOccurred('light');
-    const lbl = document.getElementById('copyBtnLabel');
-    if (lbl) { lbl.textContent = '✓ تم النسخ'; setTimeout(() => lbl.textContent = '📋 نسخ', 1500); }
-  });
-}
-
-function backToMethodsHub() {
-  document.getElementById('depMethodsList').style.display = 'block';
-  document.getElementById('depStep2').style.display = 'none';
-}
-
-async function submitGameDepositHub() {
-  const amount = parseFloat(document.getElementById('depAmount').value) || 0;
-  const playerWallet = document.getElementById('playerWallet').value.trim();
-  const saveMethod = document.getElementById('depSave').checked;
-  if (amount <= 0) { alert('أدخل المبلغ'); return; }
-  if (!playerWallet) { alert('أدخل رقم محفظتك'); return; }
-  if (!selectedGameMethod) { alert('اختر وسيلة دفع'); return; }
-
-  try {
-    const r = await apiFetch(`${BASE}/api/deposit/quick`, {
-      method: 'POST',
-      body: JSON.stringify({
-        uid, amount,
-        method_id: selectedGameMethod.id,
-        method_name: selectedGameMethod.name,
-        method_account_data: selectedGameMethod.account_data,
-        player_wallet: playerWallet,
-        save_method: saveMethod
-      })
-    });
-    const d = await r.json();
-    if (d.success) {
-      document.getElementById('modalBox').innerHTML = `<div style="text-align:center;padding:20px"><div style="font-size:32px;margin-bottom:8px">⏳</div><div style="font-size:14px;font-weight:700">تم إرسال طلب الإيداع</div><div style="font-size:11px;color:#64748b;margin-top:4px">سيتم إضافة الرصيد لمحفظة VEX<br>بعد موافقة الإدارة</div><button onclick="closeModal();loadBalance();" style="margin-top:12px;background:#334155;color:#fff;border:none;padding:8px 20px;border-radius:8px;cursor:pointer">إغلاق</button></div>`;
-    } else { alert(d.error || 'خطأ'); }
-  } catch(e) { alert('خطأ في الاتصال'); }
-}
-
-// ===== Withdraw Modal =====
-async function showWithdraw() {
-  const bal = parseFloat(document.getElementById('bal').textContent.replace(/,/g,'')) || 0;
-  const box = document.getElementById('modalBox');
-  let methodsHtml = '';
-  try {
-    const r = await apiFetch(`${BASE}/api/player/methods?uid=${uid}`);
-    const d = await r.json();
-    if (d.methods && d.methods.length > 0) {
-      methodsHtml = '<div style="font-size:11px;color:#64748b;margin-bottom:6px">اختر وسيلة الاستلام:</div>';
-      methodsHtml += d.methods.map(m =>
-        `<div class="wdr-method" onclick="selectWdr(this,'${m.account_number}','${m.id}')" style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:8px;margin-bottom:4px;cursor:pointer">${m.icon||'💳'} ${m.method_name} — ${m.account_number}</div>`
-      ).join('');
-    }
-  } catch(e) {}
-  methodsHtml += `
-    <div style="font-size:11px;color:#64748b;margin:10px 0 6px">✍️ أو اكتب يدوياً:</div>
-    <input id="wdrManualName" placeholder="اسم الوسيلة" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:8px;color:#fff;font-size:12px;margin-bottom:4px;outline:none">
-    <input id="wdrManualAcct" placeholder="رقم الحساب" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:8px;color:#fff;font-size:12px;margin-bottom:4px;outline:none">
-  `;
-  box.innerHTML = `
-    <div style="font-size:16px;font-weight:700;margin-bottom:4px">💸 سحب</div>
-    <div style="font-size:12px;color:#fbbf24;margin-bottom:8px">💰 رصيدك: ${bal.toLocaleString()}</div>
-    ${methodsHtml}
-    <input id="wdrAmount" type="number" placeholder="المبلغ" max="${bal}" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px;color:#fff;font-size:16px;text-align:center;margin:8px 0;outline:none">
-    <button onclick="submitWdr()" style="width:100%;background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#000;border:none;padding:12px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer">✅ تأكيد السحب</button>
-    <button onclick="closeModal()" style="width:100%;background:#334155;color:#94a3b8;border:none;padding:8px;border-radius:10px;font-size:12px;cursor:pointer;margin-top:4px">إلغاء</button>
-  `;
-  document.getElementById('modal').style.display = 'flex';
-}
-
-let wdrAccount = '', wdrMethodId = '';
-function selectWdr(el, acct, mid) {
-  document.querySelectorAll('.wdr-method').forEach(m => m.style.borderColor = '#334155');
-  el.style.borderColor = '#fbbf24';
-  wdrAccount = acct; wdrMethodId = mid;
-}
-
-async function submitWdr() {
-  const amount = parseFloat(document.getElementById('wdrAmount').value) || 0;
-  if (amount <= 0) { alert('أدخل المبلغ'); return; }
-  let acct = wdrAccount, mid = wdrMethodId;
-  const mName = document.getElementById('wdrManualName')?.value?.trim() || '';
-  const mAcct = document.getElementById('wdrManualAcct')?.value?.trim() || '';
-  if (mName && mAcct) { acct = mAcct; mid = ''; }
-  if (!acct) { alert('اختر وسيلة أو اكتب يدوياً'); return; }
-  try {
-    const r = await apiFetch(`${BASE}/api/wallet/withdraw`, {method:'POST',body:JSON.stringify({uid,amount,method_id:mid,account_number:acct})});
-    const d = await r.json();
-    if (d.success) {
-      document.getElementById('modalBox').innerHTML = `<div style="text-align:center;padding:20px"><div style="font-size:32px;margin-bottom:8px">⏳</div><div style="font-size:14px;font-weight:700">تم إرسال طلب السحب</div><div style="font-size:11px;color:#64748b;margin-top:4px">سيتم التحويل بعد موافقة الإدارة</div><button onclick="closeModal()" style="margin-top:12px;background:#334155;color:#fff;border:none;padding:8px 20px;border-radius:8px;cursor:pointer">إغلاق</button></div>`;
-      loadBalance();
-    } else {
-      alert(d.error || 'خطأ');
-    }
-  } catch(e) { alert('خطأ'); }
-}
-
-function closeModal() { document.getElementById('modal').style.display = 'none'; }
-
-// Init
-loadBalance();
-loadProfile();
-loadGames();
-setInterval(loadBalance, 5000);
+const lang=new URLSearchParams(location.search).get('lang')||'ar';
+const GAME_ROUTES={'GAME004':'/webapp/aviator','GAME005':'/webapp/crash','GAME006':'/webapp/mines','GAME007':'/webapp/plinko','GAME008':'/webapp/lottery','GAME009':'/webapp/wheel'};
+async function loadProfile(){try{const r=await apiFetch(`${BASE}/api/player/profile?uid=${uid}`);const d=await r.json();const p=d.profile||{};const seg=d.segment||'new';const l={new:'🟢 جديد',winner:'🔴 رابح',loser:'🟡 خاسر',hot:'🔥 ساخن',churning:'⚠️ يغادر',vip:'💎 VIP',regular:'👤 عادي'};document.getElementById('stats').textContent=`${l[seg]||seg} | ${p.win_rate||0}%`;if(p.is_vex_partner==='yes')document.getElementById('vexBtn').style.display='block';}catch(e){}}
+async function loadGames(){try{const r=await apiFetch(`${BASE}/api/games/list?uid=${uid}`);const d=await r.json();const gs=d.games||[];document.getElementById('loading').style.display='none';if(gs.length===0){document.getElementById('empty').style.display='block';return;}document.getElementById('app').style.display='flex';const h=document.getElementById('hub');h.innerHTML='';gs.forEach((g,i)=>{const c=document.createElement('div');c.className='game-card';if(i<3)c.innerHTML+='<div class="hot-badge">🔥</div>';c.innerHTML+=`<div class="game-icon">${g.icon||'🎮'}</div><div class="game-name">${g.name||''}</div><div class="game-desc">${g.description||''}</div><div class="game-rtp">RTP: ${g.rtp_target||'85'}%</div>`;c.onclick=()=>playGame(g.id);h.appendChild(c);});}catch(e){document.getElementById('loading').style.display='none';document.getElementById('empty').style.display='block';}}
+function playGame(id){const path=GAME_ROUTES[id]||`/webapp/play/${id}`;window.location.href=`${BASE}${path}?uid=${uid}&lang=${lang}`;}
+function closeModal(){document.getElementById('modal').style.display='none';}
+async function showDeposit(){document.getElementById('modal').style.display='flex';await showVexDepositModal(0);}
+async function showWithdraw(){const bal=parseFloat(document.getElementById('bal').textContent.replace(/,/g,''))||0;document.getElementById('modal').style.display='flex';const mb=document.getElementById('modalBox');let mh='';try{const r=await apiFetch(`${BASE}/api/player/methods?uid=${uid}`);const d=await r.json();if(d.methods&&d.methods.length>0){mh='<div class="modal-subtitle">اختر وسيلة الاستلام:</div>'+d.methods.map(m=>`<div class="method-item" onclick="selWdr('${m.account_number}','${m.id}')"><span class="method-icon">${m.icon||'💳'}</span><div class="method-info"><div class="method-name">${m.method_name}</div><div class="method-type">${m.account_number}</div></div></div>`).join('');}}catch(e){}mb.innerHTML=`<div class="modal-title">💸 سحب</div><div class="modal-subtitle">رصيدك: ${bal.toLocaleString()}</div>${mh}<div class="modal-subtitle" style="margin-top:8px">✍️ أو اكتب يدوياً:</div><input class="modal-input" id="wdrAcc" placeholder="رقم الحساب"><input class="modal-input" id="wdrAmt" type="number" placeholder="المبلغ" max="${bal}"><button class="modal-btn-primary" onclick="subWdr()">✅ تأكيد السحب</button><button class="modal-btn-secondary" onclick="closeModal()">إلغاء</button>`;
+  let wAcc='',wMid='';window.selWdr=function(ac,mid){document.querySelectorAll('.method-item').forEach(m=>m.style.borderColor='var(--border)');event.target.closest('.method-item').style.borderColor='var(--gold)';wAcc=ac;wMid=mid;};window.subWdr=async function(){const a=parseFloat(document.getElementById('wdrAmt').value)||0;const ac=wAcc||document.getElementById('wdrAcc').value.trim();if(a<=0||!ac){alert('أدخل المبلغ ورقم الحساب');return;}try{const r=await apiFetch(`${BASE}/api/wallet/withdraw`,{method:'POST',body:JSON.stringify({uid,amount:a,method_id:wMid,account_number:ac})});const d=await r.json();if(d.success){mb.innerHTML=`<div style="text-align:center;padding:16px"><div style="font-size:28px">⏳</div><div class="modal-title">تم الطلب</div><div class="modal-subtitle">بانتظار موافقة الإدارة</div><button class="modal-btn-secondary" onclick="closeModal();loadBalance();">إغلاق</button></div>`;}else{alert(d.error||'خطأ');}}catch(e){alert('خطأ');}};}
+function showCurrencyPicker(){const cs=[{code:'EGP',name:'جنيه مصري 🇪🇬'},{code:'SAR',name:'ريال سعودي 🇸🇦'},{code:'USD',name:'دولار 🇺🇸'},{code:'USDT',name:'تيذر 🪙'},{code:'AED',name:'درهم 🇦🇪'},{code:'KWD',name:'دينار كويتي 🇰🇼'}];document.getElementById('modal').style.display='flex';document.getElementById('modalBox').innerHTML=`<div class="modal-title">💱 اختر العملة</div><div class="modal-subtitle">الحالية: ${document.getElementById('cur').textContent}</div>${cs.map(c=>`<div class="method-item" onclick="chCur('${c.code}')"><span style="font-size:18px">${c.name.slice(-2)}</span><div class="method-info"><div class="method-name">${c.name.slice(0,-3)}</div></div></div>`).join('')}<button class="modal-btn-secondary" onclick="closeModal()">إلغاء</button>`;}
+window.chCur=async function(c){try{await apiFetch(`${BASE}/api/player/currency`,{method:'POST',body:JSON.stringify({uid,currency:c})});document.getElementById('cur').textContent=c;closeModal();loadBalance();loadGames();}catch(e){alert('خطأ');}};
+loadBalance();loadProfile();loadGames();setInterval(loadBalance,5000);
 </script>
 </body>
 </html>

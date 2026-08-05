@@ -2,586 +2,80 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Plinko</title>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>Plinko — VEX</title>
+<link rel="stylesheet" href="/static/css/game-base.css">
 <style>
-*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
-:root{--bg:#0a0e17;--surface:#131826;--surface2:#1a2032;--border:#2a3142;--gold:#fbbf24;--green:#00e701;--red:#ff4757;--blue:#3b82f6;--text:#e8eaed;--muted:#6b7280;--radius:12px}
-body{overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text)}
-#app{position:fixed;inset:0;display:flex;flex-direction:column}
-
-/* Top Bar */
-#topbar{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--surface);border-bottom:1px solid var(--border)}
-.back-btn{background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;padding:4px 8px}
-.balance-wrap{display:flex;align-items:center;gap:6px;background:var(--surface2);padding:6px 12px;border-radius:20px}
-.balance-icon{font-size:14px;color:var(--gold)}
-.balance-val{font-size:16px;font-weight:800;color:var(--text)}
-.balance-cur{font-size:11px;color:var(--muted)}
-.sound-toggle{background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;padding:4px}
-
-/* History Bar */
-#history{display:flex;gap:3px;padding:4px 8px;background:var(--surface);overflow-x:auto;border-bottom:1px solid var(--border)}
-#history::-webkit-scrollbar{display:none}
-.hist-item{flex-shrink:0;font-size:10px;padding:2px 8px;border-radius:4px;font-weight:700;min-width:40px;text-align:center}
-.hist-win{background:rgba(0,231,1,0.12);color:var(--green)}
-.hist-lose{background:rgba(255,71,87,0.12);color:var(--red)}
-
-/* Game Area */
-#game-area{flex:1;position:relative;overflow:hidden;background:radial-gradient(ellipse at 50% 100%,#0d1521 0%,var(--bg) 70%)}
 #canvas{position:absolute;inset:0;width:100%;height:100%}
-
-/* Game Status */
-.game-status{position:absolute;top:10px;left:50%;transform:translateX(-50%);font-size:12px;color:var(--muted);z-index:5}
-
-/* Result Overlay */
-.result-overlay{position:absolute;top:38%;left:50%;transform:translate(-50%,-50%);text-align:center;z-index:10;opacity:0;pointer-events:none}
-.result-overlay.show{opacity:1;animation:popIn 0.3s}
-@keyframes popIn{from{transform:translate(-50%,-50%) scale(0.5);opacity:0}to{transform:translate(-50%,-50%) scale(1);opacity:1}}
-.result-mult{font-size:48px;font-weight:900;font-family:'Courier New',monospace;letter-spacing:-2px}
-.result-mult.win{color:var(--green);text-shadow:0 0 30px rgba(0,231,1,0.5)}
-.result-mult.lose{color:var(--red);text-shadow:0 0 30px rgba(255,71,87,0.5)}
-.result-payout{font-size:18px;font-weight:700;margin-top:4px}
-.result-payout.win{color:var(--gold)}
-.result-payout.lose{color:var(--muted)}
-
-/* Bet Panel */
-#betbar{background:var(--surface);border-top:1px solid var(--border);padding:8px 12px}
-.bet-row{display:flex;gap:6px;align-items:center}
-.bet-input-wrap{position:relative;flex:1}
-.bet-input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 40px 10px 12px;color:var(--text);font-size:16px;font-weight:700;text-align:center;outline:none;font-family:'Courier New',monospace}
-.bet-input:focus{border-color:var(--gold)}
-.bet-cur{position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:11px;color:var(--muted);pointer-events:none}
-
-/* Bet Controls */
-.bet-controls{display:flex;gap:4px;margin-top:6px}
-.bet-btn{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:6px;color:var(--muted);font-size:11px;font-weight:600;cursor:pointer;transition:all 0.15s}
-.bet-btn:active{transform:scale(0.95);background:var(--border)}
-
-/* Risk Row */
-.risk-row{display:flex;gap:4px;align-items:center;margin-top:6px;padding:4px 0}
-.risk-btn{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:6px 10px;color:var(--muted);font-size:11px;font-weight:600;cursor:pointer;transition:all 0.15s}
-.risk-btn:active{transform:scale(0.95)}
-.risk-btn.active{background:var(--gold);color:#000;border-color:var(--gold)}
-
-/* Potential Win */
-.potential{display:flex;align-items:center;gap:4px;padding:4px 8px;background:var(--surface2);border-radius:6px}
-.pot-label{font-size:10px;color:var(--muted)}
-.pot-val{font-size:13px;font-weight:700;color:var(--green);font-family:'Courier New',monospace}
-
-/* Main Button */
-.action-row{display:flex;gap:6px;margin-top:8px}
-.btn-bet{flex:1;border:none;padding:14px;border-radius:var(--radius);font-size:15px;font-weight:800;cursor:pointer;transition:all 0.15s;background:linear-gradient(135deg,#b8860b,#daa520);color:#000;text-transform:uppercase;letter-spacing:1px}
-.btn-bet:active{transform:scale(0.97)}
-.btn-bet:disabled{opacity:0.3;cursor:not-allowed}
-.btn-bet:not(:disabled){animation:btnPulse 2s infinite}
-@keyframes btnPulse{0%,100%{box-shadow:0 0 0 0 rgba(218,165,32,0.2)}50%{box-shadow:0 0 0 6px rgba(218,165,32,0)}}
-
-/* Loading */
-#loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg);z-index:200}
-.spinner{width:36px;height:36px;border:3px solid var(--border);border-top:3px solid var(--gold);border-radius:50%;animation:spin 0.7s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
-
-/* Live Players */
-#lp{max-height:80px;overflow-y:auto;background:var(--surface);border-top:1px solid var(--border)}
-#lp::-webkit-scrollbar{width:2px}
-.lp-header{display:flex;justify-content:space-between;padding:3px 8px;font-size:9px;color:var(--muted);border-bottom:1px solid var(--border)}
-.lp-list{padding:2px 6px}
-.lp-row{display:flex;align-items:center;justify-content:space-between;padding:2px 4px;border-radius:4px;margin:1px 0;font-size:10px}
-.lp-row.win{background:rgba(0,231,1,0.08)}
-.lp-row.lose{background:rgba(255,71,87,0.06)}
-.lp-ava{width:16px;height:16px;border-radius:50%;background:var(--border);display:flex;align-items:center;justify-content:center;font-size:8px;margin-left:4px}
+.risk-select{display:flex;gap:4px;justify-content:center;margin-top:6px}
+.risk-opt{flex:1;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px;color:var(--muted);font-size:11px;font-weight:700;cursor:pointer;text-align:center;transition:all 0.15s}
+.risk-opt.active{background:var(--gold);color:#000;border-color:var(--gold)}
 </style>
 </head>
 <body>
-<div id="loading"><div class="spinner"></div></div>
+<div class="loader-screen" id="loading"><div class="spinner"></div></div>
 <div id="app" style="display:none">
-  <div id="topbar">
-    <button class="back-btn" onclick="goBack()">‹</button>
-    <div class="balance-wrap">
-      <span class="balance-icon">💰</span>
-      <span class="balance-val" id="bal">0</span>
-      <span class="balance-cur" id="cur">EGP</span>
-    </div>
-    <button class="sound-toggle" id="soundBtn" onclick="toggleSound()">🔊</button>
+  <div class="game-topbar">
+    <div class="topbar-left"><button class="btn-back" onclick="goBack()">‹</button><div class="bal-pill"><span class="bal-icon">💰</span><span class="bal-val" id="bal">0</span><span class="bal-cur" id="cur">EGP</span></div></div>
+    <div class="topbar-right"><span class="streak-badge" id="streak" style="display:none">🔥 0</span><button class="btn-sound" id="soundBtn" onclick="toggleSound()">🔊</button></div>
   </div>
-  <div id="history"></div>
-  <div id="game-area">
+  <div class="hist-bar" id="history"></div>
+  <div class="game-area" id="gameArea">
     <canvas id="canvas"></canvas>
-    <div class="game-status" id="statusText">ضع رهانك وأفلت الكرة</div>
-    <div class="result-overlay" id="resultDisplay">
-      <div class="result-mult" id="resultMult"></div>
-      <div class="result-payout" id="resultPayout"></div>
-    </div>
+    <div class="mult-display" style="top:40%"><div class="mult-val" id="result" style="font-size:36px;opacity:0;transition:all 0.4s">0.00</div></div>
   </div>
-  <div id="betbar">
-    <div class="bet-row">
-      <div class="bet-input-wrap">
-        <input type="number" class="bet-input" id="betInput" value="10" min="1" oninput="updatePotential()">
-        <span class="bet-cur" id="betCur">EGP</span>
-      </div>
-    </div>
-    <div class="bet-controls">
-      <div class="bet-btn" onclick="adjustBet(0.5)">½</div>
-      <div class="bet-btn" onclick="adjustBet(2)">2×</div>
-      <div class="bet-btn" onclick="setBet('min')">Min</div>
-      <div class="bet-btn" onclick="setBet('max')">Max</div>
-    </div>
-    <div class="risk-row">
-      <div class="risk-btn" data-risk="low" onclick="setRisk('low')">منخفض</div>
-      <div class="risk-btn active" data-risk="medium" onclick="setRisk('medium')">متوسط</div>
-      <div class="risk-btn" data-risk="high" onclick="setRisk('high')">عالي</div>
-      <div style="flex:1"></div>
-      <div class="potential"><span class="pot-label">ربح محتمل:</span><span class="pot-val" id="potVal">0.00</span></div>
-    </div>
-    <div class="action-row">
-      <button class="btn-bet" id="betBtn" onclick="dropBall()">أفلت الكرة</button>
-    </div>
+  <div class="bet-panel">
+    <div class="bet-row"><div class="bet-input-wrap"><input type="number" class="bet-input" id="betInput" value="10" min="1"><span class="bet-cur" id="betCur">EGP</span></div></div>
+    <div class="bet-controls"><div class="bet-ctrl" onclick="adjustBet(0.5)">½</div><div class="bet-ctrl" onclick="adjustBet(2)">2×</div><div class="bet-ctrl" onclick="setBet('min')">Min</div><div class="bet-ctrl" onclick="setBet('max')">Max</div></div>
+    <div class="risk-select"><span style="font-size:10px;color:var(--muted);align-self:center">المخاطرة:</span><div class="risk-opt active" data-risk="low" onclick="setRisk('low')">منخفض</div><div class="risk-opt" data-risk="med" onclick="setRisk('med')">متوسط</div><div class="risk-opt" data-risk="high" onclick="setRisk('high')">عالي</div></div>
+    <div class="action-row"><button class="btn-action btn-bet-green" id="dropBtn" onclick="dropBall()">إفلات الكرة</button></div>
   </div>
 </div>
-<div id="lp"><div class="lp-header"><span>👥 <span id="lpCount">0</span></span><span id="lpTotal">💰 0</span></div><div class="lp-list" id="lpList"></div></div>
+<div class="lp-bar"><div class="lp-header"><span>👥 <span class="lp-count" id="lpCount">0</span></span><span id="lpTotal">💰 0</span></div><div class="lp-list" id="lpList"></div></div>
+<script src="/static/js/game-base.js"></script>
 <script>
-const tg=window.Telegram?.WebApp;if(tg){tg.expand();tg.ready();}
-const uid=new URLSearchParams(location.search).get('uid')||'';
-const BASE=location.origin;const initData=tg?.initData||'';let soundOn=true;
-async function apiFetch(url,opts={}){opts.headers=opts.headers||{};opts.headers['X-Telegram-Init-Data']=initData;if(opts.body&&typeof opts.body==='string'){opts.headers['Content-Type']='application/json';}if(uid&&!url.includes('uid=')){url+=(url.includes('?')?'&':'?')+'uid='+uid;}return fetch(url,opts);}
-const canvas=document.getElementById('canvas');const ctx=canvas.getContext('2d');
-let audioCtx;try{audioCtx=new(window.AudioContext||window.webkitAudioContext)();}catch(e){audioCtx=null;}
-
-/* ===== Plinko Config ===== */
-const ROWS=12;const SLOTS=13;
-const RISK_MULTIPLIERS={
-  low:[5.6,2.1,1.1,1,0.6,0.4,0.3,0.4,0.6,1,1.1,2.1,5.6],
-  medium:[10,3,1.5,1,0.5,0.3,0.2,0.3,0.5,1,1.5,3,10],
-  high:[29,4,1.5,0.7,0.3,0.2,0.2,0.2,0.3,0.7,1.5,4,29]
-};
-let currentRisk='medium';let isDropping=false;let history=[];let animFrame=null;let pegLayout=null;
-function getMultipliers(){return RISK_MULTIPLIERS[currentRisk];}
-
-/* ===== Audio ===== */
-function beep(f,d,t='sine',v=0.12){if(!soundOn||!audioCtx)return;const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.connect(g);g.connect(audioCtx.destination);o.frequency.value=f;o.type=t;g.gain.setValueAtTime(v,audioCtx.currentTime);g.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+d);o.start();o.stop(audioCtx.currentTime+d);}
-function soundBounce(){beep(400+Math.random()*300,0.03,'sine',0.05);}
-function soundWin(m){const f=m>=3?880:660;beep(f,0.08);setTimeout(()=>beep(f*1.5,0.1),60);setTimeout(()=>beep(f*2,0.15),120);}
-function soundLose(){beep(200,0.15,'sawtooth',0.1);setTimeout(()=>beep(150,0.2,'sawtooth',0.08),100);}
-function haptic(t='light'){if(tg?.HapticFeedback?.impactOccurred)tg.HapticFeedback.impactOccurred(t);}
-function toggleSound(){soundOn=!soundOn;document.getElementById('soundBtn').textContent=soundOn?'🔊':'🔇';}
-
-/* ===== Peg Layout =====
-   Alternating rows: even rows have 13 pegs at integer positions (1..13),
-   odd rows have 12 pegs at half-integer positions (1.5..12.5).
-   Ball starts at position 7 (center). Each row bounces ±0.5.
-   After 12 bounces with R rights: position = 1 + R → slot index R (0..12). */
-function calculatePegLayout(){
-  const w=canvas.width,h=canvas.height;
-  const topPad=20,botPad=55;
-  const playH=h-topPad-botPad;
-  const rowSpacing=playH/(ROWS+2);
-  const pegSpacing=w/14;
-  const rows=[];
-  for(let row=0;row<ROWS;row++){
-    const y=topPad+(row+1)*rowSpacing;
-    const isOdd=row%2===1;
-    const numPegs=isOdd?12:13;
-    const offset=isOdd?1.5:1;
-    const pegs=[];
-    for(let i=0;i<numPegs;i++){
-      pegs.push({x:(offset+i)*pegSpacing,y:y,glow:0,row:row,col:i});
-    }
-    rows.push(pegs);
-  }
-  const slotY=topPad+(ROWS+1)*rowSpacing;
-  const slotHeight=botPad-15;
-  const slots=[];
-  for(let i=0;i<SLOTS;i++){
-    slots.push({x:(1+i)*pegSpacing,y:slotY,width:pegSpacing*0.85,height:slotHeight});
-  }
-  return{rows,slots,pegSpacing,rowSpacing,topPad,botPad};
-}
-
-/* ===== Path Calculation ===== */
-function calculatePath(targetSlot){
-  const path=[];let position=7;let rightsRemaining=targetSlot;const L=pegLayout;
-  path.push({x:7*L.pegSpacing,y:L.topPad-5,type:'start'});
-  for(let row=0;row<ROWS;row++){
-    const rowsRemaining=ROWS-row;
-    let goRight;
-    if(rightsRemaining<=0)goRight=false;
-    else if(rightsRemaining>=rowsRemaining)goRight=true;
-    else goRight=Math.random()<(rightsRemaining/rowsRemaining);
-    if(goRight){position+=0.5;rightsRemaining--;}else{position-=0.5;}
-    const rowY=L.topPad+(row+1)*L.rowSpacing;
-    const pegX=position*L.pegSpacing;
-    const isOdd=row%2===1;
-    const pegIdx=isOdd?Math.round(position-1.5):Math.round(position-1);
-    path.push({x:pegX,y:rowY,type:'peg',row:row,col:pegIdx,direction:goRight?'right':'left'});
-  }
-  path.push({x:(1+targetSlot)*L.pegSpacing,y:L.topPad+(ROWS+1)*L.rowSpacing,type:'slot',slot:targetSlot});
-  return path;
-}
-
-/* ===== Drawing Helpers ===== */
-function roundRect(x,y,w,h,r){
-  ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);
-  ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);
-  ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);
-  ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);
-  ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();
-}
-function getSlotColor(mult){
-  if(mult>=5)return{bg:'rgba(251,191,36,0.25)',border:'rgba(251,191,36,0.7)',text:'#fbbf24',glow:true};
-  if(mult>=1.5)return{bg:'rgba(0,231,1,0.15)',border:'rgba(0,231,1,0.5)',text:'#00e701',glow:false};
-  if(mult>=0.5)return{bg:'rgba(251,191,36,0.1)',border:'rgba(251,191,36,0.3)',text:'#fbbf24',glow:false};
-  return{bg:'rgba(255,71,87,0.12)',border:'rgba(255,71,87,0.4)',text:'#ff4757',glow:false};
-}
-
+const canvas=document.getElementById('canvas'),ctx=canvas.getContext('2d');
+let isDropping=0,ball=null,animF=null,risk='low';
+const MULT_LOW=[2.5,1.5,1.1,0.8,0.5,0.3,0.2,0.3,0.5,0.8,1.1,1.5,2.5];
+const MULT_MED=[5,3,1.5,1,0.7,0.4,0.1,0.4,0.7,1,1.5,3,5];
+const MULT_HIGH=[25,10,5,2,0.5,0.2,0.1,0.2,0.5,2,5,10,25];
+const ROWS=12,SLOTS=13;
+function getMult(){return risk==='med'?MULT_MED:risk==='high'?MULT_HIGH:MULT_LOW;}
+function setRisk(r){risk=r;document.querySelectorAll('.risk-opt').forEach(e=>e.classList.remove('active'));document.querySelector(`.risk-opt[data-risk="${r}"]`).classList.add('active');drawBoard();}
+function resizeCanvas(){canvas.width=canvas.clientWidth;canvas.height=canvas.clientHeight;drawBoard();}window.addEventListener('resize',resizeCanvas);
 function drawBoard(){
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  /* Subtle grid */
-  ctx.strokeStyle='rgba(42,49,66,0.15)';ctx.lineWidth=1;
-  for(let x=0;x<canvas.width;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,canvas.height);ctx.stroke();}
-  for(let y=0;y<canvas.height;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(canvas.width,y);ctx.stroke();}
-
-  const L=pegLayout;if(!L)return;
-
-  /* Draw slots */
-  const mults=getMultipliers();
-  for(let i=0;i<L.slots.length;i++){
-    const s=L.slots[i];const mult=mults[i];const color=getSlotColor(mult);
-    if(color.glow){
-      const gg=ctx.createRadialGradient(s.x,s.y+s.height/2,0,s.x,s.y+s.height/2,s.width);
-      gg.addColorStop(0,'rgba(251,191,36,0.15)');gg.addColorStop(1,'rgba(251,191,36,0)');
-      ctx.fillStyle=gg;ctx.fillRect(s.x-s.width,s.y-5,s.width*2,s.height+10);
-    }
-    ctx.fillStyle=color.bg;roundRect(s.x-s.width/2,s.y,s.width,s.height,4);ctx.fill();
-    ctx.strokeStyle=color.border;ctx.lineWidth=1;ctx.stroke();
-    ctx.fillStyle=color.text;ctx.font='bold 10px "Courier New",monospace';
-    ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillText(mult+'x',s.x,s.y+s.height/2);
-  }
-
-  /* Draw pegs */
-  for(let row=0;row<L.rows.length;row++){
-    for(let peg of L.rows[row]){
-      if(peg.glow>0){
-        const gr=6+peg.glow*15;
-        const gg=ctx.createRadialGradient(peg.x,peg.y,0,peg.x,peg.y,gr);
-        gg.addColorStop(0,'rgba(251,191,36,'+(peg.glow*0.6)+')');
-        gg.addColorStop(0.5,'rgba(251,191,36,'+(peg.glow*0.2)+')');
-        gg.addColorStop(1,'rgba(251,191,36,0)');
-        ctx.fillStyle=gg;ctx.beginPath();ctx.arc(peg.x,peg.y,gr,0,Math.PI*2);ctx.fill();
-        peg.glow*=0.92;
-      }
-      const pg=ctx.createRadialGradient(peg.x-1,peg.y-1,0,peg.x,peg.y,3.5);
-      pg.addColorStop(0,'#4a5568');pg.addColorStop(0.5,'#2d3748');pg.addColorStop(1,'#1a202c');
-      ctx.fillStyle=pg;ctx.beginPath();ctx.arc(peg.x,peg.y,3,0,Math.PI*2);ctx.fill();
-    }
-  }
+  ctx.clearRect(0,0,canvas.width,canvas.height);const w=canvas.width,h=canvas.height,tp=40,bp=50,ph=h-tp-bp,ps=ph/ROWS;
+  for(let r=0;r<ROWS;r++){const pr=r+2,ry=tp+r*ps,sp=w/(pr+1);for(let i=0;i<pr;i++){ctx.beginPath();ctx.arc(sp*(i+1),ry,3,0,Math.PI*2);ctx.fillStyle='#475569';ctx.fill();}}
+  const mults=getMult(),sw=w/SLOTS;
+  for(let i=0;i<SLOTS;i++){const m=mults[i],c=m>=3?'#34d399':m>=1?'#fbbf24':'#64748b';ctx.fillStyle=c;ctx.fillRect(i*sw+2,h-bp+4,sw-4,bp-8);ctx.fillStyle='#000';ctx.font='bold 10px sans-serif';ctx.textAlign='center';ctx.fillText(m+'x',i*sw+sw/2,h-bp/2+4);}
 }
-
-function drawTrail(trail){
-  for(let i=0;i<trail.length;i++){
-    const t=trail[i];const alpha=t.life*0.5;const radius=t.life*5+1;
-    const g=ctx.createRadialGradient(t.x,t.y,0,t.x,t.y,radius);
-    g.addColorStop(0,'rgba(251,191,36,'+alpha+')');
-    g.addColorStop(1,'rgba(251,191,36,0)');
-    ctx.fillStyle=g;ctx.beginPath();ctx.arc(t.x,t.y,radius,0,Math.PI*2);ctx.fill();
-  }
-}
-
-function drawBall(ball){
-  /* Outer glow */
-  const gg=ctx.createRadialGradient(ball.x,ball.y,0,ball.x,ball.y,20);
-  gg.addColorStop(0,'rgba(251,191,36,0.4)');
-  gg.addColorStop(0.5,'rgba(251,191,36,0.1)');
-  gg.addColorStop(1,'rgba(251,191,36,0)');
-  ctx.fillStyle=gg;ctx.beginPath();ctx.arc(ball.x,ball.y,20,0,Math.PI*2);ctx.fill();
-  /* Ball */
-  const bg=ctx.createRadialGradient(ball.x-2,ball.y-2,0,ball.x,ball.y,8);
-  bg.addColorStop(0,'#fef3c7');bg.addColorStop(0.4,'#fbbf24');bg.addColorStop(1,'#d97706');
-  ctx.fillStyle=bg;ctx.beginPath();ctx.arc(ball.x,ball.y,7,0,Math.PI*2);ctx.fill();
-  /* Highlight */
-  ctx.fillStyle='rgba(255,255,255,0.6)';ctx.beginPath();ctx.arc(ball.x-2,ball.y-2,2,0,Math.PI*2);ctx.fill();
-}
-
-function glowPeg(row,col){
-  if(pegLayout&&pegLayout.rows[row]&&pegLayout.rows[row][col]){
-    pegLayout.rows[row][col].glow=1.0;
-  }
-}
-
-/* ===== Animation (physics-based) ===== */
-function animateBall(path,multiplier,payout,result,sessionId,betAmount){
-  let pathIdx=0;
-  let ball={x:path[0].x,y:path[0].y,vx:0,vy:100};
-  let trail=[];let lastTime=performance.now();
-  const gravity=3000;const bounceVy=-400;
-
-  function step(now){
-    const dt=Math.min((now-lastTime)/1000,0.033);
-    lastTime=now;
-    ball.vy+=gravity*dt;
-    ball.x+=ball.vx*dt;
-    ball.y+=ball.vy*dt;
-
-    /* Check if ball reached next waypoint */
-    while(pathIdx<path.length-1&&ball.y>=path[pathIdx+1].y){
-      pathIdx++;
-      const wp=path[pathIdx];
-      ball.x=wp.x;ball.y=wp.y;
-
-      if(wp.type==='peg'){
-        soundBounce();haptic('light');glowPeg(wp.row,wp.col);
-        /* Calculate velocity to reach next waypoint exactly */
-        if(pathIdx<path.length-1){
-          const next=path[pathIdx+1];
-          const dy=next.y-wp.y;
-          const vy=bounceVy;const g=gravity;
-          const t=(-vy+Math.sqrt(vy*vy+2*g*dy))/g;
-          const dx=next.x-wp.x;
-          ball.vx=dx/t;ball.vy=vy;
-        }
-      }else if(wp.type==='slot'){
-        ball.vx=0;ball.vy=0;
-        trail.push({x:ball.x,y:ball.y,life:1.0});
-        drawBoard();drawTrail(trail);drawBall(ball);
-        finishBall(multiplier,payout,result,sessionId,betAmount);
-        return;
-      }
-    }
-
-    /* Trail */
-    trail.push({x:ball.x,y:ball.y,life:1.0});
-    if(trail.length>30)trail.shift();
-    for(let t of trail)t.life-=dt*3.5;
-    trail=trail.filter(t=>t.life>0);
-
-    drawBoard();drawTrail(trail);drawBall(ball);
-    animFrame=requestAnimationFrame(step);
-  }
-  animFrame=requestAnimationFrame(step);
-}
-
-/* ===== Game Logic ===== */
 function dropBall(){
   if(isDropping)return;
-  const betAmount=parseFloat(document.getElementById('betInput').value)||0;
-  if(betAmount<1)return;
-  document.getElementById('resultDisplay').classList.remove('show');
-
-  apiFetch(BASE+'/api/engine/plinko/start',{
-    method:'POST',body:JSON.stringify({uid,bet_amount:betAmount,risk_level:currentRisk})
-  })
-  .then(r=>r.json())
-  .then(d=>{
-    if(!d.success){
-      if(d.need_deposit)showVexDepositModal(betAmount);
-      else alert(d.error||'خطأ');
-      return;
-    }
-    isDropping=true;
-    document.getElementById('betBtn').disabled=true;
-    document.getElementById('betBtn').textContent='⏳ جاري...';
+  const betAmt=parseFloat(document.getElementById('betInput').value)||0;if(betAmt<1)return;
+  apiFetch(`${BASE}/api/engine/plinko/start`,{method:'POST',body:JSON.stringify({uid,bet_amount:betAmt})}).then(r=>r.json()).then(d=>{
+    if(!d.success){if(d.need_deposit)showVexDepositModal(betAmt);else showToast(d.error||'خطأ','error');return;}
+    isDropping=1;document.getElementById('dropBtn').disabled=1;
     document.getElementById('bal').textContent=(d.balance_after||0).toLocaleString();
-    document.getElementById('statusText').textContent='';
-
-    const targetSlot=d.target_slot!==undefined?d.target_slot:Math.floor(Math.random()*SLOTS);
-    const path=calculatePath(targetSlot);
-    const mult=d.multiplier!==undefined?d.multiplier:getMultipliers()[targetSlot];
-    const payout=d.payout!==undefined?d.payout:(betAmount*mult);
-    const result=d.result!==undefined?d.result:(mult>=1?'win':'lose');
-    animateBall(path,mult,payout,result,d.session_id,betAmount);
-  })
-  .catch(e=>{
-    isDropping=false;
-    document.getElementById('betBtn').disabled=false;
-    document.getElementById('betBtn').textContent='أفلت الكرة';
-    alert('خطأ في الاتصال');
-  });
+    const target=d.target_slot,path=[],cur=canvas.width/2,cury=20;let cs=0;
+    for(let r=0;r<ROWS;r++){const pr=r+2,sp=canvas.width/(pr+1),ry=40+r*((canvas.height-90)/ROWS);if(cs<target&&Math.random()<0.5+(target-cs)/(ROWS-r)*0.5)cs++;const px=sp*(r+1-cs+1);path.push({x:px,y:ry});}
+    const sw=canvas.width/SLOTS;path.push({x:target*sw+sw/2,y:canvas.height-50});
+    animateBall(path,d.multiplier,d.payout,d.result,d.session_id,betAmt);
+  }).catch(()=>{isDropping=0;document.getElementById('dropBtn').disabled=0;});
 }
-
-function finishBall(multiplier,payout,result,sessionId,betAmount){
-  isDropping=false;
-  document.getElementById('betBtn').disabled=false;
-  document.getElementById('betBtn').textContent='أفلت الكرة';
-
-  const rd=document.getElementById('resultDisplay');
-  const rm=document.getElementById('resultMult');
-  const rp=document.getElementById('resultPayout');
-
-  if(result==='win'){
-    rm.textContent=multiplier+'x';rm.className='result-mult win';
-    rp.textContent='+'+payout.toFixed(2);rp.className='result-payout win';
-    rd.className='result-overlay show';soundWin(multiplier);haptic('medium');
-  }else{
-    rm.textContent=multiplier+'x';rm.className='result-mult lose';
-    rp.textContent='-'+betAmount.toFixed(2);rp.className='result-payout lose';
-    rd.className='result-overlay show';soundLose();haptic('heavy');
-  }
-
+function animateBall(path,mult,pay,res,sid,bet){
+  let i=0;ball={x:canvas.width/2,y:20};
+  function step(){if(i>=path.length){finish(mult,pay,res,sid,bet);return;}const t=path[i],dx=t.x-ball.x,dy=t.y-ball.y;if(Math.sqrt(dx*dx+dy*dy)<3){i++;if(i<path.length)beep(300+Math.random()*200,0.03);haptic('light');}else{ball.x+=dx*0.15;ball.y+=dy*0.15;}drawBoard();const g=ctx.createRadialGradient(ball.x-2,ball.y-2,1,ball.x,ball.y,7);g.addColorStop(0,'#fde68a');g.addColorStop(1,'#f59e0b');ctx.beginPath();ctx.arc(ball.x,ball.y,7,0,Math.PI*2);ctx.fillStyle=g;ctx.fill();animF=requestAnimationFrame(step);}step();
+}
+function finish(mult,pay,res,sid,bet){
+  isDropping=0;document.getElementById('dropBtn').disabled=0;
+  const rd=document.getElementById('result');rd.style.opacity='1';
+  if(res==='win'){rd.textContent=`🎉 +${pay.toFixed(2)}`;rd.style.color='var(--green)';rd.className='mult-val';soundWin(mult>=5);haptic('medium');fireConfetti(document.getElementById('gameArea'));streakWin++;updateStreak(document.getElementById('streak'));}else{rd.textContent=`💔 ${mult}x`;rd.style.color='var(--red)';rd.className='mult-val crashed';soundLose();streakWin=0;updateStreak(document.getElementById('streak'));}
+  setTimeout(()=>{rd.style.opacity='0';},2500);
+  addHistory('history',mult,res==='win',mult>=5);
+  apiFetch(`${BASE}/api/engine/plinko/end`,{method:'POST',body:JSON.stringify({session_id:sid,uid,multiplier:mult,payout:pay,result:res,bet_amount:bet})}).catch(()=>{});
   loadBalance();
-  history.unshift({value:multiplier,win:result==='win'});
-  if(history.length>15)history.pop();
-  updateHistory();
-
-  apiFetch(BASE+'/api/engine/plinko/end',{
-    method:'POST',body:JSON.stringify({session_id:sessionId,uid,multiplier,payout,result,bet_amount:betAmount,risk_level:currentRisk})
-  }).catch(()=>{});
-
-  setTimeout(()=>{rd.classList.remove('show');document.getElementById('statusText').textContent='ضع رهانك وأفلت الكرة';},2500);
 }
-
-/* ===== UI Functions ===== */
-function updateHistory(){
-  const c=document.getElementById('history');c.innerHTML='';
-  history.forEach(h=>{
-    const el=document.createElement('div');
-    el.className='hist-item '+(h.win?'hist-win':'hist-lose');
-    el.textContent=h.value+'x';c.appendChild(el);
-  });
-}
-function updatePotential(){
-  const bet=parseFloat(document.getElementById('betInput').value)||0;
-  const maxMult=Math.max(...getMultipliers());
-  document.getElementById('potVal').textContent=(bet*maxMult).toFixed(2);
-}
-function adjustBet(factor){
-  const inp=document.getElementById('betInput');
-  let v=parseFloat(inp.value)||0;
-  v=Math.max(1,Math.floor(v*factor));inp.value=v;updatePotential();
-}
-function setBet(type){
-  const inp=document.getElementById('betInput');
-  inp.value=type==='min'?10:5000;updatePotential();
-}
-function setRisk(level){
-  currentRisk=level;
-  document.querySelectorAll('.risk-btn').forEach(btn=>{
-    btn.classList.toggle('active',btn.dataset.risk===level);
-  });
-  drawBoard();updatePotential();
-}
-function goBack(){window.location.href=BASE+'/webapp/games?uid='+uid+'&lang=ar';}
-async function loadBalance(){
-  try{
-    const r=await apiFetch(BASE+'/api/wallet/balance?uid='+uid);
-    const d=await r.json();
-    document.getElementById('bal').textContent=(d.balance||0).toLocaleString();
-    if(d.currency)document.getElementById('cur').textContent=d.currency;
-  }catch(e){}
-}
-function resizeCanvas(){
-  canvas.width=canvas.clientWidth;canvas.height=canvas.clientHeight;
-  pegLayout=calculatePegLayout();drawBoard();
-}
-window.addEventListener('resize',()=>{if(!isDropping)resizeCanvas();});
-
-/* ===== VEX Deposit Modal ===== */
-let vbm=[],vsw=[],vsm=null;let vsMn='',vsMd='';
-async function showVexDepositModal(req){
-  const box=document.createElement('div');
-  box.id='modal';
-  box.style.cssText='position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.8);z-index:200';
-  box.innerHTML='<div id="mb" style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;max-width:340px;width:90%;max-height:85vh;overflow-y:auto"></div>';
-  document.body.appendChild(box);
-  const mb=document.getElementById('mb');
-  try{
-    const r=await apiFetch(BASE+'/api/games/payment-methods?uid='+uid);
-    const d=await r.json();vbm=d.methods||[];vsw=d.saved_methods||[];
-  }catch(e){}
-  if(vbm.length===0){
-    mb.innerHTML='<div style="text-align:center;padding:16px"><div style="font-size:28px;margin-bottom:6px">😢</div><div style="font-size:13px;font-weight:700">لا توجد وسائل دفع</div><button onclick="document.getElementById(\'modal\').remove()" style="margin-top:10px;background:var(--border);color:#fff;border:none;padding:8px 20px;border-radius:8px;cursor:pointer">إغلاق</button></div>';
-    return;
-  }
-  const mh=vbm.map(m=>`<div onclick="vsm='${m.id}';vsM('${(m.method_name||'').replace(/'/g,"\\'")}','${(m.account_data||'').replace(/'/g,"\\'")}')" style="display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:4px;cursor:pointer"><span style="font-size:18px">${m.icon||'💳'}</span><div style="flex:1"><div style="font-weight:600;font-size:13px">${m.method_name||''}</div><div style="font-size:11px;color:var(--muted)">${m.method_type||''}</div></div><span style="color:var(--gold)">‹</span></div>`).join('');
-  mb.innerHTML=`<div style="font-size:16px;font-weight:700;margin-bottom:8px">💰 إيداع محفظة VEX</div>
-    <div style="font-size:11px;color:var(--muted);margin-bottom:8px">${req?`تحتاج ${req}`:'اختر وسيلة الدفع'}</div>
-    <div id="vm">${mh}</div>
-    <div id="vs2" style="display:none">
-      <div style="font-size:11px;color:var(--muted);margin:8px 0 4px">📋 بيانات الوسيلة</div>
-      <div style="display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px;margin-bottom:8px">
-        <div id="vMD" style="flex:1;font-size:11px;word-break:break-all;color:var(--text)">...</div>
-        <button onclick="vCopy()" id="vCL" style="background:var(--border);color:#fff;border:none;padding:4px 8px;border-radius:6px;cursor:pointer;font-size:10px">📋 نسخ</button>
-      </div>
-      <div style="font-size:11px;color:var(--muted);margin:8px 0 4px">💵 المبلغ</div>
-      <input type="number" id="vAm" placeholder="0" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px;color:var(--text);font-size:14px;font-weight:700;outline:none;margin-bottom:8px">
-      <div style="font-size:11px;color:var(--muted);margin:8px 0 4px">👛 محفظتك</div>
-      <input type="text" id="vW" placeholder="رقم المحفظة" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px;color:var(--text);font-size:13px;outline:none;margin-bottom:4px">
-      <div id="vSH" style="display:none;font-size:10px;color:var(--green);margin-bottom:4px"></div>
-      <label style="display:flex;align-items:center;gap:4px;margin-bottom:8px"><input type="checkbox" id="vSv" style="accent-color:var(--gold)"> <span style="font-size:11px;color:var(--muted)">حفظ المحفظة</span></label>
-      <button onclick="vSub()" style="width:100%;background:linear-gradient(135deg,var(--gold),#f59e0b);color:#000;border:none;padding:10px;border-radius:8px;font-weight:700;cursor:pointer">إيداع</button>
-    </div>`;
-}
-function vsM(n,d){
-  vsMn=n;vsMd=d;let sw='',h='';
-  if(vsw.length>0){
-    const m=vsw.find(w=>w.method_name&&w.method_name.includes(n));
-    if(m){sw=m.account_number;h='✓ محفظتك: '+sw;}
-  }
-  document.getElementById('vm').style.display='none';
-  document.getElementById('vs2').style.display='block';
-  document.getElementById('vMD').textContent=d;
-  if(sw){
-    document.getElementById('vW').value=sw;
-    document.getElementById('vSH').style.display='block';
-    document.getElementById('vSH').textContent=h;
-  }
-}
-function vCopy(){
-  navigator.clipboard.writeText(document.getElementById('vMD').textContent).then(()=>{
-    if(tg?.HapticFeedback?.impactOccurred)tg.HapticFeedback.impactOccurred('light');
-    document.getElementById('vCL').textContent='✓';
-    setTimeout(()=>document.getElementById('vCL').textContent='📋 نسخ',1500);
-  });
-}
-async function vSub(){
-  const a=parseFloat(document.getElementById('vAm').value)||0;
-  const w=document.getElementById('vW').value.trim();
-  const s=document.getElementById('vSv').checked;
-  if(a<=0){alert('أدخل المبلغ');return;}
-  if(!w){alert('أدخل رقم محفظتك');return;}
-  if(!vsm){alert('اختر وسيلة');return;}
-  try{
-    const r=await apiFetch(BASE+'/api/deposit/quick',{
-      method:'POST',body:JSON.stringify({uid,amount:a,method_id:vsm,method_name:vsMn,method_account_data:vsMd,player_wallet:w,save_method:s})
-    });
-    const d=await r.json();
-    if(d.success){
-      document.getElementById('mb').innerHTML='<div style="text-align:center;padding:16px"><div style="font-size:28px;margin-bottom:6px">⏳</div><div style="font-size:14px;font-weight:700">تم الإيداع</div><div style="font-size:11px;color:var(--muted);margin-top:4px">بانتظار موافقة الإدارة</div><button onclick="document.getElementById(\'modal\').remove();loadBalance();" style="margin-top:10px;background:var(--border);color:#fff;border:none;padding:8px 20px;border-radius:8px;cursor:pointer">إغلاق</button></div>';
-    }else{alert(d.error||'خطأ');}
-  }catch(e){alert('خطأ');}
-}
-
-/* ===== Live Players ===== */
-const lp=[];
-function addLP(d){
-  const i=lp.findIndex(p=>p.uid===d.uid);
-  if(i>=0)lp[i]=d;
-  else{lp.unshift(d);if(lp.length>20)lp.pop();}
-  renderLP();
-}
-function renderLP(){
-  document.getElementById('lpCount').textContent=lp.length;
-  document.getElementById('lpTotal').textContent='💰 '+lp.reduce((s,p)=>s+(p.bet||0),0).toLocaleString();
-  const l=document.getElementById('lpList');l.innerHTML='';
-  lp.forEach(p=>{
-    const r=document.createElement('div');
-    r.className='lp-row '+(p.status||'');
-    r.innerHTML=`<div style="display:flex;align-items:center;gap:4px"><div class="lp-ava">${(p.name||'?')[0].toUpperCase()}</div><span>${p.name||'???'}${p.isMe?' (أنت)':''}</span></div><span style="font-weight:700">${p.bet||0}</span>`;
-    l.appendChild(r);
-  });
-}
-function simLP(){
-  const n=['أحمد','عمر','محمد','خالد','سعد','فهد','ناصر','يوسف'];
-  if(Math.random()<0.6&&lp.length<15){
-    addLP({uid:'b'+Math.random().toString(36).substr(2,5),name:n[Math.floor(Math.random()*n.length)],bet:[10,20,50,100,200][Math.floor(Math.random()*5)],status:Math.random()<0.4?'win':'lose',isMe:false});
-  }
-  renderLP();
-}
-
-/* ===== Init ===== */
-resizeCanvas();loadBalance();updatePotential();
-document.getElementById('loading').style.display='none';
-document.getElementById('app').style.display='flex';
-setInterval(loadBalance,5000);setInterval(simLP,2500);simLP();renderLP();
+resizeCanvas();loadBalance();document.getElementById('loading').style.display='none';document.getElementById('app').style.display='flex';setInterval(loadBalance,5000);setInterval(simulatePlayers,2500);simulatePlayers();renderPlayers();
 </script>
 </body>
 </html>
