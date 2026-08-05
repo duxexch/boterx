@@ -4835,6 +4835,145 @@ def webapp_stats():
     """Player statistics page — WebApp"""
     return render_template('stats.html')
 
+# ===== Global Aviator Round System (1xBet style — all players, same round) =====
+import math as _avmath
+import time as _avtime
+
+_aviator = {
+    'phase': 'waiting', 'multiplier': 1.0, 'crash_point': 2.0,
+    'round_id': 0, 'bets': {}, 'history': [],
+}
+_aviator_lock = threading.Lock()
+_aviator_sse_queues = []
+_aviator_sse_lock = threading.Lock()
+
+def _av_calc_crash():
+    r = random.random()
+    if r < 0.03: return 1.00
+    return round(max(1.01, min(0.97 / (1 - r), 100.0)), 2)
+
+def _av_broadcast(msg):
+    payload = json.dumps(msg)
+    with _aviator_sse_lock:
+        for q in _aviator_sse_queues:
+            try: q.put_nowait(payload)
+            except: pass
+
+def _av_get_name(uid):
+    try:
+        from db_manager import _gdb
+        row = _gdb.get_user_row(uid)
+        return row.get('name', '') if row else ''
+    except: return ''
+
+def _aviator_loop():
+    GROWTH = 1.003
+    while True:
+        with _aviator_lock:
+            _aviator['phase'] = 'waiting'
+            _aviator['multiplier'] = 1.0
+            _aviator['round_id'] += 1
+            _aviator['bets'] = {}
+        _av_broadcast({'type': 'waiting', 'round_id': _aviator['round_id'], 'duration': 5, 'history': list(_aviator['history'][-15:])})
+        _avtime.sleep(5)
+
+        crash_pt = _av_calc_crash()
+        with _aviator_lock:
+            _aviator['phase'] = 'flying'
+            _aviator['crash_point'] = crash_pt
+        _av_broadcast({'type': 'flying'})
+
+        mult = 1.0
+        while mult < crash_pt:
+            mult *= GROWTH
+            with _aviator_lock:
+                _aviator['multiplier'] = mult
+                for uid, bet in list(_aviator['bets'].items()):
+                    if not bet['cashed_out'] and bet.get('auto_val', 0) > 0 and mult >= bet['auto_val']:
+                        payout = bet['amount'] * mult
+                        try: bal = _gm.add_balance(uid, payout)
+                        except: bal = 0
+                        bet['cashed_out'] = True
+                        bet['cash_mult'] = mult
+                        _av_broadcast({'type': 'cashout', 'uid': uid, 'name': _av_get_name(uid), 'amount': round(payout, 2), 'multiplier': round(mult, 2), 'auto': True})
+            _av_broadcast({'type': 'mult', 'multiplier': round(mult, 2)})
+            _avtime.sleep(0.05)
+
+        with _aviator_lock:
+            _aviator['phase'] = 'crashed'
+            _aviator['history'].append(round(crash_pt, 2))
+            if len(_aviator['history']) > 50: _aviator['history'].pop(0)
+        _av_broadcast({'type': 'crash', 'crash_point': round(crash_pt, 2)})
+        _avtime.sleep(4)
+
+_aviator_thread = threading.Thread(target=_aviator_loop, daemon=True)
+_aviator_thread.start()
+
+@app.route('/api/aviator/stream')
+def api_aviator_stream():
+    """SSE: All players see the same round — like 1xBet"""
+    q = _queue.Queue()
+    with _aviator_sse_lock:
+        _aviator_sse_queues.append(q)
+    def generate():
+        with _aviator_lock:
+            state = {'type': _aviator['phase'], 'multiplier': round(_aviator['multiplier'], 2), 'round_id': _aviator['round_id'], 'history': list(_aviator['history'][-15:])}
+        yield f"data: {json.dumps(state)}\n\n"
+        while True:
+            try: yield f"data: {q.get(timeout=15)}\n\n"
+            except _queue.Empty: yield f"data: {json.dumps({'type': 'heartbeat'})}\n\n"
+    try:
+        return Response(generate(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
+    finally:
+        with _aviator_sse_lock:
+            if q in _aviator_sse_queues: _aviator_sse_queues.remove(q)
+
+@app.route('/api/aviator/bet', methods=['POST'])
+def api_aviator_bet():
+    """Place bet during waiting phase (global round)"""
+    uid = get_request_uid()
+    if not uid: return jsonify({'error': 'No uid'}), 400
+    data = request.json
+    amount = float(data.get('bet_amount', 0))
+    auto_val = float(data.get('auto_val', 0))
+    with _aviator_lock:
+        if _aviator['phase'] != 'waiting': return jsonify({'error': 'انتهت فترة المراهنة'})
+        if uid in _aviator['bets']: return jsonify({'error': 'لقد راهنت بالفعل'})
+        if not _VEX_GAMES: return jsonify({'error': 'Games not available'}), 500
+        success, balance = _gm.deduct_balance(uid, amount)
+        if not success: return jsonify({'need_deposit': True, 'error': 'رصيد غير كافٍ'})
+        _aviator['bets'][uid] = {'amount': amount, 'cashed_out': False, 'cash_mult': 0, 'auto_val': auto_val}
+    return jsonify({'success': True, 'balance_after': balance})
+
+@app.route('/api/aviator/cashout', methods=['POST'])
+def api_aviator_cashout():
+    """Cash out during flying phase (global round)"""
+    uid = get_request_uid()
+    if not uid: return jsonify({'error': 'No uid'}), 400
+    with _aviator_lock:
+        if _aviator['phase'] != 'flying': return jsonify({'error': 'لا يمكن السحب الآن'})
+        bet = _aviator['bets'].get(uid)
+        if not bet or bet['cashed_out']: return jsonify({'error': 'لا يوجد رهان نشط'})
+        mult = _aviator['multiplier']
+        payout = bet['amount'] * mult
+        balance = _gm.add_balance(uid, payout)
+        bet['cashed_out'] = True
+        bet['cash_mult'] = mult
+        name = _av_get_name(uid)
+    _av_broadcast({'type': 'cashout', 'uid': uid, 'name': name, 'amount': round(payout, 2), 'multiplier': round(mult, 2)})
+    return jsonify({'success': True, 'payout': round(payout, 2), 'multiplier': round(mult, 2), 'balance_after': balance})
+
+@app.route('/api/aviator/state')
+def api_aviator_state():
+    """Get current round state (for new connections)"""
+    with _aviator_lock:
+        return jsonify({
+            'phase': _aviator['phase'],
+            'multiplier': round(_aviator['multiplier'], 2),
+            'round_id': _aviator['round_id'],
+            'history': list(_aviator['history'][-15:]),
+        })
+
 # ===== Provably Fair System =====
 
 try:
