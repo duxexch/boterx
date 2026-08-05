@@ -410,6 +410,9 @@
     <!-- Game Status -->
     <div class="game-status" id="statusText">ضع رهانك وانتظر الإقلاع</div>
 
+    <!-- Result message (MISSING — was causing null errors breaking cashout!) -->
+    <div class="result-msg" id="crashMsg"></div>
+
     <!-- Other Players' Bets (floating) -->
     <div class="other-bets" id="otherBets"></div>
 
@@ -554,15 +557,50 @@ function draw(px, py, tr) {
     }
   }
 
-  // Plane emoji with rotation
+  // Plane — draw actual plane shape (emoji unreliable on canvas)
   if (state === 'flying') {
     ctx.save();
     ctx.translate(px, py);
     const angle = -0.3 + (mult > 2 ? 0.1 : 0);
     ctx.rotate(angle);
-    ctx.font = '40px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('✈️', 0, 5);
+
+    // Plane body
+    ctx.fillStyle = '#fbbf24';
+    ctx.beginPath();
+    ctx.moveTo(15, 0);           // nose
+    ctx.lineTo(5, -4);            // top
+    ctx.lineTo(-8, -3);           // tail top
+    ctx.lineTo(-10, -1);          // tail
+    ctx.lineTo(-10, 1);           // tail bottom
+    ctx.lineTo(-8, 3);            // tail bottom
+    ctx.lineTo(5, 4);             // body bottom
+    ctx.closePath();
+    ctx.fill();
+
+    // Wing
+    ctx.fillStyle = '#f59e0b';
+    ctx.beginPath();
+    ctx.moveTo(2, 0);
+    ctx.lineTo(-5, -8);
+    ctx.lineTo(-8, -8);
+    ctx.lineTo(-2, 0);
+    ctx.closePath();
+    ctx.fill();
+
+    // Cockpit window
+    ctx.fillStyle = '#00e701';
+    ctx.beginPath();
+    ctx.arc(6, -1, 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Glow around plane
+    ctx.shadowBlur = 20;
+    ctx.shadowColor = '#fbbf24';
+    ctx.fillStyle = 'rgba(251,191,36,0.3)';
+    ctx.beginPath();
+    ctx.arc(0, 0, 18, 0, Math.PI * 2);
+    ctx.fill();
+
     ctx.restore();
   }
 }
@@ -651,11 +689,31 @@ function placeBet(slot) {
   slots[slot].amt = amt;
   slots[slot].autoVal = parseFloat(document.getElementById('autoVal' + slot).value) || 0;
 
+  const btn = document.getElementById('btn' + slot);
+  btn.disabled = true;
+  btn.textContent = '⏳';
+  btn.className = 'bet-slot-btn bet';
+
+  // Timeout to prevent hanging if API doesn't respond
+  let betTimedOut = false;
+  const betTimeout = setTimeout(() => {
+    betTimedOut = true;
+    btn.disabled = false;
+    btn.textContent = 'رهان';
+    btn.className = 'bet-slot-btn bet';
+    showToast('انتهت مهلة الطلب — حاول مرة أخرى', 'error');
+  }, 10000);
+
   apiFetch(`${BASE}/api/engine/aviator/start`, {
     method: 'POST',
     body: JSON.stringify({ uid, bet_amount: amt })
   }).then(r => r.json()).then(d => {
+    clearTimeout(betTimeout);
+    if (betTimedOut) return;
     if (!d.success) {
+      btn.disabled = false;
+      btn.textContent = 'رهان';
+      btn.className = 'bet-slot-btn bet';
       if (d.need_deposit) showVexDepositModal(amt);
       else showToast(d.error || 'خطأ', 'error');
       return;
@@ -665,19 +723,21 @@ function placeBet(slot) {
     slots[slot].sid = d.session_id;
     crashPt = d.crash_point;
     document.getElementById('bal').textContent = (d.balance_after || 0).toLocaleString();
-    const btn = document.getElementById('btn' + slot);
     btn.disabled = true;
     btn.textContent = '⏳';
     btn.className = 'bet-slot-btn bet';
     document.getElementById('statusText').textContent = '⏳ جاهز للإقلاع...';
     updatePotential();
-
-    // Add to other bets panel
     addOtherBet(slot, amt);
-
-    // Check if both slots are placed or if it's time to start
     checkRoundStart();
-  }).catch(() => showToast('خطأ في الاتصال', 'error'));
+  }).catch((err) => {
+    clearTimeout(betTimeout);
+    if (betTimedOut) return;
+    btn.disabled = false;
+    btn.textContent = 'رهان';
+    btn.className = 'bet-slot-btn bet';
+    showToast('خطأ في الاتصال', 'error');
+  });
 }
 
 function checkRoundStart() {
@@ -724,44 +784,46 @@ function cashOut(slot) {
   slots[slot].cashMult = mult;
   const payout = slots[slot].amt * mult;
 
+  // Immediately update UI (don't wait for API to show success)
+  const btn = document.getElementById('btn' + slot);
+  btn.className = 'bet-slot-btn';
+  btn.style.background = 'var(--surface-3)';
+  btn.style.color = 'var(--muted)';
+  btn.textContent = `✓ ${payout.toFixed(0)}`;
+  btn.disabled = true;
+
+  const msg = document.getElementById('crashMsg');
+  if (msg) {
+    msg.textContent = `✅ +${payout.toFixed(2)} @ ${mult.toFixed(2)}x`;
+    msg.style.color = 'var(--gold)';
+    msg.classList.add('show');
+  }
+  document.getElementById('mult').className = 'mult-val cashed';
+
+  soundCashOut();
+  haptic('medium');
+  fireConfetti(document.getElementById('gameArea'));
+
+  if (mult >= 3) showBigWin(payout, mult);
+
+  streakWin++;
+  updateStreak(document.getElementById('streak'));
+  sessionW++;
+  sessionPL += payout - slots[slot].amt;
+  updateSessionStats();
+  updateOtherBetCashed(slot, mult);
+
+  // API call (async, don't block UI)
   apiFetch(`${BASE}/api/engine/aviator/cashout`, {
     method: 'POST',
     body: JSON.stringify({ session_id: slots[slot].sid, uid, multiplier: mult, bet_amount: slots[slot].amt })
   }).then(r => r.json()).then(d => {
-    if (d.success) {
-      document.getElementById('bal').textContent = (d.balance_after || 0).toLocaleString();
-      const msg = document.getElementById('crashMsg');
-      msg.textContent = `✅ +${payout.toFixed(2)} @ ${mult.toFixed(2)}x`;
-      msg.style.color = 'var(--gold)';
-      msg.classList.add('show');
-      document.getElementById('mult').className = 'mult-val cashed';
-
-      const btn = document.getElementById('btn' + slot);
-      btn.className = 'bet-slot-btn';
-      btn.style.background = 'var(--surface-3)';
-      btn.style.color = 'var(--muted)';
-      btn.textContent = `✓ ${payout.toFixed(0)}`;
-      btn.disabled = true;
-
-      soundCashOut();
-      haptic('medium');
-      fireConfetti(document.getElementById('gameArea'));
-
-      // Big win overlay for >3x
-      if (mult >= 3) {
-        showBigWin(payout, mult);
-      }
-
-      streakWin++;
-      updateStreak(document.getElementById('streak'));
-      sessionW++;
-      sessionPL += payout - slots[slot].amt;
-      updateSessionStats();
-
-      // Update other bet
-      updateOtherBetCashed(slot, mult);
+    if (d.success && d.balance_after !== undefined) {
+      document.getElementById('bal').textContent = d.balance_after.toLocaleString();
     }
-  }).catch(() => {});
+  }).catch(() => {
+    showToast('تحقق من رصيدك', 'info');
+  });
 }
 
 // ===== Crash =====

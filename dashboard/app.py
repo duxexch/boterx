@@ -3669,7 +3669,7 @@ def api_player_methods_add():
 @app.route('/api/player/profile')
 @webapp_auth
 def api_player_profile():
-    """ملف اللاعب"""
+    """ملف اللاعب — يشمل الرصيد الحقيقي ورقم العميل"""
     if not _VEX_GAMES:
         return jsonify({'error': 'Games engine not available'}), 500
     uid = get_request_uid()
@@ -3677,7 +3677,17 @@ def api_player_profile():
         return jsonify({'error': 'Missing uid'}), 400
     profile = _gm.tracker.get_profile(uid)
     segment = _gm.tracker.get_segment(profile)
-    return jsonify({'profile': profile, 'segment': segment})
+    balance = _gm.get_balance(uid)
+    currency = _gm.get_user_currency(uid)
+    user_row = _gm.get_user_info(uid) if hasattr(_gm, 'get_user_info') else {}
+    customer_id = user_row.get('customer_id', '') if user_row else ''
+    return jsonify({
+        'profile': profile,
+        'segment': segment,
+        'balance': balance,
+        'currency': currency,
+        'customer_id': customer_id,
+    })
 
 @app.route('/api/player/vex-status', methods=['POST'])
 @api_auth

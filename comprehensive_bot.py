@@ -11427,7 +11427,7 @@ class ComprehensiveDUXBot:
                         return
 
                 # فتح لعبة اختطف كـ WebApp
-                base_url = self.get_setting('dashboard_url') or 'https://69.169.108.197.sslip.io'
+                base_url = self.get_setting('dashboard_url') or 'https://vex.deals'
                 snatch_url = f"{base_url}/webapp/snatch?uid={user_id}&lang={lang}"
 
                 # إرسال رسالة جديدة بـ WebApp button — لا نستخدم edit_message
@@ -17276,7 +17276,7 @@ class ComprehensiveDUXBot:
             if is_vex_partner:
                 text += "💎 تعويض متاح أثناء اللعب!\n"
 
-            base_url = self.get_setting('dashboard_url') or 'https://69.169.108.197.sslip.io'
+            base_url = self.get_setting('dashboard_url') or 'https://vex.deals'
             games_url = f"{base_url}/webapp/games?uid={user_id}&lang={lang}&currency={currency}"
 
             kb = {'inline_keyboard': [
