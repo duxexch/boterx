@@ -4457,6 +4457,212 @@ def api_plinko_end():
     _gm.tracker.update_profile(uid, {'bet_amount': bet_amount, 'payout': payout, 'result': result, 'game_id': 'GAME007', 'balance_after': _gm.get_balance(uid)})
     return jsonify({'success': True, 'result': result, 'payout': payout})
 
+# ===== Admin: Advanced Game Control =====
+
+@app.route('/api/games/<game_id>/config', methods=['POST'])
+@api_auth
+def api_game_config_update(game_id):
+    """تحديث إعدادات لعبة محددة (base_win_chance, house_edge, min/max bet)"""
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    data = request.json
+    try:
+        rows = []
+        with open(os.path.join(BASE_DIR, 'games_catalog.csv'), 'r', encoding='utf-8-sig') as f:
+            reader = csv.DictReader(f)
+            fieldnames = reader.fieldnames
+            for row in reader:
+                if row.get('id') == game_id:
+                    for key in ['base_win_chance', 'house_edge_pct', 'rtp_target',
+                                'min_bet', 'max_bet', 'is_active', 'name', 'icon',
+                                'description', 'volatility', 'max_payout_per_session']:
+                        if key in data:
+                            row[key] = str(data[key])
+                rows.append(row)
+        with open(os.path.join(BASE_DIR, 'games_catalog.csv'), 'w', newline='', encoding='utf-8-sig') as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(rows)
+        _gm.algorithm.invalidate_cache()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/games/kill-switch', methods=['POST'])
+@api_auth
+def api_games_kill_switch():
+    """إيقاف/تشغيل كل الألعاب فوراً"""
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    action = request.json.get('action', 'pause')  # pause or resume
+    try:
+        rows = []
+        with open(os.path.join(BASE_DIR, 'games_catalog.csv'), 'r', encoding='utf-8-sig') as f:
+            reader = csv.DictReader(f)
+            fieldnames = reader.fieldnames
+            for row in reader:
+                row['is_active'] = 'yes' if action == 'resume' else 'no'
+                rows.append(row)
+        with open(os.path.join(BASE_DIR, 'games_catalog.csv'), 'w', newline='', encoding='utf-8-sig') as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(rows)
+        push_notification('kill_switch', f'{"⏸️ ألعاب متوقفة" if action=="pause" else "▶️ ألعاب مفعلة"}', f'Admin {action}ed all games', {})
+        return jsonify({'success': True, 'action': action})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/player/<uid>/profile', methods=['GET'])
+@api_auth
+def api_admin_player_profile(uid):
+    """ملف لاعب كامل — الإحصائيات + الرصيد + الجلسات"""
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    profile = _gm.tracker.get_profile(uid)
+    balance = _gm.get_balance(uid)
+    user_info = _gm.get_user_info(uid)
+    # Get last 20 sessions
+    sessions = []
+    try:
+        with open(os.path.join(BASE_DIR, 'game_sessions.csv'), 'r', encoding='utf-8-sig') as f:
+            reader = csv.DictReader(f)
+            all_sessions = list(reader)
+        sessions = [s for s in all_sessions if s.get('user_id') == str(uid)][-20:]
+    except:
+        pass
+    # Algorithm decisions for this player
+    decisions = []
+    try:
+        with open(os.path.join(BASE_DIR, 'algorithm_decisions.csv'), 'r', encoding='utf-8-sig') as f:
+            reader = csv.DictReader(f)
+            all_dec = list(reader)
+        decisions = [d for d in all_dec if d.get('user_id') == str(uid)][-10:]
+    except:
+        pass
+    # Churn risk
+    churn = _gm.algorithm.check_churn_risk(profile) if _gm.algorithm else {'risk': 'none'}
+    return jsonify({
+        'profile': profile,
+        'balance': balance,
+        'user_info': user_info,
+        'sessions': sessions,
+        'decisions': decisions,
+        'churn_risk': churn,
+    })
+
+@app.route('/api/admin/player/<uid>/force-result', methods=['POST'])
+@api_auth
+def api_admin_force_result(uid):
+    """إجبار نتيجة اللاعب التالية (win/lose/normal)"""
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    data = request.json
+    force = data.get('force', 'normal')  # win, lose, normal
+    rounds = int(data.get('rounds', 1))  # for how many rounds
+    try:
+        profile = _gm.tracker.get_profile(uid)
+        if force == 'win':
+            profile['admin_win_override'] = '1.0'  # force win
+        elif force == 'lose':
+            profile['admin_win_override'] = '-1'  # force lose
+        else:
+            profile['admin_win_override'] = '0'  # normal
+        _gm.tracker._save_profile(profile)
+        log_action('force_result', f'Player {uid}: {force} for {rounds} rounds')
+        return jsonify({'success': True, 'force': force, 'rounds': rounds})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/player/<uid>/reset-daily', methods=['POST'])
+@api_auth
+def api_admin_reset_daily(uid):
+    """إعادة ضبط الإحصائيات اليومية للاعب"""
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    try:
+        profile = _gm.tracker.get_profile(uid)
+        profile = _gm.algorithm.reset_daily_stats(profile) if _gm.algorithm else profile
+        _gm.tracker._save_profile(profile)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/player/<uid>/reset-override', methods=['POST'])
+@api_auth
+def api_admin_reset_override(uid):
+    """إلغاء تحكم الأدمن على اللاعب"""
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    try:
+        profile = _gm.tracker.get_profile(uid)
+        profile['admin_win_override'] = '0'
+        _gm.tracker._save_profile(profile)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/search-players', methods=['GET'])
+@api_auth
+def api_admin_search_players():
+    """البحث عن لاعبين بالاسم/الـID/الهاتف"""
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    query = request.args.get('q', '').lower()
+    if not query:
+        return jsonify({'players': []})
+    # Search in users.csv
+    users = read_csv('users.csv')
+    results = []
+    for u in users:
+        if (query in (u.get('name', '') or '').lower() or
+            query in (u.get('telegram_id', '') or '').lower() or
+            query in (u.get('customer_id', '') or '').lower() or
+            query in (u.get('phone', '') or '')):
+            results.append({
+                'uid': u.get('telegram_id', ''),
+                'name': u.get('name', ''),
+                'customer_id': u.get('customer_id', ''),
+                'phone': u.get('phone', ''),
+                'currency': u.get('currency', 'EGP'),
+                'game_balance': u.get('game_balance', '0'),
+                'is_banned': u.get('is_banned', 'no'),
+            })
+    return jsonify({'players': results, 'count': len(results)})
+
+@app.route('/api/admin/platform-stats', methods=['GET'])
+@api_auth
+def api_admin_platform_stats():
+    """إحصائيات المنصة الكاملة — للوحة التحكم"""
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    # Platform stats
+    stats = _gm.get_platform_stats()
+    health = _gm.risk.check_platform_health() if _gm.risk else {}
+    # Active alerts
+    alerts = _gm.risk.get_active_alerts() if _gm.risk else []
+    # Pending deposits
+    deposits = _gm.get_pending_deposits() if hasattr(_gm, 'get_pending_deposits') else []
+    # Pending withdrawals
+    withdrawals = _gm.get_pending_withdrawals() if hasattr(_gm, 'get_pending_withdrawals') else []
+    # Algorithm config
+    config = _gm.algorithm.config if _gm.algorithm else {}
+    # Games list
+    games = _gm.get_games(active_only=False)
+    # Top players
+    top_players = _gm.tracker.get_top_players(limit=20) if _gm.tracker else []
+    return jsonify({
+        'stats': stats,
+        'health': health,
+        'alerts': alerts,
+        'pending_deposits': deposits,
+        'pending_withdrawals': withdrawals,
+        'config': config,
+        'games': games,
+        'top_players': top_players,
+        'total_games': len(games),
+        'active_games': len([g for g in games if g.get('is_active') == 'yes']),
+    })
+
 # ===== Main =====
 
 if __name__ == '__main__':
