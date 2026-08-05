@@ -28,6 +28,20 @@
 .hub-btn.dep{background:linear-gradient(135deg,var(--green-dim),#1a8a2e);color:#fff}
 .hub-btn.wdr{background:linear-gradient(135deg,var(--gold-dim),var(--gold));color:#000}
 .hub-btn.vex{background:linear-gradient(135deg,var(--purple),#7c3aed);color:#fff}
+/* Animated game icons */
+.game-icon-anim{animation:iconFloat 2s ease-in-out infinite}
+.game-icon-anim[data-game="GAME004"]{animation:iconFly 3s ease-in-out infinite}
+.game-icon-anim[data-game="GAME005"]{animation:iconRocket 2.5s ease-in-out infinite}
+.game-icon-anim[data-game="GAME006"]{animation:iconBounce 1.5s ease-in-out infinite}
+.game-icon-anim[data-game="GAME007"]{animation:iconSpin 2s ease-in-out infinite}
+.game-icon-anim[data-game="GAME008"]{animation:iconTicket 2s ease-in-out infinite}
+.game-icon-anim[data-game="GAME009"]{animation:iconSpin 3s linear infinite}
+@keyframes iconFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+@keyframes iconFly{0%{transform:translateX(0) translateY(0) rotate(0)}50%{transform:translateX(8px) translateY(-4px) rotate(5deg)}100%{transform:translateX(0) translateY(0) rotate(0)}}
+@keyframes iconRocket{0%{transform:translateY(0) scale(1)}50%{transform:translateY(-8px) scale(1.1)}100%{transform:translateY(0) scale(1)}}
+@keyframes iconBounce{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
+@keyframes iconSpin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}
+@keyframes iconTicket{0%,100%{transform:rotate(-3deg)}50%{transform:rotate(3deg)}}
 /* Leaderboard */
 .lb-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin:8px 12px 4px;overflow:hidden}
 .lb-header{display:flex;align-items:center;gap:6px;padding:8px 12px;background:var(--surface-2);border-bottom:1px solid var(--border)}
@@ -78,7 +92,7 @@
 const lang=new URLSearchParams(location.search).get('lang')||'ar';
 const GAME_ROUTES={'GAME004':'/webapp/aviator','GAME005':'/webapp/crash','GAME006':'/webapp/mines','GAME007':'/webapp/plinko','GAME008':'/webapp/lottery','GAME009':'/webapp/wheel'};
 async function loadProfile(){try{const r=await apiFetch(`${BASE}/api/player/profile?uid=${uid}`);const d=await r.json();const p=d.profile||{};const seg=d.segment||'new';const l={new:'🟢 جديد',winner:'🔴 رابح',loser:'🟡 خاسر',hot:'🔥 ساخن',churning:'⚠️ يغادر',vip:'💎 VIP',regular:'👤 عادي'};if(d.balance!==undefined){document.getElementById('bal').textContent=(d.balance||0).toLocaleString();}if(d.currency){document.getElementById('cur').textContent=d.currency;}const cid=d.customer_id?' | رقم: '+d.customer_id:'';document.getElementById('stats').textContent=`${l[seg]||seg}${cid} | ${p.win_rate||0}%`;if(p.is_vex_partner==='yes')document.getElementById('vexBtn').style.display='block';}catch(e){}}
-async function loadGames(){try{const r=await apiFetch(`${BASE}/api/games/list?uid=${uid}`);const d=await r.json();const gs=d.games||[];document.getElementById('loading').style.display='none';if(gs.length===0){document.getElementById('empty').style.display='block';return;}document.getElementById('app').style.display='flex';const h=document.getElementById('hub');h.innerHTML='';gs.forEach((g,i)=>{const c=document.createElement('div');c.className='game-card';if(i<3)c.innerHTML+='<div class="hot-badge">🔥</div>';c.innerHTML+=`<div class="game-icon">${g.icon||'🎮'}</div><div class="game-name">${g.name||''}</div><div class="game-desc">${g.description||''}</div><div class="game-rtp">RTP: ${g.rtp_target||'85'}%</div>`;c.onclick=()=>playGame(g.id);h.appendChild(c);});}catch(e){document.getElementById('loading').style.display='none';document.getElementById('empty').style.display='block';}}
+async function loadGames(){try{const r=await apiFetch(`${BASE}/api/games/list?uid=${uid}`);const d=await r.json();const gs=d.games||[];document.getElementById('loading').style.display='none';if(gs.length===0){document.getElementById('empty').style.display='block';return;}document.getElementById('app').style.display='flex';const h=document.getElementById('hub');h.innerHTML='';gs.forEach((g,i)=>{const c=document.createElement('div');c.className='game-card';if(i<3)c.innerHTML+='<div class="hot-badge">🔥</div>';const icon=g.icon||'🎮';c.innerHTML+=`<div class="game-icon game-icon-anim" data-game="${g.id}">${icon}</div><div class="game-name">${g.name||''}</div><div class="game-desc">${g.description||''}</div>`;c.onclick=()=>playGame(g.id);h.appendChild(c);});}catch(e){document.getElementById('loading').style.display='none';document.getElementById('empty').style.display='block';}}
 function playGame(id){const path=GAME_ROUTES[id]||`/webapp/play/${id}`;window.location.href=`${BASE}${path}?uid=${uid}&lang=${lang}`;}
 function closeModal(){document.getElementById('modal').style.display='none';}
 async function showDeposit(){document.getElementById('modal').style.display='flex';await showVexDepositModal(0);}
