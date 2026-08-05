@@ -45,7 +45,7 @@ def _load_balance_cache():
             _cache_loaded = True  # لا نعيد المحاولة في كل طلب
 
 def _flush_balance_to_csv(user_id):
-    """كتابة رصيد مستخدم واحد فقط"""
+    """كتابة رصيد مستخدم واحد فقط — باستخدام ملف مؤقت (atomic write)"""
     global _balance_cache
     try:
         rows = []
@@ -60,11 +60,15 @@ def _flush_balance_to_csv(user_id):
                 if cached:
                     row['game_balance'] = f"{cached['balance']:.2f}"
                 break
-        with open('users.csv', 'w', newline='', encoding=CSV_ENCODING) as f:
+        # Atomic write: write to temp file, then rename
+        import tempfile
+        fd, tmp_path = tempfile.mkstemp(dir='.', suffix='.tmp')
+        with os.fdopen(fd, 'w', newline='', encoding=CSV_ENCODING) as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()
             for row in rows:
                 writer.writerow({k: row.get(k, '') for k in fieldnames})
+        os.replace(tmp_path, 'users.csv')  # atomic on same filesystem
         if str(user_id) in _balance_cache:
             _balance_cache[str(user_id)]['dirty'] = False
     except Exception as e:
