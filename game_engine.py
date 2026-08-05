@@ -45,7 +45,7 @@ def _load_balance_cache():
             _cache_loaded = True  # لا نعيد المحاولة في كل طلب
 
 def _flush_balance_to_csv(user_id):
-    """كتابة رصيد مستخدم واحد فقط (وليس الملف كاملاً)"""
+    """كتابة رصيد مستخدم واحد فقط"""
     global _balance_cache
     try:
         rows = []
@@ -70,6 +70,30 @@ def _flush_balance_to_csv(user_id):
     except Exception as e:
         print(f"Flush balance error for {user_id}: {e}")
 
+# Background flush: writes dirty balances to CSV every 5 seconds
+_flush_stop = False
+def _background_flush_loop():
+    """يكتب الأرصدة المتغيرة إلى CSV كل 5 ثواني"""
+    global _balance_cache
+    while not _flush_stop:
+        time.sleep(5)
+        dirty_uids = []
+        with _cache_lock:
+            for uid, info in _balance_cache.items():
+                if info.get('dirty'):
+                    dirty_uids.append(uid)
+                    info['dirty'] = False  # mark as being written
+        if dirty_uids:
+            with _wallet_lock:
+                for uid in dirty_uids[:50]:  # max 50 per cycle
+                    try:
+                        _flush_balance_to_csv(uid)
+                    except:
+                        pass
+
+import atexit
+atexit.register(lambda: globals().update(_flush_stop=True))
+
 try:
     from house_algorithm import HouseAlgorithm
     from risk_manager import RiskManager
@@ -89,6 +113,10 @@ class GameManager:
         self.player_payment_methods_file = 'player_payment_methods.csv'
         self._ensure_files()
         self.algorithm = HouseAlgorithm() if HouseAlgorithm else None
+        # Start background flush thread
+        _load_balance_cache()
+        t = threading.Thread(target=_background_flush_loop, daemon=True)
+        t.start()
         self.risk = RiskManager() if RiskManager else None
         self.tracker = PlayerTracker() if PlayerTracker else None
 
@@ -286,39 +314,31 @@ class GameManager:
         return 'EGP'
 
     def add_balance(self, user_id, amount, reason='deposit'):
-        """إضافة رصيد — يحدّث الكاش فوراً + يكتب CSV خلفياً"""
+        """إضافة رصيد — يحدّث الكاش فوراً (الـ CSV يُكتب خلفياً)"""
         _load_balance_cache()
         uid = str(user_id)
         amt = float(amount)
         with _cache_lock:
             if uid not in _balance_cache:
-                _balance_cache[uid] = {'balance': 0.0, 'currency': 'EGP', 'dirty': True}
+                _balance_cache[uid] = {'balance': 0.0, 'currency': 'EGP', 'dirty': False}
             _balance_cache[uid]['balance'] += amt
             _balance_cache[uid]['dirty'] = True
-            new_bal = _balance_cache[uid]['balance']
-        # Write to CSV (non-blocking — lock only for this user's row)
-        with _wallet_lock:
-            _flush_balance_to_csv(uid)
-        return new_bal
+            return _balance_cache[uid]['balance']
 
     def deduct_balance(self, user_id, amount):
-        """خصم رصيد — يحدّث الكاش فوراً + يكتب CSV خلفياً"""
+        """خصم رصيد — يحدّث الكاش فوراً (الـ CSV يُكتب خلفياً)"""
         _load_balance_cache()
         uid = str(user_id)
         amt = float(amount)
         with _cache_lock:
             if uid not in _balance_cache:
-                _balance_cache[uid] = {'balance': 0.0, 'currency': 'EGP', 'dirty': True}
+                _balance_cache[uid] = {'balance': 0.0, 'currency': 'EGP', 'dirty': False}
             current = _balance_cache[uid]['balance']
             if current < amt:
                 return False, current
             _balance_cache[uid]['balance'] -= amt
             _balance_cache[uid]['dirty'] = True
-            new_bal = _balance_cache[uid]['balance']
-        # Write to CSV
-        with _wallet_lock:
-            _flush_balance_to_csv(uid)
-        return True, new_bal
+            return True, _balance_cache[uid]['balance']
 
     # ===== الألعاب =====
 
