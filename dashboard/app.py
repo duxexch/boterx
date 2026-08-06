@@ -4460,9 +4460,12 @@ def api_plinko_end():
     result = data.get('result', 'lose')
     bet_amount = float(data.get('bet_amount', 0))
     session_id = data.get('session_id', '')
-    # Add payout to balance (already calculated in start, but we add on end for consistency)
+    # Add payout to balance — the bet was ALREADY deducted at /start.
+    # Use settle_round(uid, bet=0, payout=payout) which applies net=payout atomically.
+    # This preserves ACID: the -bet at /start and +payout at /end are two atomic
+    # transactions covering distinct logical stages. anti-crash-safe.
     if payout > 0:
-        _gm.add_balance(uid, payout)
+        _gm.settle_round(uid, 0, payout)  # net = payout - 0
     _gm.tracker.log_session({'session_id': session_id, 'game_id': 'GAME007', 'user_id': uid, 'bet_amount': bet_amount, 'payout': payout, 'result': result, 'balance_before': 0, 'balance_after': _gm.get_balance(uid), 'multiplier': multiplier})
     _gm.tracker.update_profile(uid, {'bet_amount': bet_amount, 'payout': payout, 'result': result, 'game_id': 'GAME007', 'balance_after': _gm.get_balance(uid)})
     return jsonify({'success': True, 'result': result, 'payout': payout})
