@@ -67,7 +67,22 @@ if not os.getenv("BOT_TOKEN"):
 else:
     logger.info("BOT_TOKEN loaded successfully ✓")
 
-class ComprehensiveDUXBot:
+from handlers.deposit_withdraw import DepositWithdrawMixin
+from handlers.user_profile import UserProfileMixin
+from handlers.admin_panel import AdminPanelMixin
+from handlers.registration import RegistrationMixin
+from handlers.channels_handler import ChannelsHandlerMixin
+from handlers.games_hub_handler import GamesHubHandlerMixin
+from handlers.payment_methods_handler import PaymentMethodsHandlerMixin
+from handlers.svrp_handler import SVRPHandlerMixin
+from handlers.message_dispatcher import MessageDispatcherMixin
+from handlers.callback_handler import CallbackHandlerMixin
+
+
+class ComprehensiveDUXBot(DepositWithdrawMixin, UserProfileMixin, AdminPanelMixin,
+                          RegistrationMixin, ChannelsHandlerMixin, GamesHubHandlerMixin,
+                          PaymentMethodsHandlerMixin, SVRPHandlerMixin,
+                          MessageDispatcherMixin, CallbackHandlerMixin):
     def __init__(self, token):
         self.token = token
         self.api_url = f"https://api.telegram.org/bot{token}"
