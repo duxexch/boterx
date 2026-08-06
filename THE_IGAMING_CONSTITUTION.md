@@ -93,6 +93,11 @@
 | WebSocket | ⚠️ SSE + polling fallback | يحتاج ترقية لـ WS (يتطلب سيرفر أقوى) |
 | Offline Outbox | ❌ غير موجود | يجب إضافة |
 | Debouncing | ✅ rate limit + UI disable | مطبّق |
+| Wallet ACID | ✅ round_settle() | مكتمل — atomic transaction + Plinko wired |
+| Precision | ⚠️ float في بعض الحسابات | يجب ترقية |
+| WebSocket | ⚠️ SSE + polling fallback | يحتاج ترقية لـ WS (يتطلب سيرفر أقوى) |
+| Offline Outbox | ✅ apiFetchCritical + localStorage | مكتمل — auto-retry on reconnect |
+| Debouncing | ✅ rate limit + UI disable | مطبّق |
 | MainButton | ⚠️ جزئياً | يجب ربطه بحالة اللعبة |
 | BackButton | ⚠️ يرجع لـ hub مباشرة | يجب اعتراضه بحالة اللعبة |
 | Haptics | ✅ HapticFeedback | مطبّق |
@@ -105,3 +110,5 @@
 | التاريخ | الالتزام |
 |---|---|
 | 2026-08-06 | إصدار الدستور كمرجع رسمي للمشروع |
+| 2026-08-06 | §2.3 Wallet ACID: round_settle() + Plinko wired (commit faa35cd→c019e31) |
+| 2026-08-06 | §3.2 Offline Outbox: apiFetchCritical + localStorage + auto-retry (commit 52cec17) |
