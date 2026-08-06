@@ -26,6 +26,79 @@ async function apiFetch(url, opts = {}) {
   return fetch(url, opts);
 }
 
+// ---- Offline Outbox (Constitution §3.2) ----
+// Critical POST requests (bet, cashout) that fail due to network drop
+// are saved in localStorage and auto-retried on reconnect.
+var _outboxKey = 'vex_outbox_' + uid;
+var _isOnline = navigator.onLine;
+
+function _saveToOutbox(url, opts) {
+  try {
+    var queue = JSON.parse(localStorage.getItem(_outboxKey) || '[]');
+    queue.push({ url: url, opts: opts, ts: Date.now() });
+    localStorage.setItem(_outboxKey, JSON.stringify(queue));
+  } catch(e) {}
+}
+
+function _processOutbox() {
+  try {
+    var queue = JSON.parse(localStorage.getItem(_outboxKey) || '[]');
+    if (queue.length === 0) return;
+    var remaining = [];
+    var processed = 0;
+    queue.forEach(function(item) {
+      if (processed >= 5) { remaining.push(item); return; }
+      fetch(item.url, item.opts).then(function(r) {
+        if (!r.ok) remaining.push(item);
+      }).catch(function() { remaining.push(item); });
+      processed++;
+    });
+    // Save any that failed again, plus unprocessed ones
+    localStorage.setItem(_outboxKey, JSON.stringify(remaining));
+    if (remaining.length > 0) {
+      showToast('Outbox: ' + remaining.length + ' pending', 'info');
+    }
+  } catch(e) {}
+}
+
+// Listen for online/offline events
+window.addEventListener('online', function() {
+  _isOnline = true;
+  var ci = document.getElementById('connIndicator');
+  if (ci) ci.textContent = '\uD83D\uDFE2';
+  setTimeout(_processOutbox, 1000);
+});
+window.addEventListener('offline', function() {
+  _isOnline = false;
+  var ci = document.getElementById('connIndicator');
+  if (ci) ci.textContent = '\uD83D\uDD34';
+});
+
+// Wrapper for critical POST requests (bet, cashout) — saves to outbox on failure
+async function apiFetchCritical(url, opts) {
+  opts = opts || {};
+  opts.headers = opts.headers || {};
+  opts.headers['X-Telegram-Init-Data'] = initData;
+  opts.method = opts.method || 'POST';
+  if (opts.body && typeof opts.body === 'string') {
+    opts.headers['Content-Type'] = 'application/json';
+  }
+  if (uid && !url.includes('uid=')) {
+    url += (url.includes('?') ? '&' : '?') + 'uid=' + uid;
+  }
+  try {
+    var r = await fetch(url, opts);
+    if (!r.ok && r.status >= 500) {
+      _saveToOutbox(url, opts);
+    }
+    return r;
+  } catch(e) {
+    // Network error — save to outbox for retry
+    _saveToOutbox(url, opts);
+    throw e;
+  }
+}
+
 // ---- Audio Engine ----
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 let audioMuted = false;
