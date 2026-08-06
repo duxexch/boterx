@@ -261,6 +261,47 @@ class GameDB:
             conn.commit()
             return amt
 
+    def round_settle(self, user_id, bet_amount, payout):
+        """Settle a complete round in ONE atomic ACID transaction.
+
+        Combines bet deduction + win payout into a single atomic update.
+        Prevents money loss if process crashes between the two operations.
+        Returns (success, final_balance).
+
+        bet_amount: the wagered amount (already validated server-side).
+        payout: the gross payout won (0 if loss).
+        net_delta = payout - bet_amount applied atomically.
+        """
+        uid = str(user_id)
+        bet = float(bet_amount)
+        win = float(payout)
+        net = win - bet  # negative on loss, positive on win
+        conn = self._conn()
+        with _db_lock:
+            conn.execute('BEGIN')
+            try:
+                row = conn.execute(
+                    'SELECT game_balance FROM users WHERE telegram_id = ?', (uid,)
+                ).fetchone()
+                current = float(row[0]) if row else 0.0
+                # On loss (net < 0), ensure sufficient balance (bet already reserved)
+                if net < 0 and current < abs(net):
+                    conn.execute('ROLLBACK')
+                    return False, current
+                new_bal = current + net
+                conn.execute('''
+                    INSERT INTO users (telegram_id, game_balance) VALUES (?, ?)
+                    ON CONFLICT(telegram_id) DO UPDATE SET game_balance = ?
+                ''', (uid, new_bal, new_bal))
+                conn.commit()
+                return True, new_bal
+            except Exception:
+                try:
+                    conn.execute('ROLLBACK')
+                except Exception:
+                    pass
+                raise
+
     # ===== Session Logging =====
 
     def log_session(self, session_data):

@@ -374,6 +374,38 @@ class GameManager:
             _balance_cache[uid]['dirty'] = True
             return True, _balance_cache[uid]['balance']
 
+    # ===== ACID Round Settlement (Constitution §2.3) =====
+    def settle_round(self, user_id, bet_amount, payout):
+        """تسوية جولة كاملة في معاملة ACID واحدة.
+
+        يجمع خصم الرهان + صافي النتيجة في تحديث ذری واحد.
+        يمنع فقدان المال لو انهار السيرفر بين العمليتين.
+        يتبع الدستور: Wallet ACID — لا تحديث متسلسل.
+
+        bet_amount: المبلغ المراهن (مُتحقق منه server-side).
+        payout: إجمالي المكسب (0 عند الخسارة).
+        net_delta = payout - bet_amount.
+
+        Returns (success, final_balance).
+        """
+        if _USE_SQLITE:
+            return _db.round_settle(user_id, bet_amount, payout)
+        # Fallback: CSV cache (best-effort sequential)
+        _load_balance_cache()
+        uid = str(user_id)
+        bet = float(bet_amount)
+        win = float(payout)
+        net = win - bet
+        with _cache_lock:
+            if uid not in _balance_cache:
+                _balance_cache[uid] = {'balance': 0.0, 'currency': 'EGP', 'dirty': False}
+            current = _balance_cache[uid]['balance']
+            if net < 0 and current < abs(net):
+                return False, current
+            _balance_cache[uid]['balance'] += net
+            _balance_cache[uid]['dirty'] = True
+            return True, _balance_cache[uid]['balance']
+
     # ===== الألعاب =====
 
     def get_games(self, active_only=True):
