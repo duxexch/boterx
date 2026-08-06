@@ -48,6 +48,11 @@ except ImportError:
 # تحميل ملف .env من نفس المجلد
 load_dotenv(".env")
 
+# ===== bot_utils — extracted utilities =====
+from bot_utils.constants import CURRENCIES, CSV_ENCODING
+from bot_utils.validation import sanitize_input, validate_phone_number, validate_amount
+from bot_utils.telegram_helpers import make_inline_btn, make_inline_keyboard, make_reply_keyboard, remove_keyboard
+
 # إعداد نظام اللوج
 logging.basicConfig(
     level=logging.INFO,
@@ -125,27 +130,8 @@ class ComprehensiveDUXBot:
         # المفتاح هو معرف الأدمن والقيمة عبارة عن قاموس يحتوي trans_id والسبب
         self.pending_reject_reasons = {}
 
-        # نظام العملات: تعريف أسماء العملات ورموزها وأعلامها
-        self.currencies = {
-            'SAR': {'name': 'الريال السعودي', 'symbol': 'ر.س', 'flag': '🇸🇦'},
-            'AED': {'name': 'الدرهم الإماراتي', 'symbol': 'د.إ', 'flag': '🇦🇪'},
-            'EGP': {'name': 'الجنيه المصري', 'symbol': 'ج.م', 'flag': '🇪🇬'},
-            'KWD': {'name': 'الدينار الكويتي', 'symbol': 'د.ك', 'flag': '🇰🇼'},
-            'QAR': {'name': 'الريال القطري', 'symbol': 'ر.ق', 'flag': '🇶🇦'},
-            'BHD': {'name': 'الدينار البحريني', 'symbol': 'د.ب', 'flag': '🇧🇭'},
-            'OMR': {'name': 'الريال العماني', 'symbol': 'ر.ع', 'flag': '🇴🇲'},
-            'JOD': {'name': 'الدينار الأردني', 'symbol': 'د.أ', 'flag': '🇯🇴'},
-            'LBP': {'name': 'الليرة اللبنانية', 'symbol': 'ل.ل', 'flag': '🇱🇧'},
-            'IQD': {'name': 'الدينار العراقي', 'symbol': 'د.ع', 'flag': '🇮🇶'},
-            'SYP': {'name': 'الليرة السورية', 'symbol': 'ل.س', 'flag': '🇸🇾'},
-            'MAD': {'name': 'الدرهم المغربي', 'symbol': 'د.م', 'flag': '🇲🇦'},
-            'TND': {'name': 'الدينار التونسي', 'symbol': 'د.ت', 'flag': '🇹🇳'},
-            'DZD': {'name': 'الدينار الجزائري', 'symbol': 'د.ج', 'flag': '🇩🇿'},
-            'LYD': {'name': 'الدينار الليبي', 'symbol': 'د.ل', 'flag': '🇱🇾'},
-            'USD': {'name': 'الدولار الأمريكي', 'symbol': '$', 'flag': '🇺🇸'},
-            'EUR': {'name': 'اليورو', 'symbol': '€', 'flag': '🇪🇺'},
-            'TRY': {'name': 'الليرة التركية', 'symbol': '₺', 'flag': '🇹🇷'}
-        }
+        # نظام العملات: مستورد من bot_utils.constants
+        self.currencies = CURRENCIES
 
         # تسجيل عدد المدراء الدائمين
         logger.info(f"تم تحميل {len(self.admin_user_ids)} مدير دائم: {self.admin_user_ids}")
@@ -882,20 +868,8 @@ class ComprehensiveDUXBot:
         return text
 
     def sanitize_input(self, text):
-        """تنظيف مدخلات المستخدم لمنع حقن CSV والهجمات الأخرى"""
-        if not text:
-            return text
-        # Remove dangerous CSV characters
-        dangerous_chars = ['=', '+', '-', '@', '\t', '\r', '\n']
-        # If text starts with dangerous chars, prefix with space
-        if text and text[0] in dangerous_chars:
-            text = ' ' + text
-        # Limit length to prevent overflow
-        if len(text) > 500:
-            text = text[:500]
-        # Remove null bytes
-        text = text.replace('\x00', '')
-        return text.strip()
+        """تنظيف مدخلات المستخدم — delegated to bot_utils.validation"""
+        return sanitize_input(text)
 
     def check_rate_limit(self, user_id, action_type='general'):
         """فحص حد المعدل لمنع الإساءة — 30 طلب لكل دقيقة (مناسب للتدفقات متعددة الخطوات)"""
@@ -916,27 +890,12 @@ class ComprehensiveDUXBot:
         return True
 
     def validate_phone_number(self, phone):
-        """التحقق من صحة رقم الهاتف"""
-        if not phone:
-            return False
-        # Remove spaces and dashes
-        phone = phone.replace(' ', '').replace('-', '')
-        # Must start with + and be 7-20 digits
-        if phone.startswith('+'):
-            digits = phone[1:]
-        else:
-            digits = phone
-        return digits.isdigit() and 7 <= len(digits) <= 20
+        """التحقق من صحة رقم الهاتف — delegated to bot_utils.validation"""
+        return validate_phone_number(phone)
 
     def validate_amount(self, amount_str):
-        """التحقق من صحة المبلغ المدخل"""
-        try:
-            amount = float(amount_str)
-            if amount <= 0 or amount > 1000000:  # Max 1 million
-                return None
-            return amount
-        except (ValueError, TypeError):
-            return None
+        """التحقق من صحة المبلغ المدخل — delegated to bot_utils.validation"""
+        return validate_amount(amount_str)
 
     def transform_keyboard(self, keyboard):
         """تطبيق مسميات الأزرار المعدلة على أي لوحة مفاتيح قبل إرسالها لتليجرام"""
@@ -1061,16 +1020,12 @@ class ComprehensiveDUXBot:
         return self.api_call('editMessageText', data)
     
     def make_inline_btn(self, text, callback_data):
-        """إنشاء زر inline بسرعة"""
-        return {'text': text, 'callback_data': callback_data}
+        """إنشاء زر inline بسرعة — delegated to bot_utils.telegram_helpers"""
+        return make_inline_btn(text, callback_data)
     
     def make_inline_keyboard(self, rows):
-        """إنشاء لوحة inline من قائمة صفوف
-        كل صف: قائمة من (text, callback_data) tuples"""
-        keyboard = []
-        for row in rows:
-            keyboard.append([self.make_inline_btn(t, c) for t, c in row])
-        return keyboard
+        """إنشاء لوحة inline من قائمة صفوف — delegated to bot_utils.telegram_helpers"""
+        return make_inline_keyboard(rows)
     
     def get_updates(self):
         """جلب التحديثات — يشمل my_chat_member لتسجيل القنوات تلقائياً"""
