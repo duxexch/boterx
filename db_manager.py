@@ -78,6 +78,19 @@ def _init_db():
                 revealed INTEGER DEFAULT 0,
                 created_at TEXT
             );
+            
+            CREATE TABLE IF NOT EXISTS aviator_rounds (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                round_id INTEGER,
+                crash_point REAL,
+                seed_hash TEXT,
+                client_seed TEXT,
+                server_seed TEXT,
+                bet_count INTEGER DEFAULT 0,
+                total_wagered REAL DEFAULT 0,
+                total_distributed REAL DEFAULT 0,
+                created_at TEXT
+            );
         ''')
         conn.commit()
     finally:

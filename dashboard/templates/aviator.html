@@ -82,6 +82,7 @@
     </div>
     <div class="topbar-right">
       <span class="streak-badge" id="streak" style="display:none">🔥 0</span>
+      <span id="connIndicator" title="حالة الاتصال">🟡</span>
       <button class="btn-sound" id="soundBtn" onclick="toggleSound()">🔊</button>
     </div>
   </div>
@@ -252,6 +253,8 @@ function drawTrail() {
 // ===== SSE Connection — global round =====
 function connectSSE() {
   aviatorSSE = new EventSource(BASE + '/api/aviator/stream?uid=' + uid);
+  var ci = document.getElementById('connIndicator'); if (ci) ci.textContent = '🟡';
+  aviatorSSE.onopen = function() { var c = document.getElementById('connIndicator'); if (c) c.textContent = '🟢'; };
   aviatorSSE.onmessage = function(e) {
     try {
       const d = JSON.parse(e.data);
@@ -262,7 +265,10 @@ function connectSSE() {
       else if (d.type === 'crash') onCrash(d);
     } catch(err) {}
   };
-  aviatorSSE.onerror = function() { aviatorSSE.close(); setTimeout(connectSSE, 2000); };
+  aviatorSSE.onerror = function() {
+    var c = document.getElementById('connIndicator'); if (c) c.textContent = '🔴';
+    aviatorSSE.close(); setTimeout(connectSSE, 2000);
+  };
 }
 
 function onWaiting(d) {
@@ -339,6 +345,14 @@ function onCrash(d) {
   const msg = document.getElementById('crashMsg');
   msg.textContent = '💥 ' + d.crash_point.toFixed(2) + 'x'; msg.style.color = 'var(--red)'; msg.classList.add('show');
   createExplosion();
+  // Provably fair: show revealed server seed for verification
+  if (d.server_seed) {
+    const pfEl = document.createElement('div');
+    pfEl.style.cssText = 'position:absolute;top:62%;left:50%;transform:translateX(-50%);font-size:9px;color:#94a3b8;z-index:12;text-align:center;pointer-events:none;max-width:80%;word-break:break-all';
+    pfEl.innerHTML = '🔐 Server Seed: <code style="color:#fbbf24">' + d.server_seed + '</code>';
+    document.getElementById('gameArea').appendChild(pfEl);
+    setTimeout(() => pfEl.remove(), 6000);
+  }
   // Show total distributed profits to ALL players
   if (d.total_distributed !== undefined && d.total_distributed > 0) {
     const distEl = document.getElementById('recoveryMsg');
@@ -402,9 +416,10 @@ function placeBet(slot) {
   const autoVal = parseFloat(document.getElementById('autoVal'+slot).value) || 0;
   const btn = document.getElementById('btn'+slot);
   btn.disabled = true; btn.textContent = '⏳';
+  const reqId = 'b' + slot + '_' + Date.now() + '_' + Math.random().toString(36).substr(2,6);
   let timedOut = false;
   const to = setTimeout(() => { timedOut = true; btn.disabled = false; btn.textContent = 'رهان'; showToast('انتهت المهلة', 'error'); }, 8000);
-  apiFetch(BASE+'/api/aviator/bet?uid='+uid, { method:'POST', body:JSON.stringify({uid, bet_amount:amt, auto_val:autoVal}) })
+  apiFetch(BASE+'/api/aviator/bet?uid='+uid, { method:'POST', body:JSON.stringify({uid, bet_amount:amt, auto_val:autoVal, request_id:req_id}) })
   .then(r => r.json()).then(d => {
     clearTimeout(to); if (timedOut) return;
     if (d.success) {
@@ -436,7 +451,8 @@ function doCashout(slot) {
   if (currentMult >= 3) showBigWin(payout, currentMult);
   streakWin++; updateStreak(document.getElementById('streak'));
   sessionW++; sessionPL += payout - myBets[slot].amount; updateSessionStats();
-  apiFetch(BASE+'/api/aviator/cashout?uid='+uid, { method:'POST', body:JSON.stringify({uid}) })
+  const reqId = 'c' + slot + '_' + Date.now() + '_' + Math.random().toString(36).substr(2,6);
+  apiFetch(BASE+'/api/aviator/cashout?uid='+uid, { method:'POST', body:JSON.stringify({uid, request_id:reqId}) })
   .then(r => r.json()).then(d => { if (d.success && d.balance_after !== undefined) document.getElementById('bal').textContent = d.balance_after.toLocaleString(); })
   .catch(() => {});
 }
