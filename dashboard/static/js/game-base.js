@@ -696,7 +696,78 @@ async function revealPFSession() {
 
 // ---- Deposit URL ----
 function goBack() {
-  window.location.href = `${BASE}/webapp/games?uid=${uid}&lang=ar`;
+  // Constitution §4.2: BackButton MUST intercept if game is in progress
+  // Check if any game is active (Aviator/Crash flying, Mines playing, etc.)
+  var gameActive = typeof roundPhase !== 'undefined' && (roundPhase === 'flying' || roundPhase === 'playing');
+  if (typeof gameState !== 'undefined' && gameState === 'playing') gameActive = true;
+  if (gameActive) {
+    // Show confirmation modal instead of closing
+    var c = document.createElement('div');
+    c.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:500;display:flex;align-items:center;justify-content:center';
+    var box = document.createElement('div');
+    box.style.cssText = 'background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;max-width:300px;text-align:center';
+    box.innerHTML = '<div style="font-size:28px;margin-bottom:8px">\u26A0\uFE0F</div>' +
+      '<div style="font-size:14px;font-weight:700;margin-bottom:12px">\u0627\u0644\u0639\u0628\u0629 \u0642\u064A\u0627\u0645<br>\u0633\u062A\u062E\u0633\u0631 \u0631\u0647\u0627\u0646\u0643 \u0625\u0630\u0627 \u062E\u0631\u062C\u062A</div>' +
+      '<div style="display:flex;gap:8px">' +
+      '<button id="_stayBtn" style="flex:1;padding:10px;border-radius:8px;border:none;background:var(--green-dim);color:#fff;font-weight:700">\u0628\u0642\u0627\u0621</button>' +
+      '<button id="_leaveBtn" style="flex:1;padding:10px;border-radius:8px;border:none;background:var(--red-dim);color:#fff;font-weight:700">\u062E\u0631\u0648\u062C</button>' +
+      '</div>';
+    c.appendChild(box);
+    document.body.appendChild(c);
+    document.getElementById('_stayBtn').onclick = function() { c.remove(); };
+    document.getElementById('_leaveBtn').onclick = function() { c.remove(); window.location.href = BASE + '/webapp/games?uid=' + uid + '&lang=ar'; };
+    return;
+  }
+  window.location.href = BASE + '/webapp/games?uid=' + uid + '&lang=ar';
+}
+
+// ---- Constitution §4: Telegram Mini App Integration ----
+// MainButton sync with game state
+function syncMainButton(text, onClick) {
+  if (!tg || !tg.MainButton) return;
+  try {
+    tg.MainButton.setText(text);
+    tg.MainButton.show();
+    tg.MainButton.onClick(onClick);
+  } catch(e) {}
+}
+
+function hideMainButton() {
+  if (!tg || !tg.MainButton) return;
+  try { tg.MainButton.hide(); } catch(e) {}
+}
+
+// BackButton intercept (Constitution §4.2)
+function enableBackButton() {
+  if (!tg || !tg.BackButton) return;
+  try { tg.BackButton.show(); tg.BackButton.onClick(function() { goBack(); }); } catch(e) {}
+}
+
+function disableBackButton() {
+  if (!tg || !tg.BackButton) return;
+  try { tg.BackButton.hide(); } catch(e) {}
+}
+
+// Theme change listener (Constitution §4.3)
+function initThemeListener() {
+  if (!tg || !tg.onEvent) return;
+  try {
+    tg.onEvent('themeChanged', function() {
+      var tc = tg.themeParams || {};
+      var root = document.documentElement;
+      if (tc.bg_color) root.style.setProperty('--bg', tc.bg_color);
+      if (tc.text_color) root.style.setProperty('--text', tc.text_color);
+      if (tc.button_color) root.style.setProperty('--gold', tc.button_color);
+      if (tc.hint_color) root.style.setProperty('--muted', tc.hint_color);
+    });
+  } catch(e) {}
+}
+
+// Auto-init TMA features when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', function() { try { initThemeListener(); enableBackButton(); } catch(e) {} });
+} else {
+  try { initThemeListener(); enableBackButton(); } catch(e) {}
 }
 
 // ---- VEX Deposit Modal (shared) ----
