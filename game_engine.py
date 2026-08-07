@@ -406,6 +406,55 @@ class GameManager:
             _balance_cache[uid]['dirty'] = True
             return True, _balance_cache[uid]['balance']
 
+    def settle_with_idempotency(self, user_id, bet_amount, payout, request_id, response_template):
+        """Atomic: settle + store idempotency record in ONE SQLite transaction.
+
+        response_template: dict of game-specific fields WITHOUT balance_after.
+        balance_after is computed inside the transaction and added before storage.
+
+        Returns (success, stored_result_or_None, cached_response_or_None):
+          - cached_response not None → idempotent replay, don't re-process
+          - stored_result not None  → first call; has balance_after filled in
+          - success False           → insufficient funds, no settlement
+
+        Falls back to settle_round when SQLite is unavailable (no idempotency guarantee).
+        """
+        if _USE_SQLITE:
+            return _db.settle_with_idempotency(
+                user_id, bet_amount, payout, request_id, response_template)
+        # CSV fallback: no durable idempotency; apply settlement best-effort
+        ok, new_bal = self.settle_round(user_id, bet_amount, payout)
+        if not ok:
+            return False, None, None
+        result = dict(response_template)
+        result['balance_after'] = new_bal
+        return True, result, None
+
+    def credit_with_idempotency(self, user_id, amount, request_id, response_template):
+        """Credit-only atomic operation with durable idempotency.
+
+        For pre-deducted games (mines cashout, all-safe reveal) where the bet
+        was already deducted upfront.
+
+        Returns (success, stored_result_or_None, cached_response_or_None).
+        Falls back to add_balance when SQLite is unavailable.
+        """
+        if _USE_SQLITE:
+            return _db.credit_with_idempotency(
+                user_id, amount, request_id, response_template)
+        new_bal = self.add_balance(user_id, amount)
+        result = dict(response_template)
+        result['balance_after'] = new_bal
+        return True, result, None
+
+    def get_idempotency_record(self, user_id, request_id):
+        """Read a stored idempotency result from SQLite (survives restarts).
+        Returns dict or None.
+        """
+        if _USE_SQLITE:
+            return _db.get_idempotency_record(user_id, request_id)
+        return None
+
     # ===== الألعاب =====
 
     def get_games(self, active_only=True):

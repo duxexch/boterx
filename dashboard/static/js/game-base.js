@@ -74,12 +74,36 @@ window.addEventListener('offline', function() {
   if (ci) ci.textContent = '\uD83D\uDD34';
 });
 
-// Wrapper for critical POST requests (bet, cashout) — saves to outbox on failure
+// Wrapper for critical POST requests (bet, cashout) — saves to outbox on failure.
+// Auto-generates a stable X-Request-Id per logical action so the server can
+// deduplicate retries (outbox or manual). The ID is injected into headers and
+// body before the first attempt so it survives unchanged across all retries.
+function _genRequestId() {
+  return 'rid_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9);
+}
+
 async function apiFetchCritical(url, opts) {
   opts = opts || {};
   opts.headers = opts.headers || {};
   opts.headers['X-Telegram-Init-Data'] = initData;
   opts.method = opts.method || 'POST';
+
+  // Inject a stable request_id once (idempotent if already present for retries)
+  if (!opts.headers['X-Request-Id']) {
+    var rid = _genRequestId();
+    opts.headers['X-Request-Id'] = rid;
+    // Also embed in JSON body so server can read it from either location
+    if (opts.body && typeof opts.body === 'string') {
+      try {
+        var bodyObj = JSON.parse(opts.body);
+        if (!bodyObj.request_id) {
+          bodyObj.request_id = rid;
+          opts.body = JSON.stringify(bodyObj);
+        }
+      } catch(e) { /* non-JSON body — header is enough */ }
+    }
+  }
+
   if (opts.body && typeof opts.body === 'string') {
     opts.headers['Content-Type'] = 'application/json';
   }
@@ -93,7 +117,7 @@ async function apiFetchCritical(url, opts) {
     }
     return r;
   } catch(e) {
-    // Network error — save to outbox for retry
+    // Network error — save to outbox for retry (opts already has X-Request-Id)
     _saveToOutbox(url, opts);
     throw e;
   }

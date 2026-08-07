@@ -150,9 +150,9 @@ def validate_telegram_init_data(init_data_str):
             if k != 'hash':
                 data_check[k] = v[0]
         data_check_string = '\n'.join(f'{k}={v}' for k, v in sorted(data_check.items()))
-        # secret_key = HMAC_SHA256(key="WebAppData", msg=bot_token)  ← Telegram spec
-        secret_key = hmac.new(b'WebAppData', BOT_TOKEN.encode(), hashlib.sha256).digest()
-        # calculated_hash = HMAC_SHA256(key=secret_key, msg=data_check_string)
+        # secret_key = HMAC_SHA256(bot_token, "WebAppData")
+        secret_key = hmac.new(BOT_TOKEN.encode(), b'WebAppData', hashlib.sha256).digest()
+        # calculated_hash = HMAC_SHA256(secret_key, data_check_string)
         calculated_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
         # Compare
         if not hmac.compare_digest(calculated_hash, hash_from_client):
@@ -166,68 +166,71 @@ def validate_telegram_init_data(init_data_str):
     except Exception:
         return None, None
 
+_INIT_DATA_MAX_AGE = 3600  # seconds — reject stale initData older than 1 hour
+
 def webapp_auth(f):
     """Decorator: validates Telegram WebApp initData on game-facing API endpoints.
-
-    Priority order:
-      1. X-Telegram-Init-Data header (sent by game-base.js on every request)
-      2. initData query/body param (fallback for older clients)
-      3. uid param — ONLY accepted when BOT_TOKEN is NOT configured (local dev)
-
-    When BOT_TOKEN is set, uid-only requests are unconditionally rejected (403).
-    This prevents user-impersonation attacks where any caller who knows a
-    telegram_id could forge requests on behalf of that user.
+    Reads initData from 'X-Telegram-Init-Data' header or 'initData' body/query param.
+    Sets g.telegram_user_id and g.telegram_user on success.
+    Falls back to uid param ONLY if BOT_TOKEN is not configured (dev/test mode).
     """
     @wraps(f)
     def decorated(*args, **kwargs):
-        # ── Step 1: collect initData from any supported source ──────────────
-        init_data = (
-            request.headers.get('X-Telegram-Init-Data', '').strip()
-            or request.args.get('initData', '').strip()
-        )
-        if not init_data and request.is_json:
-            try:
-                init_data = (request.get_json(silent=True) or {}).get('initData', '').strip()
-            except Exception:
-                pass
+        # --- PRODUCTION: validate signed Telegram initData ---
+        if BOT_TOKEN:
+            init_data = (
+                request.headers.get('X-Telegram-Init-Data', '')
+                or request.args.get('initData', '')
+            )
+            if not init_data:
+                try:
+                    init_data = (request.get_json(silent=True) or {}).get('initData', '')
+                except Exception:
+                    init_data = ''
 
-        # ── Step 2: HMAC validation (production path) ────────────────────────
-        if BOT_TOKEN and init_data:
-            user_id, user_obj = validate_telegram_init_data(init_data)
-            if not user_id:
-                return jsonify({'error': 'Unauthorized: invalid initData',
-                                'code': 'INVALID_INIT_DATA'}), 403
-            # Reject stale initData (>24 h old) per Telegram's recommendation
+            if not init_data:
+                return jsonify({'error': 'initData required', 'code': 'NO_INIT_DATA'}), 403
+
+            uid_str, user_obj = validate_telegram_init_data(init_data)
+            if not uid_str:
+                return jsonify({'error': 'Invalid or tampered initData', 'code': 'BAD_INIT_DATA'}), 403
+
+            # Freshness check — fail CLOSED: auth_date must be present, positive,
+            # within max-age, and not in the future beyond clock-skew tolerance.
             try:
                 from urllib.parse import parse_qs as _pqs
-                auth_date = int(_pqs(init_data).get('auth_date', ['0'])[0])
-                if auth_date > 0 and (datetime.now().timestamp() - auth_date) > 86400:
-                    return jsonify({'error': 'Unauthorized: initData expired',
-                                    'code': 'EXPIRED_INIT_DATA'}), 403
-            except Exception:
-                pass
-            g.telegram_user_id = user_id
+                import time as _time
+                auth_date_vals = _pqs(init_data).get('auth_date', [])
+                if not auth_date_vals:
+                    return jsonify({'error': 'initData missing auth_date', 'code': 'NO_AUTH_DATE'}), 403
+                auth_date = int(auth_date_vals[0])
+                if auth_date <= 0:
+                    return jsonify({'error': 'initData invalid auth_date', 'code': 'BAD_AUTH_DATE'}), 403
+                now = _time.time()
+                age = now - auth_date
+                if age > _INIT_DATA_MAX_AGE:
+                    return jsonify({'error': 'initData expired', 'code': 'EXPIRED_INIT_DATA'}), 403
+                if age < -60:  # reject timestamps more than 60s in the future
+                    return jsonify({'error': 'initData auth_date in future', 'code': 'FUTURE_AUTH_DATE'}), 403
+            except (ValueError, TypeError):
+                return jsonify({'error': 'initData auth_date malformed', 'code': 'BAD_AUTH_DATE'}), 403
+
+            g.telegram_user_id = uid_str
             g.telegram_user = user_obj
             return f(*args, **kwargs)
 
-        # ── Step 3: dev fallback — uid param only when BOT_TOKEN absent ──────
-        if not BOT_TOKEN:
-            uid = request.args.get('uid', '').strip()
-            if not uid and request.is_json:
-                try:
-                    uid = (request.get_json(silent=True) or {}).get('uid', '').strip()
-                except Exception:
-                    pass
-            if uid:
-                g.telegram_user_id = uid
-                g.telegram_user = None
-                return f(*args, **kwargs)
-            return jsonify({'error': 'Missing uid (dev: BOT_TOKEN not set)',
-                            'code': 'NO_UID'}), 403
-
-        # ── Step 4: BOT_TOKEN set but no initData at all ─────────────────────
-        return jsonify({'error': 'Unauthorized: missing Telegram initData',
-                        'code': 'NO_INIT_DATA'}), 403
+        # --- DEV/TEST MODE: BOT_TOKEN not set, accept uid param ---
+        uid = request.args.get('uid', '')
+        if not uid:
+            try:
+                uid = (request.get_json(silent=True) or {}).get('uid', '')
+            except Exception:
+                pass
+        if uid:
+            g.telegram_user_id = uid
+            g.telegram_user = None
+            return f(*args, **kwargs)
+        return jsonify({'error': 'Missing uid', 'code': 'NO_UID'}), 403
     return decorated
 
 def get_request_uid():
@@ -4052,7 +4055,7 @@ def api_mines_start():
 
 @app.route('/api/engine/mines/reveal', methods=['POST'])
 @webapp_auth
-def api_mines_reveal():
+def api_engine_mines_reveal():
     if not _VEX_GAMES:
         return jsonify({'error': 'Games engine not available'}), 500
     data = request.json
@@ -4114,7 +4117,7 @@ def api_mines_reveal():
 
 @app.route('/api/engine/mines/cashout', methods=['POST'])
 @webapp_auth
-def api_mines_cashout():
+def api_engine_mines_cashout():
     if not _VEX_GAMES:
         return jsonify({'error': 'Games engine not available'}), 500
     data = request.json
@@ -4289,6 +4292,940 @@ def api_plinko_end():
     _gm.tracker.log_session({'session_id': session_id, 'game_id': 'GAME007', 'user_id': uid, 'bet_amount': bet_amount, 'payout': payout, 'result': result, 'balance_before': 0, 'balance_after': _gm.get_balance(uid), 'multiplier': multiplier})
     _gm.tracker.update_profile(uid, {'bet_amount': bet_amount, 'payout': payout, 'result': result, 'game_id': 'GAME007', 'balance_after': _gm.get_balance(uid)})
     return jsonify({'success': True, 'result': result, 'payout': payout})
+
+# ===== Mines — Frontend API (/api/mines/*) =====
+# Sessions keyed by uid so reveal/cashout don't need a session_id param.
+
+_mines_lock = threading.Lock()
+
+# ===== Per-user locking + request-ID idempotency =====
+# Pattern mirrors aviator_engine's _request_cache approach.
+# Client sends X-Request-Id header (or request_id body field) per logical action.
+# The server acquires a per-user lock, checks the cache atomically, and stores the
+# result before releasing — so concurrent retries never double-charge.
+
+import time as _idem_time
+
+_user_locks = {}          # { uid: threading.Lock() }
+_user_locks_lock = threading.Lock()
+_request_results = {}     # { (uid, request_id): {'result': dict, 'exp': float} }
+_REQUEST_RESULT_TTL = 300  # 5 minutes
+
+def _get_user_lock(uid):
+    with _user_locks_lock:
+        if uid not in _user_locks:
+            _user_locks[uid] = threading.Lock()
+        return _user_locks[uid]
+
+def _get_request_id():
+    """Extract client-supplied idempotency key from header or body."""
+    rid = request.headers.get('X-Request-Id', '')
+    if not rid:
+        try:
+            rid = (request.get_json(silent=True) or {}).get('request_id', '')
+        except Exception:
+            pass
+    return rid or None
+
+def _check_request_cache(uid, request_id):
+    """Check for a previously stored result (must be called while holding user lock)."""
+    if not request_id:
+        return None
+    entry = _request_results.get((uid, request_id))
+    if entry and entry['exp'] > _idem_time.time():
+        return entry['result']
+    return None
+
+def _store_request_result(uid, request_id, result):
+    """Persist result for future retries (must be called while holding user lock)."""
+    if not request_id:
+        return
+    # Prune stale entries lazily
+    now = _idem_time.time()
+    expired = [k for k, v in list(_request_results.items()) if v['exp'] <= now]
+    for k in expired:
+        _request_results.pop(k, None)
+    _request_results[(uid, request_id)] = {'result': result, 'exp': now + _REQUEST_RESULT_TTL}
+
+# ===
+
+def _mines_session_file():
+    return os.path.join(BASE_DIR, 'mines_user_sessions.json')
+
+def _load_mines_sessions():
+    try:
+        f = _mines_session_file()
+        if os.path.exists(f):
+            with open(f, 'r') as fh:
+                return json.load(fh)
+    except Exception:
+        pass
+    return {}
+
+def _save_mines_sessions(state):
+    try:
+        with open(_mines_session_file(), 'w') as fh:
+            json.dump(state, fh)
+    except Exception:
+        pass
+
+@app.route('/api/mines/new', methods=['POST'])
+@webapp_auth
+def api_mines_new():
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    data = request.json or {}
+    uid = get_request_uid()
+    request_id = _get_request_id()
+    if not uid:
+        return jsonify({'error': 'Missing params'}), 400
+
+    # Fast idempotency check (SQLite read, survives restarts)
+    if request_id:
+        cached = _gm.get_idempotency_record(uid, request_id)
+        if cached:
+            return jsonify(cached)
+
+    bet_amount = float(data.get('bet', 0))
+    mine_count = int(data.get('mines_count', 3))
+    if bet_amount <= 0:
+        return jsonify({'error': 'Missing params'}), 400
+    mine_count = max(1, min(24, mine_count))
+
+    player = _gm.tracker.get_profile(uid)
+    game = _gm.get_game('GAME006') or {
+        'id': 'GAME006', 'base_win_chance': '0.45', 'house_edge_pct': '15',
+        'min_bet': '10', 'max_bet': '2000'
+    }
+
+    risk_check = _gm.risk.check_risk(player, bet_amount, game)
+    if not risk_check['allowed']:
+        msg = risk_check['alerts'][0]['message'] if risk_check.get('alerts') else 'محظور'
+        return jsonify({'success': False, 'error': msg})
+
+    balance = _gm.get_balance(uid)
+    if balance < bet_amount:
+        return jsonify({'success': False, 'error': 'رصيد غير كافٍ', 'need_deposit': True, 'balance': balance})
+
+    all_positions = list(range(25))
+    random.shuffle(all_positions)
+    mine_positions = all_positions[:mine_count]
+
+    algo_result = _gm.algorithm.calculate_win_chance(player, game, bet_amount)
+    if algo_result['decision'] == 'force_lose' and random.random() < 0.6:
+        center_positions = [6, 7, 8, 11, 12, 13, 16, 17, 18]
+        non_center = [m for m in mine_positions if m not in center_positions]
+        if non_center:
+            swap_out = random.choice(non_center)
+            available = [c for c in center_positions if c not in mine_positions]
+            if available:
+                mine_positions.remove(swap_out)
+                mine_positions.append(random.choice(available))
+
+    game_id = f"MNW{str(int(datetime.now().timestamp()))[-8:]}"
+
+    # Atomic: deduct bet (payout=0) + record idempotency in one SQLite transaction
+    # Template has game_id/balance_before; balance_after is filled in by settle_with_idempotency
+    template = {'success': True, 'game_id': game_id, 'balance_before': balance}
+    ok, stored, race_cached = _gm.settle_with_idempotency(uid, bet_amount, 0, request_id, template)
+    if race_cached:
+        return jsonify(race_cached)
+    if not ok:
+        return jsonify({'success': False, 'error': 'رصيد غير كافٍ', 'need_deposit': True, 'balance': balance})
+
+    result = stored  # has balance_after
+
+    _gm.algorithm.log_decision(
+        session_id=game_id, user_id=uid, game_id='GAME006',
+        base_chance=float(game.get('base_win_chance', 0.45)),
+        adjusted_chance=algo_result['win_chance'], factors=algo_result['factors'],
+        decision=algo_result['decision'],
+        reason=f"Mines count={mine_count}; {algo_result['reason']}"
+    )
+
+    with _mines_lock:
+        sessions = _load_mines_sessions()
+        sessions[str(uid)] = {
+            'game_id': game_id, 'uid': str(uid),
+            'mine_positions': mine_positions, 'bet_amount': bet_amount,
+            'mine_count': mine_count, 'revealed': [], 'multiplier': 1.0,
+            'game_over': False, 'paid_out': False,
+            'created_at': datetime.now().isoformat()
+        }
+        _save_mines_sessions(sessions)
+
+    return jsonify(result)
+
+@app.route('/api/mines/reveal', methods=['POST'])
+@webapp_auth
+def api_mines_reveal():
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    data = request.json or {}
+    uid = get_request_uid()
+    cell = data.get('cell')
+    if cell is None:
+        return jsonify({'error': 'Missing cell'}), 400
+    cell = int(cell)
+    if cell < 0 or cell > 24:
+        return jsonify({'error': 'Invalid cell'}), 400
+
+    with _mines_lock:
+        sessions = _load_mines_sessions()
+        state = sessions.get(str(uid))
+        if not state:
+            return jsonify({'error': 'No active game'}), 400
+
+        # Idempotency: if this cell was already revealed, return the cached result
+        reveal_results = state.get('reveal_results', {})
+        if str(cell) in reveal_results:
+            return jsonify(reveal_results[str(cell)])
+
+        if state.get('game_over'):
+            return jsonify({'error': 'No active game'}), 400
+
+        mine_positions = state['mine_positions']
+        is_mine = cell in mine_positions
+        state['revealed'].append(cell)
+        if 'reveal_results' not in state:
+            state['reveal_results'] = {}
+
+        if is_mine:
+            state['game_over'] = True
+            state['multiplier'] = 0
+            resp = {'success': True, 'is_mine': True, 'multiplier': 0,
+                    'game_over': True, 'mine_cells': mine_positions}
+            state['reveal_results'][str(cell)] = resp
+            sessions[str(uid)] = state
+            _save_mines_sessions(sessions)
+            return jsonify(resp)
+
+        revealed_count = len(state['revealed'])
+        safe_count = 25 - state['mine_count']
+        mult = 1.0
+        for i in range(revealed_count):
+            mult *= (25 - i) / (25 - state['mine_count'] - i)
+        game = _gm.get_game('GAME006')
+        house_edge = float(game.get('house_edge_pct', 15)) / 100 if game else 0.15
+        mult *= (1 - house_edge * 0.5)
+        state['multiplier'] = round(mult, 4)
+
+        all_safe = revealed_count >= safe_count
+        payout = 0.0
+        new_balance = None
+        bet_amount = state.get('bet_amount', 0)
+        game_id_mines = state.get('game_id', '')
+
+        if all_safe and not state.get('paid_out'):
+            payout = round(bet_amount * state['multiplier'], 2)
+            state['game_over'] = True
+            state['paid_out'] = True
+
+        # Build partial resp now (no balance_after yet for all_safe case)
+        resp = {'success': True, 'is_mine': False, 'multiplier': state['multiplier'],
+                'game_over': all_safe, 'all_safe': all_safe,
+                'mine_cells': mine_positions if all_safe else []}
+        if all_safe:
+            resp['payout'] = payout
+
+        # Cache reveal result and persist BEFORE crediting (journal-then-execute ordering)
+        state['reveal_results'][str(cell)] = resp
+        sessions[str(uid)] = state
+        _save_mines_sessions(sessions)
+
+    # Credit payout AFTER session state is durably written.
+    # credit_with_idempotency is atomic: credit + idempotency record in one SQLite transaction.
+    # Derived key ensures re-entry (retry after crash) does not double-pay.
+    if all_safe and not state.get('_already_credited'):
+        derived_key = f"reveal_allsafe_{game_id_mines}"
+        template = {'payout': payout, 'mine_cells': mine_positions, 'all_safe': True}
+        _ok, stored, race_cached = _gm.credit_with_idempotency(uid, payout, derived_key, template)
+        credit_result = stored or race_cached or {}
+        new_balance = credit_result.get('balance_after')
+        resp = state.get('reveal_results', {}).get(str(cell), resp)
+        if new_balance is not None:
+            resp = dict(resp)
+            resp['balance_after'] = new_balance
+            # Update cached result with balance_after
+            with _mines_lock:
+                sessions2 = _load_mines_sessions()
+                if str(uid) in sessions2:
+                    sessions2[str(uid)].get('reveal_results', {})[str(cell)] = resp
+                    _save_mines_sessions(sessions2)
+        _gm.tracker.log_session({
+            'session_id': game_id_mines, 'game_id': 'GAME006',
+            'user_id': uid, 'bet_amount': bet_amount, 'payout': payout,
+            'result': 'win', 'balance_before': 0, 'balance_after': new_balance,
+            'multiplier': state['multiplier']
+        })
+        _gm.tracker.update_profile(uid, {
+            'bet_amount': bet_amount, 'payout': payout, 'result': 'win',
+            'game_id': 'GAME006', 'balance_after': new_balance
+        })
+
+    return jsonify(resp)
+
+@app.route('/api/mines/cashout', methods=['POST'])
+@webapp_auth
+def api_mines_cashout():
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    data = request.json or {}
+    uid = get_request_uid()
+    request_id = _get_request_id()
+
+    # Fast SQLite idempotency check (survives restarts)
+    if request_id:
+        cached = _gm.get_idempotency_record(uid, request_id)
+        if cached:
+            return jsonify(cached)
+
+    with _mines_lock:
+        sessions = _load_mines_sessions()
+        state = sessions.get(str(uid))
+
+        # Session-level idempotency: cashout_result persisted in session JSON
+        if state and state.get('paid_out') and state.get('cashout_result'):
+            return jsonify(state['cashout_result'])
+
+        if not state or state.get('game_over') or state.get('paid_out'):
+            return jsonify({'error': 'No active game'}), 400
+
+        multiplier = state.get('multiplier', 1.0)
+        bet_amount = state.get('bet_amount', 0)
+        mine_positions = state.get('mine_positions', [])
+        game_id = state.get('game_id', '')
+        payout = round(bet_amount * multiplier, 2)
+
+        # Mark consumed BEFORE crediting — prevents double-cashout even if credit fails
+        state['game_over'] = True
+        state['paid_out'] = True
+        sessions[str(uid)] = state
+        _save_mines_sessions(sessions)
+
+    # Credit-only: bet was pre-deducted in /new.
+    # credit_with_idempotency is atomic: credit + idempotency record in one SQLite transaction.
+    response_template = {'success': True, 'payout': payout,
+                         'multiplier': multiplier, 'mine_cells': mine_positions}
+    ok, stored, race_cached = _gm.credit_with_idempotency(uid, payout, request_id, response_template)
+    if race_cached:
+        return jsonify(race_cached)
+    if not ok:
+        return jsonify({'success': False, 'error': 'Settlement failed'}), 500
+
+    result = stored  # has balance_after
+    new_balance = result.get('balance_after', 0)
+
+    # Persist result in session JSON too (for clients without request_id support)
+    with _mines_lock:
+        sessions = _load_mines_sessions()
+        if str(uid) in sessions:
+            sessions[str(uid)]['cashout_result'] = result
+            _save_mines_sessions(sessions)
+
+    _gm.tracker.log_session({
+        'session_id': game_id, 'game_id': 'GAME006',
+        'user_id': uid, 'bet_amount': bet_amount, 'payout': payout,
+        'result': 'win', 'balance_before': 0, 'balance_after': new_balance,
+        'multiplier': multiplier
+    })
+    _gm.tracker.update_profile(uid, {
+        'bet_amount': bet_amount, 'payout': payout, 'result': 'win',
+        'game_id': 'GAME006', 'balance_after': new_balance
+    })
+
+    return jsonify(result)
+
+# ===== Plinko — Frontend API (/api/plinko/drop) =====
+
+# Multiplier tables: [rows][risk] → list of slot multipliers (left to right)
+
+# Multiplier tables MUST exactly match MULT_TABLES in plinko.html
+# slot count = rows + 1  (8→9, 12→13, 16→17)
+_PLINKO_MULTS = {
+    8: {
+        'low':  [5.6, 2.1, 1.1, 1.0, 0.5, 1.0, 1.1, 2.1, 5.6],
+        'med':  [13, 3, 1.3, 0.7, 0.4, 0.7, 1.3, 3, 13],
+        'high': [29, 4, 1.5, 0.3, 0.2, 0.3, 1.5, 4, 29],
+    },
+    12: {
+        'low':  [10, 3, 1.6, 1.4, 1.1, 1.0, 0.5, 1.0, 1.1, 1.4, 1.6, 3, 10],
+        'med':  [33, 11, 4, 2, 1.1, 0.6, 0.3, 0.6, 1.1, 2, 4, 11, 33],
+        'high': [141, 21, 5.6, 2.5, 1.2, 0.5, 0.2, 0.5, 1.2, 2.5, 5.6, 21, 141],
+    },
+    16: {
+        'low':  [16, 9, 2, 1.4, 1.4, 1.2, 1.1, 1.0, 0.5, 1.0, 1.1, 1.2, 1.4, 1.4, 2, 9, 16],
+        'med':  [110, 41, 10, 5, 3, 1.5, 1.0, 0.5, 0.3, 0.5, 1.0, 1.5, 3, 5, 10, 41, 110],
+        'high': [999, 130, 26, 9, 4, 2, 0.7, 0.2, 0.1, 0.2, 0.7, 2, 4, 9, 26, 130, 999],
+    },
+}
+
+@app.route('/api/plinko/drop', methods=['POST'])
+@webapp_auth
+def api_plinko_drop():
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    data = request.json or {}
+    uid = get_request_uid()
+    request_id = _get_request_id()
+    if not uid:
+        return jsonify({'error': 'Missing params'}), 400
+
+    # Fast SQLite idempotency check (survives restarts)
+    if request_id:
+        cached = _gm.get_idempotency_record(uid, request_id)
+        if cached:
+            return jsonify(cached)
+
+    bet_amount = float(data.get('bet', 0))
+    rows = int(data.get('rows', 8))
+    risk = str(data.get('risk', 'low')).lower()
+    if rows not in _PLINKO_MULTS:
+        rows = 8
+    if risk not in ('low', 'med', 'high'):
+        risk = 'low'
+    if bet_amount <= 0:
+        return jsonify({'error': 'Missing params'}), 400
+
+    player = _gm.tracker.get_profile(uid)
+    game = _gm.get_game('GAME007') or {
+        'id': 'GAME007', 'base_win_chance': '0.40', 'house_edge_pct': '16',
+        'min_bet': '10', 'max_bet': '2000'
+    }
+
+    risk_check = _gm.risk.check_risk(player, bet_amount, game)
+    if not risk_check['allowed']:
+        msg = risk_check['alerts'][0]['message'] if risk_check.get('alerts') else 'محظور'
+        return jsonify({'success': False, 'error': msg})
+
+    balance = _gm.get_balance(uid)
+    if balance < bet_amount:
+        return jsonify({'success': False, 'error': 'رصيد غير كافٍ', 'need_deposit': True, 'balance': balance})
+
+    mults = _PLINKO_MULTS[rows][risk]
+    num_slots = len(mults)
+
+    algo_result = _gm.algorithm.calculate_win_chance(player, game, bet_amount)
+    win_chance = algo_result['win_chance']
+
+    center = num_slots // 2
+    if win_chance > 0.6:
+        weights = [abs(i - center) + 1 for i in range(num_slots)]
+    elif win_chance > 0.4:
+        weights = [1] * num_slots
+        weights[center] = 2
+    else:
+        weights = [max(1, center - abs(i - center) + 2) for i in range(num_slots)]
+
+    total_w = sum(weights)
+    rand_val = random.uniform(0, total_w)
+    slot = 0
+    cumulative = 0
+    for i, w in enumerate(weights):
+        cumulative += w
+        if rand_val <= cumulative:
+            slot = i
+            break
+
+    multiplier = mults[slot]
+    payout = round(bet_amount * multiplier, 2)
+    result_str = 'win' if multiplier >= 1.0 else 'lose'
+
+    # Atomic: settle + idempotency record in one SQLite transaction
+    template = {'success': True, 'slot': slot, 'multiplier': multiplier,
+                'payout': payout, 'result': result_str, 'balance_before': balance}
+    ok, stored, race_cached = _gm.settle_with_idempotency(uid, bet_amount, payout, request_id, template)
+    if race_cached:
+        return jsonify(race_cached)
+    if not ok:
+        return jsonify({'success': False, 'error': 'رصيد غير كافٍ', 'need_deposit': True, 'balance': balance})
+
+    result = stored
+    new_balance = result.get('balance_after', balance)
+
+    session_id = f"PLW{str(int(datetime.now().timestamp()))[-8:]}"
+    _gm.algorithm.log_decision(
+        session_id=session_id, user_id=uid, game_id='GAME007',
+        base_chance=float(game.get('base_win_chance', 0.40)),
+        adjusted_chance=win_chance, factors=algo_result['factors'],
+        decision=algo_result['decision'],
+        reason=f"Plinko rows={rows} risk={risk} slot={slot} mult={multiplier}; {algo_result['reason']}"
+    )
+    _gm.tracker.log_session({
+        'session_id': session_id, 'game_id': 'GAME007', 'user_id': uid,
+        'bet_amount': bet_amount, 'payout': payout, 'result': result_str,
+        'balance_before': balance, 'balance_after': new_balance,
+        'multiplier': multiplier
+    })
+    _gm.tracker.update_profile(uid, {
+        'bet_amount': bet_amount, 'payout': payout, 'result': result_str,
+        'game_id': 'GAME007', 'balance_after': new_balance
+    })
+    return jsonify(result)
+
+# ===== Wheel — Frontend API (/api/wheel/spin) =====
+
+# Must match the SEGMENTS array in wheel.html exactly (same order, same indices)
+_WHEEL_SEGMENTS = [
+    {'mult': 0.0,  'label': '💀'},
+    {'mult': 1.5,  'label': '1.5x'},
+    {'mult': 2.0,  'label': '2x'},
+    {'mult': 0.5,  'label': '0.5x'},
+    {'mult': 5.0,  'label': '5x'},
+    {'mult': 1.0,  'label': '1x'},
+    {'mult': 10.0, 'label': '10x'},
+    {'mult': 0.0,  'label': '💀'},
+]
+
+@app.route('/api/wheel/spin', methods=['POST'])
+@webapp_auth
+def api_wheel_spin():
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    data = request.json or {}
+    uid = get_request_uid()
+    request_id = _get_request_id()
+    if not uid:
+        return jsonify({'error': 'Missing params'}), 400
+
+    # Fast SQLite idempotency check (survives restarts)
+    if request_id:
+        cached = _gm.get_idempotency_record(uid, request_id)
+        if cached:
+            return jsonify(cached)
+
+    bet_amount = float(data.get('bet', 0))
+    if bet_amount <= 0:
+        return jsonify({'error': 'Missing params'}), 400
+
+    player = _gm.tracker.get_profile(uid)
+    game = _gm.get_game('GAME009') or {
+        'id': 'GAME009', 'base_win_chance': '0.50', 'house_edge_pct': '10',
+        'min_bet': '10', 'max_bet': '5000'
+    }
+
+    risk_check = _gm.risk.check_risk(player, bet_amount, game)
+    if not risk_check['allowed']:
+        msg = risk_check['alerts'][0]['message'] if risk_check.get('alerts') else 'محظور'
+        return jsonify({'success': False, 'error': msg})
+
+    balance = _gm.get_balance(uid)
+    if balance < bet_amount:
+        return jsonify({'success': False, 'error': 'رصيد غير كافٍ', 'need_deposit': True, 'balance': balance})
+
+    algo_result = _gm.algorithm.calculate_win_chance(player, game, bet_amount)
+    win_chance = algo_result['win_chance']
+
+    weights = []
+    for seg in _WHEEL_SEGMENTS:
+        m = seg['mult']
+        if m == 0.0:
+            weights.append(max(1, int((1 - win_chance) * 10)))
+        elif m >= 5.0:
+            weights.append(max(1, int(win_chance * 5)))
+        elif m >= 1.0:
+            weights.append(max(1, int(win_chance * 8)))
+        else:
+            weights.append(max(1, int((1 - win_chance) * 6)))
+
+    total_w = sum(weights)
+    rand_val = random.uniform(0, total_w)
+    segment = 0
+    cumulative = 0
+    for i, w in enumerate(weights):
+        cumulative += w
+        if rand_val <= cumulative:
+            segment = i
+            break
+
+    multiplier = _WHEEL_SEGMENTS[segment]['mult']
+    payout = round(bet_amount * multiplier, 2)
+    result_str = 'win' if multiplier > 0 else 'lose'
+
+    # Atomic: settle + idempotency record in one SQLite transaction
+    template = {'success': True, 'segment': segment, 'multiplier': multiplier,
+                'payout': payout, 'result': result_str, 'balance_before': balance}
+    ok, stored, race_cached = _gm.settle_with_idempotency(uid, bet_amount, payout, request_id, template)
+    if race_cached:
+        return jsonify(race_cached)
+    if not ok:
+        return jsonify({'success': False, 'error': 'رصيد غير كافٍ', 'need_deposit': True, 'balance': balance})
+
+    result = stored
+    new_balance = result.get('balance_after', balance)
+
+    session_id = f"WHL{str(int(datetime.now().timestamp()))[-8:]}"
+    _gm.algorithm.log_decision(
+        session_id=session_id, user_id=uid, game_id='GAME009',
+        base_chance=float(game.get('base_win_chance', 0.50)),
+        adjusted_chance=win_chance, factors=algo_result['factors'],
+        decision=algo_result['decision'],
+        reason=f"Wheel segment={segment} mult={multiplier}; {algo_result['reason']}"
+    )
+    _gm.tracker.log_session({
+        'session_id': session_id, 'game_id': 'GAME009', 'user_id': uid,
+        'bet_amount': bet_amount, 'payout': payout, 'result': result_str,
+        'balance_before': balance, 'balance_after': new_balance,
+        'multiplier': multiplier
+    })
+    _gm.tracker.update_profile(uid, {
+        'bet_amount': bet_amount, 'payout': payout, 'result': result_str,
+        'game_id': 'GAME009', 'balance_after': new_balance
+    })
+    return jsonify(result)
+
+# ===== Lottery — Frontend API (/api/lottery/state + /api/lottery/buy) =====
+
+_LOTTERY_TICKET_PRICE = 50      # per ticket
+_LOTTERY_ROUND_DURATION = 3600  # seconds (1 hour rounds)
+_LOTTERY_NUMBERS_COUNT = 5      # numbers per ticket
+_LOTTERY_MAX_NUMBER = 30
+_lottery_lock = threading.Lock()
+
+def _lottery_state_file():
+    return os.path.join(BASE_DIR, 'lottery_state.json')
+
+def _load_lottery_state():
+    try:
+        f = _lottery_state_file()
+        if os.path.exists(f):
+            with open(f, 'r') as fh:
+                return json.load(fh)
+    except Exception:
+        pass
+    return {}
+
+def _save_lottery_state(state, raise_on_error=False):
+    """Persist lottery state to disk.
+
+    When raise_on_error=True (used during draw resolution), exceptions propagate
+    so callers know the state was NOT durably saved before they credit winners.
+    """
+    try:
+        with open(_lottery_state_file(), 'w') as fh:
+            json.dump(state, fh)
+    except Exception as e:
+        if raise_on_error:
+            raise
+        print(f"[lottery] _save_lottery_state warning (non-critical): {e}")
+
+def _lottery_resume_pending_credits(state):
+    """Resume any winner credits that were persisted but not yet completed.
+
+    Called on every entry to _get_or_create_lottery_round before starting a new round.
+    winners_to_credit is the durable record of pending payments — credit_with_idempotency
+    ensures each winner is paid exactly once even across restarts or partial failures.
+    After all credits succeed, clears winners_to_credit and persists state.
+    """
+    pending = state.get('winners_to_credit', [])
+    if not pending:
+        return
+    round_id = state.get('round_id', '')
+    remaining = list(pending)
+    for entry in pending:
+        w_uid = entry['uid']
+        amount = entry['amount']
+        idem_key = entry['idem_key']
+        try:
+            _gm.credit_with_idempotency(
+                str(w_uid), amount, idem_key,
+                {'source': 'lottery', 'round_id': round_id, 'prize': amount}
+            )
+            remaining.remove(entry)
+        except Exception as e:
+            print(f"[lottery] credit failed for {w_uid}: {e}")
+    state['winners_to_credit'] = remaining
+    # Persist after crediting; best-effort (don't fail the whole round if save fails here)
+    _save_lottery_state(state)
+
+
+def _get_or_create_lottery_round():
+    """Return the current active lottery round, creating one if needed or drawing if expired.
+
+    Crash-safe draw protocol:
+      1. Compute draw result and mark tickets.
+      2. Build winners_to_credit — the durable list of pending payments.
+      3. Persist drawn state + winners_to_credit (raise on failure — no credits without durable state).
+      4. Credit each winner via credit_with_idempotency (idempotent across retries/restarts).
+      5. Clear winners_to_credit, persist final state.
+    On every subsequent call, _lottery_resume_pending_credits retries any credits that were
+    not yet completed (e.g. process crashed between steps 4 and 5).
+    """
+    with _lottery_lock:
+        state = _load_lottery_state()
+        now_ts = datetime.now().timestamp()
+
+        # Resume any pending winner credits before doing anything else (crash recovery path)
+        if state and state.get('drawn') and state.get('winners_to_credit'):
+            _lottery_resume_pending_credits(state)
+            state = _load_lottery_state()  # reload after credits + save
+
+        # Draw if round has expired
+        if state and float(state.get('draw_time', 0)) <= now_ts and not state.get('drawn'):
+            drawn_nums = sorted(random.sample(range(1, _LOTTERY_MAX_NUMBER + 1), _LOTTERY_NUMBERS_COUNT))
+            round_id = state.get('round_id', '')
+            state['drawn'] = drawn_nums
+            state['drawn_at'] = now_ts
+            # Resolve tickets — mark win/lose statuses in state
+            winning_uids = []
+            prize_per_winner = 0.0
+            for ticket in state.get('tickets', []):
+                matches = len(set(ticket['numbers']) & set(drawn_nums))
+                if matches == _LOTTERY_NUMBERS_COUNT:
+                    ticket['status'] = 'win'
+                    ticket['scratched'] = True
+                    ticket['drawn'] = drawn_nums
+                    winning_uids.append(ticket['uid'])
+                else:
+                    ticket['status'] = 'lose'
+                    ticket['scratched'] = True
+                    ticket['drawn'] = drawn_nums
+            if winning_uids:
+                prize_per_winner = round(state.get('prize_pool', 0) / len(winning_uids), 2)
+            # Stamp prize amounts on tickets before persisting
+            for ticket in state.get('tickets', []):
+                ticket['prize'] = prize_per_winner if ticket.get('status') == 'win' else 0.0
+            # Preserve previous round data
+            state['previous_round'] = {
+                'round_id': round_id,
+                'draw_time': state.get('draw_time'),
+                'drawn': drawn_nums,
+                'drawn_at': now_ts,
+                'tickets': list(state.get('tickets', [])),
+                'prize_per_winner': prize_per_winner,
+            }
+            history_entry = {
+                'round_id': round_id,
+                'drawn': drawn_nums,
+                'drawn_at': now_ts,
+                'tickets_sold': state.get('tickets_sold', 0),
+                'prize_pool': state.get('prize_pool', 0),
+                'winners': len(winning_uids),
+                'prize_per_winner': prize_per_winner,
+            }
+            state.setdefault('history', []).append(history_entry)
+            if len(state['history']) > 10:
+                state['history'] = state['history'][-10:]
+
+            # Build the durable pending-credit list BEFORE persisting drawn state.
+            # Each entry has a stable idem_key derived from round_id + uid.
+            state['winners_to_credit'] = [
+                {
+                    'uid': str(w_uid),
+                    'amount': prize_per_winner,
+                    'idem_key': f"lottery_{round_id}_{w_uid}"
+                }
+                for w_uid in winning_uids
+            ]
+
+            # STEP 3: Persist drawn state + winners_to_credit atomically.
+            # raise_on_error=True: if the write fails, no credits happen (correct).
+            # If the process crashes after this write but before credits complete,
+            # _lottery_resume_pending_credits (called above) will resume on next invocation.
+            _save_lottery_state(state, raise_on_error=True)
+
+            # STEP 4: Credit each winner (idempotent via SQLite idem_key).
+            _lottery_resume_pending_credits(state)
+            state = _load_lottery_state()  # reload to get cleared winners_to_credit
+
+        # Start new round if needed
+        if not state or (state.get('drawn') and not state.get('winners_to_credit')):
+            round_id = f"LTR{int(now_ts)}"
+            new_state = {
+                'round_id': round_id,
+                'draw_time': now_ts + _LOTTERY_ROUND_DURATION,
+                'ticket_price': _LOTTERY_TICKET_PRICE,
+                'tickets': [],
+                'tickets_sold': 0,
+                'prize_pool': 0,
+                'drawn': None,
+                'history': state.get('history', []) if state else [],
+                # Carry forward previous round so users can see their results
+                'previous_round': state.get('previous_round') if state else None,
+            }
+            _save_lottery_state(new_state)
+            return new_state
+
+        return state
+
+@app.route('/api/lottery/state')
+@webapp_auth
+def api_lottery_state():
+    uid = get_request_uid()
+    state = _get_or_create_lottery_round()
+    # Tickets from the current active round
+    my_tickets = [t for t in state.get('tickets', []) if str(t.get('uid')) == str(uid)]
+    # If user has no tickets yet in the new round, also return their results from
+    # the previous round so the UI can show their winning/losing tickets.
+    if not my_tickets:
+        prev = state.get('previous_round') or {}
+        prev_tickets = [t for t in prev.get('tickets', []) if str(t.get('uid')) == str(uid)]
+        if prev_tickets:
+            my_tickets = prev_tickets
+    return jsonify({
+        'round_id': state.get('round_id'),
+        'draw_time': state.get('draw_time'),
+        'ticket_price': state.get('ticket_price', _LOTTERY_TICKET_PRICE),
+        'tickets_sold': state.get('tickets_sold', 0),
+        'prize_pool': state.get('prize_pool', 0),
+        'my_tickets': my_tickets,
+        'history': state.get('history', [])[-5:],
+    })
+
+@app.route('/api/lottery/buy', methods=['POST'])
+@webapp_auth
+def api_lottery_buy():
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    data = request.json or {}
+    uid = get_request_uid()
+    request_id = _get_request_id()
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+
+    # Fast SQLite idempotency check (survives restarts)
+    if request_id:
+        cached = _gm.get_idempotency_record(uid, request_id)
+        if cached:
+            return jsonify(cached)
+
+    count = int(data.get('count', 1))
+    count = max(1, min(10, count))
+
+    state = _get_or_create_lottery_round()
+    if state.get('drawn'):
+        return jsonify({'error': 'الجولة انتهت، جولة جديدة قادمة'}), 400
+
+    ticket_price = state.get('ticket_price', _LOTTERY_TICKET_PRICE)
+    total_cost = ticket_price * count
+    balance = _gm.get_balance(uid)
+    if balance < total_cost:
+        return jsonify({'success': False, 'error': 'رصيد غير كافٍ', 'need_deposit': True, 'balance': balance})
+
+    # Generate tickets before settlement (deterministic from request_id when present)
+    new_tickets = []
+    for _ in range(count):
+        nums = sorted(random.sample(range(1, _LOTTERY_MAX_NUMBER + 1), _LOTTERY_NUMBERS_COUNT))
+        ticket = {
+            'id': f"T{int(datetime.now().timestamp()*1000)}_{random.randint(1000,9999)}",
+            'uid': str(uid),
+            'numbers': nums,
+            'status': 'pending',
+            'scratched': False,
+            'drawn': None,
+        }
+        new_tickets.append(ticket)
+
+    # Build result template without balance_after — settle_with_idempotency fills it in atomically
+    template = {
+        'success': True,
+        'tickets': new_tickets,
+        'prize_pool': round(state.get('prize_pool', 0) + total_cost * 0.8, 2),
+        'tickets_sold': state.get('tickets_sold', 0) + count,
+    }
+    # Atomic: deduct cost + store idempotency record in one SQLite transaction
+    ok, stored, race_cached = _gm.settle_with_idempotency(uid, total_cost, 0, request_id, template)
+    if race_cached:
+        return jsonify(race_cached)
+    if not ok:
+        return jsonify({'success': False, 'error': 'رصيد غير كافٍ', 'need_deposit': True, 'balance': balance})
+
+    # Persist tickets to lottery state only after successful settlement
+    with _lottery_lock:
+        state = _load_lottery_state()
+        for ticket in new_tickets:
+            state.setdefault('tickets', []).append(ticket)
+        state['tickets_sold'] = state.get('tickets_sold', 0) + count
+        state['prize_pool'] = round(state.get('prize_pool', 0) + total_cost * 0.8, 2)
+        _save_lottery_state(state)
+
+    return jsonify(stored)
+
+# ===== Snatch — Frontend API (/api/snatch/spin) =====
+# Snatch is a skill-based client-side game. The server deducts the bet upfront
+# and adds a payout based on the score reported by the client at game end.
+# Since there is no trusted end-of-game call yet, we apply a fixed payout
+# multiplier on game start so the bet/payout is settled atomically.
+
+@app.route('/api/snatch/spin', methods=['POST'])
+@webapp_auth
+def api_snatch_spin():
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    data = request.json or {}
+    uid = get_request_uid()
+    request_id = _get_request_id()
+    if not uid:
+        return jsonify({'error': 'Missing params'}), 400
+
+    # Fast SQLite idempotency check (survives restarts)
+    if request_id:
+        cached = _gm.get_idempotency_record(uid, request_id)
+        if cached:
+            return jsonify(cached)
+
+    bet_amount = float(data.get('bet', 0))
+    if bet_amount <= 0:
+        return jsonify({'error': 'Missing params'}), 400
+
+    player = _gm.tracker.get_profile(uid)
+    game = _gm.get_game('GAME001') or {
+        'id': 'GAME001', 'base_win_chance': '0.55', 'house_edge_pct': '12',
+        'min_bet': '10', 'max_bet': '2000'
+    }
+
+    risk_check = _gm.risk.check_risk(player, bet_amount, game)
+    if not risk_check['allowed']:
+        msg = risk_check['alerts'][0]['message'] if risk_check.get('alerts') else 'محظور'
+        return jsonify({'success': False, 'error': msg})
+
+    balance = _gm.get_balance(uid)
+    if balance < bet_amount:
+        return jsonify({'success': False, 'error': 'رصيد غير كافٍ', 'need_deposit': True, 'balance': balance})
+
+    algo_result = _gm.algorithm.calculate_win_chance(player, game, bet_amount)
+    win_chance = algo_result['win_chance']
+    house_edge = float(game.get('house_edge_pct', 12)) / 100
+
+    won = random.random() < win_chance
+    if won:
+        multiplier = round(random.uniform(1.0, 3.0) * (1 - house_edge * 0.5), 2)
+    else:
+        multiplier = 0.0
+    payout = round(bet_amount * multiplier, 2)
+    result_str = 'win' if won else 'lose'
+
+    # Atomic: settle + idempotency record in one SQLite transaction
+    template = {'success': True, 'won': won, 'multiplier': multiplier,
+                'payout': payout, 'result': result_str, 'balance_before': balance}
+    ok, stored, race_cached = _gm.settle_with_idempotency(uid, bet_amount, payout, request_id, template)
+    if race_cached:
+        return jsonify(race_cached)
+    if not ok:
+        return jsonify({'success': False, 'error': 'رصيد غير كافٍ', 'need_deposit': True, 'balance': balance})
+
+    result = stored
+    new_balance = result.get('balance_after', balance)
+
+    session_id = f"SNT{str(int(datetime.now().timestamp()))[-8:]}"
+    _gm.algorithm.log_decision(
+        session_id=session_id, user_id=uid, game_id='GAME001',
+        base_chance=float(game.get('base_win_chance', 0.55)),
+        adjusted_chance=win_chance, factors=algo_result['factors'],
+        decision=algo_result['decision'],
+        reason=f"Snatch won={won} mult={multiplier}; {algo_result['reason']}"
+    )
+    _gm.tracker.log_session({
+        'session_id': session_id, 'game_id': 'GAME001', 'user_id': uid,
+        'bet_amount': bet_amount, 'payout': payout, 'result': result_str,
+        'balance_before': balance, 'balance_after': new_balance,
+        'multiplier': multiplier
+    })
+    _gm.tracker.update_profile(uid, {
+        'bet_amount': bet_amount, 'payout': payout, 'result': result_str,
+        'game_id': 'GAME001', 'balance_after': new_balance
+    })
+    return jsonify(result)
 
 # ===== Admin: Advanced Game Control =====
 
@@ -4876,428 +5813,6 @@ def api_games_live_players_stream():
             time.sleep(3)
     return Response(generate(), mimetype='text/event-stream',
                     headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
-
-# ===== Wheel — WebApp API =====
-
-_WHEEL_SEGMENTS = [0.0, 1.5, 2.0, 0.5, 5.0, 1.0, 10.0, 0.0]  # must match wheel.html SEGMENTS[i].mult
-_wheel_lock = threading.Lock()
-
-@app.route('/api/wheel/spin', methods=['POST'])
-@webapp_auth
-def api_wheel_spin():
-    if not _VEX_GAMES:
-        return jsonify({'error': 'Games engine not available'}), 500
-    data = request.json or {}
-    uid = get_request_uid()
-    bet_amount = float(data.get('bet', 0))
-    if not uid or bet_amount <= 0:
-        return jsonify({'error': 'معطيات غير صحيحة'}), 400
-
-    player = _gm.tracker.get_profile(uid)
-    game = _gm.get_game('GAME008')
-    if not game:
-        game = {'id': 'GAME008', 'base_win_chance': '0.42', 'house_edge_pct': '14',
-                'min_bet': '10', 'max_bet': '2000'}
-
-    risk_check = _gm.risk.check_risk(player, bet_amount, game)
-    if not risk_check['allowed']:
-        msg = risk_check['alerts'][0]['message'] if risk_check.get('alerts') else 'محظور'
-        return jsonify({'success': False, 'error': msg})
-
-    balance = _gm.get_balance(uid)
-    if balance < bet_amount:
-        return jsonify({'success': False, 'error': 'رصيد غير كافٍ',
-                        'need_deposit': True, 'balance': balance})
-
-    algo = _gm.algorithm.calculate_win_chance(player, game, bet_amount)
-    win_chance = algo['win_chance']
-
-    # Weight segment selection: 0 = lose (skull), others = win
-    # Higher win_chance → bias toward high multipliers
-    if algo['decision'] == 'force_lose':
-        # land on skull (index 0 or 7)
-        segment = random.choice([0, 7])
-    else:
-        # build weights proportional to multiplier × win_chance
-        weights = []
-        for m in _WHEEL_SEGMENTS:
-            if m == 0.0:
-                w = max(0.5, (1 - win_chance) * 4)   # skulls get weight when losing
-            else:
-                w = m * win_chance                    # big multipliers favoured when winning
-            weights.append(w)
-        total = sum(weights)
-        r = random.uniform(0, total)
-        cumul = 0.0
-        segment = 0
-        for i, w in enumerate(weights):
-            cumul += w
-            if r <= cumul:
-                segment = i
-                break
-
-    multiplier = _WHEEL_SEGMENTS[segment]
-    payout = round(bet_amount * multiplier, 2)
-    result = 'win' if multiplier > 0 else 'lose'
-
-    success, balance_after = _gm.deduct_balance(uid, bet_amount)
-    if not success:
-        return jsonify({'success': False, 'error': 'رصيد غير كافٍ',
-                        'need_deposit': True, 'balance': 0})
-
-    if payout > 0:
-        balance_after = _gm.add_balance(uid, payout)
-
-    session_id = f"WHEL{int(datetime.now().timestamp()) % 100000000:08d}"
-    _gm.algorithm.log_decision(
-        session_id=session_id, user_id=uid, game_id='GAME008',
-        base_chance=float(game.get('base_win_chance', 0.42)),
-        adjusted_chance=win_chance, factors=algo['factors'],
-        decision=algo['decision'],
-        reason=f"Wheel seg={segment} mult={multiplier}; {algo['reason']}"
-    )
-    _gm.tracker.log_session({
-        'session_id': session_id, 'game_id': 'GAME008', 'user_id': uid,
-        'bet_amount': bet_amount, 'payout': payout, 'result': result,
-        'balance_before': balance, 'balance_after': balance_after, 'multiplier': multiplier
-    })
-    _gm.tracker.update_profile(uid, {
-        'bet_amount': bet_amount, 'payout': payout, 'result': result,
-        'game_id': 'GAME008', 'balance_after': balance_after
-    })
-
-    with _wheel_lock:
-        spin_row = {
-            'id': session_id, 'uid': str(uid), 'segment': segment,
-            'multiplier': multiplier, 'bet_amount': bet_amount, 'payout': payout,
-            'result': result, 'created_at': datetime.now().isoformat()
-        }
-        _wf = ['id', 'uid', 'segment', 'multiplier', 'bet_amount', 'payout', 'result', 'created_at']
-        append_csv('wheel_webapp_spins.csv', spin_row, _wf)
-
-    return jsonify({
-        'success': True, 'segment': segment, 'multiplier': multiplier,
-        'payout': payout, 'result': result,
-        'balance_before': balance, 'balance_after': balance_after
-    })
-
-
-# ===== Lottery — WebApp API =====
-
-_lottery_lock = threading.Lock()
-_LOT_ROUND_FIELDS = ['id', 'draw_time', 'prize_pool', 'tickets_sold',
-                     'ticket_price', 'status', 'winning_numbers', 'created_at']
-_LOT_TICKET_FIELDS = ['id', 'round_id', 'uid', 'numbers', 'status', 'prize', 'scratched', 'bought_at']
-_LOT_TICKET_PRICE = 50
-_LOT_ROUND_DURATION = 3600   # 1 hour in seconds
-_LOT_POOL_RATIO = 0.80       # 80% of sales go to prize pool
-
-
-def _lot_get_or_create_round():
-    """Return current active round dict, creating one if none exist or triggering draw if expired."""
-    rounds = read_csv('lottery_rounds.csv')
-    now_ts = datetime.now().timestamp()
-
-    # Check for active round
-    active = [r for r in rounds if r.get('status') == 'active']
-    if active:
-        rnd = active[-1]
-        draw_ts = float(rnd.get('draw_time', 0))
-        if now_ts < draw_ts:
-            return rnd
-        # Draw time passed — trigger draw
-        _lot_trigger_draw(rnd, rounds)
-        # Create new round
-        return _lot_create_round(rounds)
-
-    return _lot_create_round(rounds)
-
-
-def _lot_create_round(existing_rounds):
-    now = datetime.now()
-    new_id = f"LOTR{int(now.timestamp()) % 100000000:08d}"
-    draw_ts = now.timestamp() + _LOT_ROUND_DURATION
-    rnd = {
-        'id': new_id,
-        'draw_time': str(int(draw_ts)),
-        'prize_pool': '0',
-        'tickets_sold': '0',
-        'ticket_price': str(_LOT_TICKET_PRICE),
-        'status': 'active',
-        'winning_numbers': '',
-        'created_at': now.isoformat()
-    }
-    existing_rounds.append(rnd)
-    write_csv('lottery_rounds.csv', existing_rounds, _LOT_ROUND_FIELDS)
-    return rnd
-
-
-def _lot_trigger_draw(rnd, all_rounds):
-    """Pick winning numbers, settle tickets, mark round drawn."""
-    round_id = rnd['id']
-    winning = sorted(random.sample(range(1, 36), 5))
-    winning_str = json.dumps(winning)
-
-    tickets = read_csv('lottery_tickets.csv')
-    round_tickets = [t for t in tickets if t.get('round_id') == round_id and t.get('status') == 'pending']
-    prize_pool = float(rnd.get('prize_pool', 0))
-
-    jackpot_winners = []
-    for t in round_tickets:
-        try:
-            nums = json.loads(t.get('numbers', '[]'))
-        except Exception:
-            nums = []
-        matches = len(set(nums) & set(winning))
-        if matches == 5:
-            jackpot_winners.append(t)
-
-    for t in tickets:
-        if t.get('round_id') != round_id or t.get('status') != 'pending':
-            continue
-        try:
-            nums = json.loads(t.get('numbers', '[]'))
-        except Exception:
-            nums = []
-        matches = len(set(nums) & set(winning))
-
-        if matches == 5:
-            if jackpot_winners:
-                share = round(prize_pool * 0.70 / len(jackpot_winners), 2)
-            else:
-                share = round(prize_pool * 0.70, 2)
-            t['prize'] = str(share)
-            t['status'] = 'win'
-            if _VEX_GAMES:
-                _gm.add_balance(t['uid'], share)
-        elif matches == 4:
-            prize = _LOT_TICKET_PRICE * 10
-            t['prize'] = str(prize)
-            t['status'] = 'win'
-            if _VEX_GAMES:
-                _gm.add_balance(t['uid'], prize)
-        elif matches == 3:
-            prize = _LOT_TICKET_PRICE * 2
-            t['prize'] = str(prize)
-            t['status'] = 'win'
-            if _VEX_GAMES:
-                _gm.add_balance(t['uid'], prize)
-        else:
-            t['prize'] = '0'
-            t['status'] = 'lose'
-
-    write_csv('lottery_tickets.csv', tickets, _LOT_TICKET_FIELDS)
-
-    # Mark round drawn
-    for r in all_rounds:
-        if r['id'] == round_id:
-            r['status'] = 'drawn'
-            r['winning_numbers'] = winning_str
-    write_csv('lottery_rounds.csv', all_rounds, _LOT_ROUND_FIELDS)
-
-
-@app.route('/api/lottery/state')
-@webapp_auth
-def api_lottery_state():
-    uid = get_request_uid()
-    with _lottery_lock:
-        rnd = _lot_get_or_create_round()
-
-    tickets = read_csv('lottery_tickets.csv')
-    round_id = rnd['id']
-
-    my_tickets = []
-    for t in tickets:
-        if t.get('round_id') == round_id and t.get('uid') == str(uid):
-            try:
-                nums = json.loads(t.get('numbers', '[]'))
-            except Exception:
-                nums = []
-            my_tickets.append({
-                'id': t['id'],
-                'numbers': nums,
-                'status': t.get('status', 'pending'),
-                'prize': float(t.get('prize', 0)) if t.get('prize') else 0,
-                'scratched': t.get('scratched', 'false') == 'true',
-                'drawn': []
-            })
-
-    # History: last 5 drawn rounds
-    rounds = read_csv('lottery_rounds.csv')
-    drawn = [r for r in rounds if r.get('status') == 'drawn'][-5:]
-    history = []
-    for r in reversed(drawn):
-        try:
-            w = json.loads(r.get('winning_numbers', '[]'))
-        except Exception:
-            w = []
-        history.append({
-            'id': r['id'],
-            'winning_numbers': w,
-            'tickets_sold': int(r.get('tickets_sold', 0)),
-            'prize_pool': float(r.get('prize_pool', 0)),
-            'draw_time': int(r.get('draw_time', 0))
-        })
-
-    return jsonify({
-        'success': True,
-        'round_id': round_id,
-        'draw_time': int(rnd.get('draw_time', 0)),
-        'prize_pool': float(rnd.get('prize_pool', 0)),
-        'tickets_sold': int(rnd.get('tickets_sold', 0)),
-        'ticket_price': int(rnd.get('ticket_price', _LOT_TICKET_PRICE)),
-        'my_tickets': my_tickets,
-        'history': history
-    })
-
-
-@app.route('/api/lottery/buy', methods=['POST'])
-@webapp_auth
-def api_lottery_buy():
-    if not _VEX_GAMES:
-        return jsonify({'error': 'Games engine not available'}), 500
-    data = request.json or {}
-    uid = get_request_uid()
-    count = max(1, min(10, int(data.get('count', 1))))
-
-    with _lottery_lock:
-        rnd = _lot_get_or_create_round()
-        ticket_price = int(rnd.get('ticket_price', _LOT_TICKET_PRICE))
-        total_cost = ticket_price * count
-
-        balance = _gm.get_balance(uid)
-        if balance < total_cost:
-            return jsonify({
-                'success': False, 'error': 'رصيد غير كافٍ',
-                'need_deposit': True, 'balance': balance
-            })
-
-        ok, balance_after = _gm.deduct_balance(uid, total_cost)
-        if not ok:
-            return jsonify({'success': False, 'error': 'رصيد غير كافٍ',
-                            'need_deposit': True, 'balance': 0})
-
-        now = datetime.now()
-        new_tickets = []
-        for _ in range(count):
-            tid = f"TKT{int(now.timestamp()) % 100000000:08d}{random.randint(100,999)}"
-            nums = sorted(random.sample(range(1, 36), 5))
-            new_tickets.append({
-                'id': tid, 'round_id': rnd['id'], 'uid': str(uid),
-                'numbers': json.dumps(nums), 'status': 'pending',
-                'prize': '0', 'scratched': 'false',
-                'bought_at': now.isoformat()
-            })
-
-        existing = read_csv('lottery_tickets.csv')
-        existing.extend(new_tickets)
-        write_csv('lottery_tickets.csv', existing, _LOT_TICKET_FIELDS)
-
-        # Update round totals
-        rounds = read_csv('lottery_rounds.csv')
-        for r in rounds:
-            if r['id'] == rnd['id']:
-                r['tickets_sold'] = str(int(r.get('tickets_sold', 0)) + count)
-                pool = float(r.get('prize_pool', 0)) + total_cost * _LOT_POOL_RATIO
-                r['prize_pool'] = str(round(pool, 2))
-                break
-        write_csv('lottery_rounds.csv', rounds, _LOT_ROUND_FIELDS)
-
-    _gm.tracker.update_profile(uid, {
-        'bet_amount': total_cost, 'payout': 0, 'result': 'pending',
-        'game_id': 'GAME009', 'balance_after': balance_after
-    })
-
-    return jsonify({
-        'success': True, 'count': count, 'total_cost': total_cost,
-        'balance_after': balance_after,
-        'tickets': [{'id': t['id'], 'numbers': json.loads(t['numbers'])} for t in new_tickets]
-    })
-
-
-# ===== Snatch — WebApp API =====
-
-@app.route('/api/snatch/spin', methods=['POST'])
-@webapp_auth
-def api_snatch_spin():
-    if not _VEX_GAMES:
-        return jsonify({'error': 'Games engine not available'}), 500
-    data = request.json or {}
-    uid = get_request_uid()
-    bet_amount = float(data.get('bet', 0))
-    if not uid or bet_amount <= 0:
-        return jsonify({'error': 'معطيات غير صحيحة'}), 400
-
-    player = _gm.tracker.get_profile(uid)
-    game = _gm.get_game('GAME010')
-    if not game:
-        game = {'id': 'GAME010', 'base_win_chance': '0.50', 'house_edge_pct': '12',
-                'min_bet': '10', 'max_bet': '500'}
-
-    risk_check = _gm.risk.check_risk(player, bet_amount, game)
-    if not risk_check['allowed']:
-        msg = risk_check['alerts'][0]['message'] if risk_check.get('alerts') else 'محظور'
-        return jsonify({'success': False, 'error': msg})
-
-    balance = _gm.get_balance(uid)
-    if balance < bet_amount:
-        return jsonify({'success': False, 'error': 'رصيد غير كافٍ',
-                        'need_deposit': True, 'balance': balance})
-
-    algo = _gm.algorithm.calculate_win_chance(player, game, bet_amount)
-    win_chance = algo['win_chance']
-    house_edge = float(game.get('house_edge_pct', 12)) / 100
-
-    # Map win_chance to a multiplier (0.0 – 2.5 range)
-    # The payout is credited immediately; client animation is cosmetic
-    if algo['decision'] == 'force_lose':
-        multiplier = 0.0
-    elif win_chance > 0.75:
-        multiplier = round(random.uniform(1.5, 2.5), 2)
-    elif win_chance > 0.55:
-        multiplier = round(random.uniform(0.8, 1.5), 2)
-    elif win_chance > 0.35:
-        multiplier = round(random.uniform(0.3, 0.8), 2)
-    else:
-        multiplier = 0.0
-
-    # Apply house edge cap
-    multiplier = round(multiplier * (1 - house_edge * 0.5), 2)
-    payout = round(bet_amount * multiplier, 2)
-    result = 'win' if payout > bet_amount else ('lose' if payout == 0 else 'partial')
-
-    ok, balance_after = _gm.deduct_balance(uid, bet_amount)
-    if not ok:
-        return jsonify({'success': False, 'error': 'رصيد غير كافٍ',
-                        'need_deposit': True, 'balance': 0})
-
-    if payout > 0:
-        balance_after = _gm.add_balance(uid, payout)
-
-    session_id = f"SNTH{int(datetime.now().timestamp()) % 100000000:08d}"
-    _gm.algorithm.log_decision(
-        session_id=session_id, user_id=uid, game_id='GAME010',
-        base_chance=float(game.get('base_win_chance', 0.50)),
-        adjusted_chance=win_chance, factors=algo['factors'],
-        decision=algo['decision'],
-        reason=f"Snatch mult={multiplier} payout={payout}; {algo['reason']}"
-    )
-    _gm.tracker.log_session({
-        'session_id': session_id, 'game_id': 'GAME010', 'user_id': uid,
-        'bet_amount': bet_amount, 'payout': payout, 'result': result,
-        'balance_before': balance, 'balance_after': balance_after, 'multiplier': multiplier
-    })
-    _gm.tracker.update_profile(uid, {
-        'bet_amount': bet_amount, 'payout': payout, 'result': result,
-        'game_id': 'GAME010', 'balance_after': balance_after
-    })
-
-    return jsonify({
-        'success': True, 'session_id': session_id,
-        'multiplier': multiplier, 'payout': payout, 'result': result,
-        'balance_before': balance, 'balance_after': balance_after
-    })
-
 
 # ===== Main =====
 

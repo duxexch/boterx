@@ -102,6 +102,17 @@ def _init_db():
                 total_distributed REAL DEFAULT 0,
                 created_at TEXT
             );
+
+            -- Durable idempotency records: survive restarts, enforce exactly-once per (uid, request_id)
+            -- Inserted atomically inside the same transaction as balance settlement.
+            CREATE TABLE IF NOT EXISTS game_idempotency (
+                uid TEXT NOT NULL,
+                request_id TEXT NOT NULL,
+                response_json TEXT NOT NULL,
+                created_at REAL NOT NULL,
+                PRIMARY KEY (uid, request_id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_idem_created ON game_idempotency(created_at);
         ''')
         conn.commit()
     finally:
@@ -175,13 +186,50 @@ _migrate_from_csv()
 class GameDB:
     """SQLite-backed game database operations."""
 
-    def __init__(self):
+    def __init__(self, db_path=None):
         self._local = threading.local()
+        self._db_path = db_path or DB_PATH
+        if db_path and db_path != DB_PATH:
+            # Initialize the custom DB (creates tables) on first instantiation
+            self._custom_init()
+
+    def _custom_init(self):
+        """Initialize tables for a custom (test) DB path."""
+        conn = sqlite3.connect(self._db_path, check_same_thread=False, timeout=10)
+        conn.execute('PRAGMA journal_mode=WAL')
+        conn.execute('PRAGMA synchronous=NORMAL')
+        conn.execute('PRAGMA foreign_keys=ON')
+        conn.executescript('''
+            CREATE TABLE IF NOT EXISTS users (
+                telegram_id TEXT PRIMARY KEY, name TEXT DEFAULT '',
+                phone TEXT DEFAULT '', customer_id TEXT DEFAULT '',
+                language TEXT DEFAULT 'ar', currency TEXT DEFAULT 'EGP',
+                game_balance REAL DEFAULT 0.0, is_banned TEXT DEFAULT 'no',
+                is_admin TEXT DEFAULT 'no', phone_verified TEXT DEFAULT 'unknown',
+                referral_earnings REAL DEFAULT 0.0, created_at TEXT DEFAULT '',
+                extra_data TEXT DEFAULT '{}'
+            );
+            CREATE TABLE IF NOT EXISTS game_idempotency (
+                uid TEXT NOT NULL, request_id TEXT NOT NULL,
+                response_json TEXT NOT NULL, created_at REAL NOT NULL,
+                PRIMARY KEY (uid, request_id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_idem_created ON game_idempotency(created_at);
+        ''')
+        conn.commit()
+        conn.close()
 
     def _conn(self):
         """Per-thread connection."""
-        if not hasattr(self._local, 'conn'):
-            self._local.conn = _get_conn()
+        if not hasattr(self._local, 'conn') or self._local.conn is None:
+            if self._db_path != DB_PATH:
+                conn = sqlite3.connect(self._db_path, check_same_thread=False, timeout=10)
+                conn.execute('PRAGMA journal_mode=WAL')
+                conn.execute('PRAGMA synchronous=NORMAL')
+                conn.row_factory = sqlite3.Row
+                self._local.conn = conn
+            else:
+                self._local.conn = _get_conn()
         return self._local.conn
 
     # ===== Balance Operations =====
@@ -271,6 +319,27 @@ class GameDB:
             conn.commit()
             return _money_float(amt)
 
+    def get_idempotency_record(self, uid, request_id):
+        """Return the persisted response JSON for a completed request, or None.
+
+        Safe to call outside a transaction; read-only.
+        """
+        if not request_id:
+            return None
+        conn = self._conn()
+        with _db_lock:
+            row = conn.execute(
+                'SELECT response_json FROM game_idempotency WHERE uid=? AND request_id=?',
+                (str(uid), str(request_id))
+            ).fetchone()
+        if row:
+            import json as _json
+            try:
+                return _json.loads(row[0])
+            except Exception:
+                return None
+        return None
+
     def round_settle(self, user_id, bet_amount, payout):
         """Settle a complete round in ONE atomic ACID transaction.
 
@@ -310,6 +379,142 @@ class GameDB:
                 except Exception:
                     pass
                 raise
+
+    def settle_with_idempotency(self, user_id, bet_amount, payout, request_id, response_template):
+        """Atomic: settle round + record idempotency in ONE SQLite transaction.
+
+        On retry with the same (uid, request_id), returns the previously stored
+        response without re-executing settlement (idempotent replay).
+
+        response_template: dict of game-specific fields (WITHOUT balance_after).
+          balance_after is computed inside the transaction and added before storage,
+          so the stored response always has the correct post-settlement balance.
+
+        Returns (success, stored_result, cached_response_or_None):
+          - cached_response is not None → idempotent replay, skip processing
+          - success is False → insufficient funds, no settlement, no record stored
+          - stored_result has balance_after filled in from the actual settlement
+        """
+        import json as _json
+        uid = str(user_id)
+        bet = _money(bet_amount)
+        win = _money(payout)
+        net = win - bet
+        conn = self._conn()
+        with _db_lock:
+            conn.execute('BEGIN')
+            try:
+                # 1. Idempotency check (under lock, inside transaction — race-free)
+                if request_id:
+                    existing = conn.execute(
+                        'SELECT response_json FROM game_idempotency WHERE uid=? AND request_id=?',
+                        (uid, str(request_id))
+                    ).fetchone()
+                    if existing:
+                        conn.execute('ROLLBACK')
+                        try:
+                            return True, None, _json.loads(existing[0])
+                        except Exception:
+                            return True, None, {}
+
+                # 2. Balance check
+                row = conn.execute(
+                    'SELECT game_balance FROM users WHERE telegram_id = ?', (uid,)
+                ).fetchone()
+                current = _money(row[0]) if row and row[0] is not None else Decimal('0.00')
+                if net < 0 and current < abs(net):
+                    conn.execute('ROLLBACK')
+                    return False, None, None
+
+                # 3. Apply balance change
+                new_bal = current + net
+                new_bal_f = _money_float(new_bal)
+                conn.execute('''
+                    INSERT INTO users (telegram_id, game_balance) VALUES (?, ?)
+                    ON CONFLICT(telegram_id) DO UPDATE SET game_balance = ?
+                ''', (uid, new_bal_f, new_bal_f))
+
+                # 4. Build complete response with actual balance_after, store atomically
+                full_response = dict(response_template)
+                full_response['balance_after'] = new_bal_f
+                if request_id:
+                    conn.execute('''
+                        INSERT OR IGNORE INTO game_idempotency (uid, request_id, response_json, created_at)
+                        VALUES (?, ?, ?, ?)
+                    ''', (uid, str(request_id), _json.dumps(full_response), time.time()))
+
+                conn.commit()
+                return True, full_response, None
+            except Exception:
+                try:
+                    conn.execute('ROLLBACK')
+                except Exception:
+                    pass
+                raise
+
+    def credit_with_idempotency(self, user_id, amount, request_id, response_template):
+        """Credit-only atomic operation with idempotency (for pre-deducted mines cashout).
+
+        Same as settle_with_idempotency but deducts nothing (net = +amount).
+        balance_after is computed inside the transaction and stored in the record.
+        Returns (success, stored_result, cached_response_or_None).
+        """
+        import json as _json
+        uid = str(user_id)
+        amt = _money(amount)
+        conn = self._conn()
+        with _db_lock:
+            conn.execute('BEGIN')
+            try:
+                if request_id:
+                    existing = conn.execute(
+                        'SELECT response_json FROM game_idempotency WHERE uid=? AND request_id=?',
+                        (uid, str(request_id))
+                    ).fetchone()
+                    if existing:
+                        conn.execute('ROLLBACK')
+                        try:
+                            return True, None, _json.loads(existing[0])
+                        except Exception:
+                            return True, None, {}
+
+                row = conn.execute(
+                    'SELECT game_balance FROM users WHERE telegram_id = ?', (uid,)
+                ).fetchone()
+                current = _money(row[0]) if row and row[0] is not None else Decimal('0.00')
+                new_bal = current + amt
+                new_bal_f = _money_float(new_bal)
+                conn.execute('''
+                    INSERT INTO users (telegram_id, game_balance) VALUES (?, ?)
+                    ON CONFLICT(telegram_id) DO UPDATE SET game_balance = ?
+                ''', (uid, new_bal_f, new_bal_f))
+
+                full_response = dict(response_template)
+                full_response['balance_after'] = new_bal_f
+                if request_id:
+                    conn.execute('''
+                        INSERT OR IGNORE INTO game_idempotency (uid, request_id, response_json, created_at)
+                        VALUES (?, ?, ?, ?)
+                    ''', (uid, str(request_id), _json.dumps(full_response), time.time()))
+                conn.commit()
+                return True, full_response, None
+            except Exception:
+                try:
+                    conn.execute('ROLLBACK')
+                except Exception:
+                    pass
+                raise
+
+    def prune_idempotency_records(self, max_age_seconds=86400):
+        """Delete idempotency records older than max_age_seconds (default 24 h).
+
+        Call periodically (e.g. on startup) to prevent unbounded growth.
+        """
+        cutoff = time.time() - max_age_seconds
+        conn = self._conn()
+        with _db_lock:
+            conn.execute('DELETE FROM game_idempotency WHERE created_at < ?', (cutoff,))
+            conn.commit()
 
     # ===== Session Logging =====
 
