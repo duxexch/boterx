@@ -118,7 +118,10 @@ def api_auth(f):
     return decorated
 
 # ===== Telegram WebApp Auth =====
-# Load BOT_TOKEN from .env if not in environment
+import logging as _auth_log
+_auth_logger = _auth_log.getLogger('boterx.auth')
+
+# Load BOT_TOKEN from environment or .env file
 BOT_TOKEN = os.getenv('BOT_TOKEN', '')
 if not BOT_TOKEN:
     try:
@@ -130,12 +133,60 @@ if not BOT_TOKEN:
                     if line.startswith('BOT_TOKEN='):
                         BOT_TOKEN = line.split('=', 1)[1].strip()
                         break
-    except:
+    except Exception:
         pass
 
-def validate_telegram_init_data(init_data_str):
+# ── Auth-mode configuration ──────────────────────────────────────────────────
+# ALLOW_DEV_AUTH=true  — accept plain uid param without HMAC verification.
+#   ONLY set this during local development. NEVER in production.
+#   When not set, uid-only requests are always rejected when BOT_TOKEN is absent.
+ALLOW_DEV_AUTH = os.getenv('ALLOW_DEV_AUTH', '').lower() in ('1', 'true', 'yes')
+
+# APP_ENV / FLASK_ENV — detect production deployment.
+_APP_ENV = os.getenv('APP_ENV', os.getenv('FLASK_ENV', 'development')).lower()
+_IS_PRODUCTION = (_APP_ENV == 'production')
+
+# ── Startup safety check ─────────────────────────────────────────────────────
+# If BOT_TOKEN is absent and we are in production mode without explicit dev-auth
+# opt-in, all game endpoints become insecure. We surface this loudly at startup
+# and make webapp_auth hard-fail (503) rather than silently open the API.
+_WEBAPP_AUTH_LOCKED_DOWN = False
+if not BOT_TOKEN:
+    if _IS_PRODUCTION and not ALLOW_DEV_AUTH:
+        _auth_logger.critical(
+            "SECURITY LOCKDOWN: BOT_TOKEN is missing in production mode "
+            "(APP_ENV/FLASK_ENV=production) and ALLOW_DEV_AUTH is not set. "
+            "All game API endpoints are DISABLED until BOT_TOKEN is provided. "
+            "Fix: set BOT_TOKEN in your environment, or set ALLOW_DEV_AUTH=true "
+            "(only for non-production environments)."
+        )
+        _WEBAPP_AUTH_LOCKED_DOWN = True
+    elif ALLOW_DEV_AUTH:
+        _auth_logger.warning(
+            "DEV AUTH MODE ACTIVE: ALLOW_DEV_AUTH=true — uid param accepted without "
+            "HMAC verification. Game endpoints are NOT secure. "
+            "NEVER run with ALLOW_DEV_AUTH=true in production!"
+        )
+    else:
+        _auth_logger.warning(
+            "BOT_TOKEN not set and ALLOW_DEV_AUTH not set — game API endpoints "
+            "will reject all requests. Set ALLOW_DEV_AUTH=true for local dev."
+        )
+else:
+    _auth_logger.info("BOT_TOKEN loaded — HMAC validation active for game endpoints.")
+
+# ── initData max age ─────────────────────────────────────────────────────────
+_INIT_DATA_MAX_AGE = 3600  # reject initData older than 1 hour
+
+
+def validate_telegram_init_data(init_data_str: str):
     """Validate Telegram WebApp initData using HMAC-SHA256.
-    Returns (user_id_str, user_dict) if valid, (None, None) if invalid.
+
+    Implements the algorithm from https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app:
+      secret_key = HMAC_SHA256(key="WebAppData", msg=bot_token)
+      hash       = HMAC_SHA256(key=secret_key,   msg=data_check_string)
+
+    Returns (user_id_str, user_dict) if valid, (None, None) otherwise.
     """
     if not init_data_str:
         return None, None
@@ -144,20 +195,19 @@ def validate_telegram_init_data(init_data_str):
         hash_from_client = parsed.get('hash', [None])[0]
         if not hash_from_client:
             return None, None
-        # Build data-check string: sorted key=value pairs (excluding 'hash')
-        data_check = {}
-        for k, v in parsed.items():
-            if k != 'hash':
-                data_check[k] = v[0]
+
+        # Build data-check string: sorted key=value pairs, excluding 'hash'
+        data_check = {k: v[0] for k, v in parsed.items() if k != 'hash'}
         data_check_string = '\n'.join(f'{k}={v}' for k, v in sorted(data_check.items()))
-        # secret_key = HMAC_SHA256(bot_token, "WebAppData")
-        secret_key = hmac.new(BOT_TOKEN.encode(), b'WebAppData', hashlib.sha256).digest()
-        # calculated_hash = HMAC_SHA256(secret_key, data_check_string)
+
+        # secret_key = HMAC_SHA256(key="WebAppData", msg=bot_token)  ← Telegram spec
+        secret_key = hmac.new(b'WebAppData', BOT_TOKEN.encode(), hashlib.sha256).digest()
+        # calculated_hash = HMAC_SHA256(key=secret_key, msg=data_check_string)
         calculated_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
-        # Compare
+
         if not hmac.compare_digest(calculated_hash, hash_from_client):
             return None, None
-        # Extract user
+
         user_json = data_check.get('user', '')
         if user_json:
             user_obj = json.loads(user_json)
@@ -166,25 +216,47 @@ def validate_telegram_init_data(init_data_str):
     except Exception:
         return None, None
 
-_INIT_DATA_MAX_AGE = 3600  # seconds — reject stale initData older than 1 hour
 
 def webapp_auth(f):
     """Decorator: validates Telegram WebApp initData on game-facing API endpoints.
-    Reads initData from 'X-Telegram-Init-Data' header or 'initData' body/query param.
-    Sets g.telegram_user_id and g.telegram_user on success.
-    Falls back to uid param ONLY if BOT_TOKEN is not configured (dev/test mode).
+
+    Auth priority (evaluated at request time, using values frozen at startup):
+
+    1. LOCKDOWN (_WEBAPP_AUTH_LOCKED_DOWN=True):
+       BOT_TOKEN missing + production mode + no ALLOW_DEV_AUTH opt-in.
+       Every request returns 503 — the endpoint is administratively disabled.
+
+    2. PRODUCTION (BOT_TOKEN set):
+       Validates X-Telegram-Init-Data header (or initData param) via HMAC-SHA256.
+       Enforces auth_date freshness (max 1 h, no future timestamps).
+       Rejects if any check fails — fail CLOSED.
+
+    3. DEV/TEST (ALLOW_DEV_AUTH=true, BOT_TOKEN absent):
+       Accepts plain uid query/body param. Logs a per-request warning.
+       NEVER enable in production.
+
+    4. UNCONFIGURED (no BOT_TOKEN, no ALLOW_DEV_AUTH):
+       Rejects all requests with 403. Operator must fix the config.
     """
     @wraps(f)
     def decorated(*args, **kwargs):
-        # --- PRODUCTION: validate signed Telegram initData ---
+
+        # ── Path 1: Security lockdown ─────────────────────────────────────
+        if _WEBAPP_AUTH_LOCKED_DOWN:
+            return jsonify({
+                'error': 'Service unavailable: BOT_TOKEN not configured in production',
+                'code': 'AUTH_LOCKDOWN'
+            }), 503
+
+        # ── Path 2: Production HMAC validation ────────────────────────────
         if BOT_TOKEN:
             init_data = (
-                request.headers.get('X-Telegram-Init-Data', '')
-                or request.args.get('initData', '')
+                request.headers.get('X-Telegram-Init-Data', '').strip()
+                or request.args.get('initData', '').strip()
             )
             if not init_data:
                 try:
-                    init_data = (request.get_json(silent=True) or {}).get('initData', '')
+                    init_data = (request.get_json(silent=True) or {}).get('initData', '').strip()
                 except Exception:
                     init_data = ''
 
@@ -195,22 +267,19 @@ def webapp_auth(f):
             if not uid_str:
                 return jsonify({'error': 'Invalid or tampered initData', 'code': 'BAD_INIT_DATA'}), 403
 
-            # Freshness check — fail CLOSED: auth_date must be present, positive,
-            # within max-age, and not in the future beyond clock-skew tolerance.
+            # Freshness check — fail CLOSED
             try:
-                from urllib.parse import parse_qs as _pqs
                 import time as _time
-                auth_date_vals = _pqs(init_data).get('auth_date', [])
+                auth_date_vals = parse_qs(init_data).get('auth_date', [])
                 if not auth_date_vals:
                     return jsonify({'error': 'initData missing auth_date', 'code': 'NO_AUTH_DATE'}), 403
                 auth_date = int(auth_date_vals[0])
                 if auth_date <= 0:
                     return jsonify({'error': 'initData invalid auth_date', 'code': 'BAD_AUTH_DATE'}), 403
-                now = _time.time()
-                age = now - auth_date
+                age = _time.time() - auth_date
                 if age > _INIT_DATA_MAX_AGE:
                     return jsonify({'error': 'initData expired', 'code': 'EXPIRED_INIT_DATA'}), 403
-                if age < -60:  # reject timestamps more than 60s in the future
+                if age < -60:
                     return jsonify({'error': 'initData auth_date in future', 'code': 'FUTURE_AUTH_DATE'}), 403
             except (ValueError, TypeError):
                 return jsonify({'error': 'initData auth_date malformed', 'code': 'BAD_AUTH_DATE'}), 403
@@ -219,18 +288,29 @@ def webapp_auth(f):
             g.telegram_user = user_obj
             return f(*args, **kwargs)
 
-        # --- DEV/TEST MODE: BOT_TOKEN not set, accept uid param ---
-        uid = request.args.get('uid', '')
-        if not uid:
-            try:
-                uid = (request.get_json(silent=True) or {}).get('uid', '')
-            except Exception:
-                pass
-        if uid:
-            g.telegram_user_id = uid
-            g.telegram_user = None
-            return f(*args, **kwargs)
-        return jsonify({'error': 'Missing uid', 'code': 'NO_UID'}), 403
+        # ── Path 3: Dev/test mode (explicit opt-in required) ──────────────
+        if ALLOW_DEV_AUTH:
+            uid = request.args.get('uid', '').strip()
+            if not uid:
+                try:
+                    uid = (request.get_json(silent=True) or {}).get('uid', '').strip()
+                except Exception:
+                    pass
+            if uid:
+                _auth_logger.warning(
+                    "DEV AUTH: uid=%s accepted without HMAC (ALLOW_DEV_AUTH=true)", uid
+                )
+                g.telegram_user_id = uid
+                g.telegram_user = None
+                return f(*args, **kwargs)
+            return jsonify({'error': 'Missing uid (dev mode)', 'code': 'NO_UID'}), 403
+
+        # ── Path 4: Unconfigured — no token, no dev opt-in ───────────────
+        return jsonify({
+            'error': 'Game API not configured: set BOT_TOKEN or ALLOW_DEV_AUTH=true (dev only)',
+            'code': 'NOT_CONFIGURED'
+        }), 403
+
     return decorated
 
 def get_request_uid():
