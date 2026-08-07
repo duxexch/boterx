@@ -6,64 +6,103 @@
 <title>Aviator — VEX</title>
 <link rel="stylesheet" href="/static/css/game-base.css">
 <style>
-.game-area { overflow: hidden; position: relative; }
-#canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; }
-.plane-mult { position: absolute; z-index: 10; pointer-events: none; transform: translate(-50%, -130%); opacity: 0; transition: opacity 0.2s; }
-.plane-mult-val { font-size: 26px; font-weight: 900; font-family: 'Courier New', monospace; letter-spacing: -1px; text-shadow: 0 0 20px rgba(0,231,1,0.5); white-space: nowrap; }
+/* ===== Phase 3: 3D & Responsive UI Revolution ===== */
+.game-area {
+  overflow: hidden; position: relative;
+  perspective: 800px;
+  perspective-origin: 50% 60%;
+}
+#canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; transform-style: preserve-3d; }
+.plane-mult {
+  position: absolute; z-index: 10; pointer-events: none;
+  transform: translate(-50%, -130%) translateZ(40px);
+  opacity: 0; transition: opacity 0.2s var(--ease-out);
+}
+.plane-mult-val {
+  font-size: clamp(18px, 5vw, 26px); font-weight: 900;
+  font-family: 'Courier New', monospace; letter-spacing: -1px;
+  text-shadow: 0 0 20px rgba(0,231,1,0.5), 0 2px 4px rgba(0,0,0,0.5);
+  white-space: nowrap;
+}
 .plane-mult-val.flying { color: #00e701; }
 .plane-mult-val.cashed { color: #fbbf24; text-shadow: 0 0 30px rgba(251,191,36,0.6); }
 .plane-mult-val.crashed { color: #ff4757; }
-.mult-display { position: absolute; top: 38%; left: 50%; transform: translate(-50%, -50%); z-index: 5; pointer-events: none; opacity: 0; transition: opacity 0.3s; }
+.mult-display {
+  position: absolute; top: 38%; left: 50%;
+  transform: translate(-50%, -50%) translateZ(20px);
+  z-index: 5; pointer-events: none; opacity: 0;
+  transition: opacity 0.3s var(--ease-out), transform 0.3s var(--ease-out);
+}
 .mult-display.show { opacity: 1; }
-.mult-val { font-size: 64px; font-weight: 900; font-family: 'Courier New', monospace; letter-spacing: -3px; color: var(--muted); transition: color 0.3s; }
+.mult-val {
+  font-size: clamp(40px, 12vw, 64px); font-weight: 900;
+  font-family: 'Courier New', monospace; letter-spacing: -3px;
+  color: var(--muted); transition: color 0.3s, text-shadow 0.3s, transform 0.3s var(--ease-spring);
+}
 .mult-val.flying { color: #00e701; text-shadow: 0 0 60px rgba(0,231,1,0.4); }
 .mult-val.crashed { color: #ff4757; text-shadow: 0 0 40px rgba(255,71,87,0.4); animation: shake 0.4s; }
-.mult-val.cashed { color: #fbbf24; text-shadow: 0 0 40px rgba(251,191,36,0.5); }
-.game-status { position: absolute; top: 10%; left: 50%; transform: translateX(-50%); font-size: 13px; color: var(--muted); z-index: 5; text-align: center; }
-.result-msg { position: absolute; top: 52%; left: 50%; transform: translate(-50%, 0); font-size: 16px; font-weight: 700; z-index: 10; display: none; padding: 10px 20px; border-radius: var(--radius-sm); background: rgba(0,0,0,0.6); backdrop-filter: blur(8px); }
-.result-msg.show { display: block; animation: fadeIn 0.3s; }
-.countdown { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 80px; font-weight: 900; color: #fbbf24; z-index: 15; text-shadow: 0 0 40px rgba(251,191,36,0.5); animation: countdownPop 0.9s ease-out; }
+.mult-val.cashed { color: #fbbf24; text-shadow: 0 0 40px rgba(251,191,36,0.5); transform: scale(1.08); }
+.game-status {
+  position: absolute; top: 10%; left: 50%; transform: translateX(-50%);
+  font-size: clamp(11px, 3vw, 13px); color: var(--muted);
+  z-index: 5; text-align: center;
+}
+.result-msg {
+  position: absolute; top: 52%; left: 50%; transform: translate(-50%, 0) translateZ(30px);
+  font-size: clamp(13px, 4vw, 16px); font-weight: 700; z-index: 10; display: none;
+  padding: 10px 20px; border-radius: var(--radius-sm);
+  background: rgba(0,0,0,0.6); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+}
+.result-msg.show { display: block; animation: fadeIn 0.3s var(--ease-out); }
+.countdown {
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%) translateZ(50px) scale(1);
+  font-size: clamp(50px, 18vw, 80px); font-weight: 900; color: #fbbf24;
+  z-index: 15; text-shadow: 0 0 40px rgba(251,191,36,0.5);
+  animation: countdownPop 0.9s ease-out;
+}
 @keyframes countdownPop { 0% { transform: translate(-50%,-50%) scale(2); opacity: 0; } 30% { transform: translate(-50%,-50%) scale(1); opacity: 1; } 100% { transform: translate(-50%,-50%) scale(0.5); opacity: 0; } }
-.other-bets { position: absolute; top: 8px; left: 8px; max-width: 130px; z-index: 10; max-height: 200px; overflow-y: auto; }
+.other-bets { position: absolute; top: 8px; left: 8px; max-width: 35vw; min-width: 90px; z-index: 10; max-height: 30vh; overflow-y: auto; }
 .other-bets::-webkit-scrollbar { display: none; }
-.other-bet { display: flex; align-items: center; gap: 4px; padding: 3px 8px; margin: 2px 0; border-radius: 8px; font-size: 10px; font-weight: 600; animation: betSlideIn 0.3s; backdrop-filter: blur(4px); }
+.other-bet { display: flex; align-items: center; gap: 4px; padding: 3px 8px; margin: 2px 0; border-radius: 8px; font-size: clamp(8px, 2.5vw, 10px); font-weight: 600; animation: betSlideIn 0.3s var(--ease-out); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
 .other-bet.active { background: rgba(0,231,1,0.1); border: 1px solid rgba(0,231,1,0.2); color: #00e701; }
 .other-bet.cashed { background: rgba(251,191,36,0.1); border: 1px solid rgba(251,191,36,0.3); color: #fbbf24; }
 .other-bet.crashed { background: rgba(255,71,87,0.08); border: 1px solid rgba(255,71,87,0.2); color: #ff4757; opacity: 0.5; }
 .other-bet .avatar { width: 14px; height: 14px; border-radius: 50%; background: #334155; display: flex; align-items: center; justify-content: center; font-size: 7px; font-weight: 700; }
 @keyframes betSlideIn { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
-.parachutes-layer { position: absolute; inset: 0; z-index: 9; pointer-events: none; overflow: hidden; }
-.parachute-item { position: absolute; display: flex; flex-direction: column; align-items: center; animation: parachuteDescend 3s ease-out forwards; }
-.parachute-icon { font-size: 32px; filter: drop-shadow(0 3px 8px rgba(0,0,0,0.5)); animation: parachuteSway 1.5s ease-in-out infinite; }
+.parachutes-layer { position: absolute; inset: 0; z-index: 9; pointer-events: none; overflow: hidden; transform-style: preserve-3d; }
+.parachute-item { position: absolute; display: flex; flex-direction: column; align-items: center; animation: parachuteDescend 3s ease-out forwards; transform-style: preserve-3d; }
+.parachute-icon { font-size: clamp(24px, 7vw, 32px); filter: drop-shadow(0 3px 8px rgba(0,0,0,0.5)); animation: parachuteSway 1.5s ease-in-out infinite; }
 @keyframes parachuteSway { 0%, 100% { transform: translateX(-3px) rotate(-5deg); } 50% { transform: translateX(3px) rotate(5deg); } }
-.parachute-amount { font-size: 13px; font-weight: 900; font-family: 'Courier New', monospace; background: linear-gradient(135deg, rgba(251,191,36,0.95), rgba(245,158,11,0.95)); color: #000; padding: 2px 10px; border-radius: 10px; margin-top: -4px; white-space: nowrap; box-shadow: 0 2px 10px rgba(251,191,36,0.3); }
-.parachute-name { font-size: 10px; color: #fbbf24; margin-top: 2px; font-weight: 700; text-shadow: 0 1px 4px rgba(0,0,0,0.8); }
+.parachute-amount { font-size: clamp(10px, 3vw, 13px); font-weight: 900; font-family: 'Courier New', monospace; background: linear-gradient(135deg, rgba(251,191,36,0.95), rgba(245,158,11,0.95)); color: #000; padding: 2px 10px; border-radius: 10px; margin-top: -4px; white-space: nowrap; box-shadow: 0 2px 10px rgba(251,191,36,0.3); }
+.parachute-name { font-size: clamp(8px, 2.5vw, 10px); color: #fbbf24; margin-top: 2px; font-weight: 700; text-shadow: 0 1px 4px rgba(0,0,0,0.8); }
 @keyframes parachuteDescend { 0% { transform: translateY(-15px) scale(0.3); opacity: 0; } 10% { transform: translateY(0) scale(1); opacity: 1; } 80% { opacity: 1; } 100% { transform: translateY(250px) scale(0.5); opacity: 0; } }
-.session-stats { position: absolute; bottom: 8px; left: 10px; display: flex; gap: 6px; z-index: 10; font-size: 10px; font-weight: 600; }
-.stat-pill { padding: 3px 8px; border-radius: 6px; background: rgba(0,0,0,0.4); backdrop-filter: blur(4px); }
+.session-stats { position: absolute; bottom: 8px; left: 10px; display: flex; gap: 6px; z-index: 10; font-size: clamp(8px, 2.5vw, 10px); font-weight: 600; }
+.stat-pill { padding: 3px 8px; border-radius: 6px; background: rgba(0,0,0,0.4); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
 .stat-pill.w { color: #00e701; } .stat-pill.l { color: #ff4757; } .stat-pill.p { color: #fbbf24; }
 .big-win-overlay { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; z-index: 30; pointer-events: none; }
 .big-win-overlay.show { display: flex; }
-.big-win-text { font-size: 48px; font-weight: 900; color: #fbbf24; text-shadow: 0 0 40px rgba(251,191,36,0.6); animation: bigWinBounce 0.6s ease-out; }
+.big-win-text { font-size: clamp(32px, 12vw, 48px); font-weight: 900; color: #fbbf24; text-shadow: 0 0 40px rgba(251,191,36,0.6); animation: bigWinBounce 0.6s ease-out; }
 @keyframes bigWinBounce { 0% { transform: scale(0); opacity: 0; } 50% { transform: scale(1.3); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
-.recovery-msg { position: absolute; top: 16%; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.6); backdrop-filter: blur(8px); padding: 8px 16px; border-radius: 12px; font-size: 12px; font-weight: 700; color: #94a3b8; z-index: 15; display: none; text-align: center; }
+.recovery-msg { position: absolute; top: 16%; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.6); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); padding: 8px 16px; border-radius: 12px; font-size: clamp(10px, 3vw, 12px); font-weight: 700; color: #94a3b8; z-index: 15; display: none; text-align: center; }
 .recovery-msg.show { display: block; animation: fadeIn 0.3s; }
-.bet-slots { display: flex; gap: 4px; }
-.bet-slot { flex: 1; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 6px; }
+.bet-slots { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.bet-slot { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 6px; transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease); }
 .bet-slot.active { border-color: var(--green); box-shadow: 0 0 0 2px rgba(0,231,1,0.1); }
 .bet-slot-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
-.bet-slot-toggle { width: 28px; height: 16px; background: #334155; border-radius: 8px; position: relative; cursor: pointer; transition: background 0.2s; }
+.bet-slot-toggle { width: 28px; height: 16px; background: #334155; border-radius: 8px; position: relative; cursor: pointer; transition: background 0.2s var(--ease); }
 .bet-slot-toggle.on { background: var(--green); }
-.bet-slot-toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: #fff; transition: transform 0.2s; }
+.bet-slot-toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: #fff; transition: transform 0.2s var(--ease-spring); }
 .bet-slot-toggle.on::after { transform: translateX(12px); }
-.bet-slot-label { font-size: 9px; color: var(--muted); text-transform: uppercase; }
-.bet-slot-input { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 6px; color: var(--text); font-size: 14px; font-weight: 700; text-align: center; outline: none; font-family: 'Courier New', monospace; }
+.bet-slot-label { font-size: clamp(8px, 2vw, 9px); color: var(--muted); text-transform: uppercase; }
+.bet-slot-input { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 6px; color: var(--text); font-size: clamp(12px, 4vw, 14px); font-weight: 700; text-align: center; outline: none; font-family: 'Courier New', monospace; transition: border-color 0.15s var(--ease); }
+.bet-slot-input:focus { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(251,191,36,0.1); }
 .bet-slot-controls { display: flex; gap: 2px; margin-top: 3px; }
-.bet-slot-ctrl { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 3px; color: var(--muted); font-size: 9px; font-weight: 700; cursor: pointer; text-align: center; transition: all 0.1s; }
+.bet-slot-ctrl { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 3px; color: var(--muted); font-size: clamp(8px, 2vw, 9px); font-weight: 700; cursor: pointer; text-align: center; transition: all 0.1s var(--ease); }
 .bet-slot-ctrl:active { transform: scale(0.9); background: var(--border); }
 .bet-slot-auto { display: flex; align-items: center; gap: 3px; margin-top: 3px; }
 .bet-slot-auto input[type="number"] { width: 32px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 3px; color: var(--text); font-size: 10px; text-align: center; outline: none; }
-.bet-slot-btn { width: 100%; border: none; padding: 8px; border-radius: 6px; font-size: 12px; font-weight: 800; cursor: pointer; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; transition: all 0.1s; }
+.bet-slot-btn { width: 100%; border: none; padding: 8px; border-radius: 6px; font-size: clamp(10px, 3vw, 12px); font-weight: 800; cursor: pointer; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; transition: all 0.15s var(--ease); }
 .bet-slot-btn.bet { background: linear-gradient(135deg,#0d7a1f,#1a5c2e); color: #fff; }
 .bet-slot-btn.bet:active { transform: scale(0.95); }
 .bet-slot-btn.cashout { background: linear-gradient(135deg,#fbbf24,#f59e0b); color: #000; animation: cashoutPulse 0.8s infinite; }
@@ -73,7 +112,11 @@
 </style>
 </head>
 <body>
-<div class="loader-screen" id="loading"><div class="spinner"></div></div>
+<div class="loader-screen" id="loading">
+  <div class="skeleton-bar"></div>
+  <div class="skeleton-bar tall"></div>
+  <div class="skeleton-bar short"></div>
+</div>
 <div id="app" style="display:none">
   <div class="game-topbar">
     <div class="topbar-left">

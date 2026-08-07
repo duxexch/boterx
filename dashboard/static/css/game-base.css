@@ -59,6 +59,11 @@ body {
   background: var(--bg);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
+  /* TMA safe areas — Constitution §4.3 */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
 
 #app {
@@ -66,6 +71,9 @@ body {
   inset: 0;
   display: flex;
   flex-direction: column;
+  /* Cross-browser: dvh with vh fallback */
+  height: 100vh;
+  height: 100dvh;
 }
 
 /* ===== Top Bar ===== */
@@ -74,6 +82,7 @@ body {
   justify-content: space-between;
   align-items: center;
   padding: 8px 12px;
+  padding-top: max(8px, env(safe-area-inset-top));
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
@@ -208,6 +217,7 @@ body {
   background: var(--surface);
   border-top: 1px solid var(--border);
   padding: 8px 12px;
+  padding-bottom: max(8px, env(safe-area-inset-bottom));
   flex-shrink: 0;
 }
 
@@ -458,6 +468,7 @@ body {
   padding: 8px 16px;
   border-radius: var(--radius-sm);
   background: rgba(0,0,0,0.5);
+  -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
 }
 .result-msg.show {
@@ -528,25 +539,30 @@ body {
 .lp-mult.win { background: rgba(0,231,1,0.15); color: var(--green); }
 .lp-mult.lose { background: rgba(255,71,87,0.1); color: var(--red); }
 
-/* ===== Loading ===== */
+/* ===== Loading Skeleton (Constitution §5: no circular loaders) ===== */
 .loader-screen {
   position: fixed;
   inset: 0;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
   background: var(--bg);
   z-index: 200;
 }
-.spinner {
-  width: 36px;
-  height: 36px;
-  border: 3px solid var(--border);
-  border-top: 3px solid var(--gold);
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
+.skeleton-bar {
+  height: 48px;
+  border-radius: var(--radius);
+  background: linear-gradient(90deg, var(--surface) 25%, var(--surface-2) 50%, var(--surface) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
 }
-@keyframes spin { to { transform: rotate(360deg); } }
+.skeleton-bar.short { width: 60%; }
+.skeleton-bar.tall { height: 200px; }
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
 
 /* ===== VEX Deposit Modal (shared) ===== */
 .modal-overlay {
@@ -556,6 +572,7 @@ body {
   align-items: center;
   justify-content: center;
   background: rgba(0,0,0,0.8);
+  -webkit-backdrop-filter: blur(5px);
   backdrop-filter: blur(5px);
   z-index: 200;
 }
