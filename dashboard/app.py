@@ -166,6 +166,58 @@ if not ALERT_BOT_TOKEN:
         pass
 
 _LOCKDOWN_SENTINEL = '/tmp/boterx_lockdown'
+_LOCKDOWN_LOG = 'lockdown_log.csv'
+_LOCKDOWN_LOG_FIELDS = ['event', 'timestamp', 'host', 'duration_seconds', 'telegram_sent', 'reason']
+
+
+def _append_lockdown_log(event: str, duration_seconds: int = 0,
+                         telegram_sent: str = 'no', reason: str = ''):
+    """Append one row to lockdown_log.csv in BASE_DIR.
+
+    event: 'lockdown' | 'recovery'
+    duration_seconds: 0 for lockdown events; elapsed seconds for recovery events
+    telegram_sent: 'yes' | 'no'
+    reason: short machine-readable cause string
+    """
+    try:
+        row = {
+            'event': event,
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'host': os.uname().nodename,
+            'duration_seconds': str(duration_seconds),
+            'telegram_sent': telegram_sent,
+            'reason': reason,
+        }
+        filepath = os.path.join(BASE_DIR, _LOCKDOWN_LOG)
+        file_exists = os.path.exists(filepath)
+        with open(filepath, 'a', newline='', encoding='utf-8-sig') as _lf:
+            writer = csv.DictWriter(_lf, fieldnames=_LOCKDOWN_LOG_FIELDS)
+            if not file_exists:
+                writer.writeheader()
+            writer.writerow({k: row.get(k, '') for k in _LOCKDOWN_LOG_FIELDS})
+    except Exception as exc:
+        _auth_logger.error("Failed to write lockdown_log.csv: %s", exc)
+
+
+def _read_lockdown_log_summary():
+    """Return (last_lockdown_at, last_recovery_at) strings from lockdown_log.csv.
+    Both values are ISO-format strings or None if no matching event exists.
+    """
+    try:
+        filepath = os.path.join(BASE_DIR, _LOCKDOWN_LOG)
+        if not os.path.exists(filepath):
+            return None, None
+        last_lockdown = None
+        last_recovery = None
+        with open(filepath, 'r', encoding='utf-8-sig') as _lf:
+            for row in csv.DictReader(_lf):
+                if row.get('event') == 'lockdown':
+                    last_lockdown = row.get('timestamp')
+                elif row.get('event') == 'recovery':
+                    last_recovery = row.get('timestamp')
+        return last_lockdown, last_recovery
+    except Exception:
+        return None, None
 
 
 def _read_sentinel_info():
@@ -260,6 +312,23 @@ def _send_recovery_alert(lockdown_iso: str):
             "Recovery alert: ADMIN_USER_IDS is empty — no admins to notify."
         )
 
+    # Calculate duration_seconds for audit log
+    duration_seconds = 0
+    if lockdown_iso:
+        try:
+            lockdown_dt = datetime.fromisoformat(lockdown_iso)
+            duration_seconds = max(0, int((datetime.now() - lockdown_dt).total_seconds()))
+        except Exception:
+            pass
+
+    # Persist recovery event to audit log
+    _append_lockdown_log(
+        event='recovery',
+        duration_seconds=duration_seconds,
+        telegram_sent='yes' if (token and ADMIN_IDS) else 'no',
+        reason='BOT_TOKEN_RESTORED'
+    )
+
     # Remove sentinel regardless of send outcome — prevents stale alerts on
     # future restarts even if Telegram delivery failed.
     try:
@@ -331,16 +400,25 @@ def _send_lockdown_alert():
         )
 
     # Always write sentinel file so external monitors can detect the outage
+    sent_str = 'yes' if sent else 'no'
     try:
         with open(_LOCKDOWN_SENTINEL, 'w') as _sf:
             _sf.write(
                 f"LOCKDOWN={datetime.now().isoformat()}\n"
                 f"REASON=BOT_TOKEN_MISSING\n"
-                f"TELEGRAM_SENT={'yes' if sent else 'no'}\n"
+                f"TELEGRAM_SENT={sent_str}\n"
             )
         _auth_logger.info("Lockdown sentinel written to %s", _LOCKDOWN_SENTINEL)
     except Exception as e:
         _auth_logger.error("Failed to write lockdown sentinel: %s", e)
+
+    # Persist to audit log
+    _append_lockdown_log(
+        event='lockdown',
+        duration_seconds=0,
+        telegram_sent=sent_str,
+        reason='BOT_TOKEN_MISSING'
+    )
 
 
 # ── Startup safety check ─────────────────────────────────────────────────────
@@ -6141,22 +6219,27 @@ def health_check():
 
     Response body (JSON):
       {
-        "status":      "ok" | "locked_down",
-        "app_env":     "production" | "development" | ...,
-        "bot_token":   "configured" | "missing",
-        "game_api":    "enabled" | "disabled",
-        "sentinel":    true | false,   // sentinel file present on disk
-        "timestamp":   "2026-..."
+        "status":           "ok" | "locked_down",
+        "app_env":          "production" | "development" | ...,
+        "bot_token":        "configured" | "missing",
+        "game_api":         "enabled" | "disabled",
+        "sentinel":         true | false,   // sentinel file present on disk
+        "last_lockdown_at": "2026-..." | null,
+        "last_recovery_at": "2026-..." | null,
+        "timestamp":        "2026-..."
       }
     """
     sentinel_present = os.path.exists(_LOCKDOWN_SENTINEL)
+    last_lockdown_at, last_recovery_at = _read_lockdown_log_summary()
     body = {
-        'status':    'locked_down' if _WEBAPP_AUTH_LOCKED_DOWN else 'ok',
-        'app_env':   _APP_ENV,
-        'bot_token': 'missing' if not BOT_TOKEN else 'configured',
-        'game_api':  'disabled' if _WEBAPP_AUTH_LOCKED_DOWN else 'enabled',
-        'sentinel':  sentinel_present,
-        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'status':           'locked_down' if _WEBAPP_AUTH_LOCKED_DOWN else 'ok',
+        'app_env':          _APP_ENV,
+        'bot_token':        'missing' if not BOT_TOKEN else 'configured',
+        'game_api':         'disabled' if _WEBAPP_AUTH_LOCKED_DOWN else 'enabled',
+        'sentinel':         sentinel_present,
+        'last_lockdown_at': last_lockdown_at,
+        'last_recovery_at': last_recovery_at,
+        'timestamp':        datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
     }
     status_code = 503 if _WEBAPP_AUTH_LOCKED_DOWN else 200
     return jsonify(body), status_code
