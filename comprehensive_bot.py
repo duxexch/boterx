@@ -9085,6 +9085,22 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             'collected_data': [],
             'lang': lang
         }
+
+        # تسجيل المعاملة في pending_transactions عند بدء الجلسة
+        # (قبل أن يكتمل الإدخال — للاسترداد عند إعادة التشغيل)
+        pending_tx_id = f"FLOW_{user_id}_{flow_type}"
+        try:
+            self._db.record_pending_transaction(
+                tx_id=pending_tx_id,
+                user_id=str(user_id),
+                tx_type=flow_type,
+                amount='',
+                currency='',
+                company=company_name,
+            )
+        except Exception as _e:
+            logger.warning(f"start_custom_flow: فشل تسجيل pending_transaction: {_e}")
+
         # عرض الخطوة الأولى
         self._show_custom_step(chat_id, steps[0], 1, len(steps), lang)
         return True
@@ -9300,6 +9316,13 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                     })
             except:
                 pass
+
+        # حلّ سجل pending_transaction بمجرد تقديم الطلب بنجاح
+        pending_tx_id = f"FLOW_{user_id}_{flow_type}"
+        try:
+            self._db.resolve_pending_transaction(pending_tx_id, status='submitted')
+        except Exception as _e:
+            logger.warning(f"_finalize_custom_flow: فشل تحديث pending_transaction: {_e}")
 
         if user_id in self.user_states:
             del self.user_states[user_id]
@@ -11756,6 +11779,63 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                 f"✅ اكتمل استرداد المعاملات: {len(all_states)} جلسة فُحصت، "
                 f"{len(notified_uids_pending)} معاملة pending أُشعر بها."
             )
+
+            # ── 3. معالجة سجلات pending_transactions (جلسات في منتصف الإدخال) ──
+            try:
+                stale_flows = self._db.get_pending_transactions_older_than(FIVE_MIN)
+                cancelled_count = 0
+                reminded_count = 0
+                for rec in stale_flows:
+                    uid        = rec['user_id']
+                    tx_id      = rec['tx_id']
+                    tx_type    = rec['tx_type']
+                    age        = rec['age_seconds']
+                    company    = rec.get('company', '')
+                    flow_label = 'إيداع' if tx_type == 'deposit' else 'سحب'
+
+                    # تجاهل إذا كان المستخدم لا يزال في جلسة FSM نشطة
+                    cur_state = self.user_states.get(uid)
+                    if cur_state and any(cur_state.startswith(p) for p in flow_prefixes):
+                        continue
+
+                    if age >= THIRTY_MIN:
+                        # إلغاء تلقائي بعد 30 دقيقة + إشعار المستخدم
+                        try:
+                            self._db.resolve_pending_transaction(tx_id, status='cancelled')
+                        except Exception as _e:
+                            logger.warning(f"recovery: فشل إلغاء {tx_id}: {_e}")
+                        try:
+                            self.send_message(
+                                uid,
+                                f"❌ <b>تم إلغاء طلب {flow_label}</b>\n\n"
+                                f"انتهت مهلة إدخال بيانات طلب {flow_label}"
+                                f"{' عبر ' + company if company else ''} "
+                                f"({int(age // 60)} دقيقة).\n"
+                                f"يرجى بدء طلب جديد عبر /start"
+                            )
+                        except Exception as _e:
+                            logger.warning(f"recovery: فشل إشعار الإلغاء {uid}: {_e}")
+                        cancelled_count += 1
+                    else:
+                        # 5-30 دقيقة: تذكير للاستئناف
+                        try:
+                            self.send_message(
+                                uid,
+                                f"🔔 <b>طلب {flow_label} غير مكتمل</b>\n\n"
+                                f"توقف طلب {flow_label}"
+                                f"{' عبر ' + company if company else ''} "
+                                f"قبل {int(age // 60)} دقيقة.\n"
+                                f"أرسل أي رسالة لمتابعة الإدخال، أو /start لبدء طلب جديد."
+                            )
+                        except Exception as _e:
+                            logger.warning(f"recovery: فشل تذكير {uid}: {_e}")
+                        reminded_count += 1
+
+                logger.info(
+                    f"✅ pending_transactions: {reminded_count} تذكير، {cancelled_count} إلغاء تلقائي."
+                )
+            except Exception as _e:
+                logger.error(f"recovery: خطأ في معالجة pending_transactions: {_e}", exc_info=True)
 
         except Exception as e:
             logger.error(f"_recover_pending_states خطأ عام: {e}", exc_info=True)

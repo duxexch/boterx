@@ -83,6 +83,19 @@ class BotDatabase:
                 updated_at TEXT NOT NULL
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS pending_transactions (
+                tx_id      TEXT PRIMARY KEY,
+                user_id    TEXT NOT NULL,
+                tx_type    TEXT NOT NULL,
+                amount     TEXT,
+                currency   TEXT,
+                company    TEXT,
+                status     TEXT NOT NULL DEFAULT 'pending',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+        """)
         conn.commit()
         logger.info("BotDatabase bootstrapped at %s", self.db_path)
 
@@ -161,6 +174,61 @@ class BotDatabase:
             "SELECT user_id, state, updated_at FROM user_states"
         )
         return [(row[0], row[1], row[2]) for row in cur.fetchall()]
+
+    # ---- pending_transactions -----------------------------------------
+
+    def record_pending_transaction(
+        self, tx_id: str, user_id, tx_type: str,
+        amount: str = '', currency: str = '', company: str = ''
+    ):
+        """Insert a new pending transaction record (idempotent via INSERT OR IGNORE)."""
+        now = datetime.now(timezone.utc).isoformat()
+        self._conn().execute(
+            """
+            INSERT OR IGNORE INTO pending_transactions
+                (tx_id, user_id, tx_type, amount, currency, company, status, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)
+            """,
+            (str(tx_id), str(user_id), str(tx_type),
+             str(amount), str(currency), str(company), now, now)
+        )
+        self._conn().commit()
+
+    def resolve_pending_transaction(self, tx_id: str, status: str = 'resolved'):
+        """Mark a pending transaction as resolved (or rejected/cancelled)."""
+        now = datetime.now(timezone.utc).isoformat()
+        self._conn().execute(
+            "UPDATE pending_transactions SET status=?, updated_at=? WHERE tx_id=?",
+            (status, now, str(tx_id))
+        )
+        self._conn().commit()
+
+    def get_pending_transactions_older_than(self, seconds: int) -> list:
+        """Return list of dicts for rows with status='pending' older than *seconds*."""
+        cutoff = (datetime.now(timezone.utc).timestamp() - seconds)
+        cur = self._conn().execute(
+            "SELECT tx_id, user_id, tx_type, amount, currency, company, created_at "
+            "FROM pending_transactions WHERE status='pending'"
+        )
+        rows = cur.fetchall()
+        result = []
+        for row in rows:
+            tx_id, user_id, tx_type, amount, currency, company, created_at_iso = row
+            try:
+                created_at = datetime.fromisoformat(created_at_iso)
+                if created_at.tzinfo is None:
+                    from datetime import timezone as _tz
+                    created_at = created_at.replace(tzinfo=_tz.utc)
+                age = (datetime.now(timezone.utc) - created_at).total_seconds()
+            except Exception:
+                age = seconds + 1  # assume stale if unparseable
+            if age >= seconds:
+                result.append({
+                    'tx_id': tx_id, 'user_id': user_id, 'tx_type': tx_type,
+                    'amount': amount, 'currency': currency, 'company': company,
+                    'age_seconds': age,
+                })
+        return result
 
     # ---- CSV-backed table operations ----------------------------------
 
