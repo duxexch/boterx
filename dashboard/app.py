@@ -150,9 +150,9 @@ def validate_telegram_init_data(init_data_str):
             if k != 'hash':
                 data_check[k] = v[0]
         data_check_string = '\n'.join(f'{k}={v}' for k, v in sorted(data_check.items()))
-        # secret_key = HMAC_SHA256(bot_token, "WebAppData")
-        secret_key = hmac.new(BOT_TOKEN.encode(), b'WebAppData', hashlib.sha256).digest()
-        # calculated_hash = HMAC_SHA256(secret_key, data_check_string)
+        # secret_key = HMAC_SHA256(key="WebAppData", msg=bot_token)  ← Telegram spec
+        secret_key = hmac.new(b'WebAppData', BOT_TOKEN.encode(), hashlib.sha256).digest()
+        # calculated_hash = HMAC_SHA256(key=secret_key, msg=data_check_string)
         calculated_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
         # Compare
         if not hmac.compare_digest(calculated_hash, hash_from_client):
@@ -168,24 +168,66 @@ def validate_telegram_init_data(init_data_str):
 
 def webapp_auth(f):
     """Decorator: validates Telegram WebApp initData on game-facing API endpoints.
-    Reads initData from 'X-Telegram-Init-Data' header or 'initData' body/query param.
-    Sets g.telegram_user_id and g.telegram_user on success.
-    Falls back to uid param if BOT_TOKEN not configured (dev mode).
+
+    Priority order:
+      1. X-Telegram-Init-Data header (sent by game-base.js on every request)
+      2. initData query/body param (fallback for older clients)
+      3. uid param — ONLY accepted when BOT_TOKEN is NOT configured (local dev)
+
+    When BOT_TOKEN is set, uid-only requests are unconditionally rejected (403).
+    This prevents user-impersonation attacks where any caller who knows a
+    telegram_id could forge requests on behalf of that user.
     """
     @wraps(f)
     def decorated(*args, **kwargs):
-        # Get uid from query string OR JSON body (works for both GET and POST)
-        uid = request.args.get('uid', '')
-        if not uid:
+        # ── Step 1: collect initData from any supported source ──────────────
+        init_data = (
+            request.headers.get('X-Telegram-Init-Data', '').strip()
+            or request.args.get('initData', '').strip()
+        )
+        if not init_data and request.is_json:
             try:
-                uid = (request.get_json(silent=True) or {}).get('uid', '')
-            except:
+                init_data = (request.get_json(silent=True) or {}).get('initData', '').strip()
+            except Exception:
                 pass
-        if uid:
-            g.telegram_user_id = uid
-            g.telegram_user = None
+
+        # ── Step 2: HMAC validation (production path) ────────────────────────
+        if BOT_TOKEN and init_data:
+            user_id, user_obj = validate_telegram_init_data(init_data)
+            if not user_id:
+                return jsonify({'error': 'Unauthorized: invalid initData',
+                                'code': 'INVALID_INIT_DATA'}), 403
+            # Reject stale initData (>24 h old) per Telegram's recommendation
+            try:
+                from urllib.parse import parse_qs as _pqs
+                auth_date = int(_pqs(init_data).get('auth_date', ['0'])[0])
+                if auth_date > 0 and (datetime.now().timestamp() - auth_date) > 86400:
+                    return jsonify({'error': 'Unauthorized: initData expired',
+                                    'code': 'EXPIRED_INIT_DATA'}), 403
+            except Exception:
+                pass
+            g.telegram_user_id = user_id
+            g.telegram_user = user_obj
             return f(*args, **kwargs)
-        return jsonify({'error': 'Missing uid', 'code': 'NO_UID'}), 403
+
+        # ── Step 3: dev fallback — uid param only when BOT_TOKEN absent ──────
+        if not BOT_TOKEN:
+            uid = request.args.get('uid', '').strip()
+            if not uid and request.is_json:
+                try:
+                    uid = (request.get_json(silent=True) or {}).get('uid', '').strip()
+                except Exception:
+                    pass
+            if uid:
+                g.telegram_user_id = uid
+                g.telegram_user = None
+                return f(*args, **kwargs)
+            return jsonify({'error': 'Missing uid (dev: BOT_TOKEN not set)',
+                            'code': 'NO_UID'}), 403
+
+        # ── Step 4: BOT_TOKEN set but no initData at all ─────────────────────
+        return jsonify({'error': 'Unauthorized: missing Telegram initData',
+                        'code': 'NO_INIT_DATA'}), 403
     return decorated
 
 def get_request_uid():
