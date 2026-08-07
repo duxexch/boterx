@@ -140,7 +140,7 @@ let bgScroll = 0, planeX = 0, planeY = 0;
 const PX = 0.35, PY = 0.45;
 let aviatorSSE = null;
 
-function resizeCanvas() { canvas.width = canvas.clientWidth; canvas.height = canvas.clientHeight; }
+function resizeCanvas() { canvas.width = Math.max(1, canvas.clientWidth || window.innerWidth); canvas.height = Math.max(1, canvas.clientHeight || window.innerHeight); }
 window.addEventListener('resize', resizeCanvas);
 
 function pickWeather() {
@@ -439,7 +439,7 @@ function placeBet(slot) {
 function doCashout(slot) {
   if (roundPhase !== 'flying' || !myBets[slot].placed || myBets[slot].cashed) return;
   myBets[slot].cashed = true;
-  const payout = myBets[slot].amount * currentMult;
+  const payout = _floorMoney(myBets[slot].amount * currentMult);
   const btn = document.getElementById('btn'+slot);
   btn.className = 'bet-slot-btn'; btn.style.background = 'var(--surface-3)'; btn.style.color = 'var(--muted)';
   btn.textContent = '✓ ' + payout.toFixed(0); btn.disabled = true;
@@ -489,12 +489,21 @@ function simulateFakeBets() {
   }
 }
 
-// Init
-if (!CanvasRenderingContext2D.prototype.roundRect) { CanvasRenderingContext2D.prototype.roundRect = function(x,y,w,h,r) { this.beginPath(); this.moveTo(x+r,y); this.arcTo(x+w,y,x+w,y+h,r); this.arcTo(x+w,y+h,x,y+h,r); this.arcTo(x,y+h,x,y,r); this.arcTo(x,y,x+w,y,r); this.closePath(); return this; }; }
-resizeCanvas(); pickWeather(); drawBackground(0); drawRunway(0);
-loadBalance();
+// ===== Constitution §2.5: Precision — use Math.floor for money display =====
+function _floorMoney(val) { return Math.floor((parseFloat(val) || 0) * 100) / 100; }
+
+// ===== Constitution §3.2: Use apiFetchCritical for bet/cashout (Offline Outbox) =====
+
+// Init — Constitution §3: show #app FIRST, then init canvas in rAF (fixes 0x0 bug)
 document.getElementById('loading').style.display = 'none';
 document.getElementById('app').style.display = 'flex';
+loadBalance();
+requestAnimationFrame(function() {
+  resizeCanvas();
+  pickWeather();
+  drawBackground(0);
+  drawRunway(0);
+});
 connectSSE();
 setInterval(loadBalance, 5000);
 setInterval(simulatePlayers, 2500);
