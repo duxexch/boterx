@@ -274,7 +274,14 @@ def page_wheel():
 
 @app.route('/webapp/snatch')
 def webapp_snatch():
-    """صفحة لعبة اختطف — Web App ديناميكي داخل تيليجرام"""
+    """لعبة Snatch الأركيد — الإصدار الجديد مع نظام رهان حقيقي"""
+    uid = request.args.get('uid', '')
+    lang = request.args.get('lang', 'ar')
+    return render_template('snatch.html', uid=uid, lang=lang)
+
+@app.route('/webapp/snatch-gifts')
+def webapp_snatch_gifts():
+    """صفحة لعبة اختطف القديمة — هدايا تابعة"""
     gifts = []
     try:
         with open('wheel_gifts.csv', 'r', encoding='utf-8-sig') as f:
@@ -4827,6 +4834,428 @@ def api_games_live_players_stream():
             time.sleep(3)
     return Response(generate(), mimetype='text/event-stream',
                     headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
+
+# ===== Wheel — WebApp API =====
+
+_WHEEL_SEGMENTS = [0.0, 1.5, 2.0, 0.5, 5.0, 1.0, 10.0, 0.0]  # must match wheel.html SEGMENTS[i].mult
+_wheel_lock = threading.Lock()
+
+@app.route('/api/wheel/spin', methods=['POST'])
+@webapp_auth
+def api_wheel_spin():
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    data = request.json or {}
+    uid = get_request_uid()
+    bet_amount = float(data.get('bet', 0))
+    if not uid or bet_amount <= 0:
+        return jsonify({'error': 'معطيات غير صحيحة'}), 400
+
+    player = _gm.tracker.get_profile(uid)
+    game = _gm.get_game('GAME008')
+    if not game:
+        game = {'id': 'GAME008', 'base_win_chance': '0.42', 'house_edge_pct': '14',
+                'min_bet': '10', 'max_bet': '2000'}
+
+    risk_check = _gm.risk.check_risk(player, bet_amount, game)
+    if not risk_check['allowed']:
+        msg = risk_check['alerts'][0]['message'] if risk_check.get('alerts') else 'محظور'
+        return jsonify({'success': False, 'error': msg})
+
+    balance = _gm.get_balance(uid)
+    if balance < bet_amount:
+        return jsonify({'success': False, 'error': 'رصيد غير كافٍ',
+                        'need_deposit': True, 'balance': balance})
+
+    algo = _gm.algorithm.calculate_win_chance(player, game, bet_amount)
+    win_chance = algo['win_chance']
+
+    # Weight segment selection: 0 = lose (skull), others = win
+    # Higher win_chance → bias toward high multipliers
+    if algo['decision'] == 'force_lose':
+        # land on skull (index 0 or 7)
+        segment = random.choice([0, 7])
+    else:
+        # build weights proportional to multiplier × win_chance
+        weights = []
+        for m in _WHEEL_SEGMENTS:
+            if m == 0.0:
+                w = max(0.5, (1 - win_chance) * 4)   # skulls get weight when losing
+            else:
+                w = m * win_chance                    # big multipliers favoured when winning
+            weights.append(w)
+        total = sum(weights)
+        r = random.uniform(0, total)
+        cumul = 0.0
+        segment = 0
+        for i, w in enumerate(weights):
+            cumul += w
+            if r <= cumul:
+                segment = i
+                break
+
+    multiplier = _WHEEL_SEGMENTS[segment]
+    payout = round(bet_amount * multiplier, 2)
+    result = 'win' if multiplier > 0 else 'lose'
+
+    success, balance_after = _gm.deduct_balance(uid, bet_amount)
+    if not success:
+        return jsonify({'success': False, 'error': 'رصيد غير كافٍ',
+                        'need_deposit': True, 'balance': 0})
+
+    if payout > 0:
+        balance_after = _gm.add_balance(uid, payout)
+
+    session_id = f"WHEL{int(datetime.now().timestamp()) % 100000000:08d}"
+    _gm.algorithm.log_decision(
+        session_id=session_id, user_id=uid, game_id='GAME008',
+        base_chance=float(game.get('base_win_chance', 0.42)),
+        adjusted_chance=win_chance, factors=algo['factors'],
+        decision=algo['decision'],
+        reason=f"Wheel seg={segment} mult={multiplier}; {algo['reason']}"
+    )
+    _gm.tracker.log_session({
+        'session_id': session_id, 'game_id': 'GAME008', 'user_id': uid,
+        'bet_amount': bet_amount, 'payout': payout, 'result': result,
+        'balance_before': balance, 'balance_after': balance_after, 'multiplier': multiplier
+    })
+    _gm.tracker.update_profile(uid, {
+        'bet_amount': bet_amount, 'payout': payout, 'result': result,
+        'game_id': 'GAME008', 'balance_after': balance_after
+    })
+
+    with _wheel_lock:
+        spin_row = {
+            'id': session_id, 'uid': str(uid), 'segment': segment,
+            'multiplier': multiplier, 'bet_amount': bet_amount, 'payout': payout,
+            'result': result, 'created_at': datetime.now().isoformat()
+        }
+        _wf = ['id', 'uid', 'segment', 'multiplier', 'bet_amount', 'payout', 'result', 'created_at']
+        append_csv('wheel_webapp_spins.csv', spin_row, _wf)
+
+    return jsonify({
+        'success': True, 'segment': segment, 'multiplier': multiplier,
+        'payout': payout, 'result': result,
+        'balance_before': balance, 'balance_after': balance_after
+    })
+
+
+# ===== Lottery — WebApp API =====
+
+_lottery_lock = threading.Lock()
+_LOT_ROUND_FIELDS = ['id', 'draw_time', 'prize_pool', 'tickets_sold',
+                     'ticket_price', 'status', 'winning_numbers', 'created_at']
+_LOT_TICKET_FIELDS = ['id', 'round_id', 'uid', 'numbers', 'status', 'prize', 'scratched', 'bought_at']
+_LOT_TICKET_PRICE = 50
+_LOT_ROUND_DURATION = 3600   # 1 hour in seconds
+_LOT_POOL_RATIO = 0.80       # 80% of sales go to prize pool
+
+
+def _lot_get_or_create_round():
+    """Return current active round dict, creating one if none exist or triggering draw if expired."""
+    rounds = read_csv('lottery_rounds.csv')
+    now_ts = datetime.now().timestamp()
+
+    # Check for active round
+    active = [r for r in rounds if r.get('status') == 'active']
+    if active:
+        rnd = active[-1]
+        draw_ts = float(rnd.get('draw_time', 0))
+        if now_ts < draw_ts:
+            return rnd
+        # Draw time passed — trigger draw
+        _lot_trigger_draw(rnd, rounds)
+        # Create new round
+        return _lot_create_round(rounds)
+
+    return _lot_create_round(rounds)
+
+
+def _lot_create_round(existing_rounds):
+    now = datetime.now()
+    new_id = f"LOTR{int(now.timestamp()) % 100000000:08d}"
+    draw_ts = now.timestamp() + _LOT_ROUND_DURATION
+    rnd = {
+        'id': new_id,
+        'draw_time': str(int(draw_ts)),
+        'prize_pool': '0',
+        'tickets_sold': '0',
+        'ticket_price': str(_LOT_TICKET_PRICE),
+        'status': 'active',
+        'winning_numbers': '',
+        'created_at': now.isoformat()
+    }
+    existing_rounds.append(rnd)
+    write_csv('lottery_rounds.csv', existing_rounds, _LOT_ROUND_FIELDS)
+    return rnd
+
+
+def _lot_trigger_draw(rnd, all_rounds):
+    """Pick winning numbers, settle tickets, mark round drawn."""
+    round_id = rnd['id']
+    winning = sorted(random.sample(range(1, 36), 5))
+    winning_str = json.dumps(winning)
+
+    tickets = read_csv('lottery_tickets.csv')
+    round_tickets = [t for t in tickets if t.get('round_id') == round_id and t.get('status') == 'pending']
+    prize_pool = float(rnd.get('prize_pool', 0))
+
+    jackpot_winners = []
+    for t in round_tickets:
+        try:
+            nums = json.loads(t.get('numbers', '[]'))
+        except Exception:
+            nums = []
+        matches = len(set(nums) & set(winning))
+        if matches == 5:
+            jackpot_winners.append(t)
+
+    for t in tickets:
+        if t.get('round_id') != round_id or t.get('status') != 'pending':
+            continue
+        try:
+            nums = json.loads(t.get('numbers', '[]'))
+        except Exception:
+            nums = []
+        matches = len(set(nums) & set(winning))
+
+        if matches == 5:
+            if jackpot_winners:
+                share = round(prize_pool * 0.70 / len(jackpot_winners), 2)
+            else:
+                share = round(prize_pool * 0.70, 2)
+            t['prize'] = str(share)
+            t['status'] = 'win'
+            if _VEX_GAMES:
+                _gm.add_balance(t['uid'], share)
+        elif matches == 4:
+            prize = _LOT_TICKET_PRICE * 10
+            t['prize'] = str(prize)
+            t['status'] = 'win'
+            if _VEX_GAMES:
+                _gm.add_balance(t['uid'], prize)
+        elif matches == 3:
+            prize = _LOT_TICKET_PRICE * 2
+            t['prize'] = str(prize)
+            t['status'] = 'win'
+            if _VEX_GAMES:
+                _gm.add_balance(t['uid'], prize)
+        else:
+            t['prize'] = '0'
+            t['status'] = 'lose'
+
+    write_csv('lottery_tickets.csv', tickets, _LOT_TICKET_FIELDS)
+
+    # Mark round drawn
+    for r in all_rounds:
+        if r['id'] == round_id:
+            r['status'] = 'drawn'
+            r['winning_numbers'] = winning_str
+    write_csv('lottery_rounds.csv', all_rounds, _LOT_ROUND_FIELDS)
+
+
+@app.route('/api/lottery/state')
+@webapp_auth
+def api_lottery_state():
+    uid = get_request_uid()
+    with _lottery_lock:
+        rnd = _lot_get_or_create_round()
+
+    tickets = read_csv('lottery_tickets.csv')
+    round_id = rnd['id']
+
+    my_tickets = []
+    for t in tickets:
+        if t.get('round_id') == round_id and t.get('uid') == str(uid):
+            try:
+                nums = json.loads(t.get('numbers', '[]'))
+            except Exception:
+                nums = []
+            my_tickets.append({
+                'id': t['id'],
+                'numbers': nums,
+                'status': t.get('status', 'pending'),
+                'prize': float(t.get('prize', 0)) if t.get('prize') else 0,
+                'scratched': t.get('scratched', 'false') == 'true',
+                'drawn': []
+            })
+
+    # History: last 5 drawn rounds
+    rounds = read_csv('lottery_rounds.csv')
+    drawn = [r for r in rounds if r.get('status') == 'drawn'][-5:]
+    history = []
+    for r in reversed(drawn):
+        try:
+            w = json.loads(r.get('winning_numbers', '[]'))
+        except Exception:
+            w = []
+        history.append({
+            'id': r['id'],
+            'winning_numbers': w,
+            'tickets_sold': int(r.get('tickets_sold', 0)),
+            'prize_pool': float(r.get('prize_pool', 0)),
+            'draw_time': int(r.get('draw_time', 0))
+        })
+
+    return jsonify({
+        'success': True,
+        'round_id': round_id,
+        'draw_time': int(rnd.get('draw_time', 0)),
+        'prize_pool': float(rnd.get('prize_pool', 0)),
+        'tickets_sold': int(rnd.get('tickets_sold', 0)),
+        'ticket_price': int(rnd.get('ticket_price', _LOT_TICKET_PRICE)),
+        'my_tickets': my_tickets,
+        'history': history
+    })
+
+
+@app.route('/api/lottery/buy', methods=['POST'])
+@webapp_auth
+def api_lottery_buy():
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    data = request.json or {}
+    uid = get_request_uid()
+    count = max(1, min(10, int(data.get('count', 1))))
+
+    with _lottery_lock:
+        rnd = _lot_get_or_create_round()
+        ticket_price = int(rnd.get('ticket_price', _LOT_TICKET_PRICE))
+        total_cost = ticket_price * count
+
+        balance = _gm.get_balance(uid)
+        if balance < total_cost:
+            return jsonify({
+                'success': False, 'error': 'رصيد غير كافٍ',
+                'need_deposit': True, 'balance': balance
+            })
+
+        ok, balance_after = _gm.deduct_balance(uid, total_cost)
+        if not ok:
+            return jsonify({'success': False, 'error': 'رصيد غير كافٍ',
+                            'need_deposit': True, 'balance': 0})
+
+        now = datetime.now()
+        new_tickets = []
+        for _ in range(count):
+            tid = f"TKT{int(now.timestamp()) % 100000000:08d}{random.randint(100,999)}"
+            nums = sorted(random.sample(range(1, 36), 5))
+            new_tickets.append({
+                'id': tid, 'round_id': rnd['id'], 'uid': str(uid),
+                'numbers': json.dumps(nums), 'status': 'pending',
+                'prize': '0', 'scratched': 'false',
+                'bought_at': now.isoformat()
+            })
+
+        existing = read_csv('lottery_tickets.csv')
+        existing.extend(new_tickets)
+        write_csv('lottery_tickets.csv', existing, _LOT_TICKET_FIELDS)
+
+        # Update round totals
+        rounds = read_csv('lottery_rounds.csv')
+        for r in rounds:
+            if r['id'] == rnd['id']:
+                r['tickets_sold'] = str(int(r.get('tickets_sold', 0)) + count)
+                pool = float(r.get('prize_pool', 0)) + total_cost * _LOT_POOL_RATIO
+                r['prize_pool'] = str(round(pool, 2))
+                break
+        write_csv('lottery_rounds.csv', rounds, _LOT_ROUND_FIELDS)
+
+    _gm.tracker.update_profile(uid, {
+        'bet_amount': total_cost, 'payout': 0, 'result': 'pending',
+        'game_id': 'GAME009', 'balance_after': balance_after
+    })
+
+    return jsonify({
+        'success': True, 'count': count, 'total_cost': total_cost,
+        'balance_after': balance_after,
+        'tickets': [{'id': t['id'], 'numbers': json.loads(t['numbers'])} for t in new_tickets]
+    })
+
+
+# ===== Snatch — WebApp API =====
+
+@app.route('/api/snatch/spin', methods=['POST'])
+@webapp_auth
+def api_snatch_spin():
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    data = request.json or {}
+    uid = get_request_uid()
+    bet_amount = float(data.get('bet', 0))
+    if not uid or bet_amount <= 0:
+        return jsonify({'error': 'معطيات غير صحيحة'}), 400
+
+    player = _gm.tracker.get_profile(uid)
+    game = _gm.get_game('GAME010')
+    if not game:
+        game = {'id': 'GAME010', 'base_win_chance': '0.50', 'house_edge_pct': '12',
+                'min_bet': '10', 'max_bet': '500'}
+
+    risk_check = _gm.risk.check_risk(player, bet_amount, game)
+    if not risk_check['allowed']:
+        msg = risk_check['alerts'][0]['message'] if risk_check.get('alerts') else 'محظور'
+        return jsonify({'success': False, 'error': msg})
+
+    balance = _gm.get_balance(uid)
+    if balance < bet_amount:
+        return jsonify({'success': False, 'error': 'رصيد غير كافٍ',
+                        'need_deposit': True, 'balance': balance})
+
+    algo = _gm.algorithm.calculate_win_chance(player, game, bet_amount)
+    win_chance = algo['win_chance']
+    house_edge = float(game.get('house_edge_pct', 12)) / 100
+
+    # Map win_chance to a multiplier (0.0 – 2.5 range)
+    # The payout is credited immediately; client animation is cosmetic
+    if algo['decision'] == 'force_lose':
+        multiplier = 0.0
+    elif win_chance > 0.75:
+        multiplier = round(random.uniform(1.5, 2.5), 2)
+    elif win_chance > 0.55:
+        multiplier = round(random.uniform(0.8, 1.5), 2)
+    elif win_chance > 0.35:
+        multiplier = round(random.uniform(0.3, 0.8), 2)
+    else:
+        multiplier = 0.0
+
+    # Apply house edge cap
+    multiplier = round(multiplier * (1 - house_edge * 0.5), 2)
+    payout = round(bet_amount * multiplier, 2)
+    result = 'win' if payout > bet_amount else ('lose' if payout == 0 else 'partial')
+
+    ok, balance_after = _gm.deduct_balance(uid, bet_amount)
+    if not ok:
+        return jsonify({'success': False, 'error': 'رصيد غير كافٍ',
+                        'need_deposit': True, 'balance': 0})
+
+    if payout > 0:
+        balance_after = _gm.add_balance(uid, payout)
+
+    session_id = f"SNTH{int(datetime.now().timestamp()) % 100000000:08d}"
+    _gm.algorithm.log_decision(
+        session_id=session_id, user_id=uid, game_id='GAME010',
+        base_chance=float(game.get('base_win_chance', 0.50)),
+        adjusted_chance=win_chance, factors=algo['factors'],
+        decision=algo['decision'],
+        reason=f"Snatch mult={multiplier} payout={payout}; {algo['reason']}"
+    )
+    _gm.tracker.log_session({
+        'session_id': session_id, 'game_id': 'GAME010', 'user_id': uid,
+        'bet_amount': bet_amount, 'payout': payout, 'result': result,
+        'balance_before': balance, 'balance_after': balance_after, 'multiplier': multiplier
+    })
+    _gm.tracker.update_profile(uid, {
+        'bet_amount': bet_amount, 'payout': payout, 'result': result,
+        'game_id': 'GAME010', 'balance_after': balance_after
+    })
+
+    return jsonify({
+        'success': True, 'session_id': session_id,
+        'multiplier': multiplier, 'payout': payout, 'result': result,
+        'balance_before': balance, 'balance_after': balance_after
+    })
+
 
 # ===== Main =====
 

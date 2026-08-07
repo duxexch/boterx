@@ -86,6 +86,7 @@ var timeLeft = 20;
 var gifts = [];
 var particles = [];
 var betAmount = 10;
+var serverPayout = 0;   // payout pre-calculated by server at /api/snatch/spin
 var animId = null;
 var timerInterval = null;
 var W, H;
@@ -106,6 +107,7 @@ function startGame() {
     body: JSON.stringify({ uid: uid, bet: betAmount })
   }).then(function(r) { return r.json(); }).then(function(d) {
     if (d.error) { showToast(d.error, 'error'); if (d.need_deposit) showDepositModal(betAmount); return; }
+    serverPayout = typeof d.payout === 'number' ? d.payout : 0;
     document.getElementById('startOverlay').style.display = 'none';
     gameRunning = true;
     score = 0; lives = 3; timeLeft = 20; gifts = []; particles = [];
@@ -262,7 +264,9 @@ function endGame() {
   setGamePhase('idle');
   if (timerInterval) clearInterval(timerInterval);
   if (animId) cancelAnimationFrame(animId);
-  var payout = score * betAmount * 0.1; // Simple scoring: each point = 10% of bet
+  // Use server-calculated payout (already credited to balance at /api/snatch/spin).
+  // Fall back to client estimate only in offline/catch mode (serverPayout === 0).
+  var payout = serverPayout > 0 ? serverPayout : score * betAmount * 0.1;
   document.getElementById('resultTitle').textContent = lives <= 0 ? '💀 نفدت الحياة!' : '⏰ انتهى الوقت!';
   document.getElementById('resultScore').textContent = score + ' نقطة';
   document.getElementById('resultPayout').textContent = '+ ' + fmtAmount(payout) + ' ' + gameCurrency;
