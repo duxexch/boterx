@@ -4877,16 +4877,6 @@ def api_provably_fair_seed():
     client_seed = request.args.get('client_seed', '')
     if not session_id:
         session_id = f"pf_{secrets.token_hex(8)}"
-@app.route('/api/provably-fair/seed')
-@webapp_auth
-def api_provably_fair_seed():
-    """Get or create provably fair seed hash for a session"""
-    if not _PROVABLY_FAIR:
-        return jsonify({'error': 'Provably fair not available'}), 500
-    session_id = request.args.get('session_id', '')
-    client_seed = request.args.get('client_seed', '')
-    if not session_id:
-        session_id = f"pf_{secrets.token_hex(8)}"
     result = _pf.create_session(session_id, client_seed or None)
     return jsonify({
         'session_id': session_id,
