@@ -5274,6 +5274,18 @@ _LOTTERY_TICKET_PRICE = 50      # per ticket
 _LOTTERY_ROUND_DURATION = 3600  # seconds (1 hour rounds)
 _LOTTERY_NUMBERS_COUNT = 5      # numbers per ticket
 _LOTTERY_MAX_NUMBER = 30
+
+# Tiered prize tiers (number of matches required for each tier)
+_LOTTERY_TIER_JACKPOT    = 5   # 5/5 — full prize pool split among winners
+_LOTTERY_TIER_SECONDARY  = 4   # 4/5 — secondary prize
+_LOTTERY_TIER_SMALL      = 3   # 3/5 — small consolation prize
+
+# When no jackpot winner: what fraction of the pool to roll over vs redistribute
+_LOTTERY_ROLLOVER_PCT    = 0.50  # 50% rolls over to next round
+# Of the redistributable half: how to split between tier-2 and tier-3 winners
+_LOTTERY_SECONDARY_SHARE = 0.70  # 70% of redistributable → 4/5 winners
+_LOTTERY_SMALL_SHARE     = 0.30  # 30% of redistributable → 3/5 winners
+
 _lottery_lock = threading.Lock()
 
 def _lottery_state_file():
@@ -5360,57 +5372,136 @@ def _get_or_create_lottery_round():
             round_id = state.get('round_id', '')
             state['drawn'] = drawn_nums
             state['drawn_at'] = now_ts
-            # Resolve tickets — mark win/lose statuses in state
-            winning_uids = []
-            prize_per_winner = 0.0
+
+            # ── Tiered ticket resolution ───────────────────────────────────────
+            # Tier 1 (jackpot): 5/5 match  — full prize pool split among winners
+            # Tier 2 (secondary): 4/5 match — share of the redistributable pool
+            # Tier 3 (small): 3/5 match    — smaller share of the redistributable pool
+            # No jackpot → 50% rolls over, remaining 50% split across tier-2/3 winners.
+            # No winners at all → full pool rolls over.
+            tier1_uids = []  # jackpot  (5/5)
+            tier2_uids = []  # secondary (4/5)
+            tier3_uids = []  # small     (3/5)
+
             for ticket in state.get('tickets', []):
                 matches = len(set(ticket['numbers']) & set(drawn_nums))
-                if matches == _LOTTERY_NUMBERS_COUNT:
+                ticket['matches'] = matches
+                ticket['drawn'] = drawn_nums
+                ticket['scratched'] = True
+                if matches >= _LOTTERY_TIER_JACKPOT:
                     ticket['status'] = 'win'
-                    ticket['scratched'] = True
-                    ticket['drawn'] = drawn_nums
-                    winning_uids.append(ticket['uid'])
+                    ticket['tier'] = 1
+                    tier1_uids.append(ticket['uid'])
+                elif matches == _LOTTERY_TIER_SECONDARY:
+                    ticket['status'] = 'win'
+                    ticket['tier'] = 2
+                    tier2_uids.append(ticket['uid'])
+                elif matches == _LOTTERY_TIER_SMALL:
+                    ticket['status'] = 'win'
+                    ticket['tier'] = 3
+                    tier3_uids.append(ticket['uid'])
                 else:
                     ticket['status'] = 'lose'
-                    ticket['scratched'] = True
-                    ticket['drawn'] = drawn_nums
-            if winning_uids:
-                prize_per_winner = round(state.get('prize_pool', 0) / len(winning_uids), 2)
-            # Stamp prize amounts on tickets before persisting
-            for ticket in state.get('tickets', []):
-                ticket['prize'] = prize_per_winner if ticket.get('status') == 'win' else 0.0
-            # Preserve previous round data
+                    ticket['tier'] = 0
+
+            prize_pool = state.get('prize_pool', 0)
+            rollover_amount = 0.0
+            winners_to_credit = []
+
+            if tier1_uids:
+                # Jackpot: split full pool equally among jackpot winners
+                prize_per_jackpot = round(prize_pool / len(tier1_uids), 2)
+                for ticket in state.get('tickets', []):
+                    ticket['prize'] = prize_per_jackpot if ticket.get('tier') == 1 else 0.0
+                winners_to_credit = [
+                    {
+                        'uid': str(w_uid),
+                        'amount': prize_per_jackpot,
+                        'idem_key': f"lottery_{round_id}_{w_uid}_t1",
+                    }
+                    for w_uid in tier1_uids
+                ]
+            else:
+                # No jackpot — roll over a portion, redistribute the rest
+                if tier2_uids or tier3_uids:
+                    rollover_amount = round(prize_pool * _LOTTERY_ROLLOVER_PCT, 2)
+                else:
+                    # No winners at all — roll over the full pool
+                    rollover_amount = prize_pool
+
+                redistributable = prize_pool - rollover_amount
+
+                # Split redistributable between tier-2 and tier-3 pools
+                if tier2_uids and tier3_uids:
+                    tier2_pool = round(redistributable * _LOTTERY_SECONDARY_SHARE, 2)
+                    tier3_pool = redistributable - tier2_pool
+                elif tier2_uids:
+                    tier2_pool = redistributable
+                    tier3_pool = 0.0
+                else:
+                    tier2_pool = 0.0
+                    tier3_pool = redistributable
+
+                prize_per_tier2 = round(tier2_pool / len(tier2_uids), 2) if tier2_uids else 0.0
+                prize_per_tier3 = round(tier3_pool / len(tier3_uids), 2) if tier3_uids else 0.0
+
+                for ticket in state.get('tickets', []):
+                    if ticket.get('tier') == 2:
+                        ticket['prize'] = prize_per_tier2
+                    elif ticket.get('tier') == 3:
+                        ticket['prize'] = prize_per_tier3
+                    else:
+                        ticket['prize'] = 0.0
+
+                for w_uid in tier2_uids:
+                    winners_to_credit.append({
+                        'uid': str(w_uid),
+                        'amount': prize_per_tier2,
+                        'idem_key': f"lottery_{round_id}_{w_uid}_t2",
+                    })
+                for w_uid in tier3_uids:
+                    winners_to_credit.append({
+                        'uid': str(w_uid),
+                        'amount': prize_per_tier3,
+                        'idem_key': f"lottery_{round_id}_{w_uid}_t3",
+                    })
+
+            # Preserve rollover so the next round starts with it
+            state['rollover_amount'] = rollover_amount
+
+            # Preserve previous round data for UI
             state['previous_round'] = {
                 'round_id': round_id,
                 'draw_time': state.get('draw_time'),
                 'drawn': drawn_nums,
                 'drawn_at': now_ts,
                 'tickets': list(state.get('tickets', [])),
-                'prize_per_winner': prize_per_winner,
+                'jackpot_winners': len(tier1_uids),
+                'secondary_winners': len(tier2_uids),
+                'small_winners': len(tier3_uids),
+                'rollover_amount': rollover_amount,
             }
+
             history_entry = {
                 'round_id': round_id,
                 'drawn': drawn_nums,
                 'drawn_at': now_ts,
                 'tickets_sold': state.get('tickets_sold', 0),
-                'prize_pool': state.get('prize_pool', 0),
-                'winners': len(winning_uids),
-                'prize_per_winner': prize_per_winner,
+                'prize_pool': prize_pool,
+                'jackpot_winners': len(tier1_uids),
+                'secondary_winners': len(tier2_uids),
+                'small_winners': len(tier3_uids),
+                'rollover_amount': rollover_amount,
+                # Legacy field — total paid out winners across all tiers
+                'winners': len(tier1_uids) + len(tier2_uids) + len(tier3_uids),
             }
             state.setdefault('history', []).append(history_entry)
             if len(state['history']) > 10:
                 state['history'] = state['history'][-10:]
 
             # Build the durable pending-credit list BEFORE persisting drawn state.
-            # Each entry has a stable idem_key derived from round_id + uid.
-            state['winners_to_credit'] = [
-                {
-                    'uid': str(w_uid),
-                    'amount': prize_per_winner,
-                    'idem_key': f"lottery_{round_id}_{w_uid}"
-                }
-                for w_uid in winning_uids
-            ]
+            # Each entry has a stable idem_key derived from round_id + uid + tier.
+            state['winners_to_credit'] = winners_to_credit
 
             # STEP 3: Persist drawn state + winners_to_credit atomically.
             # raise_on_error=True: if the write fails, no credits happen (correct).
@@ -5425,13 +5516,15 @@ def _get_or_create_lottery_round():
         # Start new round if needed
         if not state or (state.get('drawn') and not state.get('winners_to_credit')):
             round_id = f"LTR{int(now_ts)}"
+            # Carry over any rolled-over prize pool from the previous round
+            carried_pool = float(state.get('rollover_amount', 0)) if state else 0.0
             new_state = {
                 'round_id': round_id,
                 'draw_time': now_ts + _LOTTERY_ROUND_DURATION,
                 'ticket_price': _LOTTERY_TICKET_PRICE,
                 'tickets': [],
                 'tickets_sold': 0,
-                'prize_pool': 0,
+                'prize_pool': carried_pool,
                 'drawn': None,
                 'history': state.get('history', []) if state else [],
                 # Carry forward previous round so users can see their results
@@ -5456,12 +5549,25 @@ def api_lottery_state():
         prev_tickets = [t for t in prev.get('tickets', []) if str(t.get('uid')) == str(uid)]
         if prev_tickets:
             my_tickets = prev_tickets
+    prize_pool = state.get('prize_pool', 0)
+    # Theoretical tier prize pools (per-ticket amounts unknown until draw — show pool sizes)
+    redistributable = round(prize_pool * (1 - _LOTTERY_ROLLOVER_PCT), 2)
+    prize_tiers = {
+        'jackpot':   {'matches': _LOTTERY_TIER_JACKPOT,   'pool': prize_pool,
+                      'label': 'جائزة كبرى (5/5)'},
+        'secondary': {'matches': _LOTTERY_TIER_SECONDARY, 'pool': round(redistributable * _LOTTERY_SECONDARY_SHARE, 2),
+                      'label': 'جائزة ثانية (4/5)'},
+        'small':     {'matches': _LOTTERY_TIER_SMALL,     'pool': round(redistributable * _LOTTERY_SMALL_SHARE, 2),
+                      'label': 'جائزة صغيرة (3/5)'},
+        'rollover_pct': _LOTTERY_ROLLOVER_PCT,
+    }
     return jsonify({
         'round_id': state.get('round_id'),
         'draw_time': state.get('draw_time'),
         'ticket_price': state.get('ticket_price', _LOTTERY_TICKET_PRICE),
         'tickets_sold': state.get('tickets_sold', 0),
-        'prize_pool': state.get('prize_pool', 0),
+        'prize_pool': prize_pool,
+        'prize_tiers': prize_tiers,
         'my_tickets': my_tickets,
         'history': state.get('history', [])[-5:],
     })
