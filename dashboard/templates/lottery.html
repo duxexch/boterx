@@ -6,352 +6,219 @@
 <title>اليانصيب — VEX</title>
 <link rel="stylesheet" href="/static/css/game-base.css">
 <style>
-/* ===== Lottery Pro ===== */
-.game-area{background:radial-gradient(ellipse at 50% 0%,#1a1208 0%,#0a0e17 70%)!important;display:flex;flex-direction:column;align-items:center;padding:50px 12px 10px;overflow-y:auto}
-
-/* Quick stats */
-.quick-stats{position:absolute;top:8px;right:8px;display:flex;gap:4px;z-index:10}
-.qstat{padding:2px 6px;border-radius:4px;background:rgba(0,0,0,0.4);backdrop-filter:blur(4px);font-size:9px;font-weight:700}
-.qstat.best{color:#fbbf24}
-.qstat.rounds{color:#06b6d4}
-.qstat.tickets{color:#00e701}
-
-/* Other bets */
-.other-bets{position:absolute;top:8px;left:8px;max-width:130px;z-index:10;max-height:200px;overflow-y:auto}
-.other-bets::-webkit-scrollbar{display:none}
-.other-bet{display:flex;align-items:center;gap:4px;padding:3px 8px;margin:2px 0;border-radius:8px;font-size:10px;font-weight:600;backdrop-filter:blur(4px);animation:betSlideIn 0.3s}
-.other-bet.active{background:rgba(0,231,1,0.1);border:1px solid rgba(0,231,1,0.2);color:#00e701}
-.other-bet.win{background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.3);color:#fbbf24}
-.other-bet.lose{background:rgba(255,71,87,0.08);border:1px solid rgba(255,71,87,0.2);color:#ff4757;opacity:0.5}
-.other-bet .avatar{width:14px;height:14px;border-radius:50%;background:#334155;display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:700}
-@keyframes betSlideIn{from{opacity:0;transform:translateX(-20px)}to{opacity:1;transform:translateX(0)}}
-
-/* Title */
-.lottery-title{font-size:26px;font-weight:900;background:linear-gradient(135deg,var(--gold),var(--gold-dim));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:6px;text-align:center}
-
-/* Prize box */
-.prize-box{background:rgba(0,231,1,0.08);border:1px solid rgba(0,231,1,0.3);border-radius:var(--radius);padding:10px 24px;margin:4px 0;text-align:center;position:relative;overflow:hidden}
-.prize-box::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 50% 0,rgba(0,231,1,0.1),transparent 70%);pointer-events:none}
-.prize-label{font-size:10px;color:var(--green);text-transform:uppercase;letter-spacing:1px}
-.prize-amount{font-size:28px;font-weight:900;color:var(--green);font-family:'Courier New',monospace;text-shadow:0 0 20px rgba(0,231,1,0.3)}
-
-/* Participant count */
-.participant-info{display:flex;gap:12px;justify-content:center;margin:4px 0}
-.participant-stat{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--muted)}
-.participant-stat span{color:var(--gold);font-weight:700}
-
-/* Ticket card */
-.ticket-card{background:linear-gradient(135deg,var(--surface-2),var(--surface));border:2px solid var(--gold);border-radius:16px;padding:16px 24px;margin:8px 0;text-align:center;position:relative;overflow:hidden;width:100%;max-width:300px;box-shadow:var(--shadow-glow-gold)}
-.ticket-card::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 50% 0,rgba(251,191,36,0.1),transparent)}
-.ticket-card.flipped{animation:ticketFlip 0.6s var(--ease-spring)}
-@keyframes ticketFlip{0%{transform:rotateY(0)}50%{transform:rotateY(180deg)}100%{transform:rotateY(360deg)}}
-.ticket-num{font-size:38px;font-weight:900;color:var(--gold);letter-spacing:6px;font-family:'Courier New',monospace;margin:8px 0;text-shadow:0 0 20px rgba(251,191,36,0.3)}
-.ticket-label{font-size:11px;color:var(--muted)}
-.ticket-status{font-size:12px;font-weight:700;color:var(--gold);margin-top:4px}
-
-/* Scratch overlay */
-.scratch-overlay{position:absolute;inset:0;background:linear-gradient(135deg,#334155,#1e293b);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);cursor:pointer;z-index:5;transition:opacity 0.3s}
-.scratch-overlay.revealed{opacity:0;pointer-events:none}
-
-/* Result */
-.result-msg{position:static;transform:none;margin:4px 0;display:none;padding:10px 16px;border-radius:var(--radius-sm);background:rgba(0,0,0,0.5);backdrop-filter:blur(8px);text-align:center;font-size:14px;font-weight:700}
-.result-msg.show{display:block;animation:fadeIn 0.3s}
-@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
-
-/* Recovery msg */
-.recovery-msg{position:absolute;top:8%;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);padding:8px 16px;border-radius:12px;font-size:12px;font-weight:700;z-index:15;display:none;text-align:center;border:1px solid rgba(255,255,255,0.05)}
-.recovery-msg.show{display:block;animation:fadeIn 0.3s}
-
-/* Big win */
-.big-win-overlay{position:absolute;inset:0;display:none;align-items:center;justify-content:center;z-index:30;pointer-events:none}
-.big-win-overlay.show{display:flex}
-.big-win-text{font-size:48px;font-weight:900;background:linear-gradient(135deg,#fbbf24,#f59e0b,#fbbf24);-webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:goldBurst 0.8s ease-out}
-@keyframes goldBurst{0%{transform:scale(0) rotate(-180deg);opacity:0}50%{transform:scale(1.5) rotate(0);opacity:1}100%{transform:scale(1) rotate(0);opacity:1}}
-
-/* Countdown */
-.countdown{position:absolute;top:35%;left:50%;transform:translate(-50%,-50%);font-size:64px;font-weight:900;color:var(--gold);z-index:20;text-shadow:0 0 40px rgba(251,191,36,0.6);animation:countdownPop 0.8s}
-@keyframes countdownPop{0%{transform:translate(-50%,-50%) scale(2);opacity:0}50%{transform:translate(-50%,-50%) scale(1);opacity:1}100%{transform:translate(-50%,-50%) scale(0.5);opacity:0}}
-
-/* Screen shake */
-.shake-screen{animation:screenShake 0.4s}
-@keyframes screenShake{0%,100%{transform:translate(0,0)}20%{transform:translate(-4px,-2px)}40%{transform:translate(4px,2px)}60%{transform:translate(-2px,4px)}80%{transform:translate(2px,-4px)}}
-
-/* Auto-buy */
-.auto-row{display:flex;gap:6px;align-items:center;margin-top:6px}
-.auto-checkbox{accent-color:var(--green);width:14px;height:14px;cursor:pointer}
-.auto-input{width:60px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-xs);padding:5px 6px;color:var(--text);font-size:12px;text-align:center;outline:none;font-family:'Courier New',monospace}
-
-/* Potential */
-.potential{display:flex;justify-content:space-between;align-items:center;margin-top:4px;padding:6px 10px;background:var(--surface-2);border-radius:var(--radius-xs)}
-.pot-label{font-size:10px;color:var(--muted)}
-.pot-val{font-size:14px;font-weight:700;color:var(--green);font-family:'Courier New',monospace}
+.game-area{display:flex;flex-direction:column;align-items:center;gap:10px;padding:8px;overflow-y:auto}
+.lottery-timer{text-align:center;padding:10px 20px;background:var(--surface);border-radius:var(--radius);border:1px solid var(--border)}
+.timer-label{font-size:11px;color:var(--text-dim);margin-bottom:4px}
+.timer-val{font-size:24px;font-weight:900;font-family:'Courier New',monospace;color:var(--gold)}
+.lottery-info{display:flex;gap:8px;justify-content:center;width:100%;max-width:360px}
+.linfo{flex:1;text-align:center;background:var(--surface);padding:8px;border-radius:var(--radius-sm);border:1px solid var(--border)}
+.linfo-val{font-size:16px;font-weight:900;color:var(--text);font-family:'Courier New',monospace}
+.linfo-val.gold{color:var(--gold)}
+.linfo-label{font-size:9px;color:var(--text-dim);margin-top:2px}
+.ticket-area{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;width:100%;max-width:360px}
+.ticket{background:linear-gradient(135deg,var(--surface-2),var(--surface-3));border:1px solid var(--border);border-radius:var(--radius);padding:12px;cursor:pointer;position:relative;overflow:hidden;transition:all .2s var(--ease)}
+.ticket:active{transform:scale(.97)}
+.ticket.scratched{cursor:default}
+.ticket-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.ticket-id{font-size:10px;color:var(--text-dim);font-family:'Courier New',monospace}
+.ticket-status{font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px}
+.ticket-status.pending{background:rgba(251,191,36,.2);color:var(--gold)}
+.ticket-status.win{background:rgba(0,231,1,.2);color:var(--green)}
+.ticket-status.lose{background:rgba(255,71,87,.2);color:var(--red)}
+.ticket-numbers{display:flex;gap:4px;flex-wrap:wrap;justify-content:center;margin:6px 0}
+.tic-num{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;font-family:'Courier New',monospace;border:1px solid var(--border-light)}
+.tic-num.covered{background:rgba(148,163,184,.2)}
+.tic-num.revealed{background:rgba(59,130,246,.2);border-color:#3b82f6;color:#93c5fd}
+.tic-num.match{background:rgba(0,231,1,.2);border-color:var(--green);color:var(--green);animation:numMatch .4s var(--ease-spring)}
+@keyframes numMatch{0%{transform:scale(1.5);opacity:0}100%{transform:scale(1);opacity:1}}
+.ticket-prize{text-align:center;font-size:15px;font-weight:900;margin-top:6px;font-family:'Courier New',monospace}
+.ticket-prize.win{color:var(--green)}
+.ticket-prize.lose{color:var(--muted)}
+.ticket-scratch-hint{text-align:center;font-size:11px;color:var(--text-dim);margin-top:4px}
+.scratch-overlay{position:absolute;inset:0;background:linear-gradient(135deg,#374151,#1f2937);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:opacity .5s}
+.scratch-icon{font-size:32px;opacity:.6}
+.buy-section{width:100%;max-width:360px;display:flex;flex-direction:column;gap:8px}
+.count-row{display:flex;align-items:center;gap:8px;justify-content:center}
+.count-btn{width:36px;height:36px;border-radius:50%;background:var(--surface-2);border:1px solid var(--border);color:var(--text);font-size:20px;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.count-btn:active{transform:scale(.88);background:var(--surface-3)}
+.count-val{font-size:24px;font-weight:900;font-family:'Courier New',monospace;color:var(--gold);min-width:40px;text-align:center}
+.ticket-price-info{text-align:center;font-size:12px;color:var(--text-dim)}
+.buy-btn{width:100%;padding:14px;border-radius:var(--radius);font-size:16px;font-weight:900;border:none;cursor:pointer;background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;transition:all .2s}
+.buy-btn:active{transform:scale(.97)}
+.buy-btn:disabled{background:var(--surface-2);color:var(--muted);cursor:not-allowed}
+.draw-history{width:100%;max-width:360px}
+.draw-history-title{font-size:12px;color:var(--text-dim);margin-bottom:6px}
+.draw-item{display:flex;justify-content:space-between;padding:6px 10px;background:var(--surface);border-radius:var(--radius-sm);margin-bottom:4px;border:1px solid var(--border);font-size:11px}
+.draw-nums{display:flex;gap:3px}
+.draw-num{width:20px;height:20px;border-radius:50%;background:rgba(124,58,237,.2);border:1px solid #7c3aed;color:#a78bfa;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700}
 </style>
 </head>
 <body>
-<div class="loader-screen" id="loading"><div class="spinner"></div></div>
 <div id="app" style="display:none">
   <div class="game-topbar">
     <div class="topbar-left">
-      <button class="btn-back" onclick="goBack()">‹</button>
+      <button class="btn-back" onclick="if(tg)tg.close();else history.back()">←</button>
       <div class="bal-pill"><span class="bal-icon">💰</span><span class="bal-val" id="bal">0</span><span class="bal-cur" id="cur">EGP</span></div>
     </div>
     <div class="topbar-right">
-      <span class="streak-badge" id="streak" style="display:none">🔥 0</span>
       <button class="btn-sound" id="soundBtn" onclick="toggleSound()">🔊</button>
+      <span id="connIndicator">🟢</span>
     </div>
   </div>
 
-  <div class="hist-bar" id="history"></div>
+  <div class="game-area" style="flex:1">
+    <!-- Timer -->
+    <div class="lottery-timer">
+      <div class="timer-label">🎲 السحب التالي</div>
+      <div class="timer-val" id="timerVal">--:--</div>
+    </div>
 
-  <div class="game-area" id="gameArea">
-    <div class="stars-bg" id="stars"></div>
-    <div class="quick-stats">
-      <div class="qstat best">أفضل: <span id="qBest">0.00x</span></div>
-      <div class="qstat rounds">جولات: <span id="qRounds">0</span></div>
-      <div class="qstat tickets">تذاكر: <span id="qTickets">0</span></div>
+    <!-- Stats -->
+    <div class="lottery-info" style="width:100%;max-width:360px">
+      <div class="linfo"><div class="linfo-val gold" id="prizePool">0</div><div class="linfo-label">جائزة الجولة</div></div>
+      <div class="linfo"><div class="linfo-val" id="ticketsSold">0</div><div class="linfo-label">تذاكر مباعة</div></div>
+      <div class="linfo"><div class="linfo-val" id="myTickets">0</div><div class="linfo-label">تذاكري</div></div>
     </div>
-    <div class="other-bets" id="otherBets"></div>
-    <div class="recovery-msg" id="recoveryMsg"></div>
-    <div class="big-win-overlay" id="bigWin"><div class="big-win-text" id="bigWinText"></div></div>
 
-    <div class="lottery-title">🎟️ اليانصيب</div>
-    <div class="prize-box">
-      <div class="prize-label">جائزة الدور</div>
-      <div class="prize-amount" id="prizePool">50,000</div>
-    </div>
-    <div class="participant-info">
-      <div class="participant-stat">👥 المشاركون: <span id="participants">0</span></div>
-      <div class="participant-stat">🎫 تذاكرك: <span id="myTickets">0</span></div>
-    </div>
-    <div class="ticket-card" id="ticketCard">
-      <div class="scratch-overlay" id="scratchOverlay">👆 اضغط للكشف</div>
-      <div class="ticket-label">رقم تذكرتك</div>
-      <div class="ticket-num" id="ticketNum">------</div>
-      <div class="ticket-status" id="ticketStatus">لم تشترِ بعد</div>
-    </div>
-    <div class="result-msg" id="result"></div>
-  </div>
+    <!-- My Tickets -->
+    <div class="ticket-area" id="ticketArea"></div>
 
-  <div class="bet-panel">
-    <div class="bet-row">
-      <div class="bet-input-wrap">
-        <input type="number" class="bet-input" id="betInput" value="5" min="5" max="500" oninput="updatePotential()">
-        <span class="bet-cur" id="betCur">EGP</span>
+    <!-- Buy Section -->
+    <div class="buy-section">
+      <div class="ticket-price-info" id="priceInfo">سعر التذكرة: 10 لكل واحدة</div>
+      <div class="count-row">
+        <button class="count-btn" onclick="changeCount(-1)">−</button>
+        <div class="count-val" id="countVal">1</div>
+        <button class="count-btn" onclick="changeCount(1)">+</button>
       </div>
+      <button class="buy-btn" id="buyBtn" onclick="buyTickets()">🎟️ شراء تذاكر</button>
     </div>
-    <div class="bet-controls">
-      <div class="bet-ctrl" onclick="adjustBet(0.5)">½</div>
-      <div class="bet-ctrl" onclick="adjustBet(2)">2×</div>
-      <div class="bet-ctrl" onclick="setBet('min')">Min</div>
-      <div class="bet-ctrl" onclick="setBet('max')">Max</div>
-    </div>
-    <div class="auto-row">
-      <input type="checkbox" class="auto-checkbox" id="autoBuy" onchange="toggleAutoBuy()">
-      <span class="auto-label">شراء تلقائي ×</span>
-      <input type="number" class="auto-input" id="autoCount" value="5" min="1" max="50">
-      <span class="auto-label">تذاكر</span>
-    </div>
-    <div class="potential">
-      <span class="pot-label">ربح محتمل (x10):</span>
-      <span class="pot-val" id="potVal">50.00</span>
-    </div>
-    <div class="action-row">
-      <button class="btn-action btn-bet-green" id="buyBtn" onclick="buyTicket()">🎟️ اشتري تذكرة</button>
-    </div>
-  </div>
 
-  <div class="lp-bar">
-    <div class="lp-header"><span>👥 <span class="lp-count" id="lpCount">0</span></span><span id="lpTotal">💰 0</span></div>
-    <div class="lp-list" id="lpList"></div>
+    <!-- Draw History -->
+    <div class="draw-history">
+      <div class="draw-history-title">📋 آخر السحوبات</div>
+      <div id="drawHistory"></div>
+    </div>
   </div>
 </div>
-
+<div id="loading" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg);flex-direction:column;gap:12px">
+  <div style="font-size:40px">🎟️</div>
+  <div style="color:var(--text-dim);font-size:14px">جارٍ التحميل...</div>
+</div>
 <script src="/static/js/game-base.js"></script>
 <script>
-let buying=0,tickets=0,qBest=0,qRounds=0,participantCount=0;
-let autoPlaying=false,autoCountLeft=0,currentBet=0;
+'use strict';
+var ticketCount = 1;
+var myTicketsList = [];
+var timerInterval = null;
 
-function showCountdown(cb){
-  let c=3;
-  const show=()=>{
-    const el=document.createElement('div');
-    el.className='countdown';el.textContent=c;
-    document.getElementById('gameArea').appendChild(el);
-    soundTick();haptic('light');
-    setTimeout(()=>el.remove(),800);
-    c--;if(c>0)setTimeout(show,600);else setTimeout(cb,600);
-  };
-  show();
+function changeCount(delta) {
+  ticketCount = Math.max(1, Math.min(10, ticketCount + delta));
+  document.getElementById('countVal').textContent = ticketCount;
 }
 
-function buyTicket(){
-  if(buying)return;
-  currentBet=parseFloat(document.getElementById('betInput').value)||0;
-  if(currentBet<5)return;
+function loadState() {
+  apiFetch(BASE + '/api/lottery/state').then(function(r) { return r.json(); }).then(function(d) {
+    if (d.draw_time) startTimer(d.draw_time);
+    if (d.prize_pool !== undefined) document.getElementById('prizePool').textContent = fmtAmount(d.prize_pool);
+    if (d.tickets_sold !== undefined) document.getElementById('ticketsSold').textContent = d.tickets_sold;
+    if (d.ticket_price !== undefined) document.getElementById('priceInfo').textContent = 'سعر التذكرة: ' + d.ticket_price + ' لكل واحدة';
+    if (d.my_tickets) { myTicketsList = d.my_tickets; renderTickets(); }
+    if (d.history) renderHistory(d.history);
+    document.getElementById('myTickets').textContent = myTicketsList.length;
+  }).catch(function() {});
+}
 
-  buying=1;document.getElementById('buyBtn').disabled=1;
-  document.getElementById('result').classList.remove('show');
+function startTimer(drawTime) {
+  if (timerInterval) clearInterval(timerInterval);
+  timerInterval = setInterval(function() {
+    var now = Date.now() / 1000;
+    var diff = Math.max(0, drawTime - now);
+    var m = Math.floor(diff / 60);
+    var s = Math.floor(diff % 60);
+    document.getElementById('timerVal').textContent = String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+    if (diff <= 0) { clearInterval(timerInterval); loadState(); }
+  }, 1000);
+}
 
-  apiFetch(BASE+'/api/engine/result',{method:'POST',body:JSON.stringify({uid,game_id:'GAME008',bet_amount:currentBet})}).then(r=>r.json()).then(d=>{
-    if(!d.success){
-      if(d.need_deposit)showVexDepositModal(currentBet);
-      else showToast(d.error||'خطأ','error');
-      buying=0;document.getElementById('buyBtn').disabled=0;return;
-    }
+function buyTickets() {
+  var btn = document.getElementById('buyBtn');
+  btn.disabled = true;
+  apiFetchCritical(BASE + '/api/lottery/buy', {
+    method: 'POST',
+    body: JSON.stringify({ uid: uid, count: ticketCount })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    btn.disabled = false;
+    if (d.error) { showToast(d.error, 'error'); if (d.need_deposit) showDepositModal(); return; }
+    showToast('تم شراء ' + ticketCount + ' تذكرة!', 'success');
+    soundDraw(); hapticNotif('success');
+    loadState(); loadBalance();
+  }).catch(function() {
+    btn.disabled = false; showToast('خطأ في الشبكة', 'error');
+  });
+}
 
-    // Show countdown before reveal
-    document.getElementById('buyBtn').textContent='⏳ جاري...';
-    addOtherBet(currentBet);
-
-    showCountdown(()=>{
-      // Generate ticket number
-      const num=Math.floor(100000+Math.random()*900000);
-      const card=document.getElementById('ticketCard');
-      card.classList.add('flipped');
-      setTimeout(()=>card.classList.remove('flipped'),600);
-
-      document.getElementById('ticketNum').textContent=num;
-      document.getElementById('scratchOverlay').classList.remove('revealed');
-      document.getElementById('scratchOverlay').textContent='👆 اضغط للكشف';
-
-      // Auto-reveal after 1s
-      setTimeout(()=>{
-        document.getElementById('scratchOverlay').classList.add('revealed');
-        beep(659,0.1);haptic('light');
-      },1000);
-
-      tickets++;
-      participantCount++;
-      document.getElementById('myTickets').textContent=tickets;
-      document.getElementById('participants').textContent=participantCount;
-      document.getElementById('ticketStatus').textContent='تذاكرك: '+tickets;
-      document.getElementById('bal').textContent=(d.balance_after||0).toLocaleString();
-
-      const mult=d.payout/currentBet;
-      const r=document.getElementById('result');
-      r.classList.add('show');
-
-      if(d.result==='win'){
-        r.textContent='🎉 ربحت '+d.payout.toFixed(0)+'!';
-        r.style.color='var(--green)';
-        soundWin(mult>=10);haptic('medium');
-        fireConfetti(document.getElementById('gameArea'));
-        streakWin++;updateStreak(document.getElementById('streak'));
-        if(mult>=10){showBigWin(d.payout,mult);document.getElementById('app').classList.add('shake-screen');setTimeout(()=>document.getElementById('app').classList.remove('shake-screen'),400);}
-        updateOtherBetWin(d.payout);
-        qBest=Math.max(qBest,mult);
-      } else {
-        r.textContent='💔 حظ أوفر';
-        r.style.color='var(--red)';
-        soundLose();haptic('heavy');
-        streakWin=0;updateStreak(document.getElementById('streak'));
-        updateOtherBetLose();
-        if(currentBet>=20)showRecovery(currentBet);
-      }
-
-      qRounds++;
-      document.getElementById('qBest').textContent=qBest.toFixed(2)+'x';
-      document.getElementById('qRounds').textContent=qRounds;
-      document.getElementById('qTickets').textContent=tickets;
-      // Update prize pool
-      const pool=50000+participantCount*currentBet*0.3;
-      document.getElementById('prizePool').textContent=pool.toLocaleString(undefined,{maximumFractionDigits:0});
-
-      addHistory('history',mult,d.result==='win',mult>=10);
-
-      buying=0;document.getElementById('buyBtn').disabled=0;
-      document.getElementById('buyBtn').textContent='🎟️ اشتري تذكرة';
-
-      // Auto-buy continue
-      if(autoPlaying&&autoCountLeft>0){
-        autoCountLeft--;
-        if(autoCountLeft>0){
-          showToast('شراء تلقائي: '+autoCountLeft+' متبقية','info');
-          setTimeout(()=>{if(!buying)buyTicket();},1500);
-          return;
-        } else {
-          autoPlaying=false;
-          document.getElementById('autoBuy').checked=false;
-        }
-      }
+function renderTickets() {
+  var area = document.getElementById('ticketArea');
+  area.innerHTML = '';
+  myTicketsList.forEach(function(t) {
+    var div = document.createElement('div');
+    div.className = 'ticket' + (t.scratched ? ' scratched' : '');
+    var statusClass = t.status === 'win' ? 'win' : t.status === 'lose' ? 'lose' : 'pending';
+    var statusText = t.status === 'win' ? 'فائز!' : t.status === 'lose' ? 'خسارة' : 'انتظار';
+    var numsHtml = '';
+    (t.numbers || []).forEach(function(n, i) {
+      var cls = 'tic-num';
+      if (t.drawn && t.drawn.indexOf(n) !== -1) cls += ' match';
+      else if (t.scratched) cls += ' revealed';
+      numsHtml += '<div class="' + cls + '">' + n + '</div>';
     });
-  }).catch(()=>{buying=0;document.getElementById('buyBtn').disabled=0;document.getElementById('buyBtn').textContent='🎟️ اشتري تذكرة';showToast('خطأ','error');});
-}
-
-function toggleAutoBuy(){
-  autoPlaying=document.getElementById('autoBuy').checked;
-  if(autoPlaying){
-    autoCountLeft=parseInt(document.getElementById('autoCount').value)||5;
-    if(!buying)buyTicket();
-  }
-}
-
-function updatePotential(){
-  const bet=parseFloat(document.getElementById('betInput').value)||0;
-  const el=document.getElementById('potVal');
-  if(el)el.textContent=(bet*10).toFixed(2);
-}
-
-function showBigWin(payout,m){
-  const o=document.getElementById('bigWin');
-  document.getElementById('bigWinText').textContent='🎉 +'+payout.toFixed(0)+' @ '+m.toFixed(2)+'x';
-  o.classList.add('show');
-  setTimeout(()=>o.classList.remove('show'),2500);
-}
-
-function showRecovery(lostAmt){
-  const msgs=['💪 خسارة '+lostAmt+' — التذكرة القادمة أفضل!','🔥 الجو حار — الجائزة الكبرى تنتظر!','⚡ كل تذكرة تقربك من الفوز!','🎯 اشترِ المزيد لزيادة فرصك!'];
-  const m=msgs[Math.floor(Math.random()*msgs.length)];
-  const el=document.getElementById('recoveryMsg');el.textContent=m;el.classList.add('show');
-  setTimeout(()=>el.classList.remove('show'),3000);
-}
-
-// Other bets
-function addOtherBet(amt){
-  const c=document.getElementById('otherBets');
-  const e=document.createElement('div');e.className='other-bet active';e.id='ob';
-  e.innerHTML='<div class="avatar">أ</div><span>'+amt+'</span>';
-  c.appendChild(e);
-}
-function updateOtherBetWin(pay){
-  const e=document.getElementById('ob');
-  if(e){e.className='other-bet win';e.innerHTML='<div class="avatar">أ</div><span>+'+pay.toFixed(0)+'</span>';}
-}
-function updateOtherBetLose(){
-  const e=document.getElementById('ob');
-  if(e){e.className='other-bet lose';e.innerHTML='<div class="avatar">أ</div><span>💔</span>';}
-}
-function simulateFakeBets(){
-  if(!buying&&Math.random()<0.25){
-    const name=['أحمد','عمر','محمد','خالد','سعد','فهد','ناصر','يوسف','علي','حسن'][Math.floor(Math.random()*10)];
-    const bet=[5,10,20,50,100,200][Math.floor(Math.random()*6)];
-    const win=Math.random()<0.3;
-    const m=win?Math.random()*15+1:0;
-    addPlayer({uid:'fake_'+Math.random().toString(36).substr(2,5),name,bet,status:win?'win':'lose',multiplier:m,isMe:false});
-    if(Math.random()<0.5){
-      participantCount++;
-      document.getElementById('participants').textContent=participantCount;
-      const pool=50000+participantCount*10*0.3;
-      document.getElementById('prizePool').textContent=pool.toLocaleString(undefined,{maximumFractionDigits:0});
+    div.innerHTML = '<div class="ticket-header"><span class="ticket-id">#' + (t.id || '?') + '</span>' +
+      '<span class="ticket-status ' + statusClass + '">' + statusText + '</span></div>' +
+      '<div class="ticket-numbers">' + numsHtml + '</div>' +
+      '<div class="ticket-prize ' + statusClass + '">' + (t.prize ? '+' + fmtAmount(t.prize) : t.status === 'lose' ? 'لا جائزة' : '🤞') + '</div>' +
+      '<div class="ticket-scratch-hint">' + (t.scratched ? '' : 'انقر لكشف التذكرة') + '</div>';
+    if (!t.scratched) {
+      var overlay = document.createElement('div');
+      overlay.className = 'scratch-overlay';
+      overlay.innerHTML = '<span class="scratch-icon">🪙</span>';
+      overlay.onclick = function() { scratchTicket(t.id, div, overlay); };
+      div.appendChild(overlay);
     }
-  }
+    area.appendChild(div);
+  });
+}
+
+function scratchTicket(ticketId, div, overlay) {
+  overlay.style.opacity = '0';
+  setTimeout(function() { overlay.remove(); }, 500);
+  soundDraw(); haptic('medium');
+}
+
+function renderHistory(history) {
+  var container = document.getElementById('drawHistory');
+  container.innerHTML = '';
+  history.slice(0, 5).forEach(function(h) {
+    var item = document.createElement('div');
+    item.className = 'draw-item';
+    var numsHtml = (h.numbers || []).map(function(n) {
+      return '<div class="draw-num">' + n + '</div>';
+    }).join('');
+    item.innerHTML = '<span>' + (h.date || '') + '</span><div class="draw-nums">' + numsHtml + '</div><span style="color:var(--gold)">' + fmtAmount(h.prize || 0) + '</span>';
+    container.appendChild(item);
+  });
 }
 
 // Init
-createStars('stars');
-loadBalance();updatePotential();
-// Simulate initial participants
-participantCount=15+Math.floor(Math.random()*20);
-document.getElementById('participants').textContent=participantCount;
-const initPool=50000+participantCount*10*0.3;
-document.getElementById('prizePool').textContent=initPool.toLocaleString(undefined,{maximumFractionDigits:0});
-
-document.getElementById('loading').style.display='none';
-document.getElementById('app').style.display='flex';
-setInterval(loadBalance,5000);
-setInterval(simulatePlayers,2500);
-setInterval(simulateFakeBets,3500);
-simulatePlayers();renderPlayers();
+document.getElementById('loading').style.display = 'none';
+document.getElementById('app').style.display = 'flex';
+document.getElementById('app').style.flexDirection = 'column';
+document.getElementById('app').style.height = '100dvh';
+loadBalance();
+loadState();
+setInterval(loadState, 30000);
+setInterval(loadBalance, 10000);
+initBackButton();
 </script>
 </body>
 </html>

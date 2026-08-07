@@ -71,6 +71,7 @@ from handlers.deposit_withdraw import DepositWithdrawMixin
 from handlers.message_dispatcher import MessageDispatcherMixin
 from handlers.callback_handler import CallbackHandlerMixin
 from handlers.admin_actions import AdminActionsMixin
+from database import get_db, PersistentStateDict
 
 
 class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, CallbackHandlerMixin, AdminActionsMixin):
@@ -78,7 +79,8 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         self.token = token
         self.api_url = f"https://api.telegram.org/bot{token}"
         self.offset = 0
-        self.user_states = {}
+        self._db = get_db()
+        self.user_states = PersistentStateDict(self._db)
         self.temp_company_data = {}  # إضافة المتغير المفقود
         self.init_files()
         self.init_button_labels()
@@ -1050,55 +1052,19 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         return self.csv_locks[filename]
     
     def safe_csv_write(self, filename, rows, fieldnames=None, mode='a'):
-        """كتابة آمنة في CSV مع قفل"""
-        lock = self._get_csv_lock(filename)
-        with lock:
-            try:
-                if mode == 'a':
-                    with open(filename, 'a', newline='', encoding='utf-8-sig') as f:
-                        if fieldnames:
-                            writer = csv.DictWriter(f, fieldnames=fieldnames)
-                            for row in rows:
-                                writer.writerow({k: row.get(k, '') for k in fieldnames})
-                        else:
-                            writer = csv.writer(f)
-                            for row in rows:
-                                writer.writerow(row)
-                elif mode == 'w':
-                    with open(filename, 'w', newline='', encoding='utf-8-sig') as f:
-                        if fieldnames:
-                            writer = csv.DictWriter(f, fieldnames=fieldnames)
-                            writer.writeheader()
-                            for row in rows:
-                                writer.writerow({k: row.get(k, '') for k in fieldnames})
-                        else:
-                            writer = csv.writer(f)
-                            for row in rows:
-                                writer.writerow(row)
-                return True
-            except Exception as e:
-                logger.error(f"خطأ في الكتابة الآمنة لـ {filename}: {e}")
-                return False
-    
+        """كتابة آمنة في SQLite (بدلاً من CSV)"""
+        from database import csv_write
+        return csv_write(filename, rows, fieldnames=fieldnames, mode=mode)
+
     def safe_csv_read(self, filename):
-        """قراءة آمنة من CSV مع قفل"""
-        lock = self._get_csv_lock(filename)
-        with lock:
-            try:
-                with open(filename, 'r', encoding='utf-8-sig') as f:
-                    reader = csv.DictReader(f)
-                    return list(reader)
-            except Exception as e:
-                logger.error(f"خطأ في القراءة الآمنة من {filename}: {e}")
-                return []
+        """قراءة آمنة من SQLite (بدلاً من CSV)"""
+        from database import csv_read
+        return csv_read(filename)
 
     def read_csv_helper(self, filename):
-        """مساعد قراءة CSV للاستخدام السريع"""
-        try:
-            with open(filename, 'r', encoding='utf-8-sig') as f:
-                return list(csv.DictReader(f))
-        except:
-            return []
+        """مساعد قراءة من SQLite (بدلاً من CSV)"""
+        from database import csv_read
+        return csv_read(filename)
     
     def init_referral_files(self):
         """إنشاء ملفات نظام الإحالات"""

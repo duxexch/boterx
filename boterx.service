@@ -1,0 +1,38 @@
+[Unit]
+Description=Boterx Telegram Bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=boterx
+Group=boterx
+WorkingDirectory=/home/boterx/boterx
+EnvironmentFile=/home/boterx/boterx/.env
+ExecStart=/home/boterx/.venv/bin/gunicorn \
+    --workers 2 \
+    --worker-class=gthread \
+    --threads 4 \
+    --bind 127.0.0.1:8000 \
+    --timeout 120 \
+    --keep-alive 5 \
+    --access-logfile /var/log/boterx/access.log \
+    --error-logfile /var/log/boterx/error.log \
+    --log-level info \
+    "dashboard.app:app"
+ExecReload=/bin/kill -s HUP $MAINPID
+KillMode=mixed
+TimeoutStopSec=10
+Restart=on-failure
+RestartSec=5
+StartLimitBurst=5
+StartLimitInterval=60
+
+# Hardening
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/home/boterx/boterx /var/log/boterx
+
+[Install]
+WantedBy=multi-user.target

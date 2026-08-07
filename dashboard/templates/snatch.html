@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>اخطف الهدية — VEX</title>
+<link rel="stylesheet" href="/static/css/game-base.css">
+<style>
+*{box-sizing:border-box}
+.game-area{position:relative;overflow:hidden;touch-action:none;flex:1;display:flex;flex-direction:column}
+#gameCanvas{position:absolute;inset:0;width:100%;height:100%;z-index:1}
+.hud{position:absolute;top:0;left:0;right:0;z-index:10;display:flex;justify-content:space-between;align-items:center;padding:8px 12px;pointer-events:none}
+.hud-score{font-size:22px;font-weight:900;font-family:'Courier New',monospace;color:var(--gold);text-shadow:0 0 10px rgba(251,191,36,.5)}
+.hud-timer{font-size:18px;font-weight:900;font-family:'Courier New',monospace;color:var(--text);background:var(--surface);padding:4px 12px;border-radius:12px;border:1px solid var(--border)}
+.hud-lives{font-size:18px;letter-spacing:2px}
+.overlay{position:absolute;inset:0;z-index:20;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:rgba(10,14,23,.85);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.overlay-title{font-size:28px;font-weight:900;color:var(--text);text-align:center}
+.overlay-sub{font-size:14px;color:var(--text-dim);text-align:center}
+.overlay-score{font-size:48px;font-weight:900;font-family:'Courier New',monospace;color:var(--gold);text-shadow:0 0 20px rgba(251,191,36,.4)}
+.overlay-payout{font-size:20px;color:var(--green);font-weight:700}
+.bet-row-ov{display:flex;align-items:center;gap:6px}
+.bet-inp-ov{background:var(--surface-2);border:1px solid var(--border);color:var(--text);padding:10px 12px;border-radius:var(--radius-sm);font-size:16px;font-weight:700;text-align:center;font-family:'Courier New',monospace;width:100px;-moz-appearance:textfield}
+.bet-inp-ov::-webkit-inner-spin-button,.bet-inp-ov::-webkit-outer-spin-button{display:none}
+.ctrl-btn-ov{background:var(--surface-2);border:1px solid var(--border);color:var(--text-dim);padding:10px 10px;border-radius:var(--radius-sm);font-size:11px;font-weight:700;cursor:pointer}
+.start-btn{padding:16px 40px;border-radius:var(--radius);font-size:18px;font-weight:900;border:none;cursor:pointer;background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#000;box-shadow:0 4px 20px rgba(251,191,36,.4)}
+.start-btn:active{transform:scale(.97)}
+.result-btn{padding:14px 28px;border-radius:var(--radius);font-size:16px;font-weight:900;border:none;cursor:pointer;background:var(--surface-2);color:var(--text);border:1px solid var(--border)}
+</style>
+</head>
+<body>
+<div id="app" style="display:none;flex-direction:column;height:100dvh">
+  <div class="game-topbar">
+    <div class="topbar-left">
+      <button class="btn-back" id="backBtn" onclick="handleBack()">←</button>
+      <div class="bal-pill"><span class="bal-icon">💰</span><span class="bal-val" id="bal">0</span><span class="bal-cur" id="cur">EGP</span></div>
+    </div>
+    <div class="topbar-right">
+      <span class="streak-badge" id="streakBadge" style="display:none"></span>
+      <button class="btn-sound" id="soundBtn" onclick="toggleSound()">🔊</button>
+    </div>
+  </div>
+
+  <div class="game-area" id="gameArea">
+    <canvas id="gameCanvas"></canvas>
+    <div class="hud">
+      <div class="hud-score" id="hudScore">0</div>
+      <div class="hud-timer" id="hudTimer">20</div>
+      <div class="hud-lives" id="hudLives">❤️❤️❤️</div>
+    </div>
+
+    <!-- Start Overlay -->
+    <div class="overlay" id="startOverlay">
+      <div class="overlay-title">🎁 اخطف الهدايا!</div>
+      <div class="overlay-sub">اضغط على الهدايا لاختطافها قبل أن تختفي</div>
+      <div class="bet-row-ov">
+        <button class="ctrl-btn-ov" onclick="adjustBet('betInpOv',0.5)">½</button>
+        <input type="number" class="bet-inp-ov" id="betInpOv" value="10" min="1">
+        <button class="ctrl-btn-ov" onclick="adjustBet('betInpOv',2)">2×</button>
+      </div>
+      <button class="start-btn" onclick="startGame()">🚀 ابدأ اللعبة</button>
+    </div>
+
+    <!-- Result Overlay -->
+    <div class="overlay" id="resultOverlay" style="display:none">
+      <div class="overlay-title" id="resultTitle">انتهت اللعبة!</div>
+      <div class="overlay-score" id="resultScore">0</div>
+      <div class="overlay-payout" id="resultPayout"></div>
+      <div class="overlay-sub" id="resultSub"></div>
+      <button class="result-btn" onclick="resetGame()">🔄 العب مرة أخرى</button>
+    </div>
+  </div>
+</div>
+<div id="loading" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg);flex-direction:column;gap:12px">
+  <div style="font-size:40px">🎁</div>
+  <div style="color:var(--text-dim);font-size:14px">جارٍ التحميل...</div>
+</div>
+<script src="/static/js/game-base.js"></script>
+<script>
+'use strict';
+var canvas = document.getElementById('gameCanvas');
+var ctx = canvas.getContext('2d');
+var gameRunning = false;
+var score = 0;
+var lives = 3;
+var timeLeft = 20;
+var gifts = [];
+var particles = [];
+var betAmount = 10;
+var animId = null;
+var timerInterval = null;
+var W, H;
+var GIFT_EMOJIS = ['🎁','🎀','🎊','💰','⭐','🏆','💎','🍀'];
+var GIFT_VALUES = [1,1,1,2,2,3,5,10];
+
+function resize() {
+  W = canvas.clientWidth || window.innerWidth;
+  H = canvas.clientHeight || (window.innerHeight - 48);
+  canvas.width = W; canvas.height = H;
+}
+window.addEventListener('resize', function() { resize(); });
+
+function startGame() {
+  betAmount = parseFloat(document.getElementById('betInpOv').value) || 10;
+  apiFetchCritical(BASE + '/api/snatch/spin', {
+    method: 'POST',
+    body: JSON.stringify({ uid: uid, bet: betAmount })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.error) { showToast(d.error, 'error'); if (d.need_deposit) showDepositModal(betAmount); return; }
+    document.getElementById('startOverlay').style.display = 'none';
+    gameRunning = true;
+    score = 0; lives = 3; timeLeft = 20; gifts = []; particles = [];
+    setGamePhase('playing');
+    updateHUD();
+    spawnGifts();
+    startTimer();
+    animId = requestAnimationFrame(gameLoop);
+    loadBalance();
+  }).catch(function() {
+    // Offline mode - still play for fun
+    document.getElementById('startOverlay').style.display = 'none';
+    gameRunning = true; score = 0; lives = 3; timeLeft = 20; gifts = []; particles = [];
+    setGamePhase('playing');
+    updateHUD(); spawnGifts(); startTimer();
+    animId = requestAnimationFrame(gameLoop);
+  });
+}
+
+function spawnGifts() {
+  if (!gameRunning) return;
+  var count = 1 + Math.floor(Math.random() * 2);
+  for (var i = 0; i < count; i++) {
+    var idx = Math.floor(Math.random() * GIFT_EMOJIS.length);
+    gifts.push({
+      x: 40 + Math.random() * (W - 80),
+      y: -50,
+      vy: 1.5 + Math.random() * 2,
+      vx: (Math.random() - 0.5) * 1.5,
+      size: 36 + Math.random() * 16,
+      emoji: GIFT_EMOJIS[idx],
+      value: GIFT_VALUES[idx],
+      caught: false,
+      alpha: 1,
+      life: 0,
+      maxLife: 180 + Math.random() * 120
+    });
+  }
+  if (gameRunning) setTimeout(spawnGifts, 800 + Math.random() * 1200);
+}
+
+function startTimer() {
+  if (timerInterval) clearInterval(timerInterval);
+  timerInterval = setInterval(function() {
+    timeLeft--;
+    updateHUD();
+    if (timeLeft <= 0) { clearInterval(timerInterval); endGame(); }
+  }, 1000);
+}
+
+function updateHUD() {
+  document.getElementById('hudScore').textContent = score;
+  document.getElementById('hudTimer').textContent = timeLeft;
+  var livesHtml = '';
+  for (var i = 0; i < lives; i++) livesHtml += '❤️';
+  for (var j = lives; j < 3; j++) livesHtml += '🖤';
+  document.getElementById('hudLives').textContent = livesHtml;
+}
+
+function gameLoop() {
+  if (!gameRunning) return;
+  ctx.clearRect(0, 0, W, H);
+  // Draw gradient bg
+  var bg = ctx.createLinearGradient(0,0,0,H);
+  bg.addColorStop(0,'#0a0e17'); bg.addColorStop(1,'#0d1220');
+  ctx.fillStyle = bg; ctx.fillRect(0,0,W,H);
+
+  // Update & draw gifts
+  for (var i = gifts.length - 1; i >= 0; i--) {
+    var g = gifts[i];
+    g.y += g.vy; g.x += g.vx; g.life++;
+    if (g.x < 20 || g.x > W - 20) g.vx *= -1;
+    if (g.caught) {
+      g.vy -= 0.3; g.alpha -= 0.08;
+      if (g.alpha <= 0) { gifts.splice(i, 1); continue; }
+    } else if (g.y > H + 60 || g.life > g.maxLife) {
+      // Missed gift — lose a life
+      lives = Math.max(0, lives - 1);
+      updateHUD(); hapticNotif('error');
+      gifts.splice(i, 1);
+      if (lives <= 0) { endGame(); return; }
+      continue;
+    }
+    ctx.save();
+    ctx.globalAlpha = g.alpha;
+    ctx.font = g.size + 'px serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    // Glow
+    ctx.shadowColor = '#fbbf24'; ctx.shadowBlur = g.value >= 5 ? 20 : 10;
+    ctx.fillText(g.emoji, g.x, g.y);
+    ctx.shadowBlur = 0; ctx.restore();
+    // Value badge
+    if (!g.caught) {
+      ctx.fillStyle = '#fbbf24'; ctx.font = 'bold 10px Courier New';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('+' + g.value, g.x, g.y + g.size * 0.6);
+    }
+  }
+
+  // Draw particles
+  for (var p = particles.length - 1; p >= 0; p--) {
+    var pt = particles[p];
+    pt.x += pt.vx; pt.y += pt.vy; pt.vy += 0.15; pt.alpha -= 0.04;
+    if (pt.alpha <= 0) { particles.splice(p, 1); continue; }
+    ctx.save(); ctx.globalAlpha = pt.alpha;
+    ctx.fillStyle = pt.color; ctx.beginPath();
+    ctx.arc(pt.x, pt.y, pt.r, 0, 6.28); ctx.fill();
+    ctx.restore();
+  }
+
+  animId = requestAnimationFrame(gameLoop);
+}
+
+function catchGift(x, y) {
+  if (!gameRunning) return;
+  for (var i = 0; i < gifts.length; i++) {
+    var g = gifts[i];
+    if (g.caught) continue;
+    var dist = Math.sqrt((g.x - x) * (g.x - x) + (g.y - y) * (g.y - y));
+    if (dist < g.size * 0.8) {
+      g.caught = true;
+      score += g.value;
+      updateHUD();
+      soundWin(g.value >= 5); haptic(g.value >= 5 ? 'heavy' : 'light');
+      // Spawn particles
+      for (var j = 0; j < 8; j++) {
+        var ang = (j / 8) * 6.28;
+        particles.push({
+          x: g.x, y: g.y,
+          vx: Math.cos(ang) * (2 + Math.random() * 2),
+          vy: Math.sin(ang) * (2 + Math.random() * 2),
+          r: 3 + Math.random() * 3,
+          color: ['#fbbf24','#00e701','#ff4757','#3b82f6'][Math.floor(Math.random()*4)],
+          alpha: 1
+        });
+      }
+      // Show score popup
+      showScorePopup(g.x, g.y, '+' + g.value);
+      break;
+    }
+  }
+}
+
+function showScorePopup(x, y, text) {
+  var el = document.createElement('div');
+  el.style.cssText = 'position:absolute;left:' + (x-20) + 'px;top:' + (y-20) + 'px;z-index:15;font-size:16px;font-weight:900;color:#fbbf24;font-family:Courier New,monospace;pointer-events:none;animation:scorePopup .8s ease-out forwards';
+  el.textContent = text;
+  document.getElementById('gameArea').appendChild(el);
+  setTimeout(function() { if (el.parentNode) el.remove(); }, 800);
+}
+
+function endGame() {
+  gameRunning = false;
+  setGamePhase('idle');
+  if (timerInterval) clearInterval(timerInterval);
+  if (animId) cancelAnimationFrame(animId);
+  var payout = score * betAmount * 0.1; // Simple scoring: each point = 10% of bet
+  document.getElementById('resultTitle').textContent = lives <= 0 ? '💀 نفدت الحياة!' : '⏰ انتهى الوقت!';
+  document.getElementById('resultScore').textContent = score + ' نقطة';
+  document.getElementById('resultPayout').textContent = '+ ' + fmtAmount(payout) + ' ' + gameCurrency;
+  document.getElementById('resultSub').textContent = 'أحسنت! اجمع أكثر في المرة القادمة';
+  document.getElementById('resultOverlay').style.display = 'flex';
+  if (score > 0) { soundWin(score > 20); hapticNotif('success'); }
+  addHistItem(document.querySelector('.hist-bar') || document.createElement('div'), Math.max(1, score * 0.1));
+  loadBalance();
+}
+
+function resetGame() {
+  document.getElementById('resultOverlay').style.display = 'none';
+  document.getElementById('startOverlay').style.display = 'flex';
+  setGamePhase('idle');
+}
+
+function handleBack() {
+  if (gameRunning) {
+    showBackConfirmModal(function(ok) { if (ok) { endGame(); if (tg) tg.close(); else history.back(); } });
+  } else { if (tg) tg.close(); else history.back(); }
+}
+
+// Touch/Click handler
+canvas.addEventListener('click', function(e) {
+  var rect = canvas.getBoundingClientRect();
+  catchGift(e.clientX - rect.left, e.clientY - rect.top);
+});
+canvas.addEventListener('touchstart', function(e) {
+  e.preventDefault();
+  var rect = canvas.getBoundingClientRect();
+  for (var i = 0; i < e.changedTouches.length; i++) {
+    catchGift(e.changedTouches[i].clientX - rect.left, e.changedTouches[i].clientY - rect.top);
+  }
+}, { passive: false });
+
+// Add CSS animation for score popup
+var style = document.createElement('style');
+style.textContent = '@keyframes scorePopup{0%{transform:translateY(0) scale(1);opacity:1}100%{transform:translateY(-40px) scale(1.3);opacity:0}}';
+document.head.appendChild(style);
+
+// Init
+resize();
+document.getElementById('loading').style.display = 'none';
+document.getElementById('app').style.display = 'flex';
+loadBalance();
+setInterval(loadBalance, 10000);
+initBackButton();
+</script>
+</body>
+</html>
