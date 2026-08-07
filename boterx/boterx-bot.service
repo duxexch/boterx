@@ -1,0 +1,30 @@
+[Unit]
+Description=Boterx Bot Worker
+After=network-online.target boterx.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=boterx
+Group=boterx
+WorkingDirectory=/home/boterx/boterx
+EnvironmentFile=/home/boterx/boterx/.env
+ExecStart=/home/boterx/.venv/bin/python3 comprehensive_bot.py
+ExecReload=/bin/kill -s HUP $MAINPID
+KillMode=mixed
+TimeoutStopSec=15
+Restart=on-failure
+RestartSec=10
+StartLimitBurst=5
+StartLimitInterval=120
+
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/home/boterx/boterx /var/log/boterx
+
+StandardOutput=append:/var/log/boterx/bot.log
+StandardError=append:/var/log/boterx/bot-error.log
+
+[Install]
+WantedBy=multi-user.target

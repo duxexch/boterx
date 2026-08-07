@@ -1,0 +1,2 @@
+- [Boterx repo structure](boterx-repo-structure.md) — production files are at workspace ROOT, not inside boterx/ subdirectory; .git is at /home/runner/workspace/
+- [Boterx SQLite layer](boterx-sqlite-layer.md) — database.py + PersistentStateDict replace in-memory user_states and CSV I/O; migrate.py is idempotent
