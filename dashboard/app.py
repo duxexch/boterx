@@ -6487,6 +6487,46 @@ def api_admin_lockdown_log():
     })
 
 
+@app.route('/api/admin/lockdown-log/export', methods=['GET'])
+@api_auth
+def api_admin_lockdown_log_export():
+    """Stream the full lockdown_log.csv as a file download.
+
+    Returns the raw CSV with all rows (no pagination) so ops teams can
+    open it directly in Excel or import it into Google Sheets.
+    If the log file does not exist yet, returns an empty CSV with just
+    the header row so the download still succeeds.
+    """
+    filepath = os.path.join(BASE_DIR, _LOCKDOWN_LOG)
+
+    if os.path.exists(filepath):
+        try:
+            with open(filepath, 'r', encoding='utf-8-sig') as f:
+                csv_content = f.read()
+        except Exception as exc:
+            _auth_logger.error("lockdown-log export read error: %s", exc)
+            return jsonify({'error': 'Failed to read log file'}), 500
+    else:
+        # No events yet — return a header-only CSV so the download works
+        buf = io.StringIO()
+        writer = csv.DictWriter(buf, fieldnames=_LOCKDOWN_LOG_FIELDS)
+        writer.writeheader()
+        csv_content = buf.getvalue()
+
+    now_str = datetime.now().strftime('%Y%m%d_%H%M%S')
+    filename = f'lockdown_log_{now_str}.csv'
+
+    return Response(
+        csv_content,
+        status=200,
+        mimetype='text/csv; charset=utf-8',
+        headers={
+            'Content-Disposition': f'attachment; filename="{filename}"',
+            'Cache-Control': 'no-store',
+        }
+    )
+
+
 # ===== Chat / Emoji Reactions =====
 
 _chat_messages = []  # In-memory chat (last 50)

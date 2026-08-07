@@ -184,10 +184,17 @@
                     <h3 class="font-bold text-lg">سجل الانقطاعات والاستعادة</h3>
                     <p class="text-xs text-slate-400 mt-1">كل إيقاف / استعادة للـ API مرتبة من الأحدث إلى الأقدم</p>
                 </div>
-                <button @click="loadLockdownLog(true)"
-                    class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-700 hover:bg-slate-600 text-slate-300 transition flex items-center gap-1">
-                    <i class="fas fa-sync-alt text-xs"></i> تحديث
-                </button>
+                <div class="flex items-center gap-2">
+                    <button @click="loadLockdownLog(true)"
+                        class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-700 hover:bg-slate-600 text-slate-300 transition flex items-center gap-1">
+                        <i class="fas fa-sync-alt text-xs"></i> تحديث
+                    </button>
+                    <a href="/api/admin/lockdown-log/export"
+                        class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 transition flex items-center gap-1"
+                        download>
+                        <i class="fas fa-download text-xs"></i> تنزيل CSV ⬇
+                    </a>
+                </div>
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
