@@ -168,6 +168,107 @@ if not ALERT_BOT_TOKEN:
 _LOCKDOWN_SENTINEL = '/tmp/boterx_lockdown'
 
 
+def _read_sentinel_info():
+    """Return (lockdown_iso, telegram_sent) from the sentinel file, or (None, None)."""
+    try:
+        data = {}
+        with open(_LOCKDOWN_SENTINEL, 'r') as _sf:
+            for _ln in _sf:
+                _ln = _ln.strip()
+                if '=' in _ln:
+                    k, v = _ln.split('=', 1)
+                    data[k] = v
+        return data.get('LOCKDOWN'), data.get('TELEGRAM_SENT', 'no')
+    except Exception:
+        return None, None
+
+
+def _send_recovery_alert(lockdown_iso: str):
+    """Send a '✅ Game API restored' Telegram message to every admin.
+
+    Called in a background daemon thread so it never blocks startup.
+    The sentinel file is removed after the send attempt (success or failure)
+    so it cannot trigger stale alerts on the next restart.
+    """
+    import urllib.request as _ur
+    import urllib.error as _ue
+
+    token = ALERT_BOT_TOKEN or BOT_TOKEN
+
+    # Calculate downtime duration
+    duration_str = 'unknown duration'
+    if lockdown_iso:
+        try:
+            lockdown_dt = datetime.fromisoformat(lockdown_iso)
+            delta = datetime.now() - lockdown_dt
+            total_s = int(delta.total_seconds())
+            if total_s < 60:
+                duration_str = f'{total_s}s'
+            elif total_s < 3600:
+                duration_str = f'{total_s // 60}m {total_s % 60}s'
+            else:
+                h = total_s // 3600
+                m = (total_s % 3600) // 60
+                duration_str = f'{h}h {m}m'
+        except Exception:
+            pass
+
+    lockdown_time_str = lockdown_iso or 'unknown'
+    msg = (
+        "✅ *Game API RESTORED* ✅\n\n"
+        "BOT\\_TOKEN has been restored — the game API is *ENABLED* again.\n\n"
+        f"Lockdown started: `{lockdown_time_str}`\n"
+        f"Downtime: `{duration_str}`\n"
+        f"Host: `{os.uname().nodename}`\n"
+        f"Restored at: `{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}`"
+    )
+
+    if token and ADMIN_IDS:
+        for admin_uid in ADMIN_IDS:
+            try:
+                payload = json.dumps({
+                    'chat_id': admin_uid,
+                    'text': msg,
+                    'parse_mode': 'Markdown'
+                }).encode('utf-8')
+                req = _ur.Request(
+                    f'https://api.telegram.org/bot{token}/sendMessage',
+                    data=payload,
+                    headers={'Content-Type': 'application/json'},
+                    method='POST'
+                )
+                with _ur.urlopen(req, timeout=10) as resp:
+                    if resp.status == 200:
+                        _auth_logger.info(
+                            "Recovery alert sent to admin %s via Telegram.", admin_uid
+                        )
+            except _ue.HTTPError as exc:
+                _auth_logger.error(
+                    "Recovery alert HTTP error for admin %s: %s", admin_uid, exc
+                )
+            except Exception as exc:
+                _auth_logger.error(
+                    "Recovery alert failed for admin %s: %s", admin_uid, exc
+                )
+    elif not token:
+        _auth_logger.warning(
+            "Recovery alert: no ALERT_BOT_TOKEN or BOT_TOKEN available — "
+            "cannot send Telegram notification."
+        )
+    elif not ADMIN_IDS:
+        _auth_logger.warning(
+            "Recovery alert: ADMIN_USER_IDS is empty — no admins to notify."
+        )
+
+    # Remove sentinel regardless of send outcome — prevents stale alerts on
+    # future restarts even if Telegram delivery failed.
+    try:
+        os.remove(_LOCKDOWN_SENTINEL)
+        _auth_logger.info("Lockdown sentinel removed after recovery alert.")
+    except Exception as exc:
+        _auth_logger.error("Failed to remove lockdown sentinel: %s", exc)
+
+
 def _send_lockdown_alert():
     """Send a Telegram alert to every admin when the game API is locked down.
 
@@ -282,15 +383,17 @@ if not BOT_TOKEN:
             "will reject all requests with 403. Set ALLOW_DEV_AUTH=true for local dev."
         )
 else:
-    # Clean up any stale sentinel from a previous lockdown episode
-    try:
-        if os.path.exists(_LOCKDOWN_SENTINEL):
-            os.remove(_LOCKDOWN_SENTINEL)
-            _auth_logger.info(
-                "Stale lockdown sentinel removed — BOT_TOKEN is now present."
-            )
-    except Exception:
-        pass
+    # BOT_TOKEN is present — check for a previous lockdown episode and notify admins
+    if os.path.exists(_LOCKDOWN_SENTINEL):
+        lockdown_iso, _ = _read_sentinel_info()
+        _auth_logger.info(
+            "Previous lockdown detected (started %s) — sending recovery alert.", lockdown_iso
+        )
+        # Recovery alert runs in background; _send_recovery_alert also removes sentinel
+        _recovery_thread = threading.Thread(
+            target=_send_recovery_alert, args=(lockdown_iso,), daemon=True
+        )
+        _recovery_thread.start()
     _auth_logger.info("BOT_TOKEN loaded — HMAC validation active for game endpoints.")
 
 # ── initData max age ─────────────────────────────────────────────────────────
