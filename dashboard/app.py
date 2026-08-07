@@ -4760,6 +4760,8 @@ def webapp_stats():
 # load order (provably_fair / _gm are defined later in this file) is safe:
 # lambdas resolve at request time, not import time.
 try:
+    import sys as _eng_sys
+    _eng_sys.path.insert(0, os.path.join(BASE_DIR, 'dashboard'))
     from aviator_engine import init_aviator_engine
     init_aviator_engine(
         app,
@@ -4774,7 +4776,7 @@ except Exception as _av_init_err:
 
 # ===== Crash engine — separated into dashboard/crash_engine.py =====
 try:
-    from crash_engine import init_crash_engine
+    from crash_engine import init_crash_engine  # path already added above
     init_crash_engine(
         app,
         get_uid=get_request_uid,
