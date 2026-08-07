@@ -14,12 +14,23 @@ import sqlite3
 import threading
 import time
 from datetime import datetime
+from decimal import Decimal, ROUND_HALF_UP
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, 'vex_games.db')
 CSV_ENCODING = 'utf-8-sig'
 
 _db_lock = threading.Lock()
+
+# Constitution §2.5: Precision — ALL money math uses Decimal, NO native floats
+# Convert to Decimal on input, round to 2 decimal places (cents), convert to float on output
+def _money(val):
+    """Convert any value to a precise Decimal rounded to 2 decimal places."""
+    return Decimal(str(val)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+def _money_float(val):
+    """Convert Decimal back to float for API responses (display only)."""
+    return float(_money(val))
 
 
 def _get_conn():
@@ -182,7 +193,7 @@ class GameDB:
         row = conn.execute(
             'SELECT game_balance FROM users WHERE telegram_id = ?', (uid,)
         ).fetchone()
-        return float(row[0]) if row else 0.0
+        return _money_float(row[0]) if row and row[0] is not None else 0.0
 
     def get_user_currency(self, user_id):
         """Get user currency."""
@@ -215,51 +226,50 @@ class GameDB:
     def add_balance(self, user_id, amount):
         """Add to balance (atomic transaction). Returns new balance."""
         uid = str(user_id)
-        amt = float(amount)
+        amt = _money(amount)
         conn = self._conn()
         with _db_lock:
-            # Upsert user
             conn.execute('''
                 INSERT INTO users (telegram_id, game_balance) VALUES (?, ?)
                 ON CONFLICT(telegram_id) DO UPDATE SET game_balance = game_balance + ?
-            ''', (uid, amt, amt))
+            ''', (uid, float(amt), float(amt)))
             conn.commit()
             row = conn.execute(
                 'SELECT game_balance FROM users WHERE telegram_id = ?', (uid,)
             ).fetchone()
-            return float(row[0]) if row else 0.0
+            return _money_float(row[0]) if row and row[0] is not None else 0.0
 
     def deduct_balance(self, user_id, amount):
-        """Deduct from balance (atomic). Returns (success, new_balance)."""
+        """Deduct from balance (atomic, Decimal precision). Returns (success, new_balance)."""
         uid = str(user_id)
-        amt = float(amount)
+        amt = _money(amount)
         conn = self._conn()
         with _db_lock:
             row = conn.execute(
                 'SELECT game_balance FROM users WHERE telegram_id = ?', (uid,)
             ).fetchone()
-            current = float(row[0]) if row else 0.0
+            current = _money(row[0]) if row and row[0] is not None else Decimal('0.00')
             if current < amt:
-                return False, current
+                return False, _money_float(current)
             conn.execute(
                 'UPDATE users SET game_balance = game_balance - ? WHERE telegram_id = ?',
-                (amt, uid)
+                (float(amt), uid)
             )
             conn.commit()
-            return True, current - amt
+            return True, _money_float(current - amt)
 
     def set_balance(self, user_id, amount):
-        """Set balance directly (admin override)."""
+        """Set balance directly (admin override, Decimal precision)."""
         uid = str(user_id)
-        amt = float(amount)
+        amt = _money(amount)
         conn = self._conn()
         with _db_lock:
             conn.execute('''
                 INSERT INTO users (telegram_id, game_balance) VALUES (?, ?)
                 ON CONFLICT(telegram_id) DO UPDATE SET game_balance = ?
-            ''', (uid, amt, amt))
+            ''', (uid, float(amt), float(amt)))
             conn.commit()
-            return amt
+            return _money_float(amt)
 
     def round_settle(self, user_id, bet_amount, payout):
         """Settle a complete round in ONE atomic ACID transaction.
@@ -273,9 +283,9 @@ class GameDB:
         net_delta = payout - bet_amount applied atomically.
         """
         uid = str(user_id)
-        bet = float(bet_amount)
-        win = float(payout)
-        net = win - bet  # negative on loss, positive on win
+        bet = _money(bet_amount)
+        win = _money(payout)
+        net = win - bet  # Decimal arithmetic, no float drift
         conn = self._conn()
         with _db_lock:
             conn.execute('BEGIN')
@@ -283,18 +293,17 @@ class GameDB:
                 row = conn.execute(
                     'SELECT game_balance FROM users WHERE telegram_id = ?', (uid,)
                 ).fetchone()
-                current = float(row[0]) if row else 0.0
-                # On loss (net < 0), ensure sufficient balance (bet already reserved)
+                current = _money(row[0]) if row and row[0] is not None else Decimal('0.00')
                 if net < 0 and current < abs(net):
                     conn.execute('ROLLBACK')
-                    return False, current
+                    return False, _money_float(current)
                 new_bal = current + net
                 conn.execute('''
                     INSERT INTO users (telegram_id, game_balance) VALUES (?, ?)
                     ON CONFLICT(telegram_id) DO UPDATE SET game_balance = ?
-                ''', (uid, new_bal, new_bal))
+                ''', (uid, _money_float(new_bal), _money_float(new_bal)))
                 conn.commit()
-                return True, new_bal
+                return True, _money_float(new_bal)
             except Exception:
                 try:
                     conn.execute('ROLLBACK')
