@@ -5408,33 +5408,77 @@ def _get_or_create_lottery_round():
             rollover_amount = 0.0
             winners_to_credit = []
 
+            # ── Rounding-safe pool splitter ────────────────────────────────────────
+            # round(pool/n, 2) * n can exceed pool by up to n*0.005 due to
+            # floating-point rounding-up.  We give the LAST winner the exact
+            # remainder (pool − base * (n−1)) so the sum of credits == pool exactly.
+            # The last winner's payout differs from the others by at most 1 cent.
+            def _split_pool(pool, uids, tier_label):
+                """Return list of (uid, amount) pairs that sum to exactly pool.
+
+                All but the last winner receive floor(pool/n) rounded to 2 dp.
+                The last winner receives pool − sum_of_others, clamped to ≥ 0.
+                Entries with amount ≤ 0 are omitted and a warning is printed.
+                """
+                n = len(uids)
+                if n == 0 or pool <= 0:
+                    if pool < 0:
+                        print(f"[lottery] WARNING: {tier_label} pool is negative ({pool:.4f}) — skipping credits")
+                    return []
+                base = round(pool / n, 2)
+                result = []
+                running = 0.0
+                for i, uid in enumerate(uids):
+                    if i < n - 1:
+                        amt = base
+                    else:
+                        # Last winner gets the exact remainder to zero the pool
+                        amt = round(pool - running, 2)
+                    if amt <= 0:
+                        print(f"[lottery] WARNING: {tier_label} winner {uid} payout={amt:.4f} ≤ 0 "
+                              f"(pool={pool:.4f}, n={n}) — skipping credit")
+                        continue
+                    result.append((uid, amt))
+                    running = round(running + amt, 2)
+                actual_paid = round(running, 2)
+                if abs(actual_paid - pool) > 0.02:
+                    print(f"[lottery] WARNING: {tier_label} total paid {actual_paid:.4f} "
+                          f"diverges from pool {pool:.4f} by {abs(actual_paid-pool):.4f}")
+                return result
+
             if tier1_uids:
-                # Jackpot: split full pool equally among jackpot winners
-                prize_per_jackpot = round(prize_pool / len(tier1_uids), 2)
+                # Jackpot: split full pool equally among jackpot winners.
+                # Clamp prize_pool to ensure it is non-negative before splitting.
+                prize_pool_j = max(0.0, round(float(prize_pool), 2))
+                uid_prize_j = _split_pool(prize_pool_j, tier1_uids, 'tier1-jackpot')
+                prize_map_j = {u: p for u, p in uid_prize_j}
                 for ticket in state.get('tickets', []):
-                    ticket['prize'] = prize_per_jackpot if ticket.get('tier') == 1 else 0.0
+                    ticket['prize'] = prize_map_j.get(ticket['uid'], 0.0) if ticket.get('tier') == 1 else 0.0
                 winners_to_credit = [
                     {
                         'uid': str(w_uid),
-                        'amount': prize_per_jackpot,
+                        'amount': amt,
                         'idem_key': f"lottery_{round_id}_{w_uid}_t1",
                     }
-                    for w_uid in tier1_uids
+                    for w_uid, amt in uid_prize_j
                 ]
             else:
-                # No jackpot — roll over a portion, redistribute the rest
+                # No jackpot — roll over a portion, redistribute the rest.
+                prize_pool_f = max(0.0, round(float(prize_pool), 2))
                 if tier2_uids or tier3_uids:
-                    rollover_amount = round(prize_pool * _LOTTERY_ROLLOVER_PCT, 2)
+                    # Clamp rollover to [0, prize_pool] — prevents negative redistributable
+                    rollover_amount = max(0.0, min(round(prize_pool_f * _LOTTERY_ROLLOVER_PCT, 2), prize_pool_f))
                 else:
                     # No winners at all — roll over the full pool
-                    rollover_amount = prize_pool
+                    rollover_amount = prize_pool_f
 
-                redistributable = prize_pool - rollover_amount
+                redistributable = round(max(0.0, prize_pool_f - rollover_amount), 2)
 
-                # Split redistributable between tier-2 and tier-3 pools
+                # Split redistributable between tier-2 and tier-3 pools.
+                # tier3_pool is the exact remainder so tier2_pool + tier3_pool == redistributable.
                 if tier2_uids and tier3_uids:
                     tier2_pool = round(redistributable * _LOTTERY_SECONDARY_SHARE, 2)
-                    tier3_pool = redistributable - tier2_pool
+                    tier3_pool = round(max(0.0, redistributable - tier2_pool), 2)
                 elif tier2_uids:
                     tier2_pool = redistributable
                     tier3_pool = 0.0
@@ -5442,27 +5486,29 @@ def _get_or_create_lottery_round():
                     tier2_pool = 0.0
                     tier3_pool = redistributable
 
-                prize_per_tier2 = round(tier2_pool / len(tier2_uids), 2) if tier2_uids else 0.0
-                prize_per_tier3 = round(tier3_pool / len(tier3_uids), 2) if tier3_uids else 0.0
+                uid_prize_t2 = _split_pool(tier2_pool, tier2_uids, 'tier2-secondary')
+                uid_prize_t3 = _split_pool(tier3_pool, tier3_uids, 'tier3-small')
+                prize_map_t2 = {u: p for u, p in uid_prize_t2}
+                prize_map_t3 = {u: p for u, p in uid_prize_t3}
 
                 for ticket in state.get('tickets', []):
                     if ticket.get('tier') == 2:
-                        ticket['prize'] = prize_per_tier2
+                        ticket['prize'] = prize_map_t2.get(ticket['uid'], 0.0)
                     elif ticket.get('tier') == 3:
-                        ticket['prize'] = prize_per_tier3
+                        ticket['prize'] = prize_map_t3.get(ticket['uid'], 0.0)
                     else:
                         ticket['prize'] = 0.0
 
-                for w_uid in tier2_uids:
+                for w_uid, amt in uid_prize_t2:
                     winners_to_credit.append({
                         'uid': str(w_uid),
-                        'amount': prize_per_tier2,
+                        'amount': amt,
                         'idem_key': f"lottery_{round_id}_{w_uid}_t2",
                     })
-                for w_uid in tier3_uids:
+                for w_uid, amt in uid_prize_t3:
                     winners_to_credit.append({
                         'uid': str(w_uid),
-                        'amount': prize_per_tier3,
+                        'amount': amt,
                         'idem_key': f"lottery_{round_id}_{w_uid}_t3",
                     })
 
