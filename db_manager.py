@@ -113,6 +113,23 @@ def _init_db():
                 PRIMARY KEY (uid, request_id)
             );
             CREATE INDEX IF NOT EXISTS idx_idem_created ON game_idempotency(created_at);
+
+            -- Snatch game sessions: durable state machine co-located with wallet
+            -- so wallet and session state are always in the same DB file.
+            -- status: intent | pending | settling | refunding | settled | refunded
+            CREATE TABLE IF NOT EXISTS snatch_sessions (
+                session_id      TEXT PRIMARY KEY,
+                uid             TEXT NOT NULL,
+                bet_amount      REAL NOT NULL,
+                spin_request_id TEXT,
+                created_at      REAL NOT NULL,
+                status          TEXT NOT NULL DEFAULT 'intent',
+                score           INTEGER,
+                payout          REAL,
+                settled_at      REAL
+            );
+            CREATE INDEX IF NOT EXISTS idx_snatch_status_time
+                ON snatch_sessions (status, created_at);
         ''')
         conn.commit()
     finally:
@@ -215,6 +232,19 @@ class GameDB:
                 PRIMARY KEY (uid, request_id)
             );
             CREATE INDEX IF NOT EXISTS idx_idem_created ON game_idempotency(created_at);
+            CREATE TABLE IF NOT EXISTS snatch_sessions (
+                session_id      TEXT PRIMARY KEY,
+                uid             TEXT NOT NULL,
+                bet_amount      REAL NOT NULL,
+                spin_request_id TEXT,
+                created_at      REAL NOT NULL,
+                status          TEXT NOT NULL DEFAULT 'intent',
+                score           INTEGER,
+                payout          REAL,
+                settled_at      REAL
+            );
+            CREATE INDEX IF NOT EXISTS idx_snatch_status_time
+                ON snatch_sessions (status, created_at);
         ''')
         conn.commit()
         conn.close()
@@ -515,6 +545,89 @@ class GameDB:
         with _db_lock:
             conn.execute('DELETE FROM game_idempotency WHERE created_at < ?', (cutoff,))
             conn.commit()
+
+    # ===== Snatch Session State Machine =====
+
+    _SNATCH_COLS = ('session_id', 'uid', 'bet_amount', 'spin_request_id',
+                    'created_at', 'status', 'score', 'payout', 'settled_at')
+
+    def snatch_create_session(self, session_id, uid, bet_amount,
+                               spin_request_id, created_at, server_payout=None):
+        """Insert a new 'intent' session row into vex_games.db (idempotent INSERT OR IGNORE).
+
+        server_payout: the server-determined payout amount computed at spin time.
+        Stored immediately so /api/snatch/end and the sweep can credit it without
+        ever trusting a client-supplied score.
+        """
+        conn = self._conn()
+        with _db_lock:
+            conn.execute(
+                "INSERT OR IGNORE INTO snatch_sessions "
+                "(session_id, uid, bet_amount, spin_request_id, created_at, status, payout) "
+                "VALUES (?, ?, ?, ?, ?, 'intent', ?)",
+                (session_id, str(uid), float(bet_amount), spin_request_id,
+                 created_at, server_payout)
+            )
+            conn.commit()
+
+    def snatch_get_session(self, session_id):
+        """Return session as a dict, or None if not found."""
+        conn = self._conn()
+        row = conn.execute(
+            "SELECT session_id, uid, bet_amount, spin_request_id, created_at, "
+            "status, score, payout, settled_at FROM snatch_sessions WHERE session_id=?",
+            (session_id,)
+        ).fetchone()
+        return dict(zip(self._SNATCH_COLS, row)) if row else None
+
+    def snatch_cas_status(self, session_id, old_status, new_status, **kwargs):
+        """Atomic compare-and-swap status transition.
+
+        Optional kwargs: score, payout, settled_at — updated in the same statement.
+        Returns rowcount: 1 = this caller won the race; 0 = lost (status already changed).
+        """
+        conn = self._conn()
+        set_parts = ['status=?']
+        params = [new_status]
+        for k in ('score', 'payout', 'settled_at'):
+            if k in kwargs:
+                set_parts.append(f'{k}=?')
+                params.append(kwargs[k])
+        params.extend([session_id, old_status])
+        with _db_lock:
+            rowcount = conn.execute(
+                f"UPDATE snatch_sessions SET {', '.join(set_parts)} "
+                f"WHERE session_id=? AND status=?",
+                params
+            ).rowcount
+            conn.commit()
+        return rowcount
+
+    def snatch_delete_session(self, session_id):
+        """Delete a session row (used to remove ghost intent rows)."""
+        conn = self._conn()
+        with _db_lock:
+            conn.execute("DELETE FROM snatch_sessions WHERE session_id=?", (session_id,))
+            conn.commit()
+
+    def snatch_get_by_status(self, status, created_before=None):
+        """Return a list of session dicts matching the given status.
+
+        Optionally filter to rows older than ``created_before`` (UNIX timestamp).
+        """
+        conn = self._conn()
+        cols = ', '.join(self._SNATCH_COLS)
+        if created_before is not None:
+            rows = conn.execute(
+                f"SELECT {cols} FROM snatch_sessions "
+                f"WHERE status=? AND created_at < ?",
+                (status, created_before)
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                f"SELECT {cols} FROM snatch_sessions WHERE status=?", (status,)
+            ).fetchall()
+        return [dict(zip(self._SNATCH_COLS, r)) for r in rows]
 
     # ===== Session Logging =====
 

@@ -477,12 +477,13 @@ class TestFlaskEndpointIdempotency(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         if not cls._skip:
-            # Clean up test users from the real DB (UIDs start with 'flask_')
+            # Clean up test users and snatch sessions from the real DB (UIDs start with 'flask_')
             try:
                 import db_manager as dm
                 conn = dm._get_conn()
                 conn.execute("DELETE FROM users WHERE telegram_id LIKE 'flask_%'")
                 conn.execute("DELETE FROM game_idempotency WHERE uid LIKE 'flask_%'")
+                conn.execute("DELETE FROM snatch_sessions WHERE uid LIKE 'flask_%'")
                 conn.commit()
                 conn.close()
             except Exception:
@@ -614,29 +615,122 @@ class TestFlaskEndpointIdempotency(unittest.TestCase):
             'SELECT game_balance FROM users WHERE telegram_id=?', (uid,)).fetchone()
         self.assertAlmostEqual(row2[0], bal_after_co)
 
-    # --- Snatch: balance integrity ---
+    # --- Snatch: two-phase balance integrity ---
 
-    def test_snatch_spin_balance_integrity(self):
+    def test_snatch_spin_deducts_bet_only(self):
+        """Spin deducts bet; no payout until /api/snatch/end is called."""
         uid = 'flask_snatch_1'
         self._inject_user(uid, 300.0)
 
-        r = self._post('/api/snatch/spin', {'bet': 50}, uid=uid, request_id='snatch-1')
+        r = self._post('/api/snatch/spin', {'bet': 50}, uid=uid, request_id='snatch-spin-1')
         self.assertEqual(r.status_code, 200)
         d = json.loads(r.data)
-        self.assertTrue(d.get('success'))
-        reported_bal = d.get('balance_after')
-        payout = d.get('payout', 0)
-        bet = 50.0
-
-        # reported balance = 300 - 50 + payout
-        expected = 300.0 - bet + payout
-        self.assertAlmostEqual(reported_bal, expected, places=2)
+        self.assertTrue(d.get('success'), d)
+        # Spin must return session_id (not payout)
+        self.assertIn('session_id', d, "Spin must return session_id for two-phase protocol")
+        # balance_before is 300; after deduction = 300 - 50 = 250
+        expected_bal = 300.0 - 50.0
+        self.assertAlmostEqual(d.get('balance_before', -1), 300.0, places=2)
 
         import db_manager as dm
         db = dm.GameDB(self.db_path)
         row = db._conn().execute(
             'SELECT game_balance FROM users WHERE telegram_id=?', (uid,)).fetchone()
-        self.assertAlmostEqual(row[0], expected, places=2)
+        # Bet deducted in wallet DB before /api/snatch/end
+        self.assertAlmostEqual(row[0], expected_bal, places=2,
+                               msg="Bet must be deducted from wallet at spin time")
+
+    def test_snatch_end_credits_server_payout(self):
+        """Full two-phase flow: spin deducts bet, end credits server-determined payout.
+
+        The payout is set by the server algorithm at spin time.  We verify:
+          1. Bet is deducted at spin (balance drops by bet).
+          2. /api/snatch/end returns success with a payout value.
+          3. Wallet balance = balance_after_spin + payout (exactly once).
+          4. Forged score cannot inflate the payout beyond the server value.
+        """
+        uid = 'flask_snatch_2'
+        self._inject_user(uid, 500.0)
+
+        # Step 1: spin
+        r1 = self._post('/api/snatch/spin', {'bet': 100}, uid=uid, request_id='snatch-end-spin-1')
+        self.assertEqual(r1.status_code, 200)
+        d1 = json.loads(r1.data)
+        self.assertTrue(d1.get('success'), d1)
+        session_id = d1.get('session_id')
+        self.assertIsNotNone(session_id, "Spin must return session_id")
+
+        import db_manager as dm
+        db = dm.GameDB(self.db_path)
+        bal_after_spin = db._conn().execute(
+            'SELECT game_balance FROM users WHERE telegram_id=?', (uid,)).fetchone()[0]
+        self.assertAlmostEqual(bal_after_spin, 400.0, places=2,
+                               msg="Bet must be deducted at spin")
+
+        # Step 2: end — score value from client does NOT influence payout
+        r2 = self._post('/api/snatch/end', {'session_id': session_id, 'score': 45},
+                        uid=uid)
+        self.assertEqual(r2.status_code, 200)
+        d2 = json.loads(r2.data)
+        self.assertTrue(d2.get('success'), d2)
+        server_payout = d2.get('payout', 0)
+
+        # Wallet must reflect bet-out + server_payout-in: 400 + server_payout
+        bal_after_end = db._conn().execute(
+            'SELECT game_balance FROM users WHERE telegram_id=?', (uid,)).fetchone()[0]
+        self.assertAlmostEqual(bal_after_end, 400.0 + server_payout, places=2,
+                               msg="Balance must equal 400 + server_payout, no more, no less")
+
+        # Forged-score check: re-calling end with inflated score must be rejected
+        # (session is settled — second call must not succeed)
+        r3 = self._post('/api/snatch/end', {'session_id': session_id, 'score': 200},
+                        uid=uid)
+        self.assertNotEqual(r3.status_code, 200,
+                            "Second /api/snatch/end must be rejected after first succeeds")
+        # Wallet must not have changed
+        bal_after_forged = db._conn().execute(
+            'SELECT game_balance FROM users WHERE telegram_id=?', (uid,)).fetchone()[0]
+        self.assertAlmostEqual(bal_after_forged, bal_after_end, places=2,
+                               msg="Forged second end must not affect wallet balance")
+
+    def test_snatch_end_duplicate_rejected(self):
+        """Second /api/snatch/end on the same session must be rejected."""
+        uid = 'flask_snatch_3'
+        self._inject_user(uid, 500.0)
+
+        r1 = self._post('/api/snatch/spin', {'bet': 50}, uid=uid, request_id='snatch-dup-spin')
+        session_id = json.loads(r1.data).get('session_id')
+        self.assertIsNotNone(session_id)
+
+        r2 = self._post('/api/snatch/end', {'session_id': session_id, 'score': 40}, uid=uid)
+        self.assertEqual(r2.status_code, 200)
+        self.assertTrue(json.loads(r2.data).get('success'))
+
+        # Second call: session is now 'settled', must be blocked
+        r3 = self._post('/api/snatch/end', {'session_id': session_id, 'score': 40}, uid=uid)
+        self.assertNotEqual(r3.status_code, 200,
+                            "Duplicate /api/snatch/end must be rejected")
+
+    def test_snatch_spin_idempotent(self):
+        """Same request_id on /api/snatch/spin deducts bet exactly once."""
+        uid = 'flask_snatch_4'
+        self._inject_user(uid, 300.0)
+
+        r1 = self._post('/api/snatch/spin', {'bet': 50}, uid=uid, request_id='snatch-idem-1')
+        r2 = self._post('/api/snatch/spin', {'bet': 50}, uid=uid, request_id='snatch-idem-1')
+        self.assertEqual(r1.status_code, 200)
+        self.assertEqual(r2.status_code, 200)
+        d1 = json.loads(r1.data)
+        d2 = json.loads(r2.data)
+        self.assertTrue(d1.get('success'))
+        self.assertTrue(d2.get('success'))
+
+        import db_manager as dm
+        db = dm.GameDB(self.db_path)
+        bal = db._conn().execute(
+            'SELECT game_balance FROM users WHERE telegram_id=?', (uid,)).fetchone()[0]
+        self.assertAlmostEqual(bal, 250.0, places=2,
+                               msg="Idempotent spin: bet deducted exactly once")
 
     # --- Lottery buy: exactly-once ticket deduction ---
 

@@ -86,12 +86,31 @@ var timeLeft = 20;
 var gifts = [];
 var particles = [];
 var betAmount = 10;
-var serverPayout = 0;   // payout pre-calculated by server at /api/snatch/spin
+// snatchSessionId is set by /api/snatch/spin and cleared ONLY after a confirmed
+// successful /api/snatch/end response.  On network failure it is preserved so the
+// player can retry without losing their server-stored payout.
+// It is also mirrored to localStorage so a reload can resume a pending settlement.
+var snatchSessionId = null;
+var snatchFinalScore = 0;   // saved alongside session_id for retry
+
+function _savePendingSession(sid, sc) {
+  try { localStorage.setItem('snatch_pending', JSON.stringify({sid: sid, sc: sc})); } catch(e) {}
+}
+function _clearPendingSession() {
+  try { localStorage.removeItem('snatch_pending'); } catch(e) {}
+}
+function _loadPendingSession() {
+  try {
+    var raw = localStorage.getItem('snatch_pending');
+    return raw ? JSON.parse(raw) : null;
+  } catch(e) { return null; }
+}
 var animId = null;
 var timerInterval = null;
 var W, H;
 var GIFT_EMOJIS = ['🎁','🎀','🎊','💰','⭐','🏆','💎','🍀'];
 var GIFT_VALUES = [1,1,1,2,2,3,5,10];
+var gameDuration = 20;
 
 function resize() {
   W = canvas.clientWidth || window.innerWidth;
@@ -107,10 +126,14 @@ function startGame() {
     body: JSON.stringify({ uid: uid, bet: betAmount })
   }).then(function(r) { return r.json(); }).then(function(d) {
     if (d.error) { showToast(d.error, 'error'); if (d.need_deposit) showDepositModal(betAmount); return; }
-    serverPayout = typeof d.payout === 'number' ? d.payout : 0;
+    snatchSessionId = d.session_id || null;
+    // Use server-provided game parameters when available
+    if (Array.isArray(d.gift_emojis)) GIFT_EMOJIS = d.gift_emojis;
+    if (Array.isArray(d.gift_values)) GIFT_VALUES = d.gift_values;
+    if (typeof d.game_duration === 'number') gameDuration = d.game_duration;
     document.getElementById('startOverlay').style.display = 'none';
     gameRunning = true;
-    score = 0; lives = 3; timeLeft = 20; gifts = []; particles = [];
+    score = 0; lives = 3; timeLeft = gameDuration; gifts = []; particles = [];
     setGamePhase('playing');
     updateHUD();
     spawnGifts();
@@ -118,14 +141,76 @@ function startGame() {
     animId = requestAnimationFrame(gameLoop);
     loadBalance();
   }).catch(function() {
-    // Offline mode - still play for fun
-    document.getElementById('startOverlay').style.display = 'none';
-    gameRunning = true; score = 0; lives = 3; timeLeft = 20; gifts = []; particles = [];
-    setGamePhase('playing');
-    updateHUD(); spawnGifts(); startTimer();
-    animId = requestAnimationFrame(gameLoop);
+    // Network error at spin — no session was created so nothing was deducted.
+    // Do NOT enter offline play mode since there is no server-tracked session.
+    showToast('تعذّر الاتصال. تحقق من الشبكة وأعد المحاولة.', 'error');
   });
 }
+
+// ── On page load: recover a pending settlement from localStorage ──────────────
+// If the player reloads after a failed /api/snatch/end, resume settlement so
+// their server-stored payout is credited rather than being TTL-refunded.
+(function _recoverPendingSession() {
+  var pending = _loadPendingSession();
+  if (!pending || !pending.sid) return;
+  // Show the result overlay immediately in "pending" state
+  var overlayEl = document.getElementById('resultOverlay');
+  var subEl     = document.getElementById('resultSub');
+  var payoutEl  = document.getElementById('resultPayout');
+  if (!overlayEl) return;
+  overlayEl.style.display = 'flex';
+  if (subEl)    subEl.textContent    = 'جارٍ استكمال الجلسة السابقة…';
+  if (payoutEl) payoutEl.textContent = '—';
+
+  snatchSessionId = pending.sid;
+  snatchFinalScore = pending.sc || 0;
+
+  apiFetchCritical(BASE + '/api/snatch/end', {
+    method: 'POST',
+    body: JSON.stringify({ uid: uid, score: snatchFinalScore, session_id: snatchSessionId })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d && (d.success || d.payout !== undefined)) {
+      snatchSessionId = null; snatchFinalScore = 0; _clearPendingSession();
+      var payout = (typeof d.payout === 'number') ? d.payout : 0;
+      if (payoutEl) payoutEl.textContent = payout > 0
+        ? ('+ ' + fmtAmount(payout) + ' ' + gameCurrency)
+        : ('0 ' + gameCurrency);
+      if (subEl) subEl.textContent = payout > 0
+        ? 'تمت المكافأة من الجلسة السابقة!'
+        : 'انتهت الجلسة السابقة بدون مكافأة.';
+      loadBalance();
+    } else if (d && d.error && /settled|refunded|not found/i.test(d.error)) {
+      snatchSessionId = null; snatchFinalScore = 0; _clearPendingSession();
+      if (subEl) subEl.textContent = 'الجلسة السابقة تم تسويتها بالفعل.';
+      if (payoutEl) payoutEl.textContent = '—';
+      loadBalance();
+    } else {
+      // Still failing — leave localStorage intact, show retry button
+      if (subEl) subEl.textContent = 'تعذّر الاتصال — اضغط لإعادة المحاولة';
+      if (!document.getElementById('snatchRetryBtn')) {
+        var btn = document.createElement('button');
+        btn.id = 'snatchRetryBtn';
+        btn.textContent = '🔄 إعادة المحاولة';
+        btn.style.cssText = 'margin:12px auto;display:block;padding:10px 28px;font-size:15px;border-radius:8px;background:#f59e0b;color:#1a1a1a;border:none;cursor:pointer;font-weight:700;';
+        btn.onclick = function() {
+          btn.disabled = true;
+          location.reload();   // simplest retry: reload triggers this code again
+        };
+        overlayEl.appendChild(btn);
+      }
+    }
+  }).catch(function() {
+    if (subEl) subEl.textContent = 'تعذّر الاتصال — اضغط لإعادة المحاولة';
+    if (!document.getElementById('snatchRetryBtn')) {
+      var btn = document.createElement('button');
+      btn.id = 'snatchRetryBtn';
+      btn.textContent = '🔄 إعادة المحاولة';
+      btn.style.cssText = 'margin:12px auto;display:block;padding:10px 28px;font-size:15px;border-radius:8px;background:#f59e0b;color:#1a1a1a;border:none;cursor:pointer;font-weight:700;';
+      btn.onclick = function() { btn.disabled = true; location.reload(); };
+      overlayEl.appendChild(btn);
+    }
+  });
+})();
 
 function spawnGifts() {
   if (!gameRunning) return;
@@ -264,17 +349,104 @@ function endGame() {
   setGamePhase('idle');
   if (timerInterval) clearInterval(timerInterval);
   if (animId) cancelAnimationFrame(animId);
-  // Use server-calculated payout (already credited to balance at /api/snatch/spin).
-  // Fall back to client estimate only in offline/catch mode (serverPayout === 0).
-  var payout = serverPayout > 0 ? serverPayout : score * betAmount * 0.1;
-  document.getElementById('resultTitle').textContent = lives <= 0 ? '💀 نفدت الحياة!' : '⏰ انتهى الوقت!';
-  document.getElementById('resultScore').textContent = score + ' نقطة';
-  document.getElementById('resultPayout').textContent = '+ ' + fmtAmount(payout) + ' ' + gameCurrency;
-  document.getElementById('resultSub').textContent = 'أحسنت! اجمع أكثر في المرة القادمة';
-  document.getElementById('resultOverlay').style.display = 'flex';
-  if (score > 0) { soundWin(score > 20); hapticNotif('success'); }
-  addHistItem(document.querySelector('.hist-bar') || document.createElement('div'), Math.max(1, score * 0.1));
-  loadBalance();
+
+  var titleEl   = document.getElementById('resultTitle');
+  var scoreEl   = document.getElementById('resultScore');
+  var payoutEl  = document.getElementById('resultPayout');
+  var subEl     = document.getElementById('resultSub');
+  var overlayEl = document.getElementById('resultOverlay');
+
+  titleEl.textContent  = lives <= 0 ? '💀 نفدت الحياة!' : '⏰ انتهى الوقت!';
+  scoreEl.textContent  = score + ' نقطة';
+  payoutEl.textContent = '';
+  subEl.textContent    = 'جارٍ حساب مكافأتك…';
+  overlayEl.style.display = 'flex';
+
+  var finalScore = score;
+  var finalLives = lives;
+
+  // Call /api/snatch/end to credit the server-determined payout.
+  // snatchSessionId is cleared ONLY on a successful terminal response.
+  // On network failure the ID is kept (and mirrored to localStorage) so the
+  // player can retry without losing their payout — the server CAS ensures
+  // credit_with_idempotency is issued exactly once even if this is called again.
+  if (snatchSessionId) {
+    snatchFinalScore = finalScore;
+    _savePendingSession(snatchSessionId, finalScore);
+
+    function _doEndRequest(sid, sc) {
+      return apiFetchCritical(BASE + '/api/snatch/end', {
+        method: 'POST',
+        body: JSON.stringify({ uid: uid, score: sc, session_id: sid })
+      }).then(function(r) { return r.json(); }).then(function(d) {
+        if (d && (d.success || d.payout !== undefined)) {
+          // Confirmed settled — clear pending session state
+          snatchSessionId = null;
+          snatchFinalScore = 0;
+          _clearPendingSession();
+          var payout = (typeof d.payout === 'number') ? d.payout : 0;
+          if (payout > 0) {
+            payoutEl.textContent = '+ ' + fmtAmount(payout) + ' ' + gameCurrency;
+            subEl.textContent = 'أحسنت! الرصيد تم تحديثه';
+            soundWin(payout > betAmount); hapticNotif('success');
+          } else {
+            payoutEl.textContent = '0 ' + gameCurrency;
+            subEl.textContent = 'حاول مرة أخرى!';
+            hapticNotif('error');
+          }
+          // Remove retry button if visible
+          var retryBtn = document.getElementById('snatchRetryBtn');
+          if (retryBtn) retryBtn.remove();
+          addHistItem(document.querySelector('.hist-bar') || document.createElement('div'), Math.max(1, sc * 0.1));
+          loadBalance();
+        } else if (d && d.error && /settled|refunded|not found/i.test(d.error)) {
+          // Session already settled server-side (swept by TTL refund or prior retry)
+          snatchSessionId = null;
+          snatchFinalScore = 0;
+          _clearPendingSession();
+          payoutEl.textContent = '—';
+          subEl.textContent = d.error;
+          var retryBtn = document.getElementById('snatchRetryBtn');
+          if (retryBtn) retryBtn.remove();
+          loadBalance();
+        } else {
+          // Non-terminal error (e.g. server busy) — keep session, show retry
+          _showEndRetry(sid, sc);
+        }
+      }).catch(function() {
+        // Network error — keep snatchSessionId and localStorage entry for retry
+        _showEndRetry(sid, sc);
+      });
+    }
+
+    function _showEndRetry(sid, sc) {
+      payoutEl.textContent = '—';
+      subEl.textContent = 'تعذّر الاتصال — اضغط لإعادة المحاولة';
+      hapticNotif('error');
+      var existing = document.getElementById('snatchRetryBtn');
+      if (!existing) {
+        var btn = document.createElement('button');
+        btn.id = 'snatchRetryBtn';
+        btn.textContent = '🔄 إعادة المحاولة';
+        btn.style.cssText = 'margin:12px auto;display:block;padding:10px 28px;font-size:15px;border-radius:8px;background:#f59e0b;color:#1a1a1a;border:none;cursor:pointer;font-weight:700;';
+        btn.onclick = function() {
+          subEl.textContent = 'جارٍ المحاولة…';
+          btn.disabled = true;
+          _doEndRequest(sid, sc).finally(function() { btn.disabled = false; });
+        };
+        var overlayEl2 = document.getElementById('resultOverlay');
+        if (overlayEl2) overlayEl2.appendChild(btn);
+      }
+      loadBalance();
+    }
+
+    _doEndRequest(snatchSessionId, finalScore);
+  } else {
+    // Offline / no session — show placeholder; no financial outcome
+    payoutEl.textContent = '—';
+    subEl.textContent = 'وضع غير متصل — لا توجد جلسة نشطة';
+    addHistItem(document.querySelector('.hist-bar') || document.createElement('div'), Math.max(1, finalScore * 0.1));
+  }
 }
 
 function resetGame() {

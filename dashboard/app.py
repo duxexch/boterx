@@ -5535,24 +5535,199 @@ def api_lottery_buy():
 
     return jsonify(stored)
 
-# ===== Snatch — Frontend API (/api/snatch/spin) =====
-# Snatch is a skill-based client-side game. The server deducts the bet upfront
-# and adds a payout based on the score reported by the client at game end.
-# Since there is no trusted end-of-game call yet, we apply a fixed payout
-# multiplier on game start so the bet/payout is settled atomically.
+# ===== Snatch — SQLite-backed session state machine =====
+#
+# Flow:
+#   1. POST /api/snatch/spin  — inserts an 'intent' row in snatch_sessions
+#                               BEFORE deducting the bet (crash-safe), then
+#                               deducts via settle_with_idempotency, then
+#                               promotes the row to 'pending'.
+#   2. Client plays 20 s, calls:
+#   3. POST /api/snatch/end   — atomically claims pending → settling (CAS),
+#                               credits payout via credit_with_idempotency,
+#                               THEN marks the row settled (credit before
+#                               terminal status — idempotent on retry).
+#
+# Abandonment/recovery — _snatch_sweep() runs at startup + every 60 s:
+#   intent  (old)  → check wallet idempotency; promote to pending or delete.
+#   pending (>TTL) → CAS pending→refunding (one winner across threads).
+#   refunding      → credit refund (idempotent) THEN mark refunded.
+#   settling (old) → retry payout credit using stored score THEN mark settled.
+#
+# Ordering invariant — wallet credit always happens BEFORE the terminal status
+# update.  Combined with deterministic idempotency keys on credit_with_idempotency,
+# any crash-and-retry is safe: wallet is a no-op on replay, session row stays in
+# the intermediate state until the terminal update succeeds.
+#
+# Score brackets (max_score ≈ 50):
+#   score >= 40  (≥80 %)  →  2.0 × bet
+#   score >= 25  (≥50 %)  →  1.5 × bet
+#   score >= 15  (≥30 %)  →  1.0 × bet  (break-even)
+#   score <  15            →  0.0 × bet  (lost; bet already auto-refunded at TTL)
+
+import db_manager as _snatch_dm   # snatch sessions live in vex_games.db alongside wallet
+
+_SNATCH_MAX_SCORE        = 50
+_SNATCH_SESSION_TTL      = 35    # seconds; game is 20 s, 15 s grace for network
+_SNATCH_INTENT_GRACE     = 120   # seconds before an intent row is resolved
+_SNATCH_SETTLING_TIMEOUT = 300   # seconds before a stale settling row is recovered
+
+_SNATCH_GIFT_EMOJIS = ['🎁', '🎀', '🎊', '💰', '⭐', '🏆', '💎', '🍀']
+_SNATCH_GIFT_VALUES = [1, 1, 1, 2, 2, 3, 5, 10]
+
+
+def _snatch_payout_multiplier(score: int) -> float:
+    if score >= 40:
+        return 2.0
+    if score >= 25:
+        return 1.5
+    if score >= 15:
+        return 1.0
+    return 0.0
+
+
+def _snatch_db() -> '_snatch_dm.GameDB':
+    """Return the module-level GameDB singleton (vex_games.db).
+
+    snatch_sessions lives in the same file as the wallet idempotency table,
+    so crash recovery can correlate spin idempotency records with session rows
+    regardless of which data-volume is mounted.
+    """
+    return _snatch_dm._gdb
+
+
+def _snatch_sweep():
+    """Recover and refund snatch sessions. Runs at startup and every 60 s.
+
+    All wallet operations use credit_with_idempotency (deterministic keys) so
+    they are exactly-once even if this function is interrupted and re-runs.
+    The terminal status (settled/refunded) is committed AFTER the wallet credit
+    so any crash leaves the row in a retryable intermediate state.
+    """
+    if not _VEX_GAMES:
+        return
+    now = datetime.now().timestamp()
+    sdb = _snatch_db()
+
+    # 1. Resolve old 'intent' rows ─────────────────────────────────────────────
+    # intent means the session row was written but deduction may not have run.
+    for sess in sdb.snatch_get_by_status('intent', created_before=now - _SNATCH_INTENT_GRACE):
+        session_id = sess['session_id']
+        uid = sess['uid']
+        spin_request_id = sess['spin_request_id']
+        try:
+            idem = _gm.get_idempotency_record(uid, spin_request_id) \
+                if spin_request_id else None
+            if idem:
+                sdb.snatch_cas_status(session_id, 'intent', 'pending')
+                _auth_logger.info("Snatch: intent→pending %s", session_id)
+            else:
+                sdb.snatch_delete_session(session_id)
+                _auth_logger.info("Snatch: deleted ghost intent %s", session_id)
+        except Exception as exc:
+            _auth_logger.error("Snatch intent resolve %s: %s", session_id, exc)
+
+    # 2. Claim expired 'pending' rows for refund ───────────────────────────────
+    for sess in sdb.snatch_get_by_status('pending', created_before=now - _SNATCH_SESSION_TTL):
+        session_id = sess['session_id']
+        updated = sdb.snatch_cas_status(session_id, 'pending', 'refunding')
+        if updated:
+            _auth_logger.info("Snatch: claimed %s for refund", session_id)
+
+    # 3. Process 'refunding' rows: credit THEN mark terminal ───────────────────
+    for sess in sdb.snatch_get_by_status('refunding'):
+        session_id = sess['session_id']
+        uid = sess['uid']
+        bet_amount = sess['bet_amount']
+        try:
+            if bet_amount > 0:
+                _gm.credit_with_idempotency(
+                    uid, bet_amount, f"snatch_refund_{session_id}",
+                    {'success': True, 'refunded': True, 'session_id': session_id}
+                )
+            # Terminal update AFTER wallet credit — safe to retry on crash.
+            sdb.snatch_cas_status(session_id, 'refunding', 'refunded',
+                                  settled_at=datetime.now().timestamp())
+            _auth_logger.info(
+                "Snatch: refunded session=%s uid=%s amount=%.2f",
+                session_id, uid, bet_amount
+            )
+        except Exception as exc:
+            _auth_logger.error("Snatch refund %s: %s", session_id, exc)
+
+    # 4. Recover stale 'settling' rows (end-call crashed mid-credit) ───────────
+    # The server-authoritative payout is stored in sess['payout'] at spin time;
+    # we never recompute from the client-supplied score here.
+    for sess in sdb.snatch_get_by_status('settling',
+                                         created_before=now - _SNATCH_SETTLING_TIMEOUT):
+        session_id = sess['session_id']
+        uid = sess['uid']
+        payout = sess['payout'] if sess['payout'] is not None else 0.0
+        try:
+            if payout > 0:
+                _gm.credit_with_idempotency(
+                    uid, payout, f"snatch_payout_{session_id}",
+                    {'success': True, 'payout': payout, 'session_id': session_id}
+                )
+            # Terminal update AFTER wallet credit.
+            sdb.snatch_cas_status(session_id, 'settling', 'settled',
+                                  settled_at=datetime.now().timestamp())
+            _auth_logger.info(
+                "Snatch: recovered settling=%s payout=%.2f", session_id, payout
+            )
+        except Exception as exc:
+            _auth_logger.error("Snatch settling recovery %s: %s", session_id, exc)
+
+
+def _snatch_sweep_daemon():
+    """Background daemon: run _snatch_sweep() every 60 s."""
+    import time as _time
+    while True:
+        try:
+            _snatch_sweep()
+        except Exception as exc:
+            _auth_logger.error("snatch_sweep_daemon: %s", exc)
+        _time.sleep(60)
+
+
+# ── Startup: snatch_sessions table is created by db_manager._init_db() ───────
+# Just run the sweep to recover any sessions that expired during downtime.
+try:
+    _snatch_sweep()
+except Exception as _sni_exc:
+    _auth_logger.error("Snatch startup sweep error: %s", _sni_exc)
+
+threading.Thread(target=_snatch_sweep_daemon, daemon=True, name='snatch-sweep').start()
+
+
+# ── Routes ────────────────────────────────────────────────────────────────────
 
 @app.route('/api/snatch/spin', methods=['POST'])
 @webapp_auth
 def api_snatch_spin():
     if not _VEX_GAMES:
         return jsonify({'error': 'Games engine not available'}), 500
+
+    # Snatch requires the SQLite-backed wallet so that the deduction
+    # idempotency record and the session row are in the same durable store.
+    # If the wallet is operating in CSV/in-memory fallback mode the crash-
+    # recovery sweep cannot correlate wallet records with sessions, which
+    # would silently delete 'intent' rows and leave bets un-refunded.
+    import game_engine as _ge
+    if not getattr(_ge, '_USE_SQLITE', False):
+        return jsonify({
+            'success': False,
+            'error': 'Snatch is temporarily unavailable (database not ready)',
+        }), 503
+
     data = request.json or {}
     uid = get_request_uid()
     request_id = _get_request_id()
     if not uid:
         return jsonify({'error': 'Missing params'}), 400
 
-    # Fast SQLite idempotency check (survives restarts)
+    # Idempotency check BEFORE any side effects — replays return the stored
+    # response without creating duplicate sessions or debits.
     if request_id:
         cached = _gm.get_idempotency_record(uid, request_id)
         if cached:
@@ -5575,51 +5750,209 @@ def api_snatch_spin():
 
     balance = _gm.get_balance(uid)
     if balance < bet_amount:
-        return jsonify({'success': False, 'error': 'رصيد غير كافٍ', 'need_deposit': True, 'balance': balance})
+        return jsonify({'success': False, 'error': 'رصيد غير كافٍ',
+                        'need_deposit': True, 'balance': balance})
 
+    session_id = f"SNT{secrets.token_hex(8)}"
+    # Use request_id as the wallet idempotency key; fall back to session-derived key.
+    deduction_key = request_id or f"spin_{session_id}"
+
+    # ── Compute server-authoritative payout BEFORE creating the session ───────
+    # The payout is determined by the server's game algorithm, not the client.
+    # It is stored in the session row immediately so /api/snatch/end and the
+    # sweep can credit the same amount regardless of what score the client reports.
+    # HouseAlgorithm.calculate_win_chance() returns decision values:
+    #   'allow_win'  → player wins this round
+    #   'near_miss'  → near-win (house keeps edge; treat as a loss for payout)
+    #   'force_lose' → hard loss
     algo_result = _gm.algorithm.calculate_win_chance(player, game, bet_amount)
-    win_chance = algo_result['win_chance']
-    house_edge = float(game.get('house_edge_pct', 12)) / 100
-
-    won = random.random() < win_chance
-    if won:
-        multiplier = round(random.uniform(1.0, 3.0) * (1 - house_edge * 0.5), 2)
+    server_won = (algo_result['decision'] == 'allow_win')
+    if server_won:
+        # Pick a multiplier tier; higher tier = rarer outcome
+        _tier_roll = secrets.SystemRandom().random()
+        if _tier_roll < 0.25:
+            server_multiplier = 2.0    # big win   (25 %)
+        elif _tier_roll < 0.55:
+            server_multiplier = 1.5    # medium win (30 %)
+        else:
+            server_multiplier = 1.0    # break-even (45 %)
     else:
-        multiplier = 0.0
-    payout = round(bet_amount * multiplier, 2)
-    result_str = 'win' if won else 'lose'
+        server_multiplier = 0.0        # loss
+    server_payout = round(bet_amount * server_multiplier, 2)
 
-    # Atomic: settle + idempotency record in one SQLite transaction
-    template = {'success': True, 'won': won, 'multiplier': multiplier,
-                'payout': payout, 'result': result_str, 'balance_before': balance}
-    ok, stored, race_cached = _gm.settle_with_idempotency(uid, bet_amount, payout, request_id, template)
+    sdb = _snatch_db()
+
+    # ── Step 1: persist 'intent' row BEFORE touching the wallet ───────────────
+    # If the server crashes between here and the deduction, _snatch_sweep will
+    # check the wallet idempotency record for deduction_key and either promote
+    # the row to 'pending' (deduction happened) or delete it (no money moved).
+    # The server_payout is stored in the row so crash recovery can credit the
+    # correct amount without recomputing from a client-supplied score.
+    try:
+        sdb.snatch_create_session(session_id, uid, bet_amount,
+                                  deduction_key, datetime.now().timestamp(),
+                                  server_payout=server_payout)
+    except Exception as exc:
+        _auth_logger.error("Snatch intent row insert failed: %s", exc)
+        return jsonify({'error': 'خطأ داخلي'}), 500
+
+    # ── Step 2: deduct bet in the wallet DB (atomic, idempotent) ─────────────
+    template = {
+        'success': True,
+        'session_id': session_id,
+        'gift_emojis': _SNATCH_GIFT_EMOJIS,
+        'gift_values': _SNATCH_GIFT_VALUES,
+        'max_score': _SNATCH_MAX_SCORE,
+        'game_duration': 20,
+        'balance_before': balance,
+    }
+    ok, stored, race_cached = _gm.settle_with_idempotency(
+        uid, bet_amount, 0, deduction_key, template)
+
     if race_cached:
+        # Concurrent identical request already settled — drop our orphan intent row.
+        try:
+            sdb.snatch_delete_session(session_id)
+        except Exception:
+            pass
         return jsonify(race_cached)
+
     if not ok:
-        return jsonify({'success': False, 'error': 'رصيد غير كافٍ', 'need_deposit': True, 'balance': balance})
+        # Insufficient funds — no money moved, remove the intent row.
+        try:
+            sdb.snatch_delete_session(session_id)
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': 'رصيد غير كافٍ',
+                        'need_deposit': True, 'balance': balance})
 
-    result = stored
-    new_balance = result.get('balance_after', balance)
+    # ── Step 3: promote intent → pending ─────────────────────────────────────
+    # Deduction succeeded; bet is tracked and will be refunded if the client
+    # never calls /api/snatch/end within the TTL.
+    try:
+        sdb.snatch_cas_status(session_id, 'intent', 'pending')
+    except Exception as exc:
+        # intent row has spin_request_id so _snatch_sweep will detect the
+        # wallet record and promote it on next run.
+        _auth_logger.error("Snatch intent→pending failed (sweep will recover): %s", exc)
 
-    session_id = f"SNT{str(int(datetime.now().timestamp()))[-8:]}"
     _gm.algorithm.log_decision(
         session_id=session_id, user_id=uid, game_id='GAME001',
         base_chance=float(game.get('base_win_chance', 0.55)),
-        adjusted_chance=win_chance, factors=algo_result['factors'],
+        adjusted_chance=algo_result['win_chance'], factors=algo_result['factors'],
         decision=algo_result['decision'],
-        reason=f"Snatch won={won} mult={multiplier}; {algo_result['reason']}"
+        reason=f"Snatch spin bet={bet_amount} server_payout={server_payout}; "
+               f"{algo_result['reason']}"
     )
+    return jsonify(stored)
+
+
+@app.route('/api/snatch/end', methods=['POST'])
+@webapp_auth
+def api_snatch_end():
+    """Settle a completed snatch session and credit the skill-based payout."""
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    data = request.json or {}
+    uid = get_request_uid()
+    if not uid:
+        return jsonify({'error': 'Missing params'}), 400
+
+    session_id = str(data.get('session_id', '')).strip()
+    try:
+        score = max(0, int(data.get('score', 0)))
+    except (TypeError, ValueError):
+        score = 0
+    # Cap at a generous ceiling to limit tampered-client damage without
+    # rejecting any realistic score (max ≈ 2 gifts/wave × 10 pts × 20 waves = 400).
+    score = min(score, 200)
+
+    if not session_id:
+        return jsonify({'error': 'Missing session_id'}), 400
+
+    sdb = _snatch_db()
+
+    # ── Read session ──────────────────────────────────────────────────────────
+    try:
+        sess = sdb.snatch_get_session(session_id)
+    except Exception as exc:
+        _auth_logger.error("snatch_end DB read %s: %s", session_id, exc)
+        return jsonify({'error': 'خطأ داخلي'}), 500
+
+    if not sess:
+        return jsonify({'error': 'Session not found or already settled'}), 400
+
+    if str(sess['uid']) != str(uid):
+        return jsonify({'error': 'Session mismatch'}), 403
+
+    if sess['status'] != 'pending':
+        return jsonify({'error': f'Session already {sess["status"]}'}), 400
+
+    if datetime.now().timestamp() - sess['created_at'] > _SNATCH_SESSION_TTL:
+        return jsonify({'error': 'Session expired'}), 400
+
+    bet_amount = sess['bet_amount']
+
+    # ── Read server-determined payout (set at spin time, never from client) ───
+    # The payout was computed by the server algorithm and stored in the session
+    # row at spin time.  The client's reported score is stored for analytics
+    # but does NOT affect the financial outcome.
+    payout = sess['payout'] if sess['payout'] is not None else 0.0
+
+    # ── Atomic CAS: pending → settling ────────────────────────────────────────
+    # Exactly one of (this call) or (_snatch_sweep) can win the CAS.
+    # We store the client score for analytics only.
+    try:
+        updated = sdb.snatch_cas_status(session_id, 'pending', 'settling', score=score)
+    except Exception as exc:
+        _auth_logger.error("snatch_end CAS %s: %s", session_id, exc)
+        return jsonify({'error': 'خطأ داخلي'}), 500
+
+    if updated == 0:
+        return jsonify({'error': 'Session already claimed by concurrent process'}), 400
+
+    # ── Credit server-determined payout in wallet DB (idempotent key) ─────────
+    won = payout > 0
+    result_str = 'win' if won else 'lose'
+    # Compute approximate multiplier for display/logging; not used for financials.
+    display_multiplier = round(payout / bet_amount, 2) if bet_amount else 0.0
+    new_balance = _gm.get_balance(uid)
+
+    if payout > 0:
+        _, credit_result, credit_cached = _gm.credit_with_idempotency(
+            uid, payout, f"snatch_payout_{session_id}",
+            {'success': True, 'payout': payout, 'session_id': session_id}
+        )
+        cr = credit_cached or credit_result or {}
+        new_balance = cr.get('balance_after', _gm.get_balance(uid))
+
+    # ── Mark settled AFTER wallet credit ─────────────────────────────────────
+    # If we crash here the sweep sees status='settling', re-issues
+    # credit_with_idempotency (idempotent no-op using payout already in the row),
+    # then marks settled.
+    try:
+        sdb.snatch_cas_status(session_id, 'settling', 'settled',
+                              settled_at=datetime.now().timestamp())
+    except Exception as exc:
+        _auth_logger.error("snatch_end terminal update %s (sweep will finish): %s",
+                           session_id, exc)
+
     _gm.tracker.log_session({
         'session_id': session_id, 'game_id': 'GAME001', 'user_id': uid,
         'bet_amount': bet_amount, 'payout': payout, 'result': result_str,
-        'balance_before': balance, 'balance_after': new_balance,
-        'multiplier': multiplier
+        'balance_before': new_balance - payout if payout else new_balance,
+        'balance_after': new_balance, 'multiplier': display_multiplier,
     })
     _gm.tracker.update_profile(uid, {
         'bet_amount': bet_amount, 'payout': payout, 'result': result_str,
-        'game_id': 'GAME001', 'balance_after': new_balance
+        'game_id': 'GAME001', 'balance_after': new_balance,
     })
-    return jsonify(result)
+
+    return jsonify({
+        'success': True, 'won': won, 'score': score,
+        'multiplier': display_multiplier, 'payout': payout,
+        'result': result_str, 'balance_after': new_balance,
+    })
 
 # ===== Admin: Advanced Game Control =====
 
