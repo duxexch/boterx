@@ -367,13 +367,64 @@ function onFlying(d) {
   haptic('light'); animate();
 }
 
-function onMult(d) { currentMult = d.multiplier; }
+// ===== Animation — interpolates SSE multiplier for smooth 60fps display =====
+// Server sends mult at 20fps (every 50ms). We interpolate to 60fps for buttery display.
+let _lastSSEMult = 1.0;
+let _prevSSEMult = 1.0;
+let _lastSSETime = 0;
+
+function onMult(d) {
+  _prevSSEMult = _lastSSEMult;
+  _lastSSEMult = d.multiplier;
+  _lastSSETime = Date.now();
+  currentMult = d.multiplier;
+}
+
+function animate() {
+  if (roundPhase !== 'flying') return;
+  // Interpolate between previous and latest SSE multiplier for smooth display
+  var now = Date.now();
+  var elapsed = now - _lastSSETime;
+  var tickInterval = 50; // server sends every 50ms
+  var lerpT = Math.min(1, elapsed / tickInterval);
+  mult = _prevSSEMult + (_lastSSEMult - _prevSSEMult) * lerpT;
+  // Fallback: if no SSE update in 100ms, use last known value and grow locally
+  if (elapsed > 100) {
+    mult = _lastSSEMult * Math.pow(1.004, (elapsed - 100) / 50);
+  }
+  mult = Math.max(1.0, mult);
+  currentMult = mult;
+  document.getElementById('mult').textContent = mult.toFixed(2) + 'x';
+  document.getElementById('mult').className = 'mult-val flying';
+  // Auto-cashout
+  for (const s of [1,2]) {
+    if (myBets[s].placed && !myBets[s].cashed && myBets[s].autoVal > 0 && mult >= myBets[s].autoVal) doCashout(s);
+  }
+  const cx = canvas.width * PX, cy = canvas.height * PY;
+  const e = (now - startT) / 1000;
+  const takeoffDur = 3.5;
+  if (e < takeoffDur) {
+    const p = e / takeoffDur; const eased = p*p*(3-2*p);
+    planeX = 40 + eased * (cx - 40); planeY = canvas.height - 30 - eased * (canvas.height - 30 - cy);
+    trail.push({x:planeX, y:planeY}); if (trail.length > 120) trail.shift();
+    bgScroll = eased * 20;
+  } else { planeX = cx; planeY = cy; bgScroll += 2 + mult * 0.3; }
+  const alt = Math.min(1, e / 10);
+  ctx.clearRect(0,0,canvas.width,canvas.height); drawBackground(alt); drawRunway(alt); drawTrail();
+  const angle22 = 22 * Math.PI / 180;
+  let angle = e < takeoffDur ? -(angle22 * (1 - (e/takeoffDur) * 0.5)) : -(8 * Math.PI / 180) + Math.sin(e * 1.5) * 0.03;
+  drawPlane(planeX, planeY, angle);
+  const pm = document.getElementById('planeMult');
+  pm.style.left = planeX + 'px'; pm.style.top = planeY + 'px';
+  document.getElementById('planeMultVal').textContent = mult.toFixed(2) + 'x';
+  animF = requestAnimationFrame(animate);
+}
 
 function onCashoutMsg(d) {
   // Spawn parachute for ANY player — all see it
   spawnParachute(d.name || 'لاعب', d.amount, 15 + Math.random() * 70);
-  // If it's me, update UI
-  if (d.uid === uid) return; // already handled in doCashout
+  // If it's me, the local payout UI already handled it in doCashout
+  if (d.uid === uid) return;
   // Sound for others' cashouts
   beep(659, 0.05, 'sine', 0.04);
 }

@@ -4869,8 +4869,13 @@ def _av_rate_limit(uid, limit=10, window=5.0):
     return True
 
 def _av_calc_crash():
-    # Provably-fair: derive crash point from HMAC(server_seed, client_seed:round)
-    if _PROVABLY_FAIR and _avirator_seed_ready():
+    """Calculate crash point using provably fair HMAC-SHA256.
+
+    Formula: crash = max(1.01, 0.97 / (1 - R))
+    where R ∈ [0, 1) from HMAC-SHA256(server_seed, client_seed:nonce).
+    3% instant crash (R < 0.03 → crash at 1.00x) = house edge.
+    """
+    if _PROVABLY_FAIR and _av_seed_ready():
         try:
             sid = 'avround_%d' % _aviator['round_id']
             res = _pf.generate_float(sid, 0.0, 1.0)
@@ -4879,11 +4884,17 @@ def _av_calc_crash():
             r = random.random()
     else:
         r = random.random()
-    if r < 0.03: return 1.00
+    if r < 0.03:
+        return 1.00
     return round(max(1.01, min(0.97 / (1 - r), 100.0)), 2)
 
-def _avirator_seed_ready():
-    return bool(_aviator.get('server_seed')) and bool(_aviator.get('client_seed'))
+def _av_seed_ready():
+    """Check if provably fair commitment exists for this round.
+
+    seed_hash + client_seed are set BEFORE betting opens.
+    server_seed is only revealed AFTER crash — so we check seed_hash.
+    """
+    return bool(_aviator.get('seed_hash')) and bool(_aviator.get('client_seed'))
 
 def _av_broadcast(msg):
     payload = json.dumps(msg)
@@ -4900,7 +4911,11 @@ def _av_get_name(uid):
     except: return ''
 
 def _aviator_loop():
-    GROWTH = 1.012  # Faster growth — multiplier actually moves
+    # Growth rate: 1.004 per 50ms tick = e^(0.08*t) per second
+    # At 1s: 1.08x, 3s: 1.27x, 5s: 1.49x, 10s: 2.22x, 20s: 4.95x, 30s: 11.0x
+    # This matches real Aviator pacing — players have time to react and cash out
+    GROWTH = 1.004
+    TICK_RATE = 0.05  # 50ms = 20fps updates
     BETTING_DURATION = 6  # 6 second countdown (module-level ref used in endpoints)
     global AV_BETTING_DURATION
     AV_BETTING_DURATION = BETTING_DURATION
@@ -4956,15 +4971,10 @@ def _aviator_loop():
                         total_cashed_out += 1
                         _av_broadcast({'type': 'cashout', 'uid': uid, 'name': _av_get_name(uid), 'amount': round(payout, 2), 'multiplier': round(mult, 2), 'auto': True})
             _av_broadcast({'type': 'mult', 'multiplier': round(mult, 2)})
-            _avtime.sleep(0.05)
+            _avtime.sleep(TICK_RATE)
 
-        # Count remaining cashouts from manual cashout that happened
+        # Crash phase — update state, reveal seed
         with _aviator_lock:
-            for uid, bet in _aviator['bets'].items():
-                if bet['cashed_out']:
-                    if bet.get('cash_mult', 0) > 0:
-                        # Already counted in loop or manual
-                        pass
             _aviator['phase'] = 'crashed'
             _aviator['history'].append(round(crash_pt, 2))
             if len(_aviator['history']) > 50: _aviator['history'].pop(0)
