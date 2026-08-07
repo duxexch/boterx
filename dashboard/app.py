@@ -147,30 +147,38 @@ _APP_ENV = os.getenv('APP_ENV', os.getenv('FLASK_ENV', 'development')).lower()
 _IS_PRODUCTION = (_APP_ENV == 'production')
 
 # ── Startup safety check ─────────────────────────────────────────────────────
-# If BOT_TOKEN is absent and we are in production mode without explicit dev-auth
-# opt-in, all game endpoints become insecure. We surface this loudly at startup
-# and make webapp_auth hard-fail (503) rather than silently open the API.
+# Rule: in production, BOT_TOKEN is ALWAYS required.
+# ALLOW_DEV_AUTH is never consulted in production — it cannot override this.
+# If BOT_TOKEN is absent in production, every game endpoint returns 503.
 _WEBAPP_AUTH_LOCKED_DOWN = False
 if not BOT_TOKEN:
-    if _IS_PRODUCTION and not ALLOW_DEV_AUTH:
+    if _IS_PRODUCTION:
+        # Unconditional lockdown — ALLOW_DEV_AUTH is deliberately ignored here.
+        # An operator mistake (setting ALLOW_DEV_AUTH=true in production) must
+        # not silently reopen the unauthenticated uid-fallback path.
         _auth_logger.critical(
             "SECURITY LOCKDOWN: BOT_TOKEN is missing in production mode "
-            "(APP_ENV/FLASK_ENV=production) and ALLOW_DEV_AUTH is not set. "
-            "All game API endpoints are DISABLED until BOT_TOKEN is provided. "
-            "Fix: set BOT_TOKEN in your environment, or set ALLOW_DEV_AUTH=true "
-            "(only for non-production environments)."
+            "(APP_ENV/FLASK_ENV=%s). All game API endpoints are DISABLED. "
+            "Fix: set BOT_TOKEN in the production environment. "
+            "NOTE: ALLOW_DEV_AUTH is ignored in production — it cannot bypass this lockdown.",
+            _APP_ENV
         )
+        if ALLOW_DEV_AUTH:
+            _auth_logger.critical(
+                "SECURITY LOCKDOWN: ALLOW_DEV_AUTH=true was detected but is IGNORED "
+                "in production. It cannot override the BOT_TOKEN requirement."
+            )
         _WEBAPP_AUTH_LOCKED_DOWN = True
     elif ALLOW_DEV_AUTH:
         _auth_logger.warning(
-            "DEV AUTH MODE ACTIVE: ALLOW_DEV_AUTH=true — uid param accepted without "
-            "HMAC verification. Game endpoints are NOT secure. "
-            "NEVER run with ALLOW_DEV_AUTH=true in production!"
+            "DEV AUTH MODE ACTIVE (non-production): ALLOW_DEV_AUTH=true — "
+            "uid param accepted without HMAC verification. "
+            "NEVER use ALLOW_DEV_AUTH=true in production!"
         )
     else:
         _auth_logger.warning(
             "BOT_TOKEN not set and ALLOW_DEV_AUTH not set — game API endpoints "
-            "will reject all requests. Set ALLOW_DEV_AUTH=true for local dev."
+            "will reject all requests with 403. Set ALLOW_DEV_AUTH=true for local dev."
         )
 else:
     _auth_logger.info("BOT_TOKEN loaded — HMAC validation active for game endpoints.")
@@ -220,22 +228,22 @@ def validate_telegram_init_data(init_data_str: str):
 def webapp_auth(f):
     """Decorator: validates Telegram WebApp initData on game-facing API endpoints.
 
-    Auth priority (evaluated at request time, using values frozen at startup):
+    Auth priority (evaluated at request time using module-level constants):
 
     1. LOCKDOWN (_WEBAPP_AUTH_LOCKED_DOWN=True):
-       BOT_TOKEN missing + production mode + no ALLOW_DEV_AUTH opt-in.
-       Every request returns 503 — the endpoint is administratively disabled.
+       BOT_TOKEN missing in production — unconditional, ignores ALLOW_DEV_AUTH.
+       Every request returns 503.
 
-    2. PRODUCTION (BOT_TOKEN set):
+    2. PRODUCTION HMAC (BOT_TOKEN set):
        Validates X-Telegram-Init-Data header (or initData param) via HMAC-SHA256.
-       Enforces auth_date freshness (max 1 h, no future timestamps).
-       Rejects if any check fails — fail CLOSED.
+       Enforces auth_date freshness (max 1 h, no future timestamps). Fail CLOSED.
 
-    3. DEV/TEST (ALLOW_DEV_AUTH=true, BOT_TOKEN absent):
-       Accepts plain uid query/body param. Logs a per-request warning.
-       NEVER enable in production.
+    3. DEV/TEST (ALLOW_DEV_AUTH=true AND NOT production):
+       Accepts plain uid param. Logs per-request WARNING. Never allow in prod.
+       Defense-in-depth: _IS_PRODUCTION guard inside path prevents activation
+       even if operator sets ALLOW_DEV_AUTH=true on a prod server by mistake.
 
-    4. UNCONFIGURED (no BOT_TOKEN, no ALLOW_DEV_AUTH):
+    4. UNCONFIGURED (no BOT_TOKEN, no ALLOW_DEV_AUTH, non-production):
        Rejects all requests with 403. Operator must fix the config.
     """
     @wraps(f)
@@ -288,8 +296,12 @@ def webapp_auth(f):
             g.telegram_user = user_obj
             return f(*args, **kwargs)
 
-        # ── Path 3: Dev/test mode (explicit opt-in required) ──────────────
-        if ALLOW_DEV_AUTH:
+        # ── Path 3: Dev/test mode (explicit opt-in, non-production only) ────
+        # Defense-in-depth: _IS_PRODUCTION is checked here even though the
+        # startup lockdown already catches production+no-token. This prevents
+        # path 3 from activating if ALLOW_DEV_AUTH=true is mistakenly set on
+        # a production server that somehow bypassed the lockdown flag.
+        if ALLOW_DEV_AUTH and not _IS_PRODUCTION:
             uid = request.args.get('uid', '').strip()
             if not uid:
                 try:
@@ -304,6 +316,17 @@ def webapp_auth(f):
                 g.telegram_user = None
                 return f(*args, **kwargs)
             return jsonify({'error': 'Missing uid (dev mode)', 'code': 'NO_UID'}), 403
+
+        # ── Path 3b: ALLOW_DEV_AUTH in production — hard reject ───────────
+        if ALLOW_DEV_AUTH and _IS_PRODUCTION:
+            _auth_logger.critical(
+                "SECURITY: ALLOW_DEV_AUTH=true ignored in production. "
+                "Request rejected. Set BOT_TOKEN to restore game access."
+            )
+            return jsonify({
+                'error': 'Service unavailable: BOT_TOKEN required in production',
+                'code': 'AUTH_LOCKDOWN'
+            }), 503
 
         # ── Path 4: Unconfigured — no token, no dev opt-in ───────────────
         return jsonify({
