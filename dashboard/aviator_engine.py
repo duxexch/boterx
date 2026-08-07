@@ -1,17 +1,18 @@
 """
-aviator_engine.py — standalone Aviator game backend module.
+aviator_engine.py — standalone Aviator game backend module (v2).
 
-Separates ALL Aviator logic (global round loop, provably fair crash point,
-betting, cashout, SSE stream, state endpoint) out of app.py so each game
-lives in its own file and updates are isolated per game.
+Architecture v2 (per spec):
+  State machine: WAITING(5s) -> STARTING(2s) -> FLIGHT(dynamic) -> CRASHED(3s) -> WAITING
+  Server optimization: NO per-tick multiplier broadcast. Server broadcasts ONLY:
+    - 'waiting'  (betting window open, with seed_hash commitment)
+    - 'starting' (2s lock, no new bets)
+    - 'flight_start' (contains game_id + server_seed_hash)
+    - 'crashed'  (contains real crash_point + revealed server_seed)
+  Client computes multiplier locally: mult = e^(0.07 * elapsed).
+  Server keeps the authoritative multiplier + crash_point in memory for
+  cashout validation — client never sets balance.
 
-Registered into Flask via init_aviator_engine(app, **deps). Dependencies are
-injected as lazy callables to avoid circular imports and ordering issues:
-  - get_uid()   -> user id from request (app.get_request_uid)
-  - get_gm()    -> GameManager instance
-  - is_vex()    -> bool, games engine enabled
-  - is_pf()     -> bool, provably fair enabled
-  - get_pf()    -> ProvablyFair singleton
+Registered via init_aviator_engine(app, **deps) with lazy dep getters.
 """
 
 import math
@@ -23,10 +24,14 @@ import threading
 import queue as _queue
 from datetime import datetime
 
-GROWTH = 1.004          # per 50ms tick == e^(0.08*t) per second (realistic pacing)
-TICK_RATE = 0.05        # 50ms == 20fps multiplier updates
-BETTING_DURATION = 6    # seconds of betting window
-INSTANT_CRASH_RATE = 0.03  # 3% house edge (R < 0.03 -> instant crash at 1.00x)
+# === Config (v2) ===
+WAITING_DURATION = 5     # seconds — bets accepted
+STARTING_DURATION = 2    # seconds — lock, no new bets
+CRASHED_DURATION = 3     # seconds — show result before next round
+TICK_RATE = 0.05         # 50ms — internal multiplier/auto-cashout check (no broadcast)
+HOUSE_EDGE = 0.03        # 3% house edge
+GROWTH_RATE = 0.07       # mult = e^(0.07 * t_seconds) — matches client formula
+
 
 # Runtime deps (set by init_aviator_engine)
 _gm = None
@@ -35,8 +40,13 @@ _pf = None
 _is_pf = lambda: False
 
 _aviator = {
-    'phase': 'waiting', 'multiplier': 1.0, 'crash_point': 2.0,
-    'round_id': 0, 'bets': {}, 'history': [],
+    'phase': 'idle',           # idle | waiting | starting | flying | crashed
+    'multiplier': 1.0,
+    'crash_point': 2.0,
+    'round_id': 0,
+    'flight_start': 0.0,       # unix ts when flight began (for multiplier calc)
+    'bets': {},
+    'history': [],
     'seed_hash': '', 'client_seed': '', 'server_seed': '',
     'server_ts': 0,
     'request_ids': {},
@@ -61,14 +71,19 @@ def rate_limit(uid, limit=10, window=5.0):
     return True
 
 
-# ===== Provably fair crash point =====
+# ===== Provably fair crash point (v2 formula, 3% house edge) =====
 def _seed_ready():
     """seed_hash + client_seed are committed BEFORE betting opens."""
     return bool(_aviator.get('seed_hash')) and bool(_aviator.get('client_seed'))
 
 
 def calc_crash():
-    """crash = max(1.01, 0.97/(1-R)); 3% of rounds crash instantly at 1.00x."""
+    """Correct crash point with 3% house edge.
+
+    if R < 0.03: crash = 1.00 (instant crash — the 3% edge)
+    else:        crash = (1 - 0.03) / (1 - R)
+    round to 2 decimals. R in [0, 1) from provably-fair HMAC-SHA256.
+    """
     if _is_pf() and _seed_ready():
         try:
             sid = 'avround_%d' % _aviator['round_id']
@@ -77,9 +92,19 @@ def calc_crash():
             r = random.random()
     else:
         r = random.random()
-    if r < INSTANT_CRASH_RATE:
-        return 1.00
-    return round(max(1.01, min(0.97 / (1 - r), 100.0)), 2)
+    if r < HOUSE_EDGE:
+        crash_point = 1.00  # Instant crash (3% house edge)
+    else:
+        crash_point = (1 - HOUSE_EDGE) / (1 - r)
+    return max(1.00, round(crash_point, 2))
+
+
+def current_multiplier():
+    """Authoritative multiplier from flight start: e^(0.07*t)."""
+    if _aviator['phase'] != 'flying':
+        return 1.0
+    elapsed = time.time() - _aviator['flight_start']
+    return max(1.0, math.exp(GROWTH_RATE * elapsed))
 
 
 # ===== SSE broadcast =====
@@ -104,8 +129,8 @@ def _get_name(uid):
 
 # ===== Game loop (daemon thread) =====
 def _game_loop():
-    global BETTING_DURATION
     while True:
+        # ---- WAITING (5s): bets accepted ----
         with _aviator_lock:
             _aviator['phase'] = 'waiting'
             _aviator['multiplier'] = 1.0
@@ -125,24 +150,38 @@ def _game_loop():
                 _aviator['client_seed'] = secrets.token_hex(8)
 
         broadcast({'type': 'waiting', 'round_id': _aviator['round_id'],
-                   'duration': BETTING_DURATION,
+                   'duration': WAITING_DURATION,
                    'history': list(_aviator['history'][-15:]),
                    'seed_hash': _aviator.get('seed_hash', ''),
                    'client_seed': _aviator.get('client_seed', '')})
-        time.sleep(BETTING_DURATION)
+        time.sleep(WAITING_DURATION)
 
+        # ---- STARTING (2s): lock, no new bets ----
+        with _aviator_lock:
+            _aviator['phase'] = 'starting'
+        broadcast({'type': 'starting', 'round_id': _aviator['round_id'],
+                   'duration': STARTING_DURATION})
+        time.sleep(STARTING_DURATION)
+
+        # ---- FLIGHT (dynamic) ----
         crash_pt = calc_crash()
         with _aviator_lock:
             _aviator['phase'] = 'flying'
             _aviator['crash_point'] = crash_pt
-        broadcast({'type': 'flying'})
+            _aviator['flight_start'] = time.time()
 
-        mult = 1.0
+        broadcast({'type': 'flight_start', 'round_id': _aviator['round_id'],
+                   'game_id': 'GAME004',
+                   'server_seed_hash': _aviator.get('seed_hash', ''),
+                   'client_seed': _aviator.get('client_seed', '')})
+
+        # Internal loop — compute authoritative multiplier + auto-cashout
+        # WITHOUT broadcasting every tick (server optimization).
         total_distributed = 0.0
         total_cashed_out = 0
         total_bets = len(_aviator['bets'])
-        while mult < crash_pt:
-            mult *= GROWTH
+        while True:
+            mult = current_multiplier()
             with _aviator_lock:
                 _aviator['multiplier'] = mult
                 for uid, bet in list(_aviator['bets'].items()):
@@ -160,10 +199,11 @@ def _game_loop():
                         broadcast({'type': 'cashout', 'uid': uid,
                                    'name': _get_name(uid), 'amount': round(payout, 2),
                                    'multiplier': round(mult, 2), 'auto': True})
-            broadcast({'type': 'mult', 'multiplier': round(mult, 2)})
+            if mult >= crash_pt:
+                break
             time.sleep(TICK_RATE)
 
-        # Crash phase — reveal seed
+        # ---- CRASHED (3s) ----
         with _aviator_lock:
             _aviator['phase'] = 'crashed'
             _aviator['history'].append(round(crash_pt, 2))
@@ -201,13 +241,13 @@ def _game_loop():
         except Exception:
             pass
 
-        broadcast({'type': 'crash', 'crash_point': round(crash_pt, 2),
+        broadcast({'type': 'crashed', 'crash_point': round(crash_pt, 2),
                    'total_distributed': round(total_distributed, 2),
                    'total_cashed_out': total_cashed_out,
                    'total_bets': total_bets,
                    'server_seed': server_seed or '',
                    'seed_hash': _aviator.get('seed_hash', '')})
-        time.sleep(5)
+        time.sleep(CRASHED_DURATION)
 
 
 # ===== Flask route registration =====
@@ -231,7 +271,9 @@ def init_aviator_engine(app, get_uid, get_gm, get_pf, is_pf, is_vex):
             with _aviator_lock:
                 state = {'type': _aviator['phase'],
                          'multiplier': round(_aviator['multiplier'], 2),
+                         'crash_point': round(_aviator['crash_point'], 2),
                          'round_id': _aviator['round_id'],
+                         'flight_start': _aviator['flight_start'],
                          'history': list(_aviator['history'][-15:])}
             yield 'data: %s\n\n' % json.dumps(state)
             while True:
@@ -260,10 +302,11 @@ def init_aviator_engine(app, get_uid, get_gm, get_pf, is_pf, is_vex):
         auto_val = float(data.get('auto_val', 0) or 0)
         request_id = str(data.get('request_id', '') or '')
         with _aviator_lock:
+            # Bets ONLY during WAITING phase (not starting/flying/crashed)
             if _aviator['phase'] != 'waiting':
                 return jsonify({'error': 'انتهت فترة المراهنة'})
             if (_aviator.get('server_ts')
-                    and time.time() - _aviator['server_ts'] > BETTING_DURATION + 0.1):
+                    and time.time() - _aviator['server_ts'] > WAITING_DURATION + 0.1):
                 return jsonify({'error': 'انتهت نافذة الرهان'})
             if uid in _aviator['bets']:
                 return jsonify({'error': 'لقد راهنت بالفعل'})
@@ -299,7 +342,8 @@ def init_aviator_engine(app, get_uid, get_gm, get_pf, is_pf, is_vex):
                 return jsonify({'error': 'طلب مكرر'}), 409
             if request_id:
                 _aviator['request_ids']['co_'+uid] = request_id
-            mult = _aviator['multiplier']
+            # Server is the SINGLE authority for payout. Client never sets balance.
+            mult = _aviator['multiplier']  # authoritative server multiplier
             if mult >= _aviator['crash_point']:
                 return jsonify({'success': False, 'error': 'انفجرت الطائرة'})
             payout = bet['amount'] * mult
@@ -317,8 +361,10 @@ def init_aviator_engine(app, get_uid, get_gm, get_pf, is_pf, is_vex):
         with _aviator_lock:
             return jsonify({
                 'phase': _aviator['phase'],
-                'multiplier': round(_aviator['multiplier'], 2),
+                'multiplier': round(current_multiplier(), 2),
+                'crash_point': round(_aviator['crash_point'], 2),
                 'round_id': _aviator['round_id'],
+                'flight_start': _aviator['flight_start'],
                 'history': list(_aviator['history'][-15:]),
             })
 

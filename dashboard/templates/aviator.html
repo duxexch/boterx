@@ -147,10 +147,7 @@ let bgScroll = 0, planeX = 0, planeY = 0;
 const PX = 0.35, PY = 0.45;
 let aviatorSSE = null;
 
-// === Multiplier interpolation state ===
-let _lastSSEMult = 1.0;
-let _prevSSEMult = 1.0;
-let _lastSSETime = Date.now();
+// === Multiplier is computed locally — no SSE interpolation needed ===
 let _flyStartT = 0;
 
 function resizeCanvas() { canvas.width = Math.max(1, canvas.clientWidth || window.innerWidth); canvas.height = Math.max(1, canvas.clientHeight || window.innerHeight); }
@@ -314,10 +311,10 @@ function connectSSE() {
     try {
       const d = JSON.parse(e.data);
       if (d.type === 'waiting') onWaiting(d);
-      else if (d.type === 'flying') onFlying(d);
-      else if (d.type === 'mult') onMult(d);
+      else if (d.type === 'starting') onStarting(d);
+      else if (d.type === 'flight_start') onFlightStart(d);
       else if (d.type === 'cashout') onCashoutMsg(d);
-      else if (d.type === 'crash') onCrash(d);
+      else if (d.type === 'crashed') onCrash(d);
     } catch(err) {}
   };
   aviatorSSE.onerror = function() {
@@ -328,7 +325,6 @@ function connectSSE() {
 
 function onWaiting(d) {
   roundPhase = 'waiting'; currentMult = 1.0; trail = [];
-  _lastSSEMult = 1.0; _prevSSEMult = 1.0;
   ctx.clearRect(0,0,canvas.width,canvas.height);
   drawBackground(0); drawRunway(0);
   document.getElementById('multDisplay').classList.add('show');
@@ -359,8 +355,8 @@ function onWaiting(d) {
   }
   // Update history
   if (d.history) { const h = document.getElementById('history'); h.innerHTML = ''; d.history.forEach(v => { const el = document.createElement('div'); el.className = 'hist-item '+(v>=1.5?'hist-win':'hist-lose')+(v>=3?' hist-big':''); el.textContent = v.toFixed(2)+'x'; h.appendChild(el); }); }
-  // Countdown
-  let c = 6;
+  // Countdown — 5 seconds (matches server WAITING_DURATION)
+  let c = 5;
   const tick = () => {
     if (roundPhase !== 'waiting') return;
     const el = document.createElement('div'); el.className = 'countdown'; el.textContent = c;
@@ -373,12 +369,26 @@ function onWaiting(d) {
   syncGameStateMainButton();
 }
 
-function onFlying(d) {
+// ===== STARTING phase (2s lock, no new bets) =====
+function onStarting(d) {
+  roundPhase = 'starting';
+  document.getElementById('statusText').textContent = '🔒 انطلقت الطائرة...';
+  // Disable bet buttons — no new bets accepted
+  for (const s of [1,2]) {
+    var btn = document.getElementById('btn'+s);
+    if (!myBets[s].placed && !myBets[s].queued) {
+      btn.disabled = true; btn.textContent = '⏳'; btn.className = 'bet-slot-btn bet';
+    }
+  }
+  syncGameStateMainButton();
+}
+
+// ===== FLIGHT_START — client computes multiplier locally =====
+// Server sends ONE event. Client calculates: mult = e^(0.07 * elapsed_seconds)
+function onFlightStart(d) {
   roundPhase = 'flying';
-  startT = Date.now();
-  _flyStartT = Date.now();
-  _lastSSETime = Date.now(); // CRITICAL: reset SSE timer so interpolation starts fresh
-  _lastSSEMult = 1.0; _prevSSEMult = 1.0;
+  startT = performance.now();  // high-res timer for animation
+  _flyStartT = startT;
   trail = []; bgScroll = 0;
   pickWeather();
   document.getElementById('multDisplay').classList.remove('show');
@@ -400,32 +410,12 @@ function onFlying(d) {
   syncGameStateMainButton();
 }
 
-// === SSE multiplier handler — feeds the interpolation ===
-function onMult(d) {
-  _prevSSEMult = _lastSSEMult;
-  _lastSSEMult = d.multiplier;
-  _lastSSETime = Date.now();
-  currentMult = d.multiplier;
-}
-
-// === Single animate() — 60fps interpolation of SSE multiplier ===
+// === Local multiplier — NO SSE per-tick. Pure client-side calculation ===
 function animate() {
   if (roundPhase !== 'flying') return;
-  var now = Date.now();
-  var elapsed = now - _lastSSETime;
-  var tickInterval = 50; // server sends every 50ms
-  // Interpolate between prev and latest SSE value
-  var lerpT = Math.min(1, elapsed / tickInterval);
-  var mult = _prevSSEMult + (_lastSSEMult - _prevSSEMult) * lerpT;
-  // If no SSE update received yet (first 50ms), grow from 1.0
-  if (_lastSSETime <= _flyStartT) {
-    var flyElapsed = (now - _flyStartT) / 1000;
-    mult = Math.pow(1.004, flyElapsed * 20);
-  }
-  // Fallback: if SSE gap > 100ms, grow locally using same formula
-  if (elapsed > 100) {
-    mult = _lastSSEMult * Math.pow(1.004, (elapsed - 100) / 50);
-  }
+  var elapsed = (performance.now() - _flyStartT) / 1000;  // seconds
+  // mult = e^(0.07 * elapsed) — matches server formula exactly
+  var mult = Math.pow(Math.E, 0.07 * elapsed);
   mult = Math.max(1.0, mult);
   currentMult = mult;
   document.getElementById('mult').textContent = mult.toFixed(2) + 'x';
@@ -435,7 +425,7 @@ function animate() {
     if (myBets[s].placed && !myBets[s].cashed && myBets[s].autoVal > 0 && mult >= myBets[s].autoVal) doCashout(s);
   }
   const cx = canvas.width * PX, cy = canvas.height * PY;
-  const e = (now - startT) / 1000;
+  const e = elapsed;
   const takeoffDur = 3.5;
   if (e < takeoffDur) {
     const p = e / takeoffDur; const eased = p*p*(3-2*p);
@@ -447,7 +437,6 @@ function animate() {
   ctx.clearRect(0,0,canvas.width,canvas.height);
   drawBackground(alt);
   drawRunway(alt);
-  // Draw exhaust trail (replaces old green line)
   const angle22 = 22 * Math.PI / 180;
   let angle = e < takeoffDur ? -(angle22 * (1 - (e/takeoffDur) * 0.5)) : -(8 * Math.PI / 180) + Math.sin(e * 1.5) * 0.03;
   drawExhaustTrail(planeX, planeY, angle);
@@ -506,8 +495,8 @@ function placeBet(slot) {
   if (amt < 1) { showToast('أدخل مبلغ الرهان', 'error'); return; }
   var autoVal = parseFloat(document.getElementById('autoVal'+slot).value) || 0;
 
-  // If flying or crashed — QUEUE the bet for next round (like real Aviator)
-  if (roundPhase === 'flying' || roundPhase === 'crashed') {
+  // If starting/flying/crashed — QUEUE the bet for next round (like real Aviator)
+  if (roundPhase === 'starting' || roundPhase === 'flying' || roundPhase === 'crashed') {
     myBets[slot].queued = true;
     myBets[slot].amount = amt;
     myBets[slot].autoVal = autoVal;
@@ -634,6 +623,7 @@ function syncGameStateMainButton() {
       hideMainButton();
     }
   } else {
+    // starting, crashed, connecting — hide button
     hideMainButton();
   }
 }
