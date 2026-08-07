@@ -146,6 +146,102 @@ ALLOW_DEV_AUTH = os.getenv('ALLOW_DEV_AUTH', '').lower() in ('1', 'true', 'yes')
 _APP_ENV = os.getenv('APP_ENV', os.getenv('FLASK_ENV', 'development')).lower()
 _IS_PRODUCTION = (_APP_ENV == 'production')
 
+# ── Alert token for lockdown notifications ───────────────────────────────────
+# ALERT_BOT_TOKEN: a separate bot token used ONLY to send lockdown alerts.
+# Falls back to BOT_TOKEN if already loaded, then tries .env.
+# This lets the dashboard alert admins even when the main BOT_TOKEN is missing,
+# provided a dedicated alert bot token is available.
+ALERT_BOT_TOKEN = os.getenv('ALERT_BOT_TOKEN', '')
+if not ALERT_BOT_TOKEN:
+    try:
+        env_path = os.path.join(BASE_DIR, '.env')
+        if os.path.exists(env_path):
+            with open(env_path, 'r', encoding='utf-8') as _ef:
+                for _line in _ef:
+                    _line = _line.strip()
+                    if _line.startswith('ALERT_BOT_TOKEN='):
+                        ALERT_BOT_TOKEN = _line.split('=', 1)[1].strip()
+                        break
+    except Exception:
+        pass
+
+_LOCKDOWN_SENTINEL = '/tmp/boterx_lockdown'
+
+
+def _send_lockdown_alert():
+    """Send a Telegram alert to every admin when the game API is locked down.
+
+    Called in a background daemon thread so it never blocks startup.
+    Tries ALERT_BOT_TOKEN first (dedicated alert bot), then the main BOT_TOKEN
+    read from .env.  If no token is available at all, writes a sentinel file
+    at /tmp/boterx_lockdown so external health-check scripts can detect the
+    outage without Telegram access.
+    """
+    import urllib.request as _ur
+    import urllib.error as _ue
+
+    token = ALERT_BOT_TOKEN or BOT_TOKEN
+    msg = (
+        "⚠️ *SECURITY LOCKDOWN* ⚠️\n\n"
+        "BOT\\_TOKEN is missing in production — the game API is *DISABLED*.\n"
+        "All game endpoints are returning 503 until BOT\\_TOKEN is restored.\n\n"
+        f"Host: `{os.uname().nodename}`\n"
+        f"Time: `{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}`\n\n"
+        "Fix: set `BOT_TOKEN` in your production environment and restart the dashboard."
+    )
+
+    sent = False
+    if token and ADMIN_IDS:
+        for admin_uid in ADMIN_IDS:
+            try:
+                payload = json.dumps({
+                    'chat_id': admin_uid,
+                    'text': msg,
+                    'parse_mode': 'Markdown'
+                }).encode('utf-8')
+                req = _ur.Request(
+                    f'https://api.telegram.org/bot{token}/sendMessage',
+                    data=payload,
+                    headers={'Content-Type': 'application/json'},
+                    method='POST'
+                )
+                with _ur.urlopen(req, timeout=10) as resp:
+                    if resp.status == 200:
+                        sent = True
+                        _auth_logger.info(
+                            "Lockdown alert sent to admin %s via Telegram.", admin_uid
+                        )
+            except _ue.HTTPError as e:
+                _auth_logger.error(
+                    "Lockdown alert HTTP error for admin %s: %s", admin_uid, e
+                )
+            except Exception as e:
+                _auth_logger.error(
+                    "Lockdown alert failed for admin %s: %s", admin_uid, e
+                )
+    elif not token:
+        _auth_logger.warning(
+            "Lockdown alert: no ALERT_BOT_TOKEN or BOT_TOKEN available — "
+            "cannot send Telegram notification."
+        )
+    elif not ADMIN_IDS:
+        _auth_logger.warning(
+            "Lockdown alert: ADMIN_USER_IDS is empty — no admins to notify."
+        )
+
+    # Always write sentinel file so external monitors can detect the outage
+    try:
+        with open(_LOCKDOWN_SENTINEL, 'w') as _sf:
+            _sf.write(
+                f"LOCKDOWN={datetime.now().isoformat()}\n"
+                f"REASON=BOT_TOKEN_MISSING\n"
+                f"TELEGRAM_SENT={'yes' if sent else 'no'}\n"
+            )
+        _auth_logger.info("Lockdown sentinel written to %s", _LOCKDOWN_SENTINEL)
+    except Exception as e:
+        _auth_logger.error("Failed to write lockdown sentinel: %s", e)
+
+
 # ── Startup safety check ─────────────────────────────────────────────────────
 # Rule: in production, BOT_TOKEN is ALWAYS required.
 # ALLOW_DEV_AUTH is never consulted in production — it cannot override this.
@@ -169,6 +265,11 @@ if not BOT_TOKEN:
                 "in production. It cannot override the BOT_TOKEN requirement."
             )
         _WEBAPP_AUTH_LOCKED_DOWN = True
+
+        # Notify admins in a background thread — must not block startup
+        _alert_thread = threading.Thread(target=_send_lockdown_alert, daemon=True)
+        _alert_thread.start()
+
     elif ALLOW_DEV_AUTH:
         _auth_logger.warning(
             "DEV AUTH MODE ACTIVE (non-production): ALLOW_DEV_AUTH=true — "
@@ -181,6 +282,15 @@ if not BOT_TOKEN:
             "will reject all requests with 403. Set ALLOW_DEV_AUTH=true for local dev."
         )
 else:
+    # Clean up any stale sentinel from a previous lockdown episode
+    try:
+        if os.path.exists(_LOCKDOWN_SENTINEL):
+            os.remove(_LOCKDOWN_SENTINEL)
+            _auth_logger.info(
+                "Stale lockdown sentinel removed — BOT_TOKEN is now present."
+            )
+    except Exception:
+        pass
     _auth_logger.info("BOT_TOKEN loaded — HMAC validation active for game endpoints.")
 
 # ── initData max age ─────────────────────────────────────────────────────────
@@ -5916,6 +6026,38 @@ def api_games_live_players_stream():
             time.sleep(3)
     return Response(generate(), mimetype='text/event-stream',
                     headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
+
+# ===== Health Check =====
+
+@app.route('/health')
+def health_check():
+    """Lightweight health endpoint for uptime monitors (UptimeRobot, etc.).
+
+    Returns 200 OK when the service is healthy, 503 when the game API is
+    locked down due to a missing BOT_TOKEN in production.
+
+    Response body (JSON):
+      {
+        "status":      "ok" | "locked_down",
+        "app_env":     "production" | "development" | ...,
+        "bot_token":   "configured" | "missing",
+        "game_api":    "enabled" | "disabled",
+        "sentinel":    true | false,   // sentinel file present on disk
+        "timestamp":   "2026-..."
+      }
+    """
+    sentinel_present = os.path.exists(_LOCKDOWN_SENTINEL)
+    body = {
+        'status':    'locked_down' if _WEBAPP_AUTH_LOCKED_DOWN else 'ok',
+        'app_env':   _APP_ENV,
+        'bot_token': 'missing' if not BOT_TOKEN else 'configured',
+        'game_api':  'disabled' if _WEBAPP_AUTH_LOCKED_DOWN else 'enabled',
+        'sentinel':  sentinel_present,
+        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+    }
+    status_code = 503 if _WEBAPP_AUTH_LOCKED_DOWN else 200
+    return jsonify(body), status_code
+
 
 # ===== Main =====
 
