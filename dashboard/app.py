@@ -4054,92 +4054,8 @@ def webapp_crash():
     lang = request.args.get('lang', 'ar')
     return render_template('crash.html', uid=uid, lang=lang)
 
-@app.route('/api/engine/crash/start', methods=['POST'])
-@webapp_auth
-def api_crash_start():
-    if not _VEX_GAMES:
-        return jsonify({'error': 'Games engine not available'}), 500
-    data = request.json
-    uid = get_request_uid()
-    bet_amount = float(data.get('bet_amount', 0))
-    if not uid or bet_amount <= 0:
-        return jsonify({'error': 'Missing params'}), 400
-
-    player = _gm.tracker.get_profile(uid)
-    game = _gm.get_game('GAME005')
-    if not game:
-        game = {'id': 'GAME005', 'base_win_chance': '0.42', 'house_edge_pct': '17', 'min_bet': '10', 'max_bet': '5000'}
-
-    risk_check = _gm.risk.check_risk(player, bet_amount, game)
-    if not risk_check['allowed']:
-        return jsonify({'success': False, 'error': risk_check['alerts'][0]['message'] if risk_check['alerts'] else 'محظور'})
-
-    balance = _gm.get_balance(uid)
-    if balance < bet_amount:
-        return jsonify({'success': False, 'error': 'رصيد غير كافٍ', 'need_deposit': True, 'balance': balance})
-
-    import random as _rng
-    house_edge = float(game.get('house_edge_pct', 17)) / 100
-    algo_result = _gm.algorithm.calculate_win_chance(player, game, bet_amount)
-    win_chance = algo_result['win_chance']
-
-    if win_chance > 0.8:
-        crash_point = _rng.uniform(3.0, 15.0)
-    elif win_chance > 0.6:
-        crash_point = _rng.uniform(2.0, 6.0)
-    elif win_chance > 0.4:
-        crash_point = _rng.uniform(1.3, 3.5)
-    elif win_chance > 0.2:
-        crash_point = _rng.uniform(1.05, 2.0)
-    else:
-        crash_point = _rng.uniform(1.00, 1.3)
-    crash_point = max(1.0, crash_point * (1 - house_edge * 0.3))
-
-    success, balance_after = _gm.deduct_balance(uid, bet_amount)
-    if not success:
-        return jsonify({'success': False, 'error': 'رصيد غير كافٍ', 'need_deposit': True, 'balance': 0})
-
-    session_id = f"CRSH{str(int(datetime.now().timestamp()))[-8:]}"
-    _gm.algorithm.log_decision(
-        session_id=session_id, user_id=uid, game_id='GAME005',
-        base_chance=float(game.get('base_win_chance', 0.42)),
-        adjusted_chance=win_chance, factors=algo_result['factors'],
-        decision=algo_result['decision'],
-        reason=f"Crash crash_point={crash_point:.2f}; {algo_result['reason']}"
-    )
-    return jsonify({'success': True, 'session_id': session_id, 'crash_point': round(crash_point, 2), 'balance_before': balance, 'balance_after': balance_after})
-
-@app.route('/api/engine/crash/cashout', methods=['POST'])
-@webapp_auth
-def api_crash_cashout():
-    if not _VEX_GAMES:
-        return jsonify({'error': 'Games engine not available'}), 500
-    data = request.json
-    session_id = data.get('session_id', '')
-    uid = get_request_uid()
-    multiplier = float(data.get('multiplier', 1.0))
-    bet_amount = float(data.get('bet_amount', 0))
-    payout = bet_amount * multiplier
-    new_balance = _gm.add_balance(uid, payout)
-    return jsonify({'success': True, 'payout': payout, 'multiplier': multiplier, 'balance_after': new_balance})
-
-@app.route('/api/engine/crash/end', methods=['POST'])
-@webapp_auth
-def api_crash_end():
-    if not _VEX_GAMES:
-        return jsonify({'error': 'Games engine not available'}), 500
-    data = request.json
-    uid = get_request_uid()
-    crash_point = float(data.get('crash_point', 1.0))
-    cashed_out = data.get('cashed_out', False)
-    multiplier = float(data.get('multiplier', 0))
-    bet_amount = float(data.get('bet_amount', 0))
-    session_id = data.get('session_id', '')
-    result = 'win' if cashed_out else 'lose'
-    payout = bet_amount * multiplier if cashed_out else 0
-    _gm.tracker.log_session({'session_id': session_id, 'game_id': 'GAME005', 'user_id': uid, 'bet_amount': bet_amount, 'payout': payout, 'result': result, 'balance_before': 0, 'balance_after': _gm.get_balance(uid), 'multiplier': multiplier})
-    _gm.tracker.update_profile(uid, {'bet_amount': bet_amount, 'payout': payout, 'result': result, 'game_id': 'GAME005', 'balance_after': _gm.get_balance(uid)})
-    return jsonify({'success': True, 'result': result, 'payout': payout})
+# Crash game logic now lives in dashboard/crash_engine.py
+# Legacy /api/engine/crash/* endpoints removed — replaced by global round system.
 
 # ===== Mines — WebApp + API =====
 
@@ -4855,6 +4771,20 @@ try:
     )
 except Exception as _av_init_err:
     print('WARNING: aviator_engine init failed:', _av_init_err)
+
+# ===== Crash engine — separated into dashboard/crash_engine.py =====
+try:
+    from crash_engine import init_crash_engine
+    init_crash_engine(
+        app,
+        get_uid=get_request_uid,
+        get_gm=lambda: _gm,
+        get_pf=lambda: _pf,
+        is_pf=lambda: _PROVABLY_FAIR,
+        is_vex=lambda: _VEX_GAMES,
+    )
+except Exception as _cr_init_err:
+    print('WARNING: crash_engine init failed:', _cr_init_err)
 
 # ===== Provably Fair System =====
 
