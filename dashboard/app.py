@@ -4838,274 +4838,23 @@ def webapp_stats():
     """Player statistics page — WebApp"""
     return render_template('stats.html')
 
-# ===== Global Aviator Round System (1xBet style — all players, same round) =====
-import math as _avmath
-import time as _avtime
-
-_aviator = {
-    'phase': 'waiting', 'multiplier': 1.0, 'crash_point': 2.0,
-    'round_id': 0, 'bets': {}, 'history': [],
-    # Provably fair commitment
-    'seed_hash': '', 'client_seed': '', 'server_seed': '',
-    'server_ts': 0,  # server timestamp when waiting started
-    'request_ids': {},  # uid -> last request_id (replay protection per uid then round)
-}
-_aviator_lock = threading.Lock()
-_aviator_sse_queues = []
-_aviator_sse_lock = threading.Lock()
-_aviator_rate = {}  # uid -> list of timestamps (simple rate limiter)
-AV_BETTING_DURATION = 6  # module-level — used by endpoints
-
-def _av_rate_limit(uid, limit=10, window=5.0):
-    """Allow max `limit` requests per `window` seconds per uid."""
-    now = _avtime.time()
-    hits = _aviator_rate.get(uid, [])
-    hits = [h for h in hits if now - h < window]
-    if len(hits) >= limit:
-        _aviator_rate[uid] = hits
-        return False
-    hits.append(now)
-    _aviator_rate[uid] = hits
-    return True
-
-def _av_calc_crash():
-    """Calculate crash point using provably fair HMAC-SHA256.
-
-    Formula: crash = max(1.01, 0.97 / (1 - R))
-    where R ∈ [0, 1) from HMAC-SHA256(server_seed, client_seed:nonce).
-    3% instant crash (R < 0.03 → crash at 1.00x) = house edge.
-    """
-    if _PROVABLY_FAIR and _av_seed_ready():
-        try:
-            sid = 'avround_%d' % _aviator['round_id']
-            res = _pf.generate_float(sid, 0.0, 1.0)
-            r = res['value']
-        except:
-            r = random.random()
-    else:
-        r = random.random()
-    if r < 0.03:
-        return 1.00
-    return round(max(1.01, min(0.97 / (1 - r), 100.0)), 2)
-
-def _av_seed_ready():
-    """Check if provably fair commitment exists for this round.
-
-    seed_hash + client_seed are set BEFORE betting opens.
-    server_seed is only revealed AFTER crash — so we check seed_hash.
-    """
-    return bool(_aviator.get('seed_hash')) and bool(_aviator.get('client_seed'))
-
-def _av_broadcast(msg):
-    payload = json.dumps(msg)
-    with _aviator_sse_lock:
-        for q in _aviator_sse_queues:
-            try: q.put_nowait(payload)
-            except: pass
-
-def _av_get_name(uid):
-    try:
-        from db_manager import _gdb
-        row = _gdb.get_user_row(uid)
-        return row.get('name', '') if row else ''
-    except: return ''
-
-def _aviator_loop():
-    # Growth rate: 1.004 per 50ms tick = e^(0.08*t) per second
-    # At 1s: 1.08x, 3s: 1.27x, 5s: 1.49x, 10s: 2.22x, 20s: 4.95x, 30s: 11.0x
-    # This matches real Aviator pacing — players have time to react and cash out
-    GROWTH = 1.004
-    TICK_RATE = 0.05  # 50ms = 20fps updates
-    BETTING_DURATION = 6  # 6 second countdown (module-level ref used in endpoints)
-    global AV_BETTING_DURATION
-    AV_BETTING_DURATION = BETTING_DURATION
-    while True:
-        with _aviator_lock:
-            _aviator['phase'] = 'waiting'
-            _aviator['multiplier'] = 1.0
-            _aviator['round_id'] += 1
-            _aviator['bets'] = {}
-            _aviator['request_ids'] = {}
-            _aviator['server_ts'] = _avtime.time()  # authoritative betting window start
-            # Generate provably fair commitment BEFORE opening bets
-            try:
-                if _PROVABLY_FAIR:
-                    sid = 'avround_%d' % _aviator['round_id']
-                    cs = secrets.token_hex(8)
-                    seed_info = _pf.create_session(sid, cs)
-                    _aviator['seed_hash'] = seed_info['seed_hash']
-                    _aviator['client_seed'] = seed_info['client_seed']
-            except:
-                _aviator['seed_hash'] = ''
-                _aviator['client_seed'] = secrets.token_hex(8)
-        _av_broadcast({'type': 'waiting', 'round_id': _aviator['round_id'], 'duration': BETTING_DURATION,
-                       'history': list(_aviator['history'][-15:]),
-                       'seed_hash': _aviator.get('seed_hash', ''),
-                       'client_seed': _aviator.get('client_seed', '')})
-        _avtime.sleep(BETTING_DURATION)
-
-        crash_pt = _av_calc_crash()
-        with _aviator_lock:
-            _aviator['phase'] = 'flying'
-            _aviator['crash_point'] = crash_pt
-        _av_broadcast({'type': 'flying'})
-
-        mult = 1.0
-        total_distributed = 0.0
-        total_cashed_out = 0
-        total_bets = 0
-        with _aviator_lock:
-            total_bets = len(_aviator['bets'])
-        while mult < crash_pt:
-            mult *= GROWTH
-            with _aviator_lock:
-                _aviator['multiplier'] = mult
-                for uid, bet in list(_aviator['bets'].items()):
-                    if not bet['cashed_out'] and bet.get('auto_val', 0) > 0 and mult >= bet['auto_val']:
-                        payout = bet['amount'] * mult
-                        try: bal = _gm.add_balance(uid, payout)
-                        except: bal = 0
-                        bet['cashed_out'] = True
-                        bet['cash_mult'] = mult
-                        total_distributed += payout
-                        total_cashed_out += 1
-                        _av_broadcast({'type': 'cashout', 'uid': uid, 'name': _av_get_name(uid), 'amount': round(payout, 2), 'multiplier': round(mult, 2), 'auto': True})
-            _av_broadcast({'type': 'mult', 'multiplier': round(mult, 2)})
-            _avtime.sleep(TICK_RATE)
-
-        # Crash phase — update state, reveal seed
-        with _aviator_lock:
-            _aviator['phase'] = 'crashed'
-            _aviator['history'].append(round(crash_pt, 2))
-            if len(_aviator['history']) > 50: _aviator['history'].pop(0)
-            # Reveal server seed AFTER crash (provably fair)
-            server_seed = ''
-            try:
-                if _PROVABLY_FAIR and _aviator.get('seed_hash'):
-                    sid = 'avround_%d' % _aviator['round_id']
-                    rev = _pf.reveal_seed(sid)
-                    if rev: server_seed = rev.get('server_seed', '')
-            except:
-                server_seed = ''
-            _aviator['server_seed'] = server_seed
-        # Log round to DB (audit trail)
-        try:
-            from db_manager import _gdb
-            conn = _gdb._conn()
-            conn.execute('''
-                INSERT INTO aviator_rounds (round_id, crash_point, seed_hash, client_seed, server_seed,
-                    bet_count, total_wagered, total_distributed, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                _aviator['round_id'], round(crash_pt, 2),
-                _aviator.get('seed_hash', ''), _aviator.get('client_seed', ''),
-                server_seed or '',
-                total_bets,
-                round(sum(b['amount'] for b in _aviator['bets'].values()), 2),
-                round(total_distributed, 2),
-                datetime.now().isoformat()
-            ))
-            conn.commit()
-        except:
-            pass
-        # Broadcast crash with total distributed profits + revealed seed
-        _av_broadcast({'type': 'crash', 'crash_point': round(crash_pt, 2), 'total_distributed': round(total_distributed, 2), 'total_cashed_out': total_cashed_out, 'total_bets': total_bets,
-                       'server_seed': server_seed or '', 'seed_hash': _aviator.get('seed_hash', '')})
-        _avtime.sleep(5)
-
-_aviator_thread = threading.Thread(target=_aviator_loop, daemon=True)
-_aviator_thread.start()
-
-@app.route('/api/aviator/stream')
-def api_aviator_stream():
-    """SSE: All players see the same round — like 1xBet"""
-    q = _queue.Queue()
-    with _aviator_sse_lock:
-        _aviator_sse_queues.append(q)
-    def generate():
-        with _aviator_lock:
-            state = {'type': _aviator['phase'], 'multiplier': round(_aviator['multiplier'], 2), 'round_id': _aviator['round_id'], 'history': list(_aviator['history'][-15:])}
-        yield f"data: {json.dumps(state)}\n\n"
-        while True:
-            try: yield f"data: {q.get(timeout=15)}\n\n"
-            except _queue.Empty: yield f"data: {json.dumps({'type': 'heartbeat'})}\n\n"
-    try:
-        return Response(generate(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
-    finally:
-        with _aviator_sse_lock:
-            if q in _aviator_sse_queues: _aviator_sse_queues.remove(q)
-
-@app.route('/api/aviator/bet', methods=['POST'])
-def api_aviator_bet():
-    """Place bet during waiting phase (global round) — server-authoritative"""
-    uid = get_request_uid()
-    if not uid: return jsonify({'error': 'No uid'}), 400
-    # Rate limit
-    if not _av_rate_limit(uid): return jsonify({'error': 'طلبات كثيرة، انتظر قليلاً'}), 429
-    data = request.json or {}
-    amount = float(data.get('bet_amount', 0))
-    auto_val = float(data.get('auto_val', 0) or 0)
-    request_id = str(data.get('request_id', '') or '')
-    with _aviator_lock:
-        # Server-authoritative time check (reject late bets even by 50ms)
-        if _aviator['phase'] != 'waiting':
-            return jsonify({'error': 'انتهت فترة المراهنة'})
-        # Server timestamp validation — betting window must be open
-        if _aviator.get('server_ts') and (_avtime.time() - _aviator['server_ts'] > AV_BETTING_DURATION + 0.1):
-            return jsonify({'error': 'انتهت نافذة الرهان'})
-        if uid in _aviator['bets']:
-            return jsonify({'error': 'لقد راهنت بالفعل'})
-        if not _VEX_GAMES: return jsonify({'error': 'Games not available'}), 500
-        # Replay protection: unique request_id per uid per round
-        if request_id and _aviator['request_ids'].get(uid) == request_id:
-            return jsonify({'error': 'طلب مكرر'}), 409
-        if request_id:
-            _aviator['request_ids'][uid] = request_id
-        success, balance = _gm.deduct_balance(uid, amount)
-        if not success: return jsonify({'need_deposit': True, 'error': 'رصيد غير كافٍ'})
-        _aviator['bets'][uid] = {'amount': amount, 'cashed_out': False, 'cash_mult': 0, 'auto_val': auto_val}
-    return jsonify({'success': True, 'balance_after': balance})
-
-@app.route('/api/aviator/cashout', methods=['POST'])
-def api_aviator_cashout_global():
-    """Cash out during flying phase (global round) — server-authoritative"""
-    uid = get_request_uid()
-    if not uid: return jsonify({'error': 'No uid'}), 400
-    if not _av_rate_limit(uid): return jsonify({'error': 'طلبات كثيرة'}), 429
-    data = request.json or {}
-    request_id = str(data.get('request_id', '') or '')
-    with _aviator_lock:
-        if _aviator['phase'] != 'flying': return jsonify({'error': 'لا يمكن السحب الآن'})
-        bet = _aviator['bets'].get(uid)
-        if not bet or bet['cashed_out']: return jsonify({'error': 'لا يوجد رهان نشط'})
-        # Replay protection
-        if request_id and _aviator['request_ids'].get('co_'+uid) == request_id:
-            return jsonify({'error': 'طلب مكرر'}), 409
-        if request_id:
-            _aviator['request_ids']['co_'+uid] = request_id
-        # Use authoritative server multiplier at time of request
-        mult = _aviator['multiplier']
-        # If game already crashed on server (mult >= crash_point), reject
-        if mult >= _aviator['crash_point']:
-            return jsonify({'success': False, 'error': 'انفجرت الطائرة'})
-        payout = bet['amount'] * mult
-        balance = _gm.add_balance(uid, payout)
-        bet['cashed_out'] = True
-        bet['cash_mult'] = mult
-        name = _av_get_name(uid)
-    _av_broadcast({'type': 'cashout', 'uid': uid, 'name': name, 'amount': round(payout, 2), 'multiplier': round(mult, 2)})
-    return jsonify({'success': True, 'payout': round(payout, 2), 'multiplier': round(mult, 2), 'balance_after': balance})
-
-@app.route('/api/aviator/state')
-def api_aviator_state():
-    """Get current round state (for new connections)"""
-    with _aviator_lock:
-        return jsonify({
-            'phase': _aviator['phase'],
-            'multiplier': round(_aviator['multiplier'], 2),
-            'round_id': _aviator['round_id'],
-            'history': list(_aviator['history'][-15:]),
-        })
+# ===== Aviator engine — separated into dashboard/aviator_engine.py =====
+# All Aviator state, game loop, SSE stream, bet/cashout/state routes now live
+# in their own module. We register them here with lazy dep getters so module
+# load order (provably_fair / _gm are defined later in this file) is safe:
+# lambdas resolve at request time, not import time.
+try:
+    from aviator_engine import init_aviator_engine
+    init_aviator_engine(
+        app,
+        get_uid=get_request_uid,
+        get_gm=lambda: _gm,
+        get_pf=lambda: _pf,
+        is_pf=lambda: _PROVABLY_FAIR,
+        is_vex=lambda: _VEX_GAMES,
+    )
+except Exception as _av_init_err:
+    print('WARNING: aviator_engine init failed:', _av_init_err)
 
 # ===== Provably Fair System =====
 
@@ -5118,6 +4867,16 @@ except:
     _PROVABLY_FAIR = False
     _pf = None
 
+@app.route('/api/provably-fair/seed')
+@webapp_auth
+def api_provably_fair_seed():
+    """Get or create provably fair seed hash for a session"""
+    if not _PROVABLY_FAIR:
+        return jsonify({'error': 'Provably fair not available'}), 500
+    session_id = request.args.get('session_id', '')
+    client_seed = request.args.get('client_seed', '')
+    if not session_id:
+        session_id = f"pf_{secrets.token_hex(8)}"
 @app.route('/api/provably-fair/seed')
 @webapp_auth
 def api_provably_fair_seed():
