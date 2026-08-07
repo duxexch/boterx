@@ -155,6 +155,13 @@ class BotDatabase:
         cur = self._conn().execute("SELECT user_id, state FROM user_states")
         return {row[0]: row[1] for row in cur.fetchall()}
 
+    def get_all_user_states_with_timestamps(self) -> list:
+        """Return list of (user_id, state, updated_at_iso) for all rows."""
+        cur = self._conn().execute(
+            "SELECT user_id, state, updated_at FROM user_states"
+        )
+        return [(row[0], row[1], row[2]) for row in cur.fetchall()]
+
     # ---- CSV-backed table operations ----------------------------------
 
     def csv_read(self, filename: str) -> list:

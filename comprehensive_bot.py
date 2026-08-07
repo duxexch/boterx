@@ -11,7 +11,7 @@ import logging
 import threading
 import time
 import zipfile
-from datetime import datetime
+from datetime import datetime, timezone
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 # تحميل dotenv قبل استخدام أي متغيرات
@@ -146,6 +146,13 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
 
         # بدء نظام النسخ الاحتياطي التلقائي
         self.start_backup_scheduler()
+
+        # بدء استرداد المعاملات المعلّقة بعد 15 ثانية من انطلاق البوت
+        # (نمنح وقتاً للبوت كي يتجهز ثم نرسل إشعارات الاسترداد)
+        _recovery_timer = threading.Timer(15.0, self._recover_pending_states)
+        _recovery_timer.daemon = True
+        _recovery_timer.start()
+        logger.info("مجدول: استرداد المعاملات المعلّقة بعد 15 ثانية")
 
         # قاموس الترجمات للنصوص الثابتة. يمكن إضافة المزيد لاحقاً.
         # يستخدم المفاتيح لتعريف النص، ويحتوي على ترجمات للعربية والانجليزية.
@@ -11618,6 +11625,141 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             backup_thread.start()
             logger.info("تم بدء نظام النسخ الاحتياطي التلقائي (كل 6 ساعات)")
         
+    def _recover_pending_states(self):
+        """فحص المعاملات المعلّقة والجلسات المتوقفة عند إعادة التشغيل.
+
+        تعمل في خيط خلفي بعد 15 ثانية من بدء البوت.
+        ثلاثة سيناريوهات:
+          • جلسة FSM متوقفة (5-30 دقيقة): إشعار باستئناف
+          • جلسة FSM قديمة (> 30 دقيقة): إلغاء تلقائي + إشعار
+          • معاملة pending في transactions.csv بلا جلسة مقابلة: تذكير
+        """
+        try:
+            logger.info("🔄 بدء استرداد المعاملات المعلّقة...")
+            now = datetime.now(timezone.utc)
+            FIVE_MIN   = 5   * 60
+            THIRTY_MIN = 30  * 60
+            TWENTY4_H  = 24  * 60 * 60
+
+            # ── 1. فحص جلسات FSM المعلّقة ─────────────────────────────────
+            flow_prefixes = ('deposit_', 'withdraw_')
+            all_states = self._db.get_all_user_states_with_timestamps()  # [(uid, state, ts)]
+            for uid, state, updated_at_iso in all_states:
+                if not any(state.startswith(p) for p in flow_prefixes):
+                    continue
+                try:
+                    updated_at = datetime.fromisoformat(updated_at_iso)
+                    if updated_at.tzinfo is None:
+                        updated_at = updated_at.replace(tzinfo=timezone.utc)
+                    age = (now - updated_at).total_seconds()
+                except Exception:
+                    age = 0
+
+                if age < FIVE_MIN:
+                    continue  # جلسة نشطة، لا تتدخل
+
+                flow_type = 'إيداع' if state.startswith('deposit_') else 'سحب'
+
+                if age >= TWENTY4_H:
+                    # إلغاء تلقائي بعد 24 ساعة
+                    try:
+                        del self.user_states[uid]
+                    except Exception:
+                        pass
+                    try:
+                        self.send_message(
+                            uid,
+                            f"⚠️ <b>جلسة {flow_type} منتهية</b>\n\n"
+                            f"انتهت صلاحية جلسة {flow_type} المفتوحة (أكثر من 24 ساعة).\n"
+                            f"يرجى بدء طلب جديد عبر /start"
+                        )
+                    except Exception as e:
+                        logger.warning(f"recovery: فشل إشعار إلغاء جلسة {uid}: {e}")
+
+                elif age >= THIRTY_MIN:
+                    # تنبيه: جلسة متوقفة أكثر من 30 دقيقة
+                    try:
+                        self.send_message(
+                            uid,
+                            f"⏸️ <b>جلسة {flow_type} متوقفة</b>\n\n"
+                            f"يبدو أن جلسة {flow_type} الخاصة بك توقفت منذ {int(age//60)} دقيقة.\n"
+                            f"أرسل أي رسالة لمتابعة الطلب، أو /start لبدء جلسة جديدة."
+                        )
+                    except Exception as e:
+                        logger.warning(f"recovery: فشل إشعار جلسة متوقفة {uid}: {e}")
+
+                else:
+                    # 5-30 دقيقة: إشعار خفيف فقط
+                    try:
+                        self.send_message(
+                            uid,
+                            f"🔔 <b>متابعة طلب {flow_type}</b>\n\n"
+                            f"لديك طلب {flow_type} لم يكتمل — أرسل أي رسالة للمتابعة."
+                        )
+                    except Exception as e:
+                        logger.warning(f"recovery: فشل إشعار متابعة {uid}: {e}")
+
+            # ── 2. فحص معاملات pending بلا جلسة FSM مقابلة ──────────────
+            try:
+                transactions = self.safe_csv_read('transactions.csv')
+            except Exception:
+                transactions = []
+
+            pending_statuses = {'pending', 'pending_code_verification'}
+            notified_uids_pending = set()
+
+            for tx in transactions:
+                status = tx.get('status', '').strip().lower()
+                if status not in pending_statuses:
+                    continue
+                tx_uid = str(tx.get('telegram_id', '')).strip()
+                if not tx_uid or tx_uid in notified_uids_pending:
+                    continue
+
+                # تحقق من أن المعاملة قديمة بما يكفي (> 5 دقائق)
+                tx_date_str = tx.get('date', '')
+                tx_age = TWENTY4_H  # افتراضي: قديمة
+                try:
+                    tx_date = datetime.fromisoformat(tx_date_str)
+                    if tx_date.tzinfo is None:
+                        tx_date = tx_date.replace(tzinfo=timezone.utc)
+                    tx_age = (now - tx_date).total_seconds()
+                except Exception:
+                    pass
+
+                if tx_age < FIVE_MIN:
+                    continue  # معاملة حديثة جداً
+
+                # تحقق أن المستخدم ليس في جلسة FSM نشطة الآن (تجنب الازدواجية)
+                current_state = self.user_states.get(tx_uid)
+                if current_state and any(current_state.startswith(p) for p in flow_prefixes):
+                    continue  # الإشعار تمّ في الخطوة 1
+
+                tx_type = 'إيداع' if tx.get('type', '').lower() == 'deposit' else 'سحب'
+                tx_id = tx.get('id', '؟')
+                tx_amount = tx.get('amount', '؟')
+
+                try:
+                    self.send_message(
+                        tx_uid,
+                        f"📋 <b>تذكير: طلب {tx_type} قيد المراجعة</b>\n\n"
+                        f"🆔 رقم المعاملة: <code>{tx_id}</code>\n"
+                        f"💰 المبلغ: {tx_amount}\n"
+                        f"⏳ الحالة: في انتظار مراجعة الأدمن\n\n"
+                        f"سيتم إشعارك فور الموافقة أو الرفض."
+                    )
+                    notified_uids_pending.add(tx_uid)
+                except Exception as e:
+                    logger.warning(f"recovery: فشل تذكير معاملة {tx_id} للمستخدم {tx_uid}: {e}")
+
+            logger.info(
+                f"✅ اكتمل استرداد المعاملات: {len(all_states)} جلسة فُحصت، "
+                f"{len(notified_uids_pending)} معاملة pending أُشعر بها."
+            )
+
+        except Exception as e:
+            logger.error(f"_recover_pending_states خطأ عام: {e}", exc_info=True)
+
     def create_backup_zip(self):
             """إنشاء ملف مضغوط يحتوي على جميع بيانات النظام"""
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
