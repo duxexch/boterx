@@ -18,6 +18,10 @@
             class="px-5 py-3 rounded-t-lg text-sm font-semibold transition">
             <i class="fas fa-history ml-1"></i> سجل الإجراءات
         </button>
+        <button @click="activeTab = 'lockdown'; loadLockdownLog()" :class="activeTab === 'lockdown' ? 'bg-slate-800 text-white border-b-2 border-red-500' : 'text-slate-400 hover:text-white'"
+            class="px-5 py-3 rounded-t-lg text-sm font-semibold transition">
+            <i class="fas fa-shield-alt ml-1"></i> سجل الانقطاعات
+        </button>
     </div>
 
     <!-- Tab 1: System Settings -->
@@ -150,6 +154,117 @@
         </div>
     </div>
 
+    <!-- Tab 4: Lockdown History -->
+    <div x-show="activeTab === 'lockdown'" class="space-y-5">
+
+        <!-- Summary cards -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
+                <p class="text-xs text-slate-400 mb-1">إجمالي الانقطاعات</p>
+                <p class="text-2xl font-bold text-red-400" x-text="ldSummary.total_episodes ?? '—'"></p>
+            </div>
+            <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
+                <p class="text-xs text-slate-400 mb-1">إجمالي وقت التوقف</p>
+                <p class="text-2xl font-bold text-orange-400" x-text="fmtDuration(ldSummary.total_downtime_seconds)"></p>
+            </div>
+            <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
+                <p class="text-xs text-slate-400 mb-1">انقطاعات هذا الشهر</p>
+                <p class="text-2xl font-bold text-amber-400" x-text="ldSummary.this_month_episodes ?? '—'"></p>
+            </div>
+            <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
+                <p class="text-xs text-slate-400 mb-1">توقف هذا الشهر</p>
+                <p class="text-2xl font-bold text-yellow-400" x-text="fmtDuration(ldSummary.this_month_downtime_seconds)"></p>
+            </div>
+        </div>
+
+        <!-- Events table -->
+        <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+            <div class="p-5 border-b border-slate-700 flex items-center justify-between">
+                <div>
+                    <h3 class="font-bold text-lg">سجل الانقطاعات والاستعادة</h3>
+                    <p class="text-xs text-slate-400 mt-1">كل إيقاف / استعادة للـ API مرتبة من الأحدث إلى الأقدم</p>
+                </div>
+                <button @click="loadLockdownLog(true)"
+                    class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-700 hover:bg-slate-600 text-slate-300 transition flex items-center gap-1">
+                    <i class="fas fa-sync-alt text-xs"></i> تحديث
+                </button>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-slate-700 bg-slate-800/80">
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400 w-28">الحدث</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">التوقيت</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">المدة / التوقف</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">الخادم</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400 w-24">تلغرام</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">السبب</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="(row, idx) in ldRows" :key="idx">
+                            <tr class="border-b border-slate-700/50 hover:bg-slate-700/30 transition">
+                                <td class="px-4 py-3">
+                                    <span class="px-2 py-1 rounded text-[11px] font-semibold"
+                                        :class="row.event === 'lockdown'
+                                            ? 'bg-red-500/20 text-red-400'
+                                            : 'bg-green-500/20 text-green-400'">
+                                        <i :class="row.event === 'lockdown' ? 'fas fa-lock' : 'fas fa-lock-open'" class="mr-1 text-xs"></i>
+                                        <span x-text="row.event === 'lockdown' ? 'انقطاع' : 'استعادة'"></span>
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 text-slate-300 text-xs font-mono" x-text="row.timestamp || '—'"></td>
+                                <td class="px-4 py-3 text-slate-300 text-xs">
+                                    <span x-show="row.event === 'recovery'" x-text="fmtDuration(row.duration_seconds)"></span>
+                                    <span x-show="row.event === 'lockdown'" class="text-slate-500">—</span>
+                                </td>
+                                <td class="px-4 py-3 text-slate-400 text-xs font-mono" x-text="row.host || '—'"></td>
+                                <td class="px-4 py-3">
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-semibold"
+                                        :class="row.telegram_sent === 'yes'
+                                            ? 'bg-blue-500/20 text-blue-400'
+                                            : 'bg-slate-600/40 text-slate-400'"
+                                        x-text="row.telegram_sent === 'yes' ? 'أُرسل' : 'لا'">
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 text-slate-400 text-xs font-mono" x-text="row.reason || '—'"></td>
+                            </tr>
+                        </template>
+                        <tr x-show="ldRows.length === 0 && !ldLoading">
+                            <td colspan="6" class="px-4 py-10 text-center text-slate-500">
+                                <i class="fas fa-shield-alt text-4xl mb-3 block text-slate-600"></i>
+                                لا توجد سجلات انقطاع — النظام يعمل بشكل طبيعي
+                            </td>
+                        </tr>
+                        <tr x-show="ldLoading">
+                            <td colspan="6" class="px-4 py-8 text-center text-slate-500">
+                                <i class="fas fa-spinner fa-spin text-2xl mb-2 block"></i>
+                                جارٍ التحميل…
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <!-- Pagination -->
+            <div x-show="ldTotal > ldLimit" class="p-4 border-t border-slate-700 flex items-center justify-between text-xs text-slate-400">
+                <span x-text="`عرض ${ldRows.length} من ${ldTotal} سجل`"></span>
+                <div class="flex gap-2">
+                    <button @click="ldPage > 1 && (ldPage--, loadLockdownLog(true))"
+                        :disabled="ldPage === 1"
+                        class="px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600 disabled:opacity-40 transition">
+                        السابق
+                    </button>
+                    <span class="px-2 py-1.5" x-text="`صفحة ${ldPage}`"></span>
+                    <button @click="ldRows.length === ldLimit && (ldPage++, loadLockdownLog(true))"
+                        :disabled="ldRows.length < ldLimit"
+                        class="px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600 disabled:opacity-40 transition">
+                        التالي
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Tab 3: Audit Log -->
     <div x-show="activeTab === 'audit'" class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
         <div class="p-5 border-b border-slate-700">
@@ -215,6 +330,14 @@ function settingsPage() {
         settings: [],
         labels: [],
         auditLog: [],
+
+        // ─── Lockdown log state ───
+        ldRows:    [],
+        ldSummary: {},
+        ldTotal:   0,
+        ldPage:    1,
+        ldLimit:   100,
+        ldLoading: false,
 
         async init() {
             await Promise.all([this.loadSettings(), this.loadLabels()]);
@@ -284,6 +407,32 @@ function settingsPage() {
             } catch (e) {
                 toast('فشل حفظ التسمية', 'error');
             }
+        },
+
+        // ─── Lockdown log ───
+        async loadLockdownLog(force = false) {
+            if (!force && this.ldRows.length > 0) return;
+            this.ldLoading = true;
+            try {
+                const data = await api(`/api/admin/lockdown-log?page=${this.ldPage}&limit=${this.ldLimit}`);
+                this.ldRows    = data.rows    || [];
+                this.ldTotal   = data.total   || 0;
+                this.ldSummary = data.summary || {};
+            } catch (e) {
+                toast('فشل تحميل سجل الانقطاعات', 'error');
+            } finally {
+                this.ldLoading = false;
+            }
+        },
+
+        fmtDuration(seconds) {
+            const s = parseInt(seconds) || 0;
+            if (s <= 0) return '—';
+            if (s < 60)   return `${s}ث`;
+            if (s < 3600) return `${Math.floor(s/60)}د ${s%60}ث`;
+            const h = Math.floor(s / 3600);
+            const m = Math.floor((s % 3600) / 60);
+            return `${h}س ${m}د`;
         },
 
         // ─── Audit Log ───

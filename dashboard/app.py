@@ -5827,6 +5827,82 @@ def api_admin_platform_stats():
         'active_games': len([g for g in games if g.get('is_active') == 'yes']),
     })
 
+# ===== Lockdown Log API =====
+
+@app.route('/api/admin/lockdown-log', methods=['GET'])
+@api_auth
+def api_admin_lockdown_log():
+    """Return lockdown/recovery history with summary statistics.
+
+    Query params:
+      limit  — max rows to return (default 100, max 500)
+      page   — 1-based page (default 1)
+
+    Response JSON:
+      {
+        "rows":    [{event, timestamp, host, duration_seconds, telegram_sent, reason}, ...],
+        "total":   <int>,
+        "page":    <int>,
+        "limit":   <int>,
+        "summary": {
+          "total_episodes":              <int>,
+          "total_downtime_seconds":      <int>,
+          "this_month_episodes":         <int>,
+          "this_month_downtime_seconds": <int>,
+        }
+      }
+    """
+    try:
+        limit = min(int(request.args.get('limit', 100)), 500)
+        page  = max(int(request.args.get('page', 1)), 1)
+    except (ValueError, TypeError):
+        limit, page = 100, 1
+
+    all_rows = read_csv(_LOCKDOWN_LOG)
+    all_rows.reverse()          # newest first
+
+    total = len(all_rows)
+    start = (page - 1) * limit
+    page_rows = all_rows[start:start + limit]
+
+    # Summary over ALL rows (not just the current page)
+    now = datetime.now()
+    month_prefix = now.strftime('%Y-%m')
+    total_episodes = 0
+    total_downtime_s = 0
+    month_episodes = 0
+    month_downtime_s = 0
+
+    for row in all_rows:
+        if row.get('event') == 'lockdown':
+            total_episodes += 1
+            ts = row.get('timestamp', '')
+            if ts.startswith(month_prefix):
+                month_episodes += 1
+        if row.get('event') == 'recovery':
+            try:
+                ds = int(row.get('duration_seconds', 0))
+            except (ValueError, TypeError):
+                ds = 0
+            total_downtime_s += ds
+            ts = row.get('timestamp', '')
+            if ts.startswith(month_prefix):
+                month_downtime_s += ds
+
+    return jsonify({
+        'rows':  page_rows,
+        'total': total,
+        'page':  page,
+        'limit': limit,
+        'summary': {
+            'total_episodes':              total_episodes,
+            'total_downtime_seconds':      total_downtime_s,
+            'this_month_episodes':         month_episodes,
+            'this_month_downtime_seconds': month_downtime_s,
+        }
+    })
+
+
 # ===== Chat / Emoji Reactions =====
 
 _chat_messages = []  # In-memory chat (last 50)
