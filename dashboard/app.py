@@ -3689,9 +3689,9 @@ def api_send_message_recent():
     targeted.reverse()
     return jsonify({'messages': targeted[:50]})
 
-# =====================================================
+# ---------------------------------------------------
 # ===== VEX GAMES PLATFORM — API =====
-# =====================================================
+# ---------------------------------------------------
 
 # تهيئة محرك الألعاب
 try:
@@ -4427,23 +4427,27 @@ def api_mines_start():
         reason=f"Mines count={mine_count}; {algo_result['reason']}"
     )
 
-    # Store mine positions in a temp file keyed by session
+    # Store mine positions in a temp file keyed by session.
+    # _engine_mines_lock serialises all read-prune-write cycles on mines_sessions.json.
     import json as _json
     mines_state_file = os.path.join(BASE_DIR, 'mines_sessions.json')
-    mines_state = {}
-    try:
-        if os.path.exists(mines_state_file):
-            with open(mines_state_file, 'r') as f:
-                mines_state = _json.load(f)
-    except:
-        pass
-    mines_state[session_id] = {
-        'uid': uid, 'mine_positions': mine_positions, 'bet_amount': bet_amount,
-        'mine_count': mine_count, 'revealed': [], 'multiplier': 1.0,
-        'game_over': False, 'created_at': datetime.now().isoformat()
-    }
-    with open(mines_state_file, 'w') as f:
-        _json.dump(mines_state, f)
+    with _engine_mines_lock:
+        mines_state = {}
+        try:
+            if os.path.exists(mines_state_file):
+                with open(mines_state_file, 'r') as f:
+                    mines_state = _json.load(f)
+        except Exception:
+            pass
+        # Prune stale sessions before adding the new one
+        mines_state = _prune_stale_mines_sessions(mines_state)
+        mines_state[session_id] = {
+            'uid': uid, 'mine_positions': mine_positions, 'bet_amount': bet_amount,
+            'mine_count': mine_count, 'revealed': [], 'multiplier': 1.0,
+            'game_over': False, 'created_at': datetime.now().isoformat()
+        }
+        with open(mines_state_file, 'w') as f:
+            _json.dump(mines_state, f)
 
     return jsonify({'success': True, 'session_id': session_id, 'balance_before': balance, 'balance_after': balance_after})
 
@@ -4461,53 +4465,58 @@ def api_engine_mines_reveal():
 
     import json as _json
     mines_state_file = os.path.join(BASE_DIR, 'mines_sessions.json')
-    if not os.path.exists(mines_state_file):
-        return jsonify({'error': 'Session not found'}), 404
-    try:
-        with open(mines_state_file, 'r') as f:
-            mines_state = _json.load(f)
-    except:
-        return jsonify({'error': 'State error'}), 500
 
-    state = mines_state.get(session_id)
-    if not state or state.get('uid') != uid or state.get('game_over'):
-        return jsonify({'error': 'Invalid session'}), 400
+    resp_data = None
+    with _engine_mines_lock:
+        if not os.path.exists(mines_state_file):
+            return jsonify({'error': 'Session not found'}), 404
+        try:
+            with open(mines_state_file, 'r') as f:
+                mines_state = _json.load(f)
+        except Exception:
+            return jsonify({'error': 'State error'}), 500
 
-    if tile_index in state['revealed']:
-        return jsonify({'error': 'Already revealed'}), 400
+        # Prune stale sessions on every read (lazy cleanup, under lock)
+        mines_state = _prune_stale_mines_sessions(mines_state)
 
-    mine_positions = state['mine_positions']
-    is_mine = tile_index in mine_positions
-    state['revealed'].append(tile_index)
+        state = mines_state.get(session_id)
+        if not state or state.get('uid') != uid or state.get('game_over'):
+            return jsonify({'error': 'Invalid session'}), 400
 
-    if is_mine:
-        state['game_over'] = True
-        state['multiplier'] = 0
-        with open(mines_state_file, 'w') as f:
-            _json.dump(mines_state, f)
-        return jsonify({'success': True, 'is_mine': True, 'multiplier': 0, 'game_over': True})
+        if tile_index in state['revealed']:
+            return jsonify({'error': 'Already revealed'}), 400
 
-    # Calculate multiplier based on revealed count and mine count
-    revealed_count = len(state['revealed'])
-    safe_count = 25 - state['mine_count']
-    # Multiplier grows with each safe reveal: product of (25-i)/(25-mine_count-i) for each step
-    mult = 1.0
-    for i in range(revealed_count):
-        mult *= (25 - i) / (25 - state['mine_count'] - i)
-    # Apply house edge
-    game = _gm.get_game('GAME006')
-    house_edge = float(game.get('house_edge_pct', 15)) / 100 if game else 0.15
-    mult *= (1 - house_edge * 0.5)
-    state['multiplier'] = round(mult, 4)
+        mine_positions = state['mine_positions']
+        is_mine = tile_index in mine_positions
+        state['revealed'].append(tile_index)
 
-    game_over = revealed_count >= safe_count
-    if game_over:
-        state['game_over'] = True
+        if is_mine:
+            state['game_over'] = True
+            state['multiplier'] = 0
+            with open(mines_state_file, 'w') as f:
+                _json.dump(mines_state, f)
+            resp_data = {'success': True, 'is_mine': True, 'multiplier': 0, 'game_over': True}
+        else:
+            # Calculate multiplier based on revealed count and mine count
+            revealed_count = len(state['revealed'])
+            safe_count = 25 - state['mine_count']
+            mult = 1.0
+            for i in range(revealed_count):
+                mult *= (25 - i) / (25 - state['mine_count'] - i)
+            game = _gm.get_game('GAME006')
+            house_edge = float(game.get('house_edge_pct', 15)) / 100 if game else 0.15
+            mult *= (1 - house_edge * 0.5)
+            state['multiplier'] = round(mult, 4)
 
-    with open(mines_state_file, 'w') as f:
-        _json.dump(mines_state, f)
+            game_over = revealed_count >= safe_count
+            if game_over:
+                state['game_over'] = True
 
-    return jsonify({'success': True, 'is_mine': False, 'multiplier': state['multiplier'], 'game_over': game_over})
+            with open(mines_state_file, 'w') as f:
+                _json.dump(mines_state, f)
+            resp_data = {'success': True, 'is_mine': False, 'multiplier': state['multiplier'], 'game_over': game_over}
+
+    return jsonify(resp_data)
 
 @app.route('/api/engine/mines/cashout', methods=['POST'])
 @webapp_auth
@@ -4522,16 +4531,19 @@ def api_engine_mines_cashout():
 
     import json as _json
     mines_state_file = os.path.join(BASE_DIR, 'mines_sessions.json')
-    try:
-        with open(mines_state_file, 'r') as f:
-            mines_state = _json.load(f)
-        state = mines_state.get(session_id)
-        if state:
-            state['game_over'] = True
-            with open(mines_state_file, 'w') as f:
-                _json.dump(mines_state, f)
-    except:
-        pass
+    with _engine_mines_lock:
+        try:
+            with open(mines_state_file, 'r') as f:
+                mines_state = _json.load(f)
+            # Prune stale sessions on every write path (under lock)
+            mines_state = _prune_stale_mines_sessions(mines_state)
+            state = mines_state.get(session_id)
+            if state:
+                state['game_over'] = True
+                with open(mines_state_file, 'w') as f:
+                    _json.dump(mines_state, f)
+        except Exception:
+            pass
 
     payout = bet_amount * multiplier
     new_balance = _gm.add_balance(uid, payout)
@@ -4691,6 +4703,9 @@ def api_plinko_end():
 # Sessions keyed by uid so reveal/cashout don't need a session_id param.
 
 _mines_lock = threading.Lock()
+# Separate lock for the legacy engine mines_sessions.json file so every
+# read-prune-write cycle is atomic and the cleanup daemon cannot race with routes.
+_engine_mines_lock = threading.Lock()
 
 # ===== Per-user locking + request-ID idempotency =====
 # Pattern mirrors aviator_engine's _request_cache approach.
@@ -4743,15 +4758,46 @@ def _store_request_result(uid, request_id, result):
 
 # ===
 
+_MINES_SESSION_TTL_MINUTES = 30  # sessions older than this are pruned
+
 def _mines_session_file():
     return os.path.join(BASE_DIR, 'mines_user_sessions.json')
 
+def _prune_stale_mines_sessions(sessions, ttl_minutes=_MINES_SESSION_TTL_MINUTES):
+    """Return a copy of *sessions* with entries older than ttl_minutes removed.
+
+    A session is considered stale when its created_at timestamp is more than
+    ttl_minutes ago.  Sessions that are missing a created_at field, or whose
+    timestamp cannot be parsed, are treated as stale and pruned.
+    """
+    cutoff = datetime.now() - timedelta(minutes=ttl_minutes)
+    pruned = {}
+    for key, sess in sessions.items():
+        created_str = sess.get('created_at', '')
+        try:
+            created_dt = datetime.fromisoformat(created_str)
+            if created_dt >= cutoff:
+                pruned[key] = sess
+        except Exception:
+            # Unparseable timestamp — treat as stale
+            pass
+    return pruned
 def _load_mines_sessions():
+    """Load mines user sessions, pruning any stale entries before returning."""
     try:
         f = _mines_session_file()
         if os.path.exists(f):
             with open(f, 'r') as fh:
-                return json.load(fh)
+                sessions = json.load(fh)
+            pruned = _prune_stale_mines_sessions(sessions)
+            if len(pruned) != len(sessions):
+                # Persist the pruned state immediately so the file stays clean
+                try:
+                    with open(f, 'w') as fh:
+                        json.dump(pruned, fh)
+                except Exception:
+                    pass
+            return pruned
     except Exception:
         pass
     return {}
@@ -4763,6 +4809,28 @@ def _save_mines_sessions(state):
     except Exception:
         pass
 
+def _prune_engine_mines_sessions_file():
+    """Prune stale entries from mines_sessions.json (legacy engine flow) and
+    persist the result to disk.  Called from the background cleanup daemon.
+    Holds _engine_mines_lock for the entire read-prune-write cycle."""
+    import json as _json
+    mines_state_file = os.path.join(BASE_DIR, 'mines_sessions.json')
+    with _engine_mines_lock:
+        try:
+            if not os.path.exists(mines_state_file):
+                return
+            with open(mines_state_file, 'r') as fh:
+                mines_state = _json.load(fh)
+            pruned = _prune_stale_mines_sessions(mines_state)
+            if len(pruned) != len(mines_state):
+                with open(mines_state_file, 'w') as fh:
+                    _json.dump(pruned, fh)
+                _auth_logger.info(
+                    "mines_sessions.json: pruned %d stale session(s), %d remaining.",
+                    len(mines_state) - len(pruned), len(pruned)
+                )
+        except Exception as exc:
+            _auth_logger.error("_prune_engine_mines_sessions_file error: %s", exc)
 @app.route('/api/mines/new', methods=['POST'])
 @webapp_auth
 def api_mines_new():
@@ -6835,6 +6903,42 @@ def health_check():
     }
     status_code = 503 if _WEBAPP_AUTH_LOCKED_DOWN else 200
     return jsonify(body), status_code
+
+
+# ===== Mines session background cleanup =====
+# Runs every 10 minutes regardless of traffic so idle deployments are also covered.
+
+def _mines_cleanup_daemon():
+    """Background daemon: prune stale sessions from both mines JSON files every
+    10 minutes so abandoned games never accumulate indefinitely, regardless of
+    whether any new requests arrive."""
+    import time as _time
+    while True:
+        _time.sleep(600)  # 10-minute interval
+        try:
+            # Prune mines_user_sessions.json (new flow, uid-keyed)
+            with _mines_lock:
+                _load_mines_sessions()  # prunes stale entries and persists to disk
+        except Exception as exc:
+            _auth_logger.error("mines_cleanup_daemon (user sessions): %s", exc)
+        try:
+            # Prune mines_sessions.json (legacy engine flow, session_id-keyed)
+            _prune_engine_mines_sessions_file()
+        except Exception as exc:
+            _auth_logger.error("mines_cleanup_daemon (engine sessions): %s", exc)
+
+# Startup prune: clear sessions that expired while the server was down.
+try:
+    with _mines_lock:
+        _load_mines_sessions()
+except Exception as _mce:
+    _auth_logger.error("mines startup prune (user sessions) error: %s", _mce)
+try:
+    _prune_engine_mines_sessions_file()
+except Exception as _mce2:
+    _auth_logger.error("mines startup prune (engine sessions) error: %s", _mce2)
+
+threading.Thread(target=_mines_cleanup_daemon, daemon=True, name='mines-cleanup').start()
 
 
 # ===== Main =====
