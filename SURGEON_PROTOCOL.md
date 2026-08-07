@@ -40,7 +40,7 @@ Build anything missing: Loading skeletons, toast notifications, provably fair UI
 ## Games Status (as of 2026-08-07)
 | Game | Protocol Status | Notes |
 |---|---|---|
-| Aviator | Ready for Surgeon | Global round, provably fair, ACID, offline outbox done. Needs 3D UI + tests. |
+| Aviator | ✅ COMPLETE | Phase 1-5 done. 3D UI (perspective, clamp, dvh, safeArea). 26 tests green. |
 | Crash | Ready | Similar to Aviator. |
 | Mines | Ready | Grid reveal, needs provably fair UI + tests. |
 | Plinko | Ready | Physics, needs ACID wiring for /end. |
