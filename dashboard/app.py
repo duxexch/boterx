@@ -1308,7 +1308,8 @@ def _calc_age_hours(date_str):
     return round((_dt.now() - dt).total_seconds() / 3600, 1)
 
 # ===== Auto-reject old pending deposits =====
-import threading as _ar_thread
+import threading
+import time as _ar_time
 _AR_TIMEOUT_HOURS = 24  # auto-reject after 24 hours
 def _auto_reject_old_pending():
     """Background thread: auto-reject pending deposits older than timeout."""
@@ -1350,9 +1351,9 @@ def _auto_reject_old_pending():
                     with open(tx_path, 'w', newline='', encoding='utf-8-sig') as f:
                         _w = _csv.DictWriter(f, fieldnames=_fn); _w.writeheader(); _w.writerows(_rows)
         except: pass
-        time.sleep(600)  # check every 10 minutes
+        _ar_time.sleep(600)  # check every 10 minutes
 
-time.sleep(3)  # wait for app to start
+_ar_time.sleep(3)  # wait for app to start
 _ar_thread_ = threading.Thread(target=_auto_reject_old_pending, daemon=True)
 _ar_thread_.start()
 
