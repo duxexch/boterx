@@ -111,14 +111,7 @@ def _get_name(uid):
     except: return ''
 
 def _get_user_phone(uid):
-    """قراءة رقم هاتف المستخدم من users.csv"""
-    try:
-        import csv as _csv
-        with open('users.csv', 'r', encoding='utf-8-sig') as f:
-            for row in _csv.DictReader(f):
-                if row.get('telegram_id') == str(uid):
-                    return row.get('phone', '') or row.get('phone_number', '') or ''
-    except: pass
+    """قراءة رقم هاتف المستخدم — مؤقتاً معطل لمنع البطء"""
     return ''
 
 def _mask_name(name, phone):
