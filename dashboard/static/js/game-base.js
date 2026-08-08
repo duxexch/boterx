@@ -353,35 +353,8 @@ function toggleChat() {
 }
 
 // Auto-inject chat bar into game pages
-function injectChatBar() {
-  const app = document.getElementById('app');
-  if (!app || document.querySelector('.chat-bar')) return;
-  const bar = document.createElement('div');
-  bar.className = 'chat-bar';
-  bar.innerHTML = `
-    <div class="chat-header">
-      <span>💬 الدردشة</span>
-      <button class="chat-toggle" onclick="toggleChat()">‒</button>
-    </div>
-    <div class="chat-messages"></div>
-    <div class="chat-input-row">
-      <button class="chat-emoji-btn" onclick="sendEmoji('🔥')">🔥</button>
-      <button class="chat-emoji-btn" onclick="sendEmoji('💎')">💎</button>
-      <button class="chat-emoji-btn" onclick="sendEmoji('🚀')">🚀</button>
-      <input class="chat-input" placeholder="اكتب رسالة..." onkeypress="if(event.key==='Enter')sendChatMessage()">
-      <button class="chat-send-btn" onclick="sendChatMessage()">➤</button>
-    </div>
-  `;
-  app.appendChild(bar);
-  connectChatStream();
-}
-
-// Auto-inject chat on DOM ready (after PF badge)
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => { setTimeout(injectChatBar, 100); });
-} else {
-  setTimeout(injectChatBar, 100);
-}
+// Chat bar DISABLED — no user-to-user interaction per user request
+// injectChatBar, connectChatStream, sendChatMessage, sendEmoji all removed
 
 // ---- Stars Background ----
 function createStars(containerId) {
