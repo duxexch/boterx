@@ -255,9 +255,20 @@ def init_aviator_engine(app, get_uid, get_gm, get_pf, is_pf, is_vex):
         if not uid: return jsonify({'error': 'No uid'}), 400
         if not _rate_ok(uid): return jsonify({'error': 'طلبات كثيرة، انتظر قليلاً'}), 429
         data = request.json or {}
-        amount = float(data.get('bet_amount', 0))
-        auto_val = float(data.get('auto_val', 0) or 0)
-        req_id = str(data.get('request_id', '') or '')
+        # Input validation — prevent injection
+        try:
+            amount = float(data.get('bet_amount', 0))
+            if amount <= 0 or amount > 100000: return jsonify({'error': 'مبلغ غير صالح'}), 400
+        except (ValueError, TypeError):
+            return jsonify({'error': 'مبلغ غير صالح'}), 400
+        try:
+            auto_val = float(data.get('auto_val', 0) or 0)
+            if auto_val < 0 or auto_val > 1000: auto_val = 0
+        except (ValueError, TypeError):
+            auto_val = 0
+        req_id = str(data.get('request_id', '') or '')[:64]  # limit length
+        # Sanitize uid — only digits
+        if not str(uid).isdigit(): return jsonify({'error': 'uid غير صالح'}), 400
         with _lock:
             if _state['phase'] != 'waiting':
                 return jsonify({'error': 'انتهت فترة المراهنة'})
@@ -284,7 +295,8 @@ def init_aviator_engine(app, get_uid, get_gm, get_pf, is_pf, is_vex):
         if not uid: return jsonify({'error': 'No uid'}), 400
         if not _rate_ok(uid): return jsonify({'error': 'طلبات كثيرة'}), 429
         data = request.json or {}
-        req_id = str(data.get('request_id', '') or '')
+        req_id = str(data.get('request_id', '') or '')[:64]
+        if not str(uid).isdigit(): return jsonify({'error': 'uid غير صالح'}), 400
         with _lock:
             if _state['phase'] != 'flying':
                 return jsonify({'error': 'لا يمكن السحب الآن'})
