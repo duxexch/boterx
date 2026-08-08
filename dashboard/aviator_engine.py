@@ -22,9 +22,9 @@ import queue as _queue
 from datetime import datetime
 
 # ── Config ──────────────────────────────────────────────
-WAITING_DURATION = 5      # seconds — betting window open
-STARTING_DURATION = 2     # seconds — lock, no new bets
-CRASHED_DURATION = 3      # seconds — show result, then next round
+WAITING_DURATION = 6      # seconds — betting window (الطائرة في المدرج)
+STARTING_DURATION = 0     # seconds — لا مرحلة بدء، الطائرة تنطلق مباشرة
+CRASHED_DURATION = 4      # seconds — الانفجار ثم العودة للمدرج
 TICK_RATE = 0.05           # 50ms internal check for auto-cashout
 HOUSE_EDGE = 0.03          # 3%
 GROWTH_RATE = 0.07         # mult = e^(0.07 * t_seconds)
@@ -139,13 +139,7 @@ def _game_loop():
         })
         time.sleep(WAITING_DURATION)
 
-        # ── STARTING (lock, no new bets) ──
-        with _lock:
-            _state['phase'] = 'starting'
-        _broadcast({'type': 'starting', 'round_id': _state['round_id'], 'duration': STARTING_DURATION})
-        time.sleep(STARTING_DURATION)
-
-        # ── FLIGHT ──
+        # ── FLIGHT مباشرة (لا مرحلة starting) ──
         crash_pt = _calc_crash()
         with _lock:
             _state['phase'] = 'flying'
@@ -214,6 +208,7 @@ def _game_loop():
             'seed_hash': _state.get('seed_hash', ''),
         })
         time.sleep(CRASHED_DURATION)
+        # الطائرة تعود للمدرج تلقائياً — الحلقة تعيد نفسها
 
 # ── Flask route registration ─────────────────────────────
 def init_aviator_engine(app, get_uid, get_gm, get_pf, is_pf, is_vex):

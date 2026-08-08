@@ -296,7 +296,7 @@ function onWaiting(d) {
     d.history.forEach(function(v) { var el = document.createElement('div'); el.className = 'hist-item '+(v>=1.5?'hist-win':'hist-lose')+(v>=3?' hist-big':''); el.textContent = v.toFixed(2)+'x'; h.appendChild(el); });
   }
   // Countdown
-  var c = 5;
+  var c = 6;
   function tick() {
     if (roundPhase !== 'waiting') return;
     var el = document.createElement('div'); el.className = 'countdown'; el.textContent = c;
@@ -309,16 +309,9 @@ function onWaiting(d) {
   syncGameStateMainButton();
 }
 
+// onStarting غير مستخدم — الطائرة تنطلق مباشرة من المدرج
 function onStarting(d) {
-  roundPhase = 'starting';
-  document.getElementById('statusText').textContent = '🔒 انطلقت الطائرة...';
-  for (var si=1; si<=2; si++) {
-    var s = si;
-    if (!myBets[s].placed && !myBets[s].queued) {
-      var btn = document.getElementById('btn'+s); btn.disabled = true; btn.textContent = '⏳';
-    }
-  }
-  hideMainButton();
+  // لا شيء — الطائرة تنطلق مباشرة
 }
 
 function onFlightStart(d) {
@@ -401,6 +394,24 @@ function onCrash(d) {
   var msg = document.getElementById('crashMsg');
   msg.textContent = '💥 ' + d.crash_point.toFixed(2) + 'x'; msg.style.color = 'var(--red)'; msg.classList.add('show');
   createExplosion();
+  // عرض الأموال التي انفجرت واحترقت
+  if (d.total_bets > 0) {
+    var burnedEl = document.getElementById('recoveryMsg');
+    var lostBets = d.total_bets - d.total_cashed_out;
+    var lostAmount = 0;
+    for (var si=1; si<=2; si++) {
+      var s = si;
+      if (myBets[s].placed && !myBets[s].cashed) { lostAmount += myBets[s].amount; }
+    }
+    if (lostAmount > 0) {
+      burnedEl.innerHTML = '🔥 <b>انفجرت أموالك!</b><br><span style="color:#ff4757;font-weight:900;font-size:14px">' + lostAmount.toFixed(0) + '</span> احترقت مع الطائرة<br><span style="font-size:10px;color:var(--muted)">' + lostBets + ' لاعب خسر / ' + d.total_cashed_out + ' لاعب قفز في الوقت</span>';
+    } else {
+      burnedEl.innerHTML = '💥 <b>انفجرت الطائرة عند ' + d.crash_point.toFixed(2) + 'x</b><br><span style="font-size:10px;color:var(--muted)">' + d.total_cashed_out + ' لاعب قفز قبل الانفجار</span>';
+    }
+    burnedEl.style.color = '#ff4757';
+    burnedEl.classList.add('show');
+    setTimeout(function() { burnedEl.classList.remove('show'); }, 4000);
+  }
   if (d.server_seed) {
     var pfEl = document.createElement('div');
     pfEl.style.cssText = 'position:absolute;top:62%;left:50%;transform:translateX(-50%);font-size:9px;color:#94a3b8;z-index:12;text-align:center;pointer-events:none;max-width:80%;word-break:break-all';
