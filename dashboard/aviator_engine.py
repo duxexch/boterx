@@ -311,12 +311,25 @@ def init_aviator_engine(app, get_uid, get_gm, get_pf, is_pf, is_vex):
     @app.route('/api/aviator/state')
     def api_aviator_state():
         with _lock:
+            # اجمع رهانات العميل الحالية (لو راهن قبل التحديث)
+            uid = get_uid()
+            my_bets = {}
+            if uid and uid in _state['bets']:
+                b = _state['bets'][uid]
+                my_bets = {
+                    'placed': True,
+                    'amount': b['amount'],
+                    'cashed_out': b['cashed_out'],
+                    'cash_mult': b.get('cash_mult', 0),
+                    'auto_val': b.get('auto_val', 0),
+                }
             return jsonify({
                 'phase': _state['phase'],
                 'multiplier': round(_server_mult(), 2),
                 'crash_point': round(_state.get('crash_point', 0), 2),
                 'round_id': _state['round_id'],
                 'history': list(_state['history'][-15:]),
+                'my_bet': my_bets,
             })
 
 # Start the daemon thread — runs forever, even with 0 players

@@ -148,6 +148,18 @@ function startPolling(){if(pollTimer)clearInterval(pollTimer);pollTimer=setInter
 async function poll(){try{var r=await apiFetch(BASE+'/api/aviator/state?uid='+uid);var d=await r.json();var ci=document.getElementById('connIndicator');if(ci)ci.textContent='🟢';handleState(d)}catch(e){var ci=document.getElementById('connIndicator');if(ci)ci.textContent='🔴'}}
 function handleState(d){
   var np=d.phase;currentMult=d.multiplier||1.0;if(d.crash_point)crashPoint=d.crash_point;
+  // استرجاع حالة الرهان من السيرفر (لو العميل حدّث الصفحة)
+  if(d.my_bet&&d.my_bet.placed&&!bets[1].placed){
+    bets[1].st=d.my_bet.cashed_out?'cashed':'jump';
+    bets[1].amt=d.my_bet.amount||0;
+    if(d.my_bet.cashed_out){
+      setBtn(1,'done','✓ '+(d.my_bet.cash_mult*d.my_bet.amount).toFixed(0));
+    } else if(np==='flying'){
+      setBtn(1,'jump','قفز');
+    } else if(np==='waiting'){
+      setBtn(1,'betting','إلغاء');
+    }
+  }
   if(np!==lastPhase){if(np==='waiting')onWaiting(d);else if(np==='flying')onFlying(d);else if(np==='crashed')onCrashed(d);lastPhase=np}
   else{if(np==='flying'){document.getElementById('mult').textContent=currentMult.toFixed(2)+'x';document.getElementById('planeMultVal').textContent=currentMult.toFixed(2)+'x'}}
   if(d.history){var h=document.getElementById('history');h.innerHTML='';d.history.forEach(function(v){var el=document.createElement('div');el.className='hist-item '+(v>=1.5?'hist-win':'hist-lose')+(v>=3?' hist-big':'');el.textContent=v.toFixed(2)+'x';h.appendChild(el)})}
