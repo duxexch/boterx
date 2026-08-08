@@ -415,47 +415,35 @@ _FAKE_PLAYERS = []
 _FAKE_PLAYER_COUNT = 0
 
 def _init_fake_players():
-    """توليد 1000 حساب وهمي ببيانات عشوائية"""
-    global _FAKE_PLAYERS, _FAKE_PLAYER_COUNT
-    _FAKE_PLAYERS = []
-    for i in range(100):
-        name = _FAKE_NAMES[i % len(_FAKE_NAMES)] + ' ' + str(random.randint(1, 999))
-        _FAKE_PLAYERS.append({
-            'id': i + 1,
-            'name': name,
-            'avatar': name[0],
-        })
-    _FAKE_PLAYER_COUNT = len(_FAKE_PLAYERS)
-    print(f'✅ Generated {_FAKE_PLAYER_COUNT} fake players')
+    """معطل — نولّد الأسماء مباشرة بدون تخزين قائمة"""
+    pass
 
 def _generate_fake_players(current_mult):
-    """توليد لاعبين وهميين — خفيف وسريع"""
-    if not _FAKE_PLAYERS:
-        _init_fake_players()
+    """توليد لاعبين وهميين مباشرة — بدون قائمة مخزنة"""
     phase = _state['phase']
-    count = random.randint(5, 12)
-    # اختيار عشوائي سريع (مش sample كامل)
-    indices = [random.randint(0, len(_FAKE_PLAYERS)-1) for _ in range(count)]
+    count = random.randint(5, 10)
+    names = ['أحمد','عمر','محمد','خالد','سعد','فهد','ناصر','يوسف','علي','حسن','ماجد','وليد','طارق','بدر','راشد','عبدالله','سلطان','فيصل','نايف','تركي','دانا','نورة','ريم','سارة','لمى','شهد','جود','هند','روان']
     result = []
-    for idx in indices:
-        p = _FAKE_PLAYERS[idx]
+    for i in range(count):
+        name = random.choice(names) + ' ' + str(random.randint(1, 99))
         bet = random.choice([10, 20, 50, 100, 200, 500])
+        avatar = name[0]
         if phase == 'waiting':
-            result.append({'name': p['name'], 'avatar': p['avatar'], 'bet': bet, 'multiplier': 0, 'payout': 0, 'status': 'participating'})
+            result.append({'name': name, 'avatar': avatar, 'bet': bet, 'multiplier': 0, 'payout': 0, 'status': 'participating'})
         elif phase == 'flying':
             if random.random() < 0.4:
                 jm = round(random.uniform(1.0, max(1.1, current_mult)), 2)
-                result.append({'name': p['name'], 'avatar': p['avatar'], 'bet': bet, 'multiplier': jm, 'payout': round(bet*jm,2), 'status': 'cashed'})
+                result.append({'name': name, 'avatar': avatar, 'bet': bet, 'multiplier': jm, 'payout': round(bet*jm,2), 'status': 'cashed'})
             else:
-                result.append({'name': p['name'], 'avatar': p['avatar'], 'bet': bet, 'multiplier': 0, 'payout': 0, 'status': 'participating'})
+                result.append({'name': name, 'avatar': avatar, 'bet': bet, 'multiplier': 0, 'payout': 0, 'status': 'participating'})
         elif phase == 'crashed':
             if random.random() < 0.5:
                 jm = round(random.uniform(1.0, max(1.1, current_mult)), 2)
-                result.append({'name': p['name'], 'avatar': p['avatar'], 'bet': bet, 'multiplier': jm, 'payout': round(bet*jm,2), 'status': 'cashed'})
+                result.append({'name': name, 'avatar': avatar, 'bet': bet, 'multiplier': jm, 'payout': round(bet*jm,2), 'status': 'cashed'})
             else:
-                result.append({'name': p['name'], 'avatar': p['avatar'], 'bet': bet, 'multiplier': 0, 'payout': 0, 'status': 'lost'})
+                result.append({'name': name, 'avatar': avatar, 'bet': bet, 'multiplier': 0, 'payout': 0, 'status': 'lost'})
         else:
-            result.append({'name': p['name'], 'avatar': p['avatar'], 'bet': bet, 'multiplier': 0, 'payout': 0, 'status': 'participating'})
+            result.append({'name': name, 'avatar': avatar, 'bet': bet, 'multiplier': 0, 'payout': 0, 'status': 'participating'})
     result.sort(key=lambda x: (-x['payout'], 0 if x['status'] != 'lost' else 1))
     return result
 
