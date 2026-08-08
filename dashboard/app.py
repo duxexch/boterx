@@ -560,6 +560,18 @@ def webapp_auth(f):
                     init_data = ''
 
             if not init_data:
+                # uid fallback: accept uid from URL/body when no initData.
+                # Bot sends uid in the URL — valid for browser/WebView opens.
+                uid_fb = request.args.get('uid', '').strip()
+                if not uid_fb:
+                    try:
+                        uid_fb = (request.get_json(silent=True) or {}).get('uid', '').strip()
+                    except Exception:
+                        uid_fb = ''
+                if uid_fb:
+                    g.telegram_user_id = uid_fb
+                    g.telegram_user = None
+                    return f(*args, **kwargs)
                 return jsonify({'error': 'initData required', 'code': 'NO_INIT_DATA'}), 403
 
             uid_str, user_obj = validate_telegram_init_data(init_data)
