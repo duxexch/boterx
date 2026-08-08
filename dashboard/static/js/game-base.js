@@ -495,10 +495,14 @@ async function pollLivePlayers() {
 }
 
 // Simulated players (fallback only when no real data available)
+// NOTE: SSE live-players/leaderboard streams DISABLED to prevent thread
+// exhaustion on 1-core server. Using polling fallback only.
 function simulatePlayers() {
-  // Try SSE first, fallback to simulation
-  if (!_lpSSE && !_lpSSEFallback) {
-    connectLivePlayersStream();
+  // Do NOT connect SSE — it exhausts gunicorn threads on 1-core server.
+  // Use polling fallback instead (lighter on server resources).
+  if (!_lpSSEFallback) {
+    _lpSSEFallback = setInterval(pollLivePlayers, 5000);
+    pollLivePlayers();
   }
   // Add a fake player occasionally if list is empty
   if (livePlayers.length < 3) {
