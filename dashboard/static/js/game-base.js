@@ -908,9 +908,24 @@ function injectDepositButton() {
 
 // ---- Balance Check Before Bet ----
 // Returns true if balance >= requiredAmount, otherwise shows deposit modal and returns false
-function checkBalanceBeforeBet(requiredAmount) {
+// Async version — fetches balance from server (more reliable than reading DOM)
+async function checkBalanceBeforeBet(requiredAmount) {
+  // First try reading from DOM (fast path — already loaded)
   var balEl = document.getElementById('bal');
   var currentBal = balEl ? parseFloat(balEl.textContent.replace(/,/g, '')) || 0 : 0;
+  // If DOM shows 0, fetch from server (balance might not have loaded yet)
+  if (currentBal === 0) {
+    try {
+      var r = await apiFetch(BASE + '/api/wallet/balance?uid=' + uid);
+      var d = await r.json();
+      if (d.balance !== undefined) {
+        currentBal = parseFloat(d.balance) || 0;
+        if (balEl) balEl.textContent = currentBal.toLocaleString();
+        var curEl = document.getElementById('cur');
+        if (curEl && d.currency) curEl.textContent = d.currency;
+      }
+    } catch(e) { /* network error — proceed with 0 */ }
+  }
   if (currentBal < requiredAmount) {
     showVexDepositModal(requiredAmount);
     return false;

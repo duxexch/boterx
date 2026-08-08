@@ -442,7 +442,16 @@ function placeBet(slot) {
 }
 
 function _doPlaceBet(slot, amt, autoVal) {
-  if (!checkBalanceBeforeBet(amt)) return;
+  var btn = document.getElementById('btn'+slot);
+  btn.disabled = true; btn.textContent = '⏳'; btn.className = 'bet-slot-btn bet';
+  document.getElementById('slot'+slot).classList.remove('queued');
+  checkBalanceBeforeBet(amt).then(function(ok) {
+    if (!ok) { btn.disabled = false; btn.textContent = 'رهان'; return; }
+    _sendBet(slot, amt, autoVal);
+  });
+}
+
+function _sendBet(slot, amt, autoVal) {
   var btn = document.getElementById('btn'+slot);
   btn.disabled = true; btn.textContent = '⏳'; btn.className = 'bet-slot-btn bet';
   document.getElementById('slot'+slot).classList.remove('queued');
@@ -543,20 +552,27 @@ function syncGameStateMainButton() {
   } else { hideMainButton(); }
 }
 
-// ── Init ───────────────────────────────────────
+// ── Init — correct order: show app FIRST, then canvas, then network ──
 document.getElementById('loading').style.display = 'none';
 document.getElementById('app').style.display = 'flex';
-loadBalance();
+// Canvas needs #app visible to have correct dimensions
 requestAnimationFrame(function() {
   resizeCanvas();
   pickWeather();
   drawBackground(0);
   drawRunway(0);
 });
+// Load balance (async — will update #bal element)
+loadBalance();
+// Connect to game SSE (starts receiving round events)
 connectSSE();
-setInterval(loadBalance, 5000);
+// Bot players (simulated — makes the game feel alive)
 setInterval(simulatePlayers, 2500);
 simulatePlayers(); renderPlayers();
+// Periodic balance refresh
+setInterval(loadBalance, 5000);
+// Inject deposit button into topbar
+setTimeout(injectDepositButton, 100);
 </script>
 </body>
 </html>
