@@ -1350,11 +1350,10 @@ def _auto_reject_old_pending():
                     with open(tx_path, 'w', newline='', encoding='utf-8-sig') as f:
                         _w = _csv.DictWriter(f, fieldnames=_fn); _w.writeheader(); _w.writerows(_rows)
         except: pass
-        _ar_thread._ar_sleep(600)  # check every 10 minutes
+        time.sleep(600)  # check every 10 minutes
 
-import time as _ar_sleep_mod
-_ar_sleep_mod.sleep(3)  # wait for app to start
-_ar_thread_ = _ar_thread.Thread(target=_auto_reject_old_pending, daemon=True)
+time.sleep(3)  # wait for app to start
+_ar_thread_ = threading.Thread(target=_auto_reject_old_pending, daemon=True)
 _ar_thread_.start()
 
 @app.route('/api/transactions/export')
