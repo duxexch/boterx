@@ -198,6 +198,9 @@ function startTimer(drawTime) {
 
 function buyTickets() {
   var btn = document.getElementById('buyBtn');
+  var ticketCount = parseInt(document.getElementById('ticketCount').value) || 1;
+  var pricePer = parseFloat(document.getElementById('lotteryPrice') ? document.getElementById('lotteryPrice').textContent : 10) || 10;
+  if (!checkBalanceBeforeBet(pricePer * ticketCount)) return;
   btn.disabled = true;
   apiFetchCritical(BASE + '/api/lottery/buy', {
     method: 'POST',

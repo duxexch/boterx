@@ -149,6 +149,7 @@ function buildLegend() {
 function spin() {
   if (spinning) return;
   var bet = parseFloat(document.getElementById('betInp').value) || 10;
+  if (!checkBalanceBeforeBet(bet)) return;
   spinning = true;
   document.getElementById('spinBtn').disabled = true;
   document.getElementById('resultMult').classList.remove('show');

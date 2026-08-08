@@ -201,6 +201,7 @@ function drawBoard() {
 function dropBall() {
   if (dropping) return;
   var bet = parseFloat(document.getElementById('betInp').value) || 10;
+  if (!checkBalanceBeforeBet(bet)) return;
   dropping = true;
   document.getElementById('dropBtn').disabled = true;
   apiFetchCritical(BASE + '/api/plinko/drop', {
