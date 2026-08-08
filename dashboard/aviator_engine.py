@@ -87,10 +87,13 @@ def _calc_crash():
 
 def _server_mult():
     """Authoritative multiplier from flight start timestamp."""
-    if _state['phase'] != 'flying':
-        return 1.0
-    elapsed = time.time() - _state['flight_start']
-    return max(1.0, math.exp(GROWTH_RATE * elapsed))
+    if _state['phase'] == 'flying':
+        elapsed = time.time() - _state['flight_start']
+        return max(1.0, math.exp(GROWTH_RATE * elapsed))
+    elif _state['phase'] == 'crashed':
+        # أثناء الانفجار: المضاعف = قيمة الانفجار (لا ترجع لـ 1.0)
+        return _state.get('crash_point', 1.0)
+    return 1.0
 
 # ── SSE ─────────────────────────────────────────────────
 def _broadcast(msg):
@@ -311,6 +314,7 @@ def init_aviator_engine(app, get_uid, get_gm, get_pf, is_pf, is_vex):
             return jsonify({
                 'phase': _state['phase'],
                 'multiplier': round(_server_mult(), 2),
+                'crash_point': round(_state.get('crash_point', 0), 2),
                 'round_id': _state['round_id'],
                 'history': list(_state['history'][-15:]),
             })
