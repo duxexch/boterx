@@ -136,35 +136,40 @@ def _mask_name(name, phone):
     return masked
 
 def _get_real_players(current_mult):
-    """جمع الرهانات الحقيقية من اللاعبين الفعليين في الجولة الحالية.
-    الأسماء مخفية بنجوم + آخر 4 أرقام من الهاتف."""
-    result = []
+    """جمع الرهانات الحقيقية — بدون deadlock (I/O بره الـ lock)"""
+    # Step 1: جمع بيانات الرهانات تحت الـ lock (سريع)
     with _lock:
+        bets_snapshot = []
         for uid, bet in list(_state['bets'].items()):
-            name = _get_name(uid)
-            phone = _get_user_phone(uid)
-            masked_name = _mask_name(name, phone)
-            avatar = (name or '?')[0].upper() if name else '★'
-            if bet['cashed_out']:
-                mult = bet.get('cash_mult', 0)
-                payout = round(bet['amount'] * mult, 2) if mult > 0 else 0
-                result.append({
-                    'name': masked_name, 'avatar': avatar,
-                    'bet': bet['amount'], 'multiplier': mult,
-                    'payout': payout, 'status': 'cashed', 'real': True,
-                })
-            elif _state['phase'] == 'crashed':
-                result.append({
-                    'name': masked_name, 'avatar': avatar,
-                    'bet': bet['amount'], 'multiplier': 0,
-                    'payout': 0, 'status': 'lost', 'real': True,
-                })
-            else:
-                result.append({
-                    'name': masked_name, 'avatar': avatar,
-                    'bet': bet['amount'], 'multiplier': 0,
-                    'payout': 0, 'status': 'participating', 'real': True,
-                })
+            bets_snapshot.append((uid, dict(bet)))
+        phase = _state['phase']
+    # Step 2: اقرأ الأسماء/الهواتف بره الـ lock (I/O بطيء)
+    result = []
+    for uid, bet in bets_snapshot:
+        name = _get_name(uid)
+        phone = _get_user_phone(uid)
+        masked_name = _mask_name(name, phone)
+        avatar = (name or '?')[0].upper() if name else '★'
+        if bet['cashed_out']:
+            mult = bet.get('cash_mult', 0)
+            payout = round(bet['amount'] * mult, 2) if mult > 0 else 0
+            result.append({
+                'name': masked_name, 'avatar': avatar,
+                'bet': bet['amount'], 'multiplier': mult,
+                'payout': payout, 'status': 'cashed', 'real': True,
+            })
+        elif phase == 'crashed':
+            result.append({
+                'name': masked_name, 'avatar': avatar,
+                'bet': bet['amount'], 'multiplier': 0,
+                'payout': 0, 'status': 'lost', 'real': True,
+            })
+        else:
+            result.append({
+                'name': masked_name, 'avatar': avatar,
+                'bet': bet['amount'], 'multiplier': 0,
+                'payout': 0, 'status': 'participating', 'real': True,
+            })
     return result
 
 # ── Game loop (daemon, runs forever) ────────────────────
