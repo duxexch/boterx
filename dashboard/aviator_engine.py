@@ -418,7 +418,7 @@ def _init_fake_players():
     """توليد 1000 حساب وهمي ببيانات عشوائية"""
     global _FAKE_PLAYERS, _FAKE_PLAYER_COUNT
     _FAKE_PLAYERS = []
-    for i in range(1000):
+    for i in range(100):
         name = _FAKE_NAMES[i % len(_FAKE_NAMES)] + ' ' + str(random.randint(1, 999))
         _FAKE_PLAYERS.append({
             'id': i + 1,
