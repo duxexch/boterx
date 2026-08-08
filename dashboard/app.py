@@ -1179,6 +1179,24 @@ def api_reject_txn(txn_id):
             t['processed_by'] = session.get('admin_id', '')
             break
     write_csv('transactions.csv', txns, fieldnames)
+    # Sync matching quick_deposits (VEX) -> rejected
+    try:
+        import csv as _qcsv
+        _qp = os.path.join(BASE_DIR, 'quick_deposits.csv')
+        if os.path.exists(_qp):
+            with open(_qp, 'r', encoding='utf-8-sig') as _f:
+                _r = _qcsv.DictReader(_f); _fn = _r.fieldnames; _rows = list(_r)
+            _changed = False
+            for _row in _rows:
+                if _row.get('id') == txn_id or (_row.get('user_id') and txn_id.startswith(('DEP','WTH')) and _row.get('id') == txn_id):
+                    if _row.get('status') in ('pending','pending_withdrawal'):
+                        _row['status'] = 'rejected' if _row.get('status')=='pending' else 'withdrawal_rejected'
+                        _row['processed_by'] = session.get('admin_id','')
+                        _changed = True
+            if _changed:
+                with open(_qp, 'w', newline='', encoding='utf-8-sig') as _f:
+                    _w = _qcsv.DictWriter(_f, fieldnames=_fn); _w.writeheader(); _w.writerows(_rows)
+    except: pass
     log_action('reject_transaction', f'{txn_id}: {reason}')
     return jsonify({'success': True})
 
@@ -1215,6 +1233,129 @@ def api_bulk_reject():
     write_csv('transactions.csv', txns, fieldnames)
     log_action('bulk_reject', f'{count} transactions: {reason}')
     return jsonify({'success': True, 'count': count})
+
+# ===== Pending Requests: unified view (transactions + VEX deposits + withdrawals) =====
+@app.route('/api/pending-requests')
+@api_auth
+def api_pending_requests():
+    """جميع الطلبات المعلقة في صفحة واحدة: إيداع + سحب + إيداع VEX.
+    عند الموافقة/الرفض يتحول تلقائياً للسجلات ويختفي من هنا."""
+    import csv as _csv
+    from datetime import datetime as _dt
+    all_pending = []
+
+    # 1) Main transactions (deposits + withdrawals pending)
+    try:
+        with open(os.path.join(BASE_DIR, 'transactions.csv'), 'r', encoding='utf-8-sig') as f:
+            for row in _csv.DictReader(f):
+                if row.get('status') == 'pending':
+                    all_pending.append({
+                        'id': row.get('id',''),
+                        'name': row.get('name',''),
+                        'telegram_id': row.get('telegram_id',''),
+                        'customer_id': row.get('customer_id',''),
+                        'type': row.get('type','deposit'),
+                        'company': row.get('company',''),
+                        'wallet': row.get('wallet_number',''),
+                        'amount': row.get('amount','0'),
+                        'currency': row.get('currency',''),
+                        'status': 'pending',
+                        'date': row.get('date',''),
+                        'source': 'transactions',
+                        'age_hours': _calc_age_hours(row.get('date','')),
+                    })
+    except: pass
+
+    # 2) VEX quick deposits pending
+    try:
+        qd_path = os.path.join(BASE_DIR, 'quick_deposits.csv')
+        if os.path.exists(qd_path):
+            with open(qd_path, 'r', encoding='utf-8-sig') as f:
+                reader = _csv.DictReader(f)
+                for row in reader:
+                    st = row.get('status','')
+                    if st in ('pending','pending_withdrawal'):
+                        all_pending.append({
+                            'id': row.get('id',''),
+                            'name': '',
+                            'telegram_id': row.get('user_id',''),
+                            'customer_id': '',
+                            'type': 'deposit' if st=='pending' else 'withdraw',
+                            'company': 'VEX Wallet',
+                            'wallet': row.get('account_number',''),
+                            'amount': row.get('amount','0'),
+                            'currency': '',
+                            'status': st,
+                            'date': row.get('created_at',''),
+                            'source': 'vex_deposits',
+                            'age_hours': _calc_age_hours(row.get('created_at','')),
+                        })
+    except: pass
+
+    # Sort by date (newest first)
+    all_pending.sort(key=lambda x: x.get('date',''), reverse=True)
+    return jsonify({'pending': all_pending, 'count': len(all_pending)})
+
+def _calc_age_hours(date_str):
+    """Calculate age in hours from a date string."""
+    try:
+        dt = _dt.strptime(date_str.strip(), '%Y-%m-%d %H:%M:%S')
+    except:
+        try:
+            dt = _dt.strptime(date_str.strip(), '%Y-%m-%d %H:%M')
+        except:
+            return 0
+    return round((_dt.now() - dt).total_seconds() / 3600, 1)
+
+# ===== Auto-reject old pending deposits =====
+import threading as _ar_thread
+_AR_TIMEOUT_HOURS = 24  # auto-reject after 24 hours
+def _auto_reject_old_pending():
+    """Background thread: auto-reject pending deposits older than timeout."""
+    import csv as _csv
+    while True:
+        try:
+            # Check quick_deposits
+            qd_path = os.path.join(BASE_DIR, 'quick_deposits.csv')
+            if os.path.exists(qd_path):
+                with open(qd_path, 'r', encoding='utf-8-sig') as f:
+                    _r = _csv.DictReader(f); _fn = _r.fieldnames; _rows = list(_r)
+                _changed = False
+                for row in _rows:
+                    st = row.get('status','')
+                    if st in ('pending','pending_withdrawal'):
+                        age = _calc_age_hours(row.get('created_at',''))
+                        if age > _AR_TIMEOUT_HOURS:
+                            row['status'] = 'auto_rejected' if st=='pending' else 'withdrawal_auto_rejected'
+                            _changed = True
+                if _changed:
+                    with open(qd_path, 'w', newline='', encoding='utf-8-sig') as f:
+                        _w = _csv.DictWriter(f, fieldnames=_fn); _w.writeheader(); _w.writerows(_rows)
+        except: pass
+        try:
+            # Check main transactions
+            tx_path = os.path.join(BASE_DIR, 'transactions.csv')
+            if os.path.exists(tx_path):
+                with open(tx_path, 'r', encoding='utf-8-sig') as f:
+                    _r = _csv.DictReader(f); _fn = _r.fieldnames; _rows = list(_r)
+                _changed = False
+                for row in _rows:
+                    if row.get('status') == 'pending':
+                        age = _calc_age_hours(row.get('date',''))
+                        if age > _AR_TIMEOUT_HOURS:
+                            row['status'] = 'auto_rejected'
+                            row['admin_note'] = f'تم الرفض التلقائي بعد {age:.0f} ساعة'
+                            _changed = True
+                if _changed:
+                    with open(tx_path, 'w', newline='', encoding='utf-8-sig') as f:
+                        _w = _csv.DictWriter(f, fieldnames=_fn); _w.writeheader(); _w.writerows(_rows)
+        except: pass
+        _ar_thread._ar_sleep(600)  # check every 10 minutes
+
+import time as _ar_sleep_mod
+_ar_sleep_mod.sleep(3)  # wait for app to start
+_ar_thread_ = _ar_thread.Thread(target=_auto_reject_old_pending, daemon=True)
+_ar_thread_.start()
 
 @app.route('/api/transactions/export')
 @api_auth
