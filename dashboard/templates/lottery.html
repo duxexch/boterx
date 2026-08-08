@@ -198,8 +198,8 @@ function startTimer(drawTime) {
 
 function buyTickets() {
   var btn = document.getElementById('buyBtn');
-  var ticketCount = parseInt(document.getElementById('ticketCount').value) || 1;
-  var pricePer = parseFloat(document.getElementById('lotteryPrice') ? document.getElementById('lotteryPrice').textContent : 10) || 10;
+  var pricePerText = document.getElementById('priceInfo') ? document.getElementById('priceInfo').textContent : '10';
+  var pricePer = parseFloat(pricePerText.match(/[\d.]+/)) || 10;
   if (!checkBalanceBeforeBet(pricePer * ticketCount)) return;
   btn.disabled = true;
   apiFetchCritical(BASE + '/api/lottery/buy', {
