@@ -1,18 +1,18 @@
-﻿{% extends "base.html" %}
-{% block title %}Ø§Ù„Ø¨ÙˆØªØ§Øª - Boterx{% endblock %}
-{% block page_title %}Ø§Ù„Ø¨ÙˆØªØ§Øª{% endblock %}
+{% extends "base.html" %}
+{% block title %}البوتات - Boterx{% endblock %}
+{% block page_title %}البوتات{% endblock %}
 
 {% block content %}
 <div x-data="botsPage()" x-init="init()">
     <!-- Header -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-            <h2 class="text-xl font-bold">Ø¥Ø¯Ø§Ø±Ø© Ø§Ù„Ø¨ÙˆØªØ§Øª</h2>
-            <p class="text-sm text-slate-400 mt-1">Ø¥Ø¶Ø§ÙØ© ÙˆØ¥Ø¯Ø§Ø±Ø© Ø¨ÙˆØªØ§Øª ØªÙŠÙ„ÙŠØ¬Ø±Ø§Ù… Ø§Ù„Ù…ØªØµÙ„Ø© Ø¨Ø§Ù„Ù†Ø¸Ø§Ù…</p>
+            <h2 class="text-xl font-bold">إدارة البوتات</h2>
+            <p class="text-sm text-slate-400 mt-1">إضافة وإدارة بوتات تيليجرام المتصلة بالنظام</p>
         </div>
         <button @click="openAddModal()"
             class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition flex items-center gap-2 self-start">
-            <i class="fas fa-plus"></i> Ø¥Ø¶Ø§ÙØ© Ø¨ÙˆØª
+            <i class="fas fa-plus"></i> إضافة بوت
         </button>
     </div>
 
@@ -30,14 +30,14 @@
                                     :class="bot.freeze_until ? 'text-amber-400' : (bot.is_active ? 'text-green-400' : 'text-red-400')"></i>
                             </div>
                             <div>
-                                <h3 class="font-bold" x-text="bot.name || 'Ø¨ÙˆØª'"></h3>
+                                <h3 class="font-bold" x-text="bot.name || 'بوت'"></h3>
                                 <p class="text-[10px] text-slate-500 font-mono" x-text="'#' + bot.id"></p>
                             </div>
                         </div>
                         <!-- Status -->
-                        <span x-show="bot.freeze_until" class="px-2 py-1 rounded-full text-[10px] font-semibold bg-amber-500/20 text-amber-400">Ù…ÙØ¬Ù…Ù‘Ø¯</span>
-                        <span x-show="!bot.freeze_until && bot.is_active" class="px-2 py-1 rounded-full text-[10px] font-semibold bg-green-500/20 text-green-400">Ù†Ø´Ø·</span>
-                        <span x-show="!bot.freeze_until && !bot.is_active" class="px-2 py-1 rounded-full text-[10px] font-semibold bg-red-500/20 text-red-400">ØºÙŠØ± Ù†Ø´Ø·</span>
+                        <span x-show="bot.freeze_until" class="px-2 py-1 rounded-full text-[10px] font-semibold bg-amber-500/20 text-amber-400">مُجمّد</span>
+                        <span x-show="!bot.freeze_until && bot.is_active" class="px-2 py-1 rounded-full text-[10px] font-semibold bg-green-500/20 text-green-400">نشط</span>
+                        <span x-show="!bot.freeze_until && !bot.is_active" class="px-2 py-1 rounded-full text-[10px] font-semibold bg-red-500/20 text-red-400">غير نشط</span>
                     </div>
                 </div>
 
@@ -62,7 +62,7 @@
                 <div x-show="bot.freeze_until" class="px-5 py-2">
                     <p class="text-xs text-amber-400/80">
                         <i class="fas fa-snowflake text-xs ml-1"></i>
-                        Ù…Ø¬Ù…Ù‘Ø¯ Ø­ØªÙ‰: <span x-text="bot.freeze_until"></span>
+                        مجمّد حتى: <span x-text="bot.freeze_until"></span>
                     </p>
                 </div>
 
@@ -73,7 +73,7 @@
                             class="px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1"
                             :class="bot.is_active ? 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30' : 'bg-green-500/20 text-green-400 hover:bg-green-500/30'">
                             <i class="fas fa-power-off text-xs"></i>
-                            <span x-text="bot.is_active ? 'ØªØ¹Ø·ÙŠÙ„' : 'ØªÙØ¹ÙŠÙ„'"></span>
+                            <span x-text="bot.is_active ? 'تعطيل' : 'تفعيل'"></span>
                         </button>
                         <button @click="confirmDelete(bot)"
                             class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-500/20 text-red-400 hover:bg-red-500/30 transition flex items-center gap-1">
@@ -89,8 +89,8 @@
         <div x-show="bots.length === 0" class="col-span-full">
             <div class="bg-slate-800 rounded-xl border border-slate-700 p-10 text-center">
                 <i class="fas fa-robot text-5xl text-slate-600 mb-4 block"></i>
-                <p class="text-slate-400 text-lg">Ù„Ø§ ØªÙˆØ¬Ø¯ Ø¨ÙˆØªØ§Øª</p>
-                <p class="text-slate-500 text-sm mt-1">Ø£Ø¶Ù Ø§Ù„Ø¨ÙˆØª Ø§Ù„Ø£ÙˆÙ„ Ø¨Ø§Ù„Ù†Ù‚Ø± Ø¹Ù„Ù‰ Ø§Ù„Ø²Ø± Ø£Ø¹Ù„Ø§Ù‡</p>
+                <p class="text-slate-400 text-lg">لا توجد بوتات</p>
+                <p class="text-slate-500 text-sm mt-1">أضف البوت الأول بالنقر على الزر أعلاه</p>
             </div>
         </div>
     </div>
@@ -99,14 +99,14 @@
     <div x-show="showModal" x-transition.opacity class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" style="display:none" @click.self="showModal = false">
         <div class="bg-slate-800 rounded-2xl border border-slate-700 w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl" @click.stop="">
             <div class="flex items-center justify-between p-5 border-b border-slate-700">
-                <h3 class="text-lg font-bold">Ø¥Ø¶Ø§ÙØ© Ø¨ÙˆØª Ø¬Ø¯ÙŠØ¯</h3>
+                <h3 class="text-lg font-bold">إضافة بوت جديد</h3>
                 <button @click="showModal = false" class="text-slate-400 hover:text-white transition">
                     <i class="fas fa-times text-lg"></i>
                 </button>
             </div>
             <form @submit.prevent="saveBot()" class="p-5 space-y-4">
                 <div>
-                    <label class="block text-sm text-slate-400 mb-1">Ø§Ø³Ù… Ø§Ù„Ø¨ÙˆØª <span class="text-red-400">*</span></label>
+                    <label class="block text-sm text-slate-400 mb-1">اسم البوت <span class="text-red-400">*</span></label>
                     <input x-model="form.name" required type="text" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="MyBot">
                 </div>
                 <div>
@@ -114,21 +114,21 @@
                     <input x-model="form.token" required type="text" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono" placeholder="123456:ABC-DEF1234...">
                 </div>
                 <div>
-                    <label class="block text-sm text-slate-400 mb-1">Ù…Ø¹Ø±ÙØ§Øª Ø§Ù„Ù…Ø¯Ø±Ø§Ø¡</label>
+                    <label class="block text-sm text-slate-400 mb-1">معرفات المدراء</label>
                     <input x-model="form.admin_ids" type="text" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono" placeholder="123456789,987654321">
-                    <p class="text-[10px] text-slate-500 mt-1">Ø£Ø¯Ø®Ù„ Ù…Ø¹Ø±ÙØ§Øª ØªÙŠÙ„ÙŠØ¬Ø±Ø§Ù… Ù…ÙØµÙˆÙ„Ø© Ø¨ÙÙˆØ§ØµÙ„</p>
+                    <p class="text-[10px] text-slate-500 mt-1">أدخل معرفات تيليجرام مفصولة بفواصل</p>
                 </div>
                 <div>
-                    <label class="block text-sm text-slate-400 mb-1">Ø§Ù„ÙˆØµÙ</label>
-                    <textarea x-model="form.description" rows="2" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="ÙˆØµÙ Ø§Ù„Ø¨ÙˆØª"></textarea>
+                    <label class="block text-sm text-slate-400 mb-1">الوصف</label>
+                    <textarea x-model="form.description" rows="2" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="وصف البوت"></textarea>
                 </div>
                 <div>
-                    <label class="block text-sm text-slate-400 mb-1">ØªØ§Ø±ÙŠØ® ØªØ¬Ù…ÙŠØ¯ Ø§Ù„Ø¨ÙˆØª</label>
+                    <label class="block text-sm text-slate-400 mb-1">تاريخ تجميد البوت</label>
                     <input x-model="form.freeze_until" type="datetime-local" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <p class="text-[10px] text-slate-500 mt-1">Ø§ØªØ±ÙƒÙ‡ ÙØ§Ø±ØºØ§Ù‹ Ø¥Ø°Ø§ ÙƒØ§Ù† Ø§Ù„Ø¨ÙˆØª ØºÙŠØ± Ù…Ø¬Ù…Ù‘Ø¯</p>
+                    <p class="text-[10px] text-slate-500 mt-1">اتركه فارغاً إذا كان البوت غير مجمّد</p>
                 </div>
                 <div class="flex gap-3 pt-2">
-                    <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg text-sm font-semibold transition">Ø¥Ø¶Ø§ÙØ© Ø§Ù„Ø¨ÙˆØª</button>
+                    <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg text-sm font-semibold transition">إضافة البوت</button>
                     <button type="button" @click="showModal = false" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-lg text-sm transition" data-i18n="cancel">Cancel</button>
                 </div>
             </form>
@@ -142,9 +142,9 @@
                 <div class="w-14 h-14 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4">
                     <i class="fas fa-exclamation-triangle text-red-400 text-2xl"></i>
                 </div>
-                <h3 class="text-lg font-bold mb-2">ØªØ£ÙƒÙŠØ¯ Ø§Ù„Ø­Ø°Ù</h3>
-                <p class="text-sm text-slate-400">Ù‡Ù„ Ø£Ù†Øª Ù…ØªØ£ÙƒØ¯ Ù…Ù† Ø­Ø°Ù Ø§Ù„Ø¨ÙˆØª "<span class="text-white font-semibold" x-text="deleteTarget?.name"></span>"ØŸ</p>
-                <p class="text-xs text-red-400 mt-2">Ù‡Ø°Ø§ Ø§Ù„Ø¥Ø¬Ø±Ø§Ø¡ Ù„Ø§ ÙŠÙ…ÙƒÙ† Ø§Ù„ØªØ±Ø§Ø¬Ø¹ Ø¹Ù†Ù‡.</p>
+                <h3 class="text-lg font-bold mb-2">تأكيد الحذف</h3>
+                <p class="text-sm text-slate-400">هل أنت متأكد من حذف البوت "<span class="text-white font-semibold" x-text="deleteTarget?.name"></span>"؟</p>
+                <p class="text-xs text-red-400 mt-2">هذا الإجراء لا يمكن التراجع عنه.</p>
                 <div class="flex gap-3 mt-6">
                     <button @click="deleteBot()" class="flex-1 bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-lg text-sm font-semibold transition" data-i18n="delete">Delete</button>
                     <button @click="showDeleteModal = false" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-lg text-sm transition" data-i18n="cancel">Cancel</button>
@@ -174,7 +174,7 @@ function botsPage() {
                 const data = await api('/api/bots');
                 this.bots = data.bots || data || [];
             } catch (e) {
-                toast('ÙØ´Ù„ ØªØ­Ù…ÙŠÙ„ Ø§Ù„Ø¨ÙˆØªØ§Øª', 'error');
+                toast('فشل تحميل البوتات', 'error');
             }
         },
 
@@ -189,21 +189,21 @@ function botsPage() {
                     method: 'POST',
                     body: JSON.stringify(this.form),
                 });
-                toast('ØªÙ…Øª Ø¥Ø¶Ø§ÙØ© Ø§Ù„Ø¨ÙˆØª Ø¨Ù†Ø¬Ø§Ø­', 'success');
+                toast('تمت إضافة البوت بنجاح', 'success');
                 this.showModal = false;
                 await this.loadBots();
             } catch (e) {
-                toast('ÙØ´Ù„ Ø¥Ø¶Ø§ÙØ© Ø§Ù„Ø¨ÙˆØª: ' + (e.message || 'Ø®Ø·Ø£ ØºÙŠØ± Ù…Ø¹Ø±ÙˆÙ'), 'error');
+                toast('فشل إضافة البوت: ' + (e.message || 'خطأ غير معروف'), 'error');
             }
         },
 
         async toggleActive(bot) {
             try {
                 await api(`/api/bots/${bot.id}/toggle`, { method: 'POST' });
-                toast(bot.is_active ? 'ØªÙ… ØªØ¹Ø·ÙŠÙ„ Ø§Ù„Ø¨ÙˆØª' : 'ØªÙ… ØªÙØ¹ÙŠÙ„ Ø§Ù„Ø¨ÙˆØª', 'success');
+                toast(bot.is_active ? 'تم تعطيل البوت' : 'تم تفعيل البوت', 'success');
                 await this.loadBots();
             } catch (e) {
-                toast('ÙØ´Ù„ ØªØºÙŠÙŠØ± Ø§Ù„Ø­Ø§Ù„Ø©', 'error');
+                toast('فشل تغيير الحالة', 'error');
             }
         },
 
@@ -216,12 +216,12 @@ function botsPage() {
             if (!this.deleteTarget) return;
             try {
                 await api(`/api/bots/${this.deleteTarget.id}`, { method: 'DELETE' });
-                toast('ØªÙ… Ø­Ø°Ù Ø§Ù„Ø¨ÙˆØª Ø¨Ù†Ø¬Ø§Ø­', 'success');
+                toast('تم حذف البوت بنجاح', 'success');
                 this.showDeleteModal = false;
                 this.deleteTarget = null;
                 await this.loadBots();
             } catch (e) {
-                toast('ÙØ´Ù„ Ø­Ø°Ù Ø§Ù„Ø¨ÙˆØª', 'error');
+                toast('فشل حذف البوت', 'error');
             }
         },
     };

@@ -1,6 +1,6 @@
-﻿{% extends "base.html" %}
-{% block title %}Ø§Ù„Ø¥Ø­ØµØ§Ø¦ÙŠØ§Øª Ø§Ù„ØªÙØµÙŠÙ„ÙŠØ© - Boterx{% endblock %}
-{% block page_title %}Ø§Ù„Ø¥Ø­ØµØ§Ø¦ÙŠØ§Øª Ø§Ù„ØªÙØµÙŠÙ„ÙŠØ©{% endblock %}
+{% extends "base.html" %}
+{% block title %}الإحصائيات التفصيلية - Boterx{% endblock %}
+{% block page_title %}الإحصائيات التفصيلية{% endblock %}
 
 {% block content %}
 <div x-data="statisticsPage()" x-init="init()">
@@ -16,22 +16,22 @@
             <button @click="setRange('today')"
                 class="px-3 py-1.5 rounded-md text-xs font-medium transition"
                 :class="dateRange === 'today' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'">
-                Ø§Ù„ÙŠÙˆÙ…
+                اليوم
             </button>
             <button @click="setRange('week')"
                 class="px-3 py-1.5 rounded-md text-xs font-medium transition"
                 :class="dateRange === 'week' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'">
-                Ø§Ù„Ø£Ø³Ø¨ÙˆØ¹
+                الأسبوع
             </button>
             <button @click="setRange('month')"
                 class="px-3 py-1.5 rounded-md text-xs font-medium transition"
                 :class="dateRange === 'month' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'">
-                Ø§Ù„Ø´Ù‡Ø±
+                الشهر
             </button>
             <button @click="setRange('all')"
                 class="px-3 py-1.5 rounded-md text-xs font-medium transition"
                 :class="dateRange === 'all' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'">
-                Ø§Ù„ÙƒÙ„
+                الكل
             </button>
         </div>
     </div>
@@ -55,7 +55,7 @@
                 </div>
                 <span class="text-xs text-slate-500" x-text="rangeLabel"></span>
             </div>
-            <p class="text-xs text-slate-400">Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„Ø­Ø¬Ù…</p>
+            <p class="text-xs text-slate-400">إجمالي الحجم</p>
             <p class="text-2xl font-bold text-green-400 mt-1" x-text="fmtNum(kpis.totalVolume.toFixed(0))"></p>
         </div>
         <div class="bg-slate-800 rounded-xl p-5 border border-slate-700">
@@ -85,7 +85,7 @@
         <!-- Transactions over time (line chart) -->
         <div class="lg:col-span-2 bg-slate-800 rounded-xl border border-slate-700 p-5">
             <h3 class="text-sm font-semibold mb-4 flex items-center gap-2">
-                <i class="fas fa-chart-line text-blue-400"></i> Ø§Ù„Ù…Ø¹Ø§Ù…Ù„Ø§Øª Ø¹Ø¨Ø± Ø§Ù„Ø²Ù…Ù†
+                <i class="fas fa-chart-line text-blue-400"></i> المعاملات عبر الزمن
             </h3>
             <div class="relative" style="height: 280px;">
                 <canvas id="txnChart"></canvas>
@@ -95,7 +95,7 @@
         <!-- Transaction types distribution (doughnut) -->
         <div class="bg-slate-800 rounded-xl border border-slate-700 p-5">
             <h3 class="text-sm font-semibold mb-4 flex items-center gap-2">
-                <i class="fas fa-chart-pie text-purple-400"></i> ØªÙˆØ²ÙŠØ¹ Ø£Ù†ÙˆØ§Ø¹ Ø§Ù„Ù…Ø¹Ø§Ù…Ù„Ø§Øª
+                <i class="fas fa-chart-pie text-purple-400"></i> توزيع أنواع المعاملات
             </h3>
             <div class="relative" style="height: 280px;">
                 <canvas id="typeChart"></canvas>
@@ -108,7 +108,7 @@
         <!-- User growth (area chart) -->
         <div class="bg-slate-800 rounded-xl border border-slate-700 p-5">
             <h3 class="text-sm font-semibold mb-4 flex items-center gap-2">
-                <i class="fas fa-user-plus text-green-400"></i> Ù†Ù…Ùˆ Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…ÙŠÙ†
+                <i class="fas fa-user-plus text-green-400"></i> نمو المستخدمين
             </h3>
             <div class="relative" style="height: 280px;">
                 <canvas id="userGrowthChart"></canvas>
@@ -118,7 +118,7 @@
         <!-- Top 5 companies by volume (bar chart) -->
         <div class="bg-slate-800 rounded-xl border border-slate-700 p-5">
             <h3 class="text-sm font-semibold mb-4 flex items-center gap-2">
-                <i class="fas fa-building text-amber-400"></i> Ø£Ø¹Ù„Ù‰ 5 Ø´Ø±ÙƒØ§Øª Ø­Ø³Ø¨ Ø§Ù„Ø­Ø¬Ù…
+                <i class="fas fa-building text-amber-400"></i> أعلى 5 شركات حسب الحجم
             </h3>
             <div class="relative" style="height: 280px;">
                 <canvas id="companiesChart"></canvas>
@@ -132,7 +132,7 @@
         <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
             <div class="p-4 border-b border-slate-700">
                 <h3 class="text-sm font-semibold flex items-center gap-2">
-                    <i class="fas fa-trophy text-amber-400"></i> Ø£Ø¹Ù„Ù‰ 10 Ù…Ø³ØªØ®Ø¯Ù…ÙŠÙ† Ø¨Ø§Ù„Ù…Ø¹Ø§Ù…Ù„Ø§Øª
+                    <i class="fas fa-trophy text-amber-400"></i> أعلى 10 مستخدمين بالمعاملات
                 </h3>
             </div>
             <div class="overflow-x-auto">
@@ -142,7 +142,7 @@
                             <th class="text-right px-4 py-2.5 font-semibold text-slate-400">#</th>
                             <th class="text-right px-4 py-2.5 font-semibold text-slate-400" data-i18n="user">User</th>
                             <th class="text-right px-4 py-2.5 font-semibold text-slate-400" data-i18n="transactions_label">Transactions</th>
-                            <th class="text-right px-4 py-2.5 font-semibold text-slate-400">Ø§Ù„Ø­Ø¬Ù…</th>
+                            <th class="text-right px-4 py-2.5 font-semibold text-slate-400">الحجم</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -154,7 +154,7 @@
                                         x-text="i + 1"></span>
                                 </td>
                                 <td class="px-4 py-2.5">
-                                    <p class="font-medium text-xs" x-text="u.name || 'â€”'"></p>
+                                    <p class="font-medium text-xs" x-text="u.name || '—'"></p>
                                     <p class="text-xs text-slate-500 font-mono" x-text="u.telegram_id"></p>
                                 </td>
                                 <td class="px-4 py-2.5 font-semibold" x-text="fmtNum(u.transaction_count || 0)"></td>
@@ -172,7 +172,7 @@
         <!-- Complaint Stats -->
         <div class="bg-slate-800 rounded-xl border border-slate-700 p-5">
             <h3 class="text-sm font-semibold mb-4 flex items-center gap-2">
-                <i class="fas fa-exclamation-circle text-red-400"></i> Ø¥Ø­ØµØ§Ø¦ÙŠØ§Øª Ø§Ù„Ø´ÙƒØ§ÙˆÙ‰
+                <i class="fas fa-exclamation-circle text-red-400"></i> إحصائيات الشكاوى
             </h3>
             <div class="grid grid-cols-2 gap-4 mb-4">
                 <div class="bg-slate-900/50 rounded-lg p-4 text-center">
@@ -221,7 +221,7 @@
 function statisticsPage() {
     return {
         dateRange: 'week',
-        rangeLabel: 'Ø§Ù„Ø£Ø³Ø¨ÙˆØ¹',
+        rangeLabel: 'الأسبوع',
         loading: false,
         kpis: { totalUsers: 0, totalVolume: 0, avgTransaction: 0, completionRate: 0 },
         topUsers: [],
@@ -235,7 +235,7 @@ function statisticsPage() {
 
         async setRange(range) {
             this.dateRange = range;
-            const labels = { today: 'Ø§Ù„ÙŠÙˆÙ…', week: 'Ø§Ù„Ø£Ø³Ø¨ÙˆØ¹', month: 'Ø§Ù„Ø´Ù‡Ø±', all: 'Ø§Ù„ÙƒÙ„' };
+            const labels = { today: 'اليوم', week: 'الأسبوع', month: 'الشهر', all: 'الكل' };
             this.rangeLabel = labels[range] || range;
             await this.loadData();
         },
@@ -260,7 +260,7 @@ function statisticsPage() {
                 };
                 this.$nextTick(() => this.renderCharts(data));
             } catch (e) {
-                toast('ÙØ´Ù„ ØªØ­Ù…ÙŠÙ„ Ø§Ù„Ø¥Ø­ØµØ§Ø¦ÙŠØ§Øª', 'error');
+                toast('فشل تحميل الإحصائيات', 'error');
             }
             this.loading = false;
         },
@@ -279,7 +279,7 @@ function statisticsPage() {
                     data: {
                         labels: data.transactions_chart.labels || [],
                         datasets: [{
-                            label: 'Ø§Ù„Ù…Ø¹Ø§Ù…Ù„Ø§Øª',
+                            label: 'المعاملات',
                             data: data.transactions_chart.data || [],
                             borderColor: '#3B82F6',
                             backgroundColor: 'rgba(59, 130, 246, 0.1)',
@@ -311,7 +311,7 @@ function statisticsPage() {
                     data: {
                         labels: data.user_growth_chart.labels || [],
                         datasets: [{
-                            label: 'Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…ÙˆÙ† Ø§Ù„Ø¬Ø¯Ø¯',
+                            label: 'المستخدمون الجدد',
                             data: data.user_growth_chart.data || [],
                             borderColor: '#22C55E',
                             backgroundColor: 'rgba(34, 197, 94, 0.15)',
@@ -365,7 +365,7 @@ function statisticsPage() {
                     data: {
                         labels: data.companies_chart.labels || [],
                         datasets: [{
-                            label: 'Ø§Ù„Ø­Ø¬Ù…',
+                            label: 'الحجم',
                             data: data.companies_chart.data || [],
                             backgroundColor: 'rgba(251, 191, 36, 0.6)',
                             borderColor: '#FBBF24',

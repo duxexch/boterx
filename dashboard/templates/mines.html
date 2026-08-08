@@ -1,9 +1,9 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>Mines â€” VEX</title>
+<title>Mines — VEX</title>
 <link rel="stylesheet" href="/static/css/game-base.css?v=20260808">
 <style>
 .game-area{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px;gap:8px;overflow:hidden}
@@ -49,13 +49,13 @@
 <div id="app" style="display:none">
   <div class="game-topbar">
     <div class="topbar-left">
-      <button class="btn-back" id="backBtn" onclick="handleBack()">â†</button>
-      <div class="bal-pill"><span class="bal-icon">ðŸ’°</span><span class="bal-val" id="bal">0</span><span class="bal-cur" id="cur">EGP</span></div>
+      <button class="btn-back" id="backBtn" onclick="handleBack()">←</button>
+      <div class="bal-pill"><span class="bal-icon">💰</span><span class="bal-val" id="bal">0</span><span class="bal-cur" id="cur">EGP</span></div>
     </div>
     <div class="topbar-right">
       <span class="streak-badge" id="streakBadge" style="display:none"></span>
-      <button class="btn-sound" id="soundBtn" onclick="toggleSound()">ðŸ”Š</button>
-      <span id="connIndicator">ðŸŸ¡</span>
+      <button class="btn-sound" id="soundBtn" onclick="toggleSound()">🔊</button>
+      <span id="connIndicator">🟡</span>
     </div>
   </div>
 
@@ -64,9 +64,9 @@
   <div class="game-area" style="flex:1;overflow-y:auto">
     <!-- Mines Info -->
     <div class="mines-info">
-      <div class="minfo"><div class="minfo-val green" id="multVal">1.00x</div><div class="minfo-label">Ø§Ù„Ù…Ø¶Ø§Ø¹Ù</div></div>
-      <div class="minfo"><div class="minfo-val gold" id="potWin">0</div><div class="minfo-label">Ø§Ù„Ø±Ø¨Ø­ Ø§Ù„Ù…Ø­ØªÙ…Ù„</div></div>
-      <div class="minfo"><div class="minfo-val" id="safeCount">0</div><div class="minfo-label">Ù…ÙƒØ´ÙˆÙ</div></div>
+      <div class="minfo"><div class="minfo-val green" id="multVal">1.00x</div><div class="minfo-label">المضاعف</div></div>
+      <div class="minfo"><div class="minfo-val gold" id="potWin">0</div><div class="minfo-label">الربح المحتمل</div></div>
+      <div class="minfo"><div class="minfo-val" id="safeCount">0</div><div class="minfo-label">مكشوف</div></div>
     </div>
 
     <!-- Multiplier progress bar -->
@@ -75,17 +75,17 @@
     <!-- Grid -->
     <div class="grid-wrap" id="grid"></div>
 
-    <div class="mines-phase-msg" id="phaseMsg">Ø§Ø®ØªØ± Ø¹Ø¯Ø¯ Ø§Ù„Ø£Ù„ØºØ§Ù… ÙˆØ¶Ø¹ Ø±Ù‡Ø§Ù†Ùƒ</div>
+    <div class="mines-phase-msg" id="phaseMsg">اختر عدد الألغام وضع رهانك</div>
 
     <!-- Setup (shown before game) -->
     <div id="setupPanel">
       <div class="mines-setup">
-        <div class="mines-label">ðŸ”´ Ø¹Ø¯Ø¯ Ø§Ù„Ø£Ù„ØºØ§Ù…</div>
+        <div class="mines-label">🔴 عدد الألغام</div>
         <div class="mines-count-row" id="minesCountRow"></div>
         <div class="bet-row">
-          <button class="ctrl-btn" onclick="adjustBet('betInp',0.5)">Â½</button>
+          <button class="ctrl-btn" onclick="adjustBet('betInp',0.5)">½</button>
           <input type="number" class="bet-inp" id="betInp" value="10" min="1">
-          <button class="ctrl-btn" onclick="adjustBet('betInp',2)">2Ã—</button>
+          <button class="ctrl-btn" onclick="adjustBet('betInp',2)">2×</button>
           <button class="ctrl-btn" onclick="setBetMin('betInp',10)">Min</button>
           <button class="ctrl-btn" onclick="setBetMax('betInp',5000)">Max</button>
         </div>
@@ -93,12 +93,12 @@
     </div>
 
     <!-- Action buttons -->
-    <button class="action-btn start" id="actionBtn" onclick="handleAction()">ðŸŽ® Ø§Ø¨Ø¯Ø£ Ø§Ù„Ù„Ø¹Ø¨Ø©</button>
+    <button class="action-btn start" id="actionBtn" onclick="handleAction()">🎮 ابدأ اللعبة</button>
   </div>
 </div>
 <div id="loading" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg);flex-direction:column;gap:12px">
-  <div style="font-size:40px">ðŸ’£</div>
-  <div style="color:var(--text-dim);font-size:14px">Ø¬Ø§Ø±Ù Ø§Ù„ØªØ­Ù…ÙŠÙ„...</div>
+  <div style="font-size:40px">💣</div>
+  <div style="color:var(--text-dim);font-size:14px">جارٍ التحميل...</div>
 </div>
 <script src="/static/js/game-base.js?v=20260808"></script>
 <script>
@@ -118,7 +118,7 @@ var TOTAL_CELLS = 25;
   MINES_OPTIONS.forEach(function(n) {
     var btn = document.createElement('button');
     btn.className = 'mc-btn' + (n === selectedMines ? ' active' : '');
-    btn.textContent = n + ' ðŸ’£';
+    btn.textContent = n + ' 💣';
     btn.onclick = function() {
       selectedMines = n;
       document.querySelectorAll('.mc-btn').forEach(function(b) { b.classList.remove('active'); });
@@ -154,19 +154,19 @@ function revealCell(idx) {
     var cell = document.getElementById('cell' + idx);
     if (d.is_mine) {
       cell.classList.add('revealed-mine');
-      cell.textContent = 'ðŸ’£';
+      cell.textContent = '💣';
       soundBomb(); hapticNotif('error');
       gameOver(d);
     } else {
       cell.classList.add('revealed-safe');
-      cell.textContent = 'ðŸ’Ž';
+      cell.textContent = '💎';
       soundGem(); haptic('medium');
       revealedCells++;
       currentMult = d.multiplier || currentMult;
       updateInfo();
       if (d.all_safe) { cashoutAuto(d); }
     }
-  }).catch(function() { showToast('Ø®Ø·Ø£ ÙÙŠ Ø§Ù„Ø´Ø¨ÙƒØ©', 'error'); });
+  }).catch(function() { showToast('خطأ في الشبكة', 'error'); });
 }
 
 function updateInfo() {
@@ -197,14 +197,14 @@ function startGame() {
     currentMult = 1.0;
     document.getElementById('setupPanel').style.display = 'none';
     document.getElementById('actionBtn').className = 'action-btn cashout';
-    document.getElementById('actionBtn').textContent = 'ðŸ’° Ø³Ø­Ø¨ Ø§Ù„Ø£Ø±Ø¨Ø§Ø­';
-    document.getElementById('phaseMsg').textContent = 'Ø§Ù†Ù‚Ø± Ø¹Ù„Ù‰ Ø§Ù„Ø®Ù„Ø§ÙŠØ§ Ù„ÙƒØ´ÙÙ‡Ø§ â€” ØªØ¬Ù†Ø¨ Ø§Ù„Ø£Ù„ØºØ§Ù…!';
+    document.getElementById('actionBtn').textContent = '💰 سحب الأرباح';
+    document.getElementById('phaseMsg').textContent = 'انقر على الخلايا لكشفها — تجنب الألغام!';
     buildGrid();
     updateInfo();
     setGamePhase('playing');
     loadBalance();
     haptic('medium');
-  }).catch(function() { showToast('Ø®Ø·Ø£ ÙÙŠ Ø§Ù„Ø¨Ø¯Ø§ÙŠØ©', 'error'); });
+  }).catch(function() { showToast('خطأ في البداية', 'error'); });
 }
 
 function doCashout() {
@@ -221,7 +221,7 @@ function doCashout() {
     loadBalance();
     addHistItem(document.getElementById('histBar'), currentMult);
     setTimeout(resetGame, 2500);
-  }).catch(function() { showToast('Ø®Ø·Ø£ ÙÙŠ Ø§Ù„Ø³Ø­Ø¨', 'error'); });
+  }).catch(function() { showToast('خطأ في السحب', 'error'); });
 }
 
 function gameOver(d) {
@@ -249,9 +249,9 @@ function revealAll(mineCells) {
     if (!cell) continue;
     if (!cell.classList.contains('revealed-safe') && !cell.classList.contains('revealed-mine')) {
       if (mineCells.indexOf(i) !== -1) {
-        cell.classList.add('end-mine'); cell.textContent = 'ðŸ’£';
+        cell.classList.add('end-mine'); cell.textContent = '💣';
       } else {
-        cell.classList.add('end-safe'); cell.textContent = 'ðŸ’Ž';
+        cell.classList.add('end-safe'); cell.textContent = '💎';
       }
     }
     cell.classList.add('disabled');
@@ -260,14 +260,14 @@ function revealAll(mineCells) {
 
 function showResult(win, payout, mult) {
   if (win) {
-    document.getElementById('phaseMsg').textContent = 'ðŸŽ‰ Ø±Ø¨Ø­Øª ' + fmtAmount(payout) + ' (' + mult.toFixed(2) + 'x)';
+    document.getElementById('phaseMsg').textContent = '🎉 ربحت ' + fmtAmount(payout) + ' (' + mult.toFixed(2) + 'x)';
     document.getElementById('phaseMsg').style.color = 'var(--green)';
     streakWin++; updateStreak(document.getElementById('streakBadge'));
     soundWin(mult > 5);
     hapticNotif('success');
     if (payout > betAmount * 5) showBigWinOverlay(payout, mult);
   } else {
-    document.getElementById('phaseMsg').textContent = 'ðŸ’¥ Ù„Ù‚Ø¯ Ø¶Ø±Ø¨Øª Ù„ØºÙ…Ø§Ù‹!';
+    document.getElementById('phaseMsg').textContent = '💥 لقد ضربت لغماً!';
     document.getElementById('phaseMsg').style.color = 'var(--red)';
     streakWin = 0; updateStreak(document.getElementById('streakBadge'));
     hapticNotif('error');
@@ -277,8 +277,8 @@ function showResult(win, payout, mult) {
 function resetGame() {
   document.getElementById('setupPanel').style.display = '';
   document.getElementById('actionBtn').className = 'action-btn start';
-  document.getElementById('actionBtn').textContent = 'ðŸŽ® Ø§Ø¨Ø¯Ø£ Ø§Ù„Ù„Ø¹Ø¨Ø©';
-  document.getElementById('phaseMsg').textContent = 'Ø§Ø®ØªØ± Ø¹Ø¯Ø¯ Ø§Ù„Ø£Ù„ØºØ§Ù… ÙˆØ¶Ø¹ Ø±Ù‡Ø§Ù†Ùƒ';
+  document.getElementById('actionBtn').textContent = '🎮 ابدأ اللعبة';
+  document.getElementById('phaseMsg').textContent = 'اختر عدد الألغام وضع رهانك';
   document.getElementById('phaseMsg').style.color = '';
   document.getElementById('multVal').textContent = '1.00x';
   document.getElementById('potWin').textContent = '0';

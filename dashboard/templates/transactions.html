@@ -1,6 +1,6 @@
-﻿{% extends 'base.html' %}
-{% block title %}Ø§Ù„Ù…Ø¹Ø§Ù…Ù„Ø§Øª â€” Boterx{% endblock %}
-{% block page_title %}ðŸ’¼ Ø§Ù„Ù…Ø¹Ø§Ù…Ù„Ø§Øª{% endblock %}
+{% extends 'base.html' %}
+{% block title %}المعاملات — Boterx{% endblock %}
+{% block page_title %}💼 المعاملات{% endblock %}
 
 {% block content %}
 <div x-data="transactionsApp()" x-init="init()" class="space-y-4">
@@ -38,8 +38,8 @@
             <!-- Type filter -->
             <select x-model="filterType" @change="page=1; load()" class="input text-sm">
                 <option value="" data-i18n="all_types">All Types</option>
-                <option value="deposit">ðŸ’µ Ø¥ÙŠØ¯Ø§Ø¹</option>
-                <option value="withdraw">ðŸ’¸ Ø³Ø­Ø¨</option>
+                <option value="deposit">💵 إيداع</option>
+                <option value="withdraw">💸 سحب</option>
             </select>
             <!-- Date range -->
             <input type="date" x-model="dateFrom" @change="load()" class="input text-sm" placeholder="From Date" data-i18n-placeholder="date_from">
@@ -52,18 +52,18 @@
             <!-- Auto-refresh toggle -->
             <label class="flex items-center gap-2 text-sm text-slate-400 cursor-pointer">
                 <input type="checkbox" x-model="autoRefresh" @change="toggleAutoRefresh()" class="rounded">
-                ØªØ­Ø¯ÙŠØ« ØªÙ„Ù‚Ø§Ø¦ÙŠ
+                تحديث تلقائي
             </label>
             <!-- Export CSV -->
             <button @click="exportCSV()" class="btn btn-primary btn-sm">
-                <i class="fas fa-file-csv ml-1"></i> ØªØµØ¯ÙŠØ± CSV
+                <i class="fas fa-file-csv ml-1"></i> تصدير CSV
             </button>
         </div>
         <!-- Bulk actions bar -->
         <div x-show="selectedIds.length > 0" x-transition class="mt-3 flex items-center gap-3 p-2 bg-blue-500/10 rounded-lg" style="display:none">
-            <span class="text-sm text-blue-400"><i class="fas fa-check-square ml-1"></i> ØªÙ… ØªØ­Ø¯ÙŠØ¯ <span x-text="selectedIds.length"></span> Ù…Ø¹Ø§Ù…Ù„Ø©</span>
-            <button @click="bulkApprove()" class="btn btn-success btn-sm"><i class="fas fa-check ml-1"></i> Ù…ÙˆØ§ÙÙ‚Ø© Ø¬Ù…Ø§Ø¹ÙŠØ©</button>
-            <button @click="bulkReject()" class="btn btn-danger btn-sm"><i class="fas fa-xmark ml-1"></i> Ø±ÙØ¶ Ø¬Ù…Ø§Ø¹ÙŠ</button>
+            <span class="text-sm text-blue-400"><i class="fas fa-check-square ml-1"></i> تم تحديد <span x-text="selectedIds.length"></span> معاملة</span>
+            <button @click="bulkApprove()" class="btn btn-success btn-sm"><i class="fas fa-check ml-1"></i> موافقة جماعية</button>
+            <button @click="bulkReject()" class="btn btn-danger btn-sm"><i class="fas fa-xmark ml-1"></i> رفض جماعي</button>
             <button @click="selectedIds = []" class="text-sm text-slate-400 hover:text-white mr-auto" data-i18n="deselect_all">Deselect All</button>
         </div>
     </div>
@@ -109,17 +109,17 @@
                             <td class="font-mono text-xs cursor-pointer text-blue-400 hover:underline" @click="openDetail(t)" x-text="t.id"></td>
                             <td class="cursor-pointer hover:text-blue-400" @click="openDetail(t)" x-text="t.name"></td>
                             <td>
-                                <span x-text="t.type === 'deposit' ? 'ðŸ’µ Ø¥ÙŠØ¯Ø§Ø¹' : 'ðŸ’¸ Ø³Ø­Ø¨'"
+                                <span x-text="t.type === 'deposit' ? '💵 إيداع' : '💸 سحب'"
                                       :class="t.type === 'deposit' ? 'text-green-400' : 'text-red-400'"></span>
                             </td>
                             <td x-text="t.company"></td>
-                            <td class="font-mono text-xs"><code class="bg-slate-900/70 px-2 py-0.5 rounded text-amber-400" x-text="t.wallet_number || 'â€”'"></code></td>
+                            <td class="font-mono text-xs"><code class="bg-slate-900/70 px-2 py-0.5 rounded text-amber-400" x-text="t.wallet_number || '—'"></code></td>
                             <td class="font-bold" x-text="fmtAmount(t.amount, t.currency || '')"></td>
                             <td x-html="statusBadge(t.status)"></td>
                             <td class="text-xs text-slate-400" x-text="t.date"></td>
                             <td>
                                 <div class="flex gap-1">
-                                    <button @click="openDetail(t)" class="btn btn-primary btn-sm" title="ØªÙØ§ØµÙŠÙ„"><i class="fas fa-eye"></i></button>
+                                    <button @click="openDetail(t)" class="btn btn-primary btn-sm" title="تفاصيل"><i class="fas fa-eye"></i></button>
                                     <template x-if="t.status === 'pending'">
                                         <button @click="approve(t.id)" class="btn btn-success btn-sm" title="Approve" data-i18n-title="approve"><i class="fas fa-check"></i></button>
                                     </template>
@@ -138,7 +138,7 @@
     <!-- Pagination -->
     <div class="flex items-center justify-between flex-wrap gap-2">
         <button @click="page > 1 && (page--, load())" :disabled="page <= 1" class="btn btn-primary btn-sm">
-            <i class="fas fa-chevron-right ml-1"></i> Ø§Ù„Ø³Ø§Ø¨Ù‚
+            <i class="fas fa-chevron-right ml-1"></i> السابق
         </button>
         <div class="flex items-center gap-1">
             <template x-for="p in pageNumbers" :key="p">
@@ -146,28 +146,28 @@
             </template>
         </div>
         <button @click="page < pages && (page++, load())" :disabled="page >= pages" class="btn btn-primary btn-sm">
-            Ø§Ù„ØªØ§Ù„ÙŠ <i class="fas fa-chevron-left mr-1"></i>
+            التالي <i class="fas fa-chevron-left mr-1"></i>
         </button>
     </div>
-    <p class="text-center text-xs text-slate-500">Ø¥Ø¬Ù…Ø§Ù„ÙŠ: <span x-text="total"></span> Ù…Ø¹Ø§Ù…Ù„Ø© | ØµÙØ­Ø© <span x-text="page"></span> Ù…Ù† <span x-text="pages"></span></p>
+    <p class="text-center text-xs text-slate-500">إجمالي: <span x-text="total"></span> معاملة | صفحة <span x-text="page"></span> من <span x-text="pages"></span></p>
 
     <!-- Approve Modal with Amount Edit -->
     <div x-show="showApproveModal" x-transition class="modal-overlay" style="display:none" @click.self="showApproveModal = false">
         <div class="modal">
-            <h3 class="font-bold text-lg mb-4"><i class="fas fa-check-circle text-green-400 ml-1"></i> Ù…ÙˆØ§ÙÙ‚Ø© Ø¹Ù„Ù‰ Ø§Ù„Ù…Ø¹Ø§Ù…Ù„Ø©</h3>
+            <h3 class="font-bold text-lg mb-4"><i class="fas fa-check-circle text-green-400 ml-1"></i> موافقة على المعاملة</h3>
             <div class="space-y-4">
                 <div>
-                    <label class="block text-xs text-slate-400 mb-1">ðŸ†” Ø±Ù‚Ù… Ø§Ù„Ù…Ø¹Ø§Ù…Ù„Ø©</label>
+                    <label class="block text-xs text-slate-400 mb-1">🆔 رقم المعاملة</label>
                     <p class="font-mono text-sm bg-slate-900/50 p-2 rounded" x-text="approveTarget"></p>
                 </div>
                 <div>
-                    <label class="block text-xs text-slate-400 mb-1">ðŸ’° Ø§Ù„Ù…Ø¨Ù„Øº (ÙŠÙ…ÙƒÙ†Ùƒ ØªØ¹Ø¯ÙŠÙ„Ù‡)</label>
+                    <label class="block text-xs text-slate-400 mb-1">💰 المبلغ (يمكنك تعديله)</label>
                     <input type="number" step="any" x-model="approveAmount" class="input w-full text-lg font-bold" placeholder="Amount" data-i18n-placeholder="amount">
                 </div>
             </div>
             <div class="flex gap-2 justify-end mt-4">
                 <button @click="showApproveModal = false" class="btn btn-sm" style="background:#475569" data-i18n="cancel">Cancel</button>
-                <button @click="confirmApprove()" class="btn btn-success btn-sm"><i class="fas fa-check ml-1"></i> Ù…ÙˆØ§ÙÙ‚Ø© ÙˆØªØ£ÙƒÙŠØ¯ Ø§Ù„Ù…Ø¨Ù„Øº</button>
+                <button @click="confirmApprove()" class="btn btn-success btn-sm"><i class="fas fa-check ml-1"></i> موافقة وتأكيد المبلغ</button>
             </div>
         </div>
     </div>
@@ -176,7 +176,7 @@
     <div x-show="showDetail" x-transition class="modal-overlay" style="display:none" @click.self="showDetail = false">
         <div class="modal max-w-2xl">
             <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-bold"><i class="fas fa-receipt text-blue-400 ml-1"></i> ØªÙØ§ØµÙŠÙ„ Ø§Ù„Ù…Ø¹Ø§Ù…Ù„Ø©</h3>
+                <h3 class="text-lg font-bold"><i class="fas fa-receipt text-blue-400 ml-1"></i> تفاصيل المعاملة</h3>
                 <button @click="showDetail = false" class="text-slate-400 hover:text-white"><i class="fas fa-times"></i></button>
             </div>
             <template x-if="detail">
@@ -192,15 +192,15 @@
                         </div>
                         <div>
                             <label class="block text-xs text-slate-500 mb-1" data-i18n="client_name">Client Name</label>
-                            <p class="text-sm bg-slate-900/50 p-2 rounded" x-text="detail.name || 'â€”'"></p>
+                            <p class="text-sm bg-slate-900/50 p-2 rounded" x-text="detail.name || '—'"></p>
                         </div>
                         <div>
                             <label class="block text-xs text-slate-500 mb-1" data-i18n="customer_id">Customer ID</label>
-                            <p class="font-mono text-sm bg-slate-900/50 p-2 rounded" x-text="detail.customer_id || 'â€”'"></p>
+                            <p class="font-mono text-sm bg-slate-900/50 p-2 rounded" x-text="detail.customer_id || '—'"></p>
                         </div>
                         <div>
                             <label class="block text-xs text-slate-500 mb-1" data-i18n="type">Type</label>
-                            <p class="text-sm bg-slate-900/50 p-2 rounded" x-text="detail.type === 'deposit' ? 'ðŸ’µ Ø¥ÙŠØ¯Ø§Ø¹' : 'ðŸ’¸ Ø³Ø­Ø¨'"></p>
+                            <p class="text-sm bg-slate-900/50 p-2 rounded" x-text="detail.type === 'deposit' ? '💵 إيداع' : '💸 سحب'"></p>
                         </div>
                         <div>
                             <label class="block text-xs text-slate-500 mb-1" data-i18n="amount">Amount</label>
@@ -208,31 +208,31 @@
                         </div>
                         <div>
                             <label class="block text-xs text-slate-500 mb-1" data-i18n="company">Company</label>
-                            <p class="text-sm bg-slate-900/50 p-2 rounded" x-text="detail.company || 'â€”'"></p>
+                            <p class="text-sm bg-slate-900/50 p-2 rounded" x-text="detail.company || '—'"></p>
                         </div>
                         <div>
                             <label class="block text-xs text-slate-500 mb-1" data-i18n="date">Date</label>
-                            <p class="text-sm bg-slate-900/50 p-2 rounded" x-text="detail.date || 'â€”'"></p>
+                            <p class="text-sm bg-slate-900/50 p-2 rounded" x-text="detail.date || '—'"></p>
                         </div>
                     </div>
                     <div x-show="detail.admin_note">
                         <label class="block text-xs text-slate-500 mb-1" data-i18n="admin_note">Admin Note</label>
-                        <p class="text-sm bg-slate-900/50 p-2 rounded" x-text="detail.admin_note || 'â€”'"></p>
+                        <p class="text-sm bg-slate-900/50 p-2 rounded" x-text="detail.admin_note || '—'"></p>
                     </div>
                     <div x-show="detail.phone">
                         <label class="block text-xs text-slate-500 mb-1" data-i18n="phone_number">Phone Number</label>
-                        <p class="text-sm bg-slate-900/50 p-2 rounded" x-text="detail.phone || 'â€”'"></p>
+                        <p class="text-sm bg-slate-900/50 p-2 rounded" x-text="detail.phone || '—'"></p>
                     </div>
                     <div x-show="detail.reject_reason">
                         <label class="block text-xs text-slate-500 mb-1" data-i18n="reject_reason">Reject Reason</label>
-                        <p class="text-sm bg-red-900/20 p-2 rounded text-red-400" x-text="detail.reject_reason || 'â€”'"></p>
+                        <p class="text-sm bg-red-900/20 p-2 rounded text-red-400" x-text="detail.reject_reason || '—'"></p>
                     </div>
                     <div class="flex gap-2 justify-end pt-2 border-t border-slate-700">
                         <template x-if="detail.status === 'pending'">
-                            <button @click="approve(detail.id); showDetail = false" class="btn btn-success btn-sm"><i class="fas fa-check ml-1"></i> Ù…ÙˆØ§ÙÙ‚Ø©</button>
+                            <button @click="approve(detail.id); showDetail = false" class="btn btn-success btn-sm"><i class="fas fa-check ml-1"></i> موافقة</button>
                         </template>
                         <template x-if="detail.status === 'pending'">
-                            <button @click="reject(detail.id); showDetail = false" class="btn btn-danger btn-sm"><i class="fas fa-xmark ml-1"></i> Ø±ÙØ¶</button>
+                            <button @click="reject(detail.id); showDetail = false" class="btn btn-danger btn-sm"><i class="fas fa-xmark ml-1"></i> رفض</button>
                         </template>
                         <button @click="showDetail = false" class="btn bg-slate-700 text-slate-300 hover:bg-slate-600 btn-sm" data-i18n="close">Close</button>
                     </div>
@@ -281,7 +281,7 @@ function transactionsApp() {
                 this.pages = data.pages || 1;
                 this.updateSummary(data);
             } catch(e) {
-                toast('ÙØ´Ù„ ØªØ­Ù…ÙŠÙ„ Ø§Ù„Ù…Ø¹Ø§Ù…Ù„Ø§Øª', 'error');
+                toast('فشل تحميل المعاملات', 'error');
                 this.transactions = [];
             } finally {
                 this.loading = false;
@@ -311,7 +311,7 @@ function transactionsApp() {
         showApproveModal: false, approveTarget: null, approveAmount: '',
 
         async approve(id) {
-            // Ø§Ù„Ø¨Ø­Ø« Ø¹Ù† Ø§Ù„Ù…Ø¹Ø§Ù…Ù„Ø© Ù„Ø¹Ø±Ø¶ Ø§Ù„Ù…Ø¨Ù„Øº Ø§Ù„Ø­Ø§Ù„ÙŠ
+            // البحث عن المعاملة لعرض المبلغ الحالي
             const txn = this.transactions.find(t => t.id === id);
             this.approveTarget = id;
             this.approveAmount = txn ? txn.amount : '';
@@ -323,41 +323,41 @@ function transactionsApp() {
             const amount = this.approveAmount;
             try {
                 await api('/api/transactions/' + id + '/approve', { method: 'POST', body: JSON.stringify({ amount }) });
-                toast('ØªÙ…Øª Ø§Ù„Ù…ÙˆØ§ÙÙ‚Ø© â€” Ø§Ù„Ù…Ø¨Ù„Øº: ' + amount, 'success');
+                toast('تمت الموافقة — المبلغ: ' + amount, 'success');
                 Notifier?.playSuccessSound?.();
                 this.showApproveModal = false;
                 this.load();
-            } catch(e) { toast('ÙØ´Ù„Øª Ø§Ù„Ø¹Ù…Ù„ÙŠØ©', 'error'); }
+            } catch(e) { toast('فشلت العملية', 'error'); }
         },
 
         async reject(id) {
-            const reason = prompt('Ø³Ø¨Ø¨ Ø§Ù„Ø±ÙØ¶:') || '';
+            const reason = prompt('سبب الرفض:') || '';
             if (reason === null) return;
             try {
                 await api('/api/transactions/' + id + '/reject', { method: 'POST', body: JSON.stringify({ reason }) });
-                toast('ØªÙ… Ø§Ù„Ø±ÙØ¶', 'warning');
+                toast('تم الرفض', 'warning');
                 this.load();
-            } catch(e) { toast('ÙØ´Ù„Øª Ø§Ù„Ø¹Ù…Ù„ÙŠØ©', 'error'); }
+            } catch(e) { toast('فشلت العملية', 'error'); }
         },
 
         async bulkApprove() {
-            if (!confirm('Ù…ÙˆØ§ÙÙ‚Ø© Ø¹Ù„Ù‰ ' + this.selectedIds.length + ' Ù…Ø¹Ø§Ù…Ù„Ø©ØŸ')) return;
+            if (!confirm('موافقة على ' + this.selectedIds.length + ' معاملة؟')) return;
             try {
                 await api('/api/transactions/bulk-approve', { method: 'POST', body: JSON.stringify({ ids: this.selectedIds }) });
-                toast('ØªÙ…Øª Ø§Ù„Ù…ÙˆØ§ÙÙ‚Ø© Ø¹Ù„Ù‰ ' + this.selectedIds.length + ' Ù…Ø¹Ø§Ù…Ù„Ø©', 'success');
+                toast('تمت الموافقة على ' + this.selectedIds.length + ' معاملة', 'success');
                 this.selectedIds = [];
                 this.load();
-            } catch(e) { toast('ÙØ´Ù„Øª Ø§Ù„Ø¹Ù…Ù„ÙŠØ©', 'error'); }
+            } catch(e) { toast('فشلت العملية', 'error'); }
         },
 
         async bulkReject() {
-            if (!confirm('Ø±ÙØ¶ ' + this.selectedIds.length + ' Ù…Ø¹Ø§Ù…Ù„Ø©ØŸ')) return;
+            if (!confirm('رفض ' + this.selectedIds.length + ' معاملة؟')) return;
             try {
                 await api('/api/transactions/bulk-reject', { method: 'POST', body: JSON.stringify({ ids: this.selectedIds }) });
-                toast('ØªÙ… Ø±ÙØ¶ ' + this.selectedIds.length + ' Ù…Ø¹Ø§Ù…Ù„Ø©', 'warning');
+                toast('تم رفض ' + this.selectedIds.length + ' معاملة', 'warning');
                 this.selectedIds = [];
                 this.load();
-            } catch(e) { toast('ÙØ´Ù„Øª Ø§Ù„Ø¹Ù…Ù„ÙŠØ©', 'error'); }
+            } catch(e) { toast('فشلت العملية', 'error'); }
         },
 
         openDetail(t) {
@@ -368,15 +368,15 @@ function transactionsApp() {
         toggleAutoRefresh() {
             if (this.autoRefresh) {
                 this.refreshTimer = setInterval(() => this.load(), 10000);
-                toast('ØªÙ… ØªÙØ¹ÙŠÙ„ Ø§Ù„ØªØ­Ø¯ÙŠØ« Ø§Ù„ØªÙ„Ù‚Ø§Ø¦ÙŠ ÙƒÙ„ 10 Ø«ÙˆØ§Ù†ÙŠ', 'info');
+                toast('تم تفعيل التحديث التلقائي كل 10 ثواني', 'info');
             } else {
                 if (this.refreshTimer) { clearInterval(this.refreshTimer); this.refreshTimer = null; }
-                toast('ØªÙ… Ø¥ÙŠÙ‚Ø§Ù Ø§Ù„ØªØ­Ø¯ÙŠØ« Ø§Ù„ØªÙ„Ù‚Ø§Ø¦ÙŠ', 'info');
+                toast('تم إيقاف التحديث التلقائي', 'info');
             }
         },
 
         exportCSV() {
-            const headers = ['ID', 'Ø§Ù„Ø¹Ù…ÙŠÙ„', 'Ø§Ù„Ù†ÙˆØ¹', 'Ø§Ù„Ø´Ø±ÙƒØ©', 'Ø§Ù„Ù…Ø¨Ù„Øº', 'Ø§Ù„Ø¹Ù…Ù„Ø©', 'Ø§Ù„Ø­Ø§Ù„Ø©', 'Ø§Ù„ØªØ§Ø±ÙŠØ®'];
+            const headers = ['ID', 'العميل', 'النوع', 'الشركة', 'المبلغ', 'العملة', 'الحالة', 'التاريخ'];
             const rows = this.transactions.map(t => [t.id, t.name, t.type, t.company, t.amount, t.currency, t.status, t.date]);
             const csv = [headers, ...rows].map(r => r.map(c => '"' + (c || '') + '"').join(',')).join('\n');
             const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -384,7 +384,7 @@ function transactionsApp() {
             link.href = URL.createObjectURL(blob);
             link.download = 'transactions_' + new Date().toISOString().slice(0, 10) + '.csv';
             link.click();
-            toast('ØªÙ… ØªØµØ¯ÙŠØ± ' + this.transactions.length + ' Ù…Ø¹Ø§Ù…Ù„Ø©', 'success');
+            toast('تم تصدير ' + this.transactions.length + ' معاملة', 'success');
         }
     }
 }

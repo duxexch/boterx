@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl" x-data="baseApp()" :lang="lang" :dir="lang === 'ar' ? 'rtl' : 'ltr'" :class="darkMode ? '' : 'light-mode'">
 <head>
     <meta charset="UTF-8">
@@ -198,7 +198,7 @@
                             <div class="p-3 text-center text-slate-400 text-sm"><i class="fas fa-spinner fa-spin"></i></div>
                         </template>
                         <template x-if="!loading && results.length === 0">
-                            <div class="p-3 text-center text-slate-500 text-sm">Ù„Ø§ ØªÙˆØ¬Ø¯ Ù†ØªØ§Ø¦Ø¬</div>
+                            <div class="p-3 text-center text-slate-500 text-sm">لا توجد نتائج</div>
                         </template>
                         <template x-for="r in results" :key="r.type + r.id">
                             <a :href="r.url" class="block p-2 hover:bg-slate-700/50 border-b border-slate-700/30">
@@ -216,7 +216,7 @@
                 </div>
 
                 <!-- Language toggle -->
-                <button @click="toggleLang()" class="text-slate-400 hover:text-amber-400 transition px-2 py-1 rounded text-sm font-bold" x-text="lang === 'ar' ? 'EN' : 'Ø¹'" :title="lang === 'ar' ? 'Switch to English' : 'ØªØ­ÙˆÙŠÙ„ Ù„Ù„Ø¹Ø±Ø¨ÙŠØ©'"></button>
+                <button @click="toggleLang()" class="text-slate-400 hover:text-amber-400 transition px-2 py-1 rounded text-sm font-bold" x-text="lang === 'ar' ? 'EN' : 'ع'" :title="lang === 'ar' ? 'Switch to English' : 'تحويل للعربية'"></button>
 
                 <!-- Dark/light toggle -->
                 <button @click="toggleDarkMode()" class="text-slate-400 hover:text-amber-400 transition" :title="t('connected')">
@@ -412,12 +412,12 @@ function baseApp() {
             const bar = document.getElementById('liveStats');
             if (bar) {
                 const parts = [];
-                if (s.users?.total !== undefined) parts.push('ðŸ‘¥ ' + s.users.total + ' ' + tr('users'));
-                if (s.transactions?.pending !== undefined) parts.push('â³ ' + s.transactions.pending + ' ' + tr('pending'));
-                if (s.matches?.active !== undefined) parts.push('ðŸ”„ ' + s.matches.active + ' ' + tr('matching'));
-                if (s.lottery?.participants !== undefined) parts.push('ðŸŽ° ' + s.lottery.participants + ' ' + tr('participants'));
-                if (s.wheel?.participants !== undefined) parts.push('ðŸŽ¡ ' + s.wheel.participants + ' ' + tr('wheel_players'));
-                if (s.lottery?.distributed) parts.push('ðŸ’° ' + s.lottery.distributed.toFixed(0) + ' ' + tr('distributed'));
+                if (s.users?.total !== undefined) parts.push('👥 ' + s.users.total + ' ' + tr('users'));
+                if (s.transactions?.pending !== undefined) parts.push('⏳ ' + s.transactions.pending + ' ' + tr('pending'));
+                if (s.matches?.active !== undefined) parts.push('🔄 ' + s.matches.active + ' ' + tr('matching'));
+                if (s.lottery?.participants !== undefined) parts.push('🎰 ' + s.lottery.participants + ' ' + tr('participants'));
+                if (s.wheel?.participants !== undefined) parts.push('🎡 ' + s.wheel.participants + ' ' + tr('wheel_players'));
+                if (s.lottery?.distributed) parts.push('💰 ' + s.lottery.distributed.toFixed(0) + ' ' + tr('distributed'));
                 bar.textContent = parts.join(' | ') || tr('no_data');
             }
             // Update notification count
@@ -432,9 +432,9 @@ function baseApp() {
                 this.notifications.unshift({
                     id: Date.now(),
                     icon: 'fa-clock text-amber-400',
-                    title: 'Ù…Ø¹Ø§Ù…Ù„Ø§Øª Ù…Ø¹Ù„Ù‚Ø©',
-                    message: s.transactions.pending + ' Ù…Ø¹Ø§Ù…Ù„Ø© Ø¨Ø§Ù†ØªØ¸Ø§Ø± Ø§Ù„Ù…Ø±Ø§Ø¬Ø¹Ø©',
-                    time: 'Ø§Ù„Ø¢Ù†'
+                    title: 'معاملات معلقة',
+                    message: s.transactions.pending + ' معاملة بانتظار المراجعة',
+                    time: 'الآن'
                 });
             }
         },
@@ -456,9 +456,9 @@ function baseApp() {
                             icon: d.type.includes('deposit') ? 'fa-money-bill-wave text-green-400' :
                                   d.type.includes('withdrawal') ? 'fa-hand-holding-usd text-red-400' :
                                   'fa-bell text-amber-400',
-                            title: d.title || 'Ø¥Ø´Ø¹Ø§Ø±',
+                            title: d.title || 'إشعار',
                             message: d.message || '',
-                            time: 'Ø§Ù„Ø¢Ù†'
+                            time: 'الآن'
                         });
                         if (this.notifications.length > 20) this.notifications.pop();
                         // Play sound

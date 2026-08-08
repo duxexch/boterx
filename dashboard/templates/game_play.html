@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
@@ -86,9 +86,9 @@ body{overflow:hidden;font-family:system-ui,sans-serif;background:#0f172a;color:#
 <body>
 <div id="app">
   <div id="topbar">
-    <button class="back-btn" onclick="goBack()">â€¹</button>
-    <div class="balance">ðŸ’° <span id="bal">0</span></div>
-    <button class="vex-btn" id="vexBtn">ðŸ’Ž</button>
+    <button class="back-btn" onclick="goBack()">‹</button>
+    <div class="balance">💰 <span id="bal">0</span></div>
+    <button class="vex-btn" id="vexBtn">💎</button>
   </div>
   <div id="game-area">
     <div class="game-icon-big" id="gameIcon">{{ game.icon }}</div>
@@ -99,7 +99,7 @@ body{overflow:hidden;font-family:system-ui,sans-serif;background:#0f172a;color:#
   <div id="betbar">
     <div class="bet-input-row">
       <input type="number" class="bet-input" id="betInput" value="{{ game.min_bet }}" min="{{ game.min_bet }}" max="{{ game.max_bet }}">
-      <button class="play-btn" id="playBtn" onclick="playRound()">â–¶ï¸ Ø§Ù„Ø¹Ø¨</button>
+      <button class="play-btn" id="playBtn" onclick="playRound()">▶️ العب</button>
     </div>
     <div class="quick-bets" id="quickBets"></div>
   </div>
@@ -111,8 +111,8 @@ body{overflow:hidden;font-family:system-ui,sans-serif;background:#0f172a;color:#
 <!-- Live Players Bar -->
 <div id="livePlayers">
   <div class="lp-header">
-    <span>ðŸ‘¥ <span class="lp-count" id="lpCount">0</span> Ù„Ø§Ø¹Ø¨</span>
-    <span id="lpTotal">ðŸ’° 0</span>
+    <span>👥 <span class="lp-count" id="lpCount">0</span> لاعب</span>
+    <span id="lpTotal">💰 0</span>
   </div>
   <div class="lp-list" id="lpList"></div>
 </div>
@@ -164,7 +164,7 @@ async function loadBalance() {
 // Quick bet buttons
 function initQuickBets() {
   const bets = [minBet, minBet*5, minBet*10, maxBet];
-  const labels = ['Min', 'Ã—5', 'Ã—10', 'Max'];
+  const labels = ['Min', '×5', '×10', 'Max'];
   const container = document.getElementById('quickBets');
   bets.forEach((b, i) => {
     const btn = document.createElement('div');
@@ -179,7 +179,7 @@ async function playRound() {
   if (isPlaying) return;
   const bet = parseFloat(document.getElementById('betInput').value) || 0;
   if (bet < minBet || bet > maxBet) {
-    document.getElementById('resultDisplay').textContent = `Ø§Ù„Ø­Ø¯ ${minBet}-${maxBet}`;
+    document.getElementById('resultDisplay').textContent = `الحد ${minBet}-${maxBet}`;
     document.getElementById('resultDisplay').className = 'result-display result-lose';
     return;
   }
@@ -187,7 +187,7 @@ async function playRound() {
   isPlaying = true;
   document.getElementById('playBtn').disabled = true;
   document.getElementById('resultDisplay').textContent = '';
-  document.getElementById('motivational').textContent = 'â³ Ø¬Ø§Ø±Ù Ø§Ù„Ù„Ø¹Ø¨...';
+  document.getElementById('motivational').textContent = '⏳ جارٍ اللعب...';
   
   try {
     const r = await apiFetch(`${BASE}/api/engine/result`, {
@@ -201,7 +201,7 @@ async function playRound() {
       if (d.need_deposit) {
         showDepositModal(bet);
       } else {
-        document.getElementById('resultDisplay').textContent = d.error || 'Ø®Ø·Ø£';
+        document.getElementById('resultDisplay').textContent = d.error || 'خطأ';
         document.getElementById('resultDisplay').className = 'result-display result-lose';
       }
       isPlaying = false;
@@ -214,18 +214,18 @@ async function playRound() {
     const mo = document.getElementById('motivational');
     
     if (d.result === 'win') {
-      rd.textContent = `ðŸŽ‰ +${d.payout}`;
+      rd.textContent = `🎉 +${d.payout}`;
       rd.className = 'result-display result-win';
       soundWin();
       haptic('medium');
       confettiBurst();
     } else {
       if (d.near_miss) {
-        rd.textContent = 'ðŸ’¨ ÙƒØ§Ø¯Øª!';
-        mo.textContent = 'ðŸ”¥ ÙƒÙ†Øª Ù‚Ø±ÙŠØ¨Ø§Ù‹ Ø¬Ø¯Ø§Ù‹! Ø­Ø§ÙˆÙ„ Ù…Ø±Ø© Ø£Ø®Ø±Ù‰!';
+        rd.textContent = '💨 كادت!';
+        mo.textContent = '🔥 كنت قريباً جداً! حاول مرة أخرى!';
       } else {
-        rd.textContent = `âŒ -${bet}`;
-        mo.textContent = 'ðŸ’ª Ø­Ø¸ Ø£ÙˆÙØ±!';
+        rd.textContent = `❌ -${bet}`;
+        mo.textContent = '💪 حظ أوفر!';
       }
       rd.className = 'result-display result-lose';
       soundLose();
@@ -248,7 +248,7 @@ async function playRound() {
     setTimeout(() => showContinueModal(d, bet), 800);
     
   } catch(e) {
-    document.getElementById('resultDisplay').textContent = 'âŒ Ø®Ø·Ø£';
+    document.getElementById('resultDisplay').textContent = '❌ خطأ';
     document.getElementById('resultDisplay').className = 'result-display result-lose';
   }
   
@@ -262,29 +262,29 @@ function showContinueModal(result, lastBet) {
   const box = document.getElementById('modalBox');
   
   let html = `
-    <div class="modal-title">${result.result === 'win' ? 'ðŸŽ‰ Ø±Ø¨Ø­Øª!' : 'ðŸ˜” Ø®Ø³Ø±Øª'}</div>
-    <div class="modal-balance">ðŸ’° Ø±ØµÙŠØ¯Ùƒ: ${balance.toLocaleString()}</div>
+    <div class="modal-title">${result.result === 'win' ? '🎉 ربحت!' : '😔 خسرت'}</div>
+    <div class="modal-balance">💰 رصيدك: ${balance.toLocaleString()}</div>
   `;
   
   if (balance >= minBet) {
     html += `
       <input type="number" class="modal-input" id="modalBet" value="${lastBet}" min="${minBet}" max="${maxBet}">
-      <button class="modal-btn" onclick="continuePlay()">â–¶ï¸ Ø§Ù„Ø¹Ø¨ Ù…Ø±Ø© Ø£Ø®Ø±Ù‰</button>
+      <button class="modal-btn" onclick="continuePlay()">▶️ العب مرة أخرى</button>
     `;
   } else {
     html += `
-      <div class="modal-subtitle">âš ï¸ Ø±ØµÙŠØ¯Ùƒ ØºÙŠØ± ÙƒØ§ÙÙ</div>
-      <button class="modal-btn" onclick="showDepositModal(${minBet})">ðŸ’° Ø¥ÙŠØ¯Ø§Ø¹ Ø³Ø±ÙŠØ¹</button>
+      <div class="modal-subtitle">⚠️ رصيدك غير كافٍ</div>
+      <button class="modal-btn" onclick="showDepositModal(${minBet})">💰 إيداع سريع</button>
     `;
   }
   
   // Other games
   html += `
     <div class="other-games">
-      <div class="other-games-title">ðŸŽ® Ø¬Ø±Ù‘Ø¨ Ø£Ù„Ø¹Ø§Ø¨ Ø£Ø®Ø±Ù‰</div>
+      <div class="other-games-title">🎮 جرّب ألعاب أخرى</div>
       <div class="games-scroll" id="otherGames"></div>
     </div>
-    <button class="modal-btn secondary" onclick="goBack()" style="margin-top:8px">ðŸ  Ø§Ù„Ù‚Ø§Ø¦Ù…Ø©</button>
+    <button class="modal-btn secondary" onclick="goBack()" style="margin-top:8px">🏠 القائمة</button>
   `;
   
   box.innerHTML = html;
@@ -338,9 +338,9 @@ async function showDepositModal(required) {
 
   if (botMethods.length === 0) {
     box.innerHTML = `
-      <div class="modal-title">ðŸ’° Ø¥ÙŠØ¯Ø§Ø¹ Ù…Ø­ÙØ¸Ø© VEX</div>
-      <div class="modal-subtitle">Ù„Ø§ ØªÙˆØ¬Ø¯ ÙˆØ³Ø§Ø¦Ù„ Ø¯ÙØ¹ Ù…ØªØ§Ø­Ø© Ø­Ø§Ù„ÙŠØ§Ù‹</div>
-      <button class="modal-btn" onclick="document.getElementById('modal').style.display='none'">Ø¥ØºÙ„Ø§Ù‚</button>
+      <div class="modal-title">💰 إيداع محفظة VEX</div>
+      <div class="modal-subtitle">لا توجد وسائل دفع متاحة حالياً</div>
+      <button class="modal-btn" onclick="document.getElementById('modal').style.display='none'">إغلاق</button>
     `;
     modal.style.display = 'flex';
     return;
@@ -348,38 +348,38 @@ async function showDepositModal(required) {
 
   // Build method selection list
   methodsHtml = botMethods.map(m => `
-    <div class="dep-method" onclick="selectGameMethod('${m.id}','${(m.method_name||'').replace(/'/g,"\\'")}','${(m.account_data||'').replace(/'/g,"\\'")}','${(m.icon||'ðŸ’³')}')">
-      <span style="font-size:18px">${m.icon||'ðŸ’³'}</span>
+    <div class="dep-method" onclick="selectGameMethod('${m.id}','${(m.method_name||'').replace(/'/g,"\\'")}','${(m.account_data||'').replace(/'/g,"\\'")}','${(m.icon||'💳')}')">
+      <span style="font-size:18px">${m.icon||'💳'}</span>
       <div style="flex:1">
         <div style="font-weight:600;font-size:13px">${m.method_name||''}</div>
         <div style="font-size:11px;color:#64748b">${m.method_type||''}</div>
       </div>
-      <span style="color:#fbbf24;font-size:14px">â€¹</span>
+      <span style="color:#fbbf24;font-size:14px">‹</span>
     </div>
   `).join('');
 
   box.innerHTML = `
-    <div class="modal-title">ðŸ’° Ø¥ÙŠØ¯Ø§Ø¹ Ù…Ø­ÙØ¸Ø© VEX</div>
-    <div class="modal-subtitle">${required ? `Ø±ØµÙŠØ¯Ùƒ ØºÙŠØ± ÙƒØ§ÙÙ â€” ØªØ­ØªØ§Ø¬ ${required}` : 'Ø§Ø®ØªØ± ÙˆØ³ÙŠÙ„Ø© Ø§Ù„Ø¯ÙØ¹'}</div>
+    <div class="modal-title">💰 إيداع محفظة VEX</div>
+    <div class="modal-subtitle">${required ? `رصيدك غير كافٍ — تحتاج ${required}` : 'اختر وسيلة الدفع'}</div>
     <div id="depMethodsList">${methodsHtml}</div>
     <div id="depStep2" style="display:none">
-      <div style="font-size:11px;color:#64748b;margin:10px 0 6px">ðŸ“‹ Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„ÙˆØ³ÙŠÙ„Ø©:</div>
+      <div style="font-size:11px;color:#64748b;margin:10px 0 6px">📋 بيانات الوسيلة:</div>
       <div class="copy-box" onclick="copyMethodData()" style="display:flex;align-items:center;justify-content:space-between;background:#0f172a;border:1px solid #334155;border-radius:10px;padding:10px 12px;cursor:pointer;margin-bottom:10px">
         <code id="methodDataDisplay" style="font-size:13px;color:#fbbf24;word-break:break-all"></code>
-        <span style="font-size:12px;color:#94a3b8;flex-shrink:0;margin-right:8px">ðŸ“‹ Ù†Ø³Ø®</span>
+        <span style="font-size:12px;color:#94a3b8;flex-shrink:0;margin-right:8px">📋 نسخ</span>
       </div>
-      <div style="font-size:11px;color:#64748b;margin:8px 0 4px">ðŸ’µ Ø§Ù„Ù…Ø¨Ù„Øº Ø§Ù„Ø°ÙŠ Ø³ØªØ±Ø³Ù„Ù‡:</div>
-      <input type="number" id="depAmount" placeholder="Ø§Ù„Ù…Ø¨Ù„Øº" value="${required || minBet}" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px;color:#fff;font-size:15px;font-weight:700;outline:none;margin-bottom:8px">
-      <div style="font-size:11px;color:#64748b;margin:8px 0 4px">ðŸ” Ø±Ù‚Ù… Ù…Ø­ÙØ¸ØªÙƒ (Ø§Ù„ØªÙŠ Ø³ØªØ±Ø³Ù„ Ù…Ù†Ù‡Ø§):</div>
-      <input type="text" id="playerWallet" placeholder="Ø±Ù‚Ù… Ù…Ø­ÙØ¸ØªÙƒ" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px;color:#fff;font-size:15px;font-weight:700;outline:none;margin-bottom:8px">
+      <div style="font-size:11px;color:#64748b;margin:8px 0 4px">💵 المبلغ الذي سترسله:</div>
+      <input type="number" id="depAmount" placeholder="المبلغ" value="${required || minBet}" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px;color:#fff;font-size:15px;font-weight:700;outline:none;margin-bottom:8px">
+      <div style="font-size:11px;color:#64748b;margin:8px 0 4px">🔐 رقم محفظتك (التي سترسل منها):</div>
+      <input type="text" id="playerWallet" placeholder="رقم محفظتك" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px;color:#fff;font-size:15px;font-weight:700;outline:none;margin-bottom:8px">
       <div id="savedWalletsHint" style="display:none;font-size:11px;color:#34d399;margin-bottom:6px"></div>
       <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#64748b;margin-bottom:10px;cursor:pointer">
-        <input type="checkbox" id="saveMethod" style="accent-color:#fbbf24"> Ø­ÙØ¸ ÙƒÙˆØ³ÙŠÙ„Ø© Ø¯ÙØ¹ Ø¯Ø§Ø¦Ù…Ø©
+        <input type="checkbox" id="saveMethod" style="accent-color:#fbbf24"> حفظ كوسيلة دفع دائمة
       </label>
-      <button class="modal-btn" onclick="submitGameDeposit()">âœ… ØªØ£ÙƒÙŠØ¯ Ø§Ù„Ø¥ÙŠØ¯Ø§Ø¹</button>
-      <button class="modal-btn secondary" onclick="backToMethods()" style="margin-top:6px">â€¹ Ø±Ø¬ÙˆØ¹</button>
+      <button class="modal-btn" onclick="submitGameDeposit()">✅ تأكيد الإيداع</button>
+      <button class="modal-btn secondary" onclick="backToMethods()" style="margin-top:6px">‹ رجوع</button>
     </div>
-    <button class="modal-btn secondary" onclick="document.getElementById('modal').style.display='none'" style="margin-top:6px">Ø¥Ù„ØºØ§Ø¡</button>
+    <button class="modal-btn secondary" onclick="document.getElementById('modal').style.display='none'" style="margin-top:6px">إلغاء</button>
   `;
   modal.style.display = 'flex';
 }
@@ -396,7 +396,7 @@ function selectGameMethod(methodId, methodName, methodAccountData, icon) {
     const match = savedWallets.find(w => w.method_name && w.method_name.includes(methodName));
     if (match) {
       savedWallet = match.account_number;
-      savedHint = `âœ“ Ù…Ø­ÙØ¸ØªÙƒ Ø§Ù„Ù…Ø­ÙÙˆØ¸Ø©: ${savedWallet}`;
+      savedHint = `✓ محفظتك المحفوظة: ${savedWallet}`;
     }
   }
 
@@ -415,7 +415,7 @@ function copyMethodData() {
   navigator.clipboard.writeText(data).then(() => {
     haptic('light');
     const btn = document.querySelector('.copy-box span');
-    if (btn) { btn.textContent = 'âœ“ ØªÙ… Ø§Ù„Ù†Ø³Ø®'; setTimeout(() => btn.textContent = 'ðŸ“‹ Ù†Ø³Ø®', 1500); }
+    if (btn) { btn.textContent = '✓ تم النسخ'; setTimeout(() => btn.textContent = '📋 نسخ', 1500); }
   });
 }
 
@@ -429,9 +429,9 @@ async function submitGameDeposit() {
   const playerWallet = document.getElementById('playerWallet').value.trim();
   const saveMethod = document.getElementById('saveMethod').checked;
 
-  if (amount <= 0) { alert('Ø£Ø¯Ø®Ù„ Ø§Ù„Ù…Ø¨Ù„Øº'); return; }
-  if (!playerWallet) { alert('Ø£Ø¯Ø®Ù„ Ø±Ù‚Ù… Ù…Ø­ÙØ¸ØªÙƒ'); return; }
-  if (!selectedMethod) { alert('Ø§Ø®ØªØ± ÙˆØ³ÙŠÙ„Ø© Ø¯ÙØ¹'); return; }
+  if (amount <= 0) { alert('أدخل المبلغ'); return; }
+  if (!playerWallet) { alert('أدخل رقم محفظتك'); return; }
+  if (!selectedMethod) { alert('اختر وسيلة دفع'); return; }
 
   try {
     const r = await apiFetch(`${BASE}/api/deposit/quick`, {
@@ -448,14 +448,14 @@ async function submitGameDeposit() {
     const d = await r.json();
     if (d.success) {
       document.getElementById('modalBox').innerHTML = `
-        <div class="modal-title">â³ Ø¨Ø§Ù†ØªØ¸Ø§Ø± Ø§Ù„ØªØ£ÙƒÙŠØ¯</div>
-        <div class="modal-subtitle">ØªÙ… Ø¥Ø±Ø³Ø§Ù„ Ø·Ù„Ø¨ Ø§Ù„Ø¥ÙŠØ¯Ø§Ø¹<br>Ø³ÙŠØªÙ… Ø¥Ø¶Ø§ÙØ© Ø§Ù„Ø±ØµÙŠØ¯ Ù„Ù…Ø­ÙØ¸Ø© VEX Ø¨Ø¹Ø¯ Ù…ÙˆØ§ÙÙ‚Ø© Ø§Ù„Ø¥Ø¯Ø§Ø±Ø©</div>
-        <button class="modal-btn" onclick="document.getElementById('modal').style.display='none';loadBalance();">Ø¥ØºÙ„Ø§Ù‚</button>
+        <div class="modal-title">⏳ بانتظار التأكيد</div>
+        <div class="modal-subtitle">تم إرسال طلب الإيداع<br>سيتم إضافة الرصيد لمحفظة VEX بعد موافقة الإدارة</div>
+        <button class="modal-btn" onclick="document.getElementById('modal').style.display='none';loadBalance();">إغلاق</button>
       `;
     } else {
-      alert(d.error || 'Ø®Ø·Ø£ ÙÙŠ Ø§Ù„Ø¥ÙŠØ¯Ø§Ø¹');
+      alert(d.error || 'خطأ في الإيداع');
     }
-  } catch(e) { alert('Ø®Ø·Ø£ ÙÙŠ Ø§Ù„Ø§ØªØµØ§Ù„'); }
+  } catch(e) { alert('خطأ في الاتصال'); }
 }
 
 function confettiBurst() {
@@ -510,7 +510,7 @@ function renderLivePlayers() {
   
   count.textContent = livePlayers.length;
   const totalBet = livePlayers.reduce((s, p) => s + (p.bet || 0), 0);
-  total.textContent = 'ðŸ’° ' + totalBet.toLocaleString();
+  total.textContent = '💰 ' + totalBet.toLocaleString();
   
   list.innerHTML = '';
   livePlayers.forEach(p => {
@@ -523,7 +523,7 @@ function renderLivePlayers() {
     row.innerHTML = `
       <div class="lp-user">
         <div class="lp-avatar">${avatar}</div>
-        <span class="lp-name">${p.name || '???'}${p.isMe ? ' (Ø£Ù†Øª)' : ''}</span>
+        <span class="lp-name">${p.name || '???'}${p.isMe ? ' (أنت)' : ''}</span>
       </div>
       <div style="display:flex;align-items:center;gap:6px">
         <span class="lp-bet">${p.bet}</span>
@@ -535,7 +535,7 @@ function renderLivePlayers() {
 }
 
 // Simulate live players (in production: fetch from /api/games/live-players)
-const fakeNames = ['Ø£Ø­Ù…Ø¯','Ø¹Ù…Ø±','Ù…Ø­Ù…Ø¯','Ø®Ø§Ù„Ø¯','Ø³Ø¹Ø¯','ÙÙ‡Ø¯','Ù†Ø§ØµØ±','ÙŠÙˆØ³Ù','Ø¹Ù„ÙŠ','Ø­Ø³Ù†','Ù…Ø§Ø¬Ø¯','ÙˆÙ„ÙŠØ¯','Ø·Ø§Ø±Ù‚','Ø¨Ø¯Ø±','Ø±Ø§Ø´Ø¯','Ø¹Ø¨Ø¯Ø§Ù„Ù„Ù‡','Ù…Ø§Ø²Ù†','ØªØ±ÙƒÙŠ','ÙÙŠØµÙ„','Ø³Ù„Ù…Ø§Ù†'];
+const fakeNames = ['أحمد','عمر','محمد','خالد','سعد','فهد','ناصر','يوسف','علي','حسن','ماجد','وليد','طارق','بدر','راشد','عبدالله','مازن','تركي','فيصل','سلمان'];
 
 function simulatePlayers() {
   if (Math.random() < 0.6 && livePlayers.length < 15) {
@@ -568,7 +568,7 @@ playRound = function() {
   const bet = parseFloat(document.getElementById('betInput').value) || 0;
   if (bet > 0 && !isPlaying) {
     addLivePlayer({
-      uid: uid, name: 'Ø£Ù†Øª', bet: bet,
+      uid: uid, name: 'أنت', bet: bet,
       status: 'playing', payout: 0, isMe: true
     });
   }

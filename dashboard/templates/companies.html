@@ -1,29 +1,29 @@
-﻿{% extends "base.html" %}
-{% block title %}Ø§Ù„Ø´Ø±ÙƒØ§Øª - Boterx{% endblock %}
-{% block page_title %}Ø§Ù„Ø´Ø±ÙƒØ§Øª{% endblock %}
+{% extends "base.html" %}
+{% block title %}الشركات - Boterx{% endblock %}
+{% block page_title %}الشركات{% endblock %}
 
 {% block content %}
 <div x-data="companiesPage()" x-init="init()">
     <!-- Header -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-            <h2 class="text-xl font-bold">Ø¥Ø¯Ø§Ø±Ø© Ø§Ù„Ø´Ø±ÙƒØ§Øª</h2>
-            <p class="text-sm text-slate-400 mt-1">Ø¥Ø¶Ø§ÙØ© ÙˆØªØ¹Ø¯ÙŠÙ„ ÙˆØ¥Ø¯Ø§Ø±Ø© Ø´Ø±ÙƒØ§Øª Ø§Ù„Ø¥ÙŠØ¯Ø§Ø¹ ÙˆØ§Ù„Ø³Ø­Ø¨</p>
+            <h2 class="text-xl font-bold">إدارة الشركات</h2>
+            <p class="text-sm text-slate-400 mt-1">إضافة وتعديل وإدارة شركات الإيداع والسحب</p>
         </div>
         <button @click="openAddModal()"
             class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition flex items-center gap-2 self-start">
-            <i class="fas fa-plus"></i> Ø¥Ø¶Ø§ÙØ© Ø´Ø±ÙƒØ©
+            <i class="fas fa-plus"></i> إضافة شركة
         </button>
     </div>
 
     <!-- Stats -->
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
-            <p class="text-xs text-slate-400">Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„Ø´Ø±ÙƒØ§Øª</p>
+            <p class="text-xs text-slate-400">إجمالي الشركات</p>
             <p class="text-2xl font-bold mt-1" x-text="stats.total"></p>
         </div>
         <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
-            <p class="text-xs text-slate-400">Ø´Ø±ÙƒØ§Øª Ù†Ø´Ø·Ø©</p>
+            <p class="text-xs text-slate-400">شركات نشطة</p>
             <p class="text-2xl font-bold text-green-400 mt-1" x-text="stats.active"></p>
         </div>
         <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
@@ -42,28 +42,28 @@
             <table class="w-full text-sm">
                 <thead>
                     <tr class="border-b border-slate-700 bg-slate-800/80">
-                        <th class="text-right px-4 py-3 font-semibold text-slate-400">Ø§Ù„Ø£ÙŠÙ‚ÙˆÙ†Ø©</th>
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400">الأيقونة</th>
                         <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="name">Name</th>
                         <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="type">Type</th>
-                        <th class="text-right px-4 py-3 font-semibold text-slate-400">Ø§Ù„ØªÙØ§ØµÙŠÙ„</th>
-                        <th class="text-right px-4 py-3 font-semibold text-slate-400">Ø§Ù„Ø¹Ù†ÙˆØ§Ù†</th>
-                        <th class="text-right px-4 py-3 font-semibold text-slate-400">Ø±Ø§Ø¨Ø· Ø§Ù„ØªØ³ÙˆÙŠÙ‚</th>
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400">التفاصيل</th>
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400">العنوان</th>
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400">رابط التسويق</th>
                         <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="transactions_label">Transactions</th>
                         <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="status">Status</th>
-                        <th class="text-right px-4 py-3 font-semibold text-slate-400">Ø§Ù„Ø¥Ø¬Ø±Ø§Ø¡Ø§Øª</th>
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400">الإجراءات</th>
                     </tr>
                 </thead>
                 <tbody>
                     <template x-for="c in companies" :key="c.id">
                         <tr class="border-b border-slate-700/50 hover:bg-slate-700/30 transition">
                             <td class="px-4 py-3 text-center">
-                                <span class="text-2xl" x-text="c.icon || 'ðŸ¢'"></span>
+                                <span class="text-2xl" x-text="c.icon || '🏢'"></span>
                             </td>
                             <td class="px-4 py-3 font-medium" x-text="c.name"></td>
                             <td class="px-4 py-3">
                                 <span class="px-2 py-1 rounded-full text-xs font-semibold"
                                     :class="c.type === 'deposit' ? 'bg-blue-500/20 text-blue-400' : (c.type === 'withdraw' ? 'bg-purple-500/20 text-purple-400' : 'bg-amber-500/20 text-amber-400')">
-                                    <span x-show="c.type === 'both'">Ø¥ÙŠØ¯Ø§Ø¹ ÙˆØ³Ø­Ø¨</span>
+                                    <span x-show="c.type === 'both'">إيداع وسحب</span>
                                     <span x-show="c.type === 'deposit'" data-i18n="deposit">Deposit</span>
                                     <span x-show="c.type === 'withdraw'" data-i18n="withdraw">Withdraw</span>
                                 </span>
@@ -76,8 +76,8 @@
                             </td>
                             <td class="px-4 py-3">
                                 <div class="text-xs">
-                                    <p><span class="text-slate-400">Ø¹Ø¯Ø¯:</span> <span class="font-semibold" x-text="fmtNum(c.transaction_count || 0)"></span></p>
-                                    <p><span class="text-slate-400">Ø­Ø¬Ù…:</span> <span class="font-semibold" x-text="fmtAmount(c.transaction_volume || 0, 'USD')"></span></p>
+                                    <p><span class="text-slate-400">عدد:</span> <span class="font-semibold" x-text="fmtNum(c.transaction_count || 0)"></span></p>
+                                    <p><span class="text-slate-400">حجم:</span> <span class="font-semibold" x-text="fmtAmount(c.transaction_volume || 0, 'USD')"></span></p>
                                 </div>
                             </td>
                             <td class="px-4 py-3">
@@ -88,7 +88,7 @@
                                     <button @click="openEditModal(c)" class="p-1.5 rounded hover:bg-slate-600 text-slate-400 hover:text-blue-400 transition" title="Edit" data-i18n-title="edit">
                                         <i class="fas fa-edit text-sm"></i>
                                     </button>
-                                    <button @click="toggleActive(c)" class="p-1.5 rounded hover:bg-slate-600 text-slate-400 hover:text-amber-400 transition" title="ØªØ¨Ø¯ÙŠÙ„ Ø§Ù„Ø­Ø§Ù„Ø©">
+                                    <button @click="toggleActive(c)" class="p-1.5 rounded hover:bg-slate-600 text-slate-400 hover:text-amber-400 transition" title="تبديل الحالة">
                                         <i class="fas fa-power-off text-sm"></i>
                                     </button>
                                     <button @click="confirmDelete(c)" class="p-1.5 rounded hover:bg-slate-600 text-slate-400 hover:text-red-400 transition" title="Delete" data-i18n-title="delete">
@@ -101,7 +101,7 @@
                     <tr x-show="companies.length === 0">
                         <td colspan="9" class="px-4 py-8 text-center text-slate-500">
                             <i class="fas fa-building text-3xl mb-2 block"></i>
-                            Ù„Ø§ ØªÙˆØ¬Ø¯ Ø´Ø±ÙƒØ§Øª Ø¨Ø¹Ø¯
+                            لا توجد شركات بعد
                         </td>
                     </tr>
                 </tbody>
@@ -113,49 +113,49 @@
     <div x-show="showModal" x-transition.opacity class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" style="display:none" @click.self="showModal = false">
         <div class="bg-slate-800 rounded-2xl border border-slate-700 w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl" @click.stop="">
             <div class="flex items-center justify-between p-5 border-b border-slate-700">
-                <h3 class="text-lg font-bold" x-text="editingId ? 'ØªØ¹Ø¯ÙŠÙ„ Ø´Ø±ÙƒØ©' : 'Ø¥Ø¶Ø§ÙØ© Ø´Ø±ÙƒØ© Ø¬Ø¯ÙŠØ¯Ø©'"></h3>
+                <h3 class="text-lg font-bold" x-text="editingId ? 'تعديل شركة' : 'إضافة شركة جديدة'"></h3>
                 <button @click="showModal = false" class="text-slate-400 hover:text-white transition">
                     <i class="fas fa-times text-lg"></i>
                 </button>
             </div>
             <form @submit.prevent="saveCompany()" class="p-5 space-y-4">
                 <div>
-                    <label class="block text-sm text-slate-400 mb-1">Ø§Ù„Ø§Ø³Ù… <span class="text-red-400">*</span></label>
-                    <input x-model="form.name" required type="text" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ø§Ø³Ù… Ø§Ù„Ø´Ø±ÙƒØ©">
+                    <label class="block text-sm text-slate-400 mb-1">الاسم <span class="text-red-400">*</span></label>
+                    <input x-model="form.name" required type="text" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="اسم الشركة">
                 </div>
                 <div>
-                    <label class="block text-sm text-slate-400 mb-1">Ø§Ù„Ù†ÙˆØ¹ <span class="text-red-400">*</span></label>
+                    <label class="block text-sm text-slate-400 mb-1">النوع <span class="text-red-400">*</span></label>
                     <select x-model="form.type" required class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="both">Ø¥ÙŠØ¯Ø§Ø¹ ÙˆØ³Ø­Ø¨</option>
-                        <option value="deposit">Ø¥ÙŠØ¯Ø§Ø¹ ÙÙ‚Ø·</option>
-                        <option value="withdraw">Ø³Ø­Ø¨ ÙÙ‚Ø·</option>
+                        <option value="both">إيداع وسحب</option>
+                        <option value="deposit">إيداع فقط</option>
+                        <option value="withdraw">سحب فقط</option>
                     </select>
                 </div>
                 <div>
-                    <label class="block text-sm text-slate-400 mb-1">Ø§Ù„ØªÙØ§ØµÙŠÙ„</label>
-                    <textarea x-model="form.details" rows="3" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="ØªÙØ§ØµÙŠÙ„ Ø¥Ø¶Ø§ÙÙŠØ© Ø¹Ù† Ø§Ù„Ø´Ø±ÙƒØ©"></textarea>
+                    <label class="block text-sm text-slate-400 mb-1">التفاصيل</label>
+                    <textarea x-model="form.details" rows="3" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="تفاصيل إضافية عن الشركة"></textarea>
                 </div>
                 <div>
-                    <label class="block text-sm text-slate-400 mb-1">Ø£ÙŠÙ‚ÙˆÙ†Ø© (Ø¥ÙŠÙ…ÙˆØ¬ÙŠ)</label>
-                    <input x-model="form.icon" type="text" maxlength="4" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="ðŸ¢">
+                    <label class="block text-sm text-slate-400 mb-1">أيقونة (إيموجي)</label>
+                    <input x-model="form.icon" type="text" maxlength="4" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="🏢">
                 </div>
                 <div>
-                    <label class="block text-sm text-slate-400 mb-1">Ø§Ù„Ø¹Ù†ÙˆØ§Ù†</label>
-                    <input x-model="form.address" type="text" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ø¹Ù†ÙˆØ§Ù† Ø§Ù„Ù…Ø­ÙØ¸Ø©">
+                    <label class="block text-sm text-slate-400 mb-1">العنوان</label>
+                    <input x-model="form.address" type="text" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="عنوان المحفظة">
                 </div>
                 <div>
-                    <label class="block text-sm text-slate-400 mb-1">Ø±Ø§Ø¨Ø· Ø§Ù„ØªØ³ÙˆÙŠÙ‚</label>
+                    <label class="block text-sm text-slate-400 mb-1">رابط التسويق</label>
                     <input x-model="form.affiliate_link" type="url" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="https://...">
                 </div>
                 <div class="flex items-center gap-3 pt-2">
                     <label class="relative inline-flex items-center cursor-pointer">
                         <input type="checkbox" x-model="form.is_active" class="sr-only peer">
                         <div class="w-10 h-5 bg-slate-600 peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-5 rtl:peer-checked:after:-translate-x-5 peer-checked:bg-green-500 after:content-[''] after:absolute after:top-0.5 after:start-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all"></div>
-                        <span class="mr-2 text-sm text-slate-300">Ù†Ø´Ø·</span>
+                        <span class="mr-2 text-sm text-slate-300">نشط</span>
                     </label>
                 </div>
                 <div class="flex gap-3 pt-2">
-                    <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg text-sm font-semibold transition" x-text="editingId ? 'Ø­ÙØ¸ Ø§Ù„ØªØ¹Ø¯ÙŠÙ„Ø§Øª' : 'Ø¥Ø¶Ø§ÙØ©'"></button>
+                    <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg text-sm font-semibold transition" x-text="editingId ? 'حفظ التعديلات' : 'إضافة'"></button>
                     <button type="button" @click="showModal = false" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-lg text-sm transition" data-i18n="cancel">Cancel</button>
                 </div>
             </form>
@@ -169,9 +169,9 @@
                 <div class="w-14 h-14 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4">
                     <i class="fas fa-exclamation-triangle text-red-400 text-2xl"></i>
                 </div>
-                <h3 class="text-lg font-bold mb-2">ØªØ£ÙƒÙŠØ¯ Ø§Ù„Ø­Ø°Ù</h3>
-                <p class="text-sm text-slate-400">Ù‡Ù„ Ø£Ù†Øª Ù…ØªØ£ÙƒØ¯ Ù…Ù† Ø­Ø°Ù Ø´Ø±ÙƒØ© "<span class="text-white font-semibold" x-text="deleteTarget?.name"></span>"ØŸ</p>
-                <p class="text-xs text-red-400 mt-2">Ù‡Ø°Ø§ Ø§Ù„Ø¥Ø¬Ø±Ø§Ø¡ Ù„Ø§ ÙŠÙ…ÙƒÙ† Ø§Ù„ØªØ±Ø§Ø¬Ø¹ Ø¹Ù†Ù‡.</p>
+                <h3 class="text-lg font-bold mb-2">تأكيد الحذف</h3>
+                <p class="text-sm text-slate-400">هل أنت متأكد من حذف شركة "<span class="text-white font-semibold" x-text="deleteTarget?.name"></span>"؟</p>
+                <p class="text-xs text-red-400 mt-2">هذا الإجراء لا يمكن التراجع عنه.</p>
                 <div class="flex gap-3 mt-6">
                     <button @click="deleteCompany()" class="flex-1 bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-lg text-sm font-semibold transition" data-i18n="delete">Delete</button>
                     <button @click="showDeleteModal = false" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-lg text-sm transition" data-i18n="cancel">Cancel</button>
@@ -201,7 +201,7 @@ function companiesPage() {
         editingId: null,
         deleteTarget: null,
         loading: false,
-        form: { name: '', type: 'both', details: '', icon: 'ðŸ¢', address: '', affiliate_link: '', is_active: true },
+        form: { name: '', type: 'both', details: '', icon: '🏢', address: '', affiliate_link: '', is_active: true },
 
         async init() {
             await this.loadCompanies();
@@ -219,14 +219,14 @@ function companiesPage() {
                     withdraw: this.companies.filter(c => c.type === 'withdraw').length,
                 };
             } catch (e) {
-                toast('ÙØ´Ù„ ØªØ­Ù…ÙŠÙ„ Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª', 'error');
+                toast('فشل تحميل البيانات', 'error');
             }
             this.loading = false;
         },
 
         openAddModal() {
             this.editingId = null;
-            this.form = { name: '', type: 'both', details: '', icon: 'ðŸ¢', address: '', affiliate_link: '', is_active: true };
+            this.form = { name: '', type: 'both', details: '', icon: '🏢', address: '', affiliate_link: '', is_active: true };
             this.showModal = true;
         },
 
@@ -236,7 +236,7 @@ function companiesPage() {
                 name: company.name || '',
                 type: company.type || 'both',
                 details: company.details || '',
-                icon: company.icon || 'ðŸ¢',
+                icon: company.icon || '🏢',
                 address: company.address || '',
                 affiliate_link: company.affiliate_link || '',
                 is_active: company.is_active,
@@ -251,18 +251,18 @@ function companiesPage() {
                         method: 'PUT',
                         body: JSON.stringify(this.form),
                     });
-                    toast('ØªÙ… ØªØ­Ø¯ÙŠØ« Ø§Ù„Ø´Ø±ÙƒØ© Ø¨Ù†Ø¬Ø§Ø­', 'success');
+                    toast('تم تحديث الشركة بنجاح', 'success');
                 } else {
                     await api('/api/companies', {
                         method: 'POST',
                         body: JSON.stringify(this.form),
                     });
-                    toast('ØªÙ…Øª Ø¥Ø¶Ø§ÙØ© Ø§Ù„Ø´Ø±ÙƒØ© Ø¨Ù†Ø¬Ø§Ø­', 'success');
+                    toast('تمت إضافة الشركة بنجاح', 'success');
                 }
                 this.showModal = false;
                 await this.loadCompanies();
             } catch (e) {
-                toast('ÙØ´Ù„ Ø­ÙØ¸ Ø§Ù„Ø´Ø±ÙƒØ©: ' + (e.message || 'Ø®Ø·Ø£ ØºÙŠØ± Ù…Ø¹Ø±ÙˆÙ'), 'error');
+                toast('فشل حفظ الشركة: ' + (e.message || 'خطأ غير معروف'), 'error');
             }
         },
 
@@ -273,11 +273,11 @@ function companiesPage() {
                     method: 'PUT',
                     body: JSON.stringify({ is_active: company.is_active }),
                 });
-                toast(company.is_active ? 'ØªÙ… ØªÙØ¹ÙŠÙ„ Ø§Ù„Ø´Ø±ÙƒØ©' : 'ØªÙ… ØªØ¹Ø·ÙŠÙ„ Ø§Ù„Ø´Ø±ÙƒØ©', 'success');
+                toast(company.is_active ? 'تم تفعيل الشركة' : 'تم تعطيل الشركة', 'success');
                 await this.loadCompanies();
             } catch (e) {
                 company.is_active = !company.is_active;
-                toast('ÙØ´Ù„ ØªØºÙŠÙŠØ± Ø§Ù„Ø­Ø§Ù„Ø©', 'error');
+                toast('فشل تغيير الحالة', 'error');
             }
         },
 
@@ -290,12 +290,12 @@ function companiesPage() {
             if (!this.deleteTarget) return;
             try {
                 await api(`/api/companies/${this.deleteTarget.id}`, { method: 'DELETE' });
-                toast('ØªÙ… Ø­Ø°Ù Ø§Ù„Ø´Ø±ÙƒØ© Ø¨Ù†Ø¬Ø§Ø­', 'success');
+                toast('تم حذف الشركة بنجاح', 'success');
                 this.showDeleteModal = false;
                 this.deleteTarget = null;
                 await this.loadCompanies();
             } catch (e) {
-                toast('ÙØ´Ù„ Ø­Ø°Ù Ø§Ù„Ø´Ø±ÙƒØ©', 'error');
+                toast('فشل حذف الشركة', 'error');
             }
         },
     };

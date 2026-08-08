@@ -1,18 +1,18 @@
-﻿{% extends "base.html" %}
-{% block title %}Ø¹Ù†Ø§ÙˆÙŠÙ† Ø§Ù„ØµØ±Ù - Boterx{% endblock %}
-{% block page_title %}Ø¹Ù†Ø§ÙˆÙŠÙ† Ø§Ù„ØµØ±Ù{% endblock %}
+{% extends "base.html" %}
+{% block title %}عناوين الصرف - Boterx{% endblock %}
+{% block page_title %}عناوين الصرف{% endblock %}
 
 {% block content %}
 <div x-data="exchangeAddressesPage()" x-init="init()">
     <!-- Header -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-            <h2 class="text-xl font-bold">Ø¹Ù†Ø§ÙˆÙŠÙ† Ø§Ù„ØµØ±Ù</h2>
-            <p class="text-sm text-slate-400 mt-1">Ø¥Ø¯Ø§Ø±Ø© Ø¹Ù†Ø§ÙˆÙŠÙ† Ø§Ù„Ù…Ø­Ø§ÙØ¸ Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…Ø© ÙÙŠ Ø¹Ù…Ù„ÙŠØ§Øª Ø§Ù„ØµØ±Ù</p>
+            <h2 class="text-xl font-bold">عناوين الصرف</h2>
+            <p class="text-sm text-slate-400 mt-1">إدارة عناوين المحافظ المستخدمة في عمليات الصرف</p>
         </div>
         <button @click="openAddModal()"
             class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition flex items-center gap-2 self-start">
-            <i class="fas fa-plus"></i> Ø¥Ø¶Ø§ÙØ© Ø¹Ù†ÙˆØ§Ù†
+            <i class="fas fa-plus"></i> إضافة عنوان
         </button>
     </div>
 
@@ -21,7 +21,7 @@
         <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
             <div class="flex items-center gap-2 mb-1">
                 <i class="fas fa-wallet text-blue-400"></i>
-                <p class="text-xs text-slate-400">Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„Ø¹Ù†Ø§ÙˆÙŠÙ†</p>
+                <p class="text-xs text-slate-400">إجمالي العناوين</p>
             </div>
             <p class="text-2xl font-bold mt-1" x-text="fmtNum(stats.total)"></p>
         </div>
@@ -35,7 +35,7 @@
         <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
             <div class="flex items-center gap-2 mb-1">
                 <i class="fas fa-circle-xmark text-slate-400"></i>
-                <p class="text-xs text-slate-400">ØºÙŠØ± Ù†Ø´Ø·Ø©</p>
+                <p class="text-xs text-slate-400">غير نشطة</p>
             </div>
             <p class="text-2xl font-bold text-slate-400 mt-1" x-text="fmtNum(stats.inactive)"></p>
         </div>
@@ -47,11 +47,11 @@
             <table class="w-full text-sm">
                 <thead>
                     <tr class="border-b border-slate-700 bg-slate-800/80">
-                        <th class="text-right px-4 py-3 font-semibold text-slate-400">Ø§Ù„Ù…Ø¹Ø±Ù</th>
-                        <th class="text-right px-4 py-3 font-semibold text-slate-400">Ø§Ù„Ø¹Ù†ÙˆØ§Ù†</th>
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400">المعرف</th>
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400">العنوان</th>
                         <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="status">Status</th>
-                        <th class="text-right px-4 py-3 font-semibold text-slate-400">ØªØ§Ø±ÙŠØ® Ø§Ù„Ø¥Ø¶Ø§ÙØ©</th>
-                        <th class="text-right px-4 py-3 font-semibold text-slate-400">Ø§Ù„Ø¥Ø¬Ø±Ø§Ø¡Ø§Øª</th>
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400">تاريخ الإضافة</th>
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400">الإجراءات</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -61,7 +61,7 @@
                             <td class="px-4 py-3">
                                 <div class="flex items-center gap-2">
                                     <code class="text-xs bg-slate-900 px-2 py-1 rounded font-mono max-w-[280px] truncate block text-slate-300" x-text="addr.address" :title="addr.address"></code>
-                                    <button @click="copyAddress(addr.address)" class="text-slate-500 hover:text-blue-400 transition flex-shrink-0" title="Ù†Ø³Ø®">
+                                    <button @click="copyAddress(addr.address)" class="text-slate-500 hover:text-blue-400 transition flex-shrink-0" title="نسخ">
                                         <i class="fas fa-copy text-xs"></i>
                                     </button>
                                 </div>
@@ -69,10 +69,10 @@
                             <td class="px-4 py-3">
                                 <span x-html="statusBadge(addr.status === 'active' ? 'active' : 'inactive')"></span>
                             </td>
-                            <td class="px-4 py-3 text-slate-300 text-xs" x-text="addr.created_at || 'â€”'"></td>
+                            <td class="px-4 py-3 text-slate-300 text-xs" x-text="addr.created_at || '—'"></td>
                             <td class="px-4 py-3">
                                 <div class="flex items-center gap-1">
-                                    <button @click="toggleStatus(addr)" class="p-1.5 rounded hover:bg-slate-600 text-slate-400 hover:text-amber-400 transition" :title="addr.status === 'active' ? 'ØªØ¹Ø·ÙŠÙ„' : 'ØªÙØ¹ÙŠÙ„'">
+                                    <button @click="toggleStatus(addr)" class="p-1.5 rounded hover:bg-slate-600 text-slate-400 hover:text-amber-400 transition" :title="addr.status === 'active' ? 'تعطيل' : 'تفعيل'">
                                         <i class="fas fa-power-off text-sm"></i>
                                     </button>
                                     <button @click="confirmDelete(addr)" class="p-1.5 rounded hover:bg-slate-600 text-slate-400 hover:text-red-400 transition" title="Delete" data-i18n-title="delete">
@@ -85,7 +85,7 @@
                     <tr x-show="addresses.length === 0">
                         <td colspan="5" class="px-4 py-8 text-center text-slate-500">
                             <i class="fas fa-wallet text-3xl mb-2 block"></i>
-                            Ù„Ø§ ØªÙˆØ¬Ø¯ Ø¹Ù†Ø§ÙˆÙŠÙ† Ø¨Ø¹Ø¯
+                            لا توجد عناوين بعد
                         </td>
                     </tr>
                 </tbody>
@@ -97,22 +97,22 @@
     <div x-show="showAddModal" x-transition.opacity class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" style="display:none" @click.self="showAddModal = false">
         <div class="bg-slate-800 rounded-2xl border border-slate-700 w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl" @click.stop="">
             <div class="flex items-center justify-between p-5 border-b border-slate-700">
-                <h3 class="text-lg font-bold">Ø¥Ø¶Ø§ÙØ© Ø¹Ù†ÙˆØ§Ù† ØµØ±Ù Ø¬Ø¯ÙŠØ¯</h3>
+                <h3 class="text-lg font-bold">إضافة عنوان صرف جديد</h3>
                 <button @click="showAddModal = false" class="text-slate-400 hover:text-white transition">
                     <i class="fas fa-times text-lg"></i>
                 </button>
             </div>
             <form @submit.prevent="addAddress()" class="p-5 space-y-4">
                 <div>
-                    <label class="block text-sm text-slate-400 mb-1">Ø¹Ù†ÙˆØ§Ù† Ø§Ù„Ù…Ø­ÙØ¸Ø© <span class="text-red-400">*</span></label>
-                    <textarea x-model="form.address" required rows="4" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ø£Ø¯Ø®Ù„ Ø¹Ù†ÙˆØ§Ù† Ø§Ù„Ù…Ø­ÙØ¸Ø© Ù‡Ù†Ø§..."></textarea>
-                    <p class="text-xs text-slate-500 mt-1">ÙŠÙ…ÙƒÙ† Ø¥Ø¯Ø®Ø§Ù„ Ø¹Ù†ÙˆØ§Ù† ÙˆØ§Ø­Ø¯ Ù„ÙƒÙ„ Ø­Ù‚Ù„</p>
+                    <label class="block text-sm text-slate-400 mb-1">عنوان المحفظة <span class="text-red-400">*</span></label>
+                    <textarea x-model="form.address" required rows="4" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="أدخل عنوان المحفظة هنا..."></textarea>
+                    <p class="text-xs text-slate-500 mt-1">يمكن إدخال عنوان واحد لكل حقل</p>
                 </div>
                 <div class="flex items-center gap-3 pt-2">
                     <label class="relative inline-flex items-center cursor-pointer">
                         <input type="checkbox" x-model="form.status" true-value="active" false-value="inactive" class="sr-only peer">
                         <div class="w-10 h-5 bg-slate-600 peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-5 rtl:peer-checked:after:-translate-x-5 peer-checked:bg-green-500 after:content-[''] after:absolute after:top-0.5 after:start-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all"></div>
-                        <span class="mr-2 text-sm text-slate-300">Ù†Ø´Ø·</span>
+                        <span class="mr-2 text-sm text-slate-300">نشط</span>
                     </label>
                 </div>
                 <div class="flex gap-3 pt-2">
@@ -130,10 +130,10 @@
                 <div class="w-14 h-14 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4">
                     <i class="fas fa-exclamation-triangle text-red-400 text-2xl"></i>
                 </div>
-                <h3 class="text-lg font-bold mb-2">ØªØ£ÙƒÙŠØ¯ Ø§Ù„Ø­Ø°Ù</h3>
-                <p class="text-sm text-slate-400">Ù‡Ù„ Ø£Ù†Øª Ù…ØªØ£ÙƒØ¯ Ù…Ù† Ø­Ø°Ù Ù‡Ø°Ø§ Ø§Ù„Ø¹Ù†ÙˆØ§Ù†ØŸ</p>
+                <h3 class="text-lg font-bold mb-2">تأكيد الحذف</h3>
+                <p class="text-sm text-slate-400">هل أنت متأكد من حذف هذا العنوان؟</p>
                 <p class="text-xs text-slate-500 mt-2 font-mono truncate" x-text="deleteTarget?.address"></p>
-                <p class="text-xs text-red-400 mt-2">Ù‡Ø°Ø§ Ø§Ù„Ø¥Ø¬Ø±Ø§Ø¡ Ù„Ø§ ÙŠÙ…ÙƒÙ† Ø§Ù„ØªØ±Ø§Ø¬Ø¹ Ø¹Ù†Ù‡.</p>
+                <p class="text-xs text-red-400 mt-2">هذا الإجراء لا يمكن التراجع عنه.</p>
                 <div class="flex gap-3 mt-6">
                     <button @click="deleteAddress()" class="flex-1 bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-lg text-sm font-semibold transition" data-i18n="delete">Delete</button>
                     <button @click="showDeleteModal = false" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-lg text-sm transition" data-i18n="cancel">Cancel</button>
@@ -175,7 +175,7 @@ function exchangeAddressesPage() {
                 this.addresses = data.addresses || [];
                 this.computeStats();
             } catch (e) {
-                toast('ÙØ´Ù„ ØªØ­Ù…ÙŠÙ„ Ø§Ù„Ø¹Ù†Ø§ÙˆÙŠÙ†', 'error');
+                toast('فشل تحميل العناوين', 'error');
             }
             this.loading = false;
         },
@@ -199,11 +199,11 @@ function exchangeAddressesPage() {
                     method: 'POST',
                     body: JSON.stringify({ address: this.form.address, status: this.form.status }),
                 });
-                toast('ØªÙ…Øª Ø¥Ø¶Ø§ÙØ© Ø§Ù„Ø¹Ù†ÙˆØ§Ù† Ø¨Ù†Ø¬Ø§Ø­', 'success');
+                toast('تمت إضافة العنوان بنجاح', 'success');
                 this.showAddModal = false;
                 await this.loadAddresses();
             } catch (e) {
-                toast('ÙØ´Ù„ Ø¥Ø¶Ø§ÙØ© Ø§Ù„Ø¹Ù†ÙˆØ§Ù†: ' + (e.message || 'Ø®Ø·Ø£ ØºÙŠØ± Ù…Ø¹Ø±ÙˆÙ'), 'error');
+                toast('فشل إضافة العنوان: ' + (e.message || 'خطأ غير معروف'), 'error');
             }
         },
 
@@ -213,9 +213,9 @@ function exchangeAddressesPage() {
                 await api(`/api/exchange-addresses/${addr.id}/toggle`, { method: 'POST' });
                 addr.status = newStatus;
                 this.computeStats();
-                toast(newStatus === 'active' ? 'ØªÙ… ØªÙØ¹ÙŠÙ„ Ø§Ù„Ø¹Ù†ÙˆØ§Ù†' : 'ØªÙ… ØªØ¹Ø·ÙŠÙ„ Ø§Ù„Ø¹Ù†ÙˆØ§Ù†', 'success');
+                toast(newStatus === 'active' ? 'تم تفعيل العنوان' : 'تم تعطيل العنوان', 'success');
             } catch (e) {
-                toast('ÙØ´Ù„ ØªØºÙŠÙŠØ± Ø§Ù„Ø­Ø§Ù„Ø©', 'error');
+                toast('فشل تغيير الحالة', 'error');
             }
         },
 
@@ -228,20 +228,20 @@ function exchangeAddressesPage() {
             if (!this.deleteTarget) return;
             try {
                 await api(`/api/exchange-addresses/${this.deleteTarget.id}`, { method: 'DELETE' });
-                toast('ØªÙ… Ø­Ø°Ù Ø§Ù„Ø¹Ù†ÙˆØ§Ù† Ø¨Ù†Ø¬Ø§Ø­', 'success');
+                toast('تم حذف العنوان بنجاح', 'success');
                 this.showDeleteModal = false;
                 this.deleteTarget = null;
                 await this.loadAddresses();
             } catch (e) {
-                toast('ÙØ´Ù„ Ø­Ø°Ù Ø§Ù„Ø¹Ù†ÙˆØ§Ù†', 'error');
+                toast('فشل حذف العنوان', 'error');
             }
         },
 
         copyAddress(text) {
             navigator.clipboard.writeText(text).then(() => {
-                toast('ØªÙ… Ù†Ø³Ø® Ø§Ù„Ø¹Ù†ÙˆØ§Ù†', 'success');
+                toast('تم نسخ العنوان', 'success');
             }).catch(() => {
-                toast('ÙØ´Ù„ Ø§Ù„Ù†Ø³Ø®', 'error');
+                toast('فشل النسخ', 'error');
             });
         },
     };

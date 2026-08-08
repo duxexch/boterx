@@ -1,6 +1,6 @@
-﻿{% extends 'base.html' %}
-{% block title %}Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…ÙŠÙ† â€” Boterx{% endblock %}
-{% block page_title %}ðŸ‘¥ Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…ÙŠÙ†{% endblock %}
+{% extends 'base.html' %}
+{% block title %}المستخدمين — Boterx{% endblock %}
+{% block page_title %}👥 المستخدمين{% endblock %}
 
 {% block content %}
 <div x-data="usersApp()" x-init="init()" class="space-y-4">
@@ -35,23 +35,23 @@
                 <option value="no" data-i18n="not_banned">Not Banned</option>
             </select>
             <select x-model="filterLanguage" @change="page=1; load()" class="input text-sm">
-                <option value="">ÙƒÙ„ Ø§Ù„Ù„ØºØ§Øª</option>
-                <option value="ar">Ø§Ù„Ø¹Ø±Ø¨ÙŠØ©</option>
+                <option value="">كل اللغات</option>
+                <option value="ar">العربية</option>
                 <option value="en">English</option>
-                <option value="fr">FranÃ§ais</option>
+                <option value="fr">Français</option>
             </select>
             <select x-model="filterCurrency" @change="page=1; load()" class="input text-sm">
-                <option value="">ÙƒÙ„ Ø§Ù„Ø¹Ù…Ù„Ø§Øª</option>
+                <option value="">كل العملات</option>
                 <option value="EGP">EGP</option>
                 <option value="USD">USD</option>
                 <option value="SAR">SAR</option>
                 <option value="AED">AED</option>
             </select>
             <button @click="exportCSV()" class="btn btn-primary btn-sm">
-                <i class="fas fa-file-csv ml-1"></i> ØªØµØ¯ÙŠØ± CSV
+                <i class="fas fa-file-csv ml-1"></i> تصدير CSV
             </button>
             <button @click="load()" class="btn btn-primary btn-sm">
-                <i class="fas fa-rotate ml-1"></i> ØªØ­Ø¯ÙŠØ«
+                <i class="fas fa-rotate ml-1"></i> تحديث
             </button>
         </div>
     </div>
@@ -88,22 +88,22 @@
                         <tr class="hover:bg-slate-700/50">
                             <td class="font-mono text-xs cursor-pointer text-blue-400 hover:underline" @click="openDetail(u)" x-text="u.telegram_id"></td>
                             <td class="cursor-pointer hover:text-blue-400" @click="openDetail(u)" x-text="u.name"></td>
-                            <td class="text-xs" x-text="u.phone || 'â€”'"></td>
+                            <td class="text-xs" x-text="u.phone || '—'"></td>
                             <td class="font-mono text-xs text-amber-400" x-text="u.customer_id"></td>
                             <td>
-                                <span class="px-2 py-0.5 rounded text-xs bg-slate-700 text-slate-300" x-text="u.language || 'â€”'"></span>
+                                <span class="px-2 py-0.5 rounded text-xs bg-slate-700 text-slate-300" x-text="u.language || '—'"></span>
                             </td>
-                            <td x-text="u.currency || 'â€”'"></td>
+                            <td x-text="u.currency || '—'"></td>
                             <td x-html="statusBadge(u.is_banned === 'yes' ? 'yes' : 'no')"></td>
                             <td class="text-xs text-slate-400" x-text="u.date"></td>
                             <td>
                                 <div class="flex gap-1">
-                                    <button @click="openDetail(u)" class="btn btn-primary btn-sm" title="ØªÙØ§ØµÙŠÙ„"><i class="fas fa-eye"></i></button>
+                                    <button @click="openDetail(u)" class="btn btn-primary btn-sm" title="تفاصيل"><i class="fas fa-eye"></i></button>
                                     <template x-if="u.is_banned === 'yes'">
-                                        <button @click="unban(u.telegram_id)" class="btn btn-success btn-sm" title="Ø¥Ù„ØºØ§Ø¡ Ø§Ù„Ø­Ø¸Ø±"><i class="fas fa-unlock"></i></button>
+                                        <button @click="unban(u.telegram_id)" class="btn btn-success btn-sm" title="إلغاء الحظر"><i class="fas fa-unlock"></i></button>
                                     </template>
                                     <template x-if="u.is_banned !== 'yes'">
-                                        <button @click="openBanModal(u)" class="btn btn-danger btn-sm" title="Ø­Ø¸Ø±"><i class="fas fa-ban"></i></button>
+                                        <button @click="openBanModal(u)" class="btn btn-danger btn-sm" title="حظر"><i class="fas fa-ban"></i></button>
                                     </template>
                                 </div>
                             </td>
@@ -117,11 +117,11 @@
     <!-- Pagination -->
     <div class="flex items-center justify-between flex-wrap gap-2">
         <button @click="page > 1 && (page--, load())" :disabled="page <= 1" class="btn btn-primary btn-sm">
-            <i class="fas fa-chevron-right ml-1"></i> Ø§Ù„Ø³Ø§Ø¨Ù‚
+            <i class="fas fa-chevron-right ml-1"></i> السابق
         </button>
-        <span class="text-sm text-slate-400">ØµÙØ­Ø© <span x-text="page"></span> Ù…Ù† <span x-text="pages"></span> (Ø¥Ø¬Ù…Ø§Ù„ÙŠ: <span x-text="total"></span>)</span>
+        <span class="text-sm text-slate-400">صفحة <span x-text="page"></span> من <span x-text="pages"></span> (إجمالي: <span x-text="total"></span>)</span>
         <button @click="page < pages && (page++, load())" :disabled="page >= pages" class="btn btn-primary btn-sm">
-            Ø§Ù„ØªØ§Ù„ÙŠ <i class="fas fa-chevron-left mr-1"></i>
+            التالي <i class="fas fa-chevron-left mr-1"></i>
         </button>
     </div>
 
@@ -129,7 +129,7 @@
     <div x-show="showDetail" x-transition class="modal-overlay" style="display:none" @click.self="showDetail = false">
         <div class="modal max-w-3xl">
             <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-bold"><i class="fas fa-user text-blue-400 ml-1"></i> ØªÙØ§ØµÙŠÙ„ Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…</h3>
+                <h3 class="text-lg font-bold"><i class="fas fa-user text-blue-400 ml-1"></i> تفاصيل المستخدم</h3>
                 <button @click="showDetail = false" class="text-slate-400 hover:text-white"><i class="fas fa-times"></i></button>
             </div>
             <template x-if="detail">
@@ -138,39 +138,39 @@
                     <div class="flex items-center gap-4 p-4 bg-slate-900/50 rounded-lg">
                         <div class="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-xl font-bold" x-text="(detail.name || 'U').substring(0, 2).toUpperCase()"></div>
                         <div class="flex-1">
-                            <h4 class="text-lg font-semibold" x-text="detail.name || 'â€”'"></h4>
-                            <p class="text-sm text-slate-400 font-mono" x-text="detail.telegram_id || 'â€”'"></p>
+                            <h4 class="text-lg font-semibold" x-text="detail.name || '—'"></h4>
+                            <p class="text-sm text-slate-400 font-mono" x-text="detail.telegram_id || '—'"></p>
                         </div>
                         <div x-html="statusBadge(detail.is_banned === 'yes' ? 'yes' : 'no')"></div>
                     </div>
-                    <!-- User Details Grid â€” Editable -->
+                    <!-- User Details Grid — Editable -->
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        <div><label class="block text-xs text-slate-500 mb-1" data-i18n="customer_id">Customer ID</label><p class="text-sm font-mono text-amber-400" x-text="detail.customer_id || 'â€”'"></p></div>
+                        <div><label class="block text-xs text-slate-500 mb-1" data-i18n="customer_id">Customer ID</label><p class="text-sm font-mono text-amber-400" x-text="detail.customer_id || '—'"></p></div>
                         <div><label class="block text-xs text-slate-500 mb-1" data-i18n="phone">Phone</label>
                             <input x-model="detail.phone" @change="saveUserField(detail.telegram_id, 'phone', detail.phone)" class="input text-sm py-1"></div>
                         <div><label class="block text-xs text-slate-500 mb-1" data-i18n="language">Language</label>
                             <select x-model="detail.language" @change="saveUserField(detail.telegram_id, 'language', detail.language)" class="input text-sm py-1">
-                                <option value="ar">Ø§Ù„Ø¹Ø±Ø¨ÙŠØ©</option><option value="en">English</option><option value="fr">FranÃ§ais</option>
-                                <option value="es">EspaÃ±ol</option><option value="de">Deutsch</option><option value="tr">TÃ¼rkÃ§e</option>
-                                <option value="ur">Ø§Ø±Ø¯Ùˆ</option><option value="hi">à¤¹à¤¿à¤¨à¥à¤¦à¥€</option><option value="fa">ÙØ§Ø±Ø³ÛŒ</option>
-                                <option value="id">Indonesia</option><option value="pt">PortuguÃªs</option><option value="ru">Ð ÑƒÑÑÐºÐ¸Ð¹</option>
-                                <option value="zh">ä¸­æ–‡</option><option value="ja">æ—¥æœ¬èªž</option><option value="ko">í•œêµ­ì–´</option>
-                                <option value="th">à¹„à¸—à¸¢</option><option value="it">Italiano</option>
+                                <option value="ar">العربية</option><option value="en">English</option><option value="fr">Français</option>
+                                <option value="es">Español</option><option value="de">Deutsch</option><option value="tr">Türkçe</option>
+                                <option value="ur">اردو</option><option value="hi">हिन्दी</option><option value="fa">فارسی</option>
+                                <option value="id">Indonesia</option><option value="pt">Português</option><option value="ru">Русский</option>
+                                <option value="zh">中文</option><option value="ja">日本語</option><option value="ko">한국어</option>
+                                <option value="th">ไทย</option><option value="it">Italiano</option>
                             </select></div>
                         <div><label class="block text-xs text-slate-500 mb-1" data-i18n="currency">Currency</label>
                             <select x-model="detail.currency" @change="saveUserField(detail.telegram_id, 'currency', detail.currency)" class="input text-sm py-1">
                                 <option value="SAR">SAR</option><option value="USD">USD</option><option value="EGP">EGP</option>
                                 <option value="AED">AED</option><option value="EUR">EUR</option><option value="TRY">TRY</option>
                             </select></div>
-                        <div><label class="block text-xs text-slate-500 mb-1" data-i18n="registration_date">Registration Date</label><p class="text-sm" x-text="detail.date || 'â€”'"></p></div>
+                        <div><label class="block text-xs text-slate-500 mb-1" data-i18n="registration_date">Registration Date</label><p class="text-sm" x-text="detail.date || '—'"></p></div>
                         <div><label class="block text-xs text-slate-500 mb-1" data-i18n="name">Name</label>
                             <input x-model="detail.name" @change="saveUserField(detail.telegram_id, 'name', detail.name)" class="input text-sm py-1"></div>
-                        <div x-show="detail.ban_reason"><label class="block text-xs text-slate-500 mb-1" data-i18n="ban_reason">Ban Reason</label><p class="text-sm text-red-400" x-text="detail.ban_reason || 'â€”'"></p></div>
-                        <div><label class="block text-xs text-slate-500 mb-1" data-i18n="phone_verified">Phone Verified</label><p class="text-sm" x-text="detail.phone_verified === 'yes' ? 'âœ… Ù†Ø¹Ù…' : 'âŒ Ù„Ø§'"></p></div>
+                        <div x-show="detail.ban_reason"><label class="block text-xs text-slate-500 mb-1" data-i18n="ban_reason">Ban Reason</label><p class="text-sm text-red-400" x-text="detail.ban_reason || '—'"></p></div>
+                        <div><label class="block text-xs text-slate-500 mb-1" data-i18n="phone_verified">Phone Verified</label><p class="text-sm" x-text="detail.phone_verified === 'yes' ? '✅ نعم' : '❌ لا'"></p></div>
                     </div>
                     <!-- User Transactions -->
                     <div>
-                        <h4 class="font-semibold text-sm mb-2"><i class="fas fa-money-bill-transfer text-amber-400 ml-1"></i> Ø¢Ø®Ø± Ø§Ù„Ù…Ø¹Ø§Ù…Ù„Ø§Øª</h4>
+                        <h4 class="font-semibold text-sm mb-2"><i class="fas fa-money-bill-transfer text-amber-400 ml-1"></i> آخر المعاملات</h4>
                         <div class="overflow-x-auto">
                             <table class="data-table">
                                 <thead><tr><th>ID</th><th data-i18n="type">Type</th><th data-i18n="amount">Amount</th><th data-i18n="status">Status</th><th data-i18n="date">Date</th></tr></thead>
@@ -184,7 +184,7 @@
                                     <template x-for="t in detailTxns" :key="t.id">
                                         <tr>
                                             <td class="font-mono text-xs" x-text="t.id"></td>
-                                            <td x-text="t.type === 'deposit' ? 'ðŸ’µ Ø¥ÙŠØ¯Ø§Ø¹' : 'ðŸ’¸ Ø³Ø­Ø¨'"></td>
+                                            <td x-text="t.type === 'deposit' ? '💵 إيداع' : '💸 سحب'"></td>
                                             <td class="font-bold" x-text="fmtAmount(t.amount, t.currency || '')"></td>
                                             <td x-html="statusBadge(t.status)"></td>
                                             <td class="text-xs text-slate-400" x-text="t.date"></td>
@@ -196,7 +196,7 @@
                     </div>
                     <!-- SVRP Wallet -->
                     <div x-show="detailWallet">
-                        <h4 class="font-semibold text-sm mb-2"><i class="fas fa-gem text-purple-400 ml-1"></i> Ù…Ø­ÙØ¸Ø© Ø§Ù„ØªØ¹ÙˆÙŠØ¶</h4>
+                        <h4 class="font-semibold text-sm mb-2"><i class="fas fa-gem text-purple-400 ml-1"></i> محفظة التعويض</h4>
                         <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
                             <div class="p-2 bg-slate-900/50 rounded"><p class="text-xs text-slate-500" data-i18n="balance">Balance</p><p class="font-bold text-green-400" x-text="fmtNum(detailWallet?.balance || 0)"></p></div>
                             <div class="p-2 bg-slate-900/50 rounded"><p class="text-xs text-slate-500" data-i18n="pending_balance">Pending</p><p class="font-bold text-amber-400" x-text="fmtNum(detailWallet?.pending_balance || 0)"></p></div>
@@ -204,8 +204,8 @@
                             <div class="p-2 bg-slate-900/50 rounded"><p class="text-xs text-slate-500" data-i18n="frozen">Frozen</p><p class="font-bold text-red-400" x-text="fmtNum(detailWallet?.pending_balance || 0)"></p></div>
                         </div>
                         <div class="flex gap-2 mt-2">
-                            <button @click="freezeBalance(detail.telegram_id)" class="btn btn-warning btn-sm">ðŸ§Š ØªØ¬Ù…ÙŠØ¯ Ø§Ù„Ø±ØµÙŠØ¯</button>
-                            <button @click="unfreezeBalance(detail.telegram_id)" class="btn btn-success btn-sm">ðŸ”“ ÙÙƒ Ø§Ù„ØªØ¬Ù…ÙŠØ¯</button>
+                            <button @click="freezeBalance(detail.telegram_id)" class="btn btn-warning btn-sm">🧊 تجميد الرصيد</button>
+                            <button @click="unfreezeBalance(detail.telegram_id)" class="btn btn-success btn-sm">🔓 فك التجميد</button>
                         </div>
                     </div>
                     <div class="flex gap-2 justify-end pt-2 border-t border-slate-700">
@@ -220,21 +220,21 @@
     <div x-show="showBanModal" x-transition class="modal-overlay" style="display:none" @click.self="showBanModal = false">
         <div class="modal max-w-md">
             <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-bold text-red-400"><i class="fas fa-ban ml-1"></i> Ø­Ø¸Ø± Ù…Ø³ØªØ®Ø¯Ù…</h3>
+                <h3 class="text-lg font-bold text-red-400"><i class="fas fa-ban ml-1"></i> حظر مستخدم</h3>
                 <button @click="showBanModal = false" class="text-slate-400 hover:text-white"><i class="fas fa-times"></i></button>
             </div>
             <div class="space-y-4">
                 <div>
-                    <p class="text-sm text-slate-400 mb-1">Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…: <span class="font-bold text-white" x-text="banUser?.name || ''"></span></p>
+                    <p class="text-sm text-slate-400 mb-1">المستخدم: <span class="font-bold text-white" x-text="banUser?.name || ''"></span></p>
                     <p class="text-xs text-slate-500 font-mono" x-text="banUser?.telegram_id || ''"></p>
                 </div>
                 <div>
                     <label class="block text-sm text-slate-400 mb-1" data-i18n="ban_reason">Ban Reason</label>
-                    <textarea x-model="banReason" rows="3" class="input w-full" placeholder="Ø£Ø¯Ø®Ù„ Ø³Ø¨Ø¨ Ø§Ù„Ø­Ø¸Ø±..."></textarea>
+                    <textarea x-model="banReason" rows="3" class="input w-full" placeholder="أدخل سبب الحظر..."></textarea>
                 </div>
                 <div class="flex gap-2 justify-end">
                     <button @click="showBanModal = false" class="btn bg-slate-700 text-slate-300 hover:bg-slate-600" data-i18n="cancel">Cancel</button>
-                    <button @click="confirmBan()" class="btn btn-danger"><i class="fas fa-ban ml-1"></i> ØªØ£ÙƒÙŠØ¯ Ø§Ù„Ø­Ø¸Ø±</button>
+                    <button @click="confirmBan()" class="btn btn-danger"><i class="fas fa-ban ml-1"></i> تأكيد الحظر</button>
                 </div>
             </div>
         </div>
@@ -267,7 +267,7 @@ function usersApp() {
                 this.total = data.total || 0;
                 this.pages = data.pages || 1;
             } catch(e) {
-                toast('ÙØ´Ù„ ØªØ­Ù…ÙŠÙ„ Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…ÙŠÙ†', 'error');
+                toast('فشل تحميل المستخدمين', 'error');
                 this.users = [];
             } finally {
                 this.loading = false;
@@ -308,50 +308,50 @@ function usersApp() {
             if (!this.banUser) return;
             try {
                 await api('/api/users/' + this.banUser.telegram_id + '/ban', { method: 'POST', body: JSON.stringify({ reason: this.banReason }) });
-                toast('ØªÙ… Ø­Ø¸Ø± Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…', 'warning');
+                toast('تم حظر المستخدم', 'warning');
                 this.showBanModal = false;
                 this.load();
-            } catch(e) { toast('ÙØ´Ù„ Ø§Ù„Ø­Ø¸Ø±', 'error'); }
+            } catch(e) { toast('فشل الحظر', 'error'); }
         },
 
         async unban(id) {
-            if (!confirm('Ø¥Ù„ØºØ§Ø¡ Ø­Ø¸Ø± Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù… ' + id + 'ØŸ')) return;
+            if (!confirm('إلغاء حظر المستخدم ' + id + '؟')) return;
             try {
                 await api('/api/users/' + id + '/unban', { method: 'POST', body: '{}' });
-                toast('ØªÙ… Ø¥Ù„ØºØ§Ø¡ Ø§Ù„Ø­Ø¸Ø±', 'success');
+                toast('تم إلغاء الحظر', 'success');
                 this.load();
-            } catch(e) { toast('ÙØ´Ù„Øª Ø§Ù„Ø¹Ù…Ù„ÙŠØ©', 'error'); }
+            } catch(e) { toast('فشلت العملية', 'error'); }
         },
 
         async saveUserField(id, field, value) {
             try {
                 await api('/api/users/' + id, { method: 'PUT', body: JSON.stringify({ [field]: value }) });
-                toast('ØªÙ… ØªØ­Ø¯ÙŠØ« ' + field, 'success');
+                toast('تم تحديث ' + field, 'success');
                 Notifier?.playSuccessSound?.();
-            } catch(e) { toast('ÙØ´Ù„ Ø§Ù„ØªØ­Ø¯ÙŠØ«', 'error'); }
+            } catch(e) { toast('فشل التحديث', 'error'); }
         },
 
         async freezeBalance(id) {
-            if (!confirm('ØªØ¬Ù…ÙŠØ¯ ÙƒÙ„ Ø±ØµÙŠØ¯ Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…ØŸ')) return;
+            if (!confirm('تجميد كل رصيد المستخدم؟')) return;
             try {
                 await api('/api/svrp/wallets/' + id + '/freeze', { method: 'POST', body: '{}' });
-                toast('ØªÙ… ØªØ¬Ù…ÙŠØ¯ Ø§Ù„Ø±ØµÙŠØ¯', 'warning');
+                toast('تم تجميد الرصيد', 'warning');
                 this.openDetail(this.detail);
-            } catch(e) { toast('ÙØ´Ù„ Ø§Ù„ØªØ¬Ù…ÙŠØ¯', 'error'); }
+            } catch(e) { toast('فشل التجميد', 'error'); }
         },
 
         async unfreezeBalance(id) {
-            const amount = prompt('ÙƒÙ… ØªØ±ÙŠØ¯ ÙÙƒ ØªØ¬Ù…ÙŠØ¯Ù‡ØŸ (Ø§ØªØ±ÙƒÙ‡ ÙØ§Ø±ØºØ§Ù‹ Ù„ÙÙƒ Ø§Ù„ÙƒÙ„):');
+            const amount = prompt('كم تريد فك تجميده؟ (اتركه فارغاً لفك الكل):');
             const body = amount ? JSON.stringify({ amount: parseFloat(amount) }) : '{}';
             try {
                 await api('/api/svrp/wallets/' + id + '/unfreeze', { method: 'POST', body });
-                toast('ØªÙ… ÙÙƒ Ø§Ù„ØªØ¬Ù…ÙŠØ¯', 'success');
+                toast('تم فك التجميد', 'success');
                 this.openDetail(this.detail);
-            } catch(e) { toast('ÙØ´Ù„ ÙÙƒ Ø§Ù„ØªØ¬Ù…ÙŠØ¯', 'error'); }
+            } catch(e) { toast('فشل فك التجميد', 'error'); }
         },
 
         exportCSV() {
-            const headers = ['Telegram ID', 'Ø§Ù„Ø§Ø³Ù…', 'Ø§Ù„Ù‡Ø§ØªÙ', 'Ø±Ù‚Ù… Ø§Ù„Ø¹Ù…ÙŠÙ„', 'Ø§Ù„Ù„ØºØ©', 'Ø§Ù„Ø¹Ù…Ù„Ø©', 'Ù…Ø­Ø¸ÙˆØ±', 'Ø§Ù„ØªØ§Ø±ÙŠØ®'];
+            const headers = ['Telegram ID', 'الاسم', 'الهاتف', 'رقم العميل', 'اللغة', 'العملة', 'محظور', 'التاريخ'];
             const rows = this.users.map(u => [u.telegram_id, u.name, u.phone, u.customer_id, u.language, u.currency, u.is_banned, u.date]);
             const csv = [headers, ...rows].map(r => r.map(c => '"' + (c || '') + '"').join(',')).join('\n');
             const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -359,7 +359,7 @@ function usersApp() {
             link.href = URL.createObjectURL(blob);
             link.download = 'users_' + new Date().toISOString().slice(0, 10) + '.csv';
             link.click();
-            toast('ØªÙ… ØªØµØ¯ÙŠØ± ' + this.users.length + ' Ù…Ø³ØªØ®Ø¯Ù…', 'success');
+            toast('تم تصدير ' + this.users.length + ' مستخدم', 'success');
         }
     }
 }

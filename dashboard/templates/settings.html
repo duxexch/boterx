@@ -1,6 +1,6 @@
-﻿{% extends "base.html" %}
-{% block title %}Ø§Ù„Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª - Boterx{% endblock %}
-{% block page_title %}Ø§Ù„Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª{% endblock %}
+{% extends "base.html" %}
+{% block title %}الإعدادات - Boterx{% endblock %}
+{% block page_title %}الإعدادات{% endblock %}
 
 {% block content %}
 <div x-data="settingsPage()" x-init="init()">
@@ -8,19 +8,19 @@
     <div class="flex flex-wrap gap-2 mb-6 border-b border-slate-700 pb-0">
         <button @click="activeTab = 'system'" :class="activeTab === 'system' ? 'bg-slate-800 text-white border-b-2 border-blue-500' : 'text-slate-400 hover:text-white'"
             class="px-5 py-3 rounded-t-lg text-sm font-semibold transition">
-            <i class="fas fa-cogs ml-1"></i> Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª Ø§Ù„Ù†Ø¸Ø§Ù…
+            <i class="fas fa-cogs ml-1"></i> إعدادات النظام
         </button>
         <button @click="activeTab = 'labels'" :class="activeTab === 'labels' ? 'bg-slate-800 text-white border-b-2 border-blue-500' : 'text-slate-400 hover:text-white'"
             class="px-5 py-3 rounded-t-lg text-sm font-semibold transition">
-            <i class="fas fa-tags ml-1"></i> Ù…Ø³Ù…ÙŠØ§Øª Ø§Ù„Ø£Ø²Ø±Ø§Ø±
+            <i class="fas fa-tags ml-1"></i> مسميات الأزرار
         </button>
         <button @click="activeTab = 'audit'; loadAuditLog()" :class="activeTab === 'audit' ? 'bg-slate-800 text-white border-b-2 border-blue-500' : 'text-slate-400 hover:text-white'"
             class="px-5 py-3 rounded-t-lg text-sm font-semibold transition">
-            <i class="fas fa-history ml-1"></i> Ø³Ø¬Ù„ Ø§Ù„Ø¥Ø¬Ø±Ø§Ø¡Ø§Øª
+            <i class="fas fa-history ml-1"></i> سجل الإجراءات
         </button>
         <button @click="activeTab = 'lockdown'; loadLockdownLog()" :class="activeTab === 'lockdown' ? 'bg-slate-800 text-white border-b-2 border-red-500' : 'text-slate-400 hover:text-white'"
             class="px-5 py-3 rounded-t-lg text-sm font-semibold transition">
-            <i class="fas fa-shield-alt ml-1"></i> Ø³Ø¬Ù„ Ø§Ù„Ø§Ù†Ù‚Ø·Ø§Ø¹Ø§Øª
+            <i class="fas fa-shield-alt ml-1"></i> سجل الانقطاعات
         </button>
     </div>
 
@@ -28,15 +28,15 @@
     <div x-show="activeTab === 'system'" class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
         <div class="p-5 border-b border-slate-700">
             <h3 class="font-bold text-lg" data-i18n="system_settings">System Settings</h3>
-            <p class="text-xs text-slate-400 mt-1">ØªØ¹Ø¯ÙŠÙ„ Ø§Ù„Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª Ø§Ù„Ø¹Ø§Ù…Ø© Ù„Ù„Ù†Ø¸Ø§Ù…</p>
+            <p class="text-xs text-slate-400 mt-1">تعديل الإعدادات العامة للنظام</p>
         </div>
         <div class="overflow-x-auto">
             <table class="w-full text-sm">
                 <thead>
                     <tr class="border-b border-slate-700 bg-slate-800/80">
-                        <th class="text-right px-4 py-3 font-semibold text-slate-400 w-1/3">Ø§Ù„Ù…ÙØªØ§Ø­ (Key)</th>
-                        <th class="text-right px-4 py-3 font-semibold text-slate-400">Ø§Ù„Ù‚ÙŠÙ…Ø© (Value)</th>
-                        <th class="text-right px-4 py-3 font-semibold text-slate-400 w-24">Ø§Ù„Ø¥Ø¬Ø±Ø§Ø¡Ø§Øª</th>
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400 w-1/3">المفتاح (Key)</th>
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400">القيمة (Value)</th>
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400 w-24">الإجراءات</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -60,7 +60,7 @@
                                 <template x-if="!s.editing">
                                     <button @click="editSetting(s)"
                                         class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition flex items-center gap-1">
-                                        <i class="fas fa-edit text-xs"></i> ØªØ¹Ø¯ÙŠÙ„
+                                        <i class="fas fa-edit text-xs"></i> تعديل
                                     </button>
                                 </template>
                                 <template x-if="s.editing">
@@ -81,7 +81,7 @@
                     <tr x-show="settings.length === 0">
                         <td colspan="3" class="px-4 py-8 text-center text-slate-500">
                             <i class="fas fa-cogs text-3xl mb-2 block"></i>
-                            Ù„Ø§ ØªÙˆØ¬Ø¯ Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª
+                            لا توجد إعدادات
                         </td>
                     </tr>
                 </tbody>
@@ -93,7 +93,7 @@
     <div x-show="activeTab === 'labels'" class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
         <div class="p-5 border-b border-slate-700">
             <h3 class="font-bold text-lg" data-i18n="button_labels">Button Labels</h3>
-            <p class="text-xs text-slate-400 mt-1">ØªØ¹Ø¯ÙŠÙ„ Ø§Ù„Ù†ØµÙˆØµ Ø§Ù„Ø¸Ø§Ù‡Ø±Ø© Ø¹Ù„Ù‰ Ø£Ø²Ø±Ø§Ø± Ø§Ù„Ø¨ÙˆØª</p>
+            <p class="text-xs text-slate-400 mt-1">تعديل النصوص الظاهرة على أزرار البوت</p>
         </div>
         <div class="overflow-x-auto">
             <table class="w-full text-sm">
@@ -101,7 +101,7 @@
                     <tr class="border-b border-slate-700 bg-slate-800/80">
                         <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="original_text">Original Text</th>
                         <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="new_text">New Text</th>
-                        <th class="text-right px-4 py-3 font-semibold text-slate-400 w-24">Ø§Ù„Ø¥Ø¬Ø±Ø§Ø¡Ø§Øª</th>
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400 w-24">الإجراءات</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -125,7 +125,7 @@
                                 <template x-if="!lbl.editing">
                                     <button @click="editLabel(lbl)"
                                         class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition flex items-center gap-1">
-                                        <i class="fas fa-edit text-xs"></i> ØªØ¹Ø¯ÙŠÙ„
+                                        <i class="fas fa-edit text-xs"></i> تعديل
                                     </button>
                                 </template>
                                 <template x-if="lbl.editing">
@@ -146,7 +146,7 @@
                     <tr x-show="labels.length === 0">
                         <td colspan="3" class="px-4 py-8 text-center text-slate-500">
                             <i class="fas fa-tags text-3xl mb-2 block"></i>
-                            Ù„Ø§ ØªÙˆØ¬Ø¯ Ù…Ø³Ù…ÙŠØ§Øª Ø£Ø²Ø±Ø§Ø±
+                            لا توجد مسميات أزرار
                         </td>
                     </tr>
                 </tbody>
@@ -160,19 +160,19 @@
         <!-- Summary cards -->
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
-                <p class="text-xs text-slate-400 mb-1">Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„Ø§Ù†Ù‚Ø·Ø§Ø¹Ø§Øª</p>
-                <p class="text-2xl font-bold text-red-400" x-text="ldSummary.total_episodes ?? 'â€”'"></p>
+                <p class="text-xs text-slate-400 mb-1">إجمالي الانقطاعات</p>
+                <p class="text-2xl font-bold text-red-400" x-text="ldSummary.total_episodes ?? '—'"></p>
             </div>
             <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
-                <p class="text-xs text-slate-400 mb-1">Ø¥Ø¬Ù…Ø§Ù„ÙŠ ÙˆÙ‚Øª Ø§Ù„ØªÙˆÙ‚Ù</p>
+                <p class="text-xs text-slate-400 mb-1">إجمالي وقت التوقف</p>
                 <p class="text-2xl font-bold text-orange-400" x-text="fmtDuration(ldSummary.total_downtime_seconds)"></p>
             </div>
             <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
-                <p class="text-xs text-slate-400 mb-1">Ø§Ù†Ù‚Ø·Ø§Ø¹Ø§Øª Ù‡Ø°Ø§ Ø§Ù„Ø´Ù‡Ø±</p>
-                <p class="text-2xl font-bold text-amber-400" x-text="ldSummary.this_month_episodes ?? 'â€”'"></p>
+                <p class="text-xs text-slate-400 mb-1">انقطاعات هذا الشهر</p>
+                <p class="text-2xl font-bold text-amber-400" x-text="ldSummary.this_month_episodes ?? '—'"></p>
             </div>
             <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
-                <p class="text-xs text-slate-400 mb-1">ØªÙˆÙ‚Ù Ù‡Ø°Ø§ Ø§Ù„Ø´Ù‡Ø±</p>
+                <p class="text-xs text-slate-400 mb-1">توقف هذا الشهر</p>
                 <p class="text-2xl font-bold text-yellow-400" x-text="fmtDuration(ldSummary.this_month_downtime_seconds)"></p>
             </div>
         </div>
@@ -181,18 +181,18 @@
         <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
             <div class="p-5 border-b border-slate-700 flex items-center justify-between">
                 <div>
-                    <h3 class="font-bold text-lg">Ø³Ø¬Ù„ Ø§Ù„Ø§Ù†Ù‚Ø·Ø§Ø¹Ø§Øª ÙˆØ§Ù„Ø§Ø³ØªØ¹Ø§Ø¯Ø©</h3>
-                    <p class="text-xs text-slate-400 mt-1">ÙƒÙ„ Ø¥ÙŠÙ‚Ø§Ù / Ø§Ø³ØªØ¹Ø§Ø¯Ø© Ù„Ù„Ù€ API Ù…Ø±ØªØ¨Ø© Ù…Ù† Ø§Ù„Ø£Ø­Ø¯Ø« Ø¥Ù„Ù‰ Ø§Ù„Ø£Ù‚Ø¯Ù…</p>
+                    <h3 class="font-bold text-lg">سجل الانقطاعات والاستعادة</h3>
+                    <p class="text-xs text-slate-400 mt-1">كل إيقاف / استعادة للـ API مرتبة من الأحدث إلى الأقدم</p>
                 </div>
                 <div class="flex items-center gap-2">
                     <button @click="loadLockdownLog(true)"
                         class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-700 hover:bg-slate-600 text-slate-300 transition flex items-center gap-1">
-                        <i class="fas fa-sync-alt text-xs"></i> ØªØ­Ø¯ÙŠØ«
+                        <i class="fas fa-sync-alt text-xs"></i> تحديث
                     </button>
                     <a href="/api/admin/lockdown-log/export"
                         class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 transition flex items-center gap-1"
                         download>
-                        <i class="fas fa-download text-xs"></i> ØªÙ†Ø²ÙŠÙ„ CSV â¬‡
+                        <i class="fas fa-download text-xs"></i> تنزيل CSV ⬇
                     </a>
                 </div>
             </div>
@@ -200,12 +200,12 @@
                 <table class="w-full text-sm">
                     <thead>
                         <tr class="border-b border-slate-700 bg-slate-800/80">
-                            <th class="text-right px-4 py-3 font-semibold text-slate-400 w-28">Ø§Ù„Ø­Ø¯Ø«</th>
-                            <th class="text-right px-4 py-3 font-semibold text-slate-400">Ø§Ù„ØªÙˆÙ‚ÙŠØª</th>
-                            <th class="text-right px-4 py-3 font-semibold text-slate-400">Ø§Ù„Ù…Ø¯Ø© / Ø§Ù„ØªÙˆÙ‚Ù</th>
-                            <th class="text-right px-4 py-3 font-semibold text-slate-400">Ø§Ù„Ø®Ø§Ø¯Ù…</th>
-                            <th class="text-right px-4 py-3 font-semibold text-slate-400 w-24">ØªÙ„ØºØ±Ø§Ù…</th>
-                            <th class="text-right px-4 py-3 font-semibold text-slate-400">Ø§Ù„Ø³Ø¨Ø¨</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400 w-28">الحدث</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">التوقيت</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">المدة / التوقف</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">الخادم</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400 w-24">تلغرام</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">السبب</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -217,36 +217,36 @@
                                             ? 'bg-red-500/20 text-red-400'
                                             : 'bg-green-500/20 text-green-400'">
                                         <i :class="row.event === 'lockdown' ? 'fas fa-lock' : 'fas fa-lock-open'" class="mr-1 text-xs"></i>
-                                        <span x-text="row.event === 'lockdown' ? 'Ø§Ù†Ù‚Ø·Ø§Ø¹' : 'Ø§Ø³ØªØ¹Ø§Ø¯Ø©'"></span>
+                                        <span x-text="row.event === 'lockdown' ? 'انقطاع' : 'استعادة'"></span>
                                     </span>
                                 </td>
-                                <td class="px-4 py-3 text-slate-300 text-xs font-mono" x-text="row.timestamp || 'â€”'"></td>
+                                <td class="px-4 py-3 text-slate-300 text-xs font-mono" x-text="row.timestamp || '—'"></td>
                                 <td class="px-4 py-3 text-slate-300 text-xs">
                                     <span x-show="row.event === 'recovery'" x-text="fmtDuration(row.duration_seconds)"></span>
-                                    <span x-show="row.event === 'lockdown'" class="text-slate-500">â€”</span>
+                                    <span x-show="row.event === 'lockdown'" class="text-slate-500">—</span>
                                 </td>
-                                <td class="px-4 py-3 text-slate-400 text-xs font-mono" x-text="row.host || 'â€”'"></td>
+                                <td class="px-4 py-3 text-slate-400 text-xs font-mono" x-text="row.host || '—'"></td>
                                 <td class="px-4 py-3">
                                     <span class="px-2 py-0.5 rounded text-[10px] font-semibold"
                                         :class="row.telegram_sent === 'yes'
                                             ? 'bg-blue-500/20 text-blue-400'
                                             : 'bg-slate-600/40 text-slate-400'"
-                                        x-text="row.telegram_sent === 'yes' ? 'Ø£ÙØ±Ø³Ù„' : 'Ù„Ø§'">
+                                        x-text="row.telegram_sent === 'yes' ? 'أُرسل' : 'لا'">
                                     </span>
                                 </td>
-                                <td class="px-4 py-3 text-slate-400 text-xs font-mono" x-text="row.reason || 'â€”'"></td>
+                                <td class="px-4 py-3 text-slate-400 text-xs font-mono" x-text="row.reason || '—'"></td>
                             </tr>
                         </template>
                         <tr x-show="ldRows.length === 0 && !ldLoading">
                             <td colspan="6" class="px-4 py-10 text-center text-slate-500">
                                 <i class="fas fa-shield-alt text-4xl mb-3 block text-slate-600"></i>
-                                Ù„Ø§ ØªÙˆØ¬Ø¯ Ø³Ø¬Ù„Ø§Øª Ø§Ù†Ù‚Ø·Ø§Ø¹ â€” Ø§Ù„Ù†Ø¸Ø§Ù… ÙŠØ¹Ù…Ù„ Ø¨Ø´ÙƒÙ„ Ø·Ø¨ÙŠØ¹ÙŠ
+                                لا توجد سجلات انقطاع — النظام يعمل بشكل طبيعي
                             </td>
                         </tr>
                         <tr x-show="ldLoading">
                             <td colspan="6" class="px-4 py-8 text-center text-slate-500">
                                 <i class="fas fa-spinner fa-spin text-2xl mb-2 block"></i>
-                                Ø¬Ø§Ø±Ù Ø§Ù„ØªØ­Ù…ÙŠÙ„â€¦
+                                جارٍ التحميل…
                             </td>
                         </tr>
                     </tbody>
@@ -254,18 +254,18 @@
             </div>
             <!-- Pagination -->
             <div x-show="ldTotal > ldLimit" class="p-4 border-t border-slate-700 flex items-center justify-between text-xs text-slate-400">
-                <span x-text="`Ø¹Ø±Ø¶ ${ldRows.length} Ù…Ù† ${ldTotal} Ø³Ø¬Ù„`"></span>
+                <span x-text="`عرض ${ldRows.length} من ${ldTotal} سجل`"></span>
                 <div class="flex gap-2">
                     <button @click="ldPage > 1 && (ldPage--, loadLockdownLog(true))"
                         :disabled="ldPage === 1"
                         class="px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600 disabled:opacity-40 transition">
-                        Ø§Ù„Ø³Ø§Ø¨Ù‚
+                        السابق
                     </button>
-                    <span class="px-2 py-1.5" x-text="`ØµÙØ­Ø© ${ldPage}`"></span>
+                    <span class="px-2 py-1.5" x-text="`صفحة ${ldPage}`"></span>
                     <button @click="ldRows.length === ldLimit && (ldPage++, loadLockdownLog(true))"
                         :disabled="ldRows.length < ldLimit"
                         class="px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600 disabled:opacity-40 transition">
-                        Ø§Ù„ØªØ§Ù„ÙŠ
+                        التالي
                     </button>
                 </div>
             </div>
@@ -276,7 +276,7 @@
     <div x-show="activeTab === 'audit'" class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
         <div class="p-5 border-b border-slate-700">
             <h3 class="font-bold text-lg" data-i18n="audit_log">Audit Log</h3>
-            <p class="text-xs text-slate-400 mt-1">Ø³Ø¬Ù„ Ù†Ø´Ø§Ø·Ø§Øª Ø§Ù„Ù…Ø¯Ø±Ø§Ø¡ ÙÙŠ Ù„ÙˆØ­Ø© Ø§Ù„ØªØ­ÙƒÙ…</p>
+            <p class="text-xs text-slate-400 mt-1">سجل نشاطات المدراء في لوحة التحكم</p>
         </div>
 
         <!-- Timeline -->
@@ -314,7 +314,7 @@
                         </div>
                         <p class="text-sm text-slate-300" x-text="entry.details || '-'"></p>
                         <p class="text-[10px] text-slate-500 mt-1">
-                            <span x-show="entry.admin_id">Ø§Ù„Ù…Ø¯ÙŠØ±: <span class="font-mono" x-text="entry.admin_id"></span></span>
+                            <span x-show="entry.admin_id">المدير: <span class="font-mono" x-text="entry.admin_id"></span></span>
                             <span x-show="!entry.admin_id" data-i18n="system">System</span>
                         </p>
                     </div>
@@ -338,7 +338,7 @@ function settingsPage() {
         labels: [],
         auditLog: [],
 
-        // â”€â”€â”€ Lockdown log state â”€â”€â”€
+        // ─── Lockdown log state ───
         ldRows:    [],
         ldSummary: {},
         ldTotal:   0,
@@ -350,7 +350,7 @@ function settingsPage() {
             await Promise.all([this.loadSettings(), this.loadLabels()]);
         },
 
-        // â”€â”€â”€ Settings â”€â”€â”€
+        // ─── Settings ───
         async loadSettings() {
             try {
                 const data = await api('/api/settings');
@@ -360,7 +360,7 @@ function settingsPage() {
                     edit_value: s.setting_value || '',
                 }));
             } catch (e) {
-                toast('ÙØ´Ù„ ØªØ­Ù…ÙŠÙ„ Ø§Ù„Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª', 'error');
+                toast('فشل تحميل الإعدادات', 'error');
             }
         },
 
@@ -377,13 +377,13 @@ function settingsPage() {
                 });
                 s.setting_value = s.edit_value;
                 s.editing = false;
-                toast('ØªÙ… Ø­ÙØ¸ Ø§Ù„Ø¥Ø¹Ø¯Ø§Ø¯ Ø¨Ù†Ø¬Ø§Ø­', 'success');
+                toast('تم حفظ الإعداد بنجاح', 'success');
             } catch (e) {
-                toast('ÙØ´Ù„ Ø­ÙØ¸ Ø§Ù„Ø¥Ø¹Ø¯Ø§Ø¯', 'error');
+                toast('فشل حفظ الإعداد', 'error');
             }
         },
 
-        // â”€â”€â”€ Labels â”€â”€â”€
+        // ─── Labels ───
         async loadLabels() {
             try {
                 const data = await api('/api/button-labels');
@@ -393,7 +393,7 @@ function settingsPage() {
                     edit_value: l.new_text || '',
                 }));
             } catch (e) {
-                toast('ÙØ´Ù„ ØªØ­Ù…ÙŠÙ„ Ù…Ø³Ù…ÙŠØ§Øª Ø§Ù„Ø£Ø²Ø±Ø§Ø±', 'error');
+                toast('فشل تحميل مسميات الأزرار', 'error');
             }
         },
 
@@ -410,13 +410,13 @@ function settingsPage() {
                 });
                 l.new_text = l.edit_value;
                 l.editing = false;
-                toast('ØªÙ… Ø­ÙØ¸ Ø§Ù„ØªØ³Ù…ÙŠØ© Ø¨Ù†Ø¬Ø§Ø­', 'success');
+                toast('تم حفظ التسمية بنجاح', 'success');
             } catch (e) {
-                toast('ÙØ´Ù„ Ø­ÙØ¸ Ø§Ù„ØªØ³Ù…ÙŠØ©', 'error');
+                toast('فشل حفظ التسمية', 'error');
             }
         },
 
-        // â”€â”€â”€ Lockdown log â”€â”€â”€
+        // ─── Lockdown log ───
         async loadLockdownLog(force = false) {
             if (!force && this.ldRows.length > 0) return;
             this.ldLoading = true;
@@ -426,7 +426,7 @@ function settingsPage() {
                 this.ldTotal   = data.total   || 0;
                 this.ldSummary = data.summary || {};
             } catch (e) {
-                toast('ÙØ´Ù„ ØªØ­Ù…ÙŠÙ„ Ø³Ø¬Ù„ Ø§Ù„Ø§Ù†Ù‚Ø·Ø§Ø¹Ø§Øª', 'error');
+                toast('فشل تحميل سجل الانقطاعات', 'error');
             } finally {
                 this.ldLoading = false;
             }
@@ -434,22 +434,22 @@ function settingsPage() {
 
         fmtDuration(seconds) {
             const s = parseInt(seconds) || 0;
-            if (s <= 0) return 'â€”';
-            if (s < 60)   return `${s}Ø«`;
-            if (s < 3600) return `${Math.floor(s/60)}Ø¯ ${s%60}Ø«`;
+            if (s <= 0) return '—';
+            if (s < 60)   return `${s}ث`;
+            if (s < 3600) return `${Math.floor(s/60)}د ${s%60}ث`;
             const h = Math.floor(s / 3600);
             const m = Math.floor((s % 3600) / 60);
-            return `${h}Ø³ ${m}Ø¯`;
+            return `${h}س ${m}د`;
         },
 
-        // â”€â”€â”€ Audit Log â”€â”€â”€
+        // ─── Audit Log ───
         async loadAuditLog() {
             if (this.auditLog.length > 0) return;
             try {
                 const data = await api('/api/audit-log');
                 this.auditLog = data.log || data.audit_log || data || [];
             } catch (e) {
-                toast('ÙØ´Ù„ ØªØ­Ù…ÙŠÙ„ Ø³Ø¬Ù„ Ø§Ù„Ø¥Ø¬Ø±Ø§Ø¡Ø§Øª', 'error');
+                toast('فشل تحميل سجل الإجراءات', 'error');
             }
         },
     };

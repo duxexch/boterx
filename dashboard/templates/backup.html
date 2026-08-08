@@ -1,21 +1,21 @@
-﻿{% extends "base.html" %}
-{% block title %}Ø§Ù„Ù†Ø³Ø® Ø§Ù„Ø§Ø­ØªÙŠØ§Ø·ÙŠ - Boterx{% endblock %}
-{% block page_title %}Ø§Ù„Ù†Ø³Ø® Ø§Ù„Ø§Ø­ØªÙŠØ§Ø·ÙŠ{% endblock %}
+{% extends "base.html" %}
+{% block title %}النسخ الاحتياطي - Boterx{% endblock %}
+{% block page_title %}النسخ الاحتياطي{% endblock %}
 
 {% block content %}
 <div x-data="backupPage()" x-init="init()">
     <!-- Header -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-            <h2 class="text-xl font-bold">Ø¥Ø¯Ø§Ø±Ø© Ø§Ù„Ù†Ø³Ø® Ø§Ù„Ø§Ø­ØªÙŠØ§Ø·ÙŠ</h2>
-            <p class="text-sm text-slate-400 mt-1">Ø¥Ù†Ø´Ø§Ø¡ ÙˆØ§Ø³ØªØ¹Ø§Ø¯Ø© ÙˆØ¥Ø¯Ø§Ø±Ø© Ù†Ø³Ø® Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø§Ø­ØªÙŠØ§Ø·ÙŠØ©</p>
+            <h2 class="text-xl font-bold">إدارة النسخ الاحتياطي</h2>
+            <p class="text-sm text-slate-400 mt-1">إنشاء واستعادة وإدارة نسخ البيانات الاحتياطية</p>
         </div>
         <button @click="createBackup()"
             class="bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition flex items-center gap-2 self-start"
             :disabled="creating">
             <i class="fas fa-spinner fa-spin" x-show="creating"></i>
             <i class="fas fa-download" x-show="!creating"></i>
-            <span x-text="creating ? 'Ø¬Ø§Ø±Ù Ø§Ù„Ø¥Ù†Ø´Ø§Ø¡...' : 'Ø¥Ù†Ø´Ø§Ø¡ Ù†Ø³Ø®Ø© Ø§Ø­ØªÙŠØ§Ø·ÙŠØ©'"></span>
+            <span x-text="creating ? 'جارٍ الإنشاء...' : 'إنشاء نسخة احتياطية'"></span>
         </button>
     </div>
 
@@ -24,28 +24,28 @@
         <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
             <div class="flex items-center gap-2 mb-1">
                 <i class="fas fa-file-csv text-blue-400"></i>
-                <p class="text-xs text-slate-400">Ù…Ù„ÙØ§Øª CSV</p>
+                <p class="text-xs text-slate-400">ملفات CSV</p>
             </div>
             <p class="text-2xl font-bold mt-1" x-text="fmtNum(systemInfo.totalFiles)"></p>
         </div>
         <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
             <div class="flex items-center gap-2 mb-1">
                 <i class="fas fa-database text-green-400"></i>
-                <p class="text-xs text-slate-400">Ø§Ù„Ø­Ø¬Ù… Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ</p>
+                <p class="text-xs text-slate-400">الحجم الإجمالي</p>
             </div>
             <p class="text-2xl font-bold text-green-400 mt-1" x-text="formatSize(systemInfo.totalSize)"></p>
         </div>
         <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
             <div class="flex items-center gap-2 mb-1">
                 <i class="fas fa-clock-rotate-left text-amber-400"></i>
-                <p class="text-xs text-slate-400">Ø¢Ø®Ø± Ù†Ø³Ø®Ø© Ø§Ø­ØªÙŠØ§Ø·ÙŠØ©</p>
+                <p class="text-xs text-slate-400">آخر نسخة احتياطية</p>
             </div>
-            <p class="text-sm font-bold text-amber-400 mt-1" x-text="systemInfo.lastBackup || 'â€”'"></p>
+            <p class="text-sm font-bold text-amber-400 mt-1" x-text="systemInfo.lastBackup || '—'"></p>
         </div>
         <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
             <div class="flex items-center gap-2 mb-1">
                 <i class="fas fa-folder-open text-purple-400"></i>
-                <p class="text-xs text-slate-400">Ø¹Ø¯Ø¯ Ø§Ù„Ù†Ø³Ø®</p>
+                <p class="text-xs text-slate-400">عدد النسخ</p>
             </div>
             <p class="text-2xl font-bold text-purple-400 mt-1" x-text="fmtNum(backups.length)"></p>
         </div>
@@ -57,20 +57,20 @@
             <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
                 <div class="flex items-center justify-between p-4 border-b border-slate-700">
                     <h3 class="text-sm font-semibold flex items-center gap-2">
-                        <i class="fas fa-archive text-slate-400"></i> Ø§Ù„Ù†Ø³Ø® Ø§Ù„Ø§Ø­ØªÙŠØ§Ø·ÙŠØ©
+                        <i class="fas fa-archive text-slate-400"></i> النسخ الاحتياطية
                     </h3>
                     <button @click="loadBackups()" class="text-xs text-blue-400 hover:underline">
-                        <i class="fas fa-rotate ml-1"></i>ØªØ­Ø¯ÙŠØ«
+                        <i class="fas fa-rotate ml-1"></i>تحديث
                     </button>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm">
                         <thead>
                             <tr class="border-b border-slate-700 bg-slate-800/80">
-                                <th class="text-right px-4 py-3 font-semibold text-slate-400">Ø§Ø³Ù… Ø§Ù„Ù…Ù„Ù</th>
-                                <th class="text-right px-4 py-3 font-semibold text-slate-400">Ø§Ù„Ø­Ø¬Ù…</th>
+                                <th class="text-right px-4 py-3 font-semibold text-slate-400">اسم الملف</th>
+                                <th class="text-right px-4 py-3 font-semibold text-slate-400">الحجم</th>
                                 <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="date">Date</th>
-                                <th class="text-right px-4 py-3 font-semibold text-slate-400">Ø§Ù„Ø¥Ø¬Ø±Ø§Ø¡Ø§Øª</th>
+                                <th class="text-right px-4 py-3 font-semibold text-slate-400">الإجراءات</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -83,11 +83,11 @@
                                         </div>
                                     </td>
                                     <td class="px-4 py-3 text-slate-300" x-text="formatSize(b.size)"></td>
-                                    <td class="px-4 py-3 text-slate-400 text-xs" x-text="b.date || 'â€”'"></td>
+                                    <td class="px-4 py-3 text-slate-400 text-xs" x-text="b.date || '—'"></td>
                                     <td class="px-4 py-3">
                                         <a :href="'/api/backups/' + b.filename + '/download'"
                                            class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition text-xs font-medium">
-                                            <i class="fas fa-download"></i> ØªØ­Ù…ÙŠÙ„
+                                            <i class="fas fa-download"></i> تحميل
                                         </a>
                                     </td>
                                 </tr>
@@ -95,7 +95,7 @@
                             <tr x-show="backups.length === 0">
                                 <td colspan="4" class="px-4 py-8 text-center text-slate-500">
                                     <i class="fas fa-archive text-3xl mb-2 block"></i>
-                                    Ù„Ø§ ØªÙˆØ¬Ø¯ Ù†Ø³Ø® Ø§Ø­ØªÙŠØ§Ø·ÙŠØ© Ø¨Ø¹Ø¯
+                                    لا توجد نسخ احتياطية بعد
                                 </td>
                             </tr>
                         </tbody>
@@ -108,14 +108,14 @@
         <div class="lg:col-span-1">
             <div class="bg-slate-800 rounded-xl border border-slate-700 p-5">
                 <h3 class="text-sm font-semibold mb-4 flex items-center gap-2">
-                    <i class="fas fa-gear text-slate-400"></i> Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª Ø§Ù„Ù†Ø³Ø® Ø§Ù„ØªÙ„Ù‚Ø§Ø¦ÙŠ
+                    <i class="fas fa-gear text-slate-400"></i> إعدادات النسخ التلقائي
                 </h3>
                 <div class="space-y-4">
                     <!-- Enable/Disable -->
                     <div class="flex items-center justify-between p-3 bg-slate-900/50 rounded-lg">
                         <div class="flex items-center gap-2">
                             <i class="fas fa-power-off text-sm" :class="autoBackup.enabled ? 'text-green-400' : 'text-slate-500'"></i>
-                            <span class="text-sm">Ø§Ù„Ù†Ø³Ø® Ø§Ù„ØªÙ„Ù‚Ø§Ø¦ÙŠ</span>
+                            <span class="text-sm">النسخ التلقائي</span>
                         </div>
                         <label class="relative inline-flex items-center cursor-pointer">
                             <input type="checkbox" x-model="autoBackup.enabled" @change="saveAutoBackup()" class="sr-only peer">
@@ -125,13 +125,13 @@
 
                     <!-- Frequency -->
                     <div :class="autoBackup.enabled ? '' : 'opacity-50 pointer-events-none'">
-                        <label class="block text-sm text-slate-400 mb-2">Ø§Ù„ØªÙƒØ±Ø§Ø±</label>
+                        <label class="block text-sm text-slate-400 mb-2">التكرار</label>
                         <select x-model="autoBackup.frequency" @change="saveAutoBackup()"
                             class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <option value="hourly">ÙƒÙ„ Ø³Ø§Ø¹Ø©</option>
-                            <option value="daily">ÙŠÙˆÙ…ÙŠØ§Ù‹</option>
-                            <option value="weekly">Ø£Ø³Ø¨ÙˆØ¹ÙŠØ§Ù‹</option>
-                            <option value="monthly">Ø´Ù‡Ø±ÙŠØ§Ù‹</option>
+                            <option value="hourly">كل ساعة</option>
+                            <option value="daily">يومياً</option>
+                            <option value="weekly">أسبوعياً</option>
+                            <option value="monthly">شهرياً</option>
                         </select>
                     </div>
 
@@ -139,16 +139,16 @@
                     <div x-show="autoBackup.enabled" x-transition class="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
                         <p class="text-xs text-blue-300">
                             <i class="fas fa-info-circle ml-1"></i>
-                            Ø§Ù„Ù†Ø³Ø®Ø© Ø§Ù„ØªÙ„Ù‚Ø§Ø¦ÙŠØ© Ø§Ù„Ù‚Ø§Ø¯Ù…Ø© Ø³ØªÙÙ†Ø´Ø£ Ø­Ø³Ø¨ Ø§Ù„ØªÙƒØ±Ø§Ø± Ø§Ù„Ù…Ø­Ø¯Ø¯
+                            النسخة التلقائية القادمة ستُنشأ حسب التكرار المحدد
                         </p>
                     </div>
 
                     <!-- Retention -->
                     <div>
-                        <label class="block text-sm text-slate-400 mb-2">Ø§Ù„Ø­Ø¯ Ø§Ù„Ø£Ù‚ØµÙ‰ Ù„Ù„Ù†Ø³Ø® Ø§Ù„Ù…Ø­ÙÙˆØ¸Ø©</label>
+                        <label class="block text-sm text-slate-400 mb-2">الحد الأقصى للنسخ المحفوظة</label>
                         <input type="number" x-model.number="autoBackup.maxBackups" @change="saveAutoBackup()" min="1" max="100"
                             class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <p class="text-xs text-slate-500 mt-1">ÙŠØªÙ… Ø­Ø°Ù Ø§Ù„Ù†Ø³Ø® Ø§Ù„Ø£Ù‚Ø¯Ù… ØªÙ„Ù‚Ø§Ø¦ÙŠØ§Ù‹</p>
+                        <p class="text-xs text-slate-500 mt-1">يتم حذف النسخ الأقدم تلقائياً</p>
                     </div>
                 </div>
             </div>
@@ -159,7 +159,7 @@
                     class="w-full bg-slate-700 hover:bg-slate-600 text-slate-200 py-2.5 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2">
                     <i class="fas fa-download" x-show="!creating"></i>
                     <i class="fas fa-spinner fa-spin" x-show="creating"></i>
-                    <span x-text="creating ? 'Ø¬Ø§Ø±Ù Ø§Ù„Ø¥Ù†Ø´Ø§Ø¡...' : 'Ù†Ø³Ø®Ø© ÙÙˆØ±ÙŠØ©'"></span>
+                    <span x-text="creating ? 'جارٍ الإنشاء...' : 'نسخة فورية'"></span>
                 </button>
             </div>
         </div>
@@ -207,7 +207,7 @@ function backupPage() {
                     };
                 }
             } catch (e) {
-                toast('ÙØ´Ù„ ØªØ­Ù…ÙŠÙ„ Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ù†Ø³Ø® Ø§Ù„Ø§Ø­ØªÙŠØ§Ø·ÙŠ', 'error');
+                toast('فشل تحميل بيانات النسخ الاحتياطي', 'error');
             }
             this.loading = false;
         },
@@ -216,10 +216,10 @@ function backupPage() {
             this.creating = true;
             try {
                 await api('/api/backup', { method: 'POST' });
-                toast('ØªÙ… Ø¥Ù†Ø´Ø§Ø¡ Ø§Ù„Ù†Ø³Ø®Ø© Ø§Ù„Ø§Ø­ØªÙŠØ§Ø·ÙŠØ© Ø¨Ù†Ø¬Ø§Ø­', 'success');
+                toast('تم إنشاء النسخة الاحتياطية بنجاح', 'success');
                 await this.loadBackups();
             } catch (e) {
-                toast('ÙØ´Ù„ Ø¥Ù†Ø´Ø§Ø¡ Ø§Ù„Ù†Ø³Ø®Ø© Ø§Ù„Ø§Ø­ØªÙŠØ§Ø·ÙŠØ©: ' + (e.message || 'Ø®Ø·Ø£ ØºÙŠØ± Ù…Ø¹Ø±ÙˆÙ'), 'error');
+                toast('فشل إنشاء النسخة الاحتياطية: ' + (e.message || 'خطأ غير معروف'), 'error');
             }
             this.creating = false;
         },
@@ -234,9 +234,9 @@ function backupPage() {
                         max_backups: this.autoBackup.maxBackups,
                     }),
                 });
-                toast('ØªÙ… Ø­ÙØ¸ Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª Ø§Ù„Ù†Ø³Ø® Ø§Ù„ØªÙ„Ù‚Ø§Ø¦ÙŠ', 'success');
+                toast('تم حفظ إعدادات النسخ التلقائي', 'success');
             } catch (e) {
-                toast('ÙØ´Ù„ Ø­ÙØ¸ Ø§Ù„Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª', 'error');
+                toast('فشل حفظ الإعدادات', 'error');
             }
         },
 

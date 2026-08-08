@@ -1,18 +1,18 @@
-﻿{% extends "base.html" %}
-{% block title %}Ø§Ù„ØªØ·Ø¨ÙŠÙ‚Ø§Øª - Boterx{% endblock %}
-{% block page_title %}Ø§Ù„ØªØ·Ø¨ÙŠÙ‚Ø§Øª{% endblock %}
+{% extends "base.html" %}
+{% block title %}التطبيقات - Boterx{% endblock %}
+{% block page_title %}التطبيقات{% endblock %}
 
 {% block content %}
 <div x-data="appsPage()" x-init="init()">
     <!-- Header -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-            <h2 class="text-xl font-bold">Ø¥Ø¯Ø§Ø±Ø© Ø§Ù„ØªØ·Ø¨ÙŠÙ‚Ø§Øª</h2>
-            <p class="text-sm text-slate-400 mt-1">Ø¥Ø¶Ø§ÙØ© ÙˆØ¥Ø¯Ø§Ø±Ø© Ø§Ù„ØªØ·Ø¨ÙŠÙ‚Ø§Øª ÙˆØ±ÙˆØ§Ø¨Ø· Ø§Ù„ØªØ­Ù…ÙŠÙ„ ÙˆØ§Ù„Ø±Ù…ÙˆØ² Ø§Ù„ØªØ±ÙˆÙŠØ¬ÙŠØ©</p>
+            <h2 class="text-xl font-bold">إدارة التطبيقات</h2>
+            <p class="text-sm text-slate-400 mt-1">إضافة وإدارة التطبيقات وروابط التحميل والرموز الترويجية</p>
         </div>
         <button @click="openAddModal()"
             class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition flex items-center gap-2 self-start">
-            <i class="fas fa-plus"></i> Ø¥Ø¶Ø§ÙØ© ØªØ·Ø¨ÙŠÙ‚
+            <i class="fas fa-plus"></i> إضافة تطبيق
         </button>
     </div>
 
@@ -42,7 +42,7 @@
                     <!-- Download URL -->
                     <div x-show="app.download_url" class="flex items-center justify-between text-xs bg-slate-700/50 rounded-lg px-3 py-2">
                         <span class="text-slate-400 truncate flex-1 ml-2" x-text="app.download_url"></span>
-                        <a :href="app.download_url" target="_blank" class="text-blue-400 hover:text-blue-300 flex-shrink-0" title="ÙØªØ­">
+                        <a :href="app.download_url" target="_blank" class="text-blue-400 hover:text-blue-300 flex-shrink-0" title="فتح">
                             <i class="fas fa-external-link-alt"></i>
                         </a>
                     </div>
@@ -51,10 +51,10 @@
                     <div x-show="app.promo_code" class="flex items-center justify-between text-xs bg-slate-700/50 rounded-lg px-3 py-2">
                         <div class="flex items-center gap-2">
                             <span class="text-amber-400 font-mono text-sm font-bold" x-text="app.promo_code"></span>
-                            <span class="text-slate-500">Ø±Ù…Ø² ØªØ±ÙˆÙŠØ¬ÙŠ</span>
+                            <span class="text-slate-500">رمز ترويجي</span>
                         </div>
                         <button @click="copyPromo(app.promo_code)"
-                            class="text-slate-400 hover:text-amber-400 transition flex-shrink-0" title="Ù†Ø³Ø®">
+                            class="text-slate-400 hover:text-amber-400 transition flex-shrink-0" title="نسخ">
                             <i class="fas fa-copy"></i>
                         </button>
                     </div>
@@ -63,7 +63,7 @@
                     <div x-show="app.referral_link" class="flex items-center justify-between text-xs bg-slate-700/50 rounded-lg px-3 py-2">
                         <span class="text-slate-400 truncate flex-1 ml-2" x-text="app.referral_link"></span>
                         <button @click="copyPromo(app.referral_link)"
-                            class="text-slate-400 hover:text-blue-400 transition flex-shrink-0" title="Ù†Ø³Ø®">
+                            class="text-slate-400 hover:text-blue-400 transition flex-shrink-0" title="نسخ">
                             <i class="fas fa-copy"></i>
                         </button>
                     </div>
@@ -77,7 +77,7 @@
                             <i class="fas fa-edit text-sm"></i>
                         </button>
                         <button @click="toggleActive(app)"
-                            class="p-1.5 rounded hover:bg-slate-700 text-slate-400 hover:text-amber-400 transition" title="ØªØ¨Ø¯ÙŠÙ„ Ø§Ù„Ø­Ø§Ù„Ø©">
+                            class="p-1.5 rounded hover:bg-slate-700 text-slate-400 hover:text-amber-400 transition" title="تبديل الحالة">
                             <i class="fas fa-power-off text-sm"></i>
                         </button>
                         <button @click="confirmDelete(app)"
@@ -94,8 +94,8 @@
         <div x-show="apps.length === 0" class="col-span-full">
             <div class="bg-slate-800 rounded-xl border border-slate-700 p-10 text-center">
                 <i class="fas fa-mobile-screen text-5xl text-slate-600 mb-4 block"></i>
-                <p class="text-slate-400 text-lg">Ù„Ø§ ØªÙˆØ¬Ø¯ ØªØ·Ø¨ÙŠÙ‚Ø§Øª</p>
-                <p class="text-slate-500 text-sm mt-1">Ø£Ø¶Ù ØªØ·Ø¨ÙŠÙ‚Ùƒ Ø§Ù„Ø£ÙˆÙ„ Ø¨Ø§Ù„Ù†Ù‚Ø± Ø¹Ù„Ù‰ Ø§Ù„Ø²Ø± Ø£Ø¹Ù„Ø§Ù‡</p>
+                <p class="text-slate-400 text-lg">لا توجد تطبيقات</p>
+                <p class="text-slate-500 text-sm mt-1">أضف تطبيقك الأول بالنقر على الزر أعلاه</p>
             </div>
         </div>
     </div>
@@ -104,45 +104,45 @@
     <div x-show="showModal" x-transition.opacity class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" style="display:none" @click.self="showModal = false">
         <div class="bg-slate-800 rounded-2xl border border-slate-700 w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl" @click.stop="">
             <div class="flex items-center justify-between p-5 border-b border-slate-700">
-                <h3 class="text-lg font-bold" x-text="editingId ? 'ØªØ¹Ø¯ÙŠÙ„ ØªØ·Ø¨ÙŠÙ‚' : 'Ø¥Ø¶Ø§ÙØ© ØªØ·Ø¨ÙŠÙ‚ Ø¬Ø¯ÙŠØ¯'"></h3>
+                <h3 class="text-lg font-bold" x-text="editingId ? 'تعديل تطبيق' : 'إضافة تطبيق جديد'"></h3>
                 <button @click="showModal = false" class="text-slate-400 hover:text-white transition">
                     <i class="fas fa-times text-lg"></i>
                 </button>
             </div>
             <form @submit.prevent="saveApp()" class="p-5 space-y-4">
                 <div>
-                    <label class="block text-sm text-slate-400 mb-1">Ø§Ù„Ø§Ø³Ù… <span class="text-red-400">*</span></label>
-                    <input x-model="form.name" required type="text" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ø§Ø³Ù… Ø§Ù„ØªØ·Ø¨ÙŠÙ‚">
+                    <label class="block text-sm text-slate-400 mb-1">الاسم <span class="text-red-400">*</span></label>
+                    <input x-model="form.name" required type="text" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="اسم التطبيق">
                 </div>
                 <div>
-                    <label class="block text-sm text-slate-400 mb-1">Ø±Ø§Ø¨Ø· Ø§Ù„Ø£ÙŠÙ‚ÙˆÙ†Ø©</label>
+                    <label class="block text-sm text-slate-400 mb-1">رابط الأيقونة</label>
                     <input x-model="form.icon_url" type="url" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="https://...">
                 </div>
                 <div>
-                    <label class="block text-sm text-slate-400 mb-1">Ø±Ø§Ø¨Ø· Ø§Ù„ØªØ­Ù…ÙŠÙ„</label>
+                    <label class="block text-sm text-slate-400 mb-1">رابط التحميل</label>
                     <input x-model="form.download_url" type="url" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="https://...">
                 </div>
                 <div>
-                    <label class="block text-sm text-slate-400 mb-1">Ø§Ù„ÙˆØµÙ</label>
-                    <textarea x-model="form.description" rows="2" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="ÙˆØµÙ Ù…Ø®ØªØµØ± Ù„Ù„ØªØ·Ø¨ÙŠÙ‚"></textarea>
+                    <label class="block text-sm text-slate-400 mb-1">الوصف</label>
+                    <textarea x-model="form.description" rows="2" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="وصف مختصر للتطبيق"></textarea>
                 </div>
                 <div>
-                    <label class="block text-sm text-slate-400 mb-1">Ø§Ù„Ø±Ù…Ø² Ø§Ù„ØªØ±ÙˆÙŠØ¬ÙŠ</label>
+                    <label class="block text-sm text-slate-400 mb-1">الرمز الترويجي</label>
                     <input x-model="form.promo_code" type="text" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono" placeholder="PROMO2024">
                 </div>
                 <div>
-                    <label class="block text-sm text-slate-400 mb-1">Ø±Ø§Ø¨Ø· Ø§Ù„Ø¥Ø­Ø§Ù„Ø©</label>
+                    <label class="block text-sm text-slate-400 mb-1">رابط الإحالة</label>
                     <input x-model="form.referral_link" type="url" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="https://...">
                 </div>
                 <div class="flex items-center gap-3 pt-2">
                     <label class="relative inline-flex items-center cursor-pointer">
                         <input type="checkbox" x-model="form.is_active" class="sr-only peer">
                         <div class="w-10 h-5 bg-slate-600 peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-5 rtl:peer-checked:after:-translate-x-5 peer-checked:bg-green-500 after:content-[''] after:absolute after:top-0.5 after:start-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all"></div>
-                        <span class="mr-2 text-sm text-slate-300">Ù†Ø´Ø·</span>
+                        <span class="mr-2 text-sm text-slate-300">نشط</span>
                     </label>
                 </div>
                 <div class="flex gap-3 pt-2">
-                    <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg text-sm font-semibold transition" x-text="editingId ? 'Ø­ÙØ¸ Ø§Ù„ØªØ¹Ø¯ÙŠÙ„Ø§Øª' : 'Ø¥Ø¶Ø§ÙØ©'"></button>
+                    <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg text-sm font-semibold transition" x-text="editingId ? 'حفظ التعديلات' : 'إضافة'"></button>
                     <button type="button" @click="showModal = false" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-lg text-sm transition" data-i18n="cancel">Cancel</button>
                 </div>
             </form>
@@ -156,9 +156,9 @@
                 <div class="w-14 h-14 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4">
                     <i class="fas fa-exclamation-triangle text-red-400 text-2xl"></i>
                 </div>
-                <h3 class="text-lg font-bold mb-2">ØªØ£ÙƒÙŠØ¯ Ø§Ù„Ø­Ø°Ù</h3>
-                <p class="text-sm text-slate-400">Ù‡Ù„ Ø£Ù†Øª Ù…ØªØ£ÙƒØ¯ Ù…Ù† Ø­Ø°Ù ØªØ·Ø¨ÙŠÙ‚ "<span class="text-white font-semibold" x-text="deleteTarget?.name"></span>"ØŸ</p>
-                <p class="text-xs text-red-400 mt-2">Ù‡Ø°Ø§ Ø§Ù„Ø¥Ø¬Ø±Ø§Ø¡ Ù„Ø§ ÙŠÙ…ÙƒÙ† Ø§Ù„ØªØ±Ø§Ø¬Ø¹ Ø¹Ù†Ù‡.</p>
+                <h3 class="text-lg font-bold mb-2">تأكيد الحذف</h3>
+                <p class="text-sm text-slate-400">هل أنت متأكد من حذف تطبيق "<span class="text-white font-semibold" x-text="deleteTarget?.name"></span>"؟</p>
+                <p class="text-xs text-red-400 mt-2">هذا الإجراء لا يمكن التراجع عنه.</p>
                 <div class="flex gap-3 mt-6">
                     <button @click="deleteApp()" class="flex-1 bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-lg text-sm font-semibold transition" data-i18n="delete">Delete</button>
                     <button @click="showDeleteModal = false" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-lg text-sm transition" data-i18n="cancel">Cancel</button>
@@ -189,7 +189,7 @@ function appsPage() {
                 const data = await api('/api/apps');
                 this.apps = data.apps || data || [];
             } catch (e) {
-                toast('ÙØ´Ù„ ØªØ­Ù…ÙŠÙ„ Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª', 'error');
+                toast('فشل تحميل البيانات', 'error');
             }
         },
 
@@ -220,18 +220,18 @@ function appsPage() {
                         method: 'PUT',
                         body: JSON.stringify(this.form),
                     });
-                    toast('ØªÙ… ØªØ­Ø¯ÙŠØ« Ø§Ù„ØªØ·Ø¨ÙŠÙ‚ Ø¨Ù†Ø¬Ø§Ø­', 'success');
+                    toast('تم تحديث التطبيق بنجاح', 'success');
                 } else {
                     await api('/api/apps', {
                         method: 'POST',
                         body: JSON.stringify(this.form),
                     });
-                    toast('ØªÙ…Øª Ø¥Ø¶Ø§ÙØ© Ø§Ù„ØªØ·Ø¨ÙŠÙ‚ Ø¨Ù†Ø¬Ø§Ø­', 'success');
+                    toast('تمت إضافة التطبيق بنجاح', 'success');
                 }
                 this.showModal = false;
                 await this.loadApps();
             } catch (e) {
-                toast('ÙØ´Ù„ Ø­ÙØ¸ Ø§Ù„ØªØ·Ø¨ÙŠÙ‚: ' + (e.message || 'Ø®Ø·Ø£ ØºÙŠØ± Ù…Ø¹Ø±ÙˆÙ'), 'error');
+                toast('فشل حفظ التطبيق: ' + (e.message || 'خطأ غير معروف'), 'error');
             }
         },
 
@@ -242,11 +242,11 @@ function appsPage() {
                     method: 'PUT',
                     body: JSON.stringify({ is_active: app.is_active }),
                 });
-                toast(app.is_active ? 'ØªÙ… ØªÙØ¹ÙŠÙ„ Ø§Ù„ØªØ·Ø¨ÙŠÙ‚' : 'ØªÙ… ØªØ¹Ø·ÙŠÙ„ Ø§Ù„ØªØ·Ø¨ÙŠÙ‚', 'success');
+                toast(app.is_active ? 'تم تفعيل التطبيق' : 'تم تعطيل التطبيق', 'success');
                 await this.loadApps();
             } catch (e) {
                 app.is_active = !app.is_active;
-                toast('ÙØ´Ù„ ØªØºÙŠÙŠØ± Ø§Ù„Ø­Ø§Ù„Ø©', 'error');
+                toast('فشل تغيير الحالة', 'error');
             }
         },
 
@@ -259,21 +259,21 @@ function appsPage() {
             if (!this.deleteTarget) return;
             try {
                 await api(`/api/apps/${this.deleteTarget.id}`, { method: 'DELETE' });
-                toast('ØªÙ… Ø­Ø°Ù Ø§Ù„ØªØ·Ø¨ÙŠÙ‚ Ø¨Ù†Ø¬Ø§Ø­', 'success');
+                toast('تم حذف التطبيق بنجاح', 'success');
                 this.showDeleteModal = false;
                 this.deleteTarget = null;
                 await this.loadApps();
             } catch (e) {
-                toast('ÙØ´Ù„ Ø­Ø°Ù Ø§Ù„ØªØ·Ø¨ÙŠÙ‚', 'error');
+                toast('فشل حذف التطبيق', 'error');
             }
         },
 
         async copyPromo(text) {
             try {
                 await navigator.clipboard.writeText(text);
-                toast('ØªÙ… Ø§Ù„Ù†Ø³Ø® Ø¥Ù„Ù‰ Ø§Ù„Ø­Ø§ÙØ¸Ø©', 'success');
+                toast('تم النسخ إلى الحافظة', 'success');
             } catch (e) {
-                toast('ÙØ´Ù„ Ø§Ù„Ù†Ø³Ø®', 'error');
+                toast('فشل النسخ', 'error');
             }
         },
     };

@@ -1,9 +1,9 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>Ø¥Ø­ØµØ§Ø¦ÙŠØ§Øª â€” VEX</title>
+<title>إحصائيات — VEX</title>
 <link rel="stylesheet" href="/static/css/game-base.css?v=20260808">
 <style>
 #app{overflow-y:auto}
@@ -55,50 +55,50 @@
 <div id="app" style="display:none">
   <div class="game-topbar">
     <div class="topbar-left">
-      <button class="btn-back" onclick="goBack()">â€¹</button>
-      <div class="bal-pill"><span class="bal-icon">ðŸ’°</span><span class="bal-val" id="bal">0</span><span class="bal-cur" id="cur">EGP</span></div>
+      <button class="btn-back" onclick="goBack()">‹</button>
+      <div class="bal-pill"><span class="bal-icon">💰</span><span class="bal-val" id="bal">0</span><span class="bal-cur" id="cur">EGP</span></div>
     </div>
     <div class="topbar-right">
-      <button class="btn-sound" id="soundBtn" onclick="toggleSound()">ðŸ”Š</button>
+      <button class="btn-sound" id="soundBtn" onclick="toggleSound()">🔊</button>
     </div>
   </div>
 
   <div class="stats-content">
-    <div class="stats-title">ðŸ“Š Ø¥Ø­ØµØ§Ø¦ÙŠØ§ØªÙŠ</div>
+    <div class="stats-title">📊 إحصائياتي</div>
 
     <div class="kpi-grid">
       <div class="kpi-card profit">
-        <div class="kpi-label">ØµØ§ÙÙŠ Ø§Ù„Ø±Ø¨Ø­</div>
+        <div class="kpi-label">صافي الربح</div>
         <div class="kpi-value green" id="netProfit">0.00</div>
       </div>
       <div class="kpi-card bets">
-        <div class="kpi-label">Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„Ø±Ù‡Ø§Ù†Ø§Øª</div>
+        <div class="kpi-label">إجمالي الرهانات</div>
         <div class="kpi-value cyan" id="totalBets">0</div>
       </div>
       <div class="kpi-card rate">
-        <div class="kpi-label">Ù†Ø³Ø¨Ø© Ø§Ù„ÙÙˆØ²</div>
+        <div class="kpi-label">نسبة الفوز</div>
         <div class="kpi-value gold" id="winRate">0%</div>
       </div>
       <div class="kpi-card loss">
-        <div class="kpi-label">Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„Ù…Ø±Ø§Ù‡Ù†Ø§Øª</div>
+        <div class="kpi-label">إجمالي المراهنات</div>
         <div class="kpi-value red" id="totalWagered">0</div>
       </div>
     </div>
 
     <div class="chart-section">
-      <div class="chart-title">ðŸ“ˆ Ø¢Ø®Ø± 20 Ø¬ÙˆÙ„Ø© (P/L)</div>
+      <div class="chart-title">📈 آخر 20 جولة (P/L)</div>
       <canvas id="plChart"></canvas>
     </div>
 
     <div class="chart-section">
-      <div class="chart-title">ðŸŽ® ØªÙˆØ²ÙŠØ¹ Ø§Ù„Ø£Ù„Ø¹Ø§Ø¨</div>
+      <div class="chart-title">🎮 توزيع الألعاب</div>
       <div class="game-dist" id="gameDist"></div>
     </div>
 
     <div class="chart-section">
-      <div class="chart-title">ðŸ“‹ Ø¢Ø®Ø± Ø§Ù„Ø¬ÙˆÙ„Ø§Øª</div>
+      <div class="chart-title">📋 آخر الجولات</div>
       <table class="recent-table">
-        <thead><tr><th>Ø§Ù„Ù„Ø¹Ø¨Ø©</th><th>Ø§Ù„Ø±Ù‡Ø§Ù†</th><th>Ø§Ù„Ù†ØªÙŠØ¬Ø©</th><th>Ø§Ù„Ù…ÙƒØ³Ø¨</th></tr></thead>
+        <thead><tr><th>اللعبة</th><th>الرهان</th><th>النتيجة</th><th>المكسب</th></tr></thead>
         <tbody id="recentBody"></tbody>
       </table>
     </div>
@@ -115,7 +115,7 @@ async function loadStats() {
     document.getElementById('app').style.display = 'flex';
 
     if (d.error || d.total_bets === 0) {
-      document.querySelector('.stats-content').innerHTML = '<div class="empty"><div class="empty-icon">ðŸ“Š</div><p>Ù„Ø§ ØªÙˆØ¬Ø¯ Ø¥Ø­ØµØ§Ø¦ÙŠØ§Øª Ø¨Ø¹Ø¯</p><p style="font-size:12px;color:var(--muted)">Ø§Ù„Ø¹Ø¨ Ø¨Ø¹Ø¶ Ø§Ù„Ø£Ù„Ø¹Ø§Ø¨ Ø£ÙˆÙ„Ø§Ù‹!</p></div>';
+      document.querySelector('.stats-content').innerHTML = '<div class="empty"><div class="empty-icon">📊</div><p>لا توجد إحصائيات بعد</p><p style="font-size:12px;color:var(--muted)">العب بعض الألعاب أولاً!</p></div>';
       return;
     }
 
@@ -142,14 +142,14 @@ async function loadStats() {
       return `<tr>
         <td>${s.game_id || '---'}</td>
         <td>${(s.bet_amount || 0).toFixed(0)}</td>
-        <td class="${s.result === 'win' ? 'win' : 'lose'}">${s.result === 'win' ? 'âœ…' : 'âŒ'}</td>
+        <td class="${s.result === 'win' ? 'win' : 'lose'}">${s.result === 'win' ? '✅' : '❌'}</td>
         <td class="${pl >= 0 ? 'win' : 'lose'}">${pl >= 0 ? '+' : ''}${pl.toFixed(0)}</td>
       </tr>`;
     }).join('');
   } catch(e) {
     document.getElementById('loading').style.display = 'none';
     document.getElementById('app').style.display = 'flex';
-    showToast('Ø®Ø·Ø£ ÙÙŠ ØªØ­Ù…ÙŠÙ„ Ø§Ù„Ø¥Ø­ØµØ§Ø¦ÙŠØ§Øª', 'error');
+    showToast('خطأ في تحميل الإحصائيات', 'error');
   }
 }
 
@@ -205,7 +205,7 @@ function drawPLChart(data) {
 function drawGameDist(games) {
   const el = document.getElementById('gameDist');
   if (!games || games.length === 0) {
-    el.innerHTML = '<div style="text-align:center;color:var(--muted);padding:12px;font-size:12px">Ù„Ø§ ØªÙˆØ¬Ø¯ Ø¨ÙŠØ§Ù†Ø§Øª</div>';
+    el.innerHTML = '<div style="text-align:center;color:var(--muted);padding:12px;font-size:12px">لا توجد بيانات</div>';
     return;
   }
   const colors = ['#fbbf24', '#00e701', '#3b82f6', '#a78bfa', '#06b6d4', '#ff4757', '#ec4899'];

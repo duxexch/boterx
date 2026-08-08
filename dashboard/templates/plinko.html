@@ -1,9 +1,9 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>Plinko â€” VEX</title>
+<title>Plinko — VEX</title>
 <link rel="stylesheet" href="/static/css/game-base.css?v=20260808">
 <style>
 .game-area{display:flex;flex-direction:column;align-items:center;gap:6px;padding:6px;overflow:hidden}
@@ -36,13 +36,13 @@
 <div id="app" style="display:none">
   <div class="game-topbar">
     <div class="topbar-left">
-      <button class="btn-back" onclick="if(tg)tg.close();else history.back()">â†</button>
-      <div class="bal-pill"><span class="bal-icon">ðŸ’°</span><span class="bal-val" id="bal">0</span><span class="bal-cur" id="cur">EGP</span></div>
+      <button class="btn-back" onclick="if(tg)tg.close();else history.back()">←</button>
+      <div class="bal-pill"><span class="bal-icon">💰</span><span class="bal-val" id="bal">0</span><span class="bal-cur" id="cur">EGP</span></div>
     </div>
     <div class="topbar-right">
       <span class="streak-badge" id="streakBadge" style="display:none"></span>
-      <button class="btn-sound" id="soundBtn" onclick="toggleSound()">ðŸ”Š</button>
-      <span id="connIndicator">ðŸŸ¢</span>
+      <button class="btn-sound" id="soundBtn" onclick="toggleSound()">🔊</button>
+      <span id="connIndicator">🟢</span>
     </div>
   </div>
   <div class="hist-bar" id="histBar"></div>
@@ -53,7 +53,7 @@
 
     <div class="plinko-opts">
       <div class="opt-group">
-        <div class="opt-label">ðŸŽ¯ ØµÙÙˆÙ</div>
+        <div class="opt-label">🎯 صفوف</div>
         <div class="opt-btns">
           <div class="opt-btn active" id="rows8" onclick="setRows(8)">8</div>
           <div class="opt-btn" id="rows12" onclick="setRows(12)">12</div>
@@ -61,35 +61,35 @@
         </div>
       </div>
       <div class="opt-group">
-        <div class="opt-label">âš¡ Ù…Ø³ØªÙˆÙ‰ Ø§Ù„Ù…Ø®Ø§Ø·Ø±Ø©</div>
+        <div class="opt-label">⚡ مستوى المخاطرة</div>
         <div class="opt-btns">
-          <div class="opt-btn active" id="riskLow" onclick="setRisk('low')">Ù…Ù†Ø®ÙØ¶</div>
-          <div class="opt-btn" id="riskMed" onclick="setRisk('med')">Ù…ØªÙˆØ³Ø·</div>
-          <div class="opt-btn" id="riskHigh" onclick="setRisk('high')">Ø¹Ø§Ù„ÙŠ</div>
+          <div class="opt-btn active" id="riskLow" onclick="setRisk('low')">منخفض</div>
+          <div class="opt-btn" id="riskMed" onclick="setRisk('med')">متوسط</div>
+          <div class="opt-btn" id="riskHigh" onclick="setRisk('high')">عالي</div>
         </div>
       </div>
     </div>
 
     <div class="bet-row">
-      <button class="ctrl-btn" onclick="adjustBet('betInp',0.5)">Â½</button>
+      <button class="ctrl-btn" onclick="adjustBet('betInp',0.5)">½</button>
       <input type="number" class="bet-inp" id="betInp" value="10" min="1">
-      <button class="ctrl-btn" onclick="adjustBet('betInp',2)">2Ã—</button>
+      <button class="ctrl-btn" onclick="adjustBet('betInp',2)">2×</button>
       <button class="ctrl-btn" onclick="setBetMin('betInp',10)">Min</button>
       <button class="ctrl-btn" onclick="setBetMax('betInp',5000)">Max</button>
     </div>
 
     <div class="auto-row">
-      <span class="auto-lbl">ðŸ”„ ØªÙ„Ù‚Ø§Ø¦ÙŠ</span>
+      <span class="auto-lbl">🔄 تلقائي</span>
       <input type="number" class="auto-inp" id="autoCount" value="1" min="1" max="100">
-      <span class="auto-lbl">Ù…Ø±Ø©</span>
+      <span class="auto-lbl">مرة</span>
     </div>
 
-    <button class="drop-btn" id="dropBtn" onclick="dropBall()">ðŸŽ¯ Ø¥Ø³Ù‚Ø§Ø· Ø§Ù„ÙƒØ±Ø©</button>
+    <button class="drop-btn" id="dropBtn" onclick="dropBall()">🎯 إسقاط الكرة</button>
   </div>
 </div>
 <div id="loading" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg);flex-direction:column;gap:12px">
-  <div style="font-size:40px">ðŸŽ¯</div>
-  <div style="color:var(--text-dim);font-size:14px">Ø¬Ø§Ø±Ù Ø§Ù„ØªØ­Ù…ÙŠÙ„...</div>
+  <div style="font-size:40px">🎯</div>
+  <div style="color:var(--text-dim);font-size:14px">جارٍ التحميل...</div>
 </div>
 <script src="/static/js/game-base.js?v=20260808"></script>
 <script>
@@ -218,7 +218,7 @@ function dropBall() {
     animateBall(path, d.slot, d.multiplier, d.payout, bet);
     loadBalance();
   }).catch(function() {
-    showToast('Ø®Ø·Ø£ ÙÙŠ Ø§Ù„Ø´Ø¨ÙƒØ©', 'error');
+    showToast('خطأ في الشبكة', 'error');
     dropping = false; document.getElementById('dropBtn').disabled = false;
   });
 }

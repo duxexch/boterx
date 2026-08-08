@@ -1,6 +1,6 @@
-﻿{% extends "base.html" %}
-{% block title %}Ø§Ù„ØªØ¹ÙˆÙŠØ¶ (SVRP) - Boterx{% endblock %}
-{% block page_title %}Ø§Ù„ØªØ¹ÙˆÙŠØ¶ (SVRP){% endblock %}
+{% extends "base.html" %}
+{% block title %}التعويض (SVRP) - Boterx{% endblock %}
+{% block page_title %}التعويض (SVRP){% endblock %}
 
 {% block content %}
 <div x-data="svrpPage()" x-init="init()">
@@ -8,19 +8,19 @@
     <div class="flex flex-wrap gap-2 mb-6 border-b border-slate-700 pb-0">
         <button @click="activeTab = 'wallets'" :class="activeTab === 'wallets' ? 'bg-slate-800 text-white border-b-2 border-blue-500' : 'text-slate-400 hover:text-white'"
             class="px-5 py-3 rounded-t-lg text-sm font-semibold transition">
-            <i class="fas fa-wallet ml-1"></i> Ø§Ù„Ù…Ø­Ø§ÙØ¸
+            <i class="fas fa-wallet ml-1"></i> المحافظ
         </button>
         <button @click="activeTab = 'recovery'" :class="activeTab === 'recovery' ? 'bg-slate-800 text-white border-b-2 border-blue-500' : 'text-slate-400 hover:text-white'"
             class="px-5 py-3 rounded-t-lg text-sm font-semibold transition">
-            <i class="fas fa-rotate-left ml-1"></i> Ø·Ù„Ø¨Ø§Øª Ø§Ù„Ø§Ø³ØªØ±Ø¯Ø§Ø¯
+            <i class="fas fa-rotate-left ml-1"></i> طلبات الاسترداد
         </button>
         <button @click="activeTab = 'bonus'" :class="activeTab === 'bonus' ? 'bg-slate-800 text-white border-b-2 border-blue-500' : 'text-slate-400 hover:text-white'"
             class="px-5 py-3 rounded-t-lg text-sm font-semibold transition">
-            <i class="fas fa-gift ml-1"></i> Ø·Ù„Ø¨Ø§Øª Ø§Ù„Ù…ÙƒØ§ÙØ¢Øª
+            <i class="fas fa-gift ml-1"></i> طلبات المكافآت
         </button>
         <button @click="activeTab = 'promo'" :class="activeTab === 'promo' ? 'bg-slate-800 text-white border-b-2 border-blue-500' : 'text-slate-400 hover:text-white'"
             class="px-5 py-3 rounded-t-lg text-sm font-semibold transition">
-            <i class="fas fa-ticket ml-1"></i> Ø§Ù„Ø±Ù…ÙˆØ² Ø§Ù„ØªØ±ÙˆÙŠØ¬ÙŠØ©
+            <i class="fas fa-ticket ml-1"></i> الرموز الترويجية
         </button>
     </div>
 
@@ -29,11 +29,11 @@
         <!-- Stats -->
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
             <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
-                <p class="text-xs text-slate-400">Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„Ø±ØµÙŠØ¯</p>
+                <p class="text-xs text-slate-400">إجمالي الرصيد</p>
                 <p class="text-2xl font-bold text-green-400 mt-1" x-text="fmtAmount(walletStats.total_balance, 'USD')"></p>
             </div>
             <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
-                <p class="text-xs text-slate-400">Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„Ù…Ø¬Ù…Ù‘Ø¯</p>
+                <p class="text-xs text-slate-400">إجمالي المجمّد</p>
                 <p class="text-2xl font-bold text-amber-400 mt-1" x-text="fmtAmount(walletStats.total_frozen, 'USD')"></p>
             </div>
         </div>
@@ -42,7 +42,7 @@
         <div class="mb-4">
             <div class="relative max-w-md">
                 <i class="fas fa-search absolute right-3 top-3 text-slate-400 text-sm"></i>
-                <input x-model="walletSearch" type="text" placeholder="Ø¨Ø­Ø« Ø¹Ù† Ù…Ø³ØªØ®Ø¯Ù…..."
+                <input x-model="walletSearch" type="text" placeholder="بحث عن مستخدم..."
                     class="w-full bg-slate-800 border border-slate-700 rounded-lg pr-10 pl-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
             </div>
         </div>
@@ -56,9 +56,9 @@
                             <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="user">User</th>
                             <th class="text-right px-4 py-3 font-semibold text-slate-400">User ID</th>
                             <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="balance">Balance</th>
-                            <th class="text-right px-4 py-3 font-semibold text-slate-400">Ø§Ù„Ù…Ø¬Ù…Ù‘Ø¯</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">المجمّد</th>
                             <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="currency">Currency</th>
-                            <th class="text-right px-4 py-3 font-semibold text-slate-400">Ø¢Ø®Ø± ØªØ­Ø¯ÙŠØ«</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">آخر تحديث</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -75,8 +75,8 @@
                         <tr x-show="filteredWallets.length === 0">
                             <td colspan="6" class="px-4 py-10 text-center text-slate-500">
                                 <i class="fas fa-wallet text-4xl mb-3 block opacity-30"></i>
-                                <p x-show="walletSearch">Ù„Ø§ ØªÙˆØ¬Ø¯ Ù†ØªØ§Ø¦Ø¬ Ù…Ø·Ø§Ø¨Ù‚Ø© Ù„Ù„Ø¨Ø­Ø«</p>
-                                <p x-show="!walletSearch">Ù„Ø§ ØªÙˆØ¬Ø¯ Ù…Ø­Ø§ÙØ¸</p>
+                                <p x-show="walletSearch">لا توجد نتائج مطابقة للبحث</p>
+                                <p x-show="!walletSearch">لا توجد محافظ</p>
                             </td>
                         </tr>
                     </tbody>
@@ -98,7 +98,7 @@
                             <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="amount">Amount</th>
                             <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="status">Status</th>
                             <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="date">Date</th>
-                            <th class="text-right px-4 py-3 font-semibold text-slate-400">Ø§Ù„Ø¥Ø¬Ø±Ø§Ø¡Ø§Øª</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">الإجراءات</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -119,11 +119,11 @@
                                         <div class="flex items-center gap-1">
                                             <button @click="approveItem(r, 'recovery')"
                                                 class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-green-500/20 text-green-400 hover:bg-green-500/30 transition flex items-center gap-1">
-                                                <i class="fas fa-check text-xs"></i> Ù‚Ø¨ÙˆÙ„
+                                                <i class="fas fa-check text-xs"></i> قبول
                                             </button>
                                             <button @click="rejectItem(r, 'recovery')"
                                                 class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-500/20 text-red-400 hover:bg-red-500/30 transition flex items-center gap-1">
-                                                <i class="fas fa-times text-xs"></i> Ø±ÙØ¶
+                                                <i class="fas fa-times text-xs"></i> رفض
                                             </button>
                                         </div>
                                     </template>
@@ -134,7 +134,7 @@
                         <tr x-show="recoveryRequests.length === 0">
                             <td colspan="7" class="px-4 py-10 text-center text-slate-500">
                                 <i class="fas fa-rotate-left text-4xl mb-3 block opacity-30"></i>
-                                <p>Ù„Ø§ ØªÙˆØ¬Ø¯ Ø·Ù„Ø¨Ø§Øª Ø§Ø³ØªØ±Ø¯Ø§Ø¯</p>
+                                <p>لا توجد طلبات استرداد</p>
                             </td>
                         </tr>
                     </tbody>
@@ -146,18 +146,18 @@
         <div x-show="showApprovalModal" x-transition.opacity class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" style="display:none" @click.self="showApprovalModal = false">
             <div class="bg-slate-800 rounded-2xl border border-slate-700 w-full max-w-sm shadow-2xl" @click.stop="">
                 <div class="flex items-center justify-between p-5 border-b border-slate-700">
-                    <h3 class="text-lg font-bold">ØªØ£ÙƒÙŠØ¯ Ø§Ù„Ù‚Ø¨ÙˆÙ„</h3>
+                    <h3 class="text-lg font-bold">تأكيد القبول</h3>
                     <button @click="showApprovalModal = false" class="text-slate-400 hover:text-white transition">
                         <i class="fas fa-times text-lg"></i>
                     </button>
                 </div>
                 <div class="p-5 space-y-4">
                     <div>
-                        <label class="block text-sm text-slate-400 mb-1">Ø§Ù„Ù…Ø¨Ù„Øº Ø§Ù„Ù…Ø¹ØªÙ…Ø¯</label>
-                        <input x-model="approvalAmount" type="number" step="any" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ø£Ø¯Ø®Ù„ Ø§Ù„Ù…Ø¨Ù„Øº">
+                        <label class="block text-sm text-slate-400 mb-1">المبلغ المعتمد</label>
+                        <input x-model="approvalAmount" type="number" step="any" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="أدخل المبلغ">
                     </div>
                     <div class="flex gap-3">
-                        <button @click="confirmApproval()" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-lg text-sm font-semibold transition">ØªØ£ÙƒÙŠØ¯ Ø§Ù„Ù‚Ø¨ÙˆÙ„</button>
+                        <button @click="confirmApproval()" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-lg text-sm font-semibold transition">تأكيد القبول</button>
                         <button @click="showApprovalModal = false" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-lg text-sm transition" data-i18n="cancel">Cancel</button>
                     </div>
                 </div>
@@ -178,7 +178,7 @@
                             <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="amount">Amount</th>
                             <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="status">Status</th>
                             <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="date">Date</th>
-                            <th class="text-right px-4 py-3 font-semibold text-slate-400">Ø§Ù„Ø¥Ø¬Ø±Ø§Ø¡Ø§Øª</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">الإجراءات</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -199,11 +199,11 @@
                                         <div class="flex items-center gap-1">
                                             <button @click="approveItem(b, 'bonus')"
                                                 class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-green-500/20 text-green-400 hover:bg-green-500/30 transition flex items-center gap-1">
-                                                <i class="fas fa-check text-xs"></i> Ù‚Ø¨ÙˆÙ„
+                                                <i class="fas fa-check text-xs"></i> قبول
                                             </button>
                                             <button @click="rejectItem(b, 'bonus')"
                                                 class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-500/20 text-red-400 hover:bg-red-500/30 transition flex items-center gap-1">
-                                                <i class="fas fa-times text-xs"></i> Ø±ÙØ¶
+                                                <i class="fas fa-times text-xs"></i> رفض
                                             </button>
                                         </div>
                                     </template>
@@ -214,7 +214,7 @@
                         <tr x-show="bonusRequests.length === 0">
                             <td colspan="7" class="px-4 py-10 text-center text-slate-500">
                                 <i class="fas fa-gift text-4xl mb-3 block opacity-30"></i>
-                                <p>Ù„Ø§ ØªÙˆØ¬Ø¯ Ø·Ù„Ø¨Ø§Øª Ù…ÙƒØ§ÙØ¢Øª</p>
+                                <p>لا توجد طلبات مكافآت</p>
                             </td>
                         </tr>
                     </tbody>
@@ -229,7 +229,7 @@
         <div class="flex justify-end mb-4">
             <button @click="openPromoModal()"
                 class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2">
-                <i class="fas fa-plus"></i> Ø¥Ù†Ø´Ø§Ø¡ Ø±Ù…Ø² ØªØ±ÙˆÙŠØ¬ÙŠ
+                <i class="fas fa-plus"></i> إنشاء رمز ترويجي
             </button>
         </div>
 
@@ -239,14 +239,14 @@
                 <table class="w-full text-sm">
                     <thead>
                         <tr class="border-b border-slate-700 bg-slate-800/80">
-                            <th class="text-right px-4 py-3 font-semibold text-slate-400">Ø§Ù„Ø±Ù…Ø²</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">الرمز</th>
                             <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="amount">Amount</th>
                             <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="currency">Currency</th>
-                            <th class="text-right px-4 py-3 font-semibold text-slate-400">Ø§Ù„Ø§Ø³ØªØ®Ø¯Ø§Ù…Ø§Øª</th>
-                            <th class="text-right px-4 py-3 font-semibold text-slate-400">Ø§Ù„Ø­Ø¯ Ø§Ù„Ø£Ù‚ØµÙ‰</th>
-                            <th class="text-right px-4 py-3 font-semibold text-slate-400">ÙŠÙ†ØªÙ‡ÙŠ ÙÙŠ</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">الاستخدامات</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">الحد الأقصى</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">ينتهي في</th>
                             <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="status">Status</th>
-                            <th class="text-right px-4 py-3 font-semibold text-slate-400">Ø§Ù„Ø¥Ø¬Ø±Ø§Ø¡Ø§Øª</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">الإجراءات</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -258,16 +258,16 @@
                                 <td class="px-4 py-3 font-semibold" x-text="fmtAmount(p.amount, p.currency)"></td>
                                 <td class="px-4 py-3" x-text="p.currency || '-'"></td>
                                 <td class="px-4 py-3">
-                                    <span class="text-sm" x-text="(p.used_count || 0) + ' / ' + (p.max_uses || 'âˆž')"></span>
+                                    <span class="text-sm" x-text="(p.used_count || 0) + ' / ' + (p.max_uses || '∞')"></span>
                                 </td>
-                                <td class="px-4 py-3 text-xs" x-text="p.max_uses || 'ØºÙŠØ± Ù…Ø­Ø¯ÙˆØ¯'"></td>
-                                <td class="px-4 py-3 text-xs" x-text="p.expires_at || 'Ø¨Ø¯ÙˆÙ† ØªØ§Ø±ÙŠØ®'"></td>
+                                <td class="px-4 py-3 text-xs" x-text="p.max_uses || 'غير محدود'"></td>
+                                <td class="px-4 py-3 text-xs" x-text="p.expires_at || 'بدون تاريخ'"></td>
                                 <td class="px-4 py-3">
                                     <span x-html="statusBadge(p.is_active ? 'active' : 'inactive')"></span>
                                 </td>
                                 <td class="px-4 py-3">
                                     <button @click="togglePromo(p)"
-                                        class="p-1.5 rounded hover:bg-slate-600 text-slate-400 hover:text-amber-400 transition" title="ØªØ¨Ø¯ÙŠÙ„ Ø§Ù„Ø­Ø§Ù„Ø©">
+                                        class="p-1.5 rounded hover:bg-slate-600 text-slate-400 hover:text-amber-400 transition" title="تبديل الحالة">
                                         <i class="fas fa-power-off text-sm"></i>
                                     </button>
                                 </td>
@@ -276,7 +276,7 @@
                         <tr x-show="promoCodes.length === 0">
                             <td colspan="8" class="px-4 py-10 text-center text-slate-500">
                                 <i class="fas fa-ticket text-4xl mb-3 block opacity-30"></i>
-                                <p>Ù„Ø§ ØªÙˆØ¬Ø¯ Ø±Ù…ÙˆØ² ØªØ±ÙˆÙŠØ¬ÙŠØ©</p>
+                                <p>لا توجد رموز ترويجية</p>
                             </td>
                         </tr>
                     </tbody>
@@ -288,23 +288,23 @@
         <div x-show="showPromoModal" x-transition.opacity class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" style="display:none" @click.self="showPromoModal = false">
             <div class="bg-slate-800 rounded-2xl border border-slate-700 w-full max-w-lg shadow-2xl" @click.stop="">
                 <div class="flex items-center justify-between p-5 border-b border-slate-700">
-                    <h3 class="text-lg font-bold">Ø¥Ù†Ø´Ø§Ø¡ Ø±Ù…Ø² ØªØ±ÙˆÙŠØ¬ÙŠ</h3>
+                    <h3 class="text-lg font-bold">إنشاء رمز ترويجي</h3>
                     <button @click="showPromoModal = false" class="text-slate-400 hover:text-white transition">
                         <i class="fas fa-times text-lg"></i>
                     </button>
                 </div>
                 <form @submit.prevent="createPromo()" class="p-5 space-y-4">
                     <div>
-                        <label class="block text-sm text-slate-400 mb-1">Ø§Ù„Ø±Ù…Ø² <span class="text-red-400">*</span></label>
+                        <label class="block text-sm text-slate-400 mb-1">الرمز <span class="text-red-400">*</span></label>
                         <input x-model="promoForm.code" required type="text" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono" placeholder="WELCOME2024">
                     </div>
                     <div class="grid grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-sm text-slate-400 mb-1">Ø§Ù„Ù…Ø¨Ù„Øº <span class="text-red-400">*</span></label>
+                            <label class="block text-sm text-slate-400 mb-1">المبلغ <span class="text-red-400">*</span></label>
                             <input x-model="promoForm.amount" required type="number" step="any" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="10">
                         </div>
                         <div>
-                            <label class="block text-sm text-slate-400 mb-1">Ø§Ù„Ø¹Ù…Ù„Ø© <span class="text-red-400">*</span></label>
+                            <label class="block text-sm text-slate-400 mb-1">العملة <span class="text-red-400">*</span></label>
                             <select x-model="promoForm.currency" required class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                                 <option value="USD">USD</option>
                                 <option value="EUR">EUR</option>
@@ -315,15 +315,15 @@
                         </div>
                     </div>
                     <div>
-                        <label class="block text-sm text-slate-400 mb-1">Ø§Ù„Ø­Ø¯ Ø§Ù„Ø£Ù‚ØµÙ‰ Ù„Ù„Ø§Ø³ØªØ®Ø¯Ø§Ù…</label>
-                        <input x-model="promoForm.max_uses" type="number" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ø§ØªØ±ÙƒÙ‡ ÙØ§Ø±ØºØ§Ù‹ Ù„ØºÙŠØ± Ù…Ø­Ø¯ÙˆØ¯">
+                        <label class="block text-sm text-slate-400 mb-1">الحد الأقصى للاستخدام</label>
+                        <input x-model="promoForm.max_uses" type="number" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="اتركه فارغاً لغير محدود">
                     </div>
                     <div>
                         <label class="block text-sm text-slate-400 mb-1" data-i18n="expiry_date">Expiry Date</label>
                         <input x-model="promoForm.expires_at" type="datetime-local" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
                     <div class="flex gap-3 pt-2">
-                        <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg text-sm font-semibold transition">Ø¥Ù†Ø´Ø§Ø¡</button>
+                        <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg text-sm font-semibold transition">إنشاء</button>
                         <button type="button" @click="showPromoModal = false" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-lg text-sm transition" data-i18n="cancel">Cancel</button>
                     </div>
                 </form>
@@ -370,7 +370,7 @@ function svrpPage() {
             await this.loadWallets();
         },
 
-        // â”€â”€â”€ Wallets â”€â”€â”€
+        // ─── Wallets ───
         async loadWallets() {
             try {
                 const data = await api('/api/svrp/wallets');
@@ -378,40 +378,40 @@ function svrpPage() {
                 this.walletStats.total_balance = this.wallets.reduce((s, w) => s + (parseFloat(w.balance) || 0), 0);
                 this.walletStats.total_frozen = this.wallets.reduce((s, w) => s + (parseFloat(w.frozen) || 0), 0);
             } catch (e) {
-                toast('ÙØ´Ù„ ØªØ­Ù…ÙŠÙ„ Ø§Ù„Ù…Ø­Ø§ÙØ¸', 'error');
+                toast('فشل تحميل المحافظ', 'error');
             }
         },
 
-        // â”€â”€â”€ Recovery â”€â”€â”€
+        // ─── Recovery ───
         async loadRecovery() {
             if (this.recoveryRequests.length > 0) return;
             try {
                 const data = await api('/api/svrp/requests');
                 this.recoveryRequests = data.requests || data || [];
             } catch (e) {
-                toast('ÙØ´Ù„ ØªØ­Ù…ÙŠÙ„ Ø·Ù„Ø¨Ø§Øª Ø§Ù„Ø§Ø³ØªØ±Ø¯Ø§Ø¯', 'error');
+                toast('فشل تحميل طلبات الاسترداد', 'error');
             }
         },
 
-        // â”€â”€â”€ Bonus â”€â”€â”€
+        // ─── Bonus ───
         async loadBonus() {
             if (this.bonusRequests.length > 0) return;
             try {
                 const data = await api('/api/svrp/bonus-requests');
                 this.bonusRequests = data.requests || data || [];
             } catch (e) {
-                toast('ÙØ´Ù„ ØªØ­Ù…ÙŠÙ„ Ø·Ù„Ø¨Ø§Øª Ø§Ù„Ù…ÙƒØ§ÙØ¢Øª', 'error');
+                toast('فشل تحميل طلبات المكافآت', 'error');
             }
         },
 
-        // â”€â”€â”€ Promo â”€â”€â”€
+        // ─── Promo ───
         async loadPromo() {
             if (this.promoCodes.length > 0) return;
             try {
                 const data = await api('/api/svrp/promo-codes');
                 this.promoCodes = data.codes || data || [];
             } catch (e) {
-                toast('ÙØ´Ù„ ØªØ­Ù…ÙŠÙ„ Ø§Ù„Ø±Ù…ÙˆØ² Ø§Ù„ØªØ±ÙˆÙŠØ¬ÙŠØ©', 'error');
+                toast('فشل تحميل الرموز الترويجية', 'error');
             }
         },
 
@@ -426,27 +426,27 @@ function svrpPage() {
                     method: 'POST',
                     body: JSON.stringify(this.promoForm),
                 });
-                toast('ØªÙ… Ø¥Ù†Ø´Ø§Ø¡ Ø§Ù„Ø±Ù…Ø² Ø§Ù„ØªØ±ÙˆÙŠØ¬ÙŠ Ø¨Ù†Ø¬Ø§Ø­', 'success');
+                toast('تم إنشاء الرمز الترويجي بنجاح', 'success');
                 this.showPromoModal = false;
                 this.promoCodes = [];
                 await this.loadPromo();
             } catch (e) {
-                toast('ÙØ´Ù„ Ø¥Ù†Ø´Ø§Ø¡ Ø§Ù„Ø±Ù…Ø² Ø§Ù„ØªØ±ÙˆÙŠØ¬ÙŠ', 'error');
+                toast('فشل إنشاء الرمز الترويجي', 'error');
             }
         },
 
         async togglePromo(p) {
             try {
                 await api('/api/svrp/promo-codes', { method: 'POST', body: JSON.stringify({ code: p.code, status: p.status === 'active' ? 'inactive' : 'active' }) });
-                toast('ØªÙ… ØªØºÙŠÙŠØ± Ø§Ù„Ø­Ø§Ù„Ø©', 'success');
+                toast('تم تغيير الحالة', 'success');
                 this.promoCodes = [];
                 await this.loadPromo();
             } catch (e) {
-                toast('ÙØ´Ù„ ØªØºÙŠÙŠØ± Ø§Ù„Ø­Ø§Ù„Ø©', 'error');
+                toast('فشل تغيير الحالة', 'error');
             }
         },
 
-        // â”€â”€â”€ Approval â”€â”€â”€
+        // ─── Approval ───
         approveItem(item, type) {
             this.approvalTarget = item;
             this.approvalType = type;
@@ -464,7 +464,7 @@ function svrpPage() {
                     method: 'POST',
                     body: JSON.stringify({ amount: this.approvalAmount }),
                 });
-                toast('ØªÙ…Øª Ø§Ù„Ù…ÙˆØ§ÙÙ‚Ø© Ø¨Ù†Ø¬Ø§Ø­', 'success');
+                toast('تمت الموافقة بنجاح', 'success');
                 this.showApprovalModal = false;
                 this.approvalTarget = null;
                 this.approvalType = null;
@@ -476,18 +476,18 @@ function svrpPage() {
                     await this.loadBonus();
                 }
             } catch (e) {
-                toast('ÙØ´Ù„Øª Ø§Ù„Ù…ÙˆØ§ÙÙ‚Ø©', 'error');
+                toast('فشلت الموافقة', 'error');
             }
         },
 
         async rejectItem(item, type) {
-            if (!confirm('Ù‡Ù„ Ø£Ù†Øª Ù…ØªØ£ÙƒØ¯ Ù…Ù† Ø±ÙØ¶ Ù‡Ø°Ø§ Ø§Ù„Ø·Ù„Ø¨ØŸ')) return;
+            if (!confirm('هل أنت متأكد من رفض هذا الطلب؟')) return;
             try {
                 const url = type === 'recovery' ?
                     `/api/svrp/requests/${item.id}/reject` :
                     `/api/svrp/bonus-requests/${item.id}/reject`;
                 await api(url, { method: 'POST', body: '{}' });
-                toast('ØªÙ… Ø§Ù„Ø±ÙØ¶ Ø¨Ù†Ø¬Ø§Ø­', 'success');
+                toast('تم الرفض بنجاح', 'success');
                 if (type === 'recovery') {
                     this.recoveryRequests = [];
                     await this.loadRecovery();
@@ -496,11 +496,11 @@ function svrpPage() {
                     await this.loadBonus();
                 }
             } catch (e) {
-                toast('ÙØ´Ù„ Ø§Ù„Ø±ÙØ¶', 'error');
+                toast('فشل الرفض', 'error');
             }
         },
 
-        // â”€â”€â”€ Tab switching with lazy loading â”€â”€â”€
+        // ─── Tab switching with lazy loading ───
         async switchTab(tab) {
             this.activeTab = tab;
             if (tab === 'recovery') await this.loadRecovery();

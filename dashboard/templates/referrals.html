@@ -1,6 +1,6 @@
-﻿{% extends "base.html" %}
-{% block title %}Ø§Ù„Ø¥Ø­Ø§Ù„Ø§Øª - Boterx{% endblock %}
-{% block page_title %}Ø§Ù„Ø¥Ø­Ø§Ù„Ø§Øª{% endblock %}
+{% extends "base.html" %}
+{% block title %}الإحالات - Boterx{% endblock %}
+{% block page_title %}الإحالات{% endblock %}
 
 {% block content %}
 <div x-data="referralsPage()" x-init="init()">
@@ -12,7 +12,7 @@
                     <i class="fas fa-user-plus text-blue-400"></i>
                 </div>
                 <div>
-                    <p class="text-xs text-slate-400">Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„Ø¥Ø­Ø§Ù„Ø§Øª</p>
+                    <p class="text-xs text-slate-400">إجمالي الإحالات</p>
                     <p class="text-2xl font-bold" x-text="fmtNum(stats.total_referrals)"></p>
                 </div>
             </div>
@@ -23,7 +23,7 @@
                     <i class="fas fa-check-circle text-green-400"></i>
                 </div>
                 <div>
-                    <p class="text-xs text-slate-400">Ù‡ÙˆØ§ØªÙ Ù…ÙˆØ«Ù‚Ø©</p>
+                    <p class="text-xs text-slate-400">هواتف موثقة</p>
                     <p class="text-2xl font-bold" x-text="fmtNum(stats.verified_phones)"></p>
                 </div>
             </div>
@@ -34,7 +34,7 @@
                     <i class="fas fa-coins text-amber-400"></i>
                 </div>
                 <div>
-                    <p class="text-xs text-slate-400">Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„Ù…ÙƒØ§ÙØ¢Øª Ø§Ù„Ù…ÙˆØ²Ø¹Ø©</p>
+                    <p class="text-xs text-slate-400">إجمالي المكافآت الموزعة</p>
                     <p class="text-2xl font-bold" x-text="fmtAmount(stats.total_bonus, 'USD')"></p>
                 </div>
             </div>
@@ -44,10 +44,10 @@
     <!-- Section 1: Referral Links -->
     <div class="bg-slate-800 rounded-xl border border-slate-700 mb-6 overflow-hidden">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-5 border-b border-slate-700">
-            <h3 class="font-bold text-lg">Ø±ÙˆØ§Ø¨Ø· Ø§Ù„Ø¥Ø­Ø§Ù„Ø©</h3>
+            <h3 class="font-bold text-lg">روابط الإحالة</h3>
             <button @click="openAddLinkModal()"
                 class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2 self-start">
-                <i class="fas fa-plus"></i> Ø¥Ø¶Ø§ÙØ© Ø±Ø§Ø¨Ø·
+                <i class="fas fa-plus"></i> إضافة رابط
             </button>
         </div>
         <div class="overflow-x-auto">
@@ -55,10 +55,10 @@
                 <thead>
                     <tr class="border-b border-slate-700 bg-slate-800/80">
                         <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="name">Name</th>
-                        <th class="text-right px-4 py-3 font-semibold text-slate-400">Ø§Ù„Ø±Ø§Ø¨Ø·</th>
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400">الرابط</th>
                         <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="status">Status</th>
-                        <th class="text-right px-4 py-3 font-semibold text-slate-400">ØªØ§Ø±ÙŠØ® Ø§Ù„Ø¥Ù†Ø´Ø§Ø¡</th>
-                        <th class="text-right px-4 py-3 font-semibold text-slate-400">Ø§Ù„Ø¥Ø¬Ø±Ø§Ø¡Ø§Øª</th>
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400">تاريخ الإنشاء</th>
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400">الإجراءات</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -77,7 +77,7 @@
                                     <button @click="openEditLinkModal(link)" class="p-1.5 rounded hover:bg-slate-600 text-slate-400 hover:text-blue-400 transition" title="Edit" data-i18n-title="edit">
                                         <i class="fas fa-edit text-sm"></i>
                                     </button>
-                                    <button @click="toggleLink(link)" class="p-1.5 rounded hover:bg-slate-600 text-slate-400 hover:text-amber-400 transition" title="ØªØ¨Ø¯ÙŠÙ„ Ø§Ù„Ø­Ø§Ù„Ø©">
+                                    <button @click="toggleLink(link)" class="p-1.5 rounded hover:bg-slate-600 text-slate-400 hover:text-amber-400 transition" title="تبديل الحالة">
                                         <i class="fas fa-power-off text-sm"></i>
                                     </button>
                                     <button @click="confirmDeleteLink(link)" class="p-1.5 rounded hover:bg-slate-600 text-slate-400 hover:text-red-400 transition" title="Delete" data-i18n-title="delete">
@@ -90,7 +90,7 @@
                     <tr x-show="links.length === 0">
                         <td colspan="5" class="px-4 py-8 text-center text-slate-500">
                             <i class="fas fa-link text-3xl mb-2 block"></i>
-                            Ù„Ø§ ØªÙˆØ¬Ø¯ Ø±ÙˆØ§Ø¨Ø· Ø¥Ø­Ø§Ù„Ø© Ø¨Ø¹Ø¯
+                            لا توجد روابط إحالة بعد
                         </td>
                     </tr>
                 </tbody>
@@ -101,17 +101,17 @@
     <!-- Section 2: Referral Log -->
     <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
         <div class="p-5 border-b border-slate-700">
-            <h3 class="font-bold text-lg">Ø³Ø¬Ù„ Ø§Ù„Ø¥Ø­Ø§Ù„Ø§Øª</h3>
+            <h3 class="font-bold text-lg">سجل الإحالات</h3>
         </div>
         <div class="overflow-x-auto">
             <table class="w-full text-sm">
                 <thead>
                     <tr class="border-b border-slate-700 bg-slate-800/80">
-                        <th class="text-right px-4 py-3 font-semibold text-slate-400">Ø§Ù„Ù…ÙØ­ÙŠÙ„</th>
-                        <th class="text-right px-4 py-3 font-semibold text-slate-400">Ø§Ù„Ù…ÙØ­Ø§Ù„</th>
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400">المُحيل</th>
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400">المُحال</th>
                         <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="phone_number">Phone Number</th>
-                        <th class="text-right px-4 py-3 font-semibold text-slate-400">ØªÙˆØ«ÙŠÙ‚ Ø§Ù„Ù‡Ø§ØªÙ</th>
-                        <th class="text-right px-4 py-3 font-semibold text-slate-400">Ø§Ù„Ù…ÙƒØ§ÙØ£Ø©</th>
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400">توثيق الهاتف</th>
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400">المكافأة</th>
                         <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="date">Date</th>
                     </tr>
                 </thead>
@@ -122,8 +122,8 @@
                             <td class="px-4 py-3" x-text="log.referred || '-'"></td>
                             <td class="px-4 py-3 font-mono text-xs" x-text="log.phone || '-'"></td>
                             <td class="px-4 py-3">
-                                <span x-show="log.phone_verified" class="text-green-400"><i class="fas fa-check-circle"></i> Ù…ÙˆØ«Ù‚</span>
-                                <span x-show="!log.phone_verified" class="text-slate-500"><i class="fas fa-times-circle"></i> ØºÙŠØ± Ù…ÙˆØ«Ù‚</span>
+                                <span x-show="log.phone_verified" class="text-green-400"><i class="fas fa-check-circle"></i> موثق</span>
+                                <span x-show="!log.phone_verified" class="text-slate-500"><i class="fas fa-times-circle"></i> غير موثق</span>
                             </td>
                             <td class="px-4 py-3 font-semibold" x-text="fmtAmount(log.bonus, 'USD')"></td>
                             <td class="px-4 py-3 text-slate-400 text-xs" x-text="log.created_at || '-'"></td>
@@ -132,7 +132,7 @@
                     <tr x-show="referralLog.length === 0">
                         <td colspan="6" class="px-4 py-8 text-center text-slate-500">
                             <i class="fas fa-history text-3xl mb-2 block"></i>
-                            Ù„Ø§ ÙŠÙˆØ¬Ø¯ Ø³Ø¬Ù„ Ø¥Ø­Ø§Ù„Ø§Øª Ø¨Ø¹Ø¯
+                            لا يوجد سجل إحالات بعد
                         </td>
                     </tr>
                 </tbody>
@@ -144,29 +144,29 @@
     <div x-show="showLinkModal" x-transition.opacity class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" style="display:none" @click.self="showLinkModal = false">
         <div class="bg-slate-800 rounded-2xl border border-slate-700 w-full max-w-lg shadow-2xl" @click.stop="">
             <div class="flex items-center justify-between p-5 border-b border-slate-700">
-                <h3 class="text-lg font-bold" x-text="editingLinkId ? 'ØªØ¹Ø¯ÙŠÙ„ Ø±Ø§Ø¨Ø·' : 'Ø¥Ø¶Ø§ÙØ© Ø±Ø§Ø¨Ø· Ø¥Ø­Ø§Ù„Ø©'"></h3>
+                <h3 class="text-lg font-bold" x-text="editingLinkId ? 'تعديل رابط' : 'إضافة رابط إحالة'"></h3>
                 <button @click="showLinkModal = false" class="text-slate-400 hover:text-white transition">
                     <i class="fas fa-times text-lg"></i>
                 </button>
             </div>
             <form @submit.prevent="saveLink()" class="p-5 space-y-4">
                 <div>
-                    <label class="block text-sm text-slate-400 mb-1">Ø§Ù„Ø§Ø³Ù… <span class="text-red-400">*</span></label>
-                    <input x-model="linkForm.name" required type="text" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ø§Ø³Ù… Ø§Ù„Ø±Ø§Ø¨Ø·">
+                    <label class="block text-sm text-slate-400 mb-1">الاسم <span class="text-red-400">*</span></label>
+                    <input x-model="linkForm.name" required type="text" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="اسم الرابط">
                 </div>
                 <div>
-                    <label class="block text-sm text-slate-400 mb-1">Ø§Ù„Ø±Ø§Ø¨Ø· <span class="text-red-400">*</span></label>
+                    <label class="block text-sm text-slate-400 mb-1">الرابط <span class="text-red-400">*</span></label>
                     <input x-model="linkForm.url" required type="url" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="https://t.me/...">
                 </div>
                 <div class="flex items-center gap-3 pt-2">
                     <label class="relative inline-flex items-center cursor-pointer">
                         <input type="checkbox" x-model="linkForm.is_active" class="sr-only peer">
                         <div class="w-10 h-5 bg-slate-600 peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-5 rtl:peer-checked:after:-translate-x-5 peer-checked:bg-green-500 after:content-[''] after:absolute after:top-0.5 after:start-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all"></div>
-                        <span class="mr-2 text-sm text-slate-300">Ù†Ø´Ø·</span>
+                        <span class="mr-2 text-sm text-slate-300">نشط</span>
                     </label>
                 </div>
                 <div class="flex gap-3 pt-2">
-                    <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg text-sm font-semibold transition" x-text="editingLinkId ? 'Ø­ÙØ¸ Ø§Ù„ØªØ¹Ø¯ÙŠÙ„Ø§Øª' : 'Ø¥Ø¶Ø§ÙØ©'"></button>
+                    <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg text-sm font-semibold transition" x-text="editingLinkId ? 'حفظ التعديلات' : 'إضافة'"></button>
                     <button type="button" @click="showLinkModal = false" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-lg text-sm transition" data-i18n="cancel">Cancel</button>
                 </div>
             </form>
@@ -180,9 +180,9 @@
                 <div class="w-14 h-14 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4">
                     <i class="fas fa-exclamation-triangle text-red-400 text-2xl"></i>
                 </div>
-                <h3 class="text-lg font-bold mb-2">ØªØ£ÙƒÙŠØ¯ Ø§Ù„Ø­Ø°Ù</h3>
-                <p class="text-sm text-slate-400">Ù‡Ù„ Ø£Ù†Øª Ù…ØªØ£ÙƒØ¯ Ù…Ù† Ø­Ø°Ù Ø±Ø§Ø¨Ø· "<span class="text-white font-semibold" x-text="deleteLinkTarget?.name"></span>"ØŸ</p>
-                <p class="text-xs text-red-400 mt-2">Ù‡Ø°Ø§ Ø§Ù„Ø¥Ø¬Ø±Ø§Ø¡ Ù„Ø§ ÙŠÙ…ÙƒÙ† Ø§Ù„ØªØ±Ø§Ø¬Ø¹ Ø¹Ù†Ù‡.</p>
+                <h3 class="text-lg font-bold mb-2">تأكيد الحذف</h3>
+                <p class="text-sm text-slate-400">هل أنت متأكد من حذف رابط "<span class="text-white font-semibold" x-text="deleteLinkTarget?.name"></span>"؟</p>
+                <p class="text-xs text-red-400 mt-2">هذا الإجراء لا يمكن التراجع عنه.</p>
                 <div class="flex gap-3 mt-6">
                     <button @click="deleteLink()" class="flex-1 bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-lg text-sm font-semibold transition" data-i18n="delete">Delete</button>
                     <button @click="showDeleteLinkModal = false" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-lg text-sm transition" data-i18n="cancel">Cancel</button>
@@ -218,7 +218,7 @@ function referralsPage() {
                 this.stats.verified_phones = data.verified_phones || 0;
                 this.stats.total_bonus = data.total_bonus || 0;
             } catch (e) {
-                toast('ÙØ´Ù„ ØªØ­Ù…ÙŠÙ„ Ø±ÙˆØ§Ø¨Ø· Ø§Ù„Ø¥Ø­Ø§Ù„Ø©', 'error');
+                toast('فشل تحميل روابط الإحالة', 'error');
             }
         },
 
@@ -254,18 +254,18 @@ function referralsPage() {
                         method: 'PUT',
                         body: JSON.stringify(this.linkForm),
                     });
-                    toast('ØªÙ… ØªØ­Ø¯ÙŠØ« Ø§Ù„Ø±Ø§Ø¨Ø· Ø¨Ù†Ø¬Ø§Ø­', 'success');
+                    toast('تم تحديث الرابط بنجاح', 'success');
                 } else {
                     await api('/api/referrals', {
                         method: 'POST',
                         body: JSON.stringify(this.linkForm),
                     });
-                    toast('ØªÙ…Øª Ø¥Ø¶Ø§ÙØ© Ø§Ù„Ø±Ø§Ø¨Ø· Ø¨Ù†Ø¬Ø§Ø­', 'success');
+                    toast('تمت إضافة الرابط بنجاح', 'success');
                 }
                 this.showLinkModal = false;
                 await this.loadLinks();
             } catch (e) {
-                toast('ÙØ´Ù„ Ø­ÙØ¸ Ø§Ù„Ø±Ø§Ø¨Ø·: ' + (e.message || 'Ø®Ø·Ø£ ØºÙŠØ± Ù…Ø¹Ø±ÙˆÙ'), 'error');
+                toast('فشل حفظ الرابط: ' + (e.message || 'خطأ غير معروف'), 'error');
             }
         },
 
@@ -276,11 +276,11 @@ function referralsPage() {
                     method: 'PUT',
                     body: JSON.stringify({ is_active: link.is_active }),
                 });
-                toast(link.is_active ? 'ØªÙ… ØªÙØ¹ÙŠÙ„ Ø§Ù„Ø±Ø§Ø¨Ø·' : 'ØªÙ… ØªØ¹Ø·ÙŠÙ„ Ø§Ù„Ø±Ø§Ø¨Ø·', 'success');
+                toast(link.is_active ? 'تم تفعيل الرابط' : 'تم تعطيل الرابط', 'success');
                 await this.loadLinks();
             } catch (e) {
                 link.is_active = !link.is_active;
-                toast('ÙØ´Ù„ ØªØºÙŠÙŠØ± Ø§Ù„Ø­Ø§Ù„Ø©', 'error');
+                toast('فشل تغيير الحالة', 'error');
             }
         },
 
@@ -293,12 +293,12 @@ function referralsPage() {
             if (!this.deleteLinkTarget) return;
             try {
                 await api(`/api/referrals/links/${this.deleteLinkTarget.id}`, { method: 'DELETE' });
-                toast('ØªÙ… Ø­Ø°Ù Ø§Ù„Ø±Ø§Ø¨Ø· Ø¨Ù†Ø¬Ø§Ø­', 'success');
+                toast('تم حذف الرابط بنجاح', 'success');
                 this.showDeleteLinkModal = false;
                 this.deleteLinkTarget = null;
                 await this.loadLinks();
             } catch (e) {
-                toast('ÙØ´Ù„ Ø­Ø°Ù Ø§Ù„Ø±Ø§Ø¨Ø·', 'error');
+                toast('فشل حذف الرابط', 'error');
             }
         },
     };

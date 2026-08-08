@@ -1,9 +1,9 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>Ø§Ù„ÙŠØ§Ù†ØµÙŠØ¨ â€” VEX</title>
+<title>اليانصيب — VEX</title>
 <link rel="stylesheet" href="/static/css/game-base.css?v=20260808">
 <style>
 .game-area{display:flex;flex-direction:column;align-items:center;gap:10px;padding:8px;overflow-y:auto}
@@ -74,46 +74,46 @@
 <div id="app" style="display:none">
   <div class="game-topbar">
     <div class="topbar-left">
-      <button class="btn-back" onclick="if(tg)tg.close();else history.back()">â†</button>
-      <div class="bal-pill"><span class="bal-icon">ðŸ’°</span><span class="bal-val" id="bal">0</span><span class="bal-cur" id="cur">EGP</span></div>
+      <button class="btn-back" onclick="if(tg)tg.close();else history.back()">←</button>
+      <div class="bal-pill"><span class="bal-icon">💰</span><span class="bal-val" id="bal">0</span><span class="bal-cur" id="cur">EGP</span></div>
     </div>
     <div class="topbar-right">
-      <button class="btn-sound" id="soundBtn" onclick="toggleSound()">ðŸ”Š</button>
-      <span id="connIndicator">ðŸŸ¢</span>
+      <button class="btn-sound" id="soundBtn" onclick="toggleSound()">🔊</button>
+      <span id="connIndicator">🟢</span>
     </div>
   </div>
 
   <div class="game-area" style="flex:1">
     <!-- Timer -->
     <div class="lottery-timer">
-      <div class="timer-label">ðŸŽ² Ø§Ù„Ø³Ø­Ø¨ Ø§Ù„ØªØ§Ù„ÙŠ</div>
+      <div class="timer-label">🎲 السحب التالي</div>
       <div class="timer-val" id="timerVal">--:--</div>
     </div>
 
     <!-- Stats -->
     <div class="lottery-info" style="width:100%;max-width:360px">
-      <div class="linfo"><div class="linfo-val gold" id="prizePool">0</div><div class="linfo-label">Ø¬Ø§Ø¦Ø²Ø© Ø§Ù„Ø¬ÙˆÙ„Ø©</div></div>
-      <div class="linfo"><div class="linfo-val" id="ticketsSold">0</div><div class="linfo-label">ØªØ°Ø§ÙƒØ± Ù…Ø¨Ø§Ø¹Ø©</div></div>
-      <div class="linfo"><div class="linfo-val" id="myTickets">0</div><div class="linfo-label">ØªØ°Ø§ÙƒØ±ÙŠ</div></div>
+      <div class="linfo"><div class="linfo-val gold" id="prizePool">0</div><div class="linfo-label">جائزة الجولة</div></div>
+      <div class="linfo"><div class="linfo-val" id="ticketsSold">0</div><div class="linfo-label">تذاكر مباعة</div></div>
+      <div class="linfo"><div class="linfo-val" id="myTickets">0</div><div class="linfo-label">تذاكري</div></div>
     </div>
 
     <!-- Prize Tiers -->
     <div class="prize-tiers" id="prizeTiers" style="width:100%;max-width:360px;display:none">
-      <div class="pt-title">ðŸ† Ø¯Ø±Ø¬Ø§Øª Ø§Ù„Ø¬ÙˆØ§Ø¦Ø²</div>
+      <div class="pt-title">🏆 درجات الجوائز</div>
       <div class="pt-row">
         <span class="pt-badge jackpot">5/5</span>
-        <span class="pt-label">Ø¬Ø§Ø¦Ø²Ø© ÙƒØ¨Ø±Ù‰</span>
-        <span class="pt-amount gold" id="tierJackpot">â€”</span>
+        <span class="pt-label">جائزة كبرى</span>
+        <span class="pt-amount gold" id="tierJackpot">—</span>
       </div>
       <div class="pt-row">
         <span class="pt-badge secondary">4/5</span>
-        <span class="pt-label">Ø¬Ø§Ø¦Ø²Ø© Ø«Ø§Ù†ÙŠØ©</span>
-        <span class="pt-amount" id="tierSecondary">â€”</span>
+        <span class="pt-label">جائزة ثانية</span>
+        <span class="pt-amount" id="tierSecondary">—</span>
       </div>
       <div class="pt-row">
         <span class="pt-badge small">3/5</span>
-        <span class="pt-label">Ø¬Ø§Ø¦Ø²Ø© ØµØºÙŠØ±Ø©</span>
-        <span class="pt-amount" id="tierSmall">â€”</span>
+        <span class="pt-label">جائزة صغيرة</span>
+        <span class="pt-amount" id="tierSmall">—</span>
       </div>
       <div class="pt-note" id="rolloverNote"></div>
     </div>
@@ -123,25 +123,25 @@
 
     <!-- Buy Section -->
     <div class="buy-section">
-      <div class="ticket-price-info" id="priceInfo">Ø³Ø¹Ø± Ø§Ù„ØªØ°ÙƒØ±Ø©: 10 Ù„ÙƒÙ„ ÙˆØ§Ø­Ø¯Ø©</div>
+      <div class="ticket-price-info" id="priceInfo">سعر التذكرة: 10 لكل واحدة</div>
       <div class="count-row">
-        <button class="count-btn" onclick="changeCount(-1)">âˆ’</button>
+        <button class="count-btn" onclick="changeCount(-1)">−</button>
         <div class="count-val" id="countVal">1</div>
         <button class="count-btn" onclick="changeCount(1)">+</button>
       </div>
-      <button class="buy-btn" id="buyBtn" onclick="buyTickets()">ðŸŽŸï¸ Ø´Ø±Ø§Ø¡ ØªØ°Ø§ÙƒØ±</button>
+      <button class="buy-btn" id="buyBtn" onclick="buyTickets()">🎟️ شراء تذاكر</button>
     </div>
 
     <!-- Draw History -->
     <div class="draw-history">
-      <div class="draw-history-title">ðŸ“‹ Ø¢Ø®Ø± Ø§Ù„Ø³Ø­ÙˆØ¨Ø§Øª</div>
+      <div class="draw-history-title">📋 آخر السحوبات</div>
       <div id="drawHistory"></div>
     </div>
   </div>
 </div>
 <div id="loading" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg);flex-direction:column;gap:12px">
-  <div style="font-size:40px">ðŸŽŸï¸</div>
-  <div style="color:var(--text-dim);font-size:14px">Ø¬Ø§Ø±Ù Ø§Ù„ØªØ­Ù…ÙŠÙ„...</div>
+  <div style="font-size:40px">🎟️</div>
+  <div style="color:var(--text-dim);font-size:14px">جارٍ التحميل...</div>
 </div>
 <script src="/static/js/game-base.js?v=20260808"></script>
 <script>
@@ -160,7 +160,7 @@ function loadState() {
     if (d.draw_time) startTimer(d.draw_time);
     if (d.prize_pool !== undefined) document.getElementById('prizePool').textContent = fmtAmount(d.prize_pool);
     if (d.tickets_sold !== undefined) document.getElementById('ticketsSold').textContent = d.tickets_sold;
-    if (d.ticket_price !== undefined) document.getElementById('priceInfo').textContent = 'Ø³Ø¹Ø± Ø§Ù„ØªØ°ÙƒØ±Ø©: ' + d.ticket_price + ' Ù„ÙƒÙ„ ÙˆØ§Ø­Ø¯Ø©';
+    if (d.ticket_price !== undefined) document.getElementById('priceInfo').textContent = 'سعر التذكرة: ' + d.ticket_price + ' لكل واحدة';
     if (d.my_tickets) { myTicketsList = d.my_tickets; renderTickets(); }
     if (d.history) renderHistory(d.history);
     document.getElementById('myTickets').textContent = myTicketsList.length;
@@ -172,15 +172,15 @@ function renderPrizeTiers(tiers) {
   var el = document.getElementById('prizeTiers');
   if (!el) return;
   el.style.display = 'flex';
-  var jPool = tiers.jackpot && tiers.jackpot.pool > 0 ? fmtAmount(tiers.jackpot.pool) : 'â€”';
-  var sPool = tiers.secondary && tiers.secondary.pool > 0 ? fmtAmount(tiers.secondary.pool) : 'â€”';
-  var smPool = tiers.small && tiers.small.pool > 0 ? fmtAmount(tiers.small.pool) : 'â€”';
+  var jPool = tiers.jackpot && tiers.jackpot.pool > 0 ? fmtAmount(tiers.jackpot.pool) : '—';
+  var sPool = tiers.secondary && tiers.secondary.pool > 0 ? fmtAmount(tiers.secondary.pool) : '—';
+  var smPool = tiers.small && tiers.small.pool > 0 ? fmtAmount(tiers.small.pool) : '—';
   document.getElementById('tierJackpot').textContent = jPool;
   document.getElementById('tierSecondary').textContent = sPool;
   document.getElementById('tierSmall').textContent = smPool;
   var note = document.getElementById('rolloverNote');
   if (note && tiers.rollover_pct) {
-    note.textContent = 'âš¡ ' + Math.round(tiers.rollover_pct * 100) + '% Ù…Ù† Ø§Ù„Ø¬Ø§Ø¦Ø²Ø© ÙŠÙ†ØªÙ‚Ù„ Ù„Ù„Ø¬ÙˆÙ„Ø© Ø§Ù„Ù‚Ø§Ø¯Ù…Ø© Ø¹Ù†Ø¯ ØºÙŠØ§Ø¨ Ø§Ù„Ø¬Ø§Ø¦Ø²Ø© Ø§Ù„ÙƒØ¨Ø±Ù‰';
+    note.textContent = '⚡ ' + Math.round(tiers.rollover_pct * 100) + '% من الجائزة ينتقل للجولة القادمة عند غياب الجائزة الكبرى';
   }
 }
 
@@ -208,18 +208,18 @@ function buyTickets() {
   }).then(function(r) { return r.json(); }).then(function(d) {
     btn.disabled = false;
     if (d.error) { showToast(d.error, 'error'); if (d.need_deposit) showDepositModal(); return; }
-    showToast('ØªÙ… Ø´Ø±Ø§Ø¡ ' + ticketCount + ' ØªØ°ÙƒØ±Ø©!', 'success');
+    showToast('تم شراء ' + ticketCount + ' تذكرة!', 'success');
     soundDraw(); hapticNotif('success');
     loadState(); loadBalance();
   }).catch(function() {
-    btn.disabled = false; showToast('Ø®Ø·Ø£ ÙÙŠ Ø§Ù„Ø´Ø¨ÙƒØ©', 'error');
+    btn.disabled = false; showToast('خطأ في الشبكة', 'error');
   });
 }
 
 function tierLabel(tier) {
-  if (tier === 1) return '<span class="ticket-tier t1">ðŸ† Ø¬Ø§Ø¦Ø²Ø© ÙƒØ¨Ø±Ù‰</span>';
-  if (tier === 2) return '<span class="ticket-tier t2">ðŸ¥ˆ Ø¬Ø§Ø¦Ø²Ø© Ø«Ø§Ù†ÙŠØ©</span>';
-  if (tier === 3) return '<span class="ticket-tier t3">ðŸ¥‰ Ø¬Ø§Ø¦Ø²Ø© ØµØºÙŠØ±Ø©</span>';
+  if (tier === 1) return '<span class="ticket-tier t1">🏆 جائزة كبرى</span>';
+  if (tier === 2) return '<span class="ticket-tier t2">🥈 جائزة ثانية</span>';
+  if (tier === 3) return '<span class="ticket-tier t3">🥉 جائزة صغيرة</span>';
   return '';
 }
 
@@ -230,7 +230,7 @@ function renderTickets() {
     var div = document.createElement('div');
     div.className = 'ticket' + (t.scratched ? ' scratched' : '');
     var statusClass = t.status === 'win' ? 'win' : t.status === 'lose' ? 'lose' : 'pending';
-    var statusText = t.status === 'win' ? 'ÙØ§Ø¦Ø²!' : t.status === 'lose' ? 'Ø®Ø³Ø§Ø±Ø©' : 'Ø§Ù†ØªØ¸Ø§Ø±';
+    var statusText = t.status === 'win' ? 'فائز!' : t.status === 'lose' ? 'خسارة' : 'انتظار';
     var tierHtml = (t.status === 'win' && t.tier) ? tierLabel(t.tier) : '';
     var numsHtml = '';
     (t.numbers || []).forEach(function(n) {
@@ -243,12 +243,12 @@ function renderTickets() {
     div.innerHTML = '<div class="ticket-header"><span class="ticket-id">#' + (t.id || '?') + '</span>' +
       '<span class="ticket-status ' + statusClass + '">' + statusText + matchInfo + '</span>' + tierHtml + '</div>' +
       '<div class="ticket-numbers">' + numsHtml + '</div>' +
-      '<div class="ticket-prize ' + statusClass + '">' + (t.prize ? '+' + fmtAmount(t.prize) : t.status === 'lose' ? 'Ù„Ø§ Ø¬Ø§Ø¦Ø²Ø©' : 'ðŸ¤ž') + '</div>' +
-      '<div class="ticket-scratch-hint">' + (t.scratched ? '' : 'Ø§Ù†Ù‚Ø± Ù„ÙƒØ´Ù Ø§Ù„ØªØ°ÙƒØ±Ø©') + '</div>';
+      '<div class="ticket-prize ' + statusClass + '">' + (t.prize ? '+' + fmtAmount(t.prize) : t.status === 'lose' ? 'لا جائزة' : '🤞') + '</div>' +
+      '<div class="ticket-scratch-hint">' + (t.scratched ? '' : 'انقر لكشف التذكرة') + '</div>';
     if (!t.scratched) {
       var overlay = document.createElement('div');
       overlay.className = 'scratch-overlay';
-      overlay.innerHTML = '<span class="scratch-icon">ðŸª™</span>';
+      overlay.innerHTML = '<span class="scratch-icon">🪙</span>';
       overlay.onclick = function() { scratchTicket(t.id, div, overlay); };
       div.appendChild(overlay);
     }
@@ -276,20 +276,20 @@ function renderHistory(history) {
     var winnerSummary = '';
     if (h.jackpot_winners !== undefined) {
       if (h.jackpot_winners > 0) {
-        winnerSummary = 'ðŸ†Ã—' + h.jackpot_winners;
+        winnerSummary = '🏆×' + h.jackpot_winners;
       } else if ((h.secondary_winners || 0) > 0 || (h.small_winners || 0) > 0) {
         var parts = [];
-        if (h.secondary_winners > 0) parts.push('ðŸ¥ˆÃ—' + h.secondary_winners);
-        if (h.small_winners > 0) parts.push('ðŸ¥‰Ã—' + h.small_winners);
+        if (h.secondary_winners > 0) parts.push('🥈×' + h.secondary_winners);
+        if (h.small_winners > 0) parts.push('🥉×' + h.small_winners);
         winnerSummary = parts.join(' ');
       } else {
-        winnerSummary = 'â†©ï¸ ØªØ±Ø­ÙŠÙ„';
+        winnerSummary = '↩️ ترحيل';
       }
     } else {
-      winnerSummary = (h.winners || 0) > 0 ? 'ðŸ†Ã—' + h.winners : 'Ù„Ø§ ÙØ§Ø¦Ø²';
+      winnerSummary = (h.winners || 0) > 0 ? '🏆×' + h.winners : 'لا فائز';
     }
     var rolloverBadge = (h.rollover_amount && h.rollover_amount > 0 && !h.jackpot_winners)
-      ? ' <span style="font-size:9px;color:var(--text-dim)">+' + fmtAmount(h.rollover_amount) + ' ØªØ±Ø­ÙŠÙ„</span>' : '';
+      ? ' <span style="font-size:9px;color:var(--text-dim)">+' + fmtAmount(h.rollover_amount) + ' ترحيل</span>' : '';
     var dateStr = h.date || (h.drawn_at ? new Date(h.drawn_at * 1000).toLocaleDateString('ar') : '');
     item.innerHTML = '<span>' + dateStr + '</span><div class="draw-nums">' + numsHtml + '</div>' +
       '<span style="color:var(--gold);font-size:10px">' + winnerSummary + rolloverBadge + '</span>';

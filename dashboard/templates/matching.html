@@ -1,6 +1,6 @@
-﻿{% extends 'base.html' %}
-{% block title %}Ø§Ù„Ù…Ø·Ø§Ø¨Ù‚Ø§Øª â€” Boterx{% endblock %}
-{% block page_title %}ðŸ”„ Ø§Ù„Ù…Ø·Ø§Ø¨Ù‚Ø§Øª{% endblock %}
+{% extends 'base.html' %}
+{% block title %}المطابقات — Boterx{% endblock %}
+{% block page_title %}🔄 المطابقات{% endblock %}
 
 {% block content %}
 <div x-data="matchingApp()" x-init="init()" class="space-y-6">
@@ -9,36 +9,36 @@
     <div class="flex gap-1 bg-slate-800 rounded-xl border border-slate-700 p-1 w-fit">
         <button @click="setTab('active')" :class="tab === 'active' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'"
                 class="px-5 py-2 rounded-lg text-sm font-medium transition">
-            <i class="fas fa-circle-check ml-1"></i> Ù†Ø´Ø·Ø©
+            <i class="fas fa-circle-check ml-1"></i> نشطة
             <span class="ml-1 px-1.5 py-0.5 rounded text-xs bg-slate-700" x-text="activeCount"></span>
         </button>
         <button @click="setTab('pending')" :class="tab === 'pending' ? 'bg-amber-600 text-white' : 'text-slate-400 hover:text-white'"
                 class="px-5 py-2 rounded-lg text-sm font-medium transition">
-            <i class="fas fa-clock ml-1"></i> Ù…Ø¹Ù„Ù‚Ø©
+            <i class="fas fa-clock ml-1"></i> معلقة
             <span class="ml-1 px-1.5 py-0.5 rounded text-xs bg-slate-700" x-text="pendingCount"></span>
         </button>
         <button @click="setTab('logs')" :class="tab === 'logs' ? 'bg-green-600 text-white' : 'text-slate-400 hover:text-white'"
                 class="px-5 py-2 rounded-lg text-sm font-medium transition">
-            <i class="fas fa-list ml-1"></i> Ø§Ù„Ø³Ø¬Ù„Ø§Øª
+            <i class="fas fa-list ml-1"></i> السجلات
         </button>
     </div>
 
     <!-- Active matches tab -->
     <div x-show="tab === 'active'" class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
         <div class="p-4 border-b border-slate-700">
-            <h3 class="font-semibold"><i class="fas fa-circle-check text-green-400 ml-1"></i> Ø§Ù„Ù…Ø·Ø§Ø¨Ù‚Ø§Øª Ø§Ù„Ù†Ø´Ø·Ø©</h3>
+            <h3 class="font-semibold"><i class="fas fa-circle-check text-green-400 ml-1"></i> المطابقات النشطة</h3>
         </div>
         <div class="overflow-x-auto">
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th>Ø§Ù„Ù…Ø¹Ø±Ù</th>
-                        <th>Ø§Ù„Ù…ÙˆØ¯Ø¹</th>
-                        <th>Ø§Ù„Ø³Ø§Ø­Ø¨</th>
+                        <th>المعرف</th>
+                        <th>المودع</th>
+                        <th>الساحب</th>
                         <th data-i18n="amount">Amount</th>
                         <th data-i18n="company">Company</th>
                         <th data-i18n="status">Status</th>
-                        <th>ØªØ§Ø±ÙŠØ® Ø§Ù„Ø¥Ù†Ø´Ø§Ø¡</th>
+                        <th>تاريخ الإنشاء</th>
                         <th data-i18n="actions">Actions</th>
                     </tr>
                 </thead>
@@ -52,29 +52,29 @@
                     <template x-if="!loading && activeMatches.length === 0">
                         <tr><td colspan="7" class="text-center p-8 text-slate-400">
                             <i class="fas fa-inbox text-3xl mb-2"></i>
-                            <p>Ù„Ø§ ØªÙˆØ¬Ø¯ Ù…Ø·Ø§Ø¨Ù‚Ø§Øª Ù†Ø´Ø·Ø©</p>
+                            <p>لا توجد مطابقات نشطة</p>
                         </td></tr>
                     </template>
                     <template x-for="m in activeMatches" :key="m.id">
                         <tr>
-                            <td class="font-mono text-xs" x-text="m.id || 'â€”'"></td>
+                            <td class="font-mono text-xs" x-text="m.id || '—'"></td>
                             <td>
-                                <div class="font-medium" x-text="m.depositor_alias || 'â€”'"></div>
+                                <div class="font-medium" x-text="m.depositor_alias || '—'"></div>
                                 <div class="text-xs text-slate-500" x-text="m.depositor_id || ''"></div>
                             </td>
                             <td>
-                                <div class="font-medium" x-text="m.withdrawer_alias || 'â€”'"></div>
+                                <div class="font-medium" x-text="m.withdrawer_alias || '—'"></div>
                                 <div class="text-xs text-slate-500" x-text="m.withdrawer_id || ''"></div>
                             </td>
                             <td class="font-bold" x-text="fmtAmount(m.amount, m.currency)"></td>
                             <td>
-                                <span class="px-2 py-0.5 rounded text-xs bg-purple-500/20 text-purple-400" x-text="m.company_name || 'â€”'"></span>
+                                <span class="px-2 py-0.5 rounded text-xs bg-purple-500/20 text-purple-400" x-text="m.company_name || '—'"></span>
                             </td>
                             <td x-html="statusBadge(m.status)"></td>
-                            <td class="text-xs text-slate-400" x-text="m.created_at || 'â€”'"></td>
+                            <td class="text-xs text-slate-400" x-text="m.created_at || '—'"></td>
                             <td>
                                 <button @click="openMatchDetail(m)" class="btn btn-primary btn-sm">
-                                    <i class="fas fa-eye"></i> ØªÙØ§ØµÙŠÙ„
+                                    <i class="fas fa-eye"></i> تفاصيل
                                 </button>
                             </td>
                         </tr>
@@ -87,18 +87,18 @@
     <!-- Pending requests tab -->
     <div x-show="tab === 'pending'" class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
         <div class="p-4 border-b border-slate-700">
-            <h3 class="font-semibold"><i class="fas fa-clock text-amber-400 ml-1"></i> Ø§Ù„Ø·Ù„Ø¨Ø§Øª Ø§Ù„Ù…Ø¹Ù„Ù‚Ø©</h3>
+            <h3 class="font-semibold"><i class="fas fa-clock text-amber-400 ml-1"></i> الطلبات المعلقة</h3>
         </div>
         <div class="overflow-x-auto">
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th>Ø§Ù„Ù…Ø¹Ø±Ù</th>
+                        <th>المعرف</th>
                         <th data-i18n="user">User</th>
                         <th data-i18n="type">Type</th>
                         <th data-i18n="amount">Amount</th>
                         <th data-i18n="company">Company</th>
-                        <th>Ø§Ù„Ø§Ø³Ù… Ø§Ù„Ù…Ø³ØªØ¹Ø§Ø±</th>
+                        <th>الاسم المستعار</th>
                         <th data-i18n="date">Date</th>
                         <th data-i18n="actions">Actions</th>
                     </tr>
@@ -113,33 +113,33 @@
                     <template x-if="!loading && pendingRequests.length === 0">
                         <tr><td colspan="8" class="text-center p-8 text-slate-400">
                             <i class="fas fa-inbox text-3xl mb-2"></i>
-                            <p>Ù„Ø§ ØªÙˆØ¬Ø¯ Ø·Ù„Ø¨Ø§Øª Ù…Ø¹Ù„Ù‚Ø©</p>
+                            <p>لا توجد طلبات معلقة</p>
                         </td></tr>
                     </template>
                     <template x-for="r in pendingRequests" :key="r.id">
                         <tr>
-                            <td class="font-mono text-xs" x-text="r.id || 'â€”'"></td>
+                            <td class="font-mono text-xs" x-text="r.id || '—'"></td>
                             <td>
-                                <div class="font-medium" x-text="r.customer_id || 'â€”'"></div>
+                                <div class="font-medium" x-text="r.customer_id || '—'"></div>
                                 <div class="text-xs text-slate-500" x-text="r.user_id || ''"></div>
                             </td>
                             <td>
-                                <span x-text="r.type === 'deposit' ? 'ðŸ’µ Ø¥ÙŠØ¯Ø§Ø¹' : 'ðŸ’¸ Ø³Ø­Ø¨'"
+                                <span x-text="r.type === 'deposit' ? '💵 إيداع' : '💸 سحب'"
                                       :class="r.type === 'deposit' ? 'text-green-400' : 'text-red-400'"></span>
                             </td>
                             <td class="font-bold" x-text="fmtAmount(r.amount, r.currency)"></td>
                             <td>
-                                <span class="px-2 py-0.5 rounded text-xs bg-purple-500/20 text-purple-400" x-text="r.company_name || 'â€”'"></span>
+                                <span class="px-2 py-0.5 rounded text-xs bg-purple-500/20 text-purple-400" x-text="r.company_name || '—'"></span>
                             </td>
-                            <td class="text-sm" x-text="r.alias || 'â€”'"></td>
-                            <td class="text-xs text-slate-400" x-text="r.created_at || 'â€”'"></td>
+                            <td class="text-sm" x-text="r.alias || '—'"></td>
+                            <td class="text-xs text-slate-400" x-text="r.created_at || '—'"></td>
                             <td>
                                 <div class="flex gap-1">
                                     <button @click="approveRequest(r.id)" class="btn btn-success btn-sm">
-                                        <i class="fas fa-check"></i> Ù‚Ø¨ÙˆÙ„
+                                        <i class="fas fa-check"></i> قبول
                                     </button>
                                     <button @click="rejectRequest(r.id)" class="btn btn-danger btn-sm">
-                                        <i class="fas fa-xmark"></i> Ø±ÙØ¶
+                                        <i class="fas fa-xmark"></i> رفض
                                     </button>
                                 </div>
                             </td>
@@ -153,19 +153,19 @@
     <!-- Logs tab -->
     <div x-show="tab === 'logs'" class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
         <div class="p-4 border-b border-slate-700">
-            <h3 class="font-semibold"><i class="fas fa-list text-blue-400 ml-1"></i> Ø³Ø¬Ù„ Ø§Ù„Ù…Ø·Ø§Ø¨Ù‚Ø§Øª (Ù…ÙƒØªÙ…Ù„Ø© / Ù…Ù„ØºØ§Ø©)</h3>
+            <h3 class="font-semibold"><i class="fas fa-list text-blue-400 ml-1"></i> سجل المطابقات (مكتملة / ملغاة)</h3>
         </div>
         <div class="overflow-x-auto">
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th>Ø§Ù„Ù…Ø¹Ø±Ù</th>
-                        <th>Ø§Ù„Ù…ÙˆØ¯Ø¹</th>
-                        <th>Ø§Ù„Ø³Ø§Ø­Ø¨</th>
+                        <th>المعرف</th>
+                        <th>المودع</th>
+                        <th>الساحب</th>
                         <th data-i18n="amount">Amount</th>
                         <th data-i18n="company">Company</th>
                         <th data-i18n="status">Status</th>
-                        <th>ØªØ§Ø±ÙŠØ® Ø§Ù„Ø¥ÙƒÙ…Ø§Ù„</th>
+                        <th>تاريخ الإكمال</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -178,26 +178,26 @@
                     <template x-if="!loading && logs.length === 0">
                         <tr><td colspan="7" class="text-center p-8 text-slate-400">
                             <i class="fas fa-inbox text-3xl mb-2"></i>
-                            <p>Ù„Ø§ ØªÙˆØ¬Ø¯ Ø³Ø¬Ù„Ø§Øª</p>
+                            <p>لا توجد سجلات</p>
                         </td></tr>
                     </template>
                     <template x-for="m in logs" :key="m.id">
                         <tr>
-                            <td class="font-mono text-xs" x-text="m.id || 'â€”'"></td>
+                            <td class="font-mono text-xs" x-text="m.id || '—'"></td>
                             <td>
-                                <div class="font-medium" x-text="m.depositor_alias || 'â€”'"></div>
+                                <div class="font-medium" x-text="m.depositor_alias || '—'"></div>
                                 <div class="text-xs text-slate-500" x-text="m.depositor_id || ''"></div>
                             </td>
                             <td>
-                                <div class="font-medium" x-text="m.withdrawer_alias || 'â€”'"></div>
+                                <div class="font-medium" x-text="m.withdrawer_alias || '—'"></div>
                                 <div class="text-xs text-slate-500" x-text="m.withdrawer_id || ''"></div>
                             </td>
                             <td class="font-bold" x-text="fmtAmount(m.amount, m.currency)"></td>
                             <td>
-                                <span class="px-2 py-0.5 rounded text-xs bg-purple-500/20 text-purple-400" x-text="m.company_name || 'â€”'"></span>
+                                <span class="px-2 py-0.5 rounded text-xs bg-purple-500/20 text-purple-400" x-text="m.company_name || '—'"></span>
                             </td>
                             <td x-html="statusBadge(m.status)"></td>
-                            <td class="text-xs text-slate-400" x-text="m.completed_at || m.created_at || 'â€”'"></td>
+                            <td class="text-xs text-slate-400" x-text="m.completed_at || m.created_at || '—'"></td>
                         </tr>
                     </template>
                 </tbody>
@@ -208,29 +208,29 @@
     <!-- Match Detail Modal -->
     <div x-show="showDetail" x-transition class="modal-overlay" @click.self="showDetail = false" style="display:none">
         <div class="modal" style="max-width:600px">
-            <h3 class="font-bold text-lg mb-3">ØªÙØ§ØµÙŠÙ„ Ø§Ù„Ù…Ø·Ø§Ø¨Ù‚Ø©</h3>
+            <h3 class="font-bold text-lg mb-3">تفاصيل المطابقة</h3>
             <template x-if="selectedMatch">
                 <div class="space-y-4">
                     <div class="grid grid-cols-2 gap-3 text-sm">
                         <div><span class="text-slate-400">ID:</span> <span class="font-mono" x-text="selectedMatch.id"></span></div>
-                        <div><span class="text-slate-400">Ø§Ù„Ù…Ø¨Ù„Øº:</span> <span class="font-bold" x-text="fmtAmount(selectedMatch.amount, selectedMatch.currency)"></span></div>
-                        <div><span class="text-slate-400">Ø§Ù„Ù…ÙˆØ¯Ø¹:</span> <span x-text="selectedMatch.depositor_id"></span></div>
-                        <div><span class="text-slate-400">Ø§Ù„Ø³Ø§Ø­Ø¨:</span> <span x-text="selectedMatch.withdrawer_id"></span></div>
-                        <div><span class="text-slate-400">Ø§Ù„Ø´Ø±ÙƒØ©:</span> <span x-text="selectedMatch.company_name"></span></div>
-                        <div><span class="text-slate-400">Ø§Ù„Ø­Ø§Ù„Ø©:</span> <span x-html="statusBadge(selectedMatch.status)"></span></div>
-                        <div><span class="text-slate-400">Ø§Ù„ÙƒÙˆØ¯:</span> <span class="font-mono text-xs" x-text="selectedMatch.confirmation_code || 'â€”'"></span></div>
-                        <div><span class="text-slate-400">Ø§Ù„Ù†Ø²Ø§Ø¹:</span> <span x-text="selectedMatch.dispute_status || 'none'"></span></div>
+                        <div><span class="text-slate-400">المبلغ:</span> <span class="font-bold" x-text="fmtAmount(selectedMatch.amount, selectedMatch.currency)"></span></div>
+                        <div><span class="text-slate-400">المودع:</span> <span x-text="selectedMatch.depositor_id"></span></div>
+                        <div><span class="text-slate-400">الساحب:</span> <span x-text="selectedMatch.withdrawer_id"></span></div>
+                        <div><span class="text-slate-400">الشركة:</span> <span x-text="selectedMatch.company_name"></span></div>
+                        <div><span class="text-slate-400">الحالة:</span> <span x-html="statusBadge(selectedMatch.status)"></span></div>
+                        <div><span class="text-slate-400">الكود:</span> <span class="font-mono text-xs" x-text="selectedMatch.confirmation_code || '—'"></span></div>
+                        <div><span class="text-slate-400">النزاع:</span> <span x-text="selectedMatch.dispute_status || 'none'"></span></div>
                     </div>
                     
                     <!-- Chat messages -->
                     <div>
-                        <h4 class="text-sm font-semibold mb-2">ðŸ’¬ Ø±Ø³Ø§Ø¦Ù„ Ø§Ù„Ø¯Ø±Ø¯Ø´Ø©</h4>
+                        <h4 class="text-sm font-semibold mb-2">💬 رسائل الدردشة</h4>
                         <div class="bg-slate-900/50 rounded-lg p-3 max-h-48 overflow-y-auto space-y-2">
                             <template x-if="chatLoading">
                                 <p class="text-center text-slate-400 text-sm"><i class="fas fa-spinner fa-spin"></i></p>
                             </template>
                             <template x-if="!chatLoading && chatMessages.length === 0">
-                                <p class="text-center text-slate-500 text-sm">Ù„Ø§ ØªÙˆØ¬Ø¯ Ø±Ø³Ø§Ø¦Ù„</p>
+                                <p class="text-center text-slate-500 text-sm">لا توجد رسائل</p>
                             </template>
                             <template x-for="msg in chatMessages" :key="msg.id">
                                 <div class="text-sm p-2 rounded-lg" :class="msg.sender_id === selectedMatch.depositor_id ? 'bg-blue-500/10' : 'bg-green-500/10'">
@@ -244,11 +244,11 @@
 
                     <!-- Dispute resolution -->
                     <div x-show="selectedMatch.dispute_status === 'open'">
-                        <h4 class="text-sm font-semibold mb-2">âš–ï¸ Ø­Ù„ Ø§Ù„Ù†Ø²Ø§Ø¹</h4>
+                        <h4 class="text-sm font-semibold mb-2">⚖️ حل النزاع</h4>
                         <div class="flex gap-2">
-                            <button @click="resolveDispute(selectedMatch.id, 'depositor')" class="btn btn-primary btn-sm flex-1">âœ… Ù„ØµØ§Ù„Ø­ Ø§Ù„Ù…ÙˆØ¯Ø¹</button>
-                            <button @click="resolveDispute(selectedMatch.id, 'withdrawer')" class="btn btn-success btn-sm flex-1">âœ… Ù„ØµØ§Ù„Ø­ Ø§Ù„Ø³Ø§Ø­Ø¨</button>
-                            <button @click="resolveDispute(selectedMatch.id, 'cancel')" class="btn btn-danger btn-sm flex-1">âŒ Ø¥Ù„ØºØ§Ø¡</button>
+                            <button @click="resolveDispute(selectedMatch.id, 'depositor')" class="btn btn-primary btn-sm flex-1">✅ لصالح المودع</button>
+                            <button @click="resolveDispute(selectedMatch.id, 'withdrawer')" class="btn btn-success btn-sm flex-1">✅ لصالح الساحب</button>
+                            <button @click="resolveDispute(selectedMatch.id, 'cancel')" class="btn btn-danger btn-sm flex-1">❌ إلغاء</button>
                         </div>
                     </div>
 
@@ -320,24 +320,24 @@ function matchingApp() {
         },
 
         async approveRequest(id) {
-            if (!confirm('Ù‡Ù„ Ø£Ù†Øª Ù…ØªØ£ÙƒØ¯ Ù…Ù† Ù‚Ø¨ÙˆÙ„ Ù‡Ø°Ø§ Ø§Ù„Ø·Ù„Ø¨ØŸ')) return;
+            if (!confirm('هل أنت متأكد من قبول هذا الطلب؟')) return;
             try {
                 await api('/api/matching/' + id + '/approve', { method: 'POST', body: '{}' });
-                toast('ØªÙ… Ù‚Ø¨ÙˆÙ„ Ø§Ù„Ø·Ù„Ø¨', 'success');
+                toast('تم قبول الطلب', 'success');
                 this.loadAll();
             } catch (e) {
-                toast('ÙØ´Ù„ Ù‚Ø¨ÙˆÙ„ Ø§Ù„Ø·Ù„Ø¨', 'error');
+                toast('فشل قبول الطلب', 'error');
             }
         },
 
         async rejectRequest(id) {
-            if (!confirm('Ù‡Ù„ Ø£Ù†Øª Ù…ØªØ£ÙƒØ¯ Ù…Ù† Ø±ÙØ¶ Ù‡Ø°Ø§ Ø§Ù„Ø·Ù„Ø¨ØŸ')) return;
+            if (!confirm('هل أنت متأكد من رفض هذا الطلب؟')) return;
             try {
                 await api('/api/matching/' + id + '/reject', { method: 'POST', body: '{}' });
-                toast('ØªÙ… Ø±ÙØ¶ Ø§Ù„Ø·Ù„Ø¨', 'success');
+                toast('تم رفض الطلب', 'success');
                 this.loadAll();
             } catch (e) {
-                toast('ÙØ´Ù„ Ø±ÙØ¶ Ø§Ù„Ø·Ù„Ø¨', 'error');
+                toast('فشل رفض الطلب', 'error');
             }
         },
 
@@ -359,13 +359,13 @@ function matchingApp() {
         },
 
         async resolveDispute(matchId, favor) {
-            if (!confirm('Ø­Ù„ Ø§Ù„Ù†Ø²Ø§Ø¹: ' + favor + 'ØŸ')) return;
+            if (!confirm('حل النزاع: ' + favor + '؟')) return;
             try {
                 await api('/api/matching/' + matchId + '/resolve-dispute', { method: 'POST', body: JSON.stringify({ favor }) });
-                toast('ØªÙ… Ø­Ù„ Ø§Ù„Ù†Ø²Ø§Ø¹', 'success');
+                toast('تم حل النزاع', 'success');
                 this.showDetail = false;
                 this.loadAll();
-            } catch(e) { toast('ÙØ´Ù„ Ø­Ù„ Ø§Ù„Ù†Ø²Ø§Ø¹', 'error'); }
+            } catch(e) { toast('فشل حل النزاع', 'error'); }
         }
     }
 }
