@@ -110,6 +110,63 @@ def _get_name(uid):
         return row.get('name', '') if row else ''
     except: return ''
 
+def _get_user_phone(uid):
+    """قراءة رقم هاتف المستخدم من users.csv"""
+    try:
+        import csv as _csv
+        with open('users.csv', 'r', encoding='utf-8-sig') as f:
+            for row in _csv.DictReader(f):
+                if row.get('telegram_id') == str(uid):
+                    return row.get('phone', '') or row.get('phone_number', '') or ''
+    except: pass
+    return ''
+
+def _mask_name(name, phone):
+    """إخفاء الاسم بنجوم + إظهار آخر 4 أرقام من الهاتف"""
+    # الاسم: أول حرف + نجوم
+    if name and len(name) > 1:
+        masked = name[0] + '*' * (len(name) - 1)
+    elif name:
+        masked = name[0] + '**'
+    else:
+        masked = 'لاعب'
+    # الهاتف: آخر 4 أرقام
+    if phone and len(phone) >= 4:
+        masked += ' •' + phone[-4:]
+    return masked
+
+def _get_real_players(current_mult):
+    """جمع الرهانات الحقيقية من اللاعبين الفعليين في الجولة الحالية.
+    الأسماء مخفية بنجوم + آخر 4 أرقام من الهاتف."""
+    result = []
+    with _lock:
+        for uid, bet in list(_state['bets'].items()):
+            name = _get_name(uid)
+            phone = _get_user_phone(uid)
+            masked_name = _mask_name(name, phone)
+            avatar = (name or '?')[0].upper() if name else '★'
+            if bet['cashed_out']:
+                mult = bet.get('cash_mult', 0)
+                payout = round(bet['amount'] * mult, 2) if mult > 0 else 0
+                result.append({
+                    'name': masked_name, 'avatar': avatar,
+                    'bet': bet['amount'], 'multiplier': mult,
+                    'payout': payout, 'status': 'cashed', 'real': True,
+                })
+            elif _state['phase'] == 'crashed':
+                result.append({
+                    'name': masked_name, 'avatar': avatar,
+                    'bet': bet['amount'], 'multiplier': 0,
+                    'payout': 0, 'status': 'lost', 'real': True,
+                })
+            else:
+                result.append({
+                    'name': masked_name, 'avatar': avatar,
+                    'bet': bet['amount'], 'multiplier': 0,
+                    'payout': 0, 'status': 'participating', 'real': True,
+                })
+    return result
+
 # ── Game loop (daemon, runs forever) ────────────────────
 def _game_loop():
     while True:
@@ -335,8 +392,12 @@ def init_aviator_engine(app, get_uid, get_gm, get_pf, is_pf, is_vex):
                     'cash_mult': b.get('cash_mult', 0),
                     'auto_val': b.get('auto_val', 0),
                 }
-            # توليد لاعبين وهميين للمشاركة في الجولة الحالية
+            # توليد لاعبين وهميين + دمج اللاعبين الحقيقيين
             fake_players = _generate_fake_players(_server_mult())
+            real_players = _get_real_players(current_mult)
+            all_players = real_players + fake_players
+            # ترتيب: الفائزين أولاً
+            all_players.sort(key=lambda x: (-x['payout'], 0 if x['status'] != 'lost' else 1))
             return jsonify({
                 'phase': _state['phase'],
                 'multiplier': round(_server_mult(), 2),
@@ -344,7 +405,7 @@ def init_aviator_engine(app, get_uid, get_gm, get_pf, is_pf, is_vex):
                 'round_id': _state['round_id'],
                 'history': list(_state['history'][-15:]),
                 'my_bet': my_bets,
-                'players': fake_players,
+                'players': all_players,
             })
 
 # ===== لاعبين وهميون — بيانات للعرض فقط =====
