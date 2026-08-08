@@ -104,11 +104,8 @@ def _broadcast(msg):
             except: pass
 
 def _get_name(uid):
-    try:
-        from db_manager import _gdb
-        row = _gdb.get_user_row(uid)
-        return row.get('name', '') if row else ''
-    except: return ''
+    """قراءة اسم المستخدم — مؤقتاً معطل لمنع البطء"""
+    return ''
 
 def _get_user_phone(uid):
     """قراءة رقم هاتف المستخدم — مؤقتاً معطل لمنع البطء"""
