@@ -98,19 +98,20 @@
     <div class="recovery-msg" id="recoveryMsg"></div>
     <div class="big-win-overlay" id="bigWin"><div class="big-win-text" id="bigWinText"></div></div>
   </div>
-  <!-- رهان واحد فقط — لا يوجد رهان 2 -->
+  <!-- مربعي الرهان — بدون ½ و 2× -->
   <div class="bet-panel">
-    <div class="bet-controls">
-      <div class="bet-ctrl" onclick="adjustBet(0.5)">½</div>
-      <div class="bet-ctrl" onclick="adjustBet(2)">2×</div>
-      <div class="bet-ctrl" onclick="setBetMin()">Min</div>
-      <div class="bet-ctrl" onclick="setBetMax()">Max</div>
+    <div class="bet-slots">
+      <div class="bet-slot active" id="slot1">
+        <div class="bet-slot-header"><span class="bet-slot-label">رهان 1</span></div>
+        <input type="number" class="bet-slot-input" id="bet1" value="10" min="1">
+        <button class="bet-slot-btn bet" id="btn1" onclick="handleBetClick(1)">رهان</button>
+      </div>
+      <div class="bet-slot" id="slot2">
+        <div class="bet-slot-header"><span class="bet-slot-label">رهان 2</span></div>
+        <input type="number" class="bet-slot-input" id="bet2" value="0" min="0">
+        <button class="bet-slot-btn bet" id="btn2" onclick="handleBetClick(2)" disabled>رهان</button>
+      </div>
     </div>
-    <div style="position:relative">
-      <input type="number" class="bet-input" id="betInput" value="10" min="1">
-      <span class="bet-cur" id="betCur">EGP</span>
-    </div>
-    <button class="bet-btn bet" id="betBtn" onclick="handleBetClick()">رهان</button>
   </div>
   <div class="lp-bar"><div class="lp-header"><span>👥 <span class="lp-count" id="lpCount">0</span></span><span id="lpTotal">💰 0</span></div><div class="lp-list" id="lpList"></div></div>
 </div>
@@ -120,10 +121,14 @@
 var canvas = document.getElementById('canvas');
 var ctx = canvas.getContext('2d');
 
-// ── State ── رهان واحد فقط، لا auto-cashout ──
+// ── State ── مربعي رهان ──
 var roundPhase = 'connecting';
 var currentMult = 1.0;
-var myBet = { placed: false, amount: 0, cashed: false, queued: false };
+var myBets = {
+  1: {placed:false, amount:0, cashed:false, queued:false},
+  2: {placed:false, amount:0, cashed:false, queued:false}
+};
+var slotActive = {1: true, 2: false};
 var animF = null, _flyStartT = 0, trail = [];
 var sessionW = 0, sessionL = 0, sessionPL = 0;
 var weather = 'day', lightningFlash = 0, rainDrops = [], bgStars = [];
@@ -234,10 +239,13 @@ function connectSSE() {
   aviatorSSE.onmessage = function(e) {
     try {
       var d = JSON.parse(e.data);
+      // Handle ALL possible types including initial state
       if (d.type === 'waiting') onWaiting(d);
       else if (d.type === 'flight_start') onFlightStart(d);
-      else if (d.type === 'cashout') onCashoutMsg(d);
+      else if (d.type === 'flying') onFlyingState(d);  // العميل فتح في نص الطيران
       else if (d.type === 'crashed') onCrash(d);
+      else if (d.type === 'cashout') onCashoutMsg(d);
+      else if (d.type === 'heartbeat') { /* تجاهل */ }
     } catch(err) {}
   };
   aviatorSSE.onerror = function() {
@@ -264,19 +272,17 @@ function onWaiting(d) {
   // إعادة تعيين زر الرهان
   var btn = document.getElementById('betBtn');
   // لو الرهان كان queued → ضعه تلقائياً
-  if (myBet.queued) {
-    myBet.queued = false;
-    var amt = parseFloat(document.getElementById('betInput').value) || 0;
-    if (amt >= 1) { sendBet(amt); return; }
+  for (var si=1; si<=2; si++) {
+    var s = si;
+    if (myBets[s].queued) {
+      myBets[s].queued = false;
+      var amt = parseFloat(document.getElementById('bet'+s).value) || 0;
+      if (amt >= 1) { sendBet(s, amt); }
+    }
+    myBets[s].placed = false; myBets[s].cashed = false;
+    var btn = document.getElementById('btn'+s);
+    btn.disabled = false; btn.textContent = 'رهان'; btn.className = 'bet-slot-btn bet'; btn.style.background=''; btn.style.color=''; btn.style.display='block';
   }
-  // لو الرهان السابق لم يقفز → خسارة
-  if (myBet.placed && !myBet.cashed) {
-    // تمت معالجة الخسارة في onCrash
-  }
-  // إعادة تعيين الحالة
-  myBet.placed = false; myBet.cashed = false;
-  // زر الرهان
-  btn.disabled = false; btn.textContent = 'رهان'; btn.className = 'bet-btn bet';
   // History
   if (d.history) {
     var h = document.getElementById('history'); h.innerHTML = '';
@@ -296,6 +302,12 @@ function onWaiting(d) {
   syncGameStateMainButton();
 }
 
+// العميل فتح في نص الطيران — ابدأ الأنيمشن فوراً
+function onFlyingState(d) {
+  if (roundPhase === 'flying') return; // Already flying
+  onFlightStart(d);
+}
+
 function onFlightStart(d) {
   roundPhase = 'flying';
   _flyStartT = performance.now();
@@ -307,15 +319,18 @@ function onFlightStart(d) {
   document.getElementById('statusText').textContent = '';
   document.getElementById('crashMsg').classList.remove('show');
   // لو راهن → غيّر الزر لزر السحب
-  var btn = document.getElementById('betBtn');
-  if (myBet.placed && !myBet.cashed) {
-    btn.className = 'bet-btn cashout';
-    btn.textContent = '💰 سحب'; btn.disabled = false;
-  } else {
-    // لم يراهن → زر طابور الجولة القادمة
-    btn.className = 'bet-btn queued';
-    btn.textContent = '⏳ الجولة القادمة'; btn.disabled = false;
-    btn.onclick = function() { queueBet(); };
+  var btn = document.getElementById('btn1');
+  for (var si=1; si<=2; si++) {
+    var s = si;
+    if (myBets[s].placed && !myBets[s].cashed) {
+      var b = document.getElementById('btn'+s);
+      b.className = 'bet-slot-btn cashout';
+      b.textContent = '💰 سحب'; b.disabled = false;
+    } else {
+      var b2 = document.getElementById('btn'+s);
+      b2.className = 'bet-slot-btn queued';
+      b2.textContent = '⏳ القادمة'; b2.disabled = false;
+    }
   }
   haptic('light');
   if (animF) cancelAnimationFrame(animF);
@@ -371,13 +386,13 @@ function onCrash(d) {
   msg.textContent = '💥 ' + d.crash_point.toFixed(2) + 'x'; msg.style.color = 'var(--red)'; msg.classList.add('show');
   createExplosion();
   // عرض الأموال المحترقة
-  if (myBet.placed && !myBet.cashed) {
+  if (myBets[1].placed && !myBets[1].cashed) {
     var burnedEl = document.getElementById('recoveryMsg');
-    burnedEl.innerHTML = '🔥 <b>انفجرت أموالك!</b><br><span style="color:#ff4757;font-weight:900;font-size:16px">' + myBet.amount.toFixed(0) + '</span> احترقت مع الطائرة';
+    burnedEl.innerHTML = '🔥 <b>انفجرت أموالك!</b><br><span style="color:#ff4757;font-weight:900;font-size:16px">' + myBets[1].amount.toFixed(0) + '</span> احترقت مع الطائرة';
     burnedEl.style.color = '#ff4757';
     burnedEl.classList.add('show');
     setTimeout(function() { burnedEl.classList.remove('show'); }, 4000);
-    sessionL++; sessionPL -= myBet.amount;
+    sessionL++; sessionPL -= myBets[1].amount;
   }
   if (d.server_seed) {
     var pfEl = document.createElement('div');
@@ -387,66 +402,65 @@ function onCrash(d) {
     setTimeout(function() { pfEl.remove(); }, 6000);
   }
   soundCrash(); haptic('heavy');
-  if (myBet.placed && !myBet.cashed) { streakWin = 0; updateStreak(document.getElementById('streak')); }
+  if (myBets[1].placed && !myBets[1].cashed && myBets[2].placed && !myBets[2].cashed) { streakWin = 0; updateStreak(document.getElementById('streak')); }
   addHistory('history', d.crash_point, false, d.crash_point >= 3);
   updateSessionStats();
   // تحديث الرصيد من السيرفر
   loadBalance();
   // زر الرهان يعود للحالة العادية
-  var btn = document.getElementById('betBtn');
-  btn.disabled = true; btn.textContent = '⏳'; btn.className = 'bet-btn bet';
+  for (var si=1; si<=2; si++) {
+    var s = si;
+    var b = document.getElementById('btn'+s);
+    b.disabled = true; b.textContent = '⏳'; b.className = 'bet-slot-btn bet';
+  }
   syncGameStateMainButton();
 }
 
 // ── Bet Logic ── رهان واحد فقط ──
-function handleBetClick() {
+function handleBetClick(slot) {
   if (roundPhase === 'flying') {
-    // السحب (Cashout)
-    if (myBet.placed && !myBet.cashed) doCashout();
+    if (myBets[slot].placed && !myBets[slot].cashed) doCashout(slot);
     return;
   }
   if (roundPhase === 'waiting') {
-    // وضع رهان
-    var amt = parseFloat(document.getElementById('betInput').value) || 0;
+    var amt = parseFloat(document.getElementById('bet'+slot).value) || 0;
     if (amt < 1) { showToast('أدخل مبلغ الرهان', 'error'); return; }
-    sendBet(amt);
+    sendBet(slot, amt);
     return;
   }
-  // أثناء الطيران أو الانفجار → طابور الجولة القادمة
-  queueBet();
+  var amt2 = parseFloat(document.getElementById('bet'+slot).value) || 0;
+  if (amt2 < 1) { showToast('أدخل مبلغ الرهان', 'error'); return; }
+  queueBet(slot, amt2);
 }
 
-function queueBet() {
-  var amt = parseFloat(document.getElementById('betInput').value) || 0;
-  if (amt < 1) { showToast('أدخل مبلغ الرهان', 'error'); return; }
-  myBet.queued = true; myBet.amount = amt;
-  var btn = document.getElementById('betBtn');
-  btn.textContent = '⏳ الجولة القادمة'; btn.className = 'bet-btn queued'; btn.disabled = true;
-  showToast('✅ سيتم رهنك تلقائياً في الجولة القادمة', 'success');
+function queueBet(slot, amt) {
+  myBets[slot].queued = true; myBets[slot].amount = amt;
+  var btn = document.getElementById('btn'+slot);
+  btn.textContent = '⏳ القادمة'; btn.className = 'bet-slot-btn queued'; btn.disabled = true;
+  showToast('✅ سيتم رهنك في الجولة القادمة', 'success');
 }
 
-function sendBet(amt) {
-  var btn = document.getElementById('betBtn');
-  btn.disabled = true; btn.textContent = '⏳'; btn.className = 'bet-btn bet';
+function sendBet(slot, amt) {
+  var btn = document.getElementById('btn'+slot);
+  btn.disabled = true; btn.textContent = '⏳';
   checkBalanceBeforeBet(amt).then(function(ok) {
     if (!ok) { btn.disabled = false; btn.textContent = 'رهان'; return; }
-    var reqId = 'b_' + Date.now() + '_' + Math.random().toString(36).substr(2,6);
+    var reqId = 'b'+slot+'_' + Date.now() + '_' + Math.random().toString(36).substr(2,6);
     var timedOut = false;
     var to = setTimeout(function() { timedOut = true; btn.disabled = false; btn.textContent = 'رهان'; showToast('انتهت المهلة', 'error'); }, 8000);
     apiFetchCritical(BASE+'/api/aviator/bet?uid='+uid, { method:'POST', body:JSON.stringify({uid:uid, bet_amount:amt, auto_val:0, request_id:reqId}) })
     .then(function(r) { return r.json(); }).then(function(d) {
       clearTimeout(to); if (timedOut) return;
       if (d.success) {
-        myBet.placed = true; myBet.amount = amt; myBet.cashed = false; myBet.queued = false;
+        myBets[slot].placed = true; myBets[slot].amount = amt; myBets[slot].cashed = false; myBets[slot].queued = false;
         document.getElementById('bal').textContent = d.balance_after.toLocaleString();
-        btn.textContent = '✓ راهنت'; btn.className = 'bet-btn done'; btn.disabled = true;
-        addOtherBet(amt);
-        // أثناء الطيران → غيّر الزر لزر السحب
+        btn.textContent = '✓ راهنت'; btn.style.background = 'linear-gradient(135deg,#1a5c2e,#0d7a1f)';
+        addOtherBet(slot, amt);
         if (roundPhase === 'flying') {
-          btn.className = 'bet-btn cashout'; btn.textContent = '💰 سحب'; btn.disabled = false;
+          btn.className = 'bet-slot-btn cashout'; btn.textContent = '💰 سحب'; btn.disabled = false;
         }
       } else {
-        btn.disabled = false; btn.textContent = 'رهان'; btn.className = 'bet-btn bet';
+        btn.disabled = false; btn.textContent = 'رهان';
         if (d.need_deposit) showVexDepositModal(amt);
         else showToast(d.error || 'خطأ', 'error');
       }
@@ -454,13 +468,13 @@ function sendBet(amt) {
   });
 }
 
-function doCashout() {
-  if (roundPhase !== 'flying' || !myBet.placed || myBet.cashed) return;
-  myBet.cashed = true;
-  var payout = _floorMoney(myBet.amount * currentMult);
-  var btn = document.getElementById('betBtn');
-  btn.className = 'bet-btn done'; btn.disabled = true;
-  btn.textContent = '✓ ' + payout.toFixed(0);
+function doCashout(slot) {
+  if (roundPhase !== 'flying' || !myBets[slot].placed || myBets[slot].cashed) return;
+  myBets[slot].cashed = true;
+  var payout = _floorMoney(myBets[slot].amount * currentMult);
+  var btn = document.getElementById('btn'+slot);
+  btn.className = 'bet-slot-btn'; btn.style.background = 'var(--surface-3)'; btn.style.color = 'var(--muted)';
+  btn.textContent = '✓ ' + payout.toFixed(0); btn.disabled = true;
   var msg = document.getElementById('crashMsg');
   msg.textContent = '✅ +' + payout.toFixed(2) + ' @ ' + currentMult.toFixed(2) + 'x';
   msg.style.color = 'var(--gold)'; msg.classList.add('show');
@@ -468,13 +482,12 @@ function doCashout() {
   soundCashOut(); haptic('medium'); fireConfetti(document.getElementById('gameArea'));
   if (currentMult >= 3) showBigWin(payout, currentMult);
   streakWin++; updateStreak(document.getElementById('streak'));
-  sessionW++; sessionPL += payout - myBet.amount; updateSessionStats();
-  var reqId = 'c_' + Date.now() + '_' + Math.random().toString(36).substr(2,6);
+  sessionW++; sessionPL += payout - myBets[slot].amount; updateSessionStats();
+  var reqId = 'c'+slot+'_' + Date.now() + '_' + Math.random().toString(36).substr(2,6);
   apiFetchCritical(BASE+'/api/aviator/cashout?uid='+uid, { method:'POST', body:JSON.stringify({uid:uid, request_id:reqId}) })
   .then(function(r) { return r.json(); }).then(function(d) {
     if (d.success && d.balance_after !== undefined) document.getElementById('bal').textContent = d.balance_after.toLocaleString();
   }).catch(function() {});
-  syncGameStateMainButton();
 }
 
 // ── Helpers ──
@@ -488,18 +501,19 @@ function spawnParachute(name, amount, fromLeft) {
   layer.appendChild(el);
   setTimeout(function() { el.remove(); }, 3000);
 }
-function adjustBet(f) { var i = document.getElementById('betInput'); var v = parseFloat(i.value)||0; v = Math.max(1, Math.floor(v*f)); i.value = v; }
-function setBetMin() { document.getElementById('betInput').value = 10; }
-function setBetMax() { document.getElementById('betInput').value = 5000; }
+function adjustBet(slot, f) { var i = document.getElementById('bet'+slot); var v = parseFloat(i.value)||0; v = Math.max(1, Math.floor(v*f)); i.value = v; }
+function setBetMin(slot) { document.getElementById('bet'+slot).value = 10; }
+function setBetMax(slot) { document.getElementById('bet'+slot).value = 5000; }
 function updateSessionStats() { document.getElementById('sWin').textContent = sessionW; document.getElementById('sLoss').textContent = sessionL; document.getElementById('sPL').textContent = sessionPL >= 0 ? '+'+sessionPL.toFixed(0) : sessionPL.toFixed(0); }
-function addOtherBet(amt) { var c = document.getElementById('otherBets'); var e = document.createElement('div'); e.className = 'other-bet active'; e.innerHTML = '<div class="avatar">أ</div><span>'+amt+'</span>'; c.appendChild(e); }
+function addOtherBet(slot, amt) { var c = document.getElementById('otherBets'); var e = document.createElement('div'); e.className = 'other-bet active'; e.id='ob'+slot; e.innerHTML = '<div class="avatar">أ</div><span>'+amt+'</span>'; c.appendChild(e); }
 function createExplosion() { var a = document.getElementById('gameArea'); for (var i=0;i<20;i++) { var p = document.createElement('div'); p.style.cssText = 'position:absolute;width:4px;height:4px;border-radius:50%;pointer-events:none;z-index:20;left:'+planeX+'px;top:'+planeY+'px;background:'+['#ff4757','#fbbf24','#ff8c42'][i%3]; a.appendChild(p); var ang = (i/20)*6.28, dist = 60+Math.random()*100; p.animate([{transform:'translate(0,0) scale(1)',opacity:1},{transform:'translate('+Math.cos(ang)*dist+'px,'+Math.sin(ang)*dist+'px) scale(0)',opacity:0}],{duration:800,easing:'ease-out'}); setTimeout(function() { p.remove(); }, 800); } }
 function showBigWin(p, m) { var o = document.getElementById('bigWin'); document.getElementById('bigWinText').textContent = '🎉 +'+p.toFixed(0)+' @ '+m.toFixed(2)+'x'; o.classList.add('show'); soundWin(true); setTimeout(function() { o.classList.remove('show'); }, 2500); }
 function _floorMoney(val) { return Math.floor((parseFloat(val) || 0) * 100) / 100; }
 function syncGameStateMainButton() {
-  if (roundPhase === 'waiting') { syncMainButton('رهان', function() { handleBetClick(); }); }
+  if (roundPhase === 'waiting') { syncMainButton('رهان', function() { handleBetClick(1); }); }
   else if (roundPhase === 'flying') {
-    if (myBet.placed && !myBet.cashed) syncMainButton('💰 سحب', function() { doCashout(); });
+    if (myBets[1].placed && !myBets[1].cashed) syncMainButton('💰 سحب', function() { doCashout(1); });
+    else if (myBets[2].placed && !myBets[2].cashed) syncMainButton('💰 سحب', function() { doCashout(2); });
     else hideMainButton();
   } else { hideMainButton(); }
 }
