@@ -335,6 +335,8 @@ def init_aviator_engine(app, get_uid, get_gm, get_pf, is_pf, is_vex):
                     'cash_mult': b.get('cash_mult', 0),
                     'auto_val': b.get('auto_val', 0),
                 }
+            # توليد لاعبين وهميين للمشاركة في الجولة الحالية
+            fake_players = _generate_fake_players(d.get('multiplier', _server_mult()))
             return jsonify({
                 'phase': _state['phase'],
                 'multiplier': round(_server_mult(), 2),
@@ -342,7 +344,70 @@ def init_aviator_engine(app, get_uid, get_gm, get_pf, is_pf, is_vex):
                 'round_id': _state['round_id'],
                 'history': list(_state['history'][-15:]),
                 'my_bet': my_bets,
+                'players': fake_players,
             })
+
+# ===== لاعبين وهميون — بيانات للعرض فقط =====
+import string as _str
+
+_FAKE_NAMES = [
+    'أحمد','عمر','محمد','خالد','سعد','فهد','ناصر','يوسف','علي','حسن',
+    'ماجد','وليد','طارق','بدر','راشد','عبدالله','سلطان','فيصل','نايف',
+    'تركي','دانا','نورة','ريم','سارة','لمى','شهد','جود','هند','روان'
+]
+_FAKE_PLAYERS = []
+_FAKE_PLAYER_COUNT = 0
+
+def _init_fake_players():
+    """توليد 1000 حساب وهمي ببيانات عشوائية"""
+    global _FAKE_PLAYERS, _FAKE_PLAYER_COUNT
+    _FAKE_PLAYERS = []
+    for i in range(1000):
+        name = _FAKE_NAMES[i % len(_FAKE_NAMES)] + ' ' + str(random.randint(1, 999))
+        _FAKE_PLAYERS.append({
+            'id': i + 1,
+            'name': name,
+            'avatar': name[0],
+        })
+    _FAKE_PLAYER_COUNT = len(_FAKE_PLAYERS)
+    print(f'✅ Generated {_FAKE_PLAYER_COUNT} fake players')
+
+def _generate_fake_players(current_mult):
+    """توليد قائمة لاعبين وهميين للمشاركة في الجولة الحالية.
+    أرباحهم تتوافق مع قيمة الاكس الفعلية مضروبة في رهان عشوائي."""
+    if not _FAKE_PLAYERS:
+        _init_fake_players()
+    # عدد عشوائي من المشاركين (5-15)
+    count = random.randint(5, 15)
+    # اختيار عشوائي من الـ 1000 حساب
+    selected = random.sample(_FAKE_PLAYERS, min(count, len(_FAKE_PLAYERS)))
+    result = []
+    for p in selected:
+        # رهان عشوائي
+        bet = random.choice([10, 20, 50, 100, 200, 500, 1000])
+        # هل قفز أم لا؟ (60% قفزوا، 40% لم يقفزوا)
+        cashed = random.random() < 0.6
+        if cashed:
+            # قفز عند مضاعف عشوائي (بين 1.0 والـ current_mult)
+            jump_mult = round(random.uniform(1.0, max(1.1, current_mult)), 2)
+            payout = round(bet * jump_mult, 2)
+            status = 'cashed'
+        else:
+            # لم يقفز — خسارة
+            jump_mult = 0
+            payout = 0
+            status = 'lost'
+        result.append({
+            'name': p['name'],
+            'avatar': p['avatar'],
+            'bet': bet,
+            'multiplier': jump_mult,
+            'payout': payout,
+            'status': status,
+        })
+    # ترتيب: الأعلى ربحاً أولاً
+    result.sort(key=lambda x: x['payout'], reverse=True)
+    return result
 
 # Start the daemon thread — runs forever, even with 0 players
 _thread = threading.Thread(target=_game_loop, daemon=True)

@@ -61,6 +61,23 @@
 @keyframes jp{0%,100%{box-shadow:0 0 0 0 rgba(255,71,87,.5)}50%{box-shadow:0 0 0 10px rgba(255,71,87,0)}}
 @keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
 @keyframes fadeIn{from{opacity:0;transform:translate(-50%,10px)}to{opacity:1;transform:translate(-50%,0)}}
+/* شريط اللاعبين الوهميين */
+.players-panel{background:var(--surface);border-top:1px solid var(--border);flex-shrink:0;max-height:180px;overflow:hidden;display:flex;flex-direction:column}
+.players-header{display:flex;justify-content:space-between;align-items:center;padding:6px 12px;font-size:10px;color:var(--muted);border-bottom:1px solid var(--border)}
+.players-list{flex:1;overflow-y:auto;padding:4px 8px}
+.players-list::-webkit-scrollbar{width:3px}
+.players-list::-webkit-scrollbar-thumb{background:var(--border)}
+.prow{display:flex;align-items:center;justify-content:space-between;padding:4px 6px;border-radius:6px;margin:1px 0;font-size:11px;animation:pSlide .3s}
+@keyframes pSlide{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:translateX(0)}}
+.prow.win{background:rgba(0,231,1,.06)}
+.prow.lost{background:rgba(255,71,87,.04);opacity:.6}
+.prow .pavatar{width:18px;height:18px;border-radius:50%;background:#334155;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;margin-left:4px}
+.prow .pname{flex:1;font-weight:600;margin:0 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prow .pbet{font-family:'Courier New',monospace;font-weight:700;color:var(--muted);margin:0 6px}
+.prow .pmult{font-family:'Courier New',monospace;font-weight:700;padding:1px 5px;border-radius:4px;font-size:10px}
+.prow .pmult.win{background:rgba(0,231,1,.12);color:var(--green)}
+.prow .pmult.lost{background:rgba(255,71,87,.08);color:var(--red)}
+.prow .ppay{font-family:'Courier New',monospace;font-weight:700;color:var(--gold);margin-right:4px}
 </style>
 </head>
 <body>
@@ -116,7 +133,14 @@
       <button class="bet-btn idle" id="btn2" onclick="onBtn(2)" disabled>رهان</button>
     </div>
   </div>
-  <div class="lp-bar"><div class="lp-header"><span>👥 <span class="lp-count" id="lpCount">0</span></span><span id="lpTotal">💰 0</span></div><div class="lp-list" id="lpList"></div></div>
+  <!-- شريط اللاعبين الوهميين -->
+  <div class="players-panel" id="playersPanel">
+    <div class="players-header">
+      <span>👥 المشاركين (<span id="playersCount">0</span>)</span>
+      <span id="playersTotal">💰 0</span>
+    </div>
+    <div class="players-list" id="playersList"></div>
+  </div>
 </div>
 <script src="/static/js/game-base.js?v=20260808"></script>
 <script>
@@ -163,6 +187,34 @@ function handleState(d){
   if(np!==lastPhase){if(np==='waiting')onWaiting(d);else if(np==='flying')onFlying(d);else if(np==='crashed')onCrashed(d);lastPhase=np}
   else{if(np==='flying'){document.getElementById('mult').textContent=currentMult.toFixed(2)+'x';document.getElementById('planeMultVal').textContent=currentMult.toFixed(2)+'x'}}
   if(d.history){var h=document.getElementById('history');h.innerHTML='';d.history.forEach(function(v){var el=document.createElement('div');el.className='hist-item '+(v>=1.5?'hist-win':'hist-lose')+(v>=3?' hist-big':'');el.textContent=v.toFixed(2)+'x';h.appendChild(el)})}
+  // عرض اللاعبين الوهميين
+  if(d.players){renderFakePlayers(d.players)}
+}
+
+function renderFakePlayers(players){
+  var list=document.getElementById('playersList');
+  var count=document.getElementById('playersCount');
+  var total=document.getElementById('playersTotal');
+  if(!list)return;
+  count.textContent=players.length;
+  var totalBet=0;
+  list.innerHTML='';
+  players.forEach(function(p){
+    totalBet+=p.bet;
+    var row=document.createElement('div');
+    row.className='prow '+(p.status==='cashed'?'win':'lost');
+    var multHtml=p.status==='cashed'?
+      '<span class="pmult win">'+p.multiplier.toFixed(2)+'x</span>':
+      '<span class="pmult lost">—</span>';
+    var payHtml=p.status==='cashed'?
+      '<span class="ppay">+'+p.payout.toFixed(0)+'</span>':'';
+    row.innerHTML='<div class="pavatar">'+p.avatar+'</div>'+
+      '<span class="pname">'+p.name+'</span>'+
+      '<span class="pbet">'+p.bet+'</span>'+
+      multHtml+payHtml;
+    list.appendChild(row);
+  });
+  total.textContent='💰 '+totalBet.toLocaleString();
 }
 
 function setBtn(s,cls,txt){var b=document.getElementById('btn'+s);b.className='bet-btn '+cls;b.textContent=txt;b.disabled=false}
