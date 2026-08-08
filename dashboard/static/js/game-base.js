@@ -885,3 +885,56 @@ async function vSub() {
     } else { alert(d.error || 'خطأ'); }
   } catch (e) { alert('خطأ'); }
 }
+
+// ===== Phase 2: Shared Game Framework Additions =====
+
+// ---- Deposit Button Injection ----
+// Auto-injects a 💰 button into .topbar-right if not already present
+function injectDepositButton() {
+  var tr = document.querySelector('.topbar-right');
+  if (!tr || document.getElementById('depBtnTop')) return;
+  var btn = document.createElement('button');
+  btn.id = 'depBtnTop';
+  btn.className = 'btn-deposit-top';
+  btn.innerHTML = '💰';
+  btn.title = 'إيداع';
+  btn.onclick = function() { showVexDepositModal(0); };
+  tr.insertBefore(btn, tr.firstChild);
+}
+
+// ---- Balance Check Before Bet ----
+// Returns true if balance >= requiredAmount, otherwise shows deposit modal and returns false
+function checkBalanceBeforeBet(requiredAmount) {
+  var balEl = document.getElementById('bal');
+  var currentBal = balEl ? parseFloat(balEl.textContent.replace(/,/g, '')) || 0 : 0;
+  if (currentBal < requiredAmount) {
+    showVexDepositModal(requiredAmount);
+    return false;
+  }
+  return true;
+}
+
+// ---- Auto Deposit Check ----
+// On page load, fetches balance and shows deposit modal if below minimum
+async function autoDepositCheck(minAmount) {
+  try {
+    var r = await apiFetch(BASE + '/api/wallet/balance?uid=' + uid);
+    var d = await r.json();
+    if (d.balance !== undefined) {
+      var balEl = document.getElementById('bal');
+      if (balEl) balEl.textContent = (d.balance || 0).toLocaleString();
+      var curEl = document.getElementById('cur');
+      if (curEl && d.currency) curEl.textContent = d.currency;
+      if ((d.balance || 0) < (minAmount || 10)) {
+        setTimeout(function() { showVexDepositModal(minAmount || 10); }, 1500);
+      }
+    }
+  } catch(e) {}
+}
+
+// Auto-init deposit button when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', function() { setTimeout(injectDepositButton, 50); });
+} else {
+  setTimeout(injectDepositButton, 50);
+}
