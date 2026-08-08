@@ -159,7 +159,8 @@ def _game_loop():
         total_cashed_out = 0
         total_bets = len(_state['bets'])
 
-        # Internal loop: update multiplier + auto-cashout (NO broadcast per tick)
+        # Internal loop: update multiplier + auto-cashout + BROADCAST EVERY SECOND
+        _last_broadcast = 0
         while True:
             mult = _server_mult()
             with _lock:
@@ -180,6 +181,11 @@ def _game_loop():
                                    'amount': round(payout, 2),
                                    'multiplier': round(mult, 2),
                                    'auto': True})
+            # Broadcast multiplier every 1 second (so new SSE clients see updates)
+            _now = time.time()
+            if _now - _last_broadcast >= 1.0:
+                _last_broadcast = _now
+                _broadcast({'type': 'mult', 'multiplier': round(mult, 2)})
             if mult >= crash_pt:
                 break
             time.sleep(TICK_RATE)

@@ -243,6 +243,7 @@ function connectSSE() {
       if (d.type === 'waiting') onWaiting(d);
       else if (d.type === 'flight_start') onFlightStart(d);
       else if (d.type === 'flying') onFlyingState(d);  // العميل فتح في نص الطيران
+      else if (d.type === 'mult') { currentMult = d.multiplier; }  // تحديث المضاعف
       else if (d.type === 'crashed') onCrash(d);
       else if (d.type === 'cashout') onCashoutMsg(d);
       else if (d.type === 'heartbeat') { /* تجاهل */ }
