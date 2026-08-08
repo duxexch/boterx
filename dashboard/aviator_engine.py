@@ -429,61 +429,33 @@ def _init_fake_players():
     print(f'✅ Generated {_FAKE_PLAYER_COUNT} fake players')
 
 def _generate_fake_players(current_mult):
-    """توليد لاعبين وهميين حسب حالة الجولة.
-    - waiting: مشاركين فقط (بدون أرباح، بدون قفز)
-    - flying: بعضهم قفز بأرباح حقيقية (bet × mult)، الباقي مشارك
-    - crashed: الفائزين أخضر، الخاسرين أحمر
-    """
+    """توليد لاعبين وهميين — خفيف وسريع"""
     if not _FAKE_PLAYERS:
         _init_fake_players()
     phase = _state['phase']
-    count = random.randint(8, 20)
-    selected = random.sample(_FAKE_PLAYERS, min(count, len(_FAKE_PLAYERS)))
+    count = random.randint(5, 12)
+    # اختيار عشوائي سريع (مش sample كامل)
+    indices = [random.randint(0, len(_FAKE_PLAYERS)-1) for _ in range(count)]
     result = []
-    for p in selected:
-        bet = random.choice([10, 20, 50, 100, 200, 500, 1000])
+    for idx in indices:
+        p = _FAKE_PLAYERS[idx]
+        bet = random.choice([10, 20, 50, 100, 200, 500])
         if phase == 'waiting':
-            # مشاركين فقط — لم يربحوا بعد
-            result.append({
-                'name': p['name'], 'avatar': p['avatar'],
-                'bet': bet, 'multiplier': 0, 'payout': 0, 'status': 'participating',
-            })
+            result.append({'name': p['name'], 'avatar': p['avatar'], 'bet': bet, 'multiplier': 0, 'payout': 0, 'status': 'participating'})
         elif phase == 'flying':
-            # أثناء الطيران: 40% قفزوا بأرباح، 60% مشاركين
-            cashed = random.random() < 0.4
-            if cashed:
-                jump_mult = round(random.uniform(1.0, max(1.1, current_mult)), 2)
-                payout = round(bet * jump_mult, 2)
-                result.append({
-                    'name': p['name'], 'avatar': p['avatar'],
-                    'bet': bet, 'multiplier': jump_mult, 'payout': payout, 'status': 'cashed',
-                })
+            if random.random() < 0.4:
+                jm = round(random.uniform(1.0, max(1.1, current_mult)), 2)
+                result.append({'name': p['name'], 'avatar': p['avatar'], 'bet': bet, 'multiplier': jm, 'payout': round(bet*jm,2), 'status': 'cashed'})
             else:
-                result.append({
-                    'name': p['name'], 'avatar': p['avatar'],
-                    'bet': bet, 'multiplier': 0, 'payout': 0, 'status': 'participating',
-                })
+                result.append({'name': p['name'], 'avatar': p['avatar'], 'bet': bet, 'multiplier': 0, 'payout': 0, 'status': 'participating'})
         elif phase == 'crashed':
-            # بعد الانفجار: الفائزين أخضر، الخاسرين أحمر
-            cashed = random.random() < 0.5
-            if cashed:
-                jump_mult = round(random.uniform(1.0, max(1.1, current_mult)), 2)
-                payout = round(bet * jump_mult, 2)
-                result.append({
-                    'name': p['name'], 'avatar': p['avatar'],
-                    'bet': bet, 'multiplier': jump_mult, 'payout': payout, 'status': 'cashed',
-                })
+            if random.random() < 0.5:
+                jm = round(random.uniform(1.0, max(1.1, current_mult)), 2)
+                result.append({'name': p['name'], 'avatar': p['avatar'], 'bet': bet, 'multiplier': jm, 'payout': round(bet*jm,2), 'status': 'cashed'})
             else:
-                result.append({
-                    'name': p['name'], 'avatar': p['avatar'],
-                    'bet': bet, 'multiplier': 0, 'payout': 0, 'status': 'lost',
-                })
+                result.append({'name': p['name'], 'avatar': p['avatar'], 'bet': bet, 'multiplier': 0, 'payout': 0, 'status': 'lost'})
         else:
-            result.append({
-                'name': p['name'], 'avatar': p['avatar'],
-                'bet': bet, 'multiplier': 0, 'payout': 0, 'status': 'participating',
-            })
-    # ترتيب: الفائزين أولاً (بالأرباح)، ثم المشاركين، ثم الخاسرين
+            result.append({'name': p['name'], 'avatar': p['avatar'], 'bet': bet, 'multiplier': 0, 'payout': 0, 'status': 'participating'})
     result.sort(key=lambda x: (-x['payout'], 0 if x['status'] != 'lost' else 1))
     return result
 
