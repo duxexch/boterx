@@ -1,6 +1,6 @@
-{% extends 'base.html' %}
-{% block title %}بث رسالة — Boterx{% endblock %}
-{% block page_title %}📢 بث رسالة{% endblock %}
+﻿{% extends 'base.html' %}
+{% block title %}Ø¨Ø« Ø±Ø³Ø§Ù„Ø© â€” Boterx{% endblock %}
+{% block page_title %}ðŸ“¢ Ø¨Ø« Ø±Ø³Ø§Ù„Ø©{% endblock %}
 
 {% block content %}
 <div x-data="broadcastApp()" class="space-y-4 max-w-2xl">
@@ -10,9 +10,9 @@
             <div>
                 <label class="block text-sm text-slate-400 mb-1" data-i18n="message_type">Message Type</label>
                 <select x-model="type" class="input w-full">
-                    <option value="text">📝 نص</option>
-                    <option value="photo">📷 صورة</option>
-                    <option value="video">🎥 فيديو</option>
+                    <option value="text">ðŸ“ Ù†Øµ</option>
+                    <option value="photo">ðŸ“· ØµÙˆØ±Ø©</option>
+                    <option value="video">ðŸŽ¥ ÙÙŠØ¯ÙŠÙˆ</option>
                 </select>
             </div>
             <div>
@@ -21,11 +21,11 @@
             </div>
             <div class="flex items-center gap-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
                 <i class="fas fa-info-circle text-amber-400"></i>
-                <p class="text-xs text-amber-300">سيتم إضافة الرسالة لقائمة البث — البوت سيرسلها تلقائياً</p>
+                <p class="text-xs text-amber-300">Ø³ÙŠØªÙ… Ø¥Ø¶Ø§ÙØ© Ø§Ù„Ø±Ø³Ø§Ù„Ø© Ù„Ù‚Ø§Ø¦Ù…Ø© Ø§Ù„Ø¨Ø« â€” Ø§Ù„Ø¨ÙˆØª Ø³ÙŠØ±Ø³Ù„Ù‡Ø§ ØªÙ„Ù‚Ø§Ø¦ÙŠØ§Ù‹</p>
             </div>
             <button @click="send()" :disabled="sending" class="btn btn-primary w-full">
-                <span x-show="!sending">📢 إرسال البث</span>
-                <span x-show="sending">⏳ جارٍ الإرسال...</span>
+                <span x-show="!sending">ðŸ“¢ Ø¥Ø±Ø³Ø§Ù„ Ø§Ù„Ø¨Ø«</span>
+                <span x-show="sending">â³ Ø¬Ø§Ø±Ù Ø§Ù„Ø¥Ø±Ø³Ø§Ù„...</span>
             </button>
         </div>
     </div>
@@ -44,13 +44,13 @@ function broadcastApp() {
     return {
         message: '', type: 'text', sending: false,
         async send() {
-            if (!this.message.trim()) return toast('اكتب رسالة', 'warning');
+            if (!this.message.trim()) return toast('Ø§ÙƒØªØ¨ Ø±Ø³Ø§Ù„Ø©', 'warning');
             this.sending = true;
             try {
                 await api('/api/broadcast', { method: 'POST', body: JSON.stringify({ message: this.message, type: this.type }) });
-                toast('تم إضافة البث للقائمة', 'success');
+                toast('ØªÙ… Ø¥Ø¶Ø§ÙØ© Ø§Ù„Ø¨Ø« Ù„Ù„Ù‚Ø§Ø¦Ù…Ø©', 'success');
                 this.message = '';
-            } catch(e) { toast('خطأ', 'error'); }
+            } catch(e) { toast('Ø®Ø·Ø£', 'error'); }
             this.sending = false;
         }
     }

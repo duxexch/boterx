@@ -1,13 +1,13 @@
-{% extends "base.html" %}
-{% block title %}إرسال رسالة - Boterx{% endblock %}
-{% block page_title %}إرسال رسالة{% endblock %}
+﻿{% extends "base.html" %}
+{% block title %}Ø¥Ø±Ø³Ø§Ù„ Ø±Ø³Ø§Ù„Ø© - Boterx{% endblock %}
+{% block page_title %}Ø¥Ø±Ø³Ø§Ù„ Ø±Ø³Ø§Ù„Ø©{% endblock %}
 
 {% block content %}
 <div x-data="sendMessagePage()" x-init="init()">
     <!-- Header -->
     <div class="mb-6">
-        <h2 class="text-xl font-bold">إرسال رسالة لمستخدم محدد</h2>
-        <p class="text-sm text-slate-400 mt-1">ابحث عن مستخدم وأرسل له رسالة نصية أو صورة أو فيديو</p>
+        <h2 class="text-xl font-bold">Ø¥Ø±Ø³Ø§Ù„ Ø±Ø³Ø§Ù„Ø© Ù„Ù…Ø³ØªØ®Ø¯Ù… Ù…Ø­Ø¯Ø¯</h2>
+        <p class="text-sm text-slate-400 mt-1">Ø§Ø¨Ø­Ø« Ø¹Ù† Ù…Ø³ØªØ®Ø¯Ù… ÙˆØ£Ø±Ø³Ù„ Ù„Ù‡ Ø±Ø³Ø§Ù„Ø© Ù†ØµÙŠØ© Ø£Ùˆ ØµÙˆØ±Ø© Ø£Ùˆ ÙÙŠØ¯ÙŠÙˆ</p>
     </div>
 
     <!-- Message Composer -->
@@ -17,18 +17,18 @@
             <!-- Search -->
             <div class="bg-slate-800 rounded-xl border border-slate-700 p-5">
                 <h3 class="text-sm font-semibold mb-3 flex items-center gap-2">
-                    <i class="fas fa-search text-blue-400"></i> البحث عن مستخدم
+                    <i class="fas fa-search text-blue-400"></i> Ø§Ù„Ø¨Ø­Ø« Ø¹Ù† Ù…Ø³ØªØ®Ø¯Ù…
                 </h3>
                 <div class="relative">
                     <input type="text" x-model="searchQuery" @input.debounce.300ms="searchUsers()"
-                        placeholder="معرف تيليجرام، الاسم، رقم العميل..."
+                        placeholder="Ù…Ø¹Ø±Ù ØªÙŠÙ„ÙŠØ¬Ø±Ø§Ù…ØŒ Ø§Ù„Ø§Ø³Ù…ØŒ Ø±Ù‚Ù… Ø§Ù„Ø¹Ù…ÙŠÙ„..."
                         class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 pl-10 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <i class="fas fa-search absolute left-3 top-3 text-slate-400 text-sm"></i>
                 </div>
                 <!-- Search Results Dropdown -->
                 <div x-show="showResults" x-transition class="mt-2 bg-slate-900 border border-slate-700 rounded-lg max-h-64 overflow-y-auto">
                     <div x-show="searchLoading" class="p-3 text-center text-sm text-slate-400">
-                        <i class="fas fa-spinner fa-spin ml-2"></i>جارٍ البحث...
+                        <i class="fas fa-spinner fa-spin ml-2"></i>Ø¬Ø§Ø±Ù Ø§Ù„Ø¨Ø­Ø«...
                     </div>
                     <template x-for="u in searchResults" :key="u.telegram_id">
                         <button @click="selectUser(u)"
@@ -37,14 +37,14 @@
                                 <span x-text="(u.name || 'U').charAt(0)"></span>
                             </div>
                             <div class="flex-1 min-w-0 text-right">
-                                <p class="text-sm font-medium truncate" x-text="u.name || 'بدون اسم'"></p>
+                                <p class="text-sm font-medium truncate" x-text="u.name || 'Ø¨Ø¯ÙˆÙ† Ø§Ø³Ù…'"></p>
                                 <p class="text-xs text-slate-500 font-mono" x-text="u.telegram_id"></p>
                             </div>
                             <span class="text-xs text-slate-500 flex-shrink-0" x-text="u.customer_id"></span>
                         </button>
                     </template>
                     <div x-show="!searchLoading && searchResults.length === 0" class="p-3 text-center text-sm text-slate-500">
-                        لا توجد نتائج
+                        Ù„Ø§ ØªÙˆØ¬Ø¯ Ù†ØªØ§Ø¦Ø¬
                     </div>
                 </div>
             </div>
@@ -52,20 +52,20 @@
             <!-- Selected User Card -->
             <div x-show="selectedUser" x-transition class="bg-slate-800 rounded-xl border border-slate-700 p-5">
                 <h3 class="text-sm font-semibold mb-3 flex items-center gap-2">
-                    <i class="fas fa-user-check text-green-400"></i> المستخدم المحدد
+                    <i class="fas fa-user-check text-green-400"></i> Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù… Ø§Ù„Ù…Ø­Ø¯Ø¯
                 </h3>
                 <div class="flex items-center gap-3 mb-3">
                     <div class="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-lg font-bold">
                         <span x-text="(selectedUser?.name || 'U').charAt(0)"></span>
                     </div>
                     <div class="flex-1">
-                        <p class="font-semibold" x-text="selectedUser?.name || 'بدون اسم'"></p>
+                        <p class="font-semibold" x-text="selectedUser?.name || 'Ø¨Ø¯ÙˆÙ† Ø§Ø³Ù…'"></p>
                         <p class="text-xs text-slate-400 font-mono" x-text="selectedUser?.telegram_id"></p>
-                        <p class="text-xs text-slate-500" x-text="'عميل: ' + (selectedUser?.customer_id || '—')"></p>
+                        <p class="text-xs text-slate-500" x-text="'Ø¹Ù…ÙŠÙ„: ' + (selectedUser?.customer_id || 'â€”')"></p>
                     </div>
                 </div>
                 <button @click="clearSelection()" class="w-full text-xs text-red-400 hover:text-red-300 transition py-1">
-                    <i class="fas fa-times ml-1"></i>إلغاء التحديد
+                    <i class="fas fa-times ml-1"></i>Ø¥Ù„ØºØ§Ø¡ Ø§Ù„ØªØ­Ø¯ÙŠØ¯
                 </button>
             </div>
         </div>
@@ -74,7 +74,7 @@
         <div class="lg:col-span-2">
             <div class="bg-slate-800 rounded-xl border border-slate-700 p-5">
                 <h3 class="text-sm font-semibold mb-4 flex items-center gap-2">
-                    <i class="fas fa-paper-plane text-blue-400"></i> تكوين الرسالة
+                    <i class="fas fa-paper-plane text-blue-400"></i> ØªÙƒÙˆÙŠÙ† Ø§Ù„Ø±Ø³Ø§Ù„Ø©
                 </h3>
 
                 <!-- Message Type Selector -->
@@ -84,33 +84,33 @@
                         <button @click="msgType = 'text'"
                             class="py-2.5 rounded-lg text-sm font-medium transition border-2"
                             :class="msgType === 'text' ? 'border-blue-500 bg-blue-500/10 text-blue-400' : 'border-slate-600 text-slate-400 hover:border-slate-500'">
-                            <i class="fas fa-font ml-1"></i> نص
+                            <i class="fas fa-font ml-1"></i> Ù†Øµ
                         </button>
                         <button @click="msgType = 'photo'"
                             class="py-2.5 rounded-lg text-sm font-medium transition border-2"
                             :class="msgType === 'photo' ? 'border-blue-500 bg-blue-500/10 text-blue-400' : 'border-slate-600 text-slate-400 hover:border-slate-500'">
-                            <i class="fas fa-image ml-1"></i> صورة
+                            <i class="fas fa-image ml-1"></i> ØµÙˆØ±Ø©
                         </button>
                         <button @click="msgType = 'video'"
                             class="py-2.5 rounded-lg text-sm font-medium transition border-2"
                             :class="msgType === 'video' ? 'border-blue-500 bg-blue-500/10 text-blue-400' : 'border-slate-600 text-slate-400 hover:border-slate-500'">
-                            <i class="fas fa-video ml-1"></i> فيديو
+                            <i class="fas fa-video ml-1"></i> ÙÙŠØ¯ÙŠÙˆ
                         </button>
                     </div>
                 </div>
 
                 <!-- File URL (for photo/video) -->
                 <div x-show="msgType !== 'text'" x-transition class="mb-4">
-                    <label class="block text-sm text-slate-400 mb-1">رابط الملف (URL) <span class="text-red-400">*</span></label>
+                    <label class="block text-sm text-slate-400 mb-1">Ø±Ø§Ø¨Ø· Ø§Ù„Ù…Ù„Ù (URL) <span class="text-red-400">*</span></label>
                     <input x-model="fileUrl" type="url" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="https://example.com/file.jpg">
                 </div>
 
                 <!-- Message Text -->
                 <div class="mb-4">
                     <label class="block text-sm text-slate-400 mb-1">
-                        نص الرسالة <span class="text-red-400" x-show="msgType === 'text'">*</span>
+                        Ù†Øµ Ø§Ù„Ø±Ø³Ø§Ù„Ø© <span class="text-red-400" x-show="msgType === 'text'">*</span>
                     </label>
-                    <textarea x-model="messageText" rows="6" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" :placeholder="msgType === 'text' ? 'اكتب الرسالة هنا...' : 'نص مرفق مع الملف (اختياري)...'"></textarea>
+                    <textarea x-model="messageText" rows="6" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" :placeholder="msgType === 'text' ? 'Ø§ÙƒØªØ¨ Ø§Ù„Ø±Ø³Ø§Ù„Ø© Ù‡Ù†Ø§...' : 'Ù†Øµ Ù…Ø±ÙÙ‚ Ù…Ø¹ Ø§Ù„Ù…Ù„Ù (Ø§Ø®ØªÙŠØ§Ø±ÙŠ)...'"></textarea>
                 </div>
 
                 <!-- Send Button -->
@@ -119,10 +119,10 @@
                     :class="canSend() && !sending ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-slate-700 text-slate-500 cursor-not-allowed'">
                     <i class="fas fa-paper-plane" x-show="!sending"></i>
                     <i class="fas fa-spinner fa-spin" x-show="sending"></i>
-                    <span x-text="sending ? 'جارٍ الإرسال...' : 'إرسال الرسالة'"></span>
+                    <span x-text="sending ? 'Ø¬Ø§Ø±Ù Ø§Ù„Ø¥Ø±Ø³Ø§Ù„...' : 'Ø¥Ø±Ø³Ø§Ù„ Ø§Ù„Ø±Ø³Ø§Ù„Ø©'"></span>
                 </button>
                 <p x-show="!selectedUser" class="text-xs text-amber-400 mt-2 text-center">
-                    <i class="fas fa-info-circle ml-1"></i>يجب اختيار مستخدم أولاً
+                    <i class="fas fa-info-circle ml-1"></i>ÙŠØ¬Ø¨ Ø§Ø®ØªÙŠØ§Ø± Ù…Ø³ØªØ®Ø¯Ù… Ø£ÙˆÙ„Ø§Ù‹
                 </p>
             </div>
         </div>
@@ -132,17 +132,17 @@
     <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
         <div class="flex items-center justify-between p-4 border-b border-slate-700">
             <h3 class="text-sm font-semibold flex items-center gap-2">
-                <i class="fas fa-clock-rotate-left text-slate-400"></i> آخر الرسائل المرسلة
+                <i class="fas fa-clock-rotate-left text-slate-400"></i> Ø¢Ø®Ø± Ø§Ù„Ø±Ø³Ø§Ø¦Ù„ Ø§Ù„Ù…Ø±Ø³Ù„Ø©
             </h3>
             <button @click="loadRecentMessages()" class="text-xs text-blue-400 hover:underline">
-                <i class="fas fa-rotate ml-1"></i>تحديث
+                <i class="fas fa-rotate ml-1"></i>ØªØ­Ø¯ÙŠØ«
             </button>
         </div>
         <div class="overflow-x-auto">
             <table class="w-full text-sm">
                 <thead>
                     <tr class="border-b border-slate-700 bg-slate-800/80">
-                        <th class="text-right px-4 py-3 font-semibold text-slate-400">المعرف</th>
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400">Ø§Ù„Ù…Ø¹Ø±Ù</th>
                         <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="user">User</th>
                         <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="type">Type</th>
                         <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="message_text">Message</th>
@@ -155,7 +155,7 @@
                         <tr class="border-b border-slate-700/50 hover:bg-slate-700/30 transition">
                             <td class="px-4 py-3 font-mono text-xs text-slate-400" x-text="m.id"></td>
                             <td class="px-4 py-3">
-                                <p class="font-medium text-xs" x-text="m.target_user_name || '—'"></p>
+                                <p class="font-medium text-xs" x-text="m.target_user_name || 'â€”'"></p>
                                 <p class="text-xs text-slate-500 font-mono" x-text="m.target_user_id"></p>
                             </td>
                             <td class="px-4 py-3">
@@ -166,8 +166,8 @@
                                         'bg-purple-500/20 text-purple-400': m.type === 'video',
                                     }" x-text="typeLabel(m.type)"></span>
                             </td>
-                            <td class="px-4 py-3 max-w-[200px] truncate text-slate-300" x-text="m.message || '—'"></td>
-                            <td class="px-4 py-3 text-xs text-slate-400" x-text="m.created_at || '—'"></td>
+                            <td class="px-4 py-3 max-w-[200px] truncate text-slate-300" x-text="m.message || 'â€”'"></td>
+                            <td class="px-4 py-3 text-xs text-slate-400" x-text="m.created_at || 'â€”'"></td>
                             <td class="px-4 py-3">
                                 <span x-html="statusBadge(m.status || 'pending')"></span>
                             </td>
@@ -176,7 +176,7 @@
                     <tr x-show="recentMessages.length === 0">
                         <td colspan="6" class="px-4 py-8 text-center text-slate-500">
                             <i class="fas fa-inbox text-3xl mb-2 block"></i>
-                            لا توجد رسائل مرسلة بعد
+                            Ù„Ø§ ØªÙˆØ¬Ø¯ Ø±Ø³Ø§Ø¦Ù„ Ù…Ø±Ø³Ù„Ø© Ø¨Ø¹Ø¯
                         </td>
                     </tr>
                 </tbody>
@@ -188,7 +188,7 @@
     <div x-show="sending" class="fixed inset-0 bg-slate-900/50 z-40 flex items-center justify-center" style="display:none">
         <div class="bg-slate-800 rounded-xl p-4 flex items-center gap-3">
             <i class="fas fa-spinner fa-spin text-blue-400 text-xl"></i>
-            <span class="text-sm">جارٍ إرسال الرسالة...</span>
+            <span class="text-sm">Ø¬Ø§Ø±Ù Ø¥Ø±Ø³Ø§Ù„ Ø§Ù„Ø±Ø³Ø§Ù„Ø©...</span>
         </div>
     </div>
 </div>
@@ -250,7 +250,7 @@ function sendMessagePage() {
         },
 
         typeLabel(type) {
-            const map = { text: 'نص', photo: 'صورة', video: 'فيديو' };
+            const map = { text: 'Ù†Øµ', photo: 'ØµÙˆØ±Ø©', video: 'ÙÙŠØ¯ÙŠÙˆ' };
             return map[type] || type;
         },
 
@@ -267,12 +267,12 @@ function sendMessagePage() {
                     body.file_url = this.fileUrl;
                 }
                 await api('/api/send-message', { method: 'POST', body: JSON.stringify(body) });
-                toast('تم إرسال الرسالة بنجاح', 'success');
+                toast('ØªÙ… Ø¥Ø±Ø³Ø§Ù„ Ø§Ù„Ø±Ø³Ø§Ù„Ø© Ø¨Ù†Ø¬Ø§Ø­', 'success');
                 this.messageText = '';
                 this.fileUrl = '';
                 await this.loadRecentMessages();
             } catch (e) {
-                toast('فشل إرسال الرسالة: ' + (e.message || 'خطأ غير معروف'), 'error');
+                toast('ÙØ´Ù„ Ø¥Ø±Ø³Ø§Ù„ Ø§Ù„Ø±Ø³Ø§Ù„Ø©: ' + (e.message || 'Ø®Ø·Ø£ ØºÙŠØ± Ù…Ø¹Ø±ÙˆÙ'), 'error');
             }
             this.sending = false;
         },

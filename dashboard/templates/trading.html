@@ -1,25 +1,25 @@
-{% extends "base.html" %}
-{% block title %}التداول - Boterx{% endblock %}
-{% block page_title %}التداول{% endblock %}
+﻿{% extends "base.html" %}
+{% block title %}Ø§Ù„ØªØ¯Ø§ÙˆÙ„ - Boterx{% endblock %}
+{% block page_title %}Ø§Ù„ØªØ¯Ø§ÙˆÙ„{% endblock %}
 
 {% block content %}
 <div x-data="tradingPage()" x-init="init()">
     <!-- Stats Cards -->
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
-            <p class="text-xs text-slate-400">الإجمالي</p>
+            <p class="text-xs text-slate-400">Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ</p>
             <p class="text-2xl font-bold mt-1" x-text="fmtNum(stats.total)"></p>
         </div>
         <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
-            <p class="text-xs text-slate-400">قيد الانتظار</p>
+            <p class="text-xs text-slate-400">Ù‚ÙŠØ¯ Ø§Ù„Ø§Ù†ØªØ¸Ø§Ø±</p>
             <p class="text-2xl font-bold text-amber-400 mt-1" x-text="fmtNum(stats.pending)"></p>
         </div>
         <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
-            <p class="text-xs text-slate-400">شراء</p>
+            <p class="text-xs text-slate-400">Ø´Ø±Ø§Ø¡</p>
             <p class="text-2xl font-bold text-green-400 mt-1" x-text="fmtNum(stats.buy)"></p>
         </div>
         <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
-            <p class="text-xs text-slate-400">بيع</p>
+            <p class="text-xs text-slate-400">Ø¨ÙŠØ¹</p>
             <p class="text-2xl font-bold text-red-400 mt-1" x-text="fmtNum(stats.sell)"></p>
         </div>
     </div>
@@ -28,19 +28,19 @@
     <div class="flex flex-wrap gap-2 mb-4">
         <button @click="filter = 'all'" :class="filter === 'all' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'"
             class="px-4 py-2 rounded-lg text-sm font-semibold transition">
-            الكل <span class="text-xs opacity-70" x-text="'(' + fmtNum(stats.total) + ')'"></span>
+            Ø§Ù„ÙƒÙ„ <span class="text-xs opacity-70" x-text="'(' + fmtNum(stats.total) + ')'"></span>
         </button>
         <button @click="filter = 'pending'" :class="filter === 'pending' ? 'bg-amber-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'"
             class="px-4 py-2 rounded-lg text-sm font-semibold transition">
-            قيد الانتظار <span class="text-xs opacity-70" x-text="'(' + fmtNum(stats.pending) + ')'"></span>
+            Ù‚ÙŠØ¯ Ø§Ù„Ø§Ù†ØªØ¸Ø§Ø± <span class="text-xs opacity-70" x-text="'(' + fmtNum(stats.pending) + ')'"></span>
         </button>
         <button @click="filter = 'buy'" :class="filter === 'buy' ? 'bg-green-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'"
             class="px-4 py-2 rounded-lg text-sm font-semibold transition">
-            شراء <span class="text-xs opacity-70" x-text="'(' + fmtNum(stats.buy) + ')'"></span>
+            Ø´Ø±Ø§Ø¡ <span class="text-xs opacity-70" x-text="'(' + fmtNum(stats.buy) + ')'"></span>
         </button>
         <button @click="filter = 'sell'" :class="filter === 'sell' ? 'bg-red-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'"
             class="px-4 py-2 rounded-lg text-sm font-semibold transition">
-            بيع <span class="text-xs opacity-70" x-text="'(' + fmtNum(stats.sell) + ')'"></span>
+            Ø¨ÙŠØ¹ <span class="text-xs opacity-70" x-text="'(' + fmtNum(stats.sell) + ')'"></span>
         </button>
     </div>
 
@@ -53,8 +53,8 @@
                         <th class="text-right px-4 py-3 font-semibold text-slate-400 w-16">#</th>
                         <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="user">User</th>
                         <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="type">Type</th>
-                        <th class="text-right px-4 py-3 font-semibold text-slate-400">الأصل</th>
-                        <th class="text-right px-4 py-3 font-semibold text-slate-400">الشبكة</th>
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400">Ø§Ù„Ø£ØµÙ„</th>
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400">Ø§Ù„Ø´Ø¨ÙƒØ©</th>
                         <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="amount">Amount</th>
                         <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="currency">Currency</th>
                         <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="status">Status</th>
@@ -72,8 +72,8 @@
                             <td class="px-4 py-3">
                                 <span class="px-2 py-1 rounded-full text-xs font-semibold"
                                     :class="order.type === 'buy' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'">
-                                    <span x-show="order.type === 'buy'">شراء</span>
-                                    <span x-show="order.type === 'sell'">بيع</span>
+                                    <span x-show="order.type === 'buy'">Ø´Ø±Ø§Ø¡</span>
+                                    <span x-show="order.type === 'sell'">Ø¨ÙŠØ¹</span>
                                 </span>
                             </td>
                             <td class="px-4 py-3 font-mono text-xs" x-text="order.asset || '-'"></td>
@@ -89,8 +89,8 @@
                     <tr x-show="filteredOrders.length === 0">
                         <td colspan="9" class="px-4 py-10 text-center text-slate-500">
                             <i class="fas fa-coins text-4xl mb-3 block opacity-30"></i>
-                            <p>لا توجد طلبات تداول</p>
-                            <p class="text-xs mt-1" x-show="filter !== 'all'">جرّب تغيير الفلتر</p>
+                            <p>Ù„Ø§ ØªÙˆØ¬Ø¯ Ø·Ù„Ø¨Ø§Øª ØªØ¯Ø§ÙˆÙ„</p>
+                            <p class="text-xs mt-1" x-show="filter !== 'all'">Ø¬Ø±Ù‘Ø¨ ØªØºÙŠÙŠØ± Ø§Ù„ÙÙ„ØªØ±</p>
                         </td>
                     </tr>
                 </tbody>
@@ -124,7 +124,7 @@ function tradingPage() {
                 this.orders = data.orders || data || [];
                 this.computeStats();
             } catch (e) {
-                toast('فشل تحميل طلبات التداول', 'error');
+                toast('ÙØ´Ù„ ØªØ­Ù…ÙŠÙ„ Ø·Ù„Ø¨Ø§Øª Ø§Ù„ØªØ¯Ø§ÙˆÙ„', 'error');
             }
         },
 

@@ -1,6 +1,6 @@
-{% extends 'base.html' %}
-{% block title %}لوحة التحكم — Boterx{% endblock %}
-{% block page_title %}📊 لوحة التحكم{% endblock %}
+﻿{% extends 'base.html' %}
+{% block title %}Ù„ÙˆØ­Ø© Ø§Ù„ØªØ­ÙƒÙ… â€” Boterx{% endblock %}
+{% block page_title %}ðŸ“Š Ù„ÙˆØ­Ø© Ø§Ù„ØªØ­ÙƒÙ…{% endblock %}
 
 {% block content %}
 <div x-data="dashboardApp()" x-init="init()" class="space-y-6">
@@ -145,12 +145,12 @@
         </div>
         <!-- Top 5 companies bar chart -->
         <div class="bg-slate-800 rounded-xl border border-slate-700 p-5">
-            <h3 class="font-semibold mb-4"><i class="fas fa-building text-green-400 ml-1"></i> أعلى 5 شركات حسب الحجم</h3>
+            <h3 class="font-semibold mb-4"><i class="fas fa-building text-green-400 ml-1"></i> Ø£Ø¹Ù„Ù‰ 5 Ø´Ø±ÙƒØ§Øª Ø­Ø³Ø¨ Ø§Ù„Ø­Ø¬Ù…</h3>
             <canvas id="companiesChart" height="200"></canvas>
         </div>
         <!-- User registrations area chart -->
         <div class="bg-slate-800 rounded-xl border border-slate-700 p-5">
-            <h3 class="font-semibold mb-4"><i class="fas fa-user-plus text-purple-400 ml-1"></i> تسجيلات المستخدمين (14 يوم)</h3>
+            <h3 class="font-semibold mb-4"><i class="fas fa-user-plus text-purple-400 ml-1"></i> ØªØ³Ø¬ÙŠÙ„Ø§Øª Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…ÙŠÙ† (14 ÙŠÙˆÙ…)</h3>
             <canvas id="registrationsChart" height="200"></canvas>
         </div>
     </div>
@@ -160,8 +160,8 @@
         <!-- Recent transactions (spans 2 cols) -->
         <div class="lg:col-span-2 bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
             <div class="p-4 border-b border-slate-700 flex items-center justify-between">
-                <h3 class="font-semibold"><i class="fas fa-list text-slate-400 ml-1"></i> آخر المعاملات</h3>
-                <a href="{{ url_for('page_transactions') }}" class="text-xs text-blue-400 hover:underline">عرض الكل ←</a>
+                <h3 class="font-semibold"><i class="fas fa-list text-slate-400 ml-1"></i> Ø¢Ø®Ø± Ø§Ù„Ù…Ø¹Ø§Ù…Ù„Ø§Øª</h3>
+                <a href="{{ url_for('page_transactions') }}" class="text-xs text-blue-400 hover:underline">Ø¹Ø±Ø¶ Ø§Ù„ÙƒÙ„ â†</a>
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
@@ -176,7 +176,7 @@
                         </tr>
                     </thead>
                     <tbody id="recentTxns" class="divide-y divide-slate-700">
-                        <tr><td colspan="6" class="text-center p-4 text-slate-400"><i class="fas fa-spinner fa-spin mr-1"></i> جارٍ التحميل...</td></tr>
+                        <tr><td colspan="6" class="text-center p-4 text-slate-400"><i class="fas fa-spinner fa-spin mr-1"></i> Ø¬Ø§Ø±Ù Ø§Ù„ØªØ­Ù…ÙŠÙ„...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -184,20 +184,20 @@
         <!-- Recent users -->
         <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
             <div class="p-4 border-b border-slate-700 flex items-center justify-between">
-                <h3 class="font-semibold"><i class="fas fa-user-plus text-blue-400 ml-1"></i> أحدث المستخدمين</h3>
-                <a href="{{ url_for('page_users') }}" class="text-xs text-blue-400 hover:underline">الكل ←</a>
+                <h3 class="font-semibold"><i class="fas fa-user-plus text-blue-400 ml-1"></i> Ø£Ø­Ø¯Ø« Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…ÙŠÙ†</h3>
+                <a href="{{ url_for('page_users') }}" class="text-xs text-blue-400 hover:underline">Ø§Ù„ÙƒÙ„ â†</a>
             </div>
             <div class="divide-y divide-slate-700" id="recentUsers">
-                <div class="p-4 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-1"></i> جارٍ التحميل...</div>
+                <div class="p-4 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-1"></i> Ø¬Ø§Ø±Ù Ø§Ù„ØªØ­Ù…ÙŠÙ„...</div>
             </div>
         </div>
     </div>
 
     <!-- Activity Timeline -->
     <div class="bg-slate-800 rounded-xl border border-slate-700 p-5">
-        <h3 class="font-semibold mb-4"><i class="fas fa-history text-amber-400 ml-1"></i> سجل النشاط</h3>
+        <h3 class="font-semibold mb-4"><i class="fas fa-history text-amber-400 ml-1"></i> Ø³Ø¬Ù„ Ø§Ù„Ù†Ø´Ø§Ø·</h3>
         <div class="space-y-3" id="activityTimeline">
-            <div class="text-center text-slate-400 py-4"><i class="fas fa-spinner fa-spin mr-1"></i> جارٍ التحميل...</div>
+            <div class="text-center text-slate-400 py-4"><i class="fas fa-spinner fa-spin mr-1"></i> Ø¬Ø§Ø±Ù Ø§Ù„ØªØ­Ù…ÙŠÙ„...</div>
         </div>
     </div>
 </div>
@@ -236,7 +236,7 @@ function dashboardApp() {
                 }
                 tbody.innerHTML = data.transactions.map(t => {
                     const badge = statusBadge(t.status);
-                    const typeIcon = t.type === 'deposit' ? '💵 إيداع' : '💸 سحب';
+                    const typeIcon = t.type === 'deposit' ? 'ðŸ’µ Ø¥ÙŠØ¯Ø§Ø¹' : 'ðŸ’¸ Ø³Ø­Ø¨';
                     return '<tr class="hover:bg-slate-700/50">' +
                         '<td class="p-3 font-mono text-xs">' + esc(t.id || '') + '</td>' +
                         '<td class="p-3">' + esc(t.name || '') + '</td>' +
@@ -247,7 +247,7 @@ function dashboardApp() {
                         '</tr>';
                 }).join('');
             } catch(e) {
-                tbody.innerHTML = '<tr><td colspan="6" class="text-center p-4 text-red-400"><i class="fas fa-exclamation-circle mr-1"></i> فشل التحميل</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center p-4 text-red-400"><i class="fas fa-exclamation-circle mr-1"></i> ÙØ´Ù„ Ø§Ù„ØªØ­Ù…ÙŠÙ„</td></tr>';
             }
         },
 
@@ -289,7 +289,7 @@ function dashboardApp() {
                     return '<div class="flex items-start gap-3">' +
                         '<div class="w-8 h-8 rounded-lg bg-slate-700/50 flex items-center justify-center flex-shrink-0"><i class="fas ' + iconClass + '"></i></div>' +
                         '<div class="flex-1 min-w-0">' +
-                        '<p class="text-sm"><span class="font-medium">' + esc(l.admin_id || '') + '</span> — <span class="text-slate-400">' + esc(l.action_type || '') + '</span></p>' +
+                        '<p class="text-sm"><span class="font-medium">' + esc(l.admin_id || '') + '</span> â€” <span class="text-slate-400">' + esc(l.action_type || '') + '</span></p>' +
                         '<p class="text-xs text-slate-500">' + esc(l.details || '') + '</p>' +
                         '<p class="text-[10px] text-slate-600 mt-0.5">' + esc(l.timestamp || '') + '</p>' +
                         '</div>' +
@@ -304,20 +304,20 @@ function dashboardApp() {
             if (!confirm(tr('bulk_approve') + '?')) return;
             try {
                 await api('/api/transactions/bulk-approve', { method: 'POST', body: '{}' });
-                toast('تمت الموافقة الجماعية', 'success');
+                toast('ØªÙ…Øª Ø§Ù„Ù…ÙˆØ§ÙÙ‚Ø© Ø§Ù„Ø¬Ù…Ø§Ø¹ÙŠØ©', 'success');
                 this.loadStats();
                 this.loadRecentTxns();
-            } catch(e) { toast('فشلت العملية', 'error'); }
+            } catch(e) { toast('ÙØ´Ù„Øª Ø§Ù„Ø¹Ù…Ù„ÙŠØ©', 'error'); }
         },
 
         async bulkRejectTxns() {
             if (!confirm(tr('bulk_reject') + '?')) return;
             try {
                 await api('/api/transactions/bulk-reject', { method: 'POST', body: '{}' });
-                toast('تم الرفض الجماعي', 'warning');
+                toast('ØªÙ… Ø§Ù„Ø±ÙØ¶ Ø§Ù„Ø¬Ù…Ø§Ø¹ÙŠ', 'warning');
                 this.loadStats();
                 this.loadRecentTxns();
-            } catch(e) { toast('فشلت العملية', 'error'); }
+            } catch(e) { toast('ÙØ´Ù„Øª Ø§Ù„Ø¹Ù…Ù„ÙŠØ©', 'error'); }
         },
 
         renderCharts() {
@@ -342,7 +342,7 @@ function dashboardApp() {
             } else {
                 window._txnChart = new Chart(canvas, {
                     type: 'line',
-                    data: { labels: labels, datasets: [{ label: 'المعاملات', data: txnData, borderColor: '#3B82F6', backgroundColor: 'rgba(59,130,246,0.1)', fill: true, tension: 0.4 }] },
+                    data: { labels: labels, datasets: [{ label: 'Ø§Ù„Ù…Ø¹Ø§Ù…Ù„Ø§Øª', data: txnData, borderColor: '#3B82F6', backgroundColor: 'rgba(59,130,246,0.1)', fill: true, tension: 0.4 }] },
                     options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#64748b' }, grid: { color: '#1E293B' } }, y: { ticks: { color: '#64748b' }, grid: { color: '#1E293B' } } } }
                 });
             }
@@ -368,7 +368,7 @@ function dashboardApp() {
             const canvas = document.getElementById('companiesChart');
             if (!canvas) return;
             const companies = this.stats.top_companies || [];
-            const labels = companies.length > 0 ? companies.map(c => c.name) : ['شركة 1', 'شركة 2', 'شركة 3', 'شركة 4', 'شركة 5'];
+            const labels = companies.length > 0 ? companies.map(c => c.name) : ['Ø´Ø±ÙƒØ© 1', 'Ø´Ø±ÙƒØ© 2', 'Ø´Ø±ÙƒØ© 3', 'Ø´Ø±ÙƒØ© 4', 'Ø´Ø±ÙƒØ© 5'];
             const data = companies.length > 0 ? companies.map(c => c.volume) : [0, 0, 0, 0, 0];
             if (window._companiesChart) {
                 window._companiesChart.data.labels = labels;
@@ -377,7 +377,7 @@ function dashboardApp() {
             } else {
                 window._companiesChart = new Chart(canvas, {
                     type: 'bar',
-                    data: { labels: labels, datasets: [{ label: 'الحجم', data: data, backgroundColor: '#22C55E', borderRadius: 4 }] },
+                    data: { labels: labels, datasets: [{ label: 'Ø§Ù„Ø­Ø¬Ù…', data: data, backgroundColor: '#22C55E', borderRadius: 4 }] },
                     options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#64748b' }, grid: { color: '#1E293B' } }, y: { ticks: { color: '#64748b' }, grid: { color: '#1E293B' } } } }
                 });
             }
@@ -398,7 +398,7 @@ function dashboardApp() {
             } else {
                 window._regChart = new Chart(canvas, {
                     type: 'line',
-                    data: { labels: labels, datasets: [{ label: 'التسجيلات', data: regData, borderColor: '#A855F7', backgroundColor: 'rgba(168,85,247,0.15)', fill: true, tension: 0.4 }] },
+                    data: { labels: labels, datasets: [{ label: 'Ø§Ù„ØªØ³Ø¬ÙŠÙ„Ø§Øª', data: regData, borderColor: '#A855F7', backgroundColor: 'rgba(168,85,247,0.15)', fill: true, tension: 0.4 }] },
                     options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#64748b' }, grid: { color: '#1E293B' } }, y: { ticks: { color: '#64748b' }, grid: { color: '#1E293B' } }, beginAtZero: true } }
                 });
             }

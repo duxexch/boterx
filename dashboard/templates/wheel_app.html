@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🎡 عجلة الحظ</title>
+    <title>ðŸŽ¡ Ø¹Ø¬Ù„Ø© Ø§Ù„Ø­Ø¸</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -88,43 +88,43 @@
 </head>
 <body>
     <div class="header">
-        <h1>🎡 عجلة الحظ</h1>
-        <p id="roundName">جولة الأسبوع</p>
+        <h1>ðŸŽ¡ Ø¹Ø¬Ù„Ø© Ø§Ù„Ø­Ø¸</h1>
+        <p id="roundName">Ø¬ÙˆÙ„Ø© Ø§Ù„Ø£Ø³Ø¨ÙˆØ¹</p>
     </div>
 
     <div class="balance-card">
         <div class="amount" id="balance">0</div>
-        <div class="label">رصيدك المتاح</div>
+        <div class="label">Ø±ØµÙŠØ¯Ùƒ Ø§Ù„Ù…ØªØ§Ø­</div>
     </div>
 
     <div class="stats">
-        <div class="stat"><div class="num" id="freeSpins" style="color:#22C55E">0</div><div class="lbl">دورات مجانية</div></div>
-        <div class="stat"><div class="num" id="totalSpins" style="color:#3B82F6">0</div><div class="lbl">إجمالي دوراتك</div></div>
+        <div class="stat"><div class="num" id="freeSpins" style="color:#22C55E">0</div><div class="lbl">Ø¯ÙˆØ±Ø§Øª Ù…Ø¬Ø§Ù†ÙŠØ©</div></div>
+        <div class="stat"><div class="num" id="totalSpins" style="color:#3B82F6">0</div><div class="lbl">Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø¯ÙˆØ±Ø§ØªÙƒ</div></div>
         <div class="stat"><div class="num" id="participants" style="color:#FBBF24">0</div><div class="lbl" data-i18n="participants">Participants</div></div>
     </div>
 
     <div class="info-row">
-        <span>🎟️ تكلفة الدورة الإضافية: <strong id="spinCost">0</strong></span>
+        <span>ðŸŽŸï¸ ØªÙƒÙ„ÙØ© Ø§Ù„Ø¯ÙˆØ±Ø© Ø§Ù„Ø¥Ø¶Ø§ÙÙŠØ©: <strong id="spinCost">0</strong></span>
         <span id="spinBadge"></span>
     </div>
 
     <div class="wheel-container">
         <div class="pointer"></div>
         <canvas id="wheelCanvas" width="360" height="360"></canvas>
-        <div class="center-circle">🎯</div>
+        <div class="center-circle">ðŸŽ¯</div>
     </div>
 
-    <button class="spin-btn" id="spinBtn" onclick="startSpin()">🎡 أدر العجلة!</button>
+    <button class="spin-btn" id="spinBtn" onclick="startSpin()">ðŸŽ¡ Ø£Ø¯Ø± Ø§Ù„Ø¹Ø¬Ù„Ø©!</button>
 
     <div class="prize-list">
-        <h3>🎁 الجوائز المتاحة</h3>
+        <h3>ðŸŽ Ø§Ù„Ø¬ÙˆØ§Ø¦Ø² Ø§Ù„Ù…ØªØ§Ø­Ø©</h3>
         <div id="prizeList"></div>
     </div>
 
     <div class="result-overlay" id="resultOverlay">
         <div class="result-box">
-            <div class="emoji" id="resultEmoji">🎉</div>
-            <div class="prize" id="resultPrize">—</div>
+            <div class="emoji" id="resultEmoji">ðŸŽ‰</div>
+            <div class="prize" id="resultPrize">â€”</div>
             <div class="msg" id="resultMsg"></div>
         </div>
     </div>
@@ -152,15 +152,15 @@ async function init() {
         const data = await res.json();
         const active = (data.rounds || []).find(r => r.status === 'active');
         if (!active) {
-            document.getElementById('roundName').textContent = 'لا توجد جولة نشطة';
+            document.getElementById('roundName').textContent = 'Ù„Ø§ ØªÙˆØ¬Ø¯ Ø¬ÙˆÙ„Ø© Ù†Ø´Ø·Ø©';
             document.getElementById('spinBtn').disabled = true;
             return;
         }
         const round = active;
-        prizes = (round.prizes || 'حظ أوفر').split('|').map(p => p.trim());
+        prizes = (round.prizes || 'Ø­Ø¸ Ø£ÙˆÙØ±').split('|').map(p => p.trim());
         spinCost = parseFloat(round.spin_cost || 0);
         const maxPerUser = parseInt(round.max_spins_per_user || 1);
-        document.getElementById('roundName').textContent = round.name || 'عجلة الحظ';
+        document.getElementById('roundName').textContent = round.name || 'Ø¹Ø¬Ù„Ø© Ø§Ù„Ø­Ø¸';
         document.getElementById('spinCost').textContent = spinCost + ' ' + (round.currency || 'SAR');
 
         // Get user spins
@@ -185,11 +185,11 @@ async function init() {
         // Update badge
         const badge = document.getElementById('spinBadge');
         if (freeSpinsLeft > 0) {
-            badge.innerHTML = '<span class="free-spins-badge">' + freeSpinsLeft + ' مجانية متبقية</span>';
+            badge.innerHTML = '<span class="free-spins-badge">' + freeSpinsLeft + ' Ù…Ø¬Ø§Ù†ÙŠØ© Ù…ØªØ¨Ù‚ÙŠØ©</span>';
         } else if (spinCost > 0 && balance >= spinCost) {
-            badge.innerHTML = '<span class="paid-spins-badge">دورات إضافية بـ ' + spinCost + '</span>';
+            badge.innerHTML = '<span class="paid-spins-badge">Ø¯ÙˆØ±Ø§Øª Ø¥Ø¶Ø§ÙÙŠØ© Ø¨Ù€ ' + spinCost + '</span>';
         } else {
-            badge.innerHTML = '<span style="color:#EF4444;font-size:12px">لا توجد دورات</span>';
+            badge.innerHTML = '<span style="color:#EF4444;font-size:12px">Ù„Ø§ ØªÙˆØ¬Ø¯ Ø¯ÙˆØ±Ø§Øª</span>';
             document.getElementById('spinBtn').disabled = true;
         }
 
@@ -202,7 +202,7 @@ async function init() {
         drawWheel(0);
     } catch(e) {
         console.error(e);
-        document.getElementById('roundName').textContent = 'خطأ في التحميل';
+        document.getElementById('roundName').textContent = 'Ø®Ø·Ø£ ÙÙŠ Ø§Ù„ØªØ­Ù…ÙŠÙ„';
     }
 }
 
@@ -251,9 +251,9 @@ function startSpin() {
     const cost = useFree ? 0 : spinCost;
 
     if (!useFree && balance < cost) {
-        document.getElementById('resultEmoji').textContent = '⚠️';
-        document.getElementById('resultPrize').textContent = 'رصيد غير كافٍ';
-        document.getElementById('resultMsg').textContent = 'لا يوجد رصيد كافٍ للدوران';
+        document.getElementById('resultEmoji').textContent = 'âš ï¸';
+        document.getElementById('resultPrize').textContent = 'Ø±ØµÙŠØ¯ ØºÙŠØ± ÙƒØ§ÙÙ';
+        document.getElementById('resultMsg').textContent = 'Ù„Ø§ ÙŠÙˆØ¬Ø¯ Ø±ØµÙŠØ¯ ÙƒØ§ÙÙ Ù„Ù„Ø¯ÙˆØ±Ø§Ù†';
         document.getElementById('resultOverlay').classList.add('show');
         isSpinning = false;
         setTimeout(() => { document.getElementById('resultOverlay').classList.remove('show'); document.getElementById('spinBtn').disabled = false; }, 2000);
@@ -295,11 +295,11 @@ function onSpinComplete(prizeIndex, usedFree, cost) {
     const prize = prizes[prizeIndex];
     
     // Show result
-    document.getElementById('resultEmoji').textContent = '🎉';
+    document.getElementById('resultEmoji').textContent = 'ðŸŽ‰';
     document.getElementById('resultPrize').textContent = prize;
     document.getElementById('resultMsg').textContent = usedFree 
-        ? 'مبروك! تمت إضافة الجائزة لمحفظتك' 
-        : 'مبروك! تم خصم ' + cost + ' وإضافة الجائزة لمحفظتك';
+        ? 'Ù…Ø¨Ø±ÙˆÙƒ! ØªÙ…Øª Ø¥Ø¶Ø§ÙØ© Ø§Ù„Ø¬Ø§Ø¦Ø²Ø© Ù„Ù…Ø­ÙØ¸ØªÙƒ' 
+        : 'Ù…Ø¨Ø±ÙˆÙƒ! ØªÙ… Ø®ØµÙ… ' + cost + ' ÙˆØ¥Ø¶Ø§ÙØ© Ø§Ù„Ø¬Ø§Ø¦Ø²Ø© Ù„Ù…Ø­ÙØ¸ØªÙƒ';
     document.getElementById('resultOverlay').classList.add('show');
 
     // Confetti
@@ -335,11 +335,11 @@ function onSpinComplete(prizeIndex, usedFree, cost) {
     // Update badge
     const badge = document.getElementById('spinBadge');
     if (freeSpinsLeft > 0) {
-        badge.innerHTML = '<span class="free-spins-badge">' + freeSpinsLeft + ' مجانية متبقية</span>';
+        badge.innerHTML = '<span class="free-spins-badge">' + freeSpinsLeft + ' Ù…Ø¬Ø§Ù†ÙŠØ© Ù…ØªØ¨Ù‚ÙŠØ©</span>';
     } else if (spinCost > 0 && balance >= spinCost) {
-        badge.innerHTML = '<span class="paid-spins-badge">دورات إضافية بـ ' + spinCost + '</span>';
+        badge.innerHTML = '<span class="paid-spins-badge">Ø¯ÙˆØ±Ø§Øª Ø¥Ø¶Ø§ÙÙŠØ© Ø¨Ù€ ' + spinCost + '</span>';
     } else {
-        badge.innerHTML = '<span style="color:#EF4444;font-size:12px">لا توجد دورات</span>';
+        badge.innerHTML = '<span style="color:#EF4444;font-size:12px">Ù„Ø§ ØªÙˆØ¬Ø¯ Ø¯ÙˆØ±Ø§Øª</span>';
     }
 
     isSpinning = false;

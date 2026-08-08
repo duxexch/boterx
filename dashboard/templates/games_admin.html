@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% block content %}
 <div x-data="gamesAdmin()" x-init="init()" class="space-y-6">
 
@@ -24,7 +24,7 @@
 
   <!-- Risk Alerts -->
   <div class="bg-slate-800 rounded-xl p-4" x-show="alerts.length > 0">
-    <h3 class="text-sm font-bold text-red-400 mb-3">⚠️ <span data-i18n="risk_alerts">Risk Alerts</span> (<span x-text="alerts.length"></span>)</h3>
+    <h3 class="text-sm font-bold text-red-400 mb-3">âš ï¸ <span data-i18n="risk_alerts">Risk Alerts</span> (<span x-text="alerts.length"></span>)</h3>
     <div class="space-y-2">
       <template x-for="alert in alerts" :key="alert.id">
         <div class="flex items-center justify-between bg-slate-900 rounded-lg p-3">
@@ -32,7 +32,7 @@
             <span class="text-xs font-bold" :class="alert.severity === 'critical' ? 'text-red-400' : alert.severity === 'high' ? 'text-orange-400' : 'text-yellow-400'" x-text="alert.severity"></span>
             <span class="text-sm text-slate-300 mr-2" x-text="alert.message"></span>
           </div>
-          <button @click="resolveAlert(alert.id)" class="text-xs bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded">✓</button>
+          <button @click="resolveAlert(alert.id)" class="text-xs bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded">âœ“</button>
         </div>
       </template>
     </div>
@@ -40,13 +40,13 @@
 
   <!-- Pending Deposits -->
   <div class="bg-slate-800 rounded-xl p-4">
-    <h3 class="text-sm font-bold text-amber-400 mb-3">💰 <span data-i18n="pending_deposits">Pending Deposits</span> (<span x-text="deposits.length"></span>)</h3>
+    <h3 class="text-sm font-bold text-amber-400 mb-3">ðŸ’° <span data-i18n="pending_deposits">Pending Deposits</span> (<span x-text="deposits.length"></span>)</h3>
     <div class="space-y-2" x-show="deposits.length > 0">
       <template x-for="dep in deposits" :key="dep.id">
         <div class="flex items-center justify-between bg-slate-900 rounded-lg p-3">
           <div class="text-sm">
             <span class="font-bold text-amber-400" x-text="dep.amount"></span>
-            <span class="text-slate-400 mr-2">— <span x-text="dep.account_number"></span></span>
+            <span class="text-slate-400 mr-2">â€” <span x-text="dep.account_number"></span></span>
             <span class="text-xs text-slate-500">UID: <span x-text="dep.user_id"></span></span>
           </div>
           <div class="flex gap-2">
@@ -80,10 +80,10 @@
             </div>
           </div>
         </div>
-        <button @click="toggleGame(game.id)" class="text-xs px-3 py-1 rounded-lg" :class="game.is_active === 'yes' ? 'bg-green-600' : 'bg-slate-600'" x-text="game.is_active === 'yes' ? '✅ Active' : '⏸️ Off'"></button>
+        <button @click="toggleGame(game.id)" class="text-xs px-3 py-1 rounded-lg" :class="game.is_active === 'yes' ? 'bg-green-600' : 'bg-slate-600'" x-text="game.is_active === 'yes' ? 'âœ… Active' : 'â¸ï¸ Off'"></button>
       </div>
     </template>
-    <button @click="showAddGame = true" class="w-full bg-slate-800 hover:bg-slate-700 rounded-xl p-3 text-sm text-slate-400 border border-dashed border-slate-600">➕ <span data-i18n="add_game">Add Game</span></button>
+    <button @click="showAddGame = true" class="w-full bg-slate-800 hover:bg-slate-700 rounded-xl p-3 text-sm text-slate-400 border border-dashed border-slate-600">âž• <span data-i18n="add_game">Add Game</span></button>
   </div>
 
   <!-- Players Tab -->
@@ -102,11 +102,11 @@
           <div class="flex items-center gap-2">
             <span class="font-bold text-sm" x-text="p.name || p.telegram_id"></span>
             <span class="text-xs px-2 py-0.5 rounded-full" :class="segmentColor(getSegment(p))" x-text="getSegment(p)"></span>
-            <span x-show="p.is_vex_partner === 'yes'" class="text-xs px-2 py-0.5 rounded-full bg-purple-600 text-white">💎 VEX</span>
+            <span x-show="p.is_vex_partner === 'yes'" class="text-xs px-2 py-0.5 rounded-full bg-purple-600 text-white">ðŸ’Ž VEX</span>
           </div>
           <div class="flex gap-1">
             <button @click="toggleVex(p.telegram_id, p.is_vex_partner !== 'yes')" class="text-xs bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded" x-text="p.is_vex_partner === 'yes' ? 'Remove VEX' : 'Set VEX'"></button>
-            <button @click="cooldownPlayer(p.telegram_id)" class="text-xs bg-blue-700 hover:bg-blue-600 px-2 py-1 rounded">❄️ Cooldown</button>
+            <button @click="cooldownPlayer(p.telegram_id)" class="text-xs bg-blue-700 hover:bg-blue-600 px-2 py-1 rounded">â„ï¸ Cooldown</button>
           </div>
         </div>
         <div class="grid grid-cols-4 gap-2 text-xs">
@@ -182,7 +182,7 @@ function gamesAdmin() {
     sortBy: 'total_wagered',
     config: {},
     showAddGame: false,
-    newGame: { name: '', icon: '🎮', description: '', min_bet: 10, max_bet: 1000, base_win_chance: 0.45, house_edge_pct: 15 },
+    newGame: { name: '', icon: 'ðŸŽ®', description: '', min_bet: 10, max_bet: 1000, base_win_chance: 0.45, house_edge_pct: 15 },
 
     async init() {
       await Promise.all([this.loadStats(), this.loadAlerts(), this.loadDeposits(), this.loadGames(), this.loadPlayers(), this.loadConfig()]);

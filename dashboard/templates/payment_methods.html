@@ -1,6 +1,6 @@
-{% extends 'base.html' %}
-{% block title %}وسائل الدفع — Boterx{% endblock %}
-{% block page_title %}💳 وسائل الدفع{% endblock %}
+﻿{% extends 'base.html' %}
+{% block title %}ÙˆØ³Ø§Ø¦Ù„ Ø§Ù„Ø¯ÙØ¹ â€” Boterx{% endblock %}
+{% block page_title %}ðŸ’³ ÙˆØ³Ø§Ø¦Ù„ Ø§Ù„Ø¯ÙØ¹{% endblock %}
 
 {% block content %}
 <div x-data="paymentMethodsApp()" x-init="init()" class="space-y-6">
@@ -8,7 +8,7 @@
     <!-- Stats -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div class="bg-slate-800 rounded-lg border border-slate-700 p-3">
-            <p class="text-xs text-slate-400">إجمالي الوسائل</p>
+            <p class="text-xs text-slate-400">Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„ÙˆØ³Ø§Ø¦Ù„</p>
             <p class="text-xl font-bold text-amber-400" x-text="methods.length">0</p>
         </div>
         <div class="bg-slate-800 rounded-lg border border-slate-700 p-3">
@@ -16,11 +16,11 @@
             <p class="text-xl font-bold text-green-400" x-text="methods.filter(m => m.status === 'active').length">0</p>
         </div>
         <div class="bg-slate-800 rounded-lg border border-slate-700 p-3">
-            <p class="text-xs text-slate-400">موقوفة</p>
+            <p class="text-xs text-slate-400">Ù…ÙˆÙ‚ÙˆÙØ©</p>
             <p class="text-xl font-bold text-red-400" x-text="methods.filter(m => m.status !== 'active').length">0</p>
         </div>
         <div class="bg-slate-800 rounded-lg border border-slate-700 p-3">
-            <p class="text-xs text-slate-400">شركات مرتبطة</p>
+            <p class="text-xs text-slate-400">Ø´Ø±ÙƒØ§Øª Ù…Ø±ØªØ¨Ø·Ø©</p>
             <p class="text-xl font-bold text-blue-400" x-text="companies.length">0</p>
         </div>
     </div>
@@ -28,15 +28,15 @@
     <!-- Add button + refresh -->
     <div class="flex items-center justify-between">
         <button @click="showAddModal = true" class="btn btn-primary">
-            <i class="fas fa-plus ml-1"></i> إضافة وسيلة دفع
+            <i class="fas fa-plus ml-1"></i> Ø¥Ø¶Ø§ÙØ© ÙˆØ³ÙŠÙ„Ø© Ø¯ÙØ¹
         </button>
         <button @click="loadData()" class="btn btn-sm" style="background:#475569">
-            <i class="fas fa-rotate ml-1"></i> تحديث
+            <i class="fas fa-rotate ml-1"></i> ØªØ­Ø¯ÙŠØ«
         </button>
     </div>
 
     <!-- Search -->
-    <input type="text" x-model="search" @input.debounce.300ms="filterMethods()" placeholder="بحث بالاسم أو البيانات..." class="input w-full">
+    <input type="text" x-model="search" @input.debounce.300ms="filterMethods()" placeholder="Ø¨Ø­Ø« Ø¨Ø§Ù„Ø§Ø³Ù… Ø£Ùˆ Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª..." class="input w-full">
 
     <!-- Payment methods table -->
     <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
@@ -44,13 +44,13 @@
             <table class="data-table">
                 <thead><tr>
                     <th></th>
-                    <th data-i18n="name">Name</th><th data-i18n="type">Type</th><th>بيانات الحساب</th><th>معلومات</th>
-                    <th>الشركات المرتبطة</th><th data-i18n="status">Status</th><th data-i18n="actions">Actions</th>
+                    <th data-i18n="name">Name</th><th data-i18n="type">Type</th><th>Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø­Ø³Ø§Ø¨</th><th>Ù…Ø¹Ù„ÙˆÙ…Ø§Øª</th>
+                    <th>Ø§Ù„Ø´Ø±ÙƒØ§Øª Ø§Ù„Ù…Ø±ØªØ¨Ø·Ø©</th><th data-i18n="status">Status</th><th data-i18n="actions">Actions</th>
                 </tr></thead>
                 <tbody>
                     <template x-for="m in filteredMethods" :key="m.id">
                         <tr class="hover:bg-slate-700/50">
-                            <td class="text-xl" x-text="m.icon || '💳'"></td>
+                            <td class="text-xl" x-text="m.icon || 'ðŸ’³'"></td>
                             <td class="font-medium" x-text="m.method_name"></td>
                             <td>
                                 <span class="px-2 py-0.5 rounded text-xs bg-slate-700 text-slate-300" x-text="m.method_type"></span>
@@ -58,25 +58,25 @@
                             <td class="font-mono text-xs">
                                 <code class="bg-slate-900 px-2 py-0.5 rounded text-amber-400" x-text="m.account_data" @click="copyToClipboard(m.account_data)"></code>
                             </td>
-                            <td class="text-xs text-slate-400" x-text="m.additional_info || '—'"></td>
+                            <td class="text-xs text-slate-400" x-text="m.additional_info || 'â€”'"></td>
                             <td>
                                 <div class="flex flex-wrap gap-1">
                                     <template x-for="c in getLinkedCompanies(m.id)" :key="c.id">
                                         <span class="px-1.5 py-0.5 rounded text-xs bg-blue-500/20 text-blue-400" x-text="c.name"></span>
                                     </template>
-                                    <span x-show="getLinkedCompanies(m.id).length === 0" class="text-xs text-slate-500">غير مرتبطة</span>
+                                    <span x-show="getLinkedCompanies(m.id).length === 0" class="text-xs text-slate-500">ØºÙŠØ± Ù…Ø±ØªØ¨Ø·Ø©</span>
                                 </div>
                             </td>
                             <td>
                                 <button @click="toggleStatus(m)" class="badge" :class="m.status === 'active' ? 'badge-active' : 'badge-cancelled'"
-                                    x-text="m.status === 'active' ? 'نشطة' : 'متوقفة'"></button>
+                                    x-text="m.status === 'active' ? 'Ù†Ø´Ø·Ø©' : 'Ù…ØªÙˆÙ‚ÙØ©'"></button>
                             </td>
                             <td>
                                 <div class="flex gap-1">
                                     <button @click="editMethod(m)" class="btn btn-sm" style="background:#3B82F6" title="Edit" data-i18n-title="edit">
                                         <i class="fas fa-pen text-xs"></i>
                                     </button>
-                                    <button @click="linkModal(m)" class="btn btn-sm" style="background:#8B5CF6" title="ربط بشركات">
+                                    <button @click="linkModal(m)" class="btn btn-sm" style="background:#8B5CF6" title="Ø±Ø¨Ø· Ø¨Ø´Ø±ÙƒØ§Øª">
                                         <i class="fas fa-link text-xs"></i>
                                     </button>
                                     <button @click="deleteMethod(m)" class="btn btn-danger btn-sm" title="Delete" data-i18n-title="delete">
@@ -89,7 +89,7 @@
                     <tr x-show="filteredMethods.length === 0 && !loading">
                         <td colspan="8" class="text-center p-8 text-slate-400">
                             <i class="fas fa-inbox text-3xl mb-2"></i>
-                            <p>لا توجد وسائل دفع — أضف واحدة جديدة</p>
+                            <p>Ù„Ø§ ØªÙˆØ¬Ø¯ ÙˆØ³Ø§Ø¦Ù„ Ø¯ÙØ¹ â€” Ø£Ø¶Ù ÙˆØ§Ø­Ø¯Ø© Ø¬Ø¯ÙŠØ¯Ø©</p>
                         </td>
                     </tr>
                     <tr x-show="loading">
@@ -106,33 +106,33 @@
     <!-- Add/Edit Modal -->
     <div x-show="showAddModal" x-transition class="modal-overlay" @click.self="showAddModal = false" style="display:none">
         <div class="modal">
-            <h3 class="font-bold text-lg mb-4" x-text="editing ? 'تعديل وسيلة دفع' : 'إضافة وسيلة دفع'"></h3>
+            <h3 class="font-bold text-lg mb-4" x-text="editing ? 'ØªØ¹Ø¯ÙŠÙ„ ÙˆØ³ÙŠÙ„Ø© Ø¯ÙØ¹' : 'Ø¥Ø¶Ø§ÙØ© ÙˆØ³ÙŠÙ„Ø© Ø¯ÙØ¹'"></h3>
             <div class="space-y-3">
                 <div>
-                    <label class="block text-xs text-slate-400 mb-1">اسم الوسيلة</label>
-                    <input type="text" x-model="form.method_name" class="input w-full" placeholder="مثال: فودافون كاش">
+                    <label class="block text-xs text-slate-400 mb-1">Ø§Ø³Ù… Ø§Ù„ÙˆØ³ÙŠÙ„Ø©</label>
+                    <input type="text" x-model="form.method_name" class="input w-full" placeholder="Ù…Ø«Ø§Ù„: ÙÙˆØ¯Ø§ÙÙˆÙ† ÙƒØ§Ø´">
                 </div>
                 <div>
                     <label class="block text-xs text-slate-400 mb-1" data-i18n="type">Type</label>
                     <select x-model="form.method_type" class="input w-full">
-                        <option value="mobile">📱 محفظة إلكترونية</option>
-                        <option value="bank">🏦 حساب بنكي</option>
-                        <option value="card">💳 بطاقة</option>
-                        <option value="cash">💵 نقد</option>
+                        <option value="mobile">ðŸ“± Ù…Ø­ÙØ¸Ø© Ø¥Ù„ÙƒØªØ±ÙˆÙ†ÙŠØ©</option>
+                        <option value="bank">ðŸ¦ Ø­Ø³Ø§Ø¨ Ø¨Ù†ÙƒÙŠ</option>
+                        <option value="card">ðŸ’³ Ø¨Ø·Ø§Ù‚Ø©</option>
+                        <option value="cash">ðŸ’µ Ù†Ù‚Ø¯</option>
                     </select>
                 </div>
                 <div>
-                    <label class="block text-xs text-slate-400 mb-1">بيانات الحساب (التي ينسخها العميل)</label>
-                    <input type="text" x-model="form.account_data" class="input w-full" placeholder="مثال: 01012345678">
-                    <p class="text-xs text-slate-500 mt-1">هذه البيانات التي ينسخها العميل ويرسل لها المال</p>
+                    <label class="block text-xs text-slate-400 mb-1">Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø­Ø³Ø§Ø¨ (Ø§Ù„ØªÙŠ ÙŠÙ†Ø³Ø®Ù‡Ø§ Ø§Ù„Ø¹Ù…ÙŠÙ„)</label>
+                    <input type="text" x-model="form.account_data" class="input w-full" placeholder="Ù…Ø«Ø§Ù„: 01012345678">
+                    <p class="text-xs text-slate-500 mt-1">Ù‡Ø°Ù‡ Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„ØªÙŠ ÙŠÙ†Ø³Ø®Ù‡Ø§ Ø§Ù„Ø¹Ù…ÙŠÙ„ ÙˆÙŠØ±Ø³Ù„ Ù„Ù‡Ø§ Ø§Ù„Ù…Ø§Ù„</p>
                 </div>
                 <div>
-                    <label class="block text-xs text-slate-400 mb-1">معلومات إضافية</label>
-                    <input type="text" x-model="form.additional_info" class="input w-full" placeholder="مثال: فرع الرياض (اختياري)">
+                    <label class="block text-xs text-slate-400 mb-1">Ù…Ø¹Ù„ÙˆÙ…Ø§Øª Ø¥Ø¶Ø§ÙÙŠØ©</label>
+                    <input type="text" x-model="form.additional_info" class="input w-full" placeholder="Ù…Ø«Ø§Ù„: ÙØ±Ø¹ Ø§Ù„Ø±ÙŠØ§Ø¶ (Ø§Ø®ØªÙŠØ§Ø±ÙŠ)">
                 </div>
                 <div>
-                    <label class="block text-xs text-slate-400 mb-1">الأيقونة (إيموجي)</label>
-                    <input type="text" x-model="form.icon" class="input w-full" placeholder="💳" maxlength="2">
+                    <label class="block text-xs text-slate-400 mb-1">Ø§Ù„Ø£ÙŠÙ‚ÙˆÙ†Ø© (Ø¥ÙŠÙ…ÙˆØ¬ÙŠ)</label>
+                    <input type="text" x-model="form.icon" class="input w-full" placeholder="ðŸ’³" maxlength="2">
                 </div>
             </div>
             <div class="flex gap-2 justify-end mt-4">
@@ -145,9 +145,9 @@
     <!-- Link Modal -->
     <div x-show="showLinkModal" x-transition class="modal-overlay" @click.self="showLinkModal = false" style="display:none">
         <div class="modal">
-            <h3 class="font-bold text-lg mb-2">ربط وسيلة الدفع بالشركات</h3>
+            <h3 class="font-bold text-lg mb-2">Ø±Ø¨Ø· ÙˆØ³ÙŠÙ„Ø© Ø§Ù„Ø¯ÙØ¹ Ø¨Ø§Ù„Ø´Ø±ÙƒØ§Øª</h3>
             <p class="text-sm text-slate-400 mb-4">
-                <span x-text="selectedMethod?.method_name"></span> —
+                <span x-text="selectedMethod?.method_name"></span> â€”
                 <code class="text-amber-400" x-text="selectedMethod?.account_data"></code>
             </p>
             <div class="space-y-2 max-h-60 overflow-y-auto">
@@ -155,14 +155,14 @@
                     <label class="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-700 cursor-pointer">
                         <input type="checkbox" :value="c.id" x-model="selectedCompanies"
                                :checked="isLinked(c.id, selectedMethod?.id)">
-                        <span x-text="c.icon || '🏢'"></span>
+                        <span x-text="c.icon || 'ðŸ¢'"></span>
                         <span x-text="c.name"></span>
                     </label>
                 </template>
             </div>
             <div class="flex gap-2 justify-end mt-4">
                 <button @click="showLinkModal = false" class="btn btn-sm" style="background:#475569" data-i18n="cancel">Cancel</button>
-                <button @click="saveLinks()" class="btn btn-primary btn-sm">حفظ الروابط</button>
+                <button @click="saveLinks()" class="btn btn-primary btn-sm">Ø­ÙØ¸ Ø§Ù„Ø±ÙˆØ§Ø¨Ø·</button>
             </div>
         </div>
     </div>
@@ -178,7 +178,7 @@ function paymentMethodsApp() {
         search: '', loading: true,
         showAddModal: false, showLinkModal: false,
         editing: false, selectedMethod: null, selectedCompanies: [],
-        form: { method_name: '', method_type: 'mobile', account_data: '', additional_info: '', icon: '💳' },
+        form: { method_name: '', method_type: 'mobile', account_data: '', additional_info: '', icon: 'ðŸ’³' },
 
         async init() { await this.loadData(); },
 
@@ -197,7 +197,7 @@ function paymentMethodsApp() {
                     this.links = linkRes.links || [];
                 } catch { this.links = []; }
                 this.filterMethods();
-            } catch(e) { console.error(e); toast('فشل تحميل البيانات', 'error'); }
+            } catch(e) { console.error(e); toast('ÙØ´Ù„ ØªØ­Ù…ÙŠÙ„ Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª', 'error'); }
             this.loading = false;
         },
 
@@ -221,12 +221,12 @@ function paymentMethodsApp() {
 
         copyToClipboard(text) {
             navigator.clipboard.writeText(text);
-            toast('تم النسخ: ' + text, 'success');
+            toast('ØªÙ… Ø§Ù„Ù†Ø³Ø®: ' + text, 'success');
         },
 
         editMethod(m) {
             this.editing = true;
-            this.form = { method_name: m.method_name, method_type: m.method_type, account_data: m.account_data, additional_info: m.additional_info || '', icon: m.icon || '💳' };
+            this.form = { method_name: m.method_name, method_type: m.method_type, account_data: m.account_data, additional_info: m.additional_info || '', icon: m.icon || 'ðŸ’³' };
             this.selectedMethod = m;
             this.showAddModal = true;
         },
@@ -241,7 +241,7 @@ function paymentMethodsApp() {
 
         async saveMethod() {
             if (!this.form.method_name || !this.form.account_data) {
-                toast('املأ الاسم والبيانات', 'warning');
+                toast('Ø§Ù…Ù„Ø£ Ø§Ù„Ø§Ø³Ù… ÙˆØ§Ù„Ø¨ÙŠØ§Ù†Ø§Øª', 'warning');
                 return;
             }
             if (this.editing && this.selectedMethod) {
@@ -249,17 +249,17 @@ function paymentMethodsApp() {
                     method: 'PUT',
                     body: JSON.stringify(this.form)
                 });
-                toast('تم التعديل', 'success');
+                toast('ØªÙ… Ø§Ù„ØªØ¹Ø¯ÙŠÙ„', 'success');
             } else {
                 await api('/api/payment-methods', {
                     method: 'POST',
                     body: JSON.stringify(this.form)
                 });
-                toast('تمت الإضافة', 'success');
+                toast('ØªÙ…Øª Ø§Ù„Ø¥Ø¶Ø§ÙØ©', 'success');
             }
             this.showAddModal = false;
             this.editing = false;
-            this.form = { method_name: '', method_type: 'mobile', account_data: '', additional_info: '', icon: '💳' };
+            this.form = { method_name: '', method_type: 'mobile', account_data: '', additional_info: '', icon: 'ðŸ’³' };
             await this.loadData();
         },
 
@@ -269,14 +269,14 @@ function paymentMethodsApp() {
                 method: 'PUT',
                 body: JSON.stringify({ status: newStatus })
             });
-            toast('تم التبديل', 'success');
+            toast('ØªÙ… Ø§Ù„ØªØ¨Ø¯ÙŠÙ„', 'success');
             await this.loadData();
         },
 
         async deleteMethod(m) {
-            if (!confirm('حذف وسيلة الدفع: ' + m.method_name + '؟')) return;
+            if (!confirm('Ø­Ø°Ù ÙˆØ³ÙŠÙ„Ø© Ø§Ù„Ø¯ÙØ¹: ' + m.method_name + 'ØŸ')) return;
             await api(`/api/payment-methods/${m.id}`, { method: 'DELETE' });
-            toast('تم الحذف', 'warning');
+            toast('ØªÙ… Ø§Ù„Ø­Ø°Ù', 'warning');
             await this.loadData();
         },
 
@@ -289,7 +289,7 @@ function paymentMethodsApp() {
                     company_ids: this.selectedCompanies
                 })
             });
-            toast('تم حفظ الروابط', 'success');
+            toast('ØªÙ… Ø­ÙØ¸ Ø§Ù„Ø±ÙˆØ§Ø¨Ø·', 'success');
             this.showLinkModal = false;
             await this.loadData();
         }

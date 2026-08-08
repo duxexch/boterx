@@ -1,6 +1,6 @@
-{% extends 'base.html' %}
-{% block title %}الشكاوى — Boterx{% endblock %}
-{% block page_title %}📢 الشكاوى{% endblock %}
+﻿{% extends 'base.html' %}
+{% block title %}Ø§Ù„Ø´ÙƒØ§ÙˆÙ‰ â€” Boterx{% endblock %}
+{% block page_title %}ðŸ“¢ Ø§Ù„Ø´ÙƒØ§ÙˆÙ‰{% endblock %}
 
 {% block content %}
 <div x-data="complaintsApp()" x-init="init()" class="space-y-4">
@@ -33,9 +33,9 @@
                             <td class="max-w-xs truncate" x-text="c.message"></td>
                             <td x-html="statusBadge(c.status === 'resolved' ? 'approved' : 'pending')"></td>
                             <td class="text-xs text-slate-400" x-text="c.date"></td>
-                            <td class="max-w-xs truncate text-xs" x-text="c.admin_response || '—'"></td>
+                            <td class="max-w-xs truncate text-xs" x-text="c.admin_response || 'â€”'"></td>
                             <td>
-                                <button @click="openReply(c)" class="btn btn-primary btn-sm">رد</button>
+                                <button @click="openReply(c)" class="btn btn-primary btn-sm">Ø±Ø¯</button>
                             </td>
                         </tr>
                     </template>
@@ -78,9 +78,9 @@ function complaintsApp() {
         },
         openReply(c) { this.selected = c; this.replyText = c.admin_response || ''; this.showModal = true; },
         async sendReply() {
-            if (!this.replyText.trim()) return toast('اكتب رداً', 'warning');
+            if (!this.replyText.trim()) return toast('Ø§ÙƒØªØ¨ Ø±Ø¯Ø§Ù‹', 'warning');
             await api(`/api/complaints/${this.selected.id}/reply`, { method: 'POST', body: JSON.stringify({ reply: this.replyText }) });
-            toast('تم الرد', 'success');
+            toast('ØªÙ… Ø§Ù„Ø±Ø¯', 'success');
             this.showModal = false;
             this.load();
         }

@@ -1,10 +1,10 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>اخطف الهدية — VEX</title>
-<link rel="stylesheet" href="/static/css/game-base.css">
+<title>Ø§Ø®Ø·Ù Ø§Ù„Ù‡Ø¯ÙŠØ© â€” VEX</title>
+<link rel="stylesheet" href="/static/css/game-base.css?v=20260808">
 <style>
 *{box-sizing:border-box}
 .game-area{position:relative;overflow:hidden;touch-action:none;flex:1;display:flex;flex-direction:column}
@@ -31,12 +31,12 @@
 <div id="app" style="display:none;flex-direction:column;height:100dvh">
   <div class="game-topbar">
     <div class="topbar-left">
-      <button class="btn-back" id="backBtn" onclick="handleBack()">←</button>
-      <div class="bal-pill"><span class="bal-icon">💰</span><span class="bal-val" id="bal">0</span><span class="bal-cur" id="cur">EGP</span></div>
+      <button class="btn-back" id="backBtn" onclick="handleBack()">â†</button>
+      <div class="bal-pill"><span class="bal-icon">ðŸ’°</span><span class="bal-val" id="bal">0</span><span class="bal-cur" id="cur">EGP</span></div>
     </div>
     <div class="topbar-right">
       <span class="streak-badge" id="streakBadge" style="display:none"></span>
-      <button class="btn-sound" id="soundBtn" onclick="toggleSound()">🔊</button>
+      <button class="btn-sound" id="soundBtn" onclick="toggleSound()">ðŸ”Š</button>
     </div>
   </div>
 
@@ -45,36 +45,36 @@
     <div class="hud">
       <div class="hud-score" id="hudScore">0</div>
       <div class="hud-timer" id="hudTimer">20</div>
-      <div class="hud-lives" id="hudLives">❤️❤️❤️</div>
+      <div class="hud-lives" id="hudLives">â¤ï¸â¤ï¸â¤ï¸</div>
     </div>
 
     <!-- Start Overlay -->
     <div class="overlay" id="startOverlay">
-      <div class="overlay-title">🎁 اخطف الهدايا!</div>
-      <div class="overlay-sub">اضغط على الهدايا لاختطافها قبل أن تختفي</div>
+      <div class="overlay-title">ðŸŽ Ø§Ø®Ø·Ù Ø§Ù„Ù‡Ø¯Ø§ÙŠØ§!</div>
+      <div class="overlay-sub">Ø§Ø¶ØºØ· Ø¹Ù„Ù‰ Ø§Ù„Ù‡Ø¯Ø§ÙŠØ§ Ù„Ø§Ø®ØªØ·Ø§ÙÙ‡Ø§ Ù‚Ø¨Ù„ Ø£Ù† ØªØ®ØªÙÙŠ</div>
       <div class="bet-row-ov">
-        <button class="ctrl-btn-ov" onclick="adjustBet('betInpOv',0.5)">½</button>
+        <button class="ctrl-btn-ov" onclick="adjustBet('betInpOv',0.5)">Â½</button>
         <input type="number" class="bet-inp-ov" id="betInpOv" value="10" min="1">
-        <button class="ctrl-btn-ov" onclick="adjustBet('betInpOv',2)">2×</button>
+        <button class="ctrl-btn-ov" onclick="adjustBet('betInpOv',2)">2Ã—</button>
       </div>
-      <button class="start-btn" onclick="startGame()">🚀 ابدأ اللعبة</button>
+      <button class="start-btn" onclick="startGame()">ðŸš€ Ø§Ø¨Ø¯Ø£ Ø§Ù„Ù„Ø¹Ø¨Ø©</button>
     </div>
 
     <!-- Result Overlay -->
     <div class="overlay" id="resultOverlay" style="display:none">
-      <div class="overlay-title" id="resultTitle">انتهت اللعبة!</div>
+      <div class="overlay-title" id="resultTitle">Ø§Ù†ØªÙ‡Øª Ø§Ù„Ù„Ø¹Ø¨Ø©!</div>
       <div class="overlay-score" id="resultScore">0</div>
       <div class="overlay-payout" id="resultPayout"></div>
       <div class="overlay-sub" id="resultSub"></div>
-      <button class="result-btn" onclick="resetGame()">🔄 العب مرة أخرى</button>
+      <button class="result-btn" onclick="resetGame()">ðŸ”„ Ø§Ù„Ø¹Ø¨ Ù…Ø±Ø© Ø£Ø®Ø±Ù‰</button>
     </div>
   </div>
 </div>
 <div id="loading" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg);flex-direction:column;gap:12px">
-  <div style="font-size:40px">🎁</div>
-  <div style="color:var(--text-dim);font-size:14px">جارٍ التحميل...</div>
+  <div style="font-size:40px">ðŸŽ</div>
+  <div style="color:var(--text-dim);font-size:14px">Ø¬Ø§Ø±Ù Ø§Ù„ØªØ­Ù…ÙŠÙ„...</div>
 </div>
-<script src="/static/js/game-base.js"></script>
+<script src="/static/js/game-base.js?v=20260808"></script>
 <script>
 'use strict';
 var canvas = document.getElementById('gameCanvas');
@@ -108,7 +108,7 @@ function _loadPendingSession() {
 var animId = null;
 var timerInterval = null;
 var W, H;
-var GIFT_EMOJIS = ['🎁','🎀','🎊','💰','⭐','🏆','💎','🍀'];
+var GIFT_EMOJIS = ['ðŸŽ','ðŸŽ€','ðŸŽŠ','ðŸ’°','â­','ðŸ†','ðŸ’Ž','ðŸ€'];
 var GIFT_VALUES = [1,1,1,2,2,3,5,10];
 var gameDuration = 20;
 
@@ -141,13 +141,13 @@ function startGame() {
     animId = requestAnimationFrame(gameLoop);
     loadBalance();
   }).catch(function() {
-    // Network error at spin — no session was created so nothing was deducted.
+    // Network error at spin â€” no session was created so nothing was deducted.
     // Do NOT enter offline play mode since there is no server-tracked session.
-    showToast('تعذّر الاتصال. تحقق من الشبكة وأعد المحاولة.', 'error');
+    showToast('ØªØ¹Ø°Ù‘Ø± Ø§Ù„Ø§ØªØµØ§Ù„. ØªØ­Ù‚Ù‚ Ù…Ù† Ø§Ù„Ø´Ø¨ÙƒØ© ÙˆØ£Ø¹Ø¯ Ø§Ù„Ù…Ø­Ø§ÙˆÙ„Ø©.', 'error');
   });
 }
 
-// ── On page load: recover a pending settlement from localStorage ──────────────
+// â”€â”€ On page load: recover a pending settlement from localStorage â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // If the player reloads after a failed /api/snatch/end, resume settlement so
 // their server-stored payout is credited rather than being TTL-refunded.
 (function _recoverPendingSession() {
@@ -159,8 +159,8 @@ function startGame() {
   var payoutEl  = document.getElementById('resultPayout');
   if (!overlayEl) return;
   overlayEl.style.display = 'flex';
-  if (subEl)    subEl.textContent    = 'جارٍ استكمال الجلسة السابقة…';
-  if (payoutEl) payoutEl.textContent = '—';
+  if (subEl)    subEl.textContent    = 'Ø¬Ø§Ø±Ù Ø§Ø³ØªÙƒÙ…Ø§Ù„ Ø§Ù„Ø¬Ù„Ø³Ø© Ø§Ù„Ø³Ø§Ø¨Ù‚Ø©â€¦';
+  if (payoutEl) payoutEl.textContent = 'â€”';
 
   snatchSessionId = pending.sid;
   snatchFinalScore = pending.sc || 0;
@@ -176,21 +176,21 @@ function startGame() {
         ? ('+ ' + fmtAmount(payout) + ' ' + gameCurrency)
         : ('0 ' + gameCurrency);
       if (subEl) subEl.textContent = payout > 0
-        ? 'تمت المكافأة من الجلسة السابقة!'
-        : 'انتهت الجلسة السابقة بدون مكافأة.';
+        ? 'ØªÙ…Øª Ø§Ù„Ù…ÙƒØ§ÙØ£Ø© Ù…Ù† Ø§Ù„Ø¬Ù„Ø³Ø© Ø§Ù„Ø³Ø§Ø¨Ù‚Ø©!'
+        : 'Ø§Ù†ØªÙ‡Øª Ø§Ù„Ø¬Ù„Ø³Ø© Ø§Ù„Ø³Ø§Ø¨Ù‚Ø© Ø¨Ø¯ÙˆÙ† Ù…ÙƒØ§ÙØ£Ø©.';
       loadBalance();
     } else if (d && d.error && /settled|refunded|not found/i.test(d.error)) {
       snatchSessionId = null; snatchFinalScore = 0; _clearPendingSession();
-      if (subEl) subEl.textContent = 'الجلسة السابقة تم تسويتها بالفعل.';
-      if (payoutEl) payoutEl.textContent = '—';
+      if (subEl) subEl.textContent = 'Ø§Ù„Ø¬Ù„Ø³Ø© Ø§Ù„Ø³Ø§Ø¨Ù‚Ø© ØªÙ… ØªØ³ÙˆÙŠØªÙ‡Ø§ Ø¨Ø§Ù„ÙØ¹Ù„.';
+      if (payoutEl) payoutEl.textContent = 'â€”';
       loadBalance();
     } else {
-      // Still failing — leave localStorage intact, show retry button
-      if (subEl) subEl.textContent = 'تعذّر الاتصال — اضغط لإعادة المحاولة';
+      // Still failing â€” leave localStorage intact, show retry button
+      if (subEl) subEl.textContent = 'ØªØ¹Ø°Ù‘Ø± Ø§Ù„Ø§ØªØµØ§Ù„ â€” Ø§Ø¶ØºØ· Ù„Ø¥Ø¹Ø§Ø¯Ø© Ø§Ù„Ù…Ø­Ø§ÙˆÙ„Ø©';
       if (!document.getElementById('snatchRetryBtn')) {
         var btn = document.createElement('button');
         btn.id = 'snatchRetryBtn';
-        btn.textContent = '🔄 إعادة المحاولة';
+        btn.textContent = 'ðŸ”„ Ø¥Ø¹Ø§Ø¯Ø© Ø§Ù„Ù…Ø­Ø§ÙˆÙ„Ø©';
         btn.style.cssText = 'margin:12px auto;display:block;padding:10px 28px;font-size:15px;border-radius:8px;background:#f59e0b;color:#1a1a1a;border:none;cursor:pointer;font-weight:700;';
         btn.onclick = function() {
           btn.disabled = true;
@@ -200,11 +200,11 @@ function startGame() {
       }
     }
   }).catch(function() {
-    if (subEl) subEl.textContent = 'تعذّر الاتصال — اضغط لإعادة المحاولة';
+    if (subEl) subEl.textContent = 'ØªØ¹Ø°Ù‘Ø± Ø§Ù„Ø§ØªØµØ§Ù„ â€” Ø§Ø¶ØºØ· Ù„Ø¥Ø¹Ø§Ø¯Ø© Ø§Ù„Ù…Ø­Ø§ÙˆÙ„Ø©';
     if (!document.getElementById('snatchRetryBtn')) {
       var btn = document.createElement('button');
       btn.id = 'snatchRetryBtn';
-      btn.textContent = '🔄 إعادة المحاولة';
+      btn.textContent = 'ðŸ”„ Ø¥Ø¹Ø§Ø¯Ø© Ø§Ù„Ù…Ø­Ø§ÙˆÙ„Ø©';
       btn.style.cssText = 'margin:12px auto;display:block;padding:10px 28px;font-size:15px;border-radius:8px;background:#f59e0b;color:#1a1a1a;border:none;cursor:pointer;font-weight:700;';
       btn.onclick = function() { btn.disabled = true; location.reload(); };
       overlayEl.appendChild(btn);
@@ -247,8 +247,8 @@ function updateHUD() {
   document.getElementById('hudScore').textContent = score;
   document.getElementById('hudTimer').textContent = timeLeft;
   var livesHtml = '';
-  for (var i = 0; i < lives; i++) livesHtml += '❤️';
-  for (var j = lives; j < 3; j++) livesHtml += '🖤';
+  for (var i = 0; i < lives; i++) livesHtml += 'â¤ï¸';
+  for (var j = lives; j < 3; j++) livesHtml += 'ðŸ–¤';
   document.getElementById('hudLives').textContent = livesHtml;
 }
 
@@ -269,7 +269,7 @@ function gameLoop() {
       g.vy -= 0.3; g.alpha -= 0.08;
       if (g.alpha <= 0) { gifts.splice(i, 1); continue; }
     } else if (g.y > H + 60 || g.life > g.maxLife) {
-      // Missed gift — lose a life
+      // Missed gift â€” lose a life
       lives = Math.max(0, lives - 1);
       updateHUD(); hapticNotif('error');
       gifts.splice(i, 1);
@@ -356,10 +356,10 @@ function endGame() {
   var subEl     = document.getElementById('resultSub');
   var overlayEl = document.getElementById('resultOverlay');
 
-  titleEl.textContent  = lives <= 0 ? '💀 نفدت الحياة!' : '⏰ انتهى الوقت!';
-  scoreEl.textContent  = score + ' نقطة';
+  titleEl.textContent  = lives <= 0 ? 'ðŸ’€ Ù†ÙØ¯Øª Ø§Ù„Ø­ÙŠØ§Ø©!' : 'â° Ø§Ù†ØªÙ‡Ù‰ Ø§Ù„ÙˆÙ‚Øª!';
+  scoreEl.textContent  = score + ' Ù†Ù‚Ø·Ø©';
   payoutEl.textContent = '';
-  subEl.textContent    = 'جارٍ حساب مكافأتك…';
+  subEl.textContent    = 'Ø¬Ø§Ø±Ù Ø­Ø³Ø§Ø¨ Ù…ÙƒØ§ÙØ£ØªÙƒâ€¦';
   overlayEl.style.display = 'flex';
 
   var finalScore = score;
@@ -368,7 +368,7 @@ function endGame() {
   // Call /api/snatch/end to credit the server-determined payout.
   // snatchSessionId is cleared ONLY on a successful terminal response.
   // On network failure the ID is kept (and mirrored to localStorage) so the
-  // player can retry without losing their payout — the server CAS ensures
+  // player can retry without losing their payout â€” the server CAS ensures
   // credit_with_idempotency is issued exactly once even if this is called again.
   if (snatchSessionId) {
     snatchFinalScore = finalScore;
@@ -380,18 +380,18 @@ function endGame() {
         body: JSON.stringify({ uid: uid, score: sc, session_id: sid })
       }).then(function(r) { return r.json(); }).then(function(d) {
         if (d && (d.success || d.payout !== undefined)) {
-          // Confirmed settled — clear pending session state
+          // Confirmed settled â€” clear pending session state
           snatchSessionId = null;
           snatchFinalScore = 0;
           _clearPendingSession();
           var payout = (typeof d.payout === 'number') ? d.payout : 0;
           if (payout > 0) {
             payoutEl.textContent = '+ ' + fmtAmount(payout) + ' ' + gameCurrency;
-            subEl.textContent = 'أحسنت! الرصيد تم تحديثه';
+            subEl.textContent = 'Ø£Ø­Ø³Ù†Øª! Ø§Ù„Ø±ØµÙŠØ¯ ØªÙ… ØªØ­Ø¯ÙŠØ«Ù‡';
             soundWin(payout > betAmount); hapticNotif('success');
           } else {
             payoutEl.textContent = '0 ' + gameCurrency;
-            subEl.textContent = 'حاول مرة أخرى!';
+            subEl.textContent = 'Ø­Ø§ÙˆÙ„ Ù…Ø±Ø© Ø£Ø®Ø±Ù‰!';
             hapticNotif('error');
           }
           // Remove retry button if visible
@@ -404,33 +404,33 @@ function endGame() {
           snatchSessionId = null;
           snatchFinalScore = 0;
           _clearPendingSession();
-          payoutEl.textContent = '—';
+          payoutEl.textContent = 'â€”';
           subEl.textContent = d.error;
           var retryBtn = document.getElementById('snatchRetryBtn');
           if (retryBtn) retryBtn.remove();
           loadBalance();
         } else {
-          // Non-terminal error (e.g. server busy) — keep session, show retry
+          // Non-terminal error (e.g. server busy) â€” keep session, show retry
           _showEndRetry(sid, sc);
         }
       }).catch(function() {
-        // Network error — keep snatchSessionId and localStorage entry for retry
+        // Network error â€” keep snatchSessionId and localStorage entry for retry
         _showEndRetry(sid, sc);
       });
     }
 
     function _showEndRetry(sid, sc) {
-      payoutEl.textContent = '—';
-      subEl.textContent = 'تعذّر الاتصال — اضغط لإعادة المحاولة';
+      payoutEl.textContent = 'â€”';
+      subEl.textContent = 'ØªØ¹Ø°Ù‘Ø± Ø§Ù„Ø§ØªØµØ§Ù„ â€” Ø§Ø¶ØºØ· Ù„Ø¥Ø¹Ø§Ø¯Ø© Ø§Ù„Ù…Ø­Ø§ÙˆÙ„Ø©';
       hapticNotif('error');
       var existing = document.getElementById('snatchRetryBtn');
       if (!existing) {
         var btn = document.createElement('button');
         btn.id = 'snatchRetryBtn';
-        btn.textContent = '🔄 إعادة المحاولة';
+        btn.textContent = 'ðŸ”„ Ø¥Ø¹Ø§Ø¯Ø© Ø§Ù„Ù…Ø­Ø§ÙˆÙ„Ø©';
         btn.style.cssText = 'margin:12px auto;display:block;padding:10px 28px;font-size:15px;border-radius:8px;background:#f59e0b;color:#1a1a1a;border:none;cursor:pointer;font-weight:700;';
         btn.onclick = function() {
-          subEl.textContent = 'جارٍ المحاولة…';
+          subEl.textContent = 'Ø¬Ø§Ø±Ù Ø§Ù„Ù…Ø­Ø§ÙˆÙ„Ø©â€¦';
           btn.disabled = true;
           _doEndRequest(sid, sc).finally(function() { btn.disabled = false; });
         };
@@ -442,9 +442,9 @@ function endGame() {
 
     _doEndRequest(snatchSessionId, finalScore);
   } else {
-    // Offline / no session — show placeholder; no financial outcome
-    payoutEl.textContent = '—';
-    subEl.textContent = 'وضع غير متصل — لا توجد جلسة نشطة';
+    // Offline / no session â€” show placeholder; no financial outcome
+    payoutEl.textContent = 'â€”';
+    subEl.textContent = 'ÙˆØ¶Ø¹ ØºÙŠØ± Ù…ØªØµÙ„ â€” Ù„Ø§ ØªÙˆØ¬Ø¯ Ø¬Ù„Ø³Ø© Ù†Ø´Ø·Ø©';
     addHistItem(document.querySelector('.hist-bar') || document.createElement('div'), Math.max(1, finalScore * 0.1));
   }
 }

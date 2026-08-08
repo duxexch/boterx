@@ -1,10 +1,10 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>Aviator — VEX</title>
-<link rel="stylesheet" href="/static/css/game-base.css">
+<title>Aviator â€” VEX</title>
+<link rel="stylesheet" href="/static/css/game-base.css?v=20260808">
 <style>
 .game-area{overflow:hidden;position:relative;perspective:800px;perspective-origin:50% 60%}
 #canvas{position:absolute;inset:0;width:100%;height:100%;z-index:2;transform-style:preserve-3d}
@@ -79,13 +79,13 @@
 <div id="app" style="display:none">
   <div class="game-topbar">
     <div class="topbar-left">
-      <button class="btn-back" onclick="goBack()">‹</button>
-      <div class="bal-pill"><span class="bal-icon">💰</span><span class="bal-val" id="bal">0</span><span class="bal-cur" id="cur">EGP</span></div>
+      <button class="btn-back" onclick="goBack()">â€¹</button>
+      <div class="bal-pill"><span class="bal-icon">ðŸ’°</span><span class="bal-val" id="bal">0</span><span class="bal-cur" id="cur">EGP</span></div>
     </div>
     <div class="topbar-right">
-      <span class="streak-badge" id="streak" style="display:none">🔥 0</span>
-      <span id="connIndicator">🟡</span>
-      <button class="btn-sound" id="soundBtn" onclick="toggleSound()">🔊</button>
+      <span class="streak-badge" id="streak" style="display:none">ðŸ”¥ 0</span>
+      <span id="connIndicator">ðŸŸ¡</span>
+      <button class="btn-sound" id="soundBtn" onclick="toggleSound()">ðŸ”Š</button>
     </div>
   </div>
   <div class="hist-bar" id="history"></div>
@@ -94,7 +94,7 @@
     <div class="parachutes-layer" id="parachutesLayer"></div>
     <div class="mult-display show" id="multDisplay"><div class="mult-val" id="mult">1.00x</div></div>
     <div class="plane-mult" id="planeMult"><div class="plane-mult-val flying" id="planeMultVal">1.00x</div></div>
-    <div class="game-status" id="statusText">انتظر الجولة القادمة... ✈️</div>
+    <div class="game-status" id="statusText">Ø§Ù†ØªØ¸Ø± Ø§Ù„Ø¬ÙˆÙ„Ø© Ø§Ù„Ù‚Ø§Ø¯Ù…Ø©... âœˆï¸</div>
     <div class="result-msg" id="crashMsg"></div>
     <div class="other-bets" id="otherBets"></div>
     <div class="session-stats">
@@ -108,31 +108,31 @@
   <div class="bet-panel">
     <div class="bet-slots">
       <div class="bet-slot active" id="slot1">
-        <div class="bet-slot-header"><span class="bet-slot-label">رهان 1</span><div class="bet-slot-toggle on" onclick="toggleSlot(1)"></div></div>
+        <div class="bet-slot-header"><span class="bet-slot-label">Ø±Ù‡Ø§Ù† 1</span><div class="bet-slot-toggle on" onclick="toggleSlot(1)"></div></div>
         <input type="number" class="bet-slot-input" id="bet1" value="10" min="1">
-        <div class="bet-slot-controls"><div class="bet-slot-ctrl" onclick="adjustSlot(1,0.5)">½</div><div class="bet-slot-ctrl" onclick="adjustSlot(1,2)">2×</div><div class="bet-slot-ctrl" onclick="setSlotMin(1)">Min</div><div class="bet-slot-ctrl" onclick="setSlotMax(1)">Max</div></div>
+        <div class="bet-slot-controls"><div class="bet-slot-ctrl" onclick="adjustSlot(1,0.5)">Â½</div><div class="bet-slot-ctrl" onclick="adjustSlot(1,2)">2Ã—</div><div class="bet-slot-ctrl" onclick="setSlotMin(1)">Min</div><div class="bet-slot-ctrl" onclick="setSlotMax(1)">Max</div></div>
         <div class="bet-slot-auto"><input type="checkbox" id="auto1" style="accent-color:var(--green);width:12px;height:12px"><span class="auto-label">Auto</span><input type="number" id="autoVal1" value="2.0" step="0.1" min="1.1" style="width:36px"><span class="auto-label">x</span></div>
-        <button class="bet-slot-btn bet" id="btn1" onclick="placeBet(1)">رهان</button>
+        <button class="bet-slot-btn bet" id="btn1" onclick="placeBet(1)">Ø±Ù‡Ø§Ù†</button>
       </div>
       <div class="bet-slot" id="slot2">
-        <div class="bet-slot-header"><span class="bet-slot-label">رهان 2</span><div class="bet-slot-toggle" onclick="toggleSlot(2)"></div></div>
+        <div class="bet-slot-header"><span class="bet-slot-label">Ø±Ù‡Ø§Ù† 2</span><div class="bet-slot-toggle" onclick="toggleSlot(2)"></div></div>
         <input type="number" class="bet-slot-input" id="bet2" value="0" min="0">
-        <div class="bet-slot-controls"><div class="bet-slot-ctrl" onclick="adjustSlot(2,0.5)">½</div><div class="bet-slot-ctrl" onclick="adjustSlot(2,2)">2×</div><div class="bet-slot-ctrl" onclick="setSlotMin(2)">Min</div><div class="bet-slot-ctrl" onclick="setSlotMax(2)">Max</div></div>
+        <div class="bet-slot-controls"><div class="bet-slot-ctrl" onclick="adjustSlot(2,0.5)">Â½</div><div class="bet-slot-ctrl" onclick="adjustSlot(2,2)">2Ã—</div><div class="bet-slot-ctrl" onclick="setSlotMin(2)">Min</div><div class="bet-slot-ctrl" onclick="setSlotMax(2)">Max</div></div>
         <div class="bet-slot-auto"><input type="checkbox" id="auto2" style="accent-color:var(--green);width:12px;height:12px"><span class="auto-label">Auto</span><input type="number" id="autoVal2" value="2.0" step="0.1" min="1.1" style="width:36px"><span class="auto-label">x</span></div>
-        <button class="bet-slot-btn bet" id="btn2" onclick="placeBet(2)" disabled>رهان</button>
+        <button class="bet-slot-btn bet" id="btn2" onclick="placeBet(2)" disabled>Ø±Ù‡Ø§Ù†</button>
       </div>
     </div>
-    <div class="potential" style="margin-top:6px"><span class="pot-label">ربح محتمل:</span><span class="pot-val" id="potVal">0.00</span></div>
+    <div class="potential" style="margin-top:6px"><span class="pot-label">Ø±Ø¨Ø­ Ù…Ø­ØªÙ…Ù„:</span><span class="pot-val" id="potVal">0.00</span></div>
   </div>
-  <div class="lp-bar"><div class="lp-header"><span>👥 <span class="lp-count" id="lpCount">0</span></span><span id="lpTotal">💰 0</span></div><div class="lp-list" id="lpList"></div></div>
+  <div class="lp-bar"><div class="lp-header"><span>ðŸ‘¥ <span class="lp-count" id="lpCount">0</span></span><span id="lpTotal">ðŸ’° 0</span></div><div class="lp-list" id="lpList"></div></div>
 </div>
-<script src="/static/js/game-base.js"></script>
+<script src="/static/js/game-base.js?v=20260808"></script>
 <script>
 'use strict';
 var canvas = document.getElementById('canvas');
 var ctx = canvas.getContext('2d');
 
-// ── State ──────────────────────────────────────
+// â”€â”€ State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 var roundPhase = 'connecting';  // connecting | waiting | starting | flying | crashed
 var currentMult = 1.0;
 var myBets = {
@@ -158,7 +158,7 @@ function pickWeather() {
   if (weather === 'night') { bgStars = []; for (var i=0;i<80;i++) bgStars.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height*0.7,r:Math.random()*1.5,tw:Math.random()*6.28}); }
 }
 
-// ── Canvas Drawing ──────────────────────────────
+// â”€â”€ Canvas Drawing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function drawBackground(alt) {
   var w = canvas.width, h = canvas.height, scroll = bgScroll;
   if (weather === 'day') {
@@ -242,11 +242,11 @@ function drawPlane(px, py, angle) {
   ctx.restore();
 }
 
-// ── SSE Connection ─────────────────────────────
+// â”€â”€ SSE Connection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function connectSSE() {
   aviatorSSE = new EventSource(BASE + '/api/aviator/stream?uid=' + uid);
-  var ci = document.getElementById('connIndicator'); if (ci) ci.textContent = '🟡';
-  aviatorSSE.onopen = function() { var c = document.getElementById('connIndicator'); if (c) c.textContent = '🟢'; };
+  var ci = document.getElementById('connIndicator'); if (ci) ci.textContent = 'ðŸŸ¡';
+  aviatorSSE.onopen = function() { var c = document.getElementById('connIndicator'); if (c) c.textContent = 'ðŸŸ¢'; };
   aviatorSSE.onmessage = function(e) {
     try {
       var d = JSON.parse(e.data);
@@ -258,12 +258,12 @@ function connectSSE() {
     } catch(err) {}
   };
   aviatorSSE.onerror = function() {
-    var c = document.getElementById('connIndicator'); if (c) c.textContent = '🔴';
+    var c = document.getElementById('connIndicator'); if (c) c.textContent = 'ðŸ”´';
     aviatorSSE.close(); setTimeout(connectSSE, 2000);
   };
 }
 
-// ── Phase Handlers ─────────────────────────────
+// â”€â”€ Phase Handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function onWaiting(d) {
   roundPhase = 'waiting'; currentMult = 1.0; trail = [];
   ctx.clearRect(0,0,canvas.width,canvas.height);
@@ -272,7 +272,7 @@ function onWaiting(d) {
   document.getElementById('mult').textContent = '1.00x';
   document.getElementById('mult').className = 'mult-val';
   document.getElementById('planeMult').style.opacity = '0';
-  document.getElementById('statusText').textContent = 'ضع رهانك — الجولة تبدأ Soon ✈️';
+  document.getElementById('statusText').textContent = 'Ø¶Ø¹ Ø±Ù‡Ø§Ù†Ùƒ â€” Ø§Ù„Ø¬ÙˆÙ„Ø© ØªØ¨Ø¯Ø£ Soon âœˆï¸';
   document.getElementById('crashMsg').classList.remove('show');
   document.getElementById('otherBets').innerHTML = '';
   // Reset bets + auto-place queued bets
@@ -288,7 +288,7 @@ function onWaiting(d) {
     var btn = document.getElementById('btn'+s);
     var slotEl = document.getElementById('slot'+s);
     slotEl.classList.remove('queued');
-    if (myBets[s].active) { btn.disabled = false; btn.textContent = 'رهان'; btn.className = 'bet-slot-btn bet'; btn.style.background=''; btn.style.color=''; btn.style.display='block'; }
+    if (myBets[s].active) { btn.disabled = false; btn.textContent = 'Ø±Ù‡Ø§Ù†'; btn.className = 'bet-slot-btn bet'; btn.style.background=''; btn.style.color=''; btn.style.display='block'; }
   }
   // History
   if (d.history) {
@@ -311,11 +311,11 @@ function onWaiting(d) {
 
 function onStarting(d) {
   roundPhase = 'starting';
-  document.getElementById('statusText').textContent = '🔒 انطلقت الطائرة...';
+  document.getElementById('statusText').textContent = 'ðŸ”’ Ø§Ù†Ø·Ù„Ù‚Øª Ø§Ù„Ø·Ø§Ø¦Ø±Ø©...';
   for (var si=1; si<=2; si++) {
     var s = si;
     if (!myBets[s].placed && !myBets[s].queued) {
-      var btn = document.getElementById('btn'+s); btn.disabled = true; btn.textContent = '⏳';
+      var btn = document.getElementById('btn'+s); btn.disabled = true; btn.textContent = 'â³';
     }
   }
   hideMainButton();
@@ -337,7 +337,7 @@ function onFlightStart(d) {
     if (myBets[s].placed && !myBets[s].cashed) {
       var btn = document.getElementById('btn'+s);
       btn.style.display = 'block'; btn.className = 'bet-slot-btn cashout';
-      btn.textContent = '💰 سحب'; btn.disabled = false;
+      btn.textContent = 'ðŸ’° Ø³Ø­Ø¨'; btn.disabled = false;
       btn.onclick = function() { doCashout(s); };
     }
   }
@@ -347,12 +347,12 @@ function onFlightStart(d) {
   syncGameStateMainButton();
 }
 
-// ── Animation — pure client-side, 60fps ────────
-// mult = e^(0.07 * elapsed_seconds) — ALWAYS increasing during flight
+// â”€â”€ Animation â€” pure client-side, 60fps â”€â”€â”€â”€â”€â”€â”€â”€
+// mult = e^(0.07 * elapsed_seconds) â€” ALWAYS increasing during flight
 function animate() {
   if (roundPhase !== 'flying') return;
   var elapsed = (performance.now() - _flyStartT) / 1000;
-  var mult = Math.pow(Math.E, 0.07 * elapsed);  // exponential growth — always rising
+  var mult = Math.pow(Math.E, 0.07 * elapsed);  // exponential growth â€” always rising
   mult = Math.max(1.0, mult);
   currentMult = mult;
   document.getElementById('mult').textContent = mult.toFixed(2) + 'x';
@@ -386,7 +386,7 @@ function animate() {
 }
 
 function onCashoutMsg(d) {
-  spawnParachute(d.name || 'لاعب', d.amount, 15 + Math.random() * 70);
+  spawnParachute(d.name || 'Ù„Ø§Ø¹Ø¨', d.amount, 15 + Math.random() * 70);
   if (d.uid === uid) return;
   beep(659, 0.05, 'sine', 0.04);
 }
@@ -399,12 +399,12 @@ function onCrash(d) {
   document.getElementById('mult').className = 'mult-val crashed';
   document.getElementById('planeMultVal').className = 'plane-mult-val crashed';
   var msg = document.getElementById('crashMsg');
-  msg.textContent = '💥 ' + d.crash_point.toFixed(2) + 'x'; msg.style.color = 'var(--red)'; msg.classList.add('show');
+  msg.textContent = 'ðŸ’¥ ' + d.crash_point.toFixed(2) + 'x'; msg.style.color = 'var(--red)'; msg.classList.add('show');
   createExplosion();
   if (d.server_seed) {
     var pfEl = document.createElement('div');
     pfEl.style.cssText = 'position:absolute;top:62%;left:50%;transform:translateX(-50%);font-size:9px;color:#94a3b8;z-index:12;text-align:center;pointer-events:none;max-width:80%;word-break:break-all';
-    pfEl.innerHTML = '🔐 Server Seed: <code style="color:#fbbf24">' + d.server_seed + '</code>';
+    pfEl.innerHTML = 'ðŸ” Server Seed: <code style="color:#fbbf24">' + d.server_seed + '</code>';
     document.getElementById('gameArea').appendChild(pfEl);
     setTimeout(function() { pfEl.remove(); }, 6000);
   }
@@ -417,24 +417,24 @@ function onCrash(d) {
   if (myBets[1].placed && !myBets[1].cashed && myBets[2].placed && !myBets[2].cashed) { streakWin = 0; updateStreak(document.getElementById('streak')); }
   addHistory('history', d.crash_point, false, d.crash_point >= 3);
   updateSessionStats();
-  // Check if user lost everything → show deposit modal
+  // Check if user lost everything â†’ show deposit modal
   checkBalanceAfterCrash();
   syncGameStateMainButton();
 }
 
-// ── Bet Logic ──────────────────────────────────
+// â”€â”€ Bet Logic â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function placeBet(slot) {
   if (!myBets[slot].active) return;
   var amt = parseFloat(document.getElementById('bet'+slot).value) || 0;
-  if (amt < 1) { showToast('أدخل مبلغ الرهان', 'error'); return; }
+  if (amt < 1) { showToast('Ø£Ø¯Ø®Ù„ Ù…Ø¨Ù„Øº Ø§Ù„Ø±Ù‡Ø§Ù†', 'error'); return; }
   var autoVal = parseFloat(document.getElementById('autoVal'+slot).value) || 0;
-  // If not in waiting phase → queue for next round
+  // If not in waiting phase â†’ queue for next round
   if (roundPhase === 'starting' || roundPhase === 'flying' || roundPhase === 'crashed') {
     myBets[slot].queued = true; myBets[slot].amount = amt; myBets[slot].autoVal = autoVal;
     var btn = document.getElementById('btn'+slot);
-    btn.textContent = '⏳ الجولة القادمة'; btn.className = 'bet-slot-btn queued'; btn.disabled = true;
+    btn.textContent = 'â³ Ø§Ù„Ø¬ÙˆÙ„Ø© Ø§Ù„Ù‚Ø§Ø¯Ù…Ø©'; btn.className = 'bet-slot-btn queued'; btn.disabled = true;
     document.getElementById('slot'+slot).classList.add('queued');
-    showToast('✅ سيتم رهنك تلقائياً في الجولة القادمة', 'success');
+    showToast('âœ… Ø³ÙŠØªÙ… Ø±Ù‡Ù†Ùƒ ØªÙ„Ù‚Ø§Ø¦ÙŠØ§Ù‹ ÙÙŠ Ø§Ù„Ø¬ÙˆÙ„Ø© Ø§Ù„Ù‚Ø§Ø¯Ù…Ø©', 'success');
     return;
   }
   if (roundPhase !== 'waiting') return;
@@ -444,42 +444,42 @@ function placeBet(slot) {
 function _doPlaceBet(slot, amt, autoVal) {
   if (!checkBalanceBeforeBet(amt)) return;
   var btn = document.getElementById('btn'+slot);
-  btn.disabled = true; btn.textContent = '⏳'; btn.className = 'bet-slot-btn bet';
+  btn.disabled = true; btn.textContent = 'â³'; btn.className = 'bet-slot-btn bet';
   document.getElementById('slot'+slot).classList.remove('queued');
   var reqId = 'b' + slot + '_' + Date.now() + '_' + Math.random().toString(36).substr(2,6);
   var timedOut = false;
-  var to = setTimeout(function() { timedOut = true; btn.disabled = false; btn.textContent = 'رهان'; showToast('انتهت المهلة', 'error'); }, 8000);
+  var to = setTimeout(function() { timedOut = true; btn.disabled = false; btn.textContent = 'Ø±Ù‡Ø§Ù†'; showToast('Ø§Ù†ØªÙ‡Øª Ø§Ù„Ù…Ù‡Ù„Ø©', 'error'); }, 8000);
   apiFetchCritical(BASE+'/api/aviator/bet?uid='+uid, { method:'POST', body:JSON.stringify({uid:uid, bet_amount:amt, auto_val:autoVal, request_id:reqId}) })
   .then(function(r) { return r.json(); }).then(function(d) {
     clearTimeout(to); if (timedOut) return;
     if (d.success) {
       myBets[slot].placed = true; myBets[slot].amount = amt; myBets[slot].autoVal = autoVal; myBets[slot].cashed = false; myBets[slot].queued = false;
       document.getElementById('bal').textContent = d.balance_after.toLocaleString();
-      btn.textContent = '✓ راهنت'; btn.style.background = 'linear-gradient(135deg,#1a5c2e,#0d7a1f)';
+      btn.textContent = 'âœ“ Ø±Ø§Ù‡Ù†Øª'; btn.style.background = 'linear-gradient(135deg,#1a5c2e,#0d7a1f)';
       addOtherBet(slot, amt);
-      syncMainButton('💰 سحب', function() { doCashout(slot); });
+      syncMainButton('ðŸ’° Ø³Ø­Ø¨', function() { doCashout(slot); });
     } else {
-      btn.disabled = false; btn.textContent = 'رهان'; btn.className = 'bet-slot-btn bet';
-      // If insufficient balance → show deposit modal (not just a toast)
+      btn.disabled = false; btn.textContent = 'Ø±Ù‡Ø§Ù†'; btn.className = 'bet-slot-btn bet';
+      // If insufficient balance â†’ show deposit modal (not just a toast)
       if (d.need_deposit) {
         showVexDepositModal(amt);
       } else {
-        showToast(d.error || 'خطأ', 'error');
+        showToast(d.error || 'Ø®Ø·Ø£', 'error');
       }
     }
-  }).catch(function() { clearTimeout(to); if (timedOut) return; btn.disabled = false; btn.textContent = 'رهان'; showToast('خطأ', 'error'); });
+  }).catch(function() { clearTimeout(to); if (timedOut) return; btn.disabled = false; btn.textContent = 'Ø±Ù‡Ø§Ù†'; showToast('Ø®Ø·Ø£', 'error'); });
 }
 
 function doCashout(slot) {
   if (roundPhase !== 'flying' || !myBets[slot].placed || myBets[slot].cashed) return;
   myBets[slot].cashed = true;
-  // Optimistic UI — show payout immediately (server will confirm)
+  // Optimistic UI â€” show payout immediately (server will confirm)
   var payout = _floorMoney(myBets[slot].amount * currentMult);
   var btn = document.getElementById('btn'+slot);
   btn.className = 'bet-slot-btn'; btn.style.background = 'var(--surface-3)'; btn.style.color = 'var(--muted)';
-  btn.textContent = '✓ ' + payout.toFixed(0); btn.disabled = true;
+  btn.textContent = 'âœ“ ' + payout.toFixed(0); btn.disabled = true;
   var msg = document.getElementById('crashMsg');
-  msg.textContent = '✅ +' + payout.toFixed(2) + ' @ ' + currentMult.toFixed(2) + 'x';
+  msg.textContent = 'âœ… +' + payout.toFixed(2) + ' @ ' + currentMult.toFixed(2) + 'x';
   msg.style.color = 'var(--gold)'; msg.classList.add('show');
   document.getElementById('planeMultVal').className = 'plane-mult-val cashed';
   soundCashOut(); haptic('medium'); fireConfetti(document.getElementById('gameArea'));
@@ -495,7 +495,7 @@ function doCashout(slot) {
   syncGameStateMainButton();
 }
 
-// ── Balance check after crash ──────────────────
+// â”€â”€ Balance check after crash â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function checkBalanceAfterCrash() {
   // Fetch fresh balance from server
   apiFetch(BASE + '/api/wallet/balance?uid=' + uid)
@@ -503,7 +503,7 @@ function checkBalanceAfterCrash() {
   .then(function(d) {
     if (d.balance !== undefined) {
       document.getElementById('bal').textContent = (d.balance || 0).toLocaleString();
-      // If user has 0 balance → show deposit modal
+      // If user has 0 balance â†’ show deposit modal
       if ((d.balance || 0) < 10) {
         setTimeout(function() { showVexDepositModal(10); }, 1500);
       }
@@ -511,14 +511,14 @@ function checkBalanceAfterCrash() {
   }).catch(function() {});
 }
 
-// ── Helpers ───────────────────────────────────
+// â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function spawnParachute(name, amount, fromLeft) {
   var layer = document.getElementById('parachutesLayer');
   var el = document.createElement('div');
   el.className = 'parachute-item';
   el.style.left = (fromLeft !== undefined ? fromLeft : 20+Math.random()*60) + '%';
   el.style.top = '36%';
-  el.innerHTML = '<div class="parachute-icon">🪂</div><div class="parachute-amount">+' + (amount.toLocaleString ? amount.toLocaleString(undefined,{maximumFractionDigits:0}) : amount.toFixed(0)) + '</div><div class="parachute-name">' + name + '</div>';
+  el.innerHTML = '<div class="parachute-icon">ðŸª‚</div><div class="parachute-amount">+' + (amount.toLocaleString ? amount.toLocaleString(undefined,{maximumFractionDigits:0}) : amount.toFixed(0)) + '</div><div class="parachute-name">' + name + '</div>';
   layer.appendChild(el);
   setTimeout(function() { el.remove(); }, 3000);
 }
@@ -528,22 +528,22 @@ function adjustSlot(s, f) { var i = document.getElementById('bet'+s); var v = pa
 function setSlotMin(s) { document.getElementById('bet'+s).value = 10; }
 function setSlotMax(s) { document.getElementById('bet'+s).value = 5000; }
 function updateSessionStats() { document.getElementById('sWin').textContent = sessionW; document.getElementById('sLoss').textContent = sessionL; document.getElementById('sPL').textContent = sessionPL >= 0 ? '+'+sessionPL.toFixed(0) : sessionPL.toFixed(0); }
-function addOtherBet(slot, amt) { var c = document.getElementById('otherBets'); var e = document.createElement('div'); e.className = 'other-bet active'; e.id = 'ob'+slot; e.innerHTML = '<div class="avatar">أ</div><span>'+amt+'</span>'; c.appendChild(e); }
+function addOtherBet(slot, amt) { var c = document.getElementById('otherBets'); var e = document.createElement('div'); e.className = 'other-bet active'; e.id = 'ob'+slot; e.innerHTML = '<div class="avatar">Ø£</div><span>'+amt+'</span>'; c.appendChild(e); }
 function createExplosion() { var a = document.getElementById('gameArea'); for (var i=0;i<20;i++) { var p = document.createElement('div'); p.style.cssText = 'position:absolute;width:4px;height:4px;border-radius:50%;pointer-events:none;z-index:20;left:'+planeX+'px;top:'+planeY+'px;background:'+['#ff4757','#fbbf24','#ff8c42'][i%3]; a.appendChild(p); var ang = (i/20)*6.28, dist = 60+Math.random()*100; p.animate([{transform:'translate(0,0) scale(1)',opacity:1},{transform:'translate('+Math.cos(ang)*dist+'px,'+Math.sin(ang)*dist+'px) scale(0)',opacity:0}],{duration:800,easing:'ease-out'}); setTimeout(function() { p.remove(); }, 800); } }
-function showBigWin(p, m) { var o = document.getElementById('bigWin'); document.getElementById('bigWinText').textContent = '🎉 +'+p.toFixed(0)+' @ '+m.toFixed(2)+'x'; o.classList.add('show'); soundWin(true); setTimeout(function() { o.classList.remove('show'); }, 2500); }
+function showBigWin(p, m) { var o = document.getElementById('bigWin'); document.getElementById('bigWinText').textContent = 'ðŸŽ‰ +'+p.toFixed(0)+' @ '+m.toFixed(2)+'x'; o.classList.add('show'); soundWin(true); setTimeout(function() { o.classList.remove('show'); }, 2500); }
 function _floorMoney(val) { return Math.floor((parseFloat(val) || 0) * 100) / 100; }
 
 function syncGameStateMainButton() {
   if (roundPhase === 'waiting') {
-    syncMainButton('رهان', function() { placeBet(1); });
+    syncMainButton('Ø±Ù‡Ø§Ù†', function() { placeBet(1); });
   } else if (roundPhase === 'flying') {
-    if (myBets[1].placed && !myBets[1].cashed) syncMainButton('💰 سحب', function() { doCashout(1); });
-    else if (myBets[2].placed && !myBets[2].cashed) syncMainButton('💰 سحب', function() { doCashout(2); });
+    if (myBets[1].placed && !myBets[1].cashed) syncMainButton('ðŸ’° Ø³Ø­Ø¨', function() { doCashout(1); });
+    else if (myBets[2].placed && !myBets[2].cashed) syncMainButton('ðŸ’° Ø³Ø­Ø¨', function() { doCashout(2); });
     else hideMainButton();
   } else { hideMainButton(); }
 }
 
-// ── Init ───────────────────────────────────────
+// â”€â”€ Init â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 document.getElementById('loading').style.display = 'none';
 document.getElementById('app').style.display = 'flex';
 loadBalance();

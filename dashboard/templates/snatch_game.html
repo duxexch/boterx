@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>اختطف</title>
+<title>Ø§Ø®ØªØ·Ù</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none; }
 body { overflow:hidden; font-family:system-ui,sans-serif; background:var(--tg-theme-bg-color,#0f172a); color:var(--tg-theme-text-color,#fff); touch-action:none; }
@@ -61,17 +61,17 @@ body { overflow:hidden; font-family:system-ui,sans-serif; background:var(--tg-th
 <body>
 <div id="game">
   <div id="hud">
-    <div id="score">🎁 0</div>
-    <div id="round-info">جولة 0/7</div>
-    <div id="lives">❤️❤️❤️</div>
+    <div id="score">ðŸŽ 0</div>
+    <div id="round-info">Ø¬ÙˆÙ„Ø© 0/7</div>
+    <div id="lives">â¤ï¸â¤ï¸â¤ï¸</div>
   </div>
   <div id="arena"></div>
 </div>
 
 <div id="start-screen">
-  <h1>🎁 اختطف!</h1>
-  <p>هدايا ستظهر وتختفي بسرعة!<br>اخطفها قبل ما تهرب!<br>⚡ أحياناً تظهر وتختفي فوراً<br>🟢 أحياناً تنتظرك<br>🔴 احذر القنابل!</p>
-  <button id="start-btn" onclick="startGame()">ابدأ!</button>
+  <h1>ðŸŽ Ø§Ø®ØªØ·Ù!</h1>
+  <p>Ù‡Ø¯Ø§ÙŠØ§ Ø³ØªØ¸Ù‡Ø± ÙˆØªØ®ØªÙÙŠ Ø¨Ø³Ø±Ø¹Ø©!<br>Ø§Ø®Ø·ÙÙ‡Ø§ Ù‚Ø¨Ù„ Ù…Ø§ ØªÙ‡Ø±Ø¨!<br>âš¡ Ø£Ø­ÙŠØ§Ù†Ø§Ù‹ ØªØ¸Ù‡Ø± ÙˆØªØ®ØªÙÙŠ ÙÙˆØ±Ø§Ù‹<br>ðŸŸ¢ Ø£Ø­ÙŠØ§Ù†Ø§Ù‹ ØªÙ†ØªØ¸Ø±Ùƒ<br>ðŸ”´ Ø§Ø­Ø°Ø± Ø§Ù„Ù‚Ù†Ø§Ø¨Ù„!</p>
+  <button id="start-btn" onclick="startGame()">Ø§Ø¨Ø¯Ø£!</button>
 </div>
 
 <div id="countdown"></div>
@@ -99,7 +99,7 @@ const EL_START = document.getElementById('start-screen');
 const EL_RESULT = document.getElementById('result-screen');
 const EL_COUNTDOWN = document.getElementById('countdown');
 
-const GIFT_EMOJIS = ['🎁','💎','🏆','⭐','🎉','🪙','💍','🎯'];
+const GIFT_EMOJIS = ['ðŸŽ','ðŸ’Ž','ðŸ†','â­','ðŸŽ‰','ðŸª™','ðŸ’','ðŸŽ¯'];
 const COLORS = ['golden','golden','flash','flash','decoy','bomb'];
 
 // Sounds
@@ -138,14 +138,14 @@ function countdown(n, cb) {
 function nextRound() {
   round++;
   if (round > maxRounds || lives <= 0) { endGame(); return; }
-  EL_ROUND.textContent = `جولة ${round}/${maxRounds}`;
+  EL_ROUND.textContent = `Ø¬ÙˆÙ„Ø© ${round}/${maxRounds}`;
   
   // Choose behavior
   const behaviors = ['golden','golden','flash','flash','decoy','bomb','golden'];
   const behavior = behaviors[Math.floor(Math.random() * behaviors.length)];
   
   // Choose gift data
-  const gift = giftsData[Math.floor(Math.random() * giftsData.length)] || { text: 'هدية', id: '', link: '' };
+  const gift = giftsData[Math.floor(Math.random() * giftsData.length)] || { text: 'Ù‡Ø¯ÙŠØ©', id: '', link: '' };
   
   spawnGift(behavior, gift);
 }
@@ -157,7 +157,7 @@ function spawnGift(behavior, gift) {
   const el = document.createElement('div');
   el.className = `gift ${behavior} appear`;
   
-  const emoji = behavior === 'bomb' ? '💣' : GIFT_EMOJIS[Math.floor(Math.random()*GIFT_EMOJIS.length)];
+  const emoji = behavior === 'bomb' ? 'ðŸ’£' : GIFT_EMOJIS[Math.floor(Math.random()*GIFT_EMOJIS.length)];
   el.innerHTML = emoji;
   
   // Label with gift name
@@ -195,7 +195,7 @@ function spawnGift(behavior, gift) {
         el.style.transition = 'left 0.3s, top 0.3s';
         el.style.left = x + 'px'; el.style.top = y + 'px';
         soundTease();
-        showTease('هربت! 😜', x, y);
+        showTease('Ù‡Ø±Ø¨Øª! ðŸ˜œ', x, y);
       }
     }, 300);
     duration = 1200 + Math.random() * 800; // stays a bit after moving
@@ -206,7 +206,7 @@ function spawnGift(behavior, gift) {
     if (el.parentNode && !el.classList.contains('caught')) {
       el.classList.add('missed');
       if (behavior === 'golden' || behavior === 'flash') {
-        showTease('فوتتك! 😅', x, y);
+        showTease('ÙÙˆØªØªÙƒ! ðŸ˜…', x, y);
         soundMiss();
         haptic('light');
       }
@@ -223,22 +223,22 @@ function onCatch(el, behavior, gift) {
   if (behavior === 'bomb') {
     // Bomb!
     lives--;
-    EL_LIVES.textContent = '❤️'.repeat(lives) + '🖤'.repeat(3 - lives);
+    EL_LIVES.textContent = 'â¤ï¸'.repeat(lives) + 'ðŸ–¤'.repeat(3 - lives);
     soundBomb();
     hapticNotify('error');
-    showTease('💥 خداع!', parseFloat(el.style.left), parseFloat(el.style.top));
+    showTease('ðŸ’¥ Ø®Ø¯Ø§Ø¹!', parseFloat(el.style.left), parseFloat(el.style.top));
     confetti(parseFloat(el.style.left) + 40, parseFloat(el.style.top) + 40, '#ef4444');
     setTimeout(() => { el.remove(); currentGift = null; if (lives <= 0) endGame(); else nextRound(); }, 400);
   } else {
     // Caught a gift!
     score++;
-    EL_SCORE.textContent = '🎁 ' + score;
+    EL_SCORE.textContent = 'ðŸŽ ' + score;
     soundCatch();
     hapticNotify('success');
     if (behavior === 'flash') {
-      showTease('⚡ سريع!', parseFloat(el.style.left), parseFloat(el.style.top));
+      showTease('âš¡ Ø³Ø±ÙŠØ¹!', parseFloat(el.style.left), parseFloat(el.style.top));
     } else {
-      showTease('🎉 اختطفتها!', parseFloat(el.style.left), parseFloat(el.style.top));
+      showTease('ðŸŽ‰ Ø§Ø®ØªØ·ÙØªÙ‡Ø§!', parseFloat(el.style.left), parseFloat(el.style.top));
     }
     confetti(parseFloat(el.style.left) + 40, parseFloat(el.style.top) + 40, '#fbbf24');
     caughtGifts.push({ id: gift.id, text: gift.text, link: gift.link });
@@ -282,23 +282,23 @@ function endGame() {
   clearTimeout(gameTimer);
   
   EL_RESULT.style.display = 'flex';
-  const title = score > 0 ? `🎉 ${score} هدية!` : '😔 حظ أوفر!';
+  const title = score > 0 ? `ðŸŽ‰ ${score} Ù‡Ø¯ÙŠØ©!` : 'ðŸ˜” Ø­Ø¸ Ø£ÙˆÙØ±!';
   document.getElementById('result-title').textContent = title;
   
   let prizesHTML = '';
-  caughtGifts.forEach(g => { prizesHTML += `<div>🎁 ${g.text}</div>`; });
-  if (caughtGifts.length === 0) prizesHTML = '<div>لم تتمكن من اصطياد أي هدية</div>';
+  caughtGifts.forEach(g => { prizesHTML += `<div>ðŸŽ ${g.text}</div>`; });
+  if (caughtGifts.length === 0) prizesHTML = '<div>Ù„Ù… ØªØªÙ…ÙƒÙ† Ù…Ù† Ø§ØµØ·ÙŠØ§Ø¯ Ø£ÙŠ Ù‡Ø¯ÙŠØ©</div>';
   document.getElementById('result-prizes').innerHTML = prizesHTML;
   
-  // إرسال البيانات للبوت تلقائياً بدون انتظار ضغط زر
+  // Ø¥Ø±Ø³Ø§Ù„ Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ù„Ù„Ø¨ÙˆØª ØªÙ„Ù‚Ø§Ø¦ÙŠØ§Ù‹ Ø¨Ø¯ÙˆÙ† Ø§Ù†ØªØ¸Ø§Ø± Ø¶ØºØ· Ø²Ø±
   const resultData = JSON.stringify({ gifts: caughtGifts, score: score });
   if (tg) {
-    // إرسال مباشر ثم إغلاق
+    // Ø¥Ø±Ø³Ø§Ù„ Ù…Ø¨Ø§Ø´Ø± Ø«Ù… Ø¥ØºÙ„Ø§Ù‚
     try {
       tg.sendData(resultData);
     } catch(e) {
-      // لو sendData فشلت، استخدم MainButton كحل بديل
-      tg.MainButton.setText('🎁 استلام الجوائز');
+      // Ù„Ùˆ sendData ÙØ´Ù„ØªØŒ Ø§Ø³ØªØ®Ø¯Ù… MainButton ÙƒØ­Ù„ Ø¨Ø¯ÙŠÙ„
+      tg.MainButton.setText('ðŸŽ Ø§Ø³ØªÙ„Ø§Ù… Ø§Ù„Ø¬ÙˆØ§Ø¦Ø²');
       tg.MainButton.show();
       tg.MainButton.offClick(sendResult);
       tg.MainButton.onClick(sendResult);
