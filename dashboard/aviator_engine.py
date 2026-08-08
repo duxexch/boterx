@@ -394,7 +394,7 @@ def init_aviator_engine(app, get_uid, get_gm, get_pf, is_pf, is_vex):
                 }
             # توليد لاعبين وهميين + دمج اللاعبين الحقيقيين
             fake_players = _generate_fake_players(_server_mult())
-            real_players = _get_real_players(current_mult)
+            real_players = _get_real_players(_server_mult())
             all_players = real_players + fake_players
             # ترتيب: الفائزين أولاً
             all_players.sort(key=lambda x: (-x['payout'], 0 if x['status'] != 'lost' else 1))
