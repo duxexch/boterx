@@ -336,7 +336,7 @@ def init_aviator_engine(app, get_uid, get_gm, get_pf, is_pf, is_vex):
                     'auto_val': b.get('auto_val', 0),
                 }
             # توليد لاعبين وهميين للمشاركة في الجولة الحالية
-            fake_players = _generate_fake_players(d.get('multiplier', _server_mult()))
+            fake_players = _generate_fake_players(_server_mult())
             return jsonify({
                 'phase': _state['phase'],
                 'multiplier': round(_server_mult(), 2),
