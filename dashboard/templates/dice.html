@@ -447,20 +447,18 @@ function animateRoll(resultNum,power,callback){
         spinZ*=-1*(0.6+Math.random()*0.4);
         spinY+=(Math.random()-0.5)*0.3;
         bounces++;
-        soundTick();haptic('light');
-        spawnBounceParticles(diceX,diceY);
-        phase='bouncing';
+        soundDiceRoll();haptic('light');
       }
       // Side bounces (left/right walls)
       if(diceX<diceSize/2&&vx<0){
         diceX=diceSize/2;vx=-vx*0.6;
         spinY*=-0.8;spinZ*=-0.6;bounces++;
-        soundTick();spawnBounceParticles(diceX,diceY);
+        soundDiceLand();spawnBounceParticles(diceX,diceY);
       }
       if(diceX>w-diceSize/2&&vx>0){
         diceX=w-diceSize/2;vx=-vx*0.6;
         spinY*=-0.8;spinZ*=-0.6;bounces++;
-        soundTick();spawnBounceParticles(diceX,diceY);
+        soundDiceLand();spawnBounceParticles(diceX,diceY);
       }
       // Floor bounce
       if(diceY>floorY-diceSize/2&&vy>0){
@@ -470,7 +468,7 @@ function animateRoll(resultNum,power,callback){
         spinX*=0.6;spinY*=0.5;spinZ*=0.7;
         bounces++;
         if(Math.abs(vy)<2){vy=0;phase='settling';}
-        soundTick();haptic('light');
+        soundDiceLand();haptic('light');
         spawnBounceParticles(diceX,diceY);
       }
     }
@@ -519,18 +517,20 @@ function animateRoll(resultNum,power,callback){
   frame();
 }
 
-// ── Result alignment: rotate dice so the result face is on TOP ──
-// Face layout: 1=+Z(front), 2=+X(right), 3=+Y(top), 4=-Y(bottom), 5=-X(left), 6=-Z(back)
-// To bring each face to top (+Y), we need specific rotations:
+// ── Result alignment: rotate dice so result face faces VIEWER (+Z) ──
+// Canvas Y is DOWN, so +Y in our 3D space = down on screen.
+// The face the user sees clearly is +Z (front), facing the viewer.
+// Face layout: 1=+Z(front), 2=+X(right), 3=+Y(down on screen), 4=-Y(up), 5=-X(left), 6=-Z(back)
+// To bring each face to FRONT (+Z), rotate:
 function _getResultAngles(faceNum){
   var H=Math.PI/2; // 90 degrees
   switch(faceNum){
-    case 1: return [-H, 0, 0];      // front->top: tilt forward
-    case 2: return [0, -H, 0];      // right->top: tilt right
-    case 3: return [0, 0, 0];       // already top
-    case 4: return [Math.PI, 0, 0]; // bottom->top: flip
-    case 5: return [0, H, 0];       // left->top: tilt left
-    case 6: return [H, 0, 0];       // back->top: tilt backward
+    case 1: return [0, 0, 0];        // already front — no rotation
+    case 2: return [0, H, 0];        // right(+X)->front: rotY +90
+    case 3: return [H, 0, 0];        // top(+Y, down on screen)->front: rotX +90
+    case 4: return [-H, 0, 0];       // bottom(-Y, up on screen)->front: rotX -90
+    case 5: return [0, -H, 0];       // left(-X)->front: rotY -90
+    case 6: return [0, Math.PI, 0];  // back(-Z)->front: rotY 180
   }
   return [0,0,0];
 }
@@ -579,7 +579,7 @@ function onRoll(){
         animateRoll(d.result,power,function(){
           showResult(d);
         });
-        soundTick();haptic('medium');
+        soundDiceRoll();haptic('medium');
       } else {
         if(d.need_deposit)showVexDepositModal(amt);else showToast(d.error||'خطأ','error');
         var btn=document.getElementById('rollBtn');btn.className='roll-btn idle';btn.disabled=false;btn.textContent='ارمِ النرد 🎲';
@@ -603,7 +603,7 @@ function showResult(d){
     txtEl.className='result-text win';
     txtEl.textContent='🎉 ربحت! +'+d.payout.toFixed(0)+' ('+d.multiplier+'x)';
     sessionW++;sessionPL+=d.payout-parseFloat(document.getElementById('betAmount').value);
-    fireConfetti(document.getElementById('gameArea'));soundWin();haptic('medium');
+    fireConfetti(document.getElementById('gameArea'));soundDiceWin();haptic('medium');
     var be=document.getElementById('recoveryMsg');
     be.innerHTML='🎉 <b>ربحت!</b> توقعت '+d.predicted+' والنتيجة '+d.result+'<br><span style="color:#7eff9a;font-weight:900;font-size:16px">+'+d.payout.toFixed(0)+'</span>';
     be.style.color='#7eff9a';be.classList.add('show');setTimeout(function(){be.classList.remove('show')},4000);
@@ -612,7 +612,7 @@ function showResult(d){
     txtEl.className='result-text lose';
     txtEl.textContent='💥 خسرت — توقعت '+d.predicted+' والنتيجة '+d.result;
     sessionL++;sessionPL-=parseFloat(document.getElementById('betAmount').value);
-    soundLose();haptic('heavy');
+    soundDiceLose();haptic('heavy');
     var be=document.getElementById('recoveryMsg');
     be.innerHTML='💥 <b>خسرت!</b> توقعت '+d.predicted+' والنتيجة '+d.result;
     be.style.color='#ff8787';be.classList.add('show');setTimeout(function(){be.classList.remove('show')},4000);
@@ -658,6 +658,66 @@ function renderPlayers(players){
     var payHtml=p.status==='cashed'?'<span class="ppay">+'+p.payout.toFixed(0)+'</span>':'';
     row.innerHTML='<div class="pavatar">'+p.avatar+'</div><span class="pname">'+p.name+'</span><span class="pdice">'+diceEmoji+'</span><span class="ppred">('+predEmoji+')</span><span class="pbet">'+p.bet+'</span>'+payHtml;
     list.appendChild(row);
+  });
+}
+
+// ── Dice sounds: realistic dice roll, win, lose ──
+var _diceAudioCtx=null;
+function _getDiceAudio(){
+  if(!_diceAudioCtx){try{_diceAudioCtx=new (window.AudioContext||window.webkitAudioContext)()}catch(e){}}
+  return _diceAudioCtx;
+}
+function soundDiceRoll(){
+  var ac=_getDiceAudio();if(!ac||!soundOn)return;
+  // Dice rolling sound: series of rapid thuds
+  for(var i=0;i<6;i++){
+    setTimeout(function(){
+      var o=ac.createOscillator(),g=ac.createGain();
+      o.connect(g);g.connect(ac.destination);
+      o.frequency.value=80+Math.random()*60;o.type='square';
+      g.gain.setValueAtTime(0.15,ac.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.01,ac.currentTime+0.08);
+      o.start();o.stop(ac.currentTime+0.08);
+    },i*80);
+  }
+}
+function soundDiceLand(){
+  var ac=_getDiceAudio();if(!ac||!soundOn)return;
+  var o=ac.createOscillator(),g=ac.createGain();
+  o.connect(g);g.connect(ac.destination);
+  o.frequency.value=120;o.type='sine';
+  g.gain.setValueAtTime(0.3,ac.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.01,ac.currentTime+0.15);
+  o.start();o.stop(ac.currentTime+0.15);
+}
+function soundDiceWin(){
+  var ac=_getDiceAudio();if(!ac||!soundOn)return;
+  // Win: ascending happy notes
+  var notes=[523,659,784,1047];
+  notes.forEach(function(f,i){
+    setTimeout(function(){
+      var o=ac.createOscillator(),g=ac.createGain();
+      o.connect(g);g.connect(ac.destination);
+      o.frequency.value=f;o.type='sine';
+      g.gain.setValueAtTime(0.2,ac.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.01,ac.currentTime+0.2);
+      o.start();o.stop(ac.currentTime+0.2);
+    },i*100);
+  });
+}
+function soundDiceLose(){
+  var ac=_getDiceAudio();if(!ac||!soundOn)return;
+  // Lose: descending sad notes
+  var notes=[400,300,200];
+  notes.forEach(function(f,i){
+    setTimeout(function(){
+      var o=ac.createOscillator(),g=ac.createGain();
+      o.connect(g);g.connect(ac.destination);
+      o.frequency.value=f;o.type='sawtooth';
+      g.gain.setValueAtTime(0.15,ac.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.01,ac.currentTime+0.25);
+      o.start();o.stop(ac.currentTime+0.25);
+    },i*150);
   });
 }
 
