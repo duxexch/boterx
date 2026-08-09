@@ -103,13 +103,44 @@ def _broadcast(msg):
             try: q.put_nowait(payload)
             except: pass
 
+# Cache for user names/phones — يتقرأ مرة واحدة ويخزن في الذاكرة
+_user_cache = {}
+_cache_loaded = False
+
+def _load_user_cache():
+    """تحميل كل الأسماء والهواتف مرة واحدة في الذاكرة"""
+    global _user_cache, _cache_loaded
+    if _cache_loaded:
+        return
+    try:
+        import csv as _csv
+        with open('users.csv', 'r', encoding='utf-8-sig') as f:
+            for row in _csv.DictReader(f):
+                tid = row.get('telegram_id', '')
+                if tid:
+                    _user_cache[tid] = {
+                        'name': row.get('name', ''),
+                        'phone': row.get('phone', '') or row.get('phone_number', '')
+                    }
+        _cache_loaded = True
+        print(f'✅ User cache loaded: {len(_user_cache)} users')
+    except Exception as e:
+        print(f'User cache error: {e}')
+        _cache_loaded = True  # ما نحاول تاني
+
 def _get_name(uid):
-    """قراءة اسم المستخدم — مؤقتاً معطل لمنع البطء"""
-    return ''
+    """قراءة اسم من cache (سريع — O(1))"""
+    if not _cache_loaded:
+        _load_user_cache()
+    info = _user_cache.get(str(uid))
+    return info['name'] if info else ''
 
 def _get_user_phone(uid):
-    """قراءة رقم هاتف المستخدم — مؤقتاً معطل لمنع البطء"""
-    return ''
+    """قراءة هاتف من cache (سريع — O(1))"""
+    if not _cache_loaded:
+        _load_user_cache()
+    info = _user_cache.get(str(uid))
+    return info['phone'] if info else ''
 
 def _mask_name(name, phone):
     """إخفاء الاسم بنجوم + إظهار آخر 4 أرقام من الهاتف"""
@@ -387,9 +418,12 @@ def init_aviator_engine(app, get_uid, get_gm, get_pf, is_pf, is_vex):
                     'cash_mult': b.get('cash_mult', 0),
                     'auto_val': b.get('auto_val', 0),
                 }
-            # توليد لاعبين وهميين فقط (real players مؤقتاً معطل)
+            # توليد لاعبين وهميين + دمج اللاعبين الحقيقيين
             fake_players = _generate_fake_players(_server_mult())
-            all_players = fake_players
+            real_players = _get_real_players(_server_mult())
+            all_players = real_players + fake_players
+            # ترتيب: الفائزين أولاً
+            all_players.sort(key=lambda x: (-x['payout'], 0 if x['status'] != 'lost' else 1))
             return jsonify({
                 'phase': _state['phase'],
                 'multiplier': round(_server_mult(), 2),
