@@ -41,6 +41,9 @@ TICK_RATE = 0.05          # 50ms internal tick
 HOUSE_EDGE = 0.03         # 3% base edge
 GROWTH_RATE = 0.07        # mult = e^(0.07 * t_seconds)
 DRAIN_RATE = 0.5           # 50% drain per full X growth past target
+MAX_MULTIPLIER = 100.0     # HARD CAP — force crash at 100x, never millions
+WATCHDOG_TIMEOUT = 120     # seconds — if game loop stuck, force restart
+EMERGENCY_THRESHOLD = 50.0 # if multiplier reaches 50x, evaluate emergency crash
 
 # ── 7 Strategies ─────────────────────────────────────────
 # Each strategy: (min_x, max_x, weight, description)
@@ -77,6 +80,7 @@ _state = {
     'request_ids': {},
     'total_bets_in': 0,         # total bet amount this round
     'total_payout': 0,          # total paid out this round
+    'last_heartbeat': time.time(),  # watchdog: last game loop heartbeat
 }
 _lock = threading.Lock()
 _rate = {}
@@ -143,7 +147,7 @@ def _calc_crash():
     # Add ±10% noise for unpredictability
     noise = random.uniform(-0.10, 0.10)
     crash_pt = raw * (1 + noise)
-    crash_pt = max(1.00, round(crash_pt, 2))
+    crash_pt = min(MAX_MULTIPLIER, max(1.00, round(crash_pt, 2)))
 
     with _lock:
         _state['strategy_used'] = strategy['name']
@@ -337,16 +341,24 @@ def _game_loop():
 
         # ── FLIGHT ──
         crash_pt = _calc_crash()
+        # SAFETY: cap crash point at MAX_MULTIPLIER
+        crash_pt = min(crash_pt, MAX_MULTIPLIER)
         with _lock:
             _state['phase'] = 'flying'
             _state['crash_point'] = crash_pt  # SECRET
             _state['flight_start'] = time.time()
+            _state['last_heartbeat'] = time.time()
 
-        # Internal loop: update multiplier, auto-drain check
+        # Internal loop: update multiplier, auto-drain check, emergency stop
         while True:
             mult = _server_mult()
             with _lock:
                 _state['multiplier'] = mult
+                _state['last_heartbeat'] = time.time()
+            # HARD CAP: force crash at MAX_MULTIPLIER
+            if mult >= MAX_MULTIPLIER:
+                crash_pt = min(crash_pt, mult)
+                break
             if mult >= crash_pt:
                 break
             time.sleep(TICK_RATE)
@@ -551,6 +563,51 @@ def init_crash_engine(app, get_uid, get_gm, get_pf, is_pf, is_vex):
                 'total_out': round(_state.get('total_payout', 0), 2),
             })
 
-# Start daemon thread
+# ── Watchdog: monitor game loop health, auto-restart if frozen ──
+def _watchdog():
+    """Monitors game loop. If no heartbeat for WATCHDOG_TIMEOUT seconds,
+    forces phase to 'crashed' to unstick the loop."""
+    while True:
+        time.sleep(15)
+        try:
+            with _lock:
+                hb = _state.get('last_heartbeat', 0)
+                phase = _state.get('phase', 'waiting')
+                now = time.time()
+                if phase == 'flying' and (now - hb) > WATCHDOG_TIMEOUT:
+                    # EMERGENCY: game loop frozen during flight — force crash
+                    _state['phase'] = 'crashed'
+                    _state['crash_point'] = _state.get('multiplier', 1.0)
+                    _state['last_heartbeat'] = now
+                    # Settle bets immediately
+                    crash_pt = _state['crash_point']
+                    for uid, bet in list(_state.get('crash_bets', {}).items()):
+                        if not bet.get('exited', False):
+                            if crash_pt <= bet['target_x']:
+                                payout = bet['amount'] * bet['target_x']
+                                try: _gm.add_balance(uid, payout)
+                                except: pass
+                                bet['payout'] = round(payout, 2)
+                            else:
+                                rem = _calc_remaining(bet['amount'], bet['target_x'], crash_pt, 'crash')
+                                if rem > 0:
+                                    try: _gm.add_balance(uid, rem)
+                                    except: pass
+                                bet['payout'] = round(rem, 2)
+                    for uid, bet in list(_state.get('rise_bets', {}).items()):
+                        if crash_pt < bet['target_x']:
+                            bet['payout'] = 0
+                        else:
+                            rem = _calc_remaining(bet['amount'], bet['target_x'], crash_pt, 'rise')
+                            if rem > 0:
+                                try: _gm.add_balance(uid, rem)
+                                except: pass
+                            bet['payout'] = round(rem, 2)
+        except Exception as e:
+            pass  # watchdog must never crash
+
+# Start daemon threads
 _thread = threading.Thread(target=_game_loop, daemon=True)
 _thread.start()
+_wd_thread = threading.Thread(target=_watchdog, daemon=True)
+_wd_thread.start()

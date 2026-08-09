@@ -28,6 +28,8 @@ CRASHED_DURATION = 4      # seconds — الانفجار ثم العودة لل�
 TICK_RATE = 0.05           # 50ms internal check for auto-cashout
 HOUSE_EDGE = 0.03          # 3%
 GROWTH_RATE = 0.07         # mult = e^(0.07 * t_seconds)
+MAX_MULTIPLIER = 100.0     # HARD CAP — force crash at 100x
+WATCHDOG_TIMEOUT = 120     # seconds — if game loop stuck, force restart
 
 # ── Runtime deps (injected by init_aviator_engine) ──────
 _gm = None
@@ -83,7 +85,7 @@ def _calc_crash():
     if r < HOUSE_EDGE:
         return 1.00
     cp = (1 - HOUSE_EDGE) / (1 - r)
-    return max(1.00, round(cp, 2))
+    return min(MAX_MULTIPLIER, max(1.00, round(cp, 2)))
 
 def _server_mult():
     """Authoritative multiplier from flight start timestamp."""
@@ -272,6 +274,10 @@ def _game_loop():
             if _now - _last_broadcast >= 1.0:
                 _last_broadcast = _now
                 _broadcast({'type': 'mult', 'multiplier': round(mult, 2)})
+            # HARD CAP: force crash at MAX_MULTIPLIER (safety — never millions)
+            if mult >= MAX_MULTIPLIER:
+                crash_pt = min(crash_pt, mult)
+                break
             if mult >= crash_pt:
                 break
             time.sleep(TICK_RATE)

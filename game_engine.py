@@ -135,6 +135,7 @@ class GameManager:
         self.catalog_file = 'games_catalog.csv'
         self.quick_deposits_file = 'quick_deposits.csv'
         self.player_payment_methods_file = 'player_payment_methods.csv'
+        self.sessions_file = 'game_sessions.csv'
         self._ensure_files()
         self.algorithm = HouseAlgorithm() if HouseAlgorithm else None
         # Start background flush thread
@@ -705,7 +706,11 @@ class GameManager:
         return dep_id
 
     def create_withdrawal(self, user_id, amount, payment_method_id, account_number):
-        """إنشاء طلب سحب من محفظة الألعاب"""
+        """إنشاء طلب سحب من محفظة الألعاب — يتطلب استيفاء شرط الرهان 101%"""
+        # ── Wagering requirement: must wager 101% of total deposited ──
+        wager_ok, wager_msg = self._check_wagering_requirement(user_id, amount)
+        if not wager_ok:
+            return None, wager_msg
         # خصم الرصيد فوراً (يُعاد لو رفض الأدمن)
         success, balance_after = self.deduct_balance(user_id, amount)
         if not success:
@@ -727,6 +732,41 @@ class GameManager:
         except:
             pass
         return dep_id, None
+
+    def _check_wagering_requirement(self, user_id, withdrawal_amount):
+        """شرط الرهان: لازم العميل يلعب بـ 101% من إجمالي الإيداعات قبل السحب."""
+        try:
+            uid = str(user_id)
+            # احسب إجمالي الإيداعات الموافق عليها
+            total_deposited = 0.0
+            total_wagered = 0.0
+            try:
+                with open(self.quick_deposits_file, 'r', encoding=CSV_ENCODING) as f:
+                    for row in csv.DictReader(f):
+                        if row.get('user_id') == uid and row.get('status') == 'approved':
+                            try: total_deposited += float(row.get('amount', 0) or 0)
+                            except: pass
+            except: pass
+            # احسب إجمالي الرهانات من game_sessions
+            try:
+                with open(self.sessions_file, 'r', encoding=CSV_ENCODING) as f:
+                    for row in csv.DictReader(f):
+                        if row.get('user_id') == uid:
+                            try: total_wagered += float(row.get('bet_amount', 0) or 0)
+                            except: pass
+            except: pass
+            # لو مفيش إيداعات → اسمح بالسحب (حساب جديد)
+            if total_deposited <= 0:
+                return True, ''
+            required_wager = total_deposited * 1.01  # 101%
+            if total_wagered < required_wager:
+                remaining = required_wager - total_wagered
+                msg = f'يجب اللعب بـ {remaining:.0f} إضافية قبل السحب (شرط الرهان 101%)'
+                return False, msg
+            return True, ''
+        except Exception as e:
+            # في حالة الخطأ، اسمح بالسحب (fail-open)
+            return True, ''
 
     def approve_deposit(self, dep_id, admin_id):
         """موافقة على إيداع — يضيف الرصيد لمحفظة VEX"""

@@ -377,7 +377,7 @@ function animate(){
   else{rocketX=cx;rocketY=cy;bgScroll+=2+m*0.3}
   var alt=Math.min(1,el/10);
   ctx.clearRect(0,0,canvas.width,canvas.height);drawBg(alt);drawRw(alt);
-  var a22=22*Math.PI/180;var ang=el<td?-(a22*(1-(el/td)*0.5)):-(8*Math.PI/180)+Math.sin(el*1.5)*0.03;
+  var a22=22*Math.PI/180;var ang=el<td?(a22*(1-(el/td)*0.5)):(8*Math.PI/180)+Math.sin(el*1.5)*0.03;
   drawTrail(rocketX,rocketY,ang);drawRocket(rocketX,rocketY,ang);
   var cm=document.getElementById('crashMult');cm.style.left=rocketX+'px';cm.style.top=rocketY+'px';
   document.getElementById('crashMultVal').textContent=m.toFixed(2)+'x';
