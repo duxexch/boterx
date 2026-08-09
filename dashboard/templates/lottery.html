@@ -63,6 +63,7 @@
 .buy-btn{width:100%;padding:14px;border-radius:var(--radius);font-size:16px;font-weight:900;border:none;cursor:pointer;background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;transition:all .2s}
 .buy-btn:active{transform:scale(.97)}
 .buy-btn:disabled{background:var(--surface-2);color:var(--muted);cursor:not-allowed}
+.buy-btn-deposit:active{transform:scale(.97)}
 .draw-history{width:100%;max-width:360px}
 .draw-history-title{font-size:12px;color:var(--text-dim);margin-bottom:6px}
 .draw-item{display:flex;justify-content:space-between;padding:6px 10px;background:var(--surface);border-radius:var(--radius-sm);margin-bottom:4px;border:1px solid var(--border);font-size:11px}
@@ -74,7 +75,7 @@
 <div id="app" style="display:none">
   <div class="game-topbar">
     <div class="topbar-left">
-      <button class="btn-back" onclick="if(tg)tg.close();else history.back()">←</button>
+      <button class="btn-back" onclick="goBack()">←</button>
       <div class="bal-pill"><span class="bal-icon">💰</span><span class="bal-val" id="bal">0</span><span class="bal-cur" id="cur">EGP</span></div>
     </div>
     <div class="topbar-right">
@@ -123,13 +124,21 @@
 
     <!-- Buy Section -->
     <div class="buy-section">
-      <div class="ticket-price-info" id="priceInfo">سعر التذكرة: 10 لكل واحدة</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--surface);border-radius:var(--radius-sm);border:1px solid var(--border)">
+        <div style="font-size:11px;color:var(--text-dim)">سعر التذكرة</div>
+        <div style="font-size:14px;font-weight:700;color:var(--gold);font-family:'Courier New',monospace" id="pricePerTicket">10</div>
+      </div>
       <div class="count-row">
         <button class="count-btn" onclick="changeCount(-1)">−</button>
         <div class="count-val" id="countVal">1</div>
         <button class="count-btn" onclick="changeCount(1)">+</button>
       </div>
-      <button class="buy-btn" id="buyBtn" onclick="buyTickets()">🎟️ شراء تذاكر</button>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:rgba(251,191,36,.08);border-radius:var(--radius-sm);border:1px solid rgba(251,191,36,.2)">
+        <div style="font-size:12px;font-weight:700;color:var(--text)">إجمالي المطلوب</div>
+        <div style="font-size:18px;font-weight:900;color:var(--gold);font-family:'Courier New',monospace" id="totalCost">10</div>
+      </div>
+      <button class="buy-btn" id="buyBtn" onclick="buyTickets()">🎟️ شراء بالرصيد</button>
+      <button class="buy-btn-deposit" id="buyDepositBtn" onclick="showBuyDepositModal()" style="width:100%;padding:12px;border-radius:var(--radius);font-size:14px;font-weight:700;border:1px solid var(--border);cursor:pointer;background:var(--surface-2);color:var(--text);transition:all .2s">💳 شراء بإيداع سريع</button>
     </div>
 
     <!-- Draw History -->
@@ -149,10 +158,12 @@
 var ticketCount = 1;
 var myTicketsList = [];
 var timerInterval = null;
+var ticketPrice = 10;
 
 function changeCount(delta) {
   ticketCount = Math.max(1, Math.min(10, ticketCount + delta));
   document.getElementById('countVal').textContent = ticketCount;
+  document.getElementById('totalCost').textContent = (ticketPrice * ticketCount).toLocaleString();
 }
 
 function loadState() {
@@ -160,7 +171,11 @@ function loadState() {
     if (d.draw_time) startTimer(d.draw_time);
     if (d.prize_pool !== undefined) document.getElementById('prizePool').textContent = fmtAmount(d.prize_pool);
     if (d.tickets_sold !== undefined) document.getElementById('ticketsSold').textContent = d.tickets_sold;
-    if (d.ticket_price !== undefined) document.getElementById('priceInfo').textContent = 'سعر التذكرة: ' + d.ticket_price + ' لكل واحدة';
+    if (d.ticket_price !== undefined) {
+      ticketPrice = parseFloat(d.ticket_price) || 10;
+      document.getElementById('pricePerTicket').textContent = ticketPrice.toLocaleString();
+      document.getElementById('totalCost').textContent = (ticketPrice * ticketCount).toLocaleString();
+    }
     if (d.my_tickets) { myTicketsList = d.my_tickets; renderTickets(); }
     if (d.history) renderHistory(d.history);
     document.getElementById('myTickets').textContent = myTicketsList.length;
@@ -198,22 +213,32 @@ function startTimer(drawTime) {
 
 function buyTickets() {
   var btn = document.getElementById('buyBtn');
-  var pricePerText = document.getElementById('priceInfo') ? document.getElementById('priceInfo').textContent : '10';
-  var pricePer = parseFloat(pricePerText.match(/[\d.]+/)) || 10;
-  if (!checkBalanceBeforeBet(pricePer * ticketCount)) return;
-  btn.disabled = true;
-  apiFetchCritical(BASE + '/api/lottery/buy', {
-    method: 'POST',
-    body: JSON.stringify({ uid: uid, count: ticketCount })
-  }).then(function(r) { return r.json(); }).then(function(d) {
-    btn.disabled = false;
-    if (d.error) { showToast(d.error, 'error'); if (d.need_deposit) showDepositModal(); return; }
-    showToast('تم شراء ' + ticketCount + ' تذكرة!', 'success');
-    soundDraw(); hapticNotif('success');
-    loadState(); loadBalance();
-  }).catch(function() {
-    btn.disabled = false; showToast('خطأ في الشبكة', 'error');
+  var totalCost = ticketPrice * ticketCount;
+  btn.disabled = true; btn.textContent = '⏳...';
+  // Check balance first
+  checkBalanceBeforeBet(totalCost).then(function(ok) {
+    if (!ok) { btn.disabled = false; btn.textContent = '🎟️ شراء بالرصيد'; return; }
+    apiFetchCritical(BASE + '/api/lottery/buy', {
+      method: 'POST',
+      body: JSON.stringify({ count: ticketCount })
+    }).then(function(r) { return r.json(); }).then(function(d) {
+      btn.disabled = false; btn.textContent = '🎟️ شراء بالرصيد';
+      if (d.error) { showToast(d.error, 'error'); return; }
+      if (d.need_deposit) { showBuyDepositModal(); return; }
+      showToast('تم شراء ' + ticketCount + ' تذكرة!', 'success');
+      soundDraw(); hapticNotif('success');
+      loadState(); loadBalance();
+    }).catch(function() {
+      btn.disabled = false; btn.textContent = '🎟️ شراء بالرصيد';
+      showToast('خطأ في الشبكة', 'error');
+    });
   });
+}
+
+function showBuyDepositModal() {
+  var totalCost = ticketPrice * ticketCount;
+  // Reuse showVexDepositModal with the required amount
+  showVexDepositModal(totalCost);
 }
 
 function tierLabel(tier) {
@@ -306,7 +331,7 @@ loadBalance();
 loadState();
 setInterval(loadState, 30000);
 setInterval(loadBalance, 10000);
-initBackButton();
+initBackButton();setTimeout(injectDepositButton,100);
 </script>
 </body>
 </html>
