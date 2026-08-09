@@ -371,7 +371,7 @@ async function sendChatMessage() {
   try {
     await apiFetch(BASE + '/api/games/chat/send', {
       method: 'POST',
-      body: JSON.stringify({ uid, message: msg })
+      body: JSON.stringify({ message: msg })
     });
   } catch(e) { /* ignore */ }
 }
@@ -380,7 +380,7 @@ async function sendEmoji(emoji) {
   try {
     await apiFetch(BASE + '/api/games/chat/send', {
       method: 'POST',
-      body: JSON.stringify({ uid, emoji: emoji })
+      body: JSON.stringify({ emoji: emoji })
     });
     haptic('light');
   } catch(e) { /* ignore */ }

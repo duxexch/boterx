@@ -268,7 +268,8 @@ function drawDice3D(cx,cy,size,rotX,rotY,rotZ){
   var perspective=800;
   var scale=s;
   
-  // Compute all 8 vertices after rotation
+  // Compute all 8 vertices after rotation (both 3D + projected)
+  var verts3d=[];
   var verts=[];
   var baseVerts=[
     [-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],
@@ -277,23 +278,25 @@ function drawDice3D(cx,cy,size,rotX,rotY,rotZ){
   for(var i=0;i<8;i++){
     var bv=baseVerts[i];
     var rv=_rotate3D(bv[0]*s,bv[1]*s,bv[2]*s,rotX,rotY,rotZ);
-    var pv=_project(rv,cx,cy,1,perspective);
-    verts.push(pv);
+    verts3d.push(rv);
+    verts.push(_project(rv,cx,cy,1,perspective));
   }
   
-  // Compute face visibility (back-face culling) + sort by depth
+  // Compute face visibility using 3D normal (dot product with view direction)
   var visibleFaces=[];
   for(var f=0;f<CUBE_FACES.length;f++){
     var face=CUBE_FACES[f];
-    var v0=verts[face.v[0]],v1=verts[face.v[1]],v2=verts[face.v[2]];
-    // Normal (cross product of edges in screen space)
-    var ax=v1[0]-v0[0],ay=v1[1]-v0[1];
-    var bx=v2[0]-v0[0],by=v2[1]-v0[1];
-    var cross=ax*by-ay*bx;
-    if(cross>0) continue; // back-facing, skip
-    // Average depth
-    var avgZ=(verts[face.v[0]][2]+verts[face.v[1]][2]+verts[face.v[2]][2]+verts[face.v[3]][2])/4;
-    visibleFaces.push({face:face,avgZ:avgZ});
+    var v0=verts3d[face.v[0]],v1=verts3d[face.v[1]],v2=verts3d[face.v[2]];
+    // Face normal via cross product of two edges in 3D
+    var e1x=v1[0]-v0[0],e1y=v1[1]-v0[1],e1z=v1[2]-v0[2];
+    var e2x=v2[0]-v0[0],e2y=v2[1]-v0[1],e2z=v2[2]-v0[2];
+    var nx=e1y*e2z-e1z*e2y;
+    var ny=e1z*e2x-e1x*e2z;
+    var nz=e1x*e2y-e1y*e2x;
+    // View direction is +Z (toward viewer). Face visible if nz > 0
+    if(nz<=0) continue; // back-facing, skip
+    var avgZ=(verts3d[face.v[0]][2]+verts3d[face.v[1]][2]+verts3d[face.v[2]][2]+verts3d[face.v[3]][2])/4;
+    visibleFaces.push({face:face,avgZ:avgZ,normal:[nx,ny,nz]});
   }
   // Sort back-to-front (painter's algorithm)
   visibleFaces.sort(function(a,b){return b.avgZ-a.avgZ});
