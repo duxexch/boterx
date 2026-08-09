@@ -155,7 +155,7 @@ function haptic(t='light'){if(tg?.HapticFeedback?.impactOccurred)tg.HapticFeedba
 
 async function loadBalance() {
   try {
-    const r = await apiFetch(`${BASE}/api/wallet/balance?uid=${uid}`);
+    const r = await apiFetch(`${BASE}/api/wallet/balance`);
     const d = await r.json();
     document.getElementById('bal').textContent = (d.balance||0).toLocaleString();
   } catch(e) {}
@@ -315,7 +315,7 @@ async function loadOtherGames() {
       const el = document.createElement('div');
       el.className = 'mini-game';
       el.innerHTML = `<div class="mini-game-icon">${g.icon}</div><div class="mini-game-name">${g.name}</div>`;
-      el.onclick = () => { window.location.href = `${BASE}/webapp/play/${g.id}?uid=${uid}&lang=ar`; };
+      el.onclick = () => { window.location.href = `${BASE}/webapp/play/${g.id}?${_getAuthParam()}&lang=ar`; };
       container.appendChild(el);
     });
   } catch(e) {}
@@ -330,7 +330,7 @@ async function showDepositModal(required) {
   let botMethods = [];
   let savedWallets = [];
   try {
-    const r = await apiFetch(`${BASE}/api/games/payment-methods?uid=${uid}`);
+    const r = await apiFetch(`${BASE}/api/games/payment-methods`);
     const d = await r.json();
     botMethods = d.methods || [];
     savedWallets = d.saved_methods || [];
@@ -480,7 +480,7 @@ function confettiBurst() {
 }
 
 function goBack() {
-  window.location.href = `${BASE}/webapp/games?uid=${uid}&lang=ar`;
+  window.location.href = `${BASE}/webapp/games?${_getAuthParam()}&lang=ar`;
 }
 
 // Init

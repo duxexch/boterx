@@ -109,7 +109,7 @@
 <script>
 async function loadStats() {
   try {
-    const r = await apiFetch(BASE + '/api/player/stats?uid=' + uid);
+    const r = await apiFetch(BASE + '/api/player/stats');
     const d = await r.json();
     document.getElementById('loading').style.display = 'none';
     document.getElementById('app').style.display = 'flex';

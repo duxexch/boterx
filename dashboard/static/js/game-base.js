@@ -58,7 +58,8 @@ async function apiFetch(url, opts = {}) {
     opts.headers['Content-Type'] = 'application/json';
   }
   var authParam = _getAuthParam();
-  if (authParam && !url.includes('s=') && !url.includes('uid=')) {
+  var authKey = sess ? 's=' : 'uid=';
+  if (authParam && !url.includes(authKey)) {
     url += (url.includes('?') ? '&' : '?') + authParam;
   }
   return fetch(url, opts);
@@ -147,7 +148,8 @@ async function apiFetchCritical(url, opts) {
   }
   if (sess) opts.headers['X-Device-FP'] = getDeviceFP();
   var authParam = _getAuthParam();
-  if (authParam && !url.includes('s=') && !url.includes('uid=')) {
+  var authKey = sess ? 's=' : 'uid=';
+  if (authParam && !url.includes(authKey)) {
     url += (url.includes('?') ? '&' : '?') + authParam;
   }
   try {
@@ -230,7 +232,7 @@ function haptic(t = 'light') {
 // ---- Balance ----
 async function loadBalance() {
   try {
-    const r = await apiFetch(`${BASE}/api/wallet/balance?uid=${uid}`);
+    const r = await apiFetch(`${BASE}/api/wallet/balance`);
     const d = await r.json();
     const balEl = document.getElementById('bal');
     const curEl = document.getElementById('cur');
@@ -314,7 +316,7 @@ function connectChatStream() {
   const container = document.querySelector('.chat-messages');
   if (!container) return;
   try {
-    const url = BASE + '/api/games/chat/stream?uid=' + uid;
+    const url = BASE + '/api/games/chat/stream?' + _getAuthParam();
     _chatSSE = new EventSource(url);
     _chatSSE.onmessage = function(e) {
       try {
@@ -337,7 +339,7 @@ function connectChatStream() {
 
 async function pollChatHistory() {
   try {
-    const r = await apiFetch(BASE + '/api/games/chat/history?uid=' + uid);
+    const r = await apiFetch(BASE + '/api/games/chat/history');
     const d = await r.json();
     if (d.messages) {
       d.messages.forEach(m => addChatMessage(m, false));
@@ -446,7 +448,7 @@ function renderPlayers() {
 function connectLivePlayersStream() {
   try {
     if (_lpSSE) _lpSSE.close();
-    const url = BASE + '/api/games/live-players/stream?uid=' + uid;
+    const url = BASE + '/api/games/live-players/stream?' + _getAuthParam();
     _lpSSE = new EventSource(url);
     _lpSSE.onmessage = function(e) {
       try {
@@ -488,7 +490,7 @@ function connectLivePlayersStream() {
 // Polling fallback for live players
 async function pollLivePlayers() {
   try {
-    const r = await apiFetch(BASE + '/api/games/live-players?uid=' + uid);
+    const r = await apiFetch(BASE + '/api/games/live-players');
     const d = await r.json();
     if (d.players) {
       livePlayers.length = 0;
@@ -537,7 +539,7 @@ function connectLeaderboardStream(containerId) {
   const el = document.getElementById(containerId);
   if (!el) return;
   try {
-    const url = BASE + '/api/games/leaderboard/stream?uid=' + uid;
+    const url = BASE + '/api/games/leaderboard/stream?' + _getAuthParam();
     const es = new EventSource(url);
     es.onmessage = function(e) {
       try {
@@ -550,12 +552,12 @@ function connectLeaderboardStream(containerId) {
     es.onerror = function() {
       es.close();
       // Fallback: poll once
-      apiFetch(BASE + '/api/games/leaderboard?uid=' + uid).then(r => r.json()).then(d => {
+      apiFetch(BASE + '/api/games/leaderboard').then(r => r.json()).then(d => {
         if (d.leaderboard) renderLeaderboard(containerId, d.leaderboard);
       }).catch(() => {});
     };
   } catch(e) {
-    apiFetch(BASE + '/api/games/leaderboard?uid=' + uid).then(r => r.json()).then(d => {
+    apiFetch(BASE + '/api/games/leaderboard').then(r => r.json()).then(d => {
       if (d.leaderboard) renderLeaderboard(containerId, d.leaderboard);
     }).catch(() => {});
   }
@@ -616,7 +618,7 @@ let pfRevealedSeed = null;
 
 async function initProvablyFair() {
   try {
-    const r = await apiFetch(`${BASE}/api/provably-fair/seed?uid=${uid}`);
+    const r = await apiFetch(`${BASE}/api/provably-fair/seed`);
     const d = await r.json();
     if (d.seed_hash) {
       pfSessionId = d.session_id;
@@ -727,7 +729,7 @@ async function verifyPF() {
 async function revealPFSession() {
   if (!pfSessionId) return;
   try {
-    const r = await apiFetch(`${BASE}/api/provably-fair/reveal/${pfSessionId}?uid=${uid}`);
+    const r = await apiFetch(`${BASE}/api/provably-fair/reveal/${pfSessionId}`);
     const d = await r.json();
     if (d.server_seed) {
       pfRevealedSeed = d.server_seed;
@@ -756,10 +758,10 @@ function goBack() {
     c.appendChild(box);
     document.body.appendChild(c);
     document.getElementById('_stayBtn').onclick = function() { c.remove(); };
-    document.getElementById('_leaveBtn').onclick = function() { c.remove(); window.location.href = BASE + '/webapp/games?uid=' + uid + '&lang=ar'; };
+    document.getElementById('_leaveBtn').onclick = function() { c.remove(); window.location.href = BASE + '/webapp/games?' + _getAuthParam() + '&lang=ar'; };
     return;
   }
-  window.location.href = BASE + '/webapp/games?uid=' + uid + '&lang=ar';
+  window.location.href = BASE + '/webapp/games?' + _getAuthParam() + '&lang=ar';
 }
 
 // ---- Constitution §4: Telegram Mini App Integration ----
@@ -824,7 +826,7 @@ async function showVexDepositModal(required) {
   const mb = document.getElementById('mb');
 
   try {
-    const r = await apiFetch(`${BASE}/api/games/payment-methods?uid=${uid}`);
+    const r = await apiFetch(`${BASE}/api/games/payment-methods`);
     const d = await r.json();
     vMethods = d.methods || [];
     vSaved = d.saved_methods || [];
@@ -929,7 +931,7 @@ async function checkBalanceBeforeBet(requiredAmount) {
   // If DOM shows 0, fetch from server (balance might not have loaded yet)
   if (currentBal === 0) {
     try {
-      var r = await apiFetch(BASE + '/api/wallet/balance?uid=' + uid);
+      var r = await apiFetch(BASE + '/api/wallet/balance');
       var d = await r.json();
       if (d.balance !== undefined) {
         currentBal = parseFloat(d.balance) || 0;
@@ -950,7 +952,7 @@ async function checkBalanceBeforeBet(requiredAmount) {
 // On page load, fetches balance and shows deposit modal if below minimum
 async function autoDepositCheck(minAmount) {
   try {
-    var r = await apiFetch(BASE + '/api/wallet/balance?uid=' + uid);
+    var r = await apiFetch(BASE + '/api/wallet/balance');
     var d = await r.json();
     if (d.balance !== undefined) {
       var balEl = document.getElementById('bal');

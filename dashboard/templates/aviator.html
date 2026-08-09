@@ -167,7 +167,7 @@ function drawPlane(px,py,ang){ctx.save();ctx.translate(px,py);ctx.rotate(ang);ct
 
 // ── Polling ──
 function startPolling(){if(pollTimer)clearInterval(pollTimer);pollTimer=setInterval(poll,1000);poll()}
-async function poll(){try{var r=await apiFetch(BASE+'/api/aviator/state?uid='+uid);var d=await r.json();var ci=document.getElementById('connIndicator');if(ci)ci.textContent='🟢';handleState(d)}catch(e){var ci=document.getElementById('connIndicator');if(ci)ci.textContent='🔴'}}
+async function poll(){try{var r=await apiFetch(BASE+'/api/aviator/state');var d=await r.json();var ci=document.getElementById('connIndicator');if(ci)ci.textContent='🟢';handleState(d)}catch(e){var ci=document.getElementById('connIndicator');if(ci)ci.textContent='🔴'}}
 function handleState(d){
   var np=d.phase;currentMult=d.multiplier||1.0;if(d.crash_point)crashPoint=d.crash_point;
   // استرجاع حالة الرهان من السيرفر (لو العميل حدّث الصفحة)
@@ -382,7 +382,7 @@ function placeBet(s,amt){
   checkBalanceBeforeBet(amt).then(function(ok){
     if(!ok){btn.disabled=false;btn.textContent='رهان';return}
     bets[s].req='b'+s+'_'+Date.now()+'_'+Math.random().toString(36).substr(2,6);
-    apiFetchCritical(BASE+'/api/aviator/bet?uid='+uid,{method:'POST',body:JSON.stringify({uid:uid,bet_amount:amt,auto_val:0,request_id:bets[s].req})})
+    apiFetchCritical(BASE+'/api/aviator/bet',{method:'POST',body:JSON.stringify({bet_amount:amt,auto_val:0,request_id:bets[s].req})})
     .then(function(r){return r.json()}).then(function(d){
       if(d.success){
         bets[s].st='betting';bets[s].amt=amt;
@@ -412,7 +412,7 @@ function doJump(s){
   // باراشوت مع المبلغ يتحرك للأسفل
   spawnParachuteWithMoney(planeX,planeY,pay);
   var req='c'+s+'_'+Date.now()+'_'+Math.random().toString(36).substr(2,6);
-  apiFetchCritical(BASE+'/api/aviator/cashout?uid='+uid,{method:'POST',body:JSON.stringify({uid:uid,request_id:req})})
+  apiFetchCritical(BASE+'/api/aviator/cashout',{method:'POST',body:JSON.stringify({request_id:req})})
   .then(function(r){return r.json()}).then(function(d){if(d.success&&d.balance_after!==undefined)document.getElementById('bal').textContent=d.balance_after.toLocaleString()})
   .catch(function(){});
 }
