@@ -53,12 +53,12 @@ function _getAuthParam() {
 async function apiFetch(url, opts = {}) {
   opts.headers = opts.headers || {};
   opts.headers['X-Telegram-Init-Data'] = initData;
-  if (token) opts.headers['X-Device-FP'] = getDeviceFP();
+  if (sess) opts.headers['X-Device-FP'] = getDeviceFP();
   if (opts.body && typeof opts.body === 'string') {
     opts.headers['Content-Type'] = 'application/json';
   }
   var authParam = _getAuthParam();
-  if (authParam && !url.includes('token=') && !url.includes('uid=')) {
+  if (authParam && !url.includes('s=') && !url.includes('uid=')) {
     url += (url.includes('?') ? '&' : '?') + authParam;
   }
   return fetch(url, opts);
@@ -145,9 +145,9 @@ async function apiFetchCritical(url, opts) {
   if (opts.body && typeof opts.body === 'string') {
     opts.headers['Content-Type'] = 'application/json';
   }
-  if (token) opts.headers['X-Device-FP'] = getDeviceFP();
+  if (sess) opts.headers['X-Device-FP'] = getDeviceFP();
   var authParam = _getAuthParam();
-  if (authParam && !url.includes('token=') && !url.includes('uid=')) {
+  if (authParam && !url.includes('s=') && !url.includes('uid=')) {
     url += (url.includes('?') ? '&' : '?') + authParam;
   }
   try {
