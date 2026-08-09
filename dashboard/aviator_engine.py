@@ -428,7 +428,7 @@ def init_aviator_engine(app, get_uid, get_gm, get_pf, is_pf, is_vex):
                 'history': list(_state['history'][-15:]),
                 'my_bet': my_bets,
                 'players': all_players,
-                'total_bets_egp': random.randint(80000, 200000),
+                'total_bets_egp': random.randint(80000, 500000),
             })
 
 # ===== لاعبين وهميون — بيانات للعرض فقط =====
@@ -459,7 +459,7 @@ def _generate_fake_players(current_mult):
         # هاتف وهمي: +966 5• ••• + آخر 3 أرقام عشوائيين
         phone_last3 = str(random.randint(100, 999))
         display_name = masked_name + ' •' + phone_last3
-        bet = random.choice([10, 20, 50, 100, 200, 500])
+        bet = random.choice([10, 20, 50, 100, 200, 500, 1000, 2000, 5000])
         avatar = raw_name[0]
         if phase == 'waiting':
             result.append({'name': display_name, 'avatar': avatar, 'bet': bet, 'multiplier': 0, 'payout': 0, 'status': 'participating'})
