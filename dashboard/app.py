@@ -5631,6 +5631,32 @@ _LOTTERY_ROUND_DURATION = 3600  # seconds (1 hour rounds)
 _LOTTERY_NUMBERS_COUNT = 5      # numbers per ticket
 _LOTTERY_MAX_NUMBER = 30
 
+# ── Three draw types: hourly, daily, weekly ──
+# Each has its own prize pool, ticket price, and duration
+_LOTTERY_DRAW_TYPES = {
+    'hourly': {
+        'name': 'سحب كل ساعة',
+        'duration': 3600,           # 1 hour
+        'ticket_price': 50,
+        'multiplier': 1.0,          # base multiplier
+        'icon': '⏰',
+    },
+    'daily': {
+        'name': 'سحب يومي',
+        'duration': 86400,          # 24 hours
+        'ticket_price': 100,
+        'multiplier': 2.5,          # 2.5x bigger prizes
+        'icon': '📅',
+    },
+    'weekly': {
+        'name': 'سحب أسبوعي',
+        'duration': 604800,         # 7 days
+        'ticket_price': 250,
+        'multiplier': 10.0,         # 10x bigger prizes
+        'icon': '🏆',
+    },
+}
+
 # Tiered prize tiers (number of matches required for each tier)
 _LOTTERY_TIER_JACKPOT    = 5   # 5/5 — full prize pool split among winners
 _LOTTERY_TIER_SECONDARY  = 4   # 4/5 — secondary prize
@@ -5656,6 +5682,25 @@ def _load_lottery_state():
     except Exception:
         pass
     return {}
+
+def _load_lottery_state_file(filename):
+    try:
+        f = os.path.join(BASE_DIR, filename)
+        if os.path.exists(f):
+            with open(f, 'r') as fh:
+                return json.load(fh)
+    except Exception:
+        pass
+    return {}
+
+def _save_lottery_state_file(state, filename, raise_on_error=False):
+    try:
+        f = os.path.join(BASE_DIR, filename)
+        with open(f, 'w') as fh:
+            json.dump(state, fh)
+    except Exception:
+        if raise_on_error:
+            raise
 
 def _save_lottery_state(state, raise_on_error=False):
     """Persist lottery state to disk.
@@ -5700,6 +5745,33 @@ def _lottery_resume_pending_credits(state):
     # Persist after crediting; best-effort (don't fail the whole round if save fails here)
     _save_lottery_state(state)
 
+
+def _get_or_create_lottery_round_for_type(draw_type='hourly'):
+    """Get or create a lottery round for a specific draw type."""
+    state_file = f'lottery_state_{draw_type}.json'
+    dt_config = _LOTTERY_DRAW_TYPES.get(draw_type, _LOTTERY_DRAW_TYPES['hourly'])
+    with _lottery_lock:
+        state = _load_lottery_state_file(state_file)
+        now_ts = datetime.now().timestamp()
+        # Start new round if needed
+        if not state or (state.get('drawn') and not state.get('winners_to_credit')):
+            round_id = f"LTR_{draw_type}_{int(now_ts)}"
+            carried_pool = float(state.get('rollover_amount', 0)) if state else 0.0
+            new_state = {
+                'round_id': round_id,
+                'draw_type': draw_type,
+                'draw_time': now_ts + dt_config['duration'],
+                'ticket_price': dt_config['ticket_price'],
+                'tickets': [],
+                'tickets_sold': 0,
+                'prize_pool': carried_pool,
+                'drawn': None,
+                'history': state.get('history', []) if state else [],
+                'previous_round': state.get('previous_round') if state else None,
+            }
+            _save_lottery_state_file(new_state, state_file)
+            return new_state
+        return state
 
 def _get_or_create_lottery_round():
     """Return the current active lottery round, creating one if needed or drawing if expired.
@@ -5994,18 +6066,41 @@ def api_lottery_state():
                       'label': 'جائزة صغيرة (3/5)'},
         'rollover_pct': _LOTTERY_ROLLOVER_PCT,
     }
+    # Build draw types info with current stats
+    draw_types = {}
+    for dt_key, dt_config in _LOTTERY_DRAW_TYPES.items():
+        dt_state = _get_or_create_lottery_round_for_type(dt_key)
+        dt_tickets = dt_state.get('tickets', [])
+        dt_pool = dt_state.get('prize_pool', 0)
+        dt_multiplier = dt_config['multiplier']
+        draw_types[dt_key] = {
+            'name': dt_config['name'],
+            'icon': dt_config['icon'],
+            'ticket_price': dt_config['ticket_price'],
+            'duration': dt_config['duration'],
+            'multiplier': dt_multiplier,
+            'draw_time': dt_state.get('draw_time'),
+            'tickets_sold': dt_state.get('tickets_sold', 0),
+            'max_tickets': 1000,
+            'tickets_available': 1000 - dt_state.get('tickets_sold', 0),
+            'participants_count': len(set(t.get('uid') for t in dt_tickets)),
+            'prize_pool': dt_pool,
+            'jackpot_estimate': round(dt_pool * dt_multiplier, 2),
+        }
+
     return jsonify({
         'round_id': state.get('round_id'),
         'draw_time': state.get('draw_time'),
         'ticket_price': state.get('ticket_price', _LOTTERY_TICKET_PRICE),
         'tickets_sold': state.get('tickets_sold', 0),
-        'max_tickets': 1000,  # maximum tickets per round
+        'max_tickets': 1000,
         'tickets_available': 1000 - state.get('tickets_sold', 0),
         'participants_count': len(set(t.get('uid') for t in state.get('tickets', []))),
         'prize_pool': prize_pool,
         'prize_tiers': prize_tiers,
         'my_tickets': my_tickets,
         'history': state.get('history', [])[-5:],
+        'draw_types': draw_types,
     })
 
 @app.route('/api/lottery/buy', methods=['POST'])
