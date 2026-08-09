@@ -516,20 +516,18 @@ function animateRoll(resultNum,power,callback){
   frame();
 }
 
-function spawnBounceParticles(x,y){
-
 // ── Result alignment: rotate dice so the result face is on TOP ──
 // Face layout: 1=+Z(front), 2=+X(right), 3=+Y(top), 4=-Y(bottom), 5=-X(left), 6=-Z(back)
 // To bring each face to top (+Y), we need specific rotations:
 function _getResultAngles(faceNum){
   var H=Math.PI/2; // 90 degrees
   switch(faceNum){
-    case 1: return [-H, 0, 0];      // front→top: tilt forward
-    case 2: return [0, -H, 0];      // right→top: tilt right
+    case 1: return [-H, 0, 0];      // front->top: tilt forward
+    case 2: return [0, -H, 0];      // right->top: tilt right
     case 3: return [0, 0, 0];       // already top
-    case 4: return [Math.PI, 0, 0]; // bottom→top: flip
-    case 5: return [0, H, 0];       // left→top: tilt left
-    case 6: return [H, 0, 0];       // back→top: tilt backward
+    case 4: return [Math.PI, 0, 0]; // bottom->top: flip
+    case 5: return [0, H, 0];       // left->top: tilt left
+    case 6: return [H, 0, 0];       // back->top: tilt backward
   }
   return [0,0,0];
 }
