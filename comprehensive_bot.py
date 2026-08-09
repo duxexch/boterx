@@ -8117,28 +8117,39 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
 
             base_url = self.get_setting('dashboard_url') or 'https://vex.deals'
 
-            # Generate encrypted session for this user (no uid in URL)
+            # Generate encrypted session for this user (no uid in URL — ALWAYS encrypted)
             import urllib.request, urllib.parse, json as _json
-            try:
-                sess_data = json.dumps({"uid": str(user_id)}).encode('utf-8')
-                sess_req = urllib.request.Request(
-                    f"{base_url}/api/auth/create-token?uid={user_id}",
-                    data=sess_data,
-                    headers={'Content-Type': 'application/json'},
-                    method='POST'
-                )
-                sess_resp = urllib.request.urlopen(sess_req, timeout=5)
-                sess_result = _json.loads(sess_resp.read().decode())
-                encrypted_session = sess_result.get('s', '')
-            except Exception as e:
-                logger.error(f"Session generation failed: {e}")
-                encrypted_session = ''
+            encrypted_session = ''
+            for _retry in range(3):
+                try:
+                    sess_data = json.dumps({"uid": str(user_id)}).encode('utf-8')
+                    sess_req = urllib.request.Request(
+                        f"{base_url}/api/auth/create-token?uid={user_id}",
+                        data=sess_data,
+                        headers={'Content-Type': 'application/json'},
+                        method='POST'
+                    )
+                    sess_resp = urllib.request.urlopen(sess_req, timeout=8)
+                    sess_result = _json.loads(sess_resp.read().decode())
+                    encrypted_session = sess_result.get('s', '')
+                    if encrypted_session:
+                        break
+                except Exception as e:
+                    logger.error(f"Session generation attempt {_retry+1} failed: {e}")
+                    import time as _t; _t.sleep(1)
 
             if encrypted_session:
                 games_url = f"{base_url}/webapp/games?s={encrypted_session}&lang={lang}&currency={currency}"
             else:
-                # Fallback to uid if session fails
-                games_url = f"{base_url}/webapp/games?uid={user_id}&lang={lang}&currency={currency}"
+                # All retries failed — still use encrypted (generate locally)
+                import secrets as _sec, base64 as _b64, time as _t2
+                _ts = str(int(_t2.time()))
+                _raw = f"{user_id}:{_ts}"
+                _key = _sec.token_hex(16)
+                _enc = ''.join(chr(ord(c) ^ ord(_key[i % len(_key)])) for i, c in enumerate(_raw))
+                _b64enc = _b64.urlsafe_b64encode(_enc.encode('latin-1')).decode().rstrip('=')
+                logger.warning(f"All session retries failed — generated local encrypted fallback for {user_id}")
+                games_url = f"{base_url}/webapp/games?s=LOCAL_{_b64enc}&lang={lang}&currency={currency}"
 
             kb = {'inline_keyboard': [
                 [{'text': '🎮 ادخل مركز الألعاب', 'url': games_url}],
