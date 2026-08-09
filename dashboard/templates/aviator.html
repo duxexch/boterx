@@ -62,7 +62,8 @@
 @keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
 @keyframes fadeIn{from{opacity:0;transform:translate(-50%,10px)}to{opacity:1;transform:translate(-50%,0)}}
 /* شريط اللاعبين — واقعي بدون فلاش */
-.players-panel{background:var(--surface);border-top:1px solid var(--border);flex-shrink:0;height:140px;overflow:hidden}
+.players-panel{background:var(--surface);border-top:1px solid var(--border);flex-shrink:0;height:160px;overflow:hidden;display:flex;flex-direction:column}
+.total-bets-bar{padding:6px 12px;font-size:12px;font-weight:800;color:var(--gold);border-bottom:1px solid var(--border);text-align:center;background:rgba(251,191,36,.05)}
 .players-list{height:100%;overflow-y:auto;padding:4px 8px;-webkit-overflow-scrolling:touch}
 .players-list::-webkit-scrollbar{width:3px}
 .players-list::-webkit-scrollbar-thumb{background:var(--border)}
@@ -133,8 +134,9 @@
       <button class="bet-btn idle" id="btn2" onclick="onBtn(2)" disabled>رهان</button>
     </div>
   </div>
-  <!-- شريط اللاعبين الوهميين — بدون عداد -->
+  <!-- إجمالي رهانات الجولة + شريط اللاعبين -->
   <div class="players-panel" id="playersPanel">
+    <div class="total-bets-bar" id="totalBetsBar">💰 <span id="totalBetsEgp">0</span> جنيه</div>
     <div class="players-list" id="playersList"></div>
   </div>
 </div>
@@ -185,6 +187,7 @@ function handleState(d){
   if(d.history){var h=document.getElementById('history');h.innerHTML='';d.history.forEach(function(v){var el=document.createElement('div');el.className='hist-item '+(v>=1.5?'hist-win':'hist-lose')+(v>=3?' hist-big':'');el.textContent=v.toFixed(2)+'x';h.appendChild(el)})}
   // عرض اللاعبين الوهميين
   if(d.players){renderFakePlayers(d.players)}
+  if(d.total_bets_egp){document.getElementById('totalBetsEgp').textContent=d.total_bets_egp.toLocaleString()}
 }
 
 function renderFakePlayers(players){

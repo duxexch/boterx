@@ -428,6 +428,7 @@ def init_aviator_engine(app, get_uid, get_gm, get_pf, is_pf, is_vex):
                 'history': list(_state['history'][-15:]),
                 'my_bet': my_bets,
                 'players': all_players,
+                'total_bets_egp': random.randint(80000, 200000),
             })
 
 # ===== لاعبين وهميون — بيانات للعرض فقط =====
