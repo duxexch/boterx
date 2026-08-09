@@ -446,31 +446,36 @@ def _init_fake_players():
     pass
 
 def _generate_fake_players(current_mult):
-    """توليد لاعبين وهميين مباشرة — بدون قائمة مخزنة"""
+    """توليد لاعبين وهميين مباشرة — أسماء بنجوم + هواتف وهمية"""
     phase = _state['phase']
     count = random.randint(5, 10)
     names = ['أحمد','عمر','محمد','خالد','سعد','فهد','ناصر','يوسف','علي','حسن','ماجد','وليد','طارق','بدر','راشد','عبدالله','سلطان','فيصل','نايف','تركي','دانا','نورة','ريم','سارة','لمى','شهد','جود','هند','روان']
     result = []
     for i in range(count):
-        name = random.choice(names) + ' ' + str(random.randint(1, 99))
+        # اسم بنجوم: أول حرف + نجوم
+        raw_name = random.choice(names)
+        masked_name = raw_name[0] + '***'
+        # هاتف وهمي: +966 5• ••• + آخر 3 أرقام عشوائيين
+        phone_last3 = str(random.randint(100, 999))
+        display_name = masked_name + ' •' + phone_last3
         bet = random.choice([10, 20, 50, 100, 200, 500])
-        avatar = name[0]
+        avatar = raw_name[0]
         if phase == 'waiting':
-            result.append({'name': name, 'avatar': avatar, 'bet': bet, 'multiplier': 0, 'payout': 0, 'status': 'participating'})
+            result.append({'name': display_name, 'avatar': avatar, 'bet': bet, 'multiplier': 0, 'payout': 0, 'status': 'participating'})
         elif phase == 'flying':
             if random.random() < 0.4:
                 jm = round(random.uniform(1.0, max(1.1, current_mult)), 2)
-                result.append({'name': name, 'avatar': avatar, 'bet': bet, 'multiplier': jm, 'payout': round(bet*jm,2), 'status': 'cashed'})
+                result.append({'name': display_name, 'avatar': avatar, 'bet': bet, 'multiplier': jm, 'payout': round(bet*jm,2), 'status': 'cashed'})
             else:
-                result.append({'name': name, 'avatar': avatar, 'bet': bet, 'multiplier': 0, 'payout': 0, 'status': 'participating'})
+                result.append({'name': display_name, 'avatar': avatar, 'bet': bet, 'multiplier': 0, 'payout': 0, 'status': 'participating'})
         elif phase == 'crashed':
             if random.random() < 0.5:
                 jm = round(random.uniform(1.0, max(1.1, current_mult)), 2)
-                result.append({'name': name, 'avatar': avatar, 'bet': bet, 'multiplier': jm, 'payout': round(bet*jm,2), 'status': 'cashed'})
+                result.append({'name': display_name, 'avatar': avatar, 'bet': bet, 'multiplier': jm, 'payout': round(bet*jm,2), 'status': 'cashed'})
             else:
-                result.append({'name': name, 'avatar': avatar, 'bet': bet, 'multiplier': 0, 'payout': 0, 'status': 'lost'})
+                result.append({'name': display_name, 'avatar': avatar, 'bet': bet, 'multiplier': 0, 'payout': 0, 'status': 'lost'})
         else:
-            result.append({'name': name, 'avatar': avatar, 'bet': bet, 'multiplier': 0, 'payout': 0, 'status': 'participating'})
+            result.append({'name': display_name, 'avatar': avatar, 'bet': bet, 'multiplier': 0, 'payout': 0, 'status': 'participating'})
     result.sort(key=lambda x: (-x['payout'], 0 if x['status'] != 'lost' else 1))
     return result
 
