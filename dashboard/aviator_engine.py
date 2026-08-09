@@ -418,12 +418,8 @@ def init_aviator_engine(app, get_uid, get_gm, get_pf, is_pf, is_vex):
                     'cash_mult': b.get('cash_mult', 0),
                     'auto_val': b.get('auto_val', 0),
                 }
-            # توليد لاعبين وهميين + دمج اللاعبين الحقيقيين
-            fake_players = _generate_fake_players(_server_mult())
-            real_players = _get_real_players(_server_mult())
-            all_players = real_players + fake_players
-            # ترتيب: الفائزين أولاً
-            all_players.sort(key=lambda x: (-x['payout'], 0 if x['status'] != 'lost' else 1))
+            # توليد لاعبين وهميين فقط — cache معطل للأداء
+            all_players = _generate_fake_players(_server_mult())
             return jsonify({
                 'phase': _state['phase'],
                 'multiplier': round(_server_mult(), 2),
