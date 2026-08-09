@@ -95,6 +95,8 @@
     <div class="lottery-info" style="width:100%;max-width:360px">
       <div class="linfo"><div class="linfo-val gold" id="prizePool">0</div><div class="linfo-label">جائزة الجولة</div></div>
       <div class="linfo"><div class="linfo-val" id="ticketsSold">0</div><div class="linfo-label">تذاكر مباعة</div></div>
+      <div class="linfo"><div class="linfo-val" id="participantsCount">0</div><div class="linfo-label">مشاركين</div></div>
+      <div class="linfo"><div class="linfo-val" id="ticketsAvail">1000</div><div class="linfo-label">متاحة</div></div>
       <div class="linfo"><div class="linfo-val" id="myTickets">0</div><div class="linfo-label">تذاكري</div></div>
     </div>
 
@@ -171,6 +173,8 @@ function loadState() {
     if (d.draw_time) startTimer(d.draw_time);
     if (d.prize_pool !== undefined) document.getElementById('prizePool').textContent = fmtAmount(d.prize_pool);
     if (d.tickets_sold !== undefined) document.getElementById('ticketsSold').textContent = d.tickets_sold;
+    if (d.participants_count !== undefined) document.getElementById('participantsCount').textContent = d.participants_count;
+    if (d.tickets_available !== undefined) document.getElementById('ticketsAvail').textContent = d.tickets_available;
     if (d.ticket_price !== undefined) {
       ticketPrice = parseFloat(d.ticket_price) || 10;
       document.getElementById('pricePerTicket').textContent = ticketPrice.toLocaleString();
@@ -180,7 +184,7 @@ function loadState() {
     if (d.history) renderHistory(d.history);
     document.getElementById('myTickets').textContent = myTicketsList.length;
     if (d.prize_tiers) renderPrizeTiers(d.prize_tiers);
-  }).catch(function() {});
+  }).catch(function(e) { console.error('lottery state error:', e); });
 }
 
 function renderPrizeTiers(tiers) {

@@ -5948,6 +5948,9 @@ def api_lottery_state():
         'draw_time': state.get('draw_time'),
         'ticket_price': state.get('ticket_price', _LOTTERY_TICKET_PRICE),
         'tickets_sold': state.get('tickets_sold', 0),
+        'max_tickets': 1000,  # maximum tickets per round
+        'tickets_available': 1000 - state.get('tickets_sold', 0),
+        'participants_count': len(set(t.get('uid') for t in state.get('tickets', []))),
         'prize_pool': prize_pool,
         'prize_tiers': prize_tiers,
         'my_tickets': my_tickets,
