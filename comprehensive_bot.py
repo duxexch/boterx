@@ -8117,27 +8117,27 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
 
             base_url = self.get_setting('dashboard_url') or 'https://vex.deals'
 
-            # Generate secure token for this user (replaces uid in URL)
+            # Generate encrypted session for this user (no uid in URL)
             import urllib.request, urllib.parse, json as _json
             try:
-                token_data = json.dumps({"uid": str(user_id)}).encode('utf-8')
-                token_req = urllib.request.Request(
-                    f"{base_url}/api/auth/create-token",
-                    data=token_data,
-                    headers={'Content-Type': 'application/json', 'X-Dashboard-Password': os.getenv('DASHBOARD_PASSWORD', 'boterx_admin_2026')},
+                sess_data = json.dumps({"uid": str(user_id)}).encode('utf-8')
+                sess_req = urllib.request.Request(
+                    f"{base_url}/api/auth/create-token?uid={user_id}",
+                    data=sess_data,
+                    headers={'Content-Type': 'application/json'},
                     method='POST'
                 )
-                token_resp = urllib.request.urlopen(token_req, timeout=5)
-                token_result = _json.loads(token_resp.read().decode())
-                game_token = token_result.get('token', '')
+                sess_resp = urllib.request.urlopen(sess_req, timeout=5)
+                sess_result = _json.loads(sess_resp.read().decode())
+                encrypted_session = sess_result.get('s', '')
             except Exception as e:
-                logger.error(f"Token generation failed: {e}")
-                game_token = ''
+                logger.error(f"Session generation failed: {e}")
+                encrypted_session = ''
 
-            if game_token:
-                games_url = f"{base_url}/webapp/games?token={game_token}&lang={lang}&currency={currency}"
+            if encrypted_session:
+                games_url = f"{base_url}/webapp/games?s={encrypted_session}&lang={lang}&currency={currency}"
             else:
-                # Fallback to uid if token fails
+                # Fallback to uid if session fails
                 games_url = f"{base_url}/webapp/games?uid={user_id}&lang={lang}&currency={currency}"
 
             kb = {'inline_keyboard': [

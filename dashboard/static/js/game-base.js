@@ -6,11 +6,11 @@ const tg = window.Telegram?.WebApp;
 if (tg) { tg.expand(); tg.ready(); }
 
 // ---- Config ----
-// Token-based auth: ?token=XXX (secure, no uid visible)
+// Encrypted session: ?s=XXX (encrypted, no uid visible, copy-proof)
 // Falls back to ?uid=XXX for backward compat during migration
 const urlParams = new URLSearchParams(location.search);
-const token = urlParams.get('token') || '';
-const uid = urlParams.get('uid') || ''; // legacy fallback
+const sess = urlParams.get('s') || '';  // encrypted session
+const uid = urlParams.get('uid') || ''; // legacy fallback only
 const BASE = location.origin;
 const initData = tg?.initData || '';
 let soundOn = true;
@@ -24,7 +24,6 @@ function getDeviceFP() {
   var sh = window.screen ? window.screen.height : 0;
   var tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
   var raw = ua + '|' + sw + 'x' + sh + '|' + tz;
-  // Simple hash (no crypto needed for fingerprint)
   var hash = 0;
   for (var i = 0; i < raw.length; i++) {
     hash = ((hash << 5) - hash) + raw.charCodeAt(i);
@@ -33,20 +32,20 @@ function getDeviceFP() {
   return Math.abs(hash).toString(16);
 }
 
-// ---- Send fingerprint to bind token to device ----
-if (token) {
+// ---- Send fingerprint to bind session to device ----
+if (sess) {
   var fp = getDeviceFP();
   fetch(BASE + '/api/auth/fingerprint', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({token: token, fp: fp})
+    body: JSON.stringify({s: sess, fp: fp})
   }).catch(function(){});
 }
 
 // ---- API Client ----
-// Uses token if available, falls back to uid
+// Uses encrypted session if available, falls back to uid
 function _getAuthParam() {
-  if (token) return 'token=' + token;
+  if (sess) return 's=' + sess;
   if (uid) return 'uid=' + uid;
   return '';
 }

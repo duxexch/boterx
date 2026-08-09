@@ -646,14 +646,14 @@ def get_request_uid():
     uid = getattr(g, 'telegram_user_id', None)
     if uid:
         return uid
-    # Token-based auth (new secure method)
-    token = request.args.get('token', '')
-    if not token and request.is_json:
-        token = (request.json or {}).get('token', '')
-    if token:
-        from session_tokens import validate_token
+    # Encrypted session auth (?s=XXX — encrypted, no uid visible)
+    s_param = request.args.get('s', '')
+    if not s_param and request.is_json:
+        s_param = (request.json or {}).get('s', '')
+    if s_param:
+        from session_tokens import validate_session
         device_fp = request.headers.get('X-Device-FP', '')
-        uid_val, authorized = validate_token(token, device_fp)
+        uid_val, authorized = validate_session(s_param, device_fp)
         if uid_val and authorized:
             return uid_val
         if uid_val and not authorized:
@@ -665,45 +665,45 @@ def get_request_uid():
         uid = (request.json or {}).get('uid', '')
     return uid
 
-# ===== Token API — secure session tokens =====
+# ===== Encrypted Session API — secure, copy-proof game URLs =====
 @app.route('/api/auth/create-token', methods=['POST'])
 @webapp_auth
 def api_create_token():
-    """Bot calls this to generate a secure token for a user.
-    Returns: {'token': 'XXXX', 'expires_in': 3600}"""
+    """Bot calls this to generate an encrypted session for a user.
+    Returns: {'s': 'ENCRYPTED_STRING', 'expires_in': 3600}"""
     data = request.json or {}
     uid = str(data.get('uid', ''))
     if not uid or not uid.isdigit():
         return jsonify({'error': 'uid required'}), 400
-    from session_tokens import create_token
-    token = create_token(uid)
-    return jsonify({'token': token, 'expires_in': 3600})
+    from session_tokens import create_session
+    encrypted = create_session(uid)
+    return jsonify({'s': encrypted, 'expires_in': 3600})
 
 @app.route('/api/auth/validate')
 def api_validate_token():
-    """Client calls this on page load to check token + send device fingerprint."""
-    token = request.args.get('token', '')
-    if not token:
-        return jsonify({'valid': False, 'error': 'token required'}), 400
+    """Client calls this on page load to check session + send device fingerprint."""
+    s_param = request.args.get('s', '')
+    if not s_param:
+        return jsonify({'valid': False, 'error': 's required'}), 400
     device_fp = request.args.get('fp', '')
-    from session_tokens import validate_token
-    uid, authorized = validate_token(token, device_fp)
+    from session_tokens import validate_session
+    uid, authorized = validate_session(s_param, device_fp)
     if not uid:
-        return jsonify({'valid': False, 'error': 'invalid or expired token'})
+        return jsonify({'valid': False, 'error': 'invalid or expired'})
     return jsonify({'valid': True, 'uid': uid, 'authorized': authorized})
 
 @app.route('/api/auth/fingerprint', methods=['POST'])
 def api_set_fingerprint():
-    """Client sends device fingerprint to bind token to device."""
+    """Client sends device fingerprint to bind session to device."""
     data = request.json or {}
-    token = data.get('token', '')
+    s_param = data.get('s', '')
     fp = data.get('fp', '')
-    if not token or not fp:
-        return jsonify({'error': 'token and fp required'}), 400
-    from session_tokens import validate_token
-    uid, _ = validate_token(token, fp)
+    if not s_param or not fp:
+        return jsonify({'error': 's and fp required'}), 400
+    from session_tokens import validate_session
+    uid, _ = validate_session(s_param, fp)
     if not uid:
-        return jsonify({'error': 'invalid token'}), 400
+        return jsonify({'error': 'invalid session'}), 400
     return jsonify({'success': True, 'uid': uid})
 
 # ===== Routes — Pages =====
