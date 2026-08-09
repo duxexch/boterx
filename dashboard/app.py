@@ -572,6 +572,26 @@ def webapp_auth(f):
                     g.telegram_user_id = uid_fb
                     g.telegram_user = None
                     return f(*args, **kwargs)
+                # Encrypted session fallback (?s=XXX)
+                s_fb = request.args.get('s', '').strip()
+                if not s_fb and request.is_json:
+                    try:
+                        s_fb = (request.get_json(silent=True) or {}).get('s', '').strip()
+                    except Exception:
+                        s_fb = ''
+                if s_fb:
+                    from session_tokens import validate_session
+                    device_fp = request.headers.get('X-Device-FP', '')
+                    uid_val, authorized = validate_session(s_fb, device_fp)
+                    if uid_val and authorized:
+                        g.telegram_user_id = uid_val
+                        g.telegram_user = None
+                        return f(*args, **kwargs)
+                    if uid_val and not authorized:
+                        # Different device → guest mode
+                        g.telegram_user_id = uid_val
+                        g.telegram_user = None
+                        return f(*args, **kwargs)
                 return jsonify({'error': 'initData required', 'code': 'NO_INIT_DATA'}), 403
 
             uid_str, user_obj = validate_telegram_init_data(init_data)
