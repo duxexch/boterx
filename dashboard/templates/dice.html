@@ -212,13 +212,11 @@ document.addEventListener('mousemove',handlePowerMove);
 document.addEventListener('mouseup',handlePowerEnd);
 
 // ── True 3D Dice Cube — 8 vertices, 6 fixed faces ──
-// Standard dice: opposite faces sum to 7
-//   1↔6, 2↔5, 3↔4
-// Face layout on unfolded cube:
-//        [1]
-//   [2][3][4][5]   (3=top,4=front)
-//        [6]
-
+// Standard dice: opposite faces sum to 7 (1↔6, 2↔5, 3↔4)
+// Vertices (local space, Y=down on screen like Canvas):
+// v0=(-1,-1,-1) v1=(+1,-1,-1) v2=(+1,+1,-1) v3=(-1,+1,-1)  ← z=-1 (back)
+// v4=(-1,-1,+1) v5=(+1,-1,+1) v6=(+1,+1,+1) v7=(-1,+1,+1)  ← z=+1 (front)
+// Faces wound CCW from outside. num = dot pattern on that face.
 var DOT_PATTERNS={
   1:[[0.5,0.5]],
   2:[[0.28,0.28],[0.72,0.72]],
@@ -227,50 +225,31 @@ var DOT_PATTERNS={
   5:[[0.25,0.25],[0.75,0.25],[0.5,0.5],[0.25,0.75],[0.75,0.75]],
   6:[[0.25,0.2],[0.75,0.2],[0.25,0.5],[0.75,0.5],[0.25,0.8],[0.75,0.8]]
 };
-
-// Cube vertices: v0-v3 = back(z-1), v4-v7 = front(z+1)
-// v0=(-1,-1,-1) v1=(+1,-1,-1) v2=(+1,+1,-1) v3=(-1,+1,-1)
-// v4=(-1,-1,+1) v5=(+1,-1,+1) v6=(+1,+1,+1) v7=(-1,+1,+1)
-// Each face wound COUNTER-CLOCKWISE when viewed from outside.
-// Opposite faces sum to 7: 1-6, 2-5, 3-4
 var CUBE_FACES=[
-  {v:[4,5,6,7], num:1},  // +Z front  = face 1
-  {v:[5,1,2,6], num:2},  // +X right  = face 2
-  {v:[7,6,2,3], num:3},  // +Y top    = face 3
-  {v:[0,4,5,1], num:4},  // -Y bottom = face 4 (opposite 3)
-  {v:[0,3,7,4], num:5},  // -X left   = face 5 (opposite 2)
-  {v:[1,0,3,2], num:6},  // -Z back   = face 6 (opposite 1)
+  {v:[4,5,6,7], num:1},  // +Z front  = 1
+  {v:[5,1,2,6], num:2},  // +X right  = 2
+  {v:[7,6,2,3], num:3},  // +Y bottom = 3 (Canvas Y is down)
+  {v:[0,4,5,1], num:4},  // -Y top    = 4 (Canvas Y is down, -Y = up on screen)
+  {v:[0,3,7,4], num:5},  // -X left   = 5
+  {v:[1,0,3,2], num:6},  // -Z back   = 6
 ];
 
-// 3D rotation matrix application
 function _rotate3D(x,y,z,rx,ry,rz){
-  // Rotate around Z
   var cz=Math.cos(rz),sz=Math.sin(rz);
-  var x1=x*cz-y*sz, y1=x*sz+y*cz, z1=z;
-  // Rotate around X
+  var x1=x*cz-y*sz,y1=x*sz+y*cz,z1=z;
   var cx=Math.cos(rx),sx=Math.sin(rx);
-  var x2=x1, y2=y1*cx-z1*sx, z2=y1*sx+z1*cx;
-  // Rotate around Y
+  var x2=x1,y2=y1*cx-z1*sx,z2=y1*sx+z1*cx;
   var cy=Math.cos(ry),sy=Math.sin(ry);
-  var x3=x2*cy+z2*sy, y3=y2, z3=-x2*sy+z2*cy;
+  var x3=x2*cy+z2*sy,y3=y2,z3=-x2*sy+z2*cy;
   return [x3,y3,z3];
-}
-
-// Project 3D point to 2D screen with perspective
-function _project(pt3d,cx,cy,scale,perspective){
-  var z=pt3d[2];
-  var f=perspective/(perspective+z);
-  return [cx+pt3d[0]*scale*f, cy+pt3d[1]*scale*f, z];
 }
 
 function drawDice3D(cx,cy,size,rotX,rotY,rotZ){
   var s=size/2;
-  var perspective=800;
-  var scale=s;
-  
-  // Compute all 8 vertices after rotation (both 3D + projected)
+  var perspective=600;
+  // Compute all 8 vertices after rotation
   var verts3d=[];
-  var verts=[];
+  var verts2d=[];
   var baseVerts=[
     [-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],
     [-1,-1, 1],[1,-1, 1],[1,1, 1],[-1,1, 1]
@@ -279,237 +258,186 @@ function drawDice3D(cx,cy,size,rotX,rotY,rotZ){
     var bv=baseVerts[i];
     var rv=_rotate3D(bv[0]*s,bv[1]*s,bv[2]*s,rotX,rotY,rotZ);
     verts3d.push(rv);
-    verts.push(_project(rv,cx,cy,1,perspective));
+    // Perspective projection
+    var f=perspective/(perspective+rv[2]);
+    verts2d.push([cx+rv[0]*f,cy+rv[1]*f,rv[2]]);
   }
-  
-  // Compute face visibility using 3D normal (dot product with view direction)
-  var visibleFaces=[];
-  for(var f=0;f<CUBE_FACES.length;f++){
-    var face=CUBE_FACES[f];
-    var v0=verts3d[face.v[0]],v1=verts3d[face.v[1]],v2=verts3d[face.v[2]];
-    // Face normal via cross product of two edges in 3D
-    var e1x=v1[0]-v0[0],e1y=v1[1]-v0[1],e1z=v1[2]-v0[2];
-    var e2x=v2[0]-v0[0],e2y=v2[1]-v0[1],e2z=v2[2]-v0[2];
-    var nx=e1y*e2z-e1z*e2y;
-    var ny=e1z*e2x-e1x*e2z;
-    var nz=e1x*e2y-e1y*e2x;
-    // View direction is +Z (toward viewer). Face visible if nz > 0
-    if(nz<=0) continue; // back-facing, skip
+  // Build face list with normals + depth, draw all visible (sorted)
+  var faceList=[];
+  for(var fi=0;fi<CUBE_FACES.length;fi++){
+    var face=CUBE_FACES[fi];
+    var a=verts3d[face.v[0]],b=verts3d[face.v[1]],c=verts3d[face.v[2]];
+    var ux=b[0]-a[0],uy=b[1]-a[1],uz=b[2]-a[2];
+    var vx=c[0]-a[0],vy=c[1]-a[1],vz=c[2]-a[2];
+    var nx=uy*vz-uz*vy;
+    var ny=uz*vx-ux*vz;
+    var nz=ux*vy-uy*vx;
+    // Face visible if normal points toward viewer (nz > 0)
+    if(nz<0.001)continue;
     var avgZ=(verts3d[face.v[0]][2]+verts3d[face.v[1]][2]+verts3d[face.v[2]][2]+verts3d[face.v[3]][2])/4;
-    visibleFaces.push({face:face,avgZ:avgZ,normal:[nx,ny,nz]});
+    // Light intensity from normal (light from top-left-front)
+    var light=Math.max(0.35,nx*(-0.4)+ny*(-0.5)+nz*(0.8));
+    faceList.push({face:face,z:avgZ,light:light});
   }
-  // Sort back-to-front (painter's algorithm)
-  visibleFaces.sort(function(a,b){return b.avgZ-a.avgZ});
-  
+  faceList.sort(function(a,b){return b.z-a.z}); // far to near
   // Draw each visible face
-  for(var i=0;i<visibleFaces.length;i++){
-    var face=visibleFaces[i].face;
-    var v0=verts[face.v[0]],v1=verts[face.v[1]],v2=verts[face.v[2]],v3=verts[face.v[3]];
-    
-    // Face color based on depth (darker = farther)
-    var depth=1-(-visibleFaces[i].avgZ)/(s*2);
-    depth=Math.max(0.3,Math.min(1,depth));
-    
-    // Face fill
+  for(var i=0;i<faceList.length;i++){
+    var f=faceList[i].face;
+    var light=faceList[i].light;
+    var p0=verts2d[f.v[0]],p1=verts2d[f.v[1]],p2=verts2d[f.v[2]],p3=verts2d[f.v[3]];
+    // Fill face
     ctx.beginPath();
-    ctx.moveTo(v0[0],v0[1]);
-    ctx.lineTo(v1[0],v1[1]);
-    ctx.lineTo(v2[0],v2[1]);
-    ctx.lineTo(v3[0],v3[1]);
+    ctx.moveTo(p0[0],p0[1]);
+    ctx.lineTo(p1[0],p1[1]);
+    ctx.lineTo(p2[0],p2[1]);
+    ctx.lineTo(p3[0],p3[1]);
     ctx.closePath();
-    // Gradient: lighter near light source (top-left)
-    var grad=ctx.createLinearGradient(v0[0],v0[1],v2[0],v2[1]);
-    var baseR=Math.round(248*depth),baseG=Math.round(250*depth),baseB=Math.round(252*depth);
-    grad.addColorStop(0,'rgb('+baseR+','+baseG+','+baseB+')');
-    grad.addColorStop(0.5,'rgb('+Math.round(226*depth)+','+Math.round(232*depth)+','+Math.round(240*depth)+')');
-    grad.addColorStop(1,'rgb('+Math.round(148*depth)+','+Math.round(163*depth)+','+Math.round(184*depth)+')');
+    var r=Math.round(240*light),g=Math.round(248*light),b2=Math.round(255*light);
+    var grad=ctx.createLinearGradient(p0[0],p0[1],p2[0],p2[1]);
+    grad.addColorStop(0,'rgb('+r+','+g+','+b2+')');
+    grad.addColorStop(1,'rgb('+Math.round(r*0.7)+','+Math.round(g*0.7)+','+Math.round(b2*0.75)+')');
     ctx.fillStyle=grad;
     ctx.fill();
-    
-    // Face border
-    ctx.strokeStyle='rgba(71,85,105,0.6)';ctx.lineWidth=1.5;
-    ctx.stroke();
-    
-    // Draw dots on this face
-    _drawDots3D(face.num,verts,face.v,size,depth);
+    // Border
+    ctx.strokeStyle='rgba(71,85,105,0.5)';ctx.lineWidth=1.5;ctx.stroke();
+    // Dots
+    _drawDots3D(f.num,verts2d,f.v,size,light);
   }
 }
 
-function _drawDots3D(faceNum,verts,faceIdx,size,depth){
-  // Draw dots as small circles at their projected positions on the face
+function _drawDots3D(faceNum,verts2d,faceIdx,size,light){
   var dots=DOT_PATTERNS[faceNum]||DOT_PATTERNS[1];
-  var v0=verts[faceIdx[0]],v1=verts[faceIdx[1]],v2=verts[faceIdx[2]],v3=verts[faceIdx[3]];
-  var dotR=size*0.08;
+  var p0=verts2d[faceIdx[0]],p1=verts2d[faceIdx[1]],p2=verts2d[faceIdx[2]],p3=verts2d[faceIdx[3]];
+  var dotR=size*0.075;
   var dotColor=(faceNum===1)?'#ef4444':'#1e293b';
-  
   dots.forEach(function(d){
-    // Interpolate position on face using bilinear coords
     var u=d[0],v=d[1];
-    // Top edge: v0→v1, bottom edge: v3→v2
-    var tx=v0[0]+(v1[0]-v0[0])*u, ty=v0[1]+(v1[1]-v0[1])*u;
-    var bx=v3[0]+(v2[0]-v3[0])*u, by=v3[1]+(v2[1]-v3[1])*u;
-    var px=tx+(bx-tx)*v, py=ty+(by-ty)*v;
-    
-    // Dot shadow (recessed look)
-    ctx.beginPath();
-    ctx.arc(px+1,py+1,dotR*0.7,0,6.28);
-    ctx.fillStyle='rgba(0,0,0,0.15)';ctx.fill();
+    // Bilinear interpolation on projected 2D quad
+    var tx=p0[0]+(p1[0]-p0[0])*u,ty=p0[1]+(p1[1]-p0[1])*u;
+    var bx=p3[0]+(p2[0]-p3[0])*u,by=p3[1]+(p2[1]-p3[1])*u;
+    var px=tx+(bx-tx)*v,py=ty+(by-ty)*v;
+    // Shadow
+    ctx.beginPath();ctx.arc(px+0.5,py+0.5,dotR*0.6,0,6.28);
+    ctx.fillStyle='rgba(0,0,0,0.2)';ctx.fill();
     // Dot
-    ctx.beginPath();
-    ctx.arc(px,py,dotR,0,6.28);
+    ctx.beginPath();ctx.arc(px,py,dotR,0,6.28);
     ctx.fillStyle=dotColor;ctx.fill();
-    // Dot highlight
-    ctx.beginPath();
-    ctx.arc(px-dotR*0.3,py-dotR*0.3,dotR*0.35,0,6.28);
-    ctx.fillStyle='rgba(255,255,255,0.35)';ctx.fill();
+    // Highlight
+    ctx.beginPath();ctx.arc(px-dotR*0.25,py-dotR*0.25,dotR*0.3,0,6.28);
+    ctx.fillStyle='rgba(255,255,255,'+(0.3*light)+')';ctx.fill();
   });
 }
 
 function drawArena(){
   var w=canvas.width,h=canvas.height;
-  // Felt floor with perspective
   var grad=ctx.createLinearGradient(0,0,0,h);
   grad.addColorStop(0,'#0d4a23');grad.addColorStop(0.5,'#1a6a33');grad.addColorStop(1,'#0d5c2e');
   ctx.fillStyle=grad;ctx.fillRect(0,0,w,h);
-  // Floor texture lines (perspective)
   ctx.strokeStyle='rgba(0,0,0,0.08)';ctx.lineWidth=1;
-  for(var i=0;i<8;i++){
-    var y=h*0.2+i*(h*0.1);
-    ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke();
-  }
-  // Wall bumper at top
-  var wallY=h*0.15;
-  ctx.fillStyle='rgba(0,0,0,0.2)';
-  ctx.fillRect(0,0,w,wallY);
-  ctx.fillStyle='rgba(168,230,193,0.15)';
-  ctx.fillRect(0,wallY-4,w,4);
-  // Border lines for arena
-  ctx.strokeStyle='rgba(168,230,193,0.1)';ctx.lineWidth=2;
-  ctx.strokeRect(2,2,w-4,h-4);
+  for(var i=0;i<8;i++){var y=h*0.2+i*(h*0.1);ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke();}
+  var wallY=h*0.12;
+  ctx.fillStyle='rgba(0,0,0,0.25)';ctx.fillRect(0,0,w,wallY);
+  ctx.fillStyle='rgba(168,230,193,0.2)';ctx.fillRect(0,wallY-3,w,3);
+  ctx.strokeStyle='rgba(168,230,193,0.1)';ctx.lineWidth=2;ctx.strokeRect(2,2,w-4,h-4);
 }
 
 function drawIdleDice(){
   var w=canvas.width,h=canvas.height;
-  diceX=w/2;diceY=h*0.6;
+  diceX=w/2;diceY=h*0.55;
   drawArena();
-  // Idle: slight tilt to show 3D nature
-  drawDice3D(diceX,diceY,Math.min(w,h)*0.15,0.3,0.4,0);
+  // Idle: show 3 faces (front, top, right) with nice angle
+  drawDice3D(diceX,diceY,Math.min(w,h)*0.16,0.5,0.5,0);
 }
 
-// ── Roll animation — realistic 3D tumble with multiple bounces ──
-function animateRoll(resultNum,power,callback){
-  isRolling=true;
+// ── Roll animation ──
+var _rollResult=0,_rollCallback=null,_resultShown=false;
+function animateRoll(resultNum,powerPct,callback){
+  isRolling=true;_resultShown=false;
+  _rollResult=resultNum;_rollCallback=callback;
   var btn=document.getElementById('rollBtn');
   btn.className='roll-btn rolling';btn.disabled=true;btn.textContent='🎲 ...';
   document.getElementById('statusText').textContent='';
   document.getElementById('resultDisplay').classList.remove('show');
 
   var w=canvas.width,h=canvas.height;
+  var diceSize=Math.min(w,h)*0.15;
   var startX=w/2,startY=h*0.7;
-  var wallY=h*0.12;
-  var floorY=h*0.85;
-  var powerN=power/100;
+  var wallY=h*0.12,floorY=h*0.82;
+  var powerN=powerPct/100;
 
-  // ── Multi-axis rotation: independent X, Y, Z spin ──
-  var diceSize=Math.min(w,h)*0.14;
   diceX=startX;diceY=startY;
-  // 3 independent rotation axes — random initial spin
-  var rotX=Math.random()*6.28,rotY=Math.random()*6.28,rotZ=Math.random()*6.28;
-  // Spin velocities — higher power = faster spin
-  var spinX=(0.15+powerN*0.35)*(Math.random()<0.5?1:-1);
-  var spinY=(0.12+powerN*0.30)*(Math.random()<0.5?1:-1);
-  var spinZ=(0.20+powerN*0.45)*(Math.random()<0.5?1:-1);
-  // Velocity — power affects speed and direction
-  var vx=(Math.random()-0.5)*6*powerN;
-  var vy=-(10+powerN*18); // upward
-  var gravity=0.45;
+  var rotX=0.3,rotY=0.5,rotZ=0;
+  var spinX=(0.25+powerN*0.4)*(Math.random()<0.5?1:-1);
+  var spinY=(0.20+powerN*0.35)*(Math.random()<0.5?1:-1);
+  var spinZ=(0.15+powerN*0.30)*(Math.random()<0.5?1:-1);
+  var vx=(Math.random()-0.5)*8*powerN;
+  var vy=-(12+powerN*20);
+  var gravity=0.5;
   var bounces=0;
   var settleFrames=0;
-  var phase='flying'; // flying → bouncing → settling → done
+  var phase='flying';
+  var targetAngles=null;
 
   if(animF)cancelAnimationFrame(animF);
 
   function frame(){
-    // ── Physics ──
+    // Physics
     if(phase==='flying'||phase==='bouncing'){
       diceX+=vx;diceY+=vy;vy+=gravity;
-      // Apply spin
       rotX+=spinX;rotY+=spinY;rotZ+=spinZ;
-      // Air friction on spin
-      spinX*=0.992;spinY*=0.992;spinZ*=0.992;
-      
-      // Wall bounce (top)
+      spinX*=0.99;spinY*=0.99;spinZ*=0.99;
+      // Wall
       if(diceY<wallY+diceSize/2&&vy<0){
-        diceY=wallY+diceSize/2;
-        vy=-vy*0.55; // energy loss
-        // Random spin change on bounce
-        spinX*=-1*(0.5+Math.random()*0.5);
-        spinZ*=-1*(0.6+Math.random()*0.4);
-        spinY+=(Math.random()-0.5)*0.3;
-        bounces++;
-        soundDiceRoll();haptic('light');
+        diceY=wallY+diceSize/2;vy=-vy*0.5;
+        spinX*=-0.7;spinZ*=-0.6;spinY+=(Math.random()-0.5)*0.4;
+        bounces++;soundDiceLand();haptic('light');spawnBounceParticles(diceX,diceY);
       }
-      // Side bounces (left/right walls)
-      if(diceX<diceSize/2&&vx<0){
-        diceX=diceSize/2;vx=-vx*0.6;
-        spinY*=-0.8;spinZ*=-0.6;bounces++;
-        soundDiceLand();spawnBounceParticles(diceX,diceY);
-      }
-      if(diceX>w-diceSize/2&&vx>0){
-        diceX=w-diceSize/2;vx=-vx*0.6;
-        spinY*=-0.8;spinZ*=-0.6;bounces++;
-        soundDiceLand();spawnBounceParticles(diceX,diceY);
-      }
-      // Floor bounce
+      // Sides
+      if(diceX<diceSize/2&&vx<0){diceX=diceSize/2;vx=-vx*0.5;spinY*=-0.7;spinZ*=-0.5;bounces++;soundDiceLand();spawnBounceParticles(diceX,diceY);}
+      if(diceX>w-diceSize/2&&vx>0){diceX=w-diceSize/2;vx=-vx*0.5;spinY*=-0.7;spinZ*=-0.5;bounces++;soundDiceLand();spawnBounceParticles(diceX,diceY);}
+      // Floor
       if(diceY>floorY-diceSize/2&&vy>0){
-        diceY=floorY-diceSize/2;
-        vy=-vy*0.45; // energy loss
-        vx*=0.7; // friction
-        spinX*=0.6;spinY*=0.5;spinZ*=0.7;
+        diceY=floorY-diceSize/2;vy=-vy*0.4;vx*=0.6;
+        spinX*=0.5;spinY*=0.4;spinZ*=0.6;
         bounces++;
-        if(Math.abs(vy)<2){vy=0;phase='settling';}
-        soundDiceLand();haptic('light');
-        spawnBounceParticles(diceX,diceY);
+        if(Math.abs(vy)<2.5){vy=0;phase='settling';targetAngles=_getResultAngles(resultNum);}
+        soundDiceLand();haptic('light');spawnBounceParticles(diceX,diceY);
       }
     }
-    
-    // ── Settling phase — slow down spin + align to result ──
+    // Settling — gradual alignment, feels natural not predetermined
     if(phase==='settling'){
-      // Gradually snap rotation to show result face on TOP
-      var targetAngles=_getResultAngles(resultNum);
-      // Lerp toward target angles (smooth deceleration)
-      rotX=_lerpAngle(rotX,targetAngles[0],0.12);
-      rotY=_lerpAngle(rotY,targetAngles[1],0.12);
-      rotZ=_lerpAngle(rotZ,targetAngles[2],0.12);
-      spinX*=0.5;spinY*=0.5;spinZ*=0.5;
-      vx*=0.85;
       settleFrames++;
-      // Check if aligned close enough
+      var lerpSpeed=0.06; // slow lerp = natural deceleration
+      rotX=_lerpAngle(rotX,targetAngles[0],lerpSpeed);
+      rotY=_lerpAngle(rotY,targetAngles[1],lerpSpeed);
+      rotZ=_lerpAngle(rotZ,targetAngles[2],lerpSpeed);
+      vx*=0.8;
+      diceX+=vx;
       var dx=Math.abs(_angleDiff(rotX,targetAngles[0]));
       var dy=Math.abs(_angleDiff(rotY,targetAngles[1]));
       var dz=Math.abs(_angleDiff(rotZ,targetAngles[2]));
-      if(dx<0.02&&dy<0.02&&dz<0.02&&settleFrames>15){
+      if(dx<0.015&&dy<0.015&&dz<0.015&&settleFrames>20){
         rotX=targetAngles[0];rotY=targetAngles[1];rotZ=targetAngles[2];
         phase='done';
       }
     }
-    
-    // ── Draw ──
+    // Draw
     ctx.clearRect(0,0,w,h);
     drawArena();
-    // Shadow under dice
-    var shadowAlpha=Math.max(0.1,0.4-(diceY<floorY-diceSize?0.2:0));
-    var shadowSize=diceSize*(0.8+Math.max(0,(floorY-diceY-diceSize/2)/200));
+    // Shadow
+    var shadowAlpha=Math.max(0.08,0.35-Math.abs(floorY-diceY-diceSize/2)/300);
+    var shadowSize=diceSize*(0.7+Math.max(0,(floorY-diceY-diceSize/2)/250));
     ctx.fillStyle='rgba(0,0,0,'+shadowAlpha+')';
-    ctx.beginPath();ctx.ellipse(diceX,floorY+5,shadowSize/2,shadowSize/5,0,0,6.28);ctx.fill();
-    
-    // Draw true 3D cube with current rotation
+    ctx.beginPath();ctx.ellipse(diceX,floorY+5,shadowSize/2,shadowSize/6,0,0,6.28);ctx.fill();
+    // Dice
     drawDice3D(diceX,diceY,diceSize,rotX,rotY,rotZ);
-    
+
     if(phase==='done'){
-      // Slow dramatic reveal — wait a beat then callback
       isRolling=false;animF=null;
-      setTimeout(callback,400); // suspense pause
+      // Show result AFTER dice fully stopped — not before
+      setTimeout(function(){
+        if(_rollCallback){var cb=_rollCallback;_rollCallback=null;cb();}
+      },600); // dramatic pause
       return;
     }
     animF=requestAnimationFrame(frame);
@@ -517,31 +445,23 @@ function animateRoll(resultNum,power,callback){
   frame();
 }
 
-// ── Result alignment: rotate dice so result face faces VIEWER (+Z) ──
-// Canvas Y is DOWN, so +Y in our 3D space = down on screen.
-// The face the user sees clearly is +Z (front), facing the viewer.
-// Face layout: 1=+Z(front), 2=+X(right), 3=+Y(down on screen), 4=-Y(up), 5=-X(left), 6=-Z(back)
-// To bring each face to FRONT (+Z), rotate:
+// ── Result alignment: rotate result face to FRONT (+Z, facing viewer) ──
 function _getResultAngles(faceNum){
-  var H=Math.PI/2; // 90 degrees
+  var H=Math.PI/2;
   switch(faceNum){
-    case 1: return [0, 0, 0];        // already front — no rotation
-    case 2: return [0, H, 0];        // right(+X)->front: rotY +90
-    case 3: return [H, 0, 0];        // top(+Y, down on screen)->front: rotX +90
-    case 4: return [-H, 0, 0];       // bottom(-Y, up on screen)->front: rotX -90
-    case 5: return [0, -H, 0];       // left(-X)->front: rotY -90
-    case 6: return [0, Math.PI, 0];  // back(-Z)->front: rotY 180
+    case 1: return [0,0,0];
+    case 2: return [0,H,0];
+    case 3: return [H,0,0];
+    case 4: return [-H,0,0];
+    case 5: return [0,-H,0];
+    case 6: return [0,Math.PI,0];
   }
   return [0,0,0];
 }
-
 function _lerpAngle(current,target,speed){
-  var diff=_angleDiff(current,target);
-  return current+diff*speed;
+  return current+_angleDiff(current,target)*speed;
 }
-
 function _angleDiff(a,b){
-  // Shortest angular distance
   var d=(b-a)%(2*Math.PI);
   if(d>Math.PI)d-=2*Math.PI;
   if(d<-Math.PI)d+=2*Math.PI;
@@ -574,8 +494,7 @@ function onRoll(){
       body:JSON.stringify({bet_amount:amt,predicted_number:predictedNum,target_x:selectedX,request_id:req})
     }).then(function(r){return r.json()}).then(function(d){
       if(d.success){
-        document.getElementById('bal').textContent=d.balance_after.toLocaleString();
-        // Animate roll to result
+        // Animate roll FIRST — balance updated in showResult AFTER dice stops
         animateRoll(d.result,power,function(){
           showResult(d);
         });
@@ -594,6 +513,8 @@ function onRoll(){
 function showResult(d){
   var btn=document.getElementById('rollBtn');
   btn.className='roll-btn idle';btn.disabled=false;btn.textContent='ارمِ النرد 🎲';
+  // Update balance NOW — after dice has stopped, not before
+  document.getElementById('bal').textContent=d.balance_after.toLocaleString();
   var disp=document.getElementById('resultDisplay');
   var numEl=document.getElementById('resultNum');
   var txtEl=document.getElementById('resultText');
