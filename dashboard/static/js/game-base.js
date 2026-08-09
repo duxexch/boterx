@@ -6,22 +6,61 @@ const tg = window.Telegram?.WebApp;
 if (tg) { tg.expand(); tg.ready(); }
 
 // ---- Config ----
-const uid = new URLSearchParams(location.search).get('uid') || '';
+// Token-based auth: ?token=XXX (secure, no uid visible)
+// Falls back to ?uid=XXX for backward compat during migration
+const urlParams = new URLSearchParams(location.search);
+const token = urlParams.get('token') || '';
+const uid = urlParams.get('uid') || ''; // legacy fallback
 const BASE = location.origin;
 const initData = tg?.initData || '';
 let soundOn = true;
 let streakWin = 0;
 let gameCurrency = 'EGP';
 
+// ---- Device Fingerprint ----
+function getDeviceFP() {
+  var ua = navigator.userAgent || '';
+  var sw = window.screen ? window.screen.width : 0;
+  var sh = window.screen ? window.screen.height : 0;
+  var tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+  var raw = ua + '|' + sw + 'x' + sh + '|' + tz;
+  // Simple hash (no crypto needed for fingerprint)
+  var hash = 0;
+  for (var i = 0; i < raw.length; i++) {
+    hash = ((hash << 5) - hash) + raw.charCodeAt(i);
+    hash = hash & hash;
+  }
+  return Math.abs(hash).toString(16);
+}
+
+// ---- Send fingerprint to bind token to device ----
+if (token) {
+  var fp = getDeviceFP();
+  fetch(BASE + '/api/auth/fingerprint', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({token: token, fp: fp})
+  }).catch(function(){});
+}
+
 // ---- API Client ----
+// Uses token if available, falls back to uid
+function _getAuthParam() {
+  if (token) return 'token=' + token;
+  if (uid) return 'uid=' + uid;
+  return '';
+}
+
 async function apiFetch(url, opts = {}) {
   opts.headers = opts.headers || {};
   opts.headers['X-Telegram-Init-Data'] = initData;
+  if (token) opts.headers['X-Device-FP'] = getDeviceFP();
   if (opts.body && typeof opts.body === 'string') {
     opts.headers['Content-Type'] = 'application/json';
   }
-  if (uid && !url.includes('uid=')) {
-    url += (url.includes('?') ? '&' : '?') + 'uid=' + uid;
+  var authParam = _getAuthParam();
+  if (authParam && !url.includes('token=') && !url.includes('uid=')) {
+    url += (url.includes('?') ? '&' : '?') + authParam;
   }
   return fetch(url, opts);
 }
@@ -107,8 +146,10 @@ async function apiFetchCritical(url, opts) {
   if (opts.body && typeof opts.body === 'string') {
     opts.headers['Content-Type'] = 'application/json';
   }
-  if (uid && !url.includes('uid=')) {
-    url += (url.includes('?') ? '&' : '?') + 'uid=' + uid;
+  if (token) opts.headers['X-Device-FP'] = getDeviceFP();
+  var authParam = _getAuthParam();
+  if (authParam && !url.includes('token=') && !url.includes('uid=')) {
+    url += (url.includes('?') ? '&' : '?') + authParam;
   }
   try {
     var r = await fetch(url, opts);
