@@ -667,7 +667,7 @@ def get_request_uid():
 
 # ===== Token API — secure session tokens =====
 @app.route('/api/auth/create-token', methods=['POST'])
-@api_auth
+@webapp_auth
 def api_create_token():
     """Bot calls this to generate a secure token for a user.
     Returns: {'token': 'XXXX', 'expires_in': 3600}"""
