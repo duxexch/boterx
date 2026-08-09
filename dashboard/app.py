@@ -6970,6 +6970,7 @@ try:
         get_pf=lambda: _pf,
         is_pf=lambda: _PROVABLY_FAIR,
         is_vex=lambda: _VEX_GAMES,
+        webapp_auth=webapp_auth,
     )
 except Exception as _dice_init_err:
     print('WARNING: dice_engine init failed:', _dice_init_err)

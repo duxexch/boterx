@@ -135,7 +135,7 @@ def _generate_fake_players():
     return result
 
 # ── Flask route registration ─────────────────────────────
-def init_dice_engine(app, get_uid, get_gm, get_pf, is_pf, is_vex):
+def init_dice_engine(app, get_uid, get_gm, get_pf, is_pf, is_vex, webapp_auth=None):
     global _gm, _pf, _is_pf, _is_vex
     _gm = get_gm()
     _pf = get_pf
@@ -143,7 +143,13 @@ def init_dice_engine(app, get_uid, get_gm, get_pf, is_pf, is_vex):
     _is_vex = is_vex
     from flask import jsonify, request
 
+    # If webapp_auth not passed, create a passthrough decorator
+    if webapp_auth is None:
+        def webapp_auth(f):
+            return f
+
     @app.route('/api/dice/roll', methods=['POST'])
+    @webapp_auth
     def api_dice_roll():
         uid = get_uid()
         if not uid: return jsonify({'error': 'No uid'}), 400
@@ -244,6 +250,7 @@ def init_dice_engine(app, get_uid, get_gm, get_pf, is_pf, is_vex):
         })
 
     @app.route('/api/dice/history')
+    @webapp_auth
     def api_dice_history():
         uid = get_uid()
         with _lock:
