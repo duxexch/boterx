@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>VEX — منصة الألعاب المالية</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+*{font-family:'Cairo',sans-serif}
+body{background:#0a0e17;color:#f1f5f9;overflow-x:hidden}
+.hero-bg{position:absolute;inset:0;overflow:hidden;z-index:0}
+.hero-bg::before{content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;background:radial-gradient(circle at 30% 20%,rgba(251,191,36,.08) 0%,transparent 40%),radial-gradient(circle at 70% 80%,rgba(124,58,237,.06) 0%,transparent 40%);animation:pulse 8s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.5}50%{opacity:1}}
+.glow{text-shadow:0 0 30px rgba(251,191,36,.4)}
+.card-hover{transition:all .3s cubic-bezier(.4,0,.2,1)}
+.card-hover:hover{transform:translateY(-4px);box-shadow:0 20px 40px rgba(0,0,0,.3)}
+.gradient-gold{background:linear-gradient(135deg,#fbbf24,#f59e0b);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.btn-telegram{background:linear-gradient(135deg,#0088cc,#0099cc);transition:all .3s}
+.btn-telegram:hover{transform:scale(1.05);box-shadow:0 10px 30px rgba(0,136,204,.4)}
+.floating{animation:float 3s ease-in-out infinite}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+.auth-modal{position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(8px);z-index:100;display:none;align-items:center;justify-content:center}
+.auth-modal.show{display:flex;animation:fadeIn .3s}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.code-input{font-size:32px;font-weight:900;text-align:center;letter-spacing:8px;width:180px;background:#1e293b;border:2px solid #334155;border-radius:12px;padding:12px;color:#fbbf24;outline:none}
+.code-input:focus{border-color:#fbbf24}
+</style>
+</head>
+<body>
+
+<!-- Hero -->
+<section class="relative min-h-screen flex items-center justify-center px-4">
+  <div class="hero-bg"></div>
+  <div class="relative z-10 text-center max-w-2xl">
+    <!-- Logo -->
+    <div class="floating inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 text-slate-900 font-black text-4xl mb-6 shadow-2xl shadow-amber-500/30">V</div>
+    
+    <h1 class="text-5xl md:text-6xl font-black mb-4 glow">VEX</h1>
+    <p class="text-xl md:text-2xl text-slate-400 mb-2">منصة الألعاب المالية</p>
+    <p class="text-sm text-slate-500 mb-8">العب · اربح · اسحب — كل ذلك بأمان وشفافية</p>
+
+    <!-- Features -->
+    <div class="grid grid-cols-3 gap-3 mb-8 max-w-md mx-auto">
+      <div class="card-hover bg-slate-800/50 border border-slate-700 rounded-xl p-3">
+        <i class="fas fa-gamepad text-2xl text-amber-400 mb-1"></i>
+        <div class="text-xs text-slate-400">ألعاب متنوعة</div>
+      </div>
+      <div class="card-hover bg-slate-800/50 border border-slate-700 rounded-xl p-3">
+        <i class="fas fa-wallet text-2xl text-green-400 mb-1"></i>
+        <div class="text-xs text-slate-400">محفظة آمنة</div>
+      </div>
+      <div class="card-hover bg-slate-800/50 border border-slate-700 rounded-xl p-3">
+        <i class="fas fa-shield-halved text-2xl text-blue-400 mb-1"></i>
+        <div class="text-xs text-slate-400">حماية كاملة</div>
+      </div>
+    </div>
+
+    <!-- CTA -->
+    <button onclick="openTelegramAuth()" class="btn-telegram text-white font-bold py-4 px-8 rounded-xl text-lg shadow-lg inline-flex items-center gap-3">
+      <i class="fab fa-telegram text-2xl"></i>
+      الدخول عبر تيليجرام
+    </button>
+    
+    <div class="mt-4">
+      <button onclick="showAuthModal()" class="text-slate-400 hover:text-amber-400 transition text-sm">
+        لديك رمز الدخول؟ أدخله هنا
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- Features Section -->
+<section class="py-16 px-4 bg-slate-900/50">
+  <div class="max-w-4xl mx-auto">
+    <h2 class="text-3xl font-bold text-center mb-12 gradient-gold">لماذا VEX؟</h2>
+    <div class="grid md:grid-cols-3 gap-6">
+      <div class="card-hover bg-slate-800 border border-slate-700 rounded-2xl p-6">
+        <div class="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center mb-4">
+          <i class="fas fa-dice text-2xl text-amber-400"></i>
+        </div>
+        <h3 class="font-bold text-lg mb-2">ألعاب عادلة</h3>
+        <p class="text-sm text-slate-400">نظام Provably Fair يضمن عدالة كل نتيجة — تحقق بنفسك</p>
+      </div>
+      <div class="card-hover bg-slate-800 border border-slate-700 rounded-2xl p-6">
+        <div class="w-12 h-12 rounded-xl bg-green-500/20 flex items-center justify-center mb-4">
+          <i class="fas fa-bolt text-2xl text-green-400"></i>
+        </div>
+        <h3 class="font-bold text-lg mb-2">إيداع وسحب فوري</h3>
+        <p class="text-sm text-slate-400">وسائل دفع متعددة — معاملات سريعة وآمنة</p>
+      </div>
+      <div class="card-hover bg-slate-800 border border-slate-700 rounded-2xl p-6">
+        <div class="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center mb-4">
+          <i class="fas fa-trophy text-2xl text-purple-400"></i>
+        </div>
+        <h3 class="font-bold text-lg mb-2">جوائز كبرى</h3>
+        <p class="text-sm text-slate-400">يانصيب بـ 3 أنظمة: ساعي، يومي، وأسبوعي بجوائز ضخمة</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer class="py-8 text-center text-slate-500 text-sm border-t border-slate-800">
+  <p>© 2026 VEX — جميع الحقوق محفوظة</p>
+</footer>
+
+<!-- Auth Modal -->
+<div class="auth-modal" id="authModal">
+  <div class="bg-slate-800 border border-slate-700 rounded-2xl p-8 max-w-sm w-full mx-4">
+    <div class="text-center mb-6">
+      <div class="inline-flex w-14 h-14 rounded-xl bg-amber-500/20 items-center justify-center text-amber-400 text-2xl mb-3">
+        <i class="fas fa-key"></i>
+      </div>
+      <h3 class="text-xl font-bold">أدخل رمز الدخول</h3>
+      <p class="text-sm text-slate-400 mt-1">الرمز المرسل من البوت على تيليجرام</p>
+    </div>
+    <input type="text" class="code-input block mx-auto mb-4" id="authCode" maxlength="6" placeholder="000000" inputmode="numeric">
+    <button onclick="submitAuthCode()" class="w-full bg-gradient-to-r from-amber-500 to-amber-600 text-slate-900 font-bold py-3 rounded-xl transition hover:from-amber-600 hover:to-amber-700">
+      دخول
+    </button>
+    <button onclick="closeAuthModal()" class="w-full text-slate-400 hover:text-white mt-2 text-sm">إغلاق</button>
+    <div id="authError" class="text-red-400 text-sm text-center mt-2" style="display:none"></div>
+  </div>
+</div>
+
+<script>
+var BOT_USERNAME = 'boterx_bot'; // will be set from server
+var BOT_URL = 'https://t.me/' + BOT_USERNAME + '?start=web_auth';
+
+function openTelegramAuth() {
+  window.open(BOT_URL, '_blank');
+  setTimeout(function() { showAuthModal(); }, 1000);
+}
+
+function showAuthModal() {
+  document.getElementById('authModal').classList.add('show');
+  document.getElementById('authCode').focus();
+}
+
+function closeAuthModal() {
+  document.getElementById('authModal').classList.remove('show');
+  document.getElementById('authError').style.display = 'none';
+}
+
+function submitAuthCode() {
+  var code = document.getElementById('authCode').value.trim();
+  var errEl = document.getElementById('authError');
+  if (code.length !== 6) {
+    errEl.textContent = 'الرمز يجب أن يكون 6 أرقام';
+    errEl.style.display = 'block';
+    return;
+  }
+  fetch('/api/web/auth-code', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({code: code})
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.success) {
+      window.location.href = d.redirect || '/dashboard';
+    } else {
+      errEl.textContent = d.error || 'رمز غير صالح';
+      errEl.style.display = 'block';
+    }
+  }).catch(function() {
+    errEl.textContent = 'خطأ في الاتصال';
+    errEl.style.display = 'block';
+  });
+}
+
+document.getElementById('authCode').addEventListener('input', function(e) {
+  this.value = this.value.replace(/[^0-9]/g, '');
+});
+
+document.getElementById('authModal').addEventListener('click', function(e) {
+  if (e.target === this) closeAuthModal();
+});
+</script>
+</body>
+</html>

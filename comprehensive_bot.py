@@ -4482,7 +4482,38 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         """معالج بداية المحادثة — اختيار اللغة أولاً ثم رقم الهاتف"""
         chat_id = message['chat']['id']
         user_id = message['from']['id']
-        
+
+        # ── Web auth: generate 6-digit code for website login ──
+        if ref_code == 'web_auth':
+            user = self.find_user(user_id)
+            if not user:
+                self.send_message(chat_id, "🔒 يجب التسجيل أولاً في البوت قبل الدخول للموقع.\n\nأرسل /start للتسجيل.")
+                return
+            import random as _r, time as _t, json as _json
+            code = str(_r.randint(100000, 999999))
+            name = user.get('name', '')
+            auth_file = 'web_auth_codes.json'
+            try:
+                if os.path.exists(auth_file):
+                    with open(auth_file, 'r') as f:
+                        codes = _json.load(f)
+                else:
+                    codes = {}
+                # Remove old codes for this user
+                codes = {k: v for k, v in codes.items() if k != str(user_id)}
+                codes[str(user_id)] = {'code': code, 'name': name, 'created': _t.time()}
+                with open(auth_file, 'w') as f:
+                    _json.dump(codes, f)
+            except:
+                pass
+            self.send_message(chat_id,
+                f"🔐 <b>رمز دخول الموقع</b>\n\n"
+                f"<code>{code}</code>\n\n"
+                f"⏰ صالح لمدة 5 دقائق\n"
+                f"🌐 أدخل الرمز في: https://vex.deals",
+                parse_mode='HTML')
+            return
+
         # فحص إذا كان المستخدم موجود بـ telegram_id
         user = self.find_user(user_id)
         

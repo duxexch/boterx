@@ -729,9 +729,50 @@ def api_set_fingerprint():
 # ===== Routes — Pages =====
 
 @app.route('/')
-@login_required
 def index():
-    return redirect(url_for('dashboard'), code=303)
+    """Landing page — public, no auth required."""
+    # If already logged in as admin, go to dashboard
+    if session.get('logged_in'):
+        return redirect(url_for('dashboard'), code=303)
+    return render_template('landing.html')
+
+@app.route('/api/web/auth-code', methods=['POST'])
+def api_web_auth_code():
+    """Validate Telegram auth code from landing page."""
+    import random as _r, time as _t
+    data = request.json or {}
+    code = str(data.get('code', '')).strip()
+    if not code or len(code) != 6 or not code.isdigit():
+        return jsonify({'error': 'الرمز يجب أن يكون 6 أرقام'}), 400
+
+    # Check auth codes file (created by bot)
+    auth_file = os.path.join(BASE_DIR, 'web_auth_codes.json')
+    try:
+        import json as _json
+        if os.path.exists(auth_file):
+            with open(auth_file, 'r') as f:
+                codes = _json.load(f)
+        else:
+            codes = {}
+        # Find matching code
+        for uid, data in codes.items():
+            if str(data.get('code', '')) == code:
+                # Check expiry (5 min)
+                if _t.time() - data.get('created', 0) > 300:
+                    return jsonify({'error': 'انتهت صلاحية الرمز — اطلب رمزاً جديداً'}), 400
+                # Create web session
+                session['admin_id'] = uid
+                session['admin_name'] = data.get('name', 'User')
+                session['logged_in'] = True
+                session['login_time'] = _t.time()
+                # Remove used code
+                del codes[uid]
+                with open(auth_file, 'w') as f:
+                    _json.dump(codes, f)
+                return jsonify({'success': True, 'redirect': '/dashboard'})
+        return jsonify({'error': 'رمز غير صالح'}), 400
+    except Exception as e:
+        return jsonify({'error': 'خطأ في الخادم'}), 500
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
