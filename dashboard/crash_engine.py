@@ -1,12 +1,29 @@
 """
-crash_engine.py — standalone Crash game backend module (v2 architecture).
+crash_engine.py — Crash v2: Dual-Side Betting (💥 انفجار vs 🚀 صعود)
 
-Same architecture pattern as aviator_engine.py:
-  State machine: WAITING(5s) -> STARTING(2s) -> FLIGHT(dynamic) -> CRASHED(3s) -> WAITING
-  Server broadcasts ONLY: waiting, starting, flight_start, crashed (no per-tick)
-  Client computes multiplier locally: mult = e^(0.07 * elapsed)
-  Crash formula: 3% house edge, (1-0.03)/(1-R) with provably fair HMAC-SHA256
-  Server is sole authority for payout validation.
+ARCHITECTURE (same pattern as aviator_engine.py):
+  - State machine: WAITING(6s) → FLIGHT(dynamic) → CRASHED(4s) → WAITING ...
+  - Game loop runs FOREVER — always cycling, even with 0 players.
+  - Crash point is SECRET until crash — never sent to client during flight.
+  - Server is the SOLE authority for payouts.
+  - Client computes visible multiplier locally: e^(0.07 * elapsed).
+  - Polling-based (1s) — SSE disabled (gunicorn gthread incompatible).
+
+DUAL-SIDE BETTING:
+  Side A "💥 انفجار" (Crash): bet it crashes at/below target X
+    - crash ≤ X → WIN: payout = bet × X
+    - mult > X → drain starts, can EXIT with remaining
+    - drain ≥ 100% → lose all
+
+  Side B "🚀 صعود" (Rise): bet it survives to target X
+    - crash < X → LOSE all
+    - mult ≥ X → survived, drain starts, CANNOT exit
+    - drain ≥ 100% → lose all
+
+7-STRATEGY SMART ALGORITHM:
+  Strategies randomly selected per round. Considers player counts,
+  bet pools, 10-round house profit history. Occasionally triggers
+  "Moon Shot" big-win rounds to impress players.
 """
 
 import math
@@ -15,308 +32,525 @@ import json
 import random
 import secrets
 import threading
-import queue as _queue
 from datetime import datetime
 
-# === Config ===
-WAITING_DURATION = 5
-STARTING_DURATION = 2
-CRASHED_DURATION = 3
-TICK_RATE = 0.05
-HOUSE_EDGE = 0.03
-GROWTH_RATE = 0.07  # mult = e^(0.07 * t_seconds)
+# ── Config ──────────────────────────────────────────────
+WAITING_DURATION = 6      # seconds — betting window
+CRASHED_DURATION = 4      # seconds — crash display then loop
+TICK_RATE = 0.05          # 50ms internal tick
+HOUSE_EDGE = 0.03         # 3% base edge
+GROWTH_RATE = 0.07        # mult = e^(0.07 * t_seconds)
+DRAIN_RATE = 0.5           # 50% drain per full X growth past target
 
-# Runtime deps
+# ── 7 Strategies ─────────────────────────────────────────
+# Each strategy: (min_x, max_x, weight, description)
+STRATEGIES = [
+    {'name': 'early_crash',  'min': 1.00, 'max': 1.30,  'weight': 30},  # Rise loses all
+    {'name': 'normal_low',   'min': 1.30, 'max': 2.00,  'weight': 20},  # Mixed
+    {'name': 'medium',       'min': 2.00, 'max': 4.00,  'weight': 15},  # Crash drained, Rise partial
+    {'name': 'high_fly',     'min': 4.00, 'max': 10.00, 'weight': 10},  # Rise wins big but drains
+    {'name': 'moon_shot',    'min': 10.0, 'max': 50.0,  'weight': 5},   # WOW round
+    {'name': 'house_protect', 'min': 1.00, 'max': 1.10, 'weight': 10},  # Near-instant crash
+    {'name': 'balanced',     'min': 1.50, 'max': 2.50,  'weight': 10},  # Fair middle
+]
+
+# ── Runtime deps (injected by init_crash_engine) ────────
 _gm = None
-_vex_games = lambda: False
 _pf = None
 _is_pf = lambda: False
+_is_vex = lambda: False
 
-_crash = {
-    'phase': 'idle',
+# ── Game state ──────────────────────────────────────────
+_state = {
+    'phase': 'waiting',
     'multiplier': 1.0,
-    'crash_point': 2.0,
+    'crash_point': 2.0,        # SECRET
     'round_id': 0,
     'flight_start': 0.0,
-    'bets': {},
-    'history': [],
+    'crash_bets': {},           # uid -> {amount, target_x, exited: False, remaining, payout}
+    'rise_bets': {},            # uid -> {amount, target_x, remaining, payout}
+    'history': [],              # last 50 crash points
+    'house_profits': [],        # last 10 rounds: (total_in - total_out)
+    'strategy_used': '',        # for debug/log
     'seed_hash': '', 'client_seed': '', 'server_seed': '',
-    'server_ts': 0,
+    'server_ts': 0.0,
     'request_ids': {},
+    'total_bets_in': 0,         # total bet amount this round
+    'total_payout': 0,          # total paid out this round
 }
-_crash_lock = threading.Lock()
-_crash_sse_queues = []
-_crash_sse_lock = threading.Lock()
-_crash_rate = {}
+_lock = threading.Lock()
+_rate = {}
 
-
-def rate_limit(uid, limit=10, window=5.0):
+# ── Rate limiter ────────────────────────────────────────
+def _rate_ok(uid, limit=10, window=5.0):
     now = time.time()
-    hits = _crash_rate.get(uid, [])
-    hits = [h for h in hits if now - h < window]
+    hits = [h for h in _rate.get(uid, []) if now - h < window]
     if len(hits) >= limit:
-        _crash_rate[uid] = hits
+        _rate[uid] = hits
         return False
     hits.append(now)
-    _crash_rate[uid] = hits
+    _rate[uid] = hits
     return True
 
-
+# ── Provably fair ───────────────────────────────────────
 def _seed_ready():
-    return bool(_crash.get('seed_hash')) and bool(_crash.get('client_seed'))
+    return bool(_state.get('seed_hash')) and bool(_state.get('client_seed'))
 
+def _pick_strategy():
+    """Smart strategy selection based on pools + 10-round profit history."""
+    with _lock:
+        crash_pool = sum(b['amount'] for b in _state['crash_bets'].values())
+        rise_pool = sum(b['amount'] for b in _state['rise_bets'].values())
+        profits = list(_state['house_profits'])
+        round_id = _state['round_id']
 
-def calc_crash():
-    """3% house edge crash formula with provably fair HMAC-SHA256."""
-    if _is_pf() and _seed_ready():
-        try:
-            sid = 'crashround_%d' % _crash['round_id']
-            r = _pf.generate_float(sid, 0.0, 1.0)['value']
-        except Exception:
-            r = random.random()
-    else:
-        r = random.random()
-    if r < HOUSE_EDGE:
-        return 1.00
-    crash_point = (1 - HOUSE_EDGE) / (1 - r)
-    return max(1.00, round(crash_point, 2))
+    # Calculate house profit over last 10 rounds
+    recent_profit = sum(profits[-10:]) if profits else 0
+    total_recent = sum(abs(p) for p in profits[-10:]) if profits else 0
 
+    # Strategy 6 (House Protect): if house lost too much recently
+    if recent_profit < -total_recent * 0.3 and total_recent > 0:
+        return STRATEGIES[5]  # house_protect
 
-def current_multiplier():
-    if _crash['phase'] != 'flying':
-        return 1.0
-    elapsed = time.time() - _crash['flight_start']
-    return max(1.0, math.exp(GROWTH_RATE * elapsed))
+    # Strategy 5 (Moon Shot): if house is very profitable, trigger big win
+    # Every ~10 rounds, if profit is good, 85% chance to moon shot (15% skip for unpredictability)
+    if round_id > 0 and round_id % 10 == 0 and recent_profit > 0:
+        if random.random() < 0.85:
+            return STRATEGIES[4]  # moon_shot
 
+    # If rise pool >> crash pool (most bet on survival) → early crash to profit house
+    if rise_pool > crash_pool * 1.5 and rise_pool > 0:
+        # 60% chance early crash, 40% normal
+        if random.random() < 0.60:
+            return STRATEGIES[0]  # early_crash
+        return STRATEGIES[1]  # normal_low
 
-def broadcast(msg):
-    payload = json.dumps(msg)
-    with _crash_sse_lock:
-        for q in _crash_sse_queues:
-            try:
-                q.put_nowait(payload)
-            except Exception:
-                pass
+    # If crash pool >> rise pool (most bet on crash) → fly higher to drain crash bettors
+    if crash_pool > rise_pool * 1.5 and crash_pool > 0:
+        if random.random() < 0.50:
+            return STRATEGIES[2]  # medium
+        return STRATEGIES[3]  # high_fly
 
+    # Pools roughly equal or no bets → weighted random
+    weights = [s['weight'] for s in STRATEGIES]
+    chosen = random.choices(STRATEGIES, weights=weights, k=1)[0]
+    return chosen
+
+def _calc_crash():
+    """Pick strategy + generate crash point within range with ±10% noise."""
+    strategy = _pick_strategy()
+    raw = random.uniform(strategy['min'], strategy['max'])
+    # Add ±10% noise for unpredictability
+    noise = random.uniform(-0.10, 0.10)
+    crash_pt = raw * (1 + noise)
+    crash_pt = max(1.00, round(crash_pt, 2))
+
+    with _lock:
+        _state['strategy_used'] = strategy['name']
+    return crash_pt
+
+def _server_mult():
+    """Authoritative multiplier from flight start timestamp."""
+    if _state['phase'] == 'flying':
+        elapsed = time.time() - _state['flight_start']
+        return max(1.0, math.exp(GROWTH_RATE * elapsed))
+    elif _state['phase'] == 'crashed':
+        return _state.get('crash_point', 1.0)
+    return 1.0
+
+# ── Drain calculation ────────────────────────────────────
+def _calc_remaining(bet_amount, target_x, current_mult, side):
+    """Calculate remaining balance after drain."""
+    if side == 'crash':
+        if current_mult <= target_x:
+            return bet_amount  # not yet draining
+        drain = (current_mult - target_x) / target_x * DRAIN_RATE
+        return max(0, bet_amount * (1 - drain))
+    else:  # rise
+        if current_mult < target_x:
+            return 0  # hasn't survived yet — loses all on crash
+        won = bet_amount * target_x
+        drain = (current_mult - target_x) / target_x * DRAIN_RATE
+        return max(0, won * (1 - drain))
+
+# ── User cache (same pattern as aviator) ────────────────
+_user_cache = {}
+_cache_loaded = False
+
+def _load_user_cache():
+    global _user_cache, _cache_loaded
+    if _cache_loaded:
+        return
+    try:
+        import csv as _csv
+        with open('users.csv', 'r', encoding='utf-8-sig') as f:
+            for row in _csv.DictReader(f):
+                tid = row.get('telegram_id', '')
+                if tid:
+                    _user_cache[tid] = {
+                        'name': row.get('name', ''),
+                        'phone': row.get('phone', '') or row.get('phone_number', '')
+                    }
+        _cache_loaded = True
+    except Exception as e:
+        _cache_loaded = True
 
 def _get_name(uid):
-    try:
-        from db_manager import _gdb
-        row = _gdb.get_user_row(uid)
-        return row.get('name', '') if row else ''
-    except Exception:
-        return ''
+    if not _cache_loaded:
+        _load_user_cache()
+    info = _user_cache.get(str(uid))
+    return info['name'] if info else ''
 
+def _get_user_phone(uid):
+    if not _cache_loaded:
+        _load_user_cache()
+    info = _user_cache.get(str(uid))
+    return info['phone'] if info else ''
 
+def _mask_name(name, phone):
+    if name and len(name) > 1:
+        masked = name[0] + '***'
+    elif name:
+        masked = name[0] + '**'
+    else:
+        masked = 'لاعب'
+    if phone and len(phone) >= 4:
+        masked += ' •' + phone[-4:]
+    return masked
+
+# ── Fake players (dual-side) ────────────────────────────
+_FAKE_NAMES = [
+    'أحمد','عمر','محمد','خالد','سعد','فهد','ناصر','يوسف','علي','حسن',
+    'ماجد','وليد','طارق','بدر','راشد','عبدالله','سلطان','فيصل','نايف',
+    'تركي','دانا','نورة','ريم','سارة','لمى','شهد','جود','هند','روان'
+]
+
+def _generate_fake_players(current_mult):
+    """Generate fake players on BOTH sides — phase-aware."""
+    phase = _state['phase']
+    count = random.randint(5, 10)
+    result = []
+    for i in range(count):
+        raw_name = random.choice(_FAKE_NAMES)
+        masked_name = raw_name[0] + '*** •' + str(random.randint(100, 999))
+        bet = random.choice([10, 20, 50, 100, 200, 500, 1000, 2000, 5000])
+        avatar = raw_name[0]
+        side = 'crash' if random.random() < 0.5 else 'rise'
+        target = round(random.choice([1.0, 1.2, 1.5, 1.8, 2.0, 2.5, 3.0, 4.0, 5.0]), 2)
+
+        if phase == 'waiting':
+            status = 'participating'
+            mult_disp = 0
+            payout = 0
+        elif phase == 'flying':
+            remaining = _calc_remaining(bet, target, current_mult, side)
+            if side == 'crash':
+                if current_mult <= target:
+                    status = 'waiting_crash'
+                    mult_disp = target
+                    payout = 0
+                else:
+                    status = 'draining'
+                    mult_disp = target
+                    payout = round(remaining, 0)
+            else:  # rise
+                if current_mult < target:
+                    status = 'waiting_rise'
+                    mult_disp = target
+                    payout = 0
+                else:
+                    status = 'surviving'
+                    mult_disp = target
+                    payout = round(remaining, 0)
+        elif phase == 'crashed':
+            crash_pt = _state.get('crash_point', 1.0)
+            if side == 'crash':
+                if crash_pt <= target:
+                    status = 'cashed'
+                    mult_disp = target
+                    payout = round(bet * target, 0)
+                else:
+                    remaining = _calc_remaining(bet, target, crash_pt, 'crash')
+                    if remaining > 0:
+                        status = 'cashed'
+                        mult_disp = target
+                        payout = round(remaining, 0)
+                    else:
+                        status = 'lost'
+                        mult_disp = target
+                        payout = 0
+            else:  # rise
+                if crash_pt < target:
+                    status = 'lost'
+                    mult_disp = target
+                    payout = 0
+                else:
+                    remaining = _calc_remaining(bet, target, crash_pt, 'rise')
+                    if remaining > 0:
+                        status = 'cashed'
+                        mult_disp = target
+                        payout = round(remaining, 0)
+                    else:
+                        status = 'lost'
+                        mult_disp = target
+                        payout = 0
+        else:
+            status = 'participating'
+            mult_disp = 0
+            payout = 0
+
+        result.append({
+            'name': masked_name, 'avatar': avatar, 'bet': bet,
+            'target_x': target, 'side': side,
+            'multiplier': mult_disp, 'payout': payout, 'status': status,
+        })
+    # Sort by payout desc
+    result.sort(key=lambda x: (-x['payout'], 0 if x['status'] != 'lost' else 1))
+    return result
+
+# ── Game loop (daemon, runs forever) ────────────────────
 def _game_loop():
     while True:
-        # WAITING
-        with _crash_lock:
-            _crash['phase'] = 'waiting'
-            _crash['multiplier'] = 1.0
-            _crash['round_id'] += 1
-            _crash['bets'] = {}
-            _crash['request_ids'] = {}
-            _crash['server_ts'] = time.time()
+        # ── WAITING ──
+        with _lock:
+            _state['phase'] = 'waiting'
+            _state['multiplier'] = 1.0
+            _state['round_id'] += 1
+            _state['crash_bets'] = {}
+            _state['rise_bets'] = {}
+            _state['request_ids'] = {}
+            _state['server_ts'] = time.time()
+            _state['total_bets_in'] = 0
+            _state['total_payout'] = 0
             try:
                 if _is_pf():
-                    sid = 'crashround_%d' % _crash['round_id']
+                    sid = 'crashround_%d' % _state['round_id']
                     cs = secrets.token_hex(8)
-                    seed_info = _pf.create_session(sid, cs)
-                    _crash['seed_hash'] = seed_info['seed_hash']
-                    _crash['client_seed'] = seed_info['client_seed']
-            except Exception:
-                _crash['seed_hash'] = ''
-                _crash['client_seed'] = secrets.token_hex(8)
+                    si = _pf.create_session(sid, cs)
+                    _state['seed_hash'] = si['seed_hash']
+                    _state['client_seed'] = si['client_seed']
+            except:
+                _state['seed_hash'] = ''
+                _state['client_seed'] = secrets.token_hex(8)
 
-        broadcast({'type': 'waiting', 'round_id': _crash['round_id'],
-                   'duration': WAITING_DURATION,
-                   'history': list(_crash['history'][-15:]),
-                   'seed_hash': _crash.get('seed_hash', ''),
-                   'client_seed': _crash.get('client_seed', '')})
         time.sleep(WAITING_DURATION)
 
-        # STARTING
-        with _crash_lock:
-            _crash['phase'] = 'starting'
-        broadcast({'type': 'starting', 'round_id': _crash['round_id'],
-                   'duration': STARTING_DURATION})
-        time.sleep(STARTING_DURATION)
+        # ── FLIGHT ──
+        crash_pt = _calc_crash()
+        with _lock:
+            _state['phase'] = 'flying'
+            _state['crash_point'] = crash_pt  # SECRET
+            _state['flight_start'] = time.time()
 
-        # FLIGHT
-        crash_pt = calc_crash()
-        with _crash_lock:
-            _crash['phase'] = 'flying'
-            _crash['crash_point'] = crash_pt
-            _crash['flight_start'] = time.time()
-
-        broadcast({'type': 'flight_start', 'round_id': _crash['round_id'],
-                   'game_id': 'GAME005',
-                   'server_seed_hash': _crash.get('seed_hash', ''),
-                   'client_seed': _crash.get('client_seed', '')})
-
-        total_distributed = 0.0
-        total_cashed_out = 0
-        total_bets = len(_crash['bets'])
+        # Internal loop: update multiplier, auto-drain check
         while True:
-            mult = current_multiplier()
-            with _crash_lock:
-                _crash['multiplier'] = mult
-                for uid, bet in list(_crash['bets'].items()):
-                    if (not bet['cashed_out'] and bet.get('auto_val', 0) > 0
-                            and mult >= bet['auto_val']):
-                        payout = bet['amount'] * mult
-                        try:
-                            _gm.add_balance(uid, payout)
-                        except Exception:
-                            pass
-                        bet['cashed_out'] = True
-                        bet['cash_mult'] = mult
-                        total_distributed += payout
-                        total_cashed_out += 1
-                        broadcast({'type': 'cashout', 'uid': uid,
-                                   'name': _get_name(uid), 'amount': round(payout, 2),
-                                   'multiplier': round(mult, 2), 'auto': True})
+            mult = _server_mult()
+            with _lock:
+                _state['multiplier'] = mult
             if mult >= crash_pt:
                 break
             time.sleep(TICK_RATE)
 
-        # CRASHED
-        with _crash_lock:
-            _crash['phase'] = 'crashed'
-            _crash['history'].append(round(crash_pt, 2))
-            if len(_crash['history']) > 50:
-                _crash['history'].pop(0)
+        # ── CRASHED — settle all bets ──
+        total_in = 0
+        total_out = 0
+        with _lock:
+            _state['phase'] = 'crashed'
+            _state['history'].append(round(crash_pt, 2))
+            if len(_state['history']) > 50:
+                _state['history'].pop(0)
+
+            # Settle crash bets
+            for uid, bet in list(_state['crash_bets'].items()):
+                total_in += bet['amount']
+                if bet.get('exited', False):
+                    # Already exited earlier — payout was given at exit time
+                    total_out += bet.get('payout', 0)
+                elif crash_pt <= bet['target_x']:
+                    # WIN: payout = bet × target_x
+                    payout = bet['amount'] * bet['target_x']
+                    bet['payout'] = round(payout, 2)
+                    bet['remaining'] = round(payout, 2)
+                    try: _gm.add_balance(uid, payout)
+                    except: pass
+                    total_out += payout
+                else:
+                    # DRAINED: get remaining
+                    remaining = _calc_remaining(bet['amount'], bet['target_x'], crash_pt, 'crash')
+                    if remaining > 0:
+                        try: _gm.add_balance(uid, remaining)
+                        except: pass
+                    bet['payout'] = round(remaining, 2)
+                    bet['remaining'] = round(remaining, 2)
+                    total_out += remaining
+
+            # Settle rise bets
+            for uid, bet in list(_state['rise_bets'].items()):
+                total_in += bet['amount']
+                if crash_pt < bet['target_x']:
+                    # LOSE all
+                    bet['payout'] = 0
+                    bet['remaining'] = 0
+                else:
+                    # SURVIVED + DRAINED: get remaining
+                    remaining = _calc_remaining(bet['amount'], bet['target_x'], crash_pt, 'rise')
+                    if remaining > 0:
+                        try: _gm.add_balance(uid, remaining)
+                        except: pass
+                    bet['payout'] = round(remaining, 2)
+                    bet['remaining'] = round(remaining, 2)
+                    total_out += remaining
+
+            # Track house profit
+            house_profit = total_in - total_out
+            _state['house_profits'].append(house_profit)
+            if len(_state['house_profits']) > 10:
+                _state['house_profits'].pop(0)
+            _state['total_bets_in'] = round(total_in, 2)
+            _state['total_payout'] = round(total_out, 2)
+
+            # Reveal seed
             server_seed = ''
             try:
-                if _is_pf() and _crash.get('seed_hash'):
-                    rev = _pf.reveal_seed('crashround_%d' % _crash['round_id'])
-                    if rev:
-                        server_seed = rev.get('server_seed', '')
-            except Exception:
-                server_seed = ''
-            _crash['server_seed'] = server_seed
+                if _is_pf() and _state.get('seed_hash'):
+                    rev = _pf.reveal_seed('crashround_%d' % _state['round_id'])
+                    if rev: server_seed = rev.get('server_seed', '')
+            except: pass
+            _state['server_seed'] = server_seed
 
-        broadcast({'type': 'crashed', 'crash_point': round(crash_pt, 2),
-                   'total_distributed': round(total_distributed, 2),
-                   'total_cashed_out': total_cashed_out,
-                   'total_bets': total_bets,
-                   'server_seed': server_seed or '',
-                   'seed_hash': _crash.get('seed_hash', '')})
         time.sleep(CRASHED_DURATION)
 
-
+# ── Flask route registration ─────────────────────────────
 def init_crash_engine(app, get_uid, get_gm, get_pf, is_pf, is_vex):
-    """Register Crash routes onto the Flask app with injected deps."""
-    global _gm, _pf, _is_pf, _vex_games
+    global _gm, _pf, _is_pf, _is_vex
     _gm = get_gm()
     _pf = get_pf
     _is_pf = is_pf
-    _vex_games = is_vex
-
-    from flask import jsonify, request, Response
-
-    @app.route('/api/crash/stream')
-    def api_crash_stream():
-        q = _queue.Queue()
-        with _crash_sse_lock:
-            _crash_sse_queues.append(q)
-
-        def generate():
-            with _crash_lock:
-                state = {'type': _crash['phase'],
-                         'multiplier': round(_crash['multiplier'], 2),
-                         'round_id': _crash['round_id'],
-                         'history': list(_crash['history'][-15:])}
-            yield 'data: %s\n\n' % json.dumps(state)
-            while True:
-                try:
-                    yield 'data: %s\n\n' % q.get(timeout=15)
-                except _queue.Empty:
-                    yield 'data: %s\n\n' % json.dumps({'type': 'heartbeat'})
-
-        try:
-            return Response(generate(), mimetype='text/event-stream',
-                            headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
-        finally:
-            with _crash_sse_lock:
-                if q in _crash_sse_queues:
-                    _crash_sse_queues.remove(q)
+    _is_vex = is_vex
+    from flask import jsonify, request
 
     @app.route('/api/crash/bet', methods=['POST'])
     def api_crash_bet():
         uid = get_uid()
-        if not uid:
-            return jsonify({'error': 'No uid'}), 400
-        if not rate_limit(uid):
-            return jsonify({'error': 'طلبات كثيرة، انتظر قليلاً'}), 429
+        if not uid: return jsonify({'error': 'No uid'}), 400
+        if not _rate_ok(uid): return jsonify({'error': 'طلبات كثيرة، انتظر قليلاً'}), 429
         data = request.json or {}
-        amount = float(data.get('bet_amount', 0))
-        auto_val = float(data.get('auto_val', 0) or 0)
-        request_id = str(data.get('request_id', '') or '')
-        with _crash_lock:
-            if _crash['phase'] != 'waiting':
+        # Input validation
+        try:
+            amount = float(data.get('bet_amount', 0))
+            if amount <= 0 or amount > 100000: return jsonify({'error': 'مبلغ غير صالح'}), 400
+        except (ValueError, TypeError):
+            return jsonify({'error': 'مبلغ غير صالح'}), 400
+        try:
+            target_x = float(data.get('target_x', 0) or 0)
+            if target_x < 1.0 or target_x > 50.0: return jsonify({'error': 'قيمة X غير صالحة'}), 400
+        except (ValueError, TypeError):
+            return jsonify({'error': 'قيمة X غير صالحة'}), 400
+        side = str(data.get('side', '')).strip().lower()
+        if side not in ('crash', 'rise'): return jsonify({'error': 'جانب غير صالح'}), 400
+        req_id = str(data.get('request_id', '') or '')[:64]
+        if not str(uid).isdigit(): return jsonify({'error': 'uid غير صالح'}), 400
+
+        with _lock:
+            if _state['phase'] != 'waiting':
                 return jsonify({'error': 'انتهت فترة المراهنة'})
-            if (_crash.get('server_ts')
-                    and time.time() - _crash['server_ts'] > WAITING_DURATION + 0.1):
+            if _state.get('server_ts') and time.time() - _state['server_ts'] > WAITING_DURATION + 0.1:
                 return jsonify({'error': 'انتهت نافذة الرهان'})
-            if uid in _crash['bets']:
-                return jsonify({'error': 'لقد راهنت بالفعل'})
-            if not _vex_games():
-                return jsonify({'error': 'Games not available'}), 500
-            if request_id and _crash['request_ids'].get(uid) == request_id:
+            # One bet per side per user
+            bet_dict = _state['crash_bets'] if side == 'crash' else _state['rise_bets']
+            if uid in bet_dict:
+                return jsonify({'error': 'لقد راهنت بالفعل على هذا الجانب'})
+            if req_id and _state['request_ids'].get(uid + '_' + side) == req_id:
                 return jsonify({'error': 'طلب مكرر'}), 409
-            if request_id:
-                _crash['request_ids'][uid] = request_id
+            if req_id: _state['request_ids'][uid + '_' + side] = req_id
+
             success, balance = _gm.deduct_balance(uid, amount)
             if not success:
                 return jsonify({'need_deposit': True, 'error': 'رصيد غير كافٍ'})
-            _crash['bets'][uid] = {'amount': amount, 'cashed_out': False,
-                                   'cash_mult': 0, 'auto_val': auto_val}
-        return jsonify({'success': True, 'balance_after': balance})
 
-    @app.route('/api/crash/cashout', methods=['POST'])
-    def api_crash_cashout_global():
+            bet_entry = {'amount': amount, 'target_x': target_x, 'exited': False,
+                        'remaining': amount, 'payout': 0}
+            bet_dict[uid] = bet_entry
+
+        return jsonify({'success': True, 'balance_after': balance,
+                        'side': side, 'target_x': target_x})
+
+    @app.route('/api/crash/exit', methods=['POST'])
+    def api_crash_exit():
+        """Crash bettor exits (cashout remaining). Rise bettors CANNOT exit."""
         uid = get_uid()
-        if not uid:
-            return jsonify({'error': 'No uid'}), 400
-        if not rate_limit(uid):
-            return jsonify({'error': 'طلبات كثيرة'}), 429
+        if not uid: return jsonify({'error': 'No uid'}), 400
+        if not _rate_ok(uid): return jsonify({'error': 'طلبات كثيرة'}), 429
         data = request.json or {}
-        request_id = str(data.get('request_id', '') or '')
-        with _crash_lock:
-            if _crash['phase'] != 'flying':
-                return jsonify({'error': 'لا يمكن السحب الآن'})
-            bet = _crash['bets'].get(uid)
-            if not bet or bet['cashed_out']:
-                return jsonify({'error': 'لا يوجد رهان نشط'})
-            if request_id and _crash['request_ids'].get('co_'+uid) == request_id:
+        req_id = str(data.get('request_id', '') or '')[:64]
+        if not str(uid).isdigit(): return jsonify({'error': 'uid غير صالح'}), 400
+
+        with _lock:
+            if _state['phase'] != 'flying':
+                return jsonify({'error': 'لا يمكن الخروج الآن'})
+            bet = _state['crash_bets'].get(uid)
+            if not bet:
+                return jsonify({'error': 'لا يوجد رهان انفجار'})
+            if bet.get('exited', False):
+                return jsonify({'error': 'لقد خرجت بالفعل'})
+            if req_id and _state['request_ids'].get('exit_' + uid) == req_id:
                 return jsonify({'error': 'طلب مكرر'}), 409
-            if request_id:
-                _crash['request_ids']['co_'+uid] = request_id
-            mult = _crash['multiplier']
-            if mult >= _crash['crash_point']:
+            if req_id: _state['request_ids']['exit_' + uid] = req_id
+
+            mult = _state['multiplier']
+            if mult >= _state['crash_point']:
                 return jsonify({'success': False, 'error': 'انفجر الصاروخ'})
-            payout = bet['amount'] * mult
-            balance = _gm.add_balance(uid, payout)
-            bet['cashed_out'] = True
-            bet['cash_mult'] = mult
+
+            remaining = _calc_remaining(bet['amount'], bet['target_x'], mult, 'crash')
+            if remaining <= 0:
+                return jsonify({'error': 'لا يوجد رصيد متبقي'})
+
+            balance = _gm.add_balance(uid, remaining)
+            bet['exited'] = True
+            bet['remaining'] = round(remaining, 2)
+            bet['payout'] = round(remaining, 2)
             name = _get_name(uid)
-        broadcast({'type': 'cashout', 'uid': uid, 'name': name,
-                   'amount': round(payout, 2), 'multiplier': round(mult, 2)})
-        return jsonify({'success': True, 'payout': round(payout, 2),
+
+        return jsonify({'success': True, 'payout': round(remaining, 2),
                         'multiplier': round(mult, 2), 'balance_after': balance})
 
     @app.route('/api/crash/state')
     def api_crash_state():
-        with _crash_lock:
+        uid = get_uid()
+        with _lock:
+            # Get user's bets if any
+            my_crash_bet = {}
+            my_rise_bet = {}
+            if uid:
+                cb = _state['crash_bets'].get(uid)
+                if cb:
+                    my_crash_bet = {
+                        'placed': True, 'amount': cb['amount'],
+                        'target_x': cb['target_x'], 'exited': cb.get('exited', False),
+                        'remaining': round(_calc_remaining(cb['amount'], cb['target_x'], _server_mult(), 'crash'), 2),
+                    }
+                rb = _state['rise_bets'].get(uid)
+                if rb:
+                    my_rise_bet = {
+                        'placed': True, 'amount': rb['amount'],
+                        'target_x': rb['target_x'],
+                        'remaining': round(_calc_remaining(rb['amount'], rb['target_x'], _server_mult(), 'rise'), 2),
+                    }
+
             return jsonify({
-                'phase': _crash['phase'],
-                'multiplier': round(current_multiplier(), 2),
-                'round_id': _crash['round_id'],
-                'history': list(_crash['history'][-15:]),
+                'phase': _state['phase'],
+                'multiplier': round(_server_mult(), 2),
+                'crash_point': round(_state.get('crash_point', 0), 2) if _state['phase'] == 'crashed' else 0,
+                'round_id': _state['round_id'],
+                'history': list(_state['history'][-15:]),
+                'my_crash_bet': my_crash_bet,
+                'my_rise_bet': my_rise_bet,
+                'players': _generate_fake_players(_server_mult()),
+                'total_bets_egp': random.randint(80000, 500000),
+                'total_in': round(_state.get('total_bets_in', 0), 2),
+                'total_out': round(_state.get('total_payout', 0), 2),
             })
 
-
+# Start daemon thread
 _thread = threading.Thread(target=_game_loop, daemon=True)
 _thread.start()
