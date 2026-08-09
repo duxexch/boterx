@@ -258,13 +258,19 @@ class GameManager:
             print(f"Payment methods migration error: {e}")
 
     def get_games_payment_methods(self, user_currency=None):
-        """قراءة وسائل الدفع النشطة والمتاحة للألعاب — مفلترة حسب العملة"""
+        """قراءة وسائل الدفع النشطة والمتاحة للألعاب — مفلترة حسب العملة.
+        إذا لم توجد نتائج بعد الفلترة، أرجع كل الوسائل النشطة."""
         methods = []
+        all_active = []
         try:
             with open('payment_methods.csv', 'r', encoding=CSV_ENCODING) as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    if row.get('status') == 'active' and row.get('available_for_games', 'yes') == 'yes':
+                    if row.get('status') == 'active':
+                        all_active.append(row)
+                        avail = row.get('available_for_games', 'yes')
+                        if avail != 'yes':
+                            continue
                         method_currency = row.get('currency', '').strip()
                         if not method_currency or method_currency == 'كل العملات' or not user_currency:
                             methods.append(row)
@@ -272,6 +278,9 @@ class GameManager:
                             methods.append(row)
         except:
             pass
+        # Fallback: if filtered list is empty, return all active methods
+        if not methods and all_active:
+            return all_active
         return methods
 
     def get_user_info(self, user_id):

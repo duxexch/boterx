@@ -833,7 +833,19 @@ async function showVexDepositModal(required) {
   } catch (e) { /* ignore */ }
 
   if (vMethods.length === 0) {
-    mb.innerHTML = `<div style="text-align:center;padding:16px"><div style="font-size:28px">😢</div><div class="modal-title">لا توجد وسائل دفع</div><button onclick="document.getElementById('modal').remove()" class="modal-btn-secondary">إغلاق</button></div>`;
+    // No methods from API — show manual entry always
+    mb.innerHTML = `<div class="modal-title">💰 إيداع محفظة VEX</div>
+      <div class="modal-subtitle">${required ? 'تحتاج ' + required : 'أدخل بيانات الإيداع'}</div>
+      <div class="modal-subtitle">💵 المبلغ:</div>
+      <input class="modal-input" id="vAm" type="number" value="${required||10}">
+      <div class="modal-subtitle">🔐 رقم محفظتك:</div>
+      <input class="modal-input" id="vW" type="text" placeholder="رقم محفظتك">
+      <div class="modal-subtitle">📋 اسم الوسيلة:</div>
+      <input class="modal-input" id="vMN" type="text" placeholder="اسم الوسيلة">
+      <div class="modal-subtitle">📋 بيانات الحساب:</div>
+      <input class="modal-input" id="vMD" type="text" placeholder="بيانات الحساب">
+      <button class="modal-btn-primary" onclick="vSubManual()">✅ تأكيد الإيداع</button>
+      <button class="modal-btn-secondary" onclick="document.getElementById('modal').remove()">إغلاق</button>`;
     return;
   }
 
@@ -889,14 +901,35 @@ function vCopy() {
 async function vSub() {
   const a = parseFloat(document.getElementById('vAm').value) || 0;
   const w = document.getElementById('vW').value.trim();
-  const s = document.getElementById('vSv').checked;
+  const s = document.getElementById('vSv') ? document.getElementById('vSv').checked : false;
   if (a <= 0) { alert('أدخل المبلغ'); return; }
   if (!w) { alert('أدخل رقم محفظتك'); return; }
   if (!vSelected) { alert('اختر وسيلة'); return; }
   try {
     const r = await apiFetch(`${BASE}/api/deposit/quick`, {
       method: 'POST',
-      body: JSON.stringify({ uid, amount: a, method_id: vSelected, method_name: vSelName, method_account_data: vSelData, player_wallet: w, save_method: s })
+      body: JSON.stringify({ amount: a, method_id: vSelected, method_name: vSelName, method_account_data: vSelData, player_wallet: w, save_method: s })
+    });
+    const d = await r.json();
+    if (d.success) {
+      document.getElementById('mb').innerHTML = `<div style="text-align:center;padding:16px"><div style="font-size:28px">⏳</div><div class="modal-title">تم الإيداع</div><div class="modal-subtitle">بانتظار موافقة الإدارة</div><button onclick="document.getElementById('modal').remove();loadBalance()" class="modal-btn-secondary">إغلاق</button></div>`;
+    } else { alert(d.error || 'خطأ'); }
+  } catch (e) { alert('خطأ'); }
+}
+
+// Manual deposit submit (when no methods from API)
+async function vSubManual() {
+  const a = parseFloat(document.getElementById('vAm').value) || 0;
+  const w = document.getElementById('vW').value.trim();
+  const mn = document.getElementById('vMN') ? document.getElementById('vMN').value.trim() : '';
+  const md = document.getElementById('vMD') ? document.getElementById('vMD').value.trim() : '';
+  if (a <= 0) { alert('أدخل المبلغ'); return; }
+  if (!w) { alert('أدخل رقم محفظتك'); return; }
+  if (!mn) { alert('أدخل اسم الوسيلة'); return; }
+  try {
+    const r = await apiFetch(`${BASE}/api/deposit/quick`, {
+      method: 'POST',
+      body: JSON.stringify({ amount: a, method_id: 'manual', method_name: mn, method_account_data: md, player_wallet: w, save_method: false })
     });
     const d = await r.json();
     if (d.success) {

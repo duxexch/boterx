@@ -39,7 +39,6 @@
 .big-win-overlay.show{display:flex}
 .big-win-text{font-size:clamp(32px,12vw,48px);font-weight:900;color:#fbbf24;text-shadow:0 0 40px rgba(251,191,36,.6);animation:bwB .6s ease-out}
 @keyframes bwB{0%{transform:scale(0);opacity:0}50%{transform:scale(1.3);opacity:1}100%{transform:scale(1);opacity:1}}
-/* Dual bet slots — always both active */
 .bet-slots{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:8px}
 .bet-slot{background:var(--surface-2);border:2px solid var(--border);border-radius:14px;padding:8px;display:flex;flex-direction:column;gap:6px}
 .bet-slot.crash-slot{border-color:rgba(255,71,87,.2)}
@@ -60,21 +59,20 @@
 .bet-btn{width:100%;border:none;padding:12px;border-radius:10px;font-size:15px;font-weight:800;cursor:pointer;transition:all .15s;text-transform:uppercase;letter-spacing:1px}
 .bet-btn:active{transform:scale(.97)}
 .bet-btn:disabled{opacity:.3;cursor:not-allowed}
-/* Crash side button colors */
 .bet-btn.crash-idle{background:linear-gradient(135deg,#7a0d0d,#5c1a1a);color:#ff8787;box-shadow:0 2px 10px rgba(122,13,13,.3)}
 .bet-btn.crash-betting{background:#475569;color:#cbd5e1}
 .bet-btn.crash-waiting{background:#334155;color:#94a3b8}
 .bet-btn.crash-exit{background:#ff4757;color:#fff;animation:jp .8s infinite}
 .bet-btn.crash-done{background:var(--surface-3);color:var(--gold)}
+.bet-btn.crash-queued{background:linear-gradient(135deg,#b8860b,#8a6d0a);color:#fff}
 @keyframes jp{0%,100%{box-shadow:0 0 0 0 rgba(255,71,87,.5)}50%{box-shadow:0 0 0 10px rgba(255,71,87,0)}}
-/* Rise side button colors */
 .bet-btn.rise-idle{background:linear-gradient(135deg,#0d7a1f,#1a5c2e);color:#7eff9a;box-shadow:0 2px 10px rgba(13,122,31,.3)}
 .bet-btn.rise-betting{background:#475569;color:#cbd5e1}
 .bet-btn.rise-locked{background:#1a1a2e;color:#475569}
 .bet-btn.rise-done{background:var(--surface-3);color:var(--gold)}
+.bet-btn.rise-queued{background:linear-gradient(135deg,#b8860b,#8a6d0a);color:#fff}
 @keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
 @keyframes fadeIn{from{opacity:0;transform:translate(-50%,10px)}to{opacity:1;transform:translate(-50%,0)}}
-/* Players panel */
 .players-panel{background:var(--surface);border-top:1px solid var(--border);flex-shrink:0;height:160px;overflow:hidden;display:flex;flex-direction:column}
 .total-bets-bar{padding:6px 12px;font-size:12px;font-weight:800;color:var(--gold);border-bottom:1px solid var(--border);text-align:center;background:rgba(251,191,36,.05)}
 .players-list{height:100%;overflow-y:auto;padding:4px 8px;-webkit-overflow-scrolling:touch}
@@ -124,44 +122,34 @@
     <div class="big-win-overlay" id="bigWin"><div class="big-win-text" id="bigWinText"></div></div>
   </div>
   <div class="bet-slots">
-    <!-- Crash side -->
     <div class="bet-slot crash-slot" id="crashSlot">
       <div class="bet-slot-title">💥 انفجار</div>
       <input type="number" class="bet-input" id="betCrash" value="10" min="1" placeholder="المبلغ">
       <div class="quick-bets">
-        <div class="qb" onclick="setBetVal('crash',10)">10</div>
-        <div class="qb" onclick="setBetVal('crash',50)">50</div>
-        <div class="qb" onclick="setBetVal('crash',100)">100</div>
-        <div class="qb" onclick="setBetVal('crash',500)">500</div>
+        <div class="qb" onclick="setBetVal('crash',10)">10</div><div class="qb" onclick="setBetVal('crash',50)">50</div>
+        <div class="qb" onclick="setBetVal('crash',100)">100</div><div class="qb" onclick="setBetVal('crash',500)">500</div>
         <div class="qb" onclick="setBetVal('crash',1000)">1K</div>
       </div>
       <input type="number" class="target-input" id="targetCrash" value="1.5" step="0.1" min="1.0" max="50" placeholder="قيمة X">
       <div class="quick-targets">
-        <div class="qt" onclick="setTarget('crash',1.0)">1x</div>
-        <div class="qt" onclick="setTarget('crash',1.2)">1.2x</div>
-        <div class="qt" onclick="setTarget('crash',1.5)">1.5x</div>
-        <div class="qt" onclick="setTarget('crash',2.0)">2x</div>
+        <div class="qt" onclick="setTarget('crash',1.0)">1x</div><div class="qt" onclick="setTarget('crash',1.2)">1.2x</div>
+        <div class="qt" onclick="setTarget('crash',1.5)">1.5x</div><div class="qt" onclick="setTarget('crash',2.0)">2x</div>
         <div class="qt" onclick="setTarget('crash',3.0)">3x</div>
       </div>
       <button class="bet-btn crash-idle" id="btnCrash" onclick="onBtnCrash()">راهن</button>
     </div>
-    <!-- Rise side -->
     <div class="bet-slot rise-slot" id="riseSlot">
       <div class="bet-slot-title">🚀 صعود</div>
       <input type="number" class="bet-input" id="betRise" value="10" min="1" placeholder="المبلغ">
       <div class="quick-bets">
-        <div class="qb" onclick="setBetVal('rise',10)">10</div>
-        <div class="qb" onclick="setBetVal('rise',50)">50</div>
-        <div class="qb" onclick="setBetVal('rise',100)">100</div>
-        <div class="qb" onclick="setBetVal('rise',500)">500</div>
+        <div class="qb" onclick="setBetVal('rise',10)">10</div><div class="qb" onclick="setBetVal('rise',50)">50</div>
+        <div class="qb" onclick="setBetVal('rise',100)">100</div><div class="qb" onclick="setBetVal('rise',500)">500</div>
         <div class="qb" onclick="setBetVal('rise',1000)">1K</div>
       </div>
       <input type="number" class="target-input" id="targetRise" value="2.0" step="0.1" min="1.0" max="50" placeholder="قيمة X">
       <div class="quick-targets">
-        <div class="qt" onclick="setTarget('rise',1.5)">1.5x</div>
-        <div class="qt" onclick="setTarget('rise',2.0)">2x</div>
-        <div class="qt" onclick="setTarget('rise',3.0)">3x</div>
-        <div class="qt" onclick="setTarget('rise',5.0)">5x</div>
+        <div class="qt" onclick="setTarget('rise',1.5)">1.5x</div><div class="qt" onclick="setTarget('rise',2.0)">2x</div>
+        <div class="qt" onclick="setTarget('rise',3.0)">3x</div><div class="qt" onclick="setTarget('rise',5.0)">5x</div>
         <div class="qt" onclick="setTarget('rise',10.0)">10x</div>
       </div>
       <button class="bet-btn rise-idle" id="btnRise" onclick="onBtnRise()">راهن</button>
@@ -182,40 +170,110 @@ var sessionW=0,sessionL=0,sessionPL=0;
 var weather='day',lightningFlash=0,rainDrops=[],bgStars=[];
 var bgScroll=0,rocketX=0,rocketY=0,PX=0.35,PY=0.45;
 var lastPhase='',countdownEl=null;
-// Crash bet state: idle|betting|waiting|exit|done|lost
+// Crash bet: idle|betting|waiting|exit|queued|done|lost
 var crashBet={st:'idle',amt:0,target:0,req:''};
-// Rise bet state: idle|betting|locked|done|lost
+// Rise bet: idle|betting|locked|queued|done|lost
 var riseBet={st:'idle',amt:0,target:0,req:''};
+var _pollFailCount=0;
 
 function resizeCanvas(){canvas.width=Math.max(1,canvas.clientWidth||window.innerWidth);canvas.height=Math.max(1,canvas.clientHeight||window.innerHeight)}
 window.addEventListener('resize',resizeCanvas);
 function pickWeather(){weather=['day','night','storm'][Math.floor(Math.random()*3)];if(weather==='storm'){rainDrops=[];for(var i=0;i<60;i++)rainDrops.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height,len:8+Math.random()*12,spd:6+Math.random()*8})}if(weather==='night'){bgStars=[];for(var i=0;i<80;i++)bgStars.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height*0.7,r:Math.random()*1.5,tw:Math.random()*6.28})}}
-
 function setBetVal(side,v){document.getElementById(side==='crash'?'betCrash':'betRise').value=v}
 function setTarget(side,v){document.getElementById(side==='crash'?'targetCrash':'targetRise').value=v}
 
-// ── Drawing (same structure as Aviator, rocket instead of plane) ──
+// ── Drawing ──
 function drawBg(a){var w=canvas.width,h=canvas.height,s=bgScroll;if(weather==='day'){var g=ctx.createLinearGradient(0,0,0,h);if(a<0.4){g.addColorStop(0,'#4a90d9');g.addColorStop(0.4,'#7eb8e8');g.addColorStop(0.7,'#b3d9f2');g.addColorStop(1,'#d4e8f5')}else{g.addColorStop(0,'#0a0e17');g.addColorStop(0.4,'#1a3a5c');g.addColorStop(0.8,'#3a6a9c');g.addColorStop(1,'#5a8abc')}ctx.fillStyle=g;ctx.fillRect(0,0,w,h)}else if(weather==='night'){var g2=ctx.createLinearGradient(0,0,0,h);g2.addColorStop(0,'#020410');g2.addColorStop(0.4,'#080d20');g2.addColorStop(0.8,'#0c1530');g2.addColorStop(1,'#101a3a');ctx.fillStyle=g2;ctx.fillRect(0,0,w,h);var sa=0.3+a*0.5;bgStars.forEach(function(s2){s2.tw+=0.05;var tw=0.4+Math.sin(s2.tw)*0.6;var sx=(s2.x-s*0.1)%w;if(sx<0)sx+=w;ctx.beginPath();ctx.arc(sx,s2.y,s2.r,0,6.28);ctx.fillStyle='rgba(255,255,255,'+(sa*tw)+')';ctx.fill()})}else{var g3=ctx.createLinearGradient(0,0,0,h);g3.addColorStop(0,'#1a1a2e');g3.addColorStop(0.4,'#16213e');g3.addColorStop(0.8,'#0f3460');g3.addColorStop(1,'#1a4a70');ctx.fillStyle=g3;ctx.fillRect(0,0,w,h);if(lightningFlash>0){ctx.fillStyle='rgba(255,255,255,'+(lightningFlash*0.4)+')';ctx.fillRect(0,0,w,h);lightningFlash-=0.05}ctx.strokeStyle='rgba(150,170,200,0.5)';ctx.lineWidth=1.5;rainDrops.forEach(function(d){d.y+=d.spd;d.x-=4;if(d.y>h){d.y=-10;d.x=Math.random()*w}if(d.x<0)d.x=w;ctx.beginPath();ctx.moveTo(d.x,d.y);ctx.lineTo(d.x-3,d.y+d.len);ctx.stroke()})}}
 function drawRw(a){var w=canvas.width,h=canvas.height,al=Math.max(0,1-a*3.5);if(al<=0)return;var gy=h-30,s=bgScroll;ctx.fillStyle='rgba(40,80,50,'+al+')';ctx.fillRect(0,gy-8,w,10);ctx.fillStyle='rgba(30,32,40,'+al+')';ctx.fillRect(0,gy,w,30);ctx.fillStyle='rgba(251,191,36,'+(al*0.9)+')';var sw=25,gap=20,off=s%(sw+gap);for(var x=-off;x<w;x+=sw+gap)ctx.fillRect(x,gy+13,sw,3.5)}
-function drawTrail(px,py,ang){if(trail.length<2)return;ctx.save();ctx.strokeStyle='rgba(255,140,40,0.35)';ctx.lineWidth=2.5;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(trail[0].x,trail[0].y);for(var i=1;i<trail.length;i++)ctx.lineTo(trail[i].x,trail[i].y);ctx.stroke();ctx.lineTo(trail[trail.length-1].x,canvas.height);ctx.lineTo(trail[0].x,canvas.height);ctx.closePath();var fg=ctx.createLinearGradient(0,0,0,canvas.height);fg.addColorStop(0,'rgba(255,140,40,0.06)');fg.addColorStop(1,'rgba(255,140,40,0)');ctx.fillStyle=fg;ctx.fill();ctx.translate(px,py);ctx.rotate(ang);for(var j=0;j<10;j++){var ps=(10-j)*1.3,pX=-20-j*7,pY=(Math.random()-0.5)*5,al=0.6-j*0.05;ctx.beginPath();ctx.arc(pX,pY,ps,0,6.28);ctx.fillStyle='rgba(255,'+(100+j*15)+','+(20+j*20)+','+al+')';ctx.fill();if(j<5){ctx.beginPath();ctx.arc(pX,pY,ps*0.4,0,6.28);ctx.fillStyle='rgba(255,255,200,'+(al*0.8)+')';ctx.fill()}}ctx.restore()}
-function drawRocket(px,py,ang){ctx.save();ctx.translate(px,py);ctx.rotate(ang);ctx.scale(1.8,1.8);var bg=ctx.createLinearGradient(0,-8,0,8);bg.addColorStop(0,'#f8fafc');bg.addColorStop(0.4,'#e2e8f0');bg.addColorStop(1,'#94a3b8');ctx.fillStyle=bg;ctx.beginPath();ctx.moveTo(0,-22);ctx.quadraticCurveTo(8,-18,10,-8);ctx.lineTo(10,8);ctx.quadraticCurveTo(10,14,4,14);ctx.lineTo(-4,14);ctx.quadraticCurveTo(-10,14,-10,8);ctx.lineTo(-10,-8);ctx.quadraticCurveTo(-8,-18,0,-22);ctx.closePath();ctx.fill();ctx.fillStyle='#ef4444';ctx.beginPath();ctx.moveTo(0,-22);ctx.lineTo(-4,-14);ctx.lineTo(4,-14);ctx.closePath();ctx.fill();ctx.fillStyle='#1e3a5f';ctx.beginPath();ctx.ellipse(0,-4,4,3,0,0,6.28);ctx.fill();ctx.fillStyle='#06b6d4';ctx.beginPath();ctx.ellipse(0,-4,3,2,0,0,6.28);ctx.fill();var wg=ctx.createLinearGradient(0,-10,0,10);wg.addColorStop(0,'#cbd5e1');wg.addColorStop(0.5,'#94a3b8');wg.addColorStop(1,'#64748b');ctx.fillStyle=wg;ctx.beginPath();ctx.moveTo(10,2);ctx.lineTo(20,12);ctx.lineTo(10,10);ctx.closePath();ctx.fill();ctx.beginPath();ctx.moveTo(-10,2);ctx.lineTo(-20,12);ctx.lineTo(-10,10);ctx.closePath();ctx.fill();ctx.fillStyle='#ef4444';ctx.beginPath();ctx.moveTo(-4,14);ctx.lineTo(0,22);ctx.lineTo(4,14);ctx.closePath();ctx.fill();ctx.fillStyle='#475569';ctx.beginPath();ctx.ellipse(0,8,5,3,0.1,0,6.28);ctx.fill();ctx.restore()}
+// ── Flame trail: particles BELOW the rocket (base), not behind ──
+function drawTrail(px,py,ang){
+  if(trail.length<2)return;
+  ctx.save();
+  // Draw smoke trail line
+  ctx.strokeStyle='rgba(255,140,40,0.3)';ctx.lineWidth=2.5;ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(trail[0].x,trail[0].y);
+  for(var i=1;i<trail.length;i++)ctx.lineTo(trail[i].x,trail[i].y);
+  ctx.stroke();
+  // Fill under trail
+  ctx.lineTo(trail[trail.length-1].x,canvas.height);
+  ctx.lineTo(trail[0].x,canvas.height);ctx.closePath();
+  var fg=ctx.createLinearGradient(0,0,0,canvas.height);
+  fg.addColorStop(0,'rgba(255,140,40,0.06)');fg.addColorStop(1,'rgba(255,140,40,0)');
+  ctx.fillStyle=fg;ctx.fill();
+  // ── Flame particles at the BASE of the rocket (bottom) ──
+  ctx.translate(px,py);ctx.rotate(ang);
+  // Rocket body is ~14px tall, flame comes from bottom (y=+14 in rocket local space)
+  var flameBaseY=14; // bottom of rocket
+  for(var j=0;j<10;j++){
+    var ps=(12-j)*1.3;
+    var pY=flameBaseY+j*5+Math.random()*3; // below the rocket
+    var pX=(Math.random()-0.5)*8; // spread sideways
+    var al=0.7-j*0.06;
+    ctx.beginPath();ctx.arc(pX,pY,ps,0,6.28);
+    ctx.fillStyle='rgba(255,'+(100+j*15)+','+(20+j*20)+','+al+')';
+    ctx.fill();
+    if(j<4){
+      ctx.beginPath();ctx.arc(pX,pY,ps*0.4,0,6.28);
+      ctx.fillStyle='rgba(255,255,200,'+(al*0.8)+')';ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+function drawRocket(px,py,ang){ctx.save();ctx.translate(px,py);ctx.rotate(ang);ctx.scale(1.8,1.8);
+  // Body
+  var bg=ctx.createLinearGradient(0,-22,0,14);
+  bg.addColorStop(0,'#f8fafc');bg.addColorStop(0.4,'#e2e8f0');bg.addColorStop(1,'#94a3b8');
+  ctx.fillStyle=bg;ctx.beginPath();
+  ctx.moveTo(0,-22);ctx.quadraticCurveTo(8,-18,10,-8);ctx.lineTo(10,8);
+  ctx.quadraticCurveTo(10,14,4,14);ctx.lineTo(-4,14);ctx.quadraticCurveTo(-10,14,-10,8);
+  ctx.lineTo(-10,-8);ctx.quadraticCurveTo(-8,-18,0,-22);ctx.closePath();ctx.fill();
+  // Nose cone (red)
+  ctx.fillStyle='#ef4444';ctx.beginPath();ctx.moveTo(0,-22);ctx.lineTo(-4,-14);ctx.lineTo(4,-14);ctx.closePath();ctx.fill();
+  // Window
+  ctx.fillStyle='#1e3a5f';ctx.beginPath();ctx.ellipse(0,-4,4,3,0,0,6.28);ctx.fill();
+  ctx.fillStyle='#06b6d4';ctx.beginPath();ctx.ellipse(0,-4,3,2,0,0,6.28);ctx.fill();
+  // Wings
+  var wg=ctx.createLinearGradient(0,-10,0,10);wg.addColorStop(0,'#cbd5e1');wg.addColorStop(0.5,'#94a3b8');wg.addColorStop(1,'#64748b');
+  ctx.fillStyle=wg;ctx.beginPath();ctx.moveTo(10,2);ctx.lineTo(20,12);ctx.lineTo(10,10);ctx.closePath();ctx.fill();
+  ctx.beginPath();ctx.moveTo(-10,2);ctx.lineTo(-20,12);ctx.lineTo(-10,10);ctx.closePath();ctx.fill();
+  // Bottom fin
+  ctx.fillStyle='#ef4444';ctx.beginPath();ctx.moveTo(-4,14);ctx.lineTo(0,22);ctx.lineTo(4,14);ctx.closePath();ctx.fill();
+  // Engine
+  ctx.fillStyle='#475569';ctx.beginPath();ctx.ellipse(0,8,5,3,0.1,0,6.28);ctx.fill();
+  ctx.restore();
+}
 
-// ── Polling ──
+// ── Polling with error recovery ──
 function startPolling(){if(pollTimer)clearInterval(pollTimer);pollTimer=setInterval(poll,1000);poll()}
-async function poll(){try{var r=await apiFetch(BASE+'/api/crash/state');var d=await r.json();var ci=document.getElementById('connIndicator');if(ci)ci.textContent='🟢';handleState(d)}catch(e){var ci=document.getElementById('connIndicator');if(ci)ci.textContent='🔴'}}
+async function poll(){
+  try{
+    var r=await apiFetch(BASE+'/api/crash/state');
+    if(!r||!r.ok){_pollFailCount++;if(_pollFailCount>3){var ci=document.getElementById('connIndicator');if(ci)ci.textContent='🔴';}return}
+    _pollFailCount=0;
+    var d=await r.json();
+    var ci=document.getElementById('connIndicator');if(ci)ci.textContent='🟢';
+    handleState(d);
+  }catch(e){
+    _pollFailCount++;
+    var ci=document.getElementById('connIndicator');if(ci)ci.textContent='🔴';
+    // Recovery: if too many failures, force re-init
+    if(_pollFailCount>5){_pollFailCount=0;loadBalance();}
+  }
+}
+
 function handleState(d){
   var np=d.phase;currentMult=d.multiplier||1.0;if(d.crash_point)crashPoint=d.crash_point;
 
   // Restore bet states from server
-  if(d.my_crash_bet&&d.my_crash_bet.placed){
-    if(crashBet.st==='idle'){crashBet.amt=d.my_crash_bet.amount;crashBet.target=d.my_crash_bet.target_x;}
+  if(d.my_crash_bet&&d.my_crash_bet.placed&&crashBet.st==='idle'){
+    crashBet.amt=d.my_crash_bet.amount;crashBet.target=d.my_crash_bet.target_x;
     if(d.my_crash_bet.exited){crashBet.st='done';setBtnCrash('crash-done','✓ '+d.my_crash_bet.remaining.toFixed(0));}
     else if(np==='flying'&&currentMult>crashBet.target){crashBet.st='exit';setBtnCrash('crash-exit','خروج!');}
     else if(np==='flying'){crashBet.st='waiting';setBtnCrash('crash-waiting','⏳');}
     else if(np==='waiting'){crashBet.st='betting';setBtnCrash('crash-betting','إلغاء');}
   }
-  if(d.my_rise_bet&&d.my_rise_bet.placed){
-    if(riseBet.st==='idle'){riseBet.amt=d.my_rise_bet.amount;riseBet.target=d.my_rise_bet.target_x;}
+  if(d.my_rise_bet&&d.my_rise_bet.placed&&riseBet.st==='idle'){
+    riseBet.amt=d.my_rise_bet.amount;riseBet.target=d.my_rise_bet.target_x;
     if(np==='flying'){riseBet.st='locked';setBtnRise('rise-locked','🔒 محبوس');}
     else if(np==='waiting'){riseBet.st='betting';setBtnRise('rise-betting','إلغاء');}
   }
@@ -224,29 +282,20 @@ function handleState(d){
   else{if(np==='flying'){document.getElementById('mult').textContent=currentMult.toFixed(2)+'x';document.getElementById('crashMultVal').textContent=currentMult.toFixed(2)+'x'}}
 
   if(d.history){var h=document.getElementById('history');h.innerHTML='';d.history.forEach(function(v){var el=document.createElement('div');el.className='hist-item '+(v>=1.5?'hist-win':'hist-lose')+(v>=3?' hist-big':'');el.textContent=v.toFixed(2)+'x';h.appendChild(el)})}
-
   if(d.players){renderPlayers(d.players)}
   if(d.total_bets_egp){document.getElementById('totalBetsEgp').textContent=d.total_bets_egp.toLocaleString()}
 }
 
 function renderPlayers(players){
-  var list=document.getElementById('playersList');
-  if(!list)return;
-  list.innerHTML='';
+  var list=document.getElementById('playersList');if(!list)return;list.innerHTML='';
   players.forEach(function(p){
-    var row=document.createElement('div');
-    row.className='prow '+p.status;
+    var row=document.createElement('div');row.className='prow '+p.status;
     var sideHtml='<span class="pside '+p.side+'">'+(p.side==='crash'?'💥':'🚀')+'</span>';
     var targetHtml='<span class="ptarget">@'+p.target_x+'x</span>';
     var payHtml='';
-    if(p.status==='cashed'){
-      payHtml='<span class="ppay">+'+p.payout.toFixed(0)+'</span>';
-    } else if(p.status==='lost'){
-      payHtml='<span class="ppay" style="color:#ff4757">💥</span>';
-    }
-    row.innerHTML='<div class="pavatar">'+p.avatar+'</div>'+
-      '<span class="pname">'+p.name+'</span>'+sideHtml+
-      '<span class="pbet">'+p.bet+'</span>'+targetHtml+payHtml;
+    if(p.status==='cashed'){payHtml='<span class="ppay">+'+p.payout.toFixed(0)+'</span>';}
+    else if(p.status==='lost'){payHtml='<span class="ppay" style="color:#ff4757">💥</span>';}
+    row.innerHTML='<div class="pavatar">'+p.avatar+'</div><span class="pname">'+p.name+'</span>'+sideHtml+'<span class="pbet">'+p.bet+'</span>'+targetHtml+payHtml;
     list.appendChild(row);
   });
 }
@@ -260,16 +309,33 @@ function onWaiting(d){
   ctx.clearRect(0,0,canvas.width,canvas.height);drawBg(0);drawRw(0);
   rocketX=40;rocketY=canvas.height-30;drawRocket(rocketX,rocketY,0);
   document.getElementById('multDisplay').classList.add('show');
-  document.getElementById('mult').textContent='1.00x';
-  document.getElementById('mult').className='mult-val';
+  document.getElementById('mult').textContent='1.00x';document.getElementById('mult').className='mult-val';
   document.getElementById('crashMult').style.opacity='0';
   document.getElementById('statusText').textContent='ضع رهانك — الجولة تبدأ Soon 🚀';
-  document.getElementById('crashMsg').classList.remove('show');
-  document.getElementById('recoveryMsg').classList.remove('show');
+  document.getElementById('crashMsg').classList.remove('show');document.getElementById('recoveryMsg').classList.remove('show');
 
-  // Reset both sides if not in betting state
-  if(crashBet.st!=='betting'){crashBet={st:'idle',amt:0,target:0,req:''};setBtnCrash('crash-idle','راهن')}
-  if(riseBet.st!=='betting'){riseBet={st:'idle',amt:0,target:0,req:''};setBtnRise('rise-idle','راهن')}
+  // ── Queued bets: auto-place in new round ──
+  if(crashBet.st==='queued'){
+    var cAmt=parseFloat(document.getElementById('betCrash').value)||0;
+    var cTgt=parseFloat(document.getElementById('targetCrash').value)||0;
+    if(cAmt>=1&&cTgt>=1){placeCrashBet(cAmt,cTgt);}
+    else{crashBet={st:'idle',amt:0,target:0,req:''};setBtnCrash('crash-idle','راهن');}
+  } else if(crashBet.st!=='betting'){
+    crashBet={st:'idle',amt:0,target:0,req:''};setBtnCrash('crash-idle','راهن');
+  } else {
+    setBtnCrash('crash-betting','إلغاء');
+  }
+
+  if(riseBet.st==='queued'){
+    var rAmt=parseFloat(document.getElementById('betRise').value)||0;
+    var rTgt=parseFloat(document.getElementById('targetRise').value)||0;
+    if(rAmt>=1&&rTgt>=1){placeRiseBet(rAmt,rTgt);}
+    else{riseBet={st:'idle',amt:0,target:0,req:''};setBtnRise('rise-idle','راهن');}
+  } else if(riseBet.st!=='betting'){
+    riseBet={st:'idle',amt:0,target:0,req:''};setBtnRise('rise-idle','راهن');
+  } else {
+    setBtnRise('rise-betting','إلغاء');
+  }
 
   // Countdown
   var c=6;if(countdownEl)countdownEl.remove();
@@ -283,21 +349,14 @@ function onFlying(d){
   document.getElementById('multDisplay').classList.remove('show');
   document.getElementById('crashMult').style.opacity='1';
   document.getElementById('crashMultVal').className='crash-mult-val flying';
-  document.getElementById('statusText').textContent='';
-  document.getElementById('crashMsg').classList.remove('show');
+  document.getElementById('statusText').textContent='';document.getElementById('crashMsg').classList.remove('show');
 
-  // Crash side: if betted, set waiting or exit state
-  if(crashBet.st==='betting'){
-    crashBet.st='waiting';setBtnCrash('crash-waiting','⏳ انتظار');
-  } else if(crashBet.st==='idle'){
-    setBtnCrash('crash-idle','راهن');
-  }
-  // Rise side: if betted, lock
-  if(riseBet.st==='betting'){
-    riseBet.st='locked';setBtnRise('rise-locked','🔒 محبوس');
-  } else if(riseBet.st==='idle'){
-    setBtnRise('rise-idle','راهن');
-  }
+  // Crash side: betting→waiting, idle stays idle (can queue)
+  if(crashBet.st==='betting'){crashBet.st='waiting';setBtnCrash('crash-waiting','⏳ انتظار');}
+  else if(crashBet.st==='idle'){setBtnCrash('crash-idle','راهن');}
+  // Rise side: betting→locked, idle stays idle (can queue)
+  if(riseBet.st==='betting'){riseBet.st='locked';setBtnRise('rise-locked','🔒 محبوس');}
+  else if(riseBet.st==='idle'){setBtnRise('rise-idle','راهن');}
 
   haptic('light');if(animF)cancelAnimationFrame(animF);animate();
 }
@@ -311,9 +370,7 @@ function animate(){
   document.getElementById('mult').className='mult-val flying';
 
   // Check if crash bet can exit (mult passed target)
-  if(crashBet.st==='waiting'&&m>crashBet.target){
-    crashBet.st='exit';setBtnCrash('crash-exit','خروج!');
-  }
+  if(crashBet.st==='waiting'&&m>crashBet.target){crashBet.st='exit';setBtnCrash('crash-exit','خروج!');}
 
   var cx=canvas.width*PX,cy=canvas.height*PY,td=3.5;
   if(el<td){var p=el/td,e=p*p*(3-2*p);rocketX=40+e*(cx-40);rocketY=canvas.height-30-e*(canvas.height-30-cy);trail.push({x:rocketX,y:rocketY});if(trail.length>120)trail.shift();bgScroll=e*20}
@@ -333,74 +390,47 @@ function onCrashed(d){
   var cm=d.crash_point||d.multiplier||crashPoint||1.0;currentMult=cm;
   document.getElementById('crashMult').style.opacity='0';
   document.getElementById('multDisplay').classList.add('show');
-  document.getElementById('mult').textContent=cm.toFixed(2)+'x';
-  document.getElementById('mult').className='mult-val crashed';
+  document.getElementById('mult').textContent=cm.toFixed(2)+'x';document.getElementById('mult').className='mult-val crashed';
   document.getElementById('crashMultVal').className='crash-mult-val crashed';
   var msg=document.getElementById('crashMsg');msg.textContent='💥 '+cm.toFixed(2)+'x';msg.style.color='#ff4757';msg.classList.add('show');
   createExplosion();soundCrash();haptic('heavy');
 
-  // Settle crash side
+  // ── Settle crash side ──
   if(crashBet.st==='waiting'||crashBet.st==='exit'){
     if(cm<=crashBet.target){
-      // WON: bet × target
       var payout=crashBet.amt*crashBet.target;
       crashBet.st='done';sessionW++;sessionPL+=payout-crashBet.amt;
       setBtnCrash('crash-done','✓ '+payout.toFixed(0));
-      var be=document.getElementById('recoveryMsg');
-      be.innerHTML='💥 <b>ربحت!</b> '+crashBet.target.toFixed(1)+'x<br><span style="color:#fbbf24;font-weight:900;font-size:16px">+'+payout.toFixed(0)+'</span>';
-      be.style.color='#fbbf24';be.classList.add('show');
-      setTimeout(function(){be.classList.remove('show')},4000);
-      spawnParachuteWithMoney(rocketX,rocketY,payout);
-      fireConfetti(document.getElementById('gameArea'));
-      soundCashOut();
-    } else if(cm>crashBet.target){
-      // DRAINED — get remaining or lost all
+      showRecovery('💥 ربحت! '+crashBet.target.toFixed(1)+'x','+'+payout.toFixed(0),'#fbbf24');
+      spawnParachuteWithMoney(rocketX,rocketY,payout);fireConfetti(document.getElementById('gameArea'));soundCashOut();
+    } else {
       var drain=(cm-crashBet.target)/crashBet.target*0.5;
       var remaining=Math.max(0,crashBet.amt*(1-drain));
-      if(remaining>0){
-        crashBet.st='done';sessionW++;
-        sessionPL+=remaining-crashBet.amt;
-        setBtnCrash('crash-done','✓ '+remaining.toFixed(0));
-        var be=document.getElementById('recoveryMsg');
-        be.innerHTML='⚠️ <b>تم تصريف جزء من رهانك</b><br><span style="color:#fbbf24;font-weight:900;font-size:14px">استرجعت '+remaining.toFixed(0)+'</span>';
-        be.style.color='#fbbf24';be.classList.add('show');
-        setTimeout(function(){be.classList.remove('show')},4000);
-      } else {
-        crashBet.st='lost';sessionL++;sessionPL-=crashBet.amt;
-        setBtnCrash('crash-done','💥 خسارة');
-        var be=document.getElementById('recoveryMsg');
-        be.innerHTML='🔥 <b>احترق رهانك بالكامل!</b>';
-        be.style.color='#ff4757';be.classList.add('show');
-        setTimeout(function(){be.classList.remove('show')},4000);
-      }
+      if(remaining>0){crashBet.st='done';sessionW++;sessionPL+=remaining-crashBet.amt;setBtnCrash('crash-done','✓ '+remaining.toFixed(0));showRecovery('⚠️ تم تصريف جزء من رهانك','استرجعت '+remaining.toFixed(0),'#fbbf24');}
+      else{crashBet.st='lost';sessionL++;sessionPL-=crashBet.amt;setBtnCrash('crash-done','💥 خسارة');showRecovery('🔥 احترق رهانك بالكامل!','','#ff4757');}
     }
   }
-  crashBet={st:'idle',amt:0,target:0,req:''};
+  if(crashBet.st!=='queued'){crashBet={st:'idle',amt:0,target:0,req:''};}
 
-  // Settle rise side
+  // ── Settle rise side ──
   if(riseBet.st==='locked'){
-    if(cm<riseBet.target){
-      // LOST all
-      riseBet.st='lost';sessionL++;sessionPL-=riseBet.amt;
-      setBtnRise('rise-done','💥 خسارة');
-    } else {
-      // SURVIVED — get remaining after drain
-      var drain=(cm-riseBet.target)/riseBet.target*0.5;
-      var won=riseBet.amt*riseBet.target;
-      var remaining=Math.max(0,won*(1-drain));
-      if(remaining>0){
-        riseBet.st='done';sessionW++;sessionPL+=remaining-riseBet.amt;
-        setBtnRise('rise-done','✓ '+remaining.toFixed(0));
-        spawnParachuteWithMoney(rocketX,rocketY,remaining);
-        if(cm>=3)showBigWin(remaining,cm);
-      } else {
-        riseBet.st='lost';sessionL++;sessionPL-=riseBet.amt;
-        setBtnRise('rise-done','💥 خسارة');
-      }
+    if(cm<riseBet.target){riseBet.st='lost';sessionL++;sessionPL-=riseBet.amt;setBtnRise('rise-done','💥 خسارة');}
+    else{
+      var drain2=(cm-riseBet.target)/riseBet.target*0.5;
+      var won=riseBet.amt*riseBet.target;var rem2=Math.max(0,won*(1-drain2));
+      if(rem2>0){riseBet.st='done';sessionW++;sessionPL+=rem2-riseBet.amt;setBtnRise('rise-done','✓ '+rem2.toFixed(0));spawnParachuteWithMoney(rocketX,rocketY,rem2);if(cm>=3)showBigWin(rem2,cm);}
+      else{riseBet.st='lost';sessionL++;sessionPL-=riseBet.amt;setBtnRise('rise-done','💥 خسارة');}
     }
   }
-  riseBet={st:'idle',amt:0,target:0,req:''};
+  if(riseBet.st!=='queued'){riseBet={st:'idle',amt:0,target:0,req:''};}
   updateSessionStats();loadBalance();
+}
+
+function showRecovery(title,amount,color){
+  var be=document.getElementById('recoveryMsg');
+  be.innerHTML='<b>'+title+'</b>'+(amount?'<br><span style="color:'+color+';font-weight:900;font-size:16px">'+amount+'</span>':'');
+  be.style.color=color;be.classList.add('show');
+  setTimeout(function(){be.classList.remove('show')},4000);
 }
 
 // ── Crash side button ──
@@ -416,17 +446,28 @@ function onBtnCrash(){
   }
   // betting + waiting → cancel
   if(st==='betting'&&roundPhase==='waiting'){
-    crashBet={st:'idle',amt:0,target:0,req:''};
-    setBtnCrash('crash-idle','راهن');
-    showToast('تم إلغاء الرهان','info');return;
+    crashBet={st:'idle',amt:0,target:0,req:''};setBtnCrash('crash-idle','راهن');showToast('تم إلغاء الرهان','info');return;
   }
   // exit + flying → exit now!
   if(st==='exit'&&roundPhase==='flying'){doExit();return;}
+  // ── idle + flying/crashed → QUEUE for next round ──
+  if(st==='idle'&&(roundPhase==='flying'||roundPhase==='crashed')){
+    var amt2=parseFloat(document.getElementById('betCrash').value)||0;
+    var tgt2=parseFloat(document.getElementById('targetCrash').value)||0;
+    if(amt2<1){showToast('أدخل مبلغ','error');return}
+    if(tgt2<1.0||tgt2>50){showToast('قيمة X بين 1 و 50','error');return}
+    crashBet.st='queued';crashBet.amt=amt2;crashBet.target=tgt2;
+    setBtnCrash('crash-queued','⏳ القادمة');
+    showToast('✅ سيُراهن في الجولة القادمة','success');return;
+  }
+  // queued → cancel queue
+  if(st==='queued'){
+    crashBet={st:'idle',amt:0,target:0,req:''};setBtnCrash('crash-idle','راهن');showToast('تم إلغاء الطابور','info');return;
+  }
 }
 
 function placeCrashBet(amt,tgt){
-  var btn=document.getElementById('btnCrash');
-  btn.disabled=true;btn.textContent='⏳';
+  var btn=document.getElementById('btnCrash');btn.disabled=true;btn.textContent='⏳';
   checkBalanceBeforeBet(amt).then(function(ok){
     if(!ok){btn.disabled=false;btn.textContent='راهن';return}
     crashBet.req='cb_'+Date.now()+'_'+Math.random().toString(36).substr(2,6);
@@ -435,8 +476,7 @@ function placeCrashBet(amt,tgt){
       if(d.success){
         crashBet.st='betting';crashBet.amt=amt;crashBet.target=tgt;
         document.getElementById('bal').textContent=d.balance_after.toLocaleString();
-        setBtnCrash('crash-betting','إلغاء');
-        soundTick();haptic('light');
+        setBtnCrash('crash-betting','إلغاء');soundTick();haptic('light');
       }else{
         btn.disabled=false;btn.textContent='راهن';
         if(d.need_deposit)showVexDepositModal(amt);else showToast(d.error||'خطأ','error');
@@ -447,24 +487,19 @@ function placeCrashBet(amt,tgt){
 
 function doExit(){
   if(crashBet.st!=='exit')return;
-  crashBet.st='done';
-  setBtnCrash('crash-done','⏳');
+  crashBet.st='done';setBtnCrash('crash-done','⏳');
   var req='ce_'+Date.now()+'_'+Math.random().toString(36).substr(2,6);
   apiFetchCritical(BASE+'/api/crash/exit',{method:'POST',body:JSON.stringify({request_id:req})})
   .then(function(r){return r.json()}).then(function(d){
     if(d.success){
-      var pay=d.payout;
-      setBtnCrash('crash-done','✓ '+pay.toFixed(0));
+      var pay=d.payout;setBtnCrash('crash-done','✓ '+pay.toFixed(0));
       document.getElementById('bal').textContent=d.balance_after.toLocaleString();
       sessionW++;sessionPL+=pay-crashBet.amt;updateSessionStats();
       var msg=document.getElementById('crashMsg');
       msg.textContent='✅ +'+pay.toFixed(2)+' @ '+d.multiplier.toFixed(2)+'x';
       msg.style.color='var(--gold)';msg.classList.add('show');
-      soundCashOut();haptic('medium');fireConfetti(document.getElementById('gameArea'));
-      spawnParachuteWithMoney(rocketX,rocketY,pay);
-    } else {
-      setBtnCrash('crash-done','💥');
-    }
+      soundCashOut();haptic('medium');fireConfetti(document.getElementById('gameArea'));spawnParachuteWithMoney(rocketX,rocketY,pay);
+    } else {setBtnCrash('crash-done','💥');}
   }).catch(function(){setBtnCrash('crash-done','💥')});
 }
 
@@ -479,17 +514,23 @@ function onBtnRise(){
     placeRiseBet(amt,tgt);return;
   }
   if(st==='betting'&&roundPhase==='waiting'){
-    riseBet={st:'idle',amt:0,target:0,req:''};
-    setBtnRise('rise-idle','راهن');
-    showToast('تم إلغاء الرهان','info');return;
+    riseBet={st:'idle',amt:0,target:0,req:''};setBtnRise('rise-idle','راهن');showToast('تم إلغاء الرهان','info');return;
   }
-  // Rise side CANNOT exit during flight
+  // ── idle + flying/crashed → QUEUE for next round ──
+  if(st==='idle'&&(roundPhase==='flying'||roundPhase==='crashed')){
+    var amt2=parseFloat(document.getElementById('betRise').value)||0;
+    var tgt2=parseFloat(document.getElementById('targetRise').value)||0;
+    if(amt2<1){showToast('أدخل مبلغ','error');return}
+    if(tgt2<1.0||tgt2>50){showToast('قيمة X بين 1 و 50','error');return}
+    riseBet.st='queued';riseBet.amt=amt2;riseBet.target=tgt2;
+    setBtnRise('rise-queued','⏳ القادمة');showToast('✅ سيُراهن في الجولة القادمة','success');return;
+  }
+  if(st==='queued'){riseBet={st:'idle',amt:0,target:0,req:''};setBtnRise('rise-idle','راهن');showToast('تم إلغاء الطابور','info');return;}
   if(st==='locked'){showToast('لا يمكن الخروج — محبوس حتى نهاية الجولة','info');return;}
 }
 
 function placeRiseBet(amt,tgt){
-  var btn=document.getElementById('btnRise');
-  btn.disabled=true;btn.textContent='⏳';
+  var btn=document.getElementById('btnRise');btn.disabled=true;btn.textContent='⏳';
   checkBalanceBeforeBet(amt).then(function(ok){
     if(!ok){btn.disabled=false;btn.textContent='راهن';return}
     riseBet.req='rb_'+Date.now()+'_'+Math.random().toString(36).substr(2,6);
@@ -498,8 +539,7 @@ function placeRiseBet(amt,tgt){
       if(d.success){
         riseBet.st='betting';riseBet.amt=amt;riseBet.target=tgt;
         document.getElementById('bal').textContent=d.balance_after.toLocaleString();
-        setBtnRise('rise-betting','إلغاء');
-        soundTick();haptic('light');
+        setBtnRise('rise-betting','إلغاء');soundTick();haptic('light');
       }else{
         btn.disabled=false;btn.textContent='راهن';
         if(d.need_deposit)showVexDepositModal(amt);else showToast(d.error||'خطأ','error');
@@ -508,7 +548,7 @@ function placeRiseBet(amt,tgt){
   });
 }
 
-// ── Parachute (same as Aviator) ──
+// ── Parachute ──
 function spawnParachuteWithMoney(px,py,amount){
   var layer=document.getElementById('parachutesLayer');
   var el=document.createElement('div');
@@ -522,7 +562,6 @@ function spawnParachuteWithMoney(px,py,amount){
   requestAnimationFrame(fall);
 }
 
-// ── Helpers ──
 function updateSessionStats(){document.getElementById('sWin').textContent=sessionW;document.getElementById('sLoss').textContent=sessionL;document.getElementById('sPL').textContent=sessionPL>=0?'+'+sessionPL.toFixed(0):sessionPL.toFixed(0)}
 function createExplosion(){var a=document.getElementById('gameArea');for(var i=0;i<20;i++){var p=document.createElement('div');p.style.cssText='position:absolute;width:4px;height:4px;border-radius:50%;pointer-events:none;z-index:20;left:'+rocketX+'px;top:'+rocketY+'px;background:'+['#ff4757','#fbbf24','#ff8c42'][i%3];a.appendChild(p);var ang=(i/20)*6.28,dist=60+Math.random()*100;p.animate([{transform:'translate(0,0) scale(1)',opacity:1},{transform:'translate('+Math.cos(ang)*dist+'px,'+Math.sin(ang)*dist+'px) scale(0)',opacity:0}],{duration:800,easing:'ease-out'});setTimeout(function(){p.remove()},800)}}
 function showBigWin(p,m){var o=document.getElementById('bigWin');document.getElementById('bigWinText').textContent='🎉 +'+p.toFixed(0)+' @ '+m.toFixed(2)+'x';o.classList.add('show');soundWin(true);setTimeout(function(){o.classList.remove('show')},2500)}
