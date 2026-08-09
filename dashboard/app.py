@@ -4585,6 +4585,16 @@ def webapp_crash():
 # Crash game logic now lives in dashboard/crash_engine.py
 # Legacy /api/engine/crash/* endpoints removed — replaced by global round system.
 
+# ===== Dice — WebApp + API =====
+
+@app.route('/webapp/dice')
+def webapp_dice():
+    uid = request.args.get('uid', '')
+    lang = request.args.get('lang', 'ar')
+    return render_template('dice.html', uid=uid, lang=lang)
+
+# Dice game logic lives in dashboard/dice_engine.py
+
 # ===== Mines — WebApp + API =====
 
 @app.route('/webapp/mines')
@@ -6949,6 +6959,20 @@ try:
     )
 except Exception as _cr_init_err:
     print('WARNING: crash_engine init failed:', _cr_init_err)
+
+# ===== Dice engine — separated into dashboard/dice_engine.py =====
+try:
+    from dice_engine import init_dice_engine
+    init_dice_engine(
+        app,
+        get_uid=get_request_uid,
+        get_gm=lambda: _gm,
+        get_pf=lambda: _pf,
+        is_pf=lambda: _PROVABLY_FAIR,
+        is_vex=lambda: _VEX_GAMES,
+    )
+except Exception as _dice_init_err:
+    print('WARNING: dice_engine init failed:', _dice_init_err)
 
 # ===== Provably Fair System =====
 
