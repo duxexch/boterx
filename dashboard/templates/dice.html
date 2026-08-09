@@ -472,13 +472,23 @@ function animateRoll(resultNum,power,callback){
       }
     }
     
-    // ── Settling phase — slow down spin dramatically ──
+    // ── Settling phase — slow down spin + align to result ──
     if(phase==='settling'){
-      spinX*=0.82;spinY*=0.82;spinZ*=0.82;
+      // Gradually snap rotation to show result face on TOP
+      var targetAngles=_getResultAngles(resultNum);
+      // Lerp toward target angles (smooth deceleration)
+      rotX=_lerpAngle(rotX,targetAngles[0],0.12);
+      rotY=_lerpAngle(rotY,targetAngles[1],0.12);
+      rotZ=_lerpAngle(rotZ,targetAngles[2],0.12);
+      spinX*=0.5;spinY*=0.5;spinZ*=0.5;
       vx*=0.85;
-      rotX+=spinX;rotY+=spinY;rotZ+=spinZ;
       settleFrames++;
-      if(Math.abs(spinX)<0.008&&Math.abs(spinY)<0.008&&Math.abs(spinZ)<0.008){
+      // Check if aligned close enough
+      var dx=Math.abs(_angleDiff(rotX,targetAngles[0]));
+      var dy=Math.abs(_angleDiff(rotY,targetAngles[1]));
+      var dz=Math.abs(_angleDiff(rotZ,targetAngles[2]));
+      if(dx<0.02&&dy<0.02&&dz<0.02&&settleFrames>15){
+        rotX=targetAngles[0];rotY=targetAngles[1];rotZ=targetAngles[2];
         phase='done';
       }
     }
@@ -504,6 +514,37 @@ function animateRoll(resultNum,power,callback){
     animF=requestAnimationFrame(frame);
   }
   frame();
+}
+
+function spawnBounceParticles(x,y){
+
+// ── Result alignment: rotate dice so the result face is on TOP ──
+// Face layout: 1=+Z(front), 2=+X(right), 3=+Y(top), 4=-Y(bottom), 5=-X(left), 6=-Z(back)
+// To bring each face to top (+Y), we need specific rotations:
+function _getResultAngles(faceNum){
+  var H=Math.PI/2; // 90 degrees
+  switch(faceNum){
+    case 1: return [-H, 0, 0];      // front→top: tilt forward
+    case 2: return [0, -H, 0];      // right→top: tilt right
+    case 3: return [0, 0, 0];       // already top
+    case 4: return [Math.PI, 0, 0]; // bottom→top: flip
+    case 5: return [0, H, 0];       // left→top: tilt left
+    case 6: return [H, 0, 0];       // back→top: tilt backward
+  }
+  return [0,0,0];
+}
+
+function _lerpAngle(current,target,speed){
+  var diff=_angleDiff(current,target);
+  return current+diff*speed;
+}
+
+function _angleDiff(a,b){
+  // Shortest angular distance
+  var d=(b-a)%(2*Math.PI);
+  if(d>Math.PI)d-=2*Math.PI;
+  if(d<-Math.PI)d+=2*Math.PI;
+  return d;
 }
 
 function spawnBounceParticles(x,y){
