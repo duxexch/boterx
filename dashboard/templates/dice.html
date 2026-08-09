@@ -211,114 +211,155 @@ powerBar.addEventListener('mousedown',handlePowerStart);
 document.addEventListener('mousemove',handlePowerMove);
 document.addEventListener('mouseup',handlePowerEnd);
 
-// ── Dice 3D rendering: isometric cube with 3 visible faces ──
+// ── True 3D Dice Cube — 8 vertices, 6 fixed faces ──
+// Standard dice: opposite faces sum to 7
+//   1↔6, 2↔5, 3↔4
+// Face layout on unfolded cube:
+//        [1]
+//   [2][3][4][5]   (3=top,4=front)
+//        [6]
+
 var DOT_PATTERNS={
   1:[[0.5,0.5]],
-  2:[[0.25,0.25],[0.75,0.75]],
+  2:[[0.28,0.28],[0.72,0.72]],
   3:[[0.25,0.25],[0.5,0.5],[0.75,0.75]],
   4:[[0.25,0.25],[0.75,0.25],[0.25,0.75],[0.75,0.75]],
   5:[[0.25,0.25],[0.75,0.25],[0.5,0.5],[0.25,0.75],[0.75,0.75]],
   6:[[0.25,0.2],[0.75,0.2],[0.25,0.5],[0.75,0.5],[0.25,0.8],[0.75,0.8]]
 };
 
-// 3D cube vertices and faces — isometric projection
-// Faces: 0=top, 1=front, 2=right (the 3 visible faces in iso view)
-// Each face has: normal direction, vertices, dot pattern face number
-var _cubeSize=60;
-var _isoAngle=0.5; // isometric tilt
+// Cube vertices in local space (before rotation)
+// v0=(-1,-1,-1) v1=(1,-1,-1) v2=(1,1,-1) v3=(-1,1,-1)
+// v4=(-1,-1,1) v5=(1,-1,1) v6=(1,1,1) v7=(-1,1,1)
+// Faces: [vertices, faceNumber, normal_vector]
+// Face numbering: 1=front(+Z), 2=right(+X), 3=top(+Y), 4=bottom(-Y), 5=left(-X), 6=back(-Z)
+var CUBE_FACES=[
+  {v:[4,5,6,7], n:0, num:1},  // +Z front = face 1
+  {v:[1,5,6,2], n:1, num:2},  // +X right = face 2
+  {v:[3,2,6,7], n:2, num:3},  // +Y top = face 3
+  {v:[0,4,7,3], n:3, num:4},  // -Y bottom = face 4 (opposite of top=3, 3+4=7 ✓)
+  {v:[0,3,7,4], n:4, num:5},  // -X left = face 5 (opposite of right=2, 2+5=7 ✓)
+  {v:[0,1,2,3], n:5, num:6},  // -Z back = face 6 (opposite of front=1, 1+6=7 ✓)
+];
 
-function drawDice3D(cx,cy,size,rotX,rotY,rotZ,faceNum){
-  ctx.save();
-  ctx.translate(cx,cy);
+// 3D rotation matrix application
+function _rotate3D(x,y,z,rx,ry,rz){
+  // Rotate around Z
+  var cz=Math.cos(rz),sz=Math.sin(rz);
+  var x1=x*cz-y*sz, y1=x*sz+y*cz, z1=z;
+  // Rotate around X
+  var cx=Math.cos(rx),sx=Math.sin(rx);
+  var x2=x1, y2=y1*cx-z1*sx, z2=y1*sx+z1*cx;
+  // Rotate around Y
+  var cy=Math.cos(ry),sy=Math.sin(ry);
+  var x3=x2*cy+z2*sy, y3=y2, z3=-x2*sy+z2*cy;
+  return [x3,y3,z3];
+}
+
+// Project 3D point to 2D screen with perspective
+function _project(pt3d,cx,cy,scale,perspective){
+  var z=pt3d[2];
+  var f=perspective/(perspective+z);
+  return [cx+pt3d[0]*scale*f, cy+pt3d[1]*scale*f, z];
+}
+
+function drawDice3D(cx,cy,size,rotX,rotY,rotZ){
   var s=size/2;
-  // Apply rotations in order Z, X, Y
-  ctx.rotate(rotZ);
-  // Simulate X/Y rotation by scaling + skewing
-  var cosX=Math.cos(rotX),sinX=Math.sin(rotX);
-  var cosY=Math.cos(rotY),sinY=Math.sin(rotY);
-  // Scale to simulate tilt
-  ctx.scale(cosY,cosX);
+  var perspective=800;
+  var scale=s;
   
-  // Draw 3 visible faces as parallelograms
-  // Top face (lighter)
-  var topGrad=ctx.createLinearGradient(-s,-s,s,s);
-  topGrad.addColorStop(0,'#ffffff');topGrad.addColorStop(1,'#e2e8f0');
-  drawCubeFace(topGrad,-s,-s,s,s,0.3);
+  // Compute all 8 vertices after rotation
+  var verts=[];
+  var baseVerts=[
+    [-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],
+    [-1,-1, 1],[1,-1, 1],[1,1, 1],[-1,1, 1]
+  ];
+  for(var i=0;i<8;i++){
+    var bv=baseVerts[i];
+    var rv=_rotate3D(bv[0]*s,bv[1]*s,bv[2]*s,rotX,rotY,rotZ);
+    var pv=_project(rv,cx,cy,1,perspective);
+    verts.push(pv);
+  }
   
-  // Front face (medium)
-  var frontGrad=ctx.createLinearGradient(-s,0,s,s);
-  frontGrad.addColorStop(0,'#e2e8f0');frontGrad.addColorStop(1,'#94a3b8');
-  drawCubeFace(frontGrad,-s,0,s,s,0);
+  // Compute face visibility (back-face culling) + sort by depth
+  var visibleFaces=[];
+  for(var f=0;f<CUBE_FACES.length;f++){
+    var face=CUBE_FACES[f];
+    var v0=verts[face.v[0]],v1=verts[face.v[1]],v2=verts[face.v[2]];
+    // Normal (cross product of edges in screen space)
+    var ax=v1[0]-v0[0],ay=v1[1]-v0[1];
+    var bx=v2[0]-v0[0],by=v2[1]-v0[1];
+    var cross=ax*by-ay*bx;
+    if(cross>0) continue; // back-facing, skip
+    // Average depth
+    var avgZ=(verts[face.v[0]][2]+verts[face.v[1]][2]+verts[face.v[2]][2]+verts[face.v[3]][2])/4;
+    visibleFaces.push({face:face,avgZ:avgZ});
+  }
+  // Sort back-to-front (painter's algorithm)
+  visibleFaces.sort(function(a,b){return b.avgZ-a.avgZ});
   
-  // Right face (darker)
-  var rightGrad=ctx.createLinearGradient(0,-s,s,s);
-  rightGrad.addColorStop(0,'#cbd5e1');rightGrad.addColorStop(1,'#64748b');
-  drawCubeFace(rightGrad,0,-s,s,s,0.15);
-  
-  // Draw dots on the front face
-  drawDotsOnFace(0,0,s,faceNum);
-  
-  // Outline
-  ctx.strokeStyle='#475569';ctx.lineWidth=2;
-  ctx.strokeRect(-s,-s,s,s);
-  
-  ctx.restore();
+  // Draw each visible face
+  for(var i=0;i<visibleFaces.length;i++){
+    var face=visibleFaces[i].face;
+    var v0=verts[face.v[0]],v1=verts[face.v[1]],v2=verts[face.v[2]],v3=verts[face.v[3]];
+    
+    // Face color based on depth (darker = farther)
+    var depth=1-(-visibleFaces[i].avgZ)/(s*2);
+    depth=Math.max(0.3,Math.min(1,depth));
+    
+    // Face fill
+    ctx.beginPath();
+    ctx.moveTo(v0[0],v0[1]);
+    ctx.lineTo(v1[0],v1[1]);
+    ctx.lineTo(v2[0],v2[1]);
+    ctx.lineTo(v3[0],v3[1]);
+    ctx.closePath();
+    // Gradient: lighter near light source (top-left)
+    var grad=ctx.createLinearGradient(v0[0],v0[1],v2[0],v2[1]);
+    var baseR=Math.round(248*depth),baseG=Math.round(250*depth),baseB=Math.round(252*depth);
+    grad.addColorStop(0,'rgb('+baseR+','+baseG+','+baseB+')');
+    grad.addColorStop(0.5,'rgb('+Math.round(226*depth)+','+Math.round(232*depth)+','+Math.round(240*depth)+')');
+    grad.addColorStop(1,'rgb('+Math.round(148*depth)+','+Math.round(163*depth)+','+Math.round(184*depth)+')');
+    ctx.fillStyle=grad;
+    ctx.fill();
+    
+    // Face border
+    ctx.strokeStyle='rgba(71,85,105,0.6)';ctx.lineWidth=1.5;
+    ctx.stroke();
+    
+    // Draw dots on this face
+    _drawDots3D(face.num,verts,face.v,size,depth);
+  }
 }
 
-function drawCubeFace(grad,x,y,w,h,skew){
-  ctx.save();
-  ctx.fillStyle=grad;
-  ctx.beginPath();
-  ctx.moveTo(x,y);
-  ctx.lineTo(x+w,y+skew*w*0.3);
-  ctx.lineTo(x+w,y+h+skew*w*0.3);
-  ctx.lineTo(x,y+h);
-  ctx.closePath();
-  ctx.fill();
-  ctx.strokeStyle='rgba(71,85,105,0.3)';ctx.lineWidth=1;
-  ctx.stroke();
-  ctx.restore();
-}
-
-function drawDotsOnFace(cx,cy,size,faceNum){
+function _drawDots3D(faceNum,verts,faceIdx,size,depth){
+  // Draw dots as small circles at their projected positions on the face
   var dots=DOT_PATTERNS[faceNum]||DOT_PATTERNS[1];
-  var dotR=size*0.09;
-  var s=size/2;
+  var v0=verts[faceIdx[0]],v1=verts[faceIdx[1]],v2=verts[faceIdx[2]],v3=verts[faceIdx[3]];
+  var dotR=size*0.08;
+  var dotColor=(faceNum===1)?'#ef4444':'#1e293b';
+  
   dots.forEach(function(d){
-    var dx=cx-s+d[0]*size,dy=cy-s+d[1]*size;
-    ctx.beginPath();ctx.arc(dx,dy,dotR,0,6.28);
-    var dotColor=(faceNum===1)?'#ef4444':'#1e293b';
+    // Interpolate position on face using bilinear coords
+    var u=d[0],v=d[1];
+    // Top edge: v0→v1, bottom edge: v3→v2
+    var tx=v0[0]+(v1[0]-v0[0])*u, ty=v0[1]+(v1[1]-v0[1])*u;
+    var bx=v3[0]+(v2[0]-v3[0])*u, by=v3[1]+(v2[1]-v3[1])*u;
+    var px=tx+(bx-tx)*v, py=ty+(by-ty)*v;
+    
+    // Dot shadow (recessed look)
+    ctx.beginPath();
+    ctx.arc(px+1,py+1,dotR*0.7,0,6.28);
+    ctx.fillStyle='rgba(0,0,0,0.15)';ctx.fill();
+    // Dot
+    ctx.beginPath();
+    ctx.arc(px,py,dotR,0,6.28);
     ctx.fillStyle=dotColor;ctx.fill();
     // Dot highlight
-    ctx.beginPath();ctx.arc(dx-dotR*0.3,dy-dotR*0.3,dotR*0.3,0,6.28);
-    ctx.fillStyle='rgba(255,255,255,0.3)';ctx.fill();
+    ctx.beginPath();
+    ctx.arc(px-dotR*0.3,py-dotR*0.3,dotR*0.35,0,6.28);
+    ctx.fillStyle='rgba(255,255,255,0.35)';ctx.fill();
   });
-}
-
-// Simpler 2D dice face for idle (not rolling)
-function drawDiceFace(cx,cy,size,faceNum,rot){
-  ctx.save();
-  ctx.translate(cx,cy);
-  ctx.rotate(rot);
-  var s=size/2;
-  // Shadow
-  ctx.fillStyle='rgba(0,0,0,0.35)';
-  ctx.beginPath();ctx.roundRect(-s+4,-s+4,size,size,10);ctx.fill();
-  // Body with gradient
-  var grad=ctx.createLinearGradient(-s,-s,s,s);
-  grad.addColorStop(0,'#ffffff');grad.addColorStop(0.4,'#f1f5f9');grad.addColorStop(0.7,'#e2e8f0');grad.addColorStop(1,'#cbd5e1');
-  ctx.fillStyle=grad;
-  ctx.beginPath();ctx.roundRect(-s,-s,size,size,10);ctx.fill();
-  // Highlight
-  var hgrad=ctx.createLinearGradient(-s,-s,0,0);
-  hgrad.addColorStop(0,'rgba(255,255,255,0.5)');hgrad.addColorStop(1,'rgba(255,255,255,0)');
-  ctx.fillStyle=hgrad;ctx.beginPath();ctx.roundRect(-s+2,-s+2,size*0.4,size*0.4,8);ctx.fill();
-  // Border
-  ctx.strokeStyle='#64748b';ctx.lineWidth=2.5;
-  ctx.beginPath();ctx.roundRect(-s,-s,size,size,10);ctx.stroke();
-  // Dots
-  drawDotsOnFace(0,0,size,faceNum);
-  ctx.restore();
 }
 
 function drawArena(){
@@ -346,9 +387,10 @@ function drawArena(){
 
 function drawIdleDice(){
   var w=canvas.width,h=canvas.height;
-  diceX=w/2;diceY=h*0.65;
+  diceX=w/2;diceY=h*0.6;
   drawArena();
-  drawDiceFace(diceX,diceY,Math.min(w,h)*0.15,1,0);
+  // Idle: slight tilt to show 3D nature
+  drawDice3D(diceX,diceY,Math.min(w,h)*0.15,0.3,0.4,0);
 }
 
 // ── Roll animation — realistic 3D tumble with multiple bounces ──
@@ -379,9 +421,6 @@ function animateRoll(resultNum,power,callback){
   var vy=-(10+powerN*18); // upward
   var gravity=0.45;
   var bounces=0;
-  var maxBounces=4+Math.floor(powerN*3); // 4-7 bounces based on power
-  var currentFace=1;
-  var lastFaceChange=0;
   var settleFrames=0;
   var phase='flying'; // flying → bouncing → settling → done
 
@@ -431,25 +470,15 @@ function animateRoll(resultNum,power,callback){
         soundTick();haptic('light');
         spawnBounceParticles(diceX,diceY);
       }
-      
-      // Change visible face rapidly during spin
-      var now=performance.now();
-      var speed=Math.abs(vy)+Math.abs(vx)+Math.abs(spinX)+Math.abs(spinY)+Math.abs(spinZ);
-      var changeInterval=Math.max(40,120-speed*8);
-      if(now-lastFaceChange>changeInterval&&speed>0.5){
-        currentFace=1+Math.floor(Math.random()*6);lastFaceChange=now;
-      }
     }
     
-    // ── Settling phase — slow down spin ──
+    // ── Settling phase — slow down spin dramatically ──
     if(phase==='settling'){
-      spinX*=0.85;spinY*=0.85;spinZ*=0.85;
+      spinX*=0.82;spinY*=0.82;spinZ*=0.82;
       vx*=0.85;
       rotX+=spinX;rotY+=spinY;rotZ+=spinZ;
       settleFrames++;
-      // Gradually show result face
-      if(settleFrames>3&&Math.random()<0.3){currentFace=resultNum;}
-      if(Math.abs(spinX)<0.01&&Math.abs(spinY)<0.01&&Math.abs(spinZ)<0.01){
+      if(Math.abs(spinX)<0.008&&Math.abs(spinY)<0.008&&Math.abs(spinZ)<0.008){
         phase='done';
       }
     }
@@ -457,22 +486,20 @@ function animateRoll(resultNum,power,callback){
     // ── Draw ──
     ctx.clearRect(0,0,w,h);
     drawArena();
-    // Draw shadow under dice
+    // Shadow under dice
     var shadowAlpha=Math.max(0.1,0.4-(diceY<floorY-diceSize?0.2:0));
     var shadowSize=diceSize*(0.8+Math.max(0,(floorY-diceY-diceSize/2)/200));
     ctx.fillStyle='rgba(0,0,0,'+shadowAlpha+')';
     ctx.beginPath();ctx.ellipse(diceX,floorY+5,shadowSize/2,shadowSize/5,0,0,6.28);ctx.fill();
     
-    if(phase==='done'){
-      // Final result — draw with slight tilt for realism
-      drawDiceFace(diceX,diceY,diceSize,resultNum,rotZ%(Math.PI/6));
-    } else {
-      // During roll — draw with 3D rotation effect
-      drawDiceFace(diceX,diceY,diceSize,currentFace,rotZ);
-    }
+    // Draw true 3D cube with current rotation
+    drawDice3D(diceX,diceY,diceSize,rotX,rotY,rotZ);
     
     if(phase==='done'){
-      isRolling=false;animF=null;callback();return;
+      // Slow dramatic reveal — wait a beat then callback
+      isRolling=false;animF=null;
+      setTimeout(callback,400); // suspense pause
+      return;
     }
     animF=requestAnimationFrame(frame);
   }
