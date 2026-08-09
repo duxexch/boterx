@@ -640,7 +640,7 @@ class GameManager:
 
     def create_quick_deposit(self, user_id, amount, payment_method_id, account_number,
                              method_name='', method_account_data='', player_wallet='',
-                             save_method=False):
+                             save_method=False, purpose='', ticket_count=0):
         """إنشاء إيداع سريع — يكتب في quick_deposits.csv + transactions.csv كمعاملة حقيقية"""
         dep_id = f"DEP{str(int(datetime.now().timestamp()))[-8:]}"
         now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -648,12 +648,13 @@ class GameManager:
         # 1. كتابة في quick_deposits.csv
         fieldnames = ['id', 'user_id', 'amount', 'payment_method_id',
                       'account_number', 'status', 'approved_by', 'approved_at',
-                      'game_session_id', 'created_at']
+                      'game_session_id', 'created_at', 'purpose', 'ticket_count']
         row = {
             'id': dep_id, 'user_id': str(user_id), 'amount': str(amount),
             'payment_method_id': payment_method_id, 'account_number': account_number,
             'status': 'pending', 'approved_by': '', 'approved_at': '',
             'game_session_id': '', 'created_at': now_str,
+            'purpose': purpose, 'ticket_count': str(ticket_count),
         }
         try:
             with open(self.quick_deposits_file, 'a', newline='', encoding=CSV_ENCODING) as f:
@@ -794,11 +795,16 @@ class GameManager:
         except Exception as e:
             print(f"approve_deposit CSV error: {e}")
         if approved:
-            try:
-                new_bal = self.add_balance(approved['user_id'], float(approved['amount']))
-                print(f"approve_deposit: added {approved['amount']} to {approved['user_id']}, new balance: {new_bal}")
-            except Exception as e:
-                print(f"approve_deposit add_balance error: {e}")
+            # Only add to wallet if NOT a directed deposit (lottery tickets etc.)
+            purpose = approved.get('purpose', '')
+            if purpose != 'lottery_tickets':
+                try:
+                    new_bal = self.add_balance(approved['user_id'], float(approved['amount']))
+                    print(f"approve_deposit: added {approved['amount']} to {approved['user_id']}, new balance: {new_bal}")
+                except Exception as e:
+                    print(f"approve_deposit add_balance error: {e}")
+            else:
+                print(f"approve_deposit: directed deposit (lottery_tickets) — skipping wallet add, auto-buy will handle")
         return approved
 
     def approve_withdrawal(self, dep_id, admin_id):

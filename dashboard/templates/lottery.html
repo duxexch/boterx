@@ -219,30 +219,143 @@ function buyTickets() {
   var btn = document.getElementById('buyBtn');
   var totalCost = ticketPrice * ticketCount;
   btn.disabled = true; btn.textContent = '⏳...';
-  // Check balance first
-  checkBalanceBeforeBet(totalCost).then(function(ok) {
-    if (!ok) { btn.disabled = false; btn.textContent = '🎟️ شراء بالرصيد'; return; }
-    apiFetchCritical(BASE + '/api/lottery/buy', {
-      method: 'POST',
-      body: JSON.stringify({ count: ticketCount })
-    }).then(function(r) { return r.json(); }).then(function(d) {
-      btn.disabled = false; btn.textContent = '🎟️ شراء بالرصيد';
-      if (d.error) { showToast(d.error, 'error'); return; }
-      if (d.need_deposit) { showBuyDepositModal(); return; }
+  // Direct buy — API checks balance and returns need_deposit if insufficient
+  apiFetchCritical(BASE + '/api/lottery/buy', {
+    method: 'POST',
+    body: JSON.stringify({ count: ticketCount })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    btn.disabled = false; btn.textContent = '🎟️ شراء بالرصيد';
+    if (d.need_deposit) {
+      showToast('رصيد غير كافٍ — استخدم خيار الإيداع السريع', 'info');
+      return;
+    }
+    if (d.error) { showToast(d.error, 'error'); return; }
+    if (d.success) {
       showToast('تم شراء ' + ticketCount + ' تذكرة!', 'success');
       soundDraw(); hapticNotif('success');
+      if (d.balance_after !== undefined) {
+        document.getElementById('bal').textContent = d.balance_after.toLocaleString();
+      }
       loadState(); loadBalance();
-    }).catch(function() {
-      btn.disabled = false; btn.textContent = '🎟️ شراء بالرصيد';
-      showToast('خطأ في الشبكة', 'error');
-    });
+    }
+  }).catch(function(e) {
+    btn.disabled = false; btn.textContent = '🎟️ شراء بالرصيد';
+    showToast('خطأ في الشبكة', 'error');
   });
 }
 
 function showBuyDepositModal() {
   var totalCost = ticketPrice * ticketCount;
-  // Reuse showVexDepositModal with the required amount
-  showVexDepositModal(totalCost);
+  // Custom deposit modal for lottery ticket purchase
+  var overlay = document.createElement('div');
+  overlay.id = 'modal';
+  overlay.className = 'modal-overlay';
+  overlay.style.display = 'flex';
+  overlay.innerHTML = '<div class="modal-box" id="mb"></div>';
+  document.body.appendChild(overlay);
+  var mb = document.getElementById('mb');
+
+  // Fetch payment methods
+  apiFetch(BASE + '/api/games/payment-methods').then(function(r) { return r.json(); }).then(function(d) {
+    var methods = d.methods || [];
+    var saved = d.saved_methods || [];
+    var mHtml = methods.map(function(m) {
+      return '<div class="method-item" onclick="lotSel(\''+m.id+'\',\''+(m.method_name||'').replace(/'/g,"\\'")+'\',\''+(m.account_data||'').replace(/'/g,"\\'")+'\')">' +
+        '<span class="method-icon">'+(m.icon||'💳')+'</span>' +
+        '<div class="method-info"><div class="method-name">'+(m.method_name||'')+'</div><div class="method-type">'+(m.method_type||'')+'</div></div>' +
+        '<span class="method-arrow">‹</span></div>';
+    }).join('');
+
+    mb.innerHTML = '<div class="modal-title">🎟️ شراء تذاكر بإيداع</div>' +
+      '<div class="modal-subtitle">إجمالي: ' + totalCost.toLocaleString() + ' (سيتم شراء التذاكر عند موافقة الإدارة)</div>' +
+      '<div id="vm">' + mHtml + '</div>' +
+      '<div id="vs2" style="display:none">' +
+        '<div class="modal-subtitle" style="margin-top:8px">📋 بيانات الوسيلة:</div>' +
+        '<div class="copy-box" onclick="lotCopy()"><code class="copy-data" id="lotMD"></code><span class="copy-label" id="lotCL">📋 نسخ</span></div>' +
+        '<div class="modal-subtitle">🔐 رقم محفظتك:</div>' +
+        '<input class="modal-input" id="lotW" type="text" placeholder="رقم محفظتك">' +
+        '<button class="modal-btn-primary" onclick="lotSub('+totalCost+')">✅ تأكيد طلب الشراء</button>' +
+        '<button class="modal-btn-secondary" onclick="document.getElementById(\'vm\').style.display=\'block\';document.getElementById(\'vs2\').style.display=\'none\'">‹ رجوع</button>' +
+      '</div>' +
+      '<button class="modal-btn-secondary" onclick="document.getElementById(\'modal\').remove()">إغلاق</button>';
+  }).catch(function() {
+    mb.innerHTML = '<div class="modal-title">🎟️ شراء تذاكر</div>' +
+      '<div class="modal-subtitle">إجمالي: ' + totalCost.toLocaleString() + '</div>' +
+      '<div class="modal-subtitle">💵 المبلغ:</div>' +
+      '<input class="modal-input" id="lotAm" type="number" value="'+totalCost+'" readonly>' +
+      '<div class="modal-subtitle">🔐 رقم محفظتك:</div>' +
+      '<input class="modal-input" id="lotW" type="text" placeholder="رقم محفظتك">' +
+      '<div class="modal-subtitle">📋 اسم الوسيلة:</div>' +
+      '<input class="modal-input" id="lotMN" type="text" placeholder="اسم الوسيلة">' +
+      '<div class="modal-subtitle">📋 بيانات الحساب:</div>' +
+      '<input class="modal-input" id="lotMD2" type="text" placeholder="بيانات الحساب">' +
+      '<button class="modal-btn-primary" onclick="lotSubManual('+totalCost+')">✅ تأكيد طلب الشراء</button>' +
+      '<button class="modal-btn-secondary" onclick="document.getElementById(\'modal\').remove()">إغلاق</button>';
+  });
+}
+
+var _lotSelId='', _lotSelName='', _lotSelData='';
+function lotSel(id, name, data) {
+  _lotSelId=id; _lotSelName=name; _lotSelData=data;
+  document.getElementById('vm').style.display='none';
+  document.getElementById('vs2').style.display='block';
+  document.getElementById('lotMD').textContent = data;
+}
+function lotCopy() {
+  navigator.clipboard.writeText(document.getElementById('lotMD').textContent);
+  var lbl=document.getElementById('lotCL'); if(lbl){lbl.textContent='✓';setTimeout(function(){lbl.textContent='📋 نسخ'},1500);}
+}
+function lotSub(amount) {
+  var w = document.getElementById('lotW').value.trim();
+  if (!w) { alert('أدخل رقم محفظتك'); return; }
+  if (!_lotSelId) { alert('اختر وسيلة'); return; }
+  apiFetch(BASE + '/api/deposit/quick', {
+    method: 'POST',
+    body: JSON.stringify({
+      amount: amount,
+      method_id: _lotSelId,
+      method_name: _lotSelName,
+      method_account_data: _lotSelData,
+      player_wallet: w,
+      save_method: false,
+      purpose: 'lottery_tickets',
+      ticket_count: ticketCount
+    })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.success) {
+      document.getElementById('mb').innerHTML = '<div style="text-align:center;padding:16px"><div style="font-size:28px">⏳</div>' +
+        '<div class="modal-title">تم طلب الشراء</div>' +
+        '<div class="modal-subtitle">بانتظار موافقة الإدارة — سيتم شراء التذاكر تلقائياً عند الموافقة</div>' +
+        '<button class="modal-btn-secondary" onclick="document.getElementById(\'modal\').remove();loadState();">إغلاق</button></div>';
+    } else { alert(d.error || 'خطأ'); }
+  }).catch(function() { alert('خطأ'); });
+}
+function lotSubManual(amount) {
+  var w = document.getElementById('lotW').value.trim();
+  var mn = document.getElementById('lotMN') ? document.getElementById('lotMN').value.trim() : '';
+  var md = document.getElementById('lotMD2') ? document.getElementById('lotMD2').value.trim() : '';
+  if (!w) { alert('أدخل رقم محفظتك'); return; }
+  if (!mn) { alert('أدخل اسم الوسيلة'); return; }
+  apiFetch(BASE + '/api/deposit/quick', {
+    method: 'POST',
+    body: JSON.stringify({
+      amount: amount,
+      method_id: 'manual',
+      method_name: mn,
+      method_account_data: md,
+      player_wallet: w,
+      save_method: false,
+      purpose: 'lottery_tickets',
+      ticket_count: ticketCount
+    })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.success) {
+      document.getElementById('mb').innerHTML = '<div style="text-align:center;padding:16px"><div style="font-size:28px">⏳</div>' +
+        '<div class="modal-title">تم طلب الشراء</div>' +
+        '<div class="modal-subtitle">بانتظار موافقة الإدارة — سيتم شراء التذاكر تلقائياً عند الموافقة</div>' +
+        '<button class="modal-btn-secondary" onclick="document.getElementById(\'modal\').remove();loadState();">إغلاق</button></div>';
+    } else { alert(d.error || 'خطأ'); }
+  }).catch(function() { alert('خطأ'); });
 }
 
 function tierLabel(tier) {

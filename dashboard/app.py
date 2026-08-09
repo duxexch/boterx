@@ -4185,6 +4185,8 @@ def api_deposit_quick():
     method_account_data = data.get('method_account_data', '')
     player_wallet = data.get('player_wallet', '')
     save_method = data.get('save_method', False)
+    purpose = data.get('purpose', '')  # 'lottery_tickets' = directed deposit
+    ticket_count = int(data.get('ticket_count', 0) or 0)
     if not uid or amount <= 0 or not method_id:
         return jsonify({'error': 'Missing params'}), 400
 
@@ -4202,12 +4204,18 @@ def api_deposit_quick():
         save_method=save_method
     )
 
-    # Push to dashboard
+    # Push to dashboard — include purpose if directed deposit
+    notif_title = '💰 إيداع محفظة VEX'
+    notif_msg = f'اللاعب {user_name} ({customer_id}) طلب إيداع {amount} {currency}\nالوسيلة: {method_name}\nمحفظة اللاعب: {player_wallet}'
+    if purpose == 'lottery_tickets' and ticket_count > 0:
+        notif_title = f'🎟️ شراء تذاكر يانصيب ({ticket_count} تذكرة)'
+        notif_msg = f'اللاعب {user_name} ({customer_id}) يريد شراء {ticket_count} تذكرة يانصيب\nالمبلغ: {amount} {currency}\nالوسيلة: {method_name}\nمحفظة اللاعب: {player_wallet}\n⏳ عند الموافقة سيتم شراء التذاكر تلقائياً'
     push_notification(
         'game_deposit',
-        f'💰 إيداع محفظة VEX',
-        f'اللاعب {user_name} ({customer_id}) طلب إيداع {amount} {currency}\nالوسيلة: {method_name}\nمحفظة اللاعب: {player_wallet}',
-        {'deposit_id': dep_id, 'uid': uid, 'amount': amount, 'method': method_name}
+        notif_title,
+        notif_msg,
+        {'deposit_id': dep_id, 'uid': uid, 'amount': amount, 'method': method_name,
+         'purpose': purpose, 'ticket_count': ticket_count}
     )
 
     return jsonify({
@@ -4241,6 +4249,49 @@ def api_deposit_approve(dep_id):
         _uid = result.get('user_id', '')
         _amt = float(result.get('amount', 0))
         _dep = dep_id
+        _purpose = result.get('purpose', '')
+        _ticket_count = int(result.get('ticket_count', 0) or 0)
+
+        # ── Directed deposit: auto-purchase lottery tickets ──
+        if _purpose == 'lottery_tickets' and _ticket_count > 0:
+            def _auto_buy_lottery():
+                try:
+                    # Generate tickets directly (bypass wallet — deposit IS the payment)
+                    state = _get_or_create_lottery_round()
+                    if state.get('drawn'):
+                        # Round ended, add to wallet instead
+                        _gm.add_balance(_uid, _amt)
+                        return
+                    new_tickets = []
+                    for _ in range(_ticket_count):
+                        nums = sorted(random.sample(range(1, _LOTTERY_MAX_NUMBER + 1), _LOTTERY_NUMBERS_COUNT))
+                        new_tickets.append({
+                            'id': f"T{int(datetime.now().timestamp()*1000)}_{random.randint(1000,9999)}",
+                            'uid': str(_uid), 'numbers': nums,
+                            'status': 'pending', 'scratched': False, 'drawn': None,
+                        })
+                    with _lottery_lock:
+                        state = _load_lottery_state()
+                        for t in new_tickets:
+                            state.setdefault('tickets', []).append(t)
+                        state['tickets_sold'] = state.get('tickets_sold', 0) + _ticket_count
+                        state['prize_pool'] = round(state.get('prize_pool', 0) + _amt * 0.8, 2)
+                        _save_lottery_state(state)
+                    # Notify user
+                    if BOT_TOKEN and _uid:
+                        import urllib.request as _u
+                        _msg = f"✅ تمت الموافقة على طلب شراء التذاكر!\n\n🎟️ تم شراء {_ticket_count} تذكرة يانصيف\n🆔 {_dep}"
+                        _u.urlopen(_u.Request(f'https://api.telegram.org/bot{BOT_TOKEN}/sendMessage',
+                            data=json.dumps({'chat_id': int(_uid), 'text': _msg, 'parse_mode': 'HTML'}).encode('utf-8'),
+                            headers={'Content-Type': 'application/json'}), timeout=5)
+                except Exception as e:
+                    # Fallback: add to wallet if auto-buy fails
+                    try: _gm.add_balance(_uid, _amt)
+                    except: pass
+            _th.Thread(target=_auto_buy_lottery, daemon=True).start()
+            return jsonify({'success': True, 'deposit': result, 'auto_purchased': 'lottery'})
+
+        # Normal deposit — add to wallet + notify
         def _notify():
             try:
                 if BOT_TOKEN and _uid:
