@@ -228,18 +228,18 @@ var DOT_PATTERNS={
   6:[[0.25,0.2],[0.75,0.2],[0.25,0.5],[0.75,0.5],[0.25,0.8],[0.75,0.8]]
 };
 
-// Cube vertices in local space (before rotation)
-// v0=(-1,-1,-1) v1=(1,-1,-1) v2=(1,1,-1) v3=(-1,1,-1)
-// v4=(-1,-1,1) v5=(1,-1,1) v6=(1,1,1) v7=(-1,1,1)
-// Faces: [vertices, faceNumber, normal_vector]
-// Face numbering: 1=front(+Z), 2=right(+X), 3=top(+Y), 4=bottom(-Y), 5=left(-X), 6=back(-Z)
+// Cube vertices: v0-v3 = back(z-1), v4-v7 = front(z+1)
+// v0=(-1,-1,-1) v1=(+1,-1,-1) v2=(+1,+1,-1) v3=(-1,+1,-1)
+// v4=(-1,-1,+1) v5=(+1,-1,+1) v6=(+1,+1,+1) v7=(-1,+1,+1)
+// Each face wound COUNTER-CLOCKWISE when viewed from outside.
+// Opposite faces sum to 7: 1-6, 2-5, 3-4
 var CUBE_FACES=[
-  {v:[4,5,6,7], n:0, num:1},  // +Z front = face 1
-  {v:[1,5,6,2], n:1, num:2},  // +X right = face 2
-  {v:[3,2,6,7], n:2, num:3},  // +Y top = face 3
-  {v:[0,4,7,3], n:3, num:4},  // -Y bottom = face 4 (opposite of top=3, 3+4=7 ✓)
-  {v:[0,3,7,4], n:4, num:5},  // -X left = face 5 (opposite of right=2, 2+5=7 ✓)
-  {v:[0,1,2,3], n:5, num:6},  // -Z back = face 6 (opposite of front=1, 1+6=7 ✓)
+  {v:[4,5,6,7], num:1},  // +Z front  = face 1
+  {v:[5,1,2,6], num:2},  // +X right  = face 2
+  {v:[7,6,2,3], num:3},  // +Y top    = face 3
+  {v:[0,4,5,1], num:4},  // -Y bottom = face 4 (opposite 3)
+  {v:[0,3,7,4], num:5},  // -X left   = face 5 (opposite 2)
+  {v:[1,0,3,2], num:6},  // -Z back   = face 6 (opposite 1)
 ];
 
 // 3D rotation matrix application
