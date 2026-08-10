@@ -735,17 +735,26 @@ def index():
     # If already logged in as admin, go to dashboard
     if session.get('logged_in'):
         return redirect(url_for('dashboard'), code=303)
-    # Get bot username for Telegram login button
-    bot_username = 'boterx_bot'  # default
+    # Get OTP/security bot username for Telegram login button
+    bot_username = 'VEX_OTP_bot'  # default
     try:
-        import urllib.request as _u, json as _j
-        resp = _u.urlopen(_u.Request(
-            f'https://api.telegram.org/bot{BOT_TOKEN}/getMe',
-            headers={'Content-Type': 'application/json'}
-        ), timeout=5)
-        bot_info = _j.loads(resp.read().decode())
-        if bot_info.get('ok'):
-            bot_username = bot_info['result'].get('username', bot_username)
+        import csv as _csv
+        otp_token = None
+        # Read OTP bot token from bot_tokens.csv
+        with open(os.path.join(BASE_DIR, 'bot_tokens.csv'), 'r', encoding='utf-8-sig') as f:
+            for row in _csv.DictReader(f):
+                if row.get('description') == 'otp_bot' and row.get('is_active') == 'yes':
+                    otp_token = row.get('token', '')
+                    break
+        if otp_token:
+            import urllib.request as _u, json as _j
+            resp = _u.urlopen(_u.Request(
+                f'https://api.telegram.org/bot{otp_token}/getMe',
+                headers={'Content-Type': 'application/json'}
+            ), timeout=5)
+            bot_info = _j.loads(resp.read().decode())
+            if bot_info.get('ok'):
+                bot_username = bot_info['result'].get('username', bot_username)
     except:
         pass
     return render_template('landing.html', bot_username=bot_username)
