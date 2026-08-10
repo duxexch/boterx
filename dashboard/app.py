@@ -911,6 +911,61 @@ def page_bots():
 def page_settings():
     return render_template('settings.html', active_page='settings')
 
+@app.route('/seo')
+@login_required
+def page_seo():
+    """صفحة إدارة SEO وتحسين محركات البحث"""
+    # قراءة إعدادات SEO الحالية من system_settings.csv
+    import csv as _csv
+    seo_settings = {}
+    try:
+        with open(os.path.join(BASE_DIR, 'system_settings.csv'), 'r', encoding='utf-8-sig') as f:
+            for row in _csv.DictReader(f):
+                key = row.get('key', '')
+                if key.startswith('seo_') or key.startswith('og_') or key.startswith('twitter_'):
+                    seo_settings[key] = row.get('value', '')
+    except:
+        pass
+    return render_template('seo.html', active_page='seo', seo_settings=seo_settings)
+
+@app.route('/api/seo/save', methods=['POST'])
+@login_required
+def api_seo_save():
+    """حفظ إعدادات SEO"""
+    import csv as _csv
+    data = request.json or {}
+    # قراءة الإعدادات الحالية
+    settings_file = os.path.join(BASE_DIR, 'system_settings.csv')
+    existing = {}
+    fieldnames = ['key', 'value', 'updated_at']
+    try:
+        if os.path.exists(settings_file):
+            with open(settings_file, 'r', encoding='utf-8-sig') as f:
+                reader = _csv.DictReader(f)
+                fieldnames = reader.fieldnames or fieldnames
+                for row in reader:
+                    existing[row.get('key', '')] = row.get('value', '')
+    except:
+        pass
+    # تحديث قيم SEO
+    seo_keys = ['seo_title', 'seo_description', 'seo_keywords', 'seo_robots',
+                'og_title', 'og_description', 'og_image', 'og_url',
+                'twitter_card', 'twitter_title', 'twitter_description', 'twitter_image',
+                'seo_canonical', 'seo_author', 'seo_language']
+    for key in seo_keys:
+        if key in data:
+            existing[key] = data[key]
+    # كتابة الملف
+    try:
+        with open(settings_file, 'w', newline='', encoding='utf-8-sig') as f:
+            writer = _csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            for k, v in existing.items():
+                writer.writerow({'key': k, 'value': v, 'updated_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    return jsonify({'success': True})
+
 @app.route('/complaints')
 @login_required
 def page_complaints():
@@ -7424,6 +7479,16 @@ except Exception as _mce2:
     _auth_logger.error("mines startup prune (engine sessions) error: %s", _mce2)
 
 threading.Thread(target=_mines_cleanup_daemon, daemon=True, name='mines-cleanup').start()
+
+
+# ===== OTP Bot Auto-Start =====
+try:
+    import sys as _sys
+    _sys.path.insert(0, BASE_DIR)
+    from otp_bot import auto_start_otp_bot
+    auto_start_otp_bot()
+except Exception as _otp_err:
+    print('WARNING: OTP bot auto-start failed:', _otp_err)
 
 
 # ===== Main =====
