@@ -36,7 +36,8 @@ app = Flask(__name__, template_folder='templates', static_folder='static')
 app.secret_key = SECRET_KEY
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=2)
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=365)  # persistent login — never expire unless user logs out
+app.config['SESSION_COOKIE_SECURE'] = True  # HTTPS only
 
 # ===== Real-time Notification Queue =====
 _notification_queues = []  # list of queue.Queue, one per connected SSE client
@@ -765,6 +766,7 @@ def api_web_auth_code():
                 session['admin_name'] = data.get('name', 'User')
                 session['logged_in'] = True
                 session['login_time'] = _t.time()
+                session.permanent = True  # Persistent — 365 days
                 # Remove used code
                 del codes[uid]
                 with open(auth_file, 'w') as f:
@@ -784,6 +786,7 @@ def login():
             session['logged_in'] = True
             session['admin_id'] = admin_id
             session['login_time'] = datetime.now().isoformat()
+            session.permanent = True  # Persistent — 365 days
             log_action('login', f'Admin {admin_id} logged in')
             return redirect(url_for('dashboard'), code=303)
         elif admin_id not in ADMIN_IDS:

@@ -3,7 +3,34 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>VEX — منصة الألعاب المالية</title>
+<title>VEX — منصة الألعاب المالية | العب واربح بكل أمان</title>
+
+<!-- SEO / Open Graph / Social previews -->
+<meta name="description" content="VEX — منصة الألعاب المالية. العب ألعاب الحظ، اشترِ تذاكر اليانصيب، واربح جوائز كبرى بكل أمان وشفافية.">
+<meta name="keywords" content="VEX, ألعاب, يانصيب, مراهنات, ربح, كسب المال, منصة ألعاب">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://vex.deals/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://vex.deals/">
+<meta property="og:title" content="VEX — منصة الألعاب المالية">
+<meta property="og:description" content="العب، اربح، اسحب — كل ذلك بأمان وشفافية.">
+<meta property="og:image" content="https://vex.deals/static/icons/og-image.png">
+<meta property="og:locale" content="ar_AR">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="VEX — منصة الألعاب المالية">
+<meta name="twitter:description" content="العب، اربح، اسحب — كل ذلك بأمان وشفافية.">
+<meta name="twitter:image" content="https://vex.deals/static/icons/og-image.png">
+
+<!-- PWA / Mobile web app -->
+<link rel="manifest" href="/static/manifest.json">
+<link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+<link rel="icon" type="image/png" href="/static/icons/favicon.png">
+<meta name="theme-color" content="#0a0e17">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="VEX">
+
 <script src="https://cdn.tailwindcss.com"></script>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -62,6 +89,13 @@ body{background:#0a0e17;color:#f1f5f9;overflow-x:hidden}
       <i class="fab fa-telegram text-2xl"></i>
       الدخول عبر تيليجرام
     </button>
+    
+    <!-- Install app button (PWA) — shown only when not installed -->
+    <div id="installAppRow" class="mt-3" style="display:none">
+      <button onclick="installApp()" class="inline-flex items-center gap-2 text-amber-300 border border-amber-500/40 hover:bg-amber-500/10 rounded-xl px-5 py-2.5 text-sm font-bold transition">
+        <i class="fas fa-download"></i> تثبيت التطبيق على الجهاز
+      </button>
+    </div>
     
     <div class="mt-4">
       <button onclick="showAuthModal()" class="text-slate-400 hover:text-amber-400 transition text-sm">
@@ -128,6 +162,41 @@ body{background:#0a0e17;color:#f1f5f9;overflow-x:hidden}
 <script>
 var BOT_USERNAME = 'boterx_bot'; // will be set from server
 var BOT_URL = 'https://t.me/' + BOT_USERNAME + '?start=web_auth';
+
+// ── PWA: Service Worker + Install ──
+var deferredPrompt = null;
+
+function installApp() {
+  if (deferredPrompt) {
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then(function(choice) {
+      if (choice.outcome === 'accepted') { hideInstall(); }
+      deferredPrompt = null;
+    });
+  } else {
+    // Fallback: instruct user
+    alert('افتح قائمة المتصفح ثم اختر "إضافة إلى الشاشة الرئيسية" (Add to Home Screen)');
+  }
+}
+
+function showInstall() { document.getElementById('installAppRow').style.display = 'block'; }
+function hideInstall() { document.getElementById('installAppRow').style.display = 'none'; }
+
+window.addEventListener('beforeinstallprompt', function(e) {
+  e.preventDefault();
+  deferredPrompt = e;
+  showInstall();
+});
+window.addEventListener('appinstalled', function() { hideInstall(); });
+
+// Register service worker
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('/static/sw.js').then(function() {
+      // subscribed
+    }).catch(function() {});
+  });
+}
 
 function openTelegramAuth() {
   window.open(BOT_URL, '_blank');
