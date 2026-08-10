@@ -5816,17 +5816,28 @@ def api_plinko_drop():
 
 # ===== Wheel — Frontend API (/api/wheel/spin) =====
 
-# Must match the SEGMENTS array in wheel.html exactly (same order, same indices)
-_WHEEL_SEGMENTS = [
-    {'mult': 0.0,  'label': '💀'},
-    {'mult': 1.5,  'label': '1.5x'},
-    {'mult': 2.0,  'label': '2x'},
-    {'mult': 0.5,  'label': '0.5x'},
-    {'mult': 5.0,  'label': '5x'},
-    {'mult': 1.0,  'label': '1x'},
-    {'mult': 10.0, 'label': '10x'},
-    {'mult': 0.0,  'label': '💀'},
+# Wheel segments — base set, shuffled per round for variety
+_WHEEL_BASE_SEGMENTS = [
+    {'mult': 0.0,  'label': '💀',  'color': '#991b1b', 'glow': '#ef4444'},
+    {'mult': 1.5,  'label': '1.5x','color': '#1e3a5f', 'glow': '#3b82f6'},
+    {'mult': 2.0,  'label': '2x',  'color': '#14532d', 'glow': '#22c55e'},
+    {'mult': 0.5,  'label': '0.5x','color': '#581c87', 'glow': '#a855f7'},
+    {'mult': 5.0,  'label': '5x',  'color': '#78350f', 'glow': '#fbbf24'},
+    {'mult': 1.0,  'label': '1x',  'color': '#155e75', 'glow': '#06b6d4'},
+    {'mult': 10.0, 'label': '10x', 'color': '#831843', 'glow': '#ec4899'},
+    {'mult': 0.0,  'label': '💀',  'color': '#991b1b', 'glow': '#ef4444'},
 ]
+
+def _shuffle_segments():
+    """Shuffle segments for each round — prevents monotony."""
+    segs = list(_WHEEL_BASE_SEGMENTS)
+    # Keep the two 💀 segments apart (not adjacent)
+    for _ in range(10):
+        random.shuffle(segs)
+        skull_positions = [i for i, s in enumerate(segs) if s['mult'] == 0.0]
+        if len(skull_positions) == 2 and abs(skull_positions[0] - skull_positions[1]) > 1:
+            break
+    return segs
 
 @app.route('/api/wheel/spin', methods=['POST'])
 @webapp_auth
@@ -5864,20 +5875,35 @@ def api_wheel_spin():
     if balance < bet_amount:
         return jsonify({'success': False, 'error': 'رصيد غير كافٍ', 'need_deposit': True, 'balance': balance})
 
+    # Shuffle segments for this round
+    wheel_segments = _shuffle_segments()
+    N = len(wheel_segments)
+
     algo_result = _gm.algorithm.calculate_win_chance(player, game, bet_amount)
     win_chance = algo_result['win_chance']
 
+    # Smart weighted selection — considers player segment + house edge
     weights = []
-    for seg in _WHEEL_SEGMENTS:
+    for seg in wheel_segments:
         m = seg['mult']
         if m == 0.0:
+            # 💀 segments — higher weight for losers, lower for winners
             weights.append(max(1, int((1 - win_chance) * 10)))
+        elif m >= 10.0:
+            # 10x — very rare, only for new players or after big losses
+            weights.append(max(1, int(win_chance * 2)))
         elif m >= 5.0:
-            weights.append(max(1, int(win_chance * 5)))
+            # 5x — rare but possible
+            weights.append(max(1, int(win_chance * 4)))
+        elif m >= 2.0:
+            # 2x — moderate
+            weights.append(max(1, int(win_chance * 7)))
         elif m >= 1.0:
-            weights.append(max(1, int(win_chance * 8)))
+            # 1x/1.5x — common wins
+            weights.append(max(1, int(win_chance * 9)))
         else:
-            weights.append(max(1, int((1 - win_chance) * 6)))
+            # 0.5x — partial loss
+            weights.append(max(1, int((1 - win_chance) * 5)))
 
     total_w = sum(weights)
     rand_val = random.uniform(0, total_w)
@@ -5889,13 +5915,17 @@ def api_wheel_spin():
             segment = i
             break
 
-    multiplier = _WHEEL_SEGMENTS[segment]['mult']
+    multiplier = wheel_segments[segment]['mult']
     payout = round(bet_amount * multiplier, 2)
     result_str = 'win' if multiplier > 0 else 'lose'
 
+    # Build segments for client (shuffled order for this round)
+    client_segments = [{'mult': s['mult'], 'label': s['label'], 'color': s['color'], 'glow': s['glow']} for s in wheel_segments]
+
     # Atomic: settle + idempotency record in one SQLite transaction
     template = {'success': True, 'segment': segment, 'multiplier': multiplier,
-                'payout': payout, 'result': result_str, 'balance_before': balance}
+                'payout': payout, 'result': result_str, 'balance_before': balance,
+                'segments': client_segments}
     ok, stored, race_cached = _gm.settle_with_idempotency(uid, bet_amount, payout, request_id, template)
     if race_cached:
         return jsonify(race_cached)
