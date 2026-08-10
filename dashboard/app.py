@@ -1741,6 +1741,48 @@ def api_companies():
         c['volume'] = sum(float(t.get('amount', 0) or 0) for t in c_txns if t.get('status') == 'approved')
     return jsonify({'companies': companies})
 
+@app.route('/api/companies/list')
+def api_companies_public():
+    """Public companies list for user home page — no admin auth required."""
+    companies = read_csv('companies.csv')
+    # Only return active companies with essential fields
+    result = []
+    for c in companies:
+        if c.get('is_active', 'yes') == 'yes' or c.get('is_active', '') == '':
+            result.append({
+                'id': c.get('id', ''),
+                'name': c.get('name', ''),
+                'icon': c.get('icon', '🏢'),
+                'address': c.get('address', ''),
+                'type': c.get('type', ''),
+            })
+    return jsonify({'companies': result})
+
+@app.route('/api/payment-methods/by-company/<company_id>')
+def api_payment_methods_by_company(company_id):
+    """Payment methods for a specific company — public, no admin auth."""
+    methods = read_csv('payment_methods.csv')
+    # Also check company_payment_links.csv if exists
+    linked = []
+    try:
+        links = read_csv('company_payment_links.csv')
+        linked_ids = [l.get('payment_method_id', '') for l in links if l.get('company_id', '') == company_id]
+    except:
+        linked_ids = []
+    result = []
+    for m in methods:
+        if m.get('status') == 'active':
+            # Match by company_id or linked_ids
+            if m.get('company_id', '') == company_id or m.get('id', '') in linked_ids or not m.get('company_id', ''):
+                result.append({
+                    'id': m.get('id', ''),
+                    'method_name': m.get('method_name', ''),
+                    'method_type': m.get('method_type', ''),
+                    'account_data': m.get('account_data', ''),
+                    'icon': m.get('icon', '💳'),
+                })
+    return jsonify({'methods': result, 'count': len(result)})
+
 @app.route('/api/companies', methods=['POST'])
 @api_auth
 def api_add_company():

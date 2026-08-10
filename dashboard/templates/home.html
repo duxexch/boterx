@@ -210,8 +210,8 @@ function depChooseWallet(){
 function depChooseCompany(){
   var mb = document.getElementById('mb');
   mb.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">جارٍ تحميل الشركات...</div>';
-  // Fetch companies from companies.csv via API
-  fetch('/api/companies?uid={{ uid }}').then(function(r){return r.json()}).then(function(d){
+  // Fetch companies from public API
+  fetch('/api/companies/list').then(function(r){return r.json()}).then(function(d){
     var companies = d.companies || [];
     if(companies.length === 0){
       mb.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted)">لا توجد شركات متاحة حالياً</div><button onclick="openDeposit()" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer">‹ رجوع</button>';
@@ -234,8 +234,8 @@ function depChooseCompany(){
 function depCompanySel(cid, cname, cicon){
   var mb = document.getElementById('mb');
   mb.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">جارٍ تحميل وسائل دفع '+cname+'...</div>';
-  // Fetch payment methods linked to this company
-  fetch('/api/payment-methods?company_id='+cid+'&uid={{ uid }}').then(function(r){return r.json()}).then(function(d){
+  // Fetch payment methods linked to this company (public API)
+  fetch('/api/payment-methods/by-company/'+cid).then(function(r){return r.json()}).then(function(d){
     var methods = d.methods || [];
     renderDepMethods(methods, [], 'company', cid, cname, cicon);
   }).catch(function(){ renderDepMethods([], [], 'company', cid, cname, cicon); });
@@ -353,7 +353,7 @@ function wdChooseWallet(bal){
 function wdChooseCompany(bal){
   var mb = document.getElementById('mb');
   mb.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">جارٍ تحميل الشركات...</div>';
-  fetch('/api/companies?uid={{ uid }}').then(function(r){return r.json()}).then(function(d){
+  fetch('/api/companies/list').then(function(r){return r.json()}).then(function(d){
     var companies = d.companies || [];
     if(companies.length === 0){
       mb.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted)">لا توجد شركات متاحة</div><button onclick="openWithdraw()" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer">‹ رجوس</button>';
@@ -369,7 +369,7 @@ function wdChooseCompany(bal){
 function wdCompanySel(cid, cname, cicon, bal){
   var mb = document.getElementById('mb');
   mb.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">جارٍ تحميل وسائل استلام '+cname+'...</div>';
-  fetch('/api/payment-methods?company_id='+cid+'&uid={{ uid }}').then(function(r){return r.json()}).then(function(d){
+  fetch('/api/payment-methods/by-company/'+cid).then(function(r){return r.json()}).then(function(d){
     renderWdForm(d.methods||[], bal, 'company', cid, cname, cicon);
   }).catch(function(){ renderWdForm([], bal, 'company', cid, cname, cicon); });
 }

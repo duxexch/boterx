@@ -642,7 +642,7 @@ class GameManager:
                              method_name='', method_account_data='', player_wallet='',
                              save_method=False, purpose='', ticket_count=0):
         """إنشاء إيداع سريع — يكتب في quick_deposits.csv + transactions.csv كمعاملة حقيقية"""
-        dep_id = f"DEP{str(int(datetime.now().timestamp()))[-8:]}"
+        dep_id = f"DEP{str(int(datetime.now().timestamp()))[-8:]}_{random.randint(1000,9999)}"
         now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
         # 1. كتابة في quick_deposits.csv
@@ -720,7 +720,7 @@ class GameManager:
         success, balance_after = self.deduct_balance(user_id, amount)
         if not success:
             return None, 'رصيد غير كافٍ'
-        dep_id = f"WTH{str(int(datetime.now().timestamp()))[-8:]}"
+        dep_id = f"WTH{str(int(datetime.now().timestamp()))[-8:]}_{random.randint(1000,9999)}"
         fieldnames = ['id', 'user_id', 'amount', 'payment_method_id',
                       'account_number', 'status', 'approved_by', 'approved_at',
                       'game_session_id', 'created_at']
