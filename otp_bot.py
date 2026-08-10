@@ -97,13 +97,14 @@ def _get_bot_info(token):
         return None
 
 # ── OTP Code Generation ──
-def _generate_and_store_code(user_id, user_name):
+def _generate_and_store_code(user_id, user_name, phone=''):
     code = str(random.randint(100000, 999999))
     codes = _load_json(OTP_FILE)
     codes = {k: v for k, v in codes.items() if k != str(user_id)}
     codes[str(user_id)] = {
         'code': code,
         'name': user_name,
+        'phone': phone,
         'created': time.time()
     }
     _save_json(OTP_FILE, codes)
@@ -179,23 +180,30 @@ def _process_update(token, update):
 
     chat_id = message.get('chat', {}).get('id')
     user_id = message.get('from', {}).get('id')
-    text = message.get('text', '').strip()
+    text = message.get('text', '').strip() if message.get('text') else ''
 
     if not chat_id or not user_id:
         return
 
-    # /start — توليد رمز OTP
-    if text.startswith('/start'):
-        user = _find_user(user_id)
-        if not user:
-            _send_message(token, chat_id,
-                "🔒 <b>غير مسجل</b>\n\n"
-                "يجب التسجيل أولاً في البوت الرئيسي @Vex_wallet_bot\n\n"
-                "🌐 الموقع: https://vex.deals")
-            return
+    # ── Contact shared (for web_auth flow) ──
+    if 'contact' in message:
+        contact = message['contact']
+        phone = contact.get('phone_number', '')
+        contact_user_id = str(contact.get('user_id', user_id))
+        first_name = contact.get('first_name', '')
+        last_name = contact.get('last_name', '')
+        full_name = (first_name + ' ' + last_name).strip() or first_name or 'User'
 
-        name = user.get('name', '')
-        code = _generate_and_store_code(user_id, name)
+        # Delete the contact message (privacy)
+        try:
+            _api(token, 'deleteMessage', chat_id=chat_id, message_id=message.get('message_id'))
+        except:
+            pass
+
+        # Generate code
+        code = _generate_and_store_code(contact_user_id, full_name, phone)
+
+        # Send code
         _send_message(token, chat_id,
             "🔐 <b>رمز دخول موقع VEX</b>\n\n"
             f"<code>{code}</code>\n\n"
@@ -203,10 +211,59 @@ def _process_update(token, update):
             "🌐 أدخل الرمز في: https://vex.deals\n\n"
             "📋 انسخ الرمز أعلاه وألصقه في خانة الدخول بالموقع",
             parse_mode='HTML')
-        logger.info(f"OTP code sent to user {user_id} ({name})")
+        logger.info(f"OTP code sent to user {contact_user_id} ({full_name}) phone={phone}")
         return
 
-    # /status — للأدمن فقط: حالة النظام الأمني
+    # ── /start web_auth — request contact ──
+    if text.startswith('/start'):
+        # Check if user wants web auth
+        is_web_auth = 'web_auth' in text
+
+        if is_web_auth:
+            # Send contact request button
+            keyboard = {
+                'keyboard': [[{'text': '📱 مشاركة رقم الهاتف', 'request_contact': True}]],
+                'one_time_keyboard': True,
+                'resize_keyboard': True
+            }
+            _api(token, 'sendMessage',
+                chat_id=chat_id,
+                text="🔐 <b>تسجيل دخول موقع VEX</b>\n\n"
+                     "للحصول على رمز الدخول، يرجى مشاركة رقم هاتفك.\n"
+                     "اضغط الزر أدناه 👇",
+                parse_mode='HTML',
+                reply_markup=json.dumps(keyboard))
+            logger.info(f"Contact request sent to user {user_id}")
+            return
+
+        # Regular /start (no web_auth) — also request contact
+        keyboard = {
+            'keyboard': [[{'text': '📱 مشاركة رقم الهاتف', 'request_contact': True}]],
+            'one_time_keyboard': True,
+            'resize_keyboard': True
+        }
+        _api(token, 'sendMessage',
+            chat_id=chat_id,
+            text="🔐 <b>بوت الأمان VEX</b>\n\n"
+                 "للحصول على رمز دخول الموقع، شارك رقم هاتفك.\n"
+                 "اضغط الزر أدناه 👇",
+            parse_mode='HTML',
+            reply_markup=json.dumps(keyboard))
+        return
+
+    # ── Code pasted by user (6 digits) — verify and respond ──
+    if text.isdigit() and len(text) == 6:
+        codes = _load_json(OTP_FILE)
+        for uid, data in codes.items():
+            if str(data.get('code', '')) == text:
+                _send_message(token, chat_id,
+                    "✅ <b>رمز صحيح!</b>\n\n"
+                    "تم تأكيد رمزك. عد إلى الموقع https://vex.deals")
+                return
+        _send_message(token, chat_id, "❌ رمز غير صحيح أو منتهي الصلاحية.")
+        return
+
+    # ── Admin commands ──
     if text == '/status' and str(user_id) == ADMIN_ID:
         deposits = _read_csv(QUICK_DEPOSITS_CSV)
         pending = [d for d in deposits if d.get('status') == 'pending']
@@ -219,27 +276,25 @@ def _process_update(token, update):
             f"🟢 بوت الأمان: نشط")
         return
 
-    # /check — للأدمن: فحص فوري
     if text == '/check' and str(user_id) == ADMIN_ID:
-        _last_financial_check = 0  # إجبار الفحص
+        global _last_financial_check
+        _last_financial_check = 0
         _check_financial_anomalies(token)
         _send_message(token, chat_id, "✅ تم الفحص الفوري — راجع التنبيهات إن وجدت")
         return
 
-    # أي رسالة أخرى — رفض (الأمان)
+    # ── Any other message ──
     is_admin = str(user_id) == ADMIN_ID
     if is_admin:
         _send_message(token, chat_id,
             "🛡️ <b>بوت الأمان VEX</b>\n\n"
-            "الأوامر المتاحة:\n"
-            "/status — تقرير الأمان\n"
-            "/check — فحص فوري\n\n"
+            "الأوامر: /status /check\n\n"
             "🌐 https://vex.deals")
     else:
         _send_message(token, chat_id,
-            "🤖 هذا البوت مخصص للأمان ورموز الدخول فقط.\n\n"
-            "أرسل /start للحصول على رمز دخول.\n"
-            "للدعم: استخدم البوت الرئيسي @Vex_wallet_bot")
+            "🤖 أرسل /start للحصول على رمز دخول الموقع.\n"
+            "للدعم: @Vex_wallet_bot\n"
+            "🌐 https://vex.deals")
 
 # ── Polling Loop ──
 def _poll(token):

@@ -85,7 +85,7 @@ body{background:#0a0e17;color:#f1f5f9;overflow-x:hidden}
     </div>
 
     <!-- CTA -->
-    <button onclick="requestAuthCode()" class="btn-telegram text-white font-bold py-4 px-8 rounded-xl text-lg shadow-lg inline-flex items-center gap-3">
+    <button onclick="openTelegramAuth()" class="btn-telegram text-white font-bold py-4 px-8 rounded-xl text-lg shadow-lg inline-flex items-center gap-3">
       <i class="fab fa-telegram text-2xl"></i>
       الدخول عبر تيليجرام
     </button>
@@ -199,71 +199,18 @@ if ('serviceWorker' in navigator) {
 }
 
 function openTelegramAuth() {
-  // Open OTP bot in Telegram — fallback if API request fails
+  // Redirect to OTP bot — user shares contact, gets code, returns to website
   window.location.href = BOT_URL;
 }
 
-async function requestAuthCode() {
-  // Show modal with Telegram ID input first
-  var modal = document.getElementById('authModal');
-  var box = modal.querySelector('.bg-slate-800');
-  box.innerHTML = '<div class="text-center mb-6">' +
-    '<div class="inline-flex w-14 h-14 rounded-xl bg-amber-500/20 items-center justify-center text-amber-400 text-2xl mb-3"><i class="fab fa-telegram"></i></div>' +
-    '<h3 class="text-xl font-bold">أدخل معرف تيليجرام</h3>' +
-    '<p class="text-sm text-slate-400 mt-1">سيتم إرسال رمز الدخول عبر بوت الأمان</p></div>' +
-    '<input type="text" id="tgUserId" placeholder="معرف تيليجرام (أرقام)" inputmode="numeric" class="w-full bg-slate-700 border-2 border-slate-600 rounded-lg px-4 py-3 text-sm text-center text-amber-400 outline-none focus:border-amber-500 mb-3" style="font-size:18px;letter-spacing:2px">' +
-    '<button onclick="sendCodeRequest()" class="w-full bg-gradient-to-r from-amber-500 to-amber-600 text-slate-900 font-bold py-3 rounded-xl transition hover:from-amber-600 hover:to-amber-700 mb-2">إرسال الرمز</button>' +
-    '<button onclick="openTelegramAuth()" class="w-full text-slate-400 hover:text-white text-sm mb-2">أو افتح بوت الأمان مباشرة ←</button>' +
-    '<button onclick="closeAuthModal()" class="w-full text-slate-400 hover:text-white text-sm">إغلاق</button>' +
-    '<div id="reqStatus" class="text-sm text-center mt-2"></div>';
-  modal.classList.add('show');
-}
-
-async function sendCodeRequest() {
-  var tgId = document.getElementById('tgUserId').value.trim();
-  var status = document.getElementById('reqStatus');
-  if (!tgId || !tgId.match(/^\d+$/) || tgId.length < 6) {
-    status.textContent = 'معرف غير صالح — يجب أن يكون أرقام';
-    status.className = 'text-sm text-center mt-2 text-red-400';
-    return;
-  }
-  status.textContent = 'جارٍ إرسال الرمز...';
-  status.className = 'text-sm text-center mt-2 text-amber-400';
-  try {
-    var r = await fetch('/api/web/request-code', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({telegram_id: tgId})
-    });
-    var d = await r.json();
-    if (d.success) {
-      status.innerHTML = '✅ تم إرسال الرمز عبر <b>@' + (d.bot || 'VEX_OTP_bot') + '</b><br>تحقق من رسائل تيليجرام';
-      status.className = 'text-sm text-center mt-2 text-green-400';
-      // Show code input after 3s
-      setTimeout(function() { showCodeInput(tgId); }, 3000);
-    } else {
-      status.textContent = d.error || 'خطأ — تأكد من التسجيل في البوت أولاً';
-      status.className = 'text-sm text-center mt-2 text-red-400';
-    }
-  } catch(e) {
-    status.textContent = 'خطأ في الشبكة';
-    status.className = 'text-sm text-center mt-2 text-red-400';
-  }
-}
-
-function showCodeInput(tgId) {
-  var modal = document.getElementById('authModal');
-  var box = modal.querySelector('.bg-slate-800');
-  box.innerHTML = '<div class="text-center mb-6">' +
-    '<div class="inline-flex w-14 h-14 rounded-xl bg-amber-500/20 items-center justify-center text-amber-400 text-2xl mb-3"><i class="fas fa-key"></i></div>' +
-    '<h3 class="text-xl font-bold">أدخل رمز الدخول</h3>' +
-    '<p class="text-sm text-slate-400 mt-1">الرمز المرسل عبر تيليجرام</p></div>' +
-    '<input type="text" class="code-input block mx-auto mb-4" id="authCode" maxlength="6" placeholder="000000" inputmode="numeric">' +
-    '<button onclick="submitAuthCode()" class="w-full bg-gradient-to-r from-amber-500 to-amber-600 text-slate-900 font-bold py-3 rounded-xl transition hover:from-amber-600 hover:to-amber-700">دخول</button>' +
-    '<button onclick="requestAuthCode()" class="w-full text-slate-400 hover:text-white mt-2 text-sm">إعادة إرسال الرمز</button>' +
-    '<button onclick="closeAuthModal()" class="w-full text-slate-400 hover:text-white mt-2 text-sm">إغلاق</button>' +
-    '<div id="authError" class="text-red-400 text-sm text-center mt-2" style="display:none"></div>';
+function showAuthModal() {
+  document.getElementById('authModal').classList.add('show');
   document.getElementById('authCode').focus();
+}
+
+function closeAuthModal() {
+  document.getElementById('authModal').classList.remove('show');
+  document.getElementById('authError').style.display = 'none';
 }
 
 function showAuthModal() {

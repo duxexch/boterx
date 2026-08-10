@@ -868,25 +868,38 @@ def api_web_auth_code():
         else:
             codes = {}
         # Find matching code
-        for uid, data in codes.items():
-            if str(data.get('code', '')) == code:
+        for uid, code_data in codes.items():
+            if str(code_data.get('code', '')) == code:
                 # Check expiry (5 min)
-                if _t.time() - data.get('created', 0) > 300:
+                if _t.time() - code_data.get('created', 0) > 300:
                     return jsonify({'error': 'انتهت صلاحية الرمز — اطلب رمزاً جديداً'}), 400
                 # Create web session
                 session['admin_id'] = uid
-                session['admin_name'] = data.get('name', 'User')
+                session['admin_name'] = code_data.get('name', 'User')
                 session['logged_in'] = True
                 session['login_time'] = _t.time()
                 session.permanent = True  # Persistent — 365 days
-                session['is_admin'] = uid in ADMIN_IDS  # Only real admins see dashboard
+                session['is_admin'] = uid in ADMIN_IDS
+                session['phone'] = code_data.get('phone', '')
+                # Check if user is registered in bot (users.csv)
+                import csv as _csv
+                is_registered = False
+                try:
+                    with open(os.path.join(BASE_DIR, 'users.csv'), 'r', encoding='utf-8-sig') as f:
+                        for row in _csv.DictReader(f):
+                            if row.get('telegram_id') == str(uid):
+                                is_registered = True
+                                break
+                except:
+                    pass
+                session['is_registered'] = is_registered
                 # Remove used code
                 del codes[uid]
                 with open(auth_file, 'w') as f:
                     _json.dump(codes, f)
                 # Admin → dashboard, regular user → home page
                 redirect_url = '/dashboard' if session['is_admin'] else '/home'
-                return jsonify({'success': True, 'redirect': redirect_url})
+                return jsonify({'success': True, 'redirect': redirect_url, 'registered': is_registered})
         return jsonify({'error': 'رمز غير صالح'}), 400
     except Exception as e:
         return jsonify({'error': 'خطأ في الخادم'}), 500
