@@ -2846,52 +2846,62 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         return sent
 
     def broadcast_to_all_users(self, text, photo=None, video=None, document=None, sticker=None):
-        """بث محتوى لكل المستخدمين — مع rate limiting وفلترة المحظورين"""
-        sent = 0
-        failed = 0
-        try:
-            with open('users.csv', 'r', encoding='utf-8-sig') as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    tid = row.get('telegram_id', '')
-                    if not tid:
-                        continue
-                    # تخطي المحظورين
-                    if row.get('is_banned') == 'yes':
-                        continue
-                    try:
-                        if photo:
-                            self.api_call('sendPhoto', {
-                                'chat_id': int(tid), 'photo': photo,
-                                'caption': text[:1024] if text else '', 'parse_mode': 'HTML'
-                            })
-                        elif video:
-                            self.api_call('sendVideo', {
-                                'chat_id': int(tid), 'video': video,
-                                'caption': text[:1024] if text else '', 'parse_mode': 'HTML'
-                            })
-                        elif document:
-                            self.api_call('sendDocument', {
-                                'chat_id': int(tid), 'document': document,
-                                'caption': text[:1024] if text else '', 'parse_mode': 'HTML'
-                            })
-                        elif sticker:
-                            self.api_call('sendSticker', {
-                                'chat_id': int(tid), 'sticker': sticker
-                            })
-                        else:
-                            self.send_message(int(tid), text, None)
-                        sent += 1
-                    except:
-                        failed += 1
-                    # rate limiting: 20 رسالة ثم انتظار 1 ثانية
-                    if (sent + failed) % 20 == 0:
-                        time.sleep(1)
-            # تسجيل البث
-            self._log_relay('broadcast', '', text[:100], sent, 0)
-        except Exception as e:
-            logger.error(f"خطأ في البث: {e}")
-        return sent, failed
+        """بث محتوى لكل المستخدمين — في thread منفصل حتى لا يمنع معالجة رسائل المستخدمين"""
+        import threading as _th
+        def _do_broadcast():
+            sent = 0
+            failed = 0
+            try:
+                with open('users.csv', 'r', encoding='utf-8-sig') as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        tid = row.get('telegram_id', '')
+                        if not tid:
+                            continue
+                        # تخطي المحظورين
+                        if row.get('is_banned') == 'yes':
+                            continue
+                        try:
+                            if photo:
+                                result = self.api_call('sendPhoto', {
+                                    'chat_id': int(tid), 'photo': photo,
+                                    'caption': text[:1024] if text else '', 'parse_mode': 'HTML'
+                                }, retries=1)  # retry=1 — لا تكرر الفشل
+                            elif video:
+                                result = self.api_call('sendVideo', {
+                                    'chat_id': int(tid), 'video': video,
+                                    'caption': text[:1024] if text else '', 'parse_mode': 'HTML'
+                                }, retries=1)
+                            elif document:
+                                result = self.api_call('sendDocument', {
+                                    'chat_id': int(tid), 'document': document,
+                                    'caption': text[:1024] if text else '', 'parse_mode': 'HTML'
+                                }, retries=1)
+                            elif sticker:
+                                result = self.api_call('sendSticker', {
+                                    'chat_id': int(tid), 'sticker': sticker
+                                }, retries=1)
+                            else:
+                                result = self.send_message(int(tid), text, None)
+                            if result:
+                                sent += 1
+                            else:
+                                failed += 1
+                        except:
+                            failed += 1
+                        # rate limiting: 20 رسالة ثم انتظار 1 ثانية
+                        if (sent + failed) % 20 == 0:
+                            time.sleep(1)
+                # تسجيل البث
+                self._log_relay('broadcast', '', text[:100], sent, 0)
+                logger.info(f"Broadcast done: {sent} sent, {failed} failed")
+            except Exception as e:
+                logger.error(f"خطأ في البث: {e}")
+            return sent, failed
+        # تشغيل في thread منفصل — لا يمنع البوت عن معالجة رسائل المستخدمين
+        t = _th.Thread(target=_do_broadcast, daemon=True)
+        t.start()
+        return 0, 0  # يتم إرجاع 0 لأن البث غير متزامن
 
     def _log_relay(self, source_type, source_chat_id, preview, user_count, channel_count):
         """تسجيل عملية ترحيل في relay_log.csv"""
@@ -6376,50 +6386,55 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             return False
 
     def _process_broadcast_queue(self):
-        """معالجة طابور البث — يرسل الرسائل المؤجلة من لوحة الويب"""
-        if not os.path.exists('broadcast_queue.csv'):
-            return
-        try:
-            rows = []
-            pending = []
-            with open('broadcast_queue.csv', 'r', encoding='utf-8-sig') as f:
-                reader = csv.DictReader(f)
-                fieldnames = reader.fieldnames or ['id', 'message', 'type', 'created_at', 'created_by', 'status']
-                for row in reader:
-                    if row.get('status') == 'pending':
-                        pending.append(row)
-                    else:
-                        rows.append(row)
+        """معالجة طابور البث — في thread منفصل حتى لا يوقف البوت"""
+        import threading as _th
+        def _do_process():
+            if not os.path.exists('broadcast_queue.csv'):
+                return
+            try:
+                rows = []
+                pending = []
+                with open('broadcast_queue.csv', 'r', encoding='utf-8-sig') as f:
+                    reader = csv.DictReader(f)
+                    fieldnames = reader.fieldnames or ['id', 'message', 'type', 'created_at', 'created_by', 'status']
+                    for row in reader:
+                        if row.get('status') == 'pending':
+                            pending.append(row)
+                        else:
+                            rows.append(row)
 
-            for item in pending:
-                msg = item.get('message', '')
-                target = item.get('target_chat_id', '')
-                item_id = item.get('id', '')
-                try:
-                    if target:
-                        # إرسال لقناة محددة
-                        self.api_call('sendMessage', {
-                            'chat_id': target,
-                            'text': msg,
-                            'parse_mode': 'HTML'
-                        })
-                    else:
-                        # بث عام لكل المستخدمين
-                        self.broadcast_to_all_users(msg)
-                    item['status'] = 'sent'
-                except Exception as e:
-                    logger.error(f"خطأ في إرسال {item_id}: {e}")
-                    item['status'] = 'failed'
-                rows.append(item)
+                for item in pending:
+                    msg = item.get('message', '')
+                    target = item.get('target_chat_id', '')
+                    item_id = item.get('id', '')
+                    try:
+                        if target:
+                            # إرسال لقناة محددة — retry=1 فقط
+                            self.api_call('sendMessage', {
+                                'chat_id': target,
+                                'text': msg,
+                                'parse_mode': 'HTML'
+                            }, retries=1)
+                        else:
+                            # بث عام — يعمل في thread منفصل داخل broadcast_to_all_users
+                            self.broadcast_to_all_users(msg)
+                        item['status'] = 'sent'
+                    except Exception as e:
+                        logger.error(f"خطأ في إرسال {item_id}: {e}")
+                        item['status'] = 'failed'
+                    rows.append(item)
 
-            # كتابة مرة واحدة
-            with open('broadcast_queue.csv', 'w', newline='', encoding='utf-8-sig') as f:
-                writer = csv.DictWriter(f, fieldnames=fieldnames)
-                writer.writeheader()
-                for row in rows:
-                    writer.writerow({k: row.get(k, '') for k in fieldnames})
-        except Exception as e:
-            logger.error(f"خطأ في _process_broadcast_queue: {e}")
+                # كتابة مرة واحدة
+                with open('broadcast_queue.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                    writer = csv.DictWriter(f, fieldnames=fieldnames)
+                    writer.writeheader()
+                    for row in rows:
+                        writer.writerow({k: row.get(k, '') for k in fieldnames})
+            except Exception as e:
+                logger.error(f"خطأ في _process_broadcast_queue: {e}")
+        # تشغيل في thread منفصل
+        t = _th.Thread(target=_do_process, daemon=True)
+        t.start()
 
     def handle_complaint_start(self, message):
         """بدء عملية الشكوى"""
