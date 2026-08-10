@@ -6,175 +6,189 @@
 <title>VEX — {{ user_name }}</title>
 <link rel="manifest" href="/static/manifest.json">
 <link rel="icon" type="image/png" href="/static/icons/favicon.png">
-<meta name="theme-color" content="#0a0e17">
+<link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+<meta name="theme-color" content="#06100c">
 <script src="https://cdn.tailwindcss.com"></script>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <style>
-*{font-family:'Cairo',sans-serif;-webkit-tap-highlight-color:transparent}
-body{background:#0a0e17;color:#f1f5f9;margin:0;min-height:100dvh}
-.app-container{max-width:480px;margin:0 auto;padding:12px}
-/* Header */
-.app-header{display:flex;align-items:center;justify-content:space-between;padding:12px 0;margin-bottom:16px}
-.logo{display:flex;align-items:center;gap:8px}
-.logo-icon{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#fbbf24,#f59e0b);display:flex;align-items:center;justify-content:center;font-weight:900;color:#0a0e17;font-size:20px;box-shadow:0 4px 12px rgba(251,191,36,.3)}
-.logo-text{font-size:18px;font-weight:900;color:#fbbf24}
-.balance-card{background:linear-gradient(135deg,#1e293b,#0f172a);border:1px solid #334155;border-radius:16px;padding:16px;margin-bottom:16px}
-.balance-label{font-size:11px;color:#64748b;margin-bottom:4px}
-.balance-amount{font-size:28px;font-weight:900;font-family:'Courier New',monospace;color:#fbbf24}
-.balance-currency{font-size:14px;color:#94a3b8;margin-right:4px}
-/* Feature grid */
-.features-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
-.feature-card{background:#1e293b;border:1px solid #334155;border-radius:14px;padding:14px 8px;text-align:center;cursor:pointer;transition:all .2s;text-decoration:none;color:#f1f5f9}
-.feature-card:active{transform:scale(.93)}
-.feature-card:hover{border-color:#fbbf24;background:#1e293bee}
-.feature-icon{font-size:28px;margin-bottom:6px;display:block}
-.feature-name{font-size:11px;font-weight:700;color:#cbd5e1}
-/* Deposit/Withdraw buttons */
-.action-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
-.action-btn{padding:14px;border-radius:14px;font-size:15px;font-weight:800;border:none;cursor:pointer;text-align:center;transition:all .2s;text-decoration:none}
-.action-btn:active{transform:scale(.97)}
-.action-btn.deposit{background:linear-gradient(135deg,#0d7a1f,#1a5c2e);color:#7eff9a}
-.action-btn.withdraw{background:linear-gradient(135deg,#7a0d0d,#5c1a1a);color:#ff8787}
-/* Section title */
-.section-title{font-size:13px;color:#64748b;font-weight:700;margin:16px 0 10px;text-transform:uppercase}
-/* Games grid */
+:root{--bg:#06100c;--bg2:#0a1a12;--card:#0d2018;--border:#1a3a28;--green:#00e676;--green2:#00c853;--green-dim:#0d3a22;--gold:#fbbf24;--text:#e8f5e9;--muted:#6b8c7a}
+*{font-family:'Cairo',sans-serif;-webkit-tap-highlight-color:transparent;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);margin:0;min-height:100dvh;overflow-x:hidden}
+.app{max-width:500px;margin:0 auto;padding:0 12px 20px}
+/* Top bar */
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 0;position:sticky;top:0;z-index:20;background:rgba(6,16,12,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
+.logo-row{display:flex;align-items:center;gap:8px}
+.logo-img{width:36px;height:36px;border-radius:10px;object-fit:cover}
+.logo-text{font-size:20px;font-weight:900;background:linear-gradient(135deg,var(--green),#69f0ae);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.topbar-btns{display:flex;gap:8px}
+.tbtn{width:36px;height:36px;border-radius:10px;background:var(--card);border:1px solid var(--border);color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px}
+.tbtn:active{transform:scale(.9)}
+/* Balance card — glossy green */
+.bal-card{background:linear-gradient(135deg,var(--green-dim),#06120c);border:1px solid var(--border);border-radius:18px;padding:18px;margin:14px 0;position:relative;overflow:hidden}
+.bal-card::before{content:'';position:absolute;top:-50%;right:-20%;width:200px;height:200px;background:radial-gradient(circle,rgba(0,230,118,.15),transparent 70%);border-radius:50%}
+.bal-row{display:flex;align-items:center;justify-content:space-between;position:relative;z-index:1}
+.bal-info{display:flex;flex-direction:column}
+.bal-label{font-size:10px;color:var(--muted);margin-bottom:2px}
+.bal-amount{font-size:30px;font-weight:900;font-family:'Courier New',monospace;color:var(--green);text-shadow:0 0 20px rgba(0,230,118,.3)}
+.bal-cur{font-size:14px;color:var(--muted);margin-right:4px}
+.bal-actions{display:flex;gap:6px}
+.bal-btn{padding:8px 14px;border-radius:10px;border:none;font-size:13px;font-weight:800;cursor:pointer;transition:all .15s}
+.bal-btn:active{transform:scale(.93)}
+.bal-btn.dep{background:linear-gradient(135deg,var(--green),var(--green2));color:#06100c}
+.bal-btn.wd{background:var(--card);border:1px solid var(--border);color:var(--gold)}
+/* Quick actions */
+.quick-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px}
+.quick-item{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px 4px;text-align:center;cursor:pointer;transition:all .2s;text-decoration:none;color:var(--text)}
+.quick-item:active{transform:scale(.92);border-color:var(--green)}
+.quick-icon{font-size:24px;display:block;margin-bottom:4px}
+.quick-name{font-size:9px;font-weight:700;color:var(--muted)}
+/* Games */
+.section-head{display:flex;align-items:center;justify-content:space-between;margin:16px 0 10px}
+.section-title{font-size:15px;font-weight:800;color:var(--text)}
+.section-link{font-size:11px;color:var(--green);text-decoration:none}
 .games-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
-.game-card{background:#1e293b;border:1px solid #334155;border-radius:14px;padding:16px 10px;text-align:center;cursor:pointer;transition:all .2s;text-decoration:none;color:#f1f5f9;position:relative;overflow:hidden}
+.game-card{background:linear-gradient(135deg,var(--card),#06120c);border:1px solid var(--border);border-radius:14px;padding:18px 10px;text-align:center;cursor:pointer;transition:all .25s;text-decoration:none;color:var(--text);position:relative;overflow:hidden}
 .game-card:active{transform:scale(.95)}
-.game-card:hover{border-color:#fbbf24}
-.game-icon{font-size:32px;margin-bottom:6px}
-.game-name{font-size:12px;font-weight:700}
-.game-badge{position:absolute;top:6px;right:6px;background:#ef4444;color:#fff;font-size:8px;padding:2px 6px;border-radius:6px;font-weight:700}
-/* Install button */
-.install-btn{display:none;text-align:center;padding:10px;background:#1e293b;border:1px solid #fbbf24;border-radius:12px;margin-bottom:16px;cursor:pointer;color:#fbbf24;font-size:13px;font-weight:700}
-/* Logout */
-.logout-btn{display:block;width:100%;padding:12px;background:transparent;border:1px solid #334155;border-radius:12px;color:#64748b;font-size:14px;cursor:pointer;margin-top:8px}
-.logout-btn:active{transform:scale(.97)}
+.game-card:hover{border-color:var(--green);box-shadow:0 4px 20px rgba(0,230,118,.1)}
+.game-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--green),transparent);opacity:0;transition:opacity .3s}
+.game-card:hover::before{opacity:1}
+.game-icon{font-size:36px;margin-bottom:8px;display:block;filter:drop-shadow(0 2px 6px rgba(0,230,118,.2))}
+.game-name{font-size:13px;font-weight:700}
+.game-hot{position:absolute;top:8px;left:8px;background:linear-gradient(135deg,#ff4757,#c0392b);color:#fff;font-size:8px;padding:2px 8px;border-radius:6px;font-weight:800;animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
+/* Services */
+.services-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}
+.svc-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 6px;text-align:center;cursor:pointer;transition:all .2s;text-decoration:none;color:var(--text)}
+.svc-card:active{transform:scale(.92)}
+.svc-card:hover{border-color:var(--green)}
+.svc-icon{font-size:26px;margin-bottom:4px}
+.svc-name{font-size:10px;font-weight:700;color:var(--muted)}
+/* Install banner */
+.install-banner{display:none;background:linear-gradient(135deg,var(--green-dim),#06120c);border:1px solid var(--green);border-radius:14px;padding:12px 16px;margin:16px 0;display:flex;align-items:center;gap:12px;cursor:pointer}
+.install-banner.show{display:flex}
+.install-icon{font-size:28px}
+.install-text{flex:1}
+.install-title{font-size:13px;font-weight:800;color:var(--green)}
+.install-sub{font-size:10px;color:var(--muted)}
+/* Bottom nav */
+.bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:500px;background:rgba(6,16,12,.95);backdrop-filter:blur(10px);border-top:1px solid var(--border);display:flex;justify-content:space-around;padding:8px 0;z-index:20}
+.nav-item{display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;text-decoration:none;color:var(--muted);font-size:9px;font-weight:700;padding:4px 12px;border-radius:10px;transition:all .2s}
+.nav-item.active{color:var(--green)}
+.nav-item:active{transform:scale(.9)}
+.nav-icon{font-size:20px}
+/* Toast */
+.toast{position:fixed;top:60px;left:50%;transform:translateX(-50%);background:var(--card);border:1px solid var(--green);color:var(--green);padding:10px 20px;border-radius:12px;font-size:13px;font-weight:700;z-index:100;display:none}
+.toast.show{display:block;animation:slideDown .3s}
+@keyframes slideDown{from{transform:translate(-50%,-20px);opacity:0}to{transform:translateX(-50%);opacity:1}}
 </style>
 </head>
 <body>
-<div class="app-container">
-  <!-- Header -->
-  <div class="app-header">
-    <div class="logo">
-      <div class="logo-icon">V</div>
-      <div class="logo-text">VEX</div>
+<div class="app">
+  <!-- Top bar -->
+  <div class="topbar">
+    <div class="logo-row">
+      <img src="/static/icons/icon-192.png" class="logo-img" alt="VEX">
+      <span class="logo-text">VEX</span>
     </div>
-    <button onclick="location.href='/logout'" class="text-slate-500 hover:text-red-400 transition">
-      <i class="fas fa-right-from-bracket text-lg"></i>
-    </button>
+    <div class="topbar-btns">
+      <div class="tbtn" onclick="refreshBalance()"><i class="fas fa-rotate"></i></div>
+      <div class="tbtn" onclick="location.href='/logout'"><i class="fas fa-right-from-bracket"></i></div>
+    </div>
   </div>
 
   <!-- Balance -->
-  <div class="balance-card">
-    <div class="balance-label">💰 رصيد المحفظة</div>
-    <div><span class="balance-amount">{{ user_balance }}</span><span class="balance-currency">{{ user_currency }}</span></div>
+  <div class="bal-card">
+    <div class="bal-row">
+      <div class="bal-info">
+        <div class="bal-label">رصيد المحفظة</div>
+        <div><span class="bal-amount" id="balAmount">{{ user_balance }}</span><span class="bal-cur" id="balCur">{{ user_currency }}</span></div>
+      </div>
+      <div class="bal-actions">
+        <button class="bal-btn dep" onclick="openDeposit()">💰 إيداع</button>
+        <button class="bal-btn wd" onclick="openWithdraw()">💸 سحب</button>
+      </div>
+    </div>
   </div>
 
-  <!-- Deposit / Withdraw -->
-  <div class="action-row">
-    <a href="/webapp/games?uid={{ uid }}&lang=ar" class="action-btn deposit">💰 إيداع</a>
-    <a href="/webapp/games?uid={{ uid }}&lang=ar" class="action-btn withdraw">💸 سحب</a>
-  </div>
-
-  <!-- Features -->
-  <div class="section-title">الخدمات</div>
-  <div class="features-grid">
-    <a href="/webapp/games?uid={{ uid }}&lang=ar" class="feature-card">
-      <span class="feature-icon">🎮</span>
-      <span class="feature-name">الألعاب</span>
-    </a>
-    <a href="/webapp/lottery?uid={{ uid }}&lang=ar" class="feature-card">
-      <span class="feature-icon">🎟️</span>
-      <span class="feature-name">اليانصيب</span>
-    </a>
-    <a href="/webapp/stats?uid={{ uid }}&lang=ar" class="feature-card">
-      <span class="feature-icon">📊</span>
-      <span class="feature-name">إحصائياتي</span>
-    </a>
-    <a href="#" class="feature-card" onclick="alert('قريباً')">
-      <span class="feature-icon">🔄</span>
-      <span class="feature-name">المطابقات</span>
-    </a>
-    <a href="#" class="feature-card" onclick="alert('قريباً')">
-      <span class="feature-icon">💎</span>
-      <span class="feature-name">تعويض 100%</span>
-    </a>
-    <a href="#" class="feature-card" onclick="alert('قريباً')">
-      <span class="feature-icon">🎁</span>
-      <span class="feature-name">اربح</span>
-    </a>
+  <!-- Quick actions -->
+  <div class="quick-grid">
+    <a href="/webapp/games?uid={{ uid }}&lang=ar" class="quick-item"><span class="quick-icon">🎮</span><span class="quick-name">ألعاب</span></a>
+    <a href="/webapp/lottery?uid={{ uid }}&lang=ar" class="quick-item"><span class="quick-icon">🎟️</span><span class="quick-name">يانصيب</span></a>
+    <a href="/webapp/stats?uid={{ uid }}&lang=ar" class="quick-item"><span class="quick-icon">📊</span><span class="quick-name">إحصائيات</span></a>
+    <div class="quick-item" onclick="showToast('قريباً')"><span class="quick-icon">🔄</span><span class="quick-name">مطابقات</span></div>
   </div>
 
   <!-- Games -->
-  <div class="section-title">الألعاب</div>
+  <div class="section-head">
+    <span class="section-title">🎮 الألعاب</span>
+    <a href="/webapp/games?uid={{ uid }}&lang=ar" class="section-link">الكل ←</a>
+  </div>
   <div class="games-grid">
-    <a href="/webapp/aviator?uid={{ uid }}&lang=ar" class="game-card">
-      <div class="game-icon">✈️</div>
-      <div class="game-name">Aviator</div>
-      <div class="game-badge">🔥</div>
-    </a>
-    <a href="/webapp/crash?uid={{ uid }}&lang=ar" class="game-card">
-      <div class="game-icon">🚀</div>
-      <div class="game-name">Crash</div>
-    </a>
-    <a href="/webapp/dice?uid={{ uid }}&lang=ar" class="game-card">
-      <div class="game-icon">🎲</div>
-      <div class="game-name">نرد</div>
-    </a>
-    <a href="/webapp/plinko?uid={{ uid }}&lang=ar" class="game-card">
-      <div class="game-icon">🔮</div>
-      <div class="game-name">Plinko</div>
-    </a>
-    <a href="/webapp/mines?uid={{ uid }}&lang=ar" class="game-card">
-      <div class="game-icon">💣</div>
-      <div class="game-name">Mines</div>
-    </a>
-    <a href="/webapp/wheel?uid={{ uid }}&lang=ar" class="game-card">
-      <div class="game-icon">🎡</div>
-      <div class="game-name">عجلة الحظ</div>
-    </a>
+    <a href="/webapp/aviator?uid={{ uid }}&lang=ar" class="game-card"><div class="game-hot">🔥</div><span class="game-icon">✈️</span><div class="game-name">Aviator</div></a>
+    <a href="/webapp/crash?uid={{ uid }}&lang=ar" class="game-card"><span class="game-icon">🚀</span><div class="game-name">Crash</div></a>
+    <a href="/webapp/dice?uid={{ uid }}&lang=ar" class="game-card"><span class="game-icon">🎲</span><div class="game-name">نرد</div></a>
+    <a href="/webapp/plinko?uid={{ uid }}&lang=ar" class="game-card"><span class="game-icon">🔮</span><div class="game-name">Plinko</div></a>
+    <a href="/webapp/mines?uid={{ uid }}&lang=ar" class="game-card"><span class="game-icon">💣</span><div class="game-name">Mines</div></a>
+    <a href="/webapp/wheel?uid={{ uid }}&lang=ar" class="game-card"><span class="game-icon">🎡</span><div class="game-name">عجلة الحظ</div></a>
   </div>
 
-  <!-- Install app -->
-  <div class="install-btn" id="installBtn" onclick="installApp()">
-    📱 تثبيت التطبيق على الجهاز
+  <!-- Services -->
+  <div class="section-head"><span class="section-title">⚡ الخدمات</span></div>
+  <div class="services-grid">
+    <div class="svc-card" onclick="showToast('قريباً')"><div class="svc-icon">💎</div><div class="svc-name">تعويض 100%</div></div>
+    <div class="svc-card" onclick="showToast('قريباً')"><div class="svc-icon">🎁</div><div class="svc-name">اربح</div></div>
+    <div class="svc-card" onclick="showToast('قريباً')"><div class="svc-icon">📢</div><div class="svc-name">القنوات</div></div>
+    <div class="svc-card" onclick="showToast('قريباً')"><div class="svc-icon">📱</div><div class="svc-name">التطبيقات</div></div>
+    <div class="svc-card" onclick="showToast('قريباً')"><div class="svc-icon">💱</div><div class="svc-name">تداول USDT</div></div>
+    <div class="svc-card" onclick="showToast('قريباً')"><div class="svc-icon">🆘</div><div class="svc-name">الدعم</div></div>
   </div>
 
-  <!-- Logout -->
-  <button class="logout-btn" onclick="location.href='/logout'">تسجيل الخروج</button>
+  <!-- Install banner -->
+  <div class="install-banner" id="installBanner" onclick="installApp()">
+    <span class="install-icon">📱</span>
+    <div class="install-text">
+      <div class="install-title">تثبيت التطبيق</div>
+      <div class="install-sub">أضف VEX لشاشتك الرئيسية</div>
+    </div>
+    <i class="fas fa-chevron-left text-green-400"></i>
+  </div>
+
+  <div style="height:70px"></div>
 </div>
 
+<!-- Bottom nav -->
+<div class="bottom-nav">
+  <a href="/home" class="nav-item active"><span class="nav-icon">🏠</span>الرئيسية</a>
+  <a href="/webapp/games?uid={{ uid }}&lang=ar" class="nav-item"><span class="nav-icon">🎮</span>ألعاب</a>
+  <div class="nav-item" onclick="openDeposit()"><span class="nav-icon">💰</span>إيداع</a>
+  <a href="/webapp/stats?uid={{ uid }}&lang=ar" class="nav-item"><span class="nav-icon">📊</span>حسابي</a>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
 <script>
-// PWA install
-var deferredPrompt = null;
-window.addEventListener('beforeinstallprompt', function(e){
-  e.preventDefault(); deferredPrompt = e;
-  document.getElementById('installBtn').style.display = 'block';
-});
-function installApp(){
-  if(deferredPrompt){
-    deferredPrompt.prompt();
-    deferredPrompt.userChoice.then(function(c){
-      if(c.outcome==='accepted') document.getElementById('installBtn').style.display='none';
-      deferredPrompt = null;
-    });
-  }
-}
-// Register service worker
-if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('/static/sw.js').catch(function(){});
-}
-// Refresh balance every 30s
-setInterval(function(){
+function showToast(msg){var t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(function(){t.classList.remove('show')},2500)}
+function refreshBalance(){
   fetch('/api/wallet/balance?uid={{ uid }}').then(function(r){return r.json()}).then(function(d){
-    if(d.balance !== undefined){
-      document.querySelector('.balance-amount').textContent = d.balance.toLocaleString();
-      document.querySelector('.balance-currency').textContent = d.currency || '{{ user_currency }}';
-    }
-  }).catch(function(){});
-}, 30000);
+    if(d.balance!==undefined){document.getElementById('balAmount').textContent=d.balance.toLocaleString();document.getElementById('balCur').textContent=d.currency||'{{ user_currency }}';showToast('تم التحديث')}
+  }).catch(function(){showToast('خطأ')})
+}
+function openDeposit(){
+  // Open games hub with deposit modal trigger
+  window.location.href='/webapp/games?uid={{ uid }}&lang=ar&action=deposit'
+}
+function openWithdraw(){
+  window.location.href='/webapp/games?uid={{ uid }}&lang=ar&action=withdraw'
+}
+// Auto refresh balance
+setInterval(refreshBalance,30000)
+// PWA install
+var deferredPrompt=null
+window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();deferredPrompt=e;document.getElementById('installBanner').classList.add('show')})
+function installApp(){if(deferredPrompt){deferredPrompt.prompt();deferredPrompt.userChoice.then(function(c){if(c.outcome==='accepted')document.getElementById('installBanner').classList.remove('show');deferredPrompt=null})}}
+if('serviceWorker' in navigator){navigator.serviceWorker.register('/static/sw.js').catch(function(){})}
 </script>
 </body>
 </html>
