@@ -110,6 +110,17 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated
 
+def admin_required(f):
+    """Only real admins can access admin pages"""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get('logged_in'):
+            return redirect(url_for('login'))
+        if not session.get('is_admin'):
+            return redirect(url_for('home'), code=303)
+        return f(*args, **kwargs)
+    return decorated
+
 def api_auth(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -789,11 +800,14 @@ def api_web_auth_code():
                 session['logged_in'] = True
                 session['login_time'] = _t.time()
                 session.permanent = True  # Persistent — 365 days
+                session['is_admin'] = uid in ADMIN_IDS  # Only real admins see dashboard
                 # Remove used code
                 del codes[uid]
                 with open(auth_file, 'w') as f:
                     _json.dump(codes, f)
-                return jsonify({'success': True, 'redirect': '/dashboard'})
+                # Admin → dashboard, regular user → home page
+                redirect_url = '/dashboard' if session['is_admin'] else '/home'
+                return jsonify({'success': True, 'redirect': redirect_url})
         return jsonify({'error': 'رمز غير صالح'}), 400
     except Exception as e:
         return jsonify({'error': 'خطأ في الخادم'}), 500
@@ -824,42 +838,62 @@ def logout():
     return redirect(url_for('login'))
 
 @app.route('/dashboard')
-@login_required
+@admin_required
 def dashboard():
+    if not session.get('is_admin'):
+        return redirect(url_for('home'), code=303)
     return render_template('dashboard.html', active_page='dashboard')
 
-@app.route('/transactions')
+@app.route('/home')
 @login_required
+def home():
+    """User home page — shows all bot features as web interface"""
+    uid = session.get('admin_id', '')
+    user_name = session.get('admin_name', 'User')
+    # Get user data
+    user_balance = 0
+    user_currency = 'EGP'
+    try:
+        if _VEX_GAMES:
+            user_balance = _gm.get_balance(uid) or 0
+            user_info = _gm.get_user_info(uid) or {}
+            user_currency = user_info.get('currency', 'EGP')
+    except: pass
+    return render_template('home.html', active_page='home', user_name=user_name,
+                         user_balance=user_balance, user_currency=user_currency, uid=uid)
+
+@app.route('/transactions')
+@admin_required
 def page_transactions():
     return render_template('transactions.html', active_page='transactions')
 
 @app.route('/users')
-@login_required
+@admin_required
 def page_users():
     return render_template('users.html', active_page='users')
 
 @app.route('/matching')
-@login_required
+@admin_required
 def page_matching():
     return render_template('matching.html', active_page='matching')
 
 @app.route('/svrp')
-@login_required
+@admin_required
 def page_svrp():
     return render_template('svrp.html', active_page='svrp')
 
 @app.route('/trading')
-@login_required
+@admin_required
 def page_trading():
     return render_template('trading.html', active_page='trading')
 
 @app.route('/lottery')
-@login_required
+@admin_required
 def page_lottery():
     return render_template('lottery.html', active_page='lottery')
 
 @app.route('/wheel')
-@login_required
+@admin_required
 def page_wheel():
     return render_template('wheel.html', active_page='wheel')
 
@@ -899,42 +933,42 @@ def api_wheel_my_spins():
     })
 
 @app.route('/companies')
-@login_required
+@admin_required
 def page_companies():
     return render_template('companies.html', active_page='companies')
 
 @app.route('/payment-methods')
-@login_required
+@admin_required
 def page_payment_methods():
     return render_template('payment_methods.html', active_page='payment_methods')
 
 @app.route('/apps')
-@login_required
+@admin_required
 def page_apps():
     return render_template('apps.html', active_page='apps')
 
 @app.route('/referrals')
-@login_required
+@admin_required
 def page_referrals():
     return render_template('referrals.html', active_page='referrals')
 
 @app.route('/channels')
-@login_required
+@admin_required
 def page_channels():
     return render_template('channels.html', active_page='channels')
 
 @app.route('/bots')
-@login_required
+@admin_required
 def page_bots():
     return render_template('bots.html', active_page='bots')
 
 @app.route('/settings')
-@login_required
+@admin_required
 def page_settings():
     return render_template('settings.html', active_page='settings')
 
 @app.route('/seo')
-@login_required
+@admin_required
 def page_seo():
     """صفحة إدارة SEO وتحسين محركات البحث"""
     # قراءة إعدادات SEO الحالية من system_settings.csv
@@ -951,7 +985,7 @@ def page_seo():
     return render_template('seo.html', active_page='seo', seo_settings=seo_settings)
 
 @app.route('/api/seo/save', methods=['POST'])
-@login_required
+@admin_required
 def api_seo_save():
     """حفظ إعدادات SEO"""
     import csv as _csv
@@ -989,42 +1023,42 @@ def api_seo_save():
     return jsonify({'success': True})
 
 @app.route('/complaints')
-@login_required
+@admin_required
 def page_complaints():
     return render_template('complaints.html', active_page='complaints')
 
 @app.route('/broadcast')
-@login_required
+@admin_required
 def page_broadcast():
     return render_template('broadcast.html', active_page='broadcast')
 
 @app.route('/admins')
-@login_required
+@admin_required
 def page_admins():
     return render_template('admin_management.html', active_page='admins')
 
 @app.route('/themes')
-@login_required
+@admin_required
 def page_themes():
     return render_template('themes.html', active_page='themes')
 
 @app.route('/exchange-addresses')
-@login_required
+@admin_required
 def page_exchange_addresses():
     return render_template('exchange_addresses.html', active_page='exchange_addresses')
 
 @app.route('/send-message')
-@login_required
+@admin_required
 def page_send_message():
     return render_template('send_message.html', active_page='send_message')
 
 @app.route('/backup')
-@login_required
+@admin_required
 def page_backup():
     return render_template('backup.html', active_page='backup')
 
 @app.route('/statistics')
-@login_required
+@admin_required
 def page_statistics():
     return render_template('statistics.html', active_page='statistics')
 
@@ -4613,7 +4647,7 @@ def webapp_play(game_id):
     return render_template('game_play.html', uid=uid, lang=lang, game=game)
 
 @app.route('/games-admin')
-@login_required
+@admin_required
 def page_games_admin():
     """لوحة إدارة الألعاب"""
     return render_template('games_admin.html', active_page='games_admin')

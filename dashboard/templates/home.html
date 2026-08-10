@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>VEX — {{ user_name }}</title>
+<link rel="manifest" href="/static/manifest.json">
+<link rel="icon" type="image/png" href="/static/icons/favicon.png">
+<meta name="theme-color" content="#0a0e17">
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+*{font-family:'Cairo',sans-serif;-webkit-tap-highlight-color:transparent}
+body{background:#0a0e17;color:#f1f5f9;margin:0;min-height:100dvh}
+.app-container{max-width:480px;margin:0 auto;padding:12px}
+/* Header */
+.app-header{display:flex;align-items:center;justify-content:space-between;padding:12px 0;margin-bottom:16px}
+.logo{display:flex;align-items:center;gap:8px}
+.logo-icon{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#fbbf24,#f59e0b);display:flex;align-items:center;justify-content:center;font-weight:900;color:#0a0e17;font-size:20px;box-shadow:0 4px 12px rgba(251,191,36,.3)}
+.logo-text{font-size:18px;font-weight:900;color:#fbbf24}
+.balance-card{background:linear-gradient(135deg,#1e293b,#0f172a);border:1px solid #334155;border-radius:16px;padding:16px;margin-bottom:16px}
+.balance-label{font-size:11px;color:#64748b;margin-bottom:4px}
+.balance-amount{font-size:28px;font-weight:900;font-family:'Courier New',monospace;color:#fbbf24}
+.balance-currency{font-size:14px;color:#94a3b8;margin-right:4px}
+/* Feature grid */
+.features-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+.feature-card{background:#1e293b;border:1px solid #334155;border-radius:14px;padding:14px 8px;text-align:center;cursor:pointer;transition:all .2s;text-decoration:none;color:#f1f5f9}
+.feature-card:active{transform:scale(.93)}
+.feature-card:hover{border-color:#fbbf24;background:#1e293bee}
+.feature-icon{font-size:28px;margin-bottom:6px;display:block}
+.feature-name{font-size:11px;font-weight:700;color:#cbd5e1}
+/* Deposit/Withdraw buttons */
+.action-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.action-btn{padding:14px;border-radius:14px;font-size:15px;font-weight:800;border:none;cursor:pointer;text-align:center;transition:all .2s;text-decoration:none}
+.action-btn:active{transform:scale(.97)}
+.action-btn.deposit{background:linear-gradient(135deg,#0d7a1f,#1a5c2e);color:#7eff9a}
+.action-btn.withdraw{background:linear-gradient(135deg,#7a0d0d,#5c1a1a);color:#ff8787}
+/* Section title */
+.section-title{font-size:13px;color:#64748b;font-weight:700;margin:16px 0 10px;text-transform:uppercase}
+/* Games grid */
+.games-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.game-card{background:#1e293b;border:1px solid #334155;border-radius:14px;padding:16px 10px;text-align:center;cursor:pointer;transition:all .2s;text-decoration:none;color:#f1f5f9;position:relative;overflow:hidden}
+.game-card:active{transform:scale(.95)}
+.game-card:hover{border-color:#fbbf24}
+.game-icon{font-size:32px;margin-bottom:6px}
+.game-name{font-size:12px;font-weight:700}
+.game-badge{position:absolute;top:6px;right:6px;background:#ef4444;color:#fff;font-size:8px;padding:2px 6px;border-radius:6px;font-weight:700}
+/* Install button */
+.install-btn{display:none;text-align:center;padding:10px;background:#1e293b;border:1px solid #fbbf24;border-radius:12px;margin-bottom:16px;cursor:pointer;color:#fbbf24;font-size:13px;font-weight:700}
+/* Logout */
+.logout-btn{display:block;width:100%;padding:12px;background:transparent;border:1px solid #334155;border-radius:12px;color:#64748b;font-size:14px;cursor:pointer;margin-top:8px}
+.logout-btn:active{transform:scale(.97)}
+</style>
+</head>
+<body>
+<div class="app-container">
+  <!-- Header -->
+  <div class="app-header">
+    <div class="logo">
+      <div class="logo-icon">V</div>
+      <div class="logo-text">VEX</div>
+    </div>
+    <button onclick="location.href='/logout'" class="text-slate-500 hover:text-red-400 transition">
+      <i class="fas fa-right-from-bracket text-lg"></i>
+    </button>
+  </div>
+
+  <!-- Balance -->
+  <div class="balance-card">
+    <div class="balance-label">💰 رصيد المحفظة</div>
+    <div><span class="balance-amount">{{ user_balance }}</span><span class="balance-currency">{{ user_currency }}</span></div>
+  </div>
+
+  <!-- Deposit / Withdraw -->
+  <div class="action-row">
+    <a href="/webapp/games?uid={{ uid }}&lang=ar" class="action-btn deposit">💰 إيداع</a>
+    <a href="/webapp/games?uid={{ uid }}&lang=ar" class="action-btn withdraw">💸 سحب</a>
+  </div>
+
+  <!-- Features -->
+  <div class="section-title">الخدمات</div>
+  <div class="features-grid">
+    <a href="/webapp/games?uid={{ uid }}&lang=ar" class="feature-card">
+      <span class="feature-icon">🎮</span>
+      <span class="feature-name">الألعاب</span>
+    </a>
+    <a href="/webapp/lottery?uid={{ uid }}&lang=ar" class="feature-card">
+      <span class="feature-icon">🎟️</span>
+      <span class="feature-name">اليانصيب</span>
+    </a>
+    <a href="/webapp/stats?uid={{ uid }}&lang=ar" class="feature-card">
+      <span class="feature-icon">📊</span>
+      <span class="feature-name">إحصائياتي</span>
+    </a>
+    <a href="#" class="feature-card" onclick="alert('قريباً')">
+      <span class="feature-icon">🔄</span>
+      <span class="feature-name">المطابقات</span>
+    </a>
+    <a href="#" class="feature-card" onclick="alert('قريباً')">
+      <span class="feature-icon">💎</span>
+      <span class="feature-name">تعويض 100%</span>
+    </a>
+    <a href="#" class="feature-card" onclick="alert('قريباً')">
+      <span class="feature-icon">🎁</span>
+      <span class="feature-name">اربح</span>
+    </a>
+  </div>
+
+  <!-- Games -->
+  <div class="section-title">الألعاب</div>
+  <div class="games-grid">
+    <a href="/webapp/aviator?uid={{ uid }}&lang=ar" class="game-card">
+      <div class="game-icon">✈️</div>
+      <div class="game-name">Aviator</div>
+      <div class="game-badge">🔥</div>
+    </a>
+    <a href="/webapp/crash?uid={{ uid }}&lang=ar" class="game-card">
+      <div class="game-icon">🚀</div>
+      <div class="game-name">Crash</div>
+    </a>
+    <a href="/webapp/dice?uid={{ uid }}&lang=ar" class="game-card">
+      <div class="game-icon">🎲</div>
+      <div class="game-name">نرد</div>
+    </a>
+    <a href="/webapp/plinko?uid={{ uid }}&lang=ar" class="game-card">
+      <div class="game-icon">🔮</div>
+      <div class="game-name">Plinko</div>
+    </a>
+    <a href="/webapp/mines?uid={{ uid }}&lang=ar" class="game-card">
+      <div class="game-icon">💣</div>
+      <div class="game-name">Mines</div>
+    </a>
+    <a href="/webapp/wheel?uid={{ uid }}&lang=ar" class="game-card">
+      <div class="game-icon">🎡</div>
+      <div class="game-name">عجلة الحظ</div>
+    </a>
+  </div>
+
+  <!-- Install app -->
+  <div class="install-btn" id="installBtn" onclick="installApp()">
+    📱 تثبيت التطبيق على الجهاز
+  </div>
+
+  <!-- Logout -->
+  <button class="logout-btn" onclick="location.href='/logout'">تسجيل الخروج</button>
+</div>
+
+<script>
+// PWA install
+var deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', function(e){
+  e.preventDefault(); deferredPrompt = e;
+  document.getElementById('installBtn').style.display = 'block';
+});
+function installApp(){
+  if(deferredPrompt){
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then(function(c){
+      if(c.outcome==='accepted') document.getElementById('installBtn').style.display='none';
+      deferredPrompt = null;
+    });
+  }
+}
+// Register service worker
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('/static/sw.js').catch(function(){});
+}
+// Refresh balance every 30s
+setInterval(function(){
+  fetch('/api/wallet/balance?uid={{ uid }}').then(function(r){return r.json()}).then(function(d){
+    if(d.balance !== undefined){
+      document.querySelector('.balance-amount').textContent = d.balance.toLocaleString();
+      document.querySelector('.balance-currency').textContent = d.currency || '{{ user_currency }}';
+    }
+  }).catch(function(){});
+}, 30000);
+</script>
+</body>
+</html>
