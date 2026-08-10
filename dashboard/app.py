@@ -1745,10 +1745,11 @@ def api_companies():
 def api_companies_public():
     """Public companies list for user home page — no admin auth required."""
     companies = read_csv('companies.csv')
-    # Only return active companies with essential fields
     result = []
     for c in companies:
-        if c.get('is_active', 'yes') == 'yes' or c.get('is_active', '') == '':
+        # Accept 'yes', 'active', or empty as active
+        active = c.get('is_active', '').lower()
+        if active in ('yes', 'active', 'true', '1', ''):
             result.append({
                 'id': c.get('id', ''),
                 'name': c.get('name', ''),
