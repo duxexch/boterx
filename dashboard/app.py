@@ -904,7 +904,7 @@ def api_web_auth_code():
     except Exception as e:
         return jsonify({'error': 'خطأ في الخادم'}), 500
 
-@app.route('/vex/admin/admin')
+@app.route('/vex/admin/admin', methods=['GET', 'POST'])
 def admin_login():
     """Admin login page — only at /vex/admin/admin"""
     error = None
