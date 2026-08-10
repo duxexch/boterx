@@ -71,12 +71,14 @@ body{background:var(--bg);color:var(--text);margin:0;min-height:100dvh;overflow-
 .install-text{flex:1}
 .install-title{font-size:13px;font-weight:800;color:var(--green)}
 .install-sub{font-size:10px;color:var(--muted)}
-/* Bottom nav */
-.bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:500px;background:rgba(6,16,12,.95);backdrop-filter:blur(10px);border-top:1px solid var(--border);display:flex;justify-content:space-around;padding:8px 0;z-index:20}
-.nav-item{display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;text-decoration:none;color:var(--muted);font-size:9px;font-weight:700;padding:4px 12px;border-radius:10px;transition:all .2s}
-.nav-item.active{color:var(--green)}
-.nav-item:active{transform:scale(.9)}
-.nav-icon{font-size:20px}
+/* Bottom nav — professional floating pill */
+.bottom-nav{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);width:calc(100% - 24px);max-width:460px;background:linear-gradient(135deg,#0d2018,#0a1a12);border:1px solid var(--border);border-radius:20px;display:flex;justify-content:space-around;padding:10px 8px;z-index:50;box-shadow:0 -4px 24px rgba(0,0,0,.5),0 4px 12px rgba(0,230,118,.08)}
+.nav-item{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;text-decoration:none;color:var(--muted);font-size:10px;font-weight:700;padding:6px 16px;border-radius:14px;transition:all .25s;flex:1}
+.nav-item.active{color:var(--green);background:linear-gradient(135deg,var(--green-dim),transparent)}
+.nav-item.active .nav-icon{filter:drop-shadow(0 0 8px rgba(0,230,118,.5))}
+.nav-item:active{transform:scale(.88)}
+.nav-icon{font-size:22px;transition:all .2s}
+.nav-item.active .nav-icon{transform:translateY(-2px)}
 /* Toast */
 .toast{position:fixed;top:60px;left:50%;transform:translateX(-50%);background:var(--card);border:1px solid var(--green);color:var(--green);padding:10px 20px;border-radius:12px;font-size:13px;font-weight:700;z-index:100;display:none}
 .toast.show{display:block;animation:slideDown .3s}
@@ -154,14 +156,14 @@ body{background:var(--bg);color:var(--text);margin:0;min-height:100dvh;overflow-
     <i class="fas fa-chevron-left text-green-400"></i>
   </div>
 
-  <div style="height:70px"></div>
+  <div style="height:90px"></div>
 </div>
 
-<!-- Bottom nav -->
+<!-- Bottom nav — floating pill -->
 <div class="bottom-nav">
   <a href="/home" class="nav-item active"><span class="nav-icon">🏠</span>الرئيسية</a>
   <a href="/webapp/games?uid={{ uid }}&lang=ar" class="nav-item"><span class="nav-icon">🎮</span>ألعاب</a>
-  <div class="nav-item" onclick="openDeposit()"><span class="nav-icon">💰</span>إيداع</a>
+  <div class="nav-item" onclick="openDeposit()"><span class="nav-icon">💰</span>إيداع</div>
   <a href="/webapp/stats?uid={{ uid }}&lang=ar" class="nav-item"><span class="nav-icon">📊</span>حسابي</a>
 </div>
 
