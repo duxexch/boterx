@@ -154,7 +154,7 @@ body{background:#0a0e17;color:#f1f5f9;overflow-x:hidden}
     <button onclick="submitAuthCode()" class="w-full bg-gradient-to-r from-amber-500 to-amber-600 text-slate-900 font-bold py-3 rounded-xl transition hover:from-amber-600 hover:to-amber-700">
       دخول
     </button>
-    <button onclick="closeAuthModal()" class="w-full text-slate-400 hover:text-white mt-2 text-sm">إغلاق</button>
+    <button onclick="closeAuthModal()" class="w-full text-slate-400 hover:text-white mt-2 text-sm">رجوع</button>
     <div id="authError" class="text-red-400 text-sm text-center mt-2" style="display:none"></div>
   </div>
 </div>
@@ -199,7 +199,10 @@ if ('serviceWorker' in navigator) {
 }
 
 function openTelegramAuth() {
-  // Redirect to OTP bot — user shares contact, gets code, returns to website
+  // Mark that user went to get code — show modal when they return
+  localStorage.setItem('vex_awaiting_code', '1');
+  localStorage.setItem('vex_awaiting_time', Date.now().toString());
+  // Redirect to OTP bot
   window.location.href = BOT_URL;
 }
 
@@ -211,17 +214,26 @@ function showAuthModal() {
 function closeAuthModal() {
   document.getElementById('authModal').classList.remove('show');
   document.getElementById('authError').style.display = 'none';
+  // Clear awaiting state
+  localStorage.removeItem('vex_awaiting_code');
 }
 
-function showAuthModal() {
-  document.getElementById('authModal').classList.add('show');
-  document.getElementById('authCode').focus();
-}
-
-function closeAuthModal() {
-  document.getElementById('authModal').classList.remove('show');
-  document.getElementById('authError').style.display = 'none';
-}
+// ── Auto-show code input when returning from Telegram ──
+window.addEventListener('load', function() {
+  var awaiting = localStorage.getItem('vex_awaiting_code');
+  var awaitTime = parseInt(localStorage.getItem('vex_awaiting_time') || '0');
+  // Only show if user went to get code within last 5 minutes
+  if (awaiting === '1' && (Date.now() - awaitTime) < 300000) {
+    // User returned from Telegram — show code input modal
+    setTimeout(function() {
+      showAuthModal();
+    }, 500);
+  } else {
+    // Expired or not set — clean up
+    localStorage.removeItem('vex_awaiting_code');
+    localStorage.removeItem('vex_awaiting_time');
+  }
+});
 
 function submitAuthCode() {
   var code = document.getElementById('authCode').value.trim();
