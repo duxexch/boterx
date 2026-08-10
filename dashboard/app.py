@@ -770,6 +770,85 @@ def index():
         pass
     return render_template('landing.html', bot_username=bot_username)
 
+@app.route('/api/web/request-code', methods=['POST'])
+def api_web_request_code():
+    """Generate and send OTP code directly via security bot — no need to open Telegram first.
+    User enters Telegram ID on website → server generates code → sends via OTP bot."""
+    import random as _r, time as _t, json as _json, csv as _csv
+    data = request.json or {}
+    tg_id = str(data.get('telegram_id', '')).strip()
+    if not tg_id or not tg_id.isdigit() or len(tg_id) < 6:
+        return jsonify({'error': 'معرف تيليجرام غير صالح'}), 400
+
+    # Check user exists in users.csv
+    user = None
+    try:
+        with open(os.path.join(BASE_DIR, 'users.csv'), 'r', encoding='utf-8-sig') as f:
+            for row in _csv.DictReader(f):
+                if row.get('telegram_id') == tg_id:
+                    user = row
+                    break
+    except:
+        pass
+    if not user:
+        return jsonify({'error': 'غير مسجل — سجل في البوت الرئيسي أولاً'}), 400
+
+    # Generate code
+    code = str(_r.randint(100000, 999999))
+    name = user.get('name', '')
+    auth_file = os.path.join(BASE_DIR, 'web_auth_codes.json')
+    try:
+        if os.path.exists(auth_file):
+            with open(auth_file, 'r') as f:
+                codes = _json.load(f)
+        else:
+            codes = {}
+        codes = {k: v for k, v in codes.items() if k != tg_id}
+        codes[tg_id] = {'code': code, 'name': name, 'created': _t.time()}
+        with open(auth_file, 'w') as f:
+            _json.dump(codes, f)
+    except Exception as e:
+        return jsonify({'error': 'خطأ في الخادم'}), 500
+
+    # Send code via OTP bot
+    otp_token = None
+    try:
+        with open(os.path.join(BASE_DIR, 'bot_tokens.csv'), 'r', encoding='utf-8-sig') as f:
+            for row in _csv.DictReader(f):
+                if row.get('description') == 'otp_bot' and row.get('is_active') == 'yes':
+                    otp_token = row.get('token', '')
+                    break
+    except:
+        pass
+
+    if otp_token:
+        import urllib.request as _u
+        try:
+            msg = f"🔐 <b>رمز دخول موقع VEX</b>\n\n<code>{code}</code>\n\n⏰ صالح لمدة 5 دقائق\n🌐 أدخل الرمز في: https://vex.deals"
+            _u.urlopen(_u.Request(
+                f'https://api.telegram.org/bot{otp_token}/sendMessage',
+                data=_json.dumps({'chat_id': int(tg_id), 'text': msg, 'parse_mode': 'HTML'}).encode('utf-8'),
+                headers={'Content-Type': 'application/json'}
+            ), timeout=10)
+        except Exception as e:
+            # If bot can't send (user hasn't started bot yet), still return success
+            # User can use the code if they open the bot manually
+            pass
+
+    # Get bot username for response
+    bot_name = 'VEX_OTP_bot'
+    try:
+        if otp_token:
+            resp = urllib.request.urlopen(
+                f'https://api.telegram.org/bot{otp_token}/getMe', timeout=5)
+            info = json.loads(resp.read().decode())
+            if info.get('ok'):
+                bot_name = info['result'].get('username', bot_name)
+    except:
+        pass
+
+    return jsonify({'success': True, 'bot': bot_name})
+
 @app.route('/api/web/auth-code', methods=['POST'])
 def api_web_auth_code():
     """Validate Telegram auth code from landing page."""
