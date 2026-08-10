@@ -735,7 +735,20 @@ def index():
     # If already logged in as admin, go to dashboard
     if session.get('logged_in'):
         return redirect(url_for('dashboard'), code=303)
-    return render_template('landing.html')
+    # Get bot username for Telegram login button
+    bot_username = 'boterx_bot'  # default
+    try:
+        import urllib.request as _u, json as _j
+        resp = _u.urlopen(_u.Request(
+            f'https://api.telegram.org/bot{BOT_TOKEN}/getMe',
+            headers={'Content-Type': 'application/json'}
+        ), timeout=5)
+        bot_info = _j.loads(resp.read().decode())
+        if bot_info.get('ok'):
+            bot_username = bot_info['result'].get('username', bot_username)
+    except:
+        pass
+    return render_template('landing.html', bot_username=bot_username)
 
 @app.route('/api/web/auth-code', methods=['POST'])
 def api_web_auth_code():
