@@ -228,16 +228,15 @@ var BASE_VERTS=[
   [-1,-1, 1],[1,-1, 1],[1,1, 1],[-1,1, 1]  // v4-v7: z=+1 (front)
 ];
 
-// 6 faces — each face has: vertex indices + dot number
-// Winding order chosen so normal points outward (away from cube center)
-// To verify: center of face should be on the +side of the normal
+// 6 faces — winding verified mathematically: cross(v1-v0, v2-v0) = outward normal
+// Each face's vertices are CCW when viewed from outside
 var FACES=[
-  {v:[4,7,6,5], num:1},  // +Z front:  center=(0,0,1)  normal=(0,0,1)
-  {v:[5,6,2,1], num:2},  // +X right:  center=(1,0,0)  normal=(1,0,0)
-  {v:[6,7,3,2], num:3},  // +Y bottom: center=(0,1,0)  normal=(0,1,0) [Y+ = down on screen]
-  {v:[0,1,5,4], num:4},  // -Y top:    center=(0,-1,0) normal=(0,-1,0) [Y- = up on screen]
-  {v:[0,4,7,3], num:5},  // -X left:   center=(-1,0,0) normal=(-1,0,0)
-  {v:[0,3,2,1], num:6},  // -Z back:   center=(0,0,-1) normal=(0,0,-1)
+  {v:[4,5,6,7], num:1},  // +Z front:  cross = (0,0,+4) ✓ outward
+  {v:[5,1,2,6], num:2},  // +X right:  cross = (+4,0,0) ✓ outward
+  {v:[6,2,3,7], num:3},  // +Y bottom: cross = (0,+4,0) ✓ outward (Y+ = down on screen)
+  {v:[0,1,5,4], num:4},  // -Y top:    cross = (0,-4,0) ✓ outward (Y- = up on screen)
+  {v:[0,4,7,3], num:5},  // -X left:   cross = (-4,0,0) ✓ outward
+  {v:[0,3,2,1], num:6},  // -Z back:   cross = (0,0,-4) ✓ outward
 ];
 
 function _rotate3D(x,y,z,rx,ry,rz){
@@ -483,16 +482,23 @@ function animateRoll(resultNum,powerPct,callback){
   frame();
 }
 
-// ── Result alignment: rotate result face to FRONT (+Z, facing viewer) ──
+// Result alignment: rotate result face to +Z (front, facing viewer)
+// Verified mathematically for each face:
+// Face 1 (+Z): no rotation → stays at +Z
+// Face 2 (+X): rotY=-PI/2 rotates +X to +Z
+// Face 3 (+Y): rotX=+PI/2 rotates +Y to +Z
+// Face 4 (-Y): rotX=-PI/2 rotates -Y to +Z
+// Face 5 (-X): rotY=+PI/2 rotates -X to +Z
+// Face 6 (-Z): rotY=PI rotates -Z to +Z
 function _getResultAngles(faceNum){
   var H=Math.PI/2;
   switch(faceNum){
-    case 1: return [0,0,0];
-    case 2: return [0,H,0];
-    case 3: return [H,0,0];
-    case 4: return [-H,0,0];
-    case 5: return [0,-H,0];
-    case 6: return [0,Math.PI,0];
+    case 1: return [0, 0, 0];
+    case 2: return [0, -H, 0];
+    case 3: return [H, 0, 0];
+    case 4: return [-H, 0, 0];
+    case 5: return [0, H, 0];
+    case 6: return [0, Math.PI, 0];
   }
   return [0,0,0];
 }
