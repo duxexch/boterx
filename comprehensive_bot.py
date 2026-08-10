@@ -974,12 +974,20 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                         return result
                     else:
                         error_desc = result.get('description', 'unknown')
-                        # أخطاء غير قابلة لإعادة المحاولة
-                        if 'chat not found' in error_desc or 'blocked' in error_desc:
+                        # أخطاء غير قابلة لإعادة المحاولة — تخطي فوراً
+                        if 'chat not found' in error_desc or 'blocked' in error_desc or 'chat_id is empty' in error_desc:
+                            return result
+                        # HTTP 400 = خطأ في الطلب نفسه — لا فائدة من إعادة المحاولة
+                        if 'Bad Request' in error_desc or 'message is not modified' in error_desc:
+                            logger.warning(f"API {method} skipped (non-retryable): {error_desc}")
                             return result
                         last_error = f"API error: {error_desc}"
             except urllib.error.HTTPError as e:
                 last_error = f"HTTP {e.code}: {e.reason}"
+                # 400/403 = خطأ دائم — لا تعيد المحاولة
+                if e.code in (400, 403):
+                    logger.warning(f"API {method} skipped (HTTP {e.code}): {e.reason}")
+                    return None
                 if e.code == 429:  # Rate limited
                     retry_after = 1
                     logger.warning(f"Rate limited by Telegram, waiting {retry_after}s")
