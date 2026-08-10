@@ -213,10 +213,10 @@ document.addEventListener('mouseup',handlePowerEnd);
 
 // ── True 3D Dice Cube — 8 vertices, 6 fixed faces ──
 // Standard dice: opposite faces sum to 7 (1↔6, 2↔5, 3↔4)
-// Vertices (local space, Y=down on screen like Canvas):
-// v0=(-1,-1,-1) v1=(+1,-1,-1) v2=(+1,+1,-1) v3=(-1,+1,-1)  ← z=-1 (back)
-// v4=(-1,-1,+1) v5=(+1,-1,+1) v6=(+1,+1,+1) v7=(-1,+1,+1)  ← z=+1 (front)
-// Faces wound CCW from outside. num = dot pattern on that face.
+// Vertices: v0-v3 = back(z=-1), v4-v7 = front(z=+1)
+// v0=(-1,-1,-1) v1=(+1,-1,-1) v2=(+1,+1,-1) v3=(-1,+1,-1)
+// v4=(-1,-1,+1) v5=(+1,-1,+1) v6=(+1,+1,+1) v7=(-1,+1,+1)
+// Each face: [v0,v1,v2,v3] wound so that cross product points outward.
 var DOT_PATTERNS={
   1:[[0.5,0.5]],
   2:[[0.28,0.28],[0.72,0.72]],
@@ -225,13 +225,26 @@ var DOT_PATTERNS={
   5:[[0.25,0.25],[0.75,0.25],[0.5,0.5],[0.25,0.75],[0.75,0.75]],
   6:[[0.25,0.2],[0.75,0.2],[0.25,0.5],[0.75,0.5],[0.25,0.8],[0.75,0.8]]
 };
+
+// 6 faces — each with 4 vertex indices wound CCW when viewed from outside
+// Face normal = cross(v1-v0, v2-v0) must point outward
 var CUBE_FACES=[
-  {v:[4,5,6,7], num:1},  // +Z front  = 1
-  {v:[5,1,2,6], num:2},  // +X right  = 2
-  {v:[7,6,2,3], num:3},  // +Y bottom = 3 (Canvas Y is down)
-  {v:[0,4,5,1], num:4},  // -Y top    = 4 (Canvas Y is down, -Y = up on screen)
-  {v:[0,3,7,4], num:5},  // -X left   = 5
-  {v:[1,0,3,2], num:6},  // -Z back   = 6
+  {v:[4,5,6,7], num:1},  // +Z front:  v4→v5→v6→v7 (CCW from +Z)
+  {v:[5,1,2,6], num:2},  // +X right:  v5→v1→v2→v6
+  {v:[6,2,3,7], num:3},  // +Y bottom: v6→v2→v3→v7 (Y+ = down on screen)
+  {v:[0,4,7,3], num:4},  // -Y top:    v0→v4→v7→v3
+  {v:[0,3,2,1], num:5},  // -X left:   v0→v3→v2→v1 → FIX: should be v0→v1→... no
+  {v:[1,0,3,2], num:6},  // -Z back:   v1→v0→v3→v2
+];
+
+// Corrected face definitions with proper winding
+CUBE_FACES = [
+  {v:[4,5,6,7], num:1},  // +Z front
+  {v:[5,1,2,6], num:2},  // +X right
+  {v:[6,2,3,7], num:3},  // +Y bottom (Y down = screen bottom)
+  {v:[3,7,4,0], num:4},  // -Y top (Y up on screen) — FIXED winding
+  {v:[0,4,5,1], num:5},  // -X left — FIXED winding
+  {v:[1,2,3,0], num:6},  // -Z back — FIXED winding
 ];
 
 function _rotate3D(x,y,z,rx,ry,rz){
@@ -247,7 +260,7 @@ function _rotate3D(x,y,z,rx,ry,rz){
 function drawDice3D(cx,cy,size,rotX,rotY,rotZ){
   var s=size/2;
   var perspective=600;
-  // Compute all 8 vertices after rotation
+  // Compute all 8 vertices after rotation (3D + projected 2D)
   var verts3d=[];
   var verts2d=[];
   var baseVerts=[
@@ -258,49 +271,61 @@ function drawDice3D(cx,cy,size,rotX,rotY,rotZ){
     var bv=baseVerts[i];
     var rv=_rotate3D(bv[0]*s,bv[1]*s,bv[2]*s,rotX,rotY,rotZ);
     verts3d.push(rv);
-    // Perspective projection
     var f=perspective/(perspective+rv[2]);
     verts2d.push([cx+rv[0]*f,cy+rv[1]*f,rv[2]]);
   }
-  // Build face list with normals + depth, draw all visible (sorted)
+  // Build face list — check visibility via 3D normal dot view direction
   var faceList=[];
   for(var fi=0;fi<CUBE_FACES.length;fi++){
     var face=CUBE_FACES[fi];
+    // Use first 3 vertices to compute normal
     var a=verts3d[face.v[0]],b=verts3d[face.v[1]],c=verts3d[face.v[2]];
+    // Edge vectors
     var ux=b[0]-a[0],uy=b[1]-a[1],uz=b[2]-a[2];
     var vx=c[0]-a[0],vy=c[1]-a[1],vz=c[2]-a[2];
+    // Normal = cross product
     var nx=uy*vz-uz*vy;
     var ny=uz*vx-ux*vz;
     var nz=ux*vy-uy*vx;
-    // Face visible if normal points toward viewer (nz > 0)
-    if(nz<0.001)continue;
+    // View direction: from face center toward camera (0,0,perspective)
+    // Camera is at +Z, so face is visible if nz > 0
+    // Use a small negative threshold to avoid edge-case flicker
+    if(nz < -0.01) continue; // back-facing — skip
+    // Average depth for painter's algorithm
     var avgZ=(verts3d[face.v[0]][2]+verts3d[face.v[1]][2]+verts3d[face.v[2]][2]+verts3d[face.v[3]][2])/4;
-    // Light intensity from normal (light from top-left-front)
-    var light=Math.max(0.35,nx*(-0.4)+ny*(-0.5)+nz*(0.8));
-    faceList.push({face:face,z:avgZ,light:light});
+    // Light intensity: light from top-left-front direction
+    var nLen=Math.sqrt(nx*nx+ny*ny+nz*nz)||1;
+    nx/=nLen; ny/=nLen; nz/=nLen; // normalize
+    var lightDot = nx*(-0.3) + ny*(-0.4) + nz*0.85; // light dir: (-0.3,-0.4,0.85)
+    var light = Math.max(0.3, Math.min(1.0, lightDot));
+    faceList.push({face:face, z:avgZ, light:light});
   }
-  faceList.sort(function(a,b){return b.z-a.z}); // far to near
+  // Sort: far to near (painter's algorithm)
+  faceList.sort(function(a,b){return b.z - a.z;});
   // Draw each visible face
   for(var i=0;i<faceList.length;i++){
     var f=faceList[i].face;
     var light=faceList[i].light;
     var p0=verts2d[f.v[0]],p1=verts2d[f.v[1]],p2=verts2d[f.v[2]],p3=verts2d[f.v[3]];
-    // Fill face
+    // Fill face with gradient
     ctx.beginPath();
     ctx.moveTo(p0[0],p0[1]);
     ctx.lineTo(p1[0],p1[1]);
     ctx.lineTo(p2[0],p2[1]);
     ctx.lineTo(p3[0],p3[1]);
     ctx.closePath();
-    var r=Math.round(240*light),g=Math.round(248*light),b2=Math.round(255*light);
+    var r=Math.round(245*light),g=Math.round(250*light),b2=Math.round(255*light);
+    var r2=Math.round(r*0.65),g2=Math.round(g*0.65),b3=Math.round(b2*0.7);
     var grad=ctx.createLinearGradient(p0[0],p0[1],p2[0],p2[1]);
     grad.addColorStop(0,'rgb('+r+','+g+','+b2+')');
-    grad.addColorStop(1,'rgb('+Math.round(r*0.7)+','+Math.round(g*0.7)+','+Math.round(b2*0.75)+')');
+    grad.addColorStop(1,'rgb('+r2+','+g2+','+b3+')');
     ctx.fillStyle=grad;
     ctx.fill();
-    // Border
-    ctx.strokeStyle='rgba(71,85,105,0.5)';ctx.lineWidth=1.5;ctx.stroke();
-    // Dots
+    // Border — visible edge between faces
+    ctx.strokeStyle='rgba(50,60,80,0.6)';
+    ctx.lineWidth=1.5;
+    ctx.stroke();
+    // Draw dots on this face
     _drawDots3D(f.num,verts2d,f.v,size,light);
   }
 }
@@ -366,12 +391,38 @@ function animateRoll(resultNum,powerPct,callback){
   var powerN=powerPct/100;
 
   diceX=startX;diceY=startY;
+  // ── Random spin pattern — 8 different movement styles ──
+  var pattern = Math.floor(Math.random() * 8);
+  var spinX, spinY, spinZ, vx, vy;
+  switch(pattern){
+    case 0: // High vertical + fast X spin
+      spinX=(0.35+powerN*0.4)*(1); spinY=(0.15+powerN*0.2)*(1); spinZ=(0.1+powerN*0.15)*(1);
+      vx=(Math.random()-0.5)*4*powerN; vy=-(14+powerN*18); break;
+    case 1: // Horizontal drift + fast Y spin
+      spinX=(0.15+powerN*0.2)*(-1); spinY=(0.35+powerN*0.4)*(1); spinZ=(0.12+powerN*0.2)*(-1);
+      vx=(Math.random()-0.5)*12*powerN; vy=-(10+powerN*15); break;
+    case 2: // Corkscrew (all axes fast)
+      spinX=(0.3+powerN*0.35)*(1); spinY=(0.3+powerN*0.35)*(-1); spinZ=(0.3+powerN*0.35)*(1);
+      vx=(Math.random()-0.5)*6*powerN; vy=-(12+powerN*16); break;
+    case 3: // Low arc + Z dominant
+      spinX=(0.1+powerN*0.15)*(1); spinY=(0.12+powerN*0.18)*(-1); spinZ=(0.4+powerN*0.45)*(1);
+      vx=(Math.random()-0.5)*8*powerN; vy=-(8+powerN*12); break;
+    case 4: // Reverse corkscrew
+      spinX=(0.3+powerN*0.35)*(-1); spinY=(0.3+powerN*0.35)*(1); spinZ=(0.3+powerN*0.35)*(-1);
+      vx=(Math.random()-0.5)*6*powerN; vy=-(13+powerN*17); break;
+    case 5: // Wobble (asymmetric spins)
+      spinX=(0.4+powerN*0.4)*(1); spinY=(0.08+powerN*0.12)*(-1); spinZ=(0.25+powerN*0.3)*(1);
+      vx=(Math.random()-0.5)*10*powerN; vy=-(11+powerN*14); break;
+    case 6: // High power flat spin
+      spinX=(0.05+powerN*0.1)*(-1); spinY=(0.05+powerN*0.1)*(1); spinZ=(0.5+powerN*0.5)*(1);
+      vx=(Math.random()-0.5)*8*powerN; vy=-(15+powerN*20); break;
+    case 7: // Tumble (random direction each axis)
+      spinX=(0.25+powerN*0.35)*(Math.random()<0.5?1:-1);
+      spinY=(0.25+powerN*0.35)*(Math.random()<0.5?1:-1);
+      spinZ=(0.25+powerN*0.35)*(Math.random()<0.5?1:-1);
+      vx=(Math.random()-0.5)*10*powerN; vy=-(12+powerN*18); break;
+  }
   var rotX=0.3,rotY=0.5,rotZ=0;
-  var spinX=(0.25+powerN*0.4)*(Math.random()<0.5?1:-1);
-  var spinY=(0.20+powerN*0.35)*(Math.random()<0.5?1:-1);
-  var spinZ=(0.15+powerN*0.30)*(Math.random()<0.5?1:-1);
-  var vx=(Math.random()-0.5)*8*powerN;
-  var vy=-(12+powerN*20);
   var gravity=0.5;
   var bounces=0;
   var settleFrames=0;
