@@ -106,7 +106,7 @@ def login_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         if not session.get('logged_in'):
-            return redirect(url_for('login'))
+            return redirect(url_for('admin_login'))
         return f(*args, **kwargs)
     return decorated
 
@@ -115,7 +115,7 @@ def admin_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         if not session.get('logged_in'):
-            return redirect(url_for('login'))
+            return redirect(url_for('admin_login'))
         if not session.get('is_admin'):
             return redirect(url_for('home'), code=303)
         return f(*args, **kwargs)
@@ -937,7 +937,7 @@ def logout():
     session.clear()
     # Admin → admin login page, regular user → landing page
     if was_admin:
-        return redirect(url_for('login'))
+        return redirect(url_for('admin_login'))
     return redirect(url_for('index'))
 
 @app.route('/dashboard')
