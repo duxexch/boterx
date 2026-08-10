@@ -892,8 +892,8 @@ def api_web_auth_code():
         return jsonify({'error': 'خطأ في الخادم'}), 500
 
 @app.route('/vex/admin/admin')
-@app.route('/login', methods=['GET', 'POST'])
-def login():
+def admin_login():
+    """Admin login page — only at /vex/admin/admin"""
     error = None
     if request.method == 'POST':
         admin_id = request.form.get('admin_id', '').strip()
@@ -901,8 +901,9 @@ def login():
         if admin_id in ADMIN_IDS and password == ADMIN_PASSWORD:
             session['logged_in'] = True
             session['admin_id'] = admin_id
+            session['is_admin'] = True
             session['login_time'] = datetime.now().isoformat()
-            session.permanent = True  # Persistent — 365 days
+            session.permanent = True
             log_action('login', f'Admin {admin_id} logged in')
             return redirect(url_for('dashboard'), code=303)
         elif admin_id not in ADMIN_IDS:
@@ -911,11 +912,20 @@ def login():
             error = 'كلمة المرور غير صحيحة'
     return render_template('login.html', error=error)
 
+@app.route('/login')
+def login_redirect():
+    """Redirect /login to admin login page"""
+    return redirect(url_for('admin_login'))
+
 @app.route('/logout')
 def logout():
+    was_admin = session.get('is_admin', False)
     log_action('logout', '')
     session.clear()
-    return redirect(url_for('login'))
+    # Admin → admin login page, regular user → landing page
+    if was_admin:
+        return redirect(url_for('login'))
+    return redirect(url_for('index'))
 
 @app.route('/dashboard')
 @admin_required
