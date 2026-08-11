@@ -8364,25 +8364,15 @@ def webapp_stats():
 def webapp_account():
     """Unified player account page — profile, referrals, rewards, transactions.
 
-    Session bootstrap: if the request arrives with only ?uid= (no encrypted session
-    token), generate a fresh session and redirect so game-base.js receives ?s=XXX.
-    This ensures all four account APIs (which require strong auth) have a
-    cryptographically validated session rather than a plain uid fallback.
+    Auth note: this route renders the page shell with no server-side auth.
+    The four account API endpoints require g.webapp_auth_strong=True, which is
+    only set by HMAC-validated Telegram initData or a device-authorized encrypted
+    session.  In practice all legitimate users open this page inside the Telegram
+    Mini App where tg.initData is populated; game-base.js sends it as
+    X-Telegram-Init-Data on every apiFetch call.  Callers arriving outside
+    Telegram (no initData, no valid session ?s=) see a graceful 403 message.
+    No server-side uid→session minting occurs here — uid is not a trusted identity.
     """
-    uid  = request.args.get('uid', '').strip()
-    s    = request.args.get('s',   '').strip()
-    lang = request.args.get('lang', 'ar').strip()
-
-    if uid and not s:
-        # Generate a server-backed encrypted session for this uid.
-        # Security boundary: APIs require device-fingerprint binding (on first call)
-        # AND the session is cryptographically opaque in the URL.
-        # This matches the existing session model used by all other game pages.
-        from session_tokens import create_session as _cs
-        s = _cs(uid)
-        from urllib.parse import urlencode
-        return redirect('/webapp/account?' + urlencode({'s': s, 'lang': lang}))
-
     return render_template('account.html')
 
 # ── Unified account API ────────────────────────────────────────────────────────

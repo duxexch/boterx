@@ -585,10 +585,34 @@ function fmtStatus(s) {
   return m[s] || s || '—';
 }
 
+// ── Auth error helpers ────────────────────────────────────────────────────────
+function showAuthError(code) {
+  document.getElementById('loading').style.display = 'none';
+  const el = document.getElementById('authError');
+  if (el) { el.style.display = 'flex'; return; }
+  const div = document.createElement('div');
+  div.id = 'authError';
+  div.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;gap:16px;padding:32px;text-align:center';
+  div.innerHTML = `
+    <div style="font-size:48px">🔒</div>
+    <div style="font-size:18px;font-weight:700;color:var(--text)">يرجى الفتح من تيليغرام</div>
+    <div style="font-size:13px;color:var(--muted);max-width:280px">
+      صفحة حسابك تتطلب تحقق تيليغرام (initData).<br>
+      افتح التطبيق من خلال الزر في المحادثة.
+    </div>
+    <div style="font-size:11px;color:var(--muted);opacity:.6">رمز الخطأ: ${escHtml(code || 'WEAK_AUTH')}</div>`;
+  document.body.appendChild(div);
+}
+
 // ── Load account (profile tab) ───────────────────────────────────────────────
 async function loadAccount() {
   try {
     const r = await apiFetch(BASE + '/api/player/account');
+    if (r.status === 403) {
+      const e = await r.json().catch(() => ({}));
+      showAuthError(e.code || 'WEAK_AUTH');
+      return;
+    }
     const d = await r.json();
     _acctData = d;
 
