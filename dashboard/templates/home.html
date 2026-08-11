@@ -177,6 +177,7 @@ function openAccountPage(){
   // webapp_auth reads session['admin_id'] as a trusted identity — no URL token needed.
   window.location.href = '/webapp/account?lang=ar';
 }
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
 function showToast(msg){var t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(function(){t.classList.remove('show')},2500)}
 function refreshBalance(){
   fetch('/api/wallet/balance?uid={{ uid }}').then(function(r){return r.json()}).then(function(d){
@@ -226,8 +227,8 @@ function depChooseCompany(){
     _depCompanies = companies;
     var cHtml = companies.map(function(c, i){
       return '<div onclick="depCompanySelIdx('+i+')" style="display:flex;align-items:center;gap:10px;padding:14px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;margin-bottom:6px;cursor:pointer">'+
-        '<span style="font-size:24px">'+(c.icon||'🏢')+'</span>'+
-        '<div style="flex:1"><div style="font-size:14px;font-weight:700">'+(c.name||'')+'</div>'+(c.address?'<div style="font-size:10px;color:var(--muted)">'+c.address+'</div>':'')+'</div>'+
+        '<span style="font-size:24px">'+esc(c.icon||'🏢')+'</span>'+
+        '<div style="flex:1"><div style="font-size:14px;font-weight:700">'+esc(c.name||'')+'</div>'+(c.address?'<div style="font-size:10px;color:var(--muted)">'+esc(c.address)+'</div>':'')+'</div>'+
         '<span style="color:var(--muted)">‹</span></div>';
     }).join('');
     mb.innerHTML = '<div style="font-size:16px;font-weight:900;color:var(--green);margin-bottom:12px">🏢 اختر الشركة</div>'+
@@ -245,7 +246,7 @@ function depCompanySelIdx(i){
 }
 function depCompanySel(cid, cname, cicon){
   var mb = document.getElementById('mb');
-  mb.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">جارٍ تحميل وسائل دفع '+cname+'...</div>';
+  mb.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">جارٍ تحميل وسائل دفع '+esc(cname)+'...</div>';
   // Fetch payment methods linked to this company (public API)
   fetch('/api/payment-methods/by-company/'+cid).then(function(r){return r.json()}).then(function(d){
     var methods = d.methods || [];
@@ -256,15 +257,15 @@ function depCompanySel(cid, cname, cicon){
 // ── Render deposit methods + form (shared for wallet + company) ──
 function renderDepMethods(methods, saved, source, cid, cname, cicon){
   var mb = document.getElementById('mb');
-  var title = source === 'company' ? (cicon+' '+cname) : '👛 المحفظة';
+  var title = source === 'company' ? esc(cicon+' '+cname) : '👛 المحفظة';
   var mHtml = '';
   _depMethods = methods || [];
   _depCtx = { source: source, cid: cid || null, cname: cname || null };
   if(methods && methods.length > 0){
     mHtml = methods.map(function(m, i){
       return '<div onclick="depSelIdx('+i+')" style="display:flex;align-items:center;gap:10px;padding:12px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;margin-bottom:6px;cursor:pointer">'+
-        '<span style="font-size:20px">'+(m.icon||'💳')+'</span>'+
-        '<div style="flex:1"><div style="font-size:13px;font-weight:700">'+(m.method_name||'')+'</div><div style="font-size:10px;color:var(--muted)">'+(m.method_type||'')+'</div></div>'+
+        '<span style="font-size:20px">'+esc(m.icon||'💳')+'</span>'+
+        '<div style="flex:1"><div style="font-size:13px;font-weight:700">'+esc(m.method_name||'')+'</div><div style="font-size:10px;color:var(--muted)">'+esc(m.method_type||'')+'</div></div>'+
         '<span style="color:var(--muted)">‹</span></div>';
     }).join('');
   }
@@ -380,7 +381,7 @@ function wdChooseCompany(bal){
     }
     _wdCompanies = companies; _wdBal = bal;
     var cHtml = companies.map(function(c, i){
-      return '<div onclick="wdCompanySelIdx('+i+')" style="display:flex;align-items:center;gap:10px;padding:14px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;margin-bottom:6px;cursor:pointer"><span style="font-size:24px">'+(c.icon||'🏢')+'</span><div style="flex:1"><div style="font-size:14px;font-weight:700">'+(c.name||'')+'</div></div><span style="color:var(--muted)">‹</span></div>';
+      return '<div onclick="wdCompanySelIdx('+i+')" style="display:flex;align-items:center;gap:10px;padding:14px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;margin-bottom:6px;cursor:pointer"><span style="font-size:24px">'+esc(c.icon||'🏢')+'</span><div style="flex:1"><div style="font-size:14px;font-weight:700">'+esc(c.name||'')+'</div></div><span style="color:var(--muted)">‹</span></div>';
     }).join('');
     mb.innerHTML = '<div style="font-size:16px;font-weight:900;color:var(--gold);margin-bottom:12px">🏢 اختر الشركة</div>'+cHtml+'<button onclick="openWithdraw()" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);margin-top:6px;cursor:pointer">‹ رجوع</button>';
   }).catch(function(){ mb.innerHTML = '<div style="text-align:center;color:var(--muted)">خطأ</div>'; });
@@ -393,7 +394,7 @@ function wdCompanySelIdx(i){
 }
 function wdCompanySel(cid, cname, cicon, bal){
   var mb = document.getElementById('mb');
-  mb.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">جارٍ تحميل وسائل استلام '+cname+'...</div>';
+  mb.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">جارٍ تحميل وسائل استلام '+esc(cname)+'...</div>';
   fetch('/api/payment-methods/by-company/'+cid).then(function(r){return r.json()}).then(function(d){
     renderWdForm(d.methods||[], bal, 'company', cid, cname, cicon);
   }).catch(function(){ renderWdForm([], bal, 'company', cid, cname, cicon); });
@@ -405,7 +406,7 @@ function renderWdForm(methods, bal, source, cid, cname, cicon){
   _wdMethods = methods || [];
   _wdCtx = { bal: bal, source: source, cid: cid || null, cname: cname || null };
   var mHtml = methods.length > 0 ? methods.map(function(m, i){
-    return '<div onclick="wdSelAccIdx('+i+')" style="display:flex;align-items:center;gap:8px;padding:10px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;margin-bottom:6px;cursor:pointer"><span style="font-size:20px">'+(m.icon||'💳')+'</span><div style="flex:1"><div style="font-size:13px;font-weight:700">'+(m.method_name||'')+'</div><div style="font-size:10px;color:var(--muted)">'+(m.account_number||m.account_data||'')+'</div></div></div>';
+    return '<div onclick="wdSelAccIdx('+i+')" style="display:flex;align-items:center;gap:8px;padding:10px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;margin-bottom:6px;cursor:pointer"><span style="font-size:20px">'+esc(m.icon||'💳')+'</span><div style="flex:1"><div style="font-size:13px;font-weight:700">'+esc(m.method_name||'')+'</div><div style="font-size:10px;color:var(--muted)">'+esc(m.account_number||m.account_data||'')+'</div></div></div>';
   }).join('') : '';
   mb.innerHTML = '<div style="font-size:16px;font-weight:900;color:var(--gold);margin-bottom:4px">'+title+'</div>'+
     '<div style="font-size:12px;color:var(--muted);margin-bottom:12px">رصيدك: '+bal.toLocaleString()+' {{ user_currency }}</div>'+
