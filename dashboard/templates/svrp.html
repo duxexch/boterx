@@ -55,25 +55,37 @@
                         <tr class="border-b border-slate-700 bg-slate-800/80">
                             <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="user">User</th>
                             <th class="text-right px-4 py-3 font-semibold text-slate-400">User ID</th>
-                            <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="balance">Balance</th>
-                            <th class="text-right px-4 py-3 font-semibold text-slate-400">المجمّد</th>
-                            <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="currency">Currency</th>
-                            <th class="text-right px-4 py-3 font-semibold text-slate-400">آخر تحديث</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="balance">مجمد</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">معلق</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">متاح (SVRP)</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">الرهان</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="currency">عملة</th>
                         </tr>
                     </thead>
                     <tbody>
                         <template x-for="w in filteredWallets" :key="w.id || w.user_id">
                             <tr class="border-b border-slate-700/50 hover:bg-slate-700/30 transition">
-                                <td class="px-4 py-3 font-medium" x-text="w.user_name || w.username || '-'"></td>
-                                <td class="px-4 py-3 font-mono text-xs text-slate-400" x-text="w.user_id || '-'"></td>
-                                <td class="px-4 py-3 font-semibold font-mono text-sm text-green-400" x-text="fmtAmount(w.balance, w.currency)"></td>
-                                <td class="px-4 py-3 font-semibold font-mono text-sm text-amber-400" x-text="fmtAmount(w.frozen, w.currency)"></td>
+                                <td class="px-4 py-3 font-medium" x-text="w.user_name || w.username || w.telegram_id || '-'"></td>
+                                <td class="px-4 py-3 font-mono text-xs text-slate-400" x-text="w.telegram_id || w.user_id || '-'"></td>
+                                <td class="px-4 py-3 font-semibold font-mono text-sm text-blue-400" x-text="fmtAmount(w.balance, w.currency)"></td>
+                                <td class="px-4 py-3 font-mono text-sm text-amber-400" x-text="fmtAmount(w.pending_balance||0, w.currency)"></td>
+                                <td class="px-4 py-3 font-mono text-sm text-green-400" x-text="fmtAmount(w.total_used||0, w.currency)"></td>
+                                <td class="px-4 py-3 text-xs">
+                                    <div class="flex items-center gap-2">
+                                        <div class="h-1.5 w-16 bg-slate-700 rounded-full overflow-hidden">
+                                            <div class="h-full bg-purple-500 rounded-full transition-all"
+                                                :style="`width:${Math.min(100,Math.round((+w.wagering_completed||0)/(+w.wagering_required||3)*100))}%`"></div>
+                                        </div>
+                                        <span class="text-slate-400" x-text="`${w.wagering_completed||0}/${w.wagering_required||3}`"></span>
+                                        <span x-show="(+w.wagering_completed||0)>=(+w.wagering_required||3)"
+                                            class="text-green-400 text-xs font-semibold">✓ مكتمل</span>
+                                    </div>
+                                </td>
                                 <td class="px-4 py-3" x-text="w.currency || '-'"></td>
-                                <td class="px-4 py-3 text-slate-400 text-xs" x-text="w.updated_at || '-'"></td>
                             </tr>
                         </template>
                         <tr x-show="filteredWallets.length === 0">
-                            <td colspan="6" class="px-4 py-10 text-center text-slate-500">
+                            <td colspan="7" class="px-4 py-10 text-center text-slate-500">
                                 <i class="fas fa-wallet text-4xl mb-3 block opacity-30"></i>
                                 <p x-show="walletSearch">لا توجد نتائج مطابقة للبحث</p>
                                 <p x-show="!walletSearch">لا توجد محافظ</p>

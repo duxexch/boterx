@@ -4674,6 +4674,103 @@ def api_wallet_balance():
     currency = user_info.get('currency', 'EGP')
     return jsonify({'balance': balance, 'uid': uid, 'currency': currency})
 
+@app.route('/api/player/wallet')
+@webapp_auth
+def api_player_wallet():
+    """محفظة اللاعب الكاملة: رصيد اللعب + SVRP مجمد/معلق + wagering progress"""
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+
+    # ── رصيد اللعب (SQLite) ─────────────────────────────────────────
+    game_balance = float(_gm.get_balance(uid) or 0)
+    user_info = _gm.get_user_info(uid)
+    currency = user_info.get('currency', 'EGP')
+
+    # ── محفظة SVRP (CSV) ────────────────────────────────────────────
+    wallets = read_csv('svrp_wallets.csv')
+    svrp_wallet = next((w for w in wallets if str(w.get('telegram_id', '')) == uid), {})
+
+    frozen_balance  = float(svrp_wallet.get('balance', 0) or 0)
+    pending_balance = float(svrp_wallet.get('pending_balance', 0) or 0)
+    svrp_available  = float(svrp_wallet.get('total_used', 0) or 0)
+    total_earned    = float(svrp_wallet.get('total_earned', 0) or 0)
+    wager_required  = int(svrp_wallet.get('wagering_required', 3) or 3)
+    wager_done      = int(svrp_wallet.get('wagering_completed', 0) or 0)
+    wager_remaining = max(0, wager_required - wager_done)
+    is_frozen       = wager_done < wager_required
+
+    # ── مصادر التجميد (Credit breakdown) ────────────────────────────
+    credits_all = read_csv('svrp_credits.csv')
+    user_credits = [c for c in credits_all
+                    if str(c.get('user_id', '')) == uid
+                    and c.get('status') in ('frozen', 'pending', 'active')]
+
+    freeze_sources = []
+    _type_label = {
+        'keep':     'مكافأة احتفاظ',
+        'shared':   'مكافأة مشاركة',
+        'recovery': 'تعويض / استرداد',
+        'referral': 'مكافأة إحالة',
+    }
+    for c in user_credits:
+        amt = float(c.get('credit_amount', 0) or 0)
+        if amt <= 0:
+            continue
+        source_type = c.get('credit_type', 'referral')
+        freeze_sources.append({
+            'type':    source_type,
+            'label':   _type_label.get(source_type, source_type),
+            'amount':  amt,
+            'status':  c.get('status', ''),
+            'created': c.get('created_at', ''),
+        })
+
+    # ── آخر المعاملات (transactions.csv) ────────────────────────────
+    recent_txns = []
+    try:
+        txns = read_csv('transactions.csv')
+        user_txns = [t for t in txns if str(t.get('telegram_id', '')) == uid][-10:]
+        for t in reversed(user_txns):
+            recent_txns.append({
+                'id':      t.get('id', ''),
+                'type':    t.get('type', ''),
+                'amount':  t.get('amount', '0'),
+                'status':  t.get('status', ''),
+                'company': t.get('company', ''),
+                'date':    t.get('date', ''),
+            })
+    except Exception:
+        pass
+
+    return jsonify({
+        'uid':              uid,
+        'currency':         currency,
+        'available_balance': game_balance,
+        'frozen_balance':    frozen_balance,
+        'pending_balance':   pending_balance,
+        'svrp_available':    svrp_available,
+        'total_earned':      total_earned,
+        'wagering_required': wager_required,
+        'wagering_completed': wager_done,
+        'wagering_remaining': wager_remaining,
+        'is_frozen':         is_frozen,
+        'freeze_sources':    freeze_sources,
+        'recent_transactions': recent_txns,
+    })
+
+
+@app.route('/webapp/wallet')
+def webapp_wallet():
+    """صفحة محفظة اللاعب — محمية بـ uid أو s"""
+    uid = request.args.get('uid', '').strip()
+    s   = request.args.get('s', '').strip()
+    lang = request.args.get('lang', 'ar').strip()
+    return render_template('wallet.html', uid=uid, s=s, lang=lang)
+
+
 @app.route('/api/wallet/add', methods=['POST'])
 @api_auth
 @permission_required('approve_deposits')

@@ -5719,19 +5719,35 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         # بطاقة المحفظة — جدول أنيق
         if self.svrp:
             wallet = self.svrp.get_wallet(message['from']['id'])
-            balance = float(wallet.get('balance', 0) or 0)
-            available = float(wallet.get('total_used', 0) or 0)
-            total_earned = float(wallet.get('total_earned', 0) or 0)
+            svrp_frozen   = float(wallet.get('balance', 0) or 0)
+            svrp_available = float(wallet.get('total_used', 0) or 0)
+            svrp_pending  = float(wallet.get('pending_balance', 0) or 0)
+            total_earned  = float(wallet.get('total_earned', 0) or 0)
+            wager_done    = int(wallet.get('wagering_completed', 0) or 0)
+            wager_req     = int(wallet.get('wagering_required', 3) or 3)
             currency = user.get('currency', 'SAR')
-            profile_text += self.ui_section(self.tr('a0152_المحفظة', lang), '💎')
-            profile_text += self.ui_table(
-                ['الحالة', 'المبلغ', 'العملة'],
-                [
-                    ['🧊 مجمد', f'{balance:.2f}', currency],
-                    ['🟢 متاح', f'{available:.2f}', currency],
-                    ['💰 مكتسب', f'{total_earned:.2f}', currency],
-                ]
-            )
+
+            # رصيد اللعب (SQLite)
+            game_balance = 0.0
+            try:
+                from game_engine import GameManager as _GM
+                game_balance = float(_GM().get_balance(message['from']['id']) or 0)
+            except Exception:
+                pass
+
+            profile_text += self.ui_section(self.tr('a0152_المحفظة', lang), '💳')
+            wallet_rows = [
+                ['🎮 رصيد اللعب', f'{game_balance:.2f}', currency],
+                ['🧊 مجمد (SVRP)', f'{svrp_frozen:.2f}', currency],
+            ]
+            if svrp_available > 0:
+                wallet_rows.append(['🟢 متاح (SVRP)', f'{svrp_available:.2f}', currency])
+            if svrp_pending > 0:
+                wallet_rows.append(['⏳ معلق', f'{svrp_pending:.2f}', currency])
+            if svrp_frozen > 0:
+                wallet_rows.append([f'🔓 الرهان', f'{wager_done}/{wager_req} معاملات', ''])
+            wallet_rows.append(['💰 مكتسب', f'{total_earned:.2f}', currency])
+            profile_text += self.ui_table(['الحالة', 'المبلغ', 'العملة'], wallet_rows)
 
         # بطاقة حسابات الشركات
         profile_text += self.ui_section(self.tr('a0153_حسابات_الشركات', lang), '🏢')

@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=5.0,user-scalable=yes">
+<meta name="theme-color" content="#0a0e17">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="/static/manifest.json">
+<link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/static/icons/icon-32.png">
+<title>محفظتي — VEX</title>
+<link rel="stylesheet" href="/static/css/game-base.css?v=20260812">
+<style>
+body { overflow: auto !important; }
+#app { position: relative !important; height: auto !important; min-height: 100vh; min-height: 100dvh; }
+
+/* ── Topbar ── */
+.wallet-topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px 10px; background: var(--surface); border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 20;
+}
+.wallet-topbar .back-btn {
+  background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
+  width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center;
+  justify-content: center; cursor: pointer; font-size: 16px;
+}
+.wallet-topbar h1 { font-size: 17px; font-weight: 700; color: var(--text); }
+
+/* ── Cards ── */
+.wallet-page { padding: 12px; display: flex; flex-direction: column; gap: 12px; }
+
+.balance-card {
+  background: linear-gradient(135deg, var(--surface-2), var(--surface-3));
+  border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 16px;
+  position: relative; overflow: hidden;
+}
+.balance-card::before {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(ellipse at top right, rgba(0,231,1,0.06) 0%, transparent 60%);
+  pointer-events: none;
+}
+.balance-card .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+.balance-card .amount { font-size: 32px; font-weight: 800; color: var(--green); letter-spacing: -1px; line-height: 1; }
+.balance-card .currency { font-size: 14px; color: var(--muted); margin-top: 4px; }
+.balance-card .actions { display: flex; gap: 8px; margin-top: 16px; }
+.balance-card .actions button {
+  flex: 1; padding: 10px 0; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600;
+  cursor: pointer; border: none; transition: all .2s var(--ease);
+}
+.btn-dep { background: linear-gradient(135deg, #00e701, #0d7a1f); color: #fff; }
+.btn-wdr { background: var(--surface-3); border: 1px solid var(--border); color: var(--text); }
+.btn-dep:active { transform: scale(.97); }
+.btn-wdr:active { transform: scale(.97); }
+
+/* ── Frozen card ── */
+.frozen-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 16px; overflow: hidden;
+}
+.frozen-card .frozen-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.frozen-card .frozen-title { font-size: 14px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 6px; }
+.frozen-card .frozen-amount { font-size: 22px; font-weight: 800; color: #60a5fa; }
+
+/* Wagering progress */
+.wager-bar-wrap { margin: 10px 0; }
+.wager-bar-track { height: 6px; background: var(--surface-3); border-radius: 3px; overflow: hidden; }
+.wager-bar-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, #3b82f6, #8b5cf6); transition: width .6s var(--ease); }
+.wager-labels { display: flex; justify-content: space-between; margin-top: 4px; }
+.wager-labels span { font-size: 10px; color: var(--muted); }
+.wager-hint {
+  background: rgba(59,130,246,.08); border: 1px solid rgba(59,130,246,.2);
+  border-radius: 8px; padding: 10px 12px; margin-top: 8px;
+  font-size: 12px; color: #93c5fd; line-height: 1.5;
+}
+.wager-hint.done { background: rgba(0,231,1,.08); border-color: rgba(0,231,1,.2); color: #6ee7b7; }
+
+/* Freeze sources */
+.freeze-sources { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.freeze-source-row {
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--surface-2); border-radius: 8px; padding: 8px 10px;
+}
+.freeze-source-label { font-size: 12px; color: var(--text-dim); }
+.freeze-source-amount { font-size: 13px; font-weight: 700; color: #60a5fa; }
+.freeze-source-status { font-size: 10px; padding: 2px 6px; border-radius: 4px; }
+.status-frozen { background: rgba(99,102,241,.15); color: #a5b4fc; }
+.status-pending { background: rgba(251,191,36,.1); color: var(--gold); }
+.status-active { background: rgba(0,231,1,.1); color: var(--green); }
+
+/* Pending card */
+.pending-card {
+  background: var(--surface); border: 1px solid rgba(251,191,36,.25); border-radius: var(--radius); padding: 14px 16px;
+}
+.pending-card .pend-header { display: flex; align-items: center; justify-content: space-between; }
+.pending-card .pend-title { font-size: 13px; font-weight: 600; color: var(--gold); display: flex; align-items: center; gap: 6px; }
+.pending-card .pend-amount { font-size: 20px; font-weight: 800; color: var(--gold); }
+.pending-card .pend-hint { font-size: 11px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+
+/* Transactions */
+.txn-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.txn-card .txn-title { padding: 14px 16px 10px; font-size: 14px; font-weight: 700; color: var(--text); border-bottom: 1px solid var(--border); }
+.txn-row { display: flex; align-items: center; padding: 10px 14px; border-bottom: 1px solid rgba(42,49,66,.5); gap: 10px; }
+.txn-icon { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+.txn-icon.dep { background: rgba(0,231,1,.12); }
+.txn-icon.wdr { background: rgba(255,71,87,.12); }
+.txn-icon.rew { background: rgba(251,191,36,.12); }
+.txn-body { flex: 1; min-width: 0; }
+.txn-body .txn-type { font-size: 12px; font-weight: 600; color: var(--text); }
+.txn-body .txn-meta { font-size: 10px; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.txn-amount { font-size: 13px; font-weight: 800; }
+.txn-amount.dep { color: var(--green); }
+.txn-amount.wdr { color: var(--red); }
+.txn-amount.rew { color: var(--gold); }
+.txn-status { font-size: 9px; padding: 2px 5px; border-radius: 4px; margin-top: 3px; display: inline-block; }
+.txn-status.pending { background: rgba(251,191,36,.12); color: var(--gold); }
+.txn-status.completed { background: rgba(0,231,1,.1); color: var(--green); }
+.txn-status.rejected { background: rgba(255,71,87,.1); color: var(--red); }
+
+/* Loader */
+.ld { display: flex; align-items: center; justify-content: center; padding: 40px; }
+.ld::after { content:''; width:24px; height:24px; border:3px solid var(--border); border-top-color:var(--green); border-radius:50%; animation: spin .7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Empty state */
+.txn-empty { padding: 24px; text-align: center; color: var(--muted); font-size: 13px; }
+
+@media(min-width:600px){
+  #app{ max-width: 440px; margin: 0 auto; }
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="wallet-topbar">
+    <button class="back-btn" onclick="history.back()">←</button>
+    <h1>💳 محفظتي</h1>
+    <div style="width:36px"></div>
+  </div>
+
+  <div id="walletPage" class="wallet-page">
+    <div class="ld" id="loader"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal" style="display:none"><div class="modal-box" id="modalBox"></div></div>
+<script src="/static/js/game-base.js?v=20260812"></script>
+<script>
+const lang = new URLSearchParams(location.search).get('lang') || 'ar';
+
+// ── helpers ──────────────────────────────────────────────────────────────────
+const fmt = (n, cur) => `${(+n||0).toLocaleString('ar-EG',{maximumFractionDigits:2})} ${cur||'EGP'}`;
+const pct = (done, req) => req > 0 ? Math.min(100, Math.round(done / req * 100)) : 100;
+
+const TYPE_LABELS = {
+  deposit: '💰 إيداع',
+  withdraw: '💸 سحب',
+  referral: '🎁 مكافأة إحالة',
+  recovery: '🔄 تعويض',
+  compensation: '💎 تعويض',
+  game_win: '🏆 ربح ألعاب',
+};
+const STATUS_LABELS = {
+  pending: 'معلق', completed: 'مكتمل', rejected: 'مرفوض',
+  approved: 'مكتمل', cancelled: 'ملغي',
+};
+
+function txnClass(type) {
+  if (/deposit|add/i.test(type)) return 'dep';
+  if (/withdraw|wdr/i.test(type)) return 'wdr';
+  return 'rew';
+}
+function txnIcon(type) {
+  if (/deposit|add/i.test(type)) return '💰';
+  if (/withdraw|wdr/i.test(type)) return '💸';
+  if (/referral/i.test(type)) return '🎁';
+  return '💎';
+}
+
+// ── render ────────────────────────────────────────────────────────────────────
+function renderWallet(d) {
+  const cur = d.currency || 'EGP';
+  const hasFrozen  = d.frozen_balance > 0;
+  const hasPending = d.pending_balance > 0;
+  const wagerPct   = pct(d.wagering_completed, d.wagering_required);
+
+  // ── Game Balance card
+  let html = `
+  <div class="balance-card">
+    <div class="label">🎮 رصيد اللعب المتاح</div>
+    <div class="amount" id="liveBalance">${(d.available_balance||0).toLocaleString()}</div>
+    <div class="currency">${cur}</div>
+    <div class="actions">
+      <button class="btn-dep" onclick="showDeposit()">💰 إيداع</button>
+      <button class="btn-wdr" onclick="showWithdraw()">💸 سحب</button>
+    </div>
+  </div>`;
+
+  // ── Frozen balance card (SVRP)
+  if (hasFrozen) {
+    const wagerDone = d.wagering_completed || 0;
+    const wagerReq  = d.wagering_required  || 3;
+    const isFree    = !d.is_frozen;
+    const hintText  = isFree
+      ? `✅ استكملت متطلبات الرهان — يمكنك استخدام رصيدك المجمد الآن`
+      : `🔒 أكمل <strong>${d.wagering_remaining}</strong> معاملة إضافية لتحرير رصيدك المجمد`;
+
+    // Freeze sources list
+    let sourcesHtml = '';
+    if (d.freeze_sources && d.freeze_sources.length) {
+      sourcesHtml = `<div class="freeze-sources">`;
+      for (const src of d.freeze_sources) {
+        sourcesHtml += `
+        <div class="freeze-source-row">
+          <span class="freeze-source-label">${src.label}</span>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span class="freeze-source-amount">${fmt(src.amount, cur)}</span>
+            <span class="freeze-source-status status-${src.status}">${src.status === 'frozen' ? 'مجمد' : src.status === 'pending' ? 'معلق' : 'نشط'}</span>
+          </div>
+        </div>`;
+      }
+      sourcesHtml += `</div>`;
+    }
+
+    html += `
+    <div class="frozen-card">
+      <div class="frozen-header">
+        <div class="frozen-title">🔒 رصيد مجمد (تعويض)</div>
+        <div class="frozen-amount">${fmt(d.frozen_balance, cur)}</div>
+      </div>
+
+      <div class="wager-bar-wrap">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">تقدم فك التجميد</div>
+        <div class="wager-bar-track">
+          <div class="wager-bar-fill" style="width:${wagerPct}%"></div>
+        </div>
+        <div class="wager-labels">
+          <span>${wagerDone} معاملة</span>
+          <span>${wagerPct}%</span>
+          <span>من ${wagerReq}</span>
+        </div>
+      </div>
+
+      <div class="wager-hint ${isFree ? 'done' : ''}">${hintText}</div>
+      ${sourcesHtml}
+    </div>`;
+  }
+
+  // ── Pending card
+  if (hasPending) {
+    html += `
+    <div class="pending-card">
+      <div class="pend-header">
+        <div class="pend-title">⏳ بانتظار تفعيل الأصدقاء</div>
+        <div class="pend-amount">${fmt(d.pending_balance, cur)}</div>
+      </div>
+      <div class="pend-hint">هذا الرصيد ينتظر إتمام الأصدقاء المُحالين لمتطلبات الرهان. سيُضاف تلقائياً للرصيد المجمد عند الاستيفاء.</div>
+    </div>`;
+  }
+
+  // ── Recent Transactions
+  html += `<div class="txn-card"><div class="txn-title">📋 آخر المعاملات</div>`;
+  const txns = d.recent_transactions || [];
+  if (!txns.length) {
+    html += `<div class="txn-empty">لا توجد معاملات بعد</div>`;
+  } else {
+    for (const t of txns) {
+      const cls = txnClass(t.type);
+      const ico = txnIcon(t.type);
+      const lbl = TYPE_LABELS[t.type] || t.type || '—';
+      const sign = cls === 'dep' ? '+' : cls === 'wdr' ? '−' : '+';
+      const statusLbl = STATUS_LABELS[t.status] || t.status || '';
+      const statusCls = t.status === 'completed' || t.status === 'approved' ? 'completed'
+                      : t.status === 'rejected' || t.status === 'cancelled' ? 'rejected' : 'pending';
+      html += `
+      <div class="txn-row">
+        <div class="txn-icon ${cls}">${ico}</div>
+        <div class="txn-body">
+          <div class="txn-type">${lbl}</div>
+          <div class="txn-meta">${t.company ? t.company + ' · ' : ''}${t.date || ''}</div>
+          ${statusLbl ? `<span class="txn-status ${statusCls}">${statusLbl}</span>` : ''}
+        </div>
+        <div class="txn-amount ${cls}">${sign}${parseFloat(t.amount||0).toLocaleString()} ${cur}</div>
+      </div>`;
+    }
+  }
+  html += `</div>`;
+
+  document.getElementById('loader').style.display = 'none';
+  document.getElementById('walletPage').innerHTML = html;
+
+  // live balance polling
+  setInterval(async () => {
+    try {
+      const r = await apiFetch(`${BASE}/api/wallet/balance`);
+      const dd = await r.json();
+      const el = document.getElementById('liveBalance');
+      if (el && dd.balance !== undefined) {
+        const newVal = (dd.balance||0).toLocaleString();
+        if (el.textContent !== newVal) {
+          el.textContent = newVal;
+          el.style.color = '#00e701';
+          setTimeout(() => { el.style.color = ''; }, 800);
+        }
+      }
+    } catch(_) {}
+  }, 5000);
+}
+
+// ── load ──────────────────────────────────────────────────────────────────────
+async function loadWallet() {
+  try {
+    const r = await apiFetch(`${BASE}/api/player/wallet`);
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    renderWallet(d);
+  } catch(e) {
+    document.getElementById('loader').style.display = 'none';
+    document.getElementById('walletPage').innerHTML =
+      `<div class="txn-empty" style="padding:40px;font-size:14px">⚠️ تعذّر تحميل المحفظة<br><small style="color:var(--muted)">${e.message||''}</small></div>`;
+  }
+}
+
+function showDeposit() { window.location.href = `${BASE}/webapp/games?${_getAuthParam()}&lang=${lang}&action=deposit`; }
+function showWithdraw() { window.location.href = `${BASE}/webapp/games?${_getAuthParam()}&lang=${lang}&action=withdraw`; }
+
+loadWallet();
+</script>
+</body>
+</html>
