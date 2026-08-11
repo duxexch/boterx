@@ -370,6 +370,12 @@ class GameManager:
             )
         return True  # CSV fallback: no idempotency
 
+    def mark_svrp_transfer_csv_debited(self, transfer_id, uid):
+        """Mark csv_debited=1 inside svrp_lock after use_credits() succeeds."""
+        if _USE_SQLITE:
+            return _db.mark_svrp_transfer_csv_debited(transfer_id, uid)
+        return True
+
     def mark_svrp_transfer_status(self, transfer_id, uid, status):
         """Set terminal status (rolled_back etc.) with uid ownership check."""
         if _USE_SQLITE:

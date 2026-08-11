@@ -125,6 +125,7 @@ def _init_db():
                 amount                REAL    NOT NULL DEFAULT 0,
                 status                TEXT    NOT NULL DEFAULT 'pending',
                 pre_debit_svrp_balance REAL,
+                csv_debited           INTEGER NOT NULL DEFAULT 0,
                 created_at            TEXT    NOT NULL
             );
             CREATE INDEX IF NOT EXISTS idx_svrp_tlog_uid ON svrp_transfer_log(uid);
@@ -404,14 +405,16 @@ class GameDB:
                 created_at            TEXT    NOT NULL
             )
         ''')
-        # Migration: add pre_debit_svrp_balance if the table already exists without it
-        try:
-            conn.execute(
-                'ALTER TABLE svrp_transfer_log ADD COLUMN pre_debit_svrp_balance REAL'
-            )
-            conn.commit()
-        except Exception:
-            pass  # column already exists
+        # Migration: add columns that may be absent on existing installations
+        for _col_ddl in [
+            'ALTER TABLE svrp_transfer_log ADD COLUMN pre_debit_svrp_balance REAL',
+            'ALTER TABLE svrp_transfer_log ADD COLUMN csv_debited INTEGER NOT NULL DEFAULT 0',
+        ]:
+            try:
+                conn.execute(_col_ddl)
+                conn.commit()
+            except Exception:
+                pass  # column already exists
 
     def create_svrp_transfer(self, transfer_id, uid):
         """Reserve a slot in the outbox with status='pending' and amount=0.
@@ -458,6 +461,24 @@ class GameDB:
                 'WHERE transfer_id = ? AND uid = ? AND status = ?',
                 ('debited', float(actual_amount), float(pre_debit_svrp_balance),
                  transfer_id, str(uid), 'pending')
+            )
+            conn.commit()
+            return result.rowcount == 1
+
+    def mark_svrp_transfer_csv_debited(self, transfer_id, uid):
+        """Mark csv_debited=1 on the outbox record.
+
+        Called inside svrp_lock() immediately after use_credits() succeeds so
+        that crash-recovery can determine whether the CSV debit occurred without
+        relying on balance comparisons (which are unsafe under concurrent SVRP
+        mutations).  Requires uid match.  Returns True if one row was updated.
+        """
+        conn = self._conn()
+        with _db_lock:
+            result = conn.execute(
+                'UPDATE svrp_transfer_log SET csv_debited = 1 '
+                'WHERE transfer_id = ? AND uid = ?',
+                (transfer_id, str(uid))
             )
             conn.commit()
             return result.rowcount == 1
@@ -548,17 +569,53 @@ class GameDB:
                     f'Transfer {transfer_id} is in state={db_status!r}; '
                     f'expected "debited" to apply game credit'
                 )
-            # CAS: credit game balance + mark completed in one transaction
-            conn.execute(
-                'INSERT INTO users (telegram_id, game_balance) VALUES (?, ?) '
-                'ON CONFLICT(telegram_id) DO UPDATE SET game_balance = game_balance + ?',
-                (uid, float(amt), float(amt))
-            )
-            conn.execute(
-                'UPDATE svrp_transfer_log SET status = ? '
-                'WHERE transfer_id = ? AND status = ?',
-                ('completed', transfer_id, 'debited')
-            )
+            # Atomically credit + CAS debited→completed in a single SAVEPOINT.
+            # Verifying rowcount before RELEASE ensures both statements committed
+            # together or neither did — preventing a crash between them from
+            # crediting the game balance without marking 'completed'.
+            conn.execute('SAVEPOINT svrp_credit')
+            try:
+                conn.execute(
+                    'INSERT INTO users (telegram_id, game_balance) VALUES (?, ?) '
+                    'ON CONFLICT(telegram_id) '
+                    'DO UPDATE SET game_balance = game_balance + ?',
+                    (uid, float(amt), float(amt))
+                )
+                cas_result = conn.execute(
+                    'UPDATE svrp_transfer_log SET status = ? '
+                    'WHERE transfer_id = ? AND status = ?',
+                    ('completed', transfer_id, 'debited')
+                )
+                if cas_result.rowcount != 1:
+                    # Another request already transitioned this record — roll back
+                    # the credit and let the caller decide (replay vs. error).
+                    conn.execute('ROLLBACK TO SAVEPOINT svrp_credit')
+                    conn.execute('RELEASE SAVEPOINT svrp_credit')
+                    conn.commit()
+                    # Re-read status to determine whether it is now 'completed'
+                    re_row = conn.execute(
+                        'SELECT status FROM svrp_transfer_log WHERE transfer_id = ?',
+                        (transfer_id,)
+                    ).fetchone()
+                    re_status = re_row[0] if re_row else None
+                    if re_status == 'completed':
+                        # Race was won by another request — idempotent replay
+                        bal = conn.execute(
+                            'SELECT game_balance FROM users WHERE telegram_id = ?',
+                            (uid,)
+                        ).fetchone()
+                        return _money_float(bal[0]) if bal and bal[0] is not None else 0.0
+                    raise RuntimeError(
+                        f'SVRP credit CAS failed: status={re_status!r}'
+                    )
+                conn.execute('RELEASE SAVEPOINT svrp_credit')
+            except Exception:
+                try:
+                    conn.execute('ROLLBACK TO SAVEPOINT svrp_credit')
+                    conn.execute('RELEASE SAVEPOINT svrp_credit')
+                except Exception:
+                    pass
+                raise
             conn.commit()
             bal = conn.execute(
                 'SELECT game_balance FROM users WHERE telegram_id = ?', (uid,)

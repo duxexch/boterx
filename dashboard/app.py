@@ -4958,39 +4958,34 @@ def api_svrp_transfer_to_game():
 
     if _resume_debited:
         # ── Resume: check whether CSV debit actually occurred ─────────────────
+        # Use the durable csv_debited flag (set inside svrp_lock immediately
+        # after use_credits succeeds) — NOT a balance-threshold heuristic, which
+        # is unreliable under concurrent SVRP mutations.
         existing_rec = _gm.get_svrp_transfer(_transfer_id)
         amount = float((existing_rec or {}).get('amount') or 0)
-        pre_db = (existing_rec or {}).get('pre_debit_svrp_balance')
+        _csv_was_debited = bool((existing_rec or {}).get('csv_debited', 0))
 
-        if pre_db is not None:
-            # Compare current CSV balance to pre-debit snapshot to detect
-            # whether the CSV write occurred before the crash.
+        if not _csv_was_debited:
+            # CSV debit never completed (crash between CAS and use_credits).
+            # Re-apply the CSV debit inside svrp_lock before game credit.
             with _svrp_lock():
                 _mrx = _SVRPMgr()
-                _wlx = _mrx.get_wallet(uid)
-                cur_csv_bal = float((_wlx or {}).get('balance', 0) or 0)
-                _csv_debited = cur_csv_bal <= (float(pre_db) - amount + 1e-6)
-
-                if not _csv_debited:
-                    # CSV debit never happened — apply it now before game credit
-                    _credits_snapshot = {
-                        r['id']: dict(r)
-                        for r in _mrx._read_csv('svrp_credits.csv')
-                        if r.get('user_id') == uid
-                        and r.get('status') in ('active', 'pending')
-                    }
-                    try:
-                        _rok, _rmsg = _mrx.use_credits(uid, amount)
-                        if not _rok:
-                            return jsonify({
-                                'error': _rmsg or 'فشل تطبيق الخصم عند الاستئناف'
-                            }), 400
-                    except Exception as _re1:
-                        return jsonify({'error': f'خطأ في استئناف الخصم: {_re1}'}), 500
-        else:
-            # No pre_debit recorded (very old record or crash before CAS stored it)
-            # Safe default: assume CSV debit happened (avoid double debit)
-            pass
+                _credits_snapshot = {
+                    r['id']: dict(r)
+                    for r in _mrx._read_csv('svrp_credits.csv')
+                    if r.get('user_id') == uid
+                    and r.get('status') in ('active', 'pending')
+                }
+                try:
+                    _rok, _rmsg = _mrx.use_credits(uid, amount)
+                    if not _rok:
+                        return jsonify({
+                            'error': _rmsg or 'فشل تطبيق الخصم عند الاستئناف'
+                        }), 400
+                    # Mark the flag so a subsequent crash here is handled correctly
+                    _gm.mark_svrp_transfer_csv_debited(_transfer_id, uid)
+                except Exception as _re1:
+                    return jsonify({'error': f'خطأ في استئناف الخصم: {_re1}'}), 500
 
     else:
         # ── Fresh debit ───────────────────────────────────────────────────────
@@ -5061,7 +5056,10 @@ def api_svrp_transfer_to_game():
                 )
                 return jsonify({'error': 'خطأ داخلي — تم رفض الطلب (تعارض)'}), 409
 
-            # A4. CSV debit — inside lock, AFTER the durable SQLite CAS
+            # A4. CSV debit — inside lock, AFTER the durable SQLite CAS.
+            # csv_debited is set atomically inside this same lock scope so that
+            # crash-recovery can use it as a reliable debit marker rather than
+            # an unsafe balance-threshold comparison.
             try:
                 ok, msg = _mgr.use_credits(uid, amount)
                 if not ok:
@@ -5071,6 +5069,8 @@ def api_svrp_transfer_to_game():
                     except Exception:
                         pass
                     return jsonify({'error': msg or 'فشل خصم أرصدة SVRP'}), 400
+                # Flag the CSV debit as complete — used by crash-recovery resume
+                _gm.mark_svrp_transfer_csv_debited(_transfer_id, uid)
             except Exception as _e1:
                 try:
                     _gm.mark_svrp_transfer_status(_transfer_id, uid, 'pending')
