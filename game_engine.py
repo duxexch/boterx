@@ -371,10 +371,36 @@ class GameManager:
         return True  # CSV fallback: no idempotency
 
     def mark_svrp_transfer_csv_debited(self, transfer_id, uid):
-        """Mark csv_debited=1 inside svrp_lock after use_credits() succeeds."""
+        """Mark csv_debited=1 (legacy; no longer called by transfer endpoint)."""
         if _USE_SQLITE:
             return _db.mark_svrp_transfer_csv_debited(transfer_id, uid)
         return True
+
+    # ── SQLite-only SVRP wallet operations ──────────────────────────────────
+
+    def get_svrp_frozen_balance(self, uid):
+        """Return SQLite authoritative frozen-balance dict for uid."""
+        if _USE_SQLITE:
+            return _db.get_svrp_frozen_balance(uid)
+        return {'frozen_balance': 0.0, 'wagering_required': 3, 'wagering_completed': 0}
+
+    def get_outstanding_debited_transfer(self, uid):
+        """Return transfer_id of any 'debited' transfer for uid, or None."""
+        if _USE_SQLITE:
+            return _db.get_outstanding_debited_transfer(uid)
+        return None
+
+    def credit_svrp_balance_for_approval(self, req_id, uid, amount):
+        """Approve request + credit frozen balance in one SQLite SAVEPOINT."""
+        if _USE_SQLITE:
+            return _db.credit_svrp_balance_for_approval(req_id, uid, amount)
+        return False, 'SQLite not available'
+
+    def debit_svrp_balance_for_transfer(self, transfer_id, uid, amount):
+        """Debit frozen balance + CAS pending→debited in one SQLite SAVEPOINT."""
+        if _USE_SQLITE:
+            return _db.debit_svrp_balance_for_transfer(transfer_id, uid, amount)
+        return False
 
     def mark_svrp_transfer_status(self, transfer_id, uid, status):
         """Set terminal status (rolled_back etc.) with uid ownership check."""

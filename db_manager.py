@@ -130,6 +130,30 @@ def _init_db():
             );
             CREATE INDEX IF NOT EXISTS idx_svrp_tlog_uid ON svrp_transfer_log(uid);
 
+            -- Authoritative frozen SVRP wallet balance (replaces svrp_wallets.csv
+            -- for all financial mutations).  The CSV is kept for display/metadata only.
+            -- wagering_required/wagering_completed control when the balance is unlocked.
+            CREATE TABLE IF NOT EXISTS svrp_wallet_balance (
+                uid                  TEXT PRIMARY KEY,
+                frozen_balance       REAL NOT NULL DEFAULT 0,
+                total_earned         REAL NOT NULL DEFAULT 0,
+                total_used           REAL NOT NULL DEFAULT 0,
+                wagering_required    INTEGER NOT NULL DEFAULT 3,
+                wagering_completed   INTEGER NOT NULL DEFAULT 0
+            );
+
+            -- Per-request approval ledger.  Each recovery approval gets one row;
+            -- the balance credit and status transition are committed in a single
+            -- SAVEPOINT so there is no crash window between them.
+            CREATE TABLE IF NOT EXISTS svrp_approval_log (
+                req_id      TEXT PRIMARY KEY,
+                uid         TEXT NOT NULL,
+                amount      REAL NOT NULL DEFAULT 0,
+                status      TEXT NOT NULL DEFAULT 'pending',
+                created_at  TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_svrp_alog_uid ON svrp_approval_log(uid);
+
             -- Snatch game sessions: durable state machine co-located with wallet
             -- so wallet and session state are always in the same DB file.
             -- status: intent | pending | settling | refunding | settled | refunded
@@ -394,7 +418,7 @@ class GameDB:
     # rejected rather than creating a second debit.
 
     def _ensure_svrp_transfer_table(self, conn):
-        """Idempotent: create svrp_transfer_log if absent; add columns if upgrading."""
+        """Idempotent: create svrp_transfer_log + wallet/approval tables; add missing cols."""
         conn.execute('''
             CREATE TABLE IF NOT EXISTS svrp_transfer_log (
                 transfer_id           TEXT PRIMARY KEY,
@@ -405,6 +429,28 @@ class GameDB:
                 created_at            TEXT    NOT NULL
             )
         ''')
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS svrp_wallet_balance (
+                uid                TEXT PRIMARY KEY,
+                frozen_balance     REAL NOT NULL DEFAULT 0,
+                total_earned       REAL NOT NULL DEFAULT 0,
+                total_used         REAL NOT NULL DEFAULT 0,
+                wagering_required  INTEGER NOT NULL DEFAULT 3,
+                wagering_completed INTEGER NOT NULL DEFAULT 0
+            )
+        ''')
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS svrp_approval_log (
+                req_id     TEXT PRIMARY KEY,
+                uid        TEXT NOT NULL,
+                amount     REAL NOT NULL DEFAULT 0,
+                status     TEXT NOT NULL DEFAULT 'pending',
+                created_at TEXT NOT NULL
+            )
+        ''')
+        conn.execute(
+            'CREATE INDEX IF NOT EXISTS idx_svrp_alog_uid ON svrp_approval_log(uid)'
+        )
         # Migration: add columns that may be absent on existing installations
         for _col_ddl in [
             'ALTER TABLE svrp_transfer_log ADD COLUMN pre_debit_svrp_balance REAL',
@@ -415,6 +461,210 @@ class GameDB:
                 conn.commit()
             except Exception:
                 pass  # column already exists
+
+    # ── SQLite-only SVRP wallet operations ──────────────────────────────────
+    # All financial mutations (frozen balance credit/debit) happen exclusively
+    # in SQLite so that each state transition is atomic within a single DB
+    # transaction.  The svrp_wallets.csv remains for display/metadata only and
+    # is never consulted for balance decisions.
+
+    def get_svrp_frozen_balance(self, uid):
+        """Return the SQLite frozen-balance row for uid, or a zeroed default dict.
+
+        Always reflects the authoritative committed state — no CSV involved.
+        """
+        conn = self._conn()
+        self._ensure_svrp_transfer_table(conn)
+        row = conn.execute(
+            'SELECT frozen_balance, total_earned, total_used, '
+            'wagering_required, wagering_completed '
+            'FROM svrp_wallet_balance WHERE uid = ?',
+            (str(uid),)
+        ).fetchone()
+        if row:
+            return {
+                'uid': str(uid),
+                'frozen_balance':     float(row[0]),
+                'total_earned':       float(row[1]),
+                'total_used':         float(row[2]),
+                'wagering_required':  int(row[3]),
+                'wagering_completed': int(row[4]),
+            }
+        return {
+            'uid': str(uid),
+            'frozen_balance': 0.0, 'total_earned': 0.0, 'total_used': 0.0,
+            'wagering_required': 3, 'wagering_completed': 0,
+        }
+
+    def get_outstanding_debited_transfer(self, uid):
+        """Return the transfer_id of any 'debited' transfer for uid, or None.
+
+        Used to enforce one-outstanding-transfer-per-user: a new transfer must
+        not start while one is in the 'debited' (mid-flight) state.
+        """
+        conn = self._conn()
+        self._ensure_svrp_transfer_table(conn)
+        row = conn.execute(
+            'SELECT transfer_id FROM svrp_transfer_log '
+            'WHERE uid = ? AND status = ? LIMIT 1',
+            (str(uid), 'debited')
+        ).fetchone()
+        return row[0] if row else None
+
+    def credit_svrp_balance_for_approval(self, req_id, uid, amount):
+        """Approve a recovery request and credit frozen balance atomically.
+
+        State machine (per req_id in svrp_approval_log):
+          pending   → complete approval + credit wallet in one SAVEPOINT
+          completed → idempotent replay (no re-credit)
+          absent    → INSERT + approve + credit in one SAVEPOINT
+
+        Returns (True, new_frozen_balance) on success or idempotent replay.
+        Returns (False, msg) if the request was already completed by a different
+        uid (ownership violation) or amount mismatch.
+        Raises on SQLite error — caller must not update request CSV.
+        """
+        uid = str(uid)
+        amt = float(_money(amount))
+        conn = self._conn()
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        with _db_lock:
+            self._ensure_svrp_transfer_table(conn)
+            existing = conn.execute(
+                'SELECT uid, amount, status FROM svrp_approval_log WHERE req_id = ?',
+                (req_id,)
+            ).fetchone()
+
+            if existing:
+                ex_uid, ex_amt, ex_status = existing[0], existing[1], existing[2]
+                if ex_uid != uid:
+                    return False, (
+                        f'الطلب {req_id} مرتبط بمستخدم مختلف'
+                    )
+                if ex_status == 'completed':
+                    # Idempotent replay — just return current balance
+                    bal_row = conn.execute(
+                        'SELECT frozen_balance FROM svrp_wallet_balance WHERE uid = ?',
+                        (uid,)
+                    ).fetchone()
+                    return True, float(bal_row[0]) if bal_row else 0.0
+                # 'pending' → proceed to SAVEPOINT below
+
+            # Atomic: INSERT OR IGNORE approval record + credit + mark completed
+            conn.execute('SAVEPOINT svrp_approve')
+            try:
+                conn.execute(
+                    'INSERT OR IGNORE INTO svrp_approval_log '
+                    '(req_id, uid, amount, status, created_at) VALUES (?, ?, ?, ?, ?)',
+                    (req_id, uid, amt, 'pending', now)
+                )
+                # Credit wallet
+                conn.execute(
+                    'INSERT INTO svrp_wallet_balance (uid, frozen_balance, total_earned) '
+                    'VALUES (?, ?, ?) ON CONFLICT(uid) DO UPDATE SET '
+                    'frozen_balance = frozen_balance + ?, total_earned = total_earned + ?',
+                    (uid, amt, amt, amt, amt)
+                )
+                # CAS pending→completed
+                cas = conn.execute(
+                    'UPDATE svrp_approval_log SET status = ? '
+                    'WHERE req_id = ? AND status = ?',
+                    ('completed', req_id, 'pending')
+                )
+                if cas.rowcount != 1:
+                    conn.execute('ROLLBACK TO SAVEPOINT svrp_approve')
+                    conn.execute('RELEASE SAVEPOINT svrp_approve')
+                    conn.commit()
+                    # Re-check: another concurrent approval beat us
+                    re = conn.execute(
+                        'SELECT status FROM svrp_approval_log WHERE req_id = ?', (req_id,)
+                    ).fetchone()
+                    if re and re[0] == 'completed':
+                        bal_row = conn.execute(
+                            'SELECT frozen_balance FROM svrp_wallet_balance WHERE uid = ?',
+                            (uid,)
+                        ).fetchone()
+                        return True, float(bal_row[0]) if bal_row else 0.0
+                    raise RuntimeError(f'Approval CAS failed for req_id={req_id}')
+                conn.execute('RELEASE SAVEPOINT svrp_approve')
+            except Exception:
+                try:
+                    conn.execute('ROLLBACK TO SAVEPOINT svrp_approve')
+                    conn.execute('RELEASE SAVEPOINT svrp_approve')
+                except Exception:
+                    pass
+                raise
+            conn.commit()
+            bal_row = conn.execute(
+                'SELECT frozen_balance FROM svrp_wallet_balance WHERE uid = ?', (uid,)
+            ).fetchone()
+            return True, float(bal_row[0]) if bal_row else amt
+
+    def debit_svrp_balance_for_transfer(self, transfer_id, uid, amount):
+        """Debit frozen balance and CAS transfer pending→debited atomically.
+
+        Both the wallet debit and the state transition are committed in a single
+        SAVEPOINT — no cross-store inconsistency, no csv_debited flag needed.
+
+        Returns True on success.
+        Returns False if transfer not in 'pending' state or uid mismatch.
+        Raises if balance is insufficient or SQLite fails.
+        """
+        uid = str(uid)
+        amt = float(_money(amount))
+        conn = self._conn()
+        with _db_lock:
+            self._ensure_svrp_transfer_table(conn)
+            conn.execute('SAVEPOINT svrp_debit')
+            try:
+                # Debit wallet (fail if balance insufficient)
+                res = conn.execute(
+                    'UPDATE svrp_wallet_balance '
+                    'SET frozen_balance = frozen_balance - ?, '
+                    '    total_used     = total_used     + ? '
+                    'WHERE uid = ? AND frozen_balance >= ? - 0.0001',
+                    (amt, amt, uid, amt)
+                )
+                if res.rowcount != 1:
+                    # Either uid doesn't exist in wallet or insufficient balance
+                    bal_row = conn.execute(
+                        'SELECT frozen_balance FROM svrp_wallet_balance WHERE uid = ?',
+                        (uid,)
+                    ).fetchone()
+                    cur_bal = float(bal_row[0]) if bal_row else 0.0
+                    conn.execute('ROLLBACK TO SAVEPOINT svrp_debit')
+                    conn.execute('RELEASE SAVEPOINT svrp_debit')
+                    conn.commit()
+                    if cur_bal < amt:
+                        raise ValueError(
+                            f'رصيد SVRP غير كافٍ: المتاح {cur_bal:.2f}, '
+                            f'المطلوب {amt:.2f}'
+                        )
+                    raise RuntimeError(
+                        f'Wallet debit UPDATE matched 0 rows for uid={uid}'
+                    )
+                # CAS: pending → debited
+                cas = conn.execute(
+                    'UPDATE svrp_transfer_log '
+                    'SET status = ?, amount = ? '
+                    'WHERE transfer_id = ? AND uid = ? AND status = ?',
+                    ('debited', amt, transfer_id, uid, 'pending')
+                )
+                if cas.rowcount != 1:
+                    conn.execute('ROLLBACK TO SAVEPOINT svrp_debit')
+                    conn.execute('RELEASE SAVEPOINT svrp_debit')
+                    conn.commit()
+                    return False  # transfer not in pending state or wrong uid
+                conn.execute('RELEASE SAVEPOINT svrp_debit')
+            except Exception:
+                try:
+                    conn.execute('ROLLBACK TO SAVEPOINT svrp_debit')
+                    conn.execute('RELEASE SAVEPOINT svrp_debit')
+                except Exception:
+                    pass
+                raise
+            conn.commit()
+            return True
 
     def create_svrp_transfer(self, transfer_id, uid):
         """Reserve a slot in the outbox with status='pending' and amount=0.
