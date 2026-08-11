@@ -136,6 +136,110 @@ def api_auth(f):
         return f(*args, **kwargs)
     return decorated
 
+# ── RBAC — Role-Based Access Control ─────────────────────────────────────────
+# Import module-level helpers from db_manager; provide no-op fallbacks so the
+# dashboard still starts even if db_manager is absent (shouldn't happen in prod).
+try:
+    from db_manager import (has_permission as _rbac_has_perm,
+                             get_admin_role as _rbac_get_role,
+                             log_admin_action as _rbac_log,
+                             set_admin_role as _rbac_set_role,
+                             ROLE_PERMISSIONS as _ROLE_PERMISSIONS)
+    _RBAC_AVAILABLE = True
+except ImportError:
+    _RBAC_AVAILABLE = False
+    def _rbac_has_perm(uid, perm): return True   # allow-all fallback
+    def _rbac_get_role(uid): return {'role': 'super_admin', 'permissions': {}}
+    def _rbac_log(*a, **k): pass
+    def _rbac_set_role(*a, **k): return False
+    _ROLE_PERMISSIONS = {}
+
+
+def permission_required(permission_key):
+    """Decorator: require admin status + a specific RBAC permission (JSON/API routes).
+
+    Stack after @api_auth.  Rejects with 401 if not logged in, 403 if the
+    session belongs to a non-admin user (logged_in but is_admin is falsy), and
+    403 if the admin lacks the required permission.
+
+    This double-gate prevents a web/player session (logged_in=True, is_admin=False)
+    from accessing admin APIs even if their UID was assigned an RBAC role.
+    """
+    def decorator(f):
+        @wraps(f)
+        def decorated_fn(*args, **kwargs):
+            if not session.get('logged_in'):
+                return jsonify({'error': 'Unauthorized'}), 401
+            # Require admin flag — prevents player sessions from passing through
+            if not session.get('is_admin'):
+                return jsonify({'error': 'Forbidden — admin access required'}), 403
+            uid = str(session.get('admin_id', ''))
+            if not _rbac_has_perm(uid, permission_key):
+                return jsonify({
+                    'error': 'Permission denied',
+                    'required': permission_key,
+                    'message': 'ليس لديك صلاحية لهذا الإجراء',
+                }), 403
+            return f(*args, **kwargs)
+        return decorated_fn
+    return decorator
+
+
+def page_permission_required(permission_key):
+    """Decorator: require admin status + a specific RBAC permission (HTML page routes).
+
+    Stack after @admin_required.  Returns a plain 403 HTML response if the
+    logged-in admin lacks the permission so the browser shows a clear error.
+    Also rejects non-admin sessions (is_admin falsy) with the same 403.
+    """
+    def decorator(f):
+        @wraps(f)
+        def decorated_fn(*args, **kwargs):
+            if not session.get('logged_in'):
+                return redirect(url_for('login'))
+            # Require admin flag — prevents player sessions from passing through
+            if not session.get('is_admin'):
+                return redirect(url_for('dashboard'))
+            uid = str(session.get('admin_id', ''))
+            if not _rbac_has_perm(uid, permission_key):
+                html = (
+                    '<!doctype html><html lang="ar" dir="rtl">'
+                    '<head><meta charset="utf-8"><title>403 — غير مصرح</title>'
+                    '<style>body{font-family:sans-serif;background:#0f172a;color:#94a3b8;'
+                    'display:flex;align-items:center;justify-content:center;height:100vh;margin:0}'
+                    '.box{text-align:center}.icon{font-size:4rem;margin-bottom:1rem}'
+                    'h1{color:#f43f5e;font-size:1.5rem}a{color:#60a5fa}</style></head>'
+                    f'<body><div class="box"><div class="icon">🚫</div>'
+                    f'<h1>غير مصرح — ليس لديك صلاحية هذه الصفحة</h1>'
+                    f'<p>الصلاحية المطلوبة: <code>{permission_key}</code></p>'
+                    f'<a href="/dashboard">العودة للوحة التحكم</a></div></body></html>'
+                )
+                return html, 403
+            return f(*args, **kwargs)
+        return decorated_fn
+    return decorator
+
+
+@app.context_processor
+def _inject_admin_context():
+    """Inject admin_role and admin_perms into every template render.
+
+    Templates use these to conditionally show/hide sidebar links and actions.
+    The call is a single SQLite SELECT (~0.1 ms) so the per-request cost is
+    negligible.
+    """
+    if session.get('logged_in'):
+        uid = str(session.get('admin_id', ''))
+        try:
+            role_data = _rbac_get_role(uid)
+            return {
+                'admin_role': role_data.get('role') or 'super_admin',
+                'admin_perms': role_data.get('permissions') or {},
+            }
+        except Exception:
+            pass
+    return {'admin_role': None, 'admin_perms': {}}
+
 # ===== Telegram WebApp Auth =====
 import logging as _auth_log
 _auth_logger = _auth_log.getLogger('boterx.auth')
@@ -1004,36 +1108,43 @@ def home():
 
 @app.route('/transactions')
 @admin_required
+@page_permission_required('view_financial')
 def page_transactions():
     return render_template('transactions.html', active_page='transactions')
 
 @app.route('/users')
 @admin_required
+@page_permission_required('ban_users')
 def page_users():
     return render_template('users.html', active_page='users')
 
 @app.route('/matching')
 @admin_required
+@page_permission_required('view_financial')
 def page_matching():
     return render_template('matching.html', active_page='matching')
 
 @app.route('/svrp')
 @admin_required
+@page_permission_required('view_financial')
 def page_svrp():
     return render_template('svrp.html', active_page='svrp')
 
 @app.route('/trading')
 @admin_required
+@page_permission_required('view_financial')
 def page_trading():
     return render_template('trading.html', active_page='trading')
 
 @app.route('/lottery')
 @admin_required
+@page_permission_required('manage_games')
 def page_lottery():
     return render_template('lottery.html', active_page='lottery')
 
 @app.route('/wheel')
 @admin_required
+@page_permission_required('manage_games')
 def page_wheel():
     return render_template('wheel.html', active_page='wheel')
 
@@ -1074,41 +1185,49 @@ def api_wheel_my_spins():
 
 @app.route('/companies')
 @admin_required
+@page_permission_required('manage_companies')
 def page_companies():
     return render_template('companies.html', active_page='companies')
 
 @app.route('/payment-methods')
 @admin_required
+@page_permission_required('manage_companies')
 def page_payment_methods():
     return render_template('payment_methods.html', active_page='payment_methods')
 
 @app.route('/apps')
 @admin_required
+@page_permission_required('manage_companies')
 def page_apps():
     return render_template('apps.html', active_page='apps')
 
 @app.route('/referrals')
 @admin_required
+@page_permission_required('manage_companies')
 def page_referrals():
     return render_template('referrals.html', active_page='referrals')
 
 @app.route('/channels')
 @admin_required
+@page_permission_required('send_broadcast')
 def page_channels():
     return render_template('channels.html', active_page='channels')
 
 @app.route('/bots')
 @admin_required
+@page_permission_required('manage_bots')
 def page_bots():
     return render_template('bots.html', active_page='bots')
 
 @app.route('/settings')
 @admin_required
+@page_permission_required('manage_settings')
 def page_settings():
     return render_template('settings.html', active_page='settings')
 
 @app.route('/seo')
 @admin_required
+@page_permission_required('manage_settings')
 def page_seo():
     """صفحة إدارة SEO وتحسين محركات البحث"""
     # قراءة إعدادات SEO الحالية من system_settings.csv
@@ -1126,6 +1245,7 @@ def page_seo():
 
 @app.route('/api/seo/save', methods=['POST'])
 @admin_required
+@page_permission_required('manage_settings')
 def api_seo_save():
     """حفظ إعدادات SEO"""
     import csv as _csv
@@ -1164,41 +1284,49 @@ def api_seo_save():
 
 @app.route('/complaints')
 @admin_required
+@page_permission_required('ban_users')
 def page_complaints():
     return render_template('complaints.html', active_page='complaints')
 
 @app.route('/broadcast')
 @admin_required
+@page_permission_required('send_broadcast')
 def page_broadcast():
     return render_template('broadcast.html', active_page='broadcast')
 
 @app.route('/admins')
 @admin_required
+@page_permission_required('manage_admins')
 def page_admins():
     return render_template('admin_management.html', active_page='admins')
 
 @app.route('/themes')
 @admin_required
+@page_permission_required('manage_settings')
 def page_themes():
     return render_template('themes.html', active_page='themes')
 
 @app.route('/exchange-addresses')
 @admin_required
+@page_permission_required('manage_settings')
 def page_exchange_addresses():
     return render_template('exchange_addresses.html', active_page='exchange_addresses')
 
 @app.route('/send-message')
 @admin_required
+@page_permission_required('send_broadcast')
 def page_send_message():
     return render_template('send_message.html', active_page='send_message')
 
 @app.route('/backup')
 @admin_required
+@page_permission_required('manage_admins')
 def page_backup():
     return render_template('backup.html', active_page='backup')
 
 @app.route('/statistics')
 @admin_required
+@page_permission_required('view_statistics')
 def page_statistics():
     return render_template('statistics.html', active_page='statistics')
 
@@ -1469,6 +1597,7 @@ def api_transactions():
 
 @app.route('/api/transactions/<txn_id>/approve', methods=['POST'])
 @api_auth
+@permission_required('approve_deposits')
 def api_approve_txn(txn_id):
     data = request.json or {}
     new_amount = data.get('amount', '')
@@ -1537,6 +1666,7 @@ def api_approve_txn(txn_id):
 
 @app.route('/api/transactions/<txn_id>/reject', methods=['POST'])
 @api_auth
+@permission_required('reject_deposits')
 def api_reject_txn(txn_id):
     reason = request.json.get('reason', '') if request.json else ''
     txns = read_csv('transactions.csv')
@@ -1571,6 +1701,7 @@ def api_reject_txn(txn_id):
 
 @app.route('/api/transactions/bulk-approve', methods=['POST'])
 @api_auth
+@permission_required('approve_deposits')
 def api_bulk_approve():
     ids = request.json.get('ids', []) if request.json else []
     txns = read_csv('transactions.csv')
@@ -1587,6 +1718,7 @@ def api_bulk_approve():
 
 @app.route('/api/transactions/bulk-reject', methods=['POST'])
 @api_auth
+@permission_required('reject_deposits')
 def api_bulk_reject():
     ids = request.json.get('ids', []) if request.json else []
     reason = request.json.get('reason', 'رفض جماعي') if request.json else 'رفض جماعي'
@@ -1821,6 +1953,7 @@ def api_user_detail(user_id):
 
 @app.route('/api/users/<user_id>/ban', methods=['POST'])
 @api_auth
+@permission_required('ban_users')
 def api_ban_user(user_id):
     reason = request.json.get('reason', 'محظور من لوحة التحكم') if request.json else 'محظور'
     users = read_csv('users.csv')
@@ -1832,10 +1965,13 @@ def api_ban_user(user_id):
             break
     write_csv('users.csv', users, fieldnames)
     log_action('ban_user', f'{user_id}: {reason}')
+    _rbac_log(str(session.get('admin_id', '')), 'ban_user', target=user_id,
+              details=reason, ip=request.remote_addr)
     return jsonify({'success': True})
 
 @app.route('/api/users/<user_id>/unban', methods=['POST'])
 @api_auth
+@permission_required('unban_users')
 def api_unban_user(user_id):
     users = read_csv('users.csv')
     fieldnames = get_fieldnames('users.csv', ['telegram_id','name','phone','customer_id','language','date','is_banned','ban_reason','currency'])
@@ -1846,6 +1982,8 @@ def api_unban_user(user_id):
             break
     write_csv('users.csv', users, fieldnames)
     log_action('unban_user', user_id)
+    _rbac_log(str(session.get('admin_id', '')), 'unban_user', target=user_id,
+              details='unbanned', ip=request.remote_addr)
     return jsonify({'success': True})
 
 @app.route('/api/users/export')
@@ -1925,6 +2063,7 @@ def api_payment_methods_by_company(company_id):
 
 @app.route('/api/companies', methods=['POST'])
 @api_auth
+@permission_required('manage_companies')
 def api_add_company():
     data = request.json
     companies = read_csv('companies.csv')
@@ -1946,6 +2085,7 @@ def api_add_company():
 
 @app.route('/api/companies/<company_id>', methods=['PUT', 'DELETE'])
 @api_auth
+@permission_required('manage_companies')
 def api_edit_company(company_id):
     companies = read_csv('companies.csv')
     fieldnames = get_fieldnames('companies.csv', ['id','name','type','details','is_active','icon','address','affiliate_link'])
@@ -1984,6 +2124,7 @@ def api_payment_methods():
 
 @app.route('/api/payment-methods', methods=['POST'])
 @api_auth
+@permission_required('manage_companies')
 def api_add_payment_method():
     data = request.json
     methods = read_csv('payment_methods.csv')
@@ -2006,6 +2147,7 @@ def api_add_payment_method():
 
 @app.route('/api/payment-methods/<method_id>', methods=['PUT', 'DELETE'])
 @api_auth
+@permission_required('manage_companies')
 def api_edit_payment_method(method_id):
     methods = read_csv('payment_methods.csv')
     fieldnames = get_fieldnames('payment_methods.csv', ['id','company_id','method_name','method_type','account_data','additional_info','status','created_date','icon'])
@@ -2036,6 +2178,7 @@ def api_payment_links():
 
 @app.route('/api/payment-links', methods=['POST'])
 @api_auth
+@permission_required('manage_companies')
 def api_save_payment_links():
     """حفظ روابط وسيلة دفع مع شركات (استبدال كامل)"""
     data = request.json
@@ -2117,6 +2260,7 @@ def api_svrp_requests():
 
 @app.route('/api/svrp/requests/<req_id>/approve', methods=['POST'])
 @api_auth
+@permission_required('approve_deposits')
 def api_svrp_approve(req_id):
     amount = request.json.get('amount', '0') if request.json else '0'
     reqs = read_csv('recovery_requests.csv')
@@ -2134,6 +2278,7 @@ def api_svrp_approve(req_id):
 
 @app.route('/api/svrp/requests/<req_id>/reject', methods=['POST'])
 @api_auth
+@permission_required('reject_deposits')
 def api_svrp_reject(req_id):
     reqs = read_csv('recovery_requests.csv')
     fieldnames = get_fieldnames('recovery_requests.csv', ['id','user_id','customer_id','photo_file_id','status','recovery_amount','admin_note','created_at','approved_at','approved_by'])
@@ -2154,6 +2299,7 @@ def api_svrp_bonus_requests():
 
 @app.route('/api/svrp/bonus-requests/<req_id>/approve', methods=['POST'])
 @api_auth
+@permission_required('approve_deposits')
 def api_svrp_bonus_approve(req_id):
     reqs = read_csv('bonus_requests.csv')
     fieldnames = get_fieldnames('bonus_requests.csv', ['id','user_id','company_id','company_name','account_number','bonus_amount','status','created_at','approved_by'])
@@ -2168,6 +2314,7 @@ def api_svrp_bonus_approve(req_id):
 
 @app.route('/api/svrp/bonus-requests/<req_id>/reject', methods=['POST'])
 @api_auth
+@permission_required('reject_deposits')
 def api_svrp_bonus_reject(req_id):
     reqs = read_csv('bonus_requests.csv')
     fieldnames = get_fieldnames('bonus_requests.csv', ['id','user_id','company_id','company_name','account_number','bonus_amount','status','created_at','approved_by'])
@@ -2187,6 +2334,7 @@ def api_svrp_promo_codes():
 
 @app.route('/api/svrp/promo-codes', methods=['POST'])
 @api_auth
+@permission_required('manage_companies')
 def api_create_promo_code():
     data = request.json
     codes = read_csv('svrp_promo_codes.csv')
@@ -2282,6 +2430,7 @@ def api_apps():
 
 @app.route('/api/apps', methods=['POST'])
 @api_auth
+@permission_required('manage_companies')
 def api_add_app():
     data = request.json
     apps = read_csv('app_links.csv')
@@ -2302,6 +2451,7 @@ def api_add_app():
 
 @app.route('/api/apps/<app_id>', methods=['PUT', 'DELETE'])
 @api_auth
+@permission_required('manage_companies')
 def api_edit_app(app_id):
     apps = read_csv('app_links.csv')
     fieldnames = get_fieldnames('app_links.csv', ['id','name','icon_url','download_url','description','is_active','created_at'])
@@ -2341,6 +2491,7 @@ def api_referrals():
 
 @app.route('/api/referrals/links', methods=['POST'])
 @api_auth
+@permission_required('manage_companies')
 def api_add_referral_link():
     data = request.json
     links = read_csv('referral_links.csv')
@@ -2358,6 +2509,7 @@ def api_add_referral_link():
 
 @app.route('/api/referrals/links/<link_id>', methods=['PUT', 'DELETE'])
 @api_auth
+@permission_required('manage_companies')
 def api_edit_referral_link(link_id):
     links = read_csv('referral_links.csv')
     fieldnames = get_fieldnames('referral_links.csv', ['id','name','url','is_active','created_at'])
@@ -2393,6 +2545,7 @@ def api_channels():
 
 @app.route('/api/channels/<channel_id>/toggle', methods=['POST'])
 @api_auth
+@permission_required('send_broadcast')
 def api_toggle_channel(channel_id):
     channels = read_csv('bot_channels.csv')
     fieldnames = get_fieldnames('bot_channels.csv', ['id','chat_id','title','type','is_active','added_at','relay_to_users','relay_to_channels','forward_mode','welcome_text'])
@@ -2405,6 +2558,7 @@ def api_toggle_channel(channel_id):
 
 @app.route('/api/channels/<channel_id>/settings', methods=['POST'])
 @api_auth
+@permission_required('send_broadcast')
 def api_channel_settings(channel_id):
     """تحديث إعدادات قناة محددة"""
     data = request.json
@@ -2425,6 +2579,7 @@ def api_channel_settings(channel_id):
 
 @app.route('/api/channels/<channel_id>', methods=['DELETE'])
 @api_auth
+@permission_required('send_broadcast')
 def api_delete_channel(channel_id):
     channels = read_csv('bot_channels.csv')
     fieldnames = get_fieldnames('bot_channels.csv', ['id','chat_id','title','type','is_active','added_at','relay_to_users','relay_to_channels','forward_mode','welcome_text'])
@@ -2458,6 +2613,7 @@ def api_post_library():
 
 @app.route('/api/post-library', methods=['POST'])
 @api_auth
+@permission_required('send_broadcast')
 def api_add_post():
     """إنشاء منشور جديد"""
     data = request.json
@@ -2524,6 +2680,7 @@ def api_add_post():
 
 @app.route('/api/post-library/<post_id>', methods=['DELETE'])
 @api_auth
+@permission_required('send_broadcast')
 def api_delete_post(post_id):
     posts = read_csv('post_library.csv')
     fieldnames = get_fieldnames('post_library.csv', ['id','title','content','media_type','media_file_id','target_channels','schedule','status','created_by','created_at'])
@@ -2534,6 +2691,7 @@ def api_delete_post(post_id):
 
 @app.route('/api/post-library/<post_id>/publish', methods=['POST'])
 @api_auth
+@permission_required('send_broadcast')
 def api_publish_post(post_id):
     """نشر منشور من المكتبة"""
     posts = read_csv('post_library.csv')
@@ -2600,6 +2758,7 @@ def api_post_vault():
 
 @app.route('/api/post-vault/<post_id>/repost', methods=['POST'])
 @api_auth
+@permission_required('send_broadcast')
 def api_repost_from_vault(post_id):
     """إعادة نشر بوست من الأرشيف"""
     posts = read_csv('post_vault.csv')
@@ -2623,6 +2782,7 @@ def api_repost_from_vault(post_id):
 
 @app.route('/api/post-vault/<post_id>', methods=['DELETE'])
 @api_auth
+@permission_required('send_broadcast')
 def api_delete_vault_post(post_id):
     posts = read_csv('post_vault.csv')
     posts = [p for p in posts if p.get('id') != post_id]
@@ -2640,6 +2800,7 @@ def api_text_replacements():
 
 @app.route('/api/text-replacements', methods=['POST'])
 @api_auth
+@permission_required('send_broadcast')
 def api_add_text_replacement():
     data = request.json
     rules = read_csv('text_replacements.csv')
@@ -2660,6 +2821,7 @@ def api_add_text_replacement():
 
 @app.route('/api/text-replacements/<rule_id>/toggle', methods=['POST'])
 @api_auth
+@permission_required('send_broadcast')
 def api_toggle_replacement(rule_id):
     rules = read_csv('text_replacements.csv')
     fieldnames = get_fieldnames('text_replacements.csv', ['id','find_text','replace_text','is_regex','channel_id','is_active','created_at'])
@@ -2672,6 +2834,7 @@ def api_toggle_replacement(rule_id):
 
 @app.route('/api/text-replacements/<rule_id>', methods=['DELETE'])
 @api_auth
+@permission_required('send_broadcast')
 def api_delete_replacement(rule_id):
     rules = read_csv('text_replacements.csv')
     fieldnames = get_fieldnames('text_replacements.csv', ['id','find_text','replace_text','is_regex','channel_id','is_active','created_at'])
@@ -2695,6 +2858,7 @@ def api_ai_providers():
 
 @app.route('/api/ai-providers/test', methods=['POST'])
 @api_auth
+@permission_required('send_broadcast')
 def api_test_ai():
     try:
         from ai_providers import AIManager
@@ -2709,6 +2873,7 @@ def api_test_ai():
 
 @app.route('/api/ai-instructions', methods=['GET', 'POST'])
 @api_auth
+@permission_required('send_broadcast')
 def api_ai_instructions():
     if request.method == 'GET':
         settings = read_csv('system_settings.csv')
@@ -2756,6 +2921,7 @@ def api_channel_categories():
 
 @app.route('/api/channels/<channel_id>/category', methods=['POST'])
 @api_auth
+@permission_required('send_broadcast')
 def api_set_channel_category(channel_id):
     data = request.json
     category = data.get('category', 'غير مصنف')
@@ -2770,6 +2936,7 @@ def api_set_channel_category(channel_id):
 
 @app.route('/api/channels/<channel_id>/ai-toggle', methods=['POST'])
 @api_auth
+@permission_required('send_broadcast')
 def api_toggle_channel_ai(channel_id):
     channels = read_csv('bot_channels.csv')
     fieldnames = get_fieldnames('bot_channels.csv', ['id','chat_id','title','type','is_active','added_at','relay_to_users','relay_to_channels','forward_mode','welcome_text','category','ai_enabled'])
@@ -2790,6 +2957,7 @@ def api_channel_groups():
 
 @app.route('/api/channel-groups', methods=['POST'])
 @api_auth
+@permission_required('send_broadcast')
 def api_add_channel_group():
     data = request.json
     groups = read_csv('channel_groups.csv')
@@ -2807,6 +2975,7 @@ def api_add_channel_group():
 
 @app.route('/api/channel-groups/<group_id>', methods=['DELETE'])
 @api_auth
+@permission_required('send_broadcast')
 def api_delete_channel_group(group_id):
     groups = read_csv('channel_groups.csv')
     fieldnames = get_fieldnames('channel_groups.csv', ['id','name','description','channel_ids','created_at'])
@@ -2842,6 +3011,7 @@ def api_daily_report():
 
 @app.route('/api/channels/<channel_id>/post', methods=['POST'])
 @api_auth
+@permission_required('send_broadcast')
 def api_post_to_channel(channel_id):
     """إرسال رسالة لقناة محددة"""
     channels = read_csv('bot_channels.csv')
@@ -2869,6 +3039,7 @@ def api_post_to_channel(channel_id):
 
 @app.route('/api/channels', methods=['POST'])
 @api_auth
+@permission_required('send_broadcast')
 def api_add_channel_manual():
     """إضافة قناة يدوياً — مع تحديد الدور"""
     data = request.json
@@ -2910,6 +3081,7 @@ def api_add_channel_manual():
 
 @app.route('/api/channels/<channel_id>/category', methods=['POST'])
 @api_auth
+@permission_required('send_broadcast')
 def api_set_channel_category_api(channel_id):
     data = request.json
     category = data.get('category', '')
@@ -2946,6 +3118,7 @@ def api_wheel_gifts():
 
 @app.route('/api/wheel-gifts', methods=['POST'])
 @api_auth
+@permission_required('manage_games')
 def api_add_wheel_gift():
     data = request.json
     gifts = read_csv('wheel_gifts.csv')
@@ -2964,6 +3137,7 @@ def api_add_wheel_gift():
 
 @app.route('/api/wheel-gifts/<gift_id>', methods=['PUT', 'DELETE'])
 @api_auth
+@permission_required('manage_games')
 def api_edit_wheel_gift(gift_id):
     gifts = read_csv('wheel_gifts.csv')
     fieldnames = get_fieldnames('wheel_gifts.csv', ['id','gift_text','affiliate_link','is_active','created_at'])
@@ -2995,6 +3169,7 @@ def api_bots():
 
 @app.route('/api/bots', methods=['POST'])
 @api_auth
+@permission_required('manage_bots')
 def api_add_bot():
     data = request.json
     bots = read_csv('bot_tokens.csv')
@@ -3021,6 +3196,7 @@ def api_add_bot():
 
 @app.route('/api/bots/<bot_id>/toggle', methods=['POST'])
 @api_auth
+@permission_required('manage_bots')
 def api_toggle_bot(bot_id):
     bots = read_csv('bot_tokens.csv')
     fieldnames = get_fieldnames('bot_tokens.csv', ['id','name','token','is_active','created_at','admin_ids','last_started','total_users','total_transactions','freeze_until','status','description','can_manage_bots'])
@@ -3034,6 +3210,7 @@ def api_toggle_bot(bot_id):
 
 @app.route('/api/bots/<bot_id>', methods=['DELETE'])
 @api_auth
+@permission_required('manage_bots')
 def api_delete_bot(bot_id):
     bots = read_csv('bot_tokens.csv')
     fieldnames = get_fieldnames('bot_tokens.csv', ['id','name','token','is_active','created_at','admin_ids','last_started','total_users','total_transactions','freeze_until','status','description','can_manage_bots'])
@@ -3062,6 +3239,7 @@ def api_complaints():
 
 @app.route('/api/complaints/<complaint_id>/reply', methods=['POST'])
 @api_auth
+@permission_required('ban_users')
 def api_complaint_reply(complaint_id):
     reply = request.json.get('reply', '') if request.json else ''
     complaints = read_csv('complaints.csv')
@@ -3079,6 +3257,7 @@ def api_complaint_reply(complaint_id):
 
 @app.route('/api/broadcast', methods=['POST'])
 @api_auth
+@permission_required('send_broadcast')
 def api_broadcast():
     """بث رسالة لكل المستخدمين — يحفظ في ملف فقط (البوت الفعلي يرسل)"""
     message = request.json.get('message', '') if request.json else ''
@@ -3108,6 +3287,7 @@ def api_settings():
 
 @app.route('/api/settings', methods=['POST'])
 @api_auth
+@permission_required('manage_settings')
 def api_update_settings():
     data = request.json
     settings = read_csv('system_settings.csv')
@@ -3130,6 +3310,7 @@ def api_button_labels():
 
 @app.route('/api/button-labels', methods=['POST'])
 @api_auth
+@permission_required('manage_settings')
 def api_update_button_label():
     data = request.json
     labels = read_csv('button_labels.csv')
@@ -3228,6 +3409,7 @@ def api_admins():
 
 @app.route('/api/admins', methods=['POST'])
 @api_auth
+@permission_required('manage_admins')
 def api_add_admin():
     data = request.json
     telegram_id = data.get('telegram_id', '')
@@ -3287,6 +3469,7 @@ def api_add_admin():
 
 @app.route('/api/admins/<admin_id>', methods=['DELETE'])
 @api_auth
+@permission_required('manage_admins')
 def api_delete_admin(admin_id):
     perm_file = os.path.join(BASE_DIR, 'admin_permissions.json')
     if os.path.exists(perm_file):
@@ -3322,6 +3505,7 @@ def api_delete_admin(admin_id):
 
 @app.route('/api/admins/<admin_id>/role', methods=['POST'])
 @api_auth
+@permission_required('manage_admins')
 def api_set_admin_role(admin_id):
     role = request.json.get('role', 'support') if request.json else 'support'
 
@@ -3355,6 +3539,80 @@ def api_set_admin_role(admin_id):
     return jsonify({'success': True})
 
 
+# ── RBAC Roles Management API (super_admin only) ──────────────────────────────
+
+@app.route('/api/admin/rbac/roles', methods=['GET'])
+@api_auth
+@permission_required('manage_admins')
+def api_rbac_roles_list():
+    """List all admin role assignments from the SQLite admin_roles table."""
+    try:
+        import sqlite3 as _sql
+        conn = _sql.connect(os.path.join(BASE_DIR, 'vex_games.db'), timeout=5)
+        conn.row_factory = _sql.Row
+        rows = conn.execute(
+            'SELECT uid, role, permissions, created_at, created_by '
+            'FROM admin_roles ORDER BY created_at DESC'
+        ).fetchall()
+        conn.close()
+        result = []
+        for r in rows:
+            perms = {}
+            try:
+                perms = json.loads(r['permissions'] or '{}')
+            except Exception:
+                pass
+            result.append({
+                'uid': r['uid'], 'role': r['role'],
+                'permissions': perms,
+                'created_at': r['created_at'],
+                'created_by': r['created_by'],
+            })
+        return jsonify({'roles': result, 'role_definitions': _ROLE_PERMISSIONS})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/admin/rbac/roles/<uid>', methods=['POST'])
+@api_auth
+@permission_required('manage_admins')
+def api_rbac_set_role(uid):
+    """Assign or update a role for an admin UID (super_admin only)."""
+    data = request.json or {}
+    role = data.get('role', '')
+    if not role or role not in _ROLE_PERMISSIONS:
+        valid = list(_ROLE_PERMISSIONS.keys())
+        return jsonify({'error': f'Invalid role. Valid values: {valid}'}), 400
+    actor = str(session.get('admin_id', ''))
+    ok = _rbac_set_role(str(uid), role, created_by=actor)
+    if ok:
+        _rbac_log(actor, 'rbac_set_role', target=str(uid),
+                  details=f'role={role}', ip=request.remote_addr)
+        log_action('rbac_set_role', f'{uid} → {role}')
+        return jsonify({'success': True})
+    return jsonify({'error': 'Failed to set role'}), 500
+
+
+@app.route('/api/admin/rbac/roles/<uid>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_admins')
+def api_rbac_delete_role(uid):
+    """Remove a custom role (UID reverts to no-access or env-based super_admin)."""
+    try:
+        import sqlite3 as _sql
+        conn = _sql.connect(os.path.join(BASE_DIR, 'vex_games.db'), timeout=5)
+        conn.execute('DELETE FROM admin_roles WHERE uid=?', (str(uid),))
+        conn.commit()
+        conn.close()
+        actor = str(session.get('admin_id', ''))
+        _rbac_log(actor, 'rbac_delete_role', target=str(uid),
+                  details='role removed', ip=request.remote_addr)
+        log_action('rbac_delete_role', uid)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 # ===== API — Themes =====
 
 @app.route('/api/themes')
@@ -3372,6 +3630,7 @@ def api_themes():
 
 @app.route('/api/themes', methods=['POST'])
 @api_auth
+@permission_required('manage_settings')
 def api_set_theme():
     theme_id = request.json.get('theme_id', 'gold') if request.json else 'gold'
     settings = read_csv('system_settings.csv')
@@ -3404,6 +3663,7 @@ def api_exchange_addresses():
 
 @app.route('/api/exchange-addresses', methods=['POST'])
 @api_auth
+@permission_required('manage_settings')
 def api_add_exchange_address():
     data = request.json
     addresses = read_csv('exchange_addresses.csv')
@@ -3425,6 +3685,7 @@ def api_add_exchange_address():
 
 @app.route('/api/exchange-addresses/<addr_id>', methods=['DELETE'])
 @api_auth
+@permission_required('manage_settings')
 def api_delete_exchange_address(addr_id):
     addresses = read_csv('exchange_addresses.csv')
     fieldnames = get_fieldnames('exchange_addresses.csv', ['id','exchange_name','address','network','is_active','created_at','notes'])
@@ -3436,6 +3697,7 @@ def api_delete_exchange_address(addr_id):
 
 @app.route('/api/exchange-addresses/<addr_id>/toggle', methods=['POST'])
 @api_auth
+@permission_required('manage_settings')
 def api_toggle_exchange_address(addr_id):
     addresses = read_csv('exchange_addresses.csv')
     fieldnames = get_fieldnames('exchange_addresses.csv', ['id','exchange_name','address','network','is_active','created_at','notes'])
@@ -3451,6 +3713,7 @@ def api_toggle_exchange_address(addr_id):
 
 @app.route('/api/send-message', methods=['POST'])
 @api_auth
+@permission_required('send_broadcast')
 def api_send_message():
     data = request.json
     target_user_id = data.get('target_user_id', '')
@@ -3481,6 +3744,7 @@ def api_send_message():
 
 @app.route('/api/backup', methods=['POST'])
 @api_auth
+@permission_required('manage_admins')
 def api_backup():
     backup_dir = os.path.join(BASE_DIR, 'backups')
     os.makedirs(backup_dir, exist_ok=True)
@@ -3507,6 +3771,7 @@ def api_backup():
 
 @app.route('/api/backups')
 @api_auth
+@permission_required('manage_admins')
 def api_backups():
     backup_dir = os.path.join(BASE_DIR, 'backups')
     backups = []
@@ -3528,6 +3793,7 @@ def api_backups():
 
 @app.route('/api/lottery/create', methods=['POST'])
 @api_auth
+@permission_required('manage_games')
 def api_lottery_create():
     data = request.json
     rounds = read_csv('lottery_rounds.csv')
@@ -3552,6 +3818,7 @@ def api_lottery_create():
 
 @app.route('/api/lottery/<round_id>/draw', methods=['POST'])
 @api_auth
+@permission_required('manage_games')
 def api_lottery_draw(round_id):
     rounds = read_csv('lottery_rounds.csv')
     round_fieldnames = get_fieldnames('lottery_rounds.csv', ['id','name','ticket_price','currency','winner_count','max_tickets','admin_pct','draw_time','status','created_at'])
@@ -3602,6 +3869,7 @@ def api_lottery_draw(round_id):
 
 @app.route('/api/wheel/create', methods=['POST'])
 @api_auth
+@permission_required('manage_games')
 def api_wheel_create():
     data = request.json
     rounds = read_csv('wheel_rounds.csv')
@@ -3630,6 +3898,7 @@ def api_wheel_create():
 
 @app.route('/api/wheel/<round_id>/end', methods=['POST'])
 @api_auth
+@permission_required('manage_games')
 def api_wheel_end(round_id):
     rounds = read_csv('wheel_rounds.csv')
     fieldnames = get_fieldnames('wheel_rounds.csv', ['id','name','prizes','status','spin_cost','currency','min_spins','max_spins_per_user','game_speed_ms','max_relocations','created_at'])
@@ -3646,6 +3915,7 @@ def api_wheel_end(round_id):
 
 @app.route('/api/matching/<req_id>/approve', methods=['POST'])
 @api_auth
+@permission_required('approve_deposits')
 def api_matching_approve(req_id):
     reqs = read_csv('match_requests.csv')
     fieldnames = get_fieldnames('match_requests.csv', ['id','user_id','customer_id','type','amount','currency','status','created_at','approved_by','approved_at'])
@@ -3662,6 +3932,7 @@ def api_matching_approve(req_id):
 
 @app.route('/api/matching/<req_id>/reject', methods=['POST'])
 @api_auth
+@permission_required('reject_deposits')
 def api_matching_reject(req_id):
     reason = request.json.get('reason', '') if request.json else ''
     reqs = read_csv('match_requests.csv')
@@ -3677,6 +3948,7 @@ def api_matching_reject(req_id):
 
 @app.route('/api/matching/<match_id>/resolve-dispute', methods=['POST'])
 @api_auth
+@permission_required('view_financial')
 def api_resolve_dispute(match_id):
     favor = request.json.get('favor', 'cancel') if request.json else 'cancel'
     note = request.json.get('note', '') if request.json else ''
@@ -3715,6 +3987,7 @@ def api_resolve_dispute(match_id):
 
 @app.route('/api/trading/<order_id>/accept', methods=['POST'])
 @api_auth
+@permission_required('view_financial')
 def api_trading_accept(order_id):
     orders = read_csv('trade_orders.csv')
     fieldnames = get_fieldnames('trade_orders.csv', ['id','user_id','order_type','amount','currency','rate','status','created_at','accepted_by','accepted_at','completed_at'])
@@ -3731,6 +4004,7 @@ def api_trading_accept(order_id):
 
 @app.route('/api/trading/<order_id>/set-rate', methods=['POST'])
 @api_auth
+@permission_required('view_financial')
 def api_trading_set_rate(order_id):
     rate = request.json.get('rate', '') if request.json else ''
     orders = read_csv('trade_orders.csv')
@@ -3746,6 +4020,7 @@ def api_trading_set_rate(order_id):
 
 @app.route('/api/trading/<order_id>/complete', methods=['POST'])
 @api_auth
+@permission_required('view_financial')
 def api_trading_complete(order_id):
     orders = read_csv('trade_orders.csv')
     fieldnames = get_fieldnames('trade_orders.csv', ['id','user_id','order_type','amount','currency','rate','status','created_at','accepted_by','accepted_at','completed_at'])
@@ -3779,6 +4054,7 @@ def api_support_data():
 
 @app.route('/api/support-data', methods=['POST'])
 @api_auth
+@permission_required('manage_settings')
 def api_update_support_data():
     data = request.json
     settings = read_csv('system_settings.csv')
@@ -3827,6 +4103,7 @@ def api_payment_steps(method_id):
 
 @app.route('/api/payment-steps/<method_id>', methods=['POST'])
 @api_auth
+@permission_required('manage_companies')
 def api_save_payment_steps(method_id):
     data = request.json
     deposit_steps = data.get('deposit_steps', [])
@@ -4023,6 +4300,7 @@ def api_notifications_log():
 
 @app.route('/api/users/<user_id>', methods=['PUT'])
 @api_auth
+@permission_required('ban_users')
 def api_edit_user(user_id):
     data = request.json
     users = read_csv('users.csv')
@@ -4044,6 +4322,7 @@ def api_edit_user(user_id):
 
 @app.route('/api/companies/<company_id>/toggle', methods=['POST'])
 @api_auth
+@permission_required('manage_companies')
 def api_toggle_company(company_id):
     companies = read_csv('companies.csv')
     fieldnames = get_fieldnames('companies.csv', ['id','name','type','details','is_active','icon','address','affiliate_link'])
@@ -4068,6 +4347,7 @@ def api_user_activity(user_id):
 
 @app.route('/api/svrp/wallets/<user_id>/freeze', methods=['POST'])
 @api_auth
+@permission_required('view_financial')
 def api_svrp_freeze(user_id):
     wallets = read_csv('svrp_wallets.csv')
     fieldnames = get_fieldnames('svrp_wallets.csv', ['telegram_id','customer_id','balance','pending_balance','total_earned','total_used','wagering_required','wagering_completed','last_recovery_date','monthly_recovery_total'])
@@ -4085,6 +4365,7 @@ def api_svrp_freeze(user_id):
 
 @app.route('/api/svrp/wallets/<user_id>/unfreeze', methods=['POST'])
 @api_auth
+@permission_required('view_financial')
 def api_svrp_unfreeze(user_id):
     data = request.json or {}
     amount = float(data.get('amount', 0))
@@ -4171,6 +4452,7 @@ def api_broadcast_queue():
 
 @app.route('/api/transactions/<txn_id>', methods=['PUT'])
 @api_auth
+@permission_required('approve_deposits')
 def api_edit_transaction(txn_id):
     data = request.json
     txns = read_csv('transactions.csv')
@@ -4192,6 +4474,7 @@ def api_edit_transaction(txn_id):
 
 @app.route('/api/lottery/<round_id>', methods=['DELETE'])
 @api_auth
+@permission_required('manage_games')
 def api_delete_lottery_round(round_id):
     rounds = read_csv('lottery_rounds.csv')
     fieldnames = get_fieldnames('lottery_rounds.csv', ['id','name','status','ticket_price','currency','min_tickets','max_tickets_per_user','total_prize','admin_profit_pct','start_time','draw_time','winner_count','created_at'])
@@ -4204,6 +4487,7 @@ def api_delete_lottery_round(round_id):
 
 @app.route('/api/wheel/<round_id>', methods=['DELETE'])
 @api_auth
+@permission_required('manage_games')
 def api_delete_wheel_round(round_id):
     rounds = read_csv('wheel_rounds.csv')
     fieldnames = get_fieldnames('wheel_rounds.csv', ['id','name','prizes','status','spin_cost','currency','min_spins','max_spins_per_user','game_speed_ms','max_relocations','created_at'])
@@ -4216,6 +4500,7 @@ def api_delete_wheel_round(round_id):
 
 @app.route('/api/backup/restore', methods=['POST'])
 @api_auth
+@permission_required('manage_admins')
 def api_restore_backup():
     filename = request.json.get('filename', '') if request.json else ''
     if not filename:
@@ -4236,6 +4521,7 @@ def api_restore_backup():
 
 @app.route('/api/backups/<filename>/download')
 @api_auth
+@permission_required('manage_admins')
 def api_download_backup(filename):
     import zipfile
     backup_path = os.path.join(BASE_DIR, 'backups', filename)
@@ -4312,6 +4598,7 @@ def api_games_all():
 
 @app.route('/api/games/create', methods=['POST'])
 @api_auth
+@permission_required('manage_games')
 def api_games_create():
     """إضافة لعبة جديدة"""
     if not _VEX_GAMES:
@@ -4333,6 +4620,7 @@ def api_games_create():
 
 @app.route('/api/games/<game_id>/toggle', methods=['POST'])
 @api_auth
+@permission_required('manage_games')
 def api_games_toggle(game_id):
     """تفعيل/إيقاف لعبة"""
     if not _VEX_GAMES:
@@ -4372,6 +4660,7 @@ def api_wallet_balance():
 
 @app.route('/api/wallet/add', methods=['POST'])
 @api_auth
+@permission_required('approve_deposits')
 def api_wallet_add():
     """إضافة رصيد (أدمن)"""
     if not _VEX_GAMES:
@@ -4595,6 +4884,7 @@ def api_deposit_pending():
 
 @app.route('/api/deposit/<dep_id>/approve', methods=['POST'])
 @api_auth
+@permission_required('approve_deposits')
 def api_deposit_approve(dep_id):
     """موافقة على إيداع سريع — async: يضيف الرصيد + يرسل إشعار"""
     if not _VEX_GAMES:
@@ -4602,6 +4892,8 @@ def api_deposit_approve(dep_id):
     admin_id = session.get('admin_id', '')
     result = _gm.approve_deposit(dep_id, admin_id)
     if result:
+        _rbac_log(str(admin_id), 'approve_deposit', target=dep_id,
+                  details=f"amount={result.get('amount', '?')}", ip=request.remote_addr)
         push_notification('deposit_approved', '✅ تمت الموافقة على إيداع', f'إيداع {dep_id}', {'deposit_id': dep_id})
         # async Telegram notification (non-blocking)
         import threading as _th
@@ -4666,12 +4958,15 @@ def api_deposit_approve(dep_id):
 
 @app.route('/api/deposit/<dep_id>/reject', methods=['POST'])
 @api_auth
+@permission_required('reject_deposits')
 def api_deposit_reject(dep_id):
     """رفض إيداع سريع — async notification"""
     if not _VEX_GAMES:
         return jsonify({'error': 'Games engine not available'}), 500
     admin_id = session.get('admin_id', '')
     result = _gm.reject_deposit(dep_id, admin_id)
+    _rbac_log(str(admin_id), 'reject_deposit', target=dep_id,
+              details='rejected', ip=request.remote_addr)
     push_notification('deposit_rejected', '❌ تم رفض إيداع', f'إيداع {dep_id}', {'deposit_id': dep_id})
     # async Telegram notification
     if result and result.get('user_id'):
@@ -4774,6 +5069,7 @@ def api_player_profile():
 
 @app.route('/api/player/vex-status', methods=['POST'])
 @api_auth
+@permission_required('ban_users')
 def api_player_vex_status():
     """تعيين شريك VEX"""
     if not _VEX_GAMES:
@@ -4817,6 +5113,7 @@ def api_games_top_players():
 
 @app.route('/api/games/config', methods=['GET', 'POST'])
 @api_auth
+@permission_required('manage_games')
 def api_games_config():
     """قراءة/تحديث إعدادات الخوارزمية"""
     if not _VEX_GAMES:
@@ -4852,6 +5149,7 @@ def webapp_play(game_id):
 
 @app.route('/games-admin')
 @admin_required
+@page_permission_required('manage_games')
 def page_games_admin():
     """لوحة إدارة الألعاب"""
     return render_template('games_admin.html', active_page='games_admin')
@@ -4899,6 +5197,7 @@ def api_withdrawal_pending():
 
 @app.route('/api/withdrawal/<wth_id>/approve', methods=['POST'])
 @api_auth
+@permission_required('approve_withdrawals')
 def api_withdrawal_approve(wth_id):
     """موافقة على سحب"""
     if not _VEX_GAMES:
@@ -4906,12 +5205,15 @@ def api_withdrawal_approve(wth_id):
     admin_id = session.get('admin_id', '')
     result = _gm.approve_withdrawal(wth_id, admin_id)
     if result:
+        _rbac_log(str(admin_id), 'approve_withdrawal', target=wth_id,
+                  details=f"amount={result.get('amount', '?')}", ip=request.remote_addr)
         push_notification('withdrawal_approved', '✅ تمت الموافقة على سحب', f'سحب {wth_id} تمت الموافقة', {'withdrawal_id': wth_id})
         return jsonify({'success': True, 'withdrawal': result})
     return jsonify({'error': 'Not found'}), 404
 
 @app.route('/api/withdrawal/<wth_id>/reject', methods=['POST'])
 @api_auth
+@permission_required('reject_withdrawals')
 def api_withdrawal_reject(wth_id):
     """رفض سحب — إعادة الرصيد"""
     if not _VEX_GAMES:
@@ -4919,6 +5221,8 @@ def api_withdrawal_reject(wth_id):
     admin_id = session.get('admin_id', '')
     result = _gm.reject_withdrawal(wth_id, admin_id)
     if result:
+        _rbac_log(str(admin_id), 'reject_withdrawal', target=wth_id,
+                  details='rejected — balance returned', ip=request.remote_addr)
         push_notification('withdrawal_rejected', '❌ تم رفض سحب', f'سحب {wth_id} تم رفض — الرصيد مُرتجع', {'withdrawal_id': wth_id})
         return jsonify({'success': True, 'withdrawal': result})
     return jsonify({'error': 'Not found'}), 404
@@ -4927,6 +5231,7 @@ def api_withdrawal_reject(wth_id):
 
 @app.route('/api/admin/player/<uid>/win-override', methods=['POST'])
 @api_auth
+@permission_required('manage_games')
 def api_admin_win_override(uid):
     """تحكم أدمن باحتمال فوز لاعب محدد"""
     if not _VEX_GAMES:
@@ -4941,6 +5246,7 @@ def api_admin_win_override(uid):
 
 @app.route('/api/admin/player/<uid>/balance', methods=['POST'])
 @api_auth
+@permission_required('approve_deposits')
 def api_admin_player_balance(uid):
     """إضافة/خصم رصيد يدوي"""
     if not _VEX_GAMES:
@@ -4955,6 +5261,7 @@ def api_admin_player_balance(uid):
 
 @app.route('/api/admin/player/<uid>/block', methods=['POST'])
 @api_auth
+@permission_required('ban_users')
 def api_admin_block_player(uid):
     """حظر لاعب من اللعب"""
     if not _VEX_GAMES:
@@ -4964,6 +5271,7 @@ def api_admin_block_player(uid):
 
 @app.route('/api/admin/player/<uid>/cooldown', methods=['POST'])
 @api_auth
+@permission_required('ban_users')
 def api_admin_cooldown_player(uid):
     """تبريد لاعب"""
     if not _VEX_GAMES:
@@ -4975,6 +5283,7 @@ def api_admin_cooldown_player(uid):
 
 @app.route('/api/admin/player/<uid>/vex', methods=['POST'])
 @api_auth
+@permission_required('ban_users')
 def api_admin_vex_partner(uid):
     """تفعيل/إيقاف شريك VEX"""
     if not _VEX_GAMES:
@@ -7070,6 +7379,7 @@ def api_snatch_end():
 
 @app.route('/api/games/<game_id>/config', methods=['POST'])
 @api_auth
+@permission_required('manage_games')
 def api_game_config_update(game_id):
     """تحديث إعدادات لعبة محددة (base_win_chance, house_edge, min/max bet)"""
     if not _VEX_GAMES:
@@ -7099,6 +7409,7 @@ def api_game_config_update(game_id):
 
 @app.route('/api/games/kill-switch', methods=['POST'])
 @api_auth
+@permission_required('manage_games')
 def api_games_kill_switch():
     """إيقاف/تشغيل كل الألعاب فوراً"""
     if not _VEX_GAMES:
@@ -7161,6 +7472,7 @@ def api_admin_player_profile(uid):
 
 @app.route('/api/admin/player/<uid>/force-result', methods=['POST'])
 @api_auth
+@permission_required('manage_games')
 def api_admin_force_result(uid):
     """إجبار نتيجة اللاعب التالية (win/lose/normal)"""
     if not _VEX_GAMES:
@@ -7184,6 +7496,7 @@ def api_admin_force_result(uid):
 
 @app.route('/api/admin/player/<uid>/reset-daily', methods=['POST'])
 @api_auth
+@permission_required('manage_games')
 def api_admin_reset_daily(uid):
     """إعادة ضبط الإحصائيات اليومية للاعب"""
     if not _VEX_GAMES:
@@ -7198,6 +7511,7 @@ def api_admin_reset_daily(uid):
 
 @app.route('/api/admin/player/<uid>/reset-override', methods=['POST'])
 @api_auth
+@permission_required('manage_games')
 def api_admin_reset_override(uid):
     """إلغاء تحكم الأدمن على اللاعب"""
     if not _VEX_GAMES:
@@ -7276,6 +7590,7 @@ def api_admin_platform_stats():
 
 @app.route('/api/admin/lockdown-log', methods=['GET'])
 @api_auth
+@permission_required('manage_admins')
 def api_admin_lockdown_log():
     """Return lockdown/recovery history with summary statistics.
 
@@ -7350,6 +7665,7 @@ def api_admin_lockdown_log():
 
 @app.route('/api/admin/lockdown-log/export', methods=['GET'])
 @api_auth
+@permission_required('manage_admins')
 def api_admin_lockdown_log_export():
     """Stream the full lockdown_log.csv as a file download.
 
