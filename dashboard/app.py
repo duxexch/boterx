@@ -714,6 +714,20 @@ def webapp_auth(f):
                 'code': 'AUTH_LOCKDOWN'
             }), 503
 
+        # ── Path 1b: Flask dashboard session (HttpOnly cookie, never in URL) ───
+        # Users who navigate to Mini App pages from the /home dashboard route
+        # carry a Flask session cookie with their verified uid.  This cookie is
+        # HttpOnly and Secure — it cannot leak from URL logs or Referrer headers
+        # and cannot be forged without the SESSION_SECRET.  No URL token needed.
+        flask_uid = session.get('admin_id', '').strip()
+        if flask_uid and not session.get('is_admin'):
+            # Only allow non-admin (regular user) dashboard sessions here.
+            # Admin sessions are for the admin panel, not the player WebApp.
+            g.telegram_user_id = flask_uid
+            g.telegram_user = None
+            g.webapp_auth_strong = True   # login_required already verified identity
+            return f(*args, **kwargs)
+
         # ── Path 2: Production HMAC validation ────────────────────────────
         if BOT_TOKEN:
             init_data = (
@@ -1137,23 +1151,11 @@ def home():
             user_currency = user_info.get('currency', 'EGP')
     except: pass
 
-    # Generate a server-authenticated session token for this user.
-    # create_authenticated_session() sets pre_authenticated=True in SQLite,
-    # meaning the uid was verified by Flask's @login_required mechanism —
-    # not by a caller-supplied parameter.  webapp_auth treats these as
-    # webapp_auth_strong=True without requiring a device fingerprint.
-    # Safe: uid comes from session.get('admin_id') — trusted Flask session.
-    s_token = ''
-    if uid:
-        try:
-            from session_tokens import create_authenticated_session as _cas
-            s_token = _cas(uid)
-        except Exception:
-            pass
-
+    # Auth note: the Flask session cookie (set at login, HttpOnly) is automatically
+    # sent with all /webapp/* API calls from the browser.  webapp_auth reads
+    # session['admin_id'] as a trusted identity, so no URL token is needed here.
     return render_template('home.html', active_page='home', user_name=user_name,
-                         user_balance=user_balance, user_currency=user_currency,
-                         uid=uid, s_token=s_token)
+                         user_balance=user_balance, user_currency=user_currency, uid=uid)
 
 @app.route('/transactions')
 @admin_required

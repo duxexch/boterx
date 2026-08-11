@@ -172,14 +172,10 @@ body{background:var(--bg);color:var(--text);margin:0;min-height:100dvh;overflow-
 
 <script>
 function openAccountPage(){
-  // Use the server-generated encrypted session token injected by the /home route
-  // (which is @login_required — uid comes from trusted Flask session).
-  // This gives the account APIs a device-bindable strong-auth session token
-  // instead of a plain uid (which is rejected as WEAK_AUTH).
-  var s   = '{{ s_token | e }}';
-  var uid = '{{ uid | e }}';
-  var param = s ? ('s=' + encodeURIComponent(s)) : ('uid=' + encodeURIComponent(uid));
-  window.location.href = '/webapp/account?' + param + '&lang=ar';
+  // The Flask session cookie (HttpOnly, set at /home login) is automatically
+  // included in the /webapp/account request and all subsequent API calls.
+  // webapp_auth reads session['admin_id'] as a trusted identity — no URL token needed.
+  window.location.href = '/webapp/account?lang=ar';
 }
 function showToast(msg){var t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(function(){t.classList.remove('show')},2500)}
 function refreshBalance(){
