@@ -380,12 +380,27 @@ class GameManager:
 
     def upsert_svrp_wallet_balance(self, uid, frozen_balance, total_earned,
                                    total_used, wagering_required, wagering_completed):
-        """Mirror a CSV wallet row to SQLite (called from _update_wallet)."""
+        """Backfill only (INSERT OR IGNORE). Use delta_update_svrp_wallet for mutations."""
         if _USE_SQLITE:
             _db.upsert_svrp_wallet_balance(
                 uid, frozen_balance, total_earned, total_used,
                 wagering_required, wagering_completed
             )
+
+    def delta_update_svrp_wallet(self, uid, frozen_balance_delta=0.0,
+                                  total_earned_delta=0.0, total_used_delta=0.0,
+                                  wagering_completed_delta=0, set_wagering_required=None):
+        """Apply incremental deltas to SQLite frozen wallet. Returns updated dict."""
+        if _USE_SQLITE:
+            return _db.delta_update_svrp_wallet(
+                uid,
+                frozen_balance_delta=frozen_balance_delta,
+                total_earned_delta=total_earned_delta,
+                total_used_delta=total_used_delta,
+                wagering_completed_delta=wagering_completed_delta,
+                set_wagering_required=set_wagering_required,
+            )
+        return None
 
     def migrate_svrp_wallets_from_csv(self, rows):
         """Idempotent backfill: INSERT OR IGNORE CSV rows into SQLite."""

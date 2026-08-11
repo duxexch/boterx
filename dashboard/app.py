@@ -4429,19 +4429,32 @@ def api_user_activity(user_id):
 @api_auth
 @permission_required('view_financial')
 def api_svrp_freeze(user_id):
+    """Admin freeze: moves frozen_balance → 0 in SQLite (delta), CSV mirrors.
+
+    'Freeze' here means zeroing out the transferable frozen_balance —
+    the same delta operation that prevents double-spend.
+    """
     import sys as _sf; _sf.path.insert(0, BASE_DIR)
     from svrp import svrp_lock as _sl
-    with _sl():   # حماية cross-process لكتابة svrp_wallets.csv
+    with _sl():
         wallets = read_csv('svrp_wallets.csv')
         fieldnames = get_fieldnames('svrp_wallets.csv', ['telegram_id','customer_id','balance','pending_balance','total_earned','total_used','wagering_required','wagering_completed','last_recovery_date','monthly_recovery_total'])
+        delta = 0.0
         for w in wallets:
             if w.get('telegram_id') == user_id:
                 balance = float(w.get('balance', 0) or 0)
                 frozen  = float(w.get('pending_balance', 0) or 0)
+                delta   = -balance   # remove from frozen_balance in SQLite
                 w['pending_balance'] = str(balance + frozen)
                 w['balance'] = '0'
                 break
         write_csv('svrp_wallets.csv', wallets, fieldnames)
+        if delta != 0.0:
+            try:
+                _gm.delta_update_svrp_wallet(user_id, frozen_balance_delta=delta)
+            except Exception as _fe:
+                import logging; logging.getLogger(__name__).warning(
+                    f'svrp_freeze SQLite delta failed uid={user_id}: {_fe}')
     log_action('svrp_freeze', user_id)
     return jsonify({'success': True, 'message': 'تم تجميد الرصيد'})
 
@@ -4449,11 +4462,11 @@ def api_svrp_freeze(user_id):
 @api_auth
 @permission_required('view_financial')
 def api_svrp_unfreeze(user_id):
+    """Admin unfreeze: moves pending_balance → frozen_balance in SQLite (delta)."""
     import sys as _su; _su.path.insert(0, BASE_DIR)
     from svrp import svrp_lock as _sl
     data = request.json or {}
     raw  = data.get('amount', 0)
-    # Validate: reject NaN / Infinity / non-numeric before touching wallet
     try:
         amount = float(raw)
     except (TypeError, ValueError):
@@ -4463,6 +4476,7 @@ def api_svrp_unfreeze(user_id):
     with _sl():
         wallets = read_csv('svrp_wallets.csv')
         fieldnames = get_fieldnames('svrp_wallets.csv', ['telegram_id','customer_id','balance','pending_balance','total_earned','total_used','wagering_required','wagering_completed','last_recovery_date','monthly_recovery_total'])
+        delta = 0.0
         for w in wallets:
             if w.get('telegram_id') == user_id:
                 frozen  = float(w.get('pending_balance', 0) or 0)
@@ -4470,10 +4484,17 @@ def api_svrp_unfreeze(user_id):
                 if amount == 0:
                     amount = frozen
                 amount = min(amount, frozen)
-                w['balance']         = str(balance + amount)
-                w['pending_balance'] = str(frozen - amount)
+                delta = amount   # add to frozen_balance in SQLite
+                w['balance']         = str(round(balance + amount, 6))
+                w['pending_balance'] = str(round(frozen - amount, 6))
                 break
         write_csv('svrp_wallets.csv', wallets, fieldnames)
+        if delta > 0:
+            try:
+                _gm.delta_update_svrp_wallet(user_id, frozen_balance_delta=delta)
+            except Exception as _ue:
+                import logging; logging.getLogger(__name__).warning(
+                    f'svrp_unfreeze SQLite delta failed uid={user_id}: {_ue}')
     log_action('svrp_unfreeze', f'{user_id}: {amount}')
     return jsonify({'success': True, 'message': f'تم فك تجميد {amount}'})
 

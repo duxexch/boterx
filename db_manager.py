@@ -498,30 +498,95 @@ class GameDB:
 
     def upsert_svrp_wallet_balance(self, uid, frozen_balance, total_earned,
                                    total_used, wagering_required, wagering_completed):
-        """Mirror a CSV wallet row into the authoritative SQLite wallet table.
+        """DEPRECATED — kept for migration/backfill callers only.
 
-        Called inside svrp_lock() by SVRPManager._update_wallet so that every
-        CSV mutation is immediately reflected in SQLite.  Uses INSERT ... ON CONFLICT
-        UPDATE so it is safe to call repeatedly.
+        All live mutations must use delta_update_svrp_wallet() so they never
+        overwrite SQLite with a stale CSV-derived value.
         """
+        # Silently forward to the safe path only if the row does not already exist
+        # (acts as INSERT OR IGNORE equivalent so backfills still work).
         conn = self._conn()
         self._ensure_svrp_transfer_table(conn)
         with _db_lock:
             conn.execute(
-                'INSERT INTO svrp_wallet_balance '
+                'INSERT OR IGNORE INTO svrp_wallet_balance '
                 '(uid, frozen_balance, total_earned, total_used, '
                 ' wagering_required, wagering_completed) '
-                'VALUES (?, ?, ?, ?, ?, ?) '
-                'ON CONFLICT(uid) DO UPDATE SET '
-                'frozen_balance     = excluded.frozen_balance, '
-                'total_earned       = excluded.total_earned, '
-                'total_used         = excluded.total_used, '
-                'wagering_required  = excluded.wagering_required, '
-                'wagering_completed = excluded.wagering_completed',
+                'VALUES (?, ?, ?, ?, ?, ?)',
                 (str(uid), float(frozen_balance), float(total_earned),
                  float(total_used), int(wagering_required), int(wagering_completed))
             )
             conn.commit()
+
+    def delta_update_svrp_wallet(self, uid,
+                                  frozen_balance_delta: float = 0.0,
+                                  total_earned_delta:   float = 0.0,
+                                  total_used_delta:     float = 0.0,
+                                  wagering_completed_delta: int = 0,
+                                  set_wagering_required: int = None):
+        """Apply incremental deltas to the SQLite frozen wallet atomically.
+
+        This is the ONLY write path for live SVRP mutations after initial
+        migration.  All callers pass deltas so that SQLite is always updated
+        by the exact amount of each business event — no stale CSV value is
+        ever read and re-upserted, so previous transfer debits are preserved.
+
+        An INSERT OR IGNORE ensures the row exists before the UPDATE, so this
+        is safe for first-time wallet creation too.
+
+        Returns the updated row as a dict.
+        """
+        uid = str(uid)
+        conn = self._conn()
+        self._ensure_svrp_transfer_table(conn)
+        with _db_lock:
+            # Ensure row exists
+            conn.execute(
+                'INSERT OR IGNORE INTO svrp_wallet_balance '
+                '(uid, frozen_balance, total_earned, total_used, '
+                ' wagering_required, wagering_completed) '
+                'VALUES (?, 0, 0, 0, 3, 0)',
+                (uid,)
+            )
+            # Apply deltas
+            if set_wagering_required is not None:
+                conn.execute(
+                    'UPDATE svrp_wallet_balance SET '
+                    'frozen_balance     = frozen_balance     + ?, '
+                    'total_earned       = total_earned       + ?, '
+                    'total_used         = total_used         + ?, '
+                    'wagering_completed = wagering_completed + ?, '
+                    'wagering_required  = ? '
+                    'WHERE uid = ?',
+                    (float(frozen_balance_delta), float(total_earned_delta),
+                     float(total_used_delta), int(wagering_completed_delta),
+                     int(set_wagering_required), uid)
+                )
+            else:
+                conn.execute(
+                    'UPDATE svrp_wallet_balance SET '
+                    'frozen_balance     = frozen_balance     + ?, '
+                    'total_earned       = total_earned       + ?, '
+                    'total_used         = total_used         + ?, '
+                    'wagering_completed = wagering_completed + ? '
+                    'WHERE uid = ?',
+                    (float(frozen_balance_delta), float(total_earned_delta),
+                     float(total_used_delta), int(wagering_completed_delta), uid)
+                )
+            conn.commit()
+            row = conn.execute(
+                'SELECT frozen_balance, total_earned, total_used, '
+                'wagering_required, wagering_completed '
+                'FROM svrp_wallet_balance WHERE uid = ?', (uid,)
+            ).fetchone()
+            return {
+                'uid': uid,
+                'frozen_balance':     float(row[0]),
+                'total_earned':       float(row[1]),
+                'total_used':         float(row[2]),
+                'wagering_required':  int(row[3]),
+                'wagering_completed': int(row[4]),
+            } if row else None
 
     def migrate_svrp_wallets_from_csv(self, rows):
         """Idempotent one-time backfill: INSERT OR IGNORE each CSV wallet row.

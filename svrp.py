@@ -314,43 +314,38 @@ class SVRPManager:
                                 row[k] = str(v)
                         updated_row = row
                         break
-            ok = self._write_csv('svrp_wallets.csv', rows, self.WALLET_FIELDS)
-            # Mirror to SQLite (authoritative for financial decisions) within the
-            # same svrp_lock scope so reads and writes are consistent.
-            if ok and updated_row is not None:
-                try:
-                    from game_engine import GameManager as _GM
-                    _gm_instance = _GM()
-                    _gm_instance.upsert_svrp_wallet_balance(
-                        tid,
-                        float(updated_row.get('balance', 0) or 0),
-                        float(updated_row.get('total_earned', 0) or 0),
-                        float(updated_row.get('total_used', 0) or 0),
-                        int(updated_row.get('wagering_required', 3) or 3),
-                        int(updated_row.get('wagering_completed', 0) or 0),
-                    )
-                except Exception as _me:
-                    logger.warning(
-                        f'SQLite wallet mirror failed for uid={tid}: {_me}'
-                    )
-            return ok
+            # NOTE: Do NOT upsert CSV values into SQLite here.
+            # SQLite is the authoritative balance store; upserting CSV values
+            # (which may be stale after a transfer debit) would overwrite the
+            # authoritative balance.  All mutations that need SQLite updates
+            # call delta_update_svrp_wallet() directly before calling
+            # _update_wallet() for CSV, so this method is CSV-only.
+            return self._write_csv('svrp_wallets.csv', rows, self.WALLET_FIELDS)
 
     def add_frozen_balance(self, telegram_id, amount):
-        """إضافة رصيد مجمد للمحفظة — القراءة والكتابة داخل svrp_lock."""
+        """إضافة رصيد مجمد للمحفظة — delta to SQLite first, then CSV mirror."""
         tid = str(telegram_id)
+        amt = float(amount)
         with svrp_lock():
+            # SQLite delta (authoritative) — never reads CSV, preserves transfer debits
+            try:
+                from game_engine import GameManager as _GM
+                _GM().delta_update_svrp_wallet(
+                    tid, frozen_balance_delta=amt, total_earned_delta=amt
+                )
+            except Exception as _e:
+                logger.warning(f'add_frozen_balance SQLite delta failed uid={tid}: {_e}')
+            # CSV mirror (display / backward-compatibility)
             wallet = self.get_wallet(tid)
-            current_balance = float(wallet.get('balance', 0) or 0)
-            current_earned  = float(wallet.get('total_earned', 0) or 0)
             self._update_wallet(tid, {
-                'balance':      current_balance + float(amount),
-                'total_earned': current_earned  + float(amount),
+                'balance':      round(float(wallet.get('balance', 0) or 0) + amt, 6),
+                'total_earned': round(float(wallet.get('total_earned', 0) or 0) + amt, 6),
             })
         logger.info(f"Referral bonus added to {tid}: +{amount} frozen")
         return True
 
     def unfreeze_balance(self, telegram_id, amount=None):
-        """تحويل رصيد من مجمد إلى متاح — RMW داخل svrp_lock."""
+        """تحويل رصيد من مجمد إلى متاح — delta to SQLite first, then CSV mirror."""
         import math as _m
         tid = str(telegram_id)
         with svrp_lock():
@@ -363,8 +358,19 @@ class SVRPManager:
             if not _m.isfinite(amount) or amount < 0:
                 return False, frozen, available
             amount = min(amount, frozen)
-            new_frozen    = frozen    - amount
-            new_available = available + amount
+            new_frozen    = round(frozen    - amount, 6)
+            new_available = round(available + amount, 6)
+            # SQLite delta (authoritative)
+            try:
+                from game_engine import GameManager as _GM
+                _GM().delta_update_svrp_wallet(
+                    tid,
+                    frozen_balance_delta=-amount,
+                    total_used_delta=amount
+                )
+            except Exception as _e:
+                logger.warning(f'unfreeze_balance SQLite delta failed uid={tid}: {_e}')
+            # CSV mirror
             self._update_wallet(tid, {
                 'balance':    new_frozen,
                 'total_used': new_available,
@@ -554,8 +560,16 @@ class SVRPManager:
         return completed >= required
 
     def increment_wagering(self, telegram_id):
-        """زيادة عداد الرهان — القراءة والكتابة للمحفظة والأرصدة داخل svrp_lock."""
+        """زيادة عداد الرهان — delta to SQLite first, then CSV mirror."""
         with svrp_lock():
+            # SQLite delta (authoritative)
+            try:
+                from game_engine import GameManager as _GM
+                _GM().delta_update_svrp_wallet(
+                    str(telegram_id), wagering_completed_delta=1
+                )
+            except Exception as _e:
+                logger.warning(f'increment_wagering SQLite delta failed uid={telegram_id}: {_e}')
             wallet   = self.get_wallet(telegram_id)
             current  = int(wallet.get('wagering_completed', 0) or 0)
             required = int(wallet.get('wagering_required', 3) or 3)
@@ -582,23 +596,45 @@ class SVRPManager:
     # ==================== استخدام الأرصدة ====================
 
     def use_credits(self, telegram_id, amount):
-        """استخدام الأرصدة — القراءة والكتابة داخل svrp_lock (reentrant)."""
+        """استخدام الأرصدة — delta to SQLite first, then CSV mirror (reentrant)."""
         with svrp_lock():
-            wallet  = self.get_wallet(telegram_id)
-            wager_req  = int(wallet.get('wagering_required', 3) or 3)
-            wager_done = int(wallet.get('wagering_completed', 0) or 0)
-            if wager_done < wager_req:
-                return False, "لم تكمل متطلبات الرهان بعد"
+            # Read from SQLite (authoritative) for balance check
+            try:
+                from game_engine import GameManager as _GM
+                _gm = _GM()
+                sql_wallet = _gm.get_svrp_frozen_balance(str(telegram_id)) or {}
+                wager_req  = int(sql_wallet.get('wagering_required', 3) or 3)
+                wager_done = int(sql_wallet.get('wagering_completed', 0) or 0)
+                if wager_done < wager_req:
+                    return False, "لم تكمل متطلبات الرهان بعد"
+                balance = float(sql_wallet.get('frozen_balance', 0) or 0)
+                if balance < amount - 1e-9:
+                    return False, f"الرصيد غير كافٍ (المتاح: {balance:.2f})"
+                # SQLite delta (authoritative)
+                _gm.delta_update_svrp_wallet(
+                    str(telegram_id),
+                    frozen_balance_delta=-float(amount),
+                    total_used_delta=float(amount)
+                )
+            except Exception as _e:
+                logger.warning(f'use_credits SQLite delta failed uid={telegram_id}: {_e}')
+                # Fallback: read from CSV
+                wallet     = self.get_wallet(telegram_id)
+                wager_req  = int(wallet.get('wagering_required', 3) or 3)
+                wager_done = int(wallet.get('wagering_completed', 0) or 0)
+                if wager_done < wager_req:
+                    return False, "لم تكمل متطلبات الرهان بعد"
+                balance = float(wallet.get('balance', 0) or 0)
+                if balance < amount:
+                    return False, f"الرصيد غير كافٍ (المتاح: {balance})"
 
-            balance = float(wallet.get('balance', 0) or 0)
-            if balance < amount:
-                return False, f"الرصيد غير كافٍ (المتاح: {balance})"
-
-            new_balance = balance - amount
+            # CSV mirror
+            wallet     = self.get_wallet(telegram_id)
+            new_balance = float(wallet.get('balance', 0) or 0) - amount
             total_used  = float(wallet.get('total_used', 0) or 0) + amount
             self._update_wallet(telegram_id, {
-                'balance':    new_balance,
-                'total_used': total_used,
+                'balance':    max(0.0, round(new_balance, 6)),
+                'total_used': round(total_used, 6),
             })
 
             # تحديث حالة الأرصدة الفردية
@@ -614,7 +650,7 @@ class SVRPManager:
                         row['status'] = 'used'
                         row['credit_amount'] = '0'
                     else:
-                        row['credit_amount'] = str(credit_val - remaining)
+                        row['credit_amount'] = str(round(credit_val - remaining, 6))
                         remaining = 0
                         break
             self._write_csv('svrp_credits.csv', rows, self.CREDIT_FIELDS)
@@ -1292,17 +1328,32 @@ class SVRPManager:
             if amount <= 0 or sender_balance2 <= 0:
                 return False, "المبلغ أو الرصيد غير صالح"
 
-            # 1. خصم من المرسل
+            # 1. خصم من المرسل (SQLite delta first, then CSV)
+            try:
+                from game_engine import GameManager as _GM
+                _gm_s = _GM()
+                _gm_s.delta_update_svrp_wallet(
+                    tid,
+                    frozen_balance_delta=-float(amount),
+                    total_used_delta=float(amount)
+                )
+                _gm_s.delta_update_svrp_wallet(
+                    str(receiver_tid),
+                    frozen_balance_delta=float(amount),
+                    total_earned_delta=float(amount)
+                )
+            except Exception as _se:
+                logger.warning(f'send_frozen_credits SQLite delta failed: {_se}')
             self._update_wallet(tid, {
-                'balance':    sender_balance2 - amount,
-                'total_used': sender_used2    + amount,
+                'balance':    round(sender_balance2 - amount, 6),
+                'total_used': round(sender_used2    + amount, 6),
             })
 
-            # 2. إضافة للمستلم (مجمد) — قراءة حديثة داخل القفل
+            # 2. إضافة للمستلم (مجمد) — قراءة حديثة داخل القفل (CSV mirror)
             receiver_wallet = self.get_wallet(receiver_tid)
             self._update_wallet(receiver_tid, {
-                'balance':      float(receiver_wallet.get('balance', 0) or 0)    + amount,
-                'total_earned': float(receiver_wallet.get('total_earned', 0) or 0) + amount,
+                'balance':      round(float(receiver_wallet.get('balance', 0) or 0)    + amount, 6),
+                'total_earned': round(float(receiver_wallet.get('total_earned', 0) or 0) + amount, 6),
             })
 
             # 3. تسجيل التحويل
