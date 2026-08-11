@@ -94,6 +94,13 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         # نظام قفل ملفات CSV لمنع تلف البيانات عند الكتابة المتزامنة
         self.csv_locks = {}
         
+        # ── In-memory user cache — eliminates CSV reads on every request ──
+        self._user_cache = {}  # telegram_id -> user dict
+        self._user_cache_by_phone = {}  # normalized_phone -> user dict
+        self._user_cache_loaded = False
+        self._user_cache_lock = threading.Lock()
+        self._load_user_cache()
+        
         # تهيئة البيانات المؤقتة للأدمن
         self.edit_company_data = {}
         self.temp_button_label_edit = {}
@@ -3790,33 +3797,64 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             pass
         return notifications[-limit:]
     
-    def find_user(self, telegram_id):
-        """البحث عن مستخدم بـ telegram_id"""
+    def _load_user_cache(self):
+        """تحميل كل المستخدمين في الذاكرة مرة واحدة — O(1) lookup بدلاً من O(n) CSV scan"""
+        with self._user_cache_lock:
+            self._user_cache.clear()
+            self._user_cache_by_phone.clear()
+            try:
+                with open('users.csv', 'r', encoding='utf-8-sig') as f:
+                    for row in csv.DictReader(f):
+                        tid = row.get('telegram_id', '')
+                        if tid:
+                            self._user_cache[str(tid)] = row
+                            phone = row.get('phone', '').replace(' ', '').replace('-', '').replace('+', '')
+                            if phone:
+                                self._user_cache_by_phone[phone] = row
+                self._user_cache_loaded = True
+                logging.info(f"User cache loaded: {len(self._user_cache)} users")
+            except Exception as e:
+                logging.error(f"User cache load error: {e}")
+                self._user_cache_loaded = True  # تجنب إعادة المحاولة
+    
+    def _refresh_user_in_cache(self, telegram_id):
+        """تحديث مستخدم واحد في الكاش بعد الكتابة لـ users.csv"""
         try:
             with open('users.csv', 'r', encoding='utf-8-sig') as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    if row['telegram_id'] == str(telegram_id):
+                for row in csv.DictReader(f):
+                    if row.get('telegram_id') == str(telegram_id):
+                        with self._user_cache_lock:
+                            self._user_cache[str(telegram_id)] = row
+                            phone = row.get('phone', '').replace(' ', '').replace('-', '').replace('+', '')
+                            if phone:
+                                self._user_cache_by_phone[phone] = row
                         return row
         except:
             pass
         return None
     
+    def find_user(self, telegram_id):
+        """البحث عن مستخدم — O(1) من الذاكرة (بدون قراءة CSV)"""
+        tid = str(telegram_id)
+        with self._user_cache_lock:
+            if tid in self._user_cache:
+                return dict(self._user_cache[tid])  # نسخة لمنع التعديل المباشر
+        # Fallback: قراءة CSV لو الكاش فارغ أو المستخدم جديد
+        if not self._user_cache_loaded:
+            self._load_user_cache()
+            with self._user_cache_lock:
+                if tid in self._user_cache:
+                    return dict(self._user_cache[tid])
+        return None
+    
     def find_user_by_phone(self, phone):
-        """البحث عن مستخدم برقم الهاتف — للحفاظ على البيانات عند إعادة التسجيل"""
+        """البحث عن مستخدم برقم الهاتف — O(1) من الذاكرة"""
         if not phone:
             return None
-        # تطبيع رقم الهاتف
         phone_normalized = phone.replace(' ', '').replace('-', '').replace('+', '')
-        try:
-            with open('users.csv', 'r', encoding='utf-8-sig') as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    stored_phone = row.get('phone', '').replace(' ', '').replace('-', '').replace('+', '')
-                    if stored_phone and stored_phone == phone_normalized:
-                        return row
-        except:
-            pass
+        with self._user_cache_lock:
+            if phone_normalized in self._user_cache_by_phone:
+                return dict(self._user_cache_by_phone[phone_normalized])
         return None
 
     def detect_language_from_phone(self, phone):
