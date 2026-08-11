@@ -4,50 +4,58 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
 <title>عجلة الحظ — VEX</title>
-<link rel="stylesheet" href="/static/css/game-base.css">
+<link rel="stylesheet" href="/static/css/game-base.css?v=20260811">
 <style>
-.game-area{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:8px;overflow:hidden}
-.wheel-wrap{position:relative;width:min(70vw,280px);height:min(70vw,280px);flex-shrink:0}
-#wheelCanvas{width:100%;height:100%;border-radius:50%;box-shadow:0 0 40px rgba(251,191,36,.25),0 8px 30px rgba(0,0,0,.4)}
-.wheel-pointer{position:absolute;top:-16px;left:50%;transform:translateX(-50%);font-size:32px;filter:drop-shadow(0 2px 6px rgba(0,0,0,.5));z-index:10;transition:transform .05s}
-.wheel-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:36px;height:36px;border-radius:50%;background:radial-gradient(circle,#fbbf24,#92400e);border:3px solid #fff;box-shadow:0 0 12px rgba(251,191,36,.6);z-index:10}
-.wheel-result{min-height:48px;display:flex;flex-direction:column;align-items:center;justify-content:center}
-.wheel-result-mult{font-size:28px;font-weight:900;font-family:'Courier New',monospace;opacity:0;transition:opacity .3s,transform .3s;transform:scale(.8)}
+html,body{margin:0;padding:0;height:100%;touch-action:manipulation;user-select:none}
+#app{display:flex;flex-direction:column;height:100dvh}
+.game-area{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:8px;overflow:hidden;min-height:0}
+.wheel-wrap{position:relative;width:min(72vw,300px);height:min(72vw,300px);flex-shrink:0}
+#wheelCanvas{width:100%;height:100%;display:block}
+.wheel-pointer{position:absolute;top:-8px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:12px solid transparent;border-right:12px solid transparent;border-top:24px solid #fbbf24;filter:drop-shadow(0 2px 6px rgba(0,0,0,.6));z-index:10}
+.wheel-result{min-height:48px;display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0}
+.wheel-result-mult{font-size:30px;font-weight:900;font-family:'Courier New',monospace;opacity:0;transition:opacity .3s,transform .3s;transform:scale(.5)}
 .wheel-result-mult.show{opacity:1;transform:scale(1)}
 .wheel-result-sub{font-size:13px;color:var(--text-dim);opacity:0;transition:opacity .3s}
 .wheel-result-sub.show{opacity:1}
-.bet-row{display:flex;align-items:center;gap:6px;width:100%;max-width:320px}
-.bet-inp{flex:1;background:var(--surface-2);border:1px solid var(--border);color:var(--text);padding:11px 10px;border-radius:var(--radius-sm);font-size:16px;font-weight:700;text-align:center;font-family:'Courier New',monospace;-moz-appearance:textfield}
+.bet-row{display:flex;align-items:center;gap:5px;width:100%;max-width:320px;flex-shrink:0}
+.bet-inp{flex:1;background:var(--surface-2);border:1px solid var(--border);color:var(--text);padding:11px 10px;border-radius:8px;font-size:16px;font-weight:700;text-align:center;font-family:'Courier New',monospace;-moz-appearance:textfield}
 .bet-inp::-webkit-inner-spin-button,.bet-inp::-webkit-outer-spin-button{display:none}
-.ctrl-btn{background:var(--surface-2);border:1px solid var(--border);color:var(--text-dim);padding:11px 9px;border-radius:var(--radius-sm);font-size:11px;font-weight:700;cursor:pointer;transition:all .15s}
+.ctrl-btn{background:var(--surface-2);border:1px solid var(--border);color:var(--text-dim);padding:11px 8px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0}
 .ctrl-btn:active{transform:scale(.92)}
-.spin-btn{width:100%;max-width:320px;padding:15px;border-radius:var(--radius);font-size:18px;font-weight:900;border:none;cursor:pointer;background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#000;box-shadow:0 4px 20px rgba(251,191,36,.4);transition:all .2s}
+/* Press-and-hold spin button */
+.spin-btn{width:100%;max-width:320px;padding:14px;border-radius:12px;font-size:18px;font-weight:900;border:none;cursor:pointer;background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#000;box-shadow:0 4px 20px rgba(251,191,36,.4);transition:all .2s;flex-shrink:0;position:relative;overflow:hidden}
 .spin-btn:active{transform:scale(.97)}
 .spin-btn:disabled{background:var(--surface-2);color:var(--muted);cursor:not-allowed;box-shadow:none}
-.seg-legend{display:flex;flex-wrap:wrap;gap:4px;justify-content:center;max-width:320px}
+.spin-btn.charging{background:linear-gradient(135deg,#ef4444,#991b1b);color:#fff;animation:chargePulse .3s infinite}
+@keyframes chargePulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.4)}50%{box-shadow:0 0 0 15px rgba(239,68,68,0)}}
+.spin-power-bar{position:absolute;bottom:0;left:0;height:4px;background:#fff;transition:width .1s;border-radius:0 0 12px 12px}
+.spin-hint{font-size:10px;color:var(--text-dim);margin-top:-4px;flex-shrink:0}
+.seg-legend{display:flex;flex-wrap:wrap;gap:4px;justify-content:center;max-width:320px;flex-shrink:0}
 .seg-chip{padding:3px 8px;border-radius:8px;font-size:10px;font-weight:700;font-family:'Courier New',monospace}
+.big-win-overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.7);backdrop-filter:blur(6px);z-index:50}
+.big-win-overlay.show{display:flex}
+.big-win-num{font-size:64px;font-weight:900;font-family:'Courier New',monospace;color:#fbbf24;text-shadow:0 0 40px rgba(251,191,36,.6);animation:bwP 1s infinite}
+@keyframes bwP{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
 </style>
 </head>
 <body>
-<div id="app" style="display:none">
+<div id="app">
   <div class="game-topbar">
     <div class="topbar-left">
-      <button class="btn-back" onclick="if(tg)tg.close();else history.back()">←</button>
+      <button class="btn-back" onclick="goBack()">←</button>
       <div class="bal-pill"><span class="bal-icon">💰</span><span class="bal-val" id="bal">0</span><span class="bal-cur" id="cur">EGP</span></div>
     </div>
     <div class="topbar-right">
-      <span class="streak-badge" id="streakBadge" style="display:none"></span>
       <button class="btn-sound" id="soundBtn" onclick="toggleSound()">🔊</button>
       <span id="connIndicator">🟢</span>
     </div>
   </div>
   <div class="hist-bar" id="histBar"></div>
 
-  <div class="game-area" style="flex:1;overflow-y:auto">
+  <div class="game-area">
     <div class="wheel-wrap">
-      <div class="wheel-pointer">▼</div>
-      <canvas id="wheelCanvas" width="280" height="280"></canvas>
-      <div class="wheel-center"></div>
+      <div class="wheel-pointer"></div>
+      <canvas id="wheelCanvas"></canvas>
     </div>
 
     <div class="wheel-result">
@@ -63,181 +71,256 @@
       <button class="ctrl-btn" onclick="setBetMax('betInp',5000)">Max</button>
     </div>
 
-    <button class="spin-btn" id="spinBtn" onclick="spin()">🎰 أدر العجلة</button>
-
+    <button class="spin-btn" id="spinBtn">
+      🎰 أدر العجلة
+      <div class="spin-power-bar" id="powerBar" style="width:0"></div>
+    </button>
+    <div class="spin-hint">اضغط مع الاستمرار لتحديد قوة الدوران</div>
     <div class="seg-legend" id="segLegend"></div>
   </div>
 </div>
-<div id="loading" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg);flex-direction:column;gap:12px">
-  <div style="font-size:40px">🎡</div>
-  <div style="color:var(--text-dim);font-size:14px">جارٍ التحميل...</div>
+
+<div class="big-win-overlay" id="bigWinOverlay">
+  <div style="text-align:center">
+    <div class="big-win-num" id="bigWinNum">+0</div>
+    <div style="font-size:18px;color:#fff;margin-top:8px" id="bigWinText">جائزة كبرى!</div>
+  </div>
 </div>
-<script src="/static/js/game-base.js"></script>
+
+<script src="/static/js/game-base.js?v=20260811"></script>
 <script>
 'use strict';
 var canvas = document.getElementById('wheelCanvas');
 var ctx = canvas.getContext('2d');
-var W = canvas.width; var H = canvas.height;
-var cx = W/2; var cy = H/2; var radius = W/2 - 6;
 var spinning = false;
 var currentAngle = 0;
+var pressTimer = null;
+var pressStart = 0;
+var powerLevel = 50; // 0-100
+
+// Default segments (overridden by server each round)
 var SEGMENTS = [
-  { mult: 0.0, label: '💀', color: '#1e293b' },
-  { mult: 1.5, label: '1.5x', color: '#1d4ed8' },
-  { mult: 2.0, label: '2x', color: '#15803d' },
-  { mult: 0.5, label: '0.5x', color: '#7c3aed' },
-  { mult: 5.0, label: '5x', color: '#b45309' },
-  { mult: 1.0, label: '1x', color: '#0e7490' },
-  { mult: 10.0, label: '10x', color: '#9d174d' },
-  { mult: 0.0, label: '💀', color: '#1e293b' }
+  { mult: 0.0, label: '💀', color: '#991b1b', glow: '#ef4444' },
+  { mult: 1.5, label: '1.5x', color: '#1e3a5f', glow: '#3b82f6' },
+  { mult: 2.0, label: '2x', color: '#14532d', glow: '#22c55e' },
+  { mult: 0.5, label: '0.5x', color: '#581c87', glow: '#a855f7' },
+  { mult: 5.0, label: '5x', color: '#78350f', glow: '#fbbf24' },
+  { mult: 1.0, label: '1x', color: '#155e75', glow: '#06b6d4' },
+  { mult: 10.0, label: '10x', color: '#831843', glow: '#ec4899' },
+  { mult: 0.0, label: '💀', color: '#991b1b', glow: '#ef4444' }
 ];
 var N = SEGMENTS.length;
 var segAngle = (Math.PI * 2) / N;
 
-function drawWheel(angle) {
-  ctx.clearRect(0, 0, W, H);
-  // Outer glow
-  var glow = ctx.createRadialGradient(cx, cy, radius - 10, cx, cy, radius + 6);
-  glow.addColorStop(0, 'rgba(251,191,36,0.0)');
-  glow.addColorStop(1, 'rgba(251,191,36,0.15)');
-  ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(cx, cy, radius + 6, 0, 6.28); ctx.fill();
+// Audio
+var _ac = null;
+function _audio(){ if(!_ac){try{_ac=new(window.AudioContext||window.webkitAudioContext)()}catch(e){}} return _ac; }
+function _osc(f,dur,type,vol){
+  var ac=_audio(); if(!ac||!soundOn)return;
+  try{var o=ac.createOscillator(),g=ac.createGain();o.connect(g);g.connect(ac.destination);
+  o.frequency.value=f;o.type=type||'sine';g.gain.setValueAtTime(vol||0.1,ac.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+dur);o.start();o.stop(ac.currentTime+dur);}catch(e){}
+}
+function soundTick(){ _osc(500+Math.random()*300,0.03,'triangle',0.05); }
+function soundCharge(){ _osc(200+powerLevel*5,0.05,'sawtooth',0.03); }
+function soundWin(big){
+  var n = big ? [523,659,784,1047,1319] : [523,659,784];
+  n.forEach(function(f,i){setTimeout(function(){_osc(f,0.18,'sine',0.12);},i*100);});
+}
+function soundLose(){ _osc(300,0.2,'sawtooth',0.1); setTimeout(function(){_osc(200,0.25,'sawtooth',0.1);},150); }
 
-  for (var i = 0; i < N; i++) {
-    var startAngle = angle + i * segAngle - Math.PI/2;
-    var endAngle = startAngle + segAngle;
+function resizeCanvas(){
+  var size = Math.min(canvas.clientWidth || 300, canvas.clientHeight || 300);
+  canvas.width = size; canvas.height = size;
+}
+window.addEventListener('resize', function(){ resizeCanvas(); drawWheel(currentAngle); });
+
+function drawWheel(angle){
+  var w = canvas.width, h = canvas.height;
+  var cx = w/2, cy = h/2, r = Math.max(10, w/2 - 8);
+  ctx.clearRect(0, 0, w, h);
+  // Outer glow
+  ctx.save(); ctx.shadowColor = 'rgba(251,191,36,0.3)'; ctx.shadowBlur = 20;
+  ctx.beginPath(); ctx.arc(cx, cy, r+2, 0, Math.PI*2);
+  ctx.strokeStyle = 'rgba(251,191,36,0.5)'; ctx.lineWidth = 3; ctx.stroke(); ctx.restore();
+  // Segments
+  for(var i=0; i<N; i++){
+    var a0 = angle + i * segAngle - Math.PI/2;
+    var a1 = a0 + segAngle;
     var seg = SEGMENTS[i];
-    // Segment fill
-    var g = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
-    g.addColorStop(0, seg.color + 'cc'); g.addColorStop(1, seg.color);
-    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, radius, startAngle, endAngle); ctx.closePath();
+    var g = ctx.createRadialGradient(cx, cy, r*0.2, cx, cy, r);
+    g.addColorStop(0, seg.glow + 'aa'); g.addColorStop(0.7, seg.color); g.addColorStop(1, seg.color);
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, r, a0, a1); ctx.closePath();
     ctx.fillStyle = g; ctx.fill();
-    ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.lineWidth = 2; ctx.stroke();
-    // Text
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.rotate(startAngle + segAngle/2);
+    ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.lineWidth = 1.5; ctx.stroke();
+    // Label
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(a0 + segAngle/2);
     ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#fff'; ctx.font = 'bold 13px Courier New';
-    ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4;
-    ctx.fillText(seg.label, radius - 14, 0);
-    ctx.shadowBlur = 0; ctx.restore();
+    ctx.font = 'bold ' + Math.max(10, r*0.08) + 'px Courier New';
+    ctx.fillStyle = '#fff'; ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 4;
+    ctx.fillText(seg.label, r - 12, 0); ctx.shadowBlur = 0; ctx.restore();
   }
-  // Border ring
-  ctx.beginPath(); ctx.arc(cx, cy, radius, 0, 6.28);
-  ctx.strokeStyle = 'rgba(251,191,36,0.6)'; ctx.lineWidth = 4; ctx.stroke();
-  // Inner circle
-  ctx.beginPath(); ctx.arc(cx, cy, 22, 0, 6.28);
-  var ig = ctx.createRadialGradient(cx-4, cy-4, 2, cx, cy, 22);
-  ig.addColorStop(0, '#fbbf24'); ig.addColorStop(1, '#78350f');
-  ctx.fillStyle = ig; ctx.fill();
-  ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5; ctx.stroke();
+  // Border
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2);
+  ctx.strokeStyle = '#fbbf24'; ctx.lineWidth = 4; ctx.stroke();
+  // Center hub
+  var hubR = Math.max(8, r*0.12);
+  var hg = ctx.createRadialGradient(cx-hubR*0.3, cy-hubR*0.3, 1, cx, cy, hubR);
+  hg.addColorStop(0, '#fef3c7'); hg.addColorStop(0.5, '#fbbf24'); hg.addColorStop(1, '#78350f');
+  ctx.beginPath(); ctx.arc(cx, cy, hubR, 0, Math.PI*2);
+  ctx.fillStyle = hg; ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, cy, hubR*0.3, 0, Math.PI*2); ctx.fillStyle = '#78350f'; ctx.fill();
 }
 
-function buildLegend() {
-  var legend = document.getElementById('segLegend');
-  SEGMENTS.forEach(function(s) {
-    var chip = document.createElement('div');
-    chip.className = 'seg-chip';
-    chip.style.background = s.color + '33';
-    chip.style.color = '#fff';
-    chip.style.border = '1px solid ' + s.color + '66';
-    chip.textContent = s.label;
-    legend.appendChild(chip);
+function buildLegend(){
+  var el = document.getElementById('segLegend'); el.innerHTML = '';
+  SEGMENTS.forEach(function(s){
+    var chip = document.createElement('div'); chip.className = 'seg-chip';
+    chip.style.background = s.color + '44'; chip.style.color = '#fff';
+    chip.style.border = '1px solid ' + s.glow + '66'; chip.textContent = s.label;
+    el.appendChild(chip);
   });
 }
 
-function spin() {
-  if (spinning) return;
+// ── Press-and-hold spin button ──
+var spinBtn = document.getElementById('spinBtn');
+var powerBar = document.getElementById('powerBar');
+
+function startCharge(e){
+  if(spinning) return;
+  e.preventDefault();
+  pressStart = Date.now();
+  powerLevel = 10;
+  spinBtn.classList.add('charging');
+  spinBtn.textContent = '⚡ تحميل...';
+  // Add power bar element back
+  var pb = document.createElement('div'); pb.className = 'spin-power-bar'; pb.id = 'powerBar'; pb.style.width = '10%';
+  spinBtn.appendChild(pb);
+  powerBar = pb;
+  pressTimer = setInterval(function(){
+    var held = Date.now() - pressStart;
+    powerLevel = Math.min(100, 10 + (held / 20)); // 10-100 over ~2s
+    if(powerBar) powerBar.style.width = powerLevel + '%';
+    if(powerLevel % 10 < 2) soundCharge();
+  }, 50);
+}
+
+function releaseSpin(e){
+  if(spinning) return;
+  if(!pressStart) return;
+  e.preventDefault();
+  clearInterval(pressTimer); pressTimer = null;
+  spinBtn.classList.remove('charging');
+  pressStart = 0;
+  // Reset button
+  spinBtn.innerHTML = '🎰 أدر العجلة';
+  // Spin!
+  doSpin();
+}
+
+spinBtn.addEventListener('touchstart', startCharge, {passive:false});
+spinBtn.addEventListener('touchend', releaseSpin, {passive:false});
+spinBtn.addEventListener('mousedown', startCharge);
+spinBtn.addEventListener('mouseup', releaseSpin);
+spinBtn.addEventListener('mouseleave', function(e){ if(pressStart) releaseSpin(e); });
+
+function doSpin(){
   var bet = parseFloat(document.getElementById('betInp').value) || 10;
-  spinning = true;
-  document.getElementById('spinBtn').disabled = true;
+  if(bet < 1){ showToast('أدخل مبلغ','error'); return; }
+  spinning = true; spinBtn.disabled = true;
   document.getElementById('resultMult').classList.remove('show');
   document.getElementById('resultSub').classList.remove('show');
 
   apiFetchCritical(BASE + '/api/wheel/spin', {
-    method: 'POST',
-    body: JSON.stringify({ uid: uid, bet: bet })
-  }).then(function(r) { return r.json(); }).then(function(d) {
-    if (d.error) {
+    method: 'POST', body: JSON.stringify({ bet: bet })
+  }).then(function(r){ return r.json(); }).then(function(d){
+    if(d.error){
       showToast(d.error, 'error');
-      if (d.need_deposit) showDepositModal(bet);
-      spinning = false; document.getElementById('spinBtn').disabled = false; return;
+      if(d.need_deposit) showVexDepositModal(bet);
+      spinning = false; spinBtn.disabled = false; return;
     }
-    // Find segment index
-    var segIdx = d.segment !== undefined ? d.segment : Math.floor(Math.random() * N);
+    // Update segments from server (shuffled per round)
+    if(d.segments && d.segments.length > 0){
+      SEGMENTS = d.segments; N = SEGMENTS.length;
+      segAngle = (Math.PI * 2) / N;
+      buildLegend();
+    }
+    var segIdx = d.segment !== undefined ? d.segment : 0;
     var seg = SEGMENTS[segIdx];
-    var targetAngle = -(segIdx * segAngle) - segAngle/2 + Math.PI/2;
-    var fullSpins = (3 + Math.floor(Math.random() * 4)) * Math.PI * 2;
-    var finalAngle = targetAngle - fullSpins;
-    animateSpin(currentAngle, finalAngle, seg, d.payout || 0, bet);
-    loadBalance();
-  }).catch(function() {
-    showToast('خطأ في الشبكة', 'error');
-    spinning = false; document.getElementById('spinBtn').disabled = false;
+    // Calculate target angle for pointer at top
+    var targetAngle = -segIdx * segAngle - segAngle/2;
+    currentAngle = currentAngle % (Math.PI*2);
+    // Full spins based on power level (higher power = more spins)
+    var minSpins = 3 + Math.floor(powerLevel / 25); // 3-7 spins
+    var fullSpins = minSpins * Math.PI * 2;
+    var finalAngle = currentAngle + fullSpins;
+    var diff = (targetAngle - (finalAngle % (Math.PI*2)) + Math.PI*4) % (Math.PI*2);
+    finalAngle += diff;
+    // Duration based on power (higher = longer spin)
+    var duration = 3000 + powerLevel * 20; // 3-5s
+    animateSpin(currentAngle, finalAngle, seg, d.payout || 0, bet, d.multiplier || seg.mult, duration);
+    if(d.balance_after !== undefined) document.getElementById('bal').textContent = d.balance_after.toLocaleString();
+  }).catch(function(){
+    showToast('خطأ في الشبكة','error');
+    spinning = false; spinBtn.disabled = false;
   });
 }
 
-function animateSpin(fromAngle, toAngle, seg, payout, bet) {
-  var duration = 4000 + Math.random() * 1000;
-  var start = null;
-  var tickCount = 0;
-  function easeOut(t) { return 1 - Math.pow(1 - t, 4); }
-  function frame(ts) {
-    if (!start) start = ts;
-    var elapsed = ts - start;
+function animateSpin(fromAngle, toAngle, seg, payout, bet, mult, duration){
+  var startTime = null; var lastTickAngle = fromAngle;
+  function easeOutQuart(t){ return 1 - Math.pow(1 - t, 4); }
+  function frame(ts){
+    if(!startTime) startTime = ts;
+    var elapsed = ts - startTime;
     var t = Math.min(elapsed / duration, 1);
-    var easedT = easeOut(t);
-    currentAngle = fromAngle + (toAngle - fromAngle) * easedT;
+    var eased = easeOutQuart(t);
+    currentAngle = fromAngle + (toAngle - fromAngle) * eased;
     drawWheel(currentAngle);
-    // Tick sound as pointer crosses segments
-    var segsPerRad = 1 / segAngle;
-    var prevSeg = Math.floor((fromAngle + (toAngle - fromAngle) * easeOut((elapsed - 16) / duration)) * segsPerRad);
-    var curSeg = Math.floor(currentAngle * segsPerRad);
-    if (curSeg !== prevSeg && t < 0.8) { soundSpin(); haptic('light'); }
-    if (t < 1) { requestAnimationFrame(frame); }
+    var angleDiff = Math.abs(currentAngle - lastTickAngle);
+    if(angleDiff > segAngle){ soundTick(); haptic('light'); lastTickAngle = currentAngle; }
+    if(t < 1){ requestAnimationFrame(frame); }
     else {
-      currentAngle = toAngle;
-      drawWheel(currentAngle);
-      spinning = false;
-      document.getElementById('spinBtn').disabled = false;
-      showWheelResult(seg, payout, bet);
+      currentAngle = toAngle; drawWheel(currentAngle);
+      spinning = false; spinBtn.disabled = false;
+      showResult(seg, payout, bet, mult);
     }
   }
   requestAnimationFrame(frame);
 }
 
-function showWheelResult(seg, payout, bet) {
+function showResult(seg, payout, bet, mult){
   var multEl = document.getElementById('resultMult');
   var subEl = document.getElementById('resultSub');
-  if (seg.mult === 0) {
-    multEl.textContent = '💀 خسارة!';
-    multEl.style.color = 'var(--red)';
-    subEl.textContent = 'حظ أفضل في المرة القادمة';
-    soundLose(); hapticNotif('error');
-    streakWin = 0;
+  if(seg.mult === 0 || payout === 0){
+    multEl.textContent = '💀 خسارة'; multEl.style.color = '#ef4444';
+    subEl.textContent = 'حظ أوفر في المرة القادمة';
+    soundLose(); haptic('heavy');
   } else {
-    multEl.textContent = seg.mult.toFixed(1) + 'x';
-    multEl.style.color = seg.mult >= 5 ? 'var(--gold)' : 'var(--green)';
-    subEl.textContent = '+ ' + fmtAmount(payout) + ' ' + gameCurrency;
-    soundWin(seg.mult >= 5); hapticNotif('success');
-    streakWin++;
-    if (seg.mult >= 5) showBigWinOverlay(payout, seg.mult);
+    multEl.textContent = (mult || seg.mult).toFixed(1) + 'x';
+    multEl.style.color = seg.mult >= 5 ? '#fbbf24' : '#22c55e';
+    subEl.textContent = '+' + fmtAmount(payout) + ' ' + gameCurrency;
+    soundWin(seg.mult >= 5); haptic('medium');
+    if(seg.mult >= 5) showBigWin(payout, seg.mult);
   }
   multEl.classList.add('show'); subEl.classList.add('show');
-  updateStreak(document.getElementById('streakBadge'));
   addHistItem(document.getElementById('histBar'), seg.mult || 0.1);
+  loadBalance(); // Real-time balance update
+}
+
+function fmtAmount(n){ return parseFloat(n||0).toLocaleString(); }
+
+function showBigWin(payout, mult){
+  var o = document.getElementById('bigWinOverlay');
+  document.getElementById('bigWinNum').textContent = '+' + fmtAmount(payout);
+  document.getElementById('bigWinText').textContent = 'جائزة كبرى! (' + mult.toFixed(1) + 'x)';
+  o.classList.add('show');
+  setTimeout(function(){ o.classList.remove('show'); }, 3000);
 }
 
 // Init
-drawWheel(0);
-buildLegend();
-document.getElementById('loading').style.display = 'none';
-document.getElementById('app').style.display = 'flex';
-document.getElementById('app').style.flexDirection = 'column';
-document.getElementById('app').style.height = '100dvh';
-loadBalance();
-setInterval(loadBalance, 10000);
-initBackButton();
+resizeCanvas(); drawWheel(0); buildLegend();
+loadBalance(); setInterval(loadBalance, 10000);
+setTimeout(injectDepositButton, 100);
 </script>
 </body>
 </html>

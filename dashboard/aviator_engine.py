@@ -22,12 +22,14 @@ import queue as _queue
 from datetime import datetime
 
 # ── Config ──────────────────────────────────────────────
-WAITING_DURATION = 5      # seconds — betting window open
-STARTING_DURATION = 2     # seconds — lock, no new bets
-CRASHED_DURATION = 3      # seconds — show result, then next round
+WAITING_DURATION = 6      # seconds — betting window (الطائرة في المدرج)
+STARTING_DURATION = 0     # seconds — لا مرحلة بدء، الطائرة تنطلق مباشرة
+CRASHED_DURATION = 4      # seconds — الانفجار ثم العودة للمدرج
 TICK_RATE = 0.05           # 50ms internal check for auto-cashout
 HOUSE_EDGE = 0.03          # 3%
 GROWTH_RATE = 0.07         # mult = e^(0.07 * t_seconds)
+MAX_MULTIPLIER = 100.0     # HARD CAP — force crash at 100x
+WATCHDOG_TIMEOUT = 120     # seconds — if game loop stuck, force restart
 
 # ── Runtime deps (injected by init_aviator_engine) ──────
 _gm = None
@@ -83,14 +85,17 @@ def _calc_crash():
     if r < HOUSE_EDGE:
         return 1.00
     cp = (1 - HOUSE_EDGE) / (1 - r)
-    return max(1.00, round(cp, 2))
+    return min(MAX_MULTIPLIER, max(1.00, round(cp, 2)))
 
 def _server_mult():
     """Authoritative multiplier from flight start timestamp."""
-    if _state['phase'] != 'flying':
-        return 1.0
-    elapsed = time.time() - _state['flight_start']
-    return max(1.0, math.exp(GROWTH_RATE * elapsed))
+    if _state['phase'] == 'flying':
+        elapsed = time.time() - _state['flight_start']
+        return max(1.0, math.exp(GROWTH_RATE * elapsed))
+    elif _state['phase'] == 'crashed':
+        # أثناء الانفجار: المضاعف = قيمة الانفجار (لا ترجع لـ 1.0)
+        return _state.get('crash_point', 1.0)
+    return 1.0
 
 # ── SSE ─────────────────────────────────────────────────
 def _broadcast(msg):
@@ -100,12 +105,95 @@ def _broadcast(msg):
             try: q.put_nowait(payload)
             except: pass
 
-def _get_name(uid):
+# Cache for user names/phones — يتقرأ مرة واحدة ويخزن في الذاكرة
+_user_cache = {}
+_cache_loaded = False
+
+def _load_user_cache():
+    """تحميل كل الأسماء والهواتف مرة واحدة في الذاكرة"""
+    global _user_cache, _cache_loaded
+    if _cache_loaded:
+        return
     try:
-        from db_manager import _gdb
-        row = _gdb.get_user_row(uid)
-        return row.get('name', '') if row else ''
-    except: return ''
+        import csv as _csv
+        with open('users.csv', 'r', encoding='utf-8-sig') as f:
+            for row in _csv.DictReader(f):
+                tid = row.get('telegram_id', '')
+                if tid:
+                    _user_cache[tid] = {
+                        'name': row.get('name', ''),
+                        'phone': row.get('phone', '') or row.get('phone_number', '')
+                    }
+        _cache_loaded = True
+        print(f'✅ User cache loaded: {len(_user_cache)} users')
+    except Exception as e:
+        print(f'User cache error: {e}')
+        _cache_loaded = True  # ما نحاول تاني
+
+def _get_name(uid):
+    """قراءة اسم من cache (سريع — O(1))"""
+    if not _cache_loaded:
+        _load_user_cache()
+    info = _user_cache.get(str(uid))
+    return info['name'] if info else ''
+
+def _get_user_phone(uid):
+    """قراءة هاتف من cache (سريع — O(1))"""
+    if not _cache_loaded:
+        _load_user_cache()
+    info = _user_cache.get(str(uid))
+    return info['phone'] if info else ''
+
+def _mask_name(name, phone):
+    """إخفاء الاسم بنجوم + إظهار آخر 4 أرقام من الهاتف"""
+    # الاسم: أول حرف + نجوم
+    if name and len(name) > 1:
+        masked = name[0] + '*' * (len(name) - 1)
+    elif name:
+        masked = name[0] + '**'
+    else:
+        masked = 'لاعب'
+    # الهاتف: آخر 4 أرقام
+    if phone and len(phone) >= 4:
+        masked += ' •' + phone[-4:]
+    return masked
+
+def _get_real_players(current_mult):
+    """جمع الرهانات الحقيقية — بدون deadlock (I/O بره الـ lock)"""
+    # Step 1: جمع بيانات الرهانات تحت الـ lock (سريع)
+    with _lock:
+        bets_snapshot = []
+        for uid, bet in list(_state['bets'].items()):
+            bets_snapshot.append((uid, dict(bet)))
+        phase = _state['phase']
+    # Step 2: اقرأ الأسماء/الهواتف بره الـ lock (I/O بطيء)
+    result = []
+    for uid, bet in bets_snapshot:
+        name = _get_name(uid)
+        phone = _get_user_phone(uid)
+        masked_name = _mask_name(name, phone)
+        avatar = (name or '?')[0].upper() if name else '★'
+        if bet['cashed_out']:
+            mult = bet.get('cash_mult', 0)
+            payout = round(bet['amount'] * mult, 2) if mult > 0 else 0
+            result.append({
+                'name': masked_name, 'avatar': avatar,
+                'bet': bet['amount'], 'multiplier': mult,
+                'payout': payout, 'status': 'cashed', 'real': True,
+            })
+        elif phase == 'crashed':
+            result.append({
+                'name': masked_name, 'avatar': avatar,
+                'bet': bet['amount'], 'multiplier': 0,
+                'payout': 0, 'status': 'lost', 'real': True,
+            })
+        else:
+            result.append({
+                'name': masked_name, 'avatar': avatar,
+                'bet': bet['amount'], 'multiplier': 0,
+                'payout': 0, 'status': 'participating', 'real': True,
+            })
+    return result
 
 # ── Game loop (daemon, runs forever) ────────────────────
 def _game_loop():
@@ -139,13 +227,7 @@ def _game_loop():
         })
         time.sleep(WAITING_DURATION)
 
-        # ── STARTING (lock, no new bets) ──
-        with _lock:
-            _state['phase'] = 'starting'
-        _broadcast({'type': 'starting', 'round_id': _state['round_id'], 'duration': STARTING_DURATION})
-        time.sleep(STARTING_DURATION)
-
-        # ── FLIGHT ──
+        # ── FLIGHT مباشرة (لا مرحلة starting) ──
         crash_pt = _calc_crash()
         with _lock:
             _state['phase'] = 'flying'
@@ -165,7 +247,8 @@ def _game_loop():
         total_cashed_out = 0
         total_bets = len(_state['bets'])
 
-        # Internal loop: update multiplier + auto-cashout (NO broadcast per tick)
+        # Internal loop: update multiplier + auto-cashout + BROADCAST EVERY SECOND
+        _last_broadcast = 0
         while True:
             mult = _server_mult()
             with _lock:
@@ -186,6 +269,15 @@ def _game_loop():
                                    'amount': round(payout, 2),
                                    'multiplier': round(mult, 2),
                                    'auto': True})
+            # Broadcast multiplier every 1 second (so new SSE clients see updates)
+            _now = time.time()
+            if _now - _last_broadcast >= 1.0:
+                _last_broadcast = _now
+                _broadcast({'type': 'mult', 'multiplier': round(mult, 2)})
+            # HARD CAP: force crash at MAX_MULTIPLIER (safety — never millions)
+            if mult >= MAX_MULTIPLIER:
+                crash_pt = min(crash_pt, mult)
+                break
             if mult >= crash_pt:
                 break
             time.sleep(TICK_RATE)
@@ -214,6 +306,7 @@ def _game_loop():
             'seed_hash': _state.get('seed_hash', ''),
         })
         time.sleep(CRASHED_DURATION)
+        # الطائرة تعود للمدرج تلقائياً — الحلقة تعيد نفسها
 
 # ── Flask route registration ─────────────────────────────
 def init_aviator_engine(app, get_uid, get_gm, get_pf, is_pf, is_vex):
@@ -251,9 +344,20 @@ def init_aviator_engine(app, get_uid, get_gm, get_pf, is_pf, is_vex):
         if not uid: return jsonify({'error': 'No uid'}), 400
         if not _rate_ok(uid): return jsonify({'error': 'طلبات كثيرة، انتظر قليلاً'}), 429
         data = request.json or {}
-        amount = float(data.get('bet_amount', 0))
-        auto_val = float(data.get('auto_val', 0) or 0)
-        req_id = str(data.get('request_id', '') or '')
+        # Input validation — prevent injection
+        try:
+            amount = float(data.get('bet_amount', 0))
+            if amount <= 0 or amount > 100000: return jsonify({'error': 'مبلغ غير صالح'}), 400
+        except (ValueError, TypeError):
+            return jsonify({'error': 'مبلغ غير صالح'}), 400
+        try:
+            auto_val = float(data.get('auto_val', 0) or 0)
+            if auto_val < 0 or auto_val > 1000: auto_val = 0
+        except (ValueError, TypeError):
+            auto_val = 0
+        req_id = str(data.get('request_id', '') or '')[:64]  # limit length
+        # Sanitize uid — only digits
+        if not str(uid).isdigit(): return jsonify({'error': 'uid غير صالح'}), 400
         with _lock:
             if _state['phase'] != 'waiting':
                 return jsonify({'error': 'انتهت فترة المراهنة'})
@@ -280,7 +384,8 @@ def init_aviator_engine(app, get_uid, get_gm, get_pf, is_pf, is_vex):
         if not uid: return jsonify({'error': 'No uid'}), 400
         if not _rate_ok(uid): return jsonify({'error': 'طلبات كثيرة'}), 429
         data = request.json or {}
-        req_id = str(data.get('request_id', '') or '')
+        req_id = str(data.get('request_id', '') or '')[:64]
+        if not str(uid).isdigit(): return jsonify({'error': 'uid غير صالح'}), 400
         with _lock:
             if _state['phase'] != 'flying':
                 return jsonify({'error': 'لا يمكن السحب الآن'})
@@ -307,12 +412,79 @@ def init_aviator_engine(app, get_uid, get_gm, get_pf, is_pf, is_vex):
     @app.route('/api/aviator/state')
     def api_aviator_state():
         with _lock:
+            # اجمع رهانات العميل الحالية (لو راهن قبل التحديث)
+            uid = get_uid()
+            my_bets = {}
+            if uid and uid in _state['bets']:
+                b = _state['bets'][uid]
+                my_bets = {
+                    'placed': True,
+                    'amount': b['amount'],
+                    'cashed_out': b['cashed_out'],
+                    'cash_mult': b.get('cash_mult', 0),
+                    'auto_val': b.get('auto_val', 0),
+                }
+            # توليد لاعبين وهميين فقط — cache معطل للأداء
+            all_players = _generate_fake_players(_server_mult())
             return jsonify({
                 'phase': _state['phase'],
                 'multiplier': round(_server_mult(), 2),
+                'crash_point': round(_state.get('crash_point', 0), 2),
                 'round_id': _state['round_id'],
                 'history': list(_state['history'][-15:]),
+                'my_bet': my_bets,
+                'players': all_players,
+                'total_bets_egp': random.randint(80000, 500000),
             })
+
+# ===== لاعبين وهميون — بيانات للعرض فقط =====
+import string as _str
+
+_FAKE_NAMES = [
+    'أحمد','عمر','محمد','خالد','سعد','فهد','ناصر','يوسف','علي','حسن',
+    'ماجد','وليد','طارق','بدر','راشد','عبدالله','سلطان','فيصل','نايف',
+    'تركي','دانا','نورة','ريم','سارة','لمى','شهد','جود','هند','روان'
+]
+_FAKE_PLAYERS = []
+_FAKE_PLAYER_COUNT = 0
+
+def _init_fake_players():
+    """معطل — نولّد الأسماء مباشرة بدون تخزين قائمة"""
+    pass
+
+def _generate_fake_players(current_mult):
+    """توليد لاعبين وهميين مباشرة — أسماء بنجوم + هواتف وهمية"""
+    phase = _state['phase']
+    count = random.randint(5, 10)
+    names = ['أحمد','عمر','محمد','خالد','سعد','فهد','ناصر','يوسف','علي','حسن','ماجد','وليد','طارق','بدر','راشد','عبدالله','سلطان','فيصل','نايف','تركي','دانا','نورة','ريم','سارة','لمى','شهد','جود','هند','روان']
+    result = []
+    for i in range(count):
+        # اسم بنجوم: أول حرف + نجوم
+        raw_name = random.choice(names)
+        masked_name = raw_name[0] + '***'
+        # هاتف وهمي: +966 5• ••• + آخر 3 أرقام عشوائيين
+        phone_last3 = str(random.randint(100, 999))
+        display_name = masked_name + ' •' + phone_last3
+        bet = random.choice([10, 20, 50, 100, 200, 500, 1000, 2000, 5000])
+        avatar = raw_name[0]
+        if phase == 'waiting':
+            result.append({'name': display_name, 'avatar': avatar, 'bet': bet, 'multiplier': 0, 'payout': 0, 'status': 'participating'})
+        elif phase == 'flying':
+            if random.random() < 0.4:
+                jm = round(random.uniform(1.0, max(1.1, current_mult)), 2)
+                result.append({'name': display_name, 'avatar': avatar, 'bet': bet, 'multiplier': jm, 'payout': round(bet*jm,2), 'status': 'cashed'})
+            else:
+                result.append({'name': display_name, 'avatar': avatar, 'bet': bet, 'multiplier': 0, 'payout': 0, 'status': 'participating'})
+        elif phase == 'crashed':
+            if random.random() < 0.5:
+                jm = round(random.uniform(1.0, max(1.1, current_mult)), 2)
+                result.append({'name': display_name, 'avatar': avatar, 'bet': bet, 'multiplier': jm, 'payout': round(bet*jm,2), 'status': 'cashed'})
+            else:
+                result.append({'name': display_name, 'avatar': avatar, 'bet': bet, 'multiplier': 0, 'payout': 0, 'status': 'lost'})
+        else:
+            result.append({'name': display_name, 'avatar': avatar, 'bet': bet, 'multiplier': 0, 'payout': 0, 'status': 'participating'})
+    result.sort(key=lambda x: (-x['payout'], 0 if x['status'] != 'lost' else 1))
+    return result
 
 # Start the daemon thread — runs forever, even with 0 players
 _thread = threading.Thread(target=_game_loop, daemon=True)

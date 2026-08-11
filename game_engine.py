@@ -135,6 +135,7 @@ class GameManager:
         self.catalog_file = 'games_catalog.csv'
         self.quick_deposits_file = 'quick_deposits.csv'
         self.player_payment_methods_file = 'player_payment_methods.csv'
+        self.sessions_file = 'game_sessions.csv'
         self._ensure_files()
         self.algorithm = HouseAlgorithm() if HouseAlgorithm else None
         # Start background flush thread
@@ -158,9 +159,9 @@ class GameManager:
                      'min_bet': '10', 'max_bet': '500', 'base_win_chance': '0.45', 'house_edge_pct': '15',
                      'rtp_target': '85', 'volatility': 'medium', 'max_payout_per_session': '2000', 'is_active': 'yes',
                      'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')},
-                    {'id': 'GAME002', 'name': 'النرد', 'icon': '🎲', 'description': 'خمن الرقم واربح 5 أضعاف!', 'category': 'dice',
+                    {'id': 'GAME002', 'name': 'النرد القديم', 'icon': '🎲', 'description': 'خمن الرقم واربح 5 أضعاف!', 'category': 'dice',
                      'min_bet': '5', 'max_bet': '1000', 'base_win_chance': '0.40', 'house_edge_pct': '18',
-                     'rtp_target': '82', 'volatility': 'high', 'max_payout_per_session': '5000', 'is_active': 'yes',
+                     'rtp_target': '82', 'volatility': 'high', 'max_payout_per_session': '5000', 'is_active': 'no',
                      'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')},
                     {'id': 'GAME003', 'name': 'سلوتس', 'icon': '🎰', 'description': 'لُف البكرات واربح الجائزة الكبرى!', 'category': 'slots',
                      'min_bet': '20', 'max_bet': '2000', 'base_win_chance': '0.35', 'house_edge_pct': '20',
@@ -189,6 +190,10 @@ class GameManager:
                     {'id': 'GAME009', 'name': 'عجلة الحظ', 'icon': '🎡', 'description': 'أدر العجلة واربح جوائز نقدية!', 'category': 'wheel',
                      'min_bet': '10', 'max_bet': '1000', 'base_win_chance': '0.40', 'house_edge_pct': '15',
                      'rtp_target': '85', 'volatility': 'medium', 'max_payout_per_session': '5000', 'is_active': 'yes',
+                     'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')},
+                    {'id': 'GAME010', 'name': 'نرد', 'icon': '🎲', 'description': 'اسحب النرد وتوقع الرقم!', 'category': 'dice',
+                     'min_bet': '10', 'max_bet': '5000', 'base_win_chance': '0.16', 'house_edge_pct': '15',
+                     'rtp_target': '85', 'volatility': 'high', 'max_payout_per_session': '50000', 'is_active': 'yes',
                      'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')},
                 ]
                 for g in games:
@@ -258,13 +263,19 @@ class GameManager:
             print(f"Payment methods migration error: {e}")
 
     def get_games_payment_methods(self, user_currency=None):
-        """قراءة وسائل الدفع النشطة والمتاحة للألعاب — مفلترة حسب العملة"""
+        """قراءة وسائل الدفع النشطة والمتاحة للألعاب — مفلترة حسب العملة.
+        إذا لم توجد نتائج بعد الفلترة، أرجع كل الوسائل النشطة."""
         methods = []
+        all_active = []
         try:
             with open('payment_methods.csv', 'r', encoding=CSV_ENCODING) as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    if row.get('status') == 'active' and row.get('available_for_games', 'yes') == 'yes':
+                    if row.get('status') == 'active':
+                        all_active.append(row)
+                        avail = row.get('available_for_games', 'yes')
+                        if avail != 'yes':
+                            continue
                         method_currency = row.get('currency', '').strip()
                         if not method_currency or method_currency == 'كل العملات' or not user_currency:
                             methods.append(row)
@@ -272,6 +283,9 @@ class GameManager:
                             methods.append(row)
         except:
             pass
+        # Fallback: if filtered list is empty, return all active methods
+        if not methods and all_active:
+            return all_active
         return methods
 
     def get_user_info(self, user_id):
@@ -626,20 +640,21 @@ class GameManager:
 
     def create_quick_deposit(self, user_id, amount, payment_method_id, account_number,
                              method_name='', method_account_data='', player_wallet='',
-                             save_method=False):
+                             save_method=False, purpose='', ticket_count=0):
         """إنشاء إيداع سريع — يكتب في quick_deposits.csv + transactions.csv كمعاملة حقيقية"""
-        dep_id = f"DEP{str(int(datetime.now().timestamp()))[-8:]}"
+        dep_id = f"DEP{str(int(datetime.now().timestamp()))[-8:]}_{random.randint(1000,9999)}"
         now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
         # 1. كتابة في quick_deposits.csv
         fieldnames = ['id', 'user_id', 'amount', 'payment_method_id',
                       'account_number', 'status', 'approved_by', 'approved_at',
-                      'game_session_id', 'created_at']
+                      'game_session_id', 'created_at', 'purpose', 'ticket_count']
         row = {
             'id': dep_id, 'user_id': str(user_id), 'amount': str(amount),
             'payment_method_id': payment_method_id, 'account_number': account_number,
             'status': 'pending', 'approved_by': '', 'approved_at': '',
             'game_session_id': '', 'created_at': now_str,
+            'purpose': purpose, 'ticket_count': str(ticket_count),
         }
         try:
             with open(self.quick_deposits_file, 'a', newline='', encoding=CSV_ENCODING) as f:
@@ -696,12 +711,16 @@ class GameManager:
         return dep_id
 
     def create_withdrawal(self, user_id, amount, payment_method_id, account_number):
-        """إنشاء طلب سحب من محفظة الألعاب"""
+        """إنشاء طلب سحب من محفظة الألعاب — يتطلب استيفاء شرط الرهان 101%"""
+        # ── Wagering requirement: must wager 101% of total deposited ──
+        wager_ok, wager_msg = self._check_wagering_requirement(user_id, amount)
+        if not wager_ok:
+            return None, wager_msg
         # خصم الرصيد فوراً (يُعاد لو رفض الأدمن)
         success, balance_after = self.deduct_balance(user_id, amount)
         if not success:
             return None, 'رصيد غير كافٍ'
-        dep_id = f"WTH{str(int(datetime.now().timestamp()))[-8:]}"
+        dep_id = f"WTH{str(int(datetime.now().timestamp()))[-8:]}_{random.randint(1000,9999)}"
         fieldnames = ['id', 'user_id', 'amount', 'payment_method_id',
                       'account_number', 'status', 'approved_by', 'approved_at',
                       'game_session_id', 'created_at']
@@ -718,6 +737,41 @@ class GameManager:
         except:
             pass
         return dep_id, None
+
+    def _check_wagering_requirement(self, user_id, withdrawal_amount):
+        """شرط الرهان: لازم العميل يلعب بـ 101% من إجمالي الإيداعات قبل السحب."""
+        try:
+            uid = str(user_id)
+            # احسب إجمالي الإيداعات الموافق عليها
+            total_deposited = 0.0
+            total_wagered = 0.0
+            try:
+                with open(self.quick_deposits_file, 'r', encoding=CSV_ENCODING) as f:
+                    for row in csv.DictReader(f):
+                        if row.get('user_id') == uid and row.get('status') == 'approved':
+                            try: total_deposited += float(row.get('amount', 0) or 0)
+                            except: pass
+            except: pass
+            # احسب إجمالي الرهانات من game_sessions
+            try:
+                with open(self.sessions_file, 'r', encoding=CSV_ENCODING) as f:
+                    for row in csv.DictReader(f):
+                        if row.get('user_id') == uid:
+                            try: total_wagered += float(row.get('bet_amount', 0) or 0)
+                            except: pass
+            except: pass
+            # لو مفيش إيداعات → اسمح بالسحب (حساب جديد)
+            if total_deposited <= 0:
+                return True, ''
+            required_wager = total_deposited * 1.01  # 101%
+            if total_wagered < required_wager:
+                remaining = required_wager - total_wagered
+                msg = f'يجب اللعب بـ {remaining:.0f} إضافية قبل السحب (شرط الرهان 101%)'
+                return False, msg
+            return True, ''
+        except Exception as e:
+            # في حالة الخطأ، اسمح بالسحب (fail-open)
+            return True, ''
 
     def approve_deposit(self, dep_id, admin_id):
         """موافقة على إيداع — يضيف الرصيد لمحفظة VEX"""
@@ -741,11 +795,16 @@ class GameManager:
         except Exception as e:
             print(f"approve_deposit CSV error: {e}")
         if approved:
-            try:
-                new_bal = self.add_balance(approved['user_id'], float(approved['amount']))
-                print(f"approve_deposit: added {approved['amount']} to {approved['user_id']}, new balance: {new_bal}")
-            except Exception as e:
-                print(f"approve_deposit add_balance error: {e}")
+            # Only add to wallet if NOT a directed deposit (lottery tickets etc.)
+            purpose = approved.get('purpose', '')
+            if purpose != 'lottery_tickets':
+                try:
+                    new_bal = self.add_balance(approved['user_id'], float(approved['amount']))
+                    print(f"approve_deposit: added {approved['amount']} to {approved['user_id']}, new balance: {new_bal}")
+                except Exception as e:
+                    print(f"approve_deposit add_balance error: {e}")
+            else:
+                print(f"approve_deposit: directed deposit (lottery_tickets) — skipping wallet add, auto-buy will handle")
         return approved
 
     def approve_withdrawal(self, dep_id, admin_id):

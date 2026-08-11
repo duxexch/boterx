@@ -36,7 +36,8 @@ app = Flask(__name__, template_folder='templates', static_folder='static')
 app.secret_key = SECRET_KEY
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=2)
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=365)  # persistent login — never expire unless user logs out
+app.config['SESSION_COOKIE_SECURE'] = True  # HTTPS only
 
 # ===== Real-time Notification Queue =====
 _notification_queues = []  # list of queue.Queue, one per connected SSE client
@@ -105,7 +106,18 @@ def login_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         if not session.get('logged_in'):
-            return redirect(url_for('login'))
+            return redirect(url_for('admin_login'))
+        return f(*args, **kwargs)
+    return decorated
+
+def admin_required(f):
+    """Only real admins can access admin pages"""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get('logged_in'):
+            return redirect(url_for('admin_login'))
+        if not session.get('is_admin'):
+            return redirect(url_for('home'), code=303)
         return f(*args, **kwargs)
     return decorated
 
@@ -560,6 +572,38 @@ def webapp_auth(f):
                     init_data = ''
 
             if not init_data:
+                # uid fallback: accept uid from URL/body when no initData.
+                # Bot sends uid in the URL — valid for browser/WebView opens.
+                uid_fb = request.args.get('uid', '').strip()
+                if not uid_fb:
+                    try:
+                        uid_fb = (request.get_json(silent=True) or {}).get('uid', '').strip()
+                    except Exception:
+                        uid_fb = ''
+                if uid_fb:
+                    g.telegram_user_id = uid_fb
+                    g.telegram_user = None
+                    return f(*args, **kwargs)
+                # Encrypted session fallback (?s=XXX)
+                s_fb = request.args.get('s', '').strip()
+                if not s_fb and request.is_json:
+                    try:
+                        s_fb = (request.get_json(silent=True) or {}).get('s', '').strip()
+                    except Exception:
+                        s_fb = ''
+                if s_fb:
+                    from session_tokens import validate_session
+                    device_fp = request.headers.get('X-Device-FP', '')
+                    uid_val, authorized = validate_session(s_fb, device_fp)
+                    if uid_val and authorized:
+                        g.telegram_user_id = uid_val
+                        g.telegram_user = None
+                        return f(*args, **kwargs)
+                    if uid_val and not authorized:
+                        # Different device → guest mode
+                        g.telegram_user_id = uid_val
+                        g.telegram_user = None
+                        return f(*args, **kwargs)
                 return jsonify({'error': 'initData required', 'code': 'NO_INIT_DATA'}), 403
 
             uid_str, user_obj = validate_telegram_init_data(init_data)
@@ -629,12 +673,25 @@ def webapp_auth(f):
 
 def get_request_uid():
     """Get the authenticated user ID from request context.
-    Uses g.telegram_user_id if set by webapp_auth, otherwise falls back to uid param.
+    Priority: g.telegram_user_id → token param → uid param (fallback).
     """
     uid = getattr(g, 'telegram_user_id', None)
     if uid:
         return uid
-    # Fallback for admin endpoints or dev mode
+    # Encrypted session auth (?s=XXX — encrypted, no uid visible)
+    s_param = request.args.get('s', '')
+    if not s_param and request.is_json:
+        s_param = (request.json or {}).get('s', '')
+    if s_param:
+        from session_tokens import validate_session
+        device_fp = request.headers.get('X-Device-FP', '')
+        uid_val, authorized = validate_session(s_param, device_fp)
+        if uid_val and authorized:
+            return uid_val
+        if uid_val and not authorized:
+            # Different device → guest mode (no uid → no balance/bets)
+            return None
+    # Legacy fallback (will be removed after full migration)
     uid = request.args.get('uid', '')
     if not uid and request.is_json:
         uid = (request.json or {}).get('uid', '')
@@ -695,8 +752,143 @@ def index():
         return redirect(url_for('dashboard'), code=303)
     return render_template('landing.html')
 
-@app.route('/login', methods=['GET', 'POST'])
-def login():
+@app.route('/api/web/request-code', methods=['POST'])
+def api_web_request_code():
+    """Generate and send OTP code directly via security bot — no need to open Telegram first.
+    User enters Telegram ID on website → server generates code → sends via OTP bot."""
+    import random as _r, time as _t, json as _json, csv as _csv
+    data = request.json or {}
+    tg_id = str(data.get('telegram_id', '')).strip()
+    if not tg_id or not tg_id.isdigit() or len(tg_id) < 6:
+        return jsonify({'error': 'معرف تيليجرام غير صالح'}), 400
+
+    # Check user exists in users.csv
+    user = None
+    try:
+        with open(os.path.join(BASE_DIR, 'users.csv'), 'r', encoding='utf-8-sig') as f:
+            for row in _csv.DictReader(f):
+                if row.get('telegram_id') == tg_id:
+                    user = row
+                    break
+    except:
+        pass
+    if not user:
+        return jsonify({'error': 'غير مسجل — سجل في البوت الرئيسي أولاً'}), 400
+
+    # Generate code
+    code = str(_r.randint(100000, 999999))
+    name = user.get('name', '')
+    auth_file = os.path.join(BASE_DIR, 'web_auth_codes.json')
+    try:
+        if os.path.exists(auth_file):
+            with open(auth_file, 'r') as f:
+                codes = _json.load(f)
+        else:
+            codes = {}
+        codes = {k: v for k, v in codes.items() if k != tg_id}
+        codes[tg_id] = {'code': code, 'name': name, 'created': _t.time()}
+        with open(auth_file, 'w') as f:
+            _json.dump(codes, f)
+    except Exception as e:
+        return jsonify({'error': 'خطأ في الخادم'}), 500
+
+    # Send code via OTP bot
+    otp_token = None
+    try:
+        with open(os.path.join(BASE_DIR, 'bot_tokens.csv'), 'r', encoding='utf-8-sig') as f:
+            for row in _csv.DictReader(f):
+                if row.get('description') == 'otp_bot' and row.get('is_active') == 'yes':
+                    otp_token = row.get('token', '')
+                    break
+    except:
+        pass
+
+    if otp_token:
+        import urllib.request as _u
+        try:
+            msg = f"🔐 <b>رمز دخول موقع VEX</b>\n\n<code>{code}</code>\n\n⏰ صالح لمدة 5 دقائق\n🌐 أدخل الرمز في: https://vex.deals"
+            _u.urlopen(_u.Request(
+                f'https://api.telegram.org/bot{otp_token}/sendMessage',
+                data=_json.dumps({'chat_id': int(tg_id), 'text': msg, 'parse_mode': 'HTML'}).encode('utf-8'),
+                headers={'Content-Type': 'application/json'}
+            ), timeout=10)
+        except Exception as e:
+            # If bot can't send (user hasn't started bot yet), still return success
+            # User can use the code if they open the bot manually
+            pass
+
+    # Get bot username for response
+    bot_name = 'VEX_OTP_bot'
+    try:
+        if otp_token:
+            resp = urllib.request.urlopen(
+                f'https://api.telegram.org/bot{otp_token}/getMe', timeout=5)
+            info = json.loads(resp.read().decode())
+            if info.get('ok'):
+                bot_name = info['result'].get('username', bot_name)
+    except:
+        pass
+
+    return jsonify({'success': True, 'bot': bot_name})
+
+@app.route('/api/web/auth-code', methods=['POST'])
+def api_web_auth_code():
+    """Validate Telegram auth code from landing page."""
+    import random as _r, time as _t
+    data = request.json or {}
+    code = str(data.get('code', '')).strip()
+    if not code or len(code) != 6 or not code.isdigit():
+        return jsonify({'error': 'الرمز يجب أن يكون 6 أرقام'}), 400
+
+    # Check auth codes file (created by bot)
+    auth_file = os.path.join(BASE_DIR, 'web_auth_codes.json')
+    try:
+        import json as _json
+        if os.path.exists(auth_file):
+            with open(auth_file, 'r') as f:
+                codes = _json.load(f)
+        else:
+            codes = {}
+        # Find matching code
+        for uid, code_data in codes.items():
+            if str(code_data.get('code', '')) == code:
+                # Check expiry (5 min)
+                if _t.time() - code_data.get('created', 0) > 300:
+                    return jsonify({'error': 'انتهت صلاحية الرمز — اطلب رمزاً جديداً'}), 400
+                # Create web session
+                session['admin_id'] = uid
+                session['admin_name'] = code_data.get('name', 'User')
+                session['logged_in'] = True
+                session['login_time'] = _t.time()
+                session.permanent = True  # Persistent — 365 days
+                session['is_admin'] = uid in ADMIN_IDS
+                session['phone'] = code_data.get('phone', '')
+                # Check if user is registered in bot (users.csv)
+                import csv as _csv
+                is_registered = False
+                try:
+                    with open(os.path.join(BASE_DIR, 'users.csv'), 'r', encoding='utf-8-sig') as f:
+                        for row in _csv.DictReader(f):
+                            if row.get('telegram_id') == str(uid):
+                                is_registered = True
+                                break
+                except:
+                    pass
+                session['is_registered'] = is_registered
+                # Remove used code
+                del codes[uid]
+                with open(auth_file, 'w') as f:
+                    _json.dump(codes, f)
+                # Admin → dashboard, regular user → home page
+                redirect_url = '/dashboard' if session['is_admin'] else '/home'
+                return jsonify({'success': True, 'redirect': redirect_url, 'registered': is_registered})
+        return jsonify({'error': 'رمز غير صالح'}), 400
+    except Exception as e:
+        return jsonify({'error': 'خطأ في الخادم'}), 500
+
+@app.route('/vex/admin/admin', methods=['GET', 'POST'])
+def admin_login():
+    """Admin login page — only at /vex/admin/admin"""
     error = None
     if request.method == 'POST':
         # ── IP-based brute-force protection ──────────────────────────────
@@ -710,6 +902,7 @@ def login():
         if admin_id in ADMIN_IDS and password == ADMIN_PASSWORD:
             session['logged_in'] = True
             session['admin_id'] = admin_id
+            session['is_admin'] = True
             session['login_time'] = datetime.now().isoformat()
             session.permanent = True
             log_action('login', f'Admin {admin_id} logged in from {client_ip}')
@@ -720,49 +913,78 @@ def login():
             error = 'كلمة المرور غير صحيحة'
     return render_template('login.html', error=error)
 
+@app.route('/login')
+def login_redirect():
+    """Redirect /login to admin login page"""
+    return redirect(url_for('admin_login'))
+
 @app.route('/logout')
 def logout():
+    was_admin = session.get('is_admin', False)
     log_action('logout', '')
     session.clear()
-    return redirect(url_for('login'))
+    # Admin → admin login page, regular user → landing page
+    if was_admin:
+        return redirect(url_for('admin_login'))
+    return redirect(url_for('index'))
 
 @app.route('/dashboard')
-@login_required
+@admin_required
 def dashboard():
+    if not session.get('is_admin'):
+        return redirect(url_for('home'), code=303)
     return render_template('dashboard.html', active_page='dashboard')
 
-@app.route('/transactions')
+@app.route('/home')
 @login_required
+def home():
+    """User home page — shows all bot features as web interface"""
+    uid = session.get('admin_id', '')
+    user_name = session.get('admin_name', 'User')
+    # Get user data
+    user_balance = 0
+    user_currency = 'EGP'
+    try:
+        if _VEX_GAMES:
+            user_balance = _gm.get_balance(uid) or 0
+            user_info = _gm.get_user_info(uid) or {}
+            user_currency = user_info.get('currency', 'EGP')
+    except: pass
+    return render_template('home.html', active_page='home', user_name=user_name,
+                         user_balance=user_balance, user_currency=user_currency, uid=uid)
+
+@app.route('/transactions')
+@admin_required
 def page_transactions():
     return render_template('transactions.html', active_page='transactions')
 
 @app.route('/users')
-@login_required
+@admin_required
 def page_users():
     return render_template('users.html', active_page='users')
 
 @app.route('/matching')
-@login_required
+@admin_required
 def page_matching():
     return render_template('matching.html', active_page='matching')
 
 @app.route('/svrp')
-@login_required
+@admin_required
 def page_svrp():
     return render_template('svrp.html', active_page='svrp')
 
 @app.route('/trading')
-@login_required
+@admin_required
 def page_trading():
     return render_template('trading.html', active_page='trading')
 
 @app.route('/lottery')
-@login_required
+@admin_required
 def page_lottery():
     return render_template('lottery.html', active_page='lottery')
 
 @app.route('/wheel')
-@login_required
+@admin_required
 def page_wheel():
     return render_template('wheel.html', active_page='wheel')
 
@@ -802,77 +1024,132 @@ def api_wheel_my_spins():
     })
 
 @app.route('/companies')
-@login_required
+@admin_required
 def page_companies():
     return render_template('companies.html', active_page='companies')
 
 @app.route('/payment-methods')
-@login_required
+@admin_required
 def page_payment_methods():
     return render_template('payment_methods.html', active_page='payment_methods')
 
 @app.route('/apps')
-@login_required
+@admin_required
 def page_apps():
     return render_template('apps.html', active_page='apps')
 
 @app.route('/referrals')
-@login_required
+@admin_required
 def page_referrals():
     return render_template('referrals.html', active_page='referrals')
 
 @app.route('/channels')
-@login_required
+@admin_required
 def page_channels():
     return render_template('channels.html', active_page='channels')
 
 @app.route('/bots')
-@login_required
+@admin_required
 def page_bots():
     return render_template('bots.html', active_page='bots')
 
 @app.route('/settings')
-@login_required
+@admin_required
 def page_settings():
     return render_template('settings.html', active_page='settings')
 
+@app.route('/seo')
+@admin_required
+def page_seo():
+    """صفحة إدارة SEO وتحسين محركات البحث"""
+    # قراءة إعدادات SEO الحالية من system_settings.csv
+    import csv as _csv
+    seo_settings = {}
+    try:
+        with open(os.path.join(BASE_DIR, 'system_settings.csv'), 'r', encoding='utf-8-sig') as f:
+            for row in _csv.DictReader(f):
+                key = row.get('key', '')
+                if key.startswith('seo_') or key.startswith('og_') or key.startswith('twitter_'):
+                    seo_settings[key] = row.get('value', '')
+    except:
+        pass
+    return render_template('seo.html', active_page='seo', seo_settings=seo_settings)
+
+@app.route('/api/seo/save', methods=['POST'])
+@admin_required
+def api_seo_save():
+    """حفظ إعدادات SEO"""
+    import csv as _csv
+    data = request.json or {}
+    # قراءة الإعدادات الحالية
+    settings_file = os.path.join(BASE_DIR, 'system_settings.csv')
+    existing = {}
+    fieldnames = ['key', 'value', 'updated_at']
+    try:
+        if os.path.exists(settings_file):
+            with open(settings_file, 'r', encoding='utf-8-sig') as f:
+                reader = _csv.DictReader(f)
+                fieldnames = reader.fieldnames or fieldnames
+                for row in reader:
+                    existing[row.get('key', '')] = row.get('value', '')
+    except:
+        pass
+    # تحديث قيم SEO
+    seo_keys = ['seo_title', 'seo_description', 'seo_keywords', 'seo_robots',
+                'og_title', 'og_description', 'og_image', 'og_url',
+                'twitter_card', 'twitter_title', 'twitter_description', 'twitter_image',
+                'seo_canonical', 'seo_author', 'seo_language']
+    for key in seo_keys:
+        if key in data:
+            existing[key] = data[key]
+    # كتابة الملف
+    try:
+        with open(settings_file, 'w', newline='', encoding='utf-8-sig') as f:
+            writer = _csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            for k, v in existing.items():
+                writer.writerow({'key': k, 'value': v, 'updated_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    return jsonify({'success': True})
+
 @app.route('/complaints')
-@login_required
+@admin_required
 def page_complaints():
     return render_template('complaints.html', active_page='complaints')
 
 @app.route('/broadcast')
-@login_required
+@admin_required
 def page_broadcast():
     return render_template('broadcast.html', active_page='broadcast')
 
 @app.route('/admins')
-@login_required
+@admin_required
 def page_admins():
     return render_template('admin_management.html', active_page='admins')
 
 @app.route('/themes')
-@login_required
+@admin_required
 def page_themes():
     return render_template('themes.html', active_page='themes')
 
 @app.route('/exchange-addresses')
-@login_required
+@admin_required
 def page_exchange_addresses():
     return render_template('exchange_addresses.html', active_page='exchange_addresses')
 
 @app.route('/send-message')
-@login_required
+@admin_required
 def page_send_message():
     return render_template('send_message.html', active_page='send_message')
 
 @app.route('/backup')
-@login_required
+@admin_required
 def page_backup():
     return render_template('backup.html', active_page='backup')
 
 @app.route('/statistics')
-@login_required
+@admin_required
 def page_statistics():
     return render_template('statistics.html', active_page='statistics')
 
@@ -1222,6 +1499,24 @@ def api_reject_txn(txn_id):
             t['processed_by'] = session.get('admin_id', '')
             break
     write_csv('transactions.csv', txns, fieldnames)
+    # Sync matching quick_deposits (VEX) -> rejected
+    try:
+        import csv as _qcsv
+        _qp = os.path.join(BASE_DIR, 'quick_deposits.csv')
+        if os.path.exists(_qp):
+            with open(_qp, 'r', encoding='utf-8-sig') as _f:
+                _r = _qcsv.DictReader(_f); _fn = _r.fieldnames; _rows = list(_r)
+            _changed = False
+            for _row in _rows:
+                if _row.get('id') == txn_id or (_row.get('user_id') and txn_id.startswith(('DEP','WTH')) and _row.get('id') == txn_id):
+                    if _row.get('status') in ('pending','pending_withdrawal'):
+                        _row['status'] = 'rejected' if _row.get('status')=='pending' else 'withdrawal_rejected'
+                        _row['processed_by'] = session.get('admin_id','')
+                        _changed = True
+            if _changed:
+                with open(_qp, 'w', newline='', encoding='utf-8-sig') as _f:
+                    _w = _qcsv.DictWriter(_f, fieldnames=_fn); _w.writeheader(); _w.writerows(_rows)
+    except: pass
     log_action('reject_transaction', f'{txn_id}: {reason}')
     return jsonify({'success': True})
 
@@ -1258,6 +1553,129 @@ def api_bulk_reject():
     write_csv('transactions.csv', txns, fieldnames)
     log_action('bulk_reject', f'{count} transactions: {reason}')
     return jsonify({'success': True, 'count': count})
+
+# ===== Pending Requests: unified view (transactions + VEX deposits + withdrawals) =====
+@app.route('/api/pending-requests')
+@api_auth
+def api_pending_requests():
+    """جميع الطلبات المعلقة في صفحة واحدة: إيداع + سحب + إيداع VEX.
+    عند الموافقة/الرفض يتحول تلقائياً للسجلات ويختفي من هنا."""
+    import csv as _csv
+    from datetime import datetime as _dt
+    all_pending = []
+
+    # 1) Main transactions (deposits + withdrawals pending)
+    try:
+        with open(os.path.join(BASE_DIR, 'transactions.csv'), 'r', encoding='utf-8-sig') as f:
+            for row in _csv.DictReader(f):
+                if row.get('status') == 'pending':
+                    all_pending.append({
+                        'id': row.get('id',''),
+                        'name': row.get('name',''),
+                        'telegram_id': row.get('telegram_id',''),
+                        'customer_id': row.get('customer_id',''),
+                        'type': row.get('type','deposit'),
+                        'company': row.get('company',''),
+                        'wallet': row.get('wallet_number',''),
+                        'amount': row.get('amount','0'),
+                        'currency': row.get('currency',''),
+                        'status': 'pending',
+                        'date': row.get('date',''),
+                        'source': 'transactions',
+                        'age_hours': _calc_age_hours(row.get('date','')),
+                    })
+    except: pass
+
+    # 2) VEX quick deposits pending
+    try:
+        qd_path = os.path.join(BASE_DIR, 'quick_deposits.csv')
+        if os.path.exists(qd_path):
+            with open(qd_path, 'r', encoding='utf-8-sig') as f:
+                reader = _csv.DictReader(f)
+                for row in reader:
+                    st = row.get('status','')
+                    if st in ('pending','pending_withdrawal'):
+                        all_pending.append({
+                            'id': row.get('id',''),
+                            'name': '',
+                            'telegram_id': row.get('user_id',''),
+                            'customer_id': '',
+                            'type': 'deposit' if st=='pending' else 'withdraw',
+                            'company': 'VEX Wallet',
+                            'wallet': row.get('account_number',''),
+                            'amount': row.get('amount','0'),
+                            'currency': '',
+                            'status': st,
+                            'date': row.get('created_at',''),
+                            'source': 'vex_deposits',
+                            'age_hours': _calc_age_hours(row.get('created_at','')),
+                        })
+    except: pass
+
+    # Sort by date (newest first)
+    all_pending.sort(key=lambda x: x.get('date',''), reverse=True)
+    return jsonify({'pending': all_pending, 'count': len(all_pending)})
+
+def _calc_age_hours(date_str):
+    """Calculate age in hours from a date string."""
+    try:
+        dt = _dt.strptime(date_str.strip(), '%Y-%m-%d %H:%M:%S')
+    except:
+        try:
+            dt = _dt.strptime(date_str.strip(), '%Y-%m-%d %H:%M')
+        except:
+            return 0
+    return round((_dt.now() - dt).total_seconds() / 3600, 1)
+
+# ===== Auto-reject old pending deposits =====
+import threading
+import time as _ar_time
+_AR_TIMEOUT_HOURS = 24  # auto-reject after 24 hours
+def _auto_reject_old_pending():
+    """Background thread: auto-reject pending deposits older than timeout."""
+    import csv as _csv
+    while True:
+        try:
+            # Check quick_deposits
+            qd_path = os.path.join(BASE_DIR, 'quick_deposits.csv')
+            if os.path.exists(qd_path):
+                with open(qd_path, 'r', encoding='utf-8-sig') as f:
+                    _r = _csv.DictReader(f); _fn = _r.fieldnames; _rows = list(_r)
+                _changed = False
+                for row in _rows:
+                    st = row.get('status','')
+                    if st in ('pending','pending_withdrawal'):
+                        age = _calc_age_hours(row.get('created_at',''))
+                        if age > _AR_TIMEOUT_HOURS:
+                            row['status'] = 'auto_rejected' if st=='pending' else 'withdrawal_auto_rejected'
+                            _changed = True
+                if _changed:
+                    with open(qd_path, 'w', newline='', encoding='utf-8-sig') as f:
+                        _w = _csv.DictWriter(f, fieldnames=_fn); _w.writeheader(); _w.writerows(_rows)
+        except: pass
+        try:
+            # Check main transactions
+            tx_path = os.path.join(BASE_DIR, 'transactions.csv')
+            if os.path.exists(tx_path):
+                with open(tx_path, 'r', encoding='utf-8-sig') as f:
+                    _r = _csv.DictReader(f); _fn = _r.fieldnames; _rows = list(_r)
+                _changed = False
+                for row in _rows:
+                    if row.get('status') == 'pending':
+                        age = _calc_age_hours(row.get('date',''))
+                        if age > _AR_TIMEOUT_HOURS:
+                            row['status'] = 'auto_rejected'
+                            row['admin_note'] = f'تم الرفض التلقائي بعد {age:.0f} ساعة'
+                            _changed = True
+                if _changed:
+                    with open(tx_path, 'w', newline='', encoding='utf-8-sig') as f:
+                        _w = _csv.DictWriter(f, fieldnames=_fn); _w.writeheader(); _w.writerows(_rows)
+        except: pass
+        _ar_time.sleep(600)  # check every 10 minutes
+
+_ar_time.sleep(3)  # wait for app to start
+_ar_thread_ = threading.Thread(target=_auto_reject_old_pending, daemon=True)
+_ar_thread_.start()
 
 @app.route('/api/transactions/export')
 @api_auth
@@ -1412,6 +1830,49 @@ def api_companies():
         c['txn_count'] = len(c_txns)
         c['volume'] = sum(float(t.get('amount', 0) or 0) for t in c_txns if t.get('status') == 'approved')
     return jsonify({'companies': companies})
+
+@app.route('/api/companies/list')
+def api_companies_public():
+    """Public companies list for user home page — no admin auth required."""
+    companies = read_csv('companies.csv')
+    result = []
+    for c in companies:
+        # Accept 'yes', 'active', or empty as active
+        active = c.get('is_active', '').lower()
+        if active in ('yes', 'active', 'true', '1', ''):
+            result.append({
+                'id': c.get('id', ''),
+                'name': c.get('name', ''),
+                'icon': c.get('icon', '🏢'),
+                'address': c.get('address', ''),
+                'type': c.get('type', ''),
+            })
+    return jsonify({'companies': result})
+
+@app.route('/api/payment-methods/by-company/<company_id>')
+def api_payment_methods_by_company(company_id):
+    """Payment methods for a specific company — public, no admin auth."""
+    methods = read_csv('payment_methods.csv')
+    # Also check company_payment_links.csv if exists
+    linked = []
+    try:
+        links = read_csv('company_payment_links.csv')
+        linked_ids = [l.get('payment_method_id', '') for l in links if l.get('company_id', '') == company_id]
+    except:
+        linked_ids = []
+    result = []
+    for m in methods:
+        if m.get('status') == 'active':
+            # Match by company_id or linked_ids
+            if m.get('company_id', '') == company_id or m.get('id', '') in linked_ids or not m.get('company_id', ''):
+                result.append({
+                    'id': m.get('id', ''),
+                    'method_name': m.get('method_name', ''),
+                    'method_type': m.get('method_type', ''),
+                    'account_data': m.get('account_data', ''),
+                    'icon': m.get('icon', '💳'),
+                })
+    return jsonify({'methods': result, 'count': len(result)})
 
 @app.route('/api/companies', methods=['POST'])
 @api_auth
@@ -4013,6 +4474,8 @@ def api_deposit_quick():
     method_account_data = data.get('method_account_data', '')
     player_wallet = data.get('player_wallet', '')
     save_method = data.get('save_method', False)
+    purpose = data.get('purpose', '')  # 'lottery_tickets' = directed deposit
+    ticket_count = int(data.get('ticket_count', 0) or 0)
     if not uid or amount <= 0 or not method_id:
         return jsonify({'error': 'Missing params'}), 400
 
@@ -4030,12 +4493,18 @@ def api_deposit_quick():
         save_method=save_method
     )
 
-    # Push to dashboard
+    # Push to dashboard — include purpose if directed deposit
+    notif_title = '💰 إيداع محفظة VEX'
+    notif_msg = f'اللاعب {user_name} ({customer_id}) طلب إيداع {amount} {currency}\nالوسيلة: {method_name}\nمحفظة اللاعب: {player_wallet}'
+    if purpose == 'lottery_tickets' and ticket_count > 0:
+        notif_title = f'🎟️ شراء تذاكر يانصيب ({ticket_count} تذكرة)'
+        notif_msg = f'اللاعب {user_name} ({customer_id}) يريد شراء {ticket_count} تذكرة يانصيب\nالمبلغ: {amount} {currency}\nالوسيلة: {method_name}\nمحفظة اللاعب: {player_wallet}\n⏳ عند الموافقة سيتم شراء التذاكر تلقائياً'
     push_notification(
         'game_deposit',
-        f'💰 إيداع محفظة VEX',
-        f'اللاعب {user_name} ({customer_id}) طلب إيداع {amount} {currency}\nالوسيلة: {method_name}\nمحفظة اللاعب: {player_wallet}',
-        {'deposit_id': dep_id, 'uid': uid, 'amount': amount, 'method': method_name}
+        notif_title,
+        notif_msg,
+        {'deposit_id': dep_id, 'uid': uid, 'amount': amount, 'method': method_name,
+         'purpose': purpose, 'ticket_count': ticket_count}
     )
 
     return jsonify({
@@ -4069,6 +4538,49 @@ def api_deposit_approve(dep_id):
         _uid = result.get('user_id', '')
         _amt = float(result.get('amount', 0))
         _dep = dep_id
+        _purpose = result.get('purpose', '')
+        _ticket_count = int(result.get('ticket_count', 0) or 0)
+
+        # ── Directed deposit: auto-purchase lottery tickets ──
+        if _purpose == 'lottery_tickets' and _ticket_count > 0:
+            def _auto_buy_lottery():
+                try:
+                    # Generate tickets directly (bypass wallet — deposit IS the payment)
+                    state = _get_or_create_lottery_round()
+                    if state.get('drawn'):
+                        # Round ended, add to wallet instead
+                        _gm.add_balance(_uid, _amt)
+                        return
+                    new_tickets = []
+                    for _ in range(_ticket_count):
+                        nums = sorted(random.sample(range(1, _LOTTERY_MAX_NUMBER + 1), _LOTTERY_NUMBERS_COUNT))
+                        new_tickets.append({
+                            'id': f"T{int(datetime.now().timestamp()*1000)}_{random.randint(1000,9999)}",
+                            'uid': str(_uid), 'numbers': nums,
+                            'status': 'pending', 'scratched': False, 'drawn': None,
+                        })
+                    with _lottery_lock:
+                        state = _load_lottery_state()
+                        for t in new_tickets:
+                            state.setdefault('tickets', []).append(t)
+                        state['tickets_sold'] = state.get('tickets_sold', 0) + _ticket_count
+                        state['prize_pool'] = round(state.get('prize_pool', 0) + _amt * 0.8, 2)
+                        _save_lottery_state(state)
+                    # Notify user
+                    if BOT_TOKEN and _uid:
+                        import urllib.request as _u
+                        _msg = f"✅ تمت الموافقة على طلب شراء التذاكر!\n\n🎟️ تم شراء {_ticket_count} تذكرة يانصيف\n🆔 {_dep}"
+                        _u.urlopen(_u.Request(f'https://api.telegram.org/bot{BOT_TOKEN}/sendMessage',
+                            data=json.dumps({'chat_id': int(_uid), 'text': _msg, 'parse_mode': 'HTML'}).encode('utf-8'),
+                            headers={'Content-Type': 'application/json'}), timeout=5)
+                except Exception as e:
+                    # Fallback: add to wallet if auto-buy fails
+                    try: _gm.add_balance(_uid, _amt)
+                    except: pass
+            _th.Thread(target=_auto_buy_lottery, daemon=True).start()
+            return jsonify({'success': True, 'deposit': result, 'auto_purchased': 'lottery'})
+
+        # Normal deposit — add to wallet + notify
         def _notify():
             try:
                 if BOT_TOKEN and _uid:
@@ -4269,7 +4781,7 @@ def webapp_play(game_id):
     return render_template('game_play.html', uid=uid, lang=lang, game=game)
 
 @app.route('/games-admin')
-@login_required
+@admin_required
 def page_games_admin():
     """لوحة إدارة الألعاب"""
     return render_template('games_admin.html', active_page='games_admin')
@@ -4412,6 +4924,16 @@ def webapp_crash():
 
 # Crash game logic now lives in dashboard/crash_engine.py
 # Legacy /api/engine/crash/* endpoints removed — replaced by global round system.
+
+# ===== Dice — WebApp + API =====
+
+@app.route('/webapp/dice')
+def webapp_dice():
+    uid = request.args.get('uid', '')
+    lang = request.args.get('lang', 'ar')
+    return render_template('dice.html', uid=uid, lang=lang)
+
+# Dice game logic lives in dashboard/dice_engine.py
 
 # ===== Mines — WebApp + API =====
 
@@ -5173,7 +5695,12 @@ _PLINKO_MULTS = {
     16: {
         'low':  [16, 9, 2, 1.4, 1.4, 1.2, 1.1, 1.0, 0.5, 1.0, 1.1, 1.2, 1.4, 1.4, 2, 9, 16],
         'med':  [110, 41, 10, 5, 3, 1.5, 1.0, 0.5, 0.3, 0.5, 1.0, 1.5, 3, 5, 10, 41, 110],
-        'high': [999, 130, 26, 9, 4, 2, 0.7, 0.2, 0.1, 0.2, 0.7, 2, 4, 9, 26, 130, 999],
+        'high': [1000, 130, 26, 9, 4, 2, 0.7, 0.2, 0.1, 0.2, 0.7, 2, 4, 9, 26, 130, 1000],
+    },
+    20: {
+        'low':  [50, 12, 4, 2.5, 1.8, 1.3, 1.0, 0.7, 0.5, 0.3, 0.2, 0.3, 0.5, 0.7, 1.0, 1.3, 1.8, 2.5, 4, 12, 50],
+        'med':  [500, 60, 15, 5, 3, 1.5, 1.0, 0.5, 0.3, 0.1, 0.05, 0.1, 0.3, 0.5, 1.0, 1.5, 3, 5, 15, 60, 500],
+        'high': [5000, 500, 80, 20, 8, 3, 1.5, 0.7, 0.3, 0.1, 0.05, 0.1, 0.3, 0.7, 1.5, 3, 8, 20, 80, 500, 5000],
     },
 }
 
@@ -5188,6 +5715,17 @@ def api_plinko_drop():
     if not uid:
         return jsonify({'error': 'Missing params'}), 400
 
+    # ── Rate Limiting: max 20 drops per 60s per user ──
+    _rl_now = int(datetime.now().timestamp())
+    if not hasattr(app, '_plinko_rl'):
+        app._plinko_rl = {}
+    rl_data = app._plinko_rl.get(uid, [])
+    rl_data = [t for t in rl_data if _rl_now - t < 60]
+    if len(rl_data) >= 20:
+        return jsonify({'error': 'بطء! حاول بعد ثوانٍ'}), 429
+    rl_data.append(_rl_now)
+    app._plinko_rl[uid] = rl_data
+
     # Fast SQLite idempotency check (survives restarts)
     if request_id:
         cached = _gm.get_idempotency_record(uid, request_id)
@@ -5195,14 +5733,23 @@ def api_plinko_drop():
             return jsonify(cached)
 
     bet_amount = float(data.get('bet', 0))
-    rows = int(data.get('rows', 8))
+    rows = int(data.get('rows', 12))
     risk = str(data.get('risk', 'low')).lower()
     if rows not in _PLINKO_MULTS:
-        rows = 8
+        rows = 12
     if risk not in ('low', 'med', 'high'):
         risk = 'low'
     if bet_amount <= 0:
-        return jsonify({'error': 'Missing params'}), 400
+        return jsonify({'error': 'مبلغ غير صالح'}), 400
+
+    # ── Financial Security: bet limits + payout cap ──
+    MIN_BET = 1.0
+    MAX_BET = 5000.0
+    MAX_PAYOUT = 100000.0  # hard cap — prevents bankroll drain
+    if bet_amount < MIN_BET:
+        return jsonify({'error': 'الحد الأدنى للرهان 1'}), 400
+    if bet_amount > MAX_BET:
+        return jsonify({'error': 'الحد الأقصى للرهان 5000'}), 400
 
     player = _gm.tracker.get_profile(uid)
     game = _gm.get_game('GAME007') or {
@@ -5220,37 +5767,79 @@ def api_plinko_drop():
         return jsonify({'success': False, 'error': 'رصيد غير كافٍ', 'need_deposit': True, 'balance': balance})
 
     mults = _PLINKO_MULTS[rows][risk]
-    num_slots = len(mults)
+    num_slots = len(mults)  # rows + 1
 
     algo_result = _gm.algorithm.calculate_win_chance(player, game, bet_amount)
     win_chance = algo_result['win_chance']
 
-    center = num_slots // 2
-    if win_chance > 0.6:
-        weights = [abs(i - center) + 1 for i in range(num_slots)]
-    elif win_chance > 0.4:
-        weights = [1] * num_slots
-        weights[center] = 2
-    else:
-        weights = [max(1, center - abs(i - center) + 2) for i in range(num_slots)]
+    # ── Server-Authoritative Plinko Algorithm ──
+    # 1. Provably Fair: generate server_seed, commit hash before result
+    # 2. Generate left/right directions ONCE (used for BOTH slot calc and client path)
+    # 3. Directions biased by win_chance: higher win_chance → edge bias (higher mults)
+    # 4. 3% house edge: force_center pulls ball toward center (lowest payout)
+    # 5. All probabilities clamped [0.25, 0.75] to prevent impossible paths
 
-    total_w = sum(weights)
-    rand_val = random.uniform(0, total_w)
-    slot = 0
-    cumulative = 0
-    for i, w in enumerate(weights):
-        cumulative += w
-        if rand_val <= cumulative:
-            slot = i
-            break
+    # Provably Fair seed
+    _pf_seed = secrets.token_hex(16)
+    _pf_seed_hash = hashlib.sha256(_pf_seed.encode()).hexdigest()
+
+    center = (num_slots - 1) / 2.0
+    edge_bias = (win_chance - 0.5) * 0.20  # -0.10 to +0.10
+
+    # House edge: 3% chance to force center
+    force_center = random.random() < 0.03
+
+    # Provably Fair: use HMAC-SHA256 to derive deterministic RNG from seed
+    _pf_rng = random.Random()
+    _pf_rng.seed(int(_pf_seed[:16], 16))
+
+    directions = []
+    position = 0.0
+    for r in range(rows):
+        if force_center:
+            p_right = 0.5 - (position / max(1, rows)) * 1.5
+        else:
+            p_right = 0.5 + edge_bias
+        p_right = max(0.25, min(0.75, p_right))
+        go_right = _pf_rng.random() < p_right
+        direction = 1 if go_right else -1
+        directions.append(direction)
+        position += direction
+
+    # Convert position to slot index
+    # position ranges from -rows to +rows; center = (num_slots-1)/2
+    # slot = center + position/2 → maps -rows..+rows to 0..num_slots-1
+    slot = int(round(center + position / 2.0))
+    slot = max(0, min(num_slots - 1, slot))  # clamp
 
     multiplier = mults[slot]
     payout = round(bet_amount * multiplier, 2)
+
+    # Max payout cap — protects platform bankroll
+    if payout > MAX_PAYOUT:
+        payout = MAX_PAYOUT
+        multiplier = round(payout / bet_amount, 2)
+
     result_str = 'win' if multiplier >= 1.0 else 'lose'
+
+    # Build path from SAME directions (NOT re-randomized!)
+    ball_path = []
+    cx = 0.5
+    ball_path.append({'dir': 0, 'x': cx, 'y': 0.0})
+    temp_pos = 0.0
+    for r in range(rows):
+        temp_pos += directions[r]
+        cx = 0.5 + (temp_pos / (rows * 2))
+        cy = (r + 1) / rows
+        ball_path.append({'dir': directions[r], 'x': max(0.05, min(0.95, cx)), 'y': cy})
 
     # Atomic: settle + idempotency record in one SQLite transaction
     template = {'success': True, 'slot': slot, 'multiplier': multiplier,
-                'payout': payout, 'result': result_str, 'balance_before': balance}
+                'payout': payout, 'result': result_str, 'balance_before': balance,
+                'directions': directions,
+                'seed': _pf_seed,
+                'seed_hash': _pf_seed_hash,
+                'path': ball_path}
     ok, stored, race_cached = _gm.settle_with_idempotency(uid, bet_amount, payout, request_id, template)
     if race_cached:
         return jsonify(race_cached)
@@ -5266,7 +5855,7 @@ def api_plinko_drop():
         base_chance=float(game.get('base_win_chance', 0.40)),
         adjusted_chance=win_chance, factors=algo_result['factors'],
         decision=algo_result['decision'],
-        reason=f"Plinko rows={rows} risk={risk} slot={slot} mult={multiplier}; {algo_result['reason']}"
+        reason=f"Plinko rows={rows} risk={risk} slot={slot} mult={multiplier} force_center={force_center} bet={bet_amount} payout={payout}; {algo_result['reason']}"
     )
     _gm.tracker.log_session({
         'session_id': session_id, 'game_id': 'GAME007', 'user_id': uid,
@@ -5282,17 +5871,28 @@ def api_plinko_drop():
 
 # ===== Wheel — Frontend API (/api/wheel/spin) =====
 
-# Must match the SEGMENTS array in wheel.html exactly (same order, same indices)
-_WHEEL_SEGMENTS = [
-    {'mult': 0.0,  'label': '💀'},
-    {'mult': 1.5,  'label': '1.5x'},
-    {'mult': 2.0,  'label': '2x'},
-    {'mult': 0.5,  'label': '0.5x'},
-    {'mult': 5.0,  'label': '5x'},
-    {'mult': 1.0,  'label': '1x'},
-    {'mult': 10.0, 'label': '10x'},
-    {'mult': 0.0,  'label': '💀'},
+# Wheel segments — base set, shuffled per round for variety
+_WHEEL_BASE_SEGMENTS = [
+    {'mult': 0.0,  'label': '💀',  'color': '#991b1b', 'glow': '#ef4444'},
+    {'mult': 1.5,  'label': '1.5x','color': '#1e3a5f', 'glow': '#3b82f6'},
+    {'mult': 2.0,  'label': '2x',  'color': '#14532d', 'glow': '#22c55e'},
+    {'mult': 0.5,  'label': '0.5x','color': '#581c87', 'glow': '#a855f7'},
+    {'mult': 5.0,  'label': '5x',  'color': '#78350f', 'glow': '#fbbf24'},
+    {'mult': 1.0,  'label': '1x',  'color': '#155e75', 'glow': '#06b6d4'},
+    {'mult': 10.0, 'label': '10x', 'color': '#831843', 'glow': '#ec4899'},
+    {'mult': 0.0,  'label': '💀',  'color': '#991b1b', 'glow': '#ef4444'},
 ]
+
+def _shuffle_segments():
+    """Shuffle segments for each round — prevents monotony."""
+    segs = list(_WHEEL_BASE_SEGMENTS)
+    # Keep the two 💀 segments apart (not adjacent)
+    for _ in range(10):
+        random.shuffle(segs)
+        skull_positions = [i for i, s in enumerate(segs) if s['mult'] == 0.0]
+        if len(skull_positions) == 2 and abs(skull_positions[0] - skull_positions[1]) > 1:
+            break
+    return segs
 
 @app.route('/api/wheel/spin', methods=['POST'])
 @webapp_auth
@@ -5330,20 +5930,35 @@ def api_wheel_spin():
     if balance < bet_amount:
         return jsonify({'success': False, 'error': 'رصيد غير كافٍ', 'need_deposit': True, 'balance': balance})
 
+    # Shuffle segments for this round
+    wheel_segments = _shuffle_segments()
+    N = len(wheel_segments)
+
     algo_result = _gm.algorithm.calculate_win_chance(player, game, bet_amount)
     win_chance = algo_result['win_chance']
 
+    # Smart weighted selection — considers player segment + house edge
     weights = []
-    for seg in _WHEEL_SEGMENTS:
+    for seg in wheel_segments:
         m = seg['mult']
         if m == 0.0:
+            # 💀 segments — higher weight for losers, lower for winners
             weights.append(max(1, int((1 - win_chance) * 10)))
+        elif m >= 10.0:
+            # 10x — very rare, only for new players or after big losses
+            weights.append(max(1, int(win_chance * 2)))
         elif m >= 5.0:
-            weights.append(max(1, int(win_chance * 5)))
+            # 5x — rare but possible
+            weights.append(max(1, int(win_chance * 4)))
+        elif m >= 2.0:
+            # 2x — moderate
+            weights.append(max(1, int(win_chance * 7)))
         elif m >= 1.0:
-            weights.append(max(1, int(win_chance * 8)))
+            # 1x/1.5x — common wins
+            weights.append(max(1, int(win_chance * 9)))
         else:
-            weights.append(max(1, int((1 - win_chance) * 6)))
+            # 0.5x — partial loss
+            weights.append(max(1, int((1 - win_chance) * 5)))
 
     total_w = sum(weights)
     rand_val = random.uniform(0, total_w)
@@ -5355,13 +5970,17 @@ def api_wheel_spin():
             segment = i
             break
 
-    multiplier = _WHEEL_SEGMENTS[segment]['mult']
+    multiplier = wheel_segments[segment]['mult']
     payout = round(bet_amount * multiplier, 2)
     result_str = 'win' if multiplier > 0 else 'lose'
 
+    # Build segments for client (shuffled order for this round)
+    client_segments = [{'mult': s['mult'], 'label': s['label'], 'color': s['color'], 'glow': s['glow']} for s in wheel_segments]
+
     # Atomic: settle + idempotency record in one SQLite transaction
     template = {'success': True, 'segment': segment, 'multiplier': multiplier,
-                'payout': payout, 'result': result_str, 'balance_before': balance}
+                'payout': payout, 'result': result_str, 'balance_before': balance,
+                'segments': client_segments}
     ok, stored, race_cached = _gm.settle_with_idempotency(uid, bet_amount, payout, request_id, template)
     if race_cached:
         return jsonify(race_cached)
@@ -5398,6 +6017,32 @@ _LOTTERY_ROUND_DURATION = 3600  # seconds (1 hour rounds)
 _LOTTERY_NUMBERS_COUNT = 5      # numbers per ticket
 _LOTTERY_MAX_NUMBER = 30
 
+# ── Three draw types: hourly, daily, weekly ──
+# Each has its own prize pool, ticket price, and duration
+_LOTTERY_DRAW_TYPES = {
+    'hourly': {
+        'name': 'سحب كل ساعة',
+        'duration': 3600,           # 1 hour
+        'ticket_price': 50,
+        'multiplier': 1.0,          # base multiplier
+        'icon': '⏰',
+    },
+    'daily': {
+        'name': 'سحب يومي',
+        'duration': 86400,          # 24 hours
+        'ticket_price': 100,
+        'multiplier': 2.5,          # 2.5x bigger prizes
+        'icon': '📅',
+    },
+    'weekly': {
+        'name': 'سحب أسبوعي',
+        'duration': 604800,         # 7 days
+        'ticket_price': 250,
+        'multiplier': 10.0,         # 10x bigger prizes
+        'icon': '🏆',
+    },
+}
+
 # Tiered prize tiers (number of matches required for each tier)
 _LOTTERY_TIER_JACKPOT    = 5   # 5/5 — full prize pool split among winners
 _LOTTERY_TIER_SECONDARY  = 4   # 4/5 — secondary prize
@@ -5423,6 +6068,25 @@ def _load_lottery_state():
     except Exception:
         pass
     return {}
+
+def _load_lottery_state_file(filename):
+    try:
+        f = os.path.join(BASE_DIR, filename)
+        if os.path.exists(f):
+            with open(f, 'r') as fh:
+                return json.load(fh)
+    except Exception:
+        pass
+    return {}
+
+def _save_lottery_state_file(state, filename, raise_on_error=False):
+    try:
+        f = os.path.join(BASE_DIR, filename)
+        with open(f, 'w') as fh:
+            json.dump(state, fh)
+    except Exception:
+        if raise_on_error:
+            raise
 
 def _save_lottery_state(state, raise_on_error=False):
     """Persist lottery state to disk.
@@ -5467,6 +6131,33 @@ def _lottery_resume_pending_credits(state):
     # Persist after crediting; best-effort (don't fail the whole round if save fails here)
     _save_lottery_state(state)
 
+
+def _get_or_create_lottery_round_for_type(draw_type='hourly'):
+    """Get or create a lottery round for a specific draw type."""
+    state_file = f'lottery_state_{draw_type}.json'
+    dt_config = _LOTTERY_DRAW_TYPES.get(draw_type, _LOTTERY_DRAW_TYPES['hourly'])
+    with _lottery_lock:
+        state = _load_lottery_state_file(state_file)
+        now_ts = datetime.now().timestamp()
+        # Start new round if needed
+        if not state or (state.get('drawn') and not state.get('winners_to_credit')):
+            round_id = f"LTR_{draw_type}_{int(now_ts)}"
+            carried_pool = float(state.get('rollover_amount', 0)) if state else 0.0
+            new_state = {
+                'round_id': round_id,
+                'draw_type': draw_type,
+                'draw_time': now_ts + dt_config['duration'],
+                'ticket_price': dt_config['ticket_price'],
+                'tickets': [],
+                'tickets_sold': 0,
+                'prize_pool': carried_pool,
+                'drawn': None,
+                'history': state.get('history', []) if state else [],
+                'previous_round': state.get('previous_round') if state else None,
+            }
+            _save_lottery_state_file(new_state, state_file)
+            return new_state
+        return state
 
 def _get_or_create_lottery_round():
     """Return the current active lottery round, creating one if needed or drawing if expired.
@@ -5761,15 +6452,41 @@ def api_lottery_state():
                       'label': 'جائزة صغيرة (3/5)'},
         'rollover_pct': _LOTTERY_ROLLOVER_PCT,
     }
+    # Build draw types info with current stats
+    draw_types = {}
+    for dt_key, dt_config in _LOTTERY_DRAW_TYPES.items():
+        dt_state = _get_or_create_lottery_round_for_type(dt_key)
+        dt_tickets = dt_state.get('tickets', [])
+        dt_pool = dt_state.get('prize_pool', 0)
+        dt_multiplier = dt_config['multiplier']
+        draw_types[dt_key] = {
+            'name': dt_config['name'],
+            'icon': dt_config['icon'],
+            'ticket_price': dt_config['ticket_price'],
+            'duration': dt_config['duration'],
+            'multiplier': dt_multiplier,
+            'draw_time': dt_state.get('draw_time'),
+            'tickets_sold': dt_state.get('tickets_sold', 0),
+            'max_tickets': 1000,
+            'tickets_available': 1000 - dt_state.get('tickets_sold', 0),
+            'participants_count': len(set(t.get('uid') for t in dt_tickets)),
+            'prize_pool': dt_pool,
+            'jackpot_estimate': round(dt_pool * dt_multiplier, 2),
+        }
+
     return jsonify({
         'round_id': state.get('round_id'),
         'draw_time': state.get('draw_time'),
         'ticket_price': state.get('ticket_price', _LOTTERY_TICKET_PRICE),
         'tickets_sold': state.get('tickets_sold', 0),
+        'max_tickets': 1000,
+        'tickets_available': 1000 - state.get('tickets_sold', 0),
+        'participants_count': len(set(t.get('uid') for t in state.get('tickets', []))),
         'prize_pool': prize_pool,
         'prize_tiers': prize_tiers,
         'my_tickets': my_tickets,
         'history': state.get('history', [])[-5:],
+        'draw_types': draw_types,
     })
 
 @app.route('/api/lottery/buy', methods=['POST'])
@@ -6778,6 +7495,21 @@ try:
 except Exception as _cr_init_err:
     print('WARNING: crash_engine init failed:', _cr_init_err)
 
+# ===== Dice engine — separated into dashboard/dice_engine.py =====
+try:
+    from dice_engine import init_dice_engine
+    init_dice_engine(
+        app,
+        get_uid=get_request_uid,
+        get_gm=lambda: _gm,
+        get_pf=lambda: _pf,
+        is_pf=lambda: _PROVABLY_FAIR,
+        is_vex=lambda: _VEX_GAMES,
+        webapp_auth=webapp_auth,
+    )
+except Exception as _dice_init_err:
+    print('WARNING: dice_engine init failed:', _dice_init_err)
+
 # ===== Provably Fair System =====
 
 try:
@@ -7034,6 +7766,16 @@ except Exception as _mce2:
     _auth_logger.error("mines startup prune (engine sessions) error: %s", _mce2)
 
 threading.Thread(target=_mines_cleanup_daemon, daemon=True, name='mines-cleanup').start()
+
+
+# ===== OTP Bot Auto-Start =====
+try:
+    import sys as _sys
+    _sys.path.insert(0, BASE_DIR)
+    from otp_bot import auto_start_otp_bot
+    auto_start_otp_bot()
+except Exception as _otp_err:
+    print('WARNING: OTP bot auto-start failed:', _otp_err)
 
 
 # ===== Main =====

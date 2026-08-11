@@ -1,0 +1,146 @@
+{% extends 'base.html' %}
+{% block title %}إدارة SEO — VEX{% endblock %}
+{% block page_title %}إدارة SEO{% endblock %}
+{% block content %}
+<div class="max-w-4xl mx-auto">
+  <div class="bg-slate-800 rounded-xl border border-slate-700 p-6 mb-6">
+    <h3 class="text-lg font-bold text-amber-400 mb-4">🔍 تحسين محركات البحث (SEO)</h3>
+    <p class="text-sm text-slate-400 mb-6">تحكم في كيفية ظهور موقعك في محركات البحث والسوشيال ميديا</p>
+
+    <!-- SEO Basics -->
+    <div class="space-y-4">
+      <div>
+        <label class="block text-sm text-slate-400 mb-1">عنوان الصفحة (Title)</label>
+        <input type="text" id="seo_title" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm" value="{{ seo_settings.seo_title or 'VEX — منصة الألعاب المالية' }}">
+      </div>
+      <div>
+        <label class="block text-sm text-slate-400 mb-1">الوصف (Description)</label>
+        <textarea id="seo_description" rows="2" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm">{{ seo_settings.seo_description or 'منصة الألعاب المالية — العب، اربح، اسحب بكل أمان وشفافية' }}</textarea>
+      </div>
+      <div>
+        <label class="block text-sm text-slate-400 mb-1">الكلمات المفتاحية (Keywords)</label>
+        <input type="text" id="seo_keywords" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm" value="{{ seo_settings.seo_keywords or 'VEX, ألعاب, يانصيب, مراهنات, ربح' }}">
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">الروبوت (Robots)</label>
+          <select id="seo_robots" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm">
+            <option value="index, follow" {{ 'selected' if seo_settings.seo_robots == 'index, follow' or not seo_settings.seo_robots }}>index, follow (مسموح)</option>
+            <option value="noindex, nofollow" {{ 'selected' if seo_settings.seo_robots == 'noindex, nofollow' }}>noindex, nofollow (ممنوع)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">اللغة</label>
+          <input type="text" id="seo_language" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm" value="{{ seo_settings.seo_language or 'ar' }}">
+        </div>
+      </div>
+      <div>
+        <label class="block text-sm text-slate-400 mb-1">الرابط الأساسي (Canonical URL)</label>
+        <input type="text" id="seo_canonical" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm" value="{{ seo_settings.seo_canonical or 'https://vex.deals/' }}">
+      </div>
+      <div>
+        <label class="block text-sm text-slate-400 mb-1">المؤلف (Author)</label>
+        <input type="text" id="seo_author" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm" value="{{ seo_settings.seo_author or 'VEX' }}">
+      </div>
+    </div>
+  </div>
+
+  <!-- Open Graph / Social -->
+  <div class="bg-slate-800 rounded-xl border border-slate-700 p-6 mb-6">
+    <h3 class="text-lg font-bold text-blue-400 mb-4">📱 معاينة الروابط (Open Graph)</h3>
+    <div class="space-y-4">
+      <div>
+        <label class="block text-sm text-slate-400 mb-1">عنوان المعاينة (OG Title)</label>
+        <input type="text" id="og_title" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm" value="{{ seo_settings.og_title or 'VEX — منصة الألعاب المالية' }}">
+      </div>
+      <div>
+        <label class="block text-sm text-slate-400 mb-1">وصف المعاينة (OG Description)</label>
+        <textarea id="og_description" rows="2" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm">{{ seo_settings.og_description or 'العب، اربح، اسحب — كل ذلك بأمان وشفافية' }}</textarea>
+      </div>
+      <div>
+        <label class="block text-sm text-slate-400 mb-1">صورة المعاينة (OG Image URL)</label>
+        <input type="text" id="og_image" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm" value="{{ seo_settings.og_image or 'https://vex.deals/static/icons/og-image.png' }}">
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">Twitter Card</label>
+          <select id="twitter_card" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm">
+            <option value="summary_large_image" {{ 'selected' if seo_settings.twitter_card == 'summary_large_image' or not seo_settings.twitter_card }}>summary_large_image</option>
+            <option value="summary" {{ 'selected' if seo_settings.twitter_card == 'summary' }}>summary</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">Twitter Image URL</label>
+          <input type="text" id="twitter_image" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm" value="{{ seo_settings.twitter_image or 'https://vex.deals/static/icons/og-image.png' }}">
+        </div>
+      </div>
+    </div>
+    <!-- Preview -->
+    <div class="mt-4 p-4 bg-slate-900 rounded-lg border border-slate-700">
+      <p class="text-xs text-slate-500 mb-2">معاينة الشكل:</p>
+      <div class="flex gap-3">
+        <img id="previewImg" src="{{ seo_settings.og_image or '/static/icons/og-image.png' }}" class="w-24 h-24 rounded-lg object-cover border border-slate-600" onerror="this.src='/static/icons/og-image.png'">
+        <div class="flex-1 min-w-0">
+          <p class="text-xs text-slate-500 truncate">vex.deals</p>
+          <p id="previewTitle" class="text-sm font-bold text-slate-200 truncate">{{ seo_settings.og_title or 'VEX — منصة الألعاب المالية' }}</p>
+          <p id="previewDesc" class="text-xs text-slate-400 line-clamp-2">{{ seo_settings.og_description or 'العب، اربح، اسحب — كل ذلك بأمان وشفافية' }}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OTP Bot -->
+  <div class="bg-slate-800 rounded-xl border border-slate-700 p-6 mb-6">
+    <h3 class="text-lg font-bold text-green-400 mb-4">🤖 بوت الرموز (OTP Bot)</h3>
+    <p class="text-sm text-slate-400 mb-4">بوت متخصص لإرسال رموز دخول الموقع فقط. أضف بوت جديد من <a href="/bots" class="text-blue-400 hover:underline">صفحة البوتات</a> مع الوصف: <code class="bg-slate-900 px-2 py-1 rounded text-amber-400">otp_bot</code></p>
+    <div id="otpBotStatus" class="text-sm text-slate-400">جارٍ الفحص...</div>
+  </div>
+
+  <!-- Save -->
+  <button onclick="saveSEO()" class="w-full bg-gradient-to-r from-amber-500 to-amber-600 text-slate-900 font-bold py-3 rounded-xl transition hover:from-amber-600 hover:to-amber-700">
+    💾 حفظ إعدادات SEO
+  </button>
+</div>
+
+<script>
+function saveSEO() {
+  var data = {};
+  ['seo_title','seo_description','seo_keywords','seo_robots','seo_language','seo_canonical','seo_author',
+   'og_title','og_description','og_image','twitter_card','twitter_image'].forEach(function(k){
+    var el = document.getElementById(k);
+    if (el) data[k] = el.value;
+  });
+  fetch('/api/seo/save', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(data)
+  }).then(function(r){return r.json()}).then(function(d){
+    if (d.success) { Alpine.store('app').toast('تم حفظ إعدادات SEO', 'success'); }
+    else { Alpine.store('app').toast('خطأ: ' + (d.error||''), 'error'); }
+  }).catch(function(){ Alpine.store('app').toast('خطأ في الشبكة', 'error'); });
+}
+
+// Live preview update
+['og_title','og_description','og_image'].forEach(function(k){
+  var el = document.getElementById(k);
+  if (el) el.addEventListener('input', function(){
+    if (k === 'og_title') document.getElementById('previewTitle').textContent = this.value;
+    if (k === 'og_description') document.getElementById('previewDesc').textContent = this.value;
+    if (k === 'og_image') document.getElementById('previewImg').src = this.value;
+  });
+});
+
+// Check OTP bot status
+fetch('/api/bots').then(function(r){return r.json()}).then(function(d){
+  var bots = d.bots || [];
+  var otpBot = bots.find(function(b){ return b.description === 'otp_bot'; });
+  var el = document.getElementById('otpBotStatus');
+  if (otpBot) {
+    var active = otpBot.is_active === 'yes';
+    el.innerHTML = '<span class="' + (active?'text-green-400':'text-red-400') + '">●</span> بوت الرموز: ' + (active?'نشط ✅':'متوقف ❌') + ' — @' + (otpBot.name||'unknown');
+  } else {
+    el.innerHTML = '<span class="text-amber-400">⚠️</span> لم يتم إضافة بوت رموز بعد. أضف بوت من <a href="/bots" class="text-blue-400 hover:underline">صفحة البوتات</a> بالوصف: <code>otp_bot</code>';
+  }
+}).catch(function(){});
+</script>
+{% endblock %}
