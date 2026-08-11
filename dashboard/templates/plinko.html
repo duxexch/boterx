@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
 <title>Plinko — VEX</title>
-<link rel="stylesheet" href="/static/css/game-base.css?v=20260811f">
+<link rel="stylesheet" href="/static/css/game-base.css?v=20260811g">
 <style>
 /* ── FULL SELF-CONTAINED LAYOUT — do NOT depend on game-base.css for layout ── */
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -196,7 +196,7 @@ html,body{
   </div>
 </div>
 <div class="big-win-overlay" id="bigWin"><div style="text-align:center"><div class="big-win-num" id="bwNum"></div><div class="big-win-text" id="bwTxt"></div></div></div>
-<script src="/static/js/game-base.js?v=20260811f"></script>
+<script src="/static/js/game-base.js?v=20260811g"></script>
 <script>
 'use strict';
 
@@ -328,6 +328,8 @@ function initBoard() {
   // Slots: rows+1 slots at bottom
   var sc = rows + 1;
   sw = W / sc;
+  // Slot area: taller for high row counts so text fits vertically
+  var slotH = rows >= 16 ? Math.min(48, H * 0.08) : Math.min(32, H * 0.055);
   var mt = MULTS[rows][risk];
   for (var s = 0; s < sc; s++) {
     var m = mt[s];
@@ -338,8 +340,11 @@ function initBoard() {
     else if (m >= 2) col = '#00e701';
     else if (m >= 1) col = '#06b6d4';
     else col = '#ff4757';
-    slots.push({ x: s * sw + sw / 2, mult: m, color: col, highlight: 0 });
+    slots.push({ x: s * sw + sw / 2, mult: m, color: col, highlight: 0, h: slotH });
   }
+
+  // Adjust bottomPad to match slot height
+  bottomPad = slotH + 6;
 
   draw();
 }
@@ -385,13 +390,13 @@ function draw() {
   }
 
   // Slots at bottom
-  var slotH = Math.min(32, H * 0.055);
-  var slotY = H - slotH - 3;
   for (var s = 0; s < slots.length; s++) {
     var sl = slots[s];
+    var slotH = sl.h || 32;
+    var slotY = H - slotH - 2;
     if (sl.highlight > 0) {
       ctx.shadowColor = sl.color;
-      ctx.shadowBlur = 20;
+      ctx.shadowBlur = 25;
       sl.highlight--;
     } else {
       ctx.shadowBlur = 0;
@@ -411,14 +416,25 @@ function draw() {
     ctx.fill();
     ctx.shadowBlur = 0;
 
-    // multiplier text
+    // Multiplier text — vertical (rotated) for 16+ rows, horizontal for fewer
     ctx.fillStyle = '#fff';
-    var fs = Math.max(7, Math.min(sw * 0.14, 12));
-    ctx.font = 'bold ' + fs + 'px Courier New';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     var txt = sl.mult >= 100 ? sl.mult.toFixed(0) + 'x' : sl.mult.toFixed(sl.mult < 10 ? 1 : 0) + 'x';
-    ctx.fillText(txt, sl.x, slotY + slotH * 0.45);
+    if (rows >= 16) {
+      // Vertical text — rotate 90 degrees for tall narrow slots
+      var fontSize = Math.max(9, Math.min(sw * 0.45, 14));
+      ctx.font = 'bold ' + fontSize + 'px Courier New';
+      ctx.save();
+      ctx.translate(sl.x, slotY + slotH / 2);
+      ctx.rotate(-Math.PI / 2); // rotate text to read bottom-up
+      ctx.fillText(txt, 0, 0);
+      ctx.restore();
+    } else {
+      var fs2 = Math.max(8, Math.min(sw * 0.16, 13));
+      ctx.font = 'bold ' + fs2 + 'px Courier New';
+      ctx.fillText(txt, sl.x, slotY + slotH * 0.45);
+    }
   }
 
   // Trails
@@ -536,7 +552,7 @@ function startBall(targetSlot, mult, payout, bet, dirs) {
   var lastBounceRow = -1;
   var frames = 0;
   var maxFrames = 1200;
-  var settleY = H * 0.87;
+  var settleY = H - (slots.length > 0 ? (slots[0].h || 32) : 32) - 4; // settle AT slot top
   var horizVel = 0;
 
   function physics() {
@@ -589,9 +605,10 @@ function startBall(targetSlot, mult, payout, bet, dirs) {
 
   function finish() {
     if (!ball) return;
-    // Snap to target slot
+    // Snap ball to center of target slot
     if (targetSlot >= 0 && targetSlot < slots.length) {
       ball.x = slots[targetSlot].x;
+      ball.y = H - (slots[targetSlot].h || 32) / 2 - 2; // ball rests IN the slot
     }
     sndLand(mult);
     // Particle burst
@@ -605,16 +622,30 @@ function startBall(targetSlot, mult, payout, bet, dirs) {
       });
     }
     if (targetSlot >= 0 && targetSlot < slots.length) {
-      slots[targetSlot].highlight = 25;
+      slots[targetSlot].highlight = 60; // glow longer
     }
-    draw();
-    ball = null;
-    setTimeout(function() { trails = []; draw() }, 600);
+    // Keep drawing ball resting in slot for 1.8s so player sees the result
+    var restFrames = 0;
+    function restLoop() {
+      if (restFrames < 108) { // ~1.8s at 60fps
+        restFrames++;
+        draw();
+        requestAnimationFrame(restLoop);
+      } else {
+        ball = null;
+        trails = [];
+        draw();
+      }
+    }
+    draw(); // immediate draw with ball in slot
+    requestAnimationFrame(restLoop);
+
+    // After ball rests, show result and re-enable
     setTimeout(function() {
       dropping = false;
       document.getElementById('dropBtn').disabled = false;
       showResult(mult, payout, bet);
-    }, 650);
+    }, 1200); // show result after 1.2s (ball still visible)
   }
 
   requestAnimationFrame(physics);
