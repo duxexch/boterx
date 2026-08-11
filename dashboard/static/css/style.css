@@ -210,3 +210,28 @@ main, .main-content { background-color: var(--bg-primary) !important; }
 /* Notification dot */
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 .pulse { animation: pulse 2s infinite; }
+
+/* ===== Light-mode contrast fixes (opacity-variant Tailwind classes were
+   left dark, making text invisible in light mode) ===== */
+body.light-mode .bg-slate-800\/80, body.light-mode .bg-slate-800\/50,
+body.light-mode .bg-slate-800\/30 { background-color: var(--bg-card) !important; }
+body.light-mode .bg-slate-700, body.light-mode .bg-slate-700\/50,
+body.light-mode .bg-slate-700\/40, body.light-mode .bg-slate-700\/30 { background-color: var(--bg-input) !important; }
+body.light-mode .bg-slate-900 { background-color: var(--bg-primary) !important; }
+body.light-mode .hover\:bg-slate-700:hover, body.light-mode .hover\:bg-slate-600:hover,
+body.light-mode .hover\:bg-slate-700\/50:hover, body.light-mode .hover\:bg-slate-700\/30:hover { background-color: #e2e8f0 !important; }
+body.light-mode .bg-slate-600 { background-color: #cbd5e1 !important; }
+body.light-mode .text-slate-100, body.light-mode .text-slate-200,
+body.light-mode .text-white { color: var(--text-primary) !important; }
+body.light-mode .bg-black\/70, body.light-mode .bg-black\/60 { background-color: rgba(15,23,42,.45) !important; }
+body.light-mode kbd { background-color: #e2e8f0 !important; color: #334155 !important; }
+
+/* ===== Mobile usability ===== */
+@media (max-width: 640px) {
+    .data-table th, .data-table td { padding: 0.5rem 0.5rem; font-size: 0.75rem; }
+    main { padding: 0.75rem !important; }
+    .modal { max-height: 92vh; overflow-y: auto; }
+    .btn { min-height: 40px; }
+}
+/* Comfortable touch targets on sidebar links */
+.sidebar-link { min-height: 42px; }

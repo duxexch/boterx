@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
     <title>{% block title %}VEX Dashboard{% endblock %}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="{{ url_for('static', filename='vendor/tailwind.js') }}"></script>
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -17,11 +17,11 @@
             }}
         }
     </script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/fontawesome.min.css') }}">
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/app.js') }}?v=20260810c" defer></script>
-    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.5/dist/cdn.min.js" defer></script>
+    <script src="{{ url_for('static', filename='vendor/alpine.min.js') }}" defer></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/fx.css') }}">
     <!-- PWA & SEO -->
@@ -60,11 +60,21 @@
         /* Direction-aware sidebar (VEX) */
         [dir="rtl"] .vex-sidebar { right: 0; left: auto; border-left: 1px solid #334155; border-right: none; }
         [dir="ltr"] .vex-sidebar { left: 0; right: auto; border-right: 1px solid #334155; border-left: none; }
-        [dir="rtl"] .sidebar-hidden { transform: translateX(100%); }
-        [dir="ltr"] .sidebar-hidden { transform: translateX(-100%); }
+        /* CSS-first layout: correct WITHOUT JavaScript.
+           Mobile (<1024px): sidebar off-canvas by default; .mobile-open slides it in.
+           Desktop (>=1024px): sidebar visible + content pushed; .lg-collapsed hides it. */
+        @media (max-width: 1023.98px) {
+            [dir="rtl"] .vex-sidebar { transform: translateX(100%); }
+            [dir="ltr"] .vex-sidebar { transform: translateX(-100%); }
+            .vex-sidebar.mobile-open { transform: none !important; }
+        }
         @media (min-width: 1024px) {
-            [dir="rtl"] .with-sidebar { margin-right: 16rem; margin-left: 0; }
-            [dir="ltr"] .with-sidebar { margin-left: 16rem; margin-right: 0; }
+            [dir="rtl"] .vex-sidebar.lg-collapsed { transform: translateX(100%); }
+            [dir="ltr"] .vex-sidebar.lg-collapsed { transform: translateX(-100%); }
+            [dir="rtl"] .main-wrap { margin-right: 16rem; margin-left: 0; }
+            [dir="ltr"] .main-wrap { margin-left: 16rem; margin-right: 0; }
+            [dir="rtl"] .main-wrap.full { margin-right: 0; }
+            [dir="ltr"] .main-wrap.full { margin-left: 0; }
         }
         [dir="rtl"] .notif-dd { left: 0; right: auto; }
         [dir="ltr"] .notif-dd { right: 0; left: auto; }
@@ -80,7 +90,7 @@
 
 <!-- Sidebar -->
 <aside class="vex-sidebar fixed top-0 h-screen w-64 bg-slate-800 border-slate-700 transition-transform duration-300 z-50 flex flex-col"
-       :class="(mobileSidebar || (sidebarOpen && window.matchMedia('(min-width: 1024px)').matches)) ? '' : 'sidebar-hidden'">
+       :class="{ 'mobile-open': mobileSidebar, 'lg-collapsed': !sidebarOpen }">
     
     <!-- Brand header -->
     <div class="p-5 border-b border-slate-700 flex items-center justify-between flex-shrink-0">
@@ -247,7 +257,7 @@
 </aside>
 
 <!-- Main content -->
-<div :class="sidebarOpen ? 'with-sidebar' : ''" class="transition-all duration-300">
+<div class="main-wrap transition-all duration-300" :class="!sidebarOpen && 'full'">
     <!-- Navbar -->
     <header class="bg-slate-800/80 backdrop-blur-md border-b border-slate-700 sticky top-0 z-30">
         <div class="flex items-center justify-between px-4 lg:px-6 py-3">
