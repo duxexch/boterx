@@ -2,30 +2,33 @@
 /* Professional betting platform design system — Stake/1xBet level */
 
 :root {
-  /* Core palette */
-  --bg: #0a0e17;
-  --bg-2: #0d1220;
-  --surface: #131826;
-  --surface-2: #1a2032;
-  --surface-3: #1f2740;
-  --border: #2a3142;
-  --border-light: #353d52;
+  /* Core palette — VEX neon identity */
+  --bg: #030a06;
+  --bg-2: #06120b;
+  --surface: #0a1a10;
+  --surface-2: #0e2416;
+  --surface-3: #12301c;
+  --border: #1a3d26;
+  --border-light: #245234;
   
-  /* Brand colors */
-  --gold: #fbbf24;
-  --gold-dim: #b8860b;
-  --green: #00e701;
-  --green-dim: #0d7a1f;
+  /* Brand colors — VEX green replaces gold as primary accent */
+  --gold: #00ff88;
+  --gold-dim: #00b35f;
+  --green: #00ff88;
+  --green-dim: #0d7a3f;
   --red: #ff4757;
   --red-dim: #c92634;
   --blue: #3b82f6;
   --purple: #a78bfa;
   --cyan: #06b6d4;
+  --vex: #00ff88;
+  --vex-dim: #00b35f;
+  --vex-glow: rgba(0,255,136,0.35);
   
   /* Text */
-  --text: #e8eaed;
-  --text-dim: #9ca3af;
-  --muted: #6b7280;
+  --text: #e9f5ee;
+  --text-dim: #9fb8aa;
+  --muted: #6b8577;
   
   /* Layout */
   --radius: 12px;
@@ -34,9 +37,9 @@
   --gap: 8px;
   
   /* Shadows */
-  --shadow-card: 0 4px 20px rgba(0,0,0,0.3);
-  --shadow-glow-green: 0 0 30px rgba(0,231,1,0.15);
-  --shadow-glow-gold: 0 0 30px rgba(251,191,36,0.15);
+  --shadow-card: 0 4px 20px rgba(0,0,0,0.4);
+  --shadow-glow-green: 0 0 30px rgba(0,255,136,0.2);
+  --shadow-glow-gold: 0 0 30px rgba(0,255,136,0.2);
   
   /* Transitions */
   --ease: cubic-bezier(0.4, 0, 0.2, 1);
