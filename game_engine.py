@@ -355,16 +355,22 @@ class GameManager:
             pass
         return 'EGP'
 
-    def create_svrp_transfer(self, transfer_id, uid, amount):
-        """Write durable 'pending' outbox record before SVRP debit."""
+    def create_svrp_transfer(self, transfer_id, uid):
+        """Reserve outbox slot (status='pending', amount=0). Returns True if inserted."""
         if _USE_SQLITE:
-            return _db.create_svrp_transfer(transfer_id, uid, amount)
+            return _db.create_svrp_transfer(transfer_id, uid)
         return True
 
-    def update_svrp_transfer_status(self, transfer_id, status):
-        """Advance outbox record to 'credits_debited' or 'completed'."""
+    def mark_svrp_transfer_debited(self, transfer_id, uid, actual_amount):
+        """CAS pending→debited with the actual amount. Returns True on success."""
         if _USE_SQLITE:
-            _db.update_svrp_transfer_status(transfer_id, status)
+            return _db.mark_svrp_transfer_debited(transfer_id, uid, actual_amount)
+        return True  # CSV fallback: no idempotency
+
+    def mark_svrp_transfer_status(self, transfer_id, uid, status):
+        """Set terminal status (rolled_back etc.) with uid ownership check."""
+        if _USE_SQLITE:
+            _db.mark_svrp_transfer_status(transfer_id, uid, status)
 
     def get_svrp_transfer(self, transfer_id):
         """Return outbox record dict, or None if not found."""
@@ -373,12 +379,10 @@ class GameManager:
         return None
 
     def add_balance_for_svrp_transfer(self, user_id, amount, transfer_id):
-        """Credit game balance exactly once for an SVRP transfer.
-        Uses svrp_transfer_log STATUS for idempotency (no separate INSERT).
-        """
+        """Credit game balance exactly once via STATUS-based CAS (no INSERT collision)."""
         if _USE_SQLITE:
             return _db.add_balance_for_svrp_transfer(user_id, amount, transfer_id)
-        # Fallback: CSV cache — no idempotency guarantee in CSV mode
+        # CSV fallback: no idempotency guarantee
         return self.add_balance(user_id, amount, 'svrp_transfer')
 
     def add_balance(self, user_id, amount, reason='deposit', idempotency_key=None):

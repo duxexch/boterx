@@ -378,115 +378,146 @@ class GameDB:
             return d
         return {}
 
-    # ── SVRP transfer outbox helpers ─────────────────────────────────────────
+    # ── SVRP transfer outbox — state machine helpers ──────────────────────────
+    # State transitions:
+    #   (new) ──create_svrp_transfer──► pending
+    #   pending ──mark_svrp_transfer_debited (CAS)──► debited   [amount set here]
+    #   debited ──add_balance_for_svrp_transfer──► completed    [credit + CAS]
+    #   debited ──mark_svrp_transfer_status──► rolled_back      [after CSV rollback]
+    #   completed ──(replay)──► completed                        [no-op, returns balance]
+    #
+    # "pending → debited" is a compare-and-set: the UPDATE only matches rows
+    # where uid AND status='pending', so concurrent calls with the same key
+    # (or a resumed call that finds the row already 'debited'/'completed') are
+    # rejected rather than creating a second debit.
 
-    def create_svrp_transfer(self, transfer_id, uid, amount):
-        """Write a durable 'pending' outbox record BEFORE the SVRP debit begins.
+    def _ensure_svrp_transfer_table(self, conn):
+        """Idempotent: create svrp_transfer_log if it was somehow absent."""
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS svrp_transfer_log (
+                transfer_id TEXT PRIMARY KEY,
+                uid         TEXT    NOT NULL,
+                amount      REAL    NOT NULL DEFAULT 0,
+                status      TEXT    NOT NULL DEFAULT 'pending',
+                created_at  TEXT    NOT NULL
+            )
+        ''')
 
-        Must be called before any SVRP CSV mutation so that crash recovery can
-        identify debits that need a compensating game-credit or rollback.
-        Returns True on success; raises on DB error.
+    def create_svrp_transfer(self, transfer_id, uid):
+        """Reserve a slot in the outbox with status='pending' and amount=0.
+
+        The actual amount is committed atomically when the debit completes via
+        mark_svrp_transfer_debited().  Using 0 as a placeholder prevents the
+        full-balance-transfer bug where parsed_amount is None at creation time.
+
+        Returns True if the row was inserted, False if the key already existed
+        (caller should treat False as a possible concurrent-request collision
+        and return an appropriate error rather than proceeding with a debit).
+        """
+        conn = self._conn()
+        with _db_lock:
+            self._ensure_svrp_transfer_table(conn)
+            result = conn.execute(
+                'INSERT OR IGNORE INTO svrp_transfer_log '
+                '(transfer_id, uid, amount, status, created_at) VALUES (?, ?, 0, ?, ?)',
+                (transfer_id, str(uid), 'pending',
+                 datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            )
+            conn.commit()
+            return result.rowcount == 1  # False → key already existed
+
+    def mark_svrp_transfer_debited(self, transfer_id, uid, actual_amount):
+        """CAS: pending → debited, storing the final amount atomically.
+
+        Returns True  if exactly one row matched (uid AND status='pending').
+        Returns False if the row is missing, owned by a different uid, or
+        already past 'pending' — the caller must not proceed with a game credit
+        and should log a critical error.
+        """
+        conn = self._conn()
+        with _db_lock:
+            result = conn.execute(
+                'UPDATE svrp_transfer_log SET status = ?, amount = ? '
+                'WHERE transfer_id = ? AND uid = ? AND status = ?',
+                ('debited', float(actual_amount), transfer_id, str(uid), 'pending')
+            )
+            conn.commit()
+            return result.rowcount == 1
+
+    def mark_svrp_transfer_status(self, transfer_id, uid, status):
+        """Set status unconditionally (for rolled_back / terminal states).
+        Requires uid match to prevent cross-user mutation.
         """
         conn = self._conn()
         with _db_lock:
             conn.execute(
-                'INSERT OR IGNORE INTO svrp_transfer_log '
-                '(transfer_id, uid, amount, status, created_at) VALUES (?, ?, ?, ?, ?)',
-                (transfer_id, str(uid), float(amount), 'pending',
-                 datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-            )
-            conn.commit()
-        return True
-
-    def update_svrp_transfer_status(self, transfer_id, status):
-        """Advance the outbox record to 'credits_debited' or 'completed'."""
-        conn = self._conn()
-        with _db_lock:
-            conn.execute(
-                'UPDATE svrp_transfer_log SET status = ? WHERE transfer_id = ?',
-                (status, transfer_id)
+                'UPDATE svrp_transfer_log SET status = ? '
+                'WHERE transfer_id = ? AND uid = ?',
+                (status, transfer_id, str(uid))
             )
             conn.commit()
 
     def get_svrp_transfer(self, transfer_id):
-        """Return the outbox record dict for crash-recovery/startup reconciliation."""
+        """Return the outbox record dict (all columns), or None if not found."""
         conn = self._conn()
+        self._ensure_svrp_transfer_table(conn)
         row = conn.execute(
             'SELECT * FROM svrp_transfer_log WHERE transfer_id = ?', (transfer_id,)
         ).fetchone()
         return dict(row) if row else None
 
-    # ── Balance operations ────────────────────────────────────────────────────
-
-    def add_balance(self, user_id, amount, idempotency_key=None):
-        """Add to balance (atomic transaction). Returns new balance.
-
-        idempotency_key is accepted for API compatibility but is no longer used
-        here.  SVRP transfer idempotency is now handled by the STATUS column in
-        svrp_transfer_log via add_balance_for_svrp_transfer().
-        """
-        uid = str(user_id)
-        amt = _money(amount)
-        conn = self._conn()
-        with _db_lock:
-            conn.execute(
-                'INSERT INTO users (telegram_id, game_balance) VALUES (?, ?) '
-                'ON CONFLICT(telegram_id) DO UPDATE SET game_balance = game_balance + ?',
-                (uid, float(amt), float(amt))
-            )
-            conn.commit()
-            row = conn.execute(
-                'SELECT game_balance FROM users WHERE telegram_id = ?', (uid,)
-            ).fetchone()
-            return _money_float(row[0]) if row and row[0] is not None else 0.0
-
     def add_balance_for_svrp_transfer(self, user_id, amount, transfer_id):
-        """Credit game balance exactly once for an SVRP transfer, using the
-        STATUS of the outbox record in svrp_transfer_log for idempotency.
+        """Credit game balance exactly once for an SVRP transfer.
 
-        This avoids the key-collision bug that arises when the same transfer_id
-        is used both for the outbox INSERT and a separate idempotency INSERT.
+        Uses the STATUS column in svrp_transfer_log for idempotency —
+        no separate INSERT means no key-collision with the pre-existing outbox row.
 
         Rules:
-        - status == 'completed'       → replay detected; return current balance without crediting
-        - status == 'pending' or
-          status == 'credits_debited' → apply credit + flip status to 'completed' atomically
-        - transfer_id not found       → raises ValueError (caller should abort)
+          status == 'debited'   → credit game_balance + CAS to 'completed' (atomically)
+          status == 'completed' → replay; return current balance without re-crediting
+          anything else         → raises ValueError (wrong state; caller should abort)
+          uid mismatch          → raises PermissionError (cross-user security check)
+          row missing           → raises ValueError
 
-        All SQLite errors OTHER than the expected state transitions propagate so
-        the transfer endpoint's compensating rollback can run.
+        All SQLite errors other than the handled states propagate so the endpoint's
+        compensating rollback can run.
         """
         uid = str(user_id)
         amt = _money(amount)
         conn = self._conn()
         with _db_lock:
             row = conn.execute(
-                'SELECT status FROM svrp_transfer_log WHERE transfer_id = ?',
+                'SELECT status, uid, amount FROM svrp_transfer_log WHERE transfer_id = ?',
                 (transfer_id,)
             ).fetchone()
-
             if row is None:
-                raise ValueError(
-                    f'SVRP transfer outbox record not found for transfer_id={transfer_id}'
+                raise ValueError(f'SVRP outbox record not found: transfer_id={transfer_id}')
+            db_status, db_uid, db_amount = row[0], row[1], row[2]
+            if db_uid != uid:
+                raise PermissionError(
+                    f'Transfer {transfer_id} belongs to uid={db_uid}, not {uid}'
                 )
-
-            status = row[0]
-            if status == 'completed':
-                # Already credited — idempotent replay
+            if db_status == 'completed':
+                # Idempotent replay — return current balance without crediting again
                 bal = conn.execute(
                     'SELECT game_balance FROM users WHERE telegram_id = ?', (uid,)
                 ).fetchone()
                 return _money_float(bal[0]) if bal and bal[0] is not None else 0.0
-
-            # status is 'pending' or 'credits_debited' — apply credit + mark complete atomically
+            if db_status != 'debited':
+                raise ValueError(
+                    f'Transfer {transfer_id} is in state={db_status!r}; '
+                    f'expected "debited" to apply game credit'
+                )
+            # CAS: credit game balance + mark completed in one transaction
             conn.execute(
                 'INSERT INTO users (telegram_id, game_balance) VALUES (?, ?) '
                 'ON CONFLICT(telegram_id) DO UPDATE SET game_balance = game_balance + ?',
                 (uid, float(amt), float(amt))
             )
             conn.execute(
-                'UPDATE svrp_transfer_log SET status = ? WHERE transfer_id = ?',
-                ('completed', transfer_id)
+                'UPDATE svrp_transfer_log SET status = ? '
+                'WHERE transfer_id = ? AND status = ?',
+                ('completed', transfer_id, 'debited')
             )
             conn.commit()
             bal = conn.execute(
