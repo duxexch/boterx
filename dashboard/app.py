@@ -2288,7 +2288,10 @@ def api_payment_methods():
 def api_add_payment_method():
     data = request.json
     methods = read_csv('payment_methods.csv')
-    fieldnames = get_fieldnames('payment_methods.csv', ['id','company_id','method_name','method_type','account_data','additional_info','status','created_date','icon'])
+    fieldnames = get_fieldnames('payment_methods.csv', ['id','company_id','method_name','method_type','account_data','additional_info','status','created_date','icon','available_for_games','currency'])
+    for extra in ('available_for_games', 'currency'):
+        if extra not in fieldnames:
+            fieldnames.append(extra)
     new_id = f"PM{str(int(datetime.now().timestamp()))[-6:]}"
     new_method = {
         'id': new_id,
@@ -2299,7 +2302,9 @@ def api_add_payment_method():
         'additional_info': data.get('additional_info', ''),
         'status': 'active',
         'created_date': datetime.now().strftime('%Y-%m-%d'),
-        'icon': data.get('icon', '💳')
+        'icon': data.get('icon', '💳'),
+        'available_for_games': 'yes' if data.get('available_for_games', 'yes') in ('yes', True, 'true', '1') else 'no',
+        'currency': data.get('currency', '')
     }
     append_csv('payment_methods.csv', new_method, fieldnames)
     log_action('add_payment_method', new_id)
@@ -2310,7 +2315,10 @@ def api_add_payment_method():
 @permission_required('manage_companies')
 def api_edit_payment_method(method_id):
     methods = read_csv('payment_methods.csv')
-    fieldnames = get_fieldnames('payment_methods.csv', ['id','company_id','method_name','method_type','account_data','additional_info','status','created_date','icon'])
+    fieldnames = get_fieldnames('payment_methods.csv', ['id','company_id','method_name','method_type','account_data','additional_info','status','created_date','icon','available_for_games','currency'])
+    for extra in ('available_for_games', 'currency'):
+        if extra not in fieldnames:
+            fieldnames.append(extra)
 
     if request.method == 'DELETE':
         methods = [m for m in methods if m.get('id') != method_id]
