@@ -1,7 +1,7 @@
 {
   "welcome_new": "👋 Welcome, {name}!\n\nYou are now connected to our financial services platform. We're glad to have you onboard.\n\nPlease complete your registration to get started.",
   "welcome_back": "👋 Welcome back, {name}! (ID: {customer_id})\n\nYour account is active and ready to use.\n\nHow can we help you today?",
-  "choose_service": "👋 Hello, {name}! (ID: {customer_id})\n\nPlease choose a service from the menu below:",
+  "choose_service": "💚 VEX — Buy & sell with other users, safely\n\n👋 Hello, {name}! (ID: {customer_id})\n\nPlease choose a service from the menu below:",
   "deposit": "💰 Deposit Request",
   "withdraw": "💸 Withdrawal Request",
   "my_requests": "📋 My Requests",

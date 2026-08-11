@@ -190,8 +190,8 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         self.translations = {
             # رسالة اختيار الخدمة الرئيسية للمستخدم
             'choose_service': {
-                'ar': "🏠 مرحباً بك في النظام المالي\n\n👤 العميل: {name}\n🆔 رقم العميل: {customer_id}\n\nاختر الخدمة المطلوبة:",
-                'en': "🏠 Welcome to the financial system\n\n👤 Customer: {name}\n🆔 Customer ID: {customer_id}\n\nChoose the required service:"
+                'ar': "💚 VEX — اشتي وبع مع المستخدمين الآخرين بأمان\n\n👤 العميل: {name}\n🆔 رقم العميل: {customer_id}\n\nاختر الخدمة المطلوبة:",
+                'en': "💚 VEX — Buy & sell with other users, safely\n\n👤 Customer: {name}\n🆔 Customer ID: {customer_id}\n\nChoose the required service:"
             },
             # تأكيد نجاح الإيداع للعميل
             'deposit_success': {
@@ -4031,7 +4031,7 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
 
     def get_current_theme(self):
         """الحصول على الثيم النشط حالياً"""
-        theme_name = self.get_setting('active_theme') or 'gold'
+        theme_name = self.get_setting('active_theme') or 'vex'
         if THEME_AVAILABLE:
             return get_theme(theme_name)
         return {}
@@ -4540,15 +4540,16 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
 
         if lang == 'ar':
             text = (
-                f"━━━━━━━━━━━━━━━━━━\n"
+                f"🟢━━━━━━━━━━━━━━━━🟢\n"
+                f"💚 <b>VEX</b> — اشتي وبع مع المستخدمين الآخرين بأمان\n"
+                f"🟢━━━━━━━━━━━━━━━━🟢\n\n"
                 f"👋 <b>أهلاً وسهلاً، {name}!</b>\n"
-                f"━━━━━━━━━━━━━━━━━━\n\n"
                 f"🆔 رقم العميل: <b><code>{customer_id}</code></b>\n"
             )
             if stats_bar:
                 text += f"\n{stats_bar}\n"
             text += (
-                f"\n━━━━━━━━━━━━━━━━━━\n"
+                f"\n🟢━━━━━━━━━━━━━━━━🟢\n"
                 f"👇 <b>اختر ما تريد من الأزرار بالأسفل</b>"
             )
         else:
@@ -4647,7 +4648,8 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             lang_codes = list(lang_names.keys())
 
             welcome_text = (
-                "👋 مرحباً بك في منصتنا المالية!\n\n"
+                "💚 <b>VEX</b> — اشتي وبع مع المستخدمين الآخرين بأمان\n"
+                "💚 <b>VEX</b> — Buy & sell with other users, safely\n\n"
                 "🌍 Please choose your language / اختر لغتك:\n"
                 "👇 اختر من القائمة أدناه"
             )
