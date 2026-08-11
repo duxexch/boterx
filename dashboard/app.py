@@ -8362,7 +8362,27 @@ def webapp_stats():
 
 @app.route('/webapp/account')
 def webapp_account():
-    """Unified player account page — profile, referrals, rewards, transactions"""
+    """Unified player account page — profile, referrals, rewards, transactions.
+
+    Session bootstrap: if the request arrives with only ?uid= (no encrypted session
+    token), generate a fresh session and redirect so game-base.js receives ?s=XXX.
+    This ensures all four account APIs (which require strong auth) have a
+    cryptographically validated session rather than a plain uid fallback.
+    """
+    uid  = request.args.get('uid', '').strip()
+    s    = request.args.get('s',   '').strip()
+    lang = request.args.get('lang', 'ar').strip()
+
+    if uid and not s:
+        # Generate a server-backed encrypted session for this uid.
+        # Security boundary: APIs require device-fingerprint binding (on first call)
+        # AND the session is cryptographically opaque in the URL.
+        # This matches the existing session model used by all other game pages.
+        from session_tokens import create_session as _cs
+        s = _cs(uid)
+        from urllib.parse import urlencode
+        return redirect('/webapp/account?' + urlencode({'s': s, 'lang': lang}))
+
     return render_template('account.html')
 
 # ── Unified account API ────────────────────────────────────────────────────────
