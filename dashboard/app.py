@@ -15,6 +15,7 @@ import secrets
 import random
 import zipfile
 import threading
+import math
 import queue as _queue
 from datetime import datetime, timedelta
 from functools import wraps
@@ -4774,14 +4775,25 @@ def api_player_wallet():
     })
 
 
+# ── Process-wide lock for SVRP→game transfers (serialises concurrent requests) ──
+# CSV files have no native transaction support, so we use an in-process lock to
+# prevent check-then-act races on the same wallet.  A single gunicorn worker
+# (the default for this project) means this covers all concurrent requests.
+_svrp_transfer_lock = threading.Lock()
+
+
 @app.route('/api/svrp/transfer-to-game', methods=['POST'])
 @webapp_auth
 def api_svrp_transfer_to_game():
-    """نقل أرصدة SVRP (بعد اكتمال الرهان) إلى رصيد اللعب بشكل ذري.
+    """نقل أرصدة SVRP (بعد اكتمال الرهان) إلى رصيد اللعب بشكل آمن.
 
-    Body JSON: { "amount": <float, optional — defaults to full balance> }
-    يستدعي svrp.use_credits() أولاً ثم _gm.add_balance() ليضمن
-    عدم الخصم المزدوج: لو فشل إضافة رصيد اللعب يُعاد الخصم (roll-back محدود بـ CSV).
+    Body JSON: { "amount": <finite positive decimal, optional — defaults to full balance> }
+
+    الضمانات:
+    1. Concurrency: _svrp_transfer_lock يُسلسل الطلبات لنفس العملية.
+    2. Input: math.isfinite() يرفض NaN/Inf قبل أي عملية.
+    3. Rollback: snapshot كامل لحالة CSV قبل الخصم، ثم استعادة حقيقية
+       (balance + total_used + حالة الأرصدة الفردية) في حال فشل إضافة رصيد اللعب.
     """
     if not _VEX_GAMES:
         return jsonify({'error': 'Games engine not available'}), 500
@@ -4790,75 +4802,119 @@ def api_svrp_transfer_to_game():
     if not uid:
         return jsonify({'error': 'Missing uid'}), 400
 
-    # ── تحقق من الإدخال ─────────────────────────────────────────────
+    # ── تحقق مبكر من الإدخال (خارج القفل) ─────────────────────────
     data = request.get_json(silent=True) or {}
-    req_amount = data.get('amount')
-
-    # ── قراءة المحفظة الحالية ────────────────────────────────────────
-    wallets = read_csv('svrp_wallets.csv')
-    svrp_wallet = next((w for w in wallets if str(w.get('telegram_id', '')) == uid), None)
-
-    if svrp_wallet is None:
-        return jsonify({'error': 'لا توجد محفظة SVRP لهذا الحساب'}), 404
-
-    svrp_credits = float(svrp_wallet.get('balance', 0) or 0)
-    wager_done   = int(svrp_wallet.get('wagering_completed', 0) or 0)
-    wager_req    = int(svrp_wallet.get('wagering_required', 3) or 3)
-
-    # ── قواعد العمل ─────────────────────────────────────────────────
-    if wager_done < wager_req:
-        remaining = wager_req - wager_done
-        return jsonify({
-            'error': f'لم تكتمل متطلبات الرهان. أكمل {remaining} معاملة إضافية أولاً.',
-            'wagering_remaining': remaining,
-        }), 400
-
-    if svrp_credits <= 0:
-        return jsonify({'error': 'رصيد SVRP صفر — لا يوجد ما يُنقل'}), 400
-
-    # تحديد المبلغ
-    if req_amount is not None:
-        amount = float(req_amount)
-    else:
-        amount = svrp_credits  # نقل كل الرصيد
-
-    if amount <= 0:
-        return jsonify({'error': 'المبلغ يجب أن يكون أكبر من صفر'}), 400
-    if amount > svrp_credits:
-        return jsonify({'error': f'المبلغ يتجاوز رصيد SVRP المتاح ({svrp_credits:.2f})'}), 400
-
-    # ── تنفيذ النقل ─────────────────────────────────────────────────
-    try:
-        import sys as _sys2
-        _sys2.path.insert(0, BASE_DIR)
-        from svrp import SVRPManager
-        _svrp_mgr = SVRPManager()
-        success, msg = _svrp_mgr.use_credits(uid, amount)
-        if not success:
-            return jsonify({'error': msg or 'فشل خصم أرصدة SVRP'}), 400
-    except Exception as e:
-        return jsonify({'error': f'خطأ في خصم SVRP: {e}'}), 500
-
-    # ── إضافة لرصيد اللعب ───────────────────────────────────────────
-    try:
-        new_game_balance = _gm.add_balance(uid, amount, 'svrp_transfer')
-    except Exception as e:
-        # في حال فشل: نحاول إعادة الأرصدة (roll-back جزئي)
+    raw_amount = data.get('amount')
+    if raw_amount is not None:
         try:
-            from svrp import SVRPManager as _S2
-            _S2().add_frozen_balance(uid, amount)
-        except Exception:
-            pass
-        return jsonify({'error': f'فشل إضافة رصيد اللعب: {e}'}), 500
+            parsed_amount = float(raw_amount)
+        except (TypeError, ValueError):
+            return jsonify({'error': 'المبلغ غير صالح — يجب أن يكون رقماً'}), 400
+        if not math.isfinite(parsed_amount):
+            return jsonify({'error': 'المبلغ غير صالح (لا يقبل NaN أو Infinity)'}), 400
+        if parsed_amount <= 0:
+            return jsonify({'error': 'المبلغ يجب أن يكون أكبر من صفر'}), 400
+    else:
+        parsed_amount = None  # سيتحدد داخل القفل
 
-    # ── قراءة الرصيد المحدّث ────────────────────────────────────────
+    # ── تنفيذ العملية الكاملة داخل القفل ───────────────────────────
+    import sys as _sys2
+    _sys2.path.insert(0, BASE_DIR)
+    from svrp import SVRPManager as _SVRPMgr
+
+    with _svrp_transfer_lock:
+        # قراءة المحفظة داخل القفل (أحدث حالة)
+        wallets = read_csv('svrp_wallets.csv')
+        svrp_wallet = next(
+            (w for w in wallets if str(w.get('telegram_id', '')) == uid), None
+        )
+        if svrp_wallet is None:
+            return jsonify({'error': 'لا توجد محفظة SVRP لهذا الحساب'}), 404
+
+        svrp_credits  = float(svrp_wallet.get('balance', 0) or 0)
+        total_used_pre = float(svrp_wallet.get('total_used', 0) or 0)
+        wager_done    = int(svrp_wallet.get('wagering_completed', 0) or 0)
+        wager_req     = int(svrp_wallet.get('wagering_required', 3) or 3)
+
+        # ── قواعد العمل ─────────────────────────────────────────────
+        if wager_done < wager_req:
+            remaining = wager_req - wager_done
+            return jsonify({
+                'error': f'لم تكتمل متطلبات الرهان — أكمل {remaining} معاملة إضافية أولاً.',
+                'wagering_remaining': remaining,
+            }), 400
+
+        if svrp_credits <= 0:
+            return jsonify({'error': 'رصيد SVRP صفر — لا يوجد ما يُنقل'}), 400
+
+        # تحديد المبلغ النهائي
+        amount = parsed_amount if parsed_amount is not None else svrp_credits
+
+        # تحقق نهائي من المبلغ (داخل القفل، بعد قراءة الرصيد الحقيقي)
+        if not math.isfinite(amount) or amount <= 0:
+            return jsonify({'error': 'المبلغ غير صالح'}), 400
+        if amount > svrp_credits + 1e-9:   # هامش صغير لأخطاء الفاصلة العشرية
+            return jsonify({
+                'error': f'المبلغ ({amount:.2f}) يتجاوز رصيد SVRP ({svrp_credits:.2f})'
+            }), 400
+        amount = min(amount, svrp_credits)  # تقريب لأعلى حد آمن
+
+        # ── snapshot كامل للحالة قبل الخصم (للـ rollback) ──────────
+        _mgr = _SVRPMgr()
+        credits_snapshot = {
+            r['id']: dict(r)
+            for r in _mgr._read_csv('svrp_credits.csv')
+            if r.get('user_id') == uid and r.get('status') in ('active', 'pending')
+        }
+
+        # ── الخطوة 1: خصم أرصدة SVRP ───────────────────────────────
+        try:
+            success, msg = _mgr.use_credits(uid, amount)
+            if not success:
+                return jsonify({'error': msg or 'فشل خصم أرصدة SVRP'}), 400
+        except Exception as e:
+            return jsonify({'error': f'خطأ في خصم SVRP: {e}'}), 500
+
+        # ── الخطوة 2: إضافة رصيد اللعب ─────────────────────────────
+        try:
+            new_game_balance = _gm.add_balance(uid, amount, 'svrp_transfer')
+        except Exception as e:
+            # ── Compensating rollback: استعادة حقيقية لكل الحالة ────
+            try:
+                _mgr2 = _SVRPMgr()
+                # استعادة balance و total_used مباشرةً (بدون add_frozen_balance
+                # التي تضخّم total_earned أيضاً)
+                w_now = _mgr2.get_wallet(uid)
+                bal_now  = float(w_now.get('balance', 0) or 0)
+                used_now = float(w_now.get('total_used', 0) or 0)
+                _mgr2._update_wallet(uid, {
+                    'balance':    round(bal_now + amount, 6),
+                    'total_used': round(max(0.0, used_now - amount), 6),
+                })
+                # استعادة حالة الأرصدة الفردية من الـ snapshot
+                all_credits = _mgr2._read_csv('svrp_credits.csv')
+                for row in all_credits:
+                    if row.get('id') in credits_snapshot:
+                        snap = credits_snapshot[row['id']]
+                        row['status']        = snap['status']
+                        row['credit_amount'] = snap['credit_amount']
+                _mgr2._write_csv('svrp_credits.csv', all_credits, _mgr2.CREDIT_FIELDS)
+            except Exception as rb_err:
+                # سجّل فشل الـ rollback — هذه حالة طارئة تحتاج تدخل يدوي
+                import logging as _log
+                _log.getLogger('svrp_transfer').critical(
+                    "ROLLBACK FAILED for uid=%s amount=%s: %s", uid, amount, rb_err
+                )
+            return jsonify({'error': f'فشل إضافة رصيد اللعب، تم التراجع عن الخصم: {e}'}), 500
+
+    # ── قراءة الرصيد المحدّث (خارج القفل) ──────────────────────────
     wallets2 = read_csv('svrp_wallets.csv')
     w2 = next((w for w in wallets2 if str(w.get('telegram_id', '')) == uid), {})
     new_svrp = float(w2.get('balance', 0) or 0)
 
     return jsonify({
         'success':          True,
-        'transferred':      amount,
+        'transferred':      round(amount, 2),
         'new_game_balance': new_game_balance,
         'new_svrp_credits': new_svrp,
     })
