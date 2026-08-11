@@ -32,6 +32,16 @@ import json
 import random
 import secrets
 import threading
+
+# ── Durable bet persistence (crash-safety) ──────────────────────────
+# Registers each debited bet in SQLite active_game_sessions so a server
+# restart mid-round triggers auto-refund via refund_expired_game_sessions().
+try:
+    from db_manager import (set_active_game_session as _ags_set,
+                            delete_active_game_session as _ags_del)
+except Exception:
+    def _ags_set(*a, **k): pass
+    def _ags_del(*a, **k): pass
 from datetime import datetime
 
 # ── Config ──────────────────────────────────────────────
@@ -413,6 +423,14 @@ def _game_loop():
                     bet['remaining'] = round(remaining, 2)
                     total_out += remaining
 
+            # All bets settled — clear durable rows (no refund needed)
+            for uid in list(_state['crash_bets'].keys()):
+                try: _ags_del(uid, 'crash_crash')
+                except Exception: pass
+            for uid in list(_state['rise_bets'].keys()):
+                try: _ags_del(uid, 'crash_rise')
+                except Exception: pass
+
             # Track house profit
             house_profit = total_in - total_out
             _state['house_profits'].append(house_profit)
@@ -483,6 +501,9 @@ def init_crash_engine(app, get_uid, get_gm, get_pf, is_pf, is_vex):
             bet_entry = {'amount': amount, 'target_x': target_x, 'exited': False,
                         'remaining': amount, 'payout': 0}
             bet_dict[uid] = bet_entry
+            # Durable: survive restart → auto-refund if round never settles
+            try: _ags_set(uid, 'crash_' + side, {'target_x': target_x}, amount)
+            except Exception: pass
 
         return jsonify({'success': True, 'balance_after': balance,
                         'side': side, 'target_x': target_x})
@@ -522,6 +543,8 @@ def init_crash_engine(app, get_uid, get_gm, get_pf, is_pf, is_vex):
             bet['remaining'] = round(remaining, 2)
             bet['payout'] = round(remaining, 2)
             name = _get_name(uid)
+            try: _ags_del(uid, 'crash_crash')
+            except Exception: pass
 
         return jsonify({'success': True, 'payout': round(remaining, 2),
                         'multiplier': round(mult, 2), 'balance_after': balance})
@@ -603,6 +626,13 @@ def _watchdog():
                                 try: _gm.add_balance(uid, rem)
                                 except: pass
                             bet['payout'] = round(rem, 2)
+                    # Clear durable rows — watchdog settled everything
+                    for uid in list(_state.get('crash_bets', {}).keys()):
+                        try: _ags_del(uid, 'crash_crash')
+                        except Exception: pass
+                    for uid in list(_state.get('rise_bets', {}).keys()):
+                        try: _ags_del(uid, 'crash_rise')
+                        except Exception: pass
         except Exception as e:
             pass  # watchdog must never crash
 

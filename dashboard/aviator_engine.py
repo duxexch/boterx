@@ -18,6 +18,16 @@ import json
 import random
 import secrets
 import threading
+
+# ── Durable bet persistence (crash-safety) ──────────────────────────
+# Registers each debited bet in SQLite active_game_sessions so a server
+# restart mid-round triggers auto-refund via refund_expired_game_sessions().
+try:
+    from db_manager import (set_active_game_session as _ags_set,
+                            delete_active_game_session as _ags_del)
+except Exception:
+    def _ags_set(*a, **k): pass
+    def _ags_del(*a, **k): pass
 import queue as _queue
 from datetime import datetime
 
@@ -264,6 +274,8 @@ def _game_loop():
                         bet['cash_mult'] = mult
                         total_distributed += payout
                         total_cashed_out += 1
+                        try: _ags_del(uid, 'aviator')
+                        except Exception: pass
                         _broadcast({'type': 'cashout', 'uid': uid,
                                    'name': _get_name(uid),
                                    'amount': round(payout, 2),
@@ -285,6 +297,10 @@ def _game_loop():
         # ── CRASHED ──
         with _lock:
             _state['phase'] = 'crashed'
+            # Round settled — losers lost legitimately, clear durable rows
+            for uid in list(_state['bets'].keys()):
+                try: _ags_del(uid, 'aviator')
+                except Exception: pass
             _state['history'].append(round(crash_pt, 2))
             if len(_state['history']) > 50:
                 _state['history'].pop(0)
@@ -376,6 +392,9 @@ def init_aviator_engine(app, get_uid, get_gm, get_pf, is_pf, is_vex):
                 return jsonify({'need_deposit': True, 'error': 'رصيد غير كافٍ'})
             _state['bets'][uid] = {'amount': amount, 'cashed_out': False,
                                    'cash_mult': 0, 'auto_val': auto_val}
+            # Durable: survive restart → auto-refund if round never settles
+            try: _ags_set(uid, 'aviator', {'auto_val': auto_val}, amount)
+            except Exception: pass
         return jsonify({'success': True, 'balance_after': balance})
 
     @app.route('/api/aviator/cashout', methods=['POST'])
@@ -404,6 +423,8 @@ def init_aviator_engine(app, get_uid, get_gm, get_pf, is_pf, is_vex):
             bet['cashed_out'] = True
             bet['cash_mult'] = mult
             name = _get_name(uid)
+            try: _ags_del(uid, 'aviator')
+            except Exception: pass
         _broadcast({'type': 'cashout', 'uid': uid, 'name': name,
                    'amount': round(payout, 2), 'multiplier': round(mult, 2)})
         return jsonify({'success': True, 'payout': round(payout, 2),

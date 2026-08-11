@@ -4036,11 +4036,14 @@ def api_lottery_draw(round_id):
     for r in rounds:
         if r.get('id') == round_id:
             lot_round = r
-            r['status'] = 'drawn'
             break
 
     if not lot_round:
         return jsonify({'error': 'Round not found'}), 404
+    # One-shot guard: a round can only be drawn once (prevents duplicate winners)
+    if lot_round.get('status') == 'drawn':
+        return jsonify({'error': 'تم سحب هذه الجولة بالفعل'}), 400
+    lot_round['status'] = 'drawn'
 
     write_csv('lottery_rounds.csv', rounds, round_fieldnames)
 
@@ -6229,11 +6232,20 @@ def api_plinko_start():
                 continue
             break
 
-    success, balance_after = _gm.deduct_balance(uid, bet_amount)
-    if not success:
-        return jsonify({'success': False, 'error': 'رصيد غير كافٍ', 'need_deposit': True, 'balance': 0})
-
+    # Atomic full settlement (bet AND payout in one SQLite transaction) —
+    # /end no longer credits anything, so the outcome is final here and a
+    # crash mid-animation can never strand the stake or the win.
     session_id = f"PLNK{str(int(datetime.now().timestamp()))[-8:]}"
+    _req_id = str((request.json or {}).get('request_id', '') or '')[:64]
+    _template = {'success': True, 'session_id': session_id, 'target_slot': target_slot,
+                 'multiplier': multiplier, 'payout': round(payout, 2), 'result': result,
+                 'balance_before': balance}
+    ok, stored, race_cached = _gm.settle_with_idempotency(uid, bet_amount, payout, _req_id, _template)
+    if race_cached:
+        return jsonify(race_cached)
+    if not ok:
+        return jsonify({'success': False, 'error': 'رصيد غير كافٍ', 'need_deposit': True, 'balance': 0})
+    balance_after = stored.get('balance_after', balance)
     _gm.algorithm.log_decision(
         session_id=session_id, user_id=uid, game_id='GAME007',
         base_chance=float(game.get('base_win_chance', 0.40)),
@@ -6255,20 +6267,14 @@ def api_plinko_end():
         return jsonify({'error': 'Games engine not available'}), 500
     data = request.json
     uid = get_request_uid()
-    multiplier = float(data.get('multiplier', 0))
-    payout = float(data.get('payout', 0))
-    result = data.get('result', 'lose')
-    bet_amount = float(data.get('bet_amount', 0))
-    session_id = data.get('session_id', '')
-    # Add payout to balance — the bet was ALREADY deducted at /start.
-    # Use settle_round(uid, bet=0, payout=payout) which applies net=payout atomically.
-    # This preserves ACID: the -bet at /start and +payout at /end are two atomic
-    # transactions covering distinct logical stages. anti-crash-safe.
-    if payout > 0:
-        _gm.settle_round(uid, 0, payout)  # net = payout - 0
-    _gm.tracker.log_session({'session_id': session_id, 'game_id': 'GAME007', 'user_id': uid, 'bet_amount': bet_amount, 'payout': payout, 'result': result, 'balance_before': 0, 'balance_after': _gm.get_balance(uid), 'multiplier': multiplier})
-    _gm.tracker.update_profile(uid, {'bet_amount': bet_amount, 'payout': payout, 'result': result, 'game_id': 'GAME007', 'balance_after': _gm.get_balance(uid)})
-    return jsonify({'success': True, 'result': result, 'payout': payout})
+    session_id = str(data.get('session_id', ''))[:32]
+    # SECURITY: the client-supplied payout is NEVER credited here. The full
+    # settlement (bet + payout) is done atomically at /start; /end only
+    # acknowledges the animation finished. Crediting client-reported numbers
+    # allowed arbitrary-payout forgery and replay.
+    _gm.tracker.update_profile(uid, {'bet_amount': 0, 'payout': 0, 'result': 'ack',
+                                     'game_id': 'GAME007', 'balance_after': _gm.get_balance(uid)})
+    return jsonify({'success': True, 'session_id': session_id})
 
 # ===== Mines — Frontend API (/api/mines/*) =====
 # Sessions keyed by uid so reveal/cashout don't need a session_id param.
@@ -6639,19 +6645,13 @@ def api_mines_cashout():
         game_id = state.get('game_id', '')
         payout = round(bet_amount * multiplier, 2)
 
-        # Mark consumed BEFORE crediting — prevents double-cashout even if credit fails
-        state['game_over'] = True
-        state['paid_out'] = True
-        sessions[str(uid)] = state
-        _save_mines_sessions(sessions)
-        # Clear durable session — payout is about to be credited; no refund needed
-        _del_ags(str(uid), 'mines')
-
-    # Credit-only: bet was pre-deducted in /new.
-    # credit_with_idempotency is atomic: credit + idempotency record in one SQLite transaction.
+    # CREDIT FIRST with a deterministic idempotency key — a crash after the
+    # credit can never lose the payout, and a retry (same key) can never
+    # double-credit. Only after the credit commits do we mark the session paid.
+    settle_key = request_id or f"mines_cashout_{game_id}"
     response_template = {'success': True, 'payout': payout,
                          'multiplier': multiplier, 'mine_cells': mine_positions}
-    ok, stored, race_cached = _gm.credit_with_idempotency(uid, payout, request_id, response_template)
+    ok, stored, race_cached = _gm.credit_with_idempotency(uid, payout, settle_key, response_template)
     if race_cached:
         return jsonify(race_cached)
     if not ok:
@@ -6660,12 +6660,15 @@ def api_mines_cashout():
     result = stored  # has balance_after
     new_balance = result.get('balance_after', 0)
 
-    # Persist result in session JSON too (for clients without request_id support)
+    # Now mark consumed + persist result + clear durable refund row
     with _mines_lock:
         sessions = _load_mines_sessions()
         if str(uid) in sessions:
+            sessions[str(uid)]['game_over'] = True
+            sessions[str(uid)]['paid_out'] = True
             sessions[str(uid)]['cashout_result'] = result
             _save_mines_sessions(sessions)
+        _del_ags(str(uid), 'mines')
 
     _gm.tracker.log_session({
         'session_id': game_id, 'game_id': 'GAME006',
@@ -7553,16 +7556,19 @@ def api_lottery_buy():
         'prize_pool': round(state.get('prize_pool', 0) + total_cost * 0.8, 2),
         'tickets_sold': state.get('tickets_sold', 0) + count,
     }
-    # Atomic: deduct cost + store idempotency record in one SQLite transaction
-    ok, stored, race_cached = _gm.settle_with_idempotency(uid, total_cost, 0, request_id, template)
-    if race_cached:
-        return jsonify(race_cached)
-    if not ok:
-        return jsonify({'success': False, 'error': 'رصيد غير كافٍ', 'need_deposit': True, 'balance': balance})
-
-    # Persist tickets to lottery state only after successful settlement
+    # Hold the lottery lock across settle + persist so concurrent buys can
+    # never race on stale state (double debit with one ticket set lost), and
+    # the debit→ticket-save window is as small as possible.
     with _lottery_lock:
         state = _load_lottery_state()
+        if state.get('drawn'):
+            return jsonify({'error': 'الجولة انتهت، جولة جديدة قادمة'}), 400
+        # Atomic: deduct cost + store idempotency record in one SQLite transaction
+        ok, stored, race_cached = _gm.settle_with_idempotency(uid, total_cost, 0, request_id, template)
+        if race_cached:
+            return jsonify(race_cached)
+        if not ok:
+            return jsonify({'success': False, 'error': 'رصيد غير كافٍ', 'need_deposit': True, 'balance': balance})
         for ticket in new_tickets:
             state.setdefault('tickets', []).append(ticket)
         state['tickets_sold'] = state.get('tickets_sold', 0) + count
