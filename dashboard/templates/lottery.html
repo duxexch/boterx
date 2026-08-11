@@ -135,7 +135,7 @@ body{overscroll-behavior:none}
   <div style="font-size:40px">🎟️</div>
   <div style="color:var(--text-dim);font-size:14px">جارٍ التحميل...</div>
 </div>
-<script src="/static/js/game-base.js?v=20260811"></script>
+<script src="/static/js/game-base.js?v=20260812a"></script>
 <script>
 'use strict';
 var ticketCount = 1;
@@ -180,7 +180,10 @@ function changeCount(delta) {
 function fmtAmount(n) { return parseFloat(n || 0).toLocaleString(); }
 
 function loadState() {
-  apiFetch(BASE + '/api/lottery/state').then(function(r) { return r.json(); }).then(function(d) {
+  apiFetch(BASE + '/api/lottery/state').then(function(r) {
+    if (r.status === 401 || r.status === 403) { if (window._stopLotteryPolls) window._stopLotteryPolls(); throw new Error('unauthorized'); }
+    return r.json();
+  }).then(function(d) {
     var ci = document.getElementById('connIndicator'); if (ci) ci.textContent = '🟢';
 
     if (d.draw_time) startTimer(d.draw_time);
@@ -345,8 +348,9 @@ document.getElementById('loading').style.display = 'none';
 initDrawTabs();
 loadBalance();
 loadState();
-setInterval(loadState, 15000);
-setInterval(loadBalance, 10000);
+var _statePoll = setInterval(loadState, 15000);
+var _balPoll = setInterval(loadBalance, 10000);
+window._stopLotteryPolls = function() { clearInterval(_statePoll); clearInterval(_balPoll); };
 setTimeout(injectDepositButton, 100);
 </script>
 </body>

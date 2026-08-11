@@ -520,6 +520,11 @@ const Notifier = {
     async check() {
         try {
             const res = await fetch('/api/stats');
+            if (res.status === 401 || res.status === 403) {
+                // Not an authenticated admin page — stop polling (avoids 401 spam)
+                if (this._timer) { clearInterval(this._timer); this._timer = null; }
+                return;
+            }
             const stats = await res.json();
             const p = stats.transactions?.pending || 0, m = stats.matches?.pending || 0;
             const c = stats.complaints?.open || 0, tr2 = stats.trading?.pending_orders || 0;
@@ -527,6 +532,16 @@ const Notifier = {
             const lt = stats.lottery?.tickets_sold || 0, ws = stats.wheel?.total_spins || 0;
             const nu = stats.users?.today || 0;
 
+            if (!this._primed) {
+                // First check after page load: record the baseline silently so
+                // pre-existing pending items don't re-trigger the big popup on
+                // every navigation. Only NEW events (count increases) notify.
+                this._primed = true;
+                this.lastPendingCount = p; this.lastMatchCount = m;
+                this.lastComplaintsCount = c; this.lastTradingCount = tr2;
+                this.lastSvrpCount = sv; this.lastLotteryCount = lt;
+                this.lastWheelCount = ws; this.lastNewUsers = nu;
+            }
             if (p > this.lastPendingCount && this.lastPendingCount >= 0) this.notify('📥 ' + (p - this.lastPendingCount) + ' ' + tr('pending_transactions'), 'new_txn');
             if (m > this.lastMatchCount && this.lastMatchCount >= 0) this.notify('🔄 ' + (m - this.lastMatchCount) + ' ' + tr('matching'), 'new_match');
             if (c > this.lastComplaintsCount && this.lastComplaintsCount >= 0) this.notify('📢 ' + (c - this.lastComplaintsCount) + ' ' + tr('complaints'), 'new_complaint');
@@ -674,7 +689,7 @@ document.addEventListener('keydown', (e) => {
 document.addEventListener('DOMContentLoaded', () => {
     Notifier.init();
     requestNotificationPermission();
-    setInterval(() => Notifier.check(), 5000);
+    Notifier._timer = setInterval(() => Notifier.check(), 5000);
     Notifier.check();
     document.addEventListener('click', requestNotificationPermission, { once: true });
 });

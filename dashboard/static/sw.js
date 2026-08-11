@@ -3,7 +3,7 @@
  * Cache-first for static assets; network-first for API and game routes.
  */
 
-const CACHE_VER  = 'vex-v1';
+const CACHE_VER  = 'vex-v2';
 const STATIC_EXT = ['.css','.js','.png','.jpg','.jpeg','.gif','.svg','.woff2','.ico'];
 
 const PRECACHE = [

@@ -1,2 +1,5 @@
-python-dotenv
+flask
+flask-bcrypt
 openpyxl
+paramiko
+python-dotenv

@@ -59,7 +59,7 @@
                     <template x-for="c in companies" :key="c.id">
                         <tr class="border-b border-slate-700/50 hover:bg-slate-700/30 transition">
                             <td class="px-4 py-3 text-center">
-                                <img x-show="isImgIcon(c.icon)" :src="c.icon" class="w-9 h-9 rounded-lg object-cover inline-block border border-slate-600" alt="">
+                                <img x-show="isImgIcon(c.icon)" :src="isImgIcon(c.icon) ? c.icon : null" class="w-9 h-9 rounded-lg object-cover inline-block border border-slate-600" alt="">
                                 <span x-show="!isImgIcon(c.icon)" class="text-2xl" x-text="c.icon || '🏢'"></span>
                             </td>
                             <td class="px-4 py-3 font-medium" x-text="c.name"></td>
@@ -142,7 +142,7 @@
                     <label class="block text-sm text-slate-400 mb-1">الأيقونة</label>
                     <div class="flex items-center gap-3">
                         <div class="w-12 h-12 rounded-xl bg-slate-700 border border-slate-600 flex items-center justify-center overflow-hidden shrink-0">
-                            <img x-show="isImgIcon(form.icon)" :src="form.icon" class="w-full h-full object-cover" alt="">
+                            <img x-show="isImgIcon(form.icon)" :src="isImgIcon(form.icon) ? form.icon : null" class="w-full h-full object-cover" alt="">
                             <span x-show="!isImgIcon(form.icon)" class="text-2xl" x-text="form.icon || '🏢'"></span>
                         </div>
                         <div class="flex-1 space-y-2">

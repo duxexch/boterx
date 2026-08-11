@@ -20,9 +20,9 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='vendor/fontawesome.min.css') }}">
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
     <script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/app.js') }}?v=20260810c" defer></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}?v=20260811b" defer></script>
     <script src="{{ url_for('static', filename='vendor/alpine.min.js') }}" defer></script>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=20260811b">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/fx.css') }}">
     <!-- PWA & SEO -->
     <link rel="manifest" href="/static/manifest.json">
@@ -76,6 +76,7 @@
             [dir="rtl"] .main-wrap.full { margin-right: 0; }
             [dir="ltr"] .main-wrap.full { margin-left: 0; }
         }
+        .sidebar-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 40; }
         [dir="rtl"] .notif-dd { left: 0; right: auto; }
         [dir="ltr"] .notif-dd { right: 0; left: auto; }
     </style>
@@ -86,7 +87,7 @@
 <div id="toastContainer" style="position:fixed;top:0;inset-inline-end:0;z-index:9999;pointer-events:none"></div>
 
 <!-- Mobile sidebar overlay -->
-<div x-show="mobileSidebar" x-transition.opacity class="fixed inset-0 bg-black/60 z-40 lg:hidden" style="display:none" @click="mobileSidebar = false"></div>
+<div x-show="mobileSidebar" x-transition.opacity class="sidebar-backdrop lg:hidden" style="display:none" @click="mobileSidebar = false"></div>
 
 <!-- Sidebar -->
 <aside class="vex-sidebar fixed top-0 h-screen w-64 bg-slate-800 border-slate-700 transition-transform duration-300 z-50 flex flex-col"
@@ -472,7 +473,7 @@ function baseApp() {
 
         startLiveStats() {
             this.fetchStats();
-            setInterval(() => this.fetchStats(), 10000);
+            this._statsTimer = setInterval(() => this.fetchStats(), 10000);
             // SSE for live stats (fallback to polling if not available)
             if (typeof EventSource !== 'undefined') {
                 try {
@@ -496,6 +497,11 @@ function baseApp() {
         async fetchStats() {
             try {
                 const res = await fetch('/api/stats');
+                if (res.status === 401 || res.status === 403) {
+                    if (this._statsTimer) { clearInterval(this._statsTimer); this._statsTimer = null; }
+                    if (this.liveSource) { this.liveSource.close(); this.liveSource = null; }
+                    return;
+                }
                 if (!res.ok) return;
                 const data = await res.json();
                 this.processLiveStats(data);

@@ -235,6 +235,11 @@ function haptic(t = 'light') {
 async function loadBalance() {
   try {
     const r = await apiFetch(`${BASE}/api/wallet/balance`);
+    if (r.status === 401 || r.status === 403) {
+      // Not a game-authenticated user (e.g. admin viewing the page) — stop polling
+      if (window._stopLotteryPolls) window._stopLotteryPolls();
+      return;
+    }
     const d = await r.json();
     const balEl = document.getElementById('bal');
     const curEl = document.getElementById('cur');

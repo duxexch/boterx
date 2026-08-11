@@ -991,12 +991,17 @@ def _add_security_headers(response):
         response.headers.setdefault(
             'Content-Security-Policy',
             "default-src 'self' https: data:; "
-            "script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com "
-            "https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
+            # 'unsafe-eval' is required: Alpine.js and the Tailwind runtime
+            # compile expressions with new Function(). Without it every page's
+            # JS silently dies (no data, broken sidebar, stuck panels).
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
             "style-src 'self' 'unsafe-inline' https:; "
             "img-src 'self' data: https:; "
-            "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com;"
+            "font-src 'self' data: https://fonts.gstatic.com;"
         )
+    # Allow the service worker (served from /static/) to control scope '/'
+    if request.path == '/static/sw.js':
+        response.headers['Service-Worker-Allowed'] = '/'
     return response
 
 
