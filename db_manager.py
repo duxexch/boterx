@@ -496,6 +496,61 @@ class GameDB:
             'wagering_required': 3, 'wagering_completed': 0,
         }
 
+    def upsert_svrp_wallet_balance(self, uid, frozen_balance, total_earned,
+                                   total_used, wagering_required, wagering_completed):
+        """Mirror a CSV wallet row into the authoritative SQLite wallet table.
+
+        Called inside svrp_lock() by SVRPManager._update_wallet so that every
+        CSV mutation is immediately reflected in SQLite.  Uses INSERT ... ON CONFLICT
+        UPDATE so it is safe to call repeatedly.
+        """
+        conn = self._conn()
+        self._ensure_svrp_transfer_table(conn)
+        with _db_lock:
+            conn.execute(
+                'INSERT INTO svrp_wallet_balance '
+                '(uid, frozen_balance, total_earned, total_used, '
+                ' wagering_required, wagering_completed) '
+                'VALUES (?, ?, ?, ?, ?, ?) '
+                'ON CONFLICT(uid) DO UPDATE SET '
+                'frozen_balance     = excluded.frozen_balance, '
+                'total_earned       = excluded.total_earned, '
+                'total_used         = excluded.total_used, '
+                'wagering_required  = excluded.wagering_required, '
+                'wagering_completed = excluded.wagering_completed',
+                (str(uid), float(frozen_balance), float(total_earned),
+                 float(total_used), int(wagering_required), int(wagering_completed))
+            )
+            conn.commit()
+
+    def migrate_svrp_wallets_from_csv(self, rows):
+        """Idempotent one-time backfill: INSERT OR IGNORE each CSV wallet row.
+
+        Called at module load.  Existing SQLite rows are not overwritten
+        (INSERT OR IGNORE) so any mutations applied via upsert_svrp_wallet_balance
+        after the initial backfill are never silently reverted.
+        """
+        conn = self._conn()
+        self._ensure_svrp_transfer_table(conn)
+        with _db_lock:
+            for row in rows:
+                uid = str(row.get('telegram_id', '') or '')
+                if not uid:
+                    continue
+                conn.execute(
+                    'INSERT OR IGNORE INTO svrp_wallet_balance '
+                    '(uid, frozen_balance, total_earned, total_used, '
+                    ' wagering_required, wagering_completed) '
+                    'VALUES (?, ?, ?, ?, ?, ?)',
+                    (uid,
+                     float(row.get('balance', 0) or 0),
+                     float(row.get('total_earned', 0) or 0),
+                     float(row.get('total_used', 0) or 0),
+                     int(row.get('wagering_required', 3) or 3),
+                     int(row.get('wagering_completed', 0) or 0))
+                )
+            conn.commit()
+
     def get_outstanding_debited_transfer(self, uid):
         """Return the transfer_id of any 'debited' transfer for uid, or None.
 

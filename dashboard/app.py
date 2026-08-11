@@ -4774,16 +4774,17 @@ def api_player_wallet():
     user_info = _gm.get_user_info(uid)
     currency = user_info.get('currency', 'EGP')
 
-    # ── محفظة SVRP (CSV) ────────────────────────────────────────────
+    # ── محفظة SVRP (SQLite authoritative for financial fields) ─────────
+    _svrp_sql = _gm.get_svrp_frozen_balance(uid)
+    svrp_credits    = float(_svrp_sql.get('frozen_balance', 0) or 0)
+    total_earned    = float(_svrp_sql.get('total_earned', 0) or 0)
+    total_consumed  = float(_svrp_sql.get('total_used', 0) or 0)
+    wager_required  = int(_svrp_sql.get('wagering_required', 3) or 3)
+    wager_done      = int(_svrp_sql.get('wagering_completed', 0) or 0)
+    # pending_balance still from CSV (not a financial field, no transfer risk)
     wallets = read_csv('svrp_wallets.csv')
     svrp_wallet = next((w for w in wallets if str(w.get('telegram_id', '')) == uid), {})
-
-    svrp_credits    = float(svrp_wallet.get('balance', 0) or 0)        # مجمدة/قابلة للاستخدام
     pending_balance = float(svrp_wallet.get('pending_balance', 0) or 0) # ينتظر الأصدقاء
-    total_earned    = float(svrp_wallet.get('total_earned', 0) or 0)    # تراكمي تاريخي
-    total_consumed  = float(svrp_wallet.get('total_used', 0) or 0)      # تراكمي تاريخي (صُرف)
-    wager_required  = int(svrp_wallet.get('wagering_required', 3) or 3)
-    wager_done      = int(svrp_wallet.get('wagering_completed', 0) or 0)
     wager_remaining = max(0, wager_required - wager_done)
     wagering_done   = wager_done >= wager_required  # True = يمكن نقل الرصيد
     credits_spendable = wagering_done and svrp_credits > 0

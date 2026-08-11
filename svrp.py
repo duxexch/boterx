@@ -19,6 +19,28 @@ from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
+# ==================== One-time CSV→SQLite migration ====================
+# Runs once at module load to backfill any existing svrp_wallets.csv rows
+# into svrp_wallet_balance so the SQLite table is never empty for live systems.
+# Uses INSERT OR IGNORE so rows that were already synced are not overwritten.
+def _migrate_svrp_wallets_once():
+    try:
+        import csv as _csv
+        _wallet_csv = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'svrp_wallets.csv')
+        if not os.path.exists(_wallet_csv):
+            return
+        with open(_wallet_csv, 'r', encoding='utf-8-sig') as _f:
+            _rows = list(_csv.DictReader(_f))
+        if not _rows:
+            return
+        from game_engine import GameManager as _GM
+        _GM().migrate_svrp_wallets_from_csv(_rows)
+        logger.info(f'SVRP wallet migration: {len(_rows)} rows backfilled to SQLite')
+    except Exception as _e:
+        logger.warning(f'SVRP wallet SQLite migration skipped: {_e}')
+
+_migrate_svrp_wallets_once()
+
 # ==================== SVRP cross-process lock ====================
 # All writes to svrp_wallets.csv and svrp_credits.csv MUST go through
 # svrp_lock() so that concurrent requests (threads in the dashboard
@@ -262,16 +284,24 @@ class SVRPManager:
         return wallet
 
     def _update_wallet(self, telegram_id, updates):
-        """تحديث محفظة مستخدم — القراءة والكتابة داخل svrp_lock."""
+        """تحديث محفظة مستخدم — القراءة والكتابة داخل svrp_lock.
+
+        After writing the CSV, mirrors the updated financial fields to the
+        authoritative svrp_wallet_balance SQLite table so that all mutations
+        (add_frozen_balance, increment_wagering, use_credits, …) are
+        immediately reflected in SQLite without requiring a separate call.
+        """
         tid = str(telegram_id)
         with svrp_lock():
             rows = self._read_csv('svrp_wallets.csv')
             found = False
+            updated_row = None
             for row in rows:
                 if row['telegram_id'] == tid:
                     for k, v in updates.items():
                         if k in row:
                             row[k] = str(v)
+                    updated_row = row
                     found = True
                     break
             if not found:
@@ -282,8 +312,28 @@ class SVRPManager:
                         for k, v in updates.items():
                             if k in row:
                                 row[k] = str(v)
+                        updated_row = row
                         break
-            return self._write_csv('svrp_wallets.csv', rows, self.WALLET_FIELDS)
+            ok = self._write_csv('svrp_wallets.csv', rows, self.WALLET_FIELDS)
+            # Mirror to SQLite (authoritative for financial decisions) within the
+            # same svrp_lock scope so reads and writes are consistent.
+            if ok and updated_row is not None:
+                try:
+                    from game_engine import GameManager as _GM
+                    _gm_instance = _GM()
+                    _gm_instance.upsert_svrp_wallet_balance(
+                        tid,
+                        float(updated_row.get('balance', 0) or 0),
+                        float(updated_row.get('total_earned', 0) or 0),
+                        float(updated_row.get('total_used', 0) or 0),
+                        int(updated_row.get('wagering_required', 3) or 3),
+                        int(updated_row.get('wagering_completed', 0) or 0),
+                    )
+                except Exception as _me:
+                    logger.warning(
+                        f'SQLite wallet mirror failed for uid={tid}: {_me}'
+                    )
+            return ok
 
     def add_frozen_balance(self, telegram_id, amount):
         """إضافة رصيد مجمد للمحفظة — القراءة والكتابة داخل svrp_lock."""

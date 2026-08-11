@@ -378,6 +378,20 @@ class GameManager:
 
     # ── SQLite-only SVRP wallet operations ──────────────────────────────────
 
+    def upsert_svrp_wallet_balance(self, uid, frozen_balance, total_earned,
+                                   total_used, wagering_required, wagering_completed):
+        """Mirror a CSV wallet row to SQLite (called from _update_wallet)."""
+        if _USE_SQLITE:
+            _db.upsert_svrp_wallet_balance(
+                uid, frozen_balance, total_earned, total_used,
+                wagering_required, wagering_completed
+            )
+
+    def migrate_svrp_wallets_from_csv(self, rows):
+        """Idempotent backfill: INSERT OR IGNORE CSV rows into SQLite."""
+        if _USE_SQLITE:
+            _db.migrate_svrp_wallets_from_csv(rows)
+
     def get_svrp_frozen_balance(self, uid):
         """Return SQLite authoritative frozen-balance dict for uid."""
         if _USE_SQLITE:
