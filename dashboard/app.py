@@ -8461,6 +8461,32 @@ def api_player_stats():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/auth/create-token', methods=['POST', 'GET'])
+def api_auth_create_token():
+    """Create a session token for a given uid.
+
+    Called by the bot before opening the WebApp so the user never needs
+    a plain uid in the URL.  Returns {'s': token} on success.
+    """
+    try:
+        uid = ''
+        if request.method == 'POST':
+            try:
+                uid = (request.get_json(silent=True) or {}).get('uid', '')
+            except Exception:
+                pass
+        if not uid:
+            uid = request.args.get('uid', '').strip()
+        if not uid:
+            return jsonify({'error': 'uid required', 'code': 'NO_UID'}), 400
+        uid = str(uid).strip()
+        from session_tokens import create_session as _cs
+        token = _cs(uid)
+        return jsonify({'s': token, 'uid': uid, 'ok': True})
+    except Exception as e:
+        return jsonify({'error': str(e), 'code': 'SESSION_ERROR'}), 500
+
+
 @app.route('/webapp/stats')
 def webapp_stats():
     """Player statistics page — WebApp (kept for backward compat; account page replaces it)"""
