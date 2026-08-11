@@ -361,10 +361,13 @@ class GameManager:
             return _db.create_svrp_transfer(transfer_id, uid)
         return True
 
-    def mark_svrp_transfer_debited(self, transfer_id, uid, actual_amount):
-        """CAS pending→debited with the actual amount. Returns True on success."""
+    def mark_svrp_transfer_debited(self, transfer_id, uid,
+                                   actual_amount, pre_debit_svrp_balance):
+        """CAS pending→debited with actual amount + pre-debit balance. Returns True on success."""
         if _USE_SQLITE:
-            return _db.mark_svrp_transfer_debited(transfer_id, uid, actual_amount)
+            return _db.mark_svrp_transfer_debited(
+                transfer_id, uid, actual_amount, pre_debit_svrp_balance
+            )
         return True  # CSV fallback: no idempotency
 
     def mark_svrp_transfer_status(self, transfer_id, uid, status):

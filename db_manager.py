@@ -120,11 +120,12 @@ def _init_db():
             -- consistent even across crashes.  On replay the INSERT fails with
             -- IntegrityError and the balance update is skipped.
             CREATE TABLE IF NOT EXISTS svrp_transfer_log (
-                transfer_id TEXT PRIMARY KEY,
-                uid         TEXT    NOT NULL,
-                amount      REAL    NOT NULL,
-                status      TEXT    NOT NULL DEFAULT 'completed',
-                created_at  TEXT    NOT NULL
+                transfer_id           TEXT PRIMARY KEY,
+                uid                   TEXT    NOT NULL,
+                amount                REAL    NOT NULL DEFAULT 0,
+                status                TEXT    NOT NULL DEFAULT 'pending',
+                pre_debit_svrp_balance REAL,
+                created_at            TEXT    NOT NULL
             );
             CREATE INDEX IF NOT EXISTS idx_svrp_tlog_uid ON svrp_transfer_log(uid);
 
@@ -392,16 +393,25 @@ class GameDB:
     # rejected rather than creating a second debit.
 
     def _ensure_svrp_transfer_table(self, conn):
-        """Idempotent: create svrp_transfer_log if it was somehow absent."""
+        """Idempotent: create svrp_transfer_log if absent; add columns if upgrading."""
         conn.execute('''
             CREATE TABLE IF NOT EXISTS svrp_transfer_log (
-                transfer_id TEXT PRIMARY KEY,
-                uid         TEXT    NOT NULL,
-                amount      REAL    NOT NULL DEFAULT 0,
-                status      TEXT    NOT NULL DEFAULT 'pending',
-                created_at  TEXT    NOT NULL
+                transfer_id           TEXT PRIMARY KEY,
+                uid                   TEXT    NOT NULL,
+                amount                REAL    NOT NULL DEFAULT 0,
+                status                TEXT    NOT NULL DEFAULT 'pending',
+                pre_debit_svrp_balance REAL,
+                created_at            TEXT    NOT NULL
             )
         ''')
+        # Migration: add pre_debit_svrp_balance if the table already exists without it
+        try:
+            conn.execute(
+                'ALTER TABLE svrp_transfer_log ADD COLUMN pre_debit_svrp_balance REAL'
+            )
+            conn.commit()
+        except Exception:
+            pass  # column already exists
 
     def create_svrp_transfer(self, transfer_id, uid):
         """Reserve a slot in the outbox with status='pending' and amount=0.
@@ -426,20 +436,28 @@ class GameDB:
             conn.commit()
             return result.rowcount == 1  # False → key already existed
 
-    def mark_svrp_transfer_debited(self, transfer_id, uid, actual_amount):
-        """CAS: pending → debited, storing the final amount atomically.
+    def mark_svrp_transfer_debited(self, transfer_id, uid,
+                                   actual_amount, pre_debit_svrp_balance):
+        """CAS: pending → debited, storing the final amount and pre-debit CSV balance.
+
+        pre_debit_svrp_balance is the SVRP wallet balance read BEFORE the CSV
+        debit.  It is stored so that crash-recovery can compare the current CSV
+        balance against the expected post-debit balance and determine whether
+        the CSV debit actually occurred.
 
         Returns True  if exactly one row matched (uid AND status='pending').
         Returns False if the row is missing, owned by a different uid, or
         already past 'pending' — the caller must not proceed with a game credit
-        and should log a critical error.
+        or CSV debit.
         """
         conn = self._conn()
         with _db_lock:
             result = conn.execute(
-                'UPDATE svrp_transfer_log SET status = ?, amount = ? '
+                'UPDATE svrp_transfer_log '
+                'SET status = ?, amount = ?, pre_debit_svrp_balance = ? '
                 'WHERE transfer_id = ? AND uid = ? AND status = ?',
-                ('debited', float(actual_amount), transfer_id, str(uid), 'pending')
+                ('debited', float(actual_amount), float(pre_debit_svrp_balance),
+                 transfer_id, str(uid), 'pending')
             )
             conn.commit()
             return result.rowcount == 1
