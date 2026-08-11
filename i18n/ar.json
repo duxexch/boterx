@@ -1368,5 +1368,6 @@
   "game_wallet_rejected": "❌ تم رفض طلبك — تم إعادة الرصيد",
   "game_wallet_manual_entry": "✍️ أو اكتب وسيلة دفع يدوياً",
   "game_wallet_save_permanent": "حفظ كوسيلة دفع دائمة",
-  "game_wallet_confirm_withdrawal": "💸 تأكيد السحب"
+  "game_wallet_confirm_withdrawal": "💸 تأكيد السحب",
+  "account_restored": "💚 VEX — اشتي وبع مع المستخدمين الآخرين بأمان\n\n✅ تم استرجاع حسابك بنجاح!\n\n👤 الاسم: {name}\n📱 الهاتف: {phone}\n🆔 رقم العميل: {customer_id}\n📅 تاريخ التسجيل: {date}\n\n💡 تم ربط حسابك بهذا الجهاز. جميع بياناتك محفوظة."
 }

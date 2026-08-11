@@ -1368,5 +1368,6 @@
   "game_wallet_rejected": "❌ Request rejected — balance refunded",
   "game_wallet_manual_entry": "✍️ Or enter payment method manually",
   "game_wallet_save_permanent": "Save as permanent payment method",
-  "game_wallet_confirm_withdrawal": "💸 Confirm Withdrawal"
+  "game_wallet_confirm_withdrawal": "💸 Confirm Withdrawal",
+  "account_restored": "💚 VEX — Buy & sell with other users, safely\n\n✅ Your account has been restored!\n\n👤 Name: {name}\n📱 Phone: {phone}\n🆔 Customer ID: {customer_id}\n📅 Registered: {date}\n\n💡 Your account is now linked to this device. All your data is safe."
 }

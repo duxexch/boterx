@@ -4841,13 +4841,10 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                 user = self.find_user(user_id)
                 lang = user.get('language', 'ar')
                 
-                welcome_text = (
-                    f"✅ تم استرجاع حسابك بنجاح!\n\n"
-                    f"👤 الاسم: {user['name']}\n"
-                    f"📱 الهاتف: {user['phone']}\n"
-                    f"🆔 رقم العميل: {user['customer_id']}\n"
-                    f"📅 تاريخ التسجيل: {user.get('date', '')}\n\n"
-                    f"💡 تم ربط حسابك بهذا الجهاز. جميع بياناتك محفوظة."
+                welcome_text = self.tr(
+                    'account_restored', lang,
+                    name=user['name'], phone=user['phone'],
+                    customer_id=user['customer_id'], date=user.get('date', '')
                 )
                 self.send_message(message['chat']['id'], welcome_text, self.main_keyboard(lang, user_id))
                 del self.user_states[user_id]
