@@ -1134,8 +1134,22 @@ def home():
             user_info = _gm.get_user_info(uid) or {}
             user_currency = user_info.get('currency', 'EGP')
     except: pass
+
+    # Generate a device-bound encrypted session token for this user so that
+    # the /webapp/account and other Mini App pages can authenticate their API
+    # calls without relying on the plain uid fallback (weak auth).
+    # Safe: uid comes from the trusted Flask login session (@login_required).
+    s_token = ''
+    if uid:
+        try:
+            from session_tokens import create_session as _cs
+            s_token = _cs(uid)
+        except Exception:
+            pass
+
     return render_template('home.html', active_page='home', user_name=user_name,
-                         user_balance=user_balance, user_currency=user_currency, uid=uid)
+                         user_balance=user_balance, user_currency=user_currency,
+                         uid=uid, s_token=s_token)
 
 @app.route('/transactions')
 @admin_required
