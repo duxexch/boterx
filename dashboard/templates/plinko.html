@@ -165,11 +165,16 @@ function _osc(f, dur, type, vol) {
     o.start(); o.stop(ac.currentTime+dur);
   } catch(e){}
 }
-// Peg hit: bright short ding (pitch rises as ball falls)
-var _pegsince=0;
+// Peg hit: resonant musical note (rising scale as ball falls)
+var _noteScale = [262, 294, 330, 349, 392, 440, 494, 523, 587, 659, 698, 784, 880, 988, 1047, 1175];
+var _noteIdx = 0;
 function soundPegBounce(fallProgress) {
-  var base=500 + fallProgress*250;
-  _osc(base,0.04,'triangle',0.08);
+  var note = _noteScale[_noteIdx % _noteScale.length];
+  _noteIdx++;
+  // Resonant: main note + harmonic
+  _osc(note, 0.08, 'sine', 0.1);
+  _osc(note * 2, 0.04, 'sine', 0.04); // octave harmonic
+  _osc(note * 1.5, 0.03, 'triangle', 0.03); // fifth harmonic
 }
 // Ball trail whoosh (subtle)
 function soundWhoosh() { _osc(90,0.15,'sine',0.03); }
@@ -299,13 +304,20 @@ function drawBall(b){
 function dropBall(){
   if(dropping) return;
   var bet=parseFloat(document.getElementById('betInp').value)||10;
+  if(bet<1){showToast('أدخل مبلغ','error');return;}
   if(!checkBalanceBeforeBet(bet)) return;
   dropping=true; document.getElementById('dropBtn').disabled=true;
   apiFetchCritical(BASE+'/api/plinko/drop',{
     method:'POST', body:JSON.stringify({ bet:bet, rows:selectedRows, risk:selectedRisk })
   }).then(function(r){return r.json()}).then(function(d){
     if(d.error){ showToast(d.error,'error'); if(d.need_deposit)showVexDepositModal(bet); dropping=false; document.getElementById('dropBtn').disabled=false; return; }
-    animateBall(d.path||generatePath(selectedRows), d.slot, d.multiplier, d.payout, bet);
+    // Use server-provided path (normalized 0-1), convert to canvas coords
+    var path = d.path || generatePath(selectedRows);
+    path = path.map(function(p){
+      return {x: p.x * W, y: p.y * H};
+    });
+    animateBall(path, d.slot, d.multiplier, d.payout, bet);
+    if(d.balance_after !== undefined) document.getElementById('bal').textContent = d.balance_after.toLocaleString();
     loadBalance();
   }).catch(function(){ showToast('خطأ في الشبكة','error'); dropping=false; document.getElementById('dropBtn').disabled=false; });
 }
@@ -325,6 +337,7 @@ function generatePath(rows){
 function animateBall(path,slotIdx,mult,payout,bet){
   var ballObj={x:path[0].x,y:path[0].y,step:0,path:path,r:ballRadius};
   balls.push(ballObj);
+  _noteIdx = 0; // reset musical scale for each drop
   var draw=null;
   function step(){
     if(ballObj.step>=path.length-1){

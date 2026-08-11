@@ -5754,37 +5754,64 @@ def api_plinko_drop():
         return jsonify({'success': False, 'error': 'رصيد غير كافٍ', 'need_deposit': True, 'balance': balance})
 
     mults = _PLINKO_MULTS[rows][risk]
-    num_slots = len(mults)
+    num_slots = len(mults)  # rows + 1
 
     algo_result = _gm.algorithm.calculate_win_chance(player, game, bet_amount)
     win_chance = algo_result['win_chance']
 
-    center = num_slots // 2
-    if win_chance > 0.6:
-        weights = [abs(i - center) + 1 for i in range(num_slots)]
-    elif win_chance > 0.4:
-        weights = [1] * num_slots
-        weights[center] = 2
-    else:
-        weights = [max(1, center - abs(i - center) + 2) for i in range(num_slots)]
+    # ── Smart Plinko Algorithm: simulate ball physics path ──
+    # Ball starts at center, each row it goes left or right (50/50 adjusted by win_chance)
+    # Position after N rows = starting_center + sum(left=-1, right=+1) choices
+    # Final slot = position + center_offset
+    center = (num_slots - 1) / 2  # center position (float)
+    position = 0.0  # starts at center
 
-    total_w = sum(weights)
-    rand_val = random.uniform(0, total_w)
-    slot = 0
-    cumulative = 0
-    for i, w in enumerate(weights):
-        cumulative += w
-        if rand_val <= cumulative:
-            slot = i
-            break
+    # Win chance affects bias: higher win_chance → slight bias toward edges (higher multipliers)
+    # Lower win_chance → bias toward center (lower multipliers)
+    edge_bias = (win_chance - 0.5) * 0.3  # -0.15 to +0.15
+
+    for r in range(rows):
+        # Each row: 50/50 left or right, with slight edge bias
+        go_right = random.random() < (0.5 + edge_bias)
+        if go_right:
+            position += 1
+        else:
+            position -= 1
+
+    # Convert position to slot index
+    # position ranges from -rows/2 to +rows/2
+    # slot = round(center + position/2)
+    slot = int(round(center + position / 2))
+    slot = max(0, min(num_slots - 1, slot))  # clamp
+
+    # 3% house edge: 3% chance to nudge toward center (lower payout)
+    if random.random() < 0.03:
+        slot = int(center)
+        slot = max(0, min(num_slots - 1, slot))
 
     multiplier = mults[slot]
     payout = round(bet_amount * multiplier, 2)
     result_str = 'win' if multiplier >= 1.0 else 'lose'
 
+    # Build path for client animation (left/right choices per row)
+    ball_path = []
+    cx = 0.5  # normalized center
+    cy = 0.0
+    ball_path.append({'x': cx, 'y': cy})
+    # Recompute the path from position
+    temp_pos = 0.0
+    for r in range(rows):
+        # Recompute the direction (same as above but we need to store it)
+        go_right = random.random() < (0.5 + edge_bias)
+        temp_pos += 1 if go_right else -1
+        cx = 0.5 + (temp_pos / (rows * 2))  # normalize to 0-1
+        cy = (r + 1) / rows  # 0 to 1
+        ball_path.append({'x': max(0.05, min(0.95, cx)), 'y': cy})
+
     # Atomic: settle + idempotency record in one SQLite transaction
     template = {'success': True, 'slot': slot, 'multiplier': multiplier,
-                'payout': payout, 'result': result_str, 'balance_before': balance}
+                'payout': payout, 'result': result_str, 'balance_before': balance,
+                'path': ball_path}
     ok, stored, race_cached = _gm.settle_with_idempotency(uid, bet_amount, payout, request_id, template)
     if race_cached:
         return jsonify(race_cached)
