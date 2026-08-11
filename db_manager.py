@@ -588,6 +588,74 @@ class GameDB:
                 'wagering_completed': int(row[4]),
             } if row else None
 
+    def claim_svrp_task_atomically(self, task_id: str, uid: str, reward: float):
+        """Claim a task reward in a single SQLite SAVEPOINT.
+
+        Returns one of:
+          'claimed'          — credited now for the first time
+          'already_claimed'  — idempotent replay; caller can still mark CSV
+
+        Guarantees:
+          - task_id is a PRIMARY KEY in svrp_task_claims so two concurrent
+            requests both get the INSERT; only one wins (rowcount == 1), the
+            other sees rowcount == 0 and returns 'already_claimed'.
+          - Wallet credit and claim record are in the same SAVEPOINT; a crash
+            between INSERT and UPDATE is impossible — both commit or neither does.
+          - Retry after crash between RELEASE and CSV update: INSERT OR IGNORE
+            returns rowcount == 0 → 'already_claimed'; wallet is NOT re-credited.
+        """
+        uid      = str(uid)
+        task_id  = str(task_id)
+        reward_f = float(reward)
+        conn = self._conn()
+        self._ensure_svrp_transfer_table(conn)
+        with _db_lock:
+            # Ensure claims table
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS svrp_task_claims (
+                    task_id    TEXT PRIMARY KEY,
+                    uid        TEXT NOT NULL,
+                    reward     REAL NOT NULL,
+                    claimed_at TEXT NOT NULL
+                )
+            ''')
+            conn.execute('SAVEPOINT claim_task')
+            try:
+                cur = conn.execute(
+                    'INSERT OR IGNORE INTO svrp_task_claims '
+                    '(task_id, uid, reward, claimed_at) VALUES (?, ?, ?, ?)',
+                    (task_id, uid, reward_f,
+                     __import__('datetime').datetime.now().isoformat())
+                )
+                if cur.rowcount == 0:
+                    conn.execute('RELEASE claim_task')
+                    return 'already_claimed'
+                # Credit wallet in the same savepoint
+                conn.execute(
+                    'INSERT OR IGNORE INTO svrp_wallet_balance '
+                    '(uid, frozen_balance, total_earned, total_used, '
+                    ' wagering_required, wagering_completed) '
+                    'VALUES (?, 0, 0, 0, 3, 0)',
+                    (uid,)
+                )
+                conn.execute(
+                    'UPDATE svrp_wallet_balance '
+                    'SET frozen_balance = frozen_balance + ?, '
+                    '    total_earned   = total_earned   + ? '
+                    'WHERE uid = ?',
+                    (reward_f, reward_f, uid)
+                )
+                conn.execute('RELEASE claim_task')
+                conn.commit()
+                return 'claimed'
+            except Exception:
+                try:
+                    conn.execute('ROLLBACK TO claim_task')
+                    conn.execute('RELEASE claim_task')
+                except Exception:
+                    pass
+                raise
+
     def migrate_svrp_wallets_from_csv(self, rows):
         """Idempotent one-time backfill: INSERT OR IGNORE each CSV wallet row.
 

@@ -912,13 +912,15 @@ class SVRPManager:
     def claim_task_reward(self, telegram_id, task_id):
         """استلام مكافأة مهمة مكتملة.
 
-        Order of operations (atomic-first):
-        1. Find completed task and compute reward — no CSV writes yet.
-        2. Credit SQLite wallet via delta_update_svrp_wallet.
-           If this fails, return False without touching the CSV so the
-           task remains 'completed' and the user can retry.
-        3. Only after a confirmed SQLite credit: mark task 'claimed' in CSV
-           and update the CSV wallet mirror.
+        Design (atomic + idempotent):
+        1. Find task in CSV that is 'completed' (or 'claimed' for idempotent replay).
+        2. Call claim_svrp_task_atomically in SQLite — single SAVEPOINT:
+               INSERT OR IGNORE svrp_task_claims (task_id PK)
+               + UPDATE svrp_wallet_balance frozen_balance += reward
+           Returns 'claimed' (first time) or 'already_claimed' (retry/concurrent).
+           On any exception: return False — CSV untouched, user retries.
+        3. Mark CSV task 'claimed' (idempotent — safe to write even on replay).
+        4. Mirror updated balance to CSV wallet (display only).
         """
         tid = str(telegram_id)
         rows = self._read_csv('svrp_tasks.csv')
@@ -926,40 +928,48 @@ class SVRPManager:
         task_row = None
 
         for row in rows:
-            if (row['id'] == task_id and
-                row['user_id'] == tid and
-                row['status'] == 'completed'):
-                reward = float(row.get('reward_amount', 0) or 0)
-                task_row = row
-                break
+            if (row['id'] == task_id and row['user_id'] == tid):
+                if row['status'] in ('completed', 'claimed'):
+                    reward = float(row.get('reward_amount', 0) or 0)
+                    task_row = row
+                    break
 
         if task_row is None:
             return False, "المهمة غير موجودة أو لم تكتمل"
 
-        # ── Step 1: Credit SQLite first (authoritative) ───────────────────
+        # Already claimed in CSV → still call SQLite to check idempotency
+        # (ensures display is consistent even if a previous run crashed mid-way)
+
+        # ── Step 1: SQLite atomic claim (idempotency key = task_id PK) ───────
         try:
             from game_engine import GameManager as _GM
-            _GM().delta_update_svrp_wallet(
-                tid, frozen_balance_delta=float(reward), total_earned_delta=float(reward)
-            )
+            result = _GM().claim_svrp_task_atomically(task_id, tid, reward)
         except Exception as _ce:
-            logger.error(f'claim_task_reward SQLite delta FAILED uid={tid}: {_ce} — not marking claimed')
+            logger.error(
+                f'claim_task_reward SQLite FAILED uid={tid} task={task_id}: {_ce}'
+                ' — CSV untouched, user can retry'
+            )
             return False, "خطأ في قاعدة البيانات — يرجى المحاولة مجدداً"
 
-        # ── Step 2: Mark task claimed in CSV (after confirmed SQLite credit) ─
-        task_row['status'] = 'claimed'
-        self._write_csv('svrp_tasks.csv', rows, self.TASK_FIELDS)
+        # ── Step 2: Mark CSV task claimed (idempotent) ─────────────────────
+        if task_row['status'] != 'claimed':
+            task_row['status'] = 'claimed'
+            self._write_csv('svrp_tasks.csv', rows, self.TASK_FIELDS)
 
-        # ── Step 3: Mirror to CSV wallet (display only) ───────────────────
-        wallet = self.get_wallet(tid)
-        current_balance = float(wallet.get('balance', 0) or 0)
-        current_earned  = float(wallet.get('total_earned', 0) or 0)
-        self._update_wallet(tid, {
-            'balance':      round(current_balance + reward, 6),
-            'total_earned': round(current_earned + reward, 6)
-        })
+        # ── Step 3: Mirror to CSV wallet (display only) ────────────────────
+        if result == 'claimed':
+            wallet = self.get_wallet(tid)
+            current_balance = float(wallet.get('balance', 0) or 0)
+            current_earned  = float(wallet.get('total_earned', 0) or 0)
+            self._update_wallet(tid, {
+                'balance':      round(current_balance + reward, 6),
+                'total_earned': round(current_earned + reward, 6)
+            })
 
-        logger.info(f"Recovery: User {tid} claimed task {task_id} reward: {reward}")
+        logger.info(
+            f"Recovery: User {tid} claimed task {task_id} reward: {reward} "
+            f"(sqlite_result={result})"
+        )
         return True, f"تم استلام المكافأة: {reward} رصيد!"
 
     def get_user_tasks(self, telegram_id):

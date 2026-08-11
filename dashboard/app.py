@@ -757,10 +757,13 @@ def webapp_auth(f):
                         g.webapp_auth_strong = True   # device-authorized session
                         return f(*args, **kwargs)
                     if uid_val and not authorized:
-                        # Different device → guest mode (session is valid but device differs)
+                        # Different device → guest mode: session token is cryptographically
+                        # valid but was presented from a device that did not bind it.
+                        # Permit read-only game routes (balance, stats) but block sensitive
+                        # account/reward endpoints that require the originating device.
                         g.telegram_user_id = uid_val
                         g.telegram_user = None
-                        g.webapp_auth_strong = True   # session cryptographically valid
+                        g.webapp_auth_strong = False   # device mismatch — not strong
                         return f(*args, **kwargs)
                 return jsonify({'error': 'initData required', 'code': 'NO_INIT_DATA'}), 403
 

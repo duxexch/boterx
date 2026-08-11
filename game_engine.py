@@ -402,6 +402,12 @@ class GameManager:
             )
         return None
 
+    def claim_svrp_task_atomically(self, task_id: str, uid: str, reward: float):
+        """Single-SAVEPOINT task claim with idempotency. Returns 'claimed'/'already_claimed'."""
+        if _USE_SQLITE:
+            return _db.claim_svrp_task_atomically(task_id, uid, reward)
+        return 'claimed'   # no-SQLite fallback: treat as first claim
+
     def migrate_svrp_wallets_from_csv(self, rows):
         """Idempotent backfill: INSERT OR IGNORE CSV rows into SQLite."""
         if _USE_SQLITE:
