@@ -601,6 +601,15 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         'deposit_withdraw': '🔄',
     }
 
+    @staticmethod
+    def display_icon(icon, default='🏢'):
+        """Icon safe for Telegram TEXT: uploaded image URLs become the default
+        emoji (a raw URL/path would render as ugly text inside messages)."""
+        ic = (icon or '').strip()
+        if not ic or ic.startswith('/static/') or ic.startswith('http'):
+            return default
+        return ic
+
     def normalize_icon(self, icon_input, default='🏢'):
         """تحويل أي صيغة إدخال إلى أيقونة مناسبة"""
         if not icon_input or not icon_input.strip():
@@ -5108,7 +5117,7 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             companies_list = self.get_companies()
             for c in companies_list:
                 if c['name'] == company_name:
-                    company_icon = c.get('icon', '🏢') or '🏢'
+                    company_icon = self.display_icon(c.get('icon'), '🏢')
                     break
             confirmation = (
                 f"✅ <b>تم تقديم طلب الإيداع!</b>\n\n"
@@ -5459,7 +5468,7 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             withdrawal_address = self.get_exchange_address(company_id)
             lang = user.get('language', 'ar')
             company = self.get_company_by_id(company_id)
-            company_icon = company.get('icon', '🏢') if company else '🏢'
+            company_icon = self.display_icon(company.get('icon') if company else '', '🏢')
             confirm_text = (
                 f"{company_icon} {company_name}\n\n"
                 + self.tr('enter_withdrawal_address', lang, address=withdrawal_address)
@@ -5513,7 +5522,7 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             currency_symbol = self.get_currency_symbol(user_currency)
             lang = user.get('language', 'ar')
             company = self.get_company_by_id(company_id)
-            company_icon = company.get('icon', '🏢') if company else '🏢'
+            company_icon = self.display_icon(company.get('icon') if company else '', '🏢')
             final_confirm_text = self.tr('final_confirmation', lang,
                 company=f"{company_icon} {company_name}", wallet=wallet_number,
                 amount=f"{amount} {currency_symbol}",
@@ -7725,7 +7734,7 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             text += self.tr('a0798_لا_توجد', 'ar')
         else:
             for m in all_methods:
-                icon = m.get('icon', '💳') or '💳'
+                icon = self.display_icon(m.get('icon'), '💳')
                 name = m.get('method_name', '')
                 mid = m.get('id', '')
                 is_linked = mid in linked_ids
@@ -7839,7 +7848,7 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                     
                     for i, row in enumerate(companies, 1):
                         status = "✅" if row.get('is_active', '').lower() == 'active' else "❌"
-                        icon = row.get('icon', '🏢') or '🏢'
+                        icon = self.display_icon(row.get('icon'), '🏢')
                         type_display = {'deposit': 'إيداع', 'withdraw': 'سحب', 'both': 'الكل'}.get(row.get('type', ''), row.get('type', ''))
                         address = row.get('address', '')
                         companies_text += f"{i}. {status} {icon} {row.get('name', '?')} (ID: {row.get('id', '?')})\n"
@@ -9173,7 +9182,7 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                 return
             inline_btns = []
             for m in active:
-                icon = m.get('icon', '💳') or '💳'
+                icon = self.display_icon(m.get('icon'), '💳')
                 inline_btns.append([{'text': f"{icon} {m['method_name']} — {m.get('account_data', '')}",
                                      'callback_data': f"trade_method_{m['id']}"}])
             inline_btns.append([{'text': '🔙 إلغاء', 'callback_data': 'trade_buy_cancel'}])
@@ -9617,7 +9626,7 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
 
             inline_btns = []
             for method in methods:
-                method_icon = method.get('icon', '💳') or '💳'
+                method_icon = self.display_icon(method.get('icon'), '💳')
                 btn_text = f"{method_icon} {method['method_name']}"
                 if method.get('method_type'):
                     btn_text += f" — {method['method_type']}"
@@ -11049,7 +11058,7 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                 for m in methods[:15]:
                     company = self.get_company_by_id(m.get('company_id', ''))
                     company_name = company['name'] if company else self.tr('a0122_غير_محدد', 'ar')
-                    icon = m.get('icon', '💳') or '💳'
+                    icon = self.display_icon(m.get('icon'), '💳')
                     status_icon = '✅' if m.get('status') == 'active' else '⏸️'
                     text += f"{status_icon} {icon} <b>{m['method_name']}</b>\n"
                     text += f"   🏢 {company_name} | 🆔 <code>{m['id']}</code>\n"
@@ -11409,7 +11418,7 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             # عرض تفاصيل الوسيلة وطلب رقم المحفظة — رقم الحساب في code block للنسخ السهل
             user = self.find_user(user_id)
             lang = user.get('language', 'ar') if user else 'ar'
-            method_icon = selected_method.get('icon', '💳') or '💳'
+            method_icon = self.display_icon(selected_method.get('icon'), '💳')
             company_name = company['name'] if company else 'N/A'
             account_data = selected_method.get('account_data', '')
             additional_info = selected_method.get('additional_info', '')

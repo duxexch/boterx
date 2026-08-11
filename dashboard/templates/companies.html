@@ -59,7 +59,8 @@
                     <template x-for="c in companies" :key="c.id">
                         <tr class="border-b border-slate-700/50 hover:bg-slate-700/30 transition">
                             <td class="px-4 py-3 text-center">
-                                <span class="text-2xl" x-text="c.icon || '🏢'"></span>
+                                <img x-show="isImgIcon(c.icon)" :src="c.icon" class="w-9 h-9 rounded-lg object-cover inline-block border border-slate-600" alt="">
+                                <span x-show="!isImgIcon(c.icon)" class="text-2xl" x-text="c.icon || '🏢'"></span>
                             </td>
                             <td class="px-4 py-3 font-medium" x-text="c.name"></td>
                             <td class="px-4 py-3">
@@ -78,8 +79,8 @@
                             </td>
                             <td class="px-4 py-3">
                                 <div class="text-xs">
-                                    <p><span class="text-slate-400">عدد:</span> <span class="font-semibold" x-text="fmtNum(c.transaction_count || 0)"></span></p>
-                                    <p><span class="text-slate-400">حجم:</span> <span class="font-semibold" x-text="fmtAmount(c.transaction_volume || 0, 'USD')"></span></p>
+                                    <p><span class="text-slate-400">عدد:</span> <span class="font-semibold" x-text="fmtNum(c.txn_count || 0)"></span></p>
+                                    <p><span class="text-slate-400">حجم:</span> <span class="font-semibold" x-text="fmtAmount(c.volume || 0, 'USD')"></span></p>
                                 </div>
                             </td>
                             <td class="px-4 py-3">
@@ -138,8 +139,23 @@
                     <textarea x-model="form.details" rows="3" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="تفاصيل إضافية عن الشركة"></textarea>
                 </div>
                 <div>
-                    <label class="block text-sm text-slate-400 mb-1">أيقونة (إيموجي)</label>
-                    <input x-model="form.icon" type="text" maxlength="4" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="🏢">
+                    <label class="block text-sm text-slate-400 mb-1">الأيقونة</label>
+                    <div class="flex items-center gap-3">
+                        <div class="w-12 h-12 rounded-xl bg-slate-700 border border-slate-600 flex items-center justify-center overflow-hidden shrink-0">
+                            <img x-show="isImgIcon(form.icon)" :src="form.icon" class="w-full h-full object-cover" alt="">
+                            <span x-show="!isImgIcon(form.icon)" class="text-2xl" x-text="form.icon || '🏢'"></span>
+                        </div>
+                        <div class="flex-1 space-y-2">
+                            <label class="flex items-center justify-center gap-2 w-full bg-slate-700 hover:bg-slate-600 border border-dashed border-slate-500 rounded-lg px-4 py-2 text-sm cursor-pointer transition"
+                                   :class="uploadingIcon && 'opacity-50 pointer-events-none'">
+                                <i class="fas" :class="uploadingIcon ? 'fa-spinner fa-spin' : 'fa-cloud-upload-alt'"></i>
+                                <span x-text="uploadingIcon ? 'جارٍ الرفع...' : 'رفع صورة من الجهاز'"></span>
+                                <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" class="hidden" @change="uploadIcon($event)">
+                            </label>
+                            <input x-model="form.icon" type="text" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="أو اكتب إيموجي مثل 🏢">
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-1">PNG / JPG / WEBP / GIF حتى 2MB — الصورة تتحول لأيقونة دائرية تلقائياً</p>
                 </div>
                 <div>
                     <label class="block text-sm text-slate-400 mb-1">العنوان</label>
@@ -203,6 +219,31 @@ function companiesPage() {
         editingId: null,
         deleteTarget: null,
         loading: false,
+        uploadingIcon: false,
+
+        isImgIcon(icon) {
+            return typeof icon === 'string' && (icon.startsWith('/static/') || icon.startsWith('http'));
+        },
+
+        async uploadIcon(e) {
+            const file = e.target.files && e.target.files[0];
+            if (!file) return;
+            if (file.size > 2 * 1024 * 1024) { toast('حجم الصورة أكبر من 2MB', 'error'); e.target.value = ''; return; }
+            this.uploadingIcon = true;
+            try {
+                const fd = new FormData();
+                fd.append('file', file);
+                const res = await fetch('/api/upload-icon', { method: 'POST', body: fd });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || 'فشل الرفع');
+                this.form.icon = data.url;
+                toast('تم رفع الأيقونة بنجاح', 'success');
+            } catch (err) {
+                toast(err.message || 'فشل رفع الأيقونة', 'error');
+            }
+            this.uploadingIcon = false;
+            e.target.value = '';
+        },
         form: { name: '', type: 'both', details: '', icon: '🏢', address: '', affiliate_link: '', is_active: true },
 
         async init() {

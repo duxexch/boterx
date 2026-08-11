@@ -5,6 +5,7 @@ const I18N = {
     ar: {
         // Sidebar
         dashboard: 'لوحة التحكم', transactions: 'المعاملات', users: 'المستخدمين',
+        transactions_label: 'المعاملات',
         matching: 'المطابقات', svrp: 'التعويض', trading: 'التداول',
         lottery: 'اليانصيب', wheel: 'عجلة الحظ', companies: 'الشركات',
         payment_methods: 'وسائل الدفع', apps: 'التطبيقات', referrals: 'الإحالات',
@@ -82,6 +83,7 @@ const I18N = {
         no_transactions: 'لا توجد معاملات', no_users: 'لا يوجد مستخدمين', no_activity: 'لا يوجد نشاط',
         // Sidebar
         dashboard: 'لوحة التحكم', transactions: 'المعاملات', users: 'المستخدمين',
+        transactions_label: 'المعاملات',
         matching: 'المطابقات', svrp: 'التعويض', trading: 'التداول',
         lottery: 'اليانصيب', wheel: 'عجلة الحظ', companies: 'الشركات',
         payment_methods: 'وسائل الدفع', apps: 'التطبيقات', referrals: 'الإحالات',
@@ -339,6 +341,7 @@ permissions_revoked: 'سيتم إبطال جميع صلاحياته فوراً.'
     en: {
         // Sidebar
         dashboard: 'Dashboard', transactions: 'Transactions', users: 'Users',
+        transactions_label: 'Transactions',
         matching: 'Matching', svrp: 'Compensation', trading: 'Trading',
         lottery: 'Lottery', wheel: 'Wheel of Fortune', companies: 'Companies',
         payment_methods: 'Payment Methods', apps: 'Apps', referrals: 'Referrals',
@@ -436,6 +439,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
         el.placeholder = tr(el.getAttribute('data-i18n-placeholder'));
+    });
+    document.querySelectorAll('[data-i18n-title]').forEach(el => {
+        el.title = tr(el.getAttribute('data-i18n-title'));
     });
 });
 

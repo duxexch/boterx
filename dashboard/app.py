@@ -2178,6 +2178,38 @@ def api_companies():
         c['volume'] = sum(float(t.get('amount', 0) or 0) for t in c_txns if t.get('status') == 'approved')
     return jsonify({'companies': companies})
 
+
+# ===== API — Icon Upload (companies & payment methods) =====
+_ICON_UPLOAD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads', 'icons')
+_ICON_ALLOWED_EXT = {'png', 'jpg', 'jpeg', 'webp', 'gif'}
+_ICON_MAX_BYTES = 2 * 1024 * 1024  # 2MB
+
+@app.route('/api/upload-icon', methods=['POST'])
+@api_auth
+@permission_required('manage_companies')
+def api_upload_icon():
+    f = request.files.get('file')
+    if not f or not f.filename:
+        return jsonify({'success': False, 'error': 'لم يتم اختيار ملف'}), 400
+    ext = f.filename.rsplit('.', 1)[-1].lower() if '.' in f.filename else ''
+    if ext not in _ICON_ALLOWED_EXT:
+        return jsonify({'success': False, 'error': 'صيغة غير مدعومة — المسموح: PNG, JPG, WEBP, GIF'}), 400
+    blob = f.read(_ICON_MAX_BYTES + 1)
+    if len(blob) > _ICON_MAX_BYTES:
+        return jsonify({'success': False, 'error': 'حجم الملف أكبر من 2MB'}), 400
+    # Magic-byte sanity check (blocks disguised HTML/SVG/script uploads)
+    _magic_ok = (blob[:8] == b'\x89PNG\r\n\x1a\n' or blob[:3] == b'\xff\xd8\xff'
+                 or blob[:6] in (b'GIF87a', b'GIF89a')
+                 or (blob[:4] == b'RIFF' and blob[8:12] == b'WEBP'))
+    if not _magic_ok:
+        return jsonify({'success': False, 'error': 'الملف ليس صورة صالحة'}), 400
+    os.makedirs(_ICON_UPLOAD_DIR, exist_ok=True)
+    fname = f"icon_{secrets.token_hex(8)}.{ext}"
+    with open(os.path.join(_ICON_UPLOAD_DIR, fname), 'wb') as out:
+        out.write(blob)
+    log_action('upload_icon', fname)
+    return jsonify({'success': True, 'url': f'/static/uploads/icons/{fname}'})
+
 @app.route('/api/companies/list')
 def api_companies_public():
     """Public companies list for user home page — no admin auth required."""
