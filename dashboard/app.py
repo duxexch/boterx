@@ -683,6 +683,85 @@ def validate_telegram_init_data(init_data_str: str):
         return None, None
 
 
+def account_auth(f):
+    """Decorator: strict authentication for player account/reward/referral APIs.
+
+    Accepts ONLY two auth paths (fail-closed on everything else):
+
+    A. Flask session cookie — user is logged in via the /home dashboard route.
+       Requires session['logged_in'] is True, a non-empty admin_id, and
+       is_admin=False.  The session cookie is HttpOnly and never appears in URLs.
+
+    B. Fresh HMAC-validated Telegram initData — Telegram Mini App WebApp flow.
+       Validates HMAC-SHA256 with BOT_TOKEN and auth_date freshness (max 1 h).
+       No client-controlled device fingerprint is used for replay detection;
+       freshness+HMAC is the security boundary.  Fail-closed on any validation
+       or persistence error (no fail-open nonce fallback).
+
+    Any other path (uid param, ?s= session token, dev mode uid) → 403.
+    This decorator is intentionally stricter than webapp_auth for endpoints that
+    expose PII (profile, phone, transactions) and permit financial mutations (claims).
+    """
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        # ── Path A: Flask session cookie (HttpOnly, server-side) ──────────
+        flask_uid = session.get('admin_id', '').strip()
+        if (flask_uid
+                and session.get('logged_in') is True
+                and not session.get('is_admin')):
+            g.telegram_user_id = flask_uid
+            g.telegram_user = None
+            return f(*args, **kwargs)
+
+        # ── Path B: HMAC-validated Telegram initData (fail-closed) ────────
+        if not BOT_TOKEN:
+            # No BOT_TOKEN and not a Flask session — cannot validate
+            return jsonify({'error': 'Authentication required', 'code': 'NO_AUTH'}), 403
+
+        init_data = (
+            request.headers.get('X-Telegram-Init-Data', '').strip()
+            or request.args.get('initData', '').strip()
+        )
+        if not init_data:
+            try:
+                init_data = (request.get_json(silent=True) or {}).get('initData', '').strip()
+            except Exception:
+                init_data = ''
+
+        if not init_data:
+            return jsonify({'error': 'initData required', 'code': 'NO_INIT_DATA'}), 403
+
+        uid_str, user_obj = validate_telegram_init_data(init_data)
+        if not uid_str:
+            return jsonify({'error': 'Invalid or tampered initData', 'code': 'BAD_INIT_DATA'}), 403
+
+        # Freshness — fail CLOSED (no fallback on error)
+        try:
+            import time as _time
+            auth_date_vals = parse_qs(init_data).get('auth_date', [])
+            if not auth_date_vals:
+                return jsonify({'error': 'initData missing auth_date', 'code': 'NO_AUTH_DATE'}), 403
+            auth_date = int(auth_date_vals[0])
+            if auth_date <= 0:
+                return jsonify({'error': 'initData invalid auth_date', 'code': 'BAD_AUTH_DATE'}), 403
+            age = _time.time() - auth_date
+            if age > _INIT_DATA_MAX_AGE:
+                return jsonify({'error': 'initData expired', 'code': 'EXPIRED_INIT_DATA'}), 403
+            if age < -60:
+                return jsonify({'error': 'initData auth_date in future', 'code': 'FUTURE_AUTH_DATE'}), 403
+        except (ValueError, TypeError):
+            return jsonify({'error': 'initData auth_date malformed', 'code': 'BAD_AUTH_DATE'}), 403
+        except Exception:
+            # Any other error in freshness check → fail closed
+            return jsonify({'error': 'initData validation error', 'code': 'AUTH_ERROR'}), 403
+
+        # uid comes exclusively from HMAC-validated payload — not from caller
+        g.telegram_user_id = uid_str
+        g.telegram_user = user_obj
+        return f(*args, **kwargs)
+    return decorated
+
+
 def webapp_auth(f):
     """Decorator: validates Telegram WebApp initData on game-facing API endpoints.
 
@@ -8405,11 +8484,9 @@ def webapp_account():
 # ── Unified account API ────────────────────────────────────────────────────────
 
 @app.route('/api/player/account')
-@webapp_auth
+@account_auth
 def api_player_account():
     """Unified account endpoint: profile + game stats + SVRP summary + referral summary + recent txns."""
-    if not getattr(g, 'webapp_auth_strong', False):
-        return jsonify({'error': 'Validated initData or session required', 'code': 'WEAK_AUTH'}), 403
     if not _VEX_GAMES:
         return jsonify({'error': 'Games engine not available'}), 500
     uid = str(get_request_uid() or '')
@@ -8521,11 +8598,9 @@ def api_player_account():
 
 
 @app.route('/api/player/referrals')
-@webapp_auth
+@account_auth
 def api_player_referrals():
     """Player referral data: link, earnings, full list of referred users."""
-    if not getattr(g, 'webapp_auth_strong', False):
-        return jsonify({'error': 'Validated initData or session required', 'code': 'WEAK_AUTH'}), 403
     uid = str(get_request_uid() or '')
     if not uid:
         return jsonify({'error': 'Missing uid'}), 400
@@ -8578,11 +8653,9 @@ def api_player_referrals():
 
 
 @app.route('/api/player/rewards')
-@webapp_auth
+@account_auth
 def api_player_rewards():
     """Player rewards: today's SVRP tasks + approved recovery requests + promo balances."""
-    if not getattr(g, 'webapp_auth_strong', False):
-        return jsonify({'error': 'Validated initData or session required', 'code': 'WEAK_AUTH'}), 403
     uid = str(get_request_uid() or '')
     if not uid:
         return jsonify({'error': 'Missing uid'}), 400
@@ -8670,11 +8743,9 @@ def api_player_rewards():
 
 
 @app.route('/api/player/rewards/claim/<task_id>', methods=['POST'])
-@webapp_auth
+@account_auth
 def api_player_rewards_claim(task_id):
     """Claim a completed SVRP daily task reward."""
-    if not getattr(g, 'webapp_auth_strong', False):
-        return jsonify({'error': 'Validated initData or session required', 'code': 'WEAK_AUTH'}), 403
     uid = str(get_request_uid() or '')
     if not uid:
         return jsonify({'error': 'Missing uid'}), 400
