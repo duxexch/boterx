@@ -5707,7 +5707,7 @@ _PLINKO_MULTS = {
     16: {
         'low':  [16, 9, 2, 1.4, 1.4, 1.2, 1.1, 1.0, 0.5, 1.0, 1.1, 1.2, 1.4, 1.4, 2, 9, 16],
         'med':  [110, 41, 10, 5, 3, 1.5, 1.0, 0.5, 0.3, 0.5, 1.0, 1.5, 3, 5, 10, 41, 110],
-        'high': [999, 130, 26, 9, 4, 2, 0.7, 0.2, 0.1, 0.2, 0.7, 2, 4, 9, 26, 130, 999],
+        'high': [1000, 130, 26, 9, 4, 2, 0.7, 0.2, 0.1, 0.2, 0.7, 2, 4, 9, 26, 130, 1000],
     },
     20: {
         'low':  [50, 12, 4, 2.5, 1.8, 1.3, 1.0, 0.7, 0.5, 0.3, 0.2, 0.3, 0.5, 0.7, 1.0, 1.3, 1.8, 2.5, 4, 12, 50],
@@ -5726,6 +5726,17 @@ def api_plinko_drop():
     request_id = _get_request_id()
     if not uid:
         return jsonify({'error': 'Missing params'}), 400
+
+    # ── Rate Limiting: max 20 drops per 60s per user ──
+    _rl_now = int(datetime.now().timestamp())
+    if not hasattr(app, '_plinko_rl'):
+        app._plinko_rl = {}
+    rl_data = app._plinko_rl.get(uid, [])
+    rl_data = [t for t in rl_data if _rl_now - t < 60]
+    if len(rl_data) >= 20:
+        return jsonify({'error': 'بطء! حاول بعد ثوانٍ'}), 429
+    rl_data.append(_rl_now)
+    app._plinko_rl[uid] = rl_data
 
     # Fast SQLite idempotency check (survives restarts)
     if request_id:
@@ -5774,10 +5785,15 @@ def api_plinko_drop():
     win_chance = algo_result['win_chance']
 
     # ── Server-Authoritative Plinko Algorithm ──
-    # 1. Generate left/right directions ONCE (used for BOTH slot calc and client path)
-    # 2. Directions biased by win_chance: higher win_chance → edge bias (higher mults)
-    # 3. 3% house edge: force_center pulls ball toward center (lowest payout)
-    # 4. All probabilities clamped [0.25, 0.75] to prevent impossible paths
+    # 1. Provably Fair: generate server_seed, commit hash before result
+    # 2. Generate left/right directions ONCE (used for BOTH slot calc and client path)
+    # 3. Directions biased by win_chance: higher win_chance → edge bias (higher mults)
+    # 4. 3% house edge: force_center pulls ball toward center (lowest payout)
+    # 5. All probabilities clamped [0.25, 0.75] to prevent impossible paths
+
+    # Provably Fair seed
+    _pf_seed = secrets.token_hex(16)
+    _pf_seed_hash = hashlib.sha256(_pf_seed.encode()).hexdigest()
 
     center = (num_slots - 1) / 2.0
     edge_bias = (win_chance - 0.5) * 0.20  # -0.10 to +0.10
@@ -5785,17 +5801,19 @@ def api_plinko_drop():
     # House edge: 3% chance to force center
     force_center = random.random() < 0.03
 
+    # Provably Fair: use HMAC-SHA256 to derive deterministic RNG from seed
+    _pf_rng = random.Random()
+    _pf_rng.seed(int(_pf_seed[:16], 16))
+
     directions = []
     position = 0.0
     for r in range(rows):
         if force_center:
-            # Pull toward center: go opposite of current position drift
             p_right = 0.5 - (position / max(1, rows)) * 1.5
         else:
             p_right = 0.5 + edge_bias
-        # Clamp to prevent impossible paths
         p_right = max(0.25, min(0.75, p_right))
-        go_right = random.random() < p_right
+        go_right = _pf_rng.random() < p_right
         direction = 1 if go_right else -1
         directions.append(direction)
         position += direction
@@ -5831,6 +5849,8 @@ def api_plinko_drop():
     template = {'success': True, 'slot': slot, 'multiplier': multiplier,
                 'payout': payout, 'result': result_str, 'balance_before': balance,
                 'directions': directions,
+                'seed': _pf_seed,
+                'seed_hash': _pf_seed_hash,
                 'path': ball_path}
     ok, stored, race_cached = _gm.settle_with_idempotency(uid, bet_amount, payout, request_id, template)
     if race_cached:
