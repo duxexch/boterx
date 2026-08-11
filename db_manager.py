@@ -182,6 +182,17 @@ def _init_db():
             );
             CREATE INDEX IF NOT EXISTS idx_ledger_uid ON financial_ledger(user_id);
             CREATE INDEX IF NOT EXISTS idx_ledger_ts  ON financial_ledger(timestamp);
+
+            -- Persisted replay-protection nonces for Telegram initData tokens.
+            -- Survives dashboard restarts so stolen tokens cannot be replayed even
+            -- after a process restart.  TTL matches _INIT_DATA_MAX_AGE + buffer.
+            CREATE TABLE IF NOT EXISTS auth_nonces (
+                token_hash  TEXT PRIMARY KEY,
+                user_id     TEXT NOT NULL,
+                created_at  REAL NOT NULL,
+                expires_at  REAL NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_nonces_exp ON auth_nonces(expires_at);
         ''')
         conn.commit()
     finally:
@@ -1047,6 +1058,41 @@ def refund_expired_game_sessions(gdb_instance=None) -> list:
     finally:
         conn.close()
     return refunded
+
+
+# ── Replay-protection nonce store ────────────────────────────────────────────
+
+def check_and_mark_nonce(token_hash: str, user_id: str, ttl: int = 3720) -> bool:
+    """Atomically record an initData nonce and return True if it's new (allow).
+
+    Returns False when the hash already exists (replay attempt).  The nonce is
+    kept for *ttl* seconds (default 3720 = 1 h + 2-min buffer, matching
+    _INIT_DATA_MAX_AGE).  Uses INSERT OR IGNORE so the write is atomic with no
+    TOCTOU gap even under concurrent requests.
+    """
+    now = time.time()
+    conn = _get_conn()
+    try:
+        cur = conn.execute(
+            'INSERT OR IGNORE INTO auth_nonces'
+            ' (token_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)',
+            (token_hash, user_id, now, now + ttl),
+        )
+        conn.commit()
+        return cur.rowcount == 1  # 1 → inserted (new); 0 → already existed (replay)
+    finally:
+        conn.close()
+
+
+def cleanup_expired_nonces() -> int:
+    """Delete auth_nonces past their TTL.  Returns count deleted."""
+    conn = _get_conn()
+    try:
+        cur = conn.execute('DELETE FROM auth_nonces WHERE expires_at <= ?', (time.time(),))
+        conn.commit()
+        return cur.rowcount
+    finally:
+        conn.close()
 
 
 # Singleton

@@ -5998,6 +5998,45 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
 
         threading.Thread(target=_cleanup_sems, daemon=True, name='sem_cleanup').start()
 
+        # ── Periodic FSM stale-state cleanup (#16) ────────────────────────────
+        # Deposit/withdraw FSM states older than FSM_STALE_MINUTES are automatically
+        # cleared so a user who walks away mid-flow is never permanently stuck.
+        # The cleanup only touches deposit_* / withdraw_* / selecting_deposit /
+        # selecting_withdraw states; it never touches game or other states.
+        FSM_STALE_MINUTES = 45
+        FSM_FLOW_PREFIXES = (
+            'deposit_', 'withdraw_', 'selecting_deposit', 'selecting_withdraw',
+        )
+
+        def _fsm_cleanup_worker():
+            import time as _t
+            from datetime import datetime, timezone, timedelta
+            while True:
+                _t.sleep(900)  # check every 15 minutes
+                try:
+                    cutoff = (
+                        datetime.now(timezone.utc) - timedelta(minutes=FSM_STALE_MINUTES)
+                    ).isoformat()
+                    rows = self._db._conn().execute(
+                        "SELECT user_id, state FROM user_states WHERE updated_at < ?",
+                        (cutoff,)
+                    ).fetchall()
+                    cleared = 0
+                    for row in rows:
+                        uid, state = row[0], row[1]
+                        if any(state.startswith(p) for p in FSM_FLOW_PREFIXES):
+                            self._db.del_user_state(uid)
+                            logger.info(
+                                "[fsm-cleanup] Cleared stale '%s' state for user %s "
+                                "(idle >%d min)", state, uid, FSM_STALE_MINUTES)
+                            cleared += 1
+                    if cleared:
+                        logger.info("[fsm-cleanup] Cleared %d stale FSM state(s).", cleared)
+                except Exception as _fce:
+                    logger.error("[fsm-cleanup] error: %s", _fce, exc_info=True)
+
+        threading.Thread(target=_fsm_cleanup_worker, daemon=True, name='fsm-cleanup').start()
+
         # ── Main polling loop — submits to thread pool, never blocks ─────────
         with ThreadPoolExecutor(max_workers=20, thread_name_prefix='bot_worker') as pool:
             while True:

@@ -780,6 +780,20 @@ def webapp_auth(f):
             except (ValueError, TypeError):
                 return jsonify({'error': 'initData auth_date malformed', 'code': 'BAD_AUTH_DATE'}), 403
 
+            # ── Replay-protection: reject same initData token reused from a
+            # different device/IP or after it was already consumed this session.
+            # The hash is stored in SQLite so protection survives restarts.
+            try:
+                import hashlib as _hl
+                _tok_hash = _hl.sha256(init_data.encode()).hexdigest()
+                if not _check_nonce(_tok_hash, uid_str, ttl=_INIT_DATA_MAX_AGE + 120):
+                    _auth_logger.warning(
+                        "initData replay detected uid=%s hash=%s…", uid_str, _tok_hash[:12])
+                    return jsonify({'error': 'initData already used', 'code': 'REPLAY_INIT_DATA'}), 403
+            except Exception as _nonce_err:
+                # Never block a legitimate request if nonce storage fails
+                _auth_logger.error("nonce check error (fail-open): %s", _nonce_err)
+
             g.telegram_user_id = uid_str
             g.telegram_user = user_obj
             return f(*args, **kwargs)
@@ -4553,6 +4567,8 @@ try:
         set_active_game_session as _set_ags,
         delete_active_game_session as _del_ags,
         refund_expired_game_sessions as _refund_ags,
+        check_and_mark_nonce as _check_nonce,
+        cleanup_expired_nonces as _cleanup_nonces,
         _gdb as _db_singleton,
     )
     _gm = GameManager()
@@ -8137,27 +8153,71 @@ def health_check():
     return jsonify(body), status_code
 
 
-# ===== Mines session background cleanup =====
-# Runs every 10 minutes regardless of traffic so idle deployments are also covered.
+# ===== Unified game-session & security maintenance daemon =====
+# Runs every 5 minutes:
+#   1. Refund expired active_game_sessions bets (all games, not just mines)
+#      → #26: prevents bets from being locked forever between restarts
+#   2. Remove JSON mines entries for any just-refunded sessions
+#      → #25: abandoned mines bets are never silently locked
+#   3. Prune stale mines JSON files (legacy + new)
+#   4. Delete expired auth_nonces from SQLite
+#      → #29: replay-protection store stays bounded, survives restarts
 
-def _mines_cleanup_daemon():
-    """Background daemon: prune stale sessions from both mines JSON files every
-    10 minutes so abandoned games never accumulate indefinitely, regardless of
-    whether any new requests arrive."""
+def _session_maintenance_daemon():
+    """Unified background maintenance: refund expired sessions, prune JSON
+    mines state, and clean up auth nonces — every 5 minutes."""
     import time as _time
     while True:
-        _time.sleep(600)  # 10-minute interval
+        _time.sleep(300)  # 5-minute interval
+
+        # 1 & 2 — Refund expired SQLite game sessions + clean matching JSON mines entries
+        if _VEX_GAMES:
+            try:
+                refunded = _refund_ags(_db_singleton)
+                if refunded:
+                    _auth_logger.info("[maintenance] Refunded %d expired session(s): %s",
+                                      len(refunded), refunded)
+                    # For any refunded mines session, also evict the JSON entry so
+                    # the player cannot continue a game whose bet has already been returned.
+                    mines_uids = {uid for uid, game, _ in refunded if game == 'mines'}
+                    if mines_uids:
+                        try:
+                            with _mines_lock:
+                                sessions = _load_mines_sessions()
+                                cleaned = {k: v for k, v in sessions.items()
+                                           if k not in mines_uids}
+                                if len(cleaned) < len(sessions):
+                                    import json as _json
+                                    with open(_mines_session_file(), 'w') as _mf:
+                                        _json.dump(cleaned, _mf)
+                                    _auth_logger.info(
+                                        "[maintenance] Evicted %d refunded mines JSON session(s)",
+                                        len(sessions) - len(cleaned))
+                        except Exception as _me:
+                            _auth_logger.error("[maintenance] mines JSON eviction error: %s", _me)
+            except Exception as exc:
+                _auth_logger.error("[maintenance] refund_expired_game_sessions: %s", exc)
+
+        # 3 — Prune stale mines JSON files
         try:
-            # Prune mines_user_sessions.json (new flow, uid-keyed)
             with _mines_lock:
                 _load_mines_sessions()  # prunes stale entries and persists to disk
         except Exception as exc:
-            _auth_logger.error("mines_cleanup_daemon (user sessions): %s", exc)
+            _auth_logger.error("[maintenance] mines user-sessions prune: %s", exc)
         try:
-            # Prune mines_sessions.json (legacy engine flow, session_id-keyed)
             _prune_engine_mines_sessions_file()
         except Exception as exc:
-            _auth_logger.error("mines_cleanup_daemon (engine sessions): %s", exc)
+            _auth_logger.error("[maintenance] mines engine-sessions prune: %s", exc)
+
+        # 4 — Evict expired auth nonces
+        if _VEX_GAMES:
+            try:
+                n = _cleanup_nonces()
+                if n:
+                    _auth_logger.debug("[maintenance] Evicted %d expired auth nonce(s)", n)
+            except Exception as exc:
+                _auth_logger.error("[maintenance] cleanup_expired_nonces: %s", exc)
+
 
 # Startup prune: clear sessions that expired while the server was down.
 try:
@@ -8170,7 +8230,7 @@ try:
 except Exception as _mce2:
     _auth_logger.error("mines startup prune (engine sessions) error: %s", _mce2)
 
-threading.Thread(target=_mines_cleanup_daemon, daemon=True, name='mines-cleanup').start()
+threading.Thread(target=_session_maintenance_daemon, daemon=True, name='session-maintenance').start()
 
 
 # ===== OTP Bot Auto-Start =====
