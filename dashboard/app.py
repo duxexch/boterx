@@ -4933,9 +4933,6 @@ def api_svrp_transfer_to_game():
     _transfer_id = client_key if client_key else _sec.token_hex(16)
 
     # ── Amount canonicalization ───────────────────────────────────────────────
-    # Canonical precision: 2 decimal places.  Both debit and credit use the
-    # same canonical value, so there is never a fractional imbalance between
-    # the SVRP deduction and the game credit.
     if parsed_amount is not None:
         from decimal import Decimal as _Dec, ROUND_DOWN as _RDOWN, InvalidOperation as _DI
         try:
@@ -4946,70 +4943,64 @@ def api_svrp_transfer_to_game():
             return jsonify({'error': 'الحد الأدنى للنقل 0.01'}), 400
         parsed_amount = float(_canon)
 
-    # ── Step A: SVRP debit (skipped when resuming a 'debited' record) ────────
-    # ORDERING (crash-safe):
-    #   1. create_svrp_transfer   → status='pending'           (BEFORE lock)
-    #   2. svrp_lock():
-    #      a. read + validate + canonicalize amount
-    #      b. take CSV snapshot (for rollback)
-    #      c. CAS: pending→debited + pre_debit_svrp_balance   (BEFORE CSV write)
-    #      d. CSV debit (use_credits)
-    #      e. on CSV failure: rollback outbox → pending,
-    #                         rollback CSV from snapshot, return 400/500
+    # ── Step A: SVRP debit ───────────────────────────────────────────────────
+    # Crash-safe exactly-once ordering:
     #
-    # Crash at 2c (CAS done) but before 2d (CSV debit):
-    #   status='debited', CSV unchanged.
-    #   On retry: 'debited' branch reads pre_debit_svrp_balance from outbox,
-    #   compares with current CSV balance — if unchanged, re-applies CSV debit
-    #   inside svrp_lock before proceeding to game credit.
+    #   Both fresh and resumed paths call use_credits_idempotent(uid, amount,
+    #   transfer_id).  That method writes `last_transfer_id = transfer_id` into
+    #   the wallet CSV atomically alongside the balance deduction (temp+fsync+rename).
+    #   Idempotency check: if the wallet row already carries this transfer_id the
+    #   call is a no-op — provably, without any cross-store flag.
     #
-    # Crash at 2d (CSV debited) but after 2c:
-    #   status='debited', CSV debited. On retry: normal 'debited' resume path.
+    #   Fresh path:
+    #     1. create outbox pending (BEFORE svrp_lock)
+    #     2. svrp_lock(): validate + canonicalize + CAS pending→debited + use_credits_idempotent
+    #        - CAS is BEFORE the CSV debit so that crash between CAS and CSV leaves
+    #          status='debited' with wallet.last_transfer_id != transfer_id, which
+    #          the resume path correctly detects and re-applies idempotently.
+    #        - CSV write failure after CAS: revert SQLite to 'pending'; retry is fresh.
+    #
+    #   Resume path (status='debited'):
+    #     - Read wallet.last_transfer_id from CSV.
+    #     - If == transfer_id → CSV debit confirmed, skip straight to game credit.
+    #     - If != transfer_id → call use_credits_idempotent → it applies the debit
+    #       and sets the marker in one atomic CSV write, then game credit.
 
-    _credits_snapshot: dict = {}   # populated inside lock for rollback use
+    _credits_snapshot: dict = {}
     amount: float = 0.0
 
     if _resume_debited:
-        # ── Resume: check whether CSV debit actually occurred ─────────────────
-        # Use the durable csv_debited flag (set inside svrp_lock immediately
-        # after use_credits succeeds) — NOT a balance-threshold heuristic, which
-        # is unreliable under concurrent SVRP mutations.
+        # ── Resume ────────────────────────────────────────────────────────────
         existing_rec = _gm.get_svrp_transfer(_transfer_id)
         amount = float((existing_rec or {}).get('amount') or 0)
-        _csv_was_debited = bool((existing_rec or {}).get('csv_debited', 0))
+        if amount < 0.01:
+            return jsonify({'error': 'المبلغ المسجل في الطلب غير صالح'}), 400
 
-        if not _csv_was_debited:
-            # CSV debit never completed (crash between CAS and use_credits).
-            # Re-apply the CSV debit inside svrp_lock before game credit.
-            with _svrp_lock():
-                _mrx = _SVRPMgr()
-                _credits_snapshot = {
-                    r['id']: dict(r)
-                    for r in _mrx._read_csv('svrp_credits.csv')
-                    if r.get('user_id') == uid
-                    and r.get('status') in ('active', 'pending')
-                }
+        # Check durable per-transfer marker in the wallet CSV
+        with _svrp_lock():
+            _mrx    = _SVRPMgr()
+            _wlx    = _mrx.get_wallet(uid) or {}
+            _csv_ok = str(_wlx.get('last_transfer_id', '')).strip() == str(_transfer_id)
+
+            if not _csv_ok:
+                # CSV debit not yet applied — re-apply idempotently
                 try:
-                    _rok, _rmsg = _mrx.use_credits(uid, amount)
+                    _rok, _rmsg = _mrx.use_credits_idempotent(uid, amount, _transfer_id)
                     if not _rok:
                         return jsonify({
                             'error': _rmsg or 'فشل تطبيق الخصم عند الاستئناف'
                         }), 400
-                    # Mark the flag so a subsequent crash here is handled correctly
-                    _gm.mark_svrp_transfer_csv_debited(_transfer_id, uid)
                 except Exception as _re1:
                     return jsonify({'error': f'خطأ في استئناف الخصم: {_re1}'}), 500
 
     else:
         # ── Fresh debit ───────────────────────────────────────────────────────
-        # A1. Reserve outbox slot BEFORE any CSV mutation
         inserted = _gm.create_svrp_transfer(_transfer_id, uid)
         if not inserted:
             return jsonify({'error': 'معرّف الطلب مُستخدم — أرسل طلباً جديداً'}), 409
 
-        # A2. Acquire cross-process lock: validate → CAS → CSV debit
         with _svrp_lock():
-            _mgr = _SVRPMgr()
+            _mgr        = _SVRPMgr()
             svrp_wallet = _mgr.get_wallet(uid)
             if not svrp_wallet:
                 return jsonify({'error': 'لا توجد محفظة SVRP لهذا الحساب'}), 404
@@ -5029,61 +5020,42 @@ def api_svrp_transfer_to_game():
             if svrp_credits <= 0:
                 return jsonify({'error': 'رصيد SVRP صفر — لا يوجد ما يُنقل'}), 400
 
-            # Finalise canonical amount inside lock (live balance is authoritative)
+            # Canonicalize amount inside lock (live balance is authoritative)
             from decimal import Decimal as _Dec2, ROUND_DOWN as _RD2
             _raw_amt = parsed_amount if parsed_amount is not None else svrp_credits
-            amount = float(
-                _Dec2(str(_raw_amt)).quantize(_Dec2('0.01'), rounding=_RD2)
-            )
+            amount = float(_Dec2(str(_raw_amt)).quantize(_Dec2('0.01'), rounding=_RD2))
             if amount < 0.01:
                 return jsonify({'error': 'الحد الأدنى للنقل 0.01'}), 400
             if amount > svrp_credits + 1e-9:
                 return jsonify({
-                    'error': (
-                        f'المبلغ ({amount:.2f}) يتجاوز رصيد SVRP ({svrp_credits:.2f})'
-                    )
+                    'error': f'المبلغ ({amount:.2f}) يتجاوز رصيد SVRP ({svrp_credits:.2f})'
                 }), 400
             amount = min(amount, round(svrp_credits, 2))
 
-            # Full CSV snapshot for compensating rollback
-            _credits_snapshot = {
-                r['id']: dict(r)
-                for r in _mgr._read_csv('svrp_credits.csv')
-                if r.get('user_id') == uid and r.get('status') in ('active', 'pending')
-            }
-            _pre_debit_svrp_balance = svrp_credits
-
-            # A3. CAS: pending → debited WITH pre_debit_svrp_balance (BEFORE CSV write).
-            #     This ensures that even if the process crashes after this point
-            #     but before use_credits(), the retry path can detect the state
-            #     by comparing the outbox's pre_debit_svrp_balance with the live
-            #     CSV balance.
+            # CAS pending→debited (BEFORE CSV write).
+            # If process crashes after this but before use_credits_idempotent:
+            # status='debited', wallet.last_transfer_id != transfer_id → resume
+            # path detects and calls use_credits_idempotent → correct.
             cas_ok = _gm.mark_svrp_transfer_debited(
-                _transfer_id, uid, amount, _pre_debit_svrp_balance
+                _transfer_id, uid, amount, svrp_credits
             )
             if not cas_ok:
                 import logging as _dl
                 _dl.getLogger('svrp_transfer').critical(
-                    'CAS pending→debited FAILED uid=%s transfer=%s '
-                    '(concurrent debit)', uid, _transfer_id
+                    'CAS pending→debited FAILED uid=%s transfer=%s', uid, _transfer_id
                 )
-                return jsonify({'error': 'خطأ داخلي — تم رفض الطلب (تعارض)'}), 409
+                return jsonify({'error': 'خطأ داخلي — تعارض في الطلب'}), 409
 
-            # A4. CSV debit — inside lock, AFTER the durable SQLite CAS.
-            # csv_debited is set atomically inside this same lock scope so that
-            # crash-recovery can use it as a reliable debit marker rather than
-            # an unsafe balance-threshold comparison.
+            # Idempotent CSV debit: writes last_transfer_id atomically with balance
             try:
-                ok, msg = _mgr.use_credits(uid, amount)
+                ok, msg = _mgr.use_credits_idempotent(uid, amount, _transfer_id)
                 if not ok:
-                    # Revert SQLite back to 'pending' so retry is treated as fresh
+                    # Revert outbox to pending so retry is treated as fresh
                     try:
                         _gm.mark_svrp_transfer_status(_transfer_id, uid, 'pending')
                     except Exception:
                         pass
                     return jsonify({'error': msg or 'فشل خصم أرصدة SVRP'}), 400
-                # Flag the CSV debit as complete — used by crash-recovery resume
-                _gm.mark_svrp_transfer_csv_debited(_transfer_id, uid)
             except Exception as _e1:
                 try:
                     _gm.mark_svrp_transfer_status(_transfer_id, uid, 'pending')

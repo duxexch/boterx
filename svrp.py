@@ -106,7 +106,11 @@ class SVRPManager:
     WALLET_FIELDS = [
         'telegram_id', 'customer_id', 'balance', 'pending_balance',
         'total_earned', 'total_used', 'wagering_required', 'wagering_completed',
-        'last_recovery_date', 'monthly_recovery_total'
+        'last_recovery_date', 'monthly_recovery_total',
+        # Idempotency markers — written atomically with the corresponding debit/credit
+        # so crash-recovery can prove a mutation occurred without a separate flag store.
+        'last_transfer_id',   # transfer_id of the last completed SVRP→game debit
+        'last_approval_id',   # req_id of the last approved recovery request
     ]
 
     TASK_FIELDS = [
@@ -183,14 +187,34 @@ class SVRPManager:
             return []
 
     def _write_csv(self, filename, rows, fields):
-        """كتابة آمنة في CSV — محمية بـ svrp_lock (reentrant)."""
+        """كتابة آمنة وذرية في CSV — temp file + fsync + rename.
+
+        Atomicity: data is written to a sibling .tmp file, fsynced, then
+        renamed over the target.  Either the old file or the fully-written
+        new file is visible after a crash — never a partially-written file.
+        Protected by svrp_lock (reentrant).
+        """
+        import tempfile as _tf
         with svrp_lock():
             try:
-                with open(filename, 'w', newline='', encoding='utf-8-sig') as f:
-                    writer = csv.DictWriter(f, fieldnames=fields)
-                    writer.writeheader()
-                    for row in rows:
-                        writer.writerow({k: row.get(k, '') for k in fields})
+                dir_ = os.path.dirname(os.path.abspath(filename))
+                fd, tmp_path = _tf.mkstemp(dir=dir_, suffix='.tmp')
+                try:
+                    with os.fdopen(fd, 'w', newline='', encoding='utf-8-sig') as f:
+                        writer = csv.DictWriter(f, fieldnames=fields,
+                                                extrasaction='ignore')
+                        writer.writeheader()
+                        for row in rows:
+                            writer.writerow({k: row.get(k, '') for k in fields})
+                        f.flush()
+                        os.fsync(f.fileno())
+                    os.replace(tmp_path, filename)
+                except Exception:
+                    try:
+                        os.unlink(tmp_path)
+                    except OSError:
+                        pass
+                    raise
                 return True
             except Exception as e:
                 logger.error(f"خطأ في كتابة {filename}: {e}")
@@ -546,6 +570,84 @@ class SVRPManager:
             self._write_csv('svrp_credits.csv', rows, self.CREDIT_FIELDS)
 
         logger.info(f"Recovery: User {telegram_id} used {amount} credits")
+        return True, "تم استخدام الأرصدة بنجاح"
+
+    def use_credits_idempotent(self, telegram_id, amount, transfer_id):
+        """Idempotent SVRP debit keyed on transfer_id.
+
+        Stores last_transfer_id atomically in the same CSV write as the balance
+        deduction.  If the wallet row already contains this transfer_id the call
+        is a provable no-op — crash recovery can call this safely on every retry
+        without risk of double-debit.
+
+        Returns (True, msg) on success or idempotent replay.
+        Returns (False, msg) on validation failure (insufficient balance, etc.).
+        Raises on CSV write failure so the caller can roll back the outbox state.
+        """
+        tid = str(telegram_id)
+        transfer_id = str(transfer_id)
+        with svrp_lock():
+            rows = self._read_csv('svrp_wallets.csv')
+            wallet_row = None
+            for r in rows:
+                if r.get('telegram_id') == tid:
+                    wallet_row = r
+                    break
+
+            # ── Idempotency check ────────────────────────────────────────────
+            if wallet_row is not None and wallet_row.get('last_transfer_id') == transfer_id:
+                # This transfer's debit is already persisted in the CSV.
+                logger.info(
+                    f"use_credits_idempotent: replay uid={tid} transfer={transfer_id}"
+                )
+                return True, "تم استخدام الأرصدة سابقاً (إعادة تشغيل آمنة)"
+
+            # ── Validation ──────────────────────────────────────────────────
+            if wallet_row is None:
+                return False, "المحفظة غير موجودة"
+            wager_req  = int(wallet_row.get('wagering_required', 3) or 3)
+            wager_done = int(wallet_row.get('wagering_completed', 0) or 0)
+            if wager_done < wager_req:
+                return False, "لم تكمل متطلبات الرهان بعد"
+            balance = float(wallet_row.get('balance', 0) or 0)
+            if balance < amount - 1e-9:
+                return False, f"الرصيد غير كافٍ (المتاح: {balance:.2f})"
+
+            # ── Debit + mark idempotency key in ONE atomic write ────────────
+            new_balance = round(balance - amount, 6)
+            total_used  = round(float(wallet_row.get('total_used', 0) or 0) + amount, 6)
+            wallet_row['balance']          = str(new_balance)
+            wallet_row['total_used']       = str(total_used)
+            wallet_row['last_transfer_id'] = transfer_id
+
+            ok = self._write_csv('svrp_wallets.csv', rows, self.WALLET_FIELDS)
+            if not ok:
+                raise RuntimeError(
+                    f"CSV write failed for use_credits_idempotent uid={tid}"
+                )
+
+            # ── Drain matching credit rows ──────────────────────────────────
+            credit_rows = self._read_csv('svrp_credits.csv')
+            remaining = amount
+            for row in credit_rows:
+                if (row.get('user_id') == tid and
+                        row.get('status') in ('active', 'pending') and
+                        float(row.get('credit_amount', 0) or 0) > 0):
+                    cv = float(row['credit_amount'])
+                    if remaining >= cv:
+                        remaining -= cv
+                        row['status'] = 'used'
+                        row['credit_amount'] = '0'
+                    else:
+                        row['credit_amount'] = str(round(cv - remaining, 6))
+                        remaining = 0
+                        break
+            self._write_csv('svrp_credits.csv', credit_rows, self.CREDIT_FIELDS)
+
+        logger.info(
+            f"Recovery: User {telegram_id} idempotent-debited {amount} "
+            f"credits transfer={transfer_id}"
+        )
         return True, "تم استخدام الأرصدة بنجاح"
 
     # ==================== الأكواد الترويجية ====================
@@ -981,31 +1083,73 @@ class SVRPManager:
         return None
 
     def approve_recovery_request(self, req_id, amount, admin_id):
-        """موافقة الأدمن على طلب استرداد — كل الـ RMW داخل svrp_lock."""
+        """موافقة الأدمن على طلب استرداد — كل الـ RMW داخل svrp_lock.
+
+        Crash-safe ordering (two-CSV atomicity via idempotency key):
+          1. Credit wallet + set last_approval_id = req_id  (atomic CSV write)
+          2. Update request status → 'approved'             (atomic CSV write)
+
+        If crash between 1 and 2: request status is still 'pending'.
+        On retry: wallet row has last_approval_id == req_id → wallet credit
+        is a no-op → only status write is re-applied → consistent.
+
+        If crash before 1: neither write happened → full retry is safe.
+        """
         with svrp_lock():
-            rows = self._read_csv('recovery_requests.csv')
+            req_rows = self._read_csv('recovery_requests.csv')
             req = None
-            for r in rows:
-                if r['id'] == req_id:
-                    if r.get('status') == 'approved':
-                        return False, "الطلب مُوافق عليه مسبقاً"
-                    r['status'] = 'approved'
-                    r['recovery_amount'] = str(amount)
-                    r['approved_at'] = datetime.now().strftime('%Y-%m-%d %H:%M')
-                    r['approved_by'] = str(admin_id)
+            for r in req_rows:
+                if r.get('id') == req_id:
                     req = r
                     break
             if not req:
                 return False, "الطلب غير موجود"
-            self._write_csv('recovery_requests.csv', rows, self.RECOVERY_REQUEST_FIELDS)
-            # إضافة الرصيد للمحفظة المجمدة (داخل القفل)
+            if req.get('status') == 'approved':
+                return False, "الطلب مُوافق عليه مسبقاً"
+
             user_id = req['user_id']
-            wallet  = self.get_wallet(user_id)
-            self._update_wallet(user_id, {
-                'balance':            float(wallet.get('balance', 0) or 0) + amount,
-                'total_earned':       float(wallet.get('total_earned', 0) or 0) + amount,
-                'last_recovery_date': datetime.now().strftime('%Y-%m-%d %H:%M'),
-            })
+
+            # ── Step 1: credit wallet idempotently (write FIRST) ─────────────
+            w_rows = self._read_csv('svrp_wallets.csv')
+            w_row  = None
+            for wr in w_rows:
+                if wr.get('telegram_id') == str(user_id):
+                    w_row = wr
+                    break
+            if w_row is None:
+                # Create wallet on-the-fly then re-read rows
+                self.get_wallet(user_id)
+                w_rows = self._read_csv('svrp_wallets.csv')
+                for wr in w_rows:
+                    if wr.get('telegram_id') == str(user_id):
+                        w_row = wr
+                        break
+
+            if w_row is not None and w_row.get('last_approval_id') != str(req_id):
+                # Not yet applied — apply now
+                w_row['balance']          = str(
+                    round(float(w_row.get('balance', 0) or 0) + amount, 6)
+                )
+                w_row['total_earned']     = str(
+                    round(float(w_row.get('total_earned', 0) or 0) + amount, 6)
+                )
+                w_row['last_recovery_date'] = datetime.now().strftime('%Y-%m-%d %H:%M')
+                w_row['last_approval_id']   = str(req_id)
+                ok = self._write_csv('svrp_wallets.csv', w_rows, self.WALLET_FIELDS)
+                if not ok:
+                    return False, "فشل تحديث المحفظة — الطلب لم يُوافق عليه"
+            # else: last_approval_id already matches — idempotent replay
+
+            # ── Step 2: mark request approved (write SECOND) ─────────────────
+            for r in req_rows:
+                if r.get('id') == req_id:
+                    r['status']          = 'approved'
+                    r['recovery_amount'] = str(amount)
+                    r['approved_at']     = datetime.now().strftime('%Y-%m-%d %H:%M')
+                    r['approved_by']     = str(admin_id)
+                    break
+            self._write_csv('recovery_requests.csv', req_rows, self.RECOVERY_REQUEST_FIELDS)
+
         logger.info(f"Recovery approved: {req_id} amount={amount} for user {user_id}")
         return True, f"تم إضافة {amount} للرصيد المجمد"
 
