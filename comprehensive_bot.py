@@ -4616,7 +4616,8 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             customer_id = user.get('customer_id', '')
             stats_bar = self.format_stats_bar()
             if lang == 'ar':
-                welcome_text = self.ui_header(self.tr('a0124_أهلاً_وسهلاً،', lang, name=name), '👋')
+                welcome_text = "💚 <b>VEX</b> — اشتي وبع مع المستخدمين الآخرين بأمان\n\n"
+                welcome_text += self.ui_header(self.tr('a0124_أهلاً_وسهلاً،', lang, name=name), '👋')
                 welcome_text += '\n'
                 # بطاقة العميل
                 welcome_text += self.ui_card(self.tr('a0125_بيانات_العميل', lang), [
