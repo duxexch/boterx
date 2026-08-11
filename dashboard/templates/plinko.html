@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
 <title>Plinko — VEX</title>
-<link rel="stylesheet" href="/static/css/game-base.css?v=20260811e">
+<link rel="stylesheet" href="/static/css/game-base.css?v=20260811f">
 <style>
 /* ── FULL SELF-CONTAINED LAYOUT — do NOT depend on game-base.css for layout ── */
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -76,40 +76,49 @@ html,body{
 /* Controls */
 .controls-panel{
   flex-shrink:0;
-  padding:8px 8px max(8px,env(safe-area-inset-bottom));
+  padding:6px 8px max(6px,env(safe-area-inset-bottom));
   background:#060810;
   border-top:1px solid #1a2a3a;
+  display:flex;
+  flex-direction:column;
+  gap:5px;
 }
-.controls-row{display:flex;align-items:center;gap:4px;flex-wrap:nowrap}
-.opt-box{display:flex;align-items:center;gap:1px;background:#111820;border:1px solid #1e2d3d;border-radius:8px;padding:3px}
+.controls-top{display:flex;align-items:center;gap:6px;justify-content:space-between}
+.controls-bottom{display:flex;align-items:center;gap:6px}
+.opt-label{font-size:9px;color:#475569;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;text-align:center}
+.opt-box{display:flex;align-items:center;gap:2px;background:#0d141c;border:1px solid #1e2d3d;border-radius:8px;padding:3px;flex:1}
 .opt-btn{
-  padding:5px 8px;border-radius:6px;background:#0a1018;border:1px solid #1e2d3d;
-  color:#5a6a7a;font-size:10px;font-weight:700;cursor:pointer;transition:all .15s;
-  min-width:26px;text-align:center;
+  flex:1;padding:6px 4px;border-radius:6px;background:transparent;border:1px solid transparent;
+  color:#5a6a7a;font-size:11px;font-weight:700;cursor:pointer;transition:all .15s;
+  text-align:center;
 }
 .opt-btn.active{background:rgba(251,191,36,.12);border-color:#fbbf24;color:#fbbf24;box-shadow:0 0 8px rgba(251,191,36,.15)}
+.bet-section{display:flex;align-items:center;gap:4px;flex:1}
 .bet-inp{
-  flex:1;background:#0a1018;border:1px solid #1e2d3d;color:#e1e8f0;
-  padding:8px;border-radius:8px;font-size:14px;font-weight:700;text-align:center;
+  flex:1;background:#0d141c;border:1px solid #1e2d3d;color:#e1e8f0;
+  padding:9px;border-radius:8px;font-size:15px;font-weight:700;text-align:center;
   font-family:'Courier New',monospace;min-width:0;
 }
-.bet-inp:focus{outline:none;border-color:#fbbf24}
+.bet-inp:focus{outline:none;border-color:#fbbf24;box-shadow:0 0 6px rgba(251,191,36,.1)}
 .ctrl-btn{
-  background:#111820;border:1px solid #1e2d3d;color:#6a7a8a;
-  padding:8px 8px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0;
+  background:#0d141c;border:1px solid #1e2d3d;color:#6a7a8a;
+  padding:9px 12px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;flex-shrink:0;
+  transition:all .15s;min-width:40px;text-align:center;
 }
-.ctrl-btn:active{transform:scale(.93)}
+.ctrl-btn:active{transform:scale(.93);background:#162030}
 .drop-btn{
-  padding:10px 16px;border-radius:10px;font-size:15px;font-weight:900;border:none;cursor:pointer;
-  background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#000;flex:2;letter-spacing:.5px;
-  box-shadow:0 2px 12px rgba(251,191,36,.2);
+  padding:11px 20px;border-radius:10px;font-size:15px;font-weight:900;border:none;cursor:pointer;
+  background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#000;flex:1;letter-spacing:.5px;
+  box-shadow:0 2px 12px rgba(251,191,36,.2);transition:all .15s;
 }
-.drop-btn:active{transform:scale(.97)}
+.drop-btn:active{transform:scale(.98)}
 .drop-btn:disabled{background:#1a2a3a;color:#5a6a7a;cursor:not-allowed;box-shadow:none}
+.auto-section{display:flex;align-items:center;gap:4px}
 .auto-inp{
-  background:#0a1018;border:1px solid #1e2d3d;color:#e1e8f0;
-  padding:6px;border-radius:6px;font-size:11px;text-align:center;width:36px;
+  background:#0d141c;border:1px solid #1e2d3d;color:#e1e8f0;
+  padding:9px;border-radius:8px;font-size:12px;text-align:center;width:42px;font-weight:700;
 }
+.auto-label{font-size:9px;color:#475569;font-weight:700}
 
 /* Result chips */
 .result-row{
@@ -153,28 +162,41 @@ html,body{
     <div class="result-row" id="resultRow"></div>
   </div>
   <div class="controls-panel">
-    <div class="controls-row">
-      <div class="opt-box">
-        <div class="opt-btn" id="r8" onclick="setRows(8)">8</div>
-        <div class="opt-btn active" id="r12" onclick="setRows(12)">12</div>
-        <div class="opt-btn" id="r16" onclick="setRows(16)">16</div>
-        <div class="opt-btn" id="r20" onclick="setRows(20)">20</div>
+    <div class="controls-top">
+      <div style="flex:1">
+        <div class="opt-label">الصفوف</div>
+        <div class="opt-box">
+          <div class="opt-btn" id="r8" onclick="setRows(8)">8</div>
+          <div class="opt-btn active" id="r12" onclick="setRows(12)">12</div>
+          <div class="opt-btn" id="r16" onclick="setRows(16)">16</div>
+          <div class="opt-btn" id="r20" onclick="setRows(20)">20</div>
+        </div>
       </div>
-      <div class="opt-box">
-        <div class="opt-btn active" id="rkL" onclick="setRisk('low')">منخفض</div>
-        <div class="opt-btn" id="rkM" onclick="setRisk('med')">متوسط</div>
-        <div class="opt-btn" id="rkH" onclick="setRisk('high')">عالي</div>
+      <div style="flex:1">
+        <div class="opt-label">المخاطرة</div>
+        <div class="opt-box">
+          <div class="opt-btn active" id="rkL" onclick="setRisk('low')">منخفض</div>
+          <div class="opt-btn" id="rkM" onclick="setRisk('med')">متوسط</div>
+          <div class="opt-btn" id="rkH" onclick="setRisk('high')">عالي</div>
+        </div>
       </div>
+    </div>
+    <div class="controls-bottom">
       <button class="ctrl-btn" onclick="adjBet(0.5)">½</button>
-      <input class="bet-inp" type="number" id="betInp" value="10" min="1">
+      <div class="bet-section">
+        <input class="bet-inp" type="number" id="betInp" value="10" min="1">
+      </div>
       <button class="ctrl-btn" onclick="adjBet(2)">2×</button>
-      <input class="auto-inp" type="number" id="autoCount" value="1" min="1" max="100" title="تكرار">
+      <div class="auto-section">
+        <span class="auto-label">🔁</span>
+        <input class="auto-inp" type="number" id="autoCount" value="1" min="1" max="100">
+      </div>
       <button class="drop-btn" id="dropBtn" onclick="dropBall()">🎯 إسقاط</button>
     </div>
   </div>
 </div>
 <div class="big-win-overlay" id="bigWin"><div style="text-align:center"><div class="big-win-num" id="bwNum"></div><div class="big-win-text" id="bwTxt"></div></div></div>
-<script src="/static/js/game-base.js?v=20260811e"></script>
+<script src="/static/js/game-base.js?v=20260811f"></script>
 <script>
 'use strict';
 
