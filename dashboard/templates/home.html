@@ -223,8 +223,9 @@ function depChooseCompany(){
       mb.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted)">لا توجد شركات متاحة حالياً</div><button onclick="openDeposit()" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer">‹ رجوع</button>';
       return;
     }
-    var cHtml = companies.map(function(c){
-      return '<div onclick="depCompanySel('+JSON.stringify(c.id)+','+JSON.stringify(c.name||'')+','+JSON.stringify(c.icon||'🏢')+')" style="display:flex;align-items:center;gap:10px;padding:14px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;margin-bottom:6px;cursor:pointer">'+
+    _depCompanies = companies;
+    var cHtml = companies.map(function(c, i){
+      return '<div onclick="depCompanySelIdx('+i+')" style="display:flex;align-items:center;gap:10px;padding:14px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;margin-bottom:6px;cursor:pointer">'+
         '<span style="font-size:24px">'+(c.icon||'🏢')+'</span>'+
         '<div style="flex:1"><div style="font-size:14px;font-weight:700">'+(c.name||'')+'</div>'+(c.address?'<div style="font-size:10px;color:var(--muted)">'+c.address+'</div>':'')+'</div>'+
         '<span style="color:var(--muted)">‹</span></div>';
@@ -237,6 +238,11 @@ function depChooseCompany(){
   });
 }
 
+var _depCompanies = [];
+function depCompanySelIdx(i){
+  var c = _depCompanies[i] || {};
+  depCompanySel(c.id, c.name || '', c.icon || '🏢');
+}
 function depCompanySel(cid, cname, cicon){
   var mb = document.getElementById('mb');
   mb.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">جارٍ تحميل وسائل دفع '+cname+'...</div>';
@@ -252,9 +258,11 @@ function renderDepMethods(methods, saved, source, cid, cname, cicon){
   var mb = document.getElementById('mb');
   var title = source === 'company' ? (cicon+' '+cname) : '👛 المحفظة';
   var mHtml = '';
+  _depMethods = methods || [];
+  _depCtx = { source: source, cid: cid || null, cname: cname || null };
   if(methods && methods.length > 0){
-    mHtml = methods.map(function(m){
-      return '<div onclick="depSel('+JSON.stringify(m.id)+','+JSON.stringify(m.method_name||'')+','+JSON.stringify(m.account_data||'')+')" style="display:flex;align-items:center;gap:10px;padding:12px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;margin-bottom:6px;cursor:pointer">'+
+    mHtml = methods.map(function(m, i){
+      return '<div onclick="depSelIdx('+i+')" style="display:flex;align-items:center;gap:10px;padding:12px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;margin-bottom:6px;cursor:pointer">'+
         '<span style="font-size:20px">'+(m.icon||'💳')+'</span>'+
         '<div style="flex:1"><div style="font-size:13px;font-weight:700">'+(m.method_name||'')+'</div><div style="font-size:10px;color:var(--muted)">'+(m.method_type||'')+'</div></div>'+
         '<span style="color:var(--muted)">‹</span></div>';
@@ -276,13 +284,18 @@ function renderDepMethods(methods, saved, source, cid, cname, cicon){
     '<input id="depWallet" type="text" placeholder="رقم محفظتك" style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);margin-bottom:8px;font-size:14px">'+
     manualHtml+
     '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-bottom:10px;cursor:pointer"><input type="checkbox" id="depSave" style="accent-color:var(--green)"> حفظ دائم</label>'+
-    '<button onclick="depSubmit('+JSON.stringify(source)+','+(cid?JSON.stringify(cid):'null')+','+(cname?JSON.stringify(cname):'null')+')" style="width:100%;padding:12px;border-radius:10px;border:none;background:linear-gradient(135deg,var(--green),var(--green2));color:#06100c;font-weight:800;font-size:15px;cursor:pointer">✅ تأكيد الإيداع</button>'+
-    (methods?'<button onclick="depBackToMethods()" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);margin-top:6px;cursor:pointer">‹ رجوس</button>':'')+
+    '<button onclick="depSubmitCtx()" style="width:100%;padding:12px;border-radius:10px;border:none;background:linear-gradient(135deg,var(--green),var(--green2));color:#06100c;font-weight:800;font-size:15px;cursor:pointer">✅ تأكيد الإيداع</button>'+
+    (methods && methods.length?'<button onclick="depBackToMethods()" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);margin-top:6px;cursor:pointer">‹ رجوع</button>':'')+
     '</div>'+
-    '<button onclick="openDeposit()" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);margin-top:6px;cursor:pointer">‹ رجوس للقائمة</button>';
+    '<button onclick="openDeposit()" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);margin-top:6px;cursor:pointer">‹ رجوع للقائمة</button>';
 }
 
-var _depSelId='', _depSelName='', _depSelData='';
+var _depSelId='', _depSelName='', _depSelData='', _depMethods=[], _depCtx={};
+function depSelIdx(i){
+  var m = _depMethods[i] || {};
+  depSel(m.id || '', m.method_name || '', m.account_data || '');
+}
+function depSubmitCtx(){ depSubmit(_depCtx.source, _depCtx.cid, _depCtx.cname); }
 function depSel(id, name, data){
   _depSelId=id; _depSelName=name; _depSelData=data;
   document.getElementById('depList').style.display='none';
@@ -362,16 +375,22 @@ function wdChooseCompany(bal){
   fetch('/api/companies/list').then(function(r){return r.json()}).then(function(d){
     var companies = d.companies || [];
     if(companies.length === 0){
-      mb.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted)">لا توجد شركات متاحة</div><button onclick="openWithdraw()" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer">‹ رجوس</button>';
+      mb.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted)">لا توجد شركات متاحة</div><button onclick="openWithdraw()" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer">‹ رجوع</button>';
       return;
     }
-    var cHtml = companies.map(function(c){
-      return '<div onclick="wdCompanySel('+JSON.stringify(c.id)+','+JSON.stringify(c.name||'')+','+JSON.stringify(c.icon||'🏢')+','+bal+')" style="display:flex;align-items:center;gap:10px;padding:14px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;margin-bottom:6px;cursor:pointer"><span style="font-size:24px">'+(c.icon||'🏢')+'</span><div style="flex:1"><div style="font-size:14px;font-weight:700">'+(c.name||'')+'</div></div><span style="color:var(--muted)">‹</span></div>';
+    _wdCompanies = companies; _wdBal = bal;
+    var cHtml = companies.map(function(c, i){
+      return '<div onclick="wdCompanySelIdx('+i+')" style="display:flex;align-items:center;gap:10px;padding:14px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;margin-bottom:6px;cursor:pointer"><span style="font-size:24px">'+(c.icon||'🏢')+'</span><div style="flex:1"><div style="font-size:14px;font-weight:700">'+(c.name||'')+'</div></div><span style="color:var(--muted)">‹</span></div>';
     }).join('');
-    mb.innerHTML = '<div style="font-size:16px;font-weight:900;color:var(--gold);margin-bottom:12px">🏢 اختر الشركة</div>'+cHtml+'<button onclick="openWithdraw()" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);margin-top:6px;cursor:pointer">‹ رجوس</button>';
+    mb.innerHTML = '<div style="font-size:16px;font-weight:900;color:var(--gold);margin-bottom:12px">🏢 اختر الشركة</div>'+cHtml+'<button onclick="openWithdraw()" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);margin-top:6px;cursor:pointer">‹ رجوع</button>';
   }).catch(function(){ mb.innerHTML = '<div style="text-align:center;color:var(--muted)">خطأ</div>'; });
 }
 
+var _wdCompanies = [], _wdBal = 0, _wdMethods = [], _wdCtx = {};
+function wdCompanySelIdx(i){
+  var c = _wdCompanies[i] || {};
+  wdCompanySel(c.id, c.name || '', c.icon || '🏢', _wdBal);
+}
 function wdCompanySel(cid, cname, cicon, bal){
   var mb = document.getElementById('mb');
   mb.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">جارٍ تحميل وسائل استلام '+cname+'...</div>';
@@ -383,8 +402,10 @@ function wdCompanySel(cid, cname, cicon, bal){
 function renderWdForm(methods, bal, source, cid, cname, cicon){
   var mb = document.getElementById('mb');
   var title = source === 'company' ? (cicon+' '+cname) : '👛 المحفظة';
-  var mHtml = methods.length > 0 ? methods.map(function(m){
-    return '<div onclick="wdSelAcc('+JSON.stringify(m.account_number||m.account_data||'')+')" style="display:flex;align-items:center;gap:8px;padding:10px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;margin-bottom:6px;cursor:pointer"><span style="font-size:20px">'+(m.icon||'💳')+'</span><div style="flex:1"><div style="font-size:13px;font-weight:700">'+(m.method_name||'')+'</div><div style="font-size:10px;color:var(--muted)">'+(m.account_number||m.account_data||'')+'</div></div></div>';
+  _wdMethods = methods || [];
+  _wdCtx = { bal: bal, source: source, cid: cid || null, cname: cname || null };
+  var mHtml = methods.length > 0 ? methods.map(function(m, i){
+    return '<div onclick="wdSelAccIdx('+i+')" style="display:flex;align-items:center;gap:8px;padding:10px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;margin-bottom:6px;cursor:pointer"><span style="font-size:20px">'+(m.icon||'💳')+'</span><div style="flex:1"><div style="font-size:13px;font-weight:700">'+(m.method_name||'')+'</div><div style="font-size:10px;color:var(--muted)">'+(m.account_number||m.account_data||'')+'</div></div></div>';
   }).join('') : '';
   mb.innerHTML = '<div style="font-size:16px;font-weight:900;color:var(--gold);margin-bottom:4px">'+title+'</div>'+
     '<div style="font-size:12px;color:var(--muted);margin-bottom:12px">رصيدك: '+bal.toLocaleString()+' {{ user_currency }}</div>'+
@@ -393,11 +414,16 @@ function renderWdForm(methods, bal, source, cid, cname, cicon){
     '<input id="wdAcc" placeholder="رقم الحساب" style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);margin-bottom:8px;font-size:14px">'+
     '<div style="font-size:11px;color:var(--muted);margin-bottom:4px">💵 المبلغ:</div>'+
     '<input id="wdAmt" type="number" placeholder="'+bal+'" max="'+bal+'" style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);margin-bottom:8px;font-size:16px;font-weight:700;text-align:center">'+
-    '<button onclick="wdSubmit('+bal+','+JSON.stringify(source)+','+(cid?JSON.stringify(cid):'null')+','+(cname?JSON.stringify(cname):'null')+')" style="width:100%;padding:12px;border-radius:10px;border:none;background:linear-gradient(135deg,#ff8c00,#e67e00);color:#06100c;font-weight:800;font-size:15px;cursor:pointer">✅ تأكيد السحب</button>'+
-    '<button onclick="openWithdraw()" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);margin-top:6px;cursor:pointer">‹ رجوس</button>';
+    '<button onclick="wdSubmitCtx()" style="width:100%;padding:12px;border-radius:10px;border:none;background:linear-gradient(135deg,#ff8c00,#e67e00);color:#06100c;font-weight:800;font-size:15px;cursor:pointer">✅ تأكيد السحب</button>'+
+    '<button onclick="openWithdraw()" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);margin-top:6px;cursor:pointer">‹ رجوع</button>';
 }
 
+function wdSelAccIdx(i){
+  var m = _wdMethods[i] || {};
+  wdSelAcc(m.account_number || m.account_data || '');
+}
 function wdSelAcc(acc){ document.getElementById('wdAcc').value = acc; }
+function wdSubmitCtx(){ wdSubmit(_wdCtx.bal, _wdCtx.source, _wdCtx.cid, _wdCtx.cname); }
 function wdSubmit(maxBal, source, cid, cname){
   var amt = parseFloat(document.getElementById('wdAmt').value) || 0;
   var acc = document.getElementById('wdAcc').value.trim();
