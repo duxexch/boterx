@@ -243,17 +243,20 @@ class GameManager:
     # ===== المحفظة الموحدة (users.csv) =====
 
     def _migrate_payment_methods_for_games(self):
-        """إضافة عمود available_for_games إلى payment_methods.csv"""
+        """إضافة عمودَي available_for_games و currency إلى payment_methods.csv"""
         try:
             with open('payment_methods.csv', 'r', encoding=CSV_ENCODING) as f:
                 reader = csv.DictReader(f)
                 fieldnames = reader.fieldnames or []
-                if 'available_for_games' in fieldnames:
+                missing = [c for c in ('available_for_games', 'currency') if c not in fieldnames]
+                if not missing:
                     return
                 rows = list(reader)
-            new_fields = list(fieldnames) + ['available_for_games']
+            new_fields = list(fieldnames) + missing
+            defaults = {'available_for_games': 'yes', 'currency': ''}
             for row in rows:
-                row['available_for_games'] = 'yes'
+                for c in missing:
+                    row[c] = defaults[c]
             with open('payment_methods.csv', 'w', newline='', encoding=CSV_ENCODING) as f:
                 writer = csv.DictWriter(f, fieldnames=new_fields)
                 writer.writeheader()
@@ -264,15 +267,14 @@ class GameManager:
 
     def get_games_payment_methods(self, user_currency=None):
         """قراءة وسائل الدفع النشطة والمتاحة للألعاب — مفلترة حسب العملة.
-        إذا لم توجد نتائج بعد الفلترة، أرجع كل الوسائل النشطة."""
+        لا يوجد fallback: إذا لم توجد وسائل مطابقة تُرجع قائمة فارغة
+        (الواجهة تعرض نموذج الإدخال اليدوي في هذه الحالة)."""
         methods = []
-        all_active = []
         try:
             with open('payment_methods.csv', 'r', encoding=CSV_ENCODING) as f:
                 reader = csv.DictReader(f)
                 for row in reader:
                     if row.get('status') == 'active':
-                        all_active.append(row)
                         avail = row.get('available_for_games', 'yes')
                         if avail != 'yes':
                             continue
@@ -283,9 +285,6 @@ class GameManager:
                             methods.append(row)
         except:
             pass
-        # Fallback: if filtered list is empty, return all active methods
-        if not methods and all_active:
-            return all_active
         return methods
 
     def get_user_info(self, user_id):
