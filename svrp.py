@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 نظام 💎 الاسترداد الذكي — Smart Recovery
@@ -12,9 +12,64 @@ import json
 import random
 import string
 import logging
+import threading as _threading
+import fcntl as _fcntl
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
+
+# ==================== SVRP cross-process lock ====================
+# All writes to svrp_wallets.csv and svrp_credits.csv MUST go through
+# svrp_lock() so that concurrent requests (threads in the dashboard
+# worker, and the separate bot process) are fully serialised.
+#
+# Design:
+#  • _SVRP_RLOCK  — threading.RLock so the same thread can nest svrp_lock()
+#    calls (e.g. the transfer endpoint holding the outer lock while
+#    use_credits() takes the inner lock internally).
+#  • fcntl.LOCK_EX on a shared file — cross-process serialisation between
+#    the bot process and the dashboard process.
+#  • depth counter (thread-local) — prevents the inner fcntl acquire from
+#    deadlocking when the caller already holds the outer fcntl lock.
+
+_SVRP_RLOCK = _threading.RLock()
+_svrp_fcntl_depth = _threading.local()   # per-thread re-entrancy counter
+
+
+def _svrp_get_fd():
+    """Return (creating if needed) a module-level fd for the SVRP lock file."""
+    global _svrp_lock_fd  # noqa: PLW0603
+    if '_svrp_lock_fd' not in globals() or _svrp_lock_fd is None:
+        lock_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), '.svrp_lock'
+        )
+        globals()['_svrp_lock_fd'] = open(lock_path, 'w')  # noqa: WPS515
+    return globals()['_svrp_lock_fd']
+
+
+@contextmanager
+def svrp_lock():
+    """Reentrant cross-process lock for all SVRP wallet/credit CSV mutations.
+
+    Usage::
+
+        with svrp_lock():
+            wallet = mgr.get_wallet(uid)   # read inside lock
+            ...
+            mgr.use_credits(uid, amount)   # internally uses svrp_lock too — safe
+    """
+    depth = getattr(_svrp_fcntl_depth, 'v', 0)
+    with _SVRP_RLOCK:           # serialise threads within this process (reentrant)
+        if depth == 0:
+            _fcntl.flock(_svrp_get_fd().fileno(), _fcntl.LOCK_EX)
+        _svrp_fcntl_depth.v = depth + 1
+        try:
+            yield
+        finally:
+            _svrp_fcntl_depth.v -= 1
+            if _svrp_fcntl_depth.v == 0:
+                _fcntl.flock(_svrp_get_fd().fileno(), _fcntl.LOCK_UN)
 
 # ==================== إعدادات 💎 الاسترداد الذكي ====================
 SVRP_CONFIG = {
@@ -128,28 +183,30 @@ class SVRPManager:
             return []
 
     def _write_csv(self, filename, rows, fields):
-        """كتابة آمنة في CSV"""
-        try:
-            with open(filename, 'w', newline='', encoding='utf-8-sig') as f:
-                writer = csv.DictWriter(f, fieldnames=fields)
-                writer.writeheader()
-                for row in rows:
-                    writer.writerow({k: row.get(k, '') for k in fields})
-            return True
-        except Exception as e:
-            logger.error(f"خطأ في كتابة {filename}: {e}")
-            return False
+        """كتابة آمنة في CSV — محمية بـ svrp_lock (reentrant)."""
+        with svrp_lock():
+            try:
+                with open(filename, 'w', newline='', encoding='utf-8-sig') as f:
+                    writer = csv.DictWriter(f, fieldnames=fields)
+                    writer.writeheader()
+                    for row in rows:
+                        writer.writerow({k: row.get(k, '') for k in fields})
+                return True
+            except Exception as e:
+                logger.error(f"خطأ في كتابة {filename}: {e}")
+                return False
 
     def _append_csv(self, filename, row, fields):
-        """إضافة صف جديد إلى CSV"""
-        try:
-            with open(filename, 'a', newline='', encoding='utf-8-sig') as f:
-                writer = csv.DictWriter(f, fieldnames=fields)
-                writer.writerow({k: row.get(k, '') for k in fields})
-            return True
-        except Exception as e:
-            logger.error(f"خطأ في إضافة صف إلى {filename}: {e}")
-            return False
+        """إضافة صف جديد إلى CSV — محمية بـ svrp_lock (reentrant)."""
+        with svrp_lock():
+            try:
+                with open(filename, 'a', newline='', encoding='utf-8-sig') as f:
+                    writer = csv.DictWriter(f, fieldnames=fields)
+                    writer.writerow({k: row.get(k, '') for k in fields})
+                return True
+            except Exception as e:
+                logger.error(f"خطأ في إضافة صف إلى {filename}: {e}")
+                return False
 
     def _get_config(self, key):
         """الحصول على قيمة إعداد"""
