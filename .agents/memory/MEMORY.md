@@ -1,2 +1,5 @@
 - [Boterx repo structure](boterx-repo-structure.md) — production files are at workspace ROOT, not inside boterx/ subdirectory; .git is at /home/runner/workspace/
 - [Boterx SQLite layer](boterx-sqlite-layer.md) — database.py + PersistentStateDict replace in-memory user_states and CSV I/O; migrate.py is idempotent
+- [Boterx server deploy](boterx-server-deploy.md) — server 69.169.108.197 /opt/bot; git reset --hard origin/main then systemctl restart boterx boterx-dashboard; both services active post-deploy
+- [Boterx concurrent bot](boterx-concurrent-bot.md) — run() uses ThreadPoolExecutor(20) + per-user Semaphore(2) + SlidingWindowLimiter; broadcast in daemon thread; new modules: bot_utils/rate_limiter.py + notification_hub.py
+- [Boterx RBAC & sessions](boterx-rbac-sessions.md) — admin_roles + admin_audit_log + active_game_sessions + financial_ledger tables in vex_games.db; RBAC functions in db_manager.py module scope (not in GameDB class)
