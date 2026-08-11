@@ -42,6 +42,27 @@ try:
 except Exception:
     def _ags_set(*a, **k): pass
     def _ags_del(*a, **k): pass
+
+def _settle_credit(uid, amount, skey):
+    """Idempotent settlement credit that SHARES its key with the refund daemon.
+    Whichever runs first (settlement or restart-refund) consumes the key; the
+    other becomes a no-op — double-pay is impossible. Losses call this with
+    amount=0 to burn the key so a late refund cannot resurrect a lost stake.
+    Returns (paid, balance_after_or_None)."""
+    try:
+        ok, stored, cached = _gm.credit_with_idempotency(
+            uid, float(amount), skey, {'settled': True, 'amount': float(amount)})
+        if cached is not None:
+            return False, None  # key already consumed (refunded or settled)
+        if ok:
+            return True, (stored or {}).get('balance_after')
+    except Exception:
+        # Fallback: never strand a payout if idempotency layer errors
+        if amount and amount > 0:
+            try: return True, _gm.add_balance(uid, float(amount))
+            except Exception: return False, None
+    return True, None
+
 from datetime import datetime
 
 # ── Config ──────────────────────────────────────────────
@@ -393,15 +414,12 @@ def _game_loop():
                     payout = bet['amount'] * bet['target_x']
                     bet['payout'] = round(payout, 2)
                     bet['remaining'] = round(payout, 2)
-                    try: _gm.add_balance(uid, payout)
-                    except: pass
+                    _settle_credit(uid, payout, bet.get('skey', ''))
                     total_out += payout
                 else:
-                    # DRAINED: get remaining
+                    # DRAINED: get remaining (0 → burn key so no late refund)
                     remaining = _calc_remaining(bet['amount'], bet['target_x'], crash_pt, 'crash')
-                    if remaining > 0:
-                        try: _gm.add_balance(uid, remaining)
-                        except: pass
+                    _settle_credit(uid, remaining if remaining > 0 else 0, bet.get('skey', ''))
                     bet['payout'] = round(remaining, 2)
                     bet['remaining'] = round(remaining, 2)
                     total_out += remaining
@@ -410,15 +428,14 @@ def _game_loop():
             for uid, bet in list(_state['rise_bets'].items()):
                 total_in += bet['amount']
                 if crash_pt < bet['target_x']:
-                    # LOSE all
+                    # LOSE all — burn settlement key so a late refund can't fire
                     bet['payout'] = 0
                     bet['remaining'] = 0
+                    _settle_credit(uid, 0, bet.get('skey', ''))
                 else:
                     # SURVIVED + DRAINED: get remaining
                     remaining = _calc_remaining(bet['amount'], bet['target_x'], crash_pt, 'rise')
-                    if remaining > 0:
-                        try: _gm.add_balance(uid, remaining)
-                        except: pass
+                    _settle_credit(uid, remaining if remaining > 0 else 0, bet.get('skey', ''))
                     bet['payout'] = round(remaining, 2)
                     bet['remaining'] = round(remaining, 2)
                     total_out += remaining
@@ -494,16 +511,20 @@ def init_crash_engine(app, get_uid, get_gm, get_pf, is_pf, is_vex):
                 return jsonify({'error': 'طلب مكرر'}), 409
             if req_id: _state['request_ids'][uid + '_' + side] = req_id
 
+            skey = 'crashset_%s_%s_%s' % (_state['round_id'], side, uid)
+            # Durable row BEFORE debit — restart in the gap refunds via daemon,
+            # and settlement shares skey with the refund so double-pay is impossible.
+            try: _ags_set(uid, 'crash_' + side, {'target_x': target_x, 'settle_key': skey}, amount)
+            except Exception: pass
             success, balance = _gm.deduct_balance(uid, amount)
             if not success:
+                try: _ags_del(uid, 'crash_' + side)
+                except Exception: pass
                 return jsonify({'need_deposit': True, 'error': 'رصيد غير كافٍ'})
 
             bet_entry = {'amount': amount, 'target_x': target_x, 'exited': False,
-                        'remaining': amount, 'payout': 0}
+                        'remaining': amount, 'payout': 0, 'skey': skey}
             bet_dict[uid] = bet_entry
-            # Durable: survive restart → auto-refund if round never settles
-            try: _ags_set(uid, 'crash_' + side, {'target_x': target_x}, amount)
-            except Exception: pass
 
         return jsonify({'success': True, 'balance_after': balance,
                         'side': side, 'target_x': target_x})
@@ -538,7 +559,11 @@ def init_crash_engine(app, get_uid, get_gm, get_pf, is_pf, is_vex):
             if remaining <= 0:
                 return jsonify({'error': 'لا يوجد رصيد متبقي'})
 
-            balance = _gm.add_balance(uid, remaining)
+            paid, balance = _settle_credit(uid, remaining, bet.get('skey', ''))
+            if not paid:
+                return jsonify({'error': 'تمت تسوية هذا الرهان بالفعل'})
+            if balance is None:
+                balance = _gm.get_balance(uid)
             bet['exited'] = True
             bet['remaining'] = round(remaining, 2)
             bet['payout'] = round(remaining, 2)
@@ -608,23 +633,19 @@ def _watchdog():
                         if not bet.get('exited', False):
                             if crash_pt <= bet['target_x']:
                                 payout = bet['amount'] * bet['target_x']
-                                try: _gm.add_balance(uid, payout)
-                                except: pass
+                                _settle_credit(uid, payout, bet.get('skey', ''))
                                 bet['payout'] = round(payout, 2)
                             else:
                                 rem = _calc_remaining(bet['amount'], bet['target_x'], crash_pt, 'crash')
-                                if rem > 0:
-                                    try: _gm.add_balance(uid, rem)
-                                    except: pass
+                                _settle_credit(uid, rem if rem > 0 else 0, bet.get('skey', ''))
                                 bet['payout'] = round(rem, 2)
                     for uid, bet in list(_state.get('rise_bets', {}).items()):
                         if crash_pt < bet['target_x']:
                             bet['payout'] = 0
+                            _settle_credit(uid, 0, bet.get('skey', ''))
                         else:
                             rem = _calc_remaining(bet['amount'], bet['target_x'], crash_pt, 'rise')
-                            if rem > 0:
-                                try: _gm.add_balance(uid, rem)
-                                except: pass
+                            _settle_credit(uid, rem if rem > 0 else 0, bet.get('skey', ''))
                             bet['payout'] = round(rem, 2)
                     # Clear durable rows — watchdog settled everything
                     for uid in list(_state.get('crash_bets', {}).keys()):

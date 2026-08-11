@@ -1737,7 +1737,17 @@ def refund_expired_game_sessions(gdb_instance=None) -> list:
             bet = float(row['bet_amount'])
             created = row['created_at']
             if bet > 0 and gdb_instance:
+                # If the session carries a settle_key, the refund SHARES the
+                # idempotency key with settlement — whichever ran first wins,
+                # so a settled bet can never be refunded on top (no double-pay).
                 req_id = f"refund_expired_{game}_{uid}_{int(created)}"
+                try:
+                    import json as _json
+                    sd = _json.loads(row['session_data'] or '{}')
+                    if sd.get('settle_key'):
+                        req_id = sd['settle_key']
+                except Exception:
+                    pass
                 try:
                     gdb_instance.credit_with_idempotency(
                         uid, bet, req_id,

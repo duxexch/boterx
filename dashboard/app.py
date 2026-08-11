@@ -4025,10 +4025,13 @@ def api_lottery_create():
     return jsonify({'success': True, 'id': new_id})
 
 
+_lottery_draw_lock = threading.Lock()
+
 @app.route('/api/lottery/<round_id>/draw', methods=['POST'])
 @api_auth
 @permission_required('manage_games')
 def api_lottery_draw(round_id):
+  with _lottery_draw_lock:
     rounds = read_csv('lottery_rounds.csv')
     round_fieldnames = get_fieldnames('lottery_rounds.csv', ['id','name','ticket_price','currency','winner_count','max_tickets','admin_pct','draw_time','status','created_at'])
 
@@ -6274,7 +6277,10 @@ def api_plinko_end():
     # allowed arbitrary-payout forgery and replay.
     _gm.tracker.update_profile(uid, {'bet_amount': 0, 'payout': 0, 'result': 'ack',
                                      'game_id': 'GAME007', 'balance_after': _gm.get_balance(uid)})
-    return jsonify({'success': True, 'session_id': session_id})
+    # Echo client fields for old-client response compatibility — NOT credited.
+    return jsonify({'success': True, 'session_id': session_id,
+                    'result': str(data.get('result', 'lose'))[:8],
+                    'payout': float(data.get('payout', 0) or 0)})
 
 # ===== Mines — Frontend API (/api/mines/*) =====
 # Sessions keyed by uid so reveal/cashout don't need a session_id param.
@@ -7505,6 +7511,30 @@ def api_lottery_state():
         'draw_types': draw_types,
     })
 
+def _reconcile_lottery_tickets(cached_response, locked=False):
+    """Re-insert tickets from a cached (already-paid) buy response if a crash
+    happened between the debit commit and the ticket save."""
+    try:
+        tickets = (cached_response or {}).get('tickets') or []
+        if not tickets:
+            return
+        def _do():
+            state = _load_lottery_state()
+            existing = {t.get('id') for t in state.get('tickets', [])}
+            missing = [t for t in tickets if t.get('id') not in existing]
+            if missing:
+                for t in missing:
+                    state.setdefault('tickets', []).append(t)
+                state['tickets_sold'] = state.get('tickets_sold', 0) + len(missing)
+                _save_lottery_state(state)
+        if locked:
+            _do()
+        else:
+            with _lottery_lock:
+                _do()
+    except Exception as e:
+        print(f"[lottery] ticket reconcile error: {e}")
+
 @app.route('/api/lottery/buy', methods=['POST'])
 @webapp_auth
 def api_lottery_buy():
@@ -7516,10 +7546,13 @@ def api_lottery_buy():
     if not uid:
         return jsonify({'error': 'Missing uid'}), 400
 
-    # Fast SQLite idempotency check (survives restarts)
+    # Fast SQLite idempotency check (survives restarts). If the debit
+    # committed but the process died before tickets were saved, the cached
+    # response still holds the tickets — reconcile them into lottery state.
     if request_id:
         cached = _gm.get_idempotency_record(uid, request_id)
         if cached:
+            _reconcile_lottery_tickets(cached)
             return jsonify(cached)
 
     count = int(data.get('count', 1))
@@ -7566,6 +7599,7 @@ def api_lottery_buy():
         # Atomic: deduct cost + store idempotency record in one SQLite transaction
         ok, stored, race_cached = _gm.settle_with_idempotency(uid, total_cost, 0, request_id, template)
         if race_cached:
+            _reconcile_lottery_tickets(race_cached, locked=True)
             return jsonify(race_cached)
         if not ok:
             return jsonify({'success': False, 'error': 'رصيد غير كافٍ', 'need_deposit': True, 'balance': balance})
