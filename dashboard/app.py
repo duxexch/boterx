@@ -4214,11 +4214,32 @@ try:
     import sys as _sys
     _sys.path.insert(0, BASE_DIR)
     from game_engine import GameManager
+    from db_manager import (
+        set_active_game_session as _set_ags,
+        delete_active_game_session as _del_ags,
+        refund_expired_game_sessions as _refund_ags,
+        _gdb as _db_singleton,
+    )
     _gm = GameManager()
     _VEX_GAMES = True
+    # ── Startup: refund any bets stranded by a mid-game server crash ──────────
+    # active_game_sessions rows survive restarts; refund credits the bet back
+    # via credit_with_idempotency so double-refunds on repeated restarts are safe.
+    try:
+        _startup_refunded = _refund_ags(_db_singleton)
+        if _startup_refunded:
+            print(f"[startup] Refunded {len(_startup_refunded)} expired game session(s): "
+                  f"{_startup_refunded}")
+        else:
+            print("[startup] No expired game sessions to refund.")
+    except Exception as _rags_err:
+        print(f"[startup] refund_expired_game_sessions error: {_rags_err}")
 except Exception as e:
     print(f"VEX Games init error: {e}")
     _VEX_GAMES = False
+    # Provide no-op stubs so call sites don't NameError when _VEX_GAMES is False
+    def _set_ags(*a, **k): pass
+    def _del_ags(*a, **k): pass
 
 # ===== Games Catalog =====
 
@@ -5492,6 +5513,11 @@ def api_mines_new():
             'created_at': datetime.now().isoformat()
         }
         _save_mines_sessions(sessions)
+        # ── Durable session: persists the bet in SQLite so a server restart
+        # triggers auto-refund via refund_expired_game_sessions() at next boot.
+        _set_ags(str(uid), 'mines',
+                 {'game_id': game_id, 'mine_count': mine_count},
+                 bet_amount)
 
     return jsonify(result)
 
@@ -5537,6 +5563,8 @@ def api_mines_reveal():
             state['reveal_results'][str(cell)] = resp
             sessions[str(uid)] = state
             _save_mines_sessions(sessions)
+            # Game over on mine hit — clear durable session (no refund due; bet was lost)
+            _del_ags(str(uid), 'mines')
             return jsonify(resp)
 
         revealed_count = len(state['revealed'])
@@ -5601,6 +5629,8 @@ def api_mines_reveal():
             'bet_amount': bet_amount, 'payout': payout, 'result': 'win',
             'game_id': 'GAME006', 'balance_after': new_balance
         })
+        # All cells revealed safely → paid out; clear durable session
+        _del_ags(str(uid), 'mines')
 
     return jsonify(resp)
 
@@ -5641,6 +5671,8 @@ def api_mines_cashout():
         state['paid_out'] = True
         sessions[str(uid)] = state
         _save_mines_sessions(sessions)
+        # Clear durable session — payout is about to be credited; no refund needed
+        _del_ags(str(uid), 'mines')
 
     # Credit-only: bet was pre-deducted in /new.
     # credit_with_idempotency is atomic: credit + idempotency record in one SQLite transaction.
@@ -5707,6 +5739,14 @@ _PLINKO_MULTS = {
 @app.route('/api/plinko/drop', methods=['POST'])
 @webapp_auth
 def api_plinko_drop():
+    # NOTE: Plinko does NOT use active_game_sessions.
+    # The entire bet+payout is settled in one ACID SQLite transaction via
+    # settle_with_idempotency() below, so there is no window where a restart
+    # could strand a deducted bet without a matching payout.  Adding a
+    # pre-settlement session row would cause a double-credit bug on restart
+    # (the refund would run even though no money was ever deducted).
+    # The idempotency record written by settle_with_idempotency() is sufficient
+    # to replay the correct result on retry without re-executing settlement.
     if not _VEX_GAMES:
         return jsonify({'error': 'Games engine not available'}), 500
     data = request.json or {}

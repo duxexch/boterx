@@ -150,6 +150,20 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         # ── Rate limiter cleanup thread ──────────────────────────────────────
         _start_rl_cleanup(interval_sec=60.0)
 
+        # ── Startup: refund bets stranded by a mid-game server crash ─────────
+        # active_game_sessions rows survive restarts; credit_with_idempotency
+        # in refund_expired_game_sessions() ensures idempotent double-restart safety.
+        try:
+            from db_manager import refund_expired_game_sessions as _rfs, _gdb as _gdb_inst
+            _refunded = _rfs(_gdb_inst)
+            if _refunded:
+                logger.info(
+                    f"[startup] Refunded {len(_refunded)} expired game session(s): {_refunded}"
+                )
+            else:
+                logger.info("[startup] No expired game sessions to refund at startup.")
+        except Exception as _rfs_err:
+            logger.warning(f"[startup] refund_expired_game_sessions error: {_rfs_err}")
 
         # تخزين الأسباب المؤقتة لرفض المعاملات قبل التأكيد
         # المفتاح هو معرف الأدمن والقيمة عبارة عن قاموس يحتوي trans_id والسبب
