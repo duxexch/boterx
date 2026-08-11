@@ -191,7 +191,7 @@ function drawPLChart(data) {
   let running = 0;
   const cumValues = values.map(v => running += v);
   const cumMax = Math.max(...cumValues.map(Math.abs), 1);
-  ctx.strokeStyle = '#fbbf24';
+  ctx.strokeStyle = '#00ff88';
   ctx.lineWidth = 2;
   ctx.beginPath();
   cumValues.forEach((v, i) => {
@@ -208,7 +208,7 @@ function drawGameDist(games) {
     el.innerHTML = '<div style="text-align:center;color:var(--muted);padding:12px;font-size:12px">لا توجد بيانات</div>';
     return;
   }
-  const colors = ['#fbbf24', '#00e701', '#3b82f6', '#a78bfa', '#06b6d4', '#ff4757', '#ec4899'];
+  const colors = ['#00ff88', '#00e701', '#3b82f6', '#a78bfa', '#06b6d4', '#ff4757', '#ec4899'];
   const maxGames = Math.max(...games.map(g => g.games), 1);
   el.innerHTML = games.map((g, i) => {
     const pct = (g.games / maxGames) * 100;

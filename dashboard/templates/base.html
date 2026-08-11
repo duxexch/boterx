@@ -556,7 +556,7 @@ function baseApp() {
             const toast = document.createElement('div');
             toast.className = 'fixed top-4 right-4 z-[9999] bg-slate-800 border border-slate-600 rounded-xl p-4 shadow-2xl transition-all duration-300';
             toast.style.cssText = 'min-width:280px;max-width:360px;transform:translateX(0);opacity:1';
-            const color = d.type.includes('approve') ? '#34d399' : d.type.includes('reject') ? '#ef4444' : '#fbbf24';
+            const color = d.type.includes('approve') ? '#34d399' : d.type.includes('reject') ? '#ef4444' : '#00ff88';
             toast.innerHTML = `
                 <div style="display:flex;align-items:start;gap:8px">
                     <div style="width:8px;height:8px;border-radius:50%;background:${color};margin-top:6px;flex-shrink:0"></div>

@@ -20,7 +20,7 @@ body { overflow:hidden; font-family:system-ui,sans-serif; background:var(--tg-th
 
 /* Gift */
 .gift { position:absolute; width:80px; height:80px; display:flex; align-items:center; justify-content:center; font-size:40px; border-radius:20px; cursor:pointer; transition:transform 0.15s, opacity 0.2s; will-change:transform,opacity; }
-.gift.golden { background:linear-gradient(135deg,#fbbf24,#f59e0b); box-shadow:0 0 30px rgba(251,191,36,0.6); }
+.gift.golden { background:linear-gradient(135deg,#00ff88,#f59e0b); box-shadow:0 0 30px rgba(0,255,136,0.6); }
 .gift.flash { background:linear-gradient(135deg,#06b6d4,#3b82f6); box-shadow:0 0 30px rgba(6,182,212,0.6); }
 .gift.bomb { background:linear-gradient(135deg,#ef4444,#dc2626); box-shadow:0 0 30px rgba(239,68,68,0.6); }
 .gift.decoy { background:linear-gradient(135deg,#a78bfa,#8b5cf6); box-shadow:0 0 30px rgba(167,139,250,0.6); }
@@ -38,7 +38,7 @@ body { overflow:hidden; font-family:system-ui,sans-serif; background:var(--tg-th
 #start-screen { position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:200; background:var(--tg-theme-bg-color,#0f172a); }
 #start-screen h1 { font-size:48px; margin-bottom:8px; }
 #start-screen p { font-size:16px; opacity:0.7; margin-bottom:24px; text-align:center; padding:0 32px; }
-#start-btn { background:linear-gradient(135deg,#fbbf24,#f59e0b); color:#000; border:none; padding:16px 48px; border-radius:16px; font-size:24px; font-weight:900; cursor:pointer; box-shadow:0 8px 24px rgba(251,191,36,0.4); transition:transform 0.2s; }
+#start-btn { background:linear-gradient(135deg,#00ff88,#f59e0b); color:#000; border:none; padding:16px 48px; border-radius:16px; font-size:24px; font-weight:900; cursor:pointer; box-shadow:0 8px 24px rgba(0,255,136,0.4); transition:transform 0.2s; }
 #start-btn:active { transform:scale(0.95); }
 
 /* Result screen */
@@ -55,7 +55,7 @@ body { overflow:hidden; font-family:system-ui,sans-serif; background:var(--tg-th
 @keyframes teaseFloat { from{transform:translateY(0);opacity:1} to{transform:translateY(-40px);opacity:0} }
 
 /* Countdown */
-#countdown { position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:300; font-size:120px; font-weight:900; color:#fbbf24; }
+#countdown { position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:300; font-size:120px; font-weight:900; color:#00ff88; }
 </style>
 </head>
 <body>
@@ -240,7 +240,7 @@ function onCatch(el, behavior, gift) {
     } else {
       showTease('🎉 اختطفتها!', parseFloat(el.style.left), parseFloat(el.style.top));
     }
-    confetti(parseFloat(el.style.left) + 40, parseFloat(el.style.top) + 40, '#fbbf24');
+    confetti(parseFloat(el.style.left) + 40, parseFloat(el.style.top) + 40, '#00ff88');
     caughtGifts.push({ id: gift.id, text: gift.text, link: gift.link });
     setTimeout(() => { el.remove(); currentGift = null; nextRound(); }, 400);
   }
@@ -257,7 +257,7 @@ function showTease(text, x, y) {
 }
 
 function confetti(x, y, color) {
-  const colors = [color, '#fbbf24', '#06b6d4', '#a78bfa', '#34d399'];
+  const colors = [color, '#00ff88', '#06b6d4', '#a78bfa', '#34d399'];
   for (let i = 0; i < 15; i++) {
     const c = document.createElement('div');
     c.className = 'confetti';
