@@ -88,13 +88,16 @@ ROLE_PERMISSIONS = {
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 def login(session, uid=None, is_admin=True, password=None):
-    """Simulate login by POSTing to /login."""
-    data = {'password': password or ADMIN_PASS}
-    r = session.post(f'{BASE_URL}/login', data=data, allow_redirects=False)
+    """Simulate login by POSTing to /vex/admin/admin (the real admin login endpoint).
+    Requires admin_id (from ADMIN_USER_IDS env) + password."""
+    admin_ids = [a.strip() for a in os.getenv('ADMIN_USER_IDS', '').split(',') if a.strip()]
+    if not admin_ids:
+        raise RuntimeError('ADMIN_USER_IDS env var not set — cannot login')
+    admin_id = uid or admin_ids[0]
+    data = {'admin_id': admin_id, 'password': password or ADMIN_PASS}
+    r = session.post(f'{BASE_URL}/vex/admin/admin', data=data, allow_redirects=True)
     if r.status_code not in (200, 302, 303):
         raise RuntimeError(f'Login failed: {r.status_code} — {r.text[:200]}')
-    # If UID provided, override session admin_id server-side is not possible from outside.
-    # We rely on the DB role assignment + the actual admin login for testing.
     return r.status_code in (200, 302, 303)
 
 def setup_role(uid, role):
