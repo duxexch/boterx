@@ -27,10 +27,17 @@ from flask import (Flask, render_template, request, redirect, url_for,
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DASHBOARD_PORT = int(os.getenv('DASHBOARD_PORT', '8080'))
 DASHBOARD_HOST = os.getenv('DASHBOARD_HOST', '0.0.0.0')
-SECRET_KEY = os.getenv('DASHBOARD_SECRET_KEY', secrets.token_hex(32))
+
+# Sentinel: the well-known default password committed to public git history.
+# Any deployment still using this value is immediately exploitable.
+_KNOWN_DEFAULT_PASSWORD = 'boterx_admin_2026'
+
+# Load secret key — empty string means "not configured"; checked at startup below.
+_raw_secret_key = os.getenv('DASHBOARD_SECRET_KEY', '')
+SECRET_KEY = _raw_secret_key or secrets.token_hex(32)  # random fallback for dev only
 
 ADMIN_IDS = [a.strip() for a in os.getenv('ADMIN_USER_IDS', '').split(',') if a.strip()]
-ADMIN_PASSWORD = os.getenv('DASHBOARD_PASSWORD', 'boterx_admin_2026')
+ADMIN_PASSWORD = os.getenv('DASHBOARD_PASSWORD', _KNOWN_DEFAULT_PASSWORD)
 
 app = Flask(__name__, template_folder='templates', static_folder='static')
 app.secret_key = SECRET_KEY
@@ -157,6 +164,48 @@ ALLOW_DEV_AUTH = os.getenv('ALLOW_DEV_AUTH', '').lower() in ('1', 'true', 'yes')
 # APP_ENV / FLASK_ENV — detect production deployment.
 _APP_ENV = os.getenv('APP_ENV', os.getenv('FLASK_ENV', 'development')).lower()
 _IS_PRODUCTION = (_APP_ENV == 'production')
+
+# ── Production credential safety gate ────────────────────────────────────────
+# Collect every credential problem first, then decide whether to abort or warn.
+_cred_errors = []
+
+if not _raw_secret_key:
+    _cred_errors.append(
+        "DASHBOARD_SECRET_KEY is not set. A random key is generated on every "
+        "restart, invalidating all admin sessions on each reboot. "
+        "Fix: set DASHBOARD_SECRET_KEY to a stable 64-char hex string "
+        "(generate with: python3 -c \"import secrets; print(secrets.token_hex(32))\")."
+    )
+
+if not os.getenv('DASHBOARD_PASSWORD'):
+    _cred_errors.append(
+        f"DASHBOARD_PASSWORD is not set — the dashboard is running with the "
+        f"public default password '{_KNOWN_DEFAULT_PASSWORD}', which is in the "
+        f"public git history and is immediately exploitable. "
+        f"Fix: set DASHBOARD_PASSWORD to a strong unique value."
+    )
+elif ADMIN_PASSWORD == _KNOWN_DEFAULT_PASSWORD:
+    _cred_errors.append(
+        f"DASHBOARD_PASSWORD is set to the known public default "
+        f"'{_KNOWN_DEFAULT_PASSWORD}'. This value is in the public git history "
+        f"and is immediately exploitable. "
+        f"Fix: set DASHBOARD_PASSWORD to a strong unique value."
+    )
+
+if _IS_PRODUCTION and _cred_errors:
+    # Hard stop: refuse to expose a vulnerable dashboard to the internet.
+    for _ce in _cred_errors:
+        _auth_logger.critical("SECURITY STARTUP FAILURE: %s", _ce)
+    _auth_logger.critical(
+        "Dashboard refusing to start in production (APP_ENV=%s) with insecure "
+        "credentials. Set the required environment variables and restart.",
+        _APP_ENV,
+    )
+    raise SystemExit(1)
+elif _cred_errors:
+    # Non-production: warn loudly but continue so local dev still works.
+    for _ce in _cred_errors:
+        _auth_logger.warning("CREDENTIAL WARNING (non-production): %s", _ce)
 
 # ── Alert token for lockdown notifications ───────────────────────────────────
 # ALERT_BOT_TOKEN: a separate bot token used ONLY to send lockdown alerts.
