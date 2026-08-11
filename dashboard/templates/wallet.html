@@ -400,24 +400,43 @@ async function doTransfer() {
   if (isNaN(amount) || amount <= 0) amount = maxAmt;
   if (amount > maxAmt) { showToast('المبلغ يتجاوز رصيد SVRP', 'error'); return; }
 
+  // Generate a stable idempotency key for this transfer attempt.
+  // Stored in sessionStorage so that a retry from the same page session
+  // sends the same key — the server returns the cached result without
+  // debiting again.  Cleared after a confirmed terminal response.
+  const _tsKey = 'svrp_pending_transfer_id';
+  let transferId = sessionStorage.getItem(_tsKey);
+  if (!transferId) {
+    transferId = crypto.randomUUID ? crypto.randomUUID()
+      : Math.random().toString(36).slice(2) + Date.now().toString(36);
+    sessionStorage.setItem(_tsKey, transferId);
+  }
+
   btn.disabled = true;
   btn.textContent = '⏳';
   try {
     const r = await apiFetch(`${BASE}/api/svrp/transfer-to-game`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ amount }),
+      body: JSON.stringify({ amount, transfer_id: transferId }),
     });
     const d = await r.json();
-    if (!r.ok || d.error) {
+    if (d && d.retry) {
+      // Transient failure — server kept the debit; client MUST retry with same key.
+      showToast('فشل مؤقت — يرجى إعادة المحاولة', 'error');
+      // transferId stays in sessionStorage for the next tap
+    } else if (!r.ok || d.error) {
       showToast(d.error || 'فشل النقل', 'error');
+      // Terminal error — clear key so the next attempt is a fresh transfer
+      sessionStorage.removeItem(_tsKey);
     } else {
+      sessionStorage.removeItem(_tsKey);  // success — next transfer gets a fresh key
       showToast(`✅ تم نقل ${d.transferred?.toLocaleString()} — رصيد اللعب الجديد: ${d.new_game_balance?.toLocaleString()}`, 'success');
-      // Reload wallet data
       setTimeout(loadWallet, 1000);
     }
   } catch (e) {
-    showToast('خطأ في الاتصال', 'error');
+    // Network error — keep the key so retry is idempotent
+    showToast('خطأ في الاتصال — حاول مجدداً', 'error');
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = 'نقل ←'; }
   }

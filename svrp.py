@@ -1462,57 +1462,6 @@ class SVRPManager:
         rows = self._read_csv('recovery_requests.csv')
         return [r for r in rows if r.get('status') == 'pending']
 
-    def approve_recovery_request(self, req_id, admin_id, amount, note=''):
-        """الموافقة على طلب استرداد — يُضاف الرصيد المجمد"""
-        rows = self._read_csv('recovery_requests.csv')
-        request = None
-        for row in rows:
-            if row['id'] == req_id:
-                row['status'] = 'approved'
-                row['recovery_amount'] = str(amount)
-                row['admin_note'] = note
-                row['admin_id'] = str(admin_id)
-                row['approved_at'] = datetime.now().strftime('%Y-%m-%d %H:%M')
-                request = row
-                break
-
-        if not request:
-            return False, "الطلب غير موجود"
-
-        self._write_csv('recovery_requests.csv', rows, self.RECOVERY_FIELDS)
-
-        # إضافة الرصيد المجمد للمستخدم
-        user_id = request['user_id']
-        wallet = self.get_wallet(user_id)
-        current_balance = float(wallet.get('balance', 0) or 0)
-        current_earned = float(wallet.get('total_earned', 0) or 0)
-
-        self._update_wallet(user_id, {
-            'balance': current_balance + amount,
-            'total_earned': current_earned + amount
-        })
-
-        # إنشاء سجل رصيد مجمد
-        credit = {
-            'id': self._generate_id('FRC'),
-            'user_id': user_id,
-            'trigger_trans_id': req_id,
-            'trigger_amount': str(amount),
-            'credit_amount': str(amount),
-            'credit_type': 'recovery',
-            'status': 'frozen',
-            'friend_id': '',
-            'created_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
-            'expires_at': (datetime.now() + timedelta(days=self._get_config('credit_expiry_days'))).strftime('%Y-%m-%d %H:%M'),
-            'wagering_required': '0',
-            'wagering_completed': '0',
-            'currency': 'SAR'
-        }
-        self._append_csv('svrp_credits.csv', credit, self.CREDIT_FIELDS)
-
-        logger.info(f"Recovery approved: {req_id} → {amount} frozen for user {user_id}")
-        return True, "تمت الموافقة على الاسترداد"
-
     def reject_recovery_request(self, req_id, admin_id, note=''):
         """رفض طلب استرداد"""
         rows = self._read_csv('recovery_requests.csv')

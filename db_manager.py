@@ -466,6 +466,28 @@ class GameDB:
         ).fetchone()
         return dict(row) if row else None
 
+    def add_balance(self, user_id, amount, idempotency_key=None):
+        """Add to game balance atomically. Returns new balance.
+
+        idempotency_key accepted for API compatibility but is not used here —
+        SVRP-specific idempotency is handled by add_balance_for_svrp_transfer().
+        All normal credits (deposits, payouts, refunds, admin adds) use this method.
+        """
+        uid = str(user_id)
+        amt = _money(amount)
+        conn = self._conn()
+        with _db_lock:
+            conn.execute(
+                'INSERT INTO users (telegram_id, game_balance) VALUES (?, ?) '
+                'ON CONFLICT(telegram_id) DO UPDATE SET game_balance = game_balance + ?',
+                (uid, float(amt), float(amt))
+            )
+            conn.commit()
+            row = conn.execute(
+                'SELECT game_balance FROM users WHERE telegram_id = ?', (uid,)
+            ).fetchone()
+            return _money_float(row[0]) if row and row[0] is not None else 0.0
+
     def add_balance_for_svrp_transfer(self, user_id, amount, transfer_id):
         """Credit game balance exactly once for an SVRP transfer.
 
