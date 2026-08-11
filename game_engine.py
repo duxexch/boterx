@@ -366,6 +366,21 @@ class GameManager:
         if _USE_SQLITE:
             _db.update_svrp_transfer_status(transfer_id, status)
 
+    def get_svrp_transfer(self, transfer_id):
+        """Return outbox record dict, or None if not found."""
+        if _USE_SQLITE:
+            return _db.get_svrp_transfer(transfer_id)
+        return None
+
+    def add_balance_for_svrp_transfer(self, user_id, amount, transfer_id):
+        """Credit game balance exactly once for an SVRP transfer.
+        Uses svrp_transfer_log STATUS for idempotency (no separate INSERT).
+        """
+        if _USE_SQLITE:
+            return _db.add_balance_for_svrp_transfer(user_id, amount, transfer_id)
+        # Fallback: CSV cache — no idempotency guarantee in CSV mode
+        return self.add_balance(user_id, amount, 'svrp_transfer')
+
     def add_balance(self, user_id, amount, reason='deposit', idempotency_key=None):
         """إضافة رصيد — SQLite (atomic transaction)"""
         if _USE_SQLITE:

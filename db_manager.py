@@ -421,57 +421,78 @@ class GameDB:
     def add_balance(self, user_id, amount, idempotency_key=None):
         """Add to balance (atomic transaction). Returns new balance.
 
-        idempotency_key (optional str): when supplied the balance credit and a
-        matching row in svrp_transfer_log are committed inside one SQLite SAVEPOINT
-        so they are always consistent across crashes.  A duplicate key causes the
-        INSERT to fail (IntegrityError), the SAVEPOINT to roll back, and this
-        method to return the current balance WITHOUT crediting again — making the
-        operation exactly-once for any given key.
+        idempotency_key is accepted for API compatibility but is no longer used
+        here.  SVRP transfer idempotency is now handled by the STATUS column in
+        svrp_transfer_log via add_balance_for_svrp_transfer().
         """
         uid = str(user_id)
         amt = _money(amount)
         conn = self._conn()
         with _db_lock:
-            if idempotency_key:
-                conn.execute('SAVEPOINT svrp_idem')
-                try:
-                    # Log record + balance credit in one atomic savepoint
-                    conn.execute(
-                        'INSERT INTO svrp_transfer_log (transfer_id, uid, amount, created_at) '
-                        'VALUES (?, ?, ?, ?)',
-                        (idempotency_key, uid, float(amt),
-                         datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-                    )
-                    conn.execute(
-                        'INSERT INTO users (telegram_id, game_balance) VALUES (?, ?) '
-                        'ON CONFLICT(telegram_id) DO UPDATE SET game_balance = game_balance + ?',
-                        (uid, float(amt), float(amt))
-                    )
-                    conn.execute('RELEASE SAVEPOINT svrp_idem')
-                except sqlite3.IntegrityError:
-                    # Duplicate key only → this is a confirmed replay; no other error takes this path
-                    try:
-                        conn.execute('ROLLBACK TO SAVEPOINT svrp_idem')
-                        conn.execute('RELEASE SAVEPOINT svrp_idem')
-                    except Exception:
-                        pass
-                    conn.commit()
-                    row = conn.execute(
-                        'SELECT game_balance FROM users WHERE telegram_id = ?', (uid,)
-                    ).fetchone()
-                    return _money_float(row[0]) if row and row[0] is not None else 0.0
-                # All other exceptions propagate — the caller's rollback path will run
-            else:
-                conn.execute(
-                    'INSERT INTO users (telegram_id, game_balance) VALUES (?, ?) '
-                    'ON CONFLICT(telegram_id) DO UPDATE SET game_balance = game_balance + ?',
-                    (uid, float(amt), float(amt))
-                )
+            conn.execute(
+                'INSERT INTO users (telegram_id, game_balance) VALUES (?, ?) '
+                'ON CONFLICT(telegram_id) DO UPDATE SET game_balance = game_balance + ?',
+                (uid, float(amt), float(amt))
+            )
             conn.commit()
             row = conn.execute(
                 'SELECT game_balance FROM users WHERE telegram_id = ?', (uid,)
             ).fetchone()
             return _money_float(row[0]) if row and row[0] is not None else 0.0
+
+    def add_balance_for_svrp_transfer(self, user_id, amount, transfer_id):
+        """Credit game balance exactly once for an SVRP transfer, using the
+        STATUS of the outbox record in svrp_transfer_log for idempotency.
+
+        This avoids the key-collision bug that arises when the same transfer_id
+        is used both for the outbox INSERT and a separate idempotency INSERT.
+
+        Rules:
+        - status == 'completed'       → replay detected; return current balance without crediting
+        - status == 'pending' or
+          status == 'credits_debited' → apply credit + flip status to 'completed' atomically
+        - transfer_id not found       → raises ValueError (caller should abort)
+
+        All SQLite errors OTHER than the expected state transitions propagate so
+        the transfer endpoint's compensating rollback can run.
+        """
+        uid = str(user_id)
+        amt = _money(amount)
+        conn = self._conn()
+        with _db_lock:
+            row = conn.execute(
+                'SELECT status FROM svrp_transfer_log WHERE transfer_id = ?',
+                (transfer_id,)
+            ).fetchone()
+
+            if row is None:
+                raise ValueError(
+                    f'SVRP transfer outbox record not found for transfer_id={transfer_id}'
+                )
+
+            status = row[0]
+            if status == 'completed':
+                # Already credited — idempotent replay
+                bal = conn.execute(
+                    'SELECT game_balance FROM users WHERE telegram_id = ?', (uid,)
+                ).fetchone()
+                return _money_float(bal[0]) if bal and bal[0] is not None else 0.0
+
+            # status is 'pending' or 'credits_debited' — apply credit + mark complete atomically
+            conn.execute(
+                'INSERT INTO users (telegram_id, game_balance) VALUES (?, ?) '
+                'ON CONFLICT(telegram_id) DO UPDATE SET game_balance = game_balance + ?',
+                (uid, float(amt), float(amt))
+            )
+            conn.execute(
+                'UPDATE svrp_transfer_log SET status = ? WHERE transfer_id = ?',
+                ('completed', transfer_id)
+            )
+            conn.commit()
+            bal = conn.execute(
+                'SELECT game_balance FROM users WHERE telegram_id = ?', (uid,)
+            ).fetchone()
+            return _money_float(bal[0]) if bal and bal[0] is not None else 0.0
 
     def deduct_balance(self, user_id, amount):
         """Deduct from balance (atomic, Decimal precision). Returns (success, new_balance)."""
