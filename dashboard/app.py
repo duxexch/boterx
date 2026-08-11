@@ -720,7 +720,7 @@ def webapp_auth(f):
         # HttpOnly and Secure — it cannot leak from URL logs or Referrer headers
         # and cannot be forged without the SESSION_SECRET.  No URL token needed.
         flask_uid = session.get('admin_id', '').strip()
-        if flask_uid and not session.get('is_admin'):
+        if flask_uid and session.get('logged_in') is True and not session.get('is_admin'):
             # Only allow non-admin (regular user) dashboard sessions here.
             # Admin sessions are for the admin panel, not the player WebApp.
             g.telegram_user_id = flask_uid
