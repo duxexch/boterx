@@ -355,10 +355,10 @@ class GameManager:
             pass
         return 'EGP'
 
-    def add_balance(self, user_id, amount, reason='deposit'):
+    def add_balance(self, user_id, amount, reason='deposit', idempotency_key=None):
         """إضافة رصيد — SQLite (atomic transaction)"""
         if _USE_SQLITE:
-            return _db.add_balance(user_id, amount)
+            return _db.add_balance(user_id, amount, idempotency_key=idempotency_key)
         # Fallback: CSV cache
         _load_balance_cache()
         uid = str(user_id)

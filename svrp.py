@@ -981,35 +981,31 @@ class SVRPManager:
         return None
 
     def approve_recovery_request(self, req_id, amount, admin_id):
-        """موافقة الأدمن على طلب استرداد — يُضاف الرصيد للمجمد"""
-        rows = self._read_csv('recovery_requests.csv')
-        req = None
-        for r in rows:
-            if r['id'] == req_id:
-                r['status'] = 'approved'
-                r['recovery_amount'] = str(amount)
-                r['approved_at'] = datetime.now().strftime('%Y-%m-%d %H:%M')
-                r['approved_by'] = str(admin_id)
-                req = r
-                break
-
-        if not req:
-            return False, "الطلب غير موجود"
-
-        self._write_csv('recovery_requests.csv', rows, self.RECOVERY_REQUEST_FIELDS)
-
-        # إضافة الرصيد للمحفظة المجمدة
-        user_id = req['user_id']
-        wallet = self.get_wallet(user_id)
-        current_balance = float(wallet.get('balance', 0) or 0)
-        current_earned = float(wallet.get('total_earned', 0) or 0)
-
-        self._update_wallet(user_id, {
-            'balance': current_balance + amount,
-            'total_earned': current_earned + amount,
-            'last_recovery_date': datetime.now().strftime('%Y-%m-%d %H:%M')
-        })
-
+        """موافقة الأدمن على طلب استرداد — كل الـ RMW داخل svrp_lock."""
+        with svrp_lock():
+            rows = self._read_csv('recovery_requests.csv')
+            req = None
+            for r in rows:
+                if r['id'] == req_id:
+                    if r.get('status') == 'approved':
+                        return False, "الطلب مُوافق عليه مسبقاً"
+                    r['status'] = 'approved'
+                    r['recovery_amount'] = str(amount)
+                    r['approved_at'] = datetime.now().strftime('%Y-%m-%d %H:%M')
+                    r['approved_by'] = str(admin_id)
+                    req = r
+                    break
+            if not req:
+                return False, "الطلب غير موجود"
+            self._write_csv('recovery_requests.csv', rows, self.RECOVERY_REQUEST_FIELDS)
+            # إضافة الرصيد للمحفظة المجمدة (داخل القفل)
+            user_id = req['user_id']
+            wallet  = self.get_wallet(user_id)
+            self._update_wallet(user_id, {
+                'balance':            float(wallet.get('balance', 0) or 0) + amount,
+                'total_earned':       float(wallet.get('total_earned', 0) or 0) + amount,
+                'last_recovery_date': datetime.now().strftime('%Y-%m-%d %H:%M'),
+            })
         logger.info(f"Recovery approved: {req_id} amount={amount} for user {user_id}")
         return True, f"تم إضافة {amount} للرصيد المجمد"
 
@@ -1089,35 +1085,43 @@ class SVRPManager:
         else:
             friend_count = len(unique_friends)
         
-        # 1. خصم من المرسل + نقل نفس المبلغ للمتاح
-        sender_used = float(sender_wallet.get('total_used', 0) or 0)
-        
-        self._update_wallet(tid, {
-            'balance': sender_balance - amount,
-            'total_used': sender_used + amount
-        })
+        # ── الخصم والإضافة داخل قفل واحد لضمان الاتساق ───────────────────────
+        with svrp_lock():
+            # إعادة القراءة داخل القفل (أحدث حالة)
+            sender_wallet2  = self.get_wallet(tid)
+            sender_balance2 = float(sender_wallet2.get('balance', 0) or 0)
+            sender_used2    = float(sender_wallet2.get('total_used', 0) or 0)
+            max_per_friend2 = sender_balance2 * 0.25
 
-        # 2. إضافة للمستلم (مجمد)
-        receiver_wallet = self.get_wallet(receiver_tid)
-        receiver_balance = float(receiver_wallet.get('balance', 0) or 0)
-        receiver_earned = float(receiver_wallet.get('total_earned', 0) or 0)
+            if amount > max_per_friend2:
+                return False, f"الحد الأقصى لكل صديق: {max_per_friend2:.2f}"
+            if amount <= 0 or sender_balance2 <= 0:
+                return False, "المبلغ أو الرصيد غير صالح"
 
-        self._update_wallet(receiver_tid, {
-            'balance': receiver_balance + amount,
-            'total_earned': receiver_earned + amount
-        })
+            # 1. خصم من المرسل
+            self._update_wallet(tid, {
+                'balance':    sender_balance2 - amount,
+                'total_used': sender_used2    + amount,
+            })
 
-        # 3. تسجيل التحويل
-        transfer_id = self._generate_id('TRF')
-        transfer = {
-            'id': transfer_id,
-            'sender_id': tid,
-            'receiver_id': receiver_tid,
-            'amount': str(amount),
-            'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')
-        }
-        self._append_csv('svrp_transfers.csv', transfer,
-            ['id', 'sender_id', 'receiver_id', 'amount', 'created_at'])
+            # 2. إضافة للمستلم (مجمد) — قراءة حديثة داخل القفل
+            receiver_wallet = self.get_wallet(receiver_tid)
+            self._update_wallet(receiver_tid, {
+                'balance':      float(receiver_wallet.get('balance', 0) or 0)    + amount,
+                'total_earned': float(receiver_wallet.get('total_earned', 0) or 0) + amount,
+            })
+
+            # 3. تسجيل التحويل
+            transfer_id = self._generate_id('TRF')
+            transfer = {
+                'id': transfer_id,
+                'sender_id': tid,
+                'receiver_id': receiver_tid,
+                'amount': str(amount),
+                'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')
+            }
+            self._append_csv('svrp_transfers.csv', transfer,
+                ['id', 'sender_id', 'receiver_id', 'amount', 'created_at'])
 
         logger.info(f"SVRP transfer: {tid} → {receiver_tid} amount={amount}")
         remaining = max(0, 4 - friend_count)

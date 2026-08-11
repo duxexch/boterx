@@ -114,6 +114,20 @@ def _init_db():
             );
             CREATE INDEX IF NOT EXISTS idx_idem_created ON game_idempotency(created_at);
 
+            -- SVRP→game transfer idempotency log.
+            -- A row is inserted atomically with the balance credit inside the same
+            -- SQLite savepoint, so the log record and the balance update are always
+            -- consistent even across crashes.  On replay the INSERT fails with
+            -- IntegrityError and the balance update is skipped.
+            CREATE TABLE IF NOT EXISTS svrp_transfer_log (
+                transfer_id TEXT PRIMARY KEY,
+                uid         TEXT    NOT NULL,
+                amount      REAL    NOT NULL,
+                status      TEXT    NOT NULL DEFAULT 'completed',
+                created_at  TEXT    NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_svrp_tlog_uid ON svrp_transfer_log(uid);
+
             -- Snatch game sessions: durable state machine co-located with wallet
             -- so wallet and session state are always in the same DB file.
             -- status: intent | pending | settling | refunding | settled | refunded
@@ -364,16 +378,54 @@ class GameDB:
             return d
         return {}
 
-    def add_balance(self, user_id, amount):
-        """Add to balance (atomic transaction). Returns new balance."""
+    def add_balance(self, user_id, amount, idempotency_key=None):
+        """Add to balance (atomic transaction). Returns new balance.
+
+        idempotency_key (optional str): when supplied the balance credit and a
+        matching row in svrp_transfer_log are committed inside one SQLite SAVEPOINT
+        so they are always consistent across crashes.  A duplicate key causes the
+        INSERT to fail (IntegrityError), the SAVEPOINT to roll back, and this
+        method to return the current balance WITHOUT crediting again — making the
+        operation exactly-once for any given key.
+        """
         uid = str(user_id)
         amt = _money(amount)
         conn = self._conn()
         with _db_lock:
-            conn.execute('''
-                INSERT INTO users (telegram_id, game_balance) VALUES (?, ?)
-                ON CONFLICT(telegram_id) DO UPDATE SET game_balance = game_balance + ?
-            ''', (uid, float(amt), float(amt)))
+            if idempotency_key:
+                conn.execute('SAVEPOINT svrp_idem')
+                try:
+                    # Log record + balance credit in one atomic savepoint
+                    conn.execute(
+                        'INSERT INTO svrp_transfer_log (transfer_id, uid, amount, created_at) '
+                        'VALUES (?, ?, ?, ?)',
+                        (idempotency_key, uid, float(amt),
+                         datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+                    )
+                    conn.execute(
+                        'INSERT INTO users (telegram_id, game_balance) VALUES (?, ?) '
+                        'ON CONFLICT(telegram_id) DO UPDATE SET game_balance = game_balance + ?',
+                        (uid, float(amt), float(amt))
+                    )
+                    conn.execute('RELEASE SAVEPOINT svrp_idem')
+                except Exception:
+                    # Duplicate key OR other error: roll back the savepoint only
+                    try:
+                        conn.execute('ROLLBACK TO SAVEPOINT svrp_idem')
+                        conn.execute('RELEASE SAVEPOINT svrp_idem')
+                    except Exception:
+                        pass
+                    conn.commit()
+                    row = conn.execute(
+                        'SELECT game_balance FROM users WHERE telegram_id = ?', (uid,)
+                    ).fetchone()
+                    return _money_float(row[0]) if row and row[0] is not None else 0.0
+            else:
+                conn.execute(
+                    'INSERT INTO users (telegram_id, game_balance) VALUES (?, ?) '
+                    'ON CONFLICT(telegram_id) DO UPDATE SET game_balance = game_balance + ?',
+                    (uid, float(amt), float(amt))
+                )
             conn.commit()
             row = conn.execute(
                 'SELECT game_balance FROM users WHERE telegram_id = ?', (uid,)

@@ -4915,9 +4915,14 @@ def api_svrp_transfer_to_game():
         except Exception as e1:
             return jsonify({'error': f'خطأ في خصم SVRP: {e1}'}), 500
 
-        # ── الخطوة 2: إضافة رصيد اللعب ───────────────────────────────────────
+        # ── الخطوة 2: إضافة رصيد اللعب (idempotent بفضل _transfer_id) ──────────
+        import secrets as _sec
+        _transfer_id = _sec.token_hex(16)
         try:
-            new_game_balance = _gm.add_balance(uid, amount, 'svrp_transfer')
+            new_game_balance = _gm.add_balance(
+                uid, amount, 'svrp_transfer',
+                idempotency_key=_transfer_id
+            )
         except Exception as e2:
             # ── Compensating rollback: استعادة حقيقية للحالة ─────────────────
             try:

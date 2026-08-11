@@ -6329,22 +6329,20 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                 self.send_message(chat_id, self.tr('a0642_رصيدك_غير', lang, balance=balance, currency=currency, spin_cost=spin_cost))
                 return
 
-            # خصم الرصيد
+            # خصم الرصيد — عبر svrp_lock لضمان الاتساق مع التحويلات المتزامنة
             try:
-                rows = []
-                with open('svrp_wallets.csv', 'r', encoding='utf-8-sig') as f:
-                    reader = csv.DictReader(f)
-                    fieldnames = reader.fieldnames
-                    rows = list(reader)
-                for row in rows:
-                    if row.get('telegram_id') == str(user_id):
-                        row['balance'] = str(balance - spin_cost)
-                        break
-                with open('svrp_wallets.csv', 'w', newline='', encoding='utf-8-sig') as f:
-                    writer = csv.DictWriter(f, fieldnames=fieldnames)
-                    writer.writeheader()
-                    for row in rows:
-                        writer.writerow({k: row.get(k, '') for k in fieldnames})
+                from svrp import svrp_lock as _spin_svrp_lock
+                with _spin_svrp_lock():
+                    # إعادة قراءة الرصيد داخل القفل (تجنب TOCTOU)
+                    fresh = self.svrp.get_wallet(str(user_id))
+                    fresh_balance = float(fresh.get('balance', 0) or 0)
+                    if fresh_balance < spin_cost:
+                        self.send_message(chat_id, self.tr('a0642_رصيدك_غير', lang,
+                            balance=fresh_balance, currency=currency, spin_cost=spin_cost))
+                        return
+                    self.svrp._update_wallet(str(user_id), {
+                        'balance': round(fresh_balance - spin_cost, 6)
+                    })
             except Exception as e:
                 logger.error(f"خطأ في خصم رصيد العجلة: {e}")
 
