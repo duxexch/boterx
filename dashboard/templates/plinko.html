@@ -8,9 +8,11 @@
 <style>
 html,body{height:100%;margin:0;padding:0;touch-action:manipulation;overflow:hidden}
 #app{display:flex;flex-direction:column;height:100dvh;width:100%}
-.game-area{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:4px;overflow:hidden;min-height:0;width:100%}
-#plinkoCanvas{flex:1;width:100%;height:100%;border-radius:8px;background:var(--surface);border:1px solid var(--border);display:block;min-height:0;max-width:none}
-.result-row{display:flex;gap:6px;justify-content:center;min-height:22px;flex-shrink:0}
+/* Topbar — compact, minimal height */
+.game-topbar{flex-shrink:0;padding:6px 8px}
+.game-area{flex:1;display:flex;flex-direction:column;align-items:stretch;gap:3px;padding:2px;overflow:hidden;min-height:0;width:100%}
+#plinkoCanvas{flex:1;width:100%;height:100%;border-radius:6px;background:var(--surface);border:1px solid var(--border);display:block;min-height:0;max-width:none}
+.result-row{display:flex;gap:4px;justify-content:center;min-height:20px;flex-shrink:0}
 .result-chip{padding:2px 10px;border-radius:10px;font-size:12px;font-weight:800;font-family:'Courier New',monospace;animation:chipPop .3s}
 @keyframes chipPop{0%{transform:scale(0);opacity:0}70%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}}
 .options-row{display:flex;gap:4px;justify-content:center;width:100%;flex-shrink:0;flex-wrap:wrap}
@@ -321,39 +323,42 @@ function generatePath(rows){
 function animateBall(path,slotIdx,mult,payout,bet){
   var ballObj={x:path[0].x,y:path[0].y,step:0,path:path,r:ballRadius};
   balls.push(ballObj);
-  _noteIdx = 0; // reset musical scale for each drop
-  var draw=null;
+  _noteIdx = 0;
+  // Duration: 4-8 seconds based on row count (was ~1s)
+  var totalDuration = 4000 + selectedRows * 250; // 8 rows=6s, 12 rows=7s, 16 rows=8s
+  var stepDuration = totalDuration / (path.length - 1); // ms per step
+  var subSteps = 10; // interpolation steps per row
+  var subStepDelay = stepDuration / subSteps;
+  var stepTimer = null;
+  
   function step(){
     if(ballObj.step>=path.length-1){
-      if(draw)clearInterval(draw);
+      if(stepTimer)clearInterval(stepTimer);
       balls.splice(balls.indexOf(ballObj),1);
       ballTrails.length=0;
       drawBoard();
-      // land sound by gain
       soundSlotLand(mult);
-      setTimeout(function(){ dropping=false; document.getElementById('dropBtn').disabled=false; showDropResult(mult,payout,bet,slotIdx); },350);
+      setTimeout(function(){ dropping=false; document.getElementById('dropBtn').disabled=false; showDropResult(mult,payout,bet,slotIdx); },500);
       return;
     }
     ballObj.step++;
     var p0=path[ballObj.step-1], p1=path[ballObj.step];
     var progress=ballObj.step/path.length;
-    for(var i=0;i<=10;i++){
+    for(var i=0;i<=subSteps;i++){
       (function(fi){
         setTimeout(function(){
-          var ft=fi/10;
+          var ft=fi/subSteps;
           ballObj.x=p0.x+(p1.x-p0.x)*ft;
           ballObj.y=p0.y+(p1.y-p0.y)*ft;
-          // bounce sound at mid-steps
-          if(fi===5) soundPegBounce(progress);
-          // add trail
+          if(fi===Math.floor(subSteps/2)) soundPegBounce(progress);
           ballTrails.push({x:ballObj.x+Math.random()*4-2,y:ballObj.y+Math.random()*4-2,r:ballObj.r*0.5*(1-ft),a:0.4, c:BALL_STYLES[selectedBall].glow});
           if(ballTrails.length>40) ballTrails.shift();
           drawBoard();
-        }, fi*7);
+        }, fi*subStepDelay);
       })(i);
     }
   }
-  draw=setInterval(step,70);
+  stepTimer=setInterval(step, stepDuration);
 }
 
 function showDropResult(mult,payout,bet,slotIdx){
