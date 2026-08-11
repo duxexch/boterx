@@ -5736,17 +5736,19 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                 pass
 
             profile_text += self.ui_section(self.tr('a0152_المحفظة', lang), '💳')
+            # دلالات الحقول:
+            #   svrp_frozen   = أرصدة SVRP (مجمدة حتى اكتمال الرهان، ثم قابلة للنقل)
+            #   svrp_pending  = ينتظر إكمال الأصدقاء للرهان
+            #   total_earned  = مجموع تراكمي تاريخي لكل ما اكتُسب (للعرض فقط)
+            wager_status = '✅ مكتمل' if wager_done >= wager_req else f'{wager_done}/{wager_req}'
             wallet_rows = [
                 ['🎮 رصيد اللعب', f'{game_balance:.2f}', currency],
-                ['🧊 مجمد (SVRP)', f'{svrp_frozen:.2f}', currency],
+                ['💎 SVRP (تعويض)', f'{svrp_frozen:.2f}', currency],
             ]
-            if svrp_available > 0:
-                wallet_rows.append(['🟢 متاح (SVRP)', f'{svrp_available:.2f}', currency])
             if svrp_pending > 0:
-                wallet_rows.append(['⏳ معلق', f'{svrp_pending:.2f}', currency])
+                wallet_rows.append(['⏳ معلق (أصدقاء)', f'{svrp_pending:.2f}', currency])
             if svrp_frozen > 0:
-                wallet_rows.append([f'🔓 الرهان', f'{wager_done}/{wager_req} معاملات', ''])
-            wallet_rows.append(['💰 مكتسب', f'{total_earned:.2f}', currency])
+                wallet_rows.append([f'🔓 الرهان', wager_status, ''])
             profile_text += self.ui_table(['الحالة', 'المبلغ', 'العملة'], wallet_rows)
 
         # بطاقة حسابات الشركات

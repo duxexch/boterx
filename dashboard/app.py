@@ -4677,7 +4677,14 @@ def api_wallet_balance():
 @app.route('/api/player/wallet')
 @webapp_auth
 def api_player_wallet():
-    """محفظة اللاعب الكاملة: رصيد اللعب + SVRP مجمد/معلق + wagering progress"""
+    """محفظة اللاعب الكاملة: رصيد اللعب + SVRP مجمد/معلق + wagering progress
+
+    دلالات حقول SVRP:
+      balance         = أرصدة SVRP (مجمدة حتى اكتمال الرهان، ثم قابلة للنقل إلى رصيد اللعب)
+      pending_balance = تنتظر إكمال الأصدقاء للرهان حتى تنتقل إلى balance
+      total_used      = مجموع تراكمي تاريخي لما صُرف كخصومات — ليس رصيداً متاحاً
+      total_earned    = مجموع تراكمي تاريخي لكل ما اكتُسب
+    """
     if not _VEX_GAMES:
         return jsonify({'error': 'Games engine not available'}), 500
     uid = str(get_request_uid() or '')
@@ -4693,22 +4700,23 @@ def api_player_wallet():
     wallets = read_csv('svrp_wallets.csv')
     svrp_wallet = next((w for w in wallets if str(w.get('telegram_id', '')) == uid), {})
 
-    frozen_balance  = float(svrp_wallet.get('balance', 0) or 0)
-    pending_balance = float(svrp_wallet.get('pending_balance', 0) or 0)
-    svrp_available  = float(svrp_wallet.get('total_used', 0) or 0)
-    total_earned    = float(svrp_wallet.get('total_earned', 0) or 0)
+    svrp_credits    = float(svrp_wallet.get('balance', 0) or 0)        # مجمدة/قابلة للاستخدام
+    pending_balance = float(svrp_wallet.get('pending_balance', 0) or 0) # ينتظر الأصدقاء
+    total_earned    = float(svrp_wallet.get('total_earned', 0) or 0)    # تراكمي تاريخي
+    total_consumed  = float(svrp_wallet.get('total_used', 0) or 0)      # تراكمي تاريخي (صُرف)
     wager_required  = int(svrp_wallet.get('wagering_required', 3) or 3)
     wager_done      = int(svrp_wallet.get('wagering_completed', 0) or 0)
     wager_remaining = max(0, wager_required - wager_done)
-    is_frozen       = wager_done < wager_required
+    wagering_done   = wager_done >= wager_required  # True = يمكن نقل الرصيد
+    credits_spendable = wagering_done and svrp_credits > 0
 
-    # ── مصادر التجميد (Credit breakdown) ────────────────────────────
+    # ── مصادر أرصدة SVRP (Credit breakdown) ────────────────────────
     credits_all = read_csv('svrp_credits.csv')
     user_credits = [c for c in credits_all
                     if str(c.get('user_id', '')) == uid
-                    and c.get('status') in ('frozen', 'pending', 'active')]
+                    and c.get('status') in ('pending', 'active', 'frozen')]
 
-    freeze_sources = []
+    credit_sources = []
     _type_label = {
         'keep':     'مكافأة احتفاظ',
         'shared':   'مكافأة مشاركة',
@@ -4720,11 +4728,14 @@ def api_player_wallet():
         if amt <= 0:
             continue
         source_type = c.get('credit_type', 'referral')
-        freeze_sources.append({
+        status = c.get('status', '')
+        credit_sources.append({
             'type':    source_type,
             'label':   _type_label.get(source_type, source_type),
             'amount':  amt,
-            'status':  c.get('status', ''),
+            'status':  status,
+            # pending = ينتظر الأصدقاء / active = جاهز للاستخدام بعد الرهان
+            'ready':   status == 'active',
             'created': c.get('created_at', ''),
         })
 
@@ -4746,19 +4757,110 @@ def api_player_wallet():
         pass
 
     return jsonify({
-        'uid':              uid,
-        'currency':         currency,
-        'available_balance': game_balance,
-        'frozen_balance':    frozen_balance,
-        'pending_balance':   pending_balance,
-        'svrp_available':    svrp_available,
-        'total_earned':      total_earned,
+        'uid':               uid,
+        'currency':          currency,
+        'game_balance':      game_balance,      # رصيد اللعب (للرهان)
+        'svrp_credits':      svrp_credits,      # أرصدة SVRP (مجمدة أو جاهزة)
+        'pending_balance':   pending_balance,   # ينتظر الأصدقاء
+        'total_earned':      total_earned,      # تراكمي تاريخي
+        'total_consumed':    total_consumed,    # تراكمي تاريخي (للعرض الإداري فقط)
         'wagering_required': wager_required,
         'wagering_completed': wager_done,
         'wagering_remaining': wager_remaining,
-        'is_frozen':         is_frozen,
-        'freeze_sources':    freeze_sources,
+        'wagering_done':     wagering_done,     # True = اكتمل الرهان
+        'credits_spendable': credits_spendable, # True = يمكن نقل الرصيد الآن
+        'credit_sources':    credit_sources,
         'recent_transactions': recent_txns,
+    })
+
+
+@app.route('/api/svrp/transfer-to-game', methods=['POST'])
+@webapp_auth
+def api_svrp_transfer_to_game():
+    """نقل أرصدة SVRP (بعد اكتمال الرهان) إلى رصيد اللعب بشكل ذري.
+
+    Body JSON: { "amount": <float, optional — defaults to full balance> }
+    يستدعي svrp.use_credits() أولاً ثم _gm.add_balance() ليضمن
+    عدم الخصم المزدوج: لو فشل إضافة رصيد اللعب يُعاد الخصم (roll-back محدود بـ CSV).
+    """
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+
+    # ── تحقق من الإدخال ─────────────────────────────────────────────
+    data = request.get_json(silent=True) or {}
+    req_amount = data.get('amount')
+
+    # ── قراءة المحفظة الحالية ────────────────────────────────────────
+    wallets = read_csv('svrp_wallets.csv')
+    svrp_wallet = next((w for w in wallets if str(w.get('telegram_id', '')) == uid), None)
+
+    if svrp_wallet is None:
+        return jsonify({'error': 'لا توجد محفظة SVRP لهذا الحساب'}), 404
+
+    svrp_credits = float(svrp_wallet.get('balance', 0) or 0)
+    wager_done   = int(svrp_wallet.get('wagering_completed', 0) or 0)
+    wager_req    = int(svrp_wallet.get('wagering_required', 3) or 3)
+
+    # ── قواعد العمل ─────────────────────────────────────────────────
+    if wager_done < wager_req:
+        remaining = wager_req - wager_done
+        return jsonify({
+            'error': f'لم تكتمل متطلبات الرهان. أكمل {remaining} معاملة إضافية أولاً.',
+            'wagering_remaining': remaining,
+        }), 400
+
+    if svrp_credits <= 0:
+        return jsonify({'error': 'رصيد SVRP صفر — لا يوجد ما يُنقل'}), 400
+
+    # تحديد المبلغ
+    if req_amount is not None:
+        amount = float(req_amount)
+    else:
+        amount = svrp_credits  # نقل كل الرصيد
+
+    if amount <= 0:
+        return jsonify({'error': 'المبلغ يجب أن يكون أكبر من صفر'}), 400
+    if amount > svrp_credits:
+        return jsonify({'error': f'المبلغ يتجاوز رصيد SVRP المتاح ({svrp_credits:.2f})'}), 400
+
+    # ── تنفيذ النقل ─────────────────────────────────────────────────
+    try:
+        import sys as _sys2
+        _sys2.path.insert(0, BASE_DIR)
+        from svrp import SVRPManager
+        _svrp_mgr = SVRPManager()
+        success, msg = _svrp_mgr.use_credits(uid, amount)
+        if not success:
+            return jsonify({'error': msg or 'فشل خصم أرصدة SVRP'}), 400
+    except Exception as e:
+        return jsonify({'error': f'خطأ في خصم SVRP: {e}'}), 500
+
+    # ── إضافة لرصيد اللعب ───────────────────────────────────────────
+    try:
+        new_game_balance = _gm.add_balance(uid, amount, 'svrp_transfer')
+    except Exception as e:
+        # في حال فشل: نحاول إعادة الأرصدة (roll-back جزئي)
+        try:
+            from svrp import SVRPManager as _S2
+            _S2().add_frozen_balance(uid, amount)
+        except Exception:
+            pass
+        return jsonify({'error': f'فشل إضافة رصيد اللعب: {e}'}), 500
+
+    # ── قراءة الرصيد المحدّث ────────────────────────────────────────
+    wallets2 = read_csv('svrp_wallets.csv')
+    w2 = next((w for w in wallets2 if str(w.get('telegram_id', '')) == uid), {})
+    new_svrp = float(w2.get('balance', 0) or 0)
+
+    return jsonify({
+        'success':          True,
+        'transferred':      amount,
+        'new_game_balance': new_game_balance,
+        'new_svrp_credits': new_svrp,
     })
 
 
