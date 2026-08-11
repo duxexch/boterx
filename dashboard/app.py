@@ -738,6 +738,7 @@ def webapp_auth(f):
                 if uid_fb:
                     g.telegram_user_id = uid_fb
                     g.telegram_user = None
+                    g.webapp_auth_strong = False   # caller-supplied uid, not validated
                     return f(*args, **kwargs)
                 # Encrypted session fallback (?s=XXX)
                 s_fb = request.args.get('s', '').strip()
@@ -753,11 +754,13 @@ def webapp_auth(f):
                     if uid_val and authorized:
                         g.telegram_user_id = uid_val
                         g.telegram_user = None
+                        g.webapp_auth_strong = True   # device-authorized session
                         return f(*args, **kwargs)
                     if uid_val and not authorized:
-                        # Different device → guest mode
+                        # Different device → guest mode (session is valid but device differs)
                         g.telegram_user_id = uid_val
                         g.telegram_user = None
+                        g.webapp_auth_strong = True   # session cryptographically valid
                         return f(*args, **kwargs)
                 return jsonify({'error': 'initData required', 'code': 'NO_INIT_DATA'}), 403
 
@@ -798,6 +801,7 @@ def webapp_auth(f):
 
             g.telegram_user_id = uid_str
             g.telegram_user = user_obj
+            g.webapp_auth_strong = True   # HMAC-validated Telegram initData
             return f(*args, **kwargs)
 
         # ── Path 3: Dev/test mode (explicit opt-in, non-production only) ────
@@ -818,6 +822,7 @@ def webapp_auth(f):
                 )
                 g.telegram_user_id = uid
                 g.telegram_user = None
+                g.webapp_auth_strong = False   # dev/test uid — not validated
                 return f(*args, **kwargs)
             return jsonify({'error': 'Missing uid (dev mode)', 'code': 'NO_UID'}), 403
 
@@ -8363,6 +8368,8 @@ def webapp_account():
 @webapp_auth
 def api_player_account():
     """Unified account endpoint: profile + game stats + SVRP summary + referral summary + recent txns."""
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Validated initData or session required', 'code': 'WEAK_AUTH'}), 403
     if not _VEX_GAMES:
         return jsonify({'error': 'Games engine not available'}), 500
     uid = str(get_request_uid() or '')
@@ -8477,6 +8484,8 @@ def api_player_account():
 @webapp_auth
 def api_player_referrals():
     """Player referral data: link, earnings, full list of referred users."""
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Validated initData or session required', 'code': 'WEAK_AUTH'}), 403
     uid = str(get_request_uid() or '')
     if not uid:
         return jsonify({'error': 'Missing uid'}), 400
@@ -8532,6 +8541,8 @@ def api_player_referrals():
 @webapp_auth
 def api_player_rewards():
     """Player rewards: today's SVRP tasks + approved recovery requests + promo balances."""
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Validated initData or session required', 'code': 'WEAK_AUTH'}), 403
     uid = str(get_request_uid() or '')
     if not uid:
         return jsonify({'error': 'Missing uid'}), 400
@@ -8622,6 +8633,8 @@ def api_player_rewards():
 @webapp_auth
 def api_player_rewards_claim(task_id):
     """Claim a completed SVRP daily task reward."""
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Validated initData or session required', 'code': 'WEAK_AUTH'}), 403
     uid = str(get_request_uid() or '')
     if not uid:
         return jsonify({'error': 'Missing uid'}), 400
