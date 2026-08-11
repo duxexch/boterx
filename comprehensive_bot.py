@@ -4866,7 +4866,9 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             lang_names = self.get_language_names()
             lang_display = lang_names.get(detected_lang, {}).get('native', detected_lang)
             
-            welcome_text = f"""✅ تم التسجيل بنجاح!
+            welcome_text = f"""💚 <b>VEX</b> — اشتي وبع مع المستخدمين الآخرين بأمان
+
+✅ تم التسجيل بنجاح!
 
 👤 الاسم: {name}
 📱 الهاتف: {phone}

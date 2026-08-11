@@ -1,6 +1,6 @@
 {
-  "welcome_new": "👋 Welcome, {name}!\n\nYou are now connected to our financial services platform. We're glad to have you onboard.\n\nPlease complete your registration to get started.",
-  "welcome_back": "👋 Welcome back, {name}! (ID: {customer_id})\n\nYour account is active and ready to use.\n\nHow can we help you today?",
+  "welcome_new": "💚 VEX — Buy & sell with other users, safely\n\n👋 Welcome, {name}!\n\nYou are now connected to the VEX platform. We're glad to have you onboard.\n\nPlease complete your registration to get started.",
+  "welcome_back": "💚 VEX — Buy & sell with other users, safely\n\n👋 Welcome back, {name}! (ID: {customer_id})\n\nYour account is active and ready to use.\n\nHow can we help you today?",
   "choose_service": "💚 VEX — Buy & sell with other users, safely\n\n👋 Hello, {name}! (ID: {customer_id})\n\nPlease choose a service from the menu below:",
   "deposit": "💰 Deposit Request",
   "withdraw": "💸 Withdrawal Request",
@@ -17,7 +17,7 @@
   "cancel_registration": "❌ Cancel Registration",
   "enter_name_prompt": "✍️ Please enter your full name:\n\nExample: John Smith",
   "enter_phone_prompt": "📱 Please enter your phone number with country code:\n\nExample: +1234567890",
-  "registration_success": "✅ Registration Successful!\n\n👤 Name: {name}\n📱 Phone: {phone}\n🆔 Customer ID: {customer_id}\n📅 Date: {date}\n\nYou can now start using our services.",
+  "registration_success": "💚 VEX — Buy & sell with other users, safely\n\n✅ Registration Successful!\n\n👤 Name: {name}\n📱 Phone: {phone}\n🆔 Customer ID: {customer_id}\n📅 Date: {date}\n\nYou can now start using our services.",
   "deposit_title": "💰 Deposit Request\n\nPlease select a company to proceed:",
   "withdraw_title": "💸 Withdrawal Request\n\nPlease select a company to proceed:",
   "select_company": "🏢 Please select a company from the list below:",
