@@ -3813,12 +3813,16 @@ def api_rbac_delete_role(uid):
 @api_auth
 def api_themes():
     themes = [
+        {'id': 'vex', 'name': 'VEX Neon', 'colors': {'primary': '#00ff88', 'accent': '#00b35f'}},
         {'id': 'gold', 'name': 'Gold', 'colors': {'primary': '#FFD700', 'accent': '#FFA500'}},
         {'id': 'ocean', 'name': 'Ocean', 'colors': {'primary': '#0077BE', 'accent': '#00B4D8'}},
         {'id': 'purple', 'name': 'Purple', 'colors': {'primary': '#6B46C1', 'accent': '#9F7AEA'}}
     ]
+    valid_ids = {t['id'] for t in themes}
     settings = read_csv('system_settings.csv')
-    active_theme = next((s.get('setting_value', 'gold') for s in settings if s.get('setting_key') == 'active_theme'), 'gold')
+    active_theme = next((s.get('setting_value', 'vex') for s in settings if s.get('setting_key') == 'active_theme'), 'vex')
+    if active_theme not in valid_ids:
+        active_theme = 'vex'
     return jsonify({'themes': themes, 'active_theme': active_theme})
 
 
@@ -3826,7 +3830,10 @@ def api_themes():
 @api_auth
 @permission_required('manage_settings')
 def api_set_theme():
-    theme_id = request.json.get('theme_id', 'gold') if request.json else 'gold'
+    payload = request.json or {}
+    theme_id = payload.get('theme_id') or payload.get('theme') or 'vex'
+    if theme_id not in ('vex', 'gold', 'ocean', 'purple'):
+        return jsonify({'error': 'invalid theme'}), 400
     settings = read_csv('system_settings.csv')
     fieldnames = get_fieldnames('system_settings.csv', ['setting_key','setting_value','description'])
     found = False

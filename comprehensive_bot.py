@@ -4030,9 +4030,16 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         return None
 
     def get_current_theme(self):
-        """الحصول على الثيم النشط حالياً"""
+        """الحصول على الثيم النشط حالياً — مع إصلاح القيم التالفة تلقائياً"""
         theme_name = self.get_setting('active_theme') or 'vex'
         if THEME_AVAILABLE:
+            if theme_name not in THEMES:
+                # قيمة تالفة أو غير معروفة — إصلاحها بشكل دائم إلى الثيم الافتراضي
+                theme_name = 'vex'
+                try:
+                    self.save_setting('active_theme', 'vex')
+                except Exception:
+                    pass
             return get_theme(theme_name)
         return {}
 
@@ -10164,7 +10171,9 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             self.send_message(message['chat']['id'], self.tr('a0892_نظام_الثيمات', 'ar'), self.admin_keyboard())
             return
 
-        current_theme = self.get_setting('active_theme') or 'gold'
+        current_theme = self.get_setting('active_theme') or 'vex'
+        if current_theme not in THEMES:
+            current_theme = 'vex'
         theme = get_theme(current_theme)
 
         text = (
