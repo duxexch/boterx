@@ -789,15 +789,22 @@ def webapp_auth(f):
                 return jsonify({'error': 'initData auth_date malformed', 'code': 'BAD_AUTH_DATE'}), 403
 
             # ── Replay-protection: reject same initData token reused from a
-            # different device/IP or after it was already consumed this session.
-            # The hash is stored in SQLite so protection survives restarts.
+            # different device.  Same-device repeated use within the TTL is
+            # allowed (a WebApp page sends the same initData on every apiFetch
+            # call).  The hash + device fingerprint are stored in SQLite so
+            # protection survives restarts.
             try:
                 import hashlib as _hl
-                _tok_hash = _hl.sha256(init_data.encode()).hexdigest()
-                if not _check_nonce(_tok_hash, uid_str, ttl=_INIT_DATA_MAX_AGE + 120):
+                _tok_hash   = _hl.sha256(init_data.encode()).hexdigest()
+                _device_fp  = request.headers.get('X-Device-FP', '')
+                if not _check_nonce(_tok_hash, uid_str,
+                                    device_fp=_device_fp,
+                                    ttl=_INIT_DATA_MAX_AGE + 120):
                     _auth_logger.warning(
-                        "initData replay detected uid=%s hash=%s…", uid_str, _tok_hash[:12])
-                    return jsonify({'error': 'initData already used', 'code': 'REPLAY_INIT_DATA'}), 403
+                        "initData cross-device replay detected uid=%s hash=%s…",
+                        uid_str, _tok_hash[:12])
+                    return jsonify({'error': 'initData already used from different device',
+                                    'code': 'REPLAY_INIT_DATA'}), 403
             except Exception as _nonce_err:
                 # Never block a legitimate request if nonce storage fails
                 _auth_logger.error("nonce check error (fail-open): %s", _nonce_err)

@@ -226,9 +226,12 @@ def _init_db():
             -- Persisted replay-protection nonces for Telegram initData tokens.
             -- Survives dashboard restarts so stolen tokens cannot be replayed even
             -- after a process restart.  TTL matches _INIT_DATA_MAX_AGE + buffer.
+            -- device_fp: fingerprint of the device that first presented this token;
+            -- same-device reuse is allowed, cross-device reuse is blocked.
             CREATE TABLE IF NOT EXISTS auth_nonces (
                 token_hash  TEXT PRIMARY KEY,
                 user_id     TEXT NOT NULL,
+                device_fp   TEXT NOT NULL DEFAULT '',
                 created_at  REAL NOT NULL,
                 expires_at  REAL NOT NULL
             );
@@ -1742,24 +1745,60 @@ def refund_expired_game_sessions(gdb_instance=None) -> list:
 
 # ── Replay-protection nonce store ────────────────────────────────────────────
 
-def check_and_mark_nonce(token_hash: str, user_id: str, ttl: int = 3720) -> bool:
-    """Atomically record an initData nonce and return True if it's new (allow).
+def check_and_mark_nonce(token_hash: str, user_id: str, device_fp: str = '',
+                         ttl: int = 3720) -> bool:
+    """Atomically record an initData nonce and enforce cross-device replay protection.
 
-    Returns False when the hash already exists (replay attempt).  The nonce is
-    kept for *ttl* seconds (default 3720 = 1 h + 2-min buffer, matching
-    _INIT_DATA_MAX_AGE).  Uses INSERT OR IGNORE so the write is atomic with no
-    TOCTOU gap even under concurrent requests.
+    A Telegram WebApp page sends the SAME initData on every apiFetch call
+    within a session (it is set once at page load).  Blocking all repeat uses
+    would break any page with more than one API call.  We therefore allow
+    same-device repeated use within the TTL, and only block presentation of
+    the token from a DIFFERENT device fingerprint.
+
+    Returns True (allow) when:
+    - Token is new — recorded now with this device fingerprint.
+    - Token was previously recorded with the SAME device fingerprint.
+    - No device fingerprint is available on either side (fallback permissive).
+
+    Returns False (block) when:
+    - Token was previously recorded with a DIFFERENT device fingerprint
+      (cross-device replay attack).
+
+    The nonce is kept for ttl seconds (default 3720 = 1 h + 2-min buffer).
+    The device_fp column is added via ALTER TABLE if the DB pre-dates this schema.
     """
     now = time.time()
     conn = _get_conn()
     try:
+        # Ensure device_fp column exists (idempotent migration for pre-existing DBs)
+        try:
+            conn.execute("ALTER TABLE auth_nonces ADD COLUMN device_fp TEXT NOT NULL DEFAULT ''")
+            conn.commit()
+        except Exception:
+            pass  # Column already exists — expected on most runs
+
         cur = conn.execute(
             'INSERT OR IGNORE INTO auth_nonces'
-            ' (token_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)',
-            (token_hash, user_id, now, now + ttl),
+            ' (token_hash, user_id, device_fp, created_at, expires_at)'
+            ' VALUES (?, ?, ?, ?, ?)',
+            (token_hash, user_id, device_fp, now, now + ttl),
         )
         conn.commit()
-        return cur.rowcount == 1  # 1 → inserted (new); 0 → already existed (replay)
+        if cur.rowcount == 1:
+            return True  # New token — first use from this device
+
+        # Token already recorded — check device fingerprint
+        row = conn.execute(
+            'SELECT device_fp FROM auth_nonces WHERE token_hash = ?',
+            (token_hash,),
+        ).fetchone()
+        if not row:
+            return True  # Row vanished (expired between INSERT and SELECT) — allow
+
+        stored_fp = row[0] or ''
+        if not stored_fp or not device_fp:
+            return True  # No fingerprint to compare — allow (conservative)
+        return stored_fp == device_fp  # True = same device; False = cross-device replay
     finally:
         conn.close()
 

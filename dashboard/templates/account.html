@@ -679,6 +679,10 @@ async function loadAccount() {
 async function loadReferrals() {
   try {
     const r = await apiFetch(BASE + '/api/player/referrals');
+    if (r.status === 403) {
+      const e = await r.json().catch(() => ({}));
+      showAuthError(e.code || 'WEAK_AUTH'); return;
+    }
     const d = await r.json();
     _refData = d;
 
@@ -719,6 +723,10 @@ async function loadReferrals() {
 async function loadRewards() {
   try {
     const r = await apiFetch(BASE + '/api/player/rewards');
+    if (r.status === 403) {
+      const e = await r.json().catch(() => ({}));
+      showAuthError(e.code || 'WEAK_AUTH'); return;
+    }
     const d = await r.json();
     _rewardData = d;
     renderTasks(d.tasks || []);

@@ -53,7 +53,9 @@ function _getAuthParam() {
 async function apiFetch(url, opts = {}) {
   opts.headers = opts.headers || {};
   opts.headers['X-Telegram-Init-Data'] = initData;
-  if (sess) opts.headers['X-Device-FP'] = getDeviceFP();
+  // Always send device fingerprint — needed by the nonce check to distinguish
+  // same-device reuse (allowed) from cross-device replay (blocked).
+  opts.headers['X-Device-FP'] = getDeviceFP();
   if (opts.body && typeof opts.body === 'string') {
     opts.headers['Content-Type'] = 'application/json';
   }
