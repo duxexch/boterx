@@ -1622,20 +1622,24 @@ def api_approve_txn(txn_id):
     old_amount = ''
     customer_tid = ''
     trans = None
+    was_pending = False   # True only when this call actually transitions pending→approved
     for t in txns:
         if t.get('id') == txn_id:
-            old_amount = t.get('amount', '')
-            customer_tid = t.get('telegram_id', '')
+            old_amount    = t.get('amount', '')
+            customer_tid  = t.get('telegram_id', '')
+            old_status    = t.get('status', '')
             trans = t
-            t['status'] = 'approved'
-            t['processed_by'] = session.get('admin_id', '')
-            if new_amount:
-                t['amount'] = str(new_amount)
+            if old_status != 'approved':          # guard: only transition once
+                was_pending = (old_status == 'pending')
+                t['status'] = 'approved'
+                t['processed_by'] = session.get('admin_id', '')
+                if new_amount:
+                    t['amount'] = str(new_amount)
             break
     write_csv('transactions.csv', txns, fieldnames)
     log_action('approve_transaction', f'{txn_id} amount: {old_amount} -> {new_amount or old_amount}')
-    # Increment wagering counter for this user so their SVRP credits can unlock
-    if customer_tid:
+    # Increment wagering ONLY on a genuine pending→approved transition
+    if was_pending and customer_tid:
         try:
             import sys as _sw; _sw.path.insert(0, BASE_DIR)
             from svrp import SVRPManager as _SM_w
@@ -1731,26 +1735,31 @@ def api_bulk_approve():
     txns = read_csv('transactions.csv')
     fieldnames = get_fieldnames('transactions.csv', ['id','customer_id','telegram_id','name','type','company','wallet_number','amount','exchange_address','status','date','admin_note','processed_by','currency'])
     count = 0
+    newly_approved_tids = []   # telegram_ids that actually transitioned pending→approved
     for t in txns:
         if t.get('id') in ids:
-            t['status'] = 'approved'
-            t['processed_by'] = session.get('admin_id', '')
-            count += 1
+            old_st = t.get('status', '')
+            if old_st != 'approved':             # guard: only transition once
+                if old_st == 'pending' and t.get('telegram_id'):
+                    newly_approved_tids.append(str(t['telegram_id']))
+                t['status'] = 'approved'
+                t['processed_by'] = session.get('admin_id', '')
+                count += 1
     write_csv('transactions.csv', txns, fieldnames)
     log_action('bulk_approve', f'{count} transactions')
-    # Increment wagering for all approved users so SVRP credits can unlock
-    try:
-        import sys as _sbw; _sbw.path.insert(0, BASE_DIR)
-        from svrp import SVRPManager as _SM_bw
-        _sm_bw = _SM_bw()
-        for _t in txns:
-            if _t.get('id') in ids and _t.get('telegram_id'):
+    # Increment wagering ONLY for users whose status actually changed pending→approved
+    if newly_approved_tids:
+        try:
+            import sys as _sbw; _sbw.path.insert(0, BASE_DIR)
+            from svrp import SVRPManager as _SM_bw
+            _sm_bw = _SM_bw()
+            for _tid in newly_approved_tids:
                 try:
-                    _sm_bw.increment_wagering(str(_t['telegram_id']))
+                    _sm_bw.increment_wagering(_tid)
                 except Exception:
                     pass
-    except Exception:
-        pass
+        except Exception:
+            pass
     return jsonify({'success': True, 'count': count})
 
 @app.route('/api/transactions/bulk-reject', methods=['POST'])

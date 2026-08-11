@@ -238,41 +238,40 @@ class SVRPManager:
         return wallet
 
     def _update_wallet(self, telegram_id, updates):
-        """تحديث محفظة مستخدم"""
+        """تحديث محفظة مستخدم — القراءة والكتابة داخل svrp_lock."""
         tid = str(telegram_id)
-        rows = self._read_csv('svrp_wallets.csv')
-        found = False
-        for row in rows:
-            if row['telegram_id'] == tid:
-                for k, v in updates.items():
-                    if k in row:
-                        row[k] = str(v)
-                found = True
-                break
-        if not found:
-            # إنشاء إذا لم تكن موجودة
-            wallet = self.get_wallet(telegram_id)
+        with svrp_lock():
             rows = self._read_csv('svrp_wallets.csv')
+            found = False
             for row in rows:
                 if row['telegram_id'] == tid:
                     for k, v in updates.items():
                         if k in row:
                             row[k] = str(v)
+                    found = True
                     break
-        return self._write_csv('svrp_wallets.csv', rows, self.WALLET_FIELDS)
+            if not found:
+                wallet = self.get_wallet(telegram_id)
+                rows = self._read_csv('svrp_wallets.csv')
+                for row in rows:
+                    if row['telegram_id'] == tid:
+                        for k, v in updates.items():
+                            if k in row:
+                                row[k] = str(v)
+                        break
+            return self._write_csv('svrp_wallets.csv', rows, self.WALLET_FIELDS)
 
     def add_frozen_balance(self, telegram_id, amount):
-        """إضافة رصيد مجمد للمحفظة (لأرباح الإحالة)"""
+        """إضافة رصيد مجمد للمحفظة — القراءة والكتابة داخل svrp_lock."""
         tid = str(telegram_id)
-        wallet = self.get_wallet(tid)
-        current_balance = float(wallet.get('balance', 0) or 0)
-        current_earned = float(wallet.get('total_earned', 0) or 0)
-        new_balance = current_balance + float(amount)
-        new_earned = current_earned + float(amount)
-        self._update_wallet(tid, {
-            'balance': new_balance,
-            'total_earned': new_earned
-        })
+        with svrp_lock():
+            wallet = self.get_wallet(tid)
+            current_balance = float(wallet.get('balance', 0) or 0)
+            current_earned  = float(wallet.get('total_earned', 0) or 0)
+            self._update_wallet(tid, {
+                'balance':      current_balance + float(amount),
+                'total_earned': current_earned  + float(amount),
+            })
         logger.info(f"Referral bonus added to {tid}: +{amount} frozen")
         return True
 
@@ -426,31 +425,32 @@ class SVRPManager:
         if not referrer_id:
             return False
 
-        # تفعيل أول رصيد مشترك معلق للمُحيل
-        rows = self._read_csv('svrp_credits.csv')
-        activated = False
-        for row in rows:
-            if (row['user_id'] == referrer_id and
-                row['credit_type'] == 'shared' and
-                row['status'] == 'pending'):
-                row['status'] = 'active'
-                row['friend_id'] = tid
-                activated = True
-                break
+        # تفعيل أول رصيد مشترك معلق للمُحيل — داخل svrp_lock
+        with svrp_lock():
+            rows = self._read_csv('svrp_credits.csv')
+            activated = False
+            activated_row = None
+            for row in rows:
+                if (row['user_id'] == referrer_id and
+                        row['credit_type'] == 'shared' and
+                        row['status'] == 'pending'):
+                    row['status'] = 'active'
+                    row['friend_id'] = tid
+                    activated = True
+                    activated_row = row
+                    break
 
-        if activated:
-            self._write_csv('svrp_credits.csv', rows, self.CREDIT_FIELDS)
+            if activated:
+                self._write_csv('svrp_credits.csv', rows, self.CREDIT_FIELDS)
 
-            # نقل الرصيد من pending إلى balance في المحفظة
-            wallet = self.get_wallet(referrer_id)
-            share_amount = float(row['credit_amount'])
-            current_balance = float(wallet.get('balance', 0) or 0)
-            current_pending = float(wallet.get('pending_balance', 0) or 0)
-
-            self._update_wallet(referrer_id, {
-                'balance': current_balance + share_amount,
-                'pending_balance': max(0, current_pending - share_amount)
-            })
+                wallet = self.get_wallet(referrer_id)
+                share_amount    = float(activated_row['credit_amount'])
+                current_balance = float(wallet.get('balance', 0) or 0)
+                current_pending = float(wallet.get('pending_balance', 0) or 0)
+                self._update_wallet(referrer_id, {
+                    'balance':         current_balance + share_amount,
+                    'pending_balance': max(0, current_pending - share_amount),
+                })
 
             # تحديث حالة الإحالة
             try:
@@ -484,71 +484,70 @@ class SVRPManager:
         return completed >= required
 
     def increment_wagering(self, telegram_id):
-        """زيادة عداد الرهان عند إكمال معاملة — وتفعيل الأرصدة المعلقة عند إكمال الرهان"""
-        wallet = self.get_wallet(telegram_id)
-        current = int(wallet.get('wagering_completed', 0) or 0)
-        required = int(wallet.get('wagering_required', 3) or 3)
-        new_count = current + 1
-        self._update_wallet(telegram_id, {
-            'wagering_completed': new_count
-        })
+        """زيادة عداد الرهان — القراءة والكتابة للمحفظة والأرصدة داخل svrp_lock."""
+        with svrp_lock():
+            wallet   = self.get_wallet(telegram_id)
+            current  = int(wallet.get('wagering_completed', 0) or 0)
+            required = int(wallet.get('wagering_required', 3) or 3)
+            new_count = current + 1
+            self._update_wallet(telegram_id, {'wagering_completed': new_count})
 
-        # فك التجميد: تحويل أرصدة 'pending' إلى 'active' عند إكمال الرهان
-        if new_count >= required:
-            rows = self._read_csv('svrp_credits.csv')
-            activated = 0
-            for row in rows:
-                if (row['user_id'] == str(telegram_id) and
-                    row['status'] == 'pending'):
-                    row['status'] = 'active'
-                    activated += 1
-            if activated > 0:
-                self._write_csv('svrp_credits.csv', rows, self.CREDIT_FIELDS)
-                logger.info(f"Recovery: Activated {activated} pending credits for user {telegram_id} (wagering complete: {new_count}/{required})")
-
+            # فك التجميد: تحويل أرصدة 'pending' → 'active' عند إكمال الرهان
+            if new_count >= required:
+                rows = self._read_csv('svrp_credits.csv')
+                activated = 0
+                for row in rows:
+                    if (row['user_id'] == str(telegram_id) and
+                            row['status'] == 'pending'):
+                        row['status'] = 'active'
+                        activated += 1
+                if activated > 0:
+                    self._write_csv('svrp_credits.csv', rows, self.CREDIT_FIELDS)
+                    logger.info(
+                        f"Recovery: Activated {activated} pending credits for "
+                        f"user {telegram_id} (wagering complete: {new_count}/{required})"
+                    )
         return new_count
 
     # ==================== استخدام الأرصدة ====================
 
     def use_credits(self, telegram_id, amount):
-        """
-        استخدام الأرصدة كخصم رسوم
-        يجب أن يكون المستخدم قد أكمل متطلبات الرهان
-        """
-        if not self.check_wagering(telegram_id):
-            return False, "لم تكمل متطلبات الرهان بعد"
+        """استخدام الأرصدة — القراءة والكتابة داخل svrp_lock (reentrant)."""
+        with svrp_lock():
+            wallet  = self.get_wallet(telegram_id)
+            wager_req  = int(wallet.get('wagering_required', 3) or 3)
+            wager_done = int(wallet.get('wagering_completed', 0) or 0)
+            if wager_done < wager_req:
+                return False, "لم تكمل متطلبات الرهان بعد"
 
-        wallet = self.get_wallet(telegram_id)
-        balance = float(wallet.get('balance', 0) or 0)
+            balance = float(wallet.get('balance', 0) or 0)
+            if balance < amount:
+                return False, f"الرصيد غير كافٍ (المتاح: {balance})"
 
-        if balance < amount:
-            return False, f"الرصيد غير كافٍ (المتاح: {balance})"
+            new_balance = balance - amount
+            total_used  = float(wallet.get('total_used', 0) or 0) + amount
+            self._update_wallet(telegram_id, {
+                'balance':    new_balance,
+                'total_used': total_used,
+            })
 
-        # خصم من المحفظة
-        new_balance = balance - amount
-        total_used = float(wallet.get('total_used', 0) or 0) + amount
-        self._update_wallet(telegram_id, {
-            'balance': new_balance,
-            'total_used': total_used
-        })
-
-        # تحديث حالة الأرصدة المستخدمة (pending أو active — تم تفعيلها في increment_wagering)
-        rows = self._read_csv('svrp_credits.csv')
-        remaining = amount
-        for row in rows:
-            if (row['user_id'] == str(telegram_id) and
-                row['status'] in ('active', 'pending') and
-                float(row.get('credit_amount', 0) or 0) > 0):
-                credit_val = float(row['credit_amount'])
-                if remaining >= credit_val:
-                    remaining -= credit_val
-                    row['status'] = 'used'
-                    row['credit_amount'] = '0'
-                else:
-                    row['credit_amount'] = str(credit_val - remaining)
-                    remaining = 0
-                    break
-        self._write_csv('svrp_credits.csv', rows, self.CREDIT_FIELDS)
+            # تحديث حالة الأرصدة الفردية
+            rows = self._read_csv('svrp_credits.csv')
+            remaining = amount
+            for row in rows:
+                if (row['user_id'] == str(telegram_id) and
+                        row['status'] in ('active', 'pending') and
+                        float(row.get('credit_amount', 0) or 0) > 0):
+                    credit_val = float(row['credit_amount'])
+                    if remaining >= credit_val:
+                        remaining -= credit_val
+                        row['status'] = 'used'
+                        row['credit_amount'] = '0'
+                    else:
+                        row['credit_amount'] = str(credit_val - remaining)
+                        remaining = 0
+                        break
+            self._write_csv('svrp_credits.csv', rows, self.CREDIT_FIELDS)
 
         logger.info(f"Recovery: User {telegram_id} used {amount} credits")
         return True, "تم استخدام الأرصدة بنجاح"
