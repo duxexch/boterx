@@ -4,28 +4,30 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
 <title>Plinko — VEX</title>
-<link rel="stylesheet" href="/static/css/game-base.css?v=20260811b">
+<link rel="stylesheet" href="/static/css/game-base.css?v=20260811c">
 <style>
-*{box-sizing:border-box}
-html,body{margin:0;padding:0;touch-action:manipulation;overflow-y:auto;overflow-x:hidden}
-#app{display:flex;flex-direction:column;min-height:200dvh;width:100%}
-.game-topbar{flex-shrink:0;padding:6px 8px;position:sticky;top:0;z-index:10;background:#0a0e17}
-.game-area{flex:1;display:flex;flex-direction:column;gap:3px;padding:2px;overflow:hidden;min-height:0;width:100%}
-#plinkoCanvas{flex:1;width:100%;display:block;min-height:0;border-radius:6px;background:#0a0e17;border:1px solid #1a2a3a}
-.result-row{display:flex;gap:4px;justify-content:center;min-height:20px;flex-shrink:0}
-.result-chip{padding:2px 10px;border-radius:10px;font-size:12px;font-weight:800;font-family:'Courier New',monospace}
-.controls-row{display:flex;align-items:center;gap:4px;flex-shrink:0;padding:0 2px}
-.opt-box{display:flex;align-items:center;gap:3px;background:#1a2a3a;border:1px solid #2a3a4a;border-radius:8px;padding:3px 5px}
-.opt-btn{padding:3px 6px;border-radius:6px;background:#0d1520;border:1px solid #2a3a4a;color:#6a7a8a;font-size:10px;font-weight:700;cursor:pointer}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;touch-action:manipulation;overflow:hidden;background:#0a0e17;font-family:system-ui,sans-serif}
+#app{display:flex;flex-direction:column;height:100dvh;width:100%}
+.game-topbar{flex-shrink:0;padding:6px 8px}
+.game-area{flex:1;position:relative;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+#plinkoCanvas{flex:1;width:100%;display:block;min-height:0}
+.result-row{position:absolute;top:6px;left:8px;right:8px;display:flex;gap:4px;justify-content:center;flex-wrap:wrap;pointer-events:none;z-index:5}
+.result-chip{padding:3px 12px;border-radius:12px;font-size:12px;font-weight:800;font-family:'Courier New',monospace;backdrop-filter:blur(6px);background:rgba(10,14,23,.7)}
+.controls-panel{flex-shrink:0;padding:5px 6px 6px;background:linear-gradient(0deg,#0a0e17,rgba(10,14,23,.92))}
+.controls-row{display:flex;align-items:center;gap:4px}
+.opt-box{display:flex;align-items:center;gap:2px;background:#1a2a3a;border:1px solid #2a3a4a;border-radius:8px;padding:3px 4px}
+.opt-btn{padding:4px 7px;border-radius:6px;background:#0d1520;border:1px solid #2a3a4a;color:#6a7a8a;font-size:10px;font-weight:700;cursor:pointer;transition:all .15s}
 .opt-btn.active{background:rgba(251,191,36,.15);border-color:#fbbf24;color:#fbbf24}
-.bet-inp{flex:1;background:#0d1520;border:1px solid #2a3a4a;color:#e1e8f0;padding:7px;border-radius:8px;font-size:14px;font-weight:700;text-align:center;font-family:'Courier New',monospace;min-width:0}
-.ctrl-btn{background:#1a2a3a;border:1px solid #2a3a4a;color:#6a7a8a;padding:7px 6px;border-radius:8px;font-size:10px;font-weight:700;cursor:pointer;flex-shrink:0}
-.drop-btn{padding:10px;border-radius:10px;font-size:14px;font-weight:900;border:none;cursor:pointer;background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#000;flex:2}
+.bet-inp{flex:1;background:#0d1520;border:1px solid #2a3a4a;color:#e1e8f0;padding:8px;border-radius:8px;font-size:14px;font-weight:700;text-align:center;font-family:'Courier New',monospace;min-width:0}
+.ctrl-btn{background:#1a2a3a;border:1px solid #2a3a4a;color:#6a7a8a;padding:8px 7px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0}
+.drop-btn{padding:10px 14px;border-radius:10px;font-size:15px;font-weight:900;border:none;cursor:pointer;background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#000;flex:2;letter-spacing:.5px}
 .drop-btn:disabled{background:#1a2a3a;color:#6a7a8a;cursor:not-allowed}
-.auto-inp{background:#0d1520;border:1px solid #2a3a4a;color:#e1e8f0;padding:5px;border-radius:6px;font-size:11px;text-align:center;width:40px}
-.big-win-overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.8);backdrop-filter:blur(6px);z-index:50}
-.big-win-overlay.show{display:flex}
-.big-win-num{font-size:56px;font-weight:900;font-family:'Courier New',monospace;color:#fbbf24;text-shadow:0 0 40px rgba(251,191,36,.6)}
+.auto-inp{background:#0d1520;border:1px solid #2a3a4a;color:#e1e8f0;padding:6px;border-radius:6px;font-size:11px;text-align:center;width:38px}
+.big-win-overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.85);backdrop-filter:blur(8px);z-index:50}
+.big-win-overlay.show{display:flex;animation:fadeIn .3s}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.big-win-num{font-size:56px;font-weight:900;font-family:'Courier New',monospace;color:#fbbf24;text-shadow:0 0 40px rgba(251,191,36,.7)}
 .big-win-text{font-size:16px;color:#fff;margin-top:8px}
 </style>
 </head>
@@ -43,237 +45,385 @@ html,body{margin:0;padding:0;touch-action:manipulation;overflow-y:auto;overflow-
 <div class="game-area">
   <canvas id="plinkoCanvas"></canvas>
   <div class="result-row" id="resultRow"></div>
+</div>
+<div class="controls-panel">
   <div class="controls-row">
-    <div class="opt-box"><div class="opt-btn active" id="r8" onclick="setRows(8)">8</div><div class="opt-btn" id="r12" onclick="setRows(12)">12</div><div class="opt-btn" id="r16" onclick="setRows(16)">16</div></div>
-    <div class="opt-box"><div class="opt-btn active" id="rkL" onclick="setRisk('low')">منخفض</div><div class="opt-btn" id="rkM" onclick="setRisk('med')">متوسط</div><div class="opt-btn" id="rkH" onclick="setRisk('high')">عالي</div></div>
+    <div class="opt-box">
+      <div class="opt-btn" id="r8" onclick="setRows(8)">8</div>
+      <div class="opt-btn active" id="r12" onclick="setRows(12)">12</div>
+      <div class="opt-btn" id="r16" onclick="setRows(16)">16</div>
+      <div class="opt-btn" id="r20" onclick="setRows(20)">20</div>
+    </div>
+    <div class="opt-box">
+      <div class="opt-btn active" id="rkL" onclick="setRisk('low')">منخفض</div>
+      <div class="opt-btn" id="rkM" onclick="setRisk('med')">متوسط</div>
+      <div class="opt-btn" id="rkH" onclick="setRisk('high')">عالي</div>
+    </div>
     <button class="ctrl-btn" onclick="adjBet(0.5)">½</button>
     <input class="bet-inp" type="number" id="betInp" value="10" min="1">
     <button class="ctrl-btn" onclick="adjBet(2)">2×</button>
-    <input class="auto-inp" type="number" id="autoCount" value="1" min="1" max="100">
+    <input class="auto-inp" type="number" id="autoCount" value="1" min="1" max="100" title="تكرار">
     <button class="drop-btn" id="dropBtn" onclick="dropBall()">🎯 إسقاط</button>
   </div>
 </div>
 <div class="big-win-overlay" id="bigWin"><div style="text-align:center"><div class="big-win-num" id="bwNum"></div><div class="big-win-text" id="bwTxt"></div></div></div>
-<script src="/static/js/game-base.js?v=20260811b"></script>
+<script src="/static/js/game-base.js?v=20260811c"></script>
 <script>
 'use strict';
 var cv=document.getElementById('plinkoCanvas'),ctx=cv.getContext('2d');
-var W=0,H=0,rows=8,risk='low',dropping=false;
+var W=0,H=0,rows=12,risk='low',dropping=false;
 var pegs=[],slots=[],ball=null,trails=[];
-var sw=0; // slot width — global so draw() can access it
+var sw=0;
 var MULTS={
   8:{low:[5.6,2.1,1.1,1.0,0.5,1.0,1.1,2.1,5.6],med:[13,3,1.3,0.7,0.4,0.7,1.3,3,13],high:[29,4,1.5,0.3,0.2,0.3,1.5,4,29]},
   12:{low:[10,3,1.6,1.4,1.1,1.0,0.5,1.0,1.1,1.4,1.6,3,10],med:[33,11,4,2,1.1,0.6,0.3,0.6,1.1,2,4,11,33],high:[141,21,5.6,2.5,1.2,0.5,0.2,0.5,1.2,2.5,5.6,21,141]},
-  16:{low:[16,9,2,1.4,1.4,1.2,1.1,1.0,0.5,1.0,1.1,1.2,1.4,1.4,2,9,16],med:[110,41,10,5,3,1.5,1.0,0.5,0.3,0.5,1.0,1.5,3,5,10,41,110],high:[999,130,26,9,4,2,0.7,0.2,0.1,0.2,0.7,2,4,9,26,130,999]}
+  16:{low:[16,9,2,1.4,1.4,1.2,1.1,1.0,0.5,1.0,1.1,1.2,1.4,1.4,2,9,16],med:[110,41,10,5,3,1.5,1.0,0.5,0.3,0.5,1.0,1.5,3,5,10,41,110],high:[999,130,26,9,4,2,0.7,0.2,0.1,0.2,0.7,2,4,9,26,130,999]},
+  20:{low:[50,12,4,2.5,1.8,1.3,1.0,0.7,0.5,0.3,0.2,0.3,0.5,0.7,1.0,1.3,1.8,2.5,4,12,50],med:[500,60,15,5,3,1.5,1.0,0.5,0.3,0.1,0.05,0.1,0.3,0.5,1.0,1.5,3,5,15,60,500],high:[5000,500,80,20,8,3,1.5,0.7,0.3,0.1,0.05,0.1,0.3,0.7,1.5,3,8,20,80,500,5000]}
 };
-// Ball styles
 var STYLES={gold:{fill:'#fbbf24',glow:'#f59e0b'},fire:{fill:'#ff6b35',glow:'#ff4500'},neon:{fill:'#00e701',glow:'#00ff41'},ice:{fill:'#22d3ee',glow:'#67e8f9'},purple:{fill:'#a855f7',glow:'#c084fc'},rainbow:{fill:'rainbow',glow:'#ff0080'}};
 var selStyle='gold';
-// Audio
 var _ac=null;
 function au(){if(!_ac){try{_ac=new(window.AudioContext||window.webkitAudioContext)()}catch(e){}}return _ac}
 function osc(f,d,t,v){var a=au();if(!a||!soundOn)return;try{var o=a.createOscillator(),g=a.createGain();o.connect(g);g.connect(a.destination);o.frequency.value=f;o.type=t||'sine';g.gain.setValueAtTime(v||0.1,a.currentTime);g.gain.exponentialRampToValueAtTime(0.001,a.currentTime+d);o.start();o.stop(a.currentTime+d)}catch(e){}}
-var NOTES=[262,294,330,349,392,440,494,523,587,659,698,784,880,988,1047,1175];
+var NOTES=[262,294,330,349,392,440,494,523,587,659,698,784,880,988,1047,1175,1319,1397,1568,1760,2093];
 var _ni=0;
-function sndPeg(){var n=NOTES[_ni%NOTES.length];_ni++;osc(n,0.06,'sine',0.08);osc(n*2,0.03,'sine',0.03)}
-function sndLand(m){osc(150,0.15,'sine',0.12);if(m>=1)osc(300+m*15,0.12,'sine',0.06)}
-function sndWin(m){var n=m>=10?[523,659,784,1047,1319]:m>=5?[523,659,784,1047]:m>=2?[523,659,784]:[523,659];n.forEach(function(f,i){setTimeout(function(){osc(f,0.16,'sine',0.12)},i*90)})}
-function sndLose(){osc(300,0.12,'sawtooth',0.08);setTimeout(function(){osc(200,0.18,'sawtooth',0.08)},100)}
-function sndJackpot(){[392,523,659,784,1047,1319,1568].forEach(function(f,i){setTimeout(function(){osc(f,i===6?0.5:0.2,'triangle',0.14)},i*100)})}
+function sndPeg(){var n=NOTES[_ni%NOTES.length];_ni++;osc(n,0.05,'sine',0.06);osc(n*2,0.025,'sine',0.02)}
+function sndLand(m){osc(180,0.12,'sine',0.1);if(m>=1)osc(300+m*12,0.1,'sine',0.05)}
+function sndWin(m){var n=m>=10?[523,659,784,1047,1319]:m>=5?[523,659,784,1047]:m>=2?[523,659,784]:[523,659];n.forEach(function(f,i){setTimeout(function(){osc(f,0.14,'sine',0.1)},i*80)})}
+function sndLose(){osc(280,0.1,'sawtooth',0.06);setTimeout(function(){osc(180,0.15,'sawtooth',0.06)},80)}
+function sndJackpot(){[392,523,659,784,1047,1319,1568].forEach(function(f,i){setTimeout(function(){osc(f,i===6?0.4:0.18,'triangle',0.12)},i*90)})}
 function fmtA(n){return parseFloat(n||0).toLocaleString()}
 function adjBet(f){var i=document.getElementById('betInp');i.value=Math.max(1,Math.floor((parseFloat(i.value)||10)*f))}
-function setRows(r){rows=r;document.querySelectorAll('.opt-btn').forEach(function(b){if(b.id&&b.id.startsWith('r'))b.classList.remove('active')});document.getElementById('r'+r).classList.add('active');initBoard()}
-function setRisk(r){risk=r;document.querySelectorAll('.opt-btn').forEach(function(b){if(b.id&&b.id.startsWith('rk'))b.classList.remove('active')});document.getElementById('rk'+r.charAt(0).toUpperCase()).classList.add('active');initBoard()}
+function setRows(r){rows=r;document.querySelectorAll('.opt-btn').forEach(function(b){if(b.id&&b.id.startsWith('r'))b.classList.remove('active')});var rb=document.getElementById('r'+r);if(rb)rb.classList.add('active');initBoard()}
+function setRisk(r){risk=r;document.querySelectorAll('.opt-btn').forEach(function(b){if(b.id&&b.id.startsWith('rk'))b.classList.remove('active')});var rk=document.getElementById('rk'+r.charAt(0).toUpperCase());if(rk)rk.classList.add('active');initBoard()}
 
-function resize(){W=cv.clientWidth||360;H=cv.clientHeight||400;cv.width=W;cv.height=H}
+function resize(){
+  var r=cv.getBoundingClientRect();
+  W=Math.max(1,Math.round(r.width||360));
+  H=Math.max(1,Math.round(r.height||400));
+  cv.width=W;cv.height=H;
+}
 window.addEventListener('resize',function(){setTimeout(function(){resize();initBoard()},50)});
 
 function initBoard(){
   resize();
+  if(W<2||H<2){requestAnimationFrame(function(){initBoard()});return}
   pegs=[];slots=[];
-  var tp=H*0.08,bp=H*0.12,uh=H-tp-bp,rh=uh/rows;
+  // Pegs fill 94% of canvas height — very tall pyramid
+  var tp=H*0.03,bp=H*0.08,uh=H-tp-bp,rh=uh/rows;
   for(var r=0;r<rows;r++){
-    var cols=r+2,rw=(cols-1)*(W/(rows+1)),sx=(W-rw)/2;
-    for(var c=0;c<cols;c++)pegs.push({x:sx+c*(rw/Math.max(1,cols-1)),y:tp+r*rh,r:Math.max(3,W*0.012)})
+    var cols=r+3; // r+3 pegs per row (r starts at 0, so row 0 has 3 pegs)
+    // Width span: pegs spread across most of canvas
+    var availW=W*0.92;
+    var rw=(cols-1)*(availW/(rows+2));
+    var sx=(W-rw)/2;
+    for(var c=0;c<cols;c++){
+      pegs.push({
+        x:sx+c*(rw/Math.max(1,cols-1)),
+        y:tp+r*rh,
+        r:Math.max(3,Math.min(W*0.014,8)),
+        row:r
+      });
+    }
   }
-  var mt=MULTS[rows][risk],sc=rows+1;sw=W/sc;
+  var mt=MULTS[rows][risk],sc=rows+2; // rows+2 slots for rows+3 pegs
+  // Actually, let me use the standard: rows+1 pegs per last row = rows+1 slots
+  // Wait — let me recalculate. With cols=r+3, last row (r=rows-1) has rows+2 pegs.
+  // Slots = rows+2 (one more than last row pegs)? No — slots = pegs in last row + 1? No.
+  // In standard Plinko: N rows, row r has r+2 pegs, last row has N+1 pegs, slots = N+1.
+  // Let me fix: cols = r+2 (standard), last row has rows+1 pegs, slots = rows+1.
+  // I changed to r+3 above which is wrong. Let me fix.
+  pegs=[];
+  for(var r=0;r<rows;r++){
+    var cols=r+2; // standard: row 0 has 2 pegs, row 1 has 3, etc.
+    var availW=W*0.92;
+    var spacing=availW/(rows+1);
+    var rw=(cols-1)*spacing;
+    var sx=(W-rw)/2;
+    for(var c=0;c<cols;c++){
+      pegs.push({
+        x:sx+c*spacing,
+        y:tp+r*rh,
+        r:Math.max(3,Math.min(W*0.013,7)),
+        row:r
+      });
+    }
+  }
+  // Slots: rows+1
+  sc=rows+1;sw=W/sc;
+  var mt2=MULTS[rows][risk];
   for(var s=0;s<sc;s++){
-    var m=mt[s],col=m>=5?'#fbbf24':m>=2?'#00e701':m>=1?'#06b6d4':'#ff4757';
-    slots.push({x:s*sw+sw/2,y:H-bp/2,w:sw-3,mult:m,color:col})
+    var m=mt2[s];
+    var col=m>=100?'#fbbf24':m>=5?'#fbbf24':m>=2?'#00e701':m>=1?'#06b6d4':'#ff4757';
+    slots.push({x:s*sw+sw/2,y:H-bp*0.4,w:sw-3,mult:m,color:col});
   }
-  draw()
+  draw();
 }
 
 function draw(){
   ctx.clearRect(0,0,W,H);
-  // background gradient
+  // background
   var bg=ctx.createLinearGradient(0,0,0,H);
-  bg.addColorStop(0,'#0a0e17');bg.addColorStop(1,'#0d1525');
+  bg.addColorStop(0,'#0a0e17');bg.addColorStop(0.5,'#0d1525');bg.addColorStop(1,'#0a0e17');
   ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
   // pegs
-  pegs.forEach(function(p){
-    ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,6.28);
+  for(var i=0;i<pegs.length;i++){
+    var p=pegs[i];
+    ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,6.283);
     var g=ctx.createRadialGradient(p.x-p.r*0.3,p.y-p.r*0.3,0,p.x,p.y,p.r);
-    g.addColorStop(0,'#94a3b8');g.addColorStop(1,'#475569');
+    g.addColorStop(0,'#b0c0d0');g.addColorStop(1,'#475569');
     ctx.fillStyle=g;ctx.fill();
-    ctx.strokeStyle='rgba(255,255,255,0.15)';ctx.lineWidth=1;ctx.stroke()
-  });
+    ctx.strokeStyle='rgba(255,255,255,0.12)';ctx.lineWidth=0.8;ctx.stroke();
+  }
   // slots
-  slots.forEach(function(s){
-    var g=ctx.createLinearGradient(0,H-25,0,H);
-    g.addColorStop(0,s.color+'44');g.addColorStop(1,s.color+'aa');
+  var slotH=Math.min(28,H*0.05);
+  var slotY=H-slotH-2;
+  for(var s=0;s<slots.length;s++){
+    var sl=slots[s];
+    var g=ctx.createLinearGradient(0,slotY,0,H);
+    g.addColorStop(0,sl.color+'33');g.addColorStop(1,sl.color+'cc');
     ctx.fillStyle=g;
-    ctx.beginPath();ctx.moveTo(s.x-s.w/2,H);ctx.lineTo(s.x-s.w/2,H-20);
-    ctx.quadraticCurveTo(s.x,H-28,s.x+s.w/2,H-20);ctx.lineTo(s.x+s.w/2,H);ctx.fill();
-    ctx.fillStyle='#fff';ctx.font='bold '+Math.max(7,sw*0.14)+'px Courier New';
+    ctx.beginPath();
+    ctx.moveTo(sl.x-sl.w/2,H);
+    ctx.lineTo(sl.x-sl.w/2,slotY);
+    ctx.quadraticCurveTo(sl.x,slotY-slotH*0.3,sl.x+sl.w/2,slotY);
+    ctx.lineTo(sl.x+sl.w/2,H);
+    ctx.fill();
+    // multiplier text
+    ctx.fillStyle='#fff';
+    var fs=Math.max(7,Math.min(sw*0.16,13));
+    ctx.font='bold '+fs+'px Courier New';
     ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillText(s.mult>=100?s.mult.toFixed(0)+'x':s.mult.toFixed(1)+'x',s.x,H-12)
-  });
+    var txt=sl.mult>=100?sl.mult.toFixed(0)+'x':sl.mult.toFixed(sl.mult<10?1:0)+'x';
+    ctx.fillText(txt,sl.x,slotY+slotH*0.4);
+  }
   // trails
-  trails.forEach(function(t){
-    ctx.globalAlpha=t.a;ctx.beginPath();ctx.arc(t.x,t.y,t.r,0,6.28);
-    ctx.fillStyle=t.c;ctx.fill();ctx.globalAlpha=1
-  });
+  for(var t=0;t<trails.length;t++){
+    var tr=trails[t];
+    ctx.globalAlpha=tr.a||0.3;
+    ctx.beginPath();ctx.arc(tr.x,tr.y,tr.r,0,6.283);
+    ctx.fillStyle=tr.c||'#fbbf24';ctx.fill();
+  }
+  ctx.globalAlpha=1;
   // ball
-  if(ball)drawBall(ball)
+  if(ball)drawBall(ball);
 }
 
 function drawBall(b){
   var st=STYLES[selStyle];
   ctx.save();
-  ctx.shadowColor=st.glow;ctx.shadowBlur=12;
+  ctx.shadowColor=st.glow;ctx.shadowBlur=14;
   var g=ctx.createRadialGradient(b.x-b.r*0.3,b.y-b.r*0.3,0,b.x,b.y,b.r);
   if(selStyle==='rainbow'){g.addColorStop(0,'#fff');g.addColorStop(0.5,'#ff0080');g.addColorStop(1,'#7c3aed')}
   else{g.addColorStop(0,'#fff');g.addColorStop(0.4,st.fill);g.addColorStop(1,st.glow)}
-  ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,6.28);ctx.fillStyle=g;ctx.fill();
+  ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,6.283);ctx.fillStyle=g;ctx.fill();
   ctx.shadowBlur=0;
-  ctx.beginPath();ctx.arc(b.x-b.r*0.3,b.y-b.r*0.3,b.r*0.25,0,6.28);
+  // highlight
+  ctx.beginPath();ctx.arc(b.x-b.r*0.3,b.y-b.r*0.3,b.r*0.25,0,6.283);
   ctx.fillStyle='rgba(255,255,255,0.6)';ctx.fill();
-  ctx.restore()
+  ctx.restore();
 }
 
-// ── REAL PHYSICS: gravity + collision detection + bounce ──
+// ── REAL PHYSICS: gravity + collision + guided bounce ──
 function dropBall(){
   if(dropping)return;
   var bet=parseFloat(document.getElementById('betInp').value)||10;
   if(bet<1){showToast('أدخل مبلغ','error');return}
   if(!checkBalanceBeforeBet(bet))return;
-  dropping=true;document.getElementById('dropBtn').disabled=true;
+  dropping=true;
+  document.getElementById('dropBtn').disabled=true;
   apiFetchCritical(BASE+'/api/plinko/drop',{method:'POST',body:JSON.stringify({bet:bet,rows:rows,risk:risk})})
-  .then(function(r){return r.json()}).then(function(d){
-    if(d.error){showToast(d.error,'error');if(d.need_deposit)showVexDepositModal(bet);dropping=false;document.getElementById('dropBtn').disabled=false;return}
+  .then(function(r){return r.json()})
+  .then(function(d){
+    if(d.error){
+      showToast(d.error,'error');
+      if(d.need_deposit)showVexDepositModal(bet);
+      dropping=false;document.getElementById('dropBtn').disabled=false;
+      return;
+    }
     if(d.balance_after!==undefined)document.getElementById('bal').textContent=d.balance_after.toLocaleString();
     loadBalance();
-    // Start physics ball — server determines which SLOT it lands in
-    // But the PATH is real physics, not pre-determined
-    startPhysicsBall(d.slot,d.multiplier,d.payout,bet)
-  }).catch(function(){showToast('خطأ','error');dropping=false;document.getElementById('dropBtn').disabled=false})
+    // Server sends directions: array of -1 (left) / +1 (right) per row
+    var dirs=d.directions||[];
+    // If no directions (old server), derive from path
+    if(!dirs.length&&d.path&&d.path.length>1){
+      for(var i=1;i<d.path.length;i++){
+        var prev=d.path[i-1].x,cur=d.path[i].x;
+        dirs.push(cur>prev?1:-1);
+      }
+    }
+    startPhysicsBall(d.slot,d.multiplier,d.payout,bet,dirs);
+  })
+  .catch(function(){
+    showToast('خطأ في الاتصال','error');
+    dropping=false;document.getElementById('dropBtn').disabled=false;
+  });
 }
 
-function startPhysicsBall(targetSlot,mult,payout,bet){
+function startPhysicsBall(targetSlot,mult,payout,bet,dirs){
   _ni=0;
-  var r=Math.max(5,W*0.014); // ball radius
-  ball={x:W/2+(Math.random()-0.5)*W*0.05,y:H*0.04,vx:0,vy:0,r:r};
+  var r=Math.max(5,Math.min(W*0.015,8));
+  // Ball starts at center, just above first peg row
+  var startY=pegs.length>0?pegs[0].y-r*3:H*0.03;
+  ball={x:W/2,y:startY,vx:0,vy:0,r:r};
   trails=[];
-  var gravity=0.15; // gravity per frame
-  var maxV=8; // max velocity cap
+
+  var gravity=0.20;
+  var maxV=6.5;
+  var restitution=0.50;
+  var maxH=3.2;
   var lastPegHit=-1;
   var frames=0;
-  var maxFrames=600; // safety limit (10s at 60fps)
-  
+  var maxFrames=900;
+  var settleY=H*0.90;
+
   function physics(){
     if(!ball||frames>maxFrames){finish();return}
     frames++;
-    // Apply gravity
+
+    // Gravity
     ball.vy+=gravity;
-    ball.vy=Math.min(ball.vy,maxV);
-    ball.vx*=0.99; // air friction
+    if(ball.vy>maxV)ball.vy=maxV;
+    // Air friction (horizontal)
+    ball.vx*=0.985;
+
     // Move
     ball.x+=ball.vx;
     ball.y+=ball.vy;
+
     // Wall bounces
-    if(ball.x<ball.r){ball.x=ball.r;ball.vx=-ball.vx*0.5}
-    if(ball.x>W-ball.r){ball.x=W-ball.r;ball.vx=-ball.vx*0.5}
-    // Peg collisions (real physics!)
+    if(ball.x<ball.r){ball.x=ball.r;ball.vx=Math.abs(ball.vx)*0.3}
+    if(ball.x>W-ball.r){ball.x=W-ball.r;ball.vx=-Math.abs(ball.vx)*0.3}
+
+    // Peg collisions
     for(var i=0;i<pegs.length;i++){
       var p=pegs[i];
       var dx=ball.x-p.x,dy=ball.y-p.y;
-      var dist=Math.sqrt(dx*dx+dy*dy);
+      var distSq=dx*dx+dy*dy;
       var minDist=ball.r+p.r;
-      if(dist<minDist){
-        // Collision! Push ball out + bounce
+      if(distSq<minDist*minDist&&distSq>0.01){
+        var dist=Math.sqrt(distSq);
         var nx=dx/dist,ny=dy/dist;
+
         // Push out of peg
         ball.x=p.x+nx*minDist;
         ball.y=p.y+ny*minDist;
-        // Reflect velocity off peg surface
+
+        // Reflect velocity (real bounce with energy loss)
         var dot=ball.vx*nx+ball.vy*ny;
-        ball.vx-=2*dot*nx*0.65; // 0.65 = bounciness (energy loss)
-        ball.vy-=2*dot*ny*0.65;
-        // Add slight random horizontal bias (left/right 50/50)
-        ball.vx+=(Math.random()-0.5)*1.5;
-        // Sound on peg hit
+        ball.vx-=2*dot*nx*restitution;
+        ball.vy-=2*dot*ny*restitution;
+
+        // Guided nudge: use server direction for this peg's row
+        if(dirs&&dirs.length>0&&p.row>=0&&p.row<dirs.length){
+          ball.vx+=dirs[p.row]*0.75;
+        }else{
+          // Fallback: tiny random nudge for natural unpredictability
+          ball.vx+=(Math.random()-0.5)*0.25;
+        }
+
+        // Cap horizontal velocity — prevents erratic sideways jumps
+        if(ball.vx>maxH)ball.vx=maxH;
+        if(ball.vx<-maxH)ball.vx=-maxH;
+
+        // Sound + haptic
         if(i!==lastPegHit){sndPeg();haptic('light')}
         lastPegHit=i;
-        break; // only one collision per frame
+        break; // one collision per frame
       }
     }
+
     // Trail
     if(frames%2===0){
-      trails.push({x:ball.x,y:ball.y,r:ball.r*0.4,a:0.3,c:STYLES[selStyle].glow});
-      if(trails.length>30)trails.shift()
+      trails.push({x:ball.x,y:ball.y,r:ball.r*0.35,a:0.22,c:STYLES[selStyle].glow});
+      if(trails.length>22)trails.shift();
     }
-    // Check if ball reached slots area
-    if(ball.y>H*0.88){
-      // Determine which slot it's in
-      var slotIdx=Math.floor(ball.x/(W/(rows+1)));
-      slotIdx=Math.max(0,Math.min(rows,slotIdx));
-      finish(slotIdx);
-      return
+
+    // Check if ball reached slot area
+    if(ball.y>settleY){
+      finish();
+      return;
+    }
+
+    draw();
+    requestAnimationFrame(physics);
+  }
+
+  function finish(){
+    if(!ball)return;
+    // Snap ball X to target slot for visual consistency
+    if(targetSlot>=0&&targetSlot<slots.length){
+      // Smooth: move ball X toward target slot over a few frames
+      var targetX=slots[targetSlot].x;
+      ball.x=targetX;
+    }
+    sndLand(mult);
+    // Landing particles
+    for(var i=0;i<12;i++){
+      var ang=(i/12)*6.283;
+      var dist=8+Math.random()*12;
+      trails.push({
+        x:ball.x+Math.cos(ang)*dist,
+        y:ball.y+Math.sin(ang)*dist,
+        r:ball.r*0.4,
+        a:0.5,
+        c:STYLES[selStyle].glow
+      });
+    }
+    // Highlight winning slot
+    if(targetSlot>=0&&targetSlot<slots.length){
+      slots[targetSlot].highlight=30; // frames
     }
     draw();
-    requestAnimationFrame(physics)
-  }
-  
-  function finish(slotIdx){
-    if(!ball)return;
-    // Use server-determined slot/mult/payout (authoritative)
-    // but verify ball position roughly matches
-    sndLand(mult);
-    // Spawn landing particles
-    for(var i=0;i<8;i++){
-      trails.push({x:ball.x,y:ball.y,r:ball.r*0.5,a:0.5,c:STYLES[selStyle].glow});
-    }
     ball=null;
-    setTimeout(function(){trails=[];draw()},300);
+    setTimeout(function(){trails=[];draw()},500);
     setTimeout(function(){
-      dropping=false;document.getElementById('dropBtn').disabled=false;
-      showResult(mult,payout,bet)
-    },400)
+      dropping=false;
+      document.getElementById('dropBtn').disabled=false;
+      showResult(mult,payout,bet);
+    },550);
   }
-  
-  requestAnimationFrame(physics)
+
+  requestAnimationFrame(physics);
 }
 
 function showResult(mult,payout,bet){
   var col=mult>=5?'#fbbf24':mult>=2?'#00e701':mult>=1?'#06b6d4':'#ff4757';
   var chip=document.createElement('div');
-  chip.className='result-chip';chip.style.background=col+'22';chip.style.color=col;chip.style.border='1px solid '+col+'66';
+  chip.className='result-chip';
+  chip.style.background=col+'22';chip.style.color=col;chip.style.border='1px solid '+col+'66';
   chip.textContent=mult.toFixed(2)+'x  +'+fmtA(payout);
-  var row=document.getElementById('resultRow');row.insertBefore(chip,row.firstChild);
+  var row=document.getElementById('resultRow');
+  row.insertBefore(chip,row.firstChild);
   while(row.children.length>4)row.removeChild(row.lastChild);
-  if(mult>=10){sndJackpot();document.getElementById('bwNum').textContent='+'+fmtA(payout);document.getElementById('bwTxt').textContent='جائزة كبرى! ('+mult.toFixed(1)+'x)';document.getElementById('bigWin').classList.add('show');setTimeout(function(){document.getElementById('bigWin').classList.remove('show')},3000);haptic('heavy')}
-  else if(mult>=2){sndWin(mult);haptic('medium')}
+
+  if(mult>=10){
+    sndJackpot();
+    document.getElementById('bwNum').textContent='+'+fmtA(payout);
+    document.getElementById('bwTxt').textContent='جائزة كبرى! ('+mult.toFixed(1)+'x)';
+    document.getElementById('bigWin').classList.add('show');
+    setTimeout(function(){document.getElementById('bigWin').classList.remove('show')},3000);
+    haptic('heavy');
+  }else if(mult>=2){sndWin(mult);haptic('medium')}
   else if(mult>=1){sndWin(mult)}
   else{sndLose();haptic('light')}
+
   var ac=parseInt(document.getElementById('autoCount').value)||1;
-  if(ac>1){document.getElementById('autoCount').value=ac-1;setTimeout(dropBall,800)}
+  if(ac>1){
+    document.getElementById('autoCount').value=ac-1;
+    setTimeout(dropBall,900);
+  }
 }
 
-// Init
-initBoard();
-loadBalance();setInterval(loadBalance,10000);
-setTimeout(injectDepositButton,100);
+// Init — wait for layout
+requestAnimationFrame(function(){
+  requestAnimationFrame(function(){
+    initBoard();
+    loadBalance();
+    setInterval(loadBalance,10000);
+    setTimeout(injectDepositButton,100);
+  });
+});
 </script>
 </body>
 </html>

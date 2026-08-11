@@ -5709,6 +5709,11 @@ _PLINKO_MULTS = {
         'med':  [110, 41, 10, 5, 3, 1.5, 1.0, 0.5, 0.3, 0.5, 1.0, 1.5, 3, 5, 10, 41, 110],
         'high': [999, 130, 26, 9, 4, 2, 0.7, 0.2, 0.1, 0.2, 0.7, 2, 4, 9, 26, 130, 999],
     },
+    20: {
+        'low':  [50, 12, 4, 2.5, 1.8, 1.3, 1.0, 0.7, 0.5, 0.3, 0.2, 0.3, 0.5, 0.7, 1.0, 1.3, 1.8, 2.5, 4, 12, 50],
+        'med':  [500, 60, 15, 5, 3, 1.5, 1.0, 0.5, 0.3, 0.1, 0.05, 0.1, 0.3, 0.5, 1.0, 1.5, 3, 5, 15, 60, 500],
+        'high': [5000, 500, 80, 20, 8, 3, 1.5, 0.7, 0.3, 0.1, 0.05, 0.1, 0.3, 0.7, 1.5, 3, 8, 20, 80, 500, 5000],
+    },
 }
 
 @app.route('/api/plinko/drop', methods=['POST'])
@@ -5729,14 +5734,23 @@ def api_plinko_drop():
             return jsonify(cached)
 
     bet_amount = float(data.get('bet', 0))
-    rows = int(data.get('rows', 8))
+    rows = int(data.get('rows', 12))
     risk = str(data.get('risk', 'low')).lower()
     if rows not in _PLINKO_MULTS:
-        rows = 8
+        rows = 12
     if risk not in ('low', 'med', 'high'):
         risk = 'low'
     if bet_amount <= 0:
-        return jsonify({'error': 'Missing params'}), 400
+        return jsonify({'error': 'مبلغ غير صالح'}), 400
+
+    # ── Financial Security: bet limits + payout cap ──
+    MIN_BET = 1.0
+    MAX_BET = 5000.0
+    MAX_PAYOUT = 100000.0  # hard cap — prevents bankroll drain
+    if bet_amount < MIN_BET:
+        return jsonify({'error': 'الحد الأدنى للرهان 1'}), 400
+    if bet_amount > MAX_BET:
+        return jsonify({'error': 'الحد الأقصى للرهان 5000'}), 400
 
     player = _gm.tracker.get_profile(uid)
     game = _gm.get_game('GAME007') or {
@@ -5759,58 +5773,64 @@ def api_plinko_drop():
     algo_result = _gm.algorithm.calculate_win_chance(player, game, bet_amount)
     win_chance = algo_result['win_chance']
 
-    # ── Smart Plinko Algorithm: simulate ball physics path ──
-    # Ball starts at center, each row it goes left or right (50/50 adjusted by win_chance)
-    # Position after N rows = starting_center + sum(left=-1, right=+1) choices
-    # Final slot = position + center_offset
-    center = (num_slots - 1) / 2  # center position (float)
-    position = 0.0  # starts at center
+    # ── Server-Authoritative Plinko Algorithm ──
+    # 1. Generate left/right directions ONCE (used for BOTH slot calc and client path)
+    # 2. Directions biased by win_chance: higher win_chance → edge bias (higher mults)
+    # 3. 3% house edge: force_center pulls ball toward center (lowest payout)
+    # 4. All probabilities clamped [0.25, 0.75] to prevent impossible paths
 
-    # Win chance affects bias: higher win_chance → slight bias toward edges (higher multipliers)
-    # Lower win_chance → bias toward center (lower multipliers)
-    edge_bias = (win_chance - 0.5) * 0.3  # -0.15 to +0.15
+    center = (num_slots - 1) / 2.0
+    edge_bias = (win_chance - 0.5) * 0.20  # -0.10 to +0.10
 
+    # House edge: 3% chance to force center
+    force_center = random.random() < 0.03
+
+    directions = []
+    position = 0.0
     for r in range(rows):
-        # Each row: 50/50 left or right, with slight edge bias
-        go_right = random.random() < (0.5 + edge_bias)
-        if go_right:
-            position += 1
+        if force_center:
+            # Pull toward center: go opposite of current position drift
+            p_right = 0.5 - (position / max(1, rows)) * 1.5
         else:
-            position -= 1
+            p_right = 0.5 + edge_bias
+        # Clamp to prevent impossible paths
+        p_right = max(0.25, min(0.75, p_right))
+        go_right = random.random() < p_right
+        direction = 1 if go_right else -1
+        directions.append(direction)
+        position += direction
 
     # Convert position to slot index
-    # position ranges from -rows/2 to +rows/2
-    # slot = round(center + position/2)
-    slot = int(round(center + position / 2))
+    # position ranges from -rows to +rows; center = (num_slots-1)/2
+    # slot = center + position/2 → maps -rows..+rows to 0..num_slots-1
+    slot = int(round(center + position / 2.0))
     slot = max(0, min(num_slots - 1, slot))  # clamp
-
-    # 3% house edge: 3% chance to nudge toward center (lower payout)
-    if random.random() < 0.03:
-        slot = int(center)
-        slot = max(0, min(num_slots - 1, slot))
 
     multiplier = mults[slot]
     payout = round(bet_amount * multiplier, 2)
+
+    # Max payout cap — protects platform bankroll
+    if payout > MAX_PAYOUT:
+        payout = MAX_PAYOUT
+        multiplier = round(payout / bet_amount, 2)
+
     result_str = 'win' if multiplier >= 1.0 else 'lose'
 
-    # Build path for client animation (left/right choices per row)
+    # Build path from SAME directions (NOT re-randomized!)
     ball_path = []
-    cx = 0.5  # normalized center
-    cy = 0.0
-    ball_path.append({'x': cx, 'y': cy})
-    # Recompute the path from position
+    cx = 0.5
+    ball_path.append({'dir': 0, 'x': cx, 'y': 0.0})
     temp_pos = 0.0
     for r in range(rows):
-        # Recompute the direction (same as above but we need to store it)
-        go_right = random.random() < (0.5 + edge_bias)
-        temp_pos += 1 if go_right else -1
-        cx = 0.5 + (temp_pos / (rows * 2))  # normalize to 0-1
-        cy = (r + 1) / rows  # 0 to 1
-        ball_path.append({'x': max(0.05, min(0.95, cx)), 'y': cy})
+        temp_pos += directions[r]
+        cx = 0.5 + (temp_pos / (rows * 2))
+        cy = (r + 1) / rows
+        ball_path.append({'dir': directions[r], 'x': max(0.05, min(0.95, cx)), 'y': cy})
 
     # Atomic: settle + idempotency record in one SQLite transaction
     template = {'success': True, 'slot': slot, 'multiplier': multiplier,
                 'payout': payout, 'result': result_str, 'balance_before': balance,
+                'directions': directions,
                 'path': ball_path}
     ok, stored, race_cached = _gm.settle_with_idempotency(uid, bet_amount, payout, request_id, template)
     if race_cached:
@@ -5827,7 +5847,7 @@ def api_plinko_drop():
         base_chance=float(game.get('base_win_chance', 0.40)),
         adjusted_chance=win_chance, factors=algo_result['factors'],
         decision=algo_result['decision'],
-        reason=f"Plinko rows={rows} risk={risk} slot={slot} mult={multiplier}; {algo_result['reason']}"
+        reason=f"Plinko rows={rows} risk={risk} slot={slot} mult={multiplier} force_center={force_center} bet={bet_amount} payout={payout}; {algo_result['reason']}"
     )
     _gm.tracker.log_session({
         'session_id': session_id, 'game_id': 'GAME007', 'user_id': uid,
