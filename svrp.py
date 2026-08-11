@@ -930,14 +930,20 @@ class SVRPManager:
 
         self._write_csv('svrp_tasks.csv', rows, self.TASK_FIELDS)
 
-        # إضافة المكافئة للمحفظة
+        # إضافة المكافأة للمحفظة — delta to SQLite first (authoritative), then CSV
+        try:
+            from game_engine import GameManager as _GM
+            _GM().delta_update_svrp_wallet(
+                tid, frozen_balance_delta=float(reward), total_earned_delta=float(reward)
+            )
+        except Exception as _ce:
+            logger.warning(f'claim_task_reward SQLite delta failed uid={tid}: {_ce}')
         wallet = self.get_wallet(tid)
         current_balance = float(wallet.get('balance', 0) or 0)
         current_earned = float(wallet.get('total_earned', 0) or 0)
-
         self._update_wallet(tid, {
-            'balance': current_balance + reward,
-            'total_earned': current_earned + reward
+            'balance': round(current_balance + reward, 6),
+            'total_earned': round(current_earned + reward, 6)
         })
 
         logger.info(f"Recovery: User {tid} claimed task {task_id} reward: {reward}")

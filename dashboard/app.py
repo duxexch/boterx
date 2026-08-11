@@ -8349,8 +8349,292 @@ def api_player_stats():
 
 @app.route('/webapp/stats')
 def webapp_stats():
-    """Player statistics page — WebApp"""
+    """Player statistics page — WebApp (kept for backward compat; account page replaces it)"""
     return render_template('stats.html')
+
+@app.route('/webapp/account')
+def webapp_account():
+    """Unified player account page — profile, referrals, rewards, transactions"""
+    return render_template('account.html')
+
+# ── Unified account API ────────────────────────────────────────────────────────
+
+@app.route('/api/player/account')
+@webapp_auth
+def api_player_account():
+    """Unified account endpoint: profile + game stats + SVRP summary + referral summary + recent txns."""
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+
+    import sys as _asys; _asys.path.insert(0, BASE_DIR)
+
+    # ── Profile (users.csv) ──────────────────────────────────────────────
+    user_row = {}
+    try:
+        users = read_csv('users.csv')
+        user_row = next((u for u in users if str(u.get('telegram_id', '')) == uid), {})
+    except Exception:
+        pass
+    name         = user_row.get('name', '')
+    phone        = user_row.get('phone', '')
+    customer_id  = user_row.get('customer_id', '')
+    joined_date  = user_row.get('date', '')
+    currency     = user_row.get('currency', 'EGP')
+    phone_verified = user_row.get('phone_verified', 'no')
+    ref_earnings_csv = float(user_row.get('referral_earnings', 0) or 0)
+
+    # ── Game balance + profile (SQLite) ──────────────────────────────────
+    game_balance = float(_gm.get_balance(uid) or 0)
+    user_info    = _gm.get_user_info(uid) or {}
+    currency     = user_info.get('currency', currency)
+    profile      = _gm.tracker.get_profile(uid)
+    is_vip       = profile.get('is_vex_partner', '') == 'yes'
+
+    # ── Game stats (SQLite sessions) ─────────────────────────────────────
+    game_stats = {'total_bets': 0, 'win_rate': 0, 'net_profit': 0, 'total_wins': 0}
+    try:
+        from db_manager import _gdb as _ldb
+        sessions = _ldb.get_user_sessions(uid, limit=100) or []
+        if sessions:
+            total_bets    = len(sessions)
+            total_wagered = sum(s.get('bet_amount', 0) for s in sessions)
+            total_won_s   = sum(s.get('payout', 0) for s in sessions)
+            total_wins    = sum(1 for s in sessions if s.get('result') == 'win')
+            game_stats = {
+                'total_bets':    total_bets,
+                'total_wagered': round(total_wagered, 2),
+                'total_won':     round(total_won_s, 2),
+                'net_profit':    round(total_won_s - total_wagered, 2),
+                'total_wins':    total_wins,
+                'win_rate':      round(total_wins / max(total_bets, 1) * 100, 1),
+            }
+    except Exception:
+        pass
+
+    # ── SVRP wallet summary (SQLite authoritative) ────────────────────────
+    _svrp = _gm.get_svrp_frozen_balance(uid)
+    svrp_summary = {
+        'frozen_balance':    float(_svrp.get('frozen_balance', 0) or 0),
+        'total_earned':      float(_svrp.get('total_earned', 0) or 0),
+        'wagering_required': int(_svrp.get('wagering_required', 3) or 3),
+        'wagering_completed':int(_svrp.get('wagering_completed', 0) or 0),
+        'wagering_done':     int(_svrp.get('wagering_completed', 0) or 0) >=
+                             int(_svrp.get('wagering_required', 3) or 3),
+    }
+
+    # ── Referral summary (referral_log.csv) ───────────────────────────────
+    referral_count   = 0
+    referral_earnings = 0.0
+    try:
+        ref_log = read_csv('referral_log.csv')
+        my_refs = [r for r in ref_log if str(r.get('referrer_id', '')) == uid]
+        referral_count   = len(my_refs)
+        referral_earnings = ref_earnings_csv or sum(
+            float(r.get('bonus_amount', r.get('bonus', 0)) or 0) for r in my_refs
+        )
+    except Exception:
+        pass
+
+    # ── Recent transactions (last 10) ─────────────────────────────────────
+    recent_txns = []
+    try:
+        txns = read_csv('transactions.csv')
+        user_txns = [t for t in txns if str(t.get('telegram_id', '')) == uid]
+        for t in reversed(user_txns[-10:]):
+            recent_txns.append({
+                'id':      t.get('id', ''),
+                'type':    t.get('type', ''),
+                'amount':  float(t.get('amount', 0) or 0),
+                'status':  t.get('status', ''),
+                'company': t.get('company', ''),
+                'date':    t.get('date', ''),
+            })
+    except Exception:
+        pass
+
+    return jsonify({
+        'uid':             uid,
+        'name':            name,
+        'phone':           phone,
+        'customer_id':     customer_id,
+        'joined_date':     joined_date,
+        'currency':        currency,
+        'phone_verified':  phone_verified,
+        'is_vip':          is_vip,
+        'game_balance':    game_balance,
+        'game_stats':      game_stats,
+        'svrp':            svrp_summary,
+        'referral_count':  referral_count,
+        'referral_earnings': round(referral_earnings, 2),
+        'recent_txns':     recent_txns,
+    })
+
+
+@app.route('/api/player/referrals')
+@webapp_auth
+def api_player_referrals():
+    """Player referral data: link, earnings, full list of referred users."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+
+    # customer_id for building the referral code
+    customer_id = ''
+    try:
+        users = read_csv('users.csv')
+        u = next((x for x in users if str(x.get('telegram_id', '')) == uid), {})
+        customer_id = u.get('customer_id', uid)
+    except Exception:
+        customer_id = uid
+
+    # Referral log entries where this user is the referrer
+    referrals = []
+    total_earnings = 0.0
+    try:
+        ref_log = read_csv('referral_log.csv')
+        for r in ref_log:
+            if str(r.get('referrer_id', '')) != uid:
+                continue
+            bonus = float(r.get('bonus_amount', r.get('bonus', 0)) or 0)
+            total_earnings += bonus
+            referrals.append({
+                'referred_name':   r.get('referred_name', ''),
+                'phone_verified':  r.get('phone_verified', 'no'),
+                'bonus_amount':    bonus,
+                'currency':        r.get('currency', 'EGP'),
+                'status':          r.get('status', ''),
+                'created_at':      r.get('created_at', ''),
+            })
+    except Exception:
+        pass
+
+    # Referral link — Telegram bot deep-link
+    bot_username = os.environ.get('BOT_USERNAME', '')
+    if bot_username:
+        referral_link = f'https://t.me/{bot_username}?start=ref_{customer_id}'
+    else:
+        referral_link = ''
+
+    return jsonify({
+        'referral_code':    customer_id,
+        'referral_link':    referral_link,
+        'total_referrals':  len(referrals),
+        'verified_referrals': sum(1 for r in referrals if r['phone_verified'] == 'yes'),
+        'total_earnings':   round(total_earnings, 2),
+        'referrals':        list(reversed(referrals)),  # newest first
+    })
+
+
+@app.route('/api/player/rewards')
+@webapp_auth
+def api_player_rewards():
+    """Player rewards: today's SVRP tasks + approved recovery requests + promo balances."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+
+    import sys as _rsys; _rsys.path.insert(0, BASE_DIR)
+    from svrp import SVRPManager as _SMgr
+
+    mgr = _SMgr()
+    # Ensure today's tasks exist
+    try:
+        mgr.create_daily_tasks(uid)
+    except Exception:
+        pass
+
+    # Today's tasks
+    tasks = []
+    try:
+        raw_tasks = mgr.get_user_tasks(uid)
+        _task_labels = {
+            'deposit_count':  {'label': 'أودع مرة واحدة اليوم', 'icon': '💰'},
+            'deposit_amount': {'label': 'أودع مبلغاً محدداً اليوم', 'icon': '💵'},
+            'referral_count': {'label': 'ادعُ صديقاً اليوم', 'icon': '👥'},
+        }
+        for t in raw_tasks:
+            tt = t.get('task_type', '')
+            meta = _task_labels.get(tt, {'label': tt, 'icon': '🎯'})
+            progress   = float(t.get('current_progress', 0) or 0)
+            target     = float(t.get('target_value', 1) or 1)
+            status     = t.get('status', 'active')
+            reward     = float(t.get('reward_amount', 0) or 0)
+            tasks.append({
+                'id':          t.get('id', ''),
+                'type':        tt,
+                'label':       meta['label'],
+                'icon':        meta['icon'],
+                'progress':    progress,
+                'target':      target,
+                'pct':         round(min(progress / max(target, 1), 1.0) * 100),
+                'status':      status,
+                'reward':      reward,
+                'claimable':   status == 'completed',
+                'created_at':  t.get('created_at', ''),
+            })
+    except Exception:
+        pass
+
+    # Approved recovery requests (display history)
+    recovery_history = []
+    try:
+        reqs = read_csv('recovery_requests.csv')
+        user_reqs = [r for r in reqs if str(r.get('user_id', '')) == uid]
+        for r in reversed(user_reqs[-10:]):
+            recovery_history.append({
+                'id':             r.get('id', ''),
+                'status':         r.get('status', ''),
+                'recovery_amount': float(r.get('recovery_amount', 0) or 0),
+                'approved_at':    r.get('approved_at', ''),
+                'created_at':     r.get('created_at', ''),
+            })
+    except Exception:
+        pass
+
+    # Promo / active SVRP credits
+    promo_credits = []
+    try:
+        credits_all = read_csv('svrp_credits.csv')
+        user_credits = [c for c in credits_all
+                        if str(c.get('user_id', '')) == uid
+                        and c.get('status') in ('active', 'pending')]
+        for c in user_credits[:20]:
+            promo_credits.append({
+                'type':    c.get('credit_type', ''),
+                'amount':  float(c.get('credit_amount', 0) or 0),
+                'status':  c.get('status', ''),
+                'created': c.get('created_at', ''),
+            })
+    except Exception:
+        pass
+
+    return jsonify({
+        'tasks':            tasks,
+        'recovery_history': recovery_history,
+        'promo_credits':    promo_credits,
+    })
+
+
+@app.route('/api/player/rewards/claim/<task_id>', methods=['POST'])
+@webapp_auth
+def api_player_rewards_claim(task_id):
+    """Claim a completed SVRP daily task reward."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+
+    import sys as _csys; _csys.path.insert(0, BASE_DIR)
+    from svrp import SVRPManager as _SMgr
+    mgr = _SMgr()
+    ok, msg = mgr.claim_task_reward(uid, task_id)
+    if not ok:
+        return jsonify({'error': msg}), 400
+
+    new_balance = float(_gm.get_svrp_frozen_balance(uid).get('frozen_balance', 0) or 0)
+    return jsonify({'success': True, 'message': msg, 'new_svrp_balance': new_balance})
 
 # ===== Aviator engine — separated into dashboard/aviator_engine.py =====
 # All Aviator state, game loop, SSE stream, bet/cashout/state routes now live
