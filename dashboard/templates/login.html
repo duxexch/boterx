@@ -1,60 +1,431 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title data-i18n="login_title">Login — Boterx</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>VEX — تسجيل الدخول</title>
+<link rel="icon" type="image/png" href="/static/icons/favicon.png">
+<link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#030a06;
+  --bg2:#071210;
+  --card:rgba(6,20,12,0.85);
+  --green:#00ff88;
+  --green2:#00cc6a;
+  --green-dim:rgba(0,255,136,0.08);
+  --border:rgba(0,255,136,0.18);
+  --text:#e8f5e9;
+  --muted:#4a7a5a;
+  --red:#ff4d6d;
+}
+body{
+  font-family:'Cairo',sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  min-height:100vh;
+  min-height:100dvh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  overflow:hidden;
+  position:relative;
+}
+
+/* ── 3D Neon Background ── */
+.bg-scene{
+  position:fixed;inset:0;z-index:0;
+  background:
+    radial-gradient(ellipse 70% 50% at 50% 0%, rgba(0,255,136,0.13) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 40% at 80% 80%, rgba(0,200,100,0.07) 0%, transparent 50%),
+    radial-gradient(ellipse 50% 60% at 20% 50%, rgba(0,150,80,0.06) 0%, transparent 50%),
+    #030a06;
+}
+.grid-3d{
+  position:absolute;inset:0;
+  background-image:
+    linear-gradient(rgba(0,255,136,0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,255,136,0.06) 1px, transparent 1px);
+  background-size:40px 40px;
+  transform:perspective(600px) rotateX(55deg) scale(2.2);
+  transform-origin:50% 0;
+  top:40%;
+  opacity:0.6;
+  animation:gridScroll 12s linear infinite;
+}
+@keyframes gridScroll{
+  from{background-position:0 0}
+  to{background-position:0 40px}
+}
+.orb{
+  position:absolute;border-radius:50%;filter:blur(80px);pointer-events:none;
+  animation:orbFloat 8s ease-in-out infinite;
+}
+.orb1{width:400px;height:400px;background:rgba(0,255,136,0.12);top:-100px;right:-100px;animation-delay:0s}
+.orb2{width:300px;height:300px;background:rgba(0,200,80,0.08);bottom:-50px;left:-80px;animation-delay:-4s}
+.orb3{width:200px;height:200px;background:rgba(0,255,136,0.1);top:40%;left:50%;transform:translateX(-50%);animation-delay:-2s}
+@keyframes orbFloat{
+  0%,100%{transform:translate(0,0) scale(1)}
+  50%{transform:translate(20px,-20px) scale(1.05)}
+}
+/* Floating particles */
+.particle{
+  position:absolute;width:2px;height:2px;background:var(--green);border-radius:50%;
+  animation:particleFloat linear infinite;opacity:0;
+}
+@keyframes particleFloat{
+  0%{opacity:0;transform:translateY(0) scale(0)}
+  10%{opacity:1;transform:translateY(-10vh) scale(1)}
+  90%{opacity:0.5;transform:translateY(-90vh) scale(0.5)}
+  100%{opacity:0;transform:translateY(-100vh) scale(0)}
+}
+
+/* ── Card ── */
+.card-wrap{
+  position:relative;z-index:10;
+  width:100%;max-width:420px;
+  padding:16px;
+}
+.card{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:24px;
+  padding:32px 28px;
+  backdrop-filter:blur(24px);
+  -webkit-backdrop-filter:blur(24px);
+  box-shadow:
+    0 0 60px rgba(0,255,136,0.08),
+    0 30px 80px rgba(0,0,0,0.6),
+    inset 0 1px 0 rgba(0,255,136,0.15);
+  animation:cardIn 0.6s ease-out;
+}
+@keyframes cardIn{
+  from{opacity:0;transform:translateY(30px) scale(0.95)}
+  to{opacity:1;transform:translateY(0) scale(1)}
+}
+
+/* Logo section */
+.logo-section{text-align:center;margin-bottom:28px}
+.logo-img{
+  width:90px;height:90px;border-radius:50%;
+  object-fit:cover;
+  border:2px solid rgba(0,255,136,0.3);
+  box-shadow:0 0 30px rgba(0,255,136,0.3),0 0 60px rgba(0,255,136,0.15);
+  margin-bottom:12px;
+  animation:logoPulse 3s ease-in-out infinite;
+}
+@keyframes logoPulse{
+  0%,100%{box-shadow:0 0 30px rgba(0,255,136,0.3),0 0 60px rgba(0,255,136,0.15)}
+  50%{box-shadow:0 0 40px rgba(0,255,136,0.5),0 0 80px rgba(0,255,136,0.25)}
+}
+.logo-name{
+  font-size:28px;font-weight:900;letter-spacing:3px;
+  background:linear-gradient(135deg,#fff 30%,var(--green));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  background-clip:text;
+}
+.logo-sub{font-size:11px;color:var(--muted);margin-top:4px;letter-spacing:1px}
+
+/* Tabs */
+.tabs{
+  display:flex;border-radius:12px;overflow:hidden;
+  border:1px solid var(--border);margin-bottom:24px;
+}
+.tab{
+  flex:1;padding:10px;font-size:12px;font-weight:700;
+  font-family:'Cairo',sans-serif;
+  cursor:pointer;border:none;background:transparent;color:var(--muted);
+  transition:all 0.25s;display:flex;align-items:center;justify-content:center;gap:6px;
+}
+.tab.active{background:var(--green-dim);color:var(--green);border-bottom:2px solid var(--green)}
+.tab:hover:not(.active){color:var(--text);background:rgba(255,255,255,0.03)}
+
+/* Form */
+.form-section{display:none}
+.form-section.active{display:block}
+.form-group{margin-bottom:16px}
+.form-label{font-size:11px;color:var(--muted);margin-bottom:6px;display:block;font-weight:700}
+.input-wrap{position:relative}
+.form-icon{
+  position:absolute;right:14px;top:50%;transform:translateY(-50%);
+  color:var(--muted);font-size:14px;pointer-events:none;transition:color 0.2s;
+}
+.form-input{
+  width:100%;background:rgba(0,0,0,0.35);border:1px solid var(--border);
+  border-radius:12px;padding:12px 40px 12px 14px;
+  color:var(--text);font-size:14px;font-family:'Cairo',sans-serif;
+  outline:none;transition:all 0.2s;
+}
+.form-input::placeholder{color:var(--muted);font-size:12px}
+.form-input:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(0,255,136,0.08)}
+.form-input:focus + .form-icon{color:var(--green)}
+
+/* Buttons */
+.btn-submit{
+  width:100%;padding:13px;border-radius:12px;border:none;
+  font-size:15px;font-weight:800;font-family:'Cairo',sans-serif;
+  cursor:pointer;transition:all 0.2s;display:flex;align-items:center;justify-content:center;gap:8px;
+  background:linear-gradient(135deg,var(--green),var(--green2));
+  color:#030a06;margin-top:4px;
+  box-shadow:0 4px 24px rgba(0,255,136,0.25);
+}
+.btn-submit:hover{transform:translateY(-1px);box-shadow:0 6px 32px rgba(0,255,136,0.35)}
+.btn-submit:active{transform:scale(0.97)}
+.btn-tg{
+  width:100%;padding:13px;border-radius:12px;border:1px solid rgba(41,182,246,0.4);
+  font-size:14px;font-weight:800;font-family:'Cairo',sans-serif;
+  cursor:pointer;transition:all 0.2s;display:flex;align-items:center;justify-content:center;gap:8px;
+  background:rgba(41,182,246,0.1);color:#60c8ff;margin-bottom:16px;
+}
+.btn-tg:hover{background:rgba(41,182,246,0.18);transform:translateY(-1px)}
+.btn-tg:active{transform:scale(0.97)}
+
+/* OTP step 2 */
+.otp-step{display:none;animation:fadeIn 0.3s ease-out}
+.otp-step.show{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.otp-info{
+  text-align:center;padding:14px;border-radius:12px;
+  background:rgba(0,255,136,0.05);border:1px solid rgba(0,255,136,0.15);
+  margin-bottom:16px;font-size:12px;color:var(--muted);line-height:1.7;
+}
+.otp-info strong{color:var(--green)}
+.otp-input{
+  text-align:center;letter-spacing:8px;font-size:24px;font-weight:900;
+  font-family:'Courier New',monospace;
+}
+.otp-input::placeholder{letter-spacing:4px;font-size:18px}
+
+/* Error / success */
+.alert{
+  border-radius:10px;padding:10px 14px;margin-bottom:16px;
+  font-size:12px;display:none;align-items:center;gap:8px;
+}
+.alert.show{display:flex}
+.alert-error{background:rgba(255,77,109,0.12);border:1px solid rgba(255,77,109,0.3);color:#ff7090}
+.alert-success{background:rgba(0,255,136,0.08);border:1px solid rgba(0,255,136,0.25);color:var(--green)}
+
+/* Spinner */
+.spinner-sm{
+  width:16px;height:16px;border-radius:50%;
+  border:2px solid transparent;border-top-color:currentColor;
+  animation:spin 0.7s linear infinite;display:none;flex-shrink:0;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Footer */
+.card-footer{text-align:center;font-size:10px;color:var(--muted);margin-top:20px}
+.status-dot{
+  display:inline-block;width:6px;height:6px;border-radius:50%;
+  background:var(--green);margin-left:4px;
+  animation:statusPulse 2s ease-in-out infinite;vertical-align:middle;
+}
+@keyframes statusPulse{0%,100%{opacity:1}50%{opacity:0.3}}
+</style>
 </head>
-<body class="bg-slate-900 text-slate-100 font-cairo min-h-screen flex items-center justify-center">
-    <div class="absolute inset-0 overflow-hidden">
-        <div class="absolute top-0 right-0 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl"></div>
-        <div class="absolute bottom-0 left-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl"></div>
+<body>
+
+<!-- 3D Background -->
+<div class="bg-scene">
+  <div class="grid-3d"></div>
+  <div class="orb orb1"></div>
+  <div class="orb orb2"></div>
+  <div class="orb orb3"></div>
+  <div id="particles"></div>
+</div>
+
+<!-- Card -->
+<div class="card-wrap">
+  <div class="card">
+
+    <!-- Logo -->
+    <div class="logo-section">
+      <img src="/static/icons/logo-full.png" class="logo-img" alt="VEX" onerror="this.style.display='none';document.getElementById('logoFallback').style.display='flex'">
+      <div id="logoFallback" style="display:none;width:90px;height:90px;border-radius:50%;background:linear-gradient(135deg,#00ff88,#006644);align-items:center;justify-content:center;font-size:40px;font-weight:900;color:#030a06;margin:0 auto 12px;border:2px solid rgba(0,255,136,0.3);box-shadow:0 0 30px rgba(0,255,136,0.3)">V</div>
+      <div class="logo-name">VEX</div>
+      <div class="logo-sub">GAMES PLATFORM</div>
     </div>
-    
-    <div class="relative w-full max-w-md">
-        <div class="bg-slate-800/80 backdrop-blur-xl border border-slate-700 rounded-2xl shadow-2xl p-8">
-            <!-- Logo -->
-            <div class="text-center mb-8">
-                <div class="inline-flex w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 items-center justify-center text-slate-900 font-bold text-3xl mb-3">B</div>
-                <h1 class="text-2xl font-bold text-amber-400">Boterx</h1>
-                <p class="text-sm text-slate-400 mt-1" data-i18n="admin_panel">Admin Dashboard</p>
-            </div>
 
-            {% if error %}
-            <div class="bg-red-900/50 border border-red-700 text-red-300 rounded-lg p-3 mb-4 text-sm text-center">
-                <i class="fas fa-exclamation-circle ml-1"></i> {{ error }}
-            </div>
-            {% endif %}
+    {% if error %}
+    <div class="alert alert-error show">
+      <i class="fas fa-exclamation-circle"></i> {{ error }}
+    </div>
+    {% endif %}
 
-            <form method="POST" class="space-y-4">
-                <div>
-                    <label class="block text-sm text-slate-400 mb-1" data-i18n="admin_id">Admin ID</label>
-                    <div class="relative">
-                        <i class="fas fa-user-shield absolute right-3 top-3.5 text-slate-500"></i>
-                        <input type="text" name="admin_id" required
-                               class="w-full bg-slate-700 border border-slate-600 rounded-lg pr-10 pl-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-                               placeholder="Enter Admin ID" data-i18n-placeholder="enter_admin_id">
-                    </div>
-                </div>
-                <div>
-                    <label class="block text-sm text-slate-400 mb-1" data-i18n="password">Password</label>
-                    <div class="relative">
-                        <i class="fas fa-lock absolute right-3 top-3.5 text-slate-500"></i>
-                        <input type="password" name="password" required
-                               class="w-full bg-slate-700 border border-slate-600 rounded-lg pr-10 pl-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-                               placeholder="••••••••">
-                    </div>
-                </div>
-                <button type="submit"
-                        class="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-900 font-bold py-3 rounded-lg transition shadow-lg shadow-amber-500/20">
-                    <i class="fas fa-right-to-bracket ml-1"></i> دخول
-                </button>
-            </form>
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" id="tabAdmin" onclick="switchTab('admin')">
+        <i class="fas fa-shield-alt"></i> لوحة الإدارة
+      </button>
+      <button class="tab" id="tabUser" onclick="switchTab('user')">
+        <i class="fab fa-telegram"></i> دخول تيليغرام
+      </button>
+    </div>
+
+    <!-- Admin Login -->
+    <div class="form-section active" id="sectionAdmin">
+      <form method="POST" id="adminForm" onsubmit="submitAdmin(event)">
+        <div class="form-group">
+          <label class="form-label">معرف الأدمن</label>
+          <div class="input-wrap">
+            <input type="text" name="admin_id" class="form-input" placeholder="أدخل معرف الأدمن" required autocomplete="username">
+            <i class="fas fa-user-shield form-icon"></i>
+          </div>
         </div>
-        <p class="text-center text-xs text-slate-500 mt-4">© 2026 Boterx — جميع الحقوق محفوظة</p>
+        <div class="form-group">
+          <label class="form-label">كلمة المرور</label>
+          <div class="input-wrap">
+            <input type="password" name="password" class="form-input" placeholder="••••••••" required autocomplete="current-password">
+            <i class="fas fa-lock form-icon"></i>
+          </div>
+        </div>
+        <div class="alert alert-error" id="adminError"></div>
+        <button type="submit" class="btn-submit">
+          <span id="adminBtnText"><i class="fas fa-right-to-bracket"></i> دخول</span>
+          <div class="spinner-sm" id="adminSpinner"></div>
+        </button>
+      </form>
     </div>
+
+    <!-- Telegram OTP Login -->
+    <div class="form-section" id="sectionUser">
+
+      <!-- Step 1: Open bot -->
+      <div id="otpStep1">
+        <div class="otp-info">
+          <strong>🔐 دخول آمن عبر تيليغرام</strong><br>
+          اضغط الزر أدناه لفتح البوت الأمني <strong>@vex_otp_bot</strong><br>
+          شارك رقم هاتفك → ستصلك رسالة برمز الدخول
+        </div>
+        <a href="https://t.me/vex_otp_bot?start=web_auth" target="_blank" class="btn-tg" onclick="showOtpStep2()">
+          <i class="fab fa-telegram"></i> فتح @vex_otp_bot والحصول على الرمز
+        </a>
+        <div style="text-align:center;margin-bottom:12px">
+          <button type="button" onclick="showOtpStep2()" style="background:none;border:none;color:var(--muted);font-size:11px;cursor:pointer;text-decoration:underline;font-family:'Cairo',sans-serif">لديّ رمز بالفعل</button>
+        </div>
+      </div>
+
+      <!-- Step 2: Enter OTP -->
+      <div id="otpStep2" class="otp-step">
+        <div class="otp-info">
+          <strong>✅ أدخل رمز التحقق</strong><br>
+          الرمز المكوّن من 6 أرقام الذي أرسله إليك <strong>@vex_otp_bot</strong>
+        </div>
+        <div class="form-group">
+          <label class="form-label">رمز التحقق (6 أرقام)</label>
+          <div class="input-wrap">
+            <input type="text" id="otpCode" class="form-input otp-input" placeholder="000000"
+              maxlength="6" inputmode="numeric" pattern="[0-9]{6}"
+              oninput="this.value=this.value.replace(/\D/g,'')" autocomplete="one-time-code">
+            <i class="fas fa-key form-icon"></i>
+          </div>
+        </div>
+        <div class="alert alert-error" id="otpError"></div>
+        <div class="alert alert-success" id="otpSuccess"></div>
+        <button type="button" class="btn-submit" onclick="verifyOtp()">
+          <span id="otpBtnText"><i class="fas fa-unlock-alt"></i> تحقق والدخول</span>
+          <div class="spinner-sm" id="otpSpinner"></div>
+        </button>
+        <div style="text-align:center;margin-top:12px">
+          <button type="button" onclick="resetOtp()" style="background:none;border:none;color:var(--muted);font-size:11px;cursor:pointer;text-decoration:underline;font-family:'Cairo',sans-serif">
+            ← رجوع للخطوة الأولى
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <div class="card-footer">
+    <span class="status-dot"></span> النظام يعمل بكفاءة — VEX Games © 2026
+  </div>
+</div>
+
+<script>
+function switchTab(tab){
+  document.getElementById('tabAdmin').classList.toggle('active', tab==='admin');
+  document.getElementById('tabUser').classList.toggle('active', tab==='user');
+  document.getElementById('sectionAdmin').classList.toggle('active', tab==='admin');
+  document.getElementById('sectionUser').classList.toggle('active', tab==='user');
+}
+function showOtpStep2(){
+  document.getElementById('otpStep1').style.display='none';
+  document.getElementById('otpStep2').classList.add('show');
+  setTimeout(()=>document.getElementById('otpCode').focus(),100);
+}
+function resetOtp(){
+  document.getElementById('otpStep1').style.display='block';
+  document.getElementById('otpStep2').classList.remove('show');
+  document.getElementById('otpCode').value='';
+  hideAlert('otpError'); hideAlert('otpSuccess');
+}
+function showAlert(id, msg){
+  const el=document.getElementById(id);
+  el.childNodes[1] ? el.childNodes[1].textContent=msg : el.innerHTML='<i class="fas fa-info-circle"></i> '+msg;
+  el.classList.add('show');
+}
+function hideAlert(id){document.getElementById(id).classList.remove('show')}
+
+function submitAdmin(e){
+  e.preventDefault();
+  const f=document.getElementById('adminForm');
+  const spinner=document.getElementById('adminSpinner');
+  const btnText=document.getElementById('adminBtnText');
+  hideAlert('adminError');
+  spinner.style.display='block'; btnText.style.display='none';
+  fetch(window.location.href,{method:'POST',body:new FormData(f)})
+    .then(r=>{
+      if(r.redirected){window.location=r.url;return;}
+      return r.text().then(html=>{
+        document.open();document.write(html);document.close();
+      });
+    })
+    .catch(()=>{ spinner.style.display='none'; btnText.style.display='flex'; f.submit(); });
+}
+
+async function verifyOtp(){
+  const code=document.getElementById('otpCode').value.trim();
+  if(code.length!==6){showAlert('otpError','أدخل رمزاً مكوناً من 6 أرقام');return;}
+  hideAlert('otpError'); hideAlert('otpSuccess');
+  const spinner=document.getElementById('otpSpinner');
+  const btnText=document.getElementById('otpBtnText');
+  spinner.style.display='block'; btnText.style.display='none';
+  try{
+    const r=await fetch('/api/web/auth-code',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({code})
+    });
+    const d=await r.json();
+    if(d.success){
+      showAlert('otpSuccess','✅ تم التحقق — جارٍ التحويل...');
+      setTimeout(()=>window.location=d.redirect||'/home', 800);
+    } else {
+      showAlert('otpError', d.error||'رمز غير صالح');
+      spinner.style.display='none'; btnText.style.display='flex';
+    }
+  } catch(e){
+    showAlert('otpError','خطأ في الاتصال — حاول مجدداً');
+    spinner.style.display='none'; btnText.style.display='flex';
+  }
+}
+
+document.getElementById('otpCode').addEventListener('keydown',e=>{if(e.key==='Enter')verifyOtp();});
+
+// Floating particles
+(function(){
+  const container=document.getElementById('particles');
+  for(let i=0;i<25;i++){
+    const p=document.createElement('div');
+    p.className='particle';
+    p.style.cssText=`left:${Math.random()*100}%;bottom:-5px;animation-duration:${6+Math.random()*10}s;animation-delay:${Math.random()*10}s;width:${1+Math.random()*2}px;height:${1+Math.random()*2}px;opacity:${0.3+Math.random()*0.4}`;
+    container.appendChild(p);
+  }
+})();
+</script>
 </body>
 </html>

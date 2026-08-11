@@ -5,11 +5,14 @@
   "start_url": "/webapp/games",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#0a0e17",
-  "theme_color": "#0a0e17",
+  "background_color": "#030a06",
+  "theme_color": "#00ff88",
   "lang": "ar",
   "dir": "rtl",
-  "categories": ["games", "entertainment"],
+  "categories": [
+    "games",
+    "entertainment"
+  ],
   "icons": [
     {
       "src": "/static/icons/icon-32.png",
