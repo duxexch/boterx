@@ -754,13 +754,15 @@ def webapp_auth(f):
                     if uid_val and authorized:
                         g.telegram_user_id = uid_val
                         g.telegram_user = None
-                        g.webapp_auth_strong = True   # device-authorized session
+                        # validate_session returns authorized=True for both:
+                        # (a) pre_authenticated sessions (server minted from @login_required)
+                        # (b) device-fingerprint-matched sessions
+                        # Both are classified as strong auth.
+                        g.webapp_auth_strong = True
                         return f(*args, **kwargs)
                     if uid_val and not authorized:
-                        # Different device → guest mode: session token is cryptographically
-                        # valid but was presented from a device that did not bind it.
-                        # Permit read-only game routes (balance, stats) but block sensitive
-                        # account/reward endpoints that require the originating device.
+                        # Device fingerprint mismatch — guest mode.
+                        # Permit read-only game routes but block sensitive account endpoints.
                         g.telegram_user_id = uid_val
                         g.telegram_user = None
                         g.webapp_auth_strong = False   # device mismatch — not strong
@@ -1135,15 +1137,17 @@ def home():
             user_currency = user_info.get('currency', 'EGP')
     except: pass
 
-    # Generate a device-bound encrypted session token for this user so that
-    # the /webapp/account and other Mini App pages can authenticate their API
-    # calls without relying on the plain uid fallback (weak auth).
-    # Safe: uid comes from the trusted Flask login session (@login_required).
+    # Generate a server-authenticated session token for this user.
+    # create_authenticated_session() sets pre_authenticated=True in SQLite,
+    # meaning the uid was verified by Flask's @login_required mechanism —
+    # not by a caller-supplied parameter.  webapp_auth treats these as
+    # webapp_auth_strong=True without requiring a device fingerprint.
+    # Safe: uid comes from session.get('admin_id') — trusted Flask session.
     s_token = ''
     if uid:
         try:
-            from session_tokens import create_session as _cs
-            s_token = _cs(uid)
+            from session_tokens import create_authenticated_session as _cas
+            s_token = _cas(uid)
         except Exception:
             pass
 
