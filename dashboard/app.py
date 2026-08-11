@@ -2308,19 +2308,32 @@ def api_svrp_requests():
 @api_auth
 @permission_required('approve_deposits')
 def api_svrp_approve(req_id):
-    amount = request.json.get('amount', '0') if request.json else '0'
-    reqs = read_csv('recovery_requests.csv')
-    fieldnames = get_fieldnames('recovery_requests.csv', ['id','user_id','customer_id','photo_file_id','status','recovery_amount','admin_note','created_at','approved_at','approved_by'])
-    for r in reqs:
-        if r.get('id') == req_id:
-            r['status'] = 'approved'
-            r['recovery_amount'] = amount
-            r['approved_at'] = datetime.now().strftime('%Y-%m-%d %H:%M')
-            r['approved_by'] = session.get('admin_id', '')
-            break
-    write_csv('recovery_requests.csv', reqs, fieldnames)
-    log_action('svrp_approve', f'{req_id}: {amount}')
-    return jsonify({'success': True})
+    """Approve a recovery request and credit the user's frozen SVRP wallet.
+
+    Routed through SVRPManager.approve_recovery_request so that:
+    - The full RMW (status check + wallet credit) runs inside a single svrp_lock()
+    - An idempotency guard prevents double-approval of the same request
+    - The frozen wallet balance is actually updated (not just the CSV row)
+    """
+    import sys as _sys_svrp; _sys_svrp.path.insert(0, BASE_DIR)
+    from svrp import SVRPManager as _SvrpMgr
+
+    raw_amount = request.json.get('amount', '0') if request.json else '0'
+    try:
+        amount_float = float(raw_amount)
+        if not math.isfinite(amount_float) or amount_float <= 0:
+            return jsonify({'error': 'المبلغ غير صالح'}), 400
+    except (TypeError, ValueError):
+        return jsonify({'error': 'المبلغ غير صالح — يجب أن يكون رقماً'}), 400
+
+    admin_id = session.get('admin_id', 'unknown')
+    mgr = _SvrpMgr()
+    ok, msg = mgr.approve_recovery_request(req_id, amount_float, admin_id)
+    if not ok:
+        return jsonify({'error': msg or 'فشل الموافقة'}), 400
+
+    log_action('svrp_approve', f'{req_id}: {amount_float}')
+    return jsonify({'success': True, 'message': msg})
 
 @app.route('/api/svrp/requests/<req_id>/reject', methods=['POST'])
 @api_auth
@@ -5095,6 +5108,11 @@ def api_svrp_transfer_to_game():
         # For resumed 'debited' records the snapshot is unavailable; we do NOT
         # attempt rollback — the client should retry with the same transfer_id
         # and add_balance_for_svrp_transfer will apply the credit idempotently.
+        # Compensating rollback — only when we have the full CSV snapshot
+        # (fresh debit path).  The outbox STAYS 'debited' unless the rollback
+        # fully succeeds; a partial/failed rollback must NOT change the status
+        # so the client can safely retry with the same transfer_id.
+        _rollback_succeeded = False
         if not _resume_debited and _credits_snapshot is not None:
             with _svrp_lock():
                 try:
@@ -5116,19 +5134,24 @@ def api_svrp_transfer_to_game():
                                 _r2['status']        = _s2['status']
                                 _r2['credit_amount'] = _s2['credit_amount']
                         _mrb2._write_csv('svrp_credits.csv', _ac2, _mrb2.CREDIT_FIELDS)
+                    _rollback_succeeded = True
                 except Exception as _rbe2:
                     _cl.critical(
-                        'ROLLBACK FAILED uid=%s transfer=%s rollback_err=%s',
+                        'ROLLBACK FAILED uid=%s transfer=%s rollback_err=%s — '
+                        'transfer remains debited for safe retry',
                         uid, _transfer_id, _rbe2
                     )
-            try:
-                _gm.mark_svrp_transfer_status(_transfer_id, uid, 'rolled_back')
-            except Exception:
-                pass
-            return jsonify({
-                'error': f'فشل إضافة رصيد اللعب — تم التراجع عن الخصم: {_e2}'
-            }), 500
-        # Resumed path: debit is durable, credit failed — client should retry
+            if _rollback_succeeded:
+                # Only mark rolled_back after a verified full compensation
+                try:
+                    _gm.mark_svrp_transfer_status(_transfer_id, uid, 'rolled_back')
+                except Exception:
+                    pass
+                return jsonify({
+                    'error': f'فشل إضافة رصيد اللعب — تم التراجع عن الخصم: {_e2}'
+                }), 500
+        # Rollback not attempted (resume path) or rollback itself failed:
+        # keep status='debited' so client can retry with same transfer_id.
         return jsonify({
             'error': (
                 f'فشل إضافة رصيد اللعب — أعد المحاولة باستخدام '
