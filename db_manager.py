@@ -378,6 +378,46 @@ class GameDB:
             return d
         return {}
 
+    # ── SVRP transfer outbox helpers ─────────────────────────────────────────
+
+    def create_svrp_transfer(self, transfer_id, uid, amount):
+        """Write a durable 'pending' outbox record BEFORE the SVRP debit begins.
+
+        Must be called before any SVRP CSV mutation so that crash recovery can
+        identify debits that need a compensating game-credit or rollback.
+        Returns True on success; raises on DB error.
+        """
+        conn = self._conn()
+        with _db_lock:
+            conn.execute(
+                'INSERT OR IGNORE INTO svrp_transfer_log '
+                '(transfer_id, uid, amount, status, created_at) VALUES (?, ?, ?, ?, ?)',
+                (transfer_id, str(uid), float(amount), 'pending',
+                 datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            )
+            conn.commit()
+        return True
+
+    def update_svrp_transfer_status(self, transfer_id, status):
+        """Advance the outbox record to 'credits_debited' or 'completed'."""
+        conn = self._conn()
+        with _db_lock:
+            conn.execute(
+                'UPDATE svrp_transfer_log SET status = ? WHERE transfer_id = ?',
+                (status, transfer_id)
+            )
+            conn.commit()
+
+    def get_svrp_transfer(self, transfer_id):
+        """Return the outbox record dict for crash-recovery/startup reconciliation."""
+        conn = self._conn()
+        row = conn.execute(
+            'SELECT * FROM svrp_transfer_log WHERE transfer_id = ?', (transfer_id,)
+        ).fetchone()
+        return dict(row) if row else None
+
+    # ── Balance operations ────────────────────────────────────────────────────
+
     def add_balance(self, user_id, amount, idempotency_key=None):
         """Add to balance (atomic transaction). Returns new balance.
 
@@ -408,8 +448,8 @@ class GameDB:
                         (uid, float(amt), float(amt))
                     )
                     conn.execute('RELEASE SAVEPOINT svrp_idem')
-                except Exception:
-                    # Duplicate key OR other error: roll back the savepoint only
+                except sqlite3.IntegrityError:
+                    # Duplicate key only → this is a confirmed replay; no other error takes this path
                     try:
                         conn.execute('ROLLBACK TO SAVEPOINT svrp_idem')
                         conn.execute('RELEASE SAVEPOINT svrp_idem')
@@ -420,6 +460,7 @@ class GameDB:
                         'SELECT game_balance FROM users WHERE telegram_id = ?', (uid,)
                     ).fetchone()
                     return _money_float(row[0]) if row and row[0] is not None else 0.0
+                # All other exceptions propagate — the caller's rollback path will run
             else:
                 conn.execute(
                     'INSERT INTO users (telegram_id, game_balance) VALUES (?, ?) '

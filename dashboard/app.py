@@ -4860,12 +4860,20 @@ def api_svrp_transfer_to_game():
         parsed_amount = None  # سيتحدد داخل القفل
 
     import sys as _sys2; _sys2.path.insert(0, BASE_DIR)
+    import secrets as _sec
     from svrp import SVRPManager as _SVRPMgr, svrp_lock as _svrp_lock
 
-    # ── lock reentrant cross-process (threading.RLock + fcntl.LOCK_EX) ──────
-    # svrp_lock() is defined in svrp.py and covers EVERY svrp_wallets/credits
-    # write from both this dashboard process and the separate bot process.
-    # It is reentrant so nested calls from use_credits()/_write_csv() don't deadlock.
+    # ── 1. Generate a stable transfer_id and write it durably to SQLite ──────
+    # This MUST happen BEFORE any SVRP CSV mutation.  The record survives
+    # crashes/restarts so that a 'credits_debited' row without a matching
+    # game credit can be identified and reconciled by ops/monitoring.
+    _transfer_id = _sec.token_hex(16)
+    try:
+        _gm.create_svrp_transfer(_transfer_id, uid, parsed_amount or 0)
+    except Exception as _e0:
+        return jsonify({'error': f'لا يمكن تسجيل طلب النقل: {_e0}'}), 500
+
+    # ── 2. Acquire lock and perform the full read-check-debit sequence ────────
     with _svrp_lock():
         # ── قراءة المحفظة داخل القفل (أحدث حالة من CSV) ─────────────────────
         wallets = read_csv('svrp_wallets.csv')
@@ -4907,7 +4915,7 @@ def api_svrp_transfer_to_game():
             if r.get('user_id') == uid and r.get('status') in ('active', 'pending')
         }
 
-        # ── الخطوة 1: خصم أرصدة SVRP (use_credits يستخدم svrp_lock داخلياً — آمن) ──
+        # ── الخطوة 1: خصم أرصدة SVRP ──────────────────────────────────────────
         try:
             success, msg = _mgr.use_credits(uid, amount)
             if not success:
@@ -4915,9 +4923,17 @@ def api_svrp_transfer_to_game():
         except Exception as e1:
             return jsonify({'error': f'خطأ في خصم SVRP: {e1}'}), 500
 
-        # ── الخطوة 2: إضافة رصيد اللعب (idempotent بفضل _transfer_id) ──────────
-        import secrets as _sec
-        _transfer_id = _sec.token_hex(16)
+    # Lock released — mark the outbox as 'credits_debited' (durable checkpoint)
+    try:
+        _gm.update_svrp_transfer_status(_transfer_id, 'credits_debited')
+    except Exception:
+        pass  # non-fatal; the status is best-effort for ops visibility
+
+    # ── الخطوة 2: إضافة رصيد اللعب (idempotent بفضل _transfer_id) ──────────────
+    # _transfer_id was written to SQLite BEFORE the SVRP debit, so this key is
+    # stable across retries.  add_balance() catches only IntegrityError (duplicate)
+    # and replays the result; all other DB errors propagate to the rollback below.
+    with _svrp_lock():
         try:
             new_game_balance = _gm.add_balance(
                 uid, amount, 'svrp_transfer',
@@ -4949,6 +4965,10 @@ def api_svrp_transfer_to_game():
                 _rlog.getLogger('svrp_transfer').critical(
                     "ROLLBACK FAILED uid=%s amount=%s: %s", uid, amount, rb_err
                 )
+            try:
+                _gm.update_svrp_transfer_status(_transfer_id, 'rolled_back')
+            except Exception:
+                pass
             return jsonify(
                 {'error': f'فشل إضافة رصيد اللعب — تم التراجع عن الخصم: {e2}'}
             ), 500
@@ -4957,11 +4977,18 @@ def api_svrp_transfer_to_game():
         w_final = _SVRPMgr().get_wallet(uid)
         new_svrp = float(w_final.get('balance', 0) or 0)
 
+    # Mark outbox record 'completed' so ops monitoring can confirm success
+    try:
+        _gm.update_svrp_transfer_status(_transfer_id, 'completed')
+    except Exception:
+        pass  # non-fatal; record already at 'credits_debited' — still reconcilable
+
     return jsonify({
         'success':          True,
         'transferred':      round(amount, 2),
         'new_game_balance': new_game_balance,
         'new_svrp_credits': new_svrp,
+        'transfer_id':      _transfer_id,   # return to client for retry/idempotency
     })
 
 @app.route('/webapp/wallet')

@@ -355,6 +355,17 @@ class GameManager:
             pass
         return 'EGP'
 
+    def create_svrp_transfer(self, transfer_id, uid, amount):
+        """Write durable 'pending' outbox record before SVRP debit."""
+        if _USE_SQLITE:
+            return _db.create_svrp_transfer(transfer_id, uid, amount)
+        return True
+
+    def update_svrp_transfer_status(self, transfer_id, status):
+        """Advance outbox record to 'credits_debited' or 'completed'."""
+        if _USE_SQLITE:
+            _db.update_svrp_transfer_status(transfer_id, status)
+
     def add_balance(self, user_id, amount, reason='deposit', idempotency_key=None):
         """إضافة رصيد — SQLite (atomic transaction)"""
         if _USE_SQLITE:
