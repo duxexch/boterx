@@ -27,9 +27,11 @@
 
     <!-- Add button + refresh -->
     <div class="flex items-center justify-between">
+        {% if not admin_perms or admin_perms.get('manage_companies') %}
         <button @click="showAddModal = true" class="btn btn-primary">
             <i class="fas fa-plus ml-1"></i> إضافة وسيلة دفع
         </button>
+        {% endif %}
         <button @click="loadData()" class="btn btn-sm" style="background:#475569">
             <i class="fas fa-rotate ml-1"></i> تحديث
         </button>
@@ -68,11 +70,12 @@
                                 </div>
                             </td>
                             <td>
-                                <button @click="toggleStatus(m)" class="badge" :class="m.status === 'active' ? 'badge-active' : 'badge-cancelled'"
+                                <button @click="toggleStatus(m)" x-show="rbac('manage_companies')" class="badge" :class="m.status === 'active' ? 'badge-active' : 'badge-cancelled'"
                                     x-text="m.status === 'active' ? 'نشطة' : 'متوقفة'"></button>
+                                <span x-show="!rbac('manage_companies')" x-html="statusBadge(m.status)"></span>
                             </td>
                             <td>
-                                <div class="flex gap-1">
+                                <div class="flex gap-1" x-show="rbac('manage_companies')">
                                     <button @click="editMethod(m)" class="btn btn-sm" style="background:#3B82F6" title="Edit" data-i18n-title="edit">
                                         <i class="fas fa-pen text-xs"></i>
                                     </button>

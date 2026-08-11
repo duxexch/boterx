@@ -578,6 +578,14 @@ function baseApp() {
     }
 }
 </script>
+<!-- RBAC helper — injected once, available on every page via rbac('perm') -->
+<script>
+const _RBAC = {{ admin_perms | tojson }};
+// Returns true if the current admin has the given permission.
+// Empty _RBAC means super_admin (all permissions) → always true.
+// Non-empty means an assigned role → only explicitly granted keys are true.
+function rbac(perm) { return !Object.keys(_RBAC).length || !!_RBAC[perm]; }
+</script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

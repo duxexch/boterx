@@ -50,8 +50,8 @@
             <span class="text-xs text-slate-500">UID: <span x-text="dep.user_id"></span></span>
           </div>
           <div class="flex gap-2">
-            <button @click="approveDeposit(dep.id)" class="bg-green-600 hover:bg-green-500 text-white text-xs px-3 py-1 rounded-lg" data-i18n="approve">Approve</button>
-            <button @click="rejectDeposit(dep.id)" class="bg-red-600 hover:bg-red-500 text-white text-xs px-3 py-1 rounded-lg" data-i18n="reject">Reject</button>
+            <button @click="approveDeposit(dep.id)" x-show="rbac('approve_deposits')" class="bg-green-600 hover:bg-green-500 text-white text-xs px-3 py-1 rounded-lg" data-i18n="approve">Approve</button>
+            <button @click="rejectDeposit(dep.id)" x-show="rbac('reject_deposits')" class="bg-red-600 hover:bg-red-500 text-white text-xs px-3 py-1 rounded-lg" data-i18n="reject">Reject</button>
           </div>
         </div>
       </template>
@@ -80,10 +80,12 @@
             </div>
           </div>
         </div>
-        <button @click="toggleGame(game.id)" class="text-xs px-3 py-1 rounded-lg" :class="game.is_active === 'yes' ? 'bg-green-600' : 'bg-slate-600'" x-text="game.is_active === 'yes' ? '✅ Active' : '⏸️ Off'"></button>
+        <button @click="toggleGame(game.id)" x-show="rbac('manage_games')" class="text-xs px-3 py-1 rounded-lg" :class="game.is_active === 'yes' ? 'bg-green-600' : 'bg-slate-600'" x-text="game.is_active === 'yes' ? '✅ Active' : '⏸️ Off'"></button>
       </div>
     </template>
+    {% if not admin_perms or admin_perms.get('manage_games') %}
     <button @click="showAddGame = true" class="w-full bg-slate-800 hover:bg-slate-700 rounded-xl p-3 text-sm text-slate-400 border border-dashed border-slate-600">➕ <span data-i18n="add_game">Add Game</span></button>
+    {% endif %}
   </div>
 
   <!-- Players Tab -->
@@ -105,8 +107,8 @@
             <span x-show="p.is_vex_partner === 'yes'" class="text-xs px-2 py-0.5 rounded-full bg-purple-600 text-white">💎 VEX</span>
           </div>
           <div class="flex gap-1">
-            <button @click="toggleVex(p.telegram_id, p.is_vex_partner !== 'yes')" class="text-xs bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded" x-text="p.is_vex_partner === 'yes' ? 'Remove VEX' : 'Set VEX'"></button>
-            <button @click="cooldownPlayer(p.telegram_id)" class="text-xs bg-blue-700 hover:bg-blue-600 px-2 py-1 rounded">❄️ Cooldown</button>
+            <button @click="toggleVex(p.telegram_id, p.is_vex_partner !== 'yes')" x-show="rbac('ban_users')" class="text-xs bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded" x-text="p.is_vex_partner === 'yes' ? 'Remove VEX' : 'Set VEX'"></button>
+            <button @click="cooldownPlayer(p.telegram_id)" x-show="rbac('ban_users')" class="text-xs bg-blue-700 hover:bg-blue-600 px-2 py-1 rounded">❄️ Cooldown</button>
           </div>
         </div>
         <div class="grid grid-cols-4 gap-2 text-xs">
@@ -149,7 +151,9 @@
           <input type="number" x-model="config.min_balance_to_play" class="w-full bg-slate-900 text-white rounded-lg px-3 py-2 border border-slate-600 text-sm">
         </div>
       </div>
+      {% if not admin_perms or admin_perms.get('manage_games') %}
       <button @click="saveConfig()" class="bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm px-4 py-2 rounded-lg" data-i18n="save">Save</button>
+      {% endif %}
     </div>
   </div>
 

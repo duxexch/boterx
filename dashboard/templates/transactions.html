@@ -62,8 +62,8 @@
         <!-- Bulk actions bar -->
         <div x-show="selectedIds.length > 0" x-transition class="mt-3 flex items-center gap-3 p-2 bg-blue-500/10 rounded-lg" style="display:none">
             <span class="text-sm text-blue-400"><i class="fas fa-check-square ml-1"></i> تم تحديد <span x-text="selectedIds.length"></span> معاملة</span>
-            <button @click="bulkApprove()" class="btn btn-success btn-sm"><i class="fas fa-check ml-1"></i> موافقة جماعية</button>
-            <button @click="bulkReject()" class="btn btn-danger btn-sm"><i class="fas fa-xmark ml-1"></i> رفض جماعي</button>
+            <button @click="bulkApprove()" x-show="rbac('approve_deposits')" class="btn btn-success btn-sm"><i class="fas fa-check ml-1"></i> موافقة جماعية</button>
+            <button @click="bulkReject()" x-show="rbac('reject_deposits')" class="btn btn-danger btn-sm"><i class="fas fa-xmark ml-1"></i> رفض جماعي</button>
             <button @click="selectedIds = []" class="text-sm text-slate-400 hover:text-white mr-auto" data-i18n="deselect_all">Deselect All</button>
         </div>
     </div>
@@ -120,10 +120,10 @@
                             <td>
                                 <div class="flex gap-1">
                                     <button @click="openDetail(t)" class="btn btn-primary btn-sm" title="تفاصيل"><i class="fas fa-eye"></i></button>
-                                    <template x-if="t.status === 'pending'">
+                                    <template x-if="t.status === 'pending' && rbac('approve_deposits')">
                                         <button @click="approve(t.id)" class="btn btn-success btn-sm" title="Approve" data-i18n-title="approve"><i class="fas fa-check"></i></button>
                                     </template>
-                                    <template x-if="t.status === 'pending'">
+                                    <template x-if="t.status === 'pending' && rbac('reject_deposits')">
                                         <button @click="reject(t.id)" class="btn btn-danger btn-sm" title="Reject" data-i18n-title="reject"><i class="fas fa-xmark"></i></button>
                                     </template>
                                 </div>
@@ -167,7 +167,9 @@
             </div>
             <div class="flex gap-2 justify-end mt-4">
                 <button @click="showApproveModal = false" class="btn btn-sm" style="background:#475569" data-i18n="cancel">Cancel</button>
+                {% if not admin_perms or admin_perms.get('approve_deposits') %}
                 <button @click="confirmApprove()" class="btn btn-success btn-sm"><i class="fas fa-check ml-1"></i> موافقة وتأكيد المبلغ</button>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -228,10 +230,10 @@
                         <p class="text-sm bg-red-900/20 p-2 rounded text-red-400" x-text="detail.reject_reason || '—'"></p>
                     </div>
                     <div class="flex gap-2 justify-end pt-2 border-t border-slate-700">
-                        <template x-if="detail.status === 'pending'">
+                        <template x-if="detail.status === 'pending' && rbac('approve_deposits')">
                             <button @click="approve(detail.id); showDetail = false" class="btn btn-success btn-sm"><i class="fas fa-check ml-1"></i> موافقة</button>
                         </template>
-                        <template x-if="detail.status === 'pending'">
+                        <template x-if="detail.status === 'pending' && rbac('reject_deposits')">
                             <button @click="reject(detail.id); showDetail = false" class="btn btn-danger btn-sm"><i class="fas fa-xmark ml-1"></i> رفض</button>
                         </template>
                         <button @click="showDetail = false" class="btn bg-slate-700 text-slate-300 hover:bg-slate-600 btn-sm" data-i18n="close">Close</button>
