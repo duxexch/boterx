@@ -1,16 +1,22 @@
 {
   "name": "VEX Games — العب واربح",
-  "short_name": "VEX Games",
+  "short_name": "VEX",
   "description": "منصة ألعاب VEX — ألعاب مثيرة وجوائز حقيقية",
-  "start_url": "/",
+  "start_url": "/webapp/games",
   "display": "standalone",
-  "orientation": "portrait-primary",
-  "background_color": "#0f172a",
-  "theme_color": "#F5C518",
+  "orientation": "any",
+  "background_color": "#0a0e17",
+  "theme_color": "#0a0e17",
   "lang": "ar",
   "dir": "rtl",
   "categories": ["games", "entertainment"],
   "icons": [
+    {
+      "src": "/static/icons/icon-32.png",
+      "sizes": "32x32",
+      "type": "image/png",
+      "purpose": "any"
+    },
     {
       "src": "/static/icons/icon-192.png",
       "sizes": "192x192",
@@ -26,5 +32,6 @@
   ],
   "screenshots": [],
   "related_applications": [],
-  "prefer_related_applications": false
+  "prefer_related_applications": false,
+  "scope": "/"
 }

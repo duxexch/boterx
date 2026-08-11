@@ -1083,7 +1083,7 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
     
     def get_updates(self):
         """جلب التحديثات — يشمل my_chat_member لتسجيل القنوات تلقائياً"""
-        url = f"{self.api_url}/getUpdates?offset={self.offset + 1}&timeout=10&allowed_updates=%5B%22message%22%2C%22callback_query%22%2C%22my_chat_member%22%2C%22chat_member%22%5D"
+        url = f"{self.api_url}/getUpdates?offset={self.offset + 1}&timeout=10&allowed_updates=%5B%22message%22%2C%22callback_query%22%2C%22my_chat_member%22%2C%22chat_member%22%2C%22channel_post%22%5D"
         try:
             with urllib.request.urlopen(url, timeout=15) as response:
                 return json.loads(response.read().decode('utf-8'))
@@ -5963,6 +5963,13 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                         self.handle_my_chat_member(update['my_chat_member'])
                     except Exception as exc:
                         logger.error("my_chat_member error: %s", exc, exc_info=True)
+
+                elif 'channel_post' in update:
+                    # Forward channel posts to users/channels per relay settings
+                    try:
+                        self.auto_relay_channel_post(update['channel_post'])
+                    except Exception as exc:
+                        logger.error("channel_post relay error: %s", exc, exc_info=True)
 
             except Exception as exc:
                 logger.error("_handle_update uncaught: %s", exc, exc_info=True)
