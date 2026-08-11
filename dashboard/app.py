@@ -640,24 +640,79 @@ def get_request_uid():
         uid = (request.json or {}).get('uid', '')
     return uid
 
+# ===== Security headers (applied to every response) =========================
+@app.after_request
+def _add_security_headers(response):
+    """Harden every response with standard security headers."""
+    response.headers.setdefault('X-Frame-Options', 'SAMEORIGIN')
+    response.headers.setdefault('X-Content-Type-Options', 'nosniff')
+    response.headers.setdefault('X-XSS-Protection', '1; mode=block')
+    response.headers.setdefault('Referrer-Policy', 'strict-origin-when-cross-origin')
+    response.headers.setdefault('Permissions-Policy', 'geolocation=(), microphone=(), camera=()')
+    # Allow service worker and iframe for WebApp pages
+    if not request.path.startswith('/webapp/'):
+        response.headers.setdefault(
+            'Content-Security-Policy',
+            "default-src 'self' https: data:; "
+            "script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com "
+            "https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
+            "style-src 'self' 'unsafe-inline' https:; "
+            "img-src 'self' data: https:; "
+            "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com;"
+        )
+    return response
+
+
+# ===== In-memory login rate limiter (no Redis needed) ========================
+import collections as _col
+_login_attempts: dict = {}  # ip → deque of timestamps
+_login_lock = threading.Lock()
+_LOGIN_MAX = 5
+_LOGIN_WINDOW = 60.0  # seconds
+
+def _login_rate_limited(ip: str) -> bool:
+    """Return True if this IP has exceeded the login attempt limit."""
+    now = time.time()
+    cutoff = now - _LOGIN_WINDOW
+    with _login_lock:
+        if ip not in _login_attempts:
+            _login_attempts[ip] = _col.deque()
+        dq = _login_attempts[ip]
+        while dq and dq[0] < cutoff:
+            dq.popleft()
+        if len(dq) >= _LOGIN_MAX:
+            return True
+        dq.append(now)
+        return False
+
+
 # ===== Routes — Pages =====
 
 @app.route('/')
-@login_required
 def index():
-    return redirect(url_for('dashboard'), code=303)
+    """Landing page (public) — admin dashboard redirect only when logged in."""
+    if session.get('logged_in'):
+        return redirect(url_for('dashboard'), code=303)
+    return render_template('landing.html')
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     error = None
     if request.method == 'POST':
+        # ── IP-based brute-force protection ──────────────────────────────
+        client_ip = request.headers.get('X-Forwarded-For', request.remote_addr or '').split(',')[0].strip()
+        if _login_rate_limited(client_ip):
+            error = 'محاولات كثيرة — انتظر دقيقة وحاول مجدداً'
+            return render_template('login.html', error=error), 429
+
         admin_id = request.form.get('admin_id', '').strip()
         password = request.form.get('password', '')
         if admin_id in ADMIN_IDS and password == ADMIN_PASSWORD:
             session['logged_in'] = True
             session['admin_id'] = admin_id
             session['login_time'] = datetime.now().isoformat()
-            log_action('login', f'Admin {admin_id} logged in')
+            session.permanent = True
+            log_action('login', f'Admin {admin_id} logged in from {client_ip}')
             return redirect(url_for('dashboard'), code=303)
         elif admin_id not in ADMIN_IDS:
             error = 'معرف الأدمن غير صحيح'

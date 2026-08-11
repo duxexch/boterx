@@ -52,6 +52,9 @@ load_dotenv(".env")
 from bot_utils.constants import CURRENCIES, CSV_ENCODING
 from bot_utils.validation import sanitize_input, validate_phone_number, validate_amount
 from bot_utils.telegram_helpers import make_inline_btn, make_inline_keyboard, make_reply_keyboard, remove_keyboard
+from bot_utils.rate_limiter import user_message_limiter, user_callback_limiter, start_cleanup_thread as _start_rl_cleanup
+from bot_utils.notification_hub import hub as _notif_hub
+from concurrent.futures import ThreadPoolExecutor
 
 # إعداد نظام اللوج
 logging.basicConfig(
@@ -132,6 +135,13 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         self.temp_admin_expiry = {}
         # تنظيف أي مدير مؤقت منتهي عند بدء التشغيل
         self.cleanup_expired_temp_admins()
+
+        # ── Notification hub — inject send callable ──────────────────────────
+        _notif_hub.init(self.api_call)
+        self.notif = _notif_hub  # convenience alias: self.notif.send(uid, text)
+
+        # ── Rate limiter cleanup thread ──────────────────────────────────────
+        _start_rl_cleanup(interval_sec=60.0)
 
 
         # تخزين الأسباب المؤقتة لرفض المعاملات قبل التأكيد
@@ -5720,140 +5730,190 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         self.send_inline_message(chat_id, text, inline_btns)
     
     def run(self):
-        """تشغيل البوت — مع نظام حماية شامل"""
-        logger.info(f"✅ نظام DUX الشامل يعمل: @{os.getenv('BOT_TOKEN', 'unknown').split(':')[0] if os.getenv('BOT_TOKEN') else 'unknown'}")
-        
-        # نظام الحماية: تتبع الرسائل المعالجة لمنع التكرار
-        processed_updates = set()
-        MAX_PROCESSED_CACHE = 1000  # حد أقصى للذاكرة
-        
-        # نظام الحماية: تتبع آخر نشاط لكل مستخدم
-        user_last_activity = {}
-        MIN_MESSAGE_INTERVAL = 0.5  # نصف ثانية بين رسائل نفس المستخدم
-        
-        while True:
-            try:
-                updates = self.get_updates()
-                if not updates or not updates.get('ok'):
-                    time.sleep(0.5)
-                    continue
-                
-                for update in updates['result']:
-                    update_id = update['update_id']
-                    
-                    # 1. منع التكرار: تخطي الرسائل المعالجة مسبقاً
-                    if update_id in processed_updates:
-                        continue
-                    
-                    # إضافة للذاكرة
-                    processed_updates.add(update_id)
-                    if len(processed_updates) > MAX_PROCESSED_CACHE:
-                        # تنظيف الذاكرة: احتفظ بآخر 500 فقط
-                        processed_updates.clear()
-                    
-                    # تحديث الـ offset فوراً لمنع إعادة استلام نفس الرسالة
-                    self.offset = update_id
-                    
-                    if 'message' in update:
-                        message = update['message']
-                        user_id = message['from']['id']
-                        
-                        # 2. منع السبام: فحص الفاصل الزمني بين رسائل نفس المستخدم
-                        now = time.time()
-                        if user_id in user_last_activity:
-                            elapsed = now - user_last_activity[user_id]
-                            if elapsed < MIN_MESSAGE_INTERVAL:
-                                logger.warning(f"سبام محتمل من {user_id}: {elapsed:.2f}s - تخطي")
-                                continue
-                        user_last_activity[user_id] = now
-                        
-                        # 3. تسجيل الرسالة
-                        if 'text' in message:
-                            logger.info(f"رسالة: {message['text'][:50]} من {user_id}")
-                        
-                        # 4. معالجة الرسالة مع timeout
-                        try:
-                            self.process_message(message)
-                        except Exception as msg_error:
-                            logger.error(f"خطأ في معالجة الرسالة: {msg_error}", exc_info=True)
-                            # تنظيف حالة المستخدم عند الخطأ
-                            if user_id in self.user_states:
-                                try:
-                                    del self.user_states[user_id]
-                                except:
-                                    pass
-                            # إرسال رسالة خطأ للمستخدم
-                            try:
-                                err_user = self.find_user(user_id)
-                                err_lang = err_user.get('language', 'ar') if err_user else 'ar'
-                                error_kb = {
-                                    'keyboard': [
-                                        [{'text': self.tr('reset_system', err_lang)}],
-                                        [{'text': self.tr('main_menu', err_lang)}]
-                                    ],
-                                    'resize_keyboard': True
-                                }
-                                self.send_message(message['chat']['id'],
-                                    self.tr('error_occurred', err_lang), error_kb)
-                            except:
-                                pass
-                    
-                    elif 'callback_query' in update:
-                        try:
-                            self.handle_callback_query(update['callback_query'])
-                        except Exception as cb_error:
-                            logger.error(f"خطأ في معالجة callback: {cb_error}", exc_info=True)
-                            try:
-                                self.answer_callback(update['callback_query'].get('id'), self.tr('a0486_خطأ', 'ar'))
-                            except:
-                                pass
-                    
-                    elif 'my_chat_member' in update:
-                        """تسجيل تلقائي للقنوات/المجموعات عند إضافة البوت كمشرف"""
-                        try:
-                            self.handle_my_chat_member(update['my_chat_member'])
-                        except Exception as e:
-                            logger.error(f"خطأ في my_chat_member: {e}", exc_info=True)
-                    
-                    elif 'web_app_data' in update.get('message', {}):
-                        """استقبال بيانات Web App"""
-                        try:
-                            wa_msg = update['message']
-                            wa_data_raw = wa_msg.get('web_app_data', {}).get('data', '')
-                            logger.info(f"WebApp data received: {wa_data_raw[:200]}")
-                            try:
-                                wa_parsed = json.loads(wa_data_raw)
-                                if 'gifts' in wa_parsed or 'score' in wa_parsed:
-                                    self.handle_snatch_webapp_data(wa_msg)
-                                elif 'deposit' in wa_parsed or 'amount' in wa_parsed:
-                                    self.handle_game_deposit_request(wa_msg)
-                                else:
-                                    self.handle_wheel_webapp_data(wa_msg)
-                            except json.JSONDecodeError:
-                                self.handle_wheel_webapp_data(wa_msg)
-                        except Exception as e:
-                            logger.error(f"خطأ في web_app_data: {e}", exc_info=True)
-                
-                # 5. تنظيف دوري للذاكرة
-                if len(user_last_activity) > 500:
-                    cutoff = time.time() - 300  # احذف نشاط أقدم من 5 دقائق
-                    user_last_activity = {k: v for k, v in user_last_activity.items() if v > cutoff}
+        """تشغيل البوت — نظام متوازي مع ThreadPoolExecutor (20 عامل)
 
-                # 6. معالجة طابور البث (broadcast_queue.csv) — كل 30 ثانية
-                if int(time.time()) % 30 < 2:
+        كل تحديث يُعالج في thread منفصل؛ الحلقة الرئيسية لا تنتظر أحداً.
+        ميزات الأمان:
+          • per-user semaphore: أقصى 2 handler متزامن لنفس المستخدم
+          • sliding-window rate limit: max 10 رسائل / 10 ثواني للمستخدم
+          • broadcast في thread مستقل — لا يؤثر على الحلقة أبداً
+        """
+        logger.info(
+            "✅ DUX Bot starting (concurrent mode, 20 workers): "
+            "@%s", os.getenv('BOT_TOKEN', '').split(':')[0] or 'unknown'
+        )
+
+        # ── Per-user semaphore: أقصى تزامن لنفس المستخدم ───────────────────
+        _user_sems: dict = {}
+        _user_sems_lock = threading.Lock()
+        MAX_CONCURRENT_PER_USER = 2
+
+        def _user_sem(uid):
+            uid = str(uid)
+            with _user_sems_lock:
+                if uid not in _user_sems:
+                    _user_sems[uid] = threading.Semaphore(MAX_CONCURRENT_PER_USER)
+                return _user_sems[uid]
+
+        # ── Processed-update dedup ring ──────────────────────────────────────
+        processed_updates: set = set()
+        _pu_lock = threading.Lock()
+
+        def _mark_seen(uid):
+            with _pu_lock:
+                processed_updates.add(uid)
+                if len(processed_updates) > 3000:
+                    processed_updates.clear()
+
+        # ── Single update handler (runs inside thread pool) ──────────────────
+        def _handle_update(update):
+            try:
+                # ── web_app_data is nested inside 'message' ──────────────────
+                if 'message' in update and 'web_app_data' in update['message']:
+                    wa_msg = update['message']
+                    uid = str(wa_msg.get('from', {}).get('id', ''))
+                    sem = _user_sem(uid)
+                    if not sem.acquire(blocking=False):
+                        return
                     try:
-                        self._process_broadcast_queue()
-                    except Exception as qe:
-                        logger.error(f"خطأ في معالجة طابور البث: {qe}")
-                
-            except KeyboardInterrupt:
-                logger.info("تم إيقاف البوت بواسطة المستخدم")
-                break
-            except Exception as e:
-                logger.error(f"خطأ عام في حلقة التشغيل: {e}", exc_info=True)
-                # انتظار قصير قبل المحاولة مرة أخرى
-                time.sleep(1)
-                continue
+                        wa_raw = wa_msg.get('web_app_data', {}).get('data', '')
+                        logger.info("WebApp data: %.200s", wa_raw)
+                        try:
+                            wa_parsed = json.loads(wa_raw)
+                            if 'gifts' in wa_parsed or 'score' in wa_parsed:
+                                self.handle_snatch_webapp_data(wa_msg)
+                            elif 'deposit' in wa_parsed or 'amount' in wa_parsed:
+                                self.handle_game_deposit_request(wa_msg)
+                            else:
+                                self.handle_wheel_webapp_data(wa_msg)
+                        except json.JSONDecodeError:
+                            self.handle_wheel_webapp_data(wa_msg)
+                    finally:
+                        sem.release()
+
+                elif 'message' in update:
+                    message = update['message']
+                    uid = str(message.get('from', {}).get('id', ''))
+
+                    # Sliding-window rate limit
+                    if not user_message_limiter.is_allowed(uid):
+                        logger.warning("Rate limited (msg): %s", uid)
+                        return
+
+                    if 'text' in message:
+                        logger.info("MSG %.60s from %s", message['text'], uid)
+
+                    sem = _user_sem(uid)
+                    if not sem.acquire(blocking=True, timeout=5):
+                        # User has too many handlers already — skip silently
+                        return
+                    try:
+                        self.process_message(message)
+                    except Exception as exc:
+                        logger.error("process_message error: %s", exc, exc_info=True)
+                        try:
+                            del self.user_states[uid]
+                        except Exception:
+                            pass
+                        try:
+                            u = self.find_user(uid)
+                            lang = (u or {}).get('language', 'ar')
+                            kb = {'keyboard': [[{'text': self.tr('reset_system', lang)}],
+                                               [{'text': self.tr('main_menu', lang)}]],
+                                  'resize_keyboard': True}
+                            self.send_message(message['chat']['id'],
+                                              self.tr('error_occurred', lang), kb)
+                        except Exception:
+                            pass
+                    finally:
+                        sem.release()
+
+                elif 'callback_query' in update:
+                    cb = update['callback_query']
+                    uid = str(cb.get('from', {}).get('id', ''))
+
+                    if not user_callback_limiter.is_allowed(uid):
+                        try:
+                            self.answer_callback(cb.get('id'), '⏳ انتظر قليلاً')
+                        except Exception:
+                            pass
+                        return
+
+                    sem = _user_sem(uid)
+                    if not sem.acquire(blocking=False):
+                        try:
+                            self.answer_callback(cb.get('id'), '⏳')
+                        except Exception:
+                            pass
+                        return
+                    try:
+                        self.handle_callback_query(cb)
+                    except Exception as exc:
+                        logger.error("callback error: %s", exc, exc_info=True)
+                        try:
+                            self.answer_callback(cb.get('id'), self.tr('a0486_خطأ', 'ar'))
+                        except Exception:
+                            pass
+                    finally:
+                        sem.release()
+
+                elif 'my_chat_member' in update:
+                    try:
+                        self.handle_my_chat_member(update['my_chat_member'])
+                    except Exception as exc:
+                        logger.error("my_chat_member error: %s", exc, exc_info=True)
+
+            except Exception as exc:
+                logger.error("_handle_update uncaught: %s", exc, exc_info=True)
+
+        # ── Dedicated broadcast thread — never blocks the main loop ──────────
+        def _broadcast_worker():
+            while True:
+                try:
+                    self._process_broadcast_queue()
+                except Exception as exc:
+                    logger.error("broadcast_worker: %s", exc)
+                time.sleep(30)
+
+        _bt = threading.Thread(target=_broadcast_worker, daemon=True, name='broadcast_worker')
+        _bt.start()
+
+        # ── Periodic stale-semaphore cleanup ─────────────────────────────────
+        def _cleanup_sems():
+            while True:
+                time.sleep(300)
+                cutoff = time.monotonic() - 300
+                with _user_sems_lock:
+                    stale = [k for k, s in _user_sems.items() if s._value >= MAX_CONCURRENT_PER_USER]
+                    for k in stale[:200]:
+                        del _user_sems[k]
+
+        threading.Thread(target=_cleanup_sems, daemon=True, name='sem_cleanup').start()
+
+        # ── Main polling loop — submits to thread pool, never blocks ─────────
+        with ThreadPoolExecutor(max_workers=20, thread_name_prefix='bot_worker') as pool:
+            while True:
+                try:
+                    updates = self.get_updates()
+                    if not updates or not updates.get('ok'):
+                        time.sleep(0.3)
+                        continue
+
+                    for update in updates['result']:
+                        uid = update['update_id']
+                        with _pu_lock:
+                            if uid in processed_updates:
+                                continue
+                        _mark_seen(uid)
+                        self.offset = uid
+                        pool.submit(_handle_update, update)
+
+                except KeyboardInterrupt:
+                    logger.info("Bot stopped by user.")
+                    break
+                except Exception as exc:
+                    logger.error("Main loop error: %s", exc, exc_info=True)
+                    time.sleep(1)
 
     def handle_game_deposit_request(self, message):
         """معالجة طلب إيداع سريع من الألعاب"""

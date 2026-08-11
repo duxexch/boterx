@@ -22,6 +22,18 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.5/dist/cdn.min.js" defer></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/fx.css') }}">
+    <!-- PWA & SEO -->
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#F5C518">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="VEX Games">
+    <meta name="description" content="منصة VEX Games — ألعاب مثيرة وجوائز حقيقية عبر تيليغرام">
+    <meta property="og:title" content="VEX Games — العب واربح">
+    <meta property="og:description" content="منصة ألعاب تيليغرام الأكثر إثارة — مناجم، كراش، بلينكو، يانصيب وأكثر">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary">
     <style>
         [dir="rtl"] .sidebar-container { right: 0; }
         [dir="ltr"] .sidebar-container { left: 0; }
@@ -318,6 +330,16 @@
 </div>
 
 <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+<script src="{{ url_for('static', filename='js/fx.js') }}" defer></script>
+<script>
+  // Register service worker for PWA
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/static/sw.js', { scope: '/' })
+        .catch(() => {});
+    });
+  }
+</script>
 <script>
 function baseApp() {
     return {

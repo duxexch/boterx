@@ -130,6 +130,58 @@ def _init_db():
             );
             CREATE INDEX IF NOT EXISTS idx_snatch_status_time
                 ON snatch_sessions (status, created_at);
+
+            -- Active real-time game sessions: mines, plinko, etc.
+            -- Survives server restarts. TTL enforced by expires_at.
+            -- game: 'mines' | 'plinko' | 'wheel' | 'snatch' | ...
+            CREATE TABLE IF NOT EXISTS active_game_sessions (
+                user_id     TEXT NOT NULL,
+                game        TEXT NOT NULL,
+                session_data TEXT NOT NULL DEFAULT '{}',
+                bet_amount  REAL NOT NULL DEFAULT 0,
+                created_at  REAL NOT NULL,
+                expires_at  REAL NOT NULL,
+                PRIMARY KEY (user_id, game)
+            );
+            CREATE INDEX IF NOT EXISTS idx_ags_exp ON active_game_sessions(expires_at);
+
+            -- Admin RBAC: roles and per-role permission sets
+            -- role: 'super_admin' | 'finance_admin' | 'support_admin' | 'game_admin' | 'broadcast_admin'
+            -- permissions: JSON object {"approve_deposits":true, "ban_users":false, ...}
+            CREATE TABLE IF NOT EXISTS admin_roles (
+                uid         TEXT PRIMARY KEY,
+                role        TEXT NOT NULL DEFAULT 'support_admin',
+                permissions TEXT NOT NULL DEFAULT '{}',
+                created_at  TEXT NOT NULL DEFAULT '',
+                created_by  TEXT NOT NULL DEFAULT ''
+            );
+
+            -- Admin action audit trail
+            CREATE TABLE IF NOT EXISTS admin_audit_log (
+                id        INTEGER PRIMARY KEY AUTOINCREMENT,
+                uid       TEXT NOT NULL,
+                action    TEXT NOT NULL,
+                target    TEXT DEFAULT '',
+                details   TEXT DEFAULT '',
+                ip        TEXT DEFAULT '',
+                timestamp TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_audit_uid ON admin_audit_log(uid);
+            CREATE INDEX IF NOT EXISTS idx_audit_ts  ON admin_audit_log(timestamp);
+
+            -- Financial ledger: every debit/credit with reason
+            CREATE TABLE IF NOT EXISTS financial_ledger (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id      TEXT NOT NULL,
+                amount       REAL NOT NULL,
+                direction    TEXT NOT NULL,  -- 'credit' | 'debit'
+                reason       TEXT NOT NULL,  -- 'deposit' | 'withdrawal' | 'game_bet' | 'game_win' | 'referral' | 'compensation'
+                reference_id TEXT DEFAULT '',
+                balance_after REAL NOT NULL DEFAULT 0,
+                timestamp    TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_ledger_uid ON financial_ledger(user_id);
+            CREATE INDEX IF NOT EXISTS idx_ledger_ts  ON financial_ledger(timestamp);
         ''')
         conn.commit()
     finally:
@@ -762,5 +814,241 @@ class GameDB:
             print(f"CSV sync error: {e}")
 
 
+
+# ═══════════════════════════════════════════════════════════════════════════
+# RBAC — Role-Based Access Control
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Permission bits — all keys a role JSON may contain
+ROLE_PERMISSIONS = {
+    'super_admin': {
+        'approve_deposits': True, 'reject_deposits': True,
+        'approve_withdrawals': True, 'reject_withdrawals': True,
+        'ban_users': True, 'unban_users': True,
+        'manage_admins': True, 'manage_bots': True,
+        'send_broadcast': True, 'view_financial': True,
+        'manage_games': True, 'view_statistics': True,
+        'manage_companies': True, 'manage_settings': True,
+    },
+    'finance_admin': {
+        'approve_deposits': True, 'reject_deposits': True,
+        'approve_withdrawals': True, 'reject_withdrawals': True,
+        'view_financial': True, 'view_statistics': True,
+    },
+    'support_admin': {
+        'view_financial': True, 'ban_users': False,
+        'send_broadcast': False,
+    },
+    'game_admin': {
+        'manage_games': True, 'view_statistics': True,
+    },
+    'broadcast_admin': {
+        'send_broadcast': True,
+    },
+}
+
+
+def get_admin_role(uid: str) -> dict:
+    """Return {'role': str, 'permissions': dict} for a given admin UID.
+    Falls back to 'super_admin' for UIDs in ADMIN_IDS env var.
+    """
+    conn = _get_conn()
+    try:
+        row = conn.execute(
+            'SELECT role, permissions FROM admin_roles WHERE uid=?', (str(uid),)
+        ).fetchone()
+        if row:
+            import json as _json
+            perms = {}
+            try:
+                perms = _json.loads(row['permissions'] or '{}')
+            except Exception:
+                pass
+            return {'role': row['role'], 'permissions': perms}
+        # Not in DB — check env ADMIN_IDS
+        env_admins = [a.strip() for a in os.getenv('ADMIN_USER_IDS', '').split(',') if a.strip()]
+        if str(uid) in env_admins:
+            return {'role': 'super_admin', 'permissions': ROLE_PERMISSIONS['super_admin']}
+        return {'role': None, 'permissions': {}}
+    finally:
+        conn.close()
+
+
+def set_admin_role(uid: str, role: str, created_by: str = 'system',
+                   extra_permissions: dict = None) -> bool:
+    """Create or update an admin's role in the DB."""
+    import json as _json
+    if role not in ROLE_PERMISSIONS:
+        return False
+    perms = dict(ROLE_PERMISSIONS[role])
+    if extra_permissions:
+        perms.update(extra_permissions)
+    conn = _get_conn()
+    try:
+        conn.execute('''
+            INSERT INTO admin_roles (uid, role, permissions, created_at, created_by)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(uid) DO UPDATE SET role=excluded.role,
+                permissions=excluded.permissions,
+                created_at=excluded.created_at,
+                created_by=excluded.created_by
+        ''', (str(uid), role, _json.dumps(perms),
+              datetime.now().strftime('%Y-%m-%d %H:%M:%S'), str(created_by)))
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"set_admin_role error: {e}")
+        return False
+    finally:
+        conn.close()
+
+
+def has_permission(uid: str, permission: str) -> bool:
+    """Return True if the admin has the given permission."""
+    role_data = get_admin_role(uid)
+    return bool(role_data['permissions'].get(permission, False))
+
+
+def log_admin_action(uid: str, action: str, target: str = '',
+                     details: str = '', ip: str = '') -> None:
+    """Append a row to the admin_audit_log table."""
+    conn = _get_conn()
+    try:
+        conn.execute('''
+            INSERT INTO admin_audit_log (uid, action, target, details, ip, timestamp)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (str(uid), action, str(target), str(details), str(ip),
+              datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+        conn.commit()
+    except Exception as e:
+        print(f"log_admin_action error: {e}")
+    finally:
+        conn.close()
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Active Game Sessions — durable real-time session state
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Default TTLs per game (seconds)
+GAME_SESSION_TTL = {
+    'mines':  600,   # 10 minutes
+    'plinko': 300,   # 5 minutes
+    'snatch': 120,   # 2 minutes
+    'wheel':  180,   # 3 minutes
+    'crash':  60,
+    'aviator': 60,
+}
+
+
+def get_active_game_session(user_id: str, game: str) -> dict | None:
+    """Return the active session dict or None if expired/absent."""
+    conn = _get_conn()
+    try:
+        row = conn.execute('''
+            SELECT session_data, bet_amount, created_at, expires_at
+            FROM active_game_sessions
+            WHERE user_id=? AND game=? AND expires_at > ?
+        ''', (str(user_id), game, time.time())).fetchone()
+        if row:
+            import json as _json
+            try:
+                data = _json.loads(row['session_data'])
+            except Exception:
+                data = {}
+            data['_bet'] = row['bet_amount']
+            data['_created_at'] = row['created_at']
+            return data
+        return None
+    finally:
+        conn.close()
+
+
+def set_active_game_session(user_id: str, game: str, session_data: dict,
+                             bet_amount: float, ttl_seconds: int = None) -> None:
+    """Upsert a durable game session. Overwrites any existing session for this user+game."""
+    import json as _json
+    ttl = ttl_seconds or GAME_SESSION_TTL.get(game, 300)
+    now = time.time()
+    conn = _get_conn()
+    try:
+        conn.execute('''
+            INSERT INTO active_game_sessions
+                (user_id, game, session_data, bet_amount, created_at, expires_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(user_id, game) DO UPDATE SET
+                session_data=excluded.session_data,
+                bet_amount=excluded.bet_amount,
+                expires_at=excluded.expires_at
+        ''', (str(user_id), game, _json.dumps(session_data),
+              float(bet_amount), now, now + ttl))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def delete_active_game_session(user_id: str, game: str) -> None:
+    """Remove a game session (on cashout, loss, or manual clear)."""
+    conn = _get_conn()
+    try:
+        conn.execute('DELETE FROM active_game_sessions WHERE user_id=? AND game=?',
+                     (str(user_id), game))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def cleanup_expired_game_sessions() -> int:
+    """Delete sessions past their TTL. Returns count deleted."""
+    conn = _get_conn()
+    try:
+        cur = conn.execute('DELETE FROM active_game_sessions WHERE expires_at <= ?',
+                           (time.time(),))
+        conn.commit()
+        return cur.rowcount
+    finally:
+        conn.close()
+
+
+def refund_expired_game_sessions(gdb_instance=None) -> list:
+    """Find expired sessions that still have a bet, refund them via credit_with_idempotency.
+
+    Returns list of (user_id, game, bet_amount) that were refunded.
+    """
+    conn = _get_conn()
+    refunded = []
+    try:
+        rows = conn.execute('''
+            SELECT user_id, game, session_data, bet_amount, created_at
+            FROM active_game_sessions
+            WHERE expires_at <= ?
+        ''', (time.time(),)).fetchall()
+
+        for row in rows:
+            uid = row['user_id']
+            game = row['game']
+            bet = float(row['bet_amount'])
+            created = row['created_at']
+            if bet > 0 and gdb_instance:
+                req_id = f"refund_expired_{game}_{uid}_{int(created)}"
+                try:
+                    gdb_instance.credit_with_idempotency(
+                        uid, bet, req_id,
+                        {'refunded': True, 'reason': 'session_expired', 'game': game}
+                    )
+                    refunded.append((uid, game, bet))
+                    print(f"[session] Refunded expired {game} bet {bet} to {uid}")
+                except Exception as e:
+                    print(f"[session] Refund error for {uid}/{game}: {e}")
+
+        # Delete all expired
+        conn.execute('DELETE FROM active_game_sessions WHERE expires_at <= ?', (time.time(),))
+        conn.commit()
+    finally:
+        conn.close()
+    return refunded
+
+
 # Singleton
 _gdb = GameDB()
+
