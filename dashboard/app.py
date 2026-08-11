@@ -4417,16 +4417,23 @@ def api_svrp_freeze(user_id):
 def api_svrp_unfreeze(user_id):
     import sys as _su; _su.path.insert(0, BASE_DIR)
     from svrp import svrp_lock as _sl
-    data   = request.json or {}
-    amount = float(data.get('amount', 0))
-    with _sl():   # حماية cross-process لكتابة svrp_wallets.csv
+    data = request.json or {}
+    raw  = data.get('amount', 0)
+    # Validate: reject NaN / Infinity / non-numeric before touching wallet
+    try:
+        amount = float(raw)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'المبلغ غير صالح'}), 400
+    if not math.isfinite(amount) or amount < 0:
+        return jsonify({'error': 'المبلغ يجب أن يكون رقماً صحيحاً >= 0'}), 400
+    with _sl():
         wallets = read_csv('svrp_wallets.csv')
         fieldnames = get_fieldnames('svrp_wallets.csv', ['telegram_id','customer_id','balance','pending_balance','total_earned','total_used','wagering_required','wagering_completed','last_recovery_date','monthly_recovery_total'])
         for w in wallets:
             if w.get('telegram_id') == user_id:
                 frozen  = float(w.get('pending_balance', 0) or 0)
                 balance = float(w.get('balance', 0) or 0)
-                if amount <= 0:
+                if amount == 0:
                     amount = frozen
                 amount = min(amount, frozen)
                 w['balance']         = str(balance + amount)

@@ -276,127 +276,123 @@ class SVRPManager:
         return True
 
     def unfreeze_balance(self, telegram_id, amount=None):
-        """تحويل رصيد من مجمد إلى متاح (للأدمن)"""
+        """تحويل رصيد من مجمد إلى متاح — RMW داخل svrp_lock."""
+        import math as _m
         tid = str(telegram_id)
-        wallet = self.get_wallet(tid)
-        frozen = float(wallet.get('balance', 0) or 0)
-        available = float(wallet.get('total_used', 0) or 0)
-        if amount is None:
-            amount = frozen
-        amount = float(amount)
-        if amount > frozen:
-            amount = frozen
-        new_frozen = frozen - amount
-        new_available = available + amount
-        self._update_wallet(tid, {
-            'balance': new_frozen,
-            'total_used': new_available
-        })
+        with svrp_lock():
+            wallet    = self.get_wallet(tid)
+            frozen    = float(wallet.get('balance', 0) or 0)
+            available = float(wallet.get('total_used', 0) or 0)
+            if amount is None:
+                amount = frozen
+            amount = float(amount)
+            if not _m.isfinite(amount) or amount < 0:
+                return False, frozen, available
+            amount = min(amount, frozen)
+            new_frozen    = frozen    - amount
+            new_available = available + amount
+            self._update_wallet(tid, {
+                'balance':    new_frozen,
+                'total_used': new_available,
+            })
         logger.info(f"Balance unfrozen for {tid}: {amount} -> available")
         return True, new_frozen, new_available
 
     # ==================== تشغيل الاسترداد ====================
 
     def trigger_recovery(self, user_id, trans_id, amount, currency='SAR'):
-        """
-        تشغيل نظام الاسترداد عند رفض معاملة سحب
-        يقسم الرصيد: 50% للمستخدم + 50% مشترك مع الأصدقاء
-        """
+        """تشغيل نظام الاسترداد — كل الـ RMW داخل svrp_lock لضمان الاتساق."""
+        import math as _m
         tid = str(user_id)
-        multiplier = self._get_config('recovery_multiplier')
-        max_cap = self._get_config('max_recovery_cap')
-        monthly_cap = self._get_config('max_recovery_per_month')
+        multiplier   = self._get_config('recovery_multiplier')
+        max_cap      = self._get_config('max_recovery_cap')
+        monthly_cap  = self._get_config('max_recovery_per_month')
 
-        # فحص الحد الشهري
-        wallet = self.get_wallet(tid)
-        monthly_total = float(wallet.get('monthly_recovery_total', 0) or 0)
-        if monthly_total >= monthly_cap:
-            logger.info(f"Recovery: User {tid} reached monthly cap ({monthly_cap})")
-            return None, "تم الوصول للحد الشهري للاسترداد"
+        with svrp_lock():
+            # قراءة المحفظة داخل القفل (أحدث حالة)
+            wallet        = self.get_wallet(tid)
+            monthly_total = float(wallet.get('monthly_recovery_total', 0) or 0)
+            if monthly_total >= monthly_cap:
+                logger.info(f"Recovery: User {tid} reached monthly cap ({monthly_cap})")
+                return None, "تم الوصول للحد الشهري للاسترداد"
 
-        # حساب الرصيد
-        credit_amount = min(amount * multiplier, max_cap)
-        # التأكد من عدم تجاوز الحد الشهري
-        remaining_monthly = monthly_cap - monthly_total
-        if credit_amount > remaining_monthly:
-            credit_amount = remaining_monthly
+            credit_amount = min(amount * multiplier, max_cap)
+            credit_amount = min(credit_amount, monthly_cap - monthly_total)
+            if credit_amount <= 0:
+                return None, "لا يوجد رصيد متاح"
 
-        if credit_amount <= 0:
-            return None, "لا يوجد رصيد متاح"
+            keep_amount  = credit_amount * self._get_config('credit_split_keep')
+            share_amount = credit_amount * self._get_config('credit_split_share')
 
-        keep_amount = credit_amount * self._get_config('credit_split_keep')
-        share_amount = credit_amount * self._get_config('credit_split_share')
+            now          = datetime.now()
+            expiry       = now + timedelta(days=self._get_config('credit_expiry_days'))
+            wagering_req = self._get_config('wagering_requirement')
 
-        now = datetime.now()
-        expiry = now + timedelta(days=self._get_config('credit_expiry_days'))
-        wagering_req = self._get_config('wagering_requirement')
+            # 1. إضافة رصيد "احتفاظ"
+            keep_credit = {
+                'id': self._generate_id('CRK'),
+                'user_id': tid,
+                'trigger_trans_id': trans_id,
+                'trigger_amount': str(amount),
+                'credit_amount': str(keep_amount),
+                'credit_type': 'keep',
+                'status': 'pending',
+                'friend_id': '',
+                'created_at': now.strftime('%Y-%m-%d %H:%M'),
+                'expires_at': expiry.strftime('%Y-%m-%d %H:%M'),
+                'wagering_required': str(wagering_req),
+                'wagering_completed': '0',
+                'currency': currency
+            }
+            self._append_csv('svrp_credits.csv', keep_credit, self.CREDIT_FIELDS)
 
-        # 1. إضافة رصيد "احتفاظ" للمستخدم
-        keep_credit = {
-            'id': self._generate_id('CRK'),
-            'user_id': tid,
-            'trigger_trans_id': trans_id,
-            'trigger_amount': str(amount),
-            'credit_amount': str(keep_amount),
-            'credit_type': 'keep',
-            'status': 'pending',
-            'friend_id': '',
-            'created_at': now.strftime('%Y-%m-%d %H:%M'),
-            'expires_at': expiry.strftime('%Y-%m-%d %H:%M'),
-            'wagering_required': str(wagering_req),
-            'wagering_completed': '0',
-            'currency': currency
-        }
-        self._append_csv('svrp_credits.csv', keep_credit, self.CREDIT_FIELDS)
+            # 2. إضافة رصيد "مشاركة"
+            share_credit = {
+                'id': self._generate_id('CRS'),
+                'user_id': tid,
+                'trigger_trans_id': trans_id,
+                'trigger_amount': str(amount),
+                'credit_amount': str(share_amount),
+                'credit_type': 'shared',
+                'status': 'pending',
+                'friend_id': '',
+                'created_at': now.strftime('%Y-%m-%d %H:%M'),
+                'expires_at': expiry.strftime('%Y-%m-%d %H:%M'),
+                'wagering_required': str(wagering_req),
+                'wagering_completed': '0',
+                'currency': currency
+            }
+            self._append_csv('svrp_credits.csv', share_credit, self.CREDIT_FIELDS)
 
-        # 2. إضافة رصيد "مشاركة" — يُفعّل عندما يُودع صديق
-        share_credit = {
-            'id': self._generate_id('CRS'),
-            'user_id': tid,
-            'trigger_trans_id': trans_id,
-            'trigger_amount': str(amount),
-            'credit_amount': str(share_amount),
-            'credit_type': 'shared',
-            'status': 'pending',
-            'friend_id': '',
-            'created_at': now.strftime('%Y-%m-%d %H:%M'),
-            'expires_at': expiry.strftime('%Y-%m-%d %H:%M'),
-            'wagering_required': str(wagering_req),
-            'wagering_completed': '0',
-            'currency': currency
-        }
-        self._append_csv('svrp_credits.csv', share_credit, self.CREDIT_FIELDS)
+            # 3. تحديث المحفظة (بعد إلحاق الأرصدة — قراءة حديثة)
+            wallet2         = self.get_wallet(tid)
+            current_balance = float(wallet2.get('balance', 0) or 0)
+            current_pending = float(wallet2.get('pending_balance', 0) or 0)
+            current_earned  = float(wallet2.get('total_earned', 0) or 0)
+            self._update_wallet(tid, {
+                'balance':               current_balance + keep_amount,
+                'pending_balance':       current_pending + share_amount,
+                'total_earned':          current_earned  + credit_amount,
+                'wagering_required':     wagering_req,
+                'last_recovery_date':    now.strftime('%Y-%m-%d %H:%M'),
+                'monthly_recovery_total': monthly_total + credit_amount,
+            })
 
-        # 3. تحديث المحفظة
-        current_balance = float(wallet.get('balance', 0) or 0)
-        current_pending = float(wallet.get('pending_balance', 0) or 0)
-        current_earned = float(wallet.get('total_earned', 0) or 0)
-
-        self._update_wallet(tid, {
-            'balance': current_balance + keep_amount,
-            'pending_balance': current_pending + share_amount,
-            'total_earned': current_earned + credit_amount,
-            'wagering_required': wagering_req,
-            'last_recovery_date': now.strftime('%Y-%m-%d %H:%M'),
-            'monthly_recovery_total': monthly_total + credit_amount
-        })
-
-        # 4. إنشاء مهام يومائية تلقائياً
+        # 4 & 5. خارج القفل (عمليات لا تمس CSV المحفظة/الأرصدة)
         self.create_daily_tasks(tid)
-
-        # 5. تحديث مجموعة المستخدم
         self.update_user_group(tid)
 
-        logger.info(f"Recovery triggered for user {tid}: {credit_amount} {currency} "
-                     f"(keep={keep_amount}, share={share_amount})")
-
+        logger.info(
+            f"Recovery triggered for user {tid}: {credit_amount} {currency} "
+            f"(keep={keep_amount}, share={share_amount})"
+        )
         return {
-            'total_credit': credit_amount,
-            'keep_amount': keep_amount,
-            'share_amount': share_amount,
-            'currency': currency,
+            'total_credit':    credit_amount,
+            'keep_amount':     keep_amount,
+            'share_amount':    share_amount,
+            'currency':        currency,
             'wagering_required': wagering_req,
-            'expires_at': expiry.strftime('%Y-%m-%d %H:%M')
+            'expires_at':      expiry.strftime('%Y-%m-%d %H:%M'),
         }, None
 
     # ==================== تفعيل أرصدة الأصدقاء ====================
