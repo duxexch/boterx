@@ -614,25 +614,38 @@ class GameDB:
         self._ensure_svrp_transfer_table(conn)
         with _db_lock:
             # Ensure claims table
+            # Composite PK (uid, task_id) prevents cross-user ID collisions.
+            # Daily task IDs are timestamp+random with limited entropy; using
+            # only task_id as PK would cause one user's claim to block another.
             conn.execute('''
                 CREATE TABLE IF NOT EXISTS svrp_task_claims (
-                    task_id    TEXT PRIMARY KEY,
                     uid        TEXT NOT NULL,
+                    task_id    TEXT NOT NULL,
                     reward     REAL NOT NULL,
-                    claimed_at TEXT NOT NULL
+                    claimed_at TEXT NOT NULL,
+                    PRIMARY KEY (uid, task_id)
                 )
             ''')
             conn.execute('SAVEPOINT claim_task')
             try:
                 cur = conn.execute(
                     'INSERT OR IGNORE INTO svrp_task_claims '
-                    '(task_id, uid, reward, claimed_at) VALUES (?, ?, ?, ?)',
-                    (task_id, uid, reward_f,
+                    '(uid, task_id, reward, claimed_at) VALUES (?, ?, ?, ?)',
+                    (uid, task_id, reward_f,
                      __import__('datetime').datetime.now().isoformat())
                 )
                 if cur.rowcount == 0:
+                    # Validate that the existing record belongs to this uid and
+                    # has the same reward amount (guards against task_id reuse).
+                    row = conn.execute(
+                        'SELECT uid, reward FROM svrp_task_claims WHERE uid=? AND task_id=?',
+                        (uid, task_id)
+                    ).fetchone()
                     conn.execute('RELEASE claim_task')
-                    return 'already_claimed'
+                    if row and row[0] == uid:
+                        return 'already_claimed'  # idempotent replay for this user
+                    # uid mismatch or missing (should not happen) — treat as error
+                    raise RuntimeError(f'claim record uid mismatch: expected {uid}')
                 # Credit wallet in the same savepoint
                 conn.execute(
                     'INSERT OR IGNORE INTO svrp_wallet_balance '
@@ -1796,8 +1809,11 @@ def check_and_mark_nonce(token_hash: str, user_id: str, device_fp: str = '',
             return True  # Row vanished (expired between INSERT and SELECT) — allow
 
         stored_fp = row[0] or ''
+        # Fail closed: if either fingerprint is missing on a replay, we cannot
+        # verify device binding, so we block. An attacker who omits X-Device-FP
+        # is denied even if the token was previously stored without a fingerprint.
         if not stored_fp or not device_fp:
-            return True  # No fingerprint to compare — allow (conservative)
+            return False
         return stored_fp == device_fp  # True = same device; False = cross-device replay
     finally:
         conn.close()
