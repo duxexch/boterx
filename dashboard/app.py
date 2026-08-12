@@ -2725,7 +2725,30 @@ def api_wheel_rounds():
 @api_auth
 def api_apps():
     apps = read_csv('app_links.csv')
-    return jsonify({'apps': apps})
+    # Normalize: ensure every row has all expected keys (prevents None values from old CSV rows)
+    _app_fields = ['id','name','icon_url','icon_file_id','android_url','android_file_id','ios_url','ios_file_id','download_url','promo_code','referral_link','description','is_active','created_at']
+    clean = []
+    for a in apps:
+        row = {}
+        for f in _app_fields:
+            row[f] = a.get(f) or ''
+        clean.append(row)
+    return jsonify({'apps': clean})
+
+@app.route('/api/apps/public')
+def api_apps_public():
+    """Public apps list for user home page — no admin auth required."""
+    apps = read_csv('app_links.csv')
+    _app_fields = ['id','name','icon_url','icon_file_id','android_url','android_file_id','ios_url','ios_file_id','download_url','promo_code','referral_link','description','is_active','created_at']
+    clean = []
+    for a in apps:
+        active = str(a.get('is_active', '')).lower()
+        if active in ('yes', 'true', '1', 'active'):
+            row = {}
+            for f in _app_fields:
+                row[f] = a.get(f) or ''
+            clean.append(row)
+    return jsonify({'apps': clean})
 
 @app.route('/api/apps', methods=['POST'])
 @api_auth
