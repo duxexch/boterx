@@ -1064,8 +1064,12 @@ class CallbackHandlerMixin:
 
             elif data.startswith('app_view_'):
                 app_id = data.replace('app_view_', '')
-                self.edit_message(chat_id, message.get('message_id'), "📱")
+                self.answer_callback(callback_id, "⏳")
                 self.show_app_detail(chat_id, app_id, user_id)
+                try:
+                    self.api_call('deleteMessage', {'chat_id': chat_id, 'message_id': message.get('message_id')})
+                except:
+                    pass
                 return
 
             elif data.startswith('app_promo_'):

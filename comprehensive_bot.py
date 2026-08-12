@@ -1575,9 +1575,10 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             inline_btns.append(row2)
         inline_btns.append([{'text': self.tr('a0142_العودة', lang), 'callback_data': 'app_list_back'}])
 
-        # إرسال أيقونة التطبيق كصورة إن وجدت
+        # إرسال الأيقونة كصورة + النص كـ caption
         icon_file_id = app.get('icon_file_id', '')
         icon_url = app.get('icon_url', '')
+        photo_sent = False
         if icon_file_id or icon_url:
             try:
                 photo = icon_file_id if icon_file_id else icon_url
@@ -1588,12 +1589,13 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                     'parse_mode': 'HTML',
                     'reply_markup': json.dumps({'inline_keyboard': inline_btns})
                 })
-                return
-            except:
-                pass
+                photo_sent = True
+            except Exception as e:
+                logger.error(f"App icon send failed: {e}")
 
-        # بدون صورة — نص فقط
-        self.send_inline_message(chat_id, text, inline_btns)
+        # لو الصورة فشلت أو مفيش صورة — نص فقط
+        if not photo_sent:
+            self.send_inline_message(chat_id, text, inline_btns)
 
     # ==================== Admin: Apps Management ====================
 
