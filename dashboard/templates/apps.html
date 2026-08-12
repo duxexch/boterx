@@ -115,8 +115,27 @@
                     <input x-model="form.name" required type="text" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="اسم التطبيق">
                 </div>
                 <div>
-                    <label class="block text-sm text-slate-400 mb-1">رابط الأيقونة</label>
-                    <input x-model="form.icon_url" type="url" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="https://...">
+                    <label class="block text-sm text-slate-400 mb-1">أيقونة التطبيق</label>
+                    <div class="flex items-center gap-3">
+                        <!-- Preview -->
+                        <div class="w-14 h-14 rounded-xl bg-slate-700 flex items-center justify-center overflow-hidden flex-shrink-0 border border-slate-600">
+                            <img x-show="form.icon_url" :src="form.icon_url" class="w-full h-full object-cover" @error="$event.target.style.display='none'">
+                            <i x-show="!form.icon_url" class="fas fa-mobile-screen text-2xl text-slate-400"></i>
+                        </div>
+                        <!-- Upload button -->
+                        <label class="flex-1 cursor-pointer">
+                            <div class="flex items-center justify-center gap-2 bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded-lg px-4 py-2.5 text-sm text-slate-300 transition">
+                                <i class="fas fa-upload"></i>
+                                <span x-text="uploadingIcon ? 'جاري الرفع...' : 'رفع صورة'"></span>
+                            </div>
+                            <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp,image/gif" class="hidden" @change="uploadIcon($event)">
+                        </label>
+                        <!-- Clear button -->
+                        <button x-show="form.icon_url" @click="form.icon_url = ''" type="button" class="p-2 rounded-lg bg-slate-700 hover:bg-red-600 text-slate-400 hover:text-white transition" title="حذف الأيقونة">
+                            <i class="fas fa-times text-sm"></i>
+                        </button>
+                    </div>
+                    <input x-model="form.icon_url" type="url" class="w-full mt-2 bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-xs text-slate-400 focus:outline-none" placeholder="أو أدخل رابط مباشر">
                 </div>
                 <div>
                     <label class="block text-sm text-slate-400 mb-1">رابط التحميل</label>
@@ -179,6 +198,7 @@ function appsPage() {
         editingId: null,
         deleteTarget: null,
         form: { name: '', icon_url: '', download_url: '', description: '', promo_code: '', referral_link: '', is_active: true },
+        uploadingIcon: false,
 
         async init() {
             await this.loadApps();
@@ -274,6 +294,30 @@ function appsPage() {
                 toast('تم النسخ إلى الحافظة', 'success');
             } catch (e) {
                 toast('فشل النسخ', 'error');
+            }
+        },
+
+        async uploadIcon(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            this.uploadingIcon = true;
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                const res = await fetch('/api/upload-icon', { method: 'POST', body: formData, credentials: 'same-origin' });
+                if (!res.ok) throw new Error('Upload failed');
+                const data = await res.json();
+                if (data.success) {
+                    this.form.icon_url = data.url;
+                    toast('تم رفع الأيقونة بنجاح', 'success');
+                } else {
+                    toast(data.error || 'فشل رفع الأيقونة', 'error');
+                }
+            } catch (e) {
+                toast('فشل رفع الصورة', 'error');
+            } finally {
+                this.uploadingIcon = false;
+                event.target.value = '';
             }
         },
     };

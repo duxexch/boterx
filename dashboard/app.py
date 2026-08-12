@@ -2728,13 +2728,20 @@ def api_apps():
 def api_add_app():
     data = request.json
     apps = read_csv('app_links.csv')
-    fieldnames = get_fieldnames('app_links.csv', ['id','name','icon_url','download_url','description','is_active','created_at'])
+    fieldnames = get_fieldnames('app_links.csv', ['id','name','icon_url','icon_file_id','android_url','android_file_id','ios_url','ios_file_id','download_url','promo_code','referral_link','description','is_active','created_at'])
     new_id = f"APP{str(int(datetime.now().timestamp()))[-6:]}"
     new_app = {
         'id': new_id,
         'name': data.get('name', ''),
         'icon_url': data.get('icon_url', ''),
+        'icon_file_id': data.get('icon_file_id', ''),
+        'android_url': data.get('android_url', ''),
+        'android_file_id': data.get('android_file_id', ''),
+        'ios_url': data.get('ios_url', ''),
+        'ios_file_id': data.get('ios_file_id', ''),
         'download_url': data.get('download_url', ''),
+        'promo_code': data.get('promo_code', ''),
+        'referral_link': data.get('referral_link', ''),
         'description': data.get('description', ''),
         'is_active': 'yes',
         'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')
@@ -2748,7 +2755,7 @@ def api_add_app():
 @permission_required('manage_companies')
 def api_edit_app(app_id):
     apps = read_csv('app_links.csv')
-    fieldnames = get_fieldnames('app_links.csv', ['id','name','icon_url','download_url','description','is_active','created_at'])
+    fieldnames = get_fieldnames('app_links.csv', ['id','name','icon_url','icon_file_id','android_url','android_file_id','ios_url','ios_file_id','download_url','promo_code','referral_link','description','is_active','created_at'])
 
     if request.method == 'DELETE':
         apps = [a for a in apps if a.get('id') != app_id]
