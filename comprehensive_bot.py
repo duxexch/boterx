@@ -1528,41 +1528,45 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
 
         name = app.get('name', '')
         desc = app.get('description', '')
-        android_url = app.get('android_url', '')
+        android_url = app.get('android_url', '') or app.get('download_url', '')
         android_file_id = app.get('android_file_id', '')
-        ios_url = app.get('ios_url', '')
+        ios_url = app.get('ios_url', '') or app.get('referral_link', '')
         ios_file_id = app.get('ios_file_id', '')
         promo_code = app.get('promo_code', '').strip()
         referral_link = app.get('referral_link', '').strip()
+        download_url = app.get('download_url', '').strip()
 
-        # نص بسيط — اسم التطبيق فقط
+        # نص تفصيلي — اسم + وصف + برومو كود + رابط إحالة
         text = f"📱 <b>{name}</b>\n"
         if desc:
             text += f"📝 {desc}\n"
+        if promo_code:
+            text += f"━━━━━━━━━━━━━━━━━━\n🎟️ البرومو كود: <code>{promo_code}</code> 👈 اضغط للنسخ\n"
+        if referral_link:
+            text += f"🔗 رابط الإحالة: <code>{referral_link[:50]}</code>\n"
+        text += f"━━━━━━━━━━━━━━━━━━\n👇 اختر نوع التحميل:"
 
-        # بناء 4 أزرار
+        # بناء الأزرار
         row1 = []
-        row2 = []
 
-        # 1) أندرويد
-        if android_url:
-            row1.append({'text': '🤖 أندرويد', 'url': android_url})
+        # 1) أندرويد — يفتح رابط التحميل (download_url أو android_url)
+        dl_url = download_url or android_url
+        if dl_url:
+            row1.append({'text': '🤖 أندرويد', 'url': dl_url})
         elif android_file_id:
             row1.append({'text': '🤖 أندرويد', 'callback_data': f"app_dl_android_{app_id}"})
 
-        # 2) آيفون
-        if ios_url:
-            row1.append({'text': '🍎 آيفون', 'url': ios_url})
+        # 2) آيفون — يفتح رابط الإحالة (referral_link أو ios_url)
+        ios_dl = referral_link or ios_url
+        if ios_dl:
+            row1.append({'text': '🍎 آيفون', 'url': ios_dl})
         elif ios_file_id:
             row1.append({'text': '🍎 آيفون', 'callback_data': f"app_dl_ios_{app_id}"})
 
-        # 3) متصفح (رابط الموقع)
-        if referral_link:
-            row1.append({'text': '🌐 متصفح', 'url': referral_link})
-
-        # 4) البرومو كود — زر يفتح صفحة نسخ
+        # 3) البرومو كود — زر يفتح صفحة نسخ (لو مش معروض في النص)
+        row2 = []
         if promo_code:
-            row2.append({'text': f'🎟️ البرومو كود', 'callback_data': f"app_promo_{app_id}"})
+            row2.append({'text': f'🎟️ نسخ الكود: {promo_code[:15]}', 'callback_data': f"app_promo_{app_id}"})
 
         inline_btns = []
         if row1:
