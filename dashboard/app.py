@@ -1701,7 +1701,14 @@ def api_transactions():
     txns.reverse()
 
     if status:
-        txns = [t for t in txns if t.get('status') == status]
+        if status == 'pending':
+            txns = [t for t in txns if t.get('status') in ('pending', 'pending_withdrawal', 'pending_code_verification', 'awaiting_admin_review')]
+        elif status == 'approved':
+            txns = [t for t in txns if t.get('status') in ('approved', 'completed', 'code_verified', 'admin_received', 'transfer_confirmed')]
+        elif status == 'rejected':
+            txns = [t for t in txns if t.get('status') in ('rejected', 'auto_rejected', 'withdrawal_rejected', 'withdrawal_auto_rejected', 'cancelled')]
+        else:
+            txns = [t for t in txns if t.get('status') == status]
     if tx_type:
         txns = [t for t in txns if t.get('type') == tx_type]
     if search:
@@ -1719,8 +1726,8 @@ def api_transactions():
     stats = {
         'total_amount': sum(float(t.get('amount', 0) or 0) for t in txns),
         'avg_amount': 0,
-        'pending_count': sum(1 for t in txns if t.get('status') == 'pending'),
-        'approved_volume': sum(float(t.get('amount', 0) or 0) for t in txns if t.get('status') == 'approved'),
+        'pending_count': sum(1 for t in txns if t.get('status') in ('pending', 'pending_withdrawal', 'pending_code_verification', 'awaiting_admin_review')),
+        'approved_volume': sum(float(t.get('amount', 0) or 0) for t in txns if t.get('status') in ('approved', 'completed', 'code_verified')),
     }
     stats['avg_amount'] = stats['total_amount'] / len(txns) if txns else 0
 
@@ -1977,7 +1984,7 @@ def _calc_age_hours(date_str):
 # ===== Auto-reject old pending deposits =====
 import threading
 import time as _ar_time
-_AR_TIMEOUT_HOURS = 24  # auto-reject after 24 hours
+_AR_TIMEOUT_HOURS = 3  # auto-reject after 3 hours
 def _auto_reject_old_pending():
     """Background thread: auto-reject pending deposits older than timeout."""
     import csv as _csv

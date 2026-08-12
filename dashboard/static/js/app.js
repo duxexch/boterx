@@ -477,6 +477,11 @@ function statusBadge(status) {
         'open': '<span class="badge badge-pending">Open</span>',
         'yes': '<span class="badge badge-approved">' + tr('yes') + '</span>',
         'no': '<span class="badge badge-rejected">' + tr('no') + '</span>',
+        'auto_rejected': '<span class="badge badge-rejected">رفض تلقائي</span>',
+        'withdrawal_rejected': '<span class="badge badge-rejected">رفض سحب</span>',
+        'withdrawal_auto_rejected': '<span class="badge badge-rejected">رفض تلقائي</span>',
+        'pending_withdrawal': '<span class="badge badge-pending">سحب معلق</span>',
+        'pending_code_verification': '<span class="badge badge-pending">بانتظار الكود</span>',
     };
     return map[status] || '<span class="badge" style="background:#334155;color:#94A3B8">' + (status || '—') + '</span>';
 }
