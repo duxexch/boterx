@@ -341,15 +341,21 @@ function depSubmit(source, cid, cname){
   if(!methodName){ showToast('اختر وسيلة أو أدخل اسمها','error'); return; }
   var body = { amount: amt, method_id: methodId, method_name: methodName, method_account_data: methodData, player_wallet: wallet, save_method: save };
   if(source === 'company' && cid) { body.company_id = cid; body.company_name = cname; }
+  var btn = event.target;
+  if(btn){ btn.disabled = true; btn.textContent = '⏳ جاري الإرسال...'; }
   fetch('/api/deposit/quick?uid={{ uid }}', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify(body)
-  }).then(function(r){return r.json()}).then(function(d){
+  }).then(function(r){
+    if(r.status === 403){ showToast('خطأ في المصادقة — أعد فتح الصفحة','error'); if(btn){btn.disabled=false;btn.textContent='✅ تأكيد الإيداع';} return null; }
+    return r.json();
+  }).then(function(d){
+    if(!d) return;
     if(d.success){
-      document.getElementById('mb').innerHTML = '<div style="text-align:center;padding:30px 16px"><div style="font-size:48px;margin-bottom:12px">⏳</div><div style="font-size:18px;font-weight:900;color:var(--green);margin-bottom:8px">تم طلب الإيداع</div><div style="font-size:13px;color:var(--muted)">بانتظار موافقة الإدارة<br>سيظهر في محفظتك بعد الموافقة</div><button onclick="document.getElementById(\'modal\').remove();refreshBalance()" style="margin-top:16px;width:100%;padding:12px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--green);font-weight:700;cursor:pointer">إغلاق</button></div>';
+      document.getElementById('mb').innerHTML = '<div style="text-align:center;padding:30px 16px"><div style="font-size:48px;margin-bottom:12px">⏳</div><div style="font-size:18px;font-weight:900;color:var(--green);margin-bottom:8px">تم طلب الإيداع</div><div style="font-size:13px;color:var(--muted)">بانتظار موافقة الإدارة<br>رقم الطلب: '+(d.deposit_id||d.trans_id||'')+'</div><button onclick="document.getElementById(\'modal\').remove();refreshBalance()" style="margin-top:16px;width:100%;padding:12px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--green);font-weight:700;cursor:pointer">إغلاق</button></div>';
       showToast('تم طلب الإيداع بنجاح','success');
-    } else { showToast(d.error || 'خطأ','error'); }
-  }).catch(function(){ showToast('خطأ في الشبكة','error'); });
+    } else { showToast(d.error || 'فشل الإيداع','error'); if(btn){btn.disabled=false;btn.textContent='✅ تأكيد الإيداع';} }
+  }).catch(function(e){ showToast('خطأ في الشبكة — تحقق من الإنترنت','error'); if(btn){btn.disabled=false;btn.textContent='✅ تأكيد الإيداع';} });
 }
 
 // ── Withdraw ──
@@ -444,15 +450,21 @@ function wdSubmit(maxBal, source, cid, cname){
   if(!acc){ showToast('أدخل رقم الحساب','error'); return; }
   var body = { amount: amt, account_number: acc, method_id: '' };
   if(source === 'company' && cid){ body.company_id = cid; body.company_name = cname; }
+  var btn = event.target;
+  if(btn){ btn.disabled = true; btn.textContent = '⏳ جاري الإرسال...'; }
   fetch('/api/wallet/withdraw?uid={{ uid }}', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify(body)
-  }).then(function(r){return r.json()}).then(function(d){
+  }).then(function(r){
+    if(r.status === 403){ showToast('خطأ في المصادقة — أعد فتح الصفحة','error'); if(btn){btn.disabled=false;btn.textContent='✅ تأكيد السحب';} return null; }
+    return r.json();
+  }).then(function(d){
+    if(!d) return;
     if(d.success){
-      document.getElementById('mb').innerHTML = '<div style="text-align:center;padding:30px 16px"><div style="font-size:48px;margin-bottom:12px">⏳</div><div style="font-size:18px;font-weight:900;color:var(--gold);margin-bottom:8px">تم طلب السحب</div><div style="font-size:13px;color:var(--muted)">بانتظار موافقة الإدارة</div><button onclick="document.getElementById(\'modal\').remove();refreshBalance()" style="margin-top:16px;width:100%;padding:12px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--gold);font-weight:700;cursor:pointer">إغلاق</button></div>';
+      document.getElementById('mb').innerHTML = '<div style="text-align:center;padding:30px 16px"><div style="font-size:48px;margin-bottom:12px">⏳</div><div style="font-size:18px;font-weight:900;color:var(--gold);margin-bottom:8px">تم طلب السحب</div><div style="font-size:13px;color:var(--muted)">بانتظار موافقة الإدارة<br>رقم الطلب: '+(d.withdrawal_id||'')+'</div><button onclick="document.getElementById(\'modal\').remove();refreshBalance()" style="margin-top:16px;width:100%;padding:12px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--gold);font-weight:700;cursor:pointer">إغلاق</button></div>';
       showToast('تم طلب السحب','success');
-    } else { showToast(d.error || 'خطأ','error'); }
-  }).catch(function(){ showToast('خطأ في الشبكة','error'); });
+    } else { showToast(d.error || 'فشل السحب','error'); if(btn){btn.disabled=false;btn.textContent='✅ تأكيد السحب';} }
+  }).catch(function(e){ showToast('خطأ في الشبكة — تحقق من الإنترنت','error'); if(btn){btn.disabled=false;btn.textContent='✅ تأكيد السحب';} });
 }
 // Auto refresh balance
 setInterval(refreshBalance,30000)
