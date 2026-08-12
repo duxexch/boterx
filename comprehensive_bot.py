@@ -1590,14 +1590,24 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             except Exception as e:
                 logger.error(f"App icon (file_id) failed: {e}")
         elif icon_url:
+            # تحويل الرابط النسبي لمطلق
             full_url = icon_url if icon_url.startswith('http') else 'https://vex.deals' + icon_url
             try:
-                self.api_call('sendPhoto', {
+                resp = self.api_call('sendPhoto', {
                     'chat_id': chat_id, 'photo': full_url,
                     'caption': text, 'parse_mode': 'HTML',
                     'reply_markup': json.dumps({'inline_keyboard': inline_btns})
                 })
-                photo_sent = True
+                if resp and resp.get('ok'):
+                    photo_sent = True
+                    # حفظ file_id من رد تيليجرام لتسريع المرات القادمة
+                    photos = resp.get('result', {}).get('photo', [])
+                    if photos:
+                        best = photos[-1]  # أكبر حجم
+                        fid = best.get('file_id', '')
+                        if fid:
+                            self._update_app_link(app_id, {'icon_file_id': fid})
+                            logger.info(f"Saved icon file_id for {app_id}: {fid[:30]}...")
             except Exception as e:
                 logger.error(f"App icon (url) failed: {e}")
 
