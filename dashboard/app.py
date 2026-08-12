@@ -1700,36 +1700,52 @@ def api_transactions():
     txns = read_csv('transactions.csv')
 
     # ── Merge: include VEX quick_deposits that are missing from transactions.csv ──
+    # Match by user_id + amount + date (not just ID, because formats differ)
     try:
         qd_path = os.path.join(BASE_DIR, 'quick_deposits.csv')
         if os.path.exists(qd_path):
-            existing_ids = {t.get('id','') for t in txns}
+            # Build a set of (telegram_id, amount, date) for existing transactions
+            existing_keys = set()
+            for t in txns:
+                _k = (str(t.get('telegram_id','')), str(t.get('amount','')), str(t.get('date',''))[:10])
+                existing_keys.add(_k)
+
             with open(qd_path, 'r', encoding='utf-8-sig') as f:
                 for qrow in csv.DictReader(f):
                     qid = qrow.get('id','')
                     qstatus = qrow.get('status','')
-                    # Only merge rows not already in transactions.csv
-                    if qid and qid not in existing_ids:
-                        txns.append({
-                            'id': qid,
-                            'customer_id': '',
-                            'telegram_id': qrow.get('user_id',''),
-                            'name': '',
-                            'type': 'withdraw' if 'withdrawal' in qstatus else 'deposit',
-                            'company': 'VEX Wallet',
-                            'wallet_number': qrow.get('account_number',''),
-                            'amount': qrow.get('amount','0'),
-                            'exchange_address': '',
-                            'status': qstatus,
-                            'date': qrow.get('created_at',''),
-                            'admin_note': 'إيداع محفظة VEX' if 'withdrawal' not in qstatus else 'سحب محفظة VEX',
-                            'processed_by': qrow.get('approved_by',''),
-                            'currency': '',
-                        })
+                    quid = qrow.get('user_id','')
+                    qamt = qrow.get('amount','0')
+                    qdate = qrow.get('created_at','')
+                    # Skip if already exists in transactions.csv (match by uid+amount+date)
+                    _key = (str(quid), str(qamt), str(qdate)[:10])
+                    if _key in existing_keys:
+                        continue
+                    # Only merge if not already in txns by ID too
+                    if qid and any(t.get('id','') == qid for t in txns):
+                        continue
+                    txns.append({
+                        'id': qid,
+                        'customer_id': '',
+                        'telegram_id': quid,
+                        'name': '',
+                        'type': 'withdraw' if 'withdrawal' in qstatus else 'deposit',
+                        'company': 'VEX Wallet',
+                        'wallet_number': qrow.get('account_number',''),
+                        'amount': qamt,
+                        'exchange_address': '',
+                        'status': qstatus,
+                        'date': qdate,
+                        'admin_note': 'إيداع محفظة VEX' if 'withdrawal' not in qstatus else 'سحب محفظة VEX',
+                        'processed_by': qrow.get('approved_by',''),
+                        'currency': '',
+                    })
+                    existing_keys.add(_key)  # prevent duplicate merges
     except Exception as e:
         print(f"Merge quick_deposits error: {e}")
 
-    txns.reverse()
+    # Sort by date descending (newest first) — NOT reverse(), which is unreliable with mixed sources
+    txns.sort(key=lambda t: t.get('date', ''), reverse=True)
 
     if status:
         if status == 'pending':
