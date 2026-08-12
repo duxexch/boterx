@@ -475,6 +475,7 @@ function installApp(){if(deferredPrompt){deferredPrompt.prompt();deferredPrompt.
 if('serviceWorker' in navigator){navigator.serviceWorker.register('/static/sw.js').catch(function(){})}
 
 // ── Apps modal ──
+function copyToClip(text){ try{ navigator.clipboard.writeText(text); showToast('تم النسخ','success') }catch(e){ showToast('فشل النسخ','error') } }
 function openApps(){
   var overlay = document.createElement('div');
   overlay.id = 'modal';
@@ -493,11 +494,12 @@ function openApps(){
     var html = '<div style="font-size:18px;font-weight:900;color:var(--text);margin-bottom:16px;text-align:center">📱 التطبيقات</div>';
     apps.forEach(function(app){
       var icon = app.icon_url ? '<img src="'+app.icon_url+'" style="width:48px;height:48px;border-radius:12px;object-fit:cover" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'"><div style="display:none;width:48px;height:48px;border-radius:12px;background:var(--bg2);align-items:center;justify-content:center;font-size:24px">📱</div>' : '<div style="width:48px;height:48px;border-radius:12px;background:var(--bg2);display:flex;align-items:center;justify-content:center;font-size:24px">📱</div>';
-      var dl = app.download_url || app.android_url || app.ios_url || '';
       var card = '<div style="display:flex;gap:12px;padding:14px;background:var(--bg2);border:1px solid var(--border);border-radius:14px;margin-bottom:8px;align-items:center">'+icon+'<div style="flex:1"><div style="font-size:14px;font-weight:700;color:var(--text)">'+esc(app.name||'')+'</div>';
       if(app.description) card += '<div style="font-size:11px;color:var(--muted);margin-top:2px">'+esc(app.description)+'</div>';
-      if(app.promo_code) card += '<div style="margin-top:4px"><code style="background:var(--bg);padding:2px 8px;border-radius:6px;color:var(--gold);font-size:12px;font-weight:700">'+esc(app.promo_code)+'</code></div>';
+      if(app.promo_code) card += '<div style="margin-top:4px;display:flex;align-items:center;gap:4px"><code style="background:var(--bg);padding:2px 8px;border-radius:6px;color:var(--gold);font-size:12px;font-weight:700">'+esc(app.promo_code)+'</code><span onclick="copyToClip(\''+app.promo_code.replace(/'/g,"")+'\')" style="cursor:pointer;font-size:14px">📋</span></div>';
+      if(app.referral_link) card += '<div style="margin-top:4px"><a href="'+app.referral_link+'" target="_blank" style="font-size:11px;color:var(--green);text-decoration:none">🔗 رابط الإحالة</a></div>';
       card += '</div>';
+      var dl = app.download_url || app.android_url || app.ios_url || '';
       if(dl) card += '<a href="'+dl+'" target="_blank" style="flex-shrink:0;width:36px;height:36px;border-radius:10px;background:var(--green-dim);display:flex;align-items:center;justify-content:center;text-decoration:none"><span style="font-size:16px">⬇️</span></a>';
       card += '</div>';
       html += card;
