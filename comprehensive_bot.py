@@ -2061,73 +2061,127 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         self.send_inline_message(message['chat']['id'], panel_text, inline_btns)
 
     def show_svrp_wallet(self, message):
-        """عرض محفظة 💎 تعويض 100%"""
+        """عرض محفظة 💎 محفظتي — رصيد اللعب + الإيداعات + الأرباح/الخسائر + SVRP"""
         user_id = message['from']['id']
         user = self.find_user(user_id)
-        if not user or not self.svrp:
+        if not user:
             return
 
         lang = user.get('language', 'ar')
-        wallet = self.svrp.get_wallet(user_id)
-        credits = self.svrp.get_user_credits_summary(user_id)
-        wager_req = int(wallet.get('wagering_required', 3) or 3)
-        wager_done = int(wallet.get('wagering_completed', 0) or 0)
-        is_frozen = wager_done < wager_req
 
-        bal = float(wallet.get('balance', 0) or 0)
-        pend = float(wallet.get('pending_balance', 0) or 0)
-        earned = float(wallet.get('total_earned', 0) or 0)
-        used = float(wallet.get('total_used', 0) or 0)
+        # ── رصيد اللعب الحالي (game_balance) ──
+        game_bal = 0.0
+        currency = user.get('currency', 'EGP')
+        try:
+            import sys as _sys; _sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+            from game_engine import GameManager as _GM
+            _gm = _GM()
+            game_bal = float(_gm.get_balance(user_id) or 0)
+            _ui = _gm.get_user_info(user_id)
+            currency = _ui.get('currency', currency)
+        except Exception as _e:
+            try:
+                game_bal = float(user.get('game_balance', 0) or 0)
+            except:
+                pass
+
+        # ── إجمالي الإيداعات المقبولة (من transactions.csv) ──
+        total_deposited = 0.0
+        try:
+            import csv as _csv2
+            _txn_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'transactions.csv')
+            with open(_txn_path, 'r', encoding='utf-8-sig') as _f:
+                for _row in _csv2.DictReader(_f):
+                    if str(_row.get('telegram_id', '')) == str(user_id) and \
+                       _row.get('status') == 'approved' and \
+                       _row.get('type') == 'deposit':
+                        total_deposited += float(_row.get('amount', 0) or 0)
+        except:
+            pass
+
+        # ── إجمالي المراهنات والأرباح (من game_sessions.csv) ──
+        total_wagered = 0.0
+        total_won = 0.0
+        total_lost = 0.0
+        try:
+            import csv as _csv3
+            _gs_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'game_sessions.csv')
+            if os.path.exists(_gs_path):
+                with open(_gs_path, 'r', encoding='utf-8-sig') as _f:
+                    for _row in _csv3.DictReader(_f):
+                        if str(_row.get('user_id', '')) == str(user_id):
+                            bet = float(_row.get('bet_amount', 0) or 0)
+                            payout = float(_row.get('payout', 0) or 0)
+                            total_wagered += bet
+                            if payout > bet:
+                                total_won += (payout - bet)
+                            elif bet > payout:
+                                total_lost += (bet - payout)
+        except:
+            pass
+
+        net_profit = total_won - total_lost
+
+        # ── محفظة SVRP (التعويض) ──
+        svrp_bal = 0.0
+        svrp_pend = 0.0
+        svrp_earned = 0.0
+        svrp_used = 0.0
+        if self.svrp:
+            try:
+                wallet = self.svrp.get_wallet(user_id)
+                svrp_bal = float(wallet.get('balance', 0) or 0)
+                svrp_pend = float(wallet.get('pending_balance', 0) or 0)
+                svrp_earned = float(wallet.get('total_earned', 0) or 0)
+                svrp_used = float(wallet.get('total_used', 0) or 0)
+            except:
+                pass
 
         if lang == 'ar':
-            title = self.tr('a0050_محفظتي', lang)
-            frozen_lbl = self.tr('a0051_مجمد', lang) if is_frozen else self.tr('a0052_متاح', lang)
-            pending_lbl = self.tr('a0053_بانتظار_الأصدقاء', lang)
-            earned_lbl = self.tr('a0054_إجمالي_المكتسب', lang)
-            used_lbl = self.tr('a0055_إجمالي_المستخدم', lang)
-            keep_lbl = self.tr('a0056_أرصدة_الاحتفاظ', lang)
-            shared_lbl = self.tr('a0057_أرصدة_المشاركة', lang)
-            active_lbl = self.tr('a0058_نشط', lang)
-            pending_status_lbl = self.tr('a0059_معلق', lang)
-            used_lbl2 = self.tr('a0060_مستخدم', lang)
-            expired_lbl = self.tr('a0061_منتهي', lang)
-            hint = self.tr('a0062_يمكنك_إنشاء', lang)
+            text = (
+                f"💎 <b>محفظتي</b>\n\n"
+                f"━━━━━━━━━━━━━━━━━━\n"
+                f"🎮 <b>رصيد اللعب الحالي</b>\n"
+                f"  💰 <b><code>{game_bal:.2f}</code></b> {currency}\n"
+                f"━━━━━━━━━━━━━━━━━━\n"
+                f"📥 <b>إجمالي الإيداعات</b>\n"
+                f"  ✅ <b><code>{total_deposited:.2f}</code></b> {currency}\n"
+                f"━━━━━━━━━━━━━━━━━━\n"
+                f"📊 <b>إحصائيات اللعب</b>\n"
+                f"  🎯 إجمالي المراهنات: <b>{total_wagered:.2f}</b>\n"
+                f"  🟢 إجمالي الأرباح: <b>{total_won:.2f}</b>\n"
+                f"  🔴 إجمالي الخسائر: <b>{total_lost:.2f}</b>\n"
+                f"  {'📈' if net_profit >= 0 else '📉'} الصافي: <b>{'+' if net_profit >= 0 else ''}{net_profit:.2f}</b>\n"
+                f"━━━━━━━━━━━━━━━━━━\n"
+                f"💎 <b>محفظة التعويض</b>\n"
+                f"  🟢 متاح: <b><code>{svrp_bal:.2f}</code></b>\n"
+                f"  ⏳ معلق: <b>{svrp_pend:.2f}</b>\n"
+                f"  📈 اكتسب: <b>{svrp_earned:.2f}</b>\n"
+                f"  📉 استخدم: <b>{svrp_used:.2f}</b>\n"
+            )
         else:
-            title = "💎 <b>My Wallet</b>"
-            frozen_lbl = "🧊 Frozen" if is_frozen else "🟢 Available"
-            pending_lbl = "⏳ Pending friends"
-            earned_lbl = "📈 Total earned"
-            used_lbl = "📉 Total used"
-            keep_lbl = "📥 Keep credits"
-            shared_lbl = "📤 Shared credits"
-            active_lbl = "Active"
-            pending_status_lbl = "Pending"
-            used_lbl2 = "Used"
-            expired_lbl = "Expired"
-            hint = "💡 Create a promo code or redeem a friend's code"
+            text = (
+                f"💎 <b>My Wallet</b>\n\n"
+                f"━━━━━━━━━━━━━━━━━━\n"
+                f"🎮 <b>Game Balance</b>\n"
+                f"  💰 <b><code>{game_bal:.2f}</code></b> {currency}\n"
+                f"━━━━━━━━━━━━━━━━━━\n"
+                f"📥 <b>Total Deposited</b>\n"
+                f"  ✅ <b><code>{total_deposited:.2f}</code></b> {currency}\n"
+                f"━━━━━━━━━━━━━━━━━━\n"
+                f"📊 <b>Game Stats</b>\n"
+                f"  🎯 Total wagered: <b>{total_wagered:.2f}</b>\n"
+                f"  🟢 Total won: <b>{total_won:.2f}</b>\n"
+                f"  🔴 Total lost: <b>{total_lost:.2f}</b>\n"
+                f"  {'📈' if net_profit >= 0 else '📉'} Net: <b>{'+' if net_profit >= 0 else ''}{net_profit:.2f}</b>\n"
+                f"━━━━━━━━━━━━━━━━━━\n"
+                f"💎 <b>Recovery Wallet</b>\n"
+                f"  🟢 Available: <b><code>{svrp_bal:.2f}</code></b>\n"
+                f"  ⏳ Pending: <b>{svrp_pend:.2f}</b>\n"
+                f"  📈 Earned: <b>{svrp_earned:.2f}</b>\n"
+                f"  📉 Used: <b>{svrp_used:.2f}</b>\n"
+            )
 
-        text = (
-            f"{title}\n\n"
-            f"━━━━━━━━━━━━━━━━━━\n"
-            f"{frozen_lbl}: <b><code>{bal:.2f}</code></b>\n"
-            f"{pending_lbl}: <b><code>{pend:.2f}</code></b>\n"
-            f"━━━━━━━━━━━━━━━━━━\n"
-            f"{earned_lbl}: <b>{earned:.2f}</b>\n"
-            f"{used_lbl}: <b>{used:.2f}</b>\n\n"
-            f"━━━━━━━━━━━━━━━━━━\n"
-            f"<b>{keep_lbl}</b>\n"
-            f"  🟢 {active_lbl}: <b>{credits['keep']['active']}</b> | "
-            f"🟡 {pending_status_lbl}: <b>{credits['keep']['pending']}</b>\n"
-            f"  🔴 {used_lbl2}: <b>{credits['keep']['used']}</b> | "
-            f"⚫ {expired_lbl}: <b>{credits['keep']['expired']}</b>\n\n"
-            f"<b>{shared_lbl}</b>\n"
-            f"  🟢 {active_lbl}: <b>{credits['shared']['active']}</b> | "
-            f"🟡 {pending_status_lbl}: <b>{credits['shared']['pending']}</b>\n"
-            f"  🔴 {used_lbl2}: <b>{credits['shared']['used']}</b> | "
-            f"⚫ {expired_lbl}: <b>{credits['shared']['expired']}</b>\n\n"
-            f"━━━━━━━━━━━━━━━━━━\n"
-            f"{hint}"
-        )
         self.send_message(message['chat']['id'], text, self.main_keyboard(lang, user_id))
 
     def show_svrp_tasks(self, message):
