@@ -132,10 +132,12 @@ class GameManager:
     """محرك الألعاب v2 — محفظة موحدة من users.csv"""
 
     def __init__(self):
-        self.catalog_file = 'games_catalog.csv'
-        self.quick_deposits_file = 'quick_deposits.csv'
-        self.player_payment_methods_file = 'player_payment_methods.csv'
-        self.sessions_file = 'game_sessions.csv'
+        _base = os.path.dirname(os.path.abspath(__file__))
+        self.catalog_file = os.path.join(_base, 'games_catalog.csv')
+        self.quick_deposits_file = os.path.join(_base, 'quick_deposits.csv')
+        self.transactions_file = os.path.join(_base, 'transactions.csv')
+        self.player_payment_methods_file = os.path.join(_base, 'player_payment_methods.csv')
+        self.sessions_file = os.path.join(_base, 'game_sessions.csv')
         self._ensure_files()
         self.algorithm = HouseAlgorithm() if HouseAlgorithm else None
         # Start background flush thread
@@ -790,7 +792,7 @@ class GameManager:
                 'processed_by': '',
                 'currency': currency,
             }
-            txn_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'transactions.csv')
+            txn_file = self.transactions_file  # absolute path, always /opt/bot/transactions.csv
             with open(txn_file, 'a', newline='', encoding=CSV_ENCODING) as f:
                 writer = csv.DictWriter(f, fieldnames=txn_fields)
                 writer.writerow(txn_row)

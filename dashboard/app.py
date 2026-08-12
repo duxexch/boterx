@@ -1698,6 +1698,37 @@ def api_transactions():
     per_page = int(request.args.get('per_page', '20'))
 
     txns = read_csv('transactions.csv')
+
+    # ── Merge: include VEX quick_deposits that are missing from transactions.csv ──
+    try:
+        qd_path = os.path.join(BASE_DIR, 'quick_deposits.csv')
+        if os.path.exists(qd_path):
+            existing_ids = {t.get('id','') for t in txns}
+            with open(qd_path, 'r', encoding='utf-8-sig') as f:
+                for qrow in csv.DictReader(f):
+                    qid = qrow.get('id','')
+                    qstatus = qrow.get('status','')
+                    # Only merge rows not already in transactions.csv
+                    if qid and qid not in existing_ids:
+                        txns.append({
+                            'id': qid,
+                            'customer_id': '',
+                            'telegram_id': qrow.get('user_id',''),
+                            'name': '',
+                            'type': 'withdraw' if 'withdrawal' in qstatus else 'deposit',
+                            'company': 'VEX Wallet',
+                            'wallet_number': qrow.get('account_number',''),
+                            'amount': qrow.get('amount','0'),
+                            'exchange_address': '',
+                            'status': qstatus,
+                            'date': qrow.get('created_at',''),
+                            'admin_note': 'إيداع محفظة VEX' if 'withdrawal' not in qstatus else 'سحب محفظة VEX',
+                            'processed_by': qrow.get('approved_by',''),
+                            'currency': '',
+                        })
+    except Exception as e:
+        print(f"Merge quick_deposits error: {e}")
+
     txns.reverse()
 
     if status:
