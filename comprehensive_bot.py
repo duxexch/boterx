@@ -1579,19 +1579,27 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         icon_file_id = app.get('icon_file_id', '')
         icon_url = app.get('icon_url', '')
         photo_sent = False
-        if icon_file_id or icon_url:
+        if icon_file_id:
             try:
-                photo = icon_file_id if icon_file_id else icon_url
                 self.api_call('sendPhoto', {
-                    'chat_id': chat_id,
-                    'photo': photo,
-                    'caption': text,
-                    'parse_mode': 'HTML',
+                    'chat_id': chat_id, 'photo': icon_file_id,
+                    'caption': text, 'parse_mode': 'HTML',
                     'reply_markup': json.dumps({'inline_keyboard': inline_btns})
                 })
                 photo_sent = True
             except Exception as e:
-                logger.error(f"App icon send failed: {e}")
+                logger.error(f"App icon (file_id) failed: {e}")
+        elif icon_url:
+            full_url = icon_url if icon_url.startswith('http') else 'https://vex.deals' + icon_url
+            try:
+                self.api_call('sendPhoto', {
+                    'chat_id': chat_id, 'photo': full_url,
+                    'caption': text, 'parse_mode': 'HTML',
+                    'reply_markup': json.dumps({'inline_keyboard': inline_btns})
+                })
+                photo_sent = True
+            except Exception as e:
+                logger.error(f"App icon (url) failed: {e}")
 
         # لو الصورة فشلت أو مفيش صورة — نص فقط
         if not photo_sent:
