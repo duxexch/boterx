@@ -10,9 +10,9 @@
 <meta name="theme-color" content="#06100c">
 <script src="https://cdn.tailwindcss.com"></script>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/fontawesome.min.css') }}">
 <style>
-:root{--bg:#06100c;--bg2:#0a1a12;--card:#0d2018;--border:#1a3a28;--green:#00e676;--green2:#00c853;--green-dim:#0d3a22;--gold:#fbbf24;--text:#e8f5e9;--muted:#6b8c7a}
+:root{--bg:#06100c;--bg2:#0a1a12;--card:#0d2018;--border:#1a3a28;--green:#00e676;--green2:#00c853;--green-dim:#0d3a22;--gold:#00ff88;--text:#e8f5e9;--muted:#6b8c7a}
 *{font-family:'Cairo',sans-serif;-webkit-tap-highlight-color:transparent;box-sizing:border-box}
 body{background:var(--bg);color:var(--text);margin:0;min-height:100dvh;overflow-x:hidden}
 .app{max-width:500px;margin:0 auto;padding:0 12px 20px}
@@ -164,13 +164,31 @@ body{background:var(--bg);color:var(--text);margin:0;min-height:100dvh;overflow-
   <a href="/home" class="nav-item active"><span class="nav-icon">🏠</span>الرئيسية</a>
   <a href="/webapp/games?uid={{ uid }}&lang=ar" class="nav-item"><span class="nav-icon">🎮</span>ألعاب</a>
   <div class="nav-item" onclick="openDeposit()"><span class="nav-icon">💰</span>إيداع</div>
-  <a href="/webapp/stats?uid={{ uid }}&lang=ar" class="nav-item"><span class="nav-icon">📊</span>حسابي</a>
+  <div class="nav-item" onclick="openAccountPage()"><span class="nav-icon">👤</span>حسابي</div>
 </div>
 
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
 <script>
+function openAccountPage(){
+  // The Flask session cookie (HttpOnly, set at /home login) is automatically
+  // included in the /webapp/account request and all subsequent API calls.
+  // webapp_auth reads session['admin_id'] as a trusted identity — no URL token needed.
+  window.location.href = '/webapp/account?lang=ar';
+}
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+// Renders an icon: uploaded image URL → <img>, otherwise emoji text
+function isImgIcon(ic){return typeof ic==='string'&&(ic.indexOf('/static/')===0||ic.indexOf('http')===0)}
+function iconHtml(ic, fallback, size){
+  size = size || 24;
+  if(isImgIcon(ic)) return '<img src="'+esc(ic)+'" style="width:'+size+'px;height:'+size+'px;border-radius:8px;object-fit:cover;flex-shrink:0" alt="">';
+  return '<span style="font-size:'+size+'px">'+esc(ic||fallback||'')+'</span>';
+}
+function iconTitle(ic, name, fallback){
+  if(isImgIcon(ic)) return '<img src="'+esc(ic)+'" style="width:20px;height:20px;border-radius:6px;object-fit:cover;vertical-align:middle;margin-inline-end:6px" alt="">'+esc(name);
+  return esc((ic||fallback||'')+' '+name);
+}
 function showToast(msg){var t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(function(){t.classList.remove('show')},2500)}
 function refreshBalance(){
   fetch('/api/wallet/balance?uid={{ uid }}').then(function(r){return r.json()}).then(function(d){
@@ -217,10 +235,11 @@ function depChooseCompany(){
       mb.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted)">لا توجد شركات متاحة حالياً</div><button onclick="openDeposit()" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer">‹ رجوع</button>';
       return;
     }
-    var cHtml = companies.map(function(c){
-      return '<div onclick="depCompanySel('+JSON.stringify(c.id)+','+JSON.stringify(c.name||'')+','+JSON.stringify(c.icon||'🏢')+')" style="display:flex;align-items:center;gap:10px;padding:14px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;margin-bottom:6px;cursor:pointer">'+
-        '<span style="font-size:24px">'+(c.icon||'🏢')+'</span>'+
-        '<div style="flex:1"><div style="font-size:14px;font-weight:700">'+(c.name||'')+'</div>'+(c.address?'<div style="font-size:10px;color:var(--muted)">'+c.address+'</div>':'')+'</div>'+
+    _depCompanies = companies;
+    var cHtml = companies.map(function(c, i){
+      return '<div onclick="depCompanySelIdx('+i+')" style="display:flex;align-items:center;gap:10px;padding:14px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;margin-bottom:6px;cursor:pointer">'+
+        iconHtml(c.icon,'🏢',24)+
+        '<div style="flex:1"><div style="font-size:14px;font-weight:700">'+esc(c.name||'')+'</div>'+(c.address?'<div style="font-size:10px;color:var(--muted)">'+esc(c.address)+'</div>':'')+'</div>'+
         '<span style="color:var(--muted)">‹</span></div>';
     }).join('');
     mb.innerHTML = '<div style="font-size:16px;font-weight:900;color:var(--green);margin-bottom:12px">🏢 اختر الشركة</div>'+
@@ -231,9 +250,14 @@ function depChooseCompany(){
   });
 }
 
+var _depCompanies = [];
+function depCompanySelIdx(i){
+  var c = _depCompanies[i] || {};
+  depCompanySel(c.id, c.name || '', c.icon || '🏢');
+}
 function depCompanySel(cid, cname, cicon){
   var mb = document.getElementById('mb');
-  mb.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">جارٍ تحميل وسائل دفع '+cname+'...</div>';
+  mb.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">جارٍ تحميل وسائل دفع '+esc(cname)+'...</div>';
   // Fetch payment methods linked to this company (public API)
   fetch('/api/payment-methods/by-company/'+cid).then(function(r){return r.json()}).then(function(d){
     var methods = d.methods || [];
@@ -244,13 +268,15 @@ function depCompanySel(cid, cname, cicon){
 // ── Render deposit methods + form (shared for wallet + company) ──
 function renderDepMethods(methods, saved, source, cid, cname, cicon){
   var mb = document.getElementById('mb');
-  var title = source === 'company' ? (cicon+' '+cname) : '👛 المحفظة';
+  var title = source === 'company' ? iconTitle(cicon, cname, '🏢') : '👛 المحفظة';
   var mHtml = '';
+  _depMethods = methods || [];
+  _depCtx = { source: source, cid: cid || null, cname: cname || null };
   if(methods && methods.length > 0){
-    mHtml = methods.map(function(m){
-      return '<div onclick="depSel('+JSON.stringify(m.id)+','+JSON.stringify(m.method_name||'')+','+JSON.stringify(m.account_data||'')+')" style="display:flex;align-items:center;gap:10px;padding:12px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;margin-bottom:6px;cursor:pointer">'+
-        '<span style="font-size:20px">'+(m.icon||'💳')+'</span>'+
-        '<div style="flex:1"><div style="font-size:13px;font-weight:700">'+(m.method_name||'')+'</div><div style="font-size:10px;color:var(--muted)">'+(m.method_type||'')+'</div></div>'+
+    mHtml = methods.map(function(m, i){
+      return '<div onclick="depSelIdx('+i+')" style="display:flex;align-items:center;gap:10px;padding:12px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;margin-bottom:6px;cursor:pointer">'+
+        iconHtml(m.icon,'💳',20)+
+        '<div style="flex:1"><div style="font-size:13px;font-weight:700">'+esc(m.method_name||'')+'</div><div style="font-size:10px;color:var(--muted)">'+esc(m.method_type||'')+'</div></div>'+
         '<span style="color:var(--muted)">‹</span></div>';
     }).join('');
   }
@@ -270,13 +296,18 @@ function renderDepMethods(methods, saved, source, cid, cname, cicon){
     '<input id="depWallet" type="text" placeholder="رقم محفظتك" style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);margin-bottom:8px;font-size:14px">'+
     manualHtml+
     '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-bottom:10px;cursor:pointer"><input type="checkbox" id="depSave" style="accent-color:var(--green)"> حفظ دائم</label>'+
-    '<button onclick="depSubmit('+JSON.stringify(source)+','+(cid?JSON.stringify(cid):'null')+','+(cname?JSON.stringify(cname):'null')+')" style="width:100%;padding:12px;border-radius:10px;border:none;background:linear-gradient(135deg,var(--green),var(--green2));color:#06100c;font-weight:800;font-size:15px;cursor:pointer">✅ تأكيد الإيداع</button>'+
-    (methods?'<button onclick="depBackToMethods()" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);margin-top:6px;cursor:pointer">‹ رجوس</button>':'')+
+    '<button onclick="depSubmitCtx()" style="width:100%;padding:12px;border-radius:10px;border:none;background:linear-gradient(135deg,var(--green),var(--green2));color:#06100c;font-weight:800;font-size:15px;cursor:pointer">✅ تأكيد الإيداع</button>'+
+    (methods && methods.length?'<button onclick="depBackToMethods()" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);margin-top:6px;cursor:pointer">‹ رجوع</button>':'')+
     '</div>'+
-    '<button onclick="openDeposit()" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);margin-top:6px;cursor:pointer">‹ رجوس للقائمة</button>';
+    '<button onclick="openDeposit()" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);margin-top:6px;cursor:pointer">‹ رجوع للقائمة</button>';
 }
 
-var _depSelId='', _depSelName='', _depSelData='';
+var _depSelId='', _depSelName='', _depSelData='', _depMethods=[], _depCtx={};
+function depSelIdx(i){
+  var m = _depMethods[i] || {};
+  depSel(m.id || '', m.method_name || '', m.account_data || '');
+}
+function depSubmitCtx(){ depSubmit(_depCtx.source, _depCtx.cid, _depCtx.cname); }
 function depSel(id, name, data){
   _depSelId=id; _depSelName=name; _depSelData=data;
   document.getElementById('depList').style.display='none';
@@ -356,19 +387,25 @@ function wdChooseCompany(bal){
   fetch('/api/companies/list').then(function(r){return r.json()}).then(function(d){
     var companies = d.companies || [];
     if(companies.length === 0){
-      mb.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted)">لا توجد شركات متاحة</div><button onclick="openWithdraw()" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer">‹ رجوس</button>';
+      mb.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted)">لا توجد شركات متاحة</div><button onclick="openWithdraw()" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer">‹ رجوع</button>';
       return;
     }
-    var cHtml = companies.map(function(c){
-      return '<div onclick="wdCompanySel('+JSON.stringify(c.id)+','+JSON.stringify(c.name||'')+','+JSON.stringify(c.icon||'🏢')+','+bal+')" style="display:flex;align-items:center;gap:10px;padding:14px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;margin-bottom:6px;cursor:pointer"><span style="font-size:24px">'+(c.icon||'🏢')+'</span><div style="flex:1"><div style="font-size:14px;font-weight:700">'+(c.name||'')+'</div></div><span style="color:var(--muted)">‹</span></div>';
+    _wdCompanies = companies; _wdBal = bal;
+    var cHtml = companies.map(function(c, i){
+      return '<div onclick="wdCompanySelIdx('+i+')" style="display:flex;align-items:center;gap:10px;padding:14px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;margin-bottom:6px;cursor:pointer">'+iconHtml(c.icon,'🏢',24)+'<div style="flex:1"><div style="font-size:14px;font-weight:700">'+esc(c.name||'')+'</div></div><span style="color:var(--muted)">‹</span></div>';
     }).join('');
-    mb.innerHTML = '<div style="font-size:16px;font-weight:900;color:var(--gold);margin-bottom:12px">🏢 اختر الشركة</div>'+cHtml+'<button onclick="openWithdraw()" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);margin-top:6px;cursor:pointer">‹ رجوس</button>';
+    mb.innerHTML = '<div style="font-size:16px;font-weight:900;color:var(--gold);margin-bottom:12px">🏢 اختر الشركة</div>'+cHtml+'<button onclick="openWithdraw()" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);margin-top:6px;cursor:pointer">‹ رجوع</button>';
   }).catch(function(){ mb.innerHTML = '<div style="text-align:center;color:var(--muted)">خطأ</div>'; });
 }
 
+var _wdCompanies = [], _wdBal = 0, _wdMethods = [], _wdCtx = {};
+function wdCompanySelIdx(i){
+  var c = _wdCompanies[i] || {};
+  wdCompanySel(c.id, c.name || '', c.icon || '🏢', _wdBal);
+}
 function wdCompanySel(cid, cname, cicon, bal){
   var mb = document.getElementById('mb');
-  mb.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">جارٍ تحميل وسائل استلام '+cname+'...</div>';
+  mb.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">جارٍ تحميل وسائل استلام '+esc(cname)+'...</div>';
   fetch('/api/payment-methods/by-company/'+cid).then(function(r){return r.json()}).then(function(d){
     renderWdForm(d.methods||[], bal, 'company', cid, cname, cicon);
   }).catch(function(){ renderWdForm([], bal, 'company', cid, cname, cicon); });
@@ -376,9 +413,11 @@ function wdCompanySel(cid, cname, cicon, bal){
 
 function renderWdForm(methods, bal, source, cid, cname, cicon){
   var mb = document.getElementById('mb');
-  var title = source === 'company' ? (cicon+' '+cname) : '👛 المحفظة';
-  var mHtml = methods.length > 0 ? methods.map(function(m){
-    return '<div onclick="wdSelAcc('+JSON.stringify(m.account_number||m.account_data||'')+')" style="display:flex;align-items:center;gap:8px;padding:10px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;margin-bottom:6px;cursor:pointer"><span style="font-size:20px">'+(m.icon||'💳')+'</span><div style="flex:1"><div style="font-size:13px;font-weight:700">'+(m.method_name||'')+'</div><div style="font-size:10px;color:var(--muted)">'+(m.account_number||m.account_data||'')+'</div></div></div>';
+  var title = source === 'company' ? iconTitle(cicon, cname, '🏢') : '👛 المحفظة';
+  _wdMethods = methods || [];
+  _wdCtx = { bal: bal, source: source, cid: cid || null, cname: cname || null };
+  var mHtml = methods.length > 0 ? methods.map(function(m, i){
+    return '<div onclick="wdSelAccIdx('+i+')" style="display:flex;align-items:center;gap:8px;padding:10px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;margin-bottom:6px;cursor:pointer">'+iconHtml(m.icon,'💳',20)+'<div style="flex:1"><div style="font-size:13px;font-weight:700">'+esc(m.method_name||'')+'</div><div style="font-size:10px;color:var(--muted)">'+esc(m.account_number||m.account_data||'')+'</div></div></div>';
   }).join('') : '';
   mb.innerHTML = '<div style="font-size:16px;font-weight:900;color:var(--gold);margin-bottom:4px">'+title+'</div>'+
     '<div style="font-size:12px;color:var(--muted);margin-bottom:12px">رصيدك: '+bal.toLocaleString()+' {{ user_currency }}</div>'+
@@ -387,11 +426,16 @@ function renderWdForm(methods, bal, source, cid, cname, cicon){
     '<input id="wdAcc" placeholder="رقم الحساب" style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);margin-bottom:8px;font-size:14px">'+
     '<div style="font-size:11px;color:var(--muted);margin-bottom:4px">💵 المبلغ:</div>'+
     '<input id="wdAmt" type="number" placeholder="'+bal+'" max="'+bal+'" style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);margin-bottom:8px;font-size:16px;font-weight:700;text-align:center">'+
-    '<button onclick="wdSubmit('+bal+','+JSON.stringify(source)+','+(cid?JSON.stringify(cid):'null')+','+(cname?JSON.stringify(cname):'null')+')" style="width:100%;padding:12px;border-radius:10px;border:none;background:linear-gradient(135deg,#ff8c00,#e67e00);color:#06100c;font-weight:800;font-size:15px;cursor:pointer">✅ تأكيد السحب</button>'+
-    '<button onclick="openWithdraw()" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);margin-top:6px;cursor:pointer">‹ رجوس</button>';
+    '<button onclick="wdSubmitCtx()" style="width:100%;padding:12px;border-radius:10px;border:none;background:linear-gradient(135deg,#ff8c00,#e67e00);color:#06100c;font-weight:800;font-size:15px;cursor:pointer">✅ تأكيد السحب</button>'+
+    '<button onclick="openWithdraw()" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);margin-top:6px;cursor:pointer">‹ رجوع</button>';
 }
 
+function wdSelAccIdx(i){
+  var m = _wdMethods[i] || {};
+  wdSelAcc(m.account_number || m.account_data || '');
+}
 function wdSelAcc(acc){ document.getElementById('wdAcc').value = acc; }
+function wdSubmitCtx(){ wdSubmit(_wdCtx.bal, _wdCtx.source, _wdCtx.cid, _wdCtx.cname); }
 function wdSubmit(maxBal, source, cid, cname){
   var amt = parseFloat(document.getElementById('wdAmt').value) || 0;
   var acc = document.getElementById('wdAcc').value.trim();

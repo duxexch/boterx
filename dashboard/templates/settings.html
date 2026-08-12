@@ -22,6 +22,12 @@
             class="px-5 py-3 rounded-t-lg text-sm font-semibold transition">
             <i class="fas fa-shield-alt ml-1"></i> سجل الانقطاعات
         </button>
+        {% if not admin_perms or admin_perms.get('manage_admins', True) %}
+        <button @click="activeTab = 'roles'; loadRoles()" :class="activeTab === 'roles' ? 'bg-slate-800 text-white border-b-2 border-amber-500' : 'text-slate-400 hover:text-white'"
+            class="px-5 py-3 rounded-t-lg text-sm font-semibold transition">
+            <i class="fas fa-user-lock ml-1"></i> صلاحيات الإداريين
+        </button>
+        {% endif %}
     </div>
 
     <!-- Tab 1: System Settings -->
@@ -272,6 +278,113 @@
         </div>
     </div>
 
+    <!-- Tab 5: Admin Roles (manage_admins permission) -->
+    <div x-show="activeTab === 'roles'" class="space-y-5">
+        <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+            <div class="p-5 border-b border-slate-700 flex items-center justify-between">
+                <div>
+                    <h3 class="font-bold text-lg flex items-center gap-2">
+                        <i class="fas fa-user-lock text-amber-400"></i> صلاحيات الإداريين
+                    </h3>
+                    <p class="text-xs text-slate-400 mt-1">عيّن دوراً لكل مدير — يحدد ما يستطيع رؤيته وتنفيذه</p>
+                </div>
+                <button @click="showAddRole = !showAddRole"
+                    class="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-semibold text-sm transition">
+                    <i class="fas fa-plus ml-1"></i> إضافة دور
+                </button>
+            </div>
+
+            <!-- Add role form -->
+            <div x-show="showAddRole" x-transition class="p-5 border-b border-slate-700 bg-slate-900/40">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">معرف تيليغرام (UID)</label>
+                        <input x-model="newRoleUid" type="text" placeholder="123456789"
+                            class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-amber-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">الدور</label>
+                        <select x-model="newRoleName" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-amber-500">
+                            <template x-for="(perms, role) in roleDefs" :key="role">
+                                <option :value="role" x-text="role"></option>
+                            </template>
+                        </select>
+                    </div>
+                    <div class="flex items-end">
+                        <button @click="assignRole()" :disabled="!newRoleUid"
+                            class="w-full px-4 py-2 rounded-lg bg-green-600 hover:bg-green-500 disabled:opacity-40 text-white font-semibold text-sm transition">
+                            <i class="fas fa-check ml-1"></i> تعيين
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Roles table -->
+            <table class="w-full text-sm">
+                <thead class="bg-slate-900/50">
+                    <tr>
+                        <th class="text-right px-5 py-3 text-xs text-slate-400 font-semibold">UID</th>
+                        <th class="text-right px-5 py-3 text-xs text-slate-400 font-semibold">الدور</th>
+                        <th class="text-right px-5 py-3 text-xs text-slate-400 font-semibold">تاريخ التعيين</th>
+                        <th class="text-right px-5 py-3 text-xs text-slate-400 font-semibold">معيَّن بواسطة</th>
+                        <th class="px-5 py-3"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-for="r in roles" :key="r.uid">
+                        <tr class="border-t border-slate-700 hover:bg-slate-700/30 transition">
+                            <td class="px-5 py-3 font-mono text-amber-400" x-text="r.uid"></td>
+                            <td class="px-5 py-3">
+                                <select x-model="r.role" @change="updateRole(r)"
+                                    class="bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none focus:border-amber-500">
+                                    <template x-for="(perms, role) in roleDefs" :key="role">
+                                        <option :value="role" x-text="role"></option>
+                                    </template>
+                                </select>
+                            </td>
+                            <td class="px-5 py-3 text-slate-400 text-xs" x-text="r.created_at || '—'"></td>
+                            <td class="px-5 py-3 text-slate-400 text-xs font-mono" x-text="r.created_by || '—'"></td>
+                            <td class="px-5 py-3 text-right">
+                                <button @click="removeRole(r.uid)"
+                                    class="text-red-400 hover:text-red-300 transition text-xs px-2 py-1 rounded hover:bg-red-500/10">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    </template>
+                    <tr x-show="roles.length === 0">
+                        <td colspan="5" class="px-5 py-10 text-center text-slate-500">
+                            <i class="fas fa-user-lock text-3xl mb-3 block text-slate-700"></i>
+                            لا توجد أدوار مخصصة — المدراء في ADMIN_IDS لديهم صلاحية super_admin دائماً
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Role definitions reference -->
+        <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+            <div class="p-5 border-b border-slate-700">
+                <h4 class="font-semibold">تعريف الأدوار وصلاحياتها</h4>
+            </div>
+            <div class="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <template x-for="(perms, role) in roleDefs" :key="role">
+                    <div class="bg-slate-900/50 rounded-lg p-4 border border-slate-700">
+                        <p class="font-semibold text-amber-400 mb-2 font-mono text-sm" x-text="role"></p>
+                        <ul class="space-y-1">
+                            <template x-for="(val, perm) in perms" :key="perm">
+                                <li class="flex items-center gap-2 text-xs">
+                                    <i :class="val ? 'fas fa-check text-green-400' : 'fas fa-times text-slate-600'"></i>
+                                    <span :class="val ? 'text-slate-300' : 'text-slate-600'" x-text="perm"></span>
+                                </li>
+                            </template>
+                        </ul>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+
     <!-- Tab 3: Audit Log -->
     <div x-show="activeTab === 'audit'" class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
         <div class="p-5 border-b border-slate-700">
@@ -337,6 +450,13 @@ function settingsPage() {
         settings: [],
         labels: [],
         auditLog: [],
+
+        // ─── RBAC Roles state ───
+        roles:       [],
+        roleDefs:    {},
+        showAddRole: false,
+        newRoleUid:  '',
+        newRoleName: 'support_admin',
 
         // ─── Lockdown log state ───
         ldRows:    [],
@@ -450,6 +570,66 @@ function settingsPage() {
                 this.auditLog = data.log || data.audit_log || data || [];
             } catch (e) {
                 toast('فشل تحميل سجل الإجراءات', 'error');
+            }
+        },
+
+        // ─── RBAC Roles ───
+        async loadRoles() {
+            if (this.roles.length > 0 && Object.keys(this.roleDefs).length > 0) return;
+            try {
+                const data = await api('/api/admin/rbac/roles');
+                this.roles    = data.roles || [];
+                this.roleDefs = data.role_definitions || {};
+                // default first role name for the add form
+                const keys = Object.keys(this.roleDefs);
+                if (keys.length) this.newRoleName = keys.find(k => k !== 'super_admin') || keys[0];
+            } catch (e) {
+                toast('فشل تحميل صلاحيات الإداريين', 'error');
+            }
+        },
+
+        async assignRole() {
+            const uid = this.newRoleUid.trim();
+            if (!uid) return;
+            try {
+                await api(`/api/admin/rbac/roles/${uid}`, {
+                    method: 'POST',
+                    body: JSON.stringify({ role: this.newRoleName }),
+                });
+                toast('تم تعيين الدور بنجاح', 'success');
+                this.newRoleUid = '';
+                this.showAddRole = false;
+                // Refresh list
+                this.roles = [];
+                await this.loadRoles();
+            } catch (e) {
+                toast('فشل تعيين الدور', 'error');
+            }
+        },
+
+        async updateRole(r) {
+            try {
+                await api(`/api/admin/rbac/roles/${r.uid}`, {
+                    method: 'POST',
+                    body: JSON.stringify({ role: r.role }),
+                });
+                toast('تم تحديث الدور', 'success');
+            } catch (e) {
+                toast('فشل تحديث الدور', 'error');
+                // reload to revert optimistic update
+                this.roles = [];
+                await this.loadRoles();
+            }
+        },
+
+        async removeRole(uid) {
+            if (!confirm(`هل تريد إزالة الدور لـ ${uid}؟`)) return;
+            try {
+                await api(`/api/admin/rbac/roles/${uid}`, { method: 'DELETE' });
+                this.roles = this.roles.filter(r => r.uid !== uid);
+                toast('تم إزالة الدور', 'success');
+            } catch (e) {
+                toast('فشل إزالة الدور', 'error');
             }
         },
     };

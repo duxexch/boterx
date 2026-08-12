@@ -13,7 +13,53 @@
     </div>
 
     <!-- Theme Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+        <!-- VEX Neon -->
+        <div class="bg-slate-800 rounded-2xl border-2 p-6 transition-all cursor-pointer"
+             :class="activeTheme === 'vex' ? 'border-emerald-400 shadow-lg shadow-emerald-400/10' : 'border-slate-700 hover:border-slate-600'"
+             @click="selectTheme('vex')">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-2">
+                    <span class="text-2xl">🟢</span>
+                    <h3 class="text-lg font-bold">VEX النيون</h3>
+                </div>
+                <span x-show="activeTheme === 'vex'" class="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-semibold">
+                    <i class="fas fa-check-circle ml-1"></i>نشط
+                </span>
+            </div>
+            <!-- Preview -->
+            <div class="rounded-xl overflow-hidden mb-4 border border-slate-700">
+                <div class="h-10 flex items-center px-3" style="background: #0a1a10;">
+                    <div class="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold" style="background: #00ff88; color: #030a06;">V</div>
+                    <span class="text-xs mr-2 font-semibold" style="color: #00ff88;">VEX</span>
+                </div>
+                <div class="p-3 space-y-2" style="background: #030a06;">
+                    <div class="h-6 rounded-lg flex items-center px-2 text-[10px]" style="background: #0a1a10; color: #00ff88;">قائمة التنقل</div>
+                    <div class="grid grid-cols-3 gap-2">
+                        <div class="h-8 rounded-lg flex items-center justify-center text-[10px] font-bold" style="background: #0a1a10; color: #00ff88;">12</div>
+                        <div class="h-8 rounded-lg flex items-center justify-center text-[10px] font-bold" style="background: #0a1a10; color: #00ff88;">5</div>
+                        <div class="h-8 rounded-lg flex items-center justify-center text-[10px] font-bold" style="background: #0a1a10; color: #00ff88;">8</div>
+                    </div>
+                    <div class="h-5 rounded-lg" style="background: #0a1a10;"></div>
+                    <div class="h-5 rounded-lg w-3/4" style="background: #0a1a10;"></div>
+                </div>
+            </div>
+            <!-- Color swatches -->
+            <div class="flex items-center gap-2 mb-4">
+                <div class="w-6 h-6 rounded-full border border-slate-600" style="background: #030a06;" title="خلفية"></div>
+                <div class="w-6 h-6 rounded-full border border-slate-600" style="background: #0a1a10;" title="بطاقة"></div>
+                <div class="w-6 h-6 rounded-full border border-slate-600" style="background: #00ff88;" title="لون أساسي"></div>
+                <div class="w-6 h-6 rounded-full border border-slate-600" style="background: #1a3d26;" title="حدود"></div>
+            </div>
+            <button @click.stop="activateTheme('vex')"
+                class="w-full py-2.5 rounded-lg text-sm font-semibold transition"
+                :class="activeTheme === 'vex' ? 'bg-emerald-500/20 text-emerald-400 cursor-default' : 'bg-emerald-600 hover:bg-emerald-700 text-white'"
+                :disabled="activeTheme === 'vex'">
+                <span x-show="activeTheme !== 'vex'"><i class="fas fa-check ml-1"></i>تفعيل</span>
+                <span x-show="activeTheme === 'vex'">مُفعّل</span>
+            </button>
+        </div>
+
         <!-- Dark Gold -->
         <div class="bg-slate-800 rounded-2xl border-2 p-6 transition-all cursor-pointer"
              :class="activeTheme === 'gold' ? 'border-amber-400 shadow-lg shadow-amber-400/10' : 'border-slate-700 hover:border-slate-600'"
@@ -30,15 +76,15 @@
             <!-- Preview -->
             <div class="rounded-xl overflow-hidden mb-4 border border-slate-700">
                 <div class="h-10 flex items-center px-3" style="background: #1E293B;">
-                    <div class="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold" style="background: #FBBF24; color: #0F172A;">B</div>
-                    <span class="text-xs mr-2 font-semibold" style="color: #FBBF24;">Boterx</span>
+                    <div class="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold" style="background: #00ff88; color: #0F172A;">B</div>
+                    <span class="text-xs mr-2 font-semibold" style="color: #00ff88;">Boterx</span>
                 </div>
                 <div class="p-3 space-y-2" style="background: #0F172A;">
-                    <div class="h-6 rounded-lg flex items-center px-2 text-[10px]" style="background: #1E293B; color: #FBBF24;">قائمة التنقل</div>
+                    <div class="h-6 rounded-lg flex items-center px-2 text-[10px]" style="background: #1E293B; color: #00ff88;">قائمة التنقل</div>
                     <div class="grid grid-cols-3 gap-2">
-                        <div class="h-8 rounded-lg flex items-center justify-center text-[10px] font-bold" style="background: #1E293B; color: #FBBF24;">12</div>
-                        <div class="h-8 rounded-lg flex items-center justify-center text-[10px] font-bold" style="background: #1E293B; color: #FBBF24;">5</div>
-                        <div class="h-8 rounded-lg flex items-center justify-center text-[10px] font-bold" style="background: #1E293B; color: #FBBF24;">8</div>
+                        <div class="h-8 rounded-lg flex items-center justify-center text-[10px] font-bold" style="background: #1E293B; color: #00ff88;">12</div>
+                        <div class="h-8 rounded-lg flex items-center justify-center text-[10px] font-bold" style="background: #1E293B; color: #00ff88;">5</div>
+                        <div class="h-8 rounded-lg flex items-center justify-center text-[10px] font-bold" style="background: #1E293B; color: #00ff88;">8</div>
                     </div>
                     <div class="h-5 rounded-lg" style="background: #1E293B;"></div>
                     <div class="h-5 rounded-lg w-3/4" style="background: #1E293B;"></div>
@@ -48,7 +94,7 @@
             <div class="flex items-center gap-2 mb-4">
                 <div class="w-6 h-6 rounded-full border border-slate-600" style="background: #0F172A;" title="خلفية"></div>
                 <div class="w-6 h-6 rounded-full border border-slate-600" style="background: #1E293B;" title="بطاقة"></div>
-                <div class="w-6 h-6 rounded-full border border-slate-600" style="background: #FBBF24;" title="لون أساسي"></div>
+                <div class="w-6 h-6 rounded-full border border-slate-600" style="background: #00ff88;" title="لون أساسي"></div>
                 <div class="w-6 h-6 rounded-full border border-slate-600" style="background: #334155;" title="حدود"></div>
             </div>
             <button @click.stop="activateTheme('gold')"
@@ -176,7 +222,7 @@
 <script>
 function themesPage() {
     return {
-        activeTheme: 'gold',
+        activeTheme: 'vex',
         loading: false,
         loadingText: 'جارٍ التحميل...',
 
@@ -189,7 +235,7 @@ function themesPage() {
             this.loadingText = 'جارٍ تحميل السمات...';
             try {
                 const data = await api('/api/themes');
-                this.activeTheme = data.active_theme || 'gold';
+                this.activeTheme = data.active_theme || 'vex';
             } catch (e) {
                 toast('فشل تحميل السمات', 'error');
             }
@@ -207,10 +253,10 @@ function themesPage() {
             try {
                 await api('/api/themes', {
                     method: 'POST',
-                    body: JSON.stringify({ theme: theme }),
+                    body: JSON.stringify({ theme_id: theme }),
                 });
                 this.activeTheme = theme;
-                const names = { gold: 'الذهبي الداكن', ocean: 'أزرق المحيط', purple: 'الأرجواني الملكي' };
+                const names = { vex: 'VEX النيون الأخضر', gold: 'الذهبي الداكن', ocean: 'أزرق المحيط', purple: 'الأرجواني الملكي' };
                 toast(`تم تفعيل سمة ${names[theme] || theme}`, 'success');
             } catch (e) {
                 toast('فشل تفعيل السمة', 'error');

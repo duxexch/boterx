@@ -10,10 +10,12 @@
             <h2 class="text-xl font-bold">إدارة البوتات</h2>
             <p class="text-sm text-slate-400 mt-1">إضافة وإدارة بوتات تيليجرام المتصلة بالنظام</p>
         </div>
+        {% if not admin_perms or admin_perms.get('manage_bots') %}
         <button @click="openAddModal()"
             class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition flex items-center gap-2 self-start">
             <i class="fas fa-plus"></i> إضافة بوت
         </button>
+        {% endif %}
     </div>
 
     <!-- Bots Cards Grid -->
@@ -68,7 +70,7 @@
 
                 <!-- Card footer -->
                 <div class="px-5 py-3 bg-slate-900/40 border-t border-slate-700/50 flex items-center justify-between">
-                    <div class="flex items-center gap-1">
+                    <div class="flex items-center gap-1" x-show="rbac('manage_bots')">
                         <button @click="toggleActive(bot)"
                             class="px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1"
                             :class="bot.is_active ? 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30' : 'bg-green-500/20 text-green-400 hover:bg-green-500/30'">

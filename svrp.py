@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 نظام 💎 الاسترداد الذكي — Smart Recovery
@@ -12,9 +12,86 @@ import json
 import random
 import string
 import logging
+import threading as _threading
+import fcntl as _fcntl
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
+
+# ==================== One-time CSV→SQLite migration ====================
+# Runs once at module load to backfill any existing svrp_wallets.csv rows
+# into svrp_wallet_balance so the SQLite table is never empty for live systems.
+# Uses INSERT OR IGNORE so rows that were already synced are not overwritten.
+def _migrate_svrp_wallets_once():
+    try:
+        import csv as _csv
+        _wallet_csv = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'svrp_wallets.csv')
+        if not os.path.exists(_wallet_csv):
+            return
+        with open(_wallet_csv, 'r', encoding='utf-8-sig') as _f:
+            _rows = list(_csv.DictReader(_f))
+        if not _rows:
+            return
+        from game_engine import GameManager as _GM
+        _GM().migrate_svrp_wallets_from_csv(_rows)
+        logger.info(f'SVRP wallet migration: {len(_rows)} rows backfilled to SQLite')
+    except Exception as _e:
+        logger.warning(f'SVRP wallet SQLite migration skipped: {_e}')
+
+_migrate_svrp_wallets_once()
+
+# ==================== SVRP cross-process lock ====================
+# All writes to svrp_wallets.csv and svrp_credits.csv MUST go through
+# svrp_lock() so that concurrent requests (threads in the dashboard
+# worker, and the separate bot process) are fully serialised.
+#
+# Design:
+#  • _SVRP_RLOCK  — threading.RLock so the same thread can nest svrp_lock()
+#    calls (e.g. the transfer endpoint holding the outer lock while
+#    use_credits() takes the inner lock internally).
+#  • fcntl.LOCK_EX on a shared file — cross-process serialisation between
+#    the bot process and the dashboard process.
+#  • depth counter (thread-local) — prevents the inner fcntl acquire from
+#    deadlocking when the caller already holds the outer fcntl lock.
+
+_SVRP_RLOCK = _threading.RLock()
+_svrp_fcntl_depth = _threading.local()   # per-thread re-entrancy counter
+
+
+def _svrp_get_fd():
+    """Return (creating if needed) a module-level fd for the SVRP lock file."""
+    global _svrp_lock_fd  # noqa: PLW0603
+    if '_svrp_lock_fd' not in globals() or _svrp_lock_fd is None:
+        lock_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), '.svrp_lock'
+        )
+        globals()['_svrp_lock_fd'] = open(lock_path, 'w')  # noqa: WPS515
+    return globals()['_svrp_lock_fd']
+
+
+@contextmanager
+def svrp_lock():
+    """Reentrant cross-process lock for all SVRP wallet/credit CSV mutations.
+
+    Usage::
+
+        with svrp_lock():
+            wallet = mgr.get_wallet(uid)   # read inside lock
+            ...
+            mgr.use_credits(uid, amount)   # internally uses svrp_lock too — safe
+    """
+    depth = getattr(_svrp_fcntl_depth, 'v', 0)
+    with _SVRP_RLOCK:           # serialise threads within this process (reentrant)
+        if depth == 0:
+            _fcntl.flock(_svrp_get_fd().fileno(), _fcntl.LOCK_EX)
+        _svrp_fcntl_depth.v = depth + 1
+        try:
+            yield
+        finally:
+            _svrp_fcntl_depth.v -= 1
+            if _svrp_fcntl_depth.v == 0:
+                _fcntl.flock(_svrp_get_fd().fileno(), _fcntl.LOCK_UN)
 
 # ==================== إعدادات 💎 الاسترداد الذكي ====================
 SVRP_CONFIG = {
@@ -51,7 +128,11 @@ class SVRPManager:
     WALLET_FIELDS = [
         'telegram_id', 'customer_id', 'balance', 'pending_balance',
         'total_earned', 'total_used', 'wagering_required', 'wagering_completed',
-        'last_recovery_date', 'monthly_recovery_total'
+        'last_recovery_date', 'monthly_recovery_total',
+        # Idempotency markers — written atomically with the corresponding debit/credit
+        # so crash-recovery can prove a mutation occurred without a separate flag store.
+        'last_transfer_id',   # transfer_id of the last completed SVRP→game debit
+        'last_approval_id',   # req_id of the last approved recovery request
     ]
 
     TASK_FIELDS = [
@@ -128,28 +209,50 @@ class SVRPManager:
             return []
 
     def _write_csv(self, filename, rows, fields):
-        """كتابة آمنة في CSV"""
-        try:
-            with open(filename, 'w', newline='', encoding='utf-8-sig') as f:
-                writer = csv.DictWriter(f, fieldnames=fields)
-                writer.writeheader()
-                for row in rows:
-                    writer.writerow({k: row.get(k, '') for k in fields})
-            return True
-        except Exception as e:
-            logger.error(f"خطأ في كتابة {filename}: {e}")
-            return False
+        """كتابة آمنة وذرية في CSV — temp file + fsync + rename.
+
+        Atomicity: data is written to a sibling .tmp file, fsynced, then
+        renamed over the target.  Either the old file or the fully-written
+        new file is visible after a crash — never a partially-written file.
+        Protected by svrp_lock (reentrant).
+        """
+        import tempfile as _tf
+        with svrp_lock():
+            try:
+                dir_ = os.path.dirname(os.path.abspath(filename))
+                fd, tmp_path = _tf.mkstemp(dir=dir_, suffix='.tmp')
+                try:
+                    with os.fdopen(fd, 'w', newline='', encoding='utf-8-sig') as f:
+                        writer = csv.DictWriter(f, fieldnames=fields,
+                                                extrasaction='ignore')
+                        writer.writeheader()
+                        for row in rows:
+                            writer.writerow({k: row.get(k, '') for k in fields})
+                        f.flush()
+                        os.fsync(f.fileno())
+                    os.replace(tmp_path, filename)
+                except Exception:
+                    try:
+                        os.unlink(tmp_path)
+                    except OSError:
+                        pass
+                    raise
+                return True
+            except Exception as e:
+                logger.error(f"خطأ في كتابة {filename}: {e}")
+                return False
 
     def _append_csv(self, filename, row, fields):
-        """إضافة صف جديد إلى CSV"""
-        try:
-            with open(filename, 'a', newline='', encoding='utf-8-sig') as f:
-                writer = csv.DictWriter(f, fieldnames=fields)
-                writer.writerow({k: row.get(k, '') for k in fields})
-            return True
-        except Exception as e:
-            logger.error(f"خطأ في إضافة صف إلى {filename}: {e}")
-            return False
+        """إضافة صف جديد إلى CSV — محمية بـ svrp_lock (reentrant)."""
+        with svrp_lock():
+            try:
+                with open(filename, 'a', newline='', encoding='utf-8-sig') as f:
+                    writer = csv.DictWriter(f, fieldnames=fields)
+                    writer.writerow({k: row.get(k, '') for k in fields})
+                return True
+            except Exception as e:
+                logger.error(f"خطأ في إضافة صف إلى {filename}: {e}")
+                return False
 
     def _get_config(self, key):
         """الحصول على قيمة إعداد"""
@@ -181,166 +284,195 @@ class SVRPManager:
         return wallet
 
     def _update_wallet(self, telegram_id, updates):
-        """تحديث محفظة مستخدم"""
+        """تحديث محفظة مستخدم — القراءة والكتابة داخل svrp_lock.
+
+        After writing the CSV, mirrors the updated financial fields to the
+        authoritative svrp_wallet_balance SQLite table so that all mutations
+        (add_frozen_balance, increment_wagering, use_credits, …) are
+        immediately reflected in SQLite without requiring a separate call.
+        """
         tid = str(telegram_id)
-        rows = self._read_csv('svrp_wallets.csv')
-        found = False
-        for row in rows:
-            if row['telegram_id'] == tid:
-                for k, v in updates.items():
-                    if k in row:
-                        row[k] = str(v)
-                found = True
-                break
-        if not found:
-            # إنشاء إذا لم تكن موجودة
-            wallet = self.get_wallet(telegram_id)
+        with svrp_lock():
             rows = self._read_csv('svrp_wallets.csv')
+            found = False
+            updated_row = None
             for row in rows:
                 if row['telegram_id'] == tid:
                     for k, v in updates.items():
                         if k in row:
                             row[k] = str(v)
+                    updated_row = row
+                    found = True
                     break
-        return self._write_csv('svrp_wallets.csv', rows, self.WALLET_FIELDS)
+            if not found:
+                wallet = self.get_wallet(telegram_id)
+                rows = self._read_csv('svrp_wallets.csv')
+                for row in rows:
+                    if row['telegram_id'] == tid:
+                        for k, v in updates.items():
+                            if k in row:
+                                row[k] = str(v)
+                        updated_row = row
+                        break
+            # NOTE: Do NOT upsert CSV values into SQLite here.
+            # SQLite is the authoritative balance store; upserting CSV values
+            # (which may be stale after a transfer debit) would overwrite the
+            # authoritative balance.  All mutations that need SQLite updates
+            # call delta_update_svrp_wallet() directly before calling
+            # _update_wallet() for CSV, so this method is CSV-only.
+            return self._write_csv('svrp_wallets.csv', rows, self.WALLET_FIELDS)
 
     def add_frozen_balance(self, telegram_id, amount):
-        """إضافة رصيد مجمد للمحفظة (لأرباح الإحالة)"""
+        """إضافة رصيد مجمد للمحفظة — delta to SQLite first, then CSV mirror."""
         tid = str(telegram_id)
-        wallet = self.get_wallet(tid)
-        current_balance = float(wallet.get('balance', 0) or 0)
-        current_earned = float(wallet.get('total_earned', 0) or 0)
-        new_balance = current_balance + float(amount)
-        new_earned = current_earned + float(amount)
-        self._update_wallet(tid, {
-            'balance': new_balance,
-            'total_earned': new_earned
-        })
+        amt = float(amount)
+        with svrp_lock():
+            # SQLite delta (authoritative) — never reads CSV, preserves transfer debits
+            try:
+                from game_engine import GameManager as _GM
+                _GM().delta_update_svrp_wallet(
+                    tid, frozen_balance_delta=amt, total_earned_delta=amt
+                )
+            except Exception as _e:
+                logger.warning(f'add_frozen_balance SQLite delta failed uid={tid}: {_e}')
+            # CSV mirror (display / backward-compatibility)
+            wallet = self.get_wallet(tid)
+            self._update_wallet(tid, {
+                'balance':      round(float(wallet.get('balance', 0) or 0) + amt, 6),
+                'total_earned': round(float(wallet.get('total_earned', 0) or 0) + amt, 6),
+            })
         logger.info(f"Referral bonus added to {tid}: +{amount} frozen")
         return True
 
     def unfreeze_balance(self, telegram_id, amount=None):
-        """تحويل رصيد من مجمد إلى متاح (للأدمن)"""
+        """تحويل رصيد من مجمد إلى متاح — delta to SQLite first, then CSV mirror."""
+        import math as _m
         tid = str(telegram_id)
-        wallet = self.get_wallet(tid)
-        frozen = float(wallet.get('balance', 0) or 0)
-        available = float(wallet.get('total_used', 0) or 0)
-        if amount is None:
-            amount = frozen
-        amount = float(amount)
-        if amount > frozen:
-            amount = frozen
-        new_frozen = frozen - amount
-        new_available = available + amount
-        self._update_wallet(tid, {
-            'balance': new_frozen,
-            'total_used': new_available
-        })
+        with svrp_lock():
+            wallet    = self.get_wallet(tid)
+            frozen    = float(wallet.get('balance', 0) or 0)
+            available = float(wallet.get('total_used', 0) or 0)
+            if amount is None:
+                amount = frozen
+            amount = float(amount)
+            if not _m.isfinite(amount) or amount < 0:
+                return False, frozen, available
+            amount = min(amount, frozen)
+            new_frozen    = round(frozen    - amount, 6)
+            new_available = round(available + amount, 6)
+            # SQLite delta (authoritative)
+            try:
+                from game_engine import GameManager as _GM
+                _GM().delta_update_svrp_wallet(
+                    tid,
+                    frozen_balance_delta=-amount,
+                    total_used_delta=amount
+                )
+            except Exception as _e:
+                logger.warning(f'unfreeze_balance SQLite delta failed uid={tid}: {_e}')
+            # CSV mirror
+            self._update_wallet(tid, {
+                'balance':    new_frozen,
+                'total_used': new_available,
+            })
         logger.info(f"Balance unfrozen for {tid}: {amount} -> available")
         return True, new_frozen, new_available
 
     # ==================== تشغيل الاسترداد ====================
 
     def trigger_recovery(self, user_id, trans_id, amount, currency='SAR'):
-        """
-        تشغيل نظام الاسترداد عند رفض معاملة سحب
-        يقسم الرصيد: 50% للمستخدم + 50% مشترك مع الأصدقاء
-        """
+        """تشغيل نظام الاسترداد — كل الـ RMW داخل svrp_lock لضمان الاتساق."""
+        import math as _m
         tid = str(user_id)
-        multiplier = self._get_config('recovery_multiplier')
-        max_cap = self._get_config('max_recovery_cap')
-        monthly_cap = self._get_config('max_recovery_per_month')
+        multiplier   = self._get_config('recovery_multiplier')
+        max_cap      = self._get_config('max_recovery_cap')
+        monthly_cap  = self._get_config('max_recovery_per_month')
 
-        # فحص الحد الشهري
-        wallet = self.get_wallet(tid)
-        monthly_total = float(wallet.get('monthly_recovery_total', 0) or 0)
-        if monthly_total >= monthly_cap:
-            logger.info(f"Recovery: User {tid} reached monthly cap ({monthly_cap})")
-            return None, "تم الوصول للحد الشهري للاسترداد"
+        with svrp_lock():
+            # قراءة المحفظة داخل القفل (أحدث حالة)
+            wallet        = self.get_wallet(tid)
+            monthly_total = float(wallet.get('monthly_recovery_total', 0) or 0)
+            if monthly_total >= monthly_cap:
+                logger.info(f"Recovery: User {tid} reached monthly cap ({monthly_cap})")
+                return None, "تم الوصول للحد الشهري للاسترداد"
 
-        # حساب الرصيد
-        credit_amount = min(amount * multiplier, max_cap)
-        # التأكد من عدم تجاوز الحد الشهري
-        remaining_monthly = monthly_cap - monthly_total
-        if credit_amount > remaining_monthly:
-            credit_amount = remaining_monthly
+            credit_amount = min(amount * multiplier, max_cap)
+            credit_amount = min(credit_amount, monthly_cap - monthly_total)
+            if credit_amount <= 0:
+                return None, "لا يوجد رصيد متاح"
 
-        if credit_amount <= 0:
-            return None, "لا يوجد رصيد متاح"
+            keep_amount  = credit_amount * self._get_config('credit_split_keep')
+            share_amount = credit_amount * self._get_config('credit_split_share')
 
-        keep_amount = credit_amount * self._get_config('credit_split_keep')
-        share_amount = credit_amount * self._get_config('credit_split_share')
+            now          = datetime.now()
+            expiry       = now + timedelta(days=self._get_config('credit_expiry_days'))
+            wagering_req = self._get_config('wagering_requirement')
 
-        now = datetime.now()
-        expiry = now + timedelta(days=self._get_config('credit_expiry_days'))
-        wagering_req = self._get_config('wagering_requirement')
+            # 1. إضافة رصيد "احتفاظ"
+            keep_credit = {
+                'id': self._generate_id('CRK'),
+                'user_id': tid,
+                'trigger_trans_id': trans_id,
+                'trigger_amount': str(amount),
+                'credit_amount': str(keep_amount),
+                'credit_type': 'keep',
+                'status': 'pending',
+                'friend_id': '',
+                'created_at': now.strftime('%Y-%m-%d %H:%M'),
+                'expires_at': expiry.strftime('%Y-%m-%d %H:%M'),
+                'wagering_required': str(wagering_req),
+                'wagering_completed': '0',
+                'currency': currency
+            }
+            self._append_csv('svrp_credits.csv', keep_credit, self.CREDIT_FIELDS)
 
-        # 1. إضافة رصيد "احتفاظ" للمستخدم
-        keep_credit = {
-            'id': self._generate_id('CRK'),
-            'user_id': tid,
-            'trigger_trans_id': trans_id,
-            'trigger_amount': str(amount),
-            'credit_amount': str(keep_amount),
-            'credit_type': 'keep',
-            'status': 'pending',
-            'friend_id': '',
-            'created_at': now.strftime('%Y-%m-%d %H:%M'),
-            'expires_at': expiry.strftime('%Y-%m-%d %H:%M'),
-            'wagering_required': str(wagering_req),
-            'wagering_completed': '0',
-            'currency': currency
-        }
-        self._append_csv('svrp_credits.csv', keep_credit, self.CREDIT_FIELDS)
+            # 2. إضافة رصيد "مشاركة"
+            share_credit = {
+                'id': self._generate_id('CRS'),
+                'user_id': tid,
+                'trigger_trans_id': trans_id,
+                'trigger_amount': str(amount),
+                'credit_amount': str(share_amount),
+                'credit_type': 'shared',
+                'status': 'pending',
+                'friend_id': '',
+                'created_at': now.strftime('%Y-%m-%d %H:%M'),
+                'expires_at': expiry.strftime('%Y-%m-%d %H:%M'),
+                'wagering_required': str(wagering_req),
+                'wagering_completed': '0',
+                'currency': currency
+            }
+            self._append_csv('svrp_credits.csv', share_credit, self.CREDIT_FIELDS)
 
-        # 2. إضافة رصيد "مشاركة" — يُفعّل عندما يُودع صديق
-        share_credit = {
-            'id': self._generate_id('CRS'),
-            'user_id': tid,
-            'trigger_trans_id': trans_id,
-            'trigger_amount': str(amount),
-            'credit_amount': str(share_amount),
-            'credit_type': 'shared',
-            'status': 'pending',
-            'friend_id': '',
-            'created_at': now.strftime('%Y-%m-%d %H:%M'),
-            'expires_at': expiry.strftime('%Y-%m-%d %H:%M'),
-            'wagering_required': str(wagering_req),
-            'wagering_completed': '0',
-            'currency': currency
-        }
-        self._append_csv('svrp_credits.csv', share_credit, self.CREDIT_FIELDS)
+            # 3. تحديث المحفظة (بعد إلحاق الأرصدة — قراءة حديثة)
+            wallet2         = self.get_wallet(tid)
+            current_balance = float(wallet2.get('balance', 0) or 0)
+            current_pending = float(wallet2.get('pending_balance', 0) or 0)
+            current_earned  = float(wallet2.get('total_earned', 0) or 0)
+            self._update_wallet(tid, {
+                'balance':               current_balance + keep_amount,
+                'pending_balance':       current_pending + share_amount,
+                'total_earned':          current_earned  + credit_amount,
+                'wagering_required':     wagering_req,
+                'last_recovery_date':    now.strftime('%Y-%m-%d %H:%M'),
+                'monthly_recovery_total': monthly_total + credit_amount,
+            })
 
-        # 3. تحديث المحفظة
-        current_balance = float(wallet.get('balance', 0) or 0)
-        current_pending = float(wallet.get('pending_balance', 0) or 0)
-        current_earned = float(wallet.get('total_earned', 0) or 0)
-
-        self._update_wallet(tid, {
-            'balance': current_balance + keep_amount,
-            'pending_balance': current_pending + share_amount,
-            'total_earned': current_earned + credit_amount,
-            'wagering_required': wagering_req,
-            'last_recovery_date': now.strftime('%Y-%m-%d %H:%M'),
-            'monthly_recovery_total': monthly_total + credit_amount
-        })
-
-        # 4. إنشاء مهام يومائية تلقائياً
+        # 4 & 5. خارج القفل (عمليات لا تمس CSV المحفظة/الأرصدة)
         self.create_daily_tasks(tid)
-
-        # 5. تحديث مجموعة المستخدم
         self.update_user_group(tid)
 
-        logger.info(f"Recovery triggered for user {tid}: {credit_amount} {currency} "
-                     f"(keep={keep_amount}, share={share_amount})")
-
+        logger.info(
+            f"Recovery triggered for user {tid}: {credit_amount} {currency} "
+            f"(keep={keep_amount}, share={share_amount})"
+        )
         return {
-            'total_credit': credit_amount,
-            'keep_amount': keep_amount,
-            'share_amount': share_amount,
-            'currency': currency,
+            'total_credit':    credit_amount,
+            'keep_amount':     keep_amount,
+            'share_amount':    share_amount,
+            'currency':        currency,
             'wagering_required': wagering_req,
-            'expires_at': expiry.strftime('%Y-%m-%d %H:%M')
+            'expires_at':      expiry.strftime('%Y-%m-%d %H:%M'),
         }, None
 
     # ==================== تفعيل أرصدة الأصدقاء ====================
@@ -369,31 +501,32 @@ class SVRPManager:
         if not referrer_id:
             return False
 
-        # تفعيل أول رصيد مشترك معلق للمُحيل
-        rows = self._read_csv('svrp_credits.csv')
-        activated = False
-        for row in rows:
-            if (row['user_id'] == referrer_id and
-                row['credit_type'] == 'shared' and
-                row['status'] == 'pending'):
-                row['status'] = 'active'
-                row['friend_id'] = tid
-                activated = True
-                break
+        # تفعيل أول رصيد مشترك معلق للمُحيل — داخل svrp_lock
+        with svrp_lock():
+            rows = self._read_csv('svrp_credits.csv')
+            activated = False
+            activated_row = None
+            for row in rows:
+                if (row['user_id'] == referrer_id and
+                        row['credit_type'] == 'shared' and
+                        row['status'] == 'pending'):
+                    row['status'] = 'active'
+                    row['friend_id'] = tid
+                    activated = True
+                    activated_row = row
+                    break
 
-        if activated:
-            self._write_csv('svrp_credits.csv', rows, self.CREDIT_FIELDS)
+            if activated:
+                self._write_csv('svrp_credits.csv', rows, self.CREDIT_FIELDS)
 
-            # نقل الرصيد من pending إلى balance في المحفظة
-            wallet = self.get_wallet(referrer_id)
-            share_amount = float(row['credit_amount'])
-            current_balance = float(wallet.get('balance', 0) or 0)
-            current_pending = float(wallet.get('pending_balance', 0) or 0)
-
-            self._update_wallet(referrer_id, {
-                'balance': current_balance + share_amount,
-                'pending_balance': max(0, current_pending - share_amount)
-            })
+                wallet = self.get_wallet(referrer_id)
+                share_amount    = float(activated_row['credit_amount'])
+                current_balance = float(wallet.get('balance', 0) or 0)
+                current_pending = float(wallet.get('pending_balance', 0) or 0)
+                self._update_wallet(referrer_id, {
+                    'balance':         current_balance + share_amount,
+                    'pending_balance': max(0, current_pending - share_amount),
+                })
 
             # تحديث حالة الإحالة
             try:
@@ -427,73 +560,180 @@ class SVRPManager:
         return completed >= required
 
     def increment_wagering(self, telegram_id):
-        """زيادة عداد الرهان عند إكمال معاملة — وتفعيل الأرصدة المعلقة عند إكمال الرهان"""
-        wallet = self.get_wallet(telegram_id)
-        current = int(wallet.get('wagering_completed', 0) or 0)
-        required = int(wallet.get('wagering_required', 3) or 3)
-        new_count = current + 1
-        self._update_wallet(telegram_id, {
-            'wagering_completed': new_count
-        })
+        """زيادة عداد الرهان — delta to SQLite first, then CSV mirror."""
+        with svrp_lock():
+            # SQLite delta (authoritative)
+            try:
+                from game_engine import GameManager as _GM
+                _GM().delta_update_svrp_wallet(
+                    str(telegram_id), wagering_completed_delta=1
+                )
+            except Exception as _e:
+                logger.warning(f'increment_wagering SQLite delta failed uid={telegram_id}: {_e}')
+            wallet   = self.get_wallet(telegram_id)
+            current  = int(wallet.get('wagering_completed', 0) or 0)
+            required = int(wallet.get('wagering_required', 3) or 3)
+            new_count = current + 1
+            self._update_wallet(telegram_id, {'wagering_completed': new_count})
 
-        # فك التجميد: تحويل أرصدة 'pending' إلى 'active' عند إكمال الرهان
-        if new_count >= required:
-            rows = self._read_csv('svrp_credits.csv')
-            activated = 0
-            for row in rows:
-                if (row['user_id'] == str(telegram_id) and
-                    row['status'] == 'pending'):
-                    row['status'] = 'active'
-                    activated += 1
-            if activated > 0:
-                self._write_csv('svrp_credits.csv', rows, self.CREDIT_FIELDS)
-                logger.info(f"Recovery: Activated {activated} pending credits for user {telegram_id} (wagering complete: {new_count}/{required})")
-
+            # فك التجميد: تحويل أرصدة 'pending' → 'active' عند إكمال الرهان
+            if new_count >= required:
+                rows = self._read_csv('svrp_credits.csv')
+                activated = 0
+                for row in rows:
+                    if (row['user_id'] == str(telegram_id) and
+                            row['status'] == 'pending'):
+                        row['status'] = 'active'
+                        activated += 1
+                if activated > 0:
+                    self._write_csv('svrp_credits.csv', rows, self.CREDIT_FIELDS)
+                    logger.info(
+                        f"Recovery: Activated {activated} pending credits for "
+                        f"user {telegram_id} (wagering complete: {new_count}/{required})"
+                    )
         return new_count
 
     # ==================== استخدام الأرصدة ====================
 
     def use_credits(self, telegram_id, amount):
-        """
-        استخدام الأرصدة كخصم رسوم
-        يجب أن يكون المستخدم قد أكمل متطلبات الرهان
-        """
-        if not self.check_wagering(telegram_id):
-            return False, "لم تكمل متطلبات الرهان بعد"
+        """استخدام الأرصدة — delta to SQLite first, then CSV mirror (reentrant)."""
+        with svrp_lock():
+            # Read from SQLite (authoritative) for balance check
+            try:
+                from game_engine import GameManager as _GM
+                _gm = _GM()
+                sql_wallet = _gm.get_svrp_frozen_balance(str(telegram_id)) or {}
+                wager_req  = int(sql_wallet.get('wagering_required', 3) or 3)
+                wager_done = int(sql_wallet.get('wagering_completed', 0) or 0)
+                if wager_done < wager_req:
+                    return False, "لم تكمل متطلبات الرهان بعد"
+                balance = float(sql_wallet.get('frozen_balance', 0) or 0)
+                if balance < amount - 1e-9:
+                    return False, f"الرصيد غير كافٍ (المتاح: {balance:.2f})"
+                # SQLite delta (authoritative)
+                _gm.delta_update_svrp_wallet(
+                    str(telegram_id),
+                    frozen_balance_delta=-float(amount),
+                    total_used_delta=float(amount)
+                )
+            except Exception as _e:
+                logger.warning(f'use_credits SQLite delta failed uid={telegram_id}: {_e}')
+                # Fallback: read from CSV
+                wallet     = self.get_wallet(telegram_id)
+                wager_req  = int(wallet.get('wagering_required', 3) or 3)
+                wager_done = int(wallet.get('wagering_completed', 0) or 0)
+                if wager_done < wager_req:
+                    return False, "لم تكمل متطلبات الرهان بعد"
+                balance = float(wallet.get('balance', 0) or 0)
+                if balance < amount:
+                    return False, f"الرصيد غير كافٍ (المتاح: {balance})"
 
-        wallet = self.get_wallet(telegram_id)
-        balance = float(wallet.get('balance', 0) or 0)
+            # CSV mirror
+            wallet     = self.get_wallet(telegram_id)
+            new_balance = float(wallet.get('balance', 0) or 0) - amount
+            total_used  = float(wallet.get('total_used', 0) or 0) + amount
+            self._update_wallet(telegram_id, {
+                'balance':    max(0.0, round(new_balance, 6)),
+                'total_used': round(total_used, 6),
+            })
 
-        if balance < amount:
-            return False, f"الرصيد غير كافٍ (المتاح: {balance})"
-
-        # خصم من المحفظة
-        new_balance = balance - amount
-        total_used = float(wallet.get('total_used', 0) or 0) + amount
-        self._update_wallet(telegram_id, {
-            'balance': new_balance,
-            'total_used': total_used
-        })
-
-        # تحديث حالة الأرصدة المستخدمة (pending أو active — تم تفعيلها في increment_wagering)
-        rows = self._read_csv('svrp_credits.csv')
-        remaining = amount
-        for row in rows:
-            if (row['user_id'] == str(telegram_id) and
-                row['status'] in ('active', 'pending') and
-                float(row.get('credit_amount', 0) or 0) > 0):
-                credit_val = float(row['credit_amount'])
-                if remaining >= credit_val:
-                    remaining -= credit_val
-                    row['status'] = 'used'
-                    row['credit_amount'] = '0'
-                else:
-                    row['credit_amount'] = str(credit_val - remaining)
-                    remaining = 0
-                    break
-        self._write_csv('svrp_credits.csv', rows, self.CREDIT_FIELDS)
+            # تحديث حالة الأرصدة الفردية
+            rows = self._read_csv('svrp_credits.csv')
+            remaining = amount
+            for row in rows:
+                if (row['user_id'] == str(telegram_id) and
+                        row['status'] in ('active', 'pending') and
+                        float(row.get('credit_amount', 0) or 0) > 0):
+                    credit_val = float(row['credit_amount'])
+                    if remaining >= credit_val:
+                        remaining -= credit_val
+                        row['status'] = 'used'
+                        row['credit_amount'] = '0'
+                    else:
+                        row['credit_amount'] = str(round(credit_val - remaining, 6))
+                        remaining = 0
+                        break
+            self._write_csv('svrp_credits.csv', rows, self.CREDIT_FIELDS)
 
         logger.info(f"Recovery: User {telegram_id} used {amount} credits")
+        return True, "تم استخدام الأرصدة بنجاح"
+
+    def use_credits_idempotent(self, telegram_id, amount, transfer_id):
+        """Idempotent SVRP debit keyed on transfer_id.
+
+        Stores last_transfer_id atomically in the same CSV write as the balance
+        deduction.  If the wallet row already contains this transfer_id the call
+        is a provable no-op — crash recovery can call this safely on every retry
+        without risk of double-debit.
+
+        Returns (True, msg) on success or idempotent replay.
+        Returns (False, msg) on validation failure (insufficient balance, etc.).
+        Raises on CSV write failure so the caller can roll back the outbox state.
+        """
+        tid = str(telegram_id)
+        transfer_id = str(transfer_id)
+        with svrp_lock():
+            rows = self._read_csv('svrp_wallets.csv')
+            wallet_row = None
+            for r in rows:
+                if r.get('telegram_id') == tid:
+                    wallet_row = r
+                    break
+
+            # ── Idempotency check ────────────────────────────────────────────
+            if wallet_row is not None and wallet_row.get('last_transfer_id') == transfer_id:
+                # This transfer's debit is already persisted in the CSV.
+                logger.info(
+                    f"use_credits_idempotent: replay uid={tid} transfer={transfer_id}"
+                )
+                return True, "تم استخدام الأرصدة سابقاً (إعادة تشغيل آمنة)"
+
+            # ── Validation ──────────────────────────────────────────────────
+            if wallet_row is None:
+                return False, "المحفظة غير موجودة"
+            wager_req  = int(wallet_row.get('wagering_required', 3) or 3)
+            wager_done = int(wallet_row.get('wagering_completed', 0) or 0)
+            if wager_done < wager_req:
+                return False, "لم تكمل متطلبات الرهان بعد"
+            balance = float(wallet_row.get('balance', 0) or 0)
+            if balance < amount - 1e-9:
+                return False, f"الرصيد غير كافٍ (المتاح: {balance:.2f})"
+
+            # ── Debit + mark idempotency key in ONE atomic write ────────────
+            new_balance = round(balance - amount, 6)
+            total_used  = round(float(wallet_row.get('total_used', 0) or 0) + amount, 6)
+            wallet_row['balance']          = str(new_balance)
+            wallet_row['total_used']       = str(total_used)
+            wallet_row['last_transfer_id'] = transfer_id
+
+            ok = self._write_csv('svrp_wallets.csv', rows, self.WALLET_FIELDS)
+            if not ok:
+                raise RuntimeError(
+                    f"CSV write failed for use_credits_idempotent uid={tid}"
+                )
+
+            # ── Drain matching credit rows ──────────────────────────────────
+            credit_rows = self._read_csv('svrp_credits.csv')
+            remaining = amount
+            for row in credit_rows:
+                if (row.get('user_id') == tid and
+                        row.get('status') in ('active', 'pending') and
+                        float(row.get('credit_amount', 0) or 0) > 0):
+                    cv = float(row['credit_amount'])
+                    if remaining >= cv:
+                        remaining -= cv
+                        row['status'] = 'used'
+                        row['credit_amount'] = '0'
+                    else:
+                        row['credit_amount'] = str(round(cv - remaining, 6))
+                        remaining = 0
+                        break
+            self._write_csv('svrp_credits.csv', credit_rows, self.CREDIT_FIELDS)
+
+        logger.info(
+            f"Recovery: User {telegram_id} idempotent-debited {amount} "
+            f"credits transfer={transfer_id}"
+        )
         return True, "تم استخدام الأرصدة بنجاح"
 
     # ==================== الأكواد الترويجية ====================
@@ -670,37 +910,66 @@ class SVRPManager:
             self._write_csv('svrp_tasks.csv', rows, self.TASK_FIELDS)
 
     def claim_task_reward(self, telegram_id, task_id):
-        """استلام مكافأة مهمة مكتملة"""
+        """استلام مكافأة مهمة مكتملة.
+
+        Design (atomic + idempotent):
+        1. Find task in CSV that is 'completed' (or 'claimed' for idempotent replay).
+        2. Call claim_svrp_task_atomically in SQLite — single SAVEPOINT:
+               INSERT OR IGNORE svrp_task_claims (task_id PK)
+               + UPDATE svrp_wallet_balance frozen_balance += reward
+           Returns 'claimed' (first time) or 'already_claimed' (retry/concurrent).
+           On any exception: return False — CSV untouched, user retries.
+        3. Mark CSV task 'claimed' (idempotent — safe to write even on replay).
+        4. Mirror updated balance to CSV wallet (display only).
+        """
         tid = str(telegram_id)
         rows = self._read_csv('svrp_tasks.csv')
-        reward = 0
-        found = False
+        reward = 0.0
+        task_row = None
 
         for row in rows:
-            if (row['id'] == task_id and
-                row['user_id'] == tid and
-                row['status'] == 'completed'):
-                reward = float(row.get('reward_amount', 0) or 0)
-                row['status'] = 'claimed'
-                found = True
-                break
+            if (row['id'] == task_id and row['user_id'] == tid):
+                if row['status'] in ('completed', 'claimed'):
+                    reward = float(row.get('reward_amount', 0) or 0)
+                    task_row = row
+                    break
 
-        if not found:
+        if task_row is None:
             return False, "المهمة غير موجودة أو لم تكتمل"
 
-        self._write_csv('svrp_tasks.csv', rows, self.TASK_FIELDS)
+        # Already claimed in CSV → still call SQLite to check idempotency
+        # (ensures display is consistent even if a previous run crashed mid-way)
 
-        # إضافة المكافئة للمحفظة
-        wallet = self.get_wallet(tid)
-        current_balance = float(wallet.get('balance', 0) or 0)
-        current_earned = float(wallet.get('total_earned', 0) or 0)
+        # ── Step 1: SQLite atomic claim (idempotency key = task_id PK) ───────
+        try:
+            from game_engine import GameManager as _GM
+            result = _GM().claim_svrp_task_atomically(task_id, tid, reward)
+        except Exception as _ce:
+            logger.error(
+                f'claim_task_reward SQLite FAILED uid={tid} task={task_id}: {_ce}'
+                ' — CSV untouched, user can retry'
+            )
+            return False, "خطأ في قاعدة البيانات — يرجى المحاولة مجدداً"
 
-        self._update_wallet(tid, {
-            'balance': current_balance + reward,
-            'total_earned': current_earned + reward
-        })
+        # ── Step 2: Mark CSV task claimed (idempotent) ─────────────────────
+        if task_row['status'] != 'claimed':
+            task_row['status'] = 'claimed'
+            self._write_csv('svrp_tasks.csv', rows, self.TASK_FIELDS)
 
-        logger.info(f"Recovery: User {tid} claimed task {task_id} reward: {reward}")
+        # ── Step 3: Mirror to CSV wallet (display only) ────────────────────
+        if result == 'claimed':
+            wallet = self.get_wallet(tid)
+            current_balance = float(wallet.get('balance', 0) or 0)
+            current_earned  = float(wallet.get('total_earned', 0) or 0)
+            self._update_wallet(tid, {
+                'balance':      round(current_balance + reward, 6),
+                'total_earned': round(current_earned + reward, 6)
+            })
+
+        logger.info(
+            f"Recovery: User {tid} claimed task {task_id} reward: {reward} "
+            f"(sqlite_result={result})"
+        )
         return True, f"تم استلام المكافأة: {reward} رصيد!"
 
     def get_user_tasks(self, telegram_id):
@@ -929,34 +1198,72 @@ class SVRPManager:
         return None
 
     def approve_recovery_request(self, req_id, amount, admin_id):
-        """موافقة الأدمن على طلب استرداد — يُضاف الرصيد للمجمد"""
-        rows = self._read_csv('recovery_requests.csv')
-        req = None
-        for r in rows:
-            if r['id'] == req_id:
-                r['status'] = 'approved'
-                r['recovery_amount'] = str(amount)
-                r['approved_at'] = datetime.now().strftime('%Y-%m-%d %H:%M')
-                r['approved_by'] = str(admin_id)
-                req = r
-                break
+        """موافقة الأدمن على طلب استرداد — كل الـ RMW داخل svrp_lock.
 
-        if not req:
-            return False, "الطلب غير موجود"
+        Crash-safe ordering (two-CSV atomicity via idempotency key):
+          1. Credit wallet + set last_approval_id = req_id  (atomic CSV write)
+          2. Update request status → 'approved'             (atomic CSV write)
 
-        self._write_csv('recovery_requests.csv', rows, self.RECOVERY_REQUEST_FIELDS)
+        If crash between 1 and 2: request status is still 'pending'.
+        On retry: wallet row has last_approval_id == req_id → wallet credit
+        is a no-op → only status write is re-applied → consistent.
 
-        # إضافة الرصيد للمحفظة المجمدة
-        user_id = req['user_id']
-        wallet = self.get_wallet(user_id)
-        current_balance = float(wallet.get('balance', 0) or 0)
-        current_earned = float(wallet.get('total_earned', 0) or 0)
+        If crash before 1: neither write happened → full retry is safe.
+        """
+        with svrp_lock():
+            req_rows = self._read_csv('recovery_requests.csv')
+            req = None
+            for r in req_rows:
+                if r.get('id') == req_id:
+                    req = r
+                    break
+            if not req:
+                return False, "الطلب غير موجود"
+            if req.get('status') == 'approved':
+                return False, "الطلب مُوافق عليه مسبقاً"
 
-        self._update_wallet(user_id, {
-            'balance': current_balance + amount,
-            'total_earned': current_earned + amount,
-            'last_recovery_date': datetime.now().strftime('%Y-%m-%d %H:%M')
-        })
+            user_id = req['user_id']
+
+            # ── Step 1: credit wallet idempotently (write FIRST) ─────────────
+            w_rows = self._read_csv('svrp_wallets.csv')
+            w_row  = None
+            for wr in w_rows:
+                if wr.get('telegram_id') == str(user_id):
+                    w_row = wr
+                    break
+            if w_row is None:
+                # Create wallet on-the-fly then re-read rows
+                self.get_wallet(user_id)
+                w_rows = self._read_csv('svrp_wallets.csv')
+                for wr in w_rows:
+                    if wr.get('telegram_id') == str(user_id):
+                        w_row = wr
+                        break
+
+            if w_row is not None and w_row.get('last_approval_id') != str(req_id):
+                # Not yet applied — apply now
+                w_row['balance']          = str(
+                    round(float(w_row.get('balance', 0) or 0) + amount, 6)
+                )
+                w_row['total_earned']     = str(
+                    round(float(w_row.get('total_earned', 0) or 0) + amount, 6)
+                )
+                w_row['last_recovery_date'] = datetime.now().strftime('%Y-%m-%d %H:%M')
+                w_row['last_approval_id']   = str(req_id)
+                ok = self._write_csv('svrp_wallets.csv', w_rows, self.WALLET_FIELDS)
+                if not ok:
+                    return False, "فشل تحديث المحفظة — الطلب لم يُوافق عليه"
+            # else: last_approval_id already matches — idempotent replay
+
+            # ── Step 2: mark request approved (write SECOND) ─────────────────
+            for r in req_rows:
+                if r.get('id') == req_id:
+                    r['status']          = 'approved'
+                    r['recovery_amount'] = str(amount)
+                    r['approved_at']     = datetime.now().strftime('%Y-%m-%d %H:%M')
+                    r['approved_by']     = str(admin_id)
+                    break
+            self._write_csv('recovery_requests.csv', req_rows, self.RECOVERY_REQUEST_FIELDS)
 
         logger.info(f"Recovery approved: {req_id} amount={amount} for user {user_id}")
         return True, f"تم إضافة {amount} للرصيد المجمد"
@@ -1037,35 +1344,58 @@ class SVRPManager:
         else:
             friend_count = len(unique_friends)
         
-        # 1. خصم من المرسل + نقل نفس المبلغ للمتاح
-        sender_used = float(sender_wallet.get('total_used', 0) or 0)
-        
-        self._update_wallet(tid, {
-            'balance': sender_balance - amount,
-            'total_used': sender_used + amount
-        })
+        # ── الخصم والإضافة داخل قفل واحد لضمان الاتساق ───────────────────────
+        with svrp_lock():
+            # إعادة القراءة داخل القفل (أحدث حالة)
+            sender_wallet2  = self.get_wallet(tid)
+            sender_balance2 = float(sender_wallet2.get('balance', 0) or 0)
+            sender_used2    = float(sender_wallet2.get('total_used', 0) or 0)
+            max_per_friend2 = sender_balance2 * 0.25
 
-        # 2. إضافة للمستلم (مجمد)
-        receiver_wallet = self.get_wallet(receiver_tid)
-        receiver_balance = float(receiver_wallet.get('balance', 0) or 0)
-        receiver_earned = float(receiver_wallet.get('total_earned', 0) or 0)
+            if amount > max_per_friend2:
+                return False, f"الحد الأقصى لكل صديق: {max_per_friend2:.2f}"
+            if amount <= 0 or sender_balance2 <= 0:
+                return False, "المبلغ أو الرصيد غير صالح"
 
-        self._update_wallet(receiver_tid, {
-            'balance': receiver_balance + amount,
-            'total_earned': receiver_earned + amount
-        })
+            # 1. خصم من المرسل (SQLite delta first, then CSV)
+            try:
+                from game_engine import GameManager as _GM
+                _gm_s = _GM()
+                _gm_s.delta_update_svrp_wallet(
+                    tid,
+                    frozen_balance_delta=-float(amount),
+                    total_used_delta=float(amount)
+                )
+                _gm_s.delta_update_svrp_wallet(
+                    str(receiver_tid),
+                    frozen_balance_delta=float(amount),
+                    total_earned_delta=float(amount)
+                )
+            except Exception as _se:
+                logger.warning(f'send_frozen_credits SQLite delta failed: {_se}')
+            self._update_wallet(tid, {
+                'balance':    round(sender_balance2 - amount, 6),
+                'total_used': round(sender_used2    + amount, 6),
+            })
 
-        # 3. تسجيل التحويل
-        transfer_id = self._generate_id('TRF')
-        transfer = {
-            'id': transfer_id,
-            'sender_id': tid,
-            'receiver_id': receiver_tid,
-            'amount': str(amount),
-            'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')
-        }
-        self._append_csv('svrp_transfers.csv', transfer,
-            ['id', 'sender_id', 'receiver_id', 'amount', 'created_at'])
+            # 2. إضافة للمستلم (مجمد) — قراءة حديثة داخل القفل (CSV mirror)
+            receiver_wallet = self.get_wallet(receiver_tid)
+            self._update_wallet(receiver_tid, {
+                'balance':      round(float(receiver_wallet.get('balance', 0) or 0)    + amount, 6),
+                'total_earned': round(float(receiver_wallet.get('total_earned', 0) or 0) + amount, 6),
+            })
+
+            # 3. تسجيل التحويل
+            transfer_id = self._generate_id('TRF')
+            transfer = {
+                'id': transfer_id,
+                'sender_id': tid,
+                'receiver_id': receiver_tid,
+                'amount': str(amount),
+                'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')
+            }
+            self._append_csv('svrp_transfers.csv', transfer,
+                ['id', 'sender_id', 'receiver_id', 'amount', 'created_at'])
 
         logger.info(f"SVRP transfer: {tid} → {receiver_tid} amount={amount}")
         remaining = max(0, 4 - friend_count)
@@ -1405,57 +1735,6 @@ class SVRPManager:
         """الحصول على طلبات الاسترداد المعلقة"""
         rows = self._read_csv('recovery_requests.csv')
         return [r for r in rows if r.get('status') == 'pending']
-
-    def approve_recovery_request(self, req_id, admin_id, amount, note=''):
-        """الموافقة على طلب استرداد — يُضاف الرصيد المجمد"""
-        rows = self._read_csv('recovery_requests.csv')
-        request = None
-        for row in rows:
-            if row['id'] == req_id:
-                row['status'] = 'approved'
-                row['recovery_amount'] = str(amount)
-                row['admin_note'] = note
-                row['admin_id'] = str(admin_id)
-                row['approved_at'] = datetime.now().strftime('%Y-%m-%d %H:%M')
-                request = row
-                break
-
-        if not request:
-            return False, "الطلب غير موجود"
-
-        self._write_csv('recovery_requests.csv', rows, self.RECOVERY_FIELDS)
-
-        # إضافة الرصيد المجمد للمستخدم
-        user_id = request['user_id']
-        wallet = self.get_wallet(user_id)
-        current_balance = float(wallet.get('balance', 0) or 0)
-        current_earned = float(wallet.get('total_earned', 0) or 0)
-
-        self._update_wallet(user_id, {
-            'balance': current_balance + amount,
-            'total_earned': current_earned + amount
-        })
-
-        # إنشاء سجل رصيد مجمد
-        credit = {
-            'id': self._generate_id('FRC'),
-            'user_id': user_id,
-            'trigger_trans_id': req_id,
-            'trigger_amount': str(amount),
-            'credit_amount': str(amount),
-            'credit_type': 'recovery',
-            'status': 'frozen',
-            'friend_id': '',
-            'created_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
-            'expires_at': (datetime.now() + timedelta(days=self._get_config('credit_expiry_days'))).strftime('%Y-%m-%d %H:%M'),
-            'wagering_required': '0',
-            'wagering_completed': '0',
-            'currency': 'SAR'
-        }
-        self._append_csv('svrp_credits.csv', credit, self.CREDIT_FIELDS)
-
-        logger.info(f"Recovery approved: {req_id} → {amount} frozen for user {user_id}")
-        return True, "تمت الموافقة على الاسترداد"
 
     def reject_recovery_request(self, req_id, admin_id, note=''):
         """رفض طلب استرداد"""

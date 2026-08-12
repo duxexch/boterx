@@ -175,22 +175,29 @@ def init_dice_engine(app, get_uid, get_gm, get_pf, is_pf, is_vex, webapp_auth=No
         if not str(uid).isdigit(): return jsonify({'error': 'uid غير صالح'}), 400
         if not _is_vex(): return jsonify({'error': 'Games not available'}), 500
 
-        # Check balance
-        success, balance = _gm.deduct_balance(uid, amount)
-        if not success:
-            return jsonify({'need_deposit': True, 'error': 'رصيد غير كافٍ'})
-
-        # Generate result (server-authoritative)
+        # Generate result FIRST (server-authoritative), then settle bet+payout
+        # in ONE atomic SQLite transaction — a crash can never leave the bet
+        # debited without the win credited, and request_id makes retries safe.
         result_num = _generate_result(predicted)
         won = (result_num == predicted)
         actual_x = _calc_multiplier(uid, target_x)
+        payout = round(amount * actual_x, 2) if won else 0
 
-        if won:
-            payout = round(amount * actual_x, 2)
-            new_balance = _gm.add_balance(uid, payout)
-        else:
-            payout = 0
-            new_balance = balance
+        template = {
+            'success': True,
+            'result': result_num,
+            'predicted': predicted,
+            'won': won,
+            'payout': payout,
+            'multiplier': actual_x,
+        }
+        ok, stored, race_cached = _gm.settle_with_idempotency(uid, amount, payout, req_id, template)
+        if race_cached:
+            return jsonify(race_cached)
+        if not ok:
+            return jsonify({'need_deposit': True, 'error': 'رصيد غير كافٍ'})
+        new_balance = stored.get('balance_after', 0)
+        balance = round(new_balance - payout + amount, 2)  # balance before, for logs
 
         # Track stats
         with _lock:
@@ -239,15 +246,7 @@ def init_dice_engine(app, get_uid, get_gm, get_pf, is_pf, is_vex, webapp_auth=No
         except:
             pass
 
-        return jsonify({
-            'success': True,
-            'result': result_num,
-            'predicted': predicted,
-            'won': won,
-            'payout': payout,
-            'multiplier': actual_x,
-            'balance_after': new_balance,
-        })
+        return jsonify(stored)
 
     @app.route('/api/dice/history')
     @webapp_auth

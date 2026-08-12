@@ -135,10 +135,10 @@
                             <td class="text-xs text-slate-400" x-text="r.created_at || '—'"></td>
                             <td>
                                 <div class="flex gap-1">
-                                    <button @click="approveRequest(r.id)" class="btn btn-success btn-sm">
+                                    <button @click="approveRequest(r.id)" x-show="rbac('approve_deposits')" class="btn btn-success btn-sm">
                                         <i class="fas fa-check"></i> قبول
                                     </button>
-                                    <button @click="rejectRequest(r.id)" class="btn btn-danger btn-sm">
+                                    <button @click="rejectRequest(r.id)" x-show="rbac('reject_deposits')" class="btn btn-danger btn-sm">
                                         <i class="fas fa-xmark"></i> رفض
                                     </button>
                                 </div>
@@ -243,7 +243,7 @@
                     </div>
 
                     <!-- Dispute resolution -->
-                    <div x-show="selectedMatch.dispute_status === 'open'">
+                    <div x-show="selectedMatch.dispute_status === 'open' && rbac('view_financial')">
                         <h4 class="text-sm font-semibold mb-2">⚖️ حل النزاع</h4>
                         <div class="flex gap-2">
                             <button @click="resolveDispute(selectedMatch.id, 'depositor')" class="btn btn-primary btn-sm flex-1">✅ لصالح المودع</button>

@@ -2,30 +2,33 @@
 /* Professional betting platform design system — Stake/1xBet level */
 
 :root {
-  /* Core palette */
-  --bg: #0a0e17;
-  --bg-2: #0d1220;
-  --surface: #131826;
-  --surface-2: #1a2032;
-  --surface-3: #1f2740;
-  --border: #2a3142;
-  --border-light: #353d52;
+  /* Core palette — VEX neon identity */
+  --bg: #030a06;
+  --bg-2: #06120b;
+  --surface: #0a1a10;
+  --surface-2: #0e2416;
+  --surface-3: #12301c;
+  --border: #1a3d26;
+  --border-light: #245234;
   
-  /* Brand colors */
-  --gold: #fbbf24;
-  --gold-dim: #b8860b;
-  --green: #00e701;
-  --green-dim: #0d7a1f;
+  /* Brand colors — VEX green replaces gold as primary accent */
+  --gold: #00ff88;
+  --gold-dim: #00b35f;
+  --green: #00ff88;
+  --green-dim: #0d7a3f;
   --red: #ff4757;
   --red-dim: #c92634;
   --blue: #3b82f6;
   --purple: #a78bfa;
   --cyan: #06b6d4;
+  --vex: #00ff88;
+  --vex-dim: #00b35f;
+  --vex-glow: rgba(0,255,136,0.35);
   
   /* Text */
-  --text: #e8eaed;
-  --text-dim: #9ca3af;
-  --muted: #6b7280;
+  --text: #e9f5ee;
+  --text-dim: #9fb8aa;
+  --muted: #86a695;
   
   /* Layout */
   --radius: 12px;
@@ -34,9 +37,9 @@
   --gap: 8px;
   
   /* Shadows */
-  --shadow-card: 0 4px 20px rgba(0,0,0,0.3);
-  --shadow-glow-green: 0 0 30px rgba(0,231,1,0.15);
-  --shadow-glow-gold: 0 0 30px rgba(251,191,36,0.15);
+  --shadow-card: 0 4px 20px rgba(0,0,0,0.4);
+  --shadow-glow-green: 0 0 30px rgba(0,255,136,0.2);
+  --shadow-glow-gold: 0 0 30px rgba(0,255,136,0.2);
   
   /* Transitions */
   --ease: cubic-bezier(0.4, 0, 0.2, 1);
@@ -136,18 +139,18 @@ body {
 
 /* Streak badge */
 .streak-badge {
-  background: rgba(251,191,36,0.15);
+  background: rgba(0,255,136,0.15);
   color: var(--gold);
   font-size: 10px;
   padding: 3px 10px;
   border-radius: 12px;
   font-weight: 800;
-  border: 1px solid rgba(251,191,36,0.3);
+  border: 1px solid rgba(0,255,136,0.3);
   animation: streakPulse 2s infinite;
 }
 @keyframes streakPulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(251,191,36,0.2); }
-  50% { box-shadow: 0 0 0 4px rgba(251,191,36,0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(0,255,136,0.2); }
+  50% { box-shadow: 0 0 0 4px rgba(0,255,136,0); }
 }
 
 /* Sound toggle */
@@ -216,9 +219,9 @@ body {
 .hist-win { background: rgba(0,231,1,0.12); color: var(--green); }
 .hist-lose { background: rgba(255,71,87,0.1); color: var(--red); opacity: 0.7; }
 .hist-big {
-  background: rgba(251,191,36,0.15);
+  background: rgba(0,255,136,0.15);
   color: var(--gold);
-  border: 1px solid rgba(251,191,36,0.3);
+  border: 1px solid rgba(0,255,136,0.3);
   animation: histBig 0.5s;
 }
 @keyframes histBig {
@@ -257,7 +260,7 @@ body {
 }
 .bet-input:focus {
   border-color: var(--gold);
-  box-shadow: 0 0 0 3px rgba(251,191,36,0.1);
+  box-shadow: 0 0 0 3px rgba(0,255,136,0.1);
 }
 .bet-cur {
   position: absolute;
@@ -395,7 +398,7 @@ body {
   flex: 1;
   position: relative;
   overflow: hidden;
-  background: radial-gradient(ellipse at 50% 100%, #0d1521 0%, var(--bg) 70%);
+  background: radial-gradient(ellipse at 50% 100%, #06120b 0%, var(--bg) 70%);
 }
 
 /* Stars/decoration */
@@ -448,7 +451,7 @@ body {
 }
 .mult-val.cashed {
   color: var(--gold);
-  text-shadow: 0 0 40px rgba(251,191,36,0.5);
+  text-shadow: 0 0 40px rgba(0,255,136,0.5);
 }
 @keyframes shake {
   0%, 100% { transform: translateX(0); }
@@ -531,7 +534,7 @@ body {
 }
 .lp-row.win { background: rgba(0,231,1,0.08); }
 .lp-row.lose { background: rgba(255,71,87,0.06); }
-.lp-row.me { border: 1px solid rgba(251,191,36,0.2); }
+.lp-row.me { border: 1px solid rgba(0,255,136,0.2); }
 .lp-user { display: flex; align-items: center; gap: 4px; }
 .lp-avatar {
   width: 16px;
@@ -678,7 +681,7 @@ body {
 }
 .modal-input:focus {
   border-color: var(--gold);
-  box-shadow: 0 0 0 3px rgba(251,191,36,0.1);
+  box-shadow: 0 0 0 3px rgba(0,255,136,0.1);
 }
 
 /* Modal buttons */

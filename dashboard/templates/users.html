@@ -99,10 +99,10 @@
                             <td>
                                 <div class="flex gap-1">
                                     <button @click="openDetail(u)" class="btn btn-primary btn-sm" title="تفاصيل"><i class="fas fa-eye"></i></button>
-                                    <template x-if="u.is_banned === 'yes'">
+                                    <template x-if="u.is_banned === 'yes' && rbac('unban_users')">
                                         <button @click="unban(u.telegram_id)" class="btn btn-success btn-sm" title="إلغاء الحظر"><i class="fas fa-unlock"></i></button>
                                     </template>
-                                    <template x-if="u.is_banned !== 'yes'">
+                                    <template x-if="u.is_banned !== 'yes' && rbac('ban_users')">
                                         <button @click="openBanModal(u)" class="btn btn-danger btn-sm" title="حظر"><i class="fas fa-ban"></i></button>
                                     </template>
                                 </div>
@@ -203,7 +203,7 @@
                             <div class="p-2 bg-slate-900/50 rounded"><p class="text-xs text-slate-500" data-i18n="total_earned">Total Earned</p><p class="font-bold text-blue-400" x-text="fmtNum(detailWallet?.total_earned || 0)"></p></div>
                             <div class="p-2 bg-slate-900/50 rounded"><p class="text-xs text-slate-500" data-i18n="frozen">Frozen</p><p class="font-bold text-red-400" x-text="fmtNum(detailWallet?.pending_balance || 0)"></p></div>
                         </div>
-                        <div class="flex gap-2 mt-2">
+                        <div class="flex gap-2 mt-2" x-show="rbac('view_financial')">
                             <button @click="freezeBalance(detail.telegram_id)" class="btn btn-warning btn-sm">🧊 تجميد الرصيد</button>
                             <button @click="unfreezeBalance(detail.telegram_id)" class="btn btn-success btn-sm">🔓 فك التجميد</button>
                         </div>
@@ -234,7 +234,9 @@
                 </div>
                 <div class="flex gap-2 justify-end">
                     <button @click="showBanModal = false" class="btn bg-slate-700 text-slate-300 hover:bg-slate-600" data-i18n="cancel">Cancel</button>
+                    {% if not admin_perms or admin_perms.get('ban_users') %}
                     <button @click="confirmBan()" class="btn btn-danger"><i class="fas fa-ban ml-1"></i> تأكيد الحظر</button>
+                    {% endif %}
                 </div>
             </div>
         </div>

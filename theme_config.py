@@ -6,6 +6,78 @@
 """
 
 THEMES = {
+    'vex': {
+        'name': 'VEX Neon',
+        'name_ar': 'VEX النيون الأخضر',
+        'icon': '🟢',
+        # أطر زخرفية
+        'frame_top': '┏━━━━━━━━━━━━━━━━━━┓',
+        'frame_mid': '┃',
+        'frame_bot': '┗━━━━━━━━━━━━━━━━━━┛',
+        'box_top': '┌─────────────────────┐',
+        'box_bot': '└─────────────────────┘',
+        # أشرطة التقدم
+        'bar_full': '🟩',
+        'bar_empty': '⬛',
+        # فاصل
+        'separator': '🟢━━━━━━━━━━━━━━━━🟢',
+        # ألوان الحالة
+        'status_active': '🟢',
+        'status_pending': '🟡',
+        'status_used': '🔴',
+        'status_expired': '⚫',
+        # ألوان المعاملات
+        'color_deposit': '🟢',
+        'color_withdraw': '🔴',
+        'color_success': '✅',
+        'color_error': '❌',
+        'color_info': '💚',
+        'color_warning': '⚠️',
+        # أزرار رئيسية — هوية VEX الخضراء
+        'btn_deposit': '💵',
+        'btn_withdraw': '📤',
+        'btn_requests': '📋',
+        'btn_profile': '👤',
+        'btn_complaint': '📨',
+        'btn_support': '🎧',
+        'btn_currency': '💱',
+        'btn_language': '🌐',
+        'btn_recovery': '💎',
+        'btn_referral': '🎁',
+        'btn_help': '❓',
+        'btn_notifications': '🔔',
+        'btn_match': '🔄',
+        'btn_reset': '♻️',
+        # أيقونات الإدمن
+        'admin_pending': '📋',
+        'admin_approved': '✅',
+        'admin_users': '👥',
+        'admin_search': '🔍',
+        'admin_companies': '🏢',
+        'admin_payment': '💳',
+        'admin_stats': '📊',
+        'admin_excel': '📑',
+        'admin_broadcast': '📢',
+        'admin_complaints': '📨',
+        'admin_support': '🛠️',
+        'admin_settings': '⚙️',
+        'admin_addresses': '📍',
+        'admin_admins': '👥',
+        'admin_buttons': '✏️',
+        'admin_notifications': '🔔',
+        'admin_backup': '💾',
+        'admin_recovery': '💎',
+        'admin_ban': '🚫',
+        'admin_unban': '✅',
+        'admin_home': '🏠',
+        # تنسيق الرسائل
+        'msg_format': 'bold',
+        # هوية العلامة
+        'brand_name': 'VEX',
+        'brand_tagline_ar': 'اشتي وبع مع المستخدمين الآخرين بأمان',
+        'brand_tagline_en': 'Buy & sell with other users — safely',
+    },
+
     'gold': {
         'name': 'Dark Gold',
         'name_ar': 'الذهبي الداكن',
@@ -198,7 +270,7 @@ THEMES = {
 
 def get_theme(theme_name):
     """الحصول على ثيم كامل بالاسم"""
-    return THEMES.get(theme_name, THEMES['gold'])
+    return THEMES.get(theme_name, THEMES['vex'])
 
 
 def get_theme_list():
@@ -209,7 +281,7 @@ def get_theme_list():
 def get_theme_value(theme_name, key):
     """الحصول على قيمة محددة من ثيم"""
     theme = get_theme(theme_name)
-    return theme.get(key, THEMES['gold'].get(key, ''))
+    return theme.get(key, THEMES['vex'].get(key, ''))
 
 
 def format_message(theme_name, title, content):

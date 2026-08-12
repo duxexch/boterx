@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=5.0,user-scalable=yes">
+<meta name="theme-color" content="#030a06">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="/static/manifest.json">
+<link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/static/icons/icon-32.png">
+<title>محفظتي — VEX</title>
+<link rel="stylesheet" href="/static/css/game-base.css?v=20260812">
+<style>
+body { overflow: auto !important; }
+#app { position: relative !important; height: auto !important; min-height: 100vh; min-height: 100dvh; }
+
+/* ── Topbar ── */
+.wallet-topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px 10px; background: var(--surface); border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 20;
+}
+.wallet-topbar .back-btn {
+  background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
+  width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center;
+  justify-content: center; cursor: pointer; font-size: 16px;
+}
+.wallet-topbar h1 { font-size: 17px; font-weight: 700; color: var(--text); }
+
+/* ── Cards ── */
+.wallet-page { padding: 12px; display: flex; flex-direction: column; gap: 12px; padding-bottom: 32px; }
+
+/* Game balance card */
+.balance-card {
+  background: linear-gradient(135deg, var(--surface-2), var(--surface-3));
+  border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 16px;
+  position: relative; overflow: hidden;
+}
+.balance-card::before {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(ellipse at top right, rgba(0,231,1,0.07) 0%, transparent 60%);
+  pointer-events: none;
+}
+.balance-card .bc-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+.balance-card .bc-amount { font-size: 34px; font-weight: 800; color: var(--green); letter-spacing: -1px; line-height: 1; }
+.balance-card .bc-cur { font-size: 14px; color: var(--muted); margin-top: 4px; }
+.balance-card .bc-actions { display: flex; gap: 8px; margin-top: 16px; }
+.balance-card .bc-actions button {
+  flex: 1; padding: 10px 0; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600;
+  cursor: pointer; border: none; transition: transform .15s, opacity .15s;
+}
+.balance-card .bc-actions button:active { transform: scale(.96); }
+.btn-dep { background: linear-gradient(135deg, #00e701, #0d7a1f); color: #fff; }
+.btn-wdr { background: var(--surface-3); border: 1px solid var(--border) !important; color: var(--text); }
+
+/* SVRP card */
+.svrp-card {
+  background: var(--surface); border-radius: var(--radius); overflow: hidden;
+  border: 1px solid var(--border);
+}
+.svrp-header {
+  padding: 14px 16px 10px; display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+}
+.svrp-title { font-size: 14px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 6px; }
+.svrp-amount { font-size: 22px; font-weight: 800; }
+.svrp-amount.locked   { color: #60a5fa; }
+.svrp-amount.unlocked { color: #a78bfa; }
+.svrp-body { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+
+/* Wagering progress */
+.wager-section { }
+.wager-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.wager-top span { font-size: 11px; color: var(--muted); }
+.wager-top .wager-count { font-size: 12px; font-weight: 700; color: var(--text); }
+.wager-track { height: 8px; background: var(--surface-3); border-radius: 4px; overflow: hidden; }
+.wager-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+  transition: width .6s cubic-bezier(0.4,0,0.2,1); }
+.wager-fill.complete { background: linear-gradient(90deg, #00e701, #22c55e); }
+.wager-hint {
+  border-radius: 8px; padding: 10px 12px; font-size: 12px; line-height: 1.5; margin-top: 4px;
+}
+.wager-hint.locked   { background: rgba(59,130,246,.08); border: 1px solid rgba(59,130,246,.2); color: #93c5fd; }
+.wager-hint.unlocked { background: rgba(0,231,1,.08); border: 1px solid rgba(0,231,1,.2); color: #6ee7b7; }
+
+/* Transfer CTA */
+.transfer-cta {
+  background: linear-gradient(135deg, rgba(167,139,250,.12), rgba(99,102,241,.1));
+  border: 1px solid rgba(167,139,250,.3); border-radius: 10px; padding: 14px;
+}
+.transfer-cta .cta-title { font-size: 13px; font-weight: 700; color: #c4b5fd; margin-bottom: 8px; }
+.transfer-cta .cta-row { display: flex; gap: 8px; align-items: center; }
+.cta-input {
+  flex: 1; background: var(--surface-3); border: 1px solid var(--border); border-radius: 8px;
+  padding: 9px 12px; color: var(--text); font-size: 13px; min-width: 0;
+}
+.cta-input:focus { outline: none; border-color: #8b5cf6; }
+.btn-transfer {
+  background: linear-gradient(135deg, #7c3aed, #6d28d9); color: #fff;
+  border: none; border-radius: 8px; padding: 9px 16px; font-size: 13px; font-weight: 700;
+  cursor: pointer; white-space: nowrap; transition: transform .15s, opacity .15s;
+}
+.btn-transfer:disabled { opacity: .5; cursor: not-allowed; }
+.btn-transfer:not(:disabled):active { transform: scale(.96); }
+.cta-note { font-size: 10px; color: var(--muted); margin-top: 6px; }
+
+/* Credit sources */
+.credit-sources { display: flex; flex-direction: column; gap: 6px; }
+.credit-source-row {
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--surface-2); border-radius: 8px; padding: 8px 10px;
+}
+.cs-label { font-size: 12px; color: var(--text-dim); }
+.cs-right { display: flex; align-items: center; gap: 6px; }
+.cs-amount { font-size: 13px; font-weight: 700; color: #60a5fa; }
+.cs-badge { font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 600; }
+.cs-badge.active  { background: rgba(0,231,1,.1); color: var(--green); }
+.cs-badge.pending { background: rgba(0,255,136,.1); color: var(--gold); }
+.cs-badge.frozen  { background: rgba(59,130,246,.12); color: #60a5fa; }
+
+/* Pending card */
+.pending-card {
+  background: var(--surface); border: 1px solid rgba(0,255,136,.25); border-radius: var(--radius); padding: 14px 16px;
+}
+.pending-header { display: flex; align-items: center; justify-content: space-between; }
+.pending-title { font-size: 13px; font-weight: 600; color: var(--gold); display: flex; align-items: center; gap: 6px; }
+.pending-amount { font-size: 20px; font-weight: 800; color: var(--gold); }
+.pending-hint { font-size: 11px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+
+/* Transactions */
+.txn-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.txn-title { padding: 14px 16px 10px; font-size: 14px; font-weight: 700; color: var(--text); border-bottom: 1px solid var(--border); }
+.txn-row { display: flex; align-items: center; padding: 10px 14px; border-bottom: 1px solid rgba(42,49,66,.5); gap: 10px; }
+.txn-icon { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+.txn-icon.dep { background: rgba(0,231,1,.12); }
+.txn-icon.wdr { background: rgba(255,71,87,.12); }
+.txn-icon.rew { background: rgba(0,255,136,.12); }
+.txn-body { flex: 1; min-width: 0; }
+.txn-type-lbl { font-size: 12px; font-weight: 600; color: var(--text); }
+.txn-meta { font-size: 10px; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.txn-badge { font-size: 9px; padding: 2px 5px; border-radius: 4px; margin-top: 3px; display: inline-block; }
+.txn-badge.pending { background: rgba(0,255,136,.12); color: var(--gold); }
+.txn-badge.completed { background: rgba(0,231,1,.1); color: var(--green); }
+.txn-badge.rejected { background: rgba(255,71,87,.1); color: var(--red); }
+.txn-amount { font-size: 13px; font-weight: 800; }
+.txn-amount.dep { color: var(--green); }
+.txn-amount.wdr { color: var(--red); }
+.txn-amount.rew { color: var(--gold); }
+
+/* Toast */
+.toast-msg {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+  background: #1e2638; border: 1px solid var(--border); border-radius: 10px;
+  padding: 10px 18px; font-size: 13px; color: var(--text); z-index: 999;
+  white-space: nowrap; box-shadow: 0 4px 20px rgba(0,0,0,.4);
+  animation: fadeUp .25s ease; pointer-events: none;
+}
+@keyframes fadeUp { from { opacity:0; transform: translateX(-50%) translateY(8px); } to { opacity:1; transform: translateX(-50%); } }
+
+/* Loader / empty */
+.ld { display: flex; align-items: center; justify-content: center; padding: 60px; }
+.ld::after { content:''; width:24px; height:24px; border:3px solid var(--border); border-top-color:var(--green); border-radius:50%; animation: spin .7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.wallet-empty { padding: 40px; text-align: center; color: var(--muted); font-size: 13px; }
+
+@media(min-width:600px){ #app{ max-width: 460px; margin: 0 auto; } }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="wallet-topbar">
+    <button class="back-btn" onclick="history.back()">←</button>
+    <h1>💳 محفظتي</h1>
+    <div style="width:36px"></div>
+  </div>
+
+  <div id="walletPage" class="wallet-page">
+    <div class="ld" id="loader"></div>
+  </div>
+</div>
+
+<script src="/static/js/game-base.js?v=20260812a"></script>
+<script>
+const lang = new URLSearchParams(location.search).get('lang') || 'ar';
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function fmt(n, cur) {
+  const v = (+n || 0);
+  return v.toLocaleString('ar-EG', { maximumFractionDigits: 2 }) + (cur ? ' ' + cur : '');
+}
+function pct(done, req) { return req > 0 ? Math.min(100, Math.round(done / req * 100)) : 100; }
+
+const TYPE_LABELS = {
+  deposit: '💰 إيداع', withdraw: '💸 سحب',
+  referral: '🎁 مكافأة إحالة', recovery: '🔄 تعويض',
+  compensation: '💎 تعويض', game_win: '🏆 ربح ألعاب', svrp_transfer: '💎 نقل SVRP',
+};
+const STATUS_LABELS = {
+  pending: 'معلق', completed: 'مكتمل', rejected: 'مرفوض',
+  approved: 'مكتمل', cancelled: 'ملغي',
+};
+
+function txnCls(type) {
+  if (/deposit|add|svrp_transfer/i.test(type)) return 'dep';
+  if (/withdraw|wdr/i.test(type)) return 'wdr';
+  return 'rew';
+}
+function txnIcon(type) {
+  if (/deposit|add/i.test(type)) return '💰';
+  if (/withdraw|wdr/i.test(type)) return '💸';
+  if (/svrp/i.test(type)) return '💎';
+  if (/referral/i.test(type)) return '🎁';
+  return '💎';
+}
+
+function showToast(msg, color) {
+  const el = document.createElement('div');
+  el.className = 'toast-msg';
+  el.style.borderColor = color === 'error' ? 'rgba(255,71,87,.4)' : color === 'success' ? 'rgba(0,231,1,.3)' : '';
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 2800);
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+let _walletData = null;
+
+function renderWallet(d) {
+  _walletData = d;
+  const cur             = d.currency || 'EGP';
+  const gameBalance     = d.game_balance || 0;
+  const svrpCredits     = d.svrp_credits || 0;
+  const pendingBalance  = d.pending_balance || 0;
+  const wagerDone       = d.wagering_completed || 0;
+  const wagerReq        = d.wagering_required || 3;
+  const wageringDone    = d.wagering_done;      // True = اكتمل الرهان
+  const creditsSpendable = d.credits_spendable; // True = يمكن النقل الآن
+  const wPct            = pct(wagerDone, wagerReq);
+  const hasSVRP         = svrpCredits > 0;
+  const hasPending      = pendingBalance > 0;
+
+  let html = '';
+
+  // ── 1. رصيد اللعب ──────────────────────────────────────────────
+  html += `
+  <div class="balance-card">
+    <div class="bc-label">🎮 رصيد اللعب المتاح للرهان</div>
+    <div class="bc-amount" id="liveBalance">${gameBalance.toLocaleString()}</div>
+    <div class="bc-cur">${cur}</div>
+    <div class="bc-actions">
+      <button class="btn-dep" onclick="showDeposit()">💰 إيداع</button>
+      <button class="btn-wdr" onclick="showWithdraw()">💸 سحب</button>
+    </div>
+  </div>`;
+
+  // ── 2. أرصدة SVRP (التعويض الذكي) ─────────────────────────────
+  if (hasSVRP || hasPending) {
+    html += `<div class="svrp-card">`;
+
+    // Header
+    const statusIcon  = wageringDone ? '🔓' : '🔒';
+    const statusLabel = wageringDone ? 'جاهز للنقل' : 'ينتظر اكتمال الرهان';
+    html += `
+    <div class="svrp-header">
+      <div class="svrp-title">${statusIcon} أرصدة التعويض (SVRP)</div>
+      <div>
+        <div class="svrp-amount ${wageringDone ? 'unlocked' : 'locked'}">${fmt(svrpCredits, cur)}</div>
+        <div style="font-size:10px;color:var(--muted);text-align:left;margin-top:2px">${statusLabel}</div>
+      </div>
+    </div>`;
+
+    html += `<div class="svrp-body">`;
+
+    // Wagering progress
+    html += `
+    <div class="wager-section">
+      <div class="wager-top">
+        <span>تقدم اكتمال الرهان</span>
+        <span class="wager-count">${wagerDone} / ${wagerReq} معاملات (${wPct}%)</span>
+      </div>
+      <div class="wager-track">
+        <div class="wager-fill ${wageringDone ? 'complete' : ''}" style="width:${wPct}%"></div>
+      </div>
+      <div class="wager-hint ${wageringDone ? 'unlocked' : 'locked'}">`;
+
+    if (wageringDone) {
+      html += `✅ اكتملت متطلبات الرهان — يمكنك الآن نقل رصيد SVRP إلى رصيد اللعب`;
+    } else {
+      const rem = d.wagering_remaining || (wagerReq - wagerDone);
+      html += `🔒 أكمل <strong>${rem}</strong> معاملة إضافية إيداع أو سحب لفك تجميد رصيدك`;
+    }
+    html += `</div></div>`;
+
+    // Transfer CTA — يظهر فقط عند اكتمال الرهان وعندما يوجد رصيد
+    if (creditsSpendable) {
+      html += `
+      <div class="transfer-cta">
+        <div class="cta-title">💸 نقل رصيد SVRP إلى حساب اللعب</div>
+        <div class="cta-row">
+          <input class="cta-input" id="transferAmt" type="number" min="0.01"
+            max="${svrpCredits}" step="0.01" placeholder="المبلغ (أو اتركه فارغاً للكل)"
+            value="${svrpCredits.toFixed(2)}">
+          <button class="btn-transfer" id="transferBtn" onclick="doTransfer()">نقل ←</button>
+        </div>
+        <div class="cta-note">الحد الأقصى: ${fmt(svrpCredits, cur)} — سيُضاف مباشرة لرصيد اللعب</div>
+      </div>`;
+    }
+
+    // Credit sources breakdown
+    const sources = d.credit_sources || [];
+    if (sources.length) {
+      html += `<div class="credit-sources">`;
+      for (const s of sources) {
+        const badgeLbl = s.status === 'active' ? 'نشط' : s.status === 'pending' ? 'معلق' : 'مجمد';
+        html += `
+        <div class="credit-source-row">
+          <span class="cs-label">${s.label}</span>
+          <div class="cs-right">
+            <span class="cs-amount">${fmt(s.amount, cur)}</span>
+            <span class="cs-badge ${s.status === 'active' ? 'active' : 'pending'}">${badgeLbl}</span>
+          </div>
+        </div>`;
+      }
+      html += `</div>`;
+    }
+
+    html += `</div></div>`;  // .svrp-body .svrp-card
+  }
+
+  // ── 3. رصيد معلق (ينتظر الأصدقاء) ─────────────────────────────
+  if (hasPending) {
+    html += `
+    <div class="pending-card">
+      <div class="pending-header">
+        <div class="pending-title">⏳ ينتظر إكمال الأصدقاء</div>
+        <div class="pending-amount">${fmt(pendingBalance, cur)}</div>
+      </div>
+      <div class="pending-hint">هذا الرصيد سيُضاف تلقائياً لأرصدة SVRP عندما يُكمل أصدقاؤك المُحالون متطلبات الرهان الخاصة بهم.</div>
+    </div>`;
+  }
+
+  // ── 4. آخر المعاملات ────────────────────────────────────────────
+  html += `<div class="txn-card"><div class="txn-title">📋 آخر المعاملات</div>`;
+  const txns = d.recent_transactions || [];
+  if (!txns.length) {
+    html += `<div class="wallet-empty">لا توجد معاملات بعد</div>`;
+  } else {
+    for (const t of txns) {
+      const cls  = txnCls(t.type);
+      const ico  = txnIcon(t.type);
+      const lbl  = TYPE_LABELS[t.type] || t.type || '—';
+      const sign = cls === 'wdr' ? '−' : '+';
+      const sLbl = STATUS_LABELS[t.status] || t.status || '';
+      const sCls = (t.status === 'completed' || t.status === 'approved') ? 'completed'
+                 : (t.status === 'rejected' || t.status === 'cancelled') ? 'rejected' : 'pending';
+      html += `
+      <div class="txn-row">
+        <div class="txn-icon ${cls}">${ico}</div>
+        <div class="txn-body">
+          <div class="txn-type-lbl">${lbl}</div>
+          <div class="txn-meta">${t.company ? t.company + ' · ' : ''}${t.date || ''}</div>
+          ${sLbl ? `<span class="txn-badge ${sCls}">${sLbl}</span>` : ''}
+        </div>
+        <div class="txn-amount ${cls}">${sign}${parseFloat(t.amount || 0).toLocaleString()} ${cur}</div>
+      </div>`;
+    }
+  }
+  html += `</div>`;
+
+  document.getElementById('loader').style.display = 'none';
+  document.getElementById('walletPage').innerHTML = html;
+
+  // Live balance polling (game balance only)
+  setInterval(async () => {
+    try {
+      const r  = await apiFetch(`${BASE}/api/wallet/balance`);
+      const dd = await r.json();
+      const el = document.getElementById('liveBalance');
+      if (el && dd.balance !== undefined) {
+        const nv = (dd.balance || 0).toLocaleString();
+        if (el.textContent !== nv) {
+          el.textContent = nv;
+          el.style.color = '#00e701';
+          setTimeout(() => { el.style.color = ''; }, 800);
+        }
+      }
+    } catch (_) {}
+  }, 6000);
+}
+
+// ── Transfer ──────────────────────────────────────────────────────────────────
+async function doTransfer() {
+  const btn = document.getElementById('transferBtn');
+  const inp = document.getElementById('transferAmt');
+  if (!btn || !inp) return;
+
+  const maxAmt = _walletData ? (_walletData.svrp_credits || 0) : 0;
+  let amount   = parseFloat(inp.value);
+  if (isNaN(amount) || amount <= 0) amount = maxAmt;
+  if (amount > maxAmt) { showToast('المبلغ يتجاوز رصيد SVRP', 'error'); return; }
+
+  // Generate a stable idempotency key for this transfer attempt.
+  // Stored in sessionStorage so that a retry from the same page session
+  // sends the same key — the server returns the cached result without
+  // debiting again.  Cleared after a confirmed terminal response.
+  const _tsKey = 'svrp_pending_transfer_id';
+  let transferId = sessionStorage.getItem(_tsKey);
+  if (!transferId) {
+    transferId = crypto.randomUUID ? crypto.randomUUID()
+      : Math.random().toString(36).slice(2) + Date.now().toString(36);
+    sessionStorage.setItem(_tsKey, transferId);
+  }
+
+  btn.disabled = true;
+  btn.textContent = '⏳';
+  try {
+    const r = await apiFetch(`${BASE}/api/svrp/transfer-to-game`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount, transfer_id: transferId }),
+    });
+    const d = await r.json();
+    if (d && d.retry) {
+      // Transient failure — server kept the debit; client MUST retry with same key.
+      showToast('فشل مؤقت — يرجى إعادة المحاولة', 'error');
+      // transferId stays in sessionStorage for the next tap
+    } else if (!r.ok || d.error) {
+      showToast(d.error || 'فشل النقل', 'error');
+      // Terminal error — clear key so the next attempt is a fresh transfer
+      sessionStorage.removeItem(_tsKey);
+    } else {
+      sessionStorage.removeItem(_tsKey);  // success — next transfer gets a fresh key
+      showToast(`✅ تم نقل ${d.transferred?.toLocaleString()} — رصيد اللعب الجديد: ${d.new_game_balance?.toLocaleString()}`, 'success');
+      setTimeout(loadWallet, 1000);
+    }
+  } catch (e) {
+    // Network error — keep the key so retry is idempotent
+    showToast('خطأ في الاتصال — حاول مجدداً', 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'نقل ←'; }
+  }
+}
+
+// ── Load ──────────────────────────────────────────────────────────────────────
+async function loadWallet() {
+  document.getElementById('walletPage').innerHTML = '<div class="ld" id="loader"></div>';
+  try {
+    const r = await apiFetch(`${BASE}/api/player/wallet`);
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    renderWallet(d);
+  } catch (e) {
+    document.getElementById('loader').style.display = 'none';
+    document.getElementById('walletPage').innerHTML =
+      `<div class="wallet-empty" style="padding:50px">⚠️ تعذّر تحميل المحفظة<br><small style="color:var(--muted)">${e.message || ''}</small></div>`;
+  }
+}
+
+function showDeposit()  { window.location.href = `${BASE}/webapp/games?${_getAuthParam()}&lang=${lang}&action=deposit`; }
+function showWithdraw() { window.location.href = `${BASE}/webapp/games?${_getAuthParam()}&lang=${lang}&action=withdraw`; }
+
+loadWallet();
+</script>
+</body>
+</html>

@@ -27,9 +27,11 @@
 
     <!-- Add button + refresh -->
     <div class="flex items-center justify-between">
+        {% if not admin_perms or admin_perms.get('manage_companies') %}
         <button @click="showAddModal = true" class="btn btn-primary">
             <i class="fas fa-plus ml-1"></i> إضافة وسيلة دفع
         </button>
+        {% endif %}
         <button @click="loadData()" class="btn btn-sm" style="background:#475569">
             <i class="fas fa-rotate ml-1"></i> تحديث
         </button>
@@ -50,7 +52,10 @@
                 <tbody>
                     <template x-for="m in filteredMethods" :key="m.id">
                         <tr class="hover:bg-slate-700/50">
-                            <td class="text-xl" x-text="m.icon || '💳'"></td>
+                            <td>
+                                <img x-show="isImgIcon(m.icon)" :src="isImgIcon(m.icon) ? m.icon : null" class="w-8 h-8 rounded-lg object-cover inline-block border border-slate-600" alt="">
+                                <span x-show="!isImgIcon(m.icon)" class="text-xl" x-text="m.icon || '💳'"></span>
+                            </td>
                             <td class="font-medium" x-text="m.method_name"></td>
                             <td>
                                 <span class="px-2 py-0.5 rounded text-xs bg-slate-700 text-slate-300" x-text="m.method_type"></span>
@@ -58,7 +63,13 @@
                             <td class="font-mono text-xs">
                                 <code class="bg-slate-900 px-2 py-0.5 rounded text-amber-400" x-text="m.account_data" @click="copyToClipboard(m.account_data)"></code>
                             </td>
-                            <td class="text-xs text-slate-400" x-text="m.additional_info || '—'"></td>
+                            <td class="text-xs text-slate-400">
+                                <div x-text="m.additional_info || '—'"></div>
+                                <div class="flex gap-1 mt-1">
+                                    <span x-show="(m.available_for_games || 'yes') === 'yes'" class="px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/20 text-emerald-400">⚡ إيداع سريع</span>
+                                    <span class="px-1.5 py-0.5 rounded text-[10px] bg-slate-700 text-slate-300" x-text="m.currency ? m.currency : '🌍 كل العملات'"></span>
+                                </div>
+                            </td>
                             <td>
                                 <div class="flex flex-wrap gap-1">
                                     <template x-for="c in getLinkedCompanies(m.id)" :key="c.id">
@@ -68,11 +79,12 @@
                                 </div>
                             </td>
                             <td>
-                                <button @click="toggleStatus(m)" class="badge" :class="m.status === 'active' ? 'badge-active' : 'badge-cancelled'"
+                                <button @click="toggleStatus(m)" x-show="rbac('manage_companies')" class="badge" :class="m.status === 'active' ? 'badge-active' : 'badge-cancelled'"
                                     x-text="m.status === 'active' ? 'نشطة' : 'متوقفة'"></button>
+                                <span x-show="!rbac('manage_companies')" x-html="statusBadge(m.status)"></span>
                             </td>
                             <td>
-                                <div class="flex gap-1">
+                                <div class="flex gap-1" x-show="rbac('manage_companies')">
                                     <button @click="editMethod(m)" class="btn btn-sm" style="background:#3B82F6" title="Edit" data-i18n-title="edit">
                                         <i class="fas fa-pen text-xs"></i>
                                     </button>
@@ -131,8 +143,57 @@
                     <input type="text" x-model="form.additional_info" class="input w-full" placeholder="مثال: فرع الرياض (اختياري)">
                 </div>
                 <div>
-                    <label class="block text-xs text-slate-400 mb-1">الأيقونة (إيموجي)</label>
-                    <input type="text" x-model="form.icon" class="input w-full" placeholder="💳" maxlength="2">
+                    <label class="block text-xs text-slate-400 mb-1">الأيقونة</label>
+                    <div class="flex items-center gap-3">
+                        <div class="w-11 h-11 rounded-xl bg-slate-700 border border-slate-600 flex items-center justify-center overflow-hidden shrink-0">
+                            <img x-show="isImgIcon(form.icon)" :src="isImgIcon(form.icon) ? form.icon : null" class="w-full h-full object-cover" alt="">
+                            <span x-show="!isImgIcon(form.icon)" class="text-xl" x-text="form.icon || '💳'"></span>
+                        </div>
+                        <div class="flex-1 space-y-2">
+                            <label class="flex items-center justify-center gap-2 w-full bg-slate-700 hover:bg-slate-600 border border-dashed border-slate-500 rounded-lg px-3 py-2 text-xs cursor-pointer transition"
+                                   :class="uploadingIcon && 'opacity-50 pointer-events-none'">
+                                <i class="fas" :class="uploadingIcon ? 'fa-spinner fa-spin' : 'fa-cloud-upload-alt'"></i>
+                                <span x-text="uploadingIcon ? 'جارٍ الرفع...' : 'رفع صورة من الجهاز'"></span>
+                                <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" class="hidden" @change="uploadIcon($event)">
+                            </label>
+                            <input type="text" x-model="form.icon" class="input w-full text-xs" placeholder="أو اكتب إيموجي مثل 💳">
+                        </div>
+                    </div>
+                    <p class="text-[10px] text-slate-500 mt-1">PNG / JPG / WEBP / GIF حتى 2MB</p>
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">العملة (تظهر الوسيلة فقط للمستخدمين بهذه العملة)</label>
+                    <select x-model="form.currency" class="input w-full">
+                        <option value="">🌍 كل العملات</option>
+                        <option value="EGP">🇪🇬 EGP — جنيه مصري</option>
+                        <option value="SAR">🇸🇦 SAR — ريال سعودي</option>
+                        <option value="AED">🇦🇪 AED — درهم إماراتي</option>
+                        <option value="YER">🇾🇪 YER — ريال يمني</option>
+                        <option value="USD">🇺🇸 USD — دولار أمريكي</option>
+                        <option value="KWD">🇰🇼 KWD — دينار كويتي</option>
+                        <option value="QAR">🇶🇦 QAR — ريال قطري</option>
+                        <option value="OMR">🇴🇲 OMR — ريال عماني</option>
+                        <option value="BHD">🇧🇭 BHD — دينار بحريني</option>
+                        <option value="JOD">🇯🇴 JOD — دينار أردني</option>
+                        <option value="IQD">🇮🇶 IQD — دينار عراقي</option>
+                        <option value="LYD">🇱🇾 LYD — دينار ليبي</option>
+                        <option value="MAD">🇲🇦 MAD — درهم مغربي</option>
+                        <option value="TND">🇹🇳 TND — دينار تونسي</option>
+                        <option value="DZD">🇩🇿 DZD — دينار جزائري</option>
+                        <option value="SDG">🇸🇩 SDG — جنيه سوداني</option>
+                        <option value="EUR">🇪🇺 EUR — يورو</option>
+                        <option value="TRY">🇹🇷 TRY — ليرة تركية</option>
+                    </select>
+                </div>
+                <div class="flex items-center justify-between bg-slate-700/40 rounded-lg px-3 py-2.5">
+                    <div>
+                        <div class="text-sm font-semibold">⚡ الإيداع السريع في الألعاب</div>
+                        <div class="text-xs text-slate-400">تظهر هذه الوسيلة للمستخدم داخل الألعاب عند نفاد رصيده</div>
+                    </div>
+                    <label class="inline-flex items-center cursor-pointer">
+                        <input type="checkbox" x-model="form.quick" class="sr-only peer">
+                        <div class="w-10 h-5.5 h-6 bg-slate-600 peer-checked:bg-emerald-500 rounded-full relative transition after:content-[''] after:absolute after:top-0.5 after:right-0.5 after:bg-white after:rounded-full after:w-5 after:h-5 after:transition peer-checked:after:-translate-x-4"></div>
+                    </label>
                 </div>
             </div>
             <div class="flex gap-2 justify-end mt-4">
@@ -178,9 +239,35 @@ function paymentMethodsApp() {
         search: '', loading: true,
         showAddModal: false, showLinkModal: false,
         editing: false, selectedMethod: null, selectedCompanies: [],
-        form: { method_name: '', method_type: 'mobile', account_data: '', additional_info: '', icon: '💳' },
+        form: { method_name: '', method_type: 'mobile', account_data: '', additional_info: '', icon: '💳', currency: '', quick: true },
+
+        uploadingIcon: false,
 
         async init() { await this.loadData(); },
+
+        isImgIcon(icon) {
+            return typeof icon === 'string' && (icon.startsWith('/static/') || icon.startsWith('http'));
+        },
+
+        async uploadIcon(e) {
+            const file = e.target.files && e.target.files[0];
+            if (!file) return;
+            if (file.size > 2 * 1024 * 1024) { toast('حجم الصورة أكبر من 2MB', 'error'); e.target.value = ''; return; }
+            this.uploadingIcon = true;
+            try {
+                const fd = new FormData();
+                fd.append('file', file);
+                const res = await fetch('/api/upload-icon', { method: 'POST', body: fd });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || 'فشل الرفع');
+                this.form.icon = data.url;
+                toast('تم رفع الأيقونة بنجاح', 'success');
+            } catch (err) {
+                toast(err.message || 'فشل رفع الأيقونة', 'error');
+            }
+            this.uploadingIcon = false;
+            e.target.value = '';
+        },
 
         async loadData() {
             this.loading = true;
@@ -226,7 +313,7 @@ function paymentMethodsApp() {
 
         editMethod(m) {
             this.editing = true;
-            this.form = { method_name: m.method_name, method_type: m.method_type, account_data: m.account_data, additional_info: m.additional_info || '', icon: m.icon || '💳' };
+            this.form = { method_name: m.method_name, method_type: m.method_type, account_data: m.account_data, additional_info: m.additional_info || '', icon: m.icon || '💳', currency: m.currency || '', quick: (m.available_for_games || 'yes') === 'yes' };
             this.selectedMethod = m;
             this.showAddModal = true;
         },
@@ -244,22 +331,31 @@ function paymentMethodsApp() {
                 toast('املأ الاسم والبيانات', 'warning');
                 return;
             }
+            const payload = {
+                method_name: this.form.method_name,
+                method_type: this.form.method_type,
+                account_data: this.form.account_data,
+                additional_info: this.form.additional_info,
+                icon: this.form.icon,
+                currency: this.form.currency || '',
+                available_for_games: this.form.quick ? 'yes' : 'no'
+            };
             if (this.editing && this.selectedMethod) {
                 await api(`/api/payment-methods/${this.selectedMethod.id}`, {
                     method: 'PUT',
-                    body: JSON.stringify(this.form)
+                    body: JSON.stringify(payload)
                 });
                 toast('تم التعديل', 'success');
             } else {
                 await api('/api/payment-methods', {
                     method: 'POST',
-                    body: JSON.stringify(this.form)
+                    body: JSON.stringify(payload)
                 });
                 toast('تمت الإضافة', 'success');
             }
             this.showAddModal = false;
             this.editing = false;
-            this.form = { method_name: '', method_type: 'mobile', account_data: '', additional_info: '', icon: '💳' };
+            this.form = { method_name: '', method_type: 'mobile', account_data: '', additional_info: '', icon: '💳', currency: '', quick: true };
             await this.loadData();
         },
 

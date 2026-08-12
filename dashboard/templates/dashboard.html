@@ -215,15 +215,21 @@ function dashboardApp() {
             this.loadRecentTxns();
             this.loadRecentUsers();
             this.loadActivity();
-            setInterval(() => this.loadStats(), 15000);
+            this._statsTimer = setInterval(() => this.loadStats(), 15000);
         },
 
         async loadStats() {
             try {
-                const data = await api('/api/stats');
-                this.stats = data;
+                const res = await fetch('/api/stats', { credentials: 'same-origin' });
+                if (res.status === 401 || res.status === 403) {
+                    // Session not authenticated — stop polling to avoid console noise
+                    if (this._statsTimer) { clearInterval(this._statsTimer); this._statsTimer = null; }
+                    return;
+                }
+                if (!res.ok) return;
+                this.stats = await res.json();
                 this.renderCharts();
-            } catch(e) { console.error('Stats error:', e); }
+            } catch(e) { /* network hiccup — next tick retries */ }
         },
 
         async loadRecentTxns() {
@@ -399,7 +405,7 @@ function dashboardApp() {
                 window._regChart = new Chart(canvas, {
                     type: 'line',
                     data: { labels: labels, datasets: [{ label: 'التسجيلات', data: regData, borderColor: '#A855F7', backgroundColor: 'rgba(168,85,247,0.15)', fill: true, tension: 0.4 }] },
-                    options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#64748b' }, grid: { color: '#1E293B' } }, y: { ticks: { color: '#64748b' }, grid: { color: '#1E293B' } }, beginAtZero: true } }
+                    options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#64748b' }, grid: { color: '#1E293B' } }, y: { ticks: { color: '#64748b' }, grid: { color: '#1E293B' }, beginAtZero: true } } }
                 });
             }
         }

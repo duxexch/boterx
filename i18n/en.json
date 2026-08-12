@@ -1,7 +1,7 @@
 {
-  "welcome_new": "👋 Welcome, {name}!\n\nYou are now connected to our financial services platform. We're glad to have you onboard.\n\nPlease complete your registration to get started.",
-  "welcome_back": "👋 Welcome back, {name}! (ID: {customer_id})\n\nYour account is active and ready to use.\n\nHow can we help you today?",
-  "choose_service": "👋 Hello, {name}! (ID: {customer_id})\n\nPlease choose a service from the menu below:",
+  "welcome_new": "💚 VEX — Buy & sell with other users, safely\n\n👋 Welcome, {name}!\n\nYou are now connected to the VEX platform. We're glad to have you onboard.\n\nPlease complete your registration to get started.",
+  "welcome_back": "💚 VEX — Buy & sell with other users, safely\n\n👋 Welcome back, {name}! (ID: {customer_id})\n\nYour account is active and ready to use.\n\nHow can we help you today?",
+  "choose_service": "💚 VEX — Buy & sell with other users, safely\n\n👋 Hello, {name}! (ID: {customer_id})\n\nPlease choose a service from the menu below:",
   "deposit": "💰 Deposit Request",
   "withdraw": "💸 Withdrawal Request",
   "my_requests": "📋 My Requests",
@@ -17,7 +17,7 @@
   "cancel_registration": "❌ Cancel Registration",
   "enter_name_prompt": "✍️ Please enter your full name:\n\nExample: John Smith",
   "enter_phone_prompt": "📱 Please enter your phone number with country code:\n\nExample: +1234567890",
-  "registration_success": "✅ Registration Successful!\n\n👤 Name: {name}\n📱 Phone: {phone}\n🆔 Customer ID: {customer_id}\n📅 Date: {date}\n\nYou can now start using our services.",
+  "registration_success": "💚 VEX — Buy & sell with other users, safely\n\n✅ Registration Successful!\n\n👤 Name: {name}\n📱 Phone: {phone}\n🆔 Customer ID: {customer_id}\n📅 Date: {date}\n\nYou can now start using our services.",
   "deposit_title": "💰 Deposit Request\n\nPlease select a company to proceed:",
   "withdraw_title": "💸 Withdrawal Request\n\nPlease select a company to proceed:",
   "select_company": "🏢 Please select a company from the list below:",
@@ -1368,5 +1368,6 @@
   "game_wallet_rejected": "❌ Request rejected — balance refunded",
   "game_wallet_manual_entry": "✍️ Or enter payment method manually",
   "game_wallet_save_permanent": "Save as permanent payment method",
-  "game_wallet_confirm_withdrawal": "💸 Confirm Withdrawal"
+  "game_wallet_confirm_withdrawal": "💸 Confirm Withdrawal",
+  "account_restored": "💚 VEX — Buy & sell with other users, safely\n\n✅ Your account has been restored!\n\n👤 Name: {name}\n📱 Phone: {phone}\n🆔 Customer ID: {customer_id}\n📅 Registered: {date}\n\n💡 Your account is now linked to this device. All your data is safe."
 }

@@ -243,17 +243,20 @@ class GameManager:
     # ===== المحفظة الموحدة (users.csv) =====
 
     def _migrate_payment_methods_for_games(self):
-        """إضافة عمود available_for_games إلى payment_methods.csv"""
+        """إضافة عمودَي available_for_games و currency إلى payment_methods.csv"""
         try:
             with open('payment_methods.csv', 'r', encoding=CSV_ENCODING) as f:
                 reader = csv.DictReader(f)
                 fieldnames = reader.fieldnames or []
-                if 'available_for_games' in fieldnames:
+                missing = [c for c in ('available_for_games', 'currency') if c not in fieldnames]
+                if not missing:
                     return
                 rows = list(reader)
-            new_fields = list(fieldnames) + ['available_for_games']
+            new_fields = list(fieldnames) + missing
+            defaults = {'available_for_games': 'yes', 'currency': ''}
             for row in rows:
-                row['available_for_games'] = 'yes'
+                for c in missing:
+                    row[c] = defaults[c]
             with open('payment_methods.csv', 'w', newline='', encoding=CSV_ENCODING) as f:
                 writer = csv.DictWriter(f, fieldnames=new_fields)
                 writer.writeheader()
@@ -264,15 +267,14 @@ class GameManager:
 
     def get_games_payment_methods(self, user_currency=None):
         """قراءة وسائل الدفع النشطة والمتاحة للألعاب — مفلترة حسب العملة.
-        إذا لم توجد نتائج بعد الفلترة، أرجع كل الوسائل النشطة."""
+        لا يوجد fallback: إذا لم توجد وسائل مطابقة تُرجع قائمة فارغة
+        (الواجهة تعرض نموذج الإدخال اليدوي في هذه الحالة)."""
         methods = []
-        all_active = []
         try:
             with open('payment_methods.csv', 'r', encoding=CSV_ENCODING) as f:
                 reader = csv.DictReader(f)
                 for row in reader:
                     if row.get('status') == 'active':
-                        all_active.append(row)
                         avail = row.get('available_for_games', 'yes')
                         if avail != 'yes':
                             continue
@@ -283,9 +285,6 @@ class GameManager:
                             methods.append(row)
         except:
             pass
-        # Fallback: if filtered list is empty, return all active methods
-        if not methods and all_active:
-            return all_active
         return methods
 
     def get_user_info(self, user_id):
@@ -355,10 +354,110 @@ class GameManager:
             pass
         return 'EGP'
 
-    def add_balance(self, user_id, amount, reason='deposit'):
+    def create_svrp_transfer(self, transfer_id, uid):
+        """Reserve outbox slot (status='pending', amount=0). Returns True if inserted."""
+        if _USE_SQLITE:
+            return _db.create_svrp_transfer(transfer_id, uid)
+        return True
+
+    def mark_svrp_transfer_debited(self, transfer_id, uid,
+                                   actual_amount, pre_debit_svrp_balance):
+        """CAS pending→debited with actual amount + pre-debit balance. Returns True on success."""
+        if _USE_SQLITE:
+            return _db.mark_svrp_transfer_debited(
+                transfer_id, uid, actual_amount, pre_debit_svrp_balance
+            )
+        return True  # CSV fallback: no idempotency
+
+    def mark_svrp_transfer_csv_debited(self, transfer_id, uid):
+        """Mark csv_debited=1 (legacy; no longer called by transfer endpoint)."""
+        if _USE_SQLITE:
+            return _db.mark_svrp_transfer_csv_debited(transfer_id, uid)
+        return True
+
+    # ── SQLite-only SVRP wallet operations ──────────────────────────────────
+
+    def upsert_svrp_wallet_balance(self, uid, frozen_balance, total_earned,
+                                   total_used, wagering_required, wagering_completed):
+        """Backfill only (INSERT OR IGNORE). Use delta_update_svrp_wallet for mutations."""
+        if _USE_SQLITE:
+            _db.upsert_svrp_wallet_balance(
+                uid, frozen_balance, total_earned, total_used,
+                wagering_required, wagering_completed
+            )
+
+    def delta_update_svrp_wallet(self, uid, frozen_balance_delta=0.0,
+                                  total_earned_delta=0.0, total_used_delta=0.0,
+                                  wagering_completed_delta=0, set_wagering_required=None):
+        """Apply incremental deltas to SQLite frozen wallet. Returns updated dict."""
+        if _USE_SQLITE:
+            return _db.delta_update_svrp_wallet(
+                uid,
+                frozen_balance_delta=frozen_balance_delta,
+                total_earned_delta=total_earned_delta,
+                total_used_delta=total_used_delta,
+                wagering_completed_delta=wagering_completed_delta,
+                set_wagering_required=set_wagering_required,
+            )
+        return None
+
+    def claim_svrp_task_atomically(self, task_id: str, uid: str, reward: float):
+        """Single-SAVEPOINT task claim with idempotency. Returns 'claimed'/'already_claimed'."""
+        if _USE_SQLITE:
+            return _db.claim_svrp_task_atomically(task_id, uid, reward)
+        return 'claimed'   # no-SQLite fallback: treat as first claim
+
+    def migrate_svrp_wallets_from_csv(self, rows):
+        """Idempotent backfill: INSERT OR IGNORE CSV rows into SQLite."""
+        if _USE_SQLITE:
+            _db.migrate_svrp_wallets_from_csv(rows)
+
+    def get_svrp_frozen_balance(self, uid):
+        """Return SQLite authoritative frozen-balance dict for uid."""
+        if _USE_SQLITE:
+            return _db.get_svrp_frozen_balance(uid)
+        return {'frozen_balance': 0.0, 'wagering_required': 3, 'wagering_completed': 0}
+
+    def get_outstanding_debited_transfer(self, uid):
+        """Return transfer_id of any 'debited' transfer for uid, or None."""
+        if _USE_SQLITE:
+            return _db.get_outstanding_debited_transfer(uid)
+        return None
+
+    def credit_svrp_balance_for_approval(self, req_id, uid, amount):
+        """Approve request + credit frozen balance in one SQLite SAVEPOINT."""
+        if _USE_SQLITE:
+            return _db.credit_svrp_balance_for_approval(req_id, uid, amount)
+        return False, 'SQLite not available'
+
+    def debit_svrp_balance_for_transfer(self, transfer_id, uid, amount):
+        """Debit frozen balance + CAS pending→debited in one SQLite SAVEPOINT."""
+        if _USE_SQLITE:
+            return _db.debit_svrp_balance_for_transfer(transfer_id, uid, amount)
+        return False
+
+    def mark_svrp_transfer_status(self, transfer_id, uid, status):
+        """Set terminal status (rolled_back etc.) with uid ownership check."""
+        if _USE_SQLITE:
+            _db.mark_svrp_transfer_status(transfer_id, uid, status)
+
+    def get_svrp_transfer(self, transfer_id):
+        """Return outbox record dict, or None if not found."""
+        if _USE_SQLITE:
+            return _db.get_svrp_transfer(transfer_id)
+        return None
+
+    def add_balance_for_svrp_transfer(self, user_id, amount, transfer_id):
+        """Credit game balance exactly once via STATUS-based CAS (no INSERT collision)."""
+        if _USE_SQLITE:
+            return _db.add_balance_for_svrp_transfer(user_id, amount, transfer_id)
+        # CSV fallback: no idempotency guarantee
+        return self.add_balance(user_id, amount, 'svrp_transfer')
+
+    def add_balance(self, user_id, amount, reason='deposit', idempotency_key=None):
         """إضافة رصيد — SQLite (atomic transaction)"""
         if _USE_SQLITE:
-            return _db.add_balance(user_id, amount)
+            return _db.add_balance(user_id, amount, idempotency_key=idempotency_key)
         # Fallback: CSV cache
         _load_balance_cache()
         uid = str(user_id)

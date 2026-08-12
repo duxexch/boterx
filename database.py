@@ -119,6 +119,8 @@ class BotDatabase:
 
     def _ensure_table(self, table: str, fieldnames: list):
         """CREATE TABLE IF NOT EXISTS with all TEXT columns."""
+        # Strip None / empty column names (can appear in CSV headers with trailing commas)
+        fieldnames = [f for f in fieldnames if f and str(f).strip()]
         if not fieldnames:
             return
         cols = ', '.join(f'"{f}" TEXT' for f in fieldnames)

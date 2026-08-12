@@ -2,12 +2,24 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=5.0,user-scalable=yes">
+<meta name="theme-color" content="#030a06">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="VEX Games">
+<link rel="manifest" href="/static/manifest.json">
+<link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/static/icons/icon-32.png">
 <title>VEX Games</title>
-<link rel="stylesheet" href="/static/css/game-base.css?v=20260811">
+<link rel="stylesheet" href="/static/css/game-base.css?v=20260812">
 <style>
-#app{overflow-y:auto}
-#hub{padding:12px;display:grid;grid-template-columns:repeat(2,1fr);gap:10px;overflow-y:auto;align-content:start}
+/* Desktop/tablet responsive overrides */
+body { overflow: auto !important; }
+#app { position: relative !important; height: auto !important; min-height: 100vh; min-height: 100dvh; overflow: visible !important; }
+#hub{padding:12px;display:grid;grid-template-columns:repeat(2,1fr);gap:10px;align-content:start}
+@media(min-width:480px){ #hub { grid-template-columns:repeat(3,1fr) } }
+@media(min-width:768px){ #hub { grid-template-columns:repeat(4,1fr);gap:14px;padding:16px;max-width:900px;margin:0 auto } }
+@media(min-width:1024px){ #hub { grid-template-columns:repeat(5,1fr) } }
 .game-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 10px;cursor:pointer;transition:all 0.2s var(--ease);text-align:center;position:relative;overflow:hidden}
 .game-card:active{transform:scale(0.95);border-color:var(--gold)}
 .game-card:hover{border-color:var(--gold)}
@@ -65,13 +77,20 @@
 <div class="loader-screen" id="loading"><div class="spinner"></div></div>
 <div id="app" style="display:none">
   <div id="topbar">
-    <div class="topbar-info">
-      <div class="topbar-name">💰 <span id="bal">0</span> <span id="cur" style="font-size:11px;color:var(--muted);cursor:pointer" onclick="showCurrencyPicker()">EGP</span></div>
+    <div class="topbar-info" style="flex:1;min-width:0">
+      <div class="topbar-name" style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
+        <span style="color:var(--muted);font-size:12px">💰</span>
+        <span id="bal" style="font-weight:800;font-size:16px">0</span>
+        <span id="cur" style="font-size:11px;color:var(--muted);cursor:pointer" onclick="showCurrencyPicker()">EGP</span>
+        <span id="frozenBadge" style="display:none;align-items:center;gap:3px;background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.25);border-radius:6px;padding:2px 7px;font-size:10px;cursor:pointer;color:#60a5fa" onclick="openWalletPage()">🔒 <span id="frozenAmt"></span></span>
+        <span id="pendingBadge" style="display:none;align-items:center;gap:3px;background:rgba(0,255,136,.1);border:1px solid rgba(0,255,136,.2);border-radius:6px;padding:2px 7px;font-size:10px;color:var(--gold)">⏳ <span id="pendingAmt"></span></span>
+      </div>
       <div class="topbar-seg" id="stats"></div>
     </div>
     <div class="topbar-btns">
-      <button class="hub-btn vex" id="vexBtn" style="display:none" onclick="alert('💎 تعويض')">💎</button>
-      <button class="hub-btn dep" onclick="window.location.href=BASE+'/webapp/stats?'+_getAuthParam()" style="background:linear-gradient(135deg,#06b6d4,#0891b2);color:#fff">📊</button>
+      <button class="hub-btn" id="vexBtn" style="display:none;background:rgba(99,102,241,.15);color:#a5b4fc;border:1px solid rgba(99,102,241,.3)" onclick="openWalletPage()">💎</button>
+      <button class="hub-btn" title="حسابي" style="background:rgba(0,255,136,.12);color:var(--gold);border:1px solid rgba(0,255,136,.25)" onclick="openAccountPage()">👤</button>
+      <button class="hub-btn" title="محفظتي" style="background:rgba(59,130,246,.15);color:#60a5fa;border:1px solid rgba(59,130,246,.3)" onclick="openWalletPage()">💳</button>
       <button class="hub-btn dep" onclick="showDeposit()">💰</button>
       <button class="hub-btn wdr" onclick="showWithdraw()">💸</button>
     </div>
@@ -87,12 +106,15 @@
   <div class="empty-state" id="empty"><div class="empty-icon">🎮</div><p>لا توجد ألعاب متاحة</p></div>
 </div>
 <div class="modal-overlay" id="modal"><div class="modal-box" id="modalBox"></div></div>
-<script src="/static/js/game-base.js?v=20260811"></script>
+<script src="/static/js/game-base.js?v=20260812a"></script>
 <script>
 const lang=new URLSearchParams(location.search).get('lang')||'ar';
 const GAME_ROUTES={'GAME004':'/webapp/aviator','GAME005':'/webapp/crash','GAME006':'/webapp/mines','GAME007':'/webapp/plinko','GAME008':'/webapp/lottery','GAME009':'/webapp/wheel','GAME010':'/webapp/dice'};
 async function loadProfile(){try{const r=await apiFetch(`${BASE}/api/player/profile`);const d=await r.json();const p=d.profile||{};const seg=d.segment||'new';const l={new:'🟢 جديد',winner:'🔴 رابح',loser:'🟡 خاسر',hot:'🔥 ساخن',churning:'⚠️ يغادر',vip:'💎 VIP',regular:'👤 عادي'};if(d.balance!==undefined){document.getElementById('bal').textContent=(d.balance||0).toLocaleString();}if(d.currency){document.getElementById('cur').textContent=d.currency;}const cid=d.customer_id?' | رقم: '+d.customer_id:'';document.getElementById('stats').textContent=`${l[seg]||seg}${cid} | ${p.win_rate||0}%`;if(p.is_vex_partner==='yes')document.getElementById('vexBtn').style.display='block';}catch(e){}}
-async function loadGames(){try{const r=await apiFetch(`${BASE}/api/games/list`);const d=await r.json();const gs=d.games||[];document.getElementById('loading').style.display='none';if(gs.length===0){document.getElementById('empty').style.display='block';return;}document.getElementById('app').style.display='flex';const h=document.getElementById('hub');h.innerHTML='';gs.forEach((g,i)=>{const c=document.createElement('div');c.className='game-card';if(i<3)c.innerHTML+='<div class="hot-badge">🔥</div>';const icon=g.icon||'🎮';c.innerHTML+=`<div class="game-icon game-icon-anim" data-game="${g.id}">${icon}</div><div class="game-name">${g.name||''}</div><div class="game-desc">${g.description||''}</div>`;c.onclick=()=>playGame(g.id);h.appendChild(c);});}catch(e){document.getElementById('loading').style.display='none';document.getElementById('empty').style.display='block';}}
+async function loadWalletBadges(){try{const r=await apiFetch(`${BASE}/api/player/wallet`);const d=await r.json();const cur=d.currency||'EGP';if(d.svrp_credits>0){const fb=document.getElementById('frozenBadge');const fa=document.getElementById('frozenAmt');if(fb&&fa){fa.textContent=`${(d.svrp_credits||0).toLocaleString()} ${cur}`;fb.style.display='flex';}}if(d.pending_balance>0){const pb=document.getElementById('pendingBadge');const pa=document.getElementById('pendingAmt');if(pb&&pa){pa.textContent=`${(d.pending_balance||0).toLocaleString()} ${cur}`;pb.style.display='flex';}}}catch(_){}}
+function openWalletPage(){window.location.href=`${BASE}/webapp/wallet?${_getAuthParam()}&lang=${lang}`;}
+function openAccountPage(){window.location.href=`${BASE}/webapp/account?${_getAuthParam()}&lang=${lang}`;}
+async function loadGames(){try{const r=await apiFetch(`${BASE}/api/games/list`);const d=await r.json();const gs=d.games||[];document.getElementById('loading').style.display='none';document.getElementById('app').style.display='flex';if(gs.length===0){document.getElementById('empty').style.display='block';return;}const h=document.getElementById('hub');h.innerHTML='';gs.forEach((g,i)=>{const c=document.createElement('div');c.className='game-card';if(i<3)c.innerHTML+='<div class="hot-badge">🔥</div>';const icon=g.icon||'🎮';c.innerHTML+=`<div class="game-icon game-icon-anim" data-game="${g.id}">${icon}</div><div class="game-name">${g.name||''}</div><div class="game-desc">${g.description||''}</div>`;c.onclick=()=>playGame(g.id);h.appendChild(c);});}catch(e){document.getElementById('loading').style.display='none';document.getElementById('app').style.display='flex';document.getElementById('empty').style.display='block';}}
 function playGame(id){const path=GAME_ROUTES[id]||`/webapp/play/${id}`;window.location.href=`${BASE}${path}?${_getAuthParam()}&lang=${lang}`;}
 function closeModal(){document.getElementById('modal').style.display='none';}
 async function showDeposit(){document.getElementById('modal').style.display='flex';await showVexDepositModal(0);}
@@ -100,7 +122,7 @@ async function showWithdraw(){const bal=parseFloat(document.getElementById('bal'
   let wAcc='',wMid='';window.selWdr=function(ac,mid){document.querySelectorAll('.method-item').forEach(m=>m.style.borderColor='var(--border)');event.target.closest('.method-item').style.borderColor='var(--gold)';wAcc=ac;wMid=mid;};window.subWdr=async function(){const a=parseFloat(document.getElementById('wdrAmt').value)||0;const ac=wAcc||document.getElementById('wdrAcc').value.trim();if(a<=0||!ac){alert('أدخل المبلغ ورقم الحساب');return;}try{const r=await apiFetch(`${BASE}/api/wallet/withdraw`,{method:'POST',body:JSON.stringify({uid,amount:a,method_id:wMid,account_number:ac})});const d=await r.json();if(d.success){mb.innerHTML=`<div style="text-align:center;padding:16px"><div style="font-size:28px">⏳</div><div class="modal-title">تم الطلب</div><div class="modal-subtitle">بانتظار موافقة الإدارة</div><button class="modal-btn-secondary" onclick="closeModal();loadBalance();">إغلاق</button></div>`;}else{alert(d.error||'خطأ');}}catch(e){alert('خطأ');}};}
 function showCurrencyPicker(){const cs=[{code:'EGP',name:'جنيه مصري 🇪🇬'},{code:'SAR',name:'ريال سعودي 🇸🇦'},{code:'USD',name:'دولار 🇺🇸'},{code:'USDT',name:'تيذر 🪙'},{code:'AED',name:'درهم 🇦🇪'},{code:'KWD',name:'دينار كويتي 🇰🇼'}];document.getElementById('modal').style.display='flex';document.getElementById('modalBox').innerHTML=`<div class="modal-title">💱 اختر العملة</div><div class="modal-subtitle">الحالية: ${document.getElementById('cur').textContent}</div>${cs.map(c=>`<div class="method-item" onclick="chCur('${c.code}')"><span style="font-size:18px">${c.name.slice(-2)}</span><div class="method-info"><div class="method-name">${c.name.slice(0,-3)}</div></div></div>`).join('')}<button class="modal-btn-secondary" onclick="closeModal()">إلغاء</button>`;}
 window.chCur=async function(c){try{await apiFetch(`${BASE}/api/player/currency`,{method:'POST',body:JSON.stringify({uid,currency:c})});document.getElementById('cur').textContent=c;closeModal();loadBalance();loadGames();}catch(e){alert('خطأ');}};
-loadBalance();loadProfile();loadGames();setInterval(loadBalance,5000);
+loadBalance();loadProfile();loadGames();loadWalletBadges();setInterval(loadBalance,5000);setInterval(loadWalletBadges,30000);
 connectLeaderboardStream('leaderboard');
 </script>
 </body>

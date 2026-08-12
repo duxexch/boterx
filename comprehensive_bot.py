@@ -52,6 +52,9 @@ load_dotenv(".env")
 from bot_utils.constants import CURRENCIES, CSV_ENCODING
 from bot_utils.validation import sanitize_input, validate_phone_number, validate_amount
 from bot_utils.telegram_helpers import make_inline_btn, make_inline_keyboard, make_reply_keyboard, remove_keyboard
+from bot_utils.rate_limiter import user_message_limiter, user_callback_limiter, start_cleanup_thread as _start_rl_cleanup
+from bot_utils.notification_hub import hub as _notif_hub
+from concurrent.futures import ThreadPoolExecutor
 
 # إعداد نظام اللوج
 logging.basicConfig(
@@ -140,6 +143,27 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         # تنظيف أي مدير مؤقت منتهي عند بدء التشغيل
         self.cleanup_expired_temp_admins()
 
+        # ── Notification hub — inject send callable ──────────────────────────
+        _notif_hub.init(self.api_call)
+        self.notif = _notif_hub  # convenience alias: self.notif.send(uid, text)
+
+        # ── Rate limiter cleanup thread ──────────────────────────────────────
+        _start_rl_cleanup(interval_sec=60.0)
+
+        # ── Startup: refund bets stranded by a mid-game server crash ─────────
+        # active_game_sessions rows survive restarts; credit_with_idempotency
+        # in refund_expired_game_sessions() ensures idempotent double-restart safety.
+        try:
+            from db_manager import refund_expired_game_sessions as _rfs, _gdb as _gdb_inst
+            _refunded = _rfs(_gdb_inst)
+            if _refunded:
+                logger.info(
+                    f"[startup] Refunded {len(_refunded)} expired game session(s): {_refunded}"
+                )
+            else:
+                logger.info("[startup] No expired game sessions to refund at startup.")
+        except Exception as _rfs_err:
+            logger.warning(f"[startup] refund_expired_game_sessions error: {_rfs_err}")
 
         # تخزين الأسباب المؤقتة لرفض المعاملات قبل التأكيد
         # المفتاح هو معرف الأدمن والقيمة عبارة عن قاموس يحتوي trans_id والسبب
@@ -166,8 +190,8 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         self.translations = {
             # رسالة اختيار الخدمة الرئيسية للمستخدم
             'choose_service': {
-                'ar': "🏠 مرحباً بك في النظام المالي\n\n👤 العميل: {name}\n🆔 رقم العميل: {customer_id}\n\nاختر الخدمة المطلوبة:",
-                'en': "🏠 Welcome to the financial system\n\n👤 Customer: {name}\n🆔 Customer ID: {customer_id}\n\nChoose the required service:"
+                'ar': "💚 VEX — اشتي وبع مع المستخدمين الآخرين بأمان\n\n👤 العميل: {name}\n🆔 رقم العميل: {customer_id}\n\nاختر الخدمة المطلوبة:",
+                'en': "💚 VEX — Buy & sell with other users, safely\n\n👤 Customer: {name}\n🆔 Customer ID: {customer_id}\n\nChoose the required service:"
             },
             # تأكيد نجاح الإيداع للعميل
             'deposit_success': {
@@ -576,6 +600,15 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         'deposit_service': '⬇️', 'withdraw_service': '⬆️',
         'deposit_withdraw': '🔄',
     }
+
+    @staticmethod
+    def display_icon(icon, default='🏢'):
+        """Icon safe for Telegram TEXT: uploaded image URLs become the default
+        emoji (a raw URL/path would render as ugly text inside messages)."""
+        ic = (icon or '').strip()
+        if not ic or ic.startswith('/static/') or ic.startswith('http'):
+            return default
+        return ic
 
     def normalize_icon(self, icon_input, default='🏢'):
         """تحويل أي صيغة إدخال إلى أيقونة مناسبة"""
@@ -1059,7 +1092,7 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
     
     def get_updates(self):
         """جلب التحديثات — يشمل my_chat_member لتسجيل القنوات تلقائياً"""
-        url = f"{self.api_url}/getUpdates?offset={self.offset + 1}&timeout=10&allowed_updates=%5B%22message%22%2C%22callback_query%22%2C%22my_chat_member%22%2C%22chat_member%22%5D"
+        url = f"{self.api_url}/getUpdates?offset={self.offset + 1}&timeout=10&allowed_updates=%5B%22message%22%2C%22callback_query%22%2C%22my_chat_member%22%2C%22chat_member%22%2C%22channel_post%22%5D"
         try:
             with urllib.request.urlopen(url, timeout=15) as response:
                 return json.loads(response.read().decode('utf-8'))
@@ -4006,9 +4039,16 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         return None
 
     def get_current_theme(self):
-        """الحصول على الثيم النشط حالياً"""
-        theme_name = self.get_setting('active_theme') or 'gold'
+        """الحصول على الثيم النشط حالياً — مع إصلاح القيم التالفة تلقائياً"""
+        theme_name = self.get_setting('active_theme') or 'vex'
         if THEME_AVAILABLE:
+            if theme_name not in THEMES:
+                # قيمة تالفة أو غير معروفة — إصلاحها بشكل دائم إلى الثيم الافتراضي
+                theme_name = 'vex'
+                try:
+                    self.save_setting('active_theme', 'vex')
+                except Exception:
+                    pass
             return get_theme(theme_name)
         return {}
 
@@ -4516,15 +4556,16 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
 
         if lang == 'ar':
             text = (
-                f"━━━━━━━━━━━━━━━━━━\n"
+                f"🟢━━━━━━━━━━━━━━━━🟢\n"
+                f"💚 <b>VEX</b> — اشتي وبع مع المستخدمين الآخرين بأمان\n"
+                f"🟢━━━━━━━━━━━━━━━━🟢\n\n"
                 f"👋 <b>أهلاً وسهلاً، {name}!</b>\n"
-                f"━━━━━━━━━━━━━━━━━━\n\n"
                 f"🆔 رقم العميل: <b><code>{customer_id}</code></b>\n"
             )
             if stats_bar:
                 text += f"\n{stats_bar}\n"
             text += (
-                f"\n━━━━━━━━━━━━━━━━━━\n"
+                f"\n🟢━━━━━━━━━━━━━━━━🟢\n"
                 f"👇 <b>اختر ما تريد من الأزرار بالأسفل</b>"
             )
         else:
@@ -4584,7 +4625,8 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             customer_id = user.get('customer_id', '')
             stats_bar = self.format_stats_bar()
             if lang == 'ar':
-                welcome_text = self.ui_header(self.tr('a0124_أهلاً_وسهلاً،', lang, name=name), '👋')
+                welcome_text = "💚 <b>VEX</b> — اشتي وبع مع المستخدمين الآخرين بأمان\n\n"
+                welcome_text += self.ui_header(self.tr('a0124_أهلاً_وسهلاً،', lang, name=name), '👋')
                 welcome_text += '\n'
                 # بطاقة العميل
                 welcome_text += self.ui_card(self.tr('a0125_بيانات_العميل', lang), [
@@ -4623,7 +4665,8 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             lang_codes = list(lang_names.keys())
 
             welcome_text = (
-                "👋 مرحباً بك في منصتنا المالية!\n\n"
+                "💚 <b>VEX</b> — اشتي وبع مع المستخدمين الآخرين بأمان\n"
+                "💚 <b>VEX</b> — Buy & sell with other users, safely\n\n"
                 "🌍 Please choose your language / اختر لغتك:\n"
                 "👇 اختر من القائمة أدناه"
             )
@@ -4807,13 +4850,10 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                 user = self.find_user(user_id)
                 lang = user.get('language', 'ar')
                 
-                welcome_text = (
-                    f"✅ تم استرجاع حسابك بنجاح!\n\n"
-                    f"👤 الاسم: {user['name']}\n"
-                    f"📱 الهاتف: {user['phone']}\n"
-                    f"🆔 رقم العميل: {user['customer_id']}\n"
-                    f"📅 تاريخ التسجيل: {user.get('date', '')}\n\n"
-                    f"💡 تم ربط حسابك بهذا الجهاز. جميع بياناتك محفوظة."
+                welcome_text = self.tr(
+                    'account_restored', lang,
+                    name=user['name'], phone=user['phone'],
+                    customer_id=user['customer_id'], date=user.get('date', '')
                 )
                 self.send_message(message['chat']['id'], welcome_text, self.main_keyboard(lang, user_id))
                 del self.user_states[user_id]
@@ -4832,7 +4872,9 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             lang_names = self.get_language_names()
             lang_display = lang_names.get(detected_lang, {}).get('native', detected_lang)
             
-            welcome_text = f"""✅ تم التسجيل بنجاح!
+            welcome_text = f"""💚 <b>VEX</b> — اشتي وبع مع المستخدمين الآخرين بأمان
+
+✅ تم التسجيل بنجاح!
 
 👤 الاسم: {name}
 📱 الهاتف: {phone}
@@ -5075,7 +5117,7 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             companies_list = self.get_companies()
             for c in companies_list:
                 if c['name'] == company_name:
-                    company_icon = c.get('icon', '🏢') or '🏢'
+                    company_icon = self.display_icon(c.get('icon'), '🏢')
                     break
             confirmation = (
                 f"✅ <b>تم تقديم طلب الإيداع!</b>\n\n"
@@ -5426,7 +5468,7 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             withdrawal_address = self.get_exchange_address(company_id)
             lang = user.get('language', 'ar')
             company = self.get_company_by_id(company_id)
-            company_icon = company.get('icon', '🏢') if company else '🏢'
+            company_icon = self.display_icon(company.get('icon') if company else '', '🏢')
             confirm_text = (
                 f"{company_icon} {company_name}\n\n"
                 + self.tr('enter_withdrawal_address', lang, address=withdrawal_address)
@@ -5480,7 +5522,7 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             currency_symbol = self.get_currency_symbol(user_currency)
             lang = user.get('language', 'ar')
             company = self.get_company_by_id(company_id)
-            company_icon = company.get('icon', '🏢') if company else '🏢'
+            company_icon = self.display_icon(company.get('icon') if company else '', '🏢')
             final_confirm_text = self.tr('final_confirmation', lang,
                 company=f"{company_icon} {company_name}", wallet=wallet_number,
                 amount=f"{amount} {currency_symbol}",
@@ -5695,19 +5737,37 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         # بطاقة المحفظة — جدول أنيق
         if self.svrp:
             wallet = self.svrp.get_wallet(message['from']['id'])
-            balance = float(wallet.get('balance', 0) or 0)
-            available = float(wallet.get('total_used', 0) or 0)
-            total_earned = float(wallet.get('total_earned', 0) or 0)
+            svrp_frozen   = float(wallet.get('balance', 0) or 0)
+            svrp_available = float(wallet.get('total_used', 0) or 0)
+            svrp_pending  = float(wallet.get('pending_balance', 0) or 0)
+            total_earned  = float(wallet.get('total_earned', 0) or 0)
+            wager_done    = int(wallet.get('wagering_completed', 0) or 0)
+            wager_req     = int(wallet.get('wagering_required', 3) or 3)
             currency = user.get('currency', 'SAR')
-            profile_text += self.ui_section(self.tr('a0152_المحفظة', lang), '💎')
-            profile_text += self.ui_table(
-                ['الحالة', 'المبلغ', 'العملة'],
-                [
-                    ['🧊 مجمد', f'{balance:.2f}', currency],
-                    ['🟢 متاح', f'{available:.2f}', currency],
-                    ['💰 مكتسب', f'{total_earned:.2f}', currency],
-                ]
-            )
+
+            # رصيد اللعب (SQLite)
+            game_balance = 0.0
+            try:
+                from game_engine import GameManager as _GM
+                game_balance = float(_GM().get_balance(message['from']['id']) or 0)
+            except Exception:
+                pass
+
+            profile_text += self.ui_section(self.tr('a0152_المحفظة', lang), '💳')
+            # دلالات الحقول:
+            #   svrp_frozen   = أرصدة SVRP (مجمدة حتى اكتمال الرهان، ثم قابلة للنقل)
+            #   svrp_pending  = ينتظر إكمال الأصدقاء للرهان
+            #   total_earned  = مجموع تراكمي تاريخي لكل ما اكتُسب (للعرض فقط)
+            wager_status = '✅ مكتمل' if wager_done >= wager_req else f'{wager_done}/{wager_req}'
+            wallet_rows = [
+                ['🎮 رصيد اللعب', f'{game_balance:.2f}', currency],
+                ['💎 SVRP (تعويض)', f'{svrp_frozen:.2f}', currency],
+            ]
+            if svrp_pending > 0:
+                wallet_rows.append(['⏳ معلق (أصدقاء)', f'{svrp_pending:.2f}', currency])
+            if svrp_frozen > 0:
+                wallet_rows.append([f'🔓 الرهان', wager_status, ''])
+            profile_text += self.ui_table(['الحالة', 'المبلغ', 'العملة'], wallet_rows)
 
         # بطاقة حسابات الشركات
         profile_text += self.ui_section(self.tr('a0153_حسابات_الشركات', lang), '🏢')
@@ -5807,140 +5867,236 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         self.send_inline_message(chat_id, text, inline_btns)
     
     def run(self):
-        """تشغيل البوت — مع نظام حماية شامل"""
-        logger.info(f"✅ نظام DUX الشامل يعمل: @{os.getenv('BOT_TOKEN', 'unknown').split(':')[0] if os.getenv('BOT_TOKEN') else 'unknown'}")
-        
-        # نظام الحماية: تتبع الرسائل المعالجة لمنع التكرار
-        processed_updates = set()
-        MAX_PROCESSED_CACHE = 1000  # حد أقصى للذاكرة
-        
-        # نظام الحماية: تتبع آخر نشاط لكل مستخدم
-        user_last_activity = {}
-        MIN_MESSAGE_INTERVAL = 0.5  # نصف ثانية بين رسائل نفس المستخدم
-        
-        while True:
-            try:
-                updates = self.get_updates()
-                if not updates or not updates.get('ok'):
-                    time.sleep(0.5)
-                    continue
-                
-                for update in updates['result']:
-                    update_id = update['update_id']
-                    
-                    # 1. منع التكرار: تخطي الرسائل المعالجة مسبقاً
-                    if update_id in processed_updates:
-                        continue
-                    
-                    # إضافة للذاكرة
-                    processed_updates.add(update_id)
-                    if len(processed_updates) > MAX_PROCESSED_CACHE:
-                        # تنظيف الذاكرة: احتفظ بآخر 500 فقط
-                        processed_updates.clear()
-                    
-                    # تحديث الـ offset فوراً لمنع إعادة استلام نفس الرسالة
-                    self.offset = update_id
-                    
-                    if 'message' in update:
-                        message = update['message']
-                        user_id = message['from']['id']
-                        
-                        # 2. منع السبام: فحص الفاصل الزمني بين رسائل نفس المستخدم
-                        now = time.time()
-                        if user_id in user_last_activity:
-                            elapsed = now - user_last_activity[user_id]
-                            if elapsed < MIN_MESSAGE_INTERVAL:
-                                logger.warning(f"سبام محتمل من {user_id}: {elapsed:.2f}s - تخطي")
-                                continue
-                        user_last_activity[user_id] = now
-                        
-                        # 3. تسجيل الرسالة
-                        if 'text' in message:
-                            logger.info(f"رسالة: {message['text'][:50]} من {user_id}")
-                        
-                        # 4. معالجة الرسالة مع timeout
-                        try:
-                            self.process_message(message)
-                        except Exception as msg_error:
-                            logger.error(f"خطأ في معالجة الرسالة: {msg_error}", exc_info=True)
-                            # تنظيف حالة المستخدم عند الخطأ
-                            if user_id in self.user_states:
-                                try:
-                                    del self.user_states[user_id]
-                                except:
-                                    pass
-                            # إرسال رسالة خطأ للمستخدم
-                            try:
-                                err_user = self.find_user(user_id)
-                                err_lang = err_user.get('language', 'ar') if err_user else 'ar'
-                                error_kb = {
-                                    'keyboard': [
-                                        [{'text': self.tr('reset_system', err_lang)}],
-                                        [{'text': self.tr('main_menu', err_lang)}]
-                                    ],
-                                    'resize_keyboard': True
-                                }
-                                self.send_message(message['chat']['id'],
-                                    self.tr('error_occurred', err_lang), error_kb)
-                            except:
-                                pass
-                    
-                    elif 'callback_query' in update:
-                        try:
-                            self.handle_callback_query(update['callback_query'])
-                        except Exception as cb_error:
-                            logger.error(f"خطأ في معالجة callback: {cb_error}", exc_info=True)
-                            try:
-                                self.answer_callback(update['callback_query'].get('id'), self.tr('a0486_خطأ', 'ar'))
-                            except:
-                                pass
-                    
-                    elif 'my_chat_member' in update:
-                        """تسجيل تلقائي للقنوات/المجموعات عند إضافة البوت كمشرف"""
-                        try:
-                            self.handle_my_chat_member(update['my_chat_member'])
-                        except Exception as e:
-                            logger.error(f"خطأ في my_chat_member: {e}", exc_info=True)
-                    
-                    elif 'web_app_data' in update.get('message', {}):
-                        """استقبال بيانات Web App"""
-                        try:
-                            wa_msg = update['message']
-                            wa_data_raw = wa_msg.get('web_app_data', {}).get('data', '')
-                            logger.info(f"WebApp data received: {wa_data_raw[:200]}")
-                            try:
-                                wa_parsed = json.loads(wa_data_raw)
-                                if 'gifts' in wa_parsed or 'score' in wa_parsed:
-                                    self.handle_snatch_webapp_data(wa_msg)
-                                elif 'deposit' in wa_parsed or 'amount' in wa_parsed:
-                                    self.handle_game_deposit_request(wa_msg)
-                                else:
-                                    self.handle_wheel_webapp_data(wa_msg)
-                            except json.JSONDecodeError:
-                                self.handle_wheel_webapp_data(wa_msg)
-                        except Exception as e:
-                            logger.error(f"خطأ في web_app_data: {e}", exc_info=True)
-                
-                # 5. تنظيف دوري للذاكرة
-                if len(user_last_activity) > 500:
-                    cutoff = time.time() - 300  # احذف نشاط أقدم من 5 دقائق
-                    user_last_activity = {k: v for k, v in user_last_activity.items() if v > cutoff}
+        """تشغيل البوت — نظام متوازي مع ThreadPoolExecutor (20 عامل)
 
-                # 6. معالجة طابور البث (broadcast_queue.csv) — كل 30 ثانية
-                if int(time.time()) % 30 < 2:
+        كل تحديث يُعالج في thread منفصل؛ الحلقة الرئيسية لا تنتظر أحداً.
+        ميزات الأمان:
+          • per-user semaphore: أقصى 2 handler متزامن لنفس المستخدم
+          • sliding-window rate limit: max 10 رسائل / 10 ثواني للمستخدم
+          • broadcast في thread مستقل — لا يؤثر على الحلقة أبداً
+        """
+        logger.info(
+            "✅ DUX Bot starting (concurrent mode, 20 workers): "
+            "@%s", os.getenv('BOT_TOKEN', '').split(':')[0] or 'unknown'
+        )
+
+        # ── Per-user semaphore: أقصى تزامن لنفس المستخدم ───────────────────
+        _user_sems: dict = {}
+        _user_sems_lock = threading.Lock()
+        MAX_CONCURRENT_PER_USER = 2
+
+        def _user_sem(uid):
+            uid = str(uid)
+            with _user_sems_lock:
+                if uid not in _user_sems:
+                    _user_sems[uid] = threading.Semaphore(MAX_CONCURRENT_PER_USER)
+                return _user_sems[uid]
+
+        # ── Processed-update dedup ring ──────────────────────────────────────
+        processed_updates: set = set()
+        _pu_lock = threading.Lock()
+
+        def _mark_seen(uid):
+            with _pu_lock:
+                processed_updates.add(uid)
+                if len(processed_updates) > 3000:
+                    processed_updates.clear()
+
+        # ── Single update handler (runs inside thread pool) ──────────────────
+        def _handle_update(update):
+            try:
+                # ── web_app_data is nested inside 'message' ──────────────────
+                if 'message' in update and 'web_app_data' in update['message']:
+                    wa_msg = update['message']
+                    uid = str(wa_msg.get('from', {}).get('id', ''))
+                    sem = _user_sem(uid)
+                    if not sem.acquire(blocking=False):
+                        return
                     try:
-                        self._process_broadcast_queue()
-                    except Exception as qe:
-                        logger.error(f"خطأ في معالجة طابور البث: {qe}")
-                
-            except KeyboardInterrupt:
-                logger.info("تم إيقاف البوت بواسطة المستخدم")
-                break
-            except Exception as e:
-                logger.error(f"خطأ عام في حلقة التشغيل: {e}", exc_info=True)
-                # انتظار قصير قبل المحاولة مرة أخرى
-                time.sleep(1)
-                continue
+                        wa_raw = wa_msg.get('web_app_data', {}).get('data', '')
+                        logger.info("WebApp data: %.200s", wa_raw)
+                        try:
+                            wa_parsed = json.loads(wa_raw)
+                            if 'gifts' in wa_parsed or 'score' in wa_parsed:
+                                self.handle_snatch_webapp_data(wa_msg)
+                            elif 'deposit' in wa_parsed or 'amount' in wa_parsed:
+                                self.handle_game_deposit_request(wa_msg)
+                            else:
+                                self.handle_wheel_webapp_data(wa_msg)
+                        except json.JSONDecodeError:
+                            self.handle_wheel_webapp_data(wa_msg)
+                    finally:
+                        sem.release()
+
+                elif 'message' in update:
+                    message = update['message']
+                    uid = str(message.get('from', {}).get('id', ''))
+
+                    # Sliding-window rate limit
+                    if not user_message_limiter.is_allowed(uid):
+                        logger.warning("Rate limited (msg): %s", uid)
+                        return
+
+                    if 'text' in message:
+                        logger.info("MSG %.60s from %s", message['text'], uid)
+
+                    sem = _user_sem(uid)
+                    if not sem.acquire(blocking=True, timeout=5):
+                        # User has too many handlers already — skip silently
+                        return
+                    try:
+                        self.process_message(message)
+                    except Exception as exc:
+                        logger.error("process_message error: %s", exc, exc_info=True)
+                        try:
+                            del self.user_states[uid]
+                        except Exception:
+                            pass
+                        try:
+                            u = self.find_user(uid)
+                            lang = (u or {}).get('language', 'ar')
+                            kb = {'keyboard': [[{'text': self.tr('reset_system', lang)}],
+                                               [{'text': self.tr('main_menu', lang)}]],
+                                  'resize_keyboard': True}
+                            self.send_message(message['chat']['id'],
+                                              self.tr('error_occurred', lang), kb)
+                        except Exception:
+                            pass
+                    finally:
+                        sem.release()
+
+                elif 'callback_query' in update:
+                    cb = update['callback_query']
+                    uid = str(cb.get('from', {}).get('id', ''))
+
+                    if not user_callback_limiter.is_allowed(uid):
+                        try:
+                            self.answer_callback(cb.get('id'), '⏳ انتظر قليلاً')
+                        except Exception:
+                            pass
+                        return
+
+                    sem = _user_sem(uid)
+                    if not sem.acquire(blocking=False):
+                        try:
+                            self.answer_callback(cb.get('id'), '⏳')
+                        except Exception:
+                            pass
+                        return
+                    try:
+                        self.handle_callback_query(cb)
+                    except Exception as exc:
+                        logger.error("callback error: %s", exc, exc_info=True)
+                        try:
+                            self.answer_callback(cb.get('id'), self.tr('a0486_خطأ', 'ar'))
+                        except Exception:
+                            pass
+                    finally:
+                        sem.release()
+
+                elif 'my_chat_member' in update:
+                    try:
+                        self.handle_my_chat_member(update['my_chat_member'])
+                    except Exception as exc:
+                        logger.error("my_chat_member error: %s", exc, exc_info=True)
+
+                elif 'channel_post' in update:
+                    # Forward channel posts to users/channels per relay settings
+                    try:
+                        self.auto_relay_channel_post(update['channel_post'])
+                    except Exception as exc:
+                        logger.error("channel_post relay error: %s", exc, exc_info=True)
+
+            except Exception as exc:
+                logger.error("_handle_update uncaught: %s", exc, exc_info=True)
+
+        # ── Dedicated broadcast thread — never blocks the main loop ──────────
+        def _broadcast_worker():
+            while True:
+                try:
+                    self._process_broadcast_queue()
+                except Exception as exc:
+                    logger.error("broadcast_worker: %s", exc)
+                time.sleep(30)
+
+        _bt = threading.Thread(target=_broadcast_worker, daemon=True, name='broadcast_worker')
+        _bt.start()
+
+        # ── Periodic stale-semaphore cleanup ─────────────────────────────────
+        def _cleanup_sems():
+            while True:
+                time.sleep(300)
+                cutoff = time.monotonic() - 300
+                with _user_sems_lock:
+                    stale = [k for k, s in _user_sems.items() if s._value >= MAX_CONCURRENT_PER_USER]
+                    for k in stale[:200]:
+                        del _user_sems[k]
+
+        threading.Thread(target=_cleanup_sems, daemon=True, name='sem_cleanup').start()
+
+        # ── Periodic FSM stale-state cleanup (#16) ────────────────────────────
+        # Deposit/withdraw FSM states older than FSM_STALE_MINUTES are automatically
+        # cleared so a user who walks away mid-flow is never permanently stuck.
+        # The cleanup only touches deposit_* / withdraw_* / selecting_deposit /
+        # selecting_withdraw states; it never touches game or other states.
+        FSM_STALE_MINUTES = 45
+        FSM_FLOW_PREFIXES = (
+            'deposit_', 'withdraw_', 'selecting_deposit', 'selecting_withdraw',
+        )
+
+        def _fsm_cleanup_worker():
+            import time as _t
+            from datetime import datetime, timezone, timedelta
+            while True:
+                _t.sleep(900)  # check every 15 minutes
+                try:
+                    cutoff = (
+                        datetime.now(timezone.utc) - timedelta(minutes=FSM_STALE_MINUTES)
+                    ).isoformat()
+                    rows = self._db._conn().execute(
+                        "SELECT user_id, state FROM user_states WHERE updated_at < ?",
+                        (cutoff,)
+                    ).fetchall()
+                    cleared = 0
+                    for row in rows:
+                        uid, state = row[0], row[1]
+                        if any(state.startswith(p) for p in FSM_FLOW_PREFIXES):
+                            self._db.del_user_state(uid)
+                            logger.info(
+                                "[fsm-cleanup] Cleared stale '%s' state for user %s "
+                                "(idle >%d min)", state, uid, FSM_STALE_MINUTES)
+                            cleared += 1
+                    if cleared:
+                        logger.info("[fsm-cleanup] Cleared %d stale FSM state(s).", cleared)
+                except Exception as _fce:
+                    logger.error("[fsm-cleanup] error: %s", _fce, exc_info=True)
+
+        threading.Thread(target=_fsm_cleanup_worker, daemon=True, name='fsm-cleanup').start()
+
+        # ── Main polling loop — submits to thread pool, never blocks ─────────
+        with ThreadPoolExecutor(max_workers=20, thread_name_prefix='bot_worker') as pool:
+            while True:
+                try:
+                    updates = self.get_updates()
+                    if not updates or not updates.get('ok'):
+                        time.sleep(0.3)
+                        continue
+
+                    for update in updates['result']:
+                        uid = update['update_id']
+                        with _pu_lock:
+                            if uid in processed_updates:
+                                continue
+                        _mark_seen(uid)
+                        self.offset = uid
+                        pool.submit(_handle_update, update)
+
+                except KeyboardInterrupt:
+                    logger.info("Bot stopped by user.")
+                    break
+                except Exception as exc:
+                    logger.error("Main loop error: %s", exc, exc_info=True)
+                    time.sleep(1)
 
     def handle_game_deposit_request(self, message):
         """معالجة طلب إيداع سريع من الألعاب"""
@@ -6191,22 +6347,20 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                 self.send_message(chat_id, self.tr('a0642_رصيدك_غير', lang, balance=balance, currency=currency, spin_cost=spin_cost))
                 return
 
-            # خصم الرصيد
+            # خصم الرصيد — عبر svrp_lock لضمان الاتساق مع التحويلات المتزامنة
             try:
-                rows = []
-                with open('svrp_wallets.csv', 'r', encoding='utf-8-sig') as f:
-                    reader = csv.DictReader(f)
-                    fieldnames = reader.fieldnames
-                    rows = list(reader)
-                for row in rows:
-                    if row.get('telegram_id') == str(user_id):
-                        row['balance'] = str(balance - spin_cost)
-                        break
-                with open('svrp_wallets.csv', 'w', newline='', encoding='utf-8-sig') as f:
-                    writer = csv.DictWriter(f, fieldnames=fieldnames)
-                    writer.writeheader()
-                    for row in rows:
-                        writer.writerow({k: row.get(k, '') for k in fieldnames})
+                from svrp import svrp_lock as _spin_svrp_lock
+                with _spin_svrp_lock():
+                    # إعادة قراءة الرصيد داخل القفل (تجنب TOCTOU)
+                    fresh = self.svrp.get_wallet(str(user_id))
+                    fresh_balance = float(fresh.get('balance', 0) or 0)
+                    if fresh_balance < spin_cost:
+                        self.send_message(chat_id, self.tr('a0642_رصيدك_غير', lang,
+                            balance=fresh_balance, currency=currency, spin_cost=spin_cost))
+                        return
+                    self.svrp._update_wallet(str(user_id), {
+                        'balance': round(fresh_balance - spin_cost, 6)
+                    })
             except Exception as e:
                 logger.error(f"خطأ في خصم رصيد العجلة: {e}")
 
@@ -7580,7 +7734,7 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             text += self.tr('a0798_لا_توجد', 'ar')
         else:
             for m in all_methods:
-                icon = m.get('icon', '💳') or '💳'
+                icon = self.display_icon(m.get('icon'), '💳')
                 name = m.get('method_name', '')
                 mid = m.get('id', '')
                 is_linked = mid in linked_ids
@@ -7694,7 +7848,7 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                     
                     for i, row in enumerate(companies, 1):
                         status = "✅" if row.get('is_active', '').lower() == 'active' else "❌"
-                        icon = row.get('icon', '🏢') or '🏢'
+                        icon = self.display_icon(row.get('icon'), '🏢')
                         type_display = {'deposit': 'إيداع', 'withdraw': 'سحب', 'both': 'الكل'}.get(row.get('type', ''), row.get('type', ''))
                         address = row.get('address', '')
                         companies_text += f"{i}. {status} {icon} {row.get('name', '?')} (ID: {row.get('id', '?')})\n"
@@ -9028,7 +9182,7 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                 return
             inline_btns = []
             for m in active:
-                icon = m.get('icon', '💳') or '💳'
+                icon = self.display_icon(m.get('icon'), '💳')
                 inline_btns.append([{'text': f"{icon} {m['method_name']} — {m.get('account_data', '')}",
                                      'callback_data': f"trade_method_{m['id']}"}])
             inline_btns.append([{'text': '🔙 إلغاء', 'callback_data': 'trade_buy_cancel'}])
@@ -9472,7 +9626,7 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
 
             inline_btns = []
             for method in methods:
-                method_icon = method.get('icon', '💳') or '💳'
+                method_icon = self.display_icon(method.get('icon'), '💳')
                 btn_text = f"{method_icon} {method['method_name']}"
                 if method.get('method_type'):
                     btn_text += f" — {method['method_type']}"
@@ -10026,7 +10180,9 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             self.send_message(message['chat']['id'], self.tr('a0892_نظام_الثيمات', 'ar'), self.admin_keyboard())
             return
 
-        current_theme = self.get_setting('active_theme') or 'gold'
+        current_theme = self.get_setting('active_theme') or 'vex'
+        if current_theme not in THEMES:
+            current_theme = 'vex'
         theme = get_theme(current_theme)
 
         text = (
@@ -10902,7 +11058,7 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                 for m in methods[:15]:
                     company = self.get_company_by_id(m.get('company_id', ''))
                     company_name = company['name'] if company else self.tr('a0122_غير_محدد', 'ar')
-                    icon = m.get('icon', '💳') or '💳'
+                    icon = self.display_icon(m.get('icon'), '💳')
                     status_icon = '✅' if m.get('status') == 'active' else '⏸️'
                     text += f"{status_icon} {icon} <b>{m['method_name']}</b>\n"
                     text += f"   🏢 {company_name} | 🆔 <code>{m['id']}</code>\n"
@@ -11262,7 +11418,7 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             # عرض تفاصيل الوسيلة وطلب رقم المحفظة — رقم الحساب في code block للنسخ السهل
             user = self.find_user(user_id)
             lang = user.get('language', 'ar') if user else 'ar'
-            method_icon = selected_method.get('icon', '💳') or '💳'
+            method_icon = self.display_icon(selected_method.get('icon'), '💳')
             company_name = company['name'] if company else 'N/A'
             account_data = selected_method.get('account_data', '')
             additional_info = selected_method.get('additional_info', '')

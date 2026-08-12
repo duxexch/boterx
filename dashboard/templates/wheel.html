@@ -11,7 +11,7 @@ html,body{margin:0;padding:0;height:100%;touch-action:manipulation;user-select:n
 .game-area{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:8px;overflow:hidden;min-height:0}
 .wheel-wrap{position:relative;width:min(72vw,300px);height:min(72vw,300px);flex-shrink:0}
 #wheelCanvas{width:100%;height:100%;display:block}
-.wheel-pointer{position:absolute;top:-8px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:12px solid transparent;border-right:12px solid transparent;border-top:24px solid #fbbf24;filter:drop-shadow(0 2px 6px rgba(0,0,0,.6));z-index:10}
+.wheel-pointer{position:absolute;top:-8px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:12px solid transparent;border-right:12px solid transparent;border-top:24px solid #00ff88;filter:drop-shadow(0 2px 6px rgba(0,0,0,.6));z-index:10}
 .wheel-result{min-height:48px;display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0}
 .wheel-result-mult{font-size:30px;font-weight:900;font-family:'Courier New',monospace;opacity:0;transition:opacity .3s,transform .3s;transform:scale(.5)}
 .wheel-result-mult.show{opacity:1;transform:scale(1)}
@@ -23,7 +23,7 @@ html,body{margin:0;padding:0;height:100%;touch-action:manipulation;user-select:n
 .ctrl-btn{background:var(--surface-2);border:1px solid var(--border);color:var(--text-dim);padding:11px 8px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0}
 .ctrl-btn:active{transform:scale(.92)}
 /* Press-and-hold spin button */
-.spin-btn{width:100%;max-width:320px;padding:14px;border-radius:12px;font-size:18px;font-weight:900;border:none;cursor:pointer;background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#000;box-shadow:0 4px 20px rgba(251,191,36,.4);transition:all .2s;flex-shrink:0;position:relative;overflow:hidden}
+.spin-btn{width:100%;max-width:320px;padding:14px;border-radius:12px;font-size:18px;font-weight:900;border:none;cursor:pointer;background:linear-gradient(135deg,#00ff88,#f59e0b);color:#000;box-shadow:0 4px 20px rgba(0,255,136,.4);transition:all .2s;flex-shrink:0;position:relative;overflow:hidden}
 .spin-btn:active{transform:scale(.97)}
 .spin-btn:disabled{background:var(--surface-2);color:var(--muted);cursor:not-allowed;box-shadow:none}
 .spin-btn.charging{background:linear-gradient(135deg,#ef4444,#991b1b);color:#fff;animation:chargePulse .3s infinite}
@@ -34,7 +34,7 @@ html,body{margin:0;padding:0;height:100%;touch-action:manipulation;user-select:n
 .seg-chip{padding:3px 8px;border-radius:8px;font-size:10px;font-weight:700;font-family:'Courier New',monospace}
 .big-win-overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.7);backdrop-filter:blur(6px);z-index:50}
 .big-win-overlay.show{display:flex}
-.big-win-num{font-size:64px;font-weight:900;font-family:'Courier New',monospace;color:#fbbf24;text-shadow:0 0 40px rgba(251,191,36,.6);animation:bwP 1s infinite}
+.big-win-num{font-size:64px;font-weight:900;font-family:'Courier New',monospace;color:#00ff88;text-shadow:0 0 40px rgba(0,255,136,.6);animation:bwP 1s infinite}
 @keyframes bwP{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
 </style>
 </head>
@@ -87,7 +87,7 @@ html,body{margin:0;padding:0;height:100%;touch-action:manipulation;user-select:n
   </div>
 </div>
 
-<script src="/static/js/game-base.js?v=20260811"></script>
+<script src="/static/js/game-base.js?v=20260812a"></script>
 <script>
 'use strict';
 var canvas = document.getElementById('wheelCanvas');
@@ -104,7 +104,7 @@ var SEGMENTS = [
   { mult: 1.5, label: '1.5x', color: '#1e3a5f', glow: '#3b82f6' },
   { mult: 2.0, label: '2x', color: '#14532d', glow: '#22c55e' },
   { mult: 0.5, label: '0.5x', color: '#581c87', glow: '#a855f7' },
-  { mult: 5.0, label: '5x', color: '#78350f', glow: '#fbbf24' },
+  { mult: 5.0, label: '5x', color: '#78350f', glow: '#00ff88' },
   { mult: 1.0, label: '1x', color: '#155e75', glow: '#06b6d4' },
   { mult: 10.0, label: '10x', color: '#831843', glow: '#ec4899' },
   { mult: 0.0, label: '💀', color: '#991b1b', glow: '#ef4444' }
@@ -140,9 +140,9 @@ function drawWheel(angle){
   var cx = w/2, cy = h/2, r = Math.max(10, w/2 - 8);
   ctx.clearRect(0, 0, w, h);
   // Outer glow
-  ctx.save(); ctx.shadowColor = 'rgba(251,191,36,0.3)'; ctx.shadowBlur = 20;
+  ctx.save(); ctx.shadowColor = 'rgba(0,255,136,0.3)'; ctx.shadowBlur = 20;
   ctx.beginPath(); ctx.arc(cx, cy, r+2, 0, Math.PI*2);
-  ctx.strokeStyle = 'rgba(251,191,36,0.5)'; ctx.lineWidth = 3; ctx.stroke(); ctx.restore();
+  ctx.strokeStyle = 'rgba(0,255,136,0.5)'; ctx.lineWidth = 3; ctx.stroke(); ctx.restore();
   // Segments
   for(var i=0; i<N; i++){
     var a0 = angle + i * segAngle - Math.PI/2;
@@ -162,11 +162,11 @@ function drawWheel(angle){
   }
   // Border
   ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2);
-  ctx.strokeStyle = '#fbbf24'; ctx.lineWidth = 4; ctx.stroke();
+  ctx.strokeStyle = '#00ff88'; ctx.lineWidth = 4; ctx.stroke();
   // Center hub
   var hubR = Math.max(8, r*0.12);
   var hg = ctx.createRadialGradient(cx-hubR*0.3, cy-hubR*0.3, 1, cx, cy, hubR);
-  hg.addColorStop(0, '#fef3c7'); hg.addColorStop(0.5, '#fbbf24'); hg.addColorStop(1, '#78350f');
+  hg.addColorStop(0, '#fef3c7'); hg.addColorStop(0.5, '#00ff88'); hg.addColorStop(1, '#78350f');
   ctx.beginPath(); ctx.arc(cx, cy, hubR, 0, Math.PI*2);
   ctx.fillStyle = hg; ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
   ctx.beginPath(); ctx.arc(cx, cy, hubR*0.3, 0, Math.PI*2); ctx.fillStyle = '#78350f'; ctx.fill();
@@ -297,7 +297,7 @@ function showResult(seg, payout, bet, mult){
     soundLose(); haptic('heavy');
   } else {
     multEl.textContent = (mult || seg.mult).toFixed(1) + 'x';
-    multEl.style.color = seg.mult >= 5 ? '#fbbf24' : '#22c55e';
+    multEl.style.color = seg.mult >= 5 ? '#00ff88' : '#22c55e';
     subEl.textContent = '+' + fmtAmount(payout) + ' ' + gameCurrency;
     soundWin(seg.mult >= 5); haptic('medium');
     if(seg.mult >= 5) showBigWin(payout, seg.mult);

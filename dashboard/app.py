@@ -15,6 +15,9 @@ import secrets
 import random
 import zipfile
 import threading
+import math
+import fcntl
+import time
 import queue as _queue
 from datetime import datetime, timedelta
 from functools import wraps
@@ -27,10 +30,17 @@ from flask import (Flask, render_template, request, redirect, url_for,
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DASHBOARD_PORT = int(os.getenv('DASHBOARD_PORT', '8080'))
 DASHBOARD_HOST = os.getenv('DASHBOARD_HOST', '0.0.0.0')
-SECRET_KEY = os.getenv('DASHBOARD_SECRET_KEY', secrets.token_hex(32))
+
+# Sentinel: the well-known default password committed to public git history.
+# Any deployment still using this value is immediately exploitable.
+_KNOWN_DEFAULT_PASSWORD = 'boterx_admin_2026'
+
+# Load secret key — empty string means "not configured"; checked at startup below.
+_raw_secret_key = os.getenv('DASHBOARD_SECRET_KEY', '')
+SECRET_KEY = _raw_secret_key or secrets.token_hex(32)  # random fallback for dev only
 
 ADMIN_IDS = [a.strip() for a in os.getenv('ADMIN_USER_IDS', '').split(',') if a.strip()]
-ADMIN_PASSWORD = os.getenv('DASHBOARD_PASSWORD', 'boterx_admin_2026')
+ADMIN_PASSWORD = os.getenv('DASHBOARD_PASSWORD', _KNOWN_DEFAULT_PASSWORD)
 
 app = Flask(__name__, template_folder='templates', static_folder='static')
 app.secret_key = SECRET_KEY
@@ -129,6 +139,110 @@ def api_auth(f):
         return f(*args, **kwargs)
     return decorated
 
+# ── RBAC — Role-Based Access Control ─────────────────────────────────────────
+# Import module-level helpers from db_manager; provide no-op fallbacks so the
+# dashboard still starts even if db_manager is absent (shouldn't happen in prod).
+try:
+    from db_manager import (has_permission as _rbac_has_perm,
+                             get_admin_role as _rbac_get_role,
+                             log_admin_action as _rbac_log,
+                             set_admin_role as _rbac_set_role,
+                             ROLE_PERMISSIONS as _ROLE_PERMISSIONS)
+    _RBAC_AVAILABLE = True
+except ImportError:
+    _RBAC_AVAILABLE = False
+    def _rbac_has_perm(uid, perm): return True   # allow-all fallback
+    def _rbac_get_role(uid): return {'role': 'super_admin', 'permissions': {}}
+    def _rbac_log(*a, **k): pass
+    def _rbac_set_role(*a, **k): return False
+    _ROLE_PERMISSIONS = {}
+
+
+def permission_required(permission_key):
+    """Decorator: require admin status + a specific RBAC permission (JSON/API routes).
+
+    Stack after @api_auth.  Rejects with 401 if not logged in, 403 if the
+    session belongs to a non-admin user (logged_in but is_admin is falsy), and
+    403 if the admin lacks the required permission.
+
+    This double-gate prevents a web/player session (logged_in=True, is_admin=False)
+    from accessing admin APIs even if their UID was assigned an RBAC role.
+    """
+    def decorator(f):
+        @wraps(f)
+        def decorated_fn(*args, **kwargs):
+            if not session.get('logged_in'):
+                return jsonify({'error': 'Unauthorized'}), 401
+            # Require admin flag — prevents player sessions from passing through
+            if not session.get('is_admin'):
+                return jsonify({'error': 'Forbidden — admin access required'}), 403
+            uid = str(session.get('admin_id', ''))
+            if not _rbac_has_perm(uid, permission_key):
+                return jsonify({
+                    'error': 'Permission denied',
+                    'required': permission_key,
+                    'message': 'ليس لديك صلاحية لهذا الإجراء',
+                }), 403
+            return f(*args, **kwargs)
+        return decorated_fn
+    return decorator
+
+
+def page_permission_required(permission_key):
+    """Decorator: require admin status + a specific RBAC permission (HTML page routes).
+
+    Stack after @admin_required.  Returns a plain 403 HTML response if the
+    logged-in admin lacks the permission so the browser shows a clear error.
+    Also rejects non-admin sessions (is_admin falsy) with the same 403.
+    """
+    def decorator(f):
+        @wraps(f)
+        def decorated_fn(*args, **kwargs):
+            if not session.get('logged_in'):
+                return redirect(url_for('login'))
+            # Require admin flag — prevents player sessions from passing through
+            if not session.get('is_admin'):
+                return redirect(url_for('dashboard'))
+            uid = str(session.get('admin_id', ''))
+            if not _rbac_has_perm(uid, permission_key):
+                html = (
+                    '<!doctype html><html lang="ar" dir="rtl">'
+                    '<head><meta charset="utf-8"><title>403 — غير مصرح</title>'
+                    '<style>body{font-family:sans-serif;background:#0f172a;color:#94a3b8;'
+                    'display:flex;align-items:center;justify-content:center;height:100vh;margin:0}'
+                    '.box{text-align:center}.icon{font-size:4rem;margin-bottom:1rem}'
+                    'h1{color:#f43f5e;font-size:1.5rem}a{color:#60a5fa}</style></head>'
+                    f'<body><div class="box"><div class="icon">🚫</div>'
+                    f'<h1>غير مصرح — ليس لديك صلاحية هذه الصفحة</h1>'
+                    f'<p>الصلاحية المطلوبة: <code>{permission_key}</code></p>'
+                    f'<a href="/dashboard">العودة للوحة التحكم</a></div></body></html>'
+                )
+                return html, 403
+            return f(*args, **kwargs)
+        return decorated_fn
+    return decorator
+
+
+@app.context_processor
+def _inject_admin_context():
+    """Inject admin_role and admin_perms into every template render.
+
+    Templates use these to conditionally show/hide sidebar links and actions.
+    The call is a single SQLite SELECT (~0.1 ms) so the per-request cost is
+    negligible.
+    """
+    if session.get('logged_in'):
+        uid = str(session.get('admin_id', ''))
+        try:
+            role_data = _rbac_get_role(uid)
+            return {
+                'admin_role': role_data.get('role') or 'super_admin',
+                'admin_perms': role_data.get('permissions') or {},
+            }
+        except Exception:
+            pass
+    return {'admin_role': None, 'admin_perms': {}}
+
 # ===== Telegram WebApp Auth =====
 import logging as _auth_log
 _auth_logger = _auth_log.getLogger('boterx.auth')
@@ -157,6 +271,48 @@ ALLOW_DEV_AUTH = os.getenv('ALLOW_DEV_AUTH', '').lower() in ('1', 'true', 'yes')
 # APP_ENV / FLASK_ENV — detect production deployment.
 _APP_ENV = os.getenv('APP_ENV', os.getenv('FLASK_ENV', 'development')).lower()
 _IS_PRODUCTION = (_APP_ENV == 'production')
+
+# ── Production credential safety gate ────────────────────────────────────────
+# Collect every credential problem first, then decide whether to abort or warn.
+_cred_errors = []
+
+if not _raw_secret_key:
+    _cred_errors.append(
+        "DASHBOARD_SECRET_KEY is not set. A random key is generated on every "
+        "restart, invalidating all admin sessions on each reboot. "
+        "Fix: set DASHBOARD_SECRET_KEY to a stable 64-char hex string "
+        "(generate with: python3 -c \"import secrets; print(secrets.token_hex(32))\")."
+    )
+
+if not os.getenv('DASHBOARD_PASSWORD'):
+    _cred_errors.append(
+        f"DASHBOARD_PASSWORD is not set — the dashboard is running with the "
+        f"public default password '{_KNOWN_DEFAULT_PASSWORD}', which is in the "
+        f"public git history and is immediately exploitable. "
+        f"Fix: set DASHBOARD_PASSWORD to a strong unique value."
+    )
+elif ADMIN_PASSWORD == _KNOWN_DEFAULT_PASSWORD:
+    _cred_errors.append(
+        f"DASHBOARD_PASSWORD is set to the known public default "
+        f"'{_KNOWN_DEFAULT_PASSWORD}'. This value is in the public git history "
+        f"and is immediately exploitable. "
+        f"Fix: set DASHBOARD_PASSWORD to a strong unique value."
+    )
+
+if _IS_PRODUCTION and _cred_errors:
+    # Hard stop: refuse to expose a vulnerable dashboard to the internet.
+    for _ce in _cred_errors:
+        _auth_logger.critical("SECURITY STARTUP FAILURE: %s", _ce)
+    _auth_logger.critical(
+        "Dashboard refusing to start in production (APP_ENV=%s) with insecure "
+        "credentials. Set the required environment variables and restart.",
+        _APP_ENV,
+    )
+    raise SystemExit(1)
+elif _cred_errors:
+    # Non-production: warn loudly but continue so local dev still works.
+    for _ce in _cred_errors:
+        _auth_logger.warning("CREDENTIAL WARNING (non-production): %s", _ce)
 
 # ── Alert token for lockdown notifications ───────────────────────────────────
 # ALERT_BOT_TOKEN: a separate bot token used ONLY to send lockdown alerts.
@@ -528,6 +684,85 @@ def validate_telegram_init_data(init_data_str: str):
         return None, None
 
 
+def account_auth(f):
+    """Decorator: strict authentication for player account/reward/referral APIs.
+
+    Accepts ONLY two auth paths (fail-closed on everything else):
+
+    A. Flask session cookie — user is logged in via the /home dashboard route.
+       Requires session['logged_in'] is True, a non-empty admin_id, and
+       is_admin=False.  The session cookie is HttpOnly and never appears in URLs.
+
+    B. Fresh HMAC-validated Telegram initData — Telegram Mini App WebApp flow.
+       Validates HMAC-SHA256 with BOT_TOKEN and auth_date freshness (max 1 h).
+       No client-controlled device fingerprint is used for replay detection;
+       freshness+HMAC is the security boundary.  Fail-closed on any validation
+       or persistence error (no fail-open nonce fallback).
+
+    Any other path (uid param, ?s= session token, dev mode uid) → 403.
+    This decorator is intentionally stricter than webapp_auth for endpoints that
+    expose PII (profile, phone, transactions) and permit financial mutations (claims).
+    """
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        # ── Path A: Flask session cookie (HttpOnly, server-side) ──────────
+        flask_uid = session.get('admin_id', '').strip()
+        if (flask_uid
+                and session.get('logged_in') is True
+                and not session.get('is_admin')):
+            g.telegram_user_id = flask_uid
+            g.telegram_user = None
+            return f(*args, **kwargs)
+
+        # ── Path B: HMAC-validated Telegram initData (fail-closed) ────────
+        if not BOT_TOKEN:
+            # No BOT_TOKEN and not a Flask session — cannot validate
+            return jsonify({'error': 'Authentication required', 'code': 'NO_AUTH'}), 403
+
+        init_data = (
+            request.headers.get('X-Telegram-Init-Data', '').strip()
+            or request.args.get('initData', '').strip()
+        )
+        if not init_data:
+            try:
+                init_data = (request.get_json(silent=True) or {}).get('initData', '').strip()
+            except Exception:
+                init_data = ''
+
+        if not init_data:
+            return jsonify({'error': 'initData required', 'code': 'NO_INIT_DATA'}), 403
+
+        uid_str, user_obj = validate_telegram_init_data(init_data)
+        if not uid_str:
+            return jsonify({'error': 'Invalid or tampered initData', 'code': 'BAD_INIT_DATA'}), 403
+
+        # Freshness — fail CLOSED (no fallback on error)
+        try:
+            import time as _time
+            auth_date_vals = parse_qs(init_data).get('auth_date', [])
+            if not auth_date_vals:
+                return jsonify({'error': 'initData missing auth_date', 'code': 'NO_AUTH_DATE'}), 403
+            auth_date = int(auth_date_vals[0])
+            if auth_date <= 0:
+                return jsonify({'error': 'initData invalid auth_date', 'code': 'BAD_AUTH_DATE'}), 403
+            age = _time.time() - auth_date
+            if age > _INIT_DATA_MAX_AGE:
+                return jsonify({'error': 'initData expired', 'code': 'EXPIRED_INIT_DATA'}), 403
+            if age < -60:
+                return jsonify({'error': 'initData auth_date in future', 'code': 'FUTURE_AUTH_DATE'}), 403
+        except (ValueError, TypeError):
+            return jsonify({'error': 'initData auth_date malformed', 'code': 'BAD_AUTH_DATE'}), 403
+        except Exception:
+            # Any other error in freshness check → fail closed
+            return jsonify({'error': 'initData validation error', 'code': 'AUTH_ERROR'}), 403
+
+        # uid comes exclusively from HMAC-validated payload — not from caller
+        g.telegram_user_id = uid_str
+        g.telegram_user = user_obj
+        return f(*args, **kwargs)
+    return decorated
+
+
 def webapp_auth(f):
     """Decorator: validates Telegram WebApp initData on game-facing API endpoints.
 
@@ -559,6 +794,20 @@ def webapp_auth(f):
                 'code': 'AUTH_LOCKDOWN'
             }), 503
 
+        # ── Path 1b: Flask dashboard session (HttpOnly cookie, never in URL) ───
+        # Users who navigate to Mini App pages from the /home dashboard route
+        # carry a Flask session cookie with their verified uid.  This cookie is
+        # HttpOnly and Secure — it cannot leak from URL logs or Referrer headers
+        # and cannot be forged without the SESSION_SECRET.  No URL token needed.
+        flask_uid = session.get('admin_id', '').strip()
+        if flask_uid and session.get('logged_in') is True and not session.get('is_admin'):
+            # Only allow non-admin (regular user) dashboard sessions here.
+            # Admin sessions are for the admin panel, not the player WebApp.
+            g.telegram_user_id = flask_uid
+            g.telegram_user = None
+            g.webapp_auth_strong = True   # login_required already verified identity
+            return f(*args, **kwargs)
+
         # ── Path 2: Production HMAC validation ────────────────────────────
         if BOT_TOKEN:
             init_data = (
@@ -583,6 +832,7 @@ def webapp_auth(f):
                 if uid_fb:
                     g.telegram_user_id = uid_fb
                     g.telegram_user = None
+                    g.webapp_auth_strong = False   # caller-supplied uid, not validated
                     return f(*args, **kwargs)
                 # Encrypted session fallback (?s=XXX)
                 s_fb = request.args.get('s', '').strip()
@@ -598,11 +848,18 @@ def webapp_auth(f):
                     if uid_val and authorized:
                         g.telegram_user_id = uid_val
                         g.telegram_user = None
+                        # validate_session returns authorized=True for both:
+                        # (a) pre_authenticated sessions (server minted from @login_required)
+                        # (b) device-fingerprint-matched sessions
+                        # Both are classified as strong auth.
+                        g.webapp_auth_strong = True
                         return f(*args, **kwargs)
                     if uid_val and not authorized:
-                        # Different device → guest mode
+                        # Device fingerprint mismatch — guest mode.
+                        # Permit read-only game routes but block sensitive account endpoints.
                         g.telegram_user_id = uid_val
                         g.telegram_user = None
+                        g.webapp_auth_strong = False   # device mismatch — not strong
                         return f(*args, **kwargs)
                 return jsonify({'error': 'initData required', 'code': 'NO_INIT_DATA'}), 403
 
@@ -627,8 +884,30 @@ def webapp_auth(f):
             except (ValueError, TypeError):
                 return jsonify({'error': 'initData auth_date malformed', 'code': 'BAD_AUTH_DATE'}), 403
 
+            # ── Replay-protection: reject same initData token reused from a
+            # different device.  Same-device repeated use within the TTL is
+            # allowed (a WebApp page sends the same initData on every apiFetch
+            # call).  The hash + device fingerprint are stored in SQLite so
+            # protection survives restarts.
+            try:
+                import hashlib as _hl
+                _tok_hash   = _hl.sha256(init_data.encode()).hexdigest()
+                _device_fp  = request.headers.get('X-Device-FP', '')
+                if not _check_nonce(_tok_hash, uid_str,
+                                    device_fp=_device_fp,
+                                    ttl=_INIT_DATA_MAX_AGE + 120):
+                    _auth_logger.warning(
+                        "initData cross-device replay detected uid=%s hash=%s…",
+                        uid_str, _tok_hash[:12])
+                    return jsonify({'error': 'initData already used from different device',
+                                    'code': 'REPLAY_INIT_DATA'}), 403
+            except Exception as _nonce_err:
+                # Never block a legitimate request if nonce storage fails
+                _auth_logger.error("nonce check error (fail-open): %s", _nonce_err)
+
             g.telegram_user_id = uid_str
             g.telegram_user = user_obj
+            g.webapp_auth_strong = True   # HMAC-validated Telegram initData
             return f(*args, **kwargs)
 
         # ── Path 3: Dev/test mode (explicit opt-in, non-production only) ────
@@ -649,6 +928,7 @@ def webapp_auth(f):
                 )
                 g.telegram_user_id = uid
                 g.telegram_user = None
+                g.webapp_auth_strong = False   # dev/test uid — not validated
                 return f(*args, **kwargs)
             return jsonify({'error': 'Missing uid (dev mode)', 'code': 'NO_UID'}), 403
 
@@ -697,78 +977,65 @@ def get_request_uid():
         uid = (request.json or {}).get('uid', '')
     return uid
 
-# ===== Encrypted Session API — secure, copy-proof game URLs =====
-@app.route('/api/auth/create-token', methods=['POST'])
-@webapp_auth
-def api_create_token():
-    """Bot calls this to generate an encrypted session for a user.
-    Returns: {'s': 'ENCRYPTED_STRING', 'expires_in': 3600}"""
-    data = request.json or {}
-    uid = str(data.get('uid', ''))
-    if not uid or not uid.isdigit():
-        return jsonify({'error': 'uid required'}), 400
-    from session_tokens import create_session
-    encrypted = create_session(uid)
-    return jsonify({'s': encrypted, 'expires_in': 3600})
+# ===== Security headers (applied to every response) =========================
+@app.after_request
+def _add_security_headers(response):
+    """Harden every response with standard security headers."""
+    response.headers.setdefault('X-Frame-Options', 'SAMEORIGIN')
+    response.headers.setdefault('X-Content-Type-Options', 'nosniff')
+    response.headers.setdefault('X-XSS-Protection', '1; mode=block')
+    response.headers.setdefault('Referrer-Policy', 'strict-origin-when-cross-origin')
+    response.headers.setdefault('Permissions-Policy', 'geolocation=(), microphone=(), camera=()')
+    # Allow service worker and iframe for WebApp pages
+    if not request.path.startswith('/webapp/'):
+        response.headers.setdefault(
+            'Content-Security-Policy',
+            "default-src 'self' https: data:; "
+            # 'unsafe-eval' is required: Alpine.js and the Tailwind runtime
+            # compile expressions with new Function(). Without it every page's
+            # JS silently dies (no data, broken sidebar, stuck panels).
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+            "style-src 'self' 'unsafe-inline' https:; "
+            "img-src 'self' data: https:; "
+            "font-src 'self' data: https://fonts.gstatic.com;"
+        )
+    # Allow the service worker (served from /static/) to control scope '/'
+    if request.path == '/static/sw.js':
+        response.headers['Service-Worker-Allowed'] = '/'
+    return response
 
-@app.route('/api/auth/validate')
-def api_validate_token():
-    """Client calls this on page load to check session + send device fingerprint."""
-    s_param = request.args.get('s', '')
-    if not s_param:
-        return jsonify({'valid': False, 'error': 's required'}), 400
-    device_fp = request.args.get('fp', '')
-    from session_tokens import validate_session
-    uid, authorized = validate_session(s_param, device_fp)
-    if not uid:
-        return jsonify({'valid': False, 'error': 'invalid or expired'})
-    return jsonify({'valid': True, 'uid': uid, 'authorized': authorized})
 
-@app.route('/api/auth/fingerprint', methods=['POST'])
-def api_set_fingerprint():
-    """Client sends device fingerprint to bind session to device."""
-    data = request.json or {}
-    s_param = data.get('s', '')
-    fp = data.get('fp', '')
-    if not s_param or not fp:
-        return jsonify({'error': 's and fp required'}), 400
-    from session_tokens import validate_session
-    uid, _ = validate_session(s_param, fp)
-    if not uid:
-        return jsonify({'error': 'invalid session'}), 400
-    return jsonify({'success': True, 'uid': uid})
+# ===== In-memory login rate limiter (no Redis needed) ========================
+import collections as _col
+_login_attempts: dict = {}  # ip → deque of timestamps
+_login_lock = threading.Lock()
+_LOGIN_MAX = 5
+_LOGIN_WINDOW = 60.0  # seconds
+
+def _login_rate_limited(ip: str) -> bool:
+    """Return True if this IP has exceeded the login attempt limit."""
+    now = time.time()
+    cutoff = now - _LOGIN_WINDOW
+    with _login_lock:
+        if ip not in _login_attempts:
+            _login_attempts[ip] = _col.deque()
+        dq = _login_attempts[ip]
+        while dq and dq[0] < cutoff:
+            dq.popleft()
+        if len(dq) >= _LOGIN_MAX:
+            return True
+        dq.append(now)
+        return False
+
 
 # ===== Routes — Pages =====
 
 @app.route('/')
 def index():
-    """Landing page — public, no auth required."""
-    # If already logged in as admin, go to dashboard
+    """Landing page (public) — admin dashboard redirect only when logged in."""
     if session.get('logged_in'):
         return redirect(url_for('dashboard'), code=303)
-    # Get OTP/security bot username for Telegram login button
-    bot_username = 'VEX_OTP_bot'  # default
-    try:
-        import csv as _csv
-        otp_token = None
-        # Read OTP bot token from bot_tokens.csv
-        with open(os.path.join(BASE_DIR, 'bot_tokens.csv'), 'r', encoding='utf-8-sig') as f:
-            for row in _csv.DictReader(f):
-                if row.get('description') == 'otp_bot' and row.get('is_active') == 'yes':
-                    otp_token = row.get('token', '')
-                    break
-        if otp_token:
-            import urllib.request as _u, json as _j
-            resp = _u.urlopen(_u.Request(
-                f'https://api.telegram.org/bot{otp_token}/getMe',
-                headers={'Content-Type': 'application/json'}
-            ), timeout=5)
-            bot_info = _j.loads(resp.read().decode())
-            if bot_info.get('ok'):
-                bot_username = bot_info['result'].get('username', bot_username)
-    except:
-        pass
-    return render_template('landing.html', bot_username=bot_username)
+    return render_template('landing.html')
 
 @app.route('/api/web/request-code', methods=['POST'])
 def api_web_request_code():
@@ -909,6 +1176,12 @@ def admin_login():
     """Admin login page — only at /vex/admin/admin"""
     error = None
     if request.method == 'POST':
+        # ── IP-based brute-force protection ──────────────────────────────
+        client_ip = request.headers.get('X-Forwarded-For', request.remote_addr or '').split(',')[0].strip()
+        if _login_rate_limited(client_ip):
+            error = 'محاولات كثيرة — انتظر دقيقة وحاول مجدداً'
+            return render_template('login.html', error=error), 429
+
         admin_id = request.form.get('admin_id', '').strip()
         password = request.form.get('password', '')
         if admin_id in ADMIN_IDS and password == ADMIN_PASSWORD:
@@ -917,7 +1190,7 @@ def admin_login():
             session['is_admin'] = True
             session['login_time'] = datetime.now().isoformat()
             session.permanent = True
-            log_action('login', f'Admin {admin_id} logged in')
+            log_action('login', f'Admin {admin_id} logged in from {client_ip}')
             return redirect(url_for('dashboard'), code=303)
         elif admin_id not in ADMIN_IDS:
             error = 'معرف الأدمن غير صحيح'
@@ -962,41 +1235,52 @@ def home():
             user_info = _gm.get_user_info(uid) or {}
             user_currency = user_info.get('currency', 'EGP')
     except: pass
+
+    # Auth note: the Flask session cookie (set at login, HttpOnly) is automatically
+    # sent with all /webapp/* API calls from the browser.  webapp_auth reads
+    # session['admin_id'] as a trusted identity, so no URL token is needed here.
     return render_template('home.html', active_page='home', user_name=user_name,
                          user_balance=user_balance, user_currency=user_currency, uid=uid)
 
 @app.route('/transactions')
 @admin_required
+@page_permission_required('view_financial')
 def page_transactions():
     return render_template('transactions.html', active_page='transactions')
 
 @app.route('/users')
 @admin_required
+@page_permission_required('ban_users')
 def page_users():
     return render_template('users.html', active_page='users')
 
 @app.route('/matching')
 @admin_required
+@page_permission_required('view_financial')
 def page_matching():
     return render_template('matching.html', active_page='matching')
 
 @app.route('/svrp')
 @admin_required
+@page_permission_required('view_financial')
 def page_svrp():
     return render_template('svrp.html', active_page='svrp')
 
 @app.route('/trading')
 @admin_required
+@page_permission_required('view_financial')
 def page_trading():
     return render_template('trading.html', active_page='trading')
 
 @app.route('/lottery')
 @admin_required
+@page_permission_required('manage_games')
 def page_lottery():
     return render_template('lottery.html', active_page='lottery')
 
 @app.route('/wheel')
 @admin_required
+@page_permission_required('manage_games')
 def page_wheel():
     return render_template('wheel.html', active_page='wheel')
 
@@ -1037,41 +1321,49 @@ def api_wheel_my_spins():
 
 @app.route('/companies')
 @admin_required
+@page_permission_required('manage_companies')
 def page_companies():
     return render_template('companies.html', active_page='companies')
 
 @app.route('/payment-methods')
 @admin_required
+@page_permission_required('manage_companies')
 def page_payment_methods():
     return render_template('payment_methods.html', active_page='payment_methods')
 
 @app.route('/apps')
 @admin_required
+@page_permission_required('manage_companies')
 def page_apps():
     return render_template('apps.html', active_page='apps')
 
 @app.route('/referrals')
 @admin_required
+@page_permission_required('manage_companies')
 def page_referrals():
     return render_template('referrals.html', active_page='referrals')
 
 @app.route('/channels')
 @admin_required
+@page_permission_required('send_broadcast')
 def page_channels():
     return render_template('channels.html', active_page='channels')
 
 @app.route('/bots')
 @admin_required
+@page_permission_required('manage_bots')
 def page_bots():
     return render_template('bots.html', active_page='bots')
 
 @app.route('/settings')
 @admin_required
+@page_permission_required('manage_settings')
 def page_settings():
     return render_template('settings.html', active_page='settings')
 
 @app.route('/seo')
 @admin_required
+@page_permission_required('manage_settings')
 def page_seo():
     """صفحة إدارة SEO وتحسين محركات البحث"""
     # قراءة إعدادات SEO الحالية من system_settings.csv
@@ -1089,6 +1381,7 @@ def page_seo():
 
 @app.route('/api/seo/save', methods=['POST'])
 @admin_required
+@page_permission_required('manage_settings')
 def api_seo_save():
     """حفظ إعدادات SEO"""
     import csv as _csv
@@ -1127,41 +1420,49 @@ def api_seo_save():
 
 @app.route('/complaints')
 @admin_required
+@page_permission_required('ban_users')
 def page_complaints():
     return render_template('complaints.html', active_page='complaints')
 
 @app.route('/broadcast')
 @admin_required
+@page_permission_required('send_broadcast')
 def page_broadcast():
     return render_template('broadcast.html', active_page='broadcast')
 
 @app.route('/admins')
 @admin_required
+@page_permission_required('manage_admins')
 def page_admins():
     return render_template('admin_management.html', active_page='admins')
 
 @app.route('/themes')
 @admin_required
+@page_permission_required('manage_settings')
 def page_themes():
     return render_template('themes.html', active_page='themes')
 
 @app.route('/exchange-addresses')
 @admin_required
+@page_permission_required('manage_settings')
 def page_exchange_addresses():
     return render_template('exchange_addresses.html', active_page='exchange_addresses')
 
 @app.route('/send-message')
 @admin_required
+@page_permission_required('send_broadcast')
 def page_send_message():
     return render_template('send_message.html', active_page='send_message')
 
 @app.route('/backup')
 @admin_required
+@page_permission_required('manage_admins')
 def page_backup():
     return render_template('backup.html', active_page='backup')
 
 @app.route('/statistics')
 @admin_required
+@page_permission_required('view_statistics')
 def page_statistics():
     return render_template('statistics.html', active_page='statistics')
 
@@ -1432,6 +1733,7 @@ def api_transactions():
 
 @app.route('/api/transactions/<txn_id>/approve', methods=['POST'])
 @api_auth
+@permission_required('approve_deposits')
 def api_approve_txn(txn_id):
     data = request.json or {}
     new_amount = data.get('amount', '')
@@ -1440,18 +1742,30 @@ def api_approve_txn(txn_id):
     old_amount = ''
     customer_tid = ''
     trans = None
+    was_pending = False   # True only when this call actually transitions pending→approved
     for t in txns:
         if t.get('id') == txn_id:
-            old_amount = t.get('amount', '')
-            customer_tid = t.get('telegram_id', '')
+            old_amount    = t.get('amount', '')
+            customer_tid  = t.get('telegram_id', '')
+            old_status    = t.get('status', '')
             trans = t
-            t['status'] = 'approved'
-            t['processed_by'] = session.get('admin_id', '')
-            if new_amount:
-                t['amount'] = str(new_amount)
+            if old_status != 'approved':          # guard: only transition once
+                was_pending = (old_status == 'pending')
+                t['status'] = 'approved'
+                t['processed_by'] = session.get('admin_id', '')
+                if new_amount:
+                    t['amount'] = str(new_amount)
             break
     write_csv('transactions.csv', txns, fieldnames)
     log_action('approve_transaction', f'{txn_id} amount: {old_amount} -> {new_amount or old_amount}')
+    # Increment wagering ONLY on a genuine pending→approved transition
+    if was_pending and customer_tid:
+        try:
+            import sys as _sw; _sw.path.insert(0, BASE_DIR)
+            from svrp import SVRPManager as _SM_w
+            _SM_w().increment_wagering(str(customer_tid))
+        except Exception:
+            pass  # non-fatal: wagering update best-effort
     # VEX deposit: async add balance + notify player (non-blocking)
     if trans and 'VEX' in trans.get('admin_note', ''):
         import threading as _th
@@ -1500,6 +1814,7 @@ def api_approve_txn(txn_id):
 
 @app.route('/api/transactions/<txn_id>/reject', methods=['POST'])
 @api_auth
+@permission_required('reject_deposits')
 def api_reject_txn(txn_id):
     reason = request.json.get('reason', '') if request.json else ''
     txns = read_csv('transactions.csv')
@@ -1534,22 +1849,42 @@ def api_reject_txn(txn_id):
 
 @app.route('/api/transactions/bulk-approve', methods=['POST'])
 @api_auth
+@permission_required('approve_deposits')
 def api_bulk_approve():
     ids = request.json.get('ids', []) if request.json else []
     txns = read_csv('transactions.csv')
     fieldnames = get_fieldnames('transactions.csv', ['id','customer_id','telegram_id','name','type','company','wallet_number','amount','exchange_address','status','date','admin_note','processed_by','currency'])
     count = 0
+    newly_approved_tids = []   # telegram_ids that actually transitioned pending→approved
     for t in txns:
         if t.get('id') in ids:
-            t['status'] = 'approved'
-            t['processed_by'] = session.get('admin_id', '')
-            count += 1
+            old_st = t.get('status', '')
+            if old_st != 'approved':             # guard: only transition once
+                if old_st == 'pending' and t.get('telegram_id'):
+                    newly_approved_tids.append(str(t['telegram_id']))
+                t['status'] = 'approved'
+                t['processed_by'] = session.get('admin_id', '')
+                count += 1
     write_csv('transactions.csv', txns, fieldnames)
     log_action('bulk_approve', f'{count} transactions')
+    # Increment wagering ONLY for users whose status actually changed pending→approved
+    if newly_approved_tids:
+        try:
+            import sys as _sbw; _sbw.path.insert(0, BASE_DIR)
+            from svrp import SVRPManager as _SM_bw
+            _sm_bw = _SM_bw()
+            for _tid in newly_approved_tids:
+                try:
+                    _sm_bw.increment_wagering(_tid)
+                except Exception:
+                    pass
+        except Exception:
+            pass
     return jsonify({'success': True, 'count': count})
 
 @app.route('/api/transactions/bulk-reject', methods=['POST'])
 @api_auth
+@permission_required('reject_deposits')
 def api_bulk_reject():
     ids = request.json.get('ids', []) if request.json else []
     reason = request.json.get('reason', 'رفض جماعي') if request.json else 'رفض جماعي'
@@ -1784,6 +2119,7 @@ def api_user_detail(user_id):
 
 @app.route('/api/users/<user_id>/ban', methods=['POST'])
 @api_auth
+@permission_required('ban_users')
 def api_ban_user(user_id):
     reason = request.json.get('reason', 'محظور من لوحة التحكم') if request.json else 'محظور'
     users = read_csv('users.csv')
@@ -1795,10 +2131,13 @@ def api_ban_user(user_id):
             break
     write_csv('users.csv', users, fieldnames)
     log_action('ban_user', f'{user_id}: {reason}')
+    _rbac_log(str(session.get('admin_id', '')), 'ban_user', target=user_id,
+              details=reason, ip=request.remote_addr)
     return jsonify({'success': True})
 
 @app.route('/api/users/<user_id>/unban', methods=['POST'])
 @api_auth
+@permission_required('unban_users')
 def api_unban_user(user_id):
     users = read_csv('users.csv')
     fieldnames = get_fieldnames('users.csv', ['telegram_id','name','phone','customer_id','language','date','is_banned','ban_reason','currency'])
@@ -1809,6 +2148,8 @@ def api_unban_user(user_id):
             break
     write_csv('users.csv', users, fieldnames)
     log_action('unban_user', user_id)
+    _rbac_log(str(session.get('admin_id', '')), 'unban_user', target=user_id,
+              details='unbanned', ip=request.remote_addr)
     return jsonify({'success': True})
 
 @app.route('/api/users/export')
@@ -1842,6 +2183,38 @@ def api_companies():
         c['txn_count'] = len(c_txns)
         c['volume'] = sum(float(t.get('amount', 0) or 0) for t in c_txns if t.get('status') == 'approved')
     return jsonify({'companies': companies})
+
+
+# ===== API — Icon Upload (companies & payment methods) =====
+_ICON_UPLOAD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads', 'icons')
+_ICON_ALLOWED_EXT = {'png', 'jpg', 'jpeg', 'webp', 'gif'}
+_ICON_MAX_BYTES = 2 * 1024 * 1024  # 2MB
+
+@app.route('/api/upload-icon', methods=['POST'])
+@api_auth
+@permission_required('manage_companies')
+def api_upload_icon():
+    f = request.files.get('file')
+    if not f or not f.filename:
+        return jsonify({'success': False, 'error': 'لم يتم اختيار ملف'}), 400
+    ext = f.filename.rsplit('.', 1)[-1].lower() if '.' in f.filename else ''
+    if ext not in _ICON_ALLOWED_EXT:
+        return jsonify({'success': False, 'error': 'صيغة غير مدعومة — المسموح: PNG, JPG, WEBP, GIF'}), 400
+    blob = f.read(_ICON_MAX_BYTES + 1)
+    if len(blob) > _ICON_MAX_BYTES:
+        return jsonify({'success': False, 'error': 'حجم الملف أكبر من 2MB'}), 400
+    # Magic-byte sanity check (blocks disguised HTML/SVG/script uploads)
+    _magic_ok = (blob[:8] == b'\x89PNG\r\n\x1a\n' or blob[:3] == b'\xff\xd8\xff'
+                 or blob[:6] in (b'GIF87a', b'GIF89a')
+                 or (blob[:4] == b'RIFF' and blob[8:12] == b'WEBP'))
+    if not _magic_ok:
+        return jsonify({'success': False, 'error': 'الملف ليس صورة صالحة'}), 400
+    os.makedirs(_ICON_UPLOAD_DIR, exist_ok=True)
+    fname = f"icon_{secrets.token_hex(8)}.{ext}"
+    with open(os.path.join(_ICON_UPLOAD_DIR, fname), 'wb') as out:
+        out.write(blob)
+    log_action('upload_icon', fname)
+    return jsonify({'success': True, 'url': f'/static/uploads/icons/{fname}'})
 
 @app.route('/api/companies/list')
 def api_companies_public():
@@ -1888,6 +2261,7 @@ def api_payment_methods_by_company(company_id):
 
 @app.route('/api/companies', methods=['POST'])
 @api_auth
+@permission_required('manage_companies')
 def api_add_company():
     data = request.json
     companies = read_csv('companies.csv')
@@ -1909,6 +2283,7 @@ def api_add_company():
 
 @app.route('/api/companies/<company_id>', methods=['PUT', 'DELETE'])
 @api_auth
+@permission_required('manage_companies')
 def api_edit_company(company_id):
     companies = read_csv('companies.csv')
     fieldnames = get_fieldnames('companies.csv', ['id','name','type','details','is_active','icon','address','affiliate_link'])
@@ -1947,10 +2322,14 @@ def api_payment_methods():
 
 @app.route('/api/payment-methods', methods=['POST'])
 @api_auth
+@permission_required('manage_companies')
 def api_add_payment_method():
     data = request.json
     methods = read_csv('payment_methods.csv')
-    fieldnames = get_fieldnames('payment_methods.csv', ['id','company_id','method_name','method_type','account_data','additional_info','status','created_date','icon'])
+    fieldnames = get_fieldnames('payment_methods.csv', ['id','company_id','method_name','method_type','account_data','additional_info','status','created_date','icon','available_for_games','currency'])
+    for extra in ('available_for_games', 'currency'):
+        if extra not in fieldnames:
+            fieldnames.append(extra)
     new_id = f"PM{str(int(datetime.now().timestamp()))[-6:]}"
     new_method = {
         'id': new_id,
@@ -1961,7 +2340,9 @@ def api_add_payment_method():
         'additional_info': data.get('additional_info', ''),
         'status': 'active',
         'created_date': datetime.now().strftime('%Y-%m-%d'),
-        'icon': data.get('icon', '💳')
+        'icon': data.get('icon', '💳'),
+        'available_for_games': 'yes' if data.get('available_for_games', 'yes') in ('yes', True, 'true', '1') else 'no',
+        'currency': data.get('currency', '')
     }
     append_csv('payment_methods.csv', new_method, fieldnames)
     log_action('add_payment_method', new_id)
@@ -1969,9 +2350,13 @@ def api_add_payment_method():
 
 @app.route('/api/payment-methods/<method_id>', methods=['PUT', 'DELETE'])
 @api_auth
+@permission_required('manage_companies')
 def api_edit_payment_method(method_id):
     methods = read_csv('payment_methods.csv')
-    fieldnames = get_fieldnames('payment_methods.csv', ['id','company_id','method_name','method_type','account_data','additional_info','status','created_date','icon'])
+    fieldnames = get_fieldnames('payment_methods.csv', ['id','company_id','method_name','method_type','account_data','additional_info','status','created_date','icon','available_for_games','currency'])
+    for extra in ('available_for_games', 'currency'):
+        if extra not in fieldnames:
+            fieldnames.append(extra)
 
     if request.method == 'DELETE':
         methods = [m for m in methods if m.get('id') != method_id]
@@ -1999,6 +2384,7 @@ def api_payment_links():
 
 @app.route('/api/payment-links', methods=['POST'])
 @api_auth
+@permission_required('manage_companies')
 def api_save_payment_links():
     """حفظ روابط وسيلة دفع مع شركات (استبدال كامل)"""
     data = request.json
@@ -2080,23 +2466,59 @@ def api_svrp_requests():
 
 @app.route('/api/svrp/requests/<req_id>/approve', methods=['POST'])
 @api_auth
+@permission_required('approve_deposits')
 def api_svrp_approve(req_id):
-    amount = request.json.get('amount', '0') if request.json else '0'
+    """Approve a recovery request and credit the user's frozen SVRP wallet.
+
+    Uses credit_svrp_balance_for_approval which atomically credits the
+    svrp_wallet_balance SQLite table and records the approval in
+    svrp_approval_log in a single SAVEPOINT — no cross-store inconsistency.
+
+    Idempotency: svrp_approval_log has req_id as PRIMARY KEY; duplicate
+    approvals of the same request return success without re-crediting.
+
+    The recovery_requests.csv status update is best-effort (display only);
+    the SQLite record is the authoritative source of truth.
+    """
+    import sys as _sys_svrp; _sys_svrp.path.insert(0, BASE_DIR)
+    from svrp import SVRPManager as _SvrpMgr
+
+    raw_amount = request.json.get('amount', '0') if request.json else '0'
+    try:
+        amount_float = float(raw_amount)
+        if not math.isfinite(amount_float) or amount_float <= 0:
+            return jsonify({'error': 'المبلغ غير صالح'}), 400
+    except (TypeError, ValueError):
+        return jsonify({'error': 'المبلغ غير صالح — يجب أن يكون رقماً'}), 400
+
+    # Identify the user this request belongs to (from CSV, for display lookup)
+    import sys as _sys_r; _sys_r.path.insert(0, BASE_DIR)
     reqs = read_csv('recovery_requests.csv')
-    fieldnames = get_fieldnames('recovery_requests.csv', ['id','user_id','customer_id','photo_file_id','status','recovery_amount','admin_note','created_at','approved_at','approved_by'])
-    for r in reqs:
-        if r.get('id') == req_id:
-            r['status'] = 'approved'
-            r['recovery_amount'] = amount
-            r['approved_at'] = datetime.now().strftime('%Y-%m-%d %H:%M')
-            r['approved_by'] = session.get('admin_id', '')
-            break
-    write_csv('recovery_requests.csv', reqs, fieldnames)
-    log_action('svrp_approve', f'{req_id}: {amount}')
-    return jsonify({'success': True})
+    req_row = next((r for r in reqs if r.get('id') == req_id), None)
+    if not req_row:
+        return jsonify({'error': 'الطلب غير موجود'}), 404
+    uid = str(req_row.get('user_id', ''))
+    if not uid:
+        return jsonify({'error': 'لا يمكن تحديد مستخدم الطلب'}), 400
+
+    # Step 1: Atomic SQLite credit + approval log in one SAVEPOINT
+    try:
+        ok, result = _gm.credit_svrp_balance_for_approval(req_id, uid, amount_float)
+    except Exception as _ae:
+        return jsonify({'error': f'خطأ في تسجيل الموافقة: {_ae}'}), 500
+    if not ok:
+        return jsonify({'error': result or 'فشل الموافقة'}), 400
+
+    # Step 2: Best-effort CSV status update (display only; not authoritative)
+    admin_id = session.get('admin_id', 'unknown')
+    _SvrpMgr().approve_recovery_request(req_id, amount_float, admin_id)
+
+    log_action('svrp_approve', f'{req_id}: {amount_float} uid={uid}')
+    return jsonify({'success': True, 'new_frozen_balance': result})
 
 @app.route('/api/svrp/requests/<req_id>/reject', methods=['POST'])
 @api_auth
+@permission_required('reject_deposits')
 def api_svrp_reject(req_id):
     reqs = read_csv('recovery_requests.csv')
     fieldnames = get_fieldnames('recovery_requests.csv', ['id','user_id','customer_id','photo_file_id','status','recovery_amount','admin_note','created_at','approved_at','approved_by'])
@@ -2117,6 +2539,7 @@ def api_svrp_bonus_requests():
 
 @app.route('/api/svrp/bonus-requests/<req_id>/approve', methods=['POST'])
 @api_auth
+@permission_required('approve_deposits')
 def api_svrp_bonus_approve(req_id):
     reqs = read_csv('bonus_requests.csv')
     fieldnames = get_fieldnames('bonus_requests.csv', ['id','user_id','company_id','company_name','account_number','bonus_amount','status','created_at','approved_by'])
@@ -2131,6 +2554,7 @@ def api_svrp_bonus_approve(req_id):
 
 @app.route('/api/svrp/bonus-requests/<req_id>/reject', methods=['POST'])
 @api_auth
+@permission_required('reject_deposits')
 def api_svrp_bonus_reject(req_id):
     reqs = read_csv('bonus_requests.csv')
     fieldnames = get_fieldnames('bonus_requests.csv', ['id','user_id','company_id','company_name','account_number','bonus_amount','status','created_at','approved_by'])
@@ -2150,6 +2574,7 @@ def api_svrp_promo_codes():
 
 @app.route('/api/svrp/promo-codes', methods=['POST'])
 @api_auth
+@permission_required('manage_companies')
 def api_create_promo_code():
     data = request.json
     codes = read_csv('svrp_promo_codes.csv')
@@ -2245,6 +2670,7 @@ def api_apps():
 
 @app.route('/api/apps', methods=['POST'])
 @api_auth
+@permission_required('manage_companies')
 def api_add_app():
     data = request.json
     apps = read_csv('app_links.csv')
@@ -2265,6 +2691,7 @@ def api_add_app():
 
 @app.route('/api/apps/<app_id>', methods=['PUT', 'DELETE'])
 @api_auth
+@permission_required('manage_companies')
 def api_edit_app(app_id):
     apps = read_csv('app_links.csv')
     fieldnames = get_fieldnames('app_links.csv', ['id','name','icon_url','download_url','description','is_active','created_at'])
@@ -2304,6 +2731,7 @@ def api_referrals():
 
 @app.route('/api/referrals/links', methods=['POST'])
 @api_auth
+@permission_required('manage_companies')
 def api_add_referral_link():
     data = request.json
     links = read_csv('referral_links.csv')
@@ -2321,6 +2749,7 @@ def api_add_referral_link():
 
 @app.route('/api/referrals/links/<link_id>', methods=['PUT', 'DELETE'])
 @api_auth
+@permission_required('manage_companies')
 def api_edit_referral_link(link_id):
     links = read_csv('referral_links.csv')
     fieldnames = get_fieldnames('referral_links.csv', ['id','name','url','is_active','created_at'])
@@ -2356,6 +2785,7 @@ def api_channels():
 
 @app.route('/api/channels/<channel_id>/toggle', methods=['POST'])
 @api_auth
+@permission_required('send_broadcast')
 def api_toggle_channel(channel_id):
     channels = read_csv('bot_channels.csv')
     fieldnames = get_fieldnames('bot_channels.csv', ['id','chat_id','title','type','is_active','added_at','relay_to_users','relay_to_channels','forward_mode','welcome_text'])
@@ -2368,6 +2798,7 @@ def api_toggle_channel(channel_id):
 
 @app.route('/api/channels/<channel_id>/settings', methods=['POST'])
 @api_auth
+@permission_required('send_broadcast')
 def api_channel_settings(channel_id):
     """تحديث إعدادات قناة محددة"""
     data = request.json
@@ -2388,6 +2819,7 @@ def api_channel_settings(channel_id):
 
 @app.route('/api/channels/<channel_id>', methods=['DELETE'])
 @api_auth
+@permission_required('send_broadcast')
 def api_delete_channel(channel_id):
     channels = read_csv('bot_channels.csv')
     fieldnames = get_fieldnames('bot_channels.csv', ['id','chat_id','title','type','is_active','added_at','relay_to_users','relay_to_channels','forward_mode','welcome_text'])
@@ -2421,6 +2853,7 @@ def api_post_library():
 
 @app.route('/api/post-library', methods=['POST'])
 @api_auth
+@permission_required('send_broadcast')
 def api_add_post():
     """إنشاء منشور جديد"""
     data = request.json
@@ -2487,6 +2920,7 @@ def api_add_post():
 
 @app.route('/api/post-library/<post_id>', methods=['DELETE'])
 @api_auth
+@permission_required('send_broadcast')
 def api_delete_post(post_id):
     posts = read_csv('post_library.csv')
     fieldnames = get_fieldnames('post_library.csv', ['id','title','content','media_type','media_file_id','target_channels','schedule','status','created_by','created_at'])
@@ -2497,6 +2931,7 @@ def api_delete_post(post_id):
 
 @app.route('/api/post-library/<post_id>/publish', methods=['POST'])
 @api_auth
+@permission_required('send_broadcast')
 def api_publish_post(post_id):
     """نشر منشور من المكتبة"""
     posts = read_csv('post_library.csv')
@@ -2563,6 +2998,7 @@ def api_post_vault():
 
 @app.route('/api/post-vault/<post_id>/repost', methods=['POST'])
 @api_auth
+@permission_required('send_broadcast')
 def api_repost_from_vault(post_id):
     """إعادة نشر بوست من الأرشيف"""
     posts = read_csv('post_vault.csv')
@@ -2586,6 +3022,7 @@ def api_repost_from_vault(post_id):
 
 @app.route('/api/post-vault/<post_id>', methods=['DELETE'])
 @api_auth
+@permission_required('send_broadcast')
 def api_delete_vault_post(post_id):
     posts = read_csv('post_vault.csv')
     posts = [p for p in posts if p.get('id') != post_id]
@@ -2603,6 +3040,7 @@ def api_text_replacements():
 
 @app.route('/api/text-replacements', methods=['POST'])
 @api_auth
+@permission_required('send_broadcast')
 def api_add_text_replacement():
     data = request.json
     rules = read_csv('text_replacements.csv')
@@ -2623,6 +3061,7 @@ def api_add_text_replacement():
 
 @app.route('/api/text-replacements/<rule_id>/toggle', methods=['POST'])
 @api_auth
+@permission_required('send_broadcast')
 def api_toggle_replacement(rule_id):
     rules = read_csv('text_replacements.csv')
     fieldnames = get_fieldnames('text_replacements.csv', ['id','find_text','replace_text','is_regex','channel_id','is_active','created_at'])
@@ -2635,6 +3074,7 @@ def api_toggle_replacement(rule_id):
 
 @app.route('/api/text-replacements/<rule_id>', methods=['DELETE'])
 @api_auth
+@permission_required('send_broadcast')
 def api_delete_replacement(rule_id):
     rules = read_csv('text_replacements.csv')
     fieldnames = get_fieldnames('text_replacements.csv', ['id','find_text','replace_text','is_regex','channel_id','is_active','created_at'])
@@ -2658,6 +3098,7 @@ def api_ai_providers():
 
 @app.route('/api/ai-providers/test', methods=['POST'])
 @api_auth
+@permission_required('send_broadcast')
 def api_test_ai():
     try:
         from ai_providers import AIManager
@@ -2672,6 +3113,7 @@ def api_test_ai():
 
 @app.route('/api/ai-instructions', methods=['GET', 'POST'])
 @api_auth
+@permission_required('send_broadcast')
 def api_ai_instructions():
     if request.method == 'GET':
         settings = read_csv('system_settings.csv')
@@ -2719,6 +3161,7 @@ def api_channel_categories():
 
 @app.route('/api/channels/<channel_id>/category', methods=['POST'])
 @api_auth
+@permission_required('send_broadcast')
 def api_set_channel_category(channel_id):
     data = request.json
     category = data.get('category', 'غير مصنف')
@@ -2733,6 +3176,7 @@ def api_set_channel_category(channel_id):
 
 @app.route('/api/channels/<channel_id>/ai-toggle', methods=['POST'])
 @api_auth
+@permission_required('send_broadcast')
 def api_toggle_channel_ai(channel_id):
     channels = read_csv('bot_channels.csv')
     fieldnames = get_fieldnames('bot_channels.csv', ['id','chat_id','title','type','is_active','added_at','relay_to_users','relay_to_channels','forward_mode','welcome_text','category','ai_enabled'])
@@ -2753,6 +3197,7 @@ def api_channel_groups():
 
 @app.route('/api/channel-groups', methods=['POST'])
 @api_auth
+@permission_required('send_broadcast')
 def api_add_channel_group():
     data = request.json
     groups = read_csv('channel_groups.csv')
@@ -2770,6 +3215,7 @@ def api_add_channel_group():
 
 @app.route('/api/channel-groups/<group_id>', methods=['DELETE'])
 @api_auth
+@permission_required('send_broadcast')
 def api_delete_channel_group(group_id):
     groups = read_csv('channel_groups.csv')
     fieldnames = get_fieldnames('channel_groups.csv', ['id','name','description','channel_ids','created_at'])
@@ -2805,6 +3251,7 @@ def api_daily_report():
 
 @app.route('/api/channels/<channel_id>/post', methods=['POST'])
 @api_auth
+@permission_required('send_broadcast')
 def api_post_to_channel(channel_id):
     """إرسال رسالة لقناة محددة"""
     channels = read_csv('bot_channels.csv')
@@ -2832,6 +3279,7 @@ def api_post_to_channel(channel_id):
 
 @app.route('/api/channels', methods=['POST'])
 @api_auth
+@permission_required('send_broadcast')
 def api_add_channel_manual():
     """إضافة قناة يدوياً — مع تحديد الدور"""
     data = request.json
@@ -2873,6 +3321,7 @@ def api_add_channel_manual():
 
 @app.route('/api/channels/<channel_id>/category', methods=['POST'])
 @api_auth
+@permission_required('send_broadcast')
 def api_set_channel_category_api(channel_id):
     data = request.json
     category = data.get('category', '')
@@ -2909,6 +3358,7 @@ def api_wheel_gifts():
 
 @app.route('/api/wheel-gifts', methods=['POST'])
 @api_auth
+@permission_required('manage_games')
 def api_add_wheel_gift():
     data = request.json
     gifts = read_csv('wheel_gifts.csv')
@@ -2927,6 +3377,7 @@ def api_add_wheel_gift():
 
 @app.route('/api/wheel-gifts/<gift_id>', methods=['PUT', 'DELETE'])
 @api_auth
+@permission_required('manage_games')
 def api_edit_wheel_gift(gift_id):
     gifts = read_csv('wheel_gifts.csv')
     fieldnames = get_fieldnames('wheel_gifts.csv', ['id','gift_text','affiliate_link','is_active','created_at'])
@@ -2958,6 +3409,7 @@ def api_bots():
 
 @app.route('/api/bots', methods=['POST'])
 @api_auth
+@permission_required('manage_bots')
 def api_add_bot():
     data = request.json
     bots = read_csv('bot_tokens.csv')
@@ -2984,6 +3436,7 @@ def api_add_bot():
 
 @app.route('/api/bots/<bot_id>/toggle', methods=['POST'])
 @api_auth
+@permission_required('manage_bots')
 def api_toggle_bot(bot_id):
     bots = read_csv('bot_tokens.csv')
     fieldnames = get_fieldnames('bot_tokens.csv', ['id','name','token','is_active','created_at','admin_ids','last_started','total_users','total_transactions','freeze_until','status','description','can_manage_bots'])
@@ -2997,6 +3450,7 @@ def api_toggle_bot(bot_id):
 
 @app.route('/api/bots/<bot_id>', methods=['DELETE'])
 @api_auth
+@permission_required('manage_bots')
 def api_delete_bot(bot_id):
     bots = read_csv('bot_tokens.csv')
     fieldnames = get_fieldnames('bot_tokens.csv', ['id','name','token','is_active','created_at','admin_ids','last_started','total_users','total_transactions','freeze_until','status','description','can_manage_bots'])
@@ -3025,6 +3479,7 @@ def api_complaints():
 
 @app.route('/api/complaints/<complaint_id>/reply', methods=['POST'])
 @api_auth
+@permission_required('ban_users')
 def api_complaint_reply(complaint_id):
     reply = request.json.get('reply', '') if request.json else ''
     complaints = read_csv('complaints.csv')
@@ -3042,6 +3497,7 @@ def api_complaint_reply(complaint_id):
 
 @app.route('/api/broadcast', methods=['POST'])
 @api_auth
+@permission_required('send_broadcast')
 def api_broadcast():
     """بث رسالة لكل المستخدمين — يحفظ في ملف فقط (البوت الفعلي يرسل)"""
     message = request.json.get('message', '') if request.json else ''
@@ -3071,6 +3527,7 @@ def api_settings():
 
 @app.route('/api/settings', methods=['POST'])
 @api_auth
+@permission_required('manage_settings')
 def api_update_settings():
     data = request.json
     settings = read_csv('system_settings.csv')
@@ -3093,6 +3550,7 @@ def api_button_labels():
 
 @app.route('/api/button-labels', methods=['POST'])
 @api_auth
+@permission_required('manage_settings')
 def api_update_button_label():
     data = request.json
     labels = read_csv('button_labels.csv')
@@ -3191,6 +3649,7 @@ def api_admins():
 
 @app.route('/api/admins', methods=['POST'])
 @api_auth
+@permission_required('manage_admins')
 def api_add_admin():
     data = request.json
     telegram_id = data.get('telegram_id', '')
@@ -3250,6 +3709,7 @@ def api_add_admin():
 
 @app.route('/api/admins/<admin_id>', methods=['DELETE'])
 @api_auth
+@permission_required('manage_admins')
 def api_delete_admin(admin_id):
     perm_file = os.path.join(BASE_DIR, 'admin_permissions.json')
     if os.path.exists(perm_file):
@@ -3285,6 +3745,7 @@ def api_delete_admin(admin_id):
 
 @app.route('/api/admins/<admin_id>/role', methods=['POST'])
 @api_auth
+@permission_required('manage_admins')
 def api_set_admin_role(admin_id):
     role = request.json.get('role', 'support') if request.json else 'support'
 
@@ -3318,25 +3779,107 @@ def api_set_admin_role(admin_id):
     return jsonify({'success': True})
 
 
+# ── RBAC Roles Management API (super_admin only) ──────────────────────────────
+
+@app.route('/api/admin/rbac/roles', methods=['GET'])
+@api_auth
+@permission_required('manage_admins')
+def api_rbac_roles_list():
+    """List all admin role assignments from the SQLite admin_roles table."""
+    try:
+        import sqlite3 as _sql
+        conn = _sql.connect(os.path.join(BASE_DIR, 'vex_games.db'), timeout=5)
+        conn.row_factory = _sql.Row
+        rows = conn.execute(
+            'SELECT uid, role, permissions, created_at, created_by '
+            'FROM admin_roles ORDER BY created_at DESC'
+        ).fetchall()
+        conn.close()
+        result = []
+        for r in rows:
+            perms = {}
+            try:
+                perms = json.loads(r['permissions'] or '{}')
+            except Exception:
+                pass
+            result.append({
+                'uid': r['uid'], 'role': r['role'],
+                'permissions': perms,
+                'created_at': r['created_at'],
+                'created_by': r['created_by'],
+            })
+        return jsonify({'roles': result, 'role_definitions': _ROLE_PERMISSIONS})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/admin/rbac/roles/<uid>', methods=['POST'])
+@api_auth
+@permission_required('manage_admins')
+def api_rbac_set_role(uid):
+    """Assign or update a role for an admin UID (super_admin only)."""
+    data = request.json or {}
+    role = data.get('role', '')
+    if not role or role not in _ROLE_PERMISSIONS:
+        valid = list(_ROLE_PERMISSIONS.keys())
+        return jsonify({'error': f'Invalid role. Valid values: {valid}'}), 400
+    actor = str(session.get('admin_id', ''))
+    ok = _rbac_set_role(str(uid), role, created_by=actor)
+    if ok:
+        _rbac_log(actor, 'rbac_set_role', target=str(uid),
+                  details=f'role={role}', ip=request.remote_addr)
+        log_action('rbac_set_role', f'{uid} → {role}')
+        return jsonify({'success': True})
+    return jsonify({'error': 'Failed to set role'}), 500
+
+
+@app.route('/api/admin/rbac/roles/<uid>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_admins')
+def api_rbac_delete_role(uid):
+    """Remove a custom role (UID reverts to no-access or env-based super_admin)."""
+    try:
+        import sqlite3 as _sql
+        conn = _sql.connect(os.path.join(BASE_DIR, 'vex_games.db'), timeout=5)
+        conn.execute('DELETE FROM admin_roles WHERE uid=?', (str(uid),))
+        conn.commit()
+        conn.close()
+        actor = str(session.get('admin_id', ''))
+        _rbac_log(actor, 'rbac_delete_role', target=str(uid),
+                  details='role removed', ip=request.remote_addr)
+        log_action('rbac_delete_role', uid)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 # ===== API — Themes =====
 
 @app.route('/api/themes')
 @api_auth
 def api_themes():
     themes = [
+        {'id': 'vex', 'name': 'VEX Neon', 'colors': {'primary': '#00ff88', 'accent': '#00b35f'}},
         {'id': 'gold', 'name': 'Gold', 'colors': {'primary': '#FFD700', 'accent': '#FFA500'}},
         {'id': 'ocean', 'name': 'Ocean', 'colors': {'primary': '#0077BE', 'accent': '#00B4D8'}},
         {'id': 'purple', 'name': 'Purple', 'colors': {'primary': '#6B46C1', 'accent': '#9F7AEA'}}
     ]
+    valid_ids = {t['id'] for t in themes}
     settings = read_csv('system_settings.csv')
-    active_theme = next((s.get('setting_value', 'gold') for s in settings if s.get('setting_key') == 'active_theme'), 'gold')
+    active_theme = next((s.get('setting_value', 'vex') for s in settings if s.get('setting_key') == 'active_theme'), 'vex')
+    if active_theme not in valid_ids:
+        active_theme = 'vex'
     return jsonify({'themes': themes, 'active_theme': active_theme})
 
 
 @app.route('/api/themes', methods=['POST'])
 @api_auth
+@permission_required('manage_settings')
 def api_set_theme():
-    theme_id = request.json.get('theme_id', 'gold') if request.json else 'gold'
+    payload = request.json or {}
+    theme_id = payload.get('theme_id') or payload.get('theme') or 'vex'
+    if theme_id not in ('vex', 'gold', 'ocean', 'purple'):
+        return jsonify({'error': 'invalid theme'}), 400
     settings = read_csv('system_settings.csv')
     fieldnames = get_fieldnames('system_settings.csv', ['setting_key','setting_value','description'])
     found = False
@@ -3367,6 +3910,7 @@ def api_exchange_addresses():
 
 @app.route('/api/exchange-addresses', methods=['POST'])
 @api_auth
+@permission_required('manage_settings')
 def api_add_exchange_address():
     data = request.json
     addresses = read_csv('exchange_addresses.csv')
@@ -3388,6 +3932,7 @@ def api_add_exchange_address():
 
 @app.route('/api/exchange-addresses/<addr_id>', methods=['DELETE'])
 @api_auth
+@permission_required('manage_settings')
 def api_delete_exchange_address(addr_id):
     addresses = read_csv('exchange_addresses.csv')
     fieldnames = get_fieldnames('exchange_addresses.csv', ['id','exchange_name','address','network','is_active','created_at','notes'])
@@ -3399,6 +3944,7 @@ def api_delete_exchange_address(addr_id):
 
 @app.route('/api/exchange-addresses/<addr_id>/toggle', methods=['POST'])
 @api_auth
+@permission_required('manage_settings')
 def api_toggle_exchange_address(addr_id):
     addresses = read_csv('exchange_addresses.csv')
     fieldnames = get_fieldnames('exchange_addresses.csv', ['id','exchange_name','address','network','is_active','created_at','notes'])
@@ -3414,6 +3960,7 @@ def api_toggle_exchange_address(addr_id):
 
 @app.route('/api/send-message', methods=['POST'])
 @api_auth
+@permission_required('send_broadcast')
 def api_send_message():
     data = request.json
     target_user_id = data.get('target_user_id', '')
@@ -3444,6 +3991,7 @@ def api_send_message():
 
 @app.route('/api/backup', methods=['POST'])
 @api_auth
+@permission_required('manage_admins')
 def api_backup():
     backup_dir = os.path.join(BASE_DIR, 'backups')
     os.makedirs(backup_dir, exist_ok=True)
@@ -3470,6 +4018,7 @@ def api_backup():
 
 @app.route('/api/backups')
 @api_auth
+@permission_required('manage_admins')
 def api_backups():
     backup_dir = os.path.join(BASE_DIR, 'backups')
     backups = []
@@ -3491,6 +4040,7 @@ def api_backups():
 
 @app.route('/api/lottery/create', methods=['POST'])
 @api_auth
+@permission_required('manage_games')
 def api_lottery_create():
     data = request.json
     rounds = read_csv('lottery_rounds.csv')
@@ -3513,9 +4063,13 @@ def api_lottery_create():
     return jsonify({'success': True, 'id': new_id})
 
 
+_lottery_draw_lock = threading.Lock()
+
 @app.route('/api/lottery/<round_id>/draw', methods=['POST'])
 @api_auth
+@permission_required('manage_games')
 def api_lottery_draw(round_id):
+  with _lottery_draw_lock:
     rounds = read_csv('lottery_rounds.csv')
     round_fieldnames = get_fieldnames('lottery_rounds.csv', ['id','name','ticket_price','currency','winner_count','max_tickets','admin_pct','draw_time','status','created_at'])
 
@@ -3523,11 +4077,14 @@ def api_lottery_draw(round_id):
     for r in rounds:
         if r.get('id') == round_id:
             lot_round = r
-            r['status'] = 'drawn'
             break
 
     if not lot_round:
         return jsonify({'error': 'Round not found'}), 404
+    # One-shot guard: a round can only be drawn once (prevents duplicate winners)
+    if lot_round.get('status') == 'drawn':
+        return jsonify({'error': 'تم سحب هذه الجولة بالفعل'}), 400
+    lot_round['status'] = 'drawn'
 
     write_csv('lottery_rounds.csv', rounds, round_fieldnames)
 
@@ -3565,6 +4122,7 @@ def api_lottery_draw(round_id):
 
 @app.route('/api/wheel/create', methods=['POST'])
 @api_auth
+@permission_required('manage_games')
 def api_wheel_create():
     data = request.json
     rounds = read_csv('wheel_rounds.csv')
@@ -3593,6 +4151,7 @@ def api_wheel_create():
 
 @app.route('/api/wheel/<round_id>/end', methods=['POST'])
 @api_auth
+@permission_required('manage_games')
 def api_wheel_end(round_id):
     rounds = read_csv('wheel_rounds.csv')
     fieldnames = get_fieldnames('wheel_rounds.csv', ['id','name','prizes','status','spin_cost','currency','min_spins','max_spins_per_user','game_speed_ms','max_relocations','created_at'])
@@ -3609,6 +4168,7 @@ def api_wheel_end(round_id):
 
 @app.route('/api/matching/<req_id>/approve', methods=['POST'])
 @api_auth
+@permission_required('approve_deposits')
 def api_matching_approve(req_id):
     reqs = read_csv('match_requests.csv')
     fieldnames = get_fieldnames('match_requests.csv', ['id','user_id','customer_id','type','amount','currency','status','created_at','approved_by','approved_at'])
@@ -3625,6 +4185,7 @@ def api_matching_approve(req_id):
 
 @app.route('/api/matching/<req_id>/reject', methods=['POST'])
 @api_auth
+@permission_required('reject_deposits')
 def api_matching_reject(req_id):
     reason = request.json.get('reason', '') if request.json else ''
     reqs = read_csv('match_requests.csv')
@@ -3640,6 +4201,7 @@ def api_matching_reject(req_id):
 
 @app.route('/api/matching/<match_id>/resolve-dispute', methods=['POST'])
 @api_auth
+@permission_required('view_financial')
 def api_resolve_dispute(match_id):
     favor = request.json.get('favor', 'cancel') if request.json else 'cancel'
     note = request.json.get('note', '') if request.json else ''
@@ -3678,6 +4240,7 @@ def api_resolve_dispute(match_id):
 
 @app.route('/api/trading/<order_id>/accept', methods=['POST'])
 @api_auth
+@permission_required('view_financial')
 def api_trading_accept(order_id):
     orders = read_csv('trade_orders.csv')
     fieldnames = get_fieldnames('trade_orders.csv', ['id','user_id','order_type','amount','currency','rate','status','created_at','accepted_by','accepted_at','completed_at'])
@@ -3694,6 +4257,7 @@ def api_trading_accept(order_id):
 
 @app.route('/api/trading/<order_id>/set-rate', methods=['POST'])
 @api_auth
+@permission_required('view_financial')
 def api_trading_set_rate(order_id):
     rate = request.json.get('rate', '') if request.json else ''
     orders = read_csv('trade_orders.csv')
@@ -3709,6 +4273,7 @@ def api_trading_set_rate(order_id):
 
 @app.route('/api/trading/<order_id>/complete', methods=['POST'])
 @api_auth
+@permission_required('view_financial')
 def api_trading_complete(order_id):
     orders = read_csv('trade_orders.csv')
     fieldnames = get_fieldnames('trade_orders.csv', ['id','user_id','order_type','amount','currency','rate','status','created_at','accepted_by','accepted_at','completed_at'])
@@ -3742,6 +4307,7 @@ def api_support_data():
 
 @app.route('/api/support-data', methods=['POST'])
 @api_auth
+@permission_required('manage_settings')
 def api_update_support_data():
     data = request.json
     settings = read_csv('system_settings.csv')
@@ -3790,6 +4356,7 @@ def api_payment_steps(method_id):
 
 @app.route('/api/payment-steps/<method_id>', methods=['POST'])
 @api_auth
+@permission_required('manage_companies')
 def api_save_payment_steps(method_id):
     data = request.json
     deposit_steps = data.get('deposit_steps', [])
@@ -3986,6 +4553,7 @@ def api_notifications_log():
 
 @app.route('/api/users/<user_id>', methods=['PUT'])
 @api_auth
+@permission_required('ban_users')
 def api_edit_user(user_id):
     data = request.json
     users = read_csv('users.csv')
@@ -4007,6 +4575,7 @@ def api_edit_user(user_id):
 
 @app.route('/api/companies/<company_id>/toggle', methods=['POST'])
 @api_auth
+@permission_required('manage_companies')
 def api_toggle_company(company_id):
     companies = read_csv('companies.csv')
     fieldnames = get_fieldnames('companies.csv', ['id','name','type','details','is_active','icon','address','affiliate_link'])
@@ -4031,39 +4600,74 @@ def api_user_activity(user_id):
 
 @app.route('/api/svrp/wallets/<user_id>/freeze', methods=['POST'])
 @api_auth
+@permission_required('view_financial')
 def api_svrp_freeze(user_id):
-    wallets = read_csv('svrp_wallets.csv')
-    fieldnames = get_fieldnames('svrp_wallets.csv', ['telegram_id','customer_id','balance','pending_balance','total_earned','total_used','wagering_required','wagering_completed','last_recovery_date','monthly_recovery_total'])
-    for w in wallets:
-        if w.get('telegram_id') == user_id:
-            # نقل كل الرصيد إلى مجمد
-            balance = float(w.get('balance', 0) or 0)
-            frozen = float(w.get('pending_balance', 0) or 0)
-            w['pending_balance'] = str(balance + frozen)
-            w['balance'] = '0'
-            break
-    write_csv('svrp_wallets.csv', wallets, fieldnames)
+    """Admin freeze: moves frozen_balance → 0 in SQLite (delta), CSV mirrors.
+
+    'Freeze' here means zeroing out the transferable frozen_balance —
+    the same delta operation that prevents double-spend.
+    """
+    import sys as _sf; _sf.path.insert(0, BASE_DIR)
+    from svrp import svrp_lock as _sl
+    with _sl():
+        wallets = read_csv('svrp_wallets.csv')
+        fieldnames = get_fieldnames('svrp_wallets.csv', ['telegram_id','customer_id','balance','pending_balance','total_earned','total_used','wagering_required','wagering_completed','last_recovery_date','monthly_recovery_total'])
+        delta = 0.0
+        for w in wallets:
+            if w.get('telegram_id') == user_id:
+                balance = float(w.get('balance', 0) or 0)
+                frozen  = float(w.get('pending_balance', 0) or 0)
+                delta   = -balance   # remove from frozen_balance in SQLite
+                w['pending_balance'] = str(balance + frozen)
+                w['balance'] = '0'
+                break
+        write_csv('svrp_wallets.csv', wallets, fieldnames)
+        if delta != 0.0:
+            try:
+                _gm.delta_update_svrp_wallet(user_id, frozen_balance_delta=delta)
+            except Exception as _fe:
+                import logging; logging.getLogger(__name__).warning(
+                    f'svrp_freeze SQLite delta failed uid={user_id}: {_fe}')
     log_action('svrp_freeze', user_id)
     return jsonify({'success': True, 'message': 'تم تجميد الرصيد'})
 
 @app.route('/api/svrp/wallets/<user_id>/unfreeze', methods=['POST'])
 @api_auth
+@permission_required('view_financial')
 def api_svrp_unfreeze(user_id):
+    """Admin unfreeze: moves pending_balance → frozen_balance in SQLite (delta)."""
+    import sys as _su; _su.path.insert(0, BASE_DIR)
+    from svrp import svrp_lock as _sl
     data = request.json or {}
-    amount = float(data.get('amount', 0))
-    wallets = read_csv('svrp_wallets.csv')
-    fieldnames = get_fieldnames('svrp_wallets.csv', ['telegram_id','customer_id','balance','pending_balance','total_earned','total_used','wagering_required','wagering_completed','last_recovery_date','monthly_recovery_total'])
-    for w in wallets:
-        if w.get('telegram_id') == user_id:
-            frozen = float(w.get('pending_balance', 0) or 0)
-            balance = float(w.get('balance', 0) or 0)
-            if amount <= 0:
-                amount = frozen  # فك تجميد كامل
-            amount = min(amount, frozen)
-            w['balance'] = str(balance + amount)
-            w['pending_balance'] = str(frozen - amount)
-            break
-    write_csv('svrp_wallets.csv', wallets, fieldnames)
+    raw  = data.get('amount', 0)
+    try:
+        amount = float(raw)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'المبلغ غير صالح'}), 400
+    if not math.isfinite(amount) or amount < 0:
+        return jsonify({'error': 'المبلغ يجب أن يكون رقماً صحيحاً >= 0'}), 400
+    with _sl():
+        wallets = read_csv('svrp_wallets.csv')
+        fieldnames = get_fieldnames('svrp_wallets.csv', ['telegram_id','customer_id','balance','pending_balance','total_earned','total_used','wagering_required','wagering_completed','last_recovery_date','monthly_recovery_total'])
+        delta = 0.0
+        for w in wallets:
+            if w.get('telegram_id') == user_id:
+                frozen  = float(w.get('pending_balance', 0) or 0)
+                balance = float(w.get('balance', 0) or 0)
+                if amount == 0:
+                    amount = frozen
+                amount = min(amount, frozen)
+                delta = amount   # add to frozen_balance in SQLite
+                w['balance']         = str(round(balance + amount, 6))
+                w['pending_balance'] = str(round(frozen - amount, 6))
+                break
+        write_csv('svrp_wallets.csv', wallets, fieldnames)
+        if delta > 0:
+            try:
+                _gm.delta_update_svrp_wallet(user_id, frozen_balance_delta=delta)
+            except Exception as _ue:
+                import logging; logging.getLogger(__name__).warning(
+                    f'svrp_unfreeze SQLite delta failed uid={user_id}: {_ue}')
     log_action('svrp_unfreeze', f'{user_id}: {amount}')
     return jsonify({'success': True, 'message': f'تم فك تجميد {amount}'})
 
@@ -4134,6 +4738,7 @@ def api_broadcast_queue():
 
 @app.route('/api/transactions/<txn_id>', methods=['PUT'])
 @api_auth
+@permission_required('approve_deposits')
 def api_edit_transaction(txn_id):
     data = request.json
     txns = read_csv('transactions.csv')
@@ -4155,6 +4760,7 @@ def api_edit_transaction(txn_id):
 
 @app.route('/api/lottery/<round_id>', methods=['DELETE'])
 @api_auth
+@permission_required('manage_games')
 def api_delete_lottery_round(round_id):
     rounds = read_csv('lottery_rounds.csv')
     fieldnames = get_fieldnames('lottery_rounds.csv', ['id','name','status','ticket_price','currency','min_tickets','max_tickets_per_user','total_prize','admin_profit_pct','start_time','draw_time','winner_count','created_at'])
@@ -4167,6 +4773,7 @@ def api_delete_lottery_round(round_id):
 
 @app.route('/api/wheel/<round_id>', methods=['DELETE'])
 @api_auth
+@permission_required('manage_games')
 def api_delete_wheel_round(round_id):
     rounds = read_csv('wheel_rounds.csv')
     fieldnames = get_fieldnames('wheel_rounds.csv', ['id','name','prizes','status','spin_cost','currency','min_spins','max_spins_per_user','game_speed_ms','max_relocations','created_at'])
@@ -4179,6 +4786,7 @@ def api_delete_wheel_round(round_id):
 
 @app.route('/api/backup/restore', methods=['POST'])
 @api_auth
+@permission_required('manage_admins')
 def api_restore_backup():
     filename = request.json.get('filename', '') if request.json else ''
     if not filename:
@@ -4199,6 +4807,7 @@ def api_restore_backup():
 
 @app.route('/api/backups/<filename>/download')
 @api_auth
+@permission_required('manage_admins')
 def api_download_backup(filename):
     import zipfile
     backup_path = os.path.join(BASE_DIR, 'backups', filename)
@@ -4226,11 +4835,34 @@ try:
     import sys as _sys
     _sys.path.insert(0, BASE_DIR)
     from game_engine import GameManager
+    from db_manager import (
+        set_active_game_session as _set_ags,
+        delete_active_game_session as _del_ags,
+        refund_expired_game_sessions as _refund_ags,
+        check_and_mark_nonce as _check_nonce,
+        cleanup_expired_nonces as _cleanup_nonces,
+        _gdb as _db_singleton,
+    )
     _gm = GameManager()
     _VEX_GAMES = True
+    # ── Startup: refund any bets stranded by a mid-game server crash ──────────
+    # active_game_sessions rows survive restarts; refund credits the bet back
+    # via credit_with_idempotency so double-refunds on repeated restarts are safe.
+    try:
+        _startup_refunded = _refund_ags(_db_singleton)
+        if _startup_refunded:
+            print(f"[startup] Refunded {len(_startup_refunded)} expired game session(s): "
+                  f"{_startup_refunded}")
+        else:
+            print("[startup] No expired game sessions to refund.")
+    except Exception as _rags_err:
+        print(f"[startup] refund_expired_game_sessions error: {_rags_err}")
 except Exception as e:
     print(f"VEX Games init error: {e}")
     _VEX_GAMES = False
+    # Provide no-op stubs so call sites don't NameError when _VEX_GAMES is False
+    def _set_ags(*a, **k): pass
+    def _del_ags(*a, **k): pass
 
 # ===== Games Catalog =====
 
@@ -4254,6 +4886,7 @@ def api_games_all():
 
 @app.route('/api/games/create', methods=['POST'])
 @api_auth
+@permission_required('manage_games')
 def api_games_create():
     """إضافة لعبة جديدة"""
     if not _VEX_GAMES:
@@ -4275,6 +4908,7 @@ def api_games_create():
 
 @app.route('/api/games/<game_id>/toggle', methods=['POST'])
 @api_auth
+@permission_required('manage_games')
 def api_games_toggle(game_id):
     """تفعيل/إيقاف لعبة"""
     if not _VEX_GAMES:
@@ -4312,8 +4946,380 @@ def api_wallet_balance():
     currency = user_info.get('currency', 'EGP')
     return jsonify({'balance': balance, 'uid': uid, 'currency': currency})
 
+@app.route('/api/player/wallet')
+@webapp_auth
+def api_player_wallet():
+    """محفظة اللاعب الكاملة: رصيد اللعب + SVRP مجمد/معلق + wagering progress
+
+    دلالات حقول SVRP:
+      balance         = أرصدة SVRP (مجمدة حتى اكتمال الرهان، ثم قابلة للنقل إلى رصيد اللعب)
+      pending_balance = تنتظر إكمال الأصدقاء للرهان حتى تنتقل إلى balance
+      total_used      = مجموع تراكمي تاريخي لما صُرف كخصومات — ليس رصيداً متاحاً
+      total_earned    = مجموع تراكمي تاريخي لكل ما اكتُسب
+    """
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+
+    # ── رصيد اللعب (SQLite) ─────────────────────────────────────────
+    game_balance = float(_gm.get_balance(uid) or 0)
+    user_info = _gm.get_user_info(uid)
+    currency = user_info.get('currency', 'EGP')
+
+    # ── محفظة SVRP (SQLite authoritative for financial fields) ─────────
+    _svrp_sql = _gm.get_svrp_frozen_balance(uid)
+    svrp_credits    = float(_svrp_sql.get('frozen_balance', 0) or 0)
+    total_earned    = float(_svrp_sql.get('total_earned', 0) or 0)
+    total_consumed  = float(_svrp_sql.get('total_used', 0) or 0)
+    wager_required  = int(_svrp_sql.get('wagering_required', 3) or 3)
+    wager_done      = int(_svrp_sql.get('wagering_completed', 0) or 0)
+    # pending_balance still from CSV (not a financial field, no transfer risk)
+    wallets = read_csv('svrp_wallets.csv')
+    svrp_wallet = next((w for w in wallets if str(w.get('telegram_id', '')) == uid), {})
+    pending_balance = float(svrp_wallet.get('pending_balance', 0) or 0) # ينتظر الأصدقاء
+    wager_remaining = max(0, wager_required - wager_done)
+    wagering_done   = wager_done >= wager_required  # True = يمكن نقل الرصيد
+    credits_spendable = wagering_done and svrp_credits > 0
+
+    # ── مصادر أرصدة SVRP (Credit breakdown) ────────────────────────
+    credits_all = read_csv('svrp_credits.csv')
+    user_credits = [c for c in credits_all
+                    if str(c.get('user_id', '')) == uid
+                    and c.get('status') in ('pending', 'active', 'frozen')]
+
+    credit_sources = []
+    _type_label = {
+        'keep':     'مكافأة احتفاظ',
+        'shared':   'مكافأة مشاركة',
+        'recovery': 'تعويض / استرداد',
+        'referral': 'مكافأة إحالة',
+    }
+    for c in user_credits:
+        amt = float(c.get('credit_amount', 0) or 0)
+        if amt <= 0:
+            continue
+        source_type = c.get('credit_type', 'referral')
+        status = c.get('status', '')
+        credit_sources.append({
+            'type':    source_type,
+            'label':   _type_label.get(source_type, source_type),
+            'amount':  amt,
+            'status':  status,
+            # pending = ينتظر الأصدقاء / active = جاهز للاستخدام بعد الرهان
+            'ready':   status == 'active',
+            'created': c.get('created_at', ''),
+        })
+
+    # ── آخر المعاملات (transactions.csv) ────────────────────────────
+    recent_txns = []
+    try:
+        txns = read_csv('transactions.csv')
+        user_txns = [t for t in txns if str(t.get('telegram_id', '')) == uid][-10:]
+        for t in reversed(user_txns):
+            recent_txns.append({
+                'id':      t.get('id', ''),
+                'type':    t.get('type', ''),
+                'amount':  t.get('amount', '0'),
+                'status':  t.get('status', ''),
+                'company': t.get('company', ''),
+                'date':    t.get('date', ''),
+            })
+    except Exception:
+        pass
+
+    return jsonify({
+        'uid':               uid,
+        'currency':          currency,
+        'game_balance':      game_balance,      # رصيد اللعب (للرهان)
+        'svrp_credits':      svrp_credits,      # أرصدة SVRP (مجمدة أو جاهزة)
+        'pending_balance':   pending_balance,   # ينتظر الأصدقاء
+        'total_earned':      total_earned,      # تراكمي تاريخي
+        'total_consumed':    total_consumed,    # تراكمي تاريخي (للعرض الإداري فقط)
+        'wagering_required': wager_required,
+        'wagering_completed': wager_done,
+        'wagering_remaining': wager_remaining,
+        'wagering_done':     wagering_done,     # True = اكتمل الرهان
+        'credits_spendable': credits_spendable, # True = يمكن نقل الرصيد الآن
+        'credit_sources':    credit_sources,
+        'recent_transactions': recent_txns,
+    })
+
+
+# svrp_lock() is imported lazily inside the endpoint to avoid a top-level
+# circular-import issue (svrp.py is loaded after app config is set up).
+# It provides reentrant cross-process locking for all SVRP CSV mutations.
+
+
+@app.route('/api/svrp/transfer-to-game', methods=['POST'])
+@webapp_auth
+def api_svrp_transfer_to_game():
+    """نقل أرصدة SVRP (بعد اكتمال الرهان) إلى رصيد اللعب.
+
+    Body JSON: {
+        "amount": <positive finite float — optional, defaults to full balance>,
+        "transfer_id": <client-supplied idempotency key — optional but strongly recommended>
+    }
+
+    State machine (svrp_transfer_log.status):
+      pending  ──(CAS debited + amount)──► debited
+      debited  ──(CAS credit + completed)──► completed     [idempotent replay]
+      debited  ──(compensating rollback)──► rolled_back
+
+    Retry safety:
+      • 'completed'   → returns cached outcome with no CSV or DB mutation
+      • 'debited'     → skips SVRP debit, re-applies game credit idempotently
+      • 'pending'     → key exists but no debit happened; return conflict (409)
+      • key unknown   → fresh transfer
+
+    Security: uid ownership is verified before any state is read or mutated.
+    """
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+
+    import sys as _sys2; _sys2.path.insert(0, BASE_DIR)
+    import secrets as _sec
+    from svrp import SVRPManager as _SVRPMgr, svrp_lock as _svrp_lock
+
+    # ── parse input ──────────────────────────────────────────────────────────
+    data = request.get_json(silent=True) or {}
+    raw_amount = data.get('amount')
+    client_key = str(data.get('transfer_id') or '').strip()[:128]
+
+    if raw_amount is not None:
+        try:
+            parsed_amount = float(raw_amount)
+        except (TypeError, ValueError):
+            return jsonify({'error': 'المبلغ غير صالح — يجب أن يكون رقماً'}), 400
+        if not math.isfinite(parsed_amount) or parsed_amount <= 0:
+            return jsonify({'error': 'المبلغ غير صالح (لا يقبل NaN أو Infinity أو صفر)'}), 400
+    else:
+        parsed_amount = None
+
+    # ── resolve client idempotency key ───────────────────────────────────────
+    _resume_debited = False   # True → skip SVRP debit, go straight to game credit
+    _resume_amount  = None    # amount from the debited outbox record
+
+    if client_key:
+        existing = _gm.get_svrp_transfer(client_key)
+        if existing:
+            # SECURITY: verify ownership before reading any state
+            if existing.get('uid') != uid:
+                return jsonify({'error': 'هذا الطلب لا ينتمي لهذا الحساب'}), 403
+
+            st = existing.get('status')
+            if st == 'completed':
+                # Idempotent replay — no mutation at all
+                return jsonify({
+                    'success':          True,
+                    'transferred':      round(float(existing.get('amount') or 0), 2),
+                    'new_game_balance': _gm.get_balance(uid),
+                    'new_svrp_credits': float(
+                        (_SVRPMgr().get_wallet(uid) or {}).get('balance', 0) or 0
+                    ),
+                    'transfer_id': client_key,
+                    'replayed':    True,
+                })
+            if st == 'debited':
+                # SVRP already debited but game credit not yet confirmed.
+                # Resume the credit step only — no second debit.
+                _resume_debited = True
+                _resume_amount  = float(existing.get('amount') or 0)
+                if _resume_amount <= 0:
+                    return jsonify({'error': 'المبلغ المسجل في الطلب غير صالح'}), 400
+            elif st == 'pending':
+                # Key reserved but no debit committed yet.
+                # Concurrent/retried requests must not race to debit.
+                return jsonify({
+                    'error': 'الطلب قيد المعالجة — حاول مجدداً بعد لحظات',
+                    'transfer_id': client_key,
+                }), 409
+            else:
+                # rolled_back, cancelled, unknown — not resumable
+                return jsonify({
+                    'error': f'الطلب في حالة غير قابلة للاستئناف ({st})',
+                    'transfer_id': client_key,
+                }), 409
+
+    _transfer_id = client_key if client_key else _sec.token_hex(16)
+
+    # ── Amount canonicalization ───────────────────────────────────────────────
+    if parsed_amount is not None:
+        from decimal import Decimal as _Dec, ROUND_DOWN as _RDOWN, InvalidOperation as _DI
+        try:
+            _canon = _Dec(str(parsed_amount)).quantize(_Dec('0.01'), rounding=_RDOWN)
+        except _DI:
+            return jsonify({'error': 'المبلغ غير قابل للتحويل'}), 400
+        if _canon < _Dec('0.01'):
+            return jsonify({'error': 'الحد الأدنى للنقل 0.01'}), 400
+        parsed_amount = float(_canon)
+
+    # ── Step A: SVRP frozen-balance debit (SQLite-only, no CSV involved) ──────
+    #
+    # All financial state lives in SQLite (svrp_wallet_balance +
+    # svrp_transfer_log).  debit_svrp_balance_for_transfer atomically debits
+    # the wallet and CAS-transitions the outbox to 'debited' in one SAVEPOINT.
+    # There is no cross-store dependency and no crash window between the two.
+    #
+    # Fresh path:
+    #   1. Reject if user already has a 'debited' outstanding transfer (one-at-a-time).
+    #   2. CREATE outbox 'pending' (INSERT OR IGNORE in SQLite).
+    #   3. Read + validate + canonicalize amount from SQLite wallet.
+    #   4. debit_svrp_balance_for_transfer → SAVEPOINT: wallet debit + CAS
+    #      pending→debited.  Either both commit or neither does.
+    #
+    # Resume path (status='debited'):
+    #   The SQLite wallet was already debited atomically with the 'debited' CAS.
+    #   There is no CSV to re-check; simply proceed to game credit.
+
+    amount: float = 0.0
+
+    if _resume_debited:
+        # ── Resume: SQLite debit is atomic with status CAS — no re-check needed ──
+        existing_rec = _gm.get_svrp_transfer(_transfer_id)
+        amount = float((existing_rec or {}).get('amount') or 0)
+        if amount < 0.01:
+            return jsonify({'error': 'المبلغ المسجل في الطلب غير صالح'}), 400
+        # Nothing else to do here — the SQLite frozen balance was already debited
+        # atomically when the outbox transitioned to 'debited'.
+
+    else:
+        # ── Fresh debit ───────────────────────────────────────────────────────
+        # Enforce one-outstanding-per-user: reject if a debited transfer exists.
+        outstanding = _gm.get_outstanding_debited_transfer(uid)
+        if outstanding:
+            return jsonify({
+                'error': (
+                    f'يوجد تحويل معلق — أكمله أولاً باستخدام '
+                    f'transfer_id="{outstanding}"'
+                ),
+                'transfer_id': outstanding,
+                'retry': True,
+            }), 409
+
+        # Create outbox slot
+        inserted = _gm.create_svrp_transfer(_transfer_id, uid)
+        if not inserted:
+            return jsonify({'error': 'معرّف الطلب مُستخدم — أرسل طلباً جديداً'}), 409
+
+        # Read authoritative frozen balance from SQLite
+        frozen = _gm.get_svrp_frozen_balance(uid)
+        svrp_credits  = float(frozen.get('frozen_balance', 0) or 0)
+        wager_done    = int(frozen.get('wagering_completed', 0) or 0)
+        wager_req     = int(frozen.get('wagering_required', 3) or 3)
+
+        if wager_done < wager_req:
+            # Validation failure: cancel the pending slot so the client can retry
+            # with a fresh transfer_id (or the same one on next attempt).
+            try:
+                _gm.mark_svrp_transfer_status(_transfer_id, uid, 'cancelled')
+            except Exception:
+                pass
+            return jsonify({
+                'error': (
+                    f'لم تكتمل متطلبات الرهان — '
+                    f'أكمل {wager_req - wager_done} معاملة أولاً.'
+                ),
+                'wagering_remaining': wager_req - wager_done,
+            }), 400
+        if svrp_credits <= 0:
+            try:
+                _gm.mark_svrp_transfer_status(_transfer_id, uid, 'cancelled')
+            except Exception:
+                pass
+            return jsonify({'error': 'رصيد SVRP صفر — لا يوجد ما يُنقل'}), 400
+
+        # Canonicalize amount (2dp, min 0.01) using live SQLite balance
+        from decimal import Decimal as _Dec2, ROUND_DOWN as _RD2
+        _raw_amt = parsed_amount if parsed_amount is not None else svrp_credits
+        amount = float(_Dec2(str(_raw_amt)).quantize(_Dec2('0.01'), rounding=_RD2))
+        if amount < 0.01:
+            try:
+                _gm.mark_svrp_transfer_status(_transfer_id, uid, 'cancelled')
+            except Exception:
+                pass
+            return jsonify({'error': 'الحد الأدنى للنقل 0.01'}), 400
+        if amount > svrp_credits + 1e-9:
+            try:
+                _gm.mark_svrp_transfer_status(_transfer_id, uid, 'cancelled')
+            except Exception:
+                pass
+            return jsonify({
+                'error': f'المبلغ ({amount:.2f}) يتجاوز رصيد SVRP ({svrp_credits:.2f})'
+            }), 400
+        amount = min(amount, round(svrp_credits, 2))
+
+        # Atomic: debit SQLite wallet + CAS outbox pending→debited in one SAVEPOINT
+        try:
+            ok = _gm.debit_svrp_balance_for_transfer(_transfer_id, uid, amount)
+        except ValueError as _ve:
+            try:
+                _gm.mark_svrp_transfer_status(_transfer_id, uid, 'cancelled')
+            except Exception:
+                pass
+            return jsonify({'error': str(_ve)}), 400
+        except Exception as _e1:
+            try:
+                _gm.mark_svrp_transfer_status(_transfer_id, uid, 'cancelled')
+            except Exception:
+                pass
+            return jsonify({'error': f'خطأ في خصم SVRP: {_e1}'}), 500
+        if not ok:
+            # Transfer not in pending state (concurrent request or stale key)
+            return jsonify({'error': 'خطأ داخلي — تعارض في الطلب'}), 409
+
+    # ── Step B: credit game balance (idempotent via SAVEPOINT + STATUS-CAS) ──
+    # add_balance_for_svrp_transfer:
+    #   status='debited'   → SAVEPOINT: credit game_balance + CAS to 'completed'
+    #   status='completed' → idempotent replay (no re-credit)
+    #   uid mismatch       → raises PermissionError
+    #   wrong state        → raises ValueError
+    try:
+        new_game_balance = _gm.add_balance_for_svrp_transfer(uid, amount, _transfer_id)
+    except Exception as _e2:
+        import logging as _cl
+        _cl.getLogger('svrp_transfer').critical(
+            'Game credit FAILED uid=%s transfer=%s amount=%s error=%s',
+            uid, _transfer_id, amount, _e2
+        )
+        # SQLite wallet is already debited.  Keep status='debited' so client
+        # can retry safely with the same transfer_id.  No CSV rollback needed.
+        return jsonify({
+            'error': (
+                f'فشل إضافة رصيد اللعب — أعد المحاولة باستخدام '
+                f'transfer_id="{_transfer_id}"'
+            ),
+            'transfer_id': _transfer_id,
+            'retry': True,
+        }), 500
+
+    # ── Success ───────────────────────────────────────────────────────────────
+    new_svrp = float(_gm.get_svrp_frozen_balance(uid).get('frozen_balance', 0) or 0)
+    return jsonify({
+        'success':          True,
+        'transferred':      round(amount, 2),
+        'new_game_balance': new_game_balance,
+        'new_svrp_credits': new_svrp,
+        'transfer_id':      _transfer_id,
+    })
+
+@app.route('/webapp/wallet')
+def webapp_wallet():
+    """صفحة محفظة اللاعب — محمية بـ uid أو s"""
+    uid = request.args.get('uid', '').strip()
+    s   = request.args.get('s', '').strip()
+    lang = request.args.get('lang', 'ar').strip()
+    return render_template('wallet.html', uid=uid, s=s, lang=lang)
+
+
 @app.route('/api/wallet/add', methods=['POST'])
 @api_auth
+@permission_required('approve_deposits')
 def api_wallet_add():
     """إضافة رصيد (أدمن)"""
     if not _VEX_GAMES:
@@ -4537,6 +5543,7 @@ def api_deposit_pending():
 
 @app.route('/api/deposit/<dep_id>/approve', methods=['POST'])
 @api_auth
+@permission_required('approve_deposits')
 def api_deposit_approve(dep_id):
     """موافقة على إيداع سريع — async: يضيف الرصيد + يرسل إشعار"""
     if not _VEX_GAMES:
@@ -4544,6 +5551,8 @@ def api_deposit_approve(dep_id):
     admin_id = session.get('admin_id', '')
     result = _gm.approve_deposit(dep_id, admin_id)
     if result:
+        _rbac_log(str(admin_id), 'approve_deposit', target=dep_id,
+                  details=f"amount={result.get('amount', '?')}", ip=request.remote_addr)
         push_notification('deposit_approved', '✅ تمت الموافقة على إيداع', f'إيداع {dep_id}', {'deposit_id': dep_id})
         # async Telegram notification (non-blocking)
         import threading as _th
@@ -4608,12 +5617,15 @@ def api_deposit_approve(dep_id):
 
 @app.route('/api/deposit/<dep_id>/reject', methods=['POST'])
 @api_auth
+@permission_required('reject_deposits')
 def api_deposit_reject(dep_id):
     """رفض إيداع سريع — async notification"""
     if not _VEX_GAMES:
         return jsonify({'error': 'Games engine not available'}), 500
     admin_id = session.get('admin_id', '')
     result = _gm.reject_deposit(dep_id, admin_id)
+    _rbac_log(str(admin_id), 'reject_deposit', target=dep_id,
+              details='rejected', ip=request.remote_addr)
     push_notification('deposit_rejected', '❌ تم رفض إيداع', f'إيداع {dep_id}', {'deposit_id': dep_id})
     # async Telegram notification
     if result and result.get('user_id'):
@@ -4716,6 +5728,7 @@ def api_player_profile():
 
 @app.route('/api/player/vex-status', methods=['POST'])
 @api_auth
+@permission_required('ban_users')
 def api_player_vex_status():
     """تعيين شريك VEX"""
     if not _VEX_GAMES:
@@ -4759,6 +5772,7 @@ def api_games_top_players():
 
 @app.route('/api/games/config', methods=['GET', 'POST'])
 @api_auth
+@permission_required('manage_games')
 def api_games_config():
     """قراءة/تحديث إعدادات الخوارزمية"""
     if not _VEX_GAMES:
@@ -4794,6 +5808,7 @@ def webapp_play(game_id):
 
 @app.route('/games-admin')
 @admin_required
+@page_permission_required('manage_games')
 def page_games_admin():
     """لوحة إدارة الألعاب"""
     return render_template('games_admin.html', active_page='games_admin')
@@ -4841,6 +5856,7 @@ def api_withdrawal_pending():
 
 @app.route('/api/withdrawal/<wth_id>/approve', methods=['POST'])
 @api_auth
+@permission_required('approve_withdrawals')
 def api_withdrawal_approve(wth_id):
     """موافقة على سحب"""
     if not _VEX_GAMES:
@@ -4848,12 +5864,15 @@ def api_withdrawal_approve(wth_id):
     admin_id = session.get('admin_id', '')
     result = _gm.approve_withdrawal(wth_id, admin_id)
     if result:
+        _rbac_log(str(admin_id), 'approve_withdrawal', target=wth_id,
+                  details=f"amount={result.get('amount', '?')}", ip=request.remote_addr)
         push_notification('withdrawal_approved', '✅ تمت الموافقة على سحب', f'سحب {wth_id} تمت الموافقة', {'withdrawal_id': wth_id})
         return jsonify({'success': True, 'withdrawal': result})
     return jsonify({'error': 'Not found'}), 404
 
 @app.route('/api/withdrawal/<wth_id>/reject', methods=['POST'])
 @api_auth
+@permission_required('reject_withdrawals')
 def api_withdrawal_reject(wth_id):
     """رفض سحب — إعادة الرصيد"""
     if not _VEX_GAMES:
@@ -4861,6 +5880,8 @@ def api_withdrawal_reject(wth_id):
     admin_id = session.get('admin_id', '')
     result = _gm.reject_withdrawal(wth_id, admin_id)
     if result:
+        _rbac_log(str(admin_id), 'reject_withdrawal', target=wth_id,
+                  details='rejected — balance returned', ip=request.remote_addr)
         push_notification('withdrawal_rejected', '❌ تم رفض سحب', f'سحب {wth_id} تم رفض — الرصيد مُرتجع', {'withdrawal_id': wth_id})
         return jsonify({'success': True, 'withdrawal': result})
     return jsonify({'error': 'Not found'}), 404
@@ -4869,6 +5890,7 @@ def api_withdrawal_reject(wth_id):
 
 @app.route('/api/admin/player/<uid>/win-override', methods=['POST'])
 @api_auth
+@permission_required('manage_games')
 def api_admin_win_override(uid):
     """تحكم أدمن باحتمال فوز لاعب محدد"""
     if not _VEX_GAMES:
@@ -4883,6 +5905,7 @@ def api_admin_win_override(uid):
 
 @app.route('/api/admin/player/<uid>/balance', methods=['POST'])
 @api_auth
+@permission_required('approve_deposits')
 def api_admin_player_balance(uid):
     """إضافة/خصم رصيد يدوي"""
     if not _VEX_GAMES:
@@ -4897,6 +5920,7 @@ def api_admin_player_balance(uid):
 
 @app.route('/api/admin/player/<uid>/block', methods=['POST'])
 @api_auth
+@permission_required('ban_users')
 def api_admin_block_player(uid):
     """حظر لاعب من اللعب"""
     if not _VEX_GAMES:
@@ -4906,6 +5930,7 @@ def api_admin_block_player(uid):
 
 @app.route('/api/admin/player/<uid>/cooldown', methods=['POST'])
 @api_auth
+@permission_required('ban_users')
 def api_admin_cooldown_player(uid):
     """تبريد لاعب"""
     if not _VEX_GAMES:
@@ -4917,6 +5942,7 @@ def api_admin_cooldown_player(uid):
 
 @app.route('/api/admin/player/<uid>/vex', methods=['POST'])
 @api_auth
+@permission_required('ban_users')
 def api_admin_vex_partner(uid):
     """تفعيل/إيقاف شريك VEX"""
     if not _VEX_GAMES:
@@ -5247,11 +6273,20 @@ def api_plinko_start():
                 continue
             break
 
-    success, balance_after = _gm.deduct_balance(uid, bet_amount)
-    if not success:
-        return jsonify({'success': False, 'error': 'رصيد غير كافٍ', 'need_deposit': True, 'balance': 0})
-
+    # Atomic full settlement (bet AND payout in one SQLite transaction) —
+    # /end no longer credits anything, so the outcome is final here and a
+    # crash mid-animation can never strand the stake or the win.
     session_id = f"PLNK{str(int(datetime.now().timestamp()))[-8:]}"
+    _req_id = str((request.json or {}).get('request_id', '') or '')[:64]
+    _template = {'success': True, 'session_id': session_id, 'target_slot': target_slot,
+                 'multiplier': multiplier, 'payout': round(payout, 2), 'result': result,
+                 'balance_before': balance}
+    ok, stored, race_cached = _gm.settle_with_idempotency(uid, bet_amount, payout, _req_id, _template)
+    if race_cached:
+        return jsonify(race_cached)
+    if not ok:
+        return jsonify({'success': False, 'error': 'رصيد غير كافٍ', 'need_deposit': True, 'balance': 0})
+    balance_after = stored.get('balance_after', balance)
     _gm.algorithm.log_decision(
         session_id=session_id, user_id=uid, game_id='GAME007',
         base_chance=float(game.get('base_win_chance', 0.40)),
@@ -5273,20 +6308,17 @@ def api_plinko_end():
         return jsonify({'error': 'Games engine not available'}), 500
     data = request.json
     uid = get_request_uid()
-    multiplier = float(data.get('multiplier', 0))
-    payout = float(data.get('payout', 0))
-    result = data.get('result', 'lose')
-    bet_amount = float(data.get('bet_amount', 0))
-    session_id = data.get('session_id', '')
-    # Add payout to balance — the bet was ALREADY deducted at /start.
-    # Use settle_round(uid, bet=0, payout=payout) which applies net=payout atomically.
-    # This preserves ACID: the -bet at /start and +payout at /end are two atomic
-    # transactions covering distinct logical stages. anti-crash-safe.
-    if payout > 0:
-        _gm.settle_round(uid, 0, payout)  # net = payout - 0
-    _gm.tracker.log_session({'session_id': session_id, 'game_id': 'GAME007', 'user_id': uid, 'bet_amount': bet_amount, 'payout': payout, 'result': result, 'balance_before': 0, 'balance_after': _gm.get_balance(uid), 'multiplier': multiplier})
-    _gm.tracker.update_profile(uid, {'bet_amount': bet_amount, 'payout': payout, 'result': result, 'game_id': 'GAME007', 'balance_after': _gm.get_balance(uid)})
-    return jsonify({'success': True, 'result': result, 'payout': payout})
+    session_id = str(data.get('session_id', ''))[:32]
+    # SECURITY: the client-supplied payout is NEVER credited here. The full
+    # settlement (bet + payout) is done atomically at /start; /end only
+    # acknowledges the animation finished. Crediting client-reported numbers
+    # allowed arbitrary-payout forgery and replay.
+    _gm.tracker.update_profile(uid, {'bet_amount': 0, 'payout': 0, 'result': 'ack',
+                                     'game_id': 'GAME007', 'balance_after': _gm.get_balance(uid)})
+    # Echo client fields for old-client response compatibility — NOT credited.
+    return jsonify({'success': True, 'session_id': session_id,
+                    'result': str(data.get('result', 'lose'))[:8],
+                    'payout': float(data.get('payout', 0) or 0)})
 
 # ===== Mines — Frontend API (/api/mines/*) =====
 # Sessions keyed by uid so reveal/cashout don't need a session_id param.
@@ -5504,6 +6536,11 @@ def api_mines_new():
             'created_at': datetime.now().isoformat()
         }
         _save_mines_sessions(sessions)
+        # ── Durable session: persists the bet in SQLite so a server restart
+        # triggers auto-refund via refund_expired_game_sessions() at next boot.
+        _set_ags(str(uid), 'mines',
+                 {'game_id': game_id, 'mine_count': mine_count},
+                 bet_amount)
 
     return jsonify(result)
 
@@ -5549,6 +6586,8 @@ def api_mines_reveal():
             state['reveal_results'][str(cell)] = resp
             sessions[str(uid)] = state
             _save_mines_sessions(sessions)
+            # Game over on mine hit — clear durable session (no refund due; bet was lost)
+            _del_ags(str(uid), 'mines')
             return jsonify(resp)
 
         revealed_count = len(state['revealed'])
@@ -5613,6 +6652,8 @@ def api_mines_reveal():
             'bet_amount': bet_amount, 'payout': payout, 'result': 'win',
             'game_id': 'GAME006', 'balance_after': new_balance
         })
+        # All cells revealed safely → paid out; clear durable session
+        _del_ags(str(uid), 'mines')
 
     return jsonify(resp)
 
@@ -5648,17 +6689,13 @@ def api_mines_cashout():
         game_id = state.get('game_id', '')
         payout = round(bet_amount * multiplier, 2)
 
-        # Mark consumed BEFORE crediting — prevents double-cashout even if credit fails
-        state['game_over'] = True
-        state['paid_out'] = True
-        sessions[str(uid)] = state
-        _save_mines_sessions(sessions)
-
-    # Credit-only: bet was pre-deducted in /new.
-    # credit_with_idempotency is atomic: credit + idempotency record in one SQLite transaction.
+    # CREDIT FIRST with a deterministic idempotency key — a crash after the
+    # credit can never lose the payout, and a retry (same key) can never
+    # double-credit. Only after the credit commits do we mark the session paid.
+    settle_key = request_id or f"mines_cashout_{game_id}"
     response_template = {'success': True, 'payout': payout,
                          'multiplier': multiplier, 'mine_cells': mine_positions}
-    ok, stored, race_cached = _gm.credit_with_idempotency(uid, payout, request_id, response_template)
+    ok, stored, race_cached = _gm.credit_with_idempotency(uid, payout, settle_key, response_template)
     if race_cached:
         return jsonify(race_cached)
     if not ok:
@@ -5667,12 +6704,15 @@ def api_mines_cashout():
     result = stored  # has balance_after
     new_balance = result.get('balance_after', 0)
 
-    # Persist result in session JSON too (for clients without request_id support)
+    # Now mark consumed + persist result + clear durable refund row
     with _mines_lock:
         sessions = _load_mines_sessions()
         if str(uid) in sessions:
+            sessions[str(uid)]['game_over'] = True
+            sessions[str(uid)]['paid_out'] = True
             sessions[str(uid)]['cashout_result'] = result
             _save_mines_sessions(sessions)
+        _del_ags(str(uid), 'mines')
 
     _gm.tracker.log_session({
         'session_id': game_id, 'game_id': 'GAME006',
@@ -5719,6 +6759,14 @@ _PLINKO_MULTS = {
 @app.route('/api/plinko/drop', methods=['POST'])
 @webapp_auth
 def api_plinko_drop():
+    # NOTE: Plinko does NOT use active_game_sessions.
+    # The entire bet+payout is settled in one ACID SQLite transaction via
+    # settle_with_idempotency() below, so there is no window where a restart
+    # could strand a deducted bet without a matching payout.  Adding a
+    # pre-settlement session row would cause a double-credit bug on restart
+    # (the refund would run even though no money was ever deducted).
+    # The idempotency record written by settle_with_idempotency() is sufficient
+    # to replay the correct result on retry without re-executing settlement.
     if not _VEX_GAMES:
         return jsonify({'error': 'Games engine not available'}), 500
     data = request.json or {}
@@ -6501,6 +7549,30 @@ def api_lottery_state():
         'draw_types': draw_types,
     })
 
+def _reconcile_lottery_tickets(cached_response, locked=False):
+    """Re-insert tickets from a cached (already-paid) buy response if a crash
+    happened between the debit commit and the ticket save."""
+    try:
+        tickets = (cached_response or {}).get('tickets') or []
+        if not tickets:
+            return
+        def _do():
+            state = _load_lottery_state()
+            existing = {t.get('id') for t in state.get('tickets', [])}
+            missing = [t for t in tickets if t.get('id') not in existing]
+            if missing:
+                for t in missing:
+                    state.setdefault('tickets', []).append(t)
+                state['tickets_sold'] = state.get('tickets_sold', 0) + len(missing)
+                _save_lottery_state(state)
+        if locked:
+            _do()
+        else:
+            with _lottery_lock:
+                _do()
+    except Exception as e:
+        print(f"[lottery] ticket reconcile error: {e}")
+
 @app.route('/api/lottery/buy', methods=['POST'])
 @webapp_auth
 def api_lottery_buy():
@@ -6512,10 +7584,13 @@ def api_lottery_buy():
     if not uid:
         return jsonify({'error': 'Missing uid'}), 400
 
-    # Fast SQLite idempotency check (survives restarts)
+    # Fast SQLite idempotency check (survives restarts). If the debit
+    # committed but the process died before tickets were saved, the cached
+    # response still holds the tickets — reconcile them into lottery state.
     if request_id:
         cached = _gm.get_idempotency_record(uid, request_id)
         if cached:
+            _reconcile_lottery_tickets(cached)
             return jsonify(cached)
 
     count = int(data.get('count', 1))
@@ -6552,16 +7627,20 @@ def api_lottery_buy():
         'prize_pool': round(state.get('prize_pool', 0) + total_cost * 0.8, 2),
         'tickets_sold': state.get('tickets_sold', 0) + count,
     }
-    # Atomic: deduct cost + store idempotency record in one SQLite transaction
-    ok, stored, race_cached = _gm.settle_with_idempotency(uid, total_cost, 0, request_id, template)
-    if race_cached:
-        return jsonify(race_cached)
-    if not ok:
-        return jsonify({'success': False, 'error': 'رصيد غير كافٍ', 'need_deposit': True, 'balance': balance})
-
-    # Persist tickets to lottery state only after successful settlement
+    # Hold the lottery lock across settle + persist so concurrent buys can
+    # never race on stale state (double debit with one ticket set lost), and
+    # the debit→ticket-save window is as small as possible.
     with _lottery_lock:
         state = _load_lottery_state()
+        if state.get('drawn'):
+            return jsonify({'error': 'الجولة انتهت، جولة جديدة قادمة'}), 400
+        # Atomic: deduct cost + store idempotency record in one SQLite transaction
+        ok, stored, race_cached = _gm.settle_with_idempotency(uid, total_cost, 0, request_id, template)
+        if race_cached:
+            _reconcile_lottery_tickets(race_cached, locked=True)
+            return jsonify(race_cached)
+        if not ok:
+            return jsonify({'success': False, 'error': 'رصيد غير كافٍ', 'need_deposit': True, 'balance': balance})
         for ticket in new_tickets:
             state.setdefault('tickets', []).append(ticket)
         state['tickets_sold'] = state.get('tickets_sold', 0) + count
@@ -6993,6 +8072,7 @@ def api_snatch_end():
 
 @app.route('/api/games/<game_id>/config', methods=['POST'])
 @api_auth
+@permission_required('manage_games')
 def api_game_config_update(game_id):
     """تحديث إعدادات لعبة محددة (base_win_chance, house_edge, min/max bet)"""
     if not _VEX_GAMES:
@@ -7022,6 +8102,7 @@ def api_game_config_update(game_id):
 
 @app.route('/api/games/kill-switch', methods=['POST'])
 @api_auth
+@permission_required('manage_games')
 def api_games_kill_switch():
     """إيقاف/تشغيل كل الألعاب فوراً"""
     if not _VEX_GAMES:
@@ -7084,6 +8165,7 @@ def api_admin_player_profile(uid):
 
 @app.route('/api/admin/player/<uid>/force-result', methods=['POST'])
 @api_auth
+@permission_required('manage_games')
 def api_admin_force_result(uid):
     """إجبار نتيجة اللاعب التالية (win/lose/normal)"""
     if not _VEX_GAMES:
@@ -7107,6 +8189,7 @@ def api_admin_force_result(uid):
 
 @app.route('/api/admin/player/<uid>/reset-daily', methods=['POST'])
 @api_auth
+@permission_required('manage_games')
 def api_admin_reset_daily(uid):
     """إعادة ضبط الإحصائيات اليومية للاعب"""
     if not _VEX_GAMES:
@@ -7121,6 +8204,7 @@ def api_admin_reset_daily(uid):
 
 @app.route('/api/admin/player/<uid>/reset-override', methods=['POST'])
 @api_auth
+@permission_required('manage_games')
 def api_admin_reset_override(uid):
     """إلغاء تحكم الأدمن على اللاعب"""
     if not _VEX_GAMES:
@@ -7199,6 +8283,7 @@ def api_admin_platform_stats():
 
 @app.route('/api/admin/lockdown-log', methods=['GET'])
 @api_auth
+@permission_required('manage_admins')
 def api_admin_lockdown_log():
     """Return lockdown/recovery history with summary statistics.
 
@@ -7273,6 +8358,7 @@ def api_admin_lockdown_log():
 
 @app.route('/api/admin/lockdown-log/export', methods=['GET'])
 @api_auth
+@permission_required('manage_admins')
 def api_admin_lockdown_log_export():
     """Stream the full lockdown_log.csv as a file download.
 
@@ -7468,10 +8554,330 @@ def api_player_stats():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/auth/create-token', methods=['POST', 'GET'])
+def api_auth_create_token():
+    """Create a session token for a given uid.
+
+    Called by the bot before opening the WebApp so the user never needs
+    a plain uid in the URL.  Returns {'s': token} on success.
+    """
+    try:
+        uid = ''
+        if request.method == 'POST':
+            try:
+                uid = (request.get_json(silent=True) or {}).get('uid', '')
+            except Exception:
+                pass
+        if not uid:
+            uid = request.args.get('uid', '').strip()
+        if not uid:
+            return jsonify({'error': 'uid required', 'code': 'NO_UID'}), 400
+        uid = str(uid).strip()
+        from session_tokens import create_session as _cs
+        token = _cs(uid)
+        return jsonify({'s': token, 'uid': uid, 'ok': True})
+    except Exception as e:
+        return jsonify({'error': str(e), 'code': 'SESSION_ERROR'}), 500
+
+
 @app.route('/webapp/stats')
 def webapp_stats():
-    """Player statistics page — WebApp"""
+    """Player statistics page — WebApp (kept for backward compat; account page replaces it)"""
     return render_template('stats.html')
+
+@app.route('/webapp/account')
+def webapp_account():
+    """Unified player account page — profile, referrals, rewards, transactions.
+
+    Auth note: this route renders the page shell with no server-side auth.
+    The four account API endpoints require g.webapp_auth_strong=True, which is
+    only set by HMAC-validated Telegram initData or a device-authorized encrypted
+    session.  In practice all legitimate users open this page inside the Telegram
+    Mini App where tg.initData is populated; game-base.js sends it as
+    X-Telegram-Init-Data on every apiFetch call.  Callers arriving outside
+    Telegram (no initData, no valid session ?s=) see a graceful 403 message.
+    No server-side uid→session minting occurs here — uid is not a trusted identity.
+    """
+    return render_template('account.html')
+
+# ── Unified account API ────────────────────────────────────────────────────────
+
+@app.route('/api/player/account')
+@account_auth
+def api_player_account():
+    """Unified account endpoint: profile + game stats + SVRP summary + referral summary + recent txns."""
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+
+    import sys as _asys; _asys.path.insert(0, BASE_DIR)
+
+    # ── Profile (users.csv) ──────────────────────────────────────────────
+    user_row = {}
+    try:
+        users = read_csv('users.csv')
+        user_row = next((u for u in users if str(u.get('telegram_id', '')) == uid), {})
+    except Exception:
+        pass
+    name         = user_row.get('name', '')
+    phone        = user_row.get('phone', '')
+    customer_id  = user_row.get('customer_id', '')
+    joined_date  = user_row.get('date', '')
+    currency     = user_row.get('currency', 'EGP')
+    phone_verified = user_row.get('phone_verified', 'no')
+    ref_earnings_csv = float(user_row.get('referral_earnings', 0) or 0)
+
+    # ── Game balance + profile (SQLite) ──────────────────────────────────
+    game_balance = float(_gm.get_balance(uid) or 0)
+    user_info    = _gm.get_user_info(uid) or {}
+    currency     = user_info.get('currency', currency)
+    profile      = _gm.tracker.get_profile(uid)
+    is_vip       = profile.get('is_vex_partner', '') == 'yes'
+
+    # ── Game stats (SQLite sessions) ─────────────────────────────────────
+    game_stats = {'total_bets': 0, 'win_rate': 0, 'net_profit': 0, 'total_wins': 0}
+    try:
+        from db_manager import _gdb as _ldb
+        sessions = _ldb.get_user_sessions(uid, limit=100) or []
+        if sessions:
+            total_bets    = len(sessions)
+            total_wagered = sum(s.get('bet_amount', 0) for s in sessions)
+            total_won_s   = sum(s.get('payout', 0) for s in sessions)
+            total_wins    = sum(1 for s in sessions if s.get('result') == 'win')
+            game_stats = {
+                'total_bets':    total_bets,
+                'total_wagered': round(total_wagered, 2),
+                'total_won':     round(total_won_s, 2),
+                'net_profit':    round(total_won_s - total_wagered, 2),
+                'total_wins':    total_wins,
+                'win_rate':      round(total_wins / max(total_bets, 1) * 100, 1),
+            }
+    except Exception:
+        pass
+
+    # ── SVRP wallet summary (SQLite authoritative) ────────────────────────
+    _svrp = _gm.get_svrp_frozen_balance(uid)
+    svrp_summary = {
+        'frozen_balance':    float(_svrp.get('frozen_balance', 0) or 0),
+        'total_earned':      float(_svrp.get('total_earned', 0) or 0),
+        'wagering_required': int(_svrp.get('wagering_required', 3) or 3),
+        'wagering_completed':int(_svrp.get('wagering_completed', 0) or 0),
+        'wagering_done':     int(_svrp.get('wagering_completed', 0) or 0) >=
+                             int(_svrp.get('wagering_required', 3) or 3),
+    }
+
+    # ── Referral summary (referral_log.csv) ───────────────────────────────
+    referral_count   = 0
+    referral_earnings = 0.0
+    try:
+        ref_log = read_csv('referral_log.csv')
+        my_refs = [r for r in ref_log if str(r.get('referrer_id', '')) == uid]
+        referral_count   = len(my_refs)
+        referral_earnings = ref_earnings_csv or sum(
+            float(r.get('bonus_amount', r.get('bonus', 0)) or 0) for r in my_refs
+        )
+    except Exception:
+        pass
+
+    # ── Recent transactions (last 10) ─────────────────────────────────────
+    recent_txns = []
+    try:
+        txns = read_csv('transactions.csv')
+        user_txns = [t for t in txns if str(t.get('telegram_id', '')) == uid]
+        for t in reversed(user_txns[-10:]):
+            recent_txns.append({
+                'id':      t.get('id', ''),
+                'type':    t.get('type', ''),
+                'amount':  float(t.get('amount', 0) or 0),
+                'status':  t.get('status', ''),
+                'company': t.get('company', ''),
+                'date':    t.get('date', ''),
+            })
+    except Exception:
+        pass
+
+    return jsonify({
+        'uid':             uid,
+        'name':            name,
+        'phone':           phone,
+        'customer_id':     customer_id,
+        'joined_date':     joined_date,
+        'currency':        currency,
+        'phone_verified':  phone_verified,
+        'is_vip':          is_vip,
+        'game_balance':    game_balance,
+        'game_stats':      game_stats,
+        'svrp':            svrp_summary,
+        'referral_count':  referral_count,
+        'referral_earnings': round(referral_earnings, 2),
+        'recent_txns':     recent_txns,
+    })
+
+
+@app.route('/api/player/referrals')
+@account_auth
+def api_player_referrals():
+    """Player referral data: link, earnings, full list of referred users."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+
+    # customer_id for building the referral code
+    customer_id = ''
+    try:
+        users = read_csv('users.csv')
+        u = next((x for x in users if str(x.get('telegram_id', '')) == uid), {})
+        customer_id = u.get('customer_id', uid)
+    except Exception:
+        customer_id = uid
+
+    # Referral log entries where this user is the referrer
+    referrals = []
+    total_earnings = 0.0
+    try:
+        ref_log = read_csv('referral_log.csv')
+        for r in ref_log:
+            if str(r.get('referrer_id', '')) != uid:
+                continue
+            bonus = float(r.get('bonus_amount', r.get('bonus', 0)) or 0)
+            total_earnings += bonus
+            referrals.append({
+                'referred_name':   r.get('referred_name', ''),
+                'phone_verified':  r.get('phone_verified', 'no'),
+                'bonus_amount':    bonus,
+                'currency':        r.get('currency', 'EGP'),
+                'status':          r.get('status', ''),
+                'created_at':      r.get('created_at', ''),
+            })
+    except Exception:
+        pass
+
+    # Referral link — Telegram bot deep-link
+    bot_username = os.environ.get('BOT_USERNAME', '')
+    if bot_username:
+        referral_link = f'https://t.me/{bot_username}?start=ref_{customer_id}'
+    else:
+        referral_link = ''
+
+    return jsonify({
+        'referral_code':    customer_id,
+        'referral_link':    referral_link,
+        'total_referrals':  len(referrals),
+        'verified_referrals': sum(1 for r in referrals if r['phone_verified'] == 'yes'),
+        'total_earnings':   round(total_earnings, 2),
+        'referrals':        list(reversed(referrals)),  # newest first
+    })
+
+
+@app.route('/api/player/rewards')
+@account_auth
+def api_player_rewards():
+    """Player rewards: today's SVRP tasks + approved recovery requests + promo balances."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+
+    import sys as _rsys; _rsys.path.insert(0, BASE_DIR)
+    from svrp import SVRPManager as _SMgr
+
+    mgr = _SMgr()
+    # Ensure today's tasks exist
+    try:
+        mgr.create_daily_tasks(uid)
+    except Exception:
+        pass
+
+    # Today's tasks
+    tasks = []
+    try:
+        raw_tasks = mgr.get_user_tasks(uid)
+        _task_labels = {
+            'deposit_count':  {'label': 'أودع مرة واحدة اليوم', 'icon': '💰'},
+            'deposit_amount': {'label': 'أودع مبلغاً محدداً اليوم', 'icon': '💵'},
+            'referral_count': {'label': 'ادعُ صديقاً اليوم', 'icon': '👥'},
+        }
+        for t in raw_tasks:
+            tt = t.get('task_type', '')
+            meta = _task_labels.get(tt, {'label': tt, 'icon': '🎯'})
+            progress   = float(t.get('current_progress', 0) or 0)
+            target     = float(t.get('target_value', 1) or 1)
+            status     = t.get('status', 'active')
+            reward     = float(t.get('reward_amount', 0) or 0)
+            tasks.append({
+                'id':          t.get('id', ''),
+                'type':        tt,
+                'label':       meta['label'],
+                'icon':        meta['icon'],
+                'progress':    progress,
+                'target':      target,
+                'pct':         round(min(progress / max(target, 1), 1.0) * 100),
+                'status':      status,
+                'reward':      reward,
+                'claimable':   status == 'completed',
+                'created_at':  t.get('created_at', ''),
+            })
+    except Exception:
+        pass
+
+    # Approved recovery requests (display history)
+    recovery_history = []
+    try:
+        reqs = read_csv('recovery_requests.csv')
+        user_reqs = [r for r in reqs if str(r.get('user_id', '')) == uid]
+        for r in reversed(user_reqs[-10:]):
+            recovery_history.append({
+                'id':             r.get('id', ''),
+                'status':         r.get('status', ''),
+                'recovery_amount': float(r.get('recovery_amount', 0) or 0),
+                'approved_at':    r.get('approved_at', ''),
+                'created_at':     r.get('created_at', ''),
+            })
+    except Exception:
+        pass
+
+    # Promo / active SVRP credits
+    promo_credits = []
+    try:
+        credits_all = read_csv('svrp_credits.csv')
+        user_credits = [c for c in credits_all
+                        if str(c.get('user_id', '')) == uid
+                        and c.get('status') in ('active', 'pending')]
+        for c in user_credits[:20]:
+            promo_credits.append({
+                'type':    c.get('credit_type', ''),
+                'amount':  float(c.get('credit_amount', 0) or 0),
+                'status':  c.get('status', ''),
+                'created': c.get('created_at', ''),
+            })
+    except Exception:
+        pass
+
+    return jsonify({
+        'tasks':            tasks,
+        'recovery_history': recovery_history,
+        'promo_credits':    promo_credits,
+    })
+
+
+@app.route('/api/player/rewards/claim/<task_id>', methods=['POST'])
+@account_auth
+def api_player_rewards_claim(task_id):
+    """Claim a completed SVRP daily task reward."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+
+    import sys as _csys; _csys.path.insert(0, BASE_DIR)
+    from svrp import SVRPManager as _SMgr
+    mgr = _SMgr()
+    ok, msg = mgr.claim_task_reward(uid, task_id)
+    if not ok:
+        return jsonify({'error': msg}), 400
+
+    new_balance = float(_gm.get_svrp_frozen_balance(uid).get('frozen_balance', 0) or 0)
+    return jsonify({'success': True, 'message': msg, 'new_svrp_balance': new_balance})
 
 # ===== Aviator engine — separated into dashboard/aviator_engine.py =====
 # All Aviator state, game loop, SSE stream, bet/cashout/state routes now live
@@ -7744,27 +9150,71 @@ def health_check():
     return jsonify(body), status_code
 
 
-# ===== Mines session background cleanup =====
-# Runs every 10 minutes regardless of traffic so idle deployments are also covered.
+# ===== Unified game-session & security maintenance daemon =====
+# Runs every 5 minutes:
+#   1. Refund expired active_game_sessions bets (all games, not just mines)
+#      → #26: prevents bets from being locked forever between restarts
+#   2. Remove JSON mines entries for any just-refunded sessions
+#      → #25: abandoned mines bets are never silently locked
+#   3. Prune stale mines JSON files (legacy + new)
+#   4. Delete expired auth_nonces from SQLite
+#      → #29: replay-protection store stays bounded, survives restarts
 
-def _mines_cleanup_daemon():
-    """Background daemon: prune stale sessions from both mines JSON files every
-    10 minutes so abandoned games never accumulate indefinitely, regardless of
-    whether any new requests arrive."""
+def _session_maintenance_daemon():
+    """Unified background maintenance: refund expired sessions, prune JSON
+    mines state, and clean up auth nonces — every 5 minutes."""
     import time as _time
     while True:
-        _time.sleep(600)  # 10-minute interval
+        _time.sleep(300)  # 5-minute interval
+
+        # 1 & 2 — Refund expired SQLite game sessions + clean matching JSON mines entries
+        if _VEX_GAMES:
+            try:
+                refunded = _refund_ags(_db_singleton)
+                if refunded:
+                    _auth_logger.info("[maintenance] Refunded %d expired session(s): %s",
+                                      len(refunded), refunded)
+                    # For any refunded mines session, also evict the JSON entry so
+                    # the player cannot continue a game whose bet has already been returned.
+                    mines_uids = {uid for uid, game, _ in refunded if game == 'mines'}
+                    if mines_uids:
+                        try:
+                            with _mines_lock:
+                                sessions = _load_mines_sessions()
+                                cleaned = {k: v for k, v in sessions.items()
+                                           if k not in mines_uids}
+                                if len(cleaned) < len(sessions):
+                                    import json as _json
+                                    with open(_mines_session_file(), 'w') as _mf:
+                                        _json.dump(cleaned, _mf)
+                                    _auth_logger.info(
+                                        "[maintenance] Evicted %d refunded mines JSON session(s)",
+                                        len(sessions) - len(cleaned))
+                        except Exception as _me:
+                            _auth_logger.error("[maintenance] mines JSON eviction error: %s", _me)
+            except Exception as exc:
+                _auth_logger.error("[maintenance] refund_expired_game_sessions: %s", exc)
+
+        # 3 — Prune stale mines JSON files
         try:
-            # Prune mines_user_sessions.json (new flow, uid-keyed)
             with _mines_lock:
                 _load_mines_sessions()  # prunes stale entries and persists to disk
         except Exception as exc:
-            _auth_logger.error("mines_cleanup_daemon (user sessions): %s", exc)
+            _auth_logger.error("[maintenance] mines user-sessions prune: %s", exc)
         try:
-            # Prune mines_sessions.json (legacy engine flow, session_id-keyed)
             _prune_engine_mines_sessions_file()
         except Exception as exc:
-            _auth_logger.error("mines_cleanup_daemon (engine sessions): %s", exc)
+            _auth_logger.error("[maintenance] mines engine-sessions prune: %s", exc)
+
+        # 4 — Evict expired auth nonces
+        if _VEX_GAMES:
+            try:
+                n = _cleanup_nonces()
+                if n:
+                    _auth_logger.debug("[maintenance] Evicted %d expired auth nonce(s)", n)
+            except Exception as exc:
+                _auth_logger.error("[maintenance] cleanup_expired_nonces: %s", exc)
+
 
 # Startup prune: clear sessions that expired while the server was down.
 try:
@@ -7777,7 +9227,7 @@ try:
 except Exception as _mce2:
     _auth_logger.error("mines startup prune (engine sessions) error: %s", _mce2)
 
-threading.Thread(target=_mines_cleanup_daemon, daemon=True, name='mines-cleanup').start()
+threading.Thread(target=_session_maintenance_daemon, daemon=True, name='session-maintenance').start()
 
 
 # ===== OTP Bot Auto-Start =====

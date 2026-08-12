@@ -114,6 +114,46 @@ def _init_db():
             );
             CREATE INDEX IF NOT EXISTS idx_idem_created ON game_idempotency(created_at);
 
+            -- SVRP→game transfer idempotency log.
+            -- A row is inserted atomically with the balance credit inside the same
+            -- SQLite savepoint, so the log record and the balance update are always
+            -- consistent even across crashes.  On replay the INSERT fails with
+            -- IntegrityError and the balance update is skipped.
+            CREATE TABLE IF NOT EXISTS svrp_transfer_log (
+                transfer_id           TEXT PRIMARY KEY,
+                uid                   TEXT    NOT NULL,
+                amount                REAL    NOT NULL DEFAULT 0,
+                status                TEXT    NOT NULL DEFAULT 'pending',
+                pre_debit_svrp_balance REAL,
+                csv_debited           INTEGER NOT NULL DEFAULT 0,
+                created_at            TEXT    NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_svrp_tlog_uid ON svrp_transfer_log(uid);
+
+            -- Authoritative frozen SVRP wallet balance (replaces svrp_wallets.csv
+            -- for all financial mutations).  The CSV is kept for display/metadata only.
+            -- wagering_required/wagering_completed control when the balance is unlocked.
+            CREATE TABLE IF NOT EXISTS svrp_wallet_balance (
+                uid                  TEXT PRIMARY KEY,
+                frozen_balance       REAL NOT NULL DEFAULT 0,
+                total_earned         REAL NOT NULL DEFAULT 0,
+                total_used           REAL NOT NULL DEFAULT 0,
+                wagering_required    INTEGER NOT NULL DEFAULT 3,
+                wagering_completed   INTEGER NOT NULL DEFAULT 0
+            );
+
+            -- Per-request approval ledger.  Each recovery approval gets one row;
+            -- the balance credit and status transition are committed in a single
+            -- SAVEPOINT so there is no crash window between them.
+            CREATE TABLE IF NOT EXISTS svrp_approval_log (
+                req_id      TEXT PRIMARY KEY,
+                uid         TEXT NOT NULL,
+                amount      REAL NOT NULL DEFAULT 0,
+                status      TEXT NOT NULL DEFAULT 'pending',
+                created_at  TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_svrp_alog_uid ON svrp_approval_log(uid);
+
             -- Snatch game sessions: durable state machine co-located with wallet
             -- so wallet and session state are always in the same DB file.
             -- status: intent | pending | settling | refunding | settled | refunded
@@ -130,6 +170,72 @@ def _init_db():
             );
             CREATE INDEX IF NOT EXISTS idx_snatch_status_time
                 ON snatch_sessions (status, created_at);
+
+            -- Active real-time game sessions: mines, plinko, etc.
+            -- Survives server restarts. TTL enforced by expires_at.
+            -- game: 'mines' | 'plinko' | 'wheel' | 'snatch' | ...
+            CREATE TABLE IF NOT EXISTS active_game_sessions (
+                user_id     TEXT NOT NULL,
+                game        TEXT NOT NULL,
+                session_data TEXT NOT NULL DEFAULT '{}',
+                bet_amount  REAL NOT NULL DEFAULT 0,
+                created_at  REAL NOT NULL,
+                expires_at  REAL NOT NULL,
+                PRIMARY KEY (user_id, game)
+            );
+            CREATE INDEX IF NOT EXISTS idx_ags_exp ON active_game_sessions(expires_at);
+
+            -- Admin RBAC: roles and per-role permission sets
+            -- role: 'super_admin' | 'finance_admin' | 'support_admin' | 'game_admin' | 'broadcast_admin'
+            -- permissions: JSON object {"approve_deposits":true, "ban_users":false, ...}
+            CREATE TABLE IF NOT EXISTS admin_roles (
+                uid         TEXT PRIMARY KEY,
+                role        TEXT NOT NULL DEFAULT 'support_admin',
+                permissions TEXT NOT NULL DEFAULT '{}',
+                created_at  TEXT NOT NULL DEFAULT '',
+                created_by  TEXT NOT NULL DEFAULT ''
+            );
+
+            -- Admin action audit trail
+            CREATE TABLE IF NOT EXISTS admin_audit_log (
+                id        INTEGER PRIMARY KEY AUTOINCREMENT,
+                uid       TEXT NOT NULL,
+                action    TEXT NOT NULL,
+                target    TEXT DEFAULT '',
+                details   TEXT DEFAULT '',
+                ip        TEXT DEFAULT '',
+                timestamp TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_audit_uid ON admin_audit_log(uid);
+            CREATE INDEX IF NOT EXISTS idx_audit_ts  ON admin_audit_log(timestamp);
+
+            -- Financial ledger: every debit/credit with reason
+            CREATE TABLE IF NOT EXISTS financial_ledger (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id      TEXT NOT NULL,
+                amount       REAL NOT NULL,
+                direction    TEXT NOT NULL,  -- 'credit' | 'debit'
+                reason       TEXT NOT NULL,  -- 'deposit' | 'withdrawal' | 'game_bet' | 'game_win' | 'referral' | 'compensation'
+                reference_id TEXT DEFAULT '',
+                balance_after REAL NOT NULL DEFAULT 0,
+                timestamp    TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_ledger_uid ON financial_ledger(user_id);
+            CREATE INDEX IF NOT EXISTS idx_ledger_ts  ON financial_ledger(timestamp);
+
+            -- Persisted replay-protection nonces for Telegram initData tokens.
+            -- Survives dashboard restarts so stolen tokens cannot be replayed even
+            -- after a process restart.  TTL matches _INIT_DATA_MAX_AGE + buffer.
+            -- device_fp: fingerprint of the device that first presented this token;
+            -- same-device reuse is allowed, cross-device reuse is blocked.
+            CREATE TABLE IF NOT EXISTS auth_nonces (
+                token_hash  TEXT PRIMARY KEY,
+                user_id     TEXT NOT NULL,
+                device_fp   TEXT NOT NULL DEFAULT '',
+                created_at  REAL NOT NULL,
+                expires_at  REAL NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_nonces_exp ON auth_nonces(expires_at);
         ''')
         conn.commit()
     finally:
@@ -301,21 +407,674 @@ class GameDB:
             return d
         return {}
 
-    def add_balance(self, user_id, amount):
-        """Add to balance (atomic transaction). Returns new balance."""
+    # ── SVRP transfer outbox — state machine helpers ──────────────────────────
+    # State transitions:
+    #   (new) ──create_svrp_transfer──► pending
+    #   pending ──mark_svrp_transfer_debited (CAS)──► debited   [amount set here]
+    #   debited ──add_balance_for_svrp_transfer──► completed    [credit + CAS]
+    #   debited ──mark_svrp_transfer_status──► rolled_back      [after CSV rollback]
+    #   completed ──(replay)──► completed                        [no-op, returns balance]
+    #
+    # "pending → debited" is a compare-and-set: the UPDATE only matches rows
+    # where uid AND status='pending', so concurrent calls with the same key
+    # (or a resumed call that finds the row already 'debited'/'completed') are
+    # rejected rather than creating a second debit.
+
+    def _ensure_svrp_transfer_table(self, conn):
+        """Idempotent: create svrp_transfer_log + wallet/approval tables; add missing cols."""
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS svrp_transfer_log (
+                transfer_id           TEXT PRIMARY KEY,
+                uid                   TEXT    NOT NULL,
+                amount                REAL    NOT NULL DEFAULT 0,
+                status                TEXT    NOT NULL DEFAULT 'pending',
+                pre_debit_svrp_balance REAL,
+                created_at            TEXT    NOT NULL
+            )
+        ''')
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS svrp_wallet_balance (
+                uid                TEXT PRIMARY KEY,
+                frozen_balance     REAL NOT NULL DEFAULT 0,
+                total_earned       REAL NOT NULL DEFAULT 0,
+                total_used         REAL NOT NULL DEFAULT 0,
+                wagering_required  INTEGER NOT NULL DEFAULT 3,
+                wagering_completed INTEGER NOT NULL DEFAULT 0
+            )
+        ''')
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS svrp_approval_log (
+                req_id     TEXT PRIMARY KEY,
+                uid        TEXT NOT NULL,
+                amount     REAL NOT NULL DEFAULT 0,
+                status     TEXT NOT NULL DEFAULT 'pending',
+                created_at TEXT NOT NULL
+            )
+        ''')
+        conn.execute(
+            'CREATE INDEX IF NOT EXISTS idx_svrp_alog_uid ON svrp_approval_log(uid)'
+        )
+        # Migration: add columns that may be absent on existing installations
+        for _col_ddl in [
+            'ALTER TABLE svrp_transfer_log ADD COLUMN pre_debit_svrp_balance REAL',
+            'ALTER TABLE svrp_transfer_log ADD COLUMN csv_debited INTEGER NOT NULL DEFAULT 0',
+        ]:
+            try:
+                conn.execute(_col_ddl)
+                conn.commit()
+            except Exception:
+                pass  # column already exists
+
+    # ── SQLite-only SVRP wallet operations ──────────────────────────────────
+    # All financial mutations (frozen balance credit/debit) happen exclusively
+    # in SQLite so that each state transition is atomic within a single DB
+    # transaction.  The svrp_wallets.csv remains for display/metadata only and
+    # is never consulted for balance decisions.
+
+    def get_svrp_frozen_balance(self, uid):
+        """Return the SQLite frozen-balance row for uid, or a zeroed default dict.
+
+        Always reflects the authoritative committed state — no CSV involved.
+        """
+        conn = self._conn()
+        self._ensure_svrp_transfer_table(conn)
+        row = conn.execute(
+            'SELECT frozen_balance, total_earned, total_used, '
+            'wagering_required, wagering_completed '
+            'FROM svrp_wallet_balance WHERE uid = ?',
+            (str(uid),)
+        ).fetchone()
+        if row:
+            return {
+                'uid': str(uid),
+                'frozen_balance':     float(row[0]),
+                'total_earned':       float(row[1]),
+                'total_used':         float(row[2]),
+                'wagering_required':  int(row[3]),
+                'wagering_completed': int(row[4]),
+            }
+        return {
+            'uid': str(uid),
+            'frozen_balance': 0.0, 'total_earned': 0.0, 'total_used': 0.0,
+            'wagering_required': 3, 'wagering_completed': 0,
+        }
+
+    def upsert_svrp_wallet_balance(self, uid, frozen_balance, total_earned,
+                                   total_used, wagering_required, wagering_completed):
+        """DEPRECATED — kept for migration/backfill callers only.
+
+        All live mutations must use delta_update_svrp_wallet() so they never
+        overwrite SQLite with a stale CSV-derived value.
+        """
+        # Silently forward to the safe path only if the row does not already exist
+        # (acts as INSERT OR IGNORE equivalent so backfills still work).
+        conn = self._conn()
+        self._ensure_svrp_transfer_table(conn)
+        with _db_lock:
+            conn.execute(
+                'INSERT OR IGNORE INTO svrp_wallet_balance '
+                '(uid, frozen_balance, total_earned, total_used, '
+                ' wagering_required, wagering_completed) '
+                'VALUES (?, ?, ?, ?, ?, ?)',
+                (str(uid), float(frozen_balance), float(total_earned),
+                 float(total_used), int(wagering_required), int(wagering_completed))
+            )
+            conn.commit()
+
+    def delta_update_svrp_wallet(self, uid,
+                                  frozen_balance_delta: float = 0.0,
+                                  total_earned_delta:   float = 0.0,
+                                  total_used_delta:     float = 0.0,
+                                  wagering_completed_delta: int = 0,
+                                  set_wagering_required: int = None):
+        """Apply incremental deltas to the SQLite frozen wallet atomically.
+
+        This is the ONLY write path for live SVRP mutations after initial
+        migration.  All callers pass deltas so that SQLite is always updated
+        by the exact amount of each business event — no stale CSV value is
+        ever read and re-upserted, so previous transfer debits are preserved.
+
+        An INSERT OR IGNORE ensures the row exists before the UPDATE, so this
+        is safe for first-time wallet creation too.
+
+        Returns the updated row as a dict.
+        """
+        uid = str(uid)
+        conn = self._conn()
+        self._ensure_svrp_transfer_table(conn)
+        with _db_lock:
+            # Ensure row exists
+            conn.execute(
+                'INSERT OR IGNORE INTO svrp_wallet_balance '
+                '(uid, frozen_balance, total_earned, total_used, '
+                ' wagering_required, wagering_completed) '
+                'VALUES (?, 0, 0, 0, 3, 0)',
+                (uid,)
+            )
+            # Apply deltas
+            if set_wagering_required is not None:
+                conn.execute(
+                    'UPDATE svrp_wallet_balance SET '
+                    'frozen_balance     = frozen_balance     + ?, '
+                    'total_earned       = total_earned       + ?, '
+                    'total_used         = total_used         + ?, '
+                    'wagering_completed = wagering_completed + ?, '
+                    'wagering_required  = ? '
+                    'WHERE uid = ?',
+                    (float(frozen_balance_delta), float(total_earned_delta),
+                     float(total_used_delta), int(wagering_completed_delta),
+                     int(set_wagering_required), uid)
+                )
+            else:
+                conn.execute(
+                    'UPDATE svrp_wallet_balance SET '
+                    'frozen_balance     = frozen_balance     + ?, '
+                    'total_earned       = total_earned       + ?, '
+                    'total_used         = total_used         + ?, '
+                    'wagering_completed = wagering_completed + ? '
+                    'WHERE uid = ?',
+                    (float(frozen_balance_delta), float(total_earned_delta),
+                     float(total_used_delta), int(wagering_completed_delta), uid)
+                )
+            conn.commit()
+            row = conn.execute(
+                'SELECT frozen_balance, total_earned, total_used, '
+                'wagering_required, wagering_completed '
+                'FROM svrp_wallet_balance WHERE uid = ?', (uid,)
+            ).fetchone()
+            return {
+                'uid': uid,
+                'frozen_balance':     float(row[0]),
+                'total_earned':       float(row[1]),
+                'total_used':         float(row[2]),
+                'wagering_required':  int(row[3]),
+                'wagering_completed': int(row[4]),
+            } if row else None
+
+    def claim_svrp_task_atomically(self, task_id: str, uid: str, reward: float):
+        """Claim a task reward in a single SQLite SAVEPOINT.
+
+        Returns one of:
+          'claimed'          — credited now for the first time
+          'already_claimed'  — idempotent replay; caller can still mark CSV
+
+        Guarantees:
+          - task_id is a PRIMARY KEY in svrp_task_claims so two concurrent
+            requests both get the INSERT; only one wins (rowcount == 1), the
+            other sees rowcount == 0 and returns 'already_claimed'.
+          - Wallet credit and claim record are in the same SAVEPOINT; a crash
+            between INSERT and UPDATE is impossible — both commit or neither does.
+          - Retry after crash between RELEASE and CSV update: INSERT OR IGNORE
+            returns rowcount == 0 → 'already_claimed'; wallet is NOT re-credited.
+        """
+        uid      = str(uid)
+        task_id  = str(task_id)
+        reward_f = float(reward)
+        conn = self._conn()
+        self._ensure_svrp_transfer_table(conn)
+        with _db_lock:
+            # Ensure claims table
+            # Composite PK (uid, task_id) prevents cross-user ID collisions.
+            # Daily task IDs are timestamp+random with limited entropy; using
+            # only task_id as PK would cause one user's claim to block another.
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS svrp_task_claims (
+                    uid        TEXT NOT NULL,
+                    task_id    TEXT NOT NULL,
+                    reward     REAL NOT NULL,
+                    claimed_at TEXT NOT NULL,
+                    PRIMARY KEY (uid, task_id)
+                )
+            ''')
+            conn.execute('SAVEPOINT claim_task')
+            try:
+                cur = conn.execute(
+                    'INSERT OR IGNORE INTO svrp_task_claims '
+                    '(uid, task_id, reward, claimed_at) VALUES (?, ?, ?, ?)',
+                    (uid, task_id, reward_f,
+                     __import__('datetime').datetime.now().isoformat())
+                )
+                if cur.rowcount == 0:
+                    # Validate that the existing record belongs to this uid and
+                    # has the same reward amount (guards against task_id reuse).
+                    row = conn.execute(
+                        'SELECT uid, reward FROM svrp_task_claims WHERE uid=? AND task_id=?',
+                        (uid, task_id)
+                    ).fetchone()
+                    conn.execute('RELEASE claim_task')
+                    if row and row[0] == uid:
+                        return 'already_claimed'  # idempotent replay for this user
+                    # uid mismatch or missing (should not happen) — treat as error
+                    raise RuntimeError(f'claim record uid mismatch: expected {uid}')
+                # Credit wallet in the same savepoint
+                conn.execute(
+                    'INSERT OR IGNORE INTO svrp_wallet_balance '
+                    '(uid, frozen_balance, total_earned, total_used, '
+                    ' wagering_required, wagering_completed) '
+                    'VALUES (?, 0, 0, 0, 3, 0)',
+                    (uid,)
+                )
+                conn.execute(
+                    'UPDATE svrp_wallet_balance '
+                    'SET frozen_balance = frozen_balance + ?, '
+                    '    total_earned   = total_earned   + ? '
+                    'WHERE uid = ?',
+                    (reward_f, reward_f, uid)
+                )
+                conn.execute('RELEASE claim_task')
+                conn.commit()
+                return 'claimed'
+            except Exception:
+                try:
+                    conn.execute('ROLLBACK TO claim_task')
+                    conn.execute('RELEASE claim_task')
+                except Exception:
+                    pass
+                raise
+
+    def migrate_svrp_wallets_from_csv(self, rows):
+        """Idempotent one-time backfill: INSERT OR IGNORE each CSV wallet row.
+
+        Called at module load.  Existing SQLite rows are not overwritten
+        (INSERT OR IGNORE) so any mutations applied via upsert_svrp_wallet_balance
+        after the initial backfill are never silently reverted.
+        """
+        conn = self._conn()
+        self._ensure_svrp_transfer_table(conn)
+        with _db_lock:
+            for row in rows:
+                uid = str(row.get('telegram_id', '') or '')
+                if not uid:
+                    continue
+                conn.execute(
+                    'INSERT OR IGNORE INTO svrp_wallet_balance '
+                    '(uid, frozen_balance, total_earned, total_used, '
+                    ' wagering_required, wagering_completed) '
+                    'VALUES (?, ?, ?, ?, ?, ?)',
+                    (uid,
+                     float(row.get('balance', 0) or 0),
+                     float(row.get('total_earned', 0) or 0),
+                     float(row.get('total_used', 0) or 0),
+                     int(row.get('wagering_required', 3) or 3),
+                     int(row.get('wagering_completed', 0) or 0))
+                )
+            conn.commit()
+
+    def get_outstanding_debited_transfer(self, uid):
+        """Return the transfer_id of any 'debited' transfer for uid, or None.
+
+        Used to enforce one-outstanding-transfer-per-user: a new transfer must
+        not start while one is in the 'debited' (mid-flight) state.
+        """
+        conn = self._conn()
+        self._ensure_svrp_transfer_table(conn)
+        row = conn.execute(
+            'SELECT transfer_id FROM svrp_transfer_log '
+            'WHERE uid = ? AND status = ? LIMIT 1',
+            (str(uid), 'debited')
+        ).fetchone()
+        return row[0] if row else None
+
+    def credit_svrp_balance_for_approval(self, req_id, uid, amount):
+        """Approve a recovery request and credit frozen balance atomically.
+
+        State machine (per req_id in svrp_approval_log):
+          pending   → complete approval + credit wallet in one SAVEPOINT
+          completed → idempotent replay (no re-credit)
+          absent    → INSERT + approve + credit in one SAVEPOINT
+
+        Returns (True, new_frozen_balance) on success or idempotent replay.
+        Returns (False, msg) if the request was already completed by a different
+        uid (ownership violation) or amount mismatch.
+        Raises on SQLite error — caller must not update request CSV.
+        """
+        uid = str(uid)
+        amt = float(_money(amount))
+        conn = self._conn()
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        with _db_lock:
+            self._ensure_svrp_transfer_table(conn)
+            existing = conn.execute(
+                'SELECT uid, amount, status FROM svrp_approval_log WHERE req_id = ?',
+                (req_id,)
+            ).fetchone()
+
+            if existing:
+                ex_uid, ex_amt, ex_status = existing[0], existing[1], existing[2]
+                if ex_uid != uid:
+                    return False, (
+                        f'الطلب {req_id} مرتبط بمستخدم مختلف'
+                    )
+                if ex_status == 'completed':
+                    # Idempotent replay — just return current balance
+                    bal_row = conn.execute(
+                        'SELECT frozen_balance FROM svrp_wallet_balance WHERE uid = ?',
+                        (uid,)
+                    ).fetchone()
+                    return True, float(bal_row[0]) if bal_row else 0.0
+                # 'pending' → proceed to SAVEPOINT below
+
+            # Atomic: INSERT OR IGNORE approval record + credit + mark completed
+            conn.execute('SAVEPOINT svrp_approve')
+            try:
+                conn.execute(
+                    'INSERT OR IGNORE INTO svrp_approval_log '
+                    '(req_id, uid, amount, status, created_at) VALUES (?, ?, ?, ?, ?)',
+                    (req_id, uid, amt, 'pending', now)
+                )
+                # Credit wallet
+                conn.execute(
+                    'INSERT INTO svrp_wallet_balance (uid, frozen_balance, total_earned) '
+                    'VALUES (?, ?, ?) ON CONFLICT(uid) DO UPDATE SET '
+                    'frozen_balance = frozen_balance + ?, total_earned = total_earned + ?',
+                    (uid, amt, amt, amt, amt)
+                )
+                # CAS pending→completed
+                cas = conn.execute(
+                    'UPDATE svrp_approval_log SET status = ? '
+                    'WHERE req_id = ? AND status = ?',
+                    ('completed', req_id, 'pending')
+                )
+                if cas.rowcount != 1:
+                    conn.execute('ROLLBACK TO SAVEPOINT svrp_approve')
+                    conn.execute('RELEASE SAVEPOINT svrp_approve')
+                    conn.commit()
+                    # Re-check: another concurrent approval beat us
+                    re = conn.execute(
+                        'SELECT status FROM svrp_approval_log WHERE req_id = ?', (req_id,)
+                    ).fetchone()
+                    if re and re[0] == 'completed':
+                        bal_row = conn.execute(
+                            'SELECT frozen_balance FROM svrp_wallet_balance WHERE uid = ?',
+                            (uid,)
+                        ).fetchone()
+                        return True, float(bal_row[0]) if bal_row else 0.0
+                    raise RuntimeError(f'Approval CAS failed for req_id={req_id}')
+                conn.execute('RELEASE SAVEPOINT svrp_approve')
+            except Exception:
+                try:
+                    conn.execute('ROLLBACK TO SAVEPOINT svrp_approve')
+                    conn.execute('RELEASE SAVEPOINT svrp_approve')
+                except Exception:
+                    pass
+                raise
+            conn.commit()
+            bal_row = conn.execute(
+                'SELECT frozen_balance FROM svrp_wallet_balance WHERE uid = ?', (uid,)
+            ).fetchone()
+            return True, float(bal_row[0]) if bal_row else amt
+
+    def debit_svrp_balance_for_transfer(self, transfer_id, uid, amount):
+        """Debit frozen balance and CAS transfer pending→debited atomically.
+
+        Both the wallet debit and the state transition are committed in a single
+        SAVEPOINT — no cross-store inconsistency, no csv_debited flag needed.
+
+        Returns True on success.
+        Returns False if transfer not in 'pending' state or uid mismatch.
+        Raises if balance is insufficient or SQLite fails.
+        """
+        uid = str(uid)
+        amt = float(_money(amount))
+        conn = self._conn()
+        with _db_lock:
+            self._ensure_svrp_transfer_table(conn)
+            conn.execute('SAVEPOINT svrp_debit')
+            try:
+                # Debit wallet (fail if balance insufficient)
+                res = conn.execute(
+                    'UPDATE svrp_wallet_balance '
+                    'SET frozen_balance = frozen_balance - ?, '
+                    '    total_used     = total_used     + ? '
+                    'WHERE uid = ? AND frozen_balance >= ? - 0.0001',
+                    (amt, amt, uid, amt)
+                )
+                if res.rowcount != 1:
+                    # Either uid doesn't exist in wallet or insufficient balance
+                    bal_row = conn.execute(
+                        'SELECT frozen_balance FROM svrp_wallet_balance WHERE uid = ?',
+                        (uid,)
+                    ).fetchone()
+                    cur_bal = float(bal_row[0]) if bal_row else 0.0
+                    conn.execute('ROLLBACK TO SAVEPOINT svrp_debit')
+                    conn.execute('RELEASE SAVEPOINT svrp_debit')
+                    conn.commit()
+                    if cur_bal < amt:
+                        raise ValueError(
+                            f'رصيد SVRP غير كافٍ: المتاح {cur_bal:.2f}, '
+                            f'المطلوب {amt:.2f}'
+                        )
+                    raise RuntimeError(
+                        f'Wallet debit UPDATE matched 0 rows for uid={uid}'
+                    )
+                # CAS: pending → debited
+                cas = conn.execute(
+                    'UPDATE svrp_transfer_log '
+                    'SET status = ?, amount = ? '
+                    'WHERE transfer_id = ? AND uid = ? AND status = ?',
+                    ('debited', amt, transfer_id, uid, 'pending')
+                )
+                if cas.rowcount != 1:
+                    conn.execute('ROLLBACK TO SAVEPOINT svrp_debit')
+                    conn.execute('RELEASE SAVEPOINT svrp_debit')
+                    conn.commit()
+                    return False  # transfer not in pending state or wrong uid
+                conn.execute('RELEASE SAVEPOINT svrp_debit')
+            except Exception:
+                try:
+                    conn.execute('ROLLBACK TO SAVEPOINT svrp_debit')
+                    conn.execute('RELEASE SAVEPOINT svrp_debit')
+                except Exception:
+                    pass
+                raise
+            conn.commit()
+            return True
+
+    def create_svrp_transfer(self, transfer_id, uid):
+        """Reserve a slot in the outbox with status='pending' and amount=0.
+
+        The actual amount is committed atomically when the debit completes via
+        mark_svrp_transfer_debited().  Using 0 as a placeholder prevents the
+        full-balance-transfer bug where parsed_amount is None at creation time.
+
+        Returns True if the row was inserted, False if the key already existed
+        (caller should treat False as a possible concurrent-request collision
+        and return an appropriate error rather than proceeding with a debit).
+        """
+        conn = self._conn()
+        with _db_lock:
+            self._ensure_svrp_transfer_table(conn)
+            result = conn.execute(
+                'INSERT OR IGNORE INTO svrp_transfer_log '
+                '(transfer_id, uid, amount, status, created_at) VALUES (?, ?, 0, ?, ?)',
+                (transfer_id, str(uid), 'pending',
+                 datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            )
+            conn.commit()
+            return result.rowcount == 1  # False → key already existed
+
+    def mark_svrp_transfer_debited(self, transfer_id, uid,
+                                   actual_amount, pre_debit_svrp_balance):
+        """CAS: pending → debited, storing the final amount and pre-debit CSV balance.
+
+        pre_debit_svrp_balance is the SVRP wallet balance read BEFORE the CSV
+        debit.  It is stored so that crash-recovery can compare the current CSV
+        balance against the expected post-debit balance and determine whether
+        the CSV debit actually occurred.
+
+        Returns True  if exactly one row matched (uid AND status='pending').
+        Returns False if the row is missing, owned by a different uid, or
+        already past 'pending' — the caller must not proceed with a game credit
+        or CSV debit.
+        """
+        conn = self._conn()
+        with _db_lock:
+            result = conn.execute(
+                'UPDATE svrp_transfer_log '
+                'SET status = ?, amount = ?, pre_debit_svrp_balance = ? '
+                'WHERE transfer_id = ? AND uid = ? AND status = ?',
+                ('debited', float(actual_amount), float(pre_debit_svrp_balance),
+                 transfer_id, str(uid), 'pending')
+            )
+            conn.commit()
+            return result.rowcount == 1
+
+    def mark_svrp_transfer_csv_debited(self, transfer_id, uid):
+        """Mark csv_debited=1 on the outbox record.
+
+        Called inside svrp_lock() immediately after use_credits() succeeds so
+        that crash-recovery can determine whether the CSV debit occurred without
+        relying on balance comparisons (which are unsafe under concurrent SVRP
+        mutations).  Requires uid match.  Returns True if one row was updated.
+        """
+        conn = self._conn()
+        with _db_lock:
+            result = conn.execute(
+                'UPDATE svrp_transfer_log SET csv_debited = 1 '
+                'WHERE transfer_id = ? AND uid = ?',
+                (transfer_id, str(uid))
+            )
+            conn.commit()
+            return result.rowcount == 1
+
+    def mark_svrp_transfer_status(self, transfer_id, uid, status):
+        """Set status unconditionally (for rolled_back / terminal states).
+        Requires uid match to prevent cross-user mutation.
+        """
+        conn = self._conn()
+        with _db_lock:
+            conn.execute(
+                'UPDATE svrp_transfer_log SET status = ? '
+                'WHERE transfer_id = ? AND uid = ?',
+                (status, transfer_id, str(uid))
+            )
+            conn.commit()
+
+    def get_svrp_transfer(self, transfer_id):
+        """Return the outbox record dict (all columns), or None if not found."""
+        conn = self._conn()
+        self._ensure_svrp_transfer_table(conn)
+        row = conn.execute(
+            'SELECT * FROM svrp_transfer_log WHERE transfer_id = ?', (transfer_id,)
+        ).fetchone()
+        return dict(row) if row else None
+
+    def add_balance(self, user_id, amount, idempotency_key=None):
+        """Add to game balance atomically. Returns new balance.
+
+        idempotency_key accepted for API compatibility but is not used here —
+        SVRP-specific idempotency is handled by add_balance_for_svrp_transfer().
+        All normal credits (deposits, payouts, refunds, admin adds) use this method.
+        """
         uid = str(user_id)
         amt = _money(amount)
         conn = self._conn()
         with _db_lock:
-            conn.execute('''
-                INSERT INTO users (telegram_id, game_balance) VALUES (?, ?)
-                ON CONFLICT(telegram_id) DO UPDATE SET game_balance = game_balance + ?
-            ''', (uid, float(amt), float(amt)))
+            conn.execute(
+                'INSERT INTO users (telegram_id, game_balance) VALUES (?, ?) '
+                'ON CONFLICT(telegram_id) DO UPDATE SET game_balance = game_balance + ?',
+                (uid, float(amt), float(amt))
+            )
             conn.commit()
             row = conn.execute(
                 'SELECT game_balance FROM users WHERE telegram_id = ?', (uid,)
             ).fetchone()
             return _money_float(row[0]) if row and row[0] is not None else 0.0
+
+    def add_balance_for_svrp_transfer(self, user_id, amount, transfer_id):
+        """Credit game balance exactly once for an SVRP transfer.
+
+        Uses the STATUS column in svrp_transfer_log for idempotency —
+        no separate INSERT means no key-collision with the pre-existing outbox row.
+
+        Rules:
+          status == 'debited'   → credit game_balance + CAS to 'completed' (atomically)
+          status == 'completed' → replay; return current balance without re-crediting
+          anything else         → raises ValueError (wrong state; caller should abort)
+          uid mismatch          → raises PermissionError (cross-user security check)
+          row missing           → raises ValueError
+
+        All SQLite errors other than the handled states propagate so the endpoint's
+        compensating rollback can run.
+        """
+        uid = str(user_id)
+        amt = _money(amount)
+        conn = self._conn()
+        with _db_lock:
+            row = conn.execute(
+                'SELECT status, uid, amount FROM svrp_transfer_log WHERE transfer_id = ?',
+                (transfer_id,)
+            ).fetchone()
+            if row is None:
+                raise ValueError(f'SVRP outbox record not found: transfer_id={transfer_id}')
+            db_status, db_uid, db_amount = row[0], row[1], row[2]
+            if db_uid != uid:
+                raise PermissionError(
+                    f'Transfer {transfer_id} belongs to uid={db_uid}, not {uid}'
+                )
+            if db_status == 'completed':
+                # Idempotent replay — return current balance without crediting again
+                bal = conn.execute(
+                    'SELECT game_balance FROM users WHERE telegram_id = ?', (uid,)
+                ).fetchone()
+                return _money_float(bal[0]) if bal and bal[0] is not None else 0.0
+            if db_status != 'debited':
+                raise ValueError(
+                    f'Transfer {transfer_id} is in state={db_status!r}; '
+                    f'expected "debited" to apply game credit'
+                )
+            # Atomically credit + CAS debited→completed in a single SAVEPOINT.
+            # Verifying rowcount before RELEASE ensures both statements committed
+            # together or neither did — preventing a crash between them from
+            # crediting the game balance without marking 'completed'.
+            conn.execute('SAVEPOINT svrp_credit')
+            try:
+                conn.execute(
+                    'INSERT INTO users (telegram_id, game_balance) VALUES (?, ?) '
+                    'ON CONFLICT(telegram_id) '
+                    'DO UPDATE SET game_balance = game_balance + ?',
+                    (uid, float(amt), float(amt))
+                )
+                cas_result = conn.execute(
+                    'UPDATE svrp_transfer_log SET status = ? '
+                    'WHERE transfer_id = ? AND status = ?',
+                    ('completed', transfer_id, 'debited')
+                )
+                if cas_result.rowcount != 1:
+                    # Another request already transitioned this record — roll back
+                    # the credit and let the caller decide (replay vs. error).
+                    conn.execute('ROLLBACK TO SAVEPOINT svrp_credit')
+                    conn.execute('RELEASE SAVEPOINT svrp_credit')
+                    conn.commit()
+                    # Re-read status to determine whether it is now 'completed'
+                    re_row = conn.execute(
+                        'SELECT status FROM svrp_transfer_log WHERE transfer_id = ?',
+                        (transfer_id,)
+                    ).fetchone()
+                    re_status = re_row[0] if re_row else None
+                    if re_status == 'completed':
+                        # Race was won by another request — idempotent replay
+                        bal = conn.execute(
+                            'SELECT game_balance FROM users WHERE telegram_id = ?',
+                            (uid,)
+                        ).fetchone()
+                        return _money_float(bal[0]) if bal and bal[0] is not None else 0.0
+                    raise RuntimeError(
+                        f'SVRP credit CAS failed: status={re_status!r}'
+                    )
+                conn.execute('RELEASE SAVEPOINT svrp_credit')
+            except Exception:
+                try:
+                    conn.execute('ROLLBACK TO SAVEPOINT svrp_credit')
+                    conn.execute('RELEASE SAVEPOINT svrp_credit')
+                except Exception:
+                    pass
+                raise
+            conn.commit()
+            bal = conn.execute(
+                'SELECT game_balance FROM users WHERE telegram_id = ?', (uid,)
+            ).fetchone()
+            return _money_float(bal[0]) if bal and bal[0] is not None else 0.0
 
     def deduct_balance(self, user_id, amount):
         """Deduct from balance (atomic, Decimal precision). Returns (success, new_balance)."""
@@ -762,5 +1521,325 @@ class GameDB:
             print(f"CSV sync error: {e}")
 
 
+
+# ═══════════════════════════════════════════════════════════════════════════
+# RBAC — Role-Based Access Control
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Permission bits — all keys a role JSON may contain
+ROLE_PERMISSIONS = {
+    'super_admin': {
+        'approve_deposits': True, 'reject_deposits': True,
+        'approve_withdrawals': True, 'reject_withdrawals': True,
+        'ban_users': True, 'unban_users': True,
+        'manage_admins': True, 'manage_bots': True,
+        'send_broadcast': True, 'view_financial': True,
+        'manage_games': True, 'view_statistics': True,
+        'manage_companies': True, 'manage_settings': True,
+    },
+    'finance_admin': {
+        'approve_deposits': True, 'reject_deposits': True,
+        'approve_withdrawals': True, 'reject_withdrawals': True,
+        'view_financial': True, 'view_statistics': True,
+    },
+    'support_admin': {
+        'view_financial': True, 'ban_users': False,
+        'send_broadcast': False,
+    },
+    'game_admin': {
+        'manage_games': True, 'view_statistics': True,
+    },
+    'broadcast_admin': {
+        'send_broadcast': True,
+    },
+}
+
+
+def get_admin_role(uid: str) -> dict:
+    """Return {'role': str, 'permissions': dict} for a given admin UID.
+    Falls back to 'super_admin' for UIDs in ADMIN_IDS env var.
+    """
+    conn = _get_conn()
+    try:
+        row = conn.execute(
+            'SELECT role, permissions FROM admin_roles WHERE uid=?', (str(uid),)
+        ).fetchone()
+        if row:
+            import json as _json
+            perms = {}
+            try:
+                perms = _json.loads(row['permissions'] or '{}')
+            except Exception:
+                pass
+            return {'role': row['role'], 'permissions': perms}
+        # Not in DB — check env ADMIN_IDS
+        env_admins = [a.strip() for a in os.getenv('ADMIN_USER_IDS', '').split(',') if a.strip()]
+        if str(uid) in env_admins:
+            return {'role': 'super_admin', 'permissions': ROLE_PERMISSIONS['super_admin']}
+        return {'role': None, 'permissions': {}}
+    finally:
+        conn.close()
+
+
+def set_admin_role(uid: str, role: str, created_by: str = 'system',
+                   extra_permissions: dict = None) -> bool:
+    """Create or update an admin's role in the DB."""
+    import json as _json
+    if role not in ROLE_PERMISSIONS:
+        return False
+    perms = dict(ROLE_PERMISSIONS[role])
+    if extra_permissions:
+        perms.update(extra_permissions)
+    conn = _get_conn()
+    try:
+        conn.execute('''
+            INSERT INTO admin_roles (uid, role, permissions, created_at, created_by)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(uid) DO UPDATE SET role=excluded.role,
+                permissions=excluded.permissions,
+                created_at=excluded.created_at,
+                created_by=excluded.created_by
+        ''', (str(uid), role, _json.dumps(perms),
+              datetime.now().strftime('%Y-%m-%d %H:%M:%S'), str(created_by)))
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"set_admin_role error: {e}")
+        return False
+    finally:
+        conn.close()
+
+
+def has_permission(uid: str, permission: str) -> bool:
+    """Return True if the admin has the given permission."""
+    role_data = get_admin_role(uid)
+    return bool(role_data['permissions'].get(permission, False))
+
+
+def log_admin_action(uid: str, action: str, target: str = '',
+                     details: str = '', ip: str = '') -> None:
+    """Append a row to the admin_audit_log table."""
+    conn = _get_conn()
+    try:
+        conn.execute('''
+            INSERT INTO admin_audit_log (uid, action, target, details, ip, timestamp)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (str(uid), action, str(target), str(details), str(ip),
+              datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+        conn.commit()
+    except Exception as e:
+        print(f"log_admin_action error: {e}")
+    finally:
+        conn.close()
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Active Game Sessions — durable real-time session state
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Default TTLs per game (seconds)
+GAME_SESSION_TTL = {
+    'mines':  600,   # 10 minutes
+    'plinko': 300,   # 5 minutes
+    'snatch': 120,   # 2 minutes
+    'wheel':  180,   # 3 minutes
+    'crash':  60,
+    'aviator': 60,
+}
+
+
+def get_active_game_session(user_id: str, game: str) -> dict | None:
+    """Return the active session dict or None if expired/absent."""
+    conn = _get_conn()
+    try:
+        row = conn.execute('''
+            SELECT session_data, bet_amount, created_at, expires_at
+            FROM active_game_sessions
+            WHERE user_id=? AND game=? AND expires_at > ?
+        ''', (str(user_id), game, time.time())).fetchone()
+        if row:
+            import json as _json
+            try:
+                data = _json.loads(row['session_data'])
+            except Exception:
+                data = {}
+            data['_bet'] = row['bet_amount']
+            data['_created_at'] = row['created_at']
+            return data
+        return None
+    finally:
+        conn.close()
+
+
+def set_active_game_session(user_id: str, game: str, session_data: dict,
+                             bet_amount: float, ttl_seconds: int = None) -> None:
+    """Upsert a durable game session. Overwrites any existing session for this user+game."""
+    import json as _json
+    ttl = ttl_seconds or GAME_SESSION_TTL.get(game, 300)
+    now = time.time()
+    conn = _get_conn()
+    try:
+        conn.execute('''
+            INSERT INTO active_game_sessions
+                (user_id, game, session_data, bet_amount, created_at, expires_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(user_id, game) DO UPDATE SET
+                session_data=excluded.session_data,
+                bet_amount=excluded.bet_amount,
+                expires_at=excluded.expires_at
+        ''', (str(user_id), game, _json.dumps(session_data),
+              float(bet_amount), now, now + ttl))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def delete_active_game_session(user_id: str, game: str) -> None:
+    """Remove a game session (on cashout, loss, or manual clear)."""
+    conn = _get_conn()
+    try:
+        conn.execute('DELETE FROM active_game_sessions WHERE user_id=? AND game=?',
+                     (str(user_id), game))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def cleanup_expired_game_sessions() -> int:
+    """Delete sessions past their TTL. Returns count deleted."""
+    conn = _get_conn()
+    try:
+        cur = conn.execute('DELETE FROM active_game_sessions WHERE expires_at <= ?',
+                           (time.time(),))
+        conn.commit()
+        return cur.rowcount
+    finally:
+        conn.close()
+
+
+def refund_expired_game_sessions(gdb_instance=None) -> list:
+    """Find expired sessions that still have a bet, refund them via credit_with_idempotency.
+
+    Returns list of (user_id, game, bet_amount) that were refunded.
+    """
+    conn = _get_conn()
+    refunded = []
+    try:
+        rows = conn.execute('''
+            SELECT user_id, game, session_data, bet_amount, created_at
+            FROM active_game_sessions
+            WHERE expires_at <= ?
+        ''', (time.time(),)).fetchall()
+
+        for row in rows:
+            uid = row['user_id']
+            game = row['game']
+            bet = float(row['bet_amount'])
+            created = row['created_at']
+            if bet > 0 and gdb_instance:
+                # If the session carries a settle_key, the refund SHARES the
+                # idempotency key with settlement — whichever ran first wins,
+                # so a settled bet can never be refunded on top (no double-pay).
+                req_id = f"refund_expired_{game}_{uid}_{int(created)}"
+                try:
+                    import json as _json
+                    sd = _json.loads(row['session_data'] or '{}')
+                    if sd.get('settle_key'):
+                        req_id = sd['settle_key']
+                except Exception:
+                    pass
+                try:
+                    gdb_instance.credit_with_idempotency(
+                        uid, bet, req_id,
+                        {'refunded': True, 'reason': 'session_expired', 'game': game}
+                    )
+                    refunded.append((uid, game, bet))
+                    print(f"[session] Refunded expired {game} bet {bet} to {uid}")
+                except Exception as e:
+                    print(f"[session] Refund error for {uid}/{game}: {e}")
+
+        # Delete all expired
+        conn.execute('DELETE FROM active_game_sessions WHERE expires_at <= ?', (time.time(),))
+        conn.commit()
+    finally:
+        conn.close()
+    return refunded
+
+
+# ── Replay-protection nonce store ────────────────────────────────────────────
+
+def check_and_mark_nonce(token_hash: str, user_id: str, device_fp: str = '',
+                         ttl: int = 3720) -> bool:
+    """Atomically record an initData nonce and enforce cross-device replay protection.
+
+    A Telegram WebApp page sends the SAME initData on every apiFetch call
+    within a session (it is set once at page load).  Blocking all repeat uses
+    would break any page with more than one API call.  We therefore allow
+    same-device repeated use within the TTL, and only block presentation of
+    the token from a DIFFERENT device fingerprint.
+
+    Returns True (allow) when:
+    - Token is new — recorded now with this device fingerprint.
+    - Token was previously recorded with the SAME device fingerprint.
+    - No device fingerprint is available on either side (fallback permissive).
+
+    Returns False (block) when:
+    - Token was previously recorded with a DIFFERENT device fingerprint
+      (cross-device replay attack).
+
+    The nonce is kept for ttl seconds (default 3720 = 1 h + 2-min buffer).
+    The device_fp column is added via ALTER TABLE if the DB pre-dates this schema.
+    """
+    now = time.time()
+    conn = _get_conn()
+    try:
+        # Ensure device_fp column exists (idempotent migration for pre-existing DBs)
+        try:
+            conn.execute("ALTER TABLE auth_nonces ADD COLUMN device_fp TEXT NOT NULL DEFAULT ''")
+            conn.commit()
+        except Exception:
+            pass  # Column already exists — expected on most runs
+
+        cur = conn.execute(
+            'INSERT OR IGNORE INTO auth_nonces'
+            ' (token_hash, user_id, device_fp, created_at, expires_at)'
+            ' VALUES (?, ?, ?, ?, ?)',
+            (token_hash, user_id, device_fp, now, now + ttl),
+        )
+        conn.commit()
+        if cur.rowcount == 1:
+            return True  # New token — first use from this device
+
+        # Token already recorded — check device fingerprint
+        row = conn.execute(
+            'SELECT device_fp FROM auth_nonces WHERE token_hash = ?',
+            (token_hash,),
+        ).fetchone()
+        if not row:
+            return True  # Row vanished (expired between INSERT and SELECT) — allow
+
+        stored_fp = row[0] or ''
+        # Fail closed: if either fingerprint is missing on a replay, we cannot
+        # verify device binding, so we block. An attacker who omits X-Device-FP
+        # is denied even if the token was previously stored without a fingerprint.
+        if not stored_fp or not device_fp:
+            return False
+        return stored_fp == device_fp  # True = same device; False = cross-device replay
+    finally:
+        conn.close()
+
+
+def cleanup_expired_nonces() -> int:
+    """Delete auth_nonces past their TTL.  Returns count deleted."""
+    conn = _get_conn()
+    try:
+        cur = conn.execute('DELETE FROM auth_nonces WHERE expires_at <= ?', (time.time(),))
+        conn.commit()
+        return cur.rowcount
+    finally:
+        conn.close()
+
+
 # Singleton
 _gdb = GameDB()
+

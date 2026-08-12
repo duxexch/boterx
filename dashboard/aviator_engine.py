@@ -18,6 +18,37 @@ import json
 import random
 import secrets
 import threading
+
+# ── Durable bet persistence (crash-safety) ──────────────────────────
+# Registers each debited bet in SQLite active_game_sessions so a server
+# restart mid-round triggers auto-refund via refund_expired_game_sessions().
+try:
+    from db_manager import (set_active_game_session as _ags_set,
+                            delete_active_game_session as _ags_del)
+except Exception:
+    def _ags_set(*a, **k): pass
+    def _ags_del(*a, **k): pass
+
+def _settle_credit(uid, amount, skey):
+    """Idempotent settlement credit that SHARES its key with the refund daemon.
+    Whichever runs first (settlement or restart-refund) consumes the key; the
+    other becomes a no-op — double-pay is impossible. Losses call this with
+    amount=0 to burn the key so a late refund cannot resurrect a lost stake.
+    Returns (paid, balance_after_or_None)."""
+    try:
+        ok, stored, cached = _gm.credit_with_idempotency(
+            uid, float(amount), skey, {'settled': True, 'amount': float(amount)})
+        if cached is not None:
+            return False, None  # key already consumed (refunded or settled)
+        if ok:
+            return True, (stored or {}).get('balance_after')
+    except Exception:
+        # Fallback: never strand a payout if idempotency layer errors
+        if amount and amount > 0:
+            try: return True, _gm.add_balance(uid, float(amount))
+            except Exception: return False, None
+    return True, None
+
 import queue as _queue
 from datetime import datetime
 
@@ -258,12 +289,13 @@ def _game_loop():
                             and bet.get('auto_val', 0) > 0
                             and mult >= bet['auto_val']):
                         payout = bet['amount'] * mult
-                        try: _gm.add_balance(uid, payout)
-                        except: pass
+                        _settle_credit(uid, payout, bet.get('skey', ''))
                         bet['cashed_out'] = True
                         bet['cash_mult'] = mult
                         total_distributed += payout
                         total_cashed_out += 1
+                        try: _ags_del(uid, 'aviator')
+                        except Exception: pass
                         _broadcast({'type': 'cashout', 'uid': uid,
                                    'name': _get_name(uid),
                                    'amount': round(payout, 2),
@@ -285,6 +317,12 @@ def _game_loop():
         # ── CRASHED ──
         with _lock:
             _state['phase'] = 'crashed'
+            # Round settled — burn loser keys (no late refund), clear durable rows
+            for uid, bet in list(_state['bets'].items()):
+                if not bet.get('cashed_out'):
+                    _settle_credit(uid, 0, bet.get('skey', ''))
+                try: _ags_del(uid, 'aviator')
+                except Exception: pass
             _state['history'].append(round(crash_pt, 2))
             if len(_state['history']) > 50:
                 _state['history'].pop(0)
@@ -370,12 +408,18 @@ def init_aviator_engine(app, get_uid, get_gm, get_pf, is_pf, is_vex):
             if req_id and _state['request_ids'].get(uid) == req_id:
                 return jsonify({'error': 'طلب مكرر'}), 409
             if req_id: _state['request_ids'][uid] = req_id
+            skey = 'avset_%s_%s' % (_state['round_id'], uid)
+            # Durable row BEFORE debit; settlement shares skey with refund daemon
+            try: _ags_set(uid, 'aviator', {'auto_val': auto_val, 'settle_key': skey}, amount)
+            except Exception: pass
             # Deduct — if insufficient, return need_deposit so client shows deposit modal
             success, balance = _gm.deduct_balance(uid, amount)
             if not success:
+                try: _ags_del(uid, 'aviator')
+                except Exception: pass
                 return jsonify({'need_deposit': True, 'error': 'رصيد غير كافٍ'})
             _state['bets'][uid] = {'amount': amount, 'cashed_out': False,
-                                   'cash_mult': 0, 'auto_val': auto_val}
+                                   'cash_mult': 0, 'auto_val': auto_val, 'skey': skey}
         return jsonify({'success': True, 'balance_after': balance})
 
     @app.route('/api/aviator/cashout', methods=['POST'])
@@ -400,10 +444,16 @@ def init_aviator_engine(app, get_uid, get_gm, get_pf, is_pf, is_vex):
             if mult >= _state['crash_point']:
                 return jsonify({'success': False, 'error': 'انفجرت الطائرة'})
             payout = bet['amount'] * mult
-            balance = _gm.add_balance(uid, payout)
+            paid, balance = _settle_credit(uid, payout, bet.get('skey', ''))
+            if not paid:
+                return jsonify({'error': 'تمت تسوية هذا الرهان بالفعل'})
+            if balance is None:
+                balance = _gm.get_balance(uid)
             bet['cashed_out'] = True
             bet['cash_mult'] = mult
             name = _get_name(uid)
+            try: _ags_del(uid, 'aviator')
+            except Exception: pass
         _broadcast({'type': 'cashout', 'uid': uid, 'name': name,
                    'amount': round(payout, 2), 'multiplier': round(mult, 2)})
         return jsonify({'success': True, 'payout': round(payout, 2),
