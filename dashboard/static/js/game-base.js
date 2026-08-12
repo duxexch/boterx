@@ -906,43 +906,71 @@ function vCopy() {
 }
 
 async function vSub() {
-  const a = parseFloat(document.getElementById('vAm').value) || 0;
-  const w = document.getElementById('vW').value.trim();
-  const s = document.getElementById('vSv') ? document.getElementById('vSv').checked : false;
-  if (a <= 0) { alert('أدخل المبلغ'); return; }
-  if (!w) { alert('أدخل رقم محفظتك'); return; }
-  if (!vSelected) { alert('اختر وسيلة'); return; }
+  var a = parseFloat(document.getElementById('vAm').value) || 0;
+  var w = document.getElementById('vW').value.trim();
+  var s = document.getElementById('vSv') ? document.getElementById('vSv').checked : false;
+  if (a <= 0) { showToast('أدخل المبلغ', 'error'); return; }
+  if (!w) { showToast('أدخل رقم محفظتك', 'error'); return; }
+  if (!vSelected) { showToast('اختر وسيلة دفع', 'error'); return; }
+  var btn = document.querySelector('.modal-btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ جاري الإرسال...'; }
   try {
-    const r = await apiFetch(`${BASE}/api/deposit/quick`, {
+    var r = await apiFetchCritical(BASE + '/api/deposit/quick', {
       method: 'POST',
       body: JSON.stringify({ amount: a, method_id: vSelected, method_name: vSelName, method_account_data: vSelData, player_wallet: w, save_method: s })
     });
-    const d = await r.json();
+    if (!r.ok && r.status === 403) {
+      showToast('خطأ في المصادقة — أعد فتح اللعبة من البوت', 'error');
+      if (btn) { btn.disabled = false; btn.textContent = '✅ تأكيد الإيداع'; }
+      return;
+    }
+    var d = await r.json();
     if (d.success) {
-      document.getElementById('mb').innerHTML = `<div style="text-align:center;padding:16px"><div style="font-size:28px">⏳</div><div class="modal-title">تم الإيداع</div><div class="modal-subtitle">بانتظار موافقة الإدارة</div><button onclick="document.getElementById('modal').remove();loadBalance()" class="modal-btn-secondary">إغلاق</button></div>`;
-    } else { alert(d.error || 'خطأ'); }
-  } catch (e) { alert('خطأ'); }
+      document.getElementById('mb').innerHTML = '<div style="text-align:center;padding:20px"><div style="font-size:36px">⏳</div><div class="modal-title">تم إرسال طلب الإيداع</div><div class="modal-subtitle">بانتظار موافقة الإدارة</div><div class="modal-subtitle" style="margin-top:8px;color:var(--green)">رقم الطلب: ' + (d.deposit_id || d.trans_id || '') + '</div><button onclick="document.getElementById(\'modal\').remove();loadBalance()" class="modal-btn-secondary" style="margin-top:12px">إغلاق</button></div>';
+      if (tg?.HapticFeedback?.notificationOccurred) tg.HapticFeedback.notificationOccurred('success');
+    } else {
+      showToast(d.error || 'فشل الإيداع', 'error');
+      if (btn) { btn.disabled = false; btn.textContent = '✅ تأكيد الإيداع'; }
+    }
+  } catch (e) {
+    showToast('خطأ في الاتصال — تحقق من الإنترنت', 'error');
+    if (btn) { btn.disabled = false; btn.textContent = '✅ تأكيد الإيداع'; }
+  }
 }
 
 // Manual deposit submit (when no methods from API)
 async function vSubManual() {
-  const a = parseFloat(document.getElementById('vAm').value) || 0;
-  const w = document.getElementById('vW').value.trim();
-  const mn = document.getElementById('vMN') ? document.getElementById('vMN').value.trim() : '';
-  const md = document.getElementById('vMD') ? document.getElementById('vMD').value.trim() : '';
-  if (a <= 0) { alert('أدخل المبلغ'); return; }
-  if (!w) { alert('أدخل رقم محفظتك'); return; }
-  if (!mn) { alert('أدخل اسم الوسيلة'); return; }
+  var a = parseFloat(document.getElementById('vAm').value) || 0;
+  var w = document.getElementById('vW').value.trim();
+  var mn = document.getElementById('vMN') ? document.getElementById('vMN').value.trim() : '';
+  var md = document.getElementById('vMD') ? document.getElementById('vMD').value.trim() : '';
+  if (a <= 0) { showToast('أدخل المبلغ', 'error'); return; }
+  if (!w) { showToast('أدخل رقم محفظتك', 'error'); return; }
+  if (!mn) { showToast('أدخل اسم الوسيلة', 'error'); return; }
+  var btn = document.querySelector('.modal-btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ جاري الإرسال...'; }
   try {
-    const r = await apiFetch(`${BASE}/api/deposit/quick`, {
+    var r = await apiFetchCritical(BASE + '/api/deposit/quick', {
       method: 'POST',
       body: JSON.stringify({ amount: a, method_id: 'manual', method_name: mn, method_account_data: md, player_wallet: w, save_method: false })
     });
-    const d = await r.json();
+    if (!r.ok && r.status === 403) {
+      showToast('خطأ في المصادقة — أعد فتح اللعبة من البوت', 'error');
+      if (btn) { btn.disabled = false; btn.textContent = '✅ تأكيد الإيداع'; }
+      return;
+    }
+    var d = await r.json();
     if (d.success) {
-      document.getElementById('mb').innerHTML = `<div style="text-align:center;padding:16px"><div style="font-size:28px">⏳</div><div class="modal-title">تم الإيداع</div><div class="modal-subtitle">بانتظار موافقة الإدارة</div><button onclick="document.getElementById('modal').remove();loadBalance()" class="modal-btn-secondary">إغلاق</button></div>`;
-    } else { alert(d.error || 'خطأ'); }
-  } catch (e) { alert('خطأ'); }
+      document.getElementById('mb').innerHTML = '<div style="text-align:center;padding:20px"><div style="font-size:36px">⏳</div><div class="modal-title">تم إرسال طلب الإيداع</div><div class="modal-subtitle">بانتظار موافقة الإدارة</div><div class="modal-subtitle" style="margin-top:8px;color:var(--green)">رقم الطلب: ' + (d.deposit_id || d.trans_id || '') + '</div><button onclick="document.getElementById(\'modal\').remove();loadBalance()" class="modal-btn-secondary" style="margin-top:12px">إغلاق</button></div>';
+      if (tg?.HapticFeedback?.notificationOccurred) tg.HapticFeedback.notificationOccurred('success');
+    } else {
+      showToast(d.error || 'فشل الإيداع', 'error');
+      if (btn) { btn.disabled = false; btn.textContent = '✅ تأكيد الإيداع'; }
+    }
+  } catch (e) {
+    showToast('خطأ في الاتصال — تحقق من الإنترنت', 'error');
+    if (btn) { btn.disabled = false; btn.textContent = '✅ تأكيد الإيداع'; }
+  }
 }
 
 // ===== Phase 2: Shared Game Framework Additions =====
