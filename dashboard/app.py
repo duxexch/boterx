@@ -97,7 +97,12 @@ def append_csv(filename, row, fieldnames):
 def get_fieldnames(filename, default_fields):
     rows = read_csv(filename)
     if rows:
-        return list(rows[0].keys())
+        existing = list(rows[0].keys())
+        # Merge: add any default field not already in the CSV header
+        for f in default_fields:
+            if f not in existing:
+                existing.append(f)
+        return existing
     return default_fields
 
 def log_action(action_type, details=''):
