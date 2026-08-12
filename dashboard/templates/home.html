@@ -139,11 +139,11 @@ body{background:var(--bg);color:var(--text);margin:0;min-height:100dvh;overflow-
   <div class="section-head"><span class="section-title">⚡ الخدمات</span></div>
   <div class="services-grid">
     <div class="svc-card" onclick="openCompensation()"><div class="svc-icon">💎</div><div class="svc-name">تعويض 100%</div></div>
-    <div class="svc-card" onclick="showToast('قريباً')"><div class="svc-icon">🎁</div><div class="svc-name">اربح</div></div>
-    <div class="svc-card" onclick="showToast('قريباً')"><div class="svc-icon">📢</div><div class="svc-name">القنوات</div></div>
+    <div class="svc-card" onclick="openEarn()"><div class="svc-icon">🎁</div><div class="svc-name">اربح</div></div>
+    <div class="svc-card" onclick="openChannels()"><div class="svc-icon">📢</div><div class="svc-name">القنوات</div></div>
     <div class="svc-card" onclick="openApps()"><div class="svc-icon">📱</div><div class="svc-name">التطبيقات</div></div>
-    <div class="svc-card" onclick="showToast('قريباً')"><div class="svc-icon">💱</div><div class="svc-name">تداول USDT</div></div>
-    <div class="svc-card" onclick="showToast('قريباً')"><div class="svc-icon">🆘</div><div class="svc-name">الدعم</div></div>
+    <div class="svc-card" onclick="openTrading()"><div class="svc-icon">💱</div><div class="svc-name">تداول USDT</div></div>
+    <div class="svc-card" onclick="openSupport()"><div class="svc-icon">🆘</div><div class="svc-name">الدعم</div></div>
   </div>
 
   <!-- Install banner -->
@@ -488,6 +488,146 @@ function copyToClip(btn, text){
       setTimeout(function(){ btn.innerHTML = orig; btn.style.background = '#1a2032'; btn.style.borderColor = '#2a3142'; },1500);
     });
   }catch(e){ showToast('فشل النسخ','error'); }
+}
+
+// ── Generic modal helper ──
+function openModal(title, icon){
+  var overlay = document.createElement('div');
+  overlay.id = 'modal';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(5,15,12,.92);backdrop-filter:blur(12px);z-index:100;display:flex;align-items:center;justify-content:center;padding:12px;overflow-y:auto';
+  overlay.innerHTML = '<div id="mb" style="background:linear-gradient(180deg,#0d1814,#0a1410);border:1px solid #1a3a28;border-radius:18px;padding:20px;max-width:420px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.5)"></div>';
+  overlay.onclick = function(e){ if(e.target === overlay) overlay.remove(); };
+  document.body.appendChild(overlay);
+  var mb = document.getElementById('mb');
+  mb.innerHTML = '<div style="font-size:18px;font-weight:900;color:#e8eaed;margin-bottom:4px;text-align:center">' + icon + ' ' + title + '</div>';
+  return mb;
+}
+function closeModal(){ var m = document.getElementById('modal'); if(m) m.remove(); }
+function modalLoading(mb){ mb.innerHTML += '<div style="text-align:center;padding:20px;color:#7a9a8a">⏳ جارٍ التحميل...</div>'; }
+function modalCloseBtn(){ return '<button onclick="closeModal()" style="width:100%;padding:12px;border-radius:12px;border:1px solid #1a3a28;background:linear-gradient(135deg,rgba(0,231,1,.15),rgba(0,231,1,.05));color:#00e701;font-weight:700;cursor:pointer;margin-top:12px">إغلاق</button>'; }
+
+// ── 🎁 اربح (Referrals) ──
+function openEarn(){
+  var mb = openModal('اربح', '🎁');
+  mb.innerHTML += '<div style="text-align:center;padding:20px;color:#7a9a8a">⏳ جارٍ التحميل...</div>';
+  var authP = _getAuthParam ? _getAuthParam() : ('uid={{ uid }}');
+  // Fetch user's referral info + public referral links
+  Promise.all([
+    fetch(BASE + '/api/player/wallet?' + authP).then(function(r){return r.json()}).catch(function(){return {}}),
+    fetch(BASE + '/api/referrals/public').then(function(r){return r.json()}).catch(function(){return {links:[]}})
+  ]).then(function(results){
+    var wallet = results[0] || {};
+    var refLinks = results[1].links || [];
+    var referralCode = wallet.referral_code || '';
+    var refUrl = wallet.referral_url || '';
+
+    var h = '<div style="font-size:18px;font-weight:900;color:#e8eaed;margin-bottom:4px;text-align:center">🎁 اربح</div>';
+    h += '<div style="font-size:11px;color:#7a9a8a;text-align:center;margin-bottom:16px">ادعُ أصدقاءك واربح المكافآت</div>';
+
+    // Referral code
+    if(referralCode){
+      h += '<div style="background:linear-gradient(135deg,#0f1c18,#0b1410);border:1px solid #1a3a28;border-radius:12px;padding:14px;margin-bottom:10px">';
+      h += '<div style="font-size:11px;color:#7a9a8a;margin-bottom:4px">🎫 كود الإحالة</div>';
+      h += '<div style="display:flex;align-items:center;gap:8px"><code style="background:#0a1c14;border:1px solid #1a3a28;padding:4px 12px;border-radius:8px;color:#fbbf24;font-size:14px;font-weight:700;flex:1">' + esc(referralCode) + '</code>';
+      h += '<button onclick="copyToClip(this,\'' + referralCode + '\')" style="background:rgba(0,231,1,.12);border:1px solid rgba(0,231,1,.25);border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:14px">📋</button></div>';
+      h += '</div>';
+    }
+    if(refUrl){
+      h += '<div style="background:linear-gradient(135deg,#0f1c18,#0b1410);border:1px solid #1a3a28;border-radius:12px;padding:14px;margin-bottom:10px">';
+      h += '<div style="font-size:11px;color:#7a9a8a;margin-bottom:4px">🔗 رابط الدعوة</div>';
+      h += '<div style="display:flex;align-items:center;gap:8px"><code style="background:#0a1c14;border:1px solid #1a3a28;padding:4px 8px;border-radius:8px;color:#00e701;font-size:11px;flex:1;word-break:break-all">' + esc(refUrl.substring(0,50)) + '...</code>';
+      h += '<button onclick="copyToClip(this,\'' + refUrl + '\')" style="background:rgba(0,231,1,.12);border:1px solid rgba(0,231,1,.25);border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:14px">📋</button></div>';
+      h += '</div>';
+    }
+
+    // Referral links from admin
+    if(refLinks.length > 0){
+      h += '<div style="font-size:13px;font-weight:700;color:#e8eaed;margin:12px 0 8px">📌 روابط تهمك</div>';
+      refLinks.forEach(function(l){
+        h += '<a href="' + esc(l.url) + '" target="_blank" style="display:flex;align-items:center;gap:8px;padding:10px;background:linear-gradient(135deg,#0f1c18,#0b1410);border:1px solid #1a3a28;border-radius:10px;margin-bottom:6px;text-decoration:none">';
+        h += '<span style="font-size:14px">🔗</span>';
+        h += '<div style="flex:1"><div style="font-size:13px;font-weight:600;color:#e8eaed">' + esc(l.name) + '</div></div>';
+        h += '<span style="color:#00e701;font-size:14px">←</span></a>';
+      });
+    }
+
+    h += '<div style="background:rgba(0,231,1,.05);border:1px solid rgba(0,231,1,.15);border-radius:12px;padding:14px;margin-top:8px">';
+    h += '<div style="font-size:11px;color:#7a9a8a;line-height:1.6">💡 شارك كود الإحالة مع أصدقائك — عند تسجيلهم تحصل على مكافأة في محفظة التعويض.</div></div>';
+    h += modalCloseBtn();
+    mb.innerHTML = h;
+  }).catch(function(){
+    mb.innerHTML = '<div style="text-align:center;padding:30px;color:#ff4757">فشل التحميل' + modalCloseBtn() + '</div>';
+  });
+}
+
+// ── 📢 القنوات (Channels) ──
+function openChannels(){
+  var mb = openModal('القنوات', '📢');
+  mb.innerHTML += '<div style="text-align:center;padding:20px;color:#7a9a8a">⏳ جارٍ التحميل...</div>';
+  fetch(BASE + '/api/channels/public').then(function(r){return r.json()}).then(function(d){
+    var chans = d.channels || [];
+    var h = '<div style="font-size:18px;font-weight:900;color:#e8eaed;margin-bottom:4px;text-align:center">📢 القنوات</div>';
+    h += '<div style="font-size:11px;color:#7a9a8a;text-align:center;margin-bottom:16px">انضم لقنواتنا للحصول على آخر التحديثات</div>';
+    if(chans.length === 0){
+      h += '<div style="text-align:center;padding:20px;color:#7a9a8a">لا توجد قنوات متاحة حالياً</div>';
+    } else {
+      chans.forEach(function(c){
+        var uname = c.username || '';
+        var url = uname ? ('https://t.me/' + uname.replace('@','')) : '';
+        h += '<a href="' + (url || '#') + '" target="_blank" style="display:flex;align-items:center;gap:10px;padding:12px;background:linear-gradient(135deg,#0f1c18,#0b1410);border:1px solid #1a3a28;border-radius:12px;margin-bottom:8px;text-decoration:none">';
+        h += '<span style="font-size:20px">📢</span>';
+        h += '<div style="flex:1"><div style="font-size:14px;font-weight:700;color:#e8eaed">' + esc(c.title || uname || 'قناة') + '</div>';
+        if(c.description) h += '<div style="font-size:11px;color:#7a9a8a;margin-top:2px">' + esc(c.description) + '</div>';
+        h += '</div><span style="color:#00e701;font-size:14px">انضم ←</span></a>';
+      });
+    }
+    h += modalCloseBtn();
+    mb.innerHTML = h;
+  }).catch(function(){
+    mb.innerHTML = '<div style="text-align:center;padding:30px;color:#ff4757">فشل التحميل' + modalCloseBtn() + '</div>';
+  });
+}
+
+// ── 💱 تداول USDT ──
+function openTrading(){
+  var mb = openModal('تداول USDT', '💱');
+  fetch(BASE + '/api/trading/public').then(function(r){return r.json()}).then(function(d){
+    var h = '<div style="font-size:18px;font-weight:900;color:#e8eaed;margin-bottom:4px;text-align:center">💱 تداول USDT</div>';
+    h += '<div style="font-size:11px;color:#7a9a8a;text-align:center;margin-bottom:16px">اشترِ وبع USDT بأفضل الأسعار</div>';
+    if(d.usdt_rate){
+      h += '<div style="background:linear-gradient(135deg,#0f1c18,#0b1410);border:1px solid #1a3a28;border-radius:12px;padding:14px;margin-bottom:12px;text-align:center">';
+      h += '<div style="font-size:11px;color:#7a9a8a">سعر USDT الحالي</div>';
+      h += '<div style="font-size:24px;font-weight:900;color:#fbbf24;margin-top:4px">' + esc(d.usdt_rate) + '</div>';
+      h += '</div>';
+    }
+    h += '<div style="background:rgba(0,231,1,.05);border:1px solid rgba(0,231,1,.15);border-radius:12px;padding:14px;margin-bottom:12px">';
+    h += '<div style="font-size:12px;color:#7a9a8a;line-height:1.6">' + esc(d.message || 'لبدء التداول، افتح البوت') + '</div></div>';
+    if(d.bot_url){
+      h += '<a href="' + esc(d.bot_url) + '" target="_blank" style="display:block;text-align:center;padding:14px;border-radius:12px;background:linear-gradient(135deg,rgba(0,231,1,.2),rgba(0,231,1,.08));border:1px solid rgba(0,231,1,.3);color:#00e701;font-weight:800;text-decoration:none;margin-bottom:8px">🤖 افتح البوت للبدء</a>';
+    }
+    h += modalCloseBtn();
+    mb.innerHTML = h;
+  }).catch(function(){
+    mb.innerHTML = '<div style="text-align:center;padding:30px;color:#ff4757">فشل التحميل' + modalCloseBtn() + '</div>';
+  });
+}
+
+// ── 🆘 الدعم (Support) ──
+function openSupport(){
+  var mb = openModal('الدعم', '🆘');
+  fetch(BASE + '/api/support/public').then(function(r){return r.json()}).then(function(d){
+    var h = '<div style="font-size:18px;font-weight:900;color:#e8eaed;margin-bottom:4px;text-align:center">🆘 الدعم</div>';
+    h += '<div style="font-size:11px;color:#7a9a8a;text-align:center;margin-bottom:16px">نحن هنا لمساعدتك</div>';
+    h += '<div style="background:rgba(0,231,1,.05);border:1px solid rgba(0,231,1,.15);border-radius:12px;padding:14px;margin-bottom:12px">';
+    h += '<div style="font-size:13px;color:#e8eaed;line-height:1.6">' + esc(d.support_text || 'تواصل معنا عبر تيليغرام') + '</div></div>';
+    if(d.support_url){
+      h += '<a href="' + esc(d.support_url) + '" target="_blank" style="display:block;text-align:center;padding:14px;border-radius:12px;background:linear-gradient(135deg,rgba(0,231,1,.2),rgba(0,231,1,.08));border:1px solid rgba(0,231,1,.3);color:#00e701;font-weight:800;text-decoration:none;margin-bottom:8px">💬 تواصل مع الدعم</a>';
+    }
+    h += modalCloseBtn();
+    mb.innerHTML = h;
+  }).catch(function(){
+    mb.innerHTML = '<div style="text-align:center;padding:30px;color:#ff4757">فشل التحميل' + modalCloseBtn() + '</div>';
+  });
 }
 
 // ── Compensation modal ──

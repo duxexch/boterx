@@ -2750,6 +2750,67 @@ def api_apps_public():
             clean.append(row)
     return jsonify({'apps': clean})
 
+# ===== Public endpoints for user home page =====
+
+@app.route('/api/referrals/public')
+def api_referrals_public():
+    """Public referral links for user home page."""
+    links = read_csv('referral_links.csv')
+    clean = []
+    for l in links:
+        if str(l.get('is_active', '')).lower() in ('yes', 'true', '1', 'active', ''):
+            clean.append({'name': l.get('name', ''), 'url': l.get('url', '')})
+    return jsonify({'links': clean})
+
+@app.route('/api/channels/public')
+def api_channels_public():
+    """Public active channels for user home page."""
+    chans = read_csv('channels.csv')
+    clean = []
+    for c in chans:
+        if str(c.get('is_active', '')).lower() in ('yes', 'true', '1', 'active', ''):
+            clean.append({
+                'title': c.get('title', c.get('name', '')),
+                'chat_id': c.get('chat_id', ''),
+                'username': c.get('username', ''),
+                'description': c.get('description', ''),
+            })
+    return jsonify({'channels': clean})
+
+@app.route('/api/trading/public')
+def api_trading_public():
+    """Public trading info — just shows it's available + link to bot."""
+    settings = read_csv('system_settings.csv')
+    usdt_rate = ''
+    for s in settings:
+        if s.get('key') == 'usdt_rate':
+            usdt_rate = s.get('value', '')
+            break
+    return jsonify({
+        'available': True,
+        'usdt_rate': usdt_rate,
+        'bot_url': 'https://t.me/' + (BOT_TOKEN.split(':')[0] if BOT_TOKEN else ''),
+        'message': 'لبدء التداول، افتح البوت واختر 💱 تداول USDT'
+    })
+
+@app.route('/api/support/public')
+def api_support_public():
+    """Public support settings for user home page."""
+    settings = read_csv('system_settings.csv')
+    support_text = ''
+    support_url = ''
+    for s in settings:
+        if s.get('key') == 'support_text':
+            support_text = s.get('value', '')
+        if s.get('key') == 'support_url':
+            support_url = s.get('value', '')
+    if not support_url:
+        support_url = 'https://t.me/' + (BOT_TOKEN.split(':')[0] if BOT_TOKEN else '')
+    return jsonify({
+        'support_text': support_text or 'للحصول على دعم سريع، تواصل معنا عبر تيليغرام',
+        'support_url': support_url
+    })
+
 @app.route('/api/apps', methods=['POST'])
 @api_auth
 @permission_required('manage_companies')
