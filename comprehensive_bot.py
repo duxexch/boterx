@@ -4041,6 +4041,10 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                 writer.writeheader()
                 for row in rows:
                     writer.writerow({k: row.get(k, '') for k in fieldnames})
+            
+            # ── تحديث الكاش فوراً ──
+            self._refresh_user_in_cache(new_telegram_id)
+            
             return True
         except Exception as e:
             logger.error(f"خطأ في ربط تليجرام بالمستخدم: {e}")
@@ -4831,6 +4835,9 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                     writer.writerow([str(user_id), name, pre_phone, customer_id, final_lang,
                                    datetime.now().strftime('%Y-%m-%d'), 'no', '', detected_currency])
 
+                # ── تحديث الكاش فوراً — بدون هذا، find_user بترجع None والمستخدم بيدور في حلقة تسجيل ──
+                self._refresh_user_in_cache(user_id)
+
                 # معالجة كود الإحالة
                 if self.svrp and hasattr(self, '_pending_referral'):
                     ref_code = self._pending_referral.pop(user_id, None)
@@ -4937,6 +4944,9 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                 writer.writerow([user_id, name, phone, customer_id, detected_lang,
                                datetime.now().strftime('%Y-%m-%d'), 'no', '', detected_currency,
                                phone_verified, '0'])
+            
+            # ── تحديث الكاش فوراً — بدون هذا، find_user بترجع None والمستخدم بيدور في حلقة تسجيل ──
+            self._refresh_user_in_cache(user_id)
             
             lang_names = self.get_language_names()
             lang_display = lang_names.get(detected_lang, {}).get('native', detected_lang)
