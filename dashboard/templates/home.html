@@ -138,7 +138,7 @@ body{background:var(--bg);color:var(--text);margin:0;min-height:100dvh;overflow-
   <!-- Services -->
   <div class="section-head"><span class="section-title">⚡ الخدمات</span></div>
   <div class="services-grid">
-    <div class="svc-card" onclick="showToast('قريباً')"><div class="svc-icon">💎</div><div class="svc-name">تعويض 100%</div></div>
+    <div class="svc-card" onclick="openCompensation()"><div class="svc-icon">💎</div><div class="svc-name">تعويض 100%</div></div>
     <div class="svc-card" onclick="showToast('قريباً')"><div class="svc-icon">🎁</div><div class="svc-name">اربح</div></div>
     <div class="svc-card" onclick="showToast('قريباً')"><div class="svc-icon">📢</div><div class="svc-name">القنوات</div></div>
     <div class="svc-card" onclick="openApps()"><div class="svc-icon">📱</div><div class="svc-name">التطبيقات</div></div>
@@ -476,6 +476,8 @@ if('serviceWorker' in navigator){navigator.serviceWorker.register('/static/sw.js
 
 // ── Apps modal ──
 function copyToClip(btn, text){
+// ── Copy helper ──
+function copyToClip(btn, text){
   try{
     navigator.clipboard.writeText(text).then(function(){
       var orig = btn.innerHTML;
@@ -483,16 +485,94 @@ function copyToClip(btn, text){
       btn.style.background = 'rgba(0,231,1,.2)';
       btn.style.borderColor = 'rgba(0,231,1,.4)';
       showToast('تم النسخ','success');
-      setTimeout(function(){
-        btn.innerHTML = orig;
-        btn.style.background = '#1a2032';
-        btn.style.borderColor = '#2a3142';
-      },1500);
+      setTimeout(function(){ btn.innerHTML = orig; btn.style.background = '#1a2032'; btn.style.borderColor = '#2a3142'; },1500);
     });
-  }catch(e){
-    showToast('فشل النسخ','error');
-  }
+  }catch(e){ showToast('فشل النسخ','error'); }
 }
+
+// ── Compensation modal ──
+function openCompensation(){
+  var overlay = document.createElement('div');
+  overlay.id = 'modal';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(5,15,12,.92);backdrop-filter:blur(12px);z-index:100;display:flex;align-items:center;justify-content:center;padding:12px;overflow-y:auto';
+  overlay.innerHTML = '<div id="mb" style="background:linear-gradient(180deg,#0d1814,#0a1410);border:1px solid #1a3a28;border-radius:18px;padding:20px;max-width:420px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.5)"></div>';
+  overlay.onclick = function(e){ if(e.target === overlay) overlay.remove(); };
+  document.body.appendChild(overlay);
+  var mb = document.getElementById('mb');
+  mb.innerHTML = '<div style="text-align:center;padding:30px;color:#7a9a8a">⏳ جارٍ التحميل...</div>';
+
+  var authP = _getAuthParam ? _getAuthParam() : ('uid={{ uid }}');
+  fetch(BASE + '/api/player/wallet?' + authP).then(function(r){return r.json()}).then(function(d){
+    if(d.error){
+      mb.innerHTML = '<div style="text-align:center;padding:30px;color:#ff4757">' + d.error + '<button onclick="document.getElementById(\'modal\').remove()" style="margin-top:12px;width:100%;padding:10px;border-radius:10px;border:1px solid #1a3a28;background:transparent;color:#7a9a8a;cursor:pointer">إغلاق</button></div>';
+      return;
+    }
+
+    var frozen = d.svrp_credits || 0;
+    var pending = d.pending_balance || 0;
+    var earned = d.total_earned || 0;
+    var used = d.total_used || 0;
+    var wagerDone = d.wagering_done || false;
+    var wagerRem = d.wager_remaining || 0;
+    var credits = d.credit_sources || [];
+
+    var h = '<div style="font-size:18px;font-weight:900;color:#e8eaed;margin-bottom:4px;text-align:center">💎 تعويض 100%</div>';
+    h += '<div style="font-size:11px;color:#7a9a8a;text-align:center;margin-bottom:16px">نظام الاسترداد الذكي</div>';
+
+    // Balance cards
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">';
+    h += '<div style="background:linear-gradient(135deg,#0f1c18,#0b1410);border:1px solid #1a3a28;border-radius:12px;padding:12px;text-align:center"><div style="font-size:22px">🧊</div><div style="font-size:18px;font-weight:800;color:#06b6d4;margin-top:4px">' + frozen.toFixed(2) + '</div><div style="font-size:10px;color:#7a9a8a">مجمد</div></div>';
+    h += '<div style="background:linear-gradient(135deg,#0f1c18,#0b1410);border:1px solid #1a3a28;border-radius:12px;padding:12px;text-align:center"><div style="font-size:22px">⏳</div><div style="font-size:18px;font-weight:800;color:#fbbf24;margin-top:4px">' + pending.toFixed(2) + '</div><div style="font-size:10px;color:#7a9a8a">معلق للأصدقاء</div></div>';
+    h += '<div style="background:linear-gradient(135deg,#0f1c18,#0b1410);border:1px solid #1a3a28;border-radius:12px;padding:12px;text-align:center"><div style="font-size:22px">📈</div><div style="font-size:18px;font-weight:800;color:#00e701;margin-top:4px">' + earned.toFixed(2) + '</div><div style="font-size:10px;color:#7a9a8a">إجمالي مكتسب</div></div>';
+    h += '<div style="background:linear-gradient(135deg,#0f1c18,#0b1410);border:1px solid #1a3a28;border-radius:12px;padding:12px;text-align:center"><div style="font-size:22px">📉</div><div style="font-size:18px;font-weight:800;color:#ff4757;margin-top:4px">' + used.toFixed(2) + '</div><div style="font-size:10px;color:#7a9a8a">إجمالي مستخدم</div></div>';
+    h += '</div>';
+
+    // Wagering progress
+    if(wagerRem > 0){
+      h += '<div style="background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.2);border-radius:12px;padding:12px;margin-bottom:12px">';
+      h += '<div style="font-size:12px;color:#fbbf24;font-weight:700;margin-bottom:4px">⚠️ متطلبات الرهان</div>';
+      h += '<div style="font-size:11px;color:#7a9a8a">تبقى ' + wagerRem + ' معاملة لإكمال الرهان وفك التجميد</div>';
+      h += '</div>';
+    } else if(wagerDone && frozen > 0){
+      h += '<div style="background:rgba(0,231,1,.08);border:1px solid rgba(0,231,1,.2);border-radius:12px;padding:12px;margin-bottom:12px">';
+      h += '<div style="font-size:12px;color:#00e701;font-weight:700">✅ اكتمل الرهان! يمكنك نقل رصيدك للعبة</div>';
+      h += '</div>';
+    }
+
+    // Credit sources
+    if(credits.length > 0){
+      h += '<div style="font-size:13px;font-weight:700;color:#e8eaed;margin-bottom:8px">📋 مصادر الأرصدة</div>';
+      credits.forEach(function(c){
+        var stCol = c.ready ? '#00e701' : '#fbbf24';
+        var stIcon = c.ready ? '🟢' : '🟡';
+        h += '<div style="display:flex;align-items:center;gap:8px;padding:10px;background:linear-gradient(135deg,#0f1c18,#0b1410);border:1px solid #1a3a28;border-radius:10px;margin-bottom:6px">';
+        h += '<span style="font-size:14px">' + stIcon + '</span>';
+        h += '<div style="flex:1"><div style="font-size:12px;font-weight:600;color:#e8eaed">' + esc(c.label) + '</div>';
+        h += '<div style="font-size:10px;color:#7a9a8a">' + esc(c.status) + '</div></div>';
+        h += '<div style="font-size:14px;font-weight:800;color:' + stCol + '">' + c.amount.toFixed(2) + '</div>';
+        h += '</div>';
+      });
+    }
+
+    // How it works
+    h += '<div style="background:rgba(0,231,1,.05);border:1px solid rgba(0,231,1,.15);border-radius:12px;padding:14px;margin-top:12px">';
+    h += '<div style="font-size:13px;font-weight:700;color:#00e701;margin-bottom:8px">📌 كيف يعمل النظام؟</div>';
+    h += '<div style="font-size:11px;color:#7a9a8a;line-height:1.6">';
+    h += '1️⃣ أودع في حسابك بالشركة<br>';
+    h += '2️⃣ اضغط 🔄 استرداد ← أرسل لقطة شاشة برصيدك<br>';
+    h += '3️⃣ يراجع الأدمن ← يُضاف 100% لمحفظتك (مجمد 🧊)<br>';
+    h += '4️⃣ لفك التجميد: أرسل الرصيد لـ 4 أصدقاء<br>';
+    h += '5️⃣ الرصيد المتاح 🟢 ← اطلب إيداعه<br>';
+    h += '</div></div>';
+
+    h += '<button onclick="document.getElementById(\'modal\').remove()" style="width:100%;padding:12px;border-radius:12px;border:1px solid #1a3a28;background:linear-gradient(135deg,rgba(0,231,1,.15),rgba(0,231,1,.05));color:#00e701;font-weight:700;cursor:pointer;margin-top:12px">إغلاق</button>';
+
+    mb.innerHTML = h;
+  }).catch(function(){
+    mb.innerHTML = '<div style="text-align:center;padding:30px;color:#ff4757">فشل تحميل البيانات<button onclick="document.getElementById(\'modal\').remove()" style="margin-top:12px;width:100%;padding:10px;border-radius:10px;border:1px solid #1a3a28;background:transparent;color:#7a9a8a;cursor:pointer">إغلاق</button></div>';
+  });
+}
+
 function openApps(){
   var overlay = document.createElement('div');
   overlay.id = 'modal';
