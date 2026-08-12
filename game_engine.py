@@ -766,7 +766,7 @@ class GameManager:
 
         # 2. كتابة معاملة حقيقية في transactions.csv
         user_info = self.get_user_info(user_id)
-        trans_id = f"DEP{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        trans_id = f"DEP{datetime.now().strftime('%Y%m%d%H%M%S')}{random.randint(100,999)}"
         currency = user_info.get('currency', 'SAR')
         customer_id = user_info.get('customer_id', '')
         user_name = user_info.get('name', '')

@@ -93,7 +93,7 @@
                             <p>لا توجد معاملات</p>
                         </td></tr>
                     </template>
-                    <template x-for="t in transactions" :key="t.id">
+                    <template x-for="(t, idx) in transactions" :key="t.id + '_' + idx">
                         <tr class="hover:bg-slate-700/50">
                             <td><input type="checkbox" :value="t.id" x-model="selectedIds" class="rounded"></td>
                             <td class="font-mono text-xs cursor-pointer text-blue-400 hover:underline" @click="openDetail(t)" x-text="t.id"></td>

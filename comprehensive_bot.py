@@ -5089,7 +5089,7 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                     method_name_display = self.tr('a0143_الوسيلة', lang, name=name, mtype=mtype)
 
             # إنشاء معرف المعاملة
-            trans_id = f"DEP{datetime.now().strftime('%Y%m%d%H%M%S')}"
+            trans_id = f"DEP{datetime.now().strftime('%Y%m%d%H%M%S')}{random.randint(100,999)}"
             
             # حفظ المعاملة مع جميع البيانات بما في ذلك العملة
             with open('transactions.csv', 'a', newline='', encoding='utf-8-sig') as f:
@@ -9539,7 +9539,7 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             data_parts.append(f"{item.get('label', '')}: {item.get('value', '')}")
 
         combined_data = ' | '.join(data_parts)
-        trans_id = f"{'DEP' if flow_type == 'deposit' else 'WTH'}{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        trans_id = f"{'DEP' if flow_type == 'deposit' else 'WTH'}{datetime.now().strftime('%Y%m%d%H%M%S')}{random.randint(100,999)}"
 
         with open('transactions.csv', 'a', newline='', encoding='utf-8-sig') as f:
             writer = csv.writer(f)
