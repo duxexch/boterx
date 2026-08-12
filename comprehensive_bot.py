@@ -8394,42 +8394,16 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             user_id = message['from']['id']
             currency = user.get('currency', 'SAR')
 
-            # قراءة رصيد محفظة الألعاب
+            # قراءة رصيد محفظة الألعاب — من game_balance في users.csv (فوري، بدون GameManager)
             wallet_balance = 0.0
             try:
-                from game_engine import GameManager
-                gm = GameManager()
-                wallet_balance = gm.get_balance(user_id)
-            except Exception as e:
-                logger.error(f"games_hub balance error: {e}")
-                if self.svrp:
-                    try:
-                        for w in self.svrp.get_all_wallets():
-                            if str(w.get('telegram_id', '')) == str(user_id):
-                                wallet_balance = float(w.get('balance', 0) or 0)
-                                break
-                    except:
-                        pass
-
-            # قراءة شريحة اللاعب
-            player_segment = 'جديد'
-            is_vex_partner = False
-            try:
-                from player_tracker import PlayerTracker
-                pt = PlayerTracker()
-                profile = pt.get_profile(user_id)
-                segment = pt.get_segment(profile)
-                seg_labels = {
-                    'new': '🟢 جديد', 'winner': '🔴 رابح', 'loser': '🟡 خاسر',
-                    'hot': '🔥 ساخن', 'churning': '⚠️ قد يغادر',
-                    'vip': '💎 VIP', 'regular': '👤 عادي'
-                }
-                player_segment = seg_labels.get(segment, '👤 عادي')
-                is_vex_partner = profile.get('is_vex_partner') == 'yes'
-                if 'currency' not in profile or profile.get('currency') != currency:
-                    pt._save_profile({**profile, 'currency': currency})
+                wallet_balance = float(user.get('game_balance', 0) or 0)
             except:
                 pass
+
+            # شريحة اللاعب — مبسطة (بدون PlayerTracker)
+            player_segment = '🟢 جديد'
+            is_vex_partner = False
 
             text = self.ui_card_pro('مركز الألعاب', '🎮', items=[
                 {'label': 'رصيدك', 'value': f"{wallet_balance:.0f} {currency}", 'icon': '💰', 'highlight': True},
@@ -8437,31 +8411,23 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             ])
             text += "\n⚡ كل لعبة مرتبطة بمحفظتك\n"
             text += f"💰 عملتك: {currency}\n"
-            if is_vex_partner:
-                text += "💎 تعويض متاح أثناء اللعب!\n"
 
             base_url = self.get_setting('dashboard_url') or 'https://vex.deals'
 
-            # Generate encrypted session for this user (no uid in URL — ALWAYS encrypted)
-            import urllib.request, urllib.parse, json as _json
+            # Generate encrypted session — single fast attempt (no retries, no sleep)
             encrypted_session = ''
-            for _retry in range(3):
-                try:
-                    sess_data = json.dumps({"uid": str(user_id)}).encode('utf-8')
-                    sess_req = urllib.request.Request(
-                        f"{base_url}/api/auth/create-token?uid={user_id}",
-                        data=sess_data,
-                        headers={'Content-Type': 'application/json'},
-                        method='POST'
-                    )
-                    sess_resp = urllib.request.urlopen(sess_req, timeout=8)
-                    sess_result = _json.loads(sess_resp.read().decode())
-                    encrypted_session = sess_result.get('s', '')
-                    if encrypted_session:
-                        break
-                except Exception as e:
-                    logger.error(f"Session generation attempt {_retry+1} failed: {e}")
-                    import time as _t; _t.sleep(1)
+            try:
+                import urllib.request, json as _json
+                sess_req = urllib.request.Request(
+                    f"{base_url}/api/auth/create-token?uid={user_id}",
+                    data=json.dumps({"uid": str(user_id)}).encode('utf-8'),
+                    headers={'Content-Type': 'application/json'},
+                    method='POST'
+                )
+                sess_resp = urllib.request.urlopen(sess_req, timeout=3)
+                encrypted_session = _json.loads(sess_resp.read().decode()).get('s', '')
+            except Exception as e:
+                logger.error(f"Session generation failed: {e}")
 
             if encrypted_session:
                 games_url = f"{base_url}/webapp/games?s={encrypted_session}&lang={lang}&currency={currency}"
