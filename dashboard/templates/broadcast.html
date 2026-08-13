@@ -1,169 +1,181 @@
 {% extends 'base.html' %}
 {% block title %}بث رسالة — VEX{% endblock %}
-{% block page_title %}📢 بث رسالة{% endblock %}
+{% block page_title %}📢 مركز البث{% endblock %}
 
 {% block content %}
-<div x-data="broadcastApp()" class="space-y-4 max-w-3xl">
-    <!-- Broadcast Form -->
-    <div class="bg-slate-800 rounded-xl border border-slate-700 p-6">
-        <h3 class="font-semibold mb-4">📢 إرسال بث</h3>
-        <div class="space-y-4">
-            <!-- Recipient Type -->
+<div x-data="broadcastApp()" class="max-w-3xl mx-auto space-y-5">
+
+    <!-- ── COMPOSER CARD ── -->
+    <div class="bg-slate-800/80 rounded-2xl border border-slate-700 overflow-hidden shadow-xl">
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-slate-800 to-slate-800/50 px-5 py-4 border-b border-slate-700 flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-green-700 flex items-center justify-center text-lg shadow-lg">
+                <i class="fas fa-satellite-dish text-white"></i>
+            </div>
             <div>
-                <label class="block text-sm text-slate-400 mb-2">👥 المستلمون</label>
-                <div class="grid grid-cols-2 gap-2">
-                    <button @click="recipient='all'" :class="recipient==='all' ? 'bg-blue-600 text-white border-blue-500' : 'bg-slate-700 text-slate-400 border-slate-600'" class="px-4 py-3 rounded-lg border-2 text-sm font-bold transition">
-                        <i class="fas fa-bullhorn block mb-1"></i> جماعي (الكل)
+                <h3 class="font-bold text-slate-100">مركز البث الاحترافي</h3>
+                <p class="text-xs text-slate-400">إرسال رسائل فورية لكل المستخدمين أو لمستخدم محدد</p>
+            </div>
+        </div>
+
+        <div class="p-5 space-y-5">
+
+            <!-- ── SECTION: Audience ── -->
+            <div class="space-y-3">
+                <div class="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-wider">
+                    <span class="w-1 h-4 bg-green-500 rounded-full"></span> الجمهور
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <button @click="recipient='all'; countryFilter='all'"
+                        :class="recipient==='all' ? 'border-green-500 bg-green-500/10 text-green-400' : 'border-slate-600 bg-slate-700/50 text-slate-400 hover:border-slate-500'"
+                        class="rounded-xl border-2 px-4 py-3.5 text-sm font-bold transition flex items-center gap-3">
+                        <i class="fas fa-users text-xl"></i>
+                        <div class="text-right"><div>جماعي</div><div class="text-[10px] opacity-70 font-normal">كل المستخدمين</div></div>
                     </button>
-                    <button @click="recipient='single'" :class="recipient==='single' ? 'bg-amber-600 text-white border-amber-500' : 'bg-slate-700 text-slate-400 border-slate-600'" class="px-4 py-3 rounded-lg border-2 text-sm font-bold transition">
-                        <i class="fas fa-user block mb-1"></i> فردي
+                    <button @click="recipient='single'"
+                        :class="recipient==='single' ? 'border-amber-500 bg-amber-500/10 text-amber-400' : 'border-slate-600 bg-slate-700/50 text-slate-400 hover:border-slate-500'"
+                        class="rounded-xl border-2 px-4 py-3.5 text-sm font-bold transition flex items-center gap-3">
+                        <i class="fas fa-user-tag text-xl"></i>
+                        <div class="text-right"><div>فردي</div><div class="text-[10px] opacity-70 font-normal">مستخدم محدد</div></div>
                     </button>
                 </div>
-            </div>
 
-            <!-- Single User Search (only if recipient=single) -->
-            <div x-show="recipient==='single'" x-transition>
-                <label class="block text-sm text-slate-400 mb-2">🔍 ابحث عن مستخدم</label>
-                <div class="relative">
-                    <input type="text" x-model="searchQuery" @input.debounce.300ms="searchUsers()" class="input w-full" placeholder="اسم أو رقم عميل أو telegram_id...">
-                    <div x-show="searchResults.length > 0" class="absolute z-10 mt-1 w-full bg-slate-700 border border-slate-600 rounded-lg max-h-48 overflow-y-auto shadow-xl">
-                        <template x-for="u in searchResults" :key="u.telegram_id">
-                            <div @click="selectUser(u)" class="p-3 hover:bg-slate-600 cursor-pointer border-b border-slate-600/50">
-                                <div class="text-sm font-bold text-slate-200" x-text="u.name"></div>
-                                <div class="text-xs text-slate-400" x-text="u.customer_id + ' • ' + u.currency"></div>
-                            </div>
-                        </template>
+                <!-- Single user search -->
+                <div x-show="recipient==='single'" x-collapse class="space-y-2">
+                    <div class="relative">
+                        <input type="text" x-model="searchQuery" @input.debounce.300ms="searchUsers()"
+                               class="input w-full pl-10" placeholder="ابحث بالاسم، رقم العميل، أو Telegram ID...">
+                        <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"></i>
+                        <div x-show="searchResults.length > 0" x-cloak
+                             class="absolute z-20 mt-1 w-full bg-slate-700 border border-slate-600 rounded-xl max-h-52 overflow-y-auto shadow-2xl">
+                            <template x-for="u in searchResults" :key="u.telegram_id">
+                                <div @click="selectUser(u)" class="p-3 hover:bg-slate-600 cursor-pointer border-b border-slate-600/50 flex items-center gap-3">
+                                    <div class="w-8 h-8 rounded-full bg-slate-600 flex items-center justify-center text-sm font-bold" x-text="u.name?.charAt(0)"></div>
+                                    <div><div class="text-sm font-bold text-slate-200" x-text="u.name"></div><div class="text-xs text-slate-400" x-text="u.customer_id + ' • ' + (u.currency||'')"></div></div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                    <div x-show="selectedUser" x-cloak class="p-3 bg-green-500/10 border border-green-500/20 rounded-xl flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <div class="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center text-green-400 text-sm font-bold" x-text="selectedUser?.name?.charAt(0)"></div>
+                            <div><span class="text-sm font-bold text-green-400" x-text="selectedUser?.name"></span><span class="text-xs text-slate-400 ml-2" x-text="selectedUser?.customer_id"></span></div>
+                        </div>
+                        <button @click="selectedUser=null" class="text-red-400 hover:text-red-300"><i class="fas fa-times-circle"></i></button>
                     </div>
                 </div>
-                <div x-show="selectedUser" class="mt-2 p-3 bg-green-600/10 border border-green-600/20 rounded-lg flex items-center justify-between">
-                    <div>
-                                        <span class="text-sm font-bold text-green-400">✅ تم تحديد: </span>
-                        <span class="text-sm text-slate-200" x-text="selectedUser?.name"></span>
-                        <span class="text-xs text-slate-400 ml-2" x-text="selectedUser?.customer_id"></span>
-                    </div>
-                    <button @click="selectedUser=null" class="text-red-400 hover:text-red-300"><i class="fas fa-times"></i></button>
-                </div>
-            </div>
 
-            <!-- Country Filter -->
-            <div x-show="recipient==='all'" x-transition>
-                <label class="block text-sm text-slate-400 mb-2">🌍 الدول</label>
-                <div class="grid grid-cols-2 gap-2">
-                    <button @click="countryFilter='all'" :class="countryFilter==='all' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-400'" class="px-3 py-2 rounded-lg text-sm font-bold transition">🌍 كل الدول</button>
-                    <select x-model="countryFilter" x-show="countryFilter!=='all'" class="input text-sm flex-1">
+                <!-- Country filter -->
+                <div x-show="recipient==='all'" x-collapse>
+                    <select x-model="countryFilter" class="input text-sm">
                         <option value="all">🌍 كل الدول</option>
-                        <option value="EG">🇪🇬 مصر</option>
-                        <option value="SA">🇸🇦 السعودية</option>
-                        <option value="AE">🇦🇪 الإمارات</option>
-                        <option value="JO">🇯🇴 الأردن</option>
-                        <option value="MA">🇲🇦 المغرب</option>
-                        <option value="DZ">🇩🇿 الجزائر</option>
-                        <option value="TN">🇹🇳 تونس</option>
-                        <option value="IQ">🇮🇶 العراق</option>
-                        <option value="LY">🇱🇾 ليبيا</option>
-                        <option value="SD">🇸🇩 السودان</option>
-                        <option value="YE">🇾🇪 اليمن</option>
-                        <option value="PS">🇵🇸 فلسطين</option>
-                        <option value="KW">🇰🇼 الكويت</option>
-                        <option value="QA">🇶🇦 قطر</option>
-                        <option value="BH">🇧🇭 البحرين</option>
-                        <option value="OM">🇴🇲 عمان</option>
-                        <option value="LB">🇱🇧 لبنان</option>
-                        <option value="SY">🇸🇾 سوريا</option>
+                        <option value="EG">🇪🇬 مصر</option><option value="SA">🇸🇦 السعودية</option><option value="AE">🇦🇪 الإمارات</option>
+                        <option value="JO">🇯🇴 الأردن</option><option value="MA">🇲🇦 المغرب</option><option value="DZ">🇩🇿 الجزائر</option>
+                        <option value="TN">🇹🇳 تونس</option><option value="IQ">🇮🇶 العراق</option><option value="LY">🇱🇾 ليبيا</option>
+                        <option value="SD">🇸🇩 السودان</option><option value="YE">🇾🇪 اليمن</option><option value="PS">🇵🇸 فلسطين</option>
+                        <option value="KW">🇰🇼 الكويت</option><option value="QA">🇶🇦 قطر</option><option value="BH">🇧🇭 البحرين</option>
+                        <option value="OM">🇴🇲 عمان</option><option value="LB">🇱🇧 لبنان</option><option value="SY">🇸🇾 سوريا</option>
                     </select>
                 </div>
-                <button x-show="countryFilter==='all'" @click="countryFilter='EG'" class="mt-2 text-xs text-blue-400 hover:text-blue-300">← أو اختر دولة معينة</button>
             </div>
 
-            <!-- Target Channel -->
-            <div>
-                <label class="block text-sm text-slate-400 mb-2">🎯 وجهة الإرسال</label>
-                <div class="grid grid-cols-3 gap-2">
-                    <button @click="target='telegram'" :class="target==='telegram' ? 'bg-blue-600 text-white border-blue-500' : 'bg-slate-700 text-slate-400 border-slate-600'" class="px-3 py-2 rounded-lg border-2 text-sm font-bold transition">
-                        <i class="fab fa-telegram block text-lg mb-1"></i> تيليغرام
+            <!-- ── SECTION: Channel ── -->
+            <div class="space-y-3">
+                <div class="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-wider">
+                    <span class="w-1 h-4 bg-blue-500 rounded-full"></span> القناة
+                </div>
+                <div class="grid grid-cols-3 gap-3">
+                    <button @click="target='telegram'" :class="target==='telegram' ? 'border-blue-500 bg-blue-500/10 text-blue-400' : 'border-slate-600 bg-slate-700/50 text-slate-400 hover:border-slate-500'" class="rounded-xl border-2 py-3 px-2 text-xs font-bold transition flex flex-col items-center gap-1">
+                        <i class="fab fa-telegram text-xl"></i> تيليغرام
                     </button>
-                    <button @click="target='web'" :class="target==='web' ? 'bg-green-600 text-white border-green-500' : 'bg-slate-700 text-slate-400 border-slate-600'" class="px-3 py-2 rounded-lg border-2 text-sm font-bold transition">
-                        <i class="fas fa-globe block text-lg mb-1"></i> الموقع
+                    <button @click="target='web'" :class="target==='web' ? 'border-green-500 bg-green-500/10 text-green-400' : 'border-slate-600 bg-slate-700/50 text-slate-400 hover:border-slate-500'" class="rounded-xl border-2 py-3 px-2 text-xs font-bold transition flex flex-col items-center gap-1">
+                        <i class="fas fa-globe text-xl"></i> الموقع
                     </button>
-                    <button @click="target='both'" :class="target==='both' ? 'bg-amber-600 text-white border-amber-500' : 'bg-slate-700 text-slate-400 border-slate-600'" class="px-3 py-2 rounded-lg border-2 text-sm font-bold transition">
-                        <i class="fas fa-bullhorn block text-lg mb-1"></i> الاثنين
+                    <button @click="target='both'" :class="target==='both' ? 'border-amber-500 bg-amber-500/10 text-amber-400' : 'border-slate-600 bg-slate-700/50 text-slate-400 hover:border-slate-500'" class="rounded-xl border-2 py-3 px-2 text-xs font-bold transition flex flex-col items-center gap-1">
+                        <i class="fas fa-bullhorn text-xl"></i> الاثنين
                     </button>
                 </div>
             </div>
 
-            <!-- Message Text -->
-            <div>
-                <label class="block text-sm text-slate-400 mb-2">💬 نص الرسالة</label>
-                <textarea x-model="message" rows="4" class="input w-full" placeholder="اكتب رسالتك هنا... (يدعم HTML للتيليغرام)"></textarea>
-                <p class="text-xs text-slate-500 mt-1">💡 للتيليغرام: <code>&lt;b&gt;غامق&lt;/b&gt;</code> <code>&lt;code&gt;كود&lt;/code&gt;</code></p>
-            </div>
-
-            <!-- Media Attachments (Multiple) -->
-            <div>
-                <label class="block text-sm text-slate-400 mb-2">📎 المرفقات (متعدد)</label>
-                <div class="flex flex-wrap gap-2 mb-2">
-                    <template x-for="(media, idx) in mediaList" :key="idx">
-                        <div class="relative w-20 h-20 rounded-lg overflow-hidden bg-slate-700 border border-slate-600 group">
-                            <img x-show="media.type.startsWith('image')" :src="media.url" class="w-full h-full object-cover">
-                            <video x-show="media.type.startsWith('video')" :src="media.url" class="w-full h-full object-cover" muted></video>
-                            <i x-show="!media.type.startsWith('image') && !media.type.startsWith('video')" class="fas fa-file text-2xl text-slate-400 w-full h-full flex items-center justify-center"></i>
-                            <button @click="mediaList.splice(idx, 1)" class="absolute top-0 right-0 bg-red-600 text-white w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition"><i class="fas fa-times"></i></button>
-                        </div>
-                    </template>
-                    <label class="w-20 h-20 rounded-lg border-2 border-dashed border-slate-500 flex items-center justify-center cursor-pointer hover:border-green-500 hover:bg-slate-700 transition">
-                        <i class="fas fa-plus text-xl text-slate-400"></i>
-                        <input type="file" class="hidden" accept="image/*,video/*" @change="uploadMedia($event)" :disabled="uploading">
-                    </label>
+            <!-- ── SECTION: Content ── -->
+            <div class="space-y-3">
+                <div class="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-wider">
+                    <span class="w-1 h-4 bg-amber-500 rounded-full"></span> المحتوى
                 </div>
-                <p class="text-xs text-slate-500" x-show="uploading">⏳ جارٍ الرفع...</p>
-            </div>
-
-            <!-- Priority -->
-            <div>
-                <label class="block text-sm text-slate-400 mb-2">⚡ الأولوية</label>
-                <div class="grid grid-cols-3 gap-2">
-                    <button @click="priority='normal'" :class="priority==='normal' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-400'" class="px-3 py-2 rounded-lg text-xs font-bold transition">🔔 عادية</button>
-                    <button @click="priority='high'" :class="priority==='high' ? 'bg-amber-600 text-white' : 'bg-slate-700 text-slate-400'" class="px-3 py-2 rounded-lg text-xs font-bold transition">⚡ عالية</button>
-                    <button @click="priority='urgent'" :class="priority==='urgent' ? 'bg-red-600 text-white' : 'bg-slate-700 text-slate-400'" class="px-3 py-2 rounded-lg text-xs font-bold transition">🚨 عاجلة</button>
+                <textarea x-model="message" rows="4" class="input w-full text-sm" placeholder="✍️ اكتب رسالتك هنا... (يدعم HTML للتيليغرام)"></textarea>
+                <!-- Media -->
+                <div>
+                    <label class="block text-xs text-slate-400 mb-2">📎 المرفقات</label>
+                    <div class="flex flex-wrap gap-2.5">
+                        <template x-for="(media, idx) in mediaList" :key="idx">
+                            <div class="relative w-20 h-20 rounded-xl overflow-hidden bg-slate-700 border-2 border-slate-600 group shadow-md">
+                                <img x-show="media.type.startsWith('image')" :src="media.url" class="w-full h-full object-cover">
+                                <video x-show="media.type.startsWith('video')" :src="media.url" class="w-full h-full object-cover" muted></video>
+                                <div x-show="!media.type.startsWith('image') && !media.type.startsWith('video')" class="w-full h-full flex items-center justify-center"><i class="fas fa-file text-2xl text-slate-400"></i></div>
+                                <button @click="mediaList.splice(idx, 1)" class="absolute inset-0 bg-red-600/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition"><i class="fas fa-trash text-white"></i></button>
+                            </div>
+                        </template>
+                        <label class="w-20 h-20 rounded-xl border-2 border-dashed border-slate-500 flex items-center justify-center cursor-pointer hover:border-green-500 hover:bg-slate-700 transition" :class="uploading ? 'opacity-50 pointer-events-none' : ''">
+                            <i class="fas fa-plus text-xl text-slate-400"></i>
+                            <input type="file" class="hidden" accept="image/*,video/*" @change="uploadMedia($event)">
+                        </label>
+                    </div>
                 </div>
             </div>
 
-            <!-- Info -->
-            <div class="flex items-center gap-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
-                <i class="fas fa-info-circle text-amber-400"></i>
-                <p class="text-xs text-amber-300" x-text="getInfoText()"></p>
+            <!-- ── SECTION: Priority ── -->
+            <div class="space-y-3">
+                <div class="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-wider">
+                    <span class="w-1 h-4 bg-red-500 rounded-full"></span> الأولوية
+                </div>
+                <div class="grid grid-cols-3 gap-3">
+                    <button @click="priority='normal'" :class="priority==='normal' ? 'border-slate-400 bg-slate-700 text-slate-200' : 'border-slate-600 bg-slate-700/50 text-slate-400 hover:border-slate-500'" class="rounded-lg border-2 py-2 text-xs font-bold transition">🔔 عادية</button>
+                    <button @click="priority='high'" :class="priority==='high' ? 'border-amber-500 bg-amber-500/10 text-amber-400' : 'border-slate-600 bg-slate-700/50 text-slate-400 hover:border-slate-500'" class="rounded-lg border-2 py-2 text-xs font-bold transition">⚡ عالية</button>
+                    <button @click="priority='urgent'" :class="priority==='urgent' ? 'border-red-500 bg-red-500/10 text-red-400' : 'border-slate-600 bg-slate-700/50 text-slate-400 hover:border-slate-500'" class="rounded-lg border-2 py-2 text-xs font-bold transition">🚨 عاجلة</button>
+                </div>
             </div>
 
-            <!-- Send Button -->
-            <button @click="send()" :disabled="sending || (!message.trim() && mediaList.length === 0)" class="btn btn-primary w-full flex items-center justify-center gap-2">
-                <span x-show="!sending"><i class="fas fa-paper-plane"></i> إرسال</span>
-                <span x-show="sending"><i class="fas fa-spinner fa-spin"></i> جارٍ الإرسال...</span>
-            </button>
+            <!-- Summary + Send -->
+            <div class="bg-slate-900/60 rounded-xl p-3 flex items-center justify-between gap-3 border border-slate-700/50">
+                <div class="flex-1 min-w-0">
+                    <p class="text-xs text-slate-400" x-text="getSummary()"></p>
+                </div>
+                <button @click="send()" :disabled="sending || (!message.trim() && mediaList.length === 0)"
+                        class="flex-shrink-0 px-6 py-3 rounded-xl font-bold text-sm transition flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+                        :class="priority==='urgent' ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-green-600 hover:bg-green-700 text-white'">
+                    <span x-show="!sending"><i class="fas fa-paper-plane"></i> إرسال</span>
+                    <span x-show="sending"><i class="fas fa-spinner fa-spin"></i></span>
+                </button>
+            </div>
         </div>
     </div>
 
-    <!-- Recent Broadcasts -->
-    <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
-        <div class="flex items-center justify-between mb-3">
-            <h4 class="font-semibold text-sm">📋 آخر البثوث</h4>
-            <button @click="loadQueue()" class="text-xs text-blue-400 hover:text-blue-300"><i class="fas fa-sync"></i></button>
+    <!-- ── RECENT BROADCASTS ── -->
+    <div class="bg-slate-800/80 rounded-2xl border border-slate-700 overflow-hidden shadow-xl">
+        <div class="px-5 py-3 border-b border-slate-700 flex items-center justify-between">
+            <h4 class="font-bold text-sm text-slate-200">📋 آخر البثوث</h4>
+            <button @click="loadQueue()" class="text-xs text-slate-400 hover:text-slate-200 transition"><i class="fas fa-sync-alt"></i></button>
         </div>
-        <template x-if="loadingQueue">
-            <p class="text-center text-slate-400 py-4"><i class="fas fa-spinner fa-spin"></i></p>
-        </template>
-        <div class="space-y-2 max-h-64 overflow-y-auto">
+        <div class="max-h-72 overflow-y-auto p-3 space-y-2">
+            <template x-if="loadingQueue"><div class="text-center py-8 text-slate-400"><i class="fas fa-spinner fa-spin text-xl"></i></div></template>
             <template x-for="item in queue" :key="item.id">
-                <div class="bg-slate-700/50 rounded-lg p-3 flex items-center gap-3">
-                    <span :class="{'bg-green-500/20 text-green-400': item.status==='sent', 'bg-amber-500/20 text-amber-400': item.status==='pending', 'bg-red-500/20 text-red-400': item.status==='failed'}" class="px-2 py-1 rounded text-xs font-bold whitespace-nowrap" x-text="item.status==='sent' ? '✅' : item.status==='pending' ? '⏳' : '❌'"></span>
+                <div class="bg-slate-700/40 rounded-xl p-3 flex items-start gap-3 border border-slate-700/30">
+                    <div class="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-sm"
+                         :class="{'bg-green-500/20 text-green-400': item.status==='sent', 'bg-amber-500/20 text-amber-400': item.status==='pending', 'bg-red-500/20 text-red-400': item.status==='failed'}"
+                         x-text="item.status==='sent' ? '✅' : item.status==='pending' ? '⏳' : '❌'"></div>
                     <div class="flex-1 min-w-0">
-                        <p class="text-sm text-slate-200 truncate" x-text="item.message || '(وسائط)'"></p>
-                        <p class="text-xs text-slate-500" x-text="(item.recipient==='single' ? '👤 ' : '👥 ') + item.created_at"></p>
+                        <p class="text-sm text-slate-200 truncate" x-text="item.message || '(وسائط فقط)'"></p>
+                        <div class="flex items-center gap-2 mt-1 text-[10px] text-slate-500">
+                            <span x-text="(item.recipient==='single' ? '👤 فردي' : '👥 جماعي')"></span>
+                            <span>•</span>
+                            <span x-text="item.target === 'both' ? '📱🌐' : item.target === 'telegram' ? '📱' : '🌐'"></span>
+                            <span>•</span>
+                            <span x-text="item.created_at"></span>
+                        </div>
                     </div>
                 </div>
             </template>
-            <template x-if="!loadingQueue && queue.length === 0">
-                <p class="text-center text-slate-500 py-4 text-sm">لا يوجد بثوث سابقة</p>
-            </template>
+            <template x-if="!loadingQueue && queue.length === 0"><div class="text-center py-8 text-slate-500 text-sm">لا يوجد بثوث سابقة</div></template>
         </div>
     </div>
 </div>
@@ -180,16 +192,13 @@ function broadcastApp() {
 
         init() { this.loadQueue(); setInterval(() => this.loadQueue(), 20000); },
 
-        getInfoText() {
-            let t = '';
-            if (this.recipient === 'single') t = 'رسالة فردية — ';
-            else if (this.countryFilter !== 'all') t = 'بث لدولة محددة — ';
-            else t = 'بث جماعي — ';
-            if (this.target === 'telegram') t += 'عبر تيليغرام';
-            else if (this.target === 'web') t += 'عبر الموقع (إشعار فوري)';
-            else t += 'عبر تيليغرام والموقع';
-            if (this.priority === 'urgent') t += ' — عاجلة';
-            return t;
+        getSummary() {
+            let parts = [];
+            parts.push(this.recipient === 'single' ? '👤 فردي' : this.countryFilter !== 'all' ? '🌍 دولة محددة' : '👥 جماعي');
+            parts.push(this.target === 'telegram' ? '📱 تيليغرام' : this.target === 'web' ? '🌐 الموقع' : '📱🌐 الاثنين');
+            if (this.mediaList.length) parts.push('📎 ' + this.mediaList.length + ' مرفق');
+            if (this.priority !== 'normal') parts.push(this.priority === 'urgent' ? '🚨 عاجلة' : '⚡ عالية');
+            return parts.join(' • ');
         },
 
         async searchUsers() {
