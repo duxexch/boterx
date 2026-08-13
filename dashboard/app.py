@@ -58,12 +58,13 @@ ej5vx5VwKkk2dUrLlk99o8JtiJ4TGkDr5C8L0X+eMz75nJworbahwxlG
 _VAPID_PUBLIC = "jozycJLuqEqJLNOG8l2DniDbHwucPXo-b8eVcCpJNnVKy5ZPfaPCbYieExpA6-QvC9F_njM--ZycKK22ocMZRg"
 _VAPID_CLAIMS = {"sub": "mailto:admin@vex.deals"}
 
-def _send_web_push(payload_dict):
-    """Send Web Push to all subscribed browsers — works even when tab is closed."""
+def _send_web_push(payload_dict, target_uid=None):
+    """Send Web Push to all subscribed browsers (admin + users) — works even when tab is closed.
+    If target_uid is set, only send to that specific user."""
     try:
         from pywebpush import webpush, WebPushException
     except ImportError:
-        return  # pywebpush not installed
+        return
     subs = read_csv('push_subscriptions.csv')
     if not subs:
         return
@@ -72,12 +73,17 @@ def _send_web_push(payload_dict):
         'message': payload_dict.get('message', ''),
         'type': payload_dict.get('type', 'notification'),
         'timestamp': payload_dict.get('timestamp', ''),
-        'url': '/dashboard'
+        'url': '/dashboard' if payload_dict.get('target_type') == 'dashboard' else '/home'
     })
     for sub in subs:
         endpoint = sub.get('endpoint', '')
         if not endpoint:
             continue
+        # If targeting a specific user, filter
+        if target_uid:
+            sub_uid = sub.get('user_id', '') or sub.get('admin_id', '')
+            if str(sub_uid) != str(target_uid):
+                continue
         try:
             subscription_info = {
                 "endpoint": endpoint,
@@ -94,11 +100,10 @@ def _send_web_push(payload_dict):
                 timeout=5
             )
         except WebPushException as e:
-            # 410 = subscription expired, 404 = not found — remove dead subscriptions
             if hasattr(e, 'response') and e.response and e.response.status_code in (404, 410):
-                pass  # Could clean up dead subs here
+                pass
             else:
-                pass  # Silent fail — don't crash on push errors
+                pass
         except Exception:
             pass
 
@@ -4953,10 +4958,36 @@ def api_notifications_log():
 
 # ===== Web Push Subscriptions (notifications even when tab is closed) =====
 @app.route('/api/push/vapid-public-key')
-@api_auth
 def api_push_vapid_public():
-    """Return VAPID public key for browser push subscription."""
+    """Return VAPID public key — public, no auth needed."""
     return jsonify({'public_key': _VAPID_PUBLIC})
+
+@app.route('/api/push/subscribe-user', methods=['POST'])
+def api_push_subscribe_user():
+    """Store push subscription for a regular user (not admin)."""
+    data = request.json or {}
+    endpoint = data.get('endpoint', '')
+    keys = data.get('keys', {})
+    user_id = str(data.get('user_id', ''))
+    user_name = data.get('user_name', '')
+    if not endpoint:
+        return jsonify({'error': 'No endpoint'}), 400
+    subs = read_csv('push_subscriptions.csv')
+    fieldnames = get_fieldnames('push_subscriptions.csv', ['admin_id','endpoint','p256dh','auth','created_at','user_type','user_id','user_name'])
+    # Remove old sub for this endpoint
+    subs = [s for s in subs if s.get('endpoint') != endpoint]
+    subs.append({
+        'admin_id': '',
+        'endpoint': endpoint,
+        'p256dh': keys.get('p256dh', ''),
+        'auth': keys.get('auth', ''),
+        'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'user_type': 'user',
+        'user_id': user_id,
+        'user_name': user_name
+    })
+    write_csv('push_subscriptions.csv', subs, fieldnames)
+    return jsonify({'success': True})
 
 @app.route('/api/push/subscribe', methods=['POST'])
 @api_auth

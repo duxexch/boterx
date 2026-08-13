@@ -749,5 +749,52 @@ function openApps(){
   });
 }
 </script>
+
+<!-- ── USER PUSH NOTIFICATIONS: works even when site is closed ── -->
+<script>
+(async function() {
+    try {
+        if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+        const reg = await navigator.serviceWorker.register('/static/sw.js?v=20260813b');
+        await navigator.serviceWorker.ready;
+        // Request permission
+        if (Notification.permission === 'default') {
+            const perm = await Notification.requestPermission();
+            if (perm !== 'granted') return;
+        }
+        if (Notification.permission !== 'granted') return;
+        // Get VAPID key
+        let vapidKey = null;
+        try {
+            const res = await fetch('/api/push/vapid-public-key');
+            const data = await res.json();
+            vapidKey = data.public_key;
+        } catch(e) { return; }
+        if (!vapidKey) return;
+        function urlBase64ToUint8Array(base64String) {
+            const padding = '='.repeat((4 - base64String.length % 4) % 4);
+            const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+            const rawData = atob(base64);
+            const outputArray = new Uint8Array(rawData.length);
+            for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
+            return outputArray;
+        }
+        let sub = await reg.pushManager.getSubscription();
+        if (!sub) {
+            sub = await reg.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: urlBase64ToUint8Array(vapidKey)
+            });
+        }
+        if (sub) {
+            const subData = { endpoint: sub.endpoint, keys: sub.toJSON().keys || {}, user_id: '{{ uid }}', user_name: '{{ user_name }}' };
+            await fetch('/api/push/subscribe-user', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(subData), credentials: 'same-origin'
+            }).catch(() => {});
+        }
+    } catch(e) {}
+})();
+</script>
 </body>
 </html>
