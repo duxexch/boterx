@@ -6724,21 +6724,53 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         except (ValueError, TypeError):
             logger.error(f"Invalid chat_id for broadcast: {chat_id}")
             return
+
+        media_sent = False
         for url in media_urls:
             try:
                 ext = url.rsplit('.', 1)[-1].lower() if '.' in url else ''
+                # Determine caption: first media gets the text (if short enough), rest get none
+                caption = msg[:1024] if msg else ''
                 if ext in ('jpg','jpeg','png','webp','gif'):
-                    self.api_call('sendPhoto', {'chat_id': tid, 'photo': url, 'caption': msg if url == media_urls[-1] else '', 'parse_mode': 'HTML'}, retries=1)
+                    resp = self.api_call('sendPhoto', {'chat_id': tid, 'photo': url, 'caption': caption, 'parse_mode': 'HTML'}, retries=1)
+                    if resp and resp.get('ok'):
+                        media_sent = True
+                        # Cache file_id for future
+                        photos = resp.get('result', {}).get('photo', [])
+                        if photos:
+                            fid = photos[-1].get('file_id', '')
+                            if fid:
+                                logger.info(f"Cached broadcast photo file_id for {tid}: {fid[:30]}...")
+                        msg = ''  # clear msg so it's not sent again as text
                 elif ext in ('mp4','webm','mov'):
-                    self.api_call('sendVideo', {'chat_id': tid, 'video': url, 'caption': msg if url == media_urls[-1] else '', 'parse_mode': 'HTML'}, retries=1)
+                    resp = self.api_call('sendVideo', {'chat_id': tid, 'video': url, 'caption': caption, 'parse_mode': 'HTML'}, retries=1)
+                    if resp and resp.get('ok'):
+                        media_sent = True
+                        msg = ''
                 else:
-                    self.api_call('sendDocument', {'chat_id': tid, 'document': url, 'caption': msg if url == media_urls[-1] else '', 'parse_mode': 'HTML'}, retries=1)
+                    resp = self.api_call('sendDocument', {'chat_id': tid, 'document': url, 'caption': caption, 'parse_mode': 'HTML'}, retries=1)
+                    if resp and resp.get('ok'):
+                        media_sent = True
+                        msg = ''
             except Exception as e:
-                if '400' not in str(e) and '403' not in str(e):
+                err_str = str(e)
+                if '400' in err_str:
+                    logger.warning(f"sendPhoto/sendVideo failed for {tid} (400): trying sendDocument fallback")
+                    # Fallback: send as document instead of photo
+                    try:
+                        resp2 = self.api_call('sendDocument', {'chat_id': tid, 'document': url, 'caption': msg[:1024] if msg else '', 'parse_mode': 'HTML'}, retries=1)
+                        if resp2 and resp2.get('ok'):
+                            media_sent = True
+                            msg = ''
+                    except:
+                        pass
+                elif '403' not in err_str:
                     logger.error(f"Media send error to {tid}: {e}")
-        if msg and not media_urls:
+
+        # Send text only if no media was sent, or if text is too long for caption
+        if msg and not media_sent:
             self.api_call('sendMessage', {'chat_id': tid, 'text': msg, 'parse_mode': 'HTML'}, retries=1)
-        elif msg and len(msg) > 1024 and media_urls:
+        elif msg and len(msg) > 1024 and media_sent:
             self.api_call('sendMessage', {'chat_id': tid, 'text': msg, 'parse_mode': 'HTML'}, retries=1)
 
     def _send_broadcast_to_all(self, msg, media_urls, country_filter='all'):
