@@ -3116,6 +3116,165 @@ def api_edit_referral_link(link_id):
 
 # ===== API — Channels =====
 
+# ===== API — Campaigns (Ad Platform Phase 1) =====
+
+@app.route('/api/campaigns')
+@api_auth
+def api_campaigns():
+    """List all campaigns."""
+    campaigns = read_csv('campaigns.csv')
+    campaigns.reverse()
+    # Normalize fields
+    for c in campaigns:
+        for k in ['id','name','message','media_urls','target','recipient','priority','country','language','segment','channel_group','scheduled_at','repeat','status','created_at','created_by','stats_reach','stats_clicks','stats_conversions']:
+            if k not in c:
+                c[k] = ''
+    return jsonify({'campaigns': campaigns})
+
+@app.route('/api/campaigns', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_create_campaign():
+    """Create a new campaign."""
+    data = request.json or {}
+    campaign_id = f"CMP{secrets.token_hex(3).upper()}"
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    media_urls = data.get('media_urls', [])
+    abs_media_urls = []
+    for url in media_urls:
+        if url:
+            abs_media_urls.append(url if url.startswith('http') else f'https://vex.deals{url}')
+
+    campaign = {
+        'id': campaign_id,
+        'name': data.get('name', ''),
+        'message': data.get('message', ''),
+        'media_urls': '|'.join(abs_media_urls),
+        'target': data.get('target', 'both'),
+        'recipient': data.get('recipient', 'all'),
+        'priority': data.get('priority', 'normal'),
+        'country': data.get('country', 'all'),
+        'language': data.get('language', 'all'),
+        'segment': data.get('segment', 'all'),
+        'channel_group': data.get('channel_group', ''),
+        'scheduled_at': data.get('scheduled_at', ''),
+        'repeat': data.get('repeat', 'once'),
+        'status': 'scheduled' if data.get('scheduled_at') else 'draft',
+        'created_at': now,
+        'created_by': session.get('admin_id', ''),
+        'stats_reach': '0',
+        'stats_clicks': '0',
+        'stats_conversions': '0',
+    }
+    fieldnames = get_fieldnames('campaigns.csv', ['id','name','message','media_urls','target','recipient','priority','country','language','segment','channel_group','scheduled_at','repeat','status','created_at','created_by','stats_reach','stats_clicks','stats_conversions'])
+    append_csv('campaigns.csv', campaign, fieldnames)
+    log_action('create_campaign', campaign_id)
+
+    # If no schedule → send immediately
+    if not data.get('scheduled_at'):
+        campaign['status'] = 'active'
+        _execute_campaign(campaign)
+        # Update status to completed
+        _update_campaign_status(campaign_id, 'completed')
+
+    return jsonify({'success': True, 'id': campaign_id, 'status': campaign['status']})
+
+@app.route('/api/campaigns/<campaign_id>', methods=['PUT', 'DELETE'])
+@api_auth
+@permission_required('send_broadcast')
+def api_edit_campaign(campaign_id):
+    campaigns = read_csv('campaigns.csv')
+    fieldnames = get_fieldnames('campaigns.csv', ['id','name','message','media_urls','target','recipient','priority','country','language','segment','channel_group','scheduled_at','repeat','status','created_at','created_by','stats_reach','stats_clicks','stats_conversions'])
+    if request.method == 'DELETE':
+        campaigns = [c for c in campaigns if c.get('id') != campaign_id]
+        write_csv('campaigns.csv', campaigns, fieldnames)
+        log_action('delete_campaign', campaign_id)
+        return jsonify({'success': True})
+    elif request.method == 'PUT':
+        data = request.json or {}
+        for c in campaigns:
+            if c.get('id') == campaign_id:
+                for k, v in data.items():
+                    if k in fieldnames:
+                        c[k] = v
+                # If status changed to 'active' → execute
+                if data.get('status') == 'active' and c.get('status') != 'completed':
+                    _execute_campaign(c)
+                    c['status'] = 'completed'
+                break
+        write_csv('campaigns.csv', campaigns, fieldnames)
+        return jsonify({'success': True})
+
+@app.route('/api/campaigns/<campaign_id>/stats')
+@api_auth
+def api_campaign_stats(campaign_id):
+    """Get campaign stats."""
+    campaigns = read_csv('campaigns.csv')
+    for c in campaigns:
+        if c.get('id') == campaign_id:
+            return jsonify({
+                'id': campaign_id,
+                'reach': int(c.get('stats_reach', 0) or 0),
+                'clicks': int(c.get('stats_clicks', 0) or 0),
+                'conversions': int(c.get('stats_conversions', 0) or 0),
+                'status': c.get('status', 'unknown')
+            })
+    return jsonify({'error': 'Not found'}), 404
+
+def _update_campaign_status(campaign_id, status):
+    """Update campaign status in CSV."""
+    try:
+        campaigns = read_csv('campaigns.csv')
+        fieldnames = get_fieldnames('campaigns.csv', ['id','name','message','media_urls','target','recipient','priority','country','language','segment','channel_group','scheduled_at','repeat','status','created_at','created_by','stats_reach','stats_clicks','stats_conversions'])
+        for c in campaigns:
+            if c.get('id') == campaign_id:
+                c['status'] = status
+                break
+        write_csv('campaigns.csv', campaigns, fieldnames)
+    except:
+        pass
+
+def _execute_campaign(campaign):
+    """Execute a campaign — send via web + telegram."""
+    message = campaign.get('message', '')
+    target = campaign.get('target', 'both')
+    priority = campaign.get('priority', 'normal')
+    country = campaign.get('country', 'all')
+    media_urls_str = campaign.get('media_urls', '')
+    media_urls = [u for u in media_urls_str.split('|') if u] if media_urls_str else []
+    recipient = campaign.get('recipient', 'all')
+    target_user = campaign.get('target_user', '') if recipient == 'single' else ''
+
+    # Web notification
+    if target in ('web', 'both'):
+        notif_title = '📢 ' + campaign.get('name', 'حملة إعلانية')
+        if priority == 'urgent':
+            notif_title = '🚨 ' + campaign.get('name', 'حملة عاجلة')
+        push_notification('broadcast', notif_title, message[:200], {'media_urls': media_urls, 'priority': priority, 'campaign_id': campaign.get('id', '')})
+
+    # Telegram broadcast
+    if target in ('telegram', 'both'):
+        broadcast_entry = {
+            'id': f"BCAST{str(int(datetime.now().timestamp()))[-6:]}{secrets.token_hex(2)}",
+            'message': message,
+            'target': target,
+            'recipient': recipient,
+            'priority': priority,
+            'country': country,
+            'media_urls': '|'.join(media_urls),
+            'target_user': target_user,
+            'target_name': '',
+            'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'created_by': session.get('admin_id', ''),
+            'status': 'pending'
+        }
+        bc_fieldnames = get_fieldnames('broadcast_queue.csv', ['id','message','target','recipient','priority','country','media_urls','target_user','target_name','created_at','created_by','status'])
+        append_csv('broadcast_queue.csv', broadcast_entry, bc_fieldnames)
+
+    log_action('execute_campaign', campaign.get('id', ''))
+
+# ===== End Campaigns API =====
+
 @app.route('/api/channels')
 @api_auth
 def api_channels():

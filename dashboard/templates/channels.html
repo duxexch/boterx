@@ -7,11 +7,103 @@
 
     <!-- Tabs -->
     <div class="flex flex-wrap gap-1 bg-slate-800 rounded-xl border border-slate-700 p-1">
+        <button @click="setTab('campaigns')" :class="tab === 'campaigns' ? 'bg-green-600 text-white' : 'text-slate-400'" class="px-4 py-2 rounded-lg text-sm font-medium transition">📊 الحملات</button>
         <button @click="setTab('channels')" :class="tab === 'channels' ? 'bg-blue-600 text-white' : 'text-slate-400'" class="px-4 py-2 rounded-lg text-sm font-medium transition">📡 القنوات</button>
         <button @click="setTab('groups')" :class="tab === 'groups' ? 'bg-blue-600 text-white' : 'text-slate-400'" class="px-4 py-2 rounded-lg text-sm font-medium transition">📂 المجموعات</button>
         <button @click="setTab('vault')" :class="tab === 'vault' ? 'bg-blue-600 text-white' : 'text-slate-400'" class="px-4 py-2 rounded-lg text-sm font-medium transition">📦 الأرشيف</button>
         <button @click="setTab('ai')" :class="tab === 'ai' ? 'bg-blue-600 text-white' : 'text-slate-400'" class="px-4 py-2 rounded-lg text-sm font-medium transition">🤖 AI</button>
         <button @click="setTab('report')" :class="tab === 'report' ? 'bg-blue-600 text-white' : 'text-slate-400'" class="px-4 py-2 rounded-lg text-sm font-medium transition">📊 التقرير</button>
+    </div>
+
+    <!-- TAB: Campaigns -->
+    <div x-show="tab === 'campaigns'" class="space-y-4">
+        <div class="flex justify-between items-center flex-wrap gap-2">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">إجمالي الحملات</p><p class="text-xl font-bold text-amber-400" x-text="campaigns.length">0</p></div>
+                <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">نشطة</p><p class="text-xl font-bold text-green-400" x-text="campaigns.filter(c => c.status === 'active' || c.status === 'scheduled').length">0</p></div>
+                <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">مكتملة</p><p class="text-xl font-bold text-blue-400" x-text="campaigns.filter(c => c.status === 'completed').length">0</p></div>
+                <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">إجمالي الوصول</p><p class="text-xl font-bold text-purple-400" x-text="campaigns.reduce((s,c) => s + parseInt(c.stats_reach||0), 0)">0</p></div>
+            </div>
+            <button @click="showCampaignModal = true" class="btn btn-primary btn-sm">➕ حملة جديدة</button>
+        </div>
+
+        <!-- Campaign list -->
+        <div class="space-y-2">
+            <template x-for="c in campaigns" :key="c.id">
+                <div class="bg-slate-800 rounded-xl border border-slate-700 p-4" :class="{'border-green-500/30': c.status === 'active', 'border-amber-500/30': c.status === 'scheduled', 'opacity-60': c.status === 'completed'}">
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="font-bold text-sm" x-text="c.name"></span>
+                                <span :class="{'bg-green-500/20 text-green-400': c.status==='completed', 'bg-amber-500/20 text-amber-400': c.status==='scheduled', 'bg-blue-500/20 text-blue-400': c.status==='active', 'bg-slate-600/20 text-slate-400': c.status==='draft'}" class="px-2 py-0.5 rounded text-xs font-bold" x-text="c.status === 'completed' ? '✅ مكتملة' : c.status === 'scheduled' ? '⏳ مجدولة' : c.status === 'active' ? '▶️ جارية' : '📝 مسودة'"></span>
+                                <span class="text-xs px-1.5 py-0.5 rounded bg-slate-700 text-slate-400" x-text="(c.target === 'both' ? '📱🌐' : c.target === 'telegram' ? '📱' : '🌐') + ' • ' + (c.priority === 'urgent' ? '🚨' : c.priority === 'high' ? '⚡' : '🔔')"></span>
+                            </div>
+                            <p class="text-xs text-slate-400 truncate" x-text="c.message"></p>
+                            <div class="flex items-center gap-3 mt-1 text-[10px] text-slate-500">
+                                <span x-text="'👥 ' + (c.recipient === 'single' ? 'فردي' : c.country !== 'all' ? c.country : 'الكل')"></span>
+                                <span x-show="c.scheduled_at" x-text="'⏰ ' + c.scheduled_at"></span>
+                                <span x-text="'📊 وصول: ' + (c.stats_reach || 0)"></span>
+                                <span x-text="'🖱️ نقرات: ' + (c.stats_clicks || 0)"></span>
+                            </div>
+                        </div>
+                        <div class="flex gap-1 flex-shrink-0">
+                            <button x-show="c.status === 'draft' || c.status === 'scheduled'" @click="launchCampaign(c.id)" class="btn btn-success btn-sm" title="إطلاق">▶️</button>
+                            <button @click="deleteCampaign(c.id)" class="btn btn-danger btn-sm" title="حذف">🗑️</button>
+                        </div>
+                    </div>
+                </div>
+            </template>
+            <p x-show="campaigns.length === 0" class="text-center text-slate-400 p-8">لا توجد حملات — أنشئ حملتك الأولى</p>
+        </div>
+
+        <!-- Create Campaign Modal -->
+        <div x-show="showCampaignModal" x-transition class="modal-overlay" @click.self="showCampaignModal = false" style="display:none">
+            <div class="modal max-w-2xl">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="font-bold text-lg">📊 إنشاء حملة إعلانية</h3>
+                    <button @click="showCampaignModal = false" class="text-slate-400 hover:text-white"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="space-y-4">
+                    <!-- Name -->
+                    <div><label class="block text-sm text-slate-400 mb-1">📝 اسم الحملة</label><input x-model="cmpForm.name" class="input w-full" placeholder="مثال: حملة لعبة Aviator"></div>
+                    <!-- Message -->
+                    <div><label class="block text-sm text-slate-400 mb-1">💬 نص الإعلان</label><textarea x-model="cmpForm.message" rows="4" class="input w-full" placeholder="اكتب نص الإعلان هنا..."></textarea></div>
+                    <!-- Media -->
+                    <div>
+                        <label class="block text-sm text-slate-400 mb-1">📎 المرفقات</label>
+                        <div class="flex flex-wrap gap-2">
+                            <template x-for="(media, idx) in cmpForm.mediaList" :key="idx">
+                                <div class="relative w-16 h-16 rounded-lg overflow-hidden bg-slate-700 border border-slate-600 group">
+                                    <img x-show="media.type.startsWith('image')" :src="media.url" class="w-full h-full object-cover">
+                                    <div x-show="!media.type.startsWith('image')" class="w-full h-full flex items-center justify-center"><i class="fas fa-file text-xl text-slate-400"></i></div>
+                                    <button @click="cmpForm.mediaList.splice(idx, 1)" class="absolute inset-0 bg-red-600/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition"><i class="fas fa-trash text-white"></i></button>
+                                </div>
+                            </template>
+                            <label class="w-16 h-16 rounded-lg border-2 border-dashed border-slate-500 flex items-center justify-center cursor-pointer hover:border-green-500 transition" :class="cmpForm.uploading ? 'opacity-50 pointer-events-none' : ''">
+                                <i class="fas fa-plus text-xl text-slate-400"></i>
+                                <input type="file" class="hidden" accept="image/*,video/*" @change="uploadCampaignMedia($event)">
+                            </label>
+                        </div>
+                    </div>
+                    <!-- Target + Recipient -->
+                    <div class="grid grid-cols-2 gap-3">
+                        <div><label class="block text-sm text-slate-400 mb-1">🎯 الوجهة</label><select x-model="cmpForm.target" class="input w-full"><option value="both">📱🌐 الاثنين</option><option value="telegram">📱 تيليغرام</option><option value="web">🌐 الموقع</option></select></div>
+                        <div><label class="block text-sm text-slate-400 mb-1">👥 الجمهور</label><select x-model="cmpForm.recipient" class="input w-full"><option value="all">👥 الكل</option><option value="single">👤 فردي</option></select></div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-3">
+                        <div><label class="block text-sm text-slate-400 mb-1">⚡ الأولوية</label><select x-model="cmpForm.priority" class="input w-full"><option value="normal">🔔 عادية</option><option value="high">⚡ عالية</option><option value="urgent">🚨 عاجلة</option></select></div>
+                        <div><label class="block text-sm text-slate-400 mb-1">🌍 الدولة</label><select x-model="cmpForm.country" class="input w-full"><option value="all">🌍 الكل</option><option value="EG">🇪🇬 مصر</option><option value="SA">🇸🇦 السعودية</option><option value="AE">🇦🇪 الإمارات</option><option value="JO">🇯🇴 الأردن</option><option value="MA">🇲🇦 المغرب</option><option value="DZ">🇩🇿 الجزائر</option></select></div>
+                        <div><label class="block text-sm text-slate-400 mb-1">🔁 التكرار</label><select x-model="cmpForm.repeat" class="input w-full"><option value="once">مرة واحدة</option><option value="daily">يومي</option><option value="weekly">أسبوعي</option></select></div>
+                    </div>
+                    <!-- Schedule -->
+                    <div><label class="block text-sm text-slate-400 mb-1">⏰ الجدولة (اتركه فارغاً للإرسال فوراً)</label><input type="datetime-local" x-model="cmpForm.scheduled_at" class="input w-full"></div>
+                </div>
+                <div class="flex gap-2 justify-end mt-4">
+                    <button @click="showCampaignModal = false" class="btn btn-sm" style="background:#475569">إلغاء</button>
+                    <button @click="createCampaign()" class="btn btn-primary btn-sm" x-text="cmpForm.scheduled_at ? '⏰ جدولة الحملة' : '🚀 إطلاق فوراً'"></button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- TAB: Channels -->
@@ -161,18 +253,20 @@
 <script>
 function channelsApp() {
     return {
-        tab: 'channels', channels: [], groups: [], vaultPosts: [], relayLogs: [],
+        tab: 'campaigns', channels: [], groups: [], vaultPosts: [], relayLogs: [],
+        campaigns: [],
         aiProviders: [], aiActive: '', aiInstructions: '', aiTestResult: '',
         replacements: [], vaultSearch: '', filterCategory: '',
-        showGroupModal: false, showAddChannelModal: false,
+        showGroupModal: false, showAddChannelModal: false, showCampaignModal: false,
         groupForm: { name: '', description: '', selectedIds: [] },
         addChannelForm: { title: '', chat_id: '', type: 'channel', category: '' },
+        cmpForm: { name: '', message: '', mediaList: [], target: 'both', recipient: 'all', priority: 'normal', country: 'all', repeat: 'once', scheduled_at: '', uploading: false },
         trForm: { find_text: '', replace_text: '' },
         report: {},
 
         async init() { await this.loadAll(); },
-        setTab(t) { this.tab = t; if (t === 'vault') this.loadVault(); if (t === 'ai') this.loadAI(); if (t === 'report') this.loadReport(); if (t === 'groups') this.loadGroups(); },
-        async loadAll() { await Promise.all([this.loadChannels(), this.loadGroups(), this.loadAI(), this.loadReport(), this.loadReplacements(), this.loadVault(), this.loadRelayLogs()]); },
+        setTab(t) { this.tab = t; if (t === 'vault') this.loadVault(); if (t === 'ai') this.loadAI(); if (t === 'report') this.loadReport(); if (t === 'groups') this.loadGroups(); if (t === 'campaigns') this.loadCampaigns(); },
+        async loadAll() { await Promise.all([this.loadChannels(), this.loadGroups(), this.loadAI(), this.loadReport(), this.loadReplacements(), this.loadVault(), this.loadRelayLogs(), this.loadCampaigns()]); },
 
         get filteredChannels() {
             if (!this.filterCategory) return this.channels;
@@ -224,7 +318,48 @@ function channelsApp() {
         async testAI() { try { const d = await api('/api/ai-providers/test', { method: 'POST', body: '{}' }); this.aiTestResult = d.result || d.error; if (d.success) toast('نجح', 'success'); else toast('فشل', 'error'); } catch(e) { this.aiTestResult = 'خطأ'; } },
         async addReplacement() { if (!this.trForm.find_text || !this.trForm.replace_text) return toast('املأ الحقلين', 'warning'); try { await api('/api/text-replacements', { method: 'POST', body: JSON.stringify(this.trForm) }); this.trForm = { find_text: '', replace_text: '' }; await this.loadReplacements(); } catch(e) {} },
         async toggleReplacement(id) { try { await api(`/api/text-replacements/${id}/toggle`, { method: 'POST', body: '{}' }); await this.loadReplacements(); } catch(e) {} },
-        async deleteReplacement(id) { try { await api(`/api/text-replacements/${id}`, { method: 'DELETE' }); await this.loadReplacements(); } catch(e) {} }
+        async deleteReplacement(id) { try { await api(`/api/text-replacements/${id}`, { method: 'DELETE' }); await this.loadReplacements(); } catch(e) {} },
+
+        // ── Campaigns ──
+        async loadCampaigns() { try { const d = await api('/api/campaigns'); this.campaigns = d.campaigns || []; } catch(e) {} },
+        async uploadCampaignMedia(event) {
+            const file = event.target.files[0]; if (!file) return;
+            this.cmpForm.uploading = true;
+            try {
+                const formData = new FormData(); formData.append('file', file);
+                const res = await fetch('/api/upload-broadcast-media', { method: 'POST', body: formData, credentials: 'same-origin' });
+                const data = await res.json();
+                if (data.success) { this.cmpForm.mediaList.push({ url: data.absolute_url, type: file.type }); toast('تم الرفع', 'success'); }
+                else { toast(data.error || 'فشل', 'error'); }
+            } catch(e) { toast('فشل الرفع', 'error'); }
+            this.cmpForm.uploading = false; event.target.value = '';
+        },
+        async createCampaign() {
+            if (!this.cmpForm.name.trim()) return toast('اكتب اسم الحملة', 'warning');
+            if (!this.cmpForm.message.trim() && this.cmpForm.mediaList.length === 0) return toast('اكتب نص أو ارفع ملف', 'warning');
+            try {
+                const payload = {
+                    name: this.cmpForm.name, message: this.cmpForm.message,
+                    media_urls: this.cmpForm.mediaList.map(m => m.url),
+                    target: this.cmpForm.target, recipient: this.cmpForm.recipient,
+                    priority: this.cmpForm.priority, country: this.cmpForm.country,
+                    repeat: this.cmpForm.repeat, scheduled_at: this.cmpForm.scheduled_at,
+                };
+                await api('/api/campaigns', { method: 'POST', body: JSON.stringify(payload) });
+                toast(this.cmpForm.scheduled_at ? 'تمت جدولة الحملة' : 'تم إطلاق الحملة', 'success');
+                this.showCampaignModal = false;
+                this.cmpForm = { name: '', message: '', mediaList: [], target: 'both', recipient: 'all', priority: 'normal', country: 'all', repeat: 'once', scheduled_at: '', uploading: false };
+                await this.loadCampaigns();
+            } catch(e) { toast('فشل', 'error'); }
+        },
+        async launchCampaign(id) {
+            try { await api(`/api/campaigns/${id}`, { method: 'PUT', body: JSON.stringify({ status: 'active' }) }); toast('تم الإطلاق', 'success'); await this.loadCampaigns(); }
+            catch(e) { toast('فشل', 'error'); }
+        },
+        async deleteCampaign(id) {
+            if (!confirm('حذف الحملة؟')) return;
+            try { await api(`/api/campaigns/${id}`, { method: 'DELETE' }); await this.loadCampaigns(); } catch(e) {}
+        }
     }
 }
 </script>
