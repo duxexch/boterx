@@ -3876,6 +3876,21 @@ def api_broadcast():
     media_urls = request.json.get('media_urls', []) if request.json else []
     target_user = request.json.get('target_user', '') if request.json else ''
     target_name = request.json.get('target_name', '') if request.json else ''
+    search_query = request.json.get('search_query', '') if request.json else ''
+
+    # If single + search_query provided, look up user by name/phone/telegram_id/customer_id
+    if recipient == 'single' and not target_user and search_query:
+        users = read_csv('users.csv')
+        for u in users:
+            if (search_query.lower() in (u.get('name','')).lower() or
+                search_query in u.get('phone','') or
+                search_query == u.get('telegram_id','') or
+                search_query == u.get('customer_id','')):
+                target_user = u.get('telegram_id', '')
+                target_name = u.get('name', '')
+                break
+        if not target_user:
+            return jsonify({'success': False, 'error': 'لم يتم العثور على المستخدم'}), 404
 
     # Normalize media URLs to absolute
     abs_media_urls = []
