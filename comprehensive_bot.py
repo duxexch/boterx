@@ -2965,62 +2965,64 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         return sent
 
     def broadcast_to_all_users(self, text, photo=None, video=None, document=None, sticker=None):
-        """بث محتوى لكل المستخدمين — في thread منفصل حتى لا يمنع معالجة رسائل المستخدمين"""
+        """بث محتوى لكل المستخدمين — في thread منفصل، rate limiting آمن، يدعم 70K+ مستخدم"""
         import threading as _th
+        import time as _bt
         def _do_broadcast():
             sent = 0
             failed = 0
             try:
-                with open('users.csv', 'r', encoding='utf-8-sig') as f:
-                    reader = csv.DictReader(f)
-                    for row in reader:
-                        tid = row.get('telegram_id', '')
-                        if not tid:
-                            continue
-                        # تخطي المحظورين
-                        if row.get('is_banned') == 'yes':
-                            continue
-                        try:
-                            if photo:
-                                result = self.api_call('sendPhoto', {
-                                    'chat_id': int(tid), 'photo': photo,
-                                    'caption': text[:1024] if text else '', 'parse_mode': 'HTML'
-                                }, retries=1)  # retry=1 — لا تكرر الفشل
-                            elif video:
-                                result = self.api_call('sendVideo', {
-                                    'chat_id': int(tid), 'video': video,
-                                    'caption': text[:1024] if text else '', 'parse_mode': 'HTML'
-                                }, retries=1)
-                            elif document:
-                                result = self.api_call('sendDocument', {
-                                    'chat_id': int(tid), 'document': document,
-                                    'caption': text[:1024] if text else '', 'parse_mode': 'HTML'
-                                }, retries=1)
-                            elif sticker:
-                                result = self.api_call('sendSticker', {
-                                    'chat_id': int(tid), 'sticker': sticker
-                                }, retries=1)
-                            else:
-                                result = self.send_message(int(tid), text, None)
-                            if result:
-                                sent += 1
-                            else:
-                                failed += 1
-                        except:
-                            failed += 1
-                        # rate limiting: 20 رسالة ثم انتظار 1 ثانية
-                        if (sent + failed) % 20 == 0:
-                            time.sleep(1)
-                # تسجيل البث
+                # قراءة من الكاش (O(1) per user) بدلاً من CSV scan
+                with self._user_cache_lock:
+                    all_users = list(self._user_cache.values())
+                
+                total = len(all_users)
+                logger.info(f"بدء بث جماعي لـ {total} مستخدم...")
+                
+                for i, user in enumerate(all_users):
+                    tid = user.get('telegram_id', '')
+                    if not tid:
+                        continue
+                    if user.get('is_banned') == 'yes':
+                        continue
+                    try:
+                        tid_int = int(tid)
+                        if photo:
+                            self.api_call('sendPhoto', {'chat_id': tid_int, 'photo': photo,
+                                'caption': text[:1024] if text else '', 'parse_mode': 'HTML'}, retries=1)
+                        elif video:
+                            self.api_call('sendVideo', {'chat_id': tid_int, 'video': video,
+                                'caption': text[:1024] if text else '', 'parse_mode': 'HTML'}, retries=1)
+                        elif document:
+                            self.api_call('sendDocument', {'chat_id': tid_int, 'document': document,
+                                'caption': text[:1024] if text else '', 'parse_mode': 'HTML'}, retries=1)
+                        elif sticker:
+                            self.api_call('sendSticker', {'chat_id': tid_int, 'sticker': sticker}, retries=1)
+                        else:
+                            self.send_message(tid_int, text, None)
+                        sent += 1
+                    except Exception as e:
+                        # HTTP 400/403 = خطأ دائم (مستخدم محظور البوت) — لا تعيد المحاولة
+                        if '400' in str(e) or '403' in str(e):
+                            pass
+                        else:
+                            logger.error(f"خطأ في إرسال بث لـ {tid}: {e}")
+                        failed += 1
+                    
+                    # rate limiting: 25 رسالة/ثانية (آمن تحت حد تيليغرام 30/ثانية)
+                    if (sent + failed) > 0 and (sent + failed) % 25 == 0:
+                        _bt.sleep(1)
+                    
+                    # كل 1000 رسالة: سجل التقدم
+                    if (sent + failed) % 1000 == 0:
+                        logger.info(f"بث تقدم: {sent} sent, {failed} failed من {total}")
+                
                 self._log_relay('broadcast', '', text[:100], sent, 0)
-                logger.info(f"Broadcast done: {sent} sent, {failed} failed")
+                logger.info(f"بث مكتمل: {sent} sent, {failed} failed من {total}")
             except Exception as e:
                 logger.error(f"خطأ في البث: {e}")
-            return sent, failed
-        # تشغيل في thread منفصل — لا يمنع البوت عن معالجة رسائل المستخدمين
         t = _th.Thread(target=_do_broadcast, daemon=True)
         t.start()
-        return 0, 0  # يتم إرجاع 0 لأن البث غير متزامن
 
     def _log_relay(self, source_type, source_chat_id, preview, user_count, channel_count):
         """تسجيل عملية ترحيل في relay_log.csv"""
@@ -6716,55 +6718,61 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         t.start()
 
     def _send_broadcast_to_user(self, chat_id, msg, media_urls):
-        """إرسال بث لمستخدم واحد — نص + وسائط متعددة"""
-        # إرسال الوسائط أولاً
+        """إرسال بث لمستخدم واحد — نص + وسائط متعددة، crash-safe"""
+        try:
+            tid = int(chat_id)
+        except (ValueError, TypeError):
+            logger.error(f"Invalid chat_id for broadcast: {chat_id}")
+            return
         for url in media_urls:
-            ext = url.rsplit('.', 1)[-1].lower() if '.' in url else ''
-            if ext in ('jpg','jpeg','png','webp','gif'):
-                self.api_call('sendPhoto', {'chat_id': chat_id, 'photo': url, 'caption': msg if url == media_urls[-1] else '', 'parse_mode': 'HTML'}, retries=1)
-            elif ext in ('mp4','webm','mov'):
-                self.api_call('sendVideo', {'chat_id': chat_id, 'video': url, 'caption': msg if url == media_urls[-1] else '', 'parse_mode': 'HTML'}, retries=1)
-            else:
-                self.api_call('sendDocument', {'chat_id': chat_id, 'document': url, 'caption': msg if url == media_urls[-1] else '', 'parse_mode': 'HTML'}, retries=1)
-        # إرسال النص فقط لو مفيش وسائط أو النص طويل
+            try:
+                ext = url.rsplit('.', 1)[-1].lower() if '.' in url else ''
+                if ext in ('jpg','jpeg','png','webp','gif'):
+                    self.api_call('sendPhoto', {'chat_id': tid, 'photo': url, 'caption': msg if url == media_urls[-1] else '', 'parse_mode': 'HTML'}, retries=1)
+                elif ext in ('mp4','webm','mov'):
+                    self.api_call('sendVideo', {'chat_id': tid, 'video': url, 'caption': msg if url == media_urls[-1] else '', 'parse_mode': 'HTML'}, retries=1)
+                else:
+                    self.api_call('sendDocument', {'chat_id': tid, 'document': url, 'caption': msg if url == media_urls[-1] else '', 'parse_mode': 'HTML'}, retries=1)
+            except Exception as e:
+                if '400' not in str(e) and '403' not in str(e):
+                    logger.error(f"Media send error to {tid}: {e}")
         if msg and not media_urls:
-            self.api_call('sendMessage', {'chat_id': chat_id, 'text': msg, 'parse_mode': 'HTML'}, retries=1)
+            self.api_call('sendMessage', {'chat_id': tid, 'text': msg, 'parse_mode': 'HTML'}, retries=1)
         elif msg and len(msg) > 1024 and media_urls:
-            # النص طويل جداً للـ caption (1024 حد) — أرسله منفصلاً
-            self.api_call('sendMessage', {'chat_id': chat_id, 'text': msg, 'parse_mode': 'HTML'}, retries=1)
+            self.api_call('sendMessage', {'chat_id': tid, 'text': msg, 'parse_mode': 'HTML'}, retries=1)
 
     def _send_broadcast_to_all(self, msg, media_urls, country_filter='all'):
-        """بث جماعي — مع فلتر دولة + rate limiting آمن (1 ثانية كل 20 رسالة)"""
+        """بث جماعي — من الكاش، مع فلتر دولة، rate limiting آمن، يدعم 70K+"""
         import time as _bt
         users = []
-        try:
-            with open('users.csv', 'r', encoding='utf-8-sig') as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    tid = row.get('telegram_id', '')
-                    if not tid or row.get('is_banned') == 'yes':
-                        continue
-                    # فلتر الدولة
-                    if country_filter and country_filter != 'all':
-                        phone = row.get('phone', '')
-                        if not self._phone_matches_country(phone, country_filter):
-                            continue
-                    users.append(tid)
-        except:
-            pass
-
+        with self._user_cache_lock:
+            all_users = list(self._user_cache.values())
+        
+        for user in all_users:
+            tid = user.get('telegram_id', '')
+            if not tid or user.get('is_banned') == 'yes':
+                continue
+            if country_filter and country_filter != 'all':
+                phone = user.get('phone', '')
+                if not self._phone_matches_country(phone, country_filter):
+                    continue
+            users.append(tid)
+        
+        total = len(users)
+        logger.info(f"بدء بث جماعي لـ {total} مستخدم (country={country_filter})...")
         sent = 0
         failed = 0
-        for i, tid in enumerate(users):
+        for tid in users:
             try:
                 self._send_broadcast_to_user(tid, msg, media_urls)
                 sent += 1
             except:
                 failed += 1
-            # rate limiting: 1 ثانية كل 20 رسالة
-            if (sent + failed) > 0 and (sent + failed) % 20 == 0:
+            if (sent + failed) > 0 and (sent + failed) % 25 == 0:
                 _bt.sleep(1)
-        logger.info(f"بث جماعي: sent={sent} failed={failed} country={country_filter}")
+            if (sent + failed) % 1000 == 0:
+                logger.info(f"بث تقدم: {sent}/{total} sent, {failed} failed")
+        logger.info(f"بث مكتمل: {sent}/{total} sent, {failed} failed")
 
     def _phone_matches_country(self, phone, country_code):
         """فحص مطابقة رقم الهاتف لدولة"""

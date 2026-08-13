@@ -3832,8 +3832,8 @@ def api_broadcast():
             'created_by': session.get('admin_id', ''),
             'status': 'pending'
         }
-        fieldnames = ['id', 'message', 'target', 'recipient', 'priority', 'country',
-                      'media_urls', 'target_user', 'target_name', 'created_at', 'created_by', 'status']
+        fieldnames = get_fieldnames('broadcast_queue.csv', ['id', 'message', 'target', 'recipient', 'priority', 'country',
+                      'media_urls', 'target_user', 'target_name', 'created_at', 'created_by', 'status'])
         append_csv('broadcast_queue.csv', broadcast_entry, fieldnames)
 
     log_action('broadcast', f'recipient={recipient} target={target} priority={priority} country={country} msg={message[:50]}')
