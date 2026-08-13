@@ -3259,6 +3259,133 @@ def _update_campaign_status(campaign_id, status):
     except:
         pass
 
+# ===== API — Click + Conversion Tracking (Ad Platform v2 Phase 1) =====
+
+@app.route('/c/<campaign_id>')
+def track_click_redirect(campaign_id):
+    """Click tracker — redirects to campaign URL and logs the click."""
+    import urllib.parse
+    # Find campaign
+    campaigns = read_csv('campaigns.csv')
+    campaign = None
+    for c in campaigns:
+        if c.get('id') == campaign_id:
+            campaign = c
+            break
+    if not campaign:
+        return redirect('/')
+
+    # Log the click
+    click_id = f"CLK{secrets.token_hex(4).upper()}"
+    click_entry = {
+        'click_id': click_id,
+        'campaign_id': campaign_id,
+        'user_id': request.args.get('uid', ''),
+        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'ip': request.headers.get('X-Forwarded-For', request.remote_addr or '').split(',')[0].strip(),
+        'user_agent': request.headers.get('User-Agent', '')[:200],
+        'referrer': request.referrer or '',
+    }
+    click_fields = get_fieldnames('campaign_clicks.csv', ['click_id','campaign_id','user_id','timestamp','ip','user_agent','referrer'])
+    append_csv('campaign_clicks.csv', click_entry, click_fields)
+
+    # Increment stats_clicks in campaigns.csv
+    try:
+        cf_fields = get_fieldnames('campaigns.csv', ['id','name','message','media_urls','target','recipient','priority','country','language','segment','channel_group','scheduled_at','repeat','status','created_at','created_by','stats_reach','stats_clicks','stats_conversions'])
+        for c in campaigns:
+            if c.get('id') == campaign_id:
+                c['stats_clicks'] = str(int(c.get('stats_clicks', 0) or 0) + 1)
+                break
+        write_csv('campaigns.csv', campaigns, cf_fields)
+    except:
+        pass
+
+    # Determine destination URL
+    dest = campaign.get('redirect_url', '') or 'https://vex.deals/home'
+    # Add UTM parameters
+    utm = f"?utm_source=vex&utm_medium=telegram&utm_campaign={campaign_id}&click_id={click_id}"
+    if '?' in dest:
+        dest = dest + '&' + utm.lstrip('?')
+    else:
+        dest = dest + utm
+    return redirect(dest)
+
+@app.route('/api/track/conversion', methods=['POST'])
+def track_conversion():
+    """Log a conversion (deposit/register) attributed to a campaign click."""
+    data = request.json or {}
+    campaign_id = data.get('campaign_id', '')
+    user_id = data.get('user_id', '')
+    conv_type = data.get('type', 'register')  # register, deposit, game_play
+    amount = data.get('amount', 0)
+    click_id = data.get('click_id', '')
+
+    if not campaign_id:
+        return jsonify({'error': 'No campaign_id'}), 400
+
+    conv_id = f"CNV{secrets.token_hex(4).upper()}"
+    conv_entry = {
+        'conv_id': conv_id,
+        'campaign_id': campaign_id,
+        'click_id': click_id,
+        'user_id': str(user_id),
+        'type': conv_type,
+        'amount': str(amount),
+        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+    }
+    conv_fields = get_fieldnames('campaign_conversions.csv', ['conv_id','campaign_id','click_id','user_id','type','amount','timestamp'])
+    append_csv('campaign_conversions.csv', conv_entry, conv_fields)
+
+    # Increment stats_conversions in campaigns.csv
+    try:
+        campaigns = read_csv('campaigns.csv')
+        cf_fields = get_fieldnames('campaigns.csv', ['id','name','message','media_urls','target','recipient','priority','country','language','segment','channel_group','scheduled_at','repeat','status','created_at','created_by','stats_reach','stats_clicks','stats_conversions'])
+        for c in campaigns:
+            if c.get('id') == campaign_id:
+                c['stats_conversions'] = str(int(c.get('stats_conversions', 0) or 0) + 1)
+                break
+        write_csv('campaigns.csv', campaigns, cf_fields)
+    except:
+        pass
+
+    return jsonify({'success': True, 'conv_id': conv_id})
+
+@app.route('/api/campaigns/<campaign_id>/clicks')
+@api_auth
+def api_campaign_clicks(campaign_id):
+    """Get detailed click data for a campaign."""
+    clicks = read_csv('campaign_clicks.csv')
+    campaign_clicks = [c for c in clicks if c.get('campaign_id') == campaign_id]
+    campaign_clicks.reverse()
+    # Simple fraud analysis: group by IP
+    from collections import Counter
+    ip_counts = Counter(c.get('ip', '') for c in campaign_clicks if c.get('ip'))
+    suspicious_ips = {ip: count for ip, count in ip_counts.items() if count > 5}
+    return jsonify({
+        'total_clicks': len(campaign_clicks),
+        'recent_clicks': campaign_clicks[:20],
+        'suspicious_ips': suspicious_ips,
+        'unique_ips': len(ip_counts),
+        'unique_users': len(set(c.get('user_id', '') for c in campaign_clicks if c.get('user_id'))),
+    })
+
+@app.route('/api/campaigns/<campaign_id>/conversions')
+@api_auth
+def api_campaign_conversions(campaign_id):
+    """Get conversion data for a campaign."""
+    convs = read_csv('campaign_conversions.csv')
+    campaign_convs = [c for c in convs if c.get('campaign_id') == campaign_id]
+    campaign_convs.reverse()
+    total_amount = sum(float(c.get('amount', 0) or 0) for c in campaign_convs)
+    return jsonify({
+        'total_conversions': len(campaign_convs),
+        'total_amount': total_amount,
+        'recent_conversions': campaign_convs[:20],
+        'by_type': dict(Counter(c.get('type', '') for c in campaign_convs)),
+    })
+
+# ===== End Click + Conversion Tracking =====
+
 # ===== API — AI Content Generator (Phase 4) =====
 
 @app.route('/api/campaigns/generate-content', methods=['POST'])
