@@ -5024,9 +5024,8 @@ def api_push_subscribe_user():
     return jsonify({'success': True})
 
 @app.route('/api/push/subscribe', methods=['POST'])
-@api_auth
 def api_push_subscribe():
-    """Store a browser push subscription endpoint for this admin."""
+    """Store a browser push subscription — public, no auth needed."""
     data = request.json or {}
     endpoint = data.get('endpoint', '')
     keys = data.get('keys', {})
@@ -5229,7 +5228,12 @@ def api_referral_earnings():
 @app.route('/api/broadcast/queue')
 @api_auth
 def api_broadcast_queue():
+    # Normalize fieldnames for old rows
     queue = read_csv('broadcast_queue.csv')
+    for item in queue:
+        for k in ['id','message','target','recipient','priority','country','media_urls','target_user','target_name','created_at','created_by','status']:
+            if k not in item:
+                item[k] = ''
     queue.reverse()
     return jsonify({'queue': queue[:50]})
 
