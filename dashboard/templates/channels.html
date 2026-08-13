@@ -13,6 +13,40 @@
         <button @click="setTab('vault')" :class="tab === 'vault' ? 'bg-blue-600 text-white' : 'text-slate-400'" class="px-4 py-2 rounded-lg text-sm font-medium transition">📦 الأرشيف</button>
         <button @click="setTab('ai')" :class="tab === 'ai' ? 'bg-blue-600 text-white' : 'text-slate-400'" class="px-4 py-2 rounded-lg text-sm font-medium transition">🤖 AI</button>
         <button @click="setTab('report')" :class="tab === 'report' ? 'bg-blue-600 text-white' : 'text-slate-400'" class="px-4 py-2 rounded-lg text-sm font-medium transition">📊 التقرير</button>
+        <button @click="setTab('analytics')" :class="tab === 'analytics' ? 'bg-purple-600 text-white' : 'text-slate-400'" class="px-4 py-2 rounded-lg text-sm font-medium transition">📈 تحليلات</button>
+    </div>
+
+    <!-- TAB: Analytics -->
+    <div x-show="tab === 'analytics'" class="space-y-4">
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">إجمالي الحملات</p><p class="text-2xl font-bold text-amber-400" x-text="analytics.total_campaigns || 0">0</p></div>
+            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">إجمالي الوصول</p><p class="text-2xl font-bold text-green-400" x-text="analytics.total_reach || 0">0</p></div>
+            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">إجمالي النقرات</p><p class="text-2xl font-bold text-blue-400" x-text="analytics.total_clicks || 0">0</p></div>
+            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">معدل النقر CTR</p><p class="text-2xl font-bold text-purple-400" x-text="(analytics.ctr || 0) + '%'">0%</p></div>
+            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">التحويلات</p><p class="text-2xl font-bold text-red-400" x-text="analytics.total_conversions || 0">0</p></div>
+        </div>
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
+            <h3 class="font-bold mb-3">🏆 أفضل الحملات</h3>
+            <table class="data-table"><thead><tr><th>الحملة</th><th>الوصول</th><th>النقرات</th><th>CTR</th></tr></thead><tbody>
+                <template x-for="c in (analytics.top_campaigns || [])" :key="c.name">
+                    <tr class="hover:bg-slate-700/50"><td class="text-sm font-bold" x-text="c.name"></td><td class="text-green-400 font-bold" x-text="c.reach"></td><td class="text-blue-400 font-bold" x-text="c.clicks"></td><td class="text-purple-400" x-text="c.reach > 0 ? (c.clicks / c.reach * 100).toFixed(1) + '%' : '0%'"></td></tr>
+                </template>
+                <tr x-show="(analytics.top_campaigns || []).length === 0"><td colspan="4" class="text-center text-slate-400 p-4">لا توجد بيانات بعد</td></tr>
+            </tbody></table>
+        </div>
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
+            <h3 class="font-bold mb-3">📅 الوصول اليومي (7 أيام)</h3>
+            <div class="flex items-end gap-2 h-32">
+                <template x-for="(reach, date) in (analytics.daily_reach || {})" :key="date">
+                    <div class="flex-1 flex flex-col items-center gap-1">
+                        <div class="w-full bg-gradient-to-t from-green-600 to-green-400 rounded-t transition-all" :style="'height: ' + Math.min(100, (reach / Math.max(...Object.values(analytics.daily_reach || {0:1})) * 100)) + '%'"></div>
+                        <span class="text-[10px] text-slate-500" x-text="date.slice(5)"></span>
+                        <span class="text-[10px] text-green-400 font-bold" x-text="reach"></span>
+                    </div>
+                </template>
+                <div x-show="Object.keys(analytics.daily_reach || {}).length === 0" class="text-slate-400 text-sm w-full text-center self-center">لا توجد بيانات</div>
+            </div>
+        </div>
     </div>
 
     <!-- TAB: Campaigns -->
@@ -254,7 +288,7 @@
 function channelsApp() {
     return {
         tab: 'campaigns', channels: [], groups: [], vaultPosts: [], relayLogs: [],
-        campaigns: [],
+        campaigns: [], analytics: {},
         aiProviders: [], aiActive: '', aiInstructions: '', aiTestResult: '',
         replacements: [], vaultSearch: '', filterCategory: '',
         showGroupModal: false, showAddChannelModal: false, showCampaignModal: false,
@@ -265,8 +299,8 @@ function channelsApp() {
         report: {},
 
         async init() { await this.loadAll(); },
-        setTab(t) { this.tab = t; if (t === 'vault') this.loadVault(); if (t === 'ai') this.loadAI(); if (t === 'report') this.loadReport(); if (t === 'groups') this.loadGroups(); if (t === 'campaigns') this.loadCampaigns(); },
-        async loadAll() { await Promise.all([this.loadChannels(), this.loadGroups(), this.loadAI(), this.loadReport(), this.loadReplacements(), this.loadVault(), this.loadRelayLogs(), this.loadCampaigns()]); },
+        setTab(t) { this.tab = t; if (t === 'vault') this.loadVault(); if (t === 'ai') this.loadAI(); if (t === 'report') this.loadReport(); if (t === 'groups') this.loadGroups(); if (t === 'campaigns') this.loadCampaigns(); if (t === 'analytics') this.loadAnalytics(); },
+        async loadAll() { await Promise.all([this.loadChannels(), this.loadGroups(), this.loadAI(), this.loadReport(), this.loadReplacements(), this.loadVault(), this.loadRelayLogs(), this.loadCampaigns(), this.loadAnalytics()]); },
 
         get filteredChannels() {
             if (!this.filterCategory) return this.channels;
@@ -322,6 +356,7 @@ function channelsApp() {
 
         // ── Campaigns ──
         async loadCampaigns() { try { const d = await api('/api/campaigns'); this.campaigns = d.campaigns || []; } catch(e) {} },
+        async loadAnalytics() { try { const d = await api('/api/campaigns/analytics'); this.analytics = d; } catch(e) {} },
         async uploadCampaignMedia(event) {
             const file = event.target.files[0]; if (!file) return;
             this.cmpForm.uploading = true;

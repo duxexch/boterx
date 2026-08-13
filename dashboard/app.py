@@ -3205,6 +3205,31 @@ def api_edit_campaign(campaign_id):
         write_csv('campaigns.csv', campaigns, fieldnames)
         return jsonify({'success': True})
 
+@app.route('/api/campaigns/analytics')
+@api_auth
+def api_campaigns_analytics():
+    """Campaign analytics — reach, clicks, conversions, comparison."""
+    campaigns = read_csv('campaigns.csv')
+    total_reach = sum(int(c.get('stats_reach', 0) or 0) for c in campaigns)
+    total_clicks = sum(int(c.get('stats_clicks', 0) or 0) for c in campaigns)
+    total_conversions = sum(int(c.get('stats_conversions', 0) or 0) for c in campaigns)
+    completed = [c for c in campaigns if c.get('status') == 'completed']
+    top = sorted(completed, key=lambda c: int(c.get('stats_reach', 0) or 0), reverse=True)[:5]
+    from collections import defaultdict
+    daily = defaultdict(int)
+    for c in completed:
+        d = c.get('created_at', '')[:10]
+        if d: daily[d] += int(c.get('stats_reach', 0) or 0)
+    return jsonify({
+        'total_campaigns': len(campaigns), 'completed': len(completed),
+        'total_reach': total_reach, 'total_clicks': total_clicks,
+        'total_conversions': total_conversions,
+        'ctr': round(total_clicks / total_reach * 100, 2) if total_reach > 0 else 0,
+        'conversion_rate': round(total_conversions / total_clicks * 100, 2) if total_clicks > 0 else 0,
+        'top_campaigns': [{'name': c.get('name',''), 'reach': int(c.get('stats_reach',0) or 0), 'clicks': int(c.get('stats_clicks',0) or 0)} for c in top],
+        'daily_reach': dict(list(daily.items())[-7:])
+    })
+
 @app.route('/api/campaigns/<campaign_id>/stats')
 @api_auth
 def api_campaign_stats(campaign_id):

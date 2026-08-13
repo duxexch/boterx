@@ -6113,6 +6113,18 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         _bt = threading.Thread(target=_broadcast_worker, daemon=True, name='broadcast_worker')
         _bt.start()
 
+        # ── Campaign scheduler thread — checks scheduled campaigns every 60s ──
+        def _campaign_scheduler():
+            while True:
+                try:
+                    self._process_scheduled_campaigns()
+                except Exception as exc:
+                    logger.error("campaign_scheduler: %s", exc)
+                time.sleep(60)
+
+        _cs = threading.Thread(target=_campaign_scheduler, daemon=True, name='campaign_scheduler')
+        _cs.start()
+
         # ── Periodic stale-semaphore cleanup ─────────────────────────────────
         def _cleanup_sems():
             while True:
@@ -6667,6 +6679,54 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         except Exception as e:
             logger.error(f"خطأ في تحديث إعداد القناة: {e}")
             return False
+
+    def _process_scheduled_campaigns(self):
+        """فحص الحملات المجدولة وإطلاقها عند وقت التنفيذ"""
+        import csv as _csv
+        from datetime import datetime as _dt
+        campaigns_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'campaigns.csv')
+        if not os.path.exists(campaigns_path):
+            return
+        try:
+            with open(campaigns_path, 'r', encoding='utf-8-sig') as f:
+                reader = _csv.DictReader(f)
+                fieldnames = reader.fieldnames
+                rows = list(reader)
+            now = _dt.now()
+            changed = False
+            for c in rows:
+                if c.get('status') == 'scheduled' and c.get('scheduled_at'):
+                    try:
+                        sched = _dt.strptime(c['scheduled_at'].strip()[:16], '%Y-%m-%d %H:%M')
+                    except:
+                        continue
+                    if now >= sched:
+                        # Execute campaign
+                        msg = c.get('message', '')
+                        target = c.get('target', 'both')
+                        recipient = c.get('recipient', 'all')
+                        country = c.get('country', 'all')
+                        media_str = c.get('media_urls', '')
+                        media_urls = [u for u in media_str.split('|') if u] if media_str else []
+                        target_user = c.get('target_user', '') if recipient == 'single' else ''
+                        priority = c.get('priority', 'normal')
+
+                        if recipient == 'single' and target_user:
+                            self._send_broadcast_to_user(target_user, msg, media_urls)
+                        else:
+                            self._send_broadcast_to_all(msg, media_urls, country)
+                        c['status'] = 'completed'
+                        c['stats_reach'] = str(len(self._user_cache))
+                        changed = True
+                        logger.info(f"Campaign {c.get('id','')} executed (scheduled)")
+            if changed:
+                with open(campaigns_path, 'w', newline='', encoding='utf-8-sig') as f:
+                    writer = _csv.DictWriter(f, fieldnames=fieldnames)
+                    writer.writeheader()
+                    for row in rows:
+                        writer.writerow({k: row.get(k, '') for k in fieldnames})
+        except Exception as e:
+            logger.error(f"campaign_scheduler error: {e}")
 
     def _process_broadcast_queue(self):
         """معالجة طابور البث — وسائط متعددة + فردي/جماعي + دولة"""
