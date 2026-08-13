@@ -21,9 +21,9 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='vendor/fontawesome.min.css') }}">
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
     <script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/app.js') }}?v=20260813a" defer></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}?v=20260813b" defer></script>
     <script src="{{ url_for('static', filename='vendor/alpine.min.js') }}" defer></script>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=20260813a">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=20260813b">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/fx.css') }}">
     <!-- PWA & SEO -->
     <link rel="manifest" href="/static/manifest.json">
@@ -542,6 +542,9 @@ function baseApp() {
         },
 
         connectNotificationStream() {
+            // Fetch missed notifications on page load
+            this.fetchMissedNotifications();
+            // Connect SSE for real-time
             try {
                 this.notifSource = new EventSource('/api/notifications/stream');
                 this.notifSource.onmessage = (event) => {
@@ -557,14 +560,19 @@ function baseApp() {
                             id: Date.now(),
                             icon: d.type.includes('deposit') ? 'fa-money-bill-wave text-green-400' :
                                   d.type.includes('withdrawal') ? 'fa-hand-holding-usd text-red-400' :
+                                  d.type === 'broadcast' ? 'fa-bullhorn text-amber-400' :
                                   'fa-bell text-emerald-400',
                             title: d.title || 'إشعار',
                             message: d.message || '',
                             time: 'الآن'
                         });
                         if (this.notifications.length > 20) this.notifications.pop();
-                        // Play sound
-                        this.playNotifSound();
+                        // Play sound + browser notification
+                        if (typeof Notifier !== 'undefined' && Notifier.enabled) {
+                            Notifier.notify(d.title || d.message || 'إشعار', d.type);
+                        }
+                        // Also play rich sound directly
+                        this.playNotifSound(d.type);
                     } catch(e) {}
                 };
                 this.notifSource.onerror = () => {
@@ -572,6 +580,30 @@ function baseApp() {
                     // Reconnect after 5s
                     setTimeout(() => this.connectNotificationStream(), 5000);
                 };
+            } catch(e) {}
+        },
+
+        async fetchMissedNotifications() {
+            try {
+                const res = await fetch('/api/notifications-log');
+                if (!res.ok) return;
+                const data = await res.json();
+                const logs = data.notifications || [];
+                // Show last 3 as toasts (only if they're recent — within 5 minutes)
+                const now = Date.now();
+                for (const log of logs.slice(0, 3).reverse()) {
+                    try {
+                        const logTime = new Date(log.timestamp || '').getTime();
+                        const ageMin = (now - logTime) / 60000;
+                        if (ageMin < 5) { // Only show notifications from the last 5 minutes
+                            this.showToast({
+                                type: log.type || 'notification',
+                                title: log.type_label || 'إشعار',
+                                message: log.message_preview || log.message || ''
+                            });
+                        }
+                    } catch(e) {}
+                }
             } catch(e) {}
         },
 
@@ -594,16 +626,70 @@ function baseApp() {
             setTimeout(() => { toast.style.opacity = '0'; toast.style.transform = 'translateX(100%)'; setTimeout(() => toast.remove(), 300); }, 5000);
         },
 
-        playNotifSound() {
+        playNotifSound(type) {
             try {
                 const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                const o = ctx.createOscillator(), g = ctx.createGain();
-                o.connect(g); g.connect(ctx.destination);
-                o.frequency.value = 880; o.type = 'sine';
-                g.gain.setValueAtTime(0.15, ctx.currentTime);
-                g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
-                o.start(); o.stop(ctx.currentTime + 0.15);
-                setTimeout(() => { const o2 = ctx.createOscillator(), g2 = ctx.createGain(); o2.connect(g2); g2.connect(ctx.destination); o2.frequency.value = 1320; o2.type = 'sine'; g2.gain.setValueAtTime(0.1, ctx.currentTime); g2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1); o2.start(); o2.stop(ctx.currentTime + 0.1); }, 80);
+                const now = ctx.currentTime;
+                
+                if (type === 'broadcast') {
+                    // Broadcast fanfare: 5 ascending notes + chime
+                    [392, 523, 659, 784, 1047].forEach((freq, i) => {
+                        const o = ctx.createOscillator(), g = ctx.createGain();
+                        o.connect(g); g.connect(ctx.destination);
+                        o.frequency.value = freq; o.type = 'triangle';
+                        g.gain.setValueAtTime(0.25, now + i * 0.1);
+                        g.gain.exponentialRampToValueAtTime(0.01, now + i * 0.1 + 0.3);
+                        o.start(now + i * 0.1); o.stop(now + i * 0.1 + 0.3);
+                    });
+                    const chime = ctx.createOscillator(), cGain = ctx.createGain();
+                    chime.connect(cGain); cGain.connect(ctx.destination);
+                    chime.frequency.value = 1568; chime.type = 'sine';
+                    cGain.gain.setValueAtTime(0.2, now + 0.5);
+                    cGain.gain.exponentialRampToValueAtTime(0.001, now + 1.0);
+                    chime.start(now + 0.5); chime.stop(now + 1.0);
+                } else if (type === 'urgent' || type === 'alert') {
+                    // Alert: 3 sharp beeps + bass
+                    for (let i = 0; i < 3; i++) {
+                        const o = ctx.createOscillator(), g = ctx.createGain();
+                        o.connect(g); g.connect(ctx.destination);
+                        o.frequency.value = 880; o.type = 'square';
+                        g.gain.setValueAtTime(0.3, now + i * 0.3);
+                        g.gain.exponentialRampToValueAtTime(0.01, now + i * 0.3 + 0.25);
+                        o.start(now + i * 0.3); o.stop(now + i * 0.3 + 0.25);
+                    }
+                    const bass = ctx.createOscillator(), bGain = ctx.createGain();
+                    bass.connect(bGain); bGain.connect(ctx.destination);
+                    bass.frequency.value = 120; bass.type = 'sawtooth';
+                    bGain.gain.setValueAtTime(0.35, now);
+                    bGain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+                    bass.start(now); bass.stop(now + 0.5);
+                } else if (type && type.includes('approve')) {
+                    // Success: C major arpeggio
+                    [523, 659, 784, 1047].forEach((freq, i) => {
+                        const o = ctx.createOscillator(), g = ctx.createGain();
+                        o.connect(g); g.connect(ctx.destination);
+                        o.frequency.value = freq; o.type = 'sine';
+                        g.gain.setValueAtTime(0.25, now + i * 0.12);
+                        g.gain.exponentialRampToValueAtTime(0.01, now + i * 0.12 + 0.25);
+                        o.start(now + i * 0.12); o.stop(now + i * 0.12 + 0.25);
+                    });
+                } else {
+                    // Default: 2 pleasant tones
+                    const o = ctx.createOscillator(), g = ctx.createGain();
+                    o.connect(g); g.connect(ctx.destination);
+                    o.frequency.value = 740; o.type = 'sine';
+                    g.gain.setValueAtTime(0.2, now);
+                    g.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                    o.start(now); o.stop(now + 0.3);
+                    setTimeout(() => {
+                        const o2 = ctx.createOscillator(), g2 = ctx.createGain();
+                        o2.connect(g2); g2.connect(ctx.destination);
+                        o2.frequency.value = 988; o2.type = 'sine';
+                        g2.gain.setValueAtTime(0.15, ctx.currentTime);
+                        g2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
+                        o2.start(); o2.stop(ctx.currentTime + 0.2);
+                    }, 150);
+                }
             } catch(e) {}
         }
     }
