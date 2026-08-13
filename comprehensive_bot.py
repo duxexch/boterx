@@ -6667,7 +6667,7 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             return False
 
     def _process_broadcast_queue(self):
-        """معالجة طابور البث — في thread منفصل، مع rate limiting آمن"""
+        """معالجة طابور البث — وسائط متعددة + فردي/جماعي + دولة"""
         import threading as _th
         def _do_process():
             if not os.path.exists('broadcast_queue.csv'):
@@ -6677,7 +6677,7 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                 pending = []
                 with open('broadcast_queue.csv', 'r', encoding='utf-8-sig') as f:
                     reader = csv.DictReader(f)
-                    fieldnames = reader.fieldnames or ['id', 'message', 'type', 'target', 'media_url', 'created_at', 'created_by', 'status']
+                    fieldnames = reader.fieldnames or ['id','message','target','recipient','priority','country','media_urls','target_user','target_name','created_at','created_by','status']
                     for row in reader:
                         if row.get('status') == 'pending':
                             pending.append(row)
@@ -6686,31 +6686,25 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
 
                 for item in pending:
                     msg = item.get('message', '')
-                    msg_type = item.get('type', 'text')
-                    target_chat = item.get('target_chat_id', '')
-                    media_url = item.get('media_url', '').strip()
+                    recipient_type = item.get('recipient', 'all')
+                    target_user = item.get('target_user', '').strip()
+                    country_filter = item.get('country', 'all')
+                    media_urls_str = item.get('media_urls', '').strip()
+                    media_urls = [u for u in media_urls_str.split('|') if u] if media_urls_str else []
                     item_id = item.get('id', '')
                     try:
-                        if target_chat:
-                            # إرسال لقناة/مستخدم محدد
-                            if msg_type == 'photo' and media_url:
-                                self.api_call('sendPhoto', {'chat_id': target_chat, 'photo': media_url, 'caption': msg, 'parse_mode': 'HTML'}, retries=1)
-                            elif msg_type == 'video' and media_url:
-                                self.api_call('sendVideo', {'chat_id': target_chat, 'video': media_url, 'caption': msg, 'parse_mode': 'HTML'}, retries=1)
-                            elif msg_type == 'document' and media_url:
-                                self.api_call('sendDocument', {'chat_id': target_chat, 'document': media_url, 'caption': msg, 'parse_mode': 'HTML'}, retries=1)
-                            else:
-                                self.api_call('sendMessage', {'chat_id': target_chat, 'text': msg, 'parse_mode': 'HTML'}, retries=1)
+                        if recipient_type == 'single' and target_user:
+                            # ── إرسال فردي ──
+                            self._send_broadcast_to_user(target_user, msg, media_urls)
                         else:
-                            # بث عام — مع وسائط + rate limiting آمن
-                            self.broadcast_to_all_users(msg, photo=(media_url if msg_type == 'photo' else None), video=(media_url if msg_type == 'video' else None), document=(media_url if msg_type == 'document' else None))
+                            # ── إرسال جماعي (مع فلتر دولة) ──
+                            self._send_broadcast_to_all(msg, media_urls, country_filter)
                         item['status'] = 'sent'
                     except Exception as e:
                         logger.error(f"خطأ في إرسال {item_id}: {e}")
                         item['status'] = 'failed'
                     rows.append(item)
 
-                # كتابة مرة واحدة
                 with open('broadcast_queue.csv', 'w', newline='', encoding='utf-8-sig') as f:
                     writer = csv.DictWriter(f, fieldnames=fieldnames)
                     writer.writeheader()
@@ -6718,9 +6712,75 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                         writer.writerow({k: row.get(k, '') for k in fieldnames})
             except Exception as e:
                 logger.error(f"خطأ في _process_broadcast_queue: {e}")
-        # تشغيل في thread منفصل
         t = _th.Thread(target=_do_process, daemon=True)
         t.start()
+
+    def _send_broadcast_to_user(self, chat_id, msg, media_urls):
+        """إرسال بث لمستخدم واحد — نص + وسائط متعددة"""
+        # إرسال الوسائط أولاً
+        for url in media_urls:
+            ext = url.rsplit('.', 1)[-1].lower() if '.' in url else ''
+            if ext in ('jpg','jpeg','png','webp','gif'):
+                self.api_call('sendPhoto', {'chat_id': chat_id, 'photo': url, 'caption': msg if url == media_urls[-1] else '', 'parse_mode': 'HTML'}, retries=1)
+            elif ext in ('mp4','webm','mov'):
+                self.api_call('sendVideo', {'chat_id': chat_id, 'video': url, 'caption': msg if url == media_urls[-1] else '', 'parse_mode': 'HTML'}, retries=1)
+            else:
+                self.api_call('sendDocument', {'chat_id': chat_id, 'document': url, 'caption': msg if url == media_urls[-1] else '', 'parse_mode': 'HTML'}, retries=1)
+        # إرسال النص فقط لو مفيش وسائط أو النص طويل
+        if msg and not media_urls:
+            self.api_call('sendMessage', {'chat_id': chat_id, 'text': msg, 'parse_mode': 'HTML'}, retries=1)
+        elif msg and len(msg) > 1024 and media_urls:
+            # النص طويل جداً للـ caption (1024 حد) — أرسله منفصلاً
+            self.api_call('sendMessage', {'chat_id': chat_id, 'text': msg, 'parse_mode': 'HTML'}, retries=1)
+
+    def _send_broadcast_to_all(self, msg, media_urls, country_filter='all'):
+        """بث جماعي — مع فلتر دولة + rate limiting آمن (1 ثانية كل 20 رسالة)"""
+        import time as _bt
+        users = []
+        try:
+            with open('users.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    tid = row.get('telegram_id', '')
+                    if not tid or row.get('is_banned') == 'yes':
+                        continue
+                    # فلتر الدولة
+                    if country_filter and country_filter != 'all':
+                        phone = row.get('phone', '')
+                        if not self._phone_matches_country(phone, country_filter):
+                            continue
+                    users.append(tid)
+        except:
+            pass
+
+        sent = 0
+        failed = 0
+        for i, tid in enumerate(users):
+            try:
+                self._send_broadcast_to_user(tid, msg, media_urls)
+                sent += 1
+            except:
+                failed += 1
+            # rate limiting: 1 ثانية كل 20 رسالة
+            if (sent + failed) > 0 and (sent + failed) % 20 == 0:
+                _bt.sleep(1)
+        logger.info(f"بث جماعي: sent={sent} failed={failed} country={country_filter}")
+
+    def _phone_matches_country(self, phone, country_code):
+        """فحص مطابقة رقم الهاتف لدولة"""
+        prefixes = {
+            'EG': ['+20', '20'], 'SA': ['+966', '966'], 'AE': ['+971', '971'],
+            'JO': ['+962', '962'], 'MA': ['+212', '212'], 'DZ': ['+213', '213'],
+            'TN': ['+216', '216'], 'IQ': ['+964', '964'], 'LY': ['+218', '218'],
+            'SD': ['+249', '249'], 'YE': ['+967', '967'], 'PS': ['+970', '970'],
+            'KW': ['+965', '965'], 'QA': ['+974', '974'], 'BH': ['+973', '973'],
+            'OM': ['+968', '968'], 'LB': ['+961', '961'], 'SY': ['+963', '963'],
+        }
+        p = phone.replace(' ', '').replace('-', '')
+        for prefix in prefixes.get(country_code, []):
+            if p.startswith(prefix):
+                return True
+        return False
 
     def handle_complaint_start(self, message):
         """بدء عملية الشكوى"""

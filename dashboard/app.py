@@ -3783,42 +3783,63 @@ def api_upload_broadcast_media():
 @api_auth
 @permission_required('send_broadcast')
 def api_broadcast():
-    """بث رسالة لكل المستخدمين — يدعم وسائط + وجهة (telegram/web/both)"""
+    """بث رسالة — يدعم وسائط متعددة + فردي/جماعي + دولة + أولوية"""
     message = request.json.get('message', '') if request.json else ''
-    msg_type = request.json.get('type', 'text') if request.json else ''
     target = request.json.get('target', 'both') if request.json else 'both'
-    media_url = request.json.get('media_url', '') if request.json else ''
-    abs_media_url = ''
-    if media_url:
-        abs_media_url = media_url if media_url.startswith('http') else f'https://vex.deals{media_url}'
+    recipient = request.json.get('recipient', 'all') if request.json else 'all'
+    priority = request.json.get('priority', 'normal') if request.json else 'normal'
+    country = request.json.get('country', 'all') if request.json else 'all'
+    media_urls = request.json.get('media_urls', []) if request.json else []
+    target_user = request.json.get('target_user', '') if request.json else ''
+    target_name = request.json.get('target_name', '') if request.json else ''
+
+    # Normalize media URLs to absolute
+    abs_media_urls = []
+    for url in media_urls:
+        if url:
+            abs_media_urls.append(url if url.startswith('http') else f'https://vex.deals{url}')
+
+    primary_media = abs_media_urls[0] if abs_media_urls else ''
 
     # ── Web notification (instant via SSE) ──
     if target in ('web', 'both'):
+        notif_title = '📢 رسالة جديدة'
+        if priority == 'urgent':
+            notif_title = '🚨 رسالة عاجلة'
+        elif priority == 'high':
+            notif_title = '⚡ رسالة مهمة'
         push_notification(
             'broadcast',
-            '📢 رسالة جديدة',
-            message[:200] or (f'{msg_type} من الإدارة' if msg_type else 'إشعار من الإدارة'),
-            {'media_url': abs_media_url, 'type': msg_type, 'full_message': message}
+            notif_title,
+            message[:200] or 'إشعار من الإدارة',
+            {'media_url': primary_media, 'media_urls': abs_media_urls, 'priority': priority,
+             'recipient': recipient, 'country': country, 'full_message': message}
         )
 
     # ── Telegram broadcast (queued for bot) ──
     if target in ('telegram', 'both'):
         broadcast_entry = {
-            'id': f"BCAST{str(int(datetime.now().timestamp()))[-6:]}",
+            'id': f"BCAST{str(int(datetime.now().timestamp()))[-6:]}{secrets.token_hex(2)}",
             'message': message,
-            'type': msg_type,
             'target': target,
-            'media_url': abs_media_url,
+            'recipient': recipient,
+            'priority': priority,
+            'country': country,
+            'media_urls': '|'.join(abs_media_urls),
+            'target_user': target_user,
+            'target_name': target_name,
             'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             'created_by': session.get('admin_id', ''),
             'status': 'pending'
         }
-        fieldnames = ['id', 'message', 'type', 'target', 'media_url', 'created_at', 'created_by', 'status']
+        fieldnames = ['id', 'message', 'target', 'recipient', 'priority', 'country',
+                      'media_urls', 'target_user', 'target_name', 'created_at', 'created_by', 'status']
         append_csv('broadcast_queue.csv', broadcast_entry, fieldnames)
 
-    log_action('broadcast', f'type={msg_type} target={target} msg={message[:50]}')
+    log_action('broadcast', f'recipient={recipient} target={target} priority={priority} country={country} msg={message[:50]}')
     target_label = 'تيليغرام والموقع' if target == 'both' else ('تيليغرام' if target == 'telegram' else 'الموقع')
-    return jsonify({'success': True, 'message': f'تم إرسال البث عبر {target_label}'})
+    recipient_label = 'فردي' if recipient == 'single' else ('دولة محددة' if country != 'all' else 'جماعي')
+    return jsonify({'success': True, 'message': f'تم إرسال البث {recipient_label} عبر {target_label}'})
 
 # ===== API — Settings =====
 

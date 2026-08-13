@@ -3,57 +3,90 @@
 {% block page_title %}📢 بث رسالة{% endblock %}
 
 {% block content %}
-<div x-data="broadcastApp()" class="space-y-4 max-w-2xl">
+<div x-data="broadcastApp()" class="space-y-4 max-w-3xl">
     <!-- Broadcast Form -->
     <div class="bg-slate-800 rounded-xl border border-slate-700 p-6">
-        <h3 class="font-semibold mb-4">📢 إرسال بث لجميع المستخدمين</h3>
+        <h3 class="font-semibold mb-4">📢 إرسال بث</h3>
         <div class="space-y-4">
-            <!-- Target Selection -->
+            <!-- Recipient Type -->
+            <div>
+                <label class="block text-sm text-slate-400 mb-2">👥 المستلمون</label>
+                <div class="grid grid-cols-2 gap-2">
+                    <button @click="recipient='all'" :class="recipient==='all' ? 'bg-blue-600 text-white border-blue-500' : 'bg-slate-700 text-slate-400 border-slate-600'" class="px-4 py-3 rounded-lg border-2 text-sm font-bold transition">
+                        <i class="fas fa-bullhorn block mb-1"></i> جماعي (الكل)
+                    </button>
+                    <button @click="recipient='single'" :class="recipient==='single' ? 'bg-amber-600 text-white border-amber-500' : 'bg-slate-700 text-slate-400 border-slate-600'" class="px-4 py-3 rounded-lg border-2 text-sm font-bold transition">
+                        <i class="fas fa-user block mb-1"></i> فردي
+                    </button>
+                </div>
+            </div>
+
+            <!-- Single User Search (only if recipient=single) -->
+            <div x-show="recipient==='single'" x-transition>
+                <label class="block text-sm text-slate-400 mb-2">🔍 ابحث عن مستخدم</label>
+                <div class="relative">
+                    <input type="text" x-model="searchQuery" @input.debounce.300ms="searchUsers()" class="input w-full" placeholder="اسم أو رقم عميل أو telegram_id...">
+                    <div x-show="searchResults.length > 0" class="absolute z-10 mt-1 w-full bg-slate-700 border border-slate-600 rounded-lg max-h-48 overflow-y-auto shadow-xl">
+                        <template x-for="u in searchResults" :key="u.telegram_id">
+                            <div @click="selectUser(u)" class="p-3 hover:bg-slate-600 cursor-pointer border-b border-slate-600/50">
+                                <div class="text-sm font-bold text-slate-200" x-text="u.name"></div>
+                                <div class="text-xs text-slate-400" x-text="u.customer_id + ' • ' + u.currency"></div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+                <div x-show="selectedUser" class="mt-2 p-3 bg-green-600/10 border border-green-600/20 rounded-lg flex items-center justify-between">
+                    <div>
+                                        <span class="text-sm font-bold text-green-400">✅ تم تحديد: </span>
+                        <span class="text-sm text-slate-200" x-text="selectedUser?.name"></span>
+                        <span class="text-xs text-slate-400 ml-2" x-text="selectedUser?.customer_id"></span>
+                    </div>
+                    <button @click="selectedUser=null" class="text-red-400 hover:text-red-300"><i class="fas fa-times"></i></button>
+                </div>
+            </div>
+
+            <!-- Country Filter -->
+            <div x-show="recipient==='all'" x-transition>
+                <label class="block text-sm text-slate-400 mb-2">🌍 الدول</label>
+                <div class="grid grid-cols-2 gap-2">
+                    <button @click="countryFilter='all'" :class="countryFilter==='all' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-400'" class="px-3 py-2 rounded-lg text-sm font-bold transition">🌍 كل الدول</button>
+                    <select x-model="countryFilter" x-show="countryFilter!=='all'" class="input text-sm flex-1">
+                        <option value="all">🌍 كل الدول</option>
+                        <option value="EG">🇪🇬 مصر</option>
+                        <option value="SA">🇸🇦 السعودية</option>
+                        <option value="AE">🇦🇪 الإمارات</option>
+                        <option value="JO">🇯🇴 الأردن</option>
+                        <option value="MA">🇲🇦 المغرب</option>
+                        <option value="DZ">🇩🇿 الجزائر</option>
+                        <option value="TN">🇹🇳 تونس</option>
+                        <option value="IQ">🇮🇶 العراق</option>
+                        <option value="LY">🇱🇾 ليبيا</option>
+                        <option value="SD">🇸🇩 السودان</option>
+                        <option value="YE">🇾🇪 اليمن</option>
+                        <option value="PS">🇵🇸 فلسطين</option>
+                        <option value="KW">🇰🇼 الكويت</option>
+                        <option value="QA">🇶🇦 قطر</option>
+                        <option value="BH">🇧🇭 البحرين</option>
+                        <option value="OM">🇴🇲 عمان</option>
+                        <option value="LB">🇱🇧 لبنان</option>
+                        <option value="SY">🇸🇾 سوريا</option>
+                    </select>
+                </div>
+                <button x-show="countryFilter==='all'" @click="countryFilter='EG'" class="mt-2 text-xs text-blue-400 hover:text-blue-300">← أو اختر دولة معينة</button>
+            </div>
+
+            <!-- Target Channel -->
             <div>
                 <label class="block text-sm text-slate-400 mb-2">🎯 وجهة الإرسال</label>
                 <div class="grid grid-cols-3 gap-2">
-                    <button @click="target='telegram'" :class="target==='telegram' ? 'bg-blue-600 text-white border-blue-500' : 'bg-slate-700 text-slate-400 border-slate-600'" class="px-4 py-3 rounded-lg border-2 text-sm font-bold transition">
-                        <i class="fab fa-telegram text-lg block mb-1"></i> تيليغرام
+                    <button @click="target='telegram'" :class="target==='telegram' ? 'bg-blue-600 text-white border-blue-500' : 'bg-slate-700 text-slate-400 border-slate-600'" class="px-3 py-2 rounded-lg border-2 text-sm font-bold transition">
+                        <i class="fab fa-telegram block text-lg mb-1"></i> تيليغرام
                     </button>
-                    <button @click="target='web'" :class="target==='web' ? 'bg-green-600 text-white border-green-500' : 'bg-slate-700 text-slate-400 border-slate-600'" class="px-4 py-3 rounded-lg border-2 text-sm font-bold transition">
-                        <i class="fas fa-globe text-lg block mb-1"></i> الموقع
+                    <button @click="target='web'" :class="target==='web' ? 'bg-green-600 text-white border-green-500' : 'bg-slate-700 text-slate-400 border-slate-600'" class="px-3 py-2 rounded-lg border-2 text-sm font-bold transition">
+                        <i class="fas fa-globe block text-lg mb-1"></i> الموقع
                     </button>
-                    <button @click="target='both'" :class="target==='both' ? 'bg-amber-600 text-white border-amber-500' : 'bg-slate-700 text-slate-400 border-slate-600'" class="px-4 py-3 rounded-lg border-2 text-sm font-bold transition">
-                        <i class="fas fa-bullhorn text-lg block mb-1"></i> الاثنين
-                    </button>
-                </div>
-            </div>
-
-            <!-- Message Type -->
-            <div>
-                <label class="block text-sm text-slate-400 mb-2">📝 نوع الرسالة</label>
-                <div class="grid grid-cols-4 gap-2">
-                    <button @click="type='text'" :class="type==='text' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-400'" class="px-3 py-2 rounded-lg text-sm font-bold transition">📝 نص</button>
-                    <button @click="type='photo'" :class="type==='photo' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-400'" class="px-3 py-2 rounded-lg text-sm font-bold transition">📷 صورة</button>
-                    <button @click="type='video'" :class="type==='video' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-400'" class="px-3 py-2 rounded-lg text-sm font-bold transition">🎥 فيديو</button>
-                    <button @click="type='document'" :class="type==='document' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-400'" class="px-3 py-2 rounded-lg text-sm font-bold transition">📎 ملف</button>
-                </div>
-            </div>
-
-            <!-- Media Upload (for photo/video/document) -->
-            <div x-show="type !== 'text'" x-transition>
-                <label class="block text-sm text-slate-400 mb-2">📎 رفع ملف</label>
-                <div class="flex items-center gap-3">
-                    <label class="flex-1 cursor-pointer">
-                        <div class="flex items-center justify-center gap-2 bg-slate-700 hover:bg-slate-600 border-2 border-dashed border-slate-500 rounded-lg px-4 py-6 text-sm text-slate-300 transition">
-                            <i class="fas fa-cloud-upload-alt text-2xl"></i>
-                            <span x-text="uploading ? '⏳ جارٍ الرفع...' : 'اختر ملف'"></span>
-                        </div>
-                        <input type="file" class="hidden" accept="image/*,video/*" @change="uploadMedia($event)">
-                    </label>
-                    <!-- Media preview -->
-                    <div x-show="mediaUrl" class="w-20 h-20 rounded-lg overflow-hidden bg-slate-700 flex items-center justify-center flex-shrink-0">
-                        <img x-show="type==='photo' && mediaUrl" :src="mediaUrl" class="w-full h-full object-cover">
-                        <video x-show="type==='video' && mediaUrl" :src="mediaUrl" class="w-full h-full object-cover" muted></video>
-                        <i x-show="type==='document' && mediaUrl" class="fas fa-file text-2xl text-slate-400"></i>
-                    </div>
-                    <button x-show="mediaUrl" @click="mediaUrl=''" class="p-2 rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white transition" title="حذف">
-                        <i class="fas fa-times"></i>
+                    <button @click="target='both'" :class="target==='both' ? 'bg-amber-600 text-white border-amber-500' : 'bg-slate-700 text-slate-400 border-slate-600'" class="px-3 py-2 rounded-lg border-2 text-sm font-bold transition">
+                        <i class="fas fa-bullhorn block text-lg mb-1"></i> الاثنين
                     </button>
                 </div>
             </div>
@@ -61,58 +94,75 @@
             <!-- Message Text -->
             <div>
                 <label class="block text-sm text-slate-400 mb-2">💬 نص الرسالة</label>
-                <textarea x-model="message" rows="6" class="input w-full" placeholder="اكتب رسالتك هنا... (يدعم HTML للتيليغرام)" data-i18n-placeholder="write_message_here"></textarea>
-                <p class="text-xs text-slate-500 mt-1">💡 للتيليغرام: استخدم HTML tags مثل <code>&lt;b&gt;غامق&lt;/b&gt;</code> و <code>&lt;code&gt;كود&lt;/code&gt;</code></p>
+                <textarea x-model="message" rows="4" class="input w-full" placeholder="اكتب رسالتك هنا... (يدعم HTML للتيليغرام)"></textarea>
+                <p class="text-xs text-slate-500 mt-1">💡 للتيليغرام: <code>&lt;b&gt;غامق&lt;/b&gt;</code> <code>&lt;code&gt;كود&lt;/code&gt;</code></p>
+            </div>
+
+            <!-- Media Attachments (Multiple) -->
+            <div>
+                <label class="block text-sm text-slate-400 mb-2">📎 المرفقات (متعدد)</label>
+                <div class="flex flex-wrap gap-2 mb-2">
+                    <template x-for="(media, idx) in mediaList" :key="idx">
+                        <div class="relative w-20 h-20 rounded-lg overflow-hidden bg-slate-700 border border-slate-600 group">
+                            <img x-show="media.type.startsWith('image')" :src="media.url" class="w-full h-full object-cover">
+                            <video x-show="media.type.startsWith('video')" :src="media.url" class="w-full h-full object-cover" muted></video>
+                            <i x-show="!media.type.startsWith('image') && !media.type.startsWith('video')" class="fas fa-file text-2xl text-slate-400 w-full h-full flex items-center justify-center"></i>
+                            <button @click="mediaList.splice(idx, 1)" class="absolute top-0 right-0 bg-red-600 text-white w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition"><i class="fas fa-times"></i></button>
+                        </div>
+                    </template>
+                    <label class="w-20 h-20 rounded-lg border-2 border-dashed border-slate-500 flex items-center justify-center cursor-pointer hover:border-green-500 hover:bg-slate-700 transition">
+                        <i class="fas fa-plus text-xl text-slate-400"></i>
+                        <input type="file" class="hidden" accept="image/*,video/*" @change="uploadMedia($event)" :disabled="uploading">
+                    </label>
+                </div>
+                <p class="text-xs text-slate-500" x-show="uploading">⏳ جارٍ الرفع...</p>
+            </div>
+
+            <!-- Priority -->
+            <div>
+                <label class="block text-sm text-slate-400 mb-2">⚡ الأولوية</label>
+                <div class="grid grid-cols-3 gap-2">
+                    <button @click="priority='normal'" :class="priority==='normal' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-400'" class="px-3 py-2 rounded-lg text-xs font-bold transition">🔔 عادية</button>
+                    <button @click="priority='high'" :class="priority==='high' ? 'bg-amber-600 text-white' : 'bg-slate-700 text-slate-400'" class="px-3 py-2 rounded-lg text-xs font-bold transition">⚡ عالية</button>
+                    <button @click="priority='urgent'" :class="priority==='urgent' ? 'bg-red-600 text-white' : 'bg-slate-700 text-slate-400'" class="px-3 py-2 rounded-lg text-xs font-bold transition">🚨 عاجلة</button>
+                </div>
             </div>
 
             <!-- Info -->
             <div class="flex items-center gap-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
                 <i class="fas fa-info-circle text-amber-400"></i>
-                <p class="text-xs text-amber-300" x-text="target === 'telegram' ? 'سيتم إرسال الرسالة عبر بوت تيليغرام — بحد آمن 25 رسالة/ثانية' : target === 'web' ? 'سيظهر كإشعار فوري على الموقع لكل المستخدمين المتصلين' : 'سيتم الإرسال عبر تيليغرام والموقع معاً'"></p>
+                <p class="text-xs text-amber-300" x-text="getInfoText()"></p>
             </div>
 
             <!-- Send Button -->
-            <button @click="send()" :disabled="sending || (!message.trim() && !mediaUrl)" class="btn btn-primary w-full flex items-center justify-center gap-2">
-                <span x-show="!sending"><i class="fas fa-paper-plane"></i> إرسال البث</span>
+            <button @click="send()" :disabled="sending || (!message.trim() && mediaList.length === 0)" class="btn btn-primary w-full flex items-center justify-center gap-2">
+                <span x-show="!sending"><i class="fas fa-paper-plane"></i> إرسال</span>
                 <span x-show="sending"><i class="fas fa-spinner fa-spin"></i> جارٍ الإرسال...</span>
             </button>
         </div>
     </div>
 
-    <!-- Preview -->
-    <div x-show="message || mediaUrl" class="bg-slate-800 rounded-xl border border-slate-700 p-4">
-        <p class="text-xs text-slate-400 mb-2">👁️ معاينة:</p>
-        <div class="bg-slate-900/70 rounded-lg p-4 space-y-3">
-            <img x-show="type==='photo' && mediaUrl" :src="mediaUrl" class="max-h-40 rounded-lg mx-auto">
-            <video x-show="type==='video' && mediaUrl" :src="mediaUrl" class="max-h-40 rounded-lg mx-auto" controls muted></video>
-            <p x-show="message" class="text-sm text-slate-200" x-text="message"></p>
-            <div class="text-xs text-slate-500 flex items-center gap-2 pt-2 border-t border-slate-700">
-                <span x-text="target === 'telegram' ? '📱 تيليغرام' : target === 'web' ? '🌐 الموقع' : '📱🌐 الاثنين'"></span>
-                <span>•</span>
-                <span x-text="type === 'text' ? '📝 نص' : type === 'photo' ? '📷 صورة' : type === 'video' ? '🎥 فيديو' : '📎 ملف'"></span>
-            </div>
-        </div>
-    </div>
-
     <!-- Recent Broadcasts -->
     <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
-        <h4 class="font-semibold text-sm mb-3">📋 آخر البثوث</h4>
+        <div class="flex items-center justify-between mb-3">
+            <h4 class="font-semibold text-sm">📋 آخر البثوث</h4>
+            <button @click="loadQueue()" class="text-xs text-blue-400 hover:text-blue-300"><i class="fas fa-sync"></i></button>
+        </div>
         <template x-if="loadingQueue">
             <p class="text-center text-slate-400 py-4"><i class="fas fa-spinner fa-spin"></i></p>
         </template>
-        <template x-if="!loadingQueue && queue.length === 0">
-            <p class="text-center text-slate-500 py-4 text-sm">لا يوجد بثوث سابقة</p>
-        </template>
-        <div class="space-y-2">
+        <div class="space-y-2 max-h-64 overflow-y-auto">
             <template x-for="item in queue" :key="item.id">
                 <div class="bg-slate-700/50 rounded-lg p-3 flex items-center gap-3">
-                    <span :class="item.status === 'sent' ? 'bg-green-500/20 text-green-400' : item.status === 'pending' ? 'bg-amber-500/20 text-amber-400' : 'bg-red-500/20 text-red-400'" class="px-2 py-1 rounded text-xs font-bold" x-text="item.status === 'sent' ? '✅ مرسل' : item.status === 'pending' ? '⏳ معلق' : '❌ فشل'"></span>
+                    <span :class="{'bg-green-500/20 text-green-400': item.status==='sent', 'bg-amber-500/20 text-amber-400': item.status==='pending', 'bg-red-500/20 text-red-400': item.status==='failed'}" class="px-2 py-1 rounded text-xs font-bold whitespace-nowrap" x-text="item.status==='sent' ? '✅' : item.status==='pending' ? '⏳' : '❌'"></span>
                     <div class="flex-1 min-w-0">
-                        <p class="text-sm text-slate-200 truncate" x-text="item.message"></p>
-                        <p class="text-xs text-slate-500" x-text="item.created_at"></p>
+                        <p class="text-sm text-slate-200 truncate" x-text="item.message || '(وسائط)'"></p>
+                        <p class="text-xs text-slate-500" x-text="(item.recipient==='single' ? '👤 ' : '👥 ') + item.created_at"></p>
                     </div>
-                    <span class="text-xs text-slate-500" x-text="item.type"></span>
                 </div>
+            </template>
+            <template x-if="!loadingQueue && queue.length === 0">
+                <p class="text-center text-slate-500 py-4 text-sm">لا يوجد بثوث سابقة</p>
             </template>
         </div>
     </div>
@@ -123,10 +173,33 @@
 <script>
 function broadcastApp() {
     return {
-        message: '', type: 'text', target: 'both', mediaUrl: '', uploading: false,
-        sending: false, queue: [], loadingQueue: true,
+        message: '', target: 'both', recipient: 'all', priority: 'normal', countryFilter: 'all',
+        mediaList: [], uploading: false, sending: false,
+        searchQuery: '', searchResults: [], selectedUser: null,
+        queue: [], loadingQueue: true,
 
-        init() { this.loadQueue(); setInterval(() => this.loadQueue(), 15000); },
+        init() { this.loadQueue(); setInterval(() => this.loadQueue(), 20000); },
+
+        getInfoText() {
+            let t = '';
+            if (this.recipient === 'single') t = 'رسالة فردية — ';
+            else if (this.countryFilter !== 'all') t = 'بث لدولة محددة — ';
+            else t = 'بث جماعي — ';
+            if (this.target === 'telegram') t += 'عبر تيليغرام';
+            else if (this.target === 'web') t += 'عبر الموقع (إشعار فوري)';
+            else t += 'عبر تيليغرام والموقع';
+            if (this.priority === 'urgent') t += ' — عاجلة';
+            return t;
+        },
+
+        async searchUsers() {
+            if (this.searchQuery.length < 2) { this.searchResults = []; return; }
+            try {
+                const data = await api('/api/users?q=' + encodeURIComponent(this.searchQuery) + '&limit=10');
+                this.searchResults = (data.users || []).slice(0, 5);
+            } catch(e) { this.searchResults = []; }
+        },
+        selectUser(u) { this.selectedUser = u; this.searchQuery = ''; this.searchResults = []; },
 
         async uploadMedia(event) {
             const file = event.target.files[0];
@@ -136,30 +209,35 @@ function broadcastApp() {
                 const formData = new FormData();
                 formData.append('file', file);
                 const res = await fetch('/api/upload-broadcast-media', { method: 'POST', body: formData, credentials: 'same-origin' });
-                if (!res.ok) throw new Error('Upload failed');
+                if (!res.ok) throw new Error('fail');
                 const data = await res.json();
                 if (data.success) {
-                    this.mediaUrl = data.url;
+                    this.mediaList.push({ url: data.absolute_url, type: file.type, name: file.name });
                     toast('تم رفع الملف', 'success');
                 } else { toast(data.error || 'فشل الرفع', 'error'); }
-            } catch (e) { toast('فشل رفع الملف', 'error'); }
+            } catch(e) { toast('فشل رفع الملف', 'error'); }
             this.uploading = false;
             event.target.value = '';
         },
 
         async send() {
-            if (!this.message.trim() && !this.mediaUrl) return toast('اكتب رسالة أو ارفع ملف', 'warning');
+            if (!this.message.trim() && this.mediaList.length === 0) return toast('اكتب رسالة أو ارفع ملف', 'warning');
+            if (this.recipient === 'single' && !this.selectedUser) return toast('اختر مستخدم', 'warning');
             this.sending = true;
             try {
                 const payload = {
                     message: this.message,
-                    type: this.type,
                     target: this.target,
-                    media_url: this.mediaUrl
+                    recipient: this.recipient,
+                    priority: this.priority,
+                    country: this.countryFilter,
+                    media_urls: this.mediaList.map(m => m.url),
+                    target_user: this.selectedUser ? this.selectedUser.telegram_id : null,
+                    target_name: this.selectedUser ? this.selectedUser.name : null,
                 };
-                await api('/api/broadcast', { method: 'POST', body: JSON.stringify(payload) });
-                toast('تم إرسال البث بنجاح', 'success');
-                this.message = ''; this.mediaUrl = '';
+                const data = await api('/api/broadcast', { method: 'POST', body: JSON.stringify(payload) });
+                toast(data.message || 'تم الإرسال', 'success');
+                this.message = ''; this.mediaList = []; this.selectedUser = null;
                 this.loadQueue();
             } catch(e) { toast('فشل الإرسال', 'error'); }
             this.sending = false;
