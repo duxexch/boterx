@@ -49,12 +49,65 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=365)  # persistent login — never expire unless user logs out
 app.config['SESSION_COOKIE_SECURE'] = True  # HTTPS only
 
+# ===== Web Push (VAPID) — notifications work even when tab/browser is closed =====
+_VAPID_PRIVATE = """-----BEGIN PRIVATE KEY-----
+MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg06OSNvUikGK7vjDY
+ho72Y3P8AvA+PEg63UT5yz360sGhRANCAASOjPJwku6oSoks04byXYOeINsfC5w9
+ej5vx5VwKkk2dUrLlk99o8JtiJ4TGkDr5C8L0X+eMz75nJworbahwxlG
+-----END PRIVATE KEY-----"""
+_VAPID_PUBLIC = "jozycJLuqEqJLNOG8l2DniDbHwucPXo-b8eVcCpJNnVKy5ZPfaPCbYieExpA6-QvC9F_njM--ZycKK22ocMZRg"
+_VAPID_CLAIMS = {"sub": "mailto:admin@vex.deals"}
+
+def _send_web_push(payload_dict):
+    """Send Web Push to all subscribed browsers — works even when tab is closed."""
+    try:
+        from pywebpush import webpush, WebPushException
+    except ImportError:
+        return  # pywebpush not installed
+    subs = read_csv('push_subscriptions.csv')
+    if not subs:
+        return
+    payload = json.dumps({
+        'title': payload_dict.get('title', 'VEX Games'),
+        'message': payload_dict.get('message', ''),
+        'type': payload_dict.get('type', 'notification'),
+        'timestamp': payload_dict.get('timestamp', ''),
+        'url': '/dashboard'
+    })
+    for sub in subs:
+        endpoint = sub.get('endpoint', '')
+        if not endpoint:
+            continue
+        try:
+            subscription_info = {
+                "endpoint": endpoint,
+                "keys": {
+                    "p256dh": sub.get('p256dh', ''),
+                    "auth": sub.get('auth', '')
+                }
+            }
+            webpush(
+                subscription_info=subscription_info,
+                data=payload,
+                vapid_private_key=_VAPID_PRIVATE,
+                vapid_claims=_VAPID_CLAIMS,
+                timeout=5
+            )
+        except WebPushException as e:
+            # 410 = subscription expired, 404 = not found — remove dead subscriptions
+            if hasattr(e, 'response') and e.response and e.response.status_code in (404, 410):
+                pass  # Could clean up dead subs here
+            else:
+                pass  # Silent fail — don't crash on push errors
+        except Exception:
+            pass
+
 # ===== Real-time Notification Queue =====
 _notification_queues = []  # list of queue.Queue, one per connected SSE client
 _nq_lock = threading.Lock()
 
 def push_notification(notif_type, title, message, data=None):
-    """Push a real-time notification to all connected dashboard clients + log it."""
+    """Push notification: SSE (real-time) + Web Push (even when tab closed) + log."""
     payload_dict = {
         'type': notif_type,
         'title': title,
@@ -63,14 +116,14 @@ def push_notification(notif_type, title, message, data=None):
         'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     }
     payload = json.dumps(payload_dict)
-    # Push to SSE clients
+    # 1. Push to SSE clients (real-time, tab open)
     with _nq_lock:
         for q in _notification_queues:
             try:
                 q.put_nowait(payload)
             except:
                 pass
-    # Log to notifications_log.csv for missed notifications
+    # 2. Log to notifications_log.csv for missed notifications
     try:
         log_entry = {
             'timestamp': payload_dict['timestamp'],
@@ -85,6 +138,11 @@ def push_notification(notif_type, title, message, data=None):
         append_csv('notifications_log.csv', log_entry, fieldnames)
     except:
         pass
+    # 3. Web Push (works even when browser/tab is closed)
+    try:
+        _send_web_push(payload_dict)
+    except Exception as e:
+        print(f"Web Push error: {e}")
 
 # ===== CSV Helpers =====
 def read_csv(filename):
@@ -4894,6 +4952,12 @@ def api_notifications_log():
     return jsonify({'notifications': logs[:50], 'total': len(logs)})
 
 # ===== Web Push Subscriptions (notifications even when tab is closed) =====
+@app.route('/api/push/vapid-public-key')
+@api_auth
+def api_push_vapid_public():
+    """Return VAPID public key for browser push subscription."""
+    return jsonify({'public_key': _VAPID_PUBLIC})
+
 @app.route('/api/push/subscribe', methods=['POST'])
 @api_auth
 def api_push_subscribe():

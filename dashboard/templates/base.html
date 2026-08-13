@@ -707,7 +707,7 @@ function rbac(perm) { return !Object.keys(_RBAC).length || !!_RBAC[perm]; }
     try {
         if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
 
-        const reg = await navigator.serviceWorker.register('/static/sw.js?v=20260813a');
+        const reg = await navigator.serviceWorker.register('/static/sw.js?v=20260813b');
         await navigator.serviceWorker.ready;
 
         // Request permission if not granted
@@ -717,19 +717,32 @@ function rbac(perm) { return !Object.keys(_RBAC).length || !!_RBAC[perm]; }
         }
         if (Notification.permission !== 'granted') return;
 
+        // Get VAPID public key from server
+        let vapidKey = null;
+        try {
+            const res = await fetch('/api/push/vapid-public-key');
+            const data = await res.json();
+            vapidKey = data.public_key;
+        } catch(e) { return; }
+        if (!vapidKey) return;
+
+        // Convert VAPID key to Uint8Array
+        function urlBase64ToUint8Array(base64String) {
+            const padding = '='.repeat((4 - base64String.length % 4) % 4);
+            const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+            const rawData = atob(base64);
+            const outputArray = new Uint8Array(rawData.length);
+            for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
+            return outputArray;
+        }
+
         // Check existing subscription
         let sub = await reg.pushManager.getSubscription();
         if (!sub) {
-            // Use a simple VAPID-like key (generated for this app)
-            // Since we can't use VAPID without a library, we use the API approach:
-            // subscribe with a blank applicationServerKey (works for same-origin)
-            try {
-                sub = await reg.pushManager.subscribe({
-                    userVisibleOnly: true
-                });
-            } catch(e) {
-                return; // Push not supported in this browser
-            }
+            sub = await reg.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: urlBase64ToUint8Array(vapidKey)
+            });
         }
 
         // Send subscription to server
