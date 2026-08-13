@@ -1090,7 +1090,7 @@ def robots_txt():
 
 @app.route('/sitemap.xml')
 def sitemap_xml():
-    """Dynamic sitemap — lists all public, indexable pages."""
+    """Dynamic sitemap — lists all public, indexable pages + apps + referral links."""
     from datetime import datetime as _dt
     now = _dt.now().strftime('%Y-%m-%d')
     pages = [
@@ -1104,7 +1104,34 @@ def sitemap_xml():
         {'url': 'https://vex.deals/webapp/lottery', 'priority': '0.8', 'changefreq': 'weekly'},
         {'url': 'https://vex.deals/webapp/dice', 'priority': '0.8', 'changefreq': 'weekly'},
         {'url': 'https://vex.deals/webapp/stats', 'priority': '0.6', 'changefreq': 'weekly'},
+        {'url': 'https://vex.deals/webapp/account', 'priority': '0.5', 'changefreq': 'weekly'},
+        {'url': 'https://vex.deals/robots.txt', 'priority': '0.3', 'changefreq': 'monthly'},
+        {'url': 'https://vex.deals/llms.txt', 'priority': '0.3', 'changefreq': 'monthly'},
     ]
+    # Add active app referral/download links dynamically
+    try:
+        apps = read_csv('app_links.csv')
+        for a in apps:
+            if str(a.get('is_active', '')).lower() in ('yes', 'true', '1', 'active'):
+                ref = a.get('referral_link', '').strip()
+                dl = a.get('download_url', '').strip()
+                if ref:
+                    pages.append({'url': ref, 'priority': '0.5', 'changefreq': 'weekly'})
+                if dl and dl != ref:
+                    pages.append({'url': dl, 'priority': '0.5', 'changefreq': 'weekly'})
+    except:
+        pass
+    # Add public referral links
+    try:
+        refs = read_csv('referral_links.csv')
+        for r in refs:
+            if str(r.get('is_active', '')).lower() in ('yes', 'true', '1', 'active', ''):
+                url = r.get('url', '').strip()
+                if url:
+                    pages.append({'url': url, 'priority': '0.4', 'changefreq': 'weekly'})
+    except:
+        pass
+
     xml = '<?xml version="1.0" encoding="UTF-8"?>\n'
     xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
     for p in pages:
