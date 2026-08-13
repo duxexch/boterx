@@ -3756,27 +3756,69 @@ def api_complaint_reply(complaint_id):
 
 # ===== API — Broadcast =====
 
+@app.route('/api/upload-broadcast-media', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_upload_broadcast_media():
+    """Upload media file for broadcast."""
+    f = request.files.get('file')
+    if not f or not f.filename:
+        return jsonify({'success': False, 'error': 'لم يتم اختيار ملف'}), 400
+    ext = f.filename.rsplit('.', 1)[-1].lower() if '.' in f.filename else ''
+    allowed = {'png','jpg','jpeg','webp','gif','mp4','webm','mov','pdf','doc','docx'}
+    if ext not in allowed:
+        return jsonify({'success': False, 'error': 'صيغة غير مدعومة'}), 400
+    blob = f.read(50 * 1024 * 1024 + 1)  # 50MB max
+    if len(blob) > 50 * 1024 * 1024:
+        return jsonify({'success': False, 'error': 'الملف أكبر من 50MB'}), 400
+    os.makedirs(os.path.join(BASE_DIR, 'dashboard', 'static', 'uploads', 'broadcast'), exist_ok=True)
+    fname = f"bc_{secrets.token_hex(8)}.{ext}"
+    with open(os.path.join(BASE_DIR, 'dashboard', 'static', 'uploads', 'broadcast', fname), 'wb') as out:
+        out.write(blob)
+    url = f'/static/uploads/broadcast/{fname}'
+    log_action('upload_broadcast_media', fname)
+    return jsonify({'success': True, 'url': url, 'absolute_url': f'https://vex.deals{url}'})
+
 @app.route('/api/broadcast', methods=['POST'])
 @api_auth
 @permission_required('send_broadcast')
 def api_broadcast():
-    """بث رسالة لكل المستخدمين — يحفظ في ملف فقط (البوت الفعلي يرسل)"""
+    """بث رسالة لكل المستخدمين — يدعم وسائط + وجهة (telegram/web/both)"""
     message = request.json.get('message', '') if request.json else ''
-    msg_type = request.json.get('type', 'text') if request.json else 'text'
+    msg_type = request.json.get('type', 'text') if request.json else ''
+    target = request.json.get('target', 'both') if request.json else 'both'
+    media_url = request.json.get('media_url', '') if request.json else ''
+    abs_media_url = ''
+    if media_url:
+        abs_media_url = media_url if media_url.startswith('http') else f'https://vex.deals{media_url}'
 
-    # حفظ رسالة البث في ملف للبوت لإرسالها
-    broadcast_entry = {
-        'id': f"BCAST{str(int(datetime.now().timestamp()))[-6:]}",
-        'message': message,
-        'type': msg_type,
-        'created_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
-        'created_by': session.get('admin_id', ''),
-        'status': 'pending'
-    }
-    fieldnames = ['id', 'message', 'type', 'created_at', 'created_by', 'status']
-    append_csv('broadcast_queue.csv', broadcast_entry, fieldnames)
-    log_action('broadcast', message[:50])
-    return jsonify({'success': True, 'message': 'تم إضافة البث للقائمة — سيتم إرساله'})
+    # ── Web notification (instant via SSE) ──
+    if target in ('web', 'both'):
+        push_notification(
+            'broadcast',
+            '📢 رسالة جديدة',
+            message[:200] or (f'{msg_type} من الإدارة' if msg_type else 'إشعار من الإدارة'),
+            {'media_url': abs_media_url, 'type': msg_type, 'full_message': message}
+        )
+
+    # ── Telegram broadcast (queued for bot) ──
+    if target in ('telegram', 'both'):
+        broadcast_entry = {
+            'id': f"BCAST{str(int(datetime.now().timestamp()))[-6:]}",
+            'message': message,
+            'type': msg_type,
+            'target': target,
+            'media_url': abs_media_url,
+            'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'created_by': session.get('admin_id', ''),
+            'status': 'pending'
+        }
+        fieldnames = ['id', 'message', 'type', 'target', 'media_url', 'created_at', 'created_by', 'status']
+        append_csv('broadcast_queue.csv', broadcast_entry, fieldnames)
+
+    log_action('broadcast', f'type={msg_type} target={target} msg={message[:50]}')
+    target_label = 'تيليغرام والموقع' if target == 'both' else ('تيليغرام' if target == 'telegram' else 'الموقع')
+    return jsonify({'success': True, 'message': f'تم إرسال البث عبر {target_label}'})
 
 # ===== API — Settings =====
 

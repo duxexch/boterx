@@ -6667,7 +6667,7 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             return False
 
     def _process_broadcast_queue(self):
-        """معالجة طابور البث — في thread منفصل حتى لا يوقف البوت"""
+        """معالجة طابور البث — في thread منفصل، مع rate limiting آمن"""
         import threading as _th
         def _do_process():
             if not os.path.exists('broadcast_queue.csv'):
@@ -6677,7 +6677,7 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                 pending = []
                 with open('broadcast_queue.csv', 'r', encoding='utf-8-sig') as f:
                     reader = csv.DictReader(f)
-                    fieldnames = reader.fieldnames or ['id', 'message', 'type', 'created_at', 'created_by', 'status']
+                    fieldnames = reader.fieldnames or ['id', 'message', 'type', 'target', 'media_url', 'created_at', 'created_by', 'status']
                     for row in reader:
                         if row.get('status') == 'pending':
                             pending.append(row)
@@ -6686,19 +6686,24 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
 
                 for item in pending:
                     msg = item.get('message', '')
-                    target = item.get('target_chat_id', '')
+                    msg_type = item.get('type', 'text')
+                    target_chat = item.get('target_chat_id', '')
+                    media_url = item.get('media_url', '').strip()
                     item_id = item.get('id', '')
                     try:
-                        if target:
-                            # إرسال لقناة محددة — retry=1 فقط
-                            self.api_call('sendMessage', {
-                                'chat_id': target,
-                                'text': msg,
-                                'parse_mode': 'HTML'
-                            }, retries=1)
+                        if target_chat:
+                            # إرسال لقناة/مستخدم محدد
+                            if msg_type == 'photo' and media_url:
+                                self.api_call('sendPhoto', {'chat_id': target_chat, 'photo': media_url, 'caption': msg, 'parse_mode': 'HTML'}, retries=1)
+                            elif msg_type == 'video' and media_url:
+                                self.api_call('sendVideo', {'chat_id': target_chat, 'video': media_url, 'caption': msg, 'parse_mode': 'HTML'}, retries=1)
+                            elif msg_type == 'document' and media_url:
+                                self.api_call('sendDocument', {'chat_id': target_chat, 'document': media_url, 'caption': msg, 'parse_mode': 'HTML'}, retries=1)
+                            else:
+                                self.api_call('sendMessage', {'chat_id': target_chat, 'text': msg, 'parse_mode': 'HTML'}, retries=1)
                         else:
-                            # بث عام — يعمل في thread منفصل داخل broadcast_to_all_users
-                            self.broadcast_to_all_users(msg)
+                            # بث عام — مع وسائط + rate limiting آمن
+                            self.broadcast_to_all_users(msg, photo=(media_url if msg_type == 'photo' else None), video=(media_url if msg_type == 'video' else None), document=(media_url if msg_type == 'document' else None))
                         item['status'] = 'sent'
                     except Exception as e:
                         logger.error(f"خطأ في إرسال {item_id}: {e}")

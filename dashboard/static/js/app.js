@@ -602,7 +602,11 @@ const Notifier = {
     },
     notify(message, type) {
         if (!this.enabled) return;
-        if (Notification.permission === 'granted') { const n = new Notification('🔔 Boterx', { body: message, tag: type }); setTimeout(() => n.close(), 4000); }
+        if (Notification.permission === 'granted') {
+            const n = new Notification('🔔 VEX Games', { body: message, tag: type, icon: '/static/icons/icon-192.png', requireInteraction: type === 'broadcast' });
+            setTimeout(() => n.close(), type === 'broadcast' ? 8000 : 4000);
+            n.onclick = () => { window.focus(); n.close(); };
+        }
         const container = document.getElementById('notificationsList');
         if (container) {
             const item = document.createElement('div');
@@ -612,7 +616,12 @@ const Notifier = {
             if (container.children.length > 20) container.lastElementChild.remove();
         }
         this.showPopup(message, type);
-        this.playSound(type === 'new_match' || type === 'new_complaint' ? 'alert' : 'notification');
+        // Choose sound based on notification type
+        let soundType = 'notification';
+        if (type === 'broadcast') soundType = 'broadcast';
+        else if (type === 'new_match' || type === 'new_complaint') soundType = 'alert';
+        else if (type === 'deposit_approved' || type === 'withdrawal_approved' || type === 'vex_deposit') soundType = 'success';
+        this.playSound(soundType);
     },
     showPopup(message, type) {
         const existing = document.getElementById('bigPopup');
@@ -641,31 +650,65 @@ const Notifier = {
         try {
             const ctx = this.audioContext, now = ctx.currentTime;
             if (type === 'alert') {
+                // Urgent alert — 3 sharp beeps + vibration pattern
                 for (let i = 0; i < 3; i++) {
                     const osc = ctx.createOscillator(), gain = ctx.createGain();
                     osc.connect(gain); gain.connect(ctx.destination);
                     osc.frequency.value = 880; osc.type = 'square';
-                    gain.gain.setValueAtTime(0.3, now + i * 0.3);
+                    gain.gain.setValueAtTime(0.35, now + i * 0.3);
                     gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.3 + 0.25);
                     osc.start(now + i * 0.3); osc.stop(now + i * 0.3 + 0.25);
                 }
+                // Add a low bass thump for urgency
+                const bass = ctx.createOscillator(), bassGain = ctx.createGain();
+                bass.connect(bassGain); bassGain.connect(ctx.destination);
+                bass.frequency.value = 120; bass.type = 'sawtooth';
+                bassGain.gain.setValueAtTime(0.4, now);
+                bassGain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+                bass.start(now); bass.stop(now + 0.5);
             } else if (type === 'success') {
+                // Success — ascending C major arpeggio with harmonics
                 [523, 659, 784, 1047].forEach((freq, i) => {
                     const osc = ctx.createOscillator(), gain = ctx.createGain();
                     osc.connect(gain); gain.connect(ctx.destination);
                     osc.frequency.value = freq; osc.type = 'sine';
-                    gain.gain.setValueAtTime(0.3, now + i * 0.25);
-                    gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.25 + 0.2);
-                    osc.start(now + i * 0.25); osc.stop(now + i * 0.25 + 0.2);
+                    gain.gain.setValueAtTime(0.3, now + i * 0.12);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.12 + 0.3);
+                    osc.start(now + i * 0.12); osc.stop(now + i * 0.12 + 0.3);
+                    // Add octave harmonic
+                    const harm = ctx.createOscillator(), hGain = ctx.createGain();
+                    harm.connect(hGain); hGain.connect(ctx.destination);
+                    harm.frequency.value = freq * 2; harm.type = 'sine';
+                    hGain.gain.setValueAtTime(0.1, now + i * 0.12);
+                    hGain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.12 + 0.2);
+                    harm.start(now + i * 0.12); harm.stop(now + i * 0.12 + 0.2);
                 });
+            } else if (type === 'broadcast') {
+                // Broadcast — fanfare: 3 ascending notes + chime
+                [392, 523, 659, 784, 1047].forEach((freq, i) => {
+                    const osc = ctx.createOscillator(), gain = ctx.createGain();
+                    osc.connect(gain); gain.connect(ctx.destination);
+                    osc.frequency.value = freq; osc.type = 'triangle';
+                    gain.gain.setValueAtTime(0.3, now + i * 0.1);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.1 + 0.4);
+                    osc.start(now + i * 0.1); osc.stop(now + i * 0.1 + 0.4);
+                });
+                // Final chime
+                const chime = ctx.createOscillator(), cGain = ctx.createGain();
+                chime.connect(cGain); cGain.connect(ctx.destination);
+                chime.frequency.value = 1568; chime.type = 'sine';
+                cGain.gain.setValueAtTime(0.25, now + 0.5);
+                cGain.gain.exponentialRampToValueAtTime(0.001, now + 1.0);
+                chime.start(now + 0.5); chime.stop(now + 1.0);
             } else {
+                // Default notification — 2 pleasant tones with vibrato
                 for (let i = 0; i < 2; i++) {
                     const osc = ctx.createOscillator(), gain = ctx.createGain();
                     osc.connect(gain); gain.connect(ctx.destination);
                     osc.frequency.value = 740; osc.type = 'sine';
-                    gain.gain.setValueAtTime(0.3, now + i * 0.5);
-                    gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.5 + 0.4);
-                    osc.start(now + i * 0.5); osc.stop(now + i * 0.5 + 0.4);
+                    gain.gain.setValueAtTime(0.3, now + i * 0.4);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.4 + 0.35);
+                    osc.start(now + i * 0.4); osc.stop(now + i * 0.4 + 0.35);
                 }
             }
         } catch (e) {}
