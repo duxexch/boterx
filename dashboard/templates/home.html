@@ -750,7 +750,66 @@ function openApps(){
 }
 </script>
 
-<!-- ── USER PUSH NOTIFICATIONS: appears in phone notification shade ── -->
+<!-- ── USER WEB NOTIFICATIONS: in-page toast + browser notification ── -->
+<script>
+// In-page notification toast (works immediately, no SW needed)
+(function() {
+    // Check for new notifications every 10s
+    var lastNotifTime = localStorage.getItem('vex_last_notif') || '';
+    setInterval(function() {
+        fetch('/api/user/notifications').then(function(r){return r.json()}).then(function(d){
+            var notifs = d.notifications || [];
+            notifs.forEach(function(n) {
+                if (n.timestamp && n.timestamp !== lastNotifTime) {
+                    lastNotifTime = n.timestamp;
+                    localStorage.setItem('vex_last_notif', n.timestamp);
+                    // Show toast
+                    showVexToast(n.title || 'إشعار', n.message || '', n.type || 'notification');
+                    // Browser notification
+                    if (Notification.permission === 'granted') {
+                        var bn = new Notification(n.title || 'VEX Games', {
+                            body: n.message || '',
+                            icon: '/static/icons/icon-192.png',
+                            tag: n.type || 'vex',
+                            requireInteraction: n.type === 'broadcast' || n.type === 'urgent'
+                        });
+                        bn.onclick = function() { window.focus(); bn.close(); };
+                        setTimeout(function() { bn.close(); }, 8000);
+                    }
+                    // Play sound
+                    playVexSound(n.type);
+                }
+            });
+        }).catch(function(){});
+    }, 10000);
+})();
+
+function showVexToast(title, msg, type) {
+    var t = document.createElement('div');
+    var color = type === 'urgent' ? '#ef4444' : type === 'broadcast' ? '#fbbf24' : '#00ff88';
+    t.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:9999;background:linear-gradient(135deg,#0d1814,#0a1410);border:2px solid '+color+';border-radius:14px;padding:14px 20px;min-width:280px;max-width:380px;box-shadow:0 8px 32px rgba(0,0,0,.5);opacity:0;transition:opacity .3s,transform .3s';
+    t.innerHTML = '<div style="display:flex;align-items:start;gap:10px"><div style="width:10px;height:10px;border-radius:50%;background:'+color+';margin-top:6px;flex-shrink:0;animation:pulse 1.5s infinite"></div><div style="flex:1"><div style="font-weight:800;font-size:14px;color:'+color+';margin-bottom:2px">'+(title||'')+'</div><div style="font-size:12px;color:#e8f5e9;line-height:1.5">'+(msg||'')+'</div></div></div>';
+    document.body.appendChild(t);
+    setTimeout(function(){ t.style.opacity='1'; t.style.transform='translateX(-50%) translateY(0)'; },50);
+    setTimeout(function(){ t.style.opacity='0'; t.style.transform='translateX(-50%) translateY(-20px)'; setTimeout(function(){ t.remove(); },300); }, 6000);
+}
+
+function playVexSound(type) {
+    try {
+        var ctx = new (window.AudioContext || window.webkitAudioContext)();
+        var now = ctx.currentTime;
+        if (type === 'broadcast') {
+            [392,523,659,784,1047].forEach(function(f,i){var o=ctx.createOscillator(),g=ctx.createGain();o.connect(g);g.connect(ctx.destination);o.frequency.value=f;o.type='triangle';g.gain.setValueAtTime(0.2,now+i*0.1);g.gain.exponentialRampToValueAtTime(0.01,now+i*0.1+0.3);o.start(now+i*0.1);o.stop(now+i*0.1+0.3)});
+        } else if (type === 'urgent') {
+            for(var i=0;i<3;i++){var o=ctx.createOscillator(),g=ctx.createGain();o.connect(g);g.connect(ctx.destination);o.frequency.value=880;o.type='square';g.gain.setValueAtTime(0.25,now+i*0.3);g.gain.exponentialRampToValueAtTime(0.01,now+i*0.3+0.25);o.start(now+i*0.3);o.stop(now+i*0.3+0.25)}
+        } else {
+            var o=ctx.createOscillator(),g=ctx.createGain();o.connect(g);g.connect(ctx.destination);o.frequency.value=740;o.type='sine';g.gain.setValueAtTime(0.2,now);g.gain.exponentialRampToValueAtTime(0.01,now+0.3);o.start(now);o.stop(now+0.3);
+        }
+    } catch(e) {}
+}
+</script>
+
+<!-- ── PUSH NOTIFICATIONS: appears in phone notification shade (even when closed) ── -->
 <script>
 (async function() {
     try {

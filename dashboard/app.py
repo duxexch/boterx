@@ -4962,6 +4962,25 @@ def api_push_vapid_public():
     """Return VAPID public key — public, no auth needed."""
     return jsonify({'public_key': _VAPID_PUBLIC})
 
+@app.route('/api/user/notifications')
+def api_user_notifications():
+    """Public endpoint: returns recent notifications for users (no auth needed)."""
+    logs = read_csv('notifications_log.csv')
+    logs.reverse()
+    # Only return broadcast + user-targeted notifications from last 24h
+    from datetime import datetime as _dt, timedelta as _td
+    cutoff = (_dt.now() - _td(hours=24)).strftime('%Y-%m-%d %H:%M:%S')
+    result = []
+    for l in logs:
+        if l.get('timestamp', '') >= cutoff and l.get('type', '') in ('broadcast', 'new_user', 'deposit_approved', 'deposit_rejected'):
+            result.append({
+                'timestamp': l.get('timestamp', ''),
+                'type': l.get('type', ''),
+                'title': l.get('type_label', ''),
+                'message': l.get('message_preview', '')
+            })
+    return jsonify({'notifications': result[:10]})
+
 @app.route('/api/push/subscribe-user', methods=['POST'])
 def api_push_subscribe_user():
     """Store push subscription for a regular user (not admin)."""
