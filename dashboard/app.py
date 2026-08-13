@@ -3259,6 +3259,136 @@ def _update_campaign_status(campaign_id, status):
     except:
         pass
 
+# ===== API — AI Content Generator (Phase 4) =====
+
+@app.route('/api/campaigns/generate-content', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_generate_campaign_content():
+    """Generate ad content using AI from a short description."""
+    data = request.json or {}
+    description = data.get('description', '')
+    style = data.get('style', 'promotional')  # promotional, informative, urgent, casual
+    if not description:
+        return jsonify({'error': 'اكتب وصفاً'}), 400
+
+    try:
+        from ai_providers import AIManager
+        ai = AIManager()
+        active = ai.get_active_provider()
+        if not active:
+            return jsonify({'error': 'لا يوجد مزود AI مفعّل — أضف OPENAI_API_KEY أو CLAUDE_API_KEY في .env'}), 500
+
+        style_prompts = {
+            'promotional': 'اكتب إعلاناً جذاباً ومحفزاً بالعربية. استخدم إيموجي مناسبة. اجعله قصيراً (50-100 كلمة).',
+            'informative': 'اكتب نصاً معلوماتياً واضحاً بالعربية. اشرح المزايا بشكل مباشر.',
+            'urgent': 'اكتب إعلاناً عاجلاً بالعربية. استخدم كلمات مثل "محدود"، "الآن"، "لا تفوت".',
+            'casual': 'اكتب نصاً ودوداً وغير رسمي بالعربية. كأنك تكلم صديق.',
+        }
+        prompt = f"{style_prompts.get(style, style_prompts['promotional'])}\n\nالمنتج/الخدمة: {description}\n\nالنص الإعلاني:"
+        instructions = ''
+        try:
+            settings = read_csv('system_settings.csv')
+            for s in settings:
+                if s.get('key') == 'ai_instructions':
+                    instructions = s.get('value', '')
+                    break
+        except:
+            pass
+
+        full_prompt = instructions + '\n' + prompt if instructions else prompt
+        result = ai.process_text(full_prompt, active)
+        if result:
+            # Generate 3 variations
+            variations = [result]
+            for i in range(2):
+                v = ai.process_text(full_prompt + f'\n\nنسخة {i+2} مختلفة:', active)
+                if v and v != result:
+                    variations.append(v)
+            return jsonify({'success': True, 'content': result, 'variations': variations})
+        else:
+            return jsonify({'error': 'فشل التوليد'}), 500
+    except ImportError:
+        return jsonify({'error': 'ai_providers غير مثبت'}), 500
+    except Exception as e:
+        return jsonify({'error': f'خطأ: {str(e)}'}), 500
+
+# ===== API — Ad Network (Phase 5) =====
+
+@app.route('/api/ad-network/partners')
+@api_auth
+def api_ad_partners():
+    """List partner channels."""
+    partners = read_csv('partner_channels.csv')
+    return jsonify({'partners': partners})
+
+@app.route('/api/ad-network/partners', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_add_partner():
+    """Add a partner channel."""
+    data = request.json or {}
+    partner_id = f"PRT{secrets.token_hex(3).upper()}"
+    partner = {
+        'id': partner_id,
+        'channel_name': data.get('channel_name', ''),
+        'chat_id': data.get('chat_id', ''),
+        'subscriber_count': data.get('subscriber_count', '0'),
+        'revenue_share': data.get('revenue_share', '0'),
+        'category': data.get('category', ''),
+        'contact': data.get('contact', ''),
+        'is_active': 'yes',
+        'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'total_reach': '0',
+        'total_revenue': '0',
+    }
+    fieldnames = get_fieldnames('partner_channels.csv', ['id','channel_name','chat_id','subscriber_count','revenue_share','category','contact','is_active','created_at','total_reach','total_revenue'])
+    append_csv('partner_channels.csv', partner, fieldnames)
+    log_action('add_partner', partner_id)
+    return jsonify({'success': True, 'id': partner_id})
+
+@app.route('/api/ad-network/partners/<partner_id>', methods=['PUT', 'DELETE'])
+@api_auth
+@permission_required('send_broadcast')
+def api_edit_partner(partner_id):
+    partners = read_csv('partner_channels.csv')
+    fieldnames = get_fieldnames('partner_channels.csv', ['id','channel_name','chat_id','subscriber_count','revenue_share','category','contact','is_active','created_at','total_reach','total_revenue'])
+    if request.method == 'DELETE':
+        partners = [p for p in partners if p.get('id') != partner_id]
+        write_csv('partner_channels.csv', partners, fieldnames)
+        return jsonify({'success': True})
+    elif request.method == 'PUT':
+        data = request.json or {}
+        for p in partners:
+            if p.get('id') == partner_id:
+                for k, v in data.items():
+                    if k in fieldnames:
+                        p[k] = v
+                break
+        write_csv('partner_channels.csv', partners, fieldnames)
+        return jsonify({'success': True})
+
+@app.route('/api/ad-network/dashboard')
+@api_auth
+def api_ad_network_dashboard():
+    """Ad network overview — partners, revenue, CPM, CPC."""
+    partners = read_csv('partner_channels.csv')
+    campaigns = read_csv('campaigns.csv')
+    total_reach = sum(int(p.get('total_reach', 0) or 0) for p in partners)
+    total_revenue = sum(float(p.get('total_revenue', 0) or 0) for p in partners)
+    active_partners = [p for p in partners if p.get('is_active') == 'yes']
+    # CPM = (total_revenue / total_reach) * 1000
+    cpm = round(total_revenue / total_reach * 1000, 2) if total_reach > 0 else 0
+    return jsonify({
+        'total_partners': len(partners),
+        'active_partners': len(active_partners),
+        'total_subscribers': sum(int(p.get('subscriber_count', 0) or 0) for p in active_partners),
+        'total_reach': total_reach,
+        'total_revenue': total_revenue,
+        'cpm': cpm,
+        'total_campaigns': len(campaigns),
+    })
+
 def _execute_campaign(campaign):
     """Execute a campaign — send via web + telegram."""
     message = campaign.get('message', '')

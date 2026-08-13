@@ -14,6 +14,60 @@
         <button @click="setTab('ai')" :class="tab === 'ai' ? 'bg-blue-600 text-white' : 'text-slate-400'" class="px-4 py-2 rounded-lg text-sm font-medium transition">🤖 AI</button>
         <button @click="setTab('report')" :class="tab === 'report' ? 'bg-blue-600 text-white' : 'text-slate-400'" class="px-4 py-2 rounded-lg text-sm font-medium transition">📊 التقرير</button>
         <button @click="setTab('analytics')" :class="tab === 'analytics' ? 'bg-purple-600 text-white' : 'text-slate-400'" class="px-4 py-2 rounded-lg text-sm font-medium transition">📈 تحليلات</button>
+        <button @click="setTab('ainet')" :class="tab === 'ainet' ? 'bg-amber-600 text-white' : 'text-slate-400'" class="px-4 py-2 rounded-lg text-sm font-medium transition">🤝 الشبكة</button>
+    </div>
+
+    <!-- TAB: Ad Network -->
+    <div x-show="tab === 'ainet'" class="space-y-4">
+        <!-- KPIs -->
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">الشركاء</p><p class="text-2xl font-bold text-amber-400" x-text="adNet.total_partners || 0">0</p></div>
+            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">نشطون</p><p class="text-2xl font-bold text-green-400" x-text="adNet.active_partners || 0">0</p></div>
+            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">إجمالي المشتركين</p><p class="text-2xl font-bold text-blue-400" x-text="(adNet.total_subscribers || 0).toLocaleString()">0</p></div>
+            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">CPM</p><p class="text-2xl font-bold text-purple-400" x-text="adNet.cpm || 0">0</p></div>
+            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">الإيرادات</p><p class="text-2xl font-bold text-green-400" x-text="adNet.total_revenue || 0">0</p></div>
+        </div>
+        <!-- Partner list + add -->
+        <div class="flex justify-between items-center">
+            <h3 class="font-bold">📋 قنوات الشركاء</h3>
+            <button @click="showPartnerModal = true" class="btn btn-primary btn-sm">➕ شريك جديد</button>
+        </div>
+        <div class="space-y-2">
+            <template x-for="p in partners" :key="p.id">
+                <div class="bg-slate-800 rounded-xl border border-slate-700 p-4 flex items-center gap-3" :class="p.is_active === 'yes' ? '' : 'opacity-60'">
+                    <div class="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center text-xl">📢</div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2"><span class="font-bold text-sm" x-text="p.channel_name"></span><span class="text-xs px-1.5 py-0.5 rounded bg-slate-700 text-slate-400" x-text="p.category || '—'"></span></div>
+                        <div class="text-xs text-slate-500 flex gap-3 mt-1">
+                            <span x-text="'👥 ' + (p.subscriber_count || 0)"></span>
+                            <span x-text="'💰 ' + (p.revenue_share || 0) + '%'"></span>
+                            <span x-text="'📊 وصول: ' + (p.total_reach || 0)"></span>
+                            <span x-text="'💵 إيراد: ' + (p.total_revenue || 0)"></span>
+                        </div>
+                    </div>
+                    <button @click="togglePartner(p.id)" class="badge" :class="p.is_active === 'yes' ? 'badge-active' : 'badge-cancelled'" x-text="p.is_active === 'yes' ? '✅' : '⏸️'"></button>
+                    <button @click="deletePartner(p.id)" class="btn btn-danger btn-sm">🗑️</button>
+                </div>
+            </template>
+            <p x-show="partners.length === 0" class="text-center text-slate-400 p-8">لا يوجد شركاء — أضف قناة شريكة</p>
+        </div>
+        <!-- Add partner modal -->
+        <div x-show="showPartnerModal" x-transition class="modal-overlay" @click.self="showPartnerModal = false" style="display:none">
+            <div class="modal">
+                <h3 class="font-bold text-lg mb-4">➕ إضافة قناة شريكة</h3>
+                <div class="space-y-3">
+                    <div><label class="block text-sm text-slate-400 mb-1">اسم القناة</label><input x-model="partnerForm.channel_name" class="input w-full" placeholder="مثال: قناة تداول"></div>
+                    <div><label class="block text-sm text-slate-400 mb-1">Chat ID</label><input x-model="partnerForm.chat_id" class="input w-full" placeholder="-100..." dir="ltr"></div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div><label class="block text-sm text-slate-400 mb-1">عدد المشتركين</label><input type="number" x-model="partnerForm.subscriber_count" class="input w-full" placeholder="5000"></div>
+                        <div><label class="block text-sm text-slate-400 mb-1">نسبة الأرباح %</label><input type="number" x-model="partnerForm.revenue_share" class="input w-full" placeholder="30"></div>
+                    </div>
+                    <div><label class="block text-sm text-slate-400 mb-1">الفئة</label><select x-model="partnerForm.category" class="input w-full"><option value="">—</option><option value="رياضة">⚽ رياضة</option><option value="مال">💰 مال</option><option value="تداول">💱 تداول</option><option value="ألعاب">🎮 ألعاب</option><option value="تسويق">📣 تسويق</option></select></div>
+                    <div><label class="block text-sm text-slate-400 mb-1">جهة الاتصال</label><input x-model="partnerForm.contact" class="input w-full" placeholder="@username"></div>
+                </div>
+                <div class="flex gap-2 justify-end mt-4"><button @click="showPartnerModal = false" class="btn btn-sm" style="background:#475569">إلغاء</button><button @click="addPartner()" class="btn btn-primary btn-sm">إضافة</button></div>
+            </div>
+        </div>
     </div>
 
     <!-- TAB: Analytics -->
@@ -101,7 +155,13 @@
                     <!-- Name -->
                     <div><label class="block text-sm text-slate-400 mb-1">📝 اسم الحملة</label><input x-model="cmpForm.name" class="input w-full" placeholder="مثال: حملة لعبة Aviator"></div>
                     <!-- Message -->
-                    <div><label class="block text-sm text-slate-400 mb-1">💬 نص الإعلان</label><textarea x-model="cmpForm.message" rows="4" class="input w-full" placeholder="اكتب نص الإعلان هنا..."></textarea></div>
+                    <div>
+                        <div class="flex items-center justify-between mb-1">
+                            <label class="block text-sm text-slate-400">💬 نص الإعلان</label>
+                            <button @click="generateContent()" type="button" class="text-xs px-2 py-1 rounded-lg bg-purple-600/20 text-purple-400 hover:bg-purple-600 hover:text-white transition flex items-center gap-1"><i class="fas fa-magic-wand-sparkles"></i> توليد بالـ AI</button>
+                        </div>
+                        <textarea x-model="cmpForm.message" rows="4" class="input w-full" placeholder="اكتب نص الإعلان هنا... أو اضغط توليد بالـ AI"></textarea>
+                    </div>
                     <!-- Media -->
                     <div>
                         <label class="block text-sm text-slate-400 mb-1">📎 المرفقات</label>
@@ -288,7 +348,8 @@
 function channelsApp() {
     return {
         tab: 'campaigns', channels: [], groups: [], vaultPosts: [], relayLogs: [],
-        campaigns: [], analytics: {},
+        campaigns: [], analytics: {}, partners: [], adNet: {}, showPartnerModal: false,
+        partnerForm: { channel_name: '', chat_id: '', subscriber_count: '', revenue_share: '', category: '', contact: '' },
         aiProviders: [], aiActive: '', aiInstructions: '', aiTestResult: '',
         replacements: [], vaultSearch: '', filterCategory: '',
         showGroupModal: false, showAddChannelModal: false, showCampaignModal: false,
@@ -299,8 +360,8 @@ function channelsApp() {
         report: {},
 
         async init() { await this.loadAll(); },
-        setTab(t) { this.tab = t; if (t === 'vault') this.loadVault(); if (t === 'ai') this.loadAI(); if (t === 'report') this.loadReport(); if (t === 'groups') this.loadGroups(); if (t === 'campaigns') this.loadCampaigns(); if (t === 'analytics') this.loadAnalytics(); },
-        async loadAll() { await Promise.all([this.loadChannels(), this.loadGroups(), this.loadAI(), this.loadReport(), this.loadReplacements(), this.loadVault(), this.loadRelayLogs(), this.loadCampaigns(), this.loadAnalytics()]); },
+        setTab(t) { this.tab = t; if (t === 'vault') this.loadVault(); if (t === 'ai') this.loadAI(); if (t === 'report') this.loadReport(); if (t === 'groups') this.loadGroups(); if (t === 'campaigns') this.loadCampaigns(); if (t === 'analytics') this.loadAnalytics(); if (t === 'ainet') this.loadAdNet(); },
+        async loadAll() { await Promise.all([this.loadChannels(), this.loadGroups(), this.loadAI(), this.loadReport(), this.loadReplacements(), this.loadVault(), this.loadRelayLogs(), this.loadCampaigns(), this.loadAnalytics(), this.loadPartners(), this.loadAdNet()]); },
 
         get filteredChannels() {
             if (!this.filterCategory) return this.channels;
@@ -357,6 +418,23 @@ function channelsApp() {
         // ── Campaigns ──
         async loadCampaigns() { try { const d = await api('/api/campaigns'); this.campaigns = d.campaigns || []; } catch(e) {} },
         async loadAnalytics() { try { const d = await api('/api/campaigns/analytics'); this.analytics = d; } catch(e) {} },
+        async loadPartners() { try { const d = await api('/api/ad-network/partners'); this.partners = d.partners || []; } catch(e) {} },
+        async loadAdNet() { try { const d = await api('/api/ad-network/dashboard'); this.adNet = d; } catch(e) {} },
+        async addPartner() {
+            if (!this.partnerForm.channel_name || !this.partnerForm.chat_id) return toast('املأ الحقول', 'warning');
+            try { await api('/api/ad-network/partners', { method: 'POST', body: JSON.stringify(this.partnerForm) }); toast('تمت الإضافة', 'success'); this.showPartnerModal = false; this.partnerForm = { channel_name: '', chat_id: '', subscriber_count: '', revenue_share: '', category: '', contact: '' }; await this.loadPartners(); await this.loadAdNet(); }
+            catch(e) { toast('فشل', 'error'); }
+        },
+        async togglePartner(id) { try { await api(`/api/ad-network/partners/${id}`, { method: 'PUT', body: JSON.stringify({ is_active: 'toggle' }) }); await this.loadPartners(); } catch(e) {} },
+        async deletePartner(id) { if (!confirm('حذف؟')) return; try { await api(`/api/ad-network/partners/${id}`, { method: 'DELETE' }); await this.loadPartners(); await this.loadAdNet(); } catch(e) {} },
+        async generateContent() {
+            if (!this.cmpForm.name.trim()) return toast('اكتب وصفاً للحملة أولاً', 'warning');
+            try {
+                const d = await api('/api/campaigns/generate-content', { method: 'POST', body: JSON.stringify({ description: this.cmpForm.name, style: 'promotional' }) });
+                if (d.success) { this.cmpForm.message = d.content; toast('تم توليد المحتوى', 'success'); }
+                else { toast(d.error || 'فشل التوليد', 'error'); }
+            } catch(e) { toast('فشل', 'error'); }
+        },
         async uploadCampaignMedia(event) {
             const file = event.target.files[0]; if (!file) return;
             this.cmpForm.uploading = true;
