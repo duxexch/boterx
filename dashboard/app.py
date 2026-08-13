@@ -1042,6 +1042,112 @@ def index():
         return redirect(url_for('dashboard'), code=303)
     return render_template('landing.html')
 
+# ===== SEO — robots.txt + sitemap.xml + llms.txt =====
+
+@app.route('/robots.txt')
+def robots_txt():
+    """robots.txt — allow public pages, block admin/auth, allow AI crawlers."""
+    body = (
+        "# VEX Games — robots.txt\n"
+        "# Allow AI crawlers\n"
+        "User-agent: GPTBot\n"
+        "Allow: /\n\n"
+        "User-agent: ClaudeBot\n"
+        "Allow: /\n\n"
+        "User-agent: PerplexityBot\n"
+        "Allow: /\n\n"
+        "User-agent: Google-Extended\n"
+        "Allow: /\n\n"
+        "# All other bots\n"
+        "User-agent: *\n"
+        "Allow: /\n"
+        "Allow: /static/\n"
+        "Disallow: /dashboard\n"
+        "Disallow: /admin\n"
+        "Disallow: /vex/admin\n"
+        "Disallow: /api/\n"
+        "Disallow: /seo\n"
+        "Disallow: /users\n"
+        "Disallow: /transactions\n"
+        "Disallow: /matching\n"
+        "Disallow: /companies\n"
+        "Disallow: /bots\n"
+        "Disallow: /settings\n"
+        "Disallow: /svrp\n"
+        "Disallow: /referrals\n"
+        "Disallow: /channels\n"
+        "Disallow: /trading\n"
+        "Disallow: /complaints\n"
+        "Disallow: /payment_methods\n"
+        "Disallow: /wallet\n"
+        "Disallow: /account\n"
+        "Disallow: /apps\n"
+        "Disallow: /games-admin\n"
+        "\n"
+        "Sitemap: https://vex.deals/sitemap.xml\n"
+    )
+    return Response(body, mimetype='text/plain')
+
+@app.route('/sitemap.xml')
+def sitemap_xml():
+    """Dynamic sitemap — lists all public, indexable pages."""
+    from datetime import datetime as _dt
+    now = _dt.now().strftime('%Y-%m-%d')
+    pages = [
+        {'url': 'https://vex.deals/', 'priority': '1.0', 'changefreq': 'daily'},
+        {'url': 'https://vex.deals/webapp/games', 'priority': '0.9', 'changefreq': 'daily'},
+        {'url': 'https://vex.deals/webapp/aviator', 'priority': '0.8', 'changefreq': 'weekly'},
+        {'url': 'https://vex.deals/webapp/crash', 'priority': '0.8', 'changefreq': 'weekly'},
+        {'url': 'https://vex.deals/webapp/plinko', 'priority': '0.8', 'changefreq': 'weekly'},
+        {'url': 'https://vex.deals/webapp/mines', 'priority': '0.8', 'changefreq': 'weekly'},
+        {'url': 'https://vex.deals/webapp/wheel', 'priority': '0.8', 'changefreq': 'weekly'},
+        {'url': 'https://vex.deals/webapp/lottery', 'priority': '0.8', 'changefreq': 'weekly'},
+        {'url': 'https://vex.deals/webapp/dice', 'priority': '0.8', 'changefreq': 'weekly'},
+        {'url': 'https://vex.deals/webapp/stats', 'priority': '0.6', 'changefreq': 'weekly'},
+    ]
+    xml = '<?xml version="1.0" encoding="UTF-8"?>\n'
+    xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+    for p in pages:
+        xml += f'  <url>\n'
+        xml += f'    <loc>{p["url"]}</loc>\n'
+        xml += f'    <lastmod>{now}</lastmod>\n'
+        xml += f'    <changefreq>{p["changefreq"]}</changefreq>\n'
+        xml += f'    <priority>{p["priority"]}</priority>\n'
+        xml += f'  </url>\n'
+    xml += '</urlset>'
+    return Response(xml, mimetype='application/xml')
+
+@app.route('/llms.txt')
+def llms_txt():
+    """llms.txt — plain text for AI/LLM crawlers to understand the platform."""
+    body = (
+        "# VEX Games\n\n"
+        "VEX Games is a multi-language financial gaming platform accessible via Telegram bot and web interface at https://vex.deals.\n\n"
+        "## Platform Overview\n"
+        "- Games: Aviator, Crash, Plinko, Mines, Wheel of Fortune, Lottery, Dice\n"
+        "- Supported languages: Arabic, English, French, Spanish, German, Italian, Portuguese, Russian, Chinese, Turkish, Urdu, Hindi, Persian, Indonesian, Japanese, Korean, Thai\n"
+        "- Wallet system with deposits, withdrawals, and compensation (SVRP)\n"
+        "- P2P matching system for deposits/withdrawals between users\n"
+        "- USDT trading support\n"
+        "- Referral and affiliate system\n\n"
+        "## Key Pages\n"
+        "- Landing: https://vex.deals/\n"
+        "- Games Hub: https://vex.deals/webapp/games\n"
+        "- Aviator: https://vex.deals/webapp/aviator\n"
+        "- Crash: https://vex.deals/webapp/crash\n"
+        "- Plinko: https://vex.deals/webapp/plinko\n"
+        "- Stats: https://vex.deals/webapp/stats\n\n"
+        "## Brand\n"
+        "- Name: VEX Games\n"
+        "- Domain: vex.deals\n"
+        "- Logo: https://vex.deals/static/icons/icon-512.png\n"
+        "- Theme color: #00ff88 (green)\n\n"
+        "## Contact\n"
+        "- Telegram bot: @VEX_OTP_bot\n"
+        "- Support: via Telegram bot\n"
+    )
+    return Response(body, mimetype='text/plain')
+
 @app.route('/api/web/request-code', methods=['POST'])
 def api_web_request_code():
     """Generate and send OTP code directly via security bot — no need to open Telegram first.
