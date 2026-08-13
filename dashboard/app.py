@@ -90,8 +90,12 @@ def write_csv(filename, rows, fieldnames):
 
 def append_csv(filename, row, fieldnames):
     filepath = os.path.join(BASE_DIR, filename)
+    # If file doesn't exist or is empty, write header first
+    need_header = (not os.path.exists(filepath)) or (os.path.getsize(filepath) == 0)
     with open(filepath, 'a', newline='', encoding='utf-8-sig') as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
+        if need_header:
+            writer.writeheader()
         writer.writerow({k: row.get(k, '') for k in fieldnames})
 
 def get_fieldnames(filename, default_fields):
