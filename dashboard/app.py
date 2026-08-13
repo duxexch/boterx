@@ -54,20 +54,37 @@ _notification_queues = []  # list of queue.Queue, one per connected SSE client
 _nq_lock = threading.Lock()
 
 def push_notification(notif_type, title, message, data=None):
-    """Push a real-time notification to all connected dashboard clients."""
-    payload = json.dumps({
+    """Push a real-time notification to all connected dashboard clients + log it."""
+    payload_dict = {
         'type': notif_type,
         'title': title,
         'message': message,
         'data': data or {},
         'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    })
+    }
+    payload = json.dumps(payload_dict)
+    # Push to SSE clients
     with _nq_lock:
         for q in _notification_queues:
             try:
                 q.put_nowait(payload)
             except:
                 pass
+    # Log to notifications_log.csv for missed notifications
+    try:
+        log_entry = {
+            'timestamp': payload_dict['timestamp'],
+            'type': notif_type,
+            'type_label': title,
+            'message_preview': message[:200] if message else '',
+            'target_type': 'dashboard',
+            'target_id': '',
+            'status': 'sent'
+        }
+        fieldnames = get_fieldnames('notifications_log.csv', ['timestamp','type','type_label','message_preview','target_type','target_id','status'])
+        append_csv('notifications_log.csv', log_entry, fieldnames)
+    except:
+        pass
 
 # ===== CSV Helpers =====
 def read_csv(filename):
@@ -4875,6 +4892,31 @@ def api_notifications_log():
     logs = read_csv('notifications_log.csv')
     logs.reverse()
     return jsonify({'notifications': logs[:50], 'total': len(logs)})
+
+# ===== Web Push Subscriptions (notifications even when tab is closed) =====
+@app.route('/api/push/subscribe', methods=['POST'])
+@api_auth
+def api_push_subscribe():
+    """Store a browser push subscription endpoint for this admin."""
+    data = request.json or {}
+    endpoint = data.get('endpoint', '')
+    keys = data.get('keys', {})
+    if not endpoint:
+        return jsonify({'error': 'No endpoint'}), 400
+    admin_id = str(session.get('admin_id', ''))
+    subs = read_csv('push_subscriptions.csv')
+    fieldnames = get_fieldnames('push_subscriptions.csv', ['admin_id','endpoint','p256dh','auth','created_at'])
+    # Remove old sub for this endpoint
+    subs = [s for s in subs if s.get('endpoint') != endpoint]
+    subs.append({
+        'admin_id': admin_id,
+        'endpoint': endpoint,
+        'p256dh': keys.get('p256dh', ''),
+        'auth': keys.get('auth', ''),
+        'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    })
+    write_csv('push_subscriptions.csv', subs, fieldnames)
+    return jsonify({'success': True})
 
 
 # ===== API — User Edit =====

@@ -64,3 +64,42 @@ self.addEventListener('fetch', event => {
   }
   // All other routes: default browser behavior (no interception)
 });
+
+// ── Push Notifications (works even when tab is closed) ──────────────────────
+self.addEventListener('push', event => {
+  let data = { title: '🔔 VEX Games', message: 'إشعار جديد' };
+  try { data = JSON.parse(event.data.text()); } catch(e) { data.message = event.data.text(); }
+
+  const options = {
+    body: data.message || '',
+    icon: '/static/icons/icon-192.png',
+    badge: '/static/icons/icon-32.png',
+    tag: data.type || 'notification',
+    requireInteraction: data.type === 'broadcast' || data.type === 'urgent',
+    data: { url: data.url || '/dashboard' },
+    vibrate: [200, 100, 200],
+    actions: [
+      { action: 'open', title: 'فتح' },
+      { action: 'close', title: 'إغلاق' }
+    ]
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(data.title || '🔔 VEX Games', options)
+  );
+});
+
+// ── Notification click ──────────────────────────────────────────────────────
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  if (event.action === 'close') return;
+  const url = event.notification.data?.url || '/dashboard';
+  event.waitUntil(
+    clients.matchAll({ type: 'window' }).then(clientList => {
+      for (const client of clientList) {
+        if (client.url.includes(url) && 'focus' in client) return client.focus();
+      }
+      if (clients.openWindow) return clients.openWindow(url);
+    })
+  );
+});

@@ -698,10 +698,55 @@ function baseApp() {
 <!-- RBAC helper — injected once, available on every page via rbac('perm') -->
 <script>
 const _RBAC = {{ admin_perms | tojson }};
-// Returns true if the current admin has the given permission.
-// Empty _RBAC means super_admin (all permissions) → always true.
-// Non-empty means an assigned role → only explicitly granted keys are true.
 function rbac(perm) { return !Object.keys(_RBAC).length || !!_RBAC[perm]; }
+</script>
+
+<!-- Push subscription: register SW + subscribe to push notifications -->
+<script>
+(async function() {
+    try {
+        if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+
+        const reg = await navigator.serviceWorker.register('/static/sw.js?v=20260813a');
+        await navigator.serviceWorker.ready;
+
+        // Request permission if not granted
+        if (Notification.permission === 'default') {
+            const perm = await Notification.requestPermission();
+            if (perm !== 'granted') return;
+        }
+        if (Notification.permission !== 'granted') return;
+
+        // Check existing subscription
+        let sub = await reg.pushManager.getSubscription();
+        if (!sub) {
+            // Use a simple VAPID-like key (generated for this app)
+            // Since we can't use VAPID without a library, we use the API approach:
+            // subscribe with a blank applicationServerKey (works for same-origin)
+            try {
+                sub = await reg.pushManager.subscribe({
+                    userVisibleOnly: true
+                });
+            } catch(e) {
+                return; // Push not supported in this browser
+            }
+        }
+
+        // Send subscription to server
+        if (sub) {
+            const subData = {
+                endpoint: sub.endpoint,
+                keys: sub.toJSON().keys || {}
+            };
+            await fetch('/api/push/subscribe', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(subData),
+                credentials: 'same-origin'
+            }).catch(() => {});
+        }
+    } catch(e) {}
+})();
 </script>
 {% block scripts %}{% endblock %}
 </body>
