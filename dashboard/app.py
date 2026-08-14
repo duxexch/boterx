@@ -1460,6 +1460,259 @@ def page_users():
 def page_matching():
     return render_template('matching.html', active_page='matching')
 
+# ===== Agent Bot Network (Phase 1+2) =====
+
+@app.route('/agents')
+@admin_required
+@page_permission_required('view_financial')
+def page_agents():
+    return render_template('agents.html', active_page='agents')
+
+@app.route('/api/agents')
+@api_auth
+def api_agents():
+    """List all agent bots."""
+    agents = read_csv('agent_bots.csv')
+    # Normalize
+    for a in agents:
+        for k in ['id','bot_token','bot_name','username','password','balance','security_deposit',
+                   'is_active','traffic_enabled','max_daily_transactions','current_daily_count',
+                   'total_deposits_processed','total_withdrawals_processed','total_volume',
+                   'created_at','last_active','notes']:
+            if k not in a: a[k] = ''
+        a['balance'] = float(a.get('balance', 0) or 0)
+        a['security_deposit'] = float(a.get('security_deposit', 0) or 0)
+        a['traffic_stopped'] = a['balance'] <= a['security_deposit'] if a.get('is_active') == 'yes' else True
+    return jsonify({'agents': agents, 'count': len(agents)})
+
+@app.route('/api/agents', methods=['POST'])
+@api_auth
+@permission_required('approve_deposits')
+def api_create_agent():
+    """Create a new agent bot."""
+    data = request.json or {}
+    agent_id = f"AGT{secrets.token_hex(3).upper()}"
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    agent = {
+        'id': agent_id,
+        'bot_token': data.get('bot_token', ''),
+        'bot_name': data.get('bot_name', ''),
+        'username': data.get('username', agent_id.lower()),
+        'password': data.get('password', secrets.token_hex(6)),
+        'balance': '0',
+        'security_deposit': str(data.get('security_deposit', 100)),
+        'is_active': 'yes',
+        'traffic_enabled': 'yes',
+        'max_daily_transactions': str(data.get('max_daily_transactions', 50)),
+        'current_daily_count': '0',
+        'total_deposits_processed': '0',
+        'total_withdrawals_processed': '0',
+        'total_volume': '0',
+        'created_at': now,
+        'last_active': '',
+        'notes': data.get('notes', ''),
+    }
+    fields = get_fieldnames('agent_bots.csv', ['id','bot_token','bot_name','username','password','balance','security_deposit',
+        'is_active','traffic_enabled','max_daily_transactions','current_daily_count',
+        'total_deposits_processed','total_withdrawals_processed','total_volume','created_at','last_active','notes'])
+    append_csv('agent_bots.csv', agent, fields)
+    log_action('create_agent', agent_id)
+    return jsonify({'success': True, 'id': agent_id})
+
+@app.route('/api/agents/<agent_id>', methods=['PUT', 'DELETE'])
+@api_auth
+@permission_required('approve_deposits')
+def api_edit_agent(agent_id):
+    agents = read_csv('agent_bots.csv')
+    fields = get_fieldnames('agent_bots.csv', ['id','bot_token','bot_name','username','password','balance','security_deposit',
+        'is_active','traffic_enabled','max_daily_transactions','current_daily_count',
+        'total_deposits_processed','total_withdrawals_processed','total_volume','created_at','last_active','notes'])
+    if request.method == 'DELETE':
+        agents = [a for a in agents if a.get('id') != agent_id]
+        write_csv('agent_bots.csv', agents, fields)
+        log_action('delete_agent', agent_id)
+        return jsonify({'success': True})
+    elif request.method == 'PUT':
+        data = request.json or {}
+        for a in agents:
+            if a.get('id') == agent_id:
+                for k, v in data.items():
+                    if k in fields:
+                        a[k] = str(v)
+                # Check if balance dropped below security deposit
+                bal = float(a.get('balance', 0) or 0)
+                dep = float(a.get('security_deposit', 0) or 0)
+                if bal <= dep:
+                    a['traffic_enabled'] = 'no'
+                else:
+                    a['traffic_enabled'] = 'yes'
+                break
+        write_csv('agent_bots.csv', agents, fields)
+        return jsonify({'success': True})
+
+@app.route('/api/agents/<agent_id>/balance', methods=['POST'])
+@api_auth
+@permission_required('approve_deposits')
+def api_agent_balance_adjust(agent_id):
+    """Add or subtract from agent balance manually."""
+    data = request.json or {}
+    amount = float(data.get('amount', 0))
+    action = data.get('action', 'add')  # add or subtract
+    reason = data.get('reason', '')
+    agents = read_csv('agent_bots.csv')
+    fields = get_fieldnames('agent_bots.csv', ['id','bot_token','bot_name','username','password','balance','security_deposit',
+        'is_active','traffic_enabled','max_daily_transactions','current_daily_count',
+        'total_deposits_processed','total_withdrawals_processed','total_volume','created_at','last_active','notes'])
+    for a in agents:
+        if a.get('id') == agent_id:
+            current = float(a.get('balance', 0) or 0)
+            if action == 'add':
+                a['balance'] = str(current + amount)
+            else:
+                a['balance'] = str(max(0, current - amount))
+            # Check traffic
+            bal = float(a['balance'])
+            dep = float(a.get('security_deposit', 0) or 0)
+            a['traffic_enabled'] = 'yes' if bal > dep else 'no'
+            break
+    write_csv('agent_bots.csv', agents, fields)
+    log_action('agent_balance_adjust', f'{agent_id} {action} {amount} ({reason})')
+    return jsonify({'success': True, 'new_balance': float(a['balance'])})
+
+@app.route('/api/agents/<agent_id>/transactions')
+@api_auth
+def api_agent_transactions(agent_id):
+    """Get agent transaction history with search."""
+    search = request.args.get('search', '')
+    txns = read_csv('agent_transactions.csv')
+    agent_txns = [t for t in txns if t.get('agent_id') == agent_id]
+    if search:
+        sl = search.lower()
+        agent_txns = [t for t in agent_txns if sl in (t.get('user_name','') + t.get('transaction_id','') + t.get('type','') + t.get('status','')).lower()]
+    agent_txns.reverse()
+    return jsonify({'transactions': agent_txns[:100], 'total': len(agent_txns)})
+
+@app.route('/api/agents/<agent_id>/transactions/<txn_id>', methods=['PUT'])
+@api_auth
+@permission_required('approve_deposits')
+def api_agent_override_txn(agent_id, txn_id):
+    """Admin override a transaction processed by an agent."""
+    data = request.json or {}
+    new_status = data.get('status', '')
+    txns = read_csv('agent_transactions.csv')
+    fields = get_fieldnames('agent_transactions.csv', ['id','agent_id','transaction_id','type','amount','currency','status','user_id','user_name','processed_at','admin_override'])
+    overridden = False
+    for t in txns:
+        if t.get('id') == txn_id or t.get('transaction_id') == txn_id:
+            old_status = t.get('status', '')
+            t['status'] = new_status
+            t['admin_override'] = f'admin:{new_status} (was:{old_status})'
+            overridden = True
+            # Reverse balance effect if needed
+            if old_status == 'approved' and new_status == 'rejected':
+                # Reverse: deposit → add back, withdraw → subtract
+                amount = float(t.get('amount', 0) or 0)
+                agents = read_csv('agent_bots.csv')
+                a_fields = get_fieldnames('agent_bots.csv', ['id','bot_token','bot_name','username','password','balance','security_deposit',
+                    'is_active','traffic_enabled','max_daily_transactions','current_daily_count',
+                    'total_deposits_processed','total_withdrawals_processed','total_volume','created_at','last_active','notes'])
+                for a in agents:
+                    if a.get('id') == agent_id:
+                        bal = float(a.get('balance', 0) or 0)
+                        if t.get('type') == 'deposit':
+                            a['balance'] = str(bal + amount)  # refund the deduction
+                        else:
+                            a['balance'] = str(bal - amount)  # remove the addition
+                        break
+                write_csv('agent_bots.csv', agents, a_fields)
+            break
+    if overridden:
+        write_csv('agent_transactions.csv', txns, fields)
+        log_action('agent_txn_override', f'{agent_id}/{txn_id} → {new_status}')
+    return jsonify({'success': overridden})
+
+@app.route('/api/agents/<agent_id>/payment-methods')
+@api_auth
+def api_agent_payment_methods(agent_id):
+    """Get agent's payment methods."""
+    methods = read_csv('agent_payment_methods.csv')
+    agent_methods = [m for m in methods if m.get('agent_id') == agent_id]
+    return jsonify({'methods': agent_methods})
+
+@app.route('/api/agents/<agent_id>/payment-methods', methods=['POST'])
+@api_auth
+@permission_required('approve_deposits')
+def api_add_agent_payment_method(agent_id):
+    """Add payment method for an agent."""
+    data = request.json or {}
+    mid = f"APM{secrets.token_hex(3).upper()}"
+    method = {
+        'id': mid,
+        'agent_id': agent_id,
+        'method_name': data.get('method_name', ''),
+        'method_type': data.get('method_type', ''),
+        'account_data': data.get('account_data', ''),
+        'icon': data.get('icon', '💳'),
+        'is_active': 'yes',
+        'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+    }
+    fields = get_fieldnames('agent_payment_methods.csv', ['id','agent_id','method_name','method_type','account_data','icon','is_active','created_at'])
+    append_csv('agent_payment_methods.csv', method, fields)
+    return jsonify({'success': True, 'id': mid})
+
+@app.route('/api/agents/<agent_id>/payment-methods/<mid>', methods=['PUT', 'DELETE'])
+@api_auth
+@permission_required('approve_deposits')
+def api_edit_agent_payment_method(agent_id, mid):
+    methods = read_csv('agent_payment_methods.csv')
+    fields = get_fieldnames('agent_payment_methods.csv', ['id','agent_id','method_name','method_type','account_data','icon','is_active','created_at'])
+    if request.method == 'DELETE':
+        methods = [m for m in methods if not (m.get('id') == mid and m.get('agent_id') == agent_id)]
+        write_csv('agent_payment_methods.csv', methods, fields)
+        return jsonify({'success': True})
+    elif request.method == 'PUT':
+        data = request.json or {}
+        for m in methods:
+            if m.get('id') == mid and m.get('agent_id') == agent_id:
+                # Only account_data and icon editable by agent; name/type by admin
+                for k in ['account_data', 'icon', 'is_active', 'method_name', 'method_type']:
+                    if k in data:
+                        m[k] = str(data[k])
+                break
+        write_csv('agent_payment_methods.csv', methods, fields)
+        return jsonify({'success': True})
+
+@app.route('/api/agents/find-available')
+@api_auth
+def api_find_available_agent():
+    """Find an available agent for a match — internal use."""
+    amount = float(request.args.get('amount', 0))
+    txn_type = request.args.get('type', 'deposit')
+    agents = read_csv('agent_bots.csv')
+    # Filter: active + traffic_enabled + balance > security_deposit + daily_count < max
+    available = []
+    for a in agents:
+        if a.get('is_active') != 'yes' or a.get('traffic_enabled') != 'yes':
+            continue
+        bal = float(a.get('balance', 0) or 0)
+        dep = float(a.get('security_deposit', 0) or 0)
+        daily = int(a.get('current_daily_count', 0) or 0)
+        max_daily = int(a.get('max_daily_transactions', 50) or 50)
+        if bal <= dep:
+            continue
+        if daily >= max_daily:
+            continue
+        # For deposit: agent pays user → balance must have enough
+        if txn_type == 'deposit' and bal < amount:
+            continue
+        available.append({'id': a['id'], 'name': a.get('bot_name', ''), 'balance': bal, 'daily_count': daily})
+    if not available:
+        return jsonify({'found': False})
+    # Pick lowest daily count (round-robin effect)
+    available.sort(key=lambda x: x['daily_count'])
+    return jsonify({'found': True, 'agent': available[0]})
+    return render_template('matching.html', active_page='matching')
+
 @app.route('/svrp')
 @admin_required
 @page_permission_required('view_financial')

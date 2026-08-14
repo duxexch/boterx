@@ -1,0 +1,219 @@
+{% extends 'base.html' %}
+{% block title %}وكلاء المطابقة — VEX{% endblock %}
+{% block page_title %}🤖 وكلاء المطابقة{% endblock %}
+
+{% block content %}
+<div x-data="agentsApp()" x-init="init()" class="space-y-6">
+
+    <!-- KPIs -->
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">إجمالي الوكلاء</p><p class="text-2xl font-bold text-amber-400" x-text="agents.length">0</p></div>
+        <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">نشطون</p><p class="text-2xl font-bold text-green-400" x-text="agents.filter(a => a.is_active === 'yes').length">0</p></div>
+        <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">المرور متوقف</p><p class="text-2xl font-bold text-red-400" x-text="agents.filter(a => a.traffic_stopped).length">0</p></div>
+        <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">إجمالي الأرصدة</p><p class="text-2xl font-bold text-blue-400" x-text="agents.reduce((s,a) => s + a.balance, 0).toFixed(0)">0</p></div>
+        <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">إجمالي المعاملات</p><p class="text-2xl font-bold text-purple-400" x-text="agents.reduce((s,a) => s + parseInt(a.total_deposits_processed||0) + parseInt(a.total_withdrawals_processed||0), 0)">0</p></div>
+    </div>
+
+    <!-- Search + Add -->
+    <div class="flex justify-between items-center flex-wrap gap-2">
+        <input type="text" x-model="search" @input.debounce.300ms="filterAgents()" class="input max-w-xs" placeholder="🔍 بحث بالاسم أو ID...">
+        <button @click="showAddModal = true" class="btn btn-primary btn-sm">➕ إضافة وكيل</button>
+    </div>
+
+    <!-- Agent Cards -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <template x-for="a in filteredAgents" :key="a.id">
+            <div class="bg-slate-800 rounded-xl border border-slate-700 p-5" :class="a.is_active === 'yes' ? (a.traffic_stopped ? 'border-red-500/30' : 'border-green-500/30') : 'opacity-60'">
+                <div class="flex items-start justify-between mb-3">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center text-xl">🤖</div>
+                        <div>
+                            <h3 class="font-bold" x-text="a.bot_name"></h3>
+                            <p class="text-xs text-slate-500 font-mono" x-text="a.id"></p>
+                        </div>
+                    </div>
+                    <div class="flex flex-col items-end gap-1">
+                        <span :class="a.traffic_stopped ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'" class="px-2 py-1 rounded text-xs font-bold" x-text="a.traffic_stopped ? '⏸️ مرور متوقف' : '▶️ مرور نشط'"></span>
+                        <span class="text-xs text-slate-500" x-text="'معاملات اليوم: ' + (a.current_daily_count||0) + '/' + (a.max_daily_transactions||0)"></span>
+                    </div>
+                </div>
+                <!-- Balance -->
+                <div class="grid grid-cols-3 gap-2 mb-3">
+                    <div class="bg-slate-900/50 rounded-lg p-2 text-center">
+                        <p class="text-xs text-slate-400">الرصيد</p>
+                        <p class="text-lg font-bold" :class="a.balance > 0 ? 'text-green-400' : 'text-red-400'" x-text="parseFloat(a.balance||0).toFixed(0)"></p>
+                    </div>
+                    <div class="bg-slate-900/50 rounded-lg p-2 text-center">
+                        <p class="text-xs text-slate-400">حد التأمين</p>
+                        <p class="text-lg font-bold text-amber-400" x-text="parseFloat(a.security_deposit||0).toFixed(0)"></p>
+                    </div>
+                    <div class="bg-slate-900/50 rounded-lg p-2 text-center">
+                        <p class="text-xs text-slate-400">المعاملات</p>
+                        <p class="text-lg font-bold text-blue-400" x-text="parseInt(a.total_deposits_processed||0) + parseInt(a.total_withdrawals_processed||0)"></p>
+                    </div>
+                </div>
+                <!-- Actions -->
+                <div class="flex flex-wrap gap-2">
+                    <button @click="openBalanceModal(a)" class="btn btn-sm bg-blue-600 hover:bg-blue-700 text-white">💰 رصيد</button>
+                    <button @click="openMethods(a.id)" class="btn btn-sm bg-purple-600 hover:bg-purple-700 text-white">💳 وسائل</button>
+                    <button @click="openTxns(a.id)" class="btn btn-sm bg-slate-600 hover:bg-slate-700 text-white">📜 سجلات</button>
+                    <button @click="toggleAgent(a)" class="btn btn-sm" :class="a.is_active === 'yes' ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-green-600 hover:bg-green-700 text-white'" x-text="a.is_active === 'yes' ? '⏸️ تعطيل' : '▶️ تفعيل'"></button>
+                    <button @click="deleteAgent(a)" class="btn btn-danger btn-sm">🗑️</button>
+                </div>
+            </div>
+        </template>
+    </div>
+
+    <!-- Add Agent Modal -->
+    <div x-show="showAddModal" x-transition class="modal-overlay" @click.self="showAddModal = false" style="display:none">
+        <div class="modal max-w-lg">
+            <div class="flex items-center justify-between mb-4"><h3 class="font-bold text-lg">🤖 إضافة وكيل جديد</h3><button @click="showAddModal = false" class="text-slate-400 hover:text-white"><i class="fas fa-times"></i></button></div>
+            <div class="space-y-3">
+                <div><label class="block text-sm text-slate-400 mb-1">اسم البوت</label><input x-model="addForm.bot_name" class="input w-full" placeholder="وكيل 1"></div>
+                <div><label class="block text-sm text-slate-400 mb-1">Bot Token</label><input x-model="addForm.bot_token" class="input w-full" placeholder="123456:ABC..." dir="ltr"></div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div><label class="block text-sm text-slate-400 mb-1">اسم المستخدم (ويب)</label><input x-model="addForm.username" class="input w-full" placeholder="agent1" dir="ltr"></div>
+                    <div><label class="block text-sm text-slate-400 mb-1">كلمة المرور (ويب)</label><input x-model="addForm.password" class="input w-full" placeholder="auto-generated" dir="ltr"></div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div><label class="block text-sm text-slate-400 mb-1">حد التأمين</label><input type="number" x-model="addForm.security_deposit" class="input w-full" placeholder="100"></div>
+                    <div><label class="block text-sm text-slate-400 mb-1">حد المعاملات اليومي</label><input type="number" x-model="addForm.max_daily_transactions" class="input w-full" placeholder="50"></div>
+                </div>
+                <div><label class="block text-sm text-slate-400 mb-1">ملاحظات</label><input x-model="addForm.notes" class="input w-full" placeholder="..."></div>
+            </div>
+            <div class="flex gap-2 justify-end mt-4"><button @click="showAddModal = false" class="btn btn-sm" style="background:#475569">إلغاء</button><button @click="addAgent()" class="btn btn-primary btn-sm">إضافة</button></div>
+        </div>
+    </div>
+
+    <!-- Balance Modal -->
+    <div x-show="showBalanceModal" x-transition class="modal-overlay" @click.self="showBalanceModal = false" style="display:none">
+        <div class="modal">
+            <h3 class="font-bold text-lg mb-4">💰 تعديل رصيد: <span x-text="balanceTarget?.bot_name"></span></h3>
+            <div class="space-y-3">
+                <div class="bg-slate-900/50 rounded-lg p-3 text-center"><p class="text-xs text-slate-400">الرصيد الحالي</p><p class="text-2xl font-bold text-green-400" x-text="parseFloat(balanceTarget?.balance||0).toFixed(0)"></p></div>
+                <div class="grid grid-cols-2 gap-3">
+                    <button @click="balanceAction='add'" :class="balanceAction==='add' ? 'bg-green-600 text-white' : 'bg-slate-700 text-slate-400'" class="py-2 rounded-lg text-sm font-bold">➕ إضافة</button>
+                    <button @click="balanceAction='subtract'" :class="balanceAction==='subtract' ? 'bg-red-600 text-white' : 'bg-slate-700 text-slate-400'" class="py-2 rounded-lg text-sm font-bold">➖ خصم</button>
+                </div>
+                <input type="number" x-model="balanceAmount" class="input w-full" placeholder="المبلغ">
+                <input type="text" x-model="balanceReason" class="input w-full" placeholder="السبب (اختياري)">
+            </div>
+            <div class="flex gap-2 justify-end mt-4"><button @click="showBalanceModal = false" class="btn btn-sm" style="background:#475569">إلغاء</button><button @click="adjustBalance()" class="btn btn-primary btn-sm">تأكيد</button></div>
+        </div>
+    </div>
+
+    <!-- Payment Methods Modal -->
+    <div x-show="showMethodsModal" x-transition class="modal-overlay" @click.self="showMethodsModal = false" style="display:none">
+        <div class="modal max-w-lg">
+            <div class="flex items-center justify-between mb-4"><h3 class="font-bold text-lg">💳 وسائل الدفع</h3><button @click="showMethodsModal = false" class="text-slate-400 hover:text-white"><i class="fas fa-times"></i></button></div>
+            <div class="space-y-2 mb-4">
+                <template x-for="m in methods" :key="m.id">
+                    <div class="bg-slate-900/50 rounded-lg p-3 flex items-center gap-3">
+                        <span class="text-xl" x-text="m.icon || '💳'"></span>
+                        <div class="flex-1"><p class="text-sm font-bold" x-text="m.method_name"></p><p class="text-xs text-slate-400 font-mono" x-text="m.account_data"></p></div>
+                        <button @click="deleteMethod(m.id)" class="btn btn-danger btn-sm">🗑️</button>
+                    </div>
+                </template>
+                <p x-show="methods.length === 0" class="text-center text-slate-400 py-4">لا توجد وسائل دفع</p>
+            </div>
+            <div class="space-y-2 border-t border-slate-700 pt-3">
+                <input x-model="methodForm.method_name" class="input w-full" placeholder="اسم الوسيلة">
+                <input x-model="methodForm.account_data" class="input w-full" placeholder="بيانات الحساب">
+                <div class="flex gap-2"><input x-model="methodForm.method_type" class="input flex-1" placeholder="النوع"><input x-model="methodForm.icon" class="input w-16 text-center" placeholder="💳"></div>
+                <button @click="addMethod()" class="btn btn-primary btn-sm w-full">➕ إضافة وسيلة</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Transactions Modal -->
+    <div x-show="showTxnsModal" x-transition class="modal-overlay" @click.self="showTxnsModal = false" style="display:none">
+        <div class="modal max-w-2xl">
+            <div class="flex items-center justify-between mb-4"><h3 class="font-bold text-lg">📜 سجل المعاملات</h3><button @click="showTxnsModal = false" class="text-slate-400 hover:text-white"><i class="fas fa-times"></i></button></div>
+            <input type="text" x-model="txnSearch" @input.debounce.300ms="loadTxns()" class="input w-full mb-3" placeholder="🔍 بحث...">
+            <div class="max-h-96 overflow-y-auto">
+                <table class="data-table"><thead><tr><th>ID</th><th>النوع</th><th>المبلغ</th><th>المستخدم</th><th>الحالة</th><th>إجراء</th></tr></thead><tbody>
+                    <template x-for="t in txns" :key="t.id">
+                        <tr class="hover:bg-slate-700/50">
+                            <td class="text-xs font-mono" x-text="(t.transaction_id||t.id||'').slice(0,15)"></td>
+                            <td><span :class="t.type === 'deposit' ? 'text-green-400' : 'text-red-400'" x-text="t.type === 'deposit' ? '💵 إيداع' : '💸 سحب'"></span></td>
+                            <td class="font-bold" x-text="t.amount"></td>
+                            <td class="text-xs" x-text="t.user_name"></td>
+                            <td><span :class="{'text-green-400': t.status==='approved', 'text-amber-400': t.status==='pending', 'text-red-400': t.status==='rejected'}" x-text="t.status"></span></td>
+                            <td>
+                                <select x-model="t.newStatus" @change="overrideTxn(t)" class="input text-xs py-1">
+                                    <option value="">—</option>
+                                    <option value="approved">قبول</option>
+                                    <option value="rejected">رفض</option>
+                                    <option value="pending">معلق</option>
+                                </select>
+                            </td>
+                        </tr>
+                    </template>
+                    <tr x-show="txns.length === 0"><td colspan="6" class="text-center text-slate-400 p-4">لا توجد معاملات</td></tr>
+                </tbody></table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function agentsApp() {
+    return {
+        agents: [], filteredAgents: [], search: '',
+        showAddModal: false, showBalanceModal: false, showMethodsModal: false, showTxnsModal: false,
+        addForm: { bot_name: '', bot_token: '', username: '', password: '', security_deposit: 100, max_daily_transactions: 50, notes: '' },
+        balanceTarget: null, balanceAction: 'add', balanceAmount: '', balanceReason: '',
+        currentAgentId: '', methods: [], methodForm: { method_name: '', account_data: '', method_type: '', icon: '💳' },
+        txns: [], txnSearch: '',
+
+        async init() { await this.loadAgents(); },
+        async loadAgents() {
+            try { const d = await api('/api/agents'); this.agents = d.agents || []; this.filterAgents(); }
+            catch(e) { this.agents = []; }
+        },
+        filterAgents() {
+            if (!this.search) { this.filteredAgents = this.agents; return; }
+            const sl = this.search.toLowerCase();
+            this.filteredAgents = this.agents.filter(a => sl in (a.bot_name + a.id).toLowerCase());
+        },
+        async addAgent() {
+            if (!this.addForm.bot_name || !this.addForm.bot_token) return toast('املأ الحقول', 'warning');
+            try { await api('/api/agents', { method: 'POST', body: JSON.stringify(this.addForm) }); toast('تمت الإضافة', 'success'); this.showAddModal = false; this.addForm = { bot_name: '', bot_token: '', username: '', password: '', security_deposit: 100, max_daily_transactions: 50, notes: '' }; await this.loadAgents(); }
+            catch(e) { toast('فشل', 'error'); }
+        },
+        async toggleAgent(a) {
+            a.is_active = a.is_active === 'yes' ? 'no' : 'yes';
+            try { await api(`/api/agents/${a.id}`, { method: 'PUT', body: JSON.stringify({ is_active: a.is_active }) }); toast(a.is_active === 'yes' ? 'تم التفعيل' : 'تم التعطيل', 'success'); await this.loadAgents(); }
+            catch(e) { toast('فشل', 'error'); }
+        },
+        async deleteAgent(a) {
+            if (!confirm('حذف الوكيل؟')) return;
+            try { await api(`/api/agents/${a.id}`, { method: 'DELETE' }); await this.loadAgents(); } catch(e) {}
+        },
+        openBalanceModal(a) { this.balanceTarget = a; this.balanceAmount = ''; this.balanceReason = ''; this.balanceAction = 'add'; this.showBalanceModal = true; },
+        async adjustBalance() {
+            if (!this.balanceAmount) return toast('أدخل مبلغ', 'warning');
+            try { const d = await api(`/api/agents/${this.balanceTarget.id}/balance`, { method: 'POST', body: JSON.stringify({ amount: parseFloat(this.balanceAmount), action: this.balanceAction, reason: this.balanceReason }) }); toast('تم التعديل', 'success'); this.showBalanceModal = false; await this.loadAgents(); }
+            catch(e) { toast('فشل', 'error'); }
+        },
+        async openMethods(agentId) { this.currentAgentId = agentId; this.showMethodsModal = true; await this.loadMethods(); },
+        async loadMethods() { try { const d = await api(`/api/agents/${this.currentAgentId}/payment-methods`); this.methods = d.methods || []; } catch(e) { this.methods = []; } },
+        async addMethod() {
+            if (!this.methodForm.method_name) return toast('أدخل اسم', 'warning');
+            try { await api(`/api/agents/${this.currentAgentId}/payment-methods`, { method: 'POST', body: JSON.stringify(this.methodForm) }); toast('تمت الإضافة', 'success'); this.methodForm = { method_name: '', account_data: '', method_type: '', icon: '💳' }; await this.loadMethods(); }
+            catch(e) { toast('فشل', 'error'); }
+        },
+        async deleteMethod(mid) { if (!confirm('حذف؟')) return; try { await api(`/api/agents/${this.currentAgentId}/payment-methods/${mid}`, { method: 'DELETE' }); await this.loadMethods(); } catch(e) {} },
+        async openTxns(agentId) { this.currentAgentId = agentId; this.txnSearch = ''; this.showTxnsModal = true; await this.loadTxns(); },
+        async loadTxns() { try { const d = await api(`/api/agents/${this.currentAgentId}/transactions` + (this.txnSearch ? '?search=' + encodeURIComponent(this.txnSearch) : '')); this.txns = d.transactions || []; } catch(e) { this.txns = []; } },
+        async overrideTxn(t) {
+            if (!t.newStatus) return;
+            try { await api(`/api/agents/${this.currentAgentId}/transactions/${t.id}`, { method: 'PUT', body: JSON.stringify({ status: t.newStatus }) }); toast('تم التعديل', 'success'); await this.loadTxns(); }
+            catch(e) { toast('فشل', 'error'); }
+        }
+    }
+}
+</script>
+{% endblock %}
