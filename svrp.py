@@ -107,6 +107,36 @@ SVRP_CONFIG = {
     'max_recovery_per_month': 10000,   # أقصى استرداد شهرياً لكل مستخدم
 }
 
+# تحميل الإعدادات من system_settings.csv لو موجودة (يدعم التعديل من لوحة الأدمن)
+def _load_config_from_csv():
+    """تحميل إعدادات SVRP من system_settings.csv وتحديث SVRP_CONFIG"""
+    global SVRP_CONFIG
+    try:
+        import csv as _csv
+        settings_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'system_settings.csv')
+        if not os.path.exists(settings_path):
+            return
+        with open(settings_path, 'r', encoding='utf-8-sig') as f:
+            for row in _csv.DictReader(f):
+                key = row.get('key', '') or row.get('setting_key', '')
+                if key.startswith('svrp_'):
+                    cfg_key = key[5:]  # remove 'svrp_' prefix
+                    val = row.get('value', '') or row.get('setting_value', '')
+                    if cfg_key in SVRP_CONFIG:
+                        # Convert to same type as default
+                        default = SVRP_CONFIG[cfg_key]
+                        if isinstance(default, float):
+                            SVRP_CONFIG[cfg_key] = float(val) if val else default
+                        elif isinstance(default, int):
+                            SVRP_CONFIG[cfg_key] = int(float(val)) if val else default
+                        else:
+                            SVRP_CONFIG[cfg_key] = val
+        logger.info(f'SVRP config loaded from CSV: {SVRP_CONFIG}')
+    except Exception as e:
+        logger.warning(f'SVRP config CSV load failed: {e}')
+
+_load_config_from_csv()
+
 # تعريف مجموعات المستخدمين
 USER_GROUPS = {
     'bronze':   {'min_score': 0,    'multiplier': 1.0, 'icon': '🥉', 'name_ar': 'برونزي'},

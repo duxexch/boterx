@@ -2711,6 +2711,111 @@ def api_svrp_wallets():
     wallets = read_csv('svrp_wallets.csv')
     return jsonify({'wallets': wallets, 'count': len(wallets)})
 
+# ===== SVRP Settings (Phase 1 — Admin Control Panel) =====
+
+@app.route('/api/svrp/settings')
+@api_auth
+def api_svrp_settings():
+    """Get all SVRP settings from system_settings.csv."""
+    settings = read_csv('system_settings.csv')
+    svrp_settings = {}
+    for s in settings:
+        key = s.get('key', '') or s.get('setting_key', '')
+        if key.startswith('svrp_'):
+            svrp_settings[key] = s.get('value', '') or s.get('setting_value', '')
+    # Fill defaults from SVRP_CONFIG if not in CSV
+    try:
+        import sys as _sys; _sys.path.insert(0, BASE_DIR)
+        from svrp import SVRP_CONFIG
+        for k, v in SVRP_CONFIG.items():
+            csv_key = f'svrp_{k}'
+            if csv_key not in svrp_settings:
+                svrp_settings[csv_key] = str(v)
+    except:
+        pass
+    return jsonify({'settings': svrp_settings})
+
+@app.route('/api/svrp/settings', methods=['POST'])
+@api_auth
+@permission_required('manage_settings')
+def api_svrp_save_settings():
+    """Save SVRP settings to system_settings.csv."""
+    data = request.json or {}
+    settings = read_csv('system_settings.csv')
+    fieldnames = get_fieldnames('system_settings.csv', ['key', 'value', 'updated_at'])
+    existing = {s.get('key', '') or s.get('setting_key', ''): s for s in settings}
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    for key, value in data.items():
+        if not key.startswith('svrp_'):
+            continue
+        if key in existing:
+            existing[key]['value'] = str(value)
+            existing[key]['updated_at'] = now
+        else:
+            settings.append({'key': key, 'value': str(value), 'updated_at': now})
+    write_csv('system_settings.csv', settings, fieldnames)
+    # Reload SVRP_CONFIG in current process
+    try:
+        import importlib
+        import svrp as _svrp_mod
+        _svrp_mod._load_config_from_csv()
+    except:
+        pass
+    log_action('svrp_settings_update', json.dumps(data)[:100])
+    return jsonify({'success': True, 'message': 'تم تحديث إعدادات التعويض'})
+
+# ===== SVRP Analytics (Phase 4) =====
+
+@app.route('/api/svrp/analytics')
+@api_auth
+def api_svrp_analytics():
+    """SVRP analytics — recovery stats, conversion, referral growth."""
+    wallets = read_csv('svrp_wallets.csv')
+    credits = read_csv('svrp_credits.csv')
+    requests = read_csv('recovery_requests.csv')
+    promo_codes = read_csv('svrp_promo_codes.csv')
+    # Key metrics
+    total_wallets = len(wallets)
+    total_frozen = sum(float(w.get('balance', 0) or 0) for w in wallets)
+    total_pending = sum(float(w.get('pending_balance', 0) or 0) for w in wallets)
+    total_earned = sum(float(w.get('total_earned', 0) or 0) for w in wallets)
+    total_used = sum(float(w.get('total_used', 0) or 0) for w in wallets)
+    # Recovery requests
+    approved = [r for r in requests if r.get('status') == 'approved']
+    pending = [r for r in requests if r.get('status') == 'pending']
+    rejected = [r for r in requests if r.get('status') == 'rejected']
+    total_recovery_amount = sum(float(r.get('recovery_amount', 0) or 0) for r in approved)
+    # Wagering completion
+    wagered = sum(1 for w in wallets if int(w.get('wagering_completed', 0) or 0) >= int(w.get('wagering_required', 3) or 3))
+    # Promo codes
+    active_codes = [p for p in promo_codes if p.get('status') == 'active']
+    used_codes = [p for p in promo_codes if p.get('status') == 'used']
+    # Credits by type
+    from collections import Counter
+    credit_types = Counter(c.get('credit_type', '') for c in credits)
+    credit_status = Counter(c.get('status', '') for c in credits)
+    # Conversion rate: how many wallets have total_used > 0 (unfrozen)
+    converted = sum(1 for w in wallets if float(w.get('total_used', 0) or 0) > 0)
+    conversion_rate = round(converted / total_wallets * 100, 2) if total_wallets > 0 else 0
+    return jsonify({
+        'total_wallets': total_wallets,
+        'total_frozen': round(total_frozen, 2),
+        'total_pending': round(total_pending, 2),
+        'total_earned': round(total_earned, 2),
+        'total_used': round(total_used, 2),
+        'recovery_approved': len(approved),
+        'recovery_pending': len(pending),
+        'recovery_rejected': len(rejected),
+        'total_recovery_amount': round(total_recovery_amount, 2),
+        'wagering_completed': wagered,
+        'wagering_rate': round(wagered / total_wallets * 100, 2) if total_wallets > 0 else 0,
+        'active_promo_codes': len(active_codes),
+        'used_promo_codes': len(used_codes),
+        'conversion_rate': conversion_rate,
+        'credit_types': dict(credit_types),
+        'credit_status': dict(credit_status),
+    })
+
 @app.route('/api/svrp/requests')
 @api_auth
 def api_svrp_requests():
