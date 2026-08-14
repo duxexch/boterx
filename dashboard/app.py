@@ -3259,6 +3259,150 @@ def _update_campaign_status(campaign_id, status):
     except:
         pass
 
+# ===== API — Fraud Detection (Phase 2) =====
+
+_FRAUD_CLICK_LIMIT = 5  # max clicks per IP per campaign
+_FRAUD_TIME_WINDOW = 3600  # 1 hour in seconds
+
+def _check_fraud(campaign_id, ip, fingerprint=''):
+    """Check if a click is fraudulent. Returns (is_fraud, reason)."""
+    try:
+        clicks = read_csv('campaign_clicks.csv')
+        from datetime import datetime as _dt
+        now = _dt.now()
+        # Count clicks from same IP for this campaign in last hour
+        ip_clicks = 0
+        fp_clicks = 0
+        for c in clicks:
+            if c.get('campaign_id') != campaign_id:
+                continue
+            try:
+                click_time = _dt.strptime(c.get('timestamp', '')[:19], '%Y-%m-%d %H:%M:%S')
+                age = (now - click_time).total_seconds()
+                if age > _FRAUD_TIME_WINDOW:
+                    continue
+            except:
+                continue
+            if c.get('ip') == ip:
+                ip_clicks += 1
+            if fingerprint and c.get('fingerprint', '') == fingerprint:
+                fp_clicks += 1
+        if ip_clicks >= _FRAUD_CLICK_LIMIT:
+            return True, f'IP {ip} exceeded {_FRAUD_CLICK_LIMIT} clicks in 1h ({ip_clicks})'
+        if fp_clicks >= _FRAUD_CLICK_LIMIT:
+            return True, f'Fingerprint exceeded {_FRAUD_CLICK_LIMIT} clicks in 1h ({fp_clicks})'
+        return False, ''
+    except:
+        return False, ''
+
+def _log_fraud(campaign_id, ip, fingerprint, reason):
+    """Log a fraud attempt."""
+    try:
+        entry = {
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'campaign_id': campaign_id,
+            'ip': ip,
+            'fingerprint': fingerprint,
+            'reason': reason,
+            'action': 'blocked'
+        }
+        fields = get_fieldnames('fraud_log.csv', ['timestamp','campaign_id','ip','fingerprint','reason','action'])
+        append_csv('fraud_log.csv', entry, fields)
+    except:
+        pass
+
+@app.route('/api/fraud/report')
+@api_auth
+def api_fraud_report():
+    """Fraud detection report."""
+    frauds = read_csv('fraud_log.csv')
+    clicks = read_csv('campaign_clicks.csv')
+    # Group fraud by IP
+    from collections import Counter
+    fraud_ips = Counter(f.get('ip', '') for f in frauds if f.get('ip'))
+    total_clicks = len(clicks)
+    total_frauds = len(frauds)
+    clean_clicks = max(0, total_clicks - total_frauds)
+    return jsonify({
+        'total_clicks': total_clicks,
+        'fraud_blocked': total_frauds,
+        'clean_clicks': clean_clicks,
+        'fraud_rate': round(total_frauds / total_clicks * 100, 2) if total_clicks > 0 else 0,
+        'top_fraud_ips': dict(fraud_ips.most_common(10)),
+        'recent_frauds': frauds[-10:][::-1] if frauds else [],
+    })
+
+# ===== API — Frequency Capping + Daily Budget (Phase 3) =====
+
+_FREQ_CAP_DEFAULT = 3  # max exposures per user per campaign per day
+
+def _check_frequency_cap(campaign_id, user_id):
+    """Check if user has exceeded frequency cap for this campaign today."""
+    if not user_id:
+        return False  # anonymous → allow
+    try:
+        exposure = read_csv('user_exposure.csv')
+        today = datetime.now().strftime('%Y-%m-%d')
+        count = 0
+        for e in exposure:
+            if (e.get('campaign_id') == campaign_id and
+                e.get('user_id') == str(user_id) and
+                e.get('date', '').startswith(today)):
+                count += 1
+        # Get campaign's frequency cap
+        campaigns = read_csv('campaigns.csv')
+        cap = _FREQ_CAP_DEFAULT
+        for c in campaigns:
+            if c.get('id') == campaign_id:
+                cap = int(c.get('frequency_cap', _FREQ_CAP_DEFAULT) or _FREQ_CAP_DEFAULT)
+                break
+        return count >= cap
+    except:
+        return False
+
+def _log_exposure(campaign_id, user_id):
+    """Log that a user was exposed to a campaign."""
+    try:
+        entry = {
+            'user_id': str(user_id),
+            'campaign_id': campaign_id,
+            'date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        }
+        fields = get_fieldnames('user_exposure.csv', ['user_id','campaign_id','date'])
+        append_csv('user_exposure.csv', entry, fields)
+    except:
+        pass
+
+def _check_daily_budget(campaign_id):
+    """Check if campaign has exceeded its daily budget. Returns True if exceeded."""
+    try:
+        campaigns = read_csv('campaigns.csv')
+        campaign = None
+        for c in campaigns:
+            if c.get('id') == campaign_id:
+                campaign = c
+                break
+        if not campaign:
+            return False
+        daily_budget = float(campaign.get('daily_budget', 0) or 0)
+        if daily_budget <= 0:
+            return False  # no budget limit
+        # Count today's clicks × CPC
+        clicks = read_csv('campaign_clicks.csv')
+        today = datetime.now().strftime('%Y-%m-%d')
+        today_clicks = sum(1 for c in clicks if c.get('campaign_id') == campaign_id and c.get('timestamp', '').startswith(today))
+        cpc = float(campaign.get('cpc', 0) or 0)
+        spent = today_clicks * cpc
+        return spent >= daily_budget
+    except:
+        return False
+
+@app.route('/api/fraud/report')
+@api_auth
+def api_fraud_report_duplicate():
+    """Alias — handled above."""
+    return jsonify({'error': 'Use /api/fraud/report'}), 400
+
 # ===== API — Click + Conversion Tracking (Ad Platform v2 Phase 1) =====
 
 @app.route('/c/<campaign_id>')
