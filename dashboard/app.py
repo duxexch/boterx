@@ -3403,6 +3403,198 @@ def api_fraud_report_duplicate():
     """Alias — handled above."""
     return jsonify({'error': 'Use /api/fraud/report'}), 400
 
+# ===== API — A/B Testing (Phase 4) =====
+
+@app.route('/api/ab-tests')
+@api_auth
+def api_ab_tests():
+    """List all A/B tests."""
+    tests = read_csv('ab_tests.csv')
+    for t in tests:
+        for k in ['test_id','campaign_a','campaign_b','winner','status','clicks_a','clicks_b','conversions_a','conversions_b','created_at']:
+            if k not in t: t[k] = ''
+    return jsonify({'tests': tests})
+
+@app.route('/api/ab-tests', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_create_ab_test():
+    """Create an A/B test between two campaigns."""
+    data = request.json or {}
+    test_id = f"ABT{secrets.token_hex(3).upper()}"
+    test = {
+        'test_id': test_id,
+        'campaign_a': data.get('campaign_a', ''),
+        'campaign_b': data.get('campaign_b', ''),
+        'winner': '',
+        'status': 'running',
+        'clicks_a': '0',
+        'clicks_b': '0',
+        'conversions_a': '0',
+        'conversions_b': '0',
+        'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+    }
+    fields = get_fieldnames('ab_tests.csv', ['test_id','campaign_a','campaign_b','winner','status','clicks_a','clicks_b','conversions_a','conversions_b','created_at'])
+    append_csv('ab_tests.csv', test, fields)
+    log_action('create_ab_test', test_id)
+    return jsonify({'success': True, 'test_id': test_id})
+
+@app.route('/api/ab-tests/<test_id>/evaluate')
+@api_auth
+def api_evaluate_ab_test(test_id):
+    """Evaluate A/B test — pick winner based on CTR."""
+    tests = read_csv('ab_tests.csv')
+    fields = get_fieldnames('ab_tests.csv', ['test_id','campaign_a','campaign_b','winner','status','clicks_a','clicks_b','conversions_a','conversions_b','created_at'])
+    # Get click data for both campaigns
+    all_clicks = read_csv('campaign_clicks.csv')
+    all_convs = read_csv('campaign_conversions.csv')
+    for t in tests:
+        if t.get('test_id') == test_id:
+            ca = t.get('campaign_a', '')
+            cb = t.get('campaign_b', '')
+            t['clicks_a'] = str(sum(1 for c in all_clicks if c.get('campaign_id') == ca))
+            t['clicks_b'] = str(sum(1 for c in all_clicks if c.get('campaign_id') == cb))
+            t['conversions_a'] = str(sum(1 for c in all_convs if c.get('campaign_id') == ca))
+            t['conversions_b'] = str(sum(1 for c in all_convs if c.get('campaign_id') == cb))
+            # Auto-pick winner if >50 clicks each
+            ca_clicks = int(t['clicks_a'])
+            cb_clicks = int(t['clicks_b'])
+            if ca_clicks >= 50 and cb_clicks >= 50:
+                ctr_a = int(t['conversions_a']) / ca_clicks if ca_clicks > 0 else 0
+                ctr_b = int(t['conversions_b']) / cb_clicks if cb_clicks > 0 else 0
+                if ctr_a > ctr_b:
+                    t['winner'] = ca
+                    t['status'] = 'completed'
+                elif ctr_b > ctr_a:
+                    t['winner'] = cb
+                    t['status'] = 'completed'
+            break
+    write_csv('ab_tests.csv', tests, fields)
+    return jsonify({'success': True, 'tests': [t for t in tests if t.get('test_id') == test_id]})
+
+# ===== API — Retargeting (Phase 4) =====
+
+@app.route('/api/retargeting/lists')
+@api_auth
+def api_retargeting_lists():
+    """List retargeting lists."""
+    lists = read_csv('retargeting_lists.csv')
+    return jsonify({'lists': lists})
+
+@app.route('/api/retargeting/build/<campaign_id>')
+@api_auth
+@permission_required('send_broadcast')
+def api_build_retargeting_list(campaign_id):
+    """Build a retargeting list from users who clicked but didn't convert."""
+    clicks = read_csv('campaign_clicks.csv')
+    convs = read_csv('campaign_conversions.csv')
+    # Users who clicked
+    clickers = set(c.get('user_id', '') for c in clicks if c.get('campaign_id') == campaign_id and c.get('user_id'))
+    # Users who converted
+    converters = set(c.get('user_id', '') for c in convs if c.get('campaign_id') == campaign_id and c.get('user_id'))
+    # Retarget = clicked but not converted
+    retarget = clickers - converters
+    list_id = f"RTL{secrets.token_hex(3).upper()}"
+    entry = {
+        'list_id': list_id,
+        'campaign_id': campaign_id,
+        'user_ids': '|'.join(retarget),
+        'count': str(len(retarget)),
+        'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+    }
+    fields = get_fieldnames('retargeting_lists.csv', ['list_id','campaign_id','user_ids','count','created_at'])
+    append_csv('retargeting_lists.csv', entry, fields)
+    return jsonify({'success': True, 'list_id': list_id, 'count': len(retarget), 'users': list(retarget)[:20]})
+
+# ===== API — Marketplace (Phase 5) =====
+
+@app.route('/api/marketplace/listings')
+@api_auth
+def api_marketplace_listings():
+    """List channel marketplace listings."""
+    listings = read_csv('marketplace_listings.csv')
+    # Enrich with channel data
+    channels = read_csv('bot_channels.csv')
+    for l in listings:
+        for ch in channels:
+            if ch.get('id') == l.get('channel_id'):
+                l['channel_name'] = ch.get('title', '')
+                l['subscriber_count'] = ch.get('subscriber_count', '0')
+                break
+    return jsonify({'listings': listings})
+
+@app.route('/api/marketplace/listings', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_create_listing():
+    """Create a marketplace listing for a channel."""
+    data = request.json or {}
+    listing_id = f"LST{secrets.token_hex(3).upper()}"
+    listing = {
+        'listing_id': listing_id,
+        'channel_id': data.get('channel_id', ''),
+        'cpm_rate': data.get('cpm_rate', '0.50'),
+        'cpc_rate': data.get('cpc_rate', '0.05'),
+        'min_budget': data.get('min_budget', '10'),
+        'category': data.get('category', ''),
+        'is_available': 'yes',
+        'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+    }
+    fields = get_fieldnames('marketplace_listings.csv', ['listing_id','channel_id','cpm_rate','cpc_rate','min_budget','category','is_available','created_at'])
+    append_csv('marketplace_listings.csv', listing, fields)
+    return jsonify({'success': True, 'listing_id': listing_id})
+
+@app.route('/api/marketplace/dashboard')
+@api_auth
+def api_marketplace_dashboard():
+    """Marketplace overview."""
+    listings = read_csv('marketplace_listings.csv')
+    partners = read_csv('partner_channels.csv')
+    campaigns = read_csv('campaigns.csv')
+    available = [l for l in listings if l.get('is_available') == 'yes']
+    return jsonify({
+        'total_listings': len(listings),
+        'available_listings': len(available),
+        'avg_cpm': round(sum(float(l.get('cpm_rate', 0) or 0) for l in available) / len(available), 2) if available else 0,
+        'avg_cpc': round(sum(float(l.get('cpc_rate', 0) or 0) for l in available) / len(available), 2) if available else 0,
+        'total_partners': len(partners),
+        'total_campaigns': len(campaigns),
+    })
+
+# ===== API — External REST API + Scheduled Reports (Phase 6) =====
+
+@app.route('/api/v1/campaigns')
+def api_v1_campaigns():
+    """Public REST API for external advertisers — API key auth."""
+    api_key = request.headers.get('X-API-Key', '')
+    if not api_key or api_key != os.getenv('AD_API_KEY', ''):
+        return jsonify({'error': 'Invalid API key'}), 401
+    campaigns = read_csv('campaigns.csv')
+    return jsonify({'campaigns': [{'id': c.get('id',''), 'name': c.get('name',''), 'status': c.get('status',''), 'reach': c.get('stats_reach','0'), 'clicks': c.get('stats_clicks','0')} for c in campaigns]})
+
+@app.route('/api/v1/campaigns', methods=['POST'])
+def api_v1_create_campaign():
+    """Create campaign via external API."""
+    api_key = request.headers.get('X-API-Key', '')
+    if not api_key or api_key != os.getenv('AD_API_KEY', ''):
+        return jsonify({'error': 'Invalid API key'}), 401
+    data = request.json or {}
+    campaign_id = f"CMP{secrets.token_hex(3).upper()}"
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    campaign = {
+        'id': campaign_id, 'name': data.get('name', ''), 'message': data.get('message', ''),
+        'media_urls': '', 'target': data.get('target', 'both'), 'recipient': 'all',
+        'priority': data.get('priority', 'normal'), 'country': data.get('country', 'all'),
+        'language': 'all', 'segment': 'all', 'channel_group': '', 'scheduled_at': '',
+        'repeat': 'once', 'status': 'draft', 'created_at': now, 'created_by': 'api',
+        'stats_reach': '0', 'stats_clicks': '0', 'stats_conversions': '0',
+    }
+    fields = get_fieldnames('campaigns.csv', ['id','name','message','media_urls','target','recipient','priority','country','language','segment','channel_group','scheduled_at','repeat','status','created_at','created_by','stats_reach','stats_clicks','stats_conversions'])
+    append_csv('campaigns.csv', campaign, fields)
+    return jsonify({'success': True, 'id': campaign_id})
+
+# ===== End Phase 4+5+6 =====
+
 # ===== API — Click + Conversion Tracking (Ad Platform v2 Phase 1) =====
 
 @app.route('/c/<campaign_id>')
