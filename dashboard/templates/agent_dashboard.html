@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<meta name="robots" content="noindex,nofollow">
+<title>لوحة الوكيل — {{ agent.bot_name }}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:#060810;color:#e8f5e9;min-height:100vh}
+.nav{position:sticky;top:0;background:rgba(6,8,16,.95);backdrop-filter:blur(10px);border-bottom:1px solid #1a3a28;padding:10px 16px;display:flex;justify-content:space-between;align-items:center;z-index:50}
+.nav-title{font-weight:800;font-size:15px}
+.nav-title span{color:#00ff88}
+.container{max-width:600px;margin:0 auto;padding:16px}
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.kpi{background:linear-gradient(135deg,#0d1814,#0a1410);border:1px solid #1a3a28;border-radius:14px;padding:14px;text-align:center}
+.kpi-label{font-size:10px;color:#4a7a5a;margin-bottom:4px}
+.kpi-val{font-size:22px;font-weight:800}
+.kpi-val.green{color:#00ff88}.kpi-val.amber{color:#fbbf24}.kpi-val.red{color:#ff4757}.kpi-val.blue{color:#3b82f6}
+.section{background:linear-gradient(135deg,#0d1814,#0a1410);border:1px solid #1a3a28;border-radius:14px;padding:16px;margin-bottom:14px}
+.section-title{font-size:14px;font-weight:700;margin-bottom:12px;color:#00ff88}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{text-align:right;padding:6px;color:#4a7a5a;border-bottom:1px solid #1a3a28;font-weight:600}
+td{padding:6px;border-bottom:1px solid #0d1814}
+.tag{display:inline-block;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:700}
+.tag-approved{background:rgba(0,255,136,.15);color:#00ff88}
+.tag-pending{background:rgba(251,191,36,.15);color:#fbbf24}
+.tag-rejected{background:rgba(255,71,87,.15);color:#ff4757}
+.method{display:flex;align-items:center;gap:10px;padding:10px;background:#0a1820;border:1px solid #1a3040;border-radius:10px;margin-bottom:8px}
+.method-icon{font-size:20px}
+.method-info{flex:1}
+.method-name{font-size:13px;font-weight:700}
+.method-data{font-size:11px;color:#4a7a5a;font-family:monospace}
+.btn{padding:10px 16px;border-radius:10px;border:none;font-weight:700;font-size:13px;cursor:pointer}
+.btn-primary{background:linear-gradient(135deg,#00ff88,#00cc6a);color:#060810}
+.btn-deposit{background:rgba(0,255,136,.12);border:1px solid rgba(0,255,136,.3);color:#00ff88}
+.btn-edit{background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.3);color:#3b82f6;padding:6px 10px;font-size:11px}
+input,select{background:#0a1820;border:1px solid #1a3040;border-radius:8px;padding:10px;color:#e8f5e9;font-size:14px;width:100%}
+.search{margin-bottom:10px}
+.empty{text-align:center;color:#4a7a5a;padding:20px;font-size:13px}
+.logout{color:#ff4757;text-decoration:none;font-size:12px}
+</style>
+</head>
+<body>
+<div class="nav">
+  <div class="nav-title">🤖 <span>{{ agent.bot_name }}</span></div>
+  <a href="/agent-logout" class="logout">خروج ←</a>
+</div>
+<div class="container">
+  <!-- KPIs -->
+  <div class="kpis">
+    <div class="kpi"><div class="kpi-label">الرصيد</div><div class="kpi-val green" id="balance">0</div></div>
+    <div class="kpi"><div class="kpi-label">حد التأمين</div><div class="kpi-val amber" id="deposit">0</div></div>
+    <div class="kpi"><div class="kpi-label">معاملات اليوم</div><div class="kpi-val blue" id="daily">0/0</div></div>
+    <div class="kpi"><div class="kpi-label">حالة المرور</div><div class="kpi-val" id="traffic">—</div></div>
+  </div>
+
+  <!-- Deposit Balance -->
+  <div class="section">
+    <div class="section-title">💰 إيداع الرصيد</div>
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <input type="number" id="depAmount" placeholder="المبلغ" style="flex:1">
+      <input type="text" id="depMethod" placeholder="وسيلة الدفع" style="flex:1">
+    </div>
+    <input type="text" id="depWallet" placeholder="رقم محفظتك" style="margin-bottom:8px">
+    <button class="btn btn-deposit" onclick="depositBalance()" style="width:100%">💸 طلب إيداع الرصيد</button>
+  </div>
+
+  <!-- Payment Methods -->
+  <div class="section">
+    <div class="section-title">💳 وسائل الدفع</div>
+    <div id="methodsList"></div>
+  </div>
+
+  <!-- Transactions -->
+  <div class="section">
+    <div class="section-title">📜 سجل المعاملات</div>
+    <input type="text" class="search" id="txnSearch" placeholder="🔍 بحث..." oninput="loadTxns()">
+    <div id="txnTable"></div>
+  </div>
+</div>
+
+<script>
+function loadSelf(){
+  fetch('/api/agent/self').then(r=>r.json()).then(d=>{
+    document.getElementById('balance').textContent=parseFloat(d.balance||0).toFixed(0);
+    document.getElementById('deposit').textContent=parseFloat(d.security_deposit||0).toFixed(0);
+    document.getElementById('daily').textContent=(d.current_daily_count||0)+'/'+(d.max_daily_transactions||0);
+    var t=document.getElementById('traffic');
+    t.textContent=d.traffic_enabled==='yes'?'▶️ نشط':'⏸️ متوقف';
+    t.className='kpi-val '+(d.traffic_enabled==='yes'?'green':'red');
+  });
+}
+function loadMethods(){
+  fetch('/api/agent/self/payment-methods').then(r=>r.json()).then(d=>{
+    var h='';
+    (d.methods||[]).forEach(function(m){
+      h+='<div class="method"><span class="method-icon">'+(m.icon||'💳')+'</span><div class="method-info"><div class="method-name">'+m.method_name+'</div><div class="method-data">'+(m.account_data||'—')+'</div></div><button class="btn btn-edit" onclick="editMethod(\''+m.id+'\')">✏️</button></div>';
+    });
+    if(!h)h='<div class="empty">لا توجد وسائل دفع</div>';
+    document.getElementById('methodsList').innerHTML=h;
+  });
+}
+function editMethod(mid){
+  var newData=prompt('بيانات الحساب الجديدة:');
+  if(newData===null)return;
+  fetch('/api/agent/self/payment-methods/'+mid,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({account_data:newData})}).then(r=>r.json()).then(d=>{if(d.success){loadMethods();alert('تم التحديث')}else{alert('فشل')}});
+}
+function loadTxns(){
+  var s=document.getElementById('txnSearch').value;
+  fetch('/api/agent/self/transactions'+(s?'?search='+encodeURIComponent(s):'')).then(r=>r.json()).then(d=>{
+    var h='<table><thead><tr><th>النوع</th><th>المبلغ</th><th>المستخدم</th><th>الحالة</th><th>التاريخ</th></tr></thead><tbody>';
+    (d.transactions||[]).forEach(function(t){
+      var cls='tag-'+(t.status||'pending');
+      h+='<tr><td>'+(t.type==='deposit'?'💵':t.type==='withdraw'?'💸':'💰')+'</td><td>'+t.amount+'</td><td>'+(t.user_name||'—')+'</td><td><span class="tag '+cls+'">'+t.status+'</span></td><td>'+(t.processed_at||'').slice(0,16)+'</td></tr>';
+    });
+    if(!(d.transactions||[]).length)h+='<tr><td colspan="5" class="empty">لا توجد معاملات</td></tr>';
+    h+='</tbody></table>';
+    document.getElementById('txnTable').innerHTML=h;
+  });
+}
+function depositBalance(){
+  var amt=document.getElementById('depAmount').value;
+  var mtd=document.getElementById('depMethod').value;
+  var wal=document.getElementById('depWallet').value;
+  if(!amt||!mtd||!wal){alert('املأ جميع الحقول');return}
+  fetch('/api/agent/self/deposit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({amount:parseFloat(amt),method_name:mtd,wallet:wal})})
+  .then(r=>r.json()).then(d=>{
+    if(d.success){alert(d.message||'تم');document.getElementById('depAmount').value='';document.getElementById('depMethod').value='';document.getElementById('depWallet').value='';loadTxns()}
+    else{alert(d.error||'فشل')}
+  });
+}
+loadSelf();loadMethods();loadTxns();
+setInterval(loadSelf,30000);
+</script>
+</body>
+</html>

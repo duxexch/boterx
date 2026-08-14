@@ -1719,6 +1719,148 @@ def api_find_available_agent():
 def page_svrp():
     return render_template('svrp.html', active_page='svrp')
 
+# ===== Agent Web Dashboard (Phase 5) =====
+
+@app.route('/agent-login')
+def agent_login_page():
+    """Agent web login page."""
+    if session.get('agent_id'):
+        return redirect(url_for('agent_dashboard'))
+    return render_template('agent_login.html')
+
+@app.route('/api/agent/login', methods=['POST'])
+def api_agent_login():
+    """Agent login via username + password."""
+    data = request.json or {}
+    username = data.get('username', '').strip()
+    password = data.get('password', '')
+    agents = read_csv('agent_bots.csv')
+    for a in agents:
+        if a.get('username', '') == username and a.get('password', '') == password:
+            if a.get('is_active') != 'yes':
+                return jsonify({'error': 'الحساب معطل'}), 403
+            session['agent_id'] = a.get('id', '')
+            session['agent_name'] = a.get('bot_name', '')
+            session['agent_logged_in'] = True
+            return jsonify({'success': True, 'redirect': '/agent-dashboard'})
+    return jsonify({'error': 'بيانات غير صحيحة'}), 401
+
+@app.route('/agent-dashboard')
+def agent_dashboard():
+    """Agent web dashboard — manage transactions, balance, payment methods."""
+    if not session.get('agent_logged_in') or not session.get('agent_id'):
+        return redirect(url_for('agent_login_page'))
+    agent_id = session.get('agent_id', '')
+    agents = read_csv('agent_bots.csv')
+    agent = next((a for a in agents if a.get('id') == agent_id), {})
+    if not agent:
+        session.clear()
+        return redirect(url_for('agent_login_page'))
+    return render_template('agent_dashboard.html', agent=agent)
+
+@app.route('/api/agent/self')
+def api_agent_self():
+    """Get own agent data."""
+    if not session.get('agent_id'):
+        return jsonify({'error': 'Not logged in'}), 401
+    agent_id = session.get('agent_id')
+    agents = read_csv('agent_bots.csv')
+    for a in agents:
+        if a.get('id') == agent_id:
+            return jsonify({
+                'id': a.get('id', ''), 'bot_name': a.get('bot_name', ''),
+                'balance': float(a.get('balance', 0) or 0),
+                'security_deposit': float(a.get('security_deposit', 0) or 0),
+                'traffic_enabled': a.get('traffic_enabled', ''),
+                'current_daily_count': int(a.get('current_daily_count', 0) or 0),
+                'max_daily_transactions': int(a.get('max_daily_transactions', 50) or 50),
+                'is_active': a.get('is_active', ''),
+            })
+    return jsonify({'error': 'Not found'}), 404
+
+@app.route('/api/agent/self/payment-methods')
+def api_agent_self_methods():
+    """Get own payment methods."""
+    if not session.get('agent_id'):
+        return jsonify({'error': 'Not logged in'}), 401
+    agent_id = session.get('agent_id')
+    methods = read_csv('agent_payment_methods.csv')
+    agent_methods = [m for m in methods if m.get('agent_id') == agent_id]
+    return jsonify({'methods': agent_methods})
+
+@app.route('/api/agent/self/payment-methods/<mid>', methods=['PUT'])
+def api_agent_edit_method(mid):
+    """Agent edits own payment method (account_data + icon only, not name)."""
+    if not session.get('agent_id'):
+        return jsonify({'error': 'Not logged in'}), 401
+    agent_id = session.get('agent_id')
+    data = request.json or {}
+    methods = read_csv('agent_payment_methods.csv')
+    fields = get_fieldnames('agent_payment_methods.csv', ['id','agent_id','method_name','method_type','account_data','icon','is_active','created_at'])
+    for m in methods:
+        if m.get('id') == mid and m.get('agent_id') == agent_id:
+            # Agent can only edit account_data and icon, NOT method_name or method_type
+            if 'account_data' in data:
+                m['account_data'] = str(data['account_data'])
+            if 'icon' in data:
+                m['icon'] = str(data['icon'])
+            break
+    write_csv('agent_payment_methods.csv', methods, fields)
+    return jsonify({'success': True})
+
+@app.route('/api/agent/self/transactions')
+def api_agent_self_txns():
+    """Get own transactions with search."""
+    if not session.get('agent_id'):
+        return jsonify({'error': 'Not logged in'}), 401
+    agent_id = session.get('agent_id')
+    search = request.args.get('search', '')
+    txns = read_csv('agent_transactions.csv')
+    agent_txns = [t for t in txns if t.get('agent_id') == agent_id]
+    if search:
+        sl = search.lower()
+        agent_txns = [t for t in agent_txns if sl in (t.get('user_name','') + t.get('transaction_id','') + t.get('type','') + t.get('status','')).lower()]
+    agent_txns.reverse()
+    return jsonify({'transactions': agent_txns[:50], 'total': len(agent_txns)})
+
+@app.route('/api/agent/self/deposit', methods=['POST'])
+def api_agent_deposit_balance():
+    """Agent deposits to own balance — creates pending request for admin approval."""
+    if not session.get('agent_id'):
+        return jsonify({'error': 'Not logged in'}), 401
+    agent_id = session.get('agent_id')
+    data = request.json or {}
+    amount = float(data.get('amount', 0))
+    method_name = data.get('method_name', '')
+    wallet = data.get('wallet', '')
+    if amount <= 0:
+        return jsonify({'error': 'مبلغ غير صالح'}), 400
+    # Create a deposit request in agent_transactions as pending
+    txn_id = f"AGD{secrets.token_hex(3).upper()}"
+    txn = {
+        'id': txn_id,
+        'agent_id': agent_id,
+        'transaction_id': txn_id,
+        'type': 'balance_deposit',
+        'amount': str(amount),
+        'currency': '',
+        'status': 'pending',
+        'user_id': '',
+        'user_name': method_name + ' / ' + wallet,
+        'processed_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'admin_override': '',
+    }
+    fields = get_fieldnames('agent_transactions.csv', ['id','agent_id','transaction_id','type','amount','currency','status','user_id','user_name','processed_at','admin_override'])
+    append_csv('agent_transactions.csv', txn, fields)
+    return jsonify({'success': True, 'id': txn_id, 'message': 'تم إرسال طلب الإيداع — بانتظار موافقة الإدارة'})
+
+@app.route('/agent-logout')
+def agent_logout():
+    session.pop('agent_id', None)
+    session.pop('agent_name', None)
+    session.pop('agent_logged_in', None)
+    return redirect(url_for('agent_login_page'))
+
 @app.route('/trading')
 @admin_required
 @page_permission_required('view_financial')

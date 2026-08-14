@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<meta name="robots" content="noindex,nofollow">
+<title>وكلاء VEX — تسجيل الدخول</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:#060810;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.card{background:linear-gradient(180deg,#0d1814,#0a1410);border:1px solid #1a3a28;border-radius:18px;padding:30px;max-width:360px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.5)}
+.logo{font-size:28px;font-weight:900;text-align:center;margin-bottom:6px;background:linear-gradient(135deg,#00ff88,#00cc6a);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.sub{text-align:center;font-size:12px;color:#4a7a5a;margin-bottom:24px}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:12px;color:#4a7a5a;margin-bottom:4px}
+.field input{width:100%;background:#0a1820;border:1px solid #1a3040;border-radius:10px;padding:12px;color:#e8f5e9;font-size:14px}
+.field input:focus{outline:none;border-color:#00ff88}
+.btn{width:100%;padding:14px;border-radius:12px;border:none;background:linear-gradient(135deg,#00ff88,#00cc6a);color:#060810;font-weight:800;font-size:15px;cursor:pointer;transition:all .2s}
+.btn:active{transform:scale(.97)}
+.err{color:#ff4757;font-size:12px;text-align:center;margin-top:10px;min-height:16px}
+.link{text-align:center;margin-top:16px;font-size:11px}
+.link a{color:#4a7a5a;text-decoration:none}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">🤖 VEX Agents</div>
+  <div class="sub">بوابة الوكلاء — نظام المطابقة</div>
+  <div class="field"><label>اسم المستخدم</label><input type="text" id="username" placeholder="agent1" dir="ltr" autofocus></div>
+  <div class="field"><label>كلمة المرور</label><input type="password" id="password" placeholder="••••••" dir="ltr"></div>
+  <button class="btn" onclick="login()">🔐 دخول</button>
+  <div class="err" id="err"></div>
+  <div class="link"><a href="/">← العودة للموقع</a></div>
+</div>
+<script>
+function login(){
+  var u=document.getElementById('username').value.trim();
+  var p=document.getElementById('password').value;
+  if(!u||!p){document.getElementById('err').textContent='أدخل البيانات';return}
+  document.getElementById('err').textContent='';
+  fetch('/api/agent/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})})
+  .then(function(r){return r.json()})
+  .then(function(d){
+    if(d.success){window.location=d.redirect}
+    else{document.getElementById('err').textContent=d.error||'خطأ'}
+  })
+  .catch(function(){document.getElementById('err').textContent='خطأ في الاتصال'});
+}
+document.getElementById('password').addEventListener('keydown',function(e){if(e.key==='Enter')login()});
+</script>
+</body>
+</html>
