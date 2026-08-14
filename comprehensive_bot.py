@@ -11643,12 +11643,15 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             account_data = selected_method.get('account_data', '')
             additional_info = selected_method.get('additional_info', '')
             user_currency = user.get('currency', 'SAR') if user else 'SAR'
+            icon_url = selected_method.get('icon', '').strip()
             
             wallet_text = (
-                f"✅ {method_icon} {selected_method['method_name']}\n\n"
-                f"📋 {selected_method['method_type']}\n"
-                f"🏢 {company_name}\n"
+                f"✅ {method_icon} <b>{selected_method['method_name']}</b>\n\n"
+                f"📋 النوع: {selected_method.get('method_type', '')}\n"
+                f"🏢 الشركة: {company_name}\n"
             )
+            if account_data:
+                wallet_text += f"🔢 رقم الحساب: <code>{account_data}</code> 👈 اضغط للنسخ\n"
             if additional_info:
                 wallet_text += f"💡 {additional_info}\n"
             # طلب رقم محفظة العميل بوضوح
@@ -11659,7 +11662,24 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                 'resize_keyboard': True,
                 'one_time_keyboard': True
             }
-            self.send_message(message['chat']['id'], wallet_text, cancel_kb)
+            
+            # محاولة إرسال الأيقونة كصورة + النص كـ caption
+            photo_sent = False
+            if icon_url:
+                full_url = icon_url if icon_url.startswith('http') else f'https://vex.deals{icon_url}'
+                try:
+                    self.api_call('sendPhoto', {
+                        'chat_id': message['chat']['id'],
+                        'photo': full_url,
+                        'caption': wallet_text,
+                        'parse_mode': 'HTML',
+                    })
+                    photo_sent = True
+                except Exception as e:
+                    logger.warning(f"Payment method icon send failed: {e}")
+            
+            if not photo_sent:
+                self.send_message(message['chat']['id'], wallet_text, cancel_kb)
             
             # تحديث الحالة — استبدال _ في اسم الشركة بمسافة لمنع تلف الحالة
             safe_company_name = (company["name"] if company else "unknown").replace('_', ' ')
