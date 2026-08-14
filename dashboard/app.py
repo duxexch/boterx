@@ -2816,6 +2816,174 @@ def api_svrp_analytics():
         'credit_status': dict(credit_status),
     })
 
+# ===== SVRP Segments (Phase 2 — Smart Segmentation) =====
+
+@app.route('/api/svrp/segments')
+@api_auth
+def api_svrp_segments():
+    """List recovery segments with custom multipliers/wagering."""
+    segments = read_csv('svrp_segments.csv')
+    if not segments:
+        # Auto-create default segments
+        defaults = [
+            {'id': 'SEG_NEW', 'name': 'لاعب جديد', 'multiplier': '2.0', 'wagering': '3', 'max_recovery': '1000', 'color': '#00ff88', 'is_active': 'yes'},
+            {'id': 'SEG_LOSER', 'name': 'خاسر', 'multiplier': '3.0', 'wagering': '3', 'max_recovery': '3000', 'color': '#ff4757', 'is_active': 'yes'},
+            {'id': 'SEG_VIP', 'name': 'VIP', 'multiplier': '5.0', 'wagering': '5', 'max_recovery': '5000', 'color': '#fbbf24', 'is_active': 'yes'},
+            {'id': 'SEG_CHURN', 'name': 'خامل (خطر مغادرة)', 'multiplier': '4.0', 'wagering': '2', 'max_recovery': '2000', 'color': '#a855f7', 'is_active': 'yes'},
+        ]
+        fields = get_fieldnames('svrp_segments.csv', ['id','name','multiplier','wagering','max_recovery','color','is_active'])
+        for d in defaults:
+            append_csv('svrp_segments.csv', d, fields)
+        segments = defaults
+    return jsonify({'segments': segments})
+
+@app.route('/api/svrp/segments', methods=['POST'])
+@api_auth
+@permission_required('manage_settings')
+def api_create_segment():
+    """Create a new recovery segment."""
+    data = request.json or {}
+    seg_id = f"SEG{secrets.token_hex(2).upper()}"
+    segment = {
+        'id': seg_id,
+        'name': data.get('name', ''),
+        'multiplier': str(data.get('multiplier', '2.0')),
+        'wagering': str(data.get('wagering', '3')),
+        'max_recovery': str(data.get('max_recovery', '1000')),
+        'color': data.get('color', '#00ff88'),
+        'is_active': 'yes',
+    }
+    fields = get_fieldnames('svrp_segments.csv', ['id','name','multiplier','wagering','max_recovery','color','is_active'])
+    append_csv('svrp_segments.csv', segment, fields)
+    return jsonify({'success': True, 'id': seg_id})
+
+@app.route('/api/svrp/segments/<seg_id>', methods=['PUT', 'DELETE'])
+@api_auth
+@permission_required('manage_settings')
+def api_edit_segment(seg_id):
+    segments = read_csv('svrp_segments.csv')
+    fields = get_fieldnames('svrp_segments.csv', ['id','name','multiplier','wagering','max_recovery','color','is_active'])
+    if request.method == 'DELETE':
+        segments = [s for s in segments if s.get('id') != seg_id]
+        write_csv('svrp_segments.csv', segments, fields)
+        return jsonify({'success': True})
+    elif request.method == 'PUT':
+        data = request.json or {}
+        for s in segments:
+            if s.get('id') == seg_id:
+                for k, v in data.items():
+                    if k in fields:
+                        s[k] = str(v)
+                break
+        write_csv('svrp_segments.csv', segments, fields)
+        return jsonify({'success': True})
+
+# ===== SVRP Recovery Campaigns (Phase 3 — Seasonal Campaigns) =====
+
+@app.route('/api/svrp/campaigns')
+@api_auth
+def api_svrp_recovery_campaigns():
+    """List recovery campaigns."""
+    campaigns = read_csv('svrp_recovery_campaigns.csv')
+    campaigns.reverse()
+    return jsonify({'campaigns': campaigns})
+
+@app.route('/api/svrp/campaigns', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_create_recovery_campaign():
+    """Create a recovery campaign (e.g. 'Weekend 200% Recovery')."""
+    data = request.json or {}
+    camp_id = f"RCV{secrets.token_hex(3).upper()}"
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    campaign = {
+        'id': camp_id,
+        'name': data.get('name', ''),
+        'multiplier': str(data.get('multiplier', '2.0')),
+        'target_segment': data.get('target_segment', 'all'),
+        'target_country': data.get('target_country', 'all'),
+        'max_per_user': str(data.get('max_per_user', '1000')),
+        'total_budget': str(data.get('total_budget', '10000')),
+        'spent': '0',
+        'start_date': data.get('start_date', ''),
+        'end_date': data.get('end_date', ''),
+        'status': 'scheduled' if data.get('start_date') else 'active',
+        'created_at': now,
+        'created_by': session.get('admin_id', ''),
+    }
+    fields = get_fieldnames('svrp_recovery_campaigns.csv', ['id','name','multiplier','target_segment','target_country','max_per_user','total_budget','spent','start_date','end_date','status','created_at','created_by'])
+    append_csv('svrp_recovery_campaigns.csv', campaign, fields)
+    log_action('create_recovery_campaign', camp_id)
+    return jsonify({'success': True, 'id': camp_id})
+
+@app.route('/api/svrp/campaigns/<camp_id>', methods=['PUT', 'DELETE'])
+@api_auth
+@permission_required('send_broadcast')
+def api_edit_recovery_campaign(camp_id):
+    campaigns = read_csv('svrp_recovery_campaigns.csv')
+    fields = get_fieldnames('svrp_recovery_campaigns.csv', ['id','name','multiplier','target_segment','target_country','max_per_user','total_budget','spent','start_date','end_date','status','created_at','created_by'])
+    if request.method == 'DELETE':
+        campaigns = [c for c in campaigns if c.get('id') != camp_id]
+        write_csv('svrp_recovery_campaigns.csv', campaigns, fields)
+        return jsonify({'success': True})
+    elif request.method == 'PUT':
+        data = request.json or {}
+        for c in campaigns:
+            if c.get('id') == camp_id:
+                for k, v in data.items():
+                    if k in fields:
+                        c[k] = str(v)
+                break
+        write_csv('svrp_recovery_campaigns.csv', campaigns, fields)
+        return jsonify({'success': True})
+
+# ===== SVRP Automation (Phase 5 — Smart Automation) =====
+
+@app.route('/api/svrp/automation')
+@api_auth
+def api_svrp_automation():
+    """Get automation settings."""
+    settings = read_csv('system_settings.csv')
+    auto = {}
+    for s in settings:
+        key = s.get('key', '') or s.get('setting_key', '')
+        if key.startswith('svrp_auto_'):
+            auto[key] = s.get('value', '') or s.get('setting_value', '')
+    # Defaults
+    defaults = {
+        'svrp_auto_approve': 'no',
+        'svrp_auto_approve_max': '500',
+        'svrp_auto_churn_days': '7',
+        'svrp_auto_expire_days': '90',
+        'svrp_auto_highloss_alert': '500',
+    }
+    for k, v in defaults.items():
+        if k not in auto:
+            auto[k] = v
+    return jsonify({'automation': auto})
+
+@app.route('/api/svrp/automation', methods=['POST'])
+@api_auth
+@permission_required('manage_settings')
+def api_save_svrp_automation():
+    """Save automation settings."""
+    data = request.json or {}
+    settings = read_csv('system_settings.csv')
+    fields = get_fieldnames('system_settings.csv', ['key', 'value', 'updated_at'])
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    existing = {s.get('key', '') or s.get('setting_key', ''): s for s in settings}
+    for key, value in data.items():
+        if not key.startswith('svrp_auto_'):
+            continue
+        if key in existing:
+            existing[key]['value'] = str(value)
+            existing[key]['updated_at'] = now
+        else:
+            settings.append({'key': key, 'value': str(value), 'updated_at': now})
+    write_csv('system_settings.csv', settings, fields)
+    log_action('svrp_automation_update', json.dumps(data)[:100])
+    return jsonify({'success': True})
+
 @app.route('/api/svrp/requests')
 @api_auth
 def api_svrp_requests():
