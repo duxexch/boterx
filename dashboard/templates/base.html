@@ -130,6 +130,9 @@
         <a href="{{ url_for('page_matching') }}" class="sidebar-link {% if active_page == 'matching' %}active{% endif %}">
             <i class="fas fa-arrows-rotate w-5 text-center"></i> <span x-text="t('matching')"></span>
         </a>
+        <a href="{{ url_for('page_agents') }}" class="sidebar-link {% if active_page == 'agents' %}active{% endif %}">
+            <i class="fas fa-robot w-5 text-center"></i> <span>وكلاء المطابقة</span>
+        </a>
         <a href="{{ url_for('page_trading') }}" class="sidebar-link {% if active_page == 'trading' %}active{% endif %}">
             <i class="fas fa-coins w-5 text-center"></i> <span x-text="t('trading')"></span>
         </a>

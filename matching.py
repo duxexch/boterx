@@ -506,3 +506,151 @@ class MatchManager:
         except:
             pass
         return matches
+
+    # ==================== Agent Matching (Phase 6) ====================
+
+    def find_available_agent(self, amount, txn_type='deposit'):
+        """Find an available agent bot to act as counterparty."""
+        agents = []
+        try:
+            with open('agent_bots.csv', 'r', encoding='utf-8-sig') as f:
+                for row in csv.DictReader(f):
+                    if row.get('is_active') != 'yes' or row.get('traffic_enabled') != 'yes':
+                        continue
+                    bal = float(row.get('balance', 0) or 0)
+                    dep = float(row.get('security_deposit', 0) or 0)
+                    daily = int(row.get('current_daily_count', 0) or 0)
+                    max_daily = int(row.get('max_daily_transactions', 50) or 50)
+                    if bal <= dep:
+                        continue
+                    if daily >= max_daily:
+                        continue
+                    if txn_type == 'deposit' and bal < amount:
+                        continue
+                    agents.append({
+                        'id': row.get('id', ''), 'name': row.get('bot_name', ''),
+                        'balance': bal, 'daily_count': daily,
+                        'all_data': row
+                    })
+        except:
+            pass
+        if not agents:
+            return None
+        # Pick lowest daily count (round-robin)
+        agents.sort(key=lambda x: x['daily_count'])
+        return agents[0]
+
+    def create_agent_match(self, user_request, agent):
+        """Create a match between a user request and an agent bot.
+        Agent acts as the counterparty (opposite type)."""
+        match_id = self.generate_id('MTCH')
+        user_alias = self.generate_alias()
+        agent_alias = self.generate_alias()
+        agent_id = agent['id']
+
+        # Determine roles: if user is deposit → agent is withdrawer (and vice versa)
+        if user_request['type'] == 'deposit':
+            depositor_id = user_request['user_id']
+            withdrawer_id = f"AGENT_{agent_id}"
+            depositor_alias = user_alias
+            withdrawer_alias = agent_alias
+            # Agent pays user → balance goes DOWN
+            balance_change = -float(user_request['amount'])
+        else:
+            depositor_id = f"AGENT_{agent_id}"
+            withdrawer_id = user_request['user_id']
+            depositor_alias = agent_alias
+            withdrawer_alias = user_alias
+            # User pays agent → balance goes UP
+            balance_change = float(user_request['amount'])
+
+        # Write match
+        try:
+            with open('matches.csv', 'a', newline='', encoding='utf-8-sig') as f:
+                writer = csv.writer(f)
+                writer.writerow([
+                    match_id,
+                    user_request['id'], '',  # deposit_req_id, withdraw_req_id (agent has no request)
+                    depositor_id, withdrawer_id,
+                    depositor_alias, withdrawer_alias,
+                    user_request['amount'], user_request['currency'],
+                    user_request.get('company_id', ''), user_request.get('company_name', ''),
+                    'active', '',  # confirmation_code, status
+                    datetime.now().strftime('%Y-%m-%d %H:%M'), '',
+                    'no', 'no', 'none',
+                    agent_id  # bot_id = agent_id
+                ])
+        except:
+            pass
+
+        # Update user request status
+        self._update_request_status(user_request['id'], 'matched', match_id)
+
+        # Update agent balance + daily count + stats
+        self._update_agent_balance(agent_id, balance_change, user_request['type'])
+
+        # Log agent transaction
+        self._log_agent_transaction(agent_id, match_id, user_request, 'pending')
+
+        logger.info(f"Agent match created: {match_id} (agent={agent_id}, user={user_request['user_id']})")
+        return match_id, agent_alias
+
+    def _update_agent_balance(self, agent_id, change, txn_type):
+        """Update agent balance, daily count, and stats."""
+        try:
+            rows = []
+            with open('agent_bots.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                fieldnames = reader.fieldnames
+                for row in reader:
+                    if row.get('id') == agent_id:
+                        current_bal = float(row.get('balance', 0) or 0)
+                        new_bal = current_bal + change
+                        row['balance'] = str(new_bal)
+                        row['current_daily_count'] = str(int(row.get('current_daily_count', 0) or 0) + 1)
+                        if txn_type == 'deposit':
+                            row['total_deposits_processed'] = str(int(row.get('total_deposits_processed', 0) or 0) + 1)
+                        else:
+                            row['total_withdrawals_processed'] = str(int(row.get('total_withdrawals_processed', 0) or 0) + 1)
+                        row['total_volume'] = str(float(row.get('total_volume', 0) or 0) + abs(change))
+                        row['last_active'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                        # Check traffic stop
+                        dep = float(row.get('security_deposit', 0) or 0)
+                        if new_bal <= dep:
+                            row['traffic_enabled'] = 'no'
+                    rows.append(row)
+            with open('agent_bots.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer.writeheader()
+                for row in rows:
+                    writer.writerow({k: row.get(k, '') for k in fieldnames})
+        except Exception as e:
+            logger.error(f"Agent balance update error: {e}")
+
+    def _log_agent_transaction(self, agent_id, match_id, user_request, status):
+        """Log a transaction for an agent."""
+        try:
+            import secrets as _sec
+            txn_id = f"AGT{_sec.token_hex(3).upper()}"
+            with open('agent_transactions.csv', 'a', newline='', encoding='utf-8-sig') as f:
+                writer = csv.writer(f)
+                writer.writerow([
+                    txn_id, agent_id, match_id,
+                    user_request['type'], user_request['amount'], user_request.get('currency', ''),
+                    status, user_request['user_id'], '',  # user_name
+                    datetime.now().strftime('%Y-%m-%d %H:%M:%S'), ''
+                ])
+        except:
+            pass
+
+    def get_agent_payment_methods(self, agent_id):
+        """Get payment methods for an agent."""
+        methods = []
+        try:
+            with open('agent_payment_methods.csv', 'r', encoding='utf-8-sig') as f:
+                for row in csv.DictReader(f):
+                    if row.get('agent_id') == agent_id and row.get('is_active') == 'yes':
+                        methods.append(row)
+        except:
+            pass
+        return methods
