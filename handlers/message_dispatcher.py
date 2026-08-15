@@ -1599,34 +1599,49 @@ class MessageDispatcherMixin:
                 self.handle_trade_admin_step(message, state)
                 return
 
-            # ===== صيد الجوائز: إضافة هدية =====
-            if isinstance(current_state, str) and current_state == 'wheel_gift_add_text':
-                user_id = message['from']['id']
-                chat_id = message['chat']['id']
-                text_msg = message.get('text', '').strip()
-                if len(text_msg) < 3:
-                    self.send_message(chat_id, "❌ النص قصير جداً. اكتب نص الهدية:")
-                    return
-                parts = text_msg.split('|', 1)
-                gift_text = parts[0].strip()
-                gift_link = parts[1].strip() if len(parts) > 1 else ''
-                if gift_link.lower() in ('بدون', 'none', 'no'):
-                    gift_link = ''
-                gift_id = f"GFT{str(int(datetime.now().timestamp()))[-6:]}"
-                try:
-                    with open('wheel_gifts.csv', 'a', newline='', encoding='utf-8-sig') as f:
-                        writer = csv.writer(f)
-                        writer.writerow([gift_id, gift_text, gift_link, 'yes', datetime.now().strftime('%Y-%m-%d %H:%M')])
-                except:
-                    pass
+        # ── فحص أزرار الإلغاء/العودة — بعد الحالات الخاصة وقبل الباقي ──
+        all_langs = self.get_supported_languages()
+        cancel_texts = {self.tr('cancel_btn', l) for l in all_langs} | {self.tr('cancel_registration', l) for l in all_langs} | {'❌ إلغاء', '❌ Cancel', 'إلغاء', 'الغاء', 'الغاء'}
+        main_menu_texts = {self.tr('main_menu', l) for l in all_langs} | {self.tr('main_menu_btn', l) for l in all_langs} | {'🏠 القائمة الرئيسية', '🏠 الرئيسية', '🏠', '🏠 Main Menu'}
+        back_texts = {self.tr('back_btn', l) for l in all_langs} | {self.tr('back_to_main', l) for l in all_langs} | {'🔙', '🔙 Back', '🔙 رجوع', '🔙 العودة'}
+        
+        if text in cancel_texts or text in main_menu_texts or text in back_texts:
+            if user_id in self.user_states:
                 del self.user_states[user_id]
-                self.send_message(chat_id,
-                    f"✅ <b>تم إضافة الهدية!</b>\n\n"
-                    f"🎁 {gift_text}\n"
-                    f"🔗 {gift_link if gift_link else 'بدون رابط'}")
-                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
-                self.show_wheel_admin(fake_msg)
+            user = self.find_user(user_id)
+            lang = user.get('language', 'ar') if user else 'ar'
+            welcome = self.tr('choose_service', lang, name=user.get('name', ''), customer_id=user.get('customer_id', '')) if user else self.tr('welcome_new', 'ar', name='')
+            self.send_message(message['chat']['id'], welcome, self.main_keyboard(lang, user_id))
+            return
+
+        # ===== صيد الجوائز: إضافة هدية =====
+        if isinstance(current_state, str) and current_state == 'wheel_gift_add_text':
+            user_id = message['from']['id']
+            chat_id = message['chat']['id']
+            text_msg = message.get('text', '').strip()
+            if len(text_msg) < 3:
+                self.send_message(chat_id, "❌ النص قصير جداً. اكتب نص الهدية:")
                 return
+            parts = text_msg.split('|', 1)
+            gift_text = parts[0].strip()
+            gift_link = parts[1].strip() if len(parts) > 1 else ''
+            if gift_link.lower() in ('بدون', 'none', 'no'):
+                gift_link = ''
+            gift_id = f"GFT{str(int(datetime.now().timestamp()))[-6:]}"
+            try:
+                with open('wheel_gifts.csv', 'a', newline='', encoding='utf-8-sig') as f:
+                    writer = csv.writer(f)
+                    writer.writerow([gift_id, gift_text, gift_link, 'yes', datetime.now().strftime('%Y-%m-%d %H:%M')])
+            except:
+                pass
+            del self.user_states[user_id]
+            self.send_message(chat_id,
+                f"✅ <b>تم إضافة الهدية!</b>\n\n"
+                f"🎁 {gift_text}\n"
+                f"🔗 {gift_link if gift_link else 'بدون رابط'}")
+            fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+            self.show_wheel_admin(fake_msg)
+            return
 
             if isinstance(current_state, str) and current_state == 'wheel_name':
                 user_id = message['from']['id']
