@@ -2852,18 +2852,84 @@ def api_upload_icon():
     blob = f.read(_ICON_MAX_BYTES + 1)
     if len(blob) > _ICON_MAX_BYTES:
         return jsonify({'success': False, 'error': 'حجم الملف أكبر من 2MB'}), 400
-    # Magic-byte sanity check (blocks disguised HTML/SVG/script uploads)
+    # Magic-byte sanity check
     _magic_ok = (blob[:8] == b'\x89PNG\r\n\x1a\n' or blob[:3] == b'\xff\xd8\xff'
                  or blob[:6] in (b'GIF87a', b'GIF89a')
                  or (blob[:4] == b'RIFF' and blob[8:12] == b'WEBP'))
     if not _magic_ok:
         return jsonify({'success': False, 'error': 'الملف ليس صورة صالحة'}), 400
+
     os.makedirs(_ICON_UPLOAD_DIR, exist_ok=True)
-    fname = f"icon_{secrets.token_hex(8)}.{ext}"
-    with open(os.path.join(_ICON_UPLOAD_DIR, fname), 'wb') as out:
-        out.write(blob)
-    log_action('upload_icon', fname)
-    return jsonify({'success': True, 'url': f'/static/uploads/icons/{fname}'})
+    base_name = f"icon_{secrets.token_hex(8)}"
+
+    # ── Process image: create 3 versions ──
+    # 1) Telegram version: 48x48 PNG (small icon for sendPhoto)
+    # 2) Web version: 128x128 PNG (larger for website)
+    # 3) Delete original (save disk space)
+    try:
+        from PIL import Image
+        import io as _io
+
+        # Load image from blob
+        img = Image.open(_io.BytesIO(blob))
+
+        # Convert to RGBA if transparent, else RGB
+        if img.mode in ('RGBA', 'LA', 'P'):
+            img = img.convert('RGBA')
+        else:
+            img = img.convert('RGB')
+
+        # 1) Telegram icon: 48x48 PNG
+        tg_img = img.resize((48, 48), Image.Resampling.LANCZOS)
+        tg_fname = f"{base_name}_tg.png"
+        tg_path = os.path.join(_ICON_UPLOAD_DIR, tg_fname)
+        tg_img.save(tg_path, 'PNG', optimize=True)
+
+        # 2) Web icon: 128x128 PNG
+        web_img = img.resize((128, 128), Image.Resampling.LANCZOS)
+        web_fname = f"{base_name}_web.png"
+        web_path = os.path.join(_ICON_UPLOAD_DIR, web_fname)
+        web_img.save(web_path, 'PNG', optimize=True)
+
+        # 3) Original is NOT saved (deleted by not writing it)
+        log_action('upload_icon', f'{tg_fname} + {web_fname} (original discarded)')
+
+        return jsonify({
+            'success': True,
+            'url': f'/static/uploads/icons/{web_fname}',
+            'telegram_url': f'/static/uploads/icons/{tg_fname}',
+            'web_url': f'/static/uploads/icons/{web_fname}',
+            'absolute_tg_url': f'https://vex.deals/static/uploads/icons/{tg_fname}',
+            'absolute_web_url': f'https://vex.deals/static/uploads/icons/{web_fname}',
+        })
+    except ImportError:
+        # PIL not available — save original as fallback
+        fname = f"{base_name}.{ext}"
+        with open(os.path.join(_ICON_UPLOAD_DIR, fname), 'wb') as out:
+            out.write(blob)
+        log_action('upload_icon', f'{fname} (no PIL, original saved)')
+        return jsonify({
+            'success': True,
+            'url': f'/static/uploads/icons/{fname}',
+            'telegram_url': f'/static/uploads/icons/{fname}',
+            'web_url': f'/static/uploads/icons/{fname}',
+            'absolute_tg_url': f'https://vex.deals/static/uploads/icons/{fname}',
+            'absolute_web_url': f'https://vex.deals/static/uploads/icons/{fname}',
+        })
+    except Exception as e:
+        # Fallback: save original
+        fname = f"{base_name}.{ext}"
+        with open(os.path.join(_ICON_UPLOAD_DIR, fname), 'wb') as out:
+            out.write(blob)
+        log_action('upload_icon', f'{fname} (PIL error: {e})')
+        return jsonify({
+            'success': True,
+            'url': f'/static/uploads/icons/{fname}',
+            'telegram_url': f'/static/uploads/icons/{fname}',
+            'web_url': f'/static/uploads/icons/{fname}',
+            'absolute_tg_url': f'https://vex.deals/static/uploads/icons/{fname}',
+            'absolute_web_url': f'https://vex.deals/static/uploads/icons/{fname}',
+        })
 
 @app.route('/api/companies/list')
 def api_companies_public():
