@@ -4115,16 +4115,20 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         return self.tr('a0115_العنوان_غير', 'ar')
     
     def get_setting(self, key):
-        """جلب إعداد النظام"""
-        try:
-            with open('system_settings.csv', 'r', encoding='utf-8-sig') as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    if row['setting_key'] == key:
-                        return row['setting_value']
-        except:
-            pass
-        return None
+        """جلب إعداد النظام — من الكاش"""
+        if not hasattr(self, '_settings_cache') or self._settings_cache is None:
+            self._settings_cache = {}
+            try:
+                with open('system_settings.csv', 'r', encoding='utf-8-sig') as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        k = row.get('setting_key', '') or row.get('key', '')
+                        v = row.get('setting_value', '') or row.get('value', '')
+                        if k:
+                            self._settings_cache[k] = v
+            except:
+                pass
+        return self._settings_cache.get(key)
 
     def get_current_theme(self):
         """الحصول على الثيم النشط حالياً — مع إصلاح القيم التالفة تلقائياً"""
