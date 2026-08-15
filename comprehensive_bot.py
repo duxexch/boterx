@@ -608,12 +608,15 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
 
     @staticmethod
     def display_icon(icon, default='🏢'):
-        """Icon safe for Telegram TEXT: uploaded image URLs become the default
-        emoji (a raw URL/path would render as ugly text inside messages)."""
+        """Icon for Telegram — always returns emoji, never URL/path."""
         ic = (icon or '').strip()
-        if not ic or ic.startswith('/static/') or ic.startswith('http'):
+        if not ic:
             return default
-        return ic
+        if ic.startswith('/static/') or ic.startswith('http') or ic.startswith('https'):
+            return default
+        if len(ic) <= 4 and any(ord(c) > 127 for c in ic):
+            return ic
+        return default
 
     def normalize_icon(self, icon_input, default='🏢'):
         """تحويل أي صيغة إدخال إلى أيقونة مناسبة"""
@@ -11682,23 +11685,8 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                 'one_time_keyboard': True
             }
             
-            # محاولة إرسال الأيقونة كصورة + النص كـ caption
-            photo_sent = False
-            if icon_url:
-                full_url = icon_url if icon_url.startswith('http') else f'https://vex.deals{icon_url}'
-                try:
-                    self.api_call('sendPhoto', {
-                        'chat_id': message['chat']['id'],
-                        'photo': full_url,
-                        'caption': wallet_text,
-                        'parse_mode': 'HTML',
-                    })
-                    photo_sent = True
-                except Exception as e:
-                    logger.warning(f"Payment method icon send failed: {e}")
-            
-            if not photo_sent:
-                self.send_message(message['chat']['id'], wallet_text, cancel_kb)
+            # إرسال النص فقط (إيموجي + بيانات) — أبسط وأسرع
+            self.send_message(message['chat']['id'], wallet_text, cancel_kb)
             
             # تحديث الحالة — استبدال _ في اسم الشركة بمسافة لمنع تلف الحالة
             safe_company_name = (company["name"] if company else "unknown").replace('_', ' ')
