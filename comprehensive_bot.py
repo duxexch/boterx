@@ -98,11 +98,15 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         # نظام قفل ملفات CSV لمنع تلف البيانات عند الكتابة المتزامنة
         self.csv_locks = {}
         
-        # ── In-memory user cache — eliminates CSV reads on every request ──
+        # ── In-memory caches — eliminates CSV reads on every request ──
         self._user_cache = {}  # telegram_id -> user dict
         self._user_cache_by_phone = {}  # normalized_phone -> user dict
         self._user_cache_loaded = False
         self._user_cache_lock = threading.Lock()
+        self._companies_cache = None  # companies list cache
+        self._methods_cache = {}  # company_id -> [methods] cache
+        self._all_methods_cache = None  # all methods cache
+        self._cache_lock = threading.Lock()
         self._load_user_cache()
         
         # تهيئة البيانات المؤقتة للأدمن
@@ -4063,30 +4067,29 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             return False
     
     def get_companies(self, service_type=None):
-        """جلب الشركات النشطة"""
-        companies = []
-        try:
-            # التأكد من وجود الملف
-            with open('companies.csv', 'r', encoding='utf-8-sig') as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    # التأكد من أن الشركة نشطة
-                    if row.get('is_active', '').lower() in ['active', 'yes', '1', 'true']:
-                        # فلترة حسب نوع الخدمة
-                        if not service_type:
-                            companies.append(row)
-                        elif row['type'] == service_type or row['type'] == 'both':
-                            companies.append(row)
-        except FileNotFoundError:
-            # إنشاء ملف الشركات إذا لم يكن موجوداً
-            with open('companies.csv', 'w', newline='', encoding='utf-8-sig') as f:
-                writer = csv.writer(f)
-                writer.writerow(['id', 'name', 'type', 'details', 'is_active'])
-        except Exception as e:
-            # تسجيل الخطأ للتشخيص
-            logger.error(f"خطأ في قراءة ملف الشركات: {e}")
+        """جلب الشركات النشطة — من الكاش"""
+        with self._cache_lock:
+            if self._companies_cache is not None:
+                companies = self._companies_cache
+            else:
+                companies = []
+                try:
+                    with open('companies.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        for row in reader:
+                            if row.get('is_active', '').lower() in ['active', 'yes', '1', 'true']:
+                                companies.append(row)
+                        self._companies_cache = companies
+                except FileNotFoundError:
+                    with open('companies.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                        writer = csv.writer(f)
+                        writer.writerow(['id', 'name', 'type', 'details', 'is_active'])
+                except Exception as e:
+                    logger.error(f"خطأ في قراءة ملف الشركات: {e}")
         
-        return companies
+        if not service_type:
+            return companies
+        return [c for c in companies if c.get('type') == service_type or c.get('type') == 'both']
     
     def get_exchange_address(self, company_id=None):
         """جلب عنوان الصرافة — أولوية لعنوان الشركة، ثم العنوان العام"""
@@ -9534,7 +9537,11 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             self.show_unified_orders(fake_msg)
 
     def get_payment_methods_by_company(self, company_id, transaction_type=None):
-            """الحصول على وسائل الدفع لشركة معينة — من جدول الربط + السجل القديم"""
+            """الحصول على وسائل الدفع لشركة معينة — من الكاش"""
+            with self._cache_lock:
+                if company_id in self._methods_cache:
+                    return self._methods_cache[company_id]
+            
             methods = []
             seen_ids = set()
             # 1) من جدول الربط الجديد
@@ -9561,6 +9568,9 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                                 seen_ids.add(row['id'])
                 except:
                     pass
+            
+            with self._cache_lock:
+                self._methods_cache[company_id] = methods
             return methods
 
     def start_custom_flow(self, message, method_id, flow_type, company_id, company_name):
@@ -11459,7 +11469,10 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                 return False
         
     def get_all_payment_methods(self):
-            """الحصول على جميع وسائل الدفع"""
+            """الحصول على كل وسائل الدفع — من الكاش"""
+            with self._cache_lock:
+                if self._all_methods_cache is not None:
+                    return self._all_methods_cache
             methods = []
             try:
                 with open('payment_methods.csv', 'r', encoding='utf-8-sig') as f:
@@ -11468,6 +11481,8 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                         methods.append(row)
             except:
                 pass
+            with self._cache_lock:
+                self._all_methods_cache = methods
             return methods
 
     def get_payment_methods_by_currency(self, currency):
