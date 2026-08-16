@@ -1525,6 +1525,26 @@ def api_web_auth_code():
     except Exception as e:
         return jsonify({'error': 'خطأ في الخادم'}), 500
 
+@app.route('/api/web/whoami')
+def api_web_whoami():
+    """Lightweight session probe for the front-end auth gate."""
+    logged_in = bool(session.get('logged_in'))
+    uid = str(session.get('admin_id') or '')
+    registered = bool(session.get('is_registered'))
+    if logged_in and uid and not registered:
+        # Older sessions may lack the flag — recheck users.csv once
+        import csv as _csv
+        try:
+            with open(os.path.join(BASE_DIR, 'users.csv'), 'r', encoding='utf-8-sig') as f:
+                for row in _csv.DictReader(f):
+                    if row.get('telegram_id') == uid:
+                        registered = True
+                        session['is_registered'] = True
+                        break
+        except Exception:
+            pass
+    return jsonify({'logged_in': logged_in, 'registered': registered, 'uid': uid})
+
 @app.route('/vex/admin/admin', methods=['GET', 'POST'])
 def admin_login():
     """Admin login page — only at /vex/admin/admin"""
