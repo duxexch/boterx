@@ -259,7 +259,21 @@ def init_dice_engine(app, get_uid, get_gm, get_pf, is_pf, is_vex, webapp_auth=No
                 'history': global_hist,
                 'user_history': user_hist,
                 'players': _generate_fake_players(),
-                'total_bets_egp': random.randint(80000, 500000),
+                'total_bets_egp': _sim_total_bets(),
             })
+
+
+def _sim_total_bets():
+    """Smoothly drifting simulated pool (no global rounds in dice)."""
+    now = time.time()
+    w = int(now // 45)
+    def _v(k):
+        return random.Random(k * 104729 + 7).randint(90000, 320000)
+    a, b = _v(w), _v(w + 1)
+    t = (now % 45) / 45.0
+    t = t * t * (3 - 2 * t)  # smoothstep
+    val = a + (b - a) * t
+    val *= 1 + 0.006 * math.sin(now * 1.7)
+    return int(round(val / 10.0) * 10)
 
 # Start — no daemon thread needed (per-request game, not global round)

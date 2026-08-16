@@ -343,6 +343,29 @@ def _generate_fake_players(current_mult):
     result.sort(key=lambda x: (-x['payout'], 0 if x['status'] != 'lost' else 1))
     return result
 
+
+def _sim_total_bets():
+    """Natural-looking simulated round pool: grows during waiting, drains during flight."""
+    rid = _state.get('round_id', 0)
+    rnd = random.Random(rid * 7919 + 13)
+    base = rnd.randint(90000, 320000)
+    now = time.time()
+    phase = _state.get('phase', 'waiting')
+    if phase == 'waiting':
+        elapsed = max(0.0, now - _state.get('server_ts', now))
+        p = min(1.0, elapsed / max(1.0, WAITING_DURATION))
+        frac = 0.12 + 0.88 * (1 - (1 - p) ** 2)
+        val = base * frac * (1 + 0.008 * math.sin(now * 2.3))
+    elif phase == 'flying':
+        mult = max(1.0, float(_state.get('multiplier', 1.0)))
+        frac = max(0.04, min(1.0, mult ** -0.9))
+        val = base * frac * (1 + 0.006 * math.sin(now * 3.1))
+    else:  # crashed
+        cp = max(1.0, float(_state.get('crash_point', 1.0)))
+        frac = max(0.04, min(1.0, cp ** -0.9))
+        val = base * frac
+    return int(round(val / 10.0) * 10)
+
 # ── Game loop (daemon, runs forever) ────────────────────
 def _game_loop():
     while True:
@@ -606,7 +629,7 @@ def init_crash_engine(app, get_uid, get_gm, get_pf, is_pf, is_vex):
                 'my_crash_bet': my_crash_bet,
                 'my_rise_bet': my_rise_bet,
                 'players': _generate_fake_players(_server_mult()),
-                'total_bets_egp': random.randint(80000, 500000),
+                'total_bets_egp': _sim_total_bets(),
                 'total_in': round(_state.get('total_bets_in', 0), 2),
                 'total_out': round(_state.get('total_payout', 0), 2),
             })
