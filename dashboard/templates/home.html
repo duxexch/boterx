@@ -9,7 +9,7 @@
 <link rel="icon" type="image/png" href="/static/icons/favicon.png">
 <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
 <meta name="theme-color" content="#0b0e11">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/tailwind.build.css') }}?v=20260816a">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/tailwind.build.css') }}?v=20260818">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{{ url_for('static', filename='vendor/fontawesome.min.css') }}">
 <style>
@@ -45,11 +45,11 @@ body{background:var(--bg);color:var(--text);margin:0;min-height:100dvh;overflow-
 .tbtn:active{transform:scale(.9)}
 /* Balance card — glossy green */
 .bal-card{background:linear-gradient(135deg,var(--green-dim),#10141a);border:1px solid var(--border);border-radius:18px;padding:18px;margin:14px 0;position:relative;overflow:hidden}
-.bal-card::before{content:'';position:absolute;top:-50%;right:-20%;width:200px;height:200px;background:radial-gradient(circle,rgba(0,230,118,.15),transparent 70%);border-radius:50%}
+.bal-card::before{content:'';position:absolute;top:-50%;right:-20%;width:200px;height:200px;background:radial-gradient(circle,rgba(0,231,1,.15),transparent 70%);border-radius:50%}
 .bal-row{display:flex;align-items:center;justify-content:space-between;position:relative;z-index:1}
 .bal-info{display:flex;flex-direction:column}
 .bal-label{font-size:10px;color:var(--muted);margin-bottom:2px}
-.bal-amount{font-size:30px;font-weight:900;font-family:'Courier New',monospace;color:var(--green);text-shadow:0 0 20px rgba(0,230,118,.3)}
+.bal-amount{font-size:30px;font-weight:900;font-family:'Courier New',monospace;color:var(--green);text-shadow:0 0 20px rgba(0,231,1,.3)}
 .bal-cur{font-size:14px;color:var(--muted);margin-right:4px}
 .bal-actions{display:flex;gap:6px}
 .bal-btn{padding:8px 14px;border-radius:10px;border:none;font-size:13px;font-weight:800;cursor:pointer;transition:all .15s}
@@ -69,10 +69,10 @@ body{background:var(--bg);color:var(--text);margin:0;min-height:100dvh;overflow-
 .games-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
 .game-card{background:linear-gradient(135deg,var(--card),#10141a);border:1px solid var(--border);border-radius:14px;padding:18px 10px;text-align:center;cursor:pointer;transition:all .25s;text-decoration:none;color:var(--text);position:relative;overflow:hidden}
 .game-card:active{transform:scale(.95)}
-.game-card:hover{border-color:var(--green);box-shadow:0 4px 20px rgba(0,230,118,.1)}
+.game-card:hover{border-color:var(--green);box-shadow:0 4px 20px rgba(0,231,1,.1)}
 .game-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--green),transparent);opacity:0;transition:opacity .3s}
 .game-card:hover::before{opacity:1}
-.game-icon{font-size:38px;margin-bottom:8px;display:block;filter:drop-shadow(0 2px 8px rgba(0,230,118,.35))}
+.game-icon{font-size:38px;margin-bottom:8px;display:block;filter:drop-shadow(0 2px 8px rgba(0,231,1,.35))}
 .game-name{font-size:13px;font-weight:700}
 /* shimmer sweep on cards */
 .game-card::after{content:'';position:absolute;top:0;left:-80%;width:50%;height:100%;background:linear-gradient(105deg,transparent,rgba(255,215,0,.06),transparent);transform:skewX(-20deg);animation:cardShine 4.5s ease-in-out infinite}
@@ -96,7 +96,7 @@ body{background:var(--bg);color:var(--text);margin:0;min-height:100dvh;overflow-
 .gi-plinko{animation:giPlinko 1.8s cubic-bezier(.5,.05,.5,1) infinite;display:inline-block}
 @keyframes giPlinko{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}75%{transform:translateY(-2px)}}
 .gi-bomb{animation:giBomb 1.6s ease-in-out infinite;display:inline-block}
-@keyframes giBomb{0%,100%{transform:scale(1);filter:drop-shadow(0 2px 8px rgba(0,230,118,.35))}50%{transform:scale(1.18);filter:drop-shadow(0 0 14px rgba(255,71,87,.6))}}
+@keyframes giBomb{0%,100%{transform:scale(1);filter:drop-shadow(0 2px 8px rgba(0,231,1,.35))}50%{transform:scale(1.18);filter:drop-shadow(0 0 14px rgba(255,71,87,.6))}}
 .gi-wheel{animation:giWheel 4s linear infinite;display:inline-block}
 @keyframes giWheel{from{transform:rotate(0)}to{transform:rotate(360deg)}}
 .quick-icon,.svc-icon{display:inline-block;transition:transform .2s}
@@ -119,10 +119,10 @@ body{background:var(--bg);color:var(--text);margin:0;min-height:100dvh;overflow-
 .install-title{font-size:13px;font-weight:800;color:var(--green)}
 .install-sub{font-size:10px;color:var(--muted)}
 /* Bottom nav — professional floating pill */
-.bottom-nav{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);width:calc(100% - 24px);max-width:460px;background:linear-gradient(135deg,#1a2028,#10141a);border:1px solid var(--border);border-radius:20px;display:flex;justify-content:space-around;padding:10px 8px;z-index:50;box-shadow:0 -4px 24px rgba(0,0,0,.5),0 4px 12px rgba(0,230,118,.08)}
+.bottom-nav{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);width:calc(100% - 24px);max-width:460px;background:linear-gradient(135deg,#1a2028,#10141a);border:1px solid var(--border);border-radius:20px;display:flex;justify-content:space-around;padding:10px 8px;z-index:50;box-shadow:0 -4px 24px rgba(0,0,0,.5),0 4px 12px rgba(0,231,1,.08)}
 .nav-item{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;text-decoration:none;color:var(--muted);font-size:10px;font-weight:700;padding:6px 16px;border-radius:14px;transition:all .25s;flex:1}
 .nav-item.active{color:var(--green);background:linear-gradient(135deg,var(--green-dim),transparent)}
-.nav-item.active .nav-icon{filter:drop-shadow(0 0 8px rgba(0,230,118,.5))}
+.nav-item.active .nav-icon{filter:drop-shadow(0 0 8px rgba(0,231,1,.5))}
 .nav-item:active{transform:scale(.88)}
 .nav-icon{font-size:22px;transition:all .2s}
 .nav-item.active .nav-icon{transform:translateY(-2px)}

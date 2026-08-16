@@ -9,7 +9,11 @@ module.exports = {
   theme: { extend: {
     fontFamily: { cairo: ['Cairo', 'Segoe UI', 'Tahoma', 'sans-serif'] },
     colors: {
-      dark: { bg: '#0F172A', card: '#1E293B', border: '#334155', hover: '#334155' },
+      dark: { bg: '#0b0e11', card: '#141920', border: '#262e39', hover: '#212832' },
+      slate: {
+        50:'#f5f7fa', 100:'#eef2f6', 200:'#dde3ea', 300:'#cfd6de', 400:'#a8b3bf',
+        500:'#8794a3', 600:'#333d4b', 700:'#212832', 800:'#141920', 900:'#0b0e11', 950:'#07090c'
+      },
       brand: { DEFAULT: '#00e701', gold: '#ffd700', dim: '#00a801' }
     }
   }},
