@@ -5954,6 +5954,122 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         
         self.send_message(message['chat']['id'], admin_welcome, self.admin_keyboard())
     
+    # ── نظام المطابقة للمستخدم — توزيع الطلبات على الوكلاء ──────────────
+
+    def start_matching_flow(self, message):
+        """بدء تدفق المطابقة عند ضغط زر «مطابقة» — يوزع الطلب على وكيل نشط"""
+        chat_id = message['chat']['id']
+        user_id = str(message['from']['id'])
+        user = self.find_user(user_id)
+        lang = user.get('language', 'ar') if user else 'ar'
+        if not user:
+            self.send_message(chat_id, self.tr('a0218_تسجيل_حساب', lang) if self.tr('a0218_تسجيل_حساب', lang) != 'a0218_تسجيل_حساب' else '⚠️ يجب تسجيل حساب أولاً')
+            return
+        # طلب نشط بالفعل؟
+        if self.match_manager:
+            existing = self.match_manager.get_active_request_by_user(user_id)
+            if existing:
+                self.send_message(chat_id,
+                    f"⏳ لديك طلب مطابقة نشط بالفعل\n🆔 {existing.get('id','')}\n💰 {existing.get('amount','')} {existing.get('currency','')}",
+                    self.main_keyboard(lang, user_id))
+                return
+        self.user_states[user_id] = {'step': 'match_type'}
+        keyboard = {'keyboard': [
+            [{'text': '📥 مطابقة إيداع'}, {'text': '📤 مطابقة سحب'}],
+            [{'text': self.tr('main_menu', lang)}],
+        ], 'resize_keyboard': True}
+        self.send_message(chat_id,
+            "🔄 <b>نظام المطابقة</b>\n\nطابق طلبك مع وكيل معتمد بسرعة وأمان.\n\nاختر نوع العملية:",
+            keyboard)
+
+    def handle_matching_flow(self, message):
+        """معالجة خطوات تدفق المطابقة (حالة FSM من نوع dict)"""
+        chat_id = message['chat']['id']
+        user_id = str(message['from']['id'])
+        text = (message.get('text') or '').strip()
+        user = self.find_user(user_id) or {}
+        lang = user.get('language', 'ar')
+        state = self.user_states.get(user_id)
+        if not isinstance(state, dict):
+            return
+        step = state.get('step', '')
+
+        if step == 'match_type':
+            if 'إيداع' in text:
+                req_type = 'deposit'
+            elif 'سحب' in text:
+                req_type = 'withdraw'
+            else:
+                self.send_message(chat_id, '⚠️ اختر نوع العملية من الأزرار')
+                return
+            self.user_states[user_id] = {'step': 'match_amount', 'type': req_type}
+            self.send_message(chat_id, '💰 أدخل المبلغ المطلوب:')
+            return
+
+        if step == 'match_amount':
+            try:
+                amount = float(text.replace(',', ''))
+                if amount <= 0 or amount > 1000000:
+                    raise ValueError
+            except ValueError:
+                self.send_message(chat_id, '⚠️ أدخل مبلغاً صحيحاً (أكبر من صفر)')
+                return
+            req_type = state.get('type', 'deposit')
+            currency = user.get('currency', 'EGP') or 'EGP'
+            # اختيار وكيل + إنشاء معاملته ذرّياً (حصص المرور وكل الاستثناءات)
+            picked = None
+            try:
+                import agent_db
+                # للوكيل: مطابقة الإيداع من المستخدم = سحب للوكيل (يستلم أموالاً)
+                agent_txn_type = 'withdraw' if req_type == 'deposit' else 'deposit'
+                picked = agent_db.pick_and_create_transaction(
+                    agent_txn_type, amount, currency,
+                    user_id=user_id, user_name=user.get('name', ''))
+            except Exception as e:
+                print(f"agent pick error: {e}")
+            if user_id in self.user_states:
+                del self.user_states[user_id]
+            if not picked:
+                self.send_message(chat_id,
+                    '😔 لا يوجد وكيل متاح حالياً لهذا المبلغ — حاول لاحقاً أو استخدم الإيداع/السحب العادي.',
+                    self.main_keyboard(lang, user_id))
+                return
+            agent, txn_id = picked['agent'], picked['txn_id']
+            # إنشاء طلب المطابقة — وعند الفشل نلغي معاملة الوكيل ونحرر الحصة
+            req_id = None
+            if self.match_manager:
+                req_id, err = self.match_manager.create_match_request(
+                    user_id, user.get('customer_id', ''), req_type, amount,
+                    currency, '', '', '', bot_id=agent['id'])
+                if err:
+                    try:
+                        import agent_db
+                        agent_db.void_pending_transaction(agent['id'], txn_id)
+                    except Exception as e2:
+                        print(f"agent txn void error: {e2}")
+                    self.send_message(chat_id, f'⚠️ {err}', self.main_keyboard(lang, user_id))
+                    return
+            if req_id:
+                try:
+                    import agent_db
+                    agent_db.set_txn_match_request(txn_id, req_id)
+                except Exception as e:
+                    print(f"agent txn link error: {e}")
+            type_label = 'إيداع' if req_type == 'deposit' else 'سحب'
+            self.send_message(chat_id,
+                f"✅ <b>تم إنشاء طلب المطابقة</b>\n\n"
+                f"🆔 رقم الطلب: <code>{req_id or '-'}</code>\n"
+                f"🔄 النوع: {type_label}\n"
+                f"💰 المبلغ: {amount:g} {currency}\n"
+                f"🤝 تم توجيه طلبك إلى وكيل معتمد\n"
+                f"⏳ سيتم إشعارك فور معالجة الطلب.",
+                self.main_keyboard(lang, user_id))
+            return
+
+        # خطوة غير معروفة — تنظيف
+        if user_id in self.user_states:
+            del self.user_states[user_id]
+
     def show_match_admin_panel(self, message):
         """لوحة أدمن المطابقات — نشطة + معلقة + سجلات + بوتات"""
         chat_id = message['chat']['id']

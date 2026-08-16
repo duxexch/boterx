@@ -8,7 +8,7 @@
     <!-- KPIs -->
     <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
         <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">إجمالي الوكلاء</p><p class="text-2xl font-bold text-amber-400" x-text="agents.length">0</p></div>
-        <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">نشطون</p><p class="text-2xl font-bold text-green-400" x-text="agents.filter(a => a.is_active === 'yes').length">0</p></div>
+        <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">نشطون</p><p class="text-2xl font-bold text-green-400" x-text="agents.filter(a => a.is_active).length">0</p></div>
         <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">المرور متوقف</p><p class="text-2xl font-bold text-red-400" x-text="agents.filter(a => a.traffic_stopped).length">0</p></div>
         <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">إجمالي الأرصدة</p><p class="text-2xl font-bold text-blue-400" x-text="agents.reduce((s,a) => s + a.balance, 0).toFixed(0)">0</p></div>
         <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">إجمالي المعاملات</p><p class="text-2xl font-bold text-purple-400" x-text="agents.reduce((s,a) => s + parseInt(a.total_deposits_processed||0) + parseInt(a.total_withdrawals_processed||0), 0)">0</p></div>
@@ -17,13 +17,16 @@
     <!-- Search + Add -->
     <div class="flex justify-between items-center flex-wrap gap-2">
         <input type="text" x-model="search" @input.debounce.300ms="filterAgents()" class="input max-w-xs" placeholder="🔍 بحث بالاسم أو ID...">
-        <button @click="showAddModal = true" class="btn btn-primary btn-sm">➕ إضافة وكيل</button>
+        <div class="flex gap-2">
+            <button @click="openDepositRequests()" class="btn btn-sm bg-emerald-600 hover:bg-emerald-700 text-white">💸 طلبات إيداع الوكلاء <span x-show="pendingDeposits > 0" class="bg-red-500 text-white rounded-full px-2 text-xs" x-text="pendingDeposits"></span></button>
+            <button @click="showAddModal = true" class="btn btn-primary btn-sm">➕ إضافة وكيل</button>
+        </div>
     </div>
 
     <!-- Agent Cards -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <template x-for="a in filteredAgents" :key="a.id">
-            <div class="bg-slate-800 rounded-xl border border-slate-700 p-5" :class="a.is_active === 'yes' ? (a.traffic_stopped ? 'border-red-500/30' : 'border-green-500/30') : 'opacity-60'">
+            <div class="bg-slate-800 rounded-xl border border-slate-700 p-5" :class="a.is_active ? (a.traffic_stopped ? 'border-red-500/30' : 'border-green-500/30') : 'opacity-60'">
                 <div class="flex items-start justify-between mb-3">
                     <div class="flex items-center gap-3">
                         <div class="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center text-xl">🤖</div>
@@ -35,6 +38,7 @@
                     <div class="flex flex-col items-end gap-1">
                         <span :class="a.traffic_stopped ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'" class="px-2 py-1 rounded text-xs font-bold" x-text="a.traffic_stopped ? '⏸️ مرور متوقف' : '▶️ مرور نشط'"></span>
                         <span class="text-xs text-slate-500" x-text="'معاملات اليوم: ' + (a.current_daily_count||0) + '/' + (a.max_daily_transactions||0)"></span>
+                        <span class="text-xs text-amber-400" x-text="'حصة المرور: ' + (a.traffic_weight||1)"></span>
                     </div>
                 </div>
                 <!-- Balance -->
@@ -57,7 +61,9 @@
                     <button @click="openBalanceModal(a)" class="btn btn-sm bg-blue-600 hover:bg-blue-700 text-white">💰 رصيد</button>
                     <button @click="openMethods(a.id)" class="btn btn-sm bg-purple-600 hover:bg-purple-700 text-white">💳 وسائل</button>
                     <button @click="openTxns(a.id)" class="btn btn-sm bg-slate-600 hover:bg-slate-700 text-white">📜 سجلات</button>
-                    <button @click="toggleAgent(a)" class="btn btn-sm" :class="a.is_active === 'yes' ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-green-600 hover:bg-green-700 text-white'" x-text="a.is_active === 'yes' ? '⏸️ تعطيل' : '▶️ تفعيل'"></button>
+                    <button @click="openLedger(a)" class="btn btn-sm bg-cyan-700 hover:bg-cyan-800 text-white">📒 دفتر</button>
+                    <button @click="openEditModal(a)" class="btn btn-sm bg-amber-600 hover:bg-amber-700 text-white">✏️ تعديل</button>
+                    <button @click="toggleAgent(a)" class="btn btn-sm" :class="a.is_active ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-green-600 hover:bg-green-700 text-white'" x-text="a.is_active ? '⏸️ تعطيل' : '▶️ تفعيل'"></button>
                     <button @click="deleteAgent(a)" class="btn btn-danger btn-sm">🗑️</button>
                 </div>
             </div>
@@ -75,13 +81,94 @@
                     <div><label class="block text-sm text-slate-400 mb-1">اسم المستخدم (ويب)</label><input x-model="addForm.username" class="input w-full" placeholder="agent1" dir="ltr"></div>
                     <div><label class="block text-sm text-slate-400 mb-1">كلمة المرور (ويب)</label><input x-model="addForm.password" class="input w-full" placeholder="auto-generated" dir="ltr"></div>
                 </div>
-                <div class="grid grid-cols-2 gap-3">
+                <div class="grid grid-cols-3 gap-3">
                     <div><label class="block text-sm text-slate-400 mb-1">حد التأمين</label><input type="number" x-model="addForm.security_deposit" class="input w-full" placeholder="100"></div>
                     <div><label class="block text-sm text-slate-400 mb-1">حد المعاملات اليومي</label><input type="number" x-model="addForm.max_daily_transactions" class="input w-full" placeholder="50"></div>
+                    <div><label class="block text-sm text-slate-400 mb-1">حصة المرور</label><input type="number" min="1" x-model="addForm.traffic_weight" class="input w-full" placeholder="1"></div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div><label class="block text-sm text-slate-400 mb-1">وسيلة إيداع الوكيل (اسم)</label><input x-model="addForm.deposit_method_name" class="input w-full" placeholder="فودافون كاش"></div>
+                    <div><label class="block text-sm text-slate-400 mb-1">بيانات وسيلة الإيداع</label><input x-model="addForm.deposit_method_data" class="input w-full" placeholder="01000000000"></div>
                 </div>
                 <div><label class="block text-sm text-slate-400 mb-1">ملاحظات</label><input x-model="addForm.notes" class="input w-full" placeholder="..."></div>
             </div>
             <div class="flex gap-2 justify-end mt-4"><button @click="showAddModal = false" class="btn btn-sm" style="background:#475569">إلغاء</button><button @click="addAgent()" class="btn btn-primary btn-sm">إضافة</button></div>
+        </div>
+    </div>
+
+    <!-- Edit Agent Modal -->
+    <div x-show="showEditModal" x-transition class="modal-overlay" @click.self="showEditModal = false" style="display:none">
+        <div class="modal max-w-lg">
+            <div class="flex items-center justify-between mb-4"><h3 class="font-bold text-lg">✏️ تعديل وكيل: <span x-text="editForm.bot_name"></span></h3><button @click="showEditModal = false" class="text-slate-400 hover:text-white"><i class="fas fa-times"></i></button></div>
+            <div class="space-y-3">
+                <div><label class="block text-sm text-slate-400 mb-1">اسم البوت</label><input x-model="editForm.bot_name" class="input w-full"></div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div><label class="block text-sm text-slate-400 mb-1">اسم المستخدم (ويب)</label><input x-model="editForm.username" class="input w-full" dir="ltr"></div>
+                    <div><label class="block text-sm text-slate-400 mb-1">كلمة مرور جديدة (اختياري)</label><input x-model="editForm.password" class="input w-full" dir="ltr" placeholder="اتركها فارغة للإبقاء"></div>
+                </div>
+                <div class="grid grid-cols-3 gap-3">
+                    <div><label class="block text-sm text-slate-400 mb-1">حد التأمين</label><input type="number" x-model="editForm.security_deposit" class="input w-full"></div>
+                    <div><label class="block text-sm text-slate-400 mb-1">الحد اليومي</label><input type="number" x-model="editForm.max_daily_transactions" class="input w-full"></div>
+                    <div><label class="block text-sm text-slate-400 mb-1">حصة المرور</label><input type="number" min="1" x-model="editForm.traffic_weight" class="input w-full"></div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div><label class="block text-sm text-slate-400 mb-1">وسيلة إيداع الوكيل (اسم)</label><input x-model="editForm.deposit_method_name" class="input w-full"></div>
+                    <div><label class="block text-sm text-slate-400 mb-1">بيانات وسيلة الإيداع</label><input x-model="editForm.deposit_method_data" class="input w-full"></div>
+                </div>
+                <label class="flex items-center gap-2 text-sm text-slate-300"><input type="checkbox" x-model="editForm.traffic_on"> تشغيل حركة المرور (يدوي)</label>
+                <div><label class="block text-sm text-slate-400 mb-1">ملاحظات</label><input x-model="editForm.notes" class="input w-full"></div>
+            </div>
+            <div class="flex gap-2 justify-end mt-4"><button @click="showEditModal = false" class="btn btn-sm" style="background:#475569">إلغاء</button><button @click="saveEdit()" class="btn btn-primary btn-sm">حفظ</button></div>
+        </div>
+    </div>
+
+    <!-- Deposit Requests Modal -->
+    <div x-show="showDepositsModal" x-transition class="modal-overlay" @click.self="showDepositsModal = false" style="display:none">
+        <div class="modal max-w-2xl">
+            <div class="flex items-center justify-between mb-4"><h3 class="font-bold text-lg">💸 طلبات إيداع رصيد الوكلاء</h3><button @click="showDepositsModal = false" class="text-slate-400 hover:text-white"><i class="fas fa-times"></i></button></div>
+            <div class="max-h-96 overflow-y-auto">
+                <table class="data-table"><thead><tr><th>ID</th><th>الوكيل</th><th>المبلغ</th><th>الوسيلة</th><th>مرجع</th><th>الحالة</th><th>إجراء</th></tr></thead><tbody>
+                    <template x-for="r in depositRequests" :key="r.id">
+                        <tr class="hover:bg-slate-700/50">
+                            <td class="text-xs font-mono" x-text="r.id.slice(0,14)"></td>
+                            <td class="text-xs" x-text="agentName(r.agent_id)"></td>
+                            <td class="font-bold text-green-400" x-text="r.amount"></td>
+                            <td class="text-xs" x-text="r.method_name || '—'"></td>
+                            <td class="text-xs font-mono" x-text="r.reference || '—'"></td>
+                            <td><span :class="{'text-green-400': r.status==='approved', 'text-amber-400': r.status==='pending', 'text-red-400': r.status==='rejected'}" x-text="r.status"></span></td>
+                            <td>
+                                <div x-show="r.status === 'pending'" class="flex gap-1">
+                                    <button @click="processDeposit(r.id, 'approved')" class="btn btn-sm bg-green-600 hover:bg-green-700 text-white">✔</button>
+                                    <button @click="processDeposit(r.id, 'rejected')" class="btn btn-sm bg-red-600 hover:bg-red-700 text-white">✖</button>
+                                </div>
+                            </td>
+                        </tr>
+                    </template>
+                    <tr x-show="depositRequests.length === 0"><td colspan="7" class="text-center text-slate-400 p-4">لا توجد طلبات</td></tr>
+                </tbody></table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ledger Modal -->
+    <div x-show="showLedgerModal" x-transition class="modal-overlay" @click.self="showLedgerModal = false" style="display:none">
+        <div class="modal max-w-2xl">
+            <div class="flex items-center justify-between mb-4"><h3 class="font-bold text-lg">📒 الدفتر المالي: <span x-text="ledgerAgentName"></span></h3><button @click="showLedgerModal = false" class="text-slate-400 hover:text-white"><i class="fas fa-times"></i></button></div>
+            <div class="max-h-96 overflow-y-auto">
+                <table class="data-table"><thead><tr><th>التاريخ</th><th>الاتجاه</th><th>المبلغ</th><th>السبب</th><th>مرجع</th><th>الرصيد بعد</th></tr></thead><tbody>
+                    <template x-for="l in ledger" :key="l.id">
+                        <tr class="hover:bg-slate-700/50">
+                            <td class="text-xs" x-text="l.timestamp"></td>
+                            <td><span :class="l.direction==='credit' ? 'text-green-400' : 'text-red-400'" x-text="l.direction==='credit' ? '➕' : '➖'"></span></td>
+                            <td class="font-bold" x-text="l.amount"></td>
+                            <td class="text-xs" x-text="l.reason"></td>
+                            <td class="text-xs font-mono" x-text="(l.reference_id||'').slice(0,18)"></td>
+                            <td class="text-xs text-blue-400" x-text="l.balance_after"></td>
+                        </tr>
+                    </template>
+                    <tr x-show="ledger.length === 0"><td colspan="6" class="text-center text-slate-400 p-4">لا توجد حركات</td></tr>
+                </tbody></table>
+            </div>
         </div>
     </div>
 
@@ -134,7 +221,7 @@
                 <table class="data-table"><thead><tr><th>ID</th><th>النوع</th><th>المبلغ</th><th>المستخدم</th><th>الحالة</th><th>إجراء</th></tr></thead><tbody>
                     <template x-for="t in txns" :key="t.id">
                         <tr class="hover:bg-slate-700/50">
-                            <td class="text-xs font-mono" x-text="(t.transaction_id||t.id||'').slice(0,15)"></td>
+                            <td class="text-xs font-mono" x-text="(t.id||'').slice(0,15)"></td>
                             <td><span :class="t.type === 'deposit' ? 'text-green-400' : 'text-red-400'" x-text="t.type === 'deposit' ? '💵 إيداع' : '💸 سحب'"></span></td>
                             <td class="font-bold" x-text="t.amount"></td>
                             <td class="text-xs" x-text="t.user_name"></td>
@@ -163,12 +250,43 @@ function agentsApp() {
     return {
         agents: [], filteredAgents: [], search: '',
         showAddModal: false, showBalanceModal: false, showMethodsModal: false, showTxnsModal: false,
-        addForm: { bot_name: '', bot_token: '', username: '', password: '', security_deposit: 100, max_daily_transactions: 50, notes: '' },
+        showEditModal: false, showDepositsModal: false, showLedgerModal: false,
+        addForm: { bot_name: '', bot_token: '', username: '', password: '', security_deposit: 100, max_daily_transactions: 50, traffic_weight: 1, deposit_method_name: '', deposit_method_data: '', notes: '' },
+        editForm: {}, editTargetId: '',
+        depositRequests: [], pendingDeposits: 0,
+        ledger: [], ledgerAgentName: '',
         balanceTarget: null, balanceAction: 'add', balanceAmount: '', balanceReason: '',
         currentAgentId: '', methods: [], methodForm: { method_name: '', account_data: '', method_type: '', icon: '💳' },
         txns: [], txnSearch: '',
 
-        async init() { await this.loadAgents(); },
+        async init() { await this.loadAgents(); await this.refreshPendingDeposits(); },
+        agentName(id) { const a = this.agents.find(x => x.id === id); return a ? a.bot_name : id; },
+        async refreshPendingDeposits() {
+            try { const d = await api('/api/agents/deposit-requests?status=pending'); this.pendingDeposits = (d.requests || []).length; } catch(e) {}
+        },
+        async openDepositRequests() {
+            this.showDepositsModal = true;
+            try { const d = await api('/api/agents/deposit-requests'); this.depositRequests = d.requests || []; } catch(e) { this.depositRequests = []; }
+        },
+        async processDeposit(rid, decision) {
+            try { await api(`/api/agents/deposit-requests/${rid}`, { method: 'PUT', body: JSON.stringify({ decision }) }); toast(decision === 'approved' ? 'تم القبول ورفع الرصيد' : 'تم الرفض', 'success'); await this.openDepositRequests(); await this.refreshPendingDeposits(); await this.loadAgents(); }
+            catch(e) { toast('فشل', 'error'); }
+        },
+        openEditModal(a) {
+            this.editTargetId = a.id;
+            this.editForm = { bot_name: a.bot_name, username: a.username, password: '', security_deposit: a.security_deposit, max_daily_transactions: a.max_daily_transactions, traffic_weight: a.traffic_weight || 1, deposit_method_name: a.deposit_method_name || '', deposit_method_data: a.deposit_method_data || '', traffic_on: !!a.traffic_on, notes: a.notes || '' };
+            this.showEditModal = true;
+        },
+        async saveEdit() {
+            const body = { ...this.editForm, traffic_on: this.editForm.traffic_on ? 1 : 0 };
+            if (!body.password) delete body.password;
+            try { await api(`/api/agents/${this.editTargetId}`, { method: 'PUT', body: JSON.stringify(body) }); toast('تم الحفظ', 'success'); this.showEditModal = false; await this.loadAgents(); }
+            catch(e) { toast('فشل', 'error'); }
+        },
+        async openLedger(a) {
+            this.ledgerAgentName = a.bot_name; this.showLedgerModal = true;
+            try { const d = await api(`/api/agents/${a.id}/ledger`); this.ledger = d.ledger || []; } catch(e) { this.ledger = []; }
+        },
         async loadAgents() {
             try { const d = await api('/api/agents'); this.agents = d.agents || []; this.filterAgents(); }
             catch(e) { this.agents = []; }
@@ -176,16 +294,21 @@ function agentsApp() {
         filterAgents() {
             if (!this.search) { this.filteredAgents = this.agents; return; }
             const sl = this.search.toLowerCase();
-            this.filteredAgents = this.agents.filter(a => sl in (a.bot_name + a.id).toLowerCase());
+            this.filteredAgents = this.agents.filter(a => (a.bot_name + a.id + (a.username||'')).toLowerCase().includes(sl));
         },
         async addAgent() {
-            if (!this.addForm.bot_name || !this.addForm.bot_token) return toast('املأ الحقول', 'warning');
-            try { await api('/api/agents', { method: 'POST', body: JSON.stringify(this.addForm) }); toast('تمت الإضافة', 'success'); this.showAddModal = false; this.addForm = { bot_name: '', bot_token: '', username: '', password: '', security_deposit: 100, max_daily_transactions: 50, notes: '' }; await this.loadAgents(); }
-            catch(e) { toast('فشل', 'error'); }
+            if (!this.addForm.bot_name) return toast('املأ الحقول', 'warning');
+            try {
+                const d = await api('/api/agents', { method: 'POST', body: JSON.stringify(this.addForm) });
+                if (d.password) alert('بيانات دخول الوكيل (تظهر مرة واحدة):\nاسم المستخدم: ' + d.username + '\nكلمة المرور: ' + d.password);
+                toast('تمت الإضافة', 'success'); this.showAddModal = false;
+                this.addForm = { bot_name: '', bot_token: '', username: '', password: '', security_deposit: 100, max_daily_transactions: 50, traffic_weight: 1, deposit_method_name: '', deposit_method_data: '', notes: '' };
+                await this.loadAgents();
+            } catch(e) { toast(e.message || 'فشل', 'error'); }
         },
         async toggleAgent(a) {
-            a.is_active = a.is_active === 'yes' ? 'no' : 'yes';
-            try { await api(`/api/agents/${a.id}`, { method: 'PUT', body: JSON.stringify({ is_active: a.is_active }) }); toast(a.is_active === 'yes' ? 'تم التفعيل' : 'تم التعطيل', 'success'); await this.loadAgents(); }
+            const newVal = a.is_active ? 0 : 1;
+            try { await api(`/api/agents/${a.id}`, { method: 'PUT', body: JSON.stringify({ is_active: newVal }) }); toast(newVal ? 'تم التفعيل' : 'تم التعطيل', 'success'); await this.loadAgents(); }
             catch(e) { toast('فشل', 'error'); }
         },
         async deleteAgent(a) {

@@ -58,15 +58,29 @@ input,select{background:#1a2028;border:1px solid #262e39;border-radius:8px;paddi
     <div class="kpi"><div class="kpi-label">حالة المرور</div><div class="kpi-val" id="traffic">—</div></div>
   </div>
 
+  <!-- Pending matching requests -->
+  <div class="section" id="pendingSection">
+    <div class="section-title">🔔 طلبات المطابقة المعلقة <span id="pendingCount"></span></div>
+    <div id="pendingList"></div>
+  </div>
+
   <!-- Deposit Balance -->
   <div class="section">
     <div class="section-title">💰 إيداع الرصيد</div>
+    <div id="depMethodBox" class="method" style="display:none">
+      <span class="method-icon">🏦</span>
+      <div class="method-info">
+        <div class="method-name" id="depMethodName">—</div>
+        <div class="method-data" id="depMethodData">—</div>
+      </div>
+    </div>
+    <div id="depNoMethod" class="empty" style="display:none">لم يحدد الأدمن وسيلة إيداع لك بعد — تواصل مع الإدارة</div>
     <div style="display:flex;gap:8px;margin-bottom:8px">
       <input type="number" id="depAmount" placeholder="المبلغ" style="flex:1">
-      <input type="text" id="depMethod" placeholder="وسيلة الدفع" style="flex:1">
+      <input type="text" id="depWallet" placeholder="رقم محفظتك / مرجع التحويل" style="flex:1">
     </div>
-    <input type="text" id="depWallet" placeholder="رقم محفظتك" style="margin-bottom:8px">
     <button class="btn btn-deposit" onclick="depositBalance()" style="width:100%">💸 طلب إيداع الرصيد</button>
+    <div id="depHistory" style="margin-top:10px"></div>
   </div>
 
   <!-- Payment Methods -->
@@ -79,6 +93,23 @@ input,select{background:#1a2028;border:1px solid #262e39;border-radius:8px;paddi
   <div class="section">
     <div class="section-title">📜 سجل المعاملات</div>
     <input type="text" class="search" id="txnSearch" placeholder="🔍 بحث..." oninput="loadTxns()">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+      <select id="txnStatus" onchange="loadTxns()">
+        <option value="">كل الحالات</option>
+        <option value="pending">معلق</option>
+        <option value="approved">مقبول</option>
+        <option value="rejected">مرفوض</option>
+      </select>
+      <select id="txnType" onchange="loadTxns()">
+        <option value="">كل الأنواع</option>
+        <option value="deposit">إيداع</option>
+        <option value="withdraw">سحب</option>
+      </select>
+      <input type="date" id="txnFrom" onchange="loadTxns()">
+      <input type="date" id="txnTo" onchange="loadTxns()">
+      <input type="number" id="txnMin" placeholder="أقل مبلغ" oninput="loadTxns()">
+      <input type="number" id="txnMax" placeholder="أعلى مبلغ" oninput="loadTxns()">
+    </div>
     <div id="txnTable"></div>
   </div>
 </div>
@@ -92,13 +123,55 @@ function loadSelf(){
     var t=document.getElementById('traffic');
     t.textContent=d.traffic_enabled==='yes'?'▶️ نشط':'⏸️ متوقف';
     t.className='kpi-val '+(d.traffic_enabled==='yes'?'green':'red');
+    var box=document.getElementById('depMethodBox'), none=document.getElementById('depNoMethod');
+    if(d.deposit_method_name){
+      box.style.display='flex';none.style.display='none';
+      document.getElementById('depMethodName').textContent=d.deposit_method_name;
+      document.getElementById('depMethodData').textContent=d.deposit_method_data||'—';
+    }else{box.style.display='none';none.style.display='block'}
+  });
+}
+function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML}
+function loadPending(){
+  fetch('/api/agent/self/pending').then(r=>r.json()).then(d=>{
+    var list=d.transactions||[];
+    document.getElementById('pendingCount').textContent=list.length?('('+list.length+')'):'';
+    var h='';
+    list.forEach(function(t){
+      h+='<div class="method"><span class="method-icon">'+(t.type==='deposit'?'💵':'💸')+'</span>'
+        +'<div class="method-info"><div class="method-name">'+(t.type==='deposit'?'إيداع (تدفع للمستخدم)':'سحب (تستلم من المستخدم)')+' — '+esc(t.amount)+' '+esc(t.currency)+'</div>'
+        +'<div class="method-data">'+esc(t.user_name||t.user_id||'—')+' · '+esc((t.created_at||'').slice(0,16))+'</div></div>'
+        +'<button class="btn btn-primary" style="padding:6px 10px;font-size:11px" onclick="processTxn(\''+esc(t.id)+'\',\'approved\')">✔ قبول</button>'
+        +'<button class="btn" style="background:rgba(255,71,87,.15);color:#ff4757;padding:6px 10px;font-size:11px" onclick="processTxn(\''+esc(t.id)+'\',\'rejected\')">✖ رفض</button></div>';
+    });
+    if(!h)h='<div class="empty">لا توجد طلبات معلقة</div>';
+    document.getElementById('pendingList').innerHTML=h;
+  });
+}
+function processTxn(tid,decision){
+  if(!confirm(decision==='approved'?'تأكيد قبول الطلب؟':'تأكيد رفض الطلب؟'))return;
+  fetch('/api/agent/self/transactions/'+tid+'/process',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({decision:decision})})
+  .then(r=>r.json()).then(d=>{
+    if(d.success){loadSelf();loadPending();loadTxns()}
+    else{alert(d.error||'فشل')}
+  });
+}
+function loadDepHistory(){
+  fetch('/api/agent/self/deposits').then(r=>r.json()).then(d=>{
+    var list=(d.requests||[]).slice(0,5);
+    if(!list.length){document.getElementById('depHistory').innerHTML='';return}
+    var h='<table><thead><tr><th>المبلغ</th><th>الحالة</th><th>التاريخ</th></tr></thead><tbody>';
+    list.forEach(function(r){
+      h+='<tr><td>'+esc(r.amount)+'</td><td><span class="tag tag-'+esc(r.status)+'">'+esc(r.status)+'</span></td><td>'+esc((r.created_at||'').slice(0,16))+'</td></tr>';
+    });
+    document.getElementById('depHistory').innerHTML=h+'</tbody></table>';
   });
 }
 function loadMethods(){
   fetch('/api/agent/self/payment-methods').then(r=>r.json()).then(d=>{
     var h='';
     (d.methods||[]).forEach(function(m){
-      h+='<div class="method"><span class="method-icon">'+(m.icon||'💳')+'</span><div class="method-info"><div class="method-name">'+m.method_name+'</div><div class="method-data">'+(m.account_data||'—')+'</div></div><button class="btn btn-edit" onclick="editMethod(\''+m.id+'\')">✏️</button></div>';
+      h+='<div class="method"><span class="method-icon">'+esc(m.icon||'💳')+'</span><div class="method-info"><div class="method-name">'+esc(m.method_name)+'</div><div class="method-data">'+esc(m.account_data||'—')+'</div></div><button class="btn btn-edit" data-mid="'+esc(m.id)+'" onclick="editMethod(this.dataset.mid)">✏️</button></div>';
     });
     if(!h)h='<div class="empty">لا توجد وسائل دفع</div>';
     document.getElementById('methodsList').innerHTML=h;
@@ -110,12 +183,20 @@ function editMethod(mid){
   fetch('/api/agent/self/payment-methods/'+mid,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({account_data:newData})}).then(r=>r.json()).then(d=>{if(d.success){loadMethods();alert('تم التحديث')}else{alert('فشل')}});
 }
 function loadTxns(){
-  var s=document.getElementById('txnSearch').value;
-  fetch('/api/agent/self/transactions'+(s?'?search='+encodeURIComponent(s):'')).then(r=>r.json()).then(d=>{
+  var p=new URLSearchParams();
+  var s=document.getElementById('txnSearch').value; if(s)p.set('search',s);
+  var st=document.getElementById('txnStatus').value; if(st)p.set('status',st);
+  var ty=document.getElementById('txnType').value; if(ty)p.set('type',ty);
+  var f=document.getElementById('txnFrom').value; if(f)p.set('date_from',f);
+  var t2=document.getElementById('txnTo').value; if(t2)p.set('date_to',t2);
+  var mn=document.getElementById('txnMin').value; if(mn)p.set('min_amount',mn);
+  var mx=document.getElementById('txnMax').value; if(mx)p.set('max_amount',mx);
+  var qs=p.toString();
+  fetch('/api/agent/self/transactions'+(qs?'?'+qs:'')).then(r=>r.json()).then(d=>{
     var h='<table><thead><tr><th>النوع</th><th>المبلغ</th><th>المستخدم</th><th>الحالة</th><th>التاريخ</th></tr></thead><tbody>';
     (d.transactions||[]).forEach(function(t){
       var cls='tag-'+(t.status||'pending');
-      h+='<tr><td>'+(t.type==='deposit'?'💵':t.type==='withdraw'?'💸':'💰')+'</td><td>'+t.amount+'</td><td>'+(t.user_name||'—')+'</td><td><span class="tag '+cls+'">'+t.status+'</span></td><td>'+(t.processed_at||'').slice(0,16)+'</td></tr>';
+      h+='<tr><td>'+(t.type==='deposit'?'💵':t.type==='withdraw'?'💸':'💰')+'</td><td>'+esc(t.amount)+'</td><td>'+esc(t.user_name||'—')+'</td><td><span class="tag '+cls+'">'+esc(t.status)+'</span></td><td>'+esc((t.created_at||t.processed_at||'').slice(0,16))+'</td></tr>';
     });
     if(!(d.transactions||[]).length)h+='<tr><td colspan="5" class="empty">لا توجد معاملات</td></tr>';
     h+='</tbody></table>';
@@ -124,17 +205,16 @@ function loadTxns(){
 }
 function depositBalance(){
   var amt=document.getElementById('depAmount').value;
-  var mtd=document.getElementById('depMethod').value;
   var wal=document.getElementById('depWallet').value;
-  if(!amt||!mtd||!wal){alert('املأ جميع الحقول');return}
-  fetch('/api/agent/self/deposit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({amount:parseFloat(amt),method_name:mtd,wallet:wal})})
+  if(!amt||!wal){alert('املأ جميع الحقول');return}
+  fetch('/api/agent/self/deposit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({amount:parseFloat(amt),reference:wal})})
   .then(r=>r.json()).then(d=>{
-    if(d.success){alert(d.message||'تم');document.getElementById('depAmount').value='';document.getElementById('depMethod').value='';document.getElementById('depWallet').value='';loadTxns()}
+    if(d.success){alert(d.message||'تم');document.getElementById('depAmount').value='';document.getElementById('depWallet').value='';loadDepHistory()}
     else{alert(d.error||'فشل')}
   });
 }
-loadSelf();loadMethods();loadTxns();
-setInterval(loadSelf,30000);
+loadSelf();loadPending();loadMethods();loadTxns();loadDepHistory();
+setInterval(function(){loadSelf();loadPending()},30000);
 </script>
 </body>
 </html>
