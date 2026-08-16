@@ -804,6 +804,85 @@ class GameDB:
             ).fetchone()
             return True, float(bal_row[0]) if bal_row else amt
 
+    def transfer_svrp_frozen_p2p(self, transfer_id, sender_uid, receiver_uid,
+                                 amount, unlock_bonus=0.0):
+        """Atomic peer-to-peer frozen-balance transfer with unlock bonus.
+
+        In ONE SAVEPOINT:
+          - verify sender frozen_balance >= amount + unlock_bonus (SQLite is
+            authoritative — not the CSV mirror)
+          - debit sender frozen by (amount + unlock_bonus), credit sender
+            total_used by unlock_bonus (the 5% unlock rule)
+          - credit receiver frozen + total_earned by amount
+          - record transfer_id in svrp_p2p_transfer_log (PRIMARY KEY) for
+            idempotency — a replay returns True without re-applying.
+
+        Returns (True, sender_frozen_after) or (False, error_msg).
+        """
+        s_uid, r_uid = str(sender_uid), str(receiver_uid)
+        amt = float(_money(amount))
+        bonus = float(_money(unlock_bonus))
+        if amt <= 0 or bonus < 0:
+            return False, 'المبلغ غير صالح'
+        conn = self._conn()
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        with _db_lock:
+            conn.execute(
+                'CREATE TABLE IF NOT EXISTS svrp_p2p_transfer_log ('
+                ' transfer_id TEXT PRIMARY KEY, sender_uid TEXT, receiver_uid TEXT,'
+                ' amount REAL, unlock_bonus REAL, created_at TEXT)'
+            )
+            existing = conn.execute(
+                'SELECT sender_uid FROM svrp_p2p_transfer_log WHERE transfer_id = ?',
+                (transfer_id,)).fetchone()
+            if existing:
+                bal = conn.execute(
+                    'SELECT frozen_balance FROM svrp_wallet_balance WHERE uid = ?',
+                    (s_uid,)).fetchone()
+                return True, float(bal[0]) if bal else 0.0
+            conn.execute('SAVEPOINT svrp_p2p')
+            try:
+                for u in (s_uid, r_uid):
+                    conn.execute(
+                        'INSERT OR IGNORE INTO svrp_wallet_balance '
+                        '(uid, frozen_balance, total_earned, total_used, '
+                        ' wagering_required, wagering_completed) '
+                        'VALUES (?, 0, 0, 0, 3, 0)', (u,))
+                res = conn.execute(
+                    'UPDATE svrp_wallet_balance SET '
+                    'frozen_balance = frozen_balance - ?, '
+                    'total_used = total_used + ? '
+                    'WHERE uid = ? AND frozen_balance >= ?',
+                    (amt + bonus, bonus, s_uid, amt + bonus))
+                if res.rowcount != 1:
+                    conn.execute('ROLLBACK TO SAVEPOINT svrp_p2p')
+                    conn.execute('RELEASE SAVEPOINT svrp_p2p')
+                    conn.commit()
+                    return False, 'الرصيد المجمد غير كافٍ'
+                conn.execute(
+                    'UPDATE svrp_wallet_balance SET '
+                    'frozen_balance = frozen_balance + ?, '
+                    'total_earned = total_earned + ? WHERE uid = ?',
+                    (amt, amt, r_uid))
+                conn.execute(
+                    'INSERT INTO svrp_p2p_transfer_log '
+                    '(transfer_id, sender_uid, receiver_uid, amount, unlock_bonus, created_at) '
+                    'VALUES (?, ?, ?, ?, ?, ?)',
+                    (transfer_id, s_uid, r_uid, amt, bonus, now))
+                conn.execute('RELEASE SAVEPOINT svrp_p2p')
+            except Exception:
+                try:
+                    conn.execute('ROLLBACK TO SAVEPOINT svrp_p2p')
+                    conn.execute('RELEASE SAVEPOINT svrp_p2p')
+                except Exception:
+                    pass
+                raise
+            conn.commit()
+            bal = conn.execute(
+                'SELECT frozen_balance FROM svrp_wallet_balance WHERE uid = ?',
+                (s_uid,)).fetchone()
+            return True, float(bal[0]) if bal else 0.0
+
     def debit_svrp_balance_for_transfer(self, transfer_id, uid, amount):
         """Debit frozen balance and CAS transfer pending→debited atomically.
 

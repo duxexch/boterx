@@ -3278,6 +3278,7 @@ def _comp_strong_auth_or_error():
 
 @app.route('/api/comp/admin/data')
 @api_auth
+@permission_required('view_financial')
 def api_comp_admin_data():
     accounts = read_csv('user_company_accounts.csv'); accounts.reverse()
     return jsonify({'accounts': accounts[:200]})

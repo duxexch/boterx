@@ -1436,56 +1436,54 @@ class SVRPManager:
         else:
             friend_count = len(unique_friends)
         
-        # ── الخصم والإضافة داخل قفل واحد لضمان الاتساق ───────────────────────
+        # ── التحويل الذرّي عبر SQLite (المصدر الموثوق) ثم مرآة CSV ───────────
         with svrp_lock():
-            # إعادة القراءة داخل القفل (أحدث حالة)
-            sender_wallet2  = self.get_wallet(tid)
-            sender_balance2 = float(sender_wallet2.get('balance', 0) or 0)
-            sender_used2    = float(sender_wallet2.get('total_used', 0) or 0)
-            max_per_friend2 = sender_balance2 * 0.25
-
-            if amount > max_per_friend2:
-                return False, f"الحد الأقصى لكل صديق: {max_per_friend2:.2f}"
-            if amount <= 0 or sender_balance2 <= 0:
-                return False, "المبلغ أو الرصيد غير صالح"
-
-            # 1. خصم من المرسل (SQLite delta first, then CSV)
+            transfer_id = self._generate_id('TRF')
             try:
                 from game_engine import GameManager as _GM
-                # قاعدة فك التجميد: تحويل ≥10% من الرصيد المجمد لصديق مستخدم بالفعل
-                # يفك تجميد 5% إضافية للمرسل. المبلغ المحوَّل نفسه يذهب مجمداً للمستلم.
-                unlock_bonus = 0.0
-                if amount >= sender_balance2 * 0.10:
-                    unlock_bonus = round(sender_balance2 * 0.05, 6)
-                    unlock_bonus = min(unlock_bonus, max(0.0, sender_balance2 - amount))
                 _gm_s = _GM()
-                _gm_s.delta_update_svrp_wallet(
-                    tid,
-                    frozen_balance_delta=-(float(amount) + unlock_bonus),
-                    total_used_delta=unlock_bonus
-                )
-                _gm_s.delta_update_svrp_wallet(
-                    str(receiver_tid),
-                    frozen_balance_delta=float(amount),
-                    total_earned_delta=float(amount)
-                )
+                # الرصيد الموثوق من SQLite — لا نعتمد على مرآة CSV في التفويض
+                sql_row = _gm_s.get_svrp_frozen_balance(tid) or {}
+                sender_balance2 = float(sql_row.get('frozen_balance', 0) or 0)
             except Exception as _se:
-                logger.warning(f'send_frozen_credits SQLite delta failed: {_se}')
-                unlock_bonus = 0.0
-            self._update_wallet(tid, {
-                'balance':    round(sender_balance2 - amount - unlock_bonus, 6),
-                'total_used': round(sender_used2    + unlock_bonus, 6),
-            })
+                logger.error(f'send_frozen_credits: SQLite unavailable: {_se}')
+                return False, "الخدمة غير متاحة حالياً — حاول لاحقاً"
 
-            # 2. إضافة للمستلم (مجمد) — قراءة حديثة داخل القفل (CSV mirror)
+            if amount <= 0 or sender_balance2 <= 0:
+                return False, "المبلغ أو الرصيد غير صالح"
+            if amount > sender_balance2 * 0.25:
+                return False, f"الحد الأقصى لكل صديق: {sender_balance2 * 0.25:.2f}"
+
+            # قاعدة فك التجميد: تحويل ≥10% من الرصيد المجمد لصديق مستخدم بالفعل
+            # يفك تجميد 5% إضافية للمرسل. المبلغ المحوَّل نفسه يذهب مجمداً للمستلم.
+            unlock_bonus = 0.0
+            if amount >= sender_balance2 * 0.10:
+                unlock_bonus = round(sender_balance2 * 0.05, 6)
+                unlock_bonus = min(unlock_bonus, max(0.0, sender_balance2 - amount))
+
+            # عملية واحدة ذرّية: خصم المرسل + مكافأة الفك + إضافة المستلم + سجل idempotent
+            try:
+                ok, result = _gm_s.transfer_svrp_frozen_p2p(
+                    transfer_id, tid, str(receiver_tid), float(amount), unlock_bonus)
+            except Exception as _te:
+                logger.error(f'send_frozen_credits p2p failed: {_te}')
+                return False, "فشل التحويل — لم يتم خصم أي مبلغ"
+            if not ok:
+                return False, result or "فشل التحويل"
+
+            # مرآة CSV (عرض فقط — SQLite هو المصدر الموثوق)
+            sender_wallet2 = self.get_wallet(tid)
+            self._update_wallet(tid, {
+                'balance':    round(max(0.0, float(sender_wallet2.get('balance', 0) or 0) - amount - unlock_bonus), 6),
+                'total_used': round(float(sender_wallet2.get('total_used', 0) or 0) + unlock_bonus, 6),
+            })
             receiver_wallet = self.get_wallet(receiver_tid)
             self._update_wallet(receiver_tid, {
                 'balance':      round(float(receiver_wallet.get('balance', 0) or 0)    + amount, 6),
                 'total_earned': round(float(receiver_wallet.get('total_earned', 0) or 0) + amount, 6),
             })
 
-            # 3. تسجيل التحويل
-            transfer_id = self._generate_id('TRF')
+            # سجل التحويل (CSV — للعرض وعدّ الأصدقاء)
             transfer = {
                 'id': transfer_id,
                 'sender_id': tid,
@@ -1567,11 +1565,11 @@ class SVRPManager:
             'company_id': company_id,
             'company_name': company_name,
             'account_number': account_number,
-            'status': 'active',
+            'status': 'pending',
             'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')
         }
         if self._append_csv('user_company_accounts.csv', row, self.USER_COMPANY_ACCOUNT_FIELDS):
-            return True, f"✅ تم تسجيل حسابك في {company_name}"
+            return True, f"✅ تم إرسال طلب تسجيل حسابك في {company_name} — بانتظار تأكيد الإدارة"
         return False, "❌ فشل في التسجيل"
 
     def get_user_company_accounts(self, user_id):
@@ -1603,6 +1601,8 @@ class SVRPManager:
         account = self.get_user_company_account(user_id, company_id)
         if not account:
             return None, "يجب تسجيل رقم حسابك أولاً"
+        if account.get('status') not in ('active', 'approved'):
+            return None, "حسابك بانتظار تأكيد الإدارة — سيتم إشعارك فور التأكيد"
 
         # نسبة المكافأة الافتراضية
         bonus_pct = 10

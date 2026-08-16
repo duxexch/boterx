@@ -432,6 +432,14 @@ class GameManager:
             return _db.credit_svrp_balance_for_approval(req_id, uid, amount)
         return False, 'SQLite not available'
 
+    def transfer_svrp_frozen_p2p(self, transfer_id, sender_uid, receiver_uid,
+                                 amount, unlock_bonus=0.0):
+        """Atomic p2p frozen transfer + unlock bonus in one SQLite SAVEPOINT."""
+        if _USE_SQLITE:
+            return _db.transfer_svrp_frozen_p2p(
+                transfer_id, sender_uid, receiver_uid, amount, unlock_bonus)
+        return False, 'SQLite not available'
+
     def debit_svrp_balance_for_transfer(self, transfer_id, uid, amount):
         """Debit frozen balance + CAS pending→debited in one SQLite SAVEPOINT."""
         if _USE_SQLITE:
