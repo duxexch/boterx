@@ -136,7 +136,15 @@
                                         </a>
                                     </template>
                                 </td>
-                                <td class="px-4 py-3 text-xs font-mono" x-text="r.account_number || '-'"></td>
+                                <td class="px-4 py-3 text-xs font-mono">
+                                    <span x-text="r.account_number || '-'"></span>
+                                    <template x-if="(r.photo_file_id || '').startsWith('web:')">
+                                        <a :href="'/api/svrp/requests/' + r.id + '/screenshot'" target="_blank"
+                                           class="text-amber-400 hover:text-amber-300 mr-1" title="لقطة الشاشة المرفوعة">
+                                            <i class="fas fa-image text-[11px]"></i>
+                                        </a>
+                                    </template>
+                                </td>
                                 <td class="px-4 py-3 font-semibold" x-text="fmtAmount(r.amount, r.currency)"></td>
                                 <td class="px-4 py-3">
                                     <span x-html="statusBadge(r.status || 'pending')"></span>

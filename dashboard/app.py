@@ -48,6 +48,8 @@ app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=365)  # persistent login — never expire unless user logs out
 app.config['SESSION_COOKIE_SECURE'] = True  # HTTPS only
+# حد أقصى لحجم أي طلب (يشمل رفع الصور) — يرفض Werkzeug الجسم قبل التحليل الكامل
+app.config['MAX_CONTENT_LENGTH'] = 8 * 1024 * 1024  # 8MB
 
 # ===== Web Push (VAPID) — notifications work even when tab/browser is closed =====
 _VAPID_PRIVATE = """-----BEGIN PRIVATE KEY-----
@@ -7151,6 +7153,153 @@ def api_player_companies():
     except Exception:
         pass
     return jsonify({'companies': companies})
+
+
+# ── تسجيل حساب شركة + طلب تعويض من محفظة الويب ──────────────────────────────
+_RECOVERY_UPLOADS_DIR = os.path.join(BASE_DIR, 'recovery_uploads')
+_ALLOWED_SCREENSHOT_EXT = {'.png', '.jpg', '.jpeg', '.webp'}
+_MAX_SCREENSHOT_BYTES = 5 * 1024 * 1024  # 5MB
+
+
+def _find_active_company(company_id):
+    for c in read_csv('companies.csv'):
+        if c.get('id', '') == str(company_id):
+            if (c.get('is_active', '') or '').lower() in ('active', 'yes', '1', 'true'):
+                return c
+            return None
+    return None
+
+
+@app.route('/api/player/companies/<company_id>/register-account', methods=['POST'])
+@webapp_auth
+def api_player_register_company_account(company_id):
+    """تسجيل رقم حساب المستخدم في شركة تعويض — هوية موثقة فقط."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Unauthorized'}), 403
+    company = _find_active_company(company_id)
+    if not company:
+        return jsonify({'error': 'الشركة غير موجودة أو غير نشطة'}), 404
+    data = request.get_json(silent=True) or {}
+    account_number = str(data.get('account_number', '')).strip()
+    if not (3 <= len(account_number) <= 64):
+        return jsonify({'error': 'رقم الحساب يجب أن يكون بين 3 و 64 حرفاً'}), 400
+    try:
+        from svrp import SVRPManager as _SM
+        ok, msg = _SM().add_user_company_account(
+            uid, str(company_id), company.get('name', ''), account_number)
+    except Exception as e:
+        _auth_logger.error('register-account failed uid=%s company=%s: %s', uid, company_id, e)
+        return jsonify({'error': 'فشل التسجيل — حاول مجدداً'}), 500
+    if not ok:
+        return jsonify({'error': msg}), 409
+    return jsonify({'ok': True, 'message': msg, 'account_number': account_number})
+
+
+@app.route('/api/player/compensation-request', methods=['POST'])
+@webapp_auth
+def api_player_compensation_request():
+    """تقديم طلب تعويض من الويب مع رفع لقطة شاشة — هوية موثقة فقط.
+
+    يدخل نفس خط أنابيب recovery_requests الذي يستخدمه البوت؛
+    photo_file_id يحمل 'web:<filename>' ويُعرض للأدمن عبر مسار مخصص."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Unauthorized'}), 403
+
+    company_id = str(request.form.get('company_id', '')).strip()
+    if not company_id:
+        return jsonify({'error': 'اختر الشركة'}), 400
+    company = _find_active_company(company_id)
+    if not company:
+        return jsonify({'error': 'الشركة غير موجودة أو غير نشطة'}), 404
+
+    try:
+        from svrp import SVRPManager as _SM
+        mgr = _SM()
+    except Exception as e:
+        _auth_logger.error('compensation-request svrp load failed: %s', e)
+        return jsonify({'error': 'الخدمة غير متاحة حالياً'}), 500
+
+    account = mgr.get_user_company_account(uid, company_id)
+    if not account:
+        return jsonify({'error': 'يجب تسجيل رقم حسابك في هذه الشركة أولاً'}), 400
+
+    f = request.files.get('screenshot')
+    if not f or not f.filename:
+        return jsonify({'error': 'أرفق لقطة شاشة'}), 400
+    ext = os.path.splitext(f.filename)[1].lower()
+    if ext not in _ALLOWED_SCREENSHOT_EXT:
+        return jsonify({'error': 'صيغة الصورة غير مدعومة (png/jpg/webp)'}), 400
+    blob = f.read(_MAX_SCREENSHOT_BYTES + 1)
+    if len(blob) > _MAX_SCREENSHOT_BYTES:
+        return jsonify({'error': 'حجم الصورة يتجاوز 5MB'}), 400
+    if not blob:
+        return jsonify({'error': 'الملف فارغ'}), 400
+    # تحقق من توقيع الملف (magic bytes) — لا نثق بالامتداد وحده
+    _sig_ok = (blob.startswith(b'\x89PNG') or blob.startswith(b'\xff\xd8\xff')
+               or (blob[:4] == b'RIFF' and blob[8:12] == b'WEBP'))
+    if not _sig_ok:
+        return jsonify({'error': 'الملف ليس صورة صالحة'}), 400
+
+    os.makedirs(_RECOVERY_UPLOADS_DIR, exist_ok=True)
+    fname = f"{uid}_{secrets.token_hex(8)}{ext}"
+    upload_path = os.path.join(_RECOVERY_UPLOADS_DIR, fname)
+    with open(upload_path, 'wb') as out:
+        out.write(blob)
+
+    # customer_id من users.csv إن وجد
+    customer_id = ''
+    try:
+        for u in read_csv('users.csv'):
+            if str(u.get('telegram_id', '')) == uid:
+                customer_id = u.get('customer_id', '')
+                break
+    except Exception:
+        pass
+
+    # فحص "لا طلب معلق" + الإنشاء ذرّياً داخل svrp_lock واحد (يمنع سباق التكرار)
+    req_id, err = mgr.create_recovery_request_if_no_pending(
+        uid, customer_id, f'web:{fname}', company_id,
+        company_name=company.get('name', ''),
+        account_number=account.get('account_number', ''))
+    if not req_id:
+        try:
+            os.unlink(upload_path)  # لا نراكم ملفات لطلبات لم تُحفظ
+        except OSError:
+            pass
+        status = 409 if err and 'معلق' in err else 500
+        return jsonify({'error': err or 'فشل حفظ الطلب'}), status
+
+    try:
+        push_notification('recovery_request', 'طلب تعويض جديد',
+                          f'طلب تعويض من الويب — {company.get("name", "")} — {req_id}')
+    except Exception:
+        pass
+    return jsonify({'ok': True, 'request_id': req_id,
+                    'message': '✅ تم إرسال طلب التعويض — بانتظار مراجعة الإدارة'})
+
+
+@app.route('/api/svrp/requests/<req_id>/screenshot')
+@api_auth
+@permission_required('view_financial')
+def api_svrp_request_screenshot(req_id):
+    """عرض لقطة شاشة طلب تعويض مقدم من الويب (photo_file_id = web:<fname>)."""
+    for r in read_csv('recovery_requests.csv'):
+        if r.get('id') == req_id:
+            pfid = r.get('photo_file_id', '') or ''
+            if not pfid.startswith('web:'):
+                return jsonify({'error': 'الصورة مرسلة عبر تيليجرام — راجع محادثة البوت'}), 404
+            fname = os.path.basename(pfid[4:])  # يمنع path traversal
+            path = os.path.join(_RECOVERY_UPLOADS_DIR, fname)
+            if not os.path.exists(path):
+                return jsonify({'error': 'الملف غير موجود'}), 404
+            return send_file(path, max_age=3600)
+    return jsonify({'error': 'الطلب غير موجود'}), 404
 
 @app.route('/api/player/wallet')
 @webapp_auth

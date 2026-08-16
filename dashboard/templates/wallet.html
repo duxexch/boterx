@@ -380,29 +380,49 @@ async function loadCompanies() {
     const r = await apiFetch(`${BASE}/api/player/companies`);
     const d = await r.json();
     if (!d.companies || !d.companies.length) return;
-    let h = `<div class="txn-card"><div class="txn-title">🏢 شركات التعويض 100%</div>
-      <div style="font-size:11px;color:var(--muted);margin:4px 0 10px">
-        سجّل عبر رابط الشركة ثم أرسل رقم حسابك للبوت لتفعيل اشتراكك في التعويض</div>`;
+    let h = `<div class="txn-card" id="compCard"><div class="txn-title">🏢 شركات التعويض 100%</div>
+      <div style="font-size:11px;color:var(--muted);margin:4px 12px 10px">
+        سجّل عبر رابط الشركة، أدخل رقم حسابك، ثم قدّم طلب تعويض مع لقطة شاشة</div>`;
     d.companies.forEach(c => {
-      h += `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--surface-3)">
-        <span style="font-size:18px">${escH(c.icon)}</span>
-        <div style="flex:1;min-width:0">
-          <div style="font-size:13px;font-weight:600">${escH(c.name)}</div>
-          <div style="font-size:11px;color:var(--muted)">${c.registered_account
-            ? '✅ حسابك: <code>'+escH(c.registered_account)+'</code>'
-            : 'غير مسجل — سجّل عبر الرابط ثم أرسل رقم حسابك للبوت'}</div>
-        </div>
-        ${c.affiliate_link ? `<a href="${escH(c.affiliate_link)}" target="_blank" rel="noopener"
-          style="font-size:11px;font-weight:700;color:#93c5fd;background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.25);padding:6px 10px;border-radius:8px;text-decoration:none;white-space:nowrap">🔗 التسجيل</a>` : ''}
-      </div>`;
+      const cid = escH(c.id);
+      h += `<div style="padding:10px 12px;border-top:1px solid var(--surface-3)">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:18px">${escH(c.icon)}</span>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:600">${escH(c.name)}</div>
+            <div style="font-size:11px;color:var(--muted)">${c.registered_account
+              ? '✅ حسابك: <code>'+escH(c.registered_account)+'</code>'
+              : 'غير مسجل بعد'}</div>
+          </div>
+          ${c.affiliate_link ? `<a href="${escH(c.affiliate_link)}" target="_blank" rel="noopener"
+            style="font-size:11px;font-weight:700;color:#93c5fd;background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.25);padding:6px 10px;border-radius:8px;text-decoration:none;white-space:nowrap">🔗 التسجيل</a>` : ''}
+        </div>`;
+      if (!c.registered_account) {
+        h += `<div style="display:flex;gap:6px;margin-top:8px">
+          <input class="cta-input" id="acc_${cid}" placeholder="رقم حسابك في ${escH(c.name)}" maxlength="64">
+          <button class="btn-transfer" onclick="registerAccount('${cid}')" id="regBtn_${cid}">تسجيل</button>
+        </div>`;
+      } else {
+        h += `<div style="display:flex;gap:6px;margin-top:8px;align-items:center">
+          <input type="file" id="shot_${cid}" accept=".png,.jpg,.jpeg,.webp" style="display:none"
+            onchange="submitCompensation('${cid}')">
+          <button class="btn-transfer" style="background:linear-gradient(135deg,#2563eb,#1d4ed8)"
+            id="compBtn_${cid}" onclick="document.getElementById('shot_${cid}').click()">📸 طلب تعويض بلقطة شاشة</button>
+        </div>`;
+      }
+      h += `</div>`;
     });
     h += `</div>`;
     const div = document.createElement('div');
     div.innerHTML = h;
+    const old = document.getElementById('compCard');
+    if (old) old.parentElement.remove();
     document.getElementById('walletPage').appendChild(div);
   } catch (e) { /* غير حرج */ }
 
-  // Live balance polling (game balance only)
+  // Live balance polling (game balance only) — يُسجَّل مرة واحدة فقط
+  if (window._balancePollStarted) return;
+  window._balancePollStarted = true;
   setInterval(async () => {
     try {
       const r  = await apiFetch(`${BASE}/api/wallet/balance`);
@@ -418,6 +438,47 @@ async function loadCompanies() {
       }
     } catch (_) {}
   }, 6000);
+}
+
+// ── تسجيل حساب شركة ──────────────────────────────────────────────────────────
+async function registerAccount(cid) {
+  const inp = document.getElementById(`acc_${cid}`);
+  const btn = document.getElementById(`regBtn_${cid}`);
+  const acc = (inp?.value || '').trim();
+  if (acc.length < 3) { showToast('أدخل رقم حساب صالح (3 أحرف على الأقل)', 'error'); return; }
+  if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+  try {
+    const r = await apiFetch(`${BASE}/api/player/companies/${encodeURIComponent(cid)}/register-account`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ account_number: acc }),
+    });
+    const d = await r.json();
+    if (!r.ok || d.error) { showToast(d.error || 'فشل التسجيل', 'error'); }
+    else { showToast(d.message || '✅ تم التسجيل', 'success'); loadCompanies(); return; }
+  } catch (e) { showToast('خطأ في الاتصال', 'error'); }
+  if (btn) { btn.disabled = false; btn.textContent = 'تسجيل'; }
+}
+
+// ── تقديم طلب تعويض بلقطة شاشة ───────────────────────────────────────────────
+async function submitCompensation(cid) {
+  const fileInp = document.getElementById(`shot_${cid}`);
+  const btn = document.getElementById(`compBtn_${cid}`);
+  const file = fileInp?.files?.[0];
+  if (!file) return;
+  if (file.size > 5 * 1024 * 1024) { showToast('حجم الصورة يتجاوز 5MB', 'error'); fileInp.value = ''; return; }
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ جارٍ الإرسال...'; }
+  try {
+    const fd = new FormData();
+    fd.append('company_id', cid);
+    fd.append('screenshot', file);
+    const r = await apiFetch(`${BASE}/api/player/compensation-request`, { method: 'POST', body: fd });
+    const d = await r.json();
+    if (!r.ok || d.error) { showToast(d.error || 'فشل إرسال الطلب', 'error'); }
+    else { showToast(d.message || '✅ تم إرسال طلب التعويض', 'success'); }
+  } catch (e) { showToast('خطأ في الاتصال', 'error'); }
+  if (fileInp) fileInp.value = '';
+  if (btn) { btn.disabled = false; btn.textContent = '📸 طلب تعويض بلقطة شاشة'; }
 }
 
 // ── Transfer ──────────────────────────────────────────────────────────────────

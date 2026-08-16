@@ -36,3 +36,4 @@ translations/
 test_company.txt
 dashboard/static/uploads/icons/*
 !dashboard/static/uploads/icons/.gitkeep
+recovery_uploads/

@@ -1235,9 +1235,34 @@ class SVRPManager:
             'approved_at': '',
             'approved_by': ''
         }
-        self._append_csv('recovery_requests.csv', row, self.RECOVERY_REQUEST_FIELDS)
+        if not self._append_csv('recovery_requests.csv', row, self.RECOVERY_REQUEST_FIELDS):
+            logger.error(f"Recovery request persist FAILED for user {user_id}")
+            return None
         logger.info(f"Recovery request created: {req_id} by user {user_id}")
         return req_id
+
+    def create_recovery_request_if_no_pending(self, user_id, customer_id,
+                                              photo_file_id, company_id,
+                                              company_name='', account_number=''):
+        """إنشاء طلب تعويض بشرط عدم وجود طلب معلق لنفس المستخدم/الشركة — ذرّي.
+
+        الفحص والإنشاء داخل svrp_lock واحد فيستحيل أن يمرّ طلبان متزامنان
+        بالفحص معاً (سباق مالي: طلبان معلقان قد يُعتمدان مرتين).
+        Returns (req_id, None) on success or (None, error_msg) on conflict/failure.
+        """
+        with svrp_lock():
+            for r in self._read_csv('recovery_requests.csv'):
+                if (str(r.get('user_id', '')) == str(user_id)
+                        and r.get('status') == 'pending'
+                        and r.get('company_id', '') == str(company_id)):
+                    return None, 'لديك طلب تعويض معلق بالفعل لهذه الشركة'
+            req_id = self.create_recovery_request(
+                user_id, customer_id, photo_file_id,
+                company_id=str(company_id), company_name=company_name,
+                account_number=account_number)
+            if not req_id:
+                return None, 'فشل حفظ الطلب — حاول مجدداً'
+            return req_id, None
 
     def get_pending_recovery_requests(self):
         """الحصول على طلبات الاسترداد المعلقة"""
