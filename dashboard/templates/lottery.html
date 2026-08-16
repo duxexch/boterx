@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
 <title>اليانصيب — VEX</title>
-<link rel="stylesheet" href="/static/css/game-base.css?v=20260817">
+<link rel="stylesheet" href="/static/css/game-base.css?v=20260818">
 <style>
 body{overscroll-behavior:none}
 #app{display:flex;flex-direction:column;height:100dvh}
@@ -13,7 +13,7 @@ body{overscroll-behavior:none}
 .draw-tabs{display:flex;gap:4px;width:100%;max-width:380px}
 .draw-tab{flex:1;padding:8px 4px;border-radius:10px;background:var(--surface-2);border:2px solid var(--border);cursor:pointer;text-align:center;transition:all .15s}
 .draw-tab:active{transform:scale(.95)}
-.draw-tab.active{border-color:var(--gold);background:rgba(0,255,136,.1)}
+.draw-tab.active{border-color:var(--gold);background:rgba(255,215,0,.1)}
 .draw-tab-icon{font-size:20px}
 .draw-tab-name{font-size:10px;font-weight:700;color:var(--text);margin-top:2px}
 .draw-tab-time{font-size:9px;color:var(--muted);margin-top:1px}
@@ -32,7 +32,7 @@ body{overscroll-behavior:none}
 .pt-title{font-size:11px;color:var(--gold);margin-bottom:4px;font-weight:700}
 .pt-row{display:flex;align-items:center;gap:6px;padding:3px 0}
 .pt-badge{font-size:9px;font-weight:900;padding:2px 6px;border-radius:8px;font-family:'Courier New',monospace;min-width:28px;text-align:center}
-.pt-badge.jackpot{background:rgba(0,255,136,.25);color:var(--gold)}
+.pt-badge.jackpot{background:rgba(255,215,0,.25);color:var(--gold)}
 .pt-badge.secondary{background:rgba(59,130,246,.2);color:#93c5fd}
 .pt-badge.small{background:rgba(148,163,184,.15);color:var(--muted)}
 .pt-label{flex:1;font-size:11px;color:var(--text)}
@@ -44,7 +44,7 @@ body{overscroll-behavior:none}
 .ticket-card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
 .ticket-id{font-size:9px;color:var(--muted);font-family:'Courier New',monospace}
 .ticket-status{font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px}
-.ticket-status.pending{background:rgba(0,255,136,.2);color:var(--gold)}
+.ticket-status.pending{background:rgba(255,215,0,.2);color:var(--gold)}
 .ticket-status.win{background:rgba(0,231,1,.2);color:var(--green)}
 .ticket-status.lose{background:rgba(255,71,87,.15);color:var(--red)}
 .ticket-nums{display:flex;gap:3px;flex-wrap:wrap;justify-content:center;margin:4px 0}
@@ -59,7 +59,7 @@ body{overscroll-behavior:none}
 .count-btn{width:36px;height:36px;border-radius:50%;background:var(--surface-2);border:1px solid var(--border);color:var(--text);font-size:20px;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center}
 .count-btn:active{transform:scale(.88)}
 .count-val{font-size:24px;font-weight:900;font-family:'Courier New',monospace;color:var(--gold);min-width:40px;text-align:center}
-.total-box{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:rgba(0,255,136,.08);border-radius:8px;border:1px solid rgba(0,255,136,.2)}
+.total-box{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:rgba(0,231,1,.08);border-radius:8px;border:1px solid rgba(0,231,1,.2)}
 .total-label{font-size:12px;font-weight:700;color:var(--text)}
 .total-val{font-size:18px;font-weight:900;color:var(--gold);font-family:'Courier New',monospace}
 .buy-btn{width:100%;padding:14px;border-radius:12px;font-size:16px;font-weight:900;border:none;cursor:pointer;background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;transition:all .15s}

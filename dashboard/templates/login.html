@@ -11,15 +11,15 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 :root{
-  --bg:#030a06;
-  --bg2:#071210;
-  --card:rgba(6,20,12,0.85);
-  --green:#00ff88;
-  --green2:#00cc6a;
-  --green-dim:rgba(0,255,136,0.08);
-  --border:rgba(0,255,136,0.18);
-  --text:#e8f5e9;
-  --muted:#4a7a5a;
+  --bg:#0b0e11;
+  --bg2:#10141a;
+  --card:rgba(20,25,32,0.85);
+  --green:#00e701;
+  --green2:#0d7a2f;
+  --green-dim:rgba(0,231,1,0.08);
+  --border:rgba(0,231,1,0.18);
+  --text:#eef2f6;
+  --muted:#8794a3;
   --red:#ff4d6d;
 }
 body{
@@ -39,16 +39,16 @@ body{
 .bg-scene{
   position:fixed;inset:0;z-index:0;
   background:
-    radial-gradient(ellipse 70% 50% at 50% 0%, rgba(0,255,136,0.13) 0%, transparent 60%),
-    radial-gradient(ellipse 40% 40% at 80% 80%, rgba(0,200,100,0.07) 0%, transparent 50%),
-    radial-gradient(ellipse 50% 60% at 20% 50%, rgba(0,150,80,0.06) 0%, transparent 50%),
-    #030a06;
+    radial-gradient(ellipse 70% 50% at 50% 0%, rgba(0,231,1,0.13) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 40% at 80% 80%, rgba(255,215,0,0.05) 0%, transparent 50%),
+    radial-gradient(ellipse 50% 60% at 20% 50%, rgba(0,231,1,0.04) 0%, transparent 50%),
+    #0b0e11;
 }
 .grid-3d{
   position:absolute;inset:0;
   background-image:
-    linear-gradient(rgba(0,255,136,0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0,255,136,0.06) 1px, transparent 1px);
+    linear-gradient(rgba(0,231,1,0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,231,1,0.06) 1px, transparent 1px);
   background-size:40px 40px;
   transform:perspective(600px) rotateX(55deg) scale(2.2);
   transform-origin:50% 0;
@@ -64,9 +64,9 @@ body{
   position:absolute;border-radius:50%;filter:blur(80px);pointer-events:none;
   animation:orbFloat 8s ease-in-out infinite;
 }
-.orb1{width:400px;height:400px;background:rgba(0,255,136,0.12);top:-100px;right:-100px;animation-delay:0s}
-.orb2{width:300px;height:300px;background:rgba(0,200,80,0.08);bottom:-50px;left:-80px;animation-delay:-4s}
-.orb3{width:200px;height:200px;background:rgba(0,255,136,0.1);top:40%;left:50%;transform:translateX(-50%);animation-delay:-2s}
+.orb1{width:400px;height:400px;background:rgba(0,231,1,0.12);top:-100px;right:-100px;animation-delay:0s}
+.orb2{width:300px;height:300px;background:rgba(255,215,0,0.06);bottom:-50px;left:-80px;animation-delay:-4s}
+.orb3{width:200px;height:200px;background:rgba(0,231,1,0.1);top:40%;left:50%;transform:translateX(-50%);animation-delay:-2s}
 @keyframes orbFloat{
   0%,100%{transform:translate(0,0) scale(1)}
   50%{transform:translate(20px,-20px) scale(1.05)}
@@ -97,9 +97,9 @@ body{
   backdrop-filter:blur(24px);
   -webkit-backdrop-filter:blur(24px);
   box-shadow:
-    0 0 60px rgba(0,255,136,0.08),
+    0 0 60px rgba(0,231,1,0.08),
     0 30px 80px rgba(0,0,0,0.6),
-    inset 0 1px 0 rgba(0,255,136,0.15);
+    inset 0 1px 0 rgba(0,231,1,0.15);
   animation:cardIn 0.6s ease-out;
 }
 @keyframes cardIn{
@@ -112,14 +112,14 @@ body{
 .logo-img{
   width:90px;height:90px;border-radius:50%;
   object-fit:cover;
-  border:2px solid rgba(0,255,136,0.3);
-  box-shadow:0 0 30px rgba(0,255,136,0.3),0 0 60px rgba(0,255,136,0.15);
+  border:2px solid rgba(0,231,1,0.3);
+  box-shadow:0 0 30px rgba(0,231,1,0.3),0 0 60px rgba(0,231,1,0.15);
   margin-bottom:12px;
   animation:logoPulse 3s ease-in-out infinite;
 }
 @keyframes logoPulse{
-  0%,100%{box-shadow:0 0 30px rgba(0,255,136,0.3),0 0 60px rgba(0,255,136,0.15)}
-  50%{box-shadow:0 0 40px rgba(0,255,136,0.5),0 0 80px rgba(0,255,136,0.25)}
+  0%,100%{box-shadow:0 0 30px rgba(0,231,1,0.3),0 0 60px rgba(0,231,1,0.15)}
+  50%{box-shadow:0 0 40px rgba(0,231,1,0.5),0 0 80px rgba(0,231,1,0.25)}
 }
 .logo-name{
   font-size:28px;font-weight:900;letter-spacing:3px;
@@ -160,7 +160,7 @@ body{
   outline:none;transition:all 0.2s;
 }
 .form-input::placeholder{color:var(--muted);font-size:12px}
-.form-input:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(0,255,136,0.08)}
+.form-input:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(0,231,1,0.08)}
 .form-input:focus + .form-icon{color:var(--green)}
 
 /* Buttons */
@@ -169,10 +169,10 @@ body{
   font-size:15px;font-weight:800;font-family:'Cairo',sans-serif;
   cursor:pointer;transition:all 0.2s;display:flex;align-items:center;justify-content:center;gap:8px;
   background:linear-gradient(135deg,var(--green),var(--green2));
-  color:#030a06;margin-top:4px;
-  box-shadow:0 4px 24px rgba(0,255,136,0.25);
+  color:#0b0e11;margin-top:4px;
+  box-shadow:0 4px 24px rgba(0,231,1,0.25);
 }
-.btn-submit:hover{transform:translateY(-1px);box-shadow:0 6px 32px rgba(0,255,136,0.35)}
+.btn-submit:hover{transform:translateY(-1px);box-shadow:0 6px 32px rgba(0,231,1,0.35)}
 .btn-submit:active{transform:scale(0.97)}
 .btn-tg{
   width:100%;padding:13px;border-radius:12px;border:1px solid rgba(41,182,246,0.4);
@@ -189,7 +189,7 @@ body{
 @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 .otp-info{
   text-align:center;padding:14px;border-radius:12px;
-  background:rgba(0,255,136,0.05);border:1px solid rgba(0,255,136,0.15);
+  background:rgba(0,231,1,0.05);border:1px solid rgba(0,231,1,0.15);
   margin-bottom:16px;font-size:12px;color:var(--muted);line-height:1.7;
 }
 .otp-info strong{color:var(--green)}
@@ -206,7 +206,7 @@ body{
 }
 .alert.show{display:flex}
 .alert-error{background:rgba(255,77,109,0.12);border:1px solid rgba(255,77,109,0.3);color:#ff7090}
-.alert-success{background:rgba(0,255,136,0.08);border:1px solid rgba(0,255,136,0.25);color:var(--green)}
+.alert-success{background:rgba(0,231,1,0.08);border:1px solid rgba(0,231,1,0.25);color:var(--green)}
 
 /* Spinner */
 .spinner-sm{
@@ -244,7 +244,7 @@ body{
     <!-- Logo -->
     <div class="logo-section">
       <img src="/static/icons/logo-full.png" class="logo-img" alt="VEX" onerror="this.style.display='none';document.getElementById('logoFallback').style.display='flex'">
-      <div id="logoFallback" style="display:none;width:90px;height:90px;border-radius:50%;background:linear-gradient(135deg,#00ff88,#006644);align-items:center;justify-content:center;font-size:40px;font-weight:900;color:#030a06;margin:0 auto 12px;border:2px solid rgba(0,255,136,0.3);box-shadow:0 0 30px rgba(0,255,136,0.3)">V</div>
+      <div id="logoFallback" style="display:none;width:90px;height:90px;border-radius:50%;background:linear-gradient(135deg,#00e701,#0d7a2f);align-items:center;justify-content:center;font-size:40px;font-weight:900;color:#0b0e11;margin:0 auto 12px;border:2px solid rgba(0,231,1,0.3);box-shadow:0 0 30px rgba(0,231,1,0.3)">V</div>
       <div class="logo-name">VEX</div>
       <div class="logo-sub">GAMES PLATFORM</div>
     </div>

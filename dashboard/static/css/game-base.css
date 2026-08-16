@@ -170,18 +170,18 @@ body::after {
 
 /* Streak badge */
 .streak-badge {
-  background: rgba(0,255,136,0.15);
+  background: rgba(0,231,1,0.15);
   color: var(--gold);
   font-size: 10px;
   padding: 3px 10px;
   border-radius: 12px;
   font-weight: 800;
-  border: 1px solid rgba(0,255,136,0.3);
+  border: 1px solid rgba(0,231,1,0.3);
   animation: streakPulse 2s infinite;
 }
 @keyframes streakPulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(0,255,136,0.2); }
-  50% { box-shadow: 0 0 0 4px rgba(0,255,136,0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(0,231,1,0.2); }
+  50% { box-shadow: 0 0 0 4px rgba(0,231,1,0); }
 }
 
 /* Sound toggle */
@@ -250,9 +250,9 @@ body::after {
 .hist-win { background: rgba(0,231,1,0.12); color: var(--green); }
 .hist-lose { background: rgba(255,71,87,0.1); color: var(--red); opacity: 0.7; }
 .hist-big {
-  background: rgba(0,255,136,0.15);
+  background: rgba(0,231,1,0.15);
   color: var(--gold);
-  border: 1px solid rgba(0,255,136,0.3);
+  border: 1px solid rgba(0,231,1,0.3);
   animation: histBig 0.5s;
 }
 @keyframes histBig {
@@ -291,7 +291,7 @@ body::after {
 }
 .bet-input:focus {
   border-color: var(--gold);
-  box-shadow: 0 0 0 3px rgba(0,255,136,0.1);
+  box-shadow: 0 0 0 3px rgba(0,231,1,0.1);
 }
 .bet-cur {
   position: absolute;
@@ -429,7 +429,7 @@ body::after {
   flex: 1;
   position: relative;
   overflow: hidden;
-  background: radial-gradient(ellipse at 50% 100%, #06120b 0%, var(--bg) 70%);
+  background: radial-gradient(ellipse at 50% 100%, #10141a 0%, var(--bg) 70%);
 }
 
 /* Stars/decoration */
@@ -482,7 +482,7 @@ body::after {
 }
 .mult-val.cashed {
   color: var(--gold);
-  text-shadow: 0 0 40px rgba(0,255,136,0.5);
+  text-shadow: 0 0 40px rgba(0,231,1,0.5);
 }
 @keyframes shake {
   0%, 100% { transform: translateX(0); }
@@ -565,7 +565,7 @@ body::after {
 }
 .lp-row.win { background: rgba(0,231,1,0.08); }
 .lp-row.lose { background: rgba(255,71,87,0.06); }
-.lp-row.me { border: 1px solid rgba(0,255,136,0.2); }
+.lp-row.me { border: 1px solid rgba(0,231,1,0.2); }
 .lp-user { display: flex; align-items: center; gap: 4px; }
 .lp-avatar {
   width: 16px;
@@ -712,7 +712,7 @@ body::after {
 }
 .modal-input:focus {
   border-color: var(--gold);
-  box-shadow: 0 0 0 3px rgba(0,255,136,0.1);
+  box-shadow: 0 0 0 3px rgba(0,231,1,0.1);
 }
 
 /* Modal buttons */

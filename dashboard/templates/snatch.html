@@ -4,25 +4,25 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
 <title>اخطف الهدية — VEX</title>
-<link rel="stylesheet" href="/static/css/game-base.css?v=20260817">
+<link rel="stylesheet" href="/static/css/game-base.css?v=20260818">
 <style>
 *{box-sizing:border-box}
 .game-area{position:relative;overflow:hidden;touch-action:none;flex:1;display:flex;flex-direction:column}
 #gameCanvas{position:absolute;inset:0;width:100%;height:100%;z-index:1}
 .hud{position:absolute;top:0;left:0;right:0;z-index:10;display:flex;justify-content:space-between;align-items:center;padding:8px 12px;pointer-events:none}
-.hud-score{font-size:22px;font-weight:900;font-family:'Courier New',monospace;color:var(--gold);text-shadow:0 0 10px rgba(0,255,136,.5)}
+.hud-score{font-size:22px;font-weight:900;font-family:'Courier New',monospace;color:var(--gold);text-shadow:0 0 10px rgba(255,215,0,.5)}
 .hud-timer{font-size:18px;font-weight:900;font-family:'Courier New',monospace;color:var(--text);background:var(--surface);padding:4px 12px;border-radius:12px;border:1px solid var(--border)}
 .hud-lives{font-size:18px;letter-spacing:2px}
 .overlay{position:absolute;inset:0;z-index:20;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:rgba(10,14,23,.85);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
 .overlay-title{font-size:28px;font-weight:900;color:var(--text);text-align:center}
 .overlay-sub{font-size:14px;color:var(--text-dim);text-align:center}
-.overlay-score{font-size:48px;font-weight:900;font-family:'Courier New',monospace;color:var(--gold);text-shadow:0 0 20px rgba(0,255,136,.4)}
+.overlay-score{font-size:48px;font-weight:900;font-family:'Courier New',monospace;color:var(--gold);text-shadow:0 0 20px rgba(255,215,0,.4)}
 .overlay-payout{font-size:20px;color:var(--green);font-weight:700}
 .bet-row-ov{display:flex;align-items:center;gap:6px}
 .bet-inp-ov{background:var(--surface-2);border:1px solid var(--border);color:var(--text);padding:10px 12px;border-radius:var(--radius-sm);font-size:16px;font-weight:700;text-align:center;font-family:'Courier New',monospace;width:100px;-moz-appearance:textfield}
 .bet-inp-ov::-webkit-inner-spin-button,.bet-inp-ov::-webkit-outer-spin-button{display:none}
 .ctrl-btn-ov{background:var(--surface-2);border:1px solid var(--border);color:var(--text-dim);padding:10px 10px;border-radius:var(--radius-sm);font-size:11px;font-weight:700;cursor:pointer}
-.start-btn{padding:16px 40px;border-radius:var(--radius);font-size:18px;font-weight:900;border:none;cursor:pointer;background:linear-gradient(135deg,#00ff88,#f59e0b);color:#000;box-shadow:0 4px 20px rgba(0,255,136,.4)}
+.start-btn{padding:16px 40px;border-radius:var(--radius);font-size:18px;font-weight:900;border:none;cursor:pointer;background:linear-gradient(135deg,#00e701,#f59e0b);color:#000;box-shadow:0 4px 20px rgba(0,231,1,.4)}
 .start-btn:active{transform:scale(.97)}
 .result-btn{padding:14px 28px;border-radius:var(--radius);font-size:16px;font-weight:900;border:none;cursor:pointer;background:var(--surface-2);color:var(--text);border:1px solid var(--border)}
 </style>
@@ -257,7 +257,7 @@ function gameLoop() {
   ctx.clearRect(0, 0, W, H);
   // Draw gradient bg
   var bg = ctx.createLinearGradient(0,0,0,H);
-  bg.addColorStop(0,'#030a06'); bg.addColorStop(1,'#06120b');
+  bg.addColorStop(0,'#0b0e11'); bg.addColorStop(1,'#10141a');
   ctx.fillStyle = bg; ctx.fillRect(0,0,W,H);
 
   // Update & draw gifts
@@ -281,12 +281,12 @@ function gameLoop() {
     ctx.font = g.size + 'px serif';
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     // Glow
-    ctx.shadowColor = '#00ff88'; ctx.shadowBlur = g.value >= 5 ? 20 : 10;
+    ctx.shadowColor = '#00e701'; ctx.shadowBlur = g.value >= 5 ? 20 : 10;
     ctx.fillText(g.emoji, g.x, g.y);
     ctx.shadowBlur = 0; ctx.restore();
     // Value badge
     if (!g.caught) {
-      ctx.fillStyle = '#00ff88'; ctx.font = 'bold 10px Courier New';
+      ctx.fillStyle = '#00e701'; ctx.font = 'bold 10px Courier New';
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText('+' + g.value, g.x, g.y + g.size * 0.6);
     }
@@ -325,7 +325,7 @@ function catchGift(x, y) {
           vx: Math.cos(ang) * (2 + Math.random() * 2),
           vy: Math.sin(ang) * (2 + Math.random() * 2),
           r: 3 + Math.random() * 3,
-          color: ['#00ff88','#00e701','#ff4757','#3b82f6'][Math.floor(Math.random()*4)],
+          color: ['#00e701','#00e701','#ff4757','#3b82f6'][Math.floor(Math.random()*4)],
           alpha: 1
         });
       }
@@ -338,7 +338,7 @@ function catchGift(x, y) {
 
 function showScorePopup(x, y, text) {
   var el = document.createElement('div');
-  el.style.cssText = 'position:absolute;left:' + (x-20) + 'px;top:' + (y-20) + 'px;z-index:15;font-size:16px;font-weight:900;color:#00ff88;font-family:Courier New,monospace;pointer-events:none;animation:scorePopup .8s ease-out forwards';
+  el.style.cssText = 'position:absolute;left:' + (x-20) + 'px;top:' + (y-20) + 'px;z-index:15;font-size:16px;font-weight:900;color:#00e701;font-family:Courier New,monospace;pointer-events:none;animation:scorePopup .8s ease-out forwards';
   el.textContent = text;
   document.getElementById('gameArea').appendChild(el);
   setTimeout(function() { if (el.parentNode) el.remove(); }, 800);

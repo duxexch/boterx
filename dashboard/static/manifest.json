@@ -5,8 +5,8 @@
   "start_url": "/webapp/games",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#030a06",
-  "theme_color": "#00ff88",
+  "background_color": "#0b0e11",
+  "theme_color": "#00e701",
   "lang": "ar",
   "dir": "rtl",
   "categories": [

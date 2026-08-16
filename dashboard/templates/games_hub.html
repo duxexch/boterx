@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=5.0,user-scalable=yes">
-<meta name="theme-color" content="#030a06">
+<meta name="theme-color" content="#0b0e11">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="VEX Games">
@@ -11,7 +11,7 @@
 <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
 <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/icon-32.png">
 <title>VEX Games</title>
-<link rel="stylesheet" href="/static/css/game-base.css?v=20260817">
+<link rel="stylesheet" href="/static/css/game-base.css?v=20260818">
 <style>
 /* Desktop/tablet responsive overrides */
 body { overflow: auto !important; }
@@ -24,8 +24,8 @@ body { overflow: auto !important; }
 .game-card:active{transform:scale(0.95);border-color:var(--gold)}
 .game-card:hover{border-color:var(--gold)}
 .game-card .hot-badge{position:absolute;top:6px;right:6px;background:var(--red);color:#fff;font-size:8px;padding:2px 6px;border-radius:6px;font-weight:700;animation:pulse 0.8s infinite}
-.game-icon{font-size:38px;margin-bottom:6px;filter:drop-shadow(0 2px 8px rgba(0,255,136,.3))}
-.game-card::after{content:'';position:absolute;top:0;left:-80%;width:50%;height:100%;background:linear-gradient(105deg,transparent,rgba(0,255,136,.07),transparent);transform:skewX(-20deg);animation:cardShine 4.5s ease-in-out infinite;pointer-events:none}
+.game-icon{font-size:38px;margin-bottom:6px;filter:drop-shadow(0 2px 8px rgba(0,231,1,.3))}
+.game-card::after{content:'';position:absolute;top:0;left:-80%;width:50%;height:100%;background:linear-gradient(105deg,transparent,rgba(0,231,1,.07),transparent);transform:skewX(-20deg);animation:cardShine 4.5s ease-in-out infinite;pointer-events:none}
 .game-card:nth-child(2n)::after{animation-delay:.9s}.game-card:nth-child(3n)::after{animation-delay:1.8s}
 @keyframes cardShine{0%{left:-80%}45%,100%{left:130%}}
 .game-card{animation:cardIn .45s cubic-bezier(.17,.67,.3,1.2) backwards}
@@ -92,13 +92,13 @@ body { overflow: auto !important; }
         <span id="bal" style="font-weight:800;font-size:16px">0</span>
         <span id="cur" style="font-size:11px;color:var(--muted);cursor:pointer" onclick="showCurrencyPicker()">EGP</span>
         <span id="frozenBadge" style="display:none;align-items:center;gap:3px;background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.25);border-radius:6px;padding:2px 7px;font-size:10px;cursor:pointer;color:#60a5fa" onclick="openWalletPage()">🔒 <span id="frozenAmt"></span></span>
-        <span id="pendingBadge" style="display:none;align-items:center;gap:3px;background:rgba(0,255,136,.1);border:1px solid rgba(0,255,136,.2);border-radius:6px;padding:2px 7px;font-size:10px;color:var(--gold)">⏳ <span id="pendingAmt"></span></span>
+        <span id="pendingBadge" style="display:none;align-items:center;gap:3px;background:rgba(255,215,0,.1);border:1px solid rgba(255,215,0,.2);border-radius:6px;padding:2px 7px;font-size:10px;color:var(--gold)">⏳ <span id="pendingAmt"></span></span>
       </div>
       <div class="topbar-seg" id="stats"></div>
     </div>
     <div class="topbar-btns">
       <button class="hub-btn" id="vexBtn" style="display:none;background:rgba(99,102,241,.15);color:#a5b4fc;border:1px solid rgba(99,102,241,.3)" onclick="openWalletPage()">💎</button>
-      <button class="hub-btn" title="حسابي" style="background:rgba(0,255,136,.12);color:var(--gold);border:1px solid rgba(0,255,136,.25)" onclick="openAccountPage()">👤</button>
+      <button class="hub-btn" title="حسابي" style="background:rgba(255,215,0,.12);color:var(--gold);border:1px solid rgba(255,215,0,.25)" onclick="openAccountPage()">👤</button>
       <button class="hub-btn" title="محفظتي" style="background:rgba(59,130,246,.15);color:#60a5fa;border:1px solid rgba(59,130,246,.3)" onclick="openWalletPage()">💳</button>
       <button class="hub-btn dep" onclick="showDeposit()">💰</button>
       <button class="hub-btn wdr" onclick="showWithdraw()">💸</button>

@@ -17,7 +17,7 @@
     <link rel="manifest" href="/static/manifest.json">
     <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/icon-32.png">
     <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
-    <meta name="theme-color" content="#00ff88">
+    <meta name="theme-color" content="#00e701">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -85,7 +85,7 @@
     <!-- Brand header -->
     <div class="p-5 border-b border-slate-700 flex items-center justify-between flex-shrink-0">
         <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl overflow-hidden ring-1 ring-emerald-500/40" style="box-shadow:0 0 14px rgba(0,255,136,.35)">
+            <div class="w-10 h-10 rounded-xl overflow-hidden ring-1 ring-emerald-500/40" style="box-shadow:0 0 14px rgba(0,231,1,.35)">
                 <img src="/static/icons/logo-full.png" alt="VEX" class="w-full h-full object-cover">
             </div>
             <div>
@@ -604,7 +604,7 @@ function baseApp() {
             const toast = document.createElement('div');
             toast.className = 'fixed top-4 right-4 z-[9999] bg-slate-800 border border-slate-600 rounded-xl p-4 shadow-2xl transition-all duration-300';
             toast.style.cssText = 'min-width:280px;max-width:360px;transform:translateX(0);opacity:1';
-            const color = d.type.includes('approve') ? '#34d399' : d.type.includes('reject') ? '#ef4444' : '#00ff88';
+            const color = d.type.includes('approve') ? '#34d399' : d.type.includes('reject') ? '#ef4444' : '#00e701';
             toast.innerHTML = `
                 <div style="display:flex;align-items:start;gap:8px">
                     <div style="width:8px;height:8px;border-radius:50%;background:${color};margin-top:6px;flex-shrink:0"></div>
