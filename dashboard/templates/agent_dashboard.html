@@ -19,7 +19,7 @@ body{font-family:system-ui,sans-serif;background:#0b0e11;color:#eef2f6;min-heigh
 .kpi{background:linear-gradient(135deg,#141920,#10141a);border:1px solid #262e39;border-radius:14px;padding:14px;text-align:center}
 .kpi-label{font-size:10px;color:#8794a3;margin-bottom:4px}
 .kpi-val{font-size:22px;font-weight:800}
-.kpi-val.green{color:#00e701}.kpi-val.amber{color:#fbbf24}.kpi-val.red{color:#ff4757}.kpi-val.blue{color:#3b82f6}
+.kpi-val.green{color:#00e701}.kpi-val.amber{color:#fbbf24}.kpi-val.red{color:#ff4757}.kpi-val.blue{color:#3b82f6}.kpi-val.cyan{color:#06b6d4}.kpi-val.purple{color:#a78bfa}
 .section{background:linear-gradient(135deg,#141920,#10141a);border:1px solid #262e39;border-radius:14px;padding:16px;margin-bottom:14px}
 .section-title{font-size:14px;font-weight:700;margin-bottom:12px;color:#00e701}
 table{width:100%;border-collapse:collapse;font-size:12px}
@@ -54,9 +54,15 @@ input,select{background:#1a2028;border:1px solid #262e39;border-radius:8px;paddi
   <!-- KPIs -->
   <div class="kpis">
     <div class="kpi"><div class="kpi-label">الرصيد</div><div class="kpi-val green" id="balance">0</div></div>
-    <div class="kpi"><div class="kpi-label">حد التأمين</div><div class="kpi-val amber" id="deposit">0</div></div>
+    <div class="kpi"><div class="kpi-label">🔒 الضمان</div><div class="kpi-val cyan" id="escrow">0</div></div>
     <div class="kpi"><div class="kpi-label">معاملات اليوم</div><div class="kpi-val blue" id="daily">0/0</div></div>
     <div class="kpi"><div class="kpi-label">حالة المرور</div><div class="kpi-val" id="traffic">—</div></div>
+  </div>
+  <!-- Performance -->
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px">
+    <div class="kpi"><div class="kpi-label">📊 الدرجة</div><div class="kpi-val" id="score">50</div></div>
+    <div class="kpi"><div class="kpi-label">التصنيف</div><div class="kpi-val" id="tier">🥉 Bronze</div></div>
+    <div class="kpi"><div class="kpi-label">⚡ سرعة الاستجابة</div><div class="kpi-val" id="speed">—</div></div>
   </div>
 
   <!-- Pending matching requests -->
@@ -119,11 +125,26 @@ input,select{background:#1a2028;border:1px solid #262e39;border-radius:8px;paddi
 function loadSelf(){
   fetch('/api/agent/self').then(r=>r.json()).then(d=>{
     document.getElementById('balance').textContent=parseFloat(d.balance||0).toFixed(0);
+    document.getElementById('escrow').textContent=parseFloat(d.escrow_balance||0).toFixed(0);
     document.getElementById('deposit').textContent=parseFloat(d.security_deposit||0).toFixed(0);
     document.getElementById('daily').textContent=(d.current_daily_count||0)+'/'+(d.max_daily_transactions||0);
     var t=document.getElementById('traffic');
     t.textContent=d.traffic_enabled==='yes'?'▶️ نشط':'⏸️ متوقف';
     t.className='kpi-val '+(d.traffic_enabled==='yes'?'green':'red');
+    // Performance score + tier
+    var score = parseFloat(d.performance_score||50);
+    var scoreEl = document.getElementById('score');
+    scoreEl.textContent = score.toFixed(0);
+    scoreEl.className = 'kpi-val ' + (score >= 80 ? 'purple' : score >= 60 ? 'amber' : score >= 40 ? 'blue' : 'green');
+    var tiers = {platinum:'💎 Platinum',gold:'🥇 Gold',silver:'🥈 Silver',bronze:'🥉 Bronze'};
+    var tierEl = document.getElementById('tier');
+    tierEl.textContent = tiers[d.tier] || tiers.bronze;
+    // Response speed
+    var avgSec = parseFloat(d.avg_response_seconds||0);
+    var speedEl = document.getElementById('speed');
+    speedEl.textContent = avgSec > 0 ? avgSec.toFixed(0) + ' ثانية' : '—';
+    speedEl.className = 'kpi-val ' + (avgSec < 60 ? 'green' : avgSec < 180 ? 'amber' : 'red');
+    // Deposit method
     var box=document.getElementById('depMethodBox'), none=document.getElementById('depNoMethod');
     if(d.deposit_method_name){
       box.style.display='flex';none.style.display='none';
@@ -215,7 +236,10 @@ function depositBalance(){
   });
 }
 loadSelf();loadPending();loadMethods();loadTxns();loadDepHistory();
-setInterval(function(){loadSelf();loadPending()},30000);
+setInterval(function(){loadSelf();loadPending();sendHeartbeat()},30000);
+function sendHeartbeat(){
+  fetch('/api/agent/self/heartbeat',{method:'POST'}).catch(function(){});
+}
 </script>
 </body>
 </html>

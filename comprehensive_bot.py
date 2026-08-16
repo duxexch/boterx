@@ -32,6 +32,13 @@ try:
 except ImportError:
     SVRP_AVAILABLE = False
 
+# Ticket system (replaces complaints CSV)
+try:
+    import ticket_system
+    TICKETS_AVAILABLE = True
+except ImportError:
+    TICKETS_AVAILABLE = False
+
 # استيراد نظام الثيمات
 try:
     from theme_config import THEMES, get_theme, get_theme_list, get_theme_value
@@ -10886,48 +10893,79 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                 self.send_message(message['chat']['id'], self.tr('a0908_فشل_في', 'ar'), self.admin_keyboard())
         
     def save_complaint(self, message, complaint_text):
-            """حفظ شكوى المستخدم"""
+            """حفظ شكوى المستخدم + إنشاء تذكرة"""
             complaint_text = self.sanitize_input(complaint_text)
             user = self.find_user(message['from']['id'])
             if not user:
                 return
+
+            # Rate limit: max 3 complaints per day per user
+            if TICKETS_AVAILABLE:
+                daily = ticket_system.get_user_ticket_count(str(message['from']['id']), 1)
+                if daily >= 3:
+                    self.send_message(message['chat']['id'],
+                        "⚠️ وصلت للحد الأقصى للشكاوى اليوم (3). حاول غداً.",
+                        self.main_keyboard(user.get('language', 'ar')))
+                    if message['from']['id'] in self.user_states:
+                        del self.user_states[message['from']['id']]
+                    return
             
             complaint_id = f"COMP{datetime.now().strftime('%Y%m%d%H%M%S')}"
             
             try:
-                # إنشاء ملف الشكاوى مع الهيكل الصحيح إذا لم يكن موجوداً
+                # Create ticket in SQLite (smart routing)
+                ticket_id = None
+                ticket_msg = None
+                if TICKETS_AVAILABLE:
+                    try:
+                        # Check if this is a match-related complaint
+                        match = self.match_manager.get_match_by_user(message['from']['id'])
+                        match_id = match['id'] if match else ''
+                        res = ticket_system.create_ticket(
+                            str(message['from']['id']),
+                            user['customer_id'],
+                            complaint_text,
+                            category='matching' if match_id else 'general',
+                            priority='normal',
+                            match_id=match_id,
+                        )
+                        if 'id' in res:
+                            ticket_id = res['id']
+                    except Exception:
+                        pass  # Fall back to CSV
+                
+                # Legacy CSV write (kept for backward compat)
                 if not os.path.exists('complaints.csv'):
                     with open('complaints.csv', 'w', newline='', encoding='utf-8-sig') as f:
                         writer = csv.writer(f)
                         writer.writerow(['id', 'customer_id', 'subject', 'message', 'status', 'date', 'admin_response'])
                 
-                # إضافة الشكوى الجديدة
                 with open('complaints.csv', 'a', newline='', encoding='utf-8-sig') as f:
                     writer = csv.writer(f)
                     writer.writerow([complaint_id, user['customer_id'], 'شكوى جديدة', complaint_text, 'pending', 
                                    datetime.now().strftime('%Y-%m-%d %H:%M'), ''])
                 
+                # Confirmation with ticket ID
+                tkt_line = f"\n🎫 رقم التذكرة: {ticket_id}" if ticket_id else ""
                 confirmation = f"""✅ تم إرسال شكواك بنجاح
-    
-    🆔 رقم الشكوى: {complaint_id}
+    🆔 رقم الشكوى: {complaint_id}{tkt_line}
     📝 المحتوى: {complaint_text}
     📅 التاريخ: {datetime.now().strftime('%Y-%m-%d %H:%M')}
-    
-    سيتم الرد عليك في أقرب وقت ممكن."""
+
+سيتم الرد عليك في أقرب وقت ممكن."""
                 
                 self.send_message(message['chat']['id'], confirmation, self.main_keyboard(user.get('language', 'ar')))
                 if message['from']['id'] in self.user_states:
                     del self.user_states[message['from']['id']]
                 
-                # إشعار الأدمن بالشكوى الجديدة
+                # Admin notification
                 admin_msg = f"""📨 شكوى جديدة
-    
-    🆔 {complaint_id}
+    🆔 {complaint_id}{tkt_line}
     👤 {user['name']} ({user['customer_id']})
     📝 الشكوى: {complaint_text}
     📅 {datetime.now().strftime('%Y-%m-%d %H:%M')}"""
                 
-                self.notify_admins(admin_msg, notification_type='new_user')
+                self.notify_admins(admin_msg, notification_type='complaint')
                 
             except Exception as e:
                 logger.error(f"خطأ في حفظ الشكوى: {e}")
