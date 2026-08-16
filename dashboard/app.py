@@ -1216,6 +1216,70 @@ def api_public_recent_wins():
         _RECENT_WINS_CACHE['data'] = wins
         return jsonify({'wins': wins})
 
+# ===== Public API — rounded aggregate stats for the landing counters =====
+_PUBLIC_STATS_CACHE = {'ts': 0.0, 'data': None}
+_PUBLIC_STATS_TTL = 300  # seconds — aggregates change slowly
+_public_stats_lock = threading.Lock()
+
+
+def _round_public_stat(value: int) -> int:
+    """Round down to 2 significant figures.
+
+    Values under 100 pass through (nearly) exactly — these are coarse,
+    non-sensitive aggregates, not user-level data; the rounding only blurs
+    larger totals so precise platform figures aren't published.
+    """
+    v = int(value or 0)
+    if v < 10:
+        return v
+    import math as _m
+    step = 10 ** (int(_m.log10(v)) - 1)
+    return (v // step) * step
+
+
+@app.route('/api/public/stats')
+def api_public_stats():
+    """Public read-only aggregate stats (players, rounds, total paid out).
+
+    No auth required. All figures rounded down to 2 significant digits so no
+    sensitive exact totals leak. Cached in-process for 5 minutes.
+    """
+    with _public_stats_lock:
+        now = time.time()
+        if _PUBLIC_STATS_CACHE['data'] is not None and \
+                now - _PUBLIC_STATS_CACHE['ts'] < _PUBLIC_STATS_TTL:
+            return jsonify(_PUBLIC_STATS_CACHE['data'])
+        try:
+            import sqlite3 as _sq
+            _db_path = os.path.join(BASE_DIR, 'vex_games.db')
+            conn = _sq.connect(_db_path, timeout=5)
+            try:
+                conn.execute('PRAGMA query_only=ON')
+                players = conn.execute(
+                    'SELECT COUNT(*) FROM users').fetchone()[0] or 0
+                rounds = conn.execute(
+                    'SELECT COUNT(*) FROM game_sessions').fetchone()[0] or 0
+                paid = conn.execute(
+                    'SELECT COALESCE(SUM(payout), 0) FROM game_sessions '
+                    'WHERE payout > 0').fetchone()[0] or 0
+            finally:
+                conn.close()
+            data = {
+                'players': _round_public_stat(players),
+                'rounds': _round_public_stat(rounds),
+                'total_paid': _round_public_stat(int(paid)),
+            }
+            _PUBLIC_STATS_CACHE['ts'] = now
+            _PUBLIC_STATS_CACHE['data'] = data
+            return jsonify(data)
+        except Exception as exc:
+            _auth_logger.warning("public stats query failed: %s", exc)
+            # Serve stale cache if we have one; otherwise signal failure so
+            # the landing page falls back to its static showcase numbers.
+            if _PUBLIC_STATS_CACHE['data'] is not None:
+                return jsonify(_PUBLIC_STATS_CACHE['data'])
+            return jsonify({'error': 'unavailable'}), 503
+
 # ===== SEO — robots.txt + sitemap.xml + llms.txt =====
 
 @app.route('/robots.txt')

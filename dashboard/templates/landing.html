@@ -529,7 +529,7 @@
 <!-- STATS -->
 <div class="stats-row reveal-stagger">
   <div class="stat-card"><span class="stat-num" id="statUsers" data-count="5000" data-suffix="+">0</span><div class="stat-label">لاعب مسجل</div></div>
-  <div class="stat-card"><span class="stat-num" data-count="9">0</span><div class="stat-label">ألعاب مختلفة</div></div>
+  <div class="stat-card"><span class="stat-num" id="statRounds" data-count="9">0</span><div class="stat-label" id="statRoundsLabel">ألعاب مختلفة</div></div>
   <div class="stat-card"><span class="stat-num" id="statPaid">∞</span><div class="stat-label">جوائز موزعة</div></div>
   <div class="stat-card"><span class="stat-num">24/7</span><div class="stat-label">متاح دائماً</div></div>
 </div>
@@ -747,7 +747,26 @@ function countUp(el){
   requestAnimationFrame(tick);
 }
 const cntObs=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting){countUp(e.target);cntObs.unobserve(e.target);}})},{threshold:0.5});
-document.querySelectorAll('[data-count]').forEach(el=>cntObs.observe(el));
+function startCounters(){document.querySelectorAll('[data-count]').forEach(el=>cntObs.observe(el));}
+// Real platform stats — fall back to the static showcase numbers on any error
+(function(){
+  var done=false;
+  function go(){if(done)return;done=true;startCounters();}
+  var ctrl=(typeof AbortController!=='undefined')?new AbortController():null;
+  var t=setTimeout(function(){if(ctrl)ctrl.abort();go();},2500);
+  fetch('/api/public/stats',ctrl?{signal:ctrl.signal}:{}).then(function(r){return r.ok?r.json():Promise.reject();}).then(function(d){
+    clearTimeout(t);
+    if(done)return; // deadline already passed — keep static values consistent
+    function valid(v){return typeof v==='number'&&isFinite(v)&&v>=0;}
+    if(d&&valid(d.players)&&valid(d.rounds)&&valid(d.total_paid)){
+      var u=document.getElementById('statUsers');u.dataset.count=d.players;u.dataset.suffix='+';
+      var rEl=document.getElementById('statRounds');rEl.dataset.count=d.rounds;rEl.dataset.suffix='+';
+      var lbl=document.getElementById('statRoundsLabel');if(lbl)lbl.textContent='جولة لعب';
+      var p=document.getElementById('statPaid');p.dataset.count=d.total_paid;p.dataset.suffix='+';p.textContent='0';
+    }
+    go();
+  }).catch(function(){clearTimeout(t);go();});
+})();
 
 // ── Live wins ticker — real anonymized wins from /api/public/recent-wins, demo fallback ──
 (function(){
