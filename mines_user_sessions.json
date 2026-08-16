@@ -1,1 +1,1 @@
-{"flask_mines_cashout": {"game_id": "MNW86118491", "uid": "flask_mines_cashout", "mine_positions": [13, 7, 0], "bet_amount": 100.0, "mine_count": 3, "revealed": [], "multiplier": 1.0, "game_over": true, "paid_out": true, "created_at": "2026-08-07T16:01:31.124777", "cashout_result": {"success": true, "payout": 100.0, "multiplier": 1.0, "mine_cells": [13, 7, 0], "balance_after": 500.0}}}
+{}
