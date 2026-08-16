@@ -158,6 +158,25 @@
                     <p class="text-xs text-slate-500 mt-1">PNG / JPG / WEBP / GIF حتى 2MB — الصورة تتحول لأيقونة دائرية تلقائياً</p>
                 </div>
                 <div>
+                    <label class="block text-sm text-slate-400 mb-1">صورة البوت (تظهر في تيليغرام عند اختيار الشركة)</label>
+                    <div class="flex items-center gap-3">
+                        <div class="w-12 h-12 rounded-xl bg-slate-700 border border-slate-600 flex items-center justify-center overflow-hidden shrink-0">
+                            <img x-show="!!form.bot_icon" :src="form.bot_icon || null" class="w-full h-full object-cover" alt="">
+                            <span x-show="!form.bot_icon" class="text-lg text-slate-500"><i class="fab fa-telegram"></i></span>
+                        </div>
+                        <div class="flex-1 space-y-2">
+                            <label class="flex items-center justify-center gap-2 w-full bg-slate-700 hover:bg-slate-600 border border-dashed border-slate-500 rounded-lg px-4 py-2 text-sm cursor-pointer transition"
+                                   :class="uploadingBotIcon && 'opacity-50 pointer-events-none'">
+                                <i class="fas" :class="uploadingBotIcon ? 'fa-spinner fa-spin' : 'fa-cloud-upload-alt'"></i>
+                                <span x-text="uploadingBotIcon ? 'جارٍ الرفع...' : 'رفع صورة خاصة بالبوت'"></span>
+                                <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" class="hidden" @change="uploadBotIcon($event)">
+                            </label>
+                            <button type="button" x-show="!!form.bot_icon" @click="form.bot_icon = ''" class="text-xs text-red-400 hover:text-red-300">إزالة صورة البوت</button>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-1">اختيارية — تُعرض داخل البوت فقط حسب إعدادات "صور البوت" في صفحة الإعدادات، ولا تؤثر على الموقع</p>
+                </div>
+                <div>
                     <label class="block text-sm text-slate-400 mb-1">العنوان</label>
                     <input x-model="form.address" type="text" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="عنوان المحفظة">
                 </div>
@@ -220,6 +239,7 @@ function companiesPage() {
         deleteTarget: null,
         loading: false,
         uploadingIcon: false,
+        uploadingBotIcon: false,
 
         isImgIcon(icon) {
             return typeof icon === 'string' && (icon.startsWith('/static/') || icon.startsWith('http'));
@@ -244,7 +264,26 @@ function companiesPage() {
             this.uploadingIcon = false;
             e.target.value = '';
         },
-        form: { name: '', type: 'both', details: '', icon: '🏢', address: '', affiliate_link: '', is_active: true },
+        async uploadBotIcon(e) {
+            const file = e.target.files && e.target.files[0];
+            if (!file) return;
+            if (file.size > 2 * 1024 * 1024) { toast('حجم الصورة أكبر من 2MB', 'error'); e.target.value = ''; return; }
+            this.uploadingBotIcon = true;
+            try {
+                const fd = new FormData();
+                fd.append('file', file);
+                const res = await fetch('/api/upload-icon', { method: 'POST', body: fd });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || 'فشل الرفع');
+                this.form.bot_icon = data.absolute_bot_url || data.bot_url || data.url;
+                toast('تم رفع صورة البوت بنجاح', 'success');
+            } catch (err) {
+                toast(err.message || 'فشل رفع صورة البوت', 'error');
+            }
+            this.uploadingBotIcon = false;
+            e.target.value = '';
+        },
+        form: { name: '', type: 'both', details: '', icon: '🏢', address: '', affiliate_link: '', bot_icon: '', is_active: true },
 
         async init() {
             await this.loadCompanies();
@@ -269,7 +308,7 @@ function companiesPage() {
 
         openAddModal() {
             this.editingId = null;
-            this.form = { name: '', type: 'both', details: '', icon: '🏢', address: '', affiliate_link: '', is_active: true };
+            this.form = { name: '', type: 'both', details: '', icon: '🏢', address: '', affiliate_link: '', bot_icon: '', is_active: true };
             this.showModal = true;
         },
 
@@ -282,6 +321,7 @@ function companiesPage() {
                 icon: company.icon || '🏢',
                 address: company.address || '',
                 affiliate_link: company.affiliate_link || '',
+                bot_icon: company.bot_icon || '',
                 is_active: company.is_active,
             };
             this.showModal = true;

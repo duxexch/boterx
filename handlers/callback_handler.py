@@ -1612,7 +1612,7 @@ class CallbackHandlerMixin:
                         mid = m.get('id', '')
                         name = m.get('method_name', '')
                         acct = m.get('account_number', '')
-                        icon = m.get('icon', '💳')
+                        icon = self.display_icon(m.get('icon'), '💳')
                         text += f"  {icon} {name}: <code>{acct}</code>\n"
                         inline_btns.append([{'text': f"{icon} {name}", 'callback_data': f'gamewal_method_{mid}'}])
 
@@ -1623,7 +1623,7 @@ class CallbackHandlerMixin:
                         mid = m.get('id', '')
                         name = m.get('method_name', '')
                         acct = m.get('account_data', '')
-                        icon = m.get('icon', '💳') or '💳'
+                        icon = self.display_icon(m.get('icon'), '💳')
                         text += f"  {icon} {name}: <code>{acct}</code> 👈 اضغط للنسخ\n"
                         inline_btns.append([{'text': f"{icon} {name}", 'callback_data': f'gamewal_sys_{mid}'}])
 
@@ -3198,7 +3198,7 @@ class CallbackHandlerMixin:
                     self.edit_message(chat_id, message.get('message_id'), self.tr('a0548_الشركة_غير', lang))
                     return
 
-                icon = company.get('icon', '🏢') or '🏢'
+                icon = self.display_icon(company.get('icon'), '🏢')
                 self.edit_message(chat_id, message.get('message_id'),
                     f"{icon} <b>{company['name']}</b>\n📋 {company.get('details', '')}\n\n💳 اختر وسيلة الدفع:")
 
@@ -3210,13 +3210,13 @@ class CallbackHandlerMixin:
 
                 inline_btns = []
                 for m in methods:
-                    m_icon = m.get('icon', '💳') or '💳'
+                    m_icon = self.display_icon(m.get('icon'), '💳')
                     btn = f"{m_icon} {m['method_name']}"
                     if m.get('method_type'):
                         btn += f" — {m['method_type']}"
                     inline_btns.append([{'text': btn, 'callback_data': f'dep_method_{m["id"]}_{company_id}_{company["name"]}'}])
                 inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'dep_back_companies'}])
-                self.send_inline_message(chat_id, self.tr('a0565_وسائل_الدفع', lang), inline_btns)
+                self.send_entity_card(chat_id, company, self.tr('a0565_وسائل_الدفع', lang), inline_buttons=inline_btns)
                 return
 
             # الرجوع لقائمة الشركات (إيداع)
@@ -3227,7 +3227,7 @@ class CallbackHandlerMixin:
                 companies = self.get_companies('deposit')
                 inline_btns = []
                 for c in companies:
-                    icon = c.get('icon', '🏢') or '🏢'
+                    icon = self.display_icon(c.get('icon'), '🏢')
                     inline_btns.append([{'text': f"{icon} {c['name']}", 'callback_data': f'dep_company_{c["id"]}'}])
                 inline_btns.append([{'text': self.tr('main_menu', lang), 'callback_data': 'dep_cancel'}])
                 self.send_inline_message(chat_id, self.tr('a0566_طلب_إيداع', lang), inline_btns)
@@ -3247,7 +3247,7 @@ class CallbackHandlerMixin:
                 method_type = method.get('method_type', '') if method else ''
                 account_data = method.get('account_data', '') if method else ''
                 additional_info = method.get('additional_info', '') if method else ''
-                method_icon = method.get('icon', '💳') if method else '💳'
+                method_icon = self.display_icon(method.get('icon') if method else '', '💳')
 
                 # عرض بيانات وسيلة الدفع للعميل — قابلة للنسخ
                 method_text = (
@@ -3276,7 +3276,11 @@ class CallbackHandlerMixin:
                     self.start_custom_flow(fake_msg, method_id, 'deposit', company_id, company_name)
                     return
 
-                self.edit_message(chat_id, message.get('message_id'), method_text)
+                if method and (self.get_setting('bot_icon_mode') or 'off').strip() == 'photo' and (method.get('bot_icon') or '').strip():
+                    self.edit_message(chat_id, message.get('message_id'), f"{method_icon} <b>{method_name}</b>")
+                    self.send_entity_card(chat_id, method, method_text)
+                else:
+                    self.edit_message(chat_id, message.get('message_id'), method_text)
 
                 user = self.find_user(user_id)
                 lang = user.get('language', 'ar') if user else 'ar'
@@ -3297,7 +3301,7 @@ class CallbackHandlerMixin:
                     self.edit_message(chat_id, message.get('message_id'), self.tr('a0548_الشركة_غير', lang))
                     return
 
-                icon = company.get('icon', '🏢') or '🏢'
+                icon = self.display_icon(company.get('icon'), '🏢')
                 address = company.get('address', '')
 
                 text = f"{icon} <b>{company['name']}</b>\n📋 {company.get('details', '')}\n"
@@ -3305,7 +3309,11 @@ class CallbackHandlerMixin:
                     text += self.tr('a0575_عنوان_السحب', lang, address=address)
                 text += self.tr('a0576_اضغط_للنسخ', lang)
 
-                self.edit_message(chat_id, message.get('message_id'), text)
+                if (self.get_setting('bot_icon_mode') or 'off').strip() == 'photo' and (company.get('bot_icon') or '').strip():
+                    self.edit_message(chat_id, message.get('message_id'), f"{icon} <b>{company['name']}</b>")
+                    self.send_entity_card(chat_id, company, text)
+                else:
+                    self.edit_message(chat_id, message.get('message_id'), text)
 
                 user = self.find_user(user_id)
                 lang = user.get('language', 'ar') if user else 'ar'
@@ -3322,7 +3330,7 @@ class CallbackHandlerMixin:
                     # عرض وسائل الدفع للاختيار
                     inline_btns = []
                     for m in methods:
-                        icon = m.get('icon', '💳') or '💳'
+                        icon = self.display_icon(m.get('icon'), '💳')
                         inline_btns.append([{'text': f"{icon} {m['method_name']}", 'callback_data': f'wd_method_{m["id"]}_{company_id}_{company["name"]}'}])
                     inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'wd_cancel'}])
                     self.send_inline_message(chat_id, self.tr('a0578_اختر_وسيلة', lang), inline_btns)
@@ -3787,7 +3795,7 @@ class CallbackHandlerMixin:
 
                 inline_btns = []
                 for c in companies:
-                    icon = c.get('icon', '🏢') or '🏢'
+                    icon = self.display_icon(c.get('icon'), '🏢')
                     inline_btns.append([{'text': f"{icon} {c['name']}", 'callback_data': f'match_company_{c["id"]}_{match_type}'}])
                 inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'match_agree'}])
 
@@ -3811,7 +3819,7 @@ class CallbackHandlerMixin:
                     self.send_message(chat_id, self.tr('a0548_الشركة_غير', lang))
                     return
 
-                icon = company.get('icon', '🏢') or '🏢'
+                icon = self.display_icon(company.get('icon'), '🏢')
                 self.edit_message(chat_id, message.get('message_id'),
                     f"{icon} <b>{company['name']}</b>\n📋 {company.get('details', '')}\n\n"
                     "💳 اختر وسيلة الدفع:")
@@ -3823,7 +3831,7 @@ class CallbackHandlerMixin:
 
                 inline_btns = []
                 for m in methods:
-                    m_icon = m.get('icon', '💳') or '💳'
+                    m_icon = self.display_icon(m.get('icon'), '💳')
                     inline_btns.append([{'text': f"{m_icon} {m['method_name']}", 'callback_data': f'match_method_{m["id"]}_{company_id}_{company["name"]}_{match_type}'}])
                 inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'match_agree'}])
 
@@ -4031,7 +4039,7 @@ class CallbackHandlerMixin:
                     dep_user = self.find_user(dep_id)
                     dep_lang = dep_user.get('language', 'ar') if dep_user else 'ar'
                     company = self.get_company_by_id(match['company_id'])
-                    company_icon = company.get('icon', '🏢') if company else '🏢'
+                    company_icon = self.display_icon(company.get('icon') if company else '', '🏢')
 
                     pay_msg = (
                         f"✅ <b>تم تأكيد الكود!</b>\n\n"

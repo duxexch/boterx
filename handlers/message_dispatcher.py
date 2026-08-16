@@ -1178,7 +1178,7 @@ class MessageDispatcherMixin:
                 company_name = company['name'] if company else self.tr('a0122_غير_محدد', 'ar')
                 status = method.get('status', 'active')
                 status_icon = '✅' if status == 'active' else '⏸️'
-                icon = method.get('icon', '💳') or '💳'
+                icon = self.display_icon(method.get('icon'), '💳')
                 detail_text = (
                     f"💳 <b>{method['method_name']}</b>\n\n"
                     f"━━━━━━━━━━━━━━━━━━\n"
@@ -1223,7 +1223,7 @@ class MessageDispatcherMixin:
                 company_name = company['name'] if company else self.tr('a0122_غير_محدد', 'ar')
                 status = method.get('status', 'active')
                 status_icon = '✅' if status == 'active' else '⏸️'
-                icon = method.get('icon', '💳') or '💳'
+                icon = self.display_icon(method.get('icon'), '💳')
                 detail_text = (
                     f"💳 <b>{method['method_name']}</b>\n\n"
                     f"━━━━━━━━━━━━━━━━━━\n"
@@ -1432,7 +1432,7 @@ class MessageDispatcherMixin:
                     return
                 inline_btns = []
                 for m in unique_methods:
-                    icon = m.get('icon', '💳') or '💳'
+                    icon = self.display_icon(m.get('icon'), '💳')
                     inline_btns.append([{'text': f"{icon} {m['method_name']}", 'callback_data': f'lot_method_{current_state["round_id"]}_{m["id"]}'}])
                 inline_btns.append([{'text': '🔙 إلغاء', 'callback_data': 'lot_back_main'}])
                 self.send_inline_message(chat_id,
@@ -2331,7 +2331,7 @@ class MessageDispatcherMixin:
                     if methods:
                         methods_text += self.tr('a0244_وسائل_الدفع', 'ar')
                         for m in methods:
-                            icon = m.get('icon', '💳') or '💳'
+                            icon = self.display_icon(m.get('icon'), '💳')
                             methods_text += f"  {icon} {m['method_name']}\n"
                     else:
                         methods_text += self.tr('a0245_لا_توجد', 'ar')

@@ -31,6 +31,38 @@
     </div>
 
     <!-- Tab 1: System Settings -->
+    <div x-show="activeTab === 'system'" class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden mb-6">
+        <div class="p-5 border-b border-slate-700">
+            <h3 class="font-bold text-lg"><i class="fab fa-telegram text-blue-400 ml-1"></i> صور البوت (الشركات ووسائل الدفع)</h3>
+            <p class="text-xs text-slate-400 mt-1">التحكم في عرض الصور المخصصة داخل تيليغرام عند اختيار شركة أو وسيلة دفع — لا يؤثر على الموقع</p>
+        </div>
+        <div class="p-5 grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+            <div>
+                <label class="block text-sm text-slate-400 mb-1">طريقة العرض في البوت</label>
+                <select x-model="botIcon.mode" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="off">الاسم فقط (بدون صور)</option>
+                    <option value="photo">إرسال صورة مع التفاصيل</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm text-slate-400 mb-1">حجم الصورة (بكسل)</label>
+                <select x-model="botIcon.size" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="64">64 × 64</option>
+                    <option value="128">128 × 128</option>
+                    <option value="256">256 × 256</option>
+                    <option value="512">512 × 512</option>
+                </select>
+                <p class="text-[10px] text-slate-500 mt-1">يُطبق على الصور المرفوعة الجديدة من صفحات الشركات / وسائل الدفع</p>
+            </div>
+            <div>
+                <button @click="saveBotIcon()" :disabled="botIcon.saving"
+                    class="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg px-4 py-2.5 text-sm font-semibold transition">
+                    <i class="fas" :class="botIcon.saving ? 'fa-spinner fa-spin' : 'fa-save'"></i> حفظ إعدادات صور البوت
+                </button>
+            </div>
+        </div>
+    </div>
+
     <div x-show="activeTab === 'system'" class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
         <div class="p-5 border-b border-slate-700">
             <h3 class="font-bold text-lg" data-i18n="system_settings">System Settings</h3>
@@ -446,6 +478,22 @@
 <script>
 function settingsPage() {
     return {
+        botIcon: { mode: 'off', size: '128', saving: false },
+        async loadBotIcon() {
+            try {
+                const d = await api('/api/bot-icon-settings');
+                this.botIcon.mode = d.bot_icon_mode || 'off';
+                this.botIcon.size = String(d.bot_icon_size || '128');
+            } catch(e) {}
+        },
+        async saveBotIcon() {
+            this.botIcon.saving = true;
+            try {
+                await api('/api/bot-icon-settings', { method: 'POST', body: JSON.stringify({ bot_icon_mode: this.botIcon.mode, bot_icon_size: parseInt(this.botIcon.size) }) });
+                toast('تم حفظ إعدادات صور البوت', 'success');
+            } catch(e) { toast('فشل الحفظ', 'error'); }
+            this.botIcon.saving = false;
+        },
         activeTab: 'system',
         settings: [],
         labels: [],
@@ -467,6 +515,7 @@ function settingsPage() {
         ldLoading: false,
 
         async init() {
+            this.loadBotIcon();
             await Promise.all([this.loadSettings(), this.loadLabels()]);
         },
 

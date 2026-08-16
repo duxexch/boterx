@@ -1071,6 +1071,38 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         }
         return self.api_call('sendMessage', data)
     
+    def send_entity_card(self, chat_id, entity, text, inline_buttons=None, keyboard=None):
+        """إرسال بطاقة شركة/وسيلة دفع: صورة مخصصة للبوت (bot_icon) مع النص كـ caption
+        إذا كانت الميزة مفعّلة من لوحة الأدمن (bot_icon_mode=photo)، وإلا رسالة نصية عادية."""
+        try:
+            if (self.get_setting('bot_icon_mode') or 'off').strip() == 'photo':
+                url = ((entity or {}).get('bot_icon') or '').strip()
+                if url.startswith('/static/'):
+                    url = 'https://vex.deals' + url
+                if url.startswith('http'):
+                    if not hasattr(self, '_bot_icon_file_ids'):
+                        self._bot_icon_file_ids = {}
+                    photo = self._bot_icon_file_ids.get(url, url)
+                    data = {'chat_id': chat_id, 'photo': photo, 'caption': text, 'parse_mode': 'HTML'}
+                    if inline_buttons:
+                        data['reply_markup'] = json.dumps({'inline_keyboard': inline_buttons})
+                    elif keyboard:
+                        data['reply_markup'] = self.transform_keyboard(keyboard) if isinstance(keyboard, dict) else keyboard
+                    resp = self.api_call('sendPhoto', data)
+                    if resp and resp.get('ok'):
+                        try:
+                            photos = resp['result'].get('photo') or []
+                            if photos and photo == url:
+                                self._bot_icon_file_ids[url] = photos[-1]['file_id']
+                        except Exception:
+                            pass
+                        return resp
+        except Exception as e:
+            logger.error(f"send_entity_card photo failed, falling back to text: {e}")
+        if inline_buttons is not None:
+            return self.send_inline_message(chat_id, text, inline_buttons)
+        return self.send_message(chat_id, text, keyboard)
+
     def answer_callback(self, callback_query_id, text=None):
         """الرد على callback query لإزالة loading"""
         data = {'callback_query_id': callback_query_id}
@@ -4118,9 +4150,12 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         return self.tr('a0115_العنوان_غير', 'ar')
     
     def get_setting(self, key):
-        """جلب إعداد النظام — من الكاش"""
-        if not hasattr(self, '_settings_cache') or self._settings_cache is None:
+        """جلب إعداد النظام — من الكاش (يتجدد كل 60 ثانية لالتقاط تعديلات لوحة التحكم)"""
+        now = time.time()
+        if (not hasattr(self, '_settings_cache') or self._settings_cache is None
+                or now - getattr(self, '_settings_cache_ts', 0) > 60):
             self._settings_cache = {}
+            self._settings_cache_ts = now
             try:
                 with open('system_settings.csv', 'r', encoding='utf-8-sig') as f:
                     reader = csv.DictReader(f)

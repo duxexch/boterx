@@ -164,14 +164,30 @@ def read_csv(filename):
 def write_csv(filename, rows, fieldnames):
     filepath = os.path.join(BASE_DIR, filename)
     with open(filepath, 'w', newline='', encoding='utf-8-sig') as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction='ignore', restval='')
         writer.writeheader()
-        writer.writerows(rows)
+        writer.writerows([{k: v for k, v in r.items() if k is not None} for r in rows])
 
 def append_csv(filename, row, fieldnames):
     filepath = os.path.join(BASE_DIR, filename)
     # If file doesn't exist or is empty, write header first
     need_header = (not os.path.exists(filepath)) or (os.path.getsize(filepath) == 0)
+    if not need_header:
+        # If the on-disk header is missing any of the requested columns,
+        # rewrite the whole file with the merged header first (otherwise the
+        # appended row's values would land in the wrong columns).
+        try:
+            with open(filepath, 'r', encoding='utf-8-sig') as f:
+                existing_header = next(csv.reader(f), [])
+            if any(fn not in existing_header for fn in fieldnames):
+                merged = existing_header + [fn for fn in fieldnames if fn not in existing_header]
+                existing_rows = read_csv(filename)
+                for r in existing_rows:
+                    r.pop(None, None)
+                write_csv(filename, [{k: (r.get(k) or '') for k in merged} for r in existing_rows], merged)
+                fieldnames = merged
+        except Exception as e:
+            print(f"append_csv header migration failed for {filename}: {e}")
     with open(filepath, 'a', newline='', encoding='utf-8-sig') as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         if need_header:
@@ -2834,6 +2850,64 @@ def api_companies():
     return jsonify({'companies': companies})
 
 
+def _get_system_setting(key):
+    try:
+        for s_ in read_csv('system_settings.csv'):
+            k = s_.get('key', '') or s_.get('setting_key', '')
+            if k == key:
+                return s_.get('value', '') or s_.get('setting_value', '')
+    except Exception:
+        pass
+    return ''
+
+
+@app.route('/api/bot-icon-settings')
+@api_auth
+def api_bot_icon_settings():
+    """إعدادات عرض صور الشركات/وسائل الدفع في البوت."""
+    mode = _get_system_setting('bot_icon_mode') or 'off'
+    size = _get_system_setting('bot_icon_size') or '128'
+    return jsonify({'bot_icon_mode': mode, 'bot_icon_size': size})
+
+
+@app.route('/api/bot-icon-settings', methods=['POST'])
+@api_auth
+@permission_required('manage_settings')
+def api_save_bot_icon_settings():
+    data = request.json or {}
+    mode = data.get('bot_icon_mode', 'off')
+    if mode not in ('off', 'photo'):
+        return jsonify({'success': False, 'error': 'وضع غير صالح'}), 400
+    try:
+        size = max(32, min(int(data.get('bot_icon_size', 128)), 512))
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'error': 'حجم غير صالح'}), 400
+    settings = read_csv('system_settings.csv')
+    fieldnames = get_fieldnames('system_settings.csv', ['key', 'value', 'updated_at'])
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    for key, value in (('bot_icon_mode', mode), ('bot_icon_size', str(size))):
+        found = False
+        for s_ in settings:
+            k = s_.get('key', '') or s_.get('setting_key', '')
+            if k == key:
+                if 'value' in s_: s_['value'] = value
+                if 'setting_value' in s_: s_['setting_value'] = value
+                if 'updated_at' in fieldnames: s_['updated_at'] = now
+                found = True
+                break
+        if not found:
+            row = {fn: '' for fn in fieldnames}
+            if 'key' in fieldnames: row['key'] = key
+            if 'setting_key' in fieldnames: row['setting_key'] = key
+            if 'value' in fieldnames: row['value'] = value
+            if 'setting_value' in fieldnames: row['setting_value'] = value
+            if 'updated_at' in fieldnames: row['updated_at'] = now
+            settings.append(row)
+    write_csv('system_settings.csv', settings, fieldnames)
+    log_action('save_bot_icon_settings', f'{mode}/{size}')
+    return jsonify({'success': True})
+
+
 # ===== API — Icon Upload (companies & payment methods) =====
 _ICON_UPLOAD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads', 'icons')
 _ICON_ALLOWED_EXT = {'png', 'jpg', 'jpeg', 'webp', 'gif'}
@@ -2891,16 +2965,28 @@ def api_upload_icon():
         web_path = os.path.join(_ICON_UPLOAD_DIR, web_fname)
         web_img.save(web_path, 'PNG', optimize=True)
 
-        # 3) Original is NOT saved (deleted by not writing it)
-        log_action('upload_icon', f'{tg_fname} + {web_fname} (original discarded)')
+        # 3) Bot icon: size controlled from settings (bot_icon_size), overridable via form field bot_size
+        try:
+            _bot_size = int(request.form.get('bot_size') or _get_system_setting('bot_icon_size') or 128)
+        except (TypeError, ValueError):
+            _bot_size = 128
+        _bot_size = max(32, min(_bot_size, 512))
+        bot_img = img.resize((_bot_size, _bot_size), Image.Resampling.LANCZOS)
+        bot_fname = f"{base_name}_bot.png"
+        bot_img.save(os.path.join(_ICON_UPLOAD_DIR, bot_fname), 'PNG', optimize=True)
+
+        # 4) Original is NOT saved (deleted by not writing it)
+        log_action('upload_icon', f'{tg_fname} + {web_fname} + {bot_fname} (original discarded)')
 
         return jsonify({
             'success': True,
             'url': f'/static/uploads/icons/{web_fname}',
             'telegram_url': f'/static/uploads/icons/{tg_fname}',
             'web_url': f'/static/uploads/icons/{web_fname}',
+            'bot_url': f'/static/uploads/icons/{bot_fname}',
             'absolute_tg_url': f'https://vex.deals/static/uploads/icons/{tg_fname}',
             'absolute_web_url': f'https://vex.deals/static/uploads/icons/{web_fname}',
+            'absolute_bot_url': f'https://vex.deals/static/uploads/icons/{bot_fname}',
         })
     except ImportError:
         # PIL not available — save original as fallback
@@ -2913,8 +2999,10 @@ def api_upload_icon():
             'url': f'/static/uploads/icons/{fname}',
             'telegram_url': f'/static/uploads/icons/{fname}',
             'web_url': f'/static/uploads/icons/{fname}',
+            'bot_url': f'/static/uploads/icons/{fname}',
             'absolute_tg_url': f'https://vex.deals/static/uploads/icons/{fname}',
             'absolute_web_url': f'https://vex.deals/static/uploads/icons/{fname}',
+            'absolute_bot_url': f'https://vex.deals/static/uploads/icons/{fname}',
         })
     except Exception as e:
         # Fallback: save original
@@ -2927,8 +3015,10 @@ def api_upload_icon():
             'url': f'/static/uploads/icons/{fname}',
             'telegram_url': f'/static/uploads/icons/{fname}',
             'web_url': f'/static/uploads/icons/{fname}',
+            'bot_url': f'/static/uploads/icons/{fname}',
             'absolute_tg_url': f'https://vex.deals/static/uploads/icons/{fname}',
             'absolute_web_url': f'https://vex.deals/static/uploads/icons/{fname}',
+            'absolute_bot_url': f'https://vex.deals/static/uploads/icons/{fname}',
         })
 
 @app.route('/api/companies/list')
@@ -2980,7 +3070,9 @@ def api_payment_methods_by_company(company_id):
 def api_add_company():
     data = request.json
     companies = read_csv('companies.csv')
-    fieldnames = get_fieldnames('companies.csv', ['id','name','type','details','is_active','icon','address','affiliate_link'])
+    fieldnames = get_fieldnames('companies.csv', ['id','name','type','details','is_active','icon','address','affiliate_link','bot_icon'])
+    if 'bot_icon' not in fieldnames:
+        fieldnames.append('bot_icon')
     new_id = f"CMP{str(int(datetime.now().timestamp()))[-6:]}"
     new_company = {
         'id': new_id,
@@ -2990,7 +3082,8 @@ def api_add_company():
         'is_active': 'yes',
         'icon': data.get('icon', '🏢'),
         'address': data.get('address', ''),
-        'affiliate_link': data.get('affiliate_link', '')
+        'affiliate_link': data.get('affiliate_link', ''),
+        'bot_icon': data.get('bot_icon', '')
     }
     append_csv('companies.csv', new_company, fieldnames)
     log_action('add_company', new_id)
@@ -3001,7 +3094,9 @@ def api_add_company():
 @permission_required('manage_companies')
 def api_edit_company(company_id):
     companies = read_csv('companies.csv')
-    fieldnames = get_fieldnames('companies.csv', ['id','name','type','details','is_active','icon','address','affiliate_link'])
+    fieldnames = get_fieldnames('companies.csv', ['id','name','type','details','is_active','icon','address','affiliate_link','bot_icon'])
+    if 'bot_icon' not in fieldnames:
+        fieldnames.append('bot_icon')
 
     if request.method == 'DELETE':
         companies = [c for c in companies if c.get('id') != company_id]
@@ -3042,7 +3137,7 @@ def api_add_payment_method():
     data = request.json
     methods = read_csv('payment_methods.csv')
     fieldnames = get_fieldnames('payment_methods.csv', ['id','company_id','method_name','method_type','account_data','additional_info','status','created_date','icon','available_for_games','currency'])
-    for extra in ('available_for_games', 'currency'):
+    for extra in ('available_for_games', 'currency', 'bot_icon'):
         if extra not in fieldnames:
             fieldnames.append(extra)
     new_id = f"PM{str(int(datetime.now().timestamp()))[-6:]}"
@@ -3057,7 +3152,8 @@ def api_add_payment_method():
         'created_date': datetime.now().strftime('%Y-%m-%d'),
         'icon': data.get('icon', '💳'),
         'available_for_games': 'yes' if data.get('available_for_games', 'yes') in ('yes', True, 'true', '1') else 'no',
-        'currency': data.get('currency', '')
+        'currency': data.get('currency', ''),
+        'bot_icon': data.get('bot_icon', '')
     }
     append_csv('payment_methods.csv', new_method, fieldnames)
     log_action('add_payment_method', new_id)
@@ -3069,7 +3165,7 @@ def api_add_payment_method():
 def api_edit_payment_method(method_id):
     methods = read_csv('payment_methods.csv')
     fieldnames = get_fieldnames('payment_methods.csv', ['id','company_id','method_name','method_type','account_data','additional_info','status','created_date','icon','available_for_games','currency'])
-    for extra in ('available_for_games', 'currency'):
+    for extra in ('available_for_games', 'currency', 'bot_icon'):
         if extra not in fieldnames:
             fieldnames.append(extra)
 
@@ -6587,7 +6683,9 @@ def api_edit_user(user_id):
 @permission_required('manage_companies')
 def api_toggle_company(company_id):
     companies = read_csv('companies.csv')
-    fieldnames = get_fieldnames('companies.csv', ['id','name','type','details','is_active','icon','address','affiliate_link'])
+    fieldnames = get_fieldnames('companies.csv', ['id','name','type','details','is_active','icon','address','affiliate_link','bot_icon'])
+    if 'bot_icon' not in fieldnames:
+        fieldnames.append('bot_icon')
     for c in companies:
         if c.get('id') == company_id:
             c['is_active'] = 'no' if c.get('is_active') == 'yes' else 'yes'

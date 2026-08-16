@@ -1198,7 +1198,7 @@ class AdminActionsMixin:
 
             keyboard = []
             for c in companies:
-                icon = c.get('icon', '🏢') or '🏢'
+                icon = self.display_icon(c.get('icon'), '🏢')
                 keyboard.append([{'text': f"{icon} {c['name']}"}])
             keyboard.append([{'text': self.tr('main_menu', lang)}])
 

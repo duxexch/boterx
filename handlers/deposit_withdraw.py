@@ -27,7 +27,7 @@ class DepositWithdrawMixin:
             title = "💰 <b>Deposit Request</b>\n\nSelect company:"
         inline_btns = []
         for company in deposit_companies:
-            icon = company.get('icon', '🏢') or '🏢'
+            icon = self.display_icon(company.get('icon'), '🏢')
             btn_text = f"{icon} {company['name']}"
             if company.get('details'):
                 btn_text += f" — {company['details'][:30]}"
@@ -51,7 +51,7 @@ class DepositWithdrawMixin:
             title = "💸 <b>Withdrawal Request</b>\n\nSelect company:"
         inline_btns = []
         for company in withdraw_companies:
-            icon = company.get('icon', '🏢') or '🏢'
+            icon = self.display_icon(company.get('icon'), '🏢')
             btn_text = f"{icon} {company['name']}"
             if company.get('details'):
                 btn_text += f" — {company['details'][:30]}"
