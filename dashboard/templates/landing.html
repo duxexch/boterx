@@ -459,6 +459,16 @@
     .reveal-stagger.visible>*:nth-child(8){transition-delay:.54s}
     .reveal-stagger.visible>*:nth-child(9){transition-delay:.61s}
 
+    @media (max-width:480px){
+      nav{padding:10px 12px}
+      .nav-brand{font-size:.95rem}
+      .nav-links{gap:6px}
+      .btn-nav-login,.btn-play-nav{padding:7px 10px;font-size:11px}
+    }
+    @media (max-width:340px){
+      .nav-brand{display:none}
+      .btn-nav-login .fa-user+*,.btn-play-nav span{display:none}
+    }
     @media (prefers-reduced-motion: reduce){
       *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important}
       .ticker{animation:none}
@@ -474,7 +484,7 @@
 <!-- NAV -->
 <nav>
   <div class="nav-logo">
-    <img src="/static/icons/logo-full.png" class="nav-logo-img" alt="VEX" onerror="this.outerHTML='<div style=\'width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,#00e701,#0d7a2f);display:flex;align-items:center;justify-content:center;font-weight:900;color:#0b0e11;font-size:20px\'>V</div>'">
+    <img src="/static/icons/logo-full.png" class="nav-logo-img" alt="VEX" onerror="this.outerHTML='<div style=\'width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,#00e701,#00b301);display:flex;align-items:center;justify-content:center;font-weight:900;color:#0b0e11;font-size:20px\'>V</div>'">
     <span class="nav-brand">VEX Games</span>
   </div>
   <div class="nav-links">
@@ -486,7 +496,7 @@
 <!-- HERO -->
 <section class="hero" id="top">
   <div class="hero-logo-wrap">
-    <img src="/static/icons/logo-full.png" class="hero-logo" alt="VEX" onerror="this.outerHTML='<div style=\'width:130px;height:130px;border-radius:50%;background:linear-gradient(135deg,#10141a,#0d7a2f);border:2px solid rgba(0,231,1,0.3);box-shadow:0 0 50px rgba(0,231,1,0.3);display:flex;align-items:center;justify-content:center;font-size:60px;font-weight:900;color:#00e701\'>V</div>'">
+    <img src="/static/icons/logo-full.png" class="hero-logo" alt="VEX" onerror="this.outerHTML='<div style=\'width:130px;height:130px;border-radius:50%;background:linear-gradient(135deg,#10141a,#00b301);border:2px solid rgba(0,231,1,0.3);box-shadow:0 0 50px rgba(0,231,1,0.3);display:flex;align-items:center;justify-content:center;font-size:60px;font-weight:900;color:#00e701\'>V</div>'">
   </div>
   <div class="hero-badge"><span class="dot"></span> أكثر من 5,000 لاعب نشط الآن</div>
   <h1>العب واربح مع<br>VEX Games</h1>
@@ -529,15 +539,15 @@
   <h2 class="section-title reveal">🎮 <span>ألعابنا</span></h2>
   <p class="section-sub reveal">كل لعبة مصممة لتوفير تجربة مختلفة ومثيرة</p>
   <div class="games-grid reveal-stagger">
-    <div class="game-card" style="--tint:255,71,87" onclick="openBot()"><span class="game-hot">HOT</span><span class="game-icon">💣</span><div class="game-name">مناجم</div><div class="game-tag">استراتيجية</div></div>
-    <div class="game-card" style="--tint:59,130,246" onclick="openBot()"><span class="game-hot">HOT</span><span class="game-icon">✈️</span><div class="game-name">أفياتور</div><div class="game-tag">توقيت</div></div>
+    <div class="game-card" style="--tint:0,231,1" onclick="openBot()"><span class="game-hot">HOT</span><span class="game-icon">💣</span><div class="game-name">مناجم</div><div class="game-tag">استراتيجية</div></div>
+    <div class="game-card" style="--tint:255,215,0" onclick="openBot()"><span class="game-hot">HOT</span><span class="game-icon">✈️</span><div class="game-name">أفياتور</div><div class="game-tag">توقيت</div></div>
     <div class="game-card" style="--tint:0,231,1" onclick="openBot()"><span class="game-icon">🚀</span><div class="game-name">كراش</div><div class="game-tag">إثارة</div></div>
-    <div class="game-card" style="--tint:6,182,212" onclick="openBot()"><span class="game-icon">🔵</span><div class="game-name">بلينكو</div><div class="game-tag">فيزياء</div></div>
-    <div class="game-card" style="--tint:167,139,250" onclick="openBot()"><span class="game-icon">🎡</span><div class="game-name">عجلة الحظ</div><div class="game-tag">جوائز</div></div>
+    <div class="game-card" style="--tint:0,231,1" onclick="openBot()"><span class="game-icon">🔵</span><div class="game-name">بلينكو</div><div class="game-tag">فيزياء</div></div>
+    <div class="game-card" style="--tint:255,215,0" onclick="openBot()"><span class="game-icon">🎡</span><div class="game-name">عجلة الحظ</div><div class="game-tag">جوائز</div></div>
     <div class="game-card" style="--tint:255,215,0" onclick="openBot()"><span class="game-hot">جاك بوت</span><span class="game-icon">🎰</span><div class="game-name">يانصيب</div><div class="game-tag">جاك بوت</div></div>
-    <div class="game-card" style="--tint:255,140,66" onclick="openBot()"><span class="game-icon">🎯</span><div class="game-name">اخطف</div><div class="game-tag">سرعة</div></div>
+    <div class="game-card" style="--tint:255,215,0" onclick="openBot()"><span class="game-icon">🎯</span><div class="game-name">اخطف</div><div class="game-tag">سرعة</div></div>
     <div class="game-card" style="--tint:0,231,1" onclick="openBot()"><span class="game-icon">🎲</span><div class="game-name">النرد</div><div class="game-tag">حظ</div></div>
-    <div class="game-card" style="--tint:236,72,153" onclick="openBot()"><span class="game-icon">🥊</span><div class="game-name">المباراة</div><div class="game-tag">منافسة</div></div>
+    <div class="game-card" style="--tint:0,231,1" onclick="openBot()"><span class="game-icon">🥊</span><div class="game-name">المباراة</div><div class="game-tag">منافسة</div></div>
   </div>
 </section>
 
@@ -793,7 +803,21 @@ document.querySelectorAll('[data-count]').forEach(el=>cntObs.observe(el));
         var color = type === 'urgent' ? '#ef4444' : type === 'broadcast' ? '#fbbf24' : '#00e701';
         var t = document.createElement('div');
         t.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:9999;background:linear-gradient(135deg,#141920,#10141a);border:2px solid '+color+';border-radius:14px;padding:14px 20px;min-width:280px;max-width:380px;box-shadow:0 8px 32px rgba(0,0,0,.5);opacity:0;transition:opacity .3s';
-        t.innerHTML = '<div style="display:flex;align-items:start;gap:10px"><div style="width:10px;height:10px;border-radius:50%;background:'+color+';margin-top:6px;flex-shrink:0"></div><div style="flex:1"><div style="font-weight:800;font-size:14px;color:'+color+';margin-bottom:2px">'+title+'</div><div style="font-size:12px;color:#eef2f6;line-height:1.5">'+msg+'</div></div></div>';
+        var row = document.createElement('div');
+        row.style.cssText = 'display:flex;align-items:start;gap:10px';
+        var dot = document.createElement('div');
+        dot.style.cssText = 'width:10px;height:10px;border-radius:50%;background:'+color+';margin-top:6px;flex-shrink:0';
+        var body = document.createElement('div');
+        body.style.cssText = 'flex:1';
+        var h = document.createElement('div');
+        h.style.cssText = 'font-weight:800;font-size:14px;color:'+color+';margin-bottom:2px';
+        h.textContent = title;
+        var m = document.createElement('div');
+        m.style.cssText = 'font-size:12px;color:#eef2f6;line-height:1.5';
+        m.textContent = msg;
+        body.appendChild(h); body.appendChild(m);
+        row.appendChild(dot); row.appendChild(body);
+        t.appendChild(row);
         document.body.appendChild(t);
         setTimeout(function(){t.style.opacity='1'},50);
         setTimeout(function(){t.style.opacity='0';setTimeout(function(){t.remove()},300)},6000);
