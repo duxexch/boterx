@@ -43,6 +43,11 @@
         btn = document.getElementById('vexGateGo'),
         msg = document.getElementById('vexGateMsg');
 
+    var botA = document.getElementById('vexGateBot');
+    if (botA) botA.addEventListener('click', function () {
+      try { localStorage.setItem('vex_gate_pending', '1'); } catch (e) {}
+    });
+
     inp.addEventListener('input', function () {
       this.value = this.value.replace(/\D/g, '').slice(0, 6);
       msg.textContent = '';
@@ -68,6 +73,7 @@
           if (res.ok && res.d && res.d.success) {
             msg.style.color = '#00e701';
             msg.textContent = t('gate_ok', '✅ تم الدخول — جارٍ التحديث...', '✅ Logged in — refreshing...');
+            try { localStorage.removeItem('vex_gate_pending'); } catch (e2) {}
             setTimeout(function () { location.reload(); }, 600);
           } else {
             btn.disabled = false;
@@ -93,6 +99,18 @@
     if (ov) ov.style.display = 'flex';
   }
 
+  function openBotLink() {
+    try { localStorage.setItem('vex_gate_pending', '1'); } catch (e) {}
+    // Anchor click gives the most reliable Telegram deep-link (chat + START button)
+    var a = document.createElement('a');
+    a.href = BOT_URL; a.target = '_blank'; a.rel = 'noopener';
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+
+  window.VEXGate = {
+    open: function () { showOverlay(); openBotLink(); }
+  };
+
   function interceptClicks() {
     document.addEventListener('click', function (e) {
       if (!gated) return;
@@ -105,7 +123,7 @@
       showOverlay();
       if (!botOpened) {
         botOpened = true;
-        try { window.open(BOT_URL, '_blank'); } catch (err) {}
+        openBotLink();
       }
     }, true);
   }
@@ -117,7 +135,9 @@
         if (d && d.logged_in) return; // authenticated via Telegram OTP
         gated = true;
         interceptClicks();
-        showOverlay(); // show immediately so returning users find the code card
+        var pending = false;
+        try { pending = localStorage.getItem('vex_gate_pending') === '1'; } catch (e) {}
+        if (pending) showOverlay(); // returning from the bot → code card ready
       })
       .catch(function () { /* fail open — don't lock users out on network errors */ });
   }
