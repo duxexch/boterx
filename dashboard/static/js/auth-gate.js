@@ -20,6 +20,7 @@
   }
 
   var gated = false, overlayShown = false, botOpened = false;
+  var authState = 'unknown', pendingClick = false;
 
   function buildOverlay() {
     if (document.getElementById('vexAuthGate')) return;
@@ -101,10 +102,23 @@
 
   function openBotLink() {
     try { localStorage.setItem('vex_gate_pending', '1'); } catch (e) {}
-    // Anchor click gives the most reliable Telegram deep-link (chat + START button)
-    var a = document.createElement('a');
-    a.href = BOT_URL; a.target = '_blank'; a.rel = 'noopener';
-    document.body.appendChild(a); a.click(); a.remove();
+    // tg:// deep link opens the chat with the START button directly (not the profile page).
+    // Fall back to the https link if the Telegram app didn't take over.
+    var opened = false;
+    try {
+      var a = document.createElement('a');
+      a.href = 'tg://resolve?domain=vex_otp_bot&start=web_auth';
+      document.body.appendChild(a); a.click(); a.remove();
+      opened = true;
+    } catch (e) {}
+    setTimeout(function () {
+      // If the app grabbed the link the page is hidden; otherwise use the web link.
+      if (!opened || document.visibilityState === 'visible') {
+        var b = document.createElement('a');
+        b.href = BOT_URL; b.target = '_blank'; b.rel = 'noopener';
+        document.body.appendChild(b); b.click(); b.remove();
+      }
+    }, 700);
   }
 
   window.VEXGate = {
@@ -120,6 +134,7 @@
       if (!el) return;
       e.preventDefault();
       e.stopImmediatePropagation();
+      if (authState === 'unknown') { pendingClick = true; return; } // decide after whoami answers
       showOverlay();
       if (!botOpened) {
         botOpened = true;
@@ -129,17 +144,28 @@
   }
 
   function init() {
+    // Gate immediately — a fast click must never slip through while we ask the server.
+    gated = true;
+    interceptClicks();
     fetch('/api/web/whoami', { credentials: 'same-origin' })
       .then(function (r) { return r.json(); })
       .then(function (d) {
-        if (d && d.logged_in) return; // authenticated via Telegram OTP
-        gated = true;
-        interceptClicks();
+        if (d && d.logged_in) {
+          authState = 'in';
+          gated = false; // authenticated via Telegram OTP
+          var ov = document.getElementById('vexAuthGate');
+          if (ov) ov.style.display = 'none'; // hide any race-shown card
+          return;
+        }
+        authState = 'out';
         var pending = false;
         try { pending = localStorage.getItem('vex_gate_pending') === '1'; } catch (e) {}
-        if (pending) showOverlay(); // returning from the bot → code card ready
+        if (pending || pendingClick) {
+          showOverlay(); // returning from the bot, or a click landed before the check finished
+          if (pendingClick && !botOpened) { botOpened = true; openBotLink(); }
+        }
       })
-      .catch(function () { /* fail open — don't lock users out on network errors */ });
+      .catch(function () { authState = 'out'; gated = false; /* fail open — don't lock users out on network errors */ });
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
