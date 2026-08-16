@@ -1145,6 +1145,75 @@ def index():
         return redirect(url_for('dashboard'), code=303)
     return render_template('landing.html')
 
+# ===== Public API — anonymized recent wins for the landing ticker =====
+_RECENT_WINS_CACHE = {'ts': 0.0, 'data': []}
+_RECENT_WINS_TTL = 30  # seconds
+_recent_wins_lock = threading.Lock()
+
+_PUBLIC_GAME_LABELS = {
+    'mines':   ('💣', 'مناجم'),
+    'crash':   ('🚀', 'كراش'),
+    'aviator': ('✈️', 'أفياتور'),
+    'plinko':  ('🔵', 'بلينكو'),
+    'wheel':   ('🎡', 'عجلة الحظ'),
+    'lottery': ('🎰', 'يانصيب'),
+    'dice':    ('🎲', 'النرد'),
+    'snatch':  ('🎯', 'اخطف'),
+}
+
+
+def _mask_player_id(uid: str) -> str:
+    """Anonymize a telegram id: keep only the last 3 digits."""
+    tail = ''.join(ch for ch in str(uid) if ch.isdigit())[-3:] or '000'
+    return f'لاعب_{tail}••'
+
+
+@app.route('/api/public/recent-wins')
+def api_public_recent_wins():
+    """Public read-only feed of the latest anonymized wins from game_sessions.
+
+    No auth required. No PII: player ids masked to last 3 digits, no names.
+    Cached in-process for 30s so the landing page can't hammer SQLite.
+    """
+    # Single-flight refresh: the lock is held through the DB query so that at
+    # cache expiry exactly one request refreshes while concurrent requests wait
+    # and then serve the freshly published cache (the query is a ~ms indexed
+    # SELECT, so holding the lock is cheap and prevents a stampede on SQLite).
+    with _recent_wins_lock:
+        now = time.time()
+        if now - _RECENT_WINS_CACHE['ts'] < _RECENT_WINS_TTL:
+            return jsonify({'wins': _RECENT_WINS_CACHE['data']})
+        wins = []
+        try:
+            import sqlite3 as _sq
+            _db_path = os.path.join(BASE_DIR, 'vex_games.db')
+            conn = _sq.connect(_db_path, timeout=5)
+            try:
+                conn.execute('PRAGMA query_only=ON')
+                rows = conn.execute(
+                    'SELECT game_id, user_id, payout, timestamp '
+                    'FROM game_sessions '
+                    'WHERE payout > 0 AND payout > bet_amount '
+                    'ORDER BY id DESC LIMIT 20'
+                ).fetchall()
+            finally:
+                conn.close()
+            for game_id, user_id, payout, ts in rows:
+                icon, label = _PUBLIC_GAME_LABELS.get(
+                    str(game_id or '').lower(), ('🎮', 'لعبة'))
+                wins.append({
+                    'game_icon': icon,
+                    'game_name': label,
+                    'player': _mask_player_id(user_id or ''),
+                    'amount': round(float(payout or 0), 2),
+                })
+        except Exception as exc:
+            _auth_logger.warning("recent-wins query failed: %s", exc)
+            wins = []
+        _RECENT_WINS_CACHE['ts'] = now
+        _RECENT_WINS_CACHE['data'] = wins
+        return jsonify({'wins': wins})
+
 # ===== SEO — robots.txt + sitemap.xml + llms.txt =====
 
 @app.route('/robots.txt')

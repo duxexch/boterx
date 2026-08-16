@@ -749,20 +749,49 @@ function countUp(el){
 const cntObs=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting){countUp(e.target);cntObs.unobserve(e.target);}})},{threshold:0.5});
 document.querySelectorAll('[data-count]').forEach(el=>cntObs.observe(el));
 
-// ── Live wins ticker (client-side showcase) ──
+// ── Live wins ticker — real anonymized wins from /api/public/recent-wins, demo fallback ──
 (function(){
-  var games=[['💣','مناجم'],['✈️','أفياتور'],['🚀','كراش'],['🔵','بلينكو'],['🎡','عجلة الحظ'],['🎰','يانصيب'],['🎲','النرد'],['🎯','اخطف']];
   var el=document.getElementById('winTicker');
-  var items=[];
-  for(var i=0;i<14;i++){
-    var g=games[Math.floor(Math.random()*games.length)];
-    var big=Math.random()<0.22;
-    var amt=big?(Math.floor(Math.random()*80)+20)*100:(Math.floor(Math.random()*95)+5)*10;
-    var id=Math.floor(Math.random()*9000)+1000;
-    items.push('<div class="tick-item'+(big?' big':'')+'"><span class="ti-game">'+g[0]+'</span><span class="ti-name">لاعب_'+id+'••</span><span>ربح في '+g[1]+'</span><span class="ti-amt">+'+amt.toLocaleString()+'</span></div>');
+  function makeItem(icon,name,player,amt){
+    var big=amt>=1000;
+    var item=document.createElement('div');
+    item.className='tick-item'+(big?' big':'');
+    var s1=document.createElement('span');s1.className='ti-game';s1.textContent=icon;
+    var s2=document.createElement('span');s2.className='ti-name';s2.textContent=player;
+    var s3=document.createElement('span');s3.textContent='ربح في '+name;
+    var s4=document.createElement('span');s4.className='ti-amt';s4.textContent='+'+amt.toLocaleString();
+    item.appendChild(s1);item.appendChild(s2);item.appendChild(s3);item.appendChild(s4);
+    return item;
   }
-  // duplicate for seamless loop
-  el.innerHTML=items.join('')+items.join('');
+  function render(wins){
+    el.textContent='';
+    // duplicate for seamless loop
+    for(var pass=0;pass<2;pass++){
+      for(var i=0;i<wins.length;i++){
+        var w=wins[i];
+        el.appendChild(makeItem(w.game_icon,w.game_name,w.player,w.amount));
+      }
+    }
+  }
+  function demoWins(){
+    var games=[['💣','مناجم'],['✈️','أفياتور'],['🚀','كراش'],['🔵','بلينكو'],['🎡','عجلة الحظ'],['🎰','يانصيب'],['🎲','النرد'],['🎯','اخطف']];
+    var wins=[];
+    for(var i=0;i<14;i++){
+      var g=games[Math.floor(Math.random()*games.length)];
+      var big=Math.random()<0.22;
+      wins.push({
+        game_icon:g[0],game_name:g[1],
+        player:'لاعب_'+(Math.floor(Math.random()*9000)+1000)+'••',
+        amount:big?(Math.floor(Math.random()*80)+20)*100:(Math.floor(Math.random()*95)+5)*10
+      });
+    }
+    return wins;
+  }
+  render(demoWins()); // instant paint, replaced if real data arrives
+  fetch('/api/public/recent-wins').then(function(r){return r.json()}).then(function(d){
+    var wins=(d&&d.wins)||[];
+    if(wins.length>=4)render(wins);
+  }).catch(function(){/* keep demo */});
 })();
 
 // ── Floating particles ──
