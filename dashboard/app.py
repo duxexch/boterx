@@ -6592,18 +6592,24 @@ def api_user_notifications():
     """Public endpoint: returns recent notifications for users (no auth needed)."""
     logs = read_csv('notifications_log.csv')
     logs.reverse()
-    # Only return broadcast + user-targeted notifications from last 24h
+    # عام بدون تسجيل دخول ⇒ نعرض فقط البثّ العام الموجّه للمستخدمين.
+    # إشعارات الأدمن (عضو جديد… إلخ) تحتوي بيانات شخصية ويُمنع تسريبها هنا.
     from datetime import datetime as _dt, timedelta as _td
     cutoff = (_dt.now() - _td(hours=24)).strftime('%Y-%m-%d %H:%M:%S')
     result = []
     for l in logs:
-        if l.get('timestamp', '') >= cutoff and l.get('type', '') in ('broadcast', 'new_user', 'deposit_approved', 'deposit_rejected'):
-            result.append({
-                'timestamp': l.get('timestamp', ''),
-                'type': l.get('type', ''),
-                'title': l.get('type_label', ''),
-                'message': l.get('message_preview', '')
-            })
+        if l.get('timestamp', '') < cutoff:
+            continue
+        if l.get('type', '') != 'broadcast':
+            continue
+        if (l.get('target_type', '') or '').strip() == 'admin':
+            continue
+        result.append({
+            'timestamp': l.get('timestamp', ''),
+            'type': l.get('type', ''),
+            'title': l.get('type_label', ''),
+            'message': l.get('message_preview', '')
+        })
     return jsonify({'notifications': result[:10]})
 
 @app.route('/api/push/subscribe-user', methods=['POST'])
