@@ -16,7 +16,7 @@
 <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png?v=20260816">
 <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/icon-32.png?v=20260816">
 <title data-i18n="x172">محفظتي — VEX</title>
-<link rel="stylesheet" href="/static/css/game-base.css?v=20260818">
+<link rel="stylesheet" href="/static/css/game-base.css?v=20260816logo">
 <script src="/static/js/i18n.js?v=20260823"></script>
 <script src="/static/js/i18n-auto.js"></script>
 <script>
@@ -225,8 +225,7 @@ body { overflow: auto !important; }
 
 /* Loader / empty */
 .ld { display: flex; align-items: center; justify-content: center; padding: 60px; }
-.ld::after { content:''; width:24px; height:24px; border:3px solid var(--border); border-top-color:var(--green); border-radius:50%; animation: spin .7s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
+.ld::after { content:''; width:64px; height:65px; background:url('/static/icons/logo-full.png') center/contain no-repeat; animation: logoPulse 1.4s ease-in-out infinite; }
 .wallet-empty { padding: 40px; text-align: center; color: var(--muted); font-size: 13px; }
 
 @media(min-width:600px){ #app{ max-width: 460px; margin: 0 auto; } }

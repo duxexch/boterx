@@ -593,10 +593,25 @@ body::after {
   inset: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
   padding: 16px;
   background: var(--bg);
   z-index: 200;
+}
+.loader-screen::before {
+  content: '';
+  width: 110px;
+  height: 112px;
+  background: url('/static/icons/logo-full.png') center/contain no-repeat;
+  animation: logoPulse 1.4s ease-in-out infinite;
+}
+.loader-screen .skeleton-bar,
+.loader-screen .spinner { display: none; }
+@keyframes logoPulse {
+  0%, 100% { opacity: .45; transform: scale(.92); }
+  50% { opacity: 1; transform: scale(1); }
 }
 .skeleton-bar {
   height: 48px;
