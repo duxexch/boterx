@@ -10681,7 +10681,7 @@ def api_player_stats():
 
 @app.route('/favicon.ico')
 def favicon_ico():
-    return app.send_static_file('icons/icon-32.png')
+    return app.send_static_file('icons/favicon.ico')
 
 
 @app.route('/api/auth/create-token', methods=['POST', 'GET'])
