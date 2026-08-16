@@ -18,3 +18,8 @@ description: Vendor assets are self-hosted; layout is CSS-first; how to verify a
 - `bot_icon` CSV column (companies + payment_methods) holds an absolute image URL shown only in the bot via `send_entity_card()` when setting `bot_icon_mode=photo`; size via `bot_icon_size` (applied at upload). Admin API: `/api/bot-icon-settings`.
 - Bot caches (settings, companies, methods) now expire after 60s — panel changes reach the bot without restart.
 - `append_csv` auto-migrates CSV headers when new columns appear; malformed (None-key) files are left untouched.
+
+## Public games site (webapp)
+- User-facing pages: `/home` (home.html), `/webapp/games` (games_hub.html), dedicated game routes `/webapp/{aviator,crash,dice,mines,plinko,wheel,lottery,snatch}`, `/webapp/{wallet,account,stats}`. Shared shell = `static/css/game-base.css` + `static/js/game-base.js`. base.html/style.css are ADMIN shell only.
+- Live animated background: `body::before/::after` in game-base.css (z-index 0, pointer-events none) — `#app` is z-index 1 above it. home.html has its own `.bg-fx` orbs + JS spark particles. All motion honors prefers-reduced-motion.
+- game_engine.get_games() has a 30s catalog cache; ALWAYS call `_gm.invalidate_games_cache()` after any games_catalog.csv mutation (add_game does it internally; admin toggle route calls it) or the list serves stale active-set.
