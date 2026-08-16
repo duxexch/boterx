@@ -647,38 +647,24 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
 
     def get_company_icon(self, company_name='', company_icon='', company_id=''):
         """
-        الحصول على أيقونة الشركة — ذكي ومتطور
+        الحصول على أيقونة الشركة — إيموجي فقط (لا روابط)
         1) إذا كان icon إيموجي صالح → استخدمه مباشرة
-        2) إذا كان icon URL → استخدمه
-        3) ابحث في sticker_library.csv عن إيموجي مرتبط بالشركة
-        4) ابحث في ICON_MAP عن مطابقة لاسم الشركة
-        5) استخدم 🏢 كافتراضي
+        2) إذا كان icon URL → استخدم 🏢 (تجاهل الرابط)
+        3) ابحث في ICON_MAP عن مطابقة لاسم الشركة
+        4) استخدم 🏢 كافتراضي
         """
         # 1) إيموجي صالح من حقل icon
         if company_icon and company_icon.strip():
             icon = company_icon.strip()
             if len(icon) <= 4 and any(ord(c) > 127 for c in icon):
                 return icon
-            if icon.startswith('http') or icon.startswith('/'):
-                pass  # روابط الصور لا تُعرض كنص في تيليغرام — تابع للبدائل (مكتبة/خريطة/افتراضي)
-            else:
-                # حاول normalizing
-                normalized = self.normalize_icon(icon, None)
-                if normalized and normalized != '🏷️':
-                    return normalized
-
-        # 2) ابحث في المكتبة
-        if company_id:
-            try:
-                with open('sticker_library.csv', 'r', encoding='utf-8-sig') as f:
-                    reader = csv.DictReader(f)
-                    for row in reader:
-                        if row.get('category') == f'company_{company_id}' and row.get('type') == 'emoji':
-                            emoji = row.get('emoji', '').strip()
-                            if emoji:
-                                return emoji
-            except:
-                pass
+            # إذا كان URL → تجاهله واستمر للبحث
+        
+        # 2) ابحث في ICON_MAP عن اسم الشركة
+        if company_name:
+            icon = self.normalize_icon(company_name, None)
+            if icon and icon != '🏷️':
+                return icon
 
         # 3) ابحث في ICON_MAP باسم الشركة
         if company_name:
