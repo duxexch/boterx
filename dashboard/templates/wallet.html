@@ -17,7 +17,7 @@
 <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/icon-32.png?v=20260816">
 <title data-i18n="x172">محفظتي — VEX</title>
 <link rel="stylesheet" href="/static/css/game-base.css?v=20260818">
-<script src="/static/js/i18n.js"></script>
+<script src="/static/js/i18n.js?v=20260823"></script>
 <script src="/static/js/i18n-auto.js"></script>
 <script>
 window.I18N_EXTRA = Object.assign(window.I18N_EXTRA || {}, {
@@ -457,17 +457,26 @@ async function loadCompanies() {
           <div style="flex:1;min-width:0">
             <div style="font-size:13px;font-weight:600">${escH(c.name)}</div>
             <div style="font-size:11px;color:var(--muted)">${c.registered_account
-              ? I18N.t('z038')+' <code>'+escH(c.registered_account)+'</code>'
+              ? (c.account_status === 'pending'
+                  ? '⏳ ' + (I18N.lang==='en' ? 'Awaiting admin confirmation' : 'بانتظار تأكيد الإدارة') + ' — <code>'+escH(c.registered_account)+'</code>'
+                  : I18N.t('z038')+' <code>'+escH(c.registered_account)+'</code>')
               : I18N.t('y079')}</div>
+            ${c.promo_code ? `<div style="font-size:11px;color:#fbbf24;margin-top:2px">🎟️ ${I18N.lang==='en'?'Promo code':'كود البرومو'}: <code style="user-select:all">${escH(c.promo_code)}</code></div>` : ''}
           </div>
           ${c.affiliate_link ? `<a href="${escH(c.affiliate_link)}" target="_blank" rel="noopener"
             style="font-size:11px;font-weight:700;color:#93c5fd;background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.25);padding:6px 10px;border-radius:8px;text-decoration:none;white-space:nowrap" data-i18n="x279">🔗 التسجيل</a>` : ''}
         </div>`;
       if (!c.registered_account) {
         h += `<div style="display:flex;gap:6px;margin-top:8px">
-          <input class="cta-input" id="acc_${cid}" placeholder="${I18N.t('z039')} ${escH(c.name)}" maxlength="64">
-          <button class="btn-transfer" onclick="registerAccount('${cid}')" id="regBtn_${cid}" data-i18n="x075">تسجيل</button>
+          <input class="cta-input" id="acc_${cid}" placeholder="${I18N.lang==='en'?'Enter your account ID or number at':'اكتب معرف الحساب أو رقم الحساب في'} ${escH(c.name)}" maxlength="64">
+          <button class="btn-transfer" onclick="registerAccount('${cid}')" id="regBtn_${cid}">${I18N.lang==='en'?'✅ Confirm':'✅ تأكيد'}</button>
+          <button class="btn-transfer" style="background:var(--surface-3)" onclick="document.getElementById('acc_${cid}').value=''">${I18N.lang==='en'?'Cancel':'إلغاء'}</button>
         </div>`;
+      } else if (c.account_status === 'pending') {
+        h += `<div style="margin-top:8px;font-size:12px;color:#fbbf24;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.25);padding:8px 10px;border-radius:8px">
+          ⏳ ${I18N.lang==='en'
+            ? 'Your account is under review — you will be notified once confirmed, then deposit and play. If you lose, submit a compensation claim.'
+            : 'حسابك قيد المراجعة — سيتم إشعارك فور التأكيد، بعدها قم بالإيداع والعب، وإذا خسرت قدّم طلب تعويض.'}</div>`;
       } else {
         h += `<div style="display:flex;gap:6px;margin-top:8px;align-items:center">
           <input type="file" id="shot_${cid}" accept=".png,.jpg,.jpeg,.webp" style="display:none"

@@ -3162,6 +3162,8 @@ def api_companies_public():
                 'icon': c.get('icon', '🏢'),
                 'address': c.get('address', ''),
                 'type': c.get('type', ''),
+                'promo_code': c.get('promo_code', ''),
+                'affiliate_link': c.get('affiliate_link', ''),
             })
     return jsonify({'companies': result})
 
@@ -3209,7 +3211,8 @@ def api_add_company():
         'icon': data.get('icon', '🏢'),
         'address': data.get('address', ''),
         'affiliate_link': data.get('affiliate_link', ''),
-        'bot_icon': data.get('bot_icon', '')
+        'bot_icon': data.get('bot_icon', ''),
+        'promo_code': data.get('promo_code', '')
     }
     append_csv('companies.csv', new_company, fieldnames)
     log_action('add_company', new_id)
@@ -3220,9 +3223,10 @@ def api_add_company():
 @permission_required('manage_companies')
 def api_edit_company(company_id):
     companies = read_csv('companies.csv')
-    fieldnames = get_fieldnames('companies.csv', ['id','name','type','details','is_active','icon','address','affiliate_link','bot_icon'])
-    if 'bot_icon' not in fieldnames:
-        fieldnames.append('bot_icon')
+    fieldnames = get_fieldnames('companies.csv', ['id','name','type','details','is_active','icon','address','affiliate_link','bot_icon','promo_code'])
+    for _f in ('bot_icon', 'promo_code'):
+        if _f not in fieldnames:
+            fieldnames.append(_f)
 
     if request.method == 'DELETE':
         companies = [c for c in companies if c.get('id') != company_id]
@@ -3240,6 +3244,70 @@ def api_edit_company(company_id):
         write_csv('companies.csv', companies, fieldnames)
         log_action('edit_company', company_id)
         return jsonify({'success': True})
+
+# ===== نظام التعويض (Compensation) — player web flow + admin approvals =====
+
+_COMP_CSV_LOCK = threading.Lock()
+
+def _comp_svrp():
+    import sys as _s; _s.path.insert(0, BASE_DIR)
+    from svrp import SVRPManager as _M
+    return _M()
+
+def _comp_tg(uid, text):
+    """Best-effort Telegram notification to a player."""
+    if not BOT_TOKEN or not uid:
+        return
+    try:
+        import urllib.request as _u, json as _j
+        _u.urlopen(_u.Request(
+            f'https://api.telegram.org/bot{BOT_TOKEN}/sendMessage',
+            data=_j.dumps({'chat_id': str(uid), 'text': text, 'parse_mode': 'HTML'}).encode(),
+            headers={'Content-Type': 'application/json'}), timeout=6)
+    except Exception as _e:
+        app.logger.warning(f'comp notify failed uid={uid}: {_e}')
+
+def _comp_alert_admins(text):
+    for aid in ADMIN_IDS:
+        _comp_tg(aid, text)
+
+def _comp_strong_auth_or_error():
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'المصادقة مطلوبة — افتح الصفحة من التطبيق أو تيليغرام'}), 401
+    return None
+
+@app.route('/api/comp/admin/data')
+@api_auth
+def api_comp_admin_data():
+    accounts = read_csv('user_company_accounts.csv'); accounts.reverse()
+    return jsonify({'accounts': accounts[:200]})
+
+@app.route('/api/comp/admin/account/<acc_id>', methods=['POST'])
+@api_auth
+@permission_required('approve_deposits')
+def api_comp_admin_account(acc_id):
+    action = (request.json or {}).get('action', '')
+    if action not in ('approve', 'reject'):
+        return jsonify({'error': 'إجراء غير صالح'}), 400
+    with _COMP_CSV_LOCK:
+        rows = read_csv('user_company_accounts.csv')
+        fieldnames = get_fieldnames('user_company_accounts.csv',
+            ['id','user_id','company_id','company_name','account_number','status','created_at'])
+        row = next((r for r in rows if r.get('id') == acc_id), None)
+        if not row:
+            return jsonify({'error': 'الطلب غير موجود'}), 404
+        row['status'] = 'active' if action == 'approve' else 'rejected'
+        write_csv('user_company_accounts.csv', rows, fieldnames)
+    uid = str(row.get('user_id',''))
+    if action == 'approve':
+        _comp_tg(uid, f"✅ <b>تم تأكيد حسابك في {row.get('company_name','')}</b>\n"
+                      f"🔢 الحساب: <code>{row.get('account_number','')}</code>\n\n"
+                      f"💰 قم بالإيداع والعب — وإذا خسرت قدّم طلب تعويض من صفحة التعويضات وسيتم تعويضك.")
+    else:
+        _comp_tg(uid, f"❌ لم يتم تأكيد حسابك في {row.get('company_name','')}.\n"
+                      f"تأكد من رقم الحساب وأنك سجلت بكود البرومو الخاص بنا ثم أعد المحاولة.")
+    log_action(f'comp_account_{action}', acc_id)
+    return jsonify({'success': True})
 
 # ===== API — Payment Methods =====
 
@@ -3872,6 +3940,11 @@ def api_svrp_approve(req_id):
     _SvrpMgr().approve_recovery_request(req_id, amount_float, admin_id)
 
     log_action('svrp_approve', f'{req_id}: {amount_float} uid={uid}')
+    _comp_tg(uid, f"🎉 <b>تمت الموافقة على تعويضك!</b>\n"
+                  f"💎 المبلغ: <code>{amount_float:.2f}</code> أُضيف لرصيدك المجمد\n\n"
+                  f"🔓 <b>لفك التجميد شارك الرصيد مع أصدقائك:</b>\n"
+                  f"• كل صديق جديد يسجل بكود إحالتك ← يُفك 10% من رصيدك المجمد\n"
+                  f"• حوّل 10% أو أكثر لصديق مستخدم بالفعل ← يُفك لك 5% (يصله الرصيد مجمداً بنفس الشروط)")
     return jsonify({'success': True, 'new_frozen_balance': result})
 
 @app.route('/api/svrp/requests/<req_id>/reject', methods=['POST'])
@@ -3880,12 +3953,17 @@ def api_svrp_approve(req_id):
 def api_svrp_reject(req_id):
     reqs = read_csv('recovery_requests.csv')
     fieldnames = get_fieldnames('recovery_requests.csv', ['id','user_id','customer_id','photo_file_id','status','recovery_amount','admin_note','created_at','approved_at','approved_by'])
+    _rej_uid = ''
     for r in reqs:
         if r.get('id') == req_id:
             r['status'] = 'rejected'
+            _rej_uid = str(r.get('user_id', ''))
             break
     write_csv('recovery_requests.csv', reqs, fieldnames)
     log_action('svrp_reject', req_id)
+    if _rej_uid:
+        _comp_tg(_rej_uid, "❌ لم تتم الموافقة على طلب التعويض.\n"
+                           "تأكد من لقطة الشاشة وأن الخسارة على الحساب المسجل ثم أعد المحاولة.")
     return jsonify({'success': True})
 
 @app.route('/api/svrp/bonus-requests')
@@ -7358,7 +7436,10 @@ def api_player_companies():
     try:
         for a in read_csv('user_company_accounts.csv'):
             if str(a.get('user_id', '')) == uid:
-                accounts_by_company[a.get('company_id', '')] = a.get('account_number', '')
+                accounts_by_company[a.get('company_id', '')] = {
+                    'account_number': a.get('account_number', ''),
+                    'status': a.get('status', 'active') or 'active',
+                }
     except Exception:
         pass
     companies = []
@@ -7366,12 +7447,15 @@ def api_player_companies():
         for c in read_csv('companies.csv'):
             if (c.get('is_active', '') or '').lower() not in ('active', 'yes', '1', 'true'):
                 continue
+            acc = accounts_by_company.get(c.get('id', ''), {})
             companies.append({
                 'id': c.get('id', ''),
                 'name': c.get('name', ''),
                 'icon': c.get('icon', '') or '🏢',
                 'affiliate_link': c.get('affiliate_link', '') or '',
-                'registered_account': accounts_by_company.get(c.get('id', ''), ''),
+                'promo_code': c.get('promo_code', '') or '',
+                'registered_account': acc.get('account_number', ''),
+                'account_status': acc.get('status', ''),
             })
     except Exception:
         pass
@@ -7561,15 +7645,34 @@ def api_player_register_company_account(company_id):
     if not (3 <= len(account_number) <= 64):
         return jsonify({'error': 'رقم الحساب يجب أن يكون بين 3 و 64 حرفاً'}), 400
     try:
-        from svrp import SVRPManager as _SM
-        ok, msg = _SM().add_user_company_account(
-            uid, str(company_id), company.get('name', ''), account_number)
+        with _COMP_CSV_LOCK:
+            rows = read_csv('user_company_accounts.csv')
+            for r in rows:
+                if str(r.get('user_id', '')) == uid and r.get('company_id') == str(company_id) \
+                   and r.get('status') in ('pending', 'active', 'approved'):
+                    return jsonify({'error': 'لديك حساب مسجل أو طلب معلق بالفعل في هذه الشركة'}), 409
+            fieldnames = get_fieldnames('user_company_accounts.csv',
+                ['id', 'user_id', 'company_id', 'company_name', 'account_number', 'status', 'created_at'])
+            acc_id = f"UAC{secrets.token_hex(5).upper()}"
+            append_csv('user_company_accounts.csv', {
+                'id': acc_id, 'user_id': uid, 'company_id': str(company_id),
+                'company_name': company.get('name', ''), 'account_number': account_number,
+                'status': 'pending',
+                'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')}, fieldnames)
     except Exception as e:
         _auth_logger.error('register-account failed uid=%s company=%s: %s', uid, company_id, e)
         return jsonify({'error': 'فشل التسجيل — حاول مجدداً'}), 500
-    if not ok:
-        return jsonify({'error': msg}), 409
-    return jsonify({'ok': True, 'message': msg, 'account_number': account_number})
+    _comp_alert_admins(f"🆕 <b>طلب تسجيل حساب تعويض</b>\n👤 المستخدم: <code>{uid}</code>\n"
+                       f"🏢 الشركة: {company.get('name', '')}\n"
+                       f"🔢 رقم الحساب: <code>{account_number}</code>\n\n"
+                       f"أكّد أو ارفض الطلب من لوحة الإدارة ← الاسترداد الذكي")
+    try:
+        push_notification('comp_account', 'طلب تسجيل حساب تعويض',
+                          f'{company.get("name", "")} — {account_number}')
+    except Exception:
+        pass
+    return jsonify({'ok': True, 'status': 'pending', 'account_number': account_number,
+                    'message': '✅ تم إرسال طلبك للإدارة — سيتم إشعارك فور تأكيد حسابك'})
 
 
 @app.route('/api/player/compensation-request', methods=['POST'])
@@ -7602,6 +7705,8 @@ def api_player_compensation_request():
     account = mgr.get_user_company_account(uid, company_id)
     if not account:
         return jsonify({'error': 'يجب تسجيل رقم حسابك في هذه الشركة أولاً'}), 400
+    if account.get('status') not in ('active', 'approved'):
+        return jsonify({'error': 'حسابك في هذه الشركة بانتظار تأكيد الإدارة — سيتم إشعارك فور التأكيد'}), 400
 
     f = request.files.get('screenshot')
     if not f or not f.filename:

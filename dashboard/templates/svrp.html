@@ -22,6 +22,10 @@
             class="px-5 py-3 rounded-t-lg text-sm font-semibold transition">
             <i class="fas fa-ticket ml-1"></i> الرموز الترويجية
         </button>
+        <button @click="switchTab('accounts')" :class="activeTab === 'accounts' ? 'bg-slate-800 text-white border-b-2 border-blue-500' : 'text-slate-400 hover:text-white'"
+            class="px-5 py-3 rounded-t-lg text-sm font-semibold transition">
+            <i class="fas fa-id-card ml-1"></i> حسابات الشركات
+        </button>
     </div>
 
     <!-- ==================== TAB 1: Wallets ==================== -->
@@ -261,6 +265,60 @@
         </div>
     </div>
 
+    <!-- ==================== TAB: Company Accounts (Compensation registrations) ==================== -->
+    <div x-show="activeTab === 'accounts'">
+        <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-slate-700 bg-slate-800/80">
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">#</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="user">User</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">الشركة</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">رقم الحساب</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="status">Status</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="date">Date</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">الإجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="a in compAccounts" :key="a.id">
+                            <tr class="border-b border-slate-700/50 hover:bg-slate-700/30 transition">
+                                <td class="px-4 py-3 text-slate-500 text-xs" x-text="a.id"></td>
+                                <td class="px-4 py-3 font-medium" x-text="a.user_id"></td>
+                                <td class="px-4 py-3" x-text="a.company_name || a.company_id"></td>
+                                <td class="px-4 py-3 font-mono text-xs" x-text="a.account_number"></td>
+                                <td class="px-4 py-3"><span x-html="statusBadge(a.status || 'active')"></span></td>
+                                <td class="px-4 py-3 text-slate-400 text-xs" x-text="a.created_at || '-'"></td>
+                                <td class="px-4 py-3">
+                                    <template x-if="a.status === 'pending'">
+                                        <div class="flex items-center gap-1">
+                                            <button @click="decideAccount(a, 'approve')" x-show="rbac('approve_deposits')"
+                                                class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-green-500/20 text-green-400 hover:bg-green-500/30 transition">
+                                                <i class="fas fa-check text-xs"></i> تأكيد
+                                            </button>
+                                            <button @click="decideAccount(a, 'reject')" x-show="rbac('approve_deposits')"
+                                                class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-500/20 text-red-400 hover:bg-red-500/30 transition">
+                                                <i class="fas fa-times text-xs"></i> رفض
+                                            </button>
+                                        </div>
+                                    </template>
+                                    <span x-show="a.status !== 'pending'" class="text-xs text-slate-500">-</span>
+                                </td>
+                            </tr>
+                        </template>
+                        <tr x-show="compAccounts.length === 0">
+                            <td colspan="7" class="px-4 py-10 text-center text-slate-500">
+                                <i class="fas fa-id-card text-4xl mb-3 block opacity-30"></i>
+                                <p>لا توجد حسابات مسجلة</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
     <!-- ==================== TAB 4: Promo Codes ==================== -->
     <div x-show="activeTab === 'promo'">
         <!-- Create button -->
@@ -395,6 +453,7 @@ function svrpPage() {
         approvalAmount: '',
         approvalTarget: null,
         approvalType: null,
+        compAccounts: [],
 
         get filteredWallets() {
             const q = (this.walletSearch || '').toLowerCase();
@@ -441,6 +500,30 @@ function svrpPage() {
                 this.bonusRequests = data.requests || data || [];
             } catch (e) {
                 toast('فشل تحميل طلبات المكافآت', 'error');
+            }
+        },
+
+        // ─── Company accounts (compensation registrations) ───
+        async loadAccounts() {
+            try {
+                const data = await api('/api/comp/admin/data');
+                this.compAccounts = data.accounts || [];
+            } catch (e) {
+                toast('فشل تحميل حسابات الشركات', 'error');
+            }
+        },
+
+        async decideAccount(a, action) {
+            if (action === 'reject' && !confirm('رفض هذا الحساب؟')) return;
+            try {
+                await api(`/api/comp/admin/account/${a.id}`, {
+                    method: 'POST',
+                    body: JSON.stringify({ action }),
+                });
+                toast(action === 'approve' ? 'تم تأكيد الحساب وإشعار المستخدم' : 'تم رفض الحساب', 'success');
+                await this.loadAccounts();
+            } catch (e) {
+                toast('فشل تنفيذ الإجراء', 'error');
             }
         },
 
@@ -546,6 +629,7 @@ function svrpPage() {
             if (tab === 'recovery') await this.loadRecovery();
             if (tab === 'bonus') await this.loadBonus();
             if (tab === 'promo') await this.loadPromo();
+            if (tab === 'accounts') await this.loadAccounts();
         },
     };
 }

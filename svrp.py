@@ -1200,6 +1200,18 @@ class SVRPManager:
                               'created_at', 'reward_given'])
 
             logger.info(f"Recovery: Referral processed — referrer {referrer_tid} → {referred_telegram_id}")
+
+            # قاعدة فك التجميد: كل صديق جديد يسجل بكود الإحالة يفك 10% من
+            # الرصيد المجمد للمُحيل.
+            try:
+                wallet = self.get_wallet(referrer_tid)
+                frozen = float(wallet.get('balance', 0) or 0)
+                if frozen > 0:
+                    self.unfreeze_balance(referrer_tid, round(frozen * 0.10, 6))
+                    logger.info(f"Referral unlock: 10% of frozen unfrozen for referrer {referrer_tid}")
+            except Exception as _ue:
+                logger.warning(f"Referral unlock failed for {referrer_tid}: {_ue}")
+
             return True, "تم ربط كود الإحالة بنجاح"
 
         except Exception as e:
@@ -1440,11 +1452,17 @@ class SVRPManager:
             # 1. خصم من المرسل (SQLite delta first, then CSV)
             try:
                 from game_engine import GameManager as _GM
+                # قاعدة فك التجميد: تحويل ≥10% من الرصيد المجمد لصديق مستخدم بالفعل
+                # يفك تجميد 5% إضافية للمرسل. المبلغ المحوَّل نفسه يذهب مجمداً للمستلم.
+                unlock_bonus = 0.0
+                if amount >= sender_balance2 * 0.10:
+                    unlock_bonus = round(sender_balance2 * 0.05, 6)
+                    unlock_bonus = min(unlock_bonus, max(0.0, sender_balance2 - amount))
                 _gm_s = _GM()
                 _gm_s.delta_update_svrp_wallet(
                     tid,
-                    frozen_balance_delta=-float(amount),
-                    total_used_delta=float(amount)
+                    frozen_balance_delta=-(float(amount) + unlock_bonus),
+                    total_used_delta=unlock_bonus
                 )
                 _gm_s.delta_update_svrp_wallet(
                     str(receiver_tid),
@@ -1453,9 +1471,10 @@ class SVRPManager:
                 )
             except Exception as _se:
                 logger.warning(f'send_frozen_credits SQLite delta failed: {_se}')
+                unlock_bonus = 0.0
             self._update_wallet(tid, {
-                'balance':    round(sender_balance2 - amount, 6),
-                'total_used': round(sender_used2    + amount, 6),
+                'balance':    round(sender_balance2 - amount - unlock_bonus, 6),
+                'total_used': round(sender_used2    + unlock_bonus, 6),
             })
 
             # 2. إضافة للمستلم (مجمد) — قراءة حديثة داخل القفل (CSV mirror)
@@ -1477,9 +1496,13 @@ class SVRPManager:
             self._append_csv('svrp_transfers.csv', transfer,
                 ['id', 'sender_id', 'receiver_id', 'amount', 'created_at'])
 
-        logger.info(f"SVRP transfer: {tid} → {receiver_tid} amount={amount}")
-        remaining = max(0, 4 - friend_count)
-        return True, f"✅ تم إرسال {amount:.2f} للعميل {receiver_customer_id}\n💰 تم فك تجميد {amount:.2f} من رصيدك\n👥 عدد أصدقائك: {friend_count}/4\n{'⏳ تحتاج {0} أصدقاء آخرين لفك التجميد الكامل'.format(remaining) if remaining > 0 else '🎉 أكملت 4 أصدقاء!'}"
+        logger.info(f"SVRP transfer: {tid} → {receiver_tid} amount={amount} unlock_bonus={unlock_bonus}")
+        msg = f"✅ تم إرسال {amount:.2f} للعميل {receiver_customer_id} (يصل رصيداً مجمداً بنفس شروط الفك)"
+        if unlock_bonus > 0:
+            msg += f"\n💰 تم فك تجميد {unlock_bonus:.2f} (5%) من رصيدك لأنك حولت 10% أو أكثر"
+        else:
+            msg += f"\n⏳ حوّل 10% أو أكثر من رصيدك المجمد ليُفك لك 5%"
+        return True, msg
 
     # ==================== شركات الاسترداد ====================
 
