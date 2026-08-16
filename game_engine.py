@@ -626,9 +626,15 @@ class GameManager:
             with open(self.catalog_file, 'a', newline='', encoding=CSV_ENCODING) as f:
                 writer = csv.DictWriter(f, fieldnames=fieldnames)
                 writer.writerow(row)
+            self.invalidate_games_cache()
         except:
             pass
         return game_id
+
+    def invalidate_games_cache(self):
+        """إبطال كاش قائمة الألعاب فوراً بعد أي تعديل على الكتالوج."""
+        self._games_catalog_cache = None
+        self._games_catalog_cache_ts = 0
 
     # ===== الجلسات =====
 

@@ -7041,6 +7041,10 @@ def api_games_toggle(game_id):
             writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()
             writer.writerows(rows)
+        try:
+            _gm.invalidate_games_cache()
+        except Exception:
+            pass
     except:
         pass
     return jsonify({'success': True})
