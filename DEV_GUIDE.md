@@ -129,3 +129,6 @@ svrp_                 ← عام، أخيراً (أكواد ترويجية)
 - [ ] مطابقة P2P: كل خطوة منفصلة
 - [ ] كل البيانات تظهر زرقاء قابلة للنسخ
 - [ ] الطلبات لا تنتهي صلاحيتها
+
+## Tailwind CSS (pre-built)
+اللوحة تستخدم ملف CSS مبني مسبقاً `dashboard/static/css/tailwind.build.css` بدل سكربت Tailwind runtime. عند إضافة فئات Tailwind جديدة في القوالب أو ملفات JS شغّل `./build_css.sh` من جذر المشروع ثم حدّث رقم `?v=` في وسم `<link>` داخل `base.html` و `home.html`.
