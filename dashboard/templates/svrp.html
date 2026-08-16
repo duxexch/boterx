@@ -276,6 +276,7 @@
                             <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="user">User</th>
                             <th class="text-right px-4 py-3 font-semibold text-slate-400">الشركة</th>
                             <th class="text-right px-4 py-3 font-semibold text-slate-400">رقم الحساب</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400">فتح الحساب</th>
                             <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="status">Status</th>
                             <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="date">Date</th>
                             <th class="text-right px-4 py-3 font-semibold text-slate-400">الإجراءات</th>
@@ -288,6 +289,7 @@
                                 <td class="px-4 py-3 font-medium" x-text="a.user_id"></td>
                                 <td class="px-4 py-3" x-text="a.company_name || a.company_id"></td>
                                 <td class="px-4 py-3 font-mono text-xs" x-text="a.account_number"></td>
+                                <td class="px-4 py-3 text-xs" x-text="a.account_source === 'new' ? '🆕 عبر الرابط' : (a.account_source === 'existing' ? '🕘 حساب مسبق' : '-')"></td>
                                 <td class="px-4 py-3"><span x-html="statusBadge(a.status || 'active')"></span></td>
                                 <td class="px-4 py-3 text-slate-400 text-xs" x-text="a.created_at || '-'"></td>
                                 <td class="px-4 py-3">
@@ -308,7 +310,7 @@
                             </tr>
                         </template>
                         <tr x-show="compAccounts.length === 0">
-                            <td colspan="7" class="px-4 py-10 text-center text-slate-500">
+                            <td colspan="8" class="px-4 py-10 text-center text-slate-500">
                                 <i class="fas fa-id-card text-4xl mb-3 block opacity-30"></i>
                                 <p>لا توجد حسابات مسجلة</p>
                             </td>

@@ -507,12 +507,37 @@ async function loadCompanies() {
           <div style="font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:14px">${I18N.lang==='en'
             ? 'Your account at ' + escH(approved.name) + ' was approved. Deposit and play now — if you lose, submit a compensation claim with a screenshot and we will compensate you.'
             : 'تم قبول حسابك في ' + escH(approved.name) + '. قم بالإيداع والعب الآن — إذا خسرت قدّم طلب تعويض مع لقطة شاشة وسيتم تعويضك.'}</div>
+          <div id="srcQ_${escH(approved.id)}">
+            <div style="font-size:13px;font-weight:700;margin-bottom:8px">${I18N.lang==='en'?'When did you open this account?':'متى فتحت هذا الحساب؟'}</div>
+            <div style="display:flex;gap:6px;margin-bottom:10px">
+              <button class="btn-transfer" style="flex:1;font-size:12px" onclick="reportAccountSource('${escH(approved.id)}','new',this)">${I18N.lang==='en'?'Opened now via the link':'فتحته الآن عبر الرابط'}</button>
+              <button class="btn-transfer" style="flex:1;font-size:12px;background:var(--surface-3)" onclick="reportAccountSource('${escH(approved.id)}','existing',this)">${I18N.lang==='en'?'I already had it':'كان لديّ مسبقاً'}</button>
+            </div>
+          </div>
           <button class="btn-transfer" style="width:100%" onclick="this.closest('div[style*=fixed]').remove()">${I18N.lang==='en'?'Got it':'تمام، فهمت'}</button>
         </div>`;
         ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
         document.body.appendChild(ov);
       }
     } catch (_) {}
+    // إرسال إجابة "متى فتحت الحساب" للإدارة
+    window.reportAccountSource = async function(cid, source, btn) {
+      try {
+        if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+        const r = await apiFetch(`${BASE}/api/player/companies/account-source`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ company_id: cid, source })
+        });
+        const q = document.getElementById('srcQ_' + cid);
+        if (r.ok && q) {
+          q.innerHTML = '<div style="font-size:12px;color:#00e701;margin-bottom:10px">' +
+            (I18N.lang==='en' ? '✅ Thank you — your answer was recorded' : '✅ شكراً — تم تسجيل إجابتك') + '</div>';
+        } else if (btn) { btn.disabled = false; btn.textContent = I18N.lang==='en'?'Try again':'أعد المحاولة'; }
+      } catch (e) {
+        if (btn) { btn.disabled = false; btn.textContent = I18N.lang==='en'?'Try again':'أعد المحاولة'; }
+      }
+    };
   } catch (e) { /* غير حرج */ }
 
   // Live balance polling (game balance only) — يُسجَّل مرة واحدة فقط

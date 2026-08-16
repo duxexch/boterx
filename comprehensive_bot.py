@@ -4753,7 +4753,19 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                 ban_reason = user.get('ban_reason', self.tr('a0122_غير_محدد', lang))
                 self.send_message(chat_id, self.tr('a0123_تم_حظر', lang, ban_reason=ban_reason))
                 return
-            
+
+            # 💎 تعويض: صديق لديه حساب بالفعل فتح البوت برابط إحالة —
+            # يُربط بالمُحيل ويحصل المُحيل على نص فك التجميد (5% بدل 10%).
+            if ref_code and ref_code != 'web_auth' and self.svrp:
+                try:
+                    _ok_ref, _ref_msg = self.svrp.process_referral_code(ref_code, user_id, referred_is_existing=True)
+                    if _ok_ref:
+                        self.send_message(chat_id,
+                            "🎁 <b>رابط دعوة صديق</b>\n\n"
+                            f"✅ {_ref_msg}")
+                except Exception as e:
+                    logger.error(f"خطأ في معالجة إحالة مستخدم قائم: {e}")
+
             lang = user.get('language', 'ar')
             name = user.get('name', '')
             customer_id = user.get('customer_id', '')
