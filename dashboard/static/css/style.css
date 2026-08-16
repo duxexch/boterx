@@ -3,14 +3,14 @@ body { font-family: 'Cairo', 'Segoe UI', Tahoma, sans-serif; }
 
 /* ===== CSS Variables for Theming ===== */
 :root {
-    --bg-primary: #0f172a;
-    --bg-secondary: #1e293b;
-    --bg-card: #1e293b;
-    --bg-input: #0f172a;
-    --border-color: #334155;
-    --text-primary: #f1f5f9;
-    --text-secondary: #cbd5e1;
-    --text-muted: #94a3b8;
+    --bg-primary: #0b0e11;
+    --bg-secondary: #141920;
+    --bg-card: #141920;
+    --bg-input: #10141a;
+    --border-color: #262e39;
+    --text-primary: #eef2f6;
+    --text-secondary: #a8b3bf;
+    --text-muted: #8794a3;
     --accent-gold: #ffd700;
     --accent-blue: #3b82f6;
     --accent-green: #4ade80;

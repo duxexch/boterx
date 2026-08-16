@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
-<meta name="theme-color" content="#0f172a">
+<meta name="theme-color" content="#10141a">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="/static/manifest.json">
@@ -15,7 +15,7 @@
 body{
   overflow:hidden;
   font-family:system-ui,-apple-system,'Segoe UI',sans-serif;
-  background:#0f172a;color:#fff;
+  background:#10141a;color:#fff;
   /* iOS Safari safe-area */
   padding-top:env(safe-area-inset-top);
   padding-bottom:env(safe-area-inset-bottom);
@@ -35,7 +35,7 @@ body{
 .balance{font-size:18px;font-weight:900;color:#00e701}
 .vex-btn{background:linear-gradient(135deg,#a78bfa,#8b5cf6);color:#fff;border:none;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;display:none}
 .vex-btn.show{display:block}
-.back-btn{background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer}
+.back-btn{background:none;border:none;color:#8794a3;font-size:20px;cursor:pointer}
 /* Game area */
 #game-area{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;position:relative;overflow:hidden}
 .game-title{font-size:28px;font-weight:900;margin-bottom:8px}
@@ -49,55 +49,55 @@ body{
 /* Bet bar */
 #betbar{padding:12px 14px;background:rgba(0,0,0,0.3);backdrop-filter:blur(10px);position:sticky;bottom:0;z-index:100}
 .bet-input-row{display:flex;gap:8px;margin-bottom:8px}
-.bet-input{flex:1;background:#1e293b;border:1px solid #334155;border-radius:10px;padding:10px 14px;color:#fff;font-size:18px;font-weight:700;text-align:center;outline:none}
+.bet-input{flex:1;background:#1a2028;border:1px solid #262e39;border-radius:10px;padding:10px 14px;color:#fff;font-size:18px;font-weight:700;text-align:center;outline:none}
 .bet-input:focus{border-color:#00e701}
 .play-btn{background:linear-gradient(135deg,#00e701,#f59e0b);color:#000;border:none;padding:10px 24px;border-radius:10px;font-size:18px;font-weight:900;cursor:pointer;transition:transform 0.15s}
 .play-btn:active{transform:scale(0.95)}
 .play-btn:disabled{opacity:0.4;cursor:not-allowed}
 .quick-bets{display:flex;gap:6px;justify-content:center}
-.quick-bet{background:#1e293b;border:1px solid #334155;border-radius:8px;padding:6px 12px;color:#94a3b8;font-size:13px;cursor:pointer}
-.quick-bet:active{background:#334155}
+.quick-bet{background:#1a2028;border:1px solid #262e39;border-radius:8px;padding:6px 12px;color:#8794a3;font-size:13px;cursor:pointer}
+.quick-bet:active{background:#262e39}
 /* Modal */
 #modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.7);z-index:200;backdrop-filter:blur(5px)}
-.modal-box{background:linear-gradient(145deg,#1e293b,#0f172a);border:1px solid #334155;border-radius:20px;padding:24px;width:90%;max-width:360px;text-align:center}
+.modal-box{background:linear-gradient(145deg,#1a2028,#10141a);border:1px solid #262e39;border-radius:20px;padding:24px;width:90%;max-width:360px;text-align:center}
 .modal-title{font-size:24px;font-weight:900;margin-bottom:8px}
 .modal-subtitle{font-size:14px;opacity:0.6;margin-bottom:16px}
 .modal-balance{font-size:20px;color:#00e701;font-weight:700;margin-bottom:16px}
-.modal-input{width:100%;background:#0f172a;border:1px solid #334155;border-radius:10px;padding:12px;color:#fff;font-size:18px;text-align:center;outline:none;margin-bottom:12px}
+.modal-input{width:100%;background:#10141a;border:1px solid #262e39;border-radius:10px;padding:12px;color:#fff;font-size:18px;text-align:center;outline:none;margin-bottom:12px}
 .modal-btn{width:100%;background:linear-gradient(135deg,#00e701,#f59e0b);color:#000;border:none;padding:12px;border-radius:10px;font-size:16px;font-weight:900;cursor:pointer;margin-bottom:8px}
-.modal-btn.secondary{background:#334155;color:#fff}
+.modal-btn.secondary{background:#262e39;color:#fff}
 /* Other games scroll */
-.other-games{margin-top:16px;border-top:1px solid #334155;padding-top:12px}
+.other-games{margin-top:16px;border-top:1px solid #262e39;padding-top:12px}
 .other-games-title{font-size:12px;opacity:0.5;margin-bottom:8px}
 .games-scroll{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
 .games-scroll::-webkit-scrollbar{height:3px}
-.games-scroll::-webkit-scrollbar-thumb{background:#334155;border-radius:3px}
-.mini-game{flex-shrink:0;background:#1e293b;border:1px solid #334155;border-radius:10px;padding:8px 12px;text-align:center;cursor:pointer;min-width:70px}
+.games-scroll::-webkit-scrollbar-thumb{background:#262e39;border-radius:3px}
+.mini-game{flex-shrink:0;background:#1a2028;border:1px solid #262e39;border-radius:10px;padding:8px 12px;text-align:center;cursor:pointer;min-width:70px}
 .mini-game-icon{font-size:24px}
 .mini-game-name{font-size:10px;margin-top:2px}
 /* Confetti */
 .confetti{position:absolute;width:8px;height:8px;pointer-events:none;z-index:150}
 /* Deposit */
 .deposit-methods{display:flex;flex-direction:column;gap:8px;margin:12px 0}
-.deposit-method{background:#1e293b;border:1px solid #334155;border-radius:10px;padding:10px;display:flex;align-items:center;gap:8px;cursor:pointer}
+.deposit-method{background:#1a2028;border:1px solid #262e39;border-radius:10px;padding:10px;display:flex;align-items:center;gap:8px;cursor:pointer}
 .deposit-method.selected{border-color:#00e701}
-.copy-box{background:#0f172a;border:1px solid #334155;border-radius:8px;padding:8px;margin:8px 0;display:flex;align-items:center;justify-content:space-between;cursor:pointer}
+.copy-box{background:#10141a;border:1px solid #262e39;border-radius:8px;padding:8px;margin:8px 0;display:flex;align-items:center;justify-content:space-between;cursor:pointer}
 .copy-box code{color:#00e701;font-size:13px}
 
 /* Live Players Bar */
-#livePlayers{max-height:110px;overflow-y:auto;background:rgba(0,0,0,0.25);border-top:1px solid #1e293b}
+#livePlayers{max-height:110px;overflow-y:auto;background:rgba(0,0,0,0.25);border-top:1px solid #1a2028}
 #livePlayers::-webkit-scrollbar{width:3px}
-#livePlayers::-webkit-scrollbar-thumb{background:#334155;border-radius:3px}
-.lp-header{display:flex;justify-content:space-between;align-items:center;padding:4px 10px;font-size:10px;color:#64748b;border-bottom:1px solid #1e293b}
+#livePlayers::-webkit-scrollbar-thumb{background:#262e39;border-radius:3px}
+.lp-header{display:flex;justify-content:space-between;align-items:center;padding:4px 10px;font-size:10px;color:#8794a3;border-bottom:1px solid #1a2028}
 .lp-count{color:#00e701;font-weight:700}
 .lp-list{padding:2px 8px}
 .lp-row{display:flex;align-items:center;justify-content:space-between;padding:3px 6px;border-radius:6px;margin:2px 0;font-size:11px;animation:lpSlideIn 0.3s ease-out}
 @keyframes lpSlideIn{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:translateX(0)}}
-.lp-row.playing{background:rgba(148,163,184,0.08);color:#94a3b8}
+.lp-row.playing{background:rgba(148,163,184,0.08);color:#8794a3}
 .lp-row.win{background:rgba(52,211,153,0.12);color:#34d399}
 .lp-row.lose{background:rgba(239,68,68,0.08);color:#ef4444;opacity:0.6}
 .lp-user{display:flex;align-items:center;gap:4px}
-.lp-avatar{width:18px;height:18px;border-radius:50%;background:#334155;display:flex;align-items:center;justify-content:center;font-size:9px}
+.lp-avatar{width:18px;height:18px;border-radius:50%;background:#262e39;display:flex;align-items:center;justify-content:center;font-size:9px}
 .lp-name{font-weight:600}
 .lp-bet{font-weight:700}
 .lp-result{font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px}
@@ -384,7 +384,7 @@ async function showDepositModal(required) {
       <span style="font-size:18px">${m.icon||'💳'}</span>
       <div style="flex:1">
         <div style="font-weight:600;font-size:13px">${m.method_name||''}</div>
-        <div style="font-size:11px;color:#64748b">${m.method_type||''}</div>
+        <div style="font-size:11px;color:#8794a3">${m.method_type||''}</div>
       </div>
       <span style="color:#00e701;font-size:14px">‹</span>
     </div>
@@ -395,17 +395,17 @@ async function showDepositModal(required) {
     <div class="modal-subtitle">${required ? `رصيدك غير كافٍ — تحتاج ${required}` : 'اختر وسيلة الدفع'}</div>
     <div id="depMethodsList">${methodsHtml}</div>
     <div id="depStep2" style="display:none">
-      <div style="font-size:11px;color:#64748b;margin:10px 0 6px">📋 بيانات الوسيلة:</div>
-      <div class="copy-box" onclick="copyMethodData()" style="display:flex;align-items:center;justify-content:space-between;background:#0f172a;border:1px solid #334155;border-radius:10px;padding:10px 12px;cursor:pointer;margin-bottom:10px">
+      <div style="font-size:11px;color:#8794a3;margin:10px 0 6px">📋 بيانات الوسيلة:</div>
+      <div class="copy-box" onclick="copyMethodData()" style="display:flex;align-items:center;justify-content:space-between;background:#10141a;border:1px solid #262e39;border-radius:10px;padding:10px 12px;cursor:pointer;margin-bottom:10px">
         <code id="methodDataDisplay" style="font-size:13px;color:#00e701;word-break:break-all"></code>
-        <span style="font-size:12px;color:#94a3b8;flex-shrink:0;margin-right:8px">📋 نسخ</span>
+        <span style="font-size:12px;color:#8794a3;flex-shrink:0;margin-right:8px">📋 نسخ</span>
       </div>
-      <div style="font-size:11px;color:#64748b;margin:8px 0 4px">💵 المبلغ الذي سترسله:</div>
-      <input type="number" id="depAmount" placeholder="المبلغ" value="${required || minBet}" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px;color:#fff;font-size:15px;font-weight:700;outline:none;margin-bottom:8px">
-      <div style="font-size:11px;color:#64748b;margin:8px 0 4px">🔐 رقم محفظتك (التي سترسل منها):</div>
-      <input type="text" id="playerWallet" placeholder="رقم محفظتك" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px;color:#fff;font-size:15px;font-weight:700;outline:none;margin-bottom:8px">
+      <div style="font-size:11px;color:#8794a3;margin:8px 0 4px">💵 المبلغ الذي سترسله:</div>
+      <input type="number" id="depAmount" placeholder="المبلغ" value="${required || minBet}" style="width:100%;background:#10141a;border:1px solid #262e39;border-radius:8px;padding:10px;color:#fff;font-size:15px;font-weight:700;outline:none;margin-bottom:8px">
+      <div style="font-size:11px;color:#8794a3;margin:8px 0 4px">🔐 رقم محفظتك (التي سترسل منها):</div>
+      <input type="text" id="playerWallet" placeholder="رقم محفظتك" style="width:100%;background:#10141a;border:1px solid #262e39;border-radius:8px;padding:10px;color:#fff;font-size:15px;font-weight:700;outline:none;margin-bottom:8px">
       <div id="savedWalletsHint" style="display:none;font-size:11px;color:#34d399;margin-bottom:6px"></div>
-      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#64748b;margin-bottom:10px;cursor:pointer">
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#8794a3;margin-bottom:10px;cursor:pointer">
         <input type="checkbox" id="saveMethod" style="accent-color:#00e701"> حفظ كوسيلة دفع دائمة
       </label>
       <button class="modal-btn" onclick="submitGameDeposit()">✅ تأكيد الإيداع</button>
