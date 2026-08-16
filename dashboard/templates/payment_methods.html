@@ -377,6 +377,7 @@ function paymentMethodsApp() {
                 additional_info: this.form.additional_info,
                 icon: this.form.icon,
                 currency: this.form.currency || '',
+                bot_icon: this.form.bot_icon || '',
                 available_for_games: this.form.quick ? 'yes' : 'no'
             };
             if (this.editing && this.selectedMethod) {

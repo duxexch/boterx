@@ -180,12 +180,15 @@ def append_csv(filename, row, fieldnames):
             with open(filepath, 'r', encoding='utf-8-sig') as f:
                 existing_header = next(csv.reader(f), [])
             if any(fn not in existing_header for fn in fieldnames):
-                merged = existing_header + [fn for fn in fieldnames if fn not in existing_header]
                 existing_rows = read_csv(filename)
-                for r in existing_rows:
-                    r.pop(None, None)
-                write_csv(filename, [{k: (r.get(k) or '') for k in merged} for r in existing_rows], merged)
-                fieldnames = merged
+                if any(None in r for r in existing_rows):
+                    # ملف بترويسة تالفة/صفوف زائدة — لا نعيد الكتابة كي لا نفقد بيانات؛
+                    # نضيف الصف حسب الترويسة الحالية فقط
+                    fieldnames = existing_header
+                else:
+                    merged = existing_header + [fn for fn in fieldnames if fn not in existing_header]
+                    write_csv(filename, [{k: (r.get(k) or '') for k in merged} for r in existing_rows], merged)
+                    fieldnames = merged
         except Exception as e:
             print(f"append_csv header migration failed for {filename}: {e}")
     with open(filepath, 'a', newline='', encoding='utf-8-sig') as f:

@@ -659,12 +659,13 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             icon = company_icon.strip()
             if len(icon) <= 4 and any(ord(c) > 127 for c in icon):
                 return icon
-            if icon.startswith('http'):
-                return icon
-            # حاول normalizing
-            normalized = self.normalize_icon(icon, None)
-            if normalized and normalized != '🏷️':
-                return normalized
+            if icon.startswith('http') or icon.startswith('/'):
+                pass  # روابط الصور لا تُعرض كنص في تيليغرام — تابع للبدائل (مكتبة/خريطة/افتراضي)
+            else:
+                # حاول normalizing
+                normalized = self.normalize_icon(icon, None)
+                if normalized and normalized != '🏷️':
+                    return normalized
 
         # 2) ابحث في المكتبة
         if company_id:
@@ -4104,6 +4105,8 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
     def get_companies(self, service_type=None):
         """جلب الشركات النشطة — من الكاش"""
         with self._cache_lock:
+            if time.time() - getattr(self, '_companies_cache_ts', 0) > 60:
+                self._companies_cache = None
             if self._companies_cache is not None:
                 companies = self._companies_cache
             else:
@@ -4115,6 +4118,7 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                             if row.get('is_active', '').lower() in ['active', 'yes', '1', 'true']:
                                 companies.append(row)
                         self._companies_cache = companies
+                        self._companies_cache_ts = time.time()
                 except FileNotFoundError:
                     with open('companies.csv', 'w', newline='', encoding='utf-8-sig') as f:
                         writer = csv.writer(f)
@@ -9581,6 +9585,9 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
     def get_payment_methods_by_company(self, company_id, transaction_type=None):
             """الحصول على وسائل الدفع لشركة معينة — من الكاش"""
             with self._cache_lock:
+                if time.time() - getattr(self, '_methods_cache_ts', 0) > 60:
+                    self._methods_cache = {}
+                    self._methods_cache_ts = time.time()
                 if company_id in self._methods_cache:
                     return self._methods_cache[company_id]
             
@@ -11513,6 +11520,8 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
     def get_all_payment_methods(self):
             """الحصول على كل وسائل الدفع — من الكاش"""
             with self._cache_lock:
+                if time.time() - getattr(self, '_all_methods_cache_ts', 0) > 60:
+                    self._all_methods_cache = None
                 if self._all_methods_cache is not None:
                     return self._all_methods_cache
             methods = []
@@ -11525,6 +11534,7 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                 pass
             with self._cache_lock:
                 self._all_methods_cache = methods
+                self._all_methods_cache_ts = time.time()
             return methods
 
     def get_payment_methods_by_currency(self, currency):
