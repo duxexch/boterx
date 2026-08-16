@@ -94,114 +94,165 @@
       }
     ]
   }
-  </script>
-  <style>
+  </script>  <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
     :root{
       --green:#00e701;--green2:#00b301;--green-dim:rgba(0,231,1,0.1);
-      --gold:#ffd700;
-      --dark:#0b0e11;--dark2:#10141a;--card:rgba(20,25,32,0.75);
+      --gold:#ffd700;--gold-dim:#c9a800;
+      --dark:#0b0e11;--dark2:#10141a;--surface:#141920;--card:rgba(20,25,32,0.75);
       --border:rgba(255,255,255,0.08);--text:#eef2f6;--muted:#8794a3;
+      --ease:cubic-bezier(0.4,0,0.2,1);
     }
     html{scroll-behavior:smooth}
     body{font-family:'Cairo',sans-serif;background:var(--dark);color:var(--text);min-height:100vh;overflow-x:hidden}
 
-    /* BG */
+    /* ── Layered background ── */
     body::before{
-      content:'';position:fixed;inset:0;z-index:-2;
+      content:'';position:fixed;inset:0;z-index:-3;
       background:
-        radial-gradient(ellipse 80% 50% at 50% -10%,rgba(0,231,1,0.11) 0%,transparent 60%),
-        radial-gradient(ellipse 50% 60% at 90% 80%,rgba(255,215,0,0.05) 0%,transparent 50%),
+        radial-gradient(ellipse 80% 50% at 50% -10%,rgba(0,231,1,0.12) 0%,transparent 60%),
+        radial-gradient(ellipse 50% 60% at 90% 80%,rgba(255,215,0,0.06) 0%,transparent 50%),
         radial-gradient(ellipse 40% 50% at 5% 30%,rgba(0,231,1,0.05) 0%,transparent 55%),
         #0b0e11;
     }
     .grid-bg{
-      position:fixed;inset:0;z-index:-1;
+      position:fixed;inset:0;z-index:-2;pointer-events:none;
       background-image:linear-gradient(rgba(255,255,255,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.025) 1px,transparent 1px);
-      background-size:50px 50px;pointer-events:none;
+      background-size:50px 50px;
+      mask-image:radial-gradient(ellipse 90% 70% at 50% 20%,#000 30%,transparent 80%);
+      -webkit-mask-image:radial-gradient(ellipse 90% 70% at 50% 20%,#000 30%,transparent 80%);
+    }
+    /* Floating particles */
+    .fx-particles{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden}
+    .fxp{position:absolute;bottom:-10px;border-radius:50%;opacity:0;animation:fxRise linear infinite}
+    .fxp.g{background:rgba(0,231,1,.5);box-shadow:0 0 8px rgba(0,231,1,.6)}
+    .fxp.y{background:rgba(255,215,0,.45);box-shadow:0 0 8px rgba(255,215,0,.5)}
+    @keyframes fxRise{
+      0%{transform:translateY(0) translateX(0);opacity:0}
+      8%{opacity:.7}
+      90%{opacity:.25}
+      100%{transform:translateY(-105vh) translateX(30px);opacity:0}
     }
 
-    /* NAV */
+    /* ── NAV ── */
     nav{
       position:fixed;top:0;left:0;right:0;z-index:100;
-      background:rgba(11,14,17,0.88);backdrop-filter:blur(16px);
+      background:rgba(11,14,17,0.88);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
       border-bottom:1px solid var(--border);
       padding:12px 24px;display:flex;align-items:center;justify-content:space-between;
     }
-    .nav-logo{display:flex;align-items:center;gap:10px}
-    .nav-logo-img{
-      width:38px;height:38px;border-radius:10px;object-fit:cover;
-      border:1px solid rgba(0,231,1,0.3);
-      box-shadow:0 0 16px rgba(0,231,1,0.2);
+    nav::after{
+      content:'';position:absolute;bottom:-1px;left:0;right:0;height:1px;
+      background:linear-gradient(90deg,transparent,rgba(0,231,1,.6),rgba(255,215,0,.4),transparent);
+      background-size:200% 100%;animation:navSweep 6s linear infinite;
     }
+    @keyframes navSweep{from{background-position:200% 0}to{background-position:-200% 0}}
+    .nav-logo{display:flex;align-items:center;gap:10px}
+    .nav-logo-img{width:38px;height:38px;border-radius:10px;object-fit:cover;border:1px solid rgba(0,231,1,0.3);box-shadow:0 0 16px rgba(0,231,1,0.2)}
     .nav-brand{font-weight:900;font-size:1.15rem;background:linear-gradient(135deg,#fff,var(--green));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
     .nav-links{display:flex;gap:10px;align-items:center}
     .btn-nav-login{
       display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;
       background:var(--green-dim);border:1px solid rgba(0,231,1,0.3);
-      color:var(--green);font-size:12px;font-weight:700;text-decoration:none;
-      transition:all 0.2s;
+      color:var(--green);font-size:12px;font-weight:700;text-decoration:none;transition:all .2s;
     }
     .btn-nav-login:hover{background:rgba(0,231,1,0.18);box-shadow:0 0 20px rgba(0,231,1,0.15)}
     .btn-play-nav{
       display:flex;align-items:center;gap:6px;padding:8px 18px;border-radius:10px;
       background:linear-gradient(135deg,var(--green),var(--green2));
-      color:#0b0e11;font-size:12px;font-weight:800;text-decoration:none;transition:all 0.2s;
+      color:#0b0e11;font-size:12px;font-weight:800;text-decoration:none;transition:all .2s;
     }
     .btn-play-nav:hover{box-shadow:0 4px 20px rgba(0,231,1,0.3);transform:translateY(-1px)}
 
-    /* HERO */
+    /* ── HERO ── */
     .hero{
-      min-height:100vh;display:flex;flex-direction:column;
-      align-items:center;justify-content:center;
-      text-align:center;padding:100px 24px 60px;position:relative;
+      min-height:92vh;display:flex;flex-direction:column;align-items:center;justify-content:center;
+      text-align:center;padding:110px 24px 40px;position:relative;
     }
+    .hero-logo-wrap{position:relative;margin-bottom:26px}
+    .hero-logo-wrap::before{
+      content:'';position:absolute;inset:-14px;border-radius:50%;
+      border:1px dashed rgba(255,215,0,.35);
+      animation:ringSpin 18s linear infinite;
+    }
+    .hero-logo-wrap::after{
+      content:'';position:absolute;inset:-28px;border-radius:50%;
+      border:1px solid rgba(0,231,1,.15);
+      animation:ringSpin 26s linear infinite reverse;
+    }
+    @keyframes ringSpin{to{transform:rotate(360deg)}}
     .hero-logo{
-      width:130px;height:130px;border-radius:50%;object-fit:cover;
-      border:2px solid rgba(0,231,1,0.3);
-      box-shadow:0 0 50px rgba(0,231,1,0.3),0 0 100px rgba(0,231,1,0.1);
-      margin-bottom:24px;
+      width:130px;height:130px;border-radius:50%;object-fit:cover;display:block;
+      border:2px solid rgba(0,231,1,0.35);
+      box-shadow:0 0 50px rgba(0,231,1,0.3),0 0 110px rgba(0,231,1,0.12);
       animation:heroPulse 3s ease-in-out infinite;
     }
-    @keyframes heroPulse{0%,100%{box-shadow:0 0 50px rgba(0,231,1,0.3),0 0 100px rgba(0,231,1,0.1)}50%{box-shadow:0 0 70px rgba(0,231,1,0.5),0 0 140px rgba(0,231,1,0.2)}}
+    @keyframes heroPulse{0%,100%{box-shadow:0 0 50px rgba(0,231,1,0.3),0 0 100px rgba(0,231,1,0.1)}50%{box-shadow:0 0 70px rgba(0,231,1,0.5),0 0 140px rgba(255,215,0,0.15)}}
     .hero-badge{
       display:inline-flex;align-items:center;gap:6px;
       background:rgba(0,231,1,0.1);border:1px solid rgba(0,231,1,0.3);
       color:var(--green);border-radius:999px;padding:6px 18px;
       font-size:12px;font-weight:700;margin-bottom:20px;
     }
+    .hero-badge .dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);animation:dotBlink 1.6s infinite}
+    @keyframes dotBlink{0%,100%{opacity:1}50%{opacity:.35}}
     .hero h1{
-      font-size:clamp(2.2rem,6vw,4.2rem);font-weight:900;line-height:1.1;margin-bottom:16px;
-      background:linear-gradient(135deg,#fff 30%,var(--green));
+      font-size:clamp(2.3rem,6.2vw,4.4rem);font-weight:900;line-height:1.12;margin-bottom:16px;
+      background:linear-gradient(120deg,#fff 25%,var(--green) 55%,var(--gold) 90%);
+      background-size:220% 100%;
       -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+      animation:heroShine 7s ease-in-out infinite;
     }
+    @keyframes heroShine{0%,100%{background-position:0% 0}50%{background-position:100% 0}}
     .hero p{font-size:clamp(1rem,2.5vw,1.2rem);color:var(--muted);max-width:560px;margin:0 auto 32px;line-height:1.8}
-    .cta-row{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin-bottom:40px}
+    .cta-row{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin-bottom:36px}
     .btn-cta{
       display:inline-flex;align-items:center;gap:8px;
       padding:14px 28px;border-radius:999px;font-size:1rem;font-weight:800;
-      cursor:pointer;text-decoration:none;border:none;transition:all 0.2s;
-      font-family:'Cairo',sans-serif;
+      cursor:pointer;text-decoration:none;border:none;transition:all .2s;font-family:'Cairo',sans-serif;
+      position:relative;overflow:hidden;
     }
-    .btn-primary{
-      background:linear-gradient(135deg,var(--green),var(--green2));
-      color:#0b0e11;box-shadow:0 0 30px rgba(0,231,1,0.3);
+    .btn-primary{background:linear-gradient(135deg,var(--green),var(--green2));color:#0b0e11;box-shadow:0 0 30px rgba(0,231,1,0.3)}
+    .btn-primary::after{
+      content:'';position:absolute;top:0;bottom:0;width:40%;left:-60%;
+      background:linear-gradient(100deg,transparent,rgba(255,255,255,.55),transparent);
+      transform:skewX(-20deg);animation:btnSheen 3.2s ease-in-out infinite;
     }
+    @keyframes btnSheen{0%,60%{left:-60%}100%{left:140%}}
     .btn-primary:hover{transform:translateY(-2px);box-shadow:0 0 50px rgba(0,231,1,0.45)}
-    .btn-secondary{
-      background:rgba(0,231,1,0.08);color:var(--text);
-      border:1px solid rgba(0,231,1,0.2);
-    }
+    .btn-secondary{background:rgba(0,231,1,0.08);color:var(--text);border:1px solid rgba(0,231,1,0.2)}
     .btn-secondary:hover{background:rgba(0,231,1,0.14);transform:translateY(-2px)}
-    .btn-login-hero{
-      background:rgba(255,255,255,0.05);color:var(--muted);
-      border:1px solid rgba(255,255,255,0.1);
-    }
+    .btn-login-hero{background:rgba(255,255,255,0.05);color:var(--muted);border:1px solid rgba(255,255,255,0.1)}
     .btn-login-hero:hover{background:rgba(255,255,255,0.1);color:var(--text);transform:translateY(-2px)}
     .hero-tags{display:flex;gap:20px;flex-wrap:wrap;justify-content:center;color:var(--muted);font-size:12px}
     .hero-tags span{display:flex;align-items:center;gap:4px}
 
-    /* STATS */
+    /* ── LIVE WINS TICKER ── */
+    .ticker-wrap{
+      border-top:1px solid var(--border);border-bottom:1px solid var(--border);
+      background:rgba(16,20,26,.7);backdrop-filter:blur(8px);
+      overflow:hidden;position:relative;padding:10px 0;margin-bottom:70px;
+    }
+    .ticker-label{
+      position:absolute;top:0;bottom:0;right:0;z-index:2;display:flex;align-items:center;gap:6px;
+      padding:0 16px;background:linear-gradient(270deg,var(--dark) 60%,transparent);
+      font-size:11px;font-weight:800;color:var(--gold);white-space:nowrap;
+    }
+    .ticker{display:flex;gap:12px;width:max-content;animation:tickerMove 40s linear infinite;direction:ltr}
+    .ticker:hover{animation-play-state:paused}
+    @keyframes tickerMove{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+    .tick-item{
+      display:flex;align-items:center;gap:8px;direction:rtl;
+      background:var(--card);border:1px solid var(--border);border-radius:999px;
+      padding:5px 14px;font-size:11.5px;white-space:nowrap;
+    }
+    .tick-item .ti-game{font-size:14px}
+    .tick-item .ti-name{color:var(--muted);font-weight:600}
+    .tick-item .ti-amt{color:var(--green);font-weight:900;font-family:'Courier New',monospace}
+    .tick-item.big .ti-amt{color:var(--gold)}
+    .tick-item.big{border-color:rgba(255,215,0,.35);box-shadow:0 0 14px rgba(255,215,0,.08)}
+
+    /* ── STATS ── */
     .stats-row{
       display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
       gap:16px;max-width:860px;margin:0 auto 80px;padding:0 24px;
@@ -209,70 +260,162 @@
     .stat-card{
       background:var(--card);border:1px solid var(--border);
       border-radius:16px;padding:24px 16px;text-align:center;
-      backdrop-filter:blur(8px);
-      transition:border-color 0.2s,box-shadow 0.2s;
+      backdrop-filter:blur(8px);position:relative;overflow:hidden;
+      transition:border-color .2s,box-shadow .2s,transform .2s;
     }
-    .stat-card:hover{border-color:rgba(0,231,1,0.35);box-shadow:0 0 24px rgba(0,231,1,0.08)}
-    .stat-num{font-size:2rem;font-weight:900;color:var(--green);display:block;text-shadow:0 0 20px rgba(0,231,1,0.4)}
+    .stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--green),transparent);opacity:.5}
+    .stat-card:nth-child(3)::before{background:linear-gradient(90deg,transparent,var(--gold),transparent)}
+    .stat-card:hover{border-color:rgba(0,231,1,0.35);box-shadow:0 0 24px rgba(0,231,1,0.08);transform:translateY(-3px)}
+    .stat-num{font-size:2rem;font-weight:900;color:var(--green);display:block;text-shadow:0 0 20px rgba(0,231,1,0.4);font-family:'Courier New',monospace}
+    .stat-card:nth-child(3) .stat-num{color:var(--gold);text-shadow:0 0 20px rgba(255,215,0,.35)}
     .stat-label{color:var(--muted);font-size:12px;margin-top:4px}
 
-    /* SECTIONS */
+    /* ── SECTIONS ── */
     .section{padding:80px 24px;max-width:1100px;margin:0 auto}
-    .section-title{text-align:center;font-size:1.8rem;font-weight:900;margin-bottom:8px;color:var(--text)}
+    .section-title{text-align:center;font-size:1.9rem;font-weight:900;margin-bottom:8px;color:var(--text)}
     .section-sub{text-align:center;color:var(--muted);margin-bottom:48px;font-size:14px}
     .section-title span{color:var(--green)}
 
-    /* GAMES */
-    .games-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px}
+    /* ── GAMES SHOWCASE ── */
+    .games-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px}
     .game-card{
-      background:var(--card);border:1px solid var(--border);
-      border-radius:16px;padding:22px 14px;text-align:center;
-      cursor:pointer;transition:all 0.25s;position:relative;overflow:hidden;
+      --tint:0,231,1;
+      background:linear-gradient(160deg,rgba(var(--tint),.09),var(--card) 55%);
+      border:1px solid var(--border);
+      border-radius:18px;padding:26px 14px 20px;text-align:center;
+      cursor:pointer;transition:all .25s var(--ease);position:relative;overflow:hidden;
       backdrop-filter:blur(8px);
     }
     .game-card::before{
       content:'';position:absolute;top:0;left:0;right:0;height:2px;
-      background:linear-gradient(90deg,transparent,var(--green),transparent);
-      opacity:0;transition:opacity 0.3s;
+      background:linear-gradient(90deg,transparent,rgb(var(--tint)),transparent);
+      opacity:0;transition:opacity .3s;
     }
-    .game-card:hover{transform:translateY(-4px);border-color:rgba(0,231,1,0.4);box-shadow:0 0 24px rgba(0,231,1,0.12)}
-    .game-card:hover::before{opacity:1}
+    .game-card::after{
+      content:'';position:absolute;inset:0;pointer-events:none;
+      background:radial-gradient(120px circle at 50% 0%,rgba(var(--tint),.14),transparent 70%);
+      opacity:0;transition:opacity .3s;
+    }
+    .game-card:hover{transform:translateY(-5px);border-color:rgba(var(--tint),.45);box-shadow:0 10px 30px rgba(0,0,0,.4),0 0 24px rgba(var(--tint),.14)}
+    .game-card:hover::before,.game-card:hover::after{opacity:1}
     .game-card:active{transform:scale(0.96)}
-    .game-icon{font-size:2.4rem;margin-bottom:10px;display:block;filter:drop-shadow(0 0 8px rgba(0,231,1,0.3))}
-    .game-name{font-weight:700;font-size:13px;color:var(--text)}
-    .game-tag{display:inline-block;margin-top:6px;font-size:10px;padding:2px 8px;border-radius:999px;background:var(--green-dim);color:var(--green);border:1px solid rgba(0,231,1,0.2)}
+    .game-icon{font-size:2.6rem;margin-bottom:10px;display:block;filter:drop-shadow(0 0 10px rgba(var(--tint),.45));transition:transform .25s var(--ease)}
+    .game-card:hover .game-icon{transform:scale(1.15) rotate(-4deg)}
+    .game-name{font-weight:800;font-size:13.5px;color:var(--text)}
+    .game-tag{display:inline-block;margin-top:7px;font-size:10px;padding:2px 9px;border-radius:999px;background:rgba(var(--tint),.1);color:rgb(var(--tint));border:1px solid rgba(var(--tint),.25)}
+    .game-hot{
+      position:absolute;top:10px;left:10px;font-size:9px;font-weight:900;
+      background:linear-gradient(135deg,var(--gold),#ffb800);color:#000;
+      border-radius:999px;padding:2px 8px;letter-spacing:.5px;
+      box-shadow:0 0 12px rgba(255,215,0,.4);
+    }
 
-    /* FEATURES */
+    /* ── JACKPOT BANNER ── */
+    .jackpot{
+      max-width:1000px;margin:0 auto;padding:0 24px;
+    }
+    .jackpot-card{
+      position:relative;overflow:hidden;border-radius:22px;text-align:center;
+      border:1px solid rgba(255,215,0,.3);
+      background:
+        radial-gradient(ellipse 60% 100% at 50% 0%,rgba(255,215,0,.1),transparent 70%),
+        linear-gradient(160deg,#141920,#10141a);
+      padding:44px 24px;
+      box-shadow:0 20px 60px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,215,0,.15);
+    }
+    .jackpot-card::before{
+      content:'';position:absolute;top:0;bottom:0;width:34%;left:-50%;
+      background:linear-gradient(100deg,transparent,rgba(255,215,0,.08),transparent);
+      transform:skewX(-18deg);animation:jpSheen 4.5s ease-in-out infinite;
+    }
+    @keyframes jpSheen{0%,55%{left:-50%}100%{left:150%}}
+    .jackpot-title{font-size:13px;font-weight:800;color:var(--gold);letter-spacing:2px;margin-bottom:10px}
+    .jackpot-amount{
+      font-size:clamp(2.4rem,7vw,4rem);font-weight:900;font-family:'Courier New',monospace;
+      background:linear-gradient(180deg,#fff2b3,var(--gold) 55%,#b8860b);
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+      filter:drop-shadow(0 0 24px rgba(255,215,0,.35));line-height:1.1;direction:ltr;
+    }
+    .jackpot-sub{color:var(--muted);font-size:13px;margin-top:10px}
+
+    /* ── FEATURES ── */
     .features-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
     .feature-card{
       background:var(--card);border:1px solid var(--border);
       border-radius:16px;padding:26px;backdrop-filter:blur(8px);
-      transition:border-color 0.2s,box-shadow 0.2s;
+      transition:border-color .2s,box-shadow .2s,transform .2s;
     }
-    .feature-card:hover{border-color:rgba(0,231,1,0.3);box-shadow:0 0 20px rgba(0,231,1,0.07)}
-    .feature-icon{font-size:2rem;margin-bottom:12px;display:block;filter:drop-shadow(0 0 8px rgba(0,231,1,0.3))}
+    .feature-card:hover{border-color:rgba(0,231,1,0.3);box-shadow:0 0 20px rgba(0,231,1,0.07);transform:translateY(-3px)}
+    .feature-icon{
+      width:48px;height:48px;border-radius:13px;display:flex;align-items:center;justify-content:center;
+      font-size:1.5rem;margin-bottom:14px;
+      background:rgba(0,231,1,.08);border:1px solid rgba(0,231,1,.2);
+      filter:drop-shadow(0 0 8px rgba(0,231,1,0.25));
+    }
     .feature-title{font-weight:800;font-size:1rem;margin-bottom:8px;color:var(--text)}
     .feature-desc{color:var(--muted);font-size:13px;line-height:1.7}
 
-    /* LOGIN SECTION */
+    /* ── HOW IT WORKS (timeline) ── */
+    .steps{max-width:680px;margin:0 auto;position:relative}
+    .steps::before{
+      content:'';position:absolute;top:24px;bottom:24px;right:27px;width:2px;
+      background:linear-gradient(180deg,var(--green),rgba(255,215,0,.6));opacity:.35;
+    }
+    .step-row{display:flex;gap:16px;padding:16px;background:var(--card);border:1px solid var(--border);border-radius:14px;margin-bottom:12px;position:relative;backdrop-filter:blur(8px);transition:border-color .2s,transform .2s}
+    .step-row:hover{border-color:rgba(0,231,1,.3);transform:translateX(-4px)}
+    .step-num{
+      width:38px;height:38px;flex-shrink:0;border-radius:50%;display:flex;align-items:center;justify-content:center;
+      font-weight:900;font-size:15px;color:#0b0e11;
+      background:linear-gradient(135deg,var(--green),var(--green2));
+      box-shadow:0 0 16px rgba(0,231,1,.3);position:relative;z-index:1;
+    }
+    .step-row:last-child .step-num{background:linear-gradient(135deg,var(--gold),#ffb800);box-shadow:0 0 16px rgba(255,215,0,.35)}
+    .step-title{font-weight:700;color:var(--text);font-size:14px;margin-bottom:4px}
+    .step-desc{font-size:12px;color:var(--muted);line-height:1.6}
+
+    /* ── FAQ accordions ── */
+    .faq-list{max-width:680px;margin:0 auto}
+    .faq-item{
+      background:var(--card);border:1px solid var(--border);border-radius:12px;
+      margin-bottom:8px;overflow:hidden;backdrop-filter:blur(8px);transition:border-color .2s;
+    }
+    .faq-item[open]{border-color:rgba(0,231,1,.3)}
+    .faq-item summary{
+      list-style:none;cursor:pointer;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;
+      font-weight:700;color:var(--text);font-size:14px;
+    }
+    .faq-item summary::-webkit-details-marker{display:none}
+    .faq-item summary::after{content:'+';font-size:18px;color:var(--green);font-weight:900;transition:transform .2s}
+    .faq-item[open] summary::after{transform:rotate(45deg)}
+    .faq-body{padding:0 16px 14px;font-size:12.5px;color:var(--muted);line-height:1.8}
+
+    /* ── LOGIN SECTION ── */
     .login-section{
       padding:80px 24px;text-align:center;
       border-top:1px solid var(--border);border-bottom:1px solid var(--border);
-      background:linear-gradient(135deg,rgba(0,231,1,0.04) 0%,transparent 100%);
+      background:
+        radial-gradient(ellipse 50% 80% at 50% 0%,rgba(0,231,1,.06),transparent 70%),
+        linear-gradient(135deg,rgba(0,231,1,0.03) 0%,transparent 100%);
     }
     .login-card{
-      max-width:460px;margin:0 auto;
+      max-width:460px;margin:0 auto;position:relative;
       background:var(--card);border:1px solid var(--border);
       border-radius:20px;padding:32px 28px;backdrop-filter:blur(12px);
+      box-shadow:0 20px 50px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.05);
+    }
+    .login-card::before{
+      content:'';position:absolute;inset:-1px;border-radius:21px;z-index:-1;
+      background:linear-gradient(135deg,rgba(0,231,1,.35),transparent 40%,transparent 60%,rgba(255,215,0,.25));
+      opacity:.6;
     }
     .login-step{display:none}
-    .login-step.active{display:block;animation:fadeIn 0.3s ease-out}
+    .login-step.active{display:block;animation:fadeIn .3s ease-out}
     @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
     .otp-input-field{
       width:100%;background:rgba(0,0,0,0.4);border:1px solid rgba(0,231,1,0.2);
       border-radius:12px;padding:14px;font-size:24px;font-weight:900;
       font-family:'Courier New',monospace;text-align:center;letter-spacing:8px;
-      color:var(--green);outline:none;transition:all 0.2s;
+      color:var(--green);outline:none;transition:all .2s;
     }
     .otp-input-field:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(0,231,1,0.08)}
     .otp-input-field::placeholder{font-size:18px;letter-spacing:4px;color:var(--muted)}
@@ -280,7 +423,7 @@
       width:100%;padding:14px;border-radius:12px;border:none;
       background:linear-gradient(135deg,var(--green),var(--green2));
       color:#0b0e11;font-size:15px;font-weight:800;font-family:'Cairo',sans-serif;
-      cursor:pointer;margin-top:14px;transition:all 0.2s;
+      cursor:pointer;margin-top:14px;transition:all .2s;
       box-shadow:0 4px 20px rgba(0,231,1,0.2);
     }
     .btn-otp-verify:hover{box-shadow:0 6px 28px rgba(0,231,1,0.35);transform:translateY(-1px)}
@@ -288,24 +431,45 @@
     .otp-status.err{color:#ff7090}
     .otp-status.ok{color:var(--green)}
 
-    /* CTA */
+    /* ── CTA ── */
     .cta-final{
-      padding:80px 24px;text-align:center;
-      background:linear-gradient(135deg,rgba(0,231,1,0.04) 0%,transparent 100%);
+      padding:90px 24px;text-align:center;position:relative;overflow:hidden;
+      background:
+        radial-gradient(ellipse 60% 90% at 50% 100%,rgba(0,231,1,.07),transparent 70%),
+        linear-gradient(135deg,rgba(0,231,1,0.04) 0%,transparent 100%);
     }
 
-    /* FOOTER */
+    /* ── FOOTER ── */
     footer{text-align:center;padding:40px 24px;border-top:1px solid var(--border);color:var(--muted);font-size:12px}
-    footer a{color:var(--green);text-decoration:none;transition:opacity 0.2s}
+    footer a{color:var(--green);text-decoration:none;transition:opacity .2s}
     footer a:hover{opacity:0.7}
 
-    /* Scroll-reveal */
-    .reveal{opacity:0;transform:translateY(24px);transition:opacity 0.6s ease,transform 0.6s ease}
+    /* ── Scroll reveal (staggered) ── */
+    .reveal{opacity:0;transform:translateY(26px);transition:opacity .7s var(--ease),transform .7s var(--ease)}
     .reveal.visible{opacity:1;transform:translateY(0)}
+    .reveal-stagger>*{opacity:0;transform:translateY(22px);transition:opacity .6s var(--ease),transform .6s var(--ease)}
+    .reveal-stagger.visible>*{opacity:1;transform:translateY(0)}
+    .reveal-stagger.visible>*:nth-child(1){transition-delay:.05s}
+    .reveal-stagger.visible>*:nth-child(2){transition-delay:.12s}
+    .reveal-stagger.visible>*:nth-child(3){transition-delay:.19s}
+    .reveal-stagger.visible>*:nth-child(4){transition-delay:.26s}
+    .reveal-stagger.visible>*:nth-child(5){transition-delay:.33s}
+    .reveal-stagger.visible>*:nth-child(6){transition-delay:.40s}
+    .reveal-stagger.visible>*:nth-child(7){transition-delay:.47s}
+    .reveal-stagger.visible>*:nth-child(8){transition-delay:.54s}
+    .reveal-stagger.visible>*:nth-child(9){transition-delay:.61s}
+
+    @media (prefers-reduced-motion: reduce){
+      *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important}
+      .ticker{animation:none}
+      .reveal,.reveal-stagger>*{opacity:1;transform:none}
+      html{scroll-behavior:auto}
+    }
   </style>
 </head>
 <body>
 <div class="grid-bg"></div>
+<div class="fx-particles" id="fxParticles"></div>
 
 <!-- NAV -->
 <nav>
@@ -321,9 +485,11 @@
 
 <!-- HERO -->
 <section class="hero" id="top">
-  <img src="/static/icons/logo-full.png" class="hero-logo" alt="VEX" onerror="this.outerHTML='<div style=\'width:130px;height:130px;border-radius:50%;background:linear-gradient(135deg,#10141a,#0d7a2f);border:2px solid rgba(0,231,1,0.3);box-shadow:0 0 50px rgba(0,231,1,0.3);display:flex;align-items:center;justify-content:center;font-size:60px;font-weight:900;color:#00e701;margin-bottom:24px\'>V</div>'">
-  <div class="hero-badge">🔥 أكثر من 5,000 لاعب نشط</div>
-  <h1>العب واربح مع<br><span style="color:var(--green)">VEX Games</span></h1>
+  <div class="hero-logo-wrap">
+    <img src="/static/icons/logo-full.png" class="hero-logo" alt="VEX" onerror="this.outerHTML='<div style=\'width:130px;height:130px;border-radius:50%;background:linear-gradient(135deg,#10141a,#0d7a2f);border:2px solid rgba(0,231,1,0.3);box-shadow:0 0 50px rgba(0,231,1,0.3);display:flex;align-items:center;justify-content:center;font-size:60px;font-weight:900;color:#00e701\'>V</div>'">
+  </div>
+  <div class="hero-badge"><span class="dot"></span> أكثر من 5,000 لاعب نشط الآن</div>
+  <h1>العب واربح مع<br>VEX Games</h1>
   <p>منصة الألعاب الأكثر إثارة على تيليغرام — ألعاب مثيرة، جوائز حقيقية، ونظام إحالة مربح ينمو معك</p>
   <div class="cta-row" id="play">
     <a href="https://t.me/vex_bot" target="_blank" class="btn-cta btn-primary">
@@ -344,36 +510,51 @@
   </div>
 </section>
 
+<!-- LIVE WINS TICKER -->
+<div class="ticker-wrap" dir="ltr">
+  <div class="ticker-label" dir="rtl">⚡ أرباح مباشرة</div>
+  <div class="ticker" id="winTicker"></div>
+</div>
+
 <!-- STATS -->
-<div class="stats-row reveal">
-  <div class="stat-card"><span class="stat-num" id="statUsers">5,000+</span><div class="stat-label">لاعب مسجل</div></div>
-  <div class="stat-card"><span class="stat-num">9</span><div class="stat-label">ألعاب مختلفة</div></div>
+<div class="stats-row reveal-stagger">
+  <div class="stat-card"><span class="stat-num" id="statUsers" data-count="5000" data-suffix="+">0</span><div class="stat-label">لاعب مسجل</div></div>
+  <div class="stat-card"><span class="stat-num" data-count="9">0</span><div class="stat-label">ألعاب مختلفة</div></div>
   <div class="stat-card"><span class="stat-num" id="statPaid">∞</span><div class="stat-label">جوائز موزعة</div></div>
   <div class="stat-card"><span class="stat-num">24/7</span><div class="stat-label">متاح دائماً</div></div>
 </div>
 
 <!-- GAMES -->
-<section class="section reveal" id="games">
-  <h2 class="section-title">🎮 <span>ألعابنا</span></h2>
-  <p class="section-sub">كل لعبة مصممة لتوفير تجربة مختلفة ومثيرة</p>
-  <div class="games-grid">
-    <div class="game-card" onclick="openBot()"><span class="game-icon">💣</span><div class="game-name">مناجم</div><div class="game-tag">استراتيجية</div></div>
-    <div class="game-card" onclick="openBot()"><span class="game-icon">✈️</span><div class="game-name">أفياتور</div><div class="game-tag">توقيت</div></div>
-    <div class="game-card" onclick="openBot()"><span class="game-icon">🚀</span><div class="game-name">كراش</div><div class="game-tag">إثارة</div></div>
-    <div class="game-card" onclick="openBot()"><span class="game-icon">🔵</span><div class="game-name">بلينكو</div><div class="game-tag">فيزياء</div></div>
-    <div class="game-card" onclick="openBot()"><span class="game-icon">🎡</span><div class="game-name">عجلة الحظ</div><div class="game-tag">جوائز</div></div>
-    <div class="game-card" onclick="openBot()"><span class="game-icon">🎰</span><div class="game-name">يانصيب</div><div class="game-tag">جاك بوت</div></div>
-    <div class="game-card" onclick="openBot()"><span class="game-icon">🎯</span><div class="game-name">اخطف</div><div class="game-tag">سرعة</div></div>
-    <div class="game-card" onclick="openBot()"><span class="game-icon">🎲</span><div class="game-name">النرد</div><div class="game-tag">حظ</div></div>
-    <div class="game-card" onclick="openBot()"><span class="game-icon">🥊</span><div class="game-name">المباراة</div><div class="game-tag">منافسة</div></div>
+<section class="section" id="games">
+  <h2 class="section-title reveal">🎮 <span>ألعابنا</span></h2>
+  <p class="section-sub reveal">كل لعبة مصممة لتوفير تجربة مختلفة ومثيرة</p>
+  <div class="games-grid reveal-stagger">
+    <div class="game-card" style="--tint:255,71,87" onclick="openBot()"><span class="game-hot">HOT</span><span class="game-icon">💣</span><div class="game-name">مناجم</div><div class="game-tag">استراتيجية</div></div>
+    <div class="game-card" style="--tint:59,130,246" onclick="openBot()"><span class="game-hot">HOT</span><span class="game-icon">✈️</span><div class="game-name">أفياتور</div><div class="game-tag">توقيت</div></div>
+    <div class="game-card" style="--tint:0,231,1" onclick="openBot()"><span class="game-icon">🚀</span><div class="game-name">كراش</div><div class="game-tag">إثارة</div></div>
+    <div class="game-card" style="--tint:6,182,212" onclick="openBot()"><span class="game-icon">🔵</span><div class="game-name">بلينكو</div><div class="game-tag">فيزياء</div></div>
+    <div class="game-card" style="--tint:167,139,250" onclick="openBot()"><span class="game-icon">🎡</span><div class="game-name">عجلة الحظ</div><div class="game-tag">جوائز</div></div>
+    <div class="game-card" style="--tint:255,215,0" onclick="openBot()"><span class="game-hot">جاك بوت</span><span class="game-icon">🎰</span><div class="game-name">يانصيب</div><div class="game-tag">جاك بوت</div></div>
+    <div class="game-card" style="--tint:255,140,66" onclick="openBot()"><span class="game-icon">🎯</span><div class="game-name">اخطف</div><div class="game-tag">سرعة</div></div>
+    <div class="game-card" style="--tint:0,231,1" onclick="openBot()"><span class="game-icon">🎲</span><div class="game-name">النرد</div><div class="game-tag">حظ</div></div>
+    <div class="game-card" style="--tint:236,72,153" onclick="openBot()"><span class="game-icon">🥊</span><div class="game-name">المباراة</div><div class="game-tag">منافسة</div></div>
   </div>
 </section>
 
+<!-- JACKPOT -->
+<div class="jackpot reveal">
+  <div class="jackpot-card">
+    <div class="jackpot-title">💰 جوائز اليانصيب التراكمية 💰</div>
+    <div class="jackpot-amount" id="jackpotNum">250,000+</div>
+    <div class="jackpot-sub">سحب يومي — كل تذكرة فرصة للفوز بالجائزة الكبرى</div>
+  </div>
+</div>
+
 <!-- FEATURES -->
-<section class="section reveal" style="padding-top:0">
-  <h2 class="section-title">⚡ لماذا <span>VEX Games</span>؟</h2>
-  <p class="section-sub">ميزات تجعل تجربتك لا تُنسى</p>
-  <div class="features-grid">
+<section class="section">
+  <h2 class="section-title reveal">⚡ لماذا <span>VEX Games</span>؟</h2>
+  <p class="section-sub reveal">ميزات تجعل تجربتك لا تُنسى</p>
+  <div class="features-grid reveal-stagger">
     <div class="feature-card"><span class="feature-icon">🔐</span><div class="feature-title">أمان تام</div><div class="feature-desc">نظام تحقق متعدد الطبقات، تشفير كامل، وحماية من التلاعب في جميع الألعاب</div></div>
     <div class="feature-card"><span class="feature-icon">⚡</span><div class="feature-title">استجابة فورية</div><div class="feature-desc">البوت يعالج آلاف الرسائل بالتوازي دون تأخير أو تعليق حتى مع 5000 مستخدم</div></div>
     <div class="feature-card"><span class="feature-icon">💰</span><div class="feature-title">نظام إحالة مربح</div><div class="feature-desc">أدعِ أصدقاءك واكسب نسبة من كل معاملاتهم. الأرباح تُضاف تلقائياً</div></div>
@@ -394,50 +575,50 @@
 </section>
 
 <!-- HOW IT WORKS -->
-<section class="section reveal" style="padding-top:0">
-  <h2 class="section-title">🎯 <span>كيف تبدأ</span></h2>
-  <p class="section-sub">ثلاث خطوات بسيطة للبدء</p>
-  <div style="max-width:680px;margin:0 auto">
-    <div style="display:flex;gap:16px;padding:16px;background:var(--card);border:1px solid var(--border);border-radius:14px;margin-bottom:10px">
-      <div style="font-size:28px;flex-shrink:0">1️⃣</div>
-      <div><div style="font-weight:700;color:var(--text);font-size:14px;margin-bottom:4px">اضغط دخول عبر تيليغرام</div><div style="font-size:12px;color:var(--muted);line-height:1.6">افتح بوت الأمان @vex_otp_bot وشارك رقم هاتفك للحصول على رمز تحقق آمن.</div></div>
+<section class="section" style="padding-top:0">
+  <h2 class="section-title reveal">🎯 <span>كيف تبدأ</span></h2>
+  <p class="section-sub reveal">ثلاث خطوات بسيطة للبدء</p>
+  <div class="steps reveal-stagger">
+    <div class="step-row">
+      <div class="step-num">1</div>
+      <div><div class="step-title">اضغط دخول عبر تيليغرام</div><div class="step-desc">افتح بوت الأمان @vex_otp_bot وشارك رقم هاتفك للحصول على رمز تحقق آمن.</div></div>
     </div>
-    <div style="display:flex;gap:16px;padding:16px;background:var(--card);border:1px solid var(--border);border-radius:14px;margin-bottom:10px">
-      <div style="font-size:28px;flex-shrink:0">2️⃣</div>
-      <div><div style="font-weight:700;color:var(--text);font-size:14px;margin-bottom:4px">أدخل الرمز على الموقع</div><div style="font-size:12px;color:var(--muted);line-height:1.6">اكتب رمز التحقق المكون من 6 أرقام لتسجيل الدخول الآمن لمحفظتك.</div></div>
+    <div class="step-row">
+      <div class="step-num">2</div>
+      <div><div class="step-title">أدخل الرمز على الموقع</div><div class="step-desc">اكتب رمز التحقق المكون من 6 أرقام لتسجيل الدخول الآمن لمحفظتك.</div></div>
     </div>
-    <div style="display:flex;gap:16px;padding:16px;background:var(--card);border:1px solid var(--border);border-radius:14px">
-      <div style="font-size:28px;flex-shrink:0">3️⃣</div>
-      <div><div style="font-weight:700;color:var(--text);font-size:14px;margin-bottom:4px">أودع والعب</div><div style="font-size:12px;color:var(--muted);line-height:1.6">أودع في محفظتك عبر وسائل الدفع المتاحة، ثم اختر لعبتك وابدأ الفوز.</div></div>
+    <div class="step-row">
+      <div class="step-num">3</div>
+      <div><div class="step-title">أودع والعب</div><div class="step-desc">أودع في محفظتك عبر وسائل الدفع المتاحة، ثم اختر لعبتك وابدأ الفوز.</div></div>
     </div>
   </div>
 </section>
 
 <!-- FAQ -->
-<section class="section reveal" style="padding-top:0">
-  <h2 class="section-title">❓ <span>الأسئلة الشائعة</span></h2>
-  <p class="section-sub">إجابات على أكثر الأسئلة شيوعاً</p>
-  <div style="max-width:680px;margin:0 auto">
-    <div style="padding:14px;background:var(--card);border:1px solid var(--border);border-radius:12px;margin-bottom:8px">
-      <div style="font-weight:700;color:var(--text);font-size:14px;margin-bottom:6px">ما هي VEX Games؟</div>
-      <div style="font-size:12px;color:var(--muted);line-height:1.7">VEX Games هي منصة ألعاب مالية متعددة اللغات تعمل عبر تيليغرام والويب، تقدم ألعاباً مثل أفياتور، كراش، بلينكو، مناجم، يانصيب، نرد وعجلة الحظ مع نظام محفظة آمن وإيداع وسحب موثوق.</div>
-    </div>
-    <div style="padding:14px;background:var(--card);border:1px solid var(--border);border-radius:12px;margin-bottom:8px">
-      <div style="font-weight:700;color:var(--text);font-size:14px;margin-bottom:6px">هل الألعاب عادلة؟</div>
-      <div style="font-size:12px;color:var(--muted);line-height:1.7">نعم، جميع الألعاب تستخدم نظام Provably Fair مبني على HMAC-SHA256. يتم توليد نقطة التحطم أو النتيجة من بذرة خادم (server seed) يتم الكشف عنها بعد كل جولة، مما يسمح لك بالتحقق من عدالة كل نتيجة بنفسك.</div>
-    </div>
-    <div style="padding:14px;background:var(--card);border:1px solid var(--border);border-radius:12px;margin-bottom:8px">
-      <div style="font-weight:700;color:var(--text);font-size:14px;margin-bottom:6px">كيف أودع وأسحب؟</div>
-      <div style="font-size:12px;color:var(--muted);line-height:1.7">يمكنك الإيداع عبر عدة وسائل دفع (فودافون كاش، STC Pay، InstaPay، تحويل بنكي وغيرها). اختر وسيلة الدفع المناسبة لعملتك، انسخ بيانات الحساب، أرسل المبلغ، ثم أكد العملية. السحب يتم ب نفس الطريقة مع موافقة الإدارة.</div>
-    </div>
-    <div style="padding:14px;background:var(--card);border:1px solid var(--border);border-radius:12px;margin-bottom:8px">
-      <div style="font-weight:700;color:var(--text);font-size:14px;margin-bottom:6px">ما هو نظام التعويض (SVRP)؟</div>
-      <div style="font-size:12px;color:var(--muted);line-height:1.7">نظام التعويض الذكي يمنحك 100% من مبلغ الإيداع كرصيد مجمد، يمكن فك تجميده بإرساله لـ 4 أصدقاء على الأقل. كل صديق يستلم 25% من الرصيد، وعند الإرسال يُفك تجميد نفس المبلغ لك.</div>
-    </div>
-    <div style="padding:14px;background:var(--card);border:1px solid var(--border);border-radius:12px">
-      <div style="font-weight:700;color:var(--text);font-size:14px;margin-bottom:6px">هل يدعم البوت لغتي؟</div>
-      <div style="font-size:12px;color:var(--muted);line-height:1.7">نعم، VEX Games يدعم 17 لغة: العربية، الإنجليزية، الفرنسية، الإسبانية، الألمانية، الإيطالية، البرتغالية، الروسية، الصينية، التركية، الأردية، الهندية، الفارسية، الإندونيسية، اليابانية، الكورية والتايلاندية.</div>
-    </div>
+<section class="section" style="padding-top:0">
+  <h2 class="section-title reveal">❓ <span>الأسئلة الشائعة</span></h2>
+  <p class="section-sub reveal">إجابات على أكثر الأسئلة شيوعاً</p>
+  <div class="faq-list reveal-stagger">
+    <details class="faq-item" open>
+      <summary>ما هي VEX Games؟</summary>
+      <div class="faq-body">VEX Games هي منصة ألعاب مالية متعددة اللغات تعمل عبر تيليغرام والويب، تقدم ألعاباً مثل أفياتور، كراش، بلينكو، مناجم، يانصيب، نرد وعجلة الحظ مع نظام محفظة آمن وإيداع وسحب موثوق.</div>
+    </details>
+    <details class="faq-item">
+      <summary>هل الألعاب عادلة؟</summary>
+      <div class="faq-body">نعم، جميع الألعاب تستخدم نظام Provably Fair مبني على HMAC-SHA256. يتم توليد نقطة التحطم أو النتيجة من بذرة خادم (server seed) يتم الكشف عنها بعد كل جولة، مما يسمح لك بالتحقق من عدالة كل نتيجة بنفسك.</div>
+    </details>
+    <details class="faq-item">
+      <summary>كيف أودع وأسحب؟</summary>
+      <div class="faq-body">يمكنك الإيداع عبر عدة وسائل دفع (فودافون كاش، STC Pay، InstaPay، تحويل بنكي وغيرها). اختر وسيلة الدفع المناسبة لعملتك، انسخ بيانات الحساب، أرسل المبلغ، ثم أكد العملية. السحب يتم بنفس الطريقة مع موافقة الإدارة.</div>
+    </details>
+    <details class="faq-item">
+      <summary>ما هو نظام التعويض (SVRP)؟</summary>
+      <div class="faq-body">نظام التعويض الذكي يمنحك 100% من مبلغ الإيداع كرصيد مجمد، يمكن فك تجميده بإرساله لـ 4 أصدقاء على الأقل. كل صديق يستلم 25% من الرصيد، وعند الإرسال يُفك تجميد نفس المبلغ لك.</div>
+    </details>
+    <details class="faq-item">
+      <summary>هل يدعم البوت لغتي؟</summary>
+      <div class="faq-body">نعم، VEX Games يدعم 17 لغة: العربية، الإنجليزية، الفرنسية، الإسبانية، الألمانية، الإيطالية، البرتغالية، الروسية، الصينية، التركية، الأردية، الهندية، الفارسية، الإندونيسية، اليابانية، الكورية والتايلاندية.</div>
+    </details>
   </div>
 </section>
 
@@ -535,9 +716,61 @@ async function verifyLandOtp(){
 }
 document.getElementById('landOtpCode').addEventListener('keydown',e=>{if(e.key==='Enter')verifyLandOtp();});
 
-// Scroll reveal
-const observer=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting)e.target.classList.add('visible')})},{threshold:0.1});
-document.querySelectorAll('.reveal').forEach(el=>observer.observe(el));
+// ── Motion helpers ──
+var REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// Scroll reveal (single + staggered)
+const observer=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add('visible');observer.unobserve(e.target);}})},{threshold:0.12});
+document.querySelectorAll('.reveal,.reveal-stagger').forEach(el=>observer.observe(el));
+
+// Count-up stats
+function countUp(el){
+  var target=parseInt(el.dataset.count,10),suffix=el.dataset.suffix||'';
+  if(REDUCED){el.textContent=target.toLocaleString()+suffix;return;}
+  var start=null,dur=1400;
+  function tick(ts){
+    if(!start)start=ts;
+    var p=Math.min(1,(ts-start)/dur);p=1-Math.pow(1-p,3);
+    el.textContent=Math.round(target*p).toLocaleString()+(p===1?suffix:'');
+    if(p<1)requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+const cntObs=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting){countUp(e.target);cntObs.unobserve(e.target);}})},{threshold:0.5});
+document.querySelectorAll('[data-count]').forEach(el=>cntObs.observe(el));
+
+// ── Live wins ticker (client-side showcase) ──
+(function(){
+  var games=[['💣','مناجم'],['✈️','أفياتور'],['🚀','كراش'],['🔵','بلينكو'],['🎡','عجلة الحظ'],['🎰','يانصيب'],['🎲','النرد'],['🎯','اخطف']];
+  var el=document.getElementById('winTicker');
+  var items=[];
+  for(var i=0;i<14;i++){
+    var g=games[Math.floor(Math.random()*games.length)];
+    var big=Math.random()<0.22;
+    var amt=big?(Math.floor(Math.random()*80)+20)*100:(Math.floor(Math.random()*95)+5)*10;
+    var id=Math.floor(Math.random()*9000)+1000;
+    items.push('<div class="tick-item'+(big?' big':'')+'"><span class="ti-game">'+g[0]+'</span><span class="ti-name">لاعب_'+id+'••</span><span>ربح في '+g[1]+'</span><span class="ti-amt">+'+amt.toLocaleString()+'</span></div>');
+  }
+  // duplicate for seamless loop
+  el.innerHTML=items.join('')+items.join('');
+})();
+
+// ── Floating particles ──
+(function(){
+  if(REDUCED)return;
+  var wrap=document.getElementById('fxParticles');
+  var n=window.innerWidth<600?14:26;
+  for(var i=0;i<n;i++){
+    var p=document.createElement('div');
+    p.className='fxp '+(Math.random()<0.3?'y':'g');
+    var s=Math.random()*3+1.5;
+    p.style.width=p.style.height=s+'px';
+    p.style.left=(Math.random()*100)+'%';
+    p.style.animationDuration=(Math.random()*14+10)+'s';
+    p.style.animationDelay=(-Math.random()*20)+'s';
+    wrap.appendChild(p);
+  }
+})();
 
 // ── User notifications: polls /api/user/notifications every 10s — works for ANY visitor ──
 (function() {
