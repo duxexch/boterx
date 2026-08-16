@@ -1,6 +1,65 @@
 // ===== VEX Games — Shared Base JavaScript =====
 // Core game engine, API, sound, deposit, live players, config
 
+// ---- i18n keys (merged into shared runtime) ----
+// Arabic remains default; English is an optional toggle. Reuses COMMON keys
+// from i18n.js where possible (close, cancel, error, insufficient, etc.).
+window.I18N_EXTRA = Object.assign(window.I18N_EXTRA || {}, {
+  gb_you:            { ar: ' (أنت)', en: ' (You)' },
+  gb_no_players:     { ar: 'لا يوجد لاعبون بعد', en: 'No players yet' },
+  gb_games_count:    { ar: 'لعبة', en: 'games' },
+  gb_outbox_pending: { ar: 'قيد الانتظار', en: 'pending' },
+  // Provably Fair
+  gb_pf_title:       { ar: '🔐 Provably Fair', en: '🔐 Provably Fair' },
+  gb_pf_subtitle:    { ar: 'نظام عدالة قابل للتحقق', en: 'Verifiable fairness system' },
+  gb_pf_hash_lbl:    { ar: '🔐 Server Seed Hash:', en: '🔐 Server Seed Hash:' },
+  gb_pf_client_lbl:  { ar: '🔑 Client Seed:', en: '🔑 Client Seed:' },
+  gb_pf_nonce_lbl:   { ar: '🎲 Nonce (rolls):', en: '🎲 Nonce (rolls):' },
+  gb_pf_revealed_lbl:{ ar: '🔓 Server Seed (revealed):', en: '🔓 Server Seed (revealed):' },
+  gb_pf_hidden:      { ar: 'مخفي (سيكشف بعد الجولة)', en: 'Hidden (revealed after round)' },
+  gb_pf_can_verify:  { ar: '✅ يمكنك التحقق من النتيجة', en: '✅ You can verify the result' },
+  gb_pf_verify_btn:  { ar: '🔍 تحقق', en: '🔍 Verify' },
+  gb_pf_reveal_note: { ar: 'سيتم كشف server seed بعد انتهاء الجولة للتحقق', en: 'The server seed will be revealed after the round for verification' },
+  gb_pf_footer:      { ar: '🔐 يتم استخدام HMAC-SHA256 لتوليد نتائج عادلة<br>لا يمكن للخادم التلاعب بالنتيجة بعد إرسال seed hash', en: '🔐 HMAC-SHA256 is used to generate fair results<br>The server cannot tamper with the result after sending the seed hash' },
+  gb_pf_verified_title:{ ar: '✅ تم التحقق', en: '✅ Verified' },
+  gb_pf_result_ok:   { ar: 'النتيجة صحيحة!', en: 'Result is valid!' },
+  gb_pf_results:     { ar: 'النتائج', en: 'Results' },
+  gb_pf_no_seed:     { ar: 'لا يوجد seed مكشوف للتحقق', en: 'No revealed seed to verify' },
+  gb_pf_verify_fail: { ar: 'فشل التحقق!', en: 'Verification failed!' },
+  gb_pf_verify_err:  { ar: 'خطأ في التحقق', en: 'Verification error' },
+  // goBack confirmation
+  gb_leave_warn:     { ar: 'اللعبة قيام<br>ستخسر رهانك إذا خرجت', en: 'Game in progress<br>You will lose your bet if you leave' },
+  gb_stay:           { ar: 'بقاء', en: 'Stay' },
+  gb_leave:          { ar: 'خروج', en: 'Leave' },
+  // Deposit modal
+  gb_dep_title:      { ar: '💰 إيداع محفظة VEX', en: '💰 VEX Wallet Deposit' },
+  gb_dep_need:       { ar: 'تحتاج', en: 'You need' },
+  gb_dep_enter:      { ar: 'أدخل بيانات الإيداع', en: 'Enter deposit details' },
+  gb_dep_choose:     { ar: 'اختر وسيلة الدفع', en: 'Choose a payment method' },
+  gb_dep_amount:     { ar: '💵 المبلغ:', en: '💵 Amount:' },
+  gb_dep_wallet_lbl: { ar: '🔐 رقم محفظتك:', en: '🔐 Your wallet number:' },
+  gb_dep_wallet_ph:  { ar: 'رقم محفظتك', en: 'Your wallet number' },
+  gb_dep_mname_lbl:  { ar: '📋 اسم الوسيلة:', en: '📋 Method name:' },
+  gb_dep_mname_ph:   { ar: 'اسم الوسيلة', en: 'Method name' },
+  gb_dep_mdata_lbl:  { ar: '📋 بيانات الحساب:', en: '📋 Account details:' },
+  gb_dep_mdata_ph:   { ar: 'بيانات الحساب', en: 'Account details' },
+  gb_dep_method_data:{ ar: '📋 بيانات الوسيلة:', en: '📋 Method details:' },
+  gb_dep_save:       { ar: 'حفظ دائم', en: 'Save permanently' },
+  gb_dep_confirm:    { ar: '✅ تأكيد الإيداع', en: '✅ Confirm deposit' },
+  gb_dep_your_wallet:{ ar: '✓ محفظتك: ', en: '✓ Your wallet: ' },
+  gb_dep_enter_amount:{ ar: 'أدخل المبلغ', en: 'Enter the amount' },
+  gb_dep_enter_wallet:{ ar: 'أدخل رقم محفظتك', en: 'Enter your wallet number' },
+  gb_dep_choose_method:{ ar: 'اختر وسيلة دفع', en: 'Choose a payment method' },
+  gb_dep_enter_mname:{ ar: 'أدخل اسم الوسيلة', en: 'Enter the method name' },
+  gb_dep_auth_err:   { ar: 'خطأ في المصادقة — أعد فتح اللعبة من البوت', en: 'Authentication error — reopen the game from the bot' },
+  gb_dep_sent_title: { ar: 'تم إرسال طلب الإيداع', en: 'Deposit request sent' },
+  gb_dep_sent_sub:   { ar: 'بانتظار موافقة الإدارة', en: 'Awaiting admin approval' },
+  gb_dep_order_no:   { ar: 'رقم الطلب: ', en: 'Order no: ' },
+  gb_dep_failed:     { ar: 'فشل الإيداع', en: 'Deposit failed' },
+  gb_dep_conn_err:   { ar: 'خطأ في الاتصال — تحقق من الإنترنت', en: 'Connection error — check your internet' },
+  gb_dep_btn_title:  { ar: 'إيداع', en: 'Deposit' }
+});
+
 // ---- Telegram WebApp Init ----
 const tg = window.Telegram?.WebApp;
 if (tg) { tg.expand(); tg.ready(); }
@@ -97,7 +156,7 @@ function _processOutbox() {
     // Save any that failed again, plus unprocessed ones
     localStorage.setItem(_outboxKey, JSON.stringify(remaining));
     if (remaining.length > 0) {
-      showToast('Outbox: ' + remaining.length + ' pending', 'info');
+      showToast('Outbox: ' + remaining.length + ' ' + I18N.t('gb_outbox_pending'), 'info');
     }
   } catch(e) {}
 }
@@ -445,7 +504,7 @@ function renderPlayers() {
     const avatar = (p.name || '?')[0].toUpperCase();
     const mult = p.multiplier > 0 ? `<span class="lp-mult ${p.status === 'win' ? 'win' : 'lose'}">${p.multiplier.toFixed(2)}x</span>` : '';
     row.innerHTML = `
-      <div class="lp-user"><div class="lp-avatar">${avatar}</div><span>${p.name || '???'}${p.isMe ? ' (أنت)' : ''}</span></div>
+      <div class="lp-user"><div class="lp-avatar">${avatar}</div><span>${p.name || '???'}${p.isMe ? I18N.t('gb_you') : ''}</span></div>
       <div style="display:flex;align-items:center;gap:6px"><span style="font-weight:700">${p.bet || 0}</span>${mult}</div>`;
     listEl.appendChild(row);
   });
@@ -574,7 +633,7 @@ function renderLeaderboard(containerId, players) {
   const el = document.getElementById(containerId);
   if (!el) return;
   if (!players || players.length === 0) {
-    el.innerHTML = '<div style="text-align:center;color:var(--muted);padding:16px;font-size:12px">لا يوجد لاعبون بعد</div>';
+    el.innerHTML = '<div style="text-align:center;color:var(--muted);padding:16px;font-size:12px">' + I18N.t('gb_no_players') + '</div>';
     return;
   }
   el.innerHTML = players.map((p, i) => {
@@ -585,9 +644,9 @@ function renderLeaderboard(containerId, players) {
     const profitStr = (profit >= 0 ? '+' : '') + profit.toFixed(0);
     return `<div class="lb-row ${profitClass}">
       <span class="lb-rank">${medal}</span>
-      <span class="lb-name">${p.name || '???'}${p.uid === uid ? ' (أنت)' : ''}</span>
+      <span class="lb-name">${p.name || '???'}${p.uid === uid ? I18N.t('gb_you') : ''}</span>
       <span class="lb-profit">${profitStr}</span>
-      <span class="lb-games">${p.games || 0} لعبة</span>
+      <span class="lb-games">${p.games || 0} ${I18N.t('gb_games_count')}</span>
     </div>`;
   }).join('');
 }
@@ -656,49 +715,48 @@ function showProvablyFairModal() {
   const box = document.getElementById('pfBox');
 
   const hashShort = pfSeedHash ? pfSeedHash.substring(0, 32) + '...' : '---';
-  const seedShort = pfRevealedSeed ? pfRevealedSeed.substring(0, 32) + '...' : 'مخفي (سيكشف بعد الجولة)';
+  const seedShort = pfRevealedSeed ? pfRevealedSeed.substring(0, 32) + '...' : I18N.t('gb_pf_hidden');
 
   box.innerHTML = `
-    <div class="modal-title">🔐 Provably Fair</div>
-    <div class="modal-subtitle">نظام عدالة قابل للتحقق</div>
+    <div class="modal-title">${I18N.t('gb_pf_title')}</div>
+    <div class="modal-subtitle">${I18N.t('gb_pf_subtitle')}</div>
     <div style="background:var(--surface-2);border-radius:8px;padding:10px;margin:6px 0">
-      <div style="font-size:10px;color:var(--muted);margin-bottom:4px">🔐 Server Seed Hash:</div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:4px">${I18N.t('gb_pf_hash_lbl')}</div>
       <code style="font-size:11px;color:var(--gold);word-break:break-all">${hashShort}</code>
     </div>
     <div style="background:var(--surface-2);border-radius:8px;padding:10px;margin:6px 0">
-      <div style="font-size:10px;color:var(--muted);margin-bottom:4px">🔑 Client Seed:</div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:4px">${I18N.t('gb_pf_client_lbl')}</div>
       <code style="font-size:12px;color:var(--cyan)">${pfClientSeed || '---'}</code>
     </div>
     <div style="background:var(--surface-2);border-radius:8px;padding:10px;margin:6px 0">
-      <div style="font-size:10px;color:var(--muted);margin-bottom:4px">🎲 Nonce (rolls):</div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:4px">${I18N.t('gb_pf_nonce_lbl')}</div>
       <code style="font-size:14px;color:var(--green)">${pfNonce}</code>
     </div>
     <div style="background:var(--surface-2);border-radius:8px;padding:10px;margin:6px 0">
-      <div style="font-size:10px;color:var(--muted);margin-bottom:4px">🔓 Server Seed (revealed):</div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:4px">${I18N.t('gb_pf_revealed_lbl')}</div>
       <code style="font-size:11px;color:${pfRevealedSeed ? 'var(--green)' : 'var(--muted)'};word-break:break-all">${seedShort}</code>
     </div>
     ${pfRevealedSeed ? `
     <div style="background:rgba(0,231,1,0.08);border:1px solid rgba(0,231,1,0.3);border-radius:8px;padding:8px;margin:6px 0;text-align:center">
-      <div style="font-size:11px;color:var(--green)">✅ يمكنك التحقق من النتيجة</div>
+      <div style="font-size:11px;color:var(--green)">${I18N.t('gb_pf_can_verify')}</div>
       <div style="font-size:10px;color:var(--muted);margin-top:4px">SHA256(server_seed) = seed_hash</div>
     </div>
-    <button class="modal-btn-primary" onclick="verifyPF()">🔍 تحقق</button>
+    <button class="modal-btn-primary" onclick="verifyPF()">${I18N.t('gb_pf_verify_btn')}</button>
     ` : `
     <div style="font-size:11px;color:var(--muted);text-align:center;padding:8px">
-      سيتم كشف server seed بعد انتهاء الجولة للتحقق
+      ${I18N.t('gb_pf_reveal_note')}
     </div>
     `}
     <div style="font-size:10px;color:var(--muted);text-align:center;margin-top:8px;line-height:1.5">
-      🔐 يتم استخدام HMAC-SHA256 لتوليد نتائج عادلة<br>
-      لا يمكن للخادم التلاعب بالنتيجة بعد إرسال seed hash
+      ${I18N.t('gb_pf_footer')}
     </div>
-    <button class="modal-btn-secondary" onclick="document.getElementById('pfModal').remove()">إغلاق</button>
+    <button class="modal-btn-secondary" onclick="document.getElementById('pfModal').remove()">${I18N.t('close')}</button>
   `;
 }
 
 async function verifyPF() {
   if (!pfRevealedSeed) {
-    showToast('لا يوجد seed مكشوف للتحقق', 'error');
+    showToast(I18N.t('gb_pf_no_seed'), 'error');
     return;
   }
   try {
@@ -715,21 +773,21 @@ async function verifyPF() {
     if (d.valid) {
       const box = document.getElementById('pfBox');
       box.innerHTML = `
-        <div class="modal-title">✅ تم التحقق</div>
+        <div class="modal-title">${I18N.t('gb_pf_verified_title')}</div>
         <div style="background:rgba(0,231,1,0.08);border:1px solid rgba(0,231,1,0.3);border-radius:8px;padding:12px;margin:8px 0;text-align:center">
           <div style="font-size:28px">✅</div>
-          <div style="font-size:13px;color:var(--green);font-weight:700">النتيجة صحيحة!</div>
+          <div style="font-size:13px;color:var(--green);font-weight:700">${I18N.t('gb_pf_result_ok')}</div>
           <div style="font-size:11px;color:var(--muted);margin-top:4px">SHA256 matched ✓</div>
           <div style="font-size:11px;color:var(--muted)">Results: ${d.results.join(', ')}</div>
         </div>
-        <button class="modal-btn-secondary" onclick="document.getElementById('pfModal').remove()">إغلاق</button>
+        <button class="modal-btn-secondary" onclick="document.getElementById('pfModal').remove()">${I18N.t('close')}</button>
       `;
       soundWin();
     } else {
-      showToast('فشل التحقق!', 'error');
+      showToast(I18N.t('gb_pf_verify_fail'), 'error');
     }
   } catch (e) {
-    showToast('خطأ في التحقق', 'error');
+    showToast(I18N.t('gb_pf_verify_err'), 'error');
   }
 }
 
@@ -757,10 +815,10 @@ function goBack() {
     var box = document.createElement('div');
     box.style.cssText = 'background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;max-width:300px;text-align:center';
     box.innerHTML = '<div style="font-size:28px;margin-bottom:8px">\u26A0\uFE0F</div>' +
-      '<div style="font-size:14px;font-weight:700;margin-bottom:12px">\u0627\u0644\u0639\u0628\u0629 \u0642\u064A\u0627\u0645<br>\u0633\u062A\u062E\u0633\u0631 \u0631\u0647\u0627\u0646\u0643 \u0625\u0630\u0627 \u062E\u0631\u062C\u062A</div>' +
+      '<div style="font-size:14px;font-weight:700;margin-bottom:12px">' + I18N.t('gb_leave_warn') + '</div>' +
       '<div style="display:flex;gap:8px">' +
-      '<button id="_stayBtn" style="flex:1;padding:10px;border-radius:8px;border:none;background:var(--green-dim);color:#fff;font-weight:700">\u0628\u0642\u0627\u0621</button>' +
-      '<button id="_leaveBtn" style="flex:1;padding:10px;border-radius:8px;border:none;background:var(--red-dim);color:#fff;font-weight:700">\u062E\u0631\u0648\u062C</button>' +
+      '<button id="_stayBtn" style="flex:1;padding:10px;border-radius:8px;border:none;background:var(--green-dim);color:#fff;font-weight:700">' + I18N.t('gb_stay') + '</button>' +
+      '<button id="_leaveBtn" style="flex:1;padding:10px;border-radius:8px;border:none;background:var(--red-dim);color:#fff;font-weight:700">' + I18N.t('gb_leave') + '</button>' +
       '</div>';
     c.appendChild(box);
     document.body.appendChild(c);
@@ -841,18 +899,18 @@ async function showVexDepositModal(required) {
 
   if (vMethods.length === 0) {
     // No methods from API — show manual entry always
-    mb.innerHTML = `<div class="modal-title">💰 إيداع محفظة VEX</div>
-      <div class="modal-subtitle">${required ? 'تحتاج ' + required : 'أدخل بيانات الإيداع'}</div>
-      <div class="modal-subtitle">💵 المبلغ:</div>
+    mb.innerHTML = `<div class="modal-title">${I18N.t('gb_dep_title')}</div>
+      <div class="modal-subtitle">${required ? I18N.t('gb_dep_need') + ' ' + required : I18N.t('gb_dep_enter')}</div>
+      <div class="modal-subtitle">${I18N.t('gb_dep_amount')}</div>
       <input class="modal-input" id="vAm" type="number" value="${required||10}">
-      <div class="modal-subtitle">🔐 رقم محفظتك:</div>
-      <input class="modal-input" id="vW" type="text" placeholder="رقم محفظتك">
-      <div class="modal-subtitle">📋 اسم الوسيلة:</div>
-      <input class="modal-input" id="vMN" type="text" placeholder="اسم الوسيلة">
-      <div class="modal-subtitle">📋 بيانات الحساب:</div>
-      <input class="modal-input" id="vMD" type="text" placeholder="بيانات الحساب">
-      <button class="modal-btn-primary" onclick="vSubManual()">✅ تأكيد الإيداع</button>
-      <button class="modal-btn-secondary" onclick="document.getElementById('modal').remove()">إغلاق</button>`;
+      <div class="modal-subtitle">${I18N.t('gb_dep_wallet_lbl')}</div>
+      <input class="modal-input" id="vW" type="text" placeholder="${I18N.t('gb_dep_wallet_ph')}">
+      <div class="modal-subtitle">${I18N.t('gb_dep_mname_lbl')}</div>
+      <input class="modal-input" id="vMN" type="text" placeholder="${I18N.t('gb_dep_mname_ph')}">
+      <div class="modal-subtitle">${I18N.t('gb_dep_mdata_lbl')}</div>
+      <input class="modal-input" id="vMD" type="text" placeholder="${I18N.t('gb_dep_mdata_ph')}">
+      <button class="modal-btn-primary" onclick="vSubManual()">${I18N.t('gb_dep_confirm')}</button>
+      <button class="modal-btn-secondary" onclick="document.getElementById('modal').remove()">${I18N.t('close')}</button>`;
     return;
   }
 
@@ -864,24 +922,24 @@ async function showVexDepositModal(required) {
     </div>`).join('');
 
   mb.innerHTML = `
-    <div class="modal-title">💰 إيداع محفظة VEX</div>
-    <div class="modal-subtitle">${required ? `تحتاج ${required}` : 'اختر وسيلة الدفع'}</div>
+    <div class="modal-title">${I18N.t('gb_dep_title')}</div>
+    <div class="modal-subtitle">${required ? I18N.t('gb_dep_need') + ' ' + required : I18N.t('gb_dep_choose')}</div>
     <div id="vm">${mHtml}</div>
     <div id="vs2" style="display:none">
-      <div class="modal-subtitle" style="margin-top:8px">📋 بيانات الوسيلة:</div>
-      <div class="copy-box" onclick="vCopy()"><code class="copy-data" id="vMD"></code><span class="copy-label" id="vCL">📋 نسخ</span></div>
-      <div class="modal-subtitle">💵 المبلغ:</div>
+      <div class="modal-subtitle" style="margin-top:8px">${I18N.t('gb_dep_method_data')}</div>
+      <div class="copy-box" onclick="vCopy()"><code class="copy-data" id="vMD"></code><span class="copy-label" id="vCL">${I18N.t('copy')}</span></div>
+      <div class="modal-subtitle">${I18N.t('gb_dep_amount')}</div>
       <input class="modal-input" id="vAm" type="number" value="${required||10}">
-      <div class="modal-subtitle">🔐 رقم محفظتك:</div>
-      <input class="modal-input" id="vW" type="text" placeholder="رقم محفظتك">
+      <div class="modal-subtitle">${I18N.t('gb_dep_wallet_lbl')}</div>
+      <input class="modal-input" id="vW" type="text" placeholder="${I18N.t('gb_dep_wallet_ph')}">
       <div id="vSH" style="display:none;font-size:11px;color:var(--green);margin-bottom:4px"></div>
       <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-bottom:8px;cursor:pointer">
-        <input type="checkbox" id="vSv" style="accent-color:var(--gold)"> حفظ دائم
+        <input type="checkbox" id="vSv" style="accent-color:var(--gold)"> ${I18N.t('gb_dep_save')}
       </label>
-      <button class="modal-btn-primary" onclick="vSub()">✅ تأكيد الإيداع</button>
-      <button class="modal-btn-secondary" onclick="document.getElementById('vm').style.display='block';document.getElementById('vs2').style.display='none'">‹ رجوع</button>
+      <button class="modal-btn-primary" onclick="vSub()">${I18N.t('gb_dep_confirm')}</button>
+      <button class="modal-btn-secondary" onclick="document.getElementById('vm').style.display='block';document.getElementById('vs2').style.display='none'">${I18N.t('back')}</button>
     </div>
-    <button class="modal-btn-secondary" onclick="document.getElementById('modal').remove()">إغلاق</button>`;
+    <button class="modal-btn-secondary" onclick="document.getElementById('modal').remove()">${I18N.t('close')}</button>`;
 }
 
 let vSelName = '', vSelData = '';
@@ -890,7 +948,7 @@ function vSel(id, name, data) {
   let sw = '', h = '';
   if (vSaved.length > 0) {
     const m = vSaved.find(w => w.method_name && w.method_name.includes(name));
-    if (m) { sw = m.account_number; h = '✓ محفظتك: ' + sw; }
+    if (m) { sw = m.account_number; h = I18N.t('gb_dep_your_wallet') + sw; }
   }
   document.getElementById('vm').style.display = 'none';
   document.getElementById('vs2').style.display = 'block';
@@ -901,7 +959,7 @@ function vSel(id, name, data) {
 function vCopy() {
   navigator.clipboard.writeText(document.getElementById('vMD').textContent).then(() => {
     if (tg?.HapticFeedback?.impactOccurred) tg.HapticFeedback.impactOccurred('light');
-    const lbl = document.getElementById('vCL'); if (lbl) { lbl.textContent = '✓'; setTimeout(() => lbl.textContent = '📋 نسخ', 1500); }
+    const lbl = document.getElementById('vCL'); if (lbl) { lbl.textContent = '✓'; setTimeout(() => lbl.textContent = I18N.t('copy'), 1500); }
   });
 }
 
@@ -909,32 +967,32 @@ async function vSub() {
   var a = parseFloat(document.getElementById('vAm').value) || 0;
   var w = document.getElementById('vW').value.trim();
   var s = document.getElementById('vSv') ? document.getElementById('vSv').checked : false;
-  if (a <= 0) { showToast('أدخل المبلغ', 'error'); return; }
-  if (!w) { showToast('أدخل رقم محفظتك', 'error'); return; }
-  if (!vSelected) { showToast('اختر وسيلة دفع', 'error'); return; }
+  if (a <= 0) { showToast(I18N.t('gb_dep_enter_amount'), 'error'); return; }
+  if (!w) { showToast(I18N.t('gb_dep_enter_wallet'), 'error'); return; }
+  if (!vSelected) { showToast(I18N.t('gb_dep_choose_method'), 'error'); return; }
   var btn = document.querySelector('.modal-btn-primary');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ جاري الإرسال...'; }
+  if (btn) { btn.disabled = true; btn.textContent = I18N.t('sending'); }
   try {
     var r = await apiFetchCritical(BASE + '/api/deposit/quick', {
       method: 'POST',
       body: JSON.stringify({ amount: a, method_id: vSelected, method_name: vSelName, method_account_data: vSelData, player_wallet: w, save_method: s })
     });
     if (!r.ok && r.status === 403) {
-      showToast('خطأ في المصادقة — أعد فتح اللعبة من البوت', 'error');
-      if (btn) { btn.disabled = false; btn.textContent = '✅ تأكيد الإيداع'; }
+      showToast(I18N.t('gb_dep_auth_err'), 'error');
+      if (btn) { btn.disabled = false; btn.textContent = I18N.t('gb_dep_confirm'); }
       return;
     }
     var d = await r.json();
     if (d.success) {
-      document.getElementById('mb').innerHTML = '<div style="text-align:center;padding:20px"><div style="font-size:36px">⏳</div><div class="modal-title">تم إرسال طلب الإيداع</div><div class="modal-subtitle">بانتظار موافقة الإدارة</div><div class="modal-subtitle" style="margin-top:8px;color:var(--green)">رقم الطلب: ' + (d.deposit_id || d.trans_id || '') + '</div><button onclick="document.getElementById(\'modal\').remove();loadBalance()" class="modal-btn-secondary" style="margin-top:12px">إغلاق</button></div>';
+      document.getElementById('mb').innerHTML = '<div style="text-align:center;padding:20px"><div style="font-size:36px">⏳</div><div class="modal-title">' + I18N.t('gb_dep_sent_title') + '</div><div class="modal-subtitle">' + I18N.t('gb_dep_sent_sub') + '</div><div class="modal-subtitle" style="margin-top:8px;color:var(--green)">' + I18N.t('gb_dep_order_no') + (d.deposit_id || d.trans_id || '') + '</div><button onclick="document.getElementById(\'modal\').remove();loadBalance()" class="modal-btn-secondary" style="margin-top:12px">' + I18N.t('close') + '</button></div>';
       if (tg?.HapticFeedback?.notificationOccurred) tg.HapticFeedback.notificationOccurred('success');
     } else {
-      showToast(d.error || 'فشل الإيداع', 'error');
-      if (btn) { btn.disabled = false; btn.textContent = '✅ تأكيد الإيداع'; }
+      showToast(d.error || I18N.t('gb_dep_failed'), 'error');
+      if (btn) { btn.disabled = false; btn.textContent = I18N.t('gb_dep_confirm'); }
     }
   } catch (e) {
-    showToast('خطأ في الاتصال — تحقق من الإنترنت', 'error');
-    if (btn) { btn.disabled = false; btn.textContent = '✅ تأكيد الإيداع'; }
+    showToast(I18N.t('gb_dep_conn_err'), 'error');
+    if (btn) { btn.disabled = false; btn.textContent = I18N.t('gb_dep_confirm'); }
   }
 }
 
@@ -944,32 +1002,32 @@ async function vSubManual() {
   var w = document.getElementById('vW').value.trim();
   var mn = document.getElementById('vMN') ? document.getElementById('vMN').value.trim() : '';
   var md = document.getElementById('vMD') ? document.getElementById('vMD').value.trim() : '';
-  if (a <= 0) { showToast('أدخل المبلغ', 'error'); return; }
-  if (!w) { showToast('أدخل رقم محفظتك', 'error'); return; }
-  if (!mn) { showToast('أدخل اسم الوسيلة', 'error'); return; }
+  if (a <= 0) { showToast(I18N.t('gb_dep_enter_amount'), 'error'); return; }
+  if (!w) { showToast(I18N.t('gb_dep_enter_wallet'), 'error'); return; }
+  if (!mn) { showToast(I18N.t('gb_dep_enter_mname'), 'error'); return; }
   var btn = document.querySelector('.modal-btn-primary');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ جاري الإرسال...'; }
+  if (btn) { btn.disabled = true; btn.textContent = I18N.t('sending'); }
   try {
     var r = await apiFetchCritical(BASE + '/api/deposit/quick', {
       method: 'POST',
       body: JSON.stringify({ amount: a, method_id: 'manual', method_name: mn, method_account_data: md, player_wallet: w, save_method: false })
     });
     if (!r.ok && r.status === 403) {
-      showToast('خطأ في المصادقة — أعد فتح اللعبة من البوت', 'error');
-      if (btn) { btn.disabled = false; btn.textContent = '✅ تأكيد الإيداع'; }
+      showToast(I18N.t('gb_dep_auth_err'), 'error');
+      if (btn) { btn.disabled = false; btn.textContent = I18N.t('gb_dep_confirm'); }
       return;
     }
     var d = await r.json();
     if (d.success) {
-      document.getElementById('mb').innerHTML = '<div style="text-align:center;padding:20px"><div style="font-size:36px">⏳</div><div class="modal-title">تم إرسال طلب الإيداع</div><div class="modal-subtitle">بانتظار موافقة الإدارة</div><div class="modal-subtitle" style="margin-top:8px;color:var(--green)">رقم الطلب: ' + (d.deposit_id || d.trans_id || '') + '</div><button onclick="document.getElementById(\'modal\').remove();loadBalance()" class="modal-btn-secondary" style="margin-top:12px">إغلاق</button></div>';
+      document.getElementById('mb').innerHTML = '<div style="text-align:center;padding:20px"><div style="font-size:36px">⏳</div><div class="modal-title">' + I18N.t('gb_dep_sent_title') + '</div><div class="modal-subtitle">' + I18N.t('gb_dep_sent_sub') + '</div><div class="modal-subtitle" style="margin-top:8px;color:var(--green)">' + I18N.t('gb_dep_order_no') + (d.deposit_id || d.trans_id || '') + '</div><button onclick="document.getElementById(\'modal\').remove();loadBalance()" class="modal-btn-secondary" style="margin-top:12px">' + I18N.t('close') + '</button></div>';
       if (tg?.HapticFeedback?.notificationOccurred) tg.HapticFeedback.notificationOccurred('success');
     } else {
-      showToast(d.error || 'فشل الإيداع', 'error');
-      if (btn) { btn.disabled = false; btn.textContent = '✅ تأكيد الإيداع'; }
+      showToast(d.error || I18N.t('gb_dep_failed'), 'error');
+      if (btn) { btn.disabled = false; btn.textContent = I18N.t('gb_dep_confirm'); }
     }
   } catch (e) {
-    showToast('خطأ في الاتصال — تحقق من الإنترنت', 'error');
-    if (btn) { btn.disabled = false; btn.textContent = '✅ تأكيد الإيداع'; }
+    showToast(I18N.t('gb_dep_conn_err'), 'error');
+    if (btn) { btn.disabled = false; btn.textContent = I18N.t('gb_dep_confirm'); }
   }
 }
 
@@ -984,7 +1042,7 @@ function injectDepositButton() {
   btn.id = 'depBtnTop';
   btn.className = 'btn-deposit-top';
   btn.innerHTML = '💰';
-  btn.title = 'إيداع';
+  btn.title = I18N.t('gb_dep_btn_title');
   btn.onclick = function() { showVexDepositModal(0); };
   tr.insertBefore(btn, tr.firstChild);
 }

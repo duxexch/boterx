@@ -1,12 +1,14 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
+<script src="/static/js/i18n.js"></script>
+<script src="/static/js/i18n-auto.js"></script>
 <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/icon-32.png?v=20260816">
 <link rel="icon" href="/favicon.ico?v=20260816" sizes="any">
 <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png?v=20260816">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>اختطف</title>
+<title data-i18n="x030">اختطف</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none; }
 body { overflow:hidden; font-family:system-ui,sans-serif; background:var(--tg-theme-bg-color,#0b0e11); color:var(--tg-theme-text-color,#fff); touch-action:none; }
@@ -65,16 +67,16 @@ body { overflow:hidden; font-family:system-ui,sans-serif; background:var(--tg-th
 <div id="game">
   <div id="hud">
     <div id="score">🎁 0</div>
-    <div id="round-info">جولة 0/7</div>
+    <div id="round-info" data-i18n="x102">جولة 0/7</div>
     <div id="lives">❤️❤️❤️</div>
   </div>
   <div id="arena"></div>
 </div>
 
 <div id="start-screen">
-  <h1>🎁 اختطف!</h1>
+  <h1 data-i18n="x213">🎁 اختطف!</h1>
   <p>هدايا ستظهر وتختفي بسرعة!<br>اخطفها قبل ما تهرب!<br>⚡ أحياناً تظهر وتختفي فوراً<br>🟢 أحياناً تنتظرك<br>🔴 احذر القنابل!</p>
-  <button id="start-btn" onclick="startGame()">ابدأ!</button>
+  <button id="start-btn" onclick="startGame()" data-i18n="x022">ابدأ!</button>
 </div>
 
 <div id="countdown"></div>
@@ -290,7 +292,7 @@ function endGame() {
   
   let prizesHTML = '';
   caughtGifts.forEach(g => { prizesHTML += `<div>🎁 ${g.text}</div>`; });
-  if (caughtGifts.length === 0) prizesHTML = '<div>لم تتمكن من اصطياد أي هدية</div>';
+  if (caughtGifts.length === 0) prizesHTML = '<div data-i18n="x165">لم تتمكن من اصطياد أي هدية</div>';
   document.getElementById('result-prizes').innerHTML = prizesHTML;
   
   // إرسال البيانات للبوت تلقائياً بدون انتظار ضغط زر
@@ -323,5 +325,6 @@ function sendResult() {
 // Gifts data injected by Flask
 window.giftsData = {{ gifts_json|safe }};
 </script>
+<script>if(window.I18N)I18N.mountToggle();</script>
 </body>
 </html>

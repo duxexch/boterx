@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
+<script src="/static/js/i18n.js"></script>
+<script src="/static/js/i18n-auto.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
 <meta name="theme-color" content="#10141a">
@@ -121,7 +123,7 @@ body{
   <div id="betbar">
     <div class="bet-input-row">
       <input type="number" class="bet-input" id="betInput" value="{{ game.min_bet }}" min="{{ game.min_bet }}" max="{{ game.max_bet }}">
-      <button class="play-btn" id="playBtn" onclick="playRound()">▶️ العب</button>
+      <button class="play-btn" id="playBtn" onclick="playRound()" data-i18n="x196">▶️ العب</button>
     </div>
     <div class="quick-bets" id="quickBets"></div>
   </div>
@@ -233,7 +235,7 @@ async function playRound() {
       if (d.need_deposit) {
         showDepositModal(bet);
       } else {
-        document.getElementById('resultDisplay').textContent = d.error || 'خطأ';
+        document.getElementById('resultDisplay').textContent = d.error || I18N.t('x106');
         document.getElementById('resultDisplay').className = 'result-display result-lose';
       }
       isPlaying = false;
@@ -301,22 +303,22 @@ function showContinueModal(result, lastBet) {
   if (balance >= minBet) {
     html += `
       <input type="number" class="modal-input" id="modalBet" value="${lastBet}" min="${minBet}" max="${maxBet}">
-      <button class="modal-btn" onclick="continuePlay()">▶️ العب مرة أخرى</button>
+      <button class="modal-btn" onclick="continuePlay()" data-i18n="x197">▶️ العب مرة أخرى</button>
     `;
   } else {
     html += `
-      <div class="modal-subtitle">⚠️ رصيدك غير كافٍ</div>
-      <button class="modal-btn" onclick="showDepositModal(${minBet})">💰 إيداع سريع</button>
+      <div class="modal-subtitle" data-i18n="x198">⚠️ رصيدك غير كافٍ</div>
+      <button class="modal-btn" onclick="showDepositModal(${minBet})" data-i18n="x245">💰 إيداع سريع</button>
     `;
   }
   
   // Other games
   html += `
     <div class="other-games">
-      <div class="other-games-title">🎮 جرّب ألعاب أخرى</div>
+      <div class="other-games-title" data-i18n="x228">🎮 جرّب ألعاب أخرى</div>
       <div class="games-scroll" id="otherGames"></div>
     </div>
-    <button class="modal-btn secondary" onclick="goBack()" style="margin-top:8px">🏠 القائمة</button>
+    <button class="modal-btn secondary" onclick="goBack()" style="margin-top:8px" data-i18n="x235">🏠 القائمة</button>
   `;
   
   box.innerHTML = html;
@@ -370,9 +372,9 @@ async function showDepositModal(required) {
 
   if (botMethods.length === 0) {
     box.innerHTML = `
-      <div class="modal-title">💰 إيداع محفظة VEX</div>
-      <div class="modal-subtitle">لا توجد وسائل دفع متاحة حالياً</div>
-      <button class="modal-btn" onclick="document.getElementById('modal').style.display='none'">إغلاق</button>
+      <div class="modal-title" data-i18n="x246">💰 إيداع محفظة VEX</div>
+      <div class="modal-subtitle" data-i18n="x163">لا توجد وسائل دفع متاحة حالياً</div>
+      <button class="modal-btn" onclick="document.getElementById('modal').style.display='none'" data-i18n="x017">إغلاق</button>
     `;
     modal.style.display = 'flex';
     return;
@@ -391,27 +393,27 @@ async function showDepositModal(required) {
   `).join('');
 
   box.innerHTML = `
-    <div class="modal-title">💰 إيداع محفظة VEX</div>
+    <div class="modal-title" data-i18n="x246">💰 إيداع محفظة VEX</div>
     <div class="modal-subtitle">${required ? `رصيدك غير كافٍ — تحتاج ${required}` : 'اختر وسيلة الدفع'}</div>
     <div id="depMethodsList">${methodsHtml}</div>
     <div id="depStep2" style="display:none">
-      <div style="font-size:11px;color:#8794a3;margin:10px 0 6px">📋 بيانات الوسيلة:</div>
+      <div style="font-size:11px;color:#8794a3;margin:10px 0 6px" data-i18n="x263">📋 بيانات الوسيلة:</div>
       <div class="copy-box" onclick="copyMethodData()" style="display:flex;align-items:center;justify-content:space-between;background:#10141a;border:1px solid #262e39;border-radius:10px;padding:10px 12px;cursor:pointer;margin-bottom:10px">
         <code id="methodDataDisplay" style="font-size:13px;color:#00e701;word-break:break-all"></code>
-        <span style="font-size:12px;color:#8794a3;flex-shrink:0;margin-right:8px">📋 نسخ</span>
+        <span style="font-size:12px;color:#8794a3;flex-shrink:0;margin-right:8px" data-i18n="x266">📋 نسخ</span>
       </div>
-      <div style="font-size:11px;color:#8794a3;margin:8px 0 4px">💵 المبلغ الذي سترسله:</div>
-      <input type="number" id="depAmount" placeholder="المبلغ" value="${required || minBet}" style="width:100%;background:#10141a;border:1px solid #262e39;border-radius:8px;padding:10px;color:#fff;font-size:15px;font-weight:700;outline:none;margin-bottom:8px">
-      <div style="font-size:11px;color:#8794a3;margin:8px 0 4px">🔐 رقم محفظتك (التي سترسل منها):</div>
-      <input type="text" id="playerWallet" placeholder="رقم محفظتك" style="width:100%;background:#10141a;border:1px solid #262e39;border-radius:8px;padding:10px;color:#fff;font-size:15px;font-weight:700;outline:none;margin-bottom:8px">
+      <div style="font-size:11px;color:#8794a3;margin:8px 0 4px" data-i18n="x251">💵 المبلغ الذي سترسله:</div>
+      <input type="number" id="depAmount" placeholder="المبلغ" data-i18n-ph="x052" value="${required || minBet}" style="width:100%;background:#10141a;border:1px solid #262e39;border-radius:8px;padding:10px;color:#fff;font-size:15px;font-weight:700;outline:none;margin-bottom:8px">
+      <div style="font-size:11px;color:#8794a3;margin:8px 0 4px" data-i18n="x276">🔐 رقم محفظتك (التي سترسل منها):</div>
+      <input type="text" id="playerWallet" placeholder="رقم محفظتك" data-i18n-ph="x124" style="width:100%;background:#10141a;border:1px solid #262e39;border-radius:8px;padding:10px;color:#fff;font-size:15px;font-weight:700;outline:none;margin-bottom:8px">
       <div id="savedWalletsHint" style="display:none;font-size:11px;color:#34d399;margin-bottom:6px"></div>
       <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#8794a3;margin-bottom:10px;cursor:pointer">
         <input type="checkbox" id="saveMethod" style="accent-color:#00e701"> حفظ كوسيلة دفع دائمة
       </label>
-      <button class="modal-btn" onclick="submitGameDeposit()">✅ تأكيد الإيداع</button>
-      <button class="modal-btn secondary" onclick="backToMethods()" style="margin-top:6px">‹ رجوع</button>
+      <button class="modal-btn" onclick="submitGameDeposit()" data-i18n="x204">✅ تأكيد الإيداع</button>
+      <button class="modal-btn secondary" onclick="backToMethods()" style="margin-top:6px" data-i18n="x188">‹ رجوع</button>
     </div>
-    <button class="modal-btn secondary" onclick="document.getElementById('modal').style.display='none'" style="margin-top:6px">إلغاء</button>
+    <button class="modal-btn secondary" onclick="document.getElementById('modal').style.display='none'" style="margin-top:6px" data-i18n="x018">إلغاء</button>
   `;
   modal.style.display = 'flex';
 }
@@ -447,7 +449,7 @@ function copyMethodData() {
   navigator.clipboard.writeText(data).then(() => {
     haptic('light');
     const btn = document.querySelector('.copy-box span');
-    if (btn) { btn.textContent = '✓ تم النسخ'; setTimeout(() => btn.textContent = '📋 نسخ', 1500); }
+    if (btn) { btn.textContent = '✓ تم النسخ'; setTimeout(() => btn.textContent = I18N.t('x266'), 1500); }
   });
 }
 
@@ -461,8 +463,8 @@ async function submitGameDeposit() {
   const playerWallet = document.getElementById('playerWallet').value.trim();
   const saveMethod = document.getElementById('saveMethod').checked;
 
-  if (amount <= 0) { alert('أدخل المبلغ'); return; }
-  if (!playerWallet) { alert('أدخل رقم محفظتك'); return; }
+  if (amount <= 0) { alert(I18N.t('x000')); return; }
+  if (!playerWallet) { alert(I18N.t('x002')); return; }
   if (!selectedMethod) { alert('اختر وسيلة دفع'); return; }
 
   try {
@@ -480,9 +482,9 @@ async function submitGameDeposit() {
     const d = await r.json();
     if (d.success) {
       document.getElementById('modalBox').innerHTML = `
-        <div class="modal-title">⏳ بانتظار التأكيد</div>
+        <div class="modal-title" data-i18n="x190">⏳ بانتظار التأكيد</div>
         <div class="modal-subtitle">تم إرسال طلب الإيداع<br>سيتم إضافة الرصيد لمحفظة VEX بعد موافقة الإدارة</div>
-        <button class="modal-btn" onclick="document.getElementById('modal').style.display='none';loadBalance();">إغلاق</button>
+        <button class="modal-btn" onclick="document.getElementById('modal').style.display='none';loadBalance();" data-i18n="x017">إغلاق</button>
       `;
     } else {
       alert(d.error || 'خطأ في الإيداع');
@@ -621,5 +623,6 @@ setInterval(simulatePlayers, 2500);
 simulatePlayers();
 renderLivePlayers();
 </script>
+<script>if(window.I18N)I18N.mountToggle();</script>
 </body>
 </html>

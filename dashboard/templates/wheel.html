@@ -1,12 +1,14 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
+<script src="/static/js/i18n.js"></script>
+<script src="/static/js/i18n-auto.js"></script>
 <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/icon-32.png?v=20260816">
 <link rel="icon" href="/favicon.ico?v=20260816" sizes="any">
 <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png?v=20260816">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>عجلة الحظ — VEX</title>
+<title data-i18n="x135">عجلة الحظ — VEX</title>
 <link rel="stylesheet" href="/static/css/game-base.css?v=20260818">
 <style>
 html,body{margin:0;padding:0;height:100%;touch-action:manipulation;user-select:none}
@@ -78,7 +80,7 @@ html,body{margin:0;padding:0;height:100%;touch-action:manipulation;user-select:n
       🎰 أدر العجلة
       <div class="spin-power-bar" id="powerBar" style="width:0"></div>
     </button>
-    <div class="spin-hint">اضغط مع الاستمرار لتحديد قوة الدوران</div>
+    <div class="spin-hint" data-i18n="x038">اضغط مع الاستمرار لتحديد قوة الدوران</div>
     <div class="seg-legend" id="segLegend"></div>
   </div>
 </div>
@@ -86,11 +88,11 @@ html,body{margin:0;padding:0;height:100%;touch-action:manipulation;user-select:n
 <div class="big-win-overlay" id="bigWinOverlay">
   <div style="text-align:center">
     <div class="big-win-num" id="bigWinNum">+0</div>
-    <div style="font-size:18px;color:#fff;margin-top:8px" id="bigWinText">جائزة كبرى!</div>
+    <div style="font-size:18px;color:#fff;margin-top:8px" id="bigWinText" data-i18n="x093">جائزة كبرى!</div>
   </div>
 </div>
 
-<script src="/static/js/game-base.js?v=20260812b"></script>
+<script src="/static/js/game-base.js?v=20260816i18n"></script>
 <script>
 'use strict';
 var canvas = document.getElementById('wheelCanvas');
@@ -264,7 +266,7 @@ function doSpin(){
     animateSpin(currentAngle, finalAngle, seg, d.payout || 0, bet, d.multiplier || seg.mult, duration);
     if(d.balance_after !== undefined) document.getElementById('bal').textContent = d.balance_after.toLocaleString();
   }).catch(function(){
-    showToast('خطأ في الشبكة','error');
+    showToast(I18N.t('x108'),'error');
     spinning = false; spinBtn.disabled = false;
   });
 }
@@ -325,5 +327,6 @@ resizeCanvas(); drawWheel(0); buildLegend();
 loadBalance(); setInterval(loadBalance, 10000);
 setTimeout(injectDepositButton, 100);
 </script>
+<script>if(window.I18N)I18N.mountToggle();</script>
 </body>
 </html>

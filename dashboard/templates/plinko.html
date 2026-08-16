@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
+<script src="/static/js/i18n.js"></script>
+<script src="/static/js/i18n-auto.js"></script>
 <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/icon-32.png?v=20260816">
 <link rel="icon" href="/favicon.ico?v=20260816" sizes="any">
 <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png?v=20260816">
@@ -93,7 +95,7 @@ html,body{width:100%;height:100%;overflow:hidden;touch-action:manipulation;backg
   <div class="controls-panel">
     <div class="controls-top">
       <div style="flex:1">
-        <div class="opt-label">الصفوف</div>
+        <div class="opt-label" data-i18n="x046">الصفوف</div>
         <div class="opt-box">
           <div class="opt-btn" id="r8" onclick="setRows(8)">8</div>
           <div class="opt-btn active" id="r12" onclick="setRows(12)">12</div>
@@ -102,11 +104,11 @@ html,body{width:100%;height:100%;overflow:hidden;touch-action:manipulation;backg
         </div>
       </div>
       <div style="flex:1">
-        <div class="opt-label">المخاطرة</div>
+        <div class="opt-label" data-i18n="x055">المخاطرة</div>
         <div class="opt-box">
-          <div class="opt-btn active" id="rkL" onclick="setRisk('low')">منخفض</div>
-          <div class="opt-btn" id="rkM" onclick="setRisk('med')">متوسط</div>
-          <div class="opt-btn" id="rkH" onclick="setRisk('high')">عالي</div>
+          <div class="opt-btn active" id="rkL" onclick="setRisk('low')" data-i18n="x177">منخفض</div>
+          <div class="opt-btn" id="rkM" onclick="setRisk('med')" data-i18n="x168">متوسط</div>
+          <div class="opt-btn" id="rkH" onclick="setRisk('high')" data-i18n="x133">عالي</div>
         </div>
       </div>
     </div>
@@ -119,14 +121,14 @@ html,body{width:100%;height:100%;overflow:hidden;touch-action:manipulation;backg
     <div class="drop-btn-wrap">
       <button class="drop-btn" id="dropBtn" ontouchstart="onDropPressStart(event)" ontouchend="onDropPressEnd(event)" onmousedown="onDropPressStart(event)" onmouseup="onDropPressEnd(event)" onmouseleave="onDropPressEnd(event)">
         <div class="power-fill" id="powerFill"></div>
-        <div class="power-text" id="dropBtnText">🎯 إسقاط الكرة</div>
-        <div class="power-hint" id="powerHint">اضغط مع الاستمرار لزيادة القوة</div>
+        <div class="power-text" id="dropBtnText" data-i18n="x230">🎯 إسقاط الكرة</div>
+        <div class="power-hint" id="powerHint" data-i18n="x039">اضغط مع الاستمرار لزيادة القوة</div>
       </button>
     </div>
   </div>
 </div>
 <div class="big-win-overlay" id="bigWin"><div style="text-align:center"><div class="big-win-num" id="bwNum"></div><div class="big-win-text" id="bwTxt"></div></div></div>
-<script src="/static/js/game-base.js?v=20260812b"></script>
+<script src="/static/js/game-base.js?v=20260816i18n"></script>
 <script>
 'use strict';
 
@@ -320,8 +322,8 @@ function onDropPressEnd(e){
   var hint=document.getElementById('powerHint');
   btn.classList.remove('charging');
   fill.style.width='0%';
-  txt.textContent='🎯 إسقاط الكرة';
-  hint.textContent='اضغط مع الاستمرار لزيادة القوة';
+  txt.textContent=I18N.t('x230');
+  hint.textContent=I18N.t('x039');
   // If barely tapped (power < 5), use default power 50
   var finalPower=powerVal<5?50:powerVal;
   powerVal=0;
@@ -495,5 +497,6 @@ requestAnimationFrame(function(){
   });
 });
 </script>
+<script>if(window.I18N)I18N.mountToggle();</script>
 </body>
 </html>

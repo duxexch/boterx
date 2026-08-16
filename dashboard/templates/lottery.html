@@ -1,12 +1,14 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
+<script src="/static/js/i18n.js"></script>
+<script src="/static/js/i18n-auto.js"></script>
 <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/icon-32.png?v=20260816">
 <link rel="icon" href="/favicon.ico?v=20260816" sizes="any">
 <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png?v=20260816">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>اليانصيب — VEX</title>
+<title data-i18n="x059">اليانصيب — VEX</title>
 <link rel="stylesheet" href="/static/css/game-base.css?v=20260818">
 <style>
 body{overscroll-behavior:none}
@@ -92,31 +94,31 @@ body{overscroll-behavior:none}
 
     <!-- Timer -->
     <div class="lottery-timer">
-      <div class="timer-label" id="timerLabel">🎲 السحب التالي</div>
+      <div class="timer-label" id="timerLabel" data-i18n="x232">🎲 السحب التالي</div>
       <div class="timer-val" id="timerVal">--:--:--</div>
     </div>
 
     <!-- Stats -->
     <div class="lottery-info">
-      <div class="linfo"><div class="linfo-val gold" id="prizePool">0</div><div class="linfo-label">جائزة الجولة</div></div>
-      <div class="linfo"><div class="linfo-val" id="ticketsSold">0</div><div class="linfo-label">تذاكر مباعة</div></div>
-      <div class="linfo"><div class="linfo-val" id="participantsCount">0</div><div class="linfo-label">مشاركين</div></div>
-      <div class="linfo"><div class="linfo-val" id="ticketsAvail">1000</div><div class="linfo-label">متاحة</div></div>
-      <div class="linfo"><div class="linfo-val" id="myTickets">0</div><div class="linfo-label">تذاكري</div></div>
+      <div class="linfo"><div class="linfo-val gold" id="prizePool">0</div><div class="linfo-label" data-i18n="x089">جائزة الجولة</div></div>
+      <div class="linfo"><div class="linfo-val" id="ticketsSold">0</div><div class="linfo-label" data-i18n="x073">تذاكر مباعة</div></div>
+      <div class="linfo"><div class="linfo-val" id="participantsCount">0</div><div class="linfo-label" data-i18n="x173">مشاركين</div></div>
+      <div class="linfo"><div class="linfo-val" id="ticketsAvail">1000</div><div class="linfo-label" data-i18n="x167">متاحة</div></div>
+      <div class="linfo"><div class="linfo-val" id="myTickets">0</div><div class="linfo-label" data-i18n="x074">تذاكري</div></div>
     </div>
 
     <!-- Prize tiers -->
     <div class="prize-tiers" id="prizeTiers" style="display:none">
-      <div class="pt-title">🏆 درجات الجوائز</div>
-      <div class="pt-row"><span class="pt-badge jackpot">5/5</span><span class="pt-label">جائزة كبرى</span><span class="pt-amount gold" id="tierJackpot">—</span></div>
-      <div class="pt-row"><span class="pt-badge secondary">4/5</span><span class="pt-label">جائزة ثانية</span><span class="pt-amount" id="tierSecondary">—</span></div>
-      <div class="pt-row"><span class="pt-badge small">3/5</span><span class="pt-label">جائزة صغيرة</span><span class="pt-amount" id="tierSmall">—</span></div>
+      <div class="pt-title" data-i18n="x233">🏆 درجات الجوائز</div>
+      <div class="pt-row"><span class="pt-badge jackpot">5/5</span><span class="pt-label" data-i18n="x092">جائزة كبرى</span><span class="pt-amount gold" id="tierJackpot">—</span></div>
+      <div class="pt-row"><span class="pt-badge secondary">4/5</span><span class="pt-label" data-i18n="x090">جائزة ثانية</span><span class="pt-amount" id="tierSecondary">—</span></div>
+      <div class="pt-row"><span class="pt-badge small">3/5</span><span class="pt-label" data-i18n="x091">جائزة صغيرة</span><span class="pt-amount" id="tierSmall">—</span></div>
     </div>
 
     <!-- My tickets -->
-    <div class="tickets-title" id="ticketsTitle">🎟️ تذاكري</div>
+    <div class="tickets-title" id="ticketsTitle" data-i18n="x218">🎟️ تذاكري</div>
     <div class="ticket-grid" id="ticketArea"></div>
-    <div class="no-tickets" id="noTickets">لا توجد تذاكر بعد — اشترِ تذكرة بالأسفل</div>
+    <div class="no-tickets" id="noTickets" data-i18n="x153">لا توجد تذاكر بعد — اشترِ تذكرة بالأسفل</div>
 
     <!-- Buy section -->
     <div class="buy-section">
@@ -126,19 +128,19 @@ body{overscroll-behavior:none}
         <button class="count-btn" onclick="changeCount(1)">+</button>
       </div>
       <div class="total-box">
-        <div class="total-label">إجمالي المطلوب</div>
+        <div class="total-label" data-i18n="x010">إجمالي المطلوب</div>
         <div class="total-val" id="totalCost">50</div>
       </div>
-      <button class="buy-btn" id="buyBtn" onclick="buyTickets()">🎟️ شراء بالرصيد</button>
-      <button class="buy-btn-deposit" onclick="showBuyDepositModal()">💳 شراء بإيداع سريع</button>
+      <button class="buy-btn" id="buyBtn" onclick="buyTickets()" data-i18n="x219">🎟️ شراء بالرصيد</button>
+      <button class="buy-btn-deposit" onclick="showBuyDepositModal()" data-i18n="x249">💳 شراء بإيداع سريع</button>
     </div>
   </div>
 </div>
 <div id="loading" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg);flex-direction:column;gap:12px">
   <div style="font-size:40px">🎟️</div>
-  <div style="color:var(--text-dim);font-size:14px">جارٍ التحميل...</div>
+  <div style="color:var(--text-dim);font-size:14px" data-i18n="x096">جارٍ التحميل...</div>
 </div>
-<script src="/static/js/game-base.js?v=20260812b"></script>
+<script src="/static/js/game-base.js?v=20260816i18n"></script>
 <script>
 'use strict';
 var ticketCount = 1;
@@ -241,7 +243,7 @@ function buyTickets() {
     method: 'POST',
     body: JSON.stringify({ count: ticketCount, draw_type: selectedDrawType })
   }).then(function(r) { return r.json(); }).then(function(d) {
-    btn.disabled = false; btn.textContent = '🎟️ شراء بالرصيد';
+    btn.disabled = false; btn.textContent = I18N.t('x219');
     if (d.need_deposit) { showToast('رصيد غير كافٍ — استخدم الإيداع السريع', 'info'); return; }
     if (d.error) { showToast(d.error, 'error'); return; }
     if (d.success) {
@@ -252,8 +254,8 @@ function buyTickets() {
       loadBalance();
     }
   }).catch(function(e) {
-    btn.disabled = false; btn.textContent = '🎟️ شراء بالرصيد';
-    showToast('خطأ في الشبكة', 'error');
+    btn.disabled = false; btn.textContent = I18N.t('x219');
+    showToast(I18N.t('x108'), 'error');
   });
 }
 
@@ -264,19 +266,19 @@ function showBuyDepositModal() {
   overlay.innerHTML = '<div class="modal-box" id="mb"></div>';
   document.body.appendChild(overlay);
   var mb = document.getElementById('mb');
-  mb.innerHTML = '<div class="modal-title">🎟️ شراء تذاكر بإيداع</div><div class="modal-subtitle">جارٍ تحميل وسائل الدفع...</div>';
+  mb.innerHTML = '<div class="modal-title" data-i18n="x221">🎟️ شراء تذاكر بإيداع</div><div class="modal-subtitle" data-i18n="x100">جارٍ تحميل وسائل الدفع...</div>';
   apiFetch(BASE + '/api/games/payment-methods').then(function(r) { return r.json(); }).then(function(d) {
     var methods = d.methods || [];
     if (methods.length === 0) {
-      mb.innerHTML = '<div class="modal-title">🎟️ شراء تذاكر</div><div class="modal-subtitle">إجمالي: ' + totalCost.toLocaleString() + '</div><div class="modal-subtitle">🔐 رقم محفظتك:</div><input class="modal-input" id="lotW" type="text" placeholder="رقم محفظتك"><div class="modal-subtitle">📋 اسم الوسيلة:</div><input class="modal-input" id="lotMN" type="text" placeholder="اسم الوسيلة"><div class="modal-subtitle">📋 بيانات الحساب:</div><input class="modal-input" id="lotMD2" type="text" placeholder="بيانات الحساب"><button class="modal-btn-primary" onclick="lotSubManual(' + totalCost + ')">✅ تأكيد طلب الشراء</button><button class="modal-btn-secondary" onclick="document.getElementById(\'modal\').remove()">إغلاق</button>';
+      mb.innerHTML = '<div class="modal-title" data-i18n="x220">🎟️ شراء تذاكر</div><div class="modal-subtitle">إجمالي: ' + totalCost.toLocaleString() + '</div><div class="modal-subtitle" data-i18n="x278">🔐 رقم محفظتك:</div><input class="modal-input" id="lotW" type="text" placeholder="رقم محفظتك" data-i18n-ph="x124"><div class="modal-subtitle" data-i18n="x260">📋 اسم الوسيلة:</div><input class="modal-input" id="lotMN" type="text" placeholder="اسم الوسيلة" data-i18n-ph="x035"><div class="modal-subtitle" data-i18n="x261">📋 بيانات الحساب:</div><input class="modal-input" id="lotMD2" type="text" placeholder="بيانات الحساب" data-i18n-ph="x067"><button class="modal-btn-primary" onclick="lotSubManual(' + totalCost + ')" data-i18n="x206">✅ تأكيد طلب الشراء</button><button class="modal-btn-secondary" onclick="document.getElementById(\'modal\').remove()" data-i18n="x017">إغلاق</button>';
       return;
     }
     var mHtml = methods.map(function(m) {
       return '<div class="method-item" onclick="lotSel(\'' + m.id + '\',\'' + (m.method_name||'').replace(/'/g,"\\'") + '\',\'' + (m.account_data||'').replace(/'/g,"\\'") + '\')"><span class="method-icon">' + (m.icon||'💳') + '</span><div class="method-info"><div class="method-name">' + (m.method_name||'') + '</div><div class="method-type">' + (m.method_type||'') + '</div></div><span class="method-arrow">‹</span></div>';
     }).join('');
-    mb.innerHTML = '<div class="modal-title">🎟️ شراء تذاكر بإيداع</div><div class="modal-subtitle">إجمالي: ' + totalCost.toLocaleString() + ' — عند موافقة الإدارة تُشترى التذاكر تلقائياً</div><div id="vm">' + mHtml + '</div><div id="vs2" style="display:none"><div class="modal-subtitle" style="margin-top:8px">📋 بيانات الوسيلة:</div><div class="copy-box" onclick="lotCopy()"><code class="copy-data" id="lotMD"></code><span class="copy-label" id="lotCL">📋 نسخ</span></div><div class="modal-subtitle">🔐 رقم محفظتك:</div><input class="modal-input" id="lotW" type="text" placeholder="رقم محفظتك"><button class="modal-btn-primary" onclick="lotSub(' + totalCost + ')">✅ تأكيد طلب الشراء</button><button class="modal-btn-secondary" onclick="document.getElementById(\'vm\').style.display=\'block\';document.getElementById(\'vs2\').style.display=\'none\'">‹ رجوع</button></div><button class="modal-btn-secondary" onclick="document.getElementById(\'modal\').remove()">إغلاق</button>';
+    mb.innerHTML = '<div class="modal-title" data-i18n="x221">🎟️ شراء تذاكر بإيداع</div><div class="modal-subtitle">إجمالي: ' + totalCost.toLocaleString() + ' — عند موافقة الإدارة تُشترى التذاكر تلقائياً</div><div id="vm">' + mHtml + '</div><div id="vs2" style="display:none"><div class="modal-subtitle" style="margin-top:8px" data-i18n="x263">📋 بيانات الوسيلة:</div><div class="copy-box" onclick="lotCopy()"><code class="copy-data" id="lotMD"></code><span class="copy-label" id="lotCL" data-i18n="x266">📋 نسخ</span></div><div class="modal-subtitle" data-i18n="x278">🔐 رقم محفظتك:</div><input class="modal-input" id="lotW" type="text" placeholder="رقم محفظتك" data-i18n-ph="x124"><button class="modal-btn-primary" onclick="lotSub(' + totalCost + ')" data-i18n="x206">✅ تأكيد طلب الشراء</button><button class="modal-btn-secondary" onclick="document.getElementById(\'vm\').style.display=\'block\';document.getElementById(\'vs2\').style.display=\'none\'" data-i18n="x188">‹ رجوع</button></div><button class="modal-btn-secondary" onclick="document.getElementById(\'modal\').remove()" data-i18n="x017">إغلاق</button>';
   }).catch(function() {
-    mb.innerHTML = '<div class="modal-title">خطأ</div><button class="modal-btn-secondary" onclick="document.getElementById(\'modal\').remove()">إغلاق</button>';
+    mb.innerHTML = '<div class="modal-title" data-i18n="x106">خطأ</div><button class="modal-btn-secondary" onclick="document.getElementById(\'modal\').remove()" data-i18n="x017">إغلاق</button>';
   });
 }
 
@@ -289,34 +291,34 @@ function lotSel(id, name, data) {
 }
 function lotCopy() {
   navigator.clipboard.writeText(document.getElementById('lotMD').textContent);
-  var lbl=document.getElementById('lotCL'); if(lbl){lbl.textContent='✓';setTimeout(function(){lbl.textContent='📋 نسخ'},1500);}
+  var lbl=document.getElementById('lotCL'); if(lbl){lbl.textContent='✓';setTimeout(function(){lbl.textContent=I18N.t('x266')},1500);}
 }
 function lotSub(amount) {
   var w = document.getElementById('lotW').value.trim();
-  if (!w) { alert('أدخل رقم محفظتك'); return; }
+  if (!w) { alert(I18N.t('x002')); return; }
   apiFetch(BASE + '/api/deposit/quick', {
     method: 'POST',
     body: JSON.stringify({ amount: amount, method_id: _lotSelId, method_name: _lotSelName, method_account_data: _lotSelData, player_wallet: w, save_method: false, purpose: 'lottery_tickets', ticket_count: ticketCount, draw_type: selectedDrawType })
   }).then(function(r) { return r.json(); }).then(function(d) {
     if (d.success) {
-      document.getElementById('mb').innerHTML = '<div style="text-align:center;padding:16px"><div style="font-size:28px">⏳</div><div class="modal-title">تم طلب الشراء</div><div class="modal-subtitle">بانتظار موافقة الإدارة — سيتم شراء التذاكر تلقائياً</div><button class="modal-btn-secondary" onclick="document.getElementById(\'modal\').remove();loadState();">إغلاق</button></div>';
-    } else { alert(d.error || 'خطأ'); }
-  }).catch(function() { alert('خطأ'); });
+      document.getElementById('mb').innerHTML = '<div style="text-align:center;padding:16px"><div style="font-size:28px">⏳</div><div class="modal-title" data-i18n="x087">تم طلب الشراء</div><div class="modal-subtitle" data-i18n="x066">بانتظار موافقة الإدارة — سيتم شراء التذاكر تلقائياً</div><button class="modal-btn-secondary" onclick="document.getElementById(\'modal\').remove();loadState();" data-i18n="x017">إغلاق</button></div>';
+    } else { alert(d.error || I18N.t('x106')); }
+  }).catch(function() { alert(I18N.t('x106')); });
 }
 function lotSubManual(amount) {
   var w = document.getElementById('lotW').value.trim();
   var mn = document.getElementById('lotMN') ? document.getElementById('lotMN').value.trim() : '';
   var md = document.getElementById('lotMD2') ? document.getElementById('lotMD2').value.trim() : '';
-  if (!w) { alert('أدخل رقم محفظتك'); return; }
+  if (!w) { alert(I18N.t('x002')); return; }
   if (!mn) { alert('أدخل اسم الوسيلة'); return; }
   apiFetch(BASE + '/api/deposit/quick', {
     method: 'POST',
     body: JSON.stringify({ amount: amount, method_id: 'manual', method_name: mn, method_account_data: md, player_wallet: w, save_method: false, purpose: 'lottery_tickets', ticket_count: ticketCount, draw_type: selectedDrawType })
   }).then(function(r) { return r.json(); }).then(function(d) {
     if (d.success) {
-      document.getElementById('mb').innerHTML = '<div style="text-align:center;padding:16px"><div style="font-size:28px">⏳</div><div class="modal-title">تم طلب الشراء</div><div class="modal-subtitle">بانتظار موافقة الإدارة — سيتم شراء التذاكر تلقائياً</div><button class="modal-btn-secondary" onclick="document.getElementById(\'modal\').remove();loadState();">إغلاق</button></div>';
-    } else { alert(d.error || 'خطأ'); }
-  }).catch(function() { alert('خطأ'); });
+      document.getElementById('mb').innerHTML = '<div style="text-align:center;padding:16px"><div style="font-size:28px">⏳</div><div class="modal-title" data-i18n="x087">تم طلب الشراء</div><div class="modal-subtitle" data-i18n="x066">بانتظار موافقة الإدارة — سيتم شراء التذاكر تلقائياً</div><button class="modal-btn-secondary" onclick="document.getElementById(\'modal\').remove();loadState();" data-i18n="x017">إغلاق</button></div>';
+    } else { alert(d.error || I18N.t('x106')); }
+  }).catch(function() { alert(I18N.t('x106')); });
 }
 
 function renderTickets() {
@@ -356,5 +358,6 @@ var _balPoll = setInterval(loadBalance, 10000);
 window._stopLotteryPolls = function() { clearInterval(_statePoll); clearInterval(_balPoll); };
 setTimeout(injectDepositButton, 100);
 </script>
+<script>if(window.I18N)I18N.mountToggle();</script>
 </body>
 </html>

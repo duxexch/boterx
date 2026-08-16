@@ -3365,6 +3365,113 @@ def api_match_disputes(match_id):
     match_disputes = [d for d in disputes if d.get('match_id') == match_id]
     return jsonify({'disputes': match_disputes})
 
+# ── User-facing matching (نظام المطابقة) — strong webapp auth ──
+
+_MATCH_REQ_FIELDS = ['id', 'user_id', 'customer_id', 'type', 'amount', 'currency',
+                     'status', 'created_at', 'approved_by', 'approved_at']
+
+@app.route('/api/matching/my')
+@webapp_auth
+def api_matching_my():
+    """Current user's matching requests, newest first."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    reqs = [r for r in read_csv('match_requests.csv') if str(r.get('user_id', '')) == uid]
+    reqs.reverse()
+    return jsonify({'requests': reqs[:20]})
+
+@app.route('/api/matching/request', methods=['POST'])
+@webapp_auth
+def api_matching_create():
+    """Create a deposit/withdraw matching request; auto-assigns an agent when
+    one is available (SQLite pick is atomic). Appears in admin Pending tab."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    data = request.json or {}
+    rtype = str(data.get('type', '')).strip()
+    if rtype not in ('deposit', 'withdraw'):
+        return jsonify({'error': 'نوع الطلب غير صالح'}), 400
+    try:
+        amount = round(float(data.get('amount', 0)), 2)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'مبلغ غير صالح'}), 400
+    if amount <= 0 or amount > 10_000_000:
+        return jsonify({'error': 'مبلغ غير صالح'}), 400
+    details = str(data.get('details', '') or '')[:200]
+
+    currency = 'EGP'
+    user_name = ''
+    if _VEX_GAMES:
+        try:
+            info = _gm.get_user_info(uid) or {}
+            currency = info.get('currency', 'EGP') or 'EGP'
+            user_name = info.get('name', '') or ''
+            if rtype == 'withdraw':
+                bal = float(_gm.get_balance(uid) or 0)
+                if amount > bal:
+                    return jsonify({'error': 'رصيد غير كافٍ'}), 400
+        except Exception:
+            pass
+
+    # One open request per type per user — keeps the queue clean
+    existing = read_csv('match_requests.csv')
+    for r in existing:
+        if (str(r.get('user_id', '')) == uid and r.get('type') == rtype
+                and r.get('status') == 'waiting'):
+            return jsonify({'error': 'لديك طلب قيد الانتظار بالفعل — الغِه أولاً أو انتظر معالجته',
+                            'request_id': r.get('id')}), 409
+
+    rid = f"MR{datetime.now().strftime('%Y%m%d%H%M%S')}{secrets.token_hex(2).upper()}"
+    row = {'id': rid, 'user_id': uid, 'customer_id': uid, 'type': rtype,
+           'amount': f'{amount:g}', 'currency': currency, 'status': 'waiting',
+           'created_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
+           'approved_by': '', 'approved_at': ''}
+    append_csv('match_requests.csv', row, _MATCH_REQ_FIELDS)
+    log_action('match_request_created', f'{rid} {rtype} {amount} {currency} by {uid}')
+
+    agent_assigned = False
+    try:
+        res = agent_db.pick_and_create_transaction(
+            rtype, amount, currency=currency, user_id=uid,
+            user_name=user_name, match_request_id=rid, payment_details=details)
+        agent_assigned = bool(res)
+    except Exception as e:
+        print(f"[MATCHING] agent auto-assign failed for {rid}: {e}")
+    return jsonify({'success': True, 'request_id': rid,
+                    'agent_assigned': agent_assigned,
+                    'message': 'تم إنشاء طلب المطابقة — بانتظار المعالجة'})
+
+@app.route('/api/matching/my/<rid>/cancel', methods=['POST'])
+@webapp_auth
+def api_matching_cancel(rid):
+    """Cancel own still-waiting matching request (also frees assigned agent)."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    reqs = read_csv('match_requests.csv')
+    fieldnames = get_fieldnames('match_requests.csv', _MATCH_REQ_FIELDS)
+    found = False
+    for r in reqs:
+        if r.get('id') == rid and str(r.get('user_id', '')) == uid:
+            if r.get('status') != 'waiting':
+                return jsonify({'error': 'لا يمكن إلغاء هذا الطلب'}), 400
+            r['status'] = 'cancelled'
+            r['approved_by'] = f'user:{uid}'
+            r['approved_at'] = datetime.now().strftime('%Y-%m-%d %H:%M')
+            found = True
+            break
+    if not found:
+        return jsonify({'error': 'الطلب غير موجود'}), 404
+    write_csv('match_requests.csv', reqs, fieldnames)
+    try:
+        agent_db.void_pending_by_match_request(rid)
+    except Exception as e:
+        print(f"[MATCHING] failed to void agent txn for {rid}: {e}")
+    log_action('match_request_cancelled', f'{rid} by user {uid}')
+    return jsonify({'success': True})
+
 # ===== API — SVRP =====
 
 @app.route('/api/svrp/wallets')

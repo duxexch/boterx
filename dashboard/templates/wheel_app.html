@@ -1,12 +1,14 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
+<script src="/static/js/i18n.js"></script>
+<script src="/static/js/i18n-auto.js"></script>
     <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/icon-32.png?v=20260816">
 <link rel="icon" href="/favicon.ico?v=20260816" sizes="any">
 <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png?v=20260816">
 <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🎡 عجلة الحظ</title>
+    <title data-i18n="x223">🎡 عجلة الحظ</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -91,18 +93,18 @@
 </head>
 <body>
     <div class="header">
-        <h1>🎡 عجلة الحظ</h1>
-        <p id="roundName">جولة الأسبوع</p>
+        <h1 data-i18n="x223">🎡 عجلة الحظ</h1>
+        <p id="roundName" data-i18n="x103">جولة الأسبوع</p>
     </div>
 
     <div class="balance-card">
         <div class="amount" id="balance">0</div>
-        <div class="label">رصيدك المتاح</div>
+        <div class="label" data-i18n="x120">رصيدك المتاح</div>
     </div>
 
     <div class="stats">
-        <div class="stat"><div class="num" id="freeSpins" style="color:#22C55E">0</div><div class="lbl">دورات مجانية</div></div>
-        <div class="stat"><div class="num" id="totalSpins" style="color:#3B82F6">0</div><div class="lbl">إجمالي دوراتك</div></div>
+        <div class="stat"><div class="num" id="freeSpins" style="color:#22C55E">0</div><div class="lbl" data-i18n="x112">دورات مجانية</div></div>
+        <div class="stat"><div class="num" id="totalSpins" style="color:#3B82F6">0</div><div class="lbl" data-i18n="x011">إجمالي دوراتك</div></div>
         <div class="stat"><div class="num" id="participants" style="color:#00e701">0</div><div class="lbl" data-i18n="participants">Participants</div></div>
     </div>
 
@@ -117,10 +119,10 @@
         <div class="center-circle">🎯</div>
     </div>
 
-    <button class="spin-btn" id="spinBtn" onclick="startSpin()">🎡 أدر العجلة!</button>
+    <button class="spin-btn" id="spinBtn" onclick="startSpin()" data-i18n="x222">🎡 أدر العجلة!</button>
 
     <div class="prize-list">
-        <h3>🎁 الجوائز المتاحة</h3>
+        <h3 data-i18n="x217">🎁 الجوائز المتاحة</h3>
         <div id="prizeList"></div>
     </div>
 
@@ -163,7 +165,7 @@ async function init() {
         prizes = (round.prizes || 'حظ أوفر').split('|').map(p => p.trim());
         spinCost = parseFloat(round.spin_cost || 0);
         const maxPerUser = parseInt(round.max_spins_per_user || 1);
-        document.getElementById('roundName').textContent = round.name || 'عجلة الحظ';
+        document.getElementById('roundName').textContent = round.name || I18N.t('x134');
         document.getElementById('spinCost').textContent = spinCost + ' ' + (round.currency || 'SAR');
 
         // Get user spins
@@ -192,7 +194,7 @@ async function init() {
         } else if (spinCost > 0 && balance >= spinCost) {
             badge.innerHTML = '<span class="paid-spins-badge">دورات إضافية بـ ' + spinCost + '</span>';
         } else {
-            badge.innerHTML = '<span style="color:#EF4444;font-size:12px">لا توجد دورات</span>';
+            badge.innerHTML = '<span style="color:#EF4444;font-size:12px" data-i18n="x156">لا توجد دورات</span>';
             document.getElementById('spinBtn').disabled = true;
         }
 
@@ -205,7 +207,7 @@ async function init() {
         drawWheel(0);
     } catch(e) {
         console.error(e);
-        document.getElementById('roundName').textContent = 'خطأ في التحميل';
+        document.getElementById('roundName').textContent = I18N.t('x107');
     }
 }
 
@@ -255,7 +257,7 @@ function startSpin() {
 
     if (!useFree && balance < cost) {
         document.getElementById('resultEmoji').textContent = '⚠️';
-        document.getElementById('resultPrize').textContent = 'رصيد غير كافٍ';
+        document.getElementById('resultPrize').textContent = I18N.t('x118');
         document.getElementById('resultMsg').textContent = 'لا يوجد رصيد كافٍ للدوران';
         document.getElementById('resultOverlay').classList.add('show');
         isSpinning = false;
@@ -342,7 +344,7 @@ function onSpinComplete(prizeIndex, usedFree, cost) {
     } else if (spinCost > 0 && balance >= spinCost) {
         badge.innerHTML = '<span class="paid-spins-badge">دورات إضافية بـ ' + spinCost + '</span>';
     } else {
-        badge.innerHTML = '<span style="color:#EF4444;font-size:12px">لا توجد دورات</span>';
+        badge.innerHTML = '<span style="color:#EF4444;font-size:12px" data-i18n="x156">لا توجد دورات</span>';
     }
 
     isSpinning = false;
@@ -356,5 +358,6 @@ function onSpinComplete(prizeIndex, usedFree, cost) {
 
 init();
 </script>
+<script>if(window.I18N)I18N.mountToggle();</script>
 </body>
 </html>

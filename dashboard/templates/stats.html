@@ -1,12 +1,14 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
+<script src="/static/js/i18n.js"></script>
+<script src="/static/js/i18n-auto.js"></script>
 <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/icon-32.png?v=20260816">
 <link rel="icon" href="/favicon.ico?v=20260816" sizes="any">
 <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png?v=20260816">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>إحصائيات — VEX</title>
+<title data-i18n="x016">إحصائيات — VEX</title>
 <link rel="stylesheet" href="/static/css/game-base.css?v=20260818">
 <style>
 #app{overflow-y:auto}
@@ -67,48 +69,48 @@
   </div>
 
   <div class="stats-content">
-    <div class="stats-title">📊 إحصائياتي</div>
+    <div class="stats-title" data-i18n="x257">📊 إحصائياتي</div>
 
     <div class="kpi-grid">
       <div class="kpi-card profit">
-        <div class="kpi-label">صافي الربح</div>
+        <div class="kpi-label" data-i18n="x132">صافي الربح</div>
         <div class="kpi-value green" id="netProfit">0.00</div>
       </div>
       <div class="kpi-card bets">
-        <div class="kpi-label">إجمالي الرهانات</div>
+        <div class="kpi-label" data-i18n="x008">إجمالي الرهانات</div>
         <div class="kpi-value cyan" id="totalBets">0</div>
       </div>
       <div class="kpi-card rate">
-        <div class="kpi-label">نسبة الفوز</div>
+        <div class="kpi-label" data-i18n="x182">نسبة الفوز</div>
         <div class="kpi-value gold" id="winRate">0%</div>
       </div>
       <div class="kpi-card loss">
-        <div class="kpi-label">إجمالي المراهنات</div>
+        <div class="kpi-label" data-i18n="x009">إجمالي المراهنات</div>
         <div class="kpi-value red" id="totalWagered">0</div>
       </div>
     </div>
 
     <div class="chart-section">
-      <div class="chart-title">📈 آخر 20 جولة (P/L)</div>
+      <div class="chart-title" data-i18n="x256">📈 آخر 20 جولة (P/L)</div>
       <canvas id="plChart"></canvas>
     </div>
 
     <div class="chart-section">
-      <div class="chart-title">🎮 توزيع الألعاب</div>
+      <div class="chart-title" data-i18n="x227">🎮 توزيع الألعاب</div>
       <div class="game-dist" id="gameDist"></div>
     </div>
 
     <div class="chart-section">
-      <div class="chart-title">📋 آخر الجولات</div>
+      <div class="chart-title" data-i18n="x258">📋 آخر الجولات</div>
       <table class="recent-table">
-        <thead><tr><th>اللعبة</th><th>الرهان</th><th>النتيجة</th><th>المكسب</th></tr></thead>
+        <thead><tr><th data-i18n="x051">اللعبة</th><th data-i18n="x045">الرهان</th><th data-i18n="x058">النتيجة</th><th data-i18n="x057">المكسب</th></tr></thead>
         <tbody id="recentBody"></tbody>
       </table>
     </div>
   </div>
 </div>
 
-<script src="/static/js/game-base.js?v=20260812b"></script>
+<script src="/static/js/game-base.js?v=20260816i18n"></script>
 <script>
 async function loadStats() {
   try {
@@ -118,7 +120,7 @@ async function loadStats() {
     document.getElementById('app').style.display = 'flex';
 
     if (d.error || d.total_bets === 0) {
-      document.querySelector('.stats-content').innerHTML = '<div class="empty"><div class="empty-icon">📊</div><p>لا توجد إحصائيات بعد</p><p style="font-size:12px;color:var(--muted)">العب بعض الألعاب أولاً!</p></div>';
+      document.querySelector('.stats-content').innerHTML = '<div class="empty"><div class="empty-icon">📊</div><p data-i18n="x151">لا توجد إحصائيات بعد</p><p style="font-size:12px;color:var(--muted)" data-i18n="x047">العب بعض الألعاب أولاً!</p></div>';
       return;
     }
 
@@ -208,7 +210,7 @@ function drawPLChart(data) {
 function drawGameDist(games) {
   const el = document.getElementById('gameDist');
   if (!games || games.length === 0) {
-    el.innerHTML = '<div style="text-align:center;color:var(--muted);padding:12px;font-size:12px">لا توجد بيانات</div>';
+    el.innerHTML = '<div style="text-align:center;color:var(--muted);padding:12px;font-size:12px" data-i18n="x152">لا توجد بيانات</div>';
     return;
   }
   const colors = ['#00e701', '#00e701', '#3b82f6', '#a78bfa', '#06b6d4', '#ff4757', '#ec4899'];
@@ -228,5 +230,6 @@ function drawGameDist(games) {
 
 loadBalance();loadStats();setInterval(loadBalance,5000);
 </script>
+<script>if(window.I18N)I18N.mountToggle();</script>
 </body>
 </html>

@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
+<script src="/static/js/i18n.js"></script>
+<script src="/static/js/i18n-auto.js"></script>
 <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/icon-32.png?v=20260816">
 <link rel="icon" href="/favicon.ico?v=20260816" sizes="any">
 <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png?v=20260816">
@@ -114,7 +116,7 @@
     <div class="parachutes-layer" id="parachutesLayer"></div>
     <div class="mult-display show" id="multDisplay"><div class="mult-val" id="mult">1.00x</div></div>
     <div class="crash-mult" id="crashMult"><div class="crash-mult-val flying" id="crashMultVal">1.00x</div></div>
-    <div class="game-status" id="statusText">انتظر الجولة... 🚀</div>
+    <div class="game-status" id="statusText" data-i18n="x061">انتظر الجولة... 🚀</div>
     <div class="result-msg" id="crashMsg"></div>
     <div class="session-stats">
       <div class="stat-pill w">W: <span id="sWin">0</span></div>
@@ -126,36 +128,36 @@
   </div>
   <div class="bet-slots">
     <div class="bet-slot crash-slot" id="crashSlot">
-      <div class="bet-slot-title">💥 انفجار</div>
-      <input type="number" class="bet-input" id="betCrash" value="10" min="1" placeholder="المبلغ">
+      <div class="bet-slot-title" data-i18n="x242">💥 انفجار</div>
+      <input type="number" class="bet-input" id="betCrash" value="10" min="1" placeholder="المبلغ" data-i18n-ph="x052">
       <div class="quick-bets">
         <div class="qb" onclick="setBetVal('crash',10)">10</div><div class="qb" onclick="setBetVal('crash',50)">50</div>
         <div class="qb" onclick="setBetVal('crash',100)">100</div><div class="qb" onclick="setBetVal('crash',500)">500</div>
         <div class="qb" onclick="setBetVal('crash',1000)">1K</div>
       </div>
-      <input type="number" class="target-input" id="targetCrash" value="1.5" step="0.1" min="1.0" max="50" placeholder="قيمة X">
+      <input type="number" class="target-input" id="targetCrash" value="1.5" step="0.1" min="1.0" max="50" placeholder="قيمة X" data-i18n-ph="x147">
       <div class="quick-targets">
         <div class="qt" onclick="setTarget('crash',1.0)">1x</div><div class="qt" onclick="setTarget('crash',1.2)">1.2x</div>
         <div class="qt" onclick="setTarget('crash',1.5)">1.5x</div><div class="qt" onclick="setTarget('crash',2.0)">2x</div>
         <div class="qt" onclick="setTarget('crash',3.0)">3x</div>
       </div>
-      <button class="bet-btn crash-idle" id="btnCrash" onclick="onBtnCrash()">راهن</button>
+      <button class="bet-btn crash-idle" id="btnCrash" onclick="onBtnCrash()" data-i18n="x114">راهن</button>
     </div>
     <div class="bet-slot rise-slot" id="riseSlot">
-      <div class="bet-slot-title">🚀 صعود</div>
-      <input type="number" class="bet-input" id="betRise" value="10" min="1" placeholder="المبلغ">
+      <div class="bet-slot-title" data-i18n="x285">🚀 صعود</div>
+      <input type="number" class="bet-input" id="betRise" value="10" min="1" placeholder="المبلغ" data-i18n-ph="x052">
       <div class="quick-bets">
         <div class="qb" onclick="setBetVal('rise',10)">10</div><div class="qb" onclick="setBetVal('rise',50)">50</div>
         <div class="qb" onclick="setBetVal('rise',100)">100</div><div class="qb" onclick="setBetVal('rise',500)">500</div>
         <div class="qb" onclick="setBetVal('rise',1000)">1K</div>
       </div>
-      <input type="number" class="target-input" id="targetRise" value="2.0" step="0.1" min="1.0" max="50" placeholder="قيمة X">
+      <input type="number" class="target-input" id="targetRise" value="2.0" step="0.1" min="1.0" max="50" placeholder="قيمة X" data-i18n-ph="x147">
       <div class="quick-targets">
         <div class="qt" onclick="setTarget('rise',1.5)">1.5x</div><div class="qt" onclick="setTarget('rise',2.0)">2x</div>
         <div class="qt" onclick="setTarget('rise',3.0)">3x</div><div class="qt" onclick="setTarget('rise',5.0)">5x</div>
         <div class="qt" onclick="setTarget('rise',10.0)">10x</div>
       </div>
-      <button class="bet-btn rise-idle" id="btnRise" onclick="onBtnRise()">راهن</button>
+      <button class="bet-btn rise-idle" id="btnRise" onclick="onBtnRise()" data-i18n="x114">راهن</button>
     </div>
   </div>
   <div class="players-panel" id="playersPanel">
@@ -163,7 +165,7 @@
     <div class="players-list" id="playersList"></div>
   </div>
 </div>
-<script src="/static/js/game-base.js?v=20260812b"></script>
+<script src="/static/js/game-base.js?v=20260816i18n"></script>
 <script>
 'use strict';
 var canvas=document.getElementById('canvas'),ctx=canvas.getContext('2d');
@@ -273,12 +275,12 @@ function handleState(d){
     if(d.my_crash_bet.exited){crashBet.st='done';setBtnCrash('crash-done','✓ '+d.my_crash_bet.remaining.toFixed(0));}
     else if(np==='flying'&&currentMult>crashBet.target){crashBet.st='exit';setBtnCrash('crash-exit','خروج!');}
     else if(np==='flying'){crashBet.st='waiting';setBtnCrash('crash-waiting','⏳');}
-    else if(np==='waiting'){crashBet.st='betting';setBtnCrash('crash-betting','إلغاء');}
+    else if(np==='waiting'){crashBet.st='betting';setBtnCrash('crash-betting',I18N.t('x018'));}
   }
   if(d.my_rise_bet&&d.my_rise_bet.placed&&riseBet.st==='idle'){
     riseBet.amt=d.my_rise_bet.amount;riseBet.target=d.my_rise_bet.target_x;
     if(np==='flying'){riseBet.st='locked';setBtnRise('rise-locked','🔒 محبوس');}
-    else if(np==='waiting'){riseBet.st='betting';setBtnRise('rise-betting','إلغاء');}
+    else if(np==='waiting'){riseBet.st='betting';setBtnRise('rise-betting',I18N.t('x018'));}
   }
 
   if(np!==lastPhase){if(np==='waiting')onWaiting(d);else if(np==='flying')onFlying(d);else if(np==='crashed')onCrashed(d);lastPhase=np}
@@ -322,22 +324,22 @@ function onWaiting(d){
     var cAmt=parseFloat(document.getElementById('betCrash').value)||0;
     var cTgt=parseFloat(document.getElementById('targetCrash').value)||0;
     if(cAmt>=1&&cTgt>=1){placeCrashBet(cAmt,cTgt);}
-    else{crashBet={st:'idle',amt:0,target:0,req:''};setBtnCrash('crash-idle','راهن');}
+    else{crashBet={st:'idle',amt:0,target:0,req:''};setBtnCrash('crash-idle',I18N.t('x114'));}
   } else if(crashBet.st!=='betting'){
-    crashBet={st:'idle',amt:0,target:0,req:''};setBtnCrash('crash-idle','راهن');
+    crashBet={st:'idle',amt:0,target:0,req:''};setBtnCrash('crash-idle',I18N.t('x114'));
   } else {
-    setBtnCrash('crash-betting','إلغاء');
+    setBtnCrash('crash-betting',I18N.t('x018'));
   }
 
   if(riseBet.st==='queued'){
     var rAmt=parseFloat(document.getElementById('betRise').value)||0;
     var rTgt=parseFloat(document.getElementById('targetRise').value)||0;
     if(rAmt>=1&&rTgt>=1){placeRiseBet(rAmt,rTgt);}
-    else{riseBet={st:'idle',amt:0,target:0,req:''};setBtnRise('rise-idle','راهن');}
+    else{riseBet={st:'idle',amt:0,target:0,req:''};setBtnRise('rise-idle',I18N.t('x114'));}
   } else if(riseBet.st!=='betting'){
-    riseBet={st:'idle',amt:0,target:0,req:''};setBtnRise('rise-idle','راهن');
+    riseBet={st:'idle',amt:0,target:0,req:''};setBtnRise('rise-idle',I18N.t('x114'));
   } else {
-    setBtnRise('rise-betting','إلغاء');
+    setBtnRise('rise-betting',I18N.t('x018'));
   }
 
   // Countdown
@@ -356,10 +358,10 @@ function onFlying(d){
 
   // Crash side: betting→waiting, idle stays idle (can queue)
   if(crashBet.st==='betting'){crashBet.st='waiting';setBtnCrash('crash-waiting','⏳ انتظار');}
-  else if(crashBet.st==='idle'){setBtnCrash('crash-idle','راهن');}
+  else if(crashBet.st==='idle'){setBtnCrash('crash-idle',I18N.t('x114'));}
   // Rise side: betting→locked, idle stays idle (can queue)
   if(riseBet.st==='betting'){riseBet.st='locked';setBtnRise('rise-locked','🔒 محبوس');}
-  else if(riseBet.st==='idle'){setBtnRise('rise-idle','راهن');}
+  else if(riseBet.st==='idle'){setBtnRise('rise-idle',I18N.t('x114'));}
 
   haptic('light');if(animF)cancelAnimationFrame(animF);animate();
 }
@@ -449,7 +451,7 @@ function onBtnCrash(){
   }
   // betting + waiting → cancel
   if(st==='betting'&&roundPhase==='waiting'){
-    crashBet={st:'idle',amt:0,target:0,req:''};setBtnCrash('crash-idle','راهن');showToast('تم إلغاء الرهان','info');return;
+    crashBet={st:'idle',amt:0,target:0,req:''};setBtnCrash('crash-idle',I18N.t('x114'));showToast('تم إلغاء الرهان','info');return;
   }
   // exit + flying → exit now!
   if(st==='exit'&&roundPhase==='flying'){doExit();return;}
@@ -465,26 +467,26 @@ function onBtnCrash(){
   }
   // queued → cancel queue
   if(st==='queued'){
-    crashBet={st:'idle',amt:0,target:0,req:''};setBtnCrash('crash-idle','راهن');showToast('تم إلغاء الطابور','info');return;
+    crashBet={st:'idle',amt:0,target:0,req:''};setBtnCrash('crash-idle',I18N.t('x114'));showToast('تم إلغاء الطابور','info');return;
   }
 }
 
 function placeCrashBet(amt,tgt){
   var btn=document.getElementById('btnCrash');btn.disabled=true;btn.textContent='⏳';
   checkBalanceBeforeBet(amt).then(function(ok){
-    if(!ok){btn.disabled=false;btn.textContent='راهن';return}
+    if(!ok){btn.disabled=false;btn.textContent=I18N.t('x114');return}
     crashBet.req='cb_'+Date.now()+'_'+Math.random().toString(36).substr(2,6);
     apiFetchCritical(BASE+'/api/crash/bet',{method:'POST',body:JSON.stringify({side:'crash',bet_amount:amt,target_x:tgt,request_id:crashBet.req})})
     .then(function(r){return r.json()}).then(function(d){
       if(d.success){
         crashBet.st='betting';crashBet.amt=amt;crashBet.target=tgt;
         document.getElementById('bal').textContent=d.balance_after.toLocaleString();
-        setBtnCrash('crash-betting','إلغاء');soundTick();haptic('light');
+        setBtnCrash('crash-betting',I18N.t('x018'));soundTick();haptic('light');
       }else{
-        btn.disabled=false;btn.textContent='راهن';
-        if(d.need_deposit)showVexDepositModal(amt);else showToast(d.error||'خطأ','error');
+        btn.disabled=false;btn.textContent=I18N.t('x114');
+        if(d.need_deposit)showVexDepositModal(amt);else showToast(d.error||I18N.t('x106'),'error');
       }
-    }).catch(function(){btn.disabled=false;btn.textContent='راهن';showToast('خطأ','error')});
+    }).catch(function(){btn.disabled=false;btn.textContent=I18N.t('x114');showToast(I18N.t('x106'),'error')});
   });
 }
 
@@ -517,7 +519,7 @@ function onBtnRise(){
     placeRiseBet(amt,tgt);return;
   }
   if(st==='betting'&&roundPhase==='waiting'){
-    riseBet={st:'idle',amt:0,target:0,req:''};setBtnRise('rise-idle','راهن');showToast('تم إلغاء الرهان','info');return;
+    riseBet={st:'idle',amt:0,target:0,req:''};setBtnRise('rise-idle',I18N.t('x114'));showToast('تم إلغاء الرهان','info');return;
   }
   // ── idle + flying/crashed → QUEUE for next round ──
   if(st==='idle'&&(roundPhase==='flying'||roundPhase==='crashed')){
@@ -528,26 +530,26 @@ function onBtnRise(){
     riseBet.st='queued';riseBet.amt=amt2;riseBet.target=tgt2;
     setBtnRise('rise-queued','⏳ القادمة');showToast('✅ سيُراهن في الجولة القادمة','success');return;
   }
-  if(st==='queued'){riseBet={st:'idle',amt:0,target:0,req:''};setBtnRise('rise-idle','راهن');showToast('تم إلغاء الطابور','info');return;}
+  if(st==='queued'){riseBet={st:'idle',amt:0,target:0,req:''};setBtnRise('rise-idle',I18N.t('x114'));showToast('تم إلغاء الطابور','info');return;}
   if(st==='locked'){showToast('لا يمكن الخروج — محبوس حتى نهاية الجولة','info');return;}
 }
 
 function placeRiseBet(amt,tgt){
   var btn=document.getElementById('btnRise');btn.disabled=true;btn.textContent='⏳';
   checkBalanceBeforeBet(amt).then(function(ok){
-    if(!ok){btn.disabled=false;btn.textContent='راهن';return}
+    if(!ok){btn.disabled=false;btn.textContent=I18N.t('x114');return}
     riseBet.req='rb_'+Date.now()+'_'+Math.random().toString(36).substr(2,6);
     apiFetchCritical(BASE+'/api/crash/bet',{method:'POST',body:JSON.stringify({side:'rise',bet_amount:amt,target_x:tgt,request_id:riseBet.req})})
     .then(function(r){return r.json()}).then(function(d){
       if(d.success){
         riseBet.st='betting';riseBet.amt=amt;riseBet.target=tgt;
         document.getElementById('bal').textContent=d.balance_after.toLocaleString();
-        setBtnRise('rise-betting','إلغاء');soundTick();haptic('light');
+        setBtnRise('rise-betting',I18N.t('x018'));soundTick();haptic('light');
       }else{
-        btn.disabled=false;btn.textContent='راهن';
-        if(d.need_deposit)showVexDepositModal(amt);else showToast(d.error||'خطأ','error');
+        btn.disabled=false;btn.textContent=I18N.t('x114');
+        if(d.need_deposit)showVexDepositModal(amt);else showToast(d.error||I18N.t('x106'),'error');
       }
-    }).catch(function(){btn.disabled=false;btn.textContent='راهن';showToast('خطأ','error')});
+    }).catch(function(){btn.disabled=false;btn.textContent=I18N.t('x114');showToast(I18N.t('x106'),'error')});
   });
 }
 
@@ -575,5 +577,6 @@ document.getElementById('app').style.display='flex';
 requestAnimationFrame(function(){resizeCanvas();pickWeather();drawBg(0);drawRw(0);rocketX=40;rocketY=canvas.height-30;drawRocket(rocketX,rocketY,0)});
 loadBalance();startPolling();setInterval(loadBalance,5000);setTimeout(injectDepositButton,100);
 </script>
+<script>if(window.I18N)I18N.mountToggle();</script>
 </body>
 </html>

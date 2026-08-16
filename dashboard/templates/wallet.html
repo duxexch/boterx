@@ -9,8 +9,67 @@
 <link rel="manifest" href="/static/manifest.json">
 <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png?v=20260816">
 <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/icon-32.png?v=20260816">
-<title>محفظتي — VEX</title>
+<title data-i18n="x172">محفظتي — VEX</title>
 <link rel="stylesheet" href="/static/css/game-base.css?v=20260818">
+<script src="/static/js/i18n.js"></script>
+<script src="/static/js/i18n-auto.js"></script>
+<script>
+window.I18N_EXTRA = {
+  w_title:        { ar: I18N.t('x250'), en: '💳 My Wallet' },
+  w_game_bal:     { ar: I18N.t('x229'), en: '🎮 Playable balance for betting' },
+  w_deposit:      { ar: I18N.t('x244'), en: '💰 Deposit' },
+  w_withdraw:     { ar: I18N.t('x253'), en: '💸 Withdraw' },
+  w_ready:        { ar: 'جاهز للنقل', en: 'Ready to transfer' },
+  w_awaiting_wager:{ ar: 'ينتظر اكتمال الرهان', en: 'Awaiting wagering completion' },
+  w_svrp_credits: { ar: 'أرصدة التعويض (SVRP)', en: 'Compensation credits (SVRP)' },
+  w_wager_progress:{ ar: I18N.t('x077'), en: 'Wagering progress' },
+  w_txns_word:    { ar: 'معاملات', en: 'transactions' },
+  w_wager_done:   { ar: '✅ اكتملت متطلبات الرهان — يمكنك الآن نقل رصيد SVRP إلى رصيد اللعب', en: '✅ Wagering requirements met — you can now transfer SVRP credits to your play balance' },
+  w_transfer_cta: { ar: I18N.t('x255'), en: '💸 Transfer SVRP credits to play account' },
+  w_amt_ph:       { ar: I18N.t('x053'), en: 'Amount (or leave empty for all)' },
+  w_transfer_btn: { ar: I18N.t('x184'), en: 'Transfer →' },
+  w_max:          { ar: 'الحد الأقصى:', en: 'Max:' },
+  w_will_add:     { ar: '— سيُضاف مباشرة لرصيد اللعب', en: '— will be added directly to play balance' },
+  w_st_active:    { ar: 'نشط', en: 'Active' },
+  w_st_pending:   { ar: 'معلق', en: 'Pending' },
+  w_st_frozen:    { ar: I18N.t('x170'), en: 'Frozen' },
+  w_pending_title:{ ar: I18N.t('x195'), en: '⏳ Awaiting friends\u2019 completion' },
+  w_pending_hint: { ar: I18N.t('x185'), en: 'This balance will be added to your SVRP credits automatically once your referred friends complete their own wagering requirements.' },
+  w_recent_txns:  { ar: I18N.t('x259'), en: '📋 Recent transactions' },
+  w_no_txns:      { ar: I18N.t('x161'), en: 'No transactions yet' },
+  w_comp_title:   { ar: I18N.t('x237'), en: '🏢 100% Compensation companies' },
+  w_comp_hint:    { ar: I18N.t('x126'), en: 'Register via the company link, enter your account number, then submit a compensation request with a screenshot' },
+  w_your_acc:     { ar: '✅ حسابك:', en: '✅ Your account:' },
+  w_not_registered:{ ar: 'غير مسجل بعد', en: 'Not registered yet' },
+  w_register_link:{ ar: I18N.t('x279'), en: '🔗 Register' },
+  w_acc_ph:       { ar: 'رقم حسابك في', en: 'Your account number at' },
+  w_register:     { ar: I18N.t('x075'), en: 'Register' },
+  w_comp_btn:     { ar: I18N.t('x273'), en: '📸 Request compensation with screenshot' },
+  w_valid_acc:    { ar: 'أدخل رقم حساب صالح (3 أحرف على الأقل)', en: 'Enter a valid account number (at least 3 characters)' },
+  w_reg_failed:   { ar: 'فشل التسجيل', en: 'Registration failed' },
+  w_reg_ok:       { ar: '✅ تم التسجيل', en: '✅ Registered' },
+  w_img_too_big:  { ar: 'حجم الصورة يتجاوز 5MB', en: 'Image size exceeds 5MB' },
+  w_comp_failed:  { ar: I18N.t('x136'), en: 'Failed to submit request' },
+  w_comp_ok:      { ar: '✅ تم إرسال طلب التعويض', en: '✅ Compensation request submitted' },
+  w_amt_exceeds:  { ar: 'المبلغ يتجاوز رصيد SVRP', en: 'Amount exceeds SVRP balance' },
+  w_transient:    { ar: 'فشل مؤقت — يرجى إعادة المحاولة', en: 'Temporary failure — please try again' },
+  w_transfer_failed:{ ar: 'فشل النقل', en: 'Transfer failed' },
+  w_net_retry:    { ar: 'خطأ في الاتصال — حاول مجدداً', en: 'Connection error — try again' },
+  w_load_failed:  { ar: '⚠️ تعذّر تحميل المحفظة', en: '⚠️ Failed to load wallet' },
+  w_reg_wait:     { ar: '⏳ جارٍ الإرسال...', en: '⏳ Sending...' },
+  w_type_deposit:   { ar: I18N.t('x244'), en: '💰 Deposit' },
+  w_type_withdraw:  { ar: I18N.t('x253'), en: '💸 Withdraw' },
+  w_type_referral:  { ar: '🎁 مكافأة إحالة', en: '🎁 Referral bonus' },
+  w_type_recovery:  { ar: '🔄 تعويض', en: '🔄 Recovery' },
+  w_type_compensation:{ ar: '💎 تعويض', en: '💎 Compensation' },
+  w_type_game_win:  { ar: '🏆 ربح ألعاب', en: '🏆 Game win' },
+  w_type_svrp:      { ar: '💎 نقل SVRP', en: '💎 SVRP transfer' },
+  w_stat_pending:   { ar: 'معلق', en: 'Pending' },
+  w_stat_completed: { ar: 'مكتمل', en: 'Completed' },
+  w_stat_rejected:  { ar: 'مرفوض', en: 'Rejected' },
+  w_stat_cancelled: { ar: 'ملغي', en: 'Cancelled' }
+};
+</script>
 <style>
 body { overflow: auto !important; }
 #app { position: relative !important; height: auto !important; min-height: 100vh; min-height: 100dvh; }
@@ -171,7 +230,7 @@ body { overflow: auto !important; }
 <div id="app">
   <div class="wallet-topbar">
     <button class="back-btn" onclick="history.back()">←</button>
-    <h1>💳 محفظتي</h1>
+    <h1 data-i18n="x250">💳 محفظتي</h1>
     <div style="width:36px"></div>
   </div>
 
@@ -180,7 +239,7 @@ body { overflow: auto !important; }
   </div>
 </div>
 
-<script src="/static/js/game-base.js?v=20260812b"></script>
+<script src="/static/js/game-base.js?v=20260816i18n"></script>
 <script>
 const lang = new URLSearchParams(location.search).get('lang') || 'ar';
 
@@ -192,7 +251,7 @@ function fmt(n, cur) {
 function pct(done, req) { return req > 0 ? Math.min(100, Math.round(done / req * 100)) : 100; }
 
 const TYPE_LABELS = {
-  deposit: '💰 إيداع', withdraw: '💸 سحب',
+  deposit: I18N.t('x244'), withdraw: I18N.t('x253'),
   referral: '🎁 مكافأة إحالة', recovery: '🔄 تعويض',
   compensation: '💎 تعويض', game_win: '🏆 ربح ألعاب', svrp_transfer: '💎 نقل SVRP',
 };
@@ -245,12 +304,12 @@ function renderWallet(d) {
   // ── 1. رصيد اللعب ──────────────────────────────────────────────
   html += `
   <div class="balance-card">
-    <div class="bc-label">🎮 رصيد اللعب المتاح للرهان</div>
+    <div class="bc-label" data-i18n="x229">🎮 رصيد اللعب المتاح للرهان</div>
     <div class="bc-amount" id="liveBalance">${gameBalance.toLocaleString()}</div>
     <div class="bc-cur">${cur}</div>
     <div class="bc-actions">
-      <button class="btn-dep" onclick="showDeposit()">💰 إيداع</button>
-      <button class="btn-wdr" onclick="showWithdraw()">💸 سحب</button>
+      <button class="btn-dep" onclick="showDeposit()" data-i18n="x244">💰 إيداع</button>
+      <button class="btn-wdr" onclick="showWithdraw()" data-i18n="x253">💸 سحب</button>
     </div>
   </div>`;
 
@@ -276,7 +335,7 @@ function renderWallet(d) {
     html += `
     <div class="wager-section">
       <div class="wager-top">
-        <span>تقدم اكتمال الرهان</span>
+        <span data-i18n="x077">تقدم اكتمال الرهان</span>
         <span class="wager-count">${wagerDone} / ${wagerReq} معاملات (${wPct}%)</span>
       </div>
       <div class="wager-track">
@@ -296,12 +355,12 @@ function renderWallet(d) {
     if (creditsSpendable) {
       html += `
       <div class="transfer-cta">
-        <div class="cta-title">💸 نقل رصيد SVRP إلى حساب اللعب</div>
+        <div class="cta-title" data-i18n="x255">💸 نقل رصيد SVRP إلى حساب اللعب</div>
         <div class="cta-row">
           <input class="cta-input" id="transferAmt" type="number" min="0.01"
-            max="${svrpCredits}" step="0.01" placeholder="المبلغ (أو اتركه فارغاً للكل)"
+            max="${svrpCredits}" step="0.01" placeholder="المبلغ (أو اتركه فارغاً للكل)" data-i18n-ph="x053"
             value="${svrpCredits.toFixed(2)}">
-          <button class="btn-transfer" id="transferBtn" onclick="doTransfer()">نقل ←</button>
+          <button class="btn-transfer" id="transferBtn" onclick="doTransfer()" data-i18n="x184">نقل ←</button>
         </div>
         <div class="cta-note">الحد الأقصى: ${fmt(svrpCredits, cur)} — سيُضاف مباشرة لرصيد اللعب</div>
       </div>`;
@@ -312,7 +371,7 @@ function renderWallet(d) {
     if (sources.length) {
       html += `<div class="credit-sources">`;
       for (const s of sources) {
-        const badgeLbl = s.status === 'active' ? 'نشط' : s.status === 'pending' ? 'معلق' : 'مجمد';
+        const badgeLbl = s.status === 'active' ? 'نشط' : s.status === 'pending' ? 'معلق' : I18N.t('x170');
         html += `
         <div class="credit-source-row">
           <span class="cs-label">${s.label}</span>
@@ -333,18 +392,18 @@ function renderWallet(d) {
     html += `
     <div class="pending-card">
       <div class="pending-header">
-        <div class="pending-title">⏳ ينتظر إكمال الأصدقاء</div>
+        <div class="pending-title" data-i18n="x195">⏳ ينتظر إكمال الأصدقاء</div>
         <div class="pending-amount">${fmt(pendingBalance, cur)}</div>
       </div>
-      <div class="pending-hint">هذا الرصيد سيُضاف تلقائياً لأرصدة SVRP عندما يُكمل أصدقاؤك المُحالون متطلبات الرهان الخاصة بهم.</div>
+      <div class="pending-hint" data-i18n="x185">هذا الرصيد سيُضاف تلقائياً لأرصدة SVRP عندما يُكمل أصدقاؤك المُحالون متطلبات الرهان الخاصة بهم.</div>
     </div>`;
   }
 
   // ── 4. آخر المعاملات ────────────────────────────────────────────
-  html += `<div class="txn-card"><div class="txn-title">📋 آخر المعاملات</div>`;
+  html += `<div class="txn-card"><div class="txn-title" data-i18n="x259">📋 آخر المعاملات</div>`;
   const txns = d.recent_transactions || [];
   if (!txns.length) {
-    html += `<div class="wallet-empty">لا توجد معاملات بعد</div>`;
+    html += `<div class="wallet-empty" data-i18n="x161">لا توجد معاملات بعد</div>`;
   } else {
     for (const t of txns) {
       const cls  = txnCls(t.type);
@@ -380,8 +439,8 @@ async function loadCompanies() {
     const r = await apiFetch(`${BASE}/api/player/companies`);
     const d = await r.json();
     if (!d.companies || !d.companies.length) return;
-    let h = `<div class="txn-card" id="compCard"><div class="txn-title">🏢 شركات التعويض 100%</div>
-      <div style="font-size:11px;color:var(--muted);margin:4px 12px 10px">
+    let h = `<div class="txn-card" id="compCard"><div class="txn-title" data-i18n="x237">🏢 شركات التعويض 100%</div>
+      <div style="font-size:11px;color:var(--muted);margin:4px 12px 10px" data-i18n="x126">
         سجّل عبر رابط الشركة، أدخل رقم حسابك، ثم قدّم طلب تعويض مع لقطة شاشة</div>`;
     d.companies.forEach(c => {
       const cid = escH(c.id);
@@ -395,19 +454,19 @@ async function loadCompanies() {
               : 'غير مسجل بعد'}</div>
           </div>
           ${c.affiliate_link ? `<a href="${escH(c.affiliate_link)}" target="_blank" rel="noopener"
-            style="font-size:11px;font-weight:700;color:#93c5fd;background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.25);padding:6px 10px;border-radius:8px;text-decoration:none;white-space:nowrap">🔗 التسجيل</a>` : ''}
+            style="font-size:11px;font-weight:700;color:#93c5fd;background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.25);padding:6px 10px;border-radius:8px;text-decoration:none;white-space:nowrap" data-i18n="x279">🔗 التسجيل</a>` : ''}
         </div>`;
       if (!c.registered_account) {
         h += `<div style="display:flex;gap:6px;margin-top:8px">
           <input class="cta-input" id="acc_${cid}" placeholder="رقم حسابك في ${escH(c.name)}" maxlength="64">
-          <button class="btn-transfer" onclick="registerAccount('${cid}')" id="regBtn_${cid}">تسجيل</button>
+          <button class="btn-transfer" onclick="registerAccount('${cid}')" id="regBtn_${cid}" data-i18n="x075">تسجيل</button>
         </div>`;
       } else {
         h += `<div style="display:flex;gap:6px;margin-top:8px;align-items:center">
           <input type="file" id="shot_${cid}" accept=".png,.jpg,.jpeg,.webp" style="display:none"
             onchange="submitCompensation('${cid}')">
           <button class="btn-transfer" style="background:linear-gradient(135deg,#2563eb,#1d4ed8)"
-            id="compBtn_${cid}" onclick="document.getElementById('shot_${cid}').click()">📸 طلب تعويض بلقطة شاشة</button>
+            id="compBtn_${cid}" onclick="document.getElementById('shot_${cid}').click()" data-i18n="x273">📸 طلب تعويض بلقطة شاشة</button>
         </div>`;
       }
       h += `</div>`;
@@ -457,7 +516,7 @@ async function registerAccount(cid) {
     if (!r.ok || d.error) { showToast(d.error || 'فشل التسجيل', 'error'); }
     else { showToast(d.message || '✅ تم التسجيل', 'success'); loadCompanies(); return; }
   } catch (e) { showToast('خطأ في الاتصال', 'error'); }
-  if (btn) { btn.disabled = false; btn.textContent = 'تسجيل'; }
+  if (btn) { btn.disabled = false; btn.textContent = I18N.t('x075'); }
 }
 
 // ── تقديم طلب تعويض بلقطة شاشة ───────────────────────────────────────────────
@@ -474,11 +533,11 @@ async function submitCompensation(cid) {
     fd.append('screenshot', file);
     const r = await apiFetch(`${BASE}/api/player/compensation-request`, { method: 'POST', body: fd });
     const d = await r.json();
-    if (!r.ok || d.error) { showToast(d.error || 'فشل إرسال الطلب', 'error'); }
+    if (!r.ok || d.error) { showToast(d.error || I18N.t('x136'), 'error'); }
     else { showToast(d.message || '✅ تم إرسال طلب التعويض', 'success'); }
   } catch (e) { showToast('خطأ في الاتصال', 'error'); }
   if (fileInp) fileInp.value = '';
-  if (btn) { btn.disabled = false; btn.textContent = '📸 طلب تعويض بلقطة شاشة'; }
+  if (btn) { btn.disabled = false; btn.textContent = I18N.t('x273'); }
 }
 
 // ── Transfer ──────────────────────────────────────────────────────────────────
@@ -530,7 +589,7 @@ async function doTransfer() {
     // Network error — keep the key so retry is idempotent
     showToast('خطأ في الاتصال — حاول مجدداً', 'error');
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'نقل ←'; }
+    if (btn) { btn.disabled = false; btn.textContent = I18N.t('x184'); }
   }
 }
 
@@ -554,5 +613,6 @@ function showWithdraw() { window.location.href = `${BASE}/webapp/games?${_getAut
 
 loadWallet();
 </script>
+<script>if(window.I18N)I18N.mountToggle();</script>
 </body>
 </html>

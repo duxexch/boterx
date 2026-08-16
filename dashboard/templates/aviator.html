@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
+<script src="/static/js/i18n.js"></script>
+<script src="/static/js/i18n-auto.js"></script>
 <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/icon-32.png?v=20260816">
 <link rel="icon" href="/favicon.ico?v=20260816" sizes="any">
 <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png?v=20260816">
@@ -103,7 +105,7 @@
     <div class="parachutes-layer" id="parachutesLayer"></div>
     <div class="mult-display show" id="multDisplay"><div class="mult-val" id="mult">1.00x</div></div>
     <div class="plane-mult" id="planeMult"><div class="plane-mult-val flying" id="planeMultVal">1.00x</div></div>
-    <div class="game-status" id="statusText">انتظر الجولة... ✈️</div>
+    <div class="game-status" id="statusText" data-i18n="x060">انتظر الجولة... ✈️</div>
     <div class="result-msg" id="crashMsg"></div>
     <div class="session-stats">
       <div class="stat-pill w">W: <span id="sWin">0</span></div>
@@ -115,26 +117,26 @@
   </div>
   <div class="bet-slots">
     <div class="bet-slot active" id="slot1">
-      <input type="number" class="bet-input" id="bet1" value="10" min="1" placeholder="المبلغ">
+      <input type="number" class="bet-input" id="bet1" value="10" min="1" placeholder="المبلغ" data-i18n-ph="x052">
       <div class="quick-bets">
         <div class="qb" onclick="setBet(1,10)">10</div><div class="qb" onclick="setBet(1,50)">50</div>
         <div class="qb" onclick="setBet(1,100)">100</div><div class="qb" onclick="setBet(1,500)">500</div>
         <div class="qb" onclick="setBet(1,1000)">1K</div>
       </div>
-      <div class="auto-row"><input type="checkbox" id="auto1"><span>تلقائي</span><input type="number" id="autoVal1" value="2.0" step="0.1" min="1.1" style="width:36px;font-size:10px;text-align:center;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:2px;color:var(--text)"><span style="font-size:10px">x</span></div>
+      <div class="auto-row"><input type="checkbox" id="auto1"><span data-i18n="x079">تلقائي</span><input type="number" id="autoVal1" value="2.0" step="0.1" min="1.1" style="width:36px;font-size:10px;text-align:center;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:2px;color:var(--text)"><span style="font-size:10px">x</span></div>
       <div class="quick-bets"><div class="qb" onclick="setAutoX(1,3)">3x</div><div class="qb" onclick="setAutoX(1,4)">4x</div><div class="qb" onclick="setAutoX(1,5)">5x</div></div>
-      <button class="bet-btn idle" id="btn1" onclick="onBtn(1)">رهان</button>
+      <button class="bet-btn idle" id="btn1" onclick="onBtn(1)" data-i18n="x125">رهان</button>
     </div>
     <div class="bet-slot" id="slot2">
-      <input type="number" class="bet-input" id="bet2" value="0" min="0" placeholder="المبلغ">
+      <input type="number" class="bet-input" id="bet2" value="0" min="0" placeholder="المبلغ" data-i18n-ph="x052">
       <div class="quick-bets">
         <div class="qb" onclick="setBet(2,10)">10</div><div class="qb" onclick="setBet(2,50)">50</div>
         <div class="qb" onclick="setBet(2,100)">100</div><div class="qb" onclick="setBet(2,500)">500</div>
         <div class="qb" onclick="setBet(2,1000)">1K</div>
       </div>
-      <div class="auto-row"><input type="checkbox" id="auto2"><span>تلقائي</span><input type="number" id="autoVal2" value="2.0" step="0.1" min="1.1" style="width:36px;font-size:10px;text-align:center;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:2px;color:var(--text)"><span style="font-size:10px">x</span></div>
+      <div class="auto-row"><input type="checkbox" id="auto2"><span data-i18n="x079">تلقائي</span><input type="number" id="autoVal2" value="2.0" step="0.1" min="1.1" style="width:36px;font-size:10px;text-align:center;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:2px;color:var(--text)"><span style="font-size:10px">x</span></div>
       <div class="quick-bets"><div class="qb" onclick="setAutoX(2,3)">3x</div><div class="qb" onclick="setAutoX(2,4)">4x</div><div class="qb" onclick="setAutoX(2,5)">5x</div></div>
-      <button class="bet-btn idle" id="btn2" onclick="onBtn(2)" disabled>رهان</button>
+      <button class="bet-btn idle" id="btn2" onclick="onBtn(2)" disabled data-i18n="x125">رهان</button>
     </div>
   </div>
   <!-- إجمالي رهانات الجولة + شريط اللاعبين -->
@@ -143,7 +145,7 @@
     <div class="players-list" id="playersList"></div>
   </div>
 </div>
-<script src="/static/js/game-base.js?v=20260812b"></script>
+<script src="/static/js/game-base.js?v=20260816i18n"></script>
 <script>
 'use strict';
 var canvas=document.getElementById('canvas'),ctx=canvas.getContext('2d');
@@ -182,7 +184,7 @@ function handleState(d){
     } else if(np==='flying'){
       setBtn(1,'jump','قفز');
     } else if(np==='waiting'){
-      setBtn(1,'betting','إلغاء');
+      setBtn(1,'betting',I18N.t('x018'));
     }
   }
   if(np!==lastPhase){if(np==='waiting')onWaiting(d);else if(np==='flying')onFlying(d);else if(np==='crashed')onCrashed(d);lastPhase=np}
@@ -240,16 +242,16 @@ function onWaiting(d){
       var amt=parseFloat(document.getElementById('bet'+s).value)||0;
       if(amt>=1){placeBet(s,amt);continue}
       // لو مفيش مبلغ → إلغاء الطابور
-      bets[s].st='idle';setBtn(s,'idle','رهان');
+      bets[s].st='idle';setBtn(s,'idle',I18N.t('x125'));
       if(s===2&&!slot2On)document.getElementById('btn2').disabled=true;
     }
     if(bets[s].st==='betting'){
       // راهن ولم يلغَ → زر إلغاء (رمادي) — يمكن الإلغاء خلال 6 ثواني
-      setBtn(s,'betting','إلغاء');
+      setBtn(s,'betting',I18N.t('x018'));
     } else if(bets[s].st!=='cashed'&&bets[s].st!=='lost'&&bets[s].st!=='queued'){
       // إعادة تعيين
       bets[s].st='idle';bets[s].amt=0;
-      setBtn(s,'idle','رهان');
+      setBtn(s,'idle',I18N.t('x125'));
       if(s===2&&!slot2On)document.getElementById('btn2').disabled=true;
     }
     // auto-play: راهن تلقائي لو checkbox مفعل
@@ -280,7 +282,7 @@ function onFlying(d){
       bets[s].st='jump';setBtn(s,'jump','قفز');
     } else if(bets[s].st==='idle'){
       // لم يراهن → زر رهان (يقبل الطابور للجولة القادمة)
-      setBtn(s,'idle','رهان');
+      setBtn(s,'idle',I18N.t('x125'));
     }
   }
   haptic('light');if(animF)cancelAnimationFrame(animF);animate();
@@ -328,12 +330,12 @@ function onCrashed(d){
     if(bets[s].st==='jump'){
       bets[s].st='lost';sessionL++;sessionPL-=bets[s].amt;
       var be=document.getElementById('recoveryMsg');
-      be.innerHTML='🔥 <b>انفجرت أموالك!</b><br><span style="color:#ff4757;font-weight:900;font-size:16px">'+bets[s].amt.toFixed(0)+'</span> احترقت';
+      be.innerHTML='🔥 <b data-i18n="x065">انفجرت أموالك!</b><br><span style="color:#ff4757;font-weight:900;font-size:16px">'+bets[s].amt.toFixed(0)+'</span> احترقت';
       be.style.color='#ff4757';be.classList.add('show');
       setTimeout(function(){be.classList.remove('show')},4000);
     }
     bets[s].st='idle';bets[s].amt=0;
-    setBtn(s,'idle','رهان');
+    setBtn(s,'idle',I18N.t('x125'));
     if(s===2&&!slot2On)document.getElementById('btn2').disabled=true;
   }
   updateSessionStats();loadBalance();
@@ -353,7 +355,7 @@ function onBtn(s){
   // betting + waiting → إلغاء → رهان
   if(st==='betting'&&roundPhase==='waiting'){
     bets[s].st='idle';bets[s].amt=0;
-    setBtn(s,'idle','رهان');
+    setBtn(s,'idle',I18N.t('x125'));
     if(s===2&&!slot2On)document.getElementById('btn2').disabled=true;
     showToast('تم إلغاء الرهان','info');return;
   }
@@ -373,7 +375,7 @@ function onBtn(s){
   // queued → إلغاء الطابور
   if(st==='queued'){
     bets[s].st='idle';bets[s].amt=0;
-    setBtn(s,'idle','رهان');
+    setBtn(s,'idle',I18N.t('x125'));
     if(s===2&&!slot2On)document.getElementById('btn2').disabled=true;
     showToast('تم إلغاء الطابور','info');return;
   }
@@ -383,20 +385,20 @@ function placeBet(s,amt){
   var btn=document.getElementById('btn'+s);
   btn.disabled=true;btn.textContent='⏳';
   checkBalanceBeforeBet(amt).then(function(ok){
-    if(!ok){btn.disabled=false;btn.textContent='رهان';return}
+    if(!ok){btn.disabled=false;btn.textContent=I18N.t('x125');return}
     bets[s].req='b'+s+'_'+Date.now()+'_'+Math.random().toString(36).substr(2,6);
     apiFetchCritical(BASE+'/api/aviator/bet',{method:'POST',body:JSON.stringify({bet_amount:amt,auto_val:0,request_id:bets[s].req})})
     .then(function(r){return r.json()}).then(function(d){
       if(d.success){
         bets[s].st='betting';bets[s].amt=amt;
         document.getElementById('bal').textContent=d.balance_after.toLocaleString();
-        setBtn(s,'betting','إلغاء');
+        setBtn(s,'betting',I18N.t('x018'));
         soundTick();haptic('light');
       }else{
-        btn.disabled=false;btn.textContent='رهان';
-        if(d.need_deposit)showVexDepositModal(amt);else showToast(d.error||'خطأ','error');
+        btn.disabled=false;btn.textContent=I18N.t('x125');
+        if(d.need_deposit)showVexDepositModal(amt);else showToast(d.error||I18N.t('x106'),'error');
       }
-    }).catch(function(){btn.disabled=false;btn.textContent='رهان';showToast('خطأ','error')});
+    }).catch(function(){btn.disabled=false;btn.textContent=I18N.t('x125');showToast(I18N.t('x106'),'error')});
   });
 }
 
@@ -456,5 +458,6 @@ document.getElementById('app').style.display='flex';
 requestAnimationFrame(function(){resizeCanvas();pickWeather();drawBg(0);drawRw(0);planeX=40;planeY=canvas.height-30;drawPlane(planeX,planeY,0)});
 loadBalance();startPolling();setInterval(loadBalance,5000);setTimeout(injectDepositButton,100);
 </script>
+<script>if(window.I18N)I18N.mountToggle();</script>
 </body>
 </html>

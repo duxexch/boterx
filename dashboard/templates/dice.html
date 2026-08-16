@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
+<script src="/static/js/i18n.js"></script>
+<script src="/static/js/i18n-auto.js"></script>
 <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/icon-32.png?v=20260816">
 <link rel="icon" href="/favicon.ico?v=20260816" sizes="any">
 <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png?v=20260816">
@@ -89,7 +91,7 @@
   <div class="hist-bar" id="history"></div>
   <div class="game-area" id="gameArea">
     <canvas id="canvas"></canvas>
-    <div class="dice-status" id="statusText">اختر رقم واسحب النرد 🎲</div>
+    <div class="dice-status" id="statusText" data-i18n="x024">اختر رقم واسحب النرد 🎲</div>
     <div class="result-display" id="resultDisplay">
       <div class="result-num" id="resultNum">-</div>
       <div class="result-text" id="resultText"></div>
@@ -102,10 +104,10 @@
     <div class="recovery-msg" id="recoveryMsg"></div>
   </div>
   <div class="bet-panel">
-    <div class="panel-label">اختر الرقم المتوقع:</div>
+    <div class="panel-label" data-i18n="x023">اختر الرقم المتوقع:</div>
     <div class="number-picker" id="numberPicker"></div>
     <div class="bet-row">
-      <input type="number" class="bet-input" id="betAmount" value="10" min="1" placeholder="المبلغ">
+      <input type="number" class="bet-input" id="betAmount" value="10" min="1" placeholder="المبلغ" data-i18n-ph="x052">
       <div class="quick-bets">
         <div class="qb" onclick="setBet(10)">10</div>
         <div class="qb" onclick="setBet(50)">50</div>
@@ -114,21 +116,21 @@
         <div class="qb" onclick="setBet(1000)">1K</div>
       </div>
     </div>
-    <div class="panel-label">قيمة الاكس:</div>
+    <div class="panel-label" data-i18n="x148">قيمة الاكس:</div>
     <div class="x-picker" id="xPicker"></div>
-    <div class="panel-label">قوة الرمية (اسحب بإصبعك):</div>
+    <div class="panel-label" data-i18n="x146">قوة الرمية (اسحب بإصبعك):</div>
     <div class="power-bar-container" id="powerBar">
       <div class="power-bar-fill" id="powerFill"></div>
       <div class="power-bar-label" id="powerLabel">50%</div>
     </div>
-    <button class="roll-btn idle" id="rollBtn" onclick="onRoll()">ارمِ النرد 🎲</button>
+    <button class="roll-btn idle" id="rollBtn" onclick="onRoll()" data-i18n="x034">ارمِ النرد 🎲</button>
   </div>
   <div class="players-panel">
     <div class="total-bets-bar">💰 <span id="totalBetsEgp">0</span> جنيه</div>
     <div class="players-list" id="playersList"></div>
   </div>
 </div>
-<script src="/static/js/game-base.js?v=20260812b"></script>
+<script src="/static/js/game-base.js?v=20260816i18n"></script>
 <script>
 'use strict';
 var canvas=document.getElementById('canvas'),ctx=canvas.getContext('2d');
@@ -547,19 +549,19 @@ function onRoll(){
         });
         soundDiceRoll();haptic('medium');
       } else {
-        if(d.need_deposit)showVexDepositModal(amt);else showToast(d.error||'خطأ','error');
-        var btn=document.getElementById('rollBtn');btn.className='roll-btn idle';btn.disabled=false;btn.textContent='ارمِ النرد 🎲';
+        if(d.need_deposit)showVexDepositModal(amt);else showToast(d.error||I18N.t('x106'),'error');
+        var btn=document.getElementById('rollBtn');btn.className='roll-btn idle';btn.disabled=false;btn.textContent=I18N.t('x034');
       }
     }).catch(function(){
-      var btn=document.getElementById('rollBtn');btn.className='roll-btn idle';btn.disabled=false;btn.textContent='ارمِ النرد 🎲';
-      showToast('خطأ','error');
+      var btn=document.getElementById('rollBtn');btn.className='roll-btn idle';btn.disabled=false;btn.textContent=I18N.t('x034');
+      showToast(I18N.t('x106'),'error');
     });
   });
 }
 
 function showResult(d){
   var btn=document.getElementById('rollBtn');
-  btn.className='roll-btn idle';btn.disabled=false;btn.textContent='ارمِ النرد 🎲';
+  btn.className='roll-btn idle';btn.disabled=false;btn.textContent=I18N.t('x034');
   // Update balance NOW — after dice has stopped, not before
   document.getElementById('bal').textContent=d.balance_after.toLocaleString();
   var disp=document.getElementById('resultDisplay');
@@ -573,7 +575,7 @@ function showResult(d){
     sessionW++;sessionPL+=d.payout-parseFloat(document.getElementById('betAmount').value);
     fireConfetti(document.getElementById('gameArea'));soundDiceWin();haptic('medium');
     var be=document.getElementById('recoveryMsg');
-    be.innerHTML='🎉 <b>ربحت!</b> توقعت '+d.predicted+' والنتيجة '+d.result+'<br><span style="color:#7eff9a;font-weight:900;font-size:16px">+'+d.payout.toFixed(0)+'</span>';
+    be.innerHTML='🎉 <b data-i18n="x115">ربحت!</b> توقعت '+d.predicted+' والنتيجة '+d.result+'<br><span style="color:#7eff9a;font-weight:900;font-size:16px">+'+d.payout.toFixed(0)+'</span>';
     be.style.color='#7eff9a';be.classList.add('show');setTimeout(function(){be.classList.remove('show')},4000);
   } else {
     numEl.className='result-num lose';
@@ -582,7 +584,7 @@ function showResult(d){
     sessionL++;sessionPL-=parseFloat(document.getElementById('betAmount').value);
     soundDiceLose();haptic('heavy');
     var be=document.getElementById('recoveryMsg');
-    be.innerHTML='💥 <b>خسرت!</b> توقعت '+d.predicted+' والنتيجة '+d.result;
+    be.innerHTML='💥 <b data-i18n="x105">خسرت!</b> توقعت '+d.predicted+' والنتيجة '+d.result;
     be.style.color='#ff8787';be.classList.add('show');setTimeout(function(){be.classList.remove('show')},4000);
   }
   disp.classList.add('show');
@@ -697,5 +699,6 @@ requestAnimationFrame(function(){resizeCanvas();drawIdleDice()});
 loadBalance();loadHistory();histTimer=setInterval(loadHistory,5000);
 setInterval(loadBalance,5000);setTimeout(injectDepositButton,100);
 </script>
+<script>if(window.I18N)I18N.mountToggle();</script>
 </body>
 </html>

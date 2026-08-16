@@ -553,6 +553,24 @@ def void_pending_transaction(agent_id, txn_id):
         conn.close()
 
 
+def void_pending_by_match_request(match_request_id):
+    """Void the still-pending agent transaction linked to a match request
+    (if any) and release the agent's daily-quota slot. Returns True if voided."""
+    if not match_request_id:
+        return False
+    conn = _conn()
+    try:
+        row = conn.execute(
+            "SELECT id, agent_id FROM agent_transactions "
+            "WHERE match_request_id=? AND status='pending'",
+            (match_request_id,)).fetchone()
+    finally:
+        conn.close()
+    if not row:
+        return False
+    return void_pending_transaction(row['agent_id'], row['id'])
+
+
 def set_txn_match_request(txn_id, match_request_id):
     conn = _conn()
     try:

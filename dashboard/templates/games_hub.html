@@ -12,6 +12,44 @@
 <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/icon-32.png?v=20260816">
 <title>VEX Games</title>
 <link rel="stylesheet" href="/static/css/game-base.css?v=20260818">
+<script src="/static/js/i18n.js"></script>
+<script src="/static/js/i18n-auto.js"></script>
+<script>
+window.I18N_EXTRA = {
+  hub_champions:   { ar: I18N.t('x143'), en: 'Leaderboard' },
+  hub_loading:     { ar: I18N.t('x094'), en: 'Loading...' },
+  hub_no_games:    { ar: I18N.t('x150'), en: 'No games available' },
+  hub_my_account:  { ar: 'حسابي', en: 'My Account' },
+  hub_my_wallet:   { ar: 'محفظتي', en: 'My Wallet' },
+  seg_new:     { ar: '🟢 جديد', en: '🟢 New' },
+  seg_winner:  { ar: '🔴 رابح', en: '🔴 Winner' },
+  seg_loser:   { ar: '🟡 خاسر', en: '🟡 Loser' },
+  seg_hot:     { ar: '🔥 ساخن', en: '🔥 Hot' },
+  seg_churning:{ ar: '⚠️ يغادر', en: '⚠️ Churning' },
+  seg_vip:     { ar: '💎 VIP', en: '💎 VIP' },
+  seg_regular: { ar: '👤 عادي', en: '👤 Regular' },
+  hub_num:     { ar: 'رقم', en: 'ID' },
+  wdr_title:      { ar: I18N.t('x253'), en: '💸 Withdraw' },
+  wdr_your_bal:   { ar: 'رصيدك:', en: 'Balance:' },
+  wdr_choose:     { ar: 'اختر وسيلة الاستلام:', en: 'Choose a payout method:' },
+  wdr_or_manual:  { ar: '✍️ أو اكتب يدوياً:', en: '✍️ Or enter manually:' },
+  wdr_acc_ph:     { ar: I18N.t('x121'), en: 'Account number' },
+  wdr_amt_ph:     { ar: I18N.t('x052'), en: 'Amount' },
+  wdr_confirm:    { ar: I18N.t('x205'), en: '✅ Confirm withdrawal' },
+  wdr_enter_both: { ar: 'أدخل المبلغ ورقم الحساب', en: 'Enter amount and account number' },
+  wdr_requested:  { ar: 'تم الطلب', en: 'Request submitted' },
+  wdr_pending:    { ar: 'بانتظار موافقة الإدارة', en: 'Awaiting admin approval' },
+  cur_title:      { ar: '💱 اختر العملة', en: '💱 Choose currency' },
+  cur_current:    { ar: 'الحالية:', en: 'Current:' },
+  cur_egp:  { ar: 'جنيه مصري 🇪🇬', en: 'Egyptian Pound 🇪🇬' },
+  cur_sar:  { ar: 'ريال سعودي 🇸🇦', en: 'Saudi Riyal 🇸🇦' },
+  cur_usd:  { ar: 'دولار 🇺🇸', en: 'US Dollar 🇺🇸' },
+  cur_usdt: { ar: 'تيذر 🪙', en: 'Tether 🪙' },
+  cur_aed:  { ar: 'درهم 🇦🇪', en: 'UAE Dirham 🇦🇪' },
+  cur_kwd:  { ar: 'دينار كويتي 🇰🇼', en: 'Kuwaiti Dinar 🇰🇼' },
+  err_generic: { ar: I18N.t('x106'), en: 'Error' }
+};
+</script>
 <style>
 /* Desktop/tablet responsive overrides */
 body { overflow: auto !important; }
@@ -98,28 +136,29 @@ body { overflow: auto !important; }
     </div>
     <div class="topbar-btns">
       <button class="hub-btn" id="vexBtn" style="display:none;background:rgba(99,102,241,.15);color:#a5b4fc;border:1px solid rgba(99,102,241,.3)" onclick="openWalletPage()">💎</button>
-      <button class="hub-btn" title="حسابي" style="background:rgba(255,215,0,.12);color:var(--gold);border:1px solid rgba(255,215,0,.25)" onclick="openAccountPage()">👤</button>
-      <button class="hub-btn" title="محفظتي" style="background:rgba(59,130,246,.15);color:#60a5fa;border:1px solid rgba(59,130,246,.3)" onclick="openWalletPage()">💳</button>
+      <button class="hub-btn" data-i18n-title="hub_my_account" title="حسابي" style="background:rgba(255,215,0,.12);color:var(--gold);border:1px solid rgba(255,215,0,.25)" onclick="openAccountPage()">👤</button>
+      <button class="hub-btn" data-i18n-title="hub_my_wallet" title="محفظتي" style="background:rgba(59,130,246,.15);color:#60a5fa;border:1px solid rgba(59,130,246,.3)" onclick="openWalletPage()">💳</button>
       <button class="hub-btn dep" onclick="showDeposit()">💰</button>
       <button class="hub-btn wdr" onclick="showWithdraw()">💸</button>
+      <button class="hub-btn" id="i18nToggleBtn" onclick="I18N.toggle()" style="background:rgba(0,231,1,.12);color:var(--green);border:1px solid rgba(0,231,1,.3);font-weight:800;font-size:12px">EN</button>
     </div>
   </div>
   <div id="hub"></div>
   <div class="lb-section">
     <div class="lb-header">
       <span class="lb-header-icon">🏆</span>
-      <span class="lb-header-text">قائمة الأبطال</span>
+      <span class="lb-header-text" data-i18n="hub_champions">قائمة الأبطال</span>
     </div>
-    <div class="lb-list" id="leaderboard"><div class="lb-empty">جاري التحميل...</div></div>
+    <div class="lb-list" id="leaderboard"><div class="lb-empty" data-i18n="hub_loading">جاري التحميل...</div></div>
   </div>
-  <div class="empty-state" id="empty"><div class="empty-icon">🎮</div><p>لا توجد ألعاب متاحة</p></div>
+  <div class="empty-state" id="empty"><div class="empty-icon">🎮</div><p data-i18n="hub_no_games">لا توجد ألعاب متاحة</p></div>
 </div>
 <div class="modal-overlay" id="modal"><div class="modal-box" id="modalBox"></div></div>
-<script src="/static/js/game-base.js?v=20260812b"></script>
+<script src="/static/js/game-base.js?v=20260816i18n"></script>
 <script>
 const lang=new URLSearchParams(location.search).get('lang')||'ar';
 const GAME_ROUTES={'GAME004':'/webapp/aviator','GAME005':'/webapp/crash','GAME006':'/webapp/mines','GAME007':'/webapp/plinko','GAME008':'/webapp/lottery','GAME009':'/webapp/wheel','GAME010':'/webapp/dice'};
-async function loadProfile(){try{const r=await apiFetch(`${BASE}/api/player/profile`);const d=await r.json();const p=d.profile||{};const seg=d.segment||'new';const l={new:'🟢 جديد',winner:'🔴 رابح',loser:'🟡 خاسر',hot:'🔥 ساخن',churning:'⚠️ يغادر',vip:'💎 VIP',regular:'👤 عادي'};if(d.balance!==undefined){document.getElementById('bal').textContent=(d.balance||0).toLocaleString();}if(d.currency){document.getElementById('cur').textContent=d.currency;}const cid=d.customer_id?' | رقم: '+d.customer_id:'';document.getElementById('stats').textContent=`${l[seg]||seg}${cid} | ${p.win_rate||0}%`;if(p.is_vex_partner==='yes')document.getElementById('vexBtn').style.display='block';}catch(e){}}
+async function loadProfile(){try{const r=await apiFetch(`${BASE}/api/player/profile`);const d=await r.json();const p=d.profile||{};const seg=d.segment||'new';const l={new:I18N.t('seg_new'),winner:I18N.t('seg_winner'),loser:I18N.t('seg_loser'),hot:I18N.t('seg_hot'),churning:I18N.t('seg_churning'),vip:I18N.t('seg_vip'),regular:I18N.t('seg_regular')};if(d.balance!==undefined){document.getElementById('bal').textContent=(d.balance||0).toLocaleString();}if(d.currency){document.getElementById('cur').textContent=d.currency;}const cid=d.customer_id?' | '+I18N.t('hub_num')+': '+d.customer_id:'';document.getElementById('stats').textContent=`${l[seg]||seg}${cid} | ${p.win_rate||0}%`;if(p.is_vex_partner==='yes')document.getElementById('vexBtn').style.display='block';}catch(e){}}
 async function loadWalletBadges(){try{const r=await apiFetch(`${BASE}/api/player/wallet`);const d=await r.json();const cur=d.currency||'EGP';if(d.svrp_credits>0){const fb=document.getElementById('frozenBadge');const fa=document.getElementById('frozenAmt');if(fb&&fa){fa.textContent=`${(d.svrp_credits||0).toLocaleString()} ${cur}`;fb.style.display='flex';}}if(d.pending_balance>0){const pb=document.getElementById('pendingBadge');const pa=document.getElementById('pendingAmt');if(pb&&pa){pa.textContent=`${(d.pending_balance||0).toLocaleString()} ${cur}`;pb.style.display='flex';}}}catch(_){}}
 function openWalletPage(){window.location.href=`${BASE}/webapp/wallet?${_getAuthParam()}&lang=${lang}`;}
 function openAccountPage(){window.location.href=`${BASE}/webapp/account?${_getAuthParam()}&lang=${lang}`;}
@@ -127,12 +166,13 @@ async function loadGames(){try{const r=await apiFetch(`${BASE}/api/games/list`);
 function playGame(id){const path=GAME_ROUTES[id]||`/webapp/play/${id}`;window.location.href=`${BASE}${path}?${_getAuthParam()}&lang=${lang}`;}
 function closeModal(){document.getElementById('modal').style.display='none';}
 async function showDeposit(){document.getElementById('modal').style.display='flex';await showVexDepositModal(0);}
-async function showWithdraw(){const bal=parseFloat(document.getElementById('bal').textContent.replace(/,/g,''))||0;document.getElementById('modal').style.display='flex';const mb=document.getElementById('modalBox');let mh='';try{const r=await apiFetch(`${BASE}/api/player/methods`);const d=await r.json();if(d.methods&&d.methods.length>0){mh='<div class="modal-subtitle">اختر وسيلة الاستلام:</div>'+d.methods.map(m=>`<div class="method-item" onclick="selWdr('${m.account_number}','${m.id}')"><span class="method-icon">${m.icon||'💳'}</span><div class="method-info"><div class="method-name">${m.method_name}</div><div class="method-type">${m.account_number}</div></div></div>`).join('');}}catch(e){}mb.innerHTML=`<div class="modal-title">💸 سحب</div><div class="modal-subtitle">رصيدك: ${bal.toLocaleString()}</div>${mh}<div class="modal-subtitle" style="margin-top:8px">✍️ أو اكتب يدوياً:</div><input class="modal-input" id="wdrAcc" placeholder="رقم الحساب"><input class="modal-input" id="wdrAmt" type="number" placeholder="المبلغ" max="${bal}"><button class="modal-btn-primary" onclick="subWdr()">✅ تأكيد السحب</button><button class="modal-btn-secondary" onclick="closeModal()">إلغاء</button>`;
-  let wAcc='',wMid='';window.selWdr=function(ac,mid){document.querySelectorAll('.method-item').forEach(m=>m.style.borderColor='var(--border)');event.target.closest('.method-item').style.borderColor='var(--gold)';wAcc=ac;wMid=mid;};window.subWdr=async function(){const a=parseFloat(document.getElementById('wdrAmt').value)||0;const ac=wAcc||document.getElementById('wdrAcc').value.trim();if(a<=0||!ac){alert('أدخل المبلغ ورقم الحساب');return;}try{const r=await apiFetch(`${BASE}/api/wallet/withdraw`,{method:'POST',body:JSON.stringify({uid,amount:a,method_id:wMid,account_number:ac})});const d=await r.json();if(d.success){mb.innerHTML=`<div style="text-align:center;padding:16px"><div style="font-size:28px">⏳</div><div class="modal-title">تم الطلب</div><div class="modal-subtitle">بانتظار موافقة الإدارة</div><button class="modal-btn-secondary" onclick="closeModal();loadBalance();">إغلاق</button></div>`;}else{alert(d.error||'خطأ');}}catch(e){alert('خطأ');}};}
-function showCurrencyPicker(){const cs=[{code:'EGP',name:'جنيه مصري 🇪🇬'},{code:'SAR',name:'ريال سعودي 🇸🇦'},{code:'USD',name:'دولار 🇺🇸'},{code:'USDT',name:'تيذر 🪙'},{code:'AED',name:'درهم 🇦🇪'},{code:'KWD',name:'دينار كويتي 🇰🇼'}];document.getElementById('modal').style.display='flex';document.getElementById('modalBox').innerHTML=`<div class="modal-title">💱 اختر العملة</div><div class="modal-subtitle">الحالية: ${document.getElementById('cur').textContent}</div>${cs.map(c=>`<div class="method-item" onclick="chCur('${c.code}')"><span style="font-size:18px">${c.name.slice(-2)}</span><div class="method-info"><div class="method-name">${c.name.slice(0,-3)}</div></div></div>`).join('')}<button class="modal-btn-secondary" onclick="closeModal()">إلغاء</button>`;}
-window.chCur=async function(c){try{await apiFetch(`${BASE}/api/player/currency`,{method:'POST',body:JSON.stringify({uid,currency:c})});document.getElementById('cur').textContent=c;closeModal();loadBalance();loadGames();}catch(e){alert('خطأ');}};
+async function showWithdraw(){const bal=parseFloat(document.getElementById('bal').textContent.replace(/,/g,''))||0;document.getElementById('modal').style.display='flex';const mb=document.getElementById('modalBox');let mh='';try{const r=await apiFetch(`${BASE}/api/player/methods`);const d=await r.json();if(d.methods&&d.methods.length>0){mh=`<div class="modal-subtitle">${I18N.t('wdr_choose')}</div>`+d.methods.map(m=>`<div class="method-item" onclick="selWdr('${m.account_number}','${m.id}')"><span class="method-icon">${m.icon||'💳'}</span><div class="method-info"><div class="method-name">${m.method_name}</div><div class="method-type">${m.account_number}</div></div></div>`).join('');}}catch(e){}mb.innerHTML=`<div class="modal-title">${I18N.t('wdr_title')}</div><div class="modal-subtitle">${I18N.t('wdr_your_bal')} ${bal.toLocaleString()}</div>${mh}<div class="modal-subtitle" style="margin-top:8px">${I18N.t('wdr_or_manual')}</div><input class="modal-input" id="wdrAcc" placeholder="${I18N.t('wdr_acc_ph')}"><input class="modal-input" id="wdrAmt" type="number" placeholder="${I18N.t('wdr_amt_ph')}" max="${bal}"><button class="modal-btn-primary" onclick="subWdr()">${I18N.t('wdr_confirm')}</button><button class="modal-btn-secondary" onclick="closeModal()">${I18N.t('cancel')}</button>`;
+  let wAcc='',wMid='';window.selWdr=function(ac,mid){document.querySelectorAll('.method-item').forEach(m=>m.style.borderColor='var(--border)');event.target.closest('.method-item').style.borderColor='var(--gold)';wAcc=ac;wMid=mid;};window.subWdr=async function(){const a=parseFloat(document.getElementById('wdrAmt').value)||0;const ac=wAcc||document.getElementById('wdrAcc').value.trim();if(a<=0||!ac){alert(I18N.t('wdr_enter_both'));return;}try{const r=await apiFetch(`${BASE}/api/wallet/withdraw`,{method:'POST',body:JSON.stringify({uid,amount:a,method_id:wMid,account_number:ac})});const d=await r.json();if(d.success){mb.innerHTML=`<div style="text-align:center;padding:16px"><div style="font-size:28px">⏳</div><div class="modal-title">${I18N.t('wdr_requested')}</div><div class="modal-subtitle">${I18N.t('wdr_pending')}</div><button class="modal-btn-secondary" onclick="closeModal();loadBalance();">${I18N.t('close')}</button></div>`;}else{alert(d.error||I18N.t('err_generic'));}}catch(e){alert(I18N.t('err_generic'));}};}
+function showCurrencyPicker(){const cs=[{code:'EGP',name:I18N.t('cur_egp')},{code:'SAR',name:I18N.t('cur_sar')},{code:'USD',name:I18N.t('cur_usd')},{code:'USDT',name:I18N.t('cur_usdt')},{code:'AED',name:I18N.t('cur_aed')},{code:'KWD',name:I18N.t('cur_kwd')}];document.getElementById('modal').style.display='flex';document.getElementById('modalBox').innerHTML=`<div class="modal-title">${I18N.t('cur_title')}</div><div class="modal-subtitle">${I18N.t('cur_current')} ${document.getElementById('cur').textContent}</div>${cs.map(c=>`<div class="method-item" onclick="chCur('${c.code}')"><span style="font-size:18px">${c.name.slice(-2)}</span><div class="method-info"><div class="method-name">${c.name.slice(0,-3)}</div></div></div>`).join('')}<button class="modal-btn-secondary" onclick="closeModal()">${I18N.t('cancel')}</button>`;}
+window.chCur=async function(c){try{await apiFetch(`${BASE}/api/player/currency`,{method:'POST',body:JSON.stringify({uid,currency:c})});document.getElementById('cur').textContent=c;closeModal();loadBalance();loadGames();}catch(e){alert(I18N.t('err_generic'));}};
 loadBalance();loadProfile();loadGames();loadWalletBadges();setInterval(loadBalance,5000);setInterval(loadWalletBadges,30000);
 connectLeaderboardStream('leaderboard');
+document.addEventListener('vex:lang',function(){loadProfile();});
 </script>
 </body>
 </html>

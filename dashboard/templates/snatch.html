@@ -1,12 +1,14 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
+<script src="/static/js/i18n.js"></script>
+<script src="/static/js/i18n-auto.js"></script>
 <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/icon-32.png?v=20260816">
 <link rel="icon" href="/favicon.ico?v=20260816" sizes="any">
 <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png?v=20260816">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>اخطف الهدية — VEX</title>
+<title data-i18n="x031">اخطف الهدية — VEX</title>
 <link rel="stylesheet" href="/static/css/game-base.css?v=20260818">
 <style>
 *{box-sizing:border-box}
@@ -53,31 +55,31 @@
 
     <!-- Start Overlay -->
     <div class="overlay" id="startOverlay">
-      <div class="overlay-title">🎁 اخطف الهدايا!</div>
-      <div class="overlay-sub">اضغط على الهدايا لاختطافها قبل أن تختفي</div>
+      <div class="overlay-title" data-i18n="x214">🎁 اخطف الهدايا!</div>
+      <div class="overlay-sub" data-i18n="x037">اضغط على الهدايا لاختطافها قبل أن تختفي</div>
       <div class="bet-row-ov">
         <button class="ctrl-btn-ov" onclick="adjustBet('betInpOv',0.5)">½</button>
         <input type="number" class="bet-inp-ov" id="betInpOv" value="10" min="1">
         <button class="ctrl-btn-ov" onclick="adjustBet('betInpOv',2)">2×</button>
       </div>
-      <button class="start-btn" onclick="startGame()">🚀 ابدأ اللعبة</button>
+      <button class="start-btn" onclick="startGame()" data-i18n="x284">🚀 ابدأ اللعبة</button>
     </div>
 
     <!-- Result Overlay -->
     <div class="overlay" id="resultOverlay" style="display:none">
-      <div class="overlay-title" id="resultTitle">انتهت اللعبة!</div>
+      <div class="overlay-title" id="resultTitle" data-i18n="x062">انتهت اللعبة!</div>
       <div class="overlay-score" id="resultScore">0</div>
       <div class="overlay-payout" id="resultPayout"></div>
       <div class="overlay-sub" id="resultSub"></div>
-      <button class="result-btn" onclick="resetGame()">🔄 العب مرة أخرى</button>
+      <button class="result-btn" onclick="resetGame()" data-i18n="x274">🔄 العب مرة أخرى</button>
     </div>
   </div>
 </div>
 <div id="loading" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg);flex-direction:column;gap:12px">
   <div style="font-size:40px">🎁</div>
-  <div style="color:var(--text-dim);font-size:14px">جارٍ التحميل...</div>
+  <div style="color:var(--text-dim);font-size:14px" data-i18n="x096">جارٍ التحميل...</div>
 </div>
-<script src="/static/js/game-base.js?v=20260812b"></script>
+<script src="/static/js/game-base.js?v=20260816i18n"></script>
 <script>
 'use strict';
 var canvas = document.getElementById('gameCanvas');
@@ -490,5 +492,6 @@ loadBalance();
 setInterval(loadBalance, 10000);
 initBackButton();
 </script>
+<script>if(window.I18N)I18N.mountToggle();</script>
 </body>
 </html>
