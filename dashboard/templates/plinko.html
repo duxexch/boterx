@@ -299,7 +299,7 @@ function onDropPressStart(e){
   var txt=document.getElementById('dropBtnText');
   var hint=document.getElementById('powerHint');
   btn.classList.add('charging');
-  txt.textContent='⚡ شحن...';
+  txt.textContent=I18N.t('y122');
   hint.textContent='0%';
   var startT=Date.now();
   if(powerTimer)clearInterval(powerTimer);
@@ -336,7 +336,7 @@ function onDropPressEnd(e){
 function dropBall(power){
   if(dropping)return;
   var bet=parseFloat(document.getElementById('betInp').value)||10;
-  if(bet<1){showToast('أدخل مبلغ','error');return}
+  if(bet<1){showToast(I18N.t('y010'),'error');return}
   if(!checkBalanceBeforeBet(bet))return;
   dropping=true;
   document.getElementById('dropBtn').disabled=true;
@@ -362,7 +362,7 @@ function dropBall(power){
     startBall(d.slot,d.multiplier,d.payout,bet,dirs,power);
   })
   .catch(function(){
-    showToast('خطأ في الاتصال','error');
+    showToast(I18N.t('y061'),'error');
     dropping=false;document.getElementById('dropBtn').disabled=false;
   });
 }
@@ -474,7 +474,7 @@ function showResult(mult,payout,bet){
   if(mult>=10){
     sndJackpot();
     document.getElementById('bwNum').textContent='+'+fmtA(payout);
-    document.getElementById('bwTxt').textContent='جائزة كبرى! ('+mult.toFixed(1)+'x)';
+    document.getElementById('bwTxt').textContent=I18N.t('y047')+mult.toFixed(1)+'x)';
     document.getElementById('bigWin').classList.add('show');
     setTimeout(function(){document.getElementById('bigWin').classList.remove('show')},3000);
     haptic('heavy');

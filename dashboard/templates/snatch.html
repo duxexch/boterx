@@ -148,7 +148,7 @@ function startGame() {
   }).catch(function() {
     // Network error at spin — no session was created so nothing was deducted.
     // Do NOT enter offline play mode since there is no server-tracked session.
-    showToast('تعذّر الاتصال. تحقق من الشبكة وأعد المحاولة.', 'error');
+    showToast(I18N.t('y038'), 'error');
   });
 }
 
@@ -164,7 +164,7 @@ function startGame() {
   var payoutEl  = document.getElementById('resultPayout');
   if (!overlayEl) return;
   overlayEl.style.display = 'flex';
-  if (subEl)    subEl.textContent    = 'جارٍ استكمال الجلسة السابقة…';
+  if (subEl)    subEl.textContent    = I18N.t('y048');
   if (payoutEl) payoutEl.textContent = '—';
 
   snatchSessionId = pending.sid;
@@ -181,21 +181,21 @@ function startGame() {
         ? ('+ ' + fmtAmount(payout) + ' ' + gameCurrency)
         : ('0 ' + gameCurrency);
       if (subEl) subEl.textContent = payout > 0
-        ? 'تمت المكافأة من الجلسة السابقة!'
-        : 'انتهت الجلسة السابقة بدون مكافأة.';
+        ? I18N.t('y046')
+        : I18N.t('y032');
       loadBalance();
     } else if (d && d.error && /settled|refunded|not found/i.test(d.error)) {
       snatchSessionId = null; snatchFinalScore = 0; _clearPendingSession();
-      if (subEl) subEl.textContent = 'الجلسة السابقة تم تسويتها بالفعل.';
+      if (subEl) subEl.textContent = I18N.t('y025');
       if (payoutEl) payoutEl.textContent = '—';
       loadBalance();
     } else {
       // Still failing — leave localStorage intact, show retry button
-      if (subEl) subEl.textContent = 'تعذّر الاتصال — اضغط لإعادة المحاولة';
+      if (subEl) subEl.textContent = I18N.t('y037');
       if (!document.getElementById('snatchRetryBtn')) {
         var btn = document.createElement('button');
         btn.id = 'snatchRetryBtn';
-        btn.textContent = '🔄 إعادة المحاولة';
+        btn.textContent = I18N.t('y153');
         btn.style.cssText = 'margin:12px auto;display:block;padding:10px 28px;font-size:15px;border-radius:8px;background:#f59e0b;color:#1a1a1a;border:none;cursor:pointer;font-weight:700;';
         btn.onclick = function() {
           btn.disabled = true;
@@ -205,11 +205,11 @@ function startGame() {
       }
     }
   }).catch(function() {
-    if (subEl) subEl.textContent = 'تعذّر الاتصال — اضغط لإعادة المحاولة';
+    if (subEl) subEl.textContent = I18N.t('y037');
     if (!document.getElementById('snatchRetryBtn')) {
       var btn = document.createElement('button');
       btn.id = 'snatchRetryBtn';
-      btn.textContent = '🔄 إعادة المحاولة';
+      btn.textContent = I18N.t('y153');
       btn.style.cssText = 'margin:12px auto;display:block;padding:10px 28px;font-size:15px;border-radius:8px;background:#f59e0b;color:#1a1a1a;border:none;cursor:pointer;font-weight:700;';
       btn.onclick = function() { btn.disabled = true; location.reload(); };
       overlayEl.appendChild(btn);
@@ -361,10 +361,10 @@ function endGame() {
   var subEl     = document.getElementById('resultSub');
   var overlayEl = document.getElementById('resultOverlay');
 
-  titleEl.textContent  = lives <= 0 ? '💀 نفدت الحياة!' : '⏰ انتهى الوقت!';
-  scoreEl.textContent  = score + ' نقطة';
+  titleEl.textContent  = lives <= 0 ? I18N.t('y142') : I18N.t('y113');
+  scoreEl.textContent  = score + I18N.t('y003');
   payoutEl.textContent = '';
-  subEl.textContent    = 'جارٍ حساب مكافأتك…';
+  subEl.textContent    = I18N.t('y051');
   overlayEl.style.display = 'flex';
 
   var finalScore = score;
@@ -392,11 +392,11 @@ function endGame() {
           var payout = (typeof d.payout === 'number') ? d.payout : 0;
           if (payout > 0) {
             payoutEl.textContent = '+ ' + fmtAmount(payout) + ' ' + gameCurrency;
-            subEl.textContent = 'أحسنت! الرصيد تم تحديثه';
+            subEl.textContent = I18N.t('y006');
             soundWin(payout > betAmount); hapticNotif('success');
           } else {
             payoutEl.textContent = '0 ' + gameCurrency;
-            subEl.textContent = 'حاول مرة أخرى!';
+            subEl.textContent = I18N.t('y054');
             hapticNotif('error');
           }
           // Remove retry button if visible
@@ -426,16 +426,16 @@ function endGame() {
 
     function _showEndRetry(sid, sc) {
       payoutEl.textContent = '—';
-      subEl.textContent = 'تعذّر الاتصال — اضغط لإعادة المحاولة';
+      subEl.textContent = I18N.t('y037');
       hapticNotif('error');
       var existing = document.getElementById('snatchRetryBtn');
       if (!existing) {
         var btn = document.createElement('button');
         btn.id = 'snatchRetryBtn';
-        btn.textContent = '🔄 إعادة المحاولة';
+        btn.textContent = I18N.t('y153');
         btn.style.cssText = 'margin:12px auto;display:block;padding:10px 28px;font-size:15px;border-radius:8px;background:#f59e0b;color:#1a1a1a;border:none;cursor:pointer;font-weight:700;';
         btn.onclick = function() {
-          subEl.textContent = 'جارٍ المحاولة…';
+          subEl.textContent = I18N.t('y050');
           btn.disabled = true;
           _doEndRequest(sid, sc).finally(function() { btn.disabled = false; });
         };
@@ -449,7 +449,7 @@ function endGame() {
   } else {
     // Offline / no session — show placeholder; no financial outcome
     payoutEl.textContent = '—';
-    subEl.textContent = 'وضع غير متصل — لا توجد جلسة نشطة';
+    subEl.textContent = I18N.t('y109');
     addHistItem(document.querySelector('.hist-bar') || document.createElement('div'), Math.max(1, finalScore * 0.1));
   }
 }

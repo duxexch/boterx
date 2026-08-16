@@ -252,12 +252,12 @@ function pct(done, req) { return req > 0 ? Math.min(100, Math.round(done / req *
 
 const TYPE_LABELS = {
   deposit: I18N.t('x244'), withdraw: I18N.t('x253'),
-  referral: '🎁 مكافأة إحالة', recovery: '🔄 تعويض',
-  compensation: '💎 تعويض', game_win: '🏆 ربح ألعاب', svrp_transfer: '💎 نقل SVRP',
+  referral: I18N.t('y133'), recovery: I18N.t('y154'),
+  compensation: I18N.t('y143'), game_win: I18N.t('y139'), svrp_transfer: I18N.t('y144'),
 };
 const STATUS_LABELS = {
-  pending: 'معلق', completed: 'مكتمل', rejected: 'مرفوض',
-  approved: 'مكتمل', cancelled: 'ملغي',
+  pending: I18N.t('y099'), completed: I18N.t('y103'), rejected: I18N.t('y097'),
+  approved: I18N.t('y103'), cancelled: I18N.t('y104'),
 };
 
 function txnCls(type) {
@@ -319,10 +319,10 @@ function renderWallet(d) {
 
     // Header
     const statusIcon  = wageringDone ? '🔓' : '🔒';
-    const statusLabel = wageringDone ? 'جاهز للنقل' : 'ينتظر اكتمال الرهان';
+    const statusLabel = wageringDone ? I18N.t('y052') : I18N.t('y111');
     html += `
     <div class="svrp-header">
-      <div class="svrp-title">${statusIcon} أرصدة التعويض (SVRP)</div>
+      <div class="svrp-title">${statusIcon} ${I18N.t('z031')}</div>
       <div>
         <div class="svrp-amount ${wageringDone ? 'unlocked' : 'locked'}">${fmt(svrpCredits, cur)}</div>
         <div style="font-size:10px;color:var(--muted);text-align:left;margin-top:2px">${statusLabel}</div>
@@ -336,7 +336,7 @@ function renderWallet(d) {
     <div class="wager-section">
       <div class="wager-top">
         <span data-i18n="x077">تقدم اكتمال الرهان</span>
-        <span class="wager-count">${wagerDone} / ${wagerReq} معاملات (${wPct}%)</span>
+        <span class="wager-count">${wagerDone} / ${wagerReq} ${I18N.t('z032')} (${wPct}%)</span>
       </div>
       <div class="wager-track">
         <div class="wager-fill ${wageringDone ? 'complete' : ''}" style="width:${wPct}%"></div>
@@ -344,10 +344,10 @@ function renderWallet(d) {
       <div class="wager-hint ${wageringDone ? 'unlocked' : 'locked'}">`;
 
     if (wageringDone) {
-      html += `✅ اكتملت متطلبات الرهان — يمكنك الآن نقل رصيد SVRP إلى رصيد اللعب`;
+      html += I18N.t('z033');
     } else {
       const rem = d.wagering_remaining || (wagerReq - wagerDone);
-      html += `🔒 أكمل <strong>${rem}</strong> معاملة إضافية إيداع أو سحب لفك تجميد رصيدك`;
+      html += `${I18N.t('z034')} <strong>${rem}</strong> ${I18N.t('z035')}`;
     }
     html += `</div></div>`;
 
@@ -362,7 +362,7 @@ function renderWallet(d) {
             value="${svrpCredits.toFixed(2)}">
           <button class="btn-transfer" id="transferBtn" onclick="doTransfer()" data-i18n="x184">نقل ←</button>
         </div>
-        <div class="cta-note">الحد الأقصى: ${fmt(svrpCredits, cur)} — سيُضاف مباشرة لرصيد اللعب</div>
+        <div class="cta-note">${I18N.t('z036')} ${fmt(svrpCredits, cur)} — ${I18N.t('z037')}</div>
       </div>`;
     }
 
@@ -371,7 +371,7 @@ function renderWallet(d) {
     if (sources.length) {
       html += `<div class="credit-sources">`;
       for (const s of sources) {
-        const badgeLbl = s.status === 'active' ? 'نشط' : s.status === 'pending' ? 'معلق' : I18N.t('x170');
+        const badgeLbl = s.status === 'active' ? I18N.t('y106') : s.status === 'pending' ? I18N.t('y099') : I18N.t('x170');
         html += `
         <div class="credit-source-row">
           <span class="cs-label">${s.label}</span>
@@ -450,15 +450,15 @@ async function loadCompanies() {
           <div style="flex:1;min-width:0">
             <div style="font-size:13px;font-weight:600">${escH(c.name)}</div>
             <div style="font-size:11px;color:var(--muted)">${c.registered_account
-              ? '✅ حسابك: <code>'+escH(c.registered_account)+'</code>'
-              : 'غير مسجل بعد'}</div>
+              ? I18N.t('z038')+' <code>'+escH(c.registered_account)+'</code>'
+              : I18N.t('y079')}</div>
           </div>
           ${c.affiliate_link ? `<a href="${escH(c.affiliate_link)}" target="_blank" rel="noopener"
             style="font-size:11px;font-weight:700;color:#93c5fd;background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.25);padding:6px 10px;border-radius:8px;text-decoration:none;white-space:nowrap" data-i18n="x279">🔗 التسجيل</a>` : ''}
         </div>`;
       if (!c.registered_account) {
         h += `<div style="display:flex;gap:6px;margin-top:8px">
-          <input class="cta-input" id="acc_${cid}" placeholder="رقم حسابك في ${escH(c.name)}" maxlength="64">
+          <input class="cta-input" id="acc_${cid}" placeholder="${I18N.t('z039')} ${escH(c.name)}" maxlength="64">
           <button class="btn-transfer" onclick="registerAccount('${cid}')" id="regBtn_${cid}" data-i18n="x075">تسجيل</button>
         </div>`;
       } else {
@@ -504,7 +504,7 @@ async function registerAccount(cid) {
   const inp = document.getElementById(`acc_${cid}`);
   const btn = document.getElementById(`regBtn_${cid}`);
   const acc = (inp?.value || '').trim();
-  if (acc.length < 3) { showToast('أدخل رقم حساب صالح (3 أحرف على الأقل)', 'error'); return; }
+  if (acc.length < 3) { showToast(I18N.t('y008'), 'error'); return; }
   if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
   try {
     const r = await apiFetch(`${BASE}/api/player/companies/${encodeURIComponent(cid)}/register-account`, {
@@ -513,9 +513,9 @@ async function registerAccount(cid) {
       body: JSON.stringify({ account_number: acc }),
     });
     const d = await r.json();
-    if (!r.ok || d.error) { showToast(d.error || 'فشل التسجيل', 'error'); }
-    else { showToast(d.message || '✅ تم التسجيل', 'success'); loadCompanies(); return; }
-  } catch (e) { showToast('خطأ في الاتصال', 'error'); }
+    if (!r.ok || d.error) { showToast(d.error || I18N.t('y081'), 'error'); }
+    else { showToast(d.message || I18N.t('y124'), 'success'); loadCompanies(); return; }
+  } catch (e) { showToast(I18N.t('y061'), 'error'); }
   if (btn) { btn.disabled = false; btn.textContent = I18N.t('x075'); }
 }
 
@@ -525,8 +525,8 @@ async function submitCompensation(cid) {
   const btn = document.getElementById(`compBtn_${cid}`);
   const file = fileInp?.files?.[0];
   if (!file) return;
-  if (file.size > 5 * 1024 * 1024) { showToast('حجم الصورة يتجاوز 5MB', 'error'); fileInp.value = ''; return; }
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ جارٍ الإرسال...'; }
+  if (file.size > 5 * 1024 * 1024) { showToast(I18N.t('y055'), 'error'); fileInp.value = ''; return; }
+  if (btn) { btn.disabled = true; btn.textContent = I18N.t('y116'); }
   try {
     const fd = new FormData();
     fd.append('company_id', cid);
@@ -534,8 +534,8 @@ async function submitCompensation(cid) {
     const r = await apiFetch(`${BASE}/api/player/compensation-request`, { method: 'POST', body: fd });
     const d = await r.json();
     if (!r.ok || d.error) { showToast(d.error || I18N.t('x136'), 'error'); }
-    else { showToast(d.message || '✅ تم إرسال طلب التعويض', 'success'); }
-  } catch (e) { showToast('خطأ في الاتصال', 'error'); }
+    else { showToast(d.message || I18N.t('y123'), 'success'); }
+  } catch (e) { showToast(I18N.t('y061'), 'error'); }
   if (fileInp) fileInp.value = '';
   if (btn) { btn.disabled = false; btn.textContent = I18N.t('x273'); }
 }
@@ -549,7 +549,7 @@ async function doTransfer() {
   const maxAmt = _walletData ? (_walletData.svrp_credits || 0) : 0;
   let amount   = parseFloat(inp.value);
   if (isNaN(amount) || amount <= 0) amount = maxAmt;
-  if (amount > maxAmt) { showToast('المبلغ يتجاوز رصيد SVRP', 'error'); return; }
+  if (amount > maxAmt) { showToast(I18N.t('y028'), 'error'); return; }
 
   // Generate a stable idempotency key for this transfer attempt.
   // Stored in sessionStorage so that a retry from the same page session
@@ -574,20 +574,20 @@ async function doTransfer() {
     const d = await r.json();
     if (d && d.retry) {
       // Transient failure — server kept the debit; client MUST retry with same key.
-      showToast('فشل مؤقت — يرجى إعادة المحاولة', 'error');
+      showToast(I18N.t('y083'), 'error');
       // transferId stays in sessionStorage for the next tap
     } else if (!r.ok || d.error) {
-      showToast(d.error || 'فشل النقل', 'error');
+      showToast(d.error || I18N.t('y082'), 'error');
       // Terminal error — clear key so the next attempt is a fresh transfer
       sessionStorage.removeItem(_tsKey);
     } else {
       sessionStorage.removeItem(_tsKey);  // success — next transfer gets a fresh key
-      showToast(`✅ تم نقل ${d.transferred?.toLocaleString()} — رصيد اللعب الجديد: ${d.new_game_balance?.toLocaleString()}`, 'success');
+      showToast(`${I18N.t('z040')} ${d.transferred?.toLocaleString()} — ${I18N.t('z041')} ${d.new_game_balance?.toLocaleString()}`, 'success');
       setTimeout(loadWallet, 1000);
     }
   } catch (e) {
     // Network error — keep the key so retry is idempotent
-    showToast('خطأ في الاتصال — حاول مجدداً', 'error');
+    showToast(I18N.t('y062'), 'error');
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = I18N.t('x184'); }
   }
@@ -604,7 +604,7 @@ async function loadWallet() {
   } catch (e) {
     document.getElementById('loader').style.display = 'none';
     document.getElementById('walletPage').innerHTML =
-      `<div class="wallet-empty" style="padding:50px">⚠️ تعذّر تحميل المحفظة<br><small style="color:var(--muted)">${e.message || ''}</small></div>`;
+      `<div class="wallet-empty" style="padding:50px">${I18N.t('z042')}<br><small style="color:var(--muted)">${e.message || ''}</small></div>`;
   }
 }
 

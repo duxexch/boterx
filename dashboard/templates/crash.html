@@ -273,13 +273,13 @@ function handleState(d){
   if(d.my_crash_bet&&d.my_crash_bet.placed&&crashBet.st==='idle'){
     crashBet.amt=d.my_crash_bet.amount;crashBet.target=d.my_crash_bet.target_x;
     if(d.my_crash_bet.exited){crashBet.st='done';setBtnCrash('crash-done','✓ '+d.my_crash_bet.remaining.toFixed(0));}
-    else if(np==='flying'&&currentMult>crashBet.target){crashBet.st='exit';setBtnCrash('crash-exit','خروج!');}
+    else if(np==='flying'&&currentMult>crashBet.target){crashBet.st='exit';setBtnCrash('crash-exit',I18N.t('y058'));}
     else if(np==='flying'){crashBet.st='waiting';setBtnCrash('crash-waiting','⏳');}
     else if(np==='waiting'){crashBet.st='betting';setBtnCrash('crash-betting',I18N.t('x018'));}
   }
   if(d.my_rise_bet&&d.my_rise_bet.placed&&riseBet.st==='idle'){
     riseBet.amt=d.my_rise_bet.amount;riseBet.target=d.my_rise_bet.target_x;
-    if(np==='flying'){riseBet.st='locked';setBtnRise('rise-locked','🔒 محبوس');}
+    if(np==='flying'){riseBet.st='locked';setBtnRise('rise-locked',I18N.t('y156'));}
     else if(np==='waiting'){riseBet.st='betting';setBtnRise('rise-betting',I18N.t('x018'));}
   }
 
@@ -316,7 +316,7 @@ function onWaiting(d){
   document.getElementById('multDisplay').classList.add('show');
   document.getElementById('mult').textContent='1.00x';document.getElementById('mult').className='mult-val';
   document.getElementById('crashMult').style.opacity='0';
-  document.getElementById('statusText').textContent='ضع رهانك — الجولة تبدأ Soon 🚀';
+  document.getElementById('statusText').textContent=I18N.t('y077');
   document.getElementById('crashMsg').classList.remove('show');document.getElementById('recoveryMsg').classList.remove('show');
 
   // ── Queued bets: auto-place in new round ──
@@ -357,10 +357,10 @@ function onFlying(d){
   document.getElementById('statusText').textContent='';document.getElementById('crashMsg').classList.remove('show');
 
   // Crash side: betting→waiting, idle stays idle (can queue)
-  if(crashBet.st==='betting'){crashBet.st='waiting';setBtnCrash('crash-waiting','⏳ انتظار');}
+  if(crashBet.st==='betting'){crashBet.st='waiting';setBtnCrash('crash-waiting',I18N.t('y115'));}
   else if(crashBet.st==='idle'){setBtnCrash('crash-idle',I18N.t('x114'));}
   // Rise side: betting→locked, idle stays idle (can queue)
-  if(riseBet.st==='betting'){riseBet.st='locked';setBtnRise('rise-locked','🔒 محبوس');}
+  if(riseBet.st==='betting'){riseBet.st='locked';setBtnRise('rise-locked',I18N.t('y156'));}
   else if(riseBet.st==='idle'){setBtnRise('rise-idle',I18N.t('x114'));}
 
   haptic('light');if(animF)cancelAnimationFrame(animF);animate();
@@ -375,7 +375,7 @@ function animate(){
   document.getElementById('mult').className='mult-val flying';
 
   // Check if crash bet can exit (mult passed target)
-  if(crashBet.st==='waiting'&&m>crashBet.target){crashBet.st='exit';setBtnCrash('crash-exit','خروج!');}
+  if(crashBet.st==='waiting'&&m>crashBet.target){crashBet.st='exit';setBtnCrash('crash-exit',I18N.t('y058'));}
 
   var cx=canvas.width*PX,cy=canvas.height*PY,td=3.5;
   if(el<td){var p=el/td,e=p*p*(3-2*p);rocketX=40+e*(cx-40);rocketY=canvas.height-30-e*(canvas.height-30-cy);trail.push({x:rocketX,y:rocketY});if(trail.length>120)trail.shift();bgScroll=e*20}
@@ -406,25 +406,25 @@ function onCrashed(d){
       var payout=crashBet.amt*crashBet.target;
       crashBet.st='done';sessionW++;sessionPL+=payout-crashBet.amt;
       setBtnCrash('crash-done','✓ '+payout.toFixed(0));
-      showRecovery('💥 ربحت! '+crashBet.target.toFixed(1)+'x','+'+payout.toFixed(0),'#00e701');
+      showRecovery(I18N.t('y148')+crashBet.target.toFixed(1)+'x','+'+payout.toFixed(0),'#00e701');
       spawnParachuteWithMoney(rocketX,rocketY,payout);fireConfetti(document.getElementById('gameArea'));soundCashOut();
     } else {
       var drain=(cm-crashBet.target)/crashBet.target*0.5;
       var remaining=Math.max(0,crashBet.amt*(1-drain));
-      if(remaining>0){crashBet.st='done';sessionW++;sessionPL+=remaining-crashBet.amt;setBtnCrash('crash-done','✓ '+remaining.toFixed(0));showRecovery('⚠️ تم تصريف جزء من رهانك','استرجعت '+remaining.toFixed(0),'#00e701');}
-      else{crashBet.st='lost';sessionL++;sessionPL-=crashBet.amt;setBtnCrash('crash-done','💥 خسارة');showRecovery('🔥 احترق رهانك بالكامل!','','#ff4757');}
+      if(remaining>0){crashBet.st='done';sessionW++;sessionPL+=remaining-crashBet.amt;setBtnCrash('crash-done','✓ '+remaining.toFixed(0));showRecovery(I18N.t('y119'),I18N.t('y023')+remaining.toFixed(0),'#00e701');}
+      else{crashBet.st='lost';sessionL++;sessionPL-=crashBet.amt;setBtnCrash('crash-done',I18N.t('y146'));showRecovery(I18N.t('y157'),'','#ff4757');}
     }
   }
   if(crashBet.st!=='queued'){crashBet={st:'idle',amt:0,target:0,req:''};}
 
   // ── Settle rise side ──
   if(riseBet.st==='locked'){
-    if(cm<riseBet.target){riseBet.st='lost';sessionL++;sessionPL-=riseBet.amt;setBtnRise('rise-done','💥 خسارة');}
+    if(cm<riseBet.target){riseBet.st='lost';sessionL++;sessionPL-=riseBet.amt;setBtnRise('rise-done',I18N.t('y146'));}
     else{
       var drain2=(cm-riseBet.target)/riseBet.target*0.5;
       var won=riseBet.amt*riseBet.target;var rem2=Math.max(0,won*(1-drain2));
       if(rem2>0){riseBet.st='done';sessionW++;sessionPL+=rem2-riseBet.amt;setBtnRise('rise-done','✓ '+rem2.toFixed(0));spawnParachuteWithMoney(rocketX,rocketY,rem2);if(cm>=3)showBigWin(rem2,cm);}
-      else{riseBet.st='lost';sessionL++;sessionPL-=riseBet.amt;setBtnRise('rise-done','💥 خسارة');}
+      else{riseBet.st='lost';sessionL++;sessionPL-=riseBet.amt;setBtnRise('rise-done',I18N.t('y146'));}
     }
   }
   if(riseBet.st!=='queued'){riseBet={st:'idle',amt:0,target:0,req:''};}
@@ -445,13 +445,13 @@ function onBtnCrash(){
   if(st==='idle'&&roundPhase==='waiting'){
     var amt=parseFloat(document.getElementById('betCrash').value)||0;
     var tgt=parseFloat(document.getElementById('targetCrash').value)||0;
-    if(amt<1){showToast('أدخل مبلغ','error');return}
-    if(tgt<1.0||tgt>50){showToast('قيمة X بين 1 و 50','error');return}
+    if(amt<1){showToast(I18N.t('y010'),'error');return}
+    if(tgt<1.0||tgt>50){showToast(I18N.t('y086'),'error');return}
     placeCrashBet(amt,tgt);return;
   }
   // betting + waiting → cancel
   if(st==='betting'&&roundPhase==='waiting'){
-    crashBet={st:'idle',amt:0,target:0,req:''};setBtnCrash('crash-idle',I18N.t('x114'));showToast('تم إلغاء الرهان','info');return;
+    crashBet={st:'idle',amt:0,target:0,req:''};setBtnCrash('crash-idle',I18N.t('x114'));showToast(I18N.t('y040'),'info');return;
   }
   // exit + flying → exit now!
   if(st==='exit'&&roundPhase==='flying'){doExit();return;}
@@ -459,15 +459,15 @@ function onBtnCrash(){
   if(st==='idle'&&(roundPhase==='flying'||roundPhase==='crashed')){
     var amt2=parseFloat(document.getElementById('betCrash').value)||0;
     var tgt2=parseFloat(document.getElementById('targetCrash').value)||0;
-    if(amt2<1){showToast('أدخل مبلغ','error');return}
-    if(tgt2<1.0||tgt2>50){showToast('قيمة X بين 1 و 50','error');return}
+    if(amt2<1){showToast(I18N.t('y010'),'error');return}
+    if(tgt2<1.0||tgt2>50){showToast(I18N.t('y086'),'error');return}
     crashBet.st='queued';crashBet.amt=amt2;crashBet.target=tgt2;
-    setBtnCrash('crash-queued','⏳ القادمة');
-    showToast('✅ سيُراهن في الجولة القادمة','success');return;
+    setBtnCrash('crash-queued',I18N.t('y114'));
+    showToast(I18N.t('y126'),'success');return;
   }
   // queued → cancel queue
   if(st==='queued'){
-    crashBet={st:'idle',amt:0,target:0,req:''};setBtnCrash('crash-idle',I18N.t('x114'));showToast('تم إلغاء الطابور','info');return;
+    crashBet={st:'idle',amt:0,target:0,req:''};setBtnCrash('crash-idle',I18N.t('x114'));showToast(I18N.t('y041'),'info');return;
   }
 }
 
@@ -514,24 +514,24 @@ function onBtnRise(){
   if(st==='idle'&&roundPhase==='waiting'){
     var amt=parseFloat(document.getElementById('betRise').value)||0;
     var tgt=parseFloat(document.getElementById('targetRise').value)||0;
-    if(amt<1){showToast('أدخل مبلغ','error');return}
-    if(tgt<1.0||tgt>50){showToast('قيمة X بين 1 و 50','error');return}
+    if(amt<1){showToast(I18N.t('y010'),'error');return}
+    if(tgt<1.0||tgt>50){showToast(I18N.t('y086'),'error');return}
     placeRiseBet(amt,tgt);return;
   }
   if(st==='betting'&&roundPhase==='waiting'){
-    riseBet={st:'idle',amt:0,target:0,req:''};setBtnRise('rise-idle',I18N.t('x114'));showToast('تم إلغاء الرهان','info');return;
+    riseBet={st:'idle',amt:0,target:0,req:''};setBtnRise('rise-idle',I18N.t('x114'));showToast(I18N.t('y040'),'info');return;
   }
   // ── idle + flying/crashed → QUEUE for next round ──
   if(st==='idle'&&(roundPhase==='flying'||roundPhase==='crashed')){
     var amt2=parseFloat(document.getElementById('betRise').value)||0;
     var tgt2=parseFloat(document.getElementById('targetRise').value)||0;
-    if(amt2<1){showToast('أدخل مبلغ','error');return}
-    if(tgt2<1.0||tgt2>50){showToast('قيمة X بين 1 و 50','error');return}
+    if(amt2<1){showToast(I18N.t('y010'),'error');return}
+    if(tgt2<1.0||tgt2>50){showToast(I18N.t('y086'),'error');return}
     riseBet.st='queued';riseBet.amt=amt2;riseBet.target=tgt2;
-    setBtnRise('rise-queued','⏳ القادمة');showToast('✅ سيُراهن في الجولة القادمة','success');return;
+    setBtnRise('rise-queued',I18N.t('y114'));showToast(I18N.t('y126'),'success');return;
   }
-  if(st==='queued'){riseBet={st:'idle',amt:0,target:0,req:''};setBtnRise('rise-idle',I18N.t('x114'));showToast('تم إلغاء الطابور','info');return;}
-  if(st==='locked'){showToast('لا يمكن الخروج — محبوس حتى نهاية الجولة','info');return;}
+  if(st==='queued'){riseBet={st:'idle',amt:0,target:0,req:''};setBtnRise('rise-idle',I18N.t('x114'));showToast(I18N.t('y041'),'info');return;}
+  if(st==='locked'){showToast(I18N.t('y090'),'info');return;}
 }
 
 function placeRiseBet(amt,tgt){

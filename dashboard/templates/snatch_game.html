@@ -143,14 +143,14 @@ function countdown(n, cb) {
 function nextRound() {
   round++;
   if (round > maxRounds || lives <= 0) { endGame(); return; }
-  EL_ROUND.textContent = `جولة ${round}/${maxRounds}`;
+  EL_ROUND.textContent = `${I18N.t('z023')} ${round}/${maxRounds}`;
   
   // Choose behavior
   const behaviors = ['golden','golden','flash','flash','decoy','bomb','golden'];
   const behavior = behaviors[Math.floor(Math.random() * behaviors.length)];
   
   // Choose gift data
-  const gift = giftsData[Math.floor(Math.random() * giftsData.length)] || { text: 'هدية', id: '', link: '' };
+  const gift = giftsData[Math.floor(Math.random() * giftsData.length)] || { text: I18N.t('y107'), id: '', link: '' };
   
   spawnGift(behavior, gift);
 }
@@ -200,7 +200,7 @@ function spawnGift(behavior, gift) {
         el.style.transition = 'left 0.3s, top 0.3s';
         el.style.left = x + 'px'; el.style.top = y + 'px';
         soundTease();
-        showTease('هربت! 😜', x, y);
+        showTease(I18N.t('y108'), x, y);
       }
     }, 300);
     duration = 1200 + Math.random() * 800; // stays a bit after moving
@@ -211,7 +211,7 @@ function spawnGift(behavior, gift) {
     if (el.parentNode && !el.classList.contains('caught')) {
       el.classList.add('missed');
       if (behavior === 'golden' || behavior === 'flash') {
-        showTease('فوتتك! 😅', x, y);
+        showTease(I18N.t('y084'), x, y);
         soundMiss();
         haptic('light');
       }
@@ -231,7 +231,7 @@ function onCatch(el, behavior, gift) {
     EL_LIVES.textContent = '❤️'.repeat(lives) + '🖤'.repeat(3 - lives);
     soundBomb();
     hapticNotify('error');
-    showTease('💥 خداع!', parseFloat(el.style.left), parseFloat(el.style.top));
+    showTease(I18N.t('y145'), parseFloat(el.style.left), parseFloat(el.style.top));
     confetti(parseFloat(el.style.left) + 40, parseFloat(el.style.top) + 40, '#ef4444');
     setTimeout(() => { el.remove(); currentGift = null; if (lives <= 0) endGame(); else nextRound(); }, 400);
   } else {
@@ -241,9 +241,9 @@ function onCatch(el, behavior, gift) {
     soundCatch();
     hapticNotify('success');
     if (behavior === 'flash') {
-      showTease('⚡ سريع!', parseFloat(el.style.left), parseFloat(el.style.top));
+      showTease(I18N.t('y121'), parseFloat(el.style.left), parseFloat(el.style.top));
     } else {
-      showTease('🎉 اختطفتها!', parseFloat(el.style.left), parseFloat(el.style.top));
+      showTease(I18N.t('y134'), parseFloat(el.style.left), parseFloat(el.style.top));
     }
     confetti(parseFloat(el.style.left) + 40, parseFloat(el.style.top) + 40, '#00e701');
     caughtGifts.push({ id: gift.id, text: gift.text, link: gift.link });
@@ -287,7 +287,7 @@ function endGame() {
   clearTimeout(gameTimer);
   
   EL_RESULT.style.display = 'flex';
-  const title = score > 0 ? `🎉 ${score} هدية!` : '😔 حظ أوفر!';
+  const title = score > 0 ? `🎉 ${score} ${I18N.t('z024')}` : I18N.t('y159');
   document.getElementById('result-title').textContent = title;
   
   let prizesHTML = '';
@@ -303,7 +303,7 @@ function endGame() {
       tg.sendData(resultData);
     } catch(e) {
       // لو sendData فشلت، استخدم MainButton كحل بديل
-      tg.MainButton.setText('🎁 استلام الجوائز');
+      tg.MainButton.setText(I18N.t('y132'));
       tg.MainButton.show();
       tg.MainButton.offClick(sendResult);
       tg.MainButton.onClick(sendResult);

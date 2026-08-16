@@ -197,7 +197,7 @@ function startCharge(e){
   pressStart = Date.now();
   powerLevel = 10;
   spinBtn.classList.add('charging');
-  spinBtn.textContent = '⚡ تحميل...';
+  spinBtn.textContent = I18N.t('y120');
   // Add power bar element back
   var pb = document.createElement('div'); pb.className = 'spin-power-bar'; pb.id = 'powerBar'; pb.style.width = '10%';
   spinBtn.appendChild(pb);
@@ -218,7 +218,7 @@ function releaseSpin(e){
   spinBtn.classList.remove('charging');
   pressStart = 0;
   // Reset button
-  spinBtn.innerHTML = '🎰 أدر العجلة';
+  spinBtn.innerHTML = I18N.t('y138');
   // Spin!
   doSpin();
 }
@@ -231,7 +231,7 @@ spinBtn.addEventListener('mouseleave', function(e){ if(pressStart) releaseSpin(e
 
 function doSpin(){
   var bet = parseFloat(document.getElementById('betInp').value) || 10;
-  if(bet < 1){ showToast('أدخل مبلغ','error'); return; }
+  if(bet < 1){ showToast(I18N.t('y010'),'error'); return; }
   spinning = true; spinBtn.disabled = true;
   document.getElementById('resultMult').classList.remove('show');
   document.getElementById('resultSub').classList.remove('show');
@@ -297,8 +297,8 @@ function showResult(seg, payout, bet, mult){
   var multEl = document.getElementById('resultMult');
   var subEl = document.getElementById('resultSub');
   if(seg.mult === 0 || payout === 0){
-    multEl.textContent = '💀 خسارة'; multEl.style.color = '#ef4444';
-    subEl.textContent = 'حظ أوفر في المرة القادمة';
+    multEl.textContent = I18N.t('y141'); multEl.style.color = '#ef4444';
+    subEl.textContent = I18N.t('y057');
     soundLose(); haptic('heavy');
   } else {
     multEl.textContent = (mult || seg.mult).toFixed(1) + 'x';
@@ -317,7 +317,7 @@ function fmtAmount(n){ return parseFloat(n||0).toLocaleString(); }
 function showBigWin(payout, mult){
   var o = document.getElementById('bigWinOverlay');
   document.getElementById('bigWinNum').textContent = '+' + fmtAmount(payout);
-  document.getElementById('bigWinText').textContent = 'جائزة كبرى! (' + mult.toFixed(1) + 'x)';
+  document.getElementById('bigWinText').textContent = I18N.t('y047') + mult.toFixed(1) + 'x)';
   o.classList.add('show');
   setTimeout(function(){ o.classList.remove('show'); }, 3000);
 }

@@ -834,18 +834,18 @@ function resetLandOtp(){
 async function verifyLandOtp(){
   const code=document.getElementById('landOtpCode').value.trim();
   const status=document.getElementById('landOtpStatus');
-  if(code.length!==6){status.textContent='أدخل رمزاً من 6 أرقام';status.className='otp-status err';return;}
-  status.textContent='جارٍ التحقق...';status.className='otp-status';
+  if(code.length!==6){status.textContent=I18N.t('y009');status.className='otp-status err';return;}
+  status.textContent=I18N.t('y049');status.className='otp-status';
   try{
     const r=await fetch('/api/web/auth-code',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code})});
     const d=await r.json();
     if(d.success){
-      status.textContent='✅ تم الدخول — جارٍ التحويل...';status.className='otp-status ok';
+      status.textContent=I18N.t('y125');status.className='otp-status ok';
       setTimeout(()=>window.location=d.redirect||'/home',800);
     } else {
-      status.textContent=d.error||'رمز غير صالح';status.className='otp-status err';
+      status.textContent=d.error||I18N.t('y075');status.className='otp-status err';
     }
-  }catch(e){status.textContent='خطأ في الاتصال';status.className='otp-status err';}
+  }catch(e){status.textContent=I18N.t('y061');status.className='otp-status err';}
 }
 document.getElementById('landOtpCode').addEventListener('keydown',e=>{if(e.key==='Enter')verifyLandOtp();});
 
@@ -884,7 +884,7 @@ function startCounters(){document.querySelectorAll('[data-count]').forEach(el=>c
     if(d&&valid(d.players)&&valid(d.rounds)&&valid(d.total_paid)){
       var u=document.getElementById('statUsers');u.dataset.count=d.players;u.dataset.suffix='+';
       var rEl=document.getElementById('statRounds');rEl.dataset.count=d.rounds;rEl.dataset.suffix='+';
-      var lbl=document.getElementById('statRoundsLabel');if(lbl)lbl.textContent='جولة لعب';
+      var lbl=document.getElementById('statRoundsLabel');if(lbl)lbl.textContent=I18N.t('y053');
       var p=document.getElementById('statPaid');p.dataset.count=d.total_paid;p.dataset.suffix='+';p.textContent='0';
     }
     go();
@@ -900,7 +900,7 @@ function startCounters(){document.querySelectorAll('[data-count]').forEach(el=>c
     item.className='tick-item'+(big?' big':'');
     var s1=document.createElement('span');s1.className='ti-game';s1.textContent=icon;
     var s2=document.createElement('span');s2.className='ti-name';s2.textContent=player;
-    var s3=document.createElement('span');s3.textContent='ربح في '+name;
+    var s3=document.createElement('span');s3.textContent=I18N.t('y070')+name;
     var s4=document.createElement('span');s4.className='ti-amt';s4.textContent='+'+amt.toLocaleString();
     item.appendChild(s1);item.appendChild(s2);item.appendChild(s3);item.appendChild(s4);
     return item;
@@ -916,14 +916,14 @@ function startCounters(){document.querySelectorAll('[data-count]').forEach(el=>c
     }
   }
   function demoWins(){
-    var games=[['💣','مناجم'],['✈️','أفياتور'],['🚀','كراش'],['🔵','بلينكو'],['🎡','عجلة الحظ'],['🎰','يانصيب'],['🎲','النرد'],['🎯','اخطف']];
+    var games=[['💣',I18N.t('y105')],['✈️',I18N.t('y012')],['🚀',I18N.t('y087')],['🔵',I18N.t('y034')],['🎡',I18N.t('y078')],['🎰',I18N.t('y110')],['🎲',I18N.t('y030')],['🎯',I18N.t('y022')]];
     var wins=[];
     for(var i=0;i<14;i++){
       var g=games[Math.floor(Math.random()*games.length)];
       var big=Math.random()<0.22;
       wins.push({
         game_icon:g[0],game_name:g[1],
-        player:'لاعب_'+(Math.floor(Math.random()*9000)+1000)+'••',
+        player:I18N.t('y092')+(Math.floor(Math.random()*9000)+1000)+'••',
         amount:big?(Math.floor(Math.random()*80)+20)*100:(Math.floor(Math.random()*95)+5)*10
       });
     }

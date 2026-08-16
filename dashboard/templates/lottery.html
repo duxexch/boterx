@@ -155,8 +155,8 @@ function initDrawTabs() {
   c.innerHTML = '';
   var types = [
     {key:'hourly', icon:'⏰', name:'ساعي'},
-    {key:'daily', icon:'📅', name:'يومي'},
-    {key:'weekly', icon:'🏆', name:'أسبوعي'},
+    {key:'daily', icon:'📅', name:I18N.t('y112')},
+    {key:'weekly', icon:'🏆', name:I18N.t('y011')},
   ];
   types.forEach(function(t) {
     var d = document.createElement('div');
@@ -210,7 +210,7 @@ function loadState() {
       Object.keys(d.draw_types).forEach(function(key) {
         var dt = d.draw_types[key];
         var el = document.getElementById('tabTime_' + key);
-        if (el) el.textContent = dt.tickets_sold + ' تذكرة';
+        if (el) el.textContent = dt.tickets_sold + I18N.t('y001');
       });
     }
   }).catch(function(e) { var ci = document.getElementById('connIndicator'); if (ci) ci.textContent = '🔴'; });
@@ -244,10 +244,10 @@ function buyTickets() {
     body: JSON.stringify({ count: ticketCount, draw_type: selectedDrawType })
   }).then(function(r) { return r.json(); }).then(function(d) {
     btn.disabled = false; btn.textContent = I18N.t('x219');
-    if (d.need_deposit) { showToast('رصيد غير كافٍ — استخدم الإيداع السريع', 'info'); return; }
+    if (d.need_deposit) { showToast(I18N.t('y071'), 'info'); return; }
     if (d.error) { showToast(d.error, 'error'); return; }
     if (d.success) {
-      showToast('تم شراء ' + ticketCount + ' تذكرة!', 'success');
+      showToast(I18N.t('y043') + ticketCount + I18N.t('y002'), 'success');
       if (d.balance_after !== undefined) document.getElementById('bal').textContent = d.balance_after.toLocaleString();
       if (d.tickets) { myTicketsList = d.tickets.concat(myTicketsList); renderTickets(); }
       document.getElementById('myTickets').textContent = myTicketsList.length;
@@ -310,7 +310,7 @@ function lotSubManual(amount) {
   var mn = document.getElementById('lotMN') ? document.getElementById('lotMN').value.trim() : '';
   var md = document.getElementById('lotMD2') ? document.getElementById('lotMD2').value.trim() : '';
   if (!w) { alert(I18N.t('x002')); return; }
-  if (!mn) { alert('أدخل اسم الوسيلة'); return; }
+  if (!mn) { alert(I18N.t('y007')); return; }
   apiFetch(BASE + '/api/deposit/quick', {
     method: 'POST',
     body: JSON.stringify({ amount: amount, method_id: 'manual', method_name: mn, method_account_data: md, player_wallet: w, save_method: false, purpose: 'lottery_tickets', ticket_count: ticketCount, draw_type: selectedDrawType })
@@ -334,7 +334,7 @@ function renderTickets() {
     var div = document.createElement('div');
     div.className = 'ticket-card';
     var statusClass = t.status === 'win' ? 'win' : t.status === 'lose' ? 'lose' : 'pending';
-    var statusText = t.status === 'win' ? 'فائز!' : t.status === 'lose' ? 'خسارة' : 'انتظار';
+    var statusText = t.status === 'win' ? I18N.t('y080') : t.status === 'lose' ? I18N.t('y059') : I18N.t('y031');
     var numsHtml = '';
     (t.numbers || []).forEach(function(n) {
       var cls = 'tic-num';
@@ -342,7 +342,7 @@ function renderTickets() {
       numsHtml += '<div class="' + cls + '">' + n + '</div>';
     });
     var matchInfo = (t.matches !== undefined) ? ' (' + t.matches + '/5)' : '';
-    var prizeText = t.prize && t.prize > 0 ? '+' + fmtAmount(t.prize) : (t.status === 'lose' ? 'لا جائزة' : '🤞');
+    var prizeText = t.prize && t.prize > 0 ? '+' + fmtAmount(t.prize) : (t.status === 'lose' ? I18N.t('y089') : '🤞');
     div.innerHTML = '<div class="ticket-card-header"><span class="ticket-id">#' + (t.id || '?').substring(0,12) + '</span><span class="ticket-status ' + statusClass + '">' + statusText + matchInfo + '</span></div><div class="ticket-nums">' + numsHtml + '</div><div class="ticket-prize ' + statusClass + '">' + prizeText + '</div>';
     area.appendChild(div);
   });

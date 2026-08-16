@@ -182,7 +182,7 @@ function handleState(d){
     if(d.my_bet.cashed_out){
       setBtn(1,'done','✓ '+(d.my_bet.cash_mult*d.my_bet.amount).toFixed(0));
     } else if(np==='flying'){
-      setBtn(1,'jump','قفز');
+      setBtn(1,'jump',I18N.t('y085'));
     } else if(np==='waiting'){
       setBtn(1,'betting',I18N.t('x018'));
     }
@@ -232,7 +232,7 @@ function onWaiting(d){
   document.getElementById('mult').textContent='1.00x';
   document.getElementById('mult').className='mult-val';
   document.getElementById('planeMult').style.opacity='0';
-  document.getElementById('statusText').textContent='ضع رهانك — الجولة تبدأ Soon ✈️';
+  document.getElementById('statusText').textContent=I18N.t('y076');
   document.getElementById('crashMsg').classList.remove('show');
   document.getElementById('recoveryMsg').classList.remove('show');
 
@@ -279,7 +279,7 @@ function onFlying(d){
   for(var s=1;s<=2;s++){
     if(bets[s].st==='betting'){
       // راهن → زر قفز (أحمر)
-      bets[s].st='jump';setBtn(s,'jump','قفز');
+      bets[s].st='jump';setBtn(s,'jump',I18N.t('y085'));
     } else if(bets[s].st==='idle'){
       // لم يراهن → زر رهان (يقبل الطابور للجولة القادمة)
       setBtn(s,'idle',I18N.t('x125'));
@@ -348,7 +348,7 @@ function onBtn(s){
   // idle + waiting → راهن → إلغاء
   if(st==='idle'&&roundPhase==='waiting'){
     var amt=parseFloat(document.getElementById('bet'+s).value)||0;
-    if(amt<1){showToast('أدخل مبلغ','error');return}
+    if(amt<1){showToast(I18N.t('y010'),'error');return}
     placeBet(s,amt);return;
   }
 
@@ -357,7 +357,7 @@ function onBtn(s){
     bets[s].st='idle';bets[s].amt=0;
     setBtn(s,'idle',I18N.t('x125'));
     if(s===2&&!slot2On)document.getElementById('btn2').disabled=true;
-    showToast('تم إلغاء الرهان','info');return;
+    showToast(I18N.t('y040'),'info');return;
   }
 
   // jump + flying → قفز!
@@ -366,10 +366,10 @@ function onBtn(s){
   // idle + flying → طابور للجولة القادمة
   if(st==='idle'&&(roundPhase==='flying'||roundPhase==='crashed')){
     var amt2=parseFloat(document.getElementById('bet'+s).value)||0;
-    if(amt2<1){showToast('أدخل مبلغ','error');return}
+    if(amt2<1){showToast(I18N.t('y010'),'error');return}
     bets[s].st='queued';bets[s].amt=amt2;
-    setBtn(s,'queued','⏳ القادمة');
-    showToast('✅ سيُراهن في الجولة القادمة','success');return;
+    setBtn(s,'queued',I18N.t('y114'));
+    showToast(I18N.t('y126'),'success');return;
   }
 
   // queued → إلغاء الطابور
@@ -377,7 +377,7 @@ function onBtn(s){
     bets[s].st='idle';bets[s].amt=0;
     setBtn(s,'idle',I18N.t('x125'));
     if(s===2&&!slot2On)document.getElementById('btn2').disabled=true;
-    showToast('تم إلغاء الطابور','info');return;
+    showToast(I18N.t('y041'),'info');return;
   }
 }
 

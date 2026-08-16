@@ -157,12 +157,12 @@ async function init() {
         const data = await res.json();
         const active = (data.rounds || []).find(r => r.status === 'active');
         if (!active) {
-            document.getElementById('roundName').textContent = 'لا توجد جولة نشطة';
+            document.getElementById('roundName').textContent = I18N.t('y088');
             document.getElementById('spinBtn').disabled = true;
             return;
         }
         const round = active;
-        prizes = (round.prizes || 'حظ أوفر').split('|').map(p => p.trim());
+        prizes = (round.prizes || I18N.t('y056')).split('|').map(p => p.trim());
         spinCost = parseFloat(round.spin_cost || 0);
         const maxPerUser = parseInt(round.max_spins_per_user || 1);
         document.getElementById('roundName').textContent = round.name || I18N.t('x134');
@@ -190,9 +190,9 @@ async function init() {
         // Update badge
         const badge = document.getElementById('spinBadge');
         if (freeSpinsLeft > 0) {
-            badge.innerHTML = '<span class="free-spins-badge">' + freeSpinsLeft + ' مجانية متبقية</span>';
+            badge.innerHTML = '<span class="free-spins-badge">' + freeSpinsLeft + ' '+I18N.t('z021')+'</span>';
         } else if (spinCost > 0 && balance >= spinCost) {
-            badge.innerHTML = '<span class="paid-spins-badge">دورات إضافية بـ ' + spinCost + '</span>';
+            badge.innerHTML = '<span class="paid-spins-badge">'+I18N.t('z022')+' ' + spinCost + '</span>';
         } else {
             badge.innerHTML = '<span style="color:#EF4444;font-size:12px" data-i18n="x156">لا توجد دورات</span>';
             document.getElementById('spinBtn').disabled = true;
@@ -258,7 +258,7 @@ function startSpin() {
     if (!useFree && balance < cost) {
         document.getElementById('resultEmoji').textContent = '⚠️';
         document.getElementById('resultPrize').textContent = I18N.t('x118');
-        document.getElementById('resultMsg').textContent = 'لا يوجد رصيد كافٍ للدوران';
+        document.getElementById('resultMsg').textContent = I18N.t('y091');
         document.getElementById('resultOverlay').classList.add('show');
         isSpinning = false;
         setTimeout(() => { document.getElementById('resultOverlay').classList.remove('show'); document.getElementById('spinBtn').disabled = false; }, 2000);
@@ -303,8 +303,8 @@ function onSpinComplete(prizeIndex, usedFree, cost) {
     document.getElementById('resultEmoji').textContent = '🎉';
     document.getElementById('resultPrize').textContent = prize;
     document.getElementById('resultMsg').textContent = usedFree 
-        ? 'مبروك! تمت إضافة الجائزة لمحفظتك' 
-        : 'مبروك! تم خصم ' + cost + ' وإضافة الجائزة لمحفظتك';
+        ? I18N.t('y094') 
+        : I18N.t('y093') + cost + I18N.t('y004');
     document.getElementById('resultOverlay').classList.add('show');
 
     // Confetti
@@ -340,9 +340,9 @@ function onSpinComplete(prizeIndex, usedFree, cost) {
     // Update badge
     const badge = document.getElementById('spinBadge');
     if (freeSpinsLeft > 0) {
-        badge.innerHTML = '<span class="free-spins-badge">' + freeSpinsLeft + ' مجانية متبقية</span>';
+        badge.innerHTML = '<span class="free-spins-badge">' + freeSpinsLeft + ' '+I18N.t('z021')+'</span>';
     } else if (spinCost > 0 && balance >= spinCost) {
-        badge.innerHTML = '<span class="paid-spins-badge">دورات إضافية بـ ' + spinCost + '</span>';
+        badge.innerHTML = '<span class="paid-spins-badge">'+I18N.t('z022')+' ' + spinCost + '</span>';
     } else {
         badge.innerHTML = '<span style="color:#EF4444;font-size:12px" data-i18n="x156">لا توجد دورات</span>';
     }

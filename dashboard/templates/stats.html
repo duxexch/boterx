@@ -154,7 +154,7 @@ async function loadStats() {
   } catch(e) {
     document.getElementById('loading').style.display = 'none';
     document.getElementById('app').style.display = 'flex';
-    showToast('خطأ في تحميل الإحصائيات', 'error');
+    showToast(I18N.t('y067'), 'error');
   }
 }
 

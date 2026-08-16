@@ -312,7 +312,7 @@ function depCompanySelIdx(i){
 }
 function depCompanySel(cid, cname, cicon){
   var mb = document.getElementById('mb');
-  mb.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">جارٍ تحميل وسائل دفع '+esc(cname)+'...</div>';
+  mb.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">'+I18N.t('z001')+' '+esc(cname)+'...</div>';
   // Fetch payment methods linked to this company (public API)
   fetch('/api/payment-methods/by-company/'+cid).then(function(r){return r.json()}).then(function(d){
     var methods = d.methods || [];
@@ -323,7 +323,7 @@ function depCompanySel(cid, cname, cicon){
 // ── Render deposit methods + form (shared for wallet + company) ──
 function renderDepMethods(methods, saved, source, cid, cname, cicon){
   var mb = document.getElementById('mb');
-  var title = source === 'company' ? iconTitle(cicon, cname, '🏢') : '👛 المحفظة';
+  var title = source === 'company' ? iconTitle(cicon, cname, '🏢') : I18N.t('y140');
   var mHtml = '';
   _depMethods = methods || [];
   _depCtx = { source: source, cid: cid || null, cname: cname || null };
@@ -340,17 +340,17 @@ function renderDepMethods(methods, saved, source, cid, cname, cicon){
     '<input id="depMN" placeholder="اسم الوسيلة" data-i18n-ph="x035" style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);margin-bottom:6px;font-size:14px">'+
     '<input id="depMD" placeholder="بيانات الحساب (رقم الحساب/العنوان)" data-i18n-ph="x068" style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);margin-bottom:6px;font-size:14px"></div>';
   mb.innerHTML = '<div style="font-size:16px;font-weight:900;color:var(--green);margin-bottom:4px">'+title+'</div>'+
-    '<div style="font-size:11px;color:var(--muted);margin-bottom:12px">'+(source==='company'?'إيداع للشركة':'إيداع لمحفظة VEX')+'</div>'+
+    '<div style="font-size:11px;color:var(--muted);margin-bottom:12px">'+(source==='company'?I18N.t('y016'):I18N.t('y017'))+'</div>'+
     (mHtml ? '<div id="depList">'+mHtml+'</div><div id="depForm" style="display:none">' : '<div id="depForm">')+
     '<div style="font-size:11px;color:var(--muted);margin:8px 0 4px" data-i18n="x262">📋 بيانات الوسيلة (انسخها):</div>'+
     '<div onclick="depCopy()" style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;cursor:pointer;display:flex;align-items:center;justify-content:space-between">'+
-    '<code id="depData" style="font-size:12px;color:var(--gold);word-break:break-all;flex:1">'+(methods?'اختر وسيلة أولاً':'')+'</code><span id="depCopyLbl" style="font-size:10px;color:var(--green);white-space:nowrap;margin-right:8px" data-i18n="x266">📋 نسخ</span></div>'+
+    '<code id="depData" style="font-size:12px;color:var(--gold);word-break:break-all;flex:1">'+(methods?I18N.t('y019'):'')+'</code><span id="depCopyLbl" style="font-size:10px;color:var(--green);white-space:nowrap;margin-right:8px" data-i18n="x266">📋 نسخ</span></div>'+
     '<div style="font-size:11px;color:var(--muted);margin-bottom:4px" data-i18n="x252">💵 المبلغ:</div>'+
     '<input id="depAmt" type="number" value="10" style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);margin-bottom:8px;font-size:16px;font-weight:700;text-align:center">'+
     '<div style="font-size:11px;color:var(--muted);margin-bottom:4px" data-i18n="x277">🔐 رقم محفظتك / حسابك:</div>'+
     '<input id="depWallet" type="text" placeholder="رقم محفظتك" data-i18n-ph="x124" style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);margin-bottom:8px;font-size:14px">'+
     manualHtml+
-    '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-bottom:10px;cursor:pointer"><input type="checkbox" id="depSave" style="accent-color:var(--green)"> حفظ دائم</label>'+
+    '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-bottom:10px;cursor:pointer"><input type="checkbox" id="depSave" style="accent-color:var(--green)"> '+I18N.t('z004')+'</label>'+
     '<button onclick="depSubmitCtx()" style="width:100%;padding:12px;border-radius:10px;border:none;background:linear-gradient(135deg,var(--green),var(--green2));color:#0b0e11;font-weight:800;font-size:15px;cursor:pointer" data-i18n="x204">✅ تأكيد الإيداع</button>'+
     (methods && methods.length?'<button onclick="depBackToMethods()" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);margin-top:6px;cursor:pointer" data-i18n="x188">‹ رجوع</button>':'')+
     '</div>'+
@@ -377,7 +377,7 @@ function depBackToMethods(){
 }
 function depCopy(){
   var text = document.getElementById('depData').textContent;
-  if(!text || text === 'اختر وسيلة أولاً') return;
+  if(!text || text === I18N.t('y019')) return;
   navigator.clipboard.writeText(text);
   var lbl = document.getElementById('depCopyLbl');
   if(lbl){ lbl.textContent='✓'; setTimeout(function(){lbl.textContent=I18N.t('x266')},1500); }
@@ -424,7 +424,7 @@ function openWithdraw(){
   var mb = document.getElementById('mb');
   // Step 1: choose source
   mb.innerHTML = '<div style="font-size:18px;font-weight:900;color:var(--gold);margin-bottom:16px;text-align:center" data-i18n="x253">💸 سحب</div>'+
-    '<div style="font-size:12px;color:var(--muted);margin-bottom:8px;text-align:center">رصيدك: '+bal.toLocaleString()+' {{ user_currency }}</div>'+
+    '<div style="font-size:12px;color:var(--muted);margin-bottom:8px;text-align:center">'+I18N.t('z003')+' '+bal.toLocaleString()+' {{ user_currency }}</div>'+
     '<div style="font-size:12px;color:var(--muted);margin-bottom:12px;text-align:center" data-i18n="x027">اختر وجهة السحب</div>'+
     '<div onclick="wdChooseWallet('+bal+')" style="display:flex;align-items:center;gap:12px;padding:16px;background:linear-gradient(135deg,var(--green-dim),#10141a);border:1px solid var(--border);border-radius:14px;margin-bottom:8px;cursor:pointer">'+
     '<span style="font-size:28px">👛</span><div><div style="font-size:15px;font-weight:800;color:var(--green)" data-i18n="x054">المحفظة</div><div style="font-size:11px;color:var(--muted)" data-i18n="x129">سحب من محفظة VEX</div></div><span style="color:var(--muted);margin-right:auto">‹</span></div>'+
@@ -466,7 +466,7 @@ function wdCompanySelIdx(i){
 }
 function wdCompanySel(cid, cname, cicon, bal){
   var mb = document.getElementById('mb');
-  mb.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">جارٍ تحميل وسائل استلام '+esc(cname)+'...</div>';
+  mb.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">'+I18N.t('z002')+' '+esc(cname)+'...</div>';
   fetch('/api/payment-methods/by-company/'+cid).then(function(r){return r.json()}).then(function(d){
     renderWdForm(d.methods||[], bal, 'company', cid, cname, cicon);
   }).catch(function(){ renderWdForm([], bal, 'company', cid, cname, cicon); });
@@ -474,16 +474,16 @@ function wdCompanySel(cid, cname, cicon, bal){
 
 function renderWdForm(methods, bal, source, cid, cname, cicon){
   var mb = document.getElementById('mb');
-  var title = source === 'company' ? iconTitle(cicon, cname, '🏢') : '👛 المحفظة';
+  var title = source === 'company' ? iconTitle(cicon, cname, '🏢') : I18N.t('y140');
   _wdMethods = methods || [];
   _wdCtx = { bal: bal, source: source, cid: cid || null, cname: cname || null };
   var mHtml = methods.length > 0 ? methods.map(function(m, i){
     return '<div onclick="wdSelAccIdx('+i+')" style="display:flex;align-items:center;gap:8px;padding:10px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;margin-bottom:6px;cursor:pointer">'+iconHtml(m.icon,'💳',20)+'<div style="flex:1"><div style="font-size:13px;font-weight:700">'+esc(m.method_name||'')+'</div><div style="font-size:10px;color:var(--muted)">'+esc(m.account_number||m.account_data||'')+'</div></div></div>';
   }).join('') : '';
   mb.innerHTML = '<div style="font-size:16px;font-weight:900;color:var(--gold);margin-bottom:4px">'+title+'</div>'+
-    '<div style="font-size:12px;color:var(--muted);margin-bottom:12px">رصيدك: '+bal.toLocaleString()+' {{ user_currency }}</div>'+
+    '<div style="font-size:12px;color:var(--muted);margin-bottom:12px">'+I18N.t('z003')+' '+bal.toLocaleString()+' {{ user_currency }}</div>'+
     (mHtml ? '<div style="margin-bottom:8px"><div style="font-size:11px;color:var(--muted);margin-bottom:4px" data-i18n="x029">اختر وسيلة استلام:</div>'+mHtml+'</div>' : '')+
-    '<div style="font-size:11px;color:var(--muted);margin-bottom:4px">'+(methods?'أو أدخل رقم حساب يدوياً:':'رقم الحساب للاستلام:')+'</div>'+
+    '<div style="font-size:11px;color:var(--muted);margin-bottom:4px">'+(methods?I18N.t('y014'):I18N.t('y073'))+'</div>'+
     '<input id="wdAcc" placeholder="رقم الحساب" data-i18n-ph="x121" style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);margin-bottom:8px;font-size:14px">'+
     '<div style="font-size:11px;color:var(--muted);margin-bottom:4px" data-i18n="x252">💵 المبلغ:</div>'+
     '<input id="wdAmt" type="number" placeholder="'+bal+'" max="'+bal+'" style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);margin-bottom:8px;font-size:16px;font-weight:700;text-align:center">'+
@@ -609,7 +609,7 @@ function openEarn(){
     h += modalCloseBtn();
     mb.innerHTML = h;
   }).catch(function(){
-    mb.innerHTML = '<div style="text-align:center;padding:30px;color:#ff4757">فشل التحميل' + modalCloseBtn() + '</div>';
+    mb.innerHTML = '<div style="text-align:center;padding:30px;color:#ff4757">'+I18N.t('z005') + modalCloseBtn() + '</div>';
   });
 }
 
@@ -637,7 +637,7 @@ function openChannels(){
     h += modalCloseBtn();
     mb.innerHTML = h;
   }).catch(function(){
-    mb.innerHTML = '<div style="text-align:center;padding:30px;color:#ff4757">فشل التحميل' + modalCloseBtn() + '</div>';
+    mb.innerHTML = '<div style="text-align:center;padding:30px;color:#ff4757">'+I18N.t('z005') + modalCloseBtn() + '</div>';
   });
 }
 
@@ -661,7 +661,7 @@ function openTrading(){
     h += modalCloseBtn();
     mb.innerHTML = h;
   }).catch(function(){
-    mb.innerHTML = '<div style="text-align:center;padding:30px;color:#ff4757">فشل التحميل' + modalCloseBtn() + '</div>';
+    mb.innerHTML = '<div style="text-align:center;padding:30px;color:#ff4757">'+I18N.t('z005') + modalCloseBtn() + '</div>';
   });
 }
 
@@ -679,7 +679,7 @@ function openSupport(){
     h += modalCloseBtn();
     mb.innerHTML = h;
   }).catch(function(){
-    mb.innerHTML = '<div style="text-align:center;padding:30px;color:#ff4757">فشل التحميل' + modalCloseBtn() + '</div>';
+    mb.innerHTML = '<div style="text-align:center;padding:30px;color:#ff4757">'+I18N.t('z005') + modalCloseBtn() + '</div>';
   });
 }
 
@@ -724,7 +724,7 @@ function openCompensation(){
     if(wagerRem > 0){
       h += '<div style="background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.2);border-radius:12px;padding:12px;margin-bottom:12px">';
       h += '<div style="font-size:12px;color:#fbbf24;font-weight:700;margin-bottom:4px" data-i18n="x199">⚠️ متطلبات الرهان</div>';
-      h += '<div style="font-size:11px;color:#8794a3">تبقى ' + wagerRem + ' معاملة لإكمال الرهان وفك التجميد</div>';
+      h += '<div style="font-size:11px;color:#8794a3">' + I18N.t('z006') + ' ' + wagerRem + ' ' + I18N.t('z007') + '</div>';
       h += '</div>';
     } else if(wagerDone && frozen > 0){
       h += '<div style="background:rgba(0,231,1,.08);border:1px solid rgba(0,231,1,.2);border-radius:12px;padding:12px;margin-bottom:12px">';
@@ -751,11 +751,11 @@ function openCompensation(){
     h += '<div style="background:rgba(0,231,1,.05);border:1px solid rgba(0,231,1,.15);border-radius:12px;padding:14px;margin-top:12px">';
     h += '<div style="font-size:13px;font-weight:700;color:#00e701;margin-bottom:8px" data-i18n="x268">📌 كيف يعمل النظام؟</div>';
     h += '<div style="font-size:11px;color:#8794a3;line-height:1.6">';
-    h += '1️⃣ أودع في حسابك بالشركة<br>';
-    h += '2️⃣ اضغط 🔄 استرداد ← أرسل لقطة شاشة برصيدك<br>';
-    h += '3️⃣ يراجع الأدمن ← يُضاف 100% لمحفظتك (مجمد 🧊)<br>';
-    h += '4️⃣ لفك التجميد: أرسل الرصيد لـ 4 أصدقاء<br>';
-    h += '5️⃣ الرصيد المتاح 🟢 ← اطلب إيداعه<br>';
+    h += I18N.t('z008') + '<br>';
+    h += I18N.t('z009') + '<br>';
+    h += I18N.t('z010') + '<br>';
+    h += I18N.t('z011') + '<br>';
+    h += I18N.t('z012') + '<br>';
     h += '</div></div>';
 
     h += '<button onclick="document.getElementById(\'modal\').remove()" style="width:100%;padding:12px;border-radius:12px;border:1px solid #262e39;background:linear-gradient(135deg,rgba(0,231,1,.15),rgba(0,231,1,.05));color:#00e701;font-weight:700;cursor:pointer;margin-top:12px" data-i18n="x017">إغلاق</button>';
@@ -768,7 +768,7 @@ function openCompensation(){
 
 // ── 🔄 المطابقات (Matching) ──
 function openMatching(){
-  var mb = openModal('المطابقات', '🔄');
+  var mb = openModal(I18N.t('y029'), '🔄');
   mb.innerHTML += '<div style="text-align:center;padding:20px;color:#8794a3" data-i18n="x192">⏳ جارٍ التحميل...</div>';
   fetch('/api/matching/my?' + _getAuthParam()).then(function(r){
     if(r.status === 403){ throw new Error('auth'); }
@@ -776,7 +776,7 @@ function openMatching(){
   }).then(function(d){
     renderMatching(d.requests || []);
   }).catch(function(){
-    mb.innerHTML = '<div style="text-align:center;padding:30px;color:#ff4757">فشل التحميل — أعد فتح الصفحة' + modalCloseBtn() + '</div>';
+    mb.innerHTML = '<div style="text-align:center;padding:30px;color:#ff4757">'+I18N.t('z013') + modalCloseBtn() + '</div>';
   });
 }
 function renderMatching(reqs){
@@ -875,7 +875,7 @@ function openApps(){
       var icon = app.icon_url ? '<img src="'+app.icon_url+'" style="width:56px;height:56px;border-radius:14px;object-fit:cover;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,.4)" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'"><div style="display:none;width:56px;height:56px;border-radius:14px;background:#132020;align-items:center;justify-content:center;font-size:28px">📱</div>' : '<div style="width:56px;height:56px;border-radius:14px;background:#132020;display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0">📱</div>';
       var card = '<div style="display:flex;gap:14px;padding:16px;background:linear-gradient(135deg,#1a2028,#10141a);border:1px solid #262e39;border-radius:16px;margin-bottom:10px;align-items:flex-start;box-shadow:0 2px 12px rgba(0,0,0,.3)">'+icon+'<div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:800;color:#e8eaed;margin-bottom:2px">'+esc(app.name||'')+'</div>';
       if(app.description) card += '<div style="font-size:12px;color:#8794a3;margin-top:2px;line-height:1.4">'+esc(app.description)+'</div>';
-      if(app.promo_code) card += '<div style="margin-top:8px;display:flex;align-items:center;gap:8px"><code style="background:#141920;border:1px solid #262e39;padding:4px 12px;border-radius:8px;color:#fbbf24;font-size:13px;font-weight:700;font-family:Courier New;letter-spacing:.5px">'+esc(app.promo_code)+'</code><button onclick="copyToClip(this,\''+app.promo_code.replace(/'/g,"")+'\')" style="background:rgba(0,231,1,.12);border:1px solid rgba(0,231,1,.25);border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;transition:all .2s" title="نسخ الكود">📋</button></div>';
+      if(app.promo_code) card += '<div style="margin-top:8px;display:flex;align-items:center;gap:8px"><code style="background:#141920;border:1px solid #262e39;padding:4px 12px;border-radius:8px;color:#fbbf24;font-size:13px;font-weight:700;font-family:Courier New;letter-spacing:.5px">'+esc(app.promo_code)+'</code><button onclick="copyToClip(this,\''+app.promo_code.replace(/'/g,"")+'\')" style="background:rgba(0,231,1,.12);border:1px solid rgba(0,231,1,.25);border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;transition:all .2s" title="'+I18N.t('z014')+'">📋</button></div>';
       if(app.referral_link) card += '<div style="margin-top:6px"><a href="'+app.referral_link+'" target="_blank" style="font-size:12px;color:#00e701;text-decoration:none;font-weight:600;display:inline-flex;align-items:center;gap:4px" data-i18n="x280">🔗 رابط الإحالة ←</a></div>';
       card += '</div>';
       var dl = app.download_url || app.android_url || app.ios_url || '';
@@ -905,7 +905,7 @@ function openApps(){
                     lastNotifTime = n.timestamp;
                     localStorage.setItem('vex_last_notif', n.timestamp);
                     // Show toast
-                    showVexToast(n.title || 'إشعار', n.message || '', n.type || 'notification');
+                    showVexToast(n.title || I18N.t('y015'), n.message || '', n.type || 'notification');
                     // Browser notification
                     if (Notification.permission === 'granted') {
                         var bn = new Notification(n.title || 'VEX Games', {

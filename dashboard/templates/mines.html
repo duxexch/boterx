@@ -202,14 +202,14 @@ function startGame() {
     currentMult = 1.0;
     document.getElementById('setupPanel').style.display = 'none';
     document.getElementById('actionBtn').className = 'action-btn cashout';
-    document.getElementById('actionBtn').textContent = '💰 سحب الأرباح';
-    document.getElementById('phaseMsg').textContent = 'انقر على الخلايا لكشفها — تجنب الألغام!';
+    document.getElementById('actionBtn').textContent = I18N.t('y152');
+    document.getElementById('phaseMsg').textContent = I18N.t('y033');
     buildGrid();
     updateInfo();
     setGamePhase('playing');
     loadBalance();
     haptic('medium');
-  }).catch(function() { showToast('خطأ في البداية', 'error'); });
+  }).catch(function() { showToast(I18N.t('y064'), 'error'); });
 }
 
 function doCashout() {
@@ -226,7 +226,7 @@ function doCashout() {
     loadBalance();
     addHistItem(document.getElementById('histBar'), currentMult);
     setTimeout(resetGame, 2500);
-  }).catch(function() { showToast('خطأ في السحب', 'error'); });
+  }).catch(function() { showToast(I18N.t('y065'), 'error'); });
 }
 
 function gameOver(d) {
@@ -265,14 +265,14 @@ function revealAll(mineCells) {
 
 function showResult(win, payout, mult) {
   if (win) {
-    document.getElementById('phaseMsg').textContent = '🎉 ربحت ' + fmtAmount(payout) + ' (' + mult.toFixed(2) + 'x)';
+    document.getElementById('phaseMsg').textContent = I18N.t('y135') + fmtAmount(payout) + ' (' + mult.toFixed(2) + 'x)';
     document.getElementById('phaseMsg').style.color = 'var(--green)';
     streakWin++; updateStreak(document.getElementById('streakBadge'));
     soundWin(mult > 5);
     hapticNotif('success');
     if (payout > betAmount * 5) showBigWinOverlay(payout, mult);
   } else {
-    document.getElementById('phaseMsg').textContent = '💥 لقد ضربت لغماً!';
+    document.getElementById('phaseMsg').textContent = I18N.t('y149');
     document.getElementById('phaseMsg').style.color = 'var(--red)';
     streakWin = 0; updateStreak(document.getElementById('streakBadge'));
     hapticNotif('error');

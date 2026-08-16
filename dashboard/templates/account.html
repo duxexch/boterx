@@ -586,7 +586,7 @@ function switchTab(name) {
 // ── Utilities ─────────────────────────────────────────────────────────────────
 function fmtNum(n) { return (n || 0).toLocaleString('ar-EG', {maximumFractionDigits: 2}); }
 function fmtStatus(s) {
-  const m = {pending:'⏳ معلق', completed:'✅ مكتمل', approved:'✅ موافق', rejected:I18N.t('x211'), processing:'🔄 قيد التنفيذ'};
+  const m = {pending:I18N.t('y118'), completed:I18N.t('y128'), approved:I18N.t('y129'), rejected:I18N.t('x211'), processing:I18N.t('y155')};
   return m[s] || s || '—';
 }
 
@@ -602,10 +602,10 @@ function showAuthError(code) {
     <div style="font-size:48px">🔒</div>
     <div style="font-size:18px;font-weight:700;color:var(--text)" data-i18n="x187">يرجى الفتح من تيليغرام</div>
     <div style="font-size:13px;color:var(--muted);max-width:280px">
-      صفحة حسابك تتطلب تحقق تيليغرام (initData).<br>
-      افتح التطبيق من خلال الزر في المحادثة.
+      ${I18N.t('z015')}<br>
+      ${I18N.t('z016')}
     </div>
-    <div style="font-size:11px;color:var(--muted);opacity:.6">رمز الخطأ: ${escHtml(code || 'WEAK_AUTH')}</div>`;
+    <div style="font-size:11px;color:var(--muted);opacity:.6">${I18N.t('z017')} ${escHtml(code || 'WEAK_AUTH')}</div>`;
   document.body.appendChild(div);
 }
 
@@ -629,7 +629,7 @@ async function loadAccount() {
     document.getElementById('avatarLetter').textContent = letter;
 
     // Header
-    document.getElementById('profileName').textContent = d.name || 'مستخدم VEX';
+    document.getElementById('profileName').textContent = d.name || I18N.t('y098');
     document.getElementById('profileId').textContent   = d.customer_id ? 'ID: ' + d.customer_id : '';
 
     if (d.is_vip) document.getElementById('vipBadge').style.display = 'inline-flex';
@@ -676,7 +676,7 @@ async function loadAccount() {
   } catch (e) {
     document.getElementById('loading').style.display = 'none';
     document.getElementById('app').style.display = 'flex';
-    showToast('خطأ في تحميل الحساب', 'error');
+    showToast(I18N.t('y068'), 'error');
   }
 }
 
@@ -711,16 +711,16 @@ async function loadReferrals() {
     // escHtml() applied to all user-sourced strings (referred_name, currency, phone_verified)
     listEl.innerHTML = d.referrals.map(r => `
       <div class="ref-row">
-        <div class="ref-row-name">${escHtml(r.referred_name || 'مجهول')}</div>
+        <div class="ref-row-name">${escHtml(r.referred_name || I18N.t('y096'))}</div>
         <div class="ref-row-right">
           ${r.bonus_amount > 0 ? `<span class="ref-bonus">+${fmtNum(r.bonus_amount)} ${escHtml(r.currency || '')}</span>` : ''}
           <span class="tag ${r.phone_verified === 'yes' ? 'verified' : 'pending'}">
-            ${r.phone_verified === 'yes' ? I18N.t('x208') : '⏳ معلق'}
+            ${r.phone_verified === 'yes' ? I18N.t('x208') : I18N.t('y118')}
           </span>
         </div>
       </div>`).join('');
   } catch (e) {
-    showToast('خطأ في تحميل الإحالات', 'error');
+    showToast(I18N.t('y066'), 'error');
   }
 }
 
@@ -738,7 +738,7 @@ async function loadRewards() {
     renderRecovery(d.recovery_history || []);
     renderPromos(d.promo_credits || []);
   } catch (e) {
-    showToast('خطأ في تحميل المكافآت', 'error');
+    showToast(I18N.t('y069'), 'error');
   }
 }
 
@@ -784,7 +784,7 @@ async function claimTask(taskId, btn) {
     const r = await apiFetch(BASE + '/api/player/rewards/claim/' + taskId, {method: 'POST'});
     const d = await r.json();
     if (d.success) {
-      showToast(d.message || 'تم استلام المكافأة!', 'success');
+      showToast(d.message || I18N.t('y042'), 'success');
       haptic('medium');
       // Refresh rewards
       _rewardData = null;
@@ -799,7 +799,7 @@ async function claimTask(taskId, btn) {
   } catch (e) {
     btn.disabled = false;
     btn.textContent = I18N.t('x216');
-    showToast('خطأ في الاستلام', 'error');
+    showToast(I18N.t('y063'), 'error');
   }
 }
 
@@ -809,7 +809,7 @@ function renderRecovery(list) {
     el.innerHTML = '<div class="empty-state"><div class="empty-icon">🏆</div><div class="empty-text" data-i18n="x155">لا توجد تعويضات</div></div>';
     return;
   }
-  const statusLabel = {approved:'✅ معتمد', pending:'⏳ معلق', rejected:I18N.t('x211')};
+  const statusLabel = {approved:I18N.t('y127'), pending:I18N.t('y118'), rejected:I18N.t('x211')};
   el.innerHTML = list.map(r => `
     <div class="recovery-row">
       <div>
@@ -826,13 +826,13 @@ function renderPromos(list) {
     el.innerHTML = '<div class="empty-state"><div class="empty-icon">✨</div><div class="empty-text" data-i18n="x149">لا توجد أرصدة نشطة</div></div>';
     return;
   }
-  const typeLabel = {keep:'مكافأة احتفاظ', shared:'مكافأة مشاركة', recovery:'تعويض', referral:'مكافأة إحالة'};
+  const typeLabel = {keep:I18N.t('y101'), shared:I18N.t('y102'), recovery:I18N.t('y039'), referral:I18N.t('y100')};
   el.innerHTML = list.map(c => `
     <div class="recovery-row">
       <div>
         <div style="font-weight:700;font-size:12px">${escHtml(typeLabel[c.type] || c.type)}</div>
         <div style="font-size:10px;color:var(--muted)">${escHtml(c.created ? c.created.split(' ')[0] : '—')}
-          · <span class="tag ${c.status === 'active' ? 'verified' : 'pending'}" style="display:inline">${c.status === 'active' ? 'نشط' : 'معلق'}</span>
+          · <span class="tag ${c.status === 'active' ? 'verified' : 'pending'}" style="display:inline">${c.status === 'active' ? I18N.t('y106') : I18N.t('y099')}</span>
         </div>
       </div>
       <div class="recovery-amount">${fmtNum(c.amount)} 💎</div>
@@ -882,25 +882,25 @@ function renderTxns(txns) {
 function copyRefCode() {
   const code = document.getElementById('refCode').textContent;
   navigator.clipboard?.writeText(code).catch(() => {});
-  showToast('تم نسخ الكود!', 'success');
+  showToast(I18N.t('y045'), 'success');
   haptic('light');
 }
 function copyRefLink() {
   const link = document.getElementById('refLink').textContent;
   navigator.clipboard?.writeText(link).catch(() => {});
-  showToast('تم نسخ الرابط!', 'success');
+  showToast(I18N.t('y044'), 'success');
   haptic('light');
 }
 function shareWhatsApp() {
   const code = document.getElementById('refCode').textContent;
   const link = document.getElementById('refLink').textContent;
-  const text = `انضم لـ VEX Games واربح! 🎮\nكود الإحالة: ${code}\n${link || ''}`;
+  const text = `${I18N.t('z018')}\n${I18N.t('z019')} ${code}\n${link || ''}`;
   window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
 }
 function shareTelegram() {
   const code = document.getElementById('refCode').textContent;
   const link = document.getElementById('refLink').textContent;
-  const text = `انضم لـ VEX Games 🎮 كود إحالتي: ${code}`;
+  const text = `${I18N.t('z020')} ${code}`;
   const url  = link || '';
   window.open('https://t.me/share/url?url=' + encodeURIComponent(url) + '&text=' + encodeURIComponent(text), '_blank');
 }

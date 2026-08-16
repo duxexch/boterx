@@ -531,9 +531,9 @@ function spawnBounceParticles(x,y){
 // ── Roll handler ──
 function onRoll(){
   if(isRolling)return;
-  if(predictedNum===0){showToast('اختر رقم أولاً','error');return}
+  if(predictedNum===0){showToast(I18N.t('y018'),'error');return}
   var amt=parseFloat(document.getElementById('betAmount').value)||0;
-  if(amt<1){showToast('أدخل مبلغ','error');return}
+  if(amt<1){showToast(I18N.t('y010'),'error');return}
 
   checkBalanceBeforeBet(amt).then(function(ok){
     if(!ok)return;
@@ -571,20 +571,20 @@ function showResult(d){
   if(d.won){
     numEl.className='result-num win';
     txtEl.className='result-text win';
-    txtEl.textContent='🎉 ربحت! +'+d.payout.toFixed(0)+' ('+d.multiplier+'x)';
+    txtEl.textContent=I18N.t('y137')+d.payout.toFixed(0)+' ('+d.multiplier+'x)';
     sessionW++;sessionPL+=d.payout-parseFloat(document.getElementById('betAmount').value);
     fireConfetti(document.getElementById('gameArea'));soundDiceWin();haptic('medium');
     var be=document.getElementById('recoveryMsg');
-    be.innerHTML='🎉 <b data-i18n="x115">ربحت!</b> توقعت '+d.predicted+' والنتيجة '+d.result+'<br><span style="color:#7eff9a;font-weight:900;font-size:16px">+'+d.payout.toFixed(0)+'</span>';
+    be.innerHTML='🎉 <b data-i18n="x115">ربحت!</b> توقعت '+d.predicted+I18N.t('y005')+d.result+'<br><span style="color:#7eff9a;font-weight:900;font-size:16px">+'+d.payout.toFixed(0)+'</span>';
     be.style.color='#7eff9a';be.classList.add('show');setTimeout(function(){be.classList.remove('show')},4000);
   } else {
     numEl.className='result-num lose';
     txtEl.className='result-text lose';
-    txtEl.textContent='💥 خسرت — توقعت '+d.predicted+' والنتيجة '+d.result;
+    txtEl.textContent=I18N.t('y147')+d.predicted+I18N.t('y005')+d.result;
     sessionL++;sessionPL-=parseFloat(document.getElementById('betAmount').value);
     soundDiceLose();haptic('heavy');
     var be=document.getElementById('recoveryMsg');
-    be.innerHTML='💥 <b data-i18n="x105">خسرت!</b> توقعت '+d.predicted+' والنتيجة '+d.result;
+    be.innerHTML='💥 <b data-i18n="x105">خسرت!</b> توقعت '+d.predicted+I18N.t('y005')+d.result;
     be.style.color='#ff8787';be.classList.add('show');setTimeout(function(){be.classList.remove('show')},4000);
   }
   disp.classList.add('show');
