@@ -200,7 +200,7 @@ async function init() {
 
         // Draw prize list
         const listEl = document.getElementById('prizeList');
-        listEl.innerHTML = prizes.map((p, i) => 
+        listEl.innerHTML = prizes.map((p, i) =>
             '<div class="prize-item"><div class="prize-color" style="background:' + COLORS[i % COLORS.length] + '"></div>' + p + '</div>'
         ).join('');
 
@@ -219,7 +219,7 @@ function drawWheel(angle) {
     const arc = (Math.PI * 2) / numPrizes;
 
     ctx.clearRect(0, 0, 360, 360);
-    
+
     for (let i = 0; i < numPrizes; i++) {
         const start = angle + i * arc;
         const end = start + arc;
@@ -270,7 +270,7 @@ function startSpin() {
     const targetIndex = Math.floor(Math.random() * numPrizes);
     const arcPerPrize = (Math.PI * 2) / numPrizes;
     const targetAngle = -(targetIndex * arcPerPrize + arcPerPrize / 2) - Math.PI / 2;
-    
+
     // Add extra rotations
     const extraRotations = 5;
     const totalRotation = extraRotations * Math.PI * 2 + targetAngle - currentAngle;
@@ -298,12 +298,12 @@ function startSpin() {
 
 function onSpinComplete(prizeIndex, usedFree, cost) {
     const prize = prizes[prizeIndex];
-    
+
     // Show result
     document.getElementById('resultEmoji').textContent = '🎉';
     document.getElementById('resultPrize').textContent = prize;
-    document.getElementById('resultMsg').textContent = usedFree 
-        ? I18N.t('y094') 
+    document.getElementById('resultMsg').textContent = usedFree
+        ? I18N.t('y094')
         : I18N.t('y093') + cost + I18N.t('y004');
     document.getElementById('resultOverlay').classList.add('show');
 

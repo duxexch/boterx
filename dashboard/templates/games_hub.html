@@ -15,7 +15,7 @@
 <script src="/static/js/i18n.js"></script>
 <script src="/static/js/i18n-auto.js"></script>
 <script>
-window.I18N_EXTRA = {
+window.I18N_EXTRA = Object.assign(window.I18N_EXTRA || {}, {
   hub_champions:   { ar: I18N.t('x143'), en: 'Leaderboard' },
   hub_loading:     { ar: I18N.t('x094'), en: 'Loading...' },
   hub_no_games:    { ar: I18N.t('x150'), en: 'No games available' },
@@ -48,7 +48,7 @@ window.I18N_EXTRA = {
   cur_aed:  { ar: 'درهم 🇦🇪', en: 'UAE Dirham 🇦🇪' },
   cur_kwd:  { ar: 'دينار كويتي 🇰🇼', en: 'Kuwaiti Dinar 🇰🇼' },
   err_generic: { ar: I18N.t('x106'), en: 'Error' }
-};
+});
 </script>
 <style>
 /* Desktop/tablet responsive overrides */

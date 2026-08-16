@@ -47,8 +47,9 @@
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='vendor/fontawesome.min.css') }}">
   <script src="/static/js/i18n.js"></script>
+  <script src="/static/js/i18n-auto.js"></script>
   <script>
-  window.I18N_EXTRA = {
+  window.I18N_EXTRA = Object.assign(window.I18N_EXTRA || {}, {
     // NAV
     nav_account:   { ar: 'حسابي', en: 'My Account' },
     nav_play_now:  { ar: 'العب الآن', en: 'Play Now' },
@@ -166,7 +167,7 @@
     foot_disclaimer:{ ar: 'الألعاب للترفيه فقط — يُرجى اللعب بمسؤولية. المنصة تدعم 17 لغة وتعمل عبر تيليغرام والويب.', en: 'Games are for entertainment only — please play responsibly. The platform supports 17 languages and works on Telegram and the web.' },
     // Demo ticker player prefix
     demo_player:   { ar: 'لاعب_', en: 'Player_' }
-  };
+  });
   </script>
   <!-- Preload critical resources -->
   <link rel="preconnect" href="https://fonts.googleapis.com">

@@ -14,7 +14,7 @@
 <script src="/static/js/i18n.js"></script>
 <script src="/static/js/i18n-auto.js"></script>
 <script>
-window.I18N_EXTRA = {
+window.I18N_EXTRA = Object.assign(window.I18N_EXTRA || {}, {
   w_title:        { ar: I18N.t('x250'), en: '💳 My Wallet' },
   w_game_bal:     { ar: I18N.t('x229'), en: '🎮 Playable balance for betting' },
   w_deposit:      { ar: I18N.t('x244'), en: '💰 Deposit' },
@@ -68,7 +68,7 @@ window.I18N_EXTRA = {
   w_stat_completed: { ar: 'مكتمل', en: 'Completed' },
   w_stat_rejected:  { ar: 'مرفوض', en: 'Rejected' },
   w_stat_cancelled: { ar: 'ملغي', en: 'Cancelled' }
-};
+});
 </script>
 <style>
 body { overflow: auto !important; }
