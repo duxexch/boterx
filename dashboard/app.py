@@ -3212,8 +3212,12 @@ def api_add_company():
         'address': data.get('address', ''),
         'affiliate_link': data.get('affiliate_link', ''),
         'bot_icon': data.get('bot_icon', ''),
-        'promo_code': data.get('promo_code', '')
+        'promo_code': data.get('promo_code', ''),
+        'show_in_comp': 'yes' if data.get('show_in_comp', True) in (True, 'yes', '1', 1, 'true') else 'no'
     }
+    for _f in ('promo_code', 'show_in_comp'):
+        if _f not in fieldnames:
+            fieldnames.append(_f)
     append_csv('companies.csv', new_company, fieldnames)
     log_action('add_company', new_id)
     return jsonify({'success': True, 'id': new_id})
@@ -3223,8 +3227,8 @@ def api_add_company():
 @permission_required('manage_companies')
 def api_edit_company(company_id):
     companies = read_csv('companies.csv')
-    fieldnames = get_fieldnames('companies.csv', ['id','name','type','details','is_active','icon','address','affiliate_link','bot_icon','promo_code'])
-    for _f in ('bot_icon', 'promo_code'):
+    fieldnames = get_fieldnames('companies.csv', ['id','name','type','details','is_active','icon','address','affiliate_link','bot_icon','promo_code','show_in_comp'])
+    for _f in ('bot_icon', 'promo_code', 'show_in_comp'):
         if _f not in fieldnames:
             fieldnames.append(_f)
 
@@ -3235,6 +3239,8 @@ def api_edit_company(company_id):
         return jsonify({'success': True})
     elif request.method == 'PUT':
         data = request.json
+        if 'show_in_comp' in data:
+            data['show_in_comp'] = 'yes' if data['show_in_comp'] in (True, 'yes', '1', 1, 'true') else 'no'
         for c in companies:
             if c.get('id') == company_id:
                 for k, v in data.items():
@@ -7447,6 +7453,9 @@ def api_player_companies():
     try:
         for c in read_csv('companies.csv'):
             if (c.get('is_active', '') or '').lower() not in ('active', 'yes', '1', 'true'):
+                continue
+            # فلتر "تظهر في قسم التعويض" — الافتراضي نعم (توافقاً مع الشركات القديمة)
+            if (c.get('show_in_comp', '') or 'yes').lower() in ('no', '0', 'false'):
                 continue
             acc = accounts_by_company.get(c.get('id', ''), {})
             companies.append({

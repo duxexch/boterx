@@ -493,6 +493,27 @@ async function loadCompanies() {
     const old = document.getElementById('compCard');
     if (old) old.parentElement.remove();
     document.getElementById('walletPage').appendChild(div);
+    // نافذة منبثقة لمرة واحدة عند تأكيد الإدارة لحساب الشركة
+    try {
+      const approved = d.companies.find(c => c.registered_account &&
+        ['active','approved'].includes(c.account_status) &&
+        !localStorage.getItem('compApproved_' + c.id));
+      if (approved) {
+        localStorage.setItem('compApproved_' + approved.id, '1');
+        const ov = document.createElement('div');
+        ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+        ov.innerHTML = `<div style="background:var(--surface-2,#1a1f2e);border:1px solid rgba(0,231,1,.35);border-radius:16px;max-width:340px;width:100%;padding:22px;text-align:center">
+          <div style="font-size:38px;margin-bottom:8px">✅</div>
+          <div style="font-size:16px;font-weight:800;margin-bottom:8px">${I18N.lang==='en'?'Your account is confirmed!':'تم تأكيد حسابك!'}</div>
+          <div style="font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:14px">${I18N.lang==='en'
+            ? 'Your account at ' + escH(approved.name) + ' was approved. Deposit and play now — if you lose, submit a compensation claim with a screenshot and we will compensate you.'
+            : 'تم قبول حسابك في ' + escH(approved.name) + '. قم بالإيداع والعب الآن — إذا خسرت قدّم طلب تعويض مع لقطة شاشة وسيتم تعويضك.'}</div>
+          <button class="btn-transfer" style="width:100%" onclick="this.closest('div[style*=fixed]').remove()">${I18N.lang==='en'?'Got it':'تمام، فهمت'}</button>
+        </div>`;
+        ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
+        document.body.appendChild(ov);
+      }
+    } catch (_) {}
   } catch (e) { /* غير حرج */ }
 
   // Live balance polling (game balance only) — يُسجَّل مرة واحدة فقط
