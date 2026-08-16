@@ -1249,7 +1249,7 @@ def llms_txt():
         "- Name: VEX Games\n"
         "- Domain: vex.deals\n"
         "- Logo: https://vex.deals/static/icons/icon-512.png\n"
-        "- Theme color: #00ff88 (green)\n\n"
+        "- Theme color: #00e701 (electric green)\n\n"
         "## Contact\n"
         "- Telegram bot: @VEX_OTP_bot\n"
         "- Support: via Telegram bot\n"
@@ -3386,7 +3386,7 @@ def api_svrp_segments():
     if not segments:
         # Auto-create default segments
         defaults = [
-            {'id': 'SEG_NEW', 'name': 'لاعب جديد', 'multiplier': '2.0', 'wagering': '3', 'max_recovery': '1000', 'color': '#00ff88', 'is_active': 'yes'},
+            {'id': 'SEG_NEW', 'name': 'لاعب جديد', 'multiplier': '2.0', 'wagering': '3', 'max_recovery': '1000', 'color': '#00e701', 'is_active': 'yes'},
             {'id': 'SEG_LOSER', 'name': 'خاسر', 'multiplier': '3.0', 'wagering': '3', 'max_recovery': '3000', 'color': '#ff4757', 'is_active': 'yes'},
             {'id': 'SEG_VIP', 'name': 'VIP', 'multiplier': '5.0', 'wagering': '5', 'max_recovery': '5000', 'color': '#fbbf24', 'is_active': 'yes'},
             {'id': 'SEG_CHURN', 'name': 'خامل (خطر مغادرة)', 'multiplier': '4.0', 'wagering': '2', 'max_recovery': '2000', 'color': '#a855f7', 'is_active': 'yes'},
@@ -3410,7 +3410,7 @@ def api_create_segment():
         'multiplier': str(data.get('multiplier', '2.0')),
         'wagering': str(data.get('wagering', '3')),
         'max_recovery': str(data.get('max_recovery', '1000')),
-        'color': data.get('color', '#00ff88'),
+        'color': data.get('color', '#00e701'),
         'is_active': 'yes',
     }
     fields = get_fieldnames('svrp_segments.csv', ['id','name','multiplier','wagering','max_recovery','color','is_active'])
@@ -5892,7 +5892,7 @@ def api_rbac_delete_role(uid):
 @api_auth
 def api_themes():
     themes = [
-        {'id': 'vex', 'name': 'VEX Neon', 'colors': {'primary': '#00ff88', 'accent': '#00b35f'}},
+        {'id': 'vex', 'name': 'VEX Neon', 'colors': {'primary': '#00e701', 'accent': '#00a801'}},
         {'id': 'gold', 'name': 'Gold', 'colors': {'primary': '#FFD700', 'accent': '#FFA500'}},
         {'id': 'ocean', 'name': 'Ocean', 'colors': {'primary': '#0077BE', 'accent': '#00B4D8'}},
         {'id': 'purple', 'name': 'Purple', 'colors': {'primary': '#6B46C1', 'accent': '#9F7AEA'}}

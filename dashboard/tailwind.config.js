@@ -10,7 +10,7 @@ module.exports = {
     fontFamily: { cairo: ['Cairo', 'Segoe UI', 'Tahoma', 'sans-serif'] },
     colors: {
       dark: { bg: '#0F172A', card: '#1E293B', border: '#334155', hover: '#334155' },
-      brand: { DEFAULT: '#00ff88', gold: '#00ff88', dim: '#00b35f' }
+      brand: { DEFAULT: '#00e701', gold: '#ffd700', dim: '#00a801' }
     }
   }},
   safelist: [

@@ -8,7 +8,7 @@
 <link rel="manifest" href="/static/manifest.json">
 <link rel="icon" type="image/png" href="/static/icons/favicon.png">
 <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
-<meta name="theme-color" content="#06100c">
+<meta name="theme-color" content="#0b0e11">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/tailwind.build.css') }}?v=20260816a">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{{ url_for('static', filename='vendor/fontawesome.min.css') }}">
@@ -54,7 +54,7 @@ body{background:var(--bg);color:var(--text);margin:0;min-height:100dvh;overflow-
 .bal-actions{display:flex;gap:6px}
 .bal-btn{padding:8px 14px;border-radius:10px;border:none;font-size:13px;font-weight:800;cursor:pointer;transition:all .15s}
 .bal-btn:active{transform:scale(.93)}
-.bal-btn.dep{background:linear-gradient(135deg,var(--green),var(--green2));color:#06100c}
+.bal-btn.dep{background:linear-gradient(135deg,var(--green),var(--green2));color:#0b0e11}
 .bal-btn.wd{background:var(--card);border:1px solid var(--border);color:var(--gold)}
 /* Quick actions */
 .quick-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px}
@@ -119,7 +119,7 @@ body{background:var(--bg);color:var(--text);margin:0;min-height:100dvh;overflow-
 .install-title{font-size:13px;font-weight:800;color:var(--green)}
 .install-sub{font-size:10px;color:var(--muted)}
 /* Bottom nav — professional floating pill */
-.bottom-nav{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);width:calc(100% - 24px);max-width:460px;background:linear-gradient(135deg,#1a2028,#0a1a12);border:1px solid var(--border);border-radius:20px;display:flex;justify-content:space-around;padding:10px 8px;z-index:50;box-shadow:0 -4px 24px rgba(0,0,0,.5),0 4px 12px rgba(0,230,118,.08)}
+.bottom-nav{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);width:calc(100% - 24px);max-width:460px;background:linear-gradient(135deg,#1a2028,#10141a);border:1px solid var(--border);border-radius:20px;display:flex;justify-content:space-around;padding:10px 8px;z-index:50;box-shadow:0 -4px 24px rgba(0,0,0,.5),0 4px 12px rgba(0,230,118,.08)}
 .nav-item{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;text-decoration:none;color:var(--muted);font-size:10px;font-weight:700;padding:6px 16px;border-radius:14px;transition:all .25s;flex:1}
 .nav-item.active{color:var(--green);background:linear-gradient(135deg,var(--green-dim),transparent)}
 .nav-item.active .nav-icon{filter:drop-shadow(0 0 8px rgba(0,230,118,.5))}
@@ -345,7 +345,7 @@ function renderDepMethods(methods, saved, source, cid, cname, cicon){
     '<input id="depWallet" type="text" placeholder="رقم محفظتك" style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);margin-bottom:8px;font-size:14px">'+
     manualHtml+
     '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-bottom:10px;cursor:pointer"><input type="checkbox" id="depSave" style="accent-color:var(--green)"> حفظ دائم</label>'+
-    '<button onclick="depSubmitCtx()" style="width:100%;padding:12px;border-radius:10px;border:none;background:linear-gradient(135deg,var(--green),var(--green2));color:#06100c;font-weight:800;font-size:15px;cursor:pointer">✅ تأكيد الإيداع</button>'+
+    '<button onclick="depSubmitCtx()" style="width:100%;padding:12px;border-radius:10px;border:none;background:linear-gradient(135deg,var(--green),var(--green2));color:#0b0e11;font-weight:800;font-size:15px;cursor:pointer">✅ تأكيد الإيداع</button>'+
     (methods && methods.length?'<button onclick="depBackToMethods()" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);margin-top:6px;cursor:pointer">‹ رجوع</button>':'')+
     '</div>'+
     '<button onclick="openDeposit()" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);margin-top:6px;cursor:pointer">‹ رجوع للقائمة</button>';
@@ -481,7 +481,7 @@ function renderWdForm(methods, bal, source, cid, cname, cicon){
     '<input id="wdAcc" placeholder="رقم الحساب" style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);margin-bottom:8px;font-size:14px">'+
     '<div style="font-size:11px;color:var(--muted);margin-bottom:4px">💵 المبلغ:</div>'+
     '<input id="wdAmt" type="number" placeholder="'+bal+'" max="'+bal+'" style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);margin-bottom:8px;font-size:16px;font-weight:700;text-align:center">'+
-    '<button onclick="wdSubmitCtx()" style="width:100%;padding:12px;border-radius:10px;border:none;background:linear-gradient(135deg,#ff8c00,#e67e00);color:#06100c;font-weight:800;font-size:15px;cursor:pointer">✅ تأكيد السحب</button>'+
+    '<button onclick="wdSubmitCtx()" style="width:100%;padding:12px;border-radius:10px;border:none;background:linear-gradient(135deg,#ff8c00,#e67e00);color:#0b0e11;font-weight:800;font-size:15px;cursor:pointer">✅ تأكيد السحب</button>'+
     '<button onclick="openWithdraw()" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);margin-top:6px;cursor:pointer">‹ رجوع</button>';
 }
 
@@ -542,7 +542,7 @@ function openModal(title, icon){
   var overlay = document.createElement('div');
   overlay.id = 'modal';
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(5,15,12,.92);backdrop-filter:blur(12px);z-index:100;display:flex;align-items:center;justify-content:center;padding:12px;overflow-y:auto';
-  overlay.innerHTML = '<div id="mb" style="background:linear-gradient(180deg,#0d1814,#0a1410);border:1px solid #262e39;border-radius:18px;padding:20px;max-width:420px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.5)"></div>';
+  overlay.innerHTML = '<div id="mb" style="background:linear-gradient(180deg,#141920,#10141a);border:1px solid #262e39;border-radius:18px;padding:20px;max-width:420px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.5)"></div>';
   overlay.onclick = function(e){ if(e.target === overlay) overlay.remove(); };
   document.body.appendChild(overlay);
   var mb = document.getElementById('mb');
@@ -550,13 +550,13 @@ function openModal(title, icon){
   return mb;
 }
 function closeModal(){ var m = document.getElementById('modal'); if(m) m.remove(); }
-function modalLoading(mb){ mb.innerHTML += '<div style="text-align:center;padding:20px;color:#7a9a8a">⏳ جارٍ التحميل...</div>'; }
+function modalLoading(mb){ mb.innerHTML += '<div style="text-align:center;padding:20px;color:#8794a3">⏳ جارٍ التحميل...</div>'; }
 function modalCloseBtn(){ return '<button onclick="closeModal()" style="width:100%;padding:12px;border-radius:12px;border:1px solid #262e39;background:linear-gradient(135deg,rgba(0,231,1,.15),rgba(0,231,1,.05));color:#00e701;font-weight:700;cursor:pointer;margin-top:12px">إغلاق</button>'; }
 
 // ── 🎁 اربح (Referrals) ──
 function openEarn(){
   var mb = openModal('اربح', '🎁');
-  mb.innerHTML += '<div style="text-align:center;padding:20px;color:#7a9a8a">⏳ جارٍ التحميل...</div>';
+  mb.innerHTML += '<div style="text-align:center;padding:20px;color:#8794a3">⏳ جارٍ التحميل...</div>';
   var authP = _getAuthParam ? _getAuthParam() : ('uid={{ uid }}');
   // Fetch user's referral info + public referral links
   Promise.all([
@@ -569,20 +569,20 @@ function openEarn(){
     var refUrl = wallet.referral_url || '';
 
     var h = '<div style="font-size:18px;font-weight:900;color:#e8eaed;margin-bottom:4px;text-align:center">🎁 اربح</div>';
-    h += '<div style="font-size:11px;color:#7a9a8a;text-align:center;margin-bottom:16px">ادعُ أصدقاءك واربح المكافآت</div>';
+    h += '<div style="font-size:11px;color:#8794a3;text-align:center;margin-bottom:16px">ادعُ أصدقاءك واربح المكافآت</div>';
 
     // Referral code
     if(referralCode){
-      h += '<div style="background:linear-gradient(135deg,#0f1c18,#0b1410);border:1px solid #262e39;border-radius:12px;padding:14px;margin-bottom:10px">';
-      h += '<div style="font-size:11px;color:#7a9a8a;margin-bottom:4px">🎫 كود الإحالة</div>';
-      h += '<div style="display:flex;align-items:center;gap:8px"><code style="background:#0a1c14;border:1px solid #262e39;padding:4px 12px;border-radius:8px;color:#fbbf24;font-size:14px;font-weight:700;flex:1">' + esc(referralCode) + '</code>';
+      h += '<div style="background:linear-gradient(135deg,#1a2028,#10141a);border:1px solid #262e39;border-radius:12px;padding:14px;margin-bottom:10px">';
+      h += '<div style="font-size:11px;color:#8794a3;margin-bottom:4px">🎫 كود الإحالة</div>';
+      h += '<div style="display:flex;align-items:center;gap:8px"><code style="background:#141920;border:1px solid #262e39;padding:4px 12px;border-radius:8px;color:#fbbf24;font-size:14px;font-weight:700;flex:1">' + esc(referralCode) + '</code>';
       h += '<button onclick="copyToClip(this,\'' + referralCode + '\')" style="background:rgba(0,231,1,.12);border:1px solid rgba(0,231,1,.25);border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:14px">📋</button></div>';
       h += '</div>';
     }
     if(refUrl){
-      h += '<div style="background:linear-gradient(135deg,#0f1c18,#0b1410);border:1px solid #262e39;border-radius:12px;padding:14px;margin-bottom:10px">';
-      h += '<div style="font-size:11px;color:#7a9a8a;margin-bottom:4px">🔗 رابط الدعوة</div>';
-      h += '<div style="display:flex;align-items:center;gap:8px"><code style="background:#0a1c14;border:1px solid #262e39;padding:4px 8px;border-radius:8px;color:#00e701;font-size:11px;flex:1;word-break:break-all">' + esc(refUrl.substring(0,50)) + '...</code>';
+      h += '<div style="background:linear-gradient(135deg,#1a2028,#10141a);border:1px solid #262e39;border-radius:12px;padding:14px;margin-bottom:10px">';
+      h += '<div style="font-size:11px;color:#8794a3;margin-bottom:4px">🔗 رابط الدعوة</div>';
+      h += '<div style="display:flex;align-items:center;gap:8px"><code style="background:#141920;border:1px solid #262e39;padding:4px 8px;border-radius:8px;color:#00e701;font-size:11px;flex:1;word-break:break-all">' + esc(refUrl.substring(0,50)) + '...</code>';
       h += '<button onclick="copyToClip(this,\'' + refUrl + '\')" style="background:rgba(0,231,1,.12);border:1px solid rgba(0,231,1,.25);border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:14px">📋</button></div>';
       h += '</div>';
     }
@@ -591,7 +591,7 @@ function openEarn(){
     if(refLinks.length > 0){
       h += '<div style="font-size:13px;font-weight:700;color:#e8eaed;margin:12px 0 8px">📌 روابط تهمك</div>';
       refLinks.forEach(function(l){
-        h += '<a href="' + esc(l.url) + '" target="_blank" style="display:flex;align-items:center;gap:8px;padding:10px;background:linear-gradient(135deg,#0f1c18,#0b1410);border:1px solid #262e39;border-radius:10px;margin-bottom:6px;text-decoration:none">';
+        h += '<a href="' + esc(l.url) + '" target="_blank" style="display:flex;align-items:center;gap:8px;padding:10px;background:linear-gradient(135deg,#1a2028,#10141a);border:1px solid #262e39;border-radius:10px;margin-bottom:6px;text-decoration:none">';
         h += '<span style="font-size:14px">🔗</span>';
         h += '<div style="flex:1"><div style="font-size:13px;font-weight:600;color:#e8eaed">' + esc(l.name) + '</div></div>';
         h += '<span style="color:#00e701;font-size:14px">←</span></a>';
@@ -599,7 +599,7 @@ function openEarn(){
     }
 
     h += '<div style="background:rgba(0,231,1,.05);border:1px solid rgba(0,231,1,.15);border-radius:12px;padding:14px;margin-top:8px">';
-    h += '<div style="font-size:11px;color:#7a9a8a;line-height:1.6">💡 شارك كود الإحالة مع أصدقائك — عند تسجيلهم تحصل على مكافأة في محفظة التعويض.</div></div>';
+    h += '<div style="font-size:11px;color:#8794a3;line-height:1.6">💡 شارك كود الإحالة مع أصدقائك — عند تسجيلهم تحصل على مكافأة في محفظة التعويض.</div></div>';
     h += modalCloseBtn();
     mb.innerHTML = h;
   }).catch(function(){
@@ -610,21 +610,21 @@ function openEarn(){
 // ── 📢 القنوات (Channels) ──
 function openChannels(){
   var mb = openModal('القنوات', '📢');
-  mb.innerHTML += '<div style="text-align:center;padding:20px;color:#7a9a8a">⏳ جارٍ التحميل...</div>';
+  mb.innerHTML += '<div style="text-align:center;padding:20px;color:#8794a3">⏳ جارٍ التحميل...</div>';
   fetch(BASE + '/api/channels/public').then(function(r){return r.json()}).then(function(d){
     var chans = d.channels || [];
     var h = '<div style="font-size:18px;font-weight:900;color:#e8eaed;margin-bottom:4px;text-align:center">📢 القنوات</div>';
-    h += '<div style="font-size:11px;color:#7a9a8a;text-align:center;margin-bottom:16px">انضم لقنواتنا للحصول على آخر التحديثات</div>';
+    h += '<div style="font-size:11px;color:#8794a3;text-align:center;margin-bottom:16px">انضم لقنواتنا للحصول على آخر التحديثات</div>';
     if(chans.length === 0){
-      h += '<div style="text-align:center;padding:20px;color:#7a9a8a">لا توجد قنوات متاحة حالياً</div>';
+      h += '<div style="text-align:center;padding:20px;color:#8794a3">لا توجد قنوات متاحة حالياً</div>';
     } else {
       chans.forEach(function(c){
         var uname = c.username || '';
         var url = uname ? ('https://t.me/' + uname.replace('@','')) : '';
-        h += '<a href="' + (url || '#') + '" target="_blank" style="display:flex;align-items:center;gap:10px;padding:12px;background:linear-gradient(135deg,#0f1c18,#0b1410);border:1px solid #262e39;border-radius:12px;margin-bottom:8px;text-decoration:none">';
+        h += '<a href="' + (url || '#') + '" target="_blank" style="display:flex;align-items:center;gap:10px;padding:12px;background:linear-gradient(135deg,#1a2028,#10141a);border:1px solid #262e39;border-radius:12px;margin-bottom:8px;text-decoration:none">';
         h += '<span style="font-size:20px">📢</span>';
         h += '<div style="flex:1"><div style="font-size:14px;font-weight:700;color:#e8eaed">' + esc(c.title || uname || 'قناة') + '</div>';
-        if(c.description) h += '<div style="font-size:11px;color:#7a9a8a;margin-top:2px">' + esc(c.description) + '</div>';
+        if(c.description) h += '<div style="font-size:11px;color:#8794a3;margin-top:2px">' + esc(c.description) + '</div>';
         h += '</div><span style="color:#00e701;font-size:14px">انضم ←</span></a>';
       });
     }
@@ -640,15 +640,15 @@ function openTrading(){
   var mb = openModal('تداول USDT', '💱');
   fetch(BASE + '/api/trading/public').then(function(r){return r.json()}).then(function(d){
     var h = '<div style="font-size:18px;font-weight:900;color:#e8eaed;margin-bottom:4px;text-align:center">💱 تداول USDT</div>';
-    h += '<div style="font-size:11px;color:#7a9a8a;text-align:center;margin-bottom:16px">اشترِ وبع USDT بأفضل الأسعار</div>';
+    h += '<div style="font-size:11px;color:#8794a3;text-align:center;margin-bottom:16px">اشترِ وبع USDT بأفضل الأسعار</div>';
     if(d.usdt_rate){
-      h += '<div style="background:linear-gradient(135deg,#0f1c18,#0b1410);border:1px solid #262e39;border-radius:12px;padding:14px;margin-bottom:12px;text-align:center">';
-      h += '<div style="font-size:11px;color:#7a9a8a">سعر USDT الحالي</div>';
+      h += '<div style="background:linear-gradient(135deg,#1a2028,#10141a);border:1px solid #262e39;border-radius:12px;padding:14px;margin-bottom:12px;text-align:center">';
+      h += '<div style="font-size:11px;color:#8794a3">سعر USDT الحالي</div>';
       h += '<div style="font-size:24px;font-weight:900;color:#fbbf24;margin-top:4px">' + esc(d.usdt_rate) + '</div>';
       h += '</div>';
     }
     h += '<div style="background:rgba(0,231,1,.05);border:1px solid rgba(0,231,1,.15);border-radius:12px;padding:14px;margin-bottom:12px">';
-    h += '<div style="font-size:12px;color:#7a9a8a;line-height:1.6">' + esc(d.message || 'لبدء التداول، افتح البوت') + '</div></div>';
+    h += '<div style="font-size:12px;color:#8794a3;line-height:1.6">' + esc(d.message || 'لبدء التداول، افتح البوت') + '</div></div>';
     if(d.bot_url){
       h += '<a href="' + esc(d.bot_url) + '" target="_blank" style="display:block;text-align:center;padding:14px;border-radius:12px;background:linear-gradient(135deg,rgba(0,231,1,.2),rgba(0,231,1,.08));border:1px solid rgba(0,231,1,.3);color:#00e701;font-weight:800;text-decoration:none;margin-bottom:8px">🤖 افتح البوت للبدء</a>';
     }
@@ -664,7 +664,7 @@ function openSupport(){
   var mb = openModal('الدعم', '🆘');
   fetch(BASE + '/api/support/public').then(function(r){return r.json()}).then(function(d){
     var h = '<div style="font-size:18px;font-weight:900;color:#e8eaed;margin-bottom:4px;text-align:center">🆘 الدعم</div>';
-    h += '<div style="font-size:11px;color:#7a9a8a;text-align:center;margin-bottom:16px">نحن هنا لمساعدتك</div>';
+    h += '<div style="font-size:11px;color:#8794a3;text-align:center;margin-bottom:16px">نحن هنا لمساعدتك</div>';
     h += '<div style="background:rgba(0,231,1,.05);border:1px solid rgba(0,231,1,.15);border-radius:12px;padding:14px;margin-bottom:12px">';
     h += '<div style="font-size:13px;color:#e8eaed;line-height:1.6">' + esc(d.support_text || 'تواصل معنا عبر تيليغرام') + '</div></div>';
     if(d.support_url){
@@ -682,16 +682,16 @@ function openCompensation(){
   var overlay = document.createElement('div');
   overlay.id = 'modal';
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(5,15,12,.92);backdrop-filter:blur(12px);z-index:100;display:flex;align-items:center;justify-content:center;padding:12px;overflow-y:auto';
-  overlay.innerHTML = '<div id="mb" style="background:linear-gradient(180deg,#0d1814,#0a1410);border:1px solid #262e39;border-radius:18px;padding:20px;max-width:420px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.5)"></div>';
+  overlay.innerHTML = '<div id="mb" style="background:linear-gradient(180deg,#141920,#10141a);border:1px solid #262e39;border-radius:18px;padding:20px;max-width:420px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.5)"></div>';
   overlay.onclick = function(e){ if(e.target === overlay) overlay.remove(); };
   document.body.appendChild(overlay);
   var mb = document.getElementById('mb');
-  mb.innerHTML = '<div style="text-align:center;padding:30px;color:#7a9a8a">⏳ جارٍ التحميل...</div>';
+  mb.innerHTML = '<div style="text-align:center;padding:30px;color:#8794a3">⏳ جارٍ التحميل...</div>';
 
   var authP = _getAuthParam ? _getAuthParam() : ('uid={{ uid }}');
   fetch(BASE + '/api/player/wallet?' + authP).then(function(r){return r.json()}).then(function(d){
     if(d.error){
-      mb.innerHTML = '<div style="text-align:center;padding:30px;color:#ff4757">' + d.error + '<button onclick="document.getElementById(\'modal\').remove()" style="margin-top:12px;width:100%;padding:10px;border-radius:10px;border:1px solid #262e39;background:transparent;color:#7a9a8a;cursor:pointer">إغلاق</button></div>';
+      mb.innerHTML = '<div style="text-align:center;padding:30px;color:#ff4757">' + d.error + '<button onclick="document.getElementById(\'modal\').remove()" style="margin-top:12px;width:100%;padding:10px;border-radius:10px;border:1px solid #262e39;background:transparent;color:#8794a3;cursor:pointer">إغلاق</button></div>';
       return;
     }
 
@@ -704,21 +704,21 @@ function openCompensation(){
     var credits = d.credit_sources || [];
 
     var h = '<div style="font-size:18px;font-weight:900;color:#e8eaed;margin-bottom:4px;text-align:center">💎 تعويض 100%</div>';
-    h += '<div style="font-size:11px;color:#7a9a8a;text-align:center;margin-bottom:16px">نظام الاسترداد الذكي</div>';
+    h += '<div style="font-size:11px;color:#8794a3;text-align:center;margin-bottom:16px">نظام الاسترداد الذكي</div>';
 
     // Balance cards
     h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">';
-    h += '<div style="background:linear-gradient(135deg,#0f1c18,#0b1410);border:1px solid #262e39;border-radius:12px;padding:12px;text-align:center"><div style="font-size:22px">🧊</div><div style="font-size:18px;font-weight:800;color:#06b6d4;margin-top:4px">' + frozen.toFixed(2) + '</div><div style="font-size:10px;color:#7a9a8a">مجمد</div></div>';
-    h += '<div style="background:linear-gradient(135deg,#0f1c18,#0b1410);border:1px solid #262e39;border-radius:12px;padding:12px;text-align:center"><div style="font-size:22px">⏳</div><div style="font-size:18px;font-weight:800;color:#fbbf24;margin-top:4px">' + pending.toFixed(2) + '</div><div style="font-size:10px;color:#7a9a8a">معلق للأصدقاء</div></div>';
-    h += '<div style="background:linear-gradient(135deg,#0f1c18,#0b1410);border:1px solid #262e39;border-radius:12px;padding:12px;text-align:center"><div style="font-size:22px">📈</div><div style="font-size:18px;font-weight:800;color:#00e701;margin-top:4px">' + earned.toFixed(2) + '</div><div style="font-size:10px;color:#7a9a8a">إجمالي مكتسب</div></div>';
-    h += '<div style="background:linear-gradient(135deg,#0f1c18,#0b1410);border:1px solid #262e39;border-radius:12px;padding:12px;text-align:center"><div style="font-size:22px">📉</div><div style="font-size:18px;font-weight:800;color:#ff4757;margin-top:4px">' + used.toFixed(2) + '</div><div style="font-size:10px;color:#7a9a8a">إجمالي مستخدم</div></div>';
+    h += '<div style="background:linear-gradient(135deg,#1a2028,#10141a);border:1px solid #262e39;border-radius:12px;padding:12px;text-align:center"><div style="font-size:22px">🧊</div><div style="font-size:18px;font-weight:800;color:#06b6d4;margin-top:4px">' + frozen.toFixed(2) + '</div><div style="font-size:10px;color:#8794a3">مجمد</div></div>';
+    h += '<div style="background:linear-gradient(135deg,#1a2028,#10141a);border:1px solid #262e39;border-radius:12px;padding:12px;text-align:center"><div style="font-size:22px">⏳</div><div style="font-size:18px;font-weight:800;color:#fbbf24;margin-top:4px">' + pending.toFixed(2) + '</div><div style="font-size:10px;color:#8794a3">معلق للأصدقاء</div></div>';
+    h += '<div style="background:linear-gradient(135deg,#1a2028,#10141a);border:1px solid #262e39;border-radius:12px;padding:12px;text-align:center"><div style="font-size:22px">📈</div><div style="font-size:18px;font-weight:800;color:#00e701;margin-top:4px">' + earned.toFixed(2) + '</div><div style="font-size:10px;color:#8794a3">إجمالي مكتسب</div></div>';
+    h += '<div style="background:linear-gradient(135deg,#1a2028,#10141a);border:1px solid #262e39;border-radius:12px;padding:12px;text-align:center"><div style="font-size:22px">📉</div><div style="font-size:18px;font-weight:800;color:#ff4757;margin-top:4px">' + used.toFixed(2) + '</div><div style="font-size:10px;color:#8794a3">إجمالي مستخدم</div></div>';
     h += '</div>';
 
     // Wagering progress
     if(wagerRem > 0){
       h += '<div style="background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.2);border-radius:12px;padding:12px;margin-bottom:12px">';
       h += '<div style="font-size:12px;color:#fbbf24;font-weight:700;margin-bottom:4px">⚠️ متطلبات الرهان</div>';
-      h += '<div style="font-size:11px;color:#7a9a8a">تبقى ' + wagerRem + ' معاملة لإكمال الرهان وفك التجميد</div>';
+      h += '<div style="font-size:11px;color:#8794a3">تبقى ' + wagerRem + ' معاملة لإكمال الرهان وفك التجميد</div>';
       h += '</div>';
     } else if(wagerDone && frozen > 0){
       h += '<div style="background:rgba(0,231,1,.08);border:1px solid rgba(0,231,1,.2);border-radius:12px;padding:12px;margin-bottom:12px">';
@@ -732,10 +732,10 @@ function openCompensation(){
       credits.forEach(function(c){
         var stCol = c.ready ? '#00e701' : '#fbbf24';
         var stIcon = c.ready ? '🟢' : '🟡';
-        h += '<div style="display:flex;align-items:center;gap:8px;padding:10px;background:linear-gradient(135deg,#0f1c18,#0b1410);border:1px solid #262e39;border-radius:10px;margin-bottom:6px">';
+        h += '<div style="display:flex;align-items:center;gap:8px;padding:10px;background:linear-gradient(135deg,#1a2028,#10141a);border:1px solid #262e39;border-radius:10px;margin-bottom:6px">';
         h += '<span style="font-size:14px">' + stIcon + '</span>';
         h += '<div style="flex:1"><div style="font-size:12px;font-weight:600;color:#e8eaed">' + esc(c.label) + '</div>';
-        h += '<div style="font-size:10px;color:#7a9a8a">' + esc(c.status) + '</div></div>';
+        h += '<div style="font-size:10px;color:#8794a3">' + esc(c.status) + '</div></div>';
         h += '<div style="font-size:14px;font-weight:800;color:' + stCol + '">' + c.amount.toFixed(2) + '</div>';
         h += '</div>';
       });
@@ -744,7 +744,7 @@ function openCompensation(){
     // How it works
     h += '<div style="background:rgba(0,231,1,.05);border:1px solid rgba(0,231,1,.15);border-radius:12px;padding:14px;margin-top:12px">';
     h += '<div style="font-size:13px;font-weight:700;color:#00e701;margin-bottom:8px">📌 كيف يعمل النظام؟</div>';
-    h += '<div style="font-size:11px;color:#7a9a8a;line-height:1.6">';
+    h += '<div style="font-size:11px;color:#8794a3;line-height:1.6">';
     h += '1️⃣ أودع في حسابك بالشركة<br>';
     h += '2️⃣ اضغط 🔄 استرداد ← أرسل لقطة شاشة برصيدك<br>';
     h += '3️⃣ يراجع الأدمن ← يُضاف 100% لمحفظتك (مجمد 🧊)<br>';
@@ -756,7 +756,7 @@ function openCompensation(){
 
     mb.innerHTML = h;
   }).catch(function(){
-    mb.innerHTML = '<div style="text-align:center;padding:30px;color:#ff4757">فشل تحميل البيانات<button onclick="document.getElementById(\'modal\').remove()" style="margin-top:12px;width:100%;padding:10px;border-radius:10px;border:1px solid #262e39;background:transparent;color:#7a9a8a;cursor:pointer">إغلاق</button></div>';
+    mb.innerHTML = '<div style="text-align:center;padding:30px;color:#ff4757">فشل تحميل البيانات<button onclick="document.getElementById(\'modal\').remove()" style="margin-top:12px;width:100%;padding:10px;border-radius:10px;border:1px solid #262e39;background:transparent;color:#8794a3;cursor:pointer">إغلاق</button></div>';
   });
 }
 
@@ -764,7 +764,7 @@ function openApps(){
   var overlay = document.createElement('div');
   overlay.id = 'modal';
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(5,15,12,.92);backdrop-filter:blur(12px);z-index:100;display:flex;align-items:center;justify-content:center;padding:12px;overflow-y:auto';
-  overlay.innerHTML = '<div id="mb" style="background:linear-gradient(180deg,#0d1814,#0a1410);border:1px solid #262e39;border-radius:18px;padding:20px;max-width:420px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.5)"></div>';
+  overlay.innerHTML = '<div id="mb" style="background:linear-gradient(180deg,#141920,#10141a);border:1px solid #262e39;border-radius:18px;padding:20px;max-width:420px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.5)"></div>';
   overlay.onclick = function(e){ if(e.target === overlay) overlay.remove(); };
   document.body.appendChild(overlay);
   var mb = document.getElementById('mb');
@@ -778,9 +778,9 @@ function openApps(){
     var html = '<div style="font-size:18px;font-weight:900;color:#e8eaed;margin-bottom:16px;text-align:center">📱 التطبيقات</div>';
     apps.forEach(function(app, idx){
       var icon = app.icon_url ? '<img src="'+app.icon_url+'" style="width:56px;height:56px;border-radius:14px;object-fit:cover;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,.4)" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'"><div style="display:none;width:56px;height:56px;border-radius:14px;background:#132020;align-items:center;justify-content:center;font-size:28px">📱</div>' : '<div style="width:56px;height:56px;border-radius:14px;background:#132020;display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0">📱</div>';
-      var card = '<div style="display:flex;gap:14px;padding:16px;background:linear-gradient(135deg,#0f1c18,#0b1410);border:1px solid #262e39;border-radius:16px;margin-bottom:10px;align-items:flex-start;box-shadow:0 2px 12px rgba(0,0,0,.3)">'+icon+'<div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:800;color:#e8eaed;margin-bottom:2px">'+esc(app.name||'')+'</div>';
-      if(app.description) card += '<div style="font-size:12px;color:#7a9a8a;margin-top:2px;line-height:1.4">'+esc(app.description)+'</div>';
-      if(app.promo_code) card += '<div style="margin-top:8px;display:flex;align-items:center;gap:8px"><code style="background:#0a1c14;border:1px solid #262e39;padding:4px 12px;border-radius:8px;color:#fbbf24;font-size:13px;font-weight:700;font-family:Courier New;letter-spacing:.5px">'+esc(app.promo_code)+'</code><button onclick="copyToClip(this,\''+app.promo_code.replace(/'/g,"")+'\')" style="background:rgba(0,231,1,.12);border:1px solid rgba(0,231,1,.25);border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;transition:all .2s" title="نسخ الكود">📋</button></div>';
+      var card = '<div style="display:flex;gap:14px;padding:16px;background:linear-gradient(135deg,#1a2028,#10141a);border:1px solid #262e39;border-radius:16px;margin-bottom:10px;align-items:flex-start;box-shadow:0 2px 12px rgba(0,0,0,.3)">'+icon+'<div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:800;color:#e8eaed;margin-bottom:2px">'+esc(app.name||'')+'</div>';
+      if(app.description) card += '<div style="font-size:12px;color:#8794a3;margin-top:2px;line-height:1.4">'+esc(app.description)+'</div>';
+      if(app.promo_code) card += '<div style="margin-top:8px;display:flex;align-items:center;gap:8px"><code style="background:#141920;border:1px solid #262e39;padding:4px 12px;border-radius:8px;color:#fbbf24;font-size:13px;font-weight:700;font-family:Courier New;letter-spacing:.5px">'+esc(app.promo_code)+'</code><button onclick="copyToClip(this,\''+app.promo_code.replace(/'/g,"")+'\')" style="background:rgba(0,231,1,.12);border:1px solid rgba(0,231,1,.25);border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;transition:all .2s" title="نسخ الكود">📋</button></div>';
       if(app.referral_link) card += '<div style="margin-top:6px"><a href="'+app.referral_link+'" target="_blank" style="font-size:12px;color:#00e701;text-decoration:none;font-weight:600;display:inline-flex;align-items:center;gap:4px">🔗 رابط الإحالة ←</a></div>';
       card += '</div>';
       var dl = app.download_url || app.android_url || app.ios_url || '';
@@ -833,7 +833,7 @@ function openApps(){
 function showVexToast(title, msg, type) {
     var t = document.createElement('div');
     var color = type === 'urgent' ? '#ef4444' : type === 'broadcast' ? '#fbbf24' : '#00e701';
-    t.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:9999;background:linear-gradient(135deg,#0d1814,#0a1410);border:2px solid '+color+';border-radius:14px;padding:14px 20px;min-width:280px;max-width:380px;box-shadow:0 8px 32px rgba(0,0,0,.5);opacity:0;transition:opacity .3s,transform .3s';
+    t.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:9999;background:linear-gradient(135deg,#141920,#10141a);border:2px solid '+color+';border-radius:14px;padding:14px 20px;min-width:280px;max-width:380px;box-shadow:0 8px 32px rgba(0,0,0,.5);opacity:0;transition:opacity .3s,transform .3s';
     t.innerHTML = '<div style="display:flex;align-items:start;gap:10px"><div style="width:10px;height:10px;border-radius:50%;background:'+color+';margin-top:6px;flex-shrink:0;animation:pulse 1.5s infinite"></div><div style="flex:1"><div style="font-weight:800;font-size:14px;color:'+color+';margin-bottom:2px">'+(title||'')+'</div><div style="font-size:12px;color:#eef2f6;line-height:1.5">'+(msg||'')+'</div></div></div>';
     document.body.appendChild(t);
     setTimeout(function(){ t.style.opacity='1'; t.style.transform='translateX(-50%) translateY(0)'; },50);

@@ -321,7 +321,7 @@
 
 <!-- HERO -->
 <section class="hero" id="top">
-  <img src="/static/icons/logo-full.png" class="hero-logo" alt="VEX" onerror="this.outerHTML='<div style=\'width:130px;height:130px;border-radius:50%;background:linear-gradient(135deg,#001a08,#003318);border:2px solid rgba(0,231,1,0.3);box-shadow:0 0 50px rgba(0,231,1,0.3);display:flex;align-items:center;justify-content:center;font-size:60px;font-weight:900;color:#00e701;margin-bottom:24px\'>V</div>'">
+  <img src="/static/icons/logo-full.png" class="hero-logo" alt="VEX" onerror="this.outerHTML='<div style=\'width:130px;height:130px;border-radius:50%;background:linear-gradient(135deg,#10141a,#0d7a2f);border:2px solid rgba(0,231,1,0.3);box-shadow:0 0 50px rgba(0,231,1,0.3);display:flex;align-items:center;justify-content:center;font-size:60px;font-weight:900;color:#00e701;margin-bottom:24px\'>V</div>'">
   <div class="hero-badge">🔥 أكثر من 5,000 لاعب نشط</div>
   <h1>العب واربح مع<br><span style="color:var(--green)">VEX Games</span></h1>
   <p>منصة الألعاب الأكثر إثارة على تيليغرام — ألعاب مثيرة، جوائز حقيقية، ونظام إحالة مربح ينمو معك</p>
@@ -559,7 +559,7 @@ document.querySelectorAll('.reveal').forEach(el=>observer.observe(el));
     function showUserToast(title, msg, type) {
         var color = type === 'urgent' ? '#ef4444' : type === 'broadcast' ? '#fbbf24' : '#00e701';
         var t = document.createElement('div');
-        t.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:9999;background:linear-gradient(135deg,#0d1814,#0a1410);border:2px solid '+color+';border-radius:14px;padding:14px 20px;min-width:280px;max-width:380px;box-shadow:0 8px 32px rgba(0,0,0,.5);opacity:0;transition:opacity .3s';
+        t.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:9999;background:linear-gradient(135deg,#141920,#10141a);border:2px solid '+color+';border-radius:14px;padding:14px 20px;min-width:280px;max-width:380px;box-shadow:0 8px 32px rgba(0,0,0,.5);opacity:0;transition:opacity .3s';
         t.innerHTML = '<div style="display:flex;align-items:start;gap:10px"><div style="width:10px;height:10px;border-radius:50%;background:'+color+';margin-top:6px;flex-shrink:0"></div><div style="flex:1"><div style="font-weight:800;font-size:14px;color:'+color+';margin-bottom:2px">'+title+'</div><div style="font-size:12px;color:#eef2f6;line-height:1.5">'+msg+'</div></div></div>';
         document.body.appendChild(t);
         setTimeout(function(){t.style.opacity='1'},50);
