@@ -370,6 +370,37 @@ function renderWallet(d) {
 
   document.getElementById('loader').style.display = 'none';
   document.getElementById('walletPage').innerHTML = html;
+  loadCompanies();
+}
+
+// ── شركات التعويض بروابط الأفيليه ────────────────────────────────────────────
+function escH(s){const d=document.createElement('div');d.textContent=String(s==null?'':s);return d.innerHTML;}
+async function loadCompanies() {
+  try {
+    const r = await apiFetch(`${BASE}/api/player/companies`);
+    const d = await r.json();
+    if (!d.companies || !d.companies.length) return;
+    let h = `<div class="txn-card"><div class="txn-title">🏢 شركات التعويض 100%</div>
+      <div style="font-size:11px;color:var(--muted);margin:4px 0 10px">
+        سجّل عبر رابط الشركة ثم أرسل رقم حسابك للبوت لتفعيل اشتراكك في التعويض</div>`;
+    d.companies.forEach(c => {
+      h += `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--surface-3)">
+        <span style="font-size:18px">${escH(c.icon)}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600">${escH(c.name)}</div>
+          <div style="font-size:11px;color:var(--muted)">${c.registered_account
+            ? '✅ حسابك: <code>'+escH(c.registered_account)+'</code>'
+            : 'غير مسجل — سجّل عبر الرابط ثم أرسل رقم حسابك للبوت'}</div>
+        </div>
+        ${c.affiliate_link ? `<a href="${escH(c.affiliate_link)}" target="_blank" rel="noopener"
+          style="font-size:11px;font-weight:700;color:#93c5fd;background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.25);padding:6px 10px;border-radius:8px;text-decoration:none;white-space:nowrap">🔗 التسجيل</a>` : ''}
+      </div>`;
+    });
+    h += `</div>`;
+    const div = document.createElement('div');
+    div.innerHTML = h;
+    document.getElementById('walletPage').appendChild(div);
+  } catch (e) { /* غير حرج */ }
 
   // Live balance polling (game balance only)
   setInterval(async () => {

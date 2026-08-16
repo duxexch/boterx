@@ -182,7 +182,8 @@ class SVRPManager:
 
     RECOVERY_REQUEST_FIELDS = [
         'id', 'user_id', 'customer_id', 'photo_file_id', 'status',
-        'recovery_amount', 'admin_note', 'created_at', 'approved_at', 'approved_by'
+        'recovery_amount', 'admin_note', 'created_at', 'approved_at', 'approved_by',
+        'company_id', 'company_name', 'account_number'
     ]
 
     SVRP_COMPANY_FIELDS = [
@@ -221,6 +222,26 @@ class SVRPManager:
                     writer = csv.writer(f)
                     writer.writerow(fields)
                 logger.info(f"Created recovery file: {filename}")
+            else:
+                self._migrate_csv_header(filename, fields)
+
+    def _migrate_csv_header(self, filename, fields):
+        """Add newly-introduced columns to an existing CSV (idempotent).
+
+        _append_csv writes rows positionally against the file's ORIGINAL
+        header, so appending rows with new fields to an old-header file would
+        misalign columns — the header must be upgraded first."""
+        try:
+            with open(filename, 'r', encoding='utf-8-sig') as f:
+                reader = csv.reader(f)
+                header = next(reader, None)
+            if header is None or set(fields) <= set(header):
+                return
+            rows = self._read_csv(filename)
+            if self._write_csv(filename, rows, fields):
+                logger.info(f"Migrated {filename} header → {fields}")
+        except Exception as e:
+            logger.error(f"خطأ في ترحيل {filename}: {e}")
 
     # ==================== أدوات مساعدة ====================
 
@@ -1195,14 +1216,18 @@ class SVRPManager:
 
     # ==================== طلبات الاسترداد بلقطة شاشة ====================
 
-    def create_recovery_request(self, user_id, customer_id, photo_file_id):
-        """إنشاء طلب استرداد جديد بلقطة شاشة"""
+    def create_recovery_request(self, user_id, customer_id, photo_file_id,
+                                company_id='', company_name='', account_number=''):
+        """إنشاء طلب استرداد جديد بلقطة شاشة مرتبط بشركة وحساب مسجل"""
         req_id = self._generate_id('REC')
         row = {
             'id': req_id,
             'user_id': str(user_id),
             'customer_id': customer_id or '',
             'photo_file_id': photo_file_id,
+            'company_id': company_id or '',
+            'company_name': company_name or '',
+            'account_number': account_number or '',
             'status': 'pending',
             'recovery_amount': '',
             'admin_note': '',
@@ -1719,63 +1744,6 @@ class SVRPManager:
         }
 
     # ==================== نظام الاسترداد بلقطة شاشة ====================
-
-    RECOVERY_FIELDS = [
-        'id', 'user_id', 'customer_id', 'photo_file_id', 'status',
-        'recovery_amount', 'admin_note', 'admin_id', 'created_at', 'approved_at'
-    ]
-
-    def init_recovery_requests_file(self):
-        """إنشاء ملف طلبات الاسترداد"""
-        if not os.path.exists('recovery_requests.csv'):
-            with open('recovery_requests.csv', 'w', newline='', encoding='utf-8-sig') as f:
-                writer = csv.writer(f)
-                writer.writerow(self.RECOVERY_FIELDS)
-            logger.info("Created recovery_requests.csv")
-
-    def create_recovery_request(self, user_id, customer_id, photo_file_id):
-        """إنشاء طلب استرداد بلقطة شاشة"""
-        self.init_recovery_requests_file()
-        req_id = f"REC{datetime.now().strftime('%Y%m%d%H%M%S')}{random.randint(10,99)}"
-        row = {
-            'id': req_id,
-            'user_id': str(user_id),
-            'customer_id': customer_id,
-            'photo_file_id': photo_file_id,
-            'status': 'pending',
-            'recovery_amount': '0',
-            'admin_note': '',
-            'admin_id': '',
-            'created_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
-            'approved_at': ''
-        }
-        self._append_csv('recovery_requests.csv', row, self.RECOVERY_FIELDS)
-        logger.info(f"Recovery request created: {req_id} for user {user_id}")
-        return req_id
-
-    def get_recovery_request(self, req_id):
-        """الحصول على طلب استرداد"""
-        rows = self._read_csv('recovery_requests.csv')
-        for row in rows:
-            if row['id'] == req_id:
-                return row
-        return None
-
-    def get_pending_recovery_requests(self):
-        """الحصول على طلبات الاسترداد المعلقة"""
-        rows = self._read_csv('recovery_requests.csv')
-        return [r for r in rows if r.get('status') == 'pending']
-
-    def reject_recovery_request(self, req_id, admin_id, note=''):
-        """رفض طلب استرداد"""
-        rows = self._read_csv('recovery_requests.csv')
-        for row in rows:
-            if row['id'] == req_id:
-                row['status'] = 'rejected'
-                row['admin_note'] = note
-                row['admin_id'] = str(admin_id)
-                row['approved_at'] = datetime.now().strftime('%Y-%m-%d %H:%M')
-                self._write_csv('recovery_requests.csv', rows, self.RECOVERY_FIELDS)
-                logger.info(f"Recovery rejected: {req_id}")
-                return True, "تم رفض الطلب"
-        return False, "الطلب غير موجود"
+    # (التطبيق الأساسي أعلاه — create/get/reject/approve_recovery_request.
+    #  حُذفت النسخة القديمة المكررة التي كانت تتجاوز التطبيق الأساسي
+    #  وتكتب بمخطط أعمدة قديم غير متوافق.)

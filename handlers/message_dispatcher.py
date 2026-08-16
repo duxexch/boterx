@@ -216,11 +216,20 @@ class MessageDispatcherMixin:
                 del self.user_states[user_id]
             return
 
-        if current_state == 'svrp_waiting_screenshot':
-            # استقبال لقطة الشاشة للاسترداد
+        if isinstance(current_state, str) and current_state.startswith('svrp_waiting_screenshot'):
+            # استقبال لقطة الشاشة للتعويض — الطلب مرتبط بشركة وحساب مسجل
             user_id = message['from']['id']
             chat_id = message['chat']['id']
             user = self.find_user(user_id)
+
+            # استخراج الشركة من الحالة svrp_waiting_screenshot_<company_id>
+            company_id = current_state.replace('svrp_waiting_screenshot', '').lstrip('_')
+            account = self.svrp.get_user_company_account(user_id, company_id) if company_id else None
+            if not account:
+                # حالة قديمة بلا شركة أو حساب محذوف — أعد المستخدم لاختيار الشركة
+                if user_id in self.user_states: del self.user_states[user_id]
+                self._svrp_recovery_pick_company(chat_id, user_id)
+                return
 
             if 'photo' not in message:
                 self.send_message(chat_id, self.tr('a0161_يرجى_إرسال', 'ar'))
@@ -235,26 +244,46 @@ class MessageDispatcherMixin:
                 if user_id in self.user_states: del self.user_states[user_id]
                 return
 
-            # إنشاء طلب استرداد
+            company_name = account.get('company_name', '')
+            account_number = account.get('account_number', '')
+
+            # إنشاء طلب استرداد مرتبط بالشركة والحساب
             req_id = self.svrp.create_recovery_request(
-                user_id, user.get('customer_id', ''), photo_file_id
+                user_id, user.get('customer_id', ''), photo_file_id,
+                company_id=company_id, company_name=company_name,
+                account_number=account_number
             )
 
             # إشعار المستخدم
             self.send_message(chat_id,
-                f"✅ <b>تم إرسال طلب الاسترداد</b>\n\n"
+                f"✅ <b>تم إرسال طلب التعويض</b>\n\n"
                 f"🆔 <code>{req_id}</code>\n"
+                f"🏢 الشركة: {company_name}\n"
+                f"📋 رقم الحساب: <code>{account_number}</code>\n"
                 f"⏳ بانتظار مراجعة الإدارة",
                 self.main_keyboard(user.get('language', 'ar'), user_id))
+
+            # رابط الأفيليه للشركة — يظهر للأدمن للتحقق
+            affiliate_link = ''
+            try:
+                for c in self.svrp.get_recovery_companies(active_only=False):
+                    if c.get('id') == company_id:
+                        affiliate_link = c.get('affiliate_link', '') or ''
+                        break
+            except Exception:
+                pass
 
             # إرسال الصورة للأدمن + أزرار موافقة/رفض
             for admin_id in self.admin_ids:
                 try:
                     admin_msg = (
-                        f"🔄 <b>طلب استرداد جديد</b>\n\n"
+                        f"🔄 <b>طلب تعويض جديد</b>\n\n"
                         f"🆔 <code>{req_id}</code>\n"
                         f"👤 العميل: <code>{user.get('customer_id', '')}</code>\n"
-                        f"📅 {datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n"
+                        f"🏢 الشركة: {company_name}\n"
+                        f"📋 رقم الحساب المسجل: <code>{account_number}</code>\n"
+                        + (f"🔗 رابط الأفيليه: {affiliate_link}\n" if affiliate_link else '')
+                        + f"📅 {datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n"
                         f"📸 لقطة الشاشة:"
                     )
                     inline_btns = [
@@ -285,32 +314,7 @@ class MessageDispatcherMixin:
             chat_id = message['chat']['id']
             req_id = current_state.replace('svrp_recovery_amount_', '')
             text = message.get('text', '').strip()
-
-            try:
-                amount = float(text)
-                if amount <= 0:
-                    self.send_message(chat_id, self.tr('a0144_المبلغ_يجب', 'ar'))
-                    return
-            except ValueError:
-                self.send_message(chat_id, self.tr('a0145_اكتب_مبلغاً', 'ar'))
-                return
-
-            success, msg = self.svrp.approve_recovery_request(req_id, user_id, amount)
-            icon = "✅" if success else "❌"
-            self.send_message(chat_id, f"{icon} {msg}", self.admin_keyboard())
-
-            # إشعار المستخدم
-            req = self.svrp.get_recovery_request(req_id)
-            if req and success:
-                self.notify_user(int(req['user_id']),
-                    f"✅ <b>تمت الموافقة على استردادك!</b>\n\n"
-                    f"💎 الرصيد المضاف: <code>{amount:.2f}</code>\n"
-                    f"🧊 حالة الرصيد: <b>مجمد</b>\n\n"
-                    f"💡 أرسل رصيداً لأصدقائك لفك التجميد",
-                    'recovery_approved')
-
-            if user_id in self.user_states:
-                del self.user_states[user_id]
+            self._svrp_admin_approve_recovery(chat_id, user_id, req_id, text)
             return
 
         if isinstance(current_state, str) and current_state.startswith('svrp_dep_balance_'):
@@ -446,32 +450,12 @@ class MessageDispatcherMixin:
             return
 
         if isinstance(current_state, str) and current_state.startswith('svrp_approve_amount_'):
-            # الأدمن يكتب مبلغ الاسترداد للموافقة
+            # الأدمن يكتب مبلغ الاسترداد للموافقة (مسار قديم — نفس المعالجة الموحدة)
             user_id = message['from']['id']
             chat_id = message['chat']['id']
             text = message.get('text', '').strip()
             req_id = current_state.replace('svrp_approve_amount_', '')
-            try:
-                amount = float(text)
-                if amount <= 0:
-                    self.send_message(chat_id, self.tr('a0144_المبلغ_يجب', 'ar'))
-                    return
-                success, msg = self.svrp.approve_recovery_request(req_id, amount, user_id)
-                if success:
-                    self.send_message(chat_id, f"✅ {msg}", self.admin_keyboard())
-                    req = self.svrp.get_recovery_request(req_id)
-                    if req:
-                        self.notify_user(int(req['user_id']),
-                            f"✅ <b>تمت الموافقة على طلب استردادك!</b>\n\n"
-                            f"💰 تم إضافة <b>{amount:.2f}</b> لرصيدك المجمد 🧊\n\n"
-                            f"💡 أرسل رصيداً لأصدقائك لفك التجميد")
-                else:
-                    self.send_message(chat_id, f"❌ {msg}", self.admin_keyboard())
-            except ValueError:
-                self.send_message(chat_id, self.tr('a0162_اكتب_مبلغاً', 'ar'))
-                return
-            if user_id in self.user_states:
-                del self.user_states[user_id]
+            self._svrp_admin_approve_recovery(chat_id, user_id, req_id, text)
             return
 
         # باقي حالات svrp_ (أكواد ترويجية، إلخ)
@@ -1321,56 +1305,10 @@ class MessageDispatcherMixin:
             self.show_multi_bot_panel(fake_msg)
             return
         if isinstance(current_state, str) and current_state == 'svrp_awaiting_screenshot':
-            # معالجة استقبال لقطة الشاشة — يجب أن تكون صورة
-            if 'photo' not in message:
-                self.send_message(chat_id,
-                    "❌ يرجى إرسال <b>صورة</b> (لقطة شاشة).\n\n"
-                    "أو اكتب 'إلغاء' للعودة")
-                return
-
-            # استخراج أكبر صورة
-            photos = message['photo']
-            largest = photos[-1]  # آخر عنصر هو الأكبر
-            file_id = largest['file_id']
-
-            user = self.find_user(user_id)
-            customer_id = user.get('customer_id', '') if user else ''
-
-            req_id = self.svrp.create_recovery_request(user_id, customer_id, file_id)
+            # حالة قديمة قبل ربط طلب التعويض بالشركة — أعد المستخدم لاختيار الشركة
             if user_id in self.user_states:
                 del self.user_states[user_id]
-
-            self.send_message(chat_id,
-                f"✅ تم استلام لقطة الشاشة!\n\n"
-                f"🆔 <code>{req_id}</code>\n"
-                f"⏳ سيتم مراجعتها من قبل الإدارة")
-
-            # إشعار جميع الأدمن
-            for admin_id in self.admin_ids:
-                try:
-                    # إرسال الصورة للأدمن
-                    data = {
-                        'chat_id': admin_id,
-                        'photo': file_id,
-                        'caption': (
-                            f"🔄 <b>طلب استرداد جديد</b>\n\n"
-                            f"🆔 <code>{req_id}</code>\n"
-                            f"👤 العميل: {user.get('name', '')}\n"
-                            f"🆔 رقم العميل: {customer_id}\n\n"
-                            f"للموافقة: اضغط الزر وأدخل المبلغ"
-                        ),
-                        'parse_mode': 'HTML'
-                    }
-                    self.api_call('sendPhoto', data)
-
-                    # إرسال أزرار الموافقة/الرفض
-                    inline_btns = [
-                        [{'text': '✅ موافقة', 'callback_data': f'rec_approve_{req_id}'},
-                         {'text': '❌ رفض', 'callback_data': f'rec_reject_{req_id}'}]
-                    ]
-                    self.send_inline_message(admin_id, self.tr('a0194_مراجعة_الطلب', 'ar'), inline_btns)
-                except Exception as e:
-                    logger.error(f"خطأ في إشعار الأدمن بطلب الاسترداد: {e}")
+            self._svrp_recovery_pick_company(chat_id, user_id)
             return
 
         if isinstance(current_state, str) and current_state == 'selecting_language':
@@ -2783,3 +2721,75 @@ class MessageDispatcherMixin:
         except Exception as e:
             logger.error(f"خطأ في فحص ملفات النظام: {e}")
 
+
+    def _svrp_admin_approve_recovery(self, chat_id, user_id, req_id, amount_text):
+        """موافقة أدمن موحّدة على طلب تعويض/استرداد.
+
+        - تتحقق من صلاحية الأدمن قبل أي تنفيذ (الحالة وحدها لا تكفي)
+        - ترفض المبالغ غير الصالحة/غير المنتهية (inf/nan)
+        - تُقيّد الرصيد المجمد في SQLite أولاً (المصدر الموثوق، idempotent
+          عبر svrp_approval_log) ثم تُحدّث CSV كمرآة — نفس مسار لوحة التحكم
+        """
+        import math
+        if not self.is_admin(user_id):
+            if user_id in self.user_states:
+                del self.user_states[user_id]
+            self.send_message(chat_id, '⛔ هذا الإجراء متاح للإدارة فقط')
+            return
+        try:
+            amount = float(str(amount_text).strip())
+        except (ValueError, TypeError):
+            self.send_message(chat_id, self.tr('a0145_اكتب_مبلغاً', 'ar'))
+            return
+        if not math.isfinite(amount) or amount <= 0 or amount > 10_000_000:
+            self.send_message(chat_id, self.tr('a0144_المبلغ_يجب', 'ar'))
+            return
+
+        req = self.svrp.get_recovery_request(req_id)
+        if not req:
+            self.send_message(chat_id, '❌ الطلب غير موجود', self.admin_keyboard())
+            if user_id in self.user_states:
+                del self.user_states[user_id]
+            return
+        if req.get('status') == 'approved':
+            self.send_message(chat_id, '⚠️ الطلب مُوافق عليه مسبقاً', self.admin_keyboard())
+            if user_id in self.user_states:
+                del self.user_states[user_id]
+            return
+
+        # 1) القيد الموثوق في SQLite (يظهر فوراً في محفظة الويب والتحويل للعب)
+        try:
+            from db_manager import _gdb
+            ok, result = _gdb.credit_svrp_balance_for_approval(
+                req_id, str(req['user_id']), amount)
+            if not ok:
+                self.send_message(chat_id, f"❌ {result}", self.admin_keyboard())
+                if user_id in self.user_states:
+                    del self.user_states[user_id]
+                return
+        except Exception as e:
+            logger.error(f"SVRP SQLite credit failed for {req_id}: {e}")
+            self.send_message(chat_id,
+                '❌ فشل قيد الرصيد — لم تتم الموافقة. حاول مجدداً.',
+                self.admin_keyboard())
+            return
+
+        # 2) مرآة CSV (حالة الطلب + محفظة CSV القديمة) — idempotent
+        success, msg = self.svrp.approve_recovery_request(req_id, amount, user_id)
+        icon = "✅" if success else "⚠️"
+        self.send_message(chat_id, f"{icon} {msg}", self.admin_keyboard())
+
+        if success:
+            try:
+                self.notify_user(int(req['user_id']),
+                    f"✅ <b>تمت الموافقة على طلب التعويض!</b>\n\n"
+                    + (f"🏢 الشركة: {req.get('company_name', '')}\n" if req.get('company_name') else '')
+                    + f"💎 الرصيد المضاف: <code>{amount:.2f}</code>\n"
+                    f"🧊 حالة الرصيد: <b>مجمد</b>\n\n"
+                    f"💡 أكمل متطلبات الرهان لفك التجميد",
+                    'recovery_approved')
+            except Exception as e:
+                logger.error(f"notify_user recovery_approved failed: {e}")
+
+        if user_id in self.user_states:
+            del self.user_states[user_id]

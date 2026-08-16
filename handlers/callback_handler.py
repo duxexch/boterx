@@ -3131,16 +3131,30 @@ class CallbackHandlerMixin:
                 return
 
             elif data == 'svrp_recovery_request':
-                # طلب استرداد — طلب لقطة شاشة
-                user = self.find_user(user_id)
-                lang = user.get('language', 'ar') if user else 'ar'
+                # طلب استرداد — أولاً: اختيار الشركة من حسابات المستخدم المسجلة
+                self._svrp_recovery_pick_company(chat_id, user_id, message)
+                return
+
+            elif data.startswith('svrp_rec_co_'):
+                # المستخدم اختار الشركة — تحقق من الحساب ثم اطلب لقطة الشاشة
+                company_id = data.replace('svrp_rec_co_', '')
+                account = self.svrp.get_user_company_account(user_id, company_id) if self.svrp else None
+                if not account:
+                    self.edit_message(chat_id, message.get('message_id'),
+                        "⚠️ لا يوجد لديك حساب مسجل في هذه الشركة.\n"
+                        "سجّل حسابك أولاً ثم أعد المحاولة.")
+                    self.send_inline_message(chat_id, "📝 التسجيل:",
+                        [[{'text': '🏢 تسجيل حساب', 'callback_data': 'svrp_companies'}],
+                         [{'text': '🔙 رجوع', 'callback_data': 'svrp_back_panel'}]])
+                    return
                 self.edit_message(chat_id, message.get('message_id'),
-                    "🔄 <b>طلب استرداد</b>\n\n"
-                    "📸 أرسل <b>لقطة شاشة</b> تظهر:\n"
+                    f"🔄 <b>طلب تعويض — {account.get('company_name', '')}</b>\n\n"
+                    f"📋 رقم حسابك المسجل: <code>{account.get('account_number', '')}</code>\n\n"
+                    "📸 أرسل الآن <b>لقطة شاشة</b> تظهر:\n"
                     "• رصيدك في حساب الشركة\n"
                     "• رقم حسابك\n\n"
                     "سيتم مراجعة طلبك من الإدارة")
-                self.user_states[user_id] = 'svrp_waiting_screenshot'
+                self.user_states[user_id] = f'svrp_waiting_screenshot_{company_id}'
                 return
 
             elif data == 'svrp_send_credits':
@@ -3154,20 +3168,24 @@ class CallbackHandlerMixin:
                 self.user_states[user_id] = 'svrp_send_customer'
                 return
 
-            elif data == 'svrp_recovery_approve':
-                # موافقة الأدمن على طلب استرداد
-                req_id = data.replace('svrp_recovery_approve_', '') if data.startswith('svrp_recovery_approve_') else ''
+            elif data.startswith('svrp_recovery_approve_'):
+                # موافقة الأدمن على طلب استرداد — للإدارة فقط
+                if not self.is_admin(user_id):
+                    return
+                req_id = data.replace('svrp_recovery_approve_', '')
                 if not req_id:
-                    req_id = ''
+                    return
                 self.send_message(chat_id,
                     self.tr('a0561_اكتب_مبلغ', lang))
                 self.user_states[user_id] = f'svrp_recovery_amount_{req_id}'
                 return
 
-            elif data == 'svrp_recovery_reject':
-                req_id = data.replace('svrp_recovery_reject_', '') if data.startswith('svrp_recovery_reject_') else ''
+            elif data.startswith('svrp_recovery_reject_'):
+                if not self.is_admin(user_id):
+                    return
+                req_id = data.replace('svrp_recovery_reject_', '')
                 if self.svrp:
-                    self.svrp.reject_recovery_request(req_id, user_id)
+                    self.svrp.reject_recovery_request(req_id, f'رفض بواسطة الأدمن {user_id}')
                 self.edit_message(chat_id, message.get('message_id'), self.tr('a0562_تم_رفض', lang))
                 # إشعار المستخدم
                 req = self.svrp.get_recovery_request(req_id) if self.svrp else None
@@ -3681,13 +3699,8 @@ class CallbackHandlerMixin:
                 return
 
             elif data == 'svrp_recovery_request':
-                self.edit_message(chat_id, message.get('message_id'),
-                    "🔄 <b>طلب استرداد</b>\n\n"
-                    "📸 أرسل <b>لقطة شاشة</b> تظهر:\n"
-                    "• رصيدك في حساب الشركة\n"
-                    "• رقم حسابك\n\n"
-                    "سيتم مراجعتها من قبل الإدارة")
-                self.user_states[user_id] = 'svrp_awaiting_screenshot'
+                # طلب استرداد — يجب اختيار الشركة أولاً
+                self._svrp_recovery_pick_company(chat_id, user_id, message)
                 return
 
             elif data == 'svrp_deposit':
@@ -4719,4 +4732,32 @@ class CallbackHandlerMixin:
                 
         except Exception as e:
             logger.error(f"خطأ في معالجة callback: {e}")
+
+    def _svrp_recovery_pick_company(self, chat_id, user_id, message=None):
+        """خطوة اختيار الشركة قبل طلب التعويض — يُرفض من لا يملك حساباً مسجلاً."""
+        accounts = self.svrp.get_user_company_accounts(user_id) if self.svrp else []
+        if not accounts:
+            text = ("⚠️ <b>لا يمكنك طلب التعويض بعد</b>\n\n"
+                    "يجب أولاً التسجيل في إحدى الشركات عبر رابط الإحالة "
+                    "ثم إرسال رقم حسابك.")
+            if message and message.get('message_id'):
+                self.edit_message(chat_id, message.get('message_id'), text)
+            else:
+                self.send_message(chat_id, text)
+            self.send_inline_message(chat_id, "📝 ابدأ من هنا:",
+                [[{'text': '🏢 تسجيل حساب في شركة', 'callback_data': 'svrp_companies'}],
+                 [{'text': '🔙 رجوع', 'callback_data': 'svrp_back_panel'}]])
+            return
+        text = ("🔄 <b>طلب تعويض</b>\n\n"
+                "اختر الشركة التي تريد التعويض عنها\n"
+                "(تظهر فقط الشركات التي سجلت فيها حساباً):")
+        inline_btns = []
+        for a in accounts:
+            inline_btns.append([{
+                'text': f"🏢 {a.get('company_name', '')} — {a.get('account_number', '')}",
+                'callback_data': f"svrp_rec_co_{a.get('company_id', '')}"}])
+        inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'svrp_back_panel'}])
+        if message and message.get('message_id'):
+            self.edit_message(chat_id, message.get('message_id'), text)
+        self.send_inline_message(chat_id, text if not (message and message.get('message_id')) else "اختر الشركة:", inline_btns)
     

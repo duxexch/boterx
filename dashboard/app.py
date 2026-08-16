@@ -3582,9 +3582,19 @@ def api_save_svrp_automation():
 
 @app.route('/api/svrp/requests')
 @api_auth
+@permission_required('view_financial')
 def api_svrp_requests():
     reqs = read_csv('recovery_requests.csv')
     reqs.reverse()
+    # إرفاق رابط الأفيليه للشركة كي يتحقق الأدمن من التسجيل
+    affiliate_by_id = {}
+    try:
+        for c in read_csv('companies.csv'):
+            affiliate_by_id[c.get('id', '')] = c.get('affiliate_link', '') or ''
+    except Exception:
+        pass
+    for r in reqs:
+        r['affiliate_link'] = affiliate_by_id.get(r.get('company_id', ''), '')
     return jsonify({'requests': reqs})
 
 @app.route('/api/svrp/requests/<req_id>/approve', methods=['POST'])
@@ -7106,6 +7116,41 @@ def api_wallet_balance():
     user_info = _gm.get_user_info(uid)
     currency = user_info.get('currency', 'EGP')
     return jsonify({'balance': balance, 'uid': uid, 'currency': currency})
+
+@app.route('/api/player/companies')
+@webapp_auth
+def api_player_companies():
+    """شركات التعويض بروابط الأفيليه + حسابات المستخدم المسجلة (للويب).
+
+    يتطلب هوية موثقة (initData/جلسة مرتبطة بالجهاز) — رقم حساب المستخدم
+    بيانات حساسة ولا تُكشف لطلبات uid غير الموثقة."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Unauthorized'}), 403
+    accounts_by_company = {}
+    try:
+        for a in read_csv('user_company_accounts.csv'):
+            if str(a.get('user_id', '')) == uid:
+                accounts_by_company[a.get('company_id', '')] = a.get('account_number', '')
+    except Exception:
+        pass
+    companies = []
+    try:
+        for c in read_csv('companies.csv'):
+            if (c.get('is_active', '') or '').lower() not in ('active', 'yes', '1', 'true'):
+                continue
+            companies.append({
+                'id': c.get('id', ''),
+                'name': c.get('name', ''),
+                'icon': c.get('icon', '') or '🏢',
+                'affiliate_link': c.get('affiliate_link', '') or '',
+                'registered_account': accounts_by_company.get(c.get('id', ''), ''),
+            })
+    except Exception:
+        pass
+    return jsonify({'companies': companies})
 
 @app.route('/api/player/wallet')
 @webapp_auth
