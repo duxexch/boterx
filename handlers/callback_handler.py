@@ -3147,6 +3147,12 @@ class CallbackHandlerMixin:
                         [[{'text': '🏢 تسجيل حساب', 'callback_data': 'svrp_companies'}],
                          [{'text': '🔙 رجوع', 'callback_data': 'svrp_back_panel'}]])
                     return
+                if (account.get('status') or 'active') not in ('active', 'approved'):
+                    self.edit_message(chat_id, message.get('message_id'),
+                        f"⏳ <b>{account.get('company_name', '')}</b>\n\n"
+                        "حسابك بانتظار تأكيد الإدارة — سيتم إشعارك فور التأكيد.\n"
+                        "بعد التأكيد قم بالإيداع والعب، وإذا خسرت قدّم طلب تعويض.")
+                    return
                 self.edit_message(chat_id, message.get('message_id'),
                     f"🔄 <b>طلب تعويض — {account.get('company_name', '')}</b>\n\n"
                     f"📋 رقم حسابك المسجل: <code>{account.get('account_number', '')}</code>\n\n"

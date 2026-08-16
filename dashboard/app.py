@@ -7715,7 +7715,7 @@ def api_player_compensation_request():
     account = mgr.get_user_company_account(uid, company_id)
     if not account:
         return jsonify({'error': 'يجب تسجيل رقم حسابك في هذه الشركة أولاً'}), 400
-    if account.get('status') not in ('active', 'approved'):
+    if (account.get('status') or 'active') not in ('active', 'approved'):
         return jsonify({'error': 'حسابك في هذه الشركة بانتظار تأكيد الإدارة — سيتم إشعارك فور التأكيد'}), 400
 
     f = request.files.get('screenshot')

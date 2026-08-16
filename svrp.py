@@ -1601,7 +1601,7 @@ class SVRPManager:
         account = self.get_user_company_account(user_id, company_id)
         if not account:
             return None, "يجب تسجيل رقم حسابك أولاً"
-        if account.get('status') not in ('active', 'approved'):
+        if (account.get('status') or 'active') not in ('active', 'approved'):
             return None, "حسابك بانتظار تأكيد الإدارة — سيتم إشعارك فور التأكيد"
 
         # نسبة المكافأة الافتراضية

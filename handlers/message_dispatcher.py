@@ -154,8 +154,9 @@ class MessageDispatcherMixin:
             if success:
                 self.send_message(chat_id,
                     f"✅ {msg}\n\n"
-                    f"🏆 يمكنك الآن طلب المكافأة من الأدمن.\n"
-                    f"أو تسجيل حساب في شركة أخرى.")
+                    f"⏳ سيتم إشعارك فور تأكيد الإدارة لحسابك — بعدها أودِع والعب، "
+                    f"وإذا خسرت قدّم طلب تعويض.\n"
+                    f"أو سجّل حساباً في شركة أخرى.")
                 # عرض الشركات مرة أخرى للتسجيل في شركة أخرى
                 companies = self.svrp.get_recovery_companies()
                 accounts = self.svrp.get_user_company_accounts(user_id)
@@ -231,6 +232,14 @@ class MessageDispatcherMixin:
                 self._svrp_recovery_pick_company(chat_id, user_id)
                 return
 
+            # بوابة تأكيد الإدارة — لا يُقبل طلب تعويض لحساب غير مؤكد
+            if (account.get('status') or 'active') not in ('active', 'approved'):
+                if user_id in self.user_states: del self.user_states[user_id]
+                self.send_message(chat_id,
+                    "⏳ حسابك بانتظار تأكيد الإدارة — سيتم إشعارك فور التأكيد.\n"
+                    "بعد التأكيد قم بالإيداع والعب، وإذا خسرت قدّم طلب تعويض.")
+                return
+
             if 'photo' not in message:
                 self.send_message(chat_id, self.tr('a0161_يرجى_إرسال', 'ar'))
                 return
@@ -247,12 +256,16 @@ class MessageDispatcherMixin:
             company_name = account.get('company_name', '')
             account_number = account.get('account_number', '')
 
-            # إنشاء طلب استرداد مرتبط بالشركة والحساب
-            req_id = self.svrp.create_recovery_request(
+            # إنشاء طلب استرداد مرتبط بالشركة والحساب (مع منع تكرار الطلبات المعلقة)
+            req_id, _rec_err = self.svrp.create_recovery_request_if_no_pending(
                 user_id, user.get('customer_id', ''), photo_file_id,
                 company_id=company_id, company_name=company_name,
                 account_number=account_number
             )
+            if not req_id:
+                if user_id in self.user_states: del self.user_states[user_id]
+                self.send_message(chat_id, _rec_err or "⚠️ لديك طلب تعويض معلق بالفعل — انتظر مراجعة الإدارة.")
+                return
 
             # إشعار المستخدم
             self.send_message(chat_id,
