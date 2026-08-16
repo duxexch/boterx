@@ -3,3 +3,4 @@ flask-bcrypt
 openpyxl
 paramiko
 python-dotenv
+pillow

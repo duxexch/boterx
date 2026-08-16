@@ -7159,6 +7159,157 @@ def api_player_companies():
 _RECOVERY_UPLOADS_DIR = os.path.join(BASE_DIR, 'recovery_uploads')
 _ALLOWED_SCREENSHOT_EXT = {'.png', '.jpg', '.jpeg', '.webp'}
 _MAX_SCREENSHOT_BYTES = 5 * 1024 * 1024  # 5MB
+# Retention & quota — #77: recovery_uploads must not grow unboundedly
+_UPLOAD_RETENTION_DAYS = 14      # حذف صور الطلبات المحسومة بعد 14 يوماً
+_UPLOAD_ORPHAN_HOURS = 24        # حذف الملفات غير المرتبطة بأي طلب بعد 24 ساعة
+_UPLOAD_MAX_FILES_PER_USER = 10  # أقصى عدد ملفات محفوظة لكل مستخدم
+_UPLOAD_MAX_BYTES_PER_USER = 25 * 1024 * 1024  # أقصى حجم إجمالي لكل مستخدم
+
+
+def _validate_screenshot_image(blob):
+    """فك ترميز الصورة والتحقق منها فعلياً عبر Pillow — لا نثق بالتوقيع وحده.
+
+    Returns canonical extension ('.png'/'.jpg'/'.webp') or None if invalid."""
+    import io as _io
+    try:
+        from PIL import Image
+        with Image.open(_io.BytesIO(blob)) as im:
+            im.verify()  # يكتشف الملفات التالفة/المزيفة
+        # verify() يستهلك الملف — إعادة الفتح لقراءة الصيغة والأبعاد
+        with Image.open(_io.BytesIO(blob)) as im2:
+            fmt = (im2.format or '').upper()
+            w, h = im2.size
+        if fmt not in ('PNG', 'JPEG', 'WEBP') or w < 1 or h < 1 or w * h > 40_000_000:
+            return None
+        return {'PNG': '.png', 'JPEG': '.jpg', 'WEBP': '.webp'}[fmt]
+    except ImportError:
+        # Pillow غير متاح — نرجع للتوقيع فقط (تم فحصه قبل الاستدعاء)
+        return None if not blob else '.png' if blob.startswith(b'\x89PNG') \
+            else '.jpg' if blob.startswith(b'\xff\xd8\xff') \
+            else '.webp' if blob[:4] == b'RIFF' and blob[8:12] == b'WEBP' else None
+    except Exception:
+        return None
+
+
+def _iter_upload_files():
+    """Yield (fname, full_path, stat) for every file in recovery_uploads/."""
+    if not os.path.isdir(_RECOVERY_UPLOADS_DIR):
+        return
+    for fname in os.listdir(_RECOVERY_UPLOADS_DIR):
+        path = os.path.join(_RECOVERY_UPLOADS_DIR, fname)
+        try:
+            st = os.stat(path)
+        except OSError:
+            continue
+        if os.path.isfile(path):
+            yield fname, path, st
+
+
+def _read_recovery_requests_strict():
+    """قراءة recovery_requests.csv بلا إخفاء للأخطاء — أي فشل يرفع استثناء.
+
+    (read_csv تعيد [] عند الفشل، ما قد يصنّف صور الطلبات المعلقة كيتيمة
+    ويحذفها — الحذف يجب أن يكون fail-closed.)"""
+    filepath = os.path.join(BASE_DIR, 'recovery_requests.csv')
+    if not os.path.exists(filepath):
+        return []
+    with open(filepath, 'r', encoding='utf-8-sig') as f:
+        return list(csv.DictReader(f))
+
+
+def _svrp_lock_ctx():
+    """قفل SVRP العابر للعمليات — يسلسل الرفع/الحصة/التنظيف مع إنشاء الطلبات."""
+    from svrp import svrp_lock
+    return svrp_lock()
+
+
+def _cleanup_recovery_uploads():
+    """تنظيف دوري لمجلد recovery_uploads — يعيد عدد الملفات المحذوفة.
+
+    يحذف:
+      • صور الطلبات المحسومة (approved/rejected) الأقدم من _UPLOAD_RETENTION_DAYS
+      • الملفات اليتيمة (غير مشار إليها في recovery_requests.csv) الأقدم من 24 ساعة
+    صور الطلبات المعلقة لا تُحذف أبداً. يعمل داخل svrp_lock حتى لا يسابق
+    رفعاً جارياً (الكتابة + إلحاق صف الطلب يجريان تحت نفس القفل)."""
+    now = time.time()
+    pending_files, resolved_files = set(), set()
+    try:
+        with _svrp_lock_ctx():
+            rows = _read_recovery_requests_strict()
+    except Exception as exc:
+        _auth_logger.error('[uploads-cleanup] read recovery_requests failed — fail closed: %s', exc)
+        return 0
+    for r in rows:
+        pfid = r.get('photo_file_id', '') or ''
+        if not pfid.startswith('web:'):
+            continue
+        fname = os.path.basename(pfid[4:])
+        if r.get('status') == 'pending':
+            pending_files.add(fname)
+        else:
+            resolved_files.add(fname)
+    deleted = 0
+    retention_s = _UPLOAD_RETENTION_DAYS * 86400
+    orphan_s = _UPLOAD_ORPHAN_HOURS * 3600
+    for fname, path, st in _iter_upload_files():
+        if fname in pending_files:
+            continue
+        age = now - st.st_mtime
+        if fname in resolved_files:
+            expired = age > retention_s
+        else:
+            expired = age > orphan_s  # يتيم — ليس في أي طلب
+        if expired:
+            try:
+                os.unlink(path)
+                deleted += 1
+            except OSError:
+                pass
+    if deleted:
+        _auth_logger.info('[uploads-cleanup] Deleted %d expired screenshot(s)', deleted)
+    return deleted
+
+
+def _enforce_user_upload_quota(uid, incoming_bytes=0):
+    """فرض حصة المستخدم شاملةً الملف الوارد: يحذف أقدم ملفاته غير المعلقة أولاً.
+
+    يجب استدعاؤها داخل svrp_lock (يسلسل الحصة + الكتابة + إنشاء الطلب فلا
+    يمكن لطلبين متزامنين تجاوز الحد أو حذف ملف رفعٍ جارٍ قبل إلحاق صفه).
+    Returns True if — after best-effort eviction — the incoming file fits."""
+    prefix = f"{uid}_"
+
+    def _within(files, total):
+        return (len(files) + 1 <= _UPLOAD_MAX_FILES_PER_USER
+                and total + incoming_bytes <= _UPLOAD_MAX_BYTES_PER_USER)
+
+    mine = [(fname, path, st) for fname, path, st in _iter_upload_files()
+            if fname.startswith(prefix)]
+    total = sum(st.st_size for _, _, st in mine)
+    if _within(mine, total):
+        return True
+    # نحتاج للحذف — قراءة حالة الطلبات fail-closed: أي فشل ⇒ لا حذف ⇒ رفض الرفع
+    try:
+        rows = _read_recovery_requests_strict()
+    except Exception as exc:
+        _auth_logger.error('[upload-quota] read recovery_requests failed — fail closed: %s', exc)
+        return False
+    pending_files = {os.path.basename((r.get('photo_file_id') or '')[4:])
+                     for r in rows
+                     if (r.get('photo_file_id') or '').startswith('web:')
+                     and r.get('status') == 'pending'}
+    # حذف الأقدم أولاً — مع تخطي صور الطلبات المعلقة
+    for fname, path, st in sorted(mine, key=lambda t: t[2].st_mtime):
+        if fname in pending_files:
+            continue
+        try:
+            os.unlink(path)
+            total -= st.st_size
+            mine = [m for m in mine if m[0] != fname]
+        except OSError:
+            pass
+        if _within(mine, total):
+            return True
+    return _within(mine, total)
 
 
 def _find_active_company(company_id):
@@ -7245,12 +7396,11 @@ def api_player_compensation_request():
                or (blob[:4] == b'RIFF' and blob[8:12] == b'WEBP'))
     if not _sig_ok:
         return jsonify({'error': 'الملف ليس صورة صالحة'}), 400
-
-    os.makedirs(_RECOVERY_UPLOADS_DIR, exist_ok=True)
-    fname = f"{uid}_{secrets.token_hex(8)}{ext}"
-    upload_path = os.path.join(_RECOVERY_UPLOADS_DIR, fname)
-    with open(upload_path, 'wb') as out:
-        out.write(blob)
+    # فك ترميز فعلي عبر Pillow — يرفض الملفات التالفة/المزيفة و decompression bombs
+    canon_ext = _validate_screenshot_image(blob)
+    if not canon_ext:
+        return jsonify({'error': 'الملف ليس صورة صالحة'}), 400
+    ext = canon_ext  # الامتداد الحقيقي حسب محتوى الصورة، لا اسم الملف
 
     # customer_id من users.csv إن وجد
     customer_id = ''
@@ -7262,18 +7412,31 @@ def api_player_compensation_request():
     except Exception:
         pass
 
-    # فحص "لا طلب معلق" + الإنشاء ذرّياً داخل svrp_lock واحد (يمنع سباق التكرار)
-    req_id, err = mgr.create_recovery_request_if_no_pending(
-        uid, customer_id, f'web:{fname}', company_id,
-        company_name=company.get('name', ''),
-        account_number=account.get('account_number', ''))
-    if not req_id:
-        try:
-            os.unlink(upload_path)  # لا نراكم ملفات لطلبات لم تُحفظ
-        except OSError:
-            pass
-        status = 409 if err and 'معلق' in err else 500
-        return jsonify({'error': err or 'فشل حفظ الطلب'}), status
+    # الحصة + كتابة الملف + إنشاء الطلب تحت svrp_lock واحد:
+    #  • لا يمكن لطلبين متزامنين تجاوز حصة المستخدم
+    #  • لا يمكن للتنظيف/الحصة حذف ملف رفعٍ جارٍ قبل إلحاق صف طلبه
+    #  • فحص "لا طلب معلق" + الإنشاء ذرّيان (القفل reentrant)
+    with _svrp_lock_ctx():
+        if not _enforce_user_upload_quota(uid, incoming_bytes=len(blob)):
+            return jsonify({'error': 'تجاوزت الحد المسموح من الملفات المرفوعة — حاول لاحقاً'}), 429
+
+        os.makedirs(_RECOVERY_UPLOADS_DIR, exist_ok=True)
+        fname = f"{uid}_{secrets.token_hex(8)}{ext}"
+        upload_path = os.path.join(_RECOVERY_UPLOADS_DIR, fname)
+        with open(upload_path, 'wb') as out:
+            out.write(blob)
+
+        req_id, err = mgr.create_recovery_request_if_no_pending(
+            uid, customer_id, f'web:{fname}', company_id,
+            company_name=company.get('name', ''),
+            account_number=account.get('account_number', ''))
+        if not req_id:
+            try:
+                os.unlink(upload_path)  # لا نراكم ملفات لطلبات لم تُحفظ
+            except OSError:
+                pass
+            status = 409 if err and 'معلق' in err else 500
+            return jsonify({'error': err or 'فشل حفظ الطلب'}), status
 
     try:
         push_notification('recovery_request', 'طلب تعويض جديد',
@@ -11575,6 +11738,12 @@ def _session_maintenance_daemon():
             except Exception as exc:
                 _auth_logger.error("[maintenance] cleanup_expired_nonces: %s", exc)
 
+        # 5 — Prune expired/orphaned compensation screenshots (#77)
+        try:
+            _cleanup_recovery_uploads()
+        except Exception as exc:
+            _auth_logger.error("[maintenance] recovery uploads cleanup: %s", exc)
+
 
 # Startup prune: clear sessions that expired while the server was down.
 try:
@@ -11586,6 +11755,12 @@ try:
     _prune_engine_mines_sessions_file()
 except Exception as _mce2:
     _auth_logger.error("mines startup prune (engine sessions) error: %s", _mce2)
+
+# Startup prune of expired compensation screenshots (#77)
+try:
+    _cleanup_recovery_uploads()
+except Exception as _rce:
+    _auth_logger.error("recovery uploads startup cleanup error: %s", _rce)
 
 threading.Thread(target=_session_maintenance_daemon, daemon=True, name='session-maintenance').start()
 
