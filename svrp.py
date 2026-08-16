@@ -1153,11 +1153,12 @@ class SVRPManager:
 
     # ==================== معالجة كود الإحالة ====================
 
-    def process_referral_code(self, referrer_customer_id, referred_telegram_id):
+    def process_referral_code(self, referrer_customer_id, referred_telegram_id, referred_is_existing=False):
         """
         ربط كود الإحالة بالمستخدم الجديد
         referrer_customer_id: رقم عميل المُحيل (من كود REFxxxx)
         referred_telegram_id: معرف تلجرام المستخدم الجديد
+        referred_is_existing: الصديق لديه حساب بالفعل — نص فك التجميد (5% بدل 10%)
         """
         try:
             # العثور على المُحيل في users.csv
@@ -1190,7 +1191,7 @@ class SVRPManager:
                 'referrer_customer_id': referrer_customer_id,
                 'referred_id': str(referred_telegram_id),
                 'referred_phone': '',
-                'status': 'registered',
+                'status': 'existing' if referred_is_existing else 'registered',
                 'created_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
                 'reward_given': 'no'
             }
@@ -1199,19 +1200,22 @@ class SVRPManager:
                               'referred_id', 'referred_phone', 'status',
                               'created_at', 'reward_given'])
 
-            logger.info(f"Recovery: Referral processed — referrer {referrer_tid} → {referred_telegram_id}")
+            logger.info(f"Recovery: Referral processed — referrer {referrer_tid} → {referred_telegram_id} (existing={referred_is_existing})")
 
             # قاعدة فك التجميد: كل صديق جديد يسجل بكود الإحالة يفك 10% من
-            # الرصيد المجمد للمُحيل.
+            # الرصيد المجمد للمُحيل. لو الصديق لديه حساب بالفعل — النصف (5%).
+            unlock_pct = 0.05 if referred_is_existing else 0.10
             try:
                 wallet = self.get_wallet(referrer_tid)
                 frozen = float(wallet.get('balance', 0) or 0)
                 if frozen > 0:
-                    self.unfreeze_balance(referrer_tid, round(frozen * 0.10, 6))
-                    logger.info(f"Referral unlock: 10% of frozen unfrozen for referrer {referrer_tid}")
+                    self.unfreeze_balance(referrer_tid, round(frozen * unlock_pct, 6))
+                    logger.info(f"Referral unlock: {unlock_pct:.0%} of frozen unfrozen for referrer {referrer_tid}")
             except Exception as _ue:
                 logger.warning(f"Referral unlock failed for {referrer_tid}: {_ue}")
 
+            if referred_is_existing:
+                return True, "تم ربط الصديق (حساب موجود بالفعل) — فُك لك 5% من الرصيد المجمد"
             return True, "تم ربط كود الإحالة بنجاح"
 
         except Exception as e:
@@ -1521,12 +1525,19 @@ class SVRPManager:
         return None
 
     def get_recovery_companies(self, active_only=True):
-        """جلب شركات الاسترداد من ملف الشركات الرئيسي companies.csv"""
+        """جلب شركات الاسترداد من ملف الشركات الرئيسي companies.csv
+
+        يحترم علم show_in_comp من لوحة الأدمن: الشركة المخفية من قسم
+        التعويض لا تظهر هنا (نفس سلوك الويب في /api/player/companies).
+        """
         rows = self._read_csv('companies.csv')
         result = []
         for r in rows:
             is_active = r.get('is_active', '').lower() in ['active', 'yes', '1', 'true']
             if active_only and not is_active:
+                continue
+            show_in_comp = (r.get('show_in_comp', '') or 'yes').strip().lower()
+            if show_in_comp in ('no', '0', 'false'):
                 continue
             result.append({
                 'id': r.get('id', ''),
@@ -1536,7 +1547,8 @@ class SVRPManager:
                 'bonus_percentage': '10',
                 'is_active': 'yes' if is_active else 'no',
                 'icon': r.get('icon', ''),
-                'details': r.get('details', '')
+                'details': r.get('details', ''),
+                'promo_code': (r.get('promo_code', '') or '').strip()
             })
         return result
 

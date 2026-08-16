@@ -157,6 +157,19 @@ class MessageDispatcherMixin:
                     f"⏳ سيتم إشعارك فور تأكيد الإدارة لحسابك — بعدها أودِع والعب، "
                     f"وإذا خسرت قدّم طلب تعويض.\n"
                     f"أو سجّل حساباً في شركة أخرى.")
+                # إشعار الأدمن بطلب تسجيل الحساب المعلق (نفس نمط الويب)
+                try:
+                    _u = self.find_user(user_id) or {}
+                    self.notify_admins(
+                        "🆕 <b>طلب تسجيل حساب تعويض</b>\n"
+                        f"👤 المستخدم: <code>{user_id}</code>\n"
+                        f"🪪 العميل: <code>{_u.get('customer_id', '')}</code>\n"
+                        f"🏢 الشركة: <b>{company_name}</b>\n"
+                        f"📋 رقم الحساب: <code>{text}</code>\n\n"
+                        "راجعه من: لوحة الإدارة ← التعويض ← حسابات الشركات",
+                        notification_type='comp_account_pending')
+                except Exception as _nae:
+                    logger.error(f"فشل إشعار الأدمن بتسجيل حساب: {_nae}")
                 # عرض الشركات مرة أخرى للتسجيل في شركة أخرى
                 companies = self.svrp.get_recovery_companies()
                 accounts = self.svrp.get_user_company_accounts(user_id)

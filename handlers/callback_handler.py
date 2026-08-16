@@ -2970,6 +2970,9 @@ class CallbackHandlerMixin:
                     text += self.tr('a0544_شركات_متاحة', lang)
                     for c in unregistered:
                         text += f"  • <b>{c['name']}</b>\n"
+                        _promo = (c.get('promo_code', '') or '').strip()
+                        if _promo:
+                            text += f"    🎟️ كود البرومو: <code>{_promo}</code> 👈 اضغط للنسخ\n"
                         if c.get('registration_url', '').strip():
                             text += self.tr('a0545_رابط_التسجيل', lang, c_registration_url=c['registration_url'])
                     text += "\n"
@@ -3012,6 +3015,13 @@ class CallbackHandlerMixin:
                     return
 
                 msg = self.tr('a0549_تسجيل_حساب', 'ar', company_name=company['name'])
+                # 🎟️ كود البرومو — يستخدمه العميل عند التسجيل في الشركة
+                promo_code = (company.get('promo_code', '') or '').strip()
+                if promo_code:
+                    msg += (
+                        f"🎟️ كود البرومو: <code>{promo_code}</code> 👈 اضغط للنسخ\n"
+                        f"استخدمه أثناء إنشاء حسابك في الشركة.\n\n"
+                    )
                 affiliate_link = company.get('affiliate_link', '').strip()
                 if affiliate_link:
                     msg += self.tr('a0550_اضغط_الزر', 'ar')

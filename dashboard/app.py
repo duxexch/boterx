@@ -3287,6 +3287,15 @@ def _comp_strong_auth_or_error():
 @permission_required('view_financial')
 def api_comp_admin_data():
     accounts = read_csv('user_company_accounts.csv'); accounts.reverse()
+    # دمج إجابة "متى فتحت الحساب" (إن وُجدت) مع كل حساب
+    try:
+        src_map = {}
+        for s in read_csv('comp_account_sources.csv'):
+            src_map[(str(s.get('user_id', '')), str(s.get('company_id', '')))] = s.get('source', '')
+    except Exception:
+        src_map = {}
+    for a in accounts[:200]:
+        a['account_source'] = src_map.get((str(a.get('user_id', '')), str(a.get('company_id', ''))), '')
     return jsonify({'accounts': accounts[:200]})
 
 @app.route('/api/comp/admin/account/<acc_id>', methods=['POST'])
@@ -6930,10 +6939,23 @@ def api_detailed_stats():
 
 # ===== API — Notifications Log =====
 
+def _clean_log_rows(rows):
+    """تنقية صفوف سجل الإشعارات: التخلص من مفاتيح None الناتجة عن صفوف
+    CSV معطوبة (رسائل متعددة الأسطر) — وإلا فشل jsonify بفرز مفاتيح None."""
+    cleaned = []
+    for r in rows:
+        if not isinstance(r, dict):
+            continue
+        row = {str(k): v for k, v in r.items() if k is not None}
+        if row.get('timestamp') or row.get('message_preview'):
+            cleaned.append(row)
+    return cleaned
+
+
 @app.route('/api/notifications-log')
 @api_auth
 def api_notifications_log():
-    logs = read_csv('notifications_log.csv')
+    logs = _clean_log_rows(read_csv('notifications_log.csv'))
     logs.reverse()
     return jsonify({'notifications': logs[:50], 'total': len(logs)})
 
@@ -6946,7 +6968,7 @@ def api_push_vapid_public():
 @app.route('/api/user/notifications')
 def api_user_notifications():
     """Public endpoint: returns recent notifications for users (no auth needed)."""
-    logs = read_csv('notifications_log.csv')
+    logs = _clean_log_rows(read_csv('notifications_log.csv'))
     logs.reverse()
     # عام بدون تسجيل دخول ⇒ نعرض فقط البثّ العام الموجّه للمستخدمين.
     # إشعارات الأدمن (عضو جديد… إلخ) تحتوي بيانات شخصية ويُمنع تسريبها هنا.
@@ -7683,6 +7705,57 @@ def api_player_register_company_account(company_id):
         pass
     return jsonify({'ok': True, 'status': 'pending', 'account_number': account_number,
                     'message': '✅ تم إرسال طلبك للإدارة — سيتم إشعارك فور تأكيد حسابك'})
+
+
+@app.route('/api/player/companies/account-source', methods=['POST'])
+@webapp_auth
+def api_player_account_source():
+    """إجابة النافذة المنبثقة بعد تأكيد الحساب: هل فتح حساباً جديداً عبر رابط
+    التسجيل أم كان لديه حساب مسبقاً؟ تُسجَّل الإجابة وتُشعر الإدارة."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Unauthorized'}), 403
+    data = request.get_json(silent=True) or {}
+    company_id = str(data.get('company_id', '')).strip()
+    source = str(data.get('source', '')).strip()
+    if source not in ('new', 'existing'):
+        return jsonify({'error': 'قيمة غير صالحة'}), 400
+    try:
+        with _COMP_CSV_LOCK:
+            rows = read_csv('user_company_accounts.csv')
+            account = None
+            for r in rows:
+                if str(r.get('user_id', '')) == uid and r.get('company_id') == company_id:
+                    account = r
+                    break
+            if not account:
+                return jsonify({'error': 'لا يوجد حساب مسجل في هذه الشركة'}), 404
+            # إجابة واحدة لكل حساب
+            sources = read_csv('comp_account_sources.csv')
+            for s in sources:
+                if str(s.get('user_id', '')) == uid and s.get('company_id') == company_id:
+                    return jsonify({'ok': True, 'already': True})
+            fieldnames = get_fieldnames('comp_account_sources.csv',
+                ['id', 'user_id', 'company_id', 'company_name', 'source', 'created_at'])
+            append_csv('comp_account_sources.csv', {
+                'id': f"CAS{secrets.token_hex(5).upper()}",
+                'user_id': uid, 'company_id': company_id,
+                'company_name': account.get('company_name', ''),
+                'source': source,
+                'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')}, fieldnames)
+    except Exception as e:
+        _auth_logger.error('account-source failed uid=%s company=%s: %s', uid, company_id, e)
+        return jsonify({'error': 'فشل حفظ الإجابة — حاول مجدداً'}), 500
+    answer_ar = 'فتح حساباً جديداً عبر رابط التسجيل' if source == 'new' else 'كان لديه حساب مسبقاً'
+    _comp_alert_admins(
+        f"ℹ️ <b>إجابة العميل عن حسابه</b>\n"
+        f"👤 المستخدم: <code>{uid}</code>\n"
+        f"🏢 الشركة: {account.get('company_name', '')}\n"
+        f"📋 رقم الحساب: <code>{account.get('account_number', '')}</code>\n"
+        f"💬 الإجابة: {answer_ar}")
+    return jsonify({'ok': True})
 
 
 @app.route('/api/player/compensation-request', methods=['POST'])
