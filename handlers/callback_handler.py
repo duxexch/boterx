@@ -255,35 +255,32 @@ class CallbackHandlerMixin:
                     del self.user_states[user_id]
                 return
             
-            # الرد على الشكاوى (inline buttons)
-            elif data.startswith('complaint_resolve_'):
-                complaint_id = data.replace('complaint_resolve_', '')
-                reply_msg = self.tr('a0430_شكراً_لتواصلك', lang)
-                self.save_complaint_reply(complaint_id, reply_msg)
-                self.send_complaint_reply_to_customer(complaint_id, reply_msg)
-                self.edit_message(chat_id, message.get('message_id'), self.tr('a0431_تم_حل', lang, complaint_id=complaint_id))
-                return
-            
-            elif data.startswith('complaint_review_'):
-                complaint_id = data.replace('complaint_review_', '')
-                reply_msg = self.tr('a0432_نحن_نراجع', lang)
-                self.save_complaint_reply(complaint_id, reply_msg)
-                self.send_complaint_reply_to_customer(complaint_id, reply_msg)
-                self.edit_message(chat_id, message.get('message_id'), self.tr('a0433_قيد_المراجعة', lang, complaint_id=complaint_id))
-                return
-            
-            elif data.startswith('complaint_contact_'):
-                complaint_id = data.replace('complaint_contact_', '')
-                reply_msg = self.tr('a0434_سنتواصل_معك', lang)
-                self.save_complaint_reply(complaint_id, reply_msg)
-                self.send_complaint_reply_to_customer(complaint_id, reply_msg)
-                self.edit_message(chat_id, message.get('message_id'), self.tr('a0435_سنتواصل', lang, complaint_id=complaint_id))
-                return
-            
-            elif data.startswith('complaint_custom_'):
-                complaint_id = data.replace('complaint_custom_', '')
-                self.send_message(chat_id, self.tr('a0436_اكتب_ردك', lang, complaint_id=complaint_id))
-                self.user_states[user_id] = f'replying_to_complaint_{complaint_id}'
+            # الرد على الشكاوى (inline buttons) — للإدارة فقط
+            elif data.startswith('complaint_resolve_') or data.startswith('complaint_review_') or data.startswith('complaint_contact_') or data.startswith('complaint_custom_'):
+                if not self.is_admin(user_id):
+                    return
+                if data.startswith('complaint_resolve_'):
+                    complaint_id = data.replace('complaint_resolve_', '')
+                    reply_msg = self.tr('a0430_شكراً_لتواصلك', lang)
+                    self.save_complaint_reply(complaint_id, reply_msg)
+                    self.send_complaint_reply_to_customer(complaint_id, reply_msg)
+                    self.edit_message(chat_id, message.get('message_id'), self.tr('a0431_تم_حل', lang, complaint_id=complaint_id))
+                elif data.startswith('complaint_review_'):
+                    complaint_id = data.replace('complaint_review_', '')
+                    reply_msg = self.tr('a0432_نحن_نراجع', lang)
+                    self.save_complaint_reply(complaint_id, reply_msg)
+                    self.send_complaint_reply_to_customer(complaint_id, reply_msg)
+                    self.edit_message(chat_id, message.get('message_id'), self.tr('a0433_قيد_المراجعة', lang, complaint_id=complaint_id))
+                elif data.startswith('complaint_contact_'):
+                    complaint_id = data.replace('complaint_contact_', '')
+                    reply_msg = self.tr('a0434_سنتواصل_معك', lang)
+                    self.save_complaint_reply(complaint_id, reply_msg)
+                    self.send_complaint_reply_to_customer(complaint_id, reply_msg)
+                    self.edit_message(chat_id, message.get('message_id'), self.tr('a0435_سنتواصل', lang, complaint_id=complaint_id))
+                elif data.startswith('complaint_custom_'):
+                    complaint_id = data.replace('complaint_custom_', '')
+                    self.send_message(chat_id, self.tr('a0436_اكتب_ردك', lang, complaint_id=complaint_id))
+                    self.user_states[user_id] = f'replying_to_complaint_{complaint_id}'
                 return
             
             # تأكيد رفض المعاملة (inline)

@@ -193,6 +193,9 @@
         <a href="{{ url_for('page_complaints') }}" class="sidebar-link {% if active_page == 'complaints' %}active{% endif %}">
             <i class="fas fa-exclamation-circle w-5 text-center"></i> <span x-text="t('complaints')"></span>
         </a>
+        <a href="{{ url_for('page_tickets') }}" class="sidebar-link {% if active_page == 'tickets' %}active{% endif %}">
+            <i class="fas fa-ticket-alt w-5 text-center"></i> التذاكر
+        </a>
         {% endif %}
         {% if not admin_perms or admin_perms.get('send_broadcast') %}
         <a href="{{ url_for('page_broadcast') }}" class="sidebar-link {% if active_page == 'broadcast' %}active{% endif %}">
