@@ -10669,6 +10669,11 @@ def api_player_stats():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/favicon.ico')
+def favicon_ico():
+    return app.send_static_file('icons/icon-32.png')
+
+
 @app.route('/api/auth/create-token', methods=['POST', 'GET'])
 def api_auth_create_token():
     """Create a session token for a given uid.

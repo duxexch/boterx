@@ -573,6 +573,15 @@ class GameManager:
     # ===== الألعاب =====
 
     def get_games(self, active_only=True):
+        # كاش قصير (30 ثانية) لتقليل قراءة CSV في كل طلب لقائمة الألعاب
+        import time as _t
+        now = _t.time()
+        cache = getattr(self, '_games_catalog_cache', None)
+        if cache is not None and now - getattr(self, '_games_catalog_cache_ts', 0) < 30:
+            all_games = cache
+            if active_only:
+                return [g for g in all_games if g.get('is_active') == 'yes']
+            return list(all_games)
         games = []
         try:
             with open(self.catalog_file, 'r', encoding=CSV_ENCODING) as f:
@@ -583,11 +592,13 @@ class GameManager:
                     for k, v in (row or {}).items():
                         ck = k.lstrip('\ufeff').strip() if k else k
                         clean[ck] = v
-                    if active_only and clean.get('is_active') != 'yes':
-                        continue
                     games.append(clean)
         except:
             pass
+        self._games_catalog_cache = games
+        self._games_catalog_cache_ts = now
+        if active_only:
+            return [g for g in games if g.get('is_active') == 'yes']
         return games
 
     def get_game(self, game_id):
