@@ -23,6 +23,19 @@ systemctl is-active boterx boterx-dashboard
 curl -sf http://localhost:8080/health | python3 -m json.tool
 ```
 
+## No-GitHub deploy path (used when GitHub push is unavailable)
+```bash
+git bundle create /tmp/boterx.bundle <server-head>..main   # locally
+sshpass -e scp /tmp/boterx.bundle root@69.169.108.197:/tmp/
+ssh: cd /opt/bot && git fetch /tmp/boterx.bundle main && git reset --hard FETCH_HEAD
+```
+SSH access: `export SSHPASS="$SERVER_ROOT_PASSWORD"` (Replit secret) then `sshpass -e ssh root@...`.
+
+## Production mode (since Aug 2026)
+- boterx-dashboard.service runs with `Environment=APP_ENV=production` + strong DASHBOARD_PASSWORD/DASHBOARD_SECRET_KEY set in the unit file (not .env).
+- Production refuses to start with the known default password `boterx_admin_2026` — never revert those Environment lines.
+- Admin login: POST /vex/admin/admin needs the csrf_token from the GET form; success = 303.
+
 ## Services
 - `boterx.service` — Telegram bot (venv Python, comprehensive_bot.py)
 - `boterx-dashboard.service` — gunicorn on port 8080 (system Python, dashboard/app.py)
