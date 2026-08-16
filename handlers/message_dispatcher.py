@@ -17,6 +17,15 @@ class MessageDispatcherMixin:
         if 'text' not in message and 'contact' not in message and 'photo' not in message and 'document' not in message and 'video' not in message and 'sticker' not in message:
             return
 
+        # ── نظام العملاء: حارس المميزات — منع الوصول اليدوي لميزة غير ممنوحة ──
+        if getattr(self, 'client_features', None) is not None and 'text' in message:
+            _txt = (message.get('text') or '').strip()
+            if _txt and not self._client_feature_allowed_text(_txt):
+                self.send_message(message['chat']['id'],
+                    "🚫 هذه الخدمة غير مشمولة باشتراكك الحالي.\n"
+                    "تواصل مع الإدارة لتفعيلها.")
+                return
+
         # فحص هل الرسالة من قناة/مجموعة البوت مشرف بها ← إعادة نشر تلقائي
         chat_type = message.get('chat', {}).get('type', '')
         if chat_type in ('channel', 'group', 'supergroup'):

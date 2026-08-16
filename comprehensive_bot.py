@@ -94,6 +94,17 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         # فحص صلاحية إدارة البوتات: البوت الرئيسي فقط (من .env) يمكنه إدارة البوتات
         self.can_manage_bots = self._check_bot_management_permission(token)
         self.admin_ids = self.get_admin_ids()
+
+        # ── نظام العملاء (White-Label): مميزات العميل الممنوحة فقط ──
+        # CLIENT_FEATURES = JSON list من مفاتيح المميزات — فارغ = كل الميزات (البوت الرئيسي)
+        self.client_features = None
+        try:
+            _cf = (os.getenv('CLIENT_FEATURES') or '').strip()
+            if _cf.startswith('['):
+                self.client_features = {f for f in json.loads(_cf) if isinstance(f, str)}
+        except Exception:
+            self.client_features = None
+        self.client_id = os.getenv('CLIENT_ID', '') or None
         
         # نظام قفل ملفات CSV لمنع تلف البيانات عند الكتابة المتزامنة
         self.csv_locks = {}
@@ -4442,6 +4453,34 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             for row in rows:
                 writer.writerow({k: row.get(k, '') for k in fieldnames})
     
+    def feature_enabled(self, key):
+        """نظام العملاء: هل الميزة ممنوحة لهذا البوت؟ (None = بوت رئيسي بكل الميزات)"""
+        if self.client_features is None:
+            return True
+        return key in self.client_features
+
+    def _client_feature_allowed_text(self, text):
+        """هل النص المرسل يخص ميزة ممنوحة؟ (يستخدمه حارس process_message)"""
+        if self.client_features is None:
+            return True
+        lang = 'ar'
+        t = self.get_current_theme() if THEME_AVAILABLE else {}
+        _feat_btn = {
+            'deposit': self.tr('deposit', lang),
+            'withdraw': self.tr('withdraw', lang),
+            'trading': '💱 تداول USDT',
+            'compensation': self.tr('svrp_title', lang),
+            'matching': self.tr('match_btn', lang) if self.tr('match_btn', lang) != 'match_btn' else f"{t.get('btn_match', '🔄')} مطابقة",
+            'games': '🎮 ألعاب',
+            'apps': self.tr('apps_btn', lang) if self.tr('apps_btn', lang) != 'apps_btn' else self.tr('a0117_تطبيقات', lang),
+            'referral': self.tr('referral_btn', lang) if self.tr('referral_btn', lang) != 'referral_btn' else f"{t.get('btn_referral', '🎁')} اربح",
+            'complaints': self.tr('complaint', lang),
+        }
+        for k, txt in _feat_btn.items():
+            if txt and text == txt:
+                return self.feature_enabled(k)
+        return True
+
     def main_keyboard(self, lang='ar', user_id=None):
         """القائمة الرئيسية — تصميم احترافي مع رموز مميزة"""
         t = self.get_current_theme() if THEME_AVAILABLE else {}
@@ -4478,6 +4517,23 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             [{'text': more_btn}, {'text': lang_btn_text}],
             [{'text': reset_btn}],
         ]
+
+        # ── نظام العملاء: إخفاء أزرار المميزات غير الممنوحة ──
+        if self.client_features is not None:
+            _feat_btn = {
+                'deposit': deposit_btn, 'withdraw': withdraw_btn,
+                'trading': '💱 تداول USDT', 'compensation': svrp_btn,
+                'matching': match_btn, 'games': '🎮 ألعاب',
+                'apps': apps_btn, 'referral': ref_btn, 'complaints': complaint_btn,
+                'multi_lang': lang_btn_text,
+            }
+            _hidden = {txt for k, txt in _feat_btn.items() if not self.feature_enabled(k)}
+            _rows = []
+            for row in keyboard:
+                _kept = [b for b in row if b['text'] not in _hidden]
+                if _kept:
+                    _rows.append(_kept)
+            keyboard = _rows
         
         # زر التسجيل للمستخدمين غير المسجلين
         if user_id and not self.find_user(user_id):
@@ -13554,10 +13610,15 @@ if __name__ == "__main__":
         def log_message(self, format, *args):
             pass  # إسكات logs الـ HTTP
     
-    http_server = HTTPServer(('0.0.0.0', port), HealthHandler)
+    try:
+        http_server = HTTPServer(('0.0.0.0', port), HealthHandler)
+    except OSError:
+        # المنفذ مشغول (بوتات العملاء تعمل بمعزل على نفس PORT) — منفذ مؤقت
+        http_server = HTTPServer(('0.0.0.0', 0), HealthHandler)
+        logger.info(f"Port {port} busy — health server on ephemeral port {http_server.server_address[1]}")
     http_thread = threading.Thread(target=http_server.serve_forever, daemon=True)
     http_thread.start()
-    logger.info(f"Health check server started on port {port}")
+    logger.info(f"Health check server started on port {http_server.server_address[1]}")
     
     # فحص وضع متعدد البوتات
     use_multi_bot = os.getenv('MULTI_BOT', 'no').lower() in ('yes', '1', 'true')

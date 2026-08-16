@@ -37,3 +37,7 @@ test_company.txt
 dashboard/static/uploads/icons/*
 !dashboard/static/uploads/icons/.gitkeep
 recovery_uploads/
+
+# نظام العملاء — بيانات حساسة (توكنات + هاشات كلمات مرور)
+clients.csv
+clients/
