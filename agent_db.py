@@ -571,6 +571,22 @@ def void_pending_by_match_request(match_request_id):
     return void_pending_transaction(row['agent_id'], row['id'])
 
 
+def has_settled_txn_for_match_request(match_request_id):
+    """True if an agent transaction linked to this match request was already
+    approved/rejected — cancellation must not override a settled decision."""
+    if not match_request_id:
+        return False
+    conn = _conn()
+    try:
+        row = conn.execute(
+            "SELECT 1 FROM agent_transactions "
+            "WHERE match_request_id=? AND status IN ('approved','rejected') LIMIT 1",
+            (match_request_id,)).fetchone()
+        return row is not None
+    finally:
+        conn.close()
+
+
 def set_txn_match_request(txn_id, match_request_id):
     conn = _conn()
     try:

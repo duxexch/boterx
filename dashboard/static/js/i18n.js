@@ -129,9 +129,30 @@
     get lang() { return lang; }
   };
 
+  // Translate dynamically inserted content (modals, lists) when EN is active.
+  var _observing = false;
+  var _applying = false;
+  function observe() {
+    if (_observing || !window.MutationObserver || !document.body) return;
+    _observing = true;
+    new MutationObserver(function (muts) {
+      if (_applying || lang === 'ar') return;
+      _applying = true;
+      try {
+        muts.forEach(function (m) {
+          for (var i = 0; i < m.addedNodes.length; i++) {
+            var n = m.addedNodes[i];
+            if (n.nodeType === 1) apply(n);
+          }
+        });
+      } finally { _applying = false; }
+    }).observe(document.body, { childList: true, subtree: true });
+  }
+
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function () { apply(); });
+    document.addEventListener('DOMContentLoaded', function () { apply(); observe(); });
   } else {
     apply();
+    observe();
   }
 })();

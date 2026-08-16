@@ -1921,15 +1921,16 @@ def api_agent_process_txn(txn_id):
     mrid = res.get('match_request_id')
     if mrid:
         try:
-            reqs = read_csv('match_requests.csv')
-            fieldnames = get_fieldnames('match_requests.csv', ['id','user_id','customer_id','type','amount','currency','status','created_at','approved_by','approved_at'])
-            for r in reqs:
-                if r.get('id') == mrid:
-                    r['status'] = 'approved' if decision == 'approved' else 'rejected'
-                    r['approved_by'] = f"agent:{session['agent_id']}"
-                    r['approved_at'] = datetime.now().strftime('%Y-%m-%d %H:%M')
-                    break
-            write_csv('match_requests.csv', reqs, fieldnames)
+            with _MATCH_CSV_LOCK:
+                reqs = read_csv('match_requests.csv')
+                fieldnames = get_fieldnames('match_requests.csv', ['id','user_id','customer_id','type','amount','currency','status','created_at','approved_by','approved_at'])
+                for r in reqs:
+                    if r.get('id') == mrid:
+                        r['status'] = 'approved' if decision == 'approved' else 'rejected'
+                        r['approved_by'] = f"agent:{session['agent_id']}"
+                        r['approved_at'] = datetime.now().strftime('%Y-%m-%d %H:%M')
+                        break
+                write_csv('match_requests.csv', reqs, fieldnames)
         except Exception as e:
             # Settlement in SQLite is authoritative; CSV mirror failure must
             # be visible in logs so an admin can reconcile manually.
@@ -3370,10 +3371,24 @@ def api_match_disputes(match_id):
 _MATCH_REQ_FIELDS = ['id', 'user_id', 'customer_id', 'type', 'amount', 'currency',
                      'status', 'created_at', 'approved_by', 'approved_at']
 
+# Serializes all read-modify-write cycles on match_requests.csv (user create/
+# cancel + agent settlement mirror) so concurrent writes can't clobber rows.
+_MATCH_CSV_LOCK = threading.Lock()
+
+def _matching_strong_auth_or_error():
+    """User matching endpoints move money — require a validated identity
+    (session login or HMAC-checked Telegram initData), never a raw uid param."""
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'المصادقة مطلوبة — افتح الصفحة من التطبيق أو تيليغرام'}), 401
+    return None
+
 @app.route('/api/matching/my')
 @webapp_auth
 def api_matching_my():
     """Current user's matching requests, newest first."""
+    err = _matching_strong_auth_or_error()
+    if err:
+        return err
     uid = str(get_request_uid() or '')
     if not uid:
         return jsonify({'error': 'Missing uid'}), 400
@@ -3386,6 +3401,9 @@ def api_matching_my():
 def api_matching_create():
     """Create a deposit/withdraw matching request; auto-assigns an agent when
     one is available (SQLite pick is atomic). Appears in admin Pending tab."""
+    err = _matching_strong_auth_or_error()
+    if err:
+        return err
     uid = str(get_request_uid() or '')
     if not uid:
         return jsonify({'error': 'Missing uid'}), 400
@@ -3397,7 +3415,7 @@ def api_matching_create():
         amount = round(float(data.get('amount', 0)), 2)
     except (TypeError, ValueError):
         return jsonify({'error': 'مبلغ غير صالح'}), 400
-    if amount <= 0 or amount > 10_000_000:
+    if not math.isfinite(amount) or amount <= 0 or amount > 10_000_000:
         return jsonify({'error': 'مبلغ غير صالح'}), 400
     details = str(data.get('details', '') or '')[:200]
 
@@ -3415,20 +3433,22 @@ def api_matching_create():
         except Exception:
             pass
 
-    # One open request per type per user — keeps the queue clean
-    existing = read_csv('match_requests.csv')
-    for r in existing:
-        if (str(r.get('user_id', '')) == uid and r.get('type') == rtype
-                and r.get('status') == 'waiting'):
-            return jsonify({'error': 'لديك طلب قيد الانتظار بالفعل — الغِه أولاً أو انتظر معالجته',
-                            'request_id': r.get('id')}), 409
+    # One open request per type per user — keeps the queue clean.
+    # Lock spans the duplicate check + append so concurrent creates can't race.
+    with _MATCH_CSV_LOCK:
+        existing = read_csv('match_requests.csv')
+        for r in existing:
+            if (str(r.get('user_id', '')) == uid and r.get('type') == rtype
+                    and r.get('status') == 'waiting'):
+                return jsonify({'error': 'لديك طلب قيد الانتظار بالفعل — الغِه أولاً أو انتظر معالجته',
+                                'request_id': r.get('id')}), 409
 
-    rid = f"MR{datetime.now().strftime('%Y%m%d%H%M%S')}{secrets.token_hex(2).upper()}"
-    row = {'id': rid, 'user_id': uid, 'customer_id': uid, 'type': rtype,
-           'amount': f'{amount:g}', 'currency': currency, 'status': 'waiting',
-           'created_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
-           'approved_by': '', 'approved_at': ''}
-    append_csv('match_requests.csv', row, _MATCH_REQ_FIELDS)
+        rid = f"MR{datetime.now().strftime('%Y%m%d%H%M%S')}{secrets.token_hex(2).upper()}"
+        row = {'id': rid, 'user_id': uid, 'customer_id': uid, 'type': rtype,
+               'amount': f'{amount:g}', 'currency': currency, 'status': 'waiting',
+               'created_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
+               'approved_by': '', 'approved_at': ''}
+        append_csv('match_requests.csv', row, _MATCH_REQ_FIELDS)
     log_action('match_request_created', f'{rid} {rtype} {amount} {currency} by {uid}')
 
     agent_assigned = False
@@ -3446,29 +3466,41 @@ def api_matching_create():
 @app.route('/api/matching/my/<rid>/cancel', methods=['POST'])
 @webapp_auth
 def api_matching_cancel(rid):
-    """Cancel own still-waiting matching request (also frees assigned agent)."""
+    """Cancel own still-waiting matching request (also frees assigned agent).
+    Cancellation only wins while any linked agent transaction is still pending:
+    we void the agent txn FIRST (atomic in SQLite), then re-check the CSV row
+    under the lock — if an agent settled meanwhile, the cancel is rejected."""
+    err = _matching_strong_auth_or_error()
+    if err:
+        return err
     uid = str(get_request_uid() or '')
     if not uid:
         return jsonify({'error': 'Missing uid'}), 400
-    reqs = read_csv('match_requests.csv')
-    fieldnames = get_fieldnames('match_requests.csv', _MATCH_REQ_FIELDS)
-    found = False
-    for r in reqs:
-        if r.get('id') == rid and str(r.get('user_id', '')) == uid:
-            if r.get('status') != 'waiting':
-                return jsonify({'error': 'لا يمكن إلغاء هذا الطلب'}), 400
-            r['status'] = 'cancelled'
-            r['approved_by'] = f'user:{uid}'
-            r['approved_at'] = datetime.now().strftime('%Y-%m-%d %H:%M')
-            found = True
-            break
-    if not found:
-        return jsonify({'error': 'الطلب غير موجود'}), 404
-    write_csv('match_requests.csv', reqs, fieldnames)
-    try:
-        agent_db.void_pending_by_match_request(rid)
-    except Exception as e:
-        print(f"[MATCHING] failed to void agent txn for {rid}: {e}")
+    with _MATCH_CSV_LOCK:
+        reqs = read_csv('match_requests.csv')
+        fieldnames = get_fieldnames('match_requests.csv', _MATCH_REQ_FIELDS)
+        target = None
+        for r in reqs:
+            if r.get('id') == rid and str(r.get('user_id', '')) == uid:
+                target = r
+                break
+        if target is None:
+            return jsonify({'error': 'الطلب غير موجود'}), 404
+        if target.get('status') != 'waiting':
+            return jsonify({'error': 'لا يمكن إلغاء هذا الطلب'}), 400
+        # Void the pending agent txn first; if the agent already settled it,
+        # this returns False with a settled txn present → reject the cancel.
+        try:
+            voided = agent_db.void_pending_by_match_request(rid)
+        except Exception as e:
+            print(f"[MATCHING] failed to void agent txn for {rid}: {e}")
+            return jsonify({'error': 'تعذر الإلغاء الآن — حاول مجدداً'}), 500
+        if not voided and agent_db.has_settled_txn_for_match_request(rid):
+            return jsonify({'error': 'تمت معالجة الطلب بالفعل — لا يمكن إلغاؤه'}), 409
+        target['status'] = 'cancelled'
+        target['approved_by'] = f'user:{uid}'
+        target['approved_at'] = datetime.now().strftime('%Y-%m-%d %H:%M')
+        write_csv('match_requests.csv', reqs, fieldnames)
     log_action('match_request_cancelled', f'{rid} by user {uid}')
     return jsonify({'success': True})
 
