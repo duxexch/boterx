@@ -40,7 +40,7 @@
   <meta name="twitter:title" content="VEX Games — العب واربح">
   <meta name="twitter:description" content="منصة ألعاب تيليغرام الأقوى — جوائز حقيقية">
   <meta name="twitter:image" content="https://vex.deals/static/icons/og-image.png">
-  <meta name="theme-color" content="#00ff88">
+  <meta name="theme-color" content="#0b0e11">
   <link rel="manifest" href="/static/manifest.json">
   <link rel="icon" href="/static/icons/favicon.png" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
@@ -98,9 +98,10 @@
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
     :root{
-      --green:#00ff88;--green2:#00cc6a;--green-dim:rgba(0,255,136,0.1);
-      --dark:#030a06;--dark2:#061209;--card:rgba(6,20,12,0.7);
-      --border:rgba(0,255,136,0.15);--text:#e8f5e9;--muted:#4a7a5a;
+      --green:#00e701;--green2:#00b301;--green-dim:rgba(0,231,1,0.1);
+      --gold:#ffd700;
+      --dark:#0b0e11;--dark2:#10141a;--card:rgba(20,25,32,0.75);
+      --border:rgba(255,255,255,0.08);--text:#eef2f6;--muted:#8794a3;
     }
     html{scroll-behavior:smooth}
     body{font-family:'Cairo',sans-serif;background:var(--dark);color:var(--text);min-height:100vh;overflow-x:hidden}
@@ -109,44 +110,45 @@
     body::before{
       content:'';position:fixed;inset:0;z-index:-2;
       background:
-        radial-gradient(ellipse 80% 50% at 50% -10%,rgba(0,255,136,0.14) 0%,transparent 60%),
-        radial-gradient(ellipse 50% 60% at 90% 80%,rgba(0,180,80,0.07) 0%,transparent 50%),
-        #030a06;
+        radial-gradient(ellipse 80% 50% at 50% -10%,rgba(0,231,1,0.11) 0%,transparent 60%),
+        radial-gradient(ellipse 50% 60% at 90% 80%,rgba(255,215,0,0.05) 0%,transparent 50%),
+        radial-gradient(ellipse 40% 50% at 5% 30%,rgba(0,231,1,0.05) 0%,transparent 55%),
+        #0b0e11;
     }
     .grid-bg{
       position:fixed;inset:0;z-index:-1;
-      background-image:linear-gradient(rgba(0,255,136,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(0,255,136,0.04) 1px,transparent 1px);
+      background-image:linear-gradient(rgba(255,255,255,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.025) 1px,transparent 1px);
       background-size:50px 50px;pointer-events:none;
     }
 
     /* NAV */
     nav{
       position:fixed;top:0;left:0;right:0;z-index:100;
-      background:rgba(3,10,6,0.9);backdrop-filter:blur(14px);
+      background:rgba(11,14,17,0.88);backdrop-filter:blur(16px);
       border-bottom:1px solid var(--border);
       padding:12px 24px;display:flex;align-items:center;justify-content:space-between;
     }
     .nav-logo{display:flex;align-items:center;gap:10px}
     .nav-logo-img{
       width:38px;height:38px;border-radius:10px;object-fit:cover;
-      border:1px solid rgba(0,255,136,0.3);
-      box-shadow:0 0 16px rgba(0,255,136,0.2);
+      border:1px solid rgba(0,231,1,0.3);
+      box-shadow:0 0 16px rgba(0,231,1,0.2);
     }
     .nav-brand{font-weight:900;font-size:1.15rem;background:linear-gradient(135deg,#fff,var(--green));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
     .nav-links{display:flex;gap:10px;align-items:center}
     .btn-nav-login{
       display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;
-      background:var(--green-dim);border:1px solid rgba(0,255,136,0.3);
+      background:var(--green-dim);border:1px solid rgba(0,231,1,0.3);
       color:var(--green);font-size:12px;font-weight:700;text-decoration:none;
       transition:all 0.2s;
     }
-    .btn-nav-login:hover{background:rgba(0,255,136,0.18);box-shadow:0 0 20px rgba(0,255,136,0.15)}
+    .btn-nav-login:hover{background:rgba(0,231,1,0.18);box-shadow:0 0 20px rgba(0,231,1,0.15)}
     .btn-play-nav{
       display:flex;align-items:center;gap:6px;padding:8px 18px;border-radius:10px;
       background:linear-gradient(135deg,var(--green),var(--green2));
       color:#030a06;font-size:12px;font-weight:800;text-decoration:none;transition:all 0.2s;
     }
-    .btn-play-nav:hover{box-shadow:0 4px 20px rgba(0,255,136,0.3);transform:translateY(-1px)}
+    .btn-play-nav:hover{box-shadow:0 4px 20px rgba(0,231,1,0.3);transform:translateY(-1px)}
 
     /* HERO */
     .hero{
@@ -156,15 +158,15 @@
     }
     .hero-logo{
       width:130px;height:130px;border-radius:50%;object-fit:cover;
-      border:2px solid rgba(0,255,136,0.3);
-      box-shadow:0 0 50px rgba(0,255,136,0.3),0 0 100px rgba(0,255,136,0.1);
+      border:2px solid rgba(0,231,1,0.3);
+      box-shadow:0 0 50px rgba(0,231,1,0.3),0 0 100px rgba(0,231,1,0.1);
       margin-bottom:24px;
       animation:heroPulse 3s ease-in-out infinite;
     }
-    @keyframes heroPulse{0%,100%{box-shadow:0 0 50px rgba(0,255,136,0.3),0 0 100px rgba(0,255,136,0.1)}50%{box-shadow:0 0 70px rgba(0,255,136,0.5),0 0 140px rgba(0,255,136,0.2)}}
+    @keyframes heroPulse{0%,100%{box-shadow:0 0 50px rgba(0,231,1,0.3),0 0 100px rgba(0,231,1,0.1)}50%{box-shadow:0 0 70px rgba(0,231,1,0.5),0 0 140px rgba(0,231,1,0.2)}}
     .hero-badge{
       display:inline-flex;align-items:center;gap:6px;
-      background:rgba(0,255,136,0.1);border:1px solid rgba(0,255,136,0.3);
+      background:rgba(0,231,1,0.1);border:1px solid rgba(0,231,1,0.3);
       color:var(--green);border-radius:999px;padding:6px 18px;
       font-size:12px;font-weight:700;margin-bottom:20px;
     }
@@ -183,14 +185,14 @@
     }
     .btn-primary{
       background:linear-gradient(135deg,var(--green),var(--green2));
-      color:#030a06;box-shadow:0 0 30px rgba(0,255,136,0.3);
+      color:#030a06;box-shadow:0 0 30px rgba(0,231,1,0.3);
     }
-    .btn-primary:hover{transform:translateY(-2px);box-shadow:0 0 50px rgba(0,255,136,0.45)}
+    .btn-primary:hover{transform:translateY(-2px);box-shadow:0 0 50px rgba(0,231,1,0.45)}
     .btn-secondary{
-      background:rgba(0,255,136,0.08);color:var(--text);
-      border:1px solid rgba(0,255,136,0.2);
+      background:rgba(0,231,1,0.08);color:var(--text);
+      border:1px solid rgba(0,231,1,0.2);
     }
-    .btn-secondary:hover{background:rgba(0,255,136,0.14);transform:translateY(-2px)}
+    .btn-secondary:hover{background:rgba(0,231,1,0.14);transform:translateY(-2px)}
     .btn-login-hero{
       background:rgba(255,255,255,0.05);color:var(--muted);
       border:1px solid rgba(255,255,255,0.1);
@@ -210,8 +212,8 @@
       backdrop-filter:blur(8px);
       transition:border-color 0.2s,box-shadow 0.2s;
     }
-    .stat-card:hover{border-color:rgba(0,255,136,0.35);box-shadow:0 0 24px rgba(0,255,136,0.08)}
-    .stat-num{font-size:2rem;font-weight:900;color:var(--green);display:block;text-shadow:0 0 20px rgba(0,255,136,0.4)}
+    .stat-card:hover{border-color:rgba(0,231,1,0.35);box-shadow:0 0 24px rgba(0,231,1,0.08)}
+    .stat-num{font-size:2rem;font-weight:900;color:var(--green);display:block;text-shadow:0 0 20px rgba(0,231,1,0.4)}
     .stat-label{color:var(--muted);font-size:12px;margin-top:4px}
 
     /* SECTIONS */
@@ -233,12 +235,12 @@
       background:linear-gradient(90deg,transparent,var(--green),transparent);
       opacity:0;transition:opacity 0.3s;
     }
-    .game-card:hover{transform:translateY(-4px);border-color:rgba(0,255,136,0.4);box-shadow:0 0 24px rgba(0,255,136,0.12)}
+    .game-card:hover{transform:translateY(-4px);border-color:rgba(0,231,1,0.4);box-shadow:0 0 24px rgba(0,231,1,0.12)}
     .game-card:hover::before{opacity:1}
     .game-card:active{transform:scale(0.96)}
-    .game-icon{font-size:2.4rem;margin-bottom:10px;display:block;filter:drop-shadow(0 0 8px rgba(0,255,136,0.3))}
+    .game-icon{font-size:2.4rem;margin-bottom:10px;display:block;filter:drop-shadow(0 0 8px rgba(0,231,1,0.3))}
     .game-name{font-weight:700;font-size:13px;color:var(--text)}
-    .game-tag{display:inline-block;margin-top:6px;font-size:10px;padding:2px 8px;border-radius:999px;background:var(--green-dim);color:var(--green);border:1px solid rgba(0,255,136,0.2)}
+    .game-tag{display:inline-block;margin-top:6px;font-size:10px;padding:2px 8px;border-radius:999px;background:var(--green-dim);color:var(--green);border:1px solid rgba(0,231,1,0.2)}
 
     /* FEATURES */
     .features-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
@@ -247,8 +249,8 @@
       border-radius:16px;padding:26px;backdrop-filter:blur(8px);
       transition:border-color 0.2s,box-shadow 0.2s;
     }
-    .feature-card:hover{border-color:rgba(0,255,136,0.3);box-shadow:0 0 20px rgba(0,255,136,0.07)}
-    .feature-icon{font-size:2rem;margin-bottom:12px;display:block;filter:drop-shadow(0 0 8px rgba(0,255,136,0.3))}
+    .feature-card:hover{border-color:rgba(0,231,1,0.3);box-shadow:0 0 20px rgba(0,231,1,0.07)}
+    .feature-icon{font-size:2rem;margin-bottom:12px;display:block;filter:drop-shadow(0 0 8px rgba(0,231,1,0.3))}
     .feature-title{font-weight:800;font-size:1rem;margin-bottom:8px;color:var(--text)}
     .feature-desc{color:var(--muted);font-size:13px;line-height:1.7}
 
@@ -256,7 +258,7 @@
     .login-section{
       padding:80px 24px;text-align:center;
       border-top:1px solid var(--border);border-bottom:1px solid var(--border);
-      background:linear-gradient(135deg,rgba(0,255,136,0.04) 0%,transparent 100%);
+      background:linear-gradient(135deg,rgba(0,231,1,0.04) 0%,transparent 100%);
     }
     .login-card{
       max-width:460px;margin:0 auto;
@@ -267,21 +269,21 @@
     .login-step.active{display:block;animation:fadeIn 0.3s ease-out}
     @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
     .otp-input-field{
-      width:100%;background:rgba(0,0,0,0.4);border:1px solid rgba(0,255,136,0.2);
+      width:100%;background:rgba(0,0,0,0.4);border:1px solid rgba(0,231,1,0.2);
       border-radius:12px;padding:14px;font-size:24px;font-weight:900;
       font-family:'Courier New',monospace;text-align:center;letter-spacing:8px;
       color:var(--green);outline:none;transition:all 0.2s;
     }
-    .otp-input-field:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(0,255,136,0.08)}
+    .otp-input-field:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(0,231,1,0.08)}
     .otp-input-field::placeholder{font-size:18px;letter-spacing:4px;color:var(--muted)}
     .btn-otp-verify{
       width:100%;padding:14px;border-radius:12px;border:none;
       background:linear-gradient(135deg,var(--green),var(--green2));
       color:#030a06;font-size:15px;font-weight:800;font-family:'Cairo',sans-serif;
       cursor:pointer;margin-top:14px;transition:all 0.2s;
-      box-shadow:0 4px 20px rgba(0,255,136,0.2);
+      box-shadow:0 4px 20px rgba(0,231,1,0.2);
     }
-    .btn-otp-verify:hover{box-shadow:0 6px 28px rgba(0,255,136,0.35);transform:translateY(-1px)}
+    .btn-otp-verify:hover{box-shadow:0 6px 28px rgba(0,231,1,0.35);transform:translateY(-1px)}
     .otp-status{font-size:12px;color:var(--muted);margin-top:10px;min-height:20px}
     .otp-status.err{color:#ff7090}
     .otp-status.ok{color:var(--green)}
@@ -289,7 +291,7 @@
     /* CTA */
     .cta-final{
       padding:80px 24px;text-align:center;
-      background:linear-gradient(135deg,rgba(0,255,136,0.04) 0%,transparent 100%);
+      background:linear-gradient(135deg,rgba(0,231,1,0.04) 0%,transparent 100%);
     }
 
     /* FOOTER */
@@ -308,7 +310,7 @@
 <!-- NAV -->
 <nav>
   <div class="nav-logo">
-    <img src="/static/icons/logo-full.png" class="nav-logo-img" alt="VEX" onerror="this.outerHTML='<div style=\'width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,#00ff88,#006644);display:flex;align-items:center;justify-content:center;font-weight:900;color:#030a06;font-size:20px\'>V</div>'">
+    <img src="/static/icons/logo-full.png" class="nav-logo-img" alt="VEX" onerror="this.outerHTML='<div style=\'width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,#00e701,#006644);display:flex;align-items:center;justify-content:center;font-weight:900;color:#030a06;font-size:20px\'>V</div>'">
     <span class="nav-brand">VEX Games</span>
   </div>
   <div class="nav-links">
@@ -319,7 +321,7 @@
 
 <!-- HERO -->
 <section class="hero" id="top">
-  <img src="/static/icons/logo-full.png" class="hero-logo" alt="VEX" onerror="this.outerHTML='<div style=\'width:130px;height:130px;border-radius:50%;background:linear-gradient(135deg,#001a08,#003318);border:2px solid rgba(0,255,136,0.3);box-shadow:0 0 50px rgba(0,255,136,0.3);display:flex;align-items:center;justify-content:center;font-size:60px;font-weight:900;color:#00ff88;margin-bottom:24px\'>V</div>'">
+  <img src="/static/icons/logo-full.png" class="hero-logo" alt="VEX" onerror="this.outerHTML='<div style=\'width:130px;height:130px;border-radius:50%;background:linear-gradient(135deg,#001a08,#003318);border:2px solid rgba(0,231,1,0.3);box-shadow:0 0 50px rgba(0,231,1,0.3);display:flex;align-items:center;justify-content:center;font-size:60px;font-weight:900;color:#00e701;margin-bottom:24px\'>V</div>'">
   <div class="hero-badge">🔥 أكثر من 5,000 لاعب نشط</div>
   <h1>العب واربح مع<br><span style="color:var(--green)">VEX Games</span></h1>
   <p>منصة الألعاب الأكثر إثارة على تيليغرام — ألعاب مثيرة، جوائز حقيقية، ونظام إحالة مربح ينمو معك</p>
@@ -555,7 +557,7 @@ document.querySelectorAll('.reveal').forEach(el=>observer.observe(el));
         }).catch(function(){});
     }
     function showUserToast(title, msg, type) {
-        var color = type === 'urgent' ? '#ef4444' : type === 'broadcast' ? '#fbbf24' : '#00ff88';
+        var color = type === 'urgent' ? '#ef4444' : type === 'broadcast' ? '#fbbf24' : '#00e701';
         var t = document.createElement('div');
         t.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:9999;background:linear-gradient(135deg,#0d1814,#0a1410);border:2px solid '+color+';border-radius:14px;padding:14px 20px;min-width:280px;max-width:380px;box-shadow:0 8px 32px rgba(0,0,0,.5);opacity:0;transition:opacity .3s';
         t.innerHTML = '<div style="display:flex;align-items:start;gap:10px"><div style="width:10px;height:10px;border-radius:50%;background:'+color+';margin-top:6px;flex-shrink:0"></div><div style="flex:1"><div style="font-weight:800;font-size:14px;color:'+color+';margin-bottom:2px">'+title+'</div><div style="font-size:12px;color:#e8f5e9;line-height:1.5">'+msg+'</div></div></div>';
