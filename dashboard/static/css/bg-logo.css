@@ -1,0 +1,27 @@
+/* VEX — fixed logo background shared by all pages.
+   The logo layer is position:fixed so page content scrolls over it.
+   Loaded last so its overrides win. */
+
+html::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -10;
+  background: #05080b url('/static/icons/bg-logo.webp?v=1') center / cover no-repeat;
+  pointer-events: none;
+}
+
+/* Dark veil so text and cards stay readable over the artwork */
+html::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -9;
+  background: rgba(5, 8, 11, 0.78);
+  pointer-events: none;
+}
+
+/* Let the fixed logo show through page bodies */
+body {
+  background: transparent !important;
+}
