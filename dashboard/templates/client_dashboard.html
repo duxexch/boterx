@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>لوحة العميل — VEX</title>
+<link rel="icon" type="image/png" sizes="32x32" href="/static/icons/icon-32.png?v=20260816">
+<style>
+:root{--bg:#0b0e11;--surface:#141920;--surface2:#1a1f2e;--border:#262e39;--green:#00e701;--text:#eef2f6;--muted:#8794a3;--red:#ff4757;--amber:#fbbf24;--blue:#60a5fa}
+*{margin:0;padding:0;box-sizing:border-box;font-family:Cairo,Tahoma,sans-serif}
+body{background:var(--bg);min-height:100vh;color:var(--text)}
+.wrap{max-width:960px;margin:0 auto;padding:20px 16px 60px}
+.top{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;gap:12px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px}
+.brand img{height:38px}
+.brand .n{font-weight:900;font-size:16px}
+.logout{background:none;border:1px solid var(--border);color:var(--muted);border-radius:10px;padding:8px 14px;font-size:12px;cursor:pointer}
+.logout:hover{color:var(--red);border-color:var(--red)}
+.hero{background:linear-gradient(135deg,rgba(0,231,1,.08),rgba(0,231,1,.02));border:1px solid rgba(0,231,1,.25);border-radius:18px;padding:22px;margin-bottom:20px}
+.hero h1{font-size:18px;margin-bottom:6px}
+.hero .bot{color:var(--muted);font-size:13px}
+.badge{display:inline-block;font-size:11px;padding:4px 12px;border-radius:999px;font-weight:700;margin-top:10px}
+.badge.ok{background:rgba(0,231,1,.15);color:var(--green)}
+.badge.exp{background:rgba(255,71,87,.15);color:var(--red)}
+.badge.sus{background:rgba(251,191,36,.15);color:var(--amber)}
+.sub-box{display:flex;align-items:center;justify-content:space-between;background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:14px 18px;margin-bottom:20px;flex-wrap:wrap;gap:10px}
+.sub-box .l{font-size:13px}
+.sub-box .d{font-size:22px;font-weight:900}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:22px}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;text-align:center}
+.stat .v{font-size:22px;font-weight:900}
+.stat .k{font-size:11px;color:var(--muted);margin-top:3px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:16px;margin-bottom:20px;overflow:hidden}
+.card h3{font-size:14px;padding:14px 18px;border-bottom:1px solid var(--border);background:var(--surface2)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;padding:16px 18px}
+.chip{font-size:11px;padding:5px 12px;border-radius:999px;background:rgba(0,231,1,.1);color:var(--green);border:1px solid rgba(0,231,1,.25)}
+.chip.off{background:rgba(135,148,163,.08);color:var(--muted);border-color:var(--border)}
+.tbl-wrap{overflow-x:auto}
+table{width:100%;font-size:11.5px;border-collapse:collapse}
+th{background:var(--surface2);color:var(--muted);text-align:right;padding:9px 14px;font-size:10.5px;white-space:nowrap}
+td{padding:9px 14px;border-top:1px solid var(--border);white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis}
+.tabs{display:flex;gap:8px;padding:14px 18px 0;flex-wrap:wrap}
+.tabs button{background:var(--surface2);border:1px solid var(--border);color:var(--muted);border-radius:10px;padding:7px 14px;font-size:11.5px;cursor:pointer;font-weight:700}
+.tabs button.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+.empty{padding:28px;text-align:center;color:var(--muted);font-size:12px}
+.note{font-size:11px;color:var(--muted);padding:12px 18px;line-height:1.8}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="brand">
+      <img src="/static/icons/logo-full.png" alt="VEX" onerror="this.style.display='none'">
+      <div>
+        <div class="n" id="cname">—</div>
+        <div style="font-size:10px;color:var(--muted)">بوابة العميل</div>
+      </div>
+    </div>
+    <button class="logout" onclick="logout()">خروج ⏻</button>
+  </div>
+
+  <div class="hero">
+    <h1 id="hname">—</h1>
+    <div class="bot" id="hbot">—</div>
+    <span class="badge" id="hbadge">—</span>
+  </div>
+
+  <div class="sub-box">
+    <div class="l">📅 الاشتراك: <b id="subend">—</b></div>
+    <div class="d" id="subdays">—</div>
+  </div>
+
+  <div class="grid" id="stats"></div>
+
+  <div class="card">
+    <h3>🎯 مميزاتك المفعّلة</h3>
+    <div class="chips" id="featOn"></div>
+    <div class="note" id="featOffWrap" style="display:none">
+      <b>غير مفعّل لاشتراكك:</b> <span id="featOff"></span><br>
+      لتفعيل أي ميزة إضافية أو تجديد الاشتراك تواصل مع الإدارة.
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>📊 عملياتك</h3>
+    <div class="tabs">
+      <button class="on" data-k="users" onclick="sw(this,'users')">👥 المستخدمين</button>
+      <button data-k="transactions" onclick="sw(this,'transactions')">💳 المعاملات</button>
+      <button data-k="svrp_wallets" onclick="sw(this,'svrp_wallets')">💎 محافظ التعويض</button>
+    </div>
+    <div class="tbl-wrap" style="margin-top:12px">
+      <table>
+        <thead id="thead"></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+      <div class="empty" id="empty" style="display:none">لا توجد بيانات بعد</div>
+    </div>
+  </div>
+
+  <div style="text-align:center;font-size:10px;color:var(--muted)">VEX Client Portal © 2026</div>
+</div>
+
+<script>
+var FEATURES = {{ features | tojson }};
+var ME = {{ client | tojson }};
+
+function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML}
+function render(){
+  document.getElementById('cname').textContent = ME.name;
+  document.getElementById('hname').textContent = 'أهلاً، ' + ME.name;
+  document.getElementById('hbot').textContent = '🤖 البوت: @' + (ME.bot_username || '—') + (ME.running ? ' · يعمل الآن' : ' · متوقف');
+  var b = document.getElementById('hbadge');
+  if (ME.status === 'suspended'){ b.className='badge sus'; b.textContent='⏸️ حسابك موقوف — تواصل مع الإدارة'; }
+  else if (ME.expired){ b.className='badge exp'; b.textContent='⏳ اشتراكك منتهي — جدده لاستعادة الخدمة'; }
+  else { b.className='badge ok'; b.textContent='🟢 اشتراك نشط'; }
+  document.getElementById('subend').textContent = ME.subscription_end || '—';
+  var sd = document.getElementById('subdays');
+  if (ME.expired){ sd.textContent='منتهي'; sd.style.color='var(--red)'; }
+  else { sd.textContent = 'متبقي ' + ME.days_left + ' يوم'; sd.style.color = ME.days_left<=3?'var(--amber)':'var(--green)'; }
+
+  var s = ME.stats||{};
+  var items=[['👥',s.total_users||0,'مستخدم'],['💳',s.total_transactions||0,'معاملة'],
+             ['📥',s.deposits||0,'إيداع'],['📤',s.withdrawals||0,'سحب'],
+             ['⏳',s.pending||0,'معلقة'],['🚫',s.banned||0,'محظور']];
+  document.getElementById('stats').innerHTML = items.map(function(i){
+    return '<div class="stat"><div>'+i[0]+'</div><div class="v">'+i[1]+'</div><div class="k">'+i[2]+'</div></div>';
+  }).join('');
+
+  var on = (ME.features||[]).map(function(f){return '<span class="chip">'+esc(FEATURES[f]||f)+'</span>'}).join('');
+  document.getElementById('featOn').innerHTML = on || '<span class="empty">لا توجد مميزات مفعلة</span>';
+  var off = Object.keys(FEATURES).filter(function(f){return (ME.features||[]).indexOf(f)<0});
+  if (off.length){
+    document.getElementById('featOffWrap').style.display='block';
+    document.getElementById('featOff').textContent = off.map(function(f){return FEATURES[f]}).join('، ');
+  }
+}
+function sw(btn, kind){
+  document.querySelectorAll('.tabs button').forEach(function(b){b.classList.remove('on')});
+  btn.classList.add('on');
+  fetch('/api/client/data?type='+kind+'&limit=50').then(function(r){return r.json()}).then(function(d){
+    var fields=(d.fields||[]).slice(0,7), rows=d.rows||[];
+    document.getElementById('thead').innerHTML='<tr>'+fields.map(function(f){return '<th>'+esc(f)+'</th>'}).join('')+'</tr>';
+    document.getElementById('tbody').innerHTML=rows.map(function(r){
+      return '<tr>'+fields.map(function(f){return '<td>'+esc(r[f]||'-')+'</td>'}).join('')+'</tr>';
+    }).join('');
+    document.getElementById('empty').style.display=rows.length?'none':'block';
+  });
+}
+function logout(){
+  fetch('/api/client/logout',{method:'POST'}).then(function(){window.location='/client-login'});
+}
+render();
+sw(document.querySelector('.tabs button'),'users');
+// تحديث دوري خفيف للإحصائيات
+setInterval(function(){fetch('/api/client/me').then(function(r){return r.json()}).then(function(d){if(!d.error){ME=d;render();}})},30000);
+</script>
+</body>
+</html>

@@ -184,6 +184,11 @@
             <i class="fas fa-robot w-5 text-center"></i> <span x-text="t('bots')"></span>
         </a>
         {% endif %}
+        {% if not admin_perms or admin_perms.get('manage_bots') %}
+        <a href="{{ url_for('page_clients') }}" class="sidebar-link {% if active_page == 'clients' %}active{% endif %}">
+            <i class="fas fa-tags w-5 text-center"></i> <span>العملاء (White-Label)</span>
+        </a>
+        {% endif %}
         {% if not admin_perms or admin_perms.get('ban_users') %}
         <a href="{{ url_for('page_complaints') }}" class="sidebar-link {% if active_page == 'complaints' %}active{% endif %}">
             <i class="fas fa-exclamation-circle w-5 text-center"></i> <span x-text="t('complaints')"></span>

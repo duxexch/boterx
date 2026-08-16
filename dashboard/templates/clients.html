@@ -1,0 +1,330 @@
+{% extends 'base.html' %}
+{% block title %}العملاء — White Label{% endblock %}
+{% block content %}
+<div class="px-4 lg:px-8 py-6" x-data="clientsPage()" x-init="load()">
+
+  <!-- رأس الصفحة -->
+  <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-slate-100 flex items-center gap-3">
+        <span class="text-3xl">🏷️</span> نظام العملاء <span class="text-xs font-normal text-slate-400">(White-Label)</span>
+      </h1>
+      <p class="text-slate-400 text-sm mt-1">كل عميل: بوت خاص + دخول لوحة خاص + مميزات محددة + اشتراك زمني — بياناته معزولة بالكامل وتظهر لك بالتفصيل</p>
+    </div>
+    <button @click="openCreate()" class="bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-bold px-5 py-2.5 rounded-xl flex items-center gap-2 transition">
+      <i class="fas fa-plus"></i> إضافة عميل جديد
+    </button>
+  </div>
+
+  <!-- بطاقات إحصائية -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
+      <div class="text-slate-400 text-xs mb-1">إجمالي العملاء</div>
+      <div class="text-3xl font-black text-slate-100" x-text="clients.length"></div>
+    </div>
+    <div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
+      <div class="text-slate-400 text-xs mb-1">بوتات تعمل الآن</div>
+      <div class="text-3xl font-black text-emerald-400" x-text="clients.filter(c=>c.running).length"></div>
+    </div>
+    <div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
+      <div class="text-slate-400 text-xs mb-1">اشتراكات منتهية</div>
+      <div class="text-3xl font-black text-red-400" x-text="clients.filter(c=>c.expired).length"></div>
+    </div>
+    <div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
+      <div class="text-slate-400 text-xs mb-1">تنتهي خلال 3 أيام</div>
+      <div class="text-3xl font-black text-amber-400" x-text="clients.filter(c=>!c.expired && c.days_left<=3).length"></div>
+    </div>
+  </div>
+
+  <!-- جدول العملاء -->
+  <div class="bg-slate-800/40 border border-slate-700 rounded-2xl overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="bg-slate-800 border-b border-slate-700 text-slate-400">
+            <th class="text-right px-4 py-3 font-semibold">العميل</th>
+            <th class="text-right px-4 py-3 font-semibold">البوت</th>
+            <th class="text-right px-4 py-3 font-semibold">دخول اللوحة</th>
+            <th class="text-right px-4 py-3 font-semibold">المميزات</th>
+            <th class="text-right px-4 py-3 font-semibold">الاشتراك</th>
+            <th class="text-right px-4 py-3 font-semibold">الحالة</th>
+            <th class="text-right px-4 py-3 font-semibold">إجراءات</th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="c in clients" :key="c.id">
+            <tr class="border-b border-slate-700/50 hover:bg-slate-700/30 transition">
+              <td class="px-4 py-3">
+                <div class="font-bold text-slate-100" x-text="c.name"></div>
+                <div class="text-xs text-slate-500" x-text="c.id + (c.contact ? ' · ' + c.contact : '')"></div>
+              </td>
+              <td class="px-4 py-3">
+                <div class="flex items-center gap-2">
+                  <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" :class="c.running ? 'bg-emerald-400 animate-pulse' : (c.expired ? 'bg-red-400' : 'bg-slate-500')"></span>
+                  <span class="text-slate-300" x-text="'@' + (c.bot_username || '—')"></span>
+                </div>
+              </td>
+              <td class="px-4 py-3">
+                <div class="font-mono text-xs text-blue-300" x-text="c.dash_username"></div>
+                <div class="text-[10px] text-slate-500" x-text="c.last_login ? 'آخر دخول: ' + c.last_login : 'لم يدخل بعد'"></div>
+              </td>
+              <td class="px-4 py-3">
+                <div class="flex flex-wrap gap-1 max-w-[220px]">
+                  <template x-for="f in c.features" :key="f">
+                    <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30" x-text="features[f] || f"></span>
+                  </template>
+                </div>
+              </td>
+              <td class="px-4 py-3">
+                <div x-show="!c.expired" class="text-slate-300 text-xs">
+                  حتى <span class="font-bold" x-text="c.subscription_end"></span>
+                  <span class="block mt-0.5" :class="c.days_left <= 3 ? 'text-amber-400 font-bold' : 'text-slate-500'" x-text="'متبقي ' + c.days_left + ' يوم'"></span>
+                </div>
+                <div x-show="c.expired" class="text-red-400 text-xs font-bold">⏳ منتهي — بانتظار التجديد</div>
+              </td>
+              <td class="px-4 py-3">
+                <span x-show="c.status === 'active' && !c.expired" class="text-xs px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300">🟢 نشط</span>
+                <span x-show="c.expired" class="text-xs px-2.5 py-1 rounded-full bg-red-500/20 text-red-300">⏳ منتهي</span>
+                <span x-show="c.status === 'suspended'" class="text-xs px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300">⏸️ موقوف</span>
+              </td>
+              <td class="px-4 py-3">
+                <div class="flex flex-wrap items-center gap-1">
+                  <button x-show="!c.running && !c.expired && c.status!=='suspended'" @click="control(c, 'start')" title="تشغيل البوت" class="p-2 rounded-lg bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30"><i class="fas fa-play text-xs"></i></button>
+                  <button x-show="c.running" @click="control(c, 'stop')" title="إيقاف البوت" class="p-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30"><i class="fas fa-stop text-xs"></i></button>
+                  <button x-show="c.expired" @click="openRenew(c)" title="تجديد الاشتراك" class="p-2 rounded-lg bg-amber-500/20 text-amber-400 hover:bg-amber-500/30"><i class="fas fa-calendar-plus text-xs"></i></button>
+                  <button @click="openData(c)" title="بيانات العميل" class="p-2 rounded-lg bg-blue-500/20 text-blue-400 hover:bg-blue-500/30"><i class="fas fa-database text-xs"></i></button>
+                  <button @click="openEdit(c)" title="تعديل" class="p-2 rounded-lg bg-slate-500/20 text-slate-300 hover:bg-slate-500/30"><i class="fas fa-pen text-xs"></i></button>
+                  <button x-show="c.status!=='suspended'" @click="control(c, 'suspend')" title="إيقاف مؤقت" class="p-2 rounded-lg bg-amber-500/20 text-amber-400 hover:bg-amber-500/30"><i class="fas fa-pause text-xs"></i></button>
+                  <button x-show="c.status==='suspended'" @click="control(c, 'activate')" title="تفعيل" class="p-2 rounded-lg bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30"><i class="fas fa-check text-xs"></i></button>
+                  <button @click="remove(c)" title="حذف" class="p-2 rounded-lg bg-red-500/10 text-red-400/70 hover:bg-red-500/30"><i class="fas fa-trash text-xs"></i></button>
+                </div>
+              </td>
+            </tr>
+          </template>
+          <tr x-show="clients.length === 0">
+            <td colspan="7" class="px-4 py-12 text-center text-slate-500">
+              <div class="text-4xl mb-3">🏷️</div>
+              لا يوجد عملاء بعد — أضف أول عميل وابدأ بيع المنصة كـ White-Label
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- نافذة إنشاء/تعديل عميل -->
+  <div x-show="modal" x-cloak class="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 overflow-y-auto" style="display:none">
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-2xl p-6 my-8">
+      <div class="flex items-center justify-between mb-5">
+        <h3 class="text-lg font-bold text-slate-100" x-text="form.id ? 'تعديل عميل: ' + form.name : 'إضافة عميل جديد'"></h3>
+        <button @click="modal=false" class="text-slate-400 hover:text-slate-200 text-xl">✕</button>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-400 mb-1.5">اسم العميل *</label>
+          <input x-model="form.name" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm focus:border-emerald-500 outline-none">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-400 mb-1.5">وسيلة التواصل</label>
+          <input x-model="form.contact" placeholder="تليفون / @تليجرام" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm focus:border-emerald-500 outline-none">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-400 mb-1.5">يوزر البوت (بدون @)</label>
+          <input x-model="form.bot_username" dir="ltr" placeholder="MyClientBot" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm focus:border-emerald-500 outline-none">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-400 mb-1.5">توكن البوت *</label>
+          <input x-model="form.bot_token" dir="ltr" placeholder="123456:ABC-DEF..." class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm focus:border-emerald-500 outline-none">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-400 mb-1.5">اسم مستخدم اللوحة *</label>
+          <input x-model="form.dash_username" dir="ltr" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm focus:border-emerald-500 outline-none">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-400 mb-1.5" x-text="form.id ? 'كلمة مرور جديدة (اتركها فارغة للإبقاء)' : 'كلمة مرور اللوحة *'"></label>
+          <input x-model="form.dash_password" type="password" dir="ltr" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm focus:border-emerald-500 outline-none">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-400 mb-1.5">معرف تيليجرام للعميل (أدمن بوته)</label>
+          <input x-model="form.admin_ids" dir="ltr" placeholder="123456789" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm focus:border-emerald-500 outline-none">
+          <p class="text-[10px] text-slate-500 mt-1">سيصبح أدمن بوتِه ويدير عملياته من تيليجرام</p>
+        </div>
+        <div x-show="!form.id">
+          <label class="block text-xs font-bold text-slate-400 mb-1.5">مدة الاشتراك</label>
+          <div class="flex gap-2">
+            <select x-model="form.subscription_days" class="flex-1 bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm focus:border-emerald-500 outline-none">
+              <option value="7">7 أيام</option><option value="15">15 يوم</option>
+              <option value="30">30 يوم</option><option value="60">60 يوم</option>
+              <option value="90">90 يوم</option><option value="180">6 أشهر</option><option value="365">سنة</option>
+            </select>
+          </div>
+        </div>
+        <div class="md:col-span-2">
+          <label class="block text-xs font-bold text-slate-400 mb-1.5">المميزات الممنوحة *</label>
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-slate-900/50 border border-slate-700 rounded-xl p-3">
+            <template x-for="(label, key) in features" :key="key">
+              <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+                <input type="checkbox" :value="key" x-model="form.features" class="accent-emerald-500 w-4 h-4">
+                <span x-text="label"></span>
+              </label>
+            </template>
+          </div>
+          <div class="flex gap-2 mt-2">
+            <button @click="form.features = Object.keys(features)" class="text-[10px] text-emerald-400 hover:underline">تحديد الكل</button>
+            <button @click="form.features = []" class="text-[10px] text-slate-500 hover:underline">إلغاء الكل</button>
+          </div>
+        </div>
+        <div class="md:col-span-2">
+          <label class="block text-xs font-bold text-slate-400 mb-1.5">ملاحظات</label>
+          <textarea x-model="form.notes" rows="2" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm focus:border-emerald-500 outline-none"></textarea>
+        </div>
+      </div>
+      <div class="flex items-center justify-end gap-3 mt-6">
+        <button @click="modal=false" class="px-5 py-2.5 rounded-xl text-slate-300 border border-slate-600 text-sm hover:bg-slate-700">إلغاء</button>
+        <button @click="save()" :disabled="saving" class="px-6 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-bold text-sm disabled:opacity-50" x-text="saving ? '⏳ جارٍ الحفظ...' : (form.id ? 'حفظ التعديلات' : 'إنشاء العميل')"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- نافذة تجديد الاشتراك -->
+  <div x-show="renewModal" x-cloak class="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" style="display:none">
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-sm p-6">
+      <h3 class="text-lg font-bold text-slate-100 mb-1">تجديد اشتراك: <span x-text="renewClient?.name"></span></h3>
+      <p class="text-xs text-slate-400 mb-4">ينتهي حالياً: <span x-text="renewClient?.subscription_end"></span></p>
+      <div class="grid grid-cols-4 gap-2 mb-4">
+        <template x-for="d in [7, 15, 30, 90]" :key="d">
+          <button @click="doRenew(d)" class="py-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-sm font-bold hover:bg-emerald-500/30" x-text="d + ' يوم'"></button>
+        </template>
+      </div>
+      <button @click="renewModal=false" class="w-full py-2 rounded-xl text-slate-400 text-sm hover:bg-slate-700">إغلاق</button>
+    </div>
+  </div>
+
+  <!-- نافذة بيانات العميل -->
+  <div x-show="dataModal" x-cloak class="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" style="display:none">
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-4xl p-6 my-6 overflow-y-auto" style="max-height: 90vh">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-bold text-slate-100">📊 بيانات: <span x-text="dataClient?.name"></span></h3>
+        <button @click="dataModal=false" class="text-slate-400 hover:text-slate-200 text-xl">✕</button>
+      </div>
+      <!-- إحصائيات -->
+      <div class="grid grid-cols-3 sm:grid-cols-6 gap-2 mb-4" x-html="statsHtml"></div>
+      <!-- تبويبات البيانات -->
+      <div class="flex gap-2 mb-3 flex-wrap">
+        <template x-for="t in [['users','👥 المستخدمين'],['transactions','💳 المعاملات'],['svrp_wallets','💎 محافظ التعويض'],['companies','🏢 الشركات'],['bonus_requests','🏆 المكافآت'],['recovery_requests','📸 الاستردادات']]" :key="t[0]">
+          <button @click="loadData(t[0])" :class="dataKind === t[0] ? 'bg-blue-500 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'" class="px-3 py-1.5 rounded-lg text-xs font-bold" x-text="t[1]"></button>
+        </template>
+      </div>
+      <div class="overflow-x-auto border border-slate-700 rounded-xl">
+        <table class="w-full text-xs">
+          <thead>
+            <tr class="bg-slate-900 text-slate-400">
+              <template x-for="f in dataFields.slice(0, 8)" :key="f">
+                <th class="text-right px-3 py-2 font-semibold whitespace-nowrap" x-text="f"></th>
+              </template>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="(r, i) in dataRows" :key="i">
+              <tr class="border-t border-slate-700/50">
+                <template x-for="f in dataFields.slice(0, 8)" :key="f">
+                  <td class="px-3 py-2 text-slate-300 whitespace-nowrap max-w-[180px] truncate" x-text="r[f] || '-'"></td>
+                </template>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+        <div x-show="dataRows.length === 0" class="py-10 text-center text-slate-500 text-sm">لا توجد بيانات</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function clientsPage() {
+  return {
+    clients: [], features: {},
+    modal: false, renewModal: false, dataModal: false,
+    saving: false, renewClient: null, dataClient: null,
+    dataKind: 'users', dataRows: [], dataFields: [], stats: {},
+    form: {},
+    async load() {
+      try {
+        const r = await fetch('/api/clients');
+        const d = await r.json();
+        this.clients = d.clients || [];
+        this.features = d.features || {};
+      } catch (e) { console.error(e); }
+    },
+    openCreate() {
+      this.form = { id: '', name: '', contact: '', bot_username: '', bot_token: '',
+                    dash_username: '', dash_password: '', admin_ids: '',
+                    subscription_days: '30', features: Object.keys(this.features), notes: '' };
+      this.modal = true;
+    },
+    openEdit(c) {
+      this.form = { id: c.id, name: c.name, contact: c.contact,
+                    bot_username: c.bot_username, bot_token: '',
+                    dash_username: c.dash_username, dash_password: '',
+                    admin_ids: c.admin_ids, features: [...c.features], notes: c.notes };
+      this.modal = true;
+    },
+    async save() {
+      if (!this.form.name || !this.form.dash_username) { alert('الاسم واسم المستخدم مطلوبان'); return; }
+      if (!this.form.id && (!this.form.bot_token || !this.form.dash_password)) { alert('التوكن وكلمة المرور مطلوبان لعميل جديد'); return; }
+      this.saving = true;
+      try {
+        const payload = { ...this.form };
+        if (this.form.id && !payload.bot_token) delete payload.bot_token;
+        if (this.form.id && !payload.dash_password) delete payload.dash_password;
+        const r = await fetch(this.form.id ? '/api/clients/' + this.form.id : '/api/clients', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        const d = await r.json();
+        if (!r.ok || d.error) { alert(d.error || 'فشل الحفظ'); return; }
+        this.modal = false;
+        await this.load();
+      } finally { this.saving = false; }
+    },
+    async control(c, action, body) {
+      const r = await fetch('/api/clients/' + c.id + '/' + action, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+      const d = await r.json();
+      if (d.message) this.$dispatch('toast', { message: d.message });
+      await this.load();
+    },
+    openRenew(c) { this.renewClient = c; this.renewModal = true; },
+    async doRenew(days) {
+      await this.control(this.renewClient, 'renew', { days });
+      this.renewModal = false;
+    },
+    async openData(c) {
+      this.dataClient = c; this.dataModal = true;
+      const r = await fetch('/api/clients/' + c.id + '/stats');
+      this.stats = await r.json();
+      await this.loadData('users');
+    },
+    async loadData(kind) {
+      this.dataKind = kind;
+      const r = await fetch('/api/clients/' + this.dataClient.id + '/data?type=' + kind + '&limit=100');
+      const d = await r.json();
+      this.dataRows = d.rows || []; this.dataFields = d.fields || [];
+    },
+    async remove(c) {
+      if (!confirm('حذف العميل «' + c.name + '»؟ سيُوقف بوتُه. (بياناته تُحذف أيضاً — لا تراجع)')) return;
+      await fetch('/api/clients/' + c.id + '?keep_data=0', { method: 'DELETE' });
+      await this.load();
+    },
+    get statsHtml() {
+      const s = this.stats;
+      if (!s || s.total_users === undefined) return '<div class="py-6 text-center text-slate-500 text-sm col-span-6">...</div>';
+      const items = [
+        ['👥', s.total_users, 'مستخدم'], ['💳', s.total_transactions, 'معاملة'],
+        ['📥', s.deposits, 'إيداع'], ['📤', s.withdrawals, 'سحب'],
+        ['⏳', s.pending, 'معلقة'], ['🚫', s.banned, 'محظور']];
+      return items.map(i => '<div class="bg-slate-900/60 border border-slate-700 rounded-xl p-2.5 text-center"><div class="text-lg">' + i[0] + '</div><div class="text-lg font-black text-slate-100">' + i[1] + '</div><div class="text-[10px] text-slate-500">' + i[2] + '</div></div>').join('');
+    }
+  };
+}
+</script>
+{% endblock %}

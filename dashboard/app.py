@@ -2086,6 +2086,14 @@ def page_referrals():
 def page_channels():
     return render_template('channels.html', active_page='channels')
 
+@app.route('/clients')
+@admin_required
+@page_permission_required('manage_bots')
+def page_clients():
+    _start_clients_watchdog()
+    return render_template('clients.html', active_page='clients')
+
+
 @app.route('/bots')
 @admin_required
 @page_permission_required('manage_bots')
@@ -5778,6 +5786,260 @@ def api_delete_bot(bot_id):
     write_csv('bot_tokens.csv', bots, fieldnames)
     log_action('delete_bot', bot_id)
     return jsonify({'success': True})
+
+
+# ===== نظام العملاء (White-Label / Agency) =====
+# كل عميل: بوت خاص + دخول لوحة خاص + مميزات محددة + اشتراك زمني + عزل بيانات كامل.
+
+def _clients():
+    from clients_manager import get_client_manager
+    _start_clients_watchdog()
+    return get_client_manager()
+
+
+_clients_watchdog_started = False
+
+
+def _start_clients_watchdog():
+    """حراسة الاشتراكات كل 60 ثانية: إيقاف بوتات العملاء المنتهي اشتراكهم + إشعار المالك."""
+    global _clients_watchdog_started
+    if _clients_watchdog_started:
+        return
+    _clients_watchdog_started = True
+
+    def _notify(text):
+        try:
+            _comp_alert_admins(text)
+        except Exception:
+            pass
+
+    def _loop():
+        import time as _time
+        while True:
+            try:
+                _clients().check_subscriptions(notify=_notify)
+            except Exception as e:
+                _auth_logger.error('clients watchdog error: %s', e)
+            _time.sleep(60)
+
+    threading.Thread(target=_loop, daemon=True).start()
+
+
+def _client_public(c):
+    """عرض آمن لبيانات عميل (بدون التوكن أو الهاش)"""
+    import json as _json
+    if not c:
+        return None
+    feats = []
+    try:
+        feats = _json.loads(c.get('features') or '[]')
+    except Exception:
+        pass
+    return {
+        'id': c.get('id'), 'name': c.get('name'), 'contact': c.get('contact'),
+        'bot_username': c.get('bot_username'),
+        'dash_username': c.get('dash_username'),
+        'features': feats, 'admin_ids': c.get('admin_ids', ''),
+        'subscription_start': c.get('subscription_start'),
+        'subscription_end': c.get('subscription_end'),
+        'status': c.get('status'), 'notes': c.get('notes', ''),
+        'created_at': c.get('created_at'), 'last_login': c.get('last_login'),
+        'running': bool(_clients().is_running(c.get('id'))),
+        'days_left': _clients().days_left(c),
+        'expired': _clients().is_expired(c),
+    }
+
+
+@app.route('/api/clients')
+@api_auth
+@permission_required('manage_bots')
+def api_clients_list():
+    _start_clients_watchdog()
+    from clients_manager import FEATURES
+    return jsonify({
+        'clients': [_client_public(c) for c in _clients().list_clients()],
+        'features': FEATURES,
+    })
+
+
+@app.route('/api/clients', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_clients_create():
+    data = request.json or {}
+    row, err = _clients().create(
+        name=data.get('name', ''),
+        bot_username=data.get('bot_username', ''),
+        bot_token=data.get('bot_token', ''),
+        dash_username=data.get('dash_username', ''),
+        dash_password=data.get('dash_password', ''),
+        features=data.get('features'),
+        subscription_days=data.get('subscription_days', 30),
+        contact=data.get('contact', ''),
+        admin_ids=data.get('admin_ids', ''),
+        notes=data.get('notes', ''),
+    )
+    if err:
+        return jsonify({'error': err}), 400
+    log_action('create_client', row['id'])
+    return jsonify({'success': True, 'client': _client_public(row)})
+
+
+@app.route('/api/clients/<client_id>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_clients_update(client_id):
+    data = request.json or {}
+    ok, err = _clients().update(client_id, data)
+    if not ok:
+        return jsonify({'error': err or 'فشل التحديث'}), 400
+    log_action('update_client', client_id)
+    # إعادة تشغيل البوت لو كان يعمل حتى تسري التعديلات (مميزات/توكن)
+    c = _clients().get(client_id)
+    if c and _clients().is_running(client_id) and ('features' in data or 'bot_token' in data or 'admin_ids' in data):
+        _clients().restart(client_id)
+    return jsonify({'success': True, 'client': _client_public(_clients().get(client_id))})
+
+
+@app.route('/api/clients/<client_id>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_clients_delete(client_id):
+    keep_data = (request.args.get('keep_data', '1') == '1')
+    _clients().delete(client_id, keep_data=keep_data)
+    log_action('delete_client', client_id)
+    return jsonify({'success': True})
+
+
+@app.route('/api/clients/<client_id>/<action>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_clients_control(client_id, action):
+    cm = _clients()
+    c = cm.get(client_id)
+    if not c:
+        return jsonify({'error': 'العميل غير موجود'}), 404
+    if action == 'start':
+        ok, msg = cm.start(client_id)
+    elif action == 'stop':
+        cm.stop(client_id)
+        ok, msg = True, 'تم إيقاف بوت العميل'
+    elif action == 'restart':
+        ok, msg = cm.restart(client_id)
+    elif action == 'suspend':
+        cm.stop(client_id)
+        ok, err = cm.update(client_id, {'status': 'suspended'})
+        ok, msg = (True, 'تم إيقاف العميل مؤقتاً') if ok else (False, err)
+    elif action == 'activate':
+        ok, err = cm.update(client_id, {'status': 'active'})
+        ok, msg = (True, 'تم تفعيل العميل') if ok else (False, err)
+    elif action == 'renew':
+        days = int((request.json or {}).get('days', 30) or 30)
+        end = cm.renew(client_id, days)
+        ok, msg = (bool(end), f'تم التجديد حتى {end}') if end else (False, 'فشل التجديد')
+    else:
+        return jsonify({'error': 'إجراء غير معروف'}), 400
+    log_action(f'client_{action}', client_id)
+    return jsonify({'success': bool(ok), 'message': msg,
+                    'client': _client_public(cm.get(client_id))})
+
+
+@app.route('/api/clients/<client_id>/stats')
+@api_auth
+@permission_required('manage_bots')
+def api_clients_stats(client_id):
+    if not _clients().get(client_id):
+        return jsonify({'error': 'العميل غير موجود'}), 404
+    return jsonify(_clients().client_stats(client_id))
+
+
+@app.route('/api/clients/<client_id>/data')
+@api_auth
+@permission_required('manage_bots')
+def api_clients_data(client_id):
+    """رؤية المالك الكاملة لبيانات عميل — من مجلده المعزول"""
+    if not _clients().get(client_id):
+        return jsonify({'error': 'العميل غير موجود'}), 404
+    kind = request.args.get('type', 'users')
+    rows, fields = _clients().client_data(client_id, kind, limit=int(request.args.get('limit', 100)))
+    rows.reverse()  # الأحدث أولاً
+    return jsonify({'rows': rows[:int(request.args.get('limit', 100))], 'fields': fields})
+
+
+# ── بوابة العميل (لوحة مستقلة باسم مستخدم/كلمة مرور) ──
+
+@app.route('/client-login')
+def client_login_page():
+    if session.get('client_logged_in') and session.get('client_id'):
+        return redirect('/client')
+    return render_template('client_login.html')
+
+
+@app.route('/api/client/login', methods=['POST'])
+def api_client_login():
+    data = request.json or {}
+    cm = _clients()
+    c = cm.verify_login(data.get('username', ''), data.get('password', ''))
+    if not c:
+        return jsonify({'error': 'بيانات الدخول غير صحيحة'}), 401
+    if c.get('status') == 'suspended':
+        return jsonify({'error': 'حسابك موقوف — تواصل مع الإدارة'}), 403
+    session['client_logged_in'] = True
+    session['client_id'] = c['id']
+    session.permanent = False
+    return jsonify({'success': True, 'redirect': '/client'})
+
+
+@app.route('/api/client/logout', methods=['POST'])
+def api_client_logout():
+    session.pop('client_logged_in', None)
+    session.pop('client_id', None)
+    return jsonify({'success': True})
+
+
+def _client_session():
+    cid = session.get('client_id') if session.get('client_logged_in') else None
+    if not cid:
+        return None
+    return _clients().get(cid)
+
+
+@app.route('/client')
+def client_dashboard_page():
+    c = _client_session()
+    if not c:
+        return redirect('/client-login')
+    from clients_manager import FEATURES
+    return render_template('client_dashboard.html',
+                           client=_client_public(c), features=FEATURES)
+
+
+@app.route('/api/client/me')
+def api_client_me():
+    c = _client_session()
+    if not c:
+        return jsonify({'error': 'غير مسجل الدخول'}), 401
+    from clients_manager import FEATURES
+    d = _client_public(c)
+    d['stats'] = _clients().client_stats(c['id'])
+    d['features_labels'] = {k: FEATURES.get(k, k) for k in d['features']}
+    return jsonify(d)
+
+
+@app.route('/api/client/data')
+def api_client_data():
+    """بيانات العميل نفسه (قراءة فقط) من مجلده المعزول"""
+    c = _client_session()
+    if not c:
+        return jsonify({'error': 'غير مسجل الدخول'}), 401
+    kind = request.args.get('type', 'users')
+    if kind not in ('users', 'transactions', 'svrp_wallets'):
+        return jsonify({'error': 'نوع غير مسموح'}), 400
+    limit = min(int(request.args.get('limit', 50)), 100)
+    rows, fields = _clients().client_data(c['id'], kind, limit=limit)
+    rows.reverse()
+    return jsonify({'rows': rows[:limit], 'fields': fields})
+
 
 # ===== API — Complaints =====
 
