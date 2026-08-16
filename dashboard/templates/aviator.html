@@ -330,7 +330,7 @@ function onCrashed(d){
     if(bets[s].st==='jump'){
       bets[s].st='lost';sessionL++;sessionPL-=bets[s].amt;
       var be=document.getElementById('recoveryMsg');
-      be.innerHTML='🔥 <b data-i18n="x065">انفجرت أموالك!</b><br><span style="color:#ff4757;font-weight:900;font-size:16px">'+bets[s].amt.toFixed(0)+'</span> احترقت';
+      be.innerHTML='🔥 <b data-i18n="x065">انفجرت أموالك!</b><br><span style="color:#ff4757;font-weight:900;font-size:16px">'+bets[s].amt.toFixed(0)+'</span> '+I18N.t('z047');
       be.style.color='#ff4757';be.classList.add('show');
       setTimeout(function(){be.classList.remove('show')},4000);
     }

@@ -505,3 +505,22 @@ window.I18N_EXTRA = Object.assign(window.I18N_EXTRA || {}, {
   z043: { ar: "💰 رصيدك:", en: "💰 Your balance:" },
 });
 if (window.I18N) I18N.apply();
+
+// Batch 4
+window.I18N_EXTRA = Object.assign(window.I18N_EXTRA || {}, {
+  z044: { ar: "ساعي", en: "Hourly" },
+  z045: { ar: "إجمالي:", en: "Total:" },
+  z046: { ar: "عند موافقة الإدارة تُشترى التذاكر تلقائياً", en: "tickets are purchased automatically upon admin approval" },
+  z047: { ar: "احترقت", en: "burned" },
+});
+if (window.I18N) I18N.apply();
+
+// Batch 5
+window.I18N_EXTRA = Object.assign(window.I18N_EXTRA || {}, {
+  z048: { ar: "بانتظار موافقة الإدارة", en: "Awaiting admin approval" },
+  z049: { ar: "رقم الطلب:", en: "Request ID:" },
+  z050: { ar: "فشل تحميل البيانات", en: "Failed to load data" },
+  z051: { ar: "فشل تحميل التطبيقات", en: "Failed to load apps" },
+  z052: { ar: "توقعت", en: "You predicted" },
+});
+if (window.I18N) I18N.apply();

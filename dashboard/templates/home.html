@@ -407,7 +407,7 @@ function depSubmit(source, cid, cname){
   }).then(function(d){
     if(!d) return;
     if(d.success){
-      document.getElementById('mb').innerHTML = '<div style="text-align:center;padding:30px 16px"><div style="font-size:48px;margin-bottom:12px">⏳</div><div style="font-size:18px;font-weight:900;color:var(--green);margin-bottom:8px" data-i18n="x084">تم طلب الإيداع</div><div style="font-size:13px;color:var(--muted)">بانتظار موافقة الإدارة<br>رقم الطلب: '+(d.deposit_id||d.trans_id||'')+'</div><button onclick="document.getElementById(\'modal\').remove();refreshBalance()" style="margin-top:16px;width:100%;padding:12px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--green);font-weight:700;cursor:pointer" data-i18n="x017">إغلاق</button></div>';
+      document.getElementById('mb').innerHTML = '<div style="text-align:center;padding:30px 16px"><div style="font-size:48px;margin-bottom:12px">⏳</div><div style="font-size:18px;font-weight:900;color:var(--green);margin-bottom:8px" data-i18n="x084">تم طلب الإيداع</div><div style="font-size:13px;color:var(--muted)">'+I18N.t('z048')+'<br>'+I18N.t('z049')+' '+(d.deposit_id||d.trans_id||'')+'</div><button onclick="document.getElementById(\'modal\').remove();refreshBalance()" style="margin-top:16px;width:100%;padding:12px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--green);font-weight:700;cursor:pointer" data-i18n="x017">إغلاق</button></div>';
       showToast(I18N.t('x085'),'success');
     } else { showToast(d.error || I18N.t('x138'),'error'); if(btn){btn.disabled=false;btn.textContent=I18N.t('x204');} }
   }).catch(function(e){ showToast(I18N.t('x109'),'error'); if(btn){btn.disabled=false;btn.textContent=I18N.t('x204');} });
@@ -516,7 +516,7 @@ function wdSubmit(maxBal, source, cid, cname){
   }).then(function(d){
     if(!d) return;
     if(d.success){
-      document.getElementById('mb').innerHTML = '<div style="text-align:center;padding:30px 16px"><div style="font-size:48px;margin-bottom:12px">⏳</div><div style="font-size:18px;font-weight:900;color:var(--gold);margin-bottom:8px" data-i18n="x086">تم طلب السحب</div><div style="font-size:13px;color:var(--muted)">بانتظار موافقة الإدارة<br>رقم الطلب: '+(d.withdrawal_id||'')+'</div><button onclick="document.getElementById(\'modal\').remove();refreshBalance()" style="margin-top:16px;width:100%;padding:12px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--gold);font-weight:700;cursor:pointer" data-i18n="x017">إغلاق</button></div>';
+      document.getElementById('mb').innerHTML = '<div style="text-align:center;padding:30px 16px"><div style="font-size:48px;margin-bottom:12px">⏳</div><div style="font-size:18px;font-weight:900;color:var(--gold);margin-bottom:8px" data-i18n="x086">تم طلب السحب</div><div style="font-size:13px;color:var(--muted)">'+I18N.t('z048')+'<br>'+I18N.t('z049')+' '+(d.withdrawal_id||'')+'</div><button onclick="document.getElementById(\'modal\').remove();refreshBalance()" style="margin-top:16px;width:100%;padding:12px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--gold);font-weight:700;cursor:pointer" data-i18n="x017">إغلاق</button></div>';
       showToast(I18N.t('x086'),'success');
     } else { showToast(d.error || I18N.t('x141'),'error'); if(btn){btn.disabled=false;btn.textContent=I18N.t('x205');} }
   }).catch(function(e){ showToast(I18N.t('x109'),'error'); if(btn){btn.disabled=false;btn.textContent=I18N.t('x205');} });
@@ -762,7 +762,7 @@ function openCompensation(){
 
     mb.innerHTML = h;
   }).catch(function(){
-    mb.innerHTML = '<div style="text-align:center;padding:30px;color:#ff4757">فشل تحميل البيانات<button onclick="document.getElementById(\'modal\').remove()" style="margin-top:12px;width:100%;padding:10px;border-radius:10px;border:1px solid #262e39;background:transparent;color:#8794a3;cursor:pointer" data-i18n="x017">إغلاق</button></div>';
+    mb.innerHTML = '<div style="text-align:center;padding:30px;color:#ff4757">'+I18N.t('z050')+'<button onclick="document.getElementById(\'modal\').remove()" style="margin-top:12px;width:100%;padding:10px;border-radius:10px;border:1px solid #262e39;background:transparent;color:#8794a3;cursor:pointer" data-i18n="x017">إغلاق</button></div>';
   });
 }
 
@@ -886,7 +886,7 @@ function openApps(){
     html += '<button onclick="document.getElementById(\'modal\').remove()" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);margin-top:8px;cursor:pointer" data-i18n="x017">إغلاق</button>';
     mb.innerHTML = html;
   }).catch(function(){
-    mb.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted)">فشل تحميل التطبيقات<button onclick="document.getElementById(\'modal\').remove()" style="margin-top:12px;width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer" data-i18n="x017">إغلاق</button></div>';
+    mb.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted)">'+I18N.t('z051')+'<button onclick="document.getElementById(\'modal\').remove()" style="margin-top:12px;width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer" data-i18n="x017">إغلاق</button></div>';
   });
 }
 </script>

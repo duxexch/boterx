@@ -575,7 +575,7 @@ function showResult(d){
     sessionW++;sessionPL+=d.payout-parseFloat(document.getElementById('betAmount').value);
     fireConfetti(document.getElementById('gameArea'));soundDiceWin();haptic('medium');
     var be=document.getElementById('recoveryMsg');
-    be.innerHTML='🎉 <b data-i18n="x115">ربحت!</b> توقعت '+d.predicted+I18N.t('y005')+d.result+'<br><span style="color:#7eff9a;font-weight:900;font-size:16px">+'+d.payout.toFixed(0)+'</span>';
+    be.innerHTML='🎉 <b data-i18n="x115">ربحت!</b> '+I18N.t('z052')+' '+d.predicted+I18N.t('y005')+d.result+'<br><span style="color:#7eff9a;font-weight:900;font-size:16px">+'+d.payout.toFixed(0)+'</span>';
     be.style.color='#7eff9a';be.classList.add('show');setTimeout(function(){be.classList.remove('show')},4000);
   } else {
     numEl.className='result-num lose';
@@ -584,7 +584,7 @@ function showResult(d){
     sessionL++;sessionPL-=parseFloat(document.getElementById('betAmount').value);
     soundDiceLose();haptic('heavy');
     var be=document.getElementById('recoveryMsg');
-    be.innerHTML='💥 <b data-i18n="x105">خسرت!</b> توقعت '+d.predicted+I18N.t('y005')+d.result;
+    be.innerHTML='💥 <b data-i18n="x105">خسرت!</b> '+I18N.t('z052')+' '+d.predicted+I18N.t('y005')+d.result;
     be.style.color='#ff8787';be.classList.add('show');setTimeout(function(){be.classList.remove('show')},4000);
   }
   disp.classList.add('show');
