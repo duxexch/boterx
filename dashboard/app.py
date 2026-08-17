@@ -35,12 +35,8 @@ DASHBOARD_HOST = os.getenv('DASHBOARD_HOST', '0.0.0.0')
 # Any deployment still using this value is immediately exploitable.
 _KNOWN_DEFAULT_PASSWORD = 'boterx_admin_2026'
 
-# Load secret key — empty string means "not configured"; checked at startup below.
-_raw_secret_key = os.getenv('DASHBOARD_SECRET_KEY', '')
-SECRET_KEY = _raw_secret_key or secrets.token_hex(32)  # random fallback for dev only
-
-# قراءة إعدادات الأدمن من متغيرات البيئة أولاً ثم من ملف .env —
-# يمنع انكسار دخول الأدمن عند إعادة تشغيل gunicorn بدون source .env
+# قراءة قيمة من ملف .env (fallback عند غياب متغير البيئة) — يمنع انكسار
+# الإعدادات عند تشغيل gunicorn بدون source .env
 def _env_file_value(key):
     try:
         env_path = os.path.join(BASE_DIR, '.env')
@@ -53,6 +49,14 @@ def _env_file_value(key):
     except Exception:
         pass
     return ''
+
+# Load secret key — empty string means "not configured"; checked at startup below.
+# يجب أن يكون ثابتاً عبر كل عمال gunicorn: كل عامل يولّد سراً عشوائياً خاصاً به
+# فيوقّع أحدها الجلسة ويرفضها الآخر بـ 401 عشوائياً (سبب أعطال متقطعة سابقة).
+_raw_secret_key = os.getenv('DASHBOARD_SECRET_KEY', '') or _env_file_value('DASHBOARD_SECRET_KEY')
+SECRET_KEY = _raw_secret_key or secrets.token_hex(32)  # random fallback for dev only
+if _raw_secret_key and not os.getenv('DASHBOARD_SECRET_KEY'):
+    os.environ['DASHBOARD_SECRET_KEY'] = _raw_secret_key
 
 ADMIN_IDS = [a.strip() for a in (os.getenv('ADMIN_USER_IDS', '') or _env_file_value('ADMIN_USER_IDS')).split(',') if a.strip()]
 ADMIN_PASSWORD = os.getenv('DASHBOARD_PASSWORD', '') or _env_file_value('DASHBOARD_PASSWORD') or _KNOWN_DEFAULT_PASSWORD
