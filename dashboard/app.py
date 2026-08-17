@@ -8457,6 +8457,94 @@ def api_player_wallet():
     })
 
 
+# ── إرسال رصيد مجمد لصديق + بروموكود + كود إحالة ──────────────────────────
+
+@app.route('/api/player/comp/send', methods=['POST'])
+@webapp_auth
+def api_player_comp_send():
+    """إرسال أرصدة SVRP مجمدة لصديق عبر customer_id — هوية موثقة فقط."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Unauthorized'}), 403
+    data = request.get_json(silent=True) or {}
+    receiver_cid = str(data.get('receiver_cid', '')).strip()
+    amount = float(data.get('amount', 0) or 0)
+    if not receiver_cid:
+        return jsonify({'error': 'أدخل رقم العميل (Customer ID) للصديق'}), 400
+    if amount <= 0:
+        return jsonify({'error': 'المبلغ يجب أن يكون أكبر من صفر'}), 400
+    try:
+        import sys as _sys3; _sys3.path.insert(0, BASE_DIR)
+        from svrp import SVRPManager as _SM2
+        mgr = _SM2()
+        ok, msg = mgr.send_frozen_credits(uid, receiver_cid, amount)
+        return jsonify({'ok': ok, 'message': msg})
+    except Exception as e:
+        _auth_logger.error('comp/send failed uid=%s: %s', uid, e)
+        return jsonify({'error': 'فشل الإرسال — حاول مجدداً'}), 500
+
+
+@app.route('/api/player/comp/promo/redeem', methods=['POST'])
+@webapp_auth
+def api_player_comp_promo_redeem():
+    """استبدال بروموكود تعويض — هوية موثقة فقط."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Unauthorized'}), 403
+    data = request.get_json(silent=True) or {}
+    code = str(data.get('code', '')).strip().upper()
+    if not code:
+        return jsonify({'error': 'أدخل الكود'}), 400
+    try:
+        import sys as _sys4; _sys4.path.insert(0, BASE_DIR)
+        from svrp import SVRPManager as _SM3
+        mgr = _SM3()
+        ok, msg = mgr.redeem_promo_code(uid, code)
+        return jsonify({'ok': ok, 'message': msg})
+    except Exception as e:
+        _auth_logger.error('comp/promo/redeem failed uid=%s: %s', uid, e)
+        return jsonify({'error': 'فشل الاستبدال — حاول مجدداً'}), 500
+
+
+@app.route('/api/player/comp/referral/code')
+@webapp_auth
+def api_player_comp_referral_code():
+    """عرض كود الإحالة + عدد الإحالات للمستخدم."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Unauthorized'}), 403
+    try:
+        customer_id = ''
+        for u in read_csv('users.csv'):
+            if str(u.get('telegram_id', '')) == uid:
+                customer_id = u.get('customer_id', '')
+                break
+        referral_code = f"REF{customer_id}" if customer_id else ''
+        # عدد الإحالات
+        referral_count = 0
+        try:
+            for r in read_csv('referrals.csv'):
+                if str(r.get('referrer_id', '')) == uid and r.get('status') == 'completed':
+                    referral_count += 1
+        except Exception:
+            pass
+        return jsonify({
+            'ok': True,
+            'customer_id': customer_id,
+            'referral_code': referral_code,
+            'referral_count': referral_count,
+        })
+    except Exception as e:
+        _auth_logger.error('comp/referral/code failed uid=%s: %s', uid, e)
+        return jsonify({'error': 'فشل جلب البيانات'}), 500
+
+
 # svrp_lock() is imported lazily inside the endpoint to avoid a top-level
 # circular-import issue (svrp.py is loaded after app config is set up).
 # It provides reentrant cross-process locking for all SVRP CSV mutations.

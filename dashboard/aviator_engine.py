@@ -424,14 +424,17 @@ def init_aviator_engine(app, get_uid, get_gm, get_pf, is_pf, is_vex):
                 return jsonify({'error': 'انتهت فترة المراهنة'})
             if _state.get('server_ts') and time.time() - _state['server_ts'] > WAITING_DURATION + 0.1:
                 return jsonify({'error': 'انتهت نافذة الرهان'})
-            if uid in _state['bets']:
-                return jsonify({'error': 'لقد راهنت بالفعل'})
+            slot = str(data.get('slot', 's1') or 's1')
+            if slot not in ('s1', 's2'): slot = 's1'
+            bet_key = uid + '_' + slot
+            if bet_key in _state['bets']:
+                return jsonify({'error': 'لقد راهنت بالفعل في هذه الشريحة'})
             if not _is_vex():
                 return jsonify({'error': 'Games not available'}), 500
-            if req_id and _state['request_ids'].get(uid) == req_id:
+            if req_id and _state['request_ids'].get(bet_key) == req_id:
                 return jsonify({'error': 'طلب مكرر'}), 409
-            if req_id: _state['request_ids'][uid] = req_id
-            skey = 'avset_%s_%s' % (_state['round_id'], uid)
+            if req_id: _state['request_ids'][bet_key] = req_id
+            skey = 'avset_%s_%s' % (_state['round_id'], bet_key)
             # Durable row BEFORE debit; settlement shares skey with refund daemon
             try: _ags_set(uid, 'aviator', {'auto_val': auto_val, 'settle_key': skey}, amount)
             except Exception: pass
@@ -441,8 +444,8 @@ def init_aviator_engine(app, get_uid, get_gm, get_pf, is_pf, is_vex):
                 try: _ags_del(uid, 'aviator')
                 except Exception: pass
                 return jsonify({'need_deposit': True, 'error': 'رصيد غير كافٍ'})
-            _state['bets'][uid] = {'amount': amount, 'cashed_out': False,
-                                   'cash_mult': 0, 'auto_val': auto_val, 'skey': skey}
+            _state['bets'][bet_key] = {'amount': amount, 'cashed_out': False,
+                                   'cash_mult': 0, 'auto_val': auto_val, 'skey': skey, 'slot': slot}
         return jsonify({'success': True, 'balance_after': balance})
 
     @app.route('/api/aviator/cashout', methods=['POST'])
@@ -452,16 +455,19 @@ def init_aviator_engine(app, get_uid, get_gm, get_pf, is_pf, is_vex):
         if not _rate_ok(uid): return jsonify({'error': 'طلبات كثيرة'}), 429
         data = request.json or {}
         req_id = str(data.get('request_id', '') or '')[:64]
+        slot = str(data.get('slot', 's1') or 's1')
+        if slot not in ('s1', 's2'): slot = 's1'
+        bet_key = uid + '_' + slot
         if not str(uid).isdigit(): return jsonify({'error': 'uid غير صالح'}), 400
         with _lock:
             if _state['phase'] != 'flying':
                 return jsonify({'error': 'لا يمكن السحب الآن'})
-            bet = _state['bets'].get(uid)
+            bet = _state['bets'].get(bet_key)
             if not bet or bet['cashed_out']:
                 return jsonify({'error': 'لا يوجد رهان نشط'})
-            if req_id and _state['request_ids'].get('co_'+uid) == req_id:
+            if req_id and _state['request_ids'].get('co_'+bet_key) == req_id:
                 return jsonify({'error': 'طلب مكرر'}), 409
-            if req_id: _state['request_ids']['co_'+uid] = req_id
+            if req_id: _state['request_ids']['co_'+bet_key] = req_id
             # Server-authoritative: use server's internal multiplier, NOT client's
             mult = _state['multiplier']
             if mult >= _state['crash_point']:
@@ -488,15 +494,18 @@ def init_aviator_engine(app, get_uid, get_gm, get_pf, is_pf, is_vex):
             # اجمع رهانات العميل الحالية (لو راهن قبل التحديث)
             uid = get_uid()
             my_bets = {}
-            if uid and uid in _state['bets']:
-                b = _state['bets'][uid]
-                my_bets = {
-                    'placed': True,
-                    'amount': b['amount'],
-                    'cashed_out': b['cashed_out'],
-                    'cash_mult': b.get('cash_mult', 0),
-                    'auto_val': b.get('auto_val', 0),
-                }
+            if uid:
+                for s in ('s1', 's2'):
+                    bk = uid + '_' + s
+                    if bk in _state['bets']:
+                        b = _state['bets'][bk]
+                        my_bets[s] = {
+                            'placed': True,
+                            'amount': b['amount'],
+                            'cashed_out': b['cashed_out'],
+                            'cash_mult': b.get('cash_mult', 0),
+                            'auto_val': b.get('auto_val', 0),
+                        }
             # توليد لاعبين وهميين فقط — cache معطل للأداء
             all_players = _generate_fake_players(_server_mult())
             return jsonify({

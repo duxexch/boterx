@@ -52,6 +52,7 @@
                         <th class="text-right px-4 py-3 font-semibold text-slate-400">رابط التسويق</th>
                         <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="transactions_label">Transactions</th>
                         <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="status">Status</th>
+                        <th class="text-right px-4 py-3 font-semibold text-slate-400">تعويض</th>
                         <th class="text-right px-4 py-3 font-semibold text-slate-400">الإجراءات</th>
                     </tr>
                 </thead>
@@ -86,6 +87,13 @@
                             <td class="px-4 py-3">
                                 <span x-html="statusBadge(c.is_active ? 'active' : 'inactive')"></span>
                             </td>
+                            <td class="px-4 py-3 text-center">
+                                <button @click="toggleShowInComp(c)" class="p-1.5 rounded transition"
+                                    :class="(c.show_in_comp==='yes'||c.show_in_comp==='true'||c.show_in_comp===true) ? 'text-green-400 hover:bg-green-500/20' : 'text-slate-500 hover:bg-slate-600'"
+                                    :title="(c.show_in_comp==='yes'||c.show_in_comp==='true'||c.show_in_comp===true) ? 'يظهر في قسم التعويض' : 'مخفي من قسم التعويض'">
+                                    <i class="fas" :class="(c.show_in_comp==='yes'||c.show_in_comp==='true'||c.show_in_comp===true) ? 'fa-gem' : 'fa-gem-slash'"></i>
+                                </button>
+                            </td>
                             <td class="px-4 py-3">
                                 <div class="flex items-center gap-1" x-show="rbac('manage_companies')">
                                     <button @click="openEditModal(c)" class="p-1.5 rounded hover:bg-slate-600 text-slate-400 hover:text-blue-400 transition" title="Edit" data-i18n-title="edit">
@@ -102,7 +110,7 @@
                         </tr>
                     </template>
                     <tr x-show="companies.length === 0">
-                        <td colspan="9" class="px-4 py-8 text-center text-slate-500">
+                        <td colspan="10" class="px-4 py-8 text-center text-slate-500">
                             <i class="fas fa-building text-3xl mb-2 block"></i>
                             لا توجد شركات بعد
                         </td>
@@ -373,6 +381,22 @@ function companiesPage() {
             } catch (e) {
                 company.is_active = !company.is_active;
                 toast('فشل تغيير الحالة', 'error');
+            }
+        },
+
+        async toggleShowInComp(company) {
+            var newVal = (company.show_in_comp === 'yes' || company.show_in_comp === 'true' || company.show_in_comp === true) ? 'no' : 'yes';
+            company.show_in_comp = newVal;
+            try {
+                await api(`/api/companies/${company.id}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ show_in_comp: newVal }),
+                });
+                toast(newVal === 'yes' ? '✅ تظهر في قسم التعويض' : '🔒 مخفية من قسم التعويض', 'success');
+                await this.loadCompanies();
+            } catch (e) {
+                company.show_in_comp = (newVal === 'yes') ? 'no' : 'yes';
+                toast('فشل تغيير الإعداد', 'error');
             }
         },
 

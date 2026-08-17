@@ -182,17 +182,39 @@ function startPolling(){if(pollTimer)clearInterval(pollTimer);pollTimer=setInter
 async function poll(){try{var r=await apiFetch(BASE+'/api/aviator/state');var d=await r.json();var ci=document.getElementById('connIndicator');if(ci)ci.textContent='🟢';handleState(d)}catch(e){var ci=document.getElementById('connIndicator');if(ci)ci.textContent='🔴'}}
 function handleState(d){
   var np=d.phase;currentMult=d.multiplier||1.0;if(d.crash_point)crashPoint=d.crash_point;
-  // استرجاع حالة الرهان من السيرفر — مرة واحدة فقط بعد تحميل الصفحة، ولو المربعين خاليين
-  if(d.my_bet&&d.my_bet.placed&&!window._betRestored&&bets[1].st==='idle'&&bets[2].st==='idle'){
-    window._betRestored=true;
-    bets[1].st=d.my_bet.cashed_out?'cashed':'jump';
-    bets[1].amt=d.my_bet.amount||0;
-    if(d.my_bet.cashed_out){
-      setBtn(1,'done','✓ '+(d.my_bet.cash_mult*d.my_bet.amount).toFixed(0));
-    } else if(np==='flying'){
-      setBtn(1,'jump',I18N.t('y085'));
-    } else if(np==='waiting'){
-      setBtn(1,'betting',I18N.t('x018'));
+  // استرجاع حالة الرهان من السيرفر — مرة واحدة فقط بعد تحميل الصفحة، لكل سلة
+  if(!window._betRestored){
+    var restoredAny = false;
+    for(var si=1;si<=2;si++){
+      var sk='s'+si;
+      var mb=d.my_bet&&d.my_bet[sk];
+      if(mb&&mb.placed&&bets[si].st==='idle'){
+        restoredAny=true;
+        bets[si].st=mb.cashed_out?'cashed':'jump';
+        bets[si].amt=mb.amount||0;
+        if(mb.cashed_out){
+          setBtn(si,'done','✓ '+(mb.cash_mult*mb.amount).toFixed(0));
+        } else if(np==='flying'){
+          setBtn(si,'jump',I18N.t('y085'));
+        } else if(np==='waiting'){
+          setBtn(si,'betting',I18N.t('x018'));
+        }
+      }
+    }
+    // backward compat: old format (single bet without slot keys)
+    if(!restoredAny&&d.my_bet&&d.my_bet.placed&&!window._betRestored&&bets[1].st==='idle'){
+      window._betRestored=true;
+      bets[1].st=d.my_bet.cashed_out?'cashed':'jump';
+      bets[1].amt=d.my_bet.amount||0;
+      if(d.my_bet.cashed_out){
+        setBtn(1,'done','✓ '+(d.my_bet.cash_mult*d.my_bet.amount).toFixed(0));
+      } else if(np==='flying'){
+        setBtn(1,'jump',I18N.t('y085'));
+      } else if(np==='waiting'){
+        setBtn(1,'betting',I18N.t('x018'));
+      }
+    } else if(restoredAny){
+      window._betRestored=true;
     }
   }
   if(np!==lastPhase){if(np==='waiting')onWaiting(d);else if(np==='flying')onFlying(d);else if(np==='crashed')onCrashed(d);lastPhase=np}
@@ -393,7 +415,7 @@ function placeBet(s,amt){
   checkBalanceBeforeBet(amt).then(function(ok){
     if(!ok){btn.disabled=false;btn.textContent=I18N.t('x125');return}
     bets[s].req='b'+s+'_'+Date.now()+'_'+Math.random().toString(36).substr(2,6);
-    apiFetchCritical(BASE+'/api/aviator/bet',{method:'POST',body:JSON.stringify({bet_amount:amt,auto_val:0,request_id:bets[s].req})})
+    apiFetchCritical(BASE+'/api/aviator/bet',{method:'POST',body:JSON.stringify({bet_amount:amt,auto_val:0,request_id:bets[s].req,slot:'s'+s})})
     .then(function(r){return r.json()}).then(function(d){
       if(d.success){
         bets[s].st='betting';bets[s].amt=amt;
@@ -423,7 +445,7 @@ function doJump(s){
   // باراشوت مع المبلغ يتحرك للأسفل
   spawnParachuteWithMoney(planeX,planeY,pay);
   var req='c'+s+'_'+Date.now()+'_'+Math.random().toString(36).substr(2,6);
-  apiFetchCritical(BASE+'/api/aviator/cashout',{method:'POST',body:JSON.stringify({request_id:req})})
+  apiFetchCritical(BASE+'/api/aviator/cashout',{method:'POST',body:JSON.stringify({request_id:req,slot:'s'+s})})
   .then(function(r){return r.json()}).then(function(d){if(d.success&&d.balance_after!==undefined)document.getElementById('bal').textContent=d.balance_after.toLocaleString()})
   .catch(function(){});
 }

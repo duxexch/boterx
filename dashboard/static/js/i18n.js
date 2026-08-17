@@ -112,7 +112,7 @@
     b.textContent = lang === 'ar' ? 'EN' : 'ع';
     b.setAttribute('aria-label', 'Switch language');
     b.style.cssText = opts.style ||
-      'position:fixed;top:10px;inset-inline-end:10px;z-index:9999;' +
+      'position:fixed;top:10px;inset-inline-start:10px;z-index:9999;' +
       'background:rgba(20,25,32,.9);border:1px solid #262e39;color:#00e701;' +
       'font-weight:800;font-size:12px;border-radius:999px;padding:6px 12px;' +
       'cursor:pointer;backdrop-filter:blur(6px);font-family:inherit';

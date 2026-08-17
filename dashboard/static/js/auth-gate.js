@@ -40,6 +40,9 @@
       '</div>';
     document.body.appendChild(ov);
 
+    // Auto-focus code input after DOM paint (especially when returning from the bot)
+    setTimeout(function(){ try { var fi = document.getElementById('vexGateCode'); if(fi) fi.focus(); } catch(e){} }, 150);
+
     var inp = document.getElementById('vexGateCode'),
         btn = document.getElementById('vexGateGo'),
         msg = document.getElementById('vexGateMsg');

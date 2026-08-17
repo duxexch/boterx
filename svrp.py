@@ -187,7 +187,7 @@ class SVRPManager:
     ]
 
     SVRP_COMPANY_FIELDS = [
-        'id', 'name', 'registration_url', 'bonus_percentage', 'is_active', 'created_at'
+        'id', 'name', 'registration_url', 'bonus_percentage', 'is_active', 'show_in_comp', 'icon_url', 'description', 'created_at'
     ]
 
     USER_COMPANY_ACCOUNT_FIELDS = [
@@ -1559,6 +1559,11 @@ class SVRPManager:
         if len(new_rows) < len(rows):
             return self._write_csv('svrp_companies.csv', new_rows, self.SVRP_COMPANY_FIELDS)
         return False
+
+    def get_companies_for_comp(self):
+        """إرجاع الشركات المتاحة للتسجيل في قسم التعويض (show_in_comp=yes, is_active=yes)"""
+        rows = self._read_csv('svrp_companies.csv')
+        return [r for r in rows if r.get('is_active') in ('yes', 'true', True) and r.get('show_in_comp') in ('yes', 'true', True)]
 
     # ==================== حسابات المستخدمين في الشركات ====================
 
