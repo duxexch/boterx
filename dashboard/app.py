@@ -57,6 +57,14 @@ def _env_file_value(key):
 ADMIN_IDS = [a.strip() for a in (os.getenv('ADMIN_USER_IDS', '') or _env_file_value('ADMIN_USER_IDS')).split(',') if a.strip()]
 ADMIN_PASSWORD = os.getenv('DASHBOARD_PASSWORD', '') or _env_file_value('DASHBOARD_PASSWORD') or _KNOWN_DEFAULT_PASSWORD
 
+# انشر القيمة في بيئة العملية كي تراها الموديولات الأخرى (db_manager.get_admin_role
+# يرجع لـ os.getenv('ADMIN_USER_IDS') لتحديد super_admin — بدون هذا يفقد الأدمن
+# صلاحياته عند تشغيل gunicorn بدون source .env)
+if ADMIN_IDS and not os.getenv('ADMIN_USER_IDS'):
+    os.environ['ADMIN_USER_IDS'] = ','.join(ADMIN_IDS)
+if ADMIN_PASSWORD != _KNOWN_DEFAULT_PASSWORD and not os.getenv('DASHBOARD_PASSWORD'):
+    os.environ['DASHBOARD_PASSWORD'] = ADMIN_PASSWORD
+
 app = Flask(__name__, template_folder='templates', static_folder='static')
 app.secret_key = SECRET_KEY
 app.config['SESSION_COOKIE_HTTPONLY'] = True
@@ -3527,11 +3535,28 @@ def _pm_fieldnames():
         ['id','company_id','method_name','method_type','account_data','additional_info',
          'status','created_date','icon','available_for_games','currency','bot_icon'])
 
+def _pm_new_id():
+    """معرف فريد لوسيلة الدفع — timestamp وحده تكرر عند نقرات متتالية
+    في نفس الثانية (كسر Alpine x-for بالمفاتيح المكررة)؛ نضيف عشوائية."""
+    return f"PM{str(int(datetime.now().timestamp()))[-6:]}{secrets.token_hex(2).upper()}"
+
 @app.route('/api/payment-methods')
 @api_auth
 def api_payment_methods():
     with _PM_CSV_LOCK:
         methods = read_csv('payment_methods.csv')
+    # دفاع إضافي: تجاهل أي صفوف بمعرفات مكررة (نُبقي الأول) كي لا
+    # تنكسر قوائم Alpine x-for :key مهما حدث للبيانات
+    seen_ids = set()
+    unique_methods = []
+    for m in methods:
+        mid = m.get('id', '')
+        if mid and mid in seen_ids:
+            continue
+        if mid:
+            seen_ids.add(mid)
+        unique_methods.append(m)
+    methods = unique_methods
     links = read_csv('company_payment_links.csv')
     # إضافة قائمة الشركات المرتبطة لكل وسيلة
     for m in methods:
@@ -3549,9 +3574,8 @@ def api_add_payment_method():
     if not str(data.get('method_name', '')).strip():
         return jsonify({'success': False, 'error': 'اسم الوسيلة مطلوب'}), 400
     fieldnames = _pm_fieldnames()
-    new_id = f"PM{str(int(datetime.now().timestamp()))[-6:]}"
     new_method = {
-        'id': new_id,
+        'id': '',  # يُولَّد داخل القفل
         'company_id': '',
         'method_name': data.get('method_name', ''),
         'method_type': data.get('method_type', ''),
@@ -3565,6 +3589,12 @@ def api_add_payment_method():
         'bot_icon': data.get('bot_icon', '')
     }
     with _PM_CSV_LOCK:
+        # توليد معرف فريد مع فحص فعلي داخل القفل
+        new_id = _pm_new_id()
+        existing = read_csv('payment_methods.csv')
+        while any(m.get('id') == new_id for m in existing):
+            new_id = _pm_new_id()
+        new_method['id'] = new_id
         append_csv('payment_methods.csv', new_method, fieldnames)
     log_action('add_payment_method', new_id)
     return jsonify({'success': True, 'id': new_id})
