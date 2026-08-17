@@ -105,23 +105,16 @@
 
   function openBotLink() {
     try { localStorage.setItem('vex_gate_pending', '1'); } catch (e) {}
-    // tg:// deep link opens the chat with the START button directly (not the profile page).
-    // Fall back to the https link if the Telegram app didn't take over.
-    var opened = false;
+    // رابط https هو الموثوق عبر كل المنصات: يفتح محادثة البوت مع زر START
+    // مباشرة. روابط tg://resolve كانت تفتح الصفحة الشخصية للبوت على بعض
+    // العملاء (ديسكتوب/بعض أندرويد) — أزلناها.
     try {
       var a = document.createElement('a');
-      a.href = 'tg://resolve?domain=vex_otp_bot&start=web_auth';
+      a.href = BOT_URL;
       document.body.appendChild(a); a.click(); a.remove();
-      opened = true;
-    } catch (e) {}
-    setTimeout(function () {
-      // If the app grabbed the link the page is hidden; otherwise use the web link.
-      if (!opened || document.visibilityState === 'visible') {
-        var b = document.createElement('a');
-        b.href = BOT_URL; b.target = '_blank'; b.rel = 'noopener';
-        document.body.appendChild(b); b.click(); b.remove();
-      }
-    }, 700);
+    } catch (e) {
+      window.open(BOT_URL, '_blank');
+    }
   }
 
   window.VEXGate = {
