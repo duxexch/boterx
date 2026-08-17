@@ -648,28 +648,340 @@ function openChannels(){
   });
 }
 
-// ── 💱 تداول USDT ──
+// ── 💱 تداول USDT — واجهة كاملة من الويب ──
+var tradeWiz = {step: 0, order_type: '', asset_type: '', network: '', address: '', method_id: '', method_name: '', amount: 0, currency: '', methods: [], currencies: []};
+
 function openTrading(){
   var mb = openModal(I18N.t('x072'), '💱');
+  tradeWiz = {step: 0, order_type: '', asset_type: '', network: '', address: '', method_id: '', method_name: '', amount: 0, currency: '', methods: [], currencies: []};
+  var h = '<div style="font-size:18px;font-weight:900;color:#e8eaed;margin-bottom:4px;text-align:center" data-i18n="x248">💱 تداول USDT</div>';
+  h += '<div style="font-size:11px;color:#8794a3;text-align:center;margin-bottom:16px" data-i18n="x036">اشترِ وبع USDT بأفضل الأسعار</div>';
+  h += '<div id="tradeRateBox" style="display:none;background:linear-gradient(135deg,#1a2028,#10141a);border:1px solid #262e39;border-radius:12px;padding:12px;margin-bottom:12px;text-align:center"></div>';
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">';
+  h += '<button onclick="tradeStart(\'buy\')" style="padding:16px;border-radius:14px;border:1px solid rgba(0,231,1,.3);background:linear-gradient(135deg,rgba(0,231,1,.18),rgba(0,231,1,.06));color:#00e701;font-weight:900;font-size:15px;cursor:pointer">🟢 شراء USDT<div style="font-size:10px;font-weight:600;color:#8794a3;margin-top:4px">ادفع بعملتك المحلية</div></button>';
+  h += '<button onclick="tradeStart(\'sell\')" style="padding:16px;border-radius:14px;border:1px solid rgba(251,191,36,.3);background:linear-gradient(135deg,rgba(251,191,36,.15),rgba(251,191,36,.05));color:#fbbf24;font-weight:900;font-size:15px;cursor:pointer">🟡 بيع USDT<div style="font-size:10px;font-weight:600;color:#8794a3;margin-top:4px">استلم بعملتك المحلية</div></button>';
+  h += '</div>';
+  h += '<button onclick="tradeMyOrders()" style="width:100%;padding:12px;border-radius:12px;border:1px solid #262e39;background:transparent;color:#06b6d4;font-weight:800;font-size:13px;cursor:pointer;margin-bottom:12px">📋 طلباتي</button>';
+  h += modalCloseBtn();
+  mb.innerHTML = h;
   fetch(BASE + '/api/trading/public').then(function(r){return r.json()}).then(function(d){
-    var h = '<div style="font-size:18px;font-weight:900;color:#e8eaed;margin-bottom:4px;text-align:center" data-i18n="x248">💱 تداول USDT</div>';
-    h += '<div style="font-size:11px;color:#8794a3;text-align:center;margin-bottom:16px" data-i18n="x036">اشترِ وبع USDT بأفضل الأسعار</div>';
     if(d.usdt_rate){
-      h += '<div style="background:linear-gradient(135deg,#1a2028,#10141a);border:1px solid #262e39;border-radius:12px;padding:14px;margin-bottom:12px;text-align:center">';
-      h += '<div style="font-size:11px;color:#8794a3" data-i18n="x130">سعر USDT الحالي</div>';
-      h += '<div style="font-size:24px;font-weight:900;color:#fbbf24;margin-top:4px">' + esc(d.usdt_rate) + '</div>';
-      h += '</div>';
+      var el = document.getElementById('tradeRateBox');
+      if(el){
+        el.style.display = 'block';
+        el.innerHTML = '<div style="font-size:11px;color:#8794a3" data-i18n="x130">سعر USDT الحالي</div><div style="font-size:22px;font-weight:900;color:#fbbf24;margin-top:4px">' + esc(d.usdt_rate) + '</div>';
+      }
     }
-    h += '<div style="background:rgba(0,231,1,.05);border:1px solid rgba(0,231,1,.15);border-radius:12px;padding:14px;margin-bottom:12px">';
-    h += '<div style="font-size:12px;color:#8794a3;line-height:1.6">' + esc(d.message || I18N.t('x164')) + '</div></div>';
-    if(d.bot_url){
-      h += '<a href="' + esc(d.bot_url) + '" target="_blank" style="display:block;text-align:center;padding:14px;border-radius:12px;background:linear-gradient(135deg,rgba(0,231,1,.2),rgba(0,231,1,.08));border:1px solid rgba(0,231,1,.3);color:#00e701;font-weight:800;text-decoration:none;margin-bottom:8px" data-i18n="x287">🤖 افتح البوت للبدء</a>';
+  }).catch(function(){});
+}
+
+function tradeStart(type){
+  tradeWiz.order_type = type;
+  tradeWiz.step = 1;
+  var mb = document.getElementById('mb');
+  if(!mb) return;
+  var typeLabel = type === 'buy' ? 'شراء' : 'بيع';
+  var h = '<div style="font-size:16px;font-weight:900;color:#e8eaed;margin-bottom:4px;text-align:center">💱 ' + typeLabel + ' — اختر الأصل</div>';
+  h += '<div style="font-size:11px;color:#8794a3;text-align:center;margin-bottom:14px">ماذا تريد أن ' + (type === 'buy' ? 'تشتري' : 'تبيع') + '؟</div>';
+  h += '<button onclick="tradePickAsset(\'usdt\')" style="width:100%;padding:16px;border-radius:14px;border:1px solid #262e39;background:linear-gradient(135deg,#1a2028,#10141a);color:#26a17b;font-weight:800;font-size:15px;cursor:pointer;margin-bottom:8px;text-align:right">💵 USDT — تيثر</button>';
+  h += '<button onclick="tradePickAsset(\'moneygo\')" style="width:100%;padding:16px;border-radius:14px;border:1px solid #262e39;background:linear-gradient(135deg,#1a2028,#10141a);color:#06b6d4;font-weight:800;font-size:15px;cursor:pointer;text-align:right">💠 MoneyGo</button>';
+  h += '<button onclick="openTrading()" style="width:100%;padding:10px;border-radius:10px;border:1px solid #262e39;background:transparent;color:#8794a3;cursor:pointer;margin-top:10px" data-i18n="x188">‹ رجوع</button>';
+  mb.innerHTML = h;
+}
+
+function tradePickAsset(asset){
+  tradeWiz.asset_type = asset;
+  if(asset === 'moneygo'){ tradeWiz.network = ''; tradeAskAddress(); return; }
+  tradeWiz.step = 2;
+  var mb = document.getElementById('mb');
+  if(!mb) return;
+  var h = '<div style="font-size:16px;font-weight:900;color:#e8eaed;margin-bottom:4px;text-align:center">🌐 اختر الشبكة</div>';
+  ['TRC20','ERC20','BNB20'].forEach(function(n){
+    var desc = {TRC20:'أقل رسوم — الأسرع', ERC20:'شبكة إيثيريوم', BNB20:'شبكة بينانس'}[n];
+    h += '<button onclick="tradePickNet(\''+n+'\')" style="width:100%;padding:14px;border-radius:12px;border:1px solid #262e39;background:linear-gradient(135deg,#1a2028,#10141a);color:#e8eaed;font-weight:800;font-size:14px;cursor:pointer;margin-bottom:8px;text-align:right">'+n+' <span style="font-size:10px;color:#8794a3;font-weight:600">— '+desc+'</span></button>';
+  });
+  h += '<button onclick="tradeStart(tradeWiz.order_type)" style="width:100%;padding:10px;border-radius:10px;border:1px solid #262e39;background:transparent;color:#8794a3;cursor:pointer;margin-top:6px" data-i18n="x188">‹ رجوع</button>';
+  mb.innerHTML = h;
+}
+
+function tradePickNet(net){
+  tradeWiz.network = net;
+  tradeAskAddress();
+}
+
+function tradeAskAddress(){
+  tradeWiz.step = 3;
+  var mb = document.getElementById('mb');
+  if(!mb) return;
+  var isUsdt = tradeWiz.asset_type === 'usdt';
+  var q = isUsdt ? 'عنوان محفظة USDT (' + tradeWiz.network + ')' : 'رقم حساب MoneyGo';
+  var h = '<div style="font-size:16px;font-weight:900;color:#e8eaed;margin-bottom:4px;text-align:center">🏦 ' + q + '</div>';
+  h += '<div style="font-size:11px;color:#8794a3;text-align:center;margin-bottom:14px">' + (tradeWiz.order_type === 'buy' ? 'سنتحول إليها بعد الدفع' : 'التي سترسل منها') + '</div>';
+  h += '<input id="tradeAddr" type="text" placeholder="' + (isUsdt ? 'T... / 0x...' : 'رقم الحساب') + '" style="width:100%;background:#0b0e11;border:1px solid #262e39;border-radius:10px;color:#e8eaed;font-size:14px;padding:10px 12px;outline:none;direction:ltr;font-family:Courier New;margin-bottom:14px">';
+  h += '<button onclick="tradeSubmitAddress()" style="width:100%;padding:12px;border-radius:12px;border:1px solid rgba(0,231,1,.3);background:linear-gradient(135deg,rgba(0,231,1,.18),rgba(0,231,1,.06));color:#00e701;font-weight:800;font-size:14px;cursor:pointer">✅ التالي</button>';
+  h += '<button onclick="openTrading()" style="width:100%;padding:10px;border-radius:10px;border:1px solid #262e39;background:transparent;color:#8794a3;cursor:pointer;margin-top:8px" data-i18n="x018">إلغاء</button>';
+  mb.innerHTML = h;
+  setTimeout(function(){var i=document.getElementById('tradeAddr');if(i)i.focus();},100);
+}
+
+function tradeSubmitAddress(){
+  var inp = document.getElementById('tradeAddr');
+  var v = (inp && inp.value || '').trim();
+  if(v.length < 3){ showToast('اكتب العنوان بشكل صحيح'); return; }
+  tradeWiz.address = v;
+  tradeLoadMethods();
+}
+
+function tradeLoadMethods(){
+  var mb = document.getElementById('mb');
+  if(!mb) return;
+  mb.innerHTML = '<div style="text-align:center;padding:30px;color:#8794a3" data-i18n="x100">⏳ جارٍ تحميل وسائل الدفع...</div>';
+  var authP = _getAuthParam ? _getAuthParam() : ('uid={{ uid }}');
+  fetch(BASE + '/api/trading/web/methods?' + authP).then(function(r){return r.json()}).then(function(d){
+    if(d.error){ mb.innerHTML = '<div style="text-align:center;padding:20px;color:#ff4757">'+esc(d.error)+modalCloseBtn()+'</div>'; return; }
+    tradeWiz.methods = d.methods || [];
+    tradeWiz.currencies = d.currencies || [];
+    tradePickMethod();
+  }).catch(function(){
+    mb.innerHTML = '<div style="text-align:center;padding:20px;color:#ff4757">'+I18N.t('z013')+modalCloseBtn()+'</div>';
+  });
+}
+
+function tradePickMethod(){
+  tradeWiz.step = 4;
+  var mb = document.getElementById('mb');
+  if(!mb) return;
+  var h = '<div style="font-size:16px;font-weight:900;color:#e8eaed;margin-bottom:4px;text-align:center">💳 اختر وسيلة الدفع</div>';
+  h += '<div style="font-size:11px;color:#8794a3;text-align:center;margin-bottom:14px">' + (tradeWiz.order_type === 'buy' ? 'ستدفع بها' : 'ستستلم عليها') + '</div>';
+  if(tradeWiz.methods.length === 0){
+    h += '<div style="text-align:center;padding:20px;color:#8794a3">لا توجد وسائل متاحة حالياً</div>';
+  } else {
+    tradeWiz.methods.forEach(function(m){
+      var icon = m.icon && m.icon.indexOf('/static/') === 0 ? '<img src="'+esc(m.icon)+'" style="width:36px;height:36px;border-radius:10px;object-fit:cover;flex-shrink:0">' : '<div style="width:36px;height:36px;border-radius:10px;background:#132020;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">'+esc(m.icon || '💳')+'</div>';
+      h += '<button onclick="tradePickMethodId(\''+esc(m.id)+'\')" style="width:100%;display:flex;gap:10px;align-items:center;padding:12px;border-radius:12px;border:1px solid #262e39;background:linear-gradient(135deg,#1a2028,#10141a);cursor:pointer;margin-bottom:8px;text-align:right">'+icon+'<span style="font-size:13px;font-weight:800;color:#e8eaed">'+esc(m.name)+'</span></button>';
+    });
+  }
+  h += '<button onclick="tradeAskAddress()" style="width:100%;padding:10px;border-radius:10px;border:1px solid #262e39;background:transparent;color:#8794a3;cursor:pointer;margin-top:6px" data-i18n="x188">‹ رجوع</button>';
+  mb.innerHTML = h;
+}
+
+function tradePickMethodId(mid){
+  var m = tradeWiz.methods.filter(function(x){return x.id === mid})[0];
+  if(!m) return;
+  tradeWiz.method_id = mid;
+  tradeWiz.method_name = m.name;
+  tradeAskAmount();
+}
+
+function tradeAskAmount(){
+  tradeWiz.step = 5;
+  var mb = document.getElementById('mb');
+  if(!mb) return;
+  var h = '<div style="font-size:16px;font-weight:900;color:#e8eaed;margin-bottom:4px;text-align:center">💰 ' + (tradeWiz.order_type === 'buy' ? 'المبلغ الذي ستدفعه' : 'كمية USDT للبيع') + '</div>';
+  h += '<input id="tradeAmt" type="number" min="0" step="0.01" placeholder="0.00" style="width:100%;background:#0b0e11;border:1px solid #262e39;border-radius:10px;color:#e8eaed;font-size:20px;font-weight:800;padding:12px;outline:none;text-align:center;margin-bottom:14px">';
+  h += '<div style="font-size:13px;font-weight:700;color:#e8eaed;margin-bottom:8px">اختر العملة</div>';
+  h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:14px">';
+  tradeWiz.currencies.forEach(function(c){
+    h += '<button onclick="tradePickCurrency(\''+c.code+'\')" id="tradeCur_'+c.code+'" style="padding:8px 4px;border-radius:8px;border:1px solid #262e39;background:transparent;color:#8794a3;font-weight:700;font-size:11px;cursor:pointer">'+c.code+'</button>';
+  });
+  h += '</div>';
+  h += '<button onclick="tradeSubmitAmount()" style="width:100%;padding:12px;border-radius:12px;border:1px solid rgba(0,231,1,.3);background:linear-gradient(135deg,rgba(0,231,1,.18),rgba(0,231,1,.06));color:#00e701;font-weight:800;font-size:14px;cursor:pointer">✅ التالي</button>';
+  h += '<button onclick="tradePickMethod()" style="width:100%;padding:10px;border-radius:10px;border:1px solid #262e39;background:transparent;color:#8794a3;cursor:pointer;margin-top:8px" data-i18n="x188">‹ رجوع</button>';
+  mb.innerHTML = h;
+  setTimeout(function(){var i=document.getElementById('tradeAmt');if(i)i.focus();},100);
+}
+
+function tradePickCurrency(code){
+  tradeWiz.currency = code;
+  var btns = document.querySelectorAll('[id^=tradeCur_]');
+  btns.forEach(function(b){
+    b.style.border = '1px solid #262e39';
+    b.style.background = 'transparent';
+    b.style.color = '#8794a3';
+  });
+  var el = document.getElementById('tradeCur_' + code);
+  if(el){ el.style.border = '1px solid rgba(0,231,1,.4)'; el.style.background = 'rgba(0,231,1,.12)'; el.style.color = '#00e701'; }
+}
+
+function tradeSubmitAmount(){
+  var amt = parseFloat((document.getElementById('tradeAmt') || {}).value || 0);
+  if(amt <= 0){ showToast('أدخل مبلغاً صحيحاً'); return; }
+  if(!tradeWiz.currency){ showToast('اختر العملة'); return; }
+  tradeWiz.amount = amt;
+  tradeConfirm();
+}
+
+function tradeConfirm(){
+  tradeWiz.step = 6;
+  var mb = document.getElementById('mb');
+  if(!mb) return;
+  var w = tradeWiz;
+  var assetLabel = w.asset_type === 'usdt' ? 'USDT' + (w.network ? ' (' + w.network + ')' : '') : 'MoneyGo';
+  var h = '<div style="font-size:16px;font-weight:900;color:#e8eaed;margin-bottom:12px;text-align:center">📋 مراجعة الطلب</div>';
+  h += '<div style="background:linear-gradient(135deg,#1a2028,#10141a);border:1px solid #262e39;border-radius:12px;padding:14px;margin-bottom:14px">';
+  h += '<div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="color:#8794a3;font-size:12px">النوع</span><span style="color:#e8eaed;font-size:12px;font-weight:800">' + (w.order_type === 'buy' ? '🟢 شراء' : '🟡 بيع') + ' ' + assetLabel + '</span></div>';
+  h += '<div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="color:#8794a3;font-size:12px">العنوان</span><span style="color:#e8eaed;font-size:11px;font-family:Courier New;direction:ltr;max-width:60%;overflow:hidden;text-overflow:ellipsis">' + esc(w.address) + '</span></div>';
+  h += '<div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="color:#8794a3;font-size:12px">وسيلة الدفع</span><span style="color:#e8eaed;font-size:12px;font-weight:800">' + esc(w.method_name) + '</span></div>';
+  h += '<div style="display:flex;justify-content:space-between"><span style="color:#8794a3;font-size:12px">المبلغ</span><span style="color:#fbbf24;font-size:13px;font-weight:900">' + w.amount + ' ' + w.currency + '</span></div>';
+  h += '</div>';
+  h += '<div style="background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.2);border-radius:10px;padding:10px;margin-bottom:14px;font-size:11px;color:#fbbf24;line-height:1.5">💡 بعد الإنشاء سيراجع الأدمن طلبك ويرسل لك كمية USDT ووسيلة الدفع، ثم تدفع وترفع لقطة الإثبات من هنا</div>';
+  h += '<button onclick="tradeSubmitOrder()" id="tradeSubmitBtn" style="width:100%;padding:12px;border-radius:12px;border:1px solid rgba(0,231,1,.3);background:linear-gradient(135deg,rgba(0,231,1,.18),rgba(0,231,1,.06));color:#00e701;font-weight:800;font-size:14px;cursor:pointer">✅ تأكيد الطلب</button>';
+  h += '<button onclick="tradeAskAmount()" style="width:100%;padding:10px;border-radius:10px;border:1px solid #262e39;background:transparent;color:#8794a3;cursor:pointer;margin-top:8px" data-i18n="x188">‹ رجوع</button>';
+  h += '<div id="tradeMsg" style="font-size:11px;margin-top:8px;min-height:16px;text-align:center"></div>';
+  mb.innerHTML = h;
+}
+
+function tradeSubmitOrder(){
+  var btn = document.getElementById('tradeSubmitBtn');
+  var msg = document.getElementById('tradeMsg');
+  var w = tradeWiz;
+  if(btn){ btn.disabled = true; btn.textContent = '⏳ ...'; }
+  if(msg){ msg.style.color = '#8794a3'; msg.textContent = '⏳ جارٍ إنشاء الطلب...'; }
+  fetch(BASE + '/api/trading/web/create-order', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    credentials:'same-origin',
+    body: JSON.stringify({
+      order_type: w.order_type, asset_type: w.asset_type, network: w.network,
+      account_address: w.address, payment_method: w.method_name,
+      amount: w.amount, currency: w.currency
+    })
+  }).then(function(r){return r.json()}).then(function(d){
+    if(btn){ btn.disabled = false; btn.textContent = '✅ تأكيد الطلب'; }
+    if(d.ok){
+      showToast(d.message || '✅ تم إنشاء الطلب');
+      tradeMyOrders();
+    } else {
+      if(msg){ msg.style.color = '#ff4757'; msg.textContent = d.error || 'فشل إنشاء الطلب'; }
     }
+  }).catch(function(){
+    if(btn){ btn.disabled = false; btn.textContent = '✅ تأكيد الطلب'; }
+    if(msg){ msg.style.color = '#ff4757'; msg.textContent = 'خطأ في الاتصال'; }
+  });
+}
+
+function tradeMyOrders(){
+  var mb = document.getElementById('mb');
+  if(!mb) return;
+  mb.innerHTML = '<div style="text-align:center;padding:30px;color:#8794a3" data-i18n="x192">⏳ جارٍ التحميل...</div>';
+  var authP = _getAuthParam ? _getAuthParam() : ('uid={{ uid }}');
+  fetch(BASE + '/api/trading/web/my-orders?' + authP).then(function(r){return r.json()}).then(function(d){
+    if(d.error){ mb.innerHTML = '<div style="text-align:center;padding:20px;color:#ff4757">'+esc(d.error)+modalCloseBtn()+'</div>'; return; }
+    var orders = d.orders || [];
+    var stMap = {
+      pending:['⏳ بانتظار قبول الإدارة','#fbbf24'],
+      admin_accepted:['⏳ الإدارة تحدد السعر','#fbbf24'],
+      buyer_pays:['💸 ادفع الآن وارفع الإثبات','#06b6d4'],
+      buyer_sends_screenshot:['⏳ بانتظار تأكيد الدفع','#fbbf24'],
+      admin_confirms_payment:['⏳ الإدارة تحوّل USDT','#fbbf24'],
+      admin_sends_screenshot:['✅ حوّلت الإدارة — أكّد الاستلام','#00e701'],
+      completed:['✅ مكتمل','#00e701'],
+      rejected:['❌ مرفوض','#ff4757'],
+      cancelled:['🚫 ملغي','#8794a3']
+    };
+    var h = '<div style="font-size:16px;font-weight:900;color:#e8eaed;margin-bottom:4px;text-align:center">📋 طلبات التداول</div>';
+    h += '<div style="font-size:11px;color:#8794a3;text-align:center;margin-bottom:14px">حالة طلباتك المباشرة</div>';
+    if(orders.length === 0){
+      h += '<div style="text-align:center;padding:30px;color:#8794a3"><div style="font-size:40px;margin-bottom:10px">📋</div>' + I18N.t('x159') + '</div>';
+    } else {
+      orders.forEach(function(o){
+        var st = stMap[o.status] || [esc(o.status || ''),'#8794a3'];
+        var assetLabel = (o.asset_type === 'usdt' ? 'USDT' : 'MoneyGo') + (o.network ? ' ' + o.network : '');
+        h += '<div style="background:linear-gradient(135deg,#1a2028,#10141a);border:1px solid #262e39;border-radius:12px;padding:12px;margin-bottom:10px">';
+        h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">';
+        h += '<span style="font-size:12px;font-weight:800;color:#e8eaed">' + (o.order_type === 'buy' ? '🟢 شراء' : '🟡 بيع') + ' ' + assetLabel + '</span>';
+        h += '<span style="font-size:11px;font-weight:700;color:' + st[1] + '">' + st[0] + '</span>';
+        h += '</div>';
+        h += '<div style="font-size:10px;color:#8794a3;margin-bottom:6px">🆔 ' + esc(o.id) + ' • ' + esc(o.created_at || '') + '</div>';
+        h += '<div style="font-size:11px;color:#e8eaed">💰 <b>' + esc(o.amount) + ' ' + esc(o.currency) + '</b>';
+        if(o.usdt_amount){ h += ' → <b style="color:#26a17b">' + esc(o.usdt_amount) + ' USDT</b>'; }
+        h += '</div>';
+        if(o.admin_payment_method && (o.status === 'buyer_pays')){
+          h += '<div style="font-size:11px;color:#06b6d4;margin-top:4px">💳 ادفع إلى: <b>' + esc(o.admin_payment_method) + '</b></div>';
+        }
+        if(o.status === 'buyer_pays'){
+          h += '<button onclick="tradeUploadProof(\''+esc(o.id)+'\')" style="width:100%;margin-top:8px;padding:10px;border-radius:10px;border:1px solid rgba(6,182,212,.4);background:rgba(6,182,212,.12);color:#06b6d4;font-weight:800;font-size:12px;cursor:pointer">📸 رفع إثبات الدفع</button>';
+        }
+        if(o.status === 'admin_sends_screenshot'){
+          h += '<button onclick="tradeConfirmReceipt(\''+esc(o.id)+'\')" style="width:100%;margin-top:8px;padding:10px;border-radius:10px;border:1px solid rgba(0,231,1,.4);background:rgba(0,231,1,.12);color:#00e701;font-weight:800;font-size:12px;cursor:pointer">✅ تأكيد الاستلام</button>';
+        }
+        if(o.status === 'pending'){
+          h += '<button onclick="tradeCancelOrder(\''+esc(o.id)+'\')" style="width:100%;margin-top:8px;padding:8px;border-radius:10px;border:1px solid rgba(255,71,87,.3);background:transparent;color:#ff4757;font-weight:700;font-size:11px;cursor:pointer">🚫 إلغاء الطلب</button>';
+        }
+        h += '</div>';
+      });
+    }
+    h += '<button onclick="openTrading()" style="width:100%;padding:10px;border-radius:10px;border:1px solid #262e39;background:transparent;color:#8794a3;cursor:pointer;margin-top:6px">💱 طلب جديد</button>';
     h += modalCloseBtn();
     mb.innerHTML = h;
   }).catch(function(){
-    mb.innerHTML = '<div style="text-align:center;padding:30px;color:#ff4757">'+I18N.t('z005') + modalCloseBtn() + '</div>';
+    mb.innerHTML = '<div style="text-align:center;padding:20px;color:#ff4757">'+I18N.t('z013')+modalCloseBtn()+'</div>';
   });
+}
+
+function tradeUploadProof(orderId){
+  var overlay = document.createElement('div');
+  overlay.id = 'modal2';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(5,15,12,.85);backdrop-filter:blur(6px);z-index:200;display:flex;align-items:center;justify-content:center;padding:12px';
+  overlay.onclick = function(e){ if(e.target === overlay) overlay.remove(); };
+  overlay.innerHTML = '<div id="mb2" style="background:linear-gradient(180deg,#141920,#10141a);border:1px solid #262e39;border-radius:18px;padding:22px;max-width:360px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.5)"></div>';
+  document.body.appendChild(overlay);
+  var mb2 = document.getElementById('mb2');
+  var h2 = '<div style="font-size:16px;font-weight:900;color:#e8eaed;margin-bottom:4px;text-align:center">📸 إثبات الدفع</div>';
+  h2 += '<div style="font-size:12px;color:#8794a3;text-align:center;margin-bottom:14px">الطلب: <code style="color:#fbbf24">' + orderId + '</code></div>';
+  h2 += '<div style="background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.2);border-radius:10px;padding:10px;margin-bottom:14px;font-size:11px;color:#fbbf24;line-height:1.5">💡 أرفق لقطة تُظهر نجاح التحويل لوسيلة الدفع التي حددتها الإدارة</div>';
+  h2 += '<input id="tradeProofFile" type="file" accept="image/png,image/jpeg,image/webp" style="width:100%;background:#0b0e11;border:1px solid #262e39;border-radius:10px;color:#e8eaed;font-size:13px;padding:8px;margin-bottom:14px">';
+  h2 += '<button onclick="tradeDoUploadProof(\''+orderId+'\')" style="width:100%;padding:12px;border-radius:12px;border:1px solid rgba(0,231,1,.3);background:linear-gradient(135deg,rgba(0,231,1,.18),rgba(0,231,1,.06));color:#00e701;font-weight:800;font-size:14px;cursor:pointer">📤 إرسال الإثبات</button>';
+  h2 += '<button onclick="document.getElementById(\'modal2\').remove()" style="width:100%;padding:10px;border-radius:10px;border:1px solid #262e39;background:transparent;color:#8794a3;cursor:pointer;margin-top:8px" data-i18n="x018">إلغاء</button>';
+  h2 += '<div id="tradeProofMsg" style="font-size:11px;margin-top:8px;min-height:16px;text-align:center"></div>';
+  mb2.innerHTML = h2;
+}
+
+function tradeDoUploadProof(orderId){
+  var fi = document.getElementById('tradeProofFile');
+  var msg = document.getElementById('tradeProofMsg');
+  if(!fi || !fi.files || !fi.files[0]){
+    if(msg){ msg.style.color = '#ff4757'; msg.textContent = 'اختر صورة أولاً'; }
+    return;
+  }
+  var fd = new FormData();
+  fd.append('order_id', orderId);
+  fd.append('screenshot', fi.files[0]);
+  if(msg){ msg.style.color = '#8794a3'; msg.textContent = '⏳ جارٍ الرفع...'; }
+  fetch(BASE + '/api/trading/web/upload-screenshot', {
+    method:'POST', credentials:'same-origin', body: fd
+  }).then(function(r){return r.json()}).then(function(d){
+    var el = document.getElementById('modal2');
+    if(el) el.remove();
+    showToast(d.message || d.error || 'تم');
+    tradeMyOrders();
+  }).catch(function(){
+    if(msg){ msg.style.color = '#ff4757'; msg.textContent = 'خطأ في الاتصال'; }
+  });
+}
+
+function tradeConfirmReceipt(orderId){
+  fetch(BASE + '/api/trading/web/confirm-receipt', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    credentials:'same-origin',
+    body: JSON.stringify({order_id: orderId})
+  }).then(function(r){return r.json()}).then(function(d){
+    showToast(d.message || d.error || 'تم');
+    tradeMyOrders();
+  }).catch(function(){ showToast('خطأ في الاتصال'); });
+}
+
+function tradeCancelOrder(orderId){
+  fetch(BASE + '/api/trading/web/cancel', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    credentials:'same-origin',
+    body: JSON.stringify({order_id: orderId})
+  }).then(function(r){return r.json()}).then(function(d){
+    showToast(d.message || d.error || 'تم');
+    tradeMyOrders();
+  }).catch(function(){ showToast('خطأ في الاتصال'); });
 }
 
 // ── 🆘 الدعم (Support) ──

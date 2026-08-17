@@ -144,20 +144,29 @@ def _check_financial_anomalies(token):
     except:
         pass
 
-    # 2. فحص المعاملات المتكررة من نفس المستخدم (أكثر من 10 في ساعة)
+    # 2. فحص المعاملات المتكررة من نفس المستخدم (نافذة ساعتين فعلية)
     try:
         txns = _read_csv(TRANSACTIONS_CSV)
         user_txn_count = {}
+        cutoff = now - 2 * 3600  # آخر ساعتين فقط
         for t in txns[-100:]:
             uid = t.get('user_id', t.get('telegram_id', ''))
-            ts = t.get('created_at', t.get('timestamp', ''))
+            ts_str = str(t.get('created_at', t.get('timestamp', '')) or '')
+            # فلترة زمنية فعلية — لا نحسب معاملات أقدم من ساعتين
+            try:
+                ts = datetime.strptime(ts_str[:16], '%Y-%m-%d %H:%M').timestamp()
+                if ts < cutoff:
+                    continue
+            except Exception:
+                pass  # توقيت غير مقروء — نحتسبه (دفاعياً)
             user_txn_count[uid] = user_txn_count.get(uid, 0) + 1
 
         for uid, count in user_txn_count.items():
-            if count > 15 and uid:
-                key = f"freq_{uid}_{int(now/3600)}"
+            if count > 20 and uid:
+                # تنبيه واحد لكل مستخدم في اليوم — لا تكرار كل ساعة
+                key = f"freq_{uid}_{datetime.now().strftime('%Y%m%d')}"
                 if key not in _alerted_transactions:
-                    anomalies.append(f"⚠️ نشاط مكثف: المستخدم {uid} — {count} معاملة")
+                    anomalies.append(f"⚠️ نشاط مكثف: المستخدم {uid} — {count} معاملة خلال ساعتين")
                     _alerted_transactions.add(key)
     except:
         pass
@@ -168,9 +177,11 @@ def _check_financial_anomalies(token):
             f"🚨 <b>تنبيه أمني</b>\n\n{alert}\n\n⏰ {datetime.now().strftime('%H:%M:%S')}")
         logger.warning(f"Financial anomaly: {alert}")
 
-    # تنظيف القائمة كل ساعة
+    # تنظيف: نحتفظ بمعرفات الإيداعات (حتى لا تكرر أبداً) ومفاتيح اليوم فقط
     if len(_alerted_transactions) > 100:
-        _alerted_transactions = set(list(_alerted_transactions)[-50:])
+        today = datetime.now().strftime('%Y%m%d')
+        _alerted_transactions = {k for k in _alerted_transactions
+                                 if not k.startswith('freq_') or today in k}
 
 # ── Message Processing ──
 def _process_update(token, update):

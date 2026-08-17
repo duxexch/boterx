@@ -39,8 +39,23 @@ _KNOWN_DEFAULT_PASSWORD = 'boterx_admin_2026'
 _raw_secret_key = os.getenv('DASHBOARD_SECRET_KEY', '')
 SECRET_KEY = _raw_secret_key or secrets.token_hex(32)  # random fallback for dev only
 
-ADMIN_IDS = [a.strip() for a in os.getenv('ADMIN_USER_IDS', '').split(',') if a.strip()]
-ADMIN_PASSWORD = os.getenv('DASHBOARD_PASSWORD', _KNOWN_DEFAULT_PASSWORD)
+# قراءة إعدادات الأدمن من متغيرات البيئة أولاً ثم من ملف .env —
+# يمنع انكسار دخول الأدمن عند إعادة تشغيل gunicorn بدون source .env
+def _env_file_value(key):
+    try:
+        env_path = os.path.join(BASE_DIR, '.env')
+        if os.path.exists(env_path):
+            with open(env_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith(key + '='):
+                        return line.split('=', 1)[1].strip()
+    except Exception:
+        pass
+    return ''
+
+ADMIN_IDS = [a.strip() for a in (os.getenv('ADMIN_USER_IDS', '') or _env_file_value('ADMIN_USER_IDS')).split(',') if a.strip()]
+ADMIN_PASSWORD = os.getenv('DASHBOARD_PASSWORD', '') or _env_file_value('DASHBOARD_PASSWORD') or _KNOWN_DEFAULT_PASSWORD
 
 app = Flask(__name__, template_folder='templates', static_folder='static')
 app.secret_key = SECRET_KEY
@@ -165,10 +180,13 @@ def read_csv(filename):
 
 def write_csv(filename, rows, fieldnames):
     filepath = os.path.join(BASE_DIR, filename)
-    with open(filepath, 'w', newline='', encoding='utf-8-sig') as f:
+    # كتابة ذرّية: ملف مؤقت ثم استبدال — لا يبقى ملف مكسور/فارغ لو انقطعت الكتابة
+    tmp_path = filepath + '.tmp'
+    with open(tmp_path, 'w', newline='', encoding='utf-8-sig') as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction='ignore', restval='')
         writer.writeheader()
         writer.writerows([{k: v for k, v in r.items() if k is not None} for r in rows])
+    os.replace(tmp_path, filepath)
 
 def append_csv(filename, row, fieldnames):
     filepath = os.path.join(BASE_DIR, filename)
@@ -183,7 +201,13 @@ def append_csv(filename, row, fieldnames):
                 existing_header = next(csv.reader(f), [])
             if any(fn not in existing_header for fn in fieldnames):
                 existing_rows = read_csv(filename)
-                if any(None in r for r in existing_rows):
+                # حماية من المسح: لو الملف فيه صفوف فعلية لكن القراءة فشلت،
+                # نضيف الصف بالترويسة الحالية بدلاً من إعادة كتابة الملف فارغاً
+                with open(filepath, 'r', encoding='utf-8-sig') as f:
+                    raw_data_lines = [ln for ln in f.read().splitlines() if ln.strip()]
+                if len(raw_data_lines) > 1 and not existing_rows:
+                    fieldnames = existing_header
+                elif any(None in r for r in existing_rows):
                     # ملف بترويسة تالفة/صفوف زائدة — لا نعيد الكتابة كي لا نفقد بيانات؛
                     # نضيف الصف حسب الترويسة الحالية فقط
                     fieldnames = existing_header
@@ -3310,21 +3334,10 @@ def api_upload_icon():
             'absolute_bot_url': f'https://vex.deals/static/uploads/icons/{fname}',
         })
     except Exception as e:
-        # Fallback: save original
-        fname = f"{base_name}.{ext}"
-        with open(os.path.join(_ICON_UPLOAD_DIR, fname), 'wb') as out:
-            out.write(blob)
-        log_action('upload_icon', f'{fname} (PIL error: {e})')
-        return jsonify({
-            'success': True,
-            'url': f'/static/uploads/icons/{fname}',
-            'telegram_url': f'/static/uploads/icons/{fname}',
-            'web_url': f'/static/uploads/icons/{fname}',
-            'bot_url': f'/static/uploads/icons/{fname}',
-            'absolute_tg_url': f'https://vex.deals/static/uploads/icons/{fname}',
-            'absolute_web_url': f'https://vex.deals/static/uploads/icons/{fname}',
-            'absolute_bot_url': f'https://vex.deals/static/uploads/icons/{fname}',
-        })
+        # فك ترميز الصورة فشل (توقيع سليم لكن البكسلات تالفة) — نرفض بدلاً من
+        # حفظ ملف معطوب ينتهي كأيقونة مكسورة في CSV
+        log_action('upload_icon_failed', f'{base_name}: PIL error: {e}')
+        return jsonify({'success': False, 'error': 'تعذر معالجة الصورة — جرّب صورة أخرى (PNG/JPG/WEBP)'}), 400
 
 @app.route('/api/companies/list')
 def api_companies_public():
@@ -3354,7 +3367,7 @@ def api_payment_methods_by_company(company_id):
     linked = []
     try:
         links = read_csv('company_payment_links.csv')
-        linked_ids = [l.get('payment_method_id', '') for l in links if l.get('company_id', '') == company_id]
+        linked_ids = [l.get('method_id', l.get('payment_method_id', '')) for l in links if l.get('company_id', '') == company_id]
     except:
         linked_ids = []
     result = []
@@ -3506,10 +3519,19 @@ def api_comp_admin_account(acc_id):
 
 # ===== API — Payment Methods =====
 
+# قفل يمنع تداخل قراءة/كتابة متزامنة على payment_methods.csv (تعدد عمال gunicorn)
+_PM_CSV_LOCK = threading.Lock()
+
+def _pm_fieldnames():
+    return get_fieldnames('payment_methods.csv',
+        ['id','company_id','method_name','method_type','account_data','additional_info',
+         'status','created_date','icon','available_for_games','currency','bot_icon'])
+
 @app.route('/api/payment-methods')
 @api_auth
 def api_payment_methods():
-    methods = read_csv('payment_methods.csv')
+    with _PM_CSV_LOCK:
+        methods = read_csv('payment_methods.csv')
     links = read_csv('company_payment_links.csv')
     # إضافة قائمة الشركات المرتبطة لكل وسيلة
     for m in methods:
@@ -3517,18 +3539,16 @@ def api_payment_methods():
         linked_companies = [l.get('company_id') for l in links if l.get('method_id') == mid]
         m['linked_company_ids'] = linked_companies
         m['linked_count'] = len(linked_companies)
-    return jsonify({'methods': methods})
+    return jsonify({'methods': methods, 'active_count': sum(1 for m in methods if m.get('status') == 'active')})
 
 @app.route('/api/payment-methods', methods=['POST'])
 @api_auth
 @permission_required('manage_companies')
 def api_add_payment_method():
     data = request.json
-    methods = read_csv('payment_methods.csv')
-    fieldnames = get_fieldnames('payment_methods.csv', ['id','company_id','method_name','method_type','account_data','additional_info','status','created_date','icon','available_for_games','currency'])
-    for extra in ('available_for_games', 'currency', 'bot_icon'):
-        if extra not in fieldnames:
-            fieldnames.append(extra)
+    if not str(data.get('method_name', '')).strip():
+        return jsonify({'success': False, 'error': 'اسم الوسيلة مطلوب'}), 400
+    fieldnames = _pm_fieldnames()
     new_id = f"PM{str(int(datetime.now().timestamp()))[-6:]}"
     new_method = {
         'id': new_id,
@@ -3544,7 +3564,8 @@ def api_add_payment_method():
         'currency': data.get('currency', ''),
         'bot_icon': data.get('bot_icon', '')
     }
-    append_csv('payment_methods.csv', new_method, fieldnames)
+    with _PM_CSV_LOCK:
+        append_csv('payment_methods.csv', new_method, fieldnames)
     log_action('add_payment_method', new_id)
     return jsonify({'success': True, 'id': new_id})
 
@@ -3552,27 +3573,29 @@ def api_add_payment_method():
 @api_auth
 @permission_required('manage_companies')
 def api_edit_payment_method(method_id):
-    methods = read_csv('payment_methods.csv')
-    fieldnames = get_fieldnames('payment_methods.csv', ['id','company_id','method_name','method_type','account_data','additional_info','status','created_date','icon','available_for_games','currency'])
-    for extra in ('available_for_games', 'currency', 'bot_icon'):
-        if extra not in fieldnames:
-            fieldnames.append(extra)
+    with _PM_CSV_LOCK:
+        methods = read_csv('payment_methods.csv')
+        fieldnames = _pm_fieldnames()
 
-    if request.method == 'DELETE':
-        methods = [m for m in methods if m.get('id') != method_id]
-        write_csv('payment_methods.csv', methods, fieldnames)
-        log_action('delete_payment_method', method_id)
-        return jsonify({'success': True})
-    elif request.method == 'PUT':
-        data = request.json
-        for m in methods:
-            if m.get('id') == method_id:
-                for k, v in data.items():
-                    if k in fieldnames:
-                        m[k] = v
-                break
-        write_csv('payment_methods.csv', methods, fieldnames)
-        return jsonify({'success': True})
+        if request.method == 'DELETE':
+            methods = [m for m in methods if m.get('id') != method_id]
+            write_csv('payment_methods.csv', methods, fieldnames)
+            log_action('delete_payment_method', method_id)
+            return jsonify({'success': True})
+        elif request.method == 'PUT':
+            data = request.json
+            found = False
+            for m in methods:
+                if m.get('id') == method_id:
+                    found = True
+                    for k, v in data.items():
+                        if k in fieldnames and k not in ('linked_company_ids', 'linked_count'):
+                            m[k] = v
+                    break
+            if not found:
+                return jsonify({'success': False, 'error': 'الوسيلة غير موجودة'}), 404
+            write_csv('payment_methods.csv', methods, fieldnames)
+            return jsonify({'success': True})
 
 # ===== API — Payment Links (company_payment_links.csv) =====
 
@@ -4364,6 +4387,268 @@ def api_trading_public():
         'bot_url': 'https://t.me/' + (BOT_TOKEN.split(':')[0] if BOT_TOKEN else ''),
         'message': 'لبدء التداول، افتح البوت واختر 💱 تداول USDT'
     })
+
+# ── تداول USDT من الويب — نفس دورة حياة أوامر البوت (trade_orders.csv) ──────
+# الحالات: pending → admin_accepted → buyer_pays → buyer_sends_screenshot
+#          → admin_confirms_payment → admin_sends_screenshot → completed
+# الأدمن يكمل الإجراءات من البوت كالمعتاد؛ الويب ينشئ الطلب ويرفع إثبات الدفع ويؤكد الاستلام.
+
+_TRADING_CURRENCIES = [
+    {'code': 'SAR', 'name': 'ريال سعودي'}, {'code': 'AED', 'name': 'درهم إماراتي'},
+    {'code': 'EGP', 'name': 'جنيه مصري'}, {'code': 'KWD', 'name': 'دينار كويتي'},
+    {'code': 'QAR', 'name': 'ريال قطري'}, {'code': 'BHD', 'name': 'دينار بحريني'},
+    {'code': 'OMR', 'name': 'ريال عماني'}, {'code': 'JOD', 'name': 'دينار أردني'},
+    {'code': 'USD', 'name': 'دولار أمريكي'}, {'code': 'EUR', 'name': 'يورو'},
+    {'code': 'TRY', 'name': 'ليرة تركية'}, {'code': 'MAD', 'name': 'درهم مغربي'},
+]
+_TRADE_ALLOWED_EXT = {'.png', '.jpg', '.jpeg', '.webp'}
+_TRADE_MAX_BYTES = 5 * 1024 * 1024
+
+def _trade_fieldnames():
+    return get_fieldnames('trade_orders.csv',
+        ['id','buyer_id','buyer_name','customer_id','order_type','asset_type','network',
+         'account_address','payment_method','amount','currency','usdt_amount',
+         'admin_payment_method','status','screenshot_payment','screenshot_transfer',
+         'admin_id','created_at','completed_at'])
+
+def _trade_public_row(o):
+    """تجهيز صف الطلب للعرض في الويب — بدون بيانات حساسة."""
+    return {
+        'id': o.get('id', ''),
+        'order_type': o.get('order_type', ''),
+        'asset_type': o.get('asset_type', ''),
+        'network': o.get('network', ''),
+        'account_address': o.get('account_address', ''),
+        'payment_method': o.get('payment_method', ''),
+        'amount': o.get('amount', ''),
+        'currency': o.get('currency', ''),
+        'usdt_amount': o.get('usdt_amount', ''),
+        'admin_payment_method': o.get('admin_payment_method', ''),
+        'status': o.get('status', ''),
+        'screenshot_payment': o.get('screenshot_payment', '') if str(o.get('screenshot_payment', '')).startswith('http') else '',
+        'created_at': o.get('created_at', ''),
+    }
+
+@app.route('/api/trading/web/methods')
+@webapp_auth
+def api_trading_web_methods():
+    """وسائل الدفع النشطة + العملات المتاحة للتداول من الويب."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    methods = []
+    for m in read_csv('payment_methods.csv'):
+        if m.get('status') == 'active':
+            methods.append({
+                'id': m.get('id', ''),
+                'name': m.get('method_name', ''),
+                'type': m.get('method_type', ''),
+                'account_data': m.get('account_data', ''),
+                'icon': m.get('icon', '💳') or '💳',
+            })
+    return jsonify({'methods': methods, 'currencies': _TRADING_CURRENCIES})
+
+@app.route('/api/trading/web/create-order', methods=['POST'])
+@webapp_auth
+def api_trading_web_create_order():
+    """إنشاء أمر تداول (شراء/بيع USDT أو MoneyGo) من الويب."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Unauthorized'}), 403
+    data = request.get_json(silent=True) or {}
+
+    order_type = str(data.get('order_type', '')).strip()
+    asset_type = str(data.get('asset_type', '')).strip()
+    network = str(data.get('network', '')).strip()
+    account_address = str(data.get('account_address', '')).strip()
+    payment_method = str(data.get('payment_method', '')).strip()
+    currency = str(data.get('currency', '')).strip().upper()
+    if order_type not in ('buy', 'sell'):
+        return jsonify({'error': 'نوع الطلب غير صالح'}), 400
+    if asset_type not in ('usdt', 'moneygo'):
+        return jsonify({'error': 'نوع الأصل غير صالح'}), 400
+    if asset_type == 'usdt' and network not in ('TRC20', 'ERC20', 'BNB20'):
+        return jsonify({'error': 'اختر شبكة التحويل'}), 400
+    if len(account_address) < 3 or len(account_address) > 120:
+        return jsonify({'error': 'اكتب عنوان المحفظة/الحساب بشكل صحيح'}), 400
+    if not payment_method:
+        return jsonify({'error': 'اختر وسيلة الدفع'}), 400
+    if currency not in {c['code'] for c in _TRADING_CURRENCIES}:
+        return jsonify({'error': 'عملة غير مدعومة'}), 400
+    try:
+        amount = float(data.get('amount', 0))
+        if amount <= 0 or amount > 10_000_000:
+            return jsonify({'error': 'مبلغ غير صالح'}), 400
+    except (ValueError, TypeError):
+        return jsonify({'error': 'مبلغ غير صالح'}), 400
+
+    # بيانات المشتري من users.csv
+    buyer_name, customer_id = '', ''
+    for u in read_csv('users.csv'):
+        if str(u.get('telegram_id', '')) == uid:
+            buyer_name = u.get('username', '') or u.get('first_name', '') or uid
+            customer_id = u.get('customer_id', '')
+            break
+
+    order_id = 'TRD' + datetime.now().strftime('%Y%m%d%H%M%S')
+    order = {
+        'id': order_id, 'buyer_id': uid, 'buyer_name': buyer_name,
+        'customer_id': customer_id, 'order_type': order_type,
+        'asset_type': asset_type, 'network': network,
+        'account_address': account_address, 'payment_method': payment_method,
+        'amount': str(amount), 'currency': currency, 'usdt_amount': '',
+        'admin_payment_method': '', 'status': 'pending',
+        'screenshot_payment': '', 'screenshot_transfer': '',
+        'admin_id': '', 'created_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
+        'completed_at': '',
+    }
+    with _PM_CSV_LOCK:  # نفس القفل — trade_orders.csv تُكتب أيضاً من البوت
+        append_csv('trade_orders.csv', order, _trade_fieldnames())
+
+    asset_label = 'USDT' if asset_type == 'usdt' else 'MoneyGo'
+    action_label = 'شراء' if order_type == 'buy' else 'بيع'
+    _comp_alert_admins(
+        f"💱 <b>أمر تداول جديد من الويب</b>\n\n"
+        f"🆔 الطلب: <code>{order_id}</code>\n"
+        f"👤 المشتري: <code>{uid}</code>{(' (@' + buyer_name + ')') if buyer_name and buyer_name != uid else ''}\n"
+        f"📦 النوع: {action_label} {asset_type.upper()}{(' — ' + network) if network else ''}\n"
+        f"💰 المبلغ: {amount} {currency}\n"
+        f"💳 وسيلة الدفع: {payment_method}\n"
+        f"🏦 المحفظة: <code>{account_address}</code>\n\n"
+        f"راجع الطلب من البوت ← طوابير الإدارة ← التداول")
+    try:
+        push_notification('trade_order', 'أمر تداول جديد',
+                          f'{action_label} {asset_label} — {amount} {currency}')
+    except Exception:
+        pass
+    log_action('web_trade_create', order_id)
+    return jsonify({'ok': True, 'order_id': order_id,
+                    'message': '✅ تم إنشاء الطلب — سيراجعه الأدمن ويرسل لك السعر ووسيلة الدفع'})
+
+@app.route('/api/trading/web/my-orders')
+@webapp_auth
+def api_trading_web_my_orders():
+    """طلبات التداول الخاصة بالمستخدم من الويب."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    orders = [o for o in read_csv('trade_orders.csv') if str(o.get('buyer_id', '')) == uid]
+    orders.reverse()
+    return jsonify({'orders': [_trade_public_row(o) for o in orders[:20]]})
+
+@app.route('/api/trading/web/upload-screenshot', methods=['POST'])
+@webapp_auth
+def api_trading_web_upload_screenshot():
+    """رفع لقطة إثبات الدفع من الويب — تعادل إرسال الصورة في البوت."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Unauthorized'}), 403
+    order_id = str(request.form.get('order_id', '')).strip()
+    f = request.files.get('screenshot')
+    if not order_id:
+        return jsonify({'error': 'رقم الطلب مطلوب'}), 400
+    if not f or not f.filename:
+        return jsonify({'error': 'أرفق لقطة شاشة'}), 400
+
+    ext = os.path.splitext(f.filename)[1].lower()
+    if ext not in _TRADE_ALLOWED_EXT:
+        return jsonify({'error': 'صيغة الصورة غير مدعومة (png/jpg/webp)'}), 400
+    blob = f.read(_TRADE_MAX_BYTES + 1)
+    if len(blob) > _TRADE_MAX_BYTES:
+        return jsonify({'error': 'حجم الصورة يتجاوز 5MB'}), 400
+    if not blob:
+        return jsonify({'error': 'الملف فارغ'}), 400
+    if not (blob.startswith(b'\x89PNG') or blob.startswith(b'\xff\xd8\xff')
+            or (blob[:4] == b'RIFF' and blob[8:12] == b'WEBP')):
+        return jsonify({'error': 'الملف ليس صورة صالحة'}), 400
+
+    with _PM_CSV_LOCK:
+        orders = read_csv('trade_orders.csv')
+        order = next((o for o in orders if o.get('id') == order_id), None)
+        if not order:
+            return jsonify({'error': 'الطلب غير موجود'}), 404
+        if str(order.get('buyer_id', '')) != uid:
+            return jsonify({'error': 'غير مصرح'}), 403
+        if order.get('status') != 'buyer_pays':
+            return jsonify({'error': 'رفع الإثبات متاح فقط بعد تحديد السعر ووسيلة الدفع'}), 400
+
+        # حفظ في static/trade-uploads — يُخدم مباشرة و sendPhoto في البوت
+        # يقبل روابط HTTPS فتصل الإدارة لقطة المشتري من الويب
+        static_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'trade-uploads')
+        os.makedirs(static_dir, exist_ok=True)
+        fname = f"{uid}_{secrets.token_hex(8)}{ext}"
+        with open(os.path.join(static_dir, fname), 'wb') as out:
+            out.write(blob)
+        base_url = request.url_root.rstrip('/')
+        screenshot_url = f"{base_url}/static/trade-uploads/{fname}"
+
+        order['screenshot_payment'] = screenshot_url
+        order['status'] = 'buyer_sends_screenshot'
+        write_csv('trade_orders.csv', orders, _trade_fieldnames())
+
+    _comp_alert_admins(
+        f"📸 <b>إثبات دفع من الويب</b>\n\n"
+        f"🆔 الطلب: <code>{order_id}</code>\n"
+        f"👤 المشتري: <code>{uid}</code>\n\n"
+        f"راجع الصورة وأكّد الدفع من البوت ← طوابير الإدارة ← التداول")
+    return jsonify({'ok': True, 'message': '✅ تم إرسال إثبات الدفع — بانتظار تأكيد الإدارة'})
+
+@app.route('/api/trading/web/confirm-receipt', methods=['POST'])
+@webapp_auth
+def api_trading_web_confirm_receipt():
+    """تأكيد المستلم لاستلام USDT — تكملة الطلب."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Unauthorized'}), 403
+    data = request.get_json(silent=True) or {}
+    order_id = str(data.get('order_id', '')).strip()
+    if not order_id:
+        return jsonify({'error': 'رقم الطلب مطلوب'}), 400
+    with _PM_CSV_LOCK:
+        orders = read_csv('trade_orders.csv')
+        order = next((o for o in orders if o.get('id') == order_id), None)
+        if not order:
+            return jsonify({'error': 'الطلب غير موجود'}), 404
+        if str(order.get('buyer_id', '')) != uid:
+            return jsonify({'error': 'غير مصرح'}), 403
+        if order.get('status') != 'admin_sends_screenshot':
+            return jsonify({'error': 'التأكيد متاح بعد إرسال الإدارة إثبات التحويل'}), 400
+        order['status'] = 'completed'
+        order['completed_at'] = datetime.now().strftime('%Y-%m-%d %H:%M')
+        write_csv('trade_orders.csv', orders, _trade_fieldnames())
+    _comp_alert_admins(f"✅ <b>اكتمل طلب تداول (تأكيد ويب)</b>\n🆔 <code>{order_id}</code>\n👤 <code>{uid}</code>")
+    return jsonify({'ok': True, 'message': '✅ تم تأكيد الاستلام — اكتمل الطلب بنجاح'})
+
+@app.route('/api/trading/web/cancel', methods=['POST'])
+@webapp_auth
+def api_trading_web_cancel():
+    """إلغاء طلب معلق من الويب (قبل قبول الأدمن فقط)."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Unauthorized'}), 403
+    data = request.get_json(silent=True) or {}
+    order_id = str(data.get('order_id', '')).strip()
+    with _PM_CSV_LOCK:
+        orders = read_csv('trade_orders.csv')
+        order = next((o for o in orders if o.get('id') == order_id), None)
+        if not order:
+            return jsonify({'error': 'الطلب غير موجود'}), 404
+        if str(order.get('buyer_id', '')) != uid:
+            return jsonify({'error': 'غير مصرح'}), 403
+        if order.get('status') != 'pending':
+            return jsonify({'error': 'لا يمكن إلغاء طلب قيد المعالجة — تواصل مع الدعم'}), 400
+        order['status'] = 'cancelled'
+        write_csv('trade_orders.csv', orders, _trade_fieldnames())
+    _comp_alert_admins(f"🚫 <b>إلغاء طلب تداول (ويب)</b>\n🆔 <code>{order_id}</code>\n👤 <code>{uid}</code>")
+    return jsonify({'ok': True, 'message': 'تم إلغاء الطلب'})
 
 @app.route('/api/support/public')
 def api_support_public():
