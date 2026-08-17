@@ -724,6 +724,8 @@ function openCompensation(){
     var companies = (cd.companies || []).filter(function(c){return (c.is_active==='yes'||c.is_active==='true'||c.is_active===true)});
     var referralCode = (rd.referral_code) || '';
     var referralCount = (rd.referral_count) || 0;
+    var referralEarnings = (rd.referral_earnings) || 0;
+    var referralList = (rd.referral_list) || [];
     var customerId = (rd.customer_id) || '';
 
     var h = '<div style="font-size:18px;font-weight:900;color:#e8eaed;margin-bottom:4px;text-align:center" data-i18n="x240">💎 تعويض 100%</div>';
@@ -799,7 +801,9 @@ function openCompensation(){
     // ── Panel: Companies ──
     h += '<div id="compPanel_companies" style="display:none">';
     if(companies.length === 0){
-      h += '<div style="text-align:center;padding:30px;color:#8794a3"><div style="font-size:40px;margin-bottom:10px">🏢</div>' + I18N.t('x157') + '</div>';
+      h += '<div style="text-align:center;padding:20px;color:#8794a3"><div style="font-size:40px;margin-bottom:10px">🏢</div>' + I18N.t('x157') + '</div>';
+      h += '<button onclick="compOpenGeneralCompanies()" style="width:100%;padding:14px;border-radius:12px;border:1px solid rgba(0,231,1,.3);background:linear-gradient(135deg,rgba(0,231,1,.18),rgba(0,231,1,.06));color:#00e701;font-weight:800;font-size:14px;cursor:pointer;margin-top:8px">📝 إنشاء حساب في شركة</button>';
+      h += '<div style="font-size:11px;color:#8794a3;margin-top:8px;text-align:center">عرض الشركات المتاحة للتسجيل من لوحة الإدارة</div>';
     } else {
       companies.forEach(function(c){
         var icon = c.icon && c.icon !== '' ? '<img src="'+c.icon+'" style="width:50px;height:50px;border-radius:12px;object-fit:cover;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,.4)" onerror="this.outerHTML=\'<div style=width:50px;height:50px;border-radius:12px;background:#132020;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0>🏢</div>\'">' : '<div style="width:50px;height:50px;border-radius:12px;background:#132020;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0">🏢</div>';
@@ -840,11 +844,11 @@ function openCompensation(){
     h += '<div id="compPanel_send" style="display:none">';
     h += '<div style="font-size:14px;font-weight:700;color:#e8eaed;margin-bottom:12px">📤 إرسال رصيد مجمد لأصدقائك</div>';
     h += '<div style="background:rgba(6,182,212,.06);border:1px solid rgba(6,182,212,.2);border-radius:12px;padding:12px;margin-bottom:14px">';
-    h += '<div style="font-size:11px;color:#06b6d4;line-height:1.6">💡 شارك رصيدك المجمد مع أصدقائك لفك التجميد — كل صديق جديد يمنحك 10% من الرصيد كفك تجميد</div>';
+    h += '<div style="font-size:11px;color:#06b6d4;line-height:1.6">💡 شارك رصيدك المجمد مع أصدقائك لفك التجميد — كل صديق جديد يمنحك 10% من الرصيد كفك تجميد<br>🔗 إذا لم تسجل صديقك بعد، اترك حقل اسم المستخدم فارغاً وسيُنشأ رابط خاص لمرة واحدة</div>';
     h += '</div>';
     h += '<div style="margin-bottom:12px">';
-    h += '<label style="font-size:12px;color:#8794a3;margin-bottom:4px;display:block">رقم العميل (Customer ID) للصديق</label>';
-    h += '<input id="compSendCid" type="text" placeholder="مثال: C123456" style="width:100%;background:#0b0e11;border:1px solid #262e39;border-radius:10px;color:#e8eaed;font-size:14px;padding:10px 12px;outline:none;font-family:inherit">';
+    h += '<label style="font-size:12px;color:#8794a3;margin-bottom:4px;display:block">رقم العميل (Customer ID) للصديق — <span style="color:#fbbf24">اختياري</span></label>';
+    h += '<input id="compSendCid" type="text" placeholder="مثال: C123456 — اتركه فارغاً لرابط لمرة واحدة" style="width:100%;background:#0b0e11;border:1px solid #262e39;border-radius:10px;color:#e8eaed;font-size:14px;padding:10px 12px;outline:none;font-family:inherit">';
     h += '</div>';
     h += '<div style="margin-bottom:14px">';
     h += '<label style="font-size:12px;color:#8794a3;margin-bottom:4px;display:block">المبلغ</label>';
@@ -853,6 +857,7 @@ function openCompensation(){
     h += '</div>';
     h += '<button onclick="compSendFrozen()" id="compSendBtn" style="width:100%;padding:12px;border-radius:12px;border:1px solid rgba(0,231,1,.3);background:linear-gradient(135deg,rgba(0,231,1,.18),rgba(0,231,1,.06));color:#00e701;font-weight:800;font-size:14px;cursor:pointer">📤 إرسال</button>';
     h += '<div id="compSendMsg" style="font-size:11px;margin-top:8px;min-height:16px;text-align:center"></div>';
+    h += '<div id="compClaimResult" style="display:none;margin-top:14px"></div>';
     h += '</div>'; // end send panel
 
     // ── Panel: Referral ──
@@ -866,15 +871,40 @@ function openCompensation(){
       h += '<button onclick="copyToClip(this,document.getElementById(\'compRefCode\').textContent)" style="background:rgba(0,231,1,.12);border:1px solid rgba(0,231,1,.25);border-radius:8px;width:34px;height:34px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center">📋</button>';
       h += '</div>';
       h += '<div style="font-size:11px;color:#8794a3">' + I18N.t('x122') + ': <b style="color:#e8eaed">' + esc(customerId) + '</b></div>';
+      // رابط الإحالة المخصص
+      h += '<div style="margin-top:12px;padding-top:12px;border-top:1px solid #262e39">';
+      h += '<div style="font-size:11px;color:#8794a3;margin-bottom:6px">🔗 رابط الإحالة المخصص</div>';
+      var refUrl = window.location.origin + '/?ref=' + encodeURIComponent(referralCode);
+      h += '<div style="display:flex;align-items:center;gap:6px">';
+      h += '<input id="compRefUrl" type="text" readonly value="'+refUrl+'" style="flex:1;background:#0b0e11;border:1px solid #262e39;border-radius:10px;color:#06b6d4;font-size:11px;padding:8px 10px;outline:none;direction:ltr;font-family:Courier New">';
+      h += '<button onclick="copyToClip(this,document.getElementById(\'compRefUrl\').value)" style="background:rgba(0,231,1,.12);border:1px solid rgba(0,231,1,.25);border-radius:8px;padding:8px 12px;cursor:pointer;font-size:12px;color:#00e701;font-weight:700;white-space:nowrap">📋 نسخ</button>';
+      h += '</div>';
+      h += '<a href="https://t.me/share/url?url='+encodeURIComponent(refUrl)+'&text='+encodeURIComponent('انضم لـ VEX Games 🎮 كود إحالتي: '+referralCode)+'" target="_blank" style="display:inline-flex;align-items:center;gap:4px;margin-top:8px;font-size:12px;color:#06b6d4;text-decoration:none;font-weight:600">📲 مشاركة عبر تيليجرام ←</a>';
+      h += '</div>';
     } else {
       h += '<div style="font-size:13px;color:#ff4757">لا يوجد كود إحالة — سجّل في البوت أولاً</div>';
     }
     h += '</div>';
-    h += '<div style="background:linear-gradient(135deg,#1a2028,#10141a);border:1px solid #262e39;border-radius:12px;padding:16px;text-align:center">';
-    h += '<div style="font-size:32px;margin-bottom:6px">👥</div>';
-    h += '<div style="font-size:22px;font-weight:900;color:#00e701">' + referralCount + '</div>';
-    h += '<div style="font-size:11px;color:#8794a3">إحالات ناجحة</div>';
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">';
+    h += '<div style="background:linear-gradient(135deg,#1a2028,#10141a);border:1px solid #262e39;border-radius:12px;padding:14px;text-align:center"><div style="font-size:28px;margin-bottom:4px">👥</div><div style="font-size:20px;font-weight:900;color:#00e701">' + referralCount + '</div><div style="font-size:10px;color:#8794a3">إحالات ناجحة</div></div>';
+    h += '<div style="background:linear-gradient(135deg,#1a2028,#10141a);border:1px solid #262e39;border-radius:12px;padding:14px;text-align:center"><div style="font-size:28px;margin-bottom:4px">💰</div><div style="font-size:20px;font-weight:900;color:#fbbf24">' + referralEarnings.toFixed(2) + '</div><div style="font-size:10px;color:#8794a3">أرباح الإحالة</div></div>';
+    h += '<div style="background:linear-gradient(135deg,#1a2028,#10141a);border:1px solid #262e39;border-radius:12px;padding:14px;text-align:center"><div style="font-size:28px;margin-bottom:4px">💎</div><div style="font-size:20px;font-weight:900;color:#06b6d4">' + frozen.toFixed(2) + '</div><div style="font-size:10px;color:#8794a3">رصيد مجمد</div></div>';
     h += '</div>';
+    // قائمة الإحالات التفصيلية
+    if(referralList.length > 0){
+      h += '<div style="font-size:13px;font-weight:700;color:#e8eaed;margin-bottom:8px">📋 تفاصيل الإحالات</div>';
+      referralList.forEach(function(r){
+        var stCol = r.status==='completed' ? '#00e701' : '#fbbf24';
+        var stIcon = r.status==='completed' ? '✅' : '⏳';
+        var stText = r.status==='completed' ? 'مكتمل' : 'قيد الانتظار';
+        h += '<div style="display:flex;align-items:center;gap:8px;padding:8px;background:linear-gradient(135deg,#1a2028,#10141a);border:1px solid #262e39;border-radius:10px;margin-bottom:6px">';
+        h += '<span style="font-size:13px">'+stIcon+'</span>';
+        h += '<div style="flex:1"><div style="font-size:11px;color:#8794a3">'+stText+'</div>';
+        h += '<div style="font-size:10px;color:#576069">'+esc(r.date||'')+'</div></div>';
+        h += '<div style="font-size:13px;font-weight:800;color:'+stCol+'">+' + parseFloat(r.reward||0).toFixed(2) + '</div>';
+        h += '</div>';
+      });
+    }
     h += '<div style="background:rgba(0,231,1,.05);border:1px solid rgba(0,231,1,.15);border-radius:12px;padding:14px;margin-top:12px">';
     h += '<div style="font-size:12px;color:#8794a3;line-height:1.6">' + I18N.t('x241') + '</div>';
     h += '</div>';
@@ -1051,14 +1081,53 @@ function compRedeemPromo(){
   });
 }
 
-// ── Compensation: Send frozen credits ──
+// ── Compensation: Send frozen credits (or create claim link) ──
 function compSendFrozen(){
   var cid = (document.getElementById('compSendCid') || {}).value || '';
   var amt = parseFloat((document.getElementById('compSendAmt') || {}).value || 0);
   var msg = document.getElementById('compSendMsg');
   cid = cid.trim();
-  if(!cid){ if(msg){ msg.style.color='#ff4757'; msg.textContent='أدخل رقم العميل'; } return; }
   if(amt <= 0){ if(msg){ msg.style.color='#ff4757'; msg.textContent='أدخل مبلغاً صحيحاً'; } return; }
+
+  // بدون اسم مستخدم → إنشاء رابط claim لمرة واحدة
+  if(!cid){
+    var claimResult = document.getElementById('compClaimResult');
+    var btn = document.getElementById('compSendBtn');
+    if(msg){ msg.style.color='#8794a3'; msg.textContent='⏳ جارٍ إنشاء رابط خاص لمرة واحدة...'; }
+    if(btn){ btn.disabled=true; btn.textContent='⏳ ...'; }
+    fetch(BASE+'/api/player/comp/claim/create', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      credentials:'same-origin',
+      body: JSON.stringify({amount: amt})
+    }).then(function(r){return r.json()}).then(function(d){
+      if(btn){ btn.disabled=false; btn.textContent='📤 إرسال'; }
+      if(d.ok){
+        if(msg){ msg.style.color='#00e701'; msg.textContent='✅ تم إنشاء الرابط بنجاح!'; }
+        if(claimResult){
+          claimResult.style.display='block';
+          claimResult.innerHTML =
+            '<div style="background:rgba(0,231,1,.06);border:1px solid rgba(0,231,1,.2);border-radius:12px;padding:14px">'+
+            '<div style="font-size:13px;font-weight:700;color:#00e701;margin-bottom:8px">🔗 رابط خاص لمرة واحدة</div>'+
+            '<div style="font-size:11px;color:#8794a3;margin-bottom:8px">شارك هذا الرابط مع صديقك — عند تسجيله سيتم إضافة '+amt.toFixed(2)+' رصيد مجمد لحسابه</div>'+
+            '<div style="display:flex;gap:6px;margin-bottom:8px">'+
+            '<input id="compClaimUrlInput" type="text" readonly value="'+esc(d.claim_url)+'" style="flex:1;background:#0b0e11;border:1px solid #262e39;border-radius:10px;color:#06b6d4;font-size:11px;padding:8px 10px;outline:none;direction:ltr;font-family:Courier New">'+
+            '<button onclick="copyToClip(this,document.getElementById(\'compClaimUrlInput\').value)" style="background:rgba(0,231,1,.12);border:1px solid rgba(0,231,1,.25);border-radius:8px;padding:8px 12px;cursor:pointer;font-size:12px;color:#00e701;font-weight:700;white-space:nowrap">📋 نسخ</button>'+
+            '</div>'+
+            '<a href="https://t.me/share/url?url='+encodeURIComponent(d.claim_url)+'&text='+encodeURIComponent('🎁 '+window.location.host+' — شخص أرسل لك رصيد! سجّل لاستلامه')+'" target="_blank" style="display:inline-flex;align-items:center;gap:4px;font-size:12px;color:#06b6d4;text-decoration:none;font-weight:600">📲 مشاركة عبر تيليجرام ←</a>'+
+            '</div>';
+        }
+      } else {
+        if(msg){ msg.style.color='#ff4757'; msg.textContent = d.error || 'فشل إنشاء الرابط'; }
+      }
+    }).catch(function(){
+      if(btn){ btn.disabled=false; btn.textContent='📤 إرسال'; }
+      if(msg){ msg.style.color='#ff4757'; msg.textContent='خطأ في الاتصال'; }
+    });
+    return;
+  }
+
+  // مع اسم مستخدم → إرسال مباشر
   var btn = document.getElementById('compSendBtn');
   if(btn){ btn.disabled=true; btn.textContent='⏳ جارٍ الإرسال...'; }
   fetch(BASE+'/api/player/comp/send', {
@@ -1072,7 +1141,6 @@ function compSendFrozen(){
     if(d.ok){
       msg.style.color='#00e701';
       msg.textContent = d.message || '✅ تم الإرسال';
-      // Refresh modal to update balances
       setTimeout(function(){
         var modal = document.getElementById('modal');
         if(modal) modal.remove();
@@ -1085,6 +1153,49 @@ function compSendFrozen(){
   }).catch(function(){
     if(btn){ btn.disabled=false; btn.textContent='📤 إرسال'; }
     if(msg){ msg.style.color='#ff4757'; msg.textContent='خطأ في الاتصال'; }
+  });
+}
+
+// ── Compensation: Open general companies (from admin panel) ──
+function compOpenGeneralCompanies(){
+  var overlay = document.createElement('div');
+  overlay.id = 'modal2';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(5,15,12,.85);backdrop-filter:blur(6px);z-index:200;display:flex;align-items:center;justify-content:center;padding:12px;overflow-y:auto';
+  overlay.onclick = function(e){ if(e.target === overlay) overlay.remove(); };
+  overlay.innerHTML = '<div id="mb2" style="background:linear-gradient(180deg,#141920,#10141a);border:1px solid #262e39;border-radius:18px;padding:20px;max-width:420px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.5)"></div>';
+  document.body.appendChild(overlay);
+  var mb2 = document.getElementById('mb2');
+  mb2.innerHTML = '<div style="text-align:center;padding:20px;color:#8794a3" data-i18n="x192">⏳ جارٍ التحميل...</div>';
+  fetch('/api/companies/list').then(function(r){return r.json()}).then(function(data){
+    var companies = (data.companies || []).filter(function(c){return c.is_active==='yes'||c.is_active==='true'||c.is_active===true||c.is_active==='1'||c.is_active===''});
+    if(companies.length === 0){
+      mb2.innerHTML = '<div style="text-align:center;padding:30px;color:#8794a3"><div style="font-size:40px;margin-bottom:10px">🏢</div>'+I18N.t('x157')+'<button onclick="document.getElementById(\'modal2\').remove()" style="margin-top:14px;width:100%;padding:10px;border-radius:10px;border:1px solid #262e39;background:transparent;color:#8794a3;cursor:pointer">'+I18N.t('x017')+'</button></div>';
+      return;
+    }
+    var h = '<div style="font-size:16px;font-weight:900;color:#e8eaed;margin-bottom:4px;text-align:center">🏢 الشركات المتاحة</div>';
+    h += '<div style="font-size:11px;color:#8794a3;text-align:center;margin-bottom:14px">سجّل حسابك في إحدى هذه الشركات</div>';
+    companies.forEach(function(c){
+      var icon = c.icon && c.icon !== '' && c.icon !== '🏢' ? '<div style="width:44px;height:44px;border-radius:12px;background:#132020;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">'+esc(c.icon)+'</div>' : '<div style="width:44px;height:44px;border-radius:12px;background:#132020;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">🏢</div>';
+      h += '<div style="display:flex;gap:12px;padding:12px;background:linear-gradient(135deg,#1a2028,#10141a);border:1px solid #262e39;border-radius:14px;margin-bottom:8px;align-items:center">';
+      h += icon;
+      h += '<div style="flex:1;min-width:0">';
+      h += '<div style="font-size:13px;font-weight:800;color:#e8eaed;margin-bottom:2px">'+esc(c.name||'')+'</div>';
+      if(c.affiliate_link){
+        h += '<a href="'+c.affiliate_link+'" target="_blank" style="font-size:11px;color:#06b6d4;text-decoration:none;font-weight:600">🔗 '+I18N.t('x279')+'</a>';
+      }
+      if(c.promo_code){
+        h += '<div style="margin-top:4px"><code style="background:#141920;border:1px solid #262e39;padding:2px 8px;border-radius:6px;color:#fbbf24;font-size:11px;font-weight:700">'+esc(c.promo_code)+'</code></div>';
+      }
+      h += '</div>';
+      if(c.affiliate_link){
+        h += '<a href="'+c.affiliate_link+'" target="_blank" style="flex-shrink:0;width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,rgba(0,231,1,.2),rgba(0,231,1,.08));display:flex;align-items:center;justify-content:center;text-decoration:none;border:1px solid rgba(0,231,1,.3)"><span style="font-size:18px">⬇️</span></a>';
+      }
+      h += '</div>';
+    });
+    h += '<button onclick="document.getElementById(\'modal2\').remove()" style="width:100%;padding:10px;border-radius:10px;border:1px solid #262e39;background:transparent;color:#8794a3;margin-top:8px;cursor:pointer">'+I18N.t('x017')+'</button>';
+    mb2.innerHTML = h;
+  }).catch(function(){
+    mb2.innerHTML = '<div style="text-align:center;padding:30px;color:#ff4757">'+I18N.t('z050')+'<button onclick="document.getElementById(\'modal2\').remove()" style="margin-top:12px;width:100%;padding:10px;border-radius:10px;border:1px solid #262e39;background:transparent;color:#8794a3;cursor:pointer">'+I18N.t('x017')+'</button></div>';
   });
 }
 

@@ -1506,6 +1506,64 @@ class SVRPManager:
             msg += f"\n⏳ حوّل 10% أو أكثر من رصيدك المجمد ليُفك لك 5%"
         return True, msg
 
+    def send_frozen_credits_direct(self, sender_telegram_id, receiver_telegram_id, amount, is_claim=False):
+        """إرسال رصيد مجمد مباشرة عبر telegram_id (بدون customer_id lookup).
+        يُستخدم لروابط claim لمرة واحدة."""
+        tid = str(sender_telegram_id)
+        receiver_tid = str(receiver_telegram_id)
+        if tid == receiver_tid:
+            return False, "لا يمكنك إرسال رصيد لنفسك"
+        amount = float(amount)
+        if amount <= 0:
+            return False, "المبلغ يجب أن يكون أكبر من صفر"
+        try:
+            from game_engine import GameManager as _GM_d
+            transfer_id = self._generate_id('TRF')
+            # unfreeze bonus: claim = "new friend" → 10%, existing = 5%
+            unlock_pct = 0.10 if is_claim else 0.05
+            try:
+                frozen_bal = float(_GM_d.get_svrp_frozen_balance(tid).get('frozen_balance', 0) or 0)
+                unlock_bonus = round(frozen_bal * unlock_pct, 2)
+                if unlock_bonus < 0.01:
+                    unlock_bonus = 0.0
+            except Exception:
+                unlock_bonus = 0.0
+            # خصم من المرسل + إضافة للمستلم (atomic)
+            success, _bal = _GM_d.transfer_svrp_frozen_p2p(
+                transfer_id, tid, receiver_tid, amount, unlock_bonus)
+            if not success:
+                return False, "رصيدك المجمد غير كافٍ"
+            # Mirror to CSV wallets
+            self._mirror_p2p_transfer(tid, receiver_tid, amount)
+            # Record in transfers CSV
+            self._append_csv('svrp_transfers.csv', {
+                'id': transfer_id,
+                'sender_id': tid,
+                'receiver_id': receiver_tid,
+                'amount': str(round(amount, 2)),
+                'created_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
+            }, ['id', 'sender_id', 'receiver_id', 'amount', 'created_at'])
+            logger.info(f"SVRP direct transfer: {tid} → {receiver_tid} amount={amount} claim={is_claim} unlock={unlock_bonus}")
+            msg = f"✅ تم استلام {amount:.2f} رصيد مجمد"
+            if unlock_bonus > 0:
+                msg += f" + فك تجميد {unlock_bonus:.2f}"
+            return True, msg
+        except Exception as e:
+            logger.error(f"send_frozen_credits_direct failed: {e}")
+            return False, "فشل الإرسال — حاول مجدداً"
+
+    def _mirror_p2p_transfer(self, sender_tid, receiver_tid, amount):
+        """تحديث CSV wallets بعد تحويل مباشر."""
+        wallets = self._read_csv('svrp_wallets.csv')
+        sender_w = next((w for w in wallets if w.get('telegram_id') == sender_tid), None)
+        receiver_w = next((w for w in wallets if w.get('telegram_id') == receiver_tid), None)
+        if sender_w:
+            sender_w['balance'] = str(round(float(sender_w.get('balance', 0) or 0) - amount, 6))
+        if receiver_w:
+            receiver_w['balance'] = str(round(float(receiver_w.get('balance', 0) or 0) + amount, 6))
+            receiver_w['total_earned'] = str(round(float(receiver_w.get('total_earned', 0) or 0) + amount, 6))
+        self._write_csv('svrp_wallets.csv', wallets, self.WALLET_FIELDS)
+
     # ==================== شركات الاسترداد ====================
 
     def add_recovery_company(self, name, registration_url, bonus_percentage=10):

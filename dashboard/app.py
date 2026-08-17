@@ -8526,12 +8526,28 @@ def api_player_comp_referral_code():
                 customer_id = u.get('customer_id', '')
                 break
         referral_code = f"REF{customer_id}" if customer_id else ''
-        # عدد الإحالات
+        # عدد الإحالات + أرباح الإحالة
         referral_count = 0
+        referral_earnings = 0.0
         try:
             for r in read_csv('referrals.csv'):
                 if str(r.get('referrer_id', '')) == uid and r.get('status') == 'completed':
                     referral_count += 1
+                    try: referral_earnings += float(r.get('reward_amount', 0) or 0)
+                    except Exception: pass
+        except Exception:
+            pass
+        # قائمة الإحالات التفصيلية
+        referral_list = []
+        try:
+            for r in read_csv('referrals.csv'):
+                if str(r.get('referrer_id', '')) == uid:
+                    referral_list.append({
+                        'referred_id': r.get('referred_id', ''),
+                        'status': r.get('status', ''),
+                        'reward': r.get('reward_amount', '0'),
+                        'date': r.get('created_at', ''),
+                    })
         except Exception:
             pass
         return jsonify({
@@ -8539,10 +8555,193 @@ def api_player_comp_referral_code():
             'customer_id': customer_id,
             'referral_code': referral_code,
             'referral_count': referral_count,
+            'referral_earnings': round(referral_earnings, 2),
+            'referral_list': referral_list,
         })
     except Exception as e:
         _auth_logger.error('comp/referral/code failed uid=%s: %s', uid, e)
         return jsonify({'error': 'فشل جلب البيانات'}), 500
+
+
+# ── One-Time Claim Link — إرسال بدون اسم مستخدم ─────────────────────────
+
+import os as _claim_os
+_CLAIM_DIR = _claim_os.path.join(BASE_DIR, 'svrp_claims')
+
+def _ensure_claim_dir():
+    if not _claim_os.path.isdir(_CLAIM_DIR):
+        _claim_os.makedirs(_CLAIM_DIR, exist_ok=True)
+
+def _read_claims_csv():
+    _ensure_claim_dir()
+    return read_csv('svrp_claims.csv')
+
+def _write_claims_csv(rows, fieldnames=None):
+    _ensure_claim_dir()
+    if not fieldnames:
+        fieldnames = get_fieldnames('svrp_claims.csv',
+            ['id','token','sender_uid','amount','status','created_at','claimed_by_uid','claimed_at','sender_name'])
+    write_csv('svrp_claims.csv', rows, fieldnames)
+
+@app.route('/api/player/comp/claim/create', methods=['POST'])
+@webapp_auth
+def api_player_comp_claim_create():
+    """إنشاء رابط claim لمرة واحدة — المستخدم يكتب المبلغ فقط بدون اسم."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Unauthorized'}), 403
+    data = request.get_json(silent=True) or {}
+    amount = float(data.get('amount', 0) or 0)
+    if amount <= 0:
+        return jsonify({'error': 'المبلغ يجب أن يكون أكبر من صفر'}), 400
+    # تحقق من رصيد مجمد كافي (25% كحد أقصى)
+    try:
+        from game_engine import GameManager as _CLMGM
+        _cl_bal = float(_CLMGM.get_svrp_frozen_balance(uid).get('frozen_balance', 0) or 0)
+    except Exception:
+        _cl_bal = 0
+    if amount > _cl_bal * 0.25:
+        return jsonify({'error': 'الحد الأقصى 25% من رصيدك المجمد (' + str(round(_cl_bal * 0.25, 2)) + ')'}), 400
+    token = secrets.token_urlsafe(16)
+    # اسم المرسل
+    sender_name = ''
+    try:
+        for u in read_csv('users.csv'):
+            if str(u.get('telegram_id', '')) == uid:
+                sender_name = u.get('username', '') or u.get('first_name', '') or uid
+                break
+    except Exception:
+        pass
+    try:
+        rows = _read_claims_csv()
+        rows.append({
+            'id': 'CLM' + secrets.token_hex(5).upper(),
+            'token': token,
+            'sender_uid': uid,
+            'amount': str(round(amount, 2)),
+            'status': 'pending',
+            'created_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
+            'claimed_by_uid': '',
+            'claimed_at': '',
+            'sender_name': sender_name,
+        })
+        _write_claims_csv(rows)
+    except Exception as e:
+        _auth_logger.error('claim/create failed uid=%s: %s', uid, e)
+        return jsonify({'error': 'فشل إنشاء الرابط'}), 500
+    claim_url = request.url_root.rstrip('/') + '/claim/' + token
+    return jsonify({'ok': True, 'claim_url': claim_url, 'token': token, 'amount': amount})
+
+
+@app.route('/api/player/comp/claims')
+@webapp_auth
+def api_player_comp_claims():
+    """قائمة روابط claim للمستخدم (معلقة + مُطالَبة)."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Unauthorized'}), 403
+    claims = []
+    try:
+        for c in _read_claims_csv():
+            if c.get('sender_uid') == uid or c.get('claimed_by_uid') == uid:
+                claims.append(c)
+    except Exception:
+        pass
+    return jsonify({'claims': claims})
+
+
+@app.route('/claim/<token>')
+def claim_page(token):
+    """صفحة عامة لرابط claim — تعرض المبلغ وربط التسجيل."""
+    rows = _read_claims_csv()
+    claim = None
+    for c in rows:
+        if c.get('token') == token:
+            claim = c
+            break
+    if not claim:
+        return '<div style="text-align:center;padding:60px 20px;font-family:Cairo,sans-serif;color:#ff4757"><h2>❌ رابط غير صالح</h2><p>هذا الرابط غير موجود أو انتهت صلاحيته</p></div>', 404
+    status = claim.get('status', 'pending')
+    if status == 'claimed':
+        return '<div style="text-align:center;padding:60px 20px;font-family:Cairo,sans-serif;color:#8794a3"><h2>✅ تم المطالبة</h2><p>هذا الرابط تم استخدامه بالفعل</p></div>'
+    amount = claim.get('amount', '0')
+    sender = claim.get('sender_name', '') or 'مستخدم VEX'
+    claim_url = request.url_root.rstrip('/') + '/claim/' + token
+    bot_url = 'https://t.me/vex_otp_bot?start=claim_' + token
+    html = '''<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>VEX — استلم رصيدك</title>
+    <style>*{font-family:Cairo,sans-serif;box-sizing:border-box;margin:0;padding:0}
+    body{background:#0b0e11;color:#eef2f6;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+    .card{background:linear-gradient(180deg,#141920,#10141a);border:1px solid #262e39;border-radius:20px;padding:30px;max-width:400px;width:100%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.5)}
+    .icon{font-size:56px;margin-bottom:14px}.amt{font-size:32px;font-weight:900;color:#00e701;margin:10px 0}
+    .label{font-size:14px;color:#8794a3;margin-bottom:20px}
+    .btn{display:block;background:linear-gradient(135deg,#00e701,#00c101);color:#04210a;font-weight:900;font-size:16px;border-radius:14px;padding:14px;text-decoration:none;margin:10px auto;max-width:280px}
+    .btn2{background:transparent;border:1px solid #262e39;color:#8794a3}
+    .info{font-size:12px;color:#8794a3;margin-top:16px;line-height:1.6}
+    .code{background:#0b0e11;border:1px solid #262e39;padding:8px 14px;border-radius:10px;color:#fbbf24;font-size:14px;font-weight:700;font-family:Courier New;letter-spacing:.5px;margin-top:10px;display:inline-block}
+    </style></head><body><div class="card">
+    <div class="icon">🎁</div>
+    <div class="label">''' + sender + ''' أرسل لك رصيد مجمد</div>
+    <div class="amt">''' + amount + '''</div>
+    <div class="label">سجّل في VEX لاستلام الرصيد</div>
+    <a href="''' + bot_url + '''" target="_blank" class="btn">📲 فتح البوت للتسجيل</a>
+    <div class="info">💡 بعد التسجيل، سيتم إضافة الرصيد لمحفظتك تلقائياً مع قواعد التجميد المطبقة.<br>هذا الرابط صالح لمرة واحدة فقط.</div>
+    </div></body></html>'''
+    return html
+
+
+@app.route('/api/claim/<token>/redeem', methods=['POST'])
+@webapp_auth
+def api_claim_redeem(token):
+    """مطالبة رصيد claim — المستخدم المسجل يستلم الرصيد المجمد."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Unauthorized'}), 403
+    rows = _read_claims_csv()
+    claim = None
+    for c in rows:
+        if c.get('token') == token:
+            claim = c
+            break
+    if not claim:
+        return jsonify({'error': 'رابط غير صالح'}), 404
+    if claim.get('status') != 'pending':
+        return jsonify({'error': 'هذا الرابط تم استخدامه بالفعل'}), 400
+    sender_uid = claim.get('sender_uid', '')
+    if sender_uid == uid:
+        return jsonify({'error': 'لا يمكنك مطالبة رصيدك الخاص'}), 400
+    amount = float(claim.get('amount', 0) or 0)
+    if amount <= 0:
+        return jsonify({'error': 'مبلغ غير صالح'}), 400
+    # خصم من مرسل + إضافة للمطالب عبر svrp.send_frozen_credits logic
+    try:
+        import sys as _c6sys; _c6sys.path.insert(0, BASE_DIR)
+        from svrp import SVRPManager as _CLSMgr
+        mgr = _CLSMgr()
+        # نستخدم transfer_svrp_frozen_direct — خصم من المرسل + إضافة للمستلم
+        # نعاملها كإرسال لصديق جديد (5% unfreeze للمرسل)
+        ok, msg = mgr.send_frozen_credits_direct(sender_uid, uid, amount, is_claim=True)
+        if not ok:
+            return jsonify({'error': msg}), 400
+        # تحديث حالة الـ claim
+        for c in rows:
+            if c.get('token') == token:
+                c['status'] = 'claimed'
+                c['claimed_by_uid'] = uid
+                c['claimed_at'] = datetime.now().strftime('%Y-%m-%d %H:%M')
+                break
+        _write_claims_csv(rows)
+        return jsonify({'ok': True, 'message': '✅ تم استلام ' + str(round(amount, 2)) + ' رصيد مجمد في محفظتك'})
+    except Exception as e:
+        _auth_logger.error('claim/redeem failed uid=%s token=%s: %s', uid, token, e)
+        return jsonify({'error': 'فشل المطالبة — حاول مجدداً'}), 500
 
 
 # svrp_lock() is imported lazily inside the endpoint to avoid a top-level
