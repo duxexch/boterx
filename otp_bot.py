@@ -151,7 +151,8 @@ def _check_financial_anomalies(token):
         cutoff = now - 2 * 3600  # آخر ساعتين فقط
         for t in txns[-100:]:
             uid = t.get('user_id', t.get('telegram_id', ''))
-            ts_str = str(t.get('created_at', t.get('timestamp', '')) or '')
+            # transactions.csv يستخدم عمود date — وسمّيات أخرى احتياطية
+            ts_str = str(t.get('date', t.get('created_at', t.get('timestamp', ''))) or '')
             # فلترة زمنية فعلية — لا نحسب معاملات أقدم من ساعتين
             try:
                 ts = datetime.strptime(ts_str[:16], '%Y-%m-%d %H:%M').timestamp()
@@ -383,13 +384,32 @@ def get_otp_bot_token_from_csv():
     except: pass
     return None
 
+# قفل ملفي يحتفظ به الموديول حياً — لا تُطلق fcntl.flock إلا بإغلاق الملف/موت العملية
+_singleton_lock_file = None
+
 def auto_start_otp_bot():
+    global _singleton_lock_file
     token = get_otp_bot_token_from_csv()
-    if token:
-        logger.info("Found security bot token — starting...")
-        start_otp_bot(token)
-        return True
-    return False
+    if not token:
+        return False
+    # نسخة واحدة عبر كل عمال gunicorn: أول عامل يقتنص القفل يشغّل البوت،
+    # والباقي يتجاهل — بدونه يرسل كل عامل رسالة تشغيل وتنبيهات مكررة
+    try:
+        import fcntl
+        lock_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.otp_bot_singleton.lock')
+        _singleton_lock_file = open(lock_path, 'w')
+        try:
+            fcntl.flock(_singleton_lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            logger.info("Security bot already running in another worker — skipping")
+            _singleton_lock_file.close()
+            _singleton_lock_file = None
+            return False
+    except ImportError:
+        pass  # بيئات بلا fcntl (تطوير محلي على ويندوز) — عامل واحد عادةً
+    logger.info("Found security bot token — starting...")
+    start_otp_bot(token)
+    return True
 
 def send_security_alert(message):
     """إرسال تنبيه أمني للأدمن عبر بوت الأمان"""
