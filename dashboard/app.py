@@ -9599,7 +9599,13 @@ def api_deposit_quick():
         return jsonify({'error': 'Games engine not available'}), 500
     data = request.json
     uid = get_request_uid()
-    amount = float(data.get('amount', 0))
+    # NaN/Infinity rejected
+    try:
+        amount = float(data.get('amount', 0))
+    except (ValueError, TypeError):
+        return jsonify({'error': 'مبلغ غير صالح'}), 400
+    if not math.isfinite(amount) or amount <= 0:
+        return jsonify({'error': 'مبلغ غير صالح'}), 400
     method_id = data.get('method_id', '')
     method_name = data.get('method_name', '')
     method_account_data = data.get('method_account_data', '')
@@ -9607,6 +9613,8 @@ def api_deposit_quick():
     save_method = data.get('save_method', False)
     purpose = data.get('purpose', '')  # 'lottery_tickets' = directed deposit
     ticket_count = int(data.get('ticket_count', 0) or 0)
+    company_id = str(data.get('company_id', '') or '').strip()
+    company_name = str(data.get('company_name', '') or '').strip()
     if not uid or amount <= 0 or not method_id:
         return jsonify({'error': 'Missing params'}), 400
 
@@ -9621,12 +9629,20 @@ def api_deposit_quick():
         method_name=method_name,
         method_account_data=method_account_data,
         player_wallet=player_wallet,
-        save_method=save_method
+        save_method=save_method,
+        company_id=company_id,
+        company_name=company_name
     )
 
     # Push to dashboard — include purpose if directed deposit
-    notif_title = '💰 إيداع محفظة VEX'
-    notif_msg = f'اللاعب {user_name} ({customer_id}) طلب إيداع {amount} {currency}\nالوسيلة: {method_name}\nمحفظة اللاعب: {player_wallet}'
+    if company_name:
+        notif_title = f'🏢 إيداع شركة — {company_name}'
+        notif_msg = (f'اللاعب {user_name} ({customer_id}) طلب إيداع {amount} {currency}\n'
+                     f'🏢 الشركة: {company_name}\nالوسيلة: {method_name}\n'
+                     f'محفظة اللاعب: {player_wallet}')
+    else:
+        notif_title = '💰 إيداع محفظة VEX'
+        notif_msg = f'اللاعب {user_name} ({customer_id}) طلب إيداع {amount} {currency}\nالوسيلة: {method_name}\nمحفظة اللاعب: {player_wallet}'
     if purpose == 'lottery_tickets' and ticket_count > 0:
         notif_title = f'🎟️ شراء تذاكر يانصيب ({ticket_count} تذكرة)'
         notif_msg = f'اللاعب {user_name} ({customer_id}) يريد شراء {ticket_count} تذكرة يانصيب\nالمبلغ: {amount} {currency}\nالوسيلة: {method_name}\nمحفظة اللاعب: {player_wallet}\n⏳ عند الموافقة سيتم شراء التذاكر تلقائياً'
@@ -11088,6 +11104,27 @@ def _wheel_weights(win_chance):
             weights.append(_WHEEL_WIN_WEIGHTS[m])
     return weights, target
 
+@app.route('/api/wheel/preview')
+def api_wheel_preview():
+    """معاينة عامة للعجلة: الأجزاء والاحتمالات بمستوى أساسي — قبل أول دورة،
+    كي يرى اللاعب جدول الجوائز من لحظة فتح الصفحة لا بعد أول دوران."""
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    game_row = _gm.get_game('GAME009') or {}
+    try:
+        base = float(game_row.get('base_win_chance') or 0.40)
+    except (ValueError, TypeError):
+        base = 0.40
+    base = min(0.92, max(0.03, base))
+    weights, target = _wheel_weights(base)
+    total = sum(weights)
+    return jsonify({
+        'segments': [{'mult': s['mult'], 'label': s['label'], 'color': s['color'], 'glow': s['glow']} for s in _WHEEL_SEGMENTS],
+        'probabilities': [round(w / total, 4) for w in weights],
+        'rtp': round(target, 3),
+        'active': str(game_row.get('is_active', 'yes')).lower() not in ('no', 'false', '0'),
+    })
+
 @app.route('/api/wheel/spin', methods=['POST'])
 @webapp_auth
 def api_wheel_spin():
@@ -12162,9 +12199,10 @@ def api_snatch_end():
     if sess['status'] != 'pending':
         return jsonify({'error': f'Session already {sess["status"]}'}), 400
 
-    # حد أدنى لزمن اللعب (8 ثوان) — يمنع الطحن اللحظي بلا لعب فعلي
+    # حد أدنى لزمن اللعب (3 ثوان) — يمنع الطحن اللحظي (spin→end فوراً) دون
+    # كسر الحالة الشرعية: خسارة الأرواح الثلاث بسرعة جولة لعب حقيقية تنتهي مبكراً
     _age = datetime.now().timestamp() - sess['created_at']
-    if _age < 8.0:
+    if _age < 3.0:
         return jsonify({'error': 'الجولة لم تنته بعد — أكمل اللعب'}), 400
 
     if datetime.now().timestamp() - sess['created_at'] > _SNATCH_SESSION_TTL:

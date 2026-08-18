@@ -890,7 +890,29 @@ function _gbIcon(ic, fallback, size){
   return '<span style="font-size:' + size + 'px">' + (ic || fallback || '💳') + '</span>';
 }
 
+let vRequired = 0;   // المبلغ الذي يحتاجه اللاعب — يرافق كل الخطوات
+
+// شريط سياق: المبلغ المطلوب + الرصيد الحالي + مؤشر الخطوات
+function _vCtxHeader(step) {
+  var balEl = document.getElementById('bal');
+  var bal = balEl ? (parseFloat(String(balEl.textContent).replace(/,/g, '')) || null) : null;
+  var balHtml = (bal !== null)
+    ? '<span style="float:left;font-size:11px;color:#8794a3">💰 ' + bal.toLocaleString() + '</span>' : '';
+  var needHtml = vRequired > 0
+    ? '<div style="background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.25);border-radius:8px;padding:6px 10px;margin:6px 0;font-size:11.5px;color:#fbbf24;font-weight:700;text-align:center">🎯 تحتاج ' + vRequired.toLocaleString() + ' لمتابعة اللعب ' + balHtml + '</div>' : '';
+  var steps = ['المصدر', 'الاختيار', 'التأكيد'];
+  var stepHtml = '<div style="display:flex;gap:4px;margin:8px 0">' + steps.map(function (s, i) {
+    var active = (i + 1) === step;
+    return '<div style="flex:1;text-align:center;padding:4px 2px;border-radius:6px;font-size:10px;font-weight:800;' +
+      (active ? 'background:rgba(0,231,1,.15);color:#00e701;border:1px solid rgba(0,231,1,.35)' :
+                'background:#1a2028;color:#8794a3;border:1px solid #262e39') +
+      '">' + (i + 1) + '· ' + s + '</div>';
+  }).join('') + '</div>';
+  return needHtml + stepHtml;
+}
+
 async function showVexDepositModal(required) {
+  vRequired = (parseFloat(required) || 0);
   const overlay = document.createElement('div');
   overlay.id = 'modal';
   overlay.className = 'modal-overlay';
@@ -902,17 +924,17 @@ async function showVexDepositModal(required) {
   // الخطوة 1: اختيار مصدر الإيداع — محفظة VEX أو شركة
   mb.innerHTML = `
     <div class="modal-title">${I18N.t('gb_dep_title')}</div>
-    <div class="modal-subtitle">${required ? I18N.t('gb_dep_need') + ' ' + required : I18N.t('gb_dep_choose')}</div>
+    ${_vCtxHeader(1)}
     <div class="method-item" onclick="vChooseWallet()" style="cursor:pointer">
       ${_gbIcon('👛', '👛', 22)}
-      <div class="method-info"><div class="method-name">${I18N.t('gb_dep_wallet_title') || '👛 محفظة VEX'}</div>
-      <div class="method-type">${I18N.t('gb_dep_wallet_sub') || 'إيداع لمحفظتك — وسائل دفع متعددة'}</div></div>
+      <div class="method-info"><div class="method-name">👛 محفظة VEX</div>
+      <div class="method-type">الرصيد يُضاف لمحفظتك فور موافقة الإدارة</div></div>
       <span class="method-arrow">‹</span>
     </div>
     <div class="method-item" onclick="vChooseCompany()" style="cursor:pointer">
       ${_gbIcon('🏢', '🏢', 22)}
-      <div class="method-info"><div class="method-name">${I18N.t('gb_dep_company_title') || '🏢 شركة'}</div>
-      <div class="method-type">${I18N.t('gb_dep_company_sub') || 'إيداع لحسابك في شركة — اختر الشركة والوسيلة'}</div></div>
+      <div class="method-info"><div class="method-name">🏢 إيداع لشركة</div>
+      <div class="method-type">اختر الشركة ووسيلة الدفع — لتعويض 100%</div></div>
       <span class="method-arrow">‹</span>
     </div>
     <button class="modal-btn-secondary" onclick="document.getElementById('modal').remove()">${I18N.t('close')}</button>`;
@@ -949,8 +971,9 @@ async function vChooseCompany() {
   } catch (e) {}
   if (companies.length === 0) {
     mb.innerHTML = '<div class="modal-title">' + I18N.t('gb_dep_title') + '</div>' +
-      '<div class="modal-subtitle">' + (I18N.t('gb_dep_no_companies') || 'لا توجد شركات متاحة حالياً') + '</div>' +
-      '<button class="modal-btn-secondary" onclick="showVexDepositModal(0)">' + I18N.t('back') + '</button>';
+      _vCtxHeader(2) +
+      '<div class="modal-subtitle">لا توجد شركات متاحة حالياً — جرب الإيداع للمحفظة</div>' +
+      '<button class="modal-btn-secondary" onclick="showVexDepositModal(vRequired)">' + I18N.t('back') + '</button>';
     return;
   }
   const cHtml = companies.map(c => `
@@ -962,9 +985,10 @@ async function vChooseCompany() {
     </div>`).join('');
   mb.innerHTML = `
     <div class="modal-title">${I18N.t('gb_dep_title')}</div>
-    <div class="modal-subtitle">${I18N.t('x236') || '🏢 اختر الشركة'}</div>
+    ${_vCtxHeader(2)}
+    <div class="modal-subtitle">🏢 اختر الشركة</div>
     <div id="vc">${cHtml}</div>
-    <button class="modal-btn-secondary" onclick="showVexDepositModal(0)">${I18N.t('back')}</button>`;
+    <button class="modal-btn-secondary" onclick="showVexDepositModal(vRequired)">${I18N.t('back')}</button>`;
 }
 
 async function vCompanySel(cid, cname) {
@@ -985,19 +1009,22 @@ async function vCompanySel(cid, cname) {
 function vRenderMethods() {
   const mb = document.getElementById('mb');
   if (!mb) return;
+  var prefill = vRequired > 0 ? vRequired : 10;
   if (vMethods.length === 0) {
-    // No methods — manual entry
+    // لا وسائل — إدخال يدوي برسالة واضحة
     mb.innerHTML = `<div class="modal-title">${I18N.t('gb_dep_title')}</div>
-      <div class="modal-subtitle">${I18N.t('gb_dep_enter_amount') || 'لا توجد وسائل متاحة — أدخل البيانات يدوياً'}</div>
-      <div class="modal-subtitle">${I18N.t('gb_dep_amount')}</div>
-      <input class="modal-input" id="vAm" type="number" value="10">
-      <div class="modal-subtitle">${I18N.t('gb_dep_wallet_lbl')}</div>
-      <input class="modal-input" id="vW" type="text" placeholder="${I18N.t('gb_dep_wallet_ph')}">
+      ${_vCtxHeader(2)}
+      <div class="modal-subtitle">لا توجد وسائل مدرجة — أدخل بيانات الوسيلة يدوياً وسيراجعها الأدمن</div>
       <div class="modal-subtitle">${I18N.t('gb_dep_mname_lbl')}</div>
       <input class="modal-input" id="vMN" type="text" placeholder="${I18N.t('gb_dep_mname_ph')}">
       <div class="modal-subtitle">${I18N.t('gb_dep_mdata_lbl')}</div>
       <input class="modal-input" id="vMD2" type="text" placeholder="${I18N.t('gb_dep_mdata_ph')}">
+      <div class="modal-subtitle">${I18N.t('gb_dep_amount')}</div>
+      <input class="modal-input" id="vAm" type="number" value="${prefill}">
+      <div class="modal-subtitle">${I18N.t('gb_dep_wallet_lbl')}</div>
+      <input class="modal-input" id="vW" type="text" placeholder="${I18N.t('gb_dep_wallet_ph')}">
       <button class="modal-btn-primary" onclick="vSubManual()">${I18N.t('gb_dep_confirm')}</button>
+      <button class="modal-btn-secondary" onclick="showVexDepositModal(vRequired)">${I18N.t('back')}</button>
       <button class="modal-btn-secondary" onclick="document.getElementById('modal').remove()">${I18N.t('close')}</button>`;
     return;
   }
@@ -1011,29 +1038,26 @@ function vRenderMethods() {
 
   mb.innerHTML = `
     <div class="modal-title">${I18N.t('gb_dep_title')}</div>
-    <div class="modal-subtitle">${vCtx.source === 'company' ? (I18N.t('x236') || '🏢 اختر الشركة') + ' — ' + vCtx.company_name : (I18N.t('gb_dep_choose') || 'اختر وسيلة الدفع')}</div>
+    ${_vCtxHeader(2)}
+    <div class="modal-subtitle">${vCtx.source === 'company' ? '🏢 ' + vCtx.company_name + ' — اختر وسيلة الدفع' : 'اختر وسيلة الدفع'}</div>
     <div id="vm">${mHtml}</div>
     <div id="vs2" style="display:none">
-      <div class="modal-subtitle" style="margin-top:8px">${I18N.t('gb_dep_method_data')}</div>
+      ${_vCtxHeader(3)}
+      <div class="modal-subtitle" style="margin-top:8px">${I18N.t('gb_dep_method_data')} — انسخها وحوّل لها</div>
       <div class="copy-box" onclick="vCopy()"><code class="copy-data" id="vMD"></code><span class="copy-label" id="vCL">${I18N.t('copy')}</span></div>
       <div class="modal-subtitle">${I18N.t('gb_dep_amount')}</div>
-      <input class="modal-input" id="vAm" type="number" value="10">
+      <input class="modal-input" id="vAm" type="number" value="${prefill}">
       <div class="modal-subtitle">${I18N.t('gb_dep_wallet_lbl')}</div>
       <input class="modal-input" id="vW" type="text" placeholder="${I18N.t('gb_dep_wallet_ph')}">
       <div id="vSH" style="display:none;font-size:11px;color:var(--green);margin-bottom:4px"></div>
       <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-bottom:8px;cursor:pointer">
         <input type="checkbox" id="vSv" style="accent-color:var(--gold)"> ${I18N.t('gb_dep_save')}
       </label>
-      <button class="modal-btn-primary" onclick="vSub()">${I18N.t('gb_dep_confirm')}</button>
+      <button class="modal-btn-primary" onclick="vSub()">✅ ${I18N.t('gb_dep_confirm')} وإرسال الطلب للإدارة</button>
       <button class="modal-btn-secondary" onclick="document.getElementById('vm').style.display='block';document.getElementById('vs2').style.display='none'">${I18N.t('back')}</button>
     </div>
-    <button class="modal-btn-secondary" onclick="vChooseBack()">${I18N.t('back')}</button>
+    <button class="modal-btn-secondary" onclick="showVexDepositModal(vRequired)">⟲ تغيير المصدر</button>
     <button class="modal-btn-secondary" onclick="document.getElementById('modal').remove()">${I18N.t('close')}</button>`;
-}
-
-function vChooseBack() {
-  // رجوع لاختيار المصدر (محفظة/شركة) بدل إغلاق النافذة
-  showVexDepositModal(0);
 }
 
 let vSelName = '', vSelData = '';

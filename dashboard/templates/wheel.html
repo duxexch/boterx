@@ -87,6 +87,9 @@ html,body{margin:0;padding:0;height:100%;touch-action:manipulation;user-select:n
       🎰 أدر العجلة
       <div class="spin-power-bar" id="powerBar" style="width:0"></div>
     </button>
+    <label style="display:flex;align-items:center;justify-content:center;gap:6px;font-size:11px;color:var(--muted,#8794a3);margin-top:6px;cursor:pointer;user-select:none">
+      <input type="checkbox" id="quickSpin" style="accent-color:#00e701" onchange="quickSpin=this.checked"> ⚡ دوران سريع
+    </label>
     <div class="spin-hint" data-i18n="x038">اضغط مع الاستمرار لتحديد قوة الدوران</div>
     <div class="seg-legend" id="segLegend"></div>
   </div>
@@ -99,7 +102,7 @@ html,body{margin:0;padding:0;height:100%;touch-action:manipulation;user-select:n
   </div>
 </div>
 
-<script src="/static/js/game-base.js?v=20260819a"></script>
+<script src="/static/js/game-base.js?v=20260819b"></script>
 <script>
 'use strict';
 var canvas = document.getElementById('wheelCanvas');
@@ -109,6 +112,7 @@ var currentAngle = 0;
 var pressTimer = null;
 var pressStart = 0;
 var powerLevel = 50; // 0-100
+var quickSpin = false;
 
 // Default segments (overridden by server each round)
 var SEGMENTS = [
@@ -269,13 +273,13 @@ function doSpin(){
     var targetAngle = -segIdx * segAngle - segAngle/2;
     currentAngle = currentAngle % (Math.PI*2);
     // Full spins based on power level (higher power = more spins)
-    var minSpins = 3 + Math.floor(powerLevel / 25); // 3-7 spins
+    var minSpins = quickSpin ? 2 : (3 + Math.floor(powerLevel / 25)); // 3-7 spins
     var fullSpins = minSpins * Math.PI * 2;
     var finalAngle = currentAngle + fullSpins;
     var diff = (targetAngle - (finalAngle % (Math.PI*2)) + Math.PI*4) % (Math.PI*2);
     finalAngle += diff;
     // Duration based on power (higher = longer spin)
-    var duration = 3000 + powerLevel * 20; // 3-5s
+    var duration = quickSpin ? 1100 : (3000 + powerLevel * 20); // ⚡ أو 3-5s
     animateSpin(currentAngle, finalAngle, seg, d.payout || 0, bet, d.multiplier || seg.mult, duration);
     if(d.balance_after !== undefined) document.getElementById('bal').textContent = d.balance_after.toLocaleString();
   }).catch(function(){
@@ -359,8 +363,15 @@ function showBigWin(payout, mult){
   setTimeout(function(){ o.classList.remove('show'); }, 3000);
 }
 
-// Init
+// Init — احتمالات حقيقية من أول لحظة (قبل أول دورة) عبر معاينة عامة
 resizeCanvas(); drawWheel(0); buildLegend();
+fetch(BASE + '/api/wheel/preview').then(function(r){return r.json()}).then(function(d){
+  if(d && d.probabilities){
+    lastProbabilities = d.probabilities;
+    if(d.segments && d.segments.length){ SEGMENTS = d.segments; N = SEGMENTS.length; segAngle = (Math.PI*2)/N; }
+    buildLegend();
+  }
+}).catch(function(){});
 loadBalance(); setInterval(loadBalance, 10000);
 setTimeout(injectDepositButton, 100);
 </script>

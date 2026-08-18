@@ -85,7 +85,7 @@
 <div id="loading" class="loader-screen">
   <div style="color:var(--text-dim);font-size:14px" data-i18n="x096">جارٍ التحميل...</div>
 </div>
-<script src="/static/js/game-base.js?v=20260819a"></script>
+<script src="/static/js/game-base.js?v=20260819b"></script>
 <script>
 'use strict';
 var canvas = document.getElementById('gameCanvas');
@@ -189,9 +189,12 @@ function startGame() {
       if (subEl) subEl.textContent = payout > 0
         ? I18N.t('y046')
         : I18N.t('y032');
-      // تفصيل بونص المهارة فوق الجائزة الأساسية
+      // تفصيل بونص المهارة — يُزال القديم أولاً (النافذة تُعاد استخدامها)
+      var oldDetail = document.getElementById('skillBonusDetail');
+      if (oldDetail && oldDetail.parentNode) oldDetail.parentNode.removeChild(oldDetail);
       if (payout > 0 && d.skill_bonus > 0 && typeof d.base_payout === 'number') {
         var detail = document.createElement('div');
+        detail.id = 'skillBonusDetail';
         detail.style.cssText = 'font-size:12px;color:#8794a3;margin-top:4px;font-weight:600';
         detail.innerHTML = '🏅 جائزة: ' + fmtAmount(d.base_payout)
           + ' + بونص مهارة: <b style="color:#00e701">+' + fmtAmount(payout - d.base_payout) + '</b>'

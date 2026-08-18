@@ -766,7 +766,8 @@ class GameManager:
 
     def create_quick_deposit(self, user_id, amount, payment_method_id, account_number,
                              method_name='', method_account_data='', player_wallet='',
-                             save_method=False, purpose='', ticket_count=0):
+                             save_method=False, purpose='', ticket_count=0,
+                             company_id='', company_name=''):
         """إنشاء إيداع سريع — يكتب في quick_deposits.csv + transactions.csv كمعاملة حقيقية"""
         dep_id = f"DEP{str(int(datetime.now().timestamp()))[-8:]}_{random.randint(1000,9999)}"
         now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -774,13 +775,15 @@ class GameManager:
         # 1. كتابة في quick_deposits.csv
         fieldnames = ['id', 'user_id', 'amount', 'payment_method_id',
                       'account_number', 'status', 'approved_by', 'approved_at',
-                      'game_session_id', 'created_at', 'purpose', 'ticket_count']
+                      'game_session_id', 'created_at', 'purpose', 'ticket_count',
+                      'company_id', 'company_name']
         row = {
             'id': dep_id, 'user_id': str(user_id), 'amount': str(amount),
             'payment_method_id': payment_method_id, 'account_number': account_number,
             'status': 'pending', 'approved_by': '', 'approved_at': '',
             'game_session_id': '', 'created_at': now_str,
             'purpose': purpose, 'ticket_count': str(ticket_count),
+            'company_id': company_id, 'company_name': company_name,
         }
         try:
             with open(self.quick_deposits_file, 'a', newline='', encoding=CSV_ENCODING) as f:
@@ -795,7 +798,11 @@ class GameManager:
         currency = user_info.get('currency', 'SAR')
         customer_id = user_info.get('customer_id', '')
         user_name = user_info.get('name', '')
-        company_field = f"{method_name}__{method_account_data}" if method_name else payment_method_id
+        if company_name:
+            # إيداع لشركة: عمود company يحمل اسم الشركة — الأدمن يرى الوجهة الحقيقية
+            company_field = company_name
+        else:
+            company_field = f"{method_name}__{method_account_data}" if method_name else payment_method_id
 
         try:
             txn_fields = ['id', 'customer_id', 'telegram_id', 'name', 'type', 'company',
@@ -813,7 +820,8 @@ class GameManager:
                 'exchange_address': '',
                 'status': 'pending',
                 'date': now_str,
-                'admin_note': 'إيداع محفظة VEX',
+                'admin_note': (f'إيداع شركة: {company_name} — {method_name}' if company_name
+                               else 'إيداع محفظة VEX'),
                 'processed_by': '',
                 'currency': currency,
             }
