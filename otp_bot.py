@@ -98,14 +98,20 @@ def _get_bot_info(token):
 
 # ── OTP Code Generation ──
 def _generate_and_store_code(user_id, user_name, phone=''):
-    code = str(random.randint(100000, 999999))
+    # RNG آمن تشفيرياً — random.randint العادي شبه قابل للتنبؤ نظرياً
+    import secrets as _sec
+    code = str(_sec.randbelow(900000) + 100000)
     codes = _load_json(OTP_FILE)
-    codes = {k: v for k, v in codes.items() if k != str(user_id)}
+    # نظّف رموز هذا المستخدم + أي رمز انتهت صلاحيته (> 5 دقائق)
+    now = time.time()
+    codes = {k: v for k, v in codes.items()
+             if k != str(user_id) and now - v.get('created', 0) <= 300}
     codes[str(user_id)] = {
         'code': code,
         'name': user_name,
         'phone': phone,
-        'created': time.time()
+        'created': now,
+        'attempts': 0,   # عداد محاولات خاطئة — يحذفه السيرفر عند 5
     }
     _save_json(OTP_FILE, codes)
     return code

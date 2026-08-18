@@ -1506,13 +1506,85 @@ def api_web_request_code():
 
     return jsonify({'success': True, 'bot': bot_name})
 
+# ── حماية تخمين رموز الدخول: حد لكل IP + عداد لكل رمز ──────────────────────
+_OTP_ATTEMPTS_PER_IP = 8        # محاولات كحد أقصى لكل IP
+_OTP_IP_WINDOW = 600            # خلال 10 دقائق
+_OTP_CODE_MAX_TRIES = 5         # 5 محاولات خاطئة → حذف الرمز (يُطلب جديد من البوت)
+_OTP_CODE_TTL = 300             # صلاحية الرمز 5 دقائق
+_OTP_ATTEMPTS_FILE = os.path.join(BASE_DIR, 'otp_attempts.json')
+
+def _otp_ip_track(op, client_ip):
+    """عدّاد محاولات لكل IP في ملف مشترك بقفل — يعمل عبر كل عمال gunicorn
+    (الذاكرة المحلية تتوزع بين العمال ولا ترى محاولات بعضها).
+
+    op: 'check' → (blocked, remaining) | 'record' → (False, remaining)."""
+    import json as _json
+    lock_path = _OTP_ATTEMPTS_FILE + '.lock'
+    now = time.time()
+    fcntl_mod = None
+    with open(lock_path, 'w') as lf:
+        try:
+            import fcntl as _fl
+            fcntl_mod = _fl
+            _fl.flock(lf, _fl.LOCK_EX)
+        except ImportError:
+            pass
+        try:
+            data = {}
+            try:
+                if os.path.exists(_OTP_ATTEMPTS_FILE):
+                    with open(_OTP_ATTEMPTS_FILE, 'r') as f:
+                        data = _json.load(f)
+            except Exception:
+                data = {}
+            # نافذة نظيفة + تقليم حجم المخزن
+            fresh = {}
+            for ip, hits in data.items():
+                hits = [t for t in hits if now - t < _OTP_IP_WINDOW]
+                if hits:
+                    fresh[ip] = hits
+                if len(fresh) > 5000:
+                    break
+            hits = fresh.setdefault(client_ip, [])
+            if op == 'check':
+                blocked = len(hits) >= _OTP_ATTEMPTS_PER_IP
+            else:
+                hits.append(now)
+                blocked = False
+            remaining = max(0, _OTP_ATTEMPTS_PER_IP - len(hits))
+            try:
+                with open(_OTP_ATTEMPTS_FILE, 'w') as f:
+                    _json.dump(fresh, f)
+            except Exception:
+                pass
+            return blocked, remaining
+        finally:
+            try:
+                if fcntl_mod:
+                    fcntl_mod.flock(lf, fcntl_mod.LOCK_UN)
+            except Exception:
+                pass
+
 @app.route('/api/web/auth-code', methods=['POST'])
 def api_web_auth_code():
-    """Validate Telegram auth code from landing page."""
-    import random as _r, time as _t
+    """Validate Telegram auth code from landing page.
+
+    دفاع متعدد الطبقات ضد التخمين:
+    1. حد محاولات لكل IP (8/10 دقائق) عبر ملف مشترك بين العمال
+    2. عداد لكل رمز: 5 محاولات خاطئة تحذفه — التخمين يقتل الرمز نفسه
+    3. تنظيف الرموز المنتهية في كل نداء
+    4. الرموز تُولَّد بـ RNG آمن تشفيرياً (في البوت)"""
+    import time as _t
     data = request.json or {}
     code = str(data.get('code', '')).strip()
+    client_ip = request.headers.get('X-Forwarded-For', request.remote_addr or '').split(',')[0].strip()
+
+    blocked, _rem = _otp_ip_track('check', client_ip)
+    if blocked:
+        return jsonify({'error': 'محاولات كثيرة — انتظر 10 دقائق ثم اطلب رمزاً جديداً'}), 429
+
     if not code or len(code) != 6 or not code.isdigit():
+        _otp_ip_track('record', client_ip)
         return jsonify({'error': 'الرمز يجب أن يكون 6 أرقام'}), 400
 
     # Check auth codes file (created by bot)
@@ -1524,41 +1596,66 @@ def api_web_auth_code():
                 codes = _json.load(f)
         else:
             codes = {}
-        # Find matching code
+
+        # نظّف الرموز المنتهية أولاً — لا تبقى فرصة لرمز ميت
+        now = _t.time()
+        expired = [u for u, cd in codes.items() if now - cd.get('created', 0) > _OTP_CODE_TTL]
+        for u in expired:
+            del codes[u]
+
+        matched_uid = None
+        matched_data = None
         for uid, code_data in codes.items():
             if str(code_data.get('code', '')) == code:
-                # Check expiry (5 min)
-                if _t.time() - code_data.get('created', 0) > 300:
-                    return jsonify({'error': 'انتهت صلاحية الرمز — اطلب رمزاً جديداً'}), 400
-                # Create web session
-                session['admin_id'] = uid
-                session['admin_name'] = code_data.get('name', 'User')
-                session['logged_in'] = True
-                session['login_time'] = _t.time()
-                session.permanent = True  # Persistent — 365 days
-                session['is_admin'] = uid in ADMIN_IDS
-                session['phone'] = code_data.get('phone', '')
-                # Check if user is registered in bot (users.csv)
-                import csv as _csv
-                is_registered = False
-                try:
-                    with open(os.path.join(BASE_DIR, 'users.csv'), 'r', encoding='utf-8-sig') as f:
-                        for row in _csv.DictReader(f):
-                            if row.get('telegram_id') == str(uid):
-                                is_registered = True
-                                break
-                except:
-                    pass
-                session['is_registered'] = is_registered
-                # Remove used code
-                del codes[uid]
+                matched_uid, matched_data = uid, code_data
+                break
+
+        if matched_uid is None:
+            # رمز خاطئ — سجّل المحاولة على كل الرموز النشطة (لا نكشف أي واحد أصاب)
+            changed = False
+            for uid in list(codes.keys()):
+                cd = codes[uid]
+                cd['attempts'] = int(cd.get('attempts', 0)) + 1
+                if cd['attempts'] >= _OTP_CODE_MAX_TRIES:
+                    del codes[uid]   # استُنفد — يُطلب رمز جديد من البوت
+                changed = True
+            if changed:
                 with open(auth_file, 'w') as f:
                     _json.dump(codes, f)
-                # Admin → dashboard, regular user → home page
-                redirect_url = '/dashboard' if session['is_admin'] else '/home'
-                return jsonify({'success': True, 'redirect': redirect_url, 'registered': is_registered})
-        return jsonify({'error': 'رمز غير صالح'}), 400
-    except Exception as e:
+            _rb, remaining = _otp_ip_track('record', client_ip)
+            return jsonify({'error': f'رمز غير صالح — محاولات متبقية: {remaining}'}), 400
+
+        # الصلاحية أُعيد فحصها بالتنظيف أعلاه — الرمز حي
+        # Create web session
+        session['admin_id'] = matched_uid
+        session['admin_name'] = matched_data.get('name', 'User')
+        session['logged_in'] = True
+        session['login_time'] = now
+        session.permanent = True  # Persistent — 365 days
+        session['is_admin'] = matched_uid in ADMIN_IDS
+        session['phone'] = matched_data.get('phone', '')
+        # Check if user is registered in bot (users.csv)
+        import csv as _csv
+        is_registered = False
+        try:
+            with open(os.path.join(BASE_DIR, 'users.csv'), 'r', encoding='utf-8-sig') as f:
+                for row in _csv.DictReader(f):
+                    if row.get('telegram_id') == str(matched_uid):
+                        is_registered = True
+                        break
+        except Exception:
+            pass
+        session['is_registered'] = is_registered
+        # Remove used code + أي رموز أخرى لنفس المستخدم (جلسة واحدة نظيفة)
+        for uid in list(codes.keys()):
+            if uid == matched_uid:
+                del codes[uid]
+        with open(auth_file, 'w') as f:
+            _json.dump(codes, f)
+        # Admin → dashboard, regular user → home page
+        redirect_url = '/dashboard' if session['is_admin'] else '/home'
+        return jsonify({'success': True, 'redirect': redirect_url, 'registered': is_registered})
+    except Exception:
         return jsonify({'error': 'خطأ في الخادم'}), 500
 
 @app.route('/api/web/whoami')
