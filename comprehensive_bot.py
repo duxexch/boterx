@@ -1022,10 +1022,15 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
 
 
     def api_call(self, method, data=None, retries=3):
-        """استدعاء API مُحسن — مع إعادة المحاولة التلقائية"""
+        """استدعاء API مُحسن — مع إعادة المحاولة التلقائية
+
+        مضاد للحظر (2026-08-18):
+        - 429: نحترم retry_after الفعلي من تيليجرام + jitter — تجاهله كان
+          السبب الأول للحظر الدائم (كان ينتظر ثانية ثابتة فقط)
+        - backoff تدريجي مع عشوائية"""
         url = f"{self.api_url}/{method}"
         last_error = None
-        
+
         for attempt in range(retries):
             try:
                 if data:
@@ -1034,7 +1039,7 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                     req.add_header('Content-Type', 'application/json')
                 else:
                     req = urllib.request.Request(url)
-                
+
                 with urllib.request.urlopen(req, timeout=30) as response:
                     result = json.loads(response.read().decode('utf-8'))
                     if result.get('ok'):
@@ -1048,6 +1053,13 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                         if 'Bad Request' in error_desc or 'message is not modified' in error_desc:
                             logger.warning(f"API {method} skipped (non-retryable): {error_desc}")
                             return result
+                        # 429 داخل الاستجابة الناجحة HTTP-wise — احترم retry_after
+                        if result.get('error_code') == 429:
+                            params = result.get('parameters') or {}
+                            wait = float(params.get('retry_after', 3)) + random.uniform(0.5, 1.5)
+                            logger.warning(f"Rate limited (body) — sleeping {wait:.1f}s")
+                            time.sleep(wait)
+                            continue
                         last_error = f"API error: {error_desc}"
             except urllib.error.HTTPError as e:
                 last_error = f"HTTP {e.code}: {e.reason}"
@@ -1055,17 +1067,23 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                 if e.code in (400, 403):
                     logger.warning(f"API {method} skipped (HTTP {e.code}): {e.reason}")
                     return None
-                if e.code == 429:  # Rate limited
-                    retry_after = 1
-                    logger.warning(f"Rate limited by Telegram, waiting {retry_after}s")
-                    time.sleep(retry_after)
+                if e.code == 429:  # Rate limited — اقرأ retry_after من جسم الخطأ
+                    retry_after = 3.0
+                    try:
+                        body = json.loads(e.read().decode('utf-8'))
+                        retry_after = float((body.get('parameters') or {}).get('retry_after', 3))
+                    except Exception:
+                        pass
+                    wait = retry_after + random.uniform(0.5, 1.5)
+                    logger.warning(f"Rate limited by Telegram — sleeping {wait:.1f}s (respected retry_after={retry_after})")
+                    time.sleep(wait)
                     continue
             except Exception as e:
                 last_error = str(e)
-            
+
             if attempt < retries - 1:
-                time.sleep(0.5 * (attempt + 1))  # backoff تدريجي
-        
+                time.sleep(0.5 * (attempt + 1) + random.uniform(0.1, 0.4))  # backoff + jitter
+
         logger.error(f"API call failed after {retries} retries: {method} - {last_error}")
         return None
     
@@ -6937,45 +6955,104 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             logger.error(f"خطأ في تحديث إعداد القناة: {e}")
             return False
 
+    # فترة الهدوء بين تكرارات الحملة نفسها (ساعات) — يمنع الحظر النمطي
+    CAMPAIGN_REPEAT_COOLDOWN_H = 4
+    CAMPAIGN_REPEAT_MAX_RUNS = 30   # سقف جولات التكرار (توقف تلقائي)
+
+    def _spin_text(self, text):
+        """غزل Spintax: '{مرحبا|أهلا}' → اختيار عشوائي — كل تكرار بصياغة مختلفة
+        (النص المتطابق المتكرر هو أوضح إشارة حظر في تيليجرام)"""
+        import re as _re
+        def _pick(m):
+            parts = m.group(1).split('|')
+            return random.choice(parts) if parts else m.group(0)
+        for _ in range(4):
+            new = _re.sub(r'\{([^{}]*)\}', _pick, text)
+            if new == text:
+                break
+            text = new
+        return text
+
     def _process_scheduled_campaigns(self):
-        """فحص الحملات المجدولة وإطلاقها عند وقت التنفيذ"""
+        """فحص الحملات المجدولة وإطلاقها — مع تكرار حقيقي daily/weekly/monthly
+
+        إصلاح (2026-08-18): حقل repeat كان يُخزَّن ولا يُعالج — كل حملة تموت
+        بعد أول تشغيل. الآن: جدولة قادمة محسوبة + عداد جولات + هدوء بين
+        التكرارات + إزاحة عشوائية تكسر النمط + Spintax تلقائي للنص"""
         import csv as _csv
-        from datetime import datetime as _dt
+        from datetime import datetime as _dt, timedelta as _td
         campaigns_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'campaigns.csv')
         if not os.path.exists(campaigns_path):
             return
         try:
             with open(campaigns_path, 'r', encoding='utf-8-sig') as f:
                 reader = _csv.DictReader(f)
-                fieldnames = reader.fieldnames
+                fieldnames = list(reader.fieldnames or [])
                 rows = list(reader)
+            for extra in ('repeat_runs', 'last_run_at', 'next_run_at'):
+                if extra not in fieldnames:
+                    fieldnames.append(extra)
             now = _dt.now()
             changed = False
             for c in rows:
-                if c.get('status') == 'scheduled' and c.get('scheduled_at'):
-                    try:
-                        sched = _dt.strptime(c['scheduled_at'].strip()[:16], '%Y-%m-%d %H:%M')
-                    except:
-                        continue
-                    if now >= sched:
-                        # Execute campaign
-                        msg = c.get('message', '')
-                        target = c.get('target', 'both')
-                        recipient = c.get('recipient', 'all')
-                        country = c.get('country', 'all')
-                        media_str = c.get('media_urls', '')
-                        media_urls = [u for u in media_str.split('|') if u] if media_str else []
-                        target_user = c.get('target_user', '') if recipient == 'single' else ''
-                        priority = c.get('priority', 'normal')
+                status = c.get('status', '')
+                repeat = (c.get('repeat', '') or 'once').strip().lower()
+                if status not in ('scheduled', 'active'):
+                    continue
+                sched_str = (c.get('next_run_at') or c.get('scheduled_at', '') or '').strip()
+                if not sched_str:
+                    continue
+                try:
+                    sched = _dt.strptime(sched_str[:16], '%Y-%m-%d %H:%M')
+                except Exception:
+                    continue
+                if now < sched:
+                    continue
 
-                        if recipient == 'single' and target_user:
-                            self._send_broadcast_to_user(target_user, msg, media_urls)
-                        else:
-                            self._send_broadcast_to_all(msg, media_urls, country)
+                # ── تنفيذ الحملة ──
+                msg = self._spin_text(c.get('message', ''))
+                recipient = c.get('recipient', 'all')
+                country = c.get('country', 'all')
+                media_str = c.get('media_urls', '')
+                media_urls = [u for u in media_str.split('|') if u] if media_str else []
+                target_user = c.get('target_user', '') if recipient == 'single' else ''
+                channel_group = (c.get('channel_group', '') or '').strip()
+
+                if channel_group:
+                    self._send_to_channel_group(channel_group, msg, media_urls)
+                elif recipient == 'single' and target_user:
+                    self._send_broadcast_to_user(target_user, msg, media_urls)
+                else:
+                    self._send_broadcast_to_all(msg, media_urls, country)
+                c['stats_reach'] = str(len(self._user_cache))
+                runs = int(c.get('repeat_runs', '0') or 0) + 1
+                c['repeat_runs'] = str(runs)
+                c['last_run_at'] = now.strftime('%Y-%m-%d %H:%M')
+                changed = True
+                logger.info(f"Campaign {c.get('id','')} executed (run #{runs}, repeat={repeat})")
+
+                # ── الجدولة القادمة أو الإنهاء ──
+                if repeat in ('daily', 'weekly', 'monthly'):
+                    if runs >= self.CAMPAIGN_REPEAT_MAX_RUNS:
                         c['status'] = 'completed'
-                        c['stats_reach'] = str(len(self._user_cache))
-                        changed = True
-                        logger.info(f"Campaign {c.get('id','')} executed (scheduled)")
+                        c['next_run_at'] = ''
+                    else:
+                        if repeat == 'daily':
+                            nxt = now + _td(days=1)
+                        elif repeat == 'weekly':
+                            nxt = now + _td(weeks=1)
+                        else:
+                            nxt = now + _td(days=30)
+                        min_next = now + _td(hours=self.CAMPAIGN_REPEAT_COOLDOWN_H)
+                        if nxt < min_next:
+                            nxt = min_next
+                        # إزاحة عشوائية ±35 دقيقة — كسر نمط الساعة-بساعة
+                        nxt += _td(minutes=random.randint(-35, 35))
+                        c['next_run_at'] = nxt.strftime('%Y-%m-%d %H:%M')
+                        c['status'] = 'active'
+                else:
+                    c['status'] = 'completed'
+                    c['next_run_at'] = ''
             if changed:
                 with open(campaigns_path, 'w', newline='', encoding='utf-8-sig') as f:
                     writer = _csv.DictWriter(f, fieldnames=fieldnames)
@@ -6986,53 +7063,206 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             logger.error(f"campaign_scheduler error: {e}")
 
     def _process_broadcast_queue(self):
-        """معالجة طابور البث — وسائط متعددة + فردي/جماعي + دولة"""
+        """معالجة طابور البث — وسائط متعددة + فردي/جماعي + دولة
+
+        إصلاح حرج (2026-08-18): طابور البث لم يكن يقرأ target_chat_id أصلاً —
+        أي منشور أُرسل 'لقناة محددة' من اللوحة كان يذهب لكل المستخدمين!
+        الآن: type=channel/target_chat_id → القناة المحددة حصراً.
+        مضاد للحظر: سقف يومي لكل قناة + jitter بين الإرسالات."""
         import threading as _th
         def _do_process():
-            if not os.path.exists('broadcast_queue.csv'):
-                return
+            lock_path = 'broadcast_queue.csv.lock'
             try:
-                rows = []
-                pending = []
-                with open('broadcast_queue.csv', 'r', encoding='utf-8-sig') as f:
-                    reader = csv.DictReader(f)
-                    fieldnames = reader.fieldnames or ['id','message','target','recipient','priority','country','media_urls','target_user','target_name','created_at','created_by','status']
-                    for row in reader:
-                        if row.get('status') == 'pending':
-                            pending.append(row)
-                        else:
-                            rows.append(row)
-
-                for item in pending:
-                    msg = item.get('message', '')
-                    recipient_type = item.get('recipient', 'all')
-                    target_user = item.get('target_user', '').strip()
-                    country_filter = item.get('country', 'all')
-                    media_urls_str = item.get('media_urls', '').strip()
-                    media_urls = [u for u in media_urls_str.split('|') if u] if media_urls_str else []
-                    item_id = item.get('id', '')
+                import fcntl as _fl
+            except ImportError:
+                _fl = None
+            with open(lock_path, 'w') as lf:
+                if _fl:
                     try:
-                        if recipient_type == 'single' and target_user:
-                            # ── إرسال فردي ──
-                            self._send_broadcast_to_user(target_user, msg, media_urls)
-                        else:
-                            # ── إرسال جماعي (مع فلتر دولة) ──
-                            self._send_broadcast_to_all(msg, media_urls, country_filter)
-                        item['status'] = 'sent'
-                    except Exception as e:
-                        logger.error(f"خطأ في إرسال {item_id}: {e}")
-                        item['status'] = 'failed'
-                    rows.append(item)
-
-                with open('broadcast_queue.csv', 'w', newline='', encoding='utf-8-sig') as f:
-                    writer = csv.DictWriter(f, fieldnames=fieldnames)
-                    writer.writeheader()
-                    for row in rows:
-                        writer.writerow({k: row.get(k, '') for k in fieldnames})
-            except Exception as e:
-                logger.error(f"خطأ في _process_broadcast_queue: {e}")
+                        _fl.flock(lf, _fl.LOCK_EX)
+                    except Exception:
+                        pass
+                try:
+                    self._process_broadcast_queue_inner()
+                finally:
+                    if _fl:
+                        try:
+                            _fl.flock(lf, _fl.LOCK_UN)
+                        except Exception:
+                            pass
         t = _th.Thread(target=_do_process, daemon=True)
         t.start()
+
+    # سقف النشر اليومي لكل قناة — تجاوزه يأجل الإرسال لليوم التالي (مضاد حظر)
+    CHANNEL_DAILY_CAP = 12
+
+    def _channel_posts_today(self, chat_id):
+        """عدد منشورات قناة اليوم من سجل relay_log"""
+        import csv as _csv
+        from datetime import datetime as _dt
+        today = _dt.now().strftime('%Y-%m-%d')
+        n = 0
+        try:
+            filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'relay_log.csv')
+            with open(filepath, 'r', encoding='utf-8-sig') as f:
+                for row in _csv.DictReader(f):
+                    cid = (row.get('source_chat_id') or '').strip()
+                    ts = (row.get('timestamp') or '')
+                    if cid == str(chat_id) and ts.startswith(today):
+                        n += 1
+        except Exception:
+            n = 0
+        return n
+
+    def _log_channel_post(self, chat_id, ok):
+        """تسجيل منشور قناة للسقف اليومي — بنفس مخطط relay_log.csv الفعلي"""
+        from datetime import datetime as _dt
+        try:
+            import csv as _csv
+            filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'relay_log.csv')
+            file_exists = os.path.exists(filepath)
+            with open(filepath, 'a', newline='', encoding='utf-8-sig') as f:
+                w = _csv.writer(f)
+                if not file_exists:
+                    w.writerow(['timestamp', 'source_type', 'source_chat_id', 'preview',
+                                'users_relayed', 'channels_relayed'])
+                w.writerow([_dt.now().strftime('%Y-%m-%d %H:%M:%S'),
+                            'queue_post', str(chat_id),
+                            'ok' if ok else 'fail', '0', '1'])
+        except Exception:
+            pass
+
+    def _post_to_single_channel(self, chat_id, msg, media_urls):
+        """نشر لقناة واحدة محددة — نص + وسائط + سقف يومي"""
+        cid = str(chat_id).strip()
+        if not cid:
+            return False, 'empty chat_id'
+        if self._channel_posts_today(cid) >= self.CHANNEL_DAILY_CAP:
+            return False, 'daily_cap'
+        sent_ok = False
+        try:
+            if media_urls:
+                first = media_urls[0]
+                if any(first.lower().endswith(e) for e in ('.mp4', '.mov', '.avi')):
+                    r = self.api_call('sendVideo', {'chat_id': cid, 'video': first,
+                                                    'caption': msg[:1024] if msg else '', 'parse_mode': 'HTML'})
+                else:
+                    r = self.api_call('sendPhoto', {'chat_id': cid, 'photo': first,
+                                                    'caption': msg[:1024] if msg else '', 'parse_mode': 'HTML'})
+                sent_ok = bool(r and r.get('ok'))
+                # بقية الوسائط كألبوم فردي
+                for extra in media_urls[1:4]:
+                    if any(extra.lower().endswith(e) for e in ('.mp4', '.mov')):
+                        self.api_call('sendVideo', {'chat_id': cid, 'video': extra})
+                    else:
+                        self.api_call('sendPhoto', {'chat_id': cid, 'photo': extra})
+                    time.sleep(random.uniform(0.4, 1.2))
+            elif msg:
+                r = self.api_call('sendMessage', {'chat_id': cid, 'text': msg, 'parse_mode': 'HTML',
+                                                  'disable_web_page_preview': False})
+                sent_ok = bool(r and r.get('ok'))
+        except Exception as e:
+            logger.error(f"post_to_single_channel {cid}: {e}")
+            return False, str(e)
+        self._log_channel_post(cid, sent_ok)
+        # jitter بعد كل نشر لقناة — لا نمط ثابت
+        time.sleep(random.uniform(0.5, 1.8))
+        return sent_ok, 'ok' if sent_ok else 'send_failed'
+
+    def _process_broadcast_queue_inner(self):
+        if not os.path.exists('broadcast_queue.csv'):
+            return
+        try:
+            from datetime import datetime as _dt
+            rows = []
+            pending = []
+            with open('broadcast_queue.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                fieldnames = list(reader.fieldnames or ['id','message','target','recipient','priority','country','media_urls','target_user','target_name','created_at','created_by','status'])
+                for fn in ('type', 'target_chat_id', 'target_user_id', 'scheduled_at'):
+                    if fn not in fieldnames:
+                        fieldnames.append(fn)
+                for row in reader:
+                    if row.get('status') == 'pending':
+                        pending.append(row)
+                    else:
+                        rows.append(row)
+
+            for item in pending:
+                # تحصين: صفوف قديمة بحقول ناقصة تقرأ None — لا .strip() على None
+                g = lambda k, d='': (item.get(k) or d)
+                msg = g('message')
+                recipient_type = g('recipient', 'all')
+                target_user = (g('target_user') or g('target_user_id')).strip()
+                country_filter = g('country', 'all')
+                media_urls_str = g('media_urls').strip()
+                media_urls = [u for u in media_urls_str.split('|') if u] if media_urls_str else []
+                item_id = g('id')
+                # ── التوجيه الحرج: منشور موجّه لقناة/مجموعة محددة ──
+                target_chat = g('target_chat_id').strip()
+                entry_type = g('type').strip().lower()
+                if not msg and not media_urls:
+                    item['status'] = 'failed'   # صف تالف/فارغ — لا يعلّق الدورة
+                    rows.append(item)
+                    continue
+                try:
+                    if target_chat or entry_type in ('channel', 'chat'):
+                        if not target_chat:
+                            item['status'] = 'failed'
+                            rows.append(item)
+                            continue
+                        ok, reason = self._post_to_single_channel(target_chat, msg, media_urls)
+                        if reason == 'daily_cap':
+                            # تجاوز السقف اليومي — أبقِه معلقاً لمحاولة الغد
+                            rows.append(item)
+                            continue
+                        item['status'] = 'sent' if ok else 'failed'
+                        rows.append(item)
+                        logger.info(f"Queue {item_id} → channel {target_chat}: {'sent' if ok else reason}")
+                        continue
+                except Exception as e:
+                    logger.error(f"خطأ في إرسال قناة {item_id}: {e}")
+                    item['status'] = 'failed'
+                    rows.append(item)
+                    continue
+
+                try:
+                    if recipient_type == 'single' and target_user:
+                        # ── إرسال فردي ──
+                        self._send_broadcast_to_user(target_user, msg, media_urls)
+                    else:
+                        # ── إرسال جماعي (مع فلتر دولة) ──
+                        self._send_broadcast_to_all(msg, media_urls, country_filter)
+                    item['status'] = 'sent'
+                except Exception as e:
+                    logger.error(f"خطأ في إرسال {item_id}: {e}")
+                    item['status'] = 'failed'
+                rows.append(item)
+            # نهاية الحلقة
+
+            with open('broadcast_queue.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer.writeheader()
+                for row in rows:
+                    writer.writerow({k: row.get(k, '') for k in fieldnames})
+        except Exception as e:
+            logger.error(f"خطأ في _process_broadcast_queue: {e}")
+
+    def _send_to_channel_group(self, group_id, msg, media_urls):
+        """نشر لمجموعة قنوات (channel_groups.csv) — بالسقوف اليومية لكل قناة"""
+        import csv as _csv
+        try:
+            with open('channel_groups.csv', 'r', encoding='utf-8-sig') as f:
+                for row in _csv.DictReader(f):
+                    if row.get('id') == group_id or row.get('name') == group_id:
+                        ids = [i.strip() for i in (row.get('channel_ids', '') or '').split('|') if i.strip()]
+                        for cid in ids:
+                            ok, reason = self._post_to_single_channel(cid, msg, media_urls)
+                            logger.info(f"Group {group_id} -> {cid}: {reason}")
+                        return True
+        except Exception as e:
+            logger.error(f"channel group {group_id}: {e}")
+        return False
 
     def _send_broadcast_to_user(self, chat_id, msg, media_urls):
         """إرسال بث لمستخدم واحد — نص + وسائط متعددة، crash-safe"""
