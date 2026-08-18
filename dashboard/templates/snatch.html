@@ -189,6 +189,15 @@ function startGame() {
       if (subEl) subEl.textContent = payout > 0
         ? I18N.t('y046')
         : I18N.t('y032');
+      // تفصيل بونص المهارة فوق الجائزة الأساسية
+      if (payout > 0 && d.skill_bonus > 0 && typeof d.base_payout === 'number') {
+        var detail = document.createElement('div');
+        detail.style.cssText = 'font-size:12px;color:#8794a3;margin-top:4px;font-weight:600';
+        detail.innerHTML = '🏅 جائزة: ' + fmtAmount(d.base_payout)
+          + ' + بونص مهارة: <b style="color:#00e701">+' + fmtAmount(payout - d.base_payout) + '</b>'
+          + ' (نقاط: ' + (d.score || 0) + ')';
+        if (payoutEl && payoutEl.parentNode) payoutEl.parentNode.insertBefore(detail, payoutEl.nextSibling);
+      }
       loadBalance();
     } else if (d && d.error && /settled|refunded|not found/i.test(d.error)) {
       snatchSessionId = null; snatchFinalScore = 0; _clearPendingSession();

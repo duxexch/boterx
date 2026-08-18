@@ -6537,8 +6537,39 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         except:
             pass
 
-        # تسجيل كل هدية + إضافة الرصيد
-        total_prize = 0.0
+        # ── مكافأة ثابتة بسقف يومي (إصلاح أمني 2026-08-18) ──────────────────
+        # سابقاً: المبلغ كان يُستخرج من نص الهدية المرسل من العميل — أي مستخدم
+        # يستطيع إرسال نص مزيف بأي مبلغ ويُضاف لرصيده فوراً (فلوس لا نهائية).
+        # الآن: 5 رصيد مجمد لكل جولة، بحد أقصى 3 جولات مكافأة/يوم، مهما كان
+        # نص الهدية أو عددها. النص يُستخدم للعرض فقط.
+        _SNATCH_REWARD = 5.0
+        _SNATCH_DAILY_CAP = 3
+        today_str = datetime.now().strftime('%Y-%m-%d')
+        rewarded_today = 0
+        try:
+            with open('snatch_daily_rewards.csv', 'r', encoding='utf-8-sig') as f:
+                for row in csv.DictReader(f):
+                    if row.get('user_id') == str(user_id) and row.get('date') == today_str:
+                        rewarded_today += 1
+        except Exception:
+            pass
+
+        prize_amount = 0.0
+        if rewarded_today < _SNATCH_DAILY_CAP and caught_gifts:
+            prize_amount = _SNATCH_REWARD
+            if self.svrp:
+                try:
+                    self.svrp.add_frozen_balance(str(user_id), prize_amount)
+                    with open('snatch_daily_rewards.csv', 'a', newline='', encoding='utf-8-sig') as f:
+                        writer = csv.writer(f)
+                        writer.writerow([str(user_id), today_str, prize_amount,
+                                         datetime.now().strftime('%Y-%m-%d %H:%M')])
+                except Exception as e:
+                    logger.error(f"Error adding fixed snatch reward: {e}")
+                    prize_amount = 0.0
+        total_prize = prize_amount
+
+        # تسجيل الهدائف للعرض والسجل — بلا أي أثر مالي للنص
         processed_gifts = []
         for gift in caught_gifts:
             gift_text = gift.get('text', '')
@@ -6554,25 +6585,8 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             except:
                 pass
 
-            # استخراج المبلغ الرقمي وإضافته للمحفظة
-            prize_amount = 0.0
-            try:
-                import re as _re
-                numbers = _re.findall(r'[\d,.]+', gift_text.replace(',', ''))
-                if numbers:
-                    prize_amount = float(numbers[0])
-            except:
-                pass
-
-            if prize_amount > 0 and self.svrp:
-                try:
-                    self.svrp.add_frozen_balance(str(user_id), prize_amount)
-                    total_prize += prize_amount
-                    logger.info(f"Added {prize_amount} to user {user_id} wallet")
-                except Exception as e:
-                    logger.error(f"Error adding frozen balance: {e}")
-
-            processed_gifts.append({'text': gift_text, 'link': gift_link, 'amount': prize_amount})
+            # (أُزيل الاستشهاد بالمبلغ من نص العميل — ثغرة فلوس لا نهائية)
+            processed_gifts.append({'text': gift_text, 'link': gift_link, 'amount': 0})
 
         # التحقق من الرصيد بعد الإضافة
         wallet_balance = 0.0
@@ -6588,11 +6602,14 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         result_text += f"━━━━━━━━━━━━━━━━━━\n"
         for i, gift in enumerate(processed_gifts, 1):
             result_text += f"{i}️⃣ 🎁 {gift['text']}\n"
-            if gift['amount'] > 0:
-                result_text += f"   💰 +{gift['amount']:.0f} لرصيدك\n"
         result_text += f"━━━━━━━━━━━━━━━━━━\n"
         if total_prize > 0:
-            result_text += f"💎 <b>تم إضافة {total_prize:.0f} لرصيدك المجمد!</b>\n"
+            result_text += f"💎 <b>مكافأة اللعب: +{total_prize:.0f} لرصيدك المجمد!</b>\n"
+            remaining = _SNATCH_DAILY_CAP - rewarded_today - 1
+            if remaining > 0:
+                result_text += f"⏳ جولات مكافأة متبقية اليوم: {remaining}\n"
+        elif rewarded_today >= _SNATCH_DAILY_CAP:
+            result_text += f"⏳ وصلت الحد اليومي للمكافآت (3 جولات) — عد غداً\n"
         result_text += f"💰 رصيدك الحالي: <code>{wallet_balance:.0f}</code>\n\n"
         result_text += f"💡 يمكنك سحب الرصيد أو استخدامه في الإيداع"
 

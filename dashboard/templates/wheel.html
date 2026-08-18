@@ -76,11 +76,11 @@ html,body{margin:0;padding:0;height:100%;touch-action:manipulation;user-select:n
     </div>
 
     <div class="bet-row">
-      <button class="ctrl-btn" onclick="adjustBet('betInp',0.5)">½</button>
+      <button class="ctrl-btn" onclick="adjustBet(0.5,'betInp')">½</button>
       <input type="number" class="bet-inp" id="betInp" value="10" min="1">
-      <button class="ctrl-btn" onclick="adjustBet('betInp',2)">2×</button>
-      <button class="ctrl-btn" onclick="setBetMin('betInp',10)">Min</button>
-      <button class="ctrl-btn" onclick="setBetMax('betInp',5000)">Max</button>
+      <button class="ctrl-btn" onclick="adjustBet(2,'betInp')">2×</button>
+      <button class="ctrl-btn" onclick="setBet('min','betInp',10,2000)">Min</button>
+      <button class="ctrl-btn" onclick="setBet('max','betInp',10,2000)">Max</button>
     </div>
 
     <button class="spin-btn" id="spinBtn">
@@ -184,12 +184,18 @@ function drawWheel(angle){
   ctx.beginPath(); ctx.arc(cx, cy, hubR*0.3, 0, Math.PI*2); ctx.fillStyle = '#78350f'; ctx.fill();
 }
 
+var lastProbabilities = null;
 function buildLegend(){
   var el = document.getElementById('segLegend'); el.innerHTML = '';
-  SEGMENTS.forEach(function(s){
+  SEGMENTS.forEach(function(s, i){
     var chip = document.createElement('div'); chip.className = 'seg-chip';
     chip.style.background = s.color + '44'; chip.style.color = '#fff';
-    chip.style.border = '1px solid ' + s.glow + '66'; chip.textContent = s.label;
+    chip.style.border = '1px solid ' + s.glow + '66';
+    var prob = '';
+    if(lastProbabilities && lastProbabilities[i] !== undefined){
+      prob = ' <span style="opacity:.65;font-size:9px">(' + (lastProbabilities[i]*100).toFixed(1) + '%)</span>';
+    }
+    chip.innerHTML = s.label + prob;
     el.appendChild(chip);
   });
 }
@@ -255,8 +261,8 @@ function doSpin(){
     if(d.segments && d.segments.length > 0){
       SEGMENTS = d.segments; N = SEGMENTS.length;
       segAngle = (Math.PI * 2) / N;
-      buildLegend();
     }
+    if(d.probabilities){ lastProbabilities = d.probabilities; buildLegend(); }
     var segIdx = d.segment !== undefined ? d.segment : 0;
     var seg = SEGMENTS[segIdx];
     // Calculate target angle for pointer at top
@@ -303,23 +309,47 @@ function animateSpin(fromAngle, toAngle, seg, payout, bet, mult, duration){
 function showResult(seg, payout, bet, mult){
   var multEl = document.getElementById('resultMult');
   var subEl = document.getElementById('resultSub');
-  if(seg.mult === 0 || payout === 0){
-    multEl.textContent = I18N.t('y141'); multEl.style.color = '#ef4444';
+  if(seg.mult === 0){
+    multEl.textContent = '💀 ' + I18N.t('y141'); multEl.style.color = '#ef4444';
     subEl.textContent = I18N.t('y057');
     soundLose(); haptic('heavy');
+    addHist('💀', false, false);
+  } else if(seg.mult === 1.0){
+    // تعادل — استردت رهانك
+    multEl.textContent = '1.0x — تعادل'; multEl.style.color = '#06b6d4';
+    subEl.textContent = '↩ ' + fmtAmount(payout) + ' ' + gameCurrency;
+    soundTick(); haptic('light');
+    addHist('1x', false, false);
+  } else if(seg.mult < 1.0){
+    // خسارة جزئية — استردت نصف رهانك
+    multEl.textContent = '0.5x'; multEl.style.color = '#a855f7';
+    subEl.textContent = '↩ ' + fmtAmount(payout) + ' ' + gameCurrency;
+    soundLose(); haptic('medium');
+    addHist('½', false, false);
   } else {
     multEl.textContent = (mult || seg.mult).toFixed(1) + 'x';
     multEl.style.color = seg.mult >= 5 ? '#00e701' : '#22c55e';
     subEl.textContent = '+' + fmtAmount(payout) + ' ' + gameCurrency;
     soundWin(seg.mult >= 5); haptic('medium');
+    addHist((mult || seg.mult).toFixed(1) + 'x', true, seg.mult >= 5);
     if(seg.mult >= 5) showBigWin(payout, seg.mult);
   }
   multEl.classList.add('show'); subEl.classList.add('show');
-  addHistItem(document.getElementById('histBar'), seg.mult || 0.1);
   loadBalance(); // Real-time balance update
 }
 
 function fmtAmount(n){ return parseFloat(n||0).toLocaleString(); }
+
+// سجل محلي — addHistory في game-base تتوقع رقماً فقط، وهنا نصوص/رموز
+function addHist(value, isWin, isBig){
+  var container = document.getElementById('histBar');
+  if(!container) return;
+  var el = document.createElement('div');
+  el.className = 'hist-item ' + (isBig ? 'hist-big' : isWin ? 'hist-win' : 'hist-lose');
+  el.textContent = value;
+  container.insertBefore(el, container.firstChild);
+  while(container.children.length > 15) container.removeChild(container.lastChild);
+}
 
 function showBigWin(payout, mult){
   var o = document.getElementById('bigWinOverlay');

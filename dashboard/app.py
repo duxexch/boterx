@@ -10947,34 +10947,58 @@ def api_plinko_drop():
 
 # ===== Wheel — Frontend API (/api/wheel/spin) =====
 
-# Wheel segments — base set, shuffled per round for variety
-_WHEEL_BASE_SEGMENTS = [
+# Wheel segments — FIXED layout (no per-spin reshuffle: the wheel visibly
+# jumping to a new layout mid-spin looked rigged). Skulls are not adjacent.
+_WHEEL_SEGMENTS = [
     {'mult': 0.0,  'label': '💀',  'color': '#991b1b', 'glow': '#ef4444'},
     {'mult': 1.5,  'label': '1.5x','color': '#1e3a5f', 'glow': '#3b82f6'},
     {'mult': 2.0,  'label': '2x',  'color': '#14532d', 'glow': '#22c55e'},
+    {'mult': 0.0,  'label': '💀',  'color': '#991b1b', 'glow': '#ef4444'},
     {'mult': 0.5,  'label': '0.5x','color': '#581c87', 'glow': '#a855f7'},
     {'mult': 5.0,  'label': '5x',  'color': '#78350f', 'glow': '#fbbf24'},
     {'mult': 1.0,  'label': '1x',  'color': '#155e75', 'glow': '#06b6d4'},
     {'mult': 10.0, 'label': '10x', 'color': '#831843', 'glow': '#ec4899'},
-    {'mult': 0.0,  'label': '💀',  'color': '#991b1b', 'glow': '#ef4444'},
 ]
 
-def _shuffle_segments():
-    """Shuffle segments for each round — prevents monotony."""
-    segs = list(_WHEEL_BASE_SEGMENTS)
-    # Keep the two 💀 segments apart (not adjacent)
-    for _ in range(10):
-        random.shuffle(segs)
-        skull_positions = [i for i, s in enumerate(segs) if s['mult'] == 0.0]
-        if len(skull_positions) == 2 and abs(skull_positions[0] - skull_positions[1]) > 1:
-            break
-    return segs
+# Fixed relative weights of the non-skull segments (variety curve).
+# Σ(mult×weight) over winners = 80.5, Σweight_winners = 53.5.
+_WHEEL_WIN_WEIGHTS = {10.0: 1.0, 5.0: 2.5, 2.0: 8.0, 1.5: 12.0, 1.0: 18.0, 0.5: 12.0}
+_WHEEL_WIN_EV = sum(m * w for m, w in _WHEEL_WIN_WEIGHTS.items())      # 80.5
+_WHEEL_WIN_W  = sum(_WHEEL_WIN_WEIGHTS.values())                        # 53.5
+
+_WHEEL_RTP_MIN, _WHEEL_RTP_MAX = 0.80, 0.85
+
+_wheel_rng = secrets.SystemRandom()
+
+def _wheel_weights(win_chance):
+    """Solve the per-skull weight so the EXACT target RTP is achieved.
+
+    target_rtp = 0.80 + 0.05 × normalized(win_chance) ∈ [0.80, 0.85];
+    skull weight s = (EV_winners/target − Σw_winners)/2 keeps every
+    multiplier's relative odds constant. RTP is mathematically capped at
+    0.85 no matter what the house algorithm computes."""
+    t = (float(win_chance) - 0.03) / (0.92 - 0.03)
+    t = min(1.0, max(0.0, t))
+    target = _WHEEL_RTP_MIN + (_WHEEL_RTP_MAX - _WHEEL_RTP_MIN) * t
+    s = (_WHEEL_WIN_EV / target - _WHEEL_WIN_W) / 2.0
+    s = max(1.0, s)
+    weights = []
+    for seg in _WHEEL_SEGMENTS:
+        m = seg['mult']
+        if m == 0.0:
+            weights.append(s)
+        else:
+            weights.append(_WHEEL_WIN_WEIGHTS[m])
+    return weights, target
 
 @app.route('/api/wheel/spin', methods=['POST'])
 @webapp_auth
 def api_wheel_spin():
     if not _VEX_GAMES:
         return jsonify({'error': 'Games engine not available'}), 500
+    # هوية موثقة فقط — بدونها يمكن المراهنة بهوية أي ضحية
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Unauthorized'}), 403
     data = request.json or {}
     uid = get_request_uid()
     request_id = _get_request_id()
@@ -10987,17 +11011,28 @@ def api_wheel_spin():
         if cached:
             return jsonify(cached)
 
-    bet_amount = float(data.get('bet', 0))
-    if bet_amount <= 0:
-        return jsonify({'error': 'Missing params'}), 400
+    # NaN/Infinity rejected + catalog min/max enforced
+    try:
+        bet_amount = float(data.get('bet', 0))
+    except (ValueError, TypeError):
+        return jsonify({'error': 'مبلغ غير صالح'}), 400
+    if not math.isfinite(bet_amount) or bet_amount <= 0:
+        return jsonify({'error': 'مبلغ غير صالح'}), 400
+
+    game_row = _gm.get_game('GAME009')
+    if not game_row or str(game_row.get('is_active', 'yes')).lower() in ('no', 'false', '0'):
+        return jsonify({'success': False, 'error': 'اللعبة متوقفة مؤقتاً'}), 503
+    try:
+        min_bet = float(game_row.get('min_bet') or 10)
+        max_bet = float(game_row.get('max_bet') or 2000)
+    except (ValueError, TypeError):
+        min_bet, max_bet = 10.0, 2000.0
+    if bet_amount < min_bet or bet_amount > max_bet:
+        return jsonify({'success': False, 'error': f'الرهان بين {int(min_bet)} و {int(max_bet)}'}), 400
 
     player = _gm.tracker.get_profile(uid)
-    game = _gm.get_game('GAME009') or {
-        'id': 'GAME009', 'base_win_chance': '0.50', 'house_edge_pct': '10',
-        'min_bet': '10', 'max_bet': '5000'
-    }
 
-    risk_check = _gm.risk.check_risk(player, bet_amount, game)
+    risk_check = _gm.risk.check_risk(player, bet_amount, game_row)
     if not risk_check['allowed']:
         msg = risk_check['alerts'][0]['message'] if risk_check.get('alerts') else 'محظور'
         return jsonify({'success': False, 'error': msg})
@@ -11006,40 +11041,18 @@ def api_wheel_spin():
     if balance < bet_amount:
         return jsonify({'success': False, 'error': 'رصيد غير كافٍ', 'need_deposit': True, 'balance': balance})
 
-    # Shuffle segments for this round
-    wheel_segments = _shuffle_segments()
+    wheel_segments = _WHEEL_SEGMENTS
     N = len(wheel_segments)
 
-    algo_result = _gm.algorithm.calculate_win_chance(player, game, bet_amount)
+    algo_result = _gm.algorithm.calculate_win_chance(player, game_row, bet_amount)
     win_chance = algo_result['win_chance']
 
-    # Smart weighted selection — considers player segment + house edge
-    weights = []
-    for seg in wheel_segments:
-        m = seg['mult']
-        if m == 0.0:
-            # 💀 segments — higher weight for losers, lower for winners
-            weights.append(max(1, int((1 - win_chance) * 10)))
-        elif m >= 10.0:
-            # 10x — very rare, only for new players or after big losses
-            weights.append(max(1, int(win_chance * 2)))
-        elif m >= 5.0:
-            # 5x — rare but possible
-            weights.append(max(1, int(win_chance * 4)))
-        elif m >= 2.0:
-            # 2x — moderate
-            weights.append(max(1, int(win_chance * 7)))
-        elif m >= 1.0:
-            # 1x/1.5x — common wins
-            weights.append(max(1, int(win_chance * 9)))
-        else:
-            # 0.5x — partial loss
-            weights.append(max(1, int((1 - win_chance) * 5)))
-
+    # Weights solved for an exact target RTP in [0.80, 0.85]
+    weights, target_rtp = _wheel_weights(win_chance)
     total_w = sum(weights)
-    rand_val = random.uniform(0, total_w)
-    segment = 0
-    cumulative = 0
+    rand_val = _wheel_rng.uniform(0, total_w)
+    segment = N - 1
+    cumulative = 0.0
     for i, w in enumerate(weights):
         cumulative += w
         if rand_val <= cumulative:
@@ -11048,15 +11061,23 @@ def api_wheel_spin():
 
     multiplier = wheel_segments[segment]['mult']
     payout = round(bet_amount * multiplier, 2)
-    result_str = 'win' if multiplier > 0 else 'lose'
+    # فوز حقيقي فقط فوق 1x — 1x تعادل و0.5x خسارة جزئية
+    if multiplier > 1.0:
+        result_str = 'win'
+    elif multiplier == 1.0:
+        result_str = 'push'
+    else:
+        result_str = 'lose'
 
-    # Build segments for client (shuffled order for this round)
+    # Build segments + real probabilities for the client payout table
     client_segments = [{'mult': s['mult'], 'label': s['label'], 'color': s['color'], 'glow': s['glow']} for s in wheel_segments]
+    probabilities = [round(w / total_w, 4) for w in weights]
 
     # Atomic: settle + idempotency record in one SQLite transaction
     template = {'success': True, 'segment': segment, 'multiplier': multiplier,
                 'payout': payout, 'result': result_str, 'balance_before': balance,
-                'segments': client_segments}
+                'segments': client_segments, 'probabilities': probabilities,
+                'rtp': round(target_rtp, 3)}
     ok, stored, race_cached = _gm.settle_with_idempotency(uid, bet_amount, payout, request_id, template)
     if race_cached:
         return jsonify(race_cached)
@@ -11066,13 +11087,13 @@ def api_wheel_spin():
     result = stored
     new_balance = result.get('balance_after', balance)
 
-    session_id = f"WHL{str(int(datetime.now().timestamp()))[-8:]}"
+    session_id = f"WHL{secrets.token_hex(6)}"
     _gm.algorithm.log_decision(
         session_id=session_id, user_id=uid, game_id='GAME009',
-        base_chance=float(game.get('base_win_chance', 0.50)),
+        base_chance=float(game_row.get('base_win_chance', 0.40)),
         adjusted_chance=win_chance, factors=algo_result['factors'],
         decision=algo_result['decision'],
-        reason=f"Wheel segment={segment} mult={multiplier}; {algo_result['reason']}"
+        reason=f"Wheel segment={segment} mult={multiplier} rtp={target_rtp:.3f}; {algo_result['reason']}"
     )
     _gm.tracker.log_session({
         'session_id': session_id, 'game_id': 'GAME009', 'user_id': uid,
@@ -11855,6 +11876,9 @@ def api_snatch_spin():
     request_id = _get_request_id()
     if not uid:
         return jsonify({'error': 'Missing params'}), 400
+    # هوية موثقة فقط — بدونها يمكن اللعب بهوية أي ضحية عبر uid مجرد
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Unauthorized'}), 403
 
     # Idempotency check BEFORE any side effects — replays return the stored
     # response without creating duplicate sessions or debits.
@@ -11863,15 +11887,27 @@ def api_snatch_spin():
         if cached:
             return jsonify(cached)
 
-    bet_amount = float(data.get('bet', 0))
-    if bet_amount <= 0:
-        return jsonify({'error': 'Missing params'}), 400
+    # NaN/Infinity rejected + catalog min/max enforced
+    try:
+        bet_amount = float(data.get('bet', 0))
+    except (ValueError, TypeError):
+        return jsonify({'error': 'مبلغ غير صالح'}), 400
+    if not math.isfinite(bet_amount) or bet_amount <= 0:
+        return jsonify({'error': 'مبلغ غير صالح'}), 400
+
+    # مفتاح الإيقاف يحترم: لا fallback يجعل اللعبة تعمل بدون صف الكتالوج
+    game = _gm.get_game('GAME001')
+    if not game or str(game.get('is_active', 'yes')).lower() in ('no', 'false', '0'):
+        return jsonify({'success': False, 'error': 'اللعبة متوقفة مؤقتاً'}), 503
+    try:
+        min_bet = float(game.get('min_bet') or 10)
+        max_bet = float(game.get('max_bet') or 2000)
+    except (ValueError, TypeError):
+        min_bet, max_bet = 10.0, 2000.0
+    if bet_amount < min_bet or bet_amount > max_bet:
+        return jsonify({'success': False, 'error': f'الرهان بين {int(min_bet)} و {int(max_bet)}'}), 400
 
     player = _gm.tracker.get_profile(uid)
-    game = _gm.get_game('GAME001') or {
-        'id': 'GAME001', 'base_win_chance': '0.55', 'house_edge_pct': '12',
-        'min_bet': '10', 'max_bet': '2000'
-    }
 
     risk_check = _gm.risk.check_risk(player, bet_amount, game)
     if not risk_check['allowed']:
@@ -11883,6 +11919,15 @@ def api_snatch_spin():
         return jsonify({'success': False, 'error': 'رصيد غير كافٍ',
                         'need_deposit': True, 'balance': balance})
 
+    # منع جلستين متزامنتين لنفس اللاعب — جلسته السابقة تُستأنف أو تُنتظر
+    sdb_pre = _snatch_db()
+    try:
+        active = sdb_pre.snatch_get_active_by_user(uid) if hasattr(sdb_pre, 'snatch_get_active_by_user') else None
+    except Exception:
+        active = None
+    if active:
+        return jsonify({'success': False, 'error': 'لديك جولة نشطة بالفعل — أكملها أولاً'}), 409
+
     session_id = f"SNT{secrets.token_hex(8)}"
     # Use request_id as the wallet idempotency key; fall back to session-derived key.
     deduction_key = request_id or f"spin_{session_id}"
@@ -11891,12 +11936,11 @@ def api_snatch_spin():
     # The payout is determined by the server's game algorithm, not the client.
     # It is stored in the session row immediately so /api/snatch/end and the
     # sweep can credit the same amount regardless of what score the client reports.
-    # HouseAlgorithm.calculate_win_chance() returns decision values:
-    #   'allow_win'  → player wins this round
-    #   'near_miss'  → near-win (house keeps edge; treat as a loss for payout)
-    #   'force_lose' → hard loss
+    # سقف مالي: احتمال الفوز للدفع محدود بـ 0.545 — مع متوسط مضاعف أساس 1.40
+    # وبونص مهارة ≤ 0.15 يكون EV ∈ [0.76, 0.85] مهما بلغت التعزيزات
     algo_result = _gm.algorithm.calculate_win_chance(player, game, bet_amount)
-    server_won = (algo_result['decision'] == 'allow_win')
+    p_pay = min(float(algo_result.get('win_chance', 0.0)), 0.545)
+    server_won = (algo_result.get('decision') == 'allow_win') and (_wheel_rng.random() < p_pay)
     if server_won:
         # Pick a multiplier tier; higher tier = rarer outcome
         _tier_roll = secrets.SystemRandom().random()
@@ -11987,6 +12031,9 @@ def api_snatch_end():
     uid = get_request_uid()
     if not uid:
         return jsonify({'error': 'Missing params'}), 400
+    # هوية موثقة فقط — التسوية تُنسب لصاحبها حصرياً
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Unauthorized'}), 403
 
     session_id = str(data.get('session_id', '')).strip()
     try:
@@ -12018,6 +12065,11 @@ def api_snatch_end():
     if sess['status'] != 'pending':
         return jsonify({'error': f'Session already {sess["status"]}'}), 400
 
+    # حد أدنى لزمن اللعب (8 ثوان) — يمنع الطحن اللحظي بلا لعب فعلي
+    _age = datetime.now().timestamp() - sess['created_at']
+    if _age < 8.0:
+        return jsonify({'error': 'الجولة لم تنته بعد — أكمل اللعب'}), 400
+
     if datetime.now().timestamp() - sess['created_at'] > _SNATCH_SESSION_TTL:
         return jsonify({'error': 'Session expired'}), 400
 
@@ -12025,9 +12077,20 @@ def api_snatch_end():
 
     # ── Read server-determined payout (set at spin time, never from client) ───
     # The payout was computed by the server algorithm and stored in the session
-    # row at spin time.  The client's reported score is stored for analytics
-    # but does NOT affect the financial outcome.
+    # row at spin time.  The client's reported score adds a SMALL capped skill
+    # bonus on top of a decided WIN only — it can never turn a loss into a win,
+    # and the total EV stays ≤ 0.85 (p_pay ≤ 0.55 × E[mult ≤ 1.5] = 0.825).
     payout = sess['payout'] if sess['payout'] is not None else 0.0
+    skill_bonus_mult = 0.0
+    if payout > 0:
+        if score >= 100:
+            skill_bonus_mult = 0.15
+        elif score >= 70:
+            skill_bonus_mult = 0.10
+        elif score >= 40:
+            skill_bonus_mult = 0.05
+        if skill_bonus_mult > 0:
+            payout = round(payout + bet_amount * skill_bonus_mult, 2)
 
     # ── Atomic CAS: pending → settling ────────────────────────────────────────
     # Exactly one of (this call) or (_snatch_sweep) can win the CAS.
@@ -12081,6 +12144,7 @@ def api_snatch_end():
     return jsonify({
         'success': True, 'won': won, 'score': score,
         'multiplier': display_multiplier, 'payout': payout,
+        'skill_bonus': skill_bonus_mult, 'base_payout': round(payout - bet_amount * skill_bonus_mult, 2),
         'result': result_str, 'balance_after': new_balance,
     })
 

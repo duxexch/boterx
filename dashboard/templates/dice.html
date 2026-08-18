@@ -54,6 +54,19 @@
 .x-btn{padding:6px 12px;border-radius:8px;background:var(--surface-3);border:2px solid var(--border);color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;transition:all .1s;font-family:'Courier New',monospace}
 .x-btn:active{transform:scale(.9)}
 .x-btn.selected{border-color:#7eff9a;background:rgba(0,231,1,.1);color:#7eff9a}
+/* ── Mode tabs (exact / even / odd) ── */
+.mode-tabs{display:flex;gap:4px}
+.mode-tab{flex:1;padding:7px 4px;border-radius:8px;background:var(--surface-3);border:2px solid var(--border);color:var(--muted);font-size:11px;font-weight:800;cursor:pointer;transition:all .15s;text-align:center}
+.mode-tab.selected{border-color:#00e701;background:rgba(0,231,1,.12);color:#00e701}
+/* ── Potential win + auto controls ── */
+.potential-win{font-size:11px;font-weight:700;color:var(--muted);text-align:center;padding:4px;background:var(--surface-3);border-radius:8px}
+.potential-win b{color:#fbbf24}
+.auto-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.auto-toggle{padding:5px 10px;border-radius:8px;background:var(--surface-3);border:1px solid var(--border);color:var(--muted);font-size:11px;font-weight:800;cursor:pointer}
+.auto-toggle.on{border-color:#00e701;color:#00e701;background:rgba(0,231,1,.1)}
+.auto-count{background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:11px;padding:5px;font-family:inherit}
+.auto-stop{font-size:10px;color:var(--muted);display:flex;align-items:center;gap:4px;cursor:pointer}
+.auto-stop input{accent-color:#00e701}
 /* ── Power bar ── */
 .power-bar-container{position:relative;height:36px;background:var(--bg);border:2px solid var(--border);border-radius:10px;overflow:hidden;cursor:pointer;touch-action:none}
 .power-bar-fill{height:100%;width:50%;background:linear-gradient(90deg,#0d7a1f,#7eff9a,#00e701,#ff4757);border-radius:8px;transition:width .1s}
@@ -111,8 +124,17 @@
     <div class="recovery-msg" id="recoveryMsg"></div>
   </div>
   <div class="bet-panel">
-    <div class="panel-label" data-i18n="x023">اختر الرقم المتوقع:</div>
-    <div class="number-picker" id="numberPicker"></div>
+    <div class="mode-tabs">
+      <div class="mode-tab selected" id="modeExact" onclick="setBetMode('exact')">🎯 رقم محدد</div>
+      <div class="mode-tab" id="modeEven" onclick="setBetMode('even')">⚖️ زوجي 1.70x</div>
+      <div class="mode-tab" id="modeOdd" onclick="setBetMode('odd')">⚖️ فردي 1.70x</div>
+    </div>
+    <div id="exactSection">
+      <div class="panel-label" data-i18n="x023">اختر الرقم المتوقع:</div>
+      <div class="number-picker" id="numberPicker"></div>
+      <div class="panel-label" data-i18n="x148">قيمة الاكس:</div>
+      <div class="x-picker" id="xPicker"></div>
+    </div>
     <div class="bet-row">
       <input type="number" class="bet-input" id="betAmount" value="10" min="1" placeholder="المبلغ" data-i18n-ph="x052">
       <div class="quick-bets">
@@ -123,12 +145,20 @@
         <div class="qb" onclick="setBet(1000)">1K</div>
       </div>
     </div>
-    <div class="panel-label" data-i18n="x148">قيمة الاكس:</div>
-    <div class="x-picker" id="xPicker"></div>
+    <div class="potential-win" id="potentialWin">💰 الربح المحتمل: <b id="potentialVal">50</b></div>
     <div class="panel-label" data-i18n="x146">قوة الرمية (اسحب بإصبعك):</div>
     <div class="power-bar-container" id="powerBar">
       <div class="power-bar-fill" id="powerFill"></div>
       <div class="power-bar-label" id="powerLabel">50%</div>
+    </div>
+    <div class="auto-row">
+      <div class="auto-toggle" id="autoToggle" onclick="toggleAuto()">🤖 تلقائي: إيقاف</div>
+      <select class="auto-count" id="autoCount">
+        <option value="5">5 رميات</option>
+        <option value="10" selected>10 رميات</option>
+        <option value="25">25 رمية</option>
+      </select>
+      <label class="auto-stop"><input type="checkbox" id="autoStopWin"> ⏹ عند الربح</label>
     </div>
     <button class="roll-btn idle" id="rollBtn" onclick="onRoll()" data-i18n="x034">ارمِ النرد 🎲</button>
   </div>
@@ -141,7 +171,9 @@
 <script>
 'use strict';
 var canvas=document.getElementById('canvas'),ctx=canvas.getContext('2d');
-var predictedNum=0,selectedX=5.0,power=50,isRolling=false;
+var predictedNum=0,selectedX=5.0,power=50,isRolling=false,isRequesting=false;
+var betMode='exact';
+var autoRunning=false,autoRemaining=0;
 var sessionW=0,sessionL=0,sessionPL=0;
 var diceX=0,diceY=0,diceRotX=0,diceRotY=0,diceRotZ=0,diceVX=0,diceVY=0,diceVRot=0;
 var diceScale=1,diceBounces=0,animF=null;
@@ -184,9 +216,52 @@ function selectX(x){
   selectedX=x;
   var btns=document.querySelectorAll('.x-btn');
   btns.forEach(function(b){b.classList.toggle('selected',parseFloat(b.dataset.x)===x)});
+  updatePotential();
 }
 
-function setBet(v){document.getElementById('betAmount').value=v}
+function setBetMode(mode){
+  betMode=mode;
+  var tabs={exact:'modeExact',even:'modeEven',odd:'modeOdd'};
+  Object.keys(tabs).forEach(function(m){
+    var el=document.getElementById(tabs[m]);
+    if(el)el.classList.toggle('selected',m===mode);
+  });
+  var ex=document.getElementById('exactSection');
+  if(ex)ex.style.display=(mode==='exact')?'block':'none';
+  updatePotential();
+}
+
+function updatePotential(){
+  var amt=parseFloat(document.getElementById('betAmount').value)||0;
+  var x=(betMode==='exact')?selectedX:1.70;
+  var el=document.getElementById('potentialVal');
+  if(el)el.textContent=(amt*x).toFixed(0);
+}
+document.addEventListener('input',function(e){
+  if(e.target&&e.target.id==='betAmount')updatePotential();
+});
+
+function setBet(v){document.getElementById('betAmount').value=v;updatePotential()}
+
+// ── Auto-roll ──
+function toggleAuto(){
+  autoRunning=!autoRunning;
+  var t=document.getElementById('autoToggle');
+  if(autoRunning){
+    autoRemaining=parseInt(document.getElementById('autoCount').value)||10;
+    t.classList.add('on');t.textContent='⏹ إيقاف التلقائي';
+    if(!isRolling&&!isRequesting)onRoll();
+  }else{
+    t.classList.remove('on');t.textContent='🤖 تلقائي: إيقاف';
+    autoRemaining=0;
+  }
+}
+function autoNext(d){
+  if(!autoRunning||autoRemaining<=0)return;
+  var stopWin=document.getElementById('autoStopWin').checked;
+  if(stopWin&&d&&d.won){toggleAuto();return}
+  setTimeout(function(){if(autoRunning&&!isRolling&&!isRequesting)onRoll()},600);
+}
 
 // ── Power bar (touch drag) ──
 var powerBar=document.getElementById('powerBar');
@@ -537,29 +612,37 @@ function spawnBounceParticles(x,y){
 
 // ── Roll handler ──
 function onRoll(){
-  if(isRolling)return;
-  if(predictedNum===0){showToast(I18N.t('y018'),'error');return}
+  if(isRolling||isRequesting)return;
+  if(betMode==='exact'&&predictedNum===0){showToast(I18N.t('y018'),'error');return}
   var amt=parseFloat(document.getElementById('betAmount').value)||0;
   if(amt<1){showToast(I18N.t('y010'),'error');return}
+  if(autoRunning)autoRemaining--;
 
   checkBalanceBeforeBet(amt).then(function(ok){
-    if(!ok)return;
+    if(!ok){if(autoRunning)toggleAuto();return}
+    isRequesting=true;
     var req='dice_'+Date.now()+'_'+Math.random().toString(36).substr(2,6);
     apiFetchCritical(BASE+'/api/dice/roll',{
       method:'POST',
-      body:JSON.stringify({bet_amount:amt,predicted_number:predictedNum,target_x:selectedX,request_id:req})
+      body:JSON.stringify({bet_amount:amt,predicted_number:predictedNum||1,target_x:selectedX,bet_mode:betMode,request_id:req})
     }).then(function(r){return r.json()}).then(function(d){
+      isRequesting=false;
       if(d.success){
+        d._bet=amt;
         // Animate roll FIRST — balance updated in showResult AFTER dice stops
         animateRoll(d.result,power,function(){
           showResult(d);
+          autoNext(d);
         });
         soundDiceRoll();haptic('medium');
       } else {
+        if(autoRunning)toggleAuto();
         if(d.need_deposit)showVexDepositModal(amt);else showToast(d.error||I18N.t('x106'),'error');
         var btn=document.getElementById('rollBtn');btn.className='roll-btn idle';btn.disabled=false;btn.textContent=I18N.t('x034');
       }
     }).catch(function(){
+      isRequesting=false;
+      if(autoRunning)toggleAuto();
       var btn=document.getElementById('rollBtn');btn.className='roll-btn idle';btn.disabled=false;btn.textContent=I18N.t('x034');
       showToast(I18N.t('x106'),'error');
     });
@@ -570,28 +653,32 @@ function showResult(d){
   var btn=document.getElementById('rollBtn');
   btn.className='roll-btn idle';btn.disabled=false;btn.textContent=I18N.t('x034');
   // Update balance NOW — after dice has stopped, not before
-  document.getElementById('bal').textContent=d.balance_after.toLocaleString();
+  if(typeof d.balance_after==='number'){
+    document.getElementById('bal').textContent=d.balance_after.toLocaleString();
+  }else{loadBalance()}
+  var betAmt=(typeof d._bet==='number')?d._bet:parseFloat(document.getElementById('betAmount').value)||0;
   var disp=document.getElementById('resultDisplay');
   var numEl=document.getElementById('resultNum');
   var txtEl=document.getElementById('resultText');
   numEl.textContent=d.result;
+  var modeTxt=(d.bet_mode==='even')?' (زوجي)':(d.bet_mode==='odd')?' (فردي)':'';
   if(d.won){
     numEl.className='result-num win';
     txtEl.className='result-text win';
     txtEl.textContent=I18N.t('y137')+d.payout.toFixed(0)+' ('+d.multiplier+'x)';
-    sessionW++;sessionPL+=d.payout-parseFloat(document.getElementById('betAmount').value);
+    sessionW++;sessionPL+=d.payout-betAmt;
     fireConfetti(document.getElementById('gameArea'));soundDiceWin();haptic('medium');
     var be=document.getElementById('recoveryMsg');
-    be.innerHTML='🎉 <b data-i18n="x115">ربحت!</b> '+I18N.t('z052')+' '+d.predicted+I18N.t('y005')+d.result+'<br><span style="color:#7eff9a;font-weight:900;font-size:16px">+'+d.payout.toFixed(0)+'</span>';
+    be.innerHTML='🎉 <b data-i18n="x115">ربحت!</b>'+modeTxt+' '+I18N.t('z052')+' '+d.predicted+I18N.t('y005')+d.result+'<br><span style="color:#7eff9a;font-weight:900;font-size:16px">+'+d.payout.toFixed(0)+'</span>';
     be.style.color='#7eff9a';be.classList.add('show');setTimeout(function(){be.classList.remove('show')},4000);
   } else {
     numEl.className='result-num lose';
     txtEl.className='result-text lose';
-    txtEl.textContent=I18N.t('y147')+d.predicted+I18N.t('y005')+d.result;
-    sessionL++;sessionPL-=parseFloat(document.getElementById('betAmount').value);
+    txtEl.textContent=I18N.t('y147')+d.predicted+modeTxt+' '+I18N.t('y005')+d.result;
+    sessionL++;sessionPL-=betAmt;
     soundDiceLose();haptic('heavy');
     var be=document.getElementById('recoveryMsg');
-    be.innerHTML='💥 <b data-i18n="x105">خسرت!</b> '+I18N.t('z052')+' '+d.predicted+I18N.t('y005')+d.result;
+    be.innerHTML='💥 <b data-i18n="x105">خسرت!</b>'+modeTxt+' '+I18N.t('z052')+' '+d.predicted+I18N.t('y005')+d.result;
     be.style.color='#ff8787';be.classList.add('show');setTimeout(function(){be.classList.remove('show')},4000);
   }
   disp.classList.add('show');
@@ -612,11 +699,20 @@ async function loadHistory(){
     if(!r||!r.ok)return;
     var d=await r.json();
     var ci=document.getElementById('connIndicator');if(ci)ci.textContent='🟢';
-    if(d.history){
+    if(d.user_history){
+      var uh=document.getElementById('history');uh.innerHTML='';
+      d.user_history.slice(-15).reverse().forEach(function(item){
+        var el=document.createElement('div');
+        el.className='hist-item '+(item.won?'hist-win':'hist-lose');
+        el.textContent=item.result;
+        el.title=(item.won?'✓ ':'✗ ')+item.x+'x';
+        uh.appendChild(el);
+      });
+    }else if(d.history){
       var h=document.getElementById('history');h.innerHTML='';
       d.history.forEach(function(item){
         var el=document.createElement('div');
-        el.className='hist-item '+(item.result===predictedNum?'hist-win':'hist-lose');
+        el.className='hist-item';
         el.textContent=item.result;
         h.appendChild(el);
       });
@@ -701,7 +797,7 @@ function soundDiceLose(){
 // ── Init ──
 document.getElementById('loading').style.display='none';
 document.getElementById('app').style.display='flex';
-initNumberPicker();initXPicker();
+initNumberPicker();initXPicker();updatePotential();
 requestAnimationFrame(function(){resizeCanvas();drawIdleDice()});
 loadBalance();loadHistory();histTimer=setInterval(loadHistory,5000);
 setInterval(loadBalance,5000);setTimeout(injectDepositButton,100);
