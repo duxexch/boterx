@@ -4,3 +4,5 @@ openpyxl
 paramiko
 python-dotenv
 pillow
+pywebpush>=1.14.0
+aiohttp>=3.9

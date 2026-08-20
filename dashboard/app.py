@@ -79,20 +79,118 @@ app.config['SESSION_COOKIE_SECURE'] = True  # HTTPS only
 app.config['MAX_CONTENT_LENGTH'] = 8 * 1024 * 1024  # 8MB
 
 # ===== Web Push (VAPID) — notifications work even when tab/browser is closed =====
-_VAPID_PRIVATE = """-----BEGIN PRIVATE KEY-----
-MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg06OSNvUikGK7vjDY
-ho72Y3P8AvA+PEg63UT5yz360sGhRANCAASOjPJwku6oSoks04byXYOeINsfC5w9
-ej5vx5VwKkk2dUrLlk99o8JtiJ4TGkDr5C8L0X+eMz75nJworbahwxlG
------END PRIVATE KEY-----"""
-_VAPID_PUBLIC = "jozycJLuqEqJLNOG8l2DniDbHwucPXo-b8eVcCpJNnVKy5ZPfaPCbYieExpA6-QvC9F_njM--ZycKK22ocMZRg"
+# الزوج المضمّن سابقاً بالكود كان غير متطابق (الخاص لا يشتق العام) — كان
+# الاشتراك يفشل بـ InvalidAccessError في المتصفح قبل أي إرسال. الآن:
+# القراءة من .env، ولو غابت تُولَّد مرة واحدة وتُحفظ (self-healing).
 _VAPID_CLAIMS = {"sub": "mailto:admin@vex.deals"}
+_VAPID_PRIVATE = ''
+_VAPID_PUBLIC = ''
+
+def _vapid_derive_public(pem_priv):
+    """اشتقاق المفتاح العام (base64url لنقطة X962 غير المضغوطة) من الخاص PEM."""
+    import base64 as _b64
+    from cryptography.hazmat.primitives.serialization import load_pem_private_key
+    from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+    sk = load_pem_private_key(pem_priv.encode(), password=None)
+    raw = sk.public_key().public_bytes(Encoding.X962, PublicFormat.UncompressedPoint)
+    return _b64.urlsafe_b64encode(raw).rstrip(b'=').decode()
+
+def _init_vapid():
+    """حمّل مفاتيح VAPID من .env أو ولّدها واحفظها هناك — مرة واحدة."""
+    global _VAPID_PRIVATE, _VAPID_PUBLIC
+    import base64 as _b64
+    priv = (os.getenv('VAPID_PRIVATE_KEY', '') or _env_file_value('VAPID_PRIVATE_KEY') or '')
+    priv = priv.replace('\\n', '\n').strip()
+    pub = os.getenv('VAPID_PUBLIC_KEY', '') or _env_file_value('VAPID_PUBLIC_KEY')
+    if not priv.startswith('-----BEGIN'):
+        priv = ''
+    # تحقق التطابق: المفتاح العام المدمج يجب أن يُشتق من الخاص
+    if priv and pub:
+        try:
+            if _vapid_derive_public(priv) == pub.strip():
+                _VAPID_PRIVATE, _VAPID_PUBLIC = priv, pub.strip()
+                return
+        except Exception:
+            pass
+    # توليد زوج جديد صحيح وحفظه في .env — تحت قفل ملف حتى لا يولّد كل
+    # عامل gunicorn زوجاً مختلفاً في نفس اللحظة (كان يترك أزواجاً متعددة)
+    try:
+        from cryptography.hazmat.primitives.asymmetric import ec
+        from cryptography.hazmat.primitives.serialization import (
+            Encoding as _Enc, PrivateFormat as _PF, PublicFormat as _PubF, NoEncryption as _NoEnc)
+        import fcntl as _vfl
+        env_path = os.path.join(BASE_DIR, '.env')
+        lock_path = env_path + '.vapid.lock'
+        with open(lock_path, 'w') as _vlf:
+            _vfl.flock(_vlf, _vfl.LOCK_EX)
+            try:
+                # أعد القراءة تحت القفل — عامل آخر ربما كتب زوجاً للتو: الأول يفوز
+                cur_priv = _env_file_value('VAPID_PRIVATE_KEY').replace('\\n', '\n').strip()
+                cur_pub = _env_file_value('VAPID_PUBLIC_KEY')
+                if cur_priv.startswith('-----BEGIN') and cur_pub:
+                    try:
+                        if _vapid_derive_public(cur_priv) == cur_pub:
+                            _VAPID_PRIVATE, _VAPID_PUBLIC = cur_priv, cur_pub
+                            return
+                    except Exception:
+                        pass
+                sk = ec.generate_private_key(ec.SECP256R1())
+                priv = sk.private_bytes(_Enc.PEM, _PF.PKCS8, _NoEnc()).decode()
+                pub = _b64.urlsafe_b64encode(
+                    sk.public_key().public_bytes(_Enc.X962, _PubF.UncompressedPoint)
+                ).rstrip(b'=').decode()
+                with open(env_path, 'a', encoding='utf-8') as f:
+                    f.write("\n# Web Push VAPID (auto-generated)\n")
+                    f.write("VAPID_PRIVATE_KEY=" + priv.replace('\n', '\\n') + "\n")
+                    f.write("VAPID_PUBLIC_KEY=" + pub + "\n")
+                os.environ['VAPID_PRIVATE_KEY'] = priv
+                os.environ['VAPID_PUBLIC_KEY'] = pub
+                _VAPID_PRIVATE, _VAPID_PUBLIC = priv, pub
+                print(f"[VAPID] generated new keypair under lock, public={pub[:20]}...")
+            finally:
+                _vfl.flock(_vlf, _vfl.LOCK_UN)
+    except ImportError:
+        # بيئة بلا fcntl (تطوير محلي ويندوز) — توليد مباشر بلا قفل
+        try:
+            from cryptography.hazmat.primitives.asymmetric import ec
+            from cryptography.hazmat.primitives.serialization import (
+                Encoding as _Enc, PrivateFormat as _PF, PublicFormat as _PubF, NoEncryption as _NoEnc)
+            sk = ec.generate_private_key(ec.SECP256R1())
+            priv = sk.private_bytes(_Enc.PEM, _PF.PKCS8, _NoEnc()).decode()
+            pub = _b64.urlsafe_b64encode(
+                sk.public_key().public_bytes(_Enc.X962, _PubF.UncompressedPoint)
+            ).rstrip(b'=').decode()
+            env_path = os.path.join(BASE_DIR, '.env')
+            with open(env_path, 'a', encoding='utf-8') as f:
+                f.write("\nVAPID_PRIVATE_KEY=" + priv.replace('\n', '\\n') + "\n")
+                f.write("VAPID_PUBLIC_KEY=" + pub + "\n")
+            _VAPID_PRIVATE, _VAPID_PUBLIC = priv, pub
+        except Exception as e:
+            print(f"[VAPID] init FAILED (pywebpush pushes disabled): {e}")
+    except Exception as e:
+        print(f"[VAPID] init FAILED (pywebpush pushes disabled): {e}")
+
+_init_vapid()
+
+_push_lib_warned = False
 
 def _send_web_push(payload_dict, target_uid=None):
-    """Send Web Push to all subscribed browsers (admin + users) — works even when tab is closed.
-    If target_uid is set, only send to that specific user."""
+    """Send Web Push to subscribed browsers — works even when tab is closed.
+
+    إصلاحات 2026-08-18:
+    - غياب pywebpush يُسجَّل مرة واحدة بصوت عالٍ (كان عودة صامتة)
+    - الاشتراكات الميتة (404/410) تُحذف فعلياً من CSV
+    - الصور/الوسائط تمرر للـ service worker (كانت تُسقط)
+    - الاستهداف بـ target_uid يعمل، وملخص إرسال يُسجَّل"""
+    global _push_lib_warned
     try:
         from pywebpush import webpush, WebPushException
     except ImportError:
+        if not _push_lib_warned:
+            _push_lib_warned = True
+            _auth_logger.error('pywebpush NOT INSTALLED — web push silently disabled. pip install pywebpush')
+        return
+    if not _VAPID_PRIVATE:
         return
     subs = read_csv('push_subscriptions.csv')
     if not subs:
@@ -102,15 +200,17 @@ def _send_web_push(payload_dict, target_uid=None):
         'message': payload_dict.get('message', ''),
         'type': payload_dict.get('type', 'notification'),
         'timestamp': payload_dict.get('timestamp', ''),
-        'url': '/dashboard' if payload_dict.get('target_type') == 'dashboard' else '/home'
+        'url': '/dashboard' if payload_dict.get('target_type') == 'dashboard' else '/home',
+        'image': (payload_dict.get('data') or {}).get('image', ''),
     })
+    dead_endpoints = []
+    sent = failed = 0
     for sub in subs:
-        endpoint = sub.get('endpoint', '')
+        endpoint = sub.get('endpoint', '') or ''
         if not endpoint:
             continue
-        # If targeting a specific user, filter
         if target_uid:
-            sub_uid = sub.get('user_id', '') or sub.get('admin_id', '')
+            sub_uid = (sub.get('user_id') or '') or (sub.get('admin_id') or '')
             if str(sub_uid) != str(target_uid):
                 continue
         try:
@@ -128,13 +228,31 @@ def _send_web_push(payload_dict, target_uid=None):
                 vapid_claims=_VAPID_CLAIMS,
                 timeout=5
             )
+            sent += 1
         except WebPushException as e:
-            if hasattr(e, 'response') and e.response and e.response.status_code in (404, 410):
-                pass
+            code = getattr(e, 'response', None) and e.response.status_code
+            if code in (404, 410):
+                # الاشتراك ميت (أُلغي بالمتصفح) — احذفه بدل إرسال له للأبد
+                dead_endpoints.append(endpoint)
             else:
-                pass
-        except Exception:
-            pass
+                failed += 1
+                _auth_logger.warning('webpush %s... failed HTTP %s: %s',
+                                     endpoint[-20:], code, str(e)[:120])
+        except Exception as e:
+            failed += 1
+            _auth_logger.warning('webpush unexpected: %s', str(e)[:120])
+    if dead_endpoints:
+        try:
+            alive = [s for s in subs if s.get('endpoint') not in dead_endpoints]
+            fnames = get_fieldnames('push_subscriptions.csv',
+                ['endpoint','p256dh','auth','user_agent','admin_id','created_at',
+                 'user_type','user_id','user_name'])
+            write_csv('push_subscriptions.csv', alive, fnames)
+            _auth_logger.info('webpush pruned %d dead subscriptions', len(dead_endpoints))
+        except Exception as e:
+            _auth_logger.error('webpush prune failed: %s', e)
+    if sent or failed:
+        _auth_logger.info('webpush sent=%d failed=%d target=%s', sent, failed, target_uid or 'all')
 
 # ===== Real-time Notification Queue =====
 _notification_queues = []  # list of queue.Queue, one per connected SSE client
@@ -172,11 +290,12 @@ def push_notification(notif_type, title, message, data=None):
         append_csv('notifications_log.csv', log_entry, fieldnames)
     except:
         pass
-    # 3. Web Push (works even when browser/tab is closed)
+    # 3. Web Push (works even when browser/tab is closed) — مع استهداف مستخدم بعينه
     try:
-        _send_web_push(payload_dict)
+        _tuid = (data or {}).get('target_uid') if isinstance(data, dict) else None
+        _send_web_push(payload_dict, target_uid=_tuid)
     except Exception as e:
-        print(f"Web Push error: {e}")
+        _auth_logger.error('Web Push error: %s', e)
 
 # ===== CSV Helpers =====
 def read_csv(filename):
@@ -7916,23 +8035,28 @@ def api_push_subscribe_user():
 
 @app.route('/api/push/subscribe', methods=['POST'])
 def api_push_subscribe():
-    """Store a browser push subscription — public, no auth needed."""
+    """Store a browser push subscription — public, no auth needed.
+    مخطط موحّد مع اشتراك المستخدمين (user_type/user_id/user_name دائماً)."""
     data = request.json or {}
     endpoint = data.get('endpoint', '')
     keys = data.get('keys', {})
     if not endpoint:
         return jsonify({'error': 'No endpoint'}), 400
     admin_id = str(session.get('admin_id', ''))
+    is_admin = bool(session.get('is_admin'))
     subs = read_csv('push_subscriptions.csv')
-    fieldnames = get_fieldnames('push_subscriptions.csv', ['admin_id','endpoint','p256dh','auth','created_at'])
-    # Remove old sub for this endpoint
+    fieldnames = get_fieldnames('push_subscriptions.csv', ['admin_id','endpoint','p256dh','auth','created_at','user_type','user_id','user_name'])
+    # Remove old sub for this endpoint (نفس المتصفح = اشتراك واحد محدث)
     subs = [s for s in subs if s.get('endpoint') != endpoint]
     subs.append({
         'admin_id': admin_id,
         'endpoint': endpoint,
         'p256dh': keys.get('p256dh', ''),
         'auth': keys.get('auth', ''),
-        'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'user_type': 'admin' if is_admin else 'browser',
+        'user_id': admin_id,
+        'user_name': session.get('admin_name', '')
     })
     write_csv('push_subscriptions.csv', subs, fieldnames)
     return jsonify({'success': True})
