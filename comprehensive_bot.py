@@ -7409,20 +7409,31 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             self.user_states[message['from']['id']] = 'selecting_language'
         self.send_message(message['chat']['id'], lang_text, reply_keyboard)
     
+    def _language_native_names(self):
+        """أسماء اللغات الأصلية — لمطابقة زر اللغة مهما كانت أيقونة الثيم"""
+        try:
+            return {info.get('native', '') for info in self.get_language_names().values()}
+        except Exception:
+            return set()
+
     def handle_language_change(self, message, text, return_to_admin=False):
         """تغيير اللغة — يدعم جميع اللغات"""
         user_id = message['from']['id']
+        chat_id = message['chat']['id']
         lang_names = self.get_language_names()
-        
+
         # تحديد اللغة الجديدة من نص الزر
         new_lang = None
         for code, info in lang_names.items():
             if text.startswith(info['flag']):
                 new_lang = code
                 break
-        
+
         if not new_lang:
-            new_lang = 'ar'  # افتراضي
+            # إدخال غير مفهوم — أعد عرض القائمة بدل التحويل الصامت للعربية
+            # (سابقاً: أي نص آخر كان يغير لغة المستخدم للعربية بلا نيته)
+            self.show_language_selection(message, return_to_admin=return_to_admin)
+            return
         
         # تحديث لغة المستخدم في الملف
         users = []

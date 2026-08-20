@@ -2194,7 +2194,12 @@ class MessageDispatcherMixin:
                                    hours='24/7',
                                    company=self.get_setting('company_name') or 'DUX')
             self.send_message(chat_id, support_text, self.main_keyboard(user_lang, user_id))
-        elif text.startswith('🌐 '):
+        elif text.startswith('🌐 ') or text.startswith('🌍 ') or text.startswith('🗺️ ') or text.startswith('🈶 '):
+            # زر اللغة بأيقونة الثيم النشط — ocean يستخدم 🌍 وكان يُتجاهل تماماً
+            # (لا معالج مطابق → نقرة صامتة بلا قائمة). نقبل كل أيقونات globes.
+            self.show_language_selection(message)
+        elif len(text) > 2 and text.split(' ', 1)[-1] in self._language_native_names():
+            # شبكة أمان: أي زر لغة بأيقونة مستقبلية غير معروفة يُلتقط بالاسم الأصلي
             self.show_language_selection(message)
         elif text in ref_texts:
             self.show_referral_panel(message)

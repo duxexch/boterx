@@ -124,7 +124,7 @@
             <i class="fas fa-arrows-rotate w-5 text-center"></i> <span x-text="t('matching')"></span>
         </a>
         <a href="{{ url_for('page_agents') }}" class="sidebar-link {% if active_page == 'agents' %}active{% endif %}">
-            <i class="fas fa-robot w-5 text-center"></i> <span>وكلاء المطابقة</span>
+            <i class="fas fa-robot w-5 text-center"></i> <span x-text="t('agents')"></span>
         </a>
         <a href="{{ url_for('page_trading') }}" class="sidebar-link {% if active_page == 'trading' %}active{% endif %}">
             <i class="fas fa-coins w-5 text-center"></i> <span x-text="t('trading')"></span>
@@ -186,7 +186,7 @@
         {% endif %}
         {% if not admin_perms or admin_perms.get('manage_bots') %}
         <a href="{{ url_for('page_clients') }}" class="sidebar-link {% if active_page == 'clients' %}active{% endif %}">
-            <i class="fas fa-tags w-5 text-center"></i> <span>العملاء (White-Label)</span>
+            <i class="fas fa-tags w-5 text-center"></i> <span x-text="t('clients')"></span>
         </a>
         {% endif %}
         {% if not admin_perms or admin_perms.get('ban_users') %}
@@ -194,7 +194,7 @@
             <i class="fas fa-exclamation-circle w-5 text-center"></i> <span x-text="t('complaints')"></span>
         </a>
         <a href="{{ url_for('page_tickets') }}" class="sidebar-link {% if active_page == 'tickets' %}active{% endif %}">
-            <i class="fas fa-ticket-alt w-5 text-center"></i> التذاكر
+            <i class="fas fa-ticket-alt w-5 text-center"></i> <span x-text="t('tickets')"></span>
         </a>
         {% endif %}
         {% if not admin_perms or admin_perms.get('send_broadcast') %}
@@ -290,7 +290,7 @@
                             <div class="p-3 text-center text-slate-400 text-sm"><i class="fas fa-spinner fa-spin"></i></div>
                         </template>
                         <template x-if="!loading && results.length === 0">
-                            <div class="p-3 text-center text-slate-500 text-sm">لا توجد نتائج</div>
+                            <div class="p-3 text-center text-slate-500 text-sm" x-text="t('no_results')">لا توجد نتائج</div>
                         </template>
                         <template x-for="r in results" :key="r.type + r.id">
                             <a :href="r.url" class="block p-2 hover:bg-slate-700/50 border-b border-slate-700/30">
