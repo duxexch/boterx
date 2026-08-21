@@ -9,17 +9,17 @@
     <div class="flex gap-1 bg-slate-800 rounded-xl border border-slate-700 p-1 w-fit">
         <button @click="setTab('active')" :class="tab === 'active' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'"
                 class="px-5 py-2 rounded-lg text-sm font-medium transition">
-            <i class="fas fa-circle-check ml-1"></i> نشطة
+            <i class="fas fa-circle-check ml-1"></i> <span x-text="t('active_matches_tab')">نشطة</span>
             <span class="ml-1 px-1.5 py-0.5 rounded text-xs bg-slate-700" x-text="activeCount"></span>
         </button>
         <button @click="setTab('pending')" :class="tab === 'pending' ? 'bg-amber-600 text-white' : 'text-slate-400 hover:text-white'"
                 class="px-5 py-2 rounded-lg text-sm font-medium transition">
-            <i class="fas fa-clock ml-1"></i> معلقة
+            <i class="fas fa-clock ml-1"></i> <span x-text="t('pending_requests_tab')">معلقة</span>
             <span class="ml-1 px-1.5 py-0.5 rounded text-xs bg-slate-700" x-text="pendingCount"></span>
         </button>
         <button @click="setTab('logs')" :class="tab === 'logs' ? 'bg-green-600 text-white' : 'text-slate-400 hover:text-white'"
                 class="px-5 py-2 rounded-lg text-sm font-medium transition">
-            <i class="fas fa-list ml-1"></i> السجلات
+            <i class="fas fa-list ml-1"></i> <span x-text="t('logs_tab')">السجلات</span>
         </button>
     </div>
 
@@ -32,9 +32,9 @@
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th>المعرف</th>
-                        <th>المودع</th>
-                        <th>الساحب</th>
+                        <th x-text="t('match_id')">المعرف</th>
+                        <th x-text="t('depositor')">المودع</th>
+                        <th x-text="t('withdrawer')">الساحب</th>
                         <th data-i18n="amount">Amount</th>
                         <th data-i18n="company">Company</th>
                         <th data-i18n="status">Status</th>
@@ -93,25 +93,26 @@
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th>المعرف</th>
+                        <th x-text="t('match_id')">المعرف</th>
                         <th data-i18n="user">User</th>
                         <th data-i18n="type">Type</th>
                         <th data-i18n="amount">Amount</th>
                         <th data-i18n="company">Company</th>
-                        <th>الاسم المستعار</th>
+                        <th>🤖 الوكيل</th>
+                        <th>Alias</th>
                         <th data-i18n="date">Date</th>
                         <th data-i18n="actions">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     <template x-if="loading">
-                        <tr><td colspan="8" class="text-center p-8 text-slate-400">
+                        <tr><td colspan="9" class="text-center p-8 text-slate-400">
                             <i class="fas fa-spinner fa-spin text-2xl"></i>
                             <p class="mt-2" data-i18n="loading">Loading...</p>
                         </td></tr>
                     </template>
                     <template x-if="!loading && pendingRequests.length === 0">
-                        <tr><td colspan="8" class="text-center p-8 text-slate-400">
+                        <tr><td colspan="9" class="text-center p-8 text-slate-400">
                             <i class="fas fa-inbox text-3xl mb-2"></i>
                             <p>لا توجد طلبات معلقة</p>
                         </td></tr>
@@ -131,15 +132,19 @@
                             <td>
                                 <span class="px-2 py-0.5 rounded text-xs bg-purple-500/20 text-purple-400" x-text="r.company_name || '—'"></span>
                             </td>
+                            <td>
+                                <span x-show="r.agent_name" class="px-2 py-0.5 rounded text-xs bg-blue-500/20 text-blue-400" x-text="r.agent_name || ''"></span>
+                                <span x-show="!r.agent_name" class="text-xs text-slate-500">بدون وكيل</span>
+                            </td>
                             <td class="text-sm" x-text="r.alias || '—'"></td>
                             <td class="text-xs text-slate-400" x-text="r.created_at || '—'"></td>
                             <td>
                                 <div class="flex gap-1">
                                     <button @click="approveRequest(r.id)" x-show="rbac('approve_deposits')" class="btn btn-success btn-sm">
-                                        <i class="fas fa-check"></i> قبول
+                                        <i class="fas fa-check"></i> <span x-text="t('approve')">قبول</span>
                                     </button>
                                     <button @click="rejectRequest(r.id)" x-show="rbac('reject_deposits')" class="btn btn-danger btn-sm">
-                                        <i class="fas fa-xmark"></i> رفض
+                                        <i class="fas fa-xmark"></i> <span x-text="t('reject')">رفض</span>
                                     </button>
                                 </div>
                             </td>
@@ -159,9 +164,9 @@
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th>المعرف</th>
-                        <th>المودع</th>
-                        <th>الساحب</th>
+                        <th x-text="t('match_id')">المعرف</th>
+                        <th x-text="t('depositor')">المودع</th>
+                        <th x-text="t('withdrawer')">الساحب</th>
                         <th data-i18n="amount">Amount</th>
                         <th data-i18n="company">Company</th>
                         <th data-i18n="status">Status</th>

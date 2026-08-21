@@ -244,14 +244,42 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             # 1) Try file-based i18n translations first
             file_text = self.get_i18n_text(key, lang)
             if file_text:
-                return file_text.format(**kwargs)
+                try:
+                    return file_text.format(**kwargs)
+                except Exception:
+                    # فشل تنسيق placeholders (مفاتيح ترجمة تالفة) — أعد النص
+                    # المترجم كما هو بدل إظهار المفتاح الخام 'a0123_...' للمستخدم
+                    return file_text
             # 2) Fall back to inline translations dict
             template = self.translations.get(key, {}).get(lang) or self.translations.get(key, {}).get('ar')
             if not template:
-                return key
-            return template.format(**kwargs)
+                return key.split('_', 1)[-1] if '_' in key else key
+            try:
+                return template.format(**kwargs)
+            except Exception:
+                return template
         except Exception:
-            return key
+            return key.split('_', 1)[-1] if '_' in key else key
+
+    _tset_cache = {}
+
+    def _tset(self, key):
+        """مجموعة نصوص مفتاح بكل اللغات — تُبنى مرة وتُخزَّن.
+        كان الموزع يبني 530-750 استدعاء tr() لكل رسالة — الآن صفر بعد أول مرة."""
+        cached = self._tset_cache.get(key)
+        if cached is not None:
+            return cached
+        texts = set()
+        try:
+            for l in self.get_supported_languages():
+                t = self.tr(key, l)
+                if t:
+                    texts.add(t)
+        except Exception:
+            pass
+        frozen = frozenset(texts)
+        self._tset_cache[key] = frozen
+        return frozen
 
     def load_i18n_translations(self):
         """تحميل ملفات الترجمة من مجلد i18n/"""
@@ -343,11 +371,24 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                 writer = csv.writer(f)
                 writer.writerow(['id', 'referrer_id', 'referred_id', 'referred_name', 'referred_phone', 'phone_verified', 'bonus_amount', 'currency', 'status', 'created_at'])
         
+        # ترحيل: أضف عمود currency لملف قائم (التدفقات تكتب 14 قيمة والقديم 13 عموداً)
+        try:
+            if os.path.exists('transactions.csv'):
+                with open('transactions.csv', 'r', encoding='utf-8-sig', newline='') as _tf:
+                    _rows = list(csv.reader(_tf))
+                if _rows and 'currency' not in _rows[0]:
+                    _rows[0] = _rows[0] + ['currency']
+                    with open('transactions.csv', 'w', newline='', encoding='utf-8-sig') as _tf:
+                        csv.writer(_tf).writerows(_rows)
+                    logger.info('transactions.csv migrated: +currency column')
+        except Exception as _te:
+            logger.error(f'transactions.csv migration failed: {_te}')
+
         # ملف المعاملات المتقدم
         if not os.path.exists('transactions.csv'):
             with open('transactions.csv', 'w', newline='', encoding='utf-8-sig') as f:
                 writer = csv.writer(f)
-                writer.writerow(['id', 'customer_id', 'telegram_id', 'name', 'type', 'company', 'wallet_number', 'amount', 'exchange_address', 'status', 'date', 'admin_note', 'processed_by'])
+                writer.writerow(['id', 'customer_id', 'telegram_id', 'name', 'type', 'company', 'wallet_number', 'amount', 'exchange_address', 'status', 'date', 'admin_note', 'processed_by', 'currency'])
         
         # ملف الشركات
         if not os.path.exists('companies.csv'):
@@ -1022,10 +1063,15 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
 
 
     def api_call(self, method, data=None, retries=3):
-        """استدعاء API مُحسن — مع إعادة المحاولة التلقائية"""
+        """استدعاء API مُحسن — مع إعادة المحاولة التلقائية
+
+        مضاد للحظر (2026-08-18):
+        - 429: نحترم retry_after الفعلي من تيليجرام + jitter — تجاهله كان
+          السبب الأول للحظر الدائم (كان ينتظر ثانية ثابتة فقط)
+        - backoff تدريجي مع عشوائية"""
         url = f"{self.api_url}/{method}"
         last_error = None
-        
+
         for attempt in range(retries):
             try:
                 if data:
@@ -1034,7 +1080,7 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                     req.add_header('Content-Type', 'application/json')
                 else:
                     req = urllib.request.Request(url)
-                
+
                 with urllib.request.urlopen(req, timeout=30) as response:
                     result = json.loads(response.read().decode('utf-8'))
                     if result.get('ok'):
@@ -1048,6 +1094,13 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                         if 'Bad Request' in error_desc or 'message is not modified' in error_desc:
                             logger.warning(f"API {method} skipped (non-retryable): {error_desc}")
                             return result
+                        # 429 داخل الاستجابة الناجحة HTTP-wise — احترم retry_after
+                        if result.get('error_code') == 429:
+                            params = result.get('parameters') or {}
+                            wait = float(params.get('retry_after', 3)) + random.uniform(0.5, 1.5)
+                            logger.warning(f"Rate limited (body) — sleeping {wait:.1f}s")
+                            time.sleep(wait)
+                            continue
                         last_error = f"API error: {error_desc}"
             except urllib.error.HTTPError as e:
                 last_error = f"HTTP {e.code}: {e.reason}"
@@ -1055,17 +1108,23 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                 if e.code in (400, 403):
                     logger.warning(f"API {method} skipped (HTTP {e.code}): {e.reason}")
                     return None
-                if e.code == 429:  # Rate limited
-                    retry_after = 1
-                    logger.warning(f"Rate limited by Telegram, waiting {retry_after}s")
-                    time.sleep(retry_after)
+                if e.code == 429:  # Rate limited — اقرأ retry_after من جسم الخطأ
+                    retry_after = 3.0
+                    try:
+                        body = json.loads(e.read().decode('utf-8'))
+                        retry_after = float((body.get('parameters') or {}).get('retry_after', 3))
+                    except Exception:
+                        pass
+                    wait = retry_after + random.uniform(0.5, 1.5)
+                    logger.warning(f"Rate limited by Telegram — sleeping {wait:.1f}s (respected retry_after={retry_after})")
+                    time.sleep(wait)
                     continue
             except Exception as e:
                 last_error = str(e)
-            
+
             if attempt < retries - 1:
-                time.sleep(0.5 * (attempt + 1))  # backoff تدريجي
-        
+                time.sleep(0.5 * (attempt + 1) + random.uniform(0.1, 0.4))  # backoff + jitter
+
         logger.error(f"API call failed after {retries} retries: {method} - {last_error}")
         return None
     
@@ -4475,10 +4534,10 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         _feat_btn = {
             'deposit': self.tr('deposit', lang),
             'withdraw': self.tr('withdraw', lang),
-            'trading': '💱 تداول USDT',
+            'trading': self.tr('a0234_تداول', lang),
             'compensation': self.tr('svrp_title', lang),
             'matching': self.tr('match_btn', lang) if self.tr('match_btn', lang) != 'match_btn' else f"{t.get('btn_match', '🔄')} مطابقة",
-            'games': '🎮 ألعاب',
+            'games': self.tr('a0239_ألعاب', lang),
             'apps': self.tr('apps_btn', lang) if self.tr('apps_btn', lang) != 'apps_btn' else self.tr('a0117_تطبيقات', lang),
             'referral': self.tr('referral_btn', lang) if self.tr('referral_btn', lang) != 'referral_btn' else f"{t.get('btn_referral', '🎁')} اربح",
             'complaints': self.tr('complaint', lang),
@@ -4516,9 +4575,9 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
 
         keyboard = [
             [{'text': deposit_btn}, {'text': withdraw_btn}],
-            [{'text': '💱 تداول USDT'}, {'text': svrp_btn}],
+            [{'text': self.tr('a0234_تداول', lang)}, {'text': svrp_btn}],
             [{'text': wallet_btn}, {'text': profile_btn}],
-            [{'text': match_btn}, {'text': '🎮 ألعاب'}],
+            [{'text': match_btn}, {'text': self.tr('a0239_ألعاب', lang)}],
             [{'text': apps_btn}, {'text': ref_btn}],
             [{'text': notif_btn}, {'text': complaint_btn}],
             [{'text': more_btn}, {'text': lang_btn_text}],
@@ -4529,7 +4588,7 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         if self.client_features is not None:
             _feat_btn = {
                 'deposit': deposit_btn, 'withdraw': withdraw_btn,
-                'trading': '💱 تداول USDT', 'compensation': svrp_btn,
+                'trading': self.tr('a0234_تداول', lang), 'compensation': svrp_btn,
                 'matching': match_btn, 'games': '🎮 ألعاب',
                 'apps': apps_btn, 'referral': ref_btn, 'complaints': complaint_btn,
                 'multi_lang': lang_btn_text,
@@ -4652,8 +4711,15 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         
         return {'keyboard': keyboard, 'resize_keyboard': True, 'one_time_keyboard': True}
     
+    _live_stats_cache = (0, None)   # (timestamp, stats)
+
     def get_live_stats(self):
-        """إحصائيات حية — مشاركين اليانصيب + عجلة الحظ + الفائزين + الجوائز الموزعة"""
+        """إحصائيات حية — مشاركين اليانصيب + عجلة الحظ + الفائزين + الجوائز الموزعة
+        (كاش 60 ثانية: كانت 5 مسحات CSV كاملة لكل ضغطة زر البداية)"""
+        import time as _st
+        _now, _cached = self._live_stats_cache
+        if _cached is not None and (_st.time() - _now) < 60:
+            return _cached
         stats = {
             'lottery_participants': 0,
             'lottery_winners_count': 0,
@@ -4720,6 +4786,7 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         except:
             pass
 
+        self._live_stats_cache = (_st.time(), stats)
         return stats
 
     def format_stats_bar(self):
@@ -4813,8 +4880,9 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         
         if user:
             if user.get('is_banned') == 'yes':
-                ban_reason = user.get('ban_reason', self.tr('a0122_غير_محدد', lang))
-                self.send_message(chat_id, self.tr('a0123_تم_حظر', lang, ban_reason=ban_reason))
+                _bl = user.get('language', 'ar')
+                ban_reason = user.get('ban_reason', self.tr('a0122_غير_محدد', _bl))
+                self.send_message(chat_id, self.tr('a0123_تم_حظر', _bl, ban_reason=ban_reason))
                 return
 
             # 💎 تعويض: صديق لديه حساب بالفعل فتح البوت برابط إحالة —
@@ -5378,6 +5446,10 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         user_id = message['from']['id']
         state = self.user_states.get(user_id, '')
         text = message.get('text', '')
+        # لغة المستخدم أولاً — كان الاستخدام قبل التعريف يقتل السحب كله
+        # بـ UnboundLocalError من أول رسالة مبلغ (إصلاح 2026-08-20)
+        _u = self.find_user(user_id)
+        lang = _u.get('language', 'ar') if _u else 'ar'
 
         # فحص أزرار الإلغاء والعودة أولاً
         all_langs = self.get_supported_languages()
@@ -6091,54 +6163,39 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                 return
             req_type = state.get('type', 'deposit')
             currency = user.get('currency', 'EGP') or 'EGP'
-            # اختيار وكيل + إنشاء معاملته ذرّياً (حصص المرور وكل الاستثناءات)
-            picked = None
-            try:
-                import agent_db
-                # للوكيل: مطابقة الإيداع من المستخدم = سحب للوكيل (يستلم أموالاً)
-                agent_txn_type = 'withdraw' if req_type == 'deposit' else 'deposit'
-                picked = agent_db.pick_and_create_transaction(
-                    agent_txn_type, amount, currency,
-                    user_id=user_id, user_name=user.get('name', ''))
-            except Exception as e:
-                print(f"agent pick error: {e}")
+            # إنشاء ذرّي موحد: طلب + اختيار وكيل + حجز escrow في معاملة واحدة
+            import agent_db as _adb
+            req_id, err, assigned, agent_info = _adb.create_match_request_with_agent_assignment(
+                user_id, user.get('customer_id', ''), req_type, amount, currency,
+                company_id='', company_name='', payment_method_id='', bot_id='')
             if user_id in self.user_states:
                 del self.user_states[user_id]
-            if not picked:
-                self.send_message(chat_id,
-                    '😔 لا يوجد وكيل متاح حالياً لهذا المبلغ — حاول لاحقاً أو استخدم الإيداع/السحب العادي.',
-                    self.main_keyboard(lang, user_id))
+            if err:
+                self.send_message(chat_id, f'⚠️ {err}', self.main_keyboard(lang, user_id))
                 return
-            agent, txn_id = picked['agent'], picked['txn_id']
-            # إنشاء طلب المطابقة — وعند الفشل نلغي معاملة الوكيل ونحرر الحصة
-            req_id = None
-            if self.match_manager:
-                req_id, err = self.match_manager.create_match_request(
-                    user_id, user.get('customer_id', ''), req_type, amount,
-                    currency, '', '', '', bot_id=agent['id'])
-                if err:
-                    try:
-                        import agent_db
-                        agent_db.void_pending_transaction(agent['id'], txn_id)
-                    except Exception as e2:
-                        print(f"agent txn void error: {e2}")
-                    self.send_message(chat_id, f'⚠️ {err}', self.main_keyboard(lang, user_id))
-                    return
-            if req_id:
-                try:
-                    import agent_db
-                    agent_db.set_txn_match_request(txn_id, req_id)
-                except Exception as e:
-                    print(f"agent txn link error: {e}")
             type_label = 'إيداع' if req_type == 'deposit' else 'سحب'
+            agent_line = '\n🤝 تم توجيه طلبك إلى وكيل معتمد' if assigned else \
+                '\n⏳ بانتظار توفر وكيل أو مطابقة P2P'
             self.send_message(chat_id,
                 f"✅ <b>تم إنشاء طلب المطابقة</b>\n\n"
-                f"🆔 رقم الطلب: <code>{req_id or '-'}</code>\n"
+                f"🆔 رقم الطلب: <code>{req_id}</code> 👈 اضغط للنسخ\n"
                 f"🔄 النوع: {type_label}\n"
-                f"💰 المبلغ: {amount:g} {currency}\n"
-                f"🤝 تم توجيه طلبك إلى وكيل معتمد\n"
+                f"💰 المبلغ: {amount:g} {currency}"
+                f"{agent_line}\n"
                 f"⏳ سيتم إشعارك فور معالجة الطلب.",
                 self.main_keyboard(lang, user_id))
+            # إشعار الوكيل المعيّن في تيليجرام (إن كان مربوطاً)
+            if assigned and agent_info and agent_info.get('telegram_id'):
+                try:
+                    self.send_message(int(agent_info['telegram_id']),
+                        f"🔔 <b>طلب مطابقة جديد معيّن لك</b>\n\n"
+                        f"🆔 <code>{req_id}</code>\n"
+                        f"{'💵' if req_type == 'deposit' else '💸'} النوع: "
+                        f"{'إيداع (تدفع للمستخدم)' if req_type != 'deposit' else 'سحب (تستلم من المستخدم)'}\n"
+                        f"💰 المبلغ: <code>{amount:g} {currency}</code>\n\n"
+                        f"⚡ افحصه من لوحة الوكيل ← الطلبات المعلقة")
+                except Exception as _age:
+                    logger.warning(f"agent TG notify failed {req_id}: {_age}")
             return
 
         # خطوة غير معروفة — تنظيف
@@ -6153,24 +6210,34 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         completed_count = 0
 
         try:
-            with open('matches.csv', 'r', encoding='utf-8-sig') as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    if row.get('status') not in ('completed', 'cancelled'):
-                        active_count += 1
-                    else:
-                        completed_count += 1
-        except:
-            pass
-
-        try:
-            with open('match_requests.csv', 'r', encoding='utf-8-sig') as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    if row.get('status') == 'waiting':
-                        pending_count += 1
-        except:
-            pass
+            import agent_db as _adb
+            _c = _adb._conn()
+            active_count = _c.execute(
+                "SELECT COUNT(*) c FROM matches WHERE status NOT IN ('completed','cancelled')").fetchone()['c']
+            pending_count = _c.execute(
+                "SELECT COUNT(*) c FROM match_requests WHERE status='waiting'").fetchone()['c']
+            completed_count = _c.execute(
+                "SELECT COUNT(*) c FROM matches WHERE status IN ('completed','cancelled')").fetchone()['c']
+            _c.close()
+        except Exception:
+            try:
+                with open('matches.csv', 'r', encoding='utf-8-sig') as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        if row.get('status') not in ('completed', 'cancelled'):
+                            active_count += 1
+                        else:
+                            completed_count += 1
+            except:
+                pass
+            try:
+                with open('match_requests.csv', 'r', encoding='utf-8-sig') as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        if row.get('status') == 'waiting':
+                            pending_count += 1
+            except:
+                pass
 
         # عد بوتات المطابقة
         match_bots = []
@@ -6189,10 +6256,11 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         )
 
         inline_btns = [
-            [{'text': '🟢 المطابقات النشطة', 'callback_data': 'match_admin_active'}],
-            [{'text': '⏳ الطلبات المعلقة', 'callback_data': 'match_admin_pending'}],
-            [{'text': '📜 السجلات', 'callback_data': 'match_admin_logs'}],
-            [{'text': '🤖 بوتات المطابقة', 'callback_data': 'match_admin_bots'}],
+            [{'text': '🟢 المطابقات النشطة', 'callback_data': 'match_admin_active'},
+             {'text': '⏳ الطلبات المعلقة', 'callback_data': 'match_admin_pending'}],
+            [{'text': '📜 السجلات', 'callback_data': 'match_admin_logs'},
+             {'text': '🤖 بوتات المطابقة', 'callback_data': 'match_admin_bots'}],
+            [{'text': '🔄 تحديث', 'callback_data': 'match_admin_refresh'}],
             [{'text': '🔙 لوحة الأدمن', 'callback_data': 'match_back_admin'}]
         ]
         self.send_inline_message(chat_id, text, inline_btns)
@@ -6282,7 +6350,11 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                         try:
                             del self.user_states[uid]
                         except Exception:
-                            pass
+                            # المفاتيح أرقام غالباً والـ uid نص — جرّب النوعين
+                            try:
+                                del self.user_states[int(uid)]
+                            except Exception:
+                                pass
                         try:
                             u = self.find_user(uid)
                             lang = (u or {}).get('language', 'ar')
@@ -6537,8 +6609,39 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         except:
             pass
 
-        # تسجيل كل هدية + إضافة الرصيد
-        total_prize = 0.0
+        # ── مكافأة ثابتة بسقف يومي (إصلاح أمني 2026-08-18) ──────────────────
+        # سابقاً: المبلغ كان يُستخرج من نص الهدية المرسل من العميل — أي مستخدم
+        # يستطيع إرسال نص مزيف بأي مبلغ ويُضاف لرصيده فوراً (فلوس لا نهائية).
+        # الآن: 5 رصيد مجمد لكل جولة، بحد أقصى 3 جولات مكافأة/يوم، مهما كان
+        # نص الهدية أو عددها. النص يُستخدم للعرض فقط.
+        _SNATCH_REWARD = 5.0
+        _SNATCH_DAILY_CAP = 3
+        today_str = datetime.now().strftime('%Y-%m-%d')
+        rewarded_today = 0
+        try:
+            with open('snatch_daily_rewards.csv', 'r', encoding='utf-8-sig') as f:
+                for row in csv.DictReader(f):
+                    if row.get('user_id') == str(user_id) and row.get('date') == today_str:
+                        rewarded_today += 1
+        except Exception:
+            pass
+
+        prize_amount = 0.0
+        if rewarded_today < _SNATCH_DAILY_CAP and caught_gifts:
+            prize_amount = _SNATCH_REWARD
+            if self.svrp:
+                try:
+                    self.svrp.add_frozen_balance(str(user_id), prize_amount)
+                    with open('snatch_daily_rewards.csv', 'a', newline='', encoding='utf-8-sig') as f:
+                        writer = csv.writer(f)
+                        writer.writerow([str(user_id), today_str, prize_amount,
+                                         datetime.now().strftime('%Y-%m-%d %H:%M')])
+                except Exception as e:
+                    logger.error(f"Error adding fixed snatch reward: {e}")
+                    prize_amount = 0.0
+        total_prize = prize_amount
+
+        # تسجيل الهدائف للعرض والسجل — بلا أي أثر مالي للنص
         processed_gifts = []
         for gift in caught_gifts:
             gift_text = gift.get('text', '')
@@ -6554,25 +6657,8 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             except:
                 pass
 
-            # استخراج المبلغ الرقمي وإضافته للمحفظة
-            prize_amount = 0.0
-            try:
-                import re as _re
-                numbers = _re.findall(r'[\d,.]+', gift_text.replace(',', ''))
-                if numbers:
-                    prize_amount = float(numbers[0])
-            except:
-                pass
-
-            if prize_amount > 0 and self.svrp:
-                try:
-                    self.svrp.add_frozen_balance(str(user_id), prize_amount)
-                    total_prize += prize_amount
-                    logger.info(f"Added {prize_amount} to user {user_id} wallet")
-                except Exception as e:
-                    logger.error(f"Error adding frozen balance: {e}")
-
-            processed_gifts.append({'text': gift_text, 'link': gift_link, 'amount': prize_amount})
+            # (أُزيل الاستشهاد بالمبلغ من نص العميل — ثغرة فلوس لا نهائية)
+            processed_gifts.append({'text': gift_text, 'link': gift_link, 'amount': 0})
 
         # التحقق من الرصيد بعد الإضافة
         wallet_balance = 0.0
@@ -6588,11 +6674,14 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         result_text += f"━━━━━━━━━━━━━━━━━━\n"
         for i, gift in enumerate(processed_gifts, 1):
             result_text += f"{i}️⃣ 🎁 {gift['text']}\n"
-            if gift['amount'] > 0:
-                result_text += f"   💰 +{gift['amount']:.0f} لرصيدك\n"
         result_text += f"━━━━━━━━━━━━━━━━━━\n"
         if total_prize > 0:
-            result_text += f"💎 <b>تم إضافة {total_prize:.0f} لرصيدك المجمد!</b>\n"
+            result_text += f"💎 <b>مكافأة اللعب: +{total_prize:.0f} لرصيدك المجمد!</b>\n"
+            remaining = _SNATCH_DAILY_CAP - rewarded_today - 1
+            if remaining > 0:
+                result_text += f"⏳ جولات مكافأة متبقية اليوم: {remaining}\n"
+        elif rewarded_today >= _SNATCH_DAILY_CAP:
+            result_text += f"⏳ وصلت الحد اليومي للمكافآت (3 جولات) — عد غداً\n"
         result_text += f"💰 رصيدك الحالي: <code>{wallet_balance:.0f}</code>\n\n"
         result_text += f"💡 يمكنك سحب الرصيد أو استخدامه في الإيداع"
 
@@ -6920,45 +7009,104 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             logger.error(f"خطأ في تحديث إعداد القناة: {e}")
             return False
 
+    # فترة الهدوء بين تكرارات الحملة نفسها (ساعات) — يمنع الحظر النمطي
+    CAMPAIGN_REPEAT_COOLDOWN_H = 4
+    CAMPAIGN_REPEAT_MAX_RUNS = 30   # سقف جولات التكرار (توقف تلقائي)
+
+    def _spin_text(self, text):
+        """غزل Spintax: '{مرحبا|أهلا}' → اختيار عشوائي — كل تكرار بصياغة مختلفة
+        (النص المتطابق المتكرر هو أوضح إشارة حظر في تيليجرام)"""
+        import re as _re
+        def _pick(m):
+            parts = m.group(1).split('|')
+            return random.choice(parts) if parts else m.group(0)
+        for _ in range(4):
+            new = _re.sub(r'\{([^{}]*)\}', _pick, text)
+            if new == text:
+                break
+            text = new
+        return text
+
     def _process_scheduled_campaigns(self):
-        """فحص الحملات المجدولة وإطلاقها عند وقت التنفيذ"""
+        """فحص الحملات المجدولة وإطلاقها — مع تكرار حقيقي daily/weekly/monthly
+
+        إصلاح (2026-08-18): حقل repeat كان يُخزَّن ولا يُعالج — كل حملة تموت
+        بعد أول تشغيل. الآن: جدولة قادمة محسوبة + عداد جولات + هدوء بين
+        التكرارات + إزاحة عشوائية تكسر النمط + Spintax تلقائي للنص"""
         import csv as _csv
-        from datetime import datetime as _dt
+        from datetime import datetime as _dt, timedelta as _td
         campaigns_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'campaigns.csv')
         if not os.path.exists(campaigns_path):
             return
         try:
             with open(campaigns_path, 'r', encoding='utf-8-sig') as f:
                 reader = _csv.DictReader(f)
-                fieldnames = reader.fieldnames
+                fieldnames = list(reader.fieldnames or [])
                 rows = list(reader)
+            for extra in ('repeat_runs', 'last_run_at', 'next_run_at'):
+                if extra not in fieldnames:
+                    fieldnames.append(extra)
             now = _dt.now()
             changed = False
             for c in rows:
-                if c.get('status') == 'scheduled' and c.get('scheduled_at'):
-                    try:
-                        sched = _dt.strptime(c['scheduled_at'].strip()[:16], '%Y-%m-%d %H:%M')
-                    except:
-                        continue
-                    if now >= sched:
-                        # Execute campaign
-                        msg = c.get('message', '')
-                        target = c.get('target', 'both')
-                        recipient = c.get('recipient', 'all')
-                        country = c.get('country', 'all')
-                        media_str = c.get('media_urls', '')
-                        media_urls = [u for u in media_str.split('|') if u] if media_str else []
-                        target_user = c.get('target_user', '') if recipient == 'single' else ''
-                        priority = c.get('priority', 'normal')
+                status = c.get('status', '')
+                repeat = (c.get('repeat', '') or 'once').strip().lower()
+                if status not in ('scheduled', 'active'):
+                    continue
+                sched_str = (c.get('next_run_at') or c.get('scheduled_at', '') or '').strip()
+                if not sched_str:
+                    continue
+                try:
+                    sched = _dt.strptime(sched_str[:16], '%Y-%m-%d %H:%M')
+                except Exception:
+                    continue
+                if now < sched:
+                    continue
 
-                        if recipient == 'single' and target_user:
-                            self._send_broadcast_to_user(target_user, msg, media_urls)
-                        else:
-                            self._send_broadcast_to_all(msg, media_urls, country)
+                # ── تنفيذ الحملة ──
+                msg = self._spin_text(c.get('message', ''))
+                recipient = c.get('recipient', 'all')
+                country = c.get('country', 'all')
+                media_str = c.get('media_urls', '')
+                media_urls = [u for u in media_str.split('|') if u] if media_str else []
+                target_user = c.get('target_user', '') if recipient == 'single' else ''
+                channel_group = (c.get('channel_group', '') or '').strip()
+
+                if channel_group:
+                    self._send_to_channel_group(channel_group, msg, media_urls)
+                elif recipient == 'single' and target_user:
+                    self._send_broadcast_to_user(target_user, msg, media_urls)
+                else:
+                    self._send_broadcast_to_all(msg, media_urls, country)
+                c['stats_reach'] = str(len(self._user_cache))
+                runs = int(c.get('repeat_runs', '0') or 0) + 1
+                c['repeat_runs'] = str(runs)
+                c['last_run_at'] = now.strftime('%Y-%m-%d %H:%M')
+                changed = True
+                logger.info(f"Campaign {c.get('id','')} executed (run #{runs}, repeat={repeat})")
+
+                # ── الجدولة القادمة أو الإنهاء ──
+                if repeat in ('daily', 'weekly', 'monthly'):
+                    if runs >= self.CAMPAIGN_REPEAT_MAX_RUNS:
                         c['status'] = 'completed'
-                        c['stats_reach'] = str(len(self._user_cache))
-                        changed = True
-                        logger.info(f"Campaign {c.get('id','')} executed (scheduled)")
+                        c['next_run_at'] = ''
+                    else:
+                        if repeat == 'daily':
+                            nxt = now + _td(days=1)
+                        elif repeat == 'weekly':
+                            nxt = now + _td(weeks=1)
+                        else:
+                            nxt = now + _td(days=30)
+                        min_next = now + _td(hours=self.CAMPAIGN_REPEAT_COOLDOWN_H)
+                        if nxt < min_next:
+                            nxt = min_next
+                        # إزاحة عشوائية ±35 دقيقة — كسر نمط الساعة-بساعة
+                        nxt += _td(minutes=random.randint(-35, 35))
+                        c['next_run_at'] = nxt.strftime('%Y-%m-%d %H:%M')
+                        c['status'] = 'active'
+                else:
+                    c['status'] = 'completed'
+                    c['next_run_at'] = ''
             if changed:
                 with open(campaigns_path, 'w', newline='', encoding='utf-8-sig') as f:
                     writer = _csv.DictWriter(f, fieldnames=fieldnames)
@@ -6969,53 +7117,206 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             logger.error(f"campaign_scheduler error: {e}")
 
     def _process_broadcast_queue(self):
-        """معالجة طابور البث — وسائط متعددة + فردي/جماعي + دولة"""
+        """معالجة طابور البث — وسائط متعددة + فردي/جماعي + دولة
+
+        إصلاح حرج (2026-08-18): طابور البث لم يكن يقرأ target_chat_id أصلاً —
+        أي منشور أُرسل 'لقناة محددة' من اللوحة كان يذهب لكل المستخدمين!
+        الآن: type=channel/target_chat_id → القناة المحددة حصراً.
+        مضاد للحظر: سقف يومي لكل قناة + jitter بين الإرسالات."""
         import threading as _th
         def _do_process():
-            if not os.path.exists('broadcast_queue.csv'):
-                return
+            lock_path = 'broadcast_queue.csv.lock'
             try:
-                rows = []
-                pending = []
-                with open('broadcast_queue.csv', 'r', encoding='utf-8-sig') as f:
-                    reader = csv.DictReader(f)
-                    fieldnames = reader.fieldnames or ['id','message','target','recipient','priority','country','media_urls','target_user','target_name','created_at','created_by','status']
-                    for row in reader:
-                        if row.get('status') == 'pending':
-                            pending.append(row)
-                        else:
-                            rows.append(row)
-
-                for item in pending:
-                    msg = item.get('message', '')
-                    recipient_type = item.get('recipient', 'all')
-                    target_user = item.get('target_user', '').strip()
-                    country_filter = item.get('country', 'all')
-                    media_urls_str = item.get('media_urls', '').strip()
-                    media_urls = [u for u in media_urls_str.split('|') if u] if media_urls_str else []
-                    item_id = item.get('id', '')
+                import fcntl as _fl
+            except ImportError:
+                _fl = None
+            with open(lock_path, 'w') as lf:
+                if _fl:
                     try:
-                        if recipient_type == 'single' and target_user:
-                            # ── إرسال فردي ──
-                            self._send_broadcast_to_user(target_user, msg, media_urls)
-                        else:
-                            # ── إرسال جماعي (مع فلتر دولة) ──
-                            self._send_broadcast_to_all(msg, media_urls, country_filter)
-                        item['status'] = 'sent'
-                    except Exception as e:
-                        logger.error(f"خطأ في إرسال {item_id}: {e}")
-                        item['status'] = 'failed'
-                    rows.append(item)
-
-                with open('broadcast_queue.csv', 'w', newline='', encoding='utf-8-sig') as f:
-                    writer = csv.DictWriter(f, fieldnames=fieldnames)
-                    writer.writeheader()
-                    for row in rows:
-                        writer.writerow({k: row.get(k, '') for k in fieldnames})
-            except Exception as e:
-                logger.error(f"خطأ في _process_broadcast_queue: {e}")
+                        _fl.flock(lf, _fl.LOCK_EX)
+                    except Exception:
+                        pass
+                try:
+                    self._process_broadcast_queue_inner()
+                finally:
+                    if _fl:
+                        try:
+                            _fl.flock(lf, _fl.LOCK_UN)
+                        except Exception:
+                            pass
         t = _th.Thread(target=_do_process, daemon=True)
         t.start()
+
+    # سقف النشر اليومي لكل قناة — تجاوزه يأجل الإرسال لليوم التالي (مضاد حظر)
+    CHANNEL_DAILY_CAP = 12
+
+    def _channel_posts_today(self, chat_id):
+        """عدد منشورات قناة اليوم من سجل relay_log"""
+        import csv as _csv
+        from datetime import datetime as _dt
+        today = _dt.now().strftime('%Y-%m-%d')
+        n = 0
+        try:
+            filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'relay_log.csv')
+            with open(filepath, 'r', encoding='utf-8-sig') as f:
+                for row in _csv.DictReader(f):
+                    cid = (row.get('source_chat_id') or '').strip()
+                    ts = (row.get('timestamp') or '')
+                    if cid == str(chat_id) and ts.startswith(today):
+                        n += 1
+        except Exception:
+            n = 0
+        return n
+
+    def _log_channel_post(self, chat_id, ok):
+        """تسجيل منشور قناة للسقف اليومي — بنفس مخطط relay_log.csv الفعلي"""
+        from datetime import datetime as _dt
+        try:
+            import csv as _csv
+            filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'relay_log.csv')
+            file_exists = os.path.exists(filepath)
+            with open(filepath, 'a', newline='', encoding='utf-8-sig') as f:
+                w = _csv.writer(f)
+                if not file_exists:
+                    w.writerow(['timestamp', 'source_type', 'source_chat_id', 'preview',
+                                'users_relayed', 'channels_relayed'])
+                w.writerow([_dt.now().strftime('%Y-%m-%d %H:%M:%S'),
+                            'queue_post', str(chat_id),
+                            'ok' if ok else 'fail', '0', '1'])
+        except Exception:
+            pass
+
+    def _post_to_single_channel(self, chat_id, msg, media_urls):
+        """نشر لقناة واحدة محددة — نص + وسائط + سقف يومي"""
+        cid = str(chat_id).strip()
+        if not cid:
+            return False, 'empty chat_id'
+        if self._channel_posts_today(cid) >= self.CHANNEL_DAILY_CAP:
+            return False, 'daily_cap'
+        sent_ok = False
+        try:
+            if media_urls:
+                first = media_urls[0]
+                if any(first.lower().endswith(e) for e in ('.mp4', '.mov', '.avi')):
+                    r = self.api_call('sendVideo', {'chat_id': cid, 'video': first,
+                                                    'caption': msg[:1024] if msg else '', 'parse_mode': 'HTML'})
+                else:
+                    r = self.api_call('sendPhoto', {'chat_id': cid, 'photo': first,
+                                                    'caption': msg[:1024] if msg else '', 'parse_mode': 'HTML'})
+                sent_ok = bool(r and r.get('ok'))
+                # بقية الوسائط كألبوم فردي
+                for extra in media_urls[1:4]:
+                    if any(extra.lower().endswith(e) for e in ('.mp4', '.mov')):
+                        self.api_call('sendVideo', {'chat_id': cid, 'video': extra})
+                    else:
+                        self.api_call('sendPhoto', {'chat_id': cid, 'photo': extra})
+                    time.sleep(random.uniform(0.4, 1.2))
+            elif msg:
+                r = self.api_call('sendMessage', {'chat_id': cid, 'text': msg, 'parse_mode': 'HTML',
+                                                  'disable_web_page_preview': False})
+                sent_ok = bool(r and r.get('ok'))
+        except Exception as e:
+            logger.error(f"post_to_single_channel {cid}: {e}")
+            return False, str(e)
+        self._log_channel_post(cid, sent_ok)
+        # jitter بعد كل نشر لقناة — لا نمط ثابت
+        time.sleep(random.uniform(0.5, 1.8))
+        return sent_ok, 'ok' if sent_ok else 'send_failed'
+
+    def _process_broadcast_queue_inner(self):
+        if not os.path.exists('broadcast_queue.csv'):
+            return
+        try:
+            from datetime import datetime as _dt
+            rows = []
+            pending = []
+            with open('broadcast_queue.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                fieldnames = list(reader.fieldnames or ['id','message','target','recipient','priority','country','media_urls','target_user','target_name','created_at','created_by','status'])
+                for fn in ('type', 'target_chat_id', 'target_user_id', 'scheduled_at'):
+                    if fn not in fieldnames:
+                        fieldnames.append(fn)
+                for row in reader:
+                    if row.get('status') == 'pending':
+                        pending.append(row)
+                    else:
+                        rows.append(row)
+
+            for item in pending:
+                # تحصين: صفوف قديمة بحقول ناقصة تقرأ None — لا .strip() على None
+                g = lambda k, d='': (item.get(k) or d)
+                msg = g('message')
+                recipient_type = g('recipient', 'all')
+                target_user = (g('target_user') or g('target_user_id')).strip()
+                country_filter = g('country', 'all')
+                media_urls_str = g('media_urls').strip()
+                media_urls = [u for u in media_urls_str.split('|') if u] if media_urls_str else []
+                item_id = g('id')
+                # ── التوجيه الحرج: منشور موجّه لقناة/مجموعة محددة ──
+                target_chat = g('target_chat_id').strip()
+                entry_type = g('type').strip().lower()
+                if not msg and not media_urls:
+                    item['status'] = 'failed'   # صف تالف/فارغ — لا يعلّق الدورة
+                    rows.append(item)
+                    continue
+                try:
+                    if target_chat or entry_type in ('channel', 'chat'):
+                        if not target_chat:
+                            item['status'] = 'failed'
+                            rows.append(item)
+                            continue
+                        ok, reason = self._post_to_single_channel(target_chat, msg, media_urls)
+                        if reason == 'daily_cap':
+                            # تجاوز السقف اليومي — أبقِه معلقاً لمحاولة الغد
+                            rows.append(item)
+                            continue
+                        item['status'] = 'sent' if ok else 'failed'
+                        rows.append(item)
+                        logger.info(f"Queue {item_id} → channel {target_chat}: {'sent' if ok else reason}")
+                        continue
+                except Exception as e:
+                    logger.error(f"خطأ في إرسال قناة {item_id}: {e}")
+                    item['status'] = 'failed'
+                    rows.append(item)
+                    continue
+
+                try:
+                    if recipient_type == 'single' and target_user:
+                        # ── إرسال فردي ──
+                        self._send_broadcast_to_user(target_user, msg, media_urls)
+                    else:
+                        # ── إرسال جماعي (مع فلتر دولة) ──
+                        self._send_broadcast_to_all(msg, media_urls, country_filter)
+                    item['status'] = 'sent'
+                except Exception as e:
+                    logger.error(f"خطأ في إرسال {item_id}: {e}")
+                    item['status'] = 'failed'
+                rows.append(item)
+            # نهاية الحلقة
+
+            with open('broadcast_queue.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer.writeheader()
+                for row in rows:
+                    writer.writerow({k: row.get(k, '') for k in fieldnames})
+        except Exception as e:
+            logger.error(f"خطأ في _process_broadcast_queue: {e}")
+
+    def _send_to_channel_group(self, group_id, msg, media_urls):
+        """نشر لمجموعة قنوات (channel_groups.csv) — بالسقوف اليومية لكل قناة"""
+        import csv as _csv
+        try:
+            with open('channel_groups.csv', 'r', encoding='utf-8-sig') as f:
+                for row in _csv.DictReader(f):
+                    if row.get('id') == group_id or row.get('name') == group_id:
+                        ids = [i.strip() for i in (row.get('channel_ids', '') or '').split('|') if i.strip()]
+                        for cid in ids:
+                            ok, reason = self._post_to_single_channel(cid, msg, media_urls)
+                            logger.info(f"Group {group_id} -> {cid}: {reason}")
+                        return True
+        except Exception as e:
+            logger.error(f"channel group {group_id}: {e}")
+        return False
 
     def _send_broadcast_to_user(self, chat_id, msg, media_urls):
         """إرسال بث لمستخدم واحد — نص + وسائط متعددة، crash-safe"""
@@ -7162,20 +7463,31 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             self.user_states[message['from']['id']] = 'selecting_language'
         self.send_message(message['chat']['id'], lang_text, reply_keyboard)
     
+    def _language_native_names(self):
+        """أسماء اللغات الأصلية — لمطابقة زر اللغة مهما كانت أيقونة الثيم"""
+        try:
+            return {info.get('native', '') for info in self.get_language_names().values()}
+        except Exception:
+            return set()
+
     def handle_language_change(self, message, text, return_to_admin=False):
         """تغيير اللغة — يدعم جميع اللغات"""
         user_id = message['from']['id']
+        chat_id = message['chat']['id']
         lang_names = self.get_language_names()
-        
+
         # تحديد اللغة الجديدة من نص الزر
         new_lang = None
         for code, info in lang_names.items():
             if text.startswith(info['flag']):
                 new_lang = code
                 break
-        
+
         if not new_lang:
-            new_lang = 'ar'  # افتراضي
+            # إدخال غير مفهوم — أعد عرض القائمة بدل التحويل الصامت للعربية
+            # (سابقاً: أي نص آخر كان يغير لغة المستخدم للعربية بلا نيته)
+            self.show_language_selection(message, return_to_admin=return_to_admin)
+            return
         
         # تحديث لغة المستخدم في الملف
         users = []
@@ -9887,6 +10199,8 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         user_id = message['from']['id']
         chat_id = message['chat']['id']
         text = message.get('text', '').strip()
+        # لغة الحالة فوراً — كانت تُستخدم قبل تعريفها فتكسر كل خطوة
+        lang = state.get('lang', 'ar')
 
         if text in [self.tr('a0009_إلغاء', lang), self.tr('a0010_إلغاء', lang), self.tr('a0011_الغاء', lang), '🔙']:
             if user_id in self.user_states:

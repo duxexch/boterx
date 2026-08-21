@@ -289,6 +289,13 @@ def init_agent_tables():
             ('tier',                 'TEXT',    "'bronze'"),
             ('last_heartbeat',       'TEXT',    "''"),
             ('is_online',            'INTEGER', '0'),
+            ('telegram_id',          'TEXT',    "''"),
+        ])
+
+        # Admin action tracking on match_requests (parity with old CSV fields)
+        _ensure_columns(conn, 'match_requests', [
+            ('approved_by', 'TEXT', "''"),
+            ('approved_at', 'TEXT', "''"),
         ])
 
         conn.commit()
@@ -629,7 +636,8 @@ def create_agent(data):
 _ADMIN_EDITABLE = {'bot_token', 'bot_name', 'username', 'security_deposit',
                    'is_active', 'traffic_on', 'traffic_weight',
                    'max_daily_transactions', 'max_concurrent',
-                   'deposit_method_name', 'deposit_method_data', 'notes'}
+                   'deposit_method_name', 'deposit_method_data', 'notes',
+                   'telegram_id'}
 
 
 def update_agent(agent_id, data):
@@ -2097,5 +2105,240 @@ def get_agent_stats():
             'total_transactions': total_txns,
             'insurance_balance': get_insurance_balance(),
         }
+    finally:
+        conn.close()
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# ── Unified Atomic Matching (single source of truth: SQLite) ──────────────
+# These functions replace the CSV+SQLite split-brain flow. Bot and Web both
+# call these; match_requests lives ONLY in SQLite from now on.
+# ══════════════════════════════════════════════════════════════════════════
+
+def _agent_txn_type(user_req_type):
+    """User 'deposit' → agent RECEIVES money (txn type 'withdraw').
+    User 'withdraw' → agent PAYS money (txn type 'deposit')."""
+    return 'withdraw' if user_req_type == 'deposit' else 'deposit'
+
+
+def create_match_request_with_agent_assignment(
+    user_id, customer_id, req_type, amount, currency,
+    company_id='', company_name='', payment_method_id='', details='',
+    bot_id='',
+):
+    """Atomically: create match request + pick agent + create pending txn + hold escrow.
+
+    Returns (req_id, error, agent_assigned, agent_info_or_None).
+    agent_info = {'id','name','telegram_id'} when assigned, else None.
+    """
+    amount = float(amount or 0)
+    if amount <= 0:
+        return None, 'المبلغ يجب أن يكون أكبر من صفر', False, None
+    if req_type not in ('deposit', 'withdraw'):
+        return None, 'نوع الطلب غير صالح', False, None
+
+    with _lock:
+        conn = _conn()
+        try:
+            conn.execute('BEGIN IMMEDIATE')
+            existing = conn.execute(
+                "SELECT id FROM match_requests WHERE user_id=? AND status='waiting' LIMIT 1",
+                (str(user_id),)).fetchone()
+            if existing:
+                conn.rollback()
+                return None, 'لديك طلب مطابقة نشط بالفعل — انتظر معالجته أو ألغِه', False, None
+
+            req_id = _generate_id('REQ')
+            alias = _generate_alias()
+            conn.execute('''INSERT INTO match_requests
+                (id, user_id, customer_id, type, amount, currency, company_id,
+                 company_name, payment_method_id, status, created_at, alias, bot_id)
+                VALUES (?,?,?,?,?,?,?,?,?,'waiting',?,?,?)''',
+                (req_id, str(user_id), str(customer_id), req_type, amount,
+                 currency or 'EGP', str(company_id or ''), str(company_name or ''),
+                 str(payment_method_id or ''), _now(), alias, str(bot_id or '')))
+
+            chosen = _pick_agent_locked(conn, _agent_txn_type(req_type), amount)
+            agent_info = None
+            if chosen:
+                full = conn.execute(
+                    'SELECT id, bot_name, telegram_id FROM agent_bots WHERE id=?',
+                    (chosen['id'],)).fetchone()
+                tid = _generate_id('ATX')
+                conn.execute('''INSERT INTO agent_transactions
+                    (id, agent_id, match_request_id, type, amount, currency, status,
+                     user_id, user_name, payment_details, created_at)
+                    VALUES (?,?,?,?,?,?, 'pending', ?,?,?,?)''',
+                    (tid, chosen['id'], req_id, _agent_txn_type(req_type), amount,
+                     currency or 'EGP', str(user_id), '', details, _now()))
+                conn.execute(
+                    'UPDATE agent_bots SET escrow_balance=escrow_balance+? WHERE id=?',
+                    (amount, chosen['id']))
+                conn.execute(
+                    "UPDATE match_requests SET assigned_agent_id=? WHERE id=?",
+                    (chosen['id'], req_id))
+                agent_info = {
+                    'id': full['id'] if full else chosen['id'],
+                    'name': (full['bot_name'] if full else chosen.get('name', '')) or '',
+                    'telegram_id': (full['telegram_id'] if full else '') or '',
+                }
+
+            conn.commit()
+            return req_id, None, agent_info is not None, agent_info
+        except Exception as e:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            logger.error(f"create_match_request_with_agent_assignment error: {e}")
+            return None, str(e), False, None
+        finally:
+            conn.close()
+
+
+def cancel_match_request_atomic(req_id, user_id):
+    """Atomically cancel a waiting request + void its pending agent txn.
+
+    Returns (success: bool, error: str|None). If an agent already settled the
+    txn, cancellation is rejected so money movement is never undone silently.
+    """
+    with _lock:
+        conn = _conn()
+        try:
+            conn.execute('BEGIN IMMEDIATE')
+            req = conn.execute(
+                "SELECT * FROM match_requests WHERE id=? AND user_id=? AND status='waiting'",
+                (str(req_id), str(user_id))).fetchone()
+            if not req:
+                settled = conn.execute(
+                    "SELECT 1 FROM agent_transactions WHERE match_request_id=? "
+                    "AND status IN ('approved','rejected') LIMIT 1", (str(req_id),)).fetchone()
+                conn.rollback()
+                if settled:
+                    return False, 'تمت معالجة الطلب بالفعل — لا يمكن إلغاؤه'
+                return False, 'الطلب غير موجود أو لا يمكن إلغاؤه'
+
+            txn = conn.execute(
+                "SELECT id, agent_id, amount FROM agent_transactions "
+                "WHERE match_request_id=? AND status='pending'",
+                (str(req_id),)).fetchone()
+            if txn:
+                conn.execute("DELETE FROM agent_transactions WHERE id=?", (txn['id'],))
+                conn.execute(
+                    'UPDATE agent_bots SET escrow_balance=MAX(0, escrow_balance-?), '
+                    'current_daily_count=MAX(0, current_daily_count-1) WHERE id=?',
+                    (float(txn['amount']), txn['agent_id']))
+
+            conn.execute(
+                "UPDATE match_requests SET status='cancelled' WHERE id=?",
+                (str(req_id),))
+            conn.commit()
+            return True, None
+        except Exception as e:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            logger.error(f"cancel_match_request_atomic error: {e}")
+            return False, str(e)
+        finally:
+            conn.close()
+
+
+def admin_set_match_request_status(req_id, new_status, actor=''):
+    """Admin approve/reject of a waiting request (web dashboard).
+
+    - approve  → keep pending agent txn (agent will settle it); mark approved.
+    - reject   → void pending agent txn + release escrow/quota; mark rejected.
+    Returns (success, error).
+    """
+    if new_status not in ('approved', 'rejected'):
+        return False, 'حالة غير صالحة'
+    with _lock:
+        conn = _conn()
+        try:
+            conn.execute('BEGIN IMMEDIATE')
+            req = conn.execute(
+                "SELECT * FROM match_requests WHERE id=? AND status='waiting'",
+                (str(req_id),)).fetchone()
+            if not req:
+                conn.rollback()
+                return False, 'الطلب غير موجود أو تمت معالجته'
+
+            if new_status == 'rejected':
+                txn = conn.execute(
+                    "SELECT id, agent_id, amount FROM agent_transactions "
+                    "WHERE match_request_id=? AND status='pending'",
+                    (str(req_id),)).fetchone()
+                if txn:
+                    conn.execute("DELETE FROM agent_transactions WHERE id=?", (txn['id'],))
+                    conn.execute(
+                        'UPDATE agent_bots SET escrow_balance=MAX(0, escrow_balance-?), '
+                        'current_daily_count=MAX(0, current_daily_count-1) WHERE id=?',
+                        (float(txn['amount']), txn['agent_id']))
+
+            conn.execute(
+                "UPDATE match_requests SET status=?, approved_by=?, approved_at=? WHERE id=?",
+                (new_status, f'admin:{actor}' if actor else 'admin', _now(), str(req_id)))
+            conn.commit()
+            return True, None
+        except Exception as e:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            logger.error(f"admin_set_match_request_status error: {e}")
+            return False, str(e)
+        finally:
+            conn.close()
+
+
+def sync_match_request_from_txn(mrid, decision, agent_id=''):
+    """After an agent settles a txn, mirror the decision onto the request row.
+    approved → matched (request fulfilled), rejected → rejected."""
+    if not mrid:
+        return
+    status = 'matched' if decision == 'approved' else 'rejected'
+    conn = _conn()
+    try:
+        conn.execute(
+            "UPDATE match_requests SET status=?, approved_by=?, approved_at=? "
+            "WHERE id=? AND status IN ('waiting','approved')",
+            (status, f'agent:{agent_id}' if agent_id else 'agent', _now(), str(mrid)))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_pending_with_requests(agent_id):
+    """Agent dashboard view: pending txns joined with their match requests."""
+    conn = _conn()
+    try:
+        rows = conn.execute('''
+            SELECT t.id AS txn_id, t.type, t.amount, t.currency, t.status,
+                   t.created_at, t.user_id, t.user_name, t.payment_details,
+                   r.id AS request_id, r.company_name, r.company_id,
+                   r.alias AS request_alias, r.customer_id
+            FROM agent_transactions t
+            LEFT JOIN match_requests r ON t.match_request_id = r.id
+            WHERE t.agent_id=? AND t.status='pending'
+            ORDER BY t.created_at ASC
+        ''', (str(agent_id),)).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def get_match_request_full(req_id):
+    """Full request row + assigned agent name (for admin panels/notifications)."""
+    conn = _conn()
+    try:
+        row = conn.execute('''
+            SELECT r.*, a.bot_name AS agent_name, a.telegram_id AS agent_telegram_id
+            FROM match_requests r
+            LEFT JOIN agent_bots a ON r.assigned_agent_id = a.id
+            WHERE r.id=?
+        ''', (str(req_id),)).fetchone()
+        return dict(row) if row else None
     finally:
         conn.close()

@@ -170,11 +170,14 @@ class MatchManager:
 
     def create_match_request(self, user_id, customer_id, req_type, amount, currency,
                                company_id, company_name, payment_method_id, bot_id=''):
+        """Unified atomic creation (SQLite): request + agent pick + escrow hold.
+        Returns (req_id, error) for backward compatibility."""
         bot_id = bot_id or self.assign_bot()
-        return adb.db_create_match_request(
+        req_id, error, _assigned, _agent = adb.create_match_request_with_agent_assignment(
             user_id, customer_id, req_type, amount, currency,
-            company_id, company_name, payment_method_id,
-            bot_id=bot_id)
+            company_id=company_id, company_name=company_name,
+            payment_method_id=payment_method_id, bot_id=bot_id)
+        return req_id, error
 
     def get_active_request_by_user(self, user_id):
         return adb.db_get_active_request_by_user(user_id)

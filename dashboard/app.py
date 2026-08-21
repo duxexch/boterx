@@ -35,12 +35,39 @@ DASHBOARD_HOST = os.getenv('DASHBOARD_HOST', '0.0.0.0')
 # Any deployment still using this value is immediately exploitable.
 _KNOWN_DEFAULT_PASSWORD = 'boterx_admin_2026'
 
-# Load secret key — empty string means "not configured"; checked at startup below.
-_raw_secret_key = os.getenv('DASHBOARD_SECRET_KEY', '')
-SECRET_KEY = _raw_secret_key or secrets.token_hex(32)  # random fallback for dev only
+# قراءة قيمة من ملف .env (fallback عند غياب متغير البيئة) — يمنع انكسار
+# الإعدادات عند تشغيل gunicorn بدون source .env
+def _env_file_value(key):
+    try:
+        env_path = os.path.join(BASE_DIR, '.env')
+        if os.path.exists(env_path):
+            with open(env_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith(key + '='):
+                        return line.split('=', 1)[1].strip()
+    except Exception:
+        pass
+    return ''
 
-ADMIN_IDS = [a.strip() for a in os.getenv('ADMIN_USER_IDS', '').split(',') if a.strip()]
-ADMIN_PASSWORD = os.getenv('DASHBOARD_PASSWORD', _KNOWN_DEFAULT_PASSWORD)
+# Load secret key — empty string means "not configured"; checked at startup below.
+# يجب أن يكون ثابتاً عبر كل عمال gunicorn: كل عامل يولّد سراً عشوائياً خاصاً به
+# فيوقّع أحدها الجلسة ويرفضها الآخر بـ 401 عشوائياً (سبب أعطال متقطعة سابقة).
+_raw_secret_key = os.getenv('DASHBOARD_SECRET_KEY', '') or _env_file_value('DASHBOARD_SECRET_KEY')
+SECRET_KEY = _raw_secret_key or secrets.token_hex(32)  # random fallback for dev only
+if _raw_secret_key and not os.getenv('DASHBOARD_SECRET_KEY'):
+    os.environ['DASHBOARD_SECRET_KEY'] = _raw_secret_key
+
+ADMIN_IDS = [a.strip() for a in (os.getenv('ADMIN_USER_IDS', '') or _env_file_value('ADMIN_USER_IDS')).split(',') if a.strip()]
+ADMIN_PASSWORD = os.getenv('DASHBOARD_PASSWORD', '') or _env_file_value('DASHBOARD_PASSWORD') or _KNOWN_DEFAULT_PASSWORD
+
+# انشر القيمة في بيئة العملية كي تراها الموديولات الأخرى (db_manager.get_admin_role
+# يرجع لـ os.getenv('ADMIN_USER_IDS') لتحديد super_admin — بدون هذا يفقد الأدمن
+# صلاحياته عند تشغيل gunicorn بدون source .env)
+if ADMIN_IDS and not os.getenv('ADMIN_USER_IDS'):
+    os.environ['ADMIN_USER_IDS'] = ','.join(ADMIN_IDS)
+if ADMIN_PASSWORD != _KNOWN_DEFAULT_PASSWORD and not os.getenv('DASHBOARD_PASSWORD'):
+    os.environ['DASHBOARD_PASSWORD'] = ADMIN_PASSWORD
 
 app = Flask(__name__, template_folder='templates', static_folder='static')
 app.secret_key = SECRET_KEY
@@ -52,20 +79,118 @@ app.config['SESSION_COOKIE_SECURE'] = True  # HTTPS only
 app.config['MAX_CONTENT_LENGTH'] = 8 * 1024 * 1024  # 8MB
 
 # ===== Web Push (VAPID) — notifications work even when tab/browser is closed =====
-_VAPID_PRIVATE = """-----BEGIN PRIVATE KEY-----
-MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg06OSNvUikGK7vjDY
-ho72Y3P8AvA+PEg63UT5yz360sGhRANCAASOjPJwku6oSoks04byXYOeINsfC5w9
-ej5vx5VwKkk2dUrLlk99o8JtiJ4TGkDr5C8L0X+eMz75nJworbahwxlG
------END PRIVATE KEY-----"""
-_VAPID_PUBLIC = "jozycJLuqEqJLNOG8l2DniDbHwucPXo-b8eVcCpJNnVKy5ZPfaPCbYieExpA6-QvC9F_njM--ZycKK22ocMZRg"
+# الزوج المضمّن سابقاً بالكود كان غير متطابق (الخاص لا يشتق العام) — كان
+# الاشتراك يفشل بـ InvalidAccessError في المتصفح قبل أي إرسال. الآن:
+# القراءة من .env، ولو غابت تُولَّد مرة واحدة وتُحفظ (self-healing).
 _VAPID_CLAIMS = {"sub": "mailto:admin@vex.deals"}
+_VAPID_PRIVATE = ''
+_VAPID_PUBLIC = ''
+
+def _vapid_derive_public(pem_priv):
+    """اشتقاق المفتاح العام (base64url لنقطة X962 غير المضغوطة) من الخاص PEM."""
+    import base64 as _b64
+    from cryptography.hazmat.primitives.serialization import load_pem_private_key
+    from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+    sk = load_pem_private_key(pem_priv.encode(), password=None)
+    raw = sk.public_key().public_bytes(Encoding.X962, PublicFormat.UncompressedPoint)
+    return _b64.urlsafe_b64encode(raw).rstrip(b'=').decode()
+
+def _init_vapid():
+    """حمّل مفاتيح VAPID من .env أو ولّدها واحفظها هناك — مرة واحدة."""
+    global _VAPID_PRIVATE, _VAPID_PUBLIC
+    import base64 as _b64
+    priv = (os.getenv('VAPID_PRIVATE_KEY', '') or _env_file_value('VAPID_PRIVATE_KEY') or '')
+    priv = priv.replace('\\n', '\n').strip()
+    pub = os.getenv('VAPID_PUBLIC_KEY', '') or _env_file_value('VAPID_PUBLIC_KEY')
+    if not priv.startswith('-----BEGIN'):
+        priv = ''
+    # تحقق التطابق: المفتاح العام المدمج يجب أن يُشتق من الخاص
+    if priv and pub:
+        try:
+            if _vapid_derive_public(priv) == pub.strip():
+                _VAPID_PRIVATE, _VAPID_PUBLIC = priv, pub.strip()
+                return
+        except Exception:
+            pass
+    # توليد زوج جديد صحيح وحفظه في .env — تحت قفل ملف حتى لا يولّد كل
+    # عامل gunicorn زوجاً مختلفاً في نفس اللحظة (كان يترك أزواجاً متعددة)
+    try:
+        from cryptography.hazmat.primitives.asymmetric import ec
+        from cryptography.hazmat.primitives.serialization import (
+            Encoding as _Enc, PrivateFormat as _PF, PublicFormat as _PubF, NoEncryption as _NoEnc)
+        import fcntl as _vfl
+        env_path = os.path.join(BASE_DIR, '.env')
+        lock_path = env_path + '.vapid.lock'
+        with open(lock_path, 'w') as _vlf:
+            _vfl.flock(_vlf, _vfl.LOCK_EX)
+            try:
+                # أعد القراءة تحت القفل — عامل آخر ربما كتب زوجاً للتو: الأول يفوز
+                cur_priv = _env_file_value('VAPID_PRIVATE_KEY').replace('\\n', '\n').strip()
+                cur_pub = _env_file_value('VAPID_PUBLIC_KEY')
+                if cur_priv.startswith('-----BEGIN') and cur_pub:
+                    try:
+                        if _vapid_derive_public(cur_priv) == cur_pub:
+                            _VAPID_PRIVATE, _VAPID_PUBLIC = cur_priv, cur_pub
+                            return
+                    except Exception:
+                        pass
+                sk = ec.generate_private_key(ec.SECP256R1())
+                priv = sk.private_bytes(_Enc.PEM, _PF.PKCS8, _NoEnc()).decode()
+                pub = _b64.urlsafe_b64encode(
+                    sk.public_key().public_bytes(_Enc.X962, _PubF.UncompressedPoint)
+                ).rstrip(b'=').decode()
+                with open(env_path, 'a', encoding='utf-8') as f:
+                    f.write("\n# Web Push VAPID (auto-generated)\n")
+                    f.write("VAPID_PRIVATE_KEY=" + priv.replace('\n', '\\n') + "\n")
+                    f.write("VAPID_PUBLIC_KEY=" + pub + "\n")
+                os.environ['VAPID_PRIVATE_KEY'] = priv
+                os.environ['VAPID_PUBLIC_KEY'] = pub
+                _VAPID_PRIVATE, _VAPID_PUBLIC = priv, pub
+                print(f"[VAPID] generated new keypair under lock, public={pub[:20]}...")
+            finally:
+                _vfl.flock(_vlf, _vfl.LOCK_UN)
+    except ImportError:
+        # بيئة بلا fcntl (تطوير محلي ويندوز) — توليد مباشر بلا قفل
+        try:
+            from cryptography.hazmat.primitives.asymmetric import ec
+            from cryptography.hazmat.primitives.serialization import (
+                Encoding as _Enc, PrivateFormat as _PF, PublicFormat as _PubF, NoEncryption as _NoEnc)
+            sk = ec.generate_private_key(ec.SECP256R1())
+            priv = sk.private_bytes(_Enc.PEM, _PF.PKCS8, _NoEnc()).decode()
+            pub = _b64.urlsafe_b64encode(
+                sk.public_key().public_bytes(_Enc.X962, _PubF.UncompressedPoint)
+            ).rstrip(b'=').decode()
+            env_path = os.path.join(BASE_DIR, '.env')
+            with open(env_path, 'a', encoding='utf-8') as f:
+                f.write("\nVAPID_PRIVATE_KEY=" + priv.replace('\n', '\\n') + "\n")
+                f.write("VAPID_PUBLIC_KEY=" + pub + "\n")
+            _VAPID_PRIVATE, _VAPID_PUBLIC = priv, pub
+        except Exception as e:
+            print(f"[VAPID] init FAILED (pywebpush pushes disabled): {e}")
+    except Exception as e:
+        print(f"[VAPID] init FAILED (pywebpush pushes disabled): {e}")
+
+_init_vapid()
+
+_push_lib_warned = False
 
 def _send_web_push(payload_dict, target_uid=None):
-    """Send Web Push to all subscribed browsers (admin + users) — works even when tab is closed.
-    If target_uid is set, only send to that specific user."""
+    """Send Web Push to subscribed browsers — works even when tab is closed.
+
+    إصلاحات 2026-08-18:
+    - غياب pywebpush يُسجَّل مرة واحدة بصوت عالٍ (كان عودة صامتة)
+    - الاشتراكات الميتة (404/410) تُحذف فعلياً من CSV
+    - الصور/الوسائط تمرر للـ service worker (كانت تُسقط)
+    - الاستهداف بـ target_uid يعمل، وملخص إرسال يُسجَّل"""
+    global _push_lib_warned
     try:
         from pywebpush import webpush, WebPushException
     except ImportError:
+        if not _push_lib_warned:
+            _push_lib_warned = True
+            _auth_logger.error('pywebpush NOT INSTALLED — web push silently disabled. pip install pywebpush')
+        return
+    if not _VAPID_PRIVATE:
         return
     subs = read_csv('push_subscriptions.csv')
     if not subs:
@@ -75,15 +200,17 @@ def _send_web_push(payload_dict, target_uid=None):
         'message': payload_dict.get('message', ''),
         'type': payload_dict.get('type', 'notification'),
         'timestamp': payload_dict.get('timestamp', ''),
-        'url': '/dashboard' if payload_dict.get('target_type') == 'dashboard' else '/home'
+        'url': '/dashboard' if payload_dict.get('target_type') == 'dashboard' else '/home',
+        'image': (payload_dict.get('data') or {}).get('image', ''),
     })
+    dead_endpoints = []
+    sent = failed = 0
     for sub in subs:
-        endpoint = sub.get('endpoint', '')
+        endpoint = sub.get('endpoint', '') or ''
         if not endpoint:
             continue
-        # If targeting a specific user, filter
         if target_uid:
-            sub_uid = sub.get('user_id', '') or sub.get('admin_id', '')
+            sub_uid = (sub.get('user_id') or '') or (sub.get('admin_id') or '')
             if str(sub_uid) != str(target_uid):
                 continue
         try:
@@ -101,13 +228,31 @@ def _send_web_push(payload_dict, target_uid=None):
                 vapid_claims=_VAPID_CLAIMS,
                 timeout=5
             )
+            sent += 1
         except WebPushException as e:
-            if hasattr(e, 'response') and e.response and e.response.status_code in (404, 410):
-                pass
+            code = getattr(e, 'response', None) and e.response.status_code
+            if code in (404, 410):
+                # الاشتراك ميت (أُلغي بالمتصفح) — احذفه بدل إرسال له للأبد
+                dead_endpoints.append(endpoint)
             else:
-                pass
-        except Exception:
-            pass
+                failed += 1
+                _auth_logger.warning('webpush %s... failed HTTP %s: %s',
+                                     endpoint[-20:], code, str(e)[:120])
+        except Exception as e:
+            failed += 1
+            _auth_logger.warning('webpush unexpected: %s', str(e)[:120])
+    if dead_endpoints:
+        try:
+            alive = [s for s in subs if s.get('endpoint') not in dead_endpoints]
+            fnames = get_fieldnames('push_subscriptions.csv',
+                ['endpoint','p256dh','auth','user_agent','admin_id','created_at',
+                 'user_type','user_id','user_name'])
+            write_csv('push_subscriptions.csv', alive, fnames)
+            _auth_logger.info('webpush pruned %d dead subscriptions', len(dead_endpoints))
+        except Exception as e:
+            _auth_logger.error('webpush prune failed: %s', e)
+    if sent or failed:
+        _auth_logger.info('webpush sent=%d failed=%d target=%s', sent, failed, target_uid or 'all')
 
 # ===== Real-time Notification Queue =====
 _notification_queues = []  # list of queue.Queue, one per connected SSE client
@@ -145,11 +290,12 @@ def push_notification(notif_type, title, message, data=None):
         append_csv('notifications_log.csv', log_entry, fieldnames)
     except:
         pass
-    # 3. Web Push (works even when browser/tab is closed)
+    # 3. Web Push (works even when browser/tab is closed) — مع استهداف مستخدم بعينه
     try:
-        _send_web_push(payload_dict)
+        _tuid = (data or {}).get('target_uid') if isinstance(data, dict) else None
+        _send_web_push(payload_dict, target_uid=_tuid)
     except Exception as e:
-        print(f"Web Push error: {e}")
+        _auth_logger.error('Web Push error: %s', e)
 
 # ===== CSV Helpers =====
 def read_csv(filename):
@@ -165,10 +311,13 @@ def read_csv(filename):
 
 def write_csv(filename, rows, fieldnames):
     filepath = os.path.join(BASE_DIR, filename)
-    with open(filepath, 'w', newline='', encoding='utf-8-sig') as f:
+    # كتابة ذرّية: ملف مؤقت ثم استبدال — لا يبقى ملف مكسور/فارغ لو انقطعت الكتابة
+    tmp_path = filepath + '.tmp'
+    with open(tmp_path, 'w', newline='', encoding='utf-8-sig') as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction='ignore', restval='')
         writer.writeheader()
         writer.writerows([{k: v for k, v in r.items() if k is not None} for r in rows])
+    os.replace(tmp_path, filepath)
 
 def append_csv(filename, row, fieldnames):
     filepath = os.path.join(BASE_DIR, filename)
@@ -183,7 +332,13 @@ def append_csv(filename, row, fieldnames):
                 existing_header = next(csv.reader(f), [])
             if any(fn not in existing_header for fn in fieldnames):
                 existing_rows = read_csv(filename)
-                if any(None in r for r in existing_rows):
+                # حماية من المسح: لو الملف فيه صفوف فعلية لكن القراءة فشلت،
+                # نضيف الصف بالترويسة الحالية بدلاً من إعادة كتابة الملف فارغاً
+                with open(filepath, 'r', encoding='utf-8-sig') as f:
+                    raw_data_lines = [ln for ln in f.read().splitlines() if ln.strip()]
+                if len(raw_data_lines) > 1 and not existing_rows:
+                    fieldnames = existing_header
+                elif any(None in r for r in existing_rows):
                     # ملف بترويسة تالفة/صفوف زائدة — لا نعيد الكتابة كي لا نفقد بيانات؛
                     # نضيف الصف حسب الترويسة الحالية فقط
                     fieldnames = existing_header
@@ -1470,13 +1625,85 @@ def api_web_request_code():
 
     return jsonify({'success': True, 'bot': bot_name})
 
+# ── حماية تخمين رموز الدخول: حد لكل IP + عداد لكل رمز ──────────────────────
+_OTP_ATTEMPTS_PER_IP = 8        # محاولات كحد أقصى لكل IP
+_OTP_IP_WINDOW = 600            # خلال 10 دقائق
+_OTP_CODE_MAX_TRIES = 5         # 5 محاولات خاطئة → حذف الرمز (يُطلب جديد من البوت)
+_OTP_CODE_TTL = 300             # صلاحية الرمز 5 دقائق
+_OTP_ATTEMPTS_FILE = os.path.join(BASE_DIR, 'otp_attempts.json')
+
+def _otp_ip_track(op, client_ip):
+    """عدّاد محاولات لكل IP في ملف مشترك بقفل — يعمل عبر كل عمال gunicorn
+    (الذاكرة المحلية تتوزع بين العمال ولا ترى محاولات بعضها).
+
+    op: 'check' → (blocked, remaining) | 'record' → (False, remaining)."""
+    import json as _json
+    lock_path = _OTP_ATTEMPTS_FILE + '.lock'
+    now = time.time()
+    fcntl_mod = None
+    with open(lock_path, 'w') as lf:
+        try:
+            import fcntl as _fl
+            fcntl_mod = _fl
+            _fl.flock(lf, _fl.LOCK_EX)
+        except ImportError:
+            pass
+        try:
+            data = {}
+            try:
+                if os.path.exists(_OTP_ATTEMPTS_FILE):
+                    with open(_OTP_ATTEMPTS_FILE, 'r') as f:
+                        data = _json.load(f)
+            except Exception:
+                data = {}
+            # نافذة نظيفة + تقليم حجم المخزن
+            fresh = {}
+            for ip, hits in data.items():
+                hits = [t for t in hits if now - t < _OTP_IP_WINDOW]
+                if hits:
+                    fresh[ip] = hits
+                if len(fresh) > 5000:
+                    break
+            hits = fresh.setdefault(client_ip, [])
+            if op == 'check':
+                blocked = len(hits) >= _OTP_ATTEMPTS_PER_IP
+            else:
+                hits.append(now)
+                blocked = False
+            remaining = max(0, _OTP_ATTEMPTS_PER_IP - len(hits))
+            try:
+                with open(_OTP_ATTEMPTS_FILE, 'w') as f:
+                    _json.dump(fresh, f)
+            except Exception:
+                pass
+            return blocked, remaining
+        finally:
+            try:
+                if fcntl_mod:
+                    fcntl_mod.flock(lf, fcntl_mod.LOCK_UN)
+            except Exception:
+                pass
+
 @app.route('/api/web/auth-code', methods=['POST'])
 def api_web_auth_code():
-    """Validate Telegram auth code from landing page."""
-    import random as _r, time as _t
+    """Validate Telegram auth code from landing page.
+
+    دفاع متعدد الطبقات ضد التخمين:
+    1. حد محاولات لكل IP (8/10 دقائق) عبر ملف مشترك بين العمال
+    2. عداد لكل رمز: 5 محاولات خاطئة تحذفه — التخمين يقتل الرمز نفسه
+    3. تنظيف الرموز المنتهية في كل نداء
+    4. الرموز تُولَّد بـ RNG آمن تشفيرياً (في البوت)"""
+    import time as _t
     data = request.json or {}
     code = str(data.get('code', '')).strip()
+    client_ip = request.headers.get('X-Forwarded-For', request.remote_addr or '').split(',')[0].strip()
+
+    blocked, _rem = _otp_ip_track('check', client_ip)
+    if blocked:
+        return jsonify({'error': 'محاولات كثيرة — انتظر 10 دقائق ثم اطلب رمزاً جديداً'}), 429
+
     if not code or len(code) != 6 or not code.isdigit():
+        _otp_ip_track('record', client_ip)
         return jsonify({'error': 'الرمز يجب أن يكون 6 أرقام'}), 400
 
     # Check auth codes file (created by bot)
@@ -1488,41 +1715,66 @@ def api_web_auth_code():
                 codes = _json.load(f)
         else:
             codes = {}
-        # Find matching code
+
+        # نظّف الرموز المنتهية أولاً — لا تبقى فرصة لرمز ميت
+        now = _t.time()
+        expired = [u for u, cd in codes.items() if now - cd.get('created', 0) > _OTP_CODE_TTL]
+        for u in expired:
+            del codes[u]
+
+        matched_uid = None
+        matched_data = None
         for uid, code_data in codes.items():
             if str(code_data.get('code', '')) == code:
-                # Check expiry (5 min)
-                if _t.time() - code_data.get('created', 0) > 300:
-                    return jsonify({'error': 'انتهت صلاحية الرمز — اطلب رمزاً جديداً'}), 400
-                # Create web session
-                session['admin_id'] = uid
-                session['admin_name'] = code_data.get('name', 'User')
-                session['logged_in'] = True
-                session['login_time'] = _t.time()
-                session.permanent = True  # Persistent — 365 days
-                session['is_admin'] = uid in ADMIN_IDS
-                session['phone'] = code_data.get('phone', '')
-                # Check if user is registered in bot (users.csv)
-                import csv as _csv
-                is_registered = False
-                try:
-                    with open(os.path.join(BASE_DIR, 'users.csv'), 'r', encoding='utf-8-sig') as f:
-                        for row in _csv.DictReader(f):
-                            if row.get('telegram_id') == str(uid):
-                                is_registered = True
-                                break
-                except:
-                    pass
-                session['is_registered'] = is_registered
-                # Remove used code
-                del codes[uid]
+                matched_uid, matched_data = uid, code_data
+                break
+
+        if matched_uid is None:
+            # رمز خاطئ — سجّل المحاولة على كل الرموز النشطة (لا نكشف أي واحد أصاب)
+            changed = False
+            for uid in list(codes.keys()):
+                cd = codes[uid]
+                cd['attempts'] = int(cd.get('attempts', 0)) + 1
+                if cd['attempts'] >= _OTP_CODE_MAX_TRIES:
+                    del codes[uid]   # استُنفد — يُطلب رمز جديد من البوت
+                changed = True
+            if changed:
                 with open(auth_file, 'w') as f:
                     _json.dump(codes, f)
-                # Admin → dashboard, regular user → home page
-                redirect_url = '/dashboard' if session['is_admin'] else '/home'
-                return jsonify({'success': True, 'redirect': redirect_url, 'registered': is_registered})
-        return jsonify({'error': 'رمز غير صالح'}), 400
-    except Exception as e:
+            _rb, remaining = _otp_ip_track('record', client_ip)
+            return jsonify({'error': f'رمز غير صالح — محاولات متبقية: {remaining}'}), 400
+
+        # الصلاحية أُعيد فحصها بالتنظيف أعلاه — الرمز حي
+        # Create web session
+        session['admin_id'] = matched_uid
+        session['admin_name'] = matched_data.get('name', 'User')
+        session['logged_in'] = True
+        session['login_time'] = now
+        session.permanent = True  # Persistent — 365 days
+        session['is_admin'] = matched_uid in ADMIN_IDS
+        session['phone'] = matched_data.get('phone', '')
+        # Check if user is registered in bot (users.csv)
+        import csv as _csv
+        is_registered = False
+        try:
+            with open(os.path.join(BASE_DIR, 'users.csv'), 'r', encoding='utf-8-sig') as f:
+                for row in _csv.DictReader(f):
+                    if row.get('telegram_id') == str(matched_uid):
+                        is_registered = True
+                        break
+        except Exception:
+            pass
+        session['is_registered'] = is_registered
+        # Remove used code + أي رموز أخرى لنفس المستخدم (جلسة واحدة نظيفة)
+        for uid in list(codes.keys()):
+            if uid == matched_uid:
+                del codes[uid]
+        with open(auth_file, 'w') as f:
+            _json.dump(codes, f)
+        # Admin → dashboard, regular user → home page
+        redirect_url = '/dashboard' if session['is_admin'] else '/home'
+        return jsonify({'success': True, 'redirect': redirect_url, 'registered': is_registered})
+    except Exception:
         return jsonify({'error': 'خطأ في الخادم'}), 500
 
 @app.route('/api/web/whoami')
@@ -1929,8 +2181,8 @@ def api_agent_self_txns():
 @app.route('/api/agent/self/pending')
 @_agent_session_required
 def api_agent_self_pending():
-    """Pending matching requests assigned to this agent."""
-    return jsonify({'transactions': agent_db.get_pending_transactions(session['agent_id'])})
+    """Pending matching requests assigned to this agent — joined with request details."""
+    return jsonify({'transactions': agent_db.get_pending_with_requests(session['agent_id'])})
 
 @app.route('/api/agent/self/transactions/<txn_id>/process', methods=['POST'])
 @_agent_session_required
@@ -1940,26 +2192,36 @@ def api_agent_process_txn(txn_id):
     res = agent_db.agent_process_transaction(session['agent_id'], txn_id, decision)
     if 'error' in res:
         return jsonify(res), 400
-    # Reflect decision on the linked match request so admin dashboards agree
+    # Reflect decision on the linked match request (SQLite — single source of truth)
     mrid = res.get('match_request_id')
     if mrid:
         try:
-            with _MATCH_CSV_LOCK:
-                reqs = read_csv('match_requests.csv')
-                fieldnames = get_fieldnames('match_requests.csv', ['id','user_id','customer_id','type','amount','currency','status','created_at','approved_by','approved_at'])
-                for r in reqs:
-                    if r.get('id') == mrid:
-                        r['status'] = 'approved' if decision == 'approved' else 'rejected'
-                        r['approved_by'] = f"agent:{session['agent_id']}"
-                        r['approved_at'] = datetime.now().strftime('%Y-%m-%d %H:%M')
-                        break
-                write_csv('match_requests.csv', reqs, fieldnames)
+            agent_db.sync_match_request_from_txn(mrid, decision, session['agent_id'])
         except Exception as e:
-            # Settlement in SQLite is authoritative; CSV mirror failure must
-            # be visible in logs so an admin can reconcile manually.
             print(f"[AGENT] WARNING: settled txn {txn_id} but failed to sync "
-                  f"match_requests.csv row {mrid}: {e}")
-            log_action('agent_txn_csv_sync_failed', f'{txn_id} -> {mrid}: {e}')
+                  f"match_requests row {mrid}: {e}")
+            log_action('agent_txn_sync_failed', f'{txn_id} -> {mrid}: {e}')
+        # Notify the player via Telegram that their request was handled
+        try:
+            req = agent_db.get_match_request_full(mrid)
+            if req and req.get('user_id'):
+                _uid = str(req.get('user_id'))
+                _amt = req.get('amount', '')
+                _cur = req.get('currency', 'EGP')
+                if decision == 'approved':
+                    _comp_tg(_uid,
+                             f"✅ <b>تمت معالجة طلب المطابقة</b>\n\n"
+                             f"🆔 الطلب: <code>{mrid}</code>\n"
+                             f"💰 المبلغ: <code>{_amt} {_cur}</code>\n"
+                             f"🤝 تمت المعالجة بواسطة وكيل معتمد")
+                else:
+                    _comp_tg(_uid,
+                             f"❌ <b>لم تتم معالجة طلب المطابقة</b>\n\n"
+                             f"🆔 الطلب: <code>{mrid}</code>\n"
+                             f"💰 المبلغ: <code>{_amt} {_cur}</code>\n"
+                             f"💡 يمكنك إنشاء طلب جديد أو التواصل مع الدعم")
+        except Exception as _ne:
+            app.logger.warning(f'agent settle notify failed mrid={mrid}: {_ne}')
     return jsonify(res)
 
 @app.route('/api/agent/self/deposit-method')
@@ -2437,15 +2699,27 @@ def api_stats():
         if t.get('date', '').startswith(today):
             stats['transactions']['today'] += 1
 
-    # Matches
-    matches = read_csv('matches.csv')
-    for m in matches:
-        s = m.get('status', '')
-        if s not in ('completed', 'cancelled'): stats['matches']['active'] += 1
-        if s == 'completed': stats['matches']['completed'] += 1
-        if s == 'disputed': stats['matches']['disputed'] += 1
-    match_reqs = read_csv('match_requests.csv')
-    stats['matches']['pending'] = sum(1 for r in match_reqs if r.get('status') == 'waiting')
+    # Matches (SQLite — single source of truth)
+    try:
+        _mc = agent_db._conn()
+        _mrows = _mc.execute("SELECT status FROM matches").fetchall()
+        for _m in _mrows:
+            s = _m['status']
+            if s not in ('completed', 'cancelled'): stats['matches']['active'] += 1
+            if s == 'completed': stats['matches']['completed'] += 1
+            if s == 'disputed': stats['matches']['disputed'] += 1
+        stats['matches']['pending'] = _mc.execute(
+            "SELECT COUNT(*) c FROM match_requests WHERE status='waiting'").fetchone()['c']
+        _mc.close()
+    except Exception:
+        matches = read_csv('matches.csv')
+        for m in matches:
+            s = m.get('status', '')
+            if s not in ('completed', 'cancelled'): stats['matches']['active'] += 1
+            if s == 'completed': stats['matches']['completed'] += 1
+            if s == 'disputed': stats['matches']['disputed'] += 1
+        match_reqs = read_csv('match_requests.csv')
+        stats['matches']['pending'] = sum(1 for r in match_reqs if r.get('status') == 'waiting')
 
     # Lottery
     lot_rounds = read_csv('lottery_rounds.csv')
@@ -2504,12 +2778,22 @@ def api_stats_live():
     def generate():
         import time
         while True:
+            try:
+                _lc = agent_db._conn()
+                _active_m = _lc.execute(
+                    "SELECT COUNT(*) c FROM matches WHERE status NOT IN ('completed','cancelled')").fetchone()['c']
+                _pending_m = _lc.execute(
+                    "SELECT COUNT(*) c FROM match_requests WHERE status='waiting'").fetchone()['c']
+                _lc.close()
+            except Exception:
+                _active_m = sum(1 for m in read_csv('matches.csv') if m.get('status') not in ('completed', 'cancelled'))
+                _pending_m = sum(1 for r in read_csv('match_requests.csv') if r.get('status') == 'waiting')
             data = {
                 'timestamp': datetime.now().strftime('%H:%M:%S'),
                 'users_total': len(read_csv('users.csv')),
                 'pending_txns': sum(1 for t in read_csv('transactions.csv') if t.get('status') == 'pending'),
-                'active_matches': sum(1 for m in read_csv('matches.csv') if m.get('status') not in ('completed', 'cancelled')),
-                'pending_matches': sum(1 for r in read_csv('match_requests.csv') if r.get('status') == 'waiting'),
+                'active_matches': _active_m,
+                'pending_matches': _pending_m,
                 'lottery_participants': 0,
                 'wheel_participants': 0,
             }
@@ -3076,9 +3360,16 @@ def api_user_detail(user_id):
     wallets = read_csv('svrp_wallets.csv')
     wallet = next((w for w in wallets if w.get('telegram_id') == user_id), {})
 
-    # مطابقات المستخدم
-    matches = read_csv('matches.csv')
-    user_matches = [m for m in matches if m.get('depositor_id') == user_id or m.get('withdrawer_id') == user_id][-5:]
+    # مطابقات المستخدم (SQLite)
+    try:
+        _uc = agent_db._conn()
+        user_matches = [dict(r) for r in _uc.execute(
+            "SELECT * FROM matches WHERE depositor_id=? OR withdrawer_id=? "
+            "ORDER BY created_at DESC LIMIT 5", (str(user_id), str(user_id))).fetchall()]
+        _uc.close()
+    except Exception:
+        matches = read_csv('matches.csv')
+        user_matches = [m for m in matches if m.get('depositor_id') == user_id or m.get('withdrawer_id') == user_id][-5:]
 
     return jsonify({
         'user': user,
@@ -3310,21 +3601,10 @@ def api_upload_icon():
             'absolute_bot_url': f'https://vex.deals/static/uploads/icons/{fname}',
         })
     except Exception as e:
-        # Fallback: save original
-        fname = f"{base_name}.{ext}"
-        with open(os.path.join(_ICON_UPLOAD_DIR, fname), 'wb') as out:
-            out.write(blob)
-        log_action('upload_icon', f'{fname} (PIL error: {e})')
-        return jsonify({
-            'success': True,
-            'url': f'/static/uploads/icons/{fname}',
-            'telegram_url': f'/static/uploads/icons/{fname}',
-            'web_url': f'/static/uploads/icons/{fname}',
-            'bot_url': f'/static/uploads/icons/{fname}',
-            'absolute_tg_url': f'https://vex.deals/static/uploads/icons/{fname}',
-            'absolute_web_url': f'https://vex.deals/static/uploads/icons/{fname}',
-            'absolute_bot_url': f'https://vex.deals/static/uploads/icons/{fname}',
-        })
+        # فك ترميز الصورة فشل (توقيع سليم لكن البكسلات تالفة) — نرفض بدلاً من
+        # حفظ ملف معطوب ينتهي كأيقونة مكسورة في CSV
+        log_action('upload_icon_failed', f'{base_name}: PIL error: {e}')
+        return jsonify({'success': False, 'error': 'تعذر معالجة الصورة — جرّب صورة أخرى (PNG/JPG/WEBP)'}), 400
 
 @app.route('/api/companies/list')
 def api_companies_public():
@@ -3354,7 +3634,7 @@ def api_payment_methods_by_company(company_id):
     linked = []
     try:
         links = read_csv('company_payment_links.csv')
-        linked_ids = [l.get('payment_method_id', '') for l in links if l.get('company_id', '') == company_id]
+        linked_ids = [l.get('method_id', l.get('payment_method_id', '')) for l in links if l.get('company_id', '') == company_id]
     except:
         linked_ids = []
     result = []
@@ -3506,10 +3786,36 @@ def api_comp_admin_account(acc_id):
 
 # ===== API — Payment Methods =====
 
+# قفل يمنع تداخل قراءة/كتابة متزامنة على payment_methods.csv (تعدد عمال gunicorn)
+_PM_CSV_LOCK = threading.Lock()
+
+def _pm_fieldnames():
+    return get_fieldnames('payment_methods.csv',
+        ['id','company_id','method_name','method_type','account_data','additional_info',
+         'status','created_date','icon','available_for_games','currency','bot_icon'])
+
+def _pm_new_id():
+    """معرف فريد لوسيلة الدفع — timestamp وحده تكرر عند نقرات متتالية
+    في نفس الثانية (كسر Alpine x-for بالمفاتيح المكررة)؛ نضيف عشوائية."""
+    return f"PM{str(int(datetime.now().timestamp()))[-6:]}{secrets.token_hex(2).upper()}"
+
 @app.route('/api/payment-methods')
 @api_auth
 def api_payment_methods():
-    methods = read_csv('payment_methods.csv')
+    with _PM_CSV_LOCK:
+        methods = read_csv('payment_methods.csv')
+    # دفاع إضافي: تجاهل أي صفوف بمعرفات مكررة (نُبقي الأول) كي لا
+    # تنكسر قوائم Alpine x-for :key مهما حدث للبيانات
+    seen_ids = set()
+    unique_methods = []
+    for m in methods:
+        mid = m.get('id', '')
+        if mid and mid in seen_ids:
+            continue
+        if mid:
+            seen_ids.add(mid)
+        unique_methods.append(m)
+    methods = unique_methods
     links = read_csv('company_payment_links.csv')
     # إضافة قائمة الشركات المرتبطة لكل وسيلة
     for m in methods:
@@ -3517,21 +3823,18 @@ def api_payment_methods():
         linked_companies = [l.get('company_id') for l in links if l.get('method_id') == mid]
         m['linked_company_ids'] = linked_companies
         m['linked_count'] = len(linked_companies)
-    return jsonify({'methods': methods})
+    return jsonify({'methods': methods, 'active_count': sum(1 for m in methods if m.get('status') == 'active')})
 
 @app.route('/api/payment-methods', methods=['POST'])
 @api_auth
 @permission_required('manage_companies')
 def api_add_payment_method():
     data = request.json
-    methods = read_csv('payment_methods.csv')
-    fieldnames = get_fieldnames('payment_methods.csv', ['id','company_id','method_name','method_type','account_data','additional_info','status','created_date','icon','available_for_games','currency'])
-    for extra in ('available_for_games', 'currency', 'bot_icon'):
-        if extra not in fieldnames:
-            fieldnames.append(extra)
-    new_id = f"PM{str(int(datetime.now().timestamp()))[-6:]}"
+    if not str(data.get('method_name', '')).strip():
+        return jsonify({'success': False, 'error': 'اسم الوسيلة مطلوب'}), 400
+    fieldnames = _pm_fieldnames()
     new_method = {
-        'id': new_id,
+        'id': '',  # يُولَّد داخل القفل
         'company_id': '',
         'method_name': data.get('method_name', ''),
         'method_type': data.get('method_type', ''),
@@ -3544,7 +3847,14 @@ def api_add_payment_method():
         'currency': data.get('currency', ''),
         'bot_icon': data.get('bot_icon', '')
     }
-    append_csv('payment_methods.csv', new_method, fieldnames)
+    with _PM_CSV_LOCK:
+        # توليد معرف فريد مع فحص فعلي داخل القفل
+        new_id = _pm_new_id()
+        existing = read_csv('payment_methods.csv')
+        while any(m.get('id') == new_id for m in existing):
+            new_id = _pm_new_id()
+        new_method['id'] = new_id
+        append_csv('payment_methods.csv', new_method, fieldnames)
     log_action('add_payment_method', new_id)
     return jsonify({'success': True, 'id': new_id})
 
@@ -3552,27 +3862,29 @@ def api_add_payment_method():
 @api_auth
 @permission_required('manage_companies')
 def api_edit_payment_method(method_id):
-    methods = read_csv('payment_methods.csv')
-    fieldnames = get_fieldnames('payment_methods.csv', ['id','company_id','method_name','method_type','account_data','additional_info','status','created_date','icon','available_for_games','currency'])
-    for extra in ('available_for_games', 'currency', 'bot_icon'):
-        if extra not in fieldnames:
-            fieldnames.append(extra)
+    with _PM_CSV_LOCK:
+        methods = read_csv('payment_methods.csv')
+        fieldnames = _pm_fieldnames()
 
-    if request.method == 'DELETE':
-        methods = [m for m in methods if m.get('id') != method_id]
-        write_csv('payment_methods.csv', methods, fieldnames)
-        log_action('delete_payment_method', method_id)
-        return jsonify({'success': True})
-    elif request.method == 'PUT':
-        data = request.json
-        for m in methods:
-            if m.get('id') == method_id:
-                for k, v in data.items():
-                    if k in fieldnames:
-                        m[k] = v
-                break
-        write_csv('payment_methods.csv', methods, fieldnames)
-        return jsonify({'success': True})
+        if request.method == 'DELETE':
+            methods = [m for m in methods if m.get('id') != method_id]
+            write_csv('payment_methods.csv', methods, fieldnames)
+            log_action('delete_payment_method', method_id)
+            return jsonify({'success': True})
+        elif request.method == 'PUT':
+            data = request.json
+            found = False
+            for m in methods:
+                if m.get('id') == method_id:
+                    found = True
+                    for k, v in data.items():
+                        if k in fieldnames and k not in ('linked_company_ids', 'linked_count'):
+                            m[k] = v
+                    break
+            if not found:
+                return jsonify({'success': False, 'error': 'الوسيلة غير موجودة'}), 404
+            write_csv('payment_methods.csv', methods, fieldnames)
+            return jsonify({'success': True})
 
 # ===== API — Payment Links (company_payment_links.csv) =====
 
@@ -3609,45 +3921,82 @@ def api_save_payment_links():
     log_action('save_payment_links', f'method={method_id}, companies={len(company_ids)}')
     return jsonify({'success': True, 'linked_count': len(company_ids)})
 
-# ===== API — Matching =====
+# ===== API — Matching (SQLite — single source of truth) =====
 
 @app.route('/api/matching/active')
 @api_auth
 def api_matching_active():
-    matches = read_csv('matches.csv')
-    active = [m for m in matches if m.get('status') not in ('completed', 'cancelled')]
-    active.reverse()
+    conn = agent_db._conn()
+    try:
+        rows = conn.execute('''
+            SELECT m.*, a.bot_name AS agent_name
+            FROM matches m LEFT JOIN agent_bots a ON m.agent_id = a.id
+            WHERE m.status NOT IN ('completed','cancelled')
+            ORDER BY m.created_at DESC''').fetchall()
+        active = [dict(r) for r in rows]
+    finally:
+        conn.close()
     return jsonify({'matches': active, 'count': len(active)})
 
 @app.route('/api/matching/pending')
 @api_auth
 def api_matching_pending():
-    reqs = read_csv('match_requests.csv')
-    pending = [r for r in reqs if r.get('status') == 'waiting']
-    pending.reverse()
+    """Pending matching requests — with assigned-agent info so the main admin
+    sees exactly which agent is on duty for each request."""
+    conn = agent_db._conn()
+    try:
+        rows = conn.execute('''
+            SELECT r.*, a.bot_name AS agent_name, a.is_online AS agent_online,
+                   (SELECT COUNT(*) FROM agent_transactions t
+                    WHERE t.match_request_id = r.id AND t.status='pending') AS has_pending_txn
+            FROM match_requests r
+            LEFT JOIN agent_bots a ON r.assigned_agent_id = a.id
+            WHERE r.status='waiting'
+            ORDER BY r.created_at DESC''').fetchall()
+        pending = [dict(r) for r in rows]
+    finally:
+        conn.close()
     return jsonify({'requests': pending, 'count': len(pending)})
 
 @app.route('/api/matching/logs')
 @api_auth
 def api_matching_logs():
-    matches = read_csv('matches.csv')
-    logs = [m for m in matches if m.get('status') in ('completed', 'cancelled')]
-    logs.reverse()
-    return jsonify({'matches': logs[:50], 'count': len(logs)})
+    conn = agent_db._conn()
+    try:
+        rows = conn.execute('''
+            SELECT m.*, a.bot_name AS agent_name
+            FROM matches m LEFT JOIN agent_bots a ON m.agent_id = a.id
+            WHERE m.status IN ('completed','cancelled')
+            ORDER BY m.created_at DESC LIMIT 50''').fetchall()
+        logs = [dict(r) for r in rows]
+    finally:
+        conn.close()
+    return jsonify({'matches': logs, 'count': len(logs)})
 
 @app.route('/api/matching/<match_id>/chat')
 @api_auth
 def api_match_chat(match_id):
-    messages = read_csv('chat_messages.csv')
-    chat = [m for m in messages if m.get('match_id') == match_id]
+    conn = agent_db._conn()
+    try:
+        rows = conn.execute(
+            'SELECT * FROM chat_messages WHERE match_id=? ORDER BY id', (match_id,)).fetchall()
+        chat = [dict(r) for r in rows]
+    finally:
+        conn.close()
     return jsonify({'messages': chat})
 
 @app.route('/api/matching/<match_id>/disputes')
 @api_auth
 def api_match_disputes(match_id):
-    disputes = read_csv('disputes.csv')
-    match_disputes = [d for d in disputes if d.get('match_id') == match_id]
-    return jsonify({'disputes': match_disputes})
+    conn = agent_db._conn()
+    try:
+        rows = conn.execute(
+            'SELECT * FROM match_disputes WHERE match_id=? ORDER BY created_at DESC',
+            (match_id,)).fetchall()
+        disputes = [dict(r) for r in rows]
+    finally:
+        conn.close()
+    return jsonify({'disputes': disputes})
 
 # ── User-facing matching (نظام المطابقة) — strong webapp auth ──
 
@@ -3668,22 +4017,28 @@ def _matching_strong_auth_or_error():
 @app.route('/api/matching/my')
 @webapp_auth
 def api_matching_my():
-    """Current user's matching requests, newest first."""
+    """Current user's matching requests, newest first (SQLite)."""
     err = _matching_strong_auth_or_error()
     if err:
         return err
     uid = str(get_request_uid() or '')
     if not uid:
         return jsonify({'error': 'Missing uid'}), 400
-    reqs = [r for r in read_csv('match_requests.csv') if str(r.get('user_id', '')) == uid]
-    reqs.reverse()
-    return jsonify({'requests': reqs[:20]})
+    conn = agent_db._conn()
+    try:
+        rows = conn.execute(
+            'SELECT * FROM match_requests WHERE user_id=? ORDER BY created_at DESC LIMIT 20',
+            (uid,)).fetchall()
+        reqs = [dict(r) for r in rows]
+    finally:
+        conn.close()
+    return jsonify({'requests': reqs})
 
 @app.route('/api/matching/request', methods=['POST'])
 @webapp_auth
 def api_matching_create():
-    """Create a deposit/withdraw matching request; auto-assigns an agent when
-    one is available (SQLite pick is atomic). Appears in admin Pending tab."""
+    """Create a deposit/withdraw matching request — atomic SQLite create +
+    agent pick + escrow hold. Notifies main admins AND the assigned agent."""
     err = _matching_strong_auth_or_error()
     if err:
         return err
@@ -3716,32 +4071,45 @@ def api_matching_create():
         except Exception:
             pass
 
-    # One open request per type per user — keeps the queue clean.
-    # Lock spans the duplicate check + append so concurrent creates can't race.
-    with _MATCH_CSV_LOCK:
-        existing = read_csv('match_requests.csv')
-        for r in existing:
-            if (str(r.get('user_id', '')) == uid and r.get('type') == rtype
-                    and r.get('status') == 'waiting'):
-                return jsonify({'error': 'لديك طلب قيد الانتظار بالفعل — الغِه أولاً أو انتظر معالجته',
-                                'request_id': r.get('id')}), 409
+    rid, error, agent_assigned, agent_info = agent_db.create_match_request_with_agent_assignment(
+        uid, uid, rtype, amount, currency,
+        company_id='', company_name='', payment_method_id='', details=details)
+    if error:
+        status_code = 409 if 'نشط' in (error or '') else 400
+        return jsonify({'error': error}), status_code
 
-        rid = f"MR{datetime.now().strftime('%Y%m%d%H%M%S')}{secrets.token_hex(2).upper()}"
-        row = {'id': rid, 'user_id': uid, 'customer_id': uid, 'type': rtype,
-               'amount': f'{amount:g}', 'currency': currency, 'status': 'waiting',
-               'created_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
-               'approved_by': '', 'approved_at': ''}
-        append_csv('match_requests.csv', row, _MATCH_REQ_FIELDS)
     log_action('match_request_created', f'{rid} {rtype} {amount} {currency} by {uid}')
 
-    agent_assigned = False
+    # ── Notify main admins (Telegram) ──
+    type_ar = 'إيداع' if rtype == 'deposit' else 'سحب'
+    agent_line = ''
+    if agent_assigned and agent_info:
+        agent_line = f"\n🤖 الوكيل المعين: <b>{agent_info.get('name') or agent_info.get('id')}</b>"
     try:
-        res = agent_db.pick_and_create_transaction(
-            rtype, amount, currency=currency, user_id=uid,
-            user_name=user_name, match_request_id=rid, payment_details=details)
-        agent_assigned = bool(res)
-    except Exception as e:
-        print(f"[MATCHING] agent auto-assign failed for {rid}: {e}")
+        _comp_alert_admins(
+            f"🔄 <b>طلب مطابقة جديد</b>\n\n"
+            f"🆔 <code>{rid}</code>\n"
+            f"👤 المستخدم: <code>{uid}</code>\n"
+            f"{'💵' if rtype == 'deposit' else '💸'} النوع: {type_ar}\n"
+            f"💰 المبلغ: <code>{amount:g} {currency}</code>"
+            f"{agent_line}\n\n"
+            f"📋 راجعه من لوحة المطابقات ← المعلقة")
+    except Exception as _ne:
+        app.logger.warning(f'matching admin notify failed {rid}: {_ne}')
+
+    # ── Notify the assigned agent (Telegram, if linked) ──
+    if agent_assigned and agent_info and agent_info.get('telegram_id'):
+        try:
+            _comp_tg(str(agent_info['telegram_id']),
+                     f"🔔 <b>طلب مطابقة جديد معيّن لك</b>\n\n"
+                     f"🆔 <code>{rid}</code>\n"
+                     f"{'💵' if rtype == 'deposit' else '💸'} النوع: "
+                     f"{'إيداع (تدفع للمستخدم)' if rtype == 'deposit' else 'سحب (تستلم من المستخدم)'}\n"
+                     f"💰 المبلغ: <code>{amount:g} {currency}</code>\n\n"
+                     f"⚡ افحصه من لوحة الوكيل ← الطلبات المعلقة")
+        except Exception as _ae:
+            app.logger.warning(f'matching agent notify failed {rid}: {_ae}')
+
     return jsonify({'success': True, 'request_id': rid,
                     'agent_assigned': agent_assigned,
                     'message': 'تم إنشاء طلب المطابقة — بانتظار المعالجة'})
@@ -3749,41 +4117,21 @@ def api_matching_create():
 @app.route('/api/matching/my/<rid>/cancel', methods=['POST'])
 @webapp_auth
 def api_matching_cancel(rid):
-    """Cancel own still-waiting matching request (also frees assigned agent).
-    Cancellation only wins while any linked agent transaction is still pending:
-    we void the agent txn FIRST (atomic in SQLite), then re-check the CSV row
-    under the lock — if an agent settled meanwhile, the cancel is rejected."""
+    """Cancel own still-waiting matching request — atomic in SQLite
+    (voids pending agent txn + releases escrow + frees daily quota)."""
     err = _matching_strong_auth_or_error()
     if err:
         return err
     uid = str(get_request_uid() or '')
     if not uid:
         return jsonify({'error': 'Missing uid'}), 400
-    with _MATCH_CSV_LOCK:
-        reqs = read_csv('match_requests.csv')
-        fieldnames = get_fieldnames('match_requests.csv', _MATCH_REQ_FIELDS)
-        target = None
-        for r in reqs:
-            if r.get('id') == rid and str(r.get('user_id', '')) == uid:
-                target = r
-                break
-        if target is None:
-            return jsonify({'error': 'الطلب غير موجود'}), 404
-        if target.get('status') != 'waiting':
-            return jsonify({'error': 'لا يمكن إلغاء هذا الطلب'}), 400
-        # Void the pending agent txn first; if the agent already settled it,
-        # this returns False with a settled txn present → reject the cancel.
-        try:
-            voided = agent_db.void_pending_by_match_request(rid)
-        except Exception as e:
-            print(f"[MATCHING] failed to void agent txn for {rid}: {e}")
-            return jsonify({'error': 'تعذر الإلغاء الآن — حاول مجدداً'}), 500
-        if not voided and agent_db.has_settled_txn_for_match_request(rid):
-            return jsonify({'error': 'تمت معالجة الطلب بالفعل — لا يمكن إلغاؤه'}), 409
-        target['status'] = 'cancelled'
-        target['approved_by'] = f'user:{uid}'
-        target['approved_at'] = datetime.now().strftime('%Y-%m-%d %H:%M')
-        write_csv('match_requests.csv', reqs, fieldnames)
+    ok, error = agent_db.cancel_match_request_atomic(rid, uid)
+    if not ok:
+        if 'بالفعل' in (error or ''):
+            return jsonify({'error': error}), 409
+        if 'غير موجود' in (error or ''):
+            return jsonify({'error': error}), 404
+        return jsonify({'error': error or 'تعذر الإلغاء الآن — حاول مجدداً'}), 500
     log_action('match_request_cancelled', f'{rid} by user {uid}')
     return jsonify({'success': True})
 
@@ -4364,6 +4712,268 @@ def api_trading_public():
         'bot_url': 'https://t.me/' + (BOT_TOKEN.split(':')[0] if BOT_TOKEN else ''),
         'message': 'لبدء التداول، افتح البوت واختر 💱 تداول USDT'
     })
+
+# ── تداول USDT من الويب — نفس دورة حياة أوامر البوت (trade_orders.csv) ──────
+# الحالات: pending → admin_accepted → buyer_pays → buyer_sends_screenshot
+#          → admin_confirms_payment → admin_sends_screenshot → completed
+# الأدمن يكمل الإجراءات من البوت كالمعتاد؛ الويب ينشئ الطلب ويرفع إثبات الدفع ويؤكد الاستلام.
+
+_TRADING_CURRENCIES = [
+    {'code': 'SAR', 'name': 'ريال سعودي'}, {'code': 'AED', 'name': 'درهم إماراتي'},
+    {'code': 'EGP', 'name': 'جنيه مصري'}, {'code': 'KWD', 'name': 'دينار كويتي'},
+    {'code': 'QAR', 'name': 'ريال قطري'}, {'code': 'BHD', 'name': 'دينار بحريني'},
+    {'code': 'OMR', 'name': 'ريال عماني'}, {'code': 'JOD', 'name': 'دينار أردني'},
+    {'code': 'USD', 'name': 'دولار أمريكي'}, {'code': 'EUR', 'name': 'يورو'},
+    {'code': 'TRY', 'name': 'ليرة تركية'}, {'code': 'MAD', 'name': 'درهم مغربي'},
+]
+_TRADE_ALLOWED_EXT = {'.png', '.jpg', '.jpeg', '.webp'}
+_TRADE_MAX_BYTES = 5 * 1024 * 1024
+
+def _trade_fieldnames():
+    return get_fieldnames('trade_orders.csv',
+        ['id','buyer_id','buyer_name','customer_id','order_type','asset_type','network',
+         'account_address','payment_method','amount','currency','usdt_amount',
+         'admin_payment_method','status','screenshot_payment','screenshot_transfer',
+         'admin_id','created_at','completed_at'])
+
+def _trade_public_row(o):
+    """تجهيز صف الطلب للعرض في الويب — بدون بيانات حساسة."""
+    return {
+        'id': o.get('id', ''),
+        'order_type': o.get('order_type', ''),
+        'asset_type': o.get('asset_type', ''),
+        'network': o.get('network', ''),
+        'account_address': o.get('account_address', ''),
+        'payment_method': o.get('payment_method', ''),
+        'amount': o.get('amount', ''),
+        'currency': o.get('currency', ''),
+        'usdt_amount': o.get('usdt_amount', ''),
+        'admin_payment_method': o.get('admin_payment_method', ''),
+        'status': o.get('status', ''),
+        'screenshot_payment': o.get('screenshot_payment', '') if str(o.get('screenshot_payment', '')).startswith('http') else '',
+        'created_at': o.get('created_at', ''),
+    }
+
+@app.route('/api/trading/web/methods')
+@webapp_auth
+def api_trading_web_methods():
+    """وسائل الدفع النشطة + العملات المتاحة للتداول من الويب."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    methods = []
+    for m in read_csv('payment_methods.csv'):
+        if m.get('status') == 'active':
+            methods.append({
+                'id': m.get('id', ''),
+                'name': m.get('method_name', ''),
+                'type': m.get('method_type', ''),
+                'account_data': m.get('account_data', ''),
+                'icon': m.get('icon', '💳') or '💳',
+            })
+    return jsonify({'methods': methods, 'currencies': _TRADING_CURRENCIES})
+
+@app.route('/api/trading/web/create-order', methods=['POST'])
+@webapp_auth
+def api_trading_web_create_order():
+    """إنشاء أمر تداول (شراء/بيع USDT أو MoneyGo) من الويب."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Unauthorized'}), 403
+    data = request.get_json(silent=True) or {}
+
+    order_type = str(data.get('order_type', '')).strip()
+    asset_type = str(data.get('asset_type', '')).strip()
+    network = str(data.get('network', '')).strip()
+    account_address = str(data.get('account_address', '')).strip()
+    payment_method = str(data.get('payment_method', '')).strip()
+    currency = str(data.get('currency', '')).strip().upper()
+    if order_type not in ('buy', 'sell'):
+        return jsonify({'error': 'نوع الطلب غير صالح'}), 400
+    if asset_type not in ('usdt', 'moneygo'):
+        return jsonify({'error': 'نوع الأصل غير صالح'}), 400
+    if asset_type == 'usdt' and network not in ('TRC20', 'ERC20', 'BNB20'):
+        return jsonify({'error': 'اختر شبكة التحويل'}), 400
+    if len(account_address) < 3 or len(account_address) > 120:
+        return jsonify({'error': 'اكتب عنوان المحفظة/الحساب بشكل صحيح'}), 400
+    if not payment_method:
+        return jsonify({'error': 'اختر وسيلة الدفع'}), 400
+    if currency not in {c['code'] for c in _TRADING_CURRENCIES}:
+        return jsonify({'error': 'عملة غير مدعومة'}), 400
+    try:
+        amount = float(data.get('amount', 0))
+        if amount <= 0 or amount > 10_000_000:
+            return jsonify({'error': 'مبلغ غير صالح'}), 400
+    except (ValueError, TypeError):
+        return jsonify({'error': 'مبلغ غير صالح'}), 400
+
+    # بيانات المشتري من users.csv
+    buyer_name, customer_id = '', ''
+    for u in read_csv('users.csv'):
+        if str(u.get('telegram_id', '')) == uid:
+            buyer_name = u.get('username', '') or u.get('first_name', '') or uid
+            customer_id = u.get('customer_id', '')
+            break
+
+    order_id = 'TRD' + datetime.now().strftime('%Y%m%d%H%M%S')
+    order = {
+        'id': order_id, 'buyer_id': uid, 'buyer_name': buyer_name,
+        'customer_id': customer_id, 'order_type': order_type,
+        'asset_type': asset_type, 'network': network,
+        'account_address': account_address, 'payment_method': payment_method,
+        'amount': str(amount), 'currency': currency, 'usdt_amount': '',
+        'admin_payment_method': '', 'status': 'pending',
+        'screenshot_payment': '', 'screenshot_transfer': '',
+        'admin_id': '', 'created_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
+        'completed_at': '',
+    }
+    with _PM_CSV_LOCK:  # نفس القفل — trade_orders.csv تُكتب أيضاً من البوت
+        append_csv('trade_orders.csv', order, _trade_fieldnames())
+
+    asset_label = 'USDT' if asset_type == 'usdt' else 'MoneyGo'
+    action_label = 'شراء' if order_type == 'buy' else 'بيع'
+    _comp_alert_admins(
+        f"💱 <b>أمر تداول جديد من الويب</b>\n\n"
+        f"🆔 الطلب: <code>{order_id}</code>\n"
+        f"👤 المشتري: <code>{uid}</code>{(' (@' + buyer_name + ')') if buyer_name and buyer_name != uid else ''}\n"
+        f"📦 النوع: {action_label} {asset_type.upper()}{(' — ' + network) if network else ''}\n"
+        f"💰 المبلغ: {amount} {currency}\n"
+        f"💳 وسيلة الدفع: {payment_method}\n"
+        f"🏦 المحفظة: <code>{account_address}</code>\n\n"
+        f"راجع الطلب من البوت ← طوابير الإدارة ← التداول")
+    try:
+        push_notification('trade_order', 'أمر تداول جديد',
+                          f'{action_label} {asset_label} — {amount} {currency}')
+    except Exception:
+        pass
+    log_action('web_trade_create', order_id)
+    return jsonify({'ok': True, 'order_id': order_id,
+                    'message': '✅ تم إنشاء الطلب — سيراجعه الأدمن ويرسل لك السعر ووسيلة الدفع'})
+
+@app.route('/api/trading/web/my-orders')
+@webapp_auth
+def api_trading_web_my_orders():
+    """طلبات التداول الخاصة بالمستخدم من الويب."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    orders = [o for o in read_csv('trade_orders.csv') if str(o.get('buyer_id', '')) == uid]
+    orders.reverse()
+    return jsonify({'orders': [_trade_public_row(o) for o in orders[:20]]})
+
+@app.route('/api/trading/web/upload-screenshot', methods=['POST'])
+@webapp_auth
+def api_trading_web_upload_screenshot():
+    """رفع لقطة إثبات الدفع من الويب — تعادل إرسال الصورة في البوت."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Unauthorized'}), 403
+    order_id = str(request.form.get('order_id', '')).strip()
+    f = request.files.get('screenshot')
+    if not order_id:
+        return jsonify({'error': 'رقم الطلب مطلوب'}), 400
+    if not f or not f.filename:
+        return jsonify({'error': 'أرفق لقطة شاشة'}), 400
+
+    ext = os.path.splitext(f.filename)[1].lower()
+    if ext not in _TRADE_ALLOWED_EXT:
+        return jsonify({'error': 'صيغة الصورة غير مدعومة (png/jpg/webp)'}), 400
+    blob = f.read(_TRADE_MAX_BYTES + 1)
+    if len(blob) > _TRADE_MAX_BYTES:
+        return jsonify({'error': 'حجم الصورة يتجاوز 5MB'}), 400
+    if not blob:
+        return jsonify({'error': 'الملف فارغ'}), 400
+    if not (blob.startswith(b'\x89PNG') or blob.startswith(b'\xff\xd8\xff')
+            or (blob[:4] == b'RIFF' and blob[8:12] == b'WEBP')):
+        return jsonify({'error': 'الملف ليس صورة صالحة'}), 400
+
+    with _PM_CSV_LOCK:
+        orders = read_csv('trade_orders.csv')
+        order = next((o for o in orders if o.get('id') == order_id), None)
+        if not order:
+            return jsonify({'error': 'الطلب غير موجود'}), 404
+        if str(order.get('buyer_id', '')) != uid:
+            return jsonify({'error': 'غير مصرح'}), 403
+        if order.get('status') != 'buyer_pays':
+            return jsonify({'error': 'رفع الإثبات متاح فقط بعد تحديد السعر ووسيلة الدفع'}), 400
+
+        # حفظ في static/trade-uploads — يُخدم مباشرة و sendPhoto في البوت
+        # يقبل روابط HTTPS فتصل الإدارة لقطة المشتري من الويب
+        static_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'trade-uploads')
+        os.makedirs(static_dir, exist_ok=True)
+        fname = f"{uid}_{secrets.token_hex(8)}{ext}"
+        with open(os.path.join(static_dir, fname), 'wb') as out:
+            out.write(blob)
+        base_url = request.url_root.rstrip('/')
+        screenshot_url = f"{base_url}/static/trade-uploads/{fname}"
+
+        order['screenshot_payment'] = screenshot_url
+        order['status'] = 'buyer_sends_screenshot'
+        write_csv('trade_orders.csv', orders, _trade_fieldnames())
+
+    _comp_alert_admins(
+        f"📸 <b>إثبات دفع من الويب</b>\n\n"
+        f"🆔 الطلب: <code>{order_id}</code>\n"
+        f"👤 المشتري: <code>{uid}</code>\n\n"
+        f"راجع الصورة وأكّد الدفع من البوت ← طوابير الإدارة ← التداول")
+    return jsonify({'ok': True, 'message': '✅ تم إرسال إثبات الدفع — بانتظار تأكيد الإدارة'})
+
+@app.route('/api/trading/web/confirm-receipt', methods=['POST'])
+@webapp_auth
+def api_trading_web_confirm_receipt():
+    """تأكيد المستلم لاستلام USDT — تكملة الطلب."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Unauthorized'}), 403
+    data = request.get_json(silent=True) or {}
+    order_id = str(data.get('order_id', '')).strip()
+    if not order_id:
+        return jsonify({'error': 'رقم الطلب مطلوب'}), 400
+    with _PM_CSV_LOCK:
+        orders = read_csv('trade_orders.csv')
+        order = next((o for o in orders if o.get('id') == order_id), None)
+        if not order:
+            return jsonify({'error': 'الطلب غير موجود'}), 404
+        if str(order.get('buyer_id', '')) != uid:
+            return jsonify({'error': 'غير مصرح'}), 403
+        if order.get('status') != 'admin_sends_screenshot':
+            return jsonify({'error': 'التأكيد متاح بعد إرسال الإدارة إثبات التحويل'}), 400
+        order['status'] = 'completed'
+        order['completed_at'] = datetime.now().strftime('%Y-%m-%d %H:%M')
+        write_csv('trade_orders.csv', orders, _trade_fieldnames())
+    _comp_alert_admins(f"✅ <b>اكتمل طلب تداول (تأكيد ويب)</b>\n🆔 <code>{order_id}</code>\n👤 <code>{uid}</code>")
+    return jsonify({'ok': True, 'message': '✅ تم تأكيد الاستلام — اكتمل الطلب بنجاح'})
+
+@app.route('/api/trading/web/cancel', methods=['POST'])
+@webapp_auth
+def api_trading_web_cancel():
+    """إلغاء طلب معلق من الويب (قبل قبول الأدمن فقط)."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Unauthorized'}), 403
+    data = request.get_json(silent=True) or {}
+    order_id = str(data.get('order_id', '')).strip()
+    with _PM_CSV_LOCK:
+        orders = read_csv('trade_orders.csv')
+        order = next((o for o in orders if o.get('id') == order_id), None)
+        if not order:
+            return jsonify({'error': 'الطلب غير موجود'}), 404
+        if str(order.get('buyer_id', '')) != uid:
+            return jsonify({'error': 'غير مصرح'}), 403
+        if order.get('status') != 'pending':
+            return jsonify({'error': 'لا يمكن إلغاء طلب قيد المعالجة — تواصل مع الدعم'}), 400
+        order['status'] = 'cancelled'
+        write_csv('trade_orders.csv', orders, _trade_fieldnames())
+    _comp_alert_admins(f"🚫 <b>إلغاء طلب تداول (ويب)</b>\n🆔 <code>{order_id}</code>\n👤 <code>{uid}</code>")
+    return jsonify({'ok': True, 'message': 'تم إلغاء الطلب'})
 
 @app.route('/api/support/public')
 def api_support_public():
@@ -7049,16 +7659,24 @@ def api_wheel_end(round_id):
 @api_auth
 @permission_required('approve_deposits')
 def api_matching_approve(req_id):
-    reqs = read_csv('match_requests.csv')
-    fieldnames = get_fieldnames('match_requests.csv', ['id','user_id','customer_id','type','amount','currency','status','created_at','approved_by','approved_at'])
-    for r in reqs:
-        if r.get('id') == req_id:
-            r['status'] = 'approved'
-            r['approved_by'] = session.get('admin_id', '')
-            r['approved_at'] = datetime.now().strftime('%Y-%m-%d %H:%M')
-            break
-    write_csv('match_requests.csv', reqs, fieldnames)
+    """Admin approves a waiting request (SQLite). Pending agent txn stays
+    alive so the on-duty agent can settle it; request becomes 'approved'."""
+    ok, error = agent_db.admin_set_match_request_status(
+        req_id, 'approved', actor=str(session.get('admin_id', '')))
+    if not ok:
+        return jsonify({'error': error}), 400
     log_action('matching_approve', req_id)
+    # Notify the player
+    try:
+        req = agent_db.get_match_request_full(req_id)
+        if req and req.get('user_id'):
+            _comp_tg(str(req['user_id']),
+                     f"✅ <b>تمت الموافقة على طلب المطابقة</b>\n\n"
+                     f"🆔 <code>{req_id}</code>\n"
+                     f"💰 المبلغ: <code>{req.get('amount', '')} {req.get('currency', '')}</code>\n"
+                     f"⏳ قيد المعالجة النهائية")
+    except Exception:
+        pass
     return jsonify({'success': True})
 
 
@@ -7066,15 +7684,24 @@ def api_matching_approve(req_id):
 @api_auth
 @permission_required('reject_deposits')
 def api_matching_reject(req_id):
+    """Admin rejects a waiting request (SQLite). Voids pending agent txn,
+    releases escrow + daily quota atomically."""
     reason = request.json.get('reason', '') if request.json else ''
-    reqs = read_csv('match_requests.csv')
-    fieldnames = get_fieldnames('match_requests.csv', ['id','user_id','customer_id','type','amount','currency','status','created_at','approved_by','approved_at'])
-    for r in reqs:
-        if r.get('id') == req_id:
-            r['status'] = 'rejected'
-            break
-    write_csv('match_requests.csv', reqs, fieldnames)
+    ok, error = agent_db.admin_set_match_request_status(
+        req_id, 'rejected', actor=str(session.get('admin_id', '')))
+    if not ok:
+        return jsonify({'error': error}), 400
     log_action('matching_reject', f'{req_id}: {reason}')
+    try:
+        req = agent_db.get_match_request_full(req_id)
+        if req and req.get('user_id'):
+            _comp_tg(str(req['user_id']),
+                     f"❌ <b>تم رفض طلب المطابقة</b>\n\n"
+                     f"🆔 <code>{req_id}</code>\n"
+                     + (f"📝 السبب: {reason}\n" if reason else '')
+                     + f"💡 يمكنك إنشاء طلب جديد أو التواصل مع الدعم")
+    except Exception:
+        pass
     return jsonify({'success': True})
 
 
@@ -7082,34 +7709,33 @@ def api_matching_reject(req_id):
 @api_auth
 @permission_required('view_financial')
 def api_resolve_dispute(match_id):
+    """Resolve an open dispute (SQLite: matches + match_disputes)."""
     favor = request.json.get('favor', 'cancel') if request.json else 'cancel'
     note = request.json.get('note', '') if request.json else ''
+    admin_id = str(session.get('admin_id', ''))
 
-    matches = read_csv('matches.csv')
-    match_fieldnames = get_fieldnames('matches.csv', ['id','depositor_id','withdrawer_id','depositor_txn_id','withdrawer_txn_id','status','created_at','resolved_by','resolution'])
-    for m in matches:
-        if m.get('id') == match_id:
-            if favor == 'depositor':
-                m['status'] = 'completed'
-            elif favor == 'withdrawer':
-                m['status'] = 'completed'
-            else:
-                m['status'] = 'cancelled'
-            m['resolution'] = favor
-            m['resolved_by'] = session.get('admin_id', '')
-            break
-    write_csv('matches.csv', matches, match_fieldnames)
-
-    disputes = read_csv('disputes.csv')
-    dispute_fieldnames = get_fieldnames('disputes.csv', ['id','match_id','raised_by','reason','status','created_at','resolution','resolved_by','resolved_at'])
-    for d in disputes:
-        if d.get('match_id') == match_id and d.get('status') != 'resolved':
-            d['status'] = 'resolved'
-            d['resolution'] = favor
-            d['resolved_by'] = session.get('admin_id', '')
-            d['resolved_at'] = datetime.now().strftime('%Y-%m-%d %H:%M')
-            break
-    write_csv('disputes.csv', disputes, dispute_fieldnames)
+    conn = agent_db._conn()
+    try:
+        conn.execute('BEGIN IMMEDIATE')
+        new_status = 'cancelled' if favor == 'cancel' else 'completed'
+        cur = conn.execute(
+            "UPDATE matches SET status=?, dispute_status='resolved' WHERE id=?",
+            (new_status, match_id))
+        if cur.rowcount == 0:
+            conn.rollback()
+            return jsonify({'error': 'المطابقة غير موجودة'}), 404
+        conn.execute('''
+            UPDATE match_disputes SET status='resolved_by_admin',
+                admin_response=?, resolved_at=?
+            WHERE match_id=? AND status='open'
+        ''', (f'{favor}: {note}' if note else favor,
+              datetime.now().strftime('%Y-%m-%d %H:%M:%S'), match_id))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
 
     log_action('resolve_dispute', f'{match_id}: {favor}')
     return jsonify({'success': True})
@@ -7285,7 +7911,13 @@ def api_detailed_stats():
 
     users = read_csv('users.csv')
     txns = read_csv('transactions.csv')
-    matches = read_csv('matches.csv')
+    try:
+        _dsc = agent_db._conn()
+        matches = [dict(r) for r in _dsc.execute(
+            'SELECT * FROM matches').fetchall()]
+        _dsc.close()
+    except Exception:
+        matches = read_csv('matches.csv')
     companies = read_csv('companies.csv')
     complaints = read_csv('complaints.csv')
 
@@ -7500,23 +8132,28 @@ def api_push_subscribe_user():
 
 @app.route('/api/push/subscribe', methods=['POST'])
 def api_push_subscribe():
-    """Store a browser push subscription — public, no auth needed."""
+    """Store a browser push subscription — public, no auth needed.
+    مخطط موحّد مع اشتراك المستخدمين (user_type/user_id/user_name دائماً)."""
     data = request.json or {}
     endpoint = data.get('endpoint', '')
     keys = data.get('keys', {})
     if not endpoint:
         return jsonify({'error': 'No endpoint'}), 400
     admin_id = str(session.get('admin_id', ''))
+    is_admin = bool(session.get('is_admin'))
     subs = read_csv('push_subscriptions.csv')
-    fieldnames = get_fieldnames('push_subscriptions.csv', ['admin_id','endpoint','p256dh','auth','created_at'])
-    # Remove old sub for this endpoint
+    fieldnames = get_fieldnames('push_subscriptions.csv', ['admin_id','endpoint','p256dh','auth','created_at','user_type','user_id','user_name'])
+    # Remove old sub for this endpoint (نفس المتصفح = اشتراك واحد محدث)
     subs = [s for s in subs if s.get('endpoint') != endpoint]
     subs.append({
         'admin_id': admin_id,
         'endpoint': endpoint,
         'p256dh': keys.get('p256dh', ''),
         'auth': keys.get('auth', ''),
-        'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'user_type': 'admin' if is_admin else 'browser',
+        'user_id': admin_id,
+        'user_name': session.get('admin_name', '')
     })
     write_csv('push_subscriptions.csv', subs, fieldnames)
     return jsonify({'success': True})
@@ -7676,9 +8313,14 @@ def api_user_company_accounts(user_id):
 @app.route('/api/matching/ratings')
 @api_auth
 def api_match_ratings():
-    ratings = read_csv('ratings.csv')
-    ratings.reverse()
-    return jsonify({'ratings': ratings[:50]})
+    conn = agent_db._conn()
+    try:
+        rows = conn.execute(
+            'SELECT * FROM match_ratings ORDER BY timestamp DESC LIMIT 50').fetchall()
+        ratings = [dict(r) for r in rows]
+    finally:
+        conn.close()
+    return jsonify({'ratings': ratings})
 
 # ===== API — Referral Earnings Per User =====
 
@@ -8457,6 +9099,293 @@ def api_player_wallet():
     })
 
 
+# ── إرسال رصيد مجمد لصديق + بروموكود + كود إحالة ──────────────────────────
+
+@app.route('/api/player/comp/send', methods=['POST'])
+@webapp_auth
+def api_player_comp_send():
+    """إرسال أرصدة SVRP مجمدة لصديق عبر customer_id — هوية موثقة فقط."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Unauthorized'}), 403
+    data = request.get_json(silent=True) or {}
+    receiver_cid = str(data.get('receiver_cid', '')).strip()
+    amount = float(data.get('amount', 0) or 0)
+    if not receiver_cid:
+        return jsonify({'error': 'أدخل رقم العميل (Customer ID) للصديق'}), 400
+    if amount <= 0:
+        return jsonify({'error': 'المبلغ يجب أن يكون أكبر من صفر'}), 400
+    try:
+        import sys as _sys3; _sys3.path.insert(0, BASE_DIR)
+        from svrp import SVRPManager as _SM2
+        mgr = _SM2()
+        ok, msg = mgr.send_frozen_credits(uid, receiver_cid, amount)
+        return jsonify({'ok': ok, 'message': msg})
+    except Exception as e:
+        _auth_logger.error('comp/send failed uid=%s: %s', uid, e)
+        return jsonify({'error': 'فشل الإرسال — حاول مجدداً'}), 500
+
+
+@app.route('/api/player/comp/promo/redeem', methods=['POST'])
+@webapp_auth
+def api_player_comp_promo_redeem():
+    """استبدال بروموكود تعويض — هوية موثقة فقط."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Unauthorized'}), 403
+    data = request.get_json(silent=True) or {}
+    code = str(data.get('code', '')).strip().upper()
+    if not code:
+        return jsonify({'error': 'أدخل الكود'}), 400
+    try:
+        import sys as _sys4; _sys4.path.insert(0, BASE_DIR)
+        from svrp import SVRPManager as _SM3
+        mgr = _SM3()
+        ok, msg = mgr.redeem_promo_code(uid, code)
+        return jsonify({'ok': ok, 'message': msg})
+    except Exception as e:
+        _auth_logger.error('comp/promo/redeem failed uid=%s: %s', uid, e)
+        return jsonify({'error': 'فشل الاستبدال — حاول مجدداً'}), 500
+
+
+@app.route('/api/player/comp/referral/code')
+@webapp_auth
+def api_player_comp_referral_code():
+    """عرض كود الإحالة + عدد الإحالات للمستخدم."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Unauthorized'}), 403
+    try:
+        customer_id = ''
+        for u in read_csv('users.csv'):
+            if str(u.get('telegram_id', '')) == uid:
+                customer_id = u.get('customer_id', '')
+                break
+        referral_code = f"REF{customer_id}" if customer_id else ''
+        # عدد الإحالات + أرباح الإحالة
+        referral_count = 0
+        referral_earnings = 0.0
+        try:
+            for r in read_csv('referrals.csv'):
+                if str(r.get('referrer_id', '')) == uid and r.get('status') == 'completed':
+                    referral_count += 1
+                    try: referral_earnings += float(r.get('reward_amount', 0) or 0)
+                    except Exception: pass
+        except Exception:
+            pass
+        # قائمة الإحالات التفصيلية
+        referral_list = []
+        try:
+            for r in read_csv('referrals.csv'):
+                if str(r.get('referrer_id', '')) == uid:
+                    referral_list.append({
+                        'referred_id': r.get('referred_id', ''),
+                        'status': r.get('status', ''),
+                        'reward': r.get('reward_amount', '0'),
+                        'date': r.get('created_at', ''),
+                    })
+        except Exception:
+            pass
+        return jsonify({
+            'ok': True,
+            'customer_id': customer_id,
+            'referral_code': referral_code,
+            'referral_count': referral_count,
+            'referral_earnings': round(referral_earnings, 2),
+            'referral_list': referral_list,
+        })
+    except Exception as e:
+        _auth_logger.error('comp/referral/code failed uid=%s: %s', uid, e)
+        return jsonify({'error': 'فشل جلب البيانات'}), 500
+
+
+# ── One-Time Claim Link — إرسال بدون اسم مستخدم ─────────────────────────
+
+import os as _claim_os
+_CLAIM_DIR = _claim_os.path.join(BASE_DIR, 'svrp_claims')
+
+def _ensure_claim_dir():
+    if not _claim_os.path.isdir(_CLAIM_DIR):
+        _claim_os.makedirs(_CLAIM_DIR, exist_ok=True)
+
+def _read_claims_csv():
+    _ensure_claim_dir()
+    return read_csv('svrp_claims.csv')
+
+def _write_claims_csv(rows, fieldnames=None):
+    _ensure_claim_dir()
+    if not fieldnames:
+        fieldnames = get_fieldnames('svrp_claims.csv',
+            ['id','token','sender_uid','amount','status','created_at','claimed_by_uid','claimed_at','sender_name'])
+    write_csv('svrp_claims.csv', rows, fieldnames)
+
+@app.route('/api/player/comp/claim/create', methods=['POST'])
+@webapp_auth
+def api_player_comp_claim_create():
+    """إنشاء رابط claim لمرة واحدة — المستخدم يكتب المبلغ فقط بدون اسم."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Unauthorized'}), 403
+    data = request.get_json(silent=True) or {}
+    amount = float(data.get('amount', 0) or 0)
+    if amount <= 0:
+        return jsonify({'error': 'المبلغ يجب أن يكون أكبر من صفر'}), 400
+    # تحقق من رصيد مجمد كافي (25% كحد أقصى)
+    try:
+        from game_engine import GameManager as _CLMGM
+        _cl_bal = float(_CLMGM.get_svrp_frozen_balance(uid).get('frozen_balance', 0) or 0)
+    except Exception:
+        _cl_bal = 0
+    if amount > _cl_bal * 0.25:
+        return jsonify({'error': 'الحد الأقصى 25% من رصيدك المجمد (' + str(round(_cl_bal * 0.25, 2)) + ')'}), 400
+    token = secrets.token_urlsafe(16)
+    # اسم المرسل
+    sender_name = ''
+    try:
+        for u in read_csv('users.csv'):
+            if str(u.get('telegram_id', '')) == uid:
+                sender_name = u.get('username', '') or u.get('first_name', '') or uid
+                break
+    except Exception:
+        pass
+    try:
+        rows = _read_claims_csv()
+        rows.append({
+            'id': 'CLM' + secrets.token_hex(5).upper(),
+            'token': token,
+            'sender_uid': uid,
+            'amount': str(round(amount, 2)),
+            'status': 'pending',
+            'created_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
+            'claimed_by_uid': '',
+            'claimed_at': '',
+            'sender_name': sender_name,
+        })
+        _write_claims_csv(rows)
+    except Exception as e:
+        _auth_logger.error('claim/create failed uid=%s: %s', uid, e)
+        return jsonify({'error': 'فشل إنشاء الرابط'}), 500
+    claim_url = request.url_root.rstrip('/') + '/claim/' + token
+    return jsonify({'ok': True, 'claim_url': claim_url, 'token': token, 'amount': amount})
+
+
+@app.route('/api/player/comp/claims')
+@webapp_auth
+def api_player_comp_claims():
+    """قائمة روابط claim للمستخدم (معلقة + مُطالَبة)."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Unauthorized'}), 403
+    claims = []
+    try:
+        for c in _read_claims_csv():
+            if c.get('sender_uid') == uid or c.get('claimed_by_uid') == uid:
+                claims.append(c)
+    except Exception:
+        pass
+    return jsonify({'claims': claims})
+
+
+@app.route('/claim/<token>')
+def claim_page(token):
+    """صفحة عامة لرابط claim — تعرض المبلغ وربط التسجيل."""
+    rows = _read_claims_csv()
+    claim = None
+    for c in rows:
+        if c.get('token') == token:
+            claim = c
+            break
+    if not claim:
+        return '<div style="text-align:center;padding:60px 20px;font-family:Cairo,sans-serif;color:#ff4757"><h2>❌ رابط غير صالح</h2><p>هذا الرابط غير موجود أو انتهت صلاحيته</p></div>', 404
+    status = claim.get('status', 'pending')
+    if status == 'claimed':
+        return '<div style="text-align:center;padding:60px 20px;font-family:Cairo,sans-serif;color:#8794a3"><h2>✅ تم المطالبة</h2><p>هذا الرابط تم استخدامه بالفعل</p></div>'
+    amount = claim.get('amount', '0')
+    sender = claim.get('sender_name', '') or 'مستخدم VEX'
+    claim_url = request.url_root.rstrip('/') + '/claim/' + token
+    bot_url = 'https://t.me/vex_otp_bot?start=claim_' + token
+    html = '''<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>VEX — استلم رصيدك</title>
+    <style>*{font-family:Cairo,sans-serif;box-sizing:border-box;margin:0;padding:0}
+    body{background:#0b0e11;color:#eef2f6;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+    .card{background:linear-gradient(180deg,#141920,#10141a);border:1px solid #262e39;border-radius:20px;padding:30px;max-width:400px;width:100%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.5)}
+    .icon{font-size:56px;margin-bottom:14px}.amt{font-size:32px;font-weight:900;color:#00e701;margin:10px 0}
+    .label{font-size:14px;color:#8794a3;margin-bottom:20px}
+    .btn{display:block;background:linear-gradient(135deg,#00e701,#00c101);color:#04210a;font-weight:900;font-size:16px;border-radius:14px;padding:14px;text-decoration:none;margin:10px auto;max-width:280px}
+    .btn2{background:transparent;border:1px solid #262e39;color:#8794a3}
+    .info{font-size:12px;color:#8794a3;margin-top:16px;line-height:1.6}
+    .code{background:#0b0e11;border:1px solid #262e39;padding:8px 14px;border-radius:10px;color:#fbbf24;font-size:14px;font-weight:700;font-family:Courier New;letter-spacing:.5px;margin-top:10px;display:inline-block}
+    </style></head><body><div class="card">
+    <div class="icon">🎁</div>
+    <div class="label">''' + sender + ''' أرسل لك رصيد مجمد</div>
+    <div class="amt">''' + amount + '''</div>
+    <div class="label">سجّل في VEX لاستلام الرصيد</div>
+    <a href="''' + bot_url + '''" target="_blank" class="btn">📲 فتح البوت للتسجيل</a>
+    <div class="info">💡 بعد التسجيل، سيتم إضافة الرصيد لمحفظتك تلقائياً مع قواعد التجميد المطبقة.<br>هذا الرابط صالح لمرة واحدة فقط.</div>
+    </div></body></html>'''
+    return html
+
+
+@app.route('/api/claim/<token>/redeem', methods=['POST'])
+@webapp_auth
+def api_claim_redeem(token):
+    """مطالبة رصيد claim — المستخدم المسجل يستلم الرصيد المجمد."""
+    uid = str(get_request_uid() or '')
+    if not uid:
+        return jsonify({'error': 'Missing uid'}), 400
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Unauthorized'}), 403
+    rows = _read_claims_csv()
+    claim = None
+    for c in rows:
+        if c.get('token') == token:
+            claim = c
+            break
+    if not claim:
+        return jsonify({'error': 'رابط غير صالح'}), 404
+    if claim.get('status') != 'pending':
+        return jsonify({'error': 'هذا الرابط تم استخدامه بالفعل'}), 400
+    sender_uid = claim.get('sender_uid', '')
+    if sender_uid == uid:
+        return jsonify({'error': 'لا يمكنك مطالبة رصيدك الخاص'}), 400
+    amount = float(claim.get('amount', 0) or 0)
+    if amount <= 0:
+        return jsonify({'error': 'مبلغ غير صالح'}), 400
+    # خصم من مرسل + إضافة للمطالب عبر svrp.send_frozen_credits logic
+    try:
+        import sys as _c6sys; _c6sys.path.insert(0, BASE_DIR)
+        from svrp import SVRPManager as _CLSMgr
+        mgr = _CLSMgr()
+        # نستخدم transfer_svrp_frozen_direct — خصم من المرسل + إضافة للمستلم
+        # نعاملها كإرسال لصديق جديد (5% unfreeze للمرسل)
+        ok, msg = mgr.send_frozen_credits_direct(sender_uid, uid, amount, is_claim=True)
+        if not ok:
+            return jsonify({'error': msg}), 400
+        # تحديث حالة الـ claim
+        for c in rows:
+            if c.get('token') == token:
+                c['status'] = 'claimed'
+                c['claimed_by_uid'] = uid
+                c['claimed_at'] = datetime.now().strftime('%Y-%m-%d %H:%M')
+                break
+        _write_claims_csv(rows)
+        return jsonify({'ok': True, 'message': '✅ تم استلام ' + str(round(amount, 2)) + ' رصيد مجمد في محفظتك'})
+    except Exception as e:
+        _auth_logger.error('claim/redeem failed uid=%s token=%s: %s', uid, token, e)
+        return jsonify({'error': 'فشل المطالبة — حاول مجدداً'}), 500
+
+
 # svrp_lock() is imported lazily inside the endpoint to avoid a top-level
 # circular-import issue (svrp.py is loaded after app config is set up).
 # It provides reentrant cross-process locking for all SVRP CSV mutations.
@@ -8896,7 +9825,13 @@ def api_deposit_quick():
         return jsonify({'error': 'Games engine not available'}), 500
     data = request.json
     uid = get_request_uid()
-    amount = float(data.get('amount', 0))
+    # NaN/Infinity rejected
+    try:
+        amount = float(data.get('amount', 0))
+    except (ValueError, TypeError):
+        return jsonify({'error': 'مبلغ غير صالح'}), 400
+    if not math.isfinite(amount) or amount <= 0:
+        return jsonify({'error': 'مبلغ غير صالح'}), 400
     method_id = data.get('method_id', '')
     method_name = data.get('method_name', '')
     method_account_data = data.get('method_account_data', '')
@@ -8904,6 +9839,8 @@ def api_deposit_quick():
     save_method = data.get('save_method', False)
     purpose = data.get('purpose', '')  # 'lottery_tickets' = directed deposit
     ticket_count = int(data.get('ticket_count', 0) or 0)
+    company_id = str(data.get('company_id', '') or '').strip()
+    company_name = str(data.get('company_name', '') or '').strip()
     if not uid or amount <= 0 or not method_id:
         return jsonify({'error': 'Missing params'}), 400
 
@@ -8918,12 +9855,20 @@ def api_deposit_quick():
         method_name=method_name,
         method_account_data=method_account_data,
         player_wallet=player_wallet,
-        save_method=save_method
+        save_method=save_method,
+        company_id=company_id,
+        company_name=company_name
     )
 
     # Push to dashboard — include purpose if directed deposit
-    notif_title = '💰 إيداع محفظة VEX'
-    notif_msg = f'اللاعب {user_name} ({customer_id}) طلب إيداع {amount} {currency}\nالوسيلة: {method_name}\nمحفظة اللاعب: {player_wallet}'
+    if company_name:
+        notif_title = f'🏢 إيداع شركة — {company_name}'
+        notif_msg = (f'اللاعب {user_name} ({customer_id}) طلب إيداع {amount} {currency}\n'
+                     f'🏢 الشركة: {company_name}\nالوسيلة: {method_name}\n'
+                     f'محفظة اللاعب: {player_wallet}')
+    else:
+        notif_title = '💰 إيداع محفظة VEX'
+        notif_msg = f'اللاعب {user_name} ({customer_id}) طلب إيداع {amount} {currency}\nالوسيلة: {method_name}\nمحفظة اللاعب: {player_wallet}'
     if purpose == 'lottery_tickets' and ticket_count > 0:
         notif_title = f'🎟️ شراء تذاكر يانصيب ({ticket_count} تذكرة)'
         notif_msg = f'اللاعب {user_name} ({customer_id}) يريد شراء {ticket_count} تذكرة يانصيب\nالمبلغ: {amount} {currency}\nالوسيلة: {method_name}\nمحفظة اللاعب: {player_wallet}\n⏳ عند الموافقة سيتم شراء التذاكر تلقائياً'
@@ -10341,34 +11286,79 @@ def api_plinko_drop():
 
 # ===== Wheel — Frontend API (/api/wheel/spin) =====
 
-# Wheel segments — base set, shuffled per round for variety
-_WHEEL_BASE_SEGMENTS = [
+# Wheel segments — FIXED layout (no per-spin reshuffle: the wheel visibly
+# jumping to a new layout mid-spin looked rigged). Skulls are not adjacent.
+_WHEEL_SEGMENTS = [
     {'mult': 0.0,  'label': '💀',  'color': '#991b1b', 'glow': '#ef4444'},
     {'mult': 1.5,  'label': '1.5x','color': '#1e3a5f', 'glow': '#3b82f6'},
     {'mult': 2.0,  'label': '2x',  'color': '#14532d', 'glow': '#22c55e'},
+    {'mult': 0.0,  'label': '💀',  'color': '#991b1b', 'glow': '#ef4444'},
     {'mult': 0.5,  'label': '0.5x','color': '#581c87', 'glow': '#a855f7'},
     {'mult': 5.0,  'label': '5x',  'color': '#78350f', 'glow': '#fbbf24'},
     {'mult': 1.0,  'label': '1x',  'color': '#155e75', 'glow': '#06b6d4'},
     {'mult': 10.0, 'label': '10x', 'color': '#831843', 'glow': '#ec4899'},
-    {'mult': 0.0,  'label': '💀',  'color': '#991b1b', 'glow': '#ef4444'},
 ]
 
-def _shuffle_segments():
-    """Shuffle segments for each round — prevents monotony."""
-    segs = list(_WHEEL_BASE_SEGMENTS)
-    # Keep the two 💀 segments apart (not adjacent)
-    for _ in range(10):
-        random.shuffle(segs)
-        skull_positions = [i for i, s in enumerate(segs) if s['mult'] == 0.0]
-        if len(skull_positions) == 2 and abs(skull_positions[0] - skull_positions[1]) > 1:
-            break
-    return segs
+# Fixed relative weights of the non-skull segments (variety curve).
+# Σ(mult×weight) over winners = 80.5, Σweight_winners = 53.5.
+_WHEEL_WIN_WEIGHTS = {10.0: 1.0, 5.0: 2.5, 2.0: 8.0, 1.5: 12.0, 1.0: 18.0, 0.5: 12.0}
+_WHEEL_WIN_EV = sum(m * w for m, w in _WHEEL_WIN_WEIGHTS.items())      # 80.5
+_WHEEL_WIN_W  = sum(_WHEEL_WIN_WEIGHTS.values())                        # 53.5
+
+_WHEEL_RTP_MIN, _WHEEL_RTP_MAX = 0.80, 0.85
+
+_wheel_rng = secrets.SystemRandom()
+
+def _wheel_weights(win_chance):
+    """Solve the per-skull weight so the EXACT target RTP is achieved.
+
+    target_rtp = 0.80 + 0.05 × normalized(win_chance) ∈ [0.80, 0.85];
+    skull weight s = (EV_winners/target − Σw_winners)/2 keeps every
+    multiplier's relative odds constant. RTP is mathematically capped at
+    0.85 no matter what the house algorithm computes."""
+    t = (float(win_chance) - 0.03) / (0.92 - 0.03)
+    t = min(1.0, max(0.0, t))
+    target = _WHEEL_RTP_MIN + (_WHEEL_RTP_MAX - _WHEEL_RTP_MIN) * t
+    s = (_WHEEL_WIN_EV / target - _WHEEL_WIN_W) / 2.0
+    s = max(1.0, s)
+    weights = []
+    for seg in _WHEEL_SEGMENTS:
+        m = seg['mult']
+        if m == 0.0:
+            weights.append(s)
+        else:
+            weights.append(_WHEEL_WIN_WEIGHTS[m])
+    return weights, target
+
+@app.route('/api/wheel/preview')
+def api_wheel_preview():
+    """معاينة عامة للعجلة: الأجزاء والاحتمالات بمستوى أساسي — قبل أول دورة،
+    كي يرى اللاعب جدول الجوائز من لحظة فتح الصفحة لا بعد أول دوران."""
+    if not _VEX_GAMES:
+        return jsonify({'error': 'Games engine not available'}), 500
+    game_row = _gm.get_game('GAME009') or {}
+    try:
+        base = float(game_row.get('base_win_chance') or 0.40)
+    except (ValueError, TypeError):
+        base = 0.40
+    base = min(0.92, max(0.03, base))
+    weights, target = _wheel_weights(base)
+    total = sum(weights)
+    return jsonify({
+        'segments': [{'mult': s['mult'], 'label': s['label'], 'color': s['color'], 'glow': s['glow']} for s in _WHEEL_SEGMENTS],
+        'probabilities': [round(w / total, 4) for w in weights],
+        'rtp': round(target, 3),
+        'active': str(game_row.get('is_active', 'yes')).lower() not in ('no', 'false', '0'),
+    })
 
 @app.route('/api/wheel/spin', methods=['POST'])
 @webapp_auth
 def api_wheel_spin():
     if not _VEX_GAMES:
         return jsonify({'error': 'Games engine not available'}), 500
+    # هوية موثقة فقط — بدونها يمكن المراهنة بهوية أي ضحية
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Unauthorized'}), 403
     data = request.json or {}
     uid = get_request_uid()
     request_id = _get_request_id()
@@ -10381,17 +11371,28 @@ def api_wheel_spin():
         if cached:
             return jsonify(cached)
 
-    bet_amount = float(data.get('bet', 0))
-    if bet_amount <= 0:
-        return jsonify({'error': 'Missing params'}), 400
+    # NaN/Infinity rejected + catalog min/max enforced
+    try:
+        bet_amount = float(data.get('bet', 0))
+    except (ValueError, TypeError):
+        return jsonify({'error': 'مبلغ غير صالح'}), 400
+    if not math.isfinite(bet_amount) or bet_amount <= 0:
+        return jsonify({'error': 'مبلغ غير صالح'}), 400
+
+    game_row = _gm.get_game('GAME009')
+    if not game_row or str(game_row.get('is_active', 'yes')).lower() in ('no', 'false', '0'):
+        return jsonify({'success': False, 'error': 'اللعبة متوقفة مؤقتاً'}), 503
+    try:
+        min_bet = float(game_row.get('min_bet') or 10)
+        max_bet = float(game_row.get('max_bet') or 2000)
+    except (ValueError, TypeError):
+        min_bet, max_bet = 10.0, 2000.0
+    if bet_amount < min_bet or bet_amount > max_bet:
+        return jsonify({'success': False, 'error': f'الرهان بين {int(min_bet)} و {int(max_bet)}'}), 400
 
     player = _gm.tracker.get_profile(uid)
-    game = _gm.get_game('GAME009') or {
-        'id': 'GAME009', 'base_win_chance': '0.50', 'house_edge_pct': '10',
-        'min_bet': '10', 'max_bet': '5000'
-    }
 
-    risk_check = _gm.risk.check_risk(player, bet_amount, game)
+    risk_check = _gm.risk.check_risk(player, bet_amount, game_row)
     if not risk_check['allowed']:
         msg = risk_check['alerts'][0]['message'] if risk_check.get('alerts') else 'محظور'
         return jsonify({'success': False, 'error': msg})
@@ -10400,40 +11401,18 @@ def api_wheel_spin():
     if balance < bet_amount:
         return jsonify({'success': False, 'error': 'رصيد غير كافٍ', 'need_deposit': True, 'balance': balance})
 
-    # Shuffle segments for this round
-    wheel_segments = _shuffle_segments()
+    wheel_segments = _WHEEL_SEGMENTS
     N = len(wheel_segments)
 
-    algo_result = _gm.algorithm.calculate_win_chance(player, game, bet_amount)
+    algo_result = _gm.algorithm.calculate_win_chance(player, game_row, bet_amount)
     win_chance = algo_result['win_chance']
 
-    # Smart weighted selection — considers player segment + house edge
-    weights = []
-    for seg in wheel_segments:
-        m = seg['mult']
-        if m == 0.0:
-            # 💀 segments — higher weight for losers, lower for winners
-            weights.append(max(1, int((1 - win_chance) * 10)))
-        elif m >= 10.0:
-            # 10x — very rare, only for new players or after big losses
-            weights.append(max(1, int(win_chance * 2)))
-        elif m >= 5.0:
-            # 5x — rare but possible
-            weights.append(max(1, int(win_chance * 4)))
-        elif m >= 2.0:
-            # 2x — moderate
-            weights.append(max(1, int(win_chance * 7)))
-        elif m >= 1.0:
-            # 1x/1.5x — common wins
-            weights.append(max(1, int(win_chance * 9)))
-        else:
-            # 0.5x — partial loss
-            weights.append(max(1, int((1 - win_chance) * 5)))
-
+    # Weights solved for an exact target RTP in [0.80, 0.85]
+    weights, target_rtp = _wheel_weights(win_chance)
     total_w = sum(weights)
-    rand_val = random.uniform(0, total_w)
-    segment = 0
-    cumulative = 0
+    rand_val = _wheel_rng.uniform(0, total_w)
+    segment = N - 1
+    cumulative = 0.0
     for i, w in enumerate(weights):
         cumulative += w
         if rand_val <= cumulative:
@@ -10442,15 +11421,23 @@ def api_wheel_spin():
 
     multiplier = wheel_segments[segment]['mult']
     payout = round(bet_amount * multiplier, 2)
-    result_str = 'win' if multiplier > 0 else 'lose'
+    # فوز حقيقي فقط فوق 1x — 1x تعادل و0.5x خسارة جزئية
+    if multiplier > 1.0:
+        result_str = 'win'
+    elif multiplier == 1.0:
+        result_str = 'push'
+    else:
+        result_str = 'lose'
 
-    # Build segments for client (shuffled order for this round)
+    # Build segments + real probabilities for the client payout table
     client_segments = [{'mult': s['mult'], 'label': s['label'], 'color': s['color'], 'glow': s['glow']} for s in wheel_segments]
+    probabilities = [round(w / total_w, 4) for w in weights]
 
     # Atomic: settle + idempotency record in one SQLite transaction
     template = {'success': True, 'segment': segment, 'multiplier': multiplier,
                 'payout': payout, 'result': result_str, 'balance_before': balance,
-                'segments': client_segments}
+                'segments': client_segments, 'probabilities': probabilities,
+                'rtp': round(target_rtp, 3)}
     ok, stored, race_cached = _gm.settle_with_idempotency(uid, bet_amount, payout, request_id, template)
     if race_cached:
         return jsonify(race_cached)
@@ -10460,13 +11447,13 @@ def api_wheel_spin():
     result = stored
     new_balance = result.get('balance_after', balance)
 
-    session_id = f"WHL{str(int(datetime.now().timestamp()))[-8:]}"
+    session_id = f"WHL{secrets.token_hex(6)}"
     _gm.algorithm.log_decision(
         session_id=session_id, user_id=uid, game_id='GAME009',
-        base_chance=float(game.get('base_win_chance', 0.50)),
+        base_chance=float(game_row.get('base_win_chance', 0.40)),
         adjusted_chance=win_chance, factors=algo_result['factors'],
         decision=algo_result['decision'],
-        reason=f"Wheel segment={segment} mult={multiplier}; {algo_result['reason']}"
+        reason=f"Wheel segment={segment} mult={multiplier} rtp={target_rtp:.3f}; {algo_result['reason']}"
     )
     _gm.tracker.log_session({
         'session_id': session_id, 'game_id': 'GAME009', 'user_id': uid,
@@ -11249,6 +12236,9 @@ def api_snatch_spin():
     request_id = _get_request_id()
     if not uid:
         return jsonify({'error': 'Missing params'}), 400
+    # هوية موثقة فقط — بدونها يمكن اللعب بهوية أي ضحية عبر uid مجرد
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Unauthorized'}), 403
 
     # Idempotency check BEFORE any side effects — replays return the stored
     # response without creating duplicate sessions or debits.
@@ -11257,15 +12247,27 @@ def api_snatch_spin():
         if cached:
             return jsonify(cached)
 
-    bet_amount = float(data.get('bet', 0))
-    if bet_amount <= 0:
-        return jsonify({'error': 'Missing params'}), 400
+    # NaN/Infinity rejected + catalog min/max enforced
+    try:
+        bet_amount = float(data.get('bet', 0))
+    except (ValueError, TypeError):
+        return jsonify({'error': 'مبلغ غير صالح'}), 400
+    if not math.isfinite(bet_amount) or bet_amount <= 0:
+        return jsonify({'error': 'مبلغ غير صالح'}), 400
+
+    # مفتاح الإيقاف يحترم: لا fallback يجعل اللعبة تعمل بدون صف الكتالوج
+    game = _gm.get_game('GAME001')
+    if not game or str(game.get('is_active', 'yes')).lower() in ('no', 'false', '0'):
+        return jsonify({'success': False, 'error': 'اللعبة متوقفة مؤقتاً'}), 503
+    try:
+        min_bet = float(game.get('min_bet') or 10)
+        max_bet = float(game.get('max_bet') or 2000)
+    except (ValueError, TypeError):
+        min_bet, max_bet = 10.0, 2000.0
+    if bet_amount < min_bet or bet_amount > max_bet:
+        return jsonify({'success': False, 'error': f'الرهان بين {int(min_bet)} و {int(max_bet)}'}), 400
 
     player = _gm.tracker.get_profile(uid)
-    game = _gm.get_game('GAME001') or {
-        'id': 'GAME001', 'base_win_chance': '0.55', 'house_edge_pct': '12',
-        'min_bet': '10', 'max_bet': '2000'
-    }
 
     risk_check = _gm.risk.check_risk(player, bet_amount, game)
     if not risk_check['allowed']:
@@ -11277,6 +12279,15 @@ def api_snatch_spin():
         return jsonify({'success': False, 'error': 'رصيد غير كافٍ',
                         'need_deposit': True, 'balance': balance})
 
+    # منع جلستين متزامنتين لنفس اللاعب — جلسته السابقة تُستأنف أو تُنتظر
+    sdb_pre = _snatch_db()
+    try:
+        active = sdb_pre.snatch_get_active_by_user(uid) if hasattr(sdb_pre, 'snatch_get_active_by_user') else None
+    except Exception:
+        active = None
+    if active:
+        return jsonify({'success': False, 'error': 'لديك جولة نشطة بالفعل — أكملها أولاً'}), 409
+
     session_id = f"SNT{secrets.token_hex(8)}"
     # Use request_id as the wallet idempotency key; fall back to session-derived key.
     deduction_key = request_id or f"spin_{session_id}"
@@ -11285,12 +12296,11 @@ def api_snatch_spin():
     # The payout is determined by the server's game algorithm, not the client.
     # It is stored in the session row immediately so /api/snatch/end and the
     # sweep can credit the same amount regardless of what score the client reports.
-    # HouseAlgorithm.calculate_win_chance() returns decision values:
-    #   'allow_win'  → player wins this round
-    #   'near_miss'  → near-win (house keeps edge; treat as a loss for payout)
-    #   'force_lose' → hard loss
+    # سقف مالي: احتمال الفوز للدفع محدود بـ 0.545 — مع متوسط مضاعف أساس 1.40
+    # وبونص مهارة ≤ 0.15 يكون EV ∈ [0.76, 0.85] مهما بلغت التعزيزات
     algo_result = _gm.algorithm.calculate_win_chance(player, game, bet_amount)
-    server_won = (algo_result['decision'] == 'allow_win')
+    p_pay = min(float(algo_result.get('win_chance', 0.0)), 0.545)
+    server_won = (algo_result.get('decision') == 'allow_win') and (_wheel_rng.random() < p_pay)
     if server_won:
         # Pick a multiplier tier; higher tier = rarer outcome
         _tier_roll = secrets.SystemRandom().random()
@@ -11381,6 +12391,9 @@ def api_snatch_end():
     uid = get_request_uid()
     if not uid:
         return jsonify({'error': 'Missing params'}), 400
+    # هوية موثقة فقط — التسوية تُنسب لصاحبها حصرياً
+    if not getattr(g, 'webapp_auth_strong', False):
+        return jsonify({'error': 'Unauthorized'}), 403
 
     session_id = str(data.get('session_id', '')).strip()
     try:
@@ -11412,6 +12425,12 @@ def api_snatch_end():
     if sess['status'] != 'pending':
         return jsonify({'error': f'Session already {sess["status"]}'}), 400
 
+    # حد أدنى لزمن اللعب (3 ثوان) — يمنع الطحن اللحظي (spin→end فوراً) دون
+    # كسر الحالة الشرعية: خسارة الأرواح الثلاث بسرعة جولة لعب حقيقية تنتهي مبكراً
+    _age = datetime.now().timestamp() - sess['created_at']
+    if _age < 3.0:
+        return jsonify({'error': 'الجولة لم تنته بعد — أكمل اللعب'}), 400
+
     if datetime.now().timestamp() - sess['created_at'] > _SNATCH_SESSION_TTL:
         return jsonify({'error': 'Session expired'}), 400
 
@@ -11419,9 +12438,20 @@ def api_snatch_end():
 
     # ── Read server-determined payout (set at spin time, never from client) ───
     # The payout was computed by the server algorithm and stored in the session
-    # row at spin time.  The client's reported score is stored for analytics
-    # but does NOT affect the financial outcome.
+    # row at spin time.  The client's reported score adds a SMALL capped skill
+    # bonus on top of a decided WIN only — it can never turn a loss into a win,
+    # and the total EV stays ≤ 0.85 (p_pay ≤ 0.55 × E[mult ≤ 1.5] = 0.825).
     payout = sess['payout'] if sess['payout'] is not None else 0.0
+    skill_bonus_mult = 0.0
+    if payout > 0:
+        if score >= 100:
+            skill_bonus_mult = 0.15
+        elif score >= 70:
+            skill_bonus_mult = 0.10
+        elif score >= 40:
+            skill_bonus_mult = 0.05
+        if skill_bonus_mult > 0:
+            payout = round(payout + bet_amount * skill_bonus_mult, 2)
 
     # ── Atomic CAS: pending → settling ────────────────────────────────────────
     # Exactly one of (this call) or (_snatch_sweep) can win the CAS.
@@ -11475,6 +12505,7 @@ def api_snatch_end():
     return jsonify({
         'success': True, 'won': won, 'score': score,
         'multiplier': display_multiplier, 'payout': payout,
+        'skill_bonus': skill_bonus_mult, 'base_payout': round(payout - bet_amount * skill_bonus_mult, 2),
         'result': result_str, 'balance_after': new_balance,
     })
 
