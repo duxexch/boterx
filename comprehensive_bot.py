@@ -14045,7 +14045,7 @@ if __name__ == "__main__":
             self.send_response(200)
             self.send_header('Content-type', 'text/plain')
             self.end_headers()
-            self.wfile.write(self.tr('a1058_البوت_يعمل', 'ar').encode('utf-8'))
+            self.wfile.write(b'OK')
         def log_message(self, format, *args):
             pass  # إسكات logs الـ HTTP
     
@@ -14071,7 +14071,7 @@ if __name__ == "__main__":
             # إضافة البوت الرئيسي إن لم يكن موجوداً
             all_bots = manager.get_all_bots()
             if not all_bots:
-                manager.add_bot(self.tr('a1059_البوت_الرئيسي', 'ar'), bot_token, os.getenv('ADMIN_USER_IDS', '7146701713'))
+                manager.add_bot('البوت الرئيسي', bot_token, os.getenv('ADMIN_USER_IDS', '7146701713'))
                 manager.toggle_bot('BOT' + bot_token[-6:], activate=True)
             
             # تشغيل جميع البوتات النشطة
