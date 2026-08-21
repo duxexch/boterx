@@ -244,14 +244,42 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             # 1) Try file-based i18n translations first
             file_text = self.get_i18n_text(key, lang)
             if file_text:
-                return file_text.format(**kwargs)
+                try:
+                    return file_text.format(**kwargs)
+                except Exception:
+                    # فشل تنسيق placeholders (مفاتيح ترجمة تالفة) — أعد النص
+                    # المترجم كما هو بدل إظهار المفتاح الخام 'a0123_...' للمستخدم
+                    return file_text
             # 2) Fall back to inline translations dict
             template = self.translations.get(key, {}).get(lang) or self.translations.get(key, {}).get('ar')
             if not template:
-                return key
-            return template.format(**kwargs)
+                return key.split('_', 1)[-1] if '_' in key else key
+            try:
+                return template.format(**kwargs)
+            except Exception:
+                return template
         except Exception:
-            return key
+            return key.split('_', 1)[-1] if '_' in key else key
+
+    _tset_cache = {}
+
+    def _tset(self, key):
+        """مجموعة نصوص مفتاح بكل اللغات — تُبنى مرة وتُخزَّن.
+        كان الموزع يبني 530-750 استدعاء tr() لكل رسالة — الآن صفر بعد أول مرة."""
+        cached = self._tset_cache.get(key)
+        if cached is not None:
+            return cached
+        texts = set()
+        try:
+            for l in self.get_supported_languages():
+                t = self.tr(key, l)
+                if t:
+                    texts.add(t)
+        except Exception:
+            pass
+        frozen = frozenset(texts)
+        self._tset_cache[key] = frozen
+        return frozen
 
     def load_i18n_translations(self):
         """تحميل ملفات الترجمة من مجلد i18n/"""
@@ -343,11 +371,24 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                 writer = csv.writer(f)
                 writer.writerow(['id', 'referrer_id', 'referred_id', 'referred_name', 'referred_phone', 'phone_verified', 'bonus_amount', 'currency', 'status', 'created_at'])
         
+        # ترحيل: أضف عمود currency لملف قائم (التدفقات تكتب 14 قيمة والقديم 13 عموداً)
+        try:
+            if os.path.exists('transactions.csv'):
+                with open('transactions.csv', 'r', encoding='utf-8-sig', newline='') as _tf:
+                    _rows = list(csv.reader(_tf))
+                if _rows and 'currency' not in _rows[0]:
+                    _rows[0] = _rows[0] + ['currency']
+                    with open('transactions.csv', 'w', newline='', encoding='utf-8-sig') as _tf:
+                        csv.writer(_tf).writerows(_rows)
+                    logger.info('transactions.csv migrated: +currency column')
+        except Exception as _te:
+            logger.error(f'transactions.csv migration failed: {_te}')
+
         # ملف المعاملات المتقدم
         if not os.path.exists('transactions.csv'):
             with open('transactions.csv', 'w', newline='', encoding='utf-8-sig') as f:
                 writer = csv.writer(f)
-                writer.writerow(['id', 'customer_id', 'telegram_id', 'name', 'type', 'company', 'wallet_number', 'amount', 'exchange_address', 'status', 'date', 'admin_note', 'processed_by'])
+                writer.writerow(['id', 'customer_id', 'telegram_id', 'name', 'type', 'company', 'wallet_number', 'amount', 'exchange_address', 'status', 'date', 'admin_note', 'processed_by', 'currency'])
         
         # ملف الشركات
         if not os.path.exists('companies.csv'):
@@ -4493,10 +4534,10 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         _feat_btn = {
             'deposit': self.tr('deposit', lang),
             'withdraw': self.tr('withdraw', lang),
-            'trading': '💱 تداول USDT',
+            'trading': self.tr('a0234_تداول', lang),
             'compensation': self.tr('svrp_title', lang),
             'matching': self.tr('match_btn', lang) if self.tr('match_btn', lang) != 'match_btn' else f"{t.get('btn_match', '🔄')} مطابقة",
-            'games': '🎮 ألعاب',
+            'games': self.tr('a0239_ألعاب', lang),
             'apps': self.tr('apps_btn', lang) if self.tr('apps_btn', lang) != 'apps_btn' else self.tr('a0117_تطبيقات', lang),
             'referral': self.tr('referral_btn', lang) if self.tr('referral_btn', lang) != 'referral_btn' else f"{t.get('btn_referral', '🎁')} اربح",
             'complaints': self.tr('complaint', lang),
@@ -4534,9 +4575,9 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
 
         keyboard = [
             [{'text': deposit_btn}, {'text': withdraw_btn}],
-            [{'text': '💱 تداول USDT'}, {'text': svrp_btn}],
+            [{'text': self.tr('a0234_تداول', lang)}, {'text': svrp_btn}],
             [{'text': wallet_btn}, {'text': profile_btn}],
-            [{'text': match_btn}, {'text': '🎮 ألعاب'}],
+            [{'text': match_btn}, {'text': self.tr('a0239_ألعاب', lang)}],
             [{'text': apps_btn}, {'text': ref_btn}],
             [{'text': notif_btn}, {'text': complaint_btn}],
             [{'text': more_btn}, {'text': lang_btn_text}],
@@ -4547,7 +4588,7 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         if self.client_features is not None:
             _feat_btn = {
                 'deposit': deposit_btn, 'withdraw': withdraw_btn,
-                'trading': '💱 تداول USDT', 'compensation': svrp_btn,
+                'trading': self.tr('a0234_تداول', lang), 'compensation': svrp_btn,
                 'matching': match_btn, 'games': '🎮 ألعاب',
                 'apps': apps_btn, 'referral': ref_btn, 'complaints': complaint_btn,
                 'multi_lang': lang_btn_text,
@@ -4670,8 +4711,15 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         
         return {'keyboard': keyboard, 'resize_keyboard': True, 'one_time_keyboard': True}
     
+    _live_stats_cache = (0, None)   # (timestamp, stats)
+
     def get_live_stats(self):
-        """إحصائيات حية — مشاركين اليانصيب + عجلة الحظ + الفائزين + الجوائز الموزعة"""
+        """إحصائيات حية — مشاركين اليانصيب + عجلة الحظ + الفائزين + الجوائز الموزعة
+        (كاش 60 ثانية: كانت 5 مسحات CSV كاملة لكل ضغطة زر البداية)"""
+        import time as _st
+        _now, _cached = self._live_stats_cache
+        if _cached is not None and (_st.time() - _now) < 60:
+            return _cached
         stats = {
             'lottery_participants': 0,
             'lottery_winners_count': 0,
@@ -4738,6 +4786,7 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         except:
             pass
 
+        self._live_stats_cache = (_st.time(), stats)
         return stats
 
     def format_stats_bar(self):
@@ -4831,8 +4880,9 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         
         if user:
             if user.get('is_banned') == 'yes':
-                ban_reason = user.get('ban_reason', self.tr('a0122_غير_محدد', lang))
-                self.send_message(chat_id, self.tr('a0123_تم_حظر', lang, ban_reason=ban_reason))
+                _bl = user.get('language', 'ar')
+                ban_reason = user.get('ban_reason', self.tr('a0122_غير_محدد', _bl))
+                self.send_message(chat_id, self.tr('a0123_تم_حظر', _bl, ban_reason=ban_reason))
                 return
 
             # 💎 تعويض: صديق لديه حساب بالفعل فتح البوت برابط إحالة —
@@ -5396,6 +5446,10 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         user_id = message['from']['id']
         state = self.user_states.get(user_id, '')
         text = message.get('text', '')
+        # لغة المستخدم أولاً — كان الاستخدام قبل التعريف يقتل السحب كله
+        # بـ UnboundLocalError من أول رسالة مبلغ (إصلاح 2026-08-20)
+        _u = self.find_user(user_id)
+        lang = _u.get('language', 'ar') if _u else 'ar'
 
         # فحص أزرار الإلغاء والعودة أولاً
         all_langs = self.get_supported_languages()
@@ -6300,7 +6354,11 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                         try:
                             del self.user_states[uid]
                         except Exception:
-                            pass
+                            # المفاتيح أرقام غالباً والـ uid نص — جرّب النوعين
+                            try:
+                                del self.user_states[int(uid)]
+                            except Exception:
+                                pass
                         try:
                             u = self.find_user(uid)
                             lang = (u or {}).get('language', 'ar')
@@ -10145,6 +10203,8 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         user_id = message['from']['id']
         chat_id = message['chat']['id']
         text = message.get('text', '').strip()
+        # لغة الحالة فوراً — كانت تُستخدم قبل تعريفها فتكسر كل خطوة
+        lang = state.get('lang', 'ar')
 
         if text in [self.tr('a0009_إلغاء', lang), self.tr('a0010_إلغاء', lang), self.tr('a0011_الغاء', lang), '🔙']:
             if user_id in self.user_states:
