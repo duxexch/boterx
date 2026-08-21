@@ -422,19 +422,43 @@ def get_all_user_states() -> dict:
 # ---------------------------------------------------------------------------
 
 class PersistentStateDict:
-    """Drop-in replacement for user_states = {} backed by SQLite."""
+    """Drop-in replacement for user_states = {} backed by SQLite.
+
+    تدعم قيم dict/list بتسلسل JSON — كانت أي حالة مركبة (المطابقة،
+    التدفقات المخصصة، ...) تنفجر بـ sqlite3.ProgrammingError
+    'type dict is not supported' فور ضغط الزر (إصلاح 2026-08-21)."""
+
+    # بادئة تُميّز القيم المسلسلة عن النصوص العادية
+    _JSON_PREFIX = '\x00json:'
 
     def __init__(self, db: BotDatabase = None):
         self._db = db or get_db()
 
+    @classmethod
+    def _encode(cls, value):
+        if isinstance(value, (dict, list, tuple)):
+            import json as _json
+            return cls._JSON_PREFIX + _json.dumps(value, ensure_ascii=False, default=str)
+        return value
+
+    @classmethod
+    def _decode(cls, value):
+        if isinstance(value, str) and value.startswith(cls._JSON_PREFIX):
+            import json as _json
+            try:
+                return _json.loads(value[len(cls._JSON_PREFIX):])
+            except Exception:
+                return value
+        return value
+
     def __setitem__(self, key, value):
-        self._db.set_user_state(key, value)
+        self._db.set_user_state(key, self._encode(value))
 
     def __getitem__(self, key):
         val = self._db.get_user_state(key)
         if val is None:
             raise KeyError(key)
-        return val
+        return self._decode(val)
 
     def __delitem__(self, key):
         self._db.del_user_state(key)   # silent if not found
@@ -444,16 +468,18 @@ class PersistentStateDict:
 
     def get(self, key, default=None):
         val = self._db.get_user_state(key)
-        return val if val is not None else default
+        return self._decode(val) if val is not None else default
 
     def items(self):
-        return list(self._db.get_all_user_states().items())
+        return [(k, self._decode(v))
+                for k, v in self._db.get_all_user_states().items()]
 
     def keys(self):
         return list(self._db.get_all_user_states().keys())
 
     def values(self):
-        return list(self._db.get_all_user_states().values())
+        return [self._decode(v)
+                for v in self._db.get_all_user_states().values()]
 
     def __len__(self):
         cur = self._db._conn().execute("SELECT COUNT(*) FROM user_states")

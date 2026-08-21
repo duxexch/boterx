@@ -5,6 +5,7 @@ Mixin extracted from comprehensive_bot.py. Preserves self.* access.
 import csv
 from datetime import datetime
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 

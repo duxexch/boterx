@@ -2181,8 +2181,8 @@ def api_agent_self_txns():
 @app.route('/api/agent/self/pending')
 @_agent_session_required
 def api_agent_self_pending():
-    """Pending matching requests assigned to this agent."""
-    return jsonify({'transactions': agent_db.get_pending_transactions(session['agent_id'])})
+    """Pending matching requests assigned to this agent — joined with request details."""
+    return jsonify({'transactions': agent_db.get_pending_with_requests(session['agent_id'])})
 
 @app.route('/api/agent/self/transactions/<txn_id>/process', methods=['POST'])
 @_agent_session_required
@@ -2192,26 +2192,36 @@ def api_agent_process_txn(txn_id):
     res = agent_db.agent_process_transaction(session['agent_id'], txn_id, decision)
     if 'error' in res:
         return jsonify(res), 400
-    # Reflect decision on the linked match request so admin dashboards agree
+    # Reflect decision on the linked match request (SQLite — single source of truth)
     mrid = res.get('match_request_id')
     if mrid:
         try:
-            with _MATCH_CSV_LOCK:
-                reqs = read_csv('match_requests.csv')
-                fieldnames = get_fieldnames('match_requests.csv', ['id','user_id','customer_id','type','amount','currency','status','created_at','approved_by','approved_at'])
-                for r in reqs:
-                    if r.get('id') == mrid:
-                        r['status'] = 'approved' if decision == 'approved' else 'rejected'
-                        r['approved_by'] = f"agent:{session['agent_id']}"
-                        r['approved_at'] = datetime.now().strftime('%Y-%m-%d %H:%M')
-                        break
-                write_csv('match_requests.csv', reqs, fieldnames)
+            agent_db.sync_match_request_from_txn(mrid, decision, session['agent_id'])
         except Exception as e:
-            # Settlement in SQLite is authoritative; CSV mirror failure must
-            # be visible in logs so an admin can reconcile manually.
             print(f"[AGENT] WARNING: settled txn {txn_id} but failed to sync "
-                  f"match_requests.csv row {mrid}: {e}")
-            log_action('agent_txn_csv_sync_failed', f'{txn_id} -> {mrid}: {e}')
+                  f"match_requests row {mrid}: {e}")
+            log_action('agent_txn_sync_failed', f'{txn_id} -> {mrid}: {e}')
+        # Notify the player via Telegram that their request was handled
+        try:
+            req = agent_db.get_match_request_full(mrid)
+            if req and req.get('user_id'):
+                _uid = str(req.get('user_id'))
+                _amt = req.get('amount', '')
+                _cur = req.get('currency', 'EGP')
+                if decision == 'approved':
+                    _comp_tg(_uid,
+                             f"✅ <b>تمت معالجة طلب المطابقة</b>\n\n"
+                             f"🆔 الطلب: <code>{mrid}</code>\n"
+                             f"💰 المبلغ: <code>{_amt} {_cur}</code>\n"
+                             f"🤝 تمت المعالجة بواسطة وكيل معتمد")
+                else:
+                    _comp_tg(_uid,
+                             f"❌ <b>لم تتم معالجة طلب المطابقة</b>\n\n"
+                             f"🆔 الطلب: <code>{mrid}</code>\n"
+                             f"💰 المبلغ: <code>{_amt} {_cur}</code>\n"
+                             f"💡 يمكنك إنشاء طلب جديد أو التواصل مع الدعم")
+        except Exception as _ne:
+            app.logger.warning(f'agent settle notify failed mrid={mrid}: {_ne}')
     return jsonify(res)
 
 @app.route('/api/agent/self/deposit-method')
@@ -2689,15 +2699,27 @@ def api_stats():
         if t.get('date', '').startswith(today):
             stats['transactions']['today'] += 1
 
-    # Matches
-    matches = read_csv('matches.csv')
-    for m in matches:
-        s = m.get('status', '')
-        if s not in ('completed', 'cancelled'): stats['matches']['active'] += 1
-        if s == 'completed': stats['matches']['completed'] += 1
-        if s == 'disputed': stats['matches']['disputed'] += 1
-    match_reqs = read_csv('match_requests.csv')
-    stats['matches']['pending'] = sum(1 for r in match_reqs if r.get('status') == 'waiting')
+    # Matches (SQLite — single source of truth)
+    try:
+        _mc = agent_db._conn()
+        _mrows = _mc.execute("SELECT status FROM matches").fetchall()
+        for _m in _mrows:
+            s = _m['status']
+            if s not in ('completed', 'cancelled'): stats['matches']['active'] += 1
+            if s == 'completed': stats['matches']['completed'] += 1
+            if s == 'disputed': stats['matches']['disputed'] += 1
+        stats['matches']['pending'] = _mc.execute(
+            "SELECT COUNT(*) c FROM match_requests WHERE status='waiting'").fetchone()['c']
+        _mc.close()
+    except Exception:
+        matches = read_csv('matches.csv')
+        for m in matches:
+            s = m.get('status', '')
+            if s not in ('completed', 'cancelled'): stats['matches']['active'] += 1
+            if s == 'completed': stats['matches']['completed'] += 1
+            if s == 'disputed': stats['matches']['disputed'] += 1
+        match_reqs = read_csv('match_requests.csv')
+        stats['matches']['pending'] = sum(1 for r in match_reqs if r.get('status') == 'waiting')
 
     # Lottery
     lot_rounds = read_csv('lottery_rounds.csv')
@@ -2756,12 +2778,22 @@ def api_stats_live():
     def generate():
         import time
         while True:
+            try:
+                _lc = agent_db._conn()
+                _active_m = _lc.execute(
+                    "SELECT COUNT(*) c FROM matches WHERE status NOT IN ('completed','cancelled')").fetchone()['c']
+                _pending_m = _lc.execute(
+                    "SELECT COUNT(*) c FROM match_requests WHERE status='waiting'").fetchone()['c']
+                _lc.close()
+            except Exception:
+                _active_m = sum(1 for m in read_csv('matches.csv') if m.get('status') not in ('completed', 'cancelled'))
+                _pending_m = sum(1 for r in read_csv('match_requests.csv') if r.get('status') == 'waiting')
             data = {
                 'timestamp': datetime.now().strftime('%H:%M:%S'),
                 'users_total': len(read_csv('users.csv')),
                 'pending_txns': sum(1 for t in read_csv('transactions.csv') if t.get('status') == 'pending'),
-                'active_matches': sum(1 for m in read_csv('matches.csv') if m.get('status') not in ('completed', 'cancelled')),
-                'pending_matches': sum(1 for r in read_csv('match_requests.csv') if r.get('status') == 'waiting'),
+                'active_matches': _active_m,
+                'pending_matches': _pending_m,
                 'lottery_participants': 0,
                 'wheel_participants': 0,
             }
@@ -3328,9 +3360,16 @@ def api_user_detail(user_id):
     wallets = read_csv('svrp_wallets.csv')
     wallet = next((w for w in wallets if w.get('telegram_id') == user_id), {})
 
-    # مطابقات المستخدم
-    matches = read_csv('matches.csv')
-    user_matches = [m for m in matches if m.get('depositor_id') == user_id or m.get('withdrawer_id') == user_id][-5:]
+    # مطابقات المستخدم (SQLite)
+    try:
+        _uc = agent_db._conn()
+        user_matches = [dict(r) for r in _uc.execute(
+            "SELECT * FROM matches WHERE depositor_id=? OR withdrawer_id=? "
+            "ORDER BY created_at DESC LIMIT 5", (str(user_id), str(user_id))).fetchall()]
+        _uc.close()
+    except Exception:
+        matches = read_csv('matches.csv')
+        user_matches = [m for m in matches if m.get('depositor_id') == user_id or m.get('withdrawer_id') == user_id][-5:]
 
     return jsonify({
         'user': user,
@@ -3882,45 +3921,82 @@ def api_save_payment_links():
     log_action('save_payment_links', f'method={method_id}, companies={len(company_ids)}')
     return jsonify({'success': True, 'linked_count': len(company_ids)})
 
-# ===== API — Matching =====
+# ===== API — Matching (SQLite — single source of truth) =====
 
 @app.route('/api/matching/active')
 @api_auth
 def api_matching_active():
-    matches = read_csv('matches.csv')
-    active = [m for m in matches if m.get('status') not in ('completed', 'cancelled')]
-    active.reverse()
+    conn = agent_db._conn()
+    try:
+        rows = conn.execute('''
+            SELECT m.*, a.bot_name AS agent_name
+            FROM matches m LEFT JOIN agent_bots a ON m.agent_id = a.id
+            WHERE m.status NOT IN ('completed','cancelled')
+            ORDER BY m.created_at DESC''').fetchall()
+        active = [dict(r) for r in rows]
+    finally:
+        conn.close()
     return jsonify({'matches': active, 'count': len(active)})
 
 @app.route('/api/matching/pending')
 @api_auth
 def api_matching_pending():
-    reqs = read_csv('match_requests.csv')
-    pending = [r for r in reqs if r.get('status') == 'waiting']
-    pending.reverse()
+    """Pending matching requests — with assigned-agent info so the main admin
+    sees exactly which agent is on duty for each request."""
+    conn = agent_db._conn()
+    try:
+        rows = conn.execute('''
+            SELECT r.*, a.bot_name AS agent_name, a.is_online AS agent_online,
+                   (SELECT COUNT(*) FROM agent_transactions t
+                    WHERE t.match_request_id = r.id AND t.status='pending') AS has_pending_txn
+            FROM match_requests r
+            LEFT JOIN agent_bots a ON r.assigned_agent_id = a.id
+            WHERE r.status='waiting'
+            ORDER BY r.created_at DESC''').fetchall()
+        pending = [dict(r) for r in rows]
+    finally:
+        conn.close()
     return jsonify({'requests': pending, 'count': len(pending)})
 
 @app.route('/api/matching/logs')
 @api_auth
 def api_matching_logs():
-    matches = read_csv('matches.csv')
-    logs = [m for m in matches if m.get('status') in ('completed', 'cancelled')]
-    logs.reverse()
-    return jsonify({'matches': logs[:50], 'count': len(logs)})
+    conn = agent_db._conn()
+    try:
+        rows = conn.execute('''
+            SELECT m.*, a.bot_name AS agent_name
+            FROM matches m LEFT JOIN agent_bots a ON m.agent_id = a.id
+            WHERE m.status IN ('completed','cancelled')
+            ORDER BY m.created_at DESC LIMIT 50''').fetchall()
+        logs = [dict(r) for r in rows]
+    finally:
+        conn.close()
+    return jsonify({'matches': logs, 'count': len(logs)})
 
 @app.route('/api/matching/<match_id>/chat')
 @api_auth
 def api_match_chat(match_id):
-    messages = read_csv('chat_messages.csv')
-    chat = [m for m in messages if m.get('match_id') == match_id]
+    conn = agent_db._conn()
+    try:
+        rows = conn.execute(
+            'SELECT * FROM chat_messages WHERE match_id=? ORDER BY id', (match_id,)).fetchall()
+        chat = [dict(r) for r in rows]
+    finally:
+        conn.close()
     return jsonify({'messages': chat})
 
 @app.route('/api/matching/<match_id>/disputes')
 @api_auth
 def api_match_disputes(match_id):
-    disputes = read_csv('disputes.csv')
-    match_disputes = [d for d in disputes if d.get('match_id') == match_id]
-    return jsonify({'disputes': match_disputes})
+    conn = agent_db._conn()
+    try:
+        rows = conn.execute(
+            'SELECT * FROM match_disputes WHERE match_id=? ORDER BY created_at DESC',
+            (match_id,)).fetchall()
+        disputes = [dict(r) for r in rows]
+    finally:
+        conn.close()
+    return jsonify({'disputes': disputes})
 
 # ── User-facing matching (نظام المطابقة) — strong webapp auth ──
 
@@ -3941,22 +4017,28 @@ def _matching_strong_auth_or_error():
 @app.route('/api/matching/my')
 @webapp_auth
 def api_matching_my():
-    """Current user's matching requests, newest first."""
+    """Current user's matching requests, newest first (SQLite)."""
     err = _matching_strong_auth_or_error()
     if err:
         return err
     uid = str(get_request_uid() or '')
     if not uid:
         return jsonify({'error': 'Missing uid'}), 400
-    reqs = [r for r in read_csv('match_requests.csv') if str(r.get('user_id', '')) == uid]
-    reqs.reverse()
-    return jsonify({'requests': reqs[:20]})
+    conn = agent_db._conn()
+    try:
+        rows = conn.execute(
+            'SELECT * FROM match_requests WHERE user_id=? ORDER BY created_at DESC LIMIT 20',
+            (uid,)).fetchall()
+        reqs = [dict(r) for r in rows]
+    finally:
+        conn.close()
+    return jsonify({'requests': reqs})
 
 @app.route('/api/matching/request', methods=['POST'])
 @webapp_auth
 def api_matching_create():
-    """Create a deposit/withdraw matching request; auto-assigns an agent when
-    one is available (SQLite pick is atomic). Appears in admin Pending tab."""
+    """Create a deposit/withdraw matching request — atomic SQLite create +
+    agent pick + escrow hold. Notifies main admins AND the assigned agent."""
     err = _matching_strong_auth_or_error()
     if err:
         return err
@@ -3989,32 +4071,45 @@ def api_matching_create():
         except Exception:
             pass
 
-    # One open request per type per user — keeps the queue clean.
-    # Lock spans the duplicate check + append so concurrent creates can't race.
-    with _MATCH_CSV_LOCK:
-        existing = read_csv('match_requests.csv')
-        for r in existing:
-            if (str(r.get('user_id', '')) == uid and r.get('type') == rtype
-                    and r.get('status') == 'waiting'):
-                return jsonify({'error': 'لديك طلب قيد الانتظار بالفعل — الغِه أولاً أو انتظر معالجته',
-                                'request_id': r.get('id')}), 409
+    rid, error, agent_assigned, agent_info = agent_db.create_match_request_with_agent_assignment(
+        uid, uid, rtype, amount, currency,
+        company_id='', company_name='', payment_method_id='', details=details)
+    if error:
+        status_code = 409 if 'نشط' in (error or '') else 400
+        return jsonify({'error': error}), status_code
 
-        rid = f"MR{datetime.now().strftime('%Y%m%d%H%M%S')}{secrets.token_hex(2).upper()}"
-        row = {'id': rid, 'user_id': uid, 'customer_id': uid, 'type': rtype,
-               'amount': f'{amount:g}', 'currency': currency, 'status': 'waiting',
-               'created_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
-               'approved_by': '', 'approved_at': ''}
-        append_csv('match_requests.csv', row, _MATCH_REQ_FIELDS)
     log_action('match_request_created', f'{rid} {rtype} {amount} {currency} by {uid}')
 
-    agent_assigned = False
+    # ── Notify main admins (Telegram) ──
+    type_ar = 'إيداع' if rtype == 'deposit' else 'سحب'
+    agent_line = ''
+    if agent_assigned and agent_info:
+        agent_line = f"\n🤖 الوكيل المعين: <b>{agent_info.get('name') or agent_info.get('id')}</b>"
     try:
-        res = agent_db.pick_and_create_transaction(
-            rtype, amount, currency=currency, user_id=uid,
-            user_name=user_name, match_request_id=rid, payment_details=details)
-        agent_assigned = bool(res)
-    except Exception as e:
-        print(f"[MATCHING] agent auto-assign failed for {rid}: {e}")
+        _comp_alert_admins(
+            f"🔄 <b>طلب مطابقة جديد</b>\n\n"
+            f"🆔 <code>{rid}</code>\n"
+            f"👤 المستخدم: <code>{uid}</code>\n"
+            f"{'💵' if rtype == 'deposit' else '💸'} النوع: {type_ar}\n"
+            f"💰 المبلغ: <code>{amount:g} {currency}</code>"
+            f"{agent_line}\n\n"
+            f"📋 راجعه من لوحة المطابقات ← المعلقة")
+    except Exception as _ne:
+        app.logger.warning(f'matching admin notify failed {rid}: {_ne}')
+
+    # ── Notify the assigned agent (Telegram, if linked) ──
+    if agent_assigned and agent_info and agent_info.get('telegram_id'):
+        try:
+            _comp_tg(str(agent_info['telegram_id']),
+                     f"🔔 <b>طلب مطابقة جديد معيّن لك</b>\n\n"
+                     f"🆔 <code>{rid}</code>\n"
+                     f"{'💵' if rtype == 'deposit' else '💸'} النوع: "
+                     f"{'إيداع (تدفع للمستخدم)' if rtype == 'deposit' else 'سحب (تستلم من المستخدم)'}\n"
+                     f"💰 المبلغ: <code>{amount:g} {currency}</code>\n\n"
+                     f"⚡ افحصه من لوحة الوكيل ← الطلبات المعلقة")
+        except Exception as _ae:
+            app.logger.warning(f'matching agent notify failed {rid}: {_ae}')
+
     return jsonify({'success': True, 'request_id': rid,
                     'agent_assigned': agent_assigned,
                     'message': 'تم إنشاء طلب المطابقة — بانتظار المعالجة'})
@@ -4022,41 +4117,21 @@ def api_matching_create():
 @app.route('/api/matching/my/<rid>/cancel', methods=['POST'])
 @webapp_auth
 def api_matching_cancel(rid):
-    """Cancel own still-waiting matching request (also frees assigned agent).
-    Cancellation only wins while any linked agent transaction is still pending:
-    we void the agent txn FIRST (atomic in SQLite), then re-check the CSV row
-    under the lock — if an agent settled meanwhile, the cancel is rejected."""
+    """Cancel own still-waiting matching request — atomic in SQLite
+    (voids pending agent txn + releases escrow + frees daily quota)."""
     err = _matching_strong_auth_or_error()
     if err:
         return err
     uid = str(get_request_uid() or '')
     if not uid:
         return jsonify({'error': 'Missing uid'}), 400
-    with _MATCH_CSV_LOCK:
-        reqs = read_csv('match_requests.csv')
-        fieldnames = get_fieldnames('match_requests.csv', _MATCH_REQ_FIELDS)
-        target = None
-        for r in reqs:
-            if r.get('id') == rid and str(r.get('user_id', '')) == uid:
-                target = r
-                break
-        if target is None:
-            return jsonify({'error': 'الطلب غير موجود'}), 404
-        if target.get('status') != 'waiting':
-            return jsonify({'error': 'لا يمكن إلغاء هذا الطلب'}), 400
-        # Void the pending agent txn first; if the agent already settled it,
-        # this returns False with a settled txn present → reject the cancel.
-        try:
-            voided = agent_db.void_pending_by_match_request(rid)
-        except Exception as e:
-            print(f"[MATCHING] failed to void agent txn for {rid}: {e}")
-            return jsonify({'error': 'تعذر الإلغاء الآن — حاول مجدداً'}), 500
-        if not voided and agent_db.has_settled_txn_for_match_request(rid):
-            return jsonify({'error': 'تمت معالجة الطلب بالفعل — لا يمكن إلغاؤه'}), 409
-        target['status'] = 'cancelled'
-        target['approved_by'] = f'user:{uid}'
-        target['approved_at'] = datetime.now().strftime('%Y-%m-%d %H:%M')
-        write_csv('match_requests.csv', reqs, fieldnames)
+    ok, error = agent_db.cancel_match_request_atomic(rid, uid)
+    if not ok:
+        if 'بالفعل' in (error or ''):
+            return jsonify({'error': error}), 409
+        if 'غير موجود' in (error or ''):
+            return jsonify({'error': error}), 404
+        return jsonify({'error': error or 'تعذر الإلغاء الآن — حاول مجدداً'}), 500
     log_action('match_request_cancelled', f'{rid} by user {uid}')
     return jsonify({'success': True})
 
@@ -7584,16 +7659,24 @@ def api_wheel_end(round_id):
 @api_auth
 @permission_required('approve_deposits')
 def api_matching_approve(req_id):
-    reqs = read_csv('match_requests.csv')
-    fieldnames = get_fieldnames('match_requests.csv', ['id','user_id','customer_id','type','amount','currency','status','created_at','approved_by','approved_at'])
-    for r in reqs:
-        if r.get('id') == req_id:
-            r['status'] = 'approved'
-            r['approved_by'] = session.get('admin_id', '')
-            r['approved_at'] = datetime.now().strftime('%Y-%m-%d %H:%M')
-            break
-    write_csv('match_requests.csv', reqs, fieldnames)
+    """Admin approves a waiting request (SQLite). Pending agent txn stays
+    alive so the on-duty agent can settle it; request becomes 'approved'."""
+    ok, error = agent_db.admin_set_match_request_status(
+        req_id, 'approved', actor=str(session.get('admin_id', '')))
+    if not ok:
+        return jsonify({'error': error}), 400
     log_action('matching_approve', req_id)
+    # Notify the player
+    try:
+        req = agent_db.get_match_request_full(req_id)
+        if req and req.get('user_id'):
+            _comp_tg(str(req['user_id']),
+                     f"✅ <b>تمت الموافقة على طلب المطابقة</b>\n\n"
+                     f"🆔 <code>{req_id}</code>\n"
+                     f"💰 المبلغ: <code>{req.get('amount', '')} {req.get('currency', '')}</code>\n"
+                     f"⏳ قيد المعالجة النهائية")
+    except Exception:
+        pass
     return jsonify({'success': True})
 
 
@@ -7601,15 +7684,24 @@ def api_matching_approve(req_id):
 @api_auth
 @permission_required('reject_deposits')
 def api_matching_reject(req_id):
+    """Admin rejects a waiting request (SQLite). Voids pending agent txn,
+    releases escrow + daily quota atomically."""
     reason = request.json.get('reason', '') if request.json else ''
-    reqs = read_csv('match_requests.csv')
-    fieldnames = get_fieldnames('match_requests.csv', ['id','user_id','customer_id','type','amount','currency','status','created_at','approved_by','approved_at'])
-    for r in reqs:
-        if r.get('id') == req_id:
-            r['status'] = 'rejected'
-            break
-    write_csv('match_requests.csv', reqs, fieldnames)
+    ok, error = agent_db.admin_set_match_request_status(
+        req_id, 'rejected', actor=str(session.get('admin_id', '')))
+    if not ok:
+        return jsonify({'error': error}), 400
     log_action('matching_reject', f'{req_id}: {reason}')
+    try:
+        req = agent_db.get_match_request_full(req_id)
+        if req and req.get('user_id'):
+            _comp_tg(str(req['user_id']),
+                     f"❌ <b>تم رفض طلب المطابقة</b>\n\n"
+                     f"🆔 <code>{req_id}</code>\n"
+                     + (f"📝 السبب: {reason}\n" if reason else '')
+                     + f"💡 يمكنك إنشاء طلب جديد أو التواصل مع الدعم")
+    except Exception:
+        pass
     return jsonify({'success': True})
 
 
@@ -7617,34 +7709,33 @@ def api_matching_reject(req_id):
 @api_auth
 @permission_required('view_financial')
 def api_resolve_dispute(match_id):
+    """Resolve an open dispute (SQLite: matches + match_disputes)."""
     favor = request.json.get('favor', 'cancel') if request.json else 'cancel'
     note = request.json.get('note', '') if request.json else ''
+    admin_id = str(session.get('admin_id', ''))
 
-    matches = read_csv('matches.csv')
-    match_fieldnames = get_fieldnames('matches.csv', ['id','depositor_id','withdrawer_id','depositor_txn_id','withdrawer_txn_id','status','created_at','resolved_by','resolution'])
-    for m in matches:
-        if m.get('id') == match_id:
-            if favor == 'depositor':
-                m['status'] = 'completed'
-            elif favor == 'withdrawer':
-                m['status'] = 'completed'
-            else:
-                m['status'] = 'cancelled'
-            m['resolution'] = favor
-            m['resolved_by'] = session.get('admin_id', '')
-            break
-    write_csv('matches.csv', matches, match_fieldnames)
-
-    disputes = read_csv('disputes.csv')
-    dispute_fieldnames = get_fieldnames('disputes.csv', ['id','match_id','raised_by','reason','status','created_at','resolution','resolved_by','resolved_at'])
-    for d in disputes:
-        if d.get('match_id') == match_id and d.get('status') != 'resolved':
-            d['status'] = 'resolved'
-            d['resolution'] = favor
-            d['resolved_by'] = session.get('admin_id', '')
-            d['resolved_at'] = datetime.now().strftime('%Y-%m-%d %H:%M')
-            break
-    write_csv('disputes.csv', disputes, dispute_fieldnames)
+    conn = agent_db._conn()
+    try:
+        conn.execute('BEGIN IMMEDIATE')
+        new_status = 'cancelled' if favor == 'cancel' else 'completed'
+        cur = conn.execute(
+            "UPDATE matches SET status=?, dispute_status='resolved' WHERE id=?",
+            (new_status, match_id))
+        if cur.rowcount == 0:
+            conn.rollback()
+            return jsonify({'error': 'المطابقة غير موجودة'}), 404
+        conn.execute('''
+            UPDATE match_disputes SET status='resolved_by_admin',
+                admin_response=?, resolved_at=?
+            WHERE match_id=? AND status='open'
+        ''', (f'{favor}: {note}' if note else favor,
+              datetime.now().strftime('%Y-%m-%d %H:%M:%S'), match_id))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
 
     log_action('resolve_dispute', f'{match_id}: {favor}')
     return jsonify({'success': True})
@@ -7820,7 +7911,13 @@ def api_detailed_stats():
 
     users = read_csv('users.csv')
     txns = read_csv('transactions.csv')
-    matches = read_csv('matches.csv')
+    try:
+        _dsc = agent_db._conn()
+        matches = [dict(r) for r in _dsc.execute(
+            'SELECT * FROM matches').fetchall()]
+        _dsc.close()
+    except Exception:
+        matches = read_csv('matches.csv')
     companies = read_csv('companies.csv')
     complaints = read_csv('complaints.csv')
 
@@ -8216,9 +8313,14 @@ def api_user_company_accounts(user_id):
 @app.route('/api/matching/ratings')
 @api_auth
 def api_match_ratings():
-    ratings = read_csv('ratings.csv')
-    ratings.reverse()
-    return jsonify({'ratings': ratings[:50]})
+    conn = agent_db._conn()
+    try:
+        rows = conn.execute(
+            'SELECT * FROM match_ratings ORDER BY timestamp DESC LIMIT 50').fetchall()
+        ratings = [dict(r) for r in rows]
+    finally:
+        conn.close()
+    return jsonify({'ratings': ratings})
 
 # ===== API — Referral Earnings Per User =====
 

@@ -6163,54 +6163,39 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                 return
             req_type = state.get('type', 'deposit')
             currency = user.get('currency', 'EGP') or 'EGP'
-            # اختيار وكيل + إنشاء معاملته ذرّياً (حصص المرور وكل الاستثناءات)
-            picked = None
-            try:
-                import agent_db
-                # للوكيل: مطابقة الإيداع من المستخدم = سحب للوكيل (يستلم أموالاً)
-                agent_txn_type = 'withdraw' if req_type == 'deposit' else 'deposit'
-                picked = agent_db.pick_and_create_transaction(
-                    agent_txn_type, amount, currency,
-                    user_id=user_id, user_name=user.get('name', ''))
-            except Exception as e:
-                print(f"agent pick error: {e}")
+            # إنشاء ذرّي موحد: طلب + اختيار وكيل + حجز escrow في معاملة واحدة
+            import agent_db as _adb
+            req_id, err, assigned, agent_info = _adb.create_match_request_with_agent_assignment(
+                user_id, user.get('customer_id', ''), req_type, amount, currency,
+                company_id='', company_name='', payment_method_id='', bot_id='')
             if user_id in self.user_states:
                 del self.user_states[user_id]
-            if not picked:
-                self.send_message(chat_id,
-                    '😔 لا يوجد وكيل متاح حالياً لهذا المبلغ — حاول لاحقاً أو استخدم الإيداع/السحب العادي.',
-                    self.main_keyboard(lang, user_id))
+            if err:
+                self.send_message(chat_id, f'⚠️ {err}', self.main_keyboard(lang, user_id))
                 return
-            agent, txn_id = picked['agent'], picked['txn_id']
-            # إنشاء طلب المطابقة — وعند الفشل نلغي معاملة الوكيل ونحرر الحصة
-            req_id = None
-            if self.match_manager:
-                req_id, err = self.match_manager.create_match_request(
-                    user_id, user.get('customer_id', ''), req_type, amount,
-                    currency, '', '', '', bot_id=agent['id'])
-                if err:
-                    try:
-                        import agent_db
-                        agent_db.void_pending_transaction(agent['id'], txn_id)
-                    except Exception as e2:
-                        print(f"agent txn void error: {e2}")
-                    self.send_message(chat_id, f'⚠️ {err}', self.main_keyboard(lang, user_id))
-                    return
-            if req_id:
-                try:
-                    import agent_db
-                    agent_db.set_txn_match_request(txn_id, req_id)
-                except Exception as e:
-                    print(f"agent txn link error: {e}")
             type_label = 'إيداع' if req_type == 'deposit' else 'سحب'
+            agent_line = '\n🤝 تم توجيه طلبك إلى وكيل معتمد' if assigned else \
+                '\n⏳ بانتظار توفر وكيل أو مطابقة P2P'
             self.send_message(chat_id,
                 f"✅ <b>تم إنشاء طلب المطابقة</b>\n\n"
-                f"🆔 رقم الطلب: <code>{req_id or '-'}</code>\n"
+                f"🆔 رقم الطلب: <code>{req_id}</code> 👈 اضغط للنسخ\n"
                 f"🔄 النوع: {type_label}\n"
-                f"💰 المبلغ: {amount:g} {currency}\n"
-                f"🤝 تم توجيه طلبك إلى وكيل معتمد\n"
+                f"💰 المبلغ: {amount:g} {currency}"
+                f"{agent_line}\n"
                 f"⏳ سيتم إشعارك فور معالجة الطلب.",
                 self.main_keyboard(lang, user_id))
+            # إشعار الوكيل المعيّن في تيليجرام (إن كان مربوطاً)
+            if assigned and agent_info and agent_info.get('telegram_id'):
+                try:
+                    self.send_message(int(agent_info['telegram_id']),
+                        f"🔔 <b>طلب مطابقة جديد معيّن لك</b>\n\n"
+                        f"🆔 <code>{req_id}</code>\n"
+                        f"{'💵' if req_type == 'deposit' else '💸'} النوع: "
+                        f"{'إيداع (تدفع للمستخدم)' if req_type != 'deposit' else 'سحب (تستلم من المستخدم)'}\n"
+                        f"💰 المبلغ: <code>{amount:g} {currency}</code>\n\n"
+                        f"⚡ افحصه من لوحة الوكيل ← الطلبات المعلقة")
+                except Exception as _age:
+                    logger.warning(f"agent TG notify failed {req_id}: {_age}")
             return
 
         # خطوة غير معروفة — تنظيف
@@ -6225,24 +6210,34 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         completed_count = 0
 
         try:
-            with open('matches.csv', 'r', encoding='utf-8-sig') as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    if row.get('status') not in ('completed', 'cancelled'):
-                        active_count += 1
-                    else:
-                        completed_count += 1
-        except:
-            pass
-
-        try:
-            with open('match_requests.csv', 'r', encoding='utf-8-sig') as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    if row.get('status') == 'waiting':
-                        pending_count += 1
-        except:
-            pass
+            import agent_db as _adb
+            _c = _adb._conn()
+            active_count = _c.execute(
+                "SELECT COUNT(*) c FROM matches WHERE status NOT IN ('completed','cancelled')").fetchone()['c']
+            pending_count = _c.execute(
+                "SELECT COUNT(*) c FROM match_requests WHERE status='waiting'").fetchone()['c']
+            completed_count = _c.execute(
+                "SELECT COUNT(*) c FROM matches WHERE status IN ('completed','cancelled')").fetchone()['c']
+            _c.close()
+        except Exception:
+            try:
+                with open('matches.csv', 'r', encoding='utf-8-sig') as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        if row.get('status') not in ('completed', 'cancelled'):
+                            active_count += 1
+                        else:
+                            completed_count += 1
+            except:
+                pass
+            try:
+                with open('match_requests.csv', 'r', encoding='utf-8-sig') as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        if row.get('status') == 'waiting':
+                            pending_count += 1
+            except:
+                pass
 
         # عد بوتات المطابقة
         match_bots = []
@@ -6261,10 +6256,11 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         )
 
         inline_btns = [
-            [{'text': '🟢 المطابقات النشطة', 'callback_data': 'match_admin_active'}],
-            [{'text': '⏳ الطلبات المعلقة', 'callback_data': 'match_admin_pending'}],
-            [{'text': '📜 السجلات', 'callback_data': 'match_admin_logs'}],
-            [{'text': '🤖 بوتات المطابقة', 'callback_data': 'match_admin_bots'}],
+            [{'text': '🟢 المطابقات النشطة', 'callback_data': 'match_admin_active'},
+             {'text': '⏳ الطلبات المعلقة', 'callback_data': 'match_admin_pending'}],
+            [{'text': '📜 السجلات', 'callback_data': 'match_admin_logs'},
+             {'text': '🤖 بوتات المطابقة', 'callback_data': 'match_admin_bots'}],
+            [{'text': '🔄 تحديث', 'callback_data': 'match_admin_refresh'}],
             [{'text': '🔙 لوحة الأدمن', 'callback_data': 'match_back_admin'}]
         ]
         self.send_inline_message(chat_id, text, inline_btns)

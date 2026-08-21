@@ -160,11 +160,15 @@ function loadPending(){
     document.getElementById('pendingCount').textContent=list.length?('('+list.length+')'):'';
     var h='';
     list.forEach(function(t){
+      var tid=t.txn_id||t.id;
       h+='<div class="method"><span class="method-icon">'+(t.type==='deposit'?'💵':'💸')+'</span>'
-        +'<div class="method-info"><div class="method-name">'+(t.type==='deposit'?'إيداع (تدفع للمستخدم)':'سحب (تستلم من المستخدم)')+' — '+esc(t.amount)+' '+esc(t.currency)+'</div>'
-        +'<div class="method-data">'+esc(t.user_name||t.user_id||'—')+' · '+esc((t.created_at||'').slice(0,16))+'</div></div>'
-        +'<button class="btn btn-primary" style="padding:6px 10px;font-size:11px" onclick="processTxn(\''+esc(t.id)+'\',\'approved\')">✔ قبول</button>'
-        +'<button class="btn" style="background:rgba(255,71,87,.15);color:#ff4757;padding:6px 10px;font-size:11px" onclick="processTxn(\''+esc(t.id)+'\',\'rejected\')">✖ رفض</button></div>';
+        +'<div class="method-info"><div class="method-name">'+(t.type==='deposit'?'إيداع (تدفع للمستخدم)':'سحب (تستلم من المستخدم)')+' — '+esc(t.amount)+' '+esc(t.currency||'EGP')+'</div>'
+        +'<div class="method-data">'+esc(t.user_name||t.user_id||'—')
+        +(t.company_name?' · '+esc(t.company_name):'')
+        +' · '+esc((t.created_at||'').slice(0,16))
+        +(tid?' · <span style="opacity:.7">'+esc(tid)+'</span>':'')+'</div></div>'
+        +'<button class="btn btn-primary" style="padding:6px 10px;font-size:11px" onclick="processTxn(\''+esc(tid)+'\',\'approved\')">✔ قبول</button>'
+        +'<button class="btn" style="background:rgba(255,71,87,.15);color:#ff4757;padding:6px 10px;font-size:11px" onclick="processTxn(\''+esc(tid)+'\',\'rejected\')">✖ رفض</button></div>';
     });
     if(!h)h='<div class="empty">لا توجد طلبات معلقة</div>';
     document.getElementById('pendingList').innerHTML=h;
@@ -236,7 +240,7 @@ function depositBalance(){
   });
 }
 loadSelf();loadPending();loadMethods();loadTxns();loadDepHistory();
-setInterval(function(){loadSelf();loadPending();sendHeartbeat()},30000);
+setInterval(function(){loadSelf();loadPending();sendHeartbeat()},15000);
 function sendHeartbeat(){
   fetch('/api/agent/self/heartbeat',{method:'POST'}).catch(function(){});
 }
