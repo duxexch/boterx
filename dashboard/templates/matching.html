@@ -99,6 +99,7 @@
                         <th data-i18n="amount">Amount</th>
                         <th data-i18n="company">Company</th>
                         <th>🤖 الوكيل</th>
+                        <th>State</th>
                         <th>Alias</th>
                         <th data-i18n="date">Date</th>
                         <th data-i18n="actions">Actions</th>
@@ -106,13 +107,13 @@
                 </thead>
                 <tbody>
                     <template x-if="loading">
-                        <tr><td colspan="9" class="text-center p-8 text-slate-400">
+                        <tr><td colspan="10" class="text-center p-8 text-slate-400">
                             <i class="fas fa-spinner fa-spin text-2xl"></i>
                             <p class="mt-2" data-i18n="loading">Loading...</p>
                         </td></tr>
                     </template>
                     <template x-if="!loading && pendingRequests.length === 0">
-                        <tr><td colspan="9" class="text-center p-8 text-slate-400">
+                        <tr><td colspan="10" class="text-center p-8 text-slate-400">
                             <i class="fas fa-inbox text-3xl mb-2"></i>
                             <p>لا توجد طلبات معلقة</p>
                         </td></tr>
@@ -136,10 +137,16 @@
                                 <span x-show="r.agent_name" class="px-2 py-0.5 rounded text-xs bg-blue-500/20 text-blue-400" x-text="r.agent_name || ''"></span>
                                 <span x-show="!r.agent_name" class="text-xs text-slate-500">بدون وكيل</span>
                             </td>
+                            <td>
+                                <span class="px-2 py-0.5 rounded text-xs bg-slate-700 text-slate-200" x-text="r.state || 'created'"></span>
+                            </td>
                             <td class="text-sm" x-text="r.alias || '—'"></td>
                             <td class="text-xs text-slate-400" x-text="r.created_at || '—'"></td>
                             <td>
                                 <div class="flex gap-1">
+                                    <button @click="openRequestDetail(r)" class="btn btn-primary btn-sm">
+                                        <i class="fas fa-list-check"></i> Steps
+                                    </button>
                                     <button @click="approveRequest(r.id)" x-show="rbac('approve_deposits')" class="btn btn-success btn-sm">
                                         <i class="fas fa-check"></i> <span x-text="t('approve')">قبول</span>
                                     </button>
@@ -265,6 +272,65 @@
         </div>
     </div>
 
+    <!-- Request Steps Modal -->
+    <div x-show="showReqDetail" x-transition class="modal-overlay" @click.self="showReqDetail = false" style="display:none">
+        <div class="modal" style="max-width:760px">
+            <h3 class="font-bold text-lg mb-3">تفاصيل الطلب + الخطوات</h3>
+            <template x-if="selectedRequest">
+                <div class="space-y-4">
+                    <div class="grid grid-cols-2 gap-3 text-sm">
+                        <div><span class="text-slate-400">ID:</span> <span class="font-mono" x-text="selectedRequest.id"></span></div>
+                        <div><span class="text-slate-400">الحالة:</span> <span class="font-mono" x-text="(selectedRequest.status||'') + ' / ' + (selectedRequest.state||'')"></span></div>
+                        <div><span class="text-slate-400">النوع:</span> <span x-text="selectedRequest.type"></span></div>
+                        <div><span class="text-slate-400">المبلغ:</span> <span class="font-bold" x-text="fmtAmount(selectedRequest.amount, selectedRequest.currency)"></span></div>
+                        <div><span class="text-slate-400">المستخدم:</span> <span x-text="selectedRequest.user_id"></span></div>
+                        <div><span class="text-slate-400">الوكيل:</span> <span x-text="selectedRequest.agent_name || selectedRequest.assigned_agent_id || '—'"></span></div>
+                    </div>
+
+                    <div class="flex gap-2" x-show="rbac('approve_deposits')">
+                        <button @click="claimRequest(selectedRequest.id)" class="btn btn-primary btn-sm">Claim</button>
+                        <button @click="takeoverRequest(selectedRequest.id)" class="btn btn-warning btn-sm">Takeover</button>
+                        <button @click="reassignRequest(selectedRequest.id)" class="btn btn-secondary btn-sm">Reassign</button>
+                    </div>
+
+                    <div>
+                        <h4 class="text-sm font-semibold mb-2">🪜 الخطوات</h4>
+                        <div class="space-y-2 max-h-80 overflow-y-auto pr-1">
+                            <template x-if="requestStepsLoading">
+                                <div class="text-center text-slate-400 py-4"><i class="fas fa-spinner fa-spin"></i></div>
+                            </template>
+                            <template x-if="!requestStepsLoading && requestSteps.length === 0">
+                                <div class="text-center text-slate-500 py-4">لا توجد خطوات</div>
+                            </template>
+                            <template x-for="s in requestSteps" :key="s.id">
+                                <div class="p-3 rounded-lg border border-slate-700 bg-slate-900/40">
+                                    <div class="flex items-center justify-between">
+                                        <div class="text-sm font-medium">
+                                            <span class="text-slate-400" x-text="'#' + s.seq"></span>
+                                            <span x-text="s.step_key"></span>
+                                            <span class="text-xs text-slate-400" x-text="'(' + (s.actor_role || '—') + ')'" style="margin-right:6px"></span>
+                                        </div>
+                                        <span class="px-2 py-0.5 rounded text-xs" :class="stepStatusClass(s.status)" x-text="s.status"></span>
+                                    </div>
+                                    <div class="text-xs text-slate-400 mt-1" x-show="s.evidence_ref">Evidence: <span class="font-mono" x-text="s.evidence_ref"></span></div>
+                                    <div class="flex gap-2 mt-2" x-show="rbac('approve_deposits')">
+                                        <button @click="adminStepAction(selectedRequest.id, s.id)" class="btn btn-primary btn-sm" x-show="['pending','rejected','escalated'].includes(s.status)">Action</button>
+                                        <button @click="adminStepConfirm(selectedRequest.id, s.id, true)" class="btn btn-success btn-sm" x-show="s.status==='action_done'">Confirm</button>
+                                        <button @click="adminStepConfirm(selectedRequest.id, s.id, false)" class="btn btn-danger btn-sm" x-show="s.status==='action_done'">Reject</button>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end pt-2 border-t border-slate-700">
+                        <button @click="showReqDetail = false" class="btn btn-sm" style="background:#475569">Close</button>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </div>
+
 </div>
 {% endblock %}
 
@@ -350,6 +416,10 @@ function matchingApp() {
         selectedMatch: null,
         chatMessages: [],
         chatLoading: false,
+        showReqDetail: false,
+        selectedRequest: null,
+        requestSteps: [],
+        requestStepsLoading: false,
 
         async openMatchDetail(m) {
             this.selectedMatch = m;
@@ -371,6 +441,88 @@ function matchingApp() {
                 this.showDetail = false;
                 this.loadAll();
             } catch(e) { toast('فشل حل النزاع', 'error'); }
+        },
+
+        stepStatusClass(st){
+            if (st === 'confirmed') return 'bg-green-500/20 text-green-300';
+            if (st === 'action_done') return 'bg-amber-500/20 text-amber-300';
+            if (st === 'escalated') return 'bg-red-500/20 text-red-300';
+            if (st === 'rejected') return 'bg-rose-500/20 text-rose-300';
+            return 'bg-slate-700 text-slate-200';
+        },
+
+        async openRequestDetail(r){
+            this.selectedRequest = r;
+            this.showReqDetail = true;
+            this.requestStepsLoading = true;
+            this.requestSteps = [];
+            try {
+                const data = await api('/api/matching/' + r.id + '/steps');
+                this.selectedRequest = data.request || r;
+                this.requestSteps = (data.request && data.request.steps) ? data.request.steps : [];
+            } catch(e){
+                toast('فشل تحميل تفاصيل الطلب', 'error');
+            }
+            this.requestStepsLoading = false;
+        },
+
+        async claimRequest(reqId){
+            try {
+                await api('/api/matching/' + reqId + '/claim', { method:'POST', body:'{}' });
+                toast('تم claim الطلب', 'success');
+                this.openRequestDetail({id:reqId});
+                this.loadPending();
+            } catch(e){ toast('فشل claim', 'error'); }
+        },
+
+        async takeoverRequest(reqId){
+            const reason = prompt('سبب السحب من المعالج الحالي:') || '';
+            try {
+                await api('/api/matching/' + reqId + '/takeover', {
+                    method:'POST', body: JSON.stringify({reason})
+                });
+                toast('تم takeover', 'success');
+                this.openRequestDetail({id:reqId});
+                this.loadPending();
+            } catch(e){ toast('فشل takeover', 'error'); }
+        },
+
+        async reassignRequest(reqId){
+            const agentId = prompt('أدخل Agent ID الجديد:');
+            if(!agentId) return;
+            const reason = prompt('سبب إعادة التعيين:') || '';
+            try {
+                await api('/api/matching/' + reqId + '/reassign', {
+                    method:'POST', body: JSON.stringify({agent_id: agentId, reason})
+                });
+                toast('تمت إعادة التعيين', 'success');
+                this.openRequestDetail({id:reqId});
+                this.loadPending();
+            } catch(e){ toast('فشل إعادة التعيين', 'error'); }
+        },
+
+        async adminStepAction(reqId, stepId){
+            const evidence = prompt('مرجع/دليل (اختياري):') || '';
+            try {
+                await api('/api/matching/' + reqId + '/steps/' + stepId + '/action', {
+                    method:'POST', body: JSON.stringify({evidence_ref: evidence})
+                });
+                toast('تم تنفيذ الخطوة', 'success');
+                this.openRequestDetail({id:reqId});
+                this.loadPending();
+            } catch(e){ toast('فشل تنفيذ الخطوة', 'error'); }
+        },
+
+        async adminStepConfirm(reqId, stepId, accept){
+            const note = accept ? '' : (prompt('سبب الرفض:') || '');
+            try {
+                await api('/api/matching/' + reqId + '/steps/' + stepId + '/confirm', {
+                    method:'POST', body: JSON.stringify({accept, note})
+                });
+                toast(accept ? 'تم التأكيد' : 'تم الرفض', 'success');
+                this.openRequestDetail({id:reqId});
+                this.loadPending();
+            } catch(e){ toast('فشل تأكيد الخطوة', 'error'); }
         }
     }
 }

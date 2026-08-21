@@ -69,6 +69,7 @@ input,select{background:#1a2028;border:1px solid #262e39;border-radius:8px;paddi
   <div class="section" id="pendingSection">
     <div class="section-title">🔔 طلبات المطابقة المعلقة <span id="pendingCount"></span></div>
     <div id="pendingList"></div>
+    <div id="reqStepsPanel" style="display:none;margin-top:10px;background:#10141a;border:1px solid #262e39;border-radius:12px;padding:10px"></div>
   </div>
 
   <!-- Deposit Balance -->
@@ -165,8 +166,10 @@ function loadPending(){
         +'<div class="method-info"><div class="method-name">'+(t.type==='deposit'?'إيداع (تدفع للمستخدم)':'سحب (تستلم من المستخدم)')+' — '+esc(t.amount)+' '+esc(t.currency||'EGP')+'</div>'
         +'<div class="method-data">'+esc(t.user_name||t.user_id||'—')
         +(t.company_name?' · '+esc(t.company_name):'')
+        +(t.request_state?' · state:'+esc(t.request_state):'')
         +' · '+esc((t.created_at||'').slice(0,16))
         +(tid?' · <span style="opacity:.7">'+esc(tid)+'</span>':'')+'</div></div>'
+        +((t.request_id||'')?'<button class="btn" style="background:rgba(59,130,246,.15);color:#3b82f6;padding:6px 10px;font-size:11px" onclick="openReqSteps(\''+esc(t.request_id)+'\')">🪜 خطوات</button>':'')
         +'<button class="btn btn-primary" style="padding:6px 10px;font-size:11px" onclick="processTxn(\''+esc(tid)+'\',\'approved\')">✔ قبول</button>'
         +'<button class="btn" style="background:rgba(255,71,87,.15);color:#ff4757;padding:6px 10px;font-size:11px" onclick="processTxn(\''+esc(tid)+'\',\'rejected\')">✖ رفض</button></div>';
     });
@@ -181,6 +184,53 @@ function processTxn(tid,decision){
     if(d.success){loadSelf();loadPending();loadTxns()}
     else{alert(d.error||'فشل')}
   });
+}
+function openReqSteps(reqId){
+  fetch('/api/agent/self/requests/'+encodeURIComponent(reqId)+'/steps')
+  .then(r=>r.json()).then(function(d){
+    if(d.error){ alert(d.error); return; }
+    var req = d.request||{};
+    var panel = document.getElementById('reqStepsPanel');
+    var steps = req.steps||[];
+    var h = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
+      +'<div style="font-size:12px;color:#8794a3">طلب: <code>'+esc(req.id||reqId)+'</code> · '+esc((req.status||'')+' / '+(req.state||''))+'</div>'
+      +'<button class="btn" style="padding:4px 8px;font-size:11px" onclick="this.parentNode.parentNode.style.display=\'none\'">إغلاق</button></div>';
+    h += '<div style="display:flex;gap:6px;margin-bottom:8px">'
+      +'<button class="btn btn-primary" style="padding:6px 8px;font-size:11px" onclick="claimReq(\''+esc(req.id||reqId)+'\')">Claim</button>'
+      +'</div>';
+    if(!steps.length){
+      h += '<div class="empty">لا توجد خطوات</div>';
+    } else {
+      steps.forEach(function(s){
+        var color = s.status==='confirmed' ? '#00e701' : s.status==='action_done' ? '#fbbf24' : s.status==='escalated' ? '#ff4757' : '#8794a3';
+        h += '<div style="border:1px solid #262e39;border-radius:10px;padding:8px;margin-bottom:6px">'
+          +'<div style="font-size:12px;color:'+color+';font-weight:700">#'+esc(s.seq)+' '+esc(s.step_key||'step')+' ('+esc(s.actor_role||'')+') · '+esc(s.status||'')+'</div>'
+          +(s.evidence_ref?'<div style="font-size:11px;color:#06b6d4">Evidence: '+esc(s.evidence_ref)+'</div>':'')
+          +'<div style="display:flex;gap:6px;margin-top:6px">'
+          +((['pending','rejected','escalated'].indexOf(s.status)>=0)?'<button class="btn btn-primary" style="padding:4px 8px;font-size:11px" onclick="agentStepAction(\''+esc(req.id||reqId)+'\',\''+esc(s.id)+'\')">Action</button>':'')
+          +(s.status==='action_done'?'<button class="btn" style="background:rgba(0,231,1,.15);color:#00e701;padding:4px 8px;font-size:11px" onclick="agentStepConfirm(\''+esc(req.id||reqId)+'\',\''+esc(s.id)+'\',true)">Confirm</button><button class="btn" style="background:rgba(255,71,87,.15);color:#ff4757;padding:4px 8px;font-size:11px" onclick="agentStepConfirm(\''+esc(req.id||reqId)+'\',\''+esc(s.id)+'\',false)">Reject</button>':'')
+          +'</div></div>';
+      });
+    }
+    panel.innerHTML = h;
+    panel.style.display = 'block';
+  });
+}
+function claimReq(reqId){
+  fetch('/api/agent/self/requests/'+encodeURIComponent(reqId)+'/claim',{method:'POST'})
+    .then(r=>r.json()).then(function(d){ if(d.error){alert(d.error);return;} loadPending(); openReqSteps(reqId); });
+}
+function agentStepAction(reqId, stepId){
+  var ev = prompt('مرجع/دليل (اختياري):','') || '';
+  fetch('/api/agent/self/requests/'+encodeURIComponent(reqId)+'/steps/'+encodeURIComponent(stepId)+'/action',{
+    method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({evidence_ref:ev})
+  }).then(r=>r.json()).then(function(d){ if(d.error){alert(d.error);return;} loadPending(); openReqSteps(reqId); });
+}
+function agentStepConfirm(reqId, stepId, accept){
+  var note = accept ? '' : (prompt('سبب الرفض:','') || '');
+  fetch('/api/agent/self/requests/'+encodeURIComponent(reqId)+'/steps/'+encodeURIComponent(stepId)+'/confirm',{
+    method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({accept:!!accept,note:note})
+  }).then(r=>r.json()).then(function(d){ if(d.error){alert(d.error);return;} loadPending(); openReqSteps(reqId); });
 }
 function loadDepHistory(){
   fetch('/api/agent/self/deposits').then(r=>r.json()).then(d=>{

@@ -2138,11 +2138,21 @@ def api_agent_self():
     return jsonify({
         'id': a['id'], 'bot_name': a.get('bot_name', ''),
         'balance': float(a.get('balance', 0)),
+        'escrow_balance': float(a.get('escrow_balance', 0)),
         'security_deposit': float(a.get('security_deposit', 0)),
-        'traffic_enabled': 'yes' if not a.get('traffic_stopped') else 'no',
+        'traffic_enabled': 'yes' if bool(a.get('traffic_on')) else 'no',
         'traffic_on': bool(a.get('traffic_on')),
         'current_daily_count': int(a.get('current_daily_count', 0)),
         'max_daily_transactions': int(a.get('max_daily_transactions', 50)),
+        'max_concurrent': int(a.get('max_concurrent', 5)),
+        'drain': int(a.get('drain', 0)),
+        'pin_remaining': int(a.get('pin_remaining', 0)),
+        'cap_per_txn': float(a.get('cap_per_txn', 0)),
+        'performance_score': float(a.get('performance_score', 50)),
+        'tier': a.get('tier', 'bronze'),
+        'avg_response_seconds': float(a.get('avg_response_seconds', 0)),
+        'completion_rate': float(a.get('completion_rate', 0)),
+        'dispute_rate': float(a.get('dispute_rate', 0)),
         'is_active': 'yes' if a.get('is_active') else 'no',
         'deposit_method_name': a.get('deposit_method_name', ''),
         'deposit_method_data': a.get('deposit_method_data', ''),
@@ -2184,10 +2194,82 @@ def api_agent_self_pending():
     """Pending matching requests assigned to this agent — joined with request details."""
     return jsonify({'transactions': agent_db.get_pending_with_requests(session['agent_id'])})
 
+
+@app.route('/api/agent/self/requests/<req_id>/steps')
+@_agent_session_required
+def api_agent_request_steps(req_id):
+    req = agent_db.get_match_request_steps(req_id)
+    if not req:
+        return jsonify({'error': 'الطلب غير موجود'}), 404
+    if str(req.get('assigned_agent_id', '')) != str(session['agent_id']):
+        return jsonify({'error': 'غير مصرح'}), 403
+    return jsonify({'request': req})
+
+
+@app.route('/api/agent/self/requests/<req_id>/claim', methods=['POST'])
+@_agent_session_required
+def api_agent_request_claim(req_id):
+    res = agent_db.claim_request(req_id, 'agent', session['agent_id'])
+    if 'error' in res:
+        return jsonify(res), 400
+    return jsonify(res)
+
+
+@app.route('/api/agent/self/requests/<req_id>/steps/<step_id>/action', methods=['POST'])
+@_agent_session_required
+def api_agent_request_step_action(req_id, step_id):
+    payload = request.json or {}
+    res = agent_db.request_step_action(
+        req_id, step_id, 'agent', session['agent_id'],
+        evidence_ref=str(payload.get('evidence_ref', '') or '')[:200],
+        note=str(payload.get('note', '') or '')[:400],
+    )
+    if 'error' in res:
+        return jsonify(res), 400
+    return jsonify(res)
+
+
+@app.route('/api/agent/self/requests/<req_id>/steps/<step_id>/confirm', methods=['POST'])
+@_agent_session_required
+def api_agent_request_step_confirm(req_id, step_id):
+    payload = request.json or {}
+    res = agent_db.request_step_confirm(
+        req_id, step_id, 'agent', session['agent_id'],
+        accept=bool(payload.get('accept', True)),
+        note=str(payload.get('note', '') or '')[:400],
+    )
+    if 'error' in res:
+        return jsonify(res), 400
+    return jsonify(res)
+
+
+@app.route('/api/agent/self/requests/<req_id>/dispute', methods=['POST'])
+@_agent_session_required
+def api_agent_request_dispute(req_id):
+    payload = request.json or {}
+    res = agent_db.open_request_dispute(
+        req_id, 'agent', session['agent_id'],
+        str(payload.get('reason', '') or '')[:500],
+        evidence_file_id=str(payload.get('evidence_file_id', '') or '')[:200],
+    )
+    if 'error' in res:
+        return jsonify(res), 400
+    return jsonify(res)
+
 @app.route('/api/agent/self/transactions/<txn_id>/process', methods=['POST'])
 @_agent_session_required
 def api_agent_process_txn(txn_id):
     """Agent approves/rejects an assigned matching request (atomic settle)."""
+    txns = agent_db.search_transactions(session['agent_id'], q=txn_id, limit=1)
+    txn = txns[0] if txns else None
+    if txn and str(txn.get('id', '')) == str(txn_id):
+        mrid0 = str(txn.get('match_request_id', '') or '')
+        if mrid0:
+            req0 = agent_db.get_match_request_steps(mrid0)
+            if req0 and req0.get('steps'):
+                return jsonify({'error': 'هذا الطلب يعمل بمحرك الخطوات V2 — استخدم خطوات العملية'}), 409
+            if req0 and str(req0.get('status', '')) != 'approved':
+                return jsonify({'error': 'لا يمكن المعالجة قبل موافقة الأدمن'}), 409
     decision = (request.json or {}).get('decision', '')
     res = agent_db.agent_process_transaction(session['agent_id'], txn_id, decision)
     if 'error' in res:
@@ -3943,19 +4025,10 @@ def api_matching_active():
 def api_matching_pending():
     """Pending matching requests — with assigned-agent info so the main admin
     sees exactly which agent is on duty for each request."""
-    conn = agent_db._conn()
-    try:
-        rows = conn.execute('''
-            SELECT r.*, a.bot_name AS agent_name, a.is_online AS agent_online,
-                   (SELECT COUNT(*) FROM agent_transactions t
-                    WHERE t.match_request_id = r.id AND t.status='pending') AS has_pending_txn
-            FROM match_requests r
-            LEFT JOIN agent_bots a ON r.assigned_agent_id = a.id
-            WHERE r.status='waiting'
-            ORDER BY r.created_at DESC''').fetchall()
-        pending = [dict(r) for r in rows]
-    finally:
-        conn.close()
+    pending = agent_db.list_ops_requests(
+        statuses=['waiting', 'approved', 'disputed'],
+        states=[],
+        limit=300)
     return jsonify({'requests': pending, 'count': len(pending)})
 
 @app.route('/api/matching/logs')
@@ -3969,6 +4042,30 @@ def api_matching_logs():
             WHERE m.status IN ('completed','cancelled')
             ORDER BY m.created_at DESC LIMIT 50''').fetchall()
         logs = [dict(r) for r in rows]
+        req_rows = conn.execute('''
+            SELECT r.*, a.bot_name AS agent_name
+            FROM match_requests r
+            LEFT JOIN agent_bots a ON r.assigned_agent_id = a.id
+            WHERE r.status IN ('matched','cancelled','rejected')
+            ORDER BY r.created_at DESC LIMIT 100
+        ''').fetchall()
+        for rr in req_rows:
+            rd = dict(rr)
+            logs.append({
+                'id': rd.get('id', ''),
+                'depositor_alias': rd.get('alias', '—'),
+                'depositor_id': rd.get('user_id', ''),
+                'withdrawer_alias': rd.get('agent_name', 'طرف آخر'),
+                'withdrawer_id': rd.get('assigned_agent_id', ''),
+                'amount': rd.get('amount', 0),
+                'currency': rd.get('currency', 'EGP'),
+                'company_name': rd.get('company_name', ''),
+                'status': rd.get('status', ''),
+                'completed_at': rd.get('approved_at', '') or rd.get('created_at', ''),
+                'created_at': rd.get('created_at', ''),
+            })
+        logs.sort(key=lambda x: (x.get('completed_at') or x.get('created_at') or ''), reverse=True)
+        logs = logs[:100]
     finally:
         conn.close()
     return jsonify({'matches': logs, 'count': len(logs)})
@@ -4047,8 +4144,14 @@ def api_matching_create():
         return jsonify({'error': 'Missing uid'}), 400
     data = request.json or {}
     rtype = str(data.get('type', '')).strip()
-    if rtype not in ('deposit', 'withdraw'):
+    if rtype not in ('deposit', 'withdraw', 'buy_usdt', 'sell_usdt'):
         return jsonify({'error': 'نوع الطلب غير صالح'}), 400
+    source_type = 'personal_wallet' if str(data.get('source_type', '')).strip() == 'personal_wallet' else 'company'
+    network = str(data.get('network', '') or '')[:32]
+    try:
+        rate = float(data.get('rate', 0) or 0)
+    except (TypeError, ValueError):
+        rate = 0.0
     try:
         amount = round(float(data.get('amount', 0)), 2)
     except (TypeError, ValueError):
@@ -4064,7 +4167,7 @@ def api_matching_create():
             info = _gm.get_user_info(uid) or {}
             currency = info.get('currency', 'EGP') or 'EGP'
             user_name = info.get('name', '') or ''
-            if rtype == 'withdraw':
+            if rtype in ('withdraw', 'sell_usdt'):
                 bal = float(_gm.get_balance(uid) or 0)
                 if amount > bal:
                     return jsonify({'error': 'رصيد غير كافٍ'}), 400
@@ -4073,7 +4176,8 @@ def api_matching_create():
 
     rid, error, agent_assigned, agent_info = agent_db.create_match_request_with_agent_assignment(
         uid, uid, rtype, amount, currency,
-        company_id='', company_name='', payment_method_id='', details=details)
+        company_id='', company_name='', payment_method_id='', details=details,
+        source_type=source_type, network=network, rate=rate)
     if error:
         status_code = 409 if 'نشط' in (error or '') else 400
         return jsonify({'error': error}), status_code
@@ -4081,7 +4185,13 @@ def api_matching_create():
     log_action('match_request_created', f'{rid} {rtype} {amount} {currency} by {uid}')
 
     # ── Notify main admins (Telegram) ──
-    type_ar = 'إيداع' if rtype == 'deposit' else 'سحب'
+    type_map = {
+        'deposit': 'إيداع',
+        'withdraw': 'سحب',
+        'buy_usdt': 'شراء USDT',
+        'sell_usdt': 'بيع USDT',
+    }
+    type_ar = type_map.get(rtype, rtype)
     agent_line = ''
     if agent_assigned and agent_info:
         agent_line = f"\n🤖 الوكيل المعين: <b>{agent_info.get('name') or agent_info.get('id')}</b>"
@@ -4134,6 +4244,114 @@ def api_matching_cancel(rid):
         return jsonify({'error': error or 'تعذر الإلغاء الآن — حاول مجدداً'}), 500
     log_action('match_request_cancelled', f'{rid} by user {uid}')
     return jsonify({'success': True})
+
+
+@app.route('/api/matching/my/<rid>/steps')
+@webapp_auth
+def api_matching_my_steps(rid):
+    """User-facing full request detail with step state machine."""
+    err = _matching_strong_auth_or_error()
+    if err:
+        return err
+    uid = str(get_request_uid() or '')
+    req = agent_db.get_match_request_steps(rid)
+    if not req:
+        return jsonify({'error': 'الطلب غير موجود'}), 404
+    if str(req.get('user_id', '')) != uid:
+        return jsonify({'error': 'غير مصرح'}), 403
+    return jsonify({'request': req})
+
+
+@app.route('/api/matching/my/<rid>/steps/<step_id>/action', methods=['POST'])
+@webapp_auth
+def api_matching_my_step_action(rid, step_id):
+    err = _matching_strong_auth_or_error()
+    if err:
+        return err
+    uid = str(get_request_uid() or '')
+    payload = request.json or {}
+    req = agent_db.get_match_request_full(rid)
+    if not req:
+        return jsonify({'error': 'الطلب غير موجود'}), 404
+    if str(req.get('user_id', '')) != uid:
+        return jsonify({'error': 'غير مصرح'}), 403
+    res = agent_db.request_step_action(
+        rid, step_id, 'user', uid,
+        evidence_ref=str(payload.get('evidence_ref', '') or '')[:200],
+        note=str(payload.get('note', '') or '')[:400],
+    )
+    if 'error' in res:
+        return jsonify(res), 400
+    return jsonify(res)
+
+
+@app.route('/api/matching/my/<rid>/steps/<step_id>/confirm', methods=['POST'])
+@webapp_auth
+def api_matching_my_step_confirm(rid, step_id):
+    err = _matching_strong_auth_or_error()
+    if err:
+        return err
+    uid = str(get_request_uid() or '')
+    payload = request.json or {}
+    req = agent_db.get_match_request_full(rid)
+    if not req:
+        return jsonify({'error': 'الطلب غير موجود'}), 404
+    if str(req.get('user_id', '')) != uid:
+        return jsonify({'error': 'غير مصرح'}), 403
+    accept = bool(payload.get('accept', True))
+    res = agent_db.request_step_confirm(
+        rid, step_id, 'user', uid, accept=accept,
+        note=str(payload.get('note', '') or '')[:400],
+    )
+    if 'error' in res:
+        return jsonify(res), 400
+    return jsonify(res)
+
+
+@app.route('/api/matching/my/<rid>/dispute', methods=['POST'])
+@webapp_auth
+def api_matching_my_dispute(rid):
+    err = _matching_strong_auth_or_error()
+    if err:
+        return err
+    uid = str(get_request_uid() or '')
+    payload = request.json or {}
+    req = agent_db.get_match_request_full(rid)
+    if not req:
+        return jsonify({'error': 'الطلب غير موجود'}), 404
+    if str(req.get('user_id', '')) != uid:
+        return jsonify({'error': 'غير مصرح'}), 403
+    res = agent_db.open_request_dispute(
+        rid, 'user', uid,
+        str(payload.get('reason', '') or '')[:500],
+        evidence_file_id=str(payload.get('evidence_file_id', '') or '')[:200],
+    )
+    if 'error' in res:
+        return jsonify(res), 400
+    return jsonify(res)
+
+
+@app.route('/api/matching/my/<rid>/insurance-claim', methods=['POST'])
+@webapp_auth
+def api_matching_my_insurance_claim(rid):
+    err = _matching_strong_auth_or_error()
+    if err:
+        return err
+    uid = str(get_request_uid() or '')
+    payload = request.json or {}
+    req = agent_db.get_match_request_full(rid)
+    if not req:
+        return jsonify({'error': 'الطلب غير موجود'}), 404
+    if str(req.get('user_id', '')) != uid:
+        return jsonify({'error': 'غير مصرح'}), 403
+    res = agent_db.create_insurance_claim(
+        rid, 'user', uid,
+        str(payload.get('reason', '') or '')[:500],
+        evidence_file_id=str(payload.get('evidence_file_id', '') or '')[:200],
+    )
+    if 'error' in res:
+        return jsonify(res), 400
+    return jsonify(res)
 
 # ===== API — SVRP =====
 
@@ -6636,6 +6854,18 @@ def _start_agents_watchdog():
                         except Exception:
                             pass
 
+                # Ops V2 step/request deadline processor
+                try:
+                    ops = agent_db.process_ops_deadlines()
+                    if (ops.get('escalated_steps', 0) or ops.get('escalated_requests', 0)):
+                        _comp_alert_admins(
+                            "🚨 Ops Watchdog:\n"
+                            f"- escalated_steps: {ops.get('escalated_steps', 0)}\n"
+                            f"- escalated_requests: {ops.get('escalated_requests', 0)}\n"
+                            f"- auto_completed: {ops.get('completed', 0)}")
+                except Exception as _opse:
+                    _auth_logger.error('ops watchdog error: %s', _opse)
+
                 # Check SLA breaches
                 breached = ticket_system.check_sla_breached()
                 if breached:
@@ -7739,6 +7969,158 @@ def api_resolve_dispute(match_id):
 
     log_action('resolve_dispute', f'{match_id}: {favor}')
     return jsonify({'success': True})
+
+
+@app.route('/api/matching/<req_id>/steps')
+@api_auth
+@permission_required('view_financial')
+def api_matching_request_steps(req_id):
+    req = agent_db.get_match_request_steps(req_id)
+    if not req:
+        return jsonify({'error': 'الطلب غير موجود'}), 404
+    return jsonify({'request': req})
+
+
+@app.route('/api/matching/<req_id>/claim', methods=['POST'])
+@api_auth
+@permission_required('approve_deposits')
+def api_matching_claim(req_id):
+    admin_id = str(session.get('admin_id', ''))
+    res = agent_db.claim_request(req_id, 'admin', admin_id)
+    if 'error' in res:
+        return jsonify(res), 400
+    return jsonify(res)
+
+
+@app.route('/api/matching/<req_id>/takeover', methods=['POST'])
+@api_auth
+@permission_required('approve_deposits')
+def api_matching_takeover(req_id):
+    payload = request.json or {}
+    admin_id = str(session.get('admin_id', ''))
+    res = agent_db.admin_takeover_request(
+        req_id, admin_id, reason=str(payload.get('reason', '') or '')[:300])
+    if 'error' in res:
+        return jsonify(res), 400
+    return jsonify(res)
+
+
+@app.route('/api/matching/<req_id>/reassign', methods=['POST'])
+@api_auth
+@permission_required('approve_deposits')
+def api_matching_reassign(req_id):
+    payload = request.json or {}
+    admin_id = str(session.get('admin_id', ''))
+    new_agent_id = str(payload.get('agent_id', '') or '')
+    if not new_agent_id:
+        return jsonify({'error': 'agent_id مطلوب'}), 400
+    res = agent_db.admin_reassign_request(
+        req_id, admin_id, new_agent_id,
+        reason=str(payload.get('reason', '') or '')[:300])
+    if 'error' in res:
+        return jsonify(res), 400
+    return jsonify(res)
+
+
+@app.route('/api/matching/<req_id>/steps/<step_id>/action', methods=['POST'])
+@api_auth
+@permission_required('approve_deposits')
+def api_matching_step_action_admin(req_id, step_id):
+    payload = request.json or {}
+    admin_id = str(session.get('admin_id', ''))
+    res = agent_db.request_step_action(
+        req_id, step_id, 'admin', admin_id,
+        evidence_ref=str(payload.get('evidence_ref', '') or '')[:200],
+        note=str(payload.get('note', '') or '')[:400],
+    )
+    if 'error' in res:
+        return jsonify(res), 400
+    return jsonify(res)
+
+
+@app.route('/api/matching/<req_id>/steps/<step_id>/confirm', methods=['POST'])
+@api_auth
+@permission_required('approve_deposits')
+def api_matching_step_confirm_admin(req_id, step_id):
+    payload = request.json or {}
+    admin_id = str(session.get('admin_id', ''))
+    accept = bool(payload.get('accept', True))
+    res = agent_db.request_step_confirm(
+        req_id, step_id, 'admin', admin_id,
+        accept=accept, note=str(payload.get('note', '') or '')[:400],
+    )
+    if 'error' in res:
+        return jsonify(res), 400
+    return jsonify(res)
+
+
+@app.route('/api/matching/<req_id>/dispute/resolve-v2', methods=['POST'])
+@api_auth
+@permission_required('view_financial')
+def api_matching_dispute_resolve_v2(req_id):
+    payload = request.json or {}
+    decision = str(payload.get('decision', '') or '')
+    note = str(payload.get('note', '') or '')[:500]
+    admin_id = str(session.get('admin_id', ''))
+    res = agent_db.resolve_request_dispute(req_id, admin_id, decision, note)
+    if 'error' in res:
+        return jsonify(res), 400
+    return jsonify(res)
+
+
+@app.route('/api/matching/routing-rules')
+@api_auth
+@permission_required('view_financial')
+def api_matching_routing_rules():
+    return jsonify({'rules': agent_db.list_routing_rules(active_only=False)})
+
+
+@app.route('/api/matching/routing-rules', methods=['POST'])
+@api_auth
+@permission_required('approve_deposits')
+def api_matching_routing_rules_upsert():
+    payload = request.json or {}
+    res = agent_db.upsert_routing_rule(
+        payload.get('id', ''),
+        payload.get('rule_type', ''),
+        payload.get('params', {}) or {},
+        priority=payload.get('priority', 100),
+        is_active=bool(payload.get('is_active', True)),
+    )
+    if 'error' in res:
+        return jsonify(res), 400
+    return jsonify(res)
+
+
+@app.route('/api/matching/routing-rules/<rule_id>', methods=['DELETE'])
+@api_auth
+@permission_required('approve_deposits')
+def api_matching_routing_rules_delete(rule_id):
+    return jsonify(agent_db.delete_routing_rule(rule_id))
+
+
+@app.route('/api/matching/insurance-claims')
+@api_auth
+@permission_required('view_financial')
+def api_matching_insurance_claims():
+    status = request.args.get('status', '')
+    return jsonify({'claims': agent_db.list_insurance_claims(status=status)})
+
+
+@app.route('/api/matching/insurance-claims/<claim_id>/decision', methods=['POST'])
+@api_auth
+@permission_required('approve_deposits')
+def api_matching_insurance_claim_decision(claim_id):
+    payload = request.json or {}
+    res = agent_db.decide_insurance_claim(
+        claim_id, str(session.get('admin_id', '')),
+        decision=str(payload.get('decision', '') or ''),
+        payout_amount=payload.get('payout_amount', 0),
+        note=str(payload.get('note', '') or '')[:500],
+    )
+    if 'error' in res:
+        return jsonify(res), 400
+    return jsonify(res)
 
 
 # ===== API — Trading Actions =====

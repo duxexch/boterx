@@ -43,6 +43,13 @@ INSURANCE_RATE = 0.005  # 0.5% per completed transaction
 RESPONSE_TIMEOUT = 300   # seconds — auto-void pending txn after this
 HEARTBEAT_TIMEOUT = 120  # seconds — mark agent offline after no heartbeat
 
+# Ops V2 defaults (can be overridden by dashboard settings layer if needed)
+OP_STEP_ACTION_TIMEOUT_MIN = 10
+OP_STEP_CONFIRM_TIMEOUT_MIN = 5
+OP_PRECOMPLETE_WINDOW_MIN = 15
+OP_TOTAL_TIMEOUT_MIN = 60
+USDT_RATE_LOCK_MIN = 10
+
 EMA_ALPHA = 0.2  # exponential moving average factor for response time
 
 
@@ -276,6 +283,84 @@ def init_agent_tables():
                 resolved_at   TEXT NOT NULL DEFAULT ''
             );
             CREATE INDEX IF NOT EXISTS idx_disputes_status ON match_disputes(status);
+
+            -- ═══ Ops V2 step engine + audit + routing ═══
+            CREATE TABLE IF NOT EXISTS op_steps (
+                id               TEXT PRIMARY KEY,
+                txn_id           TEXT NOT NULL,
+                seq              INTEGER NOT NULL,
+                step_key         TEXT NOT NULL,
+                title_key        TEXT NOT NULL,
+                actor_role       TEXT NOT NULL,
+                status           TEXT NOT NULL DEFAULT 'pending',
+                evidence_type    TEXT NOT NULL DEFAULT 'none',
+                evidence_ref     TEXT NOT NULL DEFAULT '',
+                action_deadline  TEXT NOT NULL DEFAULT '',
+                confirm_deadline TEXT NOT NULL DEFAULT '',
+                acted_at         TEXT NOT NULL DEFAULT '',
+                acted_by         TEXT NOT NULL DEFAULT '',
+                confirmed_at     TEXT NOT NULL DEFAULT '',
+                confirmed_by     TEXT NOT NULL DEFAULT '',
+                reject_count     INTEGER NOT NULL DEFAULT 0,
+                note             TEXT NOT NULL DEFAULT '',
+                created_at       TEXT NOT NULL DEFAULT '',
+                updated_at       TEXT NOT NULL DEFAULT ''
+            );
+            CREATE INDEX IF NOT EXISTS idx_op_steps_txn_seq ON op_steps(txn_id, seq);
+            CREATE INDEX IF NOT EXISTS idx_op_steps_status ON op_steps(status);
+
+            CREATE TABLE IF NOT EXISTS op_step_templates (
+                id          TEXT PRIMARY KEY,
+                op_type     TEXT NOT NULL,
+                source_type TEXT NOT NULL,
+                steps_json  TEXT NOT NULL,
+                is_active   INTEGER NOT NULL DEFAULT 1,
+                updated_at  TEXT NOT NULL DEFAULT ''
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_op_tpl_unique
+                ON op_step_templates(op_type, source_type);
+
+            CREATE TABLE IF NOT EXISTS op_audit_log (
+                id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                entity_id      TEXT NOT NULL,
+                entity_table   TEXT NOT NULL,
+                actor_type     TEXT NOT NULL,
+                actor_id       TEXT NOT NULL,
+                event          TEXT NOT NULL,
+                from_value     TEXT NOT NULL DEFAULT '',
+                to_value       TEXT NOT NULL DEFAULT '',
+                payload_digest TEXT NOT NULL DEFAULT '',
+                created_at     TEXT NOT NULL DEFAULT ''
+            );
+            CREATE INDEX IF NOT EXISTS idx_op_audit_entity
+                ON op_audit_log(entity_table, entity_id, id);
+
+            CREATE TABLE IF NOT EXISTS insurance_claims (
+                id               TEXT PRIMARY KEY,
+                txn_id           TEXT NOT NULL,
+                claimant_type    TEXT NOT NULL,
+                claimant_id      TEXT NOT NULL,
+                reason           TEXT NOT NULL,
+                evidence_file_id TEXT NOT NULL DEFAULT '',
+                status           TEXT NOT NULL DEFAULT 'open',
+                payout_amount    REAL NOT NULL DEFAULT 0,
+                admin_note       TEXT NOT NULL DEFAULT '',
+                decided_by       TEXT NOT NULL DEFAULT '',
+                decided_at       TEXT NOT NULL DEFAULT '',
+                created_at       TEXT NOT NULL DEFAULT ''
+            );
+            CREATE INDEX IF NOT EXISTS idx_ins_claims_txn ON insurance_claims(txn_id, status);
+
+            CREATE TABLE IF NOT EXISTS routing_rules (
+                id          TEXT PRIMARY KEY,
+                priority    INTEGER NOT NULL DEFAULT 100,
+                rule_type   TEXT NOT NULL,
+                params_json TEXT NOT NULL,
+                is_active   INTEGER NOT NULL DEFAULT 1,
+                created_at  TEXT NOT NULL DEFAULT ''
+            );
+            CREATE INDEX IF NOT EXISTS idx_routing_rules_active
+                ON routing_rules(is_active, priority);
         ''')
 
         # Add v2 columns to agent_bots
@@ -290,17 +375,133 @@ def init_agent_tables():
             ('last_heartbeat',       'TEXT',    "''"),
             ('is_online',            'INTEGER', '0'),
             ('telegram_id',          'TEXT',    "''"),
+            ('drain',                'INTEGER', '0'),
+            ('pin_remaining',        'INTEGER', '0'),
+            ('cap_per_txn',          'REAL',    '0'),
         ])
 
         # Admin action tracking on match_requests (parity with old CSV fields)
         _ensure_columns(conn, 'match_requests', [
             ('approved_by', 'TEXT', "''"),
             ('approved_at', 'TEXT', "''"),
+            ('source_type', 'TEXT', "'company'"),
+            ('claimed_by_type', 'TEXT', "''"),
+            ('claimed_by_id', 'TEXT', "''"),
+            ('claimed_at', 'TEXT', "''"),
+            ('state', 'TEXT', "''"),
+            ('precomplete_until', 'TEXT', "''"),
+            ('rate', 'REAL', '0'),
+            ('rate_locked_until', 'TEXT', "''"),
+            ('network', 'TEXT', "''"),
         ])
+
+        conn.executescript('''
+            CREATE TRIGGER IF NOT EXISTS op_audit_no_update
+            BEFORE UPDATE ON op_audit_log
+            BEGIN
+                SELECT RAISE(ABORT,'audit is append-only');
+            END;
+            CREATE TRIGGER IF NOT EXISTS op_audit_no_delete
+            BEFORE DELETE ON op_audit_log
+            BEGIN
+                SELECT RAISE(ABORT,'audit is append-only');
+            END;
+        ''')
+
+        _ensure_default_op_templates(conn)
 
         conn.commit()
     finally:
         conn.close()
+
+
+def _default_step_templates():
+    """Built-in Ops V2 templates. Admin may edit later via routing/settings UI."""
+    return {
+        ('deposit', 'company'): [
+            {'key': 'requester_transfer', 'title_key': 'step_requester_transfer',
+             'actor_role': 'requester', 'evidence_type': 'reference'},
+            {'key': 'processor_confirm_received', 'title_key': 'step_processor_confirm_received',
+             'actor_role': 'processor', 'evidence_type': 'none'},
+            {'key': 'processor_send_funds', 'title_key': 'step_processor_send_funds',
+             'actor_role': 'processor', 'evidence_type': 'reference'},
+            {'key': 'requester_confirm_received', 'title_key': 'step_requester_confirm_received',
+             'actor_role': 'requester', 'evidence_type': 'none'},
+        ],
+        ('withdraw', 'company'): [
+            {'key': 'requester_submit_withdraw_data', 'title_key': 'step_requester_submit_withdraw_data',
+             'actor_role': 'requester', 'evidence_type': 'reference'},
+            {'key': 'processor_send_funds', 'title_key': 'step_processor_send_funds',
+             'actor_role': 'processor', 'evidence_type': 'reference'},
+            {'key': 'requester_confirm_received', 'title_key': 'step_requester_confirm_received',
+             'actor_role': 'requester', 'evidence_type': 'none'},
+        ],
+        ('buy_usdt', 'company'): [
+            {'key': 'requester_send_fiat', 'title_key': 'step_requester_send_fiat',
+             'actor_role': 'requester', 'evidence_type': 'reference'},
+            {'key': 'processor_send_usdt', 'title_key': 'step_processor_send_usdt',
+             'actor_role': 'processor', 'evidence_type': 'reference'},
+            {'key': 'requester_confirm_usdt', 'title_key': 'step_requester_confirm_usdt',
+             'actor_role': 'requester', 'evidence_type': 'none'},
+        ],
+        ('sell_usdt', 'company'): [
+            {'key': 'requester_send_usdt', 'title_key': 'step_requester_send_usdt',
+             'actor_role': 'requester', 'evidence_type': 'reference'},
+            {'key': 'processor_send_fiat', 'title_key': 'step_processor_send_fiat',
+             'actor_role': 'processor', 'evidence_type': 'reference'},
+            {'key': 'requester_confirm_fiat', 'title_key': 'step_requester_confirm_fiat',
+             'actor_role': 'requester', 'evidence_type': 'none'},
+        ],
+        ('deposit', 'personal_wallet'): [
+            {'key': 'system_hold_wallet', 'title_key': 'step_system_hold_wallet',
+             'actor_role': 'system', 'evidence_type': 'none'},
+            {'key': 'processor_credit_target', 'title_key': 'step_processor_credit_target',
+             'actor_role': 'processor', 'evidence_type': 'reference'},
+            {'key': 'requester_confirm_credit', 'title_key': 'step_requester_confirm_credit',
+             'actor_role': 'requester', 'evidence_type': 'none'},
+        ],
+        ('withdraw', 'personal_wallet'): [
+            {'key': 'system_hold_wallet', 'title_key': 'step_system_hold_wallet',
+             'actor_role': 'system', 'evidence_type': 'none'},
+            {'key': 'processor_send_funds', 'title_key': 'step_processor_send_funds',
+             'actor_role': 'processor', 'evidence_type': 'reference'},
+            {'key': 'requester_confirm_received', 'title_key': 'step_requester_confirm_received',
+             'actor_role': 'requester', 'evidence_type': 'none'},
+        ],
+        ('buy_usdt', 'personal_wallet'): [
+            {'key': 'system_hold_wallet', 'title_key': 'step_system_hold_wallet',
+             'actor_role': 'system', 'evidence_type': 'none'},
+            {'key': 'processor_send_usdt', 'title_key': 'step_processor_send_usdt',
+             'actor_role': 'processor', 'evidence_type': 'reference'},
+            {'key': 'requester_confirm_usdt', 'title_key': 'step_requester_confirm_usdt',
+             'actor_role': 'requester', 'evidence_type': 'none'},
+        ],
+        ('sell_usdt', 'personal_wallet'): [
+            {'key': 'requester_send_usdt', 'title_key': 'step_requester_send_usdt',
+             'actor_role': 'requester', 'evidence_type': 'reference'},
+            {'key': 'system_release_wallet', 'title_key': 'step_system_release_wallet',
+             'actor_role': 'system', 'evidence_type': 'none'},
+            {'key': 'requester_confirm_fiat', 'title_key': 'step_requester_confirm_fiat',
+             'actor_role': 'requester', 'evidence_type': 'none'},
+        ],
+    }
+
+
+def _ensure_default_op_templates(conn):
+    defaults = _default_step_templates()
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    for (op_type, source_type), steps in defaults.items():
+        row = conn.execute(
+            'SELECT id FROM op_step_templates WHERE op_type=? AND source_type=?',
+            (op_type, source_type)).fetchone()
+        if row:
+            continue
+        conn.execute(
+            'INSERT INTO op_step_templates '
+            '(id, op_type, source_type, steps_json, is_active, updated_at) '
+            'VALUES (?,?,?,?,1,?)',
+            (f"OPT{datetime.now().strftime('%Y%m%d%H%M%S')}{secrets.token_hex(2).upper()}",
+             op_type, source_type, json.dumps(steps, ensure_ascii=False), now))
 
 
 # ── CSV Migration ────────────────────────────────────────────────────────────
@@ -583,6 +784,177 @@ def _generate_alias():
     return f"عميل-{part}"
 
 
+OPS_ACTIVE_STATES = {'created', 'claimed', 'in_progress', 'pre_complete', 'escalated', 'disputed'}
+OPS_FINAL_STATES = {'completed', 'cancelled', 'rejected', 'resolved_depositor', 'resolved_withdrawer'}
+
+
+def _ts_now():
+    return datetime.now()
+
+
+def _to_ts(dt_obj):
+    return dt_obj.strftime('%Y-%m-%d %H:%M:%S')
+
+
+def _parse_ts(value):
+    if not value:
+        return None
+    try:
+        return datetime.strptime(value, '%Y-%m-%d %H:%M:%S')
+    except Exception:
+        return None
+
+
+def _plus_minutes(base_dt, minutes):
+    return base_dt + timedelta(minutes=max(0, int(minutes or 0)))
+
+
+def _payload_digest(payload):
+    try:
+        encoded = json.dumps(payload or {}, ensure_ascii=False, sort_keys=True)
+    except Exception:
+        encoded = str(payload or '')
+    return hashlib.sha256(encoded.encode('utf-8')).hexdigest()
+
+
+def _audit_event_locked(conn, entity_table, entity_id, actor_type, actor_id,
+                        event, from_value='', to_value='', payload=None):
+    conn.execute(
+        'INSERT INTO op_audit_log '
+        '(entity_id, entity_table, actor_type, actor_id, event, from_value, to_value, payload_digest, created_at) '
+        'VALUES (?,?,?,?,?,?,?,?,?)',
+        (str(entity_id), str(entity_table), str(actor_type), str(actor_id), str(event),
+         str(from_value or ''), str(to_value or ''), _payload_digest(payload), _now()))
+
+
+def _request_is_active_row(row):
+    if not row:
+        return False
+    status = str(_rowv(row, 'status', '')).strip()
+    state = str(_rowv(row, 'state', '')).strip()
+    if state in OPS_ACTIVE_STATES:
+        return True
+    return status in ('waiting', 'approved', 'disputed')
+
+
+def _rowv(row, key, default=''):
+    try:
+        val = row[key]
+        return default if val is None else val
+    except Exception:
+        try:
+            val = row.get(key, default)
+            return default if val is None else val
+        except Exception:
+            return default
+
+
+def _step_templates_for(conn, op_type, source_type):
+    row = conn.execute(
+        "SELECT steps_json FROM op_step_templates "
+        "WHERE op_type=? AND source_type=? AND is_active=1 "
+        "ORDER BY updated_at DESC LIMIT 1",
+        (str(op_type), str(source_type))).fetchone()
+    if row and row['steps_json']:
+        try:
+            val = json.loads(row['steps_json'])
+            if isinstance(val, list) and val:
+                return val
+        except Exception:
+            pass
+    return _default_step_templates().get((str(op_type), str(source_type))) \
+        or _default_step_templates().get((str(op_type), 'company')) \
+        or _default_step_templates()[('deposit', 'company')]
+
+
+def _instantiate_steps_locked(conn, req_row):
+    req_id = str(req_row['id'])
+    existing = conn.execute('SELECT COUNT(*) c FROM op_steps WHERE txn_id=?', (req_id,)).fetchone()
+    if existing and int(existing['c'] or 0) > 0:
+        return
+    now_dt = _ts_now()
+    req_type = str(_rowv(req_row, 'type', 'deposit')).strip()
+    source_type = str(_rowv(req_row, 'source_type', 'company')).strip() or 'company'
+    templates = _step_templates_for(conn, req_type, source_type)
+    for idx, st in enumerate(templates, start=1):
+        sid = _generate_id('STP')
+        actor_role = str(st.get('actor_role') or 'requester')
+        evidence_type = str(st.get('evidence_type') or 'none')
+        status = 'confirmed' if actor_role == 'system' else 'pending'
+        acted_at = _to_ts(now_dt) if actor_role == 'system' else ''
+        acted_by = 'system' if actor_role == 'system' else ''
+        confirmed_at = acted_at
+        confirmed_by = acted_by
+        action_deadline = _to_ts(_plus_minutes(now_dt, OP_STEP_ACTION_TIMEOUT_MIN))
+        confirm_deadline = ''
+        conn.execute('''
+            INSERT INTO op_steps
+            (id, txn_id, seq, step_key, title_key, actor_role, status,
+             evidence_type, evidence_ref, action_deadline, confirm_deadline,
+             acted_at, acted_by, confirmed_at, confirmed_by,
+             reject_count, note, created_at, updated_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        ''', (
+            sid, req_id, idx,
+            str(st.get('key') or f'step_{idx}'),
+            str(st.get('title_key') or st.get('key') or f'step_{idx}'),
+            actor_role, status,
+            evidence_type, '', action_deadline, confirm_deadline,
+            acted_at, acted_by, confirmed_at, confirmed_by,
+            0, '', _to_ts(now_dt), _to_ts(now_dt)
+        ))
+
+
+def _sync_request_state_from_steps_locked(conn, req_id):
+    req = conn.execute('SELECT * FROM match_requests WHERE id=?', (str(req_id),)).fetchone()
+    if not req:
+        return
+    rows = conn.execute(
+        'SELECT status FROM op_steps WHERE txn_id=? ORDER BY seq',
+        (str(req_id),)).fetchall()
+    if not rows:
+        return
+    statuses = [str(r['status']) for r in rows]
+    state = (req['state'] or '').strip() or 'created'
+
+    if any(s in ('escalated', 'expired') for s in statuses):
+        new_state = 'escalated'
+    elif any(s == 'rejected' for s in statuses):
+        new_state = 'in_progress'
+    elif all(s == 'confirmed' for s in statuses):
+        new_state = 'pre_complete'
+    elif any(s in ('action_done', 'confirmed') for s in statuses):
+        new_state = 'in_progress'
+    else:
+        new_state = 'claimed' if str(_rowv(req, 'claimed_by_id', '')) else 'created'
+
+    updates = []
+    args = []
+    if new_state != state:
+        updates.append('state=?')
+        args.append(new_state)
+    if new_state == 'pre_complete':
+        until = req['precomplete_until'] or ''
+        if not until:
+            updates.append('precomplete_until=?')
+            args.append(_to_ts(_plus_minutes(_ts_now(), OP_PRECOMPLETE_WINDOW_MIN)))
+    if updates:
+        args.append(str(req_id))
+        conn.execute(f"UPDATE match_requests SET {', '.join(updates)} WHERE id=?", args)
+        _audit_event_locked(conn, 'match_requests', req_id, 'system', 'state_sync',
+                            'state_sync', state, new_state, {'reason': 'steps_sync'})
+
+
+def _is_processor(actor_type, actor_id, req_row):
+    if actor_type == 'admin':
+        return True
+    if actor_type == 'agent':
+        claimed = str(_rowv(req_row, 'claimed_by_id', ''))
+        assigned = str(_rowv(req_row, 'assigned_agent_id', ''))
+        return str(actor_id) in (claimed, assigned)
+    return False
+
+
 # ── Agent CRUD ───────────────────────────────────────────────────────────────
 
 def list_agents():
@@ -637,7 +1009,7 @@ _ADMIN_EDITABLE = {'bot_token', 'bot_name', 'username', 'security_deposit',
                    'is_active', 'traffic_on', 'traffic_weight',
                    'max_daily_transactions', 'max_concurrent',
                    'deposit_method_name', 'deposit_method_data', 'notes',
-                   'telegram_id'}
+                   'telegram_id', 'drain', 'pin_remaining', 'cap_per_txn'}
 
 
 def update_agent(agent_id, data):
@@ -647,10 +1019,14 @@ def update_agent(agent_id, data):
             v = data[k]
             if k in ('is_active', 'traffic_on'):
                 v = 1 if v in (1, '1', True, 'yes', 'true') else 0
-            elif k in ('traffic_weight', 'max_daily_transactions', 'max_concurrent'):
+            elif k in ('traffic_weight', 'max_daily_transactions', 'max_concurrent', 'pin_remaining'):
                 v = max(1 if k == 'traffic_weight' else 0, int(v or 0))
+            elif k == 'drain':
+                v = 1 if v in (1, '1', True, 'yes', 'true') else 0
             elif k == 'security_deposit':
                 v = float(v or 0)
+            elif k == 'cap_per_txn':
+                v = max(0.0, float(v or 0))
             sets.append(f'{k}=?')
             vals.append(v)
     if data.get('password'):
@@ -824,13 +1200,59 @@ def pick_agent_for_request(txn_type, amount):
             conn.close()
 
 
-def _pick_agent_locked(conn, txn_type, amount):
-    """Pick agent with escrow-aware spendable balance + tier-based priority."""
+def _pick_agent_locked(conn, txn_type, amount, request_meta=None):
+    """Pick agent with escrow-aware spendable balance + tier-based priority.
+
+    Supports lightweight routing rules and manual controls:
+    - block_agent
+    - route_company / route_currency (preferred agent)
+    - per-agent drain / cap_per_txn / pin_remaining
+    """
+    request_meta = request_meta or {}
     _rollover_daily(conn, date.today().isoformat())
+
+    blocked = set()
+    preferred = []
+    forced_pin = None
+    forced_pin_rule = None
+    global_max_amount = None
+    rules = conn.execute(
+        "SELECT id, rule_type, params_json FROM routing_rules "
+        "WHERE is_active=1 ORDER BY priority ASC, created_at ASC").fetchall()
+    for rr in rules:
+        try:
+            params = json.loads(rr['params_json'] or '{}')
+        except Exception:
+            params = {}
+        rtype = rr['rule_type']
+        if rtype == 'block_agent' and params.get('agent_id'):
+            blocked.add(str(params.get('agent_id')))
+        elif rtype == 'max_amount_per_txn':
+            try:
+                mx = float(params.get('max_amount', 0) or 0)
+            except Exception:
+                mx = 0
+            if mx > 0:
+                global_max_amount = mx if global_max_amount is None else min(global_max_amount, mx)
+        elif rtype == 'pin_next_to_agent' and params.get('agent_id'):
+            remaining = int(params.get('remaining', 0) or 0)
+            if remaining > 0 and forced_pin is None:
+                forced_pin = str(params.get('agent_id'))
+                forced_pin_rule = {'id': rr['id'], 'params': params, 'remaining': remaining}
+        elif rtype == 'route_company' and request_meta.get('company_id'):
+            if str(params.get('company_id', '')) == str(request_meta.get('company_id', '')) and params.get('agent_id'):
+                preferred.append(str(params.get('agent_id')))
+        elif rtype == 'route_currency' and request_meta.get('currency'):
+            if str(params.get('currency', '')).upper() == str(request_meta.get('currency', '')).upper() and params.get('agent_id'):
+                preferred.append(str(params.get('agent_id')))
+
+    if global_max_amount is not None and float(amount) > float(global_max_amount):
+        return None
+
     rows = conn.execute(
         "SELECT b.id, b.bot_name, b.balance, b.security_deposit, b.traffic_weight, "
         "b.current_daily_count, b.max_daily_transactions, b.escrow_balance, "
-        "b.max_concurrent, b.is_online, b.tier, "
+        "b.max_concurrent, b.is_online, b.tier, b.drain, b.pin_remaining, b.cap_per_txn, "
         "COALESCE((SELECT SUM(t.amount) FROM agent_transactions t "
         " WHERE t.agent_id=b.id AND t.status='pending' AND t.type='deposit'),0) AS pending_out, "
         "COALESCE((SELECT COUNT(*) FROM agent_transactions t2 "
@@ -839,6 +1261,13 @@ def _pick_agent_locked(conn, txn_type, amount):
         "AND b.current_daily_count < b.max_daily_transactions").fetchall()
     eligible = []
     for r in rows:
+        if str(r['id']) in blocked:
+            continue
+        if int(r['drain'] or 0) == 1:
+            continue
+        cap = float(r['cap_per_txn'] or 0)
+        if cap > 0 and float(amount) > cap:
+            continue
         spendable = float(r['balance']) - float(r['escrow_balance']) - float(r['pending_out'])
         if spendable <= float(r['security_deposit']):
             continue
@@ -854,6 +1283,49 @@ def _pick_agent_locked(conn, txn_type, amount):
         eligible.append((ratio, r))
     if not eligible:
         return None
+
+    if forced_pin:
+        forced_rows = [r for _, r in eligible if str(r['id']) == forced_pin]
+        if forced_rows:
+            chosen = forced_rows[0]
+            conn.execute(
+                'UPDATE agent_bots SET current_daily_count=current_daily_count+1, '
+                'last_active=? WHERE id=?', (_now(), chosen['id']))
+            if forced_pin_rule:
+                new_params = dict(forced_pin_rule['params'])
+                new_params['remaining'] = max(0, int(forced_pin_rule['remaining']) - 1)
+                conn.execute(
+                    'UPDATE routing_rules SET params_json=? WHERE id=?',
+                    (json.dumps(new_params, ensure_ascii=False), forced_pin_rule['id']))
+            return {'id': chosen['id'], 'name': chosen['bot_name'],
+                    'balance': float(chosen['balance']),
+                    'escrow_balance': float(chosen['escrow_balance'])}
+
+    if preferred:
+        preferred_set = set(preferred)
+        preferred_eligible = [r for _, r in eligible if str(r['id']) in preferred_set]
+        if preferred_eligible:
+            preferred_eligible.sort(key=lambda rr: float(rr['current_daily_count']))
+            chosen = preferred_eligible[0]
+            conn.execute(
+                'UPDATE agent_bots SET current_daily_count=current_daily_count+1, '
+                'last_active=? WHERE id=?', (_now(), chosen['id']))
+            return {'id': chosen['id'], 'name': chosen['bot_name'],
+                    'balance': float(chosen['balance']),
+                    'escrow_balance': float(chosen['escrow_balance'])}
+
+    pinned = [r for _, r in eligible if int(r['pin_remaining'] or 0) > 0]
+    if pinned:
+        pinned.sort(key=lambda rr: int(rr['pin_remaining']), reverse=True)
+        chosen = pinned[0]
+        conn.execute(
+            'UPDATE agent_bots SET current_daily_count=current_daily_count+1, '
+            'pin_remaining=MAX(0,pin_remaining-1), last_active=? WHERE id=?',
+            (_now(), chosen['id']))
+        return {'id': chosen['id'], 'name': chosen['bot_name'],
+                'balance': float(chosen['balance']),
+                'escrow_balance': float(chosen['escrow_balance'])}
+
     eligible.sort(key=lambda x: x[0])
     best_ratio = eligible[0][0]
     top = [r for ratio, r in eligible if ratio <= best_ratio * 1.05]
@@ -1607,10 +2079,14 @@ def db_create_match_request(user_id, customer_id, req_type, amount, currency,
 def db_get_active_request_by_user(user_id):
     conn = _conn()
     try:
-        r = conn.execute(
-            "SELECT * FROM match_requests WHERE user_id=? AND status='waiting' LIMIT 1",
-            (str(user_id),)).fetchone()
-        return dict(r) if r else None
+        rows = conn.execute(
+            "SELECT * FROM match_requests WHERE user_id=? "
+            "ORDER BY created_at DESC LIMIT 20",
+            (str(user_id),)).fetchall()
+        for r in rows:
+            if _request_is_active_row(r):
+                return dict(r)
+        return None
     finally:
         conn.close()
 
@@ -2118,13 +2594,15 @@ def get_agent_stats():
 def _agent_txn_type(user_req_type):
     """User 'deposit' → agent RECEIVES money (txn type 'withdraw').
     User 'withdraw' → agent PAYS money (txn type 'deposit')."""
-    return 'withdraw' if user_req_type == 'deposit' else 'deposit'
+    if user_req_type in ('deposit', 'sell_usdt'):
+        return 'withdraw'
+    return 'deposit'
 
 
 def create_match_request_with_agent_assignment(
     user_id, customer_id, req_type, amount, currency,
     company_id='', company_name='', payment_method_id='', details='',
-    bot_id='',
+    bot_id='', source_type='company', network='', rate=0.0,
 ):
     """Atomically: create match request + pick agent + create pending txn + hold escrow.
 
@@ -2134,31 +2612,49 @@ def create_match_request_with_agent_assignment(
     amount = float(amount or 0)
     if amount <= 0:
         return None, 'المبلغ يجب أن يكون أكبر من صفر', False, None
-    if req_type not in ('deposit', 'withdraw'):
+    if req_type not in ('deposit', 'withdraw', 'buy_usdt', 'sell_usdt'):
         return None, 'نوع الطلب غير صالح', False, None
+    source_type = 'personal_wallet' if str(source_type) == 'personal_wallet' else 'company'
 
     with _lock:
         conn = _conn()
         try:
             conn.execute('BEGIN IMMEDIATE')
             existing = conn.execute(
-                "SELECT id FROM match_requests WHERE user_id=? AND status='waiting' LIMIT 1",
-                (str(user_id),)).fetchone()
+                "SELECT * FROM match_requests WHERE user_id=? "
+                "ORDER BY created_at DESC LIMIT 10",
+                (str(user_id),)).fetchall()
+            existing = [r for r in existing if _request_is_active_row(r)]
             if existing:
                 conn.rollback()
                 return None, 'لديك طلب مطابقة نشط بالفعل — انتظر معالجته أو ألغِه', False, None
 
             req_id = _generate_id('REQ')
             alias = _generate_alias()
+            now_dt = _ts_now()
+            now_s = _to_ts(now_dt)
+            rate_locked_until = ''
+            try:
+                rate = float(rate or 0)
+            except Exception:
+                rate = 0.0
+            if req_type in ('buy_usdt', 'sell_usdt'):
+                rate_locked_until = _to_ts(_plus_minutes(now_dt, USDT_RATE_LOCK_MIN))
             conn.execute('''INSERT INTO match_requests
                 (id, user_id, customer_id, type, amount, currency, company_id,
-                 company_name, payment_method_id, status, created_at, alias, bot_id)
-                VALUES (?,?,?,?,?,?,?,?,?,'waiting',?,?,?)''',
+                 company_name, payment_method_id, status, created_at, alias, bot_id,
+                 source_type, state, rate, rate_locked_until, network)
+                VALUES (?,?,?,?,?,?,?,?,?,'waiting',?,?,?,?,?,?,?,?)''',
                 (req_id, str(user_id), str(customer_id), req_type, amount,
                  currency or 'EGP', str(company_id or ''), str(company_name or ''),
-                 str(payment_method_id or ''), _now(), alias, str(bot_id or '')))
+                 str(payment_method_id or ''), now_s, alias, str(bot_id or ''),
+                 source_type, 'created', rate, rate_locked_until, str(network or '')))
 
-            chosen = _pick_agent_locked(conn, _agent_txn_type(req_type), amount)
+            chosen = None
+            if source_type != 'personal_wallet':
+                chosen = _pick_agent_locked(
+                    conn, _agent_txn_type(req_type), amount,
+                    request_meta={'currency': currency or 'EGP', 'company_id': company_id or ''})
             agent_info = None
             if chosen:
                 full = conn.execute(
@@ -2182,6 +2678,19 @@ def create_match_request_with_agent_assignment(
                     'name': (full['bot_name'] if full else chosen.get('name', '')) or '',
                     'telegram_id': (full['telegram_id'] if full else '') or '',
                 }
+
+            req_row = conn.execute('SELECT * FROM match_requests WHERE id=?', (req_id,)).fetchone()
+            if req_row:
+                _instantiate_steps_locked(conn, req_row)
+
+            _audit_event_locked(conn, 'match_requests', req_id, 'user', str(user_id),
+                                'request_created', '', 'created', {
+                                    'type': req_type,
+                                    'amount': amount,
+                                    'currency': currency or 'EGP',
+                                    'source_type': source_type,
+                                    'assigned_agent_id': (chosen or {}).get('id', ''),
+                                })
 
             conn.commit()
             return req_id, None, agent_info is not None, agent_info
@@ -2207,7 +2716,7 @@ def cancel_match_request_atomic(req_id, user_id):
         try:
             conn.execute('BEGIN IMMEDIATE')
             req = conn.execute(
-                "SELECT * FROM match_requests WHERE id=? AND user_id=? AND status='waiting'",
+                "SELECT * FROM match_requests WHERE id=? AND user_id=?",
                 (str(req_id), str(user_id))).fetchone()
             if not req:
                 settled = conn.execute(
@@ -2217,6 +2726,22 @@ def cancel_match_request_atomic(req_id, user_id):
                 if settled:
                     return False, 'تمت معالجة الطلب بالفعل — لا يمكن إلغاؤه'
                 return False, 'الطلب غير موجود أو لا يمكن إلغاؤه'
+
+            status = str(_rowv(req, 'status', ''))
+            state = str(_rowv(req, 'state', ''))
+            if status in ('matched', 'rejected', 'cancelled') or state in OPS_FINAL_STATES:
+                conn.rollback()
+                return False, 'تمت معالجة الطلب بالفعل — لا يمكن إلغاؤه'
+            if state in ('in_progress', 'pre_complete', 'disputed'):
+                conn.rollback()
+                return False, 'لا يمكن الإلغاء بعد بدء التنفيذ — افتح شكوى من الواجهة'
+
+            has_progress = conn.execute(
+                "SELECT 1 FROM op_steps WHERE txn_id=? AND status IN ('action_done','confirmed') "
+                "AND actor_role!='system' LIMIT 1", (str(req_id),)).fetchone()
+            if has_progress:
+                conn.rollback()
+                return False, 'لا يمكن الإلغاء بعد تنفيذ خطوة من الطرف الآخر'
 
             txn = conn.execute(
                 "SELECT id, agent_id, amount FROM agent_transactions "
@@ -2230,8 +2755,10 @@ def cancel_match_request_atomic(req_id, user_id):
                     (float(txn['amount']), txn['agent_id']))
 
             conn.execute(
-                "UPDATE match_requests SET status='cancelled' WHERE id=?",
+                "UPDATE match_requests SET status='cancelled', state='cancelled' WHERE id=?",
                 (str(req_id),))
+            _audit_event_locked(conn, 'match_requests', req_id, 'user', str(user_id),
+                                'request_cancelled', status, 'cancelled', {})
             conn.commit()
             return True, None
         except Exception as e:
@@ -2259,13 +2786,25 @@ def admin_set_match_request_status(req_id, new_status, actor=''):
         try:
             conn.execute('BEGIN IMMEDIATE')
             req = conn.execute(
-                "SELECT * FROM match_requests WHERE id=? AND status='waiting'",
+                "SELECT * FROM match_requests WHERE id=?",
                 (str(req_id),)).fetchone()
             if not req:
                 conn.rollback()
                 return False, 'الطلب غير موجود أو تمت معالجته'
 
+            cur_status = str(_rowv(req, 'status', ''))
+            cur_state = str(_rowv(req, 'state', ''))
+            if cur_status in ('matched', 'cancelled', 'rejected') or cur_state in OPS_FINAL_STATES:
+                conn.rollback()
+                return False, 'الطلب غير موجود أو تمت معالجته'
+
             if new_status == 'rejected':
+                progressed = conn.execute(
+                    "SELECT 1 FROM op_steps WHERE txn_id=? AND status IN ('action_done','confirmed') "
+                    "AND actor_role!='system' LIMIT 1", (str(req_id),)).fetchone()
+                if progressed:
+                    conn.rollback()
+                    return False, 'لا يمكن الرفض بعد بدء التنفيذ — افتح نزاع بدلاً من ذلك'
                 txn = conn.execute(
                     "SELECT id, agent_id, amount FROM agent_transactions "
                     "WHERE match_request_id=? AND status='pending'",
@@ -2277,9 +2816,26 @@ def admin_set_match_request_status(req_id, new_status, actor=''):
                         'current_daily_count=MAX(0, current_daily_count-1) WHERE id=?',
                         (float(txn['amount']), txn['agent_id']))
 
+            new_state = cur_state or 'created'
+            if new_status == 'approved':
+                if not _rowv(req, 'claimed_by_id', '') and _rowv(req, 'assigned_agent_id', ''):
+                    conn.execute(
+                        "UPDATE match_requests SET claimed_by_type='agent', claimed_by_id=?, claimed_at=? WHERE id=?",
+                        (str(_rowv(req, 'assigned_agent_id', '')), _now(), str(req_id)))
+                new_state = 'claimed' if new_state in ('', 'created') else new_state
+                req2 = conn.execute('SELECT * FROM match_requests WHERE id=?', (str(req_id),)).fetchone()
+                if req2:
+                    _instantiate_steps_locked(conn, req2)
+            elif new_status == 'rejected':
+                new_state = 'cancelled'
+
             conn.execute(
-                "UPDATE match_requests SET status=?, approved_by=?, approved_at=? WHERE id=?",
-                (new_status, f'admin:{actor}' if actor else 'admin', _now(), str(req_id)))
+                "UPDATE match_requests SET status=?, state=?, approved_by=?, approved_at=? WHERE id=?",
+                (new_status, new_state, f'admin:{actor}' if actor else 'admin', _now(), str(req_id)))
+
+            _audit_event_locked(conn, 'match_requests', req_id, 'admin', str(actor or 'admin'),
+                                f'admin_{new_status}', cur_status, new_status,
+                                {'state_from': cur_state, 'state_to': new_state})
             conn.commit()
             return True, None
         except Exception as e:
@@ -2298,13 +2854,29 @@ def sync_match_request_from_txn(mrid, decision, agent_id=''):
     approved → matched (request fulfilled), rejected → rejected."""
     if not mrid:
         return
-    status = 'matched' if decision == 'approved' else 'rejected'
     conn = _conn()
     try:
-        conn.execute(
-            "UPDATE match_requests SET status=?, approved_by=?, approved_at=? "
-            "WHERE id=? AND status IN ('waiting','approved')",
-            (status, f'agent:{agent_id}' if agent_id else 'agent', _now(), str(mrid)))
+        req = conn.execute('SELECT * FROM match_requests WHERE id=?', (str(mrid),)).fetchone()
+        if not req:
+            return
+        step_count = conn.execute('SELECT COUNT(*) c FROM op_steps WHERE txn_id=?', (str(mrid),)).fetchone()['c']
+        if decision == 'approved':
+            if int(step_count or 0) > 0:
+                conn.execute(
+                    "UPDATE match_requests SET status='approved', state='claimed', "
+                    "approved_by=?, approved_at=?, claimed_by_type='agent', claimed_by_id=?, claimed_at=? "
+                    "WHERE id=? AND status IN ('waiting','approved')",
+                    (f'agent:{agent_id}' if agent_id else 'agent', _now(), str(agent_id or ''), _now(), str(mrid)))
+            else:
+                conn.execute(
+                    "UPDATE match_requests SET status='matched', state='completed', approved_by=?, approved_at=? "
+                    "WHERE id=? AND status IN ('waiting','approved')",
+                    (f'agent:{agent_id}' if agent_id else 'agent', _now(), str(mrid)))
+        else:
+            conn.execute(
+                "UPDATE match_requests SET status='rejected', state='cancelled', approved_by=?, approved_at=? "
+                "WHERE id=? AND status IN ('waiting','approved')",
+                (f'agent:{agent_id}' if agent_id else 'agent', _now(), str(mrid)))
         conn.commit()
     finally:
         conn.close()
@@ -2318,10 +2890,12 @@ def get_pending_with_requests(agent_id):
             SELECT t.id AS txn_id, t.type, t.amount, t.currency, t.status,
                    t.created_at, t.user_id, t.user_name, t.payment_details,
                    r.id AS request_id, r.company_name, r.company_id,
-                   r.alias AS request_alias, r.customer_id
+                   r.alias AS request_alias, r.customer_id,
+                   r.status AS request_status, r.state AS request_state
             FROM agent_transactions t
             LEFT JOIN match_requests r ON t.match_request_id = r.id
             WHERE t.agent_id=? AND t.status='pending'
+              AND (r.id IS NULL OR r.status='approved' OR r.state IN ('claimed','in_progress','escalated','disputed','pre_complete'))
             ORDER BY t.created_at ASC
         ''', (str(agent_id),)).fetchall()
         return [dict(r) for r in rows]
@@ -2340,5 +2914,629 @@ def get_match_request_full(req_id):
             WHERE r.id=?
         ''', (str(req_id),)).fetchone()
         return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def get_match_request_steps(req_id):
+    conn = _conn()
+    try:
+        req = conn.execute('''
+            SELECT r.*, a.bot_name AS agent_name, a.telegram_id AS agent_telegram_id
+            FROM match_requests r
+            LEFT JOIN agent_bots a ON r.assigned_agent_id = a.id
+            WHERE r.id=?
+        ''', (str(req_id),)).fetchone()
+        if not req:
+            return None
+        steps = conn.execute(
+            'SELECT * FROM op_steps WHERE txn_id=? ORDER BY seq',
+            (str(req_id),)).fetchall()
+        payload = dict(req)
+        payload['steps'] = [dict(s) for s in steps]
+        return payload
+    finally:
+        conn.close()
+
+
+def get_user_requests(user_id, limit=20):
+    conn = _conn()
+    try:
+        rows = conn.execute(
+            'SELECT * FROM match_requests WHERE user_id=? ORDER BY created_at DESC LIMIT ?',
+            (str(user_id), int(limit))).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def list_ops_requests(statuses=None, states=None, limit=200):
+    statuses = statuses or []
+    states = states or []
+    conn = _conn()
+    try:
+        sql = (
+            'SELECT r.*, a.bot_name AS agent_name, a.is_online AS agent_online '
+            'FROM match_requests r LEFT JOIN agent_bots a ON r.assigned_agent_id=a.id '
+            'WHERE 1=1'
+        )
+        args = []
+        if statuses:
+            placeholders = ','.join(['?'] * len(statuses))
+            sql += f' AND r.status IN ({placeholders})'
+            args.extend([str(s) for s in statuses])
+        if states:
+            placeholders = ','.join(['?'] * len(states))
+            sql += f' AND r.state IN ({placeholders})'
+            args.extend([str(s) for s in states])
+        sql += ' ORDER BY r.created_at DESC LIMIT ?'
+        args.append(int(limit))
+        rows = conn.execute(sql, args).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def claim_request(req_id, claimer_type, claimer_id):
+    if claimer_type not in ('agent', 'admin'):
+        return {'error': 'claimer_type غير صالح'}
+    conn = _conn()
+    try:
+        conn.execute('BEGIN IMMEDIATE')
+        req = conn.execute('SELECT * FROM match_requests WHERE id=?', (str(req_id),)).fetchone()
+        if not req:
+            conn.rollback()
+            return {'error': 'الطلب غير موجود'}
+        if str(_rowv(req, 'state', '')) in OPS_FINAL_STATES or str(_rowv(req, 'status', '')) in ('cancelled', 'matched', 'rejected'):
+            conn.rollback()
+            return {'error': 'الطلب منتهٍ'}
+        if claimer_type == 'agent':
+            assigned = str(_rowv(req, 'assigned_agent_id', ''))
+            if assigned and assigned != str(claimer_id):
+                conn.rollback()
+                return {'error': 'هذا الطلب ليس مخصصاً لك'}
+            if str(_rowv(req, 'status', '')) != 'approved':
+                conn.rollback()
+                return {'error': 'لا يمكن الاستلام قبل موافقة الأدمن'}
+
+        claimed_by = str(_rowv(req, 'claimed_by_id', ''))
+        if claimed_by and claimed_by != str(claimer_id):
+            conn.rollback()
+            return {'error': 'تم استلام الطلب بواسطة طرف آخر'}
+
+        old_state = str(_rowv(req, 'state', '')) or 'created'
+        new_state = 'claimed' if old_state in ('', 'created') else old_state
+        conn.execute(
+            "UPDATE match_requests SET claimed_by_type=?, claimed_by_id=?, claimed_at=?, state=? WHERE id=?",
+            (str(claimer_type), str(claimer_id), _now(), new_state, str(req_id)))
+
+        req2 = conn.execute('SELECT * FROM match_requests WHERE id=?', (str(req_id),)).fetchone()
+        if req2:
+            _instantiate_steps_locked(conn, req2)
+
+        _audit_event_locked(conn, 'match_requests', req_id, claimer_type, str(claimer_id),
+                            'request_claimed', old_state, new_state, {})
+        conn.commit()
+        return {'success': True, 'state': new_state}
+    except Exception as e:
+        conn.rollback()
+        return {'error': str(e)}
+    finally:
+        conn.close()
+
+
+def admin_takeover_request(req_id, admin_id, reason=''):
+    conn = _conn()
+    try:
+        conn.execute('BEGIN IMMEDIATE')
+        req = conn.execute('SELECT * FROM match_requests WHERE id=?', (str(req_id),)).fetchone()
+        if not req:
+            conn.rollback()
+            return {'error': 'الطلب غير موجود'}
+        if str(_rowv(req, 'state', '')) in OPS_FINAL_STATES:
+            conn.rollback()
+            return {'error': 'الطلب منتهٍ'}
+        old_owner = {
+            'claimed_by_type': _rowv(req, 'claimed_by_type', ''),
+            'claimed_by_id': _rowv(req, 'claimed_by_id', ''),
+        }
+        old_state = str(_rowv(req, 'state', '')) or 'created'
+        new_state = 'claimed'
+        conn.execute(
+            "UPDATE match_requests SET claimed_by_type='admin', claimed_by_id=?, claimed_at=?, state=? WHERE id=?",
+            (str(admin_id), _now(), new_state, str(req_id)))
+        _audit_event_locked(conn, 'match_requests', req_id, 'admin', str(admin_id),
+                            'request_takeover', old_state, new_state,
+                            {'reason': reason or '', 'old_owner': old_owner})
+        conn.commit()
+        return {'success': True}
+    except Exception as e:
+        conn.rollback()
+        return {'error': str(e)}
+    finally:
+        conn.close()
+
+
+def admin_reassign_request(req_id, admin_id, new_agent_id, reason=''):
+    conn = _conn()
+    try:
+        conn.execute('BEGIN IMMEDIATE')
+        req = conn.execute('SELECT * FROM match_requests WHERE id=?', (str(req_id),)).fetchone()
+        if not req:
+            conn.rollback()
+            return {'error': 'الطلب غير موجود'}
+        if str(_rowv(req, 'state', '')) in OPS_FINAL_STATES:
+            conn.rollback()
+            return {'error': 'الطلب منتهٍ'}
+        old_agent = str(_rowv(req, 'assigned_agent_id', ''))
+        if old_agent == str(new_agent_id):
+            conn.rollback()
+            return {'success': True, 'unchanged': True}
+
+        tgt = conn.execute('SELECT * FROM agent_bots WHERE id=? AND is_active=1',
+                           (str(new_agent_id),)).fetchone()
+        if not tgt:
+            conn.rollback()
+            return {'error': 'الوكيل الجديد غير صالح'}
+
+        amount = float(_rowv(req, 'amount', 0) or 0)
+        cap = float(_rowv(tgt, 'cap_per_txn', 0) or 0)
+        if int(_rowv(tgt, 'drain', 0) or 0) == 1:
+            conn.rollback()
+            return {'error': 'الوكيل الجديد في وضع Drain'}
+        if cap > 0 and amount > cap:
+            conn.rollback()
+            return {'error': 'المبلغ يتجاوز حد الوكيل الجديد'}
+
+        pending_txn = conn.execute(
+            "SELECT * FROM agent_transactions WHERE match_request_id=? AND status='pending'",
+            (str(req_id),)).fetchone()
+        if pending_txn:
+            pamount = float(_rowv(pending_txn, 'amount', 0) or 0)
+            if old_agent:
+                conn.execute(
+                    'UPDATE agent_bots SET escrow_balance=MAX(0,escrow_balance-?) WHERE id=?',
+                    (pamount, old_agent))
+            conn.execute(
+                'UPDATE agent_bots SET escrow_balance=escrow_balance+? WHERE id=?',
+                (pamount, str(new_agent_id)))
+            conn.execute(
+                'UPDATE agent_transactions SET agent_id=? WHERE id=?',
+                (str(new_agent_id), pending_txn['id']))
+
+        old_state = str(_rowv(req, 'state', '')) or 'created'
+        conn.execute(
+            "UPDATE match_requests SET assigned_agent_id=?, claimed_by_type='agent', claimed_by_id=?, claimed_at=?, state='claimed' WHERE id=?",
+            (str(new_agent_id), str(new_agent_id), _now(), str(req_id)))
+        _audit_event_locked(conn, 'match_requests', req_id, 'admin', str(admin_id),
+                            'request_reassigned', old_state, 'claimed',
+                            {'reason': reason or '', 'old_agent': old_agent, 'new_agent': str(new_agent_id)})
+        conn.commit()
+        return {'success': True}
+    except Exception as e:
+        conn.rollback()
+        return {'error': str(e)}
+    finally:
+        conn.close()
+
+
+def _step_actor_allowed(step_row, req_row, actor_type, actor_id, action='act'):
+    role = str(_rowv(step_row, 'actor_role', 'requester'))
+    if actor_type == 'admin':
+        return True
+    if role == 'system':
+        return actor_type == 'system'
+    if role == 'requester':
+        return str(actor_type) == 'user' and str(actor_id) == str(_rowv(req_row, 'user_id', ''))
+    if role == 'processor':
+        return _is_processor(actor_type, actor_id, req_row)
+    return False
+
+
+def _step_confirmer_allowed(step_row, req_row, actor_type, actor_id):
+    role = str(_rowv(step_row, 'actor_role', 'requester'))
+    if actor_type == 'admin':
+        return True
+    if role == 'requester':
+        return _is_processor(actor_type, actor_id, req_row)
+    if role == 'processor':
+        return str(actor_type) == 'user' and str(actor_id) == str(_rowv(req_row, 'user_id', ''))
+    return False
+
+
+def request_step_action(req_id, step_id, actor_type, actor_id, evidence_ref='', note=''):
+    conn = _conn()
+    try:
+        conn.execute('BEGIN IMMEDIATE')
+        req = conn.execute('SELECT * FROM match_requests WHERE id=?', (str(req_id),)).fetchone()
+        if not req:
+            conn.rollback()
+            return {'error': 'الطلب غير موجود'}
+        if str(_rowv(req, 'status', '')) not in ('approved',):
+            conn.rollback()
+            return {'error': 'الطلب غير جاهز للتنفيذ — بانتظار موافقة الأدمن'}
+        if str(_rowv(req, 'state', '')) in OPS_FINAL_STATES:
+            conn.rollback()
+            return {'error': 'الطلب منتهٍ'}
+
+        step = conn.execute(
+            'SELECT * FROM op_steps WHERE id=? AND txn_id=?',
+            (str(step_id), str(req_id))).fetchone()
+        if not step:
+            conn.rollback()
+            return {'error': 'الخطوة غير موجودة'}
+        if str(_rowv(step, 'status', '')) not in ('pending', 'rejected', 'escalated'):
+            conn.rollback()
+            return {'error': 'لا يمكن تنفيذ هذه الخطوة حالياً'}
+        if not _step_actor_allowed(step, req, actor_type, actor_id, action='act'):
+            conn.rollback()
+            return {'error': 'غير مصرح لك بتنفيذ هذه الخطوة'}
+        if str(_rowv(step, 'evidence_type', 'none')) != 'none' and not str(evidence_ref or '').strip():
+            conn.rollback()
+            return {'error': 'هذه الخطوة تتطلب مرجع/دليل'}
+
+        now_dt = _ts_now()
+        confirm_deadline = _to_ts(_plus_minutes(now_dt, OP_STEP_CONFIRM_TIMEOUT_MIN))
+        old_status = str(_rowv(step, 'status', 'pending'))
+        conn.execute('''
+            UPDATE op_steps
+            SET status='action_done', evidence_ref=?, acted_at=?, acted_by=?,
+                confirm_deadline=?, note=?, updated_at=?
+            WHERE id=?
+        ''', (
+            str(evidence_ref or ''), _to_ts(now_dt), f'{actor_type}:{actor_id}',
+            confirm_deadline, str(note or ''), _to_ts(now_dt), str(step_id)
+        ))
+
+        req_state = str(_rowv(req, 'state', '')) or 'created'
+        if req_state in ('created', 'claimed', 'escalated'):
+            conn.execute(
+                "UPDATE match_requests SET state='in_progress', claimed_by_type=?, claimed_by_id=?, claimed_at=? WHERE id=?",
+                ('admin' if actor_type == 'admin' else 'agent', str(actor_id), _now(), str(req_id)))
+        _audit_event_locked(conn, 'op_steps', step_id, actor_type, str(actor_id),
+                            'step_action', old_status, 'action_done',
+                            {'req_id': req_id, 'evidence': str(evidence_ref or '')})
+        _sync_request_state_from_steps_locked(conn, req_id)
+        conn.commit()
+        return {'success': True}
+    except Exception as e:
+        conn.rollback()
+        return {'error': str(e)}
+    finally:
+        conn.close()
+
+
+def request_step_confirm(req_id, step_id, actor_type, actor_id, accept=True, note=''):
+    conn = _conn()
+    try:
+        conn.execute('BEGIN IMMEDIATE')
+        req = conn.execute('SELECT * FROM match_requests WHERE id=?', (str(req_id),)).fetchone()
+        if not req:
+            conn.rollback()
+            return {'error': 'الطلب غير موجود'}
+
+        step = conn.execute(
+            'SELECT * FROM op_steps WHERE id=? AND txn_id=?',
+            (str(step_id), str(req_id))).fetchone()
+        if not step:
+            conn.rollback()
+            return {'error': 'الخطوة غير موجودة'}
+        if str(_rowv(step, 'status', '')) != 'action_done':
+            conn.rollback()
+            return {'error': 'لا توجد خطوة بانتظار التأكيد'}
+        if not _step_confirmer_allowed(step, req, actor_type, actor_id):
+            conn.rollback()
+            return {'error': 'غير مصرح لك بتأكيد هذه الخطوة'}
+
+        now_s = _to_ts(_ts_now())
+        old_status = str(_rowv(step, 'status', 'action_done'))
+        if accept:
+            conn.execute('''
+                UPDATE op_steps
+                SET status='confirmed', confirmed_at=?, confirmed_by=?,
+                    note=?, updated_at=?
+                WHERE id=?
+            ''', (now_s, f'{actor_type}:{actor_id}', str(note or ''), now_s, str(step_id)))
+            _audit_event_locked(conn, 'op_steps', step_id, actor_type, str(actor_id),
+                                'step_confirmed', old_status, 'confirmed', {'req_id': req_id})
+        else:
+            reject_count = int(_rowv(step, 'reject_count', 0) or 0) + 1
+            new_status = 'pending' if reject_count < 2 else 'escalated'
+            action_deadline = _to_ts(_plus_minutes(_ts_now(), OP_STEP_ACTION_TIMEOUT_MIN))
+            conn.execute('''
+                UPDATE op_steps
+                SET status=?, reject_count=?, note=?, action_deadline=?,
+                    confirm_deadline='', acted_at='', acted_by='', updated_at=?
+                WHERE id=?
+            ''', (new_status, reject_count, str(note or ''), action_deadline, now_s, str(step_id)))
+            if new_status == 'escalated':
+                conn.execute("UPDATE match_requests SET state='escalated' WHERE id=?", (str(req_id),))
+            _audit_event_locked(conn, 'op_steps', step_id, actor_type, str(actor_id),
+                                'step_rejected', old_status, new_status,
+                                {'req_id': req_id, 'reject_count': reject_count})
+
+        _sync_request_state_from_steps_locked(conn, req_id)
+
+        req2 = conn.execute('SELECT * FROM match_requests WHERE id=?', (str(req_id),)).fetchone()
+        if req2 and str(_rowv(req2, 'state', '')) == 'pre_complete' and not str(_rowv(req2, 'precomplete_until', '')):
+            conn.execute(
+                "UPDATE match_requests SET precomplete_until=? WHERE id=?",
+                (_to_ts(_plus_minutes(_ts_now(), OP_PRECOMPLETE_WINDOW_MIN)), str(req_id)))
+
+        conn.commit()
+        return {'success': True}
+    except Exception as e:
+        conn.rollback()
+        return {'error': str(e)}
+    finally:
+        conn.close()
+
+
+def open_request_dispute(req_id, actor_type, actor_id, reason, evidence_file_id=''):
+    reason = str(reason or '').strip()
+    if len(reason) < 3:
+        return {'error': 'سبب الشكوى قصير جداً'}
+    conn = _conn()
+    try:
+        conn.execute('BEGIN IMMEDIATE')
+        req = conn.execute('SELECT * FROM match_requests WHERE id=?', (str(req_id),)).fetchone()
+        if not req:
+            conn.rollback()
+            return {'error': 'الطلب غير موجود'}
+        if str(_rowv(req, 'state', '')) in OPS_FINAL_STATES or str(_rowv(req, 'status', '')) in ('matched', 'cancelled', 'rejected'):
+            conn.rollback()
+            return {'error': 'لا يمكن فتح شكوى بعد الإغلاق'}
+        old_state = str(_rowv(req, 'state', '')) or 'created'
+        conn.execute("UPDATE match_requests SET state='disputed', status='disputed' WHERE id=?", (str(req_id),))
+        _audit_event_locked(conn, 'match_requests', req_id, actor_type, str(actor_id),
+                            'request_disputed', old_state, 'disputed',
+                            {'reason': reason, 'evidence': str(evidence_file_id or '')})
+        conn.commit()
+        return {'success': True}
+    except Exception as e:
+        conn.rollback()
+        return {'error': str(e)}
+    finally:
+        conn.close()
+
+
+def resolve_request_dispute(req_id, admin_id, decision, note=''):
+    if decision not in ('complete', 'cancel', 'reject'):
+        return {'error': 'قرار غير صالح'}
+    conn = _conn()
+    try:
+        conn.execute('BEGIN IMMEDIATE')
+        req = conn.execute('SELECT * FROM match_requests WHERE id=?', (str(req_id),)).fetchone()
+        if not req:
+            conn.rollback()
+            return {'error': 'الطلب غير موجود'}
+        old_state = str(_rowv(req, 'state', '')) or 'created'
+        if decision == 'complete':
+            new_state = 'completed'
+            new_status = 'matched'
+        elif decision == 'reject':
+            new_state = 'rejected'
+            new_status = 'rejected'
+        else:
+            new_state = 'cancelled'
+            new_status = 'cancelled'
+        conn.execute(
+            'UPDATE match_requests SET state=?, status=?, approved_by=?, approved_at=? WHERE id=?',
+            (new_state, new_status, f'admin:{admin_id}', _now(), str(req_id)))
+        _audit_event_locked(conn, 'match_requests', req_id, 'admin', str(admin_id),
+                            'dispute_resolved', old_state, new_state,
+                            {'decision': decision, 'note': note or ''})
+        conn.commit()
+        return {'success': True, 'state': new_state, 'status': new_status}
+    except Exception as e:
+        conn.rollback()
+        return {'error': str(e)}
+    finally:
+        conn.close()
+
+
+def process_ops_deadlines():
+    """Scheduler-safe periodic job.
+
+    - Escalate timed-out steps
+    - Move pre_complete -> completed when window expires
+    - Escalate requests exceeding total timeout
+    """
+    now_dt = _ts_now()
+    now_s = _to_ts(now_dt)
+    conn = _conn()
+    result = {'escalated_steps': 0, 'completed': 0, 'escalated_requests': 0}
+    try:
+        conn.execute('BEGIN IMMEDIATE')
+        rows = conn.execute('''
+            SELECT s.id, s.txn_id, s.status, s.action_deadline, s.confirm_deadline, r.state
+            FROM op_steps s
+            JOIN match_requests r ON r.id = s.txn_id
+            WHERE r.state NOT IN ('completed','cancelled','rejected','resolved_depositor','resolved_withdrawer')
+              AND s.status IN ('pending','action_done')
+        ''').fetchall()
+        for r in rows:
+            deadline = _parse_ts(r['confirm_deadline'] if r['status'] == 'action_done' else r['action_deadline'])
+            if not deadline:
+                continue
+            if deadline < now_dt:
+                conn.execute(
+                    "UPDATE op_steps SET status='escalated', updated_at=? WHERE id=?",
+                    (now_s, r['id']))
+                conn.execute(
+                    "UPDATE match_requests SET state='escalated' WHERE id=?",
+                    (r['txn_id'],))
+                _audit_event_locked(conn, 'op_steps', r['id'], 'system', 'watchdog',
+                                    'step_escalated_timeout', r['status'], 'escalated',
+                                    {'req_id': r['txn_id']})
+                result['escalated_steps'] += 1
+
+        pre_rows = conn.execute(
+            "SELECT id, precomplete_until FROM match_requests WHERE state='pre_complete' AND precomplete_until!=''"
+        ).fetchall()
+        for r in pre_rows:
+            till = _parse_ts(r['precomplete_until'])
+            if till and till < now_dt:
+                conn.execute(
+                    "UPDATE match_requests SET state='completed', status='matched', approved_at=? WHERE id=?",
+                    (now_s, r['id']))
+                _audit_event_locked(conn, 'match_requests', r['id'], 'system', 'watchdog',
+                                    'precomplete_elapsed', 'pre_complete', 'completed', {})
+                result['completed'] += 1
+
+        req_rows = conn.execute(
+            "SELECT id, created_at, state FROM match_requests "
+            "WHERE state IN ('created','claimed','in_progress','disputed')"
+        ).fetchall()
+        for r in req_rows:
+            c_at = _parse_ts(r['created_at'])
+            if not c_at:
+                continue
+            if c_at + timedelta(minutes=OP_TOTAL_TIMEOUT_MIN) < now_dt:
+                conn.execute("UPDATE match_requests SET state='escalated' WHERE id=?", (r['id'],))
+                _audit_event_locked(conn, 'match_requests', r['id'], 'system', 'watchdog',
+                                    'request_timeout', r['state'], 'escalated', {})
+                result['escalated_requests'] += 1
+
+        conn.commit()
+        return result
+    except Exception as e:
+        conn.rollback()
+        logger.error(f'process_ops_deadlines error: {e}')
+        return result
+    finally:
+        conn.close()
+
+
+def list_routing_rules(active_only=False):
+    conn = _conn()
+    try:
+        if active_only:
+            rows = conn.execute(
+                'SELECT * FROM routing_rules WHERE is_active=1 ORDER BY priority ASC, created_at ASC').fetchall()
+        else:
+            rows = conn.execute(
+                'SELECT * FROM routing_rules ORDER BY is_active DESC, priority ASC, created_at ASC').fetchall()
+        out = []
+        for r in rows:
+            rr = dict(r)
+            try:
+                rr['params'] = json.loads(rr.get('params_json', '{}') or '{}')
+            except Exception:
+                rr['params'] = {}
+            out.append(rr)
+        return out
+    finally:
+        conn.close()
+
+
+def upsert_routing_rule(rule_id, rule_type, params, priority=100, is_active=True):
+    if rule_type not in ('pin_next_to_agent', 'block_agent', 'max_amount_per_txn', 'route_currency', 'route_company'):
+        return {'error': 'نوع القاعدة غير صالح'}
+    conn = _conn()
+    try:
+        conn.execute('BEGIN IMMEDIATE')
+        rid = str(rule_id or _generate_id('RRL'))
+        params_json = json.dumps(params or {}, ensure_ascii=False)
+        exists = conn.execute('SELECT 1 FROM routing_rules WHERE id=?', (rid,)).fetchone()
+        if exists:
+            conn.execute(
+                'UPDATE routing_rules SET rule_type=?, params_json=?, priority=?, is_active=? WHERE id=?',
+                (str(rule_type), params_json, int(priority or 100), 1 if is_active else 0, rid))
+        else:
+            conn.execute(
+                'INSERT INTO routing_rules (id, priority, rule_type, params_json, is_active, created_at) '
+                'VALUES (?,?,?,?,?,?)',
+                (rid, int(priority or 100), str(rule_type), params_json, 1 if is_active else 0, _now()))
+        conn.commit()
+        return {'success': True, 'id': rid}
+    except Exception as e:
+        conn.rollback()
+        return {'error': str(e)}
+    finally:
+        conn.close()
+
+
+def delete_routing_rule(rule_id):
+    conn = _conn()
+    try:
+        cur = conn.execute('DELETE FROM routing_rules WHERE id=?', (str(rule_id),))
+        conn.commit()
+        return {'success': cur.rowcount > 0}
+    finally:
+        conn.close()
+
+
+def create_insurance_claim(txn_id, claimant_type, claimant_id, reason, evidence_file_id=''):
+    reason = str(reason or '').strip()
+    if len(reason) < 3:
+        return {'error': 'سبب المطالبة قصير'}
+    conn = _conn()
+    try:
+        req = conn.execute('SELECT id, state, status FROM match_requests WHERE id=?', (str(txn_id),)).fetchone()
+        if not req:
+            return {'error': 'العملية غير موجودة'}
+        if str(_rowv(req, 'state', '')) != 'completed' and str(_rowv(req, 'status', '')) != 'matched':
+            return {'error': 'مطالبة التأمين متاحة فقط بعد الإتمام النهائي'}
+        cid = _generate_id('ICL')
+        conn.execute('''
+            INSERT INTO insurance_claims
+            (id, txn_id, claimant_type, claimant_id, reason, evidence_file_id, status, payout_amount,
+             admin_note, decided_by, decided_at, created_at)
+            VALUES (?,?,?,?,?,?, 'open', 0, '', '', '', ?)
+        ''', (cid, str(txn_id), str(claimant_type), str(claimant_id), reason,
+              str(evidence_file_id or ''), _now()))
+        conn.commit()
+        return {'success': True, 'id': cid}
+    except Exception as e:
+        conn.rollback()
+        return {'error': str(e)}
+    finally:
+        conn.close()
+
+
+def list_insurance_claims(status=''):
+    conn = _conn()
+    try:
+        if status:
+            rows = conn.execute(
+                'SELECT * FROM insurance_claims WHERE status=? ORDER BY created_at DESC LIMIT 200',
+                (str(status),)).fetchall()
+        else:
+            rows = conn.execute(
+                'SELECT * FROM insurance_claims ORDER BY created_at DESC LIMIT 200').fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def decide_insurance_claim(claim_id, admin_id, decision, payout_amount=0, note=''):
+    if decision not in ('approved', 'rejected'):
+        return {'error': 'قرار غير صالح'}
+    conn = _conn()
+    try:
+        conn.execute('BEGIN IMMEDIATE')
+        c = conn.execute('SELECT * FROM insurance_claims WHERE id=?', (str(claim_id),)).fetchone()
+        if not c:
+            conn.rollback()
+            return {'error': 'المطالبة غير موجودة'}
+        if str(_rowv(c, 'status', '')) != 'open':
+            conn.rollback()
+            return {'error': 'تمت معالجة المطالبة بالفعل'}
+        amount = float(payout_amount or 0)
+        if decision == 'approved' and amount > 0:
+            payout = insurance_payout('', str(_rowv(c, 'txn_id', '')), amount, f'insurance_claim:{claim_id}')
+            if 'error' in payout:
+                conn.rollback()
+                return payout
+        conn.execute(
+            'UPDATE insurance_claims SET status=?, payout_amount=?, admin_note=?, decided_by=?, decided_at=? WHERE id=?',
+            (decision, amount if decision == 'approved' else 0.0,
+             str(note or ''), str(admin_id), _now(), str(claim_id)))
+        conn.commit()
+        return {'success': True}
+    except Exception as e:
+        conn.rollback()
+        return {'error': str(e)}
     finally:
         conn.close()

@@ -6123,10 +6123,12 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         self.user_states[user_id] = {'step': 'match_type'}
         keyboard = {'keyboard': [
             [{'text': '📥 مطابقة إيداع'}, {'text': '📤 مطابقة سحب'}],
+            [{'text': '🟢 شراء USDT'}, {'text': '🔴 بيع USDT'}],
             [{'text': self.tr('main_menu', lang)}],
         ], 'resize_keyboard': True}
         self.send_message(chat_id,
-            "🔄 <b>نظام المطابقة</b>\n\nطابق طلبك مع وكيل معتمد بسرعة وأمان.\n\nاختر نوع العملية:",
+            "🔄 <b>نظام المطابقة</b>\n\nطابق طلبك مع وكيل معتمد بسرعة وأمان.\n"
+            "يدعم: إيداع، سحب، شراء USDT، بيع USDT.\n\nاختر نوع العملية:",
             keyboard)
 
     def handle_matching_flow(self, message):
@@ -6141,11 +6143,73 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             return
         step = state.get('step', '')
 
+        if step == 'match_user_step_evidence':
+            req_id = str(state.get('req_id', '') or '')
+            step_id = str(state.get('step_id', '') or '')
+            evidence = text or 'ok'
+            try:
+                import agent_db as _adb
+                res = _adb.request_step_action(
+                    req_id, step_id, 'user', user_id,
+                    evidence_ref=evidence, note='user action from bot')
+            except Exception as e:
+                res = {'error': str(e)}
+            if user_id in self.user_states:
+                del self.user_states[user_id]
+            if res.get('error'):
+                self.send_message(chat_id, f"⚠️ {res['error']}", self.main_keyboard(lang, user_id))
+            else:
+                self.send_message(chat_id,
+                    f"✅ تم تنفيذ الخطوة\n🆔 <code>{req_id}</code>\n"
+                    f"استخدم زر «متابعة الخطوات» لمتابعة الحالة.",
+                    self.main_keyboard(lang, user_id))
+            return
+
+        if step == 'match_user_dispute_reason':
+            req_id = str(state.get('req_id', '') or '')
+            reason = text[:500]
+            try:
+                import agent_db as _adb
+                res = _adb.open_request_dispute(req_id, 'user', user_id, reason)
+            except Exception as e:
+                res = {'error': str(e)}
+            if user_id in self.user_states:
+                del self.user_states[user_id]
+            if res.get('error'):
+                self.send_message(chat_id, f"⚠️ {res['error']}", self.main_keyboard(lang, user_id))
+            else:
+                self.send_message(chat_id,
+                    f"✅ تم فتح الشكوى\n🆔 <code>{req_id}</code>",
+                    self.main_keyboard(lang, user_id))
+            return
+
+        if step == 'match_user_insurance_reason':
+            req_id = str(state.get('req_id', '') or '')
+            reason = text[:500]
+            try:
+                import agent_db as _adb
+                res = _adb.create_insurance_claim(req_id, 'user', user_id, reason)
+            except Exception as e:
+                res = {'error': str(e)}
+            if user_id in self.user_states:
+                del self.user_states[user_id]
+            if res.get('error'):
+                self.send_message(chat_id, f"⚠️ {res['error']}", self.main_keyboard(lang, user_id))
+            else:
+                self.send_message(chat_id,
+                    f"✅ تم إرسال مطالبة التأمين\n🆔 <code>{req_id}</code>",
+                    self.main_keyboard(lang, user_id))
+            return
+
         if step == 'match_type':
             if 'إيداع' in text:
                 req_type = 'deposit'
             elif 'سحب' in text:
                 req_type = 'withdraw'
+            elif 'شراء' in text and 'USDT' in text:
+                req_type = 'buy_usdt'
+            elif 'بيع' in text and 'USDT' in text:
+                req_type = 'sell_usdt'
             else:
                 self.send_message(chat_id, '⚠️ اختر نوع العملية من الأزرار')
                 return
@@ -6173,7 +6237,13 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             if err:
                 self.send_message(chat_id, f'⚠️ {err}', self.main_keyboard(lang, user_id))
                 return
-            type_label = 'إيداع' if req_type == 'deposit' else 'سحب'
+            type_labels = {
+                'deposit': 'إيداع',
+                'withdraw': 'سحب',
+                'buy_usdt': 'شراء USDT',
+                'sell_usdt': 'بيع USDT',
+            }
+            type_label = type_labels.get(req_type, req_type)
             agent_line = '\n🤝 تم توجيه طلبك إلى وكيل معتمد' if assigned else \
                 '\n⏳ بانتظار توفر وكيل أو مطابقة P2P'
             self.send_message(chat_id,
@@ -6184,14 +6254,28 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                 f"{agent_line}\n"
                 f"⏳ سيتم إشعارك فور معالجة الطلب.",
                 self.main_keyboard(lang, user_id))
+            try:
+                self.send_inline_message(chat_id,
+                    "📋 إجراءات الطلب:",
+                    [[
+                        {'text': '🪜 متابعة الخطوات', 'callback_data': f'match_user_steps_{req_id}'},
+                        {'text': '❌ إلغاء الطلب', 'callback_data': f'match_user_cancel_{req_id}'},
+                    ]])
+            except Exception:
+                pass
             # إشعار الوكيل المعيّن في تيليجرام (إن كان مربوطاً)
             if assigned and agent_info and agent_info.get('telegram_id'):
                 try:
+                    kind = {
+                        'deposit': 'إيداع (تستلم من المستخدم)',
+                        'withdraw': 'سحب (تدفع للمستخدم)',
+                        'buy_usdt': 'شراء USDT (تسلّم USDT للمستخدم)',
+                        'sell_usdt': 'بيع USDT (تستلم USDT من المستخدم)',
+                    }.get(req_type, req_type)
                     self.send_message(int(agent_info['telegram_id']),
                         f"🔔 <b>طلب مطابقة جديد معيّن لك</b>\n\n"
                         f"🆔 <code>{req_id}</code>\n"
-                        f"{'💵' if req_type == 'deposit' else '💸'} النوع: "
-                        f"{'إيداع (تدفع للمستخدم)' if req_type != 'deposit' else 'سحب (تستلم من المستخدم)'}\n"
+                        f"📌 النوع: {kind}\n"
                         f"💰 المبلغ: <code>{amount:g} {currency}</code>\n\n"
                         f"⚡ افحصه من لوحة الوكيل ← الطلبات المعلقة")
                 except Exception as _age:
@@ -6215,7 +6299,10 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             active_count = _c.execute(
                 "SELECT COUNT(*) c FROM matches WHERE status NOT IN ('completed','cancelled')").fetchone()['c']
             pending_count = _c.execute(
-                "SELECT COUNT(*) c FROM match_requests WHERE status='waiting'").fetchone()['c']
+                "SELECT COUNT(*) c FROM match_requests "
+                "WHERE status IN ('waiting','approved','disputed') "
+                "AND (state IN ('created','claimed','in_progress','pre_complete','escalated','disputed') OR state='')"
+            ).fetchone()['c']
             completed_count = _c.execute(
                 "SELECT COUNT(*) c FROM matches WHERE status IN ('completed','cancelled')").fetchone()['c']
             _c.close()

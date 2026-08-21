@@ -3908,60 +3908,153 @@ class CallbackHandlerMixin:
                 }
                 return
 
+            elif data.startswith('match_user_steps_'):
+                req_id = data.replace('match_user_steps_', '')
+                try:
+                    import agent_db as _adb
+                    req = _adb.get_match_request_steps(req_id)
+                except Exception as e:
+                    logger.error(f"match_user_steps error: {e}")
+                    req = None
+                if not req or str(req.get('user_id', '')) != str(user_id):
+                    self.edit_message(chat_id, message.get('message_id'), '⚠️ الطلب غير موجود أو غير مصرح')
+                    return
+                text = (
+                    f"🧭 <b>طلبك</b>\n\n"
+                    f"🆔 <code>{req_id}</code>\n"
+                    f"💰 {req.get('amount','')} {req.get('currency','')}\n"
+                    f"📊 {req.get('status','')} / {req.get('state','')}\n\n"
+                )
+                inline_btns = []
+                steps = req.get('steps') or []
+                for s in steps[:6]:
+                    sid = s.get('id', '')
+                    st = s.get('status', '')
+                    role = s.get('actor_role', '')
+                    text += f"#{s.get('seq')} {s.get('step_key','step')} — <code>{st}</code>\n"
+                    if role == 'requester' and st in ('pending', 'rejected', 'escalated'):
+                        inline_btns.append([
+                            {'text': f"▶️ تنفيذ #{s.get('seq')}", 'callback_data': f'match_user_step_act_{req_id}_{sid}'}
+                        ])
+                    if role == 'processor' and st == 'action_done':
+                        inline_btns.append([
+                            {'text': f"✅ تأكيد #{s.get('seq')}", 'callback_data': f'match_user_step_ok_{req_id}_{sid}'},
+                            {'text': f"❌ رفض #{s.get('seq')}", 'callback_data': f'match_user_step_no_{req_id}_{sid}'},
+                        ])
+
+                if req.get('state') not in ('completed', 'cancelled', 'rejected'):
+                    inline_btns.append([
+                        {'text': '🆘 شكوى', 'callback_data': f'match_user_dispute_{req_id}'},
+                        {'text': '❌ إلغاء الطلب', 'callback_data': f'match_user_cancel_{req_id}'},
+                    ])
+                else:
+                    inline_btns.append([
+                        {'text': '🛡️ مطالبة تأمين', 'callback_data': f'match_user_ins_{req_id}'}
+                    ])
+                inline_btns.append([{'text': '🔄 تحديث', 'callback_data': f'match_user_steps_{req_id}'}])
+
+                self.edit_message(chat_id, message.get('message_id'), text)
+                if inline_btns:
+                    self.send_inline_message(chat_id, 'إجراءات الطلب:', inline_btns)
+                return
+
+            elif data.startswith('match_user_cancel_'):
+                req_id = data.replace('match_user_cancel_', '')
+                try:
+                    import agent_db as _adb
+                    ok, err = _adb.cancel_match_request_atomic(req_id, str(user_id))
+                except Exception as e:
+                    logger.error(f"match_user_cancel error: {e}")
+                    ok, err = False, str(e)
+                if not ok:
+                    self.edit_message(chat_id, message.get('message_id'), f"⚠️ {err}")
+                else:
+                    self.edit_message(chat_id, message.get('message_id'), '✅ تم إلغاء الطلب')
+                return
+
+            elif data.startswith('match_user_step_act_'):
+                _x = data.replace('match_user_step_act_', '')
+                parts = _x.split('_', 1)
+                if len(parts) != 2:
+                    return
+                req_id, sid = parts[0], parts[1]
+                self.user_states[user_id] = {'step': 'match_user_step_evidence', 'req_id': req_id, 'step_id': sid}
+                self.send_message(chat_id,
+                    f"📝 أرسل الآن المرجع/الدليل للخطوة\n"
+                    f"🆔 الطلب: <code>{req_id}</code>\n\n"
+                    f"أرسل نص المرجع (أو كلمة ok إذا لا يوجد).")
+                return
+
+            elif data.startswith('match_user_step_ok_') or data.startswith('match_user_step_no_'):
+                ok = data.startswith('match_user_step_ok_')
+                _x = data.replace('match_user_step_ok_', '').replace('match_user_step_no_', '')
+                parts = _x.split('_', 1)
+                if len(parts) != 2:
+                    return
+                req_id, sid = parts[0], parts[1]
+                try:
+                    import agent_db as _adb
+                    res = _adb.request_step_confirm(
+                        req_id, sid, 'user', str(user_id),
+                        accept=ok, note='' if ok else 'user rejected from bot')
+                except Exception as e:
+                    logger.error(f"match_user_step_confirm error: {e}")
+                    res = {'error': str(e)}
+                if res.get('error'):
+                    self.edit_message(chat_id, message.get('message_id'), f"⚠️ {res['error']}")
+                else:
+                    self.edit_message(chat_id, message.get('message_id'),
+                        f"✅ تم {'تأكيد' if ok else 'رفض'} الخطوة")
+                return
+
+            elif data.startswith('match_user_dispute_'):
+                req_id = data.replace('match_user_dispute_', '')
+                self.user_states[user_id] = {'step': 'match_user_dispute_reason', 'req_id': req_id}
+                self.send_message(chat_id,
+                    f"🆘 اكتب سبب الشكوى للطلب <code>{req_id}</code>:")
+                return
+
+            elif data.startswith('match_user_ins_'):
+                req_id = data.replace('match_user_ins_', '')
+                self.user_states[user_id] = {'step': 'match_user_insurance_reason', 'req_id': req_id}
+                self.send_message(chat_id,
+                    f"🛡️ اكتب سبب مطالبة التأمين للطلب <code>{req_id}</code>:")
+                return
+
             # ==================== مطابقة: موافقة/رفض الأدمن على الطلب ====================
             elif data.startswith('match_admin_approve_req_'):
                 req_id = data.replace('match_admin_approve_req_', '')
-                # قراءة الطلب من SQLite
-                request = None
                 try:
                     import agent_db as _adb
-                    _c = _adb._conn()
-                    _row = _c.execute(
-                        "SELECT * FROM match_requests WHERE id=? AND status='waiting'",
-                        (req_id,)).fetchone()
-                    request = dict(_row) if _row else None
-                    _c.close()
-                except Exception:
-                    request = None
-
-                if not request:
-                    self.edit_message(chat_id, message.get('message_id'), self.tr('a0606_الطلب_غير', 'ar'))
-                    return
-
-                # الأدمن يوافق → يصبح الطرف الآخر تلقائياً
-                admin_id_str = str(user_id)
-                opposite_type = 'withdraw' if request.get('type') == 'deposit' else 'deposit'
-
-                try:
-                    admin_req_id, err = self.match_manager.create_match_request(
-                        admin_id_str, 'ADMIN', opposite_type,
-                        str(request.get('amount', '0')), request.get('currency', 'SAR'),
-                        str(request.get('company_id', '')), request.get('company_name', ''), ''
-                    )
-                    if err:
-                        self.edit_message(chat_id, message.get('message_id'), f"❌ {err}")
+                    ok, err = _adb.admin_set_match_request_status(
+                        req_id, 'approved', actor=str(user_id))
+                    if not ok:
+                        self.edit_message(chat_id, message.get('message_id'), f"⚠️ {err}")
                         return
-
-                    admin_request = self.match_manager.get_active_request_by_user(admin_id_str)
-                    if admin_request:
-                        match = self.match_manager.find_match(admin_request)
-                        if match:
-                            match_id = self.match_manager.create_match(admin_request, match)
-                            self._notify_match_created(match_id)
-
-                            self.edit_message(chat_id, message.get('message_id'),
-                                f"✅ <b>تم تأكيد الطلب وإنشاء المطابقة!</b>\n\n"
-                                f"🆔 <code>{match_id}</code> 👈 اضغط للنسخ\n"
-                                f"👤 العميل: <code>{request.get('user_id', '')}</code>\n"
-                                f"👤 الأدمن: <code>{admin_id_str}</code>\n\n"
-                                f"تم إشعار العميل بالمتابعة.")
-                            return
+                    _req = _adb.get_match_request_full(req_id)
                 except Exception as e:
-                    logger.error(f"خطأ في موافقة الأدمن: {e}")
+                    logger.error(f"match admin approve error: {e}")
                     self.edit_message(chat_id, message.get('message_id'), self.tr('a0081_خطأ', 'ar', e=e))
                     return
 
-                self.edit_message(chat_id, message.get('message_id'), self.tr('a0607_جارٍ_المعالجة', 'ar'))
+                self.edit_message(chat_id, message.get('message_id'),
+                    f"✅ <b>تمت الموافقة على الطلب</b>\n\n"
+                    f"🆔 <code>{req_id}</code>\n"
+                    f"⏳ يمكن بدء تنفيذ الخطوات الآن")
+
+                # إشعار العميل + الوكيل المعين
+                try:
+                    if _req and _req.get('user_id'):
+                        self.send_message(int(_req['user_id']),
+                            f"✅ تمت الموافقة على طلبك\n🆔 <code>{req_id}</code>\n"
+                            f"افتح المطابقة من الويب/البوت لمتابعة الخطوات.",
+                            self.main_keyboard('ar', int(_req['user_id'])))
+                    if _req and _req.get('agent_telegram_id'):
+                        self.send_message(int(_req['agent_telegram_id']),
+                            f"🔔 تمت الموافقة على طلب مطابقة\n🆔 <code>{req_id}</code>\n"
+                            f"يمكنك Claim وبدء الخطوات من لوحة الوكيل.")
+                except Exception:
+                    pass
                 return
 
             elif data.startswith('match_admin_reject_req_'):
@@ -3989,6 +4082,123 @@ class CallbackHandlerMixin:
                             self.main_keyboard('ar', int(rejected_user_id)))
                     except:
                         pass
+                return
+
+            elif data.startswith('match_admin_steps_'):
+                req_id = data.replace('match_admin_steps_', '')
+                try:
+                    import agent_db as _adb
+                    req = _adb.get_match_request_steps(req_id)
+                except Exception as e:
+                    logger.error(f"match_admin_steps error: {e}")
+                    req = None
+                if not req:
+                    self.edit_message(chat_id, message.get('message_id'), '⚠️ الطلب غير موجود')
+                    return
+
+                text = (
+                    f"🪜 <b>خطوات الطلب</b>\n\n"
+                    f"🆔 <code>{req_id}</code>\n"
+                    f"👤 المستخدم: <code>{req.get('user_id','')}</code>\n"
+                    f"💰 {req.get('amount','')} {req.get('currency','')}\n"
+                    f"📊 الحالة: <b>{req.get('status','')} / {req.get('state','')}</b>\n"
+                    f"🤖 الوكيل: <b>{req.get('agent_name') or req.get('assigned_agent_id') or '—'}</b>\n\n"
+                )
+                steps = req.get('steps') or []
+                inline_btns = []
+                for s in steps[:6]:
+                    text += f"#{s.get('seq')} {s.get('step_key','step')} — <code>{s.get('status','')}</code>\n"
+                    sid = s.get('id', '')
+                    st = s.get('status', '')
+                    if st in ('pending', 'rejected', 'escalated'):
+                        inline_btns.append([
+                            {'text': f"▶️ تنفيذ #{s.get('seq')}", 'callback_data': f'match_admin_step_act_{req_id}_{sid}'}
+                        ])
+                    elif st == 'action_done':
+                        inline_btns.append([
+                            {'text': f"✅ تأكيد #{s.get('seq')}", 'callback_data': f'match_admin_step_ok_{req_id}_{sid}'},
+                            {'text': f"❌ رفض #{s.get('seq')}", 'callback_data': f'match_admin_step_no_{req_id}_{sid}'},
+                        ])
+
+                inline_btns.append([
+                    {'text': '🧭 Claim', 'callback_data': f'match_admin_claim_{req_id}'},
+                    {'text': '👑 Takeover', 'callback_data': f'match_admin_takeover_{req_id}'},
+                ])
+                inline_btns.append([{'text': '🔄 تحديث', 'callback_data': f'match_admin_steps_{req_id}'}])
+                inline_btns.append([{'text': '🔙 رجوع', 'callback_data': 'match_admin_pending'}])
+                self.edit_message(chat_id, message.get('message_id'), text)
+                self.send_inline_message(chat_id, 'إجراءات الطلب:', inline_btns)
+                return
+
+            elif data.startswith('match_admin_claim_'):
+                req_id = data.replace('match_admin_claim_', '')
+                try:
+                    import agent_db as _adb
+                    res = _adb.claim_request(req_id, 'admin', str(user_id))
+                except Exception as e:
+                    logger.error(f"match_admin_claim error: {e}")
+                    res = {'error': str(e)}
+                if res.get('error'):
+                    self.edit_message(chat_id, message.get('message_id'), f"⚠️ {res['error']}")
+                else:
+                    self.edit_message(chat_id, message.get('message_id'), f"✅ تم Claim للطلب {req_id}")
+                return
+
+            elif data.startswith('match_admin_takeover_'):
+                req_id = data.replace('match_admin_takeover_', '')
+                try:
+                    import agent_db as _adb
+                    res = _adb.admin_takeover_request(req_id, str(user_id), reason='bot_takeover')
+                except Exception as e:
+                    logger.error(f"match_admin_takeover error: {e}")
+                    res = {'error': str(e)}
+                if res.get('error'):
+                    self.edit_message(chat_id, message.get('message_id'), f"⚠️ {res['error']}")
+                else:
+                    self.edit_message(chat_id, message.get('message_id'), f"✅ تم Takeover للطلب {req_id}")
+                return
+
+            elif data.startswith('match_admin_step_act_'):
+                _x = data.replace('match_admin_step_act_', '')
+                parts = _x.split('_', 1)
+                if len(parts) != 2:
+                    return
+                req_id, sid = parts[0], parts[1]
+                try:
+                    import agent_db as _adb
+                    res = _adb.request_step_action(
+                        req_id, sid, 'admin', str(user_id),
+                        evidence_ref=f'BOTADMIN-{datetime.now().strftime("%H%M%S")}',
+                        note='admin action from bot')
+                except Exception as e:
+                    logger.error(f"match_admin_step_act error: {e}")
+                    res = {'error': str(e)}
+                if res.get('error'):
+                    self.edit_message(chat_id, message.get('message_id'), f"⚠️ {res['error']}")
+                else:
+                    self.edit_message(chat_id, message.get('message_id'), f"✅ تم تنفيذ خطوة الطلب {req_id}")
+                return
+
+            elif data.startswith('match_admin_step_ok_') or data.startswith('match_admin_step_no_'):
+                ok = data.startswith('match_admin_step_ok_')
+                _x = data.replace('match_admin_step_ok_', '').replace('match_admin_step_no_', '')
+                parts = _x.split('_', 1)
+                if len(parts) != 2:
+                    return
+                req_id, sid = parts[0], parts[1]
+                try:
+                    import agent_db as _adb
+                    res = _adb.request_step_confirm(
+                        req_id, sid, 'admin', str(user_id),
+                        accept=ok, note='admin bot confirm' if ok else 'admin bot reject')
+                except Exception as e:
+                    logger.error(f"match_admin_step_confirm error: {e}")
+                    res = {'error': str(e)}
+                if res.get('error'):
+                    self.edit_message(chat_id, message.get('message_id'), f"⚠️ {res['error']}")
+                else:
+                    self.edit_message(chat_id, message.get('message_id'),
+                        f"✅ تم {'تأكيد' if ok else 'رفض'} الخطوة")
                 return
 
             # ==================== مطابقة: الأدمن ينضم كطرف آخر (قديم) ====================
@@ -4484,7 +4694,8 @@ class CallbackHandlerMixin:
                         SELECT r.*, a.bot_name AS agent_name
                         FROM match_requests r
                         LEFT JOIN agent_bots a ON r.assigned_agent_id = a.id
-                        WHERE r.status='waiting'
+                        WHERE r.status IN ('waiting','approved','disputed')
+                          AND (r.state IN ('created','claimed','in_progress','pre_complete','escalated','disputed') OR r.state='')
                         ORDER BY r.created_at DESC LIMIT 15''').fetchall()
                     pending = [dict(r) for r in rows]
                     _c.close()
@@ -4502,7 +4713,17 @@ class CallbackHandlerMixin:
                     return
                 text = f"⏳ <b>طلبات معلقة ({len(pending)})</b>\n\n━━━━━━━━━━━━━━━━━━\n"
                 for r in pending:
-                    type_ar = self.tr('a0390_إيداع', lang) if r.get('type') == 'deposit' else self.tr('a0391_سحب', lang)
+                    _t = r.get('type')
+                    if _t == 'deposit':
+                        type_ar = self.tr('a0390_إيداع', lang)
+                    elif _t == 'withdraw':
+                        type_ar = self.tr('a0391_سحب', lang)
+                    elif _t == 'buy_usdt':
+                        type_ar = 'شراء USDT'
+                    elif _t == 'sell_usdt':
+                        type_ar = 'بيع USDT'
+                    else:
+                        type_ar = str(_t or '—')
                     agent_name = r.get('agent_name') or ''
                     agent_line = f"\n🤖 الوكيل: <b>{agent_name}</b>" if agent_name else "\n🤖 بدون وكيل بعد"
                     text += (
@@ -4516,7 +4737,8 @@ class CallbackHandlerMixin:
                     )
                     inline_btns_row = [
                         {'text': '✅ موافقة', 'callback_data': f'match_admin_approve_req_{r["id"]}'},
-                        {'text': '❌ رفض', 'callback_data': f'match_admin_reject_req_{r["id"]}'}
+                        {'text': '❌ رفض', 'callback_data': f'match_admin_reject_req_{r["id"]}'},
+                        {'text': '🪜 خطوات', 'callback_data': f'match_admin_steps_{r["id"]}'}
                     ]
                     # إرسال أزرار inline لكل طلب
                     self.send_inline_message(chat_id,

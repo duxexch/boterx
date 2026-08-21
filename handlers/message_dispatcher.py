@@ -1369,7 +1369,9 @@ class MessageDispatcherMixin:
             step = current_state.get('step', '')
             if step in ('match_enter_data', 'match_enter_code', 'match_amount',
                        'match_company', 'match_company_select', 'chatting', 'rating',
-                       'selecting_payment_method', 'match_upload_screenshot'):
+                       'selecting_payment_method', 'match_upload_screenshot',
+                       'match_type', 'match_user_step_evidence',
+                       'match_user_dispute_reason', 'match_user_insurance_reason'):
                 self.handle_matching_flow(message)
                 return
             elif step == 'custom_flow':
