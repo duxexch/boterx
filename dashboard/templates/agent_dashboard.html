@@ -72,6 +72,11 @@ input,select{background:#1a2028;border:1px solid #262e39;border-radius:8px;paddi
     <div id="reqStepsPanel" style="display:none;margin-top:10px;background:#10141a;border:1px solid #262e39;border-radius:12px;padding:10px"></div>
   </div>
 
+  <div class="section" id="disputesSection">
+    <div class="section-title">🆘 نزاعاتي المفتوحة <span id="disputesCount"></span></div>
+    <div id="disputesList"></div>
+  </div>
+
   <!-- Deposit Balance -->
   <div class="section">
     <div class="section-title">💰 إيداع الرصيد</div>
@@ -197,6 +202,7 @@ function openReqSteps(reqId){
       +'<button class="btn" style="padding:4px 8px;font-size:11px" onclick="this.parentNode.parentNode.style.display=\'none\'">إغلاق</button></div>';
     h += '<div style="display:flex;gap:6px;margin-bottom:8px">'
       +'<button class="btn btn-primary" style="padding:6px 8px;font-size:11px" onclick="claimReq(\''+esc(req.id||reqId)+'\')">Claim</button>'
+      +'<button class="btn" style="padding:6px 8px;font-size:11px;background:rgba(255,71,87,.15);color:#ff4757" onclick="openReqDispute(\''+esc(req.id||reqId)+'\')">🆘 شكوى</button>'
       +'</div>';
     if(!steps.length){
       h += '<div class="empty">لا توجد خطوات</div>';
@@ -231,6 +237,35 @@ function agentStepConfirm(reqId, stepId, accept){
   fetch('/api/agent/self/requests/'+encodeURIComponent(reqId)+'/steps/'+encodeURIComponent(stepId)+'/confirm',{
     method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({accept:!!accept,note:note})
   }).then(r=>r.json()).then(function(d){ if(d.error){alert(d.error);return;} loadPending(); openReqSteps(reqId); });
+}
+function openReqDispute(reqId){
+  var reason = prompt('اكتب سبب الشكوى:','');
+  if(reason===null)return;
+  reason = String(reason||'').trim();
+  if(reason.length < 3){alert('سبب الشكوى قصير');return;}
+  fetch('/api/agent/self/requests/'+encodeURIComponent(reqId)+'/dispute',{
+    method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reason:reason})
+  }).then(r=>r.json()).then(function(d){
+    if(d.error){alert(d.error);return;}
+    alert('تم فتح الشكوى بنجاح');
+    loadDisputes();
+    openReqSteps(reqId);
+  });
+}
+function loadDisputes(){
+  fetch('/api/agent/self/disputes').then(r=>r.json()).then(function(d){
+    var list=d.disputes||[];
+    document.getElementById('disputesCount').textContent=list.length?('('+list.length+')'):'';
+    var h='';
+    list.slice(0,10).forEach(function(x){
+      h+='<div class="method"><span class="method-icon">🧾</span>'
+        +'<div class="method-info"><div class="method-name">'+esc(x.id||'')+' · '+esc(x.status||'')+'</div>'
+        +'<div class="method-data">طلب: '+esc(x.req_id||'')+' · '+esc((x.reason||'').slice(0,120))+'</div></div>'
+        +'<button class="btn btn-edit" onclick="openReqSteps(\''+esc(x.req_id||'')+'\')">فتح الطلب</button></div>';
+    });
+    if(!h)h='<div class="empty">لا توجد نزاعات مفتوحة</div>';
+    document.getElementById('disputesList').innerHTML=h;
+  });
 }
 function loadDepHistory(){
   fetch('/api/agent/self/deposits').then(r=>r.json()).then(d=>{
@@ -289,8 +324,8 @@ function depositBalance(){
     else{alert(d.error||'فشل')}
   });
 }
-loadSelf();loadPending();loadMethods();loadTxns();loadDepHistory();
-setInterval(function(){loadSelf();loadPending();sendHeartbeat()},15000);
+loadSelf();loadPending();loadDisputes();loadMethods();loadTxns();loadDepHistory();
+setInterval(function(){loadSelf();loadPending();loadDisputes();sendHeartbeat()},15000);
 function sendHeartbeat(){
   fetch('/api/agent/self/heartbeat',{method:'POST'}).catch(function(){});
 }

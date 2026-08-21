@@ -1371,7 +1371,8 @@ class MessageDispatcherMixin:
                        'match_company', 'match_company_select', 'chatting', 'rating',
                        'selecting_payment_method', 'match_upload_screenshot',
                        'match_type', 'match_user_step_evidence',
-                       'match_user_dispute_reason', 'match_user_insurance_reason'):
+                       'match_user_dispute_reason', 'match_user_insurance_reason',
+                       'match_agent_step_evidence', 'match_agent_dispute_reason'):
                 self.handle_matching_flow(message)
                 return
             elif step == 'custom_flow':

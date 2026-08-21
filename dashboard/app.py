@@ -2256,6 +2256,14 @@ def api_agent_request_dispute(req_id):
         return jsonify(res), 400
     return jsonify(res)
 
+
+@app.route('/api/agent/self/disputes')
+@_agent_session_required
+def api_agent_self_disputes():
+    status = request.args.get('status', 'open,assigned,in_review')
+    disputes = agent_db.list_agent_op_disputes(session['agent_id'], status=status, limit=200)
+    return jsonify({'disputes': disputes})
+
 @app.route('/api/agent/self/transactions/<txn_id>/process', methods=['POST'])
 @_agent_session_required
 def api_agent_process_txn(txn_id):
@@ -8066,6 +8074,61 @@ def api_matching_dispute_resolve_v2(req_id):
     if 'error' in res:
         return jsonify(res), 400
     return jsonify(res)
+
+
+@app.route('/api/matching/disputes-v2')
+@api_auth
+@permission_required('view_financial')
+def api_matching_disputes_v2_list():
+    status = request.args.get('status', '')
+    assignee_type = request.args.get('assignee_type', '')
+    assignee_id = request.args.get('assignee_id', '')
+    return jsonify({
+        'disputes': agent_db.list_op_disputes(
+            status=status,
+            assignee_type=assignee_type,
+            assignee_id=assignee_id,
+            limit=200,
+        )
+    })
+
+
+@app.route('/api/matching/disputes-v2/<dispute_id>/assign', methods=['POST'])
+@api_auth
+@permission_required('approve_deposits')
+def api_matching_disputes_v2_assign(dispute_id):
+    payload = request.json or {}
+    res = agent_db.assign_op_dispute(
+        dispute_id,
+        str(session.get('admin_id', '')),
+        assignee_type=str(payload.get('assignee_type', '') or ''),
+        assignee_id=str(payload.get('assignee_id', '') or ''),
+        note=str(payload.get('note', '') or '')[:500],
+    )
+    if 'error' in res:
+        return jsonify(res), 400
+    return jsonify(res)
+
+
+@app.route('/api/matching/disputes-v2/<dispute_id>/resolve', methods=['POST'])
+@api_auth
+@permission_required('approve_deposits')
+def api_matching_disputes_v2_resolve(dispute_id):
+    payload = request.json or {}
+    decision = str(payload.get('decision', '') or '')
+    note = str(payload.get('note', '') or '')[:500]
+    dispute = agent_db.get_op_dispute(dispute_id)
+    if not dispute:
+        return jsonify({'error': 'النزاع غير موجود'}), 404
+    res = agent_db.resolve_request_dispute(
+        str(dispute.get('req_id', '')),
+        str(session.get('admin_id', '')),
+        decision,
+        note,
+    )
+    if 'error' in res:
+        return jsonify(res), 400
+    return jsonify({'success': True, 'dispute_id': dispute_id, **res})
 
 
 @app.route('/api/matching/routing-rules')

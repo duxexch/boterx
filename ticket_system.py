@@ -263,8 +263,10 @@ def list_tickets(status='', priority='', agent_id='', user_id='', limit=100):
     sql += 'LEFT JOIN agent_bots b ON t.assigned_agent_id = b.id WHERE 1=1'
     args = []
     if status:
-        sql += ' AND t.status=?'
-        args.append(status)
+        statuses = [s.strip() for s in str(status).split(',') if s.strip()]
+        if statuses:
+            sql += f" AND t.status IN ({','.join(['?']*len(statuses))})"
+            args.extend(statuses)
     if priority:
         sql += ' AND t.priority=?'
         args.append(priority)

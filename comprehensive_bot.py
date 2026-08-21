@@ -6201,6 +6201,52 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                     self.main_keyboard(lang, user_id))
             return
 
+        if step == 'match_agent_step_evidence':
+            req_id = str(state.get('req_id', '') or '')
+            step_id = str(state.get('step_id', '') or '')
+            evidence = text or 'ok'
+            try:
+                import agent_db as _adb
+                agent = _adb.get_agent_by_telegram(user_id)
+                if not agent:
+                    raise ValueError('لا يوجد حساب وكيل مربوط بهذا التليجرام')
+                res = _adb.request_step_action(
+                    req_id, step_id, 'agent', str(agent.get('id', '')),
+                    evidence_ref=evidence, note='agent action from bot')
+            except Exception as e:
+                res = {'error': str(e)}
+            if user_id in self.user_states:
+                del self.user_states[user_id]
+            if res.get('error'):
+                self.send_message(chat_id, f"⚠️ {res['error']}", self.main_keyboard(lang, user_id))
+            else:
+                self.send_message(chat_id,
+                    f"✅ تم تنفيذ خطوة الوكيل\n🆔 <code>{req_id}</code>",
+                    self.main_keyboard(lang, user_id))
+            return
+
+        if step == 'match_agent_dispute_reason':
+            req_id = str(state.get('req_id', '') or '')
+            reason = text[:500]
+            try:
+                import agent_db as _adb
+                agent = _adb.get_agent_by_telegram(user_id)
+                if not agent:
+                    raise ValueError('لا يوجد حساب وكيل مربوط بهذا التليجرام')
+                res = _adb.open_request_dispute(
+                    req_id, 'agent', str(agent.get('id', '')), reason)
+            except Exception as e:
+                res = {'error': str(e)}
+            if user_id in self.user_states:
+                del self.user_states[user_id]
+            if res.get('error'):
+                self.send_message(chat_id, f"⚠️ {res['error']}", self.main_keyboard(lang, user_id))
+            else:
+                self.send_message(chat_id,
+                    f"✅ تم فتح الشكوى كوكيل\n🆔 <code>{req_id}</code>",
+                    self.main_keyboard(lang, user_id))
+            return
+
         if step == 'match_type':
             if 'إيداع' in text:
                 req_type = 'deposit'

@@ -4021,6 +4021,161 @@ class CallbackHandlerMixin:
                     f"🛡️ اكتب سبب مطالبة التأمين للطلب <code>{req_id}</code>:")
                 return
 
+            # ==================== مطابقة: لوحة الوكيل من البوت ====================
+            elif data == 'match_agent_open':
+                try:
+                    import agent_db as _adb
+                    agent = _adb.get_agent_by_telegram(str(user_id))
+                except Exception as e:
+                    logger.error(f"match_agent_open error: {e}")
+                    agent = None
+                if not agent:
+                    self.edit_message(chat_id, message.get('message_id'),
+                        '⚠️ لا يوجد حساب وكيل مربوط بهذا التليجرام')
+                    return
+                requests = _adb.list_agent_match_requests(agent['id'], limit=20)
+                text = (
+                    f"🤖 <b>لوحة وكيل المطابقة</b>\n\n"
+                    f"🆔 الوكيل: <code>{agent.get('id','')}</code>\n"
+                    f"👤 {agent.get('bot_name','')}\n\n"
+                )
+                inline_btns = []
+                if not requests:
+                    text += 'لا توجد طلبات مخصصة نشطة حاليا.'
+                else:
+                    text += 'الطلبات المخصصة:\n'
+                    for r in requests[:10]:
+                        rid = r.get('id', '')
+                        text += (
+                            f"\n• <code>{rid}</code> | {r.get('amount','')} {r.get('currency','')}"
+                            f"\n  {r.get('status','')} / {r.get('state','')}"
+                        )
+                        inline_btns.append([
+                            {'text': f"🧭 إدارة {rid[-6:]}", 'callback_data': f'match_agent_steps_{rid}'}
+                        ])
+                inline_btns.append([{'text': '🔄 تحديث', 'callback_data': 'match_agent_open'}])
+                self.edit_message(chat_id, message.get('message_id'), text)
+                self.send_inline_message(chat_id, 'إجراءات الوكيل:', inline_btns)
+                return
+
+            elif data.startswith('match_agent_steps_'):
+                req_id = data.replace('match_agent_steps_', '')
+                try:
+                    import agent_db as _adb
+                    agent = _adb.get_agent_by_telegram(str(user_id))
+                    req = _adb.get_match_request_steps(req_id)
+                except Exception as e:
+                    logger.error(f"match_agent_steps error: {e}")
+                    agent, req = None, None
+                if not agent:
+                    self.edit_message(chat_id, message.get('message_id'),
+                        '⚠️ لا يوجد حساب وكيل مربوط بهذا التليجرام')
+                    return
+                if not req:
+                    self.edit_message(chat_id, message.get('message_id'), '⚠️ الطلب غير موجود')
+                    return
+                aid = str(agent.get('id', ''))
+                if str(req.get('assigned_agent_id', '')) != aid and str(req.get('claimed_by_id', '')) != aid:
+                    self.edit_message(chat_id, message.get('message_id'), '⚠️ غير مصرح لك بهذا الطلب')
+                    return
+
+                text = (
+                    f"🧭 <b>إدارة طلب وكيل</b>\n\n"
+                    f"🆔 <code>{req_id}</code>\n"
+                    f"💰 {req.get('amount','')} {req.get('currency','')}\n"
+                    f"📊 {req.get('status','')} / {req.get('state','')}\n"
+                    f"👤 المستخدم: <code>{req.get('user_id','')}</code>\n\n"
+                )
+                inline_btns = []
+                steps = req.get('steps') or []
+                for s in steps[:8]:
+                    sid = s.get('id', '')
+                    st = s.get('status', '')
+                    role = s.get('actor_role', '')
+                    text += f"#{s.get('seq')} {s.get('step_key','step')} — <code>{st}</code>\n"
+                    if role == 'processor' and st in ('pending', 'rejected', 'escalated'):
+                        inline_btns.append([
+                            {'text': f"▶️ تنفيذ #{s.get('seq')}", 'callback_data': f'match_agent_step_act_{req_id}_{sid}'}
+                        ])
+                    if role == 'requester' and st == 'action_done':
+                        inline_btns.append([
+                            {'text': f"✅ تأكيد #{s.get('seq')}", 'callback_data': f'match_agent_step_ok_{req_id}_{sid}'},
+                            {'text': f"❌ رفض #{s.get('seq')}", 'callback_data': f'match_agent_step_no_{req_id}_{sid}'},
+                        ])
+
+                inline_btns.append([
+                    {'text': '🧭 Claim', 'callback_data': f'match_agent_claim_{req_id}'},
+                    {'text': '🆘 شكوى', 'callback_data': f'match_agent_dispute_{req_id}'},
+                ])
+                inline_btns.append([{'text': '🔄 تحديث', 'callback_data': f'match_agent_steps_{req_id}'}])
+                inline_btns.append([{'text': '🔙 كل الطلبات', 'callback_data': 'match_agent_open'}])
+
+                self.edit_message(chat_id, message.get('message_id'), text)
+                self.send_inline_message(chat_id, 'إجراءات الطلب:', inline_btns)
+                return
+
+            elif data.startswith('match_agent_claim_'):
+                req_id = data.replace('match_agent_claim_', '')
+                try:
+                    import agent_db as _adb
+                    agent = _adb.get_agent_by_telegram(str(user_id))
+                    if not agent:
+                        raise ValueError('agent not linked')
+                    res = _adb.claim_request(req_id, 'agent', str(agent['id']))
+                except Exception as e:
+                    logger.error(f"match_agent_claim error: {e}")
+                    res = {'error': str(e)}
+                if res.get('error'):
+                    self.edit_message(chat_id, message.get('message_id'), f"⚠️ {res['error']}")
+                else:
+                    self.edit_message(chat_id, message.get('message_id'), f"✅ تم Claim للطلب {req_id}")
+                return
+
+            elif data.startswith('match_agent_step_act_'):
+                _x = data.replace('match_agent_step_act_', '')
+                parts = _x.split('_', 1)
+                if len(parts) != 2:
+                    return
+                req_id, sid = parts[0], parts[1]
+                self.user_states[user_id] = {'step': 'match_agent_step_evidence', 'req_id': req_id, 'step_id': sid}
+                self.send_message(chat_id,
+                    f"📝 أرسل الآن المرجع/الدليل للخطوة\n"
+                    f"🆔 الطلب: <code>{req_id}</code>\n\n"
+                    f"أرسل نص المرجع (أو كلمة ok إذا لا يوجد).")
+                return
+
+            elif data.startswith('match_agent_step_ok_') or data.startswith('match_agent_step_no_'):
+                ok = data.startswith('match_agent_step_ok_')
+                _x = data.replace('match_agent_step_ok_', '').replace('match_agent_step_no_', '')
+                parts = _x.split('_', 1)
+                if len(parts) != 2:
+                    return
+                req_id, sid = parts[0], parts[1]
+                try:
+                    import agent_db as _adb
+                    agent = _adb.get_agent_by_telegram(str(user_id))
+                    if not agent:
+                        raise ValueError('agent not linked')
+                    res = _adb.request_step_confirm(
+                        req_id, sid, 'agent', str(agent['id']),
+                        accept=ok, note='agent bot confirm' if ok else 'agent bot reject')
+                except Exception as e:
+                    logger.error(f"match_agent_step_confirm error: {e}")
+                    res = {'error': str(e)}
+                if res.get('error'):
+                    self.edit_message(chat_id, message.get('message_id'), f"⚠️ {res['error']}")
+                else:
+                    self.edit_message(chat_id, message.get('message_id'),
+                        f"✅ تم {'تأكيد' if ok else 'رفض'} الخطوة")
+                return
+
+            elif data.startswith('match_agent_dispute_'):
+                req_id = data.replace('match_agent_dispute_', '')
+                self.user_states[user_id] = {'step': 'match_agent_dispute_reason', 'req_id': req_id}
+                self.send_message(chat_id,
+                    f"🆘 اكتب سبب الشكوى للطلب <code>{req_id}</code>:")
+                return
+
             # ==================== مطابقة: موافقة/رفض الأدمن على الطلب ====================
             elif data.startswith('match_admin_approve_req_'):
                 req_id = data.replace('match_admin_approve_req_', '')
@@ -4050,9 +4205,12 @@ class CallbackHandlerMixin:
                             f"افتح المطابقة من الويب/البوت لمتابعة الخطوات.",
                             self.main_keyboard('ar', int(_req['user_id'])))
                     if _req and _req.get('agent_telegram_id'):
-                        self.send_message(int(_req['agent_telegram_id']),
+                        self.send_inline_message(
+                            int(_req['agent_telegram_id']),
                             f"🔔 تمت الموافقة على طلب مطابقة\n🆔 <code>{req_id}</code>\n"
-                            f"يمكنك Claim وبدء الخطوات من لوحة الوكيل.")
+                            f"يمكنك Claim وبدء الخطوات من لوحة الوكيل.",
+                            [[{'text': '🤖 فتح لوحة الوكيل', 'callback_data': 'match_agent_open'}]]
+                        )
                 except Exception:
                     pass
                 return

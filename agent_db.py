@@ -50,6 +50,8 @@ OP_PRECOMPLETE_WINDOW_MIN = 15
 OP_TOTAL_TIMEOUT_MIN = 60
 USDT_RATE_LOCK_MIN = 10
 
+OPS_REQ_TYPES = ('deposit', 'withdraw', 'buy_usdt', 'sell_usdt')
+
 EMA_ALPHA = 0.2  # exponential moving average factor for response time
 
 
@@ -361,6 +363,27 @@ def init_agent_tables():
             );
             CREATE INDEX IF NOT EXISTS idx_routing_rules_active
                 ON routing_rules(is_active, priority);
+
+            CREATE TABLE IF NOT EXISTS op_disputes (
+                id                 TEXT PRIMARY KEY,
+                req_id             TEXT NOT NULL,
+                opened_by_type     TEXT NOT NULL,
+                opened_by_id       TEXT NOT NULL,
+                assigned_to_type   TEXT NOT NULL DEFAULT '',
+                assigned_to_id     TEXT NOT NULL DEFAULT '',
+                status             TEXT NOT NULL DEFAULT 'open',
+                reason             TEXT NOT NULL DEFAULT '',
+                evidence_file_id   TEXT NOT NULL DEFAULT '',
+                admin_note         TEXT NOT NULL DEFAULT '',
+                opened_at          TEXT NOT NULL DEFAULT '',
+                updated_at         TEXT NOT NULL DEFAULT '',
+                resolved_at        TEXT NOT NULL DEFAULT '',
+                resolved_by        TEXT NOT NULL DEFAULT '',
+                resolution         TEXT NOT NULL DEFAULT ''
+            );
+            CREATE INDEX IF NOT EXISTS idx_op_disputes_req ON op_disputes(req_id, status);
+            CREATE INDEX IF NOT EXISTS idx_op_disputes_assignee
+                ON op_disputes(assigned_to_type, assigned_to_id, status);
         ''')
 
         # Add v2 columns to agent_bots
@@ -378,6 +401,13 @@ def init_agent_tables():
             ('drain',                'INTEGER', '0'),
             ('pin_remaining',        'INTEGER', '0'),
             ('cap_per_txn',          'REAL',    '0'),
+            ('allow_deposit',        'INTEGER', '1'),
+            ('allow_withdraw',       'INTEGER', '1'),
+            ('allow_buy_usdt',       'INTEGER', '1'),
+            ('allow_sell_usdt',      'INTEGER', '1'),
+            ('max_amount_daily',     'REAL',    '0'),
+            ('current_daily_amount', 'REAL',    '0'),
+            ('max_open_disputes',    'INTEGER', '5'),
         ])
 
         # Admin action tracking on match_requests (parity with old CSV fields)
@@ -393,6 +423,11 @@ def init_agent_tables():
             ('rate', 'REAL', '0'),
             ('rate_locked_until', 'TEXT', "''"),
             ('network', 'TEXT', "''"),
+            ('dispute_status', 'TEXT', "''"),
+            ('dispute_assigned_to_type', 'TEXT', "''"),
+            ('dispute_assigned_to_id', 'TEXT', "''"),
+            ('dispute_opened_at', 'TEXT', "''"),
+            ('dispute_resolved_at', 'TEXT', "''"),
         ])
 
         conn.executescript('''
@@ -764,7 +799,7 @@ def _traffic_ok_dict(d):
 def _rollover_daily(conn, today=None):
     today = today or date.today().isoformat()
     conn.execute(
-        'UPDATE agent_bots SET current_daily_count=0, daily_count_date=? '
+        'UPDATE agent_bots SET current_daily_count=0, current_daily_amount=0, daily_count_date=? '
         'WHERE daily_count_date != ?', (today, today))
 
 
@@ -955,6 +990,76 @@ def _is_processor(actor_type, actor_id, req_row):
     return False
 
 
+def _agent_allows_req_type(agent_row, req_type):
+    req_type = str(req_type or '')
+    if req_type == 'deposit':
+        return int(_rowv(agent_row, 'allow_deposit', 1) or 0) == 1
+    if req_type == 'withdraw':
+        return int(_rowv(agent_row, 'allow_withdraw', 1) or 0) == 1
+    if req_type == 'buy_usdt':
+        return int(_rowv(agent_row, 'allow_buy_usdt', 1) or 0) == 1
+    if req_type == 'sell_usdt':
+        return int(_rowv(agent_row, 'allow_sell_usdt', 1) or 0) == 1
+    return True
+
+
+def _count_open_disputes_for_agent_locked(conn, agent_id):
+    row = conn.execute(
+        "SELECT COUNT(*) c FROM op_disputes "
+        "WHERE assigned_to_type='agent' AND assigned_to_id=? "
+        "AND status IN ('open','assigned','in_review')",
+        (str(agent_id),)).fetchone()
+    return int(row['c'] if row else 0)
+
+
+def _reserve_agent_slot_locked(conn, agent_id, amount, consume_pin=False):
+    if consume_pin:
+        conn.execute(
+            'UPDATE agent_bots SET current_daily_count=current_daily_count+1, '
+            'current_daily_amount=current_daily_amount+?, '
+            'pin_remaining=MAX(0,pin_remaining-1), last_active=? WHERE id=?',
+            (float(amount or 0), _now(), str(agent_id)))
+    else:
+        conn.execute(
+            'UPDATE agent_bots SET current_daily_count=current_daily_count+1, '
+            'current_daily_amount=current_daily_amount+?, '
+            'last_active=? WHERE id=?',
+            (float(amount or 0), _now(), str(agent_id)))
+
+
+def _decrease_agent_daily_load_locked(conn, agent_id, amount):
+    conn.execute(
+        'UPDATE agent_bots SET current_daily_count=MAX(0,current_daily_count-1), '
+        'current_daily_amount=MAX(0,current_daily_amount-?) WHERE id=?',
+        (float(amount or 0), str(agent_id)))
+
+
+def _validate_agent_policy_locked(conn, agent_row, req_type, amount):
+    if not agent_row:
+        return 'الوكيل غير موجود'
+    if int(_rowv(agent_row, 'is_active', 0) or 0) != 1:
+        return 'الوكيل غير مفعل'
+    if int(_rowv(agent_row, 'traffic_on', 0) or 0) != 1:
+        return 'الوكيل متوقف عن استقبال الحركة'
+    if int(_rowv(agent_row, 'drain', 0) or 0) == 1:
+        return 'الوكيل في وضع Drain'
+    if req_type in OPS_REQ_TYPES and not _agent_allows_req_type(agent_row, req_type):
+        return 'نوع العملية غير مسموح لهذا الوكيل'
+    cap = float(_rowv(agent_row, 'cap_per_txn', 0) or 0)
+    if cap > 0 and float(amount or 0) > cap:
+        return 'المبلغ يتجاوز الحد المسموح للوكيل'
+    max_daily_amount = float(_rowv(agent_row, 'max_amount_daily', 0) or 0)
+    cur_daily_amount = float(_rowv(agent_row, 'current_daily_amount', 0) or 0)
+    if max_daily_amount > 0 and (cur_daily_amount + float(amount or 0)) > max_daily_amount:
+        return 'تجاوز الوكيل الحد اليومي للمبالغ'
+    max_open_disputes = int(_rowv(agent_row, 'max_open_disputes', 5) or 0)
+    if max_open_disputes > 0:
+        open_disputes = _count_open_disputes_for_agent_locked(conn, _rowv(agent_row, 'id', ''))
+        if open_disputes >= max_open_disputes:
+            return 'الوكيل تجاوز الحد الأقصى للنزاعات المفتوحة'
+    return ''
+
+
 # ── Agent CRUD ───────────────────────────────────────────────────────────────
 
 def list_agents():
@@ -983,19 +1088,33 @@ def create_agent(data):
     try:
         conn.execute('''INSERT INTO agent_bots
             (id, bot_token, bot_name, username, password_hash, balance,
-             security_deposit, is_active, traffic_on, traffic_weight,
-             max_daily_transactions, max_concurrent, current_daily_count,
-             daily_count_date, deposit_method_name, deposit_method_data,
-             created_at, notes)
-            VALUES (?,?,?,?,?,0,?,1,1,?,?,5,0,?,?,?,?,?)''', (
+              security_deposit, is_active, traffic_on, traffic_weight,
+              max_daily_transactions, max_concurrent, current_daily_count,
+              daily_count_date, deposit_method_name, deposit_method_data,
+              created_at, notes, allow_deposit, allow_withdraw,
+              allow_buy_usdt, allow_sell_usdt, max_amount_daily,
+              current_daily_amount, max_open_disputes)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''', (
             agent_id, data.get('bot_token', ''), data.get('bot_name', ''),
             username, hash_password(password),
+            0.0,
             float(data.get('security_deposit', 100) or 100),
+            1,
+            1,
             max(1, int(data.get('traffic_weight', 1) or 1)),
             int(data.get('max_daily_transactions', 50) or 50),
+            5,
+            0,
             date.today().isoformat(),
             data.get('deposit_method_name', ''), data.get('deposit_method_data', ''),
             _now(), data.get('notes', ''),
+            1 if data.get('allow_deposit', 1) in (1, '1', True, 'yes', 'true') else 0,
+            1 if data.get('allow_withdraw', 1) in (1, '1', True, 'yes', 'true') else 0,
+            1 if data.get('allow_buy_usdt', 1) in (1, '1', True, 'yes', 'true') else 0,
+            1 if data.get('allow_sell_usdt', 1) in (1, '1', True, 'yes', 'true') else 0,
+            max(0.0, float(data.get('max_amount_daily', 0) or 0)),
+            0.0,
+            max(0, int(data.get('max_open_disputes', 5) or 0)),
         ))
         conn.commit()
         return {'id': agent_id, 'username': username, 'password': password}
@@ -1009,7 +1128,9 @@ _ADMIN_EDITABLE = {'bot_token', 'bot_name', 'username', 'security_deposit',
                    'is_active', 'traffic_on', 'traffic_weight',
                    'max_daily_transactions', 'max_concurrent',
                    'deposit_method_name', 'deposit_method_data', 'notes',
-                   'telegram_id', 'drain', 'pin_remaining', 'cap_per_txn'}
+                   'telegram_id', 'drain', 'pin_remaining', 'cap_per_txn',
+                   'allow_deposit', 'allow_withdraw', 'allow_buy_usdt', 'allow_sell_usdt',
+                   'max_amount_daily', 'max_open_disputes'}
 
 
 def update_agent(agent_id, data):
@@ -1019,13 +1140,13 @@ def update_agent(agent_id, data):
             v = data[k]
             if k in ('is_active', 'traffic_on'):
                 v = 1 if v in (1, '1', True, 'yes', 'true') else 0
-            elif k in ('traffic_weight', 'max_daily_transactions', 'max_concurrent', 'pin_remaining'):
-                v = max(1 if k == 'traffic_weight' else 0, int(v or 0))
-            elif k == 'drain':
+            elif k in ('allow_deposit', 'allow_withdraw', 'allow_buy_usdt', 'allow_sell_usdt', 'drain'):
                 v = 1 if v in (1, '1', True, 'yes', 'true') else 0
+            elif k in ('traffic_weight', 'max_daily_transactions', 'max_concurrent', 'pin_remaining', 'max_open_disputes'):
+                v = max(1 if k == 'traffic_weight' else 0, int(v or 0))
             elif k == 'security_deposit':
                 v = float(v or 0)
-            elif k == 'cap_per_txn':
+            elif k in ('cap_per_txn', 'max_amount_daily'):
                 v = max(0.0, float(v or 0))
             sets.append(f'{k}=?')
             vals.append(v)
@@ -1249,24 +1370,35 @@ def _pick_agent_locked(conn, txn_type, amount, request_meta=None):
     if global_max_amount is not None and float(amount) > float(global_max_amount):
         return None
 
+    req_type = str(request_meta.get('req_type', '') or '')
+
     rows = conn.execute(
         "SELECT b.id, b.bot_name, b.balance, b.security_deposit, b.traffic_weight, "
         "b.current_daily_count, b.max_daily_transactions, b.escrow_balance, "
+        "b.current_daily_amount, b.max_amount_daily, "
         "b.max_concurrent, b.is_online, b.tier, b.drain, b.pin_remaining, b.cap_per_txn, "
+        "b.is_active, b.traffic_on, "
+        "b.allow_deposit, b.allow_withdraw, b.allow_buy_usdt, b.allow_sell_usdt, b.max_open_disputes, "
         "COALESCE((SELECT SUM(t.amount) FROM agent_transactions t "
         " WHERE t.agent_id=b.id AND t.status='pending' AND t.type='deposit'),0) AS pending_out, "
         "COALESCE((SELECT COUNT(*) FROM agent_transactions t2 "
-        " WHERE t2.agent_id=b.id AND t2.status='pending'),0) AS active_escrow_count "
+        " WHERE t2.agent_id=b.id AND t2.status='pending'),0) AS active_escrow_count, "
+        "COALESCE((SELECT COUNT(*) FROM op_disputes d "
+        " WHERE d.assigned_to_type='agent' AND d.assigned_to_id=b.id "
+        " AND d.status IN ('open','assigned','in_review')),0) AS open_disputes_count "
         "FROM agent_bots b WHERE b.is_active=1 AND b.traffic_on=1 "
         "AND b.current_daily_count < b.max_daily_transactions").fetchall()
     eligible = []
     for r in rows:
         if str(r['id']) in blocked:
             continue
-        if int(r['drain'] or 0) == 1:
+        policy_err = _validate_agent_policy_locked(conn, r, req_type, amount)
+        if policy_err:
             continue
-        cap = float(r['cap_per_txn'] or 0)
-        if cap > 0 and float(amount) > cap:
+        if req_type in OPS_REQ_TYPES and not _agent_allows_req_type(r, req_type):
+            continue
+        max_daily_amount = float(r['max_amount_daily'] or 0)
+        if max_daily_amount > 0 and (float(r['current_daily_amount'] or 0) + float(amount)) > max_daily_amount:
             continue
         spendable = float(r['balance']) - float(r['escrow_balance']) - float(r['pending_out'])
         if spendable <= float(r['security_deposit']):
@@ -1288,9 +1420,7 @@ def _pick_agent_locked(conn, txn_type, amount, request_meta=None):
         forced_rows = [r for _, r in eligible if str(r['id']) == forced_pin]
         if forced_rows:
             chosen = forced_rows[0]
-            conn.execute(
-                'UPDATE agent_bots SET current_daily_count=current_daily_count+1, '
-                'last_active=? WHERE id=?', (_now(), chosen['id']))
+            _reserve_agent_slot_locked(conn, chosen['id'], amount, consume_pin=False)
             if forced_pin_rule:
                 new_params = dict(forced_pin_rule['params'])
                 new_params['remaining'] = max(0, int(forced_pin_rule['remaining']) - 1)
@@ -1307,9 +1437,7 @@ def _pick_agent_locked(conn, txn_type, amount, request_meta=None):
         if preferred_eligible:
             preferred_eligible.sort(key=lambda rr: float(rr['current_daily_count']))
             chosen = preferred_eligible[0]
-            conn.execute(
-                'UPDATE agent_bots SET current_daily_count=current_daily_count+1, '
-                'last_active=? WHERE id=?', (_now(), chosen['id']))
+            _reserve_agent_slot_locked(conn, chosen['id'], amount, consume_pin=False)
             return {'id': chosen['id'], 'name': chosen['bot_name'],
                     'balance': float(chosen['balance']),
                     'escrow_balance': float(chosen['escrow_balance'])}
@@ -1318,10 +1446,7 @@ def _pick_agent_locked(conn, txn_type, amount, request_meta=None):
     if pinned:
         pinned.sort(key=lambda rr: int(rr['pin_remaining']), reverse=True)
         chosen = pinned[0]
-        conn.execute(
-            'UPDATE agent_bots SET current_daily_count=current_daily_count+1, '
-            'pin_remaining=MAX(0,pin_remaining-1), last_active=? WHERE id=?',
-            (_now(), chosen['id']))
+        _reserve_agent_slot_locked(conn, chosen['id'], amount, consume_pin=True)
         return {'id': chosen['id'], 'name': chosen['bot_name'],
                 'balance': float(chosen['balance']),
                 'escrow_balance': float(chosen['escrow_balance'])}
@@ -1330,9 +1455,7 @@ def _pick_agent_locked(conn, txn_type, amount, request_meta=None):
     best_ratio = eligible[0][0]
     top = [r for ratio, r in eligible if ratio <= best_ratio * 1.05]
     chosen = random.choice(top)
-    conn.execute(
-        'UPDATE agent_bots SET current_daily_count=current_daily_count+1, '
-        'last_active=? WHERE id=?', (_now(), chosen['id']))
+    _reserve_agent_slot_locked(conn, chosen['id'], amount, consume_pin=False)
     return {'id': chosen['id'], 'name': chosen['bot_name'],
             'balance': float(chosen['balance']),
             'escrow_balance': float(chosen['escrow_balance'])}
@@ -1395,8 +1518,9 @@ def void_pending_transaction(agent_id, txn_id):
             (amount, agent_id))
         # Release daily quota
         conn.execute(
-            'UPDATE agent_bots SET current_daily_count=MAX(0,current_daily_count-1) '
-            'WHERE id=?', (agent_id,))
+            'UPDATE agent_bots SET current_daily_count=MAX(0,current_daily_count-1), '
+            'current_daily_amount=MAX(0,current_daily_amount-?) WHERE id=?',
+            (amount, agent_id))
         conn.commit()
         return True
     except Exception:
@@ -1827,8 +1951,9 @@ def void_stale_transactions(notify_callback=None):
                 'UPDATE agent_bots SET escrow_balance=MAX(0, escrow_balance-?) WHERE id=?',
                 (amount, agent_id))
             conn.execute(
-                'UPDATE agent_bots SET current_daily_count=MAX(0,current_daily_count-1) '
-                'WHERE id=?', (agent_id,))
+                'UPDATE agent_bots SET current_daily_count=MAX(0,current_daily_count-1), '
+                'current_daily_amount=MAX(0,current_daily_amount-?) WHERE id=?',
+                (amount, agent_id))
 
             # Log penalty
             conn.execute('''INSERT INTO agent_penalties (agent_id, penalty_type, amount, reason, created_at)
@@ -2087,6 +2212,17 @@ def db_get_active_request_by_user(user_id):
             if _request_is_active_row(r):
                 return dict(r)
         return None
+    finally:
+        conn.close()
+
+
+def get_agent_by_telegram(telegram_id):
+    conn = _conn()
+    try:
+        r = conn.execute(
+            'SELECT * FROM agent_bots WHERE telegram_id=? AND is_active=1',
+            (str(telegram_id),)).fetchone()
+        return _agent_dict(r) if r else None
     finally:
         conn.close()
 
@@ -2612,7 +2748,7 @@ def create_match_request_with_agent_assignment(
     amount = float(amount or 0)
     if amount <= 0:
         return None, 'المبلغ يجب أن يكون أكبر من صفر', False, None
-    if req_type not in ('deposit', 'withdraw', 'buy_usdt', 'sell_usdt'):
+    if req_type not in OPS_REQ_TYPES:
         return None, 'نوع الطلب غير صالح', False, None
     source_type = 'personal_wallet' if str(source_type) == 'personal_wallet' else 'company'
 
@@ -2654,7 +2790,11 @@ def create_match_request_with_agent_assignment(
             if source_type != 'personal_wallet':
                 chosen = _pick_agent_locked(
                     conn, _agent_txn_type(req_type), amount,
-                    request_meta={'currency': currency or 'EGP', 'company_id': company_id or ''})
+                    request_meta={
+                        'currency': currency or 'EGP',
+                        'company_id': company_id or '',
+                        'req_type': req_type,
+                    })
             agent_info = None
             if chosen:
                 full = conn.execute(
@@ -2751,8 +2891,9 @@ def cancel_match_request_atomic(req_id, user_id):
                 conn.execute("DELETE FROM agent_transactions WHERE id=?", (txn['id'],))
                 conn.execute(
                     'UPDATE agent_bots SET escrow_balance=MAX(0, escrow_balance-?), '
-                    'current_daily_count=MAX(0, current_daily_count-1) WHERE id=?',
-                    (float(txn['amount']), txn['agent_id']))
+                    'current_daily_count=MAX(0, current_daily_count-1), '
+                    'current_daily_amount=MAX(0,current_daily_amount-?) WHERE id=?',
+                    (float(txn['amount']), float(txn['amount']), txn['agent_id']))
 
             conn.execute(
                 "UPDATE match_requests SET status='cancelled', state='cancelled' WHERE id=?",
@@ -2813,11 +2954,23 @@ def admin_set_match_request_status(req_id, new_status, actor=''):
                     conn.execute("DELETE FROM agent_transactions WHERE id=?", (txn['id'],))
                     conn.execute(
                         'UPDATE agent_bots SET escrow_balance=MAX(0, escrow_balance-?), '
-                        'current_daily_count=MAX(0, current_daily_count-1) WHERE id=?',
-                        (float(txn['amount']), txn['agent_id']))
+                        'current_daily_count=MAX(0, current_daily_count-1), '
+                        'current_daily_amount=MAX(0,current_daily_amount-?) WHERE id=?',
+                        (float(txn['amount']), float(txn['amount']), txn['agent_id']))
 
             new_state = cur_state or 'created'
             if new_status == 'approved':
+                assigned_agent_id = str(_rowv(req, 'assigned_agent_id', '') or '')
+                if assigned_agent_id:
+                    agent_row = conn.execute('SELECT * FROM agent_bots WHERE id=?', (assigned_agent_id,)).fetchone()
+                    policy_err = _validate_agent_policy_locked(
+                        conn, agent_row,
+                        str(_rowv(req, 'type', '')),
+                        float(_rowv(req, 'amount', 0) or 0),
+                    )
+                    if policy_err:
+                        conn.rollback()
+                        return False, f'تعذر الموافقة: {policy_err}'
                 if not _rowv(req, 'claimed_by_id', '') and _rowv(req, 'assigned_agent_id', ''):
                     conn.execute(
                         "UPDATE match_requests SET claimed_by_type='agent', claimed_by_id=?, claimed_at=? WHERE id=?",
@@ -2898,6 +3051,24 @@ def get_pending_with_requests(agent_id):
               AND (r.id IS NULL OR r.status='approved' OR r.state IN ('claimed','in_progress','escalated','disputed','pre_complete'))
             ORDER BY t.created_at ASC
         ''', (str(agent_id),)).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def list_agent_match_requests(agent_id, limit=30):
+    conn = _conn()
+    try:
+        rows = conn.execute('''
+            SELECT r.*, a.bot_name AS agent_name, a.telegram_id AS agent_telegram_id
+            FROM match_requests r
+            LEFT JOIN agent_bots a ON r.assigned_agent_id = a.id
+            WHERE r.assigned_agent_id=?
+              AND r.status IN ('approved','disputed')
+              AND (r.state IN ('created','claimed','in_progress','escalated','disputed','pre_complete') OR r.state='')
+            ORDER BY r.created_at DESC
+            LIMIT ?
+        ''', (str(agent_id), int(limit))).fetchall()
         return [dict(r) for r in rows]
     finally:
         conn.close()
@@ -2998,6 +3169,15 @@ def claim_request(req_id, claimer_type, claimer_id):
             if str(_rowv(req, 'status', '')) != 'approved':
                 conn.rollback()
                 return {'error': 'لا يمكن الاستلام قبل موافقة الأدمن'}
+            agent_row = conn.execute('SELECT * FROM agent_bots WHERE id=?', (str(claimer_id),)).fetchone()
+            policy_err = _validate_agent_policy_locked(
+                conn, agent_row,
+                str(_rowv(req, 'type', '')),
+                float(_rowv(req, 'amount', 0) or 0),
+            )
+            if policy_err:
+                conn.rollback()
+                return {'error': policy_err}
 
         claimed_by = str(_rowv(req, 'claimed_by_id', ''))
         if claimed_by and claimed_by != str(claimer_id):
@@ -3080,13 +3260,11 @@ def admin_reassign_request(req_id, admin_id, new_agent_id, reason=''):
             return {'error': 'الوكيل الجديد غير صالح'}
 
         amount = float(_rowv(req, 'amount', 0) or 0)
-        cap = float(_rowv(tgt, 'cap_per_txn', 0) or 0)
-        if int(_rowv(tgt, 'drain', 0) or 0) == 1:
+        policy_err = _validate_agent_policy_locked(
+            conn, tgt, str(_rowv(req, 'type', '')), amount)
+        if policy_err:
             conn.rollback()
-            return {'error': 'الوكيل الجديد في وضع Drain'}
-        if cap > 0 and amount > cap:
-            conn.rollback()
-            return {'error': 'المبلغ يتجاوز حد الوكيل الجديد'}
+            return {'error': policy_err}
 
         pending_txn = conn.execute(
             "SELECT * FROM agent_transactions WHERE match_request_id=? AND status='pending'",
@@ -3097,9 +3275,11 @@ def admin_reassign_request(req_id, admin_id, new_agent_id, reason=''):
                 conn.execute(
                     'UPDATE agent_bots SET escrow_balance=MAX(0,escrow_balance-?) WHERE id=?',
                     (pamount, old_agent))
+                _decrease_agent_daily_load_locked(conn, old_agent, pamount)
             conn.execute(
                 'UPDATE agent_bots SET escrow_balance=escrow_balance+? WHERE id=?',
                 (pamount, str(new_agent_id)))
+            _reserve_agent_slot_locked(conn, str(new_agent_id), pamount, consume_pin=False)
             conn.execute(
                 'UPDATE agent_transactions SET agent_id=? WHERE id=?',
                 (str(new_agent_id), pending_txn['id']))
@@ -3276,6 +3456,8 @@ def open_request_dispute(req_id, actor_type, actor_id, reason, evidence_file_id=
     reason = str(reason or '').strip()
     if len(reason) < 3:
         return {'error': 'سبب الشكوى قصير جداً'}
+    if actor_type not in ('user', 'agent', 'admin'):
+        return {'error': 'نوع الفاعل غير صالح'}
     conn = _conn()
     try:
         conn.execute('BEGIN IMMEDIATE')
@@ -3286,13 +3468,72 @@ def open_request_dispute(req_id, actor_type, actor_id, reason, evidence_file_id=
         if str(_rowv(req, 'state', '')) in OPS_FINAL_STATES or str(_rowv(req, 'status', '')) in ('matched', 'cancelled', 'rejected'):
             conn.rollback()
             return {'error': 'لا يمكن فتح شكوى بعد الإغلاق'}
+
+        if actor_type == 'user' and str(_rowv(req, 'user_id', '')) != str(actor_id):
+            conn.rollback()
+            return {'error': 'غير مصرح لك بفتح شكوى لهذا الطلب'}
+        if actor_type == 'agent' and not _is_processor('agent', actor_id, req):
+            conn.rollback()
+            return {'error': 'غير مصرح لك بفتح شكوى لهذا الطلب'}
+
+        assigned_to_type = 'admin'
+        assigned_to_id = ''
+        if actor_type == 'user':
+            candidate_agent = str(_rowv(req, 'assigned_agent_id', '') or '')
+            if candidate_agent:
+                arow = conn.execute('SELECT * FROM agent_bots WHERE id=?', (candidate_agent,)).fetchone()
+                if arow:
+                    max_open = int(_rowv(arow, 'max_open_disputes', 5) or 0)
+                    open_count = _count_open_disputes_for_agent_locked(conn, candidate_agent)
+                    if max_open <= 0 or open_count < max_open:
+                        assigned_to_type = 'agent'
+                        assigned_to_id = candidate_agent
+        elif actor_type == 'agent':
+            arow = conn.execute('SELECT * FROM agent_bots WHERE id=?', (str(actor_id),)).fetchone()
+            max_open = int(_rowv(arow, 'max_open_disputes', 5) or 0) if arow else 0
+            if max_open > 0 and _count_open_disputes_for_agent_locked(conn, str(actor_id)) >= max_open:
+                conn.rollback()
+                return {'error': 'تجاوزت الحد الأقصى للنزاعات المفتوحة'}
+
+        did = _generate_id('DSP')
+        d_status = 'assigned' if assigned_to_id else 'open'
+        now = _now()
+        conn.execute('''
+            INSERT INTO op_disputes
+            (id, req_id, opened_by_type, opened_by_id, assigned_to_type, assigned_to_id,
+             status, reason, evidence_file_id, opened_at, updated_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?)
+        ''', (
+            did, str(req_id), str(actor_type), str(actor_id),
+            assigned_to_type, assigned_to_id, d_status,
+            reason, str(evidence_file_id or ''), now, now,
+        ))
+
         old_state = str(_rowv(req, 'state', '')) or 'created'
-        conn.execute("UPDATE match_requests SET state='disputed', status='disputed' WHERE id=?", (str(req_id),))
+        conn.execute(
+            "UPDATE match_requests SET state='disputed', status='disputed', "
+            "dispute_status='open', dispute_assigned_to_type=?, dispute_assigned_to_id=?, dispute_opened_at=? "
+            "WHERE id=?",
+            (assigned_to_type, assigned_to_id, now, str(req_id)))
         _audit_event_locked(conn, 'match_requests', req_id, actor_type, str(actor_id),
                             'request_disputed', old_state, 'disputed',
-                            {'reason': reason, 'evidence': str(evidence_file_id or '')})
+                            {
+                                'reason': reason,
+                                'evidence': str(evidence_file_id or ''),
+                                'dispute_id': did,
+                                'assigned_to_type': assigned_to_type,
+                                'assigned_to_id': assigned_to_id,
+                            })
+        _audit_event_locked(conn, 'op_disputes', did, actor_type, str(actor_id),
+                            'dispute_opened', '', d_status,
+                            {'req_id': str(req_id)})
         conn.commit()
-        return {'success': True}
+        return {
+            'success': True,
+            'dispute_id': did,
+            'assigned_to_type': assigned_to_type,
+            'assigned_to_id': assigned_to_id,
+        }
     except Exception as e:
         conn.rollback()
         return {'error': str(e)}
@@ -3320,9 +3561,16 @@ def resolve_request_dispute(req_id, admin_id, decision, note=''):
         else:
             new_state = 'cancelled'
             new_status = 'cancelled'
+        now = _now()
         conn.execute(
-            'UPDATE match_requests SET state=?, status=?, approved_by=?, approved_at=? WHERE id=?',
-            (new_state, new_status, f'admin:{admin_id}', _now(), str(req_id)))
+            'UPDATE match_requests SET state=?, status=?, approved_by=?, approved_at=?, '
+            'dispute_status=?, dispute_resolved_at=? WHERE id=?',
+            (new_state, new_status, f'admin:{admin_id}', now, 'resolved', now, str(req_id)))
+        conn.execute(
+            "UPDATE op_disputes SET status='resolved', resolution=?, admin_note=?, "
+            "updated_at=?, resolved_at=?, resolved_by=? "
+            "WHERE req_id=? AND status IN ('open','assigned','in_review')",
+            (str(decision), str(note or ''), now, now, str(admin_id), str(req_id)))
         _audit_event_locked(conn, 'match_requests', req_id, 'admin', str(admin_id),
                             'dispute_resolved', old_state, new_state,
                             {'decision': decision, 'note': note or ''})
@@ -3333,6 +3581,113 @@ def resolve_request_dispute(req_id, admin_id, decision, note=''):
         return {'error': str(e)}
     finally:
         conn.close()
+
+
+def list_op_disputes(status='', assignee_type='', assignee_id='', limit=200):
+    conn = _conn()
+    try:
+        sql = (
+            "SELECT d.*, r.user_id, r.amount, r.currency, r.assigned_agent_id, "
+            "a.bot_name AS assigned_agent_name "
+            "FROM op_disputes d "
+            "LEFT JOIN match_requests r ON r.id=d.req_id "
+            "LEFT JOIN agent_bots a ON a.id=d.assigned_to_id "
+            "WHERE 1=1"
+        )
+        args = []
+        if status:
+            statuses = [s.strip() for s in str(status).split(',') if s.strip()]
+            if statuses:
+                sql += f" AND d.status IN ({','.join(['?']*len(statuses))})"
+                args.extend(statuses)
+        if assignee_type:
+            sql += ' AND d.assigned_to_type=?'
+            args.append(str(assignee_type))
+        if assignee_id:
+            sql += ' AND d.assigned_to_id=?'
+            args.append(str(assignee_id))
+        sql += ' ORDER BY d.opened_at DESC LIMIT ?'
+        args.append(int(limit))
+        rows = conn.execute(sql, args).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def get_op_dispute(dispute_id):
+    conn = _conn()
+    try:
+        row = conn.execute('SELECT * FROM op_disputes WHERE id=?', (str(dispute_id),)).fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def assign_op_dispute(dispute_id, admin_id, assignee_type, assignee_id='', note=''):
+    if assignee_type not in ('agent', 'admin'):
+        return {'error': 'نوع التوجيه غير صالح'}
+    conn = _conn()
+    try:
+        conn.execute('BEGIN IMMEDIATE')
+        d = conn.execute('SELECT * FROM op_disputes WHERE id=?', (str(dispute_id),)).fetchone()
+        if not d:
+            conn.rollback()
+            return {'error': 'النزاع غير موجود'}
+        if str(_rowv(d, 'status', '')) in ('resolved', 'cancelled'):
+            conn.rollback()
+            return {'error': 'النزاع مغلق'}
+
+        target_id = str(assignee_id or '') if assignee_type == 'agent' else ''
+        if assignee_type == 'agent':
+            agent_row = conn.execute('SELECT * FROM agent_bots WHERE id=?', (target_id,)).fetchone()
+            if not agent_row:
+                conn.rollback()
+                return {'error': 'الوكيل غير موجود'}
+            max_open = int(_rowv(agent_row, 'max_open_disputes', 5) or 0)
+            if max_open > 0 and _count_open_disputes_for_agent_locked(conn, target_id) >= max_open:
+                conn.rollback()
+                return {'error': 'الوكيل متجاوز حد النزاعات المفتوحة'}
+
+        now = _now()
+        conn.execute(
+            "UPDATE op_disputes SET assigned_to_type=?, assigned_to_id=?, status='assigned', "
+            "admin_note=?, updated_at=? WHERE id=?",
+            (str(assignee_type), target_id, str(note or ''), now, str(dispute_id)))
+
+        req_id = str(_rowv(d, 'req_id', ''))
+        if req_id:
+            conn.execute(
+                "UPDATE match_requests SET dispute_status='open', dispute_assigned_to_type=?, "
+                "dispute_assigned_to_id=? WHERE id=?",
+                (str(assignee_type), target_id, req_id))
+            _audit_event_locked(conn, 'match_requests', req_id, 'admin', str(admin_id),
+                                'dispute_assigned', '', 'assigned', {
+                                    'dispute_id': str(dispute_id),
+                                    'assignee_type': str(assignee_type),
+                                    'assignee_id': target_id,
+                                })
+
+        _audit_event_locked(conn, 'op_disputes', str(dispute_id), 'admin', str(admin_id),
+                            'dispute_assigned', '', 'assigned', {
+                                'assignee_type': str(assignee_type),
+                                'assignee_id': target_id,
+                            })
+        conn.commit()
+        return {'success': True}
+    except Exception as e:
+        conn.rollback()
+        return {'error': str(e)}
+    finally:
+        conn.close()
+
+
+def list_agent_op_disputes(agent_id, status='open,assigned,in_review', limit=200):
+    return list_op_disputes(
+        status=status,
+        assignee_type='agent',
+        assignee_id=str(agent_id),
+        limit=limit,
+    )
 
 
 def process_ops_deadlines():
