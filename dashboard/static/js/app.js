@@ -339,6 +339,17 @@ permissions_revoked: 'سيتم إبطال جميع صلاحياته فوراً.'
         loading_stats: 'جارٍ تحميل الإحصائيات...',
         stats_load_failed: 'فشل تحميل الإحصائيات',
         new_users: 'المستخدمون الجدد',
+        notifications_title: 'الإشعارات',
+        time: 'الوقت',
+        total_users_label: 'إجمالي المستخدمين',
+        dispute: 'نزاع',
+        open: 'مفتوح',
+        auto_rejected: 'رفض تلقائي',
+        withdrawal_rejected: 'رفض سحب',
+        pending_withdrawal: 'سحب معلق',
+        pending_code_verification: 'بانتظار الكود',
+        muted: 'صامت',
+        click_to_open: 'انقر للذهاب',
 },
     en: {
         // Sidebar
@@ -417,6 +428,17 @@ permissions_revoked: 'سيتم إبطال جميع صلاحياته فوراً.'
         // Settings
         system_settings: 'System Settings', button_labels: 'Button Labels',
         audit_log: 'Audit Log', setting_key: 'Key', setting_value: 'Value',
+        notifications_title: 'Notifications',
+        time: 'Time',
+        total_users_label: 'Total Users',
+        dispute: 'Dispute',
+        open: 'Open',
+        auto_rejected: 'Auto Rejected',
+        withdrawal_rejected: 'Withdrawal Rejected',
+        pending_withdrawal: 'Pending Withdrawal',
+        pending_code_verification: 'Awaiting Code',
+        muted: 'Muted',
+        click_to_open: 'Click to go',
     }
 };
 
@@ -424,7 +446,11 @@ permissions_revoked: 'سيتم إبطال جميع صلاحياته فوراً.'
 function tr(key) {
     const lang = localStorage.getItem('lang') || 'ar';
     const dict = I18N[lang] || I18N.ar;
-    return dict[key] || I18N.ar[key] || key;
+    const fallback = dict[key] || I18N.ar[key] || key;
+    if (window.ADMIN_I18N_RUNTIME && typeof window.ADMIN_I18N_RUNTIME.translate === 'function') {
+        return window.ADMIN_I18N_RUNTIME.translate(fallback);
+    }
+    return fallback;
 }
 
 // Apply language to document
@@ -443,6 +469,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
         el.placeholder = tr(el.getAttribute('data-i18n-placeholder'));
+    });
+    document.querySelectorAll('[data-i18n-ph]').forEach(el => {
+        el.placeholder = tr(el.getAttribute('data-i18n-ph'));
     });
     document.querySelectorAll('[data-i18n-title]').forEach(el => {
         el.title = tr(el.getAttribute('data-i18n-title'));
@@ -476,16 +505,16 @@ function statusBadge(status) {
         'awaiting_admin_review': '<span class="badge badge-pending">' + tr('pending') + '</span>',
         'admin_received': '<span class="badge badge-approved">' + tr('approved') + '</span>',
         'transfer_confirmed': '<span class="badge badge-approved">' + tr('approved') + '</span>',
-        'disputed': '<span class="badge badge-rejected">Dispute</span>',
+        'disputed': '<span class="badge badge-rejected">' + tr('dispute') + '</span>',
         'resolved': '<span class="badge badge-approved">' + tr('approved') + '</span>',
-        'open': '<span class="badge badge-pending">Open</span>',
+        'open': '<span class="badge badge-pending">' + tr('open') + '</span>',
         'yes': '<span class="badge badge-approved">' + tr('yes') + '</span>',
         'no': '<span class="badge badge-rejected">' + tr('no') + '</span>',
-        'auto_rejected': '<span class="badge badge-rejected">رفض تلقائي</span>',
-        'withdrawal_rejected': '<span class="badge badge-rejected">رفض سحب</span>',
-        'withdrawal_auto_rejected': '<span class="badge badge-rejected">رفض تلقائي</span>',
-        'pending_withdrawal': '<span class="badge badge-pending">سحب معلق</span>',
-        'pending_code_verification': '<span class="badge badge-pending">بانتظار الكود</span>',
+        'auto_rejected': '<span class="badge badge-rejected">' + tr('auto_rejected') + '</span>',
+        'withdrawal_rejected': '<span class="badge badge-rejected">' + tr('withdrawal_rejected') + '</span>',
+        'withdrawal_auto_rejected': '<span class="badge badge-rejected">' + tr('auto_rejected') + '</span>',
+        'pending_withdrawal': '<span class="badge badge-pending">' + tr('pending_withdrawal') + '</span>',
+        'pending_code_verification': '<span class="badge badge-pending">' + tr('pending_code_verification') + '</span>',
     };
     return map[status] || '<span class="badge" style="background:#334155;color:#94A3B8">' + (status || '—') + '</span>';
 }
@@ -524,7 +553,7 @@ const Notifier = {
     toggleSound() {
         this.soundEnabled = !this.soundEnabled;
         localStorage.setItem('boterx_sound', this.soundEnabled);
-        toast(this.soundEnabled ? '🔊 ' + tr('connected') : '🔇 Muted', 'info');
+        toast(this.soundEnabled ? '🔊 ' + tr('connected') : '🔇 ' + tr('muted'), 'info');
     },
     async check() {
         try {
@@ -644,7 +673,7 @@ const Notifier = {
         const popup = document.createElement('div');
         popup.id = 'bigPopup';
         popup.className = 'fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 ' + c.bg + ' text-white px-8 py-6 rounded-2xl shadow-2xl z-[500] text-center cursor-pointer';
-        popup.innerHTML = '<div class="text-4xl mb-2">' + c.icon + '</div><div class="text-lg font-bold">' + message + '</div><div class="text-xs mt-2 opacity-50">Click to go ←</div>';
+        popup.innerHTML = '<div class="text-4xl mb-2">' + c.icon + '</div><div class="text-lg font-bold">' + message + '</div><div class="text-xs mt-2 opacity-50">' + tr('click_to_open') + ' ←</div>';
         popup.onclick = () => { window.location.href = c.url; };
         document.body.appendChild(popup);
         setTimeout(() => { popup.style.transition = 'opacity 0.3s, transform 0.3s'; popup.style.opacity = '0'; popup.style.transform = 'translate(-50%, -60%) scale(0.9)'; setTimeout(() => popup.remove(), 300); }, 3000);
