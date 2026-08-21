@@ -19,6 +19,8 @@ import math
 import fcntl
 import time
 import queue as _queue
+import urllib.request
+import urllib.error
 from datetime import datetime, timedelta
 from functools import wraps
 from urllib.parse import parse_qs
@@ -4911,7 +4913,9 @@ def api_referrals_public():
 @app.route('/api/channels/public')
 def api_channels_public():
     """Public active channels for user home page."""
-    chans = read_csv('channels.csv')
+    chans = read_csv('bot_channels.csv')
+    if not chans:
+        chans = read_csv('channels.csv')
     clean = []
     for c in chans:
         if str(c.get('is_active', '')).lower() in ('yes', 'true', '1', 'active', ''):
@@ -4920,6 +4924,7 @@ def api_channels_public():
                 'chat_id': c.get('chat_id', ''),
                 'username': c.get('username', ''),
                 'description': c.get('description', ''),
+                'platform': c.get('platform', 'telegram') or 'telegram',
             })
     return jsonify({'channels': clean})
 
@@ -5339,7 +5344,7 @@ def api_campaigns():
     campaigns.reverse()
     # Normalize fields
     for c in campaigns:
-        for k in ['id','name','message','media_urls','target','recipient','priority','country','language','segment','channel_group','scheduled_at','repeat','status','created_at','created_by','stats_reach','stats_clicks','stats_conversions']:
+        for k in _CAMPAIGN_FIELDS:
             if k not in c:
                 c[k] = ''
     return jsonify({'campaigns': campaigns})
@@ -5378,8 +5383,10 @@ def api_create_campaign():
         'stats_reach': '0',
         'stats_clicks': '0',
         'stats_conversions': '0',
+        'platform_account_id': data.get('platform_account_id', ''),
+        'ai_agent_id': data.get('ai_agent_id', ''),
     }
-    fieldnames = get_fieldnames('campaigns.csv', ['id','name','message','media_urls','target','recipient','priority','country','language','segment','channel_group','scheduled_at','repeat','status','created_at','created_by','stats_reach','stats_clicks','stats_conversions'])
+    fieldnames = get_fieldnames('campaigns.csv', _CAMPAIGN_FIELDS)
     append_csv('campaigns.csv', campaign, fieldnames)
     log_action('create_campaign', campaign_id)
 
@@ -5397,7 +5404,7 @@ def api_create_campaign():
 @permission_required('send_broadcast')
 def api_edit_campaign(campaign_id):
     campaigns = read_csv('campaigns.csv')
-    fieldnames = get_fieldnames('campaigns.csv', ['id','name','message','media_urls','target','recipient','priority','country','language','segment','channel_group','scheduled_at','repeat','status','created_at','created_by','stats_reach','stats_clicks','stats_conversions'])
+    fieldnames = get_fieldnames('campaigns.csv', _CAMPAIGN_FIELDS)
     if request.method == 'DELETE':
         campaigns = [c for c in campaigns if c.get('id') != campaign_id]
         write_csv('campaigns.csv', campaigns, fieldnames)
@@ -5463,7 +5470,7 @@ def _update_campaign_status(campaign_id, status):
     """Update campaign status in CSV."""
     try:
         campaigns = read_csv('campaigns.csv')
-        fieldnames = get_fieldnames('campaigns.csv', ['id','name','message','media_urls','target','recipient','priority','country','language','segment','channel_group','scheduled_at','repeat','status','created_at','created_by','stats_reach','stats_clicks','stats_conversions'])
+        fieldnames = get_fieldnames('campaigns.csv', _CAMPAIGN_FIELDS)
         for c in campaigns:
             if c.get('id') == campaign_id:
                 c['status'] = status
@@ -5801,8 +5808,10 @@ def api_v1_create_campaign():
         'language': 'all', 'segment': 'all', 'channel_group': '', 'scheduled_at': '',
         'repeat': 'once', 'status': 'draft', 'created_at': now, 'created_by': 'api',
         'stats_reach': '0', 'stats_clicks': '0', 'stats_conversions': '0',
+        'platform_account_id': data.get('platform_account_id', ''),
+        'ai_agent_id': data.get('ai_agent_id', ''),
     }
-    fields = get_fieldnames('campaigns.csv', ['id','name','message','media_urls','target','recipient','priority','country','language','segment','channel_group','scheduled_at','repeat','status','created_at','created_by','stats_reach','stats_clicks','stats_conversions'])
+    fields = get_fieldnames('campaigns.csv', _CAMPAIGN_FIELDS)
     append_csv('campaigns.csv', campaign, fields)
     return jsonify({'success': True, 'id': campaign_id})
 
@@ -5840,7 +5849,7 @@ def track_click_redirect(campaign_id):
 
     # Increment stats_clicks in campaigns.csv
     try:
-        cf_fields = get_fieldnames('campaigns.csv', ['id','name','message','media_urls','target','recipient','priority','country','language','segment','channel_group','scheduled_at','repeat','status','created_at','created_by','stats_reach','stats_clicks','stats_conversions'])
+        cf_fields = get_fieldnames('campaigns.csv', _CAMPAIGN_FIELDS)
         for c in campaigns:
             if c.get('id') == campaign_id:
                 c['stats_clicks'] = str(int(c.get('stats_clicks', 0) or 0) + 1)
@@ -5888,7 +5897,7 @@ def track_conversion():
     # Increment stats_conversions in campaigns.csv
     try:
         campaigns = read_csv('campaigns.csv')
-        cf_fields = get_fieldnames('campaigns.csv', ['id','name','message','media_urls','target','recipient','priority','country','language','segment','channel_group','scheduled_at','repeat','status','created_at','created_by','stats_reach','stats_clicks','stats_conversions'])
+        cf_fields = get_fieldnames('campaigns.csv', _CAMPAIGN_FIELDS)
         for c in campaigns:
             if c.get('id') == campaign_id:
                 c['stats_conversions'] = str(int(c.get('stats_conversions', 0) or 0) + 1)
@@ -6075,17 +6084,27 @@ def _execute_campaign(campaign):
     media_urls = [u for u in media_urls_str.split('|') if u] if media_urls_str else []
     recipient = campaign.get('recipient', 'all')
     target_user = campaign.get('target_user', '') if recipient == 'single' else ''
+    ai_agent_id = campaign.get('ai_agent_id', '')
+
+    if ai_agent_id and message:
+        message, _, _ = _apply_ai_text_profile(message, agent_id=ai_agent_id)
 
     # Web notification
-    if target in ('web', 'both'):
+    if target in ('web', 'both', 'all'):
         notif_title = '📢 ' + campaign.get('name', 'حملة إعلانية')
         if priority == 'urgent':
             notif_title = '🚨 ' + campaign.get('name', 'حملة عاجلة')
         push_notification('broadcast', notif_title, message[:200], {'media_urls': media_urls, 'priority': priority, 'campaign_id': campaign.get('id', '')})
 
-    # Telegram broadcast
-    if target in ('telegram', 'both'):
-        broadcast_entry = {
+    bc_fieldnames = get_fieldnames('broadcast_queue.csv', [
+        'id', 'message', 'target', 'recipient', 'priority', 'country',
+        'media_urls', 'target_user', 'target_name', 'created_at',
+        'created_by', 'status', 'platform', 'platform_account_id',
+        'type', 'target_chat_id', 'target_channel_id', 'scheduled_at'
+    ])
+
+    def _queue(platform_name):
+        entry = {
             'id': f"BCAST{str(int(datetime.now().timestamp()))[-6:]}{secrets.token_hex(2)}",
             'message': message,
             'target': target,
@@ -6097,37 +6116,304 @@ def _execute_campaign(campaign):
             'target_name': '',
             'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             'created_by': session.get('admin_id', ''),
-            'status': 'pending'
+            'status': 'pending',
+            'platform': platform_name,
+            'platform_account_id': campaign.get('platform_account_id', ''),
+            'type': 'broadcast',
+            'target_chat_id': '',
+            'target_channel_id': '',
+            'scheduled_at': campaign.get('scheduled_at', ''),
         }
-        bc_fieldnames = get_fieldnames('broadcast_queue.csv', ['id','message','target','recipient','priority','country','media_urls','target_user','target_name','created_at','created_by','status'])
-        append_csv('broadcast_queue.csv', broadcast_entry, bc_fieldnames)
+        append_csv('broadcast_queue.csv', entry, bc_fieldnames)
+
+    if target in ('telegram', 'both', 'all'):
+        _queue('telegram')
+    if target in ('whatsapp', 'all'):
+        _queue('whatsapp')
 
     log_action('execute_campaign', campaign.get('id', ''))
 
 # ===== End Campaigns API =====
 
+_CHANNEL_DEFAULT_FIELDS = [
+    'id', 'chat_id', 'title', 'type', 'is_active', 'added_at',
+    'relay_to_users', 'relay_to_channels', 'forward_mode', 'welcome_text',
+    'category', 'ai_enabled', 'channel_role', 'ai_provider', 'brand_voice',
+    'platform', 'owner_admin_id', 'managed_by_admin_ids',
+    'allow_subadmin_publish', 'ai_agent_id', 'platform_account_id'
+]
+
+_AI_AGENT_FIELDS = [
+    'id', 'name', 'provider', 'instructions', 'fallback_provider',
+    'is_active', 'created_at', 'updated_at', 'created_by'
+]
+
+_PLATFORM_ACCOUNT_FIELDS = [
+    'id', 'platform', 'account_name', 'is_active', 'api_base_url',
+    'access_token', 'phone_number_id', 'business_account_id',
+    'created_at', 'updated_at', 'created_by', 'last_health_check',
+    'health_status', 'last_error'
+]
+
+_SOURCE_CHANNEL_FIELDS = [
+    'id', 'chat_id', 'title', 'type', 'is_active', 'added_at',
+    'brand_voice', 'target_channel_ids', 'schedule', 'last_scraped_at',
+    'content_filter', 'ai_edit_text', 'ai_edit_media', 'ai_provider',
+    'ai_agent_id', 'owner_admin_id', 'managed_by_admin_ids'
+]
+
+_CAMPAIGN_FIELDS = [
+    'id', 'name', 'message', 'media_urls',
+    'target', 'recipient', 'priority', 'country',
+    'language', 'segment', 'channel_group', 'scheduled_at',
+    'repeat', 'status', 'created_at', 'created_by',
+    'stats_reach', 'stats_clicks', 'stats_conversions',
+    'platform_account_id', 'ai_agent_id',
+]
+
+
+def _is_super_admin_session():
+    uid = str(session.get('admin_id', '') or '')
+    if not uid:
+        return False
+    try:
+        role_data = _rbac_get_role(uid)
+        return str(role_data.get('role') or '') == 'super_admin'
+    except Exception:
+        return False
+
+
+def _pipe_ids(raw):
+    return '|'.join([x.strip() for x in str(raw or '').split('|') if x and x.strip()])
+
+
+def _pipe_to_list(raw):
+    return [x.strip() for x in str(raw or '').split('|') if x and x.strip()]
+
+
+def _normalize_channel_row(row, actor_uid=''):
+    changed = False
+
+    def _setdefault(key, value):
+        nonlocal changed
+        cur = row.get(key, '')
+        if cur is None or cur == '':
+            row[key] = value
+            changed = True
+
+    _setdefault('relay_to_users', 'yes')
+    _setdefault('relay_to_channels', 'yes')
+    _setdefault('forward_mode', 'all')
+    _setdefault('welcome_text', '')
+    _setdefault('category', '')
+    _setdefault('ai_enabled', 'no')
+    _setdefault('channel_role', 'both')
+    _setdefault('ai_provider', '')
+    _setdefault('brand_voice', '')
+    _setdefault('platform', 'telegram')
+    _setdefault('owner_admin_id', str(actor_uid or session.get('admin_id', '') or ''))
+    _setdefault('managed_by_admin_ids', str(row.get('owner_admin_id') or actor_uid or session.get('admin_id', '') or ''))
+    _setdefault('allow_subadmin_publish', 'no')
+    _setdefault('ai_agent_id', '')
+    _setdefault('platform_account_id', '')
+
+    # sanitize yes/no switches
+    for k in ('is_active', 'relay_to_users', 'relay_to_channels', 'ai_enabled', 'allow_subadmin_publish'):
+        v = str(row.get(k, '') or '').lower()
+        norm = 'yes' if v in ('1', 'true', 'yes', 'on', 'active') else 'no'
+        if row.get(k) != norm:
+            row[k] = norm
+            changed = True
+
+    # sanitize enums
+    if row.get('forward_mode') not in ('all', 'text_only', 'media_only'):
+        row['forward_mode'] = 'all'
+        changed = True
+    if row.get('channel_role') not in ('source', 'publish', 'both'):
+        row['channel_role'] = 'both'
+        changed = True
+    if str(row.get('platform', '')).strip().lower() not in ('telegram', 'whatsapp', 'webhook'):
+        row['platform'] = 'telegram'
+        changed = True
+
+    managers = _pipe_ids(row.get('managed_by_admin_ids', ''))
+    if managers != str(row.get('managed_by_admin_ids', '')):
+        row['managed_by_admin_ids'] = managers
+        changed = True
+
+    owner = str(row.get('owner_admin_id', '') or '').strip()
+    if owner and owner not in _pipe_to_list(row.get('managed_by_admin_ids', '')):
+        row['managed_by_admin_ids'] = _pipe_ids((row.get('managed_by_admin_ids', '') + '|' + owner).strip('|'))
+        changed = True
+
+    return row, changed
+
+
+def _admin_can_manage_channel(channel_row, admin_uid, action='edit'):
+    uid = str(admin_uid or '')
+    if not uid:
+        return False
+    if _is_super_admin_session():
+        return True
+    owner = str(channel_row.get('owner_admin_id', '') or '').strip()
+    managers = _pipe_to_list(channel_row.get('managed_by_admin_ids', ''))
+    if not owner:
+        return True  # legacy rows
+    if uid == owner or uid in managers:
+        return True
+    if action == 'publish' and str(channel_row.get('allow_subadmin_publish', 'no')) == 'yes':
+        return _rbac_has_perm(uid, 'send_broadcast')
+    return False
+
+
+def _platform_account_public(row):
+    r = dict(row)
+    token = str(r.get('access_token', '') or '')
+    if token:
+        r['access_token_masked'] = ('*' * max(0, len(token) - 6)) + token[-6:]
+    else:
+        r['access_token_masked'] = ''
+    r.pop('access_token', None)
+    return r
+
+
+def _platform_health_check(row):
+    platform = str(row.get('platform', '') or '').strip().lower()
+    token = str(row.get('access_token', '') or '').strip()
+    now_s = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    if not token:
+        return {
+            'health_status': 'error',
+            'last_error': 'missing_access_token',
+            'last_health_check': now_s,
+        }
+
+    if platform != 'whatsapp':
+        return {
+            'health_status': 'ok',
+            'last_error': '',
+            'last_health_check': now_s,
+        }
+
+    phone_number_id = str(row.get('phone_number_id', '') or '').strip()
+    if not phone_number_id:
+        return {
+            'health_status': 'error',
+            'last_error': 'missing_phone_number_id',
+            'last_health_check': now_s,
+        }
+
+    base = str(row.get('api_base_url', '') or '').strip() or 'https://graph.facebook.com/v20.0'
+    if base.endswith('/'):
+        base = base[:-1]
+    url = f"{base}/{phone_number_id}?fields=display_phone_number,verified_name"
+    req = urllib.request.Request(url, headers={'Authorization': f'Bearer {token}'})
+    try:
+        with urllib.request.urlopen(req, timeout=12) as resp:
+            _ = resp.read()
+        return {
+            'health_status': 'ok',
+            'last_error': '',
+            'last_health_check': now_s,
+        }
+    except urllib.error.HTTPError as e:
+        return {
+            'health_status': 'error',
+            'last_error': f'http_{e.code}',
+            'last_health_check': now_s,
+        }
+    except Exception as e:
+        return {
+            'health_status': 'error',
+            'last_error': str(e)[:180],
+            'last_health_check': now_s,
+        }
+
+
+def _load_ai_agent_by_id(agent_id):
+    aid = str(agent_id or '').strip()
+    if not aid:
+        return None
+    rows = read_csv('ai_agents.csv')
+    for r in rows:
+        if str(r.get('id', '')).strip() != aid:
+            continue
+        r, _ = _normalize_ai_agent_row(r)
+        if r.get('is_active') != 'yes':
+            return None
+        return r
+    return None
+
+
+def _apply_ai_text_profile(text, agent_id='', provider='', instructions='', fallback_provider=''):
+    msg = str(text or '').strip()
+    if len(msg) < 8:
+        return msg, 'none', False
+    try:
+        from ai_providers import AIManager
+        manager = AIManager()
+    except Exception:
+        return msg, 'none', False
+
+    p_name = str(provider or '').strip().lower()
+    prompt = str(instructions or '').strip()
+    fb_name = str(fallback_provider or '').strip().lower()
+
+    if agent_id:
+        agent = _load_ai_agent_by_id(agent_id)
+        if agent:
+            p_name = str(agent.get('provider', p_name) or p_name).strip().lower()
+            prompt = str(agent.get('instructions', prompt) or prompt).strip()
+            fb_name = str(agent.get('fallback_provider', fb_name) or fb_name).strip().lower()
+
+    if not prompt:
+        prompt = "أعد صياغة النص بأسلوب تسويقي واضح وجذاب مع الحفاظ على المعنى."
+
+    selected = None if p_name in ('', 'auto') else p_name
+    try:
+        result, used_provider = manager.process(msg, prompt, provider_name=selected)
+        if (not result or len(result.strip()) < 8) and fb_name:
+            result, used_provider = manager.process(msg, prompt, provider_name=fb_name)
+        if result and len(result.strip()) >= 8:
+            return result, (used_provider or p_name or 'auto'), True
+    except Exception:
+        pass
+    return msg, 'none', False
+
 @app.route('/api/channels')
 @api_auth
 def api_channels():
     channels = read_csv('bot_channels.csv')
-    # التأكد من وجود أعمدة الإعدادات
+    uid = str(session.get('admin_id', '') or '')
+    changed = False
+    out = []
     for ch in channels:
-        if 'relay_to_users' not in ch: ch['relay_to_users'] = 'yes'
-        if 'relay_to_channels' not in ch: ch['relay_to_channels'] = 'yes'
-        if 'forward_mode' not in ch: ch['forward_mode'] = 'all'
-        if 'welcome_text' not in ch: ch['welcome_text'] = ''
-    return jsonify({'channels': channels})
+        ch, row_changed = _normalize_channel_row(ch)
+        changed = changed or row_changed
+        if _admin_can_manage_channel(ch, uid, action='view'):
+            out.append(ch)
+    if changed:
+        write_csv('bot_channels.csv', channels, get_fieldnames('bot_channels.csv', _CHANNEL_DEFAULT_FIELDS))
+    return jsonify({'channels': out})
 
 @app.route('/api/channels/<channel_id>/toggle', methods=['POST'])
 @api_auth
 @permission_required('send_broadcast')
 def api_toggle_channel(channel_id):
     channels = read_csv('bot_channels.csv')
-    fieldnames = get_fieldnames('bot_channels.csv', ['id','chat_id','title','type','is_active','added_at','relay_to_users','relay_to_channels','forward_mode','welcome_text'])
+    fieldnames = get_fieldnames('bot_channels.csv', _CHANNEL_DEFAULT_FIELDS)
+    uid = str(session.get('admin_id', '') or '')
+    found = False
     for c in channels:
         if c.get('id') == channel_id:
+            found = True
+            c, _ = _normalize_channel_row(c)
+            if not _admin_can_manage_channel(c, uid, action='edit'):
+                return jsonify({'error': 'Forbidden'}), 403
             c['is_active'] = 'no' if c.get('is_active') == 'yes' else 'yes'
             break
+    if not found:
+        return jsonify({'error': 'Channel not found'}), 404
     write_csv('bot_channels.csv', channels, fieldnames)
     return jsonify({'success': True})
 
@@ -6136,20 +6422,68 @@ def api_toggle_channel(channel_id):
 @permission_required('send_broadcast')
 def api_channel_settings(channel_id):
     """تحديث إعدادات قناة محددة"""
-    data = request.json
+    data = request.json or {}
     channels = read_csv('bot_channels.csv')
-    fieldnames = get_fieldnames('bot_channels.csv', ['id','chat_id','title','type','is_active','added_at','relay_to_users','relay_to_channels','forward_mode','welcome_text'])
-    editable = ['relay_to_users', 'relay_to_channels', 'forward_mode', 'welcome_text', 'is_active', 'title']
+    fieldnames = get_fieldnames('bot_channels.csv', _CHANNEL_DEFAULT_FIELDS)
+    editable = [
+        'relay_to_users', 'relay_to_channels', 'forward_mode', 'welcome_text',
+        'is_active', 'title', 'category', 'ai_enabled', 'channel_role',
+        'ai_provider', 'brand_voice', 'platform', 'ai_agent_id', 'platform_account_id',
+        'allow_subadmin_publish'
+    ]
+    uid = str(session.get('admin_id', '') or '')
+    updated = False
     for c in channels:
         if c.get('id') == channel_id:
+            c, _ = _normalize_channel_row(c)
+            if not _admin_can_manage_channel(c, uid, action='edit'):
+                return jsonify({'error': 'Forbidden'}), 403
             for k, v in data.items():
                 if k in editable:
                     if k not in fieldnames:
                         fieldnames.append(k)
                     c[k] = v
+                    updated = True
+            c, _ = _normalize_channel_row(c)
             break
+    if not updated:
+        return jsonify({'error': 'No editable fields or channel not found'}), 400
     write_csv('bot_channels.csv', channels, fieldnames)
     log_action('update_channel_settings', f'{channel_id}: {json.dumps(data)[:100]}')
+    return jsonify({'success': True})
+
+
+@app.route('/api/channels/<channel_id>/ownership', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_channel_ownership(channel_id):
+    """Assign owner/managers for a channel (super admin only)."""
+    if not _is_super_admin_session():
+        return jsonify({'error': 'Forbidden — super admin only'}), 403
+    data = request.json or {}
+    channels = read_csv('bot_channels.csv')
+    fieldnames = get_fieldnames('bot_channels.csv', _CHANNEL_DEFAULT_FIELDS)
+    owner_admin_id = str(data.get('owner_admin_id', '') or '').strip()
+    managed_raw = data.get('managed_by_admin_ids', '')
+    if isinstance(managed_raw, list):
+        managed_raw = '|'.join([str(x).strip() for x in managed_raw if str(x).strip()])
+    managed_by_admin_ids = _pipe_ids(managed_raw)
+    allow_subadmin_publish = 'yes' if str(data.get('allow_subadmin_publish', 'no')).lower() in ('1', 'true', 'yes', 'on') else 'no'
+
+    found = False
+    for c in channels:
+        if c.get('id') == channel_id:
+            found = True
+            c, _ = _normalize_channel_row(c)
+            c['owner_admin_id'] = owner_admin_id
+            c['managed_by_admin_ids'] = managed_by_admin_ids
+            c['allow_subadmin_publish'] = allow_subadmin_publish
+            c, _ = _normalize_channel_row(c)
+            break
+    if not found:
+        return jsonify({'error': 'Channel not found'}), 404
+    write_csv('bot_channels.csv', channels, fieldnames)
+    log_action('update_channel_ownership', f'{channel_id}: owner={owner_admin_id} managers={managed_by_admin_ids}')
     return jsonify({'success': True})
 
 @app.route('/api/channels/<channel_id>', methods=['DELETE'])
@@ -6157,8 +6491,21 @@ def api_channel_settings(channel_id):
 @permission_required('send_broadcast')
 def api_delete_channel(channel_id):
     channels = read_csv('bot_channels.csv')
-    fieldnames = get_fieldnames('bot_channels.csv', ['id','chat_id','title','type','is_active','added_at','relay_to_users','relay_to_channels','forward_mode','welcome_text'])
-    channels = [c for c in channels if c.get('id') != channel_id]
+    fieldnames = get_fieldnames('bot_channels.csv', _CHANNEL_DEFAULT_FIELDS)
+    uid = str(session.get('admin_id', '') or '')
+    out = []
+    found = False
+    for c in channels:
+        if c.get('id') != channel_id:
+            out.append(c)
+            continue
+        found = True
+        c, _ = _normalize_channel_row(c)
+        if not _admin_can_manage_channel(c, uid, action='edit'):
+            return jsonify({'error': 'Forbidden'}), 403
+    if not found:
+        return jsonify({'error': 'Channel not found'}), 404
+    channels = out
     write_csv('bot_channels.csv', channels, fieldnames)
     return jsonify({'success': True})
 
@@ -6478,21 +6825,275 @@ def api_ai_posts():
     posts.reverse()
     return jsonify({'posts': posts[:50], 'total': len(posts)})
 
-# ===== API — Channel Categories =====
 
-@app.route('/api/channel-categories')
+def _normalize_ai_agent_row(row):
+    changed = False
+
+    def _setdefault(k, v):
+        nonlocal changed
+        if row.get(k, '') in ('', None):
+            row[k] = v
+            changed = True
+
+    _setdefault('id', f"AIA{secrets.token_hex(3).upper()}")
+    _setdefault('name', f"AI Agent {row.get('id', '')[-4:]}")
+    _setdefault('provider', 'openai')
+    _setdefault('instructions', '')
+    _setdefault('fallback_provider', '')
+    _setdefault('is_active', 'yes')
+    _setdefault('created_at', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+    _setdefault('updated_at', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+    _setdefault('created_by', '')
+
+    if str(row.get('is_active', '')).lower() in ('1', 'true', 'yes', 'on', 'active'):
+        norm = 'yes'
+    else:
+        norm = 'no'
+    if row.get('is_active') != norm:
+        row['is_active'] = norm
+        changed = True
+
+    provider = str(row.get('provider', '') or '').strip().lower()
+    if provider not in ('openai', 'claude', 'kimi', 'auto'):
+        row['provider'] = 'auto'
+        changed = True
+
+    fb = str(row.get('fallback_provider', '') or '').strip().lower()
+    if fb and fb not in ('openai', 'claude', 'kimi'):
+        row['fallback_provider'] = ''
+        changed = True
+
+    return row, changed
+
+
+@app.route('/api/ai-agents')
 @api_auth
-def api_channel_categories():
-    channels = read_csv('bot_channels.csv')
-    cats = {}
-    for ch in channels:
-        cat = ch.get('category', 'غير مصنف')
-        if not cat:
-            cat = 'غير مصنف'
-        if cat not in cats:
-            cats[cat] = 0
-        cats[cat] += 1
-    return jsonify({'categories': cats})
+def api_ai_agents_list():
+    rows = read_csv('ai_agents.csv')
+    changed = False
+    out = []
+    for r in rows:
+        r, ch = _normalize_ai_agent_row(r)
+        changed = changed or ch
+        out.append(r)
+    if changed:
+        write_csv('ai_agents.csv', rows, get_fieldnames('ai_agents.csv', _AI_AGENT_FIELDS))
+    out.sort(key=lambda x: (x.get('is_active') != 'yes', x.get('name', '')))
+    return jsonify({'agents': out})
+
+
+@app.route('/api/ai-agents', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_ai_agents_create():
+    data = request.json or {}
+    rows = read_csv('ai_agents.csv')
+    fieldnames = get_fieldnames('ai_agents.csv', _AI_AGENT_FIELDS)
+    now_s = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    row = {
+        'id': f"AIA{secrets.token_hex(3).upper()}",
+        'name': str(data.get('name', '') or '').strip(),
+        'provider': str(data.get('provider', 'auto') or 'auto').strip().lower(),
+        'instructions': str(data.get('instructions', '') or '').strip(),
+        'fallback_provider': str(data.get('fallback_provider', '') or '').strip().lower(),
+        'is_active': 'yes' if str(data.get('is_active', 'yes')).lower() in ('1', 'true', 'yes', 'on') else 'no',
+        'created_at': now_s,
+        'updated_at': now_s,
+        'created_by': str(session.get('admin_id', '') or ''),
+    }
+    row, _ = _normalize_ai_agent_row(row)
+    if not row.get('name'):
+        return jsonify({'error': 'name required'}), 400
+    rows.append(row)
+    write_csv('ai_agents.csv', rows, fieldnames)
+    log_action('create_ai_agent', row['id'])
+    return jsonify({'success': True, 'agent': row})
+
+
+@app.route('/api/ai-agents/<agent_id>', methods=['PUT', 'DELETE'])
+@api_auth
+@permission_required('send_broadcast')
+def api_ai_agents_edit(agent_id):
+    rows = read_csv('ai_agents.csv')
+    fieldnames = get_fieldnames('ai_agents.csv', _AI_AGENT_FIELDS)
+    if request.method == 'DELETE':
+        new_rows = [r for r in rows if r.get('id') != agent_id]
+        if len(new_rows) == len(rows):
+            return jsonify({'error': 'Agent not found'}), 404
+        write_csv('ai_agents.csv', new_rows, fieldnames)
+        log_action('delete_ai_agent', agent_id)
+        return jsonify({'success': True})
+
+    data = request.json or {}
+    editable = {'name', 'provider', 'instructions', 'fallback_provider', 'is_active'}
+    found = False
+    for r in rows:
+        if r.get('id') == agent_id:
+            found = True
+            for k, v in data.items():
+                if k in editable:
+                    r[k] = v
+            r['updated_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            r, _ = _normalize_ai_agent_row(r)
+            break
+    if not found:
+        return jsonify({'error': 'Agent not found'}), 404
+    write_csv('ai_agents.csv', rows, fieldnames)
+    log_action('update_ai_agent', agent_id)
+    return jsonify({'success': True})
+
+
+@app.route('/api/ai-agents/<agent_id>/test', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_ai_agents_test(agent_id):
+    rows = read_csv('ai_agents.csv')
+    row = next((r for r in rows if r.get('id') == agent_id), None)
+    if not row:
+        return jsonify({'success': False, 'error': 'Agent not found'}), 404
+    row, _ = _normalize_ai_agent_row(row)
+
+    try:
+        from ai_providers import AIManager
+        manager = AIManager()
+        sample = (request.json or {}).get('sample') or 'مرحبا بكم في عرضنا الجديد. سجل الآن واحصل على مكافأة.'
+        instructions = row.get('instructions') or 'أعد صياغة النص بأسلوب تسويقي مختصر.'
+        provider_name = row.get('provider') if row.get('provider') != 'auto' else None
+        result, used_provider = manager.process(sample, instructions, provider_name=provider_name)
+        if not result and row.get('fallback_provider'):
+            result, used_provider = manager.process(sample, instructions, provider_name=row.get('fallback_provider'))
+        return jsonify({
+            'success': bool(result),
+            'provider': used_provider,
+            'result': result or 'فشل الاختبار',
+            'sample': sample,
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/platform-accounts')
+@api_auth
+def api_platform_accounts_list():
+    rows = read_csv('platform_accounts.csv')
+    fieldnames = get_fieldnames('platform_accounts.csv', _PLATFORM_ACCOUNT_FIELDS)
+    changed = False
+    out = []
+    for r in rows:
+        for k in fieldnames:
+            if k not in r:
+                r[k] = ''
+                changed = True
+        if str(r.get('is_active', '')).lower() in ('1', 'true', 'yes', 'on', 'active'):
+            norm = 'yes'
+        else:
+            norm = 'no'
+        if r.get('is_active') != norm:
+            r['is_active'] = norm
+            changed = True
+        out.append(_platform_account_public(r))
+    if changed:
+        write_csv('platform_accounts.csv', rows, fieldnames)
+    return jsonify({'accounts': out})
+
+
+@app.route('/api/platform-accounts', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_platform_accounts_create():
+    data = request.json or {}
+    platform = str(data.get('platform', 'telegram') or 'telegram').strip().lower()
+    if platform not in ('telegram', 'whatsapp', 'webhook'):
+        return jsonify({'error': 'platform must be telegram/whatsapp/webhook'}), 400
+    now_s = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    row = {
+        'id': f"PAC{secrets.token_hex(3).upper()}",
+        'platform': platform,
+        'account_name': str(data.get('account_name', '') or '').strip(),
+        'is_active': 'yes' if str(data.get('is_active', 'yes')).lower() in ('1', 'true', 'yes', 'on') else 'no',
+        'api_base_url': str(data.get('api_base_url', '') or '').strip(),
+        'access_token': str(data.get('access_token', '') or '').strip(),
+        'phone_number_id': str(data.get('phone_number_id', '') or '').strip(),
+        'business_account_id': str(data.get('business_account_id', '') or '').strip(),
+        'created_at': now_s,
+        'updated_at': now_s,
+        'created_by': str(session.get('admin_id', '') or ''),
+        'last_health_check': '',
+        'health_status': 'unknown',
+        'last_error': '',
+    }
+    if not row['account_name']:
+        return jsonify({'error': 'account_name required'}), 400
+    rows = read_csv('platform_accounts.csv')
+    fieldnames = get_fieldnames('platform_accounts.csv', _PLATFORM_ACCOUNT_FIELDS)
+    rows.append(row)
+    write_csv('platform_accounts.csv', rows, fieldnames)
+    log_action('create_platform_account', row['id'])
+    return jsonify({'success': True, 'account': _platform_account_public(row)})
+
+
+@app.route('/api/platform-accounts/<account_id>', methods=['PUT', 'DELETE'])
+@api_auth
+@permission_required('send_broadcast')
+def api_platform_accounts_edit(account_id):
+    rows = read_csv('platform_accounts.csv')
+    fieldnames = get_fieldnames('platform_accounts.csv', _PLATFORM_ACCOUNT_FIELDS)
+
+    if request.method == 'DELETE':
+        new_rows = [r for r in rows if r.get('id') != account_id]
+        if len(new_rows) == len(rows):
+            return jsonify({'error': 'Account not found'}), 404
+        write_csv('platform_accounts.csv', new_rows, fieldnames)
+        log_action('delete_platform_account', account_id)
+        return jsonify({'success': True})
+
+    data = request.json or {}
+    editable = {
+        'platform', 'account_name', 'is_active', 'api_base_url', 'access_token',
+        'phone_number_id', 'business_account_id', 'health_status', 'last_error'
+    }
+    found = False
+    for r in rows:
+        if r.get('id') == account_id:
+            found = True
+            for k, v in data.items():
+                if k in editable:
+                    r[k] = v
+            r['updated_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            if str(r.get('is_active', '')).lower() in ('1', 'true', 'yes', 'on', 'active'):
+                r['is_active'] = 'yes'
+            else:
+                r['is_active'] = 'no'
+            if str(r.get('platform', '')).strip().lower() not in ('telegram', 'whatsapp', 'webhook'):
+                r['platform'] = 'telegram'
+            break
+    if not found:
+        return jsonify({'error': 'Account not found'}), 404
+    write_csv('platform_accounts.csv', rows, fieldnames)
+    log_action('update_platform_account', account_id)
+    return jsonify({'success': True})
+
+
+@app.route('/api/platform-accounts/<account_id>/health', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_platform_accounts_health(account_id):
+    rows = read_csv('platform_accounts.csv')
+    fieldnames = get_fieldnames('platform_accounts.csv', _PLATFORM_ACCOUNT_FIELDS)
+    found = False
+    result = {}
+    for r in rows:
+        if r.get('id') == account_id:
+            found = True
+            result = _platform_health_check(r)
+            r.update(result)
+            r['updated_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            break
+    if not found:
+        return jsonify({'error': 'Account not found'}), 404
+    write_csv('platform_accounts.csv', rows, fieldnames)
+    log_action('platform_account_health', account_id)
+    return jsonify({'success': True, **result})
 
 @app.route('/api/channels/<channel_id>/category', methods=['POST'])
 @api_auth
@@ -6501,11 +7102,19 @@ def api_set_channel_category(channel_id):
     data = request.json
     category = data.get('category', 'غير مصنف')
     channels = read_csv('bot_channels.csv')
-    fieldnames = get_fieldnames('bot_channels.csv', ['id','chat_id','title','type','is_active','added_at','relay_to_users','relay_to_channels','forward_mode','welcome_text','category','ai_enabled'])
+    fieldnames = get_fieldnames('bot_channels.csv', _CHANNEL_DEFAULT_FIELDS)
+    uid = str(session.get('admin_id', '') or '')
+    found = False
     for c in channels:
         if c.get('id') == channel_id:
+            found = True
+            c, _ = _normalize_channel_row(c)
+            if not _admin_can_manage_channel(c, uid, action='edit'):
+                return jsonify({'error': 'Forbidden'}), 403
             c['category'] = category
             break
+    if not found:
+        return jsonify({'error': 'Channel not found'}), 404
     write_csv('bot_channels.csv', channels, fieldnames)
     return jsonify({'success': True})
 
@@ -6514,11 +7123,19 @@ def api_set_channel_category(channel_id):
 @permission_required('send_broadcast')
 def api_toggle_channel_ai(channel_id):
     channels = read_csv('bot_channels.csv')
-    fieldnames = get_fieldnames('bot_channels.csv', ['id','chat_id','title','type','is_active','added_at','relay_to_users','relay_to_channels','forward_mode','welcome_text','category','ai_enabled'])
+    fieldnames = get_fieldnames('bot_channels.csv', _CHANNEL_DEFAULT_FIELDS)
+    uid = str(session.get('admin_id', '') or '')
+    found = False
     for c in channels:
         if c.get('id') == channel_id:
+            found = True
+            c, _ = _normalize_channel_row(c)
+            if not _admin_can_manage_channel(c, uid, action='edit'):
+                return jsonify({'error': 'Forbidden'}), 403
             c['ai_enabled'] = 'no' if c.get('ai_enabled') == 'yes' else 'yes'
             break
+    if not found:
+        return jsonify({'error': 'Channel not found'}), 404
     write_csv('bot_channels.csv', channels, fieldnames)
     return jsonify({'success': True})
 
@@ -6558,6 +7175,208 @@ def api_delete_channel_group(group_id):
     write_csv('channel_groups.csv', groups, fieldnames)
     return jsonify({'success': True})
 
+
+def _normalize_source_channel_row(row, actor_uid=''):
+    changed = False
+
+    def _setdefault(k, v):
+        nonlocal changed
+        if row.get(k, '') in ('', None):
+            row[k] = v
+            changed = True
+
+    _setdefault('id', f"SRC{secrets.token_hex(3).upper()}")
+    _setdefault('chat_id', '')
+    _setdefault('title', '')
+    _setdefault('type', 'channel')
+    _setdefault('is_active', 'yes')
+    _setdefault('added_at', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+    _setdefault('brand_voice', '')
+    _setdefault('target_channel_ids', '')
+    _setdefault('schedule', '')
+    _setdefault('last_scraped_at', '')
+    _setdefault('content_filter', 'all')
+    _setdefault('ai_edit_text', 'yes')
+    _setdefault('ai_edit_media', 'no')
+    _setdefault('ai_provider', '')
+    _setdefault('ai_agent_id', '')
+    _setdefault('owner_admin_id', str(actor_uid or session.get('admin_id', '') or ''))
+    _setdefault('managed_by_admin_ids', str(row.get('owner_admin_id') or actor_uid or session.get('admin_id', '') or ''))
+
+    for k in ('is_active', 'ai_edit_text', 'ai_edit_media'):
+        v = str(row.get(k, '')).lower()
+        norm = 'yes' if v in ('1', 'true', 'yes', 'on', 'active') else 'no'
+        if row.get(k) != norm:
+            row[k] = norm
+            changed = True
+
+    if row.get('content_filter') not in ('all', 'text_only', 'photo_only', 'video_only', 'text_photo', 'text_photo_video'):
+        row['content_filter'] = 'all'
+        changed = True
+
+    managers = _pipe_ids(row.get('managed_by_admin_ids', ''))
+    if managers != str(row.get('managed_by_admin_ids', '')):
+        row['managed_by_admin_ids'] = managers
+        changed = True
+
+    owner = str(row.get('owner_admin_id', '') or '').strip()
+    if owner and owner not in _pipe_to_list(row.get('managed_by_admin_ids', '')):
+        row['managed_by_admin_ids'] = _pipe_ids((row.get('managed_by_admin_ids', '') + '|' + owner).strip('|'))
+        changed = True
+
+    return row, changed
+
+
+def _admin_can_manage_source(row, uid):
+    if _is_super_admin_session():
+        return True
+    owner = str(row.get('owner_admin_id', '') or '').strip()
+    managers = _pipe_to_list(row.get('managed_by_admin_ids', ''))
+    if not owner:
+        return True
+    return str(uid or '') in (owner, *managers)
+
+
+@app.route('/api/source-channels')
+@api_auth
+def api_source_channels_list():
+    rows = read_csv('source_channels.csv')
+    fields = get_fieldnames('source_channels.csv', _SOURCE_CHANNEL_FIELDS)
+    uid = str(session.get('admin_id', '') or '')
+    changed = False
+    out = []
+    for r in rows:
+        r, ch = _normalize_source_channel_row(r)
+        changed = changed or ch
+        if _admin_can_manage_source(r, uid):
+            out.append(r)
+    if changed:
+        write_csv('source_channels.csv', rows, fields)
+    return jsonify({'channels': out})
+
+
+@app.route('/api/source-channels', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_source_channels_create():
+    data = request.json or {}
+    chat_id = str(data.get('chat_id', '') or '').strip()
+    if not chat_id:
+        return jsonify({'error': 'chat_id required'}), 400
+
+    rows = read_csv('source_channels.csv')
+    for r in rows:
+        if str(r.get('chat_id', '') or '') == chat_id:
+            return jsonify({'error': 'Source channel already exists'}), 400
+
+    now_s = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    uid = str(session.get('admin_id', '') or '')
+    targets_raw = data.get('target_channel_ids', '')
+    if isinstance(targets_raw, list):
+        targets_raw = '|'.join([str(x).strip() for x in targets_raw if str(x).strip()])
+    row = {
+        'id': f"SRC{secrets.token_hex(3).upper()}",
+        'chat_id': chat_id,
+        'title': str(data.get('title', '') or '').strip(),
+        'type': str(data.get('type', 'channel') or 'channel').strip(),
+        'is_active': 'yes',
+        'added_at': now_s,
+        'brand_voice': str(data.get('brand_voice', '') or '').strip(),
+        'target_channel_ids': _pipe_ids(targets_raw),
+        'schedule': str(data.get('schedule', '') or '').strip(),
+        'last_scraped_at': '',
+        'content_filter': str(data.get('content_filter', 'all') or 'all').strip(),
+        'ai_edit_text': 'yes' if str(data.get('ai_edit_text', 'yes')).lower() in ('1', 'true', 'yes', 'on') else 'no',
+        'ai_edit_media': 'yes' if str(data.get('ai_edit_media', 'no')).lower() in ('1', 'true', 'yes', 'on') else 'no',
+        'ai_provider': str(data.get('ai_provider', '') or '').strip(),
+        'ai_agent_id': str(data.get('ai_agent_id', '') or '').strip(),
+        'owner_admin_id': uid,
+        'managed_by_admin_ids': uid,
+    }
+    row, _ = _normalize_source_channel_row(row, actor_uid=uid)
+    fields = get_fieldnames('source_channels.csv', _SOURCE_CHANNEL_FIELDS)
+    rows.append(row)
+    write_csv('source_channels.csv', rows, fields)
+    log_action('create_source_channel', row['id'])
+    return jsonify({'success': True, 'channel': row})
+
+
+@app.route('/api/source-channels/<source_id>', methods=['PUT', 'DELETE'])
+@api_auth
+@permission_required('send_broadcast')
+def api_source_channels_edit(source_id):
+    rows = read_csv('source_channels.csv')
+    fields = get_fieldnames('source_channels.csv', _SOURCE_CHANNEL_FIELDS)
+    uid = str(session.get('admin_id', '') or '')
+
+    if request.method == 'DELETE':
+        out = []
+        found = False
+        for r in rows:
+            if r.get('id') != source_id:
+                out.append(r)
+                continue
+            found = True
+            r, _ = _normalize_source_channel_row(r)
+            if not _admin_can_manage_source(r, uid):
+                return jsonify({'error': 'Forbidden'}), 403
+        if not found:
+            return jsonify({'error': 'Source channel not found'}), 404
+        write_csv('source_channels.csv', out, fields)
+        log_action('delete_source_channel', source_id)
+        return jsonify({'success': True})
+
+    data = request.json or {}
+    editable = {
+        'title', 'type', 'is_active', 'brand_voice', 'target_channel_ids', 'schedule',
+        'content_filter', 'ai_edit_text', 'ai_edit_media', 'ai_provider', 'ai_agent_id',
+        'managed_by_admin_ids', 'owner_admin_id'
+    }
+    found = False
+    for r in rows:
+        if r.get('id') == source_id:
+            found = True
+            r, _ = _normalize_source_channel_row(r)
+            if not _admin_can_manage_source(r, uid):
+                return jsonify({'error': 'Forbidden'}), 403
+            if not _is_super_admin_session() and ('owner_admin_id' in data):
+                return jsonify({'error': 'Only super admin can reassign owner'}), 403
+            for k, v in data.items():
+                if k not in editable:
+                    continue
+                if k in ('target_channel_ids', 'managed_by_admin_ids') and isinstance(v, list):
+                    v = '|'.join([str(x).strip() for x in v if str(x).strip()])
+                r[k] = v
+            r, _ = _normalize_source_channel_row(r)
+            break
+    if not found:
+        return jsonify({'error': 'Source channel not found'}), 404
+    write_csv('source_channels.csv', rows, fields)
+    log_action('update_source_channel', source_id)
+    return jsonify({'success': True})
+
+
+@app.route('/api/source-channels/<source_id>/toggle', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_source_channels_toggle(source_id):
+    rows = read_csv('source_channels.csv')
+    fields = get_fieldnames('source_channels.csv', _SOURCE_CHANNEL_FIELDS)
+    uid = str(session.get('admin_id', '') or '')
+    found = False
+    for r in rows:
+        if r.get('id') == source_id:
+            found = True
+            r, _ = _normalize_source_channel_row(r)
+            if not _admin_can_manage_source(r, uid):
+                return jsonify({'error': 'Forbidden'}), 403
+            r['is_active'] = 'no' if r.get('is_active') == 'yes' else 'yes'
+            break
+    if not found:
+        return jsonify({'error': 'Source channel not found'}), 404
+    write_csv('source_channels.csv', rows, fields)
+    return jsonify({'success': True})
+
 # ===== API — Daily Report =====
 
 @app.route('/api/channels/daily-report')
@@ -6593,21 +7412,35 @@ def api_post_to_channel(channel_id):
     ch = next((c for c in channels if c.get('id') == channel_id), None)
     if not ch:
         return jsonify({'error': 'Channel not found'}), 404
+    ch, _ = _normalize_channel_row(ch)
+    uid = str(session.get('admin_id', '') or '')
+    if not _admin_can_manage_channel(ch, uid, action='publish'):
+        return jsonify({'error': 'Forbidden'}), 403
     data = request.json
     message_text = data.get('message', '')
     if not message_text:
         return jsonify({'error': 'No message'}), 400
     # حفظ في broadcast_queue.csv للبوت يرسلها
+    platform = str(ch.get('platform', 'telegram') or 'telegram').lower()
     entry = {
         'id': f"CHPOST{secrets.token_hex(3).upper()}",
         'message': message_text,
-        'type': 'text',
+        'type': 'channel',
+        'platform': platform,
         'target_chat_id': ch.get('chat_id', ''),
+        'platform_account_id': ch.get('platform_account_id', ''),
+        'target_channel_id': ch.get('id', ''),
         'created_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
         'created_by': session.get('admin_id', ''),
         'status': 'pending'
     }
-    fieldnames = ['id', 'message', 'type', 'target_chat_id', 'created_at', 'created_by', 'status']
+    fieldnames = get_fieldnames('broadcast_queue.csv', [
+        'id', 'message', 'type', 'platform', 'target_chat_id',
+        'platform_account_id', 'target_channel_id',
+        'created_at', 'created_by', 'status',
+        'target', 'recipient', 'priority', 'country', 'media_urls',
+        'target_user', 'target_name', 'scheduled_at'
+    ])
     append_csv('broadcast_queue.csv', entry, fieldnames)
     log_action('post_to_channel', f'{channel_id}: {message_text[:50]}')
     return jsonify({'success': True, 'message': 'تم إضافة الرسالة لقائمة الإرسال'})
@@ -6617,13 +7450,21 @@ def api_post_to_channel(channel_id):
 @permission_required('send_broadcast')
 def api_add_channel_manual():
     """إضافة قناة يدوياً — مع تحديد الدور"""
-    data = request.json
+    data = request.json or {}
     chat_id = data.get('chat_id', '').strip()
     title = data.get('title', '').strip()
     ch_type = data.get('type', 'channel')
+    platform = str(data.get('platform', 'telegram') or 'telegram').strip().lower()
+    owner_admin_id = str(data.get('owner_admin_id', '') or session.get('admin_id', '') or '').strip()
+    managed_ids_raw = data.get('managed_by_admin_ids', '')
+    if isinstance(managed_ids_raw, list):
+        managed_ids_raw = '|'.join([str(x).strip() for x in managed_ids_raw if str(x).strip()])
+    managed_by_admin_ids = _pipe_ids(managed_ids_raw or owner_admin_id)
 
     if not chat_id:
         return jsonify({'error': 'chat_id required'}), 400
+    if platform not in ('telegram', 'whatsapp', 'webhook'):
+        return jsonify({'error': 'platform must be telegram/whatsapp/webhook'}), 400
 
     # فحص عدم التكرار
     channels = read_csv('bot_channels.csv')
@@ -6632,12 +7473,13 @@ def api_add_channel_manual():
             return jsonify({'error': 'Channel already exists'}), 400
 
     ch_id = f"CH{secrets.token_hex(3).upper()}"
-    fieldnames = get_fieldnames('bot_channels.csv', ['id','chat_id','title','type','is_active','added_at','relay_to_users','relay_to_channels','forward_mode','welcome_text','category','ai_enabled','channel_role','ai_provider','brand_voice'])
+    fieldnames = get_fieldnames('bot_channels.csv', _CHANNEL_DEFAULT_FIELDS)
     new_channel = {
         'id': ch_id,
         'chat_id': str(chat_id),
         'title': title,
         'type': ch_type,
+        'platform': platform,
         'is_active': 'yes',
         'added_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
         'relay_to_users': 'no',
@@ -6648,26 +7490,17 @@ def api_add_channel_manual():
         'ai_enabled': 'no',
         'channel_role': data.get('channel_role', 'both'),  # source, publish, both
         'ai_provider': data.get('ai_provider', ''),
-        'brand_voice': data.get('brand_voice', '')
+        'brand_voice': data.get('brand_voice', ''),
+        'owner_admin_id': owner_admin_id,
+        'managed_by_admin_ids': managed_by_admin_ids,
+        'allow_subadmin_publish': 'yes' if str(data.get('allow_subadmin_publish', 'no')).lower() in ('1', 'true', 'yes', 'on') else 'no',
+        'ai_agent_id': str(data.get('ai_agent_id', '') or '').strip(),
+        'platform_account_id': str(data.get('platform_account_id', '') or '').strip(),
     }
+    new_channel, _ = _normalize_channel_row(new_channel, actor_uid=owner_admin_id)
     append_csv('bot_channels.csv', new_channel, fieldnames)
-    log_action('add_channel_manual', f'{ch_id}: {title} ({chat_id}) role={new_channel["channel_role"]}')
+    log_action('add_channel_manual', f'{ch_id}: {title} ({chat_id}) platform={platform} role={new_channel["channel_role"]}')
     return jsonify({'success': True, 'id': ch_id})
-
-@app.route('/api/channels/<channel_id>/category', methods=['POST'])
-@api_auth
-@permission_required('send_broadcast')
-def api_set_channel_category_api(channel_id):
-    data = request.json
-    category = data.get('category', '')
-    channels = read_csv('bot_channels.csv')
-    fieldnames = get_fieldnames('bot_channels.csv', ['id','chat_id','title','type','is_active','added_at','relay_to_users','relay_to_channels','forward_mode','welcome_text','category','ai_enabled'])
-    for c in channels:
-        if c.get('id') == channel_id:
-            c['category'] = category
-            break
-    write_csv('bot_channels.csv', channels, fieldnames)
-    return jsonify({'success': True})
 
 @app.route('/api/channel-categories')
 @api_auth
@@ -7181,6 +8014,11 @@ def api_broadcast():
     target_user = request.json.get('target_user', '') if request.json else ''
     target_name = request.json.get('target_name', '') if request.json else ''
     search_query = request.json.get('search_query', '') if request.json else ''
+    platform_account_id = request.json.get('platform_account_id', '') if request.json else ''
+
+    valid_targets = {'telegram', 'web', 'both', 'whatsapp', 'all'}
+    if target not in valid_targets:
+        return jsonify({'success': False, 'error': 'target غير صالح'}), 400
 
     # If single + search_query provided, look up user by name/phone/telegram_id/customer_id
     if recipient == 'single' and not target_user and search_query:
@@ -7205,7 +8043,7 @@ def api_broadcast():
     primary_media = abs_media_urls[0] if abs_media_urls else ''
 
     # ── Web notification (instant via SSE) ──
-    if target in ('web', 'both'):
+    if target in ('web', 'both', 'all'):
         notif_title = '📢 رسالة جديدة'
         if priority == 'urgent':
             notif_title = '🚨 رسالة عاجلة'
@@ -7220,8 +8058,15 @@ def api_broadcast():
         )
 
     # ── Telegram broadcast (queued for bot) ──
-    if target in ('telegram', 'both'):
-        broadcast_entry = {
+    fieldnames = get_fieldnames('broadcast_queue.csv', [
+        'id', 'message', 'target', 'recipient', 'priority', 'country', 'media_urls',
+        'target_user', 'target_name', 'created_at', 'created_by', 'status',
+        'platform', 'platform_account_id', 'type', 'target_chat_id',
+        'target_channel_id', 'scheduled_at'
+    ])
+
+    def _queue_entry(platform_name):
+        entry = {
             'id': f"BCAST{str(int(datetime.now().timestamp()))[-6:]}{secrets.token_hex(2)}",
             'message': message,
             'target': target,
@@ -7233,14 +8078,29 @@ def api_broadcast():
             'target_name': target_name,
             'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             'created_by': session.get('admin_id', ''),
-            'status': 'pending'
+            'status': 'pending',
+            'platform': platform_name,
+            'platform_account_id': platform_account_id,
+            'type': 'broadcast',
+            'target_chat_id': '',
+            'target_channel_id': '',
+            'scheduled_at': '',
         }
-        fieldnames = get_fieldnames('broadcast_queue.csv', ['id', 'message', 'target', 'recipient', 'priority', 'country',
-                      'media_urls', 'target_user', 'target_name', 'created_at', 'created_by', 'status'])
-        append_csv('broadcast_queue.csv', broadcast_entry, fieldnames)
+        append_csv('broadcast_queue.csv', entry, fieldnames)
+
+    if target in ('telegram', 'both', 'all'):
+        _queue_entry('telegram')
+    if target in ('whatsapp', 'all'):
+        _queue_entry('whatsapp')
 
     log_action('broadcast', f'recipient={recipient} target={target} priority={priority} country={country} msg={message[:50]}')
-    target_label = 'تيليغرام والموقع' if target == 'both' else ('تيليغرام' if target == 'telegram' else 'الموقع')
+    target_label = {
+        'both': 'تيليغرام والموقع',
+        'telegram': 'تيليغرام',
+        'web': 'الموقع',
+        'whatsapp': 'واتساب',
+        'all': 'كل المنصات',
+    }.get(target, target)
     recipient_label = 'فردي' if recipient == 'single' else ('دولة محددة' if country != 'all' else 'جماعي')
     return jsonify({'success': True, 'message': f'تم إرسال البث {recipient_label} عبر {target_label}'})
 
