@@ -1034,7 +1034,7 @@ def _decrease_agent_daily_load_locked(conn, agent_id, amount):
         (float(amount or 0), str(agent_id)))
 
 
-def _validate_agent_policy_locked(conn, agent_row, req_type, amount):
+def _validate_agent_policy_locked(conn, agent_row, req_type, amount, req_id=''):
     if not agent_row:
         return 'الوكيل غير موجود'
     if int(_rowv(agent_row, 'is_active', 0) or 0) != 1:
@@ -1050,6 +1050,17 @@ def _validate_agent_policy_locked(conn, agent_row, req_type, amount):
         return 'المبلغ يتجاوز الحد المسموح للوكيل'
     max_daily_amount = float(_rowv(agent_row, 'max_amount_daily', 0) or 0)
     cur_daily_amount = float(_rowv(agent_row, 'current_daily_amount', 0) or 0)
+    if req_id:
+        held = conn.execute(
+            "SELECT amount FROM agent_transactions "
+            "WHERE agent_id=? AND match_request_id=? AND status='pending' "
+            "ORDER BY created_at DESC LIMIT 1",
+            (str(_rowv(agent_row, 'id', '')), str(req_id))).fetchone()
+        if held:
+            try:
+                cur_daily_amount = max(0.0, cur_daily_amount - float(held['amount'] or 0))
+            except Exception:
+                pass
     if max_daily_amount > 0 and (cur_daily_amount + float(amount or 0)) > max_daily_amount:
         return 'تجاوز الوكيل الحد اليومي للمبالغ'
     max_open_disputes = int(_rowv(agent_row, 'max_open_disputes', 5) or 0)
@@ -2967,6 +2978,7 @@ def admin_set_match_request_status(req_id, new_status, actor=''):
                         conn, agent_row,
                         str(_rowv(req, 'type', '')),
                         float(_rowv(req, 'amount', 0) or 0),
+                        str(req_id),
                     )
                     if policy_err:
                         conn.rollback()
@@ -3174,6 +3186,7 @@ def claim_request(req_id, claimer_type, claimer_id):
                 conn, agent_row,
                 str(_rowv(req, 'type', '')),
                 float(_rowv(req, 'amount', 0) or 0),
+                str(req_id),
             )
             if policy_err:
                 conn.rollback()
