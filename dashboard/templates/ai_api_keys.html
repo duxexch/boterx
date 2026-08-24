@@ -1,0 +1,381 @@
+{% extends "base.html" %}
+{% block title %}{% if lang == 'ar' %}مفاتيح AI API{% else %}AI API Keys{% endif %}{% endblock %}
+{% block page_title %}🔐 {% if lang == 'ar' %}مفاتيح AI API{% else %}AI API Keys{% endif %}{% endblock %}
+
+{% block content %}
+<div x-data="aiApiKeysApp()" x-init="init()" class="space-y-6">
+
+    <!-- Header + Add Button -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+            <h2 class="text-xl font-bold">{% if lang == 'ar' %}مفاتيح AI API{% else %}AI API Keys{% endif %}</h2>
+            <p class="text-sm text-slate-400 mt-1">{% if lang == 'ar' %}إدارة مفاتيح API للمزوّدين المختلفين (OpenAI، Anthropic، Google، إلخ){% else %}Manage API keys for different providers (OpenAI, Anthropic, Google, etc.){% endif %}</p>
+        </div>
+        <button @click="openAddModal()" class="btn btn-primary btn-sm">
+            <i class="fas fa-plus"></i> {% if lang == 'ar' %}إضافة مفتاح{% else %}Add Key{% endif %}
+        </button>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-3">
+            <p class="text-xs text-slate-400">{% if lang == 'ar' %}إجمالي المفاتيح{% else %}Total Keys{% endif %}</p>
+            <p class="text-2xl font-bold text-amber-400" x-text="keys.length"></p>
+        </div>
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-3">
+            <p class="text-xs text-slate-400">{% if lang == 'ar' %}مفعّلة{% else %}Active{% endif %}</p>
+            <p class="text-2xl font-bold text-green-400" x-text="keys.filter(k => k.is_active).length"></p>
+        </div>
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-3">
+            <p class="text-xs text-slate-400">{% if lang == 'ar' %}مزوّدون{% else %}Providers{% endif %}</p>
+            <p class="text-2xl font-bold text-blue-400" x-text="uniqueProviders.length"></p>
+        </div>
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-3">
+            <p class="text-xs text-slate-400">{% if lang == 'ar' %}طلبات اليوم{% else %}Requests Today{% endif %}</p>
+            <p class="text-2xl font-bold text-purple-400" x-text="totalRequestsToday"></p>
+        </div>
+    </div>
+
+    <!-- Keys Table -->
+    <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead class="bg-slate-900/50 text-slate-400 text-xs">
+                    <tr>
+                        <th class="text-right p-3">{% if lang == 'ar' %}الاسم{% else %}Name{% endif %}</th>
+                        <th class="text-right p-3">{% if lang == 'ar' %}المزوّد{% else %}Provider{% endif %}</th>
+                        <th class="text-right p-3">{% if lang == 'ar' %}النموذج الافتراضي{% else %}Default Model{% endif %}</th>
+                        <th class="text-right p-3">{% if lang == 'ar' %}الحالة{% else %}Status{% endif %}</th>
+                        <th class="text-right p-3">{% if lang == 'ar' %}الأولوية{% else %}Priority{% endif %}</th>
+                        <th class="text-right p-3">{% if lang == 'ar' %}طلبات اليوم{% else %}Req. Today{% endif %}</th>
+                        <th class="text-right p-3">{% if lang == 'ar' %}توكنز اليوم{% else %}Tokens Today{% endif %}</th>
+                        <th class="text-right p-3">{% if lang == 'ar' %}التكلفة (USD){% else %}Est. Cost{% endif %}</th>
+                        <th class="text-right p-3">{% if lang == 'ar' %}الإجراءات{% else %}Actions{% endif %}</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-700">
+                    <template x-for="key in keys" :key="key.id">
+                        <tr class="hover:bg-slate-700/50">
+                            <td class="p-3 font-medium" x-text="key.key_name"></td>
+                            <td class="p-3">
+                                <span class="px-2 py-0.5 rounded text-xs" :class="providerClass(key.provider)" x-text="providerLabel(key.provider)"></span>
+                            </td>
+                            <td class="p-3 text-slate-300 font-mono text-xs" x-text="key.default_model || '—'"></td>
+                            <td class="p-3">
+                                <span class="px-2 py-0.5 rounded text-xs" :class="key.is_active ? 'bg-green-500/20 text-green-400' : 'bg-slate-600/20 text-slate-400'"
+                                    x-text="key.is_active ? '{{ 'Active' if lang == 'en' else 'مفعّل' }}' : '{{ 'Inactive' if lang == 'en' else 'متوقف' }}'"></span>
+                            </td>
+                            <td class="p-3 text-center" x-text="key.priority"></td>
+                            <td class="p-3 text-center text-blue-400" x-text="key.requests_today || 0"></td>
+                            <td class="p-3 text-center text-purple-400" x-text="key.tokens_today || 0"></td>
+                            <td class="p-3 text-center text-amber-400" x-text="(key.cost_estimate_usd || 0).toFixed(4)"></td>
+                            <td class="p-3">
+                                <div class="flex items-center gap-1">
+                                    <button @click="testKey(key)" class="btn btn-primary btn-xs" x-text="'{{ 'Test' if lang == 'en' else 'اختبار' }}'"></button>
+                                    <button @click="openEditModal(key)" class="btn btn-secondary btn-xs" x-text="'{{ 'Edit' if lang == 'en' else 'تعديل' }}'"></button>
+                                    <button @click="confirmDelete(key)" class="btn btn-danger btn-xs" x-text="'{{ 'Delete' if lang == 'en' else 'حذف' }}'"></button>
+                                </div>
+                            </td>
+                        </tr>
+                    </template>
+                    <tr x-show="keys.length === 0">
+                        <td colspan="9" class="text-center py-8 text-slate-400">
+                            <i class="fas fa-key text-3xl mb-2 block"></i>
+                            {% if lang == 'ar' %}لا توجد مفاتيح API — أضف أول مفتاح{% else %}No API keys — add your first key{% endif %}
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Provider Usage Summary -->
+    <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
+        <h3 class="font-semibold mb-3">{% if lang == 'ar' %}ملخص الاستخدام حسب المزوّد{% else %}Usage Summary by Provider{% endif %}</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <template x-for="(stat, provider) in providerStats" :key="provider">
+                <div class="bg-slate-900/50 rounded-lg p-3 border border-slate-700">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="font-bold" x-text="providerLabel(provider)"></span>
+                        <span class="px-2 py-0.5 rounded text-xs" :class="stat.active_keys > 0 ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'"
+                            x-text="stat.active_keys + ' / ' + stat.total_keys + ' {{ 'keys' if lang == 'en' else 'مفتاح' }}'"></span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 text-xs">
+                        <div class="bg-slate-800 rounded p-2"><div class="text-slate-500">{% if lang == 'ar' %}طلبات{% else %}Requests{% endif %}</div><div class="font-bold text-blue-400" x-text="stat.requests_today"></div></div>
+                        <div class="bg-slate-800 rounded p-2"><div class="text-slate-500">{% if lang == 'ar' %}توكنز{% else %}Tokens{% endif %}</div><div class="font-bold text-purple-400" x-text="stat.tokens_today"></div></div>
+                        <div class="bg-slate-800 rounded p-2"><div class="text-slate-500">{% if lang == 'ar' %}التكلفة{% else %}Est. Cost{% endif %}</div><div class="font-bold text-amber-400" x-text="stat.cost_usd.toFixed(4) + ' USD'"></div></div>
+                        <div class="bg-slate-800 rounded p-2"><div class="text-slate-500">{% if lang == 'ar' %}نماذج{% else %}Models{% endif %}</div><div class="font-bold" x-text="stat.models_count"></div></div>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </div>
+
+    <!-- Add/Edit Modal -->
+    <div x-show="showModal" x-transition class="modal-overlay" @click.self="showModal = false" style="display:none">
+        <div class="modal max-w-2xl">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="font-bold text-lg" x-text="editingKey ? ('{{ 'Edit API Key' if lang == 'en' else 'تعديل مفتاح API' }}') : ('{{ 'Add API Key' if lang == 'en' else 'إضافة مفتاح API' }}')"></h3>
+                <button @click="showModal = false" class="text-slate-400 hover:text-white"><i class="fas fa-times"></i></button>
+            </div>
+            <form @submit.prevent="saveKey()" class="space-y-4">
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">{% if lang == 'ar' %}اسم المفتاح <span class="text-red-400">*</span>{% else %}Key Name <span class="text-red-400">*</span>{% endif %}</label>
+                    <input x-model="form.key_name" required type="text" class="input w-full" :placeholder="'{{ 'e.g., OpenAI Main' if lang == 'en' else 'مثال: OpenAI Main' }}'">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-sm text-slate-400 mb-1">{% if lang == 'ar' %}المزوّد <span class="text-red-400">*</span>{% else %}Provider <span class="text-red-400">*</span>{% endif %}</label>
+                        <select x-model="form.provider" class="input w-full" @change="onProviderChange()">
+                            <option value="openai">{% if lang == 'ar' %}OpenAI{% else %}OpenAI{% endif %}</option>
+                            <option value="anthropic">{% if lang == 'ar' %}Anthropic (Claude){% else %}Anthropic (Claude){% endif %}</option>
+                            <option value="google">{% if lang == 'ar' %}Google (Gemini){% else %}Google (Gemini){% endif %}</option>
+                            <option value="azure">{% if lang == 'ar' %}Azure OpenAI{% else %}Azure OpenAI{% endif %}</option>
+                            <option value="custom">{% if lang == 'ar' %}مخصص{% else %}Custom{% endif %}</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm text-slate-400 mb-1">{% if lang == 'ar' %}الأولوية <span class="text-red-400">*</span>{% else %}Priority <span class="text-red-400">*</span>{% endif %}</label>
+                        <input type="number" x-model.number="form.priority" min="1" max="100" class="input w-full" value="10">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">{% if lang == 'ar' %}مفتاح API <span class="text-red-400">*</span>{% else %}API Key <span class="text-red-400">*</span>{% endif %}</label>
+                    <input x-model="form.api_key" required type="password" class="input w-full font-mono" :placeholder="'sk-... or ' + ('provider-specific key' if lang == 'en' else 'مفتاح المزوّد')">
+                </div>
+                <div x-show="form.provider === 'azure'">
+                    <label class="block text-sm text-slate-400 mb-1">{% if lang == 'ar' %}Base URL / Endpoint <span class="text-red-400">*</span>{% else %}Base URL / Endpoint <span class="text-red-400">*</span>{% endif %}</label>
+                    <input x-model="form.base_url" type="text" class="input w-full" :placeholder="'https://your-resource.openai.azure.com/'">
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">{% if lang == 'ar' %}النموذج الافتراضي <span class="text-red-400">*</span>{% else %}Default Model <span class="text-red-400">*</span>{% endif %}</label>
+                    <div class="flex gap-2">
+                        <input x-model="form.default_model" required type="text" class="input w-full" :placeholder="'{{ 'e.g., gpt-4o' if lang == 'en' else 'مثال: gpt-4o' }}'">
+                        <button type="button" @click="fetchModels()" class="btn btn-secondary btn-sm" :disabled="fetchingModels" :x-text="fetchingModels ? ('{{ 'Fetching...' if lang == 'en' else 'جارٍ الجلب...' }}') : ('{{ 'Fetch Models' if lang == 'en' else 'جلب النماذج' }}')"></button>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-1">{% if lang == 'ar' %}اضغط "جلب النماذج" لملء القائمة من المزوّد{% else %}Click "Fetch Models" to populate from provider{% endif %}</p>
+                </div>
+                <div class="grid grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-sm text-slate-400 mb-1">{% if lang == 'ar' %}Temperature{% endif %}</label>
+                        <input type="number" x-model.number="form.temperature" step="0.1" min="0" max="2" class="input w-full" value="0.7">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-slate-400 mb-1">{% if lang == 'ar' %}Max Tokens{% endif %}</label>
+                        <input type="number" x-model.number="form.max_tokens" min="1" max="128000" class="input w-full" value="4096">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-slate-400 mb-1">{% if lang == 'ar' %}المهلة (ثوانٍ){% else %}Timeout (s){% endif %}</label>
+                        <input type="number" x-model.number="form.timeout_seconds" min="5" max="300" class="input w-full" value="60">
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" x-model="form.is_active" class="sr-only peer">
+                        <div class="w-10 h-5 bg-slate-600 peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-5 rtl:peer-checked:after:-translate-x-5 peer-checked:bg-green-500 after:content-[''] after:absolute after:top-0.5 after:start-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all"></div>
+                        <span class="mr-2 text-sm text-slate-300">{% if lang == 'ar' %}مفعّل{% else %}Active{% endif %}</span>
+                    </label>
+                </div>
+                <div class="flex gap-3 pt-2">
+                    <button type="submit" class="flex-1 btn btn-primary" x-text="editingKey ? ('{{ 'Save Changes' if lang == 'en' else 'حفظ التعديلات' }}') : ('{{ 'Add Key' if lang == 'en' else 'إضافة مفتاح' }}')"></button>
+                    <button type="button" @click="showModal = false" class="flex-1 btn btn-secondary" x-text="'{{ 'Cancel' if lang == 'en' else 'إلغاء' }}'"></button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div x-show="showDeleteModal" x-transition class="modal-overlay" @click.self="showDeleteModal = false" style="display:none">
+        <div class="modal" style="max-width:400px">
+            <div class="p-6 text-center">
+                <div class="w-14 h-14 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4">
+                    <i class="fas fa-exclamation-triangle text-red-400 text-2xl"></i>
+                </div>
+                <h3 class="text-lg font-bold mb-2">{% if lang == 'ar' %}تأكيد الحذف{% else %}Confirm Delete{% endif %}</h3>
+                <p class="text-sm text-slate-400">{% if lang == 'ar' %}هل أنت متأكد من حذف المفتاح "<span class="text-white font-semibold" x-text="deleteTarget?.key_name"></span>"؟{% else %}Are you sure you want to delete key "<span class="text-white font-semibold" x-text="deleteTarget?.key_name"></span>"?{% endif %}</p>
+                <p class="text-xs text-red-400 mt-2">{% if lang == 'ar' %}لا يمكن التراجع عن هذا الإجراء.{% else %}This action cannot be undone.{% endif %}</p>
+                <div class="flex gap-3 mt-6">
+                    <button @click="deleteKey()" class="flex-1 btn btn-danger" x-text="'{{ 'Delete' if lang == 'en' else 'حذف' }}'"></button>
+                    <button @click="showDeleteModal = false" class="flex-1 btn btn-secondary" x-text="'{{ 'Cancel' if lang == 'en' else 'إلغاء' }}'"></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Test Connection Modal -->
+    <div x-show="showTestModal" x-transition class="modal-overlay" @click.self="showTestModal = false" style="display:none">
+        <div class="modal" style="max-width:500px">
+            <h3 class="font-bold text-lg mb-4">{% if lang == 'ar' %}اختبار الاتصال{% else %}Test Connection{% endif %}</h3>
+            <div x-show="!testResult">
+                <p class="text-slate-400 mb-4">{% if lang == 'ar' %}جاري اختبار الاتصال بمفتاح "<span class="font-semibold" x-text="testTarget?.key_name"></span>"...{% else %}Testing connection for key "<span class="font-semibold" x-text="testTarget?.key_name"></span>"...{% endif %}</p>
+                <div class="text-center py-4"><i class="fas fa-spinner fa-spin text-2xl text-blue-400"></i></div>
+            </div>
+            <div x-show="testResult" class="text-center">
+                <div class="text-4xl mb-2" x-text="testResult.success ? '✅' : '❌'"></div>
+                <h4 class="font-bold" x-text="testResult.success ? ('{{ 'Connection Successful' if lang == 'en' else 'الاتصال ناجح' }}') : ('{{ 'Connection Failed' if lang == 'en' else 'فشل الاتصال' }}')"></h4>
+                <p class="text-sm text-slate-400 mt-2" x-text="testResult.message"></p>
+                <template x-if="testResult.models && testResult.models.length">
+                    <div class="mt-3 p-3 bg-slate-900/50 rounded text-right text-sm">
+                        <div class="font-bold mb-1">{% if lang == 'ar' %}النماذج المتاحة:{% else %}Available Models:{% endif %}</div>
+                        <div class="flex flex-wrap gap-1" x-text="testResult.models.join(', ')"></div>
+                    </div>
+                </template>
+                <button @click="showTestModal = false" class="mt-4 btn btn-primary" x-text="'{{ 'Close' if lang == 'en' else 'إغلاق' }}'"></button>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function aiApiKeysApp() {
+    return {
+        keys: [],
+        showModal: false,
+        showDeleteModal: false,
+        showTestModal: false,
+        editingKey: null,
+        deleteTarget: null,
+        testTarget: null,
+        testResult: null,
+        fetchingModels: false,
+        form: {
+            key_name: '', provider: 'openai', api_key: '', base_url: '',
+            default_model: '', priority: 10, temperature: 0.7,
+            max_tokens: 4096, timeout_seconds: 60, is_active: true
+        },
+
+        async init() {
+            await this.loadKeys();
+        },
+
+        get uniqueProviders() {
+            return [...new Set(this.keys.map(k => k.provider))];
+        },
+
+        get totalRequestsToday() {
+            return this.keys.reduce((sum, k) => sum + (k.requests_today || 0), 0);
+        },
+
+        get providerStats() {
+            const stats = {};
+            for (const k of this.keys) {
+                if (!stats[k.provider]) stats[k.provider] = { total_keys: 0, active_keys: 0, requests_today: 0, tokens_today: 0, cost_usd: 0, models_count: 0 };
+                stats[k.provider].total_keys++;
+                if (k.is_active) stats[k.provider].active_keys++;
+                stats[k.provider].requests_today += k.requests_today || 0;
+                stats[k.provider].tokens_today += k.tokens_today || 0;
+                stats[k.provider].cost_usd += k.cost_estimate_usd || 0;
+                stats[k.provider].models_count += k.models_list ? k.models_list.length : 0;
+            }
+            return stats;
+        },
+
+        providerLabel(p) {
+            const labels = { openai: 'OpenAI', anthropic: 'Anthropic', google: 'Google', azure: 'Azure', custom: 'Custom' };
+            return labels[p] || p;
+        },
+        providerClass(p) {
+            const cls = { openai: 'bg-green-500/20 text-green-400', anthropic: 'bg-purple-500/20 text-purple-400', google: 'bg-blue-500/20 text-blue-400', azure: 'bg-indigo-500/20 text-indigo-400', custom: 'bg-slate-500/20 text-slate-400' };
+            return cls[p] || 'bg-slate-500/20 text-slate-400';
+        },
+
+        async loadKeys() {
+            try {
+                const res = await api('/api/ai/keys');
+                this.keys = res.keys || [];
+            } catch (e) {
+                toast('{{ 'Failed to load keys' if lang == 'en' else 'فشل تحميل المفاتيح' }}', 'error');
+            }
+        },
+
+        openAddModal() {
+            this.editingKey = null;
+            this.form = { key_name: '', provider: 'openai', api_key: '', base_url: '', default_model: '', priority: 10, temperature: 0.7, max_tokens: 4096, timeout_seconds: 60, is_active: true };
+            this.showModal = true;
+        },
+
+        openEditModal(key) {
+            this.editingKey = key;
+            this.form = { ...key, api_key: '' }; // Don't pre-fill key for security
+            this.showModal = true;
+        },
+
+        async onProviderChange() {
+            if (this.form.provider === 'openai') { this.form.default_model = 'gpt-4o'; }
+            else if (this.form.provider === 'anthropic') { this.form.default_model = 'claude-3-5-sonnet-20241022'; }
+            else if (this.form.provider === 'google') { this.form.default_model = 'gemini-1.5-pro'; }
+            else if (this.form.provider === 'azure') { this.form.default_model = 'gpt-4o'; }
+            else { this.form.default_model = ''; }
+        },
+
+        async fetchModels() {
+            if (!this.form.api_key && !this.editingKey) return toast('{{ 'Enter API key first' if lang == 'en' else 'أدخل مفتاح API أولاً' }}', 'warning');
+            this.fetchingModels = true;
+            try {
+                const payload = { provider: this.form.provider, api_key: this.form.api_key || this.editingKey?.api_key, base_url: this.form.base_url };
+                const res = await api('/api/ai/fetch-models', { method: 'POST', body: JSON.stringify(payload) });
+                if (res.models && res.models.length) {
+                    this.form.default_model = res.models[0];
+                    toast('{{ 'Models fetched' if lang == 'en' else 'تم جلب النماذج' }}: ' + res.models.length, 'success');
+                }
+            } catch (e) {
+                toast('{{ 'Failed to fetch models' if lang == 'en' else 'فشل جلب النماذج' }}', 'error');
+            } finally {
+                this.fetchingModels = false;
+            }
+        },
+
+        async saveKey() {
+            if (!this.form.key_name || !this.form.api_key) return toast('{{ 'Fill required fields' if lang == 'en' else 'املأ الحقول المطلوبة' }}', 'warning');
+            const payload = { ...this.form };
+            if (this.editingKey && !this.form.api_key) {
+                delete payload.api_key; // Keep existing key
+            }
+            try {
+                const url = this.editingKey ? `/api/ai/keys/${this.editingKey.id}` : '/api/ai/keys';
+                const method = this.editingKey ? 'PUT' : 'POST';
+                await api(url, { method, body: JSON.stringify(payload) });
+                toast(this.editingKey ? ('{{ 'Key updated' if lang == 'en' else 'تم تحديث المفتاح' }}') : ('{{ 'Key added' if lang == 'en' else 'تمت إضافة المفتاح' }}'), 'success');
+                this.showModal = false;
+                await this.loadKeys();
+            } catch (e) {
+                toast('{{ 'Failed to save key' if lang == 'en' else 'فشل حفظ المفتاح' }}', 'error');
+            }
+        },
+
+        confirmDelete(key) {
+            this.deleteTarget = key;
+            this.showDeleteModal = true;
+        },
+
+        async deleteKey() {
+            if (!this.deleteTarget) return;
+            try {
+                await api(`/api/ai/keys/${this.deleteTarget.id}`, { method: 'DELETE' });
+                toast('{{ 'Key deleted' if lang == 'en' else 'تم حذف المفتاح' }}', 'success');
+                this.showDeleteModal = false;
+                this.deleteTarget = null;
+                await this.loadKeys();
+            } catch (e) {
+                toast('{{ 'Failed to delete key' if lang == 'en' else 'فشل حذف المفتاح' }}', 'error');
+            }
+        },
+
+        async testKey(key) {
+            this.testTarget = key;
+            this.testResult = null;
+            this.showTestModal = true;
+            try {
+                const res = await api('/api/ai/test-key', { method: 'POST', body: JSON.stringify({ key_id: key.id }) });
+                this.testResult = res;
+            } catch (e) {
+                this.testResult = { success: false, message: '{{ 'Test failed' if lang == 'en' else 'فشل الاختبار' }}' };
+            }
+        }
+    };
+}
+</script>
+{% endblock %}

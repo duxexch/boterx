@@ -1,0 +1,391 @@
+<!doctype html>
+{% set lang = request.args.get('lang', 'ar') %}
+{% set t = 'en' if lang == 'en' else 'ar' %}
+<html lang="{{ t }}" dir="{{ 'ltr' if t == 'en' else 'rtl' }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <title>{% if t == 'en' %}VEX Admin Panel - Complete Feature Showcase{% else %}لوحة إدارة VEX - عرض شامل للمميزات{% endif %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root { --bg:#081223; --bg2:#0f1f38; --card:#132742cc; --line:#ffffff1f; --text:#eef4ff; --muted:#b5c6e9; --ok:#38d39f; --blue:#66b6ff; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family:"Cairo",sans-serif; color:var(--text); background:radial-gradient(circle at 10% 0%, #1b3d70a0, transparent 45%), radial-gradient(circle at 90% 10%, #16a08566, transparent 35%), linear-gradient(150deg,var(--bg),var(--bg2)); }
+    .wrap { width:min(1400px,95vw); margin:20px auto 36px; }
+    .panel { background:var(--card); border:1px solid var(--line); border-radius:18px; backdrop-filter: blur(8px); }
+    .hero { padding:28px; display:grid; grid-template-columns:1.3fr 1fr; gap:18px; }
+    h1 { margin:0 0 10px; font-size:clamp(1.3rem,2.6vw,2.1rem); line-height:1.35; }
+    .sub { color:var(--muted); line-height:1.8; margin:0; font-size:0.95rem; }
+    .tags { display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; }
+    .tag { border:1px solid rgba(255,255,255,0.2); color:#d8ecff; background:rgba(255,255,255,0.05); border-radius:999px; padding:6px 12px; font-size:0.8rem; font-weight:700; }
+    .hero-kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+    .kpi { border-radius:14px; border:1px solid var(--line); padding:14px; background:rgba(255,255,255,0.04); }
+    .kpi b { display:block; font-size:1.05rem; color:#ffcf68; margin-bottom:4px; }
+    .kpi span { color:var(--muted); font-size:0.8rem; line-height:1.5; }
+    .section-title { margin:22px 0 10px; font-size:1.1rem; font-weight:800; letter-spacing:0.2px; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:14px; }
+    .card { padding:18px; border-radius:16px; border:1px solid var(--line); background:rgba(255,255,255,0.035); transition:transform 0.2s,box-shadow 0.2s; }
+    .card:hover { transform:translateY(-2px); box-shadow:0 8px 24px rgba(0,0,0,0.3); }
+    .card h3 { margin:0 0 8px; font-size:1.05rem; color:#fff; display:flex; align-items:center; gap:8px; }
+    .card .emoji { font-size:1.3rem; }
+    .meta { color:var(--muted); margin:0 0 12px; line-height:1.7; font-size:0.9rem; }
+    .features-list { list-style:none; padding:0; margin:0 0 12px; display:grid; gap:6px; font-size:0.85rem; }
+    .features-list li { padding:8px 10px; border-radius:10px; border:1px dashed rgba(255,255,255,0.15); background:rgba(0,0,0,0.12); line-height:1.55; }
+    .features-list strong { color:#fff; }
+    .card-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+    .btn { display:inline-flex; align-items:center; justify-content:center; gap:6px; border-radius:10px; padding:10px 14px; font-size:0.85rem; text-decoration:none; font-weight:700; }
+    .btn-main { background:linear-gradient(135deg,#1ba7ff,#1ccf99); color:#081223; }
+    .btn-alt { border:1px solid var(--line); color:#dcedff; background:#ffffff08; }
+    .cta { margin-top:14px; padding:16px; border:1px solid #39d3a57a; background:linear-gradient(130deg,#1dd39b3d,#3ea6ff2f); border-radius:14px; }
+    .cta strong { font-size:1rem; }
+    .cta p { margin:8px 0 0; color:#e6f1ff; line-height:1.7; font-size:0.9rem; }
+    .lang-toggle { position:fixed; top:20px; left:20px; z-index:1000; }
+    .lang-btn { background:linear-gradient(135deg,#66b6ff,#38d39f); color:#081223; border:none; padding:10px 18px; border-radius:999px; font-weight:800; font-size:0.85rem; cursor:pointer; box-shadow:0 4px 16px rgba(0,0,0,0.3); }
+    @media (max-width:980px){ .hero{grid-template-columns:1fr;} .hero-kpis{grid-template-columns:1fr 1fr;} }
+    @media (max-width:600px){ .hero{padding:18px;} .hero-kpis{grid-template-columns:1fr;} .wrap{margin:12px auto 24px; width:98vw;} }
+  </style>
+</head>
+<body>
+  <div class="lang-toggle">
+    <a class="lang-btn" href="?k={{ token }}&lang={{ 'ar' if t == 'en' else 'en' }}">{{ 'العربية' if t == 'en' else 'English' }}</a>
+  </div>
+  <main class="wrap">
+    <section class="panel hero">
+      <div>
+        <h1>{% if t == 'en' %}VEX Admin Panel — Complete Feature Showcase{% else %}لوحة إدارة VEX — عرض شامل لكل المميزات{% endif %}</h1>
+        <p class="sub">
+          {% if t == 'en' %}Explore every feature of the VEX Admin Panel: from multi-channel campaigns and wallet operations to AI-powered matching, agent management, client white-label portals, role-based access control, and AI API integration. Each section includes detailed explanations of business value, operational impact, and how it drives customer acquisition and retention.{% else %}استكشف كل ميزة في لوحة إدارة VEX: من الحملات متعددة القنوات والعمليات المالية إلى المطابقة الذكية بالذكاء الاصطناعي، إدارة الوكلاء، بوابات العملاء البيضاء، التحكم في الوصول القائم على الأدوار، وتكامل واجهات برمجة تطبيقات الذكاء الاصطناعي. كل قسم يتضمن شرحاً مفصلاً للقيمة التجارية، الأثر التشغيلي، وكيفية جذب العملاء والاحتفاظ بهم.{% endif %}
+        </p>
+        <div class="tags">
+          <span class="tag">{% if t == 'en' %}17 Languages{% else %}17 لغة{% endif %}</span>
+          <span class="tag">{% if t == 'en' %}Provably Fair{% else %}Provably Fair{% endif %}</span>
+          <span class="tag">{% if t == 'en' %}OTP Security{% else %}أمان OTP{% endif %}</span>
+          <span class="tag">{% if t == 'en' %}RBAC{% else %}RBAC{% endif %}</span>
+          <span class="tag">{% if t == 'en' %}White-Label{% else %}White-Label{% endif %}</span>
+          <span class="tag">{% if t == 'en' %}AI Matching{% else %}مطابقة بالذكاء الاصطناعي{% endif %}</span>
+          <span class="tag">{% if t == 'en' %}Agent Management{% else %}إدارة الوكلاء{% endif %}</span>
+          <span class="tag">{% if t == 'en' %}Client Portals{% else %}بوابات العملاء{% endif %}</span>
+        </div>
+      </div>
+      <div class="hero-kpis">
+        <div class="kpi"><b>{% if t == 'en' %}Acquisition{% else %}الاستحواذ{% endif %}</b><span>{% if t == 'en' %}Multi-channel campaigns, partners, referrals{% else %}حملات متعددة القنوات، شركاء، إحالات{% endif %}</span></div>
+        <div class="kpi"><b>{% if t == 'en' %}Conversion{% else %}التحويل{% endif %}</b><span>{% if t == 'en' %}OTP login, instant deposits, AI matching{% else %}دخول OTP، إيداع فوري، مطابقة ذكية{% endif %}</span></div>
+        <div class="kpi"><b>{% if t == 'en' %}Retention{% else %}الاحتفاظ{% endif %}</b><span>{% if t == 'en' %}Segments, reactivation, SVRP, VIP{% else %}شرائح، إعادة تنشيط، SVRP، كبار العملاء{% endif %}</span></div>
+        <div class="kpi"><b>{% if t == 'en' %}Control{% else %}التحكم{% endif %}</b><span>{% if t == 'en' %}RBAC, white-label, audit trail, AI APIs{% else %}RBAC، أبيض، سجل تدقيق، APIs ذكية{% endif %}</span></div>
+      </div>
+    </section>
+
+    <h2 class="section-title">{% if t == 'en' %}Complete Feature Categories{% else %}فئات المميزات الكاملة{% endif %}</h2>
+
+    <section class="grid">
+      <!-- 1. Dashboard & Analytics -->
+      <article class="card">
+        <h3><span class="emoji">📊</span> {% if t == 'en' %}Dashboard & Real-time Analytics{% else %}لوحة التحكم والتحليلات اللحظية{% endif %}</h3>
+        <p class="meta">{% if t == 'en' %}Unified command center with live KPIs, charts, and activity monitoring{% else %}مركز قيادة موحد مع مؤشرات أداء حية، رسوم بيانية، ومراقبة النشاط{% endif %}</p>
+        <ul class="features-list">
+          <li><strong>{% if t == 'en' %}Live KPIs{% else %}مؤشرات أداء حية{% endif %}:</strong> {% if t == 'en' %}Users, transactions, volume, matches, lottery, trading — all updating in real-time{% else %}مستخدمون، معاملات، حجم، مطابقات، يانصيب، تداول — كلها تُحدّث لحظياً{% endif %}</li>
+          <li><strong>{% if t == 'en' %}30-day Charts{% else %}رسوم 30 يوماً{% endif %}:</strong> {% if t == 'en' %}Transaction trends, status distribution, top companies, registrations{% else %}اتجاهات المعاملات، توزيع الحالات، أهم الشركات، التسجيلات{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Pending Items Panel{% else %}لوحة العناصر المعلقة{% endif %}:</strong> {% if t == 'en' %}One-click bulk approve/reject for transactions, matches, trading, SVRP{% else %}موافقة/رفض جماعي بنقرة واحدة للمعاملات، المطابقات، التداول، SVRP{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Activity Timeline{% else %}الجدول الزمني للنشاط{% endif %}:</strong> {% if t == 'en' %}Real-time feed of all system events with filtering{% else %}تغذية فورية لجميع أحداث النظام مع فلترة{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Quick Stats API{% else %}API إحصائيات سريع{% endif %}:</strong> {% if t == 'en' %}Public endpoints for landing page counters (players, rounds, payouts){% else %}نقاط نهاية عامة لعدادات صفحة الهبوط (لاعبون، جولات، مدفوعات){% endif %}</li>
+        </ul>
+        <div class="card-actions">
+          <a class="btn btn-main" href="{{ url_for('showcase_section', section_slug='dashboard-analytics') }}?k={{ token }}&lang={{ t }}">{% if t == 'en' %}Explore Details{% else %}استكشف التفاصيل{% endif %}</a>
+          <a class="btn btn-alt" href="{{ url_for('showcase_admin_session') }}?k={{ token }}&next=/dashboard">{% if t == 'en' %}Open in Admin{% else %}افتح في الأدمن{% endif %}</a>
+        </div>
+      </article>
+
+      <!-- 2. Multi-Channel Campaigns & Broadcast -->
+      <article class="card">
+        <h3><span class="emoji">📢</span> {% if t == 'en' %}Multi-Channel Campaigns & Broadcast Center{% else %}مركز الحملات متعددة القنوات والبث{% endif %}</h3>
+        <p class="meta">{% if t == 'en' %}Professional broadcast system with targeting, scheduling, media, and partner network{% else %}نظام بث احترافي مع استهداف، جدولة، وسائط، وشبكة شركاء{% endif %}</p>
+        <ul class="features-list">
+          <li><strong>{% if t == 'en' %}Audience Targeting{% else %}استهداف الجمهور{% endif %}:</strong> {% if t == 'en' %}All users, single user, by country (18+ countries), custom segments{% else %}كل المستخدمين، مستخدم واحد، حسب الدولة (18+ دولة)، شرائح مخصصة{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Channel Selection{% else %}اختيار القناة{% endif %}:</strong> {% if t == 'en' %}Telegram, Web, WhatsApp, or simultaneous multi-channel{% else %}تليجرام، الويب، واتساب، أو متعدد القنوات متزامناً{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Rich Media Support{% else %}دعم الوسائط الغنية{% endif %}:</strong> {% if t == 'en' %}Images, videos, documents with preview and drag-drop upload{% else %}صور، فيديوهات، مستندات مع معاينة ورفع بالسحب والإفلات{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Priority Levels{% else %}مستويات الأولوية{% endif %}:</strong> {% if t == 'en' %}Normal, High, Urgent — affects delivery speed and UI prominence{% else %}عادية، عالية، عاجلة — تؤثر على سرعة التسليم وبروز الواجهة{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Scheduling & Recurrence{% else %}الجدولة والتكرار{% endif %}:</strong> {% if t == 'en' %}One-time, daily, weekly with datetime picker{% else %}مرة واحدة، يومي، أسبوعي مع منتقي التاريخ والوقت{% endif %}</li>
+          <li><strong>{% if t == 'en' %}AI Content Generation{% else %}توليد المحتوى بالذكاء الاصطناعي{% endif %}:</strong> {% if t == 'en' %}One-click AI copywriting for campaign messages{% else %}كتابة نص الحملة بنقرة واحدة بالذكاء الاصطناعي{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Partner Network (CPM/Revenue Share){% else %}شبكة الشركاء (CPM/مشاركة الإيرادات){% endif %}:</strong> {% if t == 'en' %}Manage partner channels, subscriber counts, revenue tracking{% else %}إدارة قنوات الشركاء، عدد المشتركين، تتبع الإيرادات{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Analytics Dashboard{% else %}لوحة التحليلات{% endif %}:</strong> {% if t == 'en' %}Reach, clicks, CTR, conversions, daily reach charts, top campaigns{% else %}الوصول، النقرات، معدل النقر، التحويلات، رسوم الوصول اليومي، أهم الحملات{% endif %}</li>
+        </ul>
+        <div class="card-actions">
+          <a class="btn btn-main" href="{{ url_for('showcase_section', section_slug='campaigns-broadcast') }}?k={{ token }}&lang={{ t }}">{% if t == 'en' %}Explore Details{% else %}استكشف التفاصيل{% endif %}</a>
+          <a class="btn btn-alt" href="{{ url_for('showcase_admin_session') }}?k={{ token }}&next=/broadcast">{% if t == 'en' %}Open in Admin{% else %}افتح في الأدمن{% endif %}</a>
+        </div>
+      </article>
+
+      <!-- 3. Wallet & Financial Operations -->
+      <article class="card">
+        <h3><span class="emoji">💳</span> {% if t == 'en' %}Wallet, Deposits & Withdrawals{% else %}المحفظة، الإيداعات والسحوبات{% endif %}</h3>
+        <p class="meta">{% if t == 'en' %}Complete financial lifecycle: deposits, withdrawals, matching, agents, SVRP compensation{% else %}دورة مالية كاملة: إيداعات، سحوبات، مطابقة، وكلاء، تعويض SVRP{% endif %}</p>
+        <ul class="features-list">
+          <li><strong>{% if t == 'en' %}Multi-Currency Wallet{% else %}محفظة متعددة العملات{% endif %}:</strong> {% if t == 'en' %}EGP, USD, USDT, SAR, AED, KWD with real-time conversion{% else %}جنيه مصري، دولار، USDT، ريال سعودي، درهم، دينار كويتي مع تحويل فوري{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Payment Methods Management{% else %}إدارة وسائل الدفع{% endif %}:</strong> {% if t == 'en' %}Vodafone Cash, STC Pay, InstaPay, Bank Transfer — per currency{% else %}فودافون كاش، STC Pay، إنستاباي، تحويل بنكي — لكل عملة{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Deposit Workflow{% else %}سير عمل الإيداع{% endif %}:</strong> {% if t == 'en' %}User submits → Admin reviews → Approve/Reject with notes → Instant balance update{% else %}المستخدم يرسل → الأدمن يراجع → موافقة/رفض مع ملاحظات → تحديث رصيد فوري{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Withdrawal Workflow{% else %}سير عمل السحب{% endif %}:</strong> {% if t == 'en' %}Request → Admin verification → Manual/auto processing → Completion{% else %}طلب → تحقق الأدمن → معالجة يدوية/آلية → إكمال{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Matching Engine{% else %}محرك المطابقة{% endif %}:</strong> {% if t == 'en' %}Auto-match deposits/withdrawals, agent assignment, step-by-step evidence, dispute resolution{% else %}مطابقة تلقائية للإيداعات/السحوبات، تعيين وكلاء، أدلة خطوة بخطوة، حل النزاعات{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Agent Management{% else %}إدارة الوكلاء{% endif %}:</strong> {% if t == 'en' %}Agent balances, escrow, pending deposits, transaction ledger, penalties, insurance{% else %}أرصدة الوكلاء، الضمانات، إيداعات معلقة، دفتر أستاذ، عقوبات، تأمين{% endif %}</li>
+          <li><strong>{% if t == 'en' %}SVRP Smart Compensation{% else %}تعويض SVRP الذكي{% endif %}:</strong> {% if t == 'en' %}Frozen credits unlocked by sharing with 4+ friends, automated tracking{% else %}أرصدة مجمدة تُفتح بالمشاركة مع 4+ أصدقاء، تتبع آلي{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Bulk Operations{% else %}العمليات الجماعية{% endif %}:</strong> {% if t == 'en' %}Bulk approve/reject transactions with confirmation modals{% else %}موافقة/رفض جماعي للمعاملات مع نوافذ تأكيد{% endif %}</li>
+        </ul>
+        <div class="card-actions">
+          <a class="btn btn-main" href="{{ url_for('showcase_section', section_slug='wallet-operations') }}?k={{ token }}&lang={{ t }}">{% if t == 'en' %}Explore Details{% else %}استكشف التفاصيل{% endif %}</a>
+          <a class="btn btn-alt" href="{{ url_for('showcase_admin_session') }}?k={{ token }}&next=/transactions">{% if t == 'en' %}Open in Admin{% else %}افتح في الأدمن{% endif %}</a>
+        </div>
+      </article>
+
+      <!-- 4. AI-Powered Matching & Agents -->
+      <article class="card">
+        <h3><span class="emoji">🤖</span> {% if t == 'en' %}AI-Powered Matching & Matching Agents{% else %}المطابقة بالذكاء الاصطناعي ووكلاء المطابقة{% endif %}</h3>
+        <p class="meta">{% if t == 'en' %}Intelligent deposit/withdrawal matching with AI agents, automated evidence verification, and dispute resolution{% else %}مطابقة ذكية للإيداع/السحب مع وكلاء ذكاء اصطناعي، تحقق آلي من الأدلة، وحل النزاعات{% endif %}</p>
+        <ul class="features-list">
+          <li><strong>{% if t == 'en' %}Automated Matching Algorithm{% else %}خوارزمية المطابقة الآلية{% endif %}:</strong> {% if t == 'en' %}Matches deposits to withdrawals by amount, currency, timing, and priority rules{% else %}يطابق الإيداعات بالسحوبات حسب المبلغ، العملة، التوقيت، وقواعد الأولوية{% endif %}</li>
+          <li><strong>{% if t == 'en' %}AI Agents for Matching{% else %}وكلاء الذكاء الاصطناعي للمطابقة{% endif %}:</strong> {% if t == 'en' %}Multiple AI agents (OpenAI, Anthropic, Gemini) with custom prompts per channel{% else %}وكلاء ذكاء اصطناعي متعددون (OpenAI، Anthropic، Gemini) مع محفزات مخصصة لكل قناة{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Agent Actions & Evidence{% else %}إجراءات الوكلاء والأدلة{% endif %}:</strong> {% if t == 'en' %}Agents submit actions with evidence (screenshots, txn IDs), auto-verified via APIs{% else %}الوكلاء يقدمون إجراءات مع أدلة (لقطات شاشة، معرفات معاملات)، تحقق آلي عبر APIs{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Step-by-Step Workflow{% else %}سير عمل خطوة بخطوة{% endif %}:</strong> {% if t == 'en' %}Deposit → Agent claim → Action → Counter-party confirmation → Completion{% else %}إيداع → مطالبة الوكيل → إجراء → تأكيد الطرف المقابل → إكمال{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Dispute Resolution{% else %}حل النزاعات{% endif %}:</strong> {% if t == 'en' %}Admin arbitration with chat logs, evidence review, force-complete/force-cancel{% else %}تحكيم الأدمن مع سجلات الدردشة، مراجعة الأدلة، إكمال/إلغاء قسري{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Agent Performance Dashboard{% else %}لوحة أداء الوكلاء{% endif %}:</strong> {% if t == 'en' %}Success rate, avg handling time, earnings, penalties, online status{% else %}معدل النجاح، متوسط وقت المعالجة، الأرباح، العقوبات، حالة الاتصال{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Auto-Assignment Rules{% else %}قواعد التعيين التلقائي{% endif %}:</strong> {% if t == 'en' %}Round-robin, least busy, specialization-based, priority matching{% else %}تدوير، الأقل انشغالاً، حسب التخصص، مطابقة الأولوية{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Real-time Notifications{% else %}إشعارات فورية{% endif %}:</strong> {% if t == 'en' %}WebSocket/push for new matches, actions required, disputes{% else %}WebSocket/دفع للمطابقات الجديدة، إجراءات مطلوبة، نزاعات{% endif %}</li>
+        </ul>
+        <div class="card-actions">
+          <a class="btn btn-main" href="{{ url_for('showcase_section', section_slug='ai-matching-agents') }}?k={{ token }}&lang={{ t }}">{% if t == 'en' %}Explore Details{% else %}استكشف التفاصيل{% endif %}</a>
+          <a class="btn btn-alt" href="{{ url_for('showcase_admin_session') }}?k={{ token }}&next=/matching">{% if t == 'en' %}Open in Admin{% else %}افتح في الأدمن{% endif %}</a>
+        </div>
+      </article>
+
+      <!-- 5. Agents Management -->
+      <article class="card">
+        <h3><span class="emoji">🤝</span> {% if t == 'en' %}Matching Agents Management{% else %}إدارة وكلاء المطابقة{% endif %}</h3>
+        <p class="meta">{% if t == 'en' %}Complete agent lifecycle: onboarding, balances, performance, penalties, permissions{% else %}دورة حياة الوكيل الكاملة: انضمام، أرصدة، أداء، عقوبات، صلاحيات{% endif %}</p>
+        <ul class="features-list">
+          <li><strong>{% if t == 'en' %}Agent Onboarding{% else %}انضمام الوكلاء{% endif %}:</strong> {% if t == 'en' %}Create agents with bot name, username, security deposit, traffic controls{% else %}إنشاء وكلاء مع اسم البوت، اسم المستخدم، إيداع أمان، تحكم في الترافيك{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Balance & Escrow Management{% else %}إدارة الأرصدة والضمانات{% endif %}:</strong> {% if t == 'en' %}Real-time balance, escrow (security deposit), credit/debit adjustments with audit trail{% else %}رصيد فوري، ضمانات (إيداع أمان)، تعديلات ائتمان/خصم مع سجل تدقيق{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Payment Methods per Agent{% else %}وسائل دفع لكل وكيل{% endif %}:</strong> {% if t == 'en' %}Each agent manages own payment methods (account details, icons, types){% else %}كل وكيل يدير وسائل دفعه الخاصة (بيانات الحساب، أيقونات، أنواع){% endif %}</li>
+          <li><strong>{% if t == 'en' %}Transaction Ledger{% else %}دفتر أستاذ المعاملات{% endif %}:</strong> {% if t == 'en' %}Full history with filtering, export, status override{% else %}تاريخ كامل مع فلترة، تصدير، تجاوز الحالة{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Penalties & Insurance{% else %}العقوبات والتأمين{% endif %}:</strong> {% if t == 'en' %}Automated penalties for failed matches, insurance fund for coverage{% else %}عقوبات آلية للمطابقات الفاشلة، صندوق تأمين للتغطية{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Agent Self-Service Portal{% else %}بوابة الخدمة الذاتية للوكلاء{% endif %}:</strong> {% if t == 'en' %}Agents log in via /agent-login, see assigned matches, submit evidence, manage methods{% else %}الوكلاء يدخلون عبر /agent-login، يرون المطابقات المخصصة، يقدمون أدلة، يديرون الوسائل{% endif %}</li>
+        </ul>
+        <div class="card-actions">
+          <a class="btn btn-main" href="{{ url_for('showcase_section', section_slug='agents-management') }}?k={{ token }}&lang={{ t }}">{% if t == 'en' %}Explore Details{% else %}استكشف التفاصيل{% endif %}</a>
+          <a class="btn btn-alt" href="{{ url_for('showcase_admin_session') }}?k={{ token }}&next=/agents">{% if t == 'en' %}Open in Admin{% else %}افتح في الأدمن{% endif %}</a>
+        </div>
+      </article>
+
+      <!-- 6. Client White-Label Admin Access -->
+      <article class="card">
+        <h3><span class="emoji">🏢</span> {% if t == 'en' %}Client White-Label Admin Portals{% else %}بوابات إدارة العملاء بيضاء التسمية{% endif %}</h3>
+        <p class="meta">{% if t == 'en' %}Grant clients their own branded admin panel with isolated data and controlled permissions{% else %}امنح العملاء لوحة إدارة بعلامتهم التجارية مع بيانات معزولة وصلاحيات محكومة{% endif %}</p>
+        <ul class="features-list">
+          <li><strong>{% if t == 'en' %}Client Companies Management{% else %}إدارة شركات العملاء{% endif %}:</strong> {% if t == 'en' %}Create client companies with branding (logo, colors, domain), isolated databases{% else %}إنشاء شركات عملاء مع علامات تجارية (شعار، ألوان، نطاق)، قواعد بيانات معزولة{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Client Admin Accounts{% else %}حسابات أدمن للعملاء{% endif %}:</strong> {% if t == 'en' %}Each client gets admin login with scoped access to their company data only{% else %}كل عميل يحصل على دخول أدمن بوصول محدود لبيانات شركته فقط{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Client Dashboard{% else %}لوحة تحكم العميل{% endif %}:</strong> {% if t == 'en' %}Customized view: their users, transactions, volume, campaigns, settings{% else %}عرض مخصص: مستخدموهم، معاملاتهم، حجمهم، حملاتهم، إعداداتهم{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Revenue Sharing & Billing{% else %}مشاركة الإيرادات والفوترة{% endif %}:</strong> {% if t == 'en' %}Configure revenue share %, monthly invoicing, payment tracking{% else %}تكوين نسبة مشاركة الإيرادات، فوترة شهرية، تتبع المدفوعات{% endif %}</li>
+          <li><strong>{% if t == 'en' %}White-Label Customization{% else %}تخصيص أبيض التسمية{% endif %}:</strong> {% if t == 'en' %}Custom domain, logo, colors, email templates, language defaults{% else %}نطاق مخصص، شعار، ألوان، قوالب بريد، لغات افتراضية{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Client User Management{% else %}إدارة مستخدمي العميل{% endif %}:</strong> {% if t == 'en' %}Client admins manage their own users (ban, balance, transactions) within scope{% else %}أدمن العميل يدير مستخدميه (حظر، رصيد، معاملات) ضمن النطاق{% endif %}</li>
+        </ul>
+        <div class="card-actions">
+          <a class="btn btn-main" href="{{ url_for('showcase_section', section_slug='client-white-label') }}?k={{ token }}&lang={{ t }}">{% if t == 'en' %}Explore Details{% else %}استكشف التفاصيل{% endif %}</a>
+          <a class="btn btn-alt" href="{{ url_for('showcase_admin_session') }}?k={{ token }}&next=/clients">{% if t == 'en' %}Open in Admin{% else %}افتح في الأدمن{% endif %}</a>
+        </div>
+      </article>
+
+      <!-- 7. Employee Role-Based Access Control (RBAC) -->
+      <article class="card">
+        <h3><span class="emoji">👮</span> {% if t == 'en' %}Employee RBAC & Granular Permissions{% else %}تحكم وصول الموظفين القائم على الأدوار{% endif %}</h3>
+        <p class="meta">{% if t == 'en' %}Grant employees precise permissions per admin panel section with ownership and audit trail{% else %}امنح الموظفين صلاحيات دقيقة لكل قسم في لوحة الإدارة مع ملكية وسجل تدقيق{% endif %}</p>
+        <ul class="features-list">
+          <li><strong>{% if t == 'en' %}Predefined Roles{% else %}أدوار محددة مسبقاً{% endif %}:</strong> {% if t == 'en' %}Super Admin, Finance, Support, Game Admin, Broadcast Admin, Custom{% else %}سوبر أدمن، مالية، دعم، ألعاب، بث، مخصص{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Granular Permissions{% else %}صلاحيات دقيقة{% endif %}:</strong> {% if t == 'en' %}30+ permissions: approve_deposits, reject_withdrawals, ban_users, manage_games, send_broadcast, view_financial, manage_admins, etc.{% else %}أكثر من 30 صلاحية: موافقة_إيداعات، رفض_سحوبات، حظر_مستخدمين، إدارة_ألعاب، بث، عرض_مالي، إدارة_أدمن، إلخ.{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Section-Level Access{% else %}وصول مستوى القسم{% endif %}:</strong> {% if t == 'en' %}Grant access to specific sections: /transactions, /matching, /channels, /games-admin, /broadcast, etc.{% else %}منح وصول لأقسام محددة: /transactions، /matching، /channels، /games-admin، /broadcast، إلخ.{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Ownership & Management{% else %}الملكية والإدارة{% endif %}:</strong> {% if t == 'en' %}Channel ownership (owner_admin_id, managed_by_admin_ids), sub-admin publish rights{% else %}ملكية القنوات (owner_admin_id، managed_by_admin_ids)، حقوق نشر للمشرفين الفرعيين{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Audit Trail{% else %}سجل التدقيق{% endif %}:</strong> {% if t == 'en' %}Every action logged: who, what, when, target, IP — immutable log{% else %}كل إجراء مسجل: من، ماذا، متى، الهدف، IP — سجل غير قابل للتغيير{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Temporary Access{% else %}وصول مؤقت{% endif %}:</strong> {% if t == 'en' %}Time-limited admin roles with auto-expiry (hours/days){% else %}أدوار أدمن مؤقتة مع انتهاء صلاحية تلقائي (ساعات/أيام){% endif %}</li>
+          <li><strong>{% if t == 'en' %}Admin Management UI{% else %}واجهة إدارة الأدمن{% endif %}:</strong> {% if t == 'en' %}Add/edit/remove admins, assign roles, set expiry, view permissions matrix{% else %}إضافة/تعديل/حذف أدمن، تعيين أدوار، تعيين انتهاء، عرض مصفوفة الصلاحيات{% endif %}</li>
+        </ul>
+        <div class="card-actions">
+          <a class="btn btn-main" href="{{ url_for('showcase_section', section_slug='employee-rbac') }}?k={{ token }}&lang={{ t }}">{% if t == 'en' %}Explore Details{% else %}استكشف التفاصيل{% endif %}</a>
+          <a class="btn btn-alt" href="{{ url_for('showcase_admin_session') }}?k={{ token }}&next=/admins">{% if t == 'en' %}Open in Admin{% else %}افتح في الأدمن{% endif %}</a>
+        </div>
+      </article>
+
+      <!-- 8. Games Management & Profitability -->
+      <article class="card">
+        <h3><span class="emoji">🎮</span> {% if t == 'en' %}Games Management & Profitability Control{% else %}إدارة الألعاب والتحكم في الربحية{% endif %}</h3>
+        <p class="meta">{% if t == 'en' %}11+ games with real-time edge control, risk alerts, player segmentation, RTP tuning{% else %}أكثر من 11 لعبة مع تحكم فوري في الهامش، تنبيهات مخاطر، تقسيم لاعبين، ضبط RTP{% endif %}</p>
+        <ul class="features-list">
+          <li><strong>{% if t == 'en' %}11+ Built-in Games{% else %}أكثر من 11 لعبة مدمجة{% endif %}:</strong> {% if t == 'en' %}Aviator, Crash, Mines, Plinko, Wheel, Lottery, Dice, Snatch, Snatch Gifts, Trading, SVRP{% else %}أفياتور، كراش، مناجم، بلينكو، عجلة، يانصيب، نرد، اخطف، هدايا اخطف، تداول، SVRP{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Real-time Edge/RTP Control{% else %}تحكم فوري في الهامش/RTP{% endif %}:</strong> {% if t == 'en' %}Adjust house edge, target edge, min/max bet, win chance per game instantly{% else %}ضبط هامش الكازينو، الهامش المستهدف، حد الرهان الأدنى/الأقصى، فرصة الفوز فورياً لكل لعبة{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Risk Alerts Engine{% else %}محرك تنبيهات المخاطر{% endif %}:</strong> {% if t == 'en' %}Auto-detect: high rollers, unusual win rates, bonus abuse, churn risk, heat levels{% else %}اكتشاف آلي: المراهنون الكبار، معدلات فوز غير عادية، إساءة مكافآت، خطر تسرب، مستويات الحرارة{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Player Segmentation{% else %}تقسيم اللاعبين{% endif %}:</strong> {% if t == 'en' %}New, Regular, VIP, Winner, Loser, Hot, Churning — auto-classified by behavior{% else %}جديد، منتظم، VIP، فائز، خاسر، نشط، متردد — تصنيف آلي حسب السلوك{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Algorithm Configuration{% else %}إعدادات الخوارزمية{% endif %}:</strong> {% if t == 'en' %}Target edge %, max daily win/loss, max bets/hour, compensation interval, min balance{% else %}هامش مستهدف %، حد ربح/خسارة يومي، حد رهانات/ساعة، فترة تعويض، حد أدنى للرصيد{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Game Toggle & Maintenance{% else %}تبديل اللعبة والصيانة{% endif %}:</strong> {% if t == 'en' %}Enable/disable games instantly, maintenance mode with player messaging{% else %}تمكين/تعطيل الألعاب فورياً، وضع صيانة مع رسائل للاعبين{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Profitability Dashboard{% else %}لوحة الربحية{% endif %}:</strong> {% if t == 'en' %}Total wagered, net profit, platform edge %, active players, top players by LTV{% else %}إجمالي المراهنات، صافي الربح، هامش المنصة %، لاعبون نشطون، أهم اللاعبين حسب LTV{% endif %}</li>
+        </ul>
+        <div class="card-actions">
+          <a class="btn btn-main" href="{{ url_for('showcase_section', section_slug='games-profitability') }}?k={{ token }}&lang={{ t }}">{% if t == 'en' %}Explore Details{% else %}استكشف التفاصيل{% endif %}</a>
+          <a class="btn btn-alt" href="{{ url_for('showcase_admin_session') }}?k={{ token }}&next=/games-admin">{% if t == 'en' %}Open in Admin{% else %}افتح في الأدمن{% endif %}</a>
+        </div>
+      </article>
+
+      <!-- 8. AI API Keys & Integration -->
+      <article class="card">
+        <h3><span class="emoji">🔐</span> {% if t == 'en' %}AI API Keys & Multi-Provider Integration{% else %}مفاتيح API للذكاء الاصطناعي وتكامل متعدد المزوّدين{% endif %}</h3>
+        <p class="meta">{% if t == 'en' %}Manage OpenAI, Anthropic, Google, Azure, Custom APIs with auto model fetching, testing, and usage analytics{% else %}إدارة OpenAI، Anthropic، Google، Azure، واجهات مخصصة مع جلب نماذج آلي، اختبار، وتحليلات استخدام{% endif %}</p>
+        <ul class="features-list">
+          <li><strong>{% if t == 'en' %}5+ Provider Support{% else %}دعم 5+ مزوّدين{% endif %}:</strong> {% if t == 'en' %}OpenAI, Anthropic (Claude), Google (Gemini), Azure OpenAI, Custom endpoints{% else %}OpenAI، Anthropic (Claude)، Google (Gemini)، Azure OpenAI، نقاط نهاية مخصصة{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Auto Model Fetching{% else %}جلب النماذج تلقائياً{% endif %}:</strong> {% if t == 'en' %}One-click fetches available chat models from provider API{% else %}بنقرة واحدة يجلب نماذج المحادثة المتاحة من API المزوّد{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Connection Testing{% else %}اختبار الاتصال{% endif %}:</strong> {% if t == 'en' %}Live test with sample prompt, shows latency, token usage, available models{% else %}اختبار مباشر برسالة نموذجية، يعرض زمن الاستجابة، استخدام التوكنز، النماذج المتاحة{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Per-Key Configuration{% else %}تكوين لكل مفتاح{% endif %}:</strong> {% if t == 'en' %}Priority, temperature, max tokens, timeout, base URL (for Azure/Custom){% else %}أولوية، درجة الحرارة، حد التوكنز، مهلة، عنوان أساسي (لـ Azure/مخصص){% endif %}</li>
+          <li><strong>{% if t == 'en' %}Usage Analytics{% else %}تحليلات الاستخدام{% endif %}:</strong> {% if t == 'en' %}Requests/day, tokens/day, estimated cost (USD), model breakdown{% else %}طلبات/يوم، توكنز/يوم، تكلفة تقديرية (دولار)، تفصيل حسب النموذج{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Channel Integration{% else %}تكامل القنوات{% endif %}:</strong> {% if t == 'en' %}Assign AI agents to channels for auto-replies, content generation, moderation{% else %}تعيين وكلاء ذكاء اصطناعي للقنوات للرد الآلي، توليد المحتوى، الإشراف{% endif %}</li>
+        </ul>
+        <div class="card-actions">
+          <a class="btn btn-main" href="{{ url_for('showcase_section', section_slug='ai-api-keys') }}?k={{ token }}&lang={{ t }}">{% if t == 'en' %}Explore Details{% else %}استكشف التفاصيل{% endif %}</a>
+          <a class="btn btn-alt" href="{{ url_for('showcase_admin_session') }}?k={{ token }}&next=/ai-api-keys">{% if t == 'en' %}Open in Admin{% else %}افتح في الأدمن{% endif %}</a>
+        </div>
+      </article>
+
+      <!-- 9. Security, Provably Fair & Compliance -->
+      <article class="card">
+        <h3><span class="emoji">🛡️</span> {% if t == 'en' %}Security, Provably Fair & Compliance{% else %}الأمان، النزاهة المثبتة، والامتثال{% endif %}</h3>
+        <p class="meta">{% if t == 'en' %}OTP login, HMAC-SHA256 provably fair, audit trails, data isolation, GDPR-ready{% else %}دخول OTP، نزاهة HMAC-SHA256، سجلات تدقيق، عزلة بيانات، جاهز لـ GDPR{% endif %}</p>
+        <ul class="features-list">
+          <li><strong>{% if t == 'en' %}OTP Security Login{% else %}دخول أمان OTP{% endif %}:</strong> {% if t == 'en' %}Telegram bot verification (@vex_otp_bot), 6-digit codes, session management{% else %}تحقق عبر بوت تليجرام (@vex_otp_bot)، رموز 6 أرقام، إدارة جلسات{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Provably Fair (HMAC-SHA256){% else %}نزاهة مثبتة (HMAC-SHA256){% endif %}:</strong> {% if t == 'en' %}Server seed revealed post-round, client verification, all games auditable{% else %}بذرة الخادم تُكشف بعد الجولة، تحقق العميل، جميع الألعاب قابلة للتدقيق{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Data Isolation{% else %}عزلة البيانات{% endif %}:</strong> {% if t == 'en' %}White-label clients have fully isolated databases, no cross-contamination{% else %}عملاء العلامة البيضاء لديهم قواعد بيانات معزولة تماماً، لا تلوث متبادل{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Encryption & Security{% else %}التشفير والأمان{% endif %}:</strong> {% if t == 'en' %}AES-256 at rest, TLS 1.3 in transit, hashed passwords, secure sessions{% else %}AES-256 في التخزين، TLS 1.3 في النقل، كلمات مرور مشفرة، جلسات آمنة{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Audit Logs & Compliance{% else %}سجلات التدقيق والامتثال{% endif %}:</strong> {% if t == 'en' %}Immutable action logs, GDPR data export, data retention policies{% else %}سجلات إجراءات غير قابلة للتغيير، تصدير بيانات GDPR، سياسات الاحتفاظ{% endif %}</li>
+        </ul>
+        <div class="card-actions">
+          <a class="btn btn-main" href="{{ url_for('showcase_section', section_slug='security-compliance') }}?k={{ token }}&lang={{ t }}">{% if t == 'en' %}Explore Details{% else %}استكشف التفاصيل{% endif %}</a>
+          <a class="btn btn-alt" href="{{ url_for('showcase_admin_session') }}?k={{ token }}&next=/admins">{% if t == 'en' %}Open in Admin{% else %}افتح في الأدمن{% endif %}</a>
+        </div>
+      </article>
+
+      <!-- 10. Channels, Groups & Relay System -->
+      <article class="card">
+        <h3><span class="emoji">📡</span> {% if t == 'en' %}Channels, Groups & Multi-Platform Relay{% else %}القنوات، المجموعات، وإعادة التوجيه متعددة المنصات{% endif %}</h3>
+        <p class="meta">{% if t == 'en' %}Telegram, WhatsApp, Webhook channels with AI processing, relay rules, ownership{% else %}قنوات تليجرام، واتساب، ويب هوك مع معالجة ذكية، قواعد إعادة توجيه، ملكية{% endif %}</p>
+        <ul class="features-list">
+          <li><strong>{% if t == 'en' %}Multi-Platform Support{% else %}دعم متعدد المنصات{% endif %}:</strong> {% if t == 'en' %}Telegram channels/groups, WhatsApp Business, Webhook endpoints{% else %}قنوات/مجموعات تليجرام، واتساب للأعمال، نقاط نهاية ويب هوك{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Channel Roles{% else %}أدوار القنوات{% endif %}:</strong> {% if t == 'en' %}Source only, Publish only, Source+Publish — flexible relay topology{% else %}مصدر فقط، نشر فقط، مصدر+نشر — طوبولوجيا إعادة توجيه مرنة{% endif %}</li>
+          <li><strong>{% if t == 'en' %}AI Processing Pipeline{% else %}خط أنابيب المعالجة بالذكاء الاصطناعي{% endif %}:</strong> {% if t == 'en' %}Text replacement, AI rewriting, content moderation, auto-translation{% else %}استبدال نصوص، إعادة كتابة بالذكاء الاصطناعي، إشراف محتوى، ترجمة آلية{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Relay Rules{% else %}قواعد إعادة التوجيه{% endif %}:</strong> {% if t == 'en' %}Relay to users, relay to channels, per-channel toggle, category grouping{% else %}إعادة توجيه للمستخدمين، للقنوات، تبديل لكل قناة، تجميع بالفئات{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Ownership & Permissions{% else %}الملكية والصلاحيات{% endif %}:</strong> {% if t == 'en' %}Owner admin, managed_by admins, sub-admin publish rights, category management{% else %}أدمن مالك، أدمن مديرون، حقوق نشر للمشرفين الفرعيين، إدارة فئات{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Archive & Vault{% else %}الأرشيف والخزنة{% endif %}:</strong> {% if t == 'en' %}Soft-delete to vault, restore, permanent delete, retention policies{% else %}حذف ناعم للأرشيف، استعادة، حذف دائم، سياسات احتفاظ{% endif %}</li>
+        </ul>
+        <div class="card-actions">
+          <a class="btn btn-main" href="{{ url_for('showcase_section', section_slug='channels-relay') }}?k={{ token }}&lang={{ t }}">{% if t == 'en' %}Explore Details{% else %}استكشف التفاصيل{% endif %}</a>
+          <a class="btn btn-alt" href="{{ url_for('showcase_admin_session') }}?k={{ token }}&next=/channels">{% if t == 'en' %}Open in Admin{% else %}افتح في الأدمن{% endif %}</a>
+        </div>
+      </article>
+
+      <!-- 11. Referral Engine & Loyalty -->
+      <article class="card">
+        <h3><span class="emoji">🎁</span> {% if t == 'en' %}Referral Engine & Loyalty Programs{% else %}محرك الإحالات وبرامج الولاء{% endif %}</h3>
+        <p class="meta">{% if t == 'en' %}Multi-level referrals, viral loops, SVRP compensation, daily rewards, VIP tiers{% else %}إحالات متعددة المستويات، حلقات فيروسية، تعويض SVRP، مكافآت يومية، مستويات VIP{% endif %}</p>
+        <ul class="features-list">
+          <li><strong>{% if t == 'en' %}Referral Links & Tracking{% else %}روابط الإحالة والتتبع{% endif %}:</strong> {% if t == 'en' %}Unique links per user/partner, conversion tracking, source attribution{% else %}روابط فريدة لكل مستخدم/شريك، تتبع التحويل، نسب المصدر{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Multi-Level Commissions{% else %}عمولات متعددة المستويات{% endif %}:</strong> {% if t == 'en' %}Configurable % per level, instant credit, lifetime commissions{% else %}نسبة قابلة للتكوين لكل مستوى، رصيد فوري، عمولات مدى الحياة{% endif %}</li>
+          <li><strong>{% if t == 'en' %}SVRP Compensation System{% else %}نظام تعويض SVRP{% endif %}:</strong> {% if t == 'en' %}100% deposit as frozen credits, unlock by sharing with 4+ friends{% else %}100% من الإيداع كأرصدة مجمدة، تفتح بالمشاركة مع 4+ أصدقاء{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Daily Rewards & Lottery{% else %}مكافآت يومية ويانصيب{% endif %}:</strong> {% if t == 'en' %}Daily login bonus, wheel spin, lottery tickets, streak bonuses{% else %}مكافأة تسجيل دخول يومي، دورة عجلة، تذاكر يانصيب، مكافآت تتابع{% endif %}</li>
+          <li><strong>{% if t == 'en' %}VIP Tiers & Perks{% else %}مستويات VIP والمزايا{% endif %}:</strong> {% if t == 'en' %}Auto-promotion by LTV, exclusive games, higher limits, priority support{% else %}ترقية آلية حسب LTV، ألعاب حصرية، حدود أعلى، دعم أولوية{% endif %}</li>
+        </ul>
+        <div class="card-actions">
+          <a class="btn btn-main" href="{{ url_for('showcase_section', section_slug='referrals-loyalty') }}?k={{ token }}&lang={{ t }}">{% if t == 'en' %}Explore Details{% else %}استكشف التفاصيل{% endif %}</a>
+          <a class="btn btn-alt" href="{{ url_for('showcase_admin_session') }}?k={{ token }}&next=/referrals">{% if t == 'en' %}Open in Admin{% else %}افتح في الأدمن{% endif %}</a>
+        </div>
+      </article>
+
+      <!-- 12. Tickets, Complaints & Support -->
+      <article class="card">
+        <h3><span class="emoji">🎫</span> {% if t == 'en' %}Tickets, Complaints & Support System{% else %}نظام التذاكر، الشكاوى، والدعم{% endif %}</h3>
+        <p class="meta">{% if t == 'en' %}Structured dispute resolution, SLA tracking, automated escalation, customer communication{% else %}حل نزاعات منظم، تتبع SLA، تصعيد آلي، تواصل مع العملاء{% endif %}</p>
+        <ul class="features-list">
+          <li><strong>{% if t == 'en' %}Ticket Categories{% else %}فئات التذاكر{% endif %}:</strong> {% if t == 'en' %}Deposit, Withdrawal, Game, Technical, Billing, General — auto-routing{% else %}إيداع، سحب، لعبة، تقني، فوترة، عام — توجيه آلي{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Complaint Workflow{% else %}سير عمل الشكاوى{% endif %}:</strong> {% if t == 'en' %}Open → Assigned → In Progress → Resolution → Closed, with SLA timers{% else %}مفتوح → مُعيّن → قيد العمل → حل → مغلق، مع مؤقتات SLA{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Dispute Resolution{% else %}حل النزاعات{% endif %}:</strong> {% if t == 'en' %}Admin arbitration with evidence, chat logs, force actions, compensation{% else %}تحكيم الأدمن مع أدلة، سجلات دردشة، إجراءات قسرية، تعويض{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Auto-Escalation{% else %}تصعيد آلي{% endif %}:</strong> {% if t == 'en' %}Time-based escalation to senior admins, notifications, re-assignment{% else %}تصعيد مبني على الوقت للأدمن الكبار، إشعارات، إعادة تعيين{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Customer Communication{% else %}التواصل مع العملاء{% endif %}:</strong> {% if t == 'en' %}In-ticket chat, email/Telegram notifications, canned responses, attachments{% else %}دردشة داخل التذكرة، إشعارات بريد/تليجرام، ردود جاهزة، مرفقات{% endif %}</li>
+        </ul>
+        <div class="card-actions">
+          <a class="btn btn-main" href="{{ url_for('showcase_section', section_slug='tickets-support') }}?k={{ token }}&lang={{ t }}">{% if t == 'en' %}Explore Details{% else %}استكشف التفاصيل{% endif %}</a>
+          <a class="btn btn-alt" href="{{ url_for('showcase_admin_session') }}?k={{ token }}&next=/tickets">{% if t == 'en' %}Open in Admin{% else %}افتح في الأدمن{% endif %}</a>
+        </div>
+      </article>
+
+      <!-- 13. Social Media Multi-Platform Posting & Sub-Admin Control -->
+      <article class="card">
+        <h3><span class="emoji">📱</span> {% if t == 'en' %}Social Media Multi-Platform Posting & Sub-Admin Control{% else %}نشر متعدد منصات السوشيال ميديا والتحكم بالمسؤولين الفرعيين{% endif %}</h3>
+        <p class="meta">{% if t == 'en' %}Unified social media management: publish to Telegram, WhatsApp, Web, Facebook, Twitter, Instagram from one dashboard with granular sub-admin permissions controlled by main admin{% else %}إدارة موحدة للسوشيال ميديا: انشر على تليجرام، واتساب، الويب، فيسبوك، تويتر، إنستجرام من لوحة واحدة مع صلاحيات دقيقة للمسؤولين الفرعيين يتحكم بها الأدمن الرئيسي{% endif %}</p>
+        <ul class="features-list">
+          <li><strong>{% if t == 'en' %}6+ Platform Integration{% else %}تكامل 6+ منصات{% endif %}:</strong> {% if t == 'en' %}Telegram Channels/Groups, WhatsApp Business, Facebook Pages, Twitter/X, Instagram, Web Push — single compose, multi-publish{% else %}قنوات/مجموعات تليجرام، واتساب للأعمال، صفحات فيسبوك، تويتر/إكس، إنستجرام، ويب بوش — كتابة واحدة، نشر متعدد{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Unified Composer{% else %}محرر موحد{% endif %}:</strong> {% if t == 'en' %}Single rich-text editor with platform-specific preview, character limits, hashtag suggestions, media optimization per platform{% else %}محرر نصي غني واحد مع معاينة لكل منصة، حدود الأحرف، اقتراحات هاشتاجات، تحسين الوسائط لكل منصة{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Sub-Admin Posting Permissions{% else %}صلاحيات نشر للمسؤولين الفرعيين{% endif %}:</strong> {% if t == 'en' %}Main admin grants granular posting rights per sub-admin: allowed platforms, content categories, scheduling limits, approval workflows{% else %}الأدمن الرئيسي يمنح صلاحيات نشر دقيقة لكل مسؤول فرعي: المنصات المسموحة، فئات المحتوى، حدود الجدولة، سير عمل الموافقة{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Approval Workflows{% else %}سير عمل الموافقة{% endif %}:</strong> {% if t == 'en' %}Multi-level approval: sub-admin drafts → senior review → auto-publish or schedule; audit trail on every action{% else %}موافقة متعددة المستويات: مسودة المسؤول الفرعي → مراجعة كبار → نشر تلقائي/جدولة؛ سجل تدقيق لكل إجراء{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Content Library & Templates{% else %}مكتبة المحتوى والقوالب{% endif %}:</strong> {% if t == 'en' %}Reusable templates, approved media library, brand guidelines enforcement, AI-assisted content adaptation per platform{% else %}قوالب قابلة لإعادة الاستخدام، مكتبة وسائط معتمدة، فرض إرشادات العلامة التجارية، تكييف محتوى بالذكاء الاصطناعي لكل منصة{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Cross-Platform Analytics{% else %}تحليلات متعددة المنصات{% endif %}:</strong> {% if t == 'en' %}Unified dashboard: reach, engagement, clicks, conversions per platform; ROI attribution; best posting times AI-predicted{% else %}لوحة موحدة: الوصول، التفاعل، النقرات، التحويلات لكل منصة؛ نسب العائد؛ أفضل أوقات النشر بتنبؤ الذكاء الاصطناعي{% endif %}</li>
+        </ul>
+        <div class="card-actions">
+          <a class="btn btn-main" href="{{ url_for('showcase_section', section_slug='social-media-posting') }}?k={{ token }}&lang={{ t }}">{% if t == 'en' %}Explore Details{% else %}استكشف التفاصيل{% endif %}</a>
+          <a class="btn btn-alt" href="{{ url_for('showcase_admin_session') }}?k={{ token }}&next=/social-media">{% if t == 'en' %}Open in Admin{% else %}افتح في الأدمن{% endif %}</a>
+        </div>
+      </article>
+
+      <!-- 14. Agent Partnership Program & Incentives -->
+      <article class="card">
+        <h3><span class="emoji">🤝</span> {% if t == 'en' %}Agent Partnership Program — Why Agents Choose Us{% else %}برنامج شراكة الوكلاء — لماذا يختار الوكلاء العمل معنا{% endif %}</h3>
+        <p class="meta">{% if t == 'en' %}Compelling value proposition for agents: high commissions, low risk, automated tools, scalable income, and platform support that drives their growth{% else %}عرض قيمة مقنع للوكلاء: عمولات عالية، مخاطر منخفضة، أدوات آلية، دخل قابل للتوسع، ودعم منصة يدفع نموهم{% endif %}</p>
+        <ul class="features-list">
+          <li><strong>{% if t == 'en' %}High-Commission Revenue Share{% else %}مشاركة أرباح بعمولات عالية{% endif %}:</strong> {% if t == 'en' %}Up to 40-50% net revenue share on matched transactions; transparent real-time reporting; instant withdrawal{% else %}حتى 40-50% مشاركة صافية من المعاملات المطابقة؛ تقارير شفافة فورية؛ سحب فوري{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Zero Capital Risk{% else %}صفر مخاطر رأس المال{% endif %}:</strong> {% if t == 'en' %}Agents don't fund player balances — platform handles liquidity; agents earn on successful matches only{% else %}الوكلاء لا يمولون أرصدة اللاعبين — المنصة تتولى السيولة؛ الوكلاء يكسبون فقط على المطابقات الناجحة{% endif %}</li>
+          <li><strong>{% if t == 'en' %}AI-Powered Agent Tools{% else %}أدوات وكيل مدعومة بالذكاء الاصطناعي{% endif %}:</strong> {% if t == 'en' %}Auto-match suggestions, evidence auto-verification, dispute prediction, performance coaching, earnings optimization{% else %}اقتراحات مطابقة آلية، تحقق آلي من الأدلة، تنبؤ بالنزاعات، تدريب أداء، تحسين الأرباح{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Self-Service Portal{% else %}بوابة خدمة ذاتية{% endif %}:</strong> {% if t == 'en' %}24/7 agent dashboard: assigned matches, real-time earnings, performance analytics, evidence submission, instant withdrawals{% else %}لوحة وكيل 24/7: المطابقات المخصصة، أرباح فورية، تحليلات أداء، تقديم أدلة، سحب فوري{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Scalable Earnings Model{% else %}نموذج أرباح قابل للتوسع{% endif %}:</strong> {% if t == 'en' %}No cap on transactions; performance bonuses for volume/quality; team building — recruit sub-agents, earn override commissions{% else %}لا سقف للمعاملات؛ مكافآت أداء للحجم/الجودة؛ بناء فريق — استقطاب وكلاء فرعيين، كسب عمولات تجاوز{% endif %}</li>
+          <li><strong>{% if t == 'en' %}Platform Support & Training{% else %}دعم وتدريب المنصة{% endif %}:</strong> {% if t == 'en' %}Dedicated partner manager, weekly optimization calls, marketing materials, compliance guidance, priority support{% else %}مدير شريك مخصص، مكالمات تحسين أسبوعية، مواد تسويقية، إرشادات امتثال، دعم أولوية{% endif %}</li>
+        </ul>
+        <div class="card-actions">
+          <a class="btn btn-main" href="{{ url_for('showcase_section', section_slug='agent-partnership') }}?k={{ token }}&lang={{ t }}">{% if t == 'en' %}Explore Details{% else %}استكشف التفاصيل{% endif %}</a>
+          <a class="btn btn-alt" href="{{ url_for('showcase_admin_session') }}?k={{ token }}&next=/agents">{% if t == 'en' %}Open in Admin{% else %}افتح في الأدمن{% endif %}</a>
+        </div>
+      </article>
+
+    </section>
+
+    <!-- Permanent Links Section -->
+    {% if is_permanent %}
+    <section class="cta" style="background:linear-gradient(130deg,#ffd7003d,#ffca573d); border:2px solid #ffd7007a;">
+      <strong>{% if t == 'en' %}🔗 Permanent Demo Links (Never Expire){% else %}🔗 روابط عرض دائمة (لا تنتهي أبداً){% endif %}</strong>
+      <p style="margin-top:8px;">
+        {% if t == 'en' %}Share these permanent links with your team and clients. They never expire and provide full access to the demo showcase and read-only admin tour.{% else %}شارك هذه الروابط الدائمة مع فريقك وعملائك. لا تنتهي صلاحيتها أبداً وتوفر وصولاً كاملاً للعرض التجريبي وجولة الأدمن للقراءة فقط.{% endif %}
+      </p>
+      <div class="card-actions">
+        <a class="btn btn-main" href="{{ url_for('showcase_index') }}?k={{ token }}&lang={{ t }}">{% if t == 'en' %}🔗 Copy Demo Link{% else %}🔗 نسخ رابط العرض{% endif %}</a>
+        <a class="btn btn-alt" href="{{ url_for('showcase_admin_session') }}?k={{ token }}&next=/dashboard">{% if t == 'en' %}🛡️ Permanent Admin Tour{% else %}🛡️ جولة أدمن دائمة{% endif %}</a>
+      </div>
+      <div style="margin-top:12px; font-size:0.8rem; color:var(--muted); word-break:break-all;">
+        <strong>{% if t == 'en' %}Demo Link:{% else %}رابط العرض:{% endif %}</strong>
+        <br><code>{{ request.host_url }}x/showcase?k={{ token }}&lang={{ t }}</code>
+        <br><br>
+        <strong>{% if t == 'en' %}Admin Tour Link:{% else %}رابط جولة الأدمن:{% endif %}</strong>
+        <br><code>{{ request.host_url }}x/showcase/admin-session?k={{ token }}&next=/dashboard</code>
+      </div>
+    </section>
+    {% endif %}
+    <section class="cta">
+      <strong>{% if t == 'en' %}Interactive Admin Tour (Read-Only){% else %}جولة الأدمن التفاعلية (قراءة فقط){% endif %}</strong>
+      <p>
+        {% if t == 'en' %}Enter the real admin panel via the link below with browse-only permissions — no data can be changed. Navigate freely through all sections: Dashboard, Channels, Transactions, Matching, Agents, Games Admin, Statistics, Admins, Tickets, AI API Keys, and more.{% else %}ادخل لوحة الإدارة الحقيقية عبر الرابط أدناه بصلاحيات تصفح فقط — لا يمكن تغيير أي بيانات. تنقل بحرية عبر جميع الأقسام: لوحة التحكم، القنوات، المعاملات، المطابقة، الوكلاء، إدارة الألعاب، الإحصائيات، الأدمن، التذاكر، مفاتيح AI API، والمزيد.{% endif %}
+      </p>
+      <div class="card-actions">
+        <a class="btn btn-main" href="{{ url_for('showcase_admin_session') }}?k={{ token }}&next=/dashboard">{% if t == 'en' %}Launch Admin Tour{% else %}ابدأ جولة الأدمن{% endif %}</a>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

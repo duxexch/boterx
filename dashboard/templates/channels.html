@@ -7,30 +7,31 @@
 
     <!-- Tabs -->
     <div class="flex flex-wrap gap-1 bg-slate-800 rounded-xl border border-slate-700 p-1">
-        <button @click="setTab('campaigns')" :class="tab === 'campaigns' ? 'bg-green-600 text-white' : 'text-slate-400'" class="px-4 py-2 rounded-lg text-sm font-medium transition">📊 الحملات</button>
-        <button @click="setTab('channels')" :class="tab === 'channels' ? 'bg-blue-600 text-white' : 'text-slate-400'" class="px-4 py-2 rounded-lg text-sm font-medium transition">📡 القنوات</button>
-        <button @click="setTab('groups')" :class="tab === 'groups' ? 'bg-blue-600 text-white' : 'text-slate-400'" class="px-4 py-2 rounded-lg text-sm font-medium transition">📂 المجموعات</button>
-        <button @click="setTab('vault')" :class="tab === 'vault' ? 'bg-blue-600 text-white' : 'text-slate-400'" class="px-4 py-2 rounded-lg text-sm font-medium transition">📦 الأرشيف</button>
-        <button @click="setTab('ai')" :class="tab === 'ai' ? 'bg-blue-600 text-white' : 'text-slate-400'" class="px-4 py-2 rounded-lg text-sm font-medium transition">🤖 AI</button>
-        <button @click="setTab('report')" :class="tab === 'report' ? 'bg-blue-600 text-white' : 'text-slate-400'" class="px-4 py-2 rounded-lg text-sm font-medium transition">📊 التقرير</button>
-        <button @click="setTab('analytics')" :class="tab === 'analytics' ? 'bg-purple-600 text-white' : 'text-slate-400'" class="px-4 py-2 rounded-lg text-sm font-medium transition">📈 تحليلات</button>
-        <button @click="setTab('ainet')" :class="tab === 'ainet' ? 'bg-amber-600 text-white' : 'text-slate-400'" class="px-4 py-2 rounded-lg text-sm font-medium transition">🤝 الشبكة</button>
+        <button @click="setTab('campaigns')" :class="tab === 'campaigns' ? 'bg-green-600 text-white' : 'text-slate-400'" class="px-4 py-2 rounded-lg text-sm font-medium transition" data-i18n="campaigns_tab">📊 الحملات</button>
+        <button @click="setTab('channels')" :class="tab === 'channels' ? 'bg-blue-600 text-white' : 'text-slate-400'" class="px-4 py-2 rounded-lg text-sm font-medium transition" data-i18n="channels_tab">📡 القنوات</button>
+        <button @click="setTab('groups')" :class="tab === 'groups' ? 'bg-blue-600 text-white' : 'text-slate-400'" class="px-4 py-2 rounded-lg text-sm font-medium transition" data-i18n="groups_tab">📂 المجموعات</button>
+        <button @click="setTab('vault')" :class="tab === 'vault' ? 'bg-blue-600 text-white' : 'text-slate-400'" class="px-4 py-2 rounded-lg text-sm font-medium transition" data-i18n="vault_tab">📦 الأرشيف</button>
+        <button @click="setTab('ai')" :class="tab === 'ai' ? 'bg-blue-600 text-white' : 'text-slate-400'" class="px-4 py-2 rounded-lg text-sm font-medium transition" data-i18n="ai_tab">🤖 AI</button>
+        <button @click="setTab('report')" :class="tab === 'report' ? 'bg-blue-600 text-white' : 'text-slate-400'" class="px-4 py-2 rounded-lg text-sm font-medium transition" data-i18n="report_tab">📊 التقرير</button>
+        <button @click="setTab('analytics')" :class="tab === 'analytics' ? 'bg-purple-600 text-white' : 'text-slate-400'" class="px-4 py-2 rounded-lg text-sm font-medium transition" data-i18n="analytics_tab">📈 تحليلات</button>
+        <button @click="setTab('ainet')" :class="tab === 'ainet' ? 'bg-amber-600 text-white' : 'text-slate-400'" class="px-4 py-2 rounded-lg text-sm font-medium transition" data-i18n="ainet_tab">🤝 الشبكة</button>
+        <button @click="setTab('social')" :class="tab === 'social' ? 'bg-pink-600 text-white' : 'text-slate-400'" class="px-4 py-2 rounded-lg text-sm font-medium transition" data-i18n="social_tab">📱 السوشيال</button>
     </div>
 
     <!-- TAB: Ad Network -->
     <div x-show="tab === 'ainet'" class="space-y-4">
         <!-- KPIs -->
         <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
-            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">الشركاء</p><p class="text-2xl font-bold text-amber-400" x-text="adNet.total_partners || 0">0</p></div>
-            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">نشطون</p><p class="text-2xl font-bold text-green-400" x-text="adNet.active_partners || 0">0</p></div>
-            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">إجمالي المشتركين</p><p class="text-2xl font-bold text-blue-400" x-text="(adNet.total_subscribers || 0).toLocaleString()">0</p></div>
-            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">CPM</p><p class="text-2xl font-bold text-purple-400" x-text="adNet.cpm || 0">0</p></div>
-            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">الإيرادات</p><p class="text-2xl font-bold text-green-400" x-text="adNet.total_revenue || 0">0</p></div>
+            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400" data-i18n="total_partners">الشركاء</p><p class="text-2xl font-bold text-amber-400" x-text="adNet.total_partners || 0">0</p></div>
+            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400" data-i18n="active_partners">نشطون</p><p class="text-2xl font-bold text-green-400" x-text="adNet.active_partners || 0">0</p></div>
+            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400" data-i18n="total_subscribers">إجمالي المشتركين</p><p class="text-2xl font-bold text-blue-400" x-text="(adNet.total_subscribers || 0).toLocaleString()">0</p></div>
+            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400" data-i18n="cpm">CPM</p><p class="text-2xl font-bold text-purple-400" x-text="adNet.cpm || 0">0</p></div>
+            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400" data-i18n="total_revenue">الإيرادات</p><p class="text-2xl font-bold text-green-400" x-text="adNet.total_revenue || 0">0</p></div>
         </div>
         <!-- Partner list + add -->
         <div class="flex justify-between items-center">
             <h3 class="font-bold">📋 قنوات الشركاء</h3>
-            <button @click="showPartnerModal = true" class="btn btn-primary btn-sm">➕ شريك جديد</button>
+            <button @click="showPartnerModal = true" class="btn btn-primary btn-sm" data-i18n="new_partner">➕ شريك جديد</button>
         </div>
         <div class="space-y-2">
             <template x-for="p in partners" :key="p.id">
@@ -54,18 +55,18 @@
         <!-- Add partner modal -->
         <div x-show="showPartnerModal" x-transition class="modal-overlay" @click.self="showPartnerModal = false" style="display:none">
             <div class="modal">
-                <h3 class="font-bold text-lg mb-4">➕ إضافة قناة شريكة</h3>
+                <h3 class="font-bold text-lg mb-4" data-i18n="new_partner">➕ شريك جديد</h3>
                 <div class="space-y-3">
-                    <div><label class="block text-sm text-slate-400 mb-1">اسم القناة</label><input x-model="partnerForm.channel_name" class="input w-full" placeholder="مثال: قناة تداول"></div>
-                    <div><label class="block text-sm text-slate-400 mb-1">Chat ID</label><input x-model="partnerForm.chat_id" class="input w-full" placeholder="-100..." dir="ltr"></div>
+                    <div><label class="block text-sm text-slate-400 mb-1" data-i18n="channel_name">اسم القناة</label><input x-model="partnerForm.channel_name" class="input w-full" placeholder="مثال: قناة تداول"></div>
+                    <div><label class="block text-sm text-slate-400 mb-1" data-i18n="chat_id">Chat ID</label><input x-model="partnerForm.chat_id" class="input w-full" placeholder="-100..." dir="ltr"></div>
                     <div class="grid grid-cols-2 gap-3">
-                        <div><label class="block text-sm text-slate-400 mb-1">عدد المشتركين</label><input type="number" x-model="partnerForm.subscriber_count" class="input w-full" placeholder="5000"></div>
-                        <div><label class="block text-sm text-slate-400 mb-1">نسبة الأرباح %</label><input type="number" x-model="partnerForm.revenue_share" class="input w-full" placeholder="30"></div>
+                        <div><label class="block text-sm text-slate-400 mb-1" data-i18n="subscriber_count">عدد المشتركين</label><input type="number" x-model="partnerForm.subscriber_count" class="input w-full" placeholder="5000"></div>
+                        <div><label class="block text-sm text-slate-400 mb-1" data-i18n="revenue_share">نسبة الأرباح %</label><input type="number" x-model="partnerForm.revenue_share" class="input w-full" placeholder="30"></div>
                     </div>
-                    <div><label class="block text-sm text-slate-400 mb-1">الفئة</label><select x-model="partnerForm.category" class="input w-full"><option value="">—</option><option value="رياضة">⚽ رياضة</option><option value="مال">💰 مال</option><option value="تداول">💱 تداول</option><option value="ألعاب">🎮 ألعاب</option><option value="تسويق">📣 تسويق</option></select></div>
-                    <div><label class="block text-sm text-slate-400 mb-1">جهة الاتصال</label><input x-model="partnerForm.contact" class="input w-full" placeholder="@username"></div>
+                    <div><label class="block text-sm text-slate-400 mb-1" data-i18n="category">الفئة</label><select x-model="partnerForm.category" class="input w-full"><option value="" data-i18n="uncategorized">—</option><option value="رياضة" data-i18n="sports">⚽ رياضة</option><option value="مال" data-i18n="finance">💰 مال</option><option value="تداول" data-i18n="trading">💱 تداول</option><option value="ألعاب" data-i18n="games">🎮 ألعاب</option><option value="تسويق" data-i18n="marketing">📣 تسويق</option></select></div>
+                    <div><label class="block text-sm text-slate-400 mb-1" data-i18n="contact">جهة الاتصال</label><input x-model="partnerForm.contact" class="input w-full" placeholder="@username"></div>
                 </div>
-                <div class="flex gap-2 justify-end mt-4"><button @click="showPartnerModal = false" class="btn btn-sm" style="background:#475569">إلغاء</button><button @click="addPartner()" class="btn btn-primary btn-sm">إضافة</button></div>
+                <div class="flex gap-2 justify-end mt-4"><button @click="showPartnerModal = false" class="btn btn-sm" style="background:#475569" data-i18n="cancel">إلغاء</button><button @click="addPartner()" class="btn btn-primary btn-sm" data-i18n="add">إضافة</button></div>
             </div>
         </div>
     </div>
@@ -73,23 +74,23 @@
     <!-- TAB: Analytics -->
     <div x-show="tab === 'analytics'" class="space-y-4">
         <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
-            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">إجمالي الحملات</p><p class="text-2xl font-bold text-amber-400" x-text="analytics.total_campaigns || 0">0</p></div>
-            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">إجمالي الوصول</p><p class="text-2xl font-bold text-green-400" x-text="analytics.total_reach || 0">0</p></div>
-            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">إجمالي النقرات</p><p class="text-2xl font-bold text-blue-400" x-text="analytics.total_clicks || 0">0</p></div>
-            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">معدل النقر CTR</p><p class="text-2xl font-bold text-purple-400" x-text="(analytics.ctr || 0) + '%'">0%</p></div>
-            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">التحويلات</p><p class="text-2xl font-bold text-red-400" x-text="analytics.total_conversions || 0">0</p></div>
+            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400" data-i18n="total_campaigns">إجمالي الحملات</p><p class="text-2xl font-bold text-amber-400" x-text="analytics.total_campaigns || 0">0</p></div>
+            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400" data-i18n="total_reach">إجمالي الوصول</p><p class="text-2xl font-bold text-green-400" x-text="analytics.total_reach || 0">0</p></div>
+            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400" data-i18n="total_clicks">إجمالي النقرات</p><p class="text-2xl font-bold text-blue-400" x-text="analytics.total_clicks || 0">0</p></div>
+            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400" data-i18n="ctr">معدل النقر CTR</p><p class="text-2xl font-bold text-purple-400" x-text="(analytics.ctr || 0) + '%'">0%</p></div>
+            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400" data-i18n="conversions">التحويلات</p><p class="text-2xl font-bold text-red-400" x-text="analytics.total_conversions || 0">0</p></div>
         </div>
         <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
-            <h3 class="font-bold mb-3">🏆 أفضل الحملات</h3>
-            <table class="data-table"><thead><tr><th>الحملة</th><th>الوصول</th><th>النقرات</th><th>CTR</th></tr></thead><tbody>
+            <h3 class="font-bold mb-3" data-i18n="top_campaigns">🏆 أفضل الحملات</h3>
+            <table class="data-table"><thead><tr><th data-i18n="campaign_name">الحملة</th><th data-i18n="reach">الوصول</th><th data-i18n="clicks">النقرات</th><th data-i18n="ctr">CTR</th></tr></thead><tbody>
                 <template x-for="c in (analytics.top_campaigns || [])" :key="c.name">
                     <tr class="hover:bg-slate-700/50"><td class="text-sm font-bold" x-text="c.name"></td><td class="text-green-400 font-bold" x-text="c.reach"></td><td class="text-blue-400 font-bold" x-text="c.clicks"></td><td class="text-purple-400" x-text="c.reach > 0 ? (c.clicks / c.reach * 100).toFixed(1) + '%' : '0%'"></td></tr>
                 </template>
-                <tr x-show="(analytics.top_campaigns || []).length === 0"><td colspan="4" class="text-center text-slate-400 p-4">لا توجد بيانات بعد</td></tr>
+                <tr x-show="(analytics.top_campaigns || []).length === 0"><td colspan="4" class="text-center text-slate-400 p-4" data-i18n="no_data">لا توجد بيانات بعد</td></tr>
             </tbody></table>
         </div>
         <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
-            <h3 class="font-bold mb-3">📅 الوصول اليومي (7 أيام)</h3>
+            <h3 class="font-bold mb-3" data-i18n="daily_reach">📅 الوصول اليومي (7 أيام)</h3>
             <div class="flex items-end gap-2 h-32">
                 <template x-for="(reach, date) in (analytics.daily_reach || {})" :key="date">
                     <div class="flex-1 flex flex-col items-center gap-1">
@@ -98,7 +99,7 @@
                         <span class="text-[10px] text-green-400 font-bold" x-text="reach"></span>
                     </div>
                 </template>
-                <div x-show="Object.keys(analytics.daily_reach || {}).length === 0" class="text-slate-400 text-sm w-full text-center self-center">لا توجد بيانات</div>
+                <div x-show="Object.keys(analytics.daily_reach || {}).length === 0" class="text-slate-400 text-sm w-full text-center self-center" data-i18n="no_data">لا توجد بيانات</div>
             </div>
         </div>
     </div>
@@ -470,7 +471,189 @@
         </div>
         <div class="bg-slate-800 rounded-xl border border-slate-700 p-4"><h3 class="font-bold mb-2">📜 آخر الترحيلات</h3><table class="data-table"><thead><tr><th data-i18n="time">Time</th><th data-i18n="source">Source</th><th data-i18n="preview">Preview</th><th data-i18n="users_count">Users</th><th data-i18n="channels_count">Channels</th></tr></thead><tbody><template x-for="log in relayLogs" :key="log.timestamp"><tr class="hover:bg-slate-700/50"><td class="text-xs text-slate-400" x-text="log.timestamp"></td><td class="text-xs" x-text="log.source_type === 'broadcast' ? 'بث' : 'قناة'"></td><td class="text-xs max-w-xs truncate" x-text="log.preview"></td><td class="font-bold text-green-400" x-text="log.users_relayed || 0"></td><td class="font-bold text-amber-400" x-text="log.channels_relayed || 0"></td></tr></template></tbody></table></div>
     </div>
-</div>
+<!-- TAB: Social Media Accounts -->
+    <div x-show="tab === 'social'" class="space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+            <div>
+                <h2 class="text-xl font-bold">📱 حسابات السوشيال ميديا للوكلاء الفرعيين</h2>
+                <p class="text-sm text-slate-400 mt-1">إدارة حسابات السوشيال ميديا للوكلاء الفرعيين - ربط الحسابات، إدارة الصلاحيات، وتتبع الأداء</p>
+            </div>
+            <button @click="openAddSocialAccountModal()" class="btn btn-primary btn-sm">
+                <i class="fas fa-plus"></i> <span data-i18n="add_social_account">إضافة حساب سوشيال</span>
+            </button>
+        </div>
+
+        <!-- Stats Cards -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400" data-i18n="total_accounts">إجمالي الحسابات</p><p class="text-2xl font-bold text-amber-400" x-text="socialAccounts.length">0</p></div>
+            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400" data-i18n="active_accounts">حسابات نشطة</p><p class="text-2xl font-bold text-green-400" x-text="socialAccounts.filter(a => a.is_active === 'yes').length">0</p></div>
+            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400" data-i18n="platforms_connected">منصات متصلة</p><p class="text-2xl font-bold text-blue-400" x-text="uniquePlatforms.length">0</p></div>
+            <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400" data-i18n="sub_agents_connected">وكلاء متصلين</p><p class="text-2xl font-bold text-purple-400" x-text="subAgentsWithAccounts.length">0</p></div>
+        </div>
+
+        <!-- Social Accounts Table -->
+        <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-slate-700 bg-slate-800/80">
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="platform">Platform</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="account_name">Account Name</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="sub_agent">Sub Agent</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="handle">Handle/Username</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="followers">Followers</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="status">Status</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="last_sync">Last Sync</th>
+                            <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="actions">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="acc in socialAccounts" :key="acc.id">
+                            <tr class="border-b border-slate-700/50 hover:bg-slate-700/30 transition">
+                                <td class="px-4 py-3">
+                                    <span class="px-2 py-0.5 rounded text-xs font-bold" :class="platformClass(acc.platform)" x-text="platformLabel(acc.platform)"></span>
+                                </td>
+                                <td class="px-4 py-3 font-medium" x-text="acc.account_name"></td>
+                                <td class="px-4 py-3">
+                                    <span class="px-2 py-0.5 rounded text-xs bg-blue-500/20 text-blue-400" x-text="acc.sub_agent_name || '—'"></span>
+                                </td>
+                                <td class="px-4 py-3 font-mono text-xs" x-text="acc.handle || '—'"></td>
+                                <td class="px-4 py-3 text-green-400 font-bold" x-text="(acc.followers || 0).toLocaleString()"></td>
+                                <td class="px-4 py-3">
+                                    <span x-html="statusBadge(acc.is_active === 'yes' ? 'active' : 'inactive')"></span>
+                                </td>
+                                <td class="px-4 py-3 text-slate-400 text-xs" x-text="acc.last_sync || '—'"></td>
+                                <td class="px-4 py-3">
+                                    <div class="flex items-center gap-1">
+                                        <button @click="editSocialAccount(acc)" class="p-1.5 rounded hover:bg-slate-600 text-slate-400 hover:text-blue-400 transition" title="Edit" data-i18n-title="edit"><i class="fas fa-edit text-sm"></i></button>
+                                        <button @click="toggleSocialAccount(acc)" class="p-1.5 rounded hover:bg-slate-600 text-slate-400 hover:text-amber-400 transition" title="Toggle"><i class="fas fa-power-off text-sm"></i></button>
+                                        <button @click="syncSocialAccount(acc)" class="p-1.5 rounded hover:bg-slate-600 text-slate-400 hover:text-blue-400 transition" title="Sync"><i class="fas fa-sync text-sm"></i></button>
+                                        <button @click="confirmDeleteSocialAccount(acc)" class="p-1.5 rounded hover:bg-slate-600 text-slate-400 hover:text-red-400 transition" title="Delete" data-i18n-title="delete"><i class="fas fa-trash text-sm"></i></button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </template>
+                        <tr x-show="socialAccounts.length === 0">
+                            <td colspan="8" class="px-4 py-8 text-center text-slate-500">
+                                <i class="fas fa-link text-3xl mb-2 block"></i>
+                                <span data-i18n="no_social_accounts">لا توجد حسابات سوشيال ميديا — أضف أول حساب</span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Add/Edit Social Account Modal -->
+        <div x-show="showSocialAccountModal" x-transition class="modal-overlay" @click.self="showSocialAccountModal = false" style="display:none">
+            <div class="modal max-w-2xl">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="font-bold text-lg" x-text="editingSocialAccountId ? 'تعديل حساب سوشيال' : 'إضافة حساب سوشيال'"></h3>
+                    <button @click="showSocialAccountModal = false" class="text-slate-400 hover:text-white"><i class="fas fa-times"></i></button>
+                </div>
+                <form @submit.prevent="saveSocialAccount()" class="p-5 space-y-4">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-sm text-slate-400 mb-1" data-i18n="platform">Platform <span class="text-red-400">*</span></label>
+                            <select x-model="socialForm.platform" class="input w-full" @change="onPlatformChange()" required>
+                                <option value="">— اختر المنصة —</option>
+                                <option value="facebook">📘 Facebook Page</option>
+                                <option value="instagram">📷 Instagram Business</option>
+                                <option value="twitter">🐦 Twitter/X</option>
+                                <option value="linkedin">💼 LinkedIn Page</option>
+                                <option value="youtube">📺 YouTube Channel</option>
+                                <option value="tiktok">🎵 TikTok</option>
+                                <option value="telegram">📱 Telegram Channel</option>
+                                <option value="whatsapp">💬 WhatsApp Business</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm text-slate-400 mb-1" data-i18n="account_name">Account Name <span class="text-red-400">*</span></label>
+                            <input x-model="socialForm.account_name" required type="text" class="input w-full" placeholder="My Business Page">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm text-slate-400 mb-1" data-i18n="handle">Handle/Username <span class="text-red-400">*</span></label>
+                        <input x-model="socialForm.handle" required type="text" class="input w-full" placeholder="@username or Page ID">
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-sm text-slate-400 mb-1" data-i18n="sub_agent">Sub Agent <span class="text-red-400">*</span></label>
+                            <select x-model="socialForm.sub_agent_id" class="input w-full" required>
+                                <option value="">— اختر الوكيل الفرعي —</option>
+                                <template x-for="agent in subAgents" :key="agent.id">
+                                    <option :value="agent.id" x-text="agent.name + ' (' + agent.username + ')'"></option>
+                                </template>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm text-slate-400 mb-1" data-i18n="access_token">Access Token <span class="text-red-400">*</span></label>
+                            <input x-model="socialForm.access_token" required type="password" class="input w-full font-mono" placeholder="Paste access token here">
+                        </div>
+                    </div>
+                    <div x-show="socialForm.platform === 'facebook' || socialForm.platform === 'instagram'">
+                        <label class="block text-sm text-slate-400 mb-1" data-i18n="page_id">Page ID / Business Account ID</label>
+                        <input x-model="socialForm.page_id" type="text" class="input w-full" placeholder="Page ID or Business Account ID">
+                    </div>
+                    <div x-show="socialForm.platform === 'whatsapp'">
+                        <label class="block text-sm text-slate-400 mb-1" data-i18n="phone_number_id">Phone Number ID</label>
+                        <input x-model="socialForm.phone_number_id" type="text" class="input w-full" placeholder="WhatsApp Phone Number ID">
+                        <label class="block text-sm text-slate-400 mb-1 mt-2" data-i18n="business_account_id">Business Account ID</label>
+                        <input x-model="socialForm.business_account_id" type="text" class="input w-full" placeholder="WhatsApp Business Account ID">
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-sm text-slate-400 mb-1" data-i18n="posting_permissions">Posting Permissions</label>
+                            <select x-model="socialForm.posting_permissions" class="input w-full">
+                                <option value="full">Full Access - Post, Reply, Manage</option>
+                                <option value="post_only">Post Only</option>
+                                <option value="read_only">Read Only - Analytics Only</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm text-slate-400 mb-1" data-i18n="content_categories">Content Categories</label>
+                            <select x-model="socialForm.content_categories" class="input w-full" multiple>
+                                <option value="promotional">📢 Promotional</option>
+                                <option value="educational">📚 Educational</option>
+                                <option value="news">📰 News</option>
+                                <option value="entertainment">🎮 Entertainment</option>
+                                <option value="support">🛟 Support</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3 pt-2">
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" x-model="socialForm.is_active" class="sr-only peer">
+                            <div class="w-10 h-5 bg-slate-600 peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-5 rtl:peer-checked:after:-translate-x-5 peer-checked:bg-green-500 after:content-[''] after:absolute after:top-0.5 after:start-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all"></div>
+                            <span class="mr-2 text-sm text-slate-300" data-i18n="is_active">Active</span>
+                        </label>
+                    </div>
+                    <div class="flex gap-3 pt-2">
+                        <button type="submit" class="flex-1 btn btn-primary" x-text="editingSocialAccountId ? 'حفظ التعديلات' : 'إضافة الحساب'"></button>
+                        <button type="button" @click="showSocialAccountModal = false" class="flex-1 btn btn-secondary" data-i18n="cancel">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Delete Confirmation Modal -->
+        <div x-show="showDeleteSocialModal" x-transition class="modal-overlay" @click.self="showDeleteSocialModal = false" style="display:none">
+            <div class="modal" style="max-width:400px">
+                <div class="p-6 text-center">
+                    <div class="w-14 h-14 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-exclamation-triangle text-red-400 text-2xl"></i>
+                    </div>
+                    <h3 class="text-lg font-bold mb-2" data-i18n="confirm_delete">تأكيد الحذف</h3>
+                    <p class="text-sm text-slate-400">{% if t == 'en' %}Are you sure you want to delete the social account "<span class="text-white font-semibold" x-text="deleteSocialTarget?.account_name"></span>"?{% else %}هل أنت متأكد من حذف حساب السوشيال "<span class="text-white font-semibold" x-text="deleteSocialTarget?.account_name"></span>"?{% endif %}</p>
+                    <p class="text-xs text-red-400 mt-2">{% if t == 'en' %}This action cannot be undone.{% else %}هذا الإجراء لا يمكن التراجع عنه.{% endif %}</p>
+                    <div class="flex gap-3 mt-6">
+                        <button @click="deleteSocialAccount()" class="flex-1 btn btn-danger" data-i18n="delete">Delete</button>
+                        <button @click="showDeleteSocialModal = false" class="flex-1 btn btn-secondary" data-i18n="cancel">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 {% endblock %}
 
 {% block scripts %}
@@ -493,8 +676,17 @@ function channelsApp() {
         trForm: { find_text: '', replace_text: '' },
         report: {},
 
+        // Social Media Accounts
+        socialAccounts: [],
+        subAgents: [],
+        showSocialAccountModal: false,
+        showDeleteSocialModal: false,
+        editingSocialAccountId: null,
+        deleteSocialTarget: null,
+        socialForm: { platform: '', account_name: '', handle: '', sub_agent_id: '', access_token: '', page_id: '', phone_number_id: '', business_account_id: '', posting_permissions: 'full', content_categories: [], is_active: true },
+
         async init() { await this.loadAll(); },
-        setTab(t) { this.tab = t; if (t === 'vault') this.loadVault(); if (t === 'ai') { this.loadAI(); this.loadAIAgents(); this.loadPlatformAccounts(); this.loadSourceChannels(); } if (t === 'report') this.loadReport(); if (t === 'groups') this.loadGroups(); if (t === 'campaigns') this.loadCampaigns(); if (t === 'analytics') this.loadAnalytics(); if (t === 'ainet') this.loadAdNet(); },
+        setTab(t) { this.tab = t; if (t === 'vault') this.loadVault(); if (t === 'ai') { this.loadAI(); this.loadAIAgents(); this.loadPlatformAccounts(); this.loadSourceChannels(); } if (t === 'report') this.loadReport(); if (t === 'groups') this.loadGroups(); if (t === 'campaigns') this.loadCampaigns(); if (t === 'analytics') this.loadAnalytics(); if (t === 'ainet') this.loadAdNet(); if (t === 'social') this.loadSocialAccounts(); },
         async loadAll() { await Promise.all([this.loadChannels(), this.loadGroups(), this.loadAI(), this.loadAIAgents(), this.loadPlatformAccounts(), this.loadSourceChannels(), this.loadReport(), this.loadReplacements(), this.loadVault(), this.loadRelayLogs(), this.loadCampaigns(), this.loadAnalytics(), this.loadPartners(), this.loadAdNet()]); },
 
         get filteredChannels() {
@@ -670,6 +862,43 @@ function channelsApp() {
         async deleteCampaign(id) {
             if (!confirm('حذف الحملة؟')) return;
             try { await api(`/api/campaigns/${id}`, { method: 'DELETE' }); await this.loadCampaigns(); } catch(e) {}
+        },
+
+        // ── Social Media Accounts ──
+        async loadSocialAccounts() { try { const d = await api('/api/social-accounts'); this.socialAccounts = d.accounts || []; this.subAgents = d.sub_agents || []; } catch(e) {} },
+        get uniquePlatforms() { return [...new Set(this.socialAccounts.map(a => a.platform))]; },
+        get subAgentsWithAccounts() { return [...new Set(this.socialAccounts.filter(a => a.sub_agent_id).map(a => a.sub_agent_id))]; },
+        platformLabel(p) { const labels = { facebook: 'Facebook', instagram: 'Instagram', twitter: 'Twitter/X', linkedin: 'LinkedIn', youtube: 'YouTube', tiktok: 'TikTok', telegram: 'Telegram', whatsapp: 'WhatsApp' }; return labels[p] || p; },
+        platformClass(p) { const cls = { facebook: 'bg-blue-500/20 text-blue-400', instagram: 'bg-pink-500/20 text-pink-400', twitter: 'bg-sky-500/20 text-sky-400', linkedin: 'bg-indigo-500/20 text-indigo-400', youtube: 'bg-red-500/20 text-red-400', tiktok: 'bg-purple-500/20 text-purple-400', telegram: 'bg-blue-600/20 text-blue-500', whatsapp: 'bg-green-500/20 text-green-400' }; return cls[p] || 'bg-slate-500/20 text-slate-400'; },
+
+        openAddSocialAccountModal() { this.editingSocialAccountId = null; this.socialForm = { platform: '', account_name: '', handle: '', sub_agent_id: '', access_token: '', page_id: '', phone_number_id: '', business_account_id: '', posting_permissions: 'full', content_categories: [], is_active: true }; this.showSocialAccountModal = true; },
+
+        openEditSocialAccountModal(acc) { this.editingSocialAccountId = acc.id; this.socialForm = { ...acc }; this.showSocialAccountModal = true; },
+
+        async onPlatformChange() { if (this.socialForm.platform === 'facebook') { this.socialForm.posting_permissions = 'full'; } else if (this.socialForm.platform === 'instagram') { this.socialForm.posting_permissions = 'post_only'; } else if (this.socialForm.platform === 'twitter') { this.socialForm.posting_permissions = 'full'; } },
+
+        async saveSocialAccount() {
+            if (!this.socialForm.platform || !this.socialForm.account_name || !this.socialForm.handle || !this.socialForm.sub_agent_id || !this.socialForm.access_token) return toast('املأ الحقول المطلوبة', 'warning');
+            const payload = { ...this.socialForm };
+            try {
+                const url = this.editingSocialAccountId ? `/api/social-accounts/${this.editingSocialAccountId}` : '/api/social-accounts';
+                const method = this.editingSocialAccountId ? 'PUT' : 'POST';
+                await api(url, { method, body: JSON.stringify(payload) });
+                toast(this.editingSocialAccountId ? 'تم تحديث الحساب' : 'تمت إضافة الحساب', 'success');
+                this.showSocialAccountModal = false;
+                await this.loadSocialAccounts();
+            } catch(e) { toast('فشل الحفظ', 'error'); }
+        },
+
+        async toggleSocialAccount(acc) { try { await api(`/api/social-accounts/${acc.id}/toggle`, { method: 'POST', body: '{}' }); await this.loadSocialAccounts(); } catch(e) {} },
+
+        async syncSocialAccount(acc) { try { const d = await api(`/api/social-accounts/${acc.id}/sync`, { method: 'POST', body: '{}' }); toast(d.success ? 'تم التزامن' : (d.error || 'فشل التزامن'), d.success ? 'success' : 'error'); await this.loadSocialAccounts(); } catch(e) { toast('فشل التزامن', 'error'); } },
+
+        confirmDeleteSocialAccount(acc) { this.deleteSocialTarget = acc; this.showDeleteSocialModal = true; },
+
+        async deleteSocialAccount() {
+            if (!this.deleteSocialTarget) return;
+            try { await api(`/api/social-accounts/${this.deleteSocialTarget.id}`, { method: 'DELETE' }); toast('تم الحذف', 'success'); this.showDeleteSocialModal = false; this.deleteSocialTarget = null; await this.loadSocialAccounts(); } catch(e) { toast('فشل الحذف', 'error'); }
         }
     }
 }

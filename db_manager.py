@@ -236,6 +236,67 @@ def _init_db():
                 expires_at  REAL NOT NULL
             );
             CREATE INDEX IF NOT EXISTS idx_nonces_exp ON auth_nonces(expires_at);
+
+            -- AI API Keys for multi-provider LLM integration
+            CREATE TABLE IF NOT EXISTS ai_api_keys (
+                id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                key_name         TEXT NOT NULL,
+                provider         TEXT NOT NULL,
+                api_key          TEXT NOT NULL,
+                base_url         TEXT DEFAULT '',
+                default_model    TEXT NOT NULL,
+                priority         INTEGER NOT NULL DEFAULT 10,
+                temperature      REAL NOT NULL DEFAULT 0.7,
+                max_tokens       INTEGER NOT NULL DEFAULT 4096,
+                timeout_seconds  INTEGER NOT NULL DEFAULT 60,
+                is_active        INTEGER NOT NULL DEFAULT 1,
+                models_list      TEXT DEFAULT '[]',
+                requests_today   INTEGER NOT NULL DEFAULT 0,
+                tokens_today     INTEGER NOT NULL DEFAULT 0,
+                cost_estimate_usd REAL NOT NULL DEFAULT 0.0,
+                created_at       TEXT NOT NULL,
+                updated_at       TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_ai_keys_provider ON ai_api_keys(provider);
+            CREATE INDEX IF NOT EXISTS idx_ai_keys_active ON ai_api_keys(is_active);
+
+            -- Social Media Accounts for sub-agents
+            CREATE TABLE IF NOT EXISTS social_accounts (
+                id                TEXT PRIMARY KEY,
+                platform          TEXT NOT NULL,
+                account_name      TEXT NOT NULL,
+                handle            TEXT NOT NULL,
+                sub_agent_id      TEXT NOT NULL,
+                sub_agent_name    TEXT NOT NULL,
+                access_token      TEXT NOT NULL,
+                page_id           TEXT DEFAULT '',
+                phone_number_id   TEXT DEFAULT '',
+                business_account_id TEXT DEFAULT '',
+                posting_permissions TEXT NOT NULL DEFAULT 'full',
+                content_categories TEXT DEFAULT '',
+                is_active         TEXT NOT NULL DEFAULT 'yes',
+                followers         INTEGER NOT NULL DEFAULT 0,
+                last_sync         TEXT DEFAULT '',
+                created_at        TEXT NOT NULL,
+                updated_at        TEXT NOT NULL,
+                created_by        TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_social_accounts_platform ON social_accounts(platform);
+            CREATE INDEX IF NOT EXISTS idx_social_accounts_agent ON social_accounts(sub_agent_id);
+            CREATE INDEX IF NOT EXISTS idx_social_accounts_active ON social_accounts(is_active);
+
+            -- Social Media Posts Log
+            CREATE TABLE IF NOT EXISTS social_posts (
+                id                TEXT PRIMARY KEY,
+                account_id        TEXT NOT NULL,
+                content           TEXT,
+                media_urls        TEXT,
+                status            TEXT NOT NULL,
+                posted_at         TEXT NOT NULL,
+                created_at        TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_social_posts_account ON social_posts(account_id);
+            CREATE INDEX IF NOT EXISTS idx_social_posts_posted ON social_posts(posted_at);
         ''')
         conn.commit()
     finally:

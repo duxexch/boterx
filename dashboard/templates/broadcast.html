@@ -26,17 +26,17 @@
                     <span class="w-1 h-4 bg-green-500 rounded-full"></span> الجمهور
                 </div>
                 <div class="grid grid-cols-2 gap-3">
-                    <button @click="recipient='all'; countryFilter='all'"
+                    <button @click="recipient='all'; countryFilter='all'; broadcastToAllAgents=false; targetAgents=[]; targetCountries=[]; targetPlatforms=[]; broadcastToAllChannels=false"
                         :class="recipient==='all' ? 'border-green-500 bg-green-500/10 text-green-400' : 'border-slate-600 bg-slate-700/50 text-slate-400 hover:border-slate-500'"
                         class="rounded-xl border-2 px-4 py-3.5 text-sm font-bold transition flex items-center gap-3">
                         <i class="fas fa-users text-xl"></i>
-                        <div class="text-right"><div>جماعي</div><div class="text-[10px] opacity-70 font-normal">كل المستخدمين</div></div>
+                        <div class="text-right"><div data-i18n="broadcast_all">جماعي</div><div class="text-[10px] opacity-70 font-normal" data-i18n="all_users">كل المستخدمين</div></div>
                     </button>
                     <button @click="recipient='single'"
                         :class="recipient==='single' ? 'border-amber-500 bg-amber-500/10 text-amber-400' : 'border-slate-600 bg-slate-700/50 text-slate-400 hover:border-slate-500'"
                         class="rounded-xl border-2 px-4 py-3.5 text-sm font-bold transition flex items-center gap-3">
                         <i class="fas fa-user-tag text-xl"></i>
-                        <div class="text-right"><div>فردي</div><div class="text-[10px] opacity-70 font-normal">مستخدم محدد</div></div>
+                        <div class="text-right"><div data-i18n="broadcast_single">فردي</div><div class="text-[10px] opacity-70 font-normal" data-i18n="specific_user">مستخدم محدد</div></div>
                     </button>
                 </div>
 
@@ -83,23 +83,159 @@
                         <option value="OM">🇴🇲 عمان</option><option value="LB">🇱🇧 لبنان</option><option value="SY">🇸🇾 سوريا</option>
                     </select>
                 </div>
+
+                <!-- Multi-country selection for broadcast -->
+                <div x-show="recipient==='all'" x-collapse class="space-y-2">
+                    <label class="block text-xs text-slate-400 mb-1" data-i18n="target_countries">الدول المستهدفة (متعددة)</label>
+                    <div class="flex flex-wrap gap-2">
+                        <template x-for="c in availableCountries" :key="c.code">
+                            <label class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-600 bg-slate-700/50 hover:bg-slate-700 cursor-pointer transition">
+                                <input type="checkbox" x-model="targetCountries" :value="c.code" class="w-4 h-4 text-blue-500 rounded focus:ring-blue-500">
+                                <span class="text-sm" x-text="c.name"></span>
+                            </label>
+                        </template>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Target Agents Section -->
+            <div class="space-y-3">
+                <div class="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-wider">
+                    <span class="w-1 h-4 bg-purple-500 rounded-full"></span> <span data-i18n="target_agents">الوكلاء المستهدفين</span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" x-model="broadcastToAllAgents" class="sr-only peer">
+                        <div class="w-10 h-5 bg-slate-600 peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-5 rtl:peer-checked:after:-translate-x-5 peer-checked:bg-purple-500 after:content-[''] after:absolute after:top-0.5 after:start-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all"></div>
+                        <span class="mr-2 text-sm text-slate-300" data-i18n="broadcast_to_all_agents">بث لجميع الوكلاء</span>
+                    </label>
+                </div>
+                <div x-show="!broadcastToAllAgents" x-collapse class="space-y-2">
+                    <div class="relative">
+                        <input type="text" x-model="agentSearchQuery" @input.debounce.300ms="searchAgents()"
+                               class="input w-full pl-10" placeholder="ابحث بالاسم، رقم الهاتف، رقم العميل، أو Telegram ID...">
+                        <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"></i>
+                        <div x-show="agentSearchResults.length > 0" x-cloak
+                             class="absolute z-20 mt-1 w-full bg-slate-700 border border-slate-600 rounded-xl max-h-52 overflow-y-auto shadow-2xl">
+                            <template x-for="a in agentSearchResults" :key="a.id">
+                                <label class="flex items-center gap-3 p-3 hover:bg-slate-600 cursor-pointer border-b border-slate-600/50">
+                                    <input type="checkbox" x-model="targetAgents" :value="a.id" class="w-4 h-4 text-purple-500 rounded focus:ring-purple-500">
+                                    <div class="flex-1">
+                                        <div class="text-sm font-bold text-slate-200" x-text="a.name"></div>
+                                        <div class="text-xs text-slate-400" x-text="a.customer_id + ' • ' + (a.currency||'')"></div>
+                                    </div>
+                                </label>
+                            </template>
+                        </div>
+                    </div>
+                    <div x-show="targetAgents.length > 0" x-cloak class="p-3 bg-purple-500/10 border border-purple-500/20 rounded-xl flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <i class="fas fa-users text-purple-400"></i>
+                            <span class="text-sm font-bold text-purple-400" x-text="targetAgents.length + ' وكلاء مختارين'"></span>
+                        </div>
+                        <button @click="targetAgents = []" class="text-red-400 hover:text-red-300 text-sm"><i class="fas fa-times-circle"></i> <span data-i18n="clear_selection">مسح التحديد</span></button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Target Countries Section (Multi-select) -->
+            <div class="space-y-3">
+                <div class="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-wider">
+                    <span class="w-1 h-4 bg-green-500 rounded-full"></span> <span data-i18n="target_countries_label">الدول المستهدفة</span>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <template x-for="c in availableCountries" :key="c.code">
+                        <label class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-600 bg-slate-700/50 hover:bg-slate-700 cursor-pointer transition">
+                            <input type="checkbox" x-model="targetCountries" :value="c.code" class="w-4 h-4 text-green-500 rounded focus:ring-green-500">
+                            <span class="text-sm" x-text="c.name"></span>
+                        </label>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Target Social Platforms Section -->
+            <div class="space-y-3">
+                <div class="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-wider">
+                    <span class="w-1 h-4 bg-pink-500 rounded-full"></span> <span data-i18n="target_platforms">منصات السوشيال ميديا</span>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <template x-for="p in socialPlatforms" :key="p.code">
+                        <label class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-600 bg-slate-700/50 hover:bg-slate-700 cursor-pointer transition">
+                            <input type="checkbox" x-model="targetPlatforms" :value="p.code" class="w-4 h-4 text-pink-500 rounded focus:ring-pink-500">
+                            <span class="text-sm flex items-center gap-1" :style="'color: ' + p.color" x-text="p.name"></span>
+                        </label>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Broadcast to All Channels -->
+            <div class="space-y-3">
+                <div class="flex items-center gap-3">
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" x-model="broadcastToAllChannels" class="sr-only peer">
+                        <div class="w-10 h-5 bg-slate-600 peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-5 rtl:peer-checked:after:-translate-x-5 peer-checked:bg-pink-500 after:content-[''] after:absolute after:top-0.5 after:start-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all"></div>
+                        <span class="mr-2 text-sm text-slate-300" data-i18n="broadcast_to_all_channels">بث لجميع القنوات المتصلة</span>
+                    </label>
+                </div>
             </div>
 
             <!-- ── SECTION: Channel ── -->
             <div class="space-y-3">
                 <div class="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-wider">
-                    <span class="w-1 h-4 bg-blue-500 rounded-full"></span> القناة
+                    <span class="w-1 h-4 bg-blue-500 rounded-full"></span> <span data-i18n="channel">القناة</span>
                 </div>
                 <div class="grid grid-cols-3 gap-3">
                     <button @click="target='telegram'" :class="target==='telegram' ? 'border-blue-500 bg-blue-500/10 text-blue-400' : 'border-slate-600 bg-slate-700/50 text-slate-400 hover:border-slate-500'" class="rounded-xl border-2 py-3 px-2 text-xs font-bold transition flex flex-col items-center gap-1">
-                        <i class="fab fa-telegram text-xl"></i> تيليغرام
+                        <i class="fab fa-telegram text-xl"></i> <span data-i18n="telegram">تيليغرام</span>
                     </button>
                     <button @click="target='web'" :class="target==='web' ? 'border-green-500 bg-green-500/10 text-green-400' : 'border-slate-600 bg-slate-700/50 text-slate-400 hover:border-slate-500'" class="rounded-xl border-2 py-3 px-2 text-xs font-bold transition flex flex-col items-center gap-1">
-                        <i class="fas fa-globe text-xl"></i> الموقع
+                        <i class="fas fa-globe text-xl"></i> <span data-i18n="web">الموقع</span>
                     </button>
                     <button @click="target='both'" :class="target==='both' ? 'border-amber-500 bg-amber-500/10 text-amber-400' : 'border-slate-600 bg-slate-700/50 text-slate-400 hover:border-slate-500'" class="rounded-xl border-2 py-3 px-2 text-xs font-bold transition flex flex-col items-center gap-1">
-                        <i class="fas fa-bullhorn text-xl"></i> الاثنين
+                        <i class="fas fa-bullhorn text-xl"></i> <span data-i18n="both_channels">الاثنين</span>
                     </button>
+                </div>
+            </div>
+
+            <!-- ── SECTION: Social Media Platforms ── -->
+            <div class="space-y-3">
+                <div class="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-wider">
+                    <span class="w-1 h-4 bg-pink-500 rounded-full"></span> <span data-i18n="social_platforms">منصات السوشيال ميديا</span>
+                </div>
+                <div class="grid grid-cols-3 gap-3">
+                    <button @click="target='facebook'" :class="target==='facebook' ? 'border-blue-600 bg-blue-600/20 text-blue-400' : 'border-slate-600 bg-slate-700/50 text-slate-400 hover:border-slate-500'" class="rounded-xl border-2 py-3 px-2 text-xs font-bold transition flex flex-col items-center gap-1">
+                        <i class="fab fa-facebook-f text-xl" style="color: #1877F2;"></i> <span data-i18n="facebook">فيسبوك</span>
+                    </button>
+                    <button @click="target='instagram'" :class="target==='instagram' ? 'border-pink-600 bg-pink-600/20 text-pink-400' : 'border-slate-600 bg-slate-700/50 text-slate-400 hover:border-slate-500'" class="rounded-xl border-2 py-3 px-2 text-xs font-bold transition flex flex-col items-center gap-1">
+                        <i class="fab fa-instagram text-xl" style="color: #E4405F;"></i> <span data-i18n="instagram">إنستجرام</span>
+                    </button>
+                    <button @click="target='twitter'" :class="target==='twitter' ? 'border-sky-600 bg-sky-600/20 text-sky-400' : 'border-slate-600 bg-slate-700/50 text-slate-400 hover:border-slate-500'" class="rounded-xl border-2 py-3 px-2 text-xs font-bold transition flex flex-col items-center gap-1">
+                        <i class="fab fa-x-twitter text-xl" style="color: #1DA1F2;"></i> <span data-i18n="twitter">تويتر/إكس</span>
+                    </button>
+                    <button @click="target='linkedin'" :class="target==='linkedin' ? 'border-indigo-600 bg-indigo-600/20 text-indigo-400' : 'border-slate-600 bg-slate-700/50 text-slate-400 hover:border-slate-500'" class="rounded-xl border-2 py-3 px-2 text-xs font-bold transition flex flex-col items-center gap-1">
+                        <i class="fab fa-linkedin-in text-xl" style="color: #0A66C2;"></i> <span data-i18n="linkedin">لينكدإن</span>
+                    </button>
+                    <button @click="target='youtube'" :class="target==='youtube' ? 'border-red-600 bg-red-600/20 text-red-400' : 'border-slate-600 bg-slate-700/50 text-slate-400 hover:border-slate-500'" class="rounded-xl border-2 py-3 px-2 text-xs font-bold transition flex flex-col items-center gap-1">
+                        <i class="fab fa-youtube text-xl" style="color: #FF0000;"></i> <span data-i18n="youtube">يوتيوب</span>
+                    </button>
+                    <button @click="target='tiktok'" :class="target==='tiktok' ? 'border-purple-600 bg-purple-600/20 text-purple-400' : 'border-slate-600 bg-slate-700/50 text-slate-400 hover:border-slate-500'" class="rounded-xl border-2 py-3 px-2 text-xs font-bold transition flex flex-col items-center gap-1">
+                        <i class="fab fa-tiktok text-xl" style="color: #000000;"></i> <span data-i18n="tiktok">تيك توك</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Multi-platform selection for broadcast -->
+            <div class="space-y-3">
+                <div class="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-wider">
+                    <span class="w-1 h-4 bg-pink-500 rounded-full"></span> <span data-i18n="target_platforms_label">منصات متعددة للبث</span>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <template x-for="p in socialPlatforms" :key="p.code">
+                        <label class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-600 bg-slate-700/50 hover:bg-slate-700 cursor-pointer transition">
+                            <input type="checkbox" x-model="targetPlatforms" :value="p.code" class="w-4 h-4 text-pink-500 rounded focus:ring-pink-500">
+                            <span class="text-sm flex items-center gap-1" :style="'color: ' + p.color" x-text="p.name"></span>
+                        </label>
+                    </template>
                 </div>
             </div>
 
@@ -195,13 +331,41 @@ function broadcastApp() {
         mediaList: [], uploading: false, sending: false,
         searchQuery: '', searchResults: [], selectedUser: null, manualUserId: '',
         queue: [], loadingQueue: true,
+        // New targeting options
+        targetAgents: [], targetCountries: [], targetPlatforms: [],
+        broadcastToAllAgents: false, broadcastToAllChannels: false,
+        broadcastToAllAgents: false,
+        agentSearchQuery: '', agentSearchResults: [], targetAgents: [],
+        targetCountries: [], targetPlatforms: [],
+        broadcastToAllAgents: false, broadcastToAllChannels: false,
+        availableCountries: [
+            { code: 'EG', name: '🇪🇬 مصر' }, { code: 'SA', name: '🇸🇦 السعودية' }, { code: 'AE', name: '🇦🇪 الإمارات' },
+            { code: 'JO', name: '🇯🇴 الأردن' }, { code: 'MA', name: '🇲🇦 المغرب' }, { code: 'DZ', name: '🇩🇿 الجزائر' },
+            { code: 'TN', name: '🇹🇳 تونس' }, { code: 'IQ', name: '🇮🇶 العراق' }, { code: 'LY', name: '🇱🇾 ليبيا' },
+            { code: 'SD', name: '🇸🇩 السودان' }, { code: 'YE', name: '🇾🇪 اليمن' }, { code: 'PS', name: '🇵🇸 فلسطين' },
+            { code: 'KW', name: '🇰🇼 الكويت' }, { code: 'QA', name: '🇶🇦 قطر' }, { code: 'BH', name: '🇧🇭 البحرين' },
+            { code: 'OM', name: '🇴🇲 عمان' }, { code: 'LB', name: '🇱🇧 لبنان' }, { code: 'SY', name: '🇸🇾 سوريا' }
+        ],
+        socialPlatforms: [
+            { code: 'facebook', name: 'فيسبوك', color: '#1877F2' },
+            { code: 'instagram', name: 'إنستجرام', color: '#E4405F' },
+            { code: 'twitter', name: 'تويتر/إكس', color: '#1DA1F2' },
+            { code: 'linkedin', name: 'لينكدإن', color: '#0A66C2' },
+            { code: 'youtube', name: 'يوتيوب', color: '#FF0000' },
+            { code: 'tiktok', name: 'تيك توك', color: '#000000' }
+        ],
 
         init() { this.loadQueue(); setInterval(() => this.loadQueue(), 20000); },
 
         getSummary() {
             let parts = [];
-            parts.push(this.recipient === 'single' ? '👤 فردي' : this.countryFilter !== 'all' ? '🌍 دولة محددة' : '👥 جماعي');
-            parts.push(this.target === 'telegram' ? '📱 تيليغرام' : this.target === 'web' ? '🌐 الموقع' : '📱🌐 الاثنين');
+            parts.push(this.recipient === 'single' ? '👤 فردي' : this.countryFilter !== 'all' ? '🌍 دولة محددة' : this.broadcastToAllAgents ? '🤖 جميع الوكلاء' : this.targetAgents.length > 0 ? '🤖 وكلاء محددين' : '👥 جماعي');
+            parts.push(this.target === 'telegram' ? '📱 تيليغرام' : this.target === 'web' ? '🌐 الموقع' : this.target === 'both' ? '📱🌐 الاثنين' : this.target === 'facebook' ? '📘 فيسبوك' : this.target === 'instagram' ? '📷 إنستجرام' : this.target === 'twitter' ? '🐦 تويتر/إكس' : this.target === 'linkedin' ? '💼 لينكدإن' : this.target === 'youtube' ? '📺 يوتيوب' : this.target === 'tiktok' ? '🎵 تيك توك' : this.target === 'social' ? '📱 السوشيال ميديا' : '📱🌐 الاثنين');
+            if (this.targetPlatforms.length > 0) parts.push('📱 ' + this.targetPlatforms.length + ' منصات سوشيال');
+            if (this.targetAgents.length > 0) parts.push('🤖 ' + this.targetAgents.length + ' وكلاء');
+            if (this.targetCountries.length > 0) parts.push('🌍 ' + this.targetCountries.length + ' دول');
+            if (this.broadcastToAllAgents) parts.push('🤖 جميع الوكلاء');
+            if (this.broadcastToAllChannels) parts.push('📡 جميع القنوات');
             if (this.mediaList.length) parts.push('📎 ' + this.mediaList.length + ' مرفق');
             if (this.priority !== 'normal') parts.push(this.priority === 'urgent' ? '🚨 عاجلة' : '⚡ عالية');
             return parts.join(' • ');
@@ -228,6 +392,14 @@ function broadcastApp() {
                 }
                 this.manualUserId = '';
             }, 500);
+        },
+
+        async searchAgents() {
+            if (this.agentSearchQuery.length < 2) { this.agentSearchResults = []; return; }
+            try {
+                const data = await api('/api/agents?q=' + encodeURIComponent(this.agentSearchQuery) + '&limit=10');
+                this.agentSearchResults = (data.agents || []).slice(0, 5);
+            } catch(e) { this.agentSearchResults = []; }
         },
 
         async uploadMedia(event) {
@@ -263,10 +435,18 @@ function broadcastApp() {
                     media_urls: this.mediaList.map(m => m.url),
                     target_user: this.selectedUser ? this.selectedUser.telegram_id : null,
                     target_name: this.selectedUser ? this.selectedUser.name : null,
+                    // New targeting options
+                    target_agents: this.targetAgents,
+                    target_countries: this.targetCountries,
+                    target_platforms: this.targetPlatforms,
+                    broadcast_to_all_agents: this.broadcastToAllAgents,
+                    broadcast_to_all_channels: this.broadcastToAllChannels,
                 };
                 const data = await api('/api/broadcast', { method: 'POST', body: JSON.stringify(payload) });
                 toast(data.message || 'تم الإرسال', 'success');
                 this.message = ''; this.mediaList = []; this.selectedUser = null;
+                this.targetAgents = []; this.targetCountries = []; this.targetPlatforms = [];
+                this.broadcastToAllAgents = false; this.broadcastToAllChannels = false;
                 this.loadQueue();
             } catch(e) { toast('فشل الإرسال', 'error'); }
             this.sending = false;

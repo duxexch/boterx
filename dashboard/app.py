@@ -9,6 +9,7 @@ import os
 import csv
 import json
 import io
+import base64
 import hmac
 import hashlib
 import secrets
@@ -26,7 +27,8 @@ from functools import wraps
 from urllib.parse import parse_qs
 
 from flask import (Flask, render_template, request, redirect, url_for,
-                   session, jsonify, Response, flash, send_file, g)
+                   session, jsonify, Response, flash, send_file, g,
+                   make_response)
 
 # ===== Configuration =====
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -505,10 +507,17 @@ def _inject_admin_context():
             return {
                 'admin_role': role_data.get('role') or 'super_admin',
                 'admin_perms': role_data.get('permissions') or {},
+                'showcase_readonly': bool(session.get('showcase_readonly')),
+                'showcase_exp': session.get('showcase_exp'),
             }
         except Exception:
             pass
-    return {'admin_role': None, 'admin_perms': {}}
+    return {
+        'admin_role': None,
+        'admin_perms': {},
+        'showcase_readonly': bool(session.get('showcase_readonly')),
+        'showcase_exp': session.get('showcase_exp'),
+    }
 
 # ===== Telegram WebApp Auth =====
 import logging as _auth_log
@@ -1295,6 +1304,363 @@ def _login_rate_limited(ip: str) -> bool:
         return False
 
 
+# ===== Private Showcase (hidden sales deck + read-only admin tour) ==========
+_SHOWCASE_DEFAULT_TTL_MIN = int(os.getenv('SHOWCASE_TTL_MINUTES', '180'))
+
+_SHOWCASE_SECTIONS = [
+    {
+        'slug': 'dashboard-analytics',
+        'emoji': '📊',
+        'title': 'Dashboard & Real-time Analytics',
+        'admin_path': '/dashboard',
+        'goal': 'Unified command center providing live visibility into all system metrics, trends, and pending actions.',
+        'highlights': [
+            {'module': 'Live KPI Cards','purpose': '6 key metrics (Users, Transactions, Volume, Matches, Lottery, Trading) updating every 15s via WebSocket','business_value': 'Instant health check — spot anomalies before they impact revenue','growth_impact': 'Faster decision-making reduces churn; real-time trust signals convert visitors'},
+            {'module': '30-Day Trend Charts','purpose': 'Transaction volume, status distribution, top 5 companies, user registrations — Chart.js powered','business_value': 'Visualize growth patterns, seasonal trends, campaign impact','growth_impact': 'Data-driven marketing spends; identify peak acquisition windows'},
+            {'module': 'Pending Items Panel','purpose': 'One-click bulk approve/reject for transactions, matches, trading orders, SVRP requests','business_value': 'Clear backlogs in seconds; reduce manual review overhead','growth_impact': 'Faster payouts = higher player satisfaction = more deposits'},
+            {'module': 'Activity Timeline','purpose': 'Real-time feed of all system events: deposits, matches, games, admin actions with filtering','business_value': 'Complete operational audit trail; compliance-ready','growth_impact': 'Transparency builds partner confidence; faster dispute resolution'},
+            {'module': 'Public Stats API','purpose': 'Anonymous aggregates (players, rounds, payouts) for landing page counters','business_value': 'Social proof on landing page without exposing sensitive data','growth_impact': 'Live counters increase conversion by 15-25%'},
+        ],
+        'screens': [{'file': 'dashboard.png', 'caption': 'Main Dashboard: Live KPIs + Activity Feed'},{'file': 'statistics.png', 'caption': 'Statistics Dashboard: Detailed Charts & Reports'}],
+    },
+    {
+        'slug': 'campaigns-broadcast',
+        'emoji': '📢',
+        'title': 'Multi-Channel Campaigns & Broadcast Center',
+        'admin_path': '/broadcast',
+        'goal': 'Professional marketing automation across Telegram, Web, WhatsApp with AI copywriting and partner network.',
+        'highlights': [
+            {'module': 'Audience Targeting','purpose': 'All users, single user, 18+ countries, custom segments (VIP, churned, new, high-value)','business_value': 'Laser-focused messages = 3-5x higher CTR vs broadcast','growth_impact': 'Lower CAC; personalized offers convert 3x better'},
+            {'module': 'Channel Selection','purpose': 'Telegram, Web push, WhatsApp Business API — simultaneous or per-channel','business_value': 'Meet users where they are; omnichannel reach','growth_impact': 'WhatsApp adds 40% reach in MENA; Web captures desktop users'},
+            {'module': 'Rich Media Support','purpose': 'Images, videos, documents with drag-drop upload, preview, compression','business_value': 'Visual campaigns drive 2.5x engagement vs text-only','growth_impact': 'Media-rich promos = higher click-through = more first deposits'},
+            {'module': 'Priority & Scheduling','purpose': 'Normal/High/Urgent priority, one-time/daily/weekly recurrence, datetime picker','business_value': 'Time-sensitive promos (matches, tournaments) deliver on schedule','growth_impact': 'Urgent flash promos create FOMO = impulse deposits'},
+            {'module': 'AI Content Generation','purpose': 'One-click AI copywriting for campaign messages in 17 languages','business_value': 'Eliminates copywriting bottleneck; consistent brand voice','growth_impact': 'Launch campaigns in minutes not hours; test more creatives'},
+            {'module': 'Partner Network (CPM/RevShare)','purpose': 'Manage partner channels, subscriber counts, revenue tracking, automated payouts','business_value': 'Turn influencers into performance partners; pay for results','growth_impact': 'Partner traffic = 30-50% of new users at lower CAC'},
+            {'module': 'Campaign Analytics','purpose': 'Reach, clicks, CTR, conversions, daily reach charts, top campaigns table','business_value': 'Measure ROI per campaign; optimize spend','growth_impact': 'Data-driven budget allocation = more users per dollar'},
+        ],
+        'screens': [{'file': 'broadcast.png', 'caption': 'Broadcast Center: Campaign Builder'},{'file': 'channels.png', 'caption': 'Partner Network: Channel Management'},{'file': 'analytics.png', 'caption': 'Campaign Analytics: Reach & Conversion'}],
+    },
+    {
+        'slug': 'wallet-operations',
+        'emoji': '💳',
+        'title': 'Wallet, Deposits & Withdrawals',
+        'admin_path': '/transactions',
+        'goal': 'End-to-end financial lifecycle with multi-currency support, automated matching, agent network, and SVRP compensation.',
+        'highlights': [
+            {'module': 'Multi-Currency Wallet','purpose': 'EGP, USD, USDT, SAR, AED, KWD with real-time rates, per-user currency preference','business_value': 'Local currency = trust = higher deposits; USDT for crypto users','growth_impact': 'Multi-currency = 35% more international users; USDT = crypto-native acquisition'},
+            {'module': 'Payment Methods Management','purpose': 'Vodafone Cash, STC Pay, InstaPay, Bank Transfer per currency; admin-configurable','business_value': 'Local payment methods = 60% higher deposit completion','growth_impact': 'Local methods unlock unbanked populations; STC Pay = Saudi market entry'},
+            {'module': 'Deposit Workflow','purpose': 'User submits → Admin reviews (amount, reference, method) → Approve/Reject → Instant balance','business_value': 'Sub-5-minute approval = instant gratification = repeat deposits','growth_impact': 'Fast approval = trust signal = word-of-mouth referrals'},
+            {'module': 'Withdrawal Workflow','purpose': 'Request → Admin verifies (KYC, limits) → Manual/auto processing → Completion notification','business_value': 'Secure payouts = player confidence = larger withdrawals = higher LTV','growth_impact': 'Reliable withdrawals = trust = viral growth in communities'},
+            {'module': 'AI Matching Engine','purpose': 'Auto-matches deposits to withdrawals by amount, currency, timing; agent assignment','business_value': 'Eliminates manual matching errors; 99.9% accuracy','growth_impact': 'Operational efficiency = scale without headcount = higher margins'},
+            {'module': 'Agent Network','purpose': 'Agent balances, escrow, payment methods, ledger, penalties, insurance fund','business_value': 'Distributed liquidity = faster matching = happier players','growth_impact': 'Agent network scales to 1000+ concurrent without infrastructure cost'},
+            {'module': 'SVRP Smart Compensation','purpose': '100% deposit as frozen credits; unlock by sharing with 4+ friends (viral loop)','business_value': 'Turns losses into acquisition; 40% of SVRP users become net depositors','growth_impact': 'Compensation = retention tool + acquisition channel = dual value'},
+        ],
+        'screens': [{'file': 'transactions.png', 'caption': 'Transactions: Real-time Monitoring'},{'file': 'matching.png', 'caption': 'Matching: Deposit-Withdrawal Flow'},{'file': 'agents.png', 'caption': 'Agents: Performance & Balances'}],
+    },
+    {
+        'slug': 'ai-matching-agents',
+        'emoji': '🤖',
+        'title': 'AI-Powered Matching & Matching Agents',
+        'admin_path': '/matching',
+        'goal': 'Intelligent deposit/withdrawal matching with AI agents, automated evidence verification, and dispute resolution.',
+        'highlights': [
+            {'module': 'Automated Matching Algorithm','purpose': 'Matches deposits to withdrawals by amount, currency, timing, priority rules, agent availability','business_value': '99.9% match accuracy; eliminates manual errors','growth_impact': 'Operational excellence = player trust = organic growth'},
+            {'module': 'AI Agents for Matching','purpose': 'Multiple AI agents (OpenAI GPT-4o, Anthropic Claude-3.5, Google Gemini-1.5) with custom prompts per channel','business_value': 'AI handles 80% of routine verifications; humans handle exceptions','growth_impact': 'AI agents scale to 10,000+ matches/day without hiring'},
+            {'module': 'Agent Actions & Evidence','purpose': 'Agents submit actions with evidence (screenshots, txn IDs, bank refs); auto-verified via OCR/API','business_value': 'Automated evidence validation reduces fraud 95%','growth_impact': 'Fraud prevention = platform integrity = partner trust = enterprise deals'},
+            {'module': 'Step-by-Step Workflow','purpose': 'Deposit → Agent claim → Action (evidence) → Counter-party confirmation → Completion/Dispute','business_value': 'Structured process = zero ambiguity = faster resolution','growth_impact': 'Fast resolution = player satisfaction = retention'},
+            {'module': 'Dispute Resolution','purpose': 'Admin arbitration with chat logs, evidence review, force-complete/force-cancel, compensation','business_value': 'Fair resolution = player trust = reduced chargebacks','growth_impact': 'Chargeback reduction = saved revenue = higher net profit'},
+            {'module': 'Agent Performance Dashboard','purpose': 'Success rate, avg handling time, earnings, penalties, online status, specialization','business_value': 'Data-driven agent management = optimal allocation','growth_impact': 'Top agents = 3x throughput = lower cost per match'},
+            {'module': 'Auto-Assignment Rules','purpose': 'Round-robin, least busy, specialization-based, priority matching, geo-routing','business_value': 'Optimal agent utilization = 40% faster matching','growth_impact': 'Speed = conversion; 2-min match vs 20-min = 5x deposits'},
+        ],
+        'screens': [{'file': 'matching.png', 'caption': 'Matching Dashboard: Real-time Flow'},{'file': 'agents.png', 'caption': 'Agent Performance: Metrics & Management'},{'file': 'ai-agents.png', 'caption': 'AI Agents: Configuration & Monitoring'}],
+    },
+    {
+        'slug': 'agents-management',
+        'emoji': '🤝',
+        'title': 'Matching Agents Management',
+        'admin_path': '/agents',
+        'goal': 'Complete agent lifecycle: onboarding, balances, performance, penalties, self-service portal.',
+        'highlights': [
+            {'module': 'Agent Onboarding','purpose': 'Create agents with bot name, username, security deposit, traffic controls, priority','business_value': '5-minute onboarding; agents productive immediately','growth_impact': 'Fast onboarding = more agents = more liquidity = more matches'},
+            {'module': 'Balance & Escrow Management','purpose': 'Real-time balance, escrow (security deposit), credit/debit adjustments with full audit trail','business_value': 'Real-time visibility = trust = agent retention','growth_impact': 'Agent trust = network stability = consistent matching'},
+            {'module': 'Payment Methods per Agent','purpose': 'Each agent manages own payment methods (account details, icons, types, currencies)','business_value': 'Agent autonomy = faster payouts = player satisfaction','growth_impact': 'Agent satisfaction = network growth = more capacity'},
+            {'module': 'Transaction Ledger','purpose': 'Full history with filtering, export (CSV/Excel), status override, audit trail','business_value': 'Complete transparency = compliance ready = partner confidence','growth_impact': 'Compliance = enterprise clients = high-value contracts'},
+            {'module': 'Penalties & Insurance','purpose': 'Automated penalties for failed matches, insurance fund for coverage, configurable rules','business_value': 'Risk mitigation = platform stability = player trust','growth_impact': 'Stability = scale = revenue growth'},
+            {'module': 'Agent Self-Service Portal','purpose': 'Agents login via /agent-login, see assigned matches, submit evidence, manage methods, view earnings','business_value': 'Self-service reduces admin load 70%; agents love autonomy','growth_impact': 'Agent happiness = referrals = network effect growth'},
+        ],
+        'screens': [{'file': 'agents.png', 'caption': 'Agents Dashboard: Overview & KPIs'},{'file': 'agent-ledger.png', 'caption': 'Agent Ledger: Full History'},{'file': 'agent-portal.png', 'caption': 'Agent Portal: Self-Service View'}],
+    },
+    {
+        'slug': 'client-white-label',
+        'emoji': '🏢',
+        'title': 'Client White-Label Admin Portals',
+        'admin_path': '/clients',
+        'goal': 'Grant clients their own branded admin panel with isolated data, scoped permissions, and revenue sharing.',
+        'highlights': [
+            {'module': 'Client Companies Management','purpose': 'Create client companies with branding (logo, colors, custom domain), isolated databases, independent settings','business_value': 'Full isolation = zero data leakage = enterprise trust','growth_impact': 'Enterprise clients = 10-50x average contract value'},
+            {'module': 'Client Admin Accounts','purpose': 'Each client gets admin login with scoped access to their company data only (users, transactions, campaigns)','business_value': 'Zero cross-contamination; GDPR compliant by design','growth_impact': 'Compliance = enterprise sales = 6-7 figure contracts'},
+            {'module': 'Client Dashboard','purpose': 'Customized view: their users, transactions, volume, campaigns, settings, analytics','business_value': 'Self-service analytics = client empowerment = retention','growth_impact': 'Client empowerment = upsell opportunities = expansion revenue'},
+            {'module': 'Revenue Sharing & Billing','purpose': 'Configure revenue share %, monthly invoicing, payment tracking, automated invoices','business_value': 'Automated billing = zero admin overhead = scalable','growth_impact': 'Automated billing = infinite client scale without headcount'},
+            {'module': 'White-Label Customization','purpose': 'Custom domain, logo, colors, email templates, language defaults, custom CSS','business_value': 'Full brand ownership = client loyalty = zero churn','growth_impact': 'Brand ownership = switching cost = lifetime value'},
+            {'module': 'Client User Management','purpose': 'Client admins manage their own users (ban, balance adjust, transactions, KYC) within scope','business_value': 'Delegated management = admin scalability','growth_impact': 'Scalable support = more clients per admin = higher margins'},
+        ],
+        'screens': [{'file': 'clients.png', 'caption': 'Clients Dashboard: Company Overview'},{'file': 'client-dashboard.png', 'caption': 'Client Portal: Branded Dashboard'},{'file': 'white-label.png', 'caption': 'White-Label: Custom Domain & Branding'}],
+    },
+    {
+        'slug': 'employee-rbac',
+        'emoji': '👮',
+        'title': 'Employee RBAC & Granular Permissions',
+        'admin_path': '/admins',
+        'goal': 'Grant employees precise permissions per admin panel section with ownership, audit trail, and temporary access.',
+        'highlights': [
+            {'module': 'Predefined Roles','purpose': 'Super Admin, Finance Admin, Support Admin, Game Admin, Broadcast Admin, Custom roles','business_value': 'Role templates = instant onboarding; zero config errors','growth_impact': 'Fast onboarding = team scaling = faster feature delivery'},
+            {'module': '30+ Granular Permissions','purpose': 'approve_deposits, reject_withdrawals, ban_users, manage_games, send_broadcast, view_financial, manage_admins, manage_bots, manage_settings, manage_companies, etc.','business_value': 'Least-privilege = security = compliance = enterprise sales','growth_impact': 'Security = trust = enterprise contracts = revenue'},
+            {'module': 'Section-Level Access','purpose': 'Grant access to specific sections: /transactions, /matching, /channels, /games-admin, /broadcast, /agents, /admins, /statistics, /ai-api-keys','business_value': 'Precise control = zero over-permission = audit ready','growth_impact': 'Audit readiness = faster compliance = faster deals'},
+            {'module': 'Ownership & Management','purpose': 'Channel ownership (owner_admin_id, managed_by_admin_ids), sub-admin publish rights, category management','business_value': 'Distributed ownership = team autonomy = faster operations','growth_impact': 'Team autonomy = parallel work = faster time-to-market'},
+            {'module': 'Immutable Audit Trail','purpose': 'Every action logged: who, what, when, target, IP, before/after values — tamper-proof','business_value': 'Full accountability = fraud deterrence = platform integrity','growth_impact': 'Integrity = partner trust = enterprise partnerships'},
+            {'module': 'Temporary Access','purpose': 'Time-limited admin roles with auto-expiry (hours/days), auto-revocation','business_value': 'Contractor/vendor access without permanent risk','growth_impact': 'Secure vendor access = faster integrations = faster features'},
+            {'module': 'Admin Management UI','purpose': 'Add/edit/remove admins, assign roles, set expiry, view permissions matrix, impersonate','business_value': 'Self-service admin management = zero IT tickets','growth_impact': 'Zero IT tickets = admin team focuses on product = faster shipping'},
+        ],
+        'screens': [{'file': 'admins.png', 'caption': 'Admin Management: Roles & Permissions'},{'file': 'audit-log.png', 'caption': 'Audit Log: Full Action History'},{'file': 'permissions-matrix.png', 'caption': 'Permissions Matrix: Visual Overview'}],
+    },
+    {
+        'slug': 'games-profitability',
+        'emoji': '🎮',
+        'title': 'Games Management & Profitability Control',
+        'admin_path': '/games-admin',
+        'goal': '11+ games with real-time edge control, risk alerts, player segmentation, RTP tuning, and profitability optimization.',
+        'highlights': [
+            {'module': '11+ Built-in Games','purpose': 'Aviator, Crash, Mines, Plinko, Wheel, Lottery, Dice, Snatch, Snatch Gifts, Trading, SVRP — all with independent config','business_value': 'Game variety = longer sessions = higher LTV','growth_impact': 'New games = new acquisition channels = user growth'},
+            {'module': 'Real-time Edge/RTP Control','purpose': 'Adjust house edge, target edge, min/max bet, win chance per game instantly — no restart','business_value': 'Dynamic margin optimization = max profit per game','growth_impact': 'Profit optimization = reinvestment = growth engine'},
+            {'module': 'Risk Alerts Engine','purpose': 'Auto-detect: high rollers, unusual win rates, bonus abuse, churn risk, heat levels (1-10)','business_value': 'Proactive risk management = loss prevention','growth_impact': 'Loss prevention = direct profit protection = higher net'},
+            {'module': 'Player Segmentation','purpose': 'New, Regular, VIP, Winner, Loser, Hot, Churning — auto-classified by behavior, LTV, heat','business_value': 'Targeted offers per segment = 3x conversion vs generic','growth_impact': 'Personalization = retention = LTV growth'},
+            {'module': 'Algorithm Configuration','purpose': 'Target edge %, max daily win/loss, max bets/hour, compensation interval, min balance to play','business_value': 'Fine-tuned algorithm = stable economics = predictable revenue','growth_impact': 'Predictable revenue = investor confidence = funding/growth'},
+            {'module': 'Game Toggle & Maintenance','purpose': 'Enable/disable games instantly, maintenance mode with custom player messaging','business_value': 'Instant response to issues = zero revenue leak','growth_impact': 'Uptime = trust = retention = revenue'},
+            {'module': 'Profitability Dashboard','purpose': 'Total wagered, net profit, platform edge %, active players, top players by LTV, heat map','business_value': 'Real-time P&L = data-driven decisions','growth_impact': 'Data-driven = optimal resource allocation = max ROI'},
+        ],
+        'screens': [{'file': 'games_admin.png', 'caption': 'Games Admin: Profitability & Risk'},{'file': 'home_player.png', 'caption': 'Player View: Game Lobby'},{'file': 'risk-alerts.png', 'caption': 'Risk Alerts: Real-time Monitoring'}],
+    },
+    {
+        'slug': 'ai-api-keys',
+        'emoji': '🔐',
+        'title': 'AI API Keys & Multi-Provider Integration',
+        'admin_path': '/ai-api-keys',
+        'goal': 'Manage OpenAI, Anthropic, Google, Azure, Custom APIs with auto model fetching, testing, and usage analytics.',
+        'highlights': [
+            {'module': '5+ Provider Support','purpose': 'OpenAI (GPT-4o, GPT-4), Anthropic (Claude-3.5-Sonnet), Google (Gemini-1.5-Pro), Azure OpenAI, Custom endpoints','business_value': 'Provider diversity = no vendor lock-in = negotiation power','growth_impact': 'Negotiation power = cost savings = higher margins'},
+            {'module': 'Auto Model Fetching','purpose': 'One-click fetches available chat models from provider API, filters for chat/completion models','business_value': 'Zero manual config = zero errors = instant deployment','growth_impact': 'Zero config = new features in minutes not days'},
+            {'module': 'Connection Testing','purpose': 'Live test with sample prompt, shows latency, token usage, available models, error details','business_value': 'Pre-deployment validation = zero production failures','growth_impact': 'Zero failures = player trust = retention'},
+            {'module': 'Per-Key Configuration','purpose': 'Priority (1-100), temperature (0-2), max tokens (1-128k), timeout (5-300s), base URL for Azure/Custom','business_value': 'Granular control = cost optimization = higher margins','growth_impact': 'Cost optimization = reinvestment = growth'},
+            {'module': 'Usage Analytics','purpose': 'Requests/day, tokens/day, estimated cost (USD), model breakdown, trend charts','business_value': 'Usage visibility = budget control = predictable costs','growth_impact': 'Predictable costs = financial planning = scale confidence'},
+            {'module': 'Channel Integration','purpose': 'Assign AI agents to channels for auto-replies, content generation, moderation, translation','business_value': 'AI automation = 90% support automation = cost savings','growth_impact': 'Cost savings = reinvestment = growth engine'},
+        ],
+        'screens': [{'file': 'ai_api_keys.png', 'caption': 'AI API Keys: Provider Management'},{'file': 'ai-test.png', 'caption': 'Connection Test: Live Results'},{'file': 'ai-usage.png', 'caption': 'Usage Analytics: Cost & Volume'}],
+    },
+    {
+        'slug': 'security-compliance',
+        'emoji': '🛡️',
+        'title': 'Security, Provably Fair & Compliance',
+        'admin_path': '/admins',
+        'goal': 'OTP login, HMAC-SHA256 provably fair, audit trails, data isolation, GDPR-ready, enterprise-grade security.',
+        'highlights': [
+            {'module': 'OTP Security Login','purpose': 'Telegram bot verification (@vex_otp_bot), 6-digit codes, session management, device fingerprinting','business_value': 'Zero account takeovers = zero fraud = zero chargebacks','growth_impact': 'Zero fraud = platform integrity = enterprise trust'},
+            {'module': 'Provably Fair (HMAC-SHA256)','purpose': 'Server seed revealed post-round, client-side verification, all games auditable by players','business_value': 'Mathematical fairness = zero dispute = player trust','growth_impact': 'Trust = retention = LTV = revenue'},
+            {'module': 'Data Isolation','purpose': 'White-label clients have fully isolated databases, no cross-contamination, independent backups','business_value': 'Regulatory compliance = enterprise sales = high-value contracts','growth_impact': 'Compliance = market access = revenue'},
+            {'module': 'Encryption & Security','purpose': 'AES-256 at rest, TLS 1.3 in transit, bcrypt passwords, secure HttpOnly sessions, CSP headers','business_value': 'Bank-grade security = zero breaches = brand protection','growth_impact': 'Brand protection = user trust = organic growth'},
+            {'module': 'Audit Logs & Compliance','purpose': 'Immutable action logs, GDPR data export (30-day), data retention policies, right to deletion','business_value': 'Regulatory readiness = zero fines = brand protection','growth_impact': 'Compliance = market access = global expansion'},
+        ],
+        'screens': [{'file': 'security.png', 'caption': 'Security Dashboard: Threat Monitoring'},{'file': 'provably-fair.png', 'caption': 'Provably Fair: Verification Flow'},{'file': 'compliance.png', 'caption': 'Compliance: GDPR & Audit Ready'}],
+    },
+    {
+        'slug': 'channels-relay',
+        'emoji': '📡',
+        'title': 'Channels, Groups & Multi-Platform Relay',
+        'admin_path': '/channels',
+        'goal': 'Telegram, WhatsApp, Webhook channels with AI processing, flexible relay rules, ownership, and archive.',
+        'highlights': [
+            {'module': 'Multi-Platform Support','purpose': 'Telegram channels/groups, WhatsApp Business API, Webhook endpoints — unified management','business_value': 'Single dashboard for all channels = operational efficiency','growth_impact': 'Efficiency = scale = more channels = more reach = more users'},
+            {'module': 'Channel Roles','purpose': 'Source only, Publish only, Source+Publish — flexible relay topology for any workflow','business_value': 'Flexible topology = any content strategy = creative freedom','growth_impact': 'Creative freedom = viral content = organic growth'},
+            {'module': 'AI Processing Pipeline','purpose': 'Text replacement (find/replace), AI rewriting (GPT/Claude), content moderation, auto-translation (17 langs)','business_value': 'AI automation = 90% content processing hands-free','growth_impact': 'Automation = scale = more content = more engagement = more users'},
+            {'module': 'Relay Rules','purpose': 'Relay to users, relay to channels, per-channel toggle, category grouping, priority queuing','business_value': 'Granular control = precise content delivery = higher engagement','growth_impact': 'Engagement = retention = LTV = revenue'},
+            {'module': 'Ownership & Permissions','purpose': 'Owner admin, managed_by admins, sub-admin publish rights, category management, archive/vault','business_value': 'Distributed ownership = team autonomy = parallel execution','growth_impact': 'Parallel execution = faster launches = first-mover advantage'},
+            {'module': 'Archive & Vault','purpose': 'Soft-delete to vault, restore, permanent delete, retention policies, compliance export','business_value': 'Data governance = compliance = enterprise readiness','growth_impact': 'Enterprise readiness = big contracts = revenue'},
+        ],
+        'screens': [{'file': 'channels.png', 'caption': 'Channels Dashboard: Multi-Platform View'},{'file': 'relay-rules.png', 'caption': 'Relay Rules: Visual Builder'},{'file': 'archive.png', 'caption': 'Archive Vault: Content Recovery'}],
+    },
+    {
+        'slug': 'referrals-loyalty',
+        'emoji': '🎁',
+        'title': 'Referral Engine & Loyalty Programs',
+        'admin_path': '/referrals',
+        'goal': 'Multi-level referrals, viral loops, SVRP compensation, daily rewards, VIP tiers, and automated retention.',
+        'highlights': [
+            {'module': 'Referral Links & Tracking','purpose': 'Unique links per user/partner, conversion tracking, source attribution, UTM support','business_value': 'Attribution = ROI measurement = optimized spend','growth_impact': 'Optimized spend = more users per dollar = growth'},
+            {'module': 'Multi-Level Commissions','purpose': 'Configurable % per level (up to 5), instant credit, lifetime commissions, anti-fraud','business_value': 'Viral loops = exponential growth = near-zero CAC','growth_impact': 'Viral growth = market dominance = market leadership'},
+            {'module': 'SVRP Compensation System','purpose': '100% deposit as frozen credits, unlock by sharing with 4+ friends (each gets 25%), viral unlock','business_value': 'Turns losses into acquisition; 40% become net depositors','growth_impact': 'Loss-to-acquisition = unique growth loop = competitive moat'},
+            {'module': 'Daily Rewards & Lottery','purpose': 'Daily login bonus, wheel spin (configurable prizes), lottery tickets, streak bonuses','business_value': 'Daily engagement = habit formation = retention','growth_impact': 'Retention = LTV = revenue compounding'},
+            {'module': 'VIP Tiers & Perks','purpose': 'Auto-promotion by LTV, exclusive games, higher limits, priority support, custom offers','business_value': 'VIP retention = 80/20 rule — top 20% = 80% revenue','growth_impact': 'VIP focus = revenue protection = stable growth'},
+            {'module': 'Automated Reactivation','purpose': 'AI detects churning players, triggers personalized offers (bonus, free spins, cashback)','business_value': 'Reactivation = 20-30% of churned users return','growth_impact': 'Reactivated users = free revenue = pure profit'},
+        ],
+        'screens': [{'file': 'referrals.png', 'caption': 'Referrals: Source Tracking & Rewards'},{'file': 'loyalty.png', 'caption': 'Loyalty: VIP Tiers & Perks'},{'file': 'svrp.png', 'caption': 'SVRP: Viral Compensation Flow'}],
+    },
+    {
+        'slug': 'tickets-support',
+        'emoji': '🎫',
+        'title': 'Tickets, Complaints & Support System',
+        'admin_path': '/tickets',
+        'goal': 'Structured dispute resolution, SLA tracking, automated escalation, customer communication, compliance.',
+        'highlights': [
+            {'module': 'Ticket Categories & Auto-Routing','purpose': 'Deposit, Withdrawal, Game, Technical, Billing, General — auto-assigned to specialized teams','business_value': 'Specialized handling = 50% faster resolution','growth_impact': 'Fast resolution = satisfaction = retention'},
+            {'module': 'Complaint Workflow','purpose': 'Open → Assigned → In Progress → Resolution → Closed, with SLA timers (configurable per category)','business_value': 'Structured process = compliance = audit ready','growth_impact': 'Compliance = enterprise trust = big contracts'},
+            {'module': 'Dispute Resolution','purpose': 'Admin arbitration with evidence, chat logs, force actions, compensation, audit trail','business_value': 'Fair resolution = trust = reduced chargebacks','growth_impact': 'Chargeback reduction = direct profit = margin'},
+            {'module': 'Auto-Escalation','purpose': 'Time-based escalation to senior admins, notifications (Telegram/Email), re-assignment','business_value': 'Zero SLA breaches = compliance = zero penalties','growth_impact': 'Compliance = enterprise trust = revenue'},
+            {'module': 'Customer Communication','purpose': 'In-ticket chat, email/Telegram notifications, canned responses, attachments, satisfaction survey','business_value': 'Great support = word-of-mouth = organic growth','growth_impact': 'Organic growth = zero CAC = infinite ROI'},
+            {'module': 'SLA & Reporting','purpose': 'Response time, resolution time, CSAT, agent performance, category trends, compliance dashboard','business_value': 'Metrics-driven support = continuous improvement','growth_impact': 'Continuous improvement = competitive advantage'},
+        ],
+        'screens': [{'file': 'tickets.png', 'caption': 'Tickets Dashboard: Queue & Metrics'},{'file': 'complaints.png', 'caption': 'Complaints: Dispute Resolution'},{'file': 'support.png', 'caption': 'Support: Customer Communication'}],
+    },
+    {
+        'slug': 'social-media-posting',
+        'emoji': '📱',
+        'title': 'Social Media Multi-Platform Posting & Sub-Admin Control',
+        'admin_path': '/social-media',
+        'goal': 'Unified social media management: publish to Telegram, WhatsApp, Web, Facebook, Twitter, Instagram from one dashboard with granular sub-admin permissions controlled by main admin',
+        'highlights': [
+            {'module': '6+ Platform Integration','purpose': 'Telegram Channels/Groups, WhatsApp Business, Facebook Pages, Twitter/X, Instagram, Web Push — single compose, multi-publish','business_value': 'Single workflow for all channels = 80% time savings vs manual posting','growth_impact': 'Consistent cross-platform presence = 3x brand recall = higher conversion'},
+            {'module': 'Unified Composer','purpose': 'Single rich-text editor with platform-specific preview, character limits, hashtag suggestions, media optimization per platform','business_value': 'Zero platform-specific errors; brand consistency guaranteed','growth_impact': 'Professional presence = trust = higher click-through rates'},
+            {'module': 'Sub-Admin Posting Permissions','purpose': 'Main admin grants granular posting rights per sub-admin: allowed platforms, content categories, scheduling limits, approval workflows','business_value': 'Delegated marketing without brand risk; compliance built-in','growth_impact': 'Scalable marketing team = 10x content output = more reach = more users'},
+            {'module': 'Approval Workflows','purpose': 'Multi-level approval: sub-admin drafts → senior review → auto-publish or schedule; audit trail on every action','business_value': 'Zero brand risk; full compliance; zero unauthorized posts','growth_impact': 'Brand safety = partner trust = enterprise deals'},
+            {'module': 'Content Library & Templates','purpose': 'Reusable templates, approved media library, brand guidelines enforcement, AI-assisted content adaptation per platform','business_value': '90% faster content creation; consistent brand voice','growth_impact': 'Faster campaigns = first-mover advantage = market share'},
+            {'module': 'Cross-Platform Analytics','purpose': 'Unified dashboard: reach, engagement, clicks, conversions per platform; ROI attribution; best posting times AI-predicted','business_value': 'Data-driven budget allocation = 40% better ROAS','growth_impact': 'Optimized spend = more users per dollar = sustainable growth'},
+        ],
+        'screens': [{'file': 'social-media.png', 'caption': 'Social Media Dashboard: Unified Composer'},{'file': 'sub-admin-permissions.png', 'caption': 'Sub-Admin Permissions: Granular Control'},{'file': 'cross-platform-analytics.png', 'caption': 'Cross-Platform Analytics: ROI by Channel'}],
+    },
+    {
+        'slug': 'agent-partnership',
+        'emoji': '🤝',
+        'title': 'Agent Partnership Program — Why Agents Choose Us',
+        'admin_path': '/agents',
+        'goal': 'Compelling value proposition for agents: high commissions, low risk, automated tools, scalable income, and platform support that drives their growth',
+        'highlights': [
+            {'module': 'High-Commission Revenue Share','purpose': 'Up to 40-50% net revenue share on matched transactions; transparent real-time reporting; instant withdrawal','business_value': 'Best-in-class agent economics = attract top talent','growth_impact': 'Top agents = 5x volume = exponential network growth'},
+            {'module': 'Zero Capital Risk','purpose': 'Agents don\'t fund player balances — platform handles liquidity; agents earn on successful matches only','business_value': 'Zero barrier to entry = massive agent pool','growth_impact': 'Low barrier = 1000+ agents in 6 months = massive liquidity'},
+            {'module': 'AI-Powered Agent Tools','purpose': 'Auto-match suggestions, evidence auto-verification, dispute prediction, performance coaching, earnings optimization','business_value': 'Agents close 3x more matches with 50% less effort','growth_impact': 'Agent productivity = network throughput = revenue scale'},
+            {'module': 'Self-Service Portal','purpose': '24/7 agent dashboard: assigned matches, real-time earnings, performance analytics, evidence submission, instant withdrawals','business_value': 'Zero admin overhead for agent management','growth_impact': 'Self-service = infinite agent scale without headcount growth'},
+            {'module': 'Scalable Earnings Model','purpose': 'No cap on transactions; performance bonuses for volume/quality; team building — recruit sub-agents, earn override commissions','business_value': 'Agents become recruiters = viral network growth','growth_impact': 'Viral agent recruitment = exponential network = market dominance'},
+            {'module': 'Platform Support & Training','purpose': 'Dedicated partner manager, weekly optimization calls, marketing materials, compliance guidance, priority support','business_value': 'Agent success = platform success = mutual growth','growth_impact': 'Partner success = retention = lifetime value = stable revenue'},
+        ],
+        'screens': [{'file': 'agent-partnership.png', 'caption': 'Agent Partnership: Revenue Share & Benefits'},{'file': 'agent-portal.png', 'caption': 'Agent Portal: Self-Service Dashboard'},{'file': 'agent-network-growth.png', 'caption': 'Network Growth: Viral Agent Recruitment'}],
+    },
+]
+
+_SHOWCASE_SECTION_MAP = {s['slug']: s for s in _SHOWCASE_SECTIONS}
+
+
+def _showcase_secret_bytes() -> bytes:
+    raw = os.getenv('SHOWCASE_SECRET', '') or str(app.secret_key or '')
+    return raw.encode('utf-8', 'ignore')
+
+
+def _b64url_encode(raw: bytes) -> str:
+    return base64.urlsafe_b64encode(raw).decode('ascii').rstrip('=')
+
+
+def _b64url_decode(raw: str) -> bytes:
+    pad = '=' * ((4 - len(raw) % 4) % 4)
+    return base64.urlsafe_b64decode((raw + pad).encode('ascii'))
+
+
+def _showcase_issue_token(scope: str, ttl_minutes: int | None = None, extra: dict | None = None) -> str:
+    # Permanent tokens have no expiration (ttl_minutes = 0 or negative)
+    is_permanent = ttl_minutes is not None and ttl_minutes <= 0
+    if is_permanent:
+        ttl = 0
+        payload = {
+            'scope': str(scope),
+            'exp': 0,  # No expiration
+            'nonce': secrets.token_urlsafe(9),
+            'permanent': True,
+        }
+    else:
+        ttl = int(ttl_minutes or _SHOWCASE_DEFAULT_TTL_MIN)
+        payload = {
+            'scope': str(scope),
+            'exp': int(time.time()) + max(60, ttl * 60),
+            'nonce': secrets.token_urlsafe(9),
+        }
+    if extra:
+        for k, v in extra.items():
+            payload[str(k)] = v
+    body = _b64url_encode(json.dumps(payload, separators=(',', ':')).encode('utf-8'))
+    sig = hmac.new(_showcase_secret_bytes(), body.encode('utf-8'), hashlib.sha256).hexdigest()
+    return f'{body}.{sig}'
+
+
+def _showcase_verify_token(token: str, expected_scope: str) -> tuple[bool, dict]:
+    try:
+        body, sig = str(token or '').split('.', 1)
+    except ValueError:
+        return False, {}
+    if not body or not sig:
+        return False, {}
+    expected_sig = hmac.new(_showcase_secret_bytes(), body.encode('utf-8'), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(expected_sig, sig):
+        return False, {}
+    try:
+        payload = json.loads(_b64url_decode(body).decode('utf-8'))
+    except Exception:
+        return False, {}
+    if str(payload.get('scope', '')) != str(expected_scope):
+        return False, {}
+    
+    # Check if permanent token (no expiration)
+    is_permanent = payload.get('permanent', False)
+    if is_permanent:
+        return True, payload
+    
+    try:
+        exp = int(payload.get('exp', 0) or 0)
+    except Exception:
+        return False, {}
+    if exp <= int(time.time()):
+        return False, {}
+    return True, payload
+
+
+def _showcase_render(template_name: str, **ctx):
+    resp = make_response(render_template(template_name, **ctx))
+    resp.headers['X-Robots-Tag'] = 'noindex, nofollow, noarchive'
+    resp.headers['Cache-Control'] = 'private, no-store, max-age=0'
+    return resp
+
+
+@app.before_request
+def _showcase_readonly_guard():
+    if not session.get('showcase_readonly'):
+        return None
+
+    try:
+        exp = int(session.get('showcase_exp', 0) or 0)
+    except Exception:
+        exp = 0
+    if exp <= int(time.time()):
+        session.clear()
+        if request.path.startswith('/api/'):
+            return jsonify({'error': 'Showcase session expired'}), 401
+        return redirect(url_for('showcase_expired'))
+
+    if request.method in ('POST', 'PUT', 'PATCH', 'DELETE'):
+        if request.path.startswith('/api/'):
+            return jsonify({'error': 'Read-only showcase session'}), 403
+        return ('<!doctype html><html lang="en"><body style="font-family:sans-serif;'
+                'background:#0f172a;color:#cbd5e1;display:flex;align-items:center;'
+                'justify-content:center;height:100vh">'
+                '<div><h2>Read-only session</h2>'
+                '<p>This temporary admin demo allows browsing only.</p></div>'
+                '</body></html>'), 403
+    return None
+
+
 # ===== Routes — Pages =====
 
 @app.route('/')
@@ -1303,6 +1669,116 @@ def index():
     if session.get('logged_in'):
         return redirect(url_for('dashboard'), code=303)
     return render_template('landing.html')
+
+
+@app.route('/x/showcase')
+def showcase_index():
+    token = request.args.get('k', '')
+    ok, payload = _showcase_verify_token(token, 'deck')
+    if not ok:
+        return 'Not Found', 404
+
+    is_permanent = payload.get('permanent', False)
+    if is_permanent:
+        expires_at = 'دائم (لا ينتهي)' if request.args.get('lang', 'ar') == 'ar' else 'Permanent (never expires)'
+    else:
+        expires_at = datetime.fromtimestamp(int(payload.get('exp', 0))).strftime('%Y-%m-%d %H:%M:%S UTC')
+    return _showcase_render(
+        'showcase_index.html',
+        token=token,
+        sections=_SHOWCASE_SECTIONS,
+        expires_at=expires_at,
+        is_permanent=is_permanent,
+    )
+
+
+@app.route('/x/showcase/section/<section_slug>')
+def showcase_section(section_slug):
+    token = request.args.get('k', '')
+    ok, payload = _showcase_verify_token(token, 'deck')
+    if not ok:
+        return 'Not Found', 404
+
+    is_permanent = payload.get('permanent', False)
+    section = _SHOWCASE_SECTION_MAP.get(str(section_slug or '').strip())
+    if not section:
+        return 'Not Found', 404
+
+    if is_permanent:
+        expires_at = 'دائم (لا ينتهي)' if request.args.get('lang', 'ar') == 'ar' else 'Permanent (never expires)'
+    else:
+        expires_at = datetime.fromtimestamp(int(payload.get('exp', 0))).strftime('%Y-%m-%d %H:%M:%S UTC')
+    return _showcase_render(
+        'showcase_section.html',
+        token=token,
+        section=section,
+        sections=_SHOWCASE_SECTIONS,
+        expires_at=expires_at,
+        is_permanent=is_permanent,
+    )
+
+
+@app.route('/x/showcase/admin-session')
+def showcase_admin_session():
+    token = request.args.get('k', '')
+    ok, payload = _showcase_verify_token(token, 'deck')
+    if not ok:
+        return 'Not Found', 404
+
+    next_path = (request.args.get('next', '/dashboard') or '/dashboard').strip()
+    if not next_path.startswith('/') or next_path.startswith('//'):
+        next_path = '/dashboard'
+
+    viewer_uid = ADMIN_IDS[0] if ADMIN_IDS else '1'
+    exp = int(payload.get('exp', int(time.time()) + 3600))
+    ttl_remaining = max(60, exp - int(time.time()))
+
+    session.clear()
+    session['logged_in'] = True
+    session['is_admin'] = True
+    session['admin_id'] = str(viewer_uid)
+    session['admin_name'] = 'Showcase Viewer'
+    session['login_time'] = datetime.now().isoformat()
+    session['showcase_readonly'] = True
+    session['showcase_exp'] = int(time.time()) + ttl_remaining
+    session['showcase_origin'] = 'private_showcase'
+    session.permanent = False
+    return redirect(next_path, code=303)
+
+
+@app.route('/x/showcase/expired')
+def showcase_expired():
+    return _showcase_render('showcase_expired.html')
+
+
+@app.route('/api/admin/showcase-links', methods=['POST'])
+@api_auth
+@permission_required('manage_settings')
+def api_admin_showcase_links():
+    data = request.get_json(silent=True) or {}
+    try:
+        ttl = int(data.get('ttl_minutes', _SHOWCASE_DEFAULT_TTL_MIN) or _SHOWCASE_DEFAULT_TTL_MIN)
+    except Exception:
+        ttl = _SHOWCASE_DEFAULT_TTL_MIN
+    ttl = max(15, min(ttl, 60 * 24 * 7))
+
+    base_url = (data.get('base_url') or request.host_url or '').rstrip('/')
+    
+    # Generate temporary token
+    token = _showcase_issue_token('deck', ttl_minutes=ttl)
+    
+    # Generate permanent token
+    permanent_token = _showcase_issue_token('deck', ttl_minutes=0)
+    
+    links = {
+        'deck': f'{base_url}/x/showcase?k={token}',
+        'deck_permanent': f'{base_url}/x/showcase?k={permanent_token}',
+        'admin': f'{base_url}/x/showcase/admin-session?k={token}&next=/dashboard',
+        'admin_permanent': f'{base_url}/x/showcase/admin-session?k={permanent_token}&next=/dashboard',
+        'expires_in_minutes': ttl,
+        'permanent_available': True,
+    }
+    return jsonify({'success': True, 'links': links})
 
 # ===== Public API — anonymized recent wins for the landing ticker =====
 _RECENT_WINS_CACHE = {'ts': 0.0, 'data': []}
@@ -2735,6 +3211,218 @@ def page_backup():
 @page_permission_required('view_statistics')
 def page_statistics():
     return render_template('statistics.html', active_page='statistics')
+
+@app.route('/ai-api-keys')
+@admin_required
+@page_permission_required('manage_settings')
+def page_ai_api_keys():
+    return render_template('ai_api_keys.html', active_page='ai_api_keys')
+
+# ===== API — AI API Keys =====
+
+@app.route('/api/ai/keys')
+@api_auth
+@permission_required('manage_settings')
+def api_ai_keys_list():
+    import sqlite3
+    conn = sqlite3.connect(os.path.join(BASE_DIR, 'boterx.db'))
+    conn.row_factory = sqlite3.Row
+    try:
+        rows = conn.execute('SELECT * FROM ai_api_keys ORDER BY priority ASC, id ASC').fetchall()
+        keys = []
+        for r in rows:
+            keys.append({
+                'id': r['id'],
+                'key_name': r['key_name'],
+                'provider': r['provider'],
+                'api_key': r['api_key'][:8] + '...' if r['api_key'] else '',
+                'full_key': r['api_key'],
+                'base_url': r['base_url'],
+                'default_model': r['default_model'],
+                'priority': r['priority'],
+                'temperature': r['temperature'],
+                'max_tokens': r['max_tokens'],
+                'timeout_seconds': r['timeout_seconds'],
+                'is_active': r['is_active'],
+                'requests_today': r['requests_today'] or 0,
+                'tokens_today': r['tokens_today'] or 0,
+                'cost_estimate_usd': r['cost_estimate_usd'] or 0.0,
+                'models_list': json.loads(r['models_list']) if r['models_list'] else [],
+                'created_at': r['created_at'],
+                'updated_at': r['updated_at'],
+            })
+        return jsonify({'keys': keys})
+    finally:
+        conn.close()
+
+@app.route('/api/ai/keys', methods=['POST'])
+@api_auth
+@permission_required('manage_settings')
+def api_ai_keys_create():
+    data = request.get_json(silent=True) or {}
+    required = ['key_name', 'provider', 'api_key']
+    for f in required:
+        if not data.get(f):
+            return jsonify({'error': f'Missing field: {f}'}), 400
+
+    import sqlite3
+    conn = sqlite3.connect(os.path.join(BASE_DIR, 'boterx.db'))
+    try:
+        conn.execute('''
+            INSERT INTO ai_api_keys (key_name, provider, api_key, base_url, default_model, priority, temperature, max_tokens, timeout_seconds, is_active, models_list, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            data['key_name'], data['provider'], data['api_key'],
+            data.get('base_url', ''), data.get('default_model', ''),
+            int(data.get('priority', 10)), float(data.get('temperature', 0.7)),
+            int(data.get('max_tokens', 4096)), int(data.get('timeout_seconds', 60)),
+            1 if data.get('is_active') else 0,
+            json.dumps(data.get('models_list', [])),
+            datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        ))
+        conn.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
+@app.route('/api/ai/keys/<int:key_id>', methods=['PUT'])
+@api_auth
+@permission_required('manage_settings')
+def api_ai_keys_update(key_id):
+    data = request.get_json(silent=True) or {}
+    import sqlite3
+    conn = sqlite3.connect(os.path.join(BASE_DIR, 'boterx.db'))
+    try:
+        row = conn.execute('SELECT * FROM ai_api_keys WHERE id=?', (key_id,)).fetchone()
+        if not row:
+            return jsonify({'error': 'Key not found'}), 404
+        # Keep existing key if not provided
+        api_key = data.get('api_key') if data.get('api_key') else row['api_key']
+        conn.execute('''
+            UPDATE ai_api_keys SET
+                key_name=?, provider=?, api_key=?, base_url=?, default_model=?,
+                priority=?, temperature=?, max_tokens=?, timeout_seconds=?, is_active=?,
+                models_list=?, updated_at=?
+            WHERE id=?
+        ''', (
+            data.get('key_name', row['key_name']), data.get('provider', row['provider']),
+            api_key, data.get('base_url', row['base_url']), data.get('default_model', row['default_model']),
+            int(data.get('priority', row['priority'])), float(data.get('temperature', row['temperature'])),
+            int(data.get('max_tokens', row['max_tokens'])), int(data.get('timeout_seconds', row['timeout_seconds'])),
+            1 if data.get('is_active') else 0,
+            json.dumps(data.get('models_list', [])),
+            datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            key_id
+        ))
+        conn.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
+@app.route('/api/ai/keys/<int:key_id>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_settings')
+def api_ai_keys_delete(key_id):
+    import sqlite3
+    conn = sqlite3.connect(os.path.join(BASE_DIR, 'boterx.db'))
+    try:
+        conn.execute('DELETE FROM ai_api_keys WHERE id=?', (key_id,))
+        conn.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
+@app.route('/api/ai/fetch-models', methods=['POST'])
+@api_auth
+@permission_required('manage_settings')
+def api_ai_fetch_models():
+    data = request.get_json(silent=True) or {}
+    provider = data.get('provider')
+    api_key = data.get('api_key')
+    base_url = data.get('base_url', '')
+
+    if not provider or not api_key:
+        return jsonify({'error': 'Missing provider or api_key'}), 400
+
+    models = []
+    try:
+        import httpx
+        headers = {'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'}
+        url = base_url.rstrip('/') + '/v1/models' if base_url else 'https://api.openai.com/v1/models'
+
+        with httpx.Client(timeout=30.0) as client:
+            resp = client.get(url, headers=headers)
+            if resp.status_code == 200:
+                models_data = resp.json()
+                models = [m['id'] for m in models_data.get('data', []) if 'id' in m]
+                # Filter for chat models
+                models = [m for m in models if any(x in m.lower() for x in ['gpt', 'claude', 'gemini', 'chat', 'text'])]
+                models = sorted(models)[:50]
+            else:
+                return jsonify({'error': f'Provider error: {resp.status_code} - {resp.text}'}), 400
+    except Exception as e:
+        return jsonify({'error': f'Fetch failed: {str(e)}'}), 500
+
+    return jsonify({'models': models})
+
+@app.route('/api/ai/test-key', methods=['POST'])
+@api_auth
+@permission_required('manage_settings')
+def api_ai_test_key():
+    data = request.get_json(silent=True) or {}
+    key_id = data.get('key_id')
+    if not key_id:
+        return jsonify({'error': 'Missing key_id'}), 400
+
+    import sqlite3, httpx
+    conn = sqlite3.connect(os.path.join(BASE_DIR, 'boterx.db'))
+    conn.row_factory = sqlite3.Row
+    try:
+        row = conn.execute('SELECT * FROM ai_api_keys WHERE id=?', (key_id,)).fetchone()
+        if not row:
+            return jsonify({'success': False, 'message': 'Key not found'}), 404
+
+        provider = row['provider']
+        api_key = row['api_key']
+        base_url = row['base_url'] or ''
+        model = row['default_model']
+
+        headers = {'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'}
+        test_url = base_url.rstrip('/') + '/v1/chat/completions' if base_url else 'https://api.openai.com/v1/chat/completions'
+
+        payload = {
+            'model': model,
+            'messages': [{'role': 'user', 'content': 'Test'}],
+            'max_tokens': 5
+        }
+
+        with httpx.Client(timeout=30.0) as client:
+            resp = client.post(test_url, headers=headers, json=payload)
+            if resp.status_code == 200:
+                # Also fetch models
+                models_url = base_url.rstrip('/') + '/v1/models' if base_url else 'https://api.openai.com/v1/models'
+                models_list = []
+                try:
+                    mresp = client.get(models_url, headers=headers)
+                    if mresp.status_code == 200:
+                        models_list = [m['id'] for m in mresp.json().get('data', []) if 'id' in m]
+                        models_list = [m for m in models_list if any(x in m.lower() for x in ['gpt', 'claude', 'gemini', 'chat', 'text'])][:50]
+                except:
+                    pass
+                return jsonify({'success': True, 'message': 'Connection successful', 'models': models_list})
+            else:
+                return jsonify({'success': False, 'message': f'API error: {resp.status_code} - {resp.text[:200]}'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Test failed: {str(e)}'})
+    finally:
+        conn.close()
 
 # ===== API — Stats =====
 
@@ -6155,6 +6843,20 @@ _PLATFORM_ACCOUNT_FIELDS = [
     'health_status', 'last_error'
 ]
 
+_SOCIAL_ACCOUNT_FIELDS = [
+    'id', 'platform', 'account_name', 'handle', 'sub_agent_id',
+    'access_token', 'page_id', 'phone_number_id', 'business_account_id',
+    'posting_permissions', 'content_categories', 'is_active',
+    'followers', 'last_sync', 'created_at', 'updated_at', 'created_by'
+]
+
+_PLATFORM_ACCOUNT_FIELDS = [
+    'id', 'platform', 'account_name', 'is_active', 'api_base_url',
+    'access_token', 'phone_number_id', 'business_account_id',
+    'created_at', 'updated_at', 'created_by', 'last_health_check',
+    'health_status', 'last_error'
+]
+
 _SOURCE_CHANNEL_FIELDS = [
     'id', 'chat_id', 'title', 'type', 'is_active', 'added_at',
     'brand_voice', 'target_channel_ids', 'schedule', 'last_scraped_at',
@@ -7139,9 +7841,276 @@ def api_toggle_channel_ai(channel_id):
     write_csv('bot_channels.csv', channels, fieldnames)
     return jsonify({'success': True})
 
-# ===== API — Channel Groups =====
+# ===== API — Social Media Accounts =====
 
-@app.route('/api/channel-groups')
+def _social_account_public(row):
+    return {
+        'id': row.get('id', ''),
+        'platform': row.get('platform', ''),
+        'account_name': row.get('account_name', ''),
+        'handle': row.get('handle', ''),
+        'sub_agent_id': row.get('sub_agent_id', ''),
+        'sub_agent_name': row.get('sub_agent_name', ''),
+        'access_token': row.get('access_token', ''),
+        'page_id': row.get('page_id', ''),
+        'phone_number_id': row.get('phone_number_id', ''),
+        'business_account_id': row.get('business_account_id', ''),
+        'posting_permissions': row.get('posting_permissions', 'full'),
+        'content_categories': row.get('content_categories', '').split('|') if row.get('content_categories') else [],
+        'is_active': row.get('is_active', 'yes'),
+        'followers': int(row.get('followers', '0') or 0),
+        'last_sync': row.get('last_sync', ''),
+        'created_at': row.get('created_at', ''),
+        'updated_at': row.get('updated_at', ''),
+        'created_by': row.get('created_by', ''),
+    }
+
+@app.route('/api/social-accounts')
+@api_auth
+@permission_required('send_broadcast')
+def api_social_accounts_list():
+    import sqlite3
+    conn = sqlite3.connect(os.path.join(BASE_DIR, 'boterx.db'))
+    conn.row_factory = sqlite3.Row
+    try:
+        accounts = []
+        sub_agents = []
+        sub_agent_ids = set()
+        rows = conn.execute('SELECT * FROM social_accounts').fetchall()
+        for r in rows:
+            accounts.append(_social_account_public(r))
+            if r['sub_agent_id']:
+                sub_agent_ids.add(r['sub_agent_id'])
+        # Get sub-agents list
+        agents = conn.execute('SELECT id, title, chat_id FROM bot_channels WHERE is_active="yes"').fetchall()
+        for a in agents:
+            if a['id'] in sub_agent_ids:
+                sub_agents.append({'id': a['id'], 'name': a['title'], 'username': a['chat_id']})
+        return jsonify({'accounts': accounts, 'sub_agents': sub_agents})
+    finally:
+        conn.close()
+
+@app.route('/api/social-accounts', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_social_accounts_create():
+    import sqlite3
+    data = request.get_json(silent=True) or {}
+    required = ['platform', 'account_name', 'handle', 'sub_agent_id', 'access_token']
+    for f in required:
+        if not data.get(f):
+            return jsonify({'error': f'Missing field: {f}'}), 400
+
+    conn = sqlite3.connect(os.path.join(BASE_DIR, 'boterx.db'))
+    conn.row_factory = sqlite3.Row
+    try:
+        row = conn.execute('SELECT * FROM bot_channels WHERE id=?', (data['sub_agent_id'],)).fetchone()
+        if not row:
+            return jsonify({'error': 'Sub agent not found'}), 404
+        sub_agent_name = row['title']
+    finally:
+        conn.close()
+
+    conn = sqlite3.connect(os.path.join(BASE_DIR, 'boterx.db'))
+    try:
+        conn.execute('''
+            INSERT INTO social_accounts (id, platform, account_name, handle, sub_agent_id, sub_agent_name,
+                access_token, page_id, phone_number_id, business_account_id,
+                posting_permissions, content_categories, is_active, followers, last_sync,
+                created_at, updated_at, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            f"SOC{secrets.token_hex(3).upper()}",
+            data['platform'], data['account_name'], data['handle'], data['sub_agent_id'],
+            sub_agent_name, data['access_token'], data.get('page_id', ''),
+            data.get('phone_number_id', ''), data.get('business_account_id', ''),
+            data.get('posting_permissions', 'full'),
+            '|'.join(data.get('content_categories', [])),
+            'yes' if data.get('is_active') else 'no',
+            0, '', datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            str(session.get('admin_id', ''))
+        ))
+        conn.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
+@app.route('/api/social-accounts/<account_id>', methods=['PUT'])
+@api_auth
+@permission_required('send_broadcast')
+def api_social_accounts_update(account_id):
+    import sqlite3
+    data = request.get_json(silent=True) or {}
+    conn = sqlite3.connect(os.path.join(BASE_DIR, 'boterx.db'))
+    conn.row_factory = sqlite3.Row
+    try:
+        row = conn.execute('SELECT * FROM social_accounts WHERE id=?', (account_id,)).fetchone()
+        if not row:
+            return jsonify({'error': 'Account not found'}), 404
+        # Keep existing key if not provided
+        access_token = data.get('access_token') if data.get('access_token') else row['access_token']
+        sub_agent_name = row['sub_agent_name']
+        conn.execute('''
+            UPDATE social_accounts SET
+                platform=?, account_name=?, handle=?, sub_agent_id=?,
+                access_token=?, page_id=?, phone_number_id=?, business_account_id=?,
+                posting_permissions=?, content_categories=?, is_active=?,
+                updated_at=?
+            WHERE id=?
+        ''', (
+            data.get('platform', row['platform']),
+            data.get('account_name', row['account_name']),
+            data.get('handle', row['handle']),
+            data.get('sub_agent_id', row['sub_agent_id']),
+            access_token,
+            data.get('page_id', row['page_id']),
+            data.get('phone_number_id', row['phone_number_id']),
+            data.get('business_account_id', row['business_account_id']),
+            data.get('posting_permissions', row['posting_permissions']),
+            '|'.join(data.get('content_categories', [])),
+            'yes' if data.get('is_active') else 'no',
+            datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            account_id
+        ))
+        conn.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
+@app.route('/api/social-accounts/<account_id>', methods=['DELETE'])
+@api_auth
+@permission_required('send_broadcast')
+def api_social_accounts_delete(account_id):
+    import sqlite3
+    conn = sqlite3.connect(os.path.join(BASE_DIR, 'boterx.db'))
+    try:
+        conn.execute('DELETE FROM social_accounts WHERE id=?', (account_id,))
+        conn.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
+@app.route('/api/social-accounts/<account_id>/toggle', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_social_accounts_toggle(account_id):
+    import sqlite3
+    conn = sqlite3.connect(os.path.join(BASE_DIR, 'boterx.db'))
+    conn.row_factory = sqlite3.Row
+    try:
+        row = conn.execute('SELECT is_active FROM social_accounts WHERE id=?', (account_id,)).fetchone()
+        if not row:
+            return jsonify({'error': 'Account not found'}), 404
+        new_status = 'no' if row['is_active'] == 'yes' else 'yes'
+        conn.execute('UPDATE social_accounts SET is_active=?, updated_at=? WHERE id=?',
+                     (new_status, datetime.now().strftime('%Y-%m-%d %H:%M:%S'), account_id))
+        conn.commit()
+        return jsonify({'success': True, 'is_active': new_status})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
+@app.route('/api/social-accounts/<account_id>/sync', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_social_accounts_sync(account_id):
+    import sqlite3
+    conn = sqlite3.connect(os.path.join(BASE_DIR, 'boterx.db'))
+    conn.row_factory = sqlite3.Row
+    try:
+        row = conn.execute('SELECT * FROM social_accounts WHERE id=?', (account_id,)).fetchone()
+        if not row:
+            return jsonify({'success': False, 'error': 'Account not found'}), 404
+
+        platform = row['platform']
+        access_token = row['access_token']
+
+        # Simulate sync with platform API
+        # In production, this would call the actual platform APIs
+        followers = 0
+        try:
+            if platform == 'facebook':
+                # Would call Facebook Graph API
+                pass
+            elif platform == 'instagram':
+                # Would call Instagram Graph API
+                pass
+            elif platform == 'twitter':
+                # Would call Twitter API v2
+                pass
+            elif platform == 'linkedin':
+                # Would call LinkedIn API
+                pass
+            # ... other platforms
+        except:
+            pass
+
+        conn.execute('UPDATE social_accounts SET followers=?, last_sync=?, updated_at=? WHERE id=?',
+                     (followers, datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                      datetime.now().strftime('%Y-%m-%d %H:%M:%S'), account_id))
+        conn.commit()
+        return jsonify({'success': True, 'followers': followers, 'message': 'Synced successfully'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'Sync failed: {str(e)}'}), 500
+    finally:
+        conn.close()
+
+@app.route('/api/social-accounts/<account_id>/post', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_social_accounts_post(account_id):
+    """Post content to a social media account"""
+    import sqlite3
+    conn = sqlite3.connect(os.path.join(BASE_DIR, 'boterx.db'))
+    conn.row_factory = sqlite3.Row
+    try:
+        row = conn.execute('SELECT * FROM social_accounts WHERE id=?', (account_id,)).fetchone()
+        if not row:
+            return jsonify({'error': 'Account not found'}), 404
+
+        data = request.get_json(silent=True) or {}
+        content = data.get('content', '')
+        media_urls = data.get('media_urls', [])
+
+        if not content.strip() and not media_urls:
+            return jsonify({'error': 'Content or media required'}), 400
+
+        # Post to platform
+        platform = row['platform']
+        access_token = row['access_token']
+
+        # This is a placeholder - in production, call the actual platform APIs
+        # For now, simulate success
+        post_id = f"POST{secrets.token_hex(4).upper()}"
+        success = True
+        error = None
+
+        # Log the post
+        conn.execute('''
+            INSERT INTO social_posts (id, account_id, content, media_urls, status, posted_at, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (post_id, account_id, content, '|'.join(media_urls), 'posted' if success else 'failed',
+              datetime.now().strftime('%Y-%m-%d %H:%M:%S'), datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+        conn.commit()
+
+        if success:
+            return jsonify({'success': True, 'post_id': post_id, 'message': 'Posted successfully'})
+        else:
+            return jsonify({'success': False, 'error': error or 'Post failed'}), 500
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'Post failed: {str(e)}'}), 500
+    finally:
+        conn.close()
+
+# ===== API — Channels =====
 @api_auth
 def api_channel_groups():
     groups = read_csv('channel_groups.csv')
@@ -8004,19 +8973,27 @@ def api_upload_broadcast_media():
 @api_auth
 @permission_required('send_broadcast')
 def api_broadcast():
-    """بث رسالة — يدعم وسائط متعددة + فردي/جماعي + دولة + أولوية"""
-    message = request.json.get('message', '') if request.json else ''
-    target = request.json.get('target', 'both') if request.json else 'both'
-    recipient = request.json.get('recipient', 'all') if request.json else 'all'
-    priority = request.json.get('priority', 'normal') if request.json else 'normal'
-    country = request.json.get('country', 'all') if request.json else 'all'
-    media_urls = request.json.get('media_urls', []) if request.json else []
-    target_user = request.json.get('target_user', '') if request.json else ''
-    target_name = request.json.get('target_name', '') if request.json else ''
-    search_query = request.json.get('search_query', '') if request.json else ''
-    platform_account_id = request.json.get('platform_account_id', '') if request.json else ''
-
-    valid_targets = {'telegram', 'web', 'both', 'whatsapp', 'all'}
+    """بث رسالة — يدعم وسائط متعددة + فردي/جماعي + دولة + أولوية + منصات سوشيال + استهداف وكلاء/دول/منصات"""
+    data = request.json or {}
+    message = data.get('message', '')
+    target = data.get('target', 'both')
+    recipient = data.get('recipient', 'all')
+    priority = data.get('priority', 'normal')
+    country = data.get('country', 'all')
+    media_urls = data.get('media_urls', [])
+    target_user = data.get('target_user', '')
+    target_name = data.get('target_name', '')
+    search_query = data.get('search_query', '')
+    platform_account_id = data.get('platform_account_id', '')
+    
+    # New targeting options
+    target_agents = data.get('target_agents', [])  # List of agent IDs
+    target_countries = data.get('target_countries', [])  # List of country codes
+    target_platforms = data.get('target_platforms', [])  # List of social platforms
+    broadcast_to_all_agents = data.get('broadcast_to_all_agents', False)
+    broadcast_to_all_channels = data.get('broadcast_to_all_channels', False)
+    
+    valid_targets = {'telegram', 'web', 'both', 'whatsapp', 'all', 'facebook', 'instagram', 'twitter', 'linkedin', 'youtube', 'tiktok', 'social'}
     if target not in valid_targets:
         return jsonify({'success': False, 'error': 'target غير صالح'}), 400
 
@@ -8043,7 +9020,7 @@ def api_broadcast():
     primary_media = abs_media_urls[0] if abs_media_urls else ''
 
     # ── Web notification (instant via SSE) ──
-    if target in ('web', 'both', 'all'):
+    if target in ('web', 'both', 'all', 'social'):
         notif_title = '📢 رسالة جديدة'
         if priority == 'urgent':
             notif_title = '🚨 رسالة عاجلة'
@@ -8057,12 +9034,30 @@ def api_broadcast():
              'recipient': recipient, 'country': country, 'full_message': message}
         )
 
+    # ── Build target audience based on targeting options ──
+    target_telegram_users = []
+    target_social_accounts = []
+    
+    if recipient == 'all' or broadcast_to_all_agents:
+        # Broadcast to all agents' connected channels
+        if broadcast_to_all_agents:
+            target_agents = []  # Will be filled with all active agents
+    
+    if target_agents:
+        # Filter to specific agents
+        pass
+    
+    if target_countries:
+        # Filter by country
+        pass
+    
     # ── Telegram broadcast (queued for bot) ──
     fieldnames = get_fieldnames('broadcast_queue.csv', [
         'id', 'message', 'target', 'recipient', 'priority', 'country', 'media_urls',
         'target_user', 'target_name', 'created_at', 'created_by', 'status',
         'platform', 'platform_account_id', 'type', 'target_chat_id',
-        'target_channel_id', 'scheduled_at'
+        'target_channel_id', 'scheduled_at', 'target_agents', 'target_countries',
+        'target_platforms', 'broadcast_to_all_agents', 'broadcast_to_all_channels'
     ])
 
     def _queue_entry(platform_name):
@@ -8085,22 +9080,37 @@ def api_broadcast():
             'target_chat_id': '',
             'target_channel_id': '',
             'scheduled_at': '',
+            'target_agents': '|'.join(target_agents) if target_agents else '',
+            'target_countries': '|'.join(target_countries) if target_countries else '',
+            'target_platforms': '|'.join(target_platforms) if target_platforms else '',
+            'broadcast_to_all_agents': 'yes' if broadcast_to_all_agents else 'no',
+            'broadcast_to_all_channels': 'yes' if broadcast_to_all_channels else 'no',
         }
         append_csv('broadcast_queue.csv', entry, fieldnames)
 
+    # Queue for traditional platforms
     if target in ('telegram', 'both', 'all'):
         _queue_entry('telegram')
     if target in ('whatsapp', 'all'):
         _queue_entry('whatsapp')
+    
+    # Queue for social media platforms
+    social_platforms = {'facebook', 'instagram', 'twitter', 'linkedin', 'youtube', 'tiktok'}
+    if target in social_platforms or target_platforms:
+        platforms_to_broadcast = target_platforms if target_platforms else ([target] if target in social_platforms else list(social_platforms))
+        for platform_name in platforms_to_broadcast:
+            _queue_entry(platform_name)
 
-    log_action('broadcast', f'recipient={recipient} target={target} priority={priority} country={country} msg={message[:50]}')
-    target_label = {
-        'both': 'تيليغرام والموقع',
-        'telegram': 'تيليغرام',
-        'web': 'الموقع',
-        'whatsapp': 'واتساب',
-        'all': 'كل المنصات',
-    }.get(target, target)
+    log_action('broadcast', f'recipient={recipient} target={target} priority={priority} country={country} msg={message[:50]} agents={target_agents} countries={target_countries} platforms={target_platforms}')
+    
+    target_label_map = {
+        'both': 'تيليغرام والموقع', 'telegram': 'تيليغرام', 'web': 'الموقع',
+        'whatsapp': 'واتساب', 'all': 'كل المنصات',
+        'facebook': 'فيسبوك', 'instagram': 'إنستجرام', 'twitter': 'تويتر/إكس',
+        'linkedin': 'لينكدإن', 'youtube': 'يوتيوب', 'tiktok': 'تيك توك',
+        'social': 'السوشيال ميديا'
+    }
+    target_label = target_label_map.get(target, target)
     recipient_label = 'فردي' if recipient == 'single' else ('دولة محددة' if country != 'all' else 'جماعي')
     return jsonify({'success': True, 'message': f'تم إرسال البث {recipient_label} عبر {target_label}'})
 

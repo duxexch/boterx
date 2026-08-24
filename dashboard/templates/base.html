@@ -238,6 +238,9 @@
         <a href="{{ url_for('page_settings') }}" class="sidebar-link {% if active_page == 'settings' %}active{% endif %}">
             <i class="fas fa-gear w-5 text-center"></i> <span x-text="t('settings')"></span>
         </a>
+        <a href="{{ url_for('page_ai_api_keys') }}" class="sidebar-link {% if active_page == 'ai_api_keys' %}active{% endif %}">
+            <i class="fas fa-key w-5 text-center"></i> <span x-text="t('ai_api_keys')"></span>
+        </a>
         {% endif %}
     </nav>
 
@@ -404,6 +407,15 @@
             </div>
         {% endif %}
     {% endwith %}
+
+    {% if showcase_readonly %}
+    <div class="px-4 lg:px-6 pt-4">
+        <div class="p-3 rounded-lg text-sm bg-amber-900/40 text-amber-200 border border-amber-700/60 flex items-center justify-between gap-3">
+            <span>وضع العرض فقط: هذه جلسة قراءة فقط، لا يمكن تنفيذ أي تعديل أو إرسال أو حذف.</span>
+            <a href="{{ url_for('logout') }}" class="text-amber-100 underline">إنهاء الجلسة</a>
+        </div>
+    </div>
+    {% endif %}
 
     <!-- Page content -->
     <main class="p-4 lg:p-6">
