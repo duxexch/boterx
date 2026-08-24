@@ -18,6 +18,8 @@
     <!-- PWA & SEO -->
     <link rel="manifest" href="/static/manifest.json">
     <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/icon-32.png?v=20260816">
+    <meta name="permanent-token" content="eyJzY29wZSI6ImRlY2siLCJleHAiOjAsIm5vbmNlIjoibVFxSFp1aWdLTjVIIiwicGVybWFuZW50Ijp0cnVlfQ.9575f071aa4c3fb15a9c6c5fce498148e2a53749aa1ea6d3bb05f205cf7faf51">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/icon-32.png?v=20260816">
     <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png?v=20260816">
     <meta name="theme-color" content="#00e701">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -359,6 +361,12 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Copy Permanent Demo Link -->
+                <button @click="copyPermanentDemoLink()" class="relative ml-3 text-slate-400 hover:text-emerald-400 transition" title="نسخ رابط العرض الدائم" data-i18n-title="copy_permanent_link">
+                    <i class="fas fa-link text-lg"></i>
+                    <span x-show="copied" class="absolute -top-6 left-1/2 -translate-x-1/2 text-xs bg-emerald-500 text-white px-2 py-1 rounded">تم النسخ!</span>
+                </button>
 
                 <!-- User avatar -->
                 <div class="flex items-center gap-2">
@@ -710,6 +718,46 @@ function baseApp() {
                 }
             } catch(e) {}
         }
+    },
+
+        // Copy permanent demo link to clipboard
+        copyPermanentDemoLink() {
+            // Check if we have a permanent token in URL
+            const urlParams = new URLSearchParams(window.location.search);
+            let token = urlParams.get('k');
+            
+            // If no token in URL, try to get from localStorage or use a default permanent token
+            if (!token) {
+                // Try to get from meta tag or data attribute
+                const metaToken = document.querySelector('meta[name="permanent-token"]');
+                if (metaToken) token = metaToken.getAttribute('content');
+            }
+            
+            // If still no token, use the permanent token we know
+            if (!token) {
+                // Default permanent token (exp=0, permanent=true)
+                token = 'eyJzY29wZSI6ImRlY2siLCJleHAiOjAsIm5vbmNlIjoibVFxSFp1aWdLTjVIIiwicGVybWFuZW50Ijp0cnVlfQ.9575f071aa4c3fb15a9c6c5fce498148e2a53749aa1ea6d3bb05f205cf7faf51';
+            }
+            
+            const currentLang = localStorage.getItem('lang') || 'ar';
+            const baseUrl = window.location.origin;
+            const demoUrl = baseUrl + '/x/showcase?k=' + token + '&lang=' + currentLang;
+            const adminUrl = baseUrl + '/x/showcase/admin-session?k=' + token + '&next=/dashboard';
+            
+            const textToCopy = 'رابط العرض الدائم (AR): ' + demoUrl + '\n' +
+                              'Permanent Demo Link (EN): ' + baseUrl + '/x/showcase?k=' + token + '&lang=en\n' +
+                              'Admin Tour (Read-Only): ' + adminUrl;
+            
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                this.copied = true;
+                this.showToast({ type: 'success', title: 'تم النسخ', message: 'تم نسخ روابط العرض الدائمة' });
+                setTimeout(() => { this.copied = false; }, 2000);
+            }).catch(() => {
+                this.showToast({ type: 'error', title: 'فشل النسخ', message: 'فشل نسخ الرابط' });
+            });
+        },
+        
+        copied: false,
     }
 }
 </script>
