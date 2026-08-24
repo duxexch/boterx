@@ -47,13 +47,154 @@
     @media (max-width:980px){ .hero{grid-template-columns:1fr;} .hero-kpis{grid-template-columns:1fr 1fr;} }
     @media (max-width:600px){ .hero{padding:18px;} .hero-kpis{grid-template-columns:1fr;} .wrap{margin:12px auto 24px; width:98vw;} }
   </style>
-</head>
-<body>
-  <div class="lang-toggle">
-    <a class="lang-btn" href="?k={{ token }}&lang={{ 'ar' if t == 'en' else 'en' }}">{{ 'العربية' if t == 'en' else 'English' }}</a>
-  </div>
-  <main class="wrap">
-    <section class="panel hero">
+</section>
+
+    <!-- Unified Navigation Bar -->
+    <nav class="demo-navbar" role="navigation" aria-label="Main navigation">
+      <div class="nav-container">
+        <div class="nav-brand">
+          <span class="nav-logo">🚀</span>
+          <span class="nav-title">{% if t == 'en' %}VEX Admin Panel Showcase{% else %}عرض لوحة إدارة VEX{% endif %}</span>
+        </div>
+        <div class="nav-links" role="tablist" aria-label="Feature sections">
+          <a href="#dashboard-analytics" class="nav-link" role="tab" data-section="dashboard-analytics" data-i18n="dashboard_analytics">📊 {% if t == 'en' %}Dashboard{% else %}لوحة التحكم{% endif %}</a>
+          <a href="#campaigns-broadcast" class="nav-link" role="tab" data-section="campaigns-broadcast" data-i18n="campaigns_broadcast">📢 {% if t == 'en' %}Campaigns{% else %}الحملات{% endif %}</a>
+          <a href="#wallet-operations" class="nav-link" role="tab" data-section="wallet-operations" data-i18n="wallet_operations">💳 {% if t == 'en' %}Wallet{% else %}المحفظة{% endif %}</a>
+          <a href="#ai-matching-agents" class="nav-link" role="tab" data-section="ai-matching-agents" data-i18n="ai_matching">🤖 {% if t == 'en' %}AI Matching{% else %}مطابقة AI{% endif %}</a>
+          <a href="#agents-management" class="nav-link" role="tab" data-section="agents-management" data-i18n="agents_management">🤝 {% if t == 'en' %}Agents{% else %}الوكلاء{% endif %}</a>
+          <a href="#client-white-label" class="nav-link" role="tab" data-section="client-white-label" data-i18n="white_label">🏢 {% if t == 'en' %}White-Label{% else %}أبيض{% endif %}</a>
+          <a href="#employee-rbac" class="nav-link" role="tab" data-section="employee-rbac" data-i18n="rbac">👮 {% if t == 'en' %}RBAC{% else %}RBAC{% endif %}</a>
+          <a href="#games-profitability" class="nav-link" role="tab" data-section="games-profitability" data-i18n="games_profit">🎮 {% if t == 'en' %}Games{% else %}الألعاب{% endif %}</a>
+          <a href="#ai-api-keys" class="nav-link" role="tab" data-section="ai-api-keys" data-i18n="ai_keys">🔐 {% if t == 'en' %}AI Keys{% else %}مفاتيح AI{% endif %}</a>
+          <a href="#security-compliance" class="nav-link" role="tab" data-section="security-compliance" data-i18n="security">🛡️ {% if t == 'en' %}Security{% else %}الأمان{% endif %}</a>
+          <a href="#channels-relay" class="nav-link" role="tab" data-section="channels-relay" data-i18n="channels">📡 {% if t == 'en' %}Channels{% else %}القنوات{% endif %}</a>
+          <a href="#referrals-loyalty" class="nav-link" role="tab" data-section="referrals-loyalty" data-i18n="referrals">🎁 {% if t == 'en' %}Referrals{% else %}إحالات{% endif %}</a>
+          <a href="#tickets-support" class="nav-link" role="tab" data-section="tickets-support" data-i18n="tickets">🎫 {% if t == 'en' %}Tickets{% else %}التذاكر{% endif %}</a>
+          <a href="#social-media-posting" class="nav-link" role="tab" data-section="social-media-posting" data-i18n="social_media">📱 {% if t == 'en' %}Social{% else %}سوشيال{% endif %}</a>
+          <a href="#agent-partnership" class="nav-link" role="tab" data-section="agent-partnership" data-i18n="agent_partner">🤝 {% if t == 'en' %}Agents{% else %}الوكلاء{% endif %}</a>
+        </div>
+        <div class="nav-actions">
+          <a href="{{ url_for('showcase_admin_session') }}?k={{ token }}&next=/dashboard" class="nav-btn nav-btn-primary" data-i18n="admin_tour">{% if t == 'en' %}🛡️ Admin Tour{% else %}🛡️ جولة الأدمن{% endif %}</a>
+          <button class="nav-btn nav-btn-secondary" onclick="copyPermanentDemoLink()" data-i18n-title="copy_link">{% if t == 'en' %}🔗 Copy Link{% else %}🔗 نسخ الرابط{% endif %}</button>
+        </div>
+      </div>
+    </nav>
+
+    <style>
+      .demo-navbar {
+        position: sticky;
+        top: 0;
+        z-index: 1000;
+        background: var(--card);
+        border-bottom: 1px solid var(--line);
+        backdrop-filter: blur(10px);
+        padding: 12px 20px;
+        margin-bottom: 24px;
+        border-radius: 0 0 16px 16px;
+      }
+      .nav-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+      .nav-brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 700;
+        font-size: 1.1rem;
+        color: var(--text);
+      }
+      .nav-logo { font-size: 1.5rem; }
+      .nav-title { font-weight: 800; }
+      .nav-links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        flex: 1;
+        justify-content: center;
+        gap: 6px;
+      }
+      .nav-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 14px;
+        border-radius: 10px;
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: var(--muted);
+        text-decoration: none;
+        border: 1px solid var(--line);
+        background: rgba(255,255,255,0.03);
+        transition: all 0.2s ease;
+        white-space: nowrap;
+      }
+      .nav-link:hover,
+      .nav-link:focus {
+        color: var(--ok);
+        border-color: var(--ok);
+        background: rgba(56, 211, 159, 0.1);
+        transform: translateY(-1px);
+      }
+      .nav-link[aria-selected="true"] {
+        color: var(--ok);
+        border-color: var(--ok);
+        background: rgba(56, 211, 155, 0.15);
+      }
+      .nav-actions {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .nav-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 18px;
+        border-radius: 10px;
+        font-size: 0.85rem;
+        font-weight: 700;
+        text-decoration: none;
+        transition: all 0.2s;
+        white-space: nowrap;
+      }
+      .nav-btn-primary {
+        background: linear-gradient(135deg, #1ba7ff, #1ccf99);
+        color: #081223;
+        border: none;
+      }
+      .nav-btn-primary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 16px rgba(27, 167, 255, 0.4);
+      }
+      .nav-btn-secondary {
+        border: 1px solid var(--line);
+        color: #dcedff;
+        background: rgba(255,255,255,0.05);
+      }
+      .nav-btn-secondary:hover {
+        border-color: var(--ok);
+        color: var(--ok);
+      }
+      @media (max-width: 980px) {
+        .nav-container { flex-direction: column; gap: 16px; }
+        .nav-links { justify-content: flex-start; }
+        .nav-brand { width: 100%; justify-content: space-between; }
+        .nav-actions { width: 100%; justify-content: flex-end; }
+      }
+      @media (max-width: 640px) {
+        .nav-link { padding: 6px 10px; font-size: 0.78rem; }
+        .nav-brand { font-size: 1rem; }
+        .nav-btn { padding: 8px 12px; font-size: 0.8rem; }
+      }
+      .lang-toggle { position: fixed; top: 80px; left: 20px; z-index: 999; }
+    </style>
       <div>
         <h1>{% if t == 'en' %}VEX Admin Panel — Complete Feature Showcase{% else %}لوحة إدارة VEX — عرض شامل لكل المميزات{% endif %}</h1>
         <p class="sub">
@@ -82,7 +223,7 @@
 
     <section class="grid">
       <!-- 1. Dashboard & Analytics -->
-      <article class="card">
+      <article class="card" id="dashboard-analytics">
         <h3><span class="emoji">📊</span> {% if t == 'en' %}Dashboard & Real-time Analytics{% else %}لوحة التحكم والتحليلات اللحظية{% endif %}</h3>
         <p class="meta">{% if t == 'en' %}Unified command center with live KPIs, charts, and activity monitoring{% else %}مركز قيادة موحد مع مؤشرات أداء حية، رسوم بيانية، ومراقبة النشاط{% endif %}</p>
         <ul class="features-list">
@@ -99,7 +240,7 @@
       </article>
 
       <!-- 2. Multi-Channel Campaigns & Broadcast -->
-      <article class="card">
+      <article class="card" id="campaigns-broadcast">
         <h3><span class="emoji">📢</span> {% if t == 'en' %}Multi-Channel Campaigns & Broadcast Center{% else %}مركز الحملات متعددة القنوات والبث{% endif %}</h3>
         <p class="meta">{% if t == 'en' %}Professional broadcast system with targeting, scheduling, media, and partner network{% else %}نظام بث احترافي مع استهداف، جدولة، وسائط، وشبكة شركاء{% endif %}</p>
         <ul class="features-list">
@@ -119,7 +260,7 @@
       </article>
 
       <!-- 3. Wallet & Financial Operations -->
-      <article class="card">
+      <article class="card" id="wallet-operations">
         <h3><span class="emoji">💳</span> {% if t == 'en' %}Wallet, Deposits & Withdrawals{% else %}المحفظة، الإيداعات والسحوبات{% endif %}</h3>
         <p class="meta">{% if t == 'en' %}Complete financial lifecycle: deposits, withdrawals, matching, agents, SVRP compensation{% else %}دورة مالية كاملة: إيداعات، سحوبات، مطابقة، وكلاء، تعويض SVRP{% endif %}</p>
         <ul class="features-list">
@@ -139,7 +280,7 @@
       </article>
 
       <!-- 4. AI-Powered Matching & Agents -->
-      <article class="card">
+      <article class="card" id="ai-matching-agents">
         <h3><span class="emoji">🤖</span> {% if t == 'en' %}AI-Powered Matching & Matching Agents{% else %}المطابقة بالذكاء الاصطناعي ووكلاء المطابقة{% endif %}</h3>
         <p class="meta">{% if t == 'en' %}Intelligent deposit/withdrawal matching with AI agents, automated evidence verification, and dispute resolution{% else %}مطابقة ذكية للإيداع/السحب مع وكلاء ذكاء اصطناعي، تحقق آلي من الأدلة، وحل النزاعات{% endif %}</p>
         <ul class="features-list">
@@ -159,7 +300,7 @@
       </article>
 
       <!-- 5. Agents Management -->
-      <article class="card">
+      <article class="card" id="agents-management">
         <h3><span class="emoji">🤝</span> {% if t == 'en' %}Matching Agents Management{% else %}إدارة وكلاء المطابقة{% endif %}</h3>
         <p class="meta">{% if t == 'en' %}Complete agent lifecycle: onboarding, balances, performance, penalties, permissions{% else %}دورة حياة الوكيل الكاملة: انضمام، أرصدة، أداء، عقوبات، صلاحيات{% endif %}</p>
         <ul class="features-list">
@@ -177,7 +318,7 @@
       </article>
 
       <!-- 6. Client White-Label Admin Access -->
-      <article class="card">
+      <article class="card" id="client-white-label">
         <h3><span class="emoji">🏢</span> {% if t == 'en' %}Client White-Label Admin Portals{% else %}بوابات إدارة العملاء بيضاء التسمية{% endif %}</h3>
         <p class="meta">{% if t == 'en' %}Grant clients their own branded admin panel with isolated data and controlled permissions{% else %}امنح العملاء لوحة إدارة بعلامتهم التجارية مع بيانات معزولة وصلاحيات محكومة{% endif %}</p>
         <ul class="features-list">
@@ -195,7 +336,7 @@
       </article>
 
       <!-- 7. Employee Role-Based Access Control (RBAC) -->
-      <article class="card">
+      <article class="card" id="employee-rbac">
         <h3><span class="emoji">👮</span> {% if t == 'en' %}Employee RBAC & Granular Permissions{% else %}تحكم وصول الموظفين القائم على الأدوار{% endif %}</h3>
         <p class="meta">{% if t == 'en' %}Grant employees precise permissions per admin panel section with ownership and audit trail{% else %}امنح الموظفين صلاحيات دقيقة لكل قسم في لوحة الإدارة مع ملكية وسجل تدقيق{% endif %}</p>
         <ul class="features-list">
@@ -233,7 +374,7 @@
       </article>
 
       <!-- 8. AI API Keys & Integration -->
-      <article class="card">
+      <article class="card" id="ai-api-keys">
         <h3><span class="emoji">🔐</span> {% if t == 'en' %}AI API Keys & Multi-Provider Integration{% else %}مفاتيح API للذكاء الاصطناعي وتكامل متعدد المزوّدين{% endif %}</h3>
         <p class="meta">{% if t == 'en' %}Manage OpenAI, Anthropic, Google, Azure, Custom APIs with auto model fetching, testing, and usage analytics{% else %}إدارة OpenAI، Anthropic، Google، Azure، واجهات مخصصة مع جلب نماذج آلي، اختبار، وتحليلات استخدام{% endif %}</p>
         <ul class="features-list">
@@ -251,7 +392,7 @@
       </article>
 
       <!-- 9. Security, Provably Fair & Compliance -->
-      <article class="card">
+      <article class="card" id="security-compliance">
         <h3><span class="emoji">🛡️</span> {% if t == 'en' %}Security, Provably Fair & Compliance{% else %}الأمان، النزاهة المثبتة، والامتثال{% endif %}</h3>
         <p class="meta">{% if t == 'en' %}OTP login, HMAC-SHA256 provably fair, audit trails, data isolation, GDPR-ready{% else %}دخول OTP، نزاهة HMAC-SHA256، سجلات تدقيق، عزلة بيانات، جاهز لـ GDPR{% endif %}</p>
         <ul class="features-list">
@@ -285,8 +426,8 @@
         </div>
       </article>
 
-      <!-- 11. Referral Engine & Loyalty -->
-      <article class="card">
+      <!-- 11. Referral Engine & Loyalty Programs -->
+      <article class="card" id="referrals-loyalty">
         <h3><span class="emoji">🎁</span> {% if t == 'en' %}Referral Engine & Loyalty Programs{% else %}محرك الإحالات وبرامج الولاء{% endif %}</h3>
         <p class="meta">{% if t == 'en' %}Multi-level referrals, viral loops, SVRP compensation, daily rewards, VIP tiers{% else %}إحالات متعددة المستويات، حلقات فيروسية، تعويض SVRP، مكافآت يومية، مستويات VIP{% endif %}</p>
         <ul class="features-list">
@@ -303,7 +444,7 @@
       </article>
 
       <!-- 12. Tickets, Complaints & Support -->
-      <article class="card">
+      <article class="card" id="tickets-support">
         <h3><span class="emoji">🎫</span> {% if t == 'en' %}Tickets, Complaints & Support System{% else %}نظام التذاكر، الشكاوى، والدعم{% endif %}</h3>
         <p class="meta">{% if t == 'en' %}Structured dispute resolution, SLA tracking, automated escalation, customer communication{% else %}حل نزاعات منظم، تتبع SLA، تصعيد آلي، تواصل مع العملاء{% endif %}</p>
         <ul class="features-list">
@@ -320,7 +461,7 @@
       </article>
 
       <!-- 13. Social Media Multi-Platform Posting & Sub-Admin Control -->
-      <article class="card">
+      <article class="card" id="social-media-posting">
         <h3><span class="emoji">📱</span> {% if t == 'en' %}Social Media Multi-Platform Posting & Sub-Admin Control{% else %}نشر متعدد منصات السوشيال ميديا والتحكم بالمسؤولين الفرعيين{% endif %}</h3>
         <p class="meta">{% if t == 'en' %}Unified social media management: publish to Telegram, WhatsApp, Web, Facebook, Twitter, Instagram from one dashboard with granular sub-admin permissions controlled by main admin{% else %}إدارة موحدة للسوشيال ميديا: انشر على تليجرام، واتساب، الويب، فيسبوك، تويتر، إنستجرام من لوحة واحدة مع صلاحيات دقيقة للمسؤولين الفرعيين يتحكم بها الأدمن الرئيسي{% endif %}</p>
         <ul class="features-list">
@@ -338,7 +479,7 @@
       </article>
 
       <!-- 14. Agent Partnership Program & Incentives -->
-      <article class="card">
+      <article class="card" id="agent-partnership">
         <h3><span class="emoji">🤝</span> {% if t == 'en' %}Agent Partnership Program — Why Agents Choose Us{% else %}برنامج شراكة الوكلاء — لماذا يختار الوكلاء العمل معنا{% endif %}</h3>
         <p class="meta">{% if t == 'en' %}Compelling value proposition for agents: high commissions, low risk, automated tools, scalable income, and platform support that drives their growth{% else %}عرض قيمة مقنع للوكلاء: عمولات عالية، مخاطر منخفضة، أدوات آلية، دخل قابل للتوسع، ودعم منصة يدفع نموهم{% endif %}</p>
         <ul class="features-list">

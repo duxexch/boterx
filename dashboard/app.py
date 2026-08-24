@@ -10779,9 +10779,16 @@ try:
         check_and_mark_nonce as _check_nonce,
         cleanup_expired_nonces as _cleanup_nonces,
         _gdb as _db_singleton,
+        _init_db,
     )
     _gm = GameManager()
     _VEX_GAMES = True
+    # ── Initialize all database tables ───────────────────────────────────────
+    try:
+        _init_db()
+        print("[startup] Database tables initialized.")
+    except Exception as _init_err:
+        print(f"[startup] Database init error: {_init_err}")
     # ── Startup: refund any bets stranded by a mid-game server crash ──────────
     # active_game_sessions rows survive restarts; refund credits the bet back
     # via credit_with_idempotency so double-refunds on repeated restarts are safe.

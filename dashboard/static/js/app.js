@@ -593,7 +593,7 @@ const Notifier = {
     },
     async check() {
         try {
-            const res = await fetch('/api/stats');
+            const res = await api('/api/stats');
             if (res.status === 401 || res.status === 403) {
                 if (this._timer) { clearInterval(this._timer); this._timer = null; }
                 return;

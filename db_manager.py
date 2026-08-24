@@ -17,7 +17,7 @@ from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, 'vex_games.db')
+DB_PATH = os.path.join(BASE_DIR, 'boterx.db')
 CSV_ENCODING = 'utf-8-sig'
 
 _db_lock = threading.Lock()
@@ -1646,7 +1646,10 @@ class GameDB:
             for row in rows:
                 tid = row.get('telegram_id', '')
                 if tid in bal_map:
-                    row['game_balance'] = f"{bal_map[tid]:.2f}"
+                    try:
+                        row['game_balance'] = f"{float(bal_map[tid]):.2f}"
+                    except (ValueError, TypeError):
+                        row['game_balance'] = "0.00"
 
             # Atomic write
             import tempfile
