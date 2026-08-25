@@ -1,0 +1,12 @@
+Aug 24 18:28:43 vps3524672 gunicorn[8671]: 2026-08-24 18:28:43,276 - VEX Security Bot - Polling error: The read operation timed out
+Aug 24 19:57:22 vps3524672 gunicorn[8671]: 2026-08-24 19:57:22,194 - VEX Security Bot - Polling error: HTTP Error 502: Bad Gateway
+Aug 24 19:57:27 vps3524672 gunicorn[8671]: 2026-08-24 19:57:27,429 - VEX Security Bot - Polling error: HTTP Error 502: Bad Gateway
+Aug 24 19:57:32 vps3524672 gunicorn[8671]: 2026-08-24 19:57:32,665 - VEX Security Bot - Polling error: HTTP Error 502: Bad Gateway
+Aug 24 19:58:12 vps3524672 gunicorn[8671]: 2026-08-24 19:58:12,853 - VEX Security Bot - Polling error: The read operation timed out
+Aug 24 19:58:53 vps3524672 gunicorn[8671]: 2026-08-24 19:58:53,046 - VEX Security Bot - Polling error: The read operation timed out
+Aug 24 19:59:33 vps3524672 gunicorn[8671]: 2026-08-24 19:59:33,231 - VEX Security Bot - Polling error: The read operation timed out
+Aug 24 20:00:13 vps3524672 gunicorn[8671]: 2026-08-24 20:00:13,418 - VEX Security Bot - Polling error: The read operation timed out
+Aug 24 20:00:53 vps3524672 gunicorn[8671]: 2026-08-24 20:00:53,585 - VEX Security Bot - Polling error: The read operation timed out
+Aug 24 20:11:29 vps3524672 gunicorn[13245]: 2026-08-24 20:11:29,344 - VEX Security Bot - Polling error: The read operation timed out
+Aug 24 22:46:28 vps3524672 gunicorn[15159]: 2026-08-24 22:46:28,586 - VEX Security Bot - Polling error: <urlopen error _ssl.c:983: The handshake operation timed out>
+Aug 24 22:48:09 vps3524672 gunicorn[15159]: 2026-08-24 22:48:09,248 - VEX Security Bot - Polling error: The read operation timed out
