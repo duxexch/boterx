@@ -1,5 +1,5 @@
 ﻿<!DOCTYPE html>
-<html lang="ar" dir="rtl" x-data="baseApp" :lang="lang" :dir="lang === 'ar' ? 'rtl' : 'ltr'" :class="darkMode ? '' : 'light-mode'">
+<html lang="ar" dir="rtl" x-data="baseApp()" :lang="lang" :dir="lang === 'ar' ? 'rtl' : 'ltr'" :class="darkMode ? '' : 'light-mode'">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
@@ -10,12 +10,12 @@
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
     <script src="{{ url_for('static', filename='vendor/alpine.min.js') }}" defer></script>
-    <script src="{{ url_for('static', filename='js/app.js') }}?v=20260825c" defer></script>
-    <script src="{{ url_for('static', filename='js/i18n-admin-lexicon.js') }}?v=20260825c" defer></script>
-    <script src="{{ url_for('static', filename='js/i18n-admin-runtime.js') }}?v=20260825c" defer></script>
-    <script src="{{ url_for('static', filename='js/base-app.js') }}?v=20260825c" defer></script>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=20260825c">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/fx.css') }}?v=20260825c">
+    <script src="{{ url_for('static', filename='js/app.js') }}?v=20260825d" defer></script>
+    <script src="{{ url_for('static', filename='js/i18n-admin-lexicon.js') }}?v=20260825d" defer></script>
+    <script src="{{ url_for('static', filename='js/i18n-admin-runtime.js') }}?v=20260825d" defer></script>
+    <script src="{{ url_for('static', filename='js/base-app.js') }}?v=20260825d" defer></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=20260825d">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/fx.css') }}?v=20260825d">
     <!-- PWA & SEO -->
     <link rel="manifest" href="/static/manifest.json">
     <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/icon-32.png?v=20260816">
@@ -831,4 +831,6 @@ function rbac(perm) { return !Object.keys(_RBAC).length || !!_RBAC[perm]; }
 {% block scripts %}{% endblock %}
 </body>
 </html>
+
+
 
