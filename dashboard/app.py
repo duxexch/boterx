@@ -7018,7 +7018,9 @@ _CHANNEL_DEFAULT_FIELDS = [
 
 _AI_AGENT_FIELDS = [
     'id', 'name', 'provider', 'instructions', 'fallback_provider',
-    'is_active', 'created_at', 'updated_at', 'created_by'
+    'is_active', 'created_at', 'updated_at', 'created_by',
+    'api_key', 'job_description', 'base_url', 'default_model',
+    'temperature', 'max_tokens', 'last_run_at', 'last_run_result'
 ]
 
 _PLATFORM_ACCOUNT_FIELDS = [
@@ -7731,6 +7733,14 @@ def _normalize_ai_agent_row(row):
     _setdefault('created_at', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
     _setdefault('updated_at', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
     _setdefault('created_by', '')
+    _setdefault('api_key', '')
+    _setdefault('job_description', '')
+    _setdefault('base_url', '')
+    _setdefault('default_model', '')
+    _setdefault('temperature', '0.7')
+    _setdefault('max_tokens', '2048')
+    _setdefault('last_run_at', '')
+    _setdefault('last_run_result', '')
 
     if str(row.get('is_active', '')).lower() in ('1', 'true', 'yes', 'on', 'active'):
         norm = 'yes'
@@ -7762,7 +7772,10 @@ def api_ai_agents_list():
     for r in rows:
         r, ch = _normalize_ai_agent_row(r)
         changed = changed or ch
-        out.append(r)
+        # Never leak API keys to the client — only a flag
+        pub = {k: v for k, v in r.items() if k != 'api_key'}
+        pub['has_api_key'] = bool(r.get('api_key'))
+        out.append(pub)
     if changed:
         write_csv('ai_agents.csv', rows, get_fieldnames('ai_agents.csv', _AI_AGENT_FIELDS))
     out.sort(key=lambda x: (x.get('is_active') != 'yes', x.get('name', '')))
@@ -7784,6 +7797,14 @@ def api_ai_agents_create():
         'instructions': str(data.get('instructions', '') or '').strip(),
         'fallback_provider': str(data.get('fallback_provider', '') or '').strip().lower(),
         'is_active': 'yes' if str(data.get('is_active', 'yes')).lower() in ('1', 'true', 'yes', 'on') else 'no',
+        'api_key': str(data.get('api_key', '') or '').strip(),
+        'job_description': str(data.get('job_description', '') or '').strip(),
+        'base_url': str(data.get('base_url', '') or '').strip(),
+        'default_model': str(data.get('default_model', '') or '').strip(),
+        'temperature': str(data.get('temperature', '0.7') or '0.7'),
+        'max_tokens': str(data.get('max_tokens', '2048') or '2048'),
+        'last_run_at': '',
+        'last_run_result': '',
         'created_at': now_s,
         'updated_at': now_s,
         'created_by': str(session.get('admin_id', '') or ''),
@@ -7812,7 +7833,9 @@ def api_ai_agents_edit(agent_id):
         return jsonify({'success': True})
 
     data = request.json or {}
-    editable = {'name', 'provider', 'instructions', 'fallback_provider', 'is_active'}
+    editable = {'name', 'provider', 'instructions', 'fallback_provider', 'is_active',
+                'api_key', 'job_description', 'base_url', 'default_model',
+                'temperature', 'max_tokens'}
     found = False
     for r in rows:
         if r.get('id') == agent_id:
@@ -7828,6 +7851,287 @@ def api_ai_agents_edit(agent_id):
     write_csv('ai_agents.csv', rows, fieldnames)
     log_action('update_ai_agent', agent_id)
     return jsonify({'success': True})
+
+
+# ===== AI Agent Execution Engine — full dashboard control =====
+def _agent_resolve_credentials(agent):
+    """Resolve API key + base URL + model for an agent (agent key > DB keys > env)."""
+    provider = (agent.get('provider') or 'auto').strip().lower()
+    api_key = (agent.get('api_key') or '').strip()
+    base_url = (agent.get('base_url') or '').strip()
+    model = (agent.get('default_model') or '').strip()
+
+    # Fall back to ai_api_keys DB (priority order) when agent has no key
+    if not api_key:
+        try:
+            import sqlite3
+            conn = sqlite3.connect(os.path.join(BASE_DIR, 'boterx.db'))
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                'SELECT * FROM ai_api_keys WHERE is_active=1 ORDER BY priority ASC, id ASC').fetchall()
+            conn.close()
+            for r in rows:
+                p = (r['provider'] or '').lower()
+                if provider == 'auto' or provider in p or p in provider:
+                    api_key = r['api_key']
+                    base_url = base_url or (r['base_url'] or '')
+                    model = model or (r['default_model'] or '')
+                    break
+            if not api_key and rows:
+                api_key = rows[0]['api_key']
+                base_url = base_url or (rows[0]['base_url'] or '')
+                model = model or (rows[0]['default_model'] or '')
+        except Exception:
+            pass
+
+    if not api_key:
+        api_key = os.getenv('OPENAI_API_KEY', '') or _env_file_value('OPENAI_API_KEY') or ''
+    if provider == 'openrouter' and not base_url:
+        base_url = 'https://openrouter.ai/api/v1'
+    if not base_url:
+        base_url = 'https://api.openai.com/v1'
+    if not model:
+        model = 'gpt-4o-mini'
+    return api_key, base_url.rstrip('/'), model
+
+
+def _agent_dashboard_context():
+    """Gather full dashboard state for the agent to monitor."""
+    try:
+        txns = read_csv('transactions.csv')
+        pending_txns = [t for t in txns if t.get('status') == 'pending'][:15]
+        complaints = read_csv('complaints.csv')
+        open_complaints = [c for c in complaints if c.get('status') not in ('resolved', 'closed')][:15]
+        users = read_csv('users.csv')
+        channels = read_csv('bot_channels.csv')
+        queue = read_csv('broadcast_queue.csv')
+        return {
+            'users_total': len(users),
+            'channels_total': len(channels),
+            'transactions_pending': len([t for t in txns if t.get('status') == 'pending']),
+            'complaints_open': len(open_complaints),
+            'broadcast_queue_pending': len([q for q in queue if q.get('status') == 'pending']),
+            'pending_transactions': [
+                {'id': t.get('id'), 'type': t.get('type'), 'amount': t.get('amount'),
+                 'customer': t.get('customer_id', t.get('client', '')), 'date': t.get('date', t.get('created_at', ''))}
+                for t in pending_txns],
+            'open_complaints': [
+                {'id': c.get('id'), 'message': (c.get('message') or '')[:200],
+                 'customer': c.get('customer_id', c.get('client', '')), 'date': c.get('date', c.get('created_at', ''))}
+                for c in open_complaints],
+        }
+    except Exception as e:
+        return {'error': f'context gathering failed: {e}'}
+
+
+_AGENT_ACTIONS_DOC = """You may return ONE JSON object (and only the JSON, no extra text) to execute actions:
+{"report": "short human summary of what you did/found", "actions": [
+  {"action": "approve_transaction", "id": "<txn_id>", "amount": 123.0},
+  {"action": "reject_transaction", "id": "<txn_id>", "reason": "..."},
+  {"action": "reply_complaint", "id": "<complaint_id>", "response": "..."},
+  {"action": "broadcast_message", "message": "...", "target": "telegram|web|both"},
+  {"action": "ban_user", "user_id": "<id>", "reason": "..."},
+  {"action": "unban_user", "user_id": "<id>"}
+]}
+If you only want to report without acting, return {"report": "...", "actions": []}.
+NEVER invent IDs — only use IDs from the provided dashboard context."""
+
+
+def _agent_execute_action(act):
+    """Execute a single agent action safely. Returns (ok, message)."""
+    name = str(act.get('action', '') or '').strip().lower()
+    try:
+        if name == 'approve_transaction':
+            tid = str(act.get('id', ''))
+            txns = read_csv('transactions.csv')
+            for t in txns:
+                if t.get('id') == tid and t.get('status') == 'pending':
+                    amt = act.get('amount')
+                    if amt is not None:
+                        try:
+                            t['amount'] = str(float(amt))
+                        except (TypeError, ValueError):
+                            pass
+                    t['status'] = 'approved'
+                    write_csv('transactions.csv', txns, get_fieldnames('transactions.csv',
+                              ['id', 'customer_id', 'type', 'amount', 'status', 'date', 'company', 'wallet']))
+                    return True, f'transaction {tid} approved'
+            return False, f'transaction {tid} not found or not pending'
+
+        if name == 'reject_transaction':
+            tid = str(act.get('id', ''))
+            txns = read_csv('transactions.csv')
+            for t in txns:
+                if t.get('id') == tid and t.get('status') == 'pending':
+                    t['status'] = 'rejected'
+                    t['admin_note'] = str(act.get('reason', 'rejected by AI agent'))[:200]
+                    write_csv('transactions.csv', txns, get_fieldnames('transactions.csv',
+                              ['id', 'customer_id', 'type', 'amount', 'status', 'date', 'company', 'wallet', 'admin_note']))
+                    return True, f'transaction {tid} rejected'
+            return False, f'transaction {tid} not found or not pending'
+
+        if name == 'reply_complaint':
+            cid = str(act.get('id', ''))
+            complaints = read_csv('complaints.csv')
+            for c in complaints:
+                if c.get('id') == cid:
+                    c['admin_response'] = str(act.get('response', ''))[:500]
+                    c['status'] = 'resolved'
+                    write_csv('complaints.csv', complaints, get_fieldnames('complaints.csv',
+                              ['id', 'customer_id', 'message', 'status', 'date', 'admin_response']))
+                    return True, f'complaint {cid} replied & resolved'
+            return False, f'complaint {cid} not found'
+
+        if name == 'broadcast_message':
+            msg = str(act.get('message', ''))[:4000]
+            if not msg:
+                return False, 'empty broadcast message'
+            target = str(act.get('target', 'telegram') or 'telegram').lower()
+            fieldnames = get_fieldnames('broadcast_queue.csv', [
+                'id', 'message', 'type', 'platform', 'target_chat_id', 'platform_account_id',
+                'target_channel_id', 'created_at', 'created_by', 'status', 'target', 'recipient',
+                'priority', 'country', 'media_urls', 'target_user', 'target_name', 'scheduled_at'])
+            targets = ['telegram'] if target == 'telegram' else (['whatsapp'] if target == 'whatsapp' else (['web'] if target == 'web' else ['telegram', 'web']))
+            for t in targets:
+                append_csv('broadcast_queue.csv', {
+                    'id': f"AIAG{secrets.token_hex(3).upper()}",
+                    'message': msg, 'type': 'broadcast', 'platform': t,
+                    'target_chat_id': '', 'platform_account_id': '', 'target_channel_id': '',
+                    'created_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
+                    'created_by': 'ai_agent', 'status': 'pending',
+                    'target': t, 'recipient': 'all', 'priority': 'normal', 'country': 'all',
+                    'media_urls': '', 'target_user': '', 'target_name': '', 'scheduled_at': '',
+                }, fieldnames)
+            return True, f'broadcast queued to {",".join(targets)}'
+
+        if name == 'ban_user':
+            uid = str(act.get('user_id', ''))
+            users = read_csv('users.csv')
+            for u in users:
+                if u.get('id') == uid or u.get('customer_id') == uid:
+                    u['banned'] = 'yes'
+                    u['ban_reason'] = str(act.get('reason', 'banned by AI agent'))[:200]
+                    write_csv('users.csv', users, get_fieldnames('users.csv',
+                              ['id', 'customer_id', 'name', 'phone', 'banned', 'ban_reason', 'created_at']))
+                    return True, f'user {uid} banned'
+            return False, f'user {uid} not found'
+
+        if name == 'unban_user':
+            uid = str(act.get('user_id', ''))
+            users = read_csv('users.csv')
+            for u in users:
+                if u.get('id') == uid or u.get('customer_id') == uid:
+                    u['banned'] = 'no'
+                    u['ban_reason'] = ''
+                    write_csv('users.csv', users, get_fieldnames('users.csv',
+                              ['id', 'customer_id', 'name', 'phone', 'banned', 'ban_reason', 'created_at']))
+                    return True, f'user {uid} unbanned'
+            return False, f'user {uid} not found'
+
+        return False, f'unknown action: {name}'
+    except Exception as e:
+        return False, f'action failed: {e}'
+
+
+@app.route('/api/ai-agents/<agent_id>/run', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_ai_agents_run(agent_id):
+    """Run the agent: monitor dashboard state, think with its job description, execute actions."""
+    rows = read_csv('ai_agents.csv')
+    agent = next((r for r in rows if r.get('id') == agent_id), None)
+    if not agent:
+        return jsonify({'success': False, 'error': 'Agent not found'}), 404
+    agent, _ = _normalize_ai_agent_row(agent)
+    if agent.get('is_active') != 'yes':
+        return jsonify({'success': False, 'error': 'Agent is inactive — activate it first'}), 400
+
+    api_key, base_url, model = _agent_resolve_credentials(agent)
+    if not api_key:
+        return jsonify({'success': False, 'error': 'No API key available — add one to the agent or to AI API Keys'}), 400
+
+    context = _agent_dashboard_context()
+    job = agent.get('job_description') or agent.get('instructions') or 'Monitor the dashboard and report anything important.'
+
+    system_prompt = f"""You are an autonomous admin agent inside the VEX Games admin dashboard.
+YOUR JOB: {job}
+RULES: {agent.get('instructions') or 'Act carefully. Only act when clearly needed by your job.'}
+{_AGENT_ACTIONS_DOC}"""
+
+    user_prompt = f"""DASHBOARD STATE (live):
+{json.dumps(context, ensure_ascii=False, indent=1)}
+
+Execute your job now. Return your JSON."""
+
+    try:
+        import httpx
+        try:
+            temperature = min(2.0, max(0.0, float(agent.get('temperature') or 0.7)))
+        except (TypeError, ValueError):
+            temperature = 0.7
+        try:
+            max_tokens = min(16000, max(100, int(float(agent.get('max_tokens') or 2048))))
+        except (TypeError, ValueError):
+            max_tokens = 2048
+
+        headers = {'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'}
+        payload = {
+            'model': model,
+            'messages': [
+                {'role': 'system', 'content': system_prompt},
+                {'role': 'user', 'content': user_prompt},
+            ],
+            'temperature': temperature,
+            'max_tokens': max_tokens,
+        }
+        with httpx.Client(timeout=90.0) as client:
+            resp = client.post(base_url + '/chat/completions', headers=headers, json=payload)
+        if resp.status_code != 200:
+            return jsonify({'success': False, 'error': f'AI provider error {resp.status_code}: {resp.text[:300]}'}), 502
+
+        content = resp.json()['choices'][0]['message']['content']
+        # Extract JSON from the response (tolerate markdown fences)
+        js = content.strip()
+        if '```' in js:
+            for part in js.split('```'):
+                p = part.strip()
+                if p.startswith('{'):
+                    js = p
+                    break
+        actions, report, exec_results = [], '', []
+        try:
+            js_start = js.find('{')
+            js_end = js.rfind('}')
+            parsed = json.loads(js[js_start:js_end + 1])
+            report = parsed.get('report', '')
+            actions = parsed.get('actions', []) or []
+        except Exception:
+            report = content  # raw text fallback — agent spoke but no valid JSON
+
+        for act in actions:
+            if not isinstance(act, dict):
+                continue
+            ok, msg = _agent_execute_action(act)
+            exec_results.append({'action': act.get('action'), 'ok': ok, 'message': msg})
+
+        result_text = report + ('\nActions: ' + '; '.join(
+            ('✅ ' if r['ok'] else '❌ ') + r['action'] + ' — ' + r['message'] for r in exec_results) if exec_results else '')
+
+        agent['last_run_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        agent['last_run_result'] = result_text[:1000]
+        agent['updated_at'] = agent['last_run_at']
+        for i, r in enumerate(rows):
+            if r.get('id') == agent_id:
+                rows[i] = agent
+                break
+        write_csv('ai_agents.csv', rows, get_fieldnames('ai_agents.csv', _AI_AGENT_FIELDS))
+        log_action('run_ai_agent', f'{agent_id}: {len(exec_results)} actions')
+
+        return jsonify({'success': True, 'report': report,
+                        'actions_executed': exec_results,
+                        'raw': content[:2000], 'model': model})
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'Agent run failed: {e}'}), 500
 
 
 @app.route('/api/ai-agents/<agent_id>/test', methods=['POST'])
