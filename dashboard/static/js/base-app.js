@@ -19,14 +19,10 @@ function baseApp() {
         },
 
         t(key) {
-            try {
-                if (typeof tr === 'function' && window.I18N) return tr(key);
-            } catch (e) {}
-            try {
-                const lang = localStorage.getItem('lang') || 'ar';
-                const dict = window.I18N && (window.I18N[lang] || window.I18N.ar);
-                return (dict && dict[key]) || key;
-            } catch (e) { return key; }
+            // tr() (app.js) resolves the top-level `const I18N` via scope chain —
+            // window.I18N does NOT exist because const doesn't attach to window
+            try { return tr(key); } catch (e) {}
+            return key;
         },
 
         applyLang() {
