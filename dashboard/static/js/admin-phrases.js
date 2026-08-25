@@ -862,7 +862,11 @@ window.ADMIN_PHRASES = {
   "🌐 تعدد اللغات": "🌐 Multi-language",
   "إنشاء العميل": "Client creation",
   "👥 المستخدمين": "👥 Users",
-  "قناة": "Channel"
+  "قناة": "Channel",
+  "💳 المعاملات": "💳 Transactions",
+  "💎 محافظ التعويض": "💎 Compensation Wallets",
+  "🏢 الشركات": "🏢 Companies",
+  "🏆 المكافآت": "🏆 Bonuses"
 };
 
 /* Digit-pattern rules for dynamic strings (numbers replaced by #). */
