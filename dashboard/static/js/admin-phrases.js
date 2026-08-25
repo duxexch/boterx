@@ -832,7 +832,24 @@ window.ADMIN_PHRASES = {
   "إرسال الرسالة": "Send Message",
   "(إجمالي:": "(Total:",
   "غير متصل": "Offline",
-  "عميل-": "Client-"
+  "عميل-": "Client-",
+  // ===== Emoji variants & remaining gaps =====
+  "💰 إيداع": "💰 Deposit",
+  "📱 تطبيقات": "📱 Apps",
+  "📨 شكاوى": "📨 Complaints",
+  "🚀 إطلاق فوراً": "🚀 Launch Now",
+  "غير مصنف": "Uncategorized",
+  "غير معروف": "Unknown",
+  "❌ غير مفعّل": "❌ Disabled",
+  "غير مفعّل": "Disabled",
+  "مفعّل": "Enabled",
+  "👥 جماعي • 📱🌐 الاثنين": "👥 Bulk • 📱🌐 Both",
+  "إضافة شركة": "Add Company",
+  "إضافة وكيل": "Add Agent",
+  "حساب رئيسي": "Main account",
+  "رقم محفظة": "Wallet number",
+  "حساب بنكي": "Bank account",
+  "محفظة إلكترونية": "E-Wallet"
 };
 
 /* Digit-pattern rules for dynamic strings (numbers replaced by #). */

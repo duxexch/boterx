@@ -81,6 +81,9 @@ app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=365)  # persistent log
 app.config['SESSION_COOKIE_SECURE'] = True  # HTTPS only
 # حد أقصى لحجم أي طلب (يشمل رفع الصور) — يرفض Werkzeug الجسم قبل التحليل الكامل
 app.config['MAX_CONTENT_LENGTH'] = 8 * 1024 * 1024  # 8MB
+# لا ترتب مفاتيح JSON — صفوف CSV قد تحتوي مفاتيح None فينهار الترميز بـ
+# TypeError: '<' not supported between instances of 'NoneType' and 'str'
+app.json.sort_keys = False
 
 # ===== Web Push (VAPID) — notifications work even when tab/browser is closed =====
 # الزوج المضمّن سابقاً بالكود كان غير متطابق (الخاص لا يشتق العام) — كان
