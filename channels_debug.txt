@@ -12,7 +12,6 @@ STATE: {
 
 ERRORS/WARNINGS:
 [error] The path of the provided scope ('/') is not under the max scope allowed ('/static/'). Adjust the scope, move the Service Worker script, or use the Service-Worker-Allowed HTTP header to allow the scope.
-[error] Failed to load resource: the server responded with a status of 405 ()
 [error] The path of the provided scope ('/') is not under the max scope allowed ('/static/'). Adjust the scope, move the Service Worker script, or use the Service-Worker-Allowed HTTP header to allow the scope.
 [warning] Alpine Warning: x-for ":key" is undefined or invalid JSHandle@node
 [warning] Alpine Expression Error: Cannot read properties of undefined (reading 'after')
@@ -21,7 +20,6 @@ Expression: "(vaultPosts || [])"
 
  JSHandle@node
 PAGEERROR: Cannot read properties of undefined (reading 'after')
-[error] Failed to load resource: the server responded with a status of 405 ()
 [warning] Alpine Warning: x-for ":key" is undefined or invalid JSHandle@node
 [warning] Alpine Expression Error: Cannot read properties of undefined (reading 'after')
 

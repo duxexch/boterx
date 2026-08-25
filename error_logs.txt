@@ -1,0 +1,45 @@
+Aug 25 16:55:46 vps3524672 gunicorn[13843]: 2026-08-25 16:55:46,386 - VEX Security Bot - Exception on /channels [GET]
+Aug 25 16:55:46 vps3524672 gunicorn[13843]: Traceback (most recent call last):
+Aug 25 16:55:46 vps3524672 gunicorn[13843]:   File "/usr/local/lib/python3.12/dist-packages/flask/app.py", line 1511, in wsgi_app
+Aug 25 16:55:46 vps3524672 gunicorn[13843]:     response = self.full_dispatch_request()
+Aug 25 16:55:46 vps3524672 gunicorn[13843]:                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Aug 25 16:55:46 vps3524672 gunicorn[13843]:   File "/usr/local/lib/python3.12/dist-packages/flask/app.py", line 919, in full_dispatch_request
+Aug 25 16:55:46 vps3524672 gunicorn[13843]:     rv = self.handle_user_exception(e)
+Aug 25 16:55:46 vps3524672 gunicorn[13843]:          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Aug 25 16:55:46 vps3524672 gunicorn[13843]:   File "/usr/local/lib/python3.12/dist-packages/flask/app.py", line 917, in full_dispatch_request
+Aug 25 16:55:46 vps3524672 gunicorn[13843]:     rv = self.dispatch_request()
+Aug 25 16:55:46 vps3524672 gunicorn[13843]:          ^^^^^^^^^^^^^^^^^^^^^^^
+Aug 25 16:55:46 vps3524672 gunicorn[13843]:   File "/usr/local/lib/python3.12/dist-packages/flask/app.py", line 902, in dispatch_request
+Aug 25 16:55:46 vps3524672 gunicorn[13843]:     return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+Aug 25 16:55:46 vps3524672 gunicorn[13843]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Aug 25 16:55:46 vps3524672 gunicorn[13843]:   File "/opt/bot/dashboard/app.py", line 407, in decorated
+Aug 25 16:55:46 vps3524672 gunicorn[13843]:     return f(*args, **kwargs)
+Aug 25 16:55:46 vps3524672 gunicorn[13843]:            ^^^^^^^^^^^^^^^^^^
+Aug 25 16:55:46 vps3524672 gunicorn[13843]:   File "/opt/bot/dashboard/app.py", line 499, in decorated_fn
+Aug 25 16:55:46 vps3524672 gunicorn[13843]:     return f(*args, **kwargs)
+Aug 25 16:55:46 vps3524672 gunicorn[13843]:            ^^^^^^^^^^^^^^^^^^
+Aug 25 16:55:46 vps3524672 gunicorn[13843]:   File "/opt/bot/dashboard/app.py", line 3168, in page_channels
+Aug 25 16:55:46 vps3524672 gunicorn[13843]:     return render_template('channels.html', active_page='channels')
+Aug 25 16:55:46 vps3524672 gunicorn[13843]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Aug 25 16:55:46 vps3524672 gunicorn[13843]:   File "/usr/local/lib/python3.12/dist-packages/flask/templating.py", line 150, in render_template
+Aug 25 16:55:46 vps3524672 gunicorn[13843]:     template = app.jinja_env.get_or_select_template(template_name_or_list)
+Aug 25 16:55:46 vps3524672 gunicorn[13843]:                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Aug 25 16:55:46 vps3524672 gunicorn[13843]:   File "/usr/local/lib/python3.12/dist-packages/jinja2/environment.py", line 1087, in get_or_select_template
+Aug 25 16:55:46 vps3524672 gunicorn[13843]:     return self.get_template(template_name_or_list, parent, globals)
+Aug 25 16:55:46 vps3524672 gunicorn[13843]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Aug 25 16:55:46 vps3524672 gunicorn[13843]:   File "/usr/local/lib/python3.12/dist-packages/jinja2/environment.py", line 1016, in get_template
+Aug 25 16:55:46 vps3524672 gunicorn[13843]:     return self._load_template(name, globals)
+Aug 25 16:55:46 vps3524672 gunicorn[13843]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Aug 25 16:55:46 vps3524672 gunicorn[13843]:   File "/usr/local/lib/python3.12/dist-packages/jinja2/environment.py", line 975, in _load_template
+Aug 25 16:55:46 vps3524672 gunicorn[13843]:     template = self.loader.load(self, name, self.make_globals(globals))
+Aug 25 16:55:46 vps3524672 gunicorn[13843]:                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Aug 25 16:55:46 vps3524672 gunicorn[13843]:   File "/usr/local/lib/python3.12/dist-packages/jinja2/loaders.py", line 138, in load
+Aug 25 16:55:46 vps3524672 gunicorn[13843]:     code = environment.compile(source, name, filename)
+Aug 25 16:55:46 vps3524672 gunicorn[13843]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Aug 25 16:55:46 vps3524672 gunicorn[13843]:   File "/usr/local/lib/python3.12/dist-packages/jinja2/environment.py", line 771, in compile
+Aug 25 16:55:46 vps3524672 gunicorn[13843]:     self.handle_exception(source=source_hint)
+Aug 25 16:55:46 vps3524672 gunicorn[13843]:   File "/usr/local/lib/python3.12/dist-packages/jinja2/environment.py", line 942, in handle_exception
+Aug 25 16:55:46 vps3524672 gunicorn[13843]:     raise rewrite_traceback_stack(source=source)
+Aug 25 16:55:46 vps3524672 gunicorn[13843]:   File "/opt/bot/dashboard/templates/channels.html", line 659, in template
+Aug 25 16:55:46 vps3524672 gunicorn[13843]:     {% block scripts %}
+Aug 25 16:55:46 vps3524672 gunicorn[13843]: jinja2.exceptions.TemplateSyntaxError: Unexpected end of template. Jinja was looking for the following tags: 'endblock'. The innermost block that needs to be closed is 'block'.
