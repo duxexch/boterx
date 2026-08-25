@@ -146,18 +146,27 @@ class OpenRouterProvider(AIProvider):
 
     def __init__(self, api_key=None):
         super().__init__(api_key)
-        # Also try ai_api_keys DB if env is empty
         if not self.api_key:
-            try:
-                import sqlite3
-                db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dashboard', 'boterx.db')
-                conn = sqlite3.connect(db_path)
-                row = conn.execute("SELECT api_key FROM ai_api_keys WHERE provider LIKE '%openrouter%' AND is_active=1 ORDER BY priority ASC LIMIT 1").fetchone()
-                conn.close()
-                if row:
-                    self.api_key = row[0]
-            except Exception:
-                pass
+            self.api_key = self._load_key_from_db()
+
+    def _load_key_from_db(self):
+        try:
+            import sqlite3
+            for db_path in [
+                os.getenv('BOTERX_DB', ''),
+                '/opt/bot/boterx.db',
+                os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dashboard', 'boterx.db'),
+                os.path.join(os.path.dirname(os.path.abspath(__file__)), 'boterx.db'),
+            ]:
+                if db_path and os.path.exists(db_path):
+                    conn = sqlite3.connect(db_path)
+                    row = conn.execute("SELECT api_key FROM ai_api_keys WHERE (provider LIKE '%openrouter%' OR key_name LIKE '%openrouter%') AND is_active=1 ORDER BY priority ASC LIMIT 1").fetchone()
+                    conn.close()
+                    if row and row[0]:
+                        return row[0]
+        except Exception:
+            pass
+        return ''
 
     def process(self, text, instructions):
         if not self.is_available():
