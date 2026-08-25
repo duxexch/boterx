@@ -688,16 +688,6 @@ function channelsApp() {
         async init() { 
             try { 
                 await this.loadAll();
-                // Make arrays non-reactive to avoid Alpine 'after' bug
-                this.channels = Alpine.clean(this.channels);
-                this.groups = Alpine.clean(this.groups);
-                this.vaultPosts = Alpine.clean(this.vaultPosts);
-                this.relayLogs = Alpine.clean(this.relayLogs);
-                this.aiAgents = Alpine.clean(this.aiAgents);
-                this.platformAccounts = Alpine.clean(this.platformAccounts);
-                this.sourceChannels = Alpine.clean(this.sourceChannels);
-                this.campaigns = Alpine.clean(this.campaigns);
-                this.partners = Alpine.clean(this.partners);
             } catch(e) { console.error('channelsApp init error:', e); } 
         },
         setTab(t) { this.tab = t; if (t === 'vault') this.loadVault(); if (t === 'ai') { this.loadAI(); this.loadAIAgents(); this.loadPlatformAccounts(); this.loadSourceChannels(); } if (t === 'report') this.loadReport(); if (t === 'groups') this.loadGroups(); if (t === 'campaigns') this.loadCampaigns(); if (t === 'analytics') this.loadAnalytics(); if (t === 'ainet') this.loadAdNet(); if (t === 'social') this.loadSocialAccounts(); },
