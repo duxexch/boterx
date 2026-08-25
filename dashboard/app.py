@@ -6903,6 +6903,99 @@ def _execute_campaign(campaign):
 
 # ===== End Campaigns API =====
 
+# ===== Partners API (for channels page) =====
+@app.route('/api/partners')
+@api_auth
+def api_partners():
+    """Get list of channel partners"""
+    partners = read_csv('channel_partners.csv')
+    return jsonify({'partners': partners})
+
+@app.route('/api/partners', methods=['POST'])
+@api_auth
+@permission_required('manage_channels')
+def api_add_partner():
+    data = request.json
+    partners = read_csv('channel_partners.csv')
+    fieldnames = get_fieldnames('channel_partners.csv', ['id', 'channel_name', 'chat_id', 'subscriber_count', 'revenue_share', 'category', 'contact', 'is_active', 'created_at'])
+    new_id = f"PRT{secrets.token_hex(4).upper()}"
+    partner = {
+        'id': new_id,
+        'channel_name': data.get('channel_name', ''),
+        'chat_id': data.get('chat_id', ''),
+        'subscriber_count': int(data.get('subscriber_count', 0) or 0),
+        'revenue_share': float(data.get('revenue_share', 0) or 0),
+        'category': data.get('category', ''),
+        'contact': data.get('contact', ''),
+        'is_active': 'yes',
+        'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')
+    }
+    append_csv('channel_partners.csv', partner, fieldnames)
+    return jsonify({'success': True, 'id': new_id})
+
+
+@app.route('/api/partners/<partner_id>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_channels')
+def api_delete_partner(partner_id):
+    partners = read_csv('channel_partners.csv')
+    fieldnames = get_fieldnames('channel_partners.csv', ['id', 'channel_name', 'chat_id', 'subscriber_count', 'revenue_share', 'category', 'contact', 'is_active', 'created_at'])
+    partners = [p for p in partners if p.get('id') != partner_id]
+    write_csv('channel_partners.csv', partners, fieldnames)
+    return jsonify({'success': True})
+
+
+@app.route('/api/partners/<partner_id>/toggle', methods=['POST'])
+@api_auth
+@permission_required('manage_channels')
+def api_toggle_partner(partner_id):
+    partners = read_csv('channel_partners.csv')
+    for p in partners:
+        if p.get('id') == partner_id:
+            p['is_active'] = 'no' if p.get('is_active') == 'yes' else 'yes'
+            break
+    fieldnames = get_fieldnames('channel_partners.csv', ['id', 'channel_name', 'chat_id', 'subscriber_count', 'revenue_share', 'category', 'contact', 'is_active', 'created_at'])
+    write_csv('channel_partners.csv', partners, fieldnames)
+    return jsonify({'success': True})
+
+
+# ===== Ad Network API (for channels page) =====
+@app.route('/api/ad-net')
+@api_auth
+def api_ad_net():
+    """Get ad network statistics"""
+    try:
+        # Read data from relevant CSVs
+        partners = read_csv('channel_partners.csv')
+        campaigns = read_csv('campaigns.csv')
+        
+        total_partners = len([p for p in partners if p.get('is_active') == 'yes'])
+        active_partners = total_partners
+        total_subscribers = sum(int(p.get('subscriber_count', 0) or 0) for p in partners if p.get('is_active') == 'yes')
+        
+        # Calculate total reach from campaigns
+        total_reach = sum(int(c.get('stats_reach', 0) or 0) for c in campaigns)
+        total_clicks = sum(int(c.get('stats_clicks', 0) or 0) for c in campaigns)
+        ctr = round((total_clicks / total_reach * 100) if total_reach > 0 else 0, 2)
+        
+        # Calculate revenue (simplified)
+        total_revenue = sum(float(c.get('budget', 0) or 0) for c in campaigns if c.get('status') == 'completed')
+        
+        return jsonify({
+            'total_partners': total_partners,
+            'active_partners': active_partners,
+            'total_subscribers': total_subscribers,
+            'cpm': 0,  # Placeholder
+            'total_revenue': total_revenue,
+            'total_reach': total_reach,
+            'total_clicks': total_clicks,
+            'ctr': ctr
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# ===== End Partners & Ad Network API =====
+
 _CHANNEL_DEFAULT_FIELDS = [
     'id', 'chat_id', 'title', 'type', 'is_active', 'added_at',
     'relay_to_users', 'relay_to_channels', 'forward_mode', 'welcome_text',
