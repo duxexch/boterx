@@ -685,9 +685,19 @@ function channelsApp() {
         deleteSocialTarget: null,
         socialForm: { platform: '', account_name: '', handle: '', sub_agent_id: '', access_token: '', page_id: '', phone_number_id: '', business_account_id: '', posting_permissions: 'full', content_categories: [], is_active: true },
 
-        async init() { await this.loadAll(); },
+        async init() { 
+            try { await this.loadAll(); } catch(e) { console.error('channelsApp init error:', e); } 
+        },
         setTab(t) { this.tab = t; if (t === 'vault') this.loadVault(); if (t === 'ai') { this.loadAI(); this.loadAIAgents(); this.loadPlatformAccounts(); this.loadSourceChannels(); } if (t === 'report') this.loadReport(); if (t === 'groups') this.loadGroups(); if (t === 'campaigns') this.loadCampaigns(); if (t === 'analytics') this.loadAnalytics(); if (t === 'ainet') this.loadAdNet(); if (t === 'social') this.loadSocialAccounts(); },
-        async loadAll() { await Promise.all([this.loadChannels(), this.loadGroups(), this.loadAI(), this.loadAIAgents(), this.loadPlatformAccounts(), this.loadSourceChannels(), this.loadReport(), this.loadReplacements(), this.loadVault(), this.loadRelayLogs(), this.loadCampaigns(), this.loadAnalytics(), this.loadPartners(), this.loadAdNet()]); },
+        async loadAll() { 
+            const loads = [
+                this.loadChannels(), this.loadGroups(), this.loadAI(), this.loadAIAgents(), 
+                this.loadPlatformAccounts(), this.loadSourceChannels(), this.loadReport(), 
+                this.loadReplacements(), this.loadVault(), this.loadRelayLogs(), 
+                this.loadCampaigns(), this.loadAnalytics(), this.loadPartners(), this.loadAdNet()
+            ];
+            await Promise.allSettled(loads);
+        },
 
         get filteredChannels() {
             try {
