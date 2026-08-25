@@ -1,0 +1,50 @@
+Aug 24 21:15:50 vps3524672 gunicorn[15159]: 2026-08-24 21:15:50,114 - VEX Security Bot - Found security bot token — starting...
+Aug 24 21:15:50 vps3524672 gunicorn[15159]: 2026-08-24 21:15:50,416 - VEX Security Bot - ✅ VEX Security Bot started: @VEX_OTP_bot
+Aug 24 22:46:28 vps3524672 gunicorn[15159]: 2026-08-24 22:46:28,586 - VEX Security Bot - Polling error: <urlopen error _ssl.c:983: The handshake operation timed out>
+Aug 24 22:48:09 vps3524672 gunicorn[15159]: 2026-08-24 22:48:09,248 - VEX Security Bot - Polling error: The read operation timed out
+Aug 25 00:00:27 vps3524672 gunicorn[15159]: 2026-08-25 00:00:27,551 - VEX Security Bot - Polling error: <urlopen error _ssl.c:983: The handshake operation timed out>
+Aug 25 00:02:12 vps3524672 systemd[1]: Stopping boterx-dashboard.service - Boterx Web Dashboard...
+Aug 25 00:02:12 vps3524672 gunicorn[15157]: [2026-08-25 00:02:12 +0000] [15157] [INFO] Handling signal: term
+Aug 25 00:02:12 vps3524672 gunicorn[15159]: [2026-08-25 00:02:12 +0000] [15159] [INFO] Worker exiting (pid: 15159)
+Aug 25 00:02:12 vps3524672 gunicorn[15157]: [2026-08-25 00:02:12 +0000] [15157] [INFO] Worker (pid:15159) was sent SIGTERM!
+Aug 25 00:02:12 vps3524672 gunicorn[15157]: [2026-08-25 00:02:12 +0000] [15157] [INFO] Shutting down: Master
+Aug 25 00:02:12 vps3524672 systemd[1]: boterx-dashboard.service: Deactivated successfully.
+Aug 25 00:02:12 vps3524672 systemd[1]: Stopped boterx-dashboard.service - Boterx Web Dashboard.
+Aug 25 00:02:12 vps3524672 systemd[1]: boterx-dashboard.service: Consumed 59.943s CPU time.
+Aug 25 00:02:17 vps3524672 systemd[1]: Started boterx-dashboard.service - Boterx Web Dashboard.
+Aug 25 00:02:18 vps3524672 gunicorn[24516]: [2026-08-25 00:02:18 +0000] [24516] [INFO] Starting gunicorn 26.0.0
+Aug 25 00:02:18 vps3524672 gunicorn[24516]: [2026-08-25 00:02:18 +0000] [24516] [INFO] Listening at: http://0.0.0.0:8080 (24516)
+Aug 25 00:02:18 vps3524672 gunicorn[24516]: [2026-08-25 00:02:18 +0000] [24516] [INFO] Using worker: gthread
+Aug 25 00:02:18 vps3524672 gunicorn[24518]: [2026-08-25 00:02:18 +0000] [24518] [INFO] Booting worker with pid: 24518
+Aug 25 00:02:18 vps3524672 gunicorn[24516]: [2026-08-25 00:02:18 +0000] [24516] [INFO] Control socket listening at /root/.gunicorn/gunicorn.ctl
+Aug 25 00:02:23 vps3524672 gunicorn[24518]: ✅ Game Engine: Using SQLite for balance operations
+Aug 25 00:02:23 vps3524672 gunicorn[24518]: [startup] Database tables initialized.
+Aug 25 00:02:23 vps3524672 gunicorn[24518]: [startup] No expired game sessions to refund.
+Aug 25 00:02:23 vps3524672 gunicorn[24518]: 2026-08-25 00:02:23,458 - VEX Security Bot - Found security bot token — starting...
+Aug 25 00:02:23 vps3524672 gunicorn[24518]: 2026-08-25 00:02:23,775 - VEX Security Bot - ✅ VEX Security Bot started: @VEX_OTP_bot
+Aug 25 00:04:55 vps3524672 gunicorn[24518]: 2026-08-25 00:04:55,943 - VEX Security Bot - Polling error: <urlopen error [Errno 104] Connection reset by peer>
+Aug 25 00:10:20 vps3524672 gunicorn[24518]: 2026-08-25 00:10:20,355 - VEX Security Bot - Contact request sent to user 7146701713
+Aug 25 00:10:27 vps3524672 gunicorn[24518]: 2026-08-25 00:10:27,172 - VEX Security Bot - OTP code sent to user 7146701713 (Or Ko) phone=79222014102
+Aug 25 00:11:13 vps3524672 gunicorn[24518]: 2026-08-25 00:11:13,712 - VEX Security Bot - OTP code sent to user 7146701713 (Or Ko) phone=79222014102
+Aug 25 00:11:37 vps3524672 gunicorn[24518]: 2026-08-25 00:11:37,990 - VEX Security Bot - Contact request sent to user 7146701713
+Aug 25 00:12:13 vps3524672 gunicorn[24518]: 2026-08-25 00:12:13,761 - VEX Security Bot - OTP code sent to user 7146701713 (Or Ko) phone=79222014102
+Aug 25 00:22:53 vps3524672 gunicorn[24518]: 2026-08-25 00:22:53,747 - VEX Security Bot - Polling error: The read operation timed out
+Aug 25 00:30:46 vps3524672 systemd[1]: Stopping boterx-dashboard.service - Boterx Web Dashboard...
+Aug 25 00:30:46 vps3524672 gunicorn[24516]: [2026-08-25 00:30:46 +0000] [24516] [INFO] Handling signal: term
+Aug 25 00:30:46 vps3524672 gunicorn[24518]: [2026-08-25 00:30:46 +0000] [24518] [INFO] Worker exiting (pid: 24518)
+Aug 25 00:30:46 vps3524672 gunicorn[24516]: [2026-08-25 00:30:46 +0000] [24516] [INFO] Worker (pid:24518) was sent SIGTERM!
+Aug 25 00:30:46 vps3524672 gunicorn[24516]: [2026-08-25 00:30:46 +0000] [24516] [INFO] Shutting down: Master
+Aug 25 00:30:46 vps3524672 systemd[1]: boterx-dashboard.service: Deactivated successfully.
+Aug 25 00:30:46 vps3524672 systemd[1]: Stopped boterx-dashboard.service - Boterx Web Dashboard.
+Aug 25 00:30:46 vps3524672 systemd[1]: boterx-dashboard.service: Consumed 16.383s CPU time.
+Aug 25 00:30:50 vps3524672 systemd[1]: Started boterx-dashboard.service - Boterx Web Dashboard.
+Aug 25 00:30:51 vps3524672 gunicorn[26463]: [2026-08-25 00:30:51 +0000] [26463] [INFO] Starting gunicorn 26.0.0
+Aug 25 00:30:51 vps3524672 gunicorn[26463]: [2026-08-25 00:30:51 +0000] [26463] [INFO] Listening at: http://0.0.0.0:8080 (26463)
+Aug 25 00:30:51 vps3524672 gunicorn[26463]: [2026-08-25 00:30:51 +0000] [26463] [INFO] Using worker: gthread
+Aug 25 00:30:51 vps3524672 gunicorn[26465]: [2026-08-25 00:30:51 +0000] [26465] [INFO] Booting worker with pid: 26465
+Aug 25 00:30:51 vps3524672 gunicorn[26463]: [2026-08-25 00:30:51 +0000] [26463] [INFO] Control socket listening at /root/.gunicorn/gunicorn.ctl
+Aug 25 00:30:55 vps3524672 gunicorn[26465]: ✅ Game Engine: Using SQLite for balance operations
+Aug 25 00:30:55 vps3524672 gunicorn[26465]: [startup] Database tables initialized.
+Aug 25 00:30:55 vps3524672 gunicorn[26465]: [startup] No expired game sessions to refund.
+Aug 25 00:30:55 vps3524672 gunicorn[26465]: 2026-08-25 00:30:55,824 - VEX Security Bot - Found security bot token — starting...
+Aug 25 00:30:56 vps3524672 gunicorn[26465]: 2026-08-25 00:30:56,123 - VEX Security Bot - ✅ VEX Security Bot started: @VEX_OTP_bot

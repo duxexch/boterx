@@ -1,0 +1,9 @@
+-rw-r--r-- 1 root root  59280 Aug 25 00:02 /opt/bot/dashboard/static/js/app.js
+-rw-r--r-- 1 root root   8489 Aug 25 00:02 /opt/bot/dashboard/static/js/auth-gate.js
+-rw-r--r-- 1 root root  14993 Aug 25 00:30 /opt/bot/dashboard/static/js/base-app.js
+-rw-r--r-- 1 root root  11434 Aug 11 16:37 /opt/bot/dashboard/static/js/fx.js
+-rw-r--r-- 1 root root  53879 Aug 25 00:02 /opt/bot/dashboard/static/js/game-base.js
+-rw-r--r-- 1 root root 138430 Aug 25 00:02 /opt/bot/dashboard/static/js/i18n-admin-lexicon.js
+-rw-r--r-- 1 root root   8506 Aug 25 00:30 /opt/bot/dashboard/static/js/i18n-admin-runtime.js
+-rw-r--r-- 1 root root  38702 Aug 16 04:12 /opt/bot/dashboard/static/js/i18n-auto.js
+-rw-r--r-- 1 root root   6327 Aug 25 00:02 /opt/bot/dashboard/static/js/i18n.js

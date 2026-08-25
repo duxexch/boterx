@@ -1,21 +1,21 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl" x-data="baseApp" :lang="lang" :dir="lang === 'ar' ? 'rtl' : 'ltr'" :class="darkMode ? '' : 'light-mode'">
+<html lang="ar" dir="rtl" x-data="baseApp()" :lang="lang" :dir="lang === 'ar' ? 'rtl' : 'ltr'" :class="darkMode ? '' : 'light-mode'">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
-    <title>{% block title %}VEX Dashboard{% endblock %}</title>
+    <title>لوحة التحكم — Boterx</title>
     <meta name="robots" content="noindex, nofollow">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/tailwind.build.css') }}?v=20260818">
-    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/fontawesome.min.css') }}">
+    <link rel="stylesheet" href="/static/css/tailwind.build.css?v=20260818">
+    <link rel="stylesheet" href="/static/vendor/fontawesome.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
-<script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='vendor/alpine.min.js') }}" defer></script>
-    <script src="{{ url_for('static', filename='js/app.js') }}?v=20260825b" defer></script>
-    <script src="{{ url_for('static', filename='js/i18n-admin-lexicon.js') }}?v=20260825b" defer></script>
-    <script src="{{ url_for('static', filename='js/i18n-admin-runtime.js') }}?v=20260825b" defer></script>
-    <script src="{{ url_for('static', filename='js/base-app.js') }}?v=20260825b" defer></script>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=20260825b">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/fx.css') }}?v=20260825b">
+<script src="/static/vendor/chart.umd.min.js"></script>
+    <script src="/static/vendor/alpine.min.js" defer></script>
+    <script src="/static/js/app.js?v=20260825a" defer></script>
+    <script src="/static/js/i18n-admin-lexicon.js?v=20260825a" defer></script>
+    <script src="/static/js/i18n-admin-runtime.js?v=20260825a" defer></script>
+    <script src="/static/js/base-app.js?v=20260825a" defer></script>
+    <link rel="stylesheet" href="/static/css/style.css?v=20260825a">
+    <link rel="stylesheet" href="/static/css/fx.css?v=20260825a">
     <!-- PWA & SEO -->
     <link rel="manifest" href="/static/manifest.json">
     <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/icon-32.png?v=20260816">
@@ -115,155 +115,153 @@
     -->
     <nav class="p-3 flex-1 overflow-y-auto">
         <p class="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 mt-2" data-i18n="operations">Operations</p>
-        <a href="{{ url_for('dashboard') }}" class="sidebar-link {% if active_page == 'dashboard' %}active{% endif %}">
+        <a href="/dashboard" class="sidebar-link active">
             <i class="fas fa-chart-pie w-5 text-center"></i> <span x-text="t('dashboard')"></span>
         </a>
-        {# Financial operations — visible to finance_admin (approve/reject) and view_financial roles #}
-        {% if not admin_perms or admin_perms.get('approve_deposits') or admin_perms.get('reject_deposits') or admin_perms.get('view_financial') %}
-        <a href="{{ url_for('page_transactions') }}" class="sidebar-link {% if active_page == 'transactions' %}active{% endif %}">
+        
+        
+        <a href="/transactions" class="sidebar-link ">
             <i class="fas fa-money-bill-transfer w-5 text-center"></i> <span x-text="t('transactions')"></span>
         </a>
-        {% endif %}
-        {% if not admin_perms or admin_perms.get('view_financial') or admin_perms.get('approve_deposits') %}
-        <a href="{{ url_for('page_matching') }}" class="sidebar-link {% if active_page == 'matching' %}active{% endif %}">
+        
+        
+        <a href="/matching" class="sidebar-link ">
             <i class="fas fa-arrows-rotate w-5 text-center"></i> <span x-text="t('matching')"></span>
         </a>
-        <a href="{{ url_for('page_agents') }}" class="sidebar-link {% if active_page == 'agents' %}active{% endif %}">
+        <a href="/agents" class="sidebar-link ">
             <i class="fas fa-robot w-5 text-center"></i> <span x-text="t('agents')"></span>
         </a>
-        <a href="{{ url_for('page_trading') }}" class="sidebar-link {% if active_page == 'trading' %}active{% endif %}">
+        <a href="/trading" class="sidebar-link ">
             <i class="fas fa-coins w-5 text-center"></i> <span x-text="t('trading')"></span>
         </a>
-        {% endif %}
+        
 
         <p class="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 mt-4" data-i18n="management">Management</p>
-        {# Users page — support can see users; ban requires ban_users #}
-        {% if not admin_perms or admin_perms.get('ban_users') or admin_perms.get('view_financial') %}
-        <a href="{{ url_for('page_users') }}" class="sidebar-link {% if active_page == 'users' %}active{% endif %}">
+        
+        
+        <a href="/users" class="sidebar-link ">
             <i class="fas fa-users w-5 text-center"></i> <span x-text="t('users')"></span>
         </a>
-        {% endif %}
-        {% if not admin_perms or admin_perms.get('view_financial') or admin_perms.get('approve_deposits') %}
-        <a href="{{ url_for('page_svrp') }}" class="sidebar-link {% if active_page == 'svrp' %}active{% endif %}">
+        
+        
+        <a href="/svrp" class="sidebar-link ">
             <i class="fas fa-gem w-5 text-center"></i> <span x-text="t('svrp')"></span>
         </a>
-        {% endif %}
-        {% if not admin_perms or admin_perms.get('manage_games') %}
-        <a href="{{ url_for('page_lottery') }}" class="sidebar-link {% if active_page == 'lottery' %}active{% endif %}">
+        
+        
+        <a href="/lottery" class="sidebar-link ">
             <i class="fas fa-dice w-5 text-center"></i> <span x-text="t('lottery')"></span>
         </a>
-        <a href="{{ url_for('page_wheel') }}" class="sidebar-link {% if active_page == 'wheel' %}active{% endif %}">
+        <a href="/wheel" class="sidebar-link ">
             <i class="fas fa-circle-notch w-5 text-center"></i> <span x-text="t('wheel')"></span>
         </a>
-        {% endif %}
+        
 
         <p class="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 mt-4" data-i18n="system">System</p>
-        {% if not admin_perms or admin_perms.get('manage_companies') %}
-        <a href="{{ url_for('page_companies') }}" class="sidebar-link {% if active_page == 'companies' %}active{% endif %}">
+        
+        <a href="/companies" class="sidebar-link ">
             <i class="fas fa-building w-5 text-center"></i> <span x-text="t('companies')"></span>
         </a>
-        <a href="{{ url_for('page_payment_methods') }}" class="sidebar-link {% if active_page == 'payment_methods' %}active{% endif %}">
+        <a href="/payment-methods" class="sidebar-link ">
             <i class="fas fa-credit-card w-5 text-center"></i> <span x-text="t('payment_methods')"></span>
         </a>
-        <a href="{{ url_for('page_apps') }}" class="sidebar-link {% if active_page == 'apps' %}active{% endif %}">
+        <a href="/apps" class="sidebar-link ">
             <i class="fas fa-mobile-screen w-5 text-center"></i> <span x-text="t('apps')"></span>
         </a>
-        {% endif %}
-        {% if not admin_perms or admin_perms.get('manage_games') %}
-        <a href="{{ url_for('page_games_admin') }}" class="sidebar-link {% if active_page == 'games_admin' %}active{% endif %}">
+        
+        
+        <a href="/games-admin" class="sidebar-link ">
             <i class="fas fa-gamepad w-5 text-center"></i> <span>VEX Games</span>
         </a>
-        {% endif %}
-        {% if not admin_perms or admin_perms.get('manage_companies') %}
-        <a href="{{ url_for('page_referrals') }}" class="sidebar-link {% if active_page == 'referrals' %}active{% endif %}">
+        
+        
+        <a href="/referrals" class="sidebar-link ">
             <i class="fas fa-gift w-5 text-center"></i> <span x-text="t('referrals')"></span>
         </a>
-        {% endif %}
-        {% if not admin_perms or admin_perms.get('send_broadcast') %}
-        <a href="{{ url_for('page_channels') }}" class="sidebar-link {% if active_page == 'channels' %}active{% endif %}">
+        
+        
+        <a href="/channels" class="sidebar-link ">
             <i class="fas fa-bullhorn w-5 text-center"></i> <span x-text="t('channels')"></span>
         </a>
-        {% endif %}
-        {% if not admin_perms or admin_perms.get('manage_bots') %}
-        <a href="{{ url_for('page_bots') }}" class="sidebar-link {% if active_page == 'bots' %}active{% endif %}">
+        
+        
+        <a href="/bots" class="sidebar-link ">
             <i class="fas fa-robot w-5 text-center"></i> <span x-text="t('bots')"></span>
         </a>
-        {% endif %}
-        {% if not admin_perms or admin_perms.get('manage_bots') %}
-        <a href="{{ url_for('page_clients') }}" class="sidebar-link {% if active_page == 'clients' %}active{% endif %}">
+        
+        
+        <a href="/clients" class="sidebar-link ">
             <i class="fas fa-tags w-5 text-center"></i> <span x-text="t('clients')"></span>
         </a>
-        {% endif %}
-        {% if not admin_perms or admin_perms.get('ban_users') %}
-        <a href="{{ url_for('page_complaints') }}" class="sidebar-link {% if active_page == 'complaints' %}active{% endif %}">
+        
+        
+        <a href="/complaints" class="sidebar-link ">
             <i class="fas fa-exclamation-circle w-5 text-center"></i> <span x-text="t('complaints')"></span>
         </a>
-        <a href="{{ url_for('page_tickets') }}" class="sidebar-link {% if active_page == 'tickets' %}active{% endif %}">
+        <a href="/tickets" class="sidebar-link ">
             <i class="fas fa-ticket-alt w-5 text-center"></i> <span x-text="t('tickets')"></span>
         </a>
-        {% endif %}
-        {% if not admin_perms or admin_perms.get('send_broadcast') %}
-        <a href="{{ url_for('page_broadcast') }}" class="sidebar-link {% if active_page == 'broadcast' %}active{% endif %}">
+        
+        
+        <a href="/broadcast" class="sidebar-link ">
             <i class="fas fa-tower-broadcast w-5 text-center"></i> <span x-text="t('broadcast')"></span>
         </a>
-        {% endif %}
+        
         
         <p class="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 mt-4" data-i18n="advanced_system">Advanced System</p>
-        {% if not admin_perms or admin_perms.get('view_statistics') %}
-        <a href="{{ url_for('page_statistics') }}" class="sidebar-link {% if active_page == 'statistics' %}active{% endif %}">
+        
+        <a href="/statistics" class="sidebar-link ">
             <i class="fas fa-chart-bar w-5 text-center"></i> <span x-text="t('statistics')"></span>
         </a>
-        {% endif %}
-        {% if not admin_perms or admin_perms.get('manage_admins') %}
-        <a href="{{ url_for('page_admins') }}" class="sidebar-link {% if active_page == 'admins' %}active{% endif %}">
+        
+        
+        <a href="/admins" class="sidebar-link ">
             <i class="fas fa-user-shield w-5 text-center"></i> <span x-text="t('admins')"></span>
         </a>
-        {% endif %}
-        {% if not admin_perms or admin_perms.get('manage_settings') %}
-        <a href="{{ url_for('page_themes') }}" class="sidebar-link {% if active_page == 'themes' %}active{% endif %}">
+        
+        
+        <a href="/themes" class="sidebar-link ">
             <i class="fas fa-palette w-5 text-center"></i> <span x-text="t('themes')"></span>
         </a>
-        <a href="{{ url_for('page_exchange_addresses') }}" class="sidebar-link {% if active_page == 'exchange_addresses' %}active{% endif %}">
+        <a href="/exchange-addresses" class="sidebar-link ">
             <i class="fas fa-location-dot w-5 text-center"></i> <span x-text="t('exchange_addresses')"></span>
         </a>
-        {% endif %}
-        {% if not admin_perms or admin_perms.get('send_broadcast') %}
-        <a href="{{ url_for('page_send_message') }}" class="sidebar-link {% if active_page == 'send_message' %}active{% endif %}">
+        
+        
+        <a href="/send-message" class="sidebar-link ">
             <i class="fas fa-paper-plane w-5 text-center"></i> <span x-text="t('send_message')"></span>
         </a>
-        {% endif %}
-        {% if not admin_perms or admin_perms.get('manage_admins') %}
-        <a href="{{ url_for('page_backup') }}" class="sidebar-link {% if active_page == 'backup' %}active{% endif %}">
+        
+        
+        <a href="/backup" class="sidebar-link ">
             <i class="fas fa-database w-5 text-center"></i> <span x-text="t('backup')"></span>
         </a>
-        {% endif %}
-        {% if not admin_perms or admin_perms.get('manage_settings') %}
-        <a href="{{ url_for('page_settings') }}" class="sidebar-link {% if active_page == 'settings' %}active{% endif %}">
+        
+        
+        <a href="/settings" class="sidebar-link ">
             <i class="fas fa-gear w-5 text-center"></i> <span x-text="t('settings')"></span>
         </a>
-        <a href="{{ url_for('page_ai_api_keys') }}" class="sidebar-link {% if active_page == 'ai_api_keys' %}active{% endif %}">
+        <a href="/ai-api-keys" class="sidebar-link ">
             <i class="fas fa-key w-5 text-center"></i> <span x-text="t('ai_api_keys')"></span>
         </a>
-        {% endif %}
+        
     </nav>
 
     <!-- Sidebar footer -->
     <div class="p-3 border-t border-slate-700 flex-shrink-0">
         <div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-900/50">
             <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-sm font-bold">
-                {{ session.get('admin_id', 'A')[:2] }}
+                71
             </div>
             <div class="flex-1 min-w-0">
-                <p class="text-sm font-medium truncate">{{ session.get('admin_name', 'Admin') }}</p>
+                <p class="text-sm font-medium truncate">Admin</p>
                 <p class="text-xs text-slate-500">
-                    {% if admin_role and admin_role != 'super_admin' %}
-                        {{ admin_role | replace('_', ' ') | title }}
-                    {% else %}
+                    
                         <span data-i18n="general_manager">General Manager</span>
-                    {% endif %}
+                    
                 </p>
             </div>
-            <a href="{{ url_for('logout') }}" class="text-slate-400 hover:text-red-400 transition" title="Logout" data-i18n-title="logout">
+            <a href="/logout" class="text-slate-400 hover:text-red-400 transition" title="Logout" data-i18n-title="logout">
                 <i class="fas fa-right-from-bracket"></i>
             </a>
         </div>
@@ -282,7 +280,7 @@
                 <button @click="sidebarOpen = !sidebarOpen" class="hidden lg:block text-slate-400 hover:text-emerald-400 transition">
                     <i class="fas fa-bars text-lg"></i>
                 </button>
-                <h2 class="text-lg font-semibold" x-text="t('page_title')">{% block page_title %}{% endblock %}</h2>
+                <h2 class="text-lg font-semibold" x-text="t('page_title')">📊 لوحة التحكم</h2>
             </div>
             <div class="flex items-center gap-2 lg:gap-4">
                 <!-- Quick search -->
@@ -372,10 +370,10 @@
                 <!-- User avatar -->
                 <div class="flex items-center gap-2">
                     <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-sm font-bold ring-2 ring-slate-600">
-                        {{ session.get('admin_id', 'A')[:2] }}
+                        71
                     </div>
                     <div class="hidden md:block">
-                        <p class="text-sm font-medium">{{ session.get('admin_name', 'Admin') }}</p>
+                        <p class="text-sm font-medium">Admin</p>
                         <p class="text-xs text-slate-500" data-i18n="manager">Manager</p>
                     </div>
                 </div>
@@ -405,34 +403,218 @@
     </header>
 
     <!-- Flash messages -->
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            <div class="px-4 lg:px-6 pt-4">
-                {% for category, message in messages %}
-                    <div class="p-3 rounded-lg mb-2 text-sm {{ 'bg-green-900/50 text-green-300 border border-green-700' if category == 'success' else 'bg-red-900/50 text-red-300 border border-red-700' }}">
-                        {{ message }}
-                    </div>
-                {% endfor %}
-            </div>
-        {% endif %}
-    {% endwith %}
+    
+        
+    
 
-    {% if showcase_readonly %}
-    <div class="px-4 lg:px-6 pt-4">
-        <div class="p-3 rounded-lg text-sm bg-amber-900/40 text-amber-200 border border-amber-700/60 flex items-center justify-between gap-3">
-            <span>وضع العرض فقط: هذه جلسة قراءة فقط، لا يمكن تنفيذ أي تعديل أو إرسال أو حذف.</span>
-            <a href="{{ url_for('logout') }}" class="text-amber-100 underline">إنهاء الجلسة</a>
-        </div>
-    </div>
-    {% endif %}
+    
 
     <!-- Page content -->
     <main class="p-4 lg:p-6">
-        {% block content %}{% endblock %}
+        
+<div x-data="dashboardApp()" x-init="init()" class="space-y-6">
+
+    <!-- 6 KPI Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        <!-- Users -->
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-4 hover:border-blue-500 transition kpi-card">
+            <div class="flex items-start justify-between">
+                <div class="flex-1">
+                    <p class="kpi-label text-blue-400" data-i18n="total_users">Users</p>
+                    <p class="kpi-value text-bright mt-1" x-text="fmtNum(stats.users?.total || 0)">0</p>
+                    <p class="kpi-sub text-success"><i class="fas fa-arrow-up"></i> +<span x-text="stats.users?.today || 0">0</span></p>
+                </div>
+                <div class="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-400">
+                    <i class="fas fa-users"></i>
+                </div>
+            </div>
+        </div>
+        <!-- Transactions -->
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-4 hover:border-amber-500 transition kpi-card">
+            <div class="flex items-start justify-between">
+                <div class="flex-1">
+                    <p class="kpi-label text-amber-400" data-i18n="total_transactions">Transactions</p>
+                    <p class="kpi-value text-bright mt-1" x-text="fmtNum((stats.transactions?.pending || 0) + (stats.transactions?.approved || 0))">0</p>
+                    <p class="kpi-sub text-warning"><i class="fas fa-clock"></i> <span x-text="stats.transactions?.pending || 0">0</span> <span data-i18n="pending">Pending</span></p>
+                </div>
+                <div class="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-400">
+                    <i class="fas fa-money-bill-transfer"></i>
+                </div>
+            </div>
+        </div>
+        <!-- Volume -->
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-4 hover:border-purple-500 transition kpi-card">
+            <div class="flex items-start justify-between">
+                <div class="flex-1">
+                    <p class="kpi-label text-purple-400" data-i18n="transaction_volume">Transaction Volume</p>
+                    <p class="kpi-value text-bright mt-1" x-text="fmtNum(stats.volume?.month || 0)">0</p>
+                    <p class="kpi-sub text-info"><i class="fas fa-chart-line"></i> <span data-i18n="today">Today</span>: <span x-text="fmtNum(stats.volume?.today || 0)" class="num-positive">0</span></p>
+                </div>
+                <div class="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-400">
+                    <i class="fas fa-coins"></i>
+                </div>
+            </div>
+        </div>
+        <!-- Matches -->
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-4 hover:border-green-500 transition kpi-card">
+            <div class="flex items-start justify-between">
+                <div class="flex-1">
+                    <p class="kpi-label text-green-400" data-i18n="active_matches">Matches</p>
+                    <p class="kpi-value text-bright mt-1" x-text="fmtNum(stats.matches?.active || 0)">0</p>
+                    <p class="kpi-sub text-warning"><i class="fas fa-hourglass-half"></i> <span x-text="stats.matches?.pending || 0">0</span> <span data-i18n="pending">Pending</span></p>
+                </div>
+                <div class="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center text-green-400">
+                    <i class="fas fa-arrows-rotate"></i>
+                </div>
+            </div>
+        </div>
+        <!-- Lottery Participants -->
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-4 hover:border-pink-500 transition kpi-card">
+            <div class="flex items-start justify-between">
+                <div class="flex-1">
+                    <p class="kpi-label text-pink-400" data-i18n="lottery_participants">Lottery Participants</p>
+                    <p class="kpi-value text-bright mt-1" x-text="fmtNum(stats.lottery?.participants || 0)">0</p>
+                    <p class="kpi-sub text-success"><i class="fas fa-trophy"></i> <span x-text="stats.lottery?.winners || 0">0</span> <span data-i18n="winners">Winners</span></p>
+                </div>
+                <div class="w-10 h-10 rounded-lg bg-pink-500/10 flex items-center justify-center text-pink-400">
+                    <i class="fas fa-dice"></i>
+                </div>
+            </div>
+        </div>
+        <!-- Trading Orders -->
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-4 hover:border-cyan-500 transition kpi-card">
+            <div class="flex items-start justify-between">
+                <div class="flex-1">
+                    <p class="kpi-label text-cyan-400" data-i18n="trading_orders">Trading Orders</p>
+                    <p class="kpi-value text-bright mt-1" x-text="fmtNum(stats.trading?.pending_orders || 0)">0</p>
+                    <p class="kpi-sub text-warning"><i class="fas fa-chart-line"></i> <span data-i18n="pending">Pending</span></p>
+                </div>
+                <div class="w-10 h-10 rounded-lg bg-cyan-500/10 flex items-center justify-center text-cyan-400">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pending Items Summary -->
+    <div class="bg-slate-800 rounded-xl border border-slate-700 p-5">
+        <h3 class="font-semibold mb-4"><i class="fas fa-clipboard-list text-amber-400 ml-1"></i> <span data-i18n="pending_items">Pending Items</span></h3>
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="p-3 bg-slate-900/50 rounded-lg flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-400"><i class="fas fa-money-bill-transfer"></i></div>
+                <div>
+                    <p class="text-xs text-slate-400" data-i18n="pending_transactions">Pending Transactions</p>
+                    <p class="text-xl font-bold text-amber-400" x-text="stats.transactions?.pending || 0">0</p>
+                </div>
+            </div>
+            <div class="p-3 bg-slate-900/50 rounded-lg flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center text-green-400"><i class="fas fa-arrows-rotate"></i></div>
+                <div>
+                    <p class="text-xs text-slate-400" data-i18n="pending_matches">Pending Matches</p>
+                    <p class="text-xl font-bold text-green-400" x-text="stats.matches?.pending || 0">0</p>
+                </div>
+            </div>
+            <div class="p-3 bg-slate-900/50 rounded-lg flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-cyan-500/10 flex items-center justify-center text-cyan-400"><i class="fas fa-chart-line"></i></div>
+                <div>
+                    <p class="text-xs text-slate-400" data-i18n="pending_trading">Pending Trading</p>
+                    <p class="text-xl font-bold text-cyan-400" x-text="stats.trading?.pending_orders || 0">0</p>
+                </div>
+            </div>
+            <div class="p-3 bg-slate-900/50 rounded-lg flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-400"><i class="fas fa-gem"></i></div>
+                <div>
+                    <p class="text-xs text-slate-400" data-i18n="pending_svrp">Pending Compensation</p>
+                    <p class="text-xl font-bold text-purple-400" x-text="stats.svrp?.pending || 0">0</p>
+                </div>
+            </div>
+        </div>
+        <!-- Quick action buttons -->
+        <div class="mt-4 flex flex-wrap gap-2">
+            <button @click="bulkApproveTxns()" class="btn btn-success btn-sm">
+                <i class="fas fa-check-double ml-1"></i> <span data-i18n="bulk_approve">Bulk Approve</span>
+            </button>
+            <button @click="bulkRejectTxns()" class="btn btn-danger btn-sm">
+                <i class="fas fa-xmark ml-1"></i> <span data-i18n="bulk_reject">Bulk Reject</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Charts Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Transactions line chart -->
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-5">
+            <h3 class="font-semibold mb-4"><i class="fas fa-chart-area text-blue-400 ml-1"></i> <span data-i18n="tx_last_30">Transactions Last 30 Days</span></h3>
+            <canvas id="txnChart" height="200"></canvas>
+        </div>
+        <!-- Transaction status doughnut -->
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-5">
+            <h3 class="font-semibold mb-4"><i class="fas fa-chart-pie text-amber-400 ml-1"></i> <span data-i18n="tx_distribution">Transaction Status Distribution</span></h3>
+            <canvas id="statusChart" height="200"></canvas>
+        </div>
+        <!-- Top 5 companies bar chart -->
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-5">
+            <h3 class="font-semibold mb-4"><i class="fas fa-building text-green-400 ml-1"></i> أعلى 5 شركات حسب الحجم</h3>
+            <canvas id="companiesChart" height="200"></canvas>
+        </div>
+        <!-- User registrations area chart -->
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-5">
+            <h3 class="font-semibold mb-4"><i class="fas fa-user-plus text-purple-400 ml-1"></i> تسجيلات المستخدمين (14 يوم)</h3>
+            <canvas id="registrationsChart" height="200"></canvas>
+        </div>
+    </div>
+
+    <!-- Recent Transactions + Recent Users -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Recent transactions (spans 2 cols) -->
+        <div class="lg:col-span-2 bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+            <div class="p-4 border-b border-slate-700 flex items-center justify-between">
+                <h3 class="font-semibold"><i class="fas fa-list text-slate-400 ml-1"></i> آخر المعاملات</h3>
+                <a href="/transactions" class="text-xs text-blue-400 hover:underline">عرض الكل ←</a>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-slate-900/50 text-slate-400 text-xs">
+                        <tr>
+                            <th class="text-right p-3">ID</th>
+                            <th class="text-right p-3" data-i18n="client">Client</th>
+                            <th class="text-right p-3" data-i18n="type">Type</th>
+                            <th class="text-right p-3" data-i18n="amount">Amount</th>
+                            <th class="text-right p-3" data-i18n="status">Status</th>
+                            <th class="text-right p-3" data-i18n="date">Date</th>
+                        </tr>
+                    </thead>
+                    <tbody id="recentTxns" class="divide-y divide-slate-700">
+                        <tr><td colspan="6" class="text-center p-4 text-slate-400"><i class="fas fa-spinner fa-spin mr-1"></i> جارٍ التحميل...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <!-- Recent users -->
+        <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+            <div class="p-4 border-b border-slate-700 flex items-center justify-between">
+                <h3 class="font-semibold"><i class="fas fa-user-plus text-blue-400 ml-1"></i> أحدث المستخدمين</h3>
+                <a href="/users" class="text-xs text-blue-400 hover:underline">الكل ←</a>
+            </div>
+            <div class="divide-y divide-slate-700" id="recentUsers">
+                <div class="p-4 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-1"></i> جارٍ التحميل...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Activity Timeline -->
+    <div class="bg-slate-800 rounded-xl border border-slate-700 p-5">
+        <h3 class="font-semibold mb-4"><i class="fas fa-history text-amber-400 ml-1"></i> سجل النشاط</h3>
+        <div class="space-y-3" id="activityTimeline">
+            <div class="text-center text-slate-400 py-4"><i class="fas fa-spinner fa-spin mr-1"></i> جارٍ التحميل...</div>
+        </div>
+    </div>
+</div>
+
     </main>
 </div>
 
-<script src="{{ url_for('static', filename='js/fx.js') }}" defer></script>
+<script src="/static/js/fx.js" defer></script>
 <script>
   // Register service worker for PWA
   if ('serviceWorker' in navigator) {
@@ -764,7 +946,7 @@ function baseApp() {
 </script>
 <!-- RBAC helper — injected once, available on every page via rbac('perm') -->
 <script>
-const _RBAC = {{ admin_perms | tojson }};
+const _RBAC = {"approve_deposits": true, "approve_withdrawals": true, "ban_users": true, "manage_admins": true, "manage_bots": true, "manage_companies": true, "manage_games": true, "manage_settings": true, "reject_deposits": true, "reject_withdrawals": true, "send_broadcast": true, "unban_users": true, "view_financial": true, "view_statistics": true};
 function rbac(perm) { return !Object.keys(_RBAC).length || !!_RBAC[perm]; }
 </script>
 
@@ -828,6 +1010,215 @@ function rbac(perm) { return !Object.keys(_RBAC).length || !!_RBAC[perm]; }
     } catch(e) {}
 })();
 </script>
-{% block scripts %}{% endblock %}
+
+<script>
+function dashboardApp() {
+    return {
+        stats: {},
+        charts: {},
+
+        init() {
+            this.loadStats();
+            this.loadRecentTxns();
+            this.loadRecentUsers();
+            this.loadActivity();
+            this._statsTimer = setInterval(() => this.loadStats(), 15000);
+        },
+
+        async loadStats() {
+            try {
+                const res = await fetch('/api/stats', { credentials: 'same-origin' });
+                if (res.status === 401 || res.status === 403) {
+                    // Session not authenticated — stop polling to avoid console noise
+                    if (this._statsTimer) { clearInterval(this._statsTimer); this._statsTimer = null; }
+                    return;
+                }
+                if (!res.ok) return;
+                this.stats = await res.json();
+                this.renderCharts();
+            } catch(e) { /* network hiccup — next tick retries */ }
+        },
+
+        async loadRecentTxns() {
+            const tbody = document.getElementById('recentTxns');
+            try {
+                const data = await api('/api/transactions?per_page=10');
+                if (!data.transactions || data.transactions.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center p-4 text-slate-400"><i class="fas fa-inbox text-2xl mb-2 block"></i data-i18n="no_transactions">No transactions</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = data.transactions.map(t => {
+                    const badge = statusBadge(t.status);
+                    const typeIcon = t.type === 'deposit' ? '💵 إيداع' : '💸 سحب';
+                    return '<tr class="hover:bg-slate-700/50">' +
+                        '<td class="p-3 font-mono text-xs">' + esc(t.id || '') + '</td>' +
+                        '<td class="p-3">' + esc(t.name || '') + '</td>' +
+                        '<td class="p-3">' + typeIcon + '</td>' +
+                        '<td class="p-3 font-bold">' + fmtAmount(t.amount, t.currency || '') + '</td>' +
+                        '<td class="p-3">' + badge + '</td>' +
+                        '<td class="p-3 text-xs text-slate-400">' + esc(t.date || '') + '</td>' +
+                        '</tr>';
+                }).join('');
+            } catch(e) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center p-4 text-red-400"><i class="fas fa-exclamation-circle mr-1"></i> فشل التحميل</td></tr>';
+            }
+        },
+
+        async loadRecentUsers() {
+            const el = document.getElementById('recentUsers');
+            try {
+                const data = await api('/api/users?per_page=5');
+                if (!data.users || data.users.length === 0) {
+                    el.innerHTML = '<div class="p-4 text-center text-slate-400"><i class="fas fa-inbox text-2xl mb-2 block"></i data-i18n="no_users">No users</div>';
+                    return;
+                }
+                el.innerHTML = data.users.map(u => {
+                    const initials = (u.name || 'U').substring(0, 2).toUpperCase();
+                    return '<div class="p-3 flex items-center gap-3 hover:bg-slate-700/50">' +
+                        '<div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-xs font-bold">' + esc(initials) + '</div>' +
+                        '<div class="flex-1 min-w-0">' +
+                        '<p class="text-sm font-medium truncate">' + esc(u.name || '') + '</p>' +
+                        '<p class="text-xs text-slate-500">' + esc(u.phone || u.customer_id || '') + '</p>' +
+                        '</div>' +
+                        '<span class="text-xs text-slate-600">' + esc(u.date || '') + '</span>' +
+                        '</div>';
+                }).join('');
+            } catch(e) {
+                el.innerHTML = '<div class="p-4 text-center text-red-400" data-i18n="load_failed">Failed to load</div>';
+            }
+        },
+
+        async loadActivity() {
+            const el = document.getElementById('activityTimeline');
+            try {
+                const data = await api('/api/audit-log?per_page=10');
+                if (!data.logs || data.logs.length === 0) {
+                    el.innerHTML = '<div class="text-center text-slate-400 py-4"><i class="fas fa-inbox text-2xl mb-2 block"></i data-i18n="no_activity">No activity</div>';
+                    return;
+                }
+                const iconMap = { 'approve': 'fa-check text-green-400', 'reject': 'fa-xmark text-red-400', 'ban': 'fa-ban text-red-400', 'unban': 'fa-unlock text-green-400', 'login': 'fa-right-to-bracket text-blue-400', 'create': 'fa-plus text-blue-400', 'delete': 'fa-trash text-red-400', 'edit': 'fa-pen text-amber-400' };
+                el.innerHTML = data.logs.map(l => {
+                    const iconClass = iconMap[l.action_type] || 'fa-circle text-slate-500';
+                    return '<div class="flex items-start gap-3">' +
+                        '<div class="w-8 h-8 rounded-lg bg-slate-700/50 flex items-center justify-center flex-shrink-0"><i class="fas ' + iconClass + '"></i></div>' +
+                        '<div class="flex-1 min-w-0">' +
+                        '<p class="text-sm"><span class="font-medium">' + esc(l.admin_id || '') + '</span> — <span class="text-slate-400">' + esc(l.action_type || '') + '</span></p>' +
+                        '<p class="text-xs text-slate-500">' + esc(l.details || '') + '</p>' +
+                        '<p class="text-[10px] text-slate-600 mt-0.5">' + esc(l.timestamp || '') + '</p>' +
+                        '</div>' +
+                        '</div>';
+                }).join('');
+            } catch(e) {
+                el.innerHTML = '<div class="text-center text-slate-400 py-4" data-i18n="no_activity">No activity</div>';
+            }
+        },
+
+        async bulkApproveTxns() {
+            if (!confirm(tr('bulk_approve') + '?')) return;
+            try {
+                await api('/api/transactions/bulk-approve', { method: 'POST', body: '{}' });
+                toast('تمت الموافقة الجماعية', 'success');
+                this.loadStats();
+                this.loadRecentTxns();
+            } catch(e) { toast('فشلت العملية', 'error'); }
+        },
+
+        async bulkRejectTxns() {
+            if (!confirm(tr('bulk_reject') + '?')) return;
+            try {
+                await api('/api/transactions/bulk-reject', { method: 'POST', body: '{}' });
+                toast('تم الرفض الجماعي', 'warning');
+                this.loadStats();
+                this.loadRecentTxns();
+            } catch(e) { toast('فشلت العملية', 'error'); }
+        },
+
+        renderCharts() {
+            this.renderTxnChart();
+            this.renderStatusChart();
+            this.renderCompaniesChart();
+            this.renderRegistrationsChart();
+        },
+
+        renderTxnChart() {
+            const canvas = document.getElementById('txnChart');
+            if (!canvas) return;
+            const labels = Array.from({length: 30}, (_, i) => {
+                const d = new Date(); d.setDate(d.getDate() - (29 - i));
+                return d.toLocaleDateString('ar-EG', {day:'numeric', month:'short'});
+            });
+            const txnData = this.stats.txn_chart || Array.from({length: 30}, () => Math.floor(Math.random() * 20) + 5);
+            if (window._txnChart) {
+                window._txnChart.data.labels = labels;
+                window._txnChart.data.datasets[0].data = txnData;
+                window._txnChart.update();
+            } else {
+                window._txnChart = new Chart(canvas, {
+                    type: 'line',
+                    data: { labels: labels, datasets: [{ label: 'المعاملات', data: txnData, borderColor: '#3B82F6', backgroundColor: 'rgba(59,130,246,0.1)', fill: true, tension: 0.4 }] },
+                    options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#64748b' }, grid: { color: '#1E293B' } }, y: { ticks: { color: '#64748b' }, grid: { color: '#1E293B' } } } }
+                });
+            }
+        },
+
+        renderStatusChart() {
+            const canvas = document.getElementById('statusChart');
+            if (!canvas) return;
+            const data = [this.stats.transactions?.approved || 0, this.stats.transactions?.pending || 0, this.stats.transactions?.rejected || 0];
+            if (window._statusChart) {
+                window._statusChart.data.datasets[0].data = data;
+                window._statusChart.update();
+            } else {
+                window._statusChart = new Chart(canvas, {
+                    type: 'doughnut',
+                    data: { labels: [tr('approved'), tr('pending'), tr('rejected')], datasets: [{ data: data, backgroundColor: ['#22C55E', '#F59E0B', '#EF4444'], borderWidth: 0 }] },
+                    options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { color: '#94A3B8' } } } }
+                });
+            }
+        },
+
+        renderCompaniesChart() {
+            const canvas = document.getElementById('companiesChart');
+            if (!canvas) return;
+            const companies = this.stats.top_companies || [];
+            const labels = companies.length > 0 ? companies.map(c => c.name) : ['شركة 1', 'شركة 2', 'شركة 3', 'شركة 4', 'شركة 5'];
+            const data = companies.length > 0 ? companies.map(c => c.volume) : [0, 0, 0, 0, 0];
+            if (window._companiesChart) {
+                window._companiesChart.data.labels = labels;
+                window._companiesChart.data.datasets[0].data = data;
+                window._companiesChart.update();
+            } else {
+                window._companiesChart = new Chart(canvas, {
+                    type: 'bar',
+                    data: { labels: labels, datasets: [{ label: 'الحجم', data: data, backgroundColor: '#22C55E', borderRadius: 4 }] },
+                    options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#64748b' }, grid: { color: '#1E293B' } }, y: { ticks: { color: '#64748b' }, grid: { color: '#1E293B' } } } }
+                });
+            }
+        },
+
+        renderRegistrationsChart() {
+            const canvas = document.getElementById('registrationsChart');
+            if (!canvas) return;
+            const labels = Array.from({length: 14}, (_, i) => {
+                const d = new Date(); d.setDate(d.getDate() - (13 - i));
+                return d.toLocaleDateString('ar-EG', {day:'numeric', month:'short'});
+            });
+            const regData = this.stats.registration_chart || Array.from({length: 14}, () => Math.floor(Math.random() * 10));
+            if (window._regChart) {
+                window._regChart.data.labels = labels;
+                window._regChart.data.datasets[0].data = regData;
+                window._regChart.update();
+            } else {
+                window._regChart = new Chart(canvas, {
+                    type: 'line',
+                    data: { labels: labels, datasets: [{ label: 'التسجيلات', data: regData, borderColor: '#A855F7', backgroundColor: 'rgba(168,85,247,0.15)', fill: true, tension: 0.4 }] },
+                    options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#64748b' }, grid: { color: '#1E293B' } }, y: { ticks: { color: '#64748b' }, grid: { color: '#1E293B' }, beginAtZero: true } } }
+                });
+            }
+        }
+    }
+}
+</script>
+
 </body>
 </html>

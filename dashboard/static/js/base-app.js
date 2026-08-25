@@ -253,3 +253,8 @@ function baseApp() {
             playSuccessSound() { this.playSound('success'); },
         }
     };
+
+// Register with Alpine so it's available when Alpine initializes
+if (window.Alpine) {
+    Alpine.data('baseApp', baseApp);
+}

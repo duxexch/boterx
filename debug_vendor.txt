@@ -1,0 +1,6 @@
+total 352
+drwxr-xr-x 2 root root     78 Aug 16 00:53 .
+drwxr-xr-x 9 root root    135 Aug 25 00:02 ..
+-rw-r--r-- 1 root root  43838 Aug 11 23:11 alpine.min.js
+-rw-r--r-- 1 root root 205399 Aug 11 23:11 chart.umd.min.js
+-rw-r--r-- 1 root root 102641 Aug 11 23:11 fontawesome.min.css

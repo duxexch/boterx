@@ -1,0 +1,1 @@
+/opt/bot/dashboard/static/vendor/alpine.min.js
