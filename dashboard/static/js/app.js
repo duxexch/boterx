@@ -40,7 +40,7 @@ const I18N = {
         // Dashboard
         total_users: 'إجمالي المستخدمين', new_today: 'جدد اليوم',
         total_transactions: 'إجمالي المعاملات', pending_transactions: 'معاملات معلقة',
-        transaction_volume: 'حجم المعاملات', today: 'اليوم', active_matches: 'مطابقات نشطة',
+        transaction_volume: 'حجم المعاملات', today: 'اليوم', active_matches: 'مطابقات نشطة', pending_matches: 'مطابقات معلقة',
         lottery_participants: 'مشاركين اليانصيب', wheel_players: 'لاعبي عجلة الحظ',
         distributed: 'موزّع', pending_items: 'العناصر المعلقة',
         bulk_approve: 'موافقة جماعية', bulk_reject: 'رفض جماعي',
@@ -281,7 +281,7 @@ const I18N = {
         // Dashboard
         total_users: 'Total Users', new_today: 'New Today',
         total_transactions: 'Total Transactions', pending_transactions: 'Pending Transactions',
-        transaction_volume: 'Transaction Volume', today: 'Today', active_matches: 'Active Matches',
+        transaction_volume: 'Transaction Volume', today: 'Today', active_matches: 'Active Matches', pending_matches: 'Pending Matches',
         lottery_participants: 'Lottery Participants', wheel_players: 'Wheel Players',
         distributed: 'Distributed', pending_items: 'Pending Items',
         bulk_approve: 'Bulk Approve', bulk_reject: 'Bulk Reject',
