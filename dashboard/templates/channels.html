@@ -53,7 +53,7 @@
             <p x-show="partners.length === 0" class="text-center text-slate-400 p-8">لا يوجد شركاء — أضف قناة شريكة</p>
         </div>
         <!-- Add partner modal -->
-        <div x-show="showPartnerModal" x-transition class="modal-overlay" @click.self="showPartnerModal = false" style="display:none">
+        <div x-show="showPartnerModal" class="modal-overlay" @click.self="showPartnerModal = false" style="display:none">
             <div class="modal">
                 <h3 class="font-bold text-lg mb-4" data-i18n="new_partner">➕ شريك جديد</h3>
                 <div class="space-y-3">
@@ -146,7 +146,7 @@
         </div>
 
         <!-- Create Campaign Modal -->
-        <div x-show="showCampaignModal" x-transition class="modal-overlay" @click.self="showCampaignModal = false" style="display:none">
+        <div x-show="showCampaignModal" class="modal-overlay" @click.self="showCampaignModal = false" style="display:none">
             <div class="modal max-w-2xl">
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="font-bold text-lg">📊 إنشاء حملة إعلانية</h3>
@@ -340,7 +340,7 @@
         </div>
 
         <!-- Add Channel Modal -->
-        <div x-show="showAddChannelModal" x-transition class="modal-overlay" @click.self="showAddChannelModal = false" style="display:none">
+        <div x-show="showAddChannelModal" class="modal-overlay" @click.self="showAddChannelModal = false" style="display:none">
             <div class="modal">
                 <h3 class="font-bold text-lg mb-4">➕ إضافة قناة / مجموعة</h3>
                 <div class="space-y-3">
@@ -370,7 +370,7 @@
             </div>
         </template>
         <p x-show="groups.length === 0" class="text-center text-slate-400 p-8">لا توجد مجموعات</p>
-        <div x-show="showGroupModal" x-transition class="modal-overlay" @click.self="showGroupModal = false" style="display:none"><div class="modal"><h3 class="font-bold text-lg mb-4">إنشاء مجموعة قنوات</h3><input type="text" x-model="groupForm.name" class="input w-full mb-2" placeholder="اسم المجموعة"><input type="text" x-model="groupForm.description" class="input w-full mb-2" placeholder="الوصف"><div class="max-h-40 overflow-y-auto space-y-1 mb-3"><template x-for="ch in channels" :key="ch.id"><label class="flex items-center gap-2 p-1 hover:bg-slate-700 rounded cursor-pointer"><input type="checkbox" :value="ch.id" x-model="groupForm.selectedIds"><span x-text="ch.title"></span></label></template></div><div class="flex gap-2 justify-end"><button @click="showGroupModal = false" class="btn btn-sm" style="background:#475569" data-i18n="cancel">Cancel</button><button @click="createGroup()" class="btn btn-primary btn-sm">إنشاء</button></div></div></div>
+        <div x-show="showGroupModal" class="modal-overlay" @click.self="showGroupModal = false" style="display:none"><div class="modal"><h3 class="font-bold text-lg mb-4">إنشاء مجموعة قنوات</h3><input type="text" x-model="groupForm.name" class="input w-full mb-2" placeholder="اسم المجموعة"><input type="text" x-model="groupForm.description" class="input w-full mb-2" placeholder="الوصف"><div class="max-h-40 overflow-y-auto space-y-1 mb-3"><template x-for="ch in channels" :key="ch.id"><label class="flex items-center gap-2 p-1 hover:bg-slate-700 rounded cursor-pointer"><input type="checkbox" :value="ch.id" x-model="groupForm.selectedIds"><span x-text="ch.title"></span></label></template></div><div class="flex gap-2 justify-end"><button @click="showGroupModal = false" class="btn btn-sm" style="background:#475569" data-i18n="cancel">Cancel</button><button @click="createGroup()" class="btn btn-primary btn-sm">إنشاء</button></div></div></div>
     </div>
 
     <!-- TAB: Vault -->
@@ -545,7 +545,7 @@
         </div>
 
         <!-- Add/Edit Social Account Modal -->
-        <div x-show="showSocialAccountModal" x-transition class="modal-overlay" @click.self="showSocialAccountModal = false" style="display:none">
+        <div x-show="showSocialAccountModal" class="modal-overlay" @click.self="showSocialAccountModal = false" style="display:none">
             <div class="modal max-w-2xl">
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="font-bold text-lg" x-text="editingSocialAccountId ? 'تعديل حساب سوشيال' : 'إضافة حساب سوشيال'"></h3>
@@ -637,7 +637,7 @@
         </div>
 
         <!-- Delete Confirmation Modal -->
-        <div x-show="showDeleteSocialModal" x-transition class="modal-overlay" @click.self="showDeleteSocialModal = false" style="display:none">
+        <div x-show="showDeleteSocialModal" class="modal-overlay" @click.self="showDeleteSocialModal = false" style="display:none">
             <div class="modal" style="max-width:400px">
                 <div class="p-6 text-center">
                     <div class="w-14 h-14 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4">
