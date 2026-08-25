@@ -1,0 +1,16 @@
+/* Auto-generated admin lexicon for runtime bilingual translation. */
+window.ADMIN_I18N_LEXICON = {
+  "generated_at": "2026-08-21T22:10:03Z",
+  "arToEn": {
+    "emoji صحيح": "valid emoji",
+    "آخر": "Last",
+    "آخر 30": "Last 30",
+    "آخر المشاركين": "Recent participants",
+    "آمن": "Safe",
+    "آيفون": "iPhone",
+    "أثناء": "during",
+    "أجزاء": "Parts",
+    "أحمد": "Ahmed",
+    "أخرى": "Other",
+    "أخطاء": "Errors",
+    "أخيرا":

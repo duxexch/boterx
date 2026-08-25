@@ -1,0 +1,45 @@
+ontinue;
+        }
+        if (m.type === 'attributes') {
+          translateAttrs(m.target);
+          continue;
+        }
+        for (var j = 0; j < m.addedNodes.length; j++) {
+          walkAndTranslate(m.addedNodes[j]);
+        }
+      }
+    });
+    state.observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+      attributes: true,
+      attributeFilter: ['placeholder', 'title', 'aria-label', 'alt', 'value']
+    });
+  }
+
+  function boot() {
+    buildPairsFromAppDict();
+    buildPairsFromLexicon();
+    compileLexicons();
+    patchDialogs();
+    applyAll();
+    initObserver();
+  }
+
+  window.ADMIN_I18N_RUNTIME = {
+    apply: applyAll,
+    translate: translatePreserveSpacing,
+    addPair: addPair,
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
+
+  window.addEventListener('storage', function (e) {
+    if (e && e.key === 'lang') applyAll();
+  });
+})();

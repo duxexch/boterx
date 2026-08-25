@@ -13,12 +13,12 @@ function baseApp() {
         copied: false,
 
         init() {
-            try { this.applyDarkMode(); } catch (e) {}
-            try { this.applyLang(); } catch (e) {}
-            try { this.startLiveStats(); } catch (e) {}
+            this.applyDarkMode();
+            this.applyLang();
+            this.startLiveStats();
         },
 
-        t(key) { return (window.tr || function(k){return k;})(key); },
+        t(key) { return tr(key); },
 
         applyLang() {
             document.documentElement.lang = this.lang;
@@ -77,7 +77,13 @@ function baseApp() {
 
         async fetchStats() {
             try {
-                const stats = await (window.api ? api('/api/stats') : fetch('/api/stats', { credentials: 'same-origin' }).then(r => r.json()));
+                const res = await fetch('/api/stats');
+                if (res.status === 401 || res.status === 403) {
+                    if (this._statsTimer) { clearInterval(this._statsTimer); this._statsTimer = null; }
+                    if (this.liveSource) { this.liveSource.close(); this.liveSource = null; }
+                    return;
+                }
+                const stats = await res.json();
                 const p = stats.transactions?.pending || 0, m = stats.matches?.pending || 0;
                 const c = stats.complaints?.open || 0, tr2 = stats.trading?.pending_orders || 0;
                 const sv = stats.svrp?.pending_requests || 0;
@@ -114,8 +120,7 @@ function baseApp() {
                 const liveBar = document.getElementById('liveStats');
                 if (liveBar) {
                     const parts = [];
-                    const _fmtNum = window.fmtNum || function(n){ return (n||0).toLocaleString(); };
-                    if (stats.users?.total) parts.push('👥 ' + _fmtNum(stats.users.total));
+                    if (stats.users?.total) parts.push('👥 ' + fmtNum(stats.users.total));
                     if (p) parts.push('⏳ ' + p);
                     if (m) parts.push('🔄 ' + m);
                     if (c) parts.push('📢 ' + c);

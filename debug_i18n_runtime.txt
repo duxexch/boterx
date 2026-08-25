@@ -1,0 +1,75 @@
+(function () {
+  'use strict';
+
+  var AR_RE = /[\u0600-\u06FF]/;
+  var EN_RE = /[A-Za-z]/;
+  var WS_RE = /\s+/g;
+  var SKIP_TAGS = { SCRIPT: 1, STYLE: 1, NOSCRIPT: 1, CODE: 1, PRE: 1, TEXTAREA: 1 };
+  var SKIP_EXACT = { EN: 1, AR: 1, 'ع': 1 };
+
+  var state = {
+    lang: getLang(),
+    arToEnExact: new Map(),
+    enToArExact: new Map(),
+    arLexicon: [],
+    enLexicon: [],
+    observer: null,
+  };
+
+  function getLang() {
+    try {
+      return localStorage.getItem('lang') === 'en' ? 'en' : 'ar';
+    } catch (e) {
+      return 'ar';
+    }
+  }
+
+  function norm(s) {
+    return String(s || '').replace(/\u00a0/g, ' ').replace(WS_RE, ' ').trim();
+  }
+
+  function escapeRegExp(s) {
+    return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  function addPair(ar, en) {
+    ar = norm(ar);
+    en = norm(en);
+    if (!ar || !en || ar === en) return;
+    if (!state.arToEnExact.has(ar)) state.arToEnExact.set(ar, en);
+    if (!state.enToArExact.has(en)) state.enToArExact.set(en, ar);
+  }
+
+  function buildPairsFromAppDict() {
+    if (!window.I18N || !window.I18N.ar || !window.I18N.en) return;
+    var ar = window.I18N.ar;
+    var en = window.I18N.en;
+    var keys = {};
+    Object.keys(ar).forEach(function (k) { keys[k] = 1; });
+    Object.keys(en).forEach(function (k) { keys[k] = 1; });
+
+    Object.keys(keys).forEach(function (k) {
+      var va = ar[k];
+      var ve = en[k];
+      if (typeof va !== 'string' || typeof ve !== 'string') return;
+      if (AR_RE.test(va) && EN_RE.test(ve)) addPair(va, ve);
+      else if (AR_RE.test(ve) && EN_RE.test(va)) addPair(ve, va);
+    });
+  }
+
+  function buildPairsFromLexicon() {
+    var lex = window.ADMIN_I18N_LEXICON || {};
+    var a2e = lex.arToEn || {};
+    var e2a = lex.enToAr || {};
+
+    Object.keys(a2e).forEach(function (ar) {
+      addPair(ar, a2e[ar]);
+    });
+    Object.keys(e2a).forEach(function (en) {
+      addPair(e2a[en], en);
+    });
+
+    var manual = {
+      'Dispute': 'نزاع',
+      'Open': 'مفتوح',
+      'Muted':
