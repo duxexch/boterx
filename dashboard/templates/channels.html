@@ -232,7 +232,7 @@
 
         <!-- Channel cards -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <template x-for="ch in filteredChannels" :key="ch.id">
+            <template x-for="ch in (filteredChannels || [])" :key="ch.id">
                 <div class="bg-slate-800 rounded-xl border border-slate-700 p-5" :class="ch.is_active === 'yes' ? 'border-green-500/30' : 'opacity-60'">
                     <div class="flex items-start justify-between mb-3">
                         <div class="flex items-center gap-3">
@@ -378,8 +378,8 @@
         <input type="text" x-model="vaultSearch" @input.debounce.300ms="loadVault()" class="input w-full" placeholder="🔍 بحث...">
         <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
             <table class="data-table"><thead><tr><th data-i18n="date">Date</th><th>المزود</th><th>الأصلي</th><th>المعالج</th><th data-i18n="actions">Actions</th></tr></thead><tbody>
-                <template x-for="p in vaultPosts" :key="p.id"><tr class="hover:bg-slate-700/50"><td class="text-xs text-slate-400" x-text="p.created_at"></td><td><span class="text-xs px-2 py-0.5 rounded bg-blue-500/20 text-blue-400" x-text="p.ai_provider || 'manual'"></span></td><td class="text-xs max-w-xs truncate" x-text="(p.original_text || '').substring(0,50) + '...'"></td><td class="text-xs max-w-xs truncate" x-text="(p.processed_text || '').substring(0,50) + '...'"></td><td><button @click="repost(p.id)" class="btn btn-primary btn-sm">↻</button><button @click="deleteVaultPost(p.id)" class="btn btn-danger btn-sm">🗑️</button></td></tr></template>
-                <tr x-show="vaultPosts.length === 0"><td colspan="5" class="text-center p-6 text-slate-400">لا توجد بوستات</td></tr>
+                <template x-for="p in (vaultPosts || [])" :key="p.id"><tr class="hover:bg-slate-700/50"><td class="text-xs text-slate-400" x-text="p.created_at"></td><td><span class="text-xs px-2 py-0.5 rounded bg-blue-500/20 text-blue-400" x-text="p.ai_provider || 'manual'"></span></td><td class="text-xs max-w-xs truncate" x-text="(p.original_text || '').substring(0,50) + '...'"></td><td class="text-xs max-w-xs truncate" x-text="(p.processed_text || '').substring(0,50) + '...'"></td><td><button @click="repost(p.id)" class="btn btn-primary btn-sm">↻</button><button @click="deleteVaultPost(p.id)" class="btn btn-danger btn-sm">🗑️</button></td></tr></template>
+                <tr x-show="(vaultPosts || []).length === 0"><td colspan="5" class="text-center p-6 text-slate-400">لا توجد بوستات</td></tr>
             </tbody></table>
         </div>
     </div>
@@ -690,24 +690,41 @@ function channelsApp() {
         async loadAll() { await Promise.all([this.loadChannels(), this.loadGroups(), this.loadAI(), this.loadAIAgents(), this.loadPlatformAccounts(), this.loadSourceChannels(), this.loadReport(), this.loadReplacements(), this.loadVault(), this.loadRelayLogs(), this.loadCampaigns(), this.loadAnalytics(), this.loadPartners(), this.loadAdNet()]); },
 
         get filteredChannels() {
-            if (!this.filterCategory) return this.channels;
-            return this.channels.filter(c => (c.category || 'غير مصنف') === this.filterCategory);
+            try {
+                if (!Array.isArray(this.channels)) return [];
+                if (!this.filterCategory) return this.channels;
+                return this.channels.filter(c => (c.category || 'غير مصنف') === this.filterCategory);
+            } catch(e) { return []; }
         },
         get categoryGroups() {
-            const cats = {};
-            this.channels.forEach(ch => {
-                const cat = ch.category || 'غير مصنف';
-                if (!cats[cat]) cats[cat] = { count: 0, channels: [] };
-                cats[cat].count++;
-                cats[cat].channels.push(ch);
-            });
-            return cats;
+            try {
+                if (!Array.isArray(this.channels)) return {};
+                const cats = {};
+                this.channels.forEach(ch => {
+                    const cat = ch.category || 'غير مصنف';
+                    if (!cats[cat]) cats[cat] = { count: 0, channels: [] };
+                    cats[cat].count++;
+                    cats[cat].channels.push(ch);
+                });
+                return cats;
+            } catch(e) { return {}; }
         },
 
         async loadChannels() { try { const d = await api('/api/channels'); this.channels = d.channels || []; } catch(e) {} },
         async loadGroups() { try { const d = await api('/api/channel-groups'); this.groups = d.groups || []; } catch(e) {} },
-        async loadVault() { const params = this.vaultSearch ? '?search=' + encodeURIComponent(this.vaultSearch) : ''; try { const d = await api('/api/post-vault' + params); this.vaultPosts = d.posts || []; } catch(e) {} },
-        async loadRelayLogs() { try { const d = await api('/api/relay-log'); this.relayLogs = d.logs || []; } catch(e) {} },
+        async loadVault() { 
+            const params = this.vaultSearch ? '?search=' + encodeURIComponent(this.vaultSearch) : ''; 
+            try { 
+                const d = await api('/api/post-vault' + params); 
+                this.vaultPosts = Array.isArray(d.posts) ? d.posts : []; 
+            } catch(e) { this.vaultPosts = []; } 
+        },
+        async loadRelayLogs() { 
+            try { 
+                const d = await api('/api/relay-log'); 
+                this.relayLogs = Array.isArray(d.logs) ? d.logs : []; 
+            } catch(e) { this.relayLogs = []; } 
+        },
         async loadAI() { try { const [prov, instr] = await Promise.all([api('/api/ai-providers'), api('/api/ai-instructions')]); this.aiProviders = prov.providers || []; this.aiActive = prov.active || ''; this.aiInstructions = instr.instructions || ''; } catch(e) {} },
         async loadAIAgents() { try { const d = await api('/api/ai-agents'); this.aiAgents = d.agents || []; } catch(e) {} },
         async loadPlatformAccounts() { try { const d = await api('/api/platform-accounts'); this.platformAccounts = d.accounts || []; } catch(e) {} },
