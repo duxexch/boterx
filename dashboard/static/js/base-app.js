@@ -258,6 +258,7 @@ function baseApp() {
                         osc.start(now + i * 0.4); osc.stop(now + i * 0.4 + 0.35);
                     }
                 }
+            } catch (e) {}
             },
             playSuccessSound() { this.playSound('success'); },
         }
