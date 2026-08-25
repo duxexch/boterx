@@ -263,8 +263,10 @@
     buildPairsFromLexicon();
     compileLexicons();
     patchDialogs();
-    applyAll();
-    initObserver();
+    // NOTE: applyAll() + initObserver() deliberately disabled.
+    // The lexicon text-translator was CORRUPTING UI text (e.g. "dashboard" -> "dبشكلhboard")
+    // via the MutationObserver. Admin pages use the key-based I18N dict (tr()/t())
+    // which fully covers translations. Manual API (window.ADMIN_I18N_RUNTIME) stays available.
   }
 
   window.ADMIN_I18N_RUNTIME = {
@@ -280,6 +282,6 @@
   }
 
   window.addEventListener('storage', function (e) {
-    if (e && e.key === 'lang') applyAll();
+    // applyAll disabled — see boot() note above
   });
 })();

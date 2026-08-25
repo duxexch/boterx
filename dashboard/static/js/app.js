@@ -483,11 +483,9 @@ const I18N = {
 function tr(key) {
     const lang = localStorage.getItem('lang') || 'ar';
     const dict = I18N[lang] || I18N.ar;
-    const fallback = dict[key] || I18N.ar[key] || key;
-    if (window.ADMIN_I18N_RUNTIME && typeof window.ADMIN_I18N_RUNTIME.translate === 'function') {
-        return window.ADMIN_I18N_RUNTIME.translate(fallback);
-    }
-    return fallback;
+    // Key-based dict lookup ONLY — passing text through the lexicon
+    // translator corrupted UI text (e.g. "dashboard" -> "dبشكلhboard")
+    return dict[key] || I18N.ar[key] || key;
 }
 
 // Apply language to document
