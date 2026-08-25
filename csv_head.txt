@@ -1,0 +1,5 @@
+﻿id,chat_id,title,type,is_active,added_at,relay_to_users,relay_to_channels,forward_mode,welcome_text,category,ai_enabled,channel_role,ai_provider,brand_voice,platform,owner_admin_id,managed_by_admin_ids,allow_subadmin_publish,ai_agent_id,platform_account_id
+CH658453,6669939763,,private,yes,2026-08-13 22:00,yes,yes,all,,,yes,both,,,telegram,7146701713,7146701713,no,,
+CH301143,6854283325,,private,yes,2026-08-21 08:32,yes,yes,all,,,no,both,,,telegram,7146701713,7146701713,no,,
+CH492549,-1003971857980,Vixo group,supergroup,yes,2026-08-23 13:42,yes,yes,all,,,no,both,,,telegram,7146701713,7146701713,yes,,
+CH492587,-1003982261481,Vex,channel,yes,2026-08-23 13:43,yes,yes,all,,,no,both,,,telegram,7146701713,7146701713,yes,,
