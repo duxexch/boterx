@@ -246,89 +246,18 @@
                         <span x-html="statusBadge(ch.is_active === 'yes' ? 'active' : 'inactive')"></span>
                     </div>
                     <div class="space-y-2 text-sm">
-                        <div class="flex justify-between p-2 bg-slate-900/50 rounded">
+                        <div class="flex items-center justify-between p-2 bg-slate-900/50 rounded">
                             <span class="text-slate-400">⚙️ تفعيل</span>
-                            <button @click="toggleChannel(ch.id)" class="relative inline-flex h-6 w-11 items-center rounded-full transition" :class="ch.is_active === 'yes' ? 'bg-green-500' : 'bg-slate-600'"><span class="inline-block h-4 w-4 transform rounded-full bg-white transition" :class="toggleClasses(ch.is_active === 'yes')"></span></button>
+                            <button @click.stop="toggleChannel(ch.id)" class="relative inline-flex h-6 w-11 items-center rounded-full transition" :class="ch.is_active === 'yes' ? 'bg-green-500' : 'bg-slate-600'"><span class="inline-block h-4 w-4 transform rounded-full bg-white transition" :class="toggleClasses(ch.is_active === 'yes')"></span></button>
                         </div>
-                        <div class="flex justify-between p-2 bg-slate-900/50 rounded">
-                            <span class="text-slate-400">👥 للمستخدمين</span>
-                            <button @click="toggleSetting(ch, 'relay_to_users')" class="relative inline-flex h-6 w-11 items-center rounded-full transition" :class="ch.relay_to_users === 'yes' ? 'bg-green-500' : 'bg-slate-600'"><span class="inline-block h-4 w-4 transform rounded-full bg-white transition" :class="toggleClasses(ch.relay_to_users === 'yes')"></span></button>
-                        </div>
-                        <div class="flex justify-between p-2 bg-slate-900/50 rounded">
-                            <span class="text-slate-400">📢 للقنوات</span>
-                            <button @click="toggleSetting(ch, 'relay_to_channels')" class="relative inline-flex h-6 w-11 items-center rounded-full transition" :class="ch.relay_to_channels === 'yes' ? 'bg-green-500' : 'bg-slate-600'"><span class="inline-block h-4 w-4 transform rounded-full bg-white transition" :class="toggleClasses(ch.relay_to_channels === 'yes')"></span></button>
-                        </div>
-                        <div class="flex justify-between p-2 bg-slate-900/50 rounded">
-                            <span class="text-slate-400">🤖 AI</span>
-                            <button @click="toggleAI(ch.id)" class="relative inline-flex h-6 w-11 items-center rounded-full transition" :class="ch.ai_enabled === 'yes' ? 'bg-blue-500' : 'bg-slate-600'"><span class="inline-block h-4 w-4 transform rounded-full bg-white transition" :class="toggleClasses(ch.ai_enabled === 'yes')"></span></button>
-                        </div>
-                        <div class="p-2 bg-slate-900/50 rounded grid grid-cols-2 gap-2">
-                            <div>
-                                <label class="block text-xs text-slate-400 mb-1">🌐 المنصة</label>
-                                <select x-model="ch.platform" @change="saveSetting(ch.id, 'platform', ch.platform)" class="input text-sm py-1 w-full">
-                                    <option value="telegram">Telegram</option>
-                                    <option value="whatsapp">WhatsApp</option>
-                                    <option value="webhook">Webhook</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="block text-xs text-slate-400 mb-1">🎭 الدور</label>
-                                <select x-model="ch.channel_role" @change="saveSetting(ch.id, 'channel_role', ch.channel_role)" class="input text-sm py-1 w-full">
-                                    <option value="both">Source + Publish</option>
-                                    <option value="source">Source only</option>
-                                    <option value="publish">Publish only</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="p-2 bg-slate-900/50 rounded grid grid-cols-1 gap-2">
-                            <div>
-                                <label class="block text-xs text-slate-400 mb-1">🤖 وكيل AI</label>
-                                <select x-model="ch.ai_agent_id" @change="saveSetting(ch.id, 'ai_agent_id', ch.ai_agent_id)" class="input text-sm py-1 w-full">
-                                    <option value="">— افتراضي —</option>
-                                    <template x-for="agent in aiAgents" :key="agent.id">
-                                        <option :value="agent.id" x-text="agent.name + ' (' + (agent.provider || 'auto') + ')'" :disabled="agent.is_active !== 'yes'"></option>
-                                    </template>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="block text-xs text-slate-400 mb-1">🔐 حساب المنصة</label>
-                                <select x-model="ch.platform_account_id" @change="saveSetting(ch.id, 'platform_account_id', ch.platform_account_id)" class="input text-sm py-1 w-full">
-                                    <option value="">— تلقائي —</option>
-                                    <template x-for="acc in platformAccounts" :key="acc.id">
-                                        <option :value="acc.id" x-text="acc.account_name + ' (' + acc.platform + ')'" :disabled="acc.is_active !== 'yes'"></option>
-                                    </template>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="p-2 bg-slate-900/50 rounded">
-                            <label class="block text-xs text-slate-400 mb-1">👤 Owner Admin ID</label>
-                            <input type="text" x-model="ch.owner_admin_id" @change="saveSetting(ch.id, 'owner_admin_id', ch.owner_admin_id)" class="input text-sm py-1 w-full" placeholder="admin id">
-                        </div>
-                        <div class="p-2 bg-slate-900/50 rounded">
-                            <label class="block text-xs text-slate-400 mb-1">👥 Manager Admin IDs (|)</label>
-                            <input type="text" x-model="ch.managed_by_admin_ids" @change="saveSetting(ch.id, 'managed_by_admin_ids', ch.managed_by_admin_ids)" class="input text-sm py-1 w-full" placeholder="2|7|9">
-                        </div>
-                        <div class="flex justify-between p-2 bg-slate-900/50 rounded">
-                            <span class="text-slate-400">🛡️ سماح نشر Subadmin</span>
-                            <button @click="toggleSetting(ch, 'allow_subadmin_publish')" class="relative inline-flex h-6 w-11 items-center rounded-full transition" :class="ch.allow_subadmin_publish === 'yes' ? 'bg-amber-500' : 'bg-slate-600'"><span class="inline-block h-4 w-4 transform rounded-full bg-white transition" :class="ch.allow_subadmin_publish === 'yes' ? 'translate-x-6' : 'translate-x-1'"></span></button>
-                        </div>
-                        <div class="p-2 bg-slate-900/50 rounded">
-                            <label class="block text-xs text-slate-400 mb-1">📂 الفئة</label>
-                            <select x-model="ch.category" @change="setCategory(ch.id, ch.category)" class="input text-sm py-1 w-full">
-                                <option value="" data-i18n="uncategorized">Uncategorized</option>
-                                <option value="رياضة">⚽ رياضة</option>
-                                <option value="مال">💰 مال</option>
-                                <option value="تداول">💱 تداول</option>
-                                <option value="ألعاب">🎮 ألعاب</option>
-                                <option value="أخبار">📰 أخبار</option>
-                                <option value="تسويق">📣 تسويق</option>
-                                <option value="ترفيه">🎬 ترفيه</option>
-                                <option value="أخرى">📦 أخرى</option>
-                            </select>
+                        <div class="grid grid-cols-3 gap-1">
+                            <span class="text-xs text-center p-1 rounded" :class="ch.relay_to_users === 'yes' ? 'bg-green-500/20 text-green-400' : 'bg-slate-700 text-slate-500'" @click.stop="toggleSetting(ch, 'relay_to_users')">👥 <span x-text="ch.relay_to_users === 'yes' ? 'ON' : 'OFF'"></span></span>
+                            <span class="text-xs text-center p-1 rounded" :class="ch.relay_to_channels === 'yes' ? 'bg-green-500/20 text-green-400' : 'bg-slate-700 text-slate-500'" @click.stop="toggleSetting(ch, 'relay_to_channels')">📢 <span x-text="ch.relay_to_channels === 'yes' ? 'ON' : 'OFF'"></span></span>
+                            <span class="text-xs text-center p-1 rounded" :class="ch.ai_enabled === 'yes' ? 'bg-blue-500/20 text-blue-400' : 'bg-slate-700 text-slate-500'" @click.stop="toggleAI(ch.id)">🤖 <span x-text="ch.ai_enabled === 'yes' ? 'ON' : 'OFF'"></span></span>
                         </div>
                         <div class="p-2 bg-slate-900/50 rounded flex gap-2">
-                            <input type="text" x-model="ch.postText" class="input text-sm py-1 flex-1" placeholder="📨 رسالة">
-                            <button @click="postToChannel(ch)" class="btn btn-primary btn-sm" data-i18n="send">Send</button>
+                            <input type="text" x-model="ch.postText" class="input text-sm py-1 flex-1" placeholder="📨 رسالة سريعة" @click.stop>
+                            <button @click.stop="postToChannel(ch)" class="btn btn-primary btn-sm" data-i18n="send">Send</button>
                         </div>
                     </div>
                     <div class="mt-3 pt-3 border-t border-slate-700 flex justify-between items-center">
@@ -733,6 +662,7 @@
 function channelsApp() {
     return {
         tab: 'campaigns', channels: [], groups: [], vaultPosts: [], relayLogs: [],
+        lang: localStorage.getItem('lang') || 'ar',
         campaigns: [], analytics: {}, partners: [], adNet: {}, showPartnerModal: false,
         partnerForm: { channel_name: '', chat_id: '', subscriber_count: '', revenue_share: '', category: '', contact: '' },
         aiProviders: [], aiActive: '', aiInstructions: '', aiTestResult: '',
@@ -797,9 +727,12 @@ function channelsApp() {
             } catch(e) { return {}; }
         },
         toggleClasses(isOn) {
-            const isRtl = this.lang === 'ar';
+            // CSS translate-x is always physical (left-to-right).
+            // LTR: dot on right when ON (translate-x-6), left when OFF (translate-x-1)
+            // RTL: must mirror - dot on LEFT when ON, RIGHT when OFF
+            const isRtl = (this.lang || 'ar') === 'ar';
             if (isRtl) {
-                return isOn ? 'translate-x-1' : 'translate-x-6';
+                return isOn ? 'translate-x-[-20px]' : 'translate-x-0';
             }
             return isOn ? 'translate-x-6' : 'translate-x-1';
         },
@@ -837,9 +770,9 @@ function channelsApp() {
                 await this.loadChannels();
             } catch(e) { toast('فشل', 'error'); }
         },
-        async toggleChannel(id) { try { await api(`/api/channels/${id}/toggle`, { method: 'POST', body: '{}' }); await this.loadChannels(); } catch(e) {} },
+        async toggleChannel(id) { try { await api(`/api/channels/${id}/toggle`, { method: 'POST', body: '{}' }); const ch = this.channels.find(c => c.id === id); if (ch) ch.is_active = ch.is_active === 'yes' ? 'no' : 'yes'; if (this.selectedChannel && this.selectedChannel.id === id) this.selectedChannel.is_active = ch ? ch.is_active : this.selectedChannel.is_active; } catch(e) {} },
         async toggleSetting(ch, key) { ch[key] = ch[key] === 'yes' ? 'no' : 'yes'; try { await api(`/api/channels/${ch.id}/settings`, { method: 'POST', body: JSON.stringify({ [key]: ch[key] }) }); } catch(e) { ch[key] = ch[key] === 'yes' ? 'no' : 'yes'; } },
-        async toggleAI(id) { try { await api(`/api/channels/${id}/ai-toggle`, { method: 'POST', body: '{}' }); await this.loadChannels(); } catch(e) {} },
+        async toggleAI(id) { try { await api(`/api/channels/${id}/ai-toggle`, { method: 'POST', body: '{}' }); const ch = this.channels.find(c => c.id === id); if (ch) ch.ai_enabled = ch.ai_enabled === 'yes' ? 'no' : 'yes'; if (this.selectedChannel && this.selectedChannel.id === id) this.selectedChannel.ai_enabled = ch ? ch.ai_enabled : this.selectedChannel.ai_enabled; } catch(e) {} },
         async saveSetting(id, key, value) { try { await api(`/api/channels/${id}/settings`, { method: 'POST', body: JSON.stringify({ [key]: value }) }); } catch(e) {} },
         async setCategory(id, cat) { try { await api(`/api/channels/${id}/category`, { method: 'POST', body: JSON.stringify({ category: cat }) }); } catch(e) {} },
         async postToChannel(ch) { if (!ch.postText) return toast('اكتب رسالة', 'warning'); try { await api(`/api/channels/${ch.id}/post`, { method: 'POST', body: JSON.stringify({ message: ch.postText }) }); ch.postText = ''; toast('تم الإرسال', 'success'); } catch(e) {} },
@@ -1067,17 +1000,19 @@ function channelsApp() {
             } catch(e) { toast('فشل الحفظ', 'error'); }
         },
         async sendChannelMessage() {
-            if (!this.selectedChannel || !this.msgText) return toast('اكتب رسالة', 'warning');
+            if (!this.selectedChannel) return;
+            if (!this.msgText && (!this.msgMedia || this.msgMedia.length === 0)) return toast('اكتب رسالة أو أضف ملف', 'warning');
             try {
+                const urls = (this.msgMedia || []).map(m => m.url || m).filter(Boolean);
                 await api(`/api/channels/${this.selectedChannel.id}/post`, { method: 'POST', body: JSON.stringify({ 
                     message: this.msgText, 
-                    media_urls: this.msgMedia || [] 
+                    media_urls: urls
                 }) });
                 this.msgText = '';
                 this.msgMedia = [];
-                toast('تم الإرسال', 'success');
-                await this.loadVault(); // refresh archive
-            } catch(e) { toast('فشل الإرسال', 'error'); }
+                toast('تم الإرسال — مؤرشفة في post_vault ✅', 'success');
+                await this.loadVault();
+            } catch(e) { toast('فشل الإرسال: ' + (e.message || ''), 'error'); }
         },
         msgText: '',
         msgMedia: [],

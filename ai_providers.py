@@ -138,6 +138,56 @@ class KimiProvider(AIProvider):
             return None
 
 
+class OpenRouterProvider(AIProvider):
+    """مزود OpenRouter — يدعم كل النماذج عبر OpenAI-compatible API"""
+    name = 'openrouter'
+    display_name = '🔀 OpenRouter (كل النماذج)'
+    api_key_env = 'OPENROUTER_API_KEY'
+
+    def __init__(self, api_key=None):
+        super().__init__(api_key)
+        # Also try ai_api_keys DB if env is empty
+        if not self.api_key:
+            try:
+                import sqlite3
+                db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dashboard', 'boterx.db')
+                conn = sqlite3.connect(db_path)
+                row = conn.execute("SELECT api_key FROM ai_api_keys WHERE provider LIKE '%openrouter%' AND is_active=1 ORDER BY priority ASC LIMIT 1").fetchone()
+                conn.close()
+                if row:
+                    self.api_key = row[0]
+            except Exception:
+                pass
+
+    def process(self, text, instructions):
+        if not self.is_available():
+            return None
+        try:
+            url = 'https://openrouter.ai/api/v1/chat/completions'
+            model = os.getenv('OPENROUTER_MODEL', 'openai/gpt-4o-mini')
+            payload = {
+                'model': model,
+                'messages': [
+                    {'role': 'system', 'content': instructions},
+                    {'role': 'user', 'content': f'أعد صياغة هذا البوست:\n\n{text}'}
+                ],
+                'max_tokens': 2000,
+                'temperature': 0.7
+            }
+            headers = {
+                'Content-Type': 'application/json',
+                'Authorization': f'Bearer {self.api_key}',
+                'HTTP-Referer': 'https://vex.deals',
+                'X-Title': 'VEX Games AI'
+            }
+            result = self._make_request(url, payload, headers)
+            content = result.get('choices', [{}])[0].get('message', {}).get('content', '').strip()
+            return content if len(content) > 10 else None
+        except Exception as e:
+            logger.error(f"خطأ OpenRouter: {e}")
+            return None
+
+
 class AIManager:
     """مدير كل مزودي AI — يختار المزود النشط ويعالج النصوص"""
 
@@ -146,6 +196,7 @@ class AIManager:
             'openai': OpenAIProvider(),
             'claude': ClaudeProvider(),
             'kimi': KimiProvider(),
+            'openrouter': OpenRouterProvider(),
         }
 
     def get_available_providers(self):
