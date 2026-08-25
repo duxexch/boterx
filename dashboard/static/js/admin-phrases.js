@@ -858,11 +858,18 @@ window.ADMIN_PHRASES = {
   "بث": "Broadcast",
   "عميل: —": "Client: —",
   "شكوى جديدة": "New complaint",
-  "للسحب": "For withdrawal"
+  "للسحب": "For withdrawal",
+  "🌐 تعدد اللغات": "🌐 Multi-language",
+  "إنشاء العميل": "Client creation",
+  "👥 المستخدمين": "👥 Users",
+  "قناة": "Channel"
 };
 
 /* Digit-pattern rules for dynamic strings (numbers replaced by #). */
 window.ADMIN_PHRASE_PATTERNS = {
+  "# يوم": "# days",
+  "# أيام": "# days",
+  "# ساعة": "# hours",
   "غير مصنف (#)": "Uncategorized (#)",
   "عميل: #": "Client: #",
   "📊 وصول: #": "📊 Reach: #",
