@@ -791,7 +791,7 @@ document.addEventListener('keydown', (e) => {
 });
 
 // Init
-document.addEventEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', () => {
     Notifier.init();
     requestNotificationPermission();
     Notifier._timer = setInterval(() => Notifier.check(), 5000);

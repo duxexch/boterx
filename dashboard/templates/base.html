@@ -9,11 +9,11 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='vendor/fontawesome.min.css') }}">
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}?v=20260825f" defer></script>
+    <script src="{{ url_for('static', filename='js/i18n-admin-lexicon.js') }}?v=20260825f" defer></script>
+    <script src="{{ url_for('static', filename='js/i18n-admin-runtime.js') }}?v=20260825f" defer></script>
+    <script src="{{ url_for('static', filename='js/base-app.js') }}?v=20260825f" defer></script>
     <script src="{{ url_for('static', filename='vendor/alpine.min.js') }}" defer></script>
-    <script src="{{ url_for('static', filename='js/app.js') }}?v=20260825e" defer></script>
-    <script src="{{ url_for('static', filename='js/i18n-admin-lexicon.js') }}?v=20260825e" defer></script>
-    <script src="{{ url_for('static', filename='js/i18n-admin-runtime.js') }}?v=20260825e" defer></script>
-    <script src="{{ url_for('static', filename='js/base-app.js') }}?v=20260825e" defer></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=20260825e">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/fx.css') }}?v=20260825e">
     <!-- PWA & SEO -->
@@ -718,8 +718,7 @@ function baseApp() {
                     }, 150);
                 }
             } catch(e) {}
-        }
-    },
+        },
 
         // Copy permanent demo link to clipboard
         copyPermanentDemoLink() {

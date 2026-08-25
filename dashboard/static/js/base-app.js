@@ -264,7 +264,10 @@ function baseApp() {
         }
     };
 
-// Register with Alpine so it's available when Alpine initializes
+// Register with Alpine (works regardless of load order:
+// if Alpine already exists register now, otherwise wait for alpine:init)
 if (window.Alpine) {
     Alpine.data('baseApp', baseApp);
+} else {
+    document.addEventListener('alpine:init', () => Alpine.data('baseApp', baseApp));
 }
