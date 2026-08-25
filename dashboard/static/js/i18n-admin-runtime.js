@@ -6,6 +6,7 @@
   'use strict';
 
   var PHRASES = window.ADMIN_PHRASES || {};
+  var PATTERNS = window.ADMIN_PHRASE_PATTERNS || {};
   var SKIP_TAGS = { SCRIPT: 1, STYLE: 1, NOSCRIPT: 1, CODE: 1, PRE: 1, TEXTAREA: 1 };
   var ATTRS = ['placeholder', 'title', 'aria-label'];
   var observer = null;
@@ -15,17 +16,34 @@
     catch (e) { return 'ar'; }
   }
 
+  function lookup(txt) {
+    var en = PHRASES[txt];
+    if (en) return en;
+    // digit-normalized pattern match: "وصول: 12" -> "وصول: #"
+    if (/[0-9\u0660-\u0669]/.test(txt)) {
+      var key = txt.replace(/[0-9\u0660-\u0669]+/g, '#');
+      var pen = PATTERNS[key];
+      if (pen) {
+        var nums = txt.match(/[0-9\u0660-\u0669]+/g) || [];
+        var i = 0;
+        return pen.replace(/#/g, function () { return nums[i++] !== undefined ? nums[i - 1] : '#'; });
+      }
+    }
+    return null;
+  }
+
   function translateTextNode(node) {
     if (!node || node.nodeType !== 3) return;
     var raw = node.nodeValue;
     if (!raw) return;
     var txt = raw.trim();
     if (!txt || !/[\u0600-\u06FF]/.test(txt)) return;   // only Arabic text
-    var en = PHRASES[txt];
+    var en = lookup(txt);
     if (en && en !== txt) {
       // preserve surrounding whitespace exactly
-      var lead = raw.slice(0, raw.indexOf(txt.charAt(0)));
-      var trail = raw.slice(raw.indexOf(txt) + txt.length);
+      var idx = raw.indexOf(txt);
+      var lead = raw.slice(0, idx);
+      var trail = raw.slice(idx + txt.length);
       node.nodeValue = lead + en + trail;
     }
   }
@@ -39,8 +57,9 @@
     if (root.nodeType === 1 && getLang() === 'en') {
       for (var a = 0; a < ATTRS.length; a++) {
         var val = root.getAttribute && root.getAttribute(ATTRS[a]);
-        if (val && /[\u0600-\u06FF]/.test(val) && PHRASES[val.trim()]) {
-          root.setAttribute(ATTRS[a], PHRASES[val.trim()]);
+        if (val && /[\u0600-\u06FF]/.test(val)) {
+          var t = lookup(val.trim());
+          if (t) root.setAttribute(ATTRS[a], t);
         }
       }
     }
