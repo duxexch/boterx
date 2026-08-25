@@ -231,9 +231,9 @@
         </div>
 
         <!-- Channel cards -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
             <template x-for="ch in (filteredChannels || [])" :key="ch.id">
-                <div class="bg-slate-800 rounded-xl border border-slate-700 p-5" :class="ch.is_active === 'yes' ? 'border-green-500/30' : 'opacity-60'">
+                <div class="bg-slate-800 rounded-xl border border-slate-700 p-5 cursor-pointer hover:border-green-500/50 transition" :class="ch.is_active === 'yes' ? 'border-green-500/30' : 'opacity-60'" @click="openChannelModal(ch)">
                     <div class="flex items-start justify-between mb-3">
                         <div class="flex items-center gap-3">
                             <div class="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center text-xl" x-text="ch.type === 'channel' ? '📢' : (ch.type === 'group' ? '👥' : '💬')"></div>
@@ -248,19 +248,19 @@
                     <div class="space-y-2 text-sm">
                         <div class="flex justify-between p-2 bg-slate-900/50 rounded">
                             <span class="text-slate-400">⚙️ تفعيل</span>
-                            <button @click="toggleChannel(ch.id)" class="relative inline-flex h-6 w-11 items-center rounded-full transition" :class="ch.is_active === 'yes' ? 'bg-green-500' : 'bg-slate-600'"><span class="inline-block h-4 w-4 transform rounded-full bg-white transition" :class="ch.is_active === 'yes' ? 'translate-x-6' : 'translate-x-1'"></span></button>
+                            <button @click="toggleChannel(ch.id)" class="relative inline-flex h-6 w-11 items-center rounded-full transition" :class="ch.is_active === 'yes' ? 'bg-green-500' : 'bg-slate-600'"><span class="inline-block h-4 w-4 transform rounded-full bg-white transition" :class="toggleClasses(ch.is_active === 'yes')"></span></button>
                         </div>
                         <div class="flex justify-between p-2 bg-slate-900/50 rounded">
                             <span class="text-slate-400">👥 للمستخدمين</span>
-                            <button @click="toggleSetting(ch, 'relay_to_users')" class="relative inline-flex h-6 w-11 items-center rounded-full transition" :class="ch.relay_to_users === 'yes' ? 'bg-green-500' : 'bg-slate-600'"><span class="inline-block h-4 w-4 transform rounded-full bg-white transition" :class="ch.relay_to_users === 'yes' ? 'translate-x-6' : 'translate-x-1'"></span></button>
+                            <button @click="toggleSetting(ch, 'relay_to_users')" class="relative inline-flex h-6 w-11 items-center rounded-full transition" :class="ch.relay_to_users === 'yes' ? 'bg-green-500' : 'bg-slate-600'"><span class="inline-block h-4 w-4 transform rounded-full bg-white transition" :class="toggleClasses(ch.relay_to_users === 'yes')"></span></button>
                         </div>
                         <div class="flex justify-between p-2 bg-slate-900/50 rounded">
                             <span class="text-slate-400">📢 للقنوات</span>
-                            <button @click="toggleSetting(ch, 'relay_to_channels')" class="relative inline-flex h-6 w-11 items-center rounded-full transition" :class="ch.relay_to_channels === 'yes' ? 'bg-green-500' : 'bg-slate-600'"><span class="inline-block h-4 w-4 transform rounded-full bg-white transition" :class="ch.relay_to_channels === 'yes' ? 'translate-x-6' : 'translate-x-1'"></span></button>
+                            <button @click="toggleSetting(ch, 'relay_to_channels')" class="relative inline-flex h-6 w-11 items-center rounded-full transition" :class="ch.relay_to_channels === 'yes' ? 'bg-green-500' : 'bg-slate-600'"><span class="inline-block h-4 w-4 transform rounded-full bg-white transition" :class="toggleClasses(ch.relay_to_channels === 'yes')"></span></button>
                         </div>
                         <div class="flex justify-between p-2 bg-slate-900/50 rounded">
                             <span class="text-slate-400">🤖 AI</span>
-                            <button @click="toggleAI(ch.id)" class="relative inline-flex h-6 w-11 items-center rounded-full transition" :class="ch.ai_enabled === 'yes' ? 'bg-blue-500' : 'bg-slate-600'"><span class="inline-block h-4 w-4 transform rounded-full bg-white transition" :class="ch.ai_enabled === 'yes' ? 'translate-x-6' : 'translate-x-1'"></span></button>
+                            <button @click="toggleAI(ch.id)" class="relative inline-flex h-6 w-11 items-center rounded-full transition" :class="ch.ai_enabled === 'yes' ? 'bg-blue-500' : 'bg-slate-600'"><span class="inline-block h-4 w-4 transform rounded-full bg-white transition" :class="toggleClasses(ch.ai_enabled === 'yes')"></span></button>
                         </div>
                         <div class="p-2 bg-slate-900/50 rounded grid grid-cols-2 gap-2">
                             <div>
@@ -397,8 +397,8 @@
             <div class="flex items-center justify-between"><h3 class="font-bold">🧠 AI Agents</h3><span class="text-xs text-slate-400" x-text="aiAgents.length + ' agent(s)'"></span></div>
             <div class="grid grid-cols-1 md:grid-cols-4 gap-2">
                 <input x-model="aiAgentForm.name" class="input" placeholder="Agent name">
-                <select x-model="aiAgentForm.provider" class="input"><option value="auto">Auto</option><option value="openai">OpenAI</option><option value="claude">Claude</option><option value="kimi">Kimi</option></select>
-                <select x-model="aiAgentForm.fallback_provider" class="input"><option value="">No fallback</option><option value="openai">OpenAI</option><option value="claude">Claude</option><option value="kimi">Kimi</option></select>
+                <select x-model="aiAgentForm.provider" class="input"><option value="auto">Auto</option><option value="openai">OpenAI</option><option value="claude">Claude</option><option value="kimi">Kimi</option><option value="openrouter">OpenRouter</option></select>
+                <select x-model="aiAgentForm.fallback_provider" class="input"><option value="">No fallback</option><option value="openai">OpenAI</option><option value="claude">Claude</option><option value="kimi">Kimi</option><option value="openrouter">OpenRouter</option></select>
                 <button @click="createAIAgent()" class="btn btn-primary btn-sm">➕ Add Agent</button>
             </div>
             <textarea x-model="aiAgentForm.instructions" rows="2" class="input w-full" placeholder="Custom instructions for this agent"></textarea>
@@ -731,6 +731,14 @@ function channelsApp() {
                 return cats;
             } catch(e) { return {}; }
         },
+        toggleClasses(isOn) {
+            const isRtl = this.lang === 'ar';
+            if (isRtl) {
+                return isOn ? 'translate-x-1' : 'translate-x-6';
+            }
+            return isOn ? 'translate-x-6' : 'translate-x-1';
+        },
+        isRtl() { return this.lang === 'ar'; },
 
         async loadChannels() { try { const d = await api('/api/channels'); this.channels = d.channels || []; } catch(e) {} },
         async loadGroups() { try { const d = await api('/api/channel-groups'); this.groups = d.groups || []; } catch(e) {} },
@@ -938,8 +946,126 @@ function channelsApp() {
         async deleteSocialAccount() {
             if (!this.deleteSocialTarget) return;
             try { await api(`/api/social-accounts/${this.deleteSocialTarget.id}`, { method: 'DELETE' }); toast('تم الحذف', 'success'); this.showDeleteSocialModal = false; this.deleteSocialTarget = null; await this.loadSocialAccounts(); } catch(e) { toast('فشل الحذف', 'error'); }
-        }
+        },
+
+        // Channel Detail Modal
+        selectedChannel: null,
+        showChannelModal: false,
+        openChannelModal(ch) { this.selectedChannel = ch; this.showChannelModal = true; },
+        closeChannelModal() { this.selectedChannel = null; this.showChannelModal = false; },
+        async saveChannelSetting(field, value) {
+            if (!this.selectedChannel) return;
+            try {
+                await api(`/api/channels/${this.selectedChannel.id}/settings`, { method: 'POST', body: JSON.stringify({ [field]: value }) });
+                this.selectedChannel[field] = value;
+                toast('تم الحفظ', 'success');
+            } catch(e) { toast('فشل الحفظ', 'error'); }
+        },
+        async sendChannelMessage() {
+            if (!this.selectedChannel || !this.msgText) return toast('اكتب رسالة', 'warning');
+            try {
+                await api(`/api/channels/${this.selectedChannel.id}/post`, { method: 'POST', body: JSON.stringify({ 
+                    message: this.msgText, 
+                    media_urls: this.msgMedia || [] 
+                }) });
+                this.msgText = '';
+                this.msgMedia = [];
+                toast('تم الإرسال', 'success');
+                await this.loadVault(); // refresh archive
+            } catch(e) { toast('فشل الإرسال', 'error'); }
+        },
+        msgText: '',
+        msgMedia: [],
+        async uploadMessageMedia(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const form = new FormData();
+            form.append('file', file);
+            try {
+                const res = await fetch('/api/upload-broadcast-media', { method: 'POST', body: form, credentials: 'same-origin' });
+                const d = await res.json();
+                if (d.url) {
+                    this.msgMedia = this.msgMedia || [];
+                    this.msgMedia.push({ url: d.url, type: file.type.startsWith('video/') ? 'video' : 'image' });
+                    toast('تم رفع الملف', 'success');
+                }
+            } catch(e) { toast('فشل الرفع', 'error'); }
+        },
+        removeMsgMedia(idx) { this.msgMedia.splice(idx, 1); },
     }
-}
+    }
 </script>
-{% endblock %}
+
+<!-- Channel Detail Modal -->
+<div x-show="showChannelModal" class="modal-overlay" @click.self="closeChannelModal" style="display:none">
+    <div class="modal max-w-3xl">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-bold text-lg" x-text="selectedChannel ? (selectedChannel.title || 'قناة') : ''"></h3>
+            <button @click="closeChannelModal" class="text-slate-400 hover:text-white"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="space-y-4">
+            <div class="grid grid-cols-2 gap-4">
+                <div><label class="block text-sm text-slate-400 mb-1">📛 الاسم</label><p class="font-bold" x-text="selectedChannel.title || 'غير معروف'"></p></div>
+                <div><label class="block text-sm text-slate-400 mb-1">🆔 Chat ID</label><p class="font-mono text-sm" x-text="selectedChannel.chat_id"></p></div>
+                <div><label class="block text-sm text-slate-400 mb-1">📋 النوع</label><p x-text="selectedChannel.type === 'channel' ? '📢 قناة' : (selectedChannel.type === 'group' ? '👥 مجموعة' : '💬 سوبر جروب')"></p></div>
+                <div><label class="block text-sm text-slate-400 mb-1">📂 الفئة</label><p x-text="selectedChannel.category || 'غير مصنف'"></p></div>
+                <div><label class="block text-sm text-slate-400 mb-1">🌐 المنصة</label><p x-text="selectedChannel.platform || 'telegram'"></p></div>
+                <div><label class="block text-sm text-slate-400 mb-1">🎭 الدور</label><p x-text="selectedChannel.channel_role === 'both' ? 'Source + Publish' : (selectedChannel.channel_role === 'source' ? 'Source only' : 'Publish only')"></p></div>
+            </div>
+
+            <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
+                <h4 class="font-bold mb-3">⚙️ الإعدادات</h3>
+                <div class="space-y-2">
+                    <div class="flex justify-between items-center p-2 bg-slate-900/50 rounded">
+                        <span class="text-slate-400">⚙️ الحالة</span>
+                        <button @click="toggleChannel(selectedChannel.id)" class="relative inline-flex h-6 w-11 items-center rounded-full transition" :class="selectedChannel.is_active === 'yes' ? 'bg-green-500' : 'bg-slate-600'"><span class="inline-block h-4 w-4 transform rounded-full bg-white transition" :class="toggleClasses(selectedChannel.is_active === 'yes')"></span></button>
+                    </div>
+                    <div class="flex justify-between items-center p-2 bg-slate-900/50 rounded">
+                        <span class="text-slate-400">👥 للمستخدمين</span>
+                        <button @click="toggleSetting(selectedChannel, 'relay_to_users')" class="relative inline-flex h-6 w-11 items-center rounded-full transition" :class="selectedChannel.relay_to_users === 'yes' ? 'bg-green-500' : 'bg-slate-600'"><span class="inline-block h-4 w-4 transform rounded-full bg-white transition" :class="toggleClasses(selectedChannel.relay_to_users === 'yes')"></span></button>
+                    </div>
+                    <div class="flex justify-between items-center p-2 bg-slate-900/50 rounded">
+                        <span class="text-slate-400">📢 للقنوات</span>
+                        <button @click="toggleSetting(selectedChannel, 'relay_to_channels')" class="relative inline-flex h-6 w-11 items-center rounded-full transition" :class="selectedChannel.relay_to_channels === 'yes' ? 'bg-green-500' : 'bg-slate-600'"><span class="inline-block h-4 w-4 transform rounded-full bg-white transition" :class="toggleClasses(selectedChannel.relay_to_channels === 'yes')"></span></button>
+                    </div>
+                    <div class="flex justify-between items-center p-2 bg-slate-900/50 rounded">
+                        <span class="text-slate-400">🤖 AI</span>
+                        <button @click="toggleAI(selectedChannel.id)" class="relative inline-flex h-6 w-11 items-center rounded-full transition" :class="selectedChannel.ai_enabled === 'yes' ? 'bg-blue-500' : 'bg-slate-600'"><span class="inline-block h-4 w-4 transform rounded-full bg-white transition" :class="toggleClasses(selectedChannel.ai_enabled === 'yes')"></span></button>
+                    </div>
+                    <div class="p-2 bg-slate-900/50 rounded grid grid-cols-2 gap-2">
+                        <div><label class="block text-xs text-slate-400 mb-1">🌐 المنصة</label><select x-model="selectedChannel.platform" @change="saveChannelSetting('platform', selectedChannel.platform)" class="input text-sm py-1 w-full"><option value="telegram">Telegram</option><option value="whatsapp">WhatsApp</option><option value="webhook">Webhook</option></select></div>
+                        <div><label class="block text-xs text-slate-400 mb-1">🎭 الدور</label><select x-model="selectedChannel.channel_role" @change="saveChannelSetting('channel_role', selectedChannel.channel_role)" class="input text-sm py-1 w-full"><option value="both">Source + Publish</option><option value="source">Source only</option><option value="publish">Publish only</option></select></div>
+                        <div><label class="block text-xs text-slate-400 mb-1">🤖 وكيل AI</label><select x-model="selectedChannel.ai_agent_id" @change="saveChannelSetting('ai_agent_id', selectedChannel.ai_agent_id)" class="input text-sm py-1 w-full"><option value="">— افتراضي —</option><template x-for="agent in aiAgents" :key="agent.id"><option :value="agent.id" x-text="agent.name + ' (' + (agent.provider || 'auto') + ')'" :disabled="agent.is_active !== 'yes'"></option></template></select></div>
+                        <div><label class="block text-xs text-slate-400 mb-1">🔐 حساب المنصة</label><select x-model="selectedChannel.platform_account_id" @change="saveChannelSetting('platform_account_id', selectedChannel.platform_account_id)" class="input text-sm py-1 w-full"><option value="">— تلقائي —</option><template x-for="acc in platformAccounts" :key="acc.id"><option :value="acc.id" x-text="acc.account_name + ' (' + acc.platform + ')'" :disabled="acc.is_active !== 'yes'"></option></template></select></div>
+                        <div><label class="block text-xs text-slate-400 mb-1">👤 Owner Admin ID</label><input type="text" x-model="selectedChannel.owner_admin_id" @change="saveChannelSetting('owner_admin_id', selectedChannel.owner_admin_id)" class="input text-sm py-1 w-full" placeholder="admin id"></div>
+                        <div><label class="block text-xs text-slate-400 mb-1">👥 Manager Admin IDs (|)</label><input type="text" x-model="selectedChannel.managed_by_admin_ids" @change="saveChannelSetting('managed_by_admin_ids', selectedChannel.managed_by_admin_ids)" class="input text-sm py-1 w-full" placeholder="2|7|9"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
+                <h4 class="font-bold mb-3">📨 إرسال رسالة</h3>
+                <div class="space-y-2">
+                    <textarea x-model="msgText" rows="3" class="input w-full" placeholder="اكتب الرسالة... (يدعم HTML للتيليغرام)"></textarea>
+                    <div class="flex flex-wrap gap-2">
+                        <label class="w-16 h-16 rounded-lg border-2 border-dashed border-slate-500 flex items-center justify-center cursor-pointer hover:border-green-500 transition" :class="msgMedia && msgMedia.length ? 'opacity-50 pointer-events-none' : ''">
+                            <i class="fas fa-plus text-xl text-slate-400"></i>
+                            <input type="file" class="hidden" accept="image/*,video/*" @change="uploadMessageMedia($event)">
+                        </label>
+                        <template x-for="(media, idx) in msgMedia" :key="idx">
+                            <div class="relative w-16 h-16 rounded-lg overflow-hidden bg-slate-700 border border-slate-600 group">
+                                <img x-show="media.type.startsWith('image')" :src="media.url" class="w-full h-full object-cover">
+                                <div x-show="!media.type.startsWith('image')" class="w-full h-full flex items-center justify-center"><i class="fas fa-file text-xl text-slate-400"></i></div>
+                                <button @click="removeMsgMedia(idx)" class="absolute inset-0 bg-red-600/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition"><i class="fas fa-trash text-white"></i></button>
+                            </div>
+                        </template>
+                    </div>
+                    <div class="flex gap-2">
+                        <button @click="sendChannelMessage" class="btn btn-primary btn-sm flex-1" :disabled="!msgText && (!msgMedia || msgMedia.length === 0)"><i class="fas fa-paper-plane"></i> إرسال</button>
+                        <button @click="closeChannelModal" class="btn btn-sm" style="background:#475569">إغلاق</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

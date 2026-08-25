@@ -131,6 +131,7 @@
                             <option value="anthropic">{% if lang == 'ar' %}Anthropic (Claude){% else %}Anthropic (Claude){% endif %}</option>
                             <option value="google">{% if lang == 'ar' %}Google (Gemini){% else %}Google (Gemini){% endif %}</option>
                             <option value="azure">{% if lang == 'ar' %}Azure OpenAI{% else %}Azure OpenAI{% endif %}</option>
+                            <option value="openrouter">{% if lang == 'ar' %}OpenRouter{% else %}OpenRouter{% endif %}</option>
                             <option value="custom">{% if lang == 'ar' %}مخصص{% else %}Custom{% endif %}</option>
                         </select>
                     </div>
@@ -274,11 +275,11 @@ function aiApiKeysApp() {
         },
 
         providerLabel(p) {
-            const labels = { openai: 'OpenAI', anthropic: 'Anthropic', google: 'Google', azure: 'Azure', custom: 'Custom' };
+            const labels = { openai: 'OpenAI', anthropic: 'Anthropic', google: 'Google', azure: 'Azure', openrouter: 'OpenRouter', custom: 'Custom' };
             return labels[p] || p;
         },
         providerClass(p) {
-            const cls = { openai: 'bg-green-500/20 text-green-400', anthropic: 'bg-purple-500/20 text-purple-400', google: 'bg-blue-500/20 text-blue-400', azure: 'bg-indigo-500/20 text-indigo-400', custom: 'bg-slate-500/20 text-slate-400' };
+            const cls = { openai: 'bg-green-500/20 text-green-400', anthropic: 'bg-purple-500/20 text-purple-400', google: 'bg-blue-500/20 text-blue-400', azure: 'bg-indigo-500/20 text-indigo-400', openrouter: 'bg-orange-500/20 text-orange-400', custom: 'bg-slate-500/20 text-slate-400' };
             return cls[p] || 'bg-slate-500/20 text-slate-400';
         },
 
@@ -303,12 +304,13 @@ function aiApiKeysApp() {
             this.showModal = true;
         },
 
-        async onProviderChange() {
+async onProviderChange() {
             if (this.form.provider === 'openai') { this.form.default_model = 'gpt-4o'; }
             else if (this.form.provider === 'anthropic') { this.form.default_model = 'claude-3-5-sonnet-20241022'; }
             else if (this.form.provider === 'google') { this.form.default_model = 'gemini-1.5-pro'; }
             else if (this.form.provider === 'azure') { this.form.default_model = 'gpt-4o'; }
-            else { this.form.default_model = ''; }
+            else if (this.form.provider === 'openrouter') { this.form.default_model = 'openai/gpt-4o'; this.form.base_url = 'https://openrouter.ai/api/v1'; }
+            else { this.form.default_model = ''; this.form.base_url = ''; }
         },
 
         async fetchModels() {

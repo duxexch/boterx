@@ -3435,6 +3435,11 @@ def api_ai_fetch_models():
     try:
         import httpx
         headers = {'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'}
+        
+        # OpenRouter uses a different base URL
+        if provider == 'openrouter' and not base_url:
+            base_url = 'https://openrouter.ai/api/v1'
+        
         url = base_url.rstrip('/') + '/v1/models' if base_url else 'https://api.openai.com/v1/models'
 
         with httpx.Client(timeout=30.0) as client:
@@ -3474,6 +3479,10 @@ def api_ai_test_key():
         base_url = row['base_url'] or ''
         model = row['default_model']
 
+        # OpenRouter uses a different base URL
+        if provider == 'openrouter' and not base_url:
+            base_url = 'https://openrouter.ai/api/v1'
+        
         headers = {'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'}
         test_url = base_url.rstrip('/') + '/v1/chat/completions' if base_url else 'https://api.openai.com/v1/chat/completions'
 
@@ -3487,7 +3496,10 @@ def api_ai_test_key():
             resp = client.post(test_url, headers=headers, json=payload)
             if resp.status_code == 200:
                 # Also fetch models
-                models_url = base_url.rstrip('/') + '/v1/models' if base_url else 'https://api.openai.com/v1/models'
+                if row['provider'] == 'openrouter' and not row['base_url']:
+                    models_url = 'https://openrouter.ai/api/v1/models'
+                else:
+                    models_url = base_url.rstrip('/') + '/v1/models' if base_url else 'https://api.openai.com/v1/models'
                 models_list = []
                 try:
                     mresp = client.get(models_url, headers=headers)
@@ -7729,12 +7741,12 @@ def _normalize_ai_agent_row(row):
         changed = True
 
     provider = str(row.get('provider', '') or '').strip().lower()
-    if provider not in ('openai', 'claude', 'kimi', 'auto'):
+    if provider not in ('openai', 'claude', 'kimi', 'openrouter', 'auto'):
         row['provider'] = 'auto'
         changed = True
 
     fb = str(row.get('fallback_provider', '') or '').strip().lower()
-    if fb and fb not in ('openai', 'claude', 'kimi'):
+    if fb and fb not in ('openai', 'claude', 'kimi', 'openrouter'):
         row['fallback_provider'] = ''
         changed = True
 
@@ -8561,8 +8573,9 @@ def api_post_to_channel(channel_id):
         return jsonify({'error': 'Forbidden'}), 403
     data = request.json
     message_text = data.get('message', '')
-    if not message_text:
-        return jsonify({'error': 'No message'}), 400
+    media_urls = data.get('media_urls', [])
+    if not message_text and not media_urls:
+        return jsonify({'error': 'No message or media'}), 400
     # حفظ في broadcast_queue.csv للبوت يرسلها
     platform = str(ch.get('platform', 'telegram') or 'telegram').lower()
     entry = {
@@ -8575,7 +8588,8 @@ def api_post_to_channel(channel_id):
         'target_channel_id': ch.get('id', ''),
         'created_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
         'created_by': session.get('admin_id', ''),
-        'status': 'pending'
+        'status': 'pending',
+        'media_urls': '|'.join(media_urls) if media_urls else ''
     }
     fieldnames = get_fieldnames('broadcast_queue.csv', [
         'id', 'message', 'type', 'platform', 'target_chat_id',
@@ -8585,6 +8599,31 @@ def api_post_to_channel(channel_id):
         'target_user', 'target_name', 'scheduled_at'
     ])
     append_csv('broadcast_queue.csv', entry, fieldnames)
+    
+    # Archive to post_vault for history
+    try:
+        vault_entry = {
+            'id': f"VPOST{secrets.token_hex(3).upper()}",
+            'source_channel': ch.get('title', '') or ch.get('id', ''),
+            'source_chat_id': ch.get('chat_id', ''),
+            'original_text': message_text,
+            'processed_text': message_text,
+            'media_type': 'image' if media_urls and any(u.lower().endswith(('.jpg','.jpeg','.png','.gif','.webp')) for u in media_urls) else ('video' if media_urls and any(u.lower().endswith(('.mp4','.mov','.webm')) for u in media_urls) else ''),
+            'media_file_id': '|'.join(media_urls) if media_urls else '',
+            'ai_provider': 'manual',
+            'status': 'published',
+            'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'published_to_users': '0',
+            'published_to_channels': '1',
+            'views': '0',
+            'category': ch.get('category', ''),
+        }
+        vault_fieldnames = get_fieldnames('post_vault.csv', ['id','source_channel','source_chat_id','original_text','processed_text','media_type','media_file_id','ai_provider','status','created_at','published_to_users','published_to_channels','views','category'])
+        append_csv('post_vault.csv', vault_entry, vault_fieldnames)
+    except Exception as e:
+        # Don't fail the request if archiving fails
+        pass
+    
     log_action('post_to_channel', f'{channel_id}: {message_text[:50]}')
     return jsonify({'success': True, 'message': 'تم إضافة الرسالة لقائمة الإرسال'})
 
