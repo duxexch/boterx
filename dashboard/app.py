@@ -6914,7 +6914,7 @@ def api_partners():
 @app.route('/api/partners', methods=['POST'])
 @api_auth
 @permission_required('manage_channels')
-def api_add_partner():
+def api_add_channel_partner():
     data = request.json
     partners = read_csv('channel_partners.csv')
     fieldnames = get_fieldnames('channel_partners.csv', ['id', 'channel_name', 'chat_id', 'subscriber_count', 'revenue_share', 'category', 'contact', 'is_active', 'created_at'])
