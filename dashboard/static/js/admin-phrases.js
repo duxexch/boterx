@@ -849,11 +849,22 @@ window.ADMIN_PHRASES = {
   "حساب رئيسي": "Main account",
   "رقم محفظة": "Wallet number",
   "حساب بنكي": "Bank account",
-  "محفظة إلكترونية": "E-Wallet"
+  "محفظة إلكترونية": "E-Wallet",
+  // ===== Final gaps =====
+  "🔄 مطابقة P2P": "🔄 P2P Matching",
+  "💱 تداول USDT": "💱 USDT Trading",
+  "🎮 ألعاب (يانصيب/عجلة/ويب آب)": "🎮 Games (Lottery/Wheel/Web App)",
+  "🎁 إحالات ودعوات": "🎁 Referrals & Invites",
+  "بث": "Broadcast",
+  "عميل: —": "Client: —",
+  "شكوى جديدة": "New complaint",
+  "للسحب": "For withdrawal"
 };
 
 /* Digit-pattern rules for dynamic strings (numbers replaced by #). */
 window.ADMIN_PHRASE_PATTERNS = {
+  "غير مصنف (#)": "Uncategorized (#)",
+  "عميل: #": "Client: #",
   "📊 وصول: #": "📊 Reach: #",
   "🖱️ نقرات: #": "🖱️ Clicks: #",
   "متبقي # يوم": "# days left",
