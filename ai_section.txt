@@ -1,0 +1,51 @@
+🧠 AI Agents</h3><span class="text-xs text-slate-400" x-text="aiAgents.length + ' agent(s)'"></span></div>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-2">
+                <input x-model="aiAgentForm.name" class="input" placeholder="Agent name">
+                <select x-model="aiAgentForm.provider" class="input"><option value="auto">Auto</option><option value="openai">OpenAI</option><option value="claude">Claude</option><option value="kimi">Kimi</option><option value="openrouter">OpenRouter</option></select>
+                <select x-model="aiAgentForm.fallback_provider" class="input"><option value="">No fallback</option><option value="openai">OpenAI</option><option value="claude">Claude</option><option value="kimi">Kimi</option><option value="openrouter">OpenRouter</option></select>
+                <button @click="createAIAgent()" class="btn btn-primary btn-sm">➕ Add Agent</button>
+            </div>
+            <textarea x-model="aiAgentForm.instructions" rows="2" class="input w-full" placeholder="Custom instructions for this agent"></textarea>
+            <div class="space-y-1 max-h-56 overflow-auto">
+                <template x-for="a in aiAgents" :key="a.id">
+                    <div class="p-2 rounded bg-slate-900/60 border border-slate-700 flex items-center gap-2 text-sm">
+                        <span class="font-mono text-xs text-slate-400" x-text="a.id"></span>
+                        <input x-model="a.name" @change="saveAIAgent(a)" class="input py-1 px-2 text-xs flex-1">
+                        <select x-model="a.provider" @change="saveAIAgent(a)" class="input py-1 px-2 text-xs w-28"><option value="auto">auto</option><option value="openai">openai</option><option value="claude">claude</option><option value="kimi">kimi</option></select>
+                        <button @click="testAIAgent(a)" class="btn btn-sm" style="background:#334155">🧪</button>
+                        <button @click="deleteAIAgent(a.id)" class="btn btn-danger btn-sm">🗑️</button>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-4 space-y-3">
+            <div class="flex items-center justify-between"><h3 class="font-bold">🔐 Platform Accounts</h3><span class="text-xs text-slate-400" x-text="platformAccounts.length + ' account(s)'"></span></div>
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-2">
+                <select x-model="platformForm.platform" class="input"><option value="telegram">Telegram</option><option value="whatsapp">WhatsApp</option><option value="webhook">Webhook</option></select>
+                <input x-model="platformForm.account_name" class="input" placeholder="Account name">
+                <input x-model="platformForm.api_base_url" class="input" placeholder="API/Webhook URL">
+                <input x-model="platformForm.phone_number_id" class="input" placeholder="Phone number id">
+                <button @click="createPlatformAccount()" class="btn btn-primary btn-sm">➕ Add Account</button>
+            </div>
+            <input x-model="platformForm.access_token" class="input w-full" placeholder="Access token (hidden in API responses)">
+            <div class="space-y-1 max-h-56 overflow-auto">
+                <template x-for="acc in platformAccounts" :key="acc.id">
+                    <div class="p-2 rounded bg-slate-900/60 border border-slate-700 flex items-center gap-2 text-sm">
+                        <span class="font-mono text-xs text-slate-400" x-text="acc.id"></span>
+                        <span class="text-xs px-2 py-0.5 rounded bg-slate-700" x-text="acc.platform"></span>
+                        <input x-model="acc.account_name" @change="savePlatformAccount(acc)" class="input py-1 px-2 text-xs flex-1">
+                        <span class="text-xs" :class="acc.health_status === 'ok' ? 'text-green-400' : (acc.health_status === 'error' ? 'text-red-400' : 'text-slate-400')" x-text="acc.health_status || 'unknown'"></span>
+                        <button @click="checkPlatformHealth(acc.id)" class="btn btn-sm" style="background:#334155">💓</button>
+                        <button @click="deletePlatformAccount(acc.id)" class="btn btn-danger btn-sm">🗑️</button>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-4 space-y-3">
+            <div class="flex items-center justify-between"><h3 class="font-bold">📥 Source Channels</h3><span class="text-xs text-slate-400" x-text="sourceChannels.length + ' source(s)'"></span></div>
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-2">
+                <input x-model="sourceForm.title" class="input" placeholder="Source title">
+                <input x-model="sourceForm.chat_id" class="input" placeholder="Chat ID / external ID">
+                <input x-model="sourceForm.target_channel_ids" class="input" placeholder="Target
