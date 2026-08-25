@@ -8284,6 +8284,7 @@ def api_social_accounts_post(account_id):
         conn.close()
 
 # ===== API — Channels =====
+@app.route('/api/channel-groups')
 @api_auth
 def api_channel_groups():
     groups = read_csv('channel_groups.csv')
