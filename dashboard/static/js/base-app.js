@@ -18,7 +18,16 @@ function baseApp() {
             try { this.startLiveStats(); } catch (e) {}
         },
 
-        t(key) { return (window.tr || function(k){return k;})(key); },
+        t(key) {
+            try {
+                if (typeof tr === 'function' && window.I18N) return tr(key);
+            } catch (e) {}
+            try {
+                const lang = localStorage.getItem('lang') || 'ar';
+                const dict = window.I18N && (window.I18N[lang] || window.I18N.ar);
+                return (dict && dict[key]) || key;
+            } catch (e) { return key; }
+        },
 
         applyLang() {
             document.documentElement.lang = this.lang;

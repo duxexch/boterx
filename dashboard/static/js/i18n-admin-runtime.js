@@ -272,7 +272,6 @@
     translate: translatePreserveSpacing,
     addPair: addPair,
   };
-  window.tr = translatePreserveSpacing;
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', boot);

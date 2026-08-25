@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ar" dir="rtl" x-data="baseApp" :lang="lang" :dir="lang === 'ar' ? 'rtl' : 'ltr'" :class="darkMode ? '' : 'light-mode'">
 <head>
     <meta charset="UTF-8">
@@ -10,12 +10,12 @@
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
     <script src="{{ url_for('static', filename='vendor/alpine.min.js') }}" defer></script>
-    <script src="{{ url_for('static', filename='js/app.js') }}?v=20260825b" defer></script>
-    <script src="{{ url_for('static', filename='js/i18n-admin-lexicon.js') }}?v=20260825b" defer></script>
-    <script src="{{ url_for('static', filename='js/i18n-admin-runtime.js') }}?v=20260825b" defer></script>
-    <script src="{{ url_for('static', filename='js/base-app.js') }}?v=20260825b" defer></script>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=20260825b">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/fx.css') }}?v=20260825b">
+    <script src="{{ url_for('static', filename='js/app.js') }}?v=20260825c" defer></script>
+    <script src="{{ url_for('static', filename='js/i18n-admin-lexicon.js') }}?v=20260825c" defer></script>
+    <script src="{{ url_for('static', filename='js/i18n-admin-runtime.js') }}?v=20260825c" defer></script>
+    <script src="{{ url_for('static', filename='js/base-app.js') }}?v=20260825c" defer></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=20260825c">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/fx.css') }}?v=20260825c">
     <!-- PWA & SEO -->
     <link rel="manifest" href="/static/manifest.json">
     <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/icon-32.png?v=20260816">
@@ -28,9 +28,9 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="VEX Games">
-    <meta name="description" content="منصة VEX Games — ألعاب مثيرة وجوائز حقيقية عبر تيليغرام">
-    <meta property="og:title" content="VEX Games — العب واربح">
-    <meta property="og:description" content="منصة ألعاب تيليغرام الأكثر إثارة — مناجم، كراش، بلينكو، يانصيب وأكثر">
+    <meta name="description" content="Ù…Ù†ØµØ© VEX Games â€” Ø£Ù„Ø¹Ø§Ø¨ Ù…Ø«ÙŠØ±Ø© ÙˆØ¬ÙˆØ§Ø¦Ø² Ø­Ù‚ÙŠÙ‚ÙŠØ© Ø¹Ø¨Ø± ØªÙŠÙ„ÙŠØºØ±Ø§Ù…">
+    <meta property="og:title" content="VEX Games â€” Ø§Ù„Ø¹Ø¨ ÙˆØ§Ø±Ø¨Ø­">
+    <meta property="og:description" content="Ù…Ù†ØµØ© Ø£Ù„Ø¹Ø§Ø¨ ØªÙŠÙ„ÙŠØºØ±Ø§Ù… Ø§Ù„Ø£ÙƒØ«Ø± Ø¥Ø«Ø§Ø±Ø© â€” Ù…Ù†Ø§Ø¬Ù…ØŒ ÙƒØ±Ø§Ø´ØŒ Ø¨Ù„ÙŠÙ†ÙƒÙˆØŒ ÙŠØ§Ù†ØµÙŠØ¨ ÙˆØ£ÙƒØ«Ø±">
     <meta property="og:type" content="website">
     <meta property="og:image" content="https://vex.deals/static/icons/og-image.jpg?v=20260821b">
     <meta name="twitter:image" content="https://vex.deals/static/icons/og-image.jpg?v=20260821b">
@@ -110,15 +110,15 @@
     
     <!-- Navigation with grouping
          Visibility rules (default-deny for assigned roles; empty admin_perms = super_admin = show all):
-         - not admin_perms → context processor returned {} (super_admin or unauthenticated) → show link
-         - admin_perms.get(perm, False) → True only if the role explicitly grants it
+         - not admin_perms â†’ context processor returned {} (super_admin or unauthenticated) â†’ show link
+         - admin_perms.get(perm, False) â†’ True only if the role explicitly grants it
     -->
     <nav class="p-3 flex-1 overflow-y-auto">
         <p class="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 mt-2" data-i18n="operations">Operations</p>
         <a href="{{ url_for('dashboard') }}" class="sidebar-link {% if active_page == 'dashboard' %}active{% endif %}">
             <i class="fas fa-chart-pie w-5 text-center"></i> <span x-text="t('dashboard')"></span>
         </a>
-        {# Financial operations — visible to finance_admin (approve/reject) and view_financial roles #}
+        {# Financial operations â€” visible to finance_admin (approve/reject) and view_financial roles #}
         {% if not admin_perms or admin_perms.get('approve_deposits') or admin_perms.get('reject_deposits') or admin_perms.get('view_financial') %}
         <a href="{{ url_for('page_transactions') }}" class="sidebar-link {% if active_page == 'transactions' %}active{% endif %}">
             <i class="fas fa-money-bill-transfer w-5 text-center"></i> <span x-text="t('transactions')"></span>
@@ -137,7 +137,7 @@
         {% endif %}
 
         <p class="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 mt-4" data-i18n="management">Management</p>
-        {# Users page — support can see users; ban requires ban_users #}
+        {# Users page â€” support can see users; ban requires ban_users #}
         {% if not admin_perms or admin_perms.get('ban_users') or admin_perms.get('view_financial') %}
         <a href="{{ url_for('page_users') }}" class="sidebar-link {% if active_page == 'users' %}active{% endif %}">
             <i class="fas fa-users w-5 text-center"></i> <span x-text="t('users')"></span>
@@ -298,7 +298,7 @@
                             <div class="p-3 text-center text-slate-400 text-sm"><i class="fas fa-spinner fa-spin"></i></div>
                         </template>
                         <template x-if="!loading && results.length === 0">
-                            <div class="p-3 text-center text-slate-500 text-sm" x-text="t('no_results')">لا توجد نتائج</div>
+                            <div class="p-3 text-center text-slate-500 text-sm" x-text="t('no_results')">Ù„Ø§ ØªÙˆØ¬Ø¯ Ù†ØªØ§Ø¦Ø¬</div>
                         </template>
                         <template x-for="r in results" :key="r.type + r.id">
                             <a :href="r.url" class="block p-2 hover:bg-slate-700/50 border-b border-slate-700/30">
@@ -316,7 +316,7 @@
                 </div>
 
                 <!-- Language toggle -->
-                <button @click="toggleLang()" class="text-slate-400 hover:text-emerald-400 transition px-2 py-1 rounded text-sm font-bold" x-text="lang === 'ar' ? 'EN' : 'ع'" :title="lang === 'ar' ? 'Switch to English' : 'تحويل للعربية'"></button>
+                <button @click="toggleLang()" class="text-slate-400 hover:text-emerald-400 transition px-2 py-1 rounded text-sm font-bold" x-text="lang === 'ar' ? 'EN' : 'Ø¹'" :title="lang === 'ar' ? 'Switch to English' : 'ØªØ­ÙˆÙŠÙ„ Ù„Ù„Ø¹Ø±Ø¨ÙŠØ©'"></button>
 
                 <!-- Dark/light toggle -->
                 <button @click="toggleDarkMode()" class="text-slate-400 hover:text-emerald-400 transition" :title="t('connected')">
@@ -364,9 +364,9 @@
                 </div>
 
                 <!-- Copy Permanent Demo Link -->
-                <button @click="copyPermanentDemoLink()" class="relative ml-3 text-slate-400 hover:text-emerald-400 transition" title="نسخ رابط العرض الدائم" data-i18n-title="copy_permanent_link">
+                <button @click="copyPermanentDemoLink()" class="relative ml-3 text-slate-400 hover:text-emerald-400 transition" title="Ù†Ø³Ø® Ø±Ø§Ø¨Ø· Ø§Ù„Ø¹Ø±Ø¶ Ø§Ù„Ø¯Ø§Ø¦Ù…" data-i18n-title="copy_permanent_link">
                     <i class="fas fa-link text-lg"></i>
-                    <span x-show="copied" class="absolute -top-6 left-1/2 -translate-x-1/2 text-xs bg-emerald-500 text-white px-2 py-1 rounded">تم النسخ!</span>
+                    <span x-show="copied" class="absolute -top-6 left-1/2 -translate-x-1/2 text-xs bg-emerald-500 text-white px-2 py-1 rounded">ØªÙ… Ø§Ù„Ù†Ø³Ø®!</span>
                 </button>
 
                 <!-- User avatar -->
@@ -420,8 +420,8 @@
     {% if showcase_readonly %}
     <div class="px-4 lg:px-6 pt-4">
         <div class="p-3 rounded-lg text-sm bg-amber-900/40 text-amber-200 border border-amber-700/60 flex items-center justify-between gap-3">
-            <span>وضع العرض فقط: هذه جلسة قراءة فقط، لا يمكن تنفيذ أي تعديل أو إرسال أو حذف.</span>
-            <a href="{{ url_for('logout') }}" class="text-amber-100 underline">إنهاء الجلسة</a>
+            <span>ÙˆØ¶Ø¹ Ø§Ù„Ø¹Ø±Ø¶ ÙÙ‚Ø·: Ù‡Ø°Ù‡ Ø¬Ù„Ø³Ø© Ù‚Ø±Ø§Ø¡Ø© ÙÙ‚Ø·ØŒ Ù„Ø§ ÙŠÙ…ÙƒÙ† ØªÙ†ÙÙŠØ° Ø£ÙŠ ØªØ¹Ø¯ÙŠÙ„ Ø£Ùˆ Ø¥Ø±Ø³Ø§Ù„ Ø£Ùˆ Ø­Ø°Ù.</span>
+            <a href="{{ url_for('logout') }}" class="text-amber-100 underline">Ø¥Ù†Ù‡Ø§Ø¡ Ø§Ù„Ø¬Ù„Ø³Ø©</a>
         </div>
     </div>
     {% endif %}
@@ -541,12 +541,12 @@ function baseApp() {
             const bar = document.getElementById('liveStats');
             if (bar) {
                 const parts = [];
-                if (s.users?.total !== undefined) parts.push('👥 ' + s.users.total + ' ' + tr('users'));
-                if (s.transactions?.pending !== undefined) parts.push('⏳ ' + s.transactions.pending + ' ' + tr('pending'));
-                if (s.matches?.active !== undefined) parts.push('🔄 ' + s.matches.active + ' ' + tr('matching'));
-                if (s.lottery?.participants !== undefined) parts.push('🎰 ' + s.lottery.participants + ' ' + tr('participants'));
-                if (s.wheel?.participants !== undefined) parts.push('🎡 ' + s.wheel.participants + ' ' + tr('wheel_players'));
-                if (s.lottery?.distributed) parts.push('💰 ' + s.lottery.distributed.toFixed(0) + ' ' + tr('distributed'));
+                if (s.users?.total !== undefined) parts.push('ðŸ‘¥ ' + s.users.total + ' ' + tr('users'));
+                if (s.transactions?.pending !== undefined) parts.push('â³ ' + s.transactions.pending + ' ' + tr('pending'));
+                if (s.matches?.active !== undefined) parts.push('ðŸ”„ ' + s.matches.active + ' ' + tr('matching'));
+                if (s.lottery?.participants !== undefined) parts.push('ðŸŽ° ' + s.lottery.participants + ' ' + tr('participants'));
+                if (s.wheel?.participants !== undefined) parts.push('ðŸŽ¡ ' + s.wheel.participants + ' ' + tr('wheel_players'));
+                if (s.lottery?.distributed) parts.push('ðŸ’° ' + s.lottery.distributed.toFixed(0) + ' ' + tr('distributed'));
                 bar.textContent = parts.join(' | ') || tr('no_data');
             }
             // Update notification count
@@ -561,9 +561,9 @@ function baseApp() {
                 this.notifications.unshift({
                     id: Date.now(),
                     icon: 'fa-clock text-emerald-400',
-                    title: 'معاملات معلقة',
-                    message: s.transactions.pending + ' معاملة بانتظار المراجعة',
-                    time: 'الآن'
+                    title: 'Ù…Ø¹Ø§Ù…Ù„Ø§Øª Ù…Ø¹Ù„Ù‚Ø©',
+                    message: s.transactions.pending + ' Ù…Ø¹Ø§Ù…Ù„Ø© Ø¨Ø§Ù†ØªØ¸Ø§Ø± Ø§Ù„Ù…Ø±Ø§Ø¬Ø¹Ø©',
+                    time: 'Ø§Ù„Ø¢Ù†'
                 });
             }
         },
@@ -589,14 +589,14 @@ function baseApp() {
                                   d.type.includes('withdrawal') ? 'fa-hand-holding-usd text-red-400' :
                                   d.type === 'broadcast' ? 'fa-bullhorn text-amber-400' :
                                   'fa-bell text-emerald-400',
-                            title: d.title || 'إشعار',
+                            title: d.title || 'Ø¥Ø´Ø¹Ø§Ø±',
                             message: d.message || '',
-                            time: 'الآن'
+                            time: 'Ø§Ù„Ø¢Ù†'
                         });
                         if (this.notifications.length > 20) this.notifications.pop();
                         // Play sound + browser notification
                         if (typeof Notifier !== 'undefined' && Notifier.enabled) {
-                            Notifier.notify(d.title || d.message || 'إشعار', d.type);
+                            Notifier.notify(d.title || d.message || 'Ø¥Ø´Ø¹Ø§Ø±', d.type);
                         }
                         // Also play rich sound directly
                         this.playNotifSound(d.type);
@@ -616,7 +616,7 @@ function baseApp() {
                 if (!res.ok) return;
                 const data = await res.json();
                 const logs = data.notifications || [];
-                // Show last 3 as toasts (only if they're recent — within 5 minutes)
+                // Show last 3 as toasts (only if they're recent â€” within 5 minutes)
                 const now = Date.now();
                 for (const log of logs.slice(0, 3).reverse()) {
                     try {
@@ -625,7 +625,7 @@ function baseApp() {
                         if (ageMin < 5) { // Only show notifications from the last 5 minutes
                             this.showToast({
                                 type: log.type || 'notification',
-                                title: log.type_label || 'إشعار',
+                                title: log.type_label || 'Ø¥Ø´Ø¹Ø§Ø±',
                                 message: log.message_preview || log.message || ''
                             });
                         }
@@ -745,16 +745,16 @@ function baseApp() {
             const demoUrl = baseUrl + '/x/showcase?k=' + token + '&lang=' + currentLang;
             const adminUrl = baseUrl + '/x/showcase/admin-session?k=' + token + '&next=/dashboard';
             
-            const textToCopy = 'رابط العرض الدائم (AR): ' + demoUrl + '\n' +
+            const textToCopy = 'Ø±Ø§Ø¨Ø· Ø§Ù„Ø¹Ø±Ø¶ Ø§Ù„Ø¯Ø§Ø¦Ù… (AR): ' + demoUrl + '\n' +
                               'Permanent Demo Link (EN): ' + baseUrl + '/x/showcase?k=' + token + '&lang=en\n' +
                               'Admin Tour (Read-Only): ' + adminUrl;
             
             navigator.clipboard.writeText(textToCopy).then(() => {
                 this.copied = true;
-                this.showToast({ type: 'success', title: 'تم النسخ', message: 'تم نسخ روابط العرض الدائمة' });
+                this.showToast({ type: 'success', title: 'ØªÙ… Ø§Ù„Ù†Ø³Ø®', message: 'ØªÙ… Ù†Ø³Ø® Ø±ÙˆØ§Ø¨Ø· Ø§Ù„Ø¹Ø±Ø¶ Ø§Ù„Ø¯Ø§Ø¦Ù…Ø©' });
                 setTimeout(() => { this.copied = false; }, 2000);
             }).catch(() => {
-                this.showToast({ type: 'error', title: 'فشل النسخ', message: 'فشل نسخ الرابط' });
+                this.showToast({ type: 'error', title: 'ÙØ´Ù„ Ø§Ù„Ù†Ø³Ø®', message: 'ÙØ´Ù„ Ù†Ø³Ø® Ø§Ù„Ø±Ø§Ø¨Ø·' });
             });
         },
         
@@ -762,7 +762,7 @@ function baseApp() {
     }
 }
 </script>
-<!-- RBAC helper — injected once, available on every page via rbac('perm') -->
+<!-- RBAC helper â€” injected once, available on every page via rbac('perm') -->
 <script>
 const _RBAC = {{ admin_perms | tojson }};
 function rbac(perm) { return !Object.keys(_RBAC).length || !!_RBAC[perm]; }
@@ -831,3 +831,4 @@ function rbac(perm) { return !Object.keys(_RBAC).length || !!_RBAC[perm]; }
 {% block scripts %}{% endblock %}
 </body>
 </html>
+
