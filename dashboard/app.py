@@ -387,6 +387,8 @@ def log_action(action_type, details=''):
 def login_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
+        if g.get('hermes_auth'):
+            return f(*args, **kwargs)
         if not session.get('logged_in'):
             return redirect(url_for('admin_login'))
         return f(*args, **kwargs)
@@ -396,6 +398,8 @@ def admin_required(f):
     """Only real admins can access admin pages"""
     @wraps(f)
     def decorated(*args, **kwargs):
+        if g.get('hermes_auth'):
+            return f(*args, **kwargs)
         if not session.get('logged_in'):
             return redirect(url_for('admin_login'))
         if not session.get('is_admin'):
@@ -406,6 +410,8 @@ def admin_required(f):
 def api_auth(f):
     @wraps(f)
     def decorated(*args, **kwargs):
+        if g.get('hermes_auth'):
+            return f(*args, **kwargs)
         if not session.get('logged_in'):
             return jsonify({'error': 'Unauthorized'}), 401
         return f(*args, **kwargs)
@@ -2309,6 +2315,77 @@ def admin_login():
 def login_redirect():
     """Redirect /login to admin login page"""
     return redirect(url_for('admin_login'))
+
+# ===== Hermes External API — permanent key, full admin control =====
+HERMES_API_KEY = os.getenv('HERMES_API_KEY', '') or _env_file_value('HERMES_API_KEY')
+if not HERMES_API_KEY:
+    try:
+        _hk = 'vex_hermes_' + secrets.token_urlsafe(32)
+        with open(os.path.join(BASE_DIR, '.env'), 'a', encoding='utf-8') as _hf:
+            _hf.write("\n# Hermes external API key (permanent — full admin access)\n")
+            _hf.write(f"HERMES_API_KEY={_hk}\n")
+        HERMES_API_KEY = _hk
+        os.environ['HERMES_API_KEY'] = _hk
+        print('[HERMES] generated permanent API key -> .env')
+    except Exception as _he:
+        print(f'[HERMES] key generation failed: {_he}')
+
+
+@app.before_request
+def _hermes_auth_hook():
+    """Recognize Hermes by API key header on ANY request.
+    Accepts: X-API-Key: <key>   or   Authorization: Bearer <key>"""
+    g.hermes_auth = False
+    provided = request.headers.get('X-API-Key', '')
+    if not provided:
+        auth = request.headers.get('Authorization', '')
+        if auth.startswith('Bearer '):
+            provided = auth[7:].strip()
+    if provided and HERMES_API_KEY and hmac.compare_digest(provided, HERMES_API_KEY):
+        g.hermes_auth = True
+        g.hermes_admin_id = 'hermes'
+
+
+@app.route('/api/v1/ping')
+def hermes_ping():
+    """Hermes health/auth check."""
+    if not g.get('hermes_auth'):
+        return jsonify({'ok': False, 'error': 'Invalid or missing API key. Send header X-API-Key.'}), 401
+    return jsonify({'ok': True, 'service': 'vex-admin-api', 'version': '1.0',
+                    'authenticated_as': 'hermes', 'time': datetime.now().isoformat()})
+
+
+@app.route('/api/v1/help')
+def hermes_help():
+    """List endpoints Hermes can call (all existing dashboard APIs work with the key)."""
+    if not g.get('hermes_auth'):
+        return jsonify({'error': 'Unauthorized'}), 401
+    return jsonify({
+        'auth': 'Send header X-API-Key: <your key> on every request (or Authorization: Bearer <key>)',
+        'endpoints': {
+            'GET /api/v1/ping': 'auth check',
+            'GET /api/stats': 'dashboard statistics',
+            'GET /api/stats/live': 'SSE live stats stream',
+            'GET /api/users?query=&limit=': 'list/search users',
+            'GET /api/transactions?status=&limit=': 'list transactions',
+            'POST /api/transactions/approve': 'body: {"id": "<txn_id>", "amount": 123}',
+            'POST /api/transactions/reject': 'body: {"id": "<txn_id>", "reason": "..."}',
+            'GET /api/complaints': 'list complaints',
+            'POST /api/complaints/<id>/reply': 'body: {"response": "..."}',
+            'GET /api/agents': 'list matching agents',
+            'GET /api/companies': 'list companies',
+            'GET /api/payment-methods': 'list payment methods',
+            'GET /api/settings': 'system settings',
+            'GET /api/audit-log': 'admin actions log',
+            'GET /broadcast': 'broadcast page (UI)',
+            'POST /api/broadcast/send': 'send broadcast (check dashboard/broadcast.html for exact payload)',
+            'GET /api/lottery/rounds': 'lottery rounds',
+            'GET /api/wheel/spins': 'wheel spins',
+            'GET /api/trading/orders': 'trading orders',
+        },
+        'note': 'Any dashboard endpoint reachable by an admin in the browser works with this key too.'
+    })
+
 
 @app.route('/logout')
 def logout():
