@@ -7612,7 +7612,7 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
 
     @staticmethod
     def _next_cron_time(parsed, after):
-        \"\"\"Find the next time a cron expression matches after a given datetime.\"\"\"
+        """Find the next time a cron expression matches after a given datetime."""
         dt = after + timedelta(minutes=1)
         dt = dt.replace(second=0, microsecond=0)
         for _ in range(525600):  # max 1 year of minutes
