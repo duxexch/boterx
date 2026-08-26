@@ -6647,6 +6647,93 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         _cs = threading.Thread(target=_campaign_scheduler, daemon=True, name='campaign_scheduler')
         _cs.start()
 
+        # ── Cron scheduler thread — evaluates cron expressions every 60s ──
+        def _cron_scheduler_thread():
+            import csv as _csv
+            from datetime import datetime as _dt
+            while True:
+                try:
+                    # Scan broadcast_queue.csv for entries with cron_expr but no scheduled_at
+                    if os.path.exists('broadcast_queue.csv'):
+                        with open('broadcast_queue.csv', 'r', encoding='utf-8-sig') as f:
+                            reader = _csv.DictReader(f)
+                            fieldnames = list(reader.fieldnames or [])
+                            all_rows = list(reader)
+                        for fn in ('cron_expr', 'scheduled_at', 'status'):
+                            if fn not in fieldnames:
+                                fieldnames.append(fn)
+                        changed = False
+                        for row in all_rows:
+                            if row.get('status') == 'pending' and row.get('cron_expr', '').strip() and not row.get('scheduled_at', '').strip():
+                                cron_expr = row['cron_expr'].strip()
+                                parsed = self._parse_cron(cron_expr)
+                                if parsed:
+                                    next_time = self._next_cron_time(parsed, _dt.now())
+                                    if next_time:
+                                        row['scheduled_at'] = next_time.strftime('%Y-%m-%d %H:%M')
+                                        changed = True
+                                        logger.info(f"Cron scheduler: {row.get('id','')} → next fire {row['scheduled_at']}")
+                        if changed:
+                            with open('broadcast_queue.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                                writer = _csv.DictWriter(f, fieldnames=fieldnames)
+                                writer.writeheader()
+                                for row in all_rows:
+                                    writer.writerow({k: row.get(k, '') for k in fieldnames})
+                    # Also scan post_vault.csv for cron entries and create new queue entries
+                    vault_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'post_vault.csv')
+                    if os.path.exists(vault_path):
+                        with open(vault_path, 'r', encoding='utf-8-sig') as f:
+                            reader = _csv.DictReader(f)
+                            vault_rows = list(reader)
+                        for vrow in vault_rows:
+                            cron_expr = (vrow.get('cron_expr') or '').strip()
+                            status = (vrow.get('status') or '').strip()
+                            if status == 'completed' and cron_expr:
+                                # Check if we already have a pending queue entry for this vault
+                                already_pending = any(
+                                    r.get('source_vault_id') == vrow.get('id') and r.get('status') == 'pending'
+                                    for r in all_rows if 'source_vault_id' in r
+                                )
+                                if not already_pending:
+                                    parsed = self._parse_cron(cron_expr)
+                                    if parsed:
+                                        next_time = self._next_cron_time(parsed, _dt.now())
+                                        if next_time:
+                                            # Create new queue entry
+                                            import secrets as _sec
+                                            new_entry = {
+                                                'id': f"CRON{_sec.token_hex(4).upper()}",
+                                                'message': vrow.get('original_text', ''),
+                                                'type': 'channel',
+                                                'platform': 'telegram',
+                                                'target_chat_id': '',
+                                                'platform_account_id': '',
+                                                'target_channel_id': vrow.get('source_channel', ''),
+                                                'created_at': _dt.now().strftime('%Y-%m-%d %H:%M'),
+                                                'created_by': 'cron_scheduler',
+                                                'status': 'pending',
+                                                'target': 'channel',
+                                                'recipient': 'single',
+                                                'priority': vrow.get('priority', 'normal'),
+                                                'country': 'all',
+                                                'media_urls': vrow.get('media_file_id', ''),
+                                                'target_user': '',
+                                                'target_name': '',
+                                                'scheduled_at': next_time.strftime('%Y-%m-%d %H:%M'),
+                                                'cron_expr': cron_expr,
+                                                'source_vault_id': vrow.get('id', ''),
+                                            }
+                                            all_rows.append(new_entry)
+                                            changed = True
+                                            logger.info(f"Cron scheduler: vault {vrow.get('id','')} → new queue entry at {new_entry['scheduled_at']}")
+                except Exception as exc:
+                    logger.error("cron_scheduler: %s", exc)
+                time.sleep(60)
+
+        _cron_t = threading.Thread(target=_cron_scheduler_thread, daemon=True, name='cron_scheduler')
+        _cron_t.start()
+        logger.info("[CRON] Cron scheduler thread started (60s interval)")
+
         # ── Periodic stale-semaphore cleanup ─────────────────────────────────
         def _cleanup_sems():
             while True:
@@ -7480,6 +7567,84 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
     CAMPAIGN_REPEAT_COOLDOWN_H = 4
     CAMPAIGN_REPEAT_MAX_RUNS = 30   # سقف جولات التكرار (توقف تلقائي)
 
+    # ═══ Cron Expression Parser ═══
+    @staticmethod
+    def _parse_cron(expr):
+        """Parse cron expression: minute hour day month weekday
+        Returns dict with lists of valid values, or None if invalid."""
+        parts = expr.strip().split()
+        if len(parts) != 5:
+            return None
+        result = {}
+        fields = ['minute', 'hour', 'day', 'month', 'weekday']
+        ranges = [(0, 59), (0, 23), (1, 31), (1, 12), (0, 6)]
+        for i, (field, (lo, hi)) in enumerate(zip(fields, ranges)):
+            val = parts[i]
+            values = set()
+            for part in val.split(','):
+                part = part.strip()
+                if part == '*':
+                    values.update(range(lo, hi + 1))
+                elif '/' in part:
+                    base, step = part.split('/', 1)
+                    step = int(step)
+                    if base == '*':
+                        start = lo
+                    else:
+                        start = int(base)
+                    values.update(range(start, hi + 1, step))
+                elif '-' in part:
+                    a, b = part.split('-', 1)
+                    values.update(range(int(a), int(b) + 1))
+                else:
+                    values.add(int(part))
+            result[field] = sorted(values)
+        return result
+
+    @staticmethod
+    def _cron_matches(parsed, dt):
+        """Check if a datetime matches a parsed cron expression."""
+        return (dt.minute in parsed['minute'] and
+                dt.hour in parsed['hour'] and
+                dt.day in parsed['day'] and
+                dt.month in parsed['month'] and
+                dt.weekday() in parsed['weekday'])
+
+    @staticmethod
+    def _next_cron_time(parsed, after):
+        \"\"\"Find the next time a cron expression matches after a given datetime.\"\"\"
+        dt = after + timedelta(minutes=1)
+        dt = dt.replace(second=0, microsecond=0)
+        for _ in range(525600):  # max 1 year of minutes
+            if (dt.minute in parsed['minute'] and
+                dt.hour in parsed['hour'] and
+                dt.day in parsed['day'] and
+                dt.month in parsed['month'] and
+                dt.weekday() in parsed['weekday']):
+                return dt
+            dt += timedelta(minutes=1)
+        return None
+
+    def _send_to_channel_group(self, group_id, msg, media_urls):
+        """نشر لمجموعة قنوات (channel_groups.csv) — بالriosف اليومية لكل قناة
+        Now supports nested groups (sub-groups)."""
+        import csv as _csv
+        try:
+            with open('channel_groups.csv', 'r', encoding='utf-8-sig') as f:
+                for row in _csv.DictReader(f):
+                    if row.get('id') == group_id or row.get('name') == group_id:
+                        ids = [i.strip() for i in (row.get('channel_ids', '') or '').split('|') if i.strip()]
+                        for cid in ids:
+                            # Check if this ID is a sub-group (starts with GRP)
+                            if cid.startswith('GRP'):
+                                self._send_to_channel_group(cid, msg, media_urls)
+                            else:
+                                ok, reason = self._post_to_single_channel(cid, msg, media_urls)
+                                logger.info(f"Group {group_id} -> {cid}: {reason}")
+                        return True
+        except Exception as e:
+            logger.error(f"channel group {group_id}: {e}")
+        return False
     def _spin_text(self, text):
         """غزل Spintax: '{مرحبا|أهلا}' → اختيار عشوائي — كل تكرار بصياغة مختلفة
         (النص المتطابق المتكرر هو أوضح إشارة حظر في تيليجرام)"""
@@ -7614,8 +7779,20 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         t = _th.Thread(target=_do_process, daemon=True)
         t.start()
 
-    # سقف النشر اليومي لكل قناة — تجاوزه يأجل الإرسال لليوم التالي (مضاد حظر)
+    # ═══ Smart Posting Configuration ═══
     CHANNEL_DAILY_CAP = 12
+    # تأخير بين كل منشور وال التالي (ثوانٍ) — يمنع الحظر
+    INTER_POST_DELAY_MIN = 3.0
+    INTER_POST_DELAY_MAX = 7.0
+    # تأخير إضافي بين مجموعات القنوات (ثوانٍ)
+    INTER_GROUP_DELAY_MIN = 15.0
+    INTER_GROUP_DELAY_MAX = 30.0
+    # السقف اليومي الافتراضي لكل قناة (يُخصم من relay_log)
+    DEFAULT_DAILY_CAP = 12
+    # AI monitoring enabled (can be toggled from dashboard)
+    AI_POSTING_MONITOR = True
+    # Posting statistics for AI monitoring
+    _posting_stats = {'total_posts': 0, 'failures': 0, 'rate_limits': 0, 'last_post_at': None, 'last_error': None}
 
     def _channel_posts_today(self, chat_id):
         """عدد منشورات قناة اليوم من سجل relay_log"""
@@ -7691,6 +7868,7 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         return sent_ok, 'ok' if sent_ok else 'send_failed'
 
     def _process_broadcast_queue_inner(self):
+        """Smart broadcast queue processor — delays between posts, cron evaluation, daily caps."""
         if not os.path.exists('broadcast_queue.csv'):
             return
         try:
@@ -7700,7 +7878,7 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             with open('broadcast_queue.csv', 'r', encoding='utf-8-sig') as f:
                 reader = csv.DictReader(f)
                 fieldnames = list(reader.fieldnames or ['id','message','target','recipient','priority','country','media_urls','target_user','target_name','created_at','created_by','status'])
-                for fn in ('type', 'target_chat_id', 'target_user_id', 'scheduled_at', 'platform', 'platform_account_id', 'target_channel_id'):
+                for fn in ('type', 'target_chat_id', 'target_user_id', 'scheduled_at', 'platform', 'platform_account_id', 'target_channel_id', 'cron_expr', 'group_id', 'delay_override'):
                     if fn not in fieldnames:
                         fieldnames.append(fn)
                 for row in reader:
@@ -7709,8 +7887,15 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                     else:
                         rows.append(row)
 
+            first_entry = True
+            posts_this_cycle = 0
+            MAX_POSTS_PER_CYCLE = 20  # limit per 30s cycle
+
             for item in pending:
-                # تحصين: صفوف قديمة بحقول ناقصة تقرأ None — لا .strip() على None
+                if posts_this_cycle >= MAX_POSTS_PER_CYCLE:
+                    rows.append(item)  # leave for next cycle
+                    continue
+
                 g = lambda k, d='': (item.get(k) or d)
                 msg = g('message')
                 recipient_type = g('recipient', 'all')
@@ -7721,12 +7906,27 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                 item_id = g('id')
                 platform = g('platform', '').strip().lower() or 'telegram'
                 platform_account_id = g('platform_account_id').strip()
-                # ── التوجيه الحرج: منشور موجّه لقناة/مجموعة محددة ──
                 target_chat = g('target_chat_id').strip()
                 target_channel_id = g('target_channel_id').strip()
                 entry_type = g('type').strip().lower()
+                cron_expr = g('cron_expr').strip()
 
-                # احترام الجدولة إذا تاريخها بالمستقبل
+                # ── Cron: evaluate and set scheduled_at if not yet set ──
+                if cron_expr and not g('scheduled_at').strip():
+                    parsed = self._parse_cron(cron_expr)
+                    if parsed:
+                        next_time = self._next_cron_time(parsed, _dt.now())
+                        if next_time:
+                            item['scheduled_at'] = next_time.strftime('%Y-%m-%d %H:%M')
+                            rows.append(item)
+                            logger.info(f"Cron {item_id}: next fire at {item['scheduled_at']}")
+                            continue
+                        else:
+                            item['status'] = 'failed'
+                            rows.append(item)
+                            continue
+
+                # ── Scheduled-at check ──
                 scheduled_at = g('scheduled_at').strip()
                 if scheduled_at:
                     due = None
@@ -7741,9 +7941,19 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                         continue
 
                 if not msg and not media_urls:
-                    item['status'] = 'failed'   # صف تالف/فارغ — لا يعلّق الدورة
+                    item['status'] = 'failed'
                     rows.append(item)
                     continue
+
+                # ── Inter-entry delay (skip first) ──
+                if not first_entry:
+                    delay = random.uniform(self.INTER_POST_DELAY_MIN, self.INTER_POST_DELAY_MAX)
+                    # AI monitor: slow down if recent failures
+                    if self.AI_POSTING_MONITOR and self._posting_stats.get('failures', 0) > 3:
+                        delay *= 2.0  # double delay after repeated failures
+                    time.sleep(delay)
+                first_entry = False
+
                 try:
                     if target_chat or entry_type in ('channel', 'chat'):
                         if not target_chat and target_channel_id:
@@ -7774,27 +7984,35 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                             ok, reason = self._send_whatsapp_message(target_chat, send_msg, media_urls, platform_account_id)
                         elif platform == 'webhook':
                             ok, reason = self._send_webhook_message(
-                                target_chat,
-                                send_msg,
-                                media_urls,
-                                platform_account_id,
+                                target_chat, send_msg, media_urls, platform_account_id,
                                 meta={'entry_type': entry_type, 'target_channel_id': target_channel_id, 'queue_id': item_id}
                             )
                         else:
                             ok, reason = self._post_to_single_channel(target_chat, send_msg, media_urls)
 
                         if reason == 'daily_cap':
-                            # تجاوز السقف اليومي — أبقِه معلقاً لمحاولة الغد
                             rows.append(item)
                             continue
                         item['status'] = 'sent' if ok else 'failed'
                         rows.append(item)
+                        posts_this_cycle += 1
+                        self._posting_stats['total_posts'] += 1
+                        self._posting_stats['last_post_at'] = _dt.now().isoformat()
+                        if not ok:
+                            self._posting_stats['failures'] += 1
+                            if reason == 'flood' or '429' in str(reason):
+                                self._posting_stats['rate_limits'] += 1
+                                self._posting_stats['last_error'] = f"rate_limit at {_dt.now().isoformat()}"
+                        else:
+                            self._posting_stats['failures'] = max(0, self._posting_stats['failures'] - 1)
                         logger.info(f"Queue {item_id} → channel {target_chat}: {'sent' if ok else reason}")
                         continue
                 except Exception as e:
                     logger.error(f"خطأ في إرسال قناة {item_id}: {e}")
                     item['status'] = 'failed'
                     rows.append(item)
+                    self._posting_stats['failures'] += 1
+                    self._posting_stats['last_error'] = str(e)
                     continue
 
                 try:
@@ -7808,30 +8026,27 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                             item['status'] = 'sent' if sent > 0 else 'failed'
                     elif platform == 'webhook':
                         if recipient_type == 'single' and target_user:
-                            ok, _ = self._send_webhook_message(
-                                target_user,
-                                msg,
-                                media_urls,
-                                platform_account_id,
-                                meta={'recipient_type': 'single', 'queue_id': item_id}
-                            )
+                            ok, _ = self._send_webhook_message(target_user, msg, media_urls, platform_account_id,
+                                                               meta={'recipient_type': 'single', 'queue_id': item_id})
                             item['status'] = 'sent' if ok else 'failed'
                         else:
                             sent, failed = self._send_webhook_to_all(msg, media_urls, country_filter, platform_account_id)
                             item['status'] = 'sent' if sent > 0 else 'failed'
                     elif recipient_type == 'single' and target_user:
-                        # ── إرسال فردي تيليغرام ──
                         self._send_broadcast_to_user(target_user, msg, media_urls)
                         item['status'] = 'sent'
                     else:
-                        # ── إرسال جماعي تيليغرام (مع فلتر دولة) ──
                         self._send_broadcast_to_all(msg, media_urls, country_filter)
                         item['status'] = 'sent'
+                    posts_this_cycle += 1
+                    self._posting_stats['total_posts'] += 1
+                    self._posting_stats['last_post_at'] = _dt.now().isoformat()
                 except Exception as e:
                     logger.error(f"خطأ في إرسال {item_id}: {e}")
                     item['status'] = 'failed'
+                    self._posting_stats['failures'] += 1
+                    self._posting_stats['last_error'] = str(e)
                 rows.append(item)
-            # نهاية الحلقة
 
             with open('broadcast_queue.csv', 'w', newline='', encoding='utf-8-sig') as f:
                 writer = csv.DictWriter(f, fieldnames=fieldnames)
@@ -7841,21 +8056,7 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         except Exception as e:
             logger.error(f"خطأ في _process_broadcast_queue: {e}")
 
-    def _send_to_channel_group(self, group_id, msg, media_urls):
-        """نشر لمجموعة قنوات (channel_groups.csv) — بالسقوف اليومية لكل قناة"""
-        import csv as _csv
-        try:
-            with open('channel_groups.csv', 'r', encoding='utf-8-sig') as f:
-                for row in _csv.DictReader(f):
-                    if row.get('id') == group_id or row.get('name') == group_id:
-                        ids = [i.strip() for i in (row.get('channel_ids', '') or '').split('|') if i.strip()]
-                        for cid in ids:
-                            ok, reason = self._post_to_single_channel(cid, msg, media_urls)
-                            logger.info(f"Group {group_id} -> {cid}: {reason}")
-                        return True
-        except Exception as e:
-            logger.error(f"channel group {group_id}: {e}")
-        return False
+
 
     def _send_broadcast_to_user(self, chat_id, msg, media_urls):
         """إرسال بث لمستخدم واحد — نص + وسائط متعددة، crash-safe"""

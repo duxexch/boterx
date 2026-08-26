@@ -579,16 +579,42 @@
         </div>
     </div>
 
-    <!-- TAB: Groups -->
+    <!-- TAB: Groups — Nested hierarchy -->
     <div x-show="tab === 'groups'" class="space-y-4">
-        <button @click="showGroupModal = true" class="btn btn-primary btn-sm">➕ إنشاء مجموعة</button>
-        <template x-for="g in groups" :key="g.id">
+        <div class="flex items-center gap-2">
+            <button @click="showGroupModal = true" class="btn btn-primary btn-sm">➕ إنشاء مجموعة</button>
+            <button @click="loadGroups()" class="btn btn-sm" style="background:#475569">🔄 تحديث</button>
+        </div>
+        <!-- Root groups (no parent) -->
+        <template x-for="g in groups.filter(x => !x.parent_id || !groups.find(y => y.id === x.parent_id))" :key="g.id">
             <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
-                <div class="flex justify-between items-start"><div><h3 class="font-bold" x-text="g.name"></h3><p class="text-xs text-slate-400" x-text="g.description || '—'"></p><p class="text-xs text-slate-500 mt-1" x-text="'القنوات: ' + (g.channel_ids || '').split('|').length"></p></div><button @click="deleteGroup(g.id)" class="btn btn-danger btn-sm" data-i18n="delete">Delete</button></div>
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h3 class="font-bold" x-text="g.name"></h3>
+                        <p class="text-xs text-slate-400" x-text="g.description || '—'"></p>
+                        <div class="flex gap-2 mt-1 flex-wrap">
+                            <span class="text-xs px-2 py-0.5 rounded bg-slate-600 text-slate-300" x-text="(g.channel_ids || '').split('|').filter(c => c && !c.startsWith('GRP')).length + ' قناة'"></span>
+                            <template x-if="(g.channel_ids || '').split('|').filter(c => c && c.startsWith('GRP')).length > 0">
+                                <span class="text-xs px-2 py-0.5 rounded bg-purple-600/30 text-purple-300" x-text="(g.channel_ids || '').split('|').filter(c => c.startsWith('GRP')).length + ' مجموعة فرعية'"></span>
+                            </template>
+                        </div>
+                        <!-- Sub-groups -->
+                        <div x-show="groups.filter(x => x.parent_id === g.id).length > 0" class="mt-2 pl-4 border-l-2 border-slate-600 space-y-1">
+                            <template x-for="sub in groups.filter(x => x.parent_id === g.id)" :key="sub.id">
+                                <div class="flex items-center gap-2 text-xs">
+                                    <span class="text-slate-500">└─</span>
+                                    <span class="text-slate-300" x-text="sub.name"></span>
+                                    <span class="text-slate-500" x-text="'(' + (sub.channel_ids || '').split('|').filter(c => c && !c.startsWith('GRP')).length + ')'"></span>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                    <button @click="deleteGroup(g.id)" class="btn btn-danger btn-sm" data-i18n="delete">Delete</button>
+                </div>
             </div>
         </template>
         <p x-show="groups.length === 0" class="text-center text-slate-400 p-8">لا توجد مجموعات</p>
-        <div x-show="showGroupModal" class="modal-overlay" @click.self="showGroupModal = false" style="display:none"><div class="modal"><h3 class="font-bold text-lg mb-4">إنشاء مجموعة قنوات</h3><input type="text" x-model="groupForm.name" class="input w-full mb-2" placeholder="اسم المجموعة"><input type="text" x-model="groupForm.description" class="input w-full mb-2" placeholder="الوصف"><div class="max-h-40 overflow-y-auto space-y-1 mb-3"><template x-for="ch in channels" :key="ch.id"><label class="flex items-center gap-2 p-1 hover:bg-slate-700 rounded cursor-pointer"><input type="checkbox" :value="ch.id" x-model="groupForm.selectedIds"><span x-text="ch.title"></span></label></template></div><div class="flex gap-2 justify-end"><button @click="showGroupModal = false" class="btn btn-sm" style="background:#475569" data-i18n="cancel">Cancel</button><button @click="createGroup()" class="btn btn-primary btn-sm">إنشاء</button></div></div></div>
+        <div x-show="showGroupModal" class="modal-overlay" @click.self="showGroupModal = false" style="display:none"><div class="modal"><h3 class="font-bold text-lg mb-4">إنشاء مجموعة قنوات</h3><input type="text" x-model="groupForm.name" class="input w-full mb-2" placeholder="اسم المجموعة"><input type="text" x-model="groupForm.description" class="input w-full mb-2" placeholder="الوصف"><div class="mb-2"><label class="text-xs text-slate-400">المجموعة الأب (اختياري — لإنشاء مجموعة فرعية)</label><select x-model="groupForm.parentId" class="input w-full"><option value="">— بدون أب —</option><template x-for="g in groups.filter(x => !x.parent_id)" :key="g.id"><option :value="g.id" x-text="g.name"></option></template></select></div><div class="max-h-40 overflow-y-auto space-y-1 mb-3"><template x-for="ch in channels" :key="ch.id"><label class="flex items-center gap-2 p-1 hover:bg-slate-700 rounded cursor-pointer"><input type="checkbox" :value="ch.id" x-model="groupForm.selectedIds"><span x-text="ch.title"></span></label></template></div><div class="flex gap-2 justify-end"><button @click="showGroupModal = false" class="btn btn-sm" style="background:#475569" data-i18n="cancel">Cancel</button><button @click="createGroup()" class="btn btn-primary btn-sm">إنشاء</button></div></div></div>
     </div>
 
     <!-- TAB: Vault -->
@@ -964,7 +990,7 @@ function channelsApp() {
         sourceForm: { title: '', chat_id: '', target_channel_ids: '', content_filter: 'all', ai_edit_text: true, ai_edit_media: false },
         replacements: [], vaultSearch: '', filterCategory: '',
         showGroupModal: false, showAddChannelModal: false, showCampaignModal: false,
-        groupForm: { name: '', description: '', selectedIds: [] },
+        groupForm: { name: '', description: '', selectedIds: [], parentId: '' },
         addChannelForm: { title: '', chat_id: '', type: 'channel', platform: 'telegram', channel_role: 'both', owner_admin_id: '', managed_by_admin_ids: '', category: '' },
         cmpForm: { name: '', message: '', mediaList: [], target: 'telegram', recipient: 'all', priority: 'normal', country: 'all', repeat: 'once', scheduled_at: '', platform_account_id: '', uploading: false, selectedChannels: [], selectedGroups: [], whatsappApi: '', whatsappContacts: '', whatsappGroups: '' },
         cmpWizardStep: 1, generating: false, creating: false,
@@ -1030,6 +1056,8 @@ function channelsApp() {
 
         async loadChannels() { try { const d = await api('/api/channels'); this.channels = d.channels || []; } catch(e) {} },
         async loadGroups() { try { const d = await api('/api/channel-groups'); this.groups = d.groups || []; } catch(e) {} },
+        postingStats: null,
+        async loadPostingStats() { try { this.postingStats = await api('/api/posting/stats'); } catch(e) {} },
         async loadVault() { 
             const params = this.vaultSearch ? '?search=' + encodeURIComponent(this.vaultSearch) : ''; 
             try { 
@@ -1068,7 +1096,7 @@ function channelsApp() {
         async postToChannel(ch) { if (!ch.postText) return toast('اكتب رسالة', 'warning'); try { await api(`/api/channels/${ch.id}/post`, { method: 'POST', body: JSON.stringify({ message: ch.postText, media_urls: [] }) }); ch.postText = ''; toast('تم الإرسال — مؤرشفة ✅', 'success'); await this.loadVault(); } catch(e) { toast('فشل الإرسال', 'error'); } },
         async deleteChannel(ch) { if (!confirm('حذف؟')) return; try { await api(`/api/channels/${ch.id}`, { method: 'DELETE' }); await this.loadChannels(); } catch(e) {} },
 
-        async createGroup() { if (!this.groupForm.name) return toast('اكتب اسم', 'warning'); const ids = this.groupForm.selectedIds.join('|'); try { await api('/api/channel-groups', { method: 'POST', body: JSON.stringify({ name: this.groupForm.name, description: this.groupForm.description, channel_ids: ids }) }); this.showGroupModal = false; this.groupForm = { name: '', description: '', selectedIds: [] }; await this.loadGroups(); } catch(e) {} },
+        async createGroup() { if (!this.groupForm.name) return toast('اكتب اسم', 'warning'); const ids = this.groupForm.selectedIds.join('|'); try { await api('/api/channel-groups', { method: 'POST', body: JSON.stringify({ name: this.groupForm.name, description: this.groupForm.description, channel_ids: ids, parent_id: this.groupForm.parentId || '' }) }); this.showGroupModal = false; this.groupForm = { name: '', description: '', selectedIds: [], parentId: '' }; await this.loadGroups(); } catch(e) {} },
         async deleteGroup(id) { if (!confirm('حذف؟')) return; try { await api(`/api/channel-groups/${id}`, { method: 'DELETE' }); await this.loadGroups(); } catch(e) {} },
 
         async repost(id) { try { await api(`/api/post-vault/${id}/repost`, { method: 'POST', body: '{}' }); toast('تمت الإعادة', 'success'); } catch(e) {} },
@@ -1471,6 +1499,41 @@ function channelsApp() {
 {% endblock %}
 
 
+<!-- ===== SMART POSTING MONITOR ===== -->
+<div x-show="tab === 'groups' && postingStats" class="bg-slate-800 rounded-xl border border-slate-700 p-4 mt-4">
+    <div class="flex items-center justify-between mb-3">
+        <h3 class="font-bold text-sm">📊 مراقبة النشر الذكي</h3>
+        <button @click="loadPostingStats()" class="text-xs text-slate-400 hover:text-white">🔄</button>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div class="bg-slate-900/50 rounded-lg p-3 text-center">
+            <div class="text-xl font-bold text-blue-400" x-text="postingStats?.queue_pending || 0"></div>
+            <div class="text-[10px] text-slate-500">⏳ في الانتظار</div>
+        </div>
+        <div class="bg-slate-900/50 rounded-lg p-3 text-center">
+            <div class="text-xl font-bold text-green-400" x-text="Object.keys(postingStats?.today_posts || {}).length"></div>
+            <div class="text-[10px] text-slate-500">📡 قنوات نشرت اليوم</div>
+        </div>
+        <div class="bg-slate-900/50 rounded-lg p-3 text-center">
+            <div class="text-xl font-bold text-yellow-400" x-text="Object.values(postingStats?.today_posts || {}).reduce((a,b)=>a+b, 0)"></div>
+            <div class="text-[10px] text-slate-500">📝 إجمالي منشورات اليوم</div>
+        </div>
+        <div class="bg-slate-900/50 rounded-lg p-3 text-center">
+            <div class="text-xl font-bold text-red-400" x-text="postingStats?.queue_total - postingStats?.queue_pending || 0"></div>
+            <div class="text-[10px] text-slate-500">✅ تم الإرسال</div>
+        </div>
+    </div>
+    <!-- Per-channel today posts -->
+    <div x-show="postingStats && postingStats.today_posts && Object.keys(postingStats.today_posts).length > 0" class="mt-3">
+        <div class="text-xs text-slate-400 mb-1">النشر اليومي لكل قناة:</div>
+        <div class="flex flex-wrap gap-1">
+            <template x-for="(count, cid) in (postingStats?.today_posts || {})" :key="cid">
+                <span class="text-[10px] px-2 py-0.5 rounded bg-slate-700 text-slate-300" x-text="cid + ': ' + count"></span>
+            </template>
+        </div>
+    </div>
+</div>
+
 <!-- ===== POST COMPOSER MODAL ===== -->
 <div x-show="showPostComposer" class="modal-overlay" @click.self="closePostComposer()" style="display:none" x-cloak>
     <div class="modal max-w-4xl">
@@ -1547,12 +1610,26 @@ function channelsApp() {
             </div>
         </div>
 
-        <!-- Target Selection: Groups -->
+        <!-- Target Selection: Groups — root + nested -->
         <div class="mb-4" x-show="groups.length > 0">
             <label class="block text-sm text-slate-400 mb-1">👥 مجموعات القنوات</label>
-            <div class="flex flex-wrap gap-2">
-                <template x-for="grp in groups" :key="grp.id">
-                    <button @click="togglePostGroup(grp)" class="px-3 py-1.5 rounded-lg text-sm transition" :class="postForm.groupIds.includes(grp.id) ? 'bg-purple-500/20 border border-purple-500/30 text-purple-300' : 'bg-slate-800 border border-slate-600 text-slate-400 hover:border-slate-500'" x-text="grp.name"></button>
+            <div class="space-y-2">
+                <!-- Root groups -->
+                <template x-for="grp in groups.filter(x => !x.parent_id || !groups.find(y => y.id === x.parent_id))" :key="grp.id">
+                    <div>
+                        <button @click="togglePostGroup(grp)" class="px-3 py-1.5 rounded-lg text-sm transition" :class="postForm.groupIds.includes(grp.id) ? 'bg-purple-500/20 border border-purple-500/30 text-purple-300' : 'bg-slate-800 border border-slate-600 text-slate-400 hover:border-slate-500'">
+                            <span x-text="grp.name"></span>
+                            <span class="text-[10px] ml-1 opacity-60" x-text="'(' + (grp.channel_ids||'').split('|').filter(c=>c&&!c.startsWith('GRP')).length + ')'"></span>
+                        </button>
+                        <!-- Sub-groups -->
+                        <template x-for="sub in groups.filter(x => x.parent_id === grp.id)" :key="sub.id">
+                            <button @click="togglePostGroup(sub)" class="ml-4 px-3 py-1 rounded-lg text-xs transition" :class="postForm.groupIds.includes(sub.id) ? 'bg-purple-500/20 border border-purple-500/30 text-purple-300' : 'bg-slate-800/50 border border-slate-600 text-slate-500 hover:border-slate-500'">
+                                <span>└─</span>
+                                <span x-text="sub.name"></span>
+                                <span class="ml-1 opacity-60" x-text="'(' + (sub.channel_ids||'').split('|').filter(c=>c&&!c.startsWith('GRP')).length + ')'"></span>
+                            </button>
+                        </template>
+                    </div>
                 </template>
             </div>
         </div>

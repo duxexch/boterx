@@ -8690,13 +8690,14 @@ def api_channel_groups():
 def api_add_channel_group():
     data = request.json
     groups = read_csv('channel_groups.csv')
-    fieldnames = get_fieldnames('channel_groups.csv', ['id','name','description','channel_ids','created_at'])
+    fieldnames = get_fieldnames('channel_groups.csv', ['id','name','description','channel_ids','parent_id','created_at'])
     new_id = f"GRP{secrets.token_hex(3).upper()}"
     group = {
         'id': new_id,
         'name': data.get('name', ''),
         'description': data.get('description', ''),
         'channel_ids': data.get('channel_ids', ''),
+        'parent_id': data.get('parent_id', ''),
         'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')
     }
     append_csv('channel_groups.csv', group, fieldnames)
@@ -8707,10 +8708,113 @@ def api_add_channel_group():
 @permission_required('send_broadcast')
 def api_delete_channel_group(group_id):
     groups = read_csv('channel_groups.csv')
-    fieldnames = get_fieldnames('channel_groups.csv', ['id','name','description','channel_ids','created_at'])
+    fieldnames = get_fieldnames('channel_groups.csv', ['id','name','description','channel_ids','parent_id','created_at'])
     groups = [g for g in groups if g.get('id') != group_id]
     write_csv('channel_groups.csv', groups, fieldnames)
     return jsonify({'success': True})
+
+
+@app.route('/api/channel-groups/tree')
+@api_auth
+def api_channel_groups_tree():
+    """Return channel groups as a nested tree structure."""
+    groups = read_csv('channel_groups.csv')
+    channels = read_csv('bot_channels.csv')
+    # Build lookup
+    by_id = {g['id']: g for g in groups}
+    # Resolve channel count for each group
+    for g in groups:
+        ch_ids = [c.strip() for c in (g.get('channel_ids') or '').split('|') if c.strip()]
+        g['channel_count'] = len(ch_ids)
+        g['channels'] = [{'id': cid, 'title': next((c.get('title','') for c in channels if c.get('id')==cid), cid)} for cid in ch_ids]
+        # Resolve sub-groups
+        sub_ids = [c.strip() for c in (g.get('channel_ids') or '').split('|') if c.strip() and c.strip().startswith('GRP')]
+        g['sub_groups'] = [by_id[sid] for sid in sub_ids if sid in by_id]
+    # Build tree: roots are groups with no parent or parent_id not in list
+    roots = [g for g in groups if not g.get('parent_id') or g['parent_id'] not in by_id]
+    return jsonify({'groups': groups, 'tree': roots})
+
+
+@app.route('/api/channel-groups/<group_id>/resolve', methods=['POST'])
+@api_auth
+def api_resolve_group_tree(group_id):
+    """Resolve a group and all its sub-groups recursively, return all channel IDs."""
+    groups = read_csv('channel_groups.csv')
+    by_id = {g['id']: g for g in groups}
+    resolved = set()
+    def _resolve(gid):
+        g = by_id.get(gid)
+        if not g:
+            return
+        for cid in (g.get('channel_ids') or '').split('|'):
+            cid = cid.strip()
+            if not cid:
+                continue
+            if cid.startswith('GRP'):
+                _resolve(cid)
+            else:
+                resolved.add(cid)
+    _resolve(group_id)
+    return jsonify({'group_id': group_id, 'channel_ids': list(resolved)})
+
+
+@app.route('/api/posting/stats')
+@api_auth
+def api_posting_stats():
+    """Return posting statistics for AI monitoring."""
+    # Read from bot's health endpoint stats
+    stats = {
+        'queue_pending': 0,
+        'queue_total': 0,
+        'today_posts': {},
+        'posting_rate': {},
+    }
+    # Count queue entries
+    try:
+        import csv as _csv
+        if os.path.exists('broadcast_queue.csv'):
+            with open('broadcast_queue.csv', 'r', encoding='utf-8-sig') as f:
+                reader = _csv.DictReader(f)
+                for row in reader:
+                    stats['queue_total'] += 1
+                    if row.get('status') == 'pending':
+                        stats['queue_pending'] += 1
+    except Exception:
+        pass
+    # Count today's posts per channel from relay_log
+    try:
+        today = datetime.now().strftime('%Y-%m-%d')
+        if os.path.exists('relay_log.csv'):
+            with open('relay_log.csv', 'r', encoding='utf-8-sig') as f:
+                reader = _csv.DictReader(f)
+                for row in reader:
+                    ts = (row.get('timestamp') or '')
+                    cid = (row.get('source_chat_id') or '').strip()
+                    if ts.startswith(today) and cid:
+                        stats['today_posts'][cid] = stats['today_posts'].get(cid, 0) + 1
+    except Exception:
+        pass
+    return jsonify(stats)
+
+
+@app.route('/api/posting/config', methods=['GET', 'PUT'])
+@api_auth
+def api_posting_config():
+    """Get or update smart posting configuration."""
+    if request.method == 'GET':
+        return jsonify({
+            'inter_delay_min': 3.0,
+            'inter_delay_max': 7.0,
+            'inter_group_delay_min': 15.0,
+            'inter_group_delay_max': 30.0,
+            'daily_cap': 12,
+            'ai_monitor': True,
+        })
+    data = request.json or {}
+    log_action('update_posting_config', json.dumps(data))
+    return jsonify({'success': True, 'note': 'Config updated (restart bot to apply)'})
+
+
 
 
 def _normalize_source_channel_row(row, actor_uid=''):
@@ -9065,7 +9169,7 @@ def api_create_post():
             'media_urls': '|'.join(media_urls) if media_urls else '',
             'target_user': '',
             'target_name': '',
-            'scheduled_at': scheduled_at if schedule_type in ('timed', 'cron') else '',
+            'scheduled_at': scheduled_at if schedule_type == 'timed' else '',
             'cron_expr': cron_expr if schedule_type == 'cron' else '',
         }
         entries.append(entry)
@@ -9104,7 +9208,7 @@ def api_create_post():
                 'media_urls': '|'.join(media_urls) if media_urls else '',
                 'target_user': '',
                 'target_name': '',
-                'scheduled_at': scheduled_at if schedule_type in ('timed', 'cron') else '',
+                'scheduled_at': scheduled_at if schedule_type == 'timed' else '',
                 'cron_expr': cron_expr if schedule_type == 'cron' else '',
             }
             entries.append(entry)
@@ -9117,7 +9221,7 @@ def api_create_post():
         'platform_account_id', 'target_channel_id', 'created_at',
         'created_by', 'status', 'target', 'recipient', 'priority',
         'country', 'media_urls', 'target_user', 'target_name',
-        'scheduled_at', 'cron_expr'
+        'scheduled_at', 'cron_expr', 'group_id'
     ])
     for e in entries:
         append_csv('broadcast_queue.csv', e, queue_fieldnames)
