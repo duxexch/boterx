@@ -271,6 +271,18 @@ const I18N = {
         clicks: 'النقرات', reach: 'الوصول', daily_reach: 'الوصول اليومي',
         last_sync: 'آخر مزامنة', revenue_share: 'نسبة الأرباح',
         top_campaigns: 'أفضل الحملات', pending_matches: 'مطابقات معلقة',
+        // Campaign wizard
+        create_campaign: '📊 إنشاء حملة إعلانية',
+        campaign_wizard_content: '💬 المحتوى', campaign_wizard_platform: '🎯 المنصة',
+        campaign_wizard_audience: '👥 الجمهور', campaign_wizard_schedule: '⏰ الجدولة',
+        running: 'جاري التنفيذ', completed: 'مكتملة', failed: 'فشلت',
+        draft: 'مسودة', scheduled: 'مجدولة',
+        active_campaigns: 'نشطة', new_campaign: '➕ حملة جديدة',
+        no_campaigns: 'لا توجد حملات — أنشئ حملتك الأولى',
+        total_reach: 'إجمالي الوصول',
+        campaign_preview: '👁️ معاينة الحملة', launch_now: '🚀 إطلاق الآن',
+        select_all: 'تحديد الكل', clear_all: 'مسح الكل',
+        previous: 'السابق', next: 'التالي',
     },
     en: {
         // Sidebar
@@ -534,6 +546,18 @@ const I18N = {
         clicks: 'Clicks', reach: 'Reach', daily_reach: 'Daily reach',
         last_sync: 'Last sync', revenue_share: 'Revenue Share',
         top_campaigns: 'Top Campaigns', pending_matches: 'Pending Matches',
+        // Campaign wizard
+        create_campaign: '📊 Create Ad Campaign',
+        campaign_wizard_content: '💬 Content', campaign_wizard_platform: '🎯 Platform',
+        campaign_wizard_audience: '👥 Audience', campaign_wizard_schedule: '⏰ Schedule',
+        running: 'Running', completed: 'Completed', failed: 'Failed',
+        draft: 'Draft', scheduled: 'Scheduled',
+        active_campaigns: 'Active', new_campaign: '➕ New Campaign',
+        no_campaigns: 'No campaigns — create your first one',
+        total_reach: 'Total Reach',
+        campaign_preview: '👁️ Campaign Preview', launch_now: '🚀 Launch Now',
+        select_all: 'Select All', clear_all: 'Clear All',
+        previous: 'Previous', next: 'Next',
     }
 };
 
