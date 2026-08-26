@@ -107,36 +107,50 @@
     <!-- TAB: Campaigns -->
     <div x-show="tab === 'campaigns'" class="space-y-4">
         <div class="flex justify-between items-center flex-wrap gap-2">
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">إجمالي الحملات</p><p class="text-xl font-bold text-amber-400" x-text="campaigns.length">0</p></div>
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+                <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">إجمالي</p><p class="text-xl font-bold text-amber-400" x-text="campaigns.length">0</p></div>
                 <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">نشطة</p><p class="text-xl font-bold text-green-400" x-text="campaigns.filter(c => c.status === 'active' || c.status === 'scheduled').length">0</p></div>
+                <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">جاري التنفيذ</p><p class="text-xl font-bold text-cyan-400" x-text="campaigns.filter(c => c.status === 'running').length">0</p></div>
                 <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">مكتملة</p><p class="text-xl font-bold text-blue-400" x-text="campaigns.filter(c => c.status === 'completed').length">0</p></div>
-                <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">إجمالي الوصول</p><p class="text-xl font-bold text-purple-400" x-text="campaigns.reduce((s,c) => s + parseInt(c.stats_reach||0), 0)">0</p></div>
+                <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">إجمالي الوصول</p><p class="text-xl font-bold text-purple-400" x-text="campaigns.reduce((s,c) => s + parseInt(c.stats_reach||0), 0).toLocaleString()">0</p></div>
             </div>
-            <button @click="showCampaignModal = true" class="btn btn-primary btn-sm">➕ حملة جديدة</button>
+            <button @click="showCampaignModal = true; cmpWizardStep = 1" class="btn btn-primary btn-sm">➕ حملة جديدة</button>
         </div>
 
         <!-- Campaign list -->
         <div class="space-y-2">
             <template x-for="c in campaigns" :key="c.id">
-                <div class="bg-slate-800 rounded-xl border border-slate-700 p-4" :class="{'border-green-500/30': c.status === 'active', 'border-amber-500/30': c.status === 'scheduled', 'opacity-60': c.status === 'completed'}">
+                <div class="bg-slate-800 rounded-xl border border-slate-700 p-4 transition hover:border-slate-500" :class="{'border-green-500/30': c.status === 'active' || c.status === 'running', 'border-amber-500/30': c.status === 'scheduled', 'border-red-500/30': c.status === 'failed', 'opacity-60': c.status === 'completed'}">
                     <div class="flex items-start justify-between gap-3">
                         <div class="flex-1 min-w-0">
-                            <div class="flex items-center gap-2 mb-1">
+                            <div class="flex items-center gap-2 mb-1 flex-wrap">
                                 <span class="font-bold text-sm" x-text="c.name"></span>
-                                <span :class="{'bg-green-500/20 text-green-400': c.status==='completed', 'bg-amber-500/20 text-amber-400': c.status==='scheduled', 'bg-blue-500/20 text-blue-400': c.status==='active', 'bg-slate-600/20 text-slate-400': c.status==='draft'}" class="px-2 py-0.5 rounded text-xs font-bold" x-text="c.status === 'completed' ? '✅ مكتملة' : c.status === 'scheduled' ? '⏳ مجدولة' : c.status === 'active' ? '▶️ جارية' : '📝 مسودة'"></span>
-                                <span class="text-xs px-1.5 py-0.5 rounded bg-slate-700 text-slate-400" x-text="(c.target === 'both' ? '📱🌐' : c.target === 'telegram' ? '📱' : c.target === 'whatsapp' ? '🟢' : c.target === 'all' ? '📱🌐🟢' : '🌐') + ' • ' + (c.priority === 'urgent' ? '🚨' : c.priority === 'high' ? '⚡' : '🔔')"></span>
+                                <span :class="{
+                                    'bg-green-500/20 text-green-400': c.status==='completed',
+                                    'bg-amber-500/20 text-amber-400': c.status==='scheduled',
+                                    'bg-blue-500/20 text-blue-400': c.status==='active',
+                                    'bg-cyan-500/20 text-cyan-400': c.status==='running',
+                                    'bg-red-500/20 text-red-400': c.status==='failed',
+                                    'bg-slate-600/20 text-slate-400': c.status==='draft'
+                                }" class="px-2 py-0.5 rounded text-xs font-bold" x-text="c.status === 'completed' ? '✅ مكتملة' : c.status === 'scheduled' ? '⏳ مجدولة' : c.status === 'active' ? '▶️ جارية' : c.status === 'running' ? '🔄 جاري التنفيذ' : c.status === 'failed' ? '❌ فشلت' : '📝 مسودة'"></span>
+                                <span class="text-xs px-1.5 py-0.5 rounded bg-slate-700 text-slate-400 flex items-center gap-1">
+                                    <span x-text="c.target === 'telegram' ? '📱' : c.target === 'whatsapp' ? '🟢' : c.target === 'web' ? '🌐' : c.target === 'instagram' ? '📸' : c.target === 'facebook' ? '📘' : '📱🌐'"></span>
+                                    <span x-text="c.priority === 'urgent' ? '🚨' : c.priority === 'high' ? '⚡' : '🔔'"></span>
+                                </span>
+                                <span x-show="c.selected_channels" class="text-[10px] px-1.5 py-0.5 rounded bg-slate-700 text-slate-500" x-text="(c.selected_channels || '').split(',').filter(Boolean).length + ' قناة محددة'"></span>
                             </div>
-                            <p class="text-xs text-slate-400 truncate" x-text="c.message"></p>
-                            <div class="flex items-center gap-3 mt-1 text-[10px] text-slate-500">
-                                <span x-text="'👥 ' + (c.recipient === 'single' ? 'فردي' : c.country !== 'all' ? c.country : 'الكل')"></span>
+                            <p class="text-xs text-slate-400 truncate max-w-md" x-text="c.message"></p>
+                            <div class="flex items-center gap-3 mt-1.5 text-[10px] text-slate-500">
+                                <span x-text="'👥 ' + (c.recipient === 'single' ? 'محدد' : c.recipient === 'group' ? 'مجموعة' : 'الكل')"></span>
                                 <span x-show="c.scheduled_at" x-text="'⏰ ' + c.scheduled_at"></span>
-                                <span x-text="'📊 وصول: ' + (c.stats_reach || 0)"></span>
-                                <span x-text="'🖱️ نقرات: ' + (c.stats_clicks || 0)"></span>
+                                <span class="text-green-400" x-text="'📊 وصول: ' + (c.stats_reach || 0)"></span>
+                                <span class="text-blue-400" x-text="'✅ تم: ' + (c.stats_clicks || 0)"></span>
+                                <span x-show="c.whatsapp_contacts" class="text-green-300">🟢 واتساب</span>
                             </div>
                         </div>
                         <div class="flex gap-1 flex-shrink-0">
                             <button x-show="c.status === 'draft' || c.status === 'scheduled'" @click="launchCampaign(c.id)" class="btn btn-success btn-sm" title="إطلاق">▶️</button>
+                            <button x-show="c.status === 'failed'" @click="retryCampaign(c.id)" class="btn btn-sm" title="إعادة المحاولة" style="background:#f59e0b">🔄</button>
                             <button @click="deleteCampaign(c.id)" class="btn btn-danger btn-sm" title="حذف">🗑️</button>
                         </div>
                     </div>
@@ -145,102 +159,133 @@
             <p x-show="campaigns.length === 0" class="text-center text-slate-400 p-8">لا توجد حملات — أنشئ حملتك الأولى</p>
         </div>
 
-        <!-- Create Campaign Modal -->
-        <div x-show="showCampaignModal" class="modal-overlay" @click.self="showCampaignModal = false" style="display:none">
-            <div class="modal max-w-3xl">
-                <div class="flex items-center justify-between mb-4">
+        <!-- Create Campaign Modal — Wizard -->
+        <div x-show="showCampaignModal" class="modal-overlay" @click.self="showCampaignModal = false; cmpWizardStep = 1" style="display:none">
+            <div class="modal max-w-4xl" style="max-height:90vh;overflow-y:auto">
+                <!-- Header -->
+                <div class="flex items-center justify-between mb-4 sticky top-0 bg-slate-800/95 backdrop-blur-sm z-10 pb-3 border-b border-slate-700">
                     <h3 class="font-bold text-lg">📊 إنشاء حملة إعلانية</h3>
-                    <button @click="showCampaignModal = false" class="text-slate-400 hover:text-white"><i class="fas fa-times"></i></button>
+                    <button @click="showCampaignModal = false; cmpWizardStep = 1" class="text-slate-400 hover:text-white"><i class="fas fa-times text-lg"></i></button>
                 </div>
-                <div class="space-y-4">
-                    <div><label class="block text-sm text-slate-400 mb-1">📝 اسم الحملة</label><input x-model="cmpForm.name" class="input w-full" placeholder="مثال: حملة لعبة Aviator"></div>
-                    <div>
-                        <label class="block text-sm text-slate-400 mb-1">💬 نص الإعلان</label>
-                        <div class="flex flex-wrap gap-2 mb-2">
-                            <button @click="insertCampaignContent('promo')" class="px-3 py-1.5 rounded-lg text-xs bg-green-500/20 border border-green-500/30 text-green-300 hover:bg-green-500/30">🎁 عرض/برومو</button>
-                            <button @click="insertCampaignContent('info')" class="px-3 py-1.5 rounded-lg text-xs bg-blue-500/20 border border-blue-500/30 text-blue-300 hover:bg-blue-500/30">📊 معلومة</button>
-                            <button @click="insertCampaignContent('event')" class="px-3 py-1.5 rounded-lg text-xs bg-purple-500/20 border border-purple-500/30 text-purple-300 hover:bg-purple-500/30">🎉 حدث</button>
-                            <button @click="insertCampaignContent('live')" class="px-3 py-1.5 rounded-lg text-xs bg-red-500/20 border border-red-500/30 text-red-300 hover:bg-red-500/30">🔴 مباشر</button>
-                            <button @click="generateContent()" class="px-3 py-1.5 rounded-lg text-xs bg-purple-600/20 border border-purple-600/30 text-purple-400 hover:bg-purple-600 hover:text-white transition"><i class="fas fa-magic"></i> AI توليد</button>
+
+                <!-- Step Indicator -->
+                <div class="flex items-center justify-center gap-2 my-4">
+                    <template x-for="(s, i) in ['💬 المحتوى', '🎯 المنصة', '👥 الجمهور', '⏰ الجدولة']" :key="i">
+                        <div class="flex items-center gap-2">
+                            <button @click="cmpWizardStep = i + 1" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition"
+                                :class="cmpWizardStep === i + 1 ? 'bg-green-600 text-white' : cmpWizardStep > i + 1 ? 'bg-green-600/20 text-green-400' : 'bg-slate-700 text-slate-400'">
+                                <span class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold"
+                                    :class="cmpWizardStep === i + 1 ? 'bg-white text-green-600' : cmpWizardStep > i + 1 ? 'bg-green-500/30 text-green-400' : 'bg-slate-600 text-slate-400'"
+                                    x-text="cmpWizardStep > i + 1 ? '✓' : (i + 1)"></span>
+                                <span x-text="s" class="hidden sm:inline"></span>
+                            </button>
+                            <div x-show="i < 3" class="w-6 h-px bg-slate-600"></div>
                         </div>
-                        <textarea x-model="cmpForm.message" rows="4" class="input w-full" placeholder="اكتب نص الإعلان هنا..."></textarea>
-                        <div class="flex flex-wrap gap-1 mt-1">
-                            <button @click="cmpForm.message += '{company_name}'" class="text-[10px] px-1.5 py-0.5 bg-slate-700 rounded hover:bg-slate-600">{company_name}</button>
-                            <button @click="cmpForm.message += '{download_link}'" class="text-[10px] px-1.5 py-0.5 bg-slate-700 rounded hover:bg-slate-600">{download_link}</button>
-                            <button @click="cmpForm.message += '{promo_code}'" class="text-[10px] px-1.5 py-0.5 bg-slate-700 rounded hover:bg-slate-600">{promo_code}</button>
-                            <button @click="cmpForm.message += '{affiliate_link}'" class="text-[10px] px-1.5 py-0.5 bg-slate-700 rounded hover:bg-slate-600">{affiliate_link}</button>
+                    </template>
+                </div>
+
+                <!-- ═══ STEP 1: Content ═══ -->
+                <div x-show="cmpWizardStep === 1" class="space-y-4">
+                    <div>
+                        <label class="block text-sm text-slate-400 mb-1">📝 اسم الحملة</label>
+                        <input x-model="cmpForm.name" class="input w-full" placeholder="مثال: حملة Aviator — عرض نهاية الأسبوع">
+                    </div>
+                    <div>
+                        <div class="flex items-center justify-between mb-1">
+                            <label class="block text-sm text-slate-400">💬 نص الإعلان</label>
+                            <button @click="generateContent()" type="button" class="text-xs px-3 py-1.5 rounded-lg bg-purple-600/20 border border-purple-600/30 text-purple-400 hover:bg-purple-600 hover:text-white transition flex items-center gap-1.5" :disabled="generating">
+                                <i class="fas fa-magic" :class="generating ? 'fa-spin' : ''"></i>
+                                <span x-text="generating ? 'جاري التوليد...' : 'AI توليد'"></span>
+                            </button>
+                        </div>
+                        <div class="flex flex-wrap gap-2 mb-2">
+                            <button @click="insertCampaignContent('promo')" class="px-3 py-1.5 rounded-lg text-xs bg-green-500/20 border border-green-500/30 text-green-300 hover:bg-green-500/30 transition">🎁 عرض/برومو</button>
+                            <button @click="insertCampaignContent('info')" class="px-3 py-1.5 rounded-lg text-xs bg-blue-500/20 border border-blue-500/30 text-blue-300 hover:bg-blue-500/30 transition">📊 معلومة</button>
+                            <button @click="insertCampaignContent('event')" class="px-3 py-1.5 rounded-lg text-xs bg-purple-500/20 border border-purple-500/30 text-purple-300 hover:bg-purple-500/30 transition">🎉 حدث</button>
+                            <button @click="insertCampaignContent('live')" class="px-3 py-1.5 rounded-lg text-xs bg-red-500/20 border border-red-500/30 text-red-300 hover:bg-red-500/30 transition">🔴 مباشر</button>
+                            <button @click="insertCampaignContent('result')" class="px-3 py-1.5 rounded-lg text-xs bg-amber-500/20 border border-amber-500/30 text-amber-300 hover:bg-amber-500/30 transition">🏁 نتيجة</button>
+                        </div>
+                        <textarea x-model="cmpForm.message" rows="5" class="input w-full font-mono text-sm leading-relaxed" placeholder="اكتب نص الإعلان هنا... استخدم القوالب أعلاه أو اضغط AI توليد"></textarea>
+                        <div class="flex flex-wrap gap-1 mt-1.5">
+                            <button @click="cmpForm.message += '{company_name}'" class="text-[10px] px-2 py-0.5 bg-slate-700 rounded hover:bg-slate-600 border border-slate-600 transition">{company_name}</button>
+                            <button @click="cmpForm.message += '{download_link}'" class="text-[10px] px-2 py-0.5 bg-slate-700 rounded hover:bg-slate-600 border border-slate-600 transition">{download_link}</button>
+                            <button @click="cmpForm.message += '{promo_code}'" class="text-[10px] px-2 py-0.5 bg-slate-700 rounded hover:bg-slate-600 border border-slate-600 transition">{promo_code}</button>
+                            <button @click="cmpForm.message += '{affiliate_link}'" class="text-[10px] px-2 py-0.5 bg-slate-700 rounded hover:bg-slate-600 border border-slate-600 transition">{affiliate_link}</button>
+                            <button @click="cmpForm.message += '{stat_highlight}'" class="text-[10px] px-2 py-0.5 bg-slate-700 rounded hover:bg-slate-600 border border-slate-600 transition">{stat_highlight}</button>
+                            <button @click="cmpForm.message += '{event_date}'" class="text-[10px] px-2 py-0.5 bg-slate-700 rounded hover:bg-slate-600 border border-slate-600 transition">{event_date}</button>
                         </div>
                     </div>
                     <div>
                         <label class="block text-sm text-slate-400 mb-1">📎 المرفقات</label>
                         <div class="flex flex-wrap gap-2">
                             <template x-for="(media, idx) in cmpForm.mediaList" :key="idx">
-                                <div class="relative w-16 h-16 rounded-lg overflow-hidden bg-slate-700 border border-slate-600 group">
+                                <div class="relative w-20 h-20 rounded-xl overflow-hidden bg-slate-700 border border-slate-600 group">
                                     <img x-show="media.type && media.type.startsWith('image')" :src="media.url" class="w-full h-full object-cover">
                                     <video x-show="media.type && media.type.startsWith('video')" :src="media.url" class="w-full h-full object-cover"></video>
                                     <div x-show="!media.type || (!media.type.startsWith('image') && !media.type.startsWith('video'))" class="w-full h-full flex items-center justify-center"><i class="fas fa-file text-xl text-slate-400"></i></div>
-                                    <button @click="cmpForm.mediaList.splice(idx, 1)" class="absolute inset-0 bg-red-600/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition"><i class="fas fa-trash text-white"></i></button>
+                                    <button @click="cmpForm.mediaList.splice(idx, 1)" class="absolute inset-0 bg-red-600/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition"><i class="fas fa-trash text-white text-sm"></i></button>
+                                    <div class="absolute bottom-0 inset-x-0 bg-black/60 text-[9px] text-white text-center py-0.5" x-text="media.type && media.type.startsWith('video') ? '🎬 فيديو' : '🖼️ صورة'"></div>
                                 </div>
                             </template>
-                            <label class="w-16 h-16 rounded-lg border-2 border-dashed border-slate-500 flex items-center justify-center cursor-pointer hover:border-green-500 transition" :class="cmpForm.uploading ? 'opacity-50 pointer-events-none' : ''">
-                                <i class="fas fa-plus text-xl text-slate-400"></i>
+                            <label class="w-20 h-20 rounded-xl border-2 border-dashed border-slate-500 flex flex-col items-center justify-center cursor-pointer hover:border-green-500 transition gap-1" :class="cmpForm.uploading ? 'opacity-50 pointer-events-none' : ''">
+                                <i class="fas fa-cloud-arrow-up text-lg text-slate-400"></i>
+                                <span class="text-[9px] text-slate-500" x-text="cmpForm.uploading ? 'جاري الرفع...' : 'إضافة'"></span>
                                 <input type="file" class="hidden" accept="image/*,video/*" @change="uploadCampaignMedia($event)" multiple>
                             </label>
                         </div>
                     </div>
-                    <div class="grid grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-sm text-slate-400 mb-1">🎯 المنصة</label>
-                            <select x-model="cmpForm.target" class="input w-full">
-                                <option value="telegram">📱 تيليغرام</option>
-                                <option value="whatsapp">🟢 واتساب</option>
-                                <option value="web">🌐 الموقع</option>
-                                <option value="both">📱🌐 الاثنين</option>
-                                <option value="all">📱🌐🟢 الكل</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm text-slate-400 mb-1">👥 الجمهور</label>
-                            <select x-model="cmpForm.recipient" class="input w-full">
-                                <option value="all">👥 الكل</option>
-                                <option value="single">📱 قنوات محددة</option>
-                                <option value="group">👥 مجموعة قنوات</option>
-                            </select>
-                        </div>
+                    <!-- Next Button -->
+                    <div class="flex justify-end pt-2 border-t border-slate-700">
+                        <button @click="cmpWizardStep = 2" class="btn btn-primary btn-sm gap-1" :disabled="!cmpForm.message.trim() && cmpForm.mediaList.length === 0">
+                            التالي: المنصة <i class="fas fa-arrow-left text-xs"></i>
+                        </button>
                     </div>
+                </div>
 
-                    <!-- Dynamic: Telegram Channel Selector -->
-                    <div x-show="cmpForm.recipient === 'single' && (cmpForm.target === 'telegram' || cmpForm.target === 'both' || cmpForm.target === 'all')" class="bg-slate-900/50 rounded-xl border border-slate-700 p-3">
-                        <label class="block text-sm text-slate-400 mb-2">📢 اختر القنوات</label>
-                        <div class="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-48 overflow-auto">
-                            <template x-for="ch in channels" :key="ch.id">
-                                <label class="flex items-center gap-2 p-2 rounded-lg cursor-pointer transition text-sm" :class="cmpForm.selectedChannels.includes(ch.id) ? 'bg-green-500/20 border border-green-500/30' : 'bg-slate-800 border border-transparent hover:border-slate-600'">
-                                    <input type="checkbox" :value="ch.id" @change="toggleCampaignChannel(ch.id)" class="accent-green-500" :checked="cmpForm.selectedChannels.includes(ch.id)">
-                                    <span x-text="ch.title || ch.chat_id"></span>
-                                </label>
-                            </template>
-                        </div>
-                        <div class="flex gap-2 mt-2">
-                            <button @click="cmpForm.selectedChannels = channels.map(c => c.id)" class="text-xs px-2 py-1 bg-slate-700 rounded hover:bg-slate-600">اختيار الكل</button>
-                            <button @click="cmpForm.selectedChannels = []" class="text-xs px-2 py-1 bg-slate-700 rounded hover:bg-slate-600">إلغاء الكل</button>
-                            <span class="text-xs text-slate-500 self-center" x-text="(cmpForm.selectedChannels.length || 0) + ' محدد'"></span>
-                        </div>
+                <!-- ═══ STEP 2: Platform ═══ -->
+                <div x-show="cmpWizardStep === 2" class="space-y-4">
+                    <p class="text-sm text-slate-400">اختر المنصة التي تريد النشر عليها:</p>
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                        <button @click="cmpForm.target = 'telegram'" class="p-4 rounded-xl border-2 transition text-center"
+                            :class="cmpForm.target === 'telegram' ? 'border-blue-500 bg-blue-500/10' : 'border-slate-700 bg-slate-800 hover:border-slate-500'">
+                            <div class="text-3xl mb-2">📱</div>
+                            <div class="font-bold text-sm">تيليغرام</div>
+                            <div class="text-xs text-slate-400">قنوات + مجموعات</div>
+                        </button>
+                        <button @click="cmpForm.target = 'whatsapp'" class="p-4 rounded-xl border-2 transition text-center"
+                            :class="cmpForm.target === 'whatsapp' ? 'border-green-500 bg-green-500/10' : 'border-slate-700 bg-slate-800 hover:border-slate-500'">
+                            <div class="text-3xl mb-2">🟢</div>
+                            <div class="font-bold text-sm">واتساب</div>
+                            <div class="text-xs text-slate-400">API + جهات اتصال</div>
+                        </button>
+                        <button @click="cmpForm.target = 'web'" class="p-4 rounded-xl border-2 transition text-center"
+                            :class="cmpForm.target === 'web' ? 'border-purple-500 bg-purple-500/10' : 'border-slate-700 bg-slate-800 hover:border-slate-500'">
+                            <div class="text-3xl mb-2">🌐</div>
+                            <div class="font-bold text-sm">الموقع</div>
+                            <div class="text-xs text-slate-400">إشعارات الويب</div>
+                        </button>
+                        <button @click="cmpForm.target = 'instagram'" class="p-4 rounded-xl border-2 transition text-center"
+                            :class="cmpForm.target === 'instagram' ? 'border-pink-500 bg-pink-500/10' : 'border-slate-700 bg-slate-800 hover:border-slate-500'">
+                            <div class="text-3xl mb-2">📸</div>
+                            <div class="font-bold text-sm">انستجرام</div>
+                            <div class="text-xs text-slate-400">Graph API</div>
+                        </button>
+                        <button @click="cmpForm.target = 'facebook'" class="p-4 rounded-xl border-2 transition text-center"
+                            :class="cmpForm.target === 'facebook' ? 'border-blue-600 bg-blue-600/10' : 'border-slate-700 bg-slate-800 hover:border-slate-500'">
+                            <div class="text-3xl mb-2">📘</div>
+                            <div class="font-bold text-sm">فيسبوك</div>
+                            <div class="text-xs text-slate-400">Pages API</div>
+                        </button>
+                        <button @click="cmpForm.target = 'both'" class="p-4 rounded-xl border-2 transition text-center"
+                            :class="cmpForm.target === 'both' ? 'border-amber-500 bg-amber-500/10' : 'border-slate-700 bg-slate-800 hover:border-slate-500'">
+                            <div class="text-3xl mb-2">🔄</div>
+                            <div class="font-bold text-sm">متعدد</div>
+                            <div class="text-xs text-slate-400">تيليغرام + ويب</div>
+                        </button>
                     </div>
-
-                    <!-- Dynamic: Group Selector -->
-                    <div x-show="cmpForm.recipient === 'group'" class="bg-slate-900/50 rounded-xl border border-slate-700 p-3">
-                        <label class="block text-sm text-slate-400 mb-2">👥 اختر المجموعات</label>
-                        <div class="flex flex-wrap gap-2">
-                            <template x-for="grp in groups" :key="grp.id">
-                                <button @click="toggleCampaignGroup(grp)" class="px-3 py-1.5 rounded-lg text-sm transition" :class="cmpForm.selectedGroups.includes(grp.id) ? 'bg-purple-500/20 border border-purple-500/30 text-purple-300' : 'bg-slate-800 border border-slate-600 text-slate-400'" x-text="grp.name"></button>
-                            </template>
-                        </div>
-                        <p x-show="groups.length === 0" class="text-xs text-slate-500 mt-2">لا توجد مجموعات — أنشئ مجموعة من تبويب المجموعات</p>
-                    </div>
-
-                    <!-- Dynamic: WhatsApp Options -->
-                    <div x-show="cmpForm.target === 'whatsapp' || cmpForm.target === 'all'" class="bg-slate-900/50 rounded-xl border border-green-500/20 p-3 space-y-2">
-                        <h4 class="text-sm font-bold text-green-400">🟢 إعدادات واتساب</h4>
+                    <!-- WhatsApp config (shown when whatsapp selected) -->
+                    <div x-show="cmpForm.target === 'whatsapp' || cmpForm.target === 'both'" class="bg-slate-900/50 rounded-xl border border-green-500/20 p-4 space-y-3">
+                        <h4 class="text-sm font-bold text-green-400 flex items-center gap-2">🟢 إعدادات واتساب</h4>
                         <div>
                             <label class="block text-xs text-slate-400 mb-1">🔐 WhatsApp Business API</label>
                             <select x-model="cmpForm.platform_account_id" class="input text-sm w-full">
@@ -259,17 +304,187 @@
                             <input type="text" x-model="cmpForm.whatsappGroups" class="input text-sm w-full" placeholder="group_id_1,group_id_2">
                         </div>
                     </div>
-
-                    <div class="grid grid-cols-3 gap-3">
-                        <div><label class="block text-sm text-slate-400 mb-1">⚡ الأولوية</label><select x-model="cmpForm.priority" class="input w-full"><option value="normal">🔔 عادية</option><option value="high">⚡ عالية</option><option value="urgent">🚨 عاجلة</option></select></div>
-                        <div><label class="block text-sm text-slate-400 mb-1">🌍 الدولة</label><select x-model="cmpForm.country" class="input w-full"><option value="all">🌍 الكل</option><option value="EG">🇪🇬 مصر</option><option value="SA">🇸🇦 السعودية</option><option value="AE">🇦🇪 الإمارات</option><option value="JO">🇯🇴 الأردن</option><option value="MA">🇲🇦 المغرب</option><option value="DZ">🇩🇿 الجزائر</option></select></div>
-                        <div><label class="block text-sm text-slate-400 mb-1">🔁 التكرار</label><select x-model="cmpForm.repeat" class="input w-full"><option value="once">مرة واحدة</option><option value="daily">يومي</option><option value="weekly">أسبوعي</option></select></div>
+                    <!-- Social Media Accounts (shown for instagram/facebook/twitter) -->
+                    <div x-show="['instagram','facebook','twitter','linkedin','tiktok','youtube'].includes(cmpForm.target)" class="bg-slate-900/50 rounded-xl border border-slate-700 p-4 space-y-3">
+                        <h4 class="text-sm font-bold text-slate-300 flex items-center gap-2">📱 حسابات السوشيال ميديا</h4>
+                        <p class="text-xs text-slate-500">تأكد من ربط حسابات السوشيال ميديا من تبويب "السوشيال" أولاً</p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            <template x-for="sa in socialAccounts.filter(a => a.platform === cmpForm.target)" :key="sa.id">
+                                <div class="flex items-center gap-2 p-2 rounded-lg bg-slate-800 border border-slate-700">
+                                    <span class="w-2 h-2 rounded-full" :class="sa.is_active === 'yes' ? 'bg-green-500' : 'bg-red-500'"></span>
+                                    <span class="text-sm" x-text="sa.account_name"></span>
+                                    <span class="text-xs text-slate-500" x-text="'@' + sa.handle"></span>
+                                </div>
+                            </template>
+                        </div>
+                        <p x-show="socialAccounts.filter(a => a.platform === cmpForm.target).length === 0" class="text-xs text-amber-400">
+                            <i class="fas fa-exclamation-triangle"></i> لا توجد حسابات مربطة لهذا المنصة — اربطها من تبويب السوشيال
+                        </p>
                     </div>
-                    <div><label class="block text-sm text-slate-400 mb-1">⏰ الجدولة (اتركه فارغاً للإرسال فوراً)</label><input type="datetime-local" x-model="cmpForm.scheduled_at" class="input w-full"></div>
+                    <div class="flex justify-between pt-2 border-t border-slate-700">
+                        <button @click="cmpWizardStep = 1" class="btn btn-sm" style="background:#475569"><i class="fas fa-arrow-right text-xs"></i> السابق</button>
+                        <button @click="cmpWizardStep = 3" class="btn btn-primary btn-sm gap-1">
+                            التالي: الجمهور <i class="fas fa-arrow-left text-xs"></i>
+                        </button>
+                    </div>
                 </div>
-                <div class="flex gap-2 justify-end mt-4">
-                    <button @click="showCampaignModal = false" class="btn btn-sm" style="background:#475569">إلغاء</button>
-                    <button @click="createCampaign()" class="btn btn-primary btn-sm" x-text="cmpForm.scheduled_at ? '⏰ جدولة الحملة' : '🚀 إطلاق فوراً'"></button>
+
+                <!-- ═══ STEP 3: Target ═══ -->
+                <div x-show="cmpWizardStep === 3" class="space-y-4">
+                    <div class="grid grid-cols-3 gap-3">
+                        <button @click="cmpForm.recipient = 'all'" class="p-3 rounded-xl border-2 transition text-center"
+                            :class="cmpForm.recipient === 'all' ? 'border-green-500 bg-green-500/10' : 'border-slate-700 bg-slate-800 hover:border-slate-500'">
+                            <div class="text-2xl mb-1">👥</div>
+                            <div class="text-sm font-bold">الكل</div>
+                            <div class="text-[10px] text-slate-400">جميع القنوات النشطة</div>
+                        </button>
+                        <button @click="cmpForm.recipient = 'single'" class="p-3 rounded-xl border-2 transition text-center"
+                            :class="cmpForm.recipient === 'single' ? 'border-blue-500 bg-blue-500/10' : 'border-slate-700 bg-slate-800 hover:border-slate-500'">
+                            <div class="text-2xl mb-1">📱</div>
+                            <div class="text-sm font-bold">قنوات محددة</div>
+                            <div class="text-[10px] text-slate-400">اختر قنوات بعينها</div>
+                        </button>
+                        <button @click="cmpForm.recipient = 'group'" class="p-3 rounded-xl border-2 transition text-center"
+                            :class="cmpForm.recipient === 'group' ? 'border-purple-500 bg-purple-500/10' : 'border-slate-700 bg-slate-800 hover:border-slate-500'">
+                            <div class="text-2xl mb-1">📂</div>
+                            <div class="text-sm font-bold">مجموعة قنوات</div>
+                            <div class="text-[10px] text-slate-400">مجموعة مُنشأة مسبقاً</div>
+                        </button>
+                    </div>
+
+                    <!-- Channel multi-select -->
+                    <div x-show="cmpForm.recipient === 'single' && (cmpForm.target === 'telegram' || cmpForm.target === 'both' || cmpForm.target === 'all')" class="bg-slate-900/50 rounded-xl border border-slate-700 p-4">
+                        <div class="flex items-center justify-between mb-3">
+                            <label class="text-sm font-bold text-slate-300">📢 اختر القنوات</label>
+                            <div class="flex gap-2">
+                                <button @click="cmpForm.selectedChannels = channels.map(c => c.id)" class="text-xs px-2 py-1 bg-slate-700 rounded hover:bg-slate-600 transition">اختيار الكل</button>
+                                <button @click="cmpForm.selectedChannels = []" class="text-xs px-2 py-1 bg-slate-700 rounded hover:bg-slate-600 transition">إلغاء الكل</button>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-56 overflow-auto">
+                            <template x-for="ch in channels" :key="ch.id">
+                                <label class="flex items-center gap-2 p-2.5 rounded-lg cursor-pointer transition text-sm"
+                                    :class="cmpForm.selectedChannels.includes(ch.id) ? 'bg-green-500/15 border border-green-500/30 text-green-300' : 'bg-slate-800 border border-transparent hover:border-slate-600 text-slate-400'">
+                                    <input type="checkbox" :value="ch.id" @change="toggleCampaignChannel(ch.id)" class="accent-green-500" :checked="cmpForm.selectedChannels.includes(ch.id)">
+                                    <div class="min-w-0">
+                                        <div class="truncate text-sm" x-text="ch.title || ch.chat_id"></div>
+                                        <div class="text-[10px] text-slate-500" x-text="ch.is_active === 'yes' ? '✅ نشط' : '⏸️ متوقف'"></div>
+                                    </div>
+                                </label>
+                            </template>
+                        </div>
+                        <div class="flex items-center gap-2 mt-3 pt-3 border-t border-slate-700">
+                            <span class="text-sm font-bold text-green-400" x-text="cmpForm.selectedChannels.length"></span>
+                            <span class="text-xs text-slate-400">قناة محددة</span>
+                        </div>
+                    </div>
+
+                    <!-- Group select -->
+                    <div x-show="cmpForm.recipient === 'group'" class="bg-slate-900/50 rounded-xl border border-slate-700 p-4">
+                        <label class="text-sm font-bold text-slate-300 mb-3 block">📂 اختر المجموعات</label>
+                        <div class="flex flex-wrap gap-2">
+                            <template x-for="grp in groups" :key="grp.id">
+                                <button @click="toggleCampaignGroup(grp)" class="px-4 py-2 rounded-xl text-sm transition flex items-center gap-2"
+                                    :class="cmpForm.selectedGroups.includes(grp.id) ? 'bg-purple-500/20 border border-purple-500/30 text-purple-300' : 'bg-slate-800 border border-slate-600 text-slate-400 hover:border-slate-500'">
+                                    <span x-text="grp.name"></span>
+                                    <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-700" x-text="(grp.channel_ids || '').split('|').filter(Boolean).length + ' قناة'"></span>
+                                </button>
+                            </template>
+                        </div>
+                        <p x-show="groups.length === 0" class="text-xs text-slate-500 mt-2">لا توجد مجموعات — أنشئ مجموعة من تبويب المجموعات</p>
+                    </div>
+
+                    <div class="flex justify-between pt-2 border-t border-slate-700">
+                        <button @click="cmpWizardStep = 2" class="btn btn-sm" style="background:#475569"><i class="fas fa-arrow-right text-xs"></i> السابق</button>
+                        <button @click="cmpWizardStep = 4" class="btn btn-primary btn-sm gap-1">
+                            التالي: الجدولة <i class="fas fa-arrow-left text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ═══ STEP 4: Schedule + Review ═══ -->
+                <div x-show="cmpWizardStep === 4" class="space-y-4">
+                    <!-- Live Preview Card -->
+                    <div class="bg-slate-900/50 rounded-xl border border-slate-700 p-4">
+                        <h4 class="text-sm font-bold text-slate-300 mb-3 flex items-center gap-2">👁️ معاينة الحملة</h4>
+                        <div class="bg-slate-800 rounded-xl border border-slate-600 p-4 space-y-3">
+                            <div class="flex items-center gap-2">
+                                <span class="font-bold text-white" x-text="cmpForm.name || 'بدون اسم'"></span>
+                                <span class="text-xs px-2 py-0.5 rounded-full" :class="{
+                                    'bg-blue-500/20 text-blue-400': cmpForm.target === 'telegram',
+                                    'bg-green-500/20 text-green-400': cmpForm.target === 'whatsapp',
+                                    'bg-purple-500/20 text-purple-400': cmpForm.target === 'web',
+                                    'bg-pink-500/20 text-pink-400': cmpForm.target === 'instagram',
+                                    'bg-blue-600/20 text-blue-500': cmpForm.target === 'facebook',
+                                    'bg-amber-500/20 text-amber-400': cmpForm.target === 'both',
+                                }" x-text="cmpForm.target === 'telegram' ? '📱 تيليغرام' : cmpForm.target === 'whatsapp' ? '🟢 واتساب' : cmpForm.target === 'web' ? '🌐 ويب' : cmpForm.target === 'instagram' ? '📸 انستجرام' : cmpForm.target === 'facebook' ? '📘 فيسبوك' : '🔄 متعدد'"></span>
+                            </div>
+                            <p class="text-sm text-slate-300 whitespace-pre-wrap" x-text="cmpForm.message || '⚠️ لم تكتب نصاً بعد'" :class="{'text-slate-500 italic': !cmpForm.message.trim()}"></p>
+                            <div x-show="cmpForm.mediaList.length > 0" class="flex gap-2">
+                                <template x-for="(m, i) in cmpForm.mediaList.slice(0, 3)" :key="i">
+                                    <div class="w-12 h-12 rounded-lg overflow-hidden bg-slate-700">
+                                        <img x-show="m.type && m.type.startsWith('image')" :src="m.url" class="w-full h-full object-cover">
+                                        <div x-show="!m.type || !m.type.startsWith('image')" class="w-full h-full flex items-center justify-center text-xs text-slate-400">📎</div>
+                                    </div>
+                                </template>
+                                <div x-show="cmpForm.mediaList.length > 3" class="w-12 h-12 rounded-lg bg-slate-700 flex items-center justify-center text-xs text-slate-400" x-text="'+' + (cmpForm.mediaList.length - 3)"></div>
+                            </div>
+                            <div class="flex items-center gap-3 text-[10px] text-slate-500">
+                                <span x-text="'👥 ' + (cmpForm.recipient === 'all' ? 'جميع القنوات' : cmpForm.recipient === 'single' ? cmpForm.selectedChannels.length + ' قناة' : cmpForm.selectedGroups.length + ' مجموعة')"></span>
+                                <span x-text="cmpForm.priority === 'urgent' ? '🚨 عاجلة' : cmpForm.priority === 'high' ? '⚡ عالية' : '🔔 عادية'"></span>
+                                <span x-show="cmpForm.country !== 'all'" x-text="'🌍 ' + cmpForm.country"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Settings -->
+                    <div class="grid grid-cols-3 gap-3">
+                        <div>
+                            <label class="block text-sm text-slate-400 mb-1">⚡ الأولوية</label>
+                            <select x-model="cmpForm.priority" class="input w-full">
+                                <option value="normal">🔔 عادية</option>
+                                <option value="high">⚡ عالية</option>
+                                <option value="urgent">🚨 عاجلة</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm text-slate-400 mb-1">🌍 الدولة</label>
+                            <select x-model="cmpForm.country" class="input w-full">
+                                <option value="all">🌍 الكل</option>
+                                <option value="EG">🇪🇬 مصر</option>
+                                <option value="SA">🇸🇦 السعودية</option>
+                                <option value="AE">🇦🇪 الإمارات</option>
+                                <option value="JO">🇯🇴 الأردن</option>
+                                <option value="MA">🇲🇦 المغرب</option>
+                                <option value="DZ">🇩🇿 الجزائر</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm text-slate-400 mb-1">🔁 التكرار</label>
+                            <select x-model="cmpForm.repeat" class="input w-full">
+                                <option value="once">مرة واحدة</option>
+                                <option value="daily">يومي</option>
+                                <option value="weekly">أسبوعي</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm text-slate-400 mb-1">⏰ الجدولة (اتركه فارغاً للإرسال فوراً)</label>
+                        <input type="datetime-local" x-model="cmpForm.scheduled_at" class="input w-full">
+                    </div>
+
+                    <div class="flex justify-between pt-3 border-t border-slate-700">
+                        <button @click="cmpWizardStep = 3" class="btn btn-sm" style="background:#475569"><i class="fas fa-arrow-right text-xs"></i> السابق</button>
+                        <div class="flex gap-2">
+                            <button @click="cmpForm.scheduled_at = ''; createCampaign()" class="btn btn-success btn-sm gap-1" :disabled="creating">
+                                <i class="fas fa-rocket text-xs" :class="creating ? 'fa-spin' : ''"></i>
+                                <span x-text="creating ? 'جاري الإرسال...' : '🚀 إطلاق فوراً'"></span>
+                            </button>
+                            <button x-show="cmpForm.scheduled_at" @click="createCampaign()" class="btn btn-primary btn-sm gap-1" :disabled="creating">
+                                <i class="fas fa-clock text-xs"></i> ⏰ جدولة
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -752,6 +967,7 @@ function channelsApp() {
         groupForm: { name: '', description: '', selectedIds: [] },
         addChannelForm: { title: '', chat_id: '', type: 'channel', platform: 'telegram', channel_role: 'both', owner_admin_id: '', managed_by_admin_ids: '', category: '' },
         cmpForm: { name: '', message: '', mediaList: [], target: 'telegram', recipient: 'all', priority: 'normal', country: 'all', repeat: 'once', scheduled_at: '', platform_account_id: '', uploading: false, selectedChannels: [], selectedGroups: [], whatsappApi: '', whatsappContacts: '', whatsappGroups: '' },
+        cmpWizardStep: 1, generating: false, creating: false,
         trForm: { find_text: '', replace_text: '' },
         report: {},
 
@@ -977,11 +1193,13 @@ function channelsApp() {
         async deletePartner(id) { if (!confirm('حذف؟')) return; try { await api(`/api/ad-network/partners/${id}`, { method: 'DELETE' }); await this.loadPartners(); await this.loadAdNet(); } catch(e) {} },
         async generateContent() {
             if (!this.cmpForm.name.trim()) return toast('اكتب وصفاً للحملة أولاً', 'warning');
+            this.generating = true;
             try {
                 const d = await api('/api/campaigns/generate-content', { method: 'POST', body: JSON.stringify({ description: this.cmpForm.name, style: 'promotional' }) });
                 if (d.success) { this.cmpForm.message = d.content; toast('تم توليد المحتوى', 'success'); }
                 else { toast(d.error || 'فشل التوليد', 'error'); }
             } catch(e) { toast('فشل', 'error'); }
+            this.generating = false;
         },
         async uploadCampaignMedia(event) {
             const file = event.target.files[0]; if (!file) return;
@@ -1001,8 +1219,9 @@ function channelsApp() {
                 info: '📊 معلومة اليوم: {stat_highlight}.\n\n📱 تابعنا: {download_link}\n🏢 {company_name}',
                 event: '🎉 حدث كبير قادم!\n📅 الموعد: {event_date}\n📱 سجّل الآن: {download_link}\n🎁 كود: {promo_code}\n🏢 {company_name}',
                 live: '🔴 مباشر الآن! تابع الأحداث لحظة بلحظة.\n📱 رابط البث المباشر: {download_link}\n🏢 {company_name}',
+                result: '🏁 النتائج:\n🏆 الأول: {first_place}\n🥈 الثاني: {second_place}\n🥉 الثالث: {third_place}\n\n📊 التفاصيل: {download_link}\n🏢 {company_name}',
             };
-            this.cmpForm.message = (this.cmpForm.message || '') + '\n' + (t[type] || '');
+            this.cmpForm.message = (this.cmpForm.message || '').trim() + '\n' + (t[type] || '');
         },
         toggleCampaignChannel(id) {
             var idx = this.cmpForm.selectedChannels.indexOf(id);
@@ -1020,6 +1239,7 @@ function channelsApp() {
         async createCampaign() {
             if (!this.cmpForm.name.trim()) return toast('اكتب اسم الحملة', 'warning');
             if (!this.cmpForm.message.trim() && this.cmpForm.mediaList.length === 0) return toast('اكتب نص أو ارفع ملف', 'warning');
+            this.creating = true;
             try {
                 var payload = {
                     name: this.cmpForm.name, message: this.cmpForm.message,
@@ -1036,12 +1256,18 @@ function channelsApp() {
                 await api('/api/campaigns', { method: 'POST', body: JSON.stringify(payload) });
                 toast(this.cmpForm.scheduled_at ? 'تمت جدولة الحملة' : 'تم إطلاق الحملة', 'success');
                 this.showCampaignModal = false;
+                this.cmpWizardStep = 1;
                 this.cmpForm = { name: '', message: '', mediaList: [], target: 'telegram', recipient: 'all', priority: 'normal', country: 'all', repeat: 'once', scheduled_at: '', platform_account_id: '', uploading: false, selectedChannels: [], selectedGroups: [], whatsappApi: '', whatsappContacts: '', whatsappGroups: '' };
                 await this.loadCampaigns();
             } catch(e) { toast('فشل', 'error'); }
+            this.creating = false;
         },
         async launchCampaign(id) {
             try { await api(`/api/campaigns/${id}`, { method: 'PUT', body: JSON.stringify({ status: 'active' }) }); toast('تم الإطلاق', 'success'); await this.loadCampaigns(); }
+            catch(e) { toast('فشل', 'error'); }
+        },
+        async retryCampaign(id) {
+            try { await api(`/api/campaigns/${id}/retry`, { method: 'POST' }); toast('جاري إعادة المحاولة...', 'info'); await this.loadCampaigns(); }
             catch(e) { toast('فشل', 'error'); }
         },
         async deleteCampaign(id) {

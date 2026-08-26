@@ -6133,7 +6133,7 @@ def api_campaigns():
 @api_auth
 @permission_required('send_broadcast')
 def api_create_campaign():
-    """Create a new campaign."""
+    """Create a new campaign with full platform support."""
     data = request.json or {}
     campaign_id = f"CMP{secrets.token_hex(3).upper()}"
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -6143,12 +6143,18 @@ def api_create_campaign():
         if url:
             abs_media_urls.append(url if url.startswith('http') else f'https://vex.deals{url}')
 
+    # Resolve selected channels/groups to comma-separated IDs
+    selected_channels = data.get('selectedChannels', [])
+    selected_groups = data.get('selectedGroups', [])
+    selected_channels_str = ','.join(str(c) for c in selected_channels) if selected_channels else ''
+    selected_groups_str = ','.join(str(g) for g in selected_groups) if selected_groups else ''
+
     campaign = {
         'id': campaign_id,
         'name': data.get('name', ''),
         'message': data.get('message', ''),
         'media_urls': '|'.join(abs_media_urls),
-        'target': data.get('target', 'both'),
+        'target': data.get('target', 'telegram'),
         'recipient': data.get('recipient', 'all'),
         'priority': data.get('priority', 'normal'),
         'country': data.get('country', 'all'),
@@ -6165,17 +6171,26 @@ def api_create_campaign():
         'stats_conversions': '0',
         'platform_account_id': data.get('platform_account_id', ''),
         'ai_agent_id': data.get('ai_agent_id', ''),
+        'selected_channels': selected_channels_str,
+        'selected_groups': selected_groups_str,
+        'whatsapp_contacts': data.get('whatsappContacts', ''),
+        'whatsapp_groups': data.get('whatsappGroups', ''),
     }
     fieldnames = get_fieldnames('campaigns.csv', _CAMPAIGN_FIELDS)
     append_csv('campaigns.csv', campaign, fieldnames)
     log_action('create_campaign', campaign_id)
 
-    # If no schedule → send immediately
+    # If no schedule → execute immediately (async)
     if not data.get('scheduled_at'):
         campaign['status'] = 'active'
-        _execute_campaign(campaign)
-        # Update status to completed
-        _update_campaign_status(campaign_id, 'completed')
+        _update_campaign_status(campaign_id, 'active')
+        try:
+            from campaign_platforms import run_campaign_async
+            run_campaign_async(campaign_id, BASE_DIR)
+        except Exception as e:
+            logger.error(f'Async campaign launch failed: {e}')
+            _execute_campaign(campaign)
+            _update_campaign_status(campaign_id, 'completed')
 
     return jsonify({'success': True, 'id': campaign_id, 'status': campaign['status']})
 
@@ -6197,10 +6212,18 @@ def api_edit_campaign(campaign_id):
                 for k, v in data.items():
                     if k in fieldnames:
                         c[k] = v
-                # If status changed to 'active' → execute
-                if data.get('status') == 'active' and c.get('status') != 'completed':
-                    _execute_campaign(c)
-                    c['status'] = 'completed'
+                # If status changed to 'active' → execute async
+                if data.get('status') == 'active' and c.get('status') not in ('completed', 'running'):
+                    c['status'] = 'active'
+                    try:
+                        from campaign_platforms import run_campaign_async
+                        write_csv('campaigns.csv', campaigns, fieldnames)
+                        run_campaign_async(campaign_id, BASE_DIR)
+                        return jsonify({'success': True})
+                    except Exception as e:
+                        logger.error(f'Async campaign launch failed: {e}')
+                        _execute_campaign(c)
+                        c['status'] = 'completed'
                 break
         write_csv('campaigns.csv', campaigns, fieldnames)
         return jsonify({'success': True})
@@ -6233,8 +6256,18 @@ def api_campaigns_analytics():
 @app.route('/api/campaigns/<campaign_id>/stats')
 @api_auth
 def api_campaign_stats(campaign_id):
-    """Get campaign stats."""
+    """Get campaign stats with per-channel delivery results."""
     campaigns = read_csv('campaigns.csv')
+    results = []
+    results_path = os.path.join(BASE_DIR, 'campaign_results.csv')
+    if os.path.exists(results_path):
+        try:
+            with open(results_path, 'r', encoding='utf-8-sig') as f:
+                for row in csv.DictReader(f):
+                    if row.get('campaign_id') == campaign_id:
+                        results.append(row)
+        except Exception:
+            pass
     for c in campaigns:
         if c.get('id') == campaign_id:
             return jsonify({
@@ -6242,9 +6275,41 @@ def api_campaign_stats(campaign_id):
                 'reach': int(c.get('stats_reach', 0) or 0),
                 'clicks': int(c.get('stats_clicks', 0) or 0),
                 'conversions': int(c.get('stats_conversions', 0) or 0),
-                'status': c.get('status', 'unknown')
+                'status': c.get('status', 'unknown'),
+                'channel_results': results,
+                'delivered': sum(1 for r in results if r.get('status') == 'delivered'),
+                'failed': sum(1 for r in results if r.get('status') == 'failed'),
             })
     return jsonify({'error': 'Not found'}), 404
+
+
+@app.route('/api/campaigns/<campaign_id>/retry', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_retry_campaign(campaign_id):
+    """Retry failed channels in a campaign."""
+    campaigns = read_csv('campaigns.csv')
+    for c in campaigns:
+        if c.get('id') == campaign_id:
+            try:
+                from campaign_platforms import run_campaign_async
+                _update_campaign_status(campaign_id, 'running')
+                run_campaign_async(campaign_id, BASE_DIR)
+                return jsonify({'success': True, 'message': 'Retrying...'})
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
+    return jsonify({'error': 'Campaign not found'}), 404
+
+
+@app.route('/api/supported-platforms')
+@api_auth
+def api_supported_platforms():
+    """List all supported social media platforms."""
+    try:
+        from campaign_platforms import get_all_platforms
+        return jsonify({'platforms': get_all_platforms()})
+    except ImportError:
+        return jsonify({'platforms': []})
 
 def _update_campaign_status(campaign_id, status):
     """Update campaign status in CSV."""
@@ -7060,6 +7125,8 @@ _CAMPAIGN_FIELDS = [
     'repeat', 'status', 'created_at', 'created_by',
     'stats_reach', 'stats_clicks', 'stats_conversions',
     'platform_account_id', 'ai_agent_id',
+    'selected_channels', 'selected_groups',
+    'whatsapp_contacts', 'whatsapp_groups',
 ]
 
 
