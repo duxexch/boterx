@@ -1004,159 +1004,285 @@
         </div>
     </div>
 
-<!-- ===== POST COMPOSER MODAL ===== -->
+<!-- ===== POST COMPOSER WIZARD ===== -->
 <div x-show="showPostComposer" class="modal-overlay" @click.self="closePostComposer()" style="display:none" x-cloak>
-    <div class="modal max-w-4xl">
-        <div class="flex items-center justify-between mb-4">
-            <h3 class="font-bold text-lg">📝 إنشاء منشور جديد</h3>
-            <button @click="closePostComposer()" class="text-slate-400 hover:text-white"><i class="fas fa-times text-xl"></i></button>
+    <div class="modal max-w-5xl" style="max-height:90vh;overflow-y:auto">
+
+        <!-- Header -->
+        <div class="flex items-center justify-between mb-5">
+            <h3 class="font-bold text-xl flex items-center gap-2">
+                <span class="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-sm">✦</span>
+                <span data-i18n="create_post">إنشاء منشور جديد</span>
+            </h3>
+            <button @click="closePostComposer()" class="w-8 h-8 rounded-lg bg-slate-700/50 hover:bg-red-500/20 flex items-center justify-center transition text-slate-400 hover:text-red-400"><i class="fas fa-times"></i></button>
         </div>
 
-        <div class="mb-4">
-            <label class="block text-sm text-slate-400 mb-1">✍️ نص المنشور</label>
-            <div class="flex flex-wrap gap-2 mb-2">
-                <button @click="insertContentType('info')" class="px-3 py-1.5 rounded-lg text-xs bg-blue-500/20 border border-blue-500/30 text-blue-300 hover:bg-blue-500/30">📊 معلومة</button>
-                <button @click="insertContentType('question')" class="px-3 py-1.5 rounded-lg text-xs bg-purple-500/20 border border-purple-500/30 text-purple-300 hover:bg-purple-500/30">❓ سؤال</button>
-                <button @click="insertContentType('prediction')" class="px-3 py-1.5 rounded-lg text-xs bg-amber-500/20 border border-amber-500/30 text-amber-300 hover:bg-amber-500/30">🔮 توقع</button>
-                <button @click="insertContentType('analysis')" class="px-3 py-1.5 rounded-lg text-xs bg-green-500/20 border border-green-500/30 text-green-300 hover:bg-green-500/30">📋 تحليل</button>
-                <button @click="insertContentType('live')" class="px-3 py-1.5 rounded-lg text-xs bg-red-500/20 border border-red-500/30 text-red-300 hover:bg-red-500/30">🔴 مباشر</button>
-                <button @click="insertContentType('result')" class="px-3 py-1.5 rounded-lg text-xs bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/30">🏁 نتيجة</button>
-            </div>
-            <div class="flex flex-wrap gap-1 mb-2">
-                <button @click="insertPlaceholder('company_name')" class="text-[10px] px-1.5 py-0.5 bg-slate-700 rounded hover:bg-slate-600">{company_name}</button>
-                <button @click="insertPlaceholder('download_link')" class="text-[10px] px-1.5 py-0.5 bg-slate-700 rounded hover:bg-slate-600">{download_link}</button>
-                <button @click="insertPlaceholder('promo_code')" class="text-[10px] px-1.5 py-0.5 bg-slate-700 rounded hover:bg-slate-600">{promo_code}</button>
-                <button @click="insertPlaceholder('affiliate_link')" class="text-[10px] px-1.5 py-0.5 bg-slate-700 rounded hover:bg-slate-600">{affiliate_link}</button>
-            </div>
-            <textarea x-model="postForm.message" rows="6" class="input w-full" placeholder="اكتب نص المنشور هنا... يدعم HTML للتيليغرام (bold, italic, links)"></textarea>
-            <div class="flex items-center gap-3 mt-1">
-                <span class="text-xs text-slate-500" x-text="(postForm.message || '').length + ' حرف'"></span>
-                <div class="flex gap-1">
-                    <button @click="postForm.message += '<b>نص</b>'" class="text-xs px-2 py-0.5 bg-slate-700 rounded hover:bg-slate-600">B</button>
-                    <button @click="postForm.message += '<i>نص</i>'" class="text-xs px-2 py-0.5 bg-slate-700 rounded hover:bg-slate-600 italic">I</button>
-                    <button @click="postForm.message += '<a href=\'url\'>نص</a>'" class="text-xs px-2 py-0.5 bg-slate-700 rounded hover:bg-slate-600">🔗</button>
+        <!-- Step Indicator -->
+        <div class="flex items-center gap-2 mb-6">
+            <template x-for="s in [1,2,3]" :key="s">
+                <div class="flex items-center gap-2 flex-1">
+                    <button @click="if((s===2 && postForm.message) || (s===3 && (postForm.channelIds.length || postForm.groupIds.length))) postStep=s" class="flex items-center gap-2 w-full px-3 py-2.5 rounded-xl transition-all" :class="postStep === s ? 'bg-gradient-to-r from-blue-600/30 to-purple-600/30 border border-blue-500/40 shadow-lg shadow-blue-500/10' : (postStep > s || (s===2 && postForm.message) || (s===3 && (postForm.channelIds.length || postForm.groupIds.length))) ? 'bg-slate-800/80 border border-slate-600/50 cursor-pointer hover:border-slate-500' : 'bg-slate-900/40 border border-transparent opacity-40 cursor-not-allowed'">
+                        <span class="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0" :class="postStep === s ? 'bg-blue-500 text-white' : postStep > s ? 'bg-green-500/20 text-green-400' : 'bg-slate-700 text-slate-500'">
+                            <i x-show="postStep > s || (s===2 && postForm.message) || (s===3 && (postForm.channelIds.length || postForm.groupIds.length))" class="fas fa-check text-[10px]"></i>
+                            <span x-show="!(postStep > s || (s===2 && postForm.message) || (s===3 && (postForm.channelIds.length || postForm.groupIds.length)))" x-text="s"></span>
+                        </span>
+                        <span class="text-sm hidden md:inline" :class="postStep === s ? 'text-white font-medium' : 'text-slate-400'" x-text="s===1 ? '✍️ المحتوى' : s===2 ? '🎯 الأهداف' : '⏰ الجدولة'"></span>
+                    </button>
+                    <div x-show="s < 3" class="w-8 h-px bg-slate-600/50 hidden md:block shrink-0"></div>
                 </div>
-            </div>
+            </template>
         </div>
 
-        <div class="mb-4">
-            <label class="block text-sm text-slate-400 mb-1">📎 وسائط (صورة / فيديو / كلاهما)</label>
-            <div class="flex flex-wrap gap-3">
-                <label class="w-20 h-20 rounded-xl border-2 border-dashed border-slate-500 flex flex-col items-center justify-center cursor-pointer hover:border-green-500 transition">
-                    <i class="fas fa-cloud-upload-alt text-xl text-slate-400"></i>
-                    <span class="text-[10px] text-slate-500">رفع</span>
-                    <input type="file" class="hidden" accept="image/*,video/*" @change="uploadPostMedia($event)" multiple>
-                </label>
-                <template x-for="(media, idx) in postForm.media" :key="idx">
-                    <div class="relative w-20 h-20 rounded-xl overflow-hidden bg-slate-700 border border-slate-600 group">
-                        <img x-show="media.type && media.type.startsWith('image')" :src="media.url" class="w-full h-full object-cover">
-                        <video x-show="media.type && media.type.startsWith('video')" :src="media.url" class="w-full h-full object-cover"></video>
-                        <div x-show="!media.type || (!media.type.startsWith('image') && !media.type.startsWith('video'))" class="w-full h-full flex items-center justify-center"><i class="fas fa-file text-xl text-slate-400"></i></div>
-                        <button @click="removePostMedia(idx)" class="absolute inset-0 bg-red-600/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition"><i class="fas fa-trash text-white"></i></button>
-                    </div>
-                </template>
-            </div>
-        </div>
+        <!-- ═══ STEP 1: Content ═══ -->
+        <div x-show="postStep === 1">
 
-        <div class="mb-4">
-            <label class="block text-sm text-slate-400 mb-1">📢 القنوات المستهدفة</label>
-            <div class="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-40 overflow-auto bg-slate-900/50 rounded-xl p-3">
-                <template x-for="ch in channels" :key="ch.id">
-                    <label class="flex items-center gap-2 p-2 rounded-lg cursor-pointer transition" :class="postForm.channelIds.includes(ch.id) ? 'bg-green-500/20 border border-green-500/30' : 'bg-slate-800 border border-transparent hover:border-slate-600'">
-                        <input type="checkbox" :value="ch.id" @change="togglePostChannel(ch.id)" class="accent-green-500" :checked="postForm.channelIds.includes(ch.id)">
-                        <div>
-                            <span class="text-sm" x-text="ch.title || 'غير معروف'"></span>
-                            <span class="text-xs text-slate-500 block" x-text="ch.chat_id"></span>
-                        </div>
-                    </label>
-                </template>
-            </div>
-            <div class="flex gap-2 mt-2">
-                <button @click="selectAllChannels()" class="text-xs px-2 py-1 bg-slate-700 rounded hover:bg-slate-600">اختيار الكل</button>
-                <button @click="postForm.channelIds = []" class="text-xs px-2 py-1 bg-slate-700 rounded hover:bg-slate-600">إلغاء الكل</button>
-            </div>
-        </div>
-
-        <div class="mb-4" x-show="groups.length > 0">
-            <label class="block text-sm text-slate-400 mb-1">👥 مجموعات القنوات</label>
-            <div class="space-y-2">
-                <template x-for="grp in groups.filter(x => !x.parent_id || !groups.find(y => y.id === x.parent_id))" :key="grp.id">
-                    <div>
-                        <button @click="togglePostGroup(grp)" class="px-3 py-1.5 rounded-lg text-sm transition" :class="postForm.groupIds.includes(grp.id) ? 'bg-purple-500/20 border border-purple-500/30 text-purple-300' : 'bg-slate-800 border border-slate-600 text-slate-400 hover:border-slate-500'">
-                            <span x-text="grp.name"></span>
-                            <span class="text-[10px] ml-1 opacity-60" x-text="'(' + (grp.channel_ids||'').split('|').filter(c=>c&&!c.startsWith('GRP')).length + ')'"></span>
-                        </button>
-                        <template x-for="sub in groups.filter(x => x.parent_id === grp.id)" :key="sub.id">
-                            <button @click="togglePostGroup(sub)" class="ml-4 px-3 py-1 rounded-lg text-xs transition" :class="postForm.groupIds.includes(sub.id) ? 'bg-purple-500/20 border border-purple-500/30 text-purple-300' : 'bg-slate-800/50 border border-slate-600 text-slate-500 hover:border-slate-500'">
-                                <span>└─</span>
-                                <span x-text="sub.name"></span>
-                                <span class="ml-1 opacity-60" x-text="'(' + (sub.channel_ids||'').split('|').filter(c=>c&&!c.startsWith('GRP')).length + ')'"></span>
-                            </button>
-                        </template>
-                    </div>
-                </template>
-            </div>
-        </div>
-
-        <div class="mb-4">
-            <label class="block text-sm text-slate-400 mb-1">⏰ الجدولة</label>
-            <div class="flex gap-2 flex-wrap">
-                <button @click="postForm.scheduleType = 'now'" class="px-4 py-2 rounded-lg text-sm transition" :class="postForm.scheduleType === 'now' ? 'bg-green-500/20 border border-green-500/30 text-green-300' : 'bg-slate-800 border border-slate-600 text-slate-400'">📤 فوري</button>
-                <button @click="postForm.scheduleType = 'timed'" class="px-4 py-2 rounded-lg text-sm transition" :class="postForm.scheduleType === 'timed' ? 'bg-amber-500/20 border border-amber-500/30 text-amber-300' : 'bg-slate-800 border border-slate-600 text-slate-400'">📅 مجدول</button>
-                <button @click="postForm.scheduleType = 'cron'" class="px-4 py-2 rounded-lg text-sm transition" :class="postForm.scheduleType === 'cron' ? 'bg-blue-500/20 border border-blue-500/30 text-blue-300' : 'bg-slate-800 border border-slate-600 text-slate-400'">🔄 كرون</button>
-            </div>
-            <div x-show="postForm.scheduleType === 'timed'" class="mt-2">
-                <input type="datetime-local" x-model="postForm.scheduledAt" class="input w-full md:w-auto">
-            </div>
-            <div x-show="postForm.scheduleType === 'cron'" class="mt-2 space-y-2">
-                <input type="text" x-model="postForm.cronExpr" class="input w-full md:w-96" placeholder="مثال: 0 9 * * * (كل يوم الساعة 9 صباحاً)">
+            <!-- Content Type Chips -->
+            <div class="mb-3">
+                <label class="block text-xs text-slate-400 mb-2 font-medium uppercase tracking-wider">نوع المحتوى</label>
                 <div class="flex flex-wrap gap-2">
-                    <button @click="postForm.cronExpr = '0 9 * * *'" class="text-xs px-2 py-1 bg-slate-700 rounded hover:bg-slate-600">كل يوم 9 ص</button>
-                    <button @click="postForm.cronExpr = '0 9,18 * * *'" class="text-xs px-2 py-1 bg-slate-700 rounded hover:bg-slate-600">9 ص + 6 م</button>
-                    <button @click="postForm.cronExpr = '0 */3 * * *'" class="text-xs px-2 py-1 bg-slate-700 rounded hover:bg-slate-600">كل 3 ساعات</button>
-                    <button @click="postForm.cronExpr = '0 12 * * 1-5'" class="text-xs px-2 py-1 bg-slate-700 rounded hover:bg-slate-600">أيام العمل 12 ظ</button>
-                    <button @click="postForm.cronExpr = '0 10 * * 0'" class="text-xs px-2 py-1 bg-slate-700 rounded hover:bg-slate-600">السبت 10 ص</button>
+                    <button @click="insertContentType('info')" class="group px-3.5 py-2 rounded-xl text-xs font-medium bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500/25 hover:border-blue-500/40 transition-all flex items-center gap-1.5"><span>📊</span> <span>معلومة</span></button>
+                    <button @click="insertContentType('question')" class="group px-3.5 py-2 rounded-xl text-xs font-medium bg-purple-500/10 border border-purple-500/20 text-purple-400 hover:bg-purple-500/25 hover:border-purple-500/40 transition-all flex items-center gap-1.5"><span>❓</span> <span>سؤال</span></button>
+                    <button @click="insertContentType('prediction')" class="group px-3.5 py-2 rounded-xl text-xs font-medium bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/25 hover:border-amber-500/40 transition-all flex items-center gap-1.5"><span>🔮</span> <span>توقع</span></button>
+                    <button @click="insertContentType('analysis')" class="group px-3.5 py-2 rounded-xl text-xs font-medium bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/25 hover:border-emerald-500/40 transition-all flex items-center gap-1.5"><span>📋</span> <span>تحليل</span></button>
+                    <button @click="insertContentType('live')" class="group px-3.5 py-2 rounded-xl text-xs font-medium bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/25 hover:border-red-500/40 transition-all flex items-center gap-1.5"><span>🔴</span> <span>مباشر</span></button>
+                    <button @click="insertContentType('result')" class="group px-3.5 py-2 rounded-xl text-xs font-medium bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 hover:bg-cyan-500/25 hover:border-cyan-500/40 transition-all flex items-center gap-1.5"><span>🏁</span> <span>نتيجة</span></button>
                 </div>
-                <p class="text-xs text-slate-500">تنسيق كرون: <code>دقيقة ساعة يوم الشهر يوم_الأسبوع</code></p>
             </div>
-        </div>
 
-        <div class="mb-4">
-            <label class="block text-sm text-slate-400 mb-1">🏷️ الأولوية</label>
-            <div class="flex gap-2">
-                <button @click="postForm.priority = 'low'" class="px-3 py-1.5 rounded-lg text-sm" :class="postForm.priority === 'low' ? 'bg-slate-500/30 border border-slate-400' : 'bg-slate-800 border border-slate-600'">عادي</button>
-                <button @click="postForm.priority = 'normal'" class="px-3 py-1.5 rounded-lg text-sm" :class="postForm.priority === 'normal' ? 'bg-green-500/20 border border-green-500/30' : 'bg-slate-800 border border-slate-600'">متوسط</button>
-                <button @click="postForm.priority = 'high'" class="px-3 py-1.5 rounded-lg text-sm" :class="postForm.priority === 'high' ? 'bg-red-500/20 border border-red-500/30' : 'bg-slate-800 border border-slate-600'">عالي</button>
+            <!-- Placeholders -->
+            <div class="mb-3">
+                <label class="block text-xs text-slate-400 mb-2 font-medium uppercase tracking-wider"> marqueurs dynamiques</label>
+                <div class="flex flex-wrap gap-1.5">
+                    <button @click="insertPlaceholder('company_name')" class="px-2.5 py-1 rounded-lg text-[11px] font-mono bg-slate-800 border border-slate-600/50 text-slate-300 hover:bg-slate-700 hover:border-slate-500 transition">{'{company_name}'}</button>
+                    <button @click="insertPlaceholder('download_link')" class="px-2.5 py-1 rounded-lg text-[11px] font-mono bg-slate-800 border border-slate-600/50 text-slate-300 hover:bg-slate-700 hover:border-slate-500 transition">{'{download_link}'}</button>
+                    <button @click="insertPlaceholder('promo_code')" class="px-2.5 py-1 rounded-lg text-[11px] font-mono bg-slate-800 border border-slate-600/50 text-slate-300 hover:bg-slate-700 hover:border-slate-500 transition">{'{promo_code}'}</button>
+                    <button @click="insertPlaceholder('affiliate_link')" class="px-2.5 py-1 rounded-lg text-[11px] font-mono bg-slate-800 border border-slate-600/50 text-slate-300 hover:bg-slate-700 hover:border-slate-500 transition">{'{affiliate_link}'}</button>
+                </div>
             </div>
-        </div>
 
-        <div x-show="postForm.message || postForm.media.length > 0" class="mb-4 p-4 bg-slate-900/50 rounded-xl border border-slate-700">
-            <h4 class="text-sm text-slate-400 mb-2">👁️ معاينة</h4>
-            <div class="bg-slate-800 rounded-lg p-3">
-                <div x-show="postForm.media.length > 0" class="flex gap-2 mb-2 flex-wrap">
-                    <template x-for="(media, idx) in postForm.media" :key="'preview-'+idx">
-                        <div class="w-32 h-24 rounded-lg overflow-hidden bg-slate-700">
+            <!-- Textarea -->
+            <div class="mb-4">
+                <div class="bg-slate-900/60 rounded-2xl border border-slate-700/50 overflow-hidden focus-within:border-blue-500/40 transition">
+                    <textarea x-model="postForm.message" rows="7" class="w-full bg-transparent p-4 text-sm text-white placeholder-slate-500 outline-none resize-none" placeholder="اكتب نص المنشور هنا... يدعم HTML للتيليغرام"></textarea>
+                    <div class="flex items-center justify-between px-4 py-2 border-t border-slate-700/30">
+                        <div class="flex items-center gap-1">
+                            <button @click="postForm.message += '<b>نص</b>'" class="w-7 h-7 rounded-md bg-slate-700/50 hover:bg-slate-600 flex items-center justify-center text-xs font-bold text-slate-300 transition">B</button>
+                            <button @click="postForm.message += '<i>نص</i>'" class="w-7 h-7 rounded-md bg-slate-700/50 hover:bg-slate-600 flex items-center justify-center text-xs italic text-slate-300 transition">I</button>
+                            <button @click="postForm.message += '<a href=\'url\'>نص</a>'" class="w-7 h-7 rounded-md bg-slate-700/50 hover:bg-slate-600 flex items-center justify-center text-xs text-slate-300 transition">🔗</button>
+                            <button @click="postForm.message += '\n\n'" class="w-7 h-7 rounded-md bg-slate-700/50 hover:bg-slate-600 flex items-center justify-center text-xs text-slate-300 transition">↵</button>
+                        </div>
+                        <span class="text-[11px] text-slate-500 font-mono" x-text="(postForm.message || '').length + ' حرف'"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Media Upload -->
+            <div class="mb-4">
+                <label class="block text-xs text-slate-400 mb-2 font-medium uppercase tracking-wider">📎 وسائط</label>
+                <div class="flex flex-wrap gap-3">
+                    <label class="w-24 h-24 rounded-2xl border-2 border-dashed border-slate-600 flex flex-col items-center justify-center cursor-pointer hover:border-blue-500/50 hover:bg-blue-500/5 transition-all group">
+                        <i class="fas fa-cloud-upload-alt text-xl text-slate-500 group-hover:text-blue-400 transition"></i>
+                        <span class="text-[10px] text-slate-500 mt-1 group-hover:text-blue-400">رفع ملف</span>
+                        <input type="file" class="hidden" accept="image/*,video/*" @change="uploadPostMedia($event)" multiple>
+                    </label>
+                    <template x-for="(media, idx) in postForm.media" :key="idx">
+                        <div class="relative w-24 h-24 rounded-2xl overflow-hidden bg-slate-800 border border-slate-600/50 group">
                             <img x-show="media.type && media.type.startsWith('image')" :src="media.url" class="w-full h-full object-cover">
                             <video x-show="media.type && media.type.startsWith('video')" :src="media.url" class="w-full h-full object-cover"></video>
+                            <div x-show="!media.type || (!media.type.startsWith('image') && !media.type.startsWith('video'))" class="w-full h-full flex items-center justify-center"><i class="fas fa-file text-xl text-slate-500"></i></div>
+                            <button @click="removePostMedia(idx)" class="absolute inset-0 bg-red-600/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition"><i class="fas fa-trash text-white text-sm"></i></button>
                         </div>
                     </template>
                 </div>
-                <p class="text-sm whitespace-pre-wrap" x-html="postForm.message || '(بدون نص)'"></p>
             </div>
-            <div class="mt-2 text-xs text-slate-500">
-                <span x-text="'📢 ' + (postForm.channelIds.length || 0) + ' قناة'"></span>
-                <span x-show="postForm.groupIds.length > 0" x-text="' | 👥 ' + (postForm.groupIds.length || 0) + ' مجموعة'"></span>
-                <span x-show="postForm.scheduleType !== 'now'" x-text="' | ⏰ ' + (postForm.scheduleType === 'timed' ? 'مجدول' : 'كرون')"></span>
+
+            <!-- Next Button -->
+            <div class="flex justify-end">
+                <button @click="if(postForm.message || postForm.media.length) postStep = 2" class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm font-medium hover:opacity-90 transition flex items-center gap-2" :disabled="!postForm.message && postForm.media.length === 0" :class="(!postForm.message && postForm.media.length === 0) ? 'opacity-30 cursor-not-allowed' : ''">
+                    <span>الهدف التالي</span>
+                    <i class="fas fa-arrow-left text-xs"></i>
+                </button>
             </div>
         </div>
 
-        <div class="flex gap-3">
-            <button @click="submitPost()" class="btn btn-primary flex-1" :disabled="!postForm.message && postForm.media.length === 0">
-                <i class="fas fa-paper-plane"></i>
-                <span x-text="postForm.scheduleType === 'now' ? '📤 نشر الآن' : (postForm.scheduleType === 'timed' ? '📅 جدولة' : '🔄 إعداد كرون')"></span>
-            </button>
-            <button @click="closePostComposer()" class="btn" style="background:#475569">إلغاء</button>
+        <!-- ═══ STEP 2: Targets ═══ -->
+        <div x-show="postStep === 2">
+
+            <!-- Search -->
+            <div class="mb-4">
+                <div class="relative">
+                    <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
+                    <input type="text" x-model="postSearch" class="input w-full pl-10" placeholder="🔍 بحث عن قناة...">
+                </div>
+            </div>
+
+            <!-- Channel Grid -->
+            <div class="mb-4">
+                <div class="flex items-center justify-between mb-2">
+                    <label class="text-xs text-slate-400 font-medium uppercase tracking-wider">📢 القنوات</label>
+                    <div class="flex gap-1.5">
+                        <button @click="selectAllChannels()" class="text-[11px] px-2.5 py-1 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition">اختيار الكل</button>
+                        <button @click="postForm.channelIds = []" class="text-[11px] px-2.5 py-1 rounded-lg bg-slate-700/50 text-slate-400 hover:bg-slate-600/50 transition">إلغاء الكل</button>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-48 overflow-auto rounded-2xl bg-slate-900/40 p-3 border border-slate-700/30">
+                    <template x-for="ch in channels.filter(c => !postSearch || (c.title || '').toLowerCase().includes(postSearch.toLowerCase()) || (c.chat_id || '').includes(postSearch))" :key="ch.id">
+                        <label class="flex items-center gap-2.5 p-2.5 rounded-xl cursor-pointer transition-all" :class="postForm.channelIds.includes(ch.id) ? 'bg-green-500/15 border border-green-500/30 shadow-sm shadow-green-500/5' : 'bg-slate-800/60 border border-transparent hover:border-slate-600/50'">
+                            <div class="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0" :class="postForm.channelIds.includes(ch.id) ? 'bg-green-500/20 text-green-400' : 'bg-slate-700 text-slate-500'">
+                                <i x-show="postForm.channelIds.includes(ch.id)" class="fas fa-check text-[10px]"></i>
+                                <span x-show="!postForm.channelIds.includes(ch.id)" x-text="(ch.title || '?')[0]"></span>
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <div class="text-sm truncate" :class="postForm.channelIds.includes(ch.id) ? 'text-white' : 'text-slate-300'" x-text="ch.title || 'غير معروف'"></div>
+                                <div class="text-[10px] text-slate-500 font-mono truncate" x-text="ch.chat_id"></div>
+                            </div>
+                        </label>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Groups -->
+            <div class="mb-4" x-show="groups.length > 0">
+                <label class="block text-xs text-slate-400 mb-2 font-medium uppercase tracking-wider">👥 المجموعات</label>
+                <div class="space-y-1.5 max-h-36 overflow-auto rounded-2xl bg-slate-900/40 p-3 border border-slate-700/30">
+                    <template x-for="grp in groups.filter(x => !x.parent_id || !groups.find(y => y.id === x.parent_id))" :key="grp.id">
+                        <div>
+                            <button @click="togglePostGroup(grp)" class="w-full px-3 py-2 rounded-xl text-sm transition-all flex items-center gap-2" :class="postForm.groupIds.includes(grp.id) ? 'bg-purple-500/15 border border-purple-500/30 text-purple-300' : 'bg-slate-800/60 border border-transparent text-slate-400 hover:border-slate-600/50'">
+                                <span x-text="grp.name" class="flex-1 text-left"></span>
+                                <span class="text-[10px] px-1.5 py-0.5 rounded-md" :class="postForm.groupIds.includes(grp.id) ? 'bg-purple-500/20 text-purple-400' : 'bg-slate-700 text-slate-500'" x-text="(grp.channel_ids||'').split('|').filter(c=>c&&!c.startsWith('GRP')).length + ' قناة'"></span>
+                            </button>
+                            <template x-for="sub in groups.filter(x => x.parent_id === grp.id)" :key="sub.id">
+                                <button @click="togglePostGroup(sub)" class="mr-6 w-[calc(100%-1.5rem)] px-3 py-1.5 rounded-xl text-xs transition-all flex items-center gap-2 mt-1" :class="postForm.groupIds.includes(sub.id) ? 'bg-purple-500/15 border border-purple-500/30 text-purple-400' : 'bg-slate-800/40 border border-transparent text-slate-500 hover:border-slate-600/50'">
+                                    <span class="text-slate-600">└─</span>
+                                    <span x-text="sub.name" class="flex-1 text-left"></span>
+                                    <span class="text-[10px]" x-text="(sub.channel_ids||'').split('|').filter(c=>c&&!c.startsWith('GRP')).length + ' قناة'"></span>
+                                </button>
+                            </template>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Selected count + nav -->
+            <div class="flex items-center justify-between">
+                <button @click="postStep = 1" class="px-4 py-2.5 rounded-xl bg-slate-700/50 text-slate-400 text-sm hover:bg-slate-600/50 transition flex items-center gap-2">
+                    <i class="fas fa-arrow-right text-xs"></i>
+                    <span>السابق</span>
+                </button>
+                <div class="text-sm text-slate-400">
+                    <span class="text-green-400 font-bold" x-text="postForm.channelIds.length"></span> قناة مختارة
+                    <span x-show="postForm.groupIds.length > 0" class="text-purple-400 font-bold" x-text="' | ' + postForm.groupIds.length + ' مجموعة'"></span>
+                </div>
+                <button @click="if(postForm.channelIds.length || postForm.groupIds.length) postStep = 3" class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm font-medium hover:opacity-90 transition flex items-center gap-2" :disabled="!postForm.channelIds.length && !postForm.groupIds.length" :class="(!postForm.channelIds.length && !postForm.groupIds.length) ? 'opacity-30 cursor-not-allowed' : ''">
+                    <span>الجدولة</span>
+                    <i class="fas fa-arrow-left text-xs"></i>
+                </button>
+            </div>
         </div>
+
+        <!-- ═══ STEP 3: Schedule + Send ═══ -->
+        <div x-show="postStep === 3">
+
+            <!-- Schedule Type Cards -->
+            <div class="mb-5">
+                <label class="block text-xs text-slate-400 mb-3 font-medium uppercase tracking-wider">⏰ نوع الإرسال</label>
+                <div class="grid grid-cols-3 gap-3">
+                    <button @click="postForm.scheduleType = 'now'" class="p-4 rounded-2xl text-center transition-all border" :class="postForm.scheduleType === 'now' ? 'bg-green-500/15 border-green-500/40 shadow-lg shadow-green-500/10' : 'bg-slate-800/60 border-slate-700/30 hover:border-slate-500/50'">
+                        <div class="text-2xl mb-1">📤</div>
+                        <div class="text-sm font-medium" :class="postForm.scheduleType === 'now' ? 'text-green-400' : 'text-slate-300'">فوري</div>
+                        <div class="text-[10px] mt-0.5" :class="postForm.scheduleType === 'now' ? 'text-green-500/70' : 'text-slate-500'">نشر الآن</div>
+                    </button>
+                    <button @click="postForm.scheduleType = 'timed'" class="p-4 rounded-2xl text-center transition-all border" :class="postForm.scheduleType === 'timed' ? 'bg-amber-500/15 border-amber-500/40 shadow-lg shadow-amber-500/10' : 'bg-slate-800/60 border-slate-700/30 hover:border-slate-500/50'">
+                        <div class="text-2xl mb-1">📅</div>
+                        <div class="text-sm font-medium" :class="postForm.scheduleType === 'timed' ? 'text-amber-400' : 'text-slate-300'">مجدول</div>
+                        <div class="text-[10px] mt-0.5" :class="postForm.scheduleType === 'timed' ? 'text-amber-500/70' : 'text-slate-500'">وقت محدد</div>
+                    </button>
+                    <button @click="postForm.scheduleType = 'cron'" class="p-4 rounded-2xl text-center transition-all border" :class="postForm.scheduleType === 'cron' ? 'bg-blue-500/15 border-blue-500/40 shadow-lg shadow-blue-500/10' : 'bg-slate-800/60 border-slate-700/30 hover:border-slate-500/50'">
+                        <div class="text-2xl mb-1">🔄</div>
+                        <div class="text-sm font-medium" :class="postForm.scheduleType === 'cron' ? 'text-blue-400' : 'text-slate-300'">كرون</div>
+                        <div class="text-[10px] mt-0.5" :class="postForm.scheduleType === 'cron' ? 'text-blue-500/70' : 'text-slate-500'">تلقائي متكرر</div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Timed Picker -->
+            <div x-show="postForm.scheduleType === 'timed'" class="mb-5">
+                <label class="block text-xs text-slate-400 mb-2 font-medium">حدد الوقت</label>
+                <input type="datetime-local" x-model="postForm.scheduledAt" class="input w-full md:w-auto">
+            </div>
+
+            <!-- Cron Input -->
+            <div x-show="postForm.scheduleType === 'cron'" class="mb-5">
+                <label class="block text-xs text-slate-400 mb-2 font-medium">تعبير كرون</label>
+                <div class="bg-slate-900/60 rounded-2xl border border-slate-700/50 p-3">
+                    <input type="text" x-model="postForm.cronExpr" class="input w-full font-mono" placeholder="0 9 * * *  (كل يوم 9 صباحاً)">
+                    <div class="flex flex-wrap gap-1.5 mt-2">
+                        <button @click="postForm.cronExpr = '0 9 * * *'" class="px-2.5 py-1 rounded-lg text-[11px] bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white transition">كل يوم 9 ص</button>
+                        <button @click="postForm.cronExpr = '0 9,18 * * *'" class="px-2.5 py-1 rounded-lg text-[11px] bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white transition">9 ص + 6 م</button>
+                        <button @click="postForm.cronExpr = '0 */3 * * *'" class="px-2.5 py-1 rounded-lg text-[11px] bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white transition">كل 3 ساعات</button>
+                        <button @click="postForm.cronExpr = '0 12 * * 1-5'" class="px-2.5 py-1 rounded-lg text-[11px] bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white transition">أيام العمل 12 ظ</button>
+                        <button @click="postForm.cronExpr = '0 10 * * 6'" class="px-2.5 py-1 rounded-lg text-[11px] bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white transition">السبت 10 ص</button>
+                    </div>
+                    <p class="text-[10px] text-slate-500 mt-2 font-mono">دقيقة · ساعة · يوم · شهر · يوم_الأسبوع</p>
+                </div>
+            </div>
+
+            <!-- Priority -->
+            <div class="mb-5">
+                <label class="block text-xs text-slate-400 mb-2 font-medium uppercase tracking-wider">🏷️ الأولوية</label>
+                <div class="flex gap-2">
+                    <button @click="postForm.priority = 'low'" class="flex-1 px-3 py-2.5 rounded-xl text-sm font-medium transition-all border" :class="postForm.priority === 'low' ? 'bg-slate-500/20 border-slate-400/40 text-slate-300' : 'bg-slate-800/60 border-slate-700/30 text-slate-500 hover:border-slate-500'">
+                        <span class="inline-block w-2 h-2 rounded-full bg-slate-400 mr-1.5"></span> عادي
+                    </button>
+                    <button @click="postForm.priority = 'normal'" class="flex-1 px-3 py-2.5 rounded-xl text-sm font-medium transition-all border" :class="postForm.priority === 'normal' ? 'bg-green-500/15 border-green-500/40 text-green-400' : 'bg-slate-800/60 border-slate-700/30 text-slate-500 hover:border-slate-500'">
+                        <span class="inline-block w-2 h-2 rounded-full bg-green-400 mr-1.5"></span> متوسط
+                    </button>
+                    <button @click="postForm.priority = 'high'" class="flex-1 px-3 py-2.5 rounded-xl text-sm font-medium transition-all border" :class="postForm.priority === 'high' ? 'bg-red-500/15 border-red-500/40 text-red-400' : 'bg-slate-800/60 border-slate-700/30 text-slate-500 hover:border-slate-500'">
+                        <span class="inline-block w-2 h-2 rounded-full bg-red-400 mr-1.5"></span> عالي
+                    </button>
+                </div>
+            </div>
+
+            <!-- Live Preview Card -->
+            <div x-show="postForm.message || postForm.media.length > 0" class="mb-5">
+                <label class="block text-xs text-slate-400 mb-2 font-medium uppercase tracking-wider">👁️ معاينة</label>
+                <div class="bg-slate-900/80 rounded-2xl border border-slate-700/40 p-4">
+                    <div x-show="postForm.media.length > 0" class="flex gap-2 mb-3 flex-wrap">
+                        <template x-for="(media, idx) in postForm.media" :key="'preview-'+idx">
+                            <div class="w-36 h-24 rounded-xl overflow-hidden bg-slate-800 border border-slate-600/30">
+                                <img x-show="media.type && media.type.startsWith('image')" :src="media.url" class="w-full h-full object-cover">
+                                <video x-show="media.type && media.type.startsWith('video')" :src="media.url" class="w-full h-full object-cover"></video>
+                            </div>
+                        </template>
+                    </div>
+                    <div class="bg-slate-800/60 rounded-xl p-3">
+                        <p class="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed" x-html="postForm.message || '(بدون نص)'"></p>
+                    </div>
+                    <div class="flex items-center gap-3 mt-3 text-[11px] text-slate-500">
+                        <span class="flex items-center gap-1"><i class="fas fa-bullhorn text-green-500/70"></i> <span x-text="postForm.channelIds.length + ' قناة'"></span></span>
+                        <span x-show="postForm.groupIds.length > 0" class="flex items-center gap-1"><i class="fas fa-users text-purple-500/70"></i> <span x-text="postForm.groupIds.length + ' مجموعة'"></span></span>
+                        <span class="flex items-center gap-1"><i class="fas fa-clock text-blue-500/70"></i> <span x-text="postForm.scheduleType === 'now' ? 'فوري' : (postForm.scheduleType === 'timed' ? 'مجدول' : 'كرون')"></span></span>
+                        <span class="flex items-center gap-1"><i class="fas fa-flag text-amber-500/70"></i> <span x-text="postForm.priority === 'low' ? 'عادي' : (postForm.priority === 'normal' ? 'متوسط' : 'عالي')"></span></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="flex items-center justify-between pt-2 border-t border-slate-700/30">
+                <button @click="postStep = 2" class="px-4 py-2.5 rounded-xl bg-slate-700/50 text-slate-400 text-sm hover:bg-slate-600/50 transition flex items-center gap-2">
+                    <i class="fas fa-arrow-right text-xs"></i>
+                    <span>السابق</span>
+                </button>
+                <div class="flex gap-3">
+                    <button @click="closePostComposer()" class="px-5 py-2.5 rounded-xl bg-slate-700/50 text-slate-400 text-sm hover:bg-slate-600/50 transition">إلغاء</button>
+                    <button @click="submitPost()" class="px-8 py-2.5 rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 text-white text-sm font-bold hover:opacity-90 transition flex items-center gap-2 shadow-lg shadow-green-500/20" :disabled="!postForm.message && postForm.media.length === 0" :class="(!postForm.message && postForm.media.length === 0) ? 'opacity-30 cursor-not-allowed' : ''">
+                        <i class="fas fa-paper-plane text-xs"></i>
+                        <span x-text="postForm.scheduleType === 'now' ? '📤 نشر الآن' : (postForm.scheduleType === 'timed' ? '📅 جدولة' : '🔄 إعداد كرون')"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
     </div>
 </div>
 
@@ -1656,6 +1782,8 @@ function channelsApp() {
 
         // === Post Composer ===
         showPostComposer: false,
+        postStep: 1,
+        postSearch: '',
         postForm: {
             message: '',
             media: [],
@@ -1668,6 +1796,8 @@ function channelsApp() {
         },
         openPostComposer() {
             this.postForm = { message: '', media: [], channelIds: [], groupIds: [], scheduleType: 'now', scheduledAt: '', cronExpr: '', priority: 'normal' };
+            this.postStep = 1;
+            this.postSearch = '';
             this.showPostComposer = true;
         },
         closePostComposer() { this.showPostComposer = false; },
