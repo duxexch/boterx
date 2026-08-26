@@ -558,6 +558,11 @@ const I18N = {
         campaign_preview: '👁️ Campaign Preview', launch_now: '🚀 Launch Now',
         select_all: 'Select All', clear_all: 'Clear All',
         previous: 'Previous', next: 'Next',
+        smart_posting_monitor: 'Smart Posting Monitor',
+        posting_pending: 'Pending', posting_channels_today: 'Channels posted today',
+        posting_total_today: 'Total posts today', posting_sent: 'Sent',
+        parent_group: 'Parent Group', sub_groups: 'Sub-groups',
+        create_group: 'Create Group', no_groups: 'No groups', refresh: 'Refresh',
     }
 };
 
@@ -904,16 +909,5 @@ function globalSearchApp() {
             this.results = results.slice(0, 10);
             this.loading = false;
         }
-        smart_posting_monitor: { ar: 'مراقبة النشر الذكي', en: 'Smart Posting Monitor' },
-        posting_pending: { ar: 'في الانتظار', en: 'Pending' },
-        posting_channels_today: { ar: 'قنوات نشرت اليوم', en: 'Channels posted today' },
-        posting_total_today: { ar: 'إجمالي منشورات اليوم', en: 'Total posts today' },
-        posting_sent: { ar: 'تم الإرسال', en: 'Sent' },
-        parent_group: { ar: 'المجموعة الأب', en: 'Parent Group' },
-        sub_groups: { ar: 'مجموعات فرعية', en: 'Sub-groups' },
-        create_group: { ar: 'إنشاء مجموعة', en: 'Create Group' },
-        no_groups: { ar: 'لا توجد مجموعات', en: 'No groups' },
-        refresh: { ar: 'تحديث', en: 'Refresh' },
-    };
-
+    }
 }
