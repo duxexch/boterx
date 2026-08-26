@@ -1063,15 +1063,35 @@
             <!-- Textarea -->
             <div class="mb-4">
                 <div class="bg-slate-900/60 rounded-2xl border border-slate-700/50 overflow-hidden focus-within:border-blue-500/40 transition">
-                    <textarea x-model="postForm.message" rows="7" class="w-full bg-transparent p-4 text-sm text-white placeholder-slate-500 outline-none resize-none" placeholder="اكتب نص المنشور هنا... يدعم HTML للتيليغرام"></textarea>
+                    <!-- Formatting Toolbar -->
+                    <div class="flex items-center gap-0.5 px-3 py-2 border-b border-slate-700/30 flex-wrap">
+                        <button @click="postForm.message += '<b>نص</b>'" class="w-7 h-7 rounded-md bg-slate-700/50 hover:bg-slate-600 flex items-center justify-center text-xs font-bold text-slate-300 transition" title="Bold">B</button>
+                        <button @click="postForm.message += '<i>نص</i>'" class="w-7 h-7 rounded-md bg-slate-700/50 hover:bg-slate-600 flex items-center justify-center text-xs italic text-slate-300 transition" title="Italic">I</button>
+                        <button @click="postForm.message += '<u>نص</u>'" class="w-7 h-7 rounded-md bg-slate-700/50 hover:bg-slate-600 flex items-center justify-center text-xs underline text-slate-300 transition" title="Underline">U</button>
+                        <button @click="postForm.message += '<s>نص</s>'" class="w-7 h-7 rounded-md bg-slate-700/50 hover:bg-slate-600 flex items-center justify-center text-xs line-through text-slate-300 transition" title="Strikethrough">S</button>
+                        <div class="w-px h-4 bg-slate-600/50 mx-0.5"></div>
+                        <button @click="postForm.message += '<span class=\"tg-spoiler\">نص مخفي</span>'" class="w-7 h-7 rounded-md bg-slate-700/50 hover:bg-slate-600 flex items-center justify-center text-xs text-slate-300 transition" title="Spoiler">🎯</button>
+                        <button @click="postForm.message += '<code>كود</code>'" class="w-7 h-7 rounded-md bg-slate-700/50 hover:bg-slate-600 flex items-center justify-center text-[10px] font-mono text-slate-300 transition" title="Code">&lt;/&gt;</button>
+                        <button @click="postForm.message += '<pre>نص طويل</pre>'" class="w-7 h-7 rounded-md bg-slate-700/50 hover:bg-slate-600 flex items-center justify-center text-[10px] font-mono text-slate-300 transition" title="Pre">[pre]</button>
+                        <div class="w-px h-4 bg-slate-600/50 mx-0.5"></div>
+                        <button @click="postForm.message += '<a href=\"https://\">نص الرابط</a>'" class="w-7 h-7 rounded-md bg-slate-700/50 hover:bg-slate-600 flex items-center justify-center text-xs text-slate-300 transition" title="Link">🔗</button>
+                        <button @click="postForm.message += '<blockquote>اقتباس</blockquote>'" class="w-7 h-7 rounded-md bg-slate-700/50 hover:bg-slate-600 flex items-center justify-center text-xs text-slate-300 transition" title="Quote">❝</button>
+                        <button @click="postForm.message += '<tg-spoiler>نص مخفي</tg-spoiler>'" class="w-7 h-7 rounded-md bg-slate-700/50 hover:bg-slate-600 flex items-center justify-center text-[10px] text-slate-300 transition" title="TG Spoiler">🕵</button>
+                        <div class="w-px h-4 bg-slate-600/50 mx-0.5"></div>
+                        <button @click="postForm.message += '\n\n'" class="w-7 h-7 rounded-md bg-slate-700/50 hover:bg-slate-600 flex items-center justify-center text-xs text-slate-300 transition" title="New Line">↵</button>
+                        <button @click="postForm.message += '───────────\n'" class="w-7 h-7 rounded-md bg-slate-700/50 hover:bg-slate-600 flex items-center justify-center text-[10px] text-slate-300 transition" title="Divider">─</button>
+                    </div>
+                    <textarea x-model="postForm.message" rows="7" class="w-full bg-transparent p-4 text-sm text-white placeholder-slate-500 outline-none resize-none font-[Cairo]" placeholder="اكتب نص المنشور هنا... يدعم HTML للتيليغرام"></textarea>
                     <div class="flex items-center justify-between px-4 py-2 border-t border-slate-700/30">
-                        <div class="flex items-center gap-1">
-                            <button @click="postForm.message += '<b>نص</b>'" class="w-7 h-7 rounded-md bg-slate-700/50 hover:bg-slate-600 flex items-center justify-center text-xs font-bold text-slate-300 transition">B</button>
-                            <button @click="postForm.message += '<i>نص</i>'" class="w-7 h-7 rounded-md bg-slate-700/50 hover:bg-slate-600 flex items-center justify-center text-xs italic text-slate-300 transition">I</button>
-                            <button @click="postForm.message += '<a href=\'url\'>نص</a>'" class="w-7 h-7 rounded-md bg-slate-700/50 hover:bg-slate-600 flex items-center justify-center text-xs text-slate-300 transition">🔗</button>
-                            <button @click="postForm.message += '\n\n'" class="w-7 h-7 rounded-md bg-slate-700/50 hover:bg-slate-600 flex items-center justify-center text-xs text-slate-300 transition">↵</button>
+                        <div class="flex items-center gap-2">
+                            <span class="text-[10px] px-2 py-0.5 rounded-md" :class="parseMode === 'HTML' ? 'bg-cyan-500/10 text-cyan-400' : parseMode === 'Markdown' ? 'bg-purple-500/10 text-purple-400' : 'bg-amber-500/10 text-amber-400'" x-text="parseMode"></span>
                         </div>
-                        <span class="text-[11px] text-slate-500 font-mono" x-text="(postForm.message || '').length + ' حرف'"></span>
+                        <div class="flex items-center gap-2">
+                            <span class="text-[11px] text-slate-500 font-mono" x-text="(postForm.message || '').length + ' / 4096'"></span>
+                            <div class="w-16 h-1.5 rounded-full bg-slate-700/50 overflow-hidden">
+                                <div class="h-full rounded-full transition-all" :class="(postForm.message || '').length > 4096 ? 'bg-red-500' : (postForm.message || '').length > 3500 ? 'bg-amber-500' : 'bg-green-500'" :style="'width:' + Math.min(100, ((postForm.message || '').length / 4096) * 100) + '%'"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1243,6 +1263,52 @@
                 </div>
             </div>
 
+            <!-- Deep Link Buttons Builder -->
+            <div class="mb-5">
+                <div class="flex items-center justify-between mb-3">
+                    <label class="text-xs text-slate-400 font-medium uppercase tracking-wider">🔗 أزرار Deep Link</label>
+                    <button @click="addInlineButton()" class="text-[11px] px-3 py-1.5 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition flex items-center gap-1">
+                        <i class="fas fa-plus text-[9px]"></i> إضافة زر
+                    </button>
+                </div>
+                <div class="space-y-2">
+                    <template x-for="(btn, idx) in inlineButtons" :key="idx">
+                        <div class="flex gap-2 items-center">
+                            <div class="flex-1">
+                                <input type="text" x-model="btn.text" class="input w-full text-sm" placeholder="نص الزر (مثلاً: سجّل الآن)">
+                            </div>
+                            <div class="flex-1">
+                                <input type="url" x-model="btn.url" class="input w-full text-sm font-mono text-ltr" placeholder="https://example.com/join">
+                            </div>
+                            <button @click="removeInlineButton(idx)" class="w-8 h-8 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 flex items-center justify-center shrink-0 transition" x-show="inlineButtons.length > 1">
+                                <i class="fas fa-times text-xs"></i>
+                            </button>
+                        </div>
+                    </template>
+                </div>
+                <!-- Button Preview -->
+                <div x-show="inlineButtons.some(b => b.text)" class="mt-3 bg-slate-800/60 rounded-xl border border-slate-700/30 p-3">
+                    <div class="text-[10px] text-slate-500 mb-2">معاينة الأزرار:</div>
+                    <div class="flex flex-wrap gap-1.5">
+                        <template x-for="(btn, idx) in inlineButtons.filter(b => b.text)" :key="'prev-'+idx">
+                            <div class="px-4 py-1.5 rounded-lg text-xs font-medium bg-slate-700/80 text-blue-300 border border-blue-500/20">
+                                <span x-text="btn.text"></span>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Parse Mode -->
+            <div class="mb-5">
+                <label class="block text-xs text-slate-400 mb-2 font-medium uppercase tracking-wider">📝 تنسيق الرسالة</label>
+                <div class="flex gap-2">
+                    <button @click="parseMode = 'HTML'" class="px-4 py-2 rounded-xl text-xs font-medium transition-all border" :class="parseMode === 'HTML' ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-400' : 'bg-slate-800/60 border-slate-700/30 text-slate-500'">HTML</button>
+                    <button @click="parseMode = 'Markdown'" class="px-4 py-2 rounded-xl text-xs font-medium transition-all border" :class="parseMode === 'Markdown' ? 'bg-purple-500/15 border-purple-500/40 text-purple-400' : 'bg-slate-800/60 border-slate-700/30 text-slate-500'">Markdown</button>
+                    <button @click="parseMode = 'MarkdownV2'" class="px-4 py-2 rounded-xl text-xs font-medium transition-all border" :class="parseMode === 'MarkdownV2' ? 'bg-amber-500/15 border-amber-500/40 text-amber-400' : 'bg-slate-800/60 border-slate-700/30 text-slate-500'">MarkdownV2</button>
+                </div>
+            </div>
+
             <!-- Live Preview Card -->
             <div x-show="postForm.message || postForm.media.length > 0" class="mb-5">
                 <label class="block text-xs text-slate-400 mb-2 font-medium uppercase tracking-wider">👁️ معاينة</label>
@@ -1258,11 +1324,19 @@
                     <div class="bg-slate-800/60 rounded-xl p-3">
                         <p class="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed" x-html="postForm.message || '(بدون نص)'"></p>
                     </div>
+                    <div x-show="inlineButtons.some(b => b.text)" class="mt-2 flex flex-wrap gap-1">
+                        <template x-for="(btn, idx) in inlineButtons.filter(b => b.text)" :key="'prev-btn-'+idx">
+                            <div class="px-3 py-1 rounded-lg text-[11px] bg-slate-700/60 text-blue-300 border border-blue-500/20">
+                                <span x-text="btn.text"></span>
+                            </div>
+                        </template>
+                    </div>
                     <div class="flex items-center gap-3 mt-3 text-[11px] text-slate-500">
                         <span class="flex items-center gap-1"><i class="fas fa-bullhorn text-green-500/70"></i> <span x-text="postForm.channelIds.length + ' قناة'"></span></span>
                         <span x-show="postForm.groupIds.length > 0" class="flex items-center gap-1"><i class="fas fa-users text-purple-500/70"></i> <span x-text="postForm.groupIds.length + ' مجموعة'"></span></span>
                         <span class="flex items-center gap-1"><i class="fas fa-clock text-blue-500/70"></i> <span x-text="postForm.scheduleType === 'now' ? 'فوري' : (postForm.scheduleType === 'timed' ? 'مجدول' : 'كرون')"></span></span>
                         <span class="flex items-center gap-1"><i class="fas fa-flag text-amber-500/70"></i> <span x-text="postForm.priority === 'low' ? 'عادي' : (postForm.priority === 'normal' ? 'متوسط' : 'عالي')"></span></span>
+                        <span x-show="inlineButtons.filter(b => b.text).length > 0" class="flex items-center gap-1"><i class="fas fa-hand-pointer text-blue-400/70"></i> <span x-text="inlineButtons.filter(b => b.text).length + ' زر'"></span></span>
                     </div>
                 </div>
             </div>
@@ -1784,6 +1858,8 @@ function channelsApp() {
         showPostComposer: false,
         postStep: 1,
         postSearch: '',
+        inlineButtons: [{ text: '', url: '' }],
+        parseMode: 'HTML',
         postForm: {
             message: '',
             media: [],
@@ -1798,6 +1874,8 @@ function channelsApp() {
             this.postForm = { message: '', media: [], channelIds: [], groupIds: [], scheduleType: 'now', scheduledAt: '', cronExpr: '', priority: 'normal' };
             this.postStep = 1;
             this.postSearch = '';
+            this.inlineButtons = [{ text: '', url: '' }];
+            this.parseMode = 'HTML';
             this.showPostComposer = true;
         },
         closePostComposer() { this.showPostComposer = false; },
@@ -1834,6 +1912,8 @@ function channelsApp() {
             event.target.value = '';
         },
         removePostMedia(idx) { this.postForm.media.splice(idx, 1); },
+        addInlineButton() { this.inlineButtons.push({ text: '', url: '' }); },
+        removeInlineButton(idx) { this.inlineButtons.splice(idx, 1); if (!this.inlineButtons.length) this.inlineButtons.push({ text: '', url: '' }); },
         insertContentType(type) {
             var templates = {
                 info: '📊 إحصائيات اليوم: فريقك سجّل {stat_highlight}. تابع التحديثات معنا!',
@@ -1868,6 +1948,8 @@ function channelsApp() {
             if (this.postForm.scheduleType === 'timed' && !this.postForm.scheduledAt) return toast('حدد وقت الإرسال', 'warning');
             if (this.postForm.scheduleType === 'cron' && !this.postForm.cronExpr) return toast('اكتب تعبير كرون', 'warning');
             try {
+                const validButtons = (this.inlineButtons || []).filter(b => b.text && b.url);
+                const replyMarkup = validButtons.length ? { inline_keyboard: validButtons.map(b => [{ text: b.text, url: b.url }]) } : '';
                 const payload = {
                     message: this.postForm.message,
                     media_urls: this.postForm.media.map(m => m.url),
@@ -1877,6 +1959,7 @@ function channelsApp() {
                     scheduled_at: this.postForm.scheduledAt,
                     cron_expr: this.postForm.cronExpr,
                     priority: this.postForm.priority,
+                    reply_markup: replyMarkup,
                 };
                 const d = await api('/api/posts/create', { method: 'POST', body: JSON.stringify(payload) });
                 if (d.success) {

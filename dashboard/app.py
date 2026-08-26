@@ -9130,6 +9130,13 @@ def api_create_post():
     scheduled_at = (data.get('scheduled_at') or '').strip()
     cron_expr = (data.get('cron_expr') or '').strip()
     priority = (data.get('priority') or 'normal').strip()
+    reply_markup_raw = data.get('reply_markup') or ''
+    if isinstance(reply_markup_raw, dict):
+        reply_markup_str = json.dumps(reply_markup_raw)
+    elif isinstance(reply_markup_raw, str):
+        reply_markup_str = reply_markup_raw
+    else:
+        reply_markup_str = ''
 
     if not message and not media_urls:
         return jsonify({'error': 'اكتب رسالة أو أضف وسائط'}), 400
@@ -9171,6 +9178,7 @@ def api_create_post():
             'target_name': '',
             'scheduled_at': scheduled_at if schedule_type == 'timed' else '',
             'cron_expr': cron_expr if schedule_type == 'cron' else '',
+                'reply_markup': reply_markup_str,
         }
         entries.append(entry)
 
@@ -9210,6 +9218,7 @@ def api_create_post():
                 'target_name': '',
                 'scheduled_at': scheduled_at if schedule_type == 'timed' else '',
                 'cron_expr': cron_expr if schedule_type == 'cron' else '',
+                'reply_markup': reply_markup_str,
             }
             entries.append(entry)
 
@@ -9221,7 +9230,7 @@ def api_create_post():
         'platform_account_id', 'target_channel_id', 'created_at',
         'created_by', 'status', 'target', 'recipient', 'priority',
         'country', 'media_urls', 'target_user', 'target_name',
-        'scheduled_at', 'cron_expr', 'group_id'
+        'scheduled_at', 'cron_expr', 'group_id', 'reply_markup'
     ])
     for e in entries:
         append_csv('broadcast_queue.csv', e, queue_fieldnames)

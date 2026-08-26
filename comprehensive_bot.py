@@ -7830,8 +7830,8 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         except Exception:
             pass
 
-    def _post_to_single_channel(self, chat_id, msg, media_urls):
-        """نشر لقناة واحدة محددة — نص + وسائط + سقف يومي"""
+    def _post_to_single_channel(self, chat_id, msg, media_urls, inline_buttons=None):
+        """نشر لقناة واحدة محددة — نص + وسائط + سقف يومي + أزرار inline"""
         cid = str(chat_id).strip()
         if not cid:
             return False, 'empty chat_id'
@@ -7839,16 +7839,30 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             return False, 'daily_cap'
         sent_ok = False
         try:
+            reply_markup = None
+            if inline_buttons:
+                try:
+                    if isinstance(inline_buttons, str):
+                        kb = json.loads(inline_buttons)
+                    else:
+                        kb = inline_buttons
+                    if kb and 'inline_keyboard' in kb:
+                        reply_markup = json.dumps(kb)
+                except Exception:
+                    pass
             if media_urls:
                 first = media_urls[0]
-                if any(first.lower().endswith(e) for e in ('.mp4', '.mov', '.avi')):
-                    r = self.api_call('sendVideo', {'chat_id': cid, 'video': first,
-                                                    'caption': msg[:1024] if msg else '', 'parse_mode': 'HTML'})
+                payload = {'chat_id': cid, 'parse_mode': 'HTML'}
+                if first.lower().endswith(('.mp4', '.mov', '.avi')):
+                    payload['video'] = first
+                    payload['caption'] = msg[:1024] if msg else ''
                 else:
-                    r = self.api_call('sendPhoto', {'chat_id': cid, 'photo': first,
-                                                    'caption': msg[:1024] if msg else '', 'parse_mode': 'HTML'})
+                    payload['photo'] = first
+                    payload['caption'] = msg[:1024] if msg else ''
+                if reply_markup:
+                    payload['reply_markup'] = reply_markup
+                r = self.api_call('sendPhoto' if not first.lower().endswith(('.mp4', '.mov', '.avi')) else 'sendVideo', payload)
                 sent_ok = bool(r and r.get('ok'))
-                # بقية الوسائط كألبوم فردي
                 for extra in media_urls[1:4]:
                     if any(extra.lower().endswith(e) for e in ('.mp4', '.mov')):
                         self.api_call('sendVideo', {'chat_id': cid, 'video': extra})
@@ -7856,14 +7870,15 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                         self.api_call('sendPhoto', {'chat_id': cid, 'photo': extra})
                     time.sleep(random.uniform(0.4, 1.2))
             elif msg:
-                r = self.api_call('sendMessage', {'chat_id': cid, 'text': msg, 'parse_mode': 'HTML',
-                                                  'disable_web_page_preview': False})
+                payload = {'chat_id': cid, 'text': msg, 'parse_mode': 'HTML', 'disable_web_page_preview': False}
+                if reply_markup:
+                    payload['reply_markup'] = reply_markup
+                r = self.api_call('sendMessage', payload)
                 sent_ok = bool(r and r.get('ok'))
         except Exception as e:
             logger.error(f"post_to_single_channel {cid}: {e}")
             return False, str(e)
         self._log_channel_post(cid, sent_ok)
-        # jitter بعد كل نشر لقناة — لا نمط ثابت
         time.sleep(random.uniform(0.5, 1.8))
         return sent_ok, 'ok' if sent_ok else 'send_failed'
 
@@ -7878,7 +7893,7 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             with open('broadcast_queue.csv', 'r', encoding='utf-8-sig') as f:
                 reader = csv.DictReader(f)
                 fieldnames = list(reader.fieldnames or ['id','message','target','recipient','priority','country','media_urls','target_user','target_name','created_at','created_by','status'])
-                for fn in ('type', 'target_chat_id', 'target_user_id', 'scheduled_at', 'platform', 'platform_account_id', 'target_channel_id', 'cron_expr', 'group_id', 'delay_override'):
+                for fn in ('type', 'target_chat_id', 'target_user_id', 'scheduled_at', 'platform', 'platform_account_id', 'target_channel_id', 'cron_expr', 'group_id', 'delay_override', 'reply_markup'):
                     if fn not in fieldnames:
                         fieldnames.append(fn)
                 for row in reader:
@@ -7903,6 +7918,13 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                 country_filter = g('country', 'all')
                 media_urls_str = g('media_urls').strip()
                 media_urls = [u for u in media_urls_str.split('|') if u] if media_urls_str else []
+                reply_markup_str = g('reply_markup', '').strip()
+                inline_buttons = None
+                if reply_markup_str:
+                    try:
+                        inline_buttons = json.loads(reply_markup_str)
+                    except Exception:
+                        pass
                 item_id = g('id')
                 platform = g('platform', '').strip().lower() or 'telegram'
                 platform_account_id = g('platform_account_id').strip()
@@ -7988,7 +8010,7 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                                 meta={'entry_type': entry_type, 'target_channel_id': target_channel_id, 'queue_id': item_id}
                             )
                         else:
-                            ok, reason = self._post_to_single_channel(target_chat, send_msg, media_urls)
+                            ok, reason = self._post_to_single_channel(target_chat, send_msg, media_urls, inline_buttons)
 
                         if reason == 'daily_cap':
                             rows.append(item)
