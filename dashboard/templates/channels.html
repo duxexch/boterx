@@ -1128,73 +1128,104 @@
         <!-- ═══ STEP 2: Targets ═══ -->
         <div x-show="postStep === 2">
 
-            <!-- Search -->
-            <div class="mb-4">
-                <div class="relative">
+            <!-- Search + Stats Bar -->
+            <div class="flex items-center gap-3 mb-4">
+                <div class="relative flex-1">
                     <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
-                    <input type="text" x-model="postSearch" class="input w-full pl-10" placeholder="🔍 بحث عن قناة...">
+                    <input type="text" x-model="postSearch" class="input w-full pl-10 pr-4" placeholder="🔍 ابحث عن قناة بالاسم أو ID...">
                 </div>
+                <div class="flex items-center gap-2 shrink-0">
+                    <button @click="selectAllChannels()" class="px-3 py-2 rounded-xl text-xs font-medium bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 border border-blue-500/20 transition flex items-center gap-1.5">
+                        <i class="fas fa-check-double text-[10px]"></i> الكل
+                    </button>
+                    <button @click="postForm.channelIds = []; postForm.groupIds = []" class="px-3 py-2 rounded-xl text-xs font-medium bg-slate-700/50 text-slate-400 hover:bg-slate-600/50 border border-slate-600/30 transition flex items-center gap-1.5">
+                        <i class="fas fa-times text-[10px]"></i> مسح
+                    </button>
+                </div>
+            </div>
+
+            <!-- Selection Summary Bar -->
+            <div x-show="postForm.channelIds.length > 0 || postForm.groupIds.length > 0" class="mb-4 px-4 py-2.5 rounded-xl bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20 flex items-center justify-between">
+                <div class="flex items-center gap-3 text-sm">
+                    <span class="flex items-center gap-1.5"><span class="w-5 h-5 rounded-md bg-green-500/20 flex items-center justify-center text-[10px] text-green-400 font-bold" x-text="postForm.channelIds.length"></span> <span class="text-green-400">قناة</span></span>
+                    <span x-show="postForm.groupIds.length > 0" class="flex items-center gap-1.5"><span class="w-5 h-5 rounded-md bg-purple-500/20 flex items-center justify-center text-[10px] text-purple-400 font-bold" x-text="postForm.groupIds.length"></span> <span class="text-purple-400">مجموعة</span></span>
+                </div>
+                <div class="text-xs text-slate-500">النقر للإضافة / الإزالة</div>
             </div>
 
             <!-- Channel Grid -->
             <div class="mb-4">
-                <div class="flex items-center justify-between mb-2">
-                    <label class="text-xs text-slate-400 font-medium uppercase tracking-wider">📢 القنوات</label>
-                    <div class="flex gap-1.5">
-                        <button @click="selectAllChannels()" class="text-[11px] px-2.5 py-1 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition">اختيار الكل</button>
-                        <button @click="postForm.channelIds = []" class="text-[11px] px-2.5 py-1 rounded-lg bg-slate-700/50 text-slate-400 hover:bg-slate-600/50 transition">إلغاء الكل</button>
-                    </div>
+                <div class="flex items-center justify-between mb-2.5">
+                    <label class="text-xs text-slate-400 font-medium uppercase tracking-wider flex items-center gap-1.5">
+                        <span class="w-5 h-5 rounded bg-slate-700 flex items-center justify-center text-[10px]" x-text="channels.length"></span>
+                        📢 القنوات
+                    </label>
                 </div>
-                <div class="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-48 overflow-auto rounded-2xl bg-slate-900/40 p-3 border border-slate-700/30">
-                    <template x-for="ch in channels.filter(c => !postSearch || (c.title || '').toLowerCase().includes(postSearch.toLowerCase()) || (c.chat_id || '').includes(postSearch))" :key="ch.id">
-                        <label class="flex items-center gap-2.5 p-2.5 rounded-xl cursor-pointer transition-all" :class="postForm.channelIds.includes(ch.id) ? 'bg-green-500/15 border border-green-500/30 shadow-sm shadow-green-500/5' : 'bg-slate-800/60 border border-transparent hover:border-slate-600/50'">
-                            <div class="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0" :class="postForm.channelIds.includes(ch.id) ? 'bg-green-500/20 text-green-400' : 'bg-slate-700 text-slate-500'">
-                                <i x-show="postForm.channelIds.includes(ch.id)" class="fas fa-check text-[10px]"></i>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-64 overflow-auto rounded-2xl bg-slate-900/40 p-3 border border-slate-700/30 scroll-smooth">
+                    <template x-for="ch in channels.filter(c => !postSearch || (c.title || '').toLowerCase().includes(postSearch.toLowerCase()) || String(c.chat_id || '').includes(postSearch))" :key="ch.id">
+                        <div @click="togglePostChannel(ch.id)" class="relative flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all duration-200 select-none" :class="postForm.channelIds.includes(ch.id) ? 'bg-gradient-to-br from-green-500/15 to-emerald-500/10 border-2 border-green-500/40 shadow-md shadow-green-500/10 scale-[1.01]' : 'bg-slate-800/50 border-2 border-transparent hover:border-slate-500/40 hover:bg-slate-800/80'">
+                            <!-- Avatar / Check -->
+                            <div class="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold shrink-0 transition-all" :class="postForm.channelIds.includes(ch.id) ? 'bg-green-500 text-white shadow-lg shadow-green-500/30' : 'bg-slate-700 text-slate-400'">
+                                <i x-show="postForm.channelIds.includes(ch.id)" class="fas fa-check"></i>
                                 <span x-show="!postForm.channelIds.includes(ch.id)" x-text="(ch.title || '?')[0]"></span>
                             </div>
+                            <!-- Info -->
                             <div class="min-w-0 flex-1">
-                                <div class="text-sm truncate" :class="postForm.channelIds.includes(ch.id) ? 'text-white' : 'text-slate-300'" x-text="ch.title || 'غير معروف'"></div>
-                                <div class="text-[10px] text-slate-500 font-mono truncate" x-text="ch.chat_id"></div>
+                                <div class="text-sm font-medium truncate transition-colors" :class="postForm.channelIds.includes(ch.id) ? 'text-white' : 'text-slate-300'" x-text="ch.title || 'غير معروف'"></div>
+                                <div class="flex items-center gap-1.5 mt-0.5">
+                                    <span class="text-[10px] text-slate-500 font-mono" x-text="ch.chat_id"></span>
+                                    <span class="text-[9px] px-1.5 py-0.5 rounded bg-slate-700/80 text-slate-500" x-text="ch.platform || 'tg'"></span>
+                                </div>
                             </div>
-                        </label>
+                            <!-- Active indicator -->
+                            <div class="w-2 h-2 rounded-full shrink-0" :class="ch.is_active === 'yes' ? 'bg-green-400' : 'bg-red-400'"></div>
+                        </div>
                     </template>
+                    <!-- Empty state -->
+                    <div x-show="channels.filter(c => !postSearch || (c.title || '').toLowerCase().includes(postSearch.toLowerCase()) || String(c.chat_id || '').includes(postSearch)).length === 0" class="col-span-full text-center py-8 text-slate-500 text-sm">
+                        <i class="fas fa-search text-2xl mb-2 text-slate-600"></i>
+                        <div>لا توجد قنوات تطابق البحث</div>
+                    </div>
                 </div>
             </div>
 
             <!-- Groups -->
             <div class="mb-4" x-show="groups.length > 0">
-                <label class="block text-xs text-slate-400 mb-2 font-medium uppercase tracking-wider">👥 المجموعات</label>
-                <div class="space-y-1.5 max-h-36 overflow-auto rounded-2xl bg-slate-900/40 p-3 border border-slate-700/30">
+                <label class="block text-xs text-slate-400 mb-2.5 font-medium uppercase tracking-wider flex items-center gap-1.5">
+                    <span class="w-5 h-5 rounded bg-slate-700 flex items-center justify-center text-[10px]" x-text="groups.length"></span>
+                    👥 المجموعات
+                </label>
+                <div class="space-y-1.5 max-h-40 overflow-auto rounded-2xl bg-slate-900/40 p-3 border border-slate-700/30">
                     <template x-for="grp in groups.filter(x => !x.parent_id || !groups.find(y => y.id === x.parent_id))" :key="grp.id">
                         <div>
-                            <button @click="togglePostGroup(grp)" class="w-full px-3 py-2 rounded-xl text-sm transition-all flex items-center gap-2" :class="postForm.groupIds.includes(grp.id) ? 'bg-purple-500/15 border border-purple-500/30 text-purple-300' : 'bg-slate-800/60 border border-transparent text-slate-400 hover:border-slate-600/50'">
-                                <span x-text="grp.name" class="flex-1 text-left"></span>
-                                <span class="text-[10px] px-1.5 py-0.5 rounded-md" :class="postForm.groupIds.includes(grp.id) ? 'bg-purple-500/20 text-purple-400' : 'bg-slate-700 text-slate-500'" x-text="(grp.channel_ids||'').split('|').filter(c=>c&&!c.startsWith('GRP')).length + ' قناة'"></span>
-                            </button>
+                            <div @click="togglePostGroup(grp)" class="w-full px-4 py-2.5 rounded-xl text-sm transition-all flex items-center gap-3 cursor-pointer select-none" :class="postForm.groupIds.includes(grp.id) ? 'bg-gradient-to-br from-purple-500/15 to-violet-500/10 border-2 border-purple-500/40 shadow-md shadow-purple-500/10' : 'bg-slate-800/50 border-2 border-transparent hover:border-slate-500/40'">
+                                <div class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-all" :class="postForm.groupIds.includes(grp.id) ? 'bg-purple-500 text-white' : 'bg-slate-700 text-slate-500'">
+                                    <i x-show="postForm.groupIds.includes(grp.id)" class="fas fa-check text-[10px]"></i>
+                                    <i x-show="!postForm.groupIds.includes(grp.id)" class="fas fa-users text-[10px]"></i>
+                                </div>
+                                <span class="flex-1 text-left font-medium" :class="postForm.groupIds.includes(grp.id) ? 'text-purple-300' : 'text-slate-400'" x-text="grp.name"></span>
+                                <span class="text-[10px] px-2 py-0.5 rounded-lg" :class="postForm.groupIds.includes(grp.id) ? 'bg-purple-500/20 text-purple-400' : 'bg-slate-700/80 text-slate-500'" x-text="(grp.channel_ids||'').split('|').filter(c=>c&&!c.startsWith('GRP')).length + ' قناة'"></span>
+                            </div>
                             <template x-for="sub in groups.filter(x => x.parent_id === grp.id)" :key="sub.id">
-                                <button @click="togglePostGroup(sub)" class="mr-6 w-[calc(100%-1.5rem)] px-3 py-1.5 rounded-xl text-xs transition-all flex items-center gap-2 mt-1" :class="postForm.groupIds.includes(sub.id) ? 'bg-purple-500/15 border border-purple-500/30 text-purple-400' : 'bg-slate-800/40 border border-transparent text-slate-500 hover:border-slate-600/50'">
+                                <div @click="togglePostGroup(sub)" class="mr-8 w-[calc(100%-2rem)] px-3 py-2 rounded-xl text-xs transition-all flex items-center gap-2 mt-1 cursor-pointer select-none" :class="postForm.groupIds.includes(sub.id) ? 'bg-purple-500/10 border border-purple-500/30 text-purple-400' : 'bg-slate-800/30 border border-transparent text-slate-500 hover:border-slate-600/50'">
                                     <span class="text-slate-600">└─</span>
-                                    <span x-text="sub.name" class="flex-1 text-left"></span>
+                                    <span class="flex-1 text-left" x-text="sub.name"></span>
                                     <span class="text-[10px]" x-text="(sub.channel_ids||'').split('|').filter(c=>c&&!c.startsWith('GRP')).length + ' قناة'"></span>
-                                </button>
+                                </div>
                             </template>
                         </div>
                     </template>
                 </div>
             </div>
 
-            <!-- Selected count + nav -->
-            <div class="flex items-center justify-between">
-                <button @click="postStep = 1" class="px-4 py-2.5 rounded-xl bg-slate-700/50 text-slate-400 text-sm hover:bg-slate-600/50 transition flex items-center gap-2">
+            <!-- Bottom Navigation -->
+            <div class="flex items-center justify-between pt-3 border-t border-slate-700/30">
+                <button @click="postStep = 1" class="px-5 py-2.5 rounded-xl bg-slate-700/50 text-slate-400 text-sm hover:bg-slate-600/50 transition flex items-center gap-2 border border-slate-600/30">
                     <i class="fas fa-arrow-right text-xs"></i>
                     <span>السابق</span>
                 </button>
-                <div class="text-sm text-slate-400">
-                    <span class="text-green-400 font-bold" x-text="postForm.channelIds.length"></span> قناة مختارة
-                    <span x-show="postForm.groupIds.length > 0" class="text-purple-400 font-bold" x-text="' | ' + postForm.groupIds.length + ' مجموعة'"></span>
-                </div>
-                <button @click="if(postForm.channelIds.length || postForm.groupIds.length) postStep = 3" class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm font-medium hover:opacity-90 transition flex items-center gap-2" :disabled="!postForm.channelIds.length && !postForm.groupIds.length" :class="(!postForm.channelIds.length && !postForm.groupIds.length) ? 'opacity-30 cursor-not-allowed' : ''">
-                    <span>الجدولة</span>
+                <button @click="if(postForm.channelIds.length || postForm.groupIds.length) postStep = 3" class="px-8 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm font-bold hover:opacity-90 transition flex items-center gap-2 shadow-lg shadow-blue-500/20 disabled:opacity-30 disabled:cursor-not-allowed" :disabled="!postForm.channelIds.length && !postForm.groupIds.length">
+                    <span>الجدولة والإرسال</span>
                     <i class="fas fa-arrow-left text-xs"></i>
                 </button>
             </div>
