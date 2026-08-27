@@ -1109,17 +1109,37 @@
                     <!-- Deep Link Buttons -->
                     <div>
                         <div class="flex items-center justify-between mb-2">
-                            <label class="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">🔗 أزرار Deep Link</label>
-                            <button @click="addInlineButton()" class="text-[10px] px-2.5 py-1 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition flex items-center gap-1"><i class="fas fa-plus text-[8px]"></i> إضافة</button>
+                            <label class="text-[11px] text-slate-400 font-semibold uppercase tracking-wider flex items-center gap-2">
+                                🔗 أزرار Deep Link
+                                <span class="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-bold" x-text="inlineButtons.filter(b => b.text && b.url).length"></span>
+                            </label>
+                            <div class="flex items-center gap-1">
+                                <button @click="deepLinkMode = 'individual'" :class="deepLinkMode === 'individual' ? 'bg-blue-500/20 text-blue-300' : 'text-slate-500 hover:text-slate-300'" class="text-[10px] px-2 py-1 rounded-md transition">فردي</button>
+                                <button @click="deepLinkMode = 'bulk'" :class="deepLinkMode === 'bulk' ? 'bg-blue-500/20 text-blue-300' : 'text-slate-500 hover:text-slate-300'" class="text-[10px] px-2 py-1 rounded-md transition">الجملة</button>
+                            </div>
                         </div>
-                        <div class="space-y-1.5">
+
+                        <!-- Bulk Import Mode -->
+                        <div x-show="deepLinkMode === 'bulk'" class="space-y-2">
+                            <p class="text-[10px] text-slate-500">صق كلمات مع روابط — كل سطر: <code class="text-blue-400">الكلمة | https://رابط</code></p>
+                            <textarea x-model="bulkButtonsText" rows="5" class="input w-full text-xs py-2 font-mono text-ltr leading-relaxed" placeholder="اشترك الآن | https://t.me/channel?start=subscribe&#10;افتح اللعبة | https://t.me/bot?start=play&#10;احصل على مكافأة | https://t.me/bot?start=bonus&#10;شاهد البث | https://t.me/channel?start=live"></textarea>
+                            <div class="flex gap-2">
+                                <button @click="parseBulkButtons()" class="px-3 py-1.5 rounded-lg bg-blue-500/20 text-blue-300 text-[10px] font-bold hover:bg-blue-500/30 transition flex items-center gap-1"><i class="fas fa-check text-[8px]"></i> تطبيق (<span x-text="bulkButtonsText.split('\n').filter(l => l.trim() && l.includes('|')).length"></span>)</button>
+                                <button @click="bulkButtonsText = ''; deepLinkMode = 'individual'" class="px-3 py-1.5 rounded-lg bg-slate-700/50 text-slate-400 text-[10px] hover:bg-slate-600/50 transition">إلغاء</button>
+                            </div>
+                        </div>
+
+                        <!-- Individual Mode -->
+                        <div x-show="deepLinkMode === 'individual'" class="space-y-1.5">
                             <template x-for="(btn, idx) in inlineButtons" :key="idx">
-                                <div class="flex gap-1.5 items-center">
-                                    <input type="text" x-model="btn.text" class="input flex-1 text-xs py-1.5" placeholder="نص الزر">
-                                    <input type="url" x-model="btn.url" class="input flex-1 text-xs py-1.5 font-mono text-ltr" placeholder="https://...">
-                                    <button @click="removeInlineButton(idx)" class="w-6 h-6 rounded-md bg-red-500/10 text-red-400 hover:bg-red-500/20 flex items-center justify-center shrink-0 text-[10px] transition" x-show="inlineButtons.length > 1"><i class="fas fa-times"></i></button>
+                                <div class="flex gap-1.5 items-center group/btn">
+                                    <span class="text-[9px] text-slate-600 w-4 text-center shrink-0 font-mono" x-text="idx + 1"></span>
+                                    <input type="text" x-model="btn.text" class="input flex-1 text-xs py-1.5" placeholder="نص الزر (الكلمة التسويقية)">
+                                    <input type="url" x-model="btn.url" class="input flex-1 text-xs py-1.5 font-mono text-ltr" placeholder="https://t.me/...?start=...">
+                                    <button @click="removeInlineButton(idx)" class="w-6 h-6 rounded-md bg-red-500/10 text-red-400 hover:bg-red-500/20 flex items-center justify-center shrink-0 text-[10px] transition opacity-0 group-hover/btn:opacity-100"><i class="fas fa-times"></i></button>
                                 </div>
                             </template>
+                            <button @click="addInlineButton()" class="w-full py-1.5 rounded-lg border border-dashed border-slate-600/50 text-slate-500 text-[10px] hover:border-blue-500/30 hover:text-blue-400 transition flex items-center justify-center gap-1"><i class="fas fa-plus text-[8px]"></i> إضافة زر</button>
                         </div>
                     </div>
 
@@ -1148,11 +1168,12 @@
                                 </div>
                                 <p class="text-[13px] text-white/90 whitespace-pre-wrap leading-relaxed" x-html="postForm.message || ''"></p>
                                 <div x-show="inlineButtons.some(b => b.text)" class="mt-2 space-y-1">
-                                    <template x-for="(btn, idx) in inlineButtons.filter(b => b.text)" :key="'pb-'+idx">
+                                    <template x-for="(btn, idx) in inlineButtons.filter(b => b.text).slice(0, 20)" :key="'pb-'+idx">
                                         <div class="block w-full text-center px-3 py-1.5 rounded-lg text-[12px] font-medium bg-[#2b5278] text-white border border-[#3a6a94]">
                                             <span x-text="btn.text"></span>
                                         </div>
                                     </template>
+                                    <div x-show="inlineButtons.filter(b => b.text).length > 20" class="text-center text-[9px] text-slate-500">+<span x-text="inlineButtons.filter(b => b.text).length - 20"></span> أزرار أخرى</div>
                                 </div>
                             </div>
                             <div x-show="!postForm.message && postForm.media.length === 0" class="flex items-center justify-center h-20 text-slate-600 text-xs">
@@ -1770,6 +1791,8 @@ function channelsApp() {
         postStep: 1,
         postSearch: '',
         inlineButtons: [{ text: '', url: '' }],
+        deepLinkMode: 'individual',
+        bulkButtonsText: '',
         parseMode: 'HTML',
         postForm: {
             message: '',
@@ -1786,6 +1809,8 @@ function channelsApp() {
             this.postStep = 1;
             this.postSearch = '';
             this.inlineButtons = [{ text: '', url: '' }];
+            this.deepLinkMode = 'individual';
+            this.bulkButtonsText = '';
             this.parseMode = 'HTML';
             this.showPostComposer = true;
         },
@@ -1825,6 +1850,26 @@ function channelsApp() {
         removePostMedia(idx) { this.postForm.media.splice(idx, 1); },
         addInlineButton() { this.inlineButtons.push({ text: '', url: '' }); },
         removeInlineButton(idx) { this.inlineButtons.splice(idx, 1); if (!this.inlineButtons.length) this.inlineButtons.push({ text: '', url: '' }); },
+        parseBulkButtons() {
+            const lines = this.bulkButtonsText.split('\n').filter(l => l.trim());
+            let added = 0;
+            for (const line of lines) {
+                const parts = line.split('|').map(s => s.trim());
+                if (parts.length >= 2 && parts[0] && parts[1]) {
+                    this.inlineButtons.push({ text: parts[0], url: parts[1] });
+                    added++;
+                }
+            }
+            if (added > 0) {
+                this.inlineButtons = this.inlineButtons.filter(b => b.text || b.url);
+                if (!this.inlineButtons.length) this.inlineButtons.push({ text: '', url: '' });
+                toast('تم إضافة ' + added + ' أزرار', 'success');
+                this.bulkButtonsText = '';
+                this.deepLinkMode = 'individual';
+            } else {
+                toast('الصق الكلمة | الرابط في كل سطر', 'warning');
+            }
+        },
         insertContentType(type) {
             var templates = {
                 info: '📊 إحصائيات اليوم: فريقك سجّل {stat_highlight}. تابع التحديثات معنا!',
