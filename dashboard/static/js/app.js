@@ -325,6 +325,16 @@ const I18N = {
         ai_generating: 'جاري التوليد بالـ AI...',
         ai_use_result: 'استخدام في المحرر',
         ai_generate_btn: 'توليد',
+        // Translation
+        translate_btn: 'ترجمة',
+        translate_title: '🌐 ترجمة البوست',
+        translate_subtitle: 'اختر اللغة المطلوبة واترك الباقي على AI',
+        translate_target: 'اللغة المطلوبة',
+        translate_loading: 'جاري الترجمة...',
+        translate_done: 'تمت الترجمة بنجاح',
+        translate_apply: 'تطبيق الترجمة',
+        // Platform preview
+        char_limit_warning: 'تجاوز الحد المسموح للمنصة',
     },
     en: {
         // Sidebar
@@ -642,6 +652,16 @@ const I18N = {
         ai_generating: 'Generating with AI...',
         ai_use_result: 'Use in Editor',
         ai_generate_btn: 'Generate',
+        // Translation
+        translate_btn: 'Translate',
+        translate_title: '🌐 Translate Post',
+        translate_subtitle: 'Choose target language, let AI handle the rest',
+        translate_target: 'Target Language',
+        translate_loading: 'Translating...',
+        translate_done: 'Translation complete',
+        translate_apply: 'Apply Translation',
+        // Platform preview
+        char_limit_warning: 'Exceeds platform character limit',
         smart_posting_monitor: 'Smart Posting Monitor',
         posting_pending: 'Pending', posting_channels_today: 'Channels posted today',
         posting_total_today: 'Total posts today', posting_sent: 'Sent',

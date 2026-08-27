@@ -1019,7 +1019,12 @@
                     <p class="text-[11px] text-slate-500" x-text="t('post_composer_subtitle')"></p>
                 </div>
             </div>
-            <button @click="closePostComposer()" class="w-9 h-9 rounded-xl bg-slate-700/50 hover:bg-red-500/20 flex items-center justify-center transition text-slate-400 hover:text-red-400"><i class="fas fa-times"></i></button>
+            <div class="flex items-center gap-2">
+                <button @click="openTranslateModal()" x-show="postForm.message" class="px-3 py-1.5 rounded-xl bg-gradient-to-r from-cyan-500/15 to-blue-500/15 border border-cyan-500/25 text-cyan-300 text-[11px] font-medium hover:from-cyan-500/25 hover:to-blue-500/25 transition flex items-center gap-1.5">
+                    <i class="fas fa-language text-[10px]"></i> <span x-text="t('translate_btn')"></span>
+                </button>
+                <button @click="closePostComposer()" class="w-9 h-9 rounded-xl bg-slate-700/50 hover:bg-red-500/20 flex items-center justify-center transition text-slate-400 hover:text-red-400"><i class="fas fa-times"></i></button>
+            </div>
         </div>
 
         <!-- Scrollable Body -->
@@ -1147,40 +1152,181 @@
 
                 </div>
 
-                <!-- ═══ RIGHT: Preview + Targets + Settings (2/5) ═══ -->
+                    <!-- ═══ RIGHT: Preview + Targets + Settings (2/5) ═══ -->
                 <div class="lg:col-span-2 space-y-4">
 
-                    <!-- Live Telegram Preview -->
-                    <div class="bg-[#17212b] rounded-2xl border border-slate-700/30 overflow-hidden">
-                        <div class="px-4 py-2.5 bg-[#1e2c3a] flex items-center gap-2">
-                            <div class="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-[10px] text-white font-bold">V</div>
-                            <div>
-                                <div class="text-xs font-medium text-white">VEX Channel</div>
-                                <div class="text-[10px] text-slate-400">online</div>
+                    <!-- Platform Preview Card -->
+                    <div>
+                        <!-- Platform Tabs -->
+                        <div class="flex items-center gap-1 mb-2 overflow-x-auto">
+                            <template x-for="p in platforms" :key="p.id">
+                                <button @click="activePlatform = p.id" class="px-2.5 py-1 rounded-lg text-[10px] font-medium transition whitespace-nowrap flex items-center gap-1" :class="activePlatform === p.id ? p.activeClass : 'bg-slate-800/50 text-slate-500 hover:text-slate-300'">
+                                    <span x-text="p.icon"></span> <span x-text="p.label"></span>
+                                </button>
+                            </template>
+                            <div class="flex-1"></div>
+                            <span class="text-[9px] font-mono px-1.5 py-0.5 rounded" :class="platformCharCount > platformCharLimit ? 'bg-red-500/15 text-red-400' : platformCharCount > platformCharLimit * 0.9 ? 'bg-amber-500/15 text-amber-400' : 'bg-slate-700/50 text-slate-500'" x-text="platformCharCount + '/' + platformCharLimit"></span>
+                        </div>
+
+                        <!-- Telegram Card -->
+                        <div x-show="activePlatform === 'telegram'" class="bg-[#17212b] rounded-2xl border border-slate-700/30 overflow-hidden">
+                            <div class="px-4 py-2.5 bg-[#1e2c3a] flex items-center gap-2">
+                                <div class="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-[10px] text-white font-bold">V</div>
+                                <div>
+                                    <div class="text-xs font-medium text-white">VEX Channel</div>
+                                    <div class="text-[10px] text-[#6d8a9e]">online</div>
+                                </div>
+                            </div>
+                            <div class="p-4 min-h-[120px] max-h-[260px] overflow-y-auto">
+                                <div x-show="postForm.message || postForm.media.length > 0">
+                                    <div x-show="postForm.media.length > 0" class="mb-2">
+                                        <template x-for="(media, idx) in postForm.media.slice(0,2)" :key="'tg-'+idx">
+                                            <div class="rounded-lg overflow-hidden bg-slate-800 mb-1 max-h-28">
+                                                <img x-show="media.type && media.type.startsWith('image')" :src="media.url" class="w-full h-full object-cover">
+                                            </div>
+                                        </template>
+                                    </div>
+                                    <p class="text-[13px] text-white/90 whitespace-pre-wrap leading-relaxed" x-html="postForm.message || ''"></p>
+                                    <div x-show="inlineButtons.some(b => b.text)" class="mt-2 space-y-1">
+                                        <template x-for="(btn, idx) in inlineButtons.filter(b => b.text).slice(0, 20)" :key="'tbb-'+idx">
+                                            <div class="block w-full text-center px-3 py-1.5 rounded-lg text-[12px] font-medium bg-[#2b5278] text-white border border-[#3a6a94]">
+                                                <span x-text="btn.text"></span>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </div>
+                                <div x-show="!postForm.message && postForm.media.length === 0" class="flex items-center justify-center h-20 text-[#6d8a9e] text-xs">
+                                    <span x-text="t('post_preview')"></span>
+                                </div>
                             </div>
                         </div>
-                        <div class="p-4 min-h-[120px] max-h-[260px] overflow-y-auto">
-                            <div x-show="postForm.message || postForm.media.length > 0">
-                                <div x-show="postForm.media.length > 0" class="mb-2">
-                                    <template x-for="(media, idx) in postForm.media.slice(0,2)" :key="'pv-'+idx">
-                                        <div class="rounded-lg overflow-hidden bg-slate-800 mb-1 max-h-28">
+
+                        <!-- WhatsApp Card -->
+                        <div x-show="activePlatform === 'whatsapp'" class="rounded-2xl overflow-hidden" style="background:#0b141a">
+                            <div class="px-4 py-2.5 flex items-center gap-2" style="background:#1f2c34">
+                                <div class="w-7 h-7 rounded-full bg-[#00a884] flex items-center justify-center text-[10px] text-white font-bold">V</div>
+                                <div>
+                                    <div class="text-xs font-medium text-white">VEX Channel</div>
+                                    <div class="text-[10px] text-[#8696a0]">online</div>
+                                </div>
+                            </div>
+                            <div class="p-4 min-h-[120px] max-h-[260px] overflow-y-auto">
+                                <div x-show="postForm.message || postForm.media.length > 0">
+                                    <div class="rounded-xl p-3 max-w-[85%]" style="background:#005c4b">
+                                        <div x-show="postForm.media.length > 0" class="mb-2">
+                                            <template x-for="(media, idx) in postForm.media.slice(0,1)" :key="'wa-'+idx">
+                                                <div class="rounded-lg overflow-hidden mb-1 max-h-32">
+                                                    <img x-show="media.type && media.type.startsWith('image')" :src="media.url" class="w-full h-full object-cover">
+                                                </div>
+                                            </template>
+                                        </div>
+                                        <p class="text-[13px] text-[#e9edef] whitespace-pre-wrap leading-relaxed" x-html="postForm.message || ''"></p>
+                                        <div class="flex items-center justify-end gap-1 mt-1">
+                                            <span class="text-[9px] text-[#8696a0]">now</span>
+                                            <svg class="w-4 h-4 text-[#53bdeb]" viewBox="0 0 16 11" fill="currentColor"><path d="M11.071.653a.457.457 0 0 0-.304-.102.493.493 0 0 0-.381.178l-6.19 7.636-2.011-2.095a.463.463 0 0 0-.659-.003.461.461 0 0 0-.003.66l2.37 2.47c.091.095.211.142.333.142a.458.458 0 0 0 .352-.17l6.545-8.07a.458.458 0 0 0-.052-.647z"/></svg>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div x-show="!postForm.message && postForm.media.length === 0" class="flex items-center justify-center h-20 text-[#8696a0] text-xs">
+                                    <span x-text="t('post_preview')"></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Instagram Card -->
+                        <div x-show="activePlatform === 'instagram'" class="bg-white rounded-2xl overflow-hidden border border-gray-200">
+                            <div class="px-3 py-2 flex items-center gap-2 border-b border-gray-100">
+                                <div class="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400 p-[2px]">
+                                    <div class="w-full h-full rounded-full bg-white flex items-center justify-center text-[9px] font-bold text-gray-800">V</div>
+                                </div>
+                                <div>
+                                    <div class="text-xs font-semibold text-gray-900">vex.deals</div>
+                                    <div class="text-[9px] text-gray-400">Sponsored</div>
+                                </div>
+                            </div>
+                            <div x-show="postForm.media.length > 0" class="aspect-square max-h-[200px] overflow-hidden bg-gray-100">
+                                <template x-for="(media, idx) in postForm.media.slice(0,1)" :key="'ig-'+idx">
+                                    <img x-show="media.type && media.type.startsWith('image')" :src="media.url" class="w-full h-full object-cover">
+                                </template>
+                            </div>
+                            <div class="p-3">
+                                <div class="flex items-center gap-3 mb-2">
+                                    <div class="w-6 h-6 rounded-full bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400 p-[1px]"><div class="w-full h-full rounded-full bg-white"></div></div>
+                                    <span class="text-xs font-semibold text-gray-900">vex.deals</span>
+                                </div>
+                                <p class="text-[12px] text-gray-800 whitespace-pre-wrap leading-relaxed" x-html="(postForm.message || '').replace(/<[^>]+>/g, '')"></p>
+                                <div x-show="postHasHashtags" class="mt-1 text-[11px] text-[#00376b]" x-text="hashtagsText"></div>
+                                <div class="flex items-center gap-4 mt-2 pt-2 border-t border-gray-100">
+                                    <span class="text-gray-500 text-sm">♡</span>
+                                    <span class="text-gray-500 text-sm">💬</span>
+                                    <span class="text-gray-500 text-sm">➤</span>
+                                    <span class="text-gray-500 text-sm ml-auto">☐</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Facebook Card -->
+                        <div x-show="activePlatform === 'facebook'" class="bg-white rounded-2xl overflow-hidden border border-gray-200">
+                            <div class="px-4 py-3 flex items-center gap-3 border-b border-gray-100">
+                                <div class="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-xs text-white font-bold">V</div>
+                                <div>
+                                    <div class="text-[13px] font-semibold text-gray-900">VEX Deals</div>
+                                    <div class="text-[10px] text-gray-500">Just now · 🌍</div>
+                                </div>
+                            </div>
+                            <div class="px-4 py-2">
+                                <p class="text-[13px] text-gray-900 whitespace-pre-wrap leading-relaxed" x-text="postForm.message || ''"></p>
+                            </div>
+                            <div x-show="postForm.media.length > 0" class="border-t border-gray-100">
+                                <template x-for="(media, idx) in postForm.media.slice(0,1)" :key="'fb-'+idx">
+                                    <div class="max-h-[180px] overflow-hidden bg-gray-100">
+                                        <img x-show="media.type && media.type.startsWith('image')" :src="media.url" class="w-full h-full object-cover">
+                                    </div>
+                                </template>
+                            </div>
+                            <div x-show="postForm.message" class="px-4 py-2 border-t border-gray-100 bg-gray-50">
+                                <div class="text-[10px] text-gray-400 truncate" x-text="postForm.message.substring(0, 80) + '...'"></div>
+                            </div>
+                            <div class="px-4 py-2 flex items-center justify-between border-t border-gray-100 text-gray-500 text-xs">
+                                <span>👍 Like</span><span>💬 Comment</span><span>↗️ Share</span>
+                            </div>
+                        </div>
+
+                        <!-- Twitter/X Card -->
+                        <div x-show="activePlatform === 'twitter'" class="bg-black rounded-2xl overflow-hidden border border-gray-800">
+                            <div class="px-4 py-3 flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-xs text-white font-bold">V</div>
+                                <div class="flex-1">
+                                    <div class="flex items-center gap-1">
+                                        <span class="text-[13px] font-bold text-white">VEX Deals</span>
+                                        <svg class="w-4 h-4 text-blue-400" viewBox="0 0 24 24" fill="currentColor"><path d="M22.5 12.5c0-1.58-.875-2.95-2.148-3.6.154-.435.238-.905.238-1.4 0-2.21-1.71-3.998-3.818-3.998-.47 0-.92.084-1.336.25C14.818 2.415 13.51 1.5 12 1.5s-2.816.917-3.437 2.25c-.415-.165-.866-.25-1.336-.25-2.11 0-3.818 1.79-3.818 4 0 .494.083.964.237 1.4-1.272.65-2.147 2.018-2.147 3.6 0 1.495.782 2.798 1.942 3.486-.02.17-.032.34-.032.514 0 2.21 1.708 4 3.818 4 .47 0 .92-.086 1.335-.25.62 1.334 1.926 2.25 3.437 2.25 1.512 0 2.818-.916 3.437-2.25.415.163.865.248 1.336.248 2.11 0 3.818-1.79 3.818-4 0-.174-.012-.344-.033-.513 1.158-.687 1.943-1.99 1.943-3.484zm-6.616-3.334l-4.334 6.5c-.145.217-.382.334-.625.334-.143 0-.288-.04-.416-.126l-.115-.094-2.415-2.415c-.293-.293-.293-.768 0-1.06s.768-.294 1.06 0l1.77 1.767 3.825-5.74c.23-.345.696-.436 1.04-.207.346.23.44.696.21 1.04z"/></svg>
+                                    </div>
+                                    <div class="text-[12px] text-gray-500">@vexdeals</div>
+                                </div>
+                            </div>
+                            <div class="px-4 pb-3">
+                                <p class="text-[14px] text-white whitespace-pre-wrap leading-relaxed" x-text="postForm.message || ''"></p>
+                                <div x-show="postHasHashtags" class="mt-1 text-[13px] text-[#1d9bf0]" x-text="hashtagsText"></div>
+                                <div x-show="postForm.media.length > 0" class="mt-2 rounded-xl overflow-hidden border border-gray-800">
+                                    <template x-for="(media, idx) in postForm.media.slice(0,1)" :key="'tw-'+idx">
+                                        <div class="max-h-[180px] overflow-hidden">
                                             <img x-show="media.type && media.type.startsWith('image')" :src="media.url" class="w-full h-full object-cover">
                                         </div>
                                     </template>
                                 </div>
-                                <p class="text-[13px] text-white/90 whitespace-pre-wrap leading-relaxed" x-html="postForm.message || ''"></p>
-                                <div x-show="inlineButtons.some(b => b.text)" class="mt-2 space-y-1">
-                                    <template x-for="(btn, idx) in inlineButtons.filter(b => b.text).slice(0, 20)" :key="'pb-'+idx">
-                                        <div class="block w-full text-center px-3 py-1.5 rounded-lg text-[12px] font-medium bg-[#2b5278] text-white border border-[#3a6a94]">
-                                            <span x-text="btn.text"></span>
-                                        </div>
-                                    </template>
-                                    <div x-show="inlineButtons.filter(b => b.text).length > 20" class="text-center text-[9px] text-slate-500">+<span x-text="inlineButtons.filter(b => b.text).length - 20"></span> <span x-text="t('more_buttons')"></span></div>
-                                </div>
                             </div>
-                            <div x-show="!postForm.message && postForm.media.length === 0" class="flex items-center justify-center h-20 text-slate-600 text-xs">
-                                <span x-text="t('post_preview')"></span>
+                            <div class="px-4 py-2 flex items-center justify-between border-t border-gray-800 text-gray-500 text-xs">
+                                <span>💬 <span x-text="platformCharCount > 280 ? '1' : '0'"></span></span>
+                                <span>🔁 0</span>
+                                <span>❤️ 0</span>
+                                <span>📊 0</span>
                             </div>
+                        </div>
+
+                        <!-- Character limit warning -->
+                        <div x-show="platformCharCount > platformCharLimit" class="mt-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center gap-2">
+                            <i class="fas fa-exclamation-triangle text-red-400 text-[10px]"></i>
+                            <span class="text-[10px] text-red-400" x-text="t('char_limit_warning') + ' (' + platformCharLimit + ')'"></span>
                         </div>
                     </div>
 
@@ -1370,6 +1516,61 @@
             </button>
             <button @click="generateAiPost()" x-show="!aiLoading" class="px-5 py-2 rounded-xl bg-gradient-to-r from-violet-500 to-fuchsia-600 text-white text-sm font-bold hover:opacity-90 transition flex items-center gap-2 shadow-lg shadow-violet-500/20 disabled:opacity-30" :disabled="!aiForm.keyId">
                 <i class="fas fa-wand-magic-sparkles text-xs"></i> <span x-text="t('ai_generate_btn')"></span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Translation Modal -->
+<div x-show="showTranslateModal" class="modal-overlay" @click.self="closeTranslateModal()" style="display:none" x-cloak>
+    <div class="modal max-w-md">
+        <div class="flex items-center gap-3 mb-4">
+            <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+                <i class="fas fa-language text-white text-sm"></i>
+            </div>
+            <div>
+                <h3 class="font-bold text-lg text-white" x-text="t('translate_title')"></h3>
+                <p class="text-[11px] text-slate-500" x-text="t('translate_subtitle')"></p>
+            </div>
+        </div>
+
+        <!-- Language Grid -->
+        <div class="mb-4">
+            <label class="block text-[11px] text-slate-400 mb-2 font-semibold" x-text="t('translate_target')"></label>
+            <div class="grid grid-cols-3 gap-1.5 max-h-48 overflow-y-auto">
+                <template x-for="lang in languages" :key="lang.code">
+                    <button @click="translateTargetLang = lang.name" class="px-2 py-1.5 rounded-lg text-[10px] font-medium transition border text-center" :class="translateTargetLang === lang.name ? 'bg-cyan-500/15 border-cyan-500/30 text-cyan-300' : 'bg-slate-800/50 border-slate-700/30 text-slate-500 hover:border-slate-500'">
+                        <span x-text="lang.flag"></span> <span x-text="lang.name"></span>
+                    </button>
+                </template>
+            </div>
+        </div>
+
+        <!-- Loading -->
+        <div x-show="translateLoading" class="mb-4 p-4 rounded-xl bg-slate-800/50 border border-slate-700/30 flex items-center justify-center gap-3">
+            <div class="w-5 h-5 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin"></div>
+            <span class="text-sm text-slate-400" x-text="t('translate_loading')"></span>
+        </div>
+
+        <!-- Result -->
+        <div x-show="translateResult" class="mb-4 p-3 rounded-xl bg-slate-800/80 border border-slate-700/50">
+            <div class="text-[11px] text-cyan-400 font-semibold mb-2 flex items-center gap-1"><i class="fas fa-check-circle"></i> <span x-text="t('translate_done')"></span></div>
+            <div class="text-sm text-white/90 whitespace-pre-wrap leading-relaxed max-h-40 overflow-y-auto" x-text="translateResult"></div>
+        </div>
+
+        <!-- Error -->
+        <div x-show="translateError" class="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20">
+            <p class="text-xs text-red-400" x-text="translateError"></p>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex gap-2 justify-end">
+            <button @click="closeTranslateModal()" class="px-4 py-2 rounded-xl bg-slate-700/50 text-slate-400 text-sm hover:bg-slate-600/50 transition border border-slate-600/30" x-text="t('cancel')"></button>
+            <button @click="applyTranslation()" x-show="translateResult" class="px-5 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white text-sm font-bold hover:opacity-90 transition flex items-center gap-2 shadow-lg shadow-cyan-500/20">
+                <i class="fas fa-check text-xs"></i> <span x-text="t('translate_apply')"></span>
+            </button>
+            <button @click="doTranslate()" x-show="!translateLoading && !translateResult" class="px-5 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white text-sm font-bold hover:opacity-90 transition flex items-center gap-2 shadow-lg shadow-cyan-500/20 disabled:opacity-30" :disabled="!translateTargetLang">
+                <i class="fas fa-language text-xs"></i> <span x-text="t('translate_btn')"></span>
             </button>
         </div>
     </div>
@@ -1888,6 +2089,67 @@ function channelsApp() {
             cronExpr: '',
             priority: 'normal',
         },
+        // Platform preview
+        activePlatform: 'telegram',
+        platforms: [
+            { id: 'telegram', icon: '✈️', label: 'Telegram', activeClass: 'bg-blue-500/15 text-blue-300 border border-blue-500/25', charLimit: 4096 },
+            { id: 'whatsapp', icon: '💬', label: 'WhatsApp', activeClass: 'bg-green-500/15 text-green-300 border border-green-500/25', charLimit: 65536 },
+            { id: 'instagram', icon: '📸', label: 'Instagram', activeClass: 'bg-pink-500/15 text-pink-300 border border-pink-500/25', charLimit: 2200 },
+            { id: 'facebook', icon: '📘', label: 'Facebook', activeClass: 'bg-blue-500/15 text-blue-300 border border-blue-500/25', charLimit: 63206 },
+            { id: 'twitter', icon: '🐦', label: 'Twitter/X', activeClass: 'bg-sky-500/15 text-sky-300 border border-sky-500/25', charLimit: 280 },
+        ],
+        get platformCharCount() {
+            return (this.postForm.message || '').length;
+        },
+        get platformCharLimit() {
+            const p = this.platforms.find(p => p.id === this.activePlatform);
+            return p ? p.charLimit : 4096;
+        },
+        get postHasHashtags() {
+            return /#[\w\u0600-\u06FF]+/.test(this.postForm.message || '');
+        },
+        get hashtagsText() {
+            const tags = (this.postForm.message || '').match(/#[\w\u0600-\u06FF]+/g);
+            return tags ? tags.join(' ') : '';
+        },
+        // Translation
+        showTranslateModal: false,
+        translateTargetLang: 'English',
+        translateLoading: false,
+        translateResult: '',
+        translateError: '',
+        languages: [
+            { code: 'en', name: 'English', flag: '🇬🇧' },
+            { code: 'fr', name: 'French', flag: '🇫🇷' },
+            { code: 'es', name: 'Spanish', flag: '🇪🇸' },
+            { code: 'de', name: 'German', flag: '🇩🇪' },
+            { code: 'it', name: 'Italian', flag: '🇮🇹' },
+            { code: 'pt', name: 'Portuguese', flag: '🇵🇹' },
+            { code: 'ru', name: 'Russian', flag: '🇷🇺' },
+            { code: 'tr', name: 'Turkish', flag: '🇹🇷' },
+            { code: 'hi', name: 'Hindi', flag: '🇮🇳' },
+            { code: 'ur', name: 'Urdu', flag: '🇵🇰' },
+            { code: 'id', name: 'Indonesian', flag: '🇮🇩' },
+            { code: 'ms', name: 'Malay', flag: '🇲🇾' },
+            { code: 'th', name: 'Thai', flag: '🇹🇭' },
+            { code: 'vi', name: 'Vietnamese', flag: '🇻🇳' },
+            { code: 'ko', name: 'Korean', flag: '🇰🇷' },
+            { code: 'ja', name: 'Japanese', flag: '🇯🇵' },
+            { code: 'zh', name: 'Chinese', flag: '🇨🇳' },
+            { code: 'ar', name: 'Arabic', flag: '🇸🇦' },
+            { code: 'sw', name: 'Swahili', flag: '🇰🇪' },
+            { code: 'fa', name: 'Persian', flag: '🇮🇷' },
+            { code: 'nl', name: 'Dutch', flag: '🇳🇱' },
+            { code: 'sv', name: 'Swedish', flag: '🇸🇪' },
+            { code: 'pl', name: 'Polish', flag: '🇵🇱' },
+            { code: 'ro', name: 'Romanian', flag: '🇷🇴' },
+            { code: 'cs', name: 'Czech', flag: '🇨🇿' },
+            { code: 'el', name: 'Greek', flag: '🇬🇷' },
+            { code: 'he', name: 'Hebrew', flag: '🇮🇱' },
+            { code: 'bn', name: 'Bengali', flag: '🇧🇩' },
+            { code: 'tl', name: 'Filipino', flag: '🇵🇭' },
+            { code: 'sv', name: 'Swedish', flag: '🇸🇪' },
+        ],
         openPostComposer() {
             this.postForm = { message: '', media: [], channelIds: [], groupIds: [], scheduleType: 'now', scheduledAt: '', cronExpr: '', priority: 'normal' };
             this.postStep = 1;
@@ -1965,6 +2227,46 @@ function channelsApp() {
                 this.postForm.message = (this.postForm.message ? this.postForm.message + '\n\n' : '') + this.aiResult;
                 this.closeAiComposer();
                 toast('تم إدراج النص في المحرر', 'success');
+            }
+        },
+        // Translation methods
+        openTranslateModal() {
+            this.translateResult = '';
+            this.translateError = '';
+            this.translateLoading = false;
+            this.translateTargetLang = 'English';
+            this.showTranslateModal = true;
+        },
+        closeTranslateModal() { this.showTranslateModal = false; },
+        async doTranslate() {
+            if (!this.postForm.message) return toast('اكتب نصاً أولاً', 'warning');
+            if (!this.translateTargetLang) return toast('اختر لغة', 'warning');
+            this.translateLoading = true;
+            this.translateResult = '';
+            this.translateError = '';
+            try {
+                const d = await api('/api/ai/translate', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        text: this.postForm.message,
+                        target_language: this.translateTargetLang,
+                    })
+                });
+                if (d.success) {
+                    this.translateResult = d.text;
+                } else {
+                    this.translateError = d.error || 'Translation failed';
+                }
+            } catch(e) {
+                this.translateError = e.message || 'Network error';
+            }
+            this.translateLoading = false;
+        },
+        applyTranslation() {
+            if (this.translateResult) {
+                this.postForm.message = this.translateResult;
+                this.closeTranslateModal();
+                toast('تم تطبيق الترجمة', 'success');
             }
         },
         togglePostChannel(id) {

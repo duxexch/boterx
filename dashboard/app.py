@@ -3564,6 +3564,44 @@ def api_ai_compose():
         return jsonify({'success': False, 'error': result.get('error', 'Unknown error')}), 400
 
 
+# ===== API — AI Translator (ترجمة بوستات بالذكاء الاصطناعي) =====
+@app.route('/api/ai/translate', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_ai_translate():
+    """
+    ترجم نص بوست إلى لغة عالمية.
+    Body: {text, target_language, key_id}
+    """
+    from ai_composer import translate_post, get_active_keys
+
+    data = request.json or {}
+    text = (data.get('text') or '').strip()
+    target_language = (data.get('target_language') or 'English').strip()
+    key_id = data.get('key_id')
+
+    if not text:
+        return jsonify({'success': False, 'error': 'No text to translate'}), 400
+
+    # Resolve AI key
+    keys = get_active_keys(os.path.join(BASE_DIR, 'boterx.db'))
+    if not keys:
+        return jsonify({'success': False, 'error': 'No active AI keys'}), 400
+
+    key_data = None
+    if key_id:
+        key_data = next((k for k in keys if k['id'] == key_id), None)
+    if not key_data:
+        key_data = keys[0]
+
+    result = translate_post(key_data, text, target_language, BASE_DIR)
+
+    if result.get('success'):
+        return jsonify({'success': True, 'text': result['text'], 'key_used': key_data.get('key_name', '')})
+    else:
+        return jsonify({'success': False, 'error': result.get('error', 'Translation failed')}), 400
+
+
 # ===== API — Stats =====
 
 @app.route('/api/stats')

@@ -275,3 +275,103 @@ def _update_key_usage(key_id, usage, base_dir):
         conn.close()
     except Exception:
         pass
+
+
+# ─── Translation ─────────────────────────────────────────────────
+def translate_post(key_data, text, target_language, base_dir):
+    """
+    Translate a Telegram post to target language.
+    Returns: {'success': True, 'text': '...'} or {'success': False, 'error': '...'}
+    """
+    if not text or not text.strip():
+        return {'success': False, 'error': 'No text to translate'}
+
+    system = (
+        f"أنت مترجم محترف. ترجم النص التالي إلى {target_language}. "
+        "حافظ على أسلوب بوست تليجرام. "
+        "حافظ على تنسيق HTML إن وُجد (<b>, <i>, <a href>). "
+        "أخرج النص المترجم فقط بدون أي شرح."
+    )
+
+    # Reuse the same key resolution logic
+    api_key = key_data.get('api_key', '')
+    base_url = (key_data.get('base_url') or '').rstrip('/')
+    model = key_data.get('default_model', '')
+    temperature = float(key_data.get('temperature', 0.7))
+    max_tokens = int(key_data.get('max_tokens', 1024))
+    timeout = int(key_data.get('timeout_seconds', 60))
+
+    if not api_key:
+        return {'success': False, 'error': 'No API key available'}
+
+    provider = (key_data.get('provider') or '').lower()
+    if not base_url:
+        if 'openrouter' in provider:
+            base_url = 'https://openrouter.ai/api/v1'
+        elif 'openai' in provider:
+            base_url = 'https://api.openai.com/v1'
+        else:
+            base_url = 'https://openrouter.ai/api/v1'
+
+    if not model:
+        model = 'openai/gpt-4o-mini' if 'openrouter' in provider else 'gpt-4o-mini'
+
+    url = base_url + '/chat/completions'
+    headers = {
+        'Authorization': f'Bearer {api_key}',
+        'Content-Type': 'application/json',
+    }
+    if 'openrouter' in provider:
+        headers['HTTP-Referer'] = 'https://vex.deals'
+        headers['X-Title'] = 'VEX Admin Translator'
+
+    payload = {
+        'model': model,
+        'messages': [
+            {'role': 'system', 'content': system},
+            {'role': 'user', 'content': text},
+        ],
+        'temperature': 0.3,
+        'max_tokens': max_tokens,
+    }
+
+    # Try httpx first, fall back to urllib
+    try:
+        import httpx
+        try:
+            with httpx.Client(timeout=float(timeout)) as client:
+                resp = client.post(url, headers=headers, json=payload)
+            if resp.status_code != 200:
+                error_detail = ''
+                try:
+                    error_detail = resp.json().get('error', {}).get('message', resp.text[:200])
+                except Exception:
+                    error_detail = resp.text[:200]
+                return {'success': False, 'error': f'API error {resp.status_code}: {error_detail}'}
+            data = resp.json()
+            content = data.get('choices', [{}])[0].get('message', {}).get('content', '').strip()
+            if not content or len(content) < 5:
+                return {'success': False, 'error': 'Translation returned empty response'}
+            content = _clean_content(content)
+            _update_key_usage(key_data.get('id'), data.get('usage', {}), base_dir)
+            return {'success': True, 'text': content}
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+    except ImportError:
+        import urllib.request, ssl, json as _json
+        try:
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            body = _json.dumps(payload).encode('utf-8')
+            req = urllib.request.Request(url, data=body, headers=headers, method='POST')
+            resp = urllib.request.urlopen(req, timeout=float(timeout), context=ctx)
+            data = _json.loads(resp.read().decode('utf-8'))
+            content = data.get('choices', [{}])[0].get('message', {}).get('content', '').strip()
+            if not content or len(content) < 5:
+                return {'success': False, 'error': 'Translation returned empty response'}
+            content = _clean_content(content)
+            _update_key_usage(key_data.get('id'), data.get('usage', {}), base_dir)
+            return {'success': True, 'text': content}
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
