@@ -1027,6 +1027,22 @@
             </div>
         </div>
 
+        <!-- Platform Selector — First Step -->
+        <div class="shrink-0 pt-4 pb-3 border-b border-slate-700/20">
+            <label class="block text-[11px] text-slate-400 mb-2 font-semibold uppercase tracking-wider" x-text="t('select_platform')"></label>
+            <div class="flex gap-2 overflow-x-auto pb-1">
+                <template x-for="p in platforms" :key="p.id">
+                    <button @click="activePlatform = p.id; selectedPlatformForPost = p.id" class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-[12px] font-medium transition-all whitespace-nowrap border" :class="activePlatform === p.id ? p.activeClass + ' shadow-lg ' + p.shadowClass : 'bg-slate-800/50 border-slate-700/30 text-slate-500 hover:text-slate-300 hover:border-slate-500'">
+                        <span class="text-base" x-text="p.icon"></span>
+                        <div class="text-left">
+                            <div class="font-semibold" x-text="p.label"></div>
+                            <div class="text-[9px] opacity-60" x-text="p.charLimit + ' chars'"></div>
+                        </div>
+                    </button>
+                </template>
+            </div>
+        </div>
+
         <!-- Scrollable Body -->
         <div class="flex-1 overflow-y-auto pt-4" style="min-height:0">
             <div class="grid grid-cols-1 lg:grid-cols-5 gap-5">
@@ -1049,42 +1065,70 @@
                         </div>
                     </div>
 
-                    <!-- Text Editor Card -->
-                    <div class="bg-slate-900/50 rounded-2xl border border-slate-700/40 overflow-hidden focus-within:border-blue-500/30 transition">
-                        <!-- Toolbar -->
-                        <div class="flex items-center gap-0.5 px-2 py-1.5 border-b border-slate-700/30 bg-slate-900/30 flex-wrap">
-                            <button @click="postForm.message += '<b>نص</b>'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-xs font-bold text-slate-300 transition" title="Bold">B</button>
-                            <button @click="postForm.message += '<i>نص</i>'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-xs italic text-slate-300 transition" title="Italic">I</button>
-                            <button @click="postForm.message += '<u>نص</u>'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-xs underline text-slate-300 transition" title="Underline">U</button>
-                            <button @click="postForm.message += '<s>نص</s>'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-xs line-through text-slate-300 transition" title="Strikethrough">S</button>
-                            <div class="w-px h-4 bg-slate-600/40 mx-0.5"></div>
-                            <button @click="postForm.message += '<span class=&quot;tg-spoiler&quot;>نص</span>'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-[11px] text-slate-300 transition" title="Spoiler">🎯</button>
-                            <button @click="postForm.message += '<code>كود</code>'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-[10px] font-mono text-slate-300 transition" title="Code">&lt;/&gt;</button>
-                            <button @click="postForm.message += '<pre>نص</pre>'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-[10px] font-mono text-slate-300 transition" title="Pre">[pre]</button>
-                            <div class="w-px h-4 bg-slate-600/40 mx-0.5"></div>
-                            <button @click="postForm.message += '<a href=&quot;https://&quot;>رابط</a>'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-slate-300 transition" title="Link">🔗</button>
-                            <button @click="postForm.message += '<blockquote>اقتباس</blockquote>'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-slate-300 transition" title="Quote">❝</button>
-                            <div class="w-px h-4 bg-slate-600/40 mx-0.5"></div>
-                            <button @click="postForm.message += '\n\n'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-slate-300 transition" title="سطر">↵</button>
-                            <button @click="postForm.message += '───────────\n'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-slate-300 transition" title="فاصل">─</button>
+                    <!-- Text Editor Card — adapts per platform -->
+                    <div class="rounded-2xl border overflow-hidden focus-within:transition" :class="platformEditorClass">
+                        <!-- Toolbar — platform-aware -->
+                        <div class="flex items-center gap-0.5 px-2 py-1.5 border-b flex-wrap" :class="platformToolbarClass">
+                            <template x-if="activePlatform === 'telegram'">
+                                <div class="flex items-center gap-0.5 flex-wrap">
+                                    <button @click="postForm.message += '<b>نص</b>'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-xs font-bold text-slate-300 transition" title="Bold">B</button>
+                                    <button @click="postForm.message += '<i>نص</i>'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-xs italic text-slate-300 transition" title="Italic">I</button>
+                                    <button @click="postForm.message += '<u>نص</u>'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-xs underline text-slate-300 transition" title="Underline">U</button>
+                                    <button @click="postForm.message += '<s>نص</s>'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-xs line-through text-slate-300 transition" title="Strikethrough">S</button>
+                                    <div class="w-px h-4 bg-slate-600/40 mx-0.5"></div>
+                                    <button @click="postForm.message += '<span class=&quot;tg-spoiler&quot;>نص</span>'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-[11px] text-slate-300 transition" title="Spoiler">🎯</button>
+                                    <button @click="postForm.message += '<code>كود</code>'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-[10px] font-mono text-slate-300 transition" title="Code">&lt;/&gt;</button>
+                                    <button @click="postForm.message += '<pre>نص</pre>'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-[10px] font-mono text-slate-300 transition" title="Pre">[pre]</button>
+                                    <div class="w-px h-4 bg-slate-600/40 mx-0.5"></div>
+                                    <button @click="postForm.message += '<a href=&quot;https://&quot;>رابط</a>'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-slate-300 transition" title="Link">🔗</button>
+                                    <button @click="postForm.message += '<blockquote>اقتباس</blockquote>'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-slate-300 transition" title="Quote">❝</button>
+                                </div>
+                            </template>
+                            <template x-if="activePlatform === 'whatsapp'">
+                                <div class="flex items-center gap-0.5 flex-wrap">
+                                    <button @click="postForm.message += '*نص*'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-xs font-bold text-slate-300 transition">B</button>
+                                    <button @click="postForm.message += '_نص_'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-xs italic text-slate-300 transition">I</button>
+                                    <button @click="postForm.message += '~نص~'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-xs line-through text-slate-300 transition">S</button>
+                                    <button @click="postForm.message += '```كود```'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-[10px] font-mono text-slate-300 transition">&lt;/&gt;</button>
+                                </div>
+                            </template>
+                            <template x-if="activePlatform === 'instagram'">
+                                <div class="flex items-center gap-0.5 flex-wrap">
+                                    <button @click="postForm.message += '#'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-xs text-slate-300 transition font-bold">#</button>
+                                    <button @click="postForm.message += '@'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-xs text-slate-300 transition">@</button>
+                                    <button @click="postForm.message += '\n\n'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-slate-300 transition">↵</button>
+                                </div>
+                            </template>
+                            <template x-if="activePlatform === 'facebook'">
+                                <div class="flex items-center gap-0.5 flex-wrap">
+                                    <button @click="postForm.message += '\n\n'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-slate-300 transition">↵</button>
+                                    <button @click="postForm.message += '───────────\n'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-slate-300 transition">─</button>
+                                </div>
+                            </template>
+                            <template x-if="activePlatform === 'twitter'">
+                                <div class="flex items-center gap-0.5 flex-wrap">
+                                    <button @click="postForm.message += '#'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-xs text-[#1d9bf0] transition font-bold">#</button>
+                                    <button @click="postForm.message += '@'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-xs text-[#1d9bf0] transition">@</button>
+                                </div>
+                            </template>
                         </div>
-                        <textarea x-model="postForm.message" rows="8" class="w-full bg-transparent p-4 text-sm text-white placeholder-slate-600 outline-none resize-none" :placeholder="t('post_editor_placeholder')"></textarea>
-                        <!-- Bottom Bar -->
-                        <div class="flex items-center justify-between px-3 py-1.5 border-t border-slate-700/30 bg-slate-900/20">
+                        <textarea x-model="postForm.message" rows="8" class="w-full bg-transparent p-4 text-sm text-white placeholder-slate-600 outline-none resize-none" :placeholder="platformPlaceholder"></textarea>
+                        <!-- Bottom Bar — platform-aware char counter -->
+                        <div class="flex items-center justify-between px-3 py-1.5 border-t bg-slate-900/20" :class="platformBorderClass">
                             <div class="flex items-center gap-1.5">
-                                <button @click="parseMode = parseMode === 'HTML' ? 'Markdown' : parseMode === 'Markdown' ? 'MarkdownV2' : 'HTML'" class="text-[10px] px-2 py-0.5 rounded-md cursor-pointer transition font-mono" :class="parseMode === 'HTML' ? 'bg-cyan-500/15 text-cyan-400' : parseMode === 'Markdown' ? 'bg-purple-500/15 text-purple-400' : 'bg-amber-500/15 text-amber-400'" x-text="parseMode"></button>
+                                <button @click="parseMode = parseMode === 'HTML' ? 'Markdown' : parseMode === 'Markdown' ? 'MarkdownV2' : 'HTML'" class="text-[10px] px-2 py-0.5 rounded-md cursor-pointer transition font-mono" :class="parseMode === 'HTML' ? 'bg-cyan-500/15 text-cyan-400' : parseMode === 'Markdown' ? 'bg-purple-500/15 text-purple-400' : 'bg-amber-500/15 text-amber-400'" x-text="parseMode" x-show="activePlatform === 'telegram'"></button>
                             </div>
                             <div class="flex items-center gap-2">
-                                <span class="text-[11px] font-mono" :class="(postForm.message || '').length > 4096 ? 'text-red-400' : (postForm.message || '').length > 3500 ? 'text-amber-400' : 'text-slate-500'" x-text="(postForm.message || '').length + '/4096'"></span>
+                                <span class="text-[11px] font-mono" :class="platformCharCount > platformCharLimit ? 'text-red-400' : platformCharCount > platformCharLimit * 0.9 ? 'text-amber-400' : 'text-slate-500'" x-text="platformCharCount + '/' + platformCharLimit"></span>
                                 <div class="w-14 h-1 rounded-full bg-slate-700/50 overflow-hidden">
-                                    <div class="h-full rounded-full transition-all" :class="(postForm.message || '').length > 4096 ? 'bg-red-500' : (postForm.message || '').length > 3500 ? 'bg-amber-500' : 'bg-green-500'" :style="'width:' + Math.min(100, ((postForm.message || '').length / 4096) * 100) + '%'"></div>
+                                    <div class="h-full rounded-full transition-all" :class="platformCharCount > platformCharLimit ? 'bg-red-500' : platformCharCount > platformCharLimit * 0.9 ? 'bg-amber-500' : 'bg-green-500'" :style="'width:' + Math.min(100, (platformCharCount / platformCharLimit) * 100) + '%'"></div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Placeholders -->
-                    <div>
+                    <!-- Placeholders (Telegram only) -->
+                    <div x-show="activePlatform === 'telegram'">
                         <label class="block text-[11px] text-slate-400 mb-2 font-semibold uppercase tracking-wider" x-text="t('dynamic_placeholders')"></label>
                         <div class="flex flex-wrap gap-1.5">
                             <button @click="insertPlaceholder('company_name')" class="px-2.5 py-1 rounded-lg text-[11px] font-mono bg-slate-800 border border-slate-600/40 text-slate-400 hover:bg-slate-700 hover:text-white transition">{'{company_name}'}</button>
@@ -1094,9 +1138,9 @@
                         </div>
                     </div>
 
-                    <!-- Media Upload -->
+                    <!-- Media Upload — platform-aware limits -->
                     <div>
-                        <label class="block text-[11px] text-slate-400 mb-2 font-semibold uppercase tracking-wider" x-text="t('media_label')"></label>
+                        <label class="block text-[11px] text-slate-400 mb-2 font-semibold uppercase tracking-wider" x-text="t('media_label') + ' (' + platformMediaLabel + ')'"></label>
                         <div class="flex flex-wrap gap-2">
                             <label class="w-20 h-20 rounded-xl border-2 border-dashed border-slate-600 flex flex-col items-center justify-center cursor-pointer hover:border-blue-500/50 hover:bg-blue-500/5 transition-all group shrink-0">
                                 <i class="fas fa-plus text-lg text-slate-500 group-hover:text-blue-400 transition"></i>
@@ -1113,8 +1157,8 @@
                         </div>
                     </div>
 
-                    <!-- Deep Link Buttons -->
-                    <div>
+                    <!-- Deep Link Buttons (Telegram only) -->
+                    <div x-show="activePlatform === 'telegram'">
                         <div class="flex items-center justify-between mb-2">
                             <label class="text-[11px] text-slate-400 font-semibold uppercase tracking-wider flex items-center gap-2">
                                 🔗 <span x-text="t('deep_link_buttons').replace('🔗 ', '')"></span>
@@ -1125,18 +1169,14 @@
                                 <button @click="deepLinkMode = 'bulk'" :class="deepLinkMode === 'bulk' ? 'bg-blue-500/20 text-blue-300' : 'text-slate-500 hover:text-slate-300'" class="text-[10px] px-2 py-1 rounded-md transition" x-text="t('deep_link_bulk')"></button>
                             </div>
                         </div>
-
-                        <!-- Bulk Import Mode -->
                         <div x-show="deepLinkMode === 'bulk'" class="space-y-2">
                             <p class="text-[10px] text-slate-500" x-text="t('bulk_import_hint')"></p>
-                            <textarea x-model="bulkButtonsText" rows="5" class="input w-full text-xs py-2 font-mono text-ltr leading-relaxed" placeholder="اشترك الآن | https://t.me/channel?start=subscribe&#10;افتح اللعبة | https://t.me/bot?start=play&#10;احصل على مكافأة | https://t.me/bot?start=bonus&#10;شاهد البث | https://t.me/channel?start=live"></textarea>
+                            <textarea x-model="bulkButtonsText" rows="5" class="input w-full text-xs py-2 font-mono text-ltr leading-relaxed" placeholder="اشترك الآن | https://t.me/channel?start=subscribe&#10;افتح اللعبة | https://t.me/bot?start=play"></textarea>
                             <div class="flex gap-2">
                                 <button @click="parseBulkButtons()" class="px-3 py-1.5 rounded-lg bg-blue-500/20 text-blue-300 text-[10px] font-bold hover:bg-blue-500/30 transition flex items-center gap-1"><i class="fas fa-check text-[8px]"></i> <span x-text="t('bulk_apply')"></span> (<span x-text="bulkButtonsText.split('\n').filter(l => l.trim() && l.includes('|')).length"></span>)</button>
                                 <button @click="bulkButtonsText = ''; deepLinkMode = 'individual'" class="px-3 py-1.5 rounded-lg bg-slate-700/50 text-slate-400 text-[10px] hover:bg-slate-600/50 transition" x-text="t('bulk_cancel')"></button>
                             </div>
                         </div>
-
-                        <!-- Individual Mode -->
                         <div x-show="deepLinkMode === 'individual'" class="space-y-1.5">
                             <template x-for="(btn, idx) in inlineButtons" :key="idx">
                                 <div class="flex gap-1.5 items-center group/btn">
@@ -1150,177 +1190,100 @@
                         </div>
                     </div>
 
+                    <!-- Instagram Hashtag Helper -->
+                    <div x-show="activePlatform === 'instagram'" class="p-3 rounded-xl bg-gradient-to-r from-pink-500/10 to-purple-500/10 border border-pink-500/20">
+                        <label class="block text-[11px] text-pink-300 font-semibold mb-1.5">📸 Instagram Hashtag Tips</label>
+                        <p class="text-[10px] text-slate-400 mb-2">أضف هاشتاجات بـ # في نهاية البوست. Instagram يسمح بـ 30 هاشتاج.</p>
+                        <div class="flex flex-wrap gap-1">
+                            <button @click="postForm.message += ' #vex'" class="px-2 py-0.5 rounded bg-pink-500/15 text-pink-300 text-[9px]">#vex</button>
+                            <button @click="postForm.message += ' #betting'" class="px-2 py-0.5 rounded bg-pink-500/15 text-pink-300 text-[9px]">#betting</button>
+                            <button @click="postForm.message += ' #sports'" class="px-2 py-0.5 rounded bg-pink-500/15 text-pink-300 text-[9px]">#sports</button>
+                            <button @click="postForm.message += ' #casino'" class="px-2 py-0.5 rounded bg-pink-500/15 text-pink-300 text-[9px]">#casino</button>
+                            <button @click="postForm.message += ' #promo'" class="px-2 py-0.5 rounded bg-pink-500/15 text-pink-300 text-[9px]">#promo</button>
+                        </div>
+                    </div>
+
+                    <!-- Twitter/X Character Helper -->
+                    <div x-show="activePlatform === 'twitter'" class="p-3 rounded-xl bg-sky-500/10 border border-sky-500/20">
+                        <label class="block text-[11px] text-sky-300 font-semibold mb-1.5">🐦 Twitter/X Tips</label>
+                        <p class="text-[10px] text-slate-400">الحد الأقصى 280 حرف. الروابط تاخد 23 حرف بغض النظر عن طولها.</p>
+                    </div>
+
                 </div>
 
-                    <!-- ═══ RIGHT: Preview + Targets + Settings (2/5) ═══ -->
+                <!-- ═══ RIGHT: Preview + Targets + Settings (2/5) ═══ -->
                 <div class="lg:col-span-2 space-y-4">
 
-                    <!-- Platform Preview Card -->
+                    <!-- Live Preview Card — platform-specific -->
                     <div>
-                        <!-- Platform Tabs -->
-                        <div class="flex items-center gap-1 mb-2 overflow-x-auto">
-                            <template x-for="p in platforms" :key="p.id">
-                                <button @click="activePlatform = p.id" class="px-2.5 py-1 rounded-lg text-[10px] font-medium transition whitespace-nowrap flex items-center gap-1" :class="activePlatform === p.id ? p.activeClass : 'bg-slate-800/50 text-slate-500 hover:text-slate-300'">
-                                    <span x-text="p.icon"></span> <span x-text="p.label"></span>
-                                </button>
-                            </template>
-                            <div class="flex-1"></div>
-                            <span class="text-[9px] font-mono px-1.5 py-0.5 rounded" :class="platformCharCount > platformCharLimit ? 'bg-red-500/15 text-red-400' : platformCharCount > platformCharLimit * 0.9 ? 'bg-amber-500/15 text-amber-400' : 'bg-slate-700/50 text-slate-500'" x-text="platformCharCount + '/' + platformCharLimit"></span>
-                        </div>
-
                         <!-- Telegram Card -->
                         <div x-show="activePlatform === 'telegram'" class="bg-[#17212b] rounded-2xl border border-slate-700/30 overflow-hidden">
                             <div class="px-4 py-2.5 bg-[#1e2c3a] flex items-center gap-2">
                                 <div class="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-[10px] text-white font-bold">V</div>
-                                <div>
-                                    <div class="text-xs font-medium text-white">VEX Channel</div>
-                                    <div class="text-[10px] text-[#6d8a9e]">online</div>
-                                </div>
+                                <div><div class="text-xs font-medium text-white">VEX Channel</div><div class="text-[10px] text-[#6d8a9e]">online</div></div>
                             </div>
                             <div class="p-4 min-h-[120px] max-h-[260px] overflow-y-auto">
                                 <div x-show="postForm.message || postForm.media.length > 0">
-                                    <div x-show="postForm.media.length > 0" class="mb-2">
-                                        <template x-for="(media, idx) in postForm.media.slice(0,2)" :key="'tg-'+idx">
-                                            <div class="rounded-lg overflow-hidden bg-slate-800 mb-1 max-h-28">
-                                                <img x-show="media.type && media.type.startsWith('image')" :src="media.url" class="w-full h-full object-cover">
-                                            </div>
-                                        </template>
-                                    </div>
+                                    <div x-show="postForm.media.length > 0" class="mb-2"><template x-for="(media, idx) in postForm.media.slice(0,2)" :key="'tg-'+idx"><div class="rounded-lg overflow-hidden bg-slate-800 mb-1 max-h-28"><img x-show="media.type && media.type.startsWith('image')" :src="media.url" class="w-full h-full object-cover"></div></template></div>
                                     <p class="text-[13px] text-white/90 whitespace-pre-wrap leading-relaxed" x-html="postForm.message || ''"></p>
-                                    <div x-show="inlineButtons.some(b => b.text)" class="mt-2 space-y-1">
-                                        <template x-for="(btn, idx) in inlineButtons.filter(b => b.text).slice(0, 20)" :key="'tbb-'+idx">
-                                            <div class="block w-full text-center px-3 py-1.5 rounded-lg text-[12px] font-medium bg-[#2b5278] text-white border border-[#3a6a94]">
-                                                <span x-text="btn.text"></span>
-                                            </div>
-                                        </template>
-                                    </div>
+                                    <div x-show="inlineButtons.some(b => b.text)" class="mt-2 space-y-1"><template x-for="(btn, idx) in inlineButtons.filter(b => b.text).slice(0, 20)" :key="'tbb-'+idx"><div class="block w-full text-center px-3 py-1.5 rounded-lg text-[12px] font-medium bg-[#2b5278] text-white border border-[#3a6a94]"><span x-text="btn.text"></span></div></template></div>
                                 </div>
-                                <div x-show="!postForm.message && postForm.media.length === 0" class="flex items-center justify-center h-20 text-[#6d8a9e] text-xs">
-                                    <span x-text="t('post_preview')"></span>
-                                </div>
+                                <div x-show="!postForm.message && postForm.media.length === 0" class="flex items-center justify-center h-20 text-[#6d8a9e] text-xs"><span x-text="t('post_preview')"></span></div>
                             </div>
                         </div>
-
                         <!-- WhatsApp Card -->
                         <div x-show="activePlatform === 'whatsapp'" class="rounded-2xl overflow-hidden" style="background:#0b141a">
                             <div class="px-4 py-2.5 flex items-center gap-2" style="background:#1f2c34">
                                 <div class="w-7 h-7 rounded-full bg-[#00a884] flex items-center justify-center text-[10px] text-white font-bold">V</div>
-                                <div>
-                                    <div class="text-xs font-medium text-white">VEX Channel</div>
-                                    <div class="text-[10px] text-[#8696a0]">online</div>
-                                </div>
+                                <div><div class="text-xs font-medium text-white">VEX Channel</div><div class="text-[10px] text-[#8696a0]">online</div></div>
                             </div>
                             <div class="p-4 min-h-[120px] max-h-[260px] overflow-y-auto">
                                 <div x-show="postForm.message || postForm.media.length > 0">
                                     <div class="rounded-xl p-3 max-w-[85%]" style="background:#005c4b">
-                                        <div x-show="postForm.media.length > 0" class="mb-2">
-                                            <template x-for="(media, idx) in postForm.media.slice(0,1)" :key="'wa-'+idx">
-                                                <div class="rounded-lg overflow-hidden mb-1 max-h-32">
-                                                    <img x-show="media.type && media.type.startsWith('image')" :src="media.url" class="w-full h-full object-cover">
-                                                </div>
-                                            </template>
-                                        </div>
-                                        <p class="text-[13px] text-[#e9edef] whitespace-pre-wrap leading-relaxed" x-html="postForm.message || ''"></p>
-                                        <div class="flex items-center justify-end gap-1 mt-1">
-                                            <span class="text-[9px] text-[#8696a0]">now</span>
-                                            <svg class="w-4 h-4 text-[#53bdeb]" viewBox="0 0 16 11" fill="currentColor"><path d="M11.071.653a.457.457 0 0 0-.304-.102.493.493 0 0 0-.381.178l-6.19 7.636-2.011-2.095a.463.463 0 0 0-.659-.003.461.461 0 0 0-.003.66l2.37 2.47c.091.095.211.142.333.142a.458.458 0 0 0 .352-.17l6.545-8.07a.458.458 0 0 0-.052-.647z"/></svg>
-                                        </div>
+                                        <div x-show="postForm.media.length > 0" class="mb-2"><template x-for="(media, idx) in postForm.media.slice(0,1)" :key="'wa-'+idx"><div class="rounded-lg overflow-hidden mb-1 max-h-32"><img x-show="media.type && media.type.startsWith('image')" :src="media.url" class="w-full h-full object-cover"></div></template></div>
+                                        <p class="text-[13px] text-[#e9edef] whitespace-pre-wrap leading-relaxed" x-text="postForm.message || ''"></p>
+                                        <div class="flex items-center justify-end gap-1 mt-1"><span class="text-[9px] text-[#8696a0]">now</span><svg class="w-4 h-4 text-[#53bdeb]" viewBox="0 0 16 11" fill="currentColor"><path d="M11.071.653a.457.457 0 0 0-.304-.102.493.493 0 0 0-.381.178l-6.19 7.636-2.011-2.095a.463.463 0 0 0-.659-.003.461.461 0 0 0-.003.66l2.37 2.47c.091.095.211.142.333.142a.458.458 0 0 0 .352-.17l6.545-8.07a.458.458 0 0 0-.052-.647z"/></svg></div>
                                     </div>
                                 </div>
-                                <div x-show="!postForm.message && postForm.media.length === 0" class="flex items-center justify-center h-20 text-[#8696a0] text-xs">
-                                    <span x-text="t('post_preview')"></span>
-                                </div>
+                                <div x-show="!postForm.message && postForm.media.length === 0" class="flex items-center justify-center h-20 text-[#8696a0] text-xs"><span x-text="t('post_preview')"></span></div>
                             </div>
                         </div>
-
                         <!-- Instagram Card -->
                         <div x-show="activePlatform === 'instagram'" class="bg-white rounded-2xl overflow-hidden border border-gray-200">
                             <div class="px-3 py-2 flex items-center gap-2 border-b border-gray-100">
-                                <div class="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400 p-[2px]">
-                                    <div class="w-full h-full rounded-full bg-white flex items-center justify-center text-[9px] font-bold text-gray-800">V</div>
-                                </div>
-                                <div>
-                                    <div class="text-xs font-semibold text-gray-900">vex.deals</div>
-                                    <div class="text-[9px] text-gray-400">Sponsored</div>
-                                </div>
+                                <div class="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400 p-[2px]"><div class="w-full h-full rounded-full bg-white flex items-center justify-center text-[9px] font-bold text-gray-800">V</div></div>
+                                <div><div class="text-xs font-semibold text-gray-900">vex.deals</div><div class="text-[9px] text-gray-400">Sponsored</div></div>
                             </div>
-                            <div x-show="postForm.media.length > 0" class="aspect-square max-h-[200px] overflow-hidden bg-gray-100">
-                                <template x-for="(media, idx) in postForm.media.slice(0,1)" :key="'ig-'+idx">
-                                    <img x-show="media.type && media.type.startsWith('image')" :src="media.url" class="w-full h-full object-cover">
-                                </template>
-                            </div>
+                            <div x-show="postForm.media.length > 0" class="aspect-square max-h-[200px] overflow-hidden bg-gray-100"><template x-for="(media, idx) in postForm.media.slice(0,1)" :key="'ig-'+idx"><img x-show="media.type && media.type.startsWith('image')" :src="media.url" class="w-full h-full object-cover"></template></div>
                             <div class="p-3">
-                                <div class="flex items-center gap-3 mb-2">
-                                    <div class="w-6 h-6 rounded-full bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400 p-[1px]"><div class="w-full h-full rounded-full bg-white"></div></div>
-                                    <span class="text-xs font-semibold text-gray-900">vex.deals</span>
-                                </div>
-                                <p class="text-[12px] text-gray-800 whitespace-pre-wrap leading-relaxed" x-html="(postForm.message || '').replace(/<[^>]+>/g, '')"></p>
+                                <div class="flex items-center gap-3 mb-2"><div class="w-6 h-6 rounded-full bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400 p-[1px]"><div class="w-full h-full rounded-full bg-white"></div></div><span class="text-xs font-semibold text-gray-900">vex.deals</span></div>
+                                <p class="text-[12px] text-gray-800 whitespace-pre-wrap leading-relaxed" x-text="postForm.message || ''"></p>
                                 <div x-show="postHasHashtags" class="mt-1 text-[11px] text-[#00376b]" x-text="hashtagsText"></div>
-                                <div class="flex items-center gap-4 mt-2 pt-2 border-t border-gray-100">
-                                    <span class="text-gray-500 text-sm">♡</span>
-                                    <span class="text-gray-500 text-sm">💬</span>
-                                    <span class="text-gray-500 text-sm">➤</span>
-                                    <span class="text-gray-500 text-sm ml-auto">☐</span>
-                                </div>
+                                <div class="flex items-center gap-4 mt-2 pt-2 border-t border-gray-100"><span class="text-gray-500 text-sm">♡</span><span class="text-gray-500 text-sm">💬</span><span class="text-gray-500 text-sm">➤</span><span class="text-gray-500 text-sm ml-auto">☐</span></div>
                             </div>
                         </div>
-
                         <!-- Facebook Card -->
                         <div x-show="activePlatform === 'facebook'" class="bg-white rounded-2xl overflow-hidden border border-gray-200">
                             <div class="px-4 py-3 flex items-center gap-3 border-b border-gray-100">
                                 <div class="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-xs text-white font-bold">V</div>
-                                <div>
-                                    <div class="text-[13px] font-semibold text-gray-900">VEX Deals</div>
-                                    <div class="text-[10px] text-gray-500">Just now · 🌍</div>
-                                </div>
+                                <div><div class="text-[13px] font-semibold text-gray-900">VEX Deals</div><div class="text-[10px] text-gray-500">Just now · 🌍</div></div>
                             </div>
-                            <div class="px-4 py-2">
-                                <p class="text-[13px] text-gray-900 whitespace-pre-wrap leading-relaxed" x-text="postForm.message || ''"></p>
-                            </div>
-                            <div x-show="postForm.media.length > 0" class="border-t border-gray-100">
-                                <template x-for="(media, idx) in postForm.media.slice(0,1)" :key="'fb-'+idx">
-                                    <div class="max-h-[180px] overflow-hidden bg-gray-100">
-                                        <img x-show="media.type && media.type.startsWith('image')" :src="media.url" class="w-full h-full object-cover">
-                                    </div>
-                                </template>
-                            </div>
-                            <div x-show="postForm.message" class="px-4 py-2 border-t border-gray-100 bg-gray-50">
-                                <div class="text-[10px] text-gray-400 truncate" x-text="postForm.message.substring(0, 80) + '...'"></div>
-                            </div>
-                            <div class="px-4 py-2 flex items-center justify-between border-t border-gray-100 text-gray-500 text-xs">
-                                <span>👍 Like</span><span>💬 Comment</span><span>↗️ Share</span>
-                            </div>
+                            <div class="px-4 py-2"><p class="text-[13px] text-gray-900 whitespace-pre-wrap leading-relaxed" x-text="postForm.message || ''"></p></div>
+                            <div x-show="postForm.media.length > 0" class="border-t border-gray-100"><template x-for="(media, idx) in postForm.media.slice(0,1)" :key="'fb-'+idx"><div class="max-h-[180px] overflow-hidden bg-gray-100"><img x-show="media.type && media.type.startsWith('image')" :src="media.url" class="w-full h-full object-cover"></div></template></div>
+                            <div class="px-4 py-2 flex items-center justify-between border-t border-gray-100 text-gray-500 text-xs"><span>👍 Like</span><span>💬 Comment</span><span>↗️ Share</span></div>
                         </div>
-
                         <!-- Twitter/X Card -->
                         <div x-show="activePlatform === 'twitter'" class="bg-black rounded-2xl overflow-hidden border border-gray-800">
                             <div class="px-4 py-3 flex items-center gap-3">
                                 <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-xs text-white font-bold">V</div>
-                                <div class="flex-1">
-                                    <div class="flex items-center gap-1">
-                                        <span class="text-[13px] font-bold text-white">VEX Deals</span>
-                                        <svg class="w-4 h-4 text-blue-400" viewBox="0 0 24 24" fill="currentColor"><path d="M22.5 12.5c0-1.58-.875-2.95-2.148-3.6.154-.435.238-.905.238-1.4 0-2.21-1.71-3.998-3.818-3.998-.47 0-.92.084-1.336.25C14.818 2.415 13.51 1.5 12 1.5s-2.816.917-3.437 2.25c-.415-.165-.866-.25-1.336-.25-2.11 0-3.818 1.79-3.818 4 0 .494.083.964.237 1.4-1.272.65-2.147 2.018-2.147 3.6 0 1.495.782 2.798 1.942 3.486-.02.17-.032.34-.032.514 0 2.21 1.708 4 3.818 4 .47 0 .92-.086 1.335-.25.62 1.334 1.926 2.25 3.437 2.25 1.512 0 2.818-.916 3.437-2.25.415.163.865.248 1.336.248 2.11 0 3.818-1.79 3.818-4 0-.174-.012-.344-.033-.513 1.158-.687 1.943-1.99 1.943-3.484zm-6.616-3.334l-4.334 6.5c-.145.217-.382.334-.625.334-.143 0-.288-.04-.416-.126l-.115-.094-2.415-2.415c-.293-.293-.293-.768 0-1.06s.768-.294 1.06 0l1.77 1.767 3.825-5.74c.23-.345.696-.436 1.04-.207.346.23.44.696.21 1.04z"/></svg>
-                                    </div>
-                                    <div class="text-[12px] text-gray-500">@vexdeals</div>
-                                </div>
+                                <div class="flex-1"><div class="flex items-center gap-1"><span class="text-[13px] font-bold text-white">VEX Deals</span><svg class="w-4 h-4 text-blue-400" viewBox="0 0 24 24" fill="currentColor"><path d="M22.5 12.5c0-1.58-.875-2.95-2.148-3.6.154-.435.238-.905.238-1.4 0-2.21-1.71-3.998-3.818-3.998-.47 0-.92.084-1.336.25C14.818 2.415 13.51 1.5 12 1.5s-2.816.917-3.437 2.25c-.415-.165-.866-.25-1.336-.25-2.11 0-3.818 1.79-3.818 4 0 .494.083.964.237 1.4-1.272.65-2.147 2.018-2.147 3.6 0 1.495.782 2.798 1.942 3.486-.02.17-.032.34-.032.514 0 2.21 1.708 4 3.818 4 .47 0 .92-.086 1.335-.25.62 1.334 1.926 2.25 3.437 2.25 1.512 0 2.818-.916 3.437-2.25.415.163.865.248 1.336.248 2.11 0 3.818-1.79 3.818-4 0-.174-.012-.344-.033-.513 1.158-.687 1.943-1.99 1.943-3.484zm-6.616-3.334l-4.334 6.5c-.145.217-.382.334-.625.334-.143 0-.288-.04-.416-.126l-.115-.094-2.415-2.415c-.293-.293-.293-.768 0-1.06s.768-.294 1.06 0l1.77 1.767 3.825-5.74c.23-.345.696-.436 1.04-.207.346.23.44.696.21 1.04z"/></svg></div><div class="text-[12px] text-gray-500">@vexdeals</div></div>
                             </div>
                             <div class="px-4 pb-3">
                                 <p class="text-[14px] text-white whitespace-pre-wrap leading-relaxed" x-text="postForm.message || ''"></p>
                                 <div x-show="postHasHashtags" class="mt-1 text-[13px] text-[#1d9bf0]" x-text="hashtagsText"></div>
-                                <div x-show="postForm.media.length > 0" class="mt-2 rounded-xl overflow-hidden border border-gray-800">
-                                    <template x-for="(media, idx) in postForm.media.slice(0,1)" :key="'tw-'+idx">
-                                        <div class="max-h-[180px] overflow-hidden">
-                                            <img x-show="media.type && media.type.startsWith('image')" :src="media.url" class="w-full h-full object-cover">
-                                        </div>
-                                    </template>
-                                </div>
+                                <div x-show="postForm.media.length > 0" class="mt-2 rounded-xl overflow-hidden border border-gray-800"><template x-for="(media, idx) in postForm.media.slice(0,1)" :key="'tw-'+idx"><div class="max-h-[180px] overflow-hidden"><img x-show="media.type && media.type.startsWith('image')" :src="media.url" class="w-full h-full object-cover"></div></template></div>
                             </div>
-                            <div class="px-4 py-2 flex items-center justify-between border-t border-gray-800 text-gray-500 text-xs">
-                                <span>💬 <span x-text="platformCharCount > 280 ? '1' : '0'"></span></span>
-                                <span>🔁 0</span>
-                                <span>❤️ 0</span>
-                                <span>📊 0</span>
-                            </div>
+                            <div class="px-4 py-2 flex items-center justify-between border-t border-gray-800 text-gray-500 text-xs"><span>💬 0</span><span>🔁 0</span><span>❤️ 0</span><span>📊 0</span></div>
                         </div>
 
                         <!-- Character limit warning -->
@@ -2091,12 +2054,13 @@ function channelsApp() {
         },
         // Platform preview
         activePlatform: 'telegram',
+        selectedPlatformForPost: 'telegram',
         platforms: [
-            { id: 'telegram', icon: '✈️', label: 'Telegram', activeClass: 'bg-blue-500/15 text-blue-300 border border-blue-500/25', charLimit: 4096 },
-            { id: 'whatsapp', icon: '💬', label: 'WhatsApp', activeClass: 'bg-green-500/15 text-green-300 border border-green-500/25', charLimit: 65536 },
-            { id: 'instagram', icon: '📸', label: 'Instagram', activeClass: 'bg-pink-500/15 text-pink-300 border border-pink-500/25', charLimit: 2200 },
-            { id: 'facebook', icon: '📘', label: 'Facebook', activeClass: 'bg-blue-500/15 text-blue-300 border border-blue-500/25', charLimit: 63206 },
-            { id: 'twitter', icon: '🐦', label: 'Twitter/X', activeClass: 'bg-sky-500/15 text-sky-300 border border-sky-500/25', charLimit: 280 },
+            { id: 'telegram', icon: '✈️', label: 'Telegram', activeClass: 'bg-blue-500/15 text-blue-300 border border-blue-500/25', shadowClass: 'shadow-blue-500/20', charLimit: 4096 },
+            { id: 'whatsapp', icon: '💬', label: 'WhatsApp', activeClass: 'bg-green-500/15 text-green-300 border border-green-500/25', shadowClass: 'shadow-green-500/20', charLimit: 65536 },
+            { id: 'instagram', icon: '📸', label: 'Instagram', activeClass: 'bg-pink-500/15 text-pink-300 border border-pink-500/25', shadowClass: 'shadow-pink-500/20', charLimit: 2200 },
+            { id: 'facebook', icon: '📘', label: 'Facebook', activeClass: 'bg-blue-500/15 text-blue-300 border border-blue-500/25', shadowClass: 'shadow-blue-500/20', charLimit: 63206 },
+            { id: 'twitter', icon: '🐦', label: 'Twitter/X', activeClass: 'bg-sky-500/15 text-sky-300 border border-sky-500/25', shadowClass: 'shadow-sky-500/20', charLimit: 280 },
         ],
         get platformCharCount() {
             return (this.postForm.message || '').length;
@@ -2111,6 +2075,56 @@ function channelsApp() {
         get hashtagsText() {
             const tags = (this.postForm.message || '').match(/#[\w\u0600-\u06FF]+/g);
             return tags ? tags.join(' ') : '';
+        },
+        get platformEditorClass() {
+            const cls = {
+                telegram: 'bg-slate-800/60 border-blue-500/20',
+                whatsapp: 'bg-slate-800/60 border-green-500/20',
+                instagram: 'bg-slate-800/60 border-pink-500/20',
+                facebook: 'bg-slate-800/60 border-blue-500/20',
+                twitter: 'bg-slate-800/60 border-sky-500/20',
+            };
+            return cls[this.activePlatform] || cls.telegram;
+        },
+        get platformToolbarClass() {
+            const cls = {
+                telegram: 'bg-slate-900/40 border-blue-500/10',
+                whatsapp: 'bg-slate-900/40 border-green-500/10',
+                instagram: 'bg-slate-900/40 border-pink-500/10',
+                facebook: 'bg-slate-900/40 border-blue-500/10',
+                twitter: 'bg-slate-900/40 border-sky-500/10',
+            };
+            return cls[this.activePlatform] || cls.telegram;
+        },
+        get platformBorderClass() {
+            const cls = {
+                telegram: 'border-blue-500/10',
+                whatsapp: 'border-green-500/10',
+                instagram: 'border-pink-500/10',
+                facebook: 'border-blue-500/10',
+                twitter: 'border-sky-500/10',
+            };
+            return cls[this.activePlatform] || cls.telegram;
+        },
+        get platformPlaceholder() {
+            const ph = {
+                telegram: 'اكتب منشورك هنا... (HTML مدعوم)',
+                whatsapp: 'اكتب رسالتك هنا... (Markdown مدعوم)',
+                instagram: 'اكتب كابشن هنا... (#hashtags مدعومة)',
+                facebook: 'اكتب منشورك هنا...',
+                twitter: 'اكتب تغريدتك هنا... (280 حرف)',
+            };
+            return ph[this.activePlatform] || ph.telegram;
+        },
+        get platformMediaLabel() {
+            const labels = {
+                telegram: 'صور/فيديو (10MB)',
+                whatsapp: 'صور/فيديو (16MB)',
+                instagram: 'صور (30MB) / فيديو (650MB)',
+                facebook: 'صور/فيديو (10GB)',
+                twitter: 'صور/GIF (5MB) / فيديو (512MB)',
+            };
+            return labels[this.activePlatform] || labels.telegram;
         },
         // Translation
         showTranslateModal: false,
@@ -2158,6 +2172,8 @@ function channelsApp() {
             this.deepLinkMode = 'individual';
             this.bulkButtonsText = '';
             this.parseMode = 'HTML';
+            this.activePlatform = 'telegram';
+            this.selectedPlatformForPost = 'telegram';
             this.showPostComposer = true;
         },
         closePostComposer() { this.showPostComposer = false; },

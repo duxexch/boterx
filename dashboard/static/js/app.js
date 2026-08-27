@@ -334,6 +334,7 @@ const I18N = {
         translate_done: 'تمت الترجمة بنجاح',
         translate_apply: 'تطبيق الترجمة',
         // Platform preview
+        select_platform: 'اختر المنصة',
         char_limit_warning: 'تجاوز الحد المسموح للمنصة',
     },
     en: {
@@ -661,6 +662,7 @@ const I18N = {
         translate_done: 'Translation complete',
         translate_apply: 'Apply Translation',
         // Platform preview
+        select_platform: 'Select Platform',
         char_limit_warning: 'Exceeds platform character limit',
         smart_posting_monitor: 'Smart Posting Monitor',
         posting_pending: 'Pending', posting_channels_today: 'Channels posted today',
