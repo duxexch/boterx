@@ -761,7 +761,7 @@ const Notifier = {
         if (container) {
             const item = document.createElement('div');
             item.className = 'flex items-center gap-2 p-2 rounded-lg bg-slate-700/50 text-sm';
-            item.innerHTML = '<span>' + message + '</span> <span class="text-xs text-slate-500">' + new Date().toLocaleTimeString() + '</span>';
+            item.innerHTML = '<span>' + message + '</span> <span class="text-xs text-slate-500">' + (window.__ADMIN_CLOCK__ || new Date()).toLocaleTimeString() + '</span>';
             container.prepend(item);
             if (container.children.length > 20) container.lastElementChild.remove();
         }

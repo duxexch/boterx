@@ -11,11 +11,35 @@ function baseApp() {
         liveSource: null,
         lang: localStorage.getItem('lang') || 'ar',
         copied: false,
+        _clockInterval: null,
 
         init() {
             try { this.applyDarkMode(); } catch (e) {}
             try { this.applyLang(); } catch (e) {}
             try { this.startLiveStats(); } catch (e) {}
+            try { this.startClock(); } catch (e) {}
+        },
+
+        startClock() {
+            const tick = () => {
+                const now = new Date();
+                const isAr = this.lang === 'ar';
+                const timeEl = document.getElementById('liveClockTime');
+                const dateEl = document.getElementById('liveClockDate');
+                if (timeEl) {
+                    timeEl.textContent = now.toLocaleTimeString(isAr ? 'ar-EG' : 'en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: isAr });
+                }
+                if (dateEl) {
+                    dateEl.textContent = now.toLocaleDateString(isAr ? 'ar-EG' : 'en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
+                }
+                window.__ADMIN_CLOCK__ = now;
+            };
+            tick();
+            this._clockInterval = setInterval(tick, 1000);
+        },
+
+        getAdminTime() {
+            return window.__ADMIN_CLOCK__ || new Date();
         },
 
         t(key) {
@@ -129,6 +153,11 @@ function baseApp() {
                     if (stats.wheel?.participants) parts.push('🎡 ' + stats.wheel.participants);
                     liveBar.textContent = parts.join(' | ') || tr('connected');
                 }
+
+                const srvTimeEl = document.getElementById('serverTimeDisplay');
+                if (srvTimeEl && stats.timestamp) {
+                    srvTimeEl.textContent = 'UTC ' + stats.timestamp.split(' ')[1];
+                }
             } catch (e) {}
         },
 
@@ -162,7 +191,7 @@ function baseApp() {
             if (container) {
                 const item = document.createElement('div');
                 item.className = 'flex items-center gap-2 p-2 rounded-lg bg-slate-700/50 text-sm';
-                item.innerHTML = '<span>' + message + '</span> <span class="text-xs text-slate-500">' + new Date().toLocaleTimeString() + '</span>';
+                item.innerHTML = '<span>' + message + '</span> <span class="text-xs text-slate-500">' + (window.__ADMIN_CLOCK__ || new Date()).toLocaleTimeString() + '</span>';
                 container.prepend(item);
                 if (container.children.length > 20) container.lastElementChild.remove();
             }

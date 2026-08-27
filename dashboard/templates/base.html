@@ -370,6 +370,15 @@
                     <span x-show="copied" class="absolute -top-6 left-1/2 -translate-x-1/2 text-xs bg-emerald-500 text-white px-2 py-1 rounded">ØªÙ… Ø§Ù„Ù†Ø³Ø®!</span>
                 </button>
 
+                <!-- Live Clock -->
+                <div class="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-700/50 border border-slate-600/40" id="liveClockBox">
+                    <i class="fas fa-clock text-emerald-400 text-sm"></i>
+                    <div class="flex flex-col leading-none">
+                        <span id="liveClockTime" class="text-sm font-mono font-bold text-white tracking-wider"></span>
+                        <span id="liveClockDate" class="text-[10px] text-slate-400"></span>
+                    </div>
+                </div>
+
                 <!-- User avatar -->
                 <div class="flex items-center gap-2">
                     <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-sm font-bold ring-2 ring-slate-600">
@@ -389,6 +398,10 @@
                 <span data-i18n="connected">Connected</span>
             </span>
             <span id="liveStats" class="flex-shrink-0" data-i18n="loading">Loading...</span>
+            <span class="flex items-center gap-1 flex-shrink-0 text-slate-500">
+                <i class="fas fa-server text-[10px]"></i>
+                <span id="serverTimeDisplay">UTC --:--</span>
+            </span>
             <div class="flex-1 overflow-hidden hidden lg:block">
                 <div class="flex items-center gap-2" x-show="activityTicker.length > 0" style="display:none">
                     <span class="text-slate-500 flex-shrink-0" data-i18n="last_activity">Last activity:</span>
