@@ -128,11 +128,6 @@ def generate_post(key_data, content_type, channel_identity, company_data, user_n
     Generate a Telegram post using AI.
     Returns: {'success': True, 'text': '...'} or {'success': False, 'error': '...'}
     """
-    try:
-        import httpx
-    except ImportError:
-        return {'success': False, 'error': 'httpx not installed'}
-
     api_key = key_data.get('api_key', '')
     base_url = (key_data.get('base_url') or '').rstrip('/')
     model = key_data.get('default_model', '')
@@ -185,6 +180,16 @@ def generate_post(key_data, content_type, channel_identity, company_data, user_n
         'max_tokens': max_tokens,
     }
 
+    # Try httpx first, fall back to urllib
+    try:
+        import httpx
+        return _call_with_httpx(url, headers, payload, timeout, provider, key_data, base_dir)
+    except ImportError:
+        return _call_with_urllib(url, headers, payload, timeout, provider, key_data, base_dir)
+
+
+def _call_with_httpx(url, headers, payload, timeout, provider, key_data, base_dir):
+    import httpx
     try:
         with httpx.Client(timeout=float(timeout)) as client:
             resp = client.post(url, headers=headers, json=payload)
@@ -195,35 +200,63 @@ def generate_post(key_data, content_type, channel_identity, company_data, user_n
                 error_detail = resp.json().get('error', {}).get('message', resp.text[:200])
             except Exception:
                 error_detail = resp.text[:200]
-            return {
-                'success': False,
-                'error': f'API error {resp.status_code}: {error_detail}'
-            }
+            return {'success': False, 'error': f'API error {resp.status_code}: {error_detail}'}
 
         data = resp.json()
         content = data.get('choices', [{}])[0].get('message', {}).get('content', '').strip()
-
         if not content or len(content) < 5:
             return {'success': False, 'error': 'AI returned empty response'}
-
-        # Clean up: remove markdown code fences if present
-        if content.startswith('```'):
-            lines = content.split('\n')
-            content = '\n'.join(lines[1:-1] if lines[-1].strip() == '```' else lines[1:])
-        content = content.strip('"').strip("'")
-
-        # Update usage stats
+        content = _clean_content(content)
         _update_key_usage(key_data.get('id'), data.get('usage', {}), base_dir)
-
         return {'success': True, 'text': content}
 
     except httpx.TimeoutException:
         return {'success': False, 'error': f'API timeout after {timeout}s'}
     except httpx.ConnectError:
-        return {'success': False, 'error': f'Cannot connect to {base_url}'}
+        return {'success': False, 'error': f'Cannot connect to {url}'}
     except Exception as e:
         logger.error(f"AI compose error: {e}")
         return {'success': False, 'error': str(e)}
+
+
+def _call_with_urllib(url, headers, payload, timeout, provider, key_data, base_dir):
+    import urllib.request
+    import ssl
+    try:
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+
+        body = json.dumps(payload).encode('utf-8')
+        req = urllib.request.Request(url, data=body, headers=headers, method='POST')
+        resp = urllib.request.urlopen(req, timeout=float(timeout), context=ctx)
+        data = json.loads(resp.read().decode('utf-8'))
+
+        content = data.get('choices', [{}])[0].get('message', {}).get('content', '').strip()
+        if not content or len(content) < 5:
+            return {'success': False, 'error': 'AI returned empty response'}
+        content = _clean_content(content)
+        _update_key_usage(key_data.get('id'), data.get('usage', {}), base_dir)
+        return {'success': True, 'text': content}
+
+    except urllib.error.HTTPError as e:
+        error_detail = ''
+        try:
+            error_detail = json.loads(e.read().decode()).get('error', {}).get('message', str(e))
+        except Exception:
+            error_detail = str(e)
+        return {'success': False, 'error': f'API error {e.code}: {error_detail}'}
+    except Exception as e:
+        logger.error(f"AI compose error: {e}")
+        return {'success': False, 'error': str(e)}
+
+
+def _clean_content(content):
+    """Clean AI output: remove code fences, extra quotes."""
+    if content.startswith('```'):
+        lines = content.split('\n')
+        content = '\n'.join(lines[1:-1] if lines[-1].strip() == '```' else lines[1:])
+    return content.strip('"').strip("'").strip()
 
 
 def _update_key_usage(key_id, usage, base_dir):
