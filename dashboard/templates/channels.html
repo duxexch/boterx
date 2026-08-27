@@ -1008,14 +1008,14 @@
 <div x-show="showPostComposer" class="modal-overlay" @click.self="closePostComposer()" style="display:none" x-cloak>
     <div class="modal max-w-6xl" style="max-height:92vh;display:flex;flex-direction:column">
 
-        <!-- Fixed Header -->
-        <div class="flex items-center justify-between pb-4 border-b border-slate-700/40 shrink-0">
+        <!-- Fixed Header — theme shifts per platform -->
+        <div class="flex items-center justify-between pb-4 border-b shrink-0" :class="platformHeaderBorder">
             <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
+                <div class="w-10 h-10 rounded-2xl flex items-center justify-center shadow-lg" :class="platformHeaderIcon">
                     <i class="fas fa-pen-fancy text-white text-sm"></i>
                 </div>
                 <div>
-                    <h3 class="font-bold text-lg text-white" x-text="t('post_composer_title')"></h3>
+                    <h3 class="font-bold text-lg text-white" x-text="platformName + ' ' + t('post_composer_title')"></h3>
                     <p class="text-[11px] text-slate-500" x-text="t('post_composer_subtitle')"></p>
                 </div>
             </div>
@@ -1023,14 +1023,19 @@
                 <button @click="openTranslateModal()" x-show="postForm.message" class="px-3 py-1.5 rounded-xl bg-gradient-to-r from-cyan-500/15 to-blue-500/15 border border-cyan-500/25 text-cyan-300 text-[11px] font-medium hover:from-cyan-500/25 hover:to-blue-500/25 transition flex items-center gap-1.5">
                     <i class="fas fa-language text-[10px]"></i> <span x-text="t('translate_btn')"></span>
                 </button>
+                <button @click="copyPostText()" x-show="postForm.message" class="px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500/15 to-teal-500/15 border border-emerald-500/25 text-emerald-300 text-[11px] font-medium hover:from-emerald-500/25 hover:to-teal-500/25 transition flex items-center gap-1.5">
+                    <i class="fas fa-copy text-[10px]"></i> <span x-text="t('copy_text')"></span>
+                </button>
+                <button @click="downloadPostText()" x-show="postForm.message" class="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500/15 to-orange-500/15 border border-amber-500/25 text-amber-300 text-[11px] font-medium hover:from-amber-500/25 hover:to-orange-500/25 transition flex items-center gap-1.5">
+                    <i class="fas fa-download text-[10px]"></i> <span x-text="t('download')"></span>
+                </button>
                 <button @click="closePostComposer()" class="w-9 h-9 rounded-xl bg-slate-700/50 hover:bg-red-500/20 flex items-center justify-center transition text-slate-400 hover:text-red-400"><i class="fas fa-times"></i></button>
             </div>
         </div>
 
-        <!-- Platform Selector — First Step -->
+        <!-- Platform Selector — Tab Style -->
         <div class="shrink-0 pt-4 pb-3 border-b border-slate-700/20">
-            <label class="block text-[11px] text-slate-400 mb-2 font-semibold uppercase tracking-wider" x-text="t('select_platform')"></label>
-            <div class="flex gap-2 overflow-x-auto pb-1">
+            <div class="flex gap-1.5 overflow-x-auto pb-1">
                 <template x-for="p in platforms" :key="p.id">
                     <button @click="activePlatform = p.id; selectedPlatformForPost = p.id" class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-[12px] font-medium transition-all whitespace-nowrap border" :class="activePlatform === p.id ? p.activeClass + ' shadow-lg ' + p.shadowClass : 'bg-slate-800/50 border-slate-700/30 text-slate-500 hover:text-slate-300 hover:border-slate-500'">
                         <span class="text-base" x-text="p.icon"></span>
@@ -1047,99 +1052,296 @@
         <div class="flex-1 overflow-y-auto pt-4" style="min-height:0">
             <div class="grid grid-cols-1 lg:grid-cols-5 gap-5">
 
-                <!-- ═══ LEFT: Editor (3/5) ═══ -->
+                <!-- ═══ LEFT: Platform-Adaptive Editor (3/5) ═══ -->
                 <div class="lg:col-span-3 space-y-4">
 
-                    <!-- Content Type Quick Insert -->
+                    <!-- Content Type Quick Insert — platform-adaptive templates -->
                     <div>
                         <label class="block text-[11px] text-slate-400 mb-2 font-semibold uppercase tracking-wider" x-text="t('content_type')"></label>
                         <div class="flex flex-wrap gap-1.5">
-                            <button @click="insertContentType('info')" class="px-3 py-1.5 rounded-lg text-[11px] font-medium bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500/20 transition flex items-center gap-1"><span>📊</span> <span x-text="t('content_info')"></span></button>
-                            <button @click="insertContentType('question')" class="px-3 py-1.5 rounded-lg text-[11px] font-medium bg-purple-500/10 border border-purple-500/20 text-purple-400 hover:bg-purple-500/20 transition flex items-center gap-1"><span>❓</span> <span x-text="t('content_question')"></span></button>
-                            <button @click="insertContentType('prediction')" class="px-3 py-1.5 rounded-lg text-[11px] font-medium bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/20 transition flex items-center gap-1"><span>🔮</span> <span x-text="t('content_prediction')"></span></button>
-                            <button @click="insertContentType('analysis')" class="px-3 py-1.5 rounded-lg text-[11px] font-medium bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 transition flex items-center gap-1"><span>📋</span> <span x-text="t('content_analysis')"></span></button>
-                            <button @click="insertContentType('live')" class="px-3 py-1.5 rounded-lg text-[11px] font-medium bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition flex items-center gap-1"><span>🔴</span> <span x-text="t('content_live')"></span></button>
-                            <button @click="insertContentType('result')" class="px-3 py-1.5 rounded-lg text-[11px] font-medium bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 hover:bg-cyan-500/20 transition flex items-center gap-1"><span>🏁</span> <span x-text="t('content_result')"></span></button>
+                            <template x-for="ct in platformContentTypes" :key="ct.id">
+                                <button @click="insertContentType(ct.id)" class="px-3 py-1.5 rounded-lg text-[11px] font-medium transition flex items-center gap-1 border" :class="ct.cls"><span x-text="ct.icon"></span> <span x-text="t(ct.label)"></span></button>
+                            </template>
                             <div class="w-px h-6 bg-slate-600/30 self-center"></div>
                             <button @click="openAiComposer()" class="px-3 py-1.5 rounded-lg text-[11px] font-medium bg-gradient-to-r from-violet-500/15 to-fuchsia-500/15 border border-violet-500/25 text-violet-300 hover:from-violet-500/25 hover:to-fuchsia-500/25 transition flex items-center gap-1.5 shadow-sm shadow-violet-500/10"><span>✨</span> <span x-text="t('ai_generate')"></span></button>
                         </div>
                     </div>
 
-                    <!-- Text Editor Card — adapts per platform -->
-                    <div class="rounded-2xl border overflow-hidden focus-within:transition" :class="platformEditorClass">
-                        <!-- Toolbar — platform-aware -->
-                        <div class="flex items-center gap-0.5 px-2 py-1.5 border-b flex-wrap" :class="platformToolbarClass">
-                            <template x-if="activePlatform === 'telegram'">
-                                <div class="flex items-center gap-0.5 flex-wrap">
-                                    <button @click="postForm.message += '<b>نص</b>'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-xs font-bold text-slate-300 transition" title="Bold">B</button>
-                                    <button @click="postForm.message += '<i>نص</i>'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-xs italic text-slate-300 transition" title="Italic">I</button>
-                                    <button @click="postForm.message += '<u>نص</u>'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-xs underline text-slate-300 transition" title="Underline">U</button>
-                                    <button @click="postForm.message += '<s>نص</s>'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-xs line-through text-slate-300 transition" title="Strikethrough">S</button>
-                                    <div class="w-px h-4 bg-slate-600/40 mx-0.5"></div>
-                                    <button @click="postForm.message += '<span class=&quot;tg-spoiler&quot;>نص</span>'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-[11px] text-slate-300 transition" title="Spoiler">🎯</button>
-                                    <button @click="postForm.message += '<code>كود</code>'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-[10px] font-mono text-slate-300 transition" title="Code">&lt;/&gt;</button>
-                                    <button @click="postForm.message += '<pre>نص</pre>'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-[10px] font-mono text-slate-300 transition" title="Pre">[pre]</button>
-                                    <div class="w-px h-4 bg-slate-600/40 mx-0.5"></div>
-                                    <button @click="postForm.message += '<a href=&quot;https://&quot;>رابط</a>'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-slate-300 transition" title="Link">🔗</button>
-                                    <button @click="postForm.message += '<blockquote>اقتباس</blockquote>'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-slate-300 transition" title="Quote">❝</button>
-                                </div>
-                            </template>
-                            <template x-if="activePlatform === 'whatsapp'">
-                                <div class="flex items-center gap-0.5 flex-wrap">
-                                    <button @click="postForm.message += '*نص*'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-xs font-bold text-slate-300 transition">B</button>
-                                    <button @click="postForm.message += '_نص_'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-xs italic text-slate-300 transition">I</button>
-                                    <button @click="postForm.message += '~نص~'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-xs line-through text-slate-300 transition">S</button>
-                                    <button @click="postForm.message += '```كود```'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-[10px] font-mono text-slate-300 transition">&lt;/&gt;</button>
-                                </div>
-                            </template>
-                            <template x-if="activePlatform === 'instagram'">
-                                <div class="flex items-center gap-0.5 flex-wrap">
-                                    <button @click="postForm.message += '#'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-xs text-slate-300 transition font-bold">#</button>
-                                    <button @click="postForm.message += '@'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-xs text-slate-300 transition">@</button>
-                                    <button @click="postForm.message += '\n\n'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-slate-300 transition">↵</button>
-                                </div>
-                            </template>
-                            <template x-if="activePlatform === 'facebook'">
-                                <div class="flex items-center gap-0.5 flex-wrap">
-                                    <button @click="postForm.message += '\n\n'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-slate-300 transition">↵</button>
-                                    <button @click="postForm.message += '───────────\n'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-slate-300 transition">─</button>
-                                </div>
-                            </template>
-                            <template x-if="activePlatform === 'twitter'">
-                                <div class="flex items-center gap-0.5 flex-wrap">
-                                    <button @click="postForm.message += '#'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-xs text-[#1d9bf0] transition font-bold">#</button>
-                                    <button @click="postForm.message += '@'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-xs text-[#1d9bf0] transition">@</button>
-                                </div>
-                            </template>
-                        </div>
-                        <textarea x-model="postForm.message" rows="8" class="w-full bg-transparent p-4 text-sm text-white placeholder-slate-600 outline-none resize-none" :placeholder="platformPlaceholder"></textarea>
-                        <!-- Bottom Bar — platform-aware char counter -->
-                        <div class="flex items-center justify-between px-3 py-1.5 border-t bg-slate-900/20" :class="platformBorderClass">
-                            <div class="flex items-center gap-1.5">
-                                <button @click="parseMode = parseMode === 'HTML' ? 'Markdown' : parseMode === 'Markdown' ? 'MarkdownV2' : 'HTML'" class="text-[10px] px-2 py-0.5 rounded-md cursor-pointer transition font-mono" :class="parseMode === 'HTML' ? 'bg-cyan-500/15 text-cyan-400' : parseMode === 'Markdown' ? 'bg-purple-500/15 text-purple-400' : 'bg-amber-500/15 text-amber-400'" x-text="parseMode" x-show="activePlatform === 'telegram'"></button>
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <span class="text-[11px] font-mono" :class="platformCharCount > platformCharLimit ? 'text-red-400' : platformCharCount > platformCharLimit * 0.9 ? 'text-amber-400' : 'text-slate-500'" x-text="platformCharCount + '/' + platformCharLimit"></span>
-                                <div class="w-14 h-1 rounded-full bg-slate-700/50 overflow-hidden">
-                                    <div class="h-full rounded-full transition-all" :class="platformCharCount > platformCharLimit ? 'bg-red-500' : platformCharCount > platformCharLimit * 0.9 ? 'bg-amber-500' : 'bg-green-500'" :style="'width:' + Math.min(100, (platformCharCount / platformCharLimit) * 100) + '%'"></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Placeholders (Telegram only) -->
+                    <!-- ═══ TELEGRAM EDITOR ═══ -->
                     <div x-show="activePlatform === 'telegram'">
-                        <label class="block text-[11px] text-slate-400 mb-2 font-semibold uppercase tracking-wider" x-text="t('dynamic_placeholders')"></label>
-                        <div class="flex flex-wrap gap-1.5">
-                            <button @click="insertPlaceholder('company_name')" class="px-2.5 py-1 rounded-lg text-[11px] font-mono bg-slate-800 border border-slate-600/40 text-slate-400 hover:bg-slate-700 hover:text-white transition">{'{company_name}'}</button>
-                            <button @click="insertPlaceholder('download_link')" class="px-2.5 py-1 rounded-lg text-[11px] font-mono bg-slate-800 border border-slate-600/40 text-slate-400 hover:bg-slate-700 hover:text-white transition">{'{download_link}'}</button>
-                            <button @click="insertPlaceholder('promo_code')" class="px-2.5 py-1 rounded-lg text-[11px] font-mono bg-slate-800 border border-slate-600/40 text-slate-400 hover:bg-slate-700 hover:text-white transition">{'{promo_code}'}</button>
-                            <button @click="insertPlaceholder('affiliate_link')" class="px-2.5 py-1 rounded-lg text-[11px] font-mono bg-slate-800 border border-slate-600/40 text-slate-400 hover:bg-slate-700 hover:text-white transition">{'{affiliate_link}'}</button>
+                        <div class="rounded-2xl border overflow-hidden border-blue-500/20 bg-slate-800/60 focus-within:transition">
+                            <div class="flex items-center gap-0.5 px-2 py-1.5 border-b border-blue-500/10 bg-slate-900/40 flex-wrap">
+                                <button @click="postForm.message += '<b>نص</b>'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-xs font-bold text-slate-300 transition" title="Bold">B</button>
+                                <button @click="postForm.message += '<i>نص</i>'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-xs italic text-slate-300 transition" title="Italic">I</button>
+                                <button @click="postForm.message += '<u>نص</u>'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-xs underline text-slate-300 transition" title="Underline">U</button>
+                                <button @click="postForm.message += '<s>نص</s>'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-xs line-through text-slate-300 transition" title="Strikethrough">S</button>
+                                <div class="w-px h-4 bg-slate-600/40 mx-0.5"></div>
+                                <button @click="postForm.message += '<span class=&quot;tg-spoiler&quot;>نص</span>'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-[11px] text-slate-300 transition" title="Spoiler">🎯</button>
+                                <button @click="postForm.message += '<code>كود</code>'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-[10px] font-mono text-slate-300 transition" title="Code">&lt;/&gt;</button>
+                                <button @click="postForm.message += '<pre>نص</pre>'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-[10px] font-mono text-slate-300 transition" title="Pre">[pre]</button>
+                                <div class="w-px h-4 bg-slate-600/40 mx-0.5"></div>
+                                <button @click="postForm.message += '<a href=&quot;https://&quot;>رابط</a>'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-slate-300 transition" title="Link">🔗</button>
+                                <button @click="postForm.message += '<blockquote>اقتباس</blockquote>'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-slate-300 transition" title="Quote">❝</button>
+                                <div class="w-px h-4 bg-slate-600/40 mx-0.5"></div>
+                                <button @click="postForm.message += '\n🔔 ' + t('content_live') + ': '" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-[11px] text-slate-300 transition" title="Live">🔔</button>
+                            </div>
+                            <textarea x-model="postForm.message" rows="8" class="w-full bg-transparent p-4 text-sm text-white placeholder-slate-600 outline-none resize-none" :placeholder="t('tg_editor_placeholder')"></textarea>
+                            <div class="flex items-center justify-between px-3 py-1.5 border-t border-blue-500/10 bg-slate-900/20">
+                                <div class="flex items-center gap-1.5">
+                                    <button @click="parseMode = parseMode === 'HTML' ? 'Markdown' : parseMode === 'Markdown' ? 'MarkdownV2' : 'HTML'" class="text-[10px] px-2 py-0.5 rounded-md cursor-pointer transition font-mono" :class="parseMode === 'HTML' ? 'bg-cyan-500/15 text-cyan-400' : parseMode === 'Markdown' ? 'bg-purple-500/15 text-purple-400' : 'bg-amber-500/15 text-amber-400'" x-text="'Parse: ' + parseMode"></button>
+                                    <label class="flex items-center gap-1 text-[10px] text-slate-500 cursor-pointer"><input type="checkbox" x-model="tgSilent" class="rounded bg-slate-700 border-slate-600 w-3 h-3"> 🔇 <span x-text="t('silent_mode')"></span></label>
+                                    <label class="flex items-center gap-1 text-[10px] text-slate-500 cursor-pointer"><input type="checkbox" x-model="tgPin" class="rounded bg-slate-700 border-slate-600 w-3 h-3"> 📌 <span x-text="t('pin_message')"></span></label>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-[11px] font-mono" :class="platformCharCount > platformCharLimit ? 'text-red-400' : platformCharCount > platformCharLimit * 0.9 ? 'text-amber-400' : 'text-slate-500'" x-text="platformCharCount + '/' + platformCharLimit"></span>
+                                    <div class="w-14 h-1 rounded-full bg-slate-700/50 overflow-hidden">
+                                        <div class="h-full rounded-full transition-all" :class="platformCharCount > platformCharLimit ? 'bg-red-500' : platformCharCount > platformCharLimit * 0.9 ? 'bg-amber-500' : 'bg-green-500'" :style="'width:' + Math.min(100, (platformCharCount / platformCharLimit) * 100) + '%'"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Telegram Placeholders -->
+                        <div class="mt-3">
+                            <label class="block text-[11px] text-slate-400 mb-2 font-semibold uppercase tracking-wider" x-text="t('dynamic_placeholders')"></label>
+                            <div class="flex flex-wrap gap-1.5">
+                                <button @click="insertPlaceholder('company_name')" class="px-2.5 py-1 rounded-lg text-[11px] font-mono bg-slate-800 border border-slate-600/40 text-slate-400 hover:bg-slate-700 hover:text-white transition">{'{company_name}'}</button>
+                                <button @click="insertPlaceholder('download_link')" class="px-2.5 py-1 rounded-lg text-[11px] font-mono bg-slate-800 border border-slate-600/40 text-slate-400 hover:bg-slate-700 hover:text-white transition">{'{download_link}'}</button>
+                                <button @click="insertPlaceholder('promo_code')" class="px-2.5 py-1 rounded-lg text-[11px] font-mono bg-slate-800 border border-slate-600/40 text-slate-400 hover:bg-slate-700 hover:text-white transition">{'{promo_code}'}</button>
+                                <button @click="insertPlaceholder('affiliate_link')" class="px-2.5 py-1 rounded-lg text-[11px] font-mono bg-slate-800 border border-slate-600/40 text-slate-400 hover:bg-slate-700 hover:text-white transition">{'{affiliate_link}'}</button>
+                                <button @click="insertPlaceholder('username')" class="px-2.5 py-1 rounded-lg text-[11px] font-mono bg-slate-800 border border-slate-600/40 text-slate-400 hover:bg-slate-700 hover:text-white transition">{'{username}'}</button>
+                            </div>
+                        </div>
+                        <!-- Telegram Deep Link Buttons -->
+                        <div class="mt-3">
+                            <div class="flex items-center justify-between mb-2">
+                                <label class="text-[11px] text-slate-400 font-semibold uppercase tracking-wider flex items-center gap-2">🔗 <span x-text="t('deep_link_buttons')"></span> <span class="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-bold" x-text="inlineButtons.filter(b => b.text && b.url).length"></span></label>
+                                <div class="flex items-center gap-1">
+                                    <button @click="deepLinkMode = 'individual'" :class="deepLinkMode === 'individual' ? 'bg-blue-500/20 text-blue-300' : 'text-slate-500 hover:text-slate-300'" class="text-[10px] px-2 py-1 rounded-md transition" x-text="t('deep_link_individual')"></button>
+                                    <button @click="deepLinkMode = 'bulk'" :class="deepLinkMode === 'bulk' ? 'bg-blue-500/20 text-blue-300' : 'text-slate-500 hover:text-slate-300'" class="text-[10px] px-2 py-1 rounded-md transition" x-text="t('deep_link_bulk')"></button>
+                                </div>
+                            </div>
+                            <div x-show="deepLinkMode === 'bulk'" class="space-y-2">
+                                <p class="text-[10px] text-slate-500" x-text="t('bulk_import_hint')"></p>
+                                <textarea x-model="bulkButtonsText" rows="4" class="input w-full text-xs py-2 font-mono text-ltr leading-relaxed" placeholder="اشترك الآن | https://t.me/channel?start=subscribe&#10;افتح اللعبة | https://t.me/bot?start=play"></textarea>
+                                <div class="flex gap-2">
+                                    <button @click="parseBulkButtons()" class="px-3 py-1.5 rounded-lg bg-blue-500/20 text-blue-300 text-[10px] font-bold hover:bg-blue-500/30 transition flex items-center gap-1"><i class="fas fa-check text-[8px]"></i> <span x-text="t('bulk_apply')"></span> (<span x-text="bulkButtonsText.split('\n').filter(l => l.trim() && l.includes('|')).length"></span>)</button>
+                                    <button @click="bulkButtonsText = ''; deepLinkMode = 'individual'" class="px-3 py-1.5 rounded-lg bg-slate-700/50 text-slate-400 text-[10px] hover:bg-slate-600/50 transition" x-text="t('bulk_cancel')"></button>
+                                </div>
+                            </div>
+                            <div x-show="deepLinkMode === 'individual'" class="space-y-1.5">
+                                <template x-for="(btn, idx) in inlineButtons" :key="idx">
+                                    <div class="flex gap-1.5 items-center group/btn">
+                                        <span class="text-[9px] text-slate-600 w-4 text-center shrink-0 font-mono" x-text="idx + 1"></span>
+                                        <input type="text" x-model="btn.text" class="input flex-1 text-xs py-1.5" :placeholder="t('btn_text_placeholder')">
+                                        <input type="url" x-model="btn.url" class="input flex-1 text-xs py-1.5 font-mono text-ltr" placeholder="https://t.me/...?start=...">
+                                        <button @click="removeInlineButton(idx)" class="w-6 h-6 rounded-md bg-red-500/10 text-red-400 hover:bg-red-500/20 flex items-center justify-center shrink-0 text-[10px] transition opacity-0 group-hover/btn:opacity-100"><i class="fas fa-times"></i></button>
+                                    </div>
+                                </template>
+                                <button @click="addInlineButton()" class="w-full py-1.5 rounded-lg border border-dashed border-slate-600/50 text-slate-500 text-[10px] hover:border-blue-500/30 hover:text-blue-400 transition flex items-center justify-center gap-1"><i class="fas fa-plus text-[8px]"></i> <span x-text="t('add_button')"></span></button>
+                            </div>
+                        </div>
+                        <!-- Telegram Pro Tips -->
+                        <div class="mt-3 p-3 rounded-xl bg-blue-500/5 border border-blue-500/15">
+                            <label class="block text-[11px] text-blue-300 font-semibold mb-1.5">✈️ Telegram Tips</label>
+                            <p class="text-[10px] text-slate-400 leading-relaxed">HTML formatting: &lt;b&gt;bold&lt;/b&gt;, &lt;i&gt;italic&lt;/i&gt;, &lt;u&gt;underline&lt;/u&gt;, &lt;s&gt;strike&lt;/s&gt;, &lt;code&gt;code&lt;/code&gt;, &lt;pre&gt;pre&lt;/pre&gt;, &lt;a href="url"&gt;link&lt;/a&gt;, &lt;blockquote&gt;quote&lt;/blockquote&gt;. Spoiler: &lt;span class="tg-spoiler"&gt;text&lt;/span&gt;. Max 4096 chars.</p>
                         </div>
                     </div>
 
-                    <!-- Media Upload — platform-aware limits -->
-                    <div>
+                    <!-- ═══ WHATSAPP EDITOR ═══ -->
+                    <div x-show="activePlatform === 'whatsapp'">
+                        <div class="rounded-2xl border overflow-hidden border-green-500/20 bg-slate-800/60 focus-within:transition">
+                            <div class="flex items-center gap-0.5 px-2 py-1.5 border-b border-green-500/10 bg-slate-900/40 flex-wrap">
+                                <button @click="postForm.message += '*نص*'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-xs font-bold text-slate-300 transition" title="Bold">B</button>
+                                <button @click="postForm.message += '_نص_'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-xs italic text-slate-300 transition" title="Italic">I</button>
+                                <button @click="postForm.message += '~نص~'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-xs line-through text-slate-300 transition" title="Strikethrough">S</button>
+                                <button @click="postForm.message += '```كود```'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-[10px] font-mono text-slate-300 transition">&lt;/&gt;</button>
+                                <div class="w-px h-4 bg-slate-600/40 mx-0.5"></div>
+                                <button @click="postForm.message += '>اقتباس\n'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-slate-300 transition" title="Quote">❝</button>
+                                <button @click="postForm.message += '• '" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-slate-300 transition" title="List">•</button>
+                                <div class="w-px h-4 bg-slate-600/40 mx-0.5"></div>
+                                <button @click="postForm.message += '\n📞 ' + t('phone') + ': '" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-[11px] text-slate-300 transition">📞</button>
+                                <button @click="postForm.message += '\n📍 ' + t('location') + ': '" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-[11px] text-slate-300 transition">📍</button>
+                            </div>
+                            <textarea x-model="postForm.message" rows="8" class="w-full bg-transparent p-4 text-sm text-white placeholder-slate-600 outline-none resize-none" :placeholder="t('wa_editor_placeholder')"></textarea>
+                            <div class="flex items-center justify-between px-3 py-1.5 border-t border-green-500/10 bg-slate-900/20">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-[10px] text-slate-500">📋 Markdown</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-[11px] font-mono" :class="platformCharCount > 65536 ? 'text-red-400' : 'text-slate-500'" x-text="platformCharCount + '/65536'"></span>
+                                    <div class="w-14 h-1 rounded-full bg-slate-700/50 overflow-hidden">
+                                        <div class="h-full rounded-full transition-all bg-green-500" :style="'width:' + Math.min(100, (platformCharCount / 65536) * 100) + '%'"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- WhatsApp Pro Tips -->
+                        <div class="mt-3 p-3 rounded-xl bg-green-500/5 border border-green-500/15">
+                            <label class="block text-[11px] text-green-300 font-semibold mb-1.5">💬 WhatsApp Tips</label>
+                            <p class="text-[10px] text-slate-400 leading-relaxed">Markdown: *bold*, _italic_, ~strikethrough~, ```code```. > for blockquotes. Lists with • or 1. Max 65536 chars. Supports images, videos (16MB), documents, audio.</p>
+                            <div class="flex flex-wrap gap-1 mt-2">
+                                <button @click="postForm.message += '\n\n📢 *عرض خاص*\n\n'" class="px-2 py-0.5 rounded bg-green-500/15 text-green-300 text-[9px]">📢 عرض خاص</button>
+                                <button @click="postForm.message += '\n\n⏰ *عرض محدود*\n\n'" class="px-2 py-0.5 rounded bg-green-500/15 text-green-300 text-[9px]">⏰ عرض محدود</button>
+                                <button @click="postForm.message += '\n\n✅ *سجّل الآن*\n\n'" class="px-2 py-0.5 rounded bg-green-500/15 text-green-300 text-[9px]">✅ سجّل الآن</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ═══ INSTAGRAM EDITOR ═══ -->
+                    <div x-show="activePlatform === 'instagram'">
+                        <div class="rounded-2xl border overflow-hidden border-pink-500/20 bg-slate-800/60 focus-within:transition">
+                            <div class="flex items-center gap-0.5 px-2 py-1.5 border-b border-pink-500/10 bg-slate-900/40 flex-wrap">
+                                <button @click="insertHashtag()" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-xs text-pink-300 transition font-bold">#</button>
+                                <button @click="postForm.message += '@'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-xs text-pink-300 transition">@</button>
+                                <button @click="postForm.message += '\n\n'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-slate-300 transition">↵</button>
+                                <div class="w-px h-4 bg-slate-600/40 mx-0.5"></div>
+                                <button @click="postForm.message += '❤️'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-[11px] transition">❤️</button>
+                                <button @click="postForm.message += '🔥'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-[11px] transition">🔥</button>
+                                <button @click="postForm.message += '💯'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-[11px] transition">💯</button>
+                                <button @click="postForm.message += '🎯'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-[11px] transition">🎯</button>
+                                <button @click="postForm.message += '⭐'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-[11px] transition">⭐</button>
+                            </div>
+                            <textarea x-model="postForm.message" rows="8" class="w-full bg-transparent p-4 text-sm text-white placeholder-slate-600 outline-none resize-none" :placeholder="t('ig_editor_placeholder')"></textarea>
+                            <div class="flex items-center justify-between px-3 py-1.5 border-t border-pink-500/10 bg-slate-900/20">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-[10px] text-slate-500">📷 <span x-text="t('hashtags_count') + ': ' + igHashtagCount + '/30'"></span></span>
+                                    <div class="w-14 h-1 rounded-full bg-slate-700/50 overflow-hidden">
+                                        <div class="h-full rounded-full transition-all" :class="igHashtagCount > 30 ? 'bg-red-500' : igHashtagCount > 25 ? 'bg-amber-500' : 'bg-pink-500'" :style="'width:' + Math.min(100, (igHashtagCount / 30) * 100) + '%'"></div>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-[11px] font-mono text-slate-500" x-text="platformCharCount + '/2200'"></span>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Instagram Hashtag Helper -->
+                        <div class="mt-3 p-3 rounded-xl bg-gradient-to-r from-pink-500/5 to-purple-500/5 border border-pink-500/15">
+                            <label class="block text-[11px] text-pink-300 font-semibold mb-1.5">📸 <span x-text="t('ig_hashtag_helper')"></span></label>
+                            <p class="text-[10px] text-slate-400 mb-2" x-text="t('ig_hashtag_tip')"></p>
+                            <div class="flex flex-wrap gap-1">
+                                <button @click="postForm.message += ' #vex'" class="px-2 py-0.5 rounded bg-pink-500/15 text-pink-300 text-[9px] hover:bg-pink-500/25 transition">#vex</button>
+                                <button @click="postForm.message += ' #betting'" class="px-2 py-0.5 rounded bg-pink-500/15 text-pink-300 text-[9px] hover:bg-pink-500/25 transition">#betting</button>
+                                <button @click="postForm.message += ' #sports'" class="px-2 py-0.5 rounded bg-pink-500/15 text-pink-300 text-[9px] hover:bg-pink-500/25 transition">#sports</button>
+                                <button @click="postForm.message += ' #casino'" class="px-2 py-0.5 rounded bg-pink-500/15 text-pink-300 text-[9px] hover:bg-pink-500/25 transition">#casino</button>
+                                <button @click="postForm.message += ' #promo'" class="px-2 py-0.5 rounded bg-pink-500/15 text-pink-300 text-[9px] hover:bg-pink-500/25 transition">#promo</button>
+                                <button @click="postForm.message += ' #deals'" class="px-2 py-0.5 rounded bg-pink-500/15 text-pink-300 text-[9px] hover:bg-pink-500/25 transition">#deals</button>
+                                <button @click="postForm.message += ' #winner'" class="px-2 py-0.5 rounded bg-pink-500/15 text-pink-300 text-[9px] hover:bg-pink-500/25 transition">#winner</button>
+                                <button @click="postForm.message += ' #jackpot'" class="px-2 py-0.5 rounded bg-pink-500/15 text-pink-300 text-[9px] hover:bg-pink-500/25 transition">#jackpot</button>
+                            </div>
+                        </div>
+                        <!-- Instagram Location Tag -->
+                        <div class="mt-3">
+                            <label class="text-[11px] text-slate-400 font-semibold">📍 <span x-text="t('location_tag')"></span></label>
+                            <input type="text" x-model="igLocation" class="input w-full text-xs py-2 mt-1" :placeholder="t('ig_location_placeholder')">
+                        </div>
+                    </div>
+
+                    <!-- ═══ FACEBOOK EDITOR ═══ -->
+                    <div x-show="activePlatform === 'facebook'">
+                        <div class="rounded-2xl border overflow-hidden border-blue-500/20 bg-slate-800/60 focus-within:transition">
+                            <div class="flex items-center gap-0.5 px-2 py-1.5 border-b border-blue-500/10 bg-slate-900/40 flex-wrap">
+                                <button @click="postForm.message += '\n\n'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-slate-300 transition">↵</button>
+                                <button @click="postForm.message += '───────────\n'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-slate-300 transition">─</button>
+                                <div class="w-px h-4 bg-slate-600/40 mx-0.5"></div>
+                                <button @click="postForm.message += '👍'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-[11px] transition">👍</button>
+                                <button @click="postForm.message += '❤️'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-[11px] transition">❤️</button>
+                                <button @click="postForm.message += '😂'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-[11px] transition">😂</button>
+                                <button @click="postForm.message += '😮'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-[11px] transition">😮</button>
+                                <button @click="postForm.message += '😢'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-[11px] transition">😢</button>
+                                <button @click="postForm.message += '😡'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-[11px] transition">😡</button>
+                                <div class="w-px h-4 bg-slate-600/40 mx-0.5"></div>
+                                <button @click="fbLinkPreview = !fbLinkPreview" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-[11px] text-blue-300 transition" title="Link Preview">🔗</button>
+                            </div>
+                            <textarea x-model="postForm.message" rows="8" class="w-full bg-transparent p-4 text-sm text-white placeholder-slate-600 outline-none resize-none" :placeholder="t('fb_editor_placeholder')"></textarea>
+                            <div class="flex items-center justify-between px-3 py-1.5 border-t border-blue-500/10 bg-slate-900/20">
+                                <div class="flex items-center gap-2">
+                                    <label class="text-[10px] text-slate-500 flex items-center gap-1 cursor-pointer"><input type="checkbox" x-model="fbLinkPreview" class="rounded bg-slate-700 border-slate-600 w-3 h-3"> <span x-text="t('link_preview')"></span></label>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-[11px] font-mono text-slate-500" x-text="platformCharCount + '/63206'"></span>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Facebook Link Preview URL -->
+                        <div x-show="fbLinkPreview" class="mt-3">
+                            <label class="text-[11px] text-slate-400 font-semibold">🔗 <span x-text="t('preview_url')"></span></label>
+                            <input type="url" x-model="fbPreviewUrl" class="input w-full text-xs py-2 mt-1 font-mono text-ltr" placeholder="https://vex.deals/...">
+                        </div>
+                        <!-- Facebook Pro Tips -->
+                        <div class="mt-3 p-3 rounded-xl bg-blue-500/5 border border-blue-500/15">
+                            <label class="block text-[11px] text-blue-300 font-semibold mb-1.5">📘 Facebook Tips</label>
+                            <p class="text-[10px] text-slate-400 leading-relaxed">Posts with images get 2.3x more engagement. Keep text under 80 characters for best reach. Use emojis for +56% comments. Link previews auto-generate from URLs.</p>
+                        </div>
+                    </div>
+
+                    <!-- ═══ TWITTER/X EDITOR ═══ -->
+                    <div x-show="activePlatform === 'twitter'">
+                        <div class="rounded-2xl border overflow-hidden border-sky-500/20 bg-slate-800/60 focus-within:transition">
+                            <div class="flex items-center gap-0.5 px-2 py-1.5 border-b border-sky-500/10 bg-slate-900/40 flex-wrap">
+                                <button @click="insertHashtag()" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-xs text-[#1d9bf0] transition font-bold">#</button>
+                                <button @click="postForm.message += '@'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-xs text-[#1d9bf0] transition">@</button>
+                                <button @click="postForm.message += '\n'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-slate-300 transition">↵</button>
+                                <div class="w-px h-4 bg-slate-600/40 mx-0.5"></div>
+                                <button @click="twAddThread()" class="text-[9px] px-2 py-1 rounded-md hover:bg-slate-600 flex items-center justify-center gap-1 text-[#1d9bf0] transition font-medium"><i class="fas fa-plus text-[8px]"></i> <span x-text="t('add_tweet')"></span></button>
+                                <button @click="twPollActive = !twPollActive" :class="twPollActive ? 'bg-[#1d9bf0]/20 text-[#1d9bf0]' : ''" class="text-[9px] px-2 py-1 rounded-md hover:bg-slate-600 flex items-center justify-center gap-1 text-slate-400 transition font-medium">📊 <span x-text="t('poll')"></span></button>
+                            </div>
+                            <textarea x-model="postForm.message" rows="8" class="w-full bg-transparent p-4 text-sm text-white placeholder-slate-600 outline-none resize-none" :placeholder="t('tw_editor_placeholder')"></textarea>
+                            <div class="flex items-center justify-between px-3 py-1.5 border-t border-sky-500/10 bg-slate-900/20">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-[10px] text-slate-500">🧵 <span x-text="twThreadCount + ' ' + t('tweets')"></span></span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-[11px] font-mono" :class="twitterCharCount > 280 ? 'text-red-400' : twitterCharCount > 252 ? 'text-amber-400' : 'text-slate-500'" x-text="twitterCharCount + '/280'"></span>
+                                    <div class="w-14 h-1 rounded-full bg-slate-700/50 overflow-hidden">
+                                        <div class="h-full rounded-full transition-all" :class="twitterCharCount > 280 ? 'bg-red-500' : twitterCharCount > 252 ? 'bg-amber-500' : 'bg-sky-500'" :style="'width:' + Math.min(100, (twitterCharCount / 280) * 100) + '%'"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Twitter Thread Builder -->
+                        <div x-show="twThreadCount > 1" class="mt-3 p-3 rounded-xl bg-sky-500/5 border border-sky-500/15">
+                            <label class="block text-[11px] text-sky-300 font-semibold mb-1.5">🧵 <span x-text="t('thread_builder')"></span></label>
+                            <p class="text-[10px] text-slate-400 mb-2"><span x-text="t('thread_info')"></span></p>
+                        </div>
+                        <!-- Twitter Poll -->
+                        <div x-show="twPollActive" class="mt-3 p-3 rounded-xl bg-sky-500/5 border border-sky-500/15">
+                            <label class="block text-[11px] text-sky-300 font-semibold mb-2">📊 <span x-text="t('poll_creator')"></span></label>
+                            <div class="space-y-1.5">
+                                <template x-for="(opt, idx) in twPollOptions" :key="idx">
+                                    <div class="flex gap-1.5">
+                                        <input type="text" x-model="twPollOptions[idx]" class="input flex-1 text-xs py-1.5" :placeholder="t('poll_option') + ' ' + (idx+1)">
+                                    </div>
+                                </template>
+                            </div>
+                            <div class="flex gap-2 mt-2">
+                                <button x-show="twPollOptions.length < 4" @click="twPollOptions.push('')" class="text-[9px] px-2 py-1 rounded bg-sky-500/15 text-sky-300"><i class="fas fa-plus"></i> <span x-text="t('add_option')"></span></button>
+                                <div class="flex-1"></div>
+                                <select x-model="twPollDuration" class="input text-[10px] py-1 w-24">
+                                    <option value="60">1 min</option>
+                                    <option value="360">6 hrs</option>
+                                    <option value="1440">1 day</option>
+                                    <option value="10080">3 days</option>
+                                    <option value="43200">7 days</option>
+                                </select>
+                            </div>
+                        </div>
+                        <!-- Twitter Pro Tips -->
+                        <div class="mt-3 p-3 rounded-xl bg-sky-500/5 border border-sky-500/15">
+                            <label class="block text-[11px] text-sky-300 font-semibold mb-1.5">🐦 <span x-text="t('twitter_tips')"></span></label>
+                            <p class="text-[10px] text-slate-400 leading-relaxed" x-text="t('twitter_tips_text')"></p>
+                            <div class="flex flex-wrap gap-1 mt-2">
+                                <button @click="postForm.message += ' #vex'" class="px-2 py-0.5 rounded bg-sky-500/15 text-sky-300 text-[9px]">#vex</button>
+                                <button @click="postForm.message += ' #betting'" class="px-2 py-0.5 rounded bg-sky-500/15 text-sky-300 text-[9px]">#betting</button>
+                                <button @click="postForm.message += ' #crypto'" class="px-2 py-0.5 rounded bg-sky-500/15 text-sky-300 text-[9px]">#crypto</button>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- ═══ Media Upload (shared) ═══ -->
+                <div class="lg:col-span-5">
+                    <div class="p-3 rounded-xl border border-slate-700/30 bg-slate-900/40">
                         <label class="block text-[11px] text-slate-400 mb-2 font-semibold uppercase tracking-wider" x-text="t('media_label') + ' (' + platformMediaLabel + ')'"></label>
                         <div class="flex flex-wrap gap-2">
                             <label class="w-20 h-20 rounded-xl border-2 border-dashed border-slate-600 flex flex-col items-center justify-center cursor-pointer hover:border-blue-500/50 hover:bg-blue-500/5 transition-all group shrink-0">
@@ -1156,59 +1358,6 @@
                             </template>
                         </div>
                     </div>
-
-                    <!-- Deep Link Buttons (Telegram only) -->
-                    <div x-show="activePlatform === 'telegram'">
-                        <div class="flex items-center justify-between mb-2">
-                            <label class="text-[11px] text-slate-400 font-semibold uppercase tracking-wider flex items-center gap-2">
-                                🔗 <span x-text="t('deep_link_buttons').replace('🔗 ', '')"></span>
-                                <span class="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-bold" x-text="inlineButtons.filter(b => b.text && b.url).length"></span>
-                            </label>
-                            <div class="flex items-center gap-1">
-                                <button @click="deepLinkMode = 'individual'" :class="deepLinkMode === 'individual' ? 'bg-blue-500/20 text-blue-300' : 'text-slate-500 hover:text-slate-300'" class="text-[10px] px-2 py-1 rounded-md transition" x-text="t('deep_link_individual')"></button>
-                                <button @click="deepLinkMode = 'bulk'" :class="deepLinkMode === 'bulk' ? 'bg-blue-500/20 text-blue-300' : 'text-slate-500 hover:text-slate-300'" class="text-[10px] px-2 py-1 rounded-md transition" x-text="t('deep_link_bulk')"></button>
-                            </div>
-                        </div>
-                        <div x-show="deepLinkMode === 'bulk'" class="space-y-2">
-                            <p class="text-[10px] text-slate-500" x-text="t('bulk_import_hint')"></p>
-                            <textarea x-model="bulkButtonsText" rows="5" class="input w-full text-xs py-2 font-mono text-ltr leading-relaxed" placeholder="اشترك الآن | https://t.me/channel?start=subscribe&#10;افتح اللعبة | https://t.me/bot?start=play"></textarea>
-                            <div class="flex gap-2">
-                                <button @click="parseBulkButtons()" class="px-3 py-1.5 rounded-lg bg-blue-500/20 text-blue-300 text-[10px] font-bold hover:bg-blue-500/30 transition flex items-center gap-1"><i class="fas fa-check text-[8px]"></i> <span x-text="t('bulk_apply')"></span> (<span x-text="bulkButtonsText.split('\n').filter(l => l.trim() && l.includes('|')).length"></span>)</button>
-                                <button @click="bulkButtonsText = ''; deepLinkMode = 'individual'" class="px-3 py-1.5 rounded-lg bg-slate-700/50 text-slate-400 text-[10px] hover:bg-slate-600/50 transition" x-text="t('bulk_cancel')"></button>
-                            </div>
-                        </div>
-                        <div x-show="deepLinkMode === 'individual'" class="space-y-1.5">
-                            <template x-for="(btn, idx) in inlineButtons" :key="idx">
-                                <div class="flex gap-1.5 items-center group/btn">
-                                    <span class="text-[9px] text-slate-600 w-4 text-center shrink-0 font-mono" x-text="idx + 1"></span>
-                                    <input type="text" x-model="btn.text" class="input flex-1 text-xs py-1.5" :placeholder="t('btn_text_placeholder')">
-                                    <input type="url" x-model="btn.url" class="input flex-1 text-xs py-1.5 font-mono text-ltr" placeholder="https://t.me/...?start=...">
-                                    <button @click="removeInlineButton(idx)" class="w-6 h-6 rounded-md bg-red-500/10 text-red-400 hover:bg-red-500/20 flex items-center justify-center shrink-0 text-[10px] transition opacity-0 group-hover/btn:opacity-100"><i class="fas fa-times"></i></button>
-                                </div>
-                            </template>
-                            <button @click="addInlineButton()" class="w-full py-1.5 rounded-lg border border-dashed border-slate-600/50 text-slate-500 text-[10px] hover:border-blue-500/30 hover:text-blue-400 transition flex items-center justify-center gap-1"><i class="fas fa-plus text-[8px]"></i> <span x-text="t('add_button')"></span></button>
-                        </div>
-                    </div>
-
-                    <!-- Instagram Hashtag Helper -->
-                    <div x-show="activePlatform === 'instagram'" class="p-3 rounded-xl bg-gradient-to-r from-pink-500/10 to-purple-500/10 border border-pink-500/20">
-                        <label class="block text-[11px] text-pink-300 font-semibold mb-1.5">📸 Instagram Hashtag Tips</label>
-                        <p class="text-[10px] text-slate-400 mb-2">أضف هاشتاجات بـ # في نهاية البوست. Instagram يسمح بـ 30 هاشتاج.</p>
-                        <div class="flex flex-wrap gap-1">
-                            <button @click="postForm.message += ' #vex'" class="px-2 py-0.5 rounded bg-pink-500/15 text-pink-300 text-[9px]">#vex</button>
-                            <button @click="postForm.message += ' #betting'" class="px-2 py-0.5 rounded bg-pink-500/15 text-pink-300 text-[9px]">#betting</button>
-                            <button @click="postForm.message += ' #sports'" class="px-2 py-0.5 rounded bg-pink-500/15 text-pink-300 text-[9px]">#sports</button>
-                            <button @click="postForm.message += ' #casino'" class="px-2 py-0.5 rounded bg-pink-500/15 text-pink-300 text-[9px]">#casino</button>
-                            <button @click="postForm.message += ' #promo'" class="px-2 py-0.5 rounded bg-pink-500/15 text-pink-300 text-[9px]">#promo</button>
-                        </div>
-                    </div>
-
-                    <!-- Twitter/X Character Helper -->
-                    <div x-show="activePlatform === 'twitter'" class="p-3 rounded-xl bg-sky-500/10 border border-sky-500/20">
-                        <label class="block text-[11px] text-sky-300 font-semibold mb-1.5">🐦 Twitter/X Tips</label>
-                        <p class="text-[10px] text-slate-400">الحد الأقصى 280 حرف. الروابط تاخد 23 حرف بغض النظر عن طولها.</p>
-                    </div>
-
                 </div>
 
                 <!-- ═══ RIGHT: Preview + Targets + Settings (2/5) ═══ -->
@@ -1389,14 +1538,20 @@
 
         <!-- Fixed Footer -->
         <div class="flex items-center justify-between pt-4 mt-4 border-t border-slate-700/40 shrink-0">
-            <div class="text-[11px] text-slate-600">
-                <span x-text="postForm.channelIds.length + postForm.groupIds.length"></span> <span x-text="t('targets_selected')"></span>
+            <div class="flex items-center gap-3">
+                <div class="text-[11px] text-slate-600">
+                    <span x-text="postForm.channelIds.length + postForm.groupIds.length"></span> <span x-text="t('targets_selected')"></span>
+                </div>
+                <div class="text-[10px] px-2 py-1 rounded-lg" :class="platformPostingMethod.cls" x-text="platformPostingMethod.label"></div>
             </div>
             <div class="flex gap-2">
                 <button @click="closePostComposer()" class="px-5 py-2.5 rounded-xl bg-slate-700/50 text-slate-400 text-sm hover:bg-slate-600/50 transition border border-slate-600/30" x-text="t('cancel')"></button>
-                <button @click="submitPost()" class="px-8 py-2.5 rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 text-white text-sm font-bold hover:opacity-90 transition flex items-center gap-2 shadow-lg shadow-green-500/20 disabled:opacity-30 disabled:cursor-not-allowed" :disabled="(!postForm.message && postForm.media.length === 0) || (!postForm.channelIds.length && !postForm.groupIds.length)">
+                <button x-show="platformPostingMethod.needsApi" @click="submitPost()" class="px-8 py-2.5 rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 text-white text-sm font-bold hover:opacity-90 transition flex items-center gap-2 shadow-lg shadow-green-500/20 disabled:opacity-30 disabled:cursor-not-allowed" :disabled="(!postForm.message && postForm.media.length === 0) || (!postForm.channelIds.length && !postForm.groupIds.length)">
                     <i class="fas fa-paper-plane text-xs"></i>
                     <span x-text="postForm.scheduleType === 'now' ? t('publish_now') : (postForm.scheduleType === 'timed' ? t('schedule_action') : t('cron_action'))"></span>
+                </button>
+                <button x-show="!platformPostingMethod.needsApi" @click="copyPostText()" class="px-8 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-sm font-bold hover:opacity-90 transition flex items-center gap-2 shadow-lg shadow-emerald-500/20">
+                    <i class="fas fa-copy text-xs"></i> <span x-text="t('copy_and_post')"></span>
                 </button>
             </div>
         </div>
@@ -2062,6 +2217,70 @@ function channelsApp() {
             { id: 'facebook', icon: '📘', label: 'Facebook', activeClass: 'bg-blue-500/15 text-blue-300 border border-blue-500/25', shadowClass: 'shadow-blue-500/20', charLimit: 63206 },
             { id: 'twitter', icon: '🐦', label: 'Twitter/X', activeClass: 'bg-sky-500/15 text-sky-300 border border-sky-500/25', shadowClass: 'shadow-sky-500/20', charLimit: 280 },
         ],
+        // Telegram options
+        tgSilent: false,
+        tgPin: false,
+        // Instagram
+        igLocation: '',
+        get igHashtagCount() {
+            const tags = (this.postForm.message || '').match(/#[\w\u0600-\u06FF]+/g);
+            return tags ? tags.length : 0;
+        },
+        // Facebook
+        fbLinkPreview: true,
+        fbPreviewUrl: '',
+        // Twitter
+        twPollActive: false,
+        twPollOptions: ['', ''],
+        twPollDuration: '60',
+        get twThreadCount() {
+            return (this.postForm.message || '').split('\n---\n').length;
+        },
+        get twitterCharCount() {
+            let text = this.postForm.message || '';
+            const urls = text.match(/https?:\/\/[^\s]+/g) || [];
+            urls.forEach(u => { text = text.replace(u, 'https://t.co/XXXXXXXX'); });
+            return text.length;
+        },
+        // Platform display helpers
+        get platformName() {
+            const names = { telegram: '✈️', whatsapp: '💬', instagram: '📸', facebook: '📘', twitter: '🐦' };
+            return names[this.activePlatform] || '';
+        },
+        get platformHeaderBorder() {
+            const cls = { telegram: 'border-blue-500/30', whatsapp: 'border-green-500/30', instagram: 'border-pink-500/30', facebook: 'border-blue-500/30', twitter: 'border-sky-500/30' };
+            return cls[this.activePlatform] || 'border-slate-700/40';
+        },
+        get platformHeaderIcon() {
+            const cls = { telegram: 'bg-gradient-to-br from-blue-500 to-purple-600 shadow-blue-500/20', whatsapp: 'bg-gradient-to-br from-green-500 to-emerald-600 shadow-green-500/20', instagram: 'bg-gradient-to-br from-pink-500 via-purple-500 to-orange-400 shadow-pink-500/20', facebook: 'bg-gradient-to-br from-blue-600 to-blue-500 shadow-blue-500/20', twitter: 'bg-gradient-to-br from-sky-400 to-blue-600 shadow-sky-500/20' };
+            return cls[this.activePlatform] || cls.telegram;
+        },
+        // Per-platform content type templates
+        get platformContentTypes() {
+            const base = [
+                { id: 'info', icon: '📊', label: 'content_info', cls: 'bg-blue-500/10 border-blue-500/20 text-blue-400 hover:bg-blue-500/20' },
+                { id: 'question', icon: '❓', label: 'content_question', cls: 'bg-purple-500/10 border-purple-500/20 text-purple-400 hover:bg-purple-500/20' },
+                { id: 'prediction', icon: '🔮', label: 'content_prediction', cls: 'bg-amber-500/10 border-amber-500/20 text-amber-400 hover:bg-amber-500/20' },
+                { id: 'analysis', icon: '📋', label: 'content_analysis', cls: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20' },
+                { id: 'live', icon: '🔴', label: 'content_live', cls: 'bg-red-500/10 border-red-500/20 text-red-400 hover:bg-red-500/20' },
+                { id: 'result', icon: '🏁', label: 'content_result', cls: 'bg-cyan-500/10 border-cyan-500/20 text-cyan-400 hover:bg-cyan-500/20' },
+            ];
+            if (this.activePlatform === 'instagram') base.push({ id: 'story', icon: '📱', label: 'content_story', cls: 'bg-pink-500/10 border-pink-500/20 text-pink-400 hover:bg-pink-500/20' });
+            if (this.activePlatform === 'twitter') base.push({ id: 'thread', icon: '🧵', label: 'content_thread', cls: 'bg-sky-500/10 border-sky-500/20 text-sky-400 hover:bg-sky-500/20' });
+            if (this.activePlatform === 'facebook') base.push({ id: 'event', icon: '📅', label: 'content_event', cls: 'bg-blue-500/10 border-blue-500/20 text-blue-400 hover:bg-blue-500/20' });
+            return base;
+        },
+        // Posting method per platform
+        get platformPostingMethod() {
+            const methods = {
+                telegram: { needsApi: true, label: '🤖 ' + t('api_posting'), cls: 'bg-blue-500/15 text-blue-300 border border-blue-500/25' },
+                whatsapp: { needsApi: true, label: '📋 ' + t('copy_posting'), cls: 'bg-green-500/15 text-green-300 border border-green-500/25' },
+                instagram: { needsApi: false, label: '📋 ' + t('copy_posting'), cls: 'bg-pink-500/15 text-pink-300 border border-pink-500/25' },
+                facebook: { needsApi: true, label: '🤖 ' + t('api_posting'), cls: 'bg-blue-500/15 text-blue-300 border border-blue-500/25' },
+                twitter: { needsApi: true, label: '🤖 ' + t('api_posting'), cls: 'bg-sky-500/15 text-sky-300 border border-sky-500/25' },
+            };
+            return methods[this.activePlatform] || methods.telegram;
+        },
         get platformCharCount() {
             return (this.postForm.message || '').length;
         },
@@ -2174,9 +2393,57 @@ function channelsApp() {
             this.parseMode = 'HTML';
             this.activePlatform = 'telegram';
             this.selectedPlatformForPost = 'telegram';
+            this.tgSilent = false;
+            this.tgPin = false;
+            this.igLocation = '';
+            this.fbLinkPreview = true;
+            this.fbPreviewUrl = '';
+            this.twPollActive = false;
+            this.twPollOptions = ['', ''];
+            this.twPollDuration = '60';
             this.showPostComposer = true;
         },
         closePostComposer() { this.showPostComposer = false; },
+
+        // === No-API Posting ===
+        async copyPostText() {
+            const text = this.postForm.message || '';
+            if (!text) return toast('لا يوجد نص', 'warning');
+            try {
+                await navigator.clipboard.writeText(text);
+                toast('تم النسخ到 الحافظة', 'success');
+            } catch(e) {
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                toast('تم النسخ到 الحافظة', 'success');
+            }
+        },
+        downloadPostText() {
+            const text = this.postForm.message || '';
+            if (!text) return toast('لا يوجد نص', 'warning');
+            const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = this.activePlatform + '_post_' + new Date().toISOString().slice(0,10) + '.txt';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            toast('تم التحميل', 'success');
+        },
+        insertHashtag() {
+            const tags = (this.postForm.message || '').match(/#[\w\u0600-\u06FF]+/g);
+            if (tags && tags.length >= 30) return toast('الحد الأقصى 30 هاشتاج', 'warning');
+            this.postForm.message = (this.postForm.message || '') + ' #';
+        },
+        twAddThread() {
+            this.postForm.message = (this.postForm.message || '') + '\n---\n';
+        },
 
         // === AI Composer ===
         showAiModal: false,
@@ -2341,15 +2608,53 @@ function channelsApp() {
             }
         },
         insertContentType(type) {
-            var templates = {
-                info: '📊 إحصائيات اليوم: فريقك سجّل {stat_highlight}. تابع التحديثات معنا!',
-                question: '🤔 سؤال اليوم: ما رأيك في أداء الفريق؟ اكتب رأيك في التعليقات!',
-                prediction: '🔮 توقعاتنا: {prediction_details}. ما رأيك؟',
-                analysis: '📋 تحليل مباراة {match_name}:\n{analysis_details}',
-                live: '🔴 مباشر | {live_event}',
-                result: '🏁 نتيجة المباراة: {result}',
+            const templates = {
+                telegram: {
+                    info: '📊 إحصائيات اليوم:\n\n🏆 الفريق: {stat_highlight}\n📈 النتائج: تابع التحديثات معنا!',
+                    question: '🤔 سؤال اليوم:\n\nما رأيك في أداء الفريق؟\nاكتب رأيك في التعليقات!',
+                    prediction: '🔮 توقعاتنا:\n\n{prediction_details}\nما رأيك؟',
+                    analysis: '📋 تحليل مباراة {match_name}:\n\n{analysis_details}',
+                    live: '🔴 مباشر | {live_event}\n\nتابع معنا!',
+                    result: '🏁 نتيجة المباراة:\n\n{result}',
+                },
+                whatsapp: {
+                    info: '*📊 إحصائيات اليوم*\n\n🏆 الفريق: {stat_highlight}\n\nتابع التحديثات معنا!',
+                    question: '*❓ سؤال اليوم*\n\nما رأيك في أداء الفريق؟\nاكتب رأيك!',
+                    prediction: '*🔮 توقعاتنا*\n\n{prediction_details}\n\nما رأيك؟',
+                    analysis: '*📋 تحليل*\n\n{match_name}\n\n{analysis_details}',
+                    live: '*🔴 مباشر*\n\n{live_event}\n\nتابع معنا!',
+                    result: '*🏁 النتيجة*\n\n{result}',
+                },
+                instagram: {
+                    info: '📊 إحصائيات اليوم\n\n🏆 الفريق: {stat_highlight}\n📈 تابع التحديثات!\n\n',
+                    question: '🤔 سؤال اليوم\n\nما رأيك في أداء الفريق؟\n\n',
+                    prediction: '🔮 توقعاتنا\n\n{prediction_details}\n\n',
+                    analysis: '📋 تحليل مباراة {match_name}\n\n{analysis_details}\n\n',
+                    live: '🔴 مباشر | {live_event}\n\nتابع معنا!\n\n',
+                    result: '🏁 النتيجة\n\n{result}\n\n',
+                    story: '📱 Story Content:\n\n{story_text}\n\n',
+                },
+                facebook: {
+                    info: '📊 Today\'s Stats:\n\n🏆 Team: {stat_highlight}\n\nStay tuned for updates!',
+                    question: '❓ Question of the Day:\n\nWhat do you think about the team\'s performance?\nShare your thoughts!',
+                    prediction: '🔮 Our Predictions:\n\n{prediction_details}\n\nWhat\'s your take?',
+                    analysis: '📋 Match Analysis:\n\n{match_name}\n\n{analysis_details}',
+                    live: '🔴 LIVE | {live_event}\n\nFollow along!',
+                    result: '🏁 Match Result:\n\n{result}',
+                    event: '📅 Event:\n\n{event_name}\n\n{event_details}',
+                },
+                twitter: {
+                    info: '📊 Stats Update\n\n🏆 {stat_highlight}\n\nFollow for more!',
+                    question: '🤔 Question:\n\nWhat do you think about the team?\n\n',
+                    prediction: '🔮 Predictions\n\n{prediction_details}\n\nThoughts?',
+                    analysis: '📋 Analysis\n\n{match_name}\n\n{analysis_details}',
+                    live: '🔴 LIVE: {live_event}\n\nFollow along!',
+                    result: '🏁 Result\n\n{result}',
+                    thread: '🧵 Thread:\n\nLet me break this down...\n\n---\n',
+                },
             };
-            this.postForm.message = (this.postForm.message || '') + '\n' + (templates[type] || '');
+            const platformTemplates = templates[this.activePlatform] || templates.telegram;
+            this.postForm.message = (this.postForm.message || '') + '\n' + (platformTemplates[type] || '');
         },
         insertPlaceholder(name) {
             this.postForm.message = (this.postForm.message || '') + '{' + name + '}';
@@ -2373,11 +2678,17 @@ function channelsApp() {
             if (this.postForm.channelIds.length === 0 && this.postForm.groupIds.length === 0) return toast('اختر قناة واحدة على الأقل', 'warning');
             if (this.postForm.scheduleType === 'timed' && !this.postForm.scheduledAt) return toast('حدد وقت الإرسال', 'warning');
             if (this.postForm.scheduleType === 'cron' && !this.postForm.cronExpr) return toast('اكتب تعبير كرون', 'warning');
+            if (this.activePlatform === 'twitter' && this.twitterCharCount > 280) return toast('النص يتجاوز 280 حرف', 'warning');
             try {
                 const validButtons = (this.inlineButtons || []).filter(b => b.text && b.url);
                 const replyMarkup = validButtons.length ? { inline_keyboard: validButtons.map(b => [{ text: b.text, url: b.url }]) } : '';
+                let message = this.postForm.message;
+                // Twitter: join thread with newlines
+                if (this.activePlatform === 'twitter' && this.twPollActive && this.twPollOptions.filter(o => o.trim()).length >= 2) {
+                    message += '\n\n📊 Poll: ' + this.twPollOptions.filter(o => o.trim()).join(' | ');
+                }
                 const payload = {
-                    message: this.postForm.message,
+                    message: message,
                     media_urls: this.postForm.media.map(m => m.url),
                     channels: this.postForm.channelIds,
                     groups: this.postForm.groupIds,
@@ -2386,6 +2697,10 @@ function channelsApp() {
                     cron_expr: this.postForm.cronExpr,
                     priority: this.postForm.priority,
                     reply_markup: replyMarkup,
+                    platform: this.activePlatform,
+                    parse_mode: this.parseMode,
+                    silent: this.activePlatform === 'telegram' ? this.tgSilent : false,
+                    pin: this.activePlatform === 'telegram' ? this.tgPin : false,
                 };
                 const d = await api('/api/posts/create', { method: 'POST', body: JSON.stringify(payload) });
                 if (d.success) {
