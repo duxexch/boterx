@@ -3516,6 +3516,54 @@ def api_ai_test_key():
     finally:
         conn.close()
 
+# ===== API — AI Composer (توليد بوستات بالذكاء الاصطناعي) =====
+@app.route('/api/ai/compose', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_ai_compose():
+    """
+    توليد بوست تليغرام بالذكاء الاصطناعي.
+    Body: {content_type, channel_id, user_note, key_id}
+    """
+    from ai_composer import generate_post, get_active_keys, get_company_context
+
+    data = request.json or {}
+    content_type = (data.get('content_type') or 'info').strip()
+    channel_id = (data.get('channel_id') or '').strip()
+    user_note = (data.get('user_note') or '').strip()
+    key_id = data.get('key_id')
+
+    # 1. Resolve AI key
+    keys = get_active_keys(os.path.join(BASE_DIR, 'boterx.db'))
+    if not keys:
+        return jsonify({'success': False, 'error': 'No active AI keys — add one in AI API Keys first'}), 400
+
+    key_data = None
+    if key_id:
+        key_data = next((k for k in keys if k['id'] == key_id), None)
+    if not key_data:
+        key_data = keys[0]  # fallback to highest priority
+
+    # 2. Get channel identity (if selected)
+    channel_identity = ''
+    channels_csv = read_csv('bot_channels.csv')
+    if channel_id:
+        ch = next((c for c in channels_csv if c.get('id') == channel_id), None)
+        if ch:
+            channel_identity = ch.get('category', '') or ch.get('title', '')
+
+    # 3. Get company context for placeholders
+    company_data = get_company_context(BASE_DIR)
+
+    # 4. Generate
+    result = generate_post(key_data, content_type, channel_identity, company_data, user_note, BASE_DIR)
+
+    if result.get('success'):
+        return jsonify({'success': True, 'text': result['text'], 'key_used': key_data.get('key_name', '')})
+    else:
+        return jsonify({'success': False, 'error': result.get('error', 'Unknown error')}), 400
+
+
 # ===== API — Stats =====
 
 @app.route('/api/stats')
