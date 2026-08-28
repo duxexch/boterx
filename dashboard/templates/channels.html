@@ -1013,6 +1013,10 @@
 .ig-tag{padding:3px 8px;border-radius:6px;font-size:10px;font-weight:500;background:rgba(236,72,153,0.12);color:#f472b6;transition:all 0.15s}
 .ig-tag:hover{background:rgba(236,72,153,0.25)}
 .pc-modal{max-width:900px;width:100%;overflow:visible!important;padding:0!important;max-height:92vh;display:flex;flex-direction:column}
+.pm-card{display:flex;flex-direction:column;align-items:center;gap:5px;padding:10px 8px;border-radius:12px;border:1.5px solid rgba(100,116,139,0.15);background:rgba(15,23,42,0.3);cursor:pointer;transition:all 0.2s;flex:1;min-width:0}
+.pm-card:hover{border-color:rgba(100,116,139,0.4);background:rgba(30,41,59,0.5)}
+.pm-card.pm-active{border-color:rgba(59,130,246,0.5);background:rgba(59,130,246,0.08);box-shadow:0 0 0 1px rgba(59,130,246,0.2)}
+.pm-card.pm-warn{border-color:rgba(234,179,8,0.3);opacity:0.5}
 </style>
 <!-- ===== POST COMPOSER ===== -->
 <div x-show="showPostComposer" class="modal-overlay" @click.self="closePostComposer()" style="display:none" x-cloak>
@@ -1038,19 +1042,60 @@
             </div>
         </div>
 
-        <!-- ═══ PLATFORM TABS ═══ -->
-        <div class="px-6 pt-3 pb-0 border-b border-slate-700/30 shrink-0 bg-slate-900/30">
-            <div class="flex gap-1 -mb-px">
-                <template x-for="p in platforms" :key="p.id">
-                    <button @click="activePlatform = p.id; selectedPlatformForPost = p.id" class="px-4 py-2.5 rounded-t-xl text-[12px] font-semibold transition-all border-b-2 border-transparent whitespace-nowrap" :class="activePlatform === p.id ? p.tabActiveClass : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/30'">
-                        <span x-text="p.icon"></span> <span x-text="p.label"></span>
-                        <span class="text-[9px] ml-1 opacity-60" x-text="p.charLimit"></span>
+        <!-- ═══ PLATFORM SELECTOR + TOOLS ═══ -->
+        <div class="px-5 pt-3 pb-3 border-b border-slate-700/30 shrink-0 bg-slate-900/30">
+            <div class="flex items-center gap-3 flex-wrap">
+                <div x-data="{ open: false }" class="relative">
+                    <button @click="open = !open" class="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-slate-800/60 border border-slate-700/30 hover:border-slate-600/50 transition text-[13px]">
+                        <span x-text="platforms.find(p => p.id === activePlatform)?.icon"></span>
+                        <span class="text-white font-semibold" x-text="platforms.find(p => p.id === activePlatform)?.label"></span>
+                        <span x-show="!isPlatformConnected" class="text-[9px] text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded-full font-medium">⚠</span>
+                        <span x-show="isPlatformConnected" class="text-[9px] text-green-400 bg-green-500/10 px-1.5 py-0.5 rounded-full font-medium">✓</span>
+                        <i class="fas fa-chevron-down text-[9px] text-slate-500 transition-transform" :class="open ? 'rotate-180' : ''"></i>
                     </button>
-                </template>
+                    <div x-show="open" @click.outside="open = false" x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-100" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="absolute top-full left-0 mt-1.5 w-72 bg-slate-800 border border-slate-700/50 rounded-xl shadow-2xl z-50 py-2 overflow-hidden">
+                        <template x-for="p in platforms" :key="p.id">
+                            <button @click="activePlatform = p.id; selectedPlatformForPost = p.id; postingMethod = getDefaultMethod(p.id); open = false" class="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-slate-700/40 transition" :class="activePlatform === p.id ? 'bg-slate-700/30' : ''">
+                                <span class="text-xl w-8 text-center" x-text="p.icon"></span>
+                                <div class="flex-1 min-w-0">
+                                    <div class="text-[13px] font-semibold" :class="activePlatform === p.id ? 'text-white' : 'text-slate-300'" x-text="p.label"></div>
+                                    <div class="text-[10px] text-slate-500">Limit: <span x-text="p.charLimit.toLocaleString()"></span></div>
+                                </div>
+                                <div class="flex items-center gap-1.5 shrink-0">
+                                    <span x-show="channels.filter(c => c.platform === p.id).length > 0" class="w-2 h-2 rounded-full bg-green-500"></span>
+                                    <span x-show="channels.filter(c => c.platform === p.id).length === 0" class="w-2 h-2 rounded-full bg-amber-500"></span>
+                                </div>
+                            </button>
+                        </template>
+                    </div>
+                </div>
+                <div class="w-px h-6 bg-slate-700/40"></div>
+                <div x-data="{ open: false }" class="relative">
+                    <button @click="open = !open" class="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-800/40 border border-slate-700/20 hover:border-slate-600/40 transition text-[12px]">
+                        <span>📊</span>
+                        <span class="text-slate-400">Content Type</span>
+                        <i class="fas fa-chevron-down text-[9px] text-slate-600"></i>
+                    </button>
+                    <div x-show="open" @click.outside="open = false" x-transition class="absolute top-full left-0 mt-1.5 w-52 bg-slate-800 border border-slate-700/50 rounded-xl shadow-2xl z-50 py-1.5">
+                        <template x-for="ct in platformContentTypes" :key="ct.id">
+                            <button @click="insertContentType(ct.id); open = false" class="w-full flex items-center gap-2.5 px-4 py-2.5 text-left hover:bg-slate-700/40 transition text-[12px]">
+                                <span x-text="ct.icon"></span>
+                                <span class="text-slate-300" x-text="t(ct.label)"></span>
+                            </button>
+                        </template>
+                    </div>
+                </div>
+                <div class="flex-1"></div>
+                <button @click="openAiComposer()" class="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-violet-500/10 border border-violet-500/20 text-violet-400 text-[12px] hover:bg-violet-500/20 transition font-medium">
+                    <span>✨</span> <span>AI Generate</span>
+                </button>
+                <a x-show="!isPlatformConnected" href="/channels" class="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[11px] hover:bg-amber-500/20 transition font-medium">
+                    <i class="fas fa-plug text-[10px]"></i> <span>Connect Channel</span>
+                </a>
             </div>
         </div>
 
-        <!-- ═══ BODY ═══ -->
+<!-- ═══ BODY ═══ -->
         <div class="flex-1 overflow-y-auto min-h-0">
             <div class="grid grid-cols-1 lg:grid-cols-5 min-h-[420px]">
 
@@ -1303,6 +1348,47 @@
 
                 </div>
 
+                    <!-- ═══ POSTING METHODS ═══ -->
+                    <div class="rounded-2xl border border-slate-700/30 bg-slate-900/30 p-4">
+                        <div class="flex items-center gap-2 mb-3">
+                            <i class="fas fa-rocket text-[11px] text-slate-400"></i>
+                            <label class="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">Posting Method</label>
+                        </div>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            <template x-for="m in platformPostingMethods" :key="m.id">
+                                <div @click="postingMethod = m.id" class="pm-card" :class="(postingMethod === m.id ? 'pm-active' : '') + (m.disabled ? ' pm-warn' : '')">
+                                    <span class="text-xl" x-text="m.icon"></span>
+                                    <span class="text-[11px] font-bold text-slate-200" x-text="m.label"></span>
+                                    <span class="text-[9px] text-slate-500 text-center leading-tight" x-text="m.desc"></span>
+                                    <span x-show="m.disabled" class="text-[8px] text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded-full font-medium mt-0.5">⚠ Needs API</span>
+                                </div>
+                            </template>
+                        </div>
+                        <!-- Info boxes -->
+                        <div x-show="postingMethod === 'deeplink' && activePlatform === 'telegram'" class="mt-3 p-3 rounded-xl bg-blue-500/5 border border-blue-500/15">
+                            <div class="flex items-center gap-2 mb-1"><i class="fas fa-info-circle text-blue-400 text-[10px]"></i><span class="text-[11px] text-blue-300 font-medium">Open Telegram share dialog</span></div>
+                            <p class="text-[10px] text-slate-500">Opens Telegram with your post text pre-filled, ready to forward to any channel or group</p>
+                        </div>
+                        <div x-show="postingMethod === 'deeplink' && activePlatform === 'whatsapp'" class="mt-3 p-3 rounded-xl bg-green-500/5 border border-green-500/15">
+                            <div class="flex items-center gap-2 mb-1"><i class="fas fa-info-circle text-green-400 text-[10px]"></i><span class="text-[11px] text-green-300 font-medium">Open WhatsApp</span></div>
+                            <p class="text-[10px] text-slate-500">Opens wa.me with your message ready to send</p>
+                        </div>
+                        <div x-show="postingMethod === 'deeplink' && activePlatform === 'twitter'" class="mt-3 p-3 rounded-xl bg-sky-500/5 border border-sky-500/15">
+                            <div class="flex items-center gap-2 mb-1"><i class="fas fa-info-circle text-sky-400 text-[10px]"></i><span class="text-[11px] text-sky-300 font-medium">Open Twitter Intent</span></div>
+                            <p class="text-[10px] text-slate-500">Opens twitter.com/intent/tweet with your text pre-filled</p>
+                        </div>
+                        <div x-show="postingMethod === 'deeplink' && activePlatform === 'facebook'" class="mt-3 p-3 rounded-xl bg-blue-500/5 border border-blue-500/15">
+                            <div class="flex items-center gap-2 mb-1"><i class="fas fa-info-circle text-blue-400 text-[10px]"></i><span class="text-[11px] text-blue-300 font-medium">Open Facebook Share</span></div>
+                            <p class="text-[10px] text-slate-500">Opens Facebook share dialog with your text</p>
+                        </div>
+                        <div x-show="postingMethod === 'group'" class="mt-3 p-3 rounded-xl bg-purple-500/5 border border-purple-500/15">
+                            <div class="flex items-center gap-2 mb-1"><i class="fas fa-info-circle text-purple-400 text-[10px]"></i><span class="text-[11px] text-purple-300 font-medium">Post to Open Group</span></div>
+                            <p class="text-[10px] text-slate-500">Post to a group that allows posting from all members, even if you are not admin</p>
+                        </div>
+                    </div>
+
+
+
                 <!-- ═══ RIGHT COLUMN: Preview + Target + Settings (2/5) ═══ -->
                 <div class="lg:col-span-2 p-5 space-y-4">
 
@@ -1472,22 +1558,35 @@
         <!-- ═══ FOOTER ═══ -->
         <div class="flex items-center justify-between px-6 py-3 border-t border-slate-700/40 shrink-0 bg-slate-900/60 backdrop-blur-sm rounded-b-2xl">
             <div class="flex items-center gap-3">
-                <span class="text-[11px] text-slate-500"><span class="text-white font-semibold" x-text="postForm.channelIds.length + postForm.groupIds.length"></span> <span x-text="t('targets_selected')"></span></span>
-                <div class="text-[10px] px-2.5 py-1 rounded-lg font-medium" :class="platformPostingMethod.cls" x-text="platformPostingMethod.label"></div>
+                <span class="text-[11px] text-slate-500"><span class="text-white font-semibold" x-text="postForm.channelIds.length + postForm.groupIds.length"></span> target<span x-show="postForm.channelIds.length + postForm.groupIds.length !== 1">s</span></span>
+                <div class="text-[10px] px-2.5 py-1 rounded-lg font-medium" :class="activePlatform === 'telegram' ? 'bg-blue-500/15 text-blue-300 border border-blue-500/25' : activePlatform === 'whatsapp' ? 'bg-green-500/15 text-green-300 border border-green-500/25' : activePlatform === 'instagram' ? 'bg-pink-500/15 text-pink-300 border border-pink-500/25' : activePlatform === 'facebook' ? 'bg-blue-500/15 text-blue-300 border border-blue-500/25' : 'bg-sky-500/15 text-sky-300 border border-sky-500/25'">
+                    <span x-text="platforms.find(p => p.id === activePlatform)?.icon + ' ' + postingMethodName"></span>
+                </div>
             </div>
             <div class="flex gap-2">
-                <button @click="closePostComposer()" class="px-5 py-2.5 rounded-xl bg-slate-700/50 text-slate-400 text-[13px] font-medium hover:bg-slate-600/50 transition border border-slate-600/30" x-text="t('cancel')"></button>
-                <button x-show="platformPostingMethod.needsApi" @click="submitPost()" class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 text-white text-[13px] font-bold hover:opacity-90 transition flex items-center gap-2 shadow-lg shadow-green-500/20 disabled:opacity-30 disabled:cursor-not-allowed" :disabled="(!postForm.message && postForm.media.length === 0) || (!postForm.channelIds.length && !postForm.groupIds.length)">
+                <button @click="closePostComposer()" class="px-5 py-2.5 rounded-xl bg-slate-700/50 text-slate-400 text-[13px] font-medium hover:bg-slate-600/50 transition border border-slate-600/30">Cancel</button>
+                <!-- API Post -->
+                <button x-show="postingMethod === 'api'" @click="submitPost()" class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 text-white text-[13px] font-bold hover:opacity-90 transition flex items-center gap-2 shadow-lg shadow-green-500/20 disabled:opacity-30 disabled:cursor-not-allowed" :disabled="(!postForm.message && postForm.media.length === 0) || (!postForm.channelIds.length && !postForm.groupIds.length)">
                     <i class="fas fa-paper-plane text-xs"></i>
-                    <span x-text="postForm.scheduleType === 'now' ? t('publish_now') : (postForm.scheduleType === 'timed' ? t('schedule_action') : t('cron_action'))"></span>
+                    <span x-text="postForm.scheduleType === 'now' ? 'Publish Now' : (postForm.scheduleType === 'timed' ? 'Schedule' : 'Set Cron')"></span>
                 </button>
-                <button x-show="!platformPostingMethod.needsApi" @click="copyPostText()" class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-[13px] font-bold hover:opacity-90 transition flex items-center gap-2 shadow-lg shadow-emerald-500/20">
-                    <i class="fas fa-copy text-xs"></i> <span x-text="t('copy_and_post')"></span>
+                <!-- Copy -->
+                <button x-show="postingMethod === 'copy'" @click="copyPostText()" class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-[13px] font-bold hover:opacity-90 transition flex items-center gap-2 shadow-lg shadow-emerald-500/20">
+                    <i class="fas fa-copy text-xs"></i> <span>Copy to Clipboard</span>
+                </button>
+                <!-- Download -->
+                <button x-show="postingMethod === 'download'" @click="downloadPostText()" class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-pink-500 to-rose-600 text-white text-[13px] font-bold hover:opacity-90 transition flex items-center gap-2 shadow-lg shadow-pink-500/20">
+                    <i class="fas fa-download text-xs"></i> <span>Download Package</span>
+                </button>
+                <!-- Deep Link -->
+                <button x-show="postingMethod === 'deeplink'" @click="openDeepLink()" class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-[13px] font-bold hover:opacity-90 transition flex items-center gap-2 shadow-lg shadow-blue-500/20">
+                    <i class="fas fa-external-link-alt text-xs"></i> <span>Open in App</span>
+                </button>
+                <!-- Group Post -->
+                <button x-show="postingMethod === 'group'" @click="submitPost()" class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-purple-500 to-violet-600 text-white text-[13px] font-bold hover:opacity-90 transition flex items-center gap-2 shadow-lg shadow-purple-500/20 disabled:opacity-30 disabled:cursor-not-allowed" :disabled="(!postForm.message && postForm.media.length === 0) || (!postForm.channelIds.length && !postForm.groupIds.length)">
+                    <i class="fas fa-users text-xs"></i> <span>Post to Group</span>
                 </button>
             </div>
-        </div>
-    </div>
-</div>
 
 <!-- AI Composer Modal -->
 <div x-show="showAiModal" class="modal-overlay" @click.self="closeAiComposer()" style="display:none" x-cloak>
@@ -2148,6 +2247,58 @@ function channelsApp() {
             { id: 'facebook', icon: '📘', label: 'Facebook', activeClass: 'bg-blue-500/15 text-blue-300 border border-blue-500/25', shadowClass: 'shadow-blue-500/20', tabActiveClass: 'text-blue-400 border-blue-500 bg-blue-500/5', charLimit: 63206 },
             { id: 'twitter', icon: '🐦', label: 'Twitter/X', activeClass: 'bg-sky-500/15 text-sky-300 border border-sky-500/25', shadowClass: 'shadow-sky-500/20', tabActiveClass: 'text-sky-400 border-sky-500 bg-sky-500/5', charLimit: 280 },
         ],
+        // Posting method state
+        postingMethod: 'api',
+        get isPlatformConnected() {
+            return this.channels.filter(c => c.platform === this.activePlatform).length > 0;
+        },
+        getDefaultMethod(pid) {
+            const m = { telegram: 'api', whatsapp: 'copy', instagram: 'copy', facebook: 'api', twitter: 'api' };
+            return m[pid] || 'api';
+        },
+        get postingMethodName() {
+            const names = { api: 'API', copy: 'Copy', download: 'Download', deeplink: 'Deep Link', group: 'Group' };
+            return names[this.postingMethod] || 'API';
+        },
+        get platformPostingMethods() {
+            const all = {
+                telegram: [
+                    { id: 'api', icon: '🤖', label: 'API Direct', desc: 'Bot token' },
+                    { id: 'copy', icon: '📋', label: 'Copy', desc: 'Copy text' },
+                    { id: 'deeplink', icon: '🔗', label: 'Deep Link', desc: 't.me/share' },
+                    { id: 'group', icon: '👥', label: 'Group', desc: 'Post to group' },
+                ],
+                whatsapp: [
+                    { id: 'api', icon: '🤖', label: 'WA Business', desc: 'Business API' },
+                    { id: 'copy', icon: '📋', label: 'Copy', desc: 'Copy text' },
+                    { id: 'deeplink', icon: '🔗', label: 'wa.me', desc: 'WhatsApp Web' },
+                    { id: 'group', icon: '👥', label: 'Group', desc: 'Post to group' },
+                ],
+                instagram: [
+                    { id: 'api', icon: '🤖', label: 'Graph API', desc: 'Instagram API' },
+                    { id: 'copy', icon: '📋', label: 'Copy', desc: 'Copy caption' },
+                    { id: 'download', icon: '📦', label: 'Download', desc: 'Media + text' },
+                    { id: 'group', icon: '👥', label: 'Group', desc: 'Post to group' },
+                ],
+                facebook: [
+                    { id: 'api', icon: '🤖', label: 'Graph API', desc: 'Facebook API' },
+                    { id: 'copy', icon: '📋', label: 'Copy', desc: 'Copy text' },
+                    { id: 'deeplink', icon: '🔗', label: 'FB Share', desc: 'Share dialog' },
+                    { id: 'group', icon: '👥', label: 'Group', desc: 'Post to group' },
+                ],
+                twitter: [
+                    { id: 'api', icon: '🤖', label: 'Twitter API', desc: 'API v2' },
+                    { id: 'copy', icon: '📋', label: 'Copy', desc: 'Copy tweet' },
+                    { id: 'deeplink', icon: '🔗', label: 'Tweet Intent', desc: 'twitter.com/intent' },
+                    { id: 'group', icon: '👥', label: 'Group', desc: 'Post to group' },
+                ],
+            };
+            const methods = all[this.activePlatform] || all.telegram;
+            if (!this.isPlatformConnected) {
+                return methods.map(m => m.id === 'api' ? { ...m, disabled: true } : m);
+            }
+            return methods;
+        },
         // Telegram options
         tgSilent: false,
         tgPin: false,
@@ -2201,17 +2352,7 @@ function channelsApp() {
             if (this.activePlatform === 'facebook') base.push({ id: 'event', icon: '📅', label: 'content_event', cls: 'bg-blue-500/10 border-blue-500/20 text-blue-400 hover:bg-blue-500/20' });
             return base;
         },
-        // Posting method per platform
-        get platformPostingMethod() {
-            const methods = {
-                telegram: { needsApi: true, label: '🤖 ' + t('api_posting'), cls: 'bg-blue-500/15 text-blue-300 border border-blue-500/25' },
-                whatsapp: { needsApi: true, label: '📋 ' + t('copy_posting'), cls: 'bg-green-500/15 text-green-300 border border-green-500/25' },
-                instagram: { needsApi: false, label: '📋 ' + t('copy_posting'), cls: 'bg-pink-500/15 text-pink-300 border border-pink-500/25' },
-                facebook: { needsApi: true, label: '🤖 ' + t('api_posting'), cls: 'bg-blue-500/15 text-blue-300 border border-blue-500/25' },
-                twitter: { needsApi: true, label: '🤖 ' + t('api_posting'), cls: 'bg-sky-500/15 text-sky-300 border border-sky-500/25' },
-            };
-            return methods[this.activePlatform] || methods.telegram;
-        },
+        // platformPostingMethod replaced by platformPostingMethods array
         get platformCharCount() {
             return (this.postForm.message || '').length;
         },
@@ -2676,6 +2817,19 @@ function channelsApp() {
                     toast(d.error || 'فشل', 'error');
                 }
             } catch(e) { toast('خطأ: ' + (e.message || ''), 'error'); }
+        },
+        openDeepLink() {
+            const text = encodeURIComponent(this.postForm.message || '');
+            const links = {
+                telegram: 'https://t.me/share/url?text=' + text,
+                whatsapp: 'https://wa.me/?text=' + text,
+                twitter: 'https://twitter.com/intent/tweet?text=' + text,
+                facebook: 'https://www.facebook.com/sharer/sharer.php?quote=' + text,
+                instagram: '',
+            };
+            const url = links[this.activePlatform];
+            if (url) { window.open(url, '_blank'); toast('Opening ' + this.activePlatform, 'success'); }
+            else { this.copyPostText(); toast('Copy and paste manually', 'warning'); }
         },
 
         // Channel Detail Modal
