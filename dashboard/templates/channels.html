@@ -1004,120 +1004,204 @@
         </div>
     </div>
 
+<style>
+.tool-btn{display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:8px;font-size:12px;color:#94a3b8;transition:all 0.15s}
+.tool-btn:hover{background:rgba(100,116,139,0.3);color:#e2e8f0}
+.tool-sep{width:1px;height:16px;background:rgba(100,116,139,0.3);margin:0 2px}
+.ph-btn{padding:4px 10px;border-radius:8px;font-size:11px;font-family:monospace;background:rgba(30,41,59,0.8);border:1px solid rgba(71,85,105,0.4);color:#94a3b8;transition:all 0.15s}
+.ph-btn:hover{background:rgba(51,65,85,0.8);color:#fff;border-color:rgba(100,116,139,0.6)}
+.ig-tag{padding:3px 8px;border-radius:6px;font-size:10px;font-weight:500;background:rgba(236,72,153,0.12);color:#f472b6;transition:all 0.15s}
+.ig-tag:hover{background:rgba(236,72,153,0.25)}
+</style>
 <!-- ===== POST COMPOSER ===== -->
 <div x-show="showPostComposer" class="modal-overlay" @click.self="closePostComposer()" style="display:none" x-cloak>
-    <div class="modal max-w-6xl" style="max-height:92vh;display:flex;flex-direction:column">
+    <div class="modal max-w-[1400px]" style="max-height:93vh;display:flex;flex-direction:column">
 
-        <!-- Fixed Header — theme shifts per platform -->
-        <div class="flex items-center justify-between pb-4 border-b shrink-0" :class="platformHeaderBorder">
+        <!-- ═══ HEADER ═══ -->
+        <div class="flex items-center justify-between px-6 py-4 border-b border-slate-700/40 shrink-0 bg-slate-900/60 backdrop-blur-sm rounded-t-2xl">
             <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-2xl flex items-center justify-center shadow-lg" :class="platformHeaderIcon">
-                    <i class="fas fa-pen-fancy text-white text-sm"></i>
+                <div class="w-9 h-9 rounded-xl flex items-center justify-center" :class="platformHeaderIcon">
+                    <i class="fas fa-pen-fancy text-white text-xs"></i>
                 </div>
                 <div>
-                    <h3 class="font-bold text-lg text-white" x-text="platformName + ' ' + t('post_composer_title')"></h3>
-                    <p class="text-[11px] text-slate-500" x-text="t('post_composer_subtitle')"></p>
+                    <h3 class="font-bold text-[15px] text-white" x-text="platformName + ' ' + t('post_composer_title')"></h3>
+                    <p class="text-[11px] text-slate-500 mt-0.5" x-text="t('post_composer_subtitle')"></p>
                 </div>
             </div>
-            <div class="flex items-center gap-2">
-                <button @click="openTranslateModal()" x-show="postForm.message" class="px-3 py-1.5 rounded-xl bg-gradient-to-r from-cyan-500/15 to-blue-500/15 border border-cyan-500/25 text-cyan-300 text-[11px] font-medium hover:from-cyan-500/25 hover:to-blue-500/25 transition flex items-center gap-1.5">
-                    <i class="fas fa-language text-[10px]"></i> <span x-text="t('translate_btn')"></span>
-                </button>
-                <button @click="copyPostText()" x-show="postForm.message" class="px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500/15 to-teal-500/15 border border-emerald-500/25 text-emerald-300 text-[11px] font-medium hover:from-emerald-500/25 hover:to-teal-500/25 transition flex items-center gap-1.5">
-                    <i class="fas fa-copy text-[10px]"></i> <span x-text="t('copy_text')"></span>
-                </button>
-                <button @click="downloadPostText()" x-show="postForm.message" class="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500/15 to-orange-500/15 border border-amber-500/25 text-amber-300 text-[11px] font-medium hover:from-amber-500/25 hover:to-orange-500/25 transition flex items-center gap-1.5">
-                    <i class="fas fa-download text-[10px]"></i> <span x-text="t('download')"></span>
-                </button>
-                <button @click="closePostComposer()" class="w-9 h-9 rounded-xl bg-slate-700/50 hover:bg-red-500/20 flex items-center justify-center transition text-slate-400 hover:text-red-400"><i class="fas fa-times"></i></button>
+            <div class="flex items-center gap-1.5">
+                <button @click="openTranslateModal()" x-show="postForm.message" class="px-3 py-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-[11px] font-medium hover:bg-cyan-500/20 transition flex items-center gap-1.5"><i class="fas fa-language text-[10px]"></i> <span x-text="t('translate_btn')"></span></button>
+                <button @click="copyPostText()" x-show="postForm.message" class="px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-medium hover:bg-emerald-500/20 transition flex items-center gap-1.5"><i class="fas fa-copy text-[10px]"></i> <span x-text="t('copy_text')"></span></button>
+                <button @click="downloadPostText()" x-show="postForm.message" class="px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[11px] font-medium hover:bg-amber-500/20 transition flex items-center gap-1.5"><i class="fas fa-download text-[10px]"></i> <span x-text="t('download')"></span></button>
+                <div class="w-px h-6 bg-slate-700/50 mx-1"></div>
+                <button @click="closePostComposer()" class="w-8 h-8 rounded-lg bg-slate-700/40 hover:bg-red-500/20 flex items-center justify-center transition text-slate-400 hover:text-red-400"><i class="fas fa-times text-xs"></i></button>
             </div>
         </div>
 
-        <!-- Platform Selector — Tab Style -->
-        <div class="shrink-0 pt-4 pb-3 border-b border-slate-700/20">
-            <div class="flex gap-1.5 overflow-x-auto pb-1">
+        <!-- ═══ PLATFORM TABS ═══ -->
+        <div class="px-6 pt-3 pb-0 border-b border-slate-700/30 shrink-0 bg-slate-900/30">
+            <div class="flex gap-1 -mb-px">
                 <template x-for="p in platforms" :key="p.id">
-                    <button @click="activePlatform = p.id; selectedPlatformForPost = p.id" class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-[12px] font-medium transition-all whitespace-nowrap border" :class="activePlatform === p.id ? p.activeClass + ' shadow-lg ' + p.shadowClass : 'bg-slate-800/50 border-slate-700/30 text-slate-500 hover:text-slate-300 hover:border-slate-500'">
-                        <span class="text-base" x-text="p.icon"></span>
-                        <div class="text-left">
-                            <div class="font-semibold" x-text="p.label"></div>
-                            <div class="text-[9px] opacity-60" x-text="p.charLimit + ' chars'"></div>
-                        </div>
+                    <button @click="activePlatform = p.id; selectedPlatformForPost = p.id" class="px-4 py-2.5 rounded-t-xl text-[12px] font-semibold transition-all border-b-2 border-transparent whitespace-nowrap" :class="activePlatform === p.id ? p.tabActiveClass : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/30'">
+                        <span x-text="p.icon"></span> <span x-text="p.label"></span>
+                        <span class="text-[9px] ml-1 opacity-60" x-text="p.charLimit"></span>
                     </button>
                 </template>
             </div>
         </div>
 
-        <!-- Scrollable Body -->
-        <div class="flex-1 overflow-y-auto pt-4" style="min-height:0">
-            <div class="grid grid-cols-1 lg:grid-cols-5 gap-5">
+        <!-- ═══ BODY ═══ -->
+        <div class="flex-1 overflow-y-auto min-h-0">
+            <div class="grid grid-cols-1 lg:grid-cols-5 gap-0 min-h-full">
 
-                <!-- ═══ LEFT: Platform-Adaptive Editor (3/5) ═══ -->
-                <div class="lg:col-span-3 space-y-4">
+                <!-- ═══ LEFT COLUMN: Editor + Features (3/5) ═══ -->
+                <div class="lg:col-span-3 p-5 space-y-4 border-r border-slate-700/20">
 
-                    <!-- Content Type Quick Insert — platform-adaptive templates -->
-                    <div>
-                        <label class="block text-[11px] text-slate-400 mb-2 font-semibold uppercase tracking-wider" x-text="t('content_type')"></label>
-                        <div class="flex flex-wrap gap-1.5">
-                            <template x-for="ct in platformContentTypes" :key="ct.id">
-                                <button @click="insertContentType(ct.id)" class="px-3 py-1.5 rounded-lg text-[11px] font-medium transition flex items-center gap-1 border" :class="ct.cls"><span x-text="ct.icon"></span> <span x-text="t(ct.label)"></span></button>
+                    <!-- Content Type Row -->
+                    <div class="flex flex-wrap gap-1.5 items-center">
+                        <template x-for="ct in platformContentTypes" :key="ct.id">
+                            <button @click="insertContentType(ct.id)" class="px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all border" :class="ct.cls"><span x-text="ct.icon"></span> <span x-text="t(ct.label)"></span></button>
+                        </template>
+                        <div class="w-px h-5 bg-slate-700/40"></div>
+                        <button @click="openAiComposer()" class="px-2.5 py-1.5 rounded-lg text-[11px] font-medium bg-violet-500/10 border border-violet-500/20 text-violet-400 hover:bg-violet-500/20 transition flex items-center gap-1"><span>✨</span> <span x-text="t('ai_generate')"></span></button>
+                    </div>
+
+                    <!-- ═══ EDITOR CARD ═══ -->
+                    <div class="rounded-2xl border overflow-hidden transition-all focus-within:ring-1" :class="platformEditorRing">
+                        <!-- Toolbar -->
+                        <div class="flex items-center gap-1 px-3 py-2 border-b flex-wrap" :class="platformToolbarBg">
+                            <template x-if="activePlatform === 'telegram'">
+                                <div class="flex items-center gap-0.5">
+                                    <button @click="postForm.message += '<b>نص</b>'" class="tool-btn font-bold" title="Bold">B</button>
+                                    <button @click="postForm.message += '<i>نص</i>'" class="tool-btn italic" title="Italic">I</button>
+                                    <button @click="postForm.message += '<u>نص</u>'" class="tool-btn underline" title="Underline">U</button>
+                                    <button @click="postForm.message += '<s>نص</s>'" class="tool-btn line-through" title="Strike">S</button>
+                                    <span class="tool-sep"></span>
+                                    <button @click="postForm.message += '<span class=&quot;tg-spoiler&quot;>نص</span>'" class="tool-btn" title="Spoiler">🎯</button>
+                                    <button @click="postForm.message += '<code>كود</code>'" class="tool-btn font-mono text-[10px]" title="Code">&lt;/&gt;</button>
+                                    <button @click="postForm.message += '<pre>نص</pre>'" class="tool-btn font-mono text-[10px]" title="Pre">[pre]</button>
+                                    <span class="tool-sep"></span>
+                                    <button @click="postForm.message += '<a href=&quot;https://&quot;>رابط</a>'" class="tool-btn" title="Link">🔗</button>
+                                    <button @click="postForm.message += '<blockquote>اقتباس</blockquote>'" class="tool-btn" title="Quote">❝</button>
+                                </div>
                             </template>
-                            <div class="w-px h-6 bg-slate-600/30 self-center"></div>
-                            <button @click="openAiComposer()" class="px-3 py-1.5 rounded-lg text-[11px] font-medium bg-gradient-to-r from-violet-500/15 to-fuchsia-500/15 border border-violet-500/25 text-violet-300 hover:from-violet-500/25 hover:to-fuchsia-500/25 transition flex items-center gap-1.5 shadow-sm shadow-violet-500/10"><span>✨</span> <span x-text="t('ai_generate')"></span></button>
+                            <template x-if="activePlatform === 'whatsapp'">
+                                <div class="flex items-center gap-0.5">
+                                    <button @click="postForm.message += '*نص*'" class="tool-btn font-bold" title="Bold">B</button>
+                                    <button @click="postForm.message += '_نص_'" class="tool-btn italic" title="Italic">I</button>
+                                    <button @click="postForm.message += '~نص~'" class="tool-btn line-through" title="Strike">S</button>
+                                    <span class="tool-sep"></span>
+                                    <button @click="postForm.message += '```كود```'" class="tool-btn font-mono text-[10px]" title="Code">&lt;/&gt;</button>
+                                    <button @click="postForm.message += '>اقتباس\n'" class="tool-btn" title="Quote">❝</button>
+                                    <button @click="postForm.message += '• '" class="tool-btn" title="List">•</button>
+                                    <span class="tool-sep"></span>
+                                    <button @click="postForm.message += '\n📞 '" class="tool-btn" title="Phone">📞</button>
+                                    <button @click="postForm.message += '\n📍 '" class="tool-btn" title="Location">📍</button>
+                                </div>
+                            </template>
+                            <template x-if="activePlatform === 'instagram'">
+                                <div class="flex items-center gap-0.5">
+                                    <button @click="insertHashtag()" class="tool-btn font-bold text-pink-400" title="Hashtag">#</button>
+                                    <button @click="postForm.message += '@'" class="tool-btn text-pink-400" title="Mention">@</button>
+                                    <button @click="postForm.message += '\n\n'" class="tool-btn" title="Break">↵</button>
+                                    <span class="tool-sep"></span>
+                                    <button @click="postForm.message += '❤️'" class="tool-btn">❤️</button>
+                                    <button @click="postForm.message += '🔥'" class="tool-btn">🔥</button>
+                                    <button @click="postForm.message += '💯'" class="tool-btn">💯</button>
+                                    <button @click="postForm.message += '🎯'" class="tool-btn">🎯</button>
+                                    <button @click="postForm.message += '⭐'" class="tool-btn">⭐</button>
+                                </div>
+                            </template>
+                            <template x-if="activePlatform === 'facebook'">
+                                <div class="flex items-center gap-0.5">
+                                    <button @click="postForm.message += '\n\n'" class="tool-btn" title="Break">↵</button>
+                                    <button @click="postForm.message += '───────────\n'" class="tool-btn" title="Divider">─</button>
+                                    <span class="tool-sep"></span>
+                                    <button @click="postForm.message += '👍'" class="tool-btn">👍</button>
+                                    <button @click="postForm.message += '❤️'" class="tool-btn">❤️</button>
+                                    <button @click="postForm.message += '😂'" class="tool-btn">😂</button>
+                                    <button @click="postForm.message += '😮'" class="tool-btn">😮</button>
+                                    <button @click="postForm.message += '😢'" class="tool-btn">😢</button>
+                                    <span class="tool-sep"></span>
+                                    <button @click="fbLinkPreview = !fbLinkPreview" class="tool-btn text-blue-400" title="Link Preview">🔗</button>
+                                </div>
+                            </template>
+                            <template x-if="activePlatform === 'twitter'">
+                                <div class="flex items-center gap-0.5">
+                                    <button @click="insertHashtag()" class="tool-btn font-bold text-sky-400" title="Hashtag">#</button>
+                                    <button @click="postForm.message += '@'" class="tool-btn text-sky-400" title="Mention">@</button>
+                                    <button @click="postForm.message += '\n'" class="tool-btn" title="Break">↵</button>
+                                    <span class="tool-sep"></span>
+                                    <button @click="twAddThread()" class="tool-btn !px-2 !gap-1 text-sky-400" title="Thread"><i class="fas fa-plus text-[8px]"></i> <span class="text-[9px]">Thread</span></button>
+                                    <button @click="twPollActive = !twPollActive" :class="twPollActive ? '!bg-sky-500/20 !text-sky-400' : ''" class="tool-btn !px-2 !gap-1" title="Poll">📊 <span class="text-[9px]">Poll</span></button>
+                                </div>
+                            </template>
+                            <!-- Spacer pushes char counter right -->
+                            <div class="flex-1"></div>
+                            <!-- Parse Mode (Telegram only) -->
+                            <button x-show="activePlatform === 'telegram'" @click="parseMode = parseMode === 'HTML' ? 'Markdown' : parseMode === 'Markdown' ? 'MarkdownV2' : 'HTML'" class="tool-btn !px-2 font-mono text-[9px]" :class="parseMode === 'HTML' ? 'text-cyan-400' : parseMode === 'Markdown' ? 'text-purple-400' : 'text-amber-400'" x-text="parseMode"></button>
+                            <!-- Char Counter -->
+                            <div class="flex items-center gap-2 pl-2">
+                                <span class="text-[11px] font-mono" :class="platformCharCount > platformCharLimit ? 'text-red-400' : platformCharCount > platformCharLimit * 0.85 ? 'text-amber-400' : 'text-slate-500'" x-text="platformCharCount + '/' + platformCharLimit"></span>
+                                <div class="w-16 h-1.5 rounded-full bg-slate-700/50 overflow-hidden">
+                                    <div class="h-full rounded-full transition-all duration-300" :class="platformCharCount > platformCharLimit ? 'bg-red-500' : platformCharCount > platformCharLimit * 0.85 ? 'bg-amber-500' : platformCharBarColor" :style="'width:' + Math.min(100, (platformCharCount / platformCharLimit) * 100) + '%'"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Textarea -->
+                        <textarea x-model="postForm.message" rows="10" class="w-full bg-transparent p-5 text-[14px] text-white/90 placeholder-slate-600 outline-none resize-none leading-relaxed" :placeholder="platformPlaceholder"></textarea>
+                        <!-- Bottom Bar -->
+                        <div class="flex items-center justify-between px-4 py-2 border-t bg-slate-900/30" :class="platformBorderClass">
+                            <div class="flex items-center gap-3">
+                                <label x-show="activePlatform === 'telegram'" class="flex items-center gap-1.5 text-[11px] text-slate-400 cursor-pointer hover:text-slate-300 transition"><input type="checkbox" x-model="tgSilent" class="rounded bg-slate-700 border-slate-600 w-3.5 h-3.5"> 🔇 <span x-text="t('silent_mode')"></span></label>
+                                <label x-show="activePlatform === 'telegram'" class="flex items-center gap-1.5 text-[11px] text-slate-400 cursor-pointer hover:text-slate-300 transition"><input type="checkbox" x-model="tgPin" class="rounded bg-slate-700 border-slate-600 w-3.5 h-3.5"> 📌 <span x-text="t('pin_message')"></span></label>
+                                <label x-show="activePlatform === 'facebook'" class="flex items-center gap-1.5 text-[11px] text-slate-400 cursor-pointer hover:text-slate-300 transition"><input type="checkbox" x-model="fbLinkPreview" class="rounded bg-slate-700 border-slate-600 w-3.5 h-3.5"> 🔗 <span x-text="t('link_preview')"></span></label>
+                                <span x-show="activePlatform === 'instagram'" class="text-[11px] text-slate-400">📷 <span x-text="t('hashtags_count') + ': ' + igHashtagCount + '/30'"></span></span>
+                                <span x-show="activePlatform === 'twitter'" class="text-[11px] text-slate-400">🧵 <span x-text="twThreadCount + ' ' + t('tweets')"></span></span>
+                            </div>
+                            <div class="text-[10px] text-slate-600" x-text="platformMediaLabel"></div>
                         </div>
                     </div>
 
-                    <!-- ═══ TELEGRAM EDITOR ═══ -->
-                    <div x-show="activePlatform === 'telegram'">
-                        <div class="rounded-2xl border overflow-hidden border-blue-500/20 bg-slate-800/60 focus-within:transition">
-                            <div class="flex items-center gap-0.5 px-2 py-1.5 border-b border-blue-500/10 bg-slate-900/40 flex-wrap">
-                                <button @click="postForm.message += '<b>نص</b>'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-xs font-bold text-slate-300 transition" title="Bold">B</button>
-                                <button @click="postForm.message += '<i>نص</i>'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-xs italic text-slate-300 transition" title="Italic">I</button>
-                                <button @click="postForm.message += '<u>نص</u>'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-xs underline text-slate-300 transition" title="Underline">U</button>
-                                <button @click="postForm.message += '<s>نص</s>'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-xs line-through text-slate-300 transition" title="Strikethrough">S</button>
-                                <div class="w-px h-4 bg-slate-600/40 mx-0.5"></div>
-                                <button @click="postForm.message += '<span class=&quot;tg-spoiler&quot;>نص</span>'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-[11px] text-slate-300 transition" title="Spoiler">🎯</button>
-                                <button @click="postForm.message += '<code>كود</code>'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-[10px] font-mono text-slate-300 transition" title="Code">&lt;/&gt;</button>
-                                <button @click="postForm.message += '<pre>نص</pre>'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-[10px] font-mono text-slate-300 transition" title="Pre">[pre]</button>
-                                <div class="w-px h-4 bg-slate-600/40 mx-0.5"></div>
-                                <button @click="postForm.message += '<a href=&quot;https://&quot;>رابط</a>'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-slate-300 transition" title="Link">🔗</button>
-                                <button @click="postForm.message += '<blockquote>اقتباس</blockquote>'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-slate-300 transition" title="Quote">❝</button>
-                                <div class="w-px h-4 bg-slate-600/40 mx-0.5"></div>
-                                <button @click="postForm.message += '\n🔔 ' + t('content_live') + ': '" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-[11px] text-slate-300 transition" title="Live">🔔</button>
-                            </div>
-                            <textarea x-model="postForm.message" rows="8" class="w-full bg-transparent p-4 text-sm text-white placeholder-slate-600 outline-none resize-none" :placeholder="t('tg_editor_placeholder')"></textarea>
-                            <div class="flex items-center justify-between px-3 py-1.5 border-t border-blue-500/10 bg-slate-900/20">
-                                <div class="flex items-center gap-1.5">
-                                    <button @click="parseMode = parseMode === 'HTML' ? 'Markdown' : parseMode === 'Markdown' ? 'MarkdownV2' : 'HTML'" class="text-[10px] px-2 py-0.5 rounded-md cursor-pointer transition font-mono" :class="parseMode === 'HTML' ? 'bg-cyan-500/15 text-cyan-400' : parseMode === 'Markdown' ? 'bg-purple-500/15 text-purple-400' : 'bg-amber-500/15 text-amber-400'" x-text="'Parse: ' + parseMode"></button>
-                                    <label class="flex items-center gap-1 text-[10px] text-slate-500 cursor-pointer"><input type="checkbox" x-model="tgSilent" class="rounded bg-slate-700 border-slate-600 w-3 h-3"> 🔇 <span x-text="t('silent_mode')"></span></label>
-                                    <label class="flex items-center gap-1 text-[10px] text-slate-500 cursor-pointer"><input type="checkbox" x-model="tgPin" class="rounded bg-slate-700 border-slate-600 w-3 h-3"> 📌 <span x-text="t('pin_message')"></span></label>
+                    <!-- ═══ MEDIA UPLOAD ═══ -->
+                    <div class="rounded-xl border border-slate-700/30 bg-slate-900/30 p-3">
+                        <label class="block text-[11px] text-slate-400 mb-2.5 font-semibold uppercase tracking-wider" x-text="t('media_label')"></label>
+                        <div class="flex flex-wrap gap-2">
+                            <label class="w-[72px] h-[72px] rounded-xl border-2 border-dashed border-slate-600/60 flex flex-col items-center justify-center cursor-pointer hover:border-blue-500/50 hover:bg-blue-500/5 transition-all group shrink-0">
+                                <i class="fas fa-cloud-upload-alt text-lg text-slate-500 group-hover:text-blue-400 transition"></i>
+                                <span class="text-[8px] text-slate-600 mt-0.5">Upload</span>
+                                <input type="file" class="hidden" accept="image/*,video/*" @change="uploadPostMedia($event)" multiple>
+                            </label>
+                            <template x-for="(media, idx) in postForm.media" :key="idx">
+                                <div class="relative w-[72px] h-[72px] rounded-xl overflow-hidden bg-slate-800 border border-slate-600/40 group shrink-0">
+                                    <img x-show="media.type && media.type.startsWith('image')" :src="media.url" class="w-full h-full object-cover">
+                                    <video x-show="media.type && media.type.startsWith('video')" :src="media.url" class="w-full h-full object-cover"></video>
+                                    <div x-show="!media.type || (!media.type.startsWith('image') && !media.type.startsWith('video'))" class="w-full h-full flex items-center justify-center"><i class="fas fa-file text-slate-500"></i></div>
+                                    <button @click="removePostMedia(idx)" class="absolute inset-0 bg-red-600/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition"><i class="fas fa-trash text-white text-xs"></i></button>
                                 </div>
-                                <div class="flex items-center gap-2">
-                                    <span class="text-[11px] font-mono" :class="platformCharCount > platformCharLimit ? 'text-red-400' : platformCharCount > platformCharLimit * 0.9 ? 'text-amber-400' : 'text-slate-500'" x-text="platformCharCount + '/' + platformCharLimit"></span>
-                                    <div class="w-14 h-1 rounded-full bg-slate-700/50 overflow-hidden">
-                                        <div class="h-full rounded-full transition-all" :class="platformCharCount > platformCharLimit ? 'bg-red-500' : platformCharCount > platformCharLimit * 0.9 ? 'bg-amber-500' : 'bg-green-500'" :style="'width:' + Math.min(100, (platformCharCount / platformCharLimit) * 100) + '%'"></div>
-                                    </div>
-                                </div>
-                            </div>
+                            </template>
                         </div>
-                        <!-- Telegram Placeholders -->
-                        <div class="mt-3">
+                    </div>
+
+                    <!-- ═══ TELEGRAM FEATURES ═══ -->
+                    <div x-show="activePlatform === 'telegram'" class="space-y-3">
+                        <!-- Placeholders -->
+                        <div class="rounded-xl border border-slate-700/30 bg-slate-900/30 p-3">
                             <label class="block text-[11px] text-slate-400 mb-2 font-semibold uppercase tracking-wider" x-text="t('dynamic_placeholders')"></label>
                             <div class="flex flex-wrap gap-1.5">
-                                <button @click="insertPlaceholder('company_name')" class="px-2.5 py-1 rounded-lg text-[11px] font-mono bg-slate-800 border border-slate-600/40 text-slate-400 hover:bg-slate-700 hover:text-white transition">{'{company_name}'}</button>
-                                <button @click="insertPlaceholder('download_link')" class="px-2.5 py-1 rounded-lg text-[11px] font-mono bg-slate-800 border border-slate-600/40 text-slate-400 hover:bg-slate-700 hover:text-white transition">{'{download_link}'}</button>
-                                <button @click="insertPlaceholder('promo_code')" class="px-2.5 py-1 rounded-lg text-[11px] font-mono bg-slate-800 border border-slate-600/40 text-slate-400 hover:bg-slate-700 hover:text-white transition">{'{promo_code}'}</button>
-                                <button @click="insertPlaceholder('affiliate_link')" class="px-2.5 py-1 rounded-lg text-[11px] font-mono bg-slate-800 border border-slate-600/40 text-slate-400 hover:bg-slate-700 hover:text-white transition">{'{affiliate_link}'}</button>
-                                <button @click="insertPlaceholder('username')" class="px-2.5 py-1 rounded-lg text-[11px] font-mono bg-slate-800 border border-slate-600/40 text-slate-400 hover:bg-slate-700 hover:text-white transition">{'{username}'}</button>
+                                <button @click="insertPlaceholder('company_name')" class="ph-btn">{'{company_name}'}</button>
+                                <button @click="insertPlaceholder('download_link')" class="ph-btn">{'{download_link}'}</button>
+                                <button @click="insertPlaceholder('promo_code')" class="ph-btn">{'{promo_code}'}</button>
+                                <button @click="insertPlaceholder('affiliate_link')" class="ph-btn">{'{affiliate_link}'}</button>
+                                <button @click="insertPlaceholder('username')" class="ph-btn">{'{username}'}</button>
                             </div>
                         </div>
-                        <!-- Telegram Deep Link Buttons -->
-                        <div class="mt-3">
+                        <!-- Deep Link Buttons -->
+                        <div class="rounded-xl border border-slate-700/30 bg-slate-900/30 p-3">
                             <div class="flex items-center justify-between mb-2">
-                                <label class="text-[11px] text-slate-400 font-semibold uppercase tracking-wider flex items-center gap-2">🔗 <span x-text="t('deep_link_buttons')"></span> <span class="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-bold" x-text="inlineButtons.filter(b => b.text && b.url).length"></span></label>
-                                <div class="flex items-center gap-1">
-                                    <button @click="deepLinkMode = 'individual'" :class="deepLinkMode === 'individual' ? 'bg-blue-500/20 text-blue-300' : 'text-slate-500 hover:text-slate-300'" class="text-[10px] px-2 py-1 rounded-md transition" x-text="t('deep_link_individual')"></button>
-                                    <button @click="deepLinkMode = 'bulk'" :class="deepLinkMode === 'bulk' ? 'bg-blue-500/20 text-blue-300' : 'text-slate-500 hover:text-slate-300'" class="text-[10px] px-2 py-1 rounded-md transition" x-text="t('deep_link_bulk')"></button>
+                                <label class="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">🔗 <span x-text="t('deep_link_buttons')"></span> <span class="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-bold" x-text="inlineButtons.filter(b => b.text && b.url).length"></span></label>
+                                <div class="flex gap-1">
+                                    <button @click="deepLinkMode = 'individual'" :class="deepLinkMode === 'individual' ? 'bg-blue-500/20 text-blue-300' : 'text-slate-500'" class="text-[10px] px-2 py-1 rounded-md transition font-medium" x-text="t('deep_link_individual')"></button>
+                                    <button @click="deepLinkMode = 'bulk'" :class="deepLinkMode === 'bulk' ? 'bg-blue-500/20 text-blue-300' : 'text-slate-500'" class="text-[10px] px-2 py-1 rounded-md transition font-medium" x-text="t('deep_link_bulk')"></button>
                                 </div>
                             </div>
                             <div x-show="deepLinkMode === 'bulk'" class="space-y-2">
@@ -1140,183 +1224,64 @@
                                 <button @click="addInlineButton()" class="w-full py-1.5 rounded-lg border border-dashed border-slate-600/50 text-slate-500 text-[10px] hover:border-blue-500/30 hover:text-blue-400 transition flex items-center justify-center gap-1"><i class="fas fa-plus text-[8px]"></i> <span x-text="t('add_button')"></span></button>
                             </div>
                         </div>
-                        <!-- Telegram Pro Tips -->
-                        <div class="mt-3 p-3 rounded-xl bg-blue-500/5 border border-blue-500/15">
-                            <label class="block text-[11px] text-blue-300 font-semibold mb-1.5">✈️ Telegram Tips</label>
-                            <p class="text-[10px] text-slate-400 leading-relaxed">HTML formatting: &lt;b&gt;bold&lt;/b&gt;, &lt;i&gt;italic&lt;/i&gt;, &lt;u&gt;underline&lt;/u&gt;, &lt;s&gt;strike&lt;/s&gt;, &lt;code&gt;code&lt;/code&gt;, &lt;pre&gt;pre&lt;/pre&gt;, &lt;a href="url"&gt;link&lt;/a&gt;, &lt;blockquote&gt;quote&lt;/blockquote&gt;. Spoiler: &lt;span class="tg-spoiler"&gt;text&lt;/span&gt;. Max 4096 chars.</p>
+                    </div>
+
+                    <!-- ═══ WHATSAPP FEATURES ═══ -->
+                    <div x-show="activePlatform === 'whatsapp'" class="rounded-xl border border-green-500/15 bg-green-500/5 p-3">
+                        <label class="block text-[11px] text-green-300 font-semibold mb-2">💬 WhatsApp Templates</label>
+                        <div class="flex flex-wrap gap-1.5">
+                            <button @click="postForm.message += '\n\n📢 *عرض خاص*\n\n'" class="px-2.5 py-1 rounded-lg bg-green-500/10 text-green-300 text-[10px] font-medium hover:bg-green-500/20 transition">📢 عرض خاص</button>
+                            <button @click="postForm.message += '\n\n⏰ *عرض محدود*\n\n'" class="px-2.5 py-1 rounded-lg bg-green-500/10 text-green-300 text-[10px] font-medium hover:bg-green-500/20 transition">⏰ عرض محدود</button>
+                            <button @click="postForm.message += '\n\n✅ *سجّل الآن*\n\n'" class="px-2.5 py-1 rounded-lg bg-green-500/10 text-green-300 text-[10px] font-medium hover:bg-green-500/20 transition">✅ سجّل الآن</button>
                         </div>
                     </div>
 
-                    <!-- ═══ WHATSAPP EDITOR ═══ -->
-                    <div x-show="activePlatform === 'whatsapp'">
-                        <div class="rounded-2xl border overflow-hidden border-green-500/20 bg-slate-800/60 focus-within:transition">
-                            <div class="flex items-center gap-0.5 px-2 py-1.5 border-b border-green-500/10 bg-slate-900/40 flex-wrap">
-                                <button @click="postForm.message += '*نص*'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-xs font-bold text-slate-300 transition" title="Bold">B</button>
-                                <button @click="postForm.message += '_نص_'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-xs italic text-slate-300 transition" title="Italic">I</button>
-                                <button @click="postForm.message += '~نص~'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-xs line-through text-slate-300 transition" title="Strikethrough">S</button>
-                                <button @click="postForm.message += '```كود```'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-[10px] font-mono text-slate-300 transition">&lt;/&gt;</button>
-                                <div class="w-px h-4 bg-slate-600/40 mx-0.5"></div>
-                                <button @click="postForm.message += '>اقتباس\n'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-slate-300 transition" title="Quote">❝</button>
-                                <button @click="postForm.message += '• '" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-slate-300 transition" title="List">•</button>
-                                <div class="w-px h-4 bg-slate-600/40 mx-0.5"></div>
-                                <button @click="postForm.message += '\n📞 ' + t('phone') + ': '" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-[11px] text-slate-300 transition">📞</button>
-                                <button @click="postForm.message += '\n📍 ' + t('location') + ': '" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-[11px] text-slate-300 transition">📍</button>
-                            </div>
-                            <textarea x-model="postForm.message" rows="8" class="w-full bg-transparent p-4 text-sm text-white placeholder-slate-600 outline-none resize-none" :placeholder="t('wa_editor_placeholder')"></textarea>
-                            <div class="flex items-center justify-between px-3 py-1.5 border-t border-green-500/10 bg-slate-900/20">
-                                <div class="flex items-center gap-2">
-                                    <span class="text-[10px] text-slate-500">📋 Markdown</span>
-                                </div>
-                                <div class="flex items-center gap-2">
-                                    <span class="text-[11px] font-mono" :class="platformCharCount > 65536 ? 'text-red-400' : 'text-slate-500'" x-text="platformCharCount + '/65536'"></span>
-                                    <div class="w-14 h-1 rounded-full bg-slate-700/50 overflow-hidden">
-                                        <div class="h-full rounded-full transition-all bg-green-500" :style="'width:' + Math.min(100, (platformCharCount / 65536) * 100) + '%'"></div>
-                                    </div>
-                                </div>
+                    <!-- ═══ INSTAGRAM FEATURES ═══ -->
+                    <div x-show="activePlatform === 'instagram'" class="space-y-3">
+                        <div class="rounded-xl border border-pink-500/15 bg-pink-500/5 p-3">
+                            <label class="block text-[11px] text-pink-300 font-semibold mb-2">📸 <span x-text="t('ig_hashtag_helper')"></span></label>
+                            <div class="flex flex-wrap gap-1.5">
+                                <button @click="postForm.message += ' #vex'" class="ig-tag">#vex</button>
+                                <button @click="postForm.message += ' #betting'" class="ig-tag">#betting</button>
+                                <button @click="postForm.message += ' #sports'" class="ig-tag">#sports</button>
+                                <button @click="postForm.message += ' #casino'" class="ig-tag">#casino</button>
+                                <button @click="postForm.message += ' #promo'" class="ig-tag">#promo</button>
+                                <button @click="postForm.message += ' #deals'" class="ig-tag">#deals</button>
+                                <button @click="postForm.message += ' #winner'" class="ig-tag">#winner</button>
+                                <button @click="postForm.message += ' #jackpot'" class="ig-tag">#jackpot</button>
                             </div>
                         </div>
-                        <!-- WhatsApp Pro Tips -->
-                        <div class="mt-3 p-3 rounded-xl bg-green-500/5 border border-green-500/15">
-                            <label class="block text-[11px] text-green-300 font-semibold mb-1.5">💬 WhatsApp Tips</label>
-                            <p class="text-[10px] text-slate-400 leading-relaxed">Markdown: *bold*, _italic_, ~strikethrough~, ```code```. > for blockquotes. Lists with • or 1. Max 65536 chars. Supports images, videos (16MB), documents, audio.</p>
-                            <div class="flex flex-wrap gap-1 mt-2">
-                                <button @click="postForm.message += '\n\n📢 *عرض خاص*\n\n'" class="px-2 py-0.5 rounded bg-green-500/15 text-green-300 text-[9px]">📢 عرض خاص</button>
-                                <button @click="postForm.message += '\n\n⏰ *عرض محدود*\n\n'" class="px-2 py-0.5 rounded bg-green-500/15 text-green-300 text-[9px]">⏰ عرض محدود</button>
-                                <button @click="postForm.message += '\n\n✅ *سجّل الآن*\n\n'" class="px-2 py-0.5 rounded bg-green-500/15 text-green-300 text-[9px]">✅ سجّل الآن</button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- ═══ INSTAGRAM EDITOR ═══ -->
-                    <div x-show="activePlatform === 'instagram'">
-                        <div class="rounded-2xl border overflow-hidden border-pink-500/20 bg-slate-800/60 focus-within:transition">
-                            <div class="flex items-center gap-0.5 px-2 py-1.5 border-b border-pink-500/10 bg-slate-900/40 flex-wrap">
-                                <button @click="insertHashtag()" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-xs text-pink-300 transition font-bold">#</button>
-                                <button @click="postForm.message += '@'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-xs text-pink-300 transition">@</button>
-                                <button @click="postForm.message += '\n\n'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-slate-300 transition">↵</button>
-                                <div class="w-px h-4 bg-slate-600/40 mx-0.5"></div>
-                                <button @click="postForm.message += '❤️'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-[11px] transition">❤️</button>
-                                <button @click="postForm.message += '🔥'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-[11px] transition">🔥</button>
-                                <button @click="postForm.message += '💯'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-[11px] transition">💯</button>
-                                <button @click="postForm.message += '🎯'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-[11px] transition">🎯</button>
-                                <button @click="postForm.message += '⭐'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-[11px] transition">⭐</button>
-                            </div>
-                            <textarea x-model="postForm.message" rows="8" class="w-full bg-transparent p-4 text-sm text-white placeholder-slate-600 outline-none resize-none" :placeholder="t('ig_editor_placeholder')"></textarea>
-                            <div class="flex items-center justify-between px-3 py-1.5 border-t border-pink-500/10 bg-slate-900/20">
-                                <div class="flex items-center gap-2">
-                                    <span class="text-[10px] text-slate-500">📷 <span x-text="t('hashtags_count') + ': ' + igHashtagCount + '/30'"></span></span>
-                                    <div class="w-14 h-1 rounded-full bg-slate-700/50 overflow-hidden">
-                                        <div class="h-full rounded-full transition-all" :class="igHashtagCount > 30 ? 'bg-red-500' : igHashtagCount > 25 ? 'bg-amber-500' : 'bg-pink-500'" :style="'width:' + Math.min(100, (igHashtagCount / 30) * 100) + '%'"></div>
-                                    </div>
-                                </div>
-                                <div class="flex items-center gap-2">
-                                    <span class="text-[11px] font-mono text-slate-500" x-text="platformCharCount + '/2200'"></span>
-                                </div>
-                            </div>
-                        </div>
-                        <!-- Instagram Hashtag Helper -->
-                        <div class="mt-3 p-3 rounded-xl bg-gradient-to-r from-pink-500/5 to-purple-500/5 border border-pink-500/15">
-                            <label class="block text-[11px] text-pink-300 font-semibold mb-1.5">📸 <span x-text="t('ig_hashtag_helper')"></span></label>
-                            <p class="text-[10px] text-slate-400 mb-2" x-text="t('ig_hashtag_tip')"></p>
-                            <div class="flex flex-wrap gap-1">
-                                <button @click="postForm.message += ' #vex'" class="px-2 py-0.5 rounded bg-pink-500/15 text-pink-300 text-[9px] hover:bg-pink-500/25 transition">#vex</button>
-                                <button @click="postForm.message += ' #betting'" class="px-2 py-0.5 rounded bg-pink-500/15 text-pink-300 text-[9px] hover:bg-pink-500/25 transition">#betting</button>
-                                <button @click="postForm.message += ' #sports'" class="px-2 py-0.5 rounded bg-pink-500/15 text-pink-300 text-[9px] hover:bg-pink-500/25 transition">#sports</button>
-                                <button @click="postForm.message += ' #casino'" class="px-2 py-0.5 rounded bg-pink-500/15 text-pink-300 text-[9px] hover:bg-pink-500/25 transition">#casino</button>
-                                <button @click="postForm.message += ' #promo'" class="px-2 py-0.5 rounded bg-pink-500/15 text-pink-300 text-[9px] hover:bg-pink-500/25 transition">#promo</button>
-                                <button @click="postForm.message += ' #deals'" class="px-2 py-0.5 rounded bg-pink-500/15 text-pink-300 text-[9px] hover:bg-pink-500/25 transition">#deals</button>
-                                <button @click="postForm.message += ' #winner'" class="px-2 py-0.5 rounded bg-pink-500/15 text-pink-300 text-[9px] hover:bg-pink-500/25 transition">#winner</button>
-                                <button @click="postForm.message += ' #jackpot'" class="px-2 py-0.5 rounded bg-pink-500/15 text-pink-300 text-[9px] hover:bg-pink-500/25 transition">#jackpot</button>
-                            </div>
-                        </div>
-                        <!-- Instagram Location Tag -->
-                        <div class="mt-3">
+                        <div class="rounded-xl border border-slate-700/30 bg-slate-900/30 p-3">
                             <label class="text-[11px] text-slate-400 font-semibold">📍 <span x-text="t('location_tag')"></span></label>
-                            <input type="text" x-model="igLocation" class="input w-full text-xs py-2 mt-1" :placeholder="t('ig_location_placeholder')">
+                            <input type="text" x-model="igLocation" class="input w-full text-xs py-2 mt-1.5" :placeholder="t('ig_location_placeholder')">
                         </div>
                     </div>
 
-                    <!-- ═══ FACEBOOK EDITOR ═══ -->
-                    <div x-show="activePlatform === 'facebook'">
-                        <div class="rounded-2xl border overflow-hidden border-blue-500/20 bg-slate-800/60 focus-within:transition">
-                            <div class="flex items-center gap-0.5 px-2 py-1.5 border-b border-blue-500/10 bg-slate-900/40 flex-wrap">
-                                <button @click="postForm.message += '\n\n'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-slate-300 transition">↵</button>
-                                <button @click="postForm.message += '───────────\n'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-slate-300 transition">─</button>
-                                <div class="w-px h-4 bg-slate-600/40 mx-0.5"></div>
-                                <button @click="postForm.message += '👍'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-[11px] transition">👍</button>
-                                <button @click="postForm.message += '❤️'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-[11px] transition">❤️</button>
-                                <button @click="postForm.message += '😂'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-[11px] transition">😂</button>
-                                <button @click="postForm.message += '😮'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-[11px] transition">😮</button>
-                                <button @click="postForm.message += '😢'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-[11px] transition">😢</button>
-                                <button @click="postForm.message += '😡'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-[11px] transition">😡</button>
-                                <div class="w-px h-4 bg-slate-600/40 mx-0.5"></div>
-                                <button @click="fbLinkPreview = !fbLinkPreview" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-[11px] text-blue-300 transition" title="Link Preview">🔗</button>
-                            </div>
-                            <textarea x-model="postForm.message" rows="8" class="w-full bg-transparent p-4 text-sm text-white placeholder-slate-600 outline-none resize-none" :placeholder="t('fb_editor_placeholder')"></textarea>
-                            <div class="flex items-center justify-between px-3 py-1.5 border-t border-blue-500/10 bg-slate-900/20">
-                                <div class="flex items-center gap-2">
-                                    <label class="text-[10px] text-slate-500 flex items-center gap-1 cursor-pointer"><input type="checkbox" x-model="fbLinkPreview" class="rounded bg-slate-700 border-slate-600 w-3 h-3"> <span x-text="t('link_preview')"></span></label>
-                                </div>
-                                <div class="flex items-center gap-2">
-                                    <span class="text-[11px] font-mono text-slate-500" x-text="platformCharCount + '/63206'"></span>
-                                </div>
-                            </div>
-                        </div>
-                        <!-- Facebook Link Preview URL -->
-                        <div x-show="fbLinkPreview" class="mt-3">
+                    <!-- ═══ FACEBOOK FEATURES ═══ -->
+                    <div x-show="activePlatform === 'facebook'" class="space-y-3">
+                        <div x-show="fbLinkPreview" class="rounded-xl border border-slate-700/30 bg-slate-900/30 p-3">
                             <label class="text-[11px] text-slate-400 font-semibold">🔗 <span x-text="t('preview_url')"></span></label>
-                            <input type="url" x-model="fbPreviewUrl" class="input w-full text-xs py-2 mt-1 font-mono text-ltr" placeholder="https://vex.deals/...">
-                        </div>
-                        <!-- Facebook Pro Tips -->
-                        <div class="mt-3 p-3 rounded-xl bg-blue-500/5 border border-blue-500/15">
-                            <label class="block text-[11px] text-blue-300 font-semibold mb-1.5">📘 Facebook Tips</label>
-                            <p class="text-[10px] text-slate-400 leading-relaxed">Posts with images get 2.3x more engagement. Keep text under 80 characters for best reach. Use emojis for +56% comments. Link previews auto-generate from URLs.</p>
+                            <input type="url" x-model="fbPreviewUrl" class="input w-full text-xs py-2 mt-1.5 font-mono text-ltr" placeholder="https://vex.deals/...">
                         </div>
                     </div>
 
-                    <!-- ═══ TWITTER/X EDITOR ═══ -->
-                    <div x-show="activePlatform === 'twitter'">
-                        <div class="rounded-2xl border overflow-hidden border-sky-500/20 bg-slate-800/60 focus-within:transition">
-                            <div class="flex items-center gap-0.5 px-2 py-1.5 border-b border-sky-500/10 bg-slate-900/40 flex-wrap">
-                                <button @click="insertHashtag()" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-xs text-[#1d9bf0] transition font-bold">#</button>
-                                <button @click="postForm.message += '@'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-xs text-[#1d9bf0] transition">@</button>
-                                <button @click="postForm.message += '\n'" class="w-7 h-7 rounded-md hover:bg-slate-600 flex items-center justify-center text-slate-300 transition">↵</button>
-                                <div class="w-px h-4 bg-slate-600/40 mx-0.5"></div>
-                                <button @click="twAddThread()" class="text-[9px] px-2 py-1 rounded-md hover:bg-slate-600 flex items-center justify-center gap-1 text-[#1d9bf0] transition font-medium"><i class="fas fa-plus text-[8px]"></i> <span x-text="t('add_tweet')"></span></button>
-                                <button @click="twPollActive = !twPollActive" :class="twPollActive ? 'bg-[#1d9bf0]/20 text-[#1d9bf0]' : ''" class="text-[9px] px-2 py-1 rounded-md hover:bg-slate-600 flex items-center justify-center gap-1 text-slate-400 transition font-medium">📊 <span x-text="t('poll')"></span></button>
-                            </div>
-                            <textarea x-model="postForm.message" rows="8" class="w-full bg-transparent p-4 text-sm text-white placeholder-slate-600 outline-none resize-none" :placeholder="t('tw_editor_placeholder')"></textarea>
-                            <div class="flex items-center justify-between px-3 py-1.5 border-t border-sky-500/10 bg-slate-900/20">
-                                <div class="flex items-center gap-2">
-                                    <span class="text-[10px] text-slate-500">🧵 <span x-text="twThreadCount + ' ' + t('tweets')"></span></span>
-                                </div>
-                                <div class="flex items-center gap-2">
-                                    <span class="text-[11px] font-mono" :class="twitterCharCount > 280 ? 'text-red-400' : twitterCharCount > 252 ? 'text-amber-400' : 'text-slate-500'" x-text="twitterCharCount + '/280'"></span>
-                                    <div class="w-14 h-1 rounded-full bg-slate-700/50 overflow-hidden">
-                                        <div class="h-full rounded-full transition-all" :class="twitterCharCount > 280 ? 'bg-red-500' : twitterCharCount > 252 ? 'bg-amber-500' : 'bg-sky-500'" :style="'width:' + Math.min(100, (twitterCharCount / 280) * 100) + '%'"></div>
-                                    </div>
-                                </div>
-                            </div>
+                    <!-- ═══ TWITTER FEATURES ═══ -->
+                    <div x-show="activePlatform === 'twitter'" class="space-y-3">
+                        <div x-show="twThreadCount > 1" class="rounded-xl border border-sky-500/15 bg-sky-500/5 p-3">
+                            <label class="block text-[11px] text-sky-300 font-semibold mb-1">🧵 Thread Active</label>
+                            <p class="text-[10px] text-slate-400" x-text="t('thread_info')"></p>
                         </div>
-                        <!-- Twitter Thread Builder -->
-                        <div x-show="twThreadCount > 1" class="mt-3 p-3 rounded-xl bg-sky-500/5 border border-sky-500/15">
-                            <label class="block text-[11px] text-sky-300 font-semibold mb-1.5">🧵 <span x-text="t('thread_builder')"></span></label>
-                            <p class="text-[10px] text-slate-400 mb-2"><span x-text="t('thread_info')"></span></p>
-                        </div>
-                        <!-- Twitter Poll -->
-                        <div x-show="twPollActive" class="mt-3 p-3 rounded-xl bg-sky-500/5 border border-sky-500/15">
+                        <div x-show="twPollActive" class="rounded-xl border border-sky-500/15 bg-sky-500/5 p-3">
                             <label class="block text-[11px] text-sky-300 font-semibold mb-2">📊 <span x-text="t('poll_creator')"></span></label>
                             <div class="space-y-1.5">
                                 <template x-for="(opt, idx) in twPollOptions" :key="idx">
-                                    <div class="flex gap-1.5">
-                                        <input type="text" x-model="twPollOptions[idx]" class="input flex-1 text-xs py-1.5" :placeholder="t('poll_option') + ' ' + (idx+1)">
-                                    </div>
+                                    <input type="text" x-model="twPollOptions[idx]" class="input w-full text-xs py-1.5" :placeholder="t('poll_option') + ' ' + (idx+1)">
                                 </template>
                             </div>
-                            <div class="flex gap-2 mt-2">
-                                <button x-show="twPollOptions.length < 4" @click="twPollOptions.push('')" class="text-[9px] px-2 py-1 rounded bg-sky-500/15 text-sky-300"><i class="fas fa-plus"></i> <span x-text="t('add_option')"></span></button>
+                            <div class="flex items-center gap-2 mt-2">
+                                <button x-show="twPollOptions.length < 4" @click="twPollOptions.push('')" class="text-[10px] px-2 py-1 rounded-lg bg-sky-500/15 text-sky-300 font-medium hover:bg-sky-500/25 transition"><i class="fas fa-plus text-[8px]"></i> <span x-text="t('add_option')"></span></button>
                                 <div class="flex-1"></div>
-                                <select x-model="twPollDuration" class="input text-[10px] py-1 w-24">
+                                <select x-model="twPollDuration" class="input text-[10px] py-1 w-20">
                                     <option value="60">1 min</option>
                                     <option value="360">6 hrs</option>
                                     <option value="1440">1 day</option>
@@ -1325,144 +1290,117 @@
                                 </select>
                             </div>
                         </div>
-                        <!-- Twitter Pro Tips -->
-                        <div class="mt-3 p-3 rounded-xl bg-sky-500/5 border border-sky-500/15">
-                            <label class="block text-[11px] text-sky-300 font-semibold mb-1.5">🐦 <span x-text="t('twitter_tips')"></span></label>
-                            <p class="text-[10px] text-slate-400 leading-relaxed" x-text="t('twitter_tips_text')"></p>
-                            <div class="flex flex-wrap gap-1 mt-2">
-                                <button @click="postForm.message += ' #vex'" class="px-2 py-0.5 rounded bg-sky-500/15 text-sky-300 text-[9px]">#vex</button>
-                                <button @click="postForm.message += ' #betting'" class="px-2 py-0.5 rounded bg-sky-500/15 text-sky-300 text-[9px]">#betting</button>
-                                <button @click="postForm.message += ' #crypto'" class="px-2 py-0.5 rounded bg-sky-500/15 text-sky-300 text-[9px]">#crypto</button>
+                        <div class="rounded-xl border border-sky-500/15 bg-sky-500/5 p-3">
+                            <label class="block text-[11px] text-sky-300 font-semibold mb-1.5">🐦 Quick Tags</label>
+                            <div class="flex flex-wrap gap-1">
+                                <button @click="postForm.message += ' #vex'" class="px-2 py-0.5 rounded bg-sky-500/15 text-sky-300 text-[9px] font-medium hover:bg-sky-500/25 transition">#vex</button>
+                                <button @click="postForm.message += ' #betting'" class="px-2 py-0.5 rounded bg-sky-500/15 text-sky-300 text-[9px] font-medium hover:bg-sky-500/25 transition">#betting</button>
+                                <button @click="postForm.message += ' #crypto'" class="px-2 py-0.5 rounded bg-sky-500/15 text-sky-300 text-[9px] font-medium hover:bg-sky-500/25 transition">#crypto</button>
                             </div>
                         </div>
                     </div>
 
                 </div>
 
-                <!-- ═══ Media Upload (shared) ═══ -->
-                <div class="lg:col-span-5">
-                    <div class="p-3 rounded-xl border border-slate-700/30 bg-slate-900/40">
-                        <label class="block text-[11px] text-slate-400 mb-2 font-semibold uppercase tracking-wider" x-text="t('media_label') + ' (' + platformMediaLabel + ')'"></label>
-                        <div class="flex flex-wrap gap-2">
-                            <label class="w-20 h-20 rounded-xl border-2 border-dashed border-slate-600 flex flex-col items-center justify-center cursor-pointer hover:border-blue-500/50 hover:bg-blue-500/5 transition-all group shrink-0">
-                                <i class="fas fa-plus text-lg text-slate-500 group-hover:text-blue-400 transition"></i>
-                                <input type="file" class="hidden" accept="image/*,video/*" @change="uploadPostMedia($event)" multiple>
-                            </label>
-                            <template x-for="(media, idx) in postForm.media" :key="idx">
-                                <div class="relative w-20 h-20 rounded-xl overflow-hidden bg-slate-800 border border-slate-600/40 group shrink-0">
-                                    <img x-show="media.type && media.type.startsWith('image')" :src="media.url" class="w-full h-full object-cover">
-                                    <video x-show="media.type && media.type.startsWith('video')" :src="media.url" class="w-full h-full object-cover"></video>
-                                    <div x-show="!media.type || (!media.type.startsWith('image') && !media.type.startsWith('video'))" class="w-full h-full flex items-center justify-center"><i class="fas fa-file text-slate-500"></i></div>
-                                    <button @click="removePostMedia(idx)" class="absolute inset-0 bg-red-600/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition"><i class="fas fa-trash text-white text-xs"></i></button>
-                                </div>
-                            </template>
-                        </div>
-                    </div>
-                </div>
+                <!-- ═══ RIGHT COLUMN: Preview + Target + Settings (2/5) ═══ -->
+                <div class="lg:col-span-2 p-5 space-y-4">
 
-                <!-- ═══ RIGHT: Preview + Targets + Settings (2/5) ═══ -->
-                <div class="lg:col-span-2 space-y-4">
-
-                    <!-- Live Preview Card — platform-specific -->
-                    <div>
-                        <!-- Telegram Card -->
-                        <div x-show="activePlatform === 'telegram'" class="bg-[#17212b] rounded-2xl border border-slate-700/30 overflow-hidden">
-                            <div class="px-4 py-2.5 bg-[#1e2c3a] flex items-center gap-2">
-                                <div class="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-[10px] text-white font-bold">V</div>
-                                <div><div class="text-xs font-medium text-white">VEX Channel</div><div class="text-[10px] text-[#6d8a9e]">online</div></div>
+                    <!-- Preview Card -->
+                    <div class="rounded-2xl overflow-hidden border" :class="platformPreviewBorder">
+                        <!-- Telegram Preview -->
+                        <div x-show="activePlatform === 'telegram'" class="bg-[#17212b]">
+                            <div class="px-4 py-3 bg-[#1e2c3a] flex items-center gap-2.5">
+                                <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-[10px] text-white font-bold">V</div>
+                                <div><div class="text-[13px] font-semibold text-white">VEX Channel</div><div class="text-[10px] text-[#6d8a9e]">online</div></div>
                             </div>
-                            <div class="p-4 min-h-[120px] max-h-[260px] overflow-y-auto">
+                            <div class="p-4 min-h-[140px] max-h-[280px] overflow-y-auto">
                                 <div x-show="postForm.message || postForm.media.length > 0">
-                                    <div x-show="postForm.media.length > 0" class="mb-2"><template x-for="(media, idx) in postForm.media.slice(0,2)" :key="'tg-'+idx"><div class="rounded-lg overflow-hidden bg-slate-800 mb-1 max-h-28"><img x-show="media.type && media.type.startsWith('image')" :src="media.url" class="w-full h-full object-cover"></div></template></div>
+                                    <div x-show="postForm.media.length > 0" class="mb-3"><template x-for="(media, idx) in postForm.media.slice(0,2)" :key="'tg-'+idx"><div class="rounded-xl overflow-hidden bg-slate-800 mb-1.5 max-h-32"><img x-show="media.type && media.type.startsWith('image')" :src="media.url" class="w-full h-full object-cover"></div></template></div>
                                     <p class="text-[13px] text-white/90 whitespace-pre-wrap leading-relaxed" x-html="postForm.message || ''"></p>
-                                    <div x-show="inlineButtons.some(b => b.text)" class="mt-2 space-y-1"><template x-for="(btn, idx) in inlineButtons.filter(b => b.text).slice(0, 20)" :key="'tbb-'+idx"><div class="block w-full text-center px-3 py-1.5 rounded-lg text-[12px] font-medium bg-[#2b5278] text-white border border-[#3a6a94]"><span x-text="btn.text"></span></div></template></div>
+                                    <div x-show="inlineButtons.some(b => b.text)" class="mt-3 space-y-1.5"><template x-for="(btn, idx) in inlineButtons.filter(b => b.text).slice(0, 20)" :key="'tbb-'+idx"><div class="block w-full text-center px-3 py-2 rounded-xl text-[12px] font-medium bg-[#2b5278] text-white border border-[#3a6a94]"><span x-text="btn.text"></span></div></template></div>
                                 </div>
-                                <div x-show="!postForm.message && postForm.media.length === 0" class="flex items-center justify-center h-20 text-[#6d8a9e] text-xs"><span x-text="t('post_preview')"></span></div>
+                                <div x-show="!postForm.message && postForm.media.length === 0" class="flex items-center justify-center h-24 text-[#6d8a9e] text-xs"><span x-text="t('post_preview')"></span></div>
                             </div>
                         </div>
-                        <!-- WhatsApp Card -->
-                        <div x-show="activePlatform === 'whatsapp'" class="rounded-2xl overflow-hidden" style="background:#0b141a">
-                            <div class="px-4 py-2.5 flex items-center gap-2" style="background:#1f2c34">
-                                <div class="w-7 h-7 rounded-full bg-[#00a884] flex items-center justify-center text-[10px] text-white font-bold">V</div>
-                                <div><div class="text-xs font-medium text-white">VEX Channel</div><div class="text-[10px] text-[#8696a0]">online</div></div>
+                        <!-- WhatsApp Preview -->
+                        <div x-show="activePlatform === 'whatsapp'" class="bg-[#0b141a]">
+                            <div class="px-4 py-3 bg-[#1f2c34] flex items-center gap-2.5">
+                                <div class="w-8 h-8 rounded-full bg-[#00a884] flex items-center justify-center text-[10px] text-white font-bold">V</div>
+                                <div><div class="text-[13px] font-semibold text-white">VEX Channel</div><div class="text-[10px] text-[#8696a0]">online</div></div>
                             </div>
-                            <div class="p-4 min-h-[120px] max-h-[260px] overflow-y-auto">
+                            <div class="p-4 min-h-[140px] max-h-[280px] overflow-y-auto">
                                 <div x-show="postForm.message || postForm.media.length > 0">
-                                    <div class="rounded-xl p-3 max-w-[85%]" style="background:#005c4b">
-                                        <div x-show="postForm.media.length > 0" class="mb-2"><template x-for="(media, idx) in postForm.media.slice(0,1)" :key="'wa-'+idx"><div class="rounded-lg overflow-hidden mb-1 max-h-32"><img x-show="media.type && media.type.startsWith('image')" :src="media.url" class="w-full h-full object-cover"></div></template></div>
+                                    <div class="rounded-xl p-3.5 max-w-[85%] ml-auto" style="background:#005c4b">
+                                        <div x-show="postForm.media.length > 0" class="mb-2"><template x-for="(media, idx) in postForm.media.slice(0,1)" :key="'wa-'+idx"><div class="rounded-lg overflow-hidden mb-1.5 max-h-36"><img x-show="media.type && media.type.startsWith('image')" :src="media.url" class="w-full h-full object-cover"></div></template></div>
                                         <p class="text-[13px] text-[#e9edef] whitespace-pre-wrap leading-relaxed" x-text="postForm.message || ''"></p>
-                                        <div class="flex items-center justify-end gap-1 mt-1"><span class="text-[9px] text-[#8696a0]">now</span><svg class="w-4 h-4 text-[#53bdeb]" viewBox="0 0 16 11" fill="currentColor"><path d="M11.071.653a.457.457 0 0 0-.304-.102.493.493 0 0 0-.381.178l-6.19 7.636-2.011-2.095a.463.463 0 0 0-.659-.003.461.461 0 0 0-.003.66l2.37 2.47c.091.095.211.142.333.142a.458.458 0 0 0 .352-.17l6.545-8.07a.458.458 0 0 0-.052-.647z"/></svg></div>
+                                        <div class="flex items-center justify-end gap-1 mt-1.5"><span class="text-[9px] text-[#8696a0]">now</span><svg class="w-4 h-4 text-[#53bdeb]" viewBox="0 0 16 11" fill="currentColor"><path d="M11.071.653a.457.457 0 0 0-.304-.102.493.493 0 0 0-.381.178l-6.19 7.636-2.011-2.095a.463.463 0 0 0-.659-.003.461.461 0 0 0-.003.66l2.37 2.47c.091.095.211.142.333.142a.458.458 0 0 0 .352-.17l6.545-8.07a.458.458 0 0 0-.052-.647z"/></svg></div>
                                     </div>
                                 </div>
-                                <div x-show="!postForm.message && postForm.media.length === 0" class="flex items-center justify-center h-20 text-[#8696a0] text-xs"><span x-text="t('post_preview')"></span></div>
+                                <div x-show="!postForm.message && postForm.media.length === 0" class="flex items-center justify-center h-24 text-[#8696a0] text-xs"><span x-text="t('post_preview')"></span></div>
                             </div>
                         </div>
-                        <!-- Instagram Card -->
-                        <div x-show="activePlatform === 'instagram'" class="bg-white rounded-2xl overflow-hidden border border-gray-200">
-                            <div class="px-3 py-2 flex items-center gap-2 border-b border-gray-100">
-                                <div class="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400 p-[2px]"><div class="w-full h-full rounded-full bg-white flex items-center justify-center text-[9px] font-bold text-gray-800">V</div></div>
-                                <div><div class="text-xs font-semibold text-gray-900">vex.deals</div><div class="text-[9px] text-gray-400">Sponsored</div></div>
+                        <!-- Instagram Preview -->
+                        <div x-show="activePlatform === 'instagram'" class="bg-white">
+                            <div class="px-3 py-2.5 flex items-center gap-2.5 border-b border-gray-100">
+                                <div class="w-9 h-9 rounded-full bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400 p-[2px]"><div class="w-full h-full rounded-full bg-white flex items-center justify-center text-[10px] font-bold text-gray-800">V</div></div>
+                                <div><div class="text-[13px] font-semibold text-gray-900">vex.deals</div><div class="text-[10px] text-gray-400">Sponsored</div></div>
                             </div>
-                            <div x-show="postForm.media.length > 0" class="aspect-square max-h-[200px] overflow-hidden bg-gray-100"><template x-for="(media, idx) in postForm.media.slice(0,1)" :key="'ig-'+idx"><img x-show="media.type && media.type.startsWith('image')" :src="media.url" class="w-full h-full object-cover"></template></div>
+                            <div x-show="postForm.media.length > 0" class="aspect-square max-h-[220px] overflow-hidden bg-gray-100"><template x-for="(media, idx) in postForm.media.slice(0,1)" :key="'ig-'+idx"><img x-show="media.type && media.type.startsWith('image')" :src="media.url" class="w-full h-full object-cover"></template></div>
                             <div class="p-3">
-                                <div class="flex items-center gap-3 mb-2"><div class="w-6 h-6 rounded-full bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400 p-[1px]"><div class="w-full h-full rounded-full bg-white"></div></div><span class="text-xs font-semibold text-gray-900">vex.deals</span></div>
+                                <div class="flex items-center gap-2.5 mb-2"><div class="w-7 h-7 rounded-full bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400 p-[1px]"><div class="w-full h-full rounded-full bg-white"></div></div><span class="text-[12px] font-semibold text-gray-900">vex.deals</span></div>
                                 <p class="text-[12px] text-gray-800 whitespace-pre-wrap leading-relaxed" x-text="postForm.message || ''"></p>
-                                <div x-show="postHasHashtags" class="mt-1 text-[11px] text-[#00376b]" x-text="hashtagsText"></div>
-                                <div class="flex items-center gap-4 mt-2 pt-2 border-t border-gray-100"><span class="text-gray-500 text-sm">♡</span><span class="text-gray-500 text-sm">💬</span><span class="text-gray-500 text-sm">➤</span><span class="text-gray-500 text-sm ml-auto">☐</span></div>
+                                <div x-show="postHasHashtags" class="mt-1.5 text-[11px] text-[#00376b]" x-text="hashtagsText"></div>
+                                <div class="flex items-center gap-4 mt-2.5 pt-2.5 border-t border-gray-100"><span class="text-gray-500 text-sm">♡</span><span class="text-gray-500 text-sm">💬</span><span class="text-gray-500 text-sm">➤</span><span class="text-gray-500 text-sm ml-auto">☐</span></div>
                             </div>
                         </div>
-                        <!-- Facebook Card -->
-                        <div x-show="activePlatform === 'facebook'" class="bg-white rounded-2xl overflow-hidden border border-gray-200">
+                        <!-- Facebook Preview -->
+                        <div x-show="activePlatform === 'facebook'" class="bg-white">
                             <div class="px-4 py-3 flex items-center gap-3 border-b border-gray-100">
                                 <div class="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-xs text-white font-bold">V</div>
                                 <div><div class="text-[13px] font-semibold text-gray-900">VEX Deals</div><div class="text-[10px] text-gray-500">Just now · 🌍</div></div>
                             </div>
-                            <div class="px-4 py-2"><p class="text-[13px] text-gray-900 whitespace-pre-wrap leading-relaxed" x-text="postForm.message || ''"></p></div>
+                            <div class="px-4 py-3"><p class="text-[13px] text-gray-900 whitespace-pre-wrap leading-relaxed" x-text="postForm.message || ''"></p></div>
                             <div x-show="postForm.media.length > 0" class="border-t border-gray-100"><template x-for="(media, idx) in postForm.media.slice(0,1)" :key="'fb-'+idx"><div class="max-h-[180px] overflow-hidden bg-gray-100"><img x-show="media.type && media.type.startsWith('image')" :src="media.url" class="w-full h-full object-cover"></div></template></div>
-                            <div class="px-4 py-2 flex items-center justify-between border-t border-gray-100 text-gray-500 text-xs"><span>👍 Like</span><span>💬 Comment</span><span>↗️ Share</span></div>
+                            <div class="px-4 py-2.5 flex items-center justify-between border-t border-gray-100 text-gray-500 text-xs"><span>👍 Like</span><span>💬 Comment</span><span>↗️ Share</span></div>
                         </div>
-                        <!-- Twitter/X Card -->
-                        <div x-show="activePlatform === 'twitter'" class="bg-black rounded-2xl overflow-hidden border border-gray-800">
+                        <!-- Twitter Preview -->
+                        <div x-show="activePlatform === 'twitter'" class="bg-black">
                             <div class="px-4 py-3 flex items-center gap-3">
                                 <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-xs text-white font-bold">V</div>
                                 <div class="flex-1"><div class="flex items-center gap-1"><span class="text-[13px] font-bold text-white">VEX Deals</span><svg class="w-4 h-4 text-blue-400" viewBox="0 0 24 24" fill="currentColor"><path d="M22.5 12.5c0-1.58-.875-2.95-2.148-3.6.154-.435.238-.905.238-1.4 0-2.21-1.71-3.998-3.818-3.998-.47 0-.92.084-1.336.25C14.818 2.415 13.51 1.5 12 1.5s-2.816.917-3.437 2.25c-.415-.165-.866-.25-1.336-.25-2.11 0-3.818 1.79-3.818 4 0 .494.083.964.237 1.4-1.272.65-2.147 2.018-2.147 3.6 0 1.495.782 2.798 1.942 3.486-.02.17-.032.34-.032.514 0 2.21 1.708 4 3.818 4 .47 0 .92-.086 1.335-.25.62 1.334 1.926 2.25 3.437 2.25 1.512 0 2.818-.916 3.437-2.25.415.163.865.248 1.336.248 2.11 0 3.818-1.79 3.818-4 0-.174-.012-.344-.033-.513 1.158-.687 1.943-1.99 1.943-3.484zm-6.616-3.334l-4.334 6.5c-.145.217-.382.334-.625.334-.143 0-.288-.04-.416-.126l-.115-.094-2.415-2.415c-.293-.293-.293-.768 0-1.06s.768-.294 1.06 0l1.77 1.767 3.825-5.74c.23-.345.696-.436 1.04-.207.346.23.44.696.21 1.04z"/></svg></div><div class="text-[12px] text-gray-500">@vexdeals</div></div>
                             </div>
                             <div class="px-4 pb-3">
                                 <p class="text-[14px] text-white whitespace-pre-wrap leading-relaxed" x-text="postForm.message || ''"></p>
-                                <div x-show="postHasHashtags" class="mt-1 text-[13px] text-[#1d9bf0]" x-text="hashtagsText"></div>
-                                <div x-show="postForm.media.length > 0" class="mt-2 rounded-xl overflow-hidden border border-gray-800"><template x-for="(media, idx) in postForm.media.slice(0,1)" :key="'tw-'+idx"><div class="max-h-[180px] overflow-hidden"><img x-show="media.type && media.type.startsWith('image')" :src="media.url" class="w-full h-full object-cover"></div></template></div>
+                                <div x-show="postHasHashtags" class="mt-1.5 text-[13px] text-[#1d9bf0]" x-text="hashtagsText"></div>
+                                <div x-show="postForm.media.length > 0" class="mt-2.5 rounded-xl overflow-hidden border border-gray-800"><template x-for="(media, idx) in postForm.media.slice(0,1)" :key="'tw-'+idx"><div class="max-h-[180px] overflow-hidden"><img x-show="media.type && media.type.startsWith('image')" :src="media.url" class="w-full h-full object-cover"></div></template></div>
                             </div>
-                            <div class="px-4 py-2 flex items-center justify-between border-t border-gray-800 text-gray-500 text-xs"><span>💬 0</span><span>🔁 0</span><span>❤️ 0</span><span>📊 0</span></div>
+                            <div class="px-4 py-2.5 flex items-center justify-between border-t border-gray-800 text-gray-500 text-xs"><span>💬 0</span><span>🔁 0</span><span>❤️ 0</span><span>📊 0</span></div>
                         </div>
-
-                        <!-- Character limit warning -->
-                        <div x-show="platformCharCount > platformCharLimit" class="mt-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center gap-2">
+                        <!-- Char limit warning -->
+                        <div x-show="platformCharCount > platformCharLimit" class="px-3 py-2 bg-red-500/10 border-t border-red-500/20 flex items-center gap-2">
                             <i class="fas fa-exclamation-triangle text-red-400 text-[10px]"></i>
                             <span class="text-[10px] text-red-400" x-text="t('char_limit_warning') + ' (' + platformCharLimit + ')'"></span>
                         </div>
                     </div>
 
                     <!-- Target Channels -->
-                    <div class="bg-slate-900/40 rounded-2xl border border-slate-700/30 p-3">
-                        <div class="flex items-center justify-between mb-2">
+                    <div class="rounded-xl border border-slate-700/30 bg-slate-900/30 p-3">
+                        <div class="flex items-center justify-between mb-2.5">
                             <label class="text-[11px] text-slate-400 font-semibold uppercase tracking-wider" x-text="t('target_channels')"></label>
                             <div class="flex items-center gap-1">
-                                <button @click="selectAllChannels()" class="text-[10px] px-2 py-1 rounded-md bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition" x-text="t('select_all_channels')"></button>
+                                <button @click="selectAllChannels()" class="text-[10px] px-2 py-1 rounded-md bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition font-medium" x-text="t('select_all_channels')"></button>
                                 <button @click="postForm.channelIds = []; postForm.groupIds = []" class="text-[10px] px-2 py-1 rounded-md bg-slate-700/50 text-slate-500 hover:bg-slate-600/50 transition" x-text="t('clear_selection')"></button>
                             </div>
                         </div>
-                        <!-- Search -->
                         <div class="relative mb-2">
                             <i class="fas fa-search absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-600 text-[10px]"></i>
                             <input type="text" x-model="postSearch" class="input w-full text-xs py-1.5 pl-7 pr-2" :placeholder="t('search_ellipsis')">
                         </div>
-                        <!-- Selection Badge -->
                         <div x-show="postForm.channelIds.length > 0 || postForm.groupIds.length > 0" class="mb-2 px-2.5 py-1.5 rounded-lg bg-green-500/10 border border-green-500/20 flex items-center gap-2">
                             <span class="text-[11px] text-green-400 font-medium" x-text="postForm.channelIds.length + ' ' + t('channels_count')"></span>
                             <span x-show="postForm.groupIds.length > 0" class="text-[11px] text-purple-400 font-medium" x-text="'• ' + postForm.groupIds.length + ' ' + t('groups_count')"></span>
                         </div>
-                        <!-- Channel List -->
-                        <div class="max-h-40 overflow-y-auto space-y-0.5">
+                        <div class="max-h-44 overflow-y-auto space-y-0.5">
                             <template x-for="ch in channels.filter(c => !postSearch || (c.title||'').toLowerCase().includes(postSearch.toLowerCase()) || String(c.chat_id||'').includes(postSearch))" :key="ch.id">
                                 <div @click="togglePostChannel(ch.id)" class="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer transition-all select-none" :class="postForm.channelIds.includes(ch.id) ? 'bg-green-500/10 border border-green-500/25' : 'hover:bg-slate-800/60 border border-transparent'">
                                     <div class="w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-bold shrink-0 transition" :class="postForm.channelIds.includes(ch.id) ? 'bg-green-500 text-white' : 'bg-slate-700 text-slate-500'">
@@ -1477,24 +1415,18 @@
                                 </div>
                             </template>
                         </div>
-                        <!-- Groups -->
                         <div x-show="groups.length > 0" class="mt-2 pt-2 border-t border-slate-700/20">
                             <div class="text-[10px] text-slate-500 mb-1.5 font-semibold uppercase" x-text="t('groups_label')"></div>
                             <div class="space-y-0.5">
                                 <template x-for="grp in groups.filter(x => !x.parent_id || !groups.find(y => y.id === x.parent_id))" :key="grp.id">
                                     <div>
                                         <div @click="togglePostGroup(grp)" class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer transition select-none" :class="postForm.groupIds.includes(grp.id) ? 'bg-purple-500/10 border border-purple-500/25' : 'hover:bg-slate-800/60 border border-transparent'">
-                                            <div class="w-5 h-5 rounded flex items-center justify-center shrink-0" :class="postForm.groupIds.includes(grp.id) ? 'bg-purple-500 text-white' : 'bg-slate-700 text-slate-600'">
-                                                <i class="fas fa-users text-[8px]"></i>
-                                            </div>
+                                            <div class="w-5 h-5 rounded flex items-center justify-center shrink-0" :class="postForm.groupIds.includes(grp.id) ? 'bg-purple-500 text-white' : 'bg-slate-700 text-slate-600'"><i class="fas fa-users text-[8px]"></i></div>
                                             <span class="flex-1 text-[11px] truncate" :class="postForm.groupIds.includes(grp.id) ? 'text-purple-300' : 'text-slate-500'" x-text="grp.name"></span>
                                             <span class="text-[9px] text-slate-600" x-text="(grp.channel_ids||'').split('|').filter(c=>c&&!c.startsWith('GRP')).length"></span>
                                         </div>
                                         <template x-for="sub in groups.filter(x => x.parent_id === grp.id)" :key="sub.id">
-                                            <div @click="togglePostGroup(sub)" class="mr-5 flex items-center gap-1.5 px-2 py-1 rounded-md cursor-pointer transition select-none text-[10px]" :class="postForm.groupIds.includes(sub.id) ? 'text-purple-400' : 'text-slate-600 hover:text-slate-400'">
-                                                <span>└</span>
-                                                <span class="truncate" x-text="sub.name"></span>
-                                            </div>
+                                            <div @click="togglePostGroup(sub)" class="mr-5 flex items-center gap-1.5 px-2 py-1 rounded-md cursor-pointer transition select-none text-[10px]" :class="postForm.groupIds.includes(sub.id) ? 'text-purple-400' : 'text-slate-600 hover:text-slate-400'"><span>└</span><span class="truncate" x-text="sub.name"></span></div>
                                         </template>
                                     </div>
                                 </template>
@@ -1503,15 +1435,15 @@
                     </div>
 
                     <!-- Schedule -->
-                    <div class="bg-slate-900/40 rounded-2xl border border-slate-700/30 p-3">
+                    <div class="rounded-xl border border-slate-700/30 bg-slate-900/30 p-3">
                         <label class="block text-[11px] text-slate-400 mb-2 font-semibold uppercase tracking-wider" x-text="t('schedule_label')"></label>
                         <div class="grid grid-cols-3 gap-1.5 mb-2">
                             <button @click="postForm.scheduleType = 'now'" class="py-2 rounded-lg text-[11px] font-medium transition border" :class="postForm.scheduleType === 'now' ? 'bg-green-500/15 border-green-500/30 text-green-400' : 'bg-slate-800/50 border-slate-700/30 text-slate-500 hover:border-slate-500'" x-text="t('schedule_immediate')"></button>
                             <button @click="postForm.scheduleType = 'timed'" class="py-2 rounded-lg text-[11px] font-medium transition border" :class="postForm.scheduleType === 'timed' ? 'bg-amber-500/15 border-amber-500/30 text-amber-400' : 'bg-slate-800/50 border-slate-700/30 text-slate-500 hover:border-slate-500'" x-text="t('schedule_timed')"></button>
                             <button @click="postForm.scheduleType = 'cron'" class="py-2 rounded-lg text-[11px] font-medium transition border" :class="postForm.scheduleType === 'cron' ? 'bg-blue-500/15 border-blue-500/30 text-blue-400' : 'bg-slate-800/50 border-slate-700/30 text-slate-500 hover:border-slate-500'" x-text="t('schedule_cron')"></button>
                         </div>
-                        <div x-show="postForm.scheduleType === 'timed'"><input type="datetime-local" x-model="postForm.scheduledAt" class="input w-full text-xs py-1.5"></div>
-                        <div x-show="postForm.scheduleType === 'cron'" class="space-y-1.5">
+                        <div x-show="postForm.scheduleType === 'timed'" class="mt-2"><input type="datetime-local" x-model="postForm.scheduledAt" class="input w-full text-xs py-1.5"></div>
+                        <div x-show="postForm.scheduleType === 'cron'" class="space-y-1.5 mt-2">
                             <input type="text" x-model="postForm.cronExpr" class="input w-full text-xs py-1.5 font-mono" placeholder="0 9 * * *">
                             <div class="flex flex-wrap gap-1">
                                 <button @click="postForm.cronExpr = '0 9 * * *'" class="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-500 hover:text-white transition" x-text="t('cron_9am_daily')"></button>
@@ -1523,7 +1455,7 @@
                     </div>
 
                     <!-- Priority -->
-                    <div class="bg-slate-900/40 rounded-2xl border border-slate-700/30 p-3">
+                    <div class="rounded-xl border border-slate-700/30 bg-slate-900/30 p-3">
                         <label class="block text-[11px] text-slate-400 mb-2 font-semibold uppercase tracking-wider" x-text="t('priority_label')"></label>
                         <div class="grid grid-cols-3 gap-1.5">
                             <button @click="postForm.priority = 'low'" class="py-1.5 rounded-lg text-[11px] font-medium transition border flex items-center justify-center gap-1" :class="postForm.priority === 'low' ? 'bg-slate-500/15 border-slate-400/30 text-slate-300' : 'bg-slate-800/50 border-slate-700/30 text-slate-600'"><span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span> <span x-text="t('priority_low')"></span></button>
@@ -1536,21 +1468,19 @@
             </div>
         </div>
 
-        <!-- Fixed Footer -->
-        <div class="flex items-center justify-between pt-4 mt-4 border-t border-slate-700/40 shrink-0">
+        <!-- ═══ FOOTER ═══ -->
+        <div class="flex items-center justify-between px-6 py-3 border-t border-slate-700/40 shrink-0 bg-slate-900/60 backdrop-blur-sm rounded-b-2xl">
             <div class="flex items-center gap-3">
-                <div class="text-[11px] text-slate-600">
-                    <span x-text="postForm.channelIds.length + postForm.groupIds.length"></span> <span x-text="t('targets_selected')"></span>
-                </div>
-                <div class="text-[10px] px-2 py-1 rounded-lg" :class="platformPostingMethod.cls" x-text="platformPostingMethod.label"></div>
+                <span class="text-[11px] text-slate-500"><span class="text-white font-semibold" x-text="postForm.channelIds.length + postForm.groupIds.length"></span> <span x-text="t('targets_selected')"></span></span>
+                <div class="text-[10px] px-2.5 py-1 rounded-lg font-medium" :class="platformPostingMethod.cls" x-text="platformPostingMethod.label"></div>
             </div>
             <div class="flex gap-2">
-                <button @click="closePostComposer()" class="px-5 py-2.5 rounded-xl bg-slate-700/50 text-slate-400 text-sm hover:bg-slate-600/50 transition border border-slate-600/30" x-text="t('cancel')"></button>
-                <button x-show="platformPostingMethod.needsApi" @click="submitPost()" class="px-8 py-2.5 rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 text-white text-sm font-bold hover:opacity-90 transition flex items-center gap-2 shadow-lg shadow-green-500/20 disabled:opacity-30 disabled:cursor-not-allowed" :disabled="(!postForm.message && postForm.media.length === 0) || (!postForm.channelIds.length && !postForm.groupIds.length)">
+                <button @click="closePostComposer()" class="px-5 py-2.5 rounded-xl bg-slate-700/50 text-slate-400 text-[13px] font-medium hover:bg-slate-600/50 transition border border-slate-600/30" x-text="t('cancel')"></button>
+                <button x-show="platformPostingMethod.needsApi" @click="submitPost()" class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 text-white text-[13px] font-bold hover:opacity-90 transition flex items-center gap-2 shadow-lg shadow-green-500/20 disabled:opacity-30 disabled:cursor-not-allowed" :disabled="(!postForm.message && postForm.media.length === 0) || (!postForm.channelIds.length && !postForm.groupIds.length)">
                     <i class="fas fa-paper-plane text-xs"></i>
                     <span x-text="postForm.scheduleType === 'now' ? t('publish_now') : (postForm.scheduleType === 'timed' ? t('schedule_action') : t('cron_action'))"></span>
                 </button>
-                <button x-show="!platformPostingMethod.needsApi" @click="copyPostText()" class="px-8 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-sm font-bold hover:opacity-90 transition flex items-center gap-2 shadow-lg shadow-emerald-500/20">
+                <button x-show="!platformPostingMethod.needsApi" @click="copyPostText()" class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-[13px] font-bold hover:opacity-90 transition flex items-center gap-2 shadow-lg shadow-emerald-500/20">
                     <i class="fas fa-copy text-xs"></i> <span x-text="t('copy_and_post')"></span>
                 </button>
             </div>
@@ -2211,11 +2141,11 @@ function channelsApp() {
         activePlatform: 'telegram',
         selectedPlatformForPost: 'telegram',
         platforms: [
-            { id: 'telegram', icon: '✈️', label: 'Telegram', activeClass: 'bg-blue-500/15 text-blue-300 border border-blue-500/25', shadowClass: 'shadow-blue-500/20', charLimit: 4096 },
-            { id: 'whatsapp', icon: '💬', label: 'WhatsApp', activeClass: 'bg-green-500/15 text-green-300 border border-green-500/25', shadowClass: 'shadow-green-500/20', charLimit: 65536 },
-            { id: 'instagram', icon: '📸', label: 'Instagram', activeClass: 'bg-pink-500/15 text-pink-300 border border-pink-500/25', shadowClass: 'shadow-pink-500/20', charLimit: 2200 },
-            { id: 'facebook', icon: '📘', label: 'Facebook', activeClass: 'bg-blue-500/15 text-blue-300 border border-blue-500/25', shadowClass: 'shadow-blue-500/20', charLimit: 63206 },
-            { id: 'twitter', icon: '🐦', label: 'Twitter/X', activeClass: 'bg-sky-500/15 text-sky-300 border border-sky-500/25', shadowClass: 'shadow-sky-500/20', charLimit: 280 },
+            { id: 'telegram', icon: '✈️', label: 'Telegram', activeClass: 'bg-blue-500/15 text-blue-300 border border-blue-500/25', shadowClass: 'shadow-blue-500/20', tabActiveClass: 'text-blue-400 border-blue-500 bg-blue-500/5', charLimit: 4096 },
+            { id: 'whatsapp', icon: '💬', label: 'WhatsApp', activeClass: 'bg-green-500/15 text-green-300 border border-green-500/25', shadowClass: 'shadow-green-500/20', tabActiveClass: 'text-green-400 border-green-500 bg-green-500/5', charLimit: 65536 },
+            { id: 'instagram', icon: '📸', label: 'Instagram', activeClass: 'bg-pink-500/15 text-pink-300 border border-pink-500/25', shadowClass: 'shadow-pink-500/20', tabActiveClass: 'text-pink-400 border-pink-500 bg-pink-500/5', charLimit: 2200 },
+            { id: 'facebook', icon: '📘', label: 'Facebook', activeClass: 'bg-blue-500/15 text-blue-300 border border-blue-500/25', shadowClass: 'shadow-blue-500/20', tabActiveClass: 'text-blue-400 border-blue-500 bg-blue-500/5', charLimit: 63206 },
+            { id: 'twitter', icon: '🐦', label: 'Twitter/X', activeClass: 'bg-sky-500/15 text-sky-300 border border-sky-500/25', shadowClass: 'shadow-sky-500/20', tabActiveClass: 'text-sky-400 border-sky-500 bg-sky-500/5', charLimit: 280 },
         ],
         // Telegram options
         tgSilent: false,
@@ -2322,6 +2252,40 @@ function channelsApp() {
                 instagram: 'border-pink-500/10',
                 facebook: 'border-blue-500/10',
                 twitter: 'border-sky-500/10',
+            };
+            return cls[this.activePlatform] || cls.telegram;
+        },
+        get platformEditorRing() {
+            const cls = {
+                telegram: 'border-blue-500/20 bg-slate-800/60 focus-within:ring-blue-500/30',
+                whatsapp: 'border-green-500/20 bg-slate-800/60 focus-within:ring-green-500/30',
+                instagram: 'border-pink-500/20 bg-slate-800/60 focus-within:ring-pink-500/30',
+                facebook: 'border-blue-500/20 bg-slate-800/60 focus-within:ring-blue-500/30',
+                twitter: 'border-sky-500/20 bg-slate-800/60 focus-within:ring-sky-500/30',
+            };
+            return cls[this.activePlatform] || cls.telegram;
+        },
+        get platformToolbarBg() {
+            const cls = {
+                telegram: 'bg-slate-900/50 border-blue-500/10',
+                whatsapp: 'bg-slate-900/50 border-green-500/10',
+                instagram: 'bg-slate-900/50 border-pink-500/10',
+                facebook: 'bg-slate-900/50 border-blue-500/10',
+                twitter: 'bg-slate-900/50 border-sky-500/10',
+            };
+            return cls[this.activePlatform] || cls.telegram;
+        },
+        get platformCharBarColor() {
+            const cls = { telegram: 'bg-blue-500', whatsapp: 'bg-green-500', instagram: 'bg-pink-500', facebook: 'bg-blue-500', twitter: 'bg-sky-500' };
+            return cls[this.activePlatform] || 'bg-green-500';
+        },
+        get platformPreviewBorder() {
+            const cls = {
+                telegram: 'border-blue-500/15',
+                whatsapp: 'border-green-500/15',
+                instagram: 'border-gray-200',
+                facebook: 'border-gray-200',
+                twitter: 'border-gray-800',
             };
             return cls[this.activePlatform] || cls.telegram;
         },
