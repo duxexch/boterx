@@ -5626,6 +5626,223 @@ def api_browser_screenshot_delete(sid):
     return jsonify({'success': True})
 
 
+# ── WebSocket Real-Time ──────────────────────────────────────
+
+@app.route('/api/browser/ws/subscribe/<instance_id>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_ws_subscribe(instance_id):
+    from browser_realtime import browser_ws
+    q = browser_ws.subscribe(instance_id)
+    events = list(q)[-50:]
+    return jsonify({'success': True, 'events': events, 'subscribers': browser_ws.get_subscribers_count(instance_id)})
+
+
+@app.route('/api/browser/ws/events/<instance_id>', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_ws_events(instance_id):
+    from browser_realtime import browser_ws
+    limit = request.args.get('limit', 50, type=int)
+    return jsonify({'success': True, 'events': browser_ws.get_recent(instance_id, limit)})
+
+
+@app.route('/api/browser/ws/events-all', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_ws_events_all():
+    from browser_realtime import browser_ws
+    limit = request.args.get('limit', 100, type=int)
+    return jsonify({'success': True, 'events': browser_ws.get_all_recent(limit)})
+
+
+@app.route('/api/browser/ws/stats', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_ws_stats():
+    from browser_realtime import browser_ws
+    return jsonify({'success': True, 'subscribers': browser_ws.get_subscribers_count()})
+
+
+# ── Ad Blocker ───────────────────────────────────────────────
+
+@app.route('/api/browser/adblock/<instance_id>/enable', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_adblock_enable(instance_id):
+    from browser_manager import get_instance
+    from browser_realtime import get_adblock_js
+    inst = get_instance(instance_id)
+    if not inst or not inst.page:
+        return jsonify({'success': False, 'error': 'Browser not running'}), 400
+    try:
+        inst.page.evaluate(get_adblock_js())
+        return jsonify({'success': True, 'message': 'Ad blocker enabled'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/browser/adblock/<instance_id>/hide', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_adblock_hide(instance_id):
+    from browser_manager import get_instance
+    from browser_realtime import get_hide_elements_js
+    data = request.json or {}
+    inst = get_instance(instance_id)
+    if not inst or not inst.page:
+        return jsonify({'success': False, 'error': 'Browser not running'}), 400
+    try:
+        selectors = data.get('selectors', [])
+        inst.page.evaluate(get_hide_elements_js(selectors if selectors else None))
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/browser/adblock/<instance_id>/custom', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_adblock_custom(instance_id):
+    from browser_manager import get_instance
+    from browser_realtime import get_custom_hide_js
+    data = request.json or {}
+    selector = data.get('selector', '')
+    if not selector:
+        return jsonify({'success': False, 'error': 'Selector required'}), 400
+    inst = get_instance(instance_id)
+    if not inst or not inst.page:
+        return jsonify({'success': False, 'error': 'Browser not running'}), 400
+    try:
+        result = inst.page.evaluate(get_custom_hide_js(selector))
+        return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ── Resource Blocker + Throttle ──────────────────────────────
+
+@app.route('/api/browser/resources/<instance_id>/block', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_resources_block(instance_id):
+    from browser_manager import get_instance
+    from browser_realtime import get_resource_block_js
+    data = request.json or {}
+    inst = get_instance(instance_id)
+    if not inst or not inst.page:
+        return jsonify({'success': False, 'error': 'Browser not running'}), 400
+    try:
+        block_types = data.get('types', ['image', 'media', 'font', 'stylesheet'])
+        inst.page.evaluate(get_resource_block_js(block_types))
+        return jsonify({'success': True, 'blocked': block_types})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/browser/resources/throttle-profiles', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_throttle_profiles():
+    from browser_realtime import THROTTLE_PROFILES
+    return jsonify({'success': True, 'profiles': THROTTLE_PROFILES})
+
+
+# ── Console Viewer ───────────────────────────────────────────
+
+@app.route('/api/browser/console/<instance_id>/logs', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_console_logs(instance_id):
+    from browser_realtime import console_viewer
+    logs = console_viewer.get_logs(instance_id)
+    return jsonify({'success': True, 'logs': logs, 'count': len(logs)})
+
+
+@app.route('/api/browser/console/<instance_id>/clear', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_console_clear(instance_id):
+    from browser_realtime import console_viewer
+    console_viewer.clear_logs(instance_id)
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/console/<instance_id>/enable', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_console_enable(instance_id):
+    from browser_manager import get_instance
+    from browser_realtime import console_viewer
+    inst = get_instance(instance_id)
+    if not inst or not inst.page:
+        return jsonify({'success': False, 'error': 'Browser not running'}), 400
+    try:
+        inst.page.evaluate(console_viewer.get_console_js())
+        return jsonify({'success': True, 'message': 'Console capture enabled'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ── PDF / HTML / Text Export ─────────────────────────────────
+
+@app.route('/api/browser/export/<instance_id>/pdf', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_export_pdf(instance_id):
+    from browser_realtime import export_page_pdf
+    data = request.json or {}
+    result = export_page_pdf(instance_id, **data)
+    return jsonify(result)
+
+
+@app.route('/api/browser/export/<instance_id>/html', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_export_html(instance_id):
+    from browser_realtime import export_page_html
+    result = export_page_html(instance_id)
+    return jsonify(result)
+
+
+@app.route('/api/browser/export/<instance_id>/text', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_export_text(instance_id):
+    from browser_realtime import export_page_text
+    result = export_page_text(instance_id)
+    return jsonify(result)
+
+
+# ── Page Performance ─────────────────────────────────────────
+
+@app.route('/api/browser/performance/<instance_id>', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_performance(instance_id):
+    from browser_realtime import get_page_metrics
+    return jsonify(get_page_metrics(instance_id))
+
+
+# ── Browser State Export/Import ──────────────────────────────
+
+@app.route('/api/browser/state/<instance_id>/export', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_state_export(instance_id):
+    from browser_realtime import export_browser_state
+    return jsonify(export_browser_state(instance_id))
+
+
+@app.route('/api/browser/state/<instance_id>/import', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_state_import(instance_id):
+    from browser_realtime import import_browser_state
+    data = request.json or {}
+    return jsonify(import_browser_state(instance_id, data.get('state', {})))
+
+
 # ── Instance CRUD ────────────────────────────────────────────
 
 @app.route('/api/browser/instances', methods=['GET'])

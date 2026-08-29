@@ -114,6 +114,21 @@
             <button @click="showDashboard=!showDashboard;loadDashboard()" class="btn btn-secondary btn-sm gap-1">
                 <i class="fas fa-tachometer-alt"></i> لوحة معلومات
             </button>
+            <button @click="toggleAdBlock()" class="btn btn-secondary btn-sm gap-1" :class="adBlockEnabled?'bg-green-600/20 text-green-400':''">
+                <i class="fas fa-shield-alt"></i> حجب الإعلانات
+            </button>
+            <button @click="enableConsole()" class="btn btn-secondary btn-sm gap-1">
+                <i class="fas fa-terminal"></i> وحدة التحكم
+            </button>
+            <button @click="exportPDF()" class="btn btn-secondary btn-sm gap-1">
+                <i class="fas fa-file-pdf"></i> تصدير PDF
+            </button>
+            <button @click="showPerformance=!showPerformance;loadPerformance()" class="btn btn-secondary btn-sm gap-1">
+                <i class="fas fa-bolt"></i> الأداء
+            </button>
+            <button @click="loadRealtimeEvents()" class="btn btn-secondary btn-sm gap-1">
+                <i class="fas fa-satellite-dish"></i> أحداث مباشرة
+            </button>
         </div>
 
         <!-- Agent Permissions Panel -->
@@ -821,6 +836,11 @@ function browserPage() {
         clipboardItems: [],
         backups: [],
         dashboard: null,
+        adBlockEnabled: false,
+        showPerformance: false,
+        pageMetrics: null,
+        consoleLogs: [],
+        realtimeEvents: [],
         isRecording: false,
         recordedActions: 0,
         _pollTimer: null,
@@ -1388,6 +1408,66 @@ function browserPage() {
             try {
                 const d = await api('/api/browser/dashboard');
                 this.dashboard = d.overview || null;
+            } catch(e) {}
+        },
+
+        async toggleAdBlock() {
+            if (!this.selected) return;
+            try {
+                if (this.adBlockEnabled) {
+                    this.adBlockEnabled = false;
+                    return;
+                }
+                await api(`/api/browser/adblock/${this.selected}/enable`, {method:'POST'});
+                this.adBlockEnabled = true;
+            } catch(e) {}
+        },
+
+        async enableConsole() {
+            if (!this.selected) return;
+            try {
+                await api(`/api/browser/console/${this.selected}/enable`, {method:'POST'});
+                await this.loadConsoleLogs();
+            } catch(e) {}
+        },
+
+        async loadConsoleLogs() {
+            if (!this.selected) return;
+            try {
+                const d = await api(`/api/browser/console/${this.selected}/logs`);
+                this.consoleLogs = d.logs || [];
+            } catch(e) {}
+        },
+
+        async clearConsole() {
+            if (!this.selected) return;
+            try {
+                await api(`/api/browser/console/${this.selected}/clear`, {method:'POST'});
+                this.consoleLogs = [];
+            } catch(e) {}
+        },
+
+        async exportPDF() {
+            if (!this.selected) return;
+            try {
+                const d = await api(`/api/browser/export/${this.selected}/pdf`, {method:'POST', body:'{}'});
+                if (d.success) alert('PDF exported: ' + d.path);
+                else alert('Export failed: ' + d.error);
+            } catch(e) { alert('Export failed'); }
+        },
+
+        async loadPerformance() {
+            if (!this.selected) return;
+            try {
+                const d = await api(`/api/browser/performance/${this.selected}`);
+                this.pageMetrics = d.metrics || null;
+            } catch(e) {}
+        },
+
+        async loadRealtimeEvents() {
+            try {
+                const d = await api('/api/browser/ws/events-all?limit=50');
+                this.realtimeEvents = d.events || [];
             } catch(e) {}
         },
 
