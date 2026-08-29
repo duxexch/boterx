@@ -21,11 +21,8 @@
     <link rel="manifest" href="/static/manifest.json">
     <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/icon-32.png?v=20260816">
     <meta name="permanent-token" content="eyJzY29wZSI6ImRlY2siLCJleHAiOjAsIm5vbmNlIjoibVFxSFp1aWdLTjVIIiwicGVybWFuZW50Ijp0cnVlfQ.9575f071aa4c3fb15a9c6c5fce498148e2a53749aa1ea6d3bb05f205cf7faf51">
-    <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/icon-32.png?v=20260816">
     <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png?v=20260816">
     <meta name="theme-color" content="#00e701">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="VEX Games">
@@ -73,7 +70,7 @@
             [dir="rtl"] .main-wrap.full { margin-right: 0; }
             [dir="ltr"] .main-wrap.full { margin-left: 0; }
         }
-        .sidebar-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 40; }
+        .sidebar-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 40; backdrop-filter: blur(2px); }
         [dir="rtl"] .notif-dd { left: 0; right: auto; }
         [dir="ltr"] .notif-dd { right: 0; left: auto; }
         .vex-loader-logo { width: 34px; height: 35px; object-fit: contain; animation: vexLogoPulse 1.4s ease-in-out infinite; }
@@ -84,7 +81,7 @@
 <body class="bg-slate-900 text-slate-100 font-cairo" :class="darkMode ? 'dark' : ''">
 
 <!-- Toast container for real-time notifications -->
-<div id="toastContainer" style="position:fixed;top:0;inset-inline-end:0;z-index:9999;pointer-events:none"></div>
+<div id="toastContainer"></div>
 
 <!-- Mobile sidebar overlay -->
 <div x-show="mobileSidebar" x-transition.opacity class="sidebar-backdrop lg:hidden" style="display:none" @click="mobileSidebar = false"></div>

@@ -21,7 +21,7 @@
     <!-- TAB: Ad Network -->
     <div x-show="tab === 'ainet'" class="space-y-4">
         <!-- KPIs -->
-        <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div class="grid grid-cols-2 lg:grid-cols-5 gap-3">
             <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400" data-i18n="total_partners">الشركاء</p><p class="text-2xl font-bold text-amber-400" x-text="adNet.total_partners || 0">0</p></div>
             <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400" data-i18n="active_partners">نشطون</p><p class="text-2xl font-bold text-green-400" x-text="adNet.active_partners || 0">0</p></div>
             <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400" data-i18n="total_subscribers">إجمالي المشتركين</p><p class="text-2xl font-bold text-blue-400" x-text="(adNet.total_subscribers || 0).toLocaleString()">0</p></div>
@@ -73,7 +73,7 @@
 
     <!-- TAB: Analytics -->
     <div x-show="tab === 'analytics'" class="space-y-4">
-        <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div class="grid grid-cols-2 lg:grid-cols-5 gap-3">
             <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400" data-i18n="total_campaigns">إجمالي الحملات</p><p class="text-2xl font-bold text-amber-400" x-text="analytics.total_campaigns || 0">0</p></div>
             <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400" data-i18n="total_reach">إجمالي الوصول</p><p class="text-2xl font-bold text-green-400" x-text="analytics.total_reach || 0">0</p></div>
             <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400" data-i18n="total_clicks">إجمالي النقرات</p><p class="text-2xl font-bold text-blue-400" x-text="analytics.total_clicks || 0">0</p></div>
@@ -107,7 +107,7 @@
     <!-- TAB: Campaigns -->
     <div x-show="tab === 'campaigns'" class="space-y-4">
         <div class="flex justify-between items-center flex-wrap gap-2">
-            <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <div class="grid grid-cols-2 lg:grid-cols-5 gap-3">
                 <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400" data-i18n="total_campaigns">إجمالي</p><p class="text-xl font-bold text-amber-400" x-text="campaigns.length">0</p></div>
                 <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400" data-i18n="active_campaigns">نشطة</p><p class="text-xl font-bold text-green-400" x-text="campaigns.filter(c => c.status === 'active' || c.status === 'scheduled').length">0</p></div>
                 <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400" data-i18n="running">جاري التنفيذ</p><p class="text-xl font-bold text-cyan-400" x-text="campaigns.filter(c => c.status === 'running').length">0</p></div>
@@ -331,7 +331,7 @@
 
                 <!-- ═══ STEP 3: Target ═══ -->
                 <div x-show="cmpWizardStep === 3" class="space-y-4">
-                    <div class="grid grid-cols-3 gap-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <button @click="cmpForm.recipient = 'all'" class="p-3 rounded-xl border-2 transition text-center"
                             :class="cmpForm.recipient === 'all' ? 'border-green-500 bg-green-500/10' : 'border-slate-700 bg-slate-800 hover:border-slate-500'">
                             <div class="text-2xl mb-1">👥</div>
@@ -438,7 +438,7 @@
                     </div>
 
                     <!-- Settings -->
-                    <div class="grid grid-cols-3 gap-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <div>
                             <label class="block text-sm text-slate-400 mb-1">⚡ الأولوية</label>
                             <select x-model="cmpForm.priority" class="input w-full">
@@ -493,7 +493,7 @@
     <!-- TAB: Channels -->
     <div x-show="tab === 'channels'" class="space-y-4">
         <div class="flex justify-between items-center flex-wrap gap-2">
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400" data-i18n="total">Total</p><p class="text-xl font-bold text-amber-400" x-text="channels.length">0</p></div>
                 <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400" data-i18n="active_count">Active</p><p class="text-xl font-bold text-green-400" x-text="channels.filter(c => c.is_active === 'yes').length">0</p></div>
                 <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400" data-i18n="categories">Categories</p><p class="text-xl font-bold text-blue-400" x-text="Object.keys(categoryGroups).length">0</p></div>
@@ -539,7 +539,7 @@
                             <span class="text-slate-400">⚙️ تفعيل</span>
                             <button @click.stop="toggleChannel(ch.id)" class="relative inline-flex h-6 w-11 items-center rounded-full transition" :class="ch.is_active === 'yes' ? 'bg-green-500' : 'bg-slate-600'"><span class="inline-block h-4 w-4 transform rounded-full bg-white transition" :class="toggleClasses(ch.is_active === 'yes')"></span></button>
                         </div>
-                        <div class="grid grid-cols-3 gap-1">
+                        <div class="grid grid-cols-3 gap-1 sm:grid-cols-3">
                             <span class="text-xs text-center p-1 rounded" :class="ch.relay_to_users === 'yes' ? 'bg-green-500/20 text-green-400' : 'bg-slate-700 text-slate-500'" @click.stop="toggleSetting(ch, 'relay_to_users')">👥 <span x-text="ch.relay_to_users === 'yes' ? 'ON' : 'OFF'"></span></span>
                             <span class="text-xs text-center p-1 rounded" :class="ch.relay_to_channels === 'yes' ? 'bg-green-500/20 text-green-400' : 'bg-slate-700 text-slate-500'" @click.stop="toggleSetting(ch, 'relay_to_channels')">📢 <span x-text="ch.relay_to_channels === 'yes' ? 'ON' : 'OFF'"></span></span>
                             <span class="text-xs text-center p-1 rounded" :class="ch.ai_enabled === 'yes' ? 'bg-blue-500/20 text-blue-400' : 'bg-slate-700 text-slate-500'" @click.stop="toggleAI(ch.id)">🤖 <span x-text="ch.ai_enabled === 'yes' ? 'ON' : 'OFF'"></span></span>
@@ -621,7 +621,7 @@
             <h3 class="font-bold text-sm">📊 مراقبة النشر الذكي</h3>
             <button @click="loadPostingStats()" class="text-xs text-slate-400 hover:text-white">🔄</button>
         </div>
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <div class="bg-slate-900/50 rounded-lg p-3 text-center">
                 <div class="text-xl font-bold text-blue-400" x-text="postingStats?.queue_pending || 0"></div>
                 <div class="text-[10px] text-slate-500">⏳ في الانتظار</div>
@@ -766,7 +766,7 @@
 
         <div class="bg-slate-800 rounded-xl border border-slate-700 p-4 space-y-3">
             <div class="flex items-center justify-between"><h3 class="font-bold">🔐 Platform Accounts</h3><span class="text-xs text-slate-400" x-text="platformAccounts.length + ' account(s)'"></span></div>
-            <div class="grid grid-cols-1 md:grid-cols-5 gap-2">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-2">
                 <select x-model="platformForm.platform" class="input"><option value="telegram">Telegram</option><option value="whatsapp">WhatsApp</option><option value="webhook">Webhook</option></select>
                 <input x-model="platformForm.account_name" class="input" placeholder="Account name">
                 <input x-model="platformForm.api_base_url" class="input" placeholder="API/Webhook URL">
@@ -790,7 +790,7 @@
 
         <div class="bg-slate-800 rounded-xl border border-slate-700 p-4 space-y-3">
             <div class="flex items-center justify-between"><h3 class="font-bold">📥 Source Channels</h3><span class="text-xs text-slate-400" x-text="sourceChannels.length + ' source(s)'"></span></div>
-            <div class="grid grid-cols-1 md:grid-cols-5 gap-2">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-2">
                 <input x-model="sourceForm.title" class="input" placeholder="Source title">
                 <input x-model="sourceForm.chat_id" class="input" placeholder="Chat ID / external ID">
                 <input x-model="sourceForm.target_channel_ids" class="input" placeholder="Target IDs (|)">
@@ -812,13 +812,13 @@
 
     <!-- TAB: Report -->
     <div x-show="tab === 'report'" class="space-y-4">
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400" data-i18n="today_posts">Today Posts</p><p class="text-2xl font-bold text-amber-400" x-text="report.total_posts || 0">0</p></div>
             <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400" data-i18n="ai_processed">AI Processed</p><p class="text-2xl font-bold text-blue-400" x-text="report.total_ai_processed || 0">0</p></div>
             <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400" data-i18n="users_reached">Users Reached</p><p class="text-2xl font-bold text-green-400" x-text="report.total_users_reached || 0">0</p></div>
             <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400" data-i18n="active_channels">Active Channels</p><p class="text-2xl font-bold text-purple-400" x-text="report.active_channels || 0">0</p></div>
         </div>
-        <div class="bg-slate-800 rounded-xl border border-slate-700 p-4"><h3 class="font-bold mb-2">📜 آخر الترحيلات</h3><table class="data-table"><thead><tr><th data-i18n="time">Time</th><th data-i18n="source">Source</th><th data-i18n="preview">Preview</th><th data-i18n="users_count">Users</th><th data-i18n="channels_count">Channels</th></tr></thead><tbody><template x-for="log in relayLogs" :key="log.timestamp"><tr class="hover:bg-slate-700/50"><td class="text-xs text-slate-400" x-text="log.timestamp"></td><td class="text-xs" x-text="log.source_type === 'broadcast' ? 'بث' : 'قناة'"></td><td class="text-xs max-w-xs truncate" x-text="log.preview"></td><td class="font-bold text-green-400" x-text="log.users_relayed || 0"></td><td class="font-bold text-amber-400" x-text="log.channels_relayed || 0"></td></tr></template></tbody></table></div>
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-4"><h3 class="font-bold mb-2">📜 آخر الترحيلات</h3><div class="overflow-x-auto"><table class="data-table"><thead><tr><th data-i18n="time">Time</th><th data-i18n="source">Source</th><th data-i18n="preview">Preview</th><th data-i18n="users_count">Users</th><th data-i18n="channels_count">Channels</th></tr></thead><tbody><template x-for="log in relayLogs" :key="log.timestamp"><tr class="hover:bg-slate-700/50"><td class="text-xs text-slate-400" x-text="log.timestamp"></td><td class="text-xs" x-text="log.source_type === 'broadcast' ? 'بث' : 'قناة'"></td><td class="text-xs max-w-xs truncate" x-text="log.preview"></td><td class="font-bold text-green-400" x-text="log.users_relayed || 0"></td><td class="font-bold text-amber-400" x-text="log.channels_relayed || 0"></td></tr></template></tbody></table></div></div>
     </div>
 <!-- TAB: Social Media Accounts -->
     <div x-show="tab === 'social'" class="space-y-4">
@@ -833,7 +833,7 @@
         </div>
 
         <!-- Stats Cards -->
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400" data-i18n="total_accounts">إجمالي الحسابات</p><p class="text-2xl font-bold text-amber-400" x-text="socialAccounts.length">0</p></div>
             <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400" data-i18n="active_accounts">حسابات نشطة</p><p class="text-2xl font-bold text-green-400" x-text="socialAccounts.filter(a => a.is_active === 'yes').length">0</p></div>
             <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400" data-i18n="platforms_connected">منصات متصلة</p><p class="text-2xl font-bold text-blue-400" x-text="uniquePlatforms.length">0</p></div>
@@ -1029,6 +1029,12 @@
   .pc-modal header{flex-wrap:wrap}
   .pc-modal footer{flex-direction:column!important;gap:8px!important}
   .pc-modal footer .flex{flex-wrap:wrap!important;justify-content:center!important}
+  .pc-modal .grid-cols-3{grid-template-columns:1fr!important}
+  .pc-modal .grid-cols-2{grid-template-columns:1fr!important}
+  .pc-modal .grid.grid-cols-2.sm\:grid-cols-4{grid-template-columns:repeat(2,1fr)!important}
+  .pc-modal .space-y-4>.grid{gap:8px!important}
+  .pc-modal [class*="grid-cols-1.md\:grid-cols-3"]{grid-template-columns:1fr!important}
+  .pc-modal [class*="grid-cols-1.sm\:grid-cols-3"]{grid-template-columns:1fr!important}
 }
 .pc-btn-cancel{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;font-size:13px;font-weight:600;color:#94a3b8;background:rgba(51,65,85,0.5);border:1px solid rgba(71,85,105,0.3);transition:all 0.15s;cursor:pointer}
 .pc-btn-cancel:hover{background:rgba(71,85,105,0.5);color:#e2e8f0}

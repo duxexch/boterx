@@ -184,7 +184,7 @@
                 <div class="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-wider">
                     <span class="w-1 h-4 bg-blue-500 rounded-full"></span> <span data-i18n="channel">القناة</span>
                 </div>
-                <div class="grid grid-cols-3 gap-3">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <button @click="target='telegram'" :class="target==='telegram' ? 'border-blue-500 bg-blue-500/10 text-blue-400' : 'border-slate-600 bg-slate-700/50 text-slate-400 hover:border-slate-500'" class="rounded-xl border-2 py-3 px-2 text-xs font-bold transition flex flex-col items-center gap-1">
                         <i class="fab fa-telegram text-xl"></i> <span data-i18n="telegram">تيليغرام</span>
                     </button>
@@ -202,7 +202,7 @@
                 <div class="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-wider">
                     <span class="w-1 h-4 bg-pink-500 rounded-full"></span> <span data-i18n="social_platforms">منصات السوشيال ميديا</span>
                 </div>
-                <div class="grid grid-cols-3 gap-3">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <button @click="target='facebook'" :class="target==='facebook' ? 'border-blue-600 bg-blue-600/20 text-blue-400' : 'border-slate-600 bg-slate-700/50 text-slate-400 hover:border-slate-500'" class="rounded-xl border-2 py-3 px-2 text-xs font-bold transition flex flex-col items-center gap-1">
                         <i class="fab fa-facebook-f text-xl" style="color: #1877F2;"></i> <span data-i18n="facebook">فيسبوك</span>
                     </button>
@@ -270,7 +270,7 @@
                 <div class="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-wider">
                     <span class="w-1 h-4 bg-red-500 rounded-full"></span> الأولوية
                 </div>
-                <div class="grid grid-cols-3 gap-3">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <button @click="priority='normal'" :class="priority==='normal' ? 'border-slate-400 bg-slate-700 text-slate-200' : 'border-slate-600 bg-slate-700/50 text-slate-400 hover:border-slate-500'" class="rounded-lg border-2 py-2 text-xs font-bold transition">🔔 عادية</button>
                     <button @click="priority='high'" :class="priority==='high' ? 'border-amber-500 bg-amber-500/10 text-amber-400' : 'border-slate-600 bg-slate-700/50 text-slate-400 hover:border-slate-500'" class="rounded-lg border-2 py-2 text-xs font-bold transition">⚡ عالية</button>
                     <button @click="priority='urgent'" :class="priority==='urgent' ? 'border-red-500 bg-red-500/10 text-red-400' : 'border-slate-600 bg-slate-700/50 text-slate-400 hover:border-slate-500'" class="rounded-lg border-2 py-2 text-xs font-bold transition">🚨 عاجلة</button>

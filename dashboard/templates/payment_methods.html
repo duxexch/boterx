@@ -39,7 +39,7 @@
             <i class="fas fa-plus ml-1"></i> إضافة وسيلة دفع
         </button>
         {% endif %}
-        <button @click="loadData()" class="btn btn-sm" style="background:#475569">
+        <button @click="loadData()" class="btn btn-secondary btn-sm">
             <i class="fas fa-rotate ml-1"></i> تحديث
         </button>
     </div>
@@ -223,7 +223,7 @@
                 </div>
             </div>
             <div class="flex gap-2 justify-end mt-4">
-                <button @click="showAddModal = false" class="btn btn-sm" style="background:#475569" data-i18n="cancel">Cancel</button>
+                <button @click="showAddModal = false" class="btn btn-secondary btn-sm" data-i18n="cancel">Cancel</button>
                 <button @click="saveMethod()" class="btn btn-primary btn-sm" data-i18n="save">Save</button>
             </div>
         </div>
@@ -248,7 +248,7 @@
                 </template>
             </div>
             <div class="flex gap-2 justify-end mt-4">
-                <button @click="showLinkModal = false" class="btn btn-sm" style="background:#475569" data-i18n="cancel">Cancel</button>
+                <button @click="showLinkModal = false" class="btn btn-secondary btn-sm" data-i18n="cancel">Cancel</button>
                 <button @click="saveLinks()" class="btn btn-primary btn-sm">حفظ الروابط</button>
             </div>
         </div>

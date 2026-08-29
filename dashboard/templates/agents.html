@@ -129,7 +129,7 @@
                 </div>
                 <div><label class="block text-sm text-slate-400 mb-1">ملاحظات</label><input x-model="addForm.notes" class="input w-full"></div>
             </div>
-            <div class="flex gap-2 justify-end mt-4"><button @click="showAddModal = false" class="btn btn-sm" style="background:#475569">إلغاء</button><button @click="addAgent()" class="btn btn-primary btn-sm">إضافة</button></div>
+            <div class="flex gap-2 justify-end mt-4"><button @click="showAddModal = false" class="btn btn-secondary btn-sm">إلغاء</button><button @click="addAgent()" class="btn btn-primary btn-sm">إضافة</button></div>
         </div>
     </div>
 
@@ -156,7 +156,7 @@
                 <label class="flex items-center gap-2 text-sm text-slate-300"><input type="checkbox" x-model="editForm.traffic_on"> تشغيل حركة المرور</label>
                 <div><label class="block text-sm text-slate-400 mb-1">ملاحظات</label><input x-model="editForm.notes" class="input w-full"></div>
             </div>
-            <div class="flex gap-2 justify-end mt-4"><button @click="showEditModal = false" class="btn btn-sm" style="background:#475569">إلغاء</button><button @click="saveEdit()" class="btn btn-primary btn-sm">حفظ</button></div>
+            <div class="flex gap-2 justify-end mt-4"><button @click="showEditModal = false" class="btn btn-secondary btn-sm">إلغاء</button><button @click="saveEdit()" class="btn btn-primary btn-sm">حفظ</button></div>
         </div>
     </div>
 
@@ -206,7 +206,7 @@
                 <input type="number" x-model="balanceAmount" class="input w-full" placeholder="المبلغ">
                 <input type="text" x-model="balanceReason" class="input w-full" placeholder="السبب">
             </div>
-            <div class="flex gap-2 justify-end mt-4"><button @click="showBalanceModal = false" class="btn btn-sm" style="background:#475569">إلغاء</button><button @click="adjustBalance()" class="btn btn-primary btn-sm">تأكيد</button></div>
+            <div class="flex gap-2 justify-end mt-4"><button @click="showBalanceModal = false" class="btn btn-secondary btn-sm">إلغاء</button><button @click="adjustBalance()" class="btn btn-primary btn-sm">تأكيد</button></div>
         </div>
     </div>
 
