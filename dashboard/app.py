@@ -85,6 +85,13 @@ app.config['MAX_CONTENT_LENGTH'] = 8 * 1024 * 1024  # 8MB
 # TypeError: '<' not supported between instances of 'NoneType' and 'str'
 app.json.sort_keys = False
 
+# Initialize AI assistant chat DB
+try:
+    from ai_assistant import _init_chat_db
+    _init_chat_db()
+except Exception:
+    pass
+
 # ===== Web Push (VAPID) — notifications work even when tab/browser is closed =====
 # الزوج المضمّن سابقاً بالكود كان غير متطابق (الخاص لا يشتق العام) — كان
 # الاشتراك يفشل بـ InvalidAccessError في المتصفح قبل أي إرسال. الآن:
@@ -3600,6 +3607,54 @@ def api_ai_translate():
         return jsonify({'success': True, 'text': result['text'], 'key_used': key_data.get('key_name', '')})
     else:
         return jsonify({'success': False, 'error': result.get('error', 'Translation failed')}), 400
+
+
+# ===== API — AI Admin Assistant =====
+
+@app.route('/api/ai/assistant/chat', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_ai_assistant_chat():
+    """AI Assistant chat — receive message, process with AI, execute actions."""
+    from ai_assistant import process_chat_message, clear_history
+
+    data = request.json or {}
+    message = (data.get('message') or '').strip()
+    admin_id = session.get('user_id', session.get('admin_id', 'unknown'))
+
+    if not message:
+        return jsonify({'success': False, 'error': 'No message provided'}), 400
+
+    # Handle special commands
+    if message.lower() in ('/clear', '/reset', 'امسح المحادثة', 'مسح'):
+        clear_history(admin_id)
+        return jsonify({'success': True, 'reply': '✅ تم مسح تاريخ المحادثة.', 'action_taken': 'clear_history'})
+
+    result = process_chat_message(admin_id, message)
+    return jsonify(result)
+
+
+@app.route('/api/ai/assistant/history', methods=['GET'])
+@api_auth
+@permission_required('send_broadcast')
+def api_ai_assistant_history():
+    """Get chat history."""
+    from ai_assistant import get_conversation_history
+    admin_id = session.get('user_id', session.get('admin_id', 'unknown'))
+    limit = request.args.get('limit', 50, type=int)
+    history = get_conversation_history(admin_id, limit=limit)
+    return jsonify({'success': True, 'history': history})
+
+
+@app.route('/api/ai/assistant/clear', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_ai_assistant_clear():
+    """Clear chat history."""
+    from ai_assistant import clear_history
+    admin_id = session.get('user_id', session.get('admin_id', 'unknown'))
+    clear_history(admin_id)
+    return jsonify({'success': True, 'message': 'History cleared'})
 
 
 # ===== API — Stats =====

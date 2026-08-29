@@ -839,6 +839,189 @@ function rbac(perm) { return !Object.keys(_RBAC).length || !!_RBAC[perm]; }
 })();
 </script>
 {% block scripts %}{% endblock %}
+
+<!-- ===== AI ASSISTANT FLOATING CHAT ===== -->
+<div id="aiAssistant" x-data="aiAssistant()" x-init="init()" class="fixed bottom-5 right-5 z-[9999]" style="font-family: 'Cairo', system-ui, sans-serif;">
+  <!-- Floating Button -->
+  <button @click="toggleChat()" x-show="!open"
+    class="w-14 h-14 rounded-full bg-gradient-to-br from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/30 flex items-center justify-center text-2xl hover:scale-110 transition-all duration-200 active:scale-95"
+    title="AI Assistant">
+    🤖
+  </button>
+
+  <!-- Chat Panel -->
+  <div x-show="open" x-cloak x-transition:enter="transition ease-out duration-200"
+    x-transition:enter-start="opacity-0 scale-95 translate-y-4" x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+    x-transition:leave="transition ease-in duration-150"
+    x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+    class="absolute bottom-0 right-0 w-[380px] max-w-[calc(100vw-2rem)] bg-[#0f1219] border border-[#262e39] rounded-2xl shadow-2xl shadow-black/50 flex flex-col overflow-hidden"
+    style="height: min(560px, calc(100vh - 100px));">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-violet-600/20 to-indigo-600/20 border-b border-[#262e39]">
+      <div class="flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
+        <span class="text-sm font-bold text-white">AI Assistant</span>
+      </div>
+      <div class="flex items-center gap-1">
+        <button @click="clearChat()" class="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors" title="Clear">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+        </button>
+        <button @click="open=false" class="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Messages -->
+    <div x-ref="messages" class="flex-1 overflow-y-auto px-4 py-3 space-y-3 scroll-smooth">
+      <!-- Welcome message -->
+      <template x-if="messages.length === 0">
+        <div class="text-center py-8">
+          <div class="text-4xl mb-3">🤖</div>
+          <div class="text-sm font-bold text-white mb-1">مرحباً! أنا مساعدك الذكي</div>
+          <div class="text-xs text-gray-400 mb-4">أستطيع مساعدتك في إدارة لوحة التحكم</div>
+          <div class="space-y-2">
+            <button @click="sendQuick('كم عدد المستخدمين؟')" class="block w-full text-right px-3 py-2 bg-[#1a2028] border border-[#262e39] rounded-lg text-xs text-gray-300 hover:border-violet-500/50 hover:text-white transition-all">📊 كم عدد المستخدمين؟</button>
+            <button @click="sendQuick('اعرض لي القنوات المتاحة')" class="block w-full text-right px-3 py-2 bg-[#1a2028] border border-[#262e39] rounded-lg text-xs text-gray-300 hover:border-violet-500/50 hover:text-white transition-all">📋 اعرض لي القنوات المتاحة</button>
+            <button @click="sendQuick('اكتب بوست ترحيبي لقنوات تليجرام')" class="block w-full text-right px-3 py-2 bg-[#1a2028] border border-[#262e39] rounded-lg text-xs text-gray-300 hover:border-violet-500/50 hover:text-white transition-all">✍️ اكتب بوست ترحيبي</button>
+            <button @click="sendQuick('اعرض المعاملات المعلقة')" class="block w-full text-right px-3 py-2 bg-[#1a2028] border border-[#262e39] rounded-lg text-xs text-gray-300 hover:border-violet-500/50 hover:text-white transition-all">⏳ اعرض المعاملات المعلقة</button>
+          </div>
+        </div>
+      </template>
+
+      <!-- Message list -->
+      <template x-for="(msg, idx) in messages" :key="idx">
+        <div :class="msg.role === 'user' ? 'flex justify-end' : 'flex justify-start'">
+          <div :class="msg.role === 'user'
+            ? 'bg-violet-600/20 border border-violet-500/30 text-white rounded-2xl rounded-br-md max-w-[85%]'
+            : 'bg-[#1a2028] border border-[#262e39] text-gray-200 rounded-2xl rounded-bl-md max-w-[85%]'"
+            class="px-3 py-2.5 text-sm leading-relaxed">
+            <div x-html="formatMessage(msg.content)" class="whitespace-pre-wrap break-words"></div>
+            <div x-show="msg.action_taken" class="mt-1.5 pt-1.5 border-t border-white/10">
+              <span class="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300" x-text="'⚡ ' + msg.action_taken"></span>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <!-- Typing indicator -->
+      <div x-show="typing" class="flex justify-start">
+        <div class="bg-[#1a2028] border border-[#262e39] rounded-2xl rounded-bl-md px-4 py-3">
+          <div class="flex gap-1">
+            <span class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay:0ms"></span>
+            <span class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay:150ms"></span>
+            <span class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay:300ms"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Input -->
+    <div class="px-3 py-3 border-t border-[#262e39] bg-[#0b0e11]">
+      <form @submit.prevent="sendMessage()" class="flex items-center gap-2">
+        <input x-model="input" x-ref="chatInput" type="text"
+          placeholder="اكتب أمرك هنا..."
+          class="flex-1 bg-[#1a2028] border border-[#262e39] rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-violet-500/50 transition-colors"
+          :disabled="typing">
+        <button type="submit" :disabled="!input.trim() || typing"
+          class="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 text-white flex items-center justify-center hover:scale-105 active:scale-95 transition-all disabled:opacity-40 disabled:hover:scale-100">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+function aiAssistant() {
+  return {
+    open: false,
+    input: '',
+    messages: [],
+    typing: false,
+
+    init() {
+      this.$watch('open', (v) => {
+        if (v) this.$nextTick(() => { this.$refs.chatInput?.focus(); this.scrollToBottom(); });
+      });
+    },
+
+    toggleChat() { this.open = !this.open; },
+
+    scrollToBottom() {
+      this.$nextTick(() => {
+        const el = this.$refs.messages;
+        if (el) el.scrollTop = el.scrollHeight;
+      });
+    },
+
+    formatMessage(text) {
+      if (!text) return '';
+      // Simple HTML rendering
+      text = text.replace(/\n/g, '<br>');
+      text = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+      text = text.replace(/`(.*?)`/g, '<code class="bg-black/30 px-1 py-0.5 rounded text-violet-300 text-xs">$1</code>');
+      text = text.replace(/^• /gm, '<span class="text-violet-400 mr-1">•</span> ');
+      return text;
+    },
+
+    sendQuick(text) {
+      this.input = text;
+      this.sendMessage();
+    },
+
+    async sendMessage() {
+      const msg = this.input.trim();
+      if (!msg || this.typing) return;
+
+      this.messages.push({ role: 'user', content: msg });
+      this.input = '';
+      this.typing = true;
+      this.scrollToBottom();
+
+      try {
+        const resp = await fetch('/api/ai/assistant/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: msg }),
+          credentials: 'same-origin'
+        });
+        const data = await resp.json();
+
+        if (data.success) {
+          this.messages.push({
+            role: 'assistant',
+            content: data.reply || 'تم',
+            action_taken: data.action_taken || null
+          });
+        } else {
+          this.messages.push({
+            role: 'assistant',
+            content: '❌ ' + (data.error || 'حدث خطأ')
+          });
+        }
+      } catch (e) {
+        this.messages.push({
+          role: 'assistant',
+          content: '❌ خطأ في الاتصال بالخادم'
+        });
+      }
+
+      this.typing = false;
+      this.scrollToBottom();
+    },
+
+    async clearChat() {
+      if (!confirm('مسح تاريخ المحادثة؟')) return;
+      try {
+        await fetch('/api/ai/assistant/clear', { method: 'POST', credentials: 'same-origin' });
+      } catch (e) {}
+      this.messages = [];
+    }
+  };
+}
+</script>
 </body>
 </html>
 
