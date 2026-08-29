@@ -44,6 +44,7 @@ AGENTS = {
                     'anti_ban_status', 'anti_ban_log',
                     'list_relays', 'relay_status', 'preview_relay', 'relay_log', 'relay_stats',
                     'browser_list', 'browser_open', 'browser_screenshot', 'browser_status',
+                    'daemon_status', 'sleep_all_browsers', 'wake_all_browsers',
                     'list_campaigns', 'campaign_stats', 'list_companies', 'company_detail',
                     'list_admins', 'add_admin', 'list_agents', 'agent_stats',
                     'game_stats', 'toggle_game', 'platform_stats',
@@ -480,6 +481,9 @@ ACTIONS_SCHEMA = [
     {"name": "browser_open", "description": "فتح موقع في المتصفح", "parameters": {"url": "الرابط", "name": "الاسم"}},
     {"name": "browser_screenshot", "description": "لقطة شاشة من المتصفح", "parameters": {"instance_id": "معرف النافذة"}},
     {"name": "browser_status", "description": "حالة المتصفح", "parameters": {"instance_id": "معرف النافذة"}},
+    {"name": "daemon_status", "description": "حالة Daemon المتصفح", "parameters": {}},
+    {"name": "sleep_all_browsers", "description": "إدخال كل المتصفحات في النوم", "parameters": {}},
+    {"name": "wake_all_browsers", "description": "إيقاظ كل المتصفحات", "parameters": {}},
     # Learning
     {"name": "learn_fact", "description": "حفظ معلومة", "parameters": {"category": "الفئة", "key": "المفتاح", "value": "القيمة"}},
     {"name": "get_learning_stats", "description": "إحصائيات التعلم", "parameters": {}},
@@ -1302,6 +1306,29 @@ def _exec_browser_status(params):
     except Exception as e: return {'success': False, 'error': str(e)}
 
 
+def _exec_daemon_status(params):
+    try:
+        from browser_daemon import browser_daemon
+        return {'success': True, 'daemon': browser_daemon.get_daemon_status()}
+    except Exception as e: return {'success': False, 'error': str(e)}
+
+
+def _exec_sleep_all_browsers(params):
+    try:
+        from browser_daemon import browser_daemon
+        browser_daemon.sleep_all()
+        return {'success': True, 'message': 'تم إدخال كل المتصفحات في النوم'}
+    except Exception as e: return {'success': False, 'error': str(e)}
+
+
+def _exec_wake_all_browsers(params):
+    try:
+        from browser_daemon import browser_daemon
+        results = browser_daemon.wake_all(trigger='ai_command')
+        return {'success': True, 'results': results, 'message': 'تم إيقاظ كل المتصفحات'}
+    except Exception as e: return {'success': False, 'error': str(e)}
+
+
 # ── Learning ──────────────────────────────────────────────────
 
 def _exec_learn_fact(params):
@@ -1368,6 +1395,8 @@ ACTION_DISPATCH = {
     'relay_stats': _exec_relay_stats,
     'browser_list': _exec_browser_list, 'browser_open': _exec_browser_open,
     'browser_screenshot': _exec_browser_screenshot, 'browser_status': _exec_browser_status,
+    'daemon_status': _exec_daemon_status, 'sleep_all_browsers': _exec_sleep_all_browsers,
+    'wake_all_browsers': _exec_wake_all_browsers,
     'learn_fact': _exec_learn_fact, 'get_learning_stats': _exec_get_learning_stats,
     'delegate_task': _exec_delegate_task, 'consult_all': _exec_consult_all,
 }
@@ -1813,6 +1842,19 @@ def _format_action_result(action_name, result):
 • الكوكيز: {inst.get('cookies_count',0)}
 • الصفحات: {inst.get('pages_visited',0)}"""
         return f"🌐 <b>{result.get('total',0)} نوافذ نشطة</b>"
+    elif action_name == 'daemon_status':
+        d = result.get('daemon', {})
+        h = d.get('health', {})
+        return f"""🖥️ <b>حالة Daemon:</b>
+• الحالة: {'🟢 نشط' if d.get('running') else 'متوقف'}
+• النوافذ: {d.get('instances',0)}
+• نشطة: {d.get('active',0)} | في النوم: {d.get('sleeping',0)}
+• إعادة تشغيل: {h.get('restarts',0)}
+• فحوصات: {h.get('checks',0)}"""
+    elif action_name == 'sleep_all_browsers':
+        return f"😴 <b>{result.get('message','')}</b>"
+    elif action_name == 'wake_all_browsers':
+        return f"☀️ <b>{result.get('message','')}</b>"
     elif action_name == 'generate_post':
         if result.get('success'): return f"🤖 <b>البوست:</b>\n\n{result.get('text', '')}"
         return f"❌ خطأ: {result.get('error', '')}"

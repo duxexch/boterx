@@ -29,30 +29,61 @@
         </div>
         <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
             <div class="flex items-center gap-2 mb-2">
-                <div class="w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center">
-                    <i class="fas fa-play text-green-400 text-sm"></i>
+                <div class="w-8 h-8 rounded-lg" :class="daemonRunning?'bg-green-500/20':'bg-red-500/20'">
+                    <i class="fas fa-server text-sm" :class="daemonRunning?'text-green-400':'text-red-400'"></i>
                 </div>
-                <p class="text-xs text-dim">قيد التشغيل</p>
+                <p class="text-xs text-dim">ال服务 (Daemon)</p>
             </div>
-            <p class="text-2xl font-bold text-success" x-text="instances.filter(i=>i.status==='running').length"></p>
+            <p class="text-2xl font-bold" :class="daemonRunning?'text-success':'text-danger'" x-text="daemonRunning?'نشط':'متوقف'"></p>
         </div>
         <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
             <div class="flex items-center gap-2 mb-2">
                 <div class="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center">
-                    <i class="fas fa-cookie text-amber-400 text-sm"></i>
+                    <i class="fas fa-moon text-amber-400 text-sm"></i>
                 </div>
-                <p class="text-xs text-dim">الكوكيز المحفوظة</p>
+                <p class="text-xs text-dim">في النوم</p>
             </div>
-            <p class="text-2xl font-bold text-warning" x-text="instances.reduce((a,i)=>a+(i.cookies_count||0),0)"></p>
+            <p class="text-2xl font-bold text-warning" x-text="instances.filter(i=>i.sleep_state==='sleeping').length"></p>
         </div>
         <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
             <div class="flex items-center gap-2 mb-2">
-                <div class="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center">
-                    <i class="fas fa-file-alt text-purple-400 text-sm"></i>
+                <div class="w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center">
+                    <i class="fas fa-heartbeat text-green-400 text-sm"></i>
                 </div>
-                <p class="text-xs text-dim">الصفحات</p>
+                <p class="text-xs text-dim">الصحة</p>
             </div>
-            <p class="text-2xl font-bold text-info" x-text="instances.reduce((a,i)=>a+(i.pages_visited||0),0)"></p>
+            <p class="text-2xl font-bold text-success" x-text="healthStats.healthy||0"></p>
+        </div>
+    </div>
+
+    <!-- Daemon Controls -->
+    <div class="bg-slate-800 rounded-xl border border-slate-700 p-4 mb-6">
+        <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-semibold text-bright">تحكم Daemon</h3>
+            <div class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full" :class="daemonRunning?'bg-green-400':'bg-red-400'"></span>
+                <span class="text-xs text-dim" x-text="daemonRunning?'Daemon نشط':'Daemon متوقف'"></span>
+            </div>
+        </div>
+        <div class="flex flex-wrap gap-2">
+            <button @click="startDaemon()" class="btn btn-success btn-sm gap-1" x-show="!daemonRunning">
+                <i class="fas fa-play"></i> تشغيل Daemon
+            </button>
+            <button @click="stopDaemon()" class="btn btn-danger btn-sm gap-1" x-show="daemonRunning">
+                <i class="fas fa-stop"></i> إيقاف Daemon
+            </button>
+            <button @click="sleepAll()" class="btn btn-secondary btn-sm gap-1">
+                <i class="fas fa-moon"></i> إدخال الكل في النوم
+            </button>
+            <button @click="wakeAll()" class="btn btn-primary btn-sm gap-1">
+                <i class="fas fa-sun"></i> إيقاظ الكل
+            </button>
+            <button @click="saveSnapshot()" class="btn btn-secondary btn-sm gap-1">
+                <i class="fas fa-camera"></i> حفظ Snapshot
+            </button>
+            <button @click="loadInstances()" class="btn btn-secondary btn-sm gap-1">
+                <i class="fas fa-sync-alt"></i> تحديث
+            </button>
         </div>
     </div>
 
@@ -75,9 +106,19 @@
                              @click="selectInstance(inst.id)">
                             <div class="flex items-center justify-between mb-1">
                                 <span class="text-sm font-medium text-bright truncate" x-text="inst.name || inst.profile_name"></span>
-                                <span class="w-2 h-2 rounded-full" :class="inst.status==='running'?'bg-green-400':'bg-slate-500'"></span>
+                                <div class="flex items-center gap-1.5">
+                                    <button @click.stop="toggleSleep(inst.id)" class="text-xs p-1 rounded hover:bg-slate-600/50"
+                                        :title="inst.sleep_state==='sleeping'?'إيقاظ':'إدخال في النوم'">
+                                        <i :class="inst.sleep_state==='sleeping'?'fas fa-sun text-amber-400':'fas fa-moon text-slate-400'"></i>
+                                    </button>
+                                    <span class="w-2 h-2 rounded-full"
+                                        :class="inst.status==='running'?'bg-green-400':inst.sleep_state==='sleeping'?'bg-amber-400':'bg-slate-500'"></span>
+                                </div>
                             </div>
                             <p class="text-xs text-dim truncate" x-text="inst.current_url || 'about:blank'"></p>
+                            <div class="flex items-center gap-2 mt-1" x-show="inst.idle_for">
+                                <span class="text-[10px] text-dim">خامل: <span x-text="Math.round((inst.idle_for||0)/60)+'د'"></span></span>
+                            </div>
                         </div>
                     </template>
                     <div x-show="instances.length===0" class="px-4 py-8 text-center text-dim text-sm">
@@ -262,11 +303,20 @@ function browserPage() {
         jsResult: '',
         showCreate: false,
         createForm: { name: '', url: '', proxy: '' },
+        daemonRunning: false,
+        healthStats: {},
         _pollTimer: null,
 
         async init() {
             await this.loadInstances();
             await this.loadProfiles();
+            await this.loadDaemonStatus();
+            // Auto-refresh screenshots every 5s for active instance
+            this._pollTimer = setInterval(() => {
+                if (this.selected && this.currentInst?.status === 'running') {
+                    this.refreshView();
+                }
+            }, 5000);
         },
 
         get currentInst() {
@@ -432,6 +482,70 @@ function browserPage() {
                     await this.startBrowser();
                 }
             } catch(e) { toast('فشل فتح الجلسة', 'error'); }
+        },
+
+        // ── Daemon Controls ───────────────────────
+
+        async loadDaemonStatus() {
+            try {
+                const d = await api('/api/browser/daemon');
+                this.daemonRunning = d.daemon?.running || false;
+                this.healthStats = d.daemon?.health || {};
+            } catch(e) {}
+        },
+
+        async startDaemon() {
+            try {
+                await api('/api/browser/daemon/start', { method: 'POST' });
+                await this.loadDaemonStatus();
+                toast('تم تشغيل Daemon', 'success');
+            } catch(e) { toast('فشل تشغيل Daemon', 'error'); }
+        },
+
+        async stopDaemon() {
+            try {
+                await api('/api/browser/daemon/stop', { method: 'POST' });
+                await this.loadDaemonStatus();
+                toast('تم إيقاف Daemon', 'success');
+            } catch(e) { toast('فشل إيقاف Daemon', 'error'); }
+        },
+
+        async sleepAll() {
+            try {
+                await api('/api/browser/daemon/sleep-all', { method: 'POST' });
+                await this.loadInstances();
+                toast('تم إدخال الكل في النوم', 'success');
+            } catch(e) { toast('فشل', 'error'); }
+        },
+
+        async wakeAll() {
+            try {
+                await api('/api/browser/daemon/wake-all', { method: 'POST' });
+                await this.loadInstances();
+                await this.refreshView();
+                toast('تم إيقاظ الكل', 'success');
+            } catch(e) { toast('فشل', 'error'); }
+        },
+
+        async saveSnapshot() {
+            try {
+                await api('/api/browser/snapshot');
+                toast('تم حفظ Snapshot', 'success');
+            } catch(e) { toast('فشل', 'error'); }
+        },
+
+        async toggleSleep(id) {
+            const inst = this.instances.find(i => i.id === id);
+            if (!inst) return;
+            try {
+                if (inst.sleep_state === 'sleeping') {
+                    await api(`/api/browser/instances/${id}/wake`, { method: 'POST' });
+                } else {
+                    await api(`/api/browser/instances/${id}/sleep`, { method: 'POST' });
+                }
+                await this.loadInstances();
+                if (this.selected === id) await this.refreshView();
+            } catch(e) { toast('فشل', 'error'); }
         },
     };
 }

@@ -4163,6 +4163,152 @@ def page_browser():
     return render_template('browser.html', active_page='browser')
 
 
+# ── Daemon Control ───────────────────────────────────────────
+
+@app.route('/api/browser/daemon', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_daemon_status():
+    from browser_daemon import browser_daemon
+    return jsonify({'success': True, 'daemon': browser_daemon.get_daemon_status()})
+
+
+@app.route('/api/browser/daemon/start', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_daemon_start():
+    from browser_daemon import browser_daemon
+    browser_daemon.start()
+    return jsonify({'success': True, 'message': 'Daemon started'})
+
+
+@app.route('/api/browser/daemon/stop', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_daemon_stop():
+    from browser_daemon import browser_daemon
+    browser_daemon.stop()
+    return jsonify({'success': True, 'message': 'Daemon stopped'})
+
+
+@app.route('/api/browser/daemon/sleep-all', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_daemon_sleep_all():
+    from browser_daemon import browser_daemon
+    browser_daemon.sleep_all()
+    return jsonify({'success': True, 'message': 'All instances sleeping'})
+
+
+@app.route('/api/browser/daemon/wake-all', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_daemon_wake_all():
+    from browser_daemon import browser_daemon
+    results = browser_daemon.wake_all(trigger='manual')
+    return jsonify({'success': True, 'results': results})
+
+
+@app.route('/api/browser/health', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_health():
+    from browser_health import health_monitor
+    return jsonify({'success': True, 'health': health_monitor.get_stats()})
+
+
+@app.route('/api/browser/health/check/<iid>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_health_check(iid):
+    from browser_health import health_monitor
+    return jsonify(health_monitor.manual_check(iid))
+
+
+@app.route('/api/browser/health/restart/<iid>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_health_restart(iid):
+    from browser_health import health_monitor
+    return jsonify(health_monitor.manual_restart(iid))
+
+
+@app.route('/api/browser/instances/<iid>/sleep', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_sleep(iid):
+    from browser_daemon import browser_daemon
+    return jsonify(browser_daemon.sleep_instance(iid))
+
+
+@app.route('/api/browser/instances/<iid>/wake', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_wake(iid):
+    from browser_daemon import browser_daemon
+    return jsonify(browser_daemon.wake_instance(iid, 'manual'))
+
+
+@app.route('/api/browser/instances/<iid>/idle-timeout', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_idle_timeout(iid):
+    from browser_daemon import browser_daemon
+    ctrl = browser_daemon.get_sleep_controller(iid)
+    if not ctrl:
+        return jsonify({'success': False, 'error': 'No controller'}), 404
+    timeout = (request.json or {}).get('timeout', 300)
+    ctrl.set_idle_timeout(timeout)
+    return jsonify({'success': True, 'idle_timeout': timeout})
+
+
+@app.route('/api/browser/instances/<iid>/triggers', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_triggers_list(iid):
+    from browser_daemon import browser_daemon
+    ctrl = browser_daemon.get_sleep_controller(iid)
+    if not ctrl:
+        return jsonify({'success': False, 'error': 'No controller'}), 404
+    return jsonify({'success': True, 'triggers': ctrl.list_wake_triggers()})
+
+
+@app.route('/api/browser/instances/<iid>/triggers', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_trigger_add(iid):
+    from browser_daemon import browser_daemon
+    ctrl = browser_daemon.get_sleep_controller(iid)
+    if not ctrl:
+        return jsonify({'success': False, 'error': 'No controller'}), 404
+    data = request.json or {}
+    trigger = ctrl.add_wake_trigger(data.get('type', 'api'), data.get('config', {}))
+    return jsonify({'success': True, 'trigger': trigger})
+
+
+@app.route('/api/browser/instances/<iid>/triggers/<tid>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_trigger_remove(iid, tid):
+    from browser_daemon import browser_daemon
+    ctrl = browser_daemon.get_sleep_controller(iid)
+    if not ctrl:
+        return jsonify({'success': False, 'error': 'No controller'}), 404
+    ctrl.remove_wake_trigger(tid)
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/snapshot', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_snapshot():
+    from browser_daemon import browser_daemon
+    browser_daemon._save_snapshot()
+    return jsonify({'success': True, 'message': 'Snapshot saved'})
+
+
+# ── Instance CRUD ────────────────────────────────────────────
+
 @app.route('/api/browser/instances', methods=['GET'])
 @api_auth
 @permission_required('manage_bots')

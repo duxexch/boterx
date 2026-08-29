@@ -407,6 +407,12 @@ def create_instance(name='', profile_id=None, proxy=None):
             profile_id = str(uuid.uuid4())
         inst = BrowserInstance(instance_id, profile_id, name)
         _instances[instance_id] = inst
+        # Register with daemon
+        try:
+            from browser_daemon import browser_daemon
+            browser_daemon.register_instance(instance_id, inst)
+        except Exception:
+            pass
         return inst
 
 
@@ -415,6 +421,13 @@ def get_instance(instance_id):
 
 
 def list_instances():
+    # Prefer daemon list (includes sleep/health info)
+    try:
+        from browser_daemon import browser_daemon
+        if browser_daemon._initialized:
+            return browser_daemon.list_instances()
+    except Exception:
+        pass
     return [inst.to_dict() for inst in _instances.values()]
 
 
@@ -424,6 +437,11 @@ def remove_instance(instance_id):
         if inst:
             try:
                 inst.stop()
+            except Exception:
+                pass
+            try:
+                from browser_daemon import browser_daemon
+                browser_daemon.unregister_instance(instance_id)
             except Exception:
                 pass
             return True
