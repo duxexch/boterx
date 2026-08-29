@@ -3994,6 +3994,166 @@ def api_contacts_send_preview():
     return jsonify({'success': True, 'samples': samples})
 
 
+# ═══════════════════════════════════════════════════════════════
+#  CONTENT RELAY SYSTEM
+# ═══════════════════════════════════════════════════════════════
+
+@app.route('/api/relays', methods=['GET'])
+@api_auth
+@permission_required('send_broadcast')
+def api_relays_list():
+    from content_relay import list_relays
+    active_only = request.args.get('active_only', '0') == '1'
+    return jsonify({'success': True, 'relays': list_relays(active_only)})
+
+
+@app.route('/api/relays', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_relays_create():
+    from content_relay import create_relay
+    data = request.json or {}
+    name = data.get('name', '')
+    if not name:
+        return jsonify({'success': False, 'error': 'name required'}), 400
+    result = create_relay(
+        name=name,
+        source_platform=data.get('source_platform', 'telegram'),
+        source_ids=data.get('source_ids', []),
+        dest_platform=data.get('dest_platform', 'telegram'),
+        dest_ids=data.get('dest_ids', []),
+        agent_id=data.get('agent_id', 'commander'),
+        agent_prompt=data.get('agent_prompt', ''),
+        content_filter=data.get('content_filter', 'all'),
+        add_branding=data.get('add_branding', 0),
+        branding_text=data.get('branding_text', ''),
+        add_links=data.get('add_links', 0),
+        links_to_add=data.get('links_to_add', []),
+        text_replacements=data.get('text_replacements', []),
+        delay_seconds=data.get('delay_seconds', 5),
+        max_per_hour=data.get('max_per_hour', 20),
+        ai_transform=data.get('ai_transform', 1),
+        ai_temperature=data.get('ai_temperature', 0.7),
+        auto_approve=data.get('auto_approve', 0),
+        created_by=session.get('user_id', session.get('admin_id'))
+    )
+    return jsonify(result)
+
+
+@app.route('/api/relays/<int:relay_id>', methods=['GET'])
+@api_auth
+@permission_required('send_broadcast')
+def api_relays_get(relay_id):
+    from content_relay import get_relay, get_relay_stats
+    relay = get_relay(relay_id)
+    if not relay:
+        return jsonify({'success': False, 'error': 'Relay not found'}), 404
+    relay['stats'] = get_relay_stats(relay_id)
+    return jsonify({'success': True, 'relay': relay})
+
+
+@app.route('/api/relays/<int:relay_id>', methods=['PUT'])
+@api_auth
+@permission_required('send_broadcast')
+def api_relays_update(relay_id):
+    from content_relay import update_relay
+    data = request.json or {}
+    result = update_relay(relay_id, **data)
+    return jsonify(result)
+
+
+@app.route('/api/relays/<int:relay_id>', methods=['DELETE'])
+@api_auth
+@permission_required('send_broadcast')
+def api_relays_delete(relay_id):
+    from content_relay import delete_relay
+    return jsonify(delete_relay(relay_id))
+
+
+@app.route('/api/relays/<int:relay_id>/toggle', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_relays_toggle(relay_id):
+    from content_relay import toggle_relay
+    return jsonify(toggle_relay(relay_id))
+
+
+@app.route('/api/relays/<int:relay_id>/relay', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_relays_execute(relay_id):
+    from content_relay import relay_from_post
+    data = request.json or {}
+    post_id = data.get('post_id')
+    if not post_id:
+        return jsonify({'success': False, 'error': 'post_id required'}), 400
+    return jsonify(relay_from_post(post_id, relay_id))
+
+
+@app.route('/api/relays/<int:relay_id>/preview', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_relays_preview(relay_id):
+    from content_relay import preview_relay
+    data = request.json or {}
+    text = data.get('text', '')
+    if not text:
+        return jsonify({'success': False, 'error': 'text required'}), 400
+    return jsonify(preview_relay(text, relay_id))
+
+
+@app.route('/api/relays/<int:relay_id>/queue', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_relays_queue(relay_id):
+    from content_relay import queue_relay_content
+    data = request.json or {}
+    content = data.get('content', '')
+    if not content:
+        return jsonify({'success': False, 'error': 'content required'}), 400
+    return jsonify(queue_relay_content(
+        relay_id, content,
+        data.get('source_platform'), data.get('source_id'),
+        data.get('source_msg_id'), data.get('media_urls')))
+
+
+@app.route('/api/relays/process-queue', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_relays_process_queue():
+    from content_relay import process_relay_queue
+    limit = (request.json or {}).get('limit', 10)
+    return jsonify(process_relay_queue(limit))
+
+
+@app.route('/api/relays/log', methods=['GET'])
+@api_auth
+@permission_required('send_broadcast')
+def api_relays_log():
+    from content_relay import get_relay_log
+    relay_id = request.args.get('relay_id', type=int)
+    limit = request.args.get('limit', 50, type=int)
+    return jsonify({'success': True, 'log': get_relay_log(relay_id, limit)})
+
+
+@app.route('/api/relays/stats', methods=['GET'])
+@api_auth
+@permission_required('send_broadcast')
+def api_relays_stats():
+    from content_relay import get_relay_stats
+    relay_id = request.args.get('relay_id', type=int)
+    return jsonify({'success': True, 'stats': get_relay_stats(relay_id)})
+
+
+@app.route('/api/relays/log/clear', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_relays_log_clear():
+    from content_relay import clear_relay_log
+    relay_id = (request.json or {}).get('relay_id')
+    return jsonify(clear_relay_log(relay_id))
+
+
 # ===== API — Stats =====
 
 @app.route('/api/stats')

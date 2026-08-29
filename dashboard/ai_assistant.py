@@ -42,6 +42,7 @@ AGENTS = {
                     'create_multi_post', 'list_multi_posts', 'publish_post', 'preview_post',
                     'import_contacts', 'list_imports', 'contact_stats', 'send_to_contacts',
                     'anti_ban_status', 'anti_ban_log',
+                    'list_relays', 'relay_status', 'preview_relay', 'relay_log', 'relay_stats',
                     'list_campaigns', 'campaign_stats', 'list_companies', 'company_detail',
                     'list_admins', 'add_admin', 'list_agents', 'agent_stats',
                     'game_stats', 'toggle_game', 'platform_stats',
@@ -467,6 +468,12 @@ ACTIONS_SCHEMA = [
     {"name": "send_to_contacts", "description": "إرسال رسالة لجهات اتصال", "parameters": {"platform": "المنصة", "template": "القالب", "import_id": "الاستيراد"}},
     {"name": "anti_ban_status", "description": "حالة الحماية من الحظر", "parameters": {"platform": "المنصة"}},
     {"name": "anti_ban_log", "description": "سجل الحماية من الحظر", "parameters": {}},
+    # Content Relay
+    {"name": "list_relays", "description": "عرض عمليات النقل", "parameters": {}},
+    {"name": "relay_status", "description": "حالة عملية نقل", "parameters": {"relay_id": "المعرف"}},
+    {"name": "preview_relay", "description": "معاينة محتوى بعد المعالجة", "parameters": {"text": "النص", "relay_id": "المعرف"}},
+    {"name": "relay_log", "description": "سجل عمليات النقل", "parameters": {"relay_id": "المعرف"}},
+    {"name": "relay_stats", "description": "إحصائيات النقل", "parameters": {}},
     # Learning
     {"name": "learn_fact", "description": "حفظ معلومة", "parameters": {"category": "الفئة", "key": "المفتاح", "value": "القيمة"}},
     {"name": "get_learning_stats", "description": "إحصائيات التعلم", "parameters": {}},
@@ -1194,6 +1201,54 @@ def _exec_anti_ban_log(params):
     except Exception as e: return {'success': False, 'error': str(e)}
 
 
+# ── Content Relay ─────────────────────────────────────────────
+
+def _exec_list_relays(params):
+    try:
+        from content_relay import list_relays
+        relays = list_relays(params.get('active_only', False))
+        return {'success': True, 'relays': relays, 'total': len(relays)}
+    except Exception as e: return {'success': False, 'error': str(e)}
+
+
+def _exec_relay_status(params):
+    relay_id = params.get('relay_id')
+    if not relay_id: return {'success': False, 'error': 'relay_id مطلوب'}
+    try:
+        from content_relay import get_relay, get_relay_stats
+        relay = get_relay(int(relay_id))
+        if not relay: return {'success': False, 'error': 'عملية النقل غير موجودة'}
+        stats = get_relay_stats(int(relay_id))
+        return {'success': True, 'relay': relay, 'stats': stats}
+    except Exception as e: return {'success': False, 'error': str(e)}
+
+
+def _exec_preview_relay(params):
+    text = params.get('text', ''); relay_id = params.get('relay_id')
+    if not text: return {'success': False, 'error': 'النص مطلوب'}
+    if not relay_id: return {'success': False, 'error': 'relay_id مطلوب'}
+    try:
+        from content_relay import preview_relay
+        return preview_relay(text, int(relay_id))
+    except Exception as e: return {'success': False, 'error': str(e)}
+
+
+def _exec_relay_log(params):
+    try:
+        from content_relay import get_relay_log
+        log = get_relay_log(params.get('relay_id'), params.get('limit', 20))
+        return {'success': True, 'log': log, 'total': len(log)}
+    except Exception as e: return {'success': False, 'error': str(e)}
+
+
+def _exec_relay_stats(params):
+    try:
+        from content_relay import get_relay_stats
+        stats = get_relay_stats(params.get('relay_id'))
+        return {'success': True, 'stats': stats}
+    except Exception as e: return {'success': False, 'error': str(e)}
+
+
 # ── Learning ──────────────────────────────────────────────────
 
 def _exec_learn_fact(params):
@@ -1255,6 +1310,9 @@ ACTION_DISPATCH = {
     'import_contacts': _exec_import_contacts, 'list_imports': _exec_list_imports,
     'contact_stats': _exec_contact_stats, 'send_to_contacts': _exec_send_to_contacts,
     'anti_ban_status': _exec_anti_ban_status, 'anti_ban_log': _exec_anti_ban_log,
+    'list_relays': _exec_list_relays, 'relay_status': _exec_relay_status,
+    'preview_relay': _exec_preview_relay, 'relay_log': _exec_relay_log,
+    'relay_stats': _exec_relay_stats,
     'learn_fact': _exec_learn_fact, 'get_learning_stats': _exec_get_learning_stats,
     'delegate_task': _exec_delegate_task, 'consult_all': _exec_consult_all,
 }
@@ -1644,6 +1702,37 @@ def _format_action_result(action_name, result):
             status_emoji = '✅' if l.get('status') == 'sent' else '❌'
             lines.append(f"• {status_emoji} {l.get('platform','')} — {l.get('delay_used',0)}s delay")
         return '\n'.join(lines)
+    elif action_name == 'list_relays':
+        relays = result.get('relays', []); lines = [f"🔄 <b>عمليات النقل ({len(relays)}):</b>"]
+        for r in relays[:10]:
+            active = '🟢' if r.get('is_active') else '🔴'
+            stats = r.get('stats', {})
+            lines.append(f"• {active} #{r.get('id','')} {r.get('name','')} — {r.get('source_platform','')}→{r.get('dest_platform','')} ({stats.get('total',0)} عملية)")
+        return '\n'.join(lines)
+    elif action_name == 'relay_status':
+        r = result.get('relay', {}); s = result.get('stats', {})
+        platforms = f"{r.get('source_platform','')} → {r.get('dest_platform','')}"
+        sources = len(r.get('source_ids', [])); dests = len(r.get('dest_ids', []))
+        return f"""🔄 <b>عملية النقل #{r.get('id','')} — {r.get('name','')}</b>
+• المنصات: {platforms}
+• المصادر: {sources} | الوجهات: {dests}
+• الوكيل: {r.get('agent_id','')} | AI: {'مفعّل' if r.get('ai_transform') else 'معطّل'}
+• الحالة: {'🟢 نشط' if r.get('is_active') else '🔴 معطّل'}
+• المعالج: {s.get('total',0)} | ناجح: {s.get('success',0)} | فاشل: {s.get('failed',0)}
+• برومت الوكيل: {(r.get('agent_prompt','') or '')[:100]}"""
+    elif action_name == 'relay_log':
+        log = result.get('log', []); lines = [f"🔄 <b>سجل النقل ({len(log)}):</b>"]
+        for l in log[:10]:
+            emoji = '✅' if l.get('status') == 'success' else '❌'
+            ai = '🤖' if l.get('ai_used') else ''
+            lines.append(f"• {emoji} {l.get('source_platform','')}→{l.get('dest_platform','')} {ai} — {l.get('created_at','')[:16]}")
+        return '\n'.join(lines)
+    elif action_name == 'relay_stats':
+        s = result.get('stats', {})
+        return f"""🔄 <b>إحصائيات النقل:</b>
+• الإجمالي: <b>{s.get('total',0)}</b>
+• ناجح: <b>{s.get('success',0)}</b> | فاشل: <b>{s.get('failed',0)}</b>
+• معالج بالـ AI: <b>{s.get('ai_processed',0)}</b>"""
     elif action_name == 'generate_post':
         if result.get('success'): return f"🤖 <b>البوست:</b>\n\n{result.get('text', '')}"
         return f"❌ خطأ: {result.get('error', '')}"
