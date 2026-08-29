@@ -3766,6 +3766,234 @@ def api_ai_assistant_learn():
     return jsonify({'success': True, 'message': f'Knowledge stored: [{category}] {key} = {value}'})
 
 
+# ═══════════════════════════════════════════════════════════════
+#  MULTI-PLATFORM POSTS
+# ═══════════════════════════════════════════════════════════════
+
+@app.route('/api/multi-posts', methods=['GET'])
+@api_auth
+@permission_required('send_broadcast')
+def api_multi_posts_list():
+    from platform_posts import list_posts
+    status = request.args.get('status')
+    limit = request.args.get('limit', 50, type=int)
+    return jsonify({'success': True, 'posts': list_posts(status, limit)})
+
+
+@app.route('/api/multi-posts', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_multi_posts_create():
+    from platform_posts import create_post
+    data = request.json or {}
+    title = data.get('title', '')
+    content = data.get('content', '')
+    if not title or not content:
+        return jsonify({'success': False, 'error': 'title and content required'}), 400
+    result = create_post(
+        title=title, base_content=content,
+        media_urls=data.get('media_urls', []),
+        platforms=data.get('platforms'),
+        tags=data.get('tags', []),
+        created_by=session.get('user_id', session.get('admin_id'))
+    )
+    return jsonify(result)
+
+
+@app.route('/api/multi-posts/<post_id>', methods=['GET'])
+@api_auth
+@permission_required('send_broadcast')
+def api_multi_posts_get(post_id):
+    from platform_posts import get_post
+    post = get_post(post_id)
+    if not post:
+        return jsonify({'success': False, 'error': 'Post not found'}), 404
+    return jsonify({'success': True, 'post': post})
+
+
+@app.route('/api/multi-posts/<post_id>', methods=['PUT'])
+@api_auth
+@permission_required('send_broadcast')
+def api_multi_posts_update(post_id):
+    from platform_posts import update_post
+    data = request.json or {}
+    result = update_post(post_id, **data)
+    return jsonify(result)
+
+
+@app.route('/api/multi-posts/<post_id>', methods=['DELETE'])
+@api_auth
+@permission_required('send_broadcast')
+def api_multi_posts_delete(post_id):
+    from platform_posts import delete_post
+    return jsonify(delete_post(post_id))
+
+
+@app.route('/api/multi-posts/<post_id>/publish', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_multi_posts_publish(post_id):
+    from platform_posts import publish_variant
+    data = request.json or {}
+    platform = data.get('platform', 'telegram')
+    channel_ids = data.get('channel_ids')
+    return jsonify(publish_variant(post_id, platform, channel_ids))
+
+
+@app.route('/api/platforms', methods=['GET'])
+@api_auth
+def api_platforms_list():
+    from platform_posts import get_platforms
+    return jsonify({'success': True, 'platforms': get_platforms()})
+
+
+@app.route('/api/multi-posts/preview', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_multi_posts_preview():
+    from platform_posts import format_for_platform, PLATFORM_RULES
+    data = request.json or {}
+    content = data.get('content', '')
+    platform = data.get('platform', 'telegram')
+    title = data.get('title', '')
+    result = format_for_platform(content, platform, title)
+    return jsonify({'success': True, 'variant': result})
+
+
+# ═══════════════════════════════════════════════════════════════
+#  CONTACT IMPORTER
+# ═══════════════════════════════════════════════════════════════
+
+@app.route('/api/contacts/import', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_contacts_import():
+    from contact_importer import import_contacts
+    if 'file' not in request.files:
+        return jsonify({'success': False, 'error': 'No file uploaded'}), 400
+    file = request.files['file']
+    if not file.filename:
+        return jsonify({'success': False, 'error': 'No file selected'}), 400
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in ('.xlsx', '.xls', '.csv'):
+        return jsonify({'success': False, 'error': 'Unsupported file type. Use .xlsx, .xls, or .csv'}), 400
+    upload_dir = os.path.join(BASE_DIR, 'dashboard', 'static', 'uploads', 'contacts')
+    os.makedirs(upload_dir, exist_ok=True)
+    filepath = os.path.join(upload_dir, f'import_{int(time.time())}{ext}')
+    file.save(filepath)
+    result = import_contacts(filepath, created_by=session.get('user_id', session.get('admin_id')))
+    return jsonify(result)
+
+
+@app.route('/api/contacts/imports', methods=['GET'])
+@api_auth
+@permission_required('send_broadcast')
+def api_contacts_imports():
+    from contact_importer import list_imports
+    return jsonify({'success': True, 'imports': list_imports()})
+
+
+@app.route('/api/contacts/<import_id>', methods=['GET'])
+@api_auth
+@permission_required('send_broadcast')
+def api_contacts_detail(import_id):
+    from contact_importer import get_import_contacts, get_contact_stats
+    platform = request.args.get('platform')
+    status = request.args.get('status')
+    contacts = get_import_contacts(import_id, platform, status)
+    stats = get_contact_stats(import_id)
+    return jsonify({'success': True, 'contacts': contacts, 'stats': stats})
+
+
+@app.route('/api/contacts/stats', methods=['GET'])
+@api_auth
+@permission_required('send_broadcast')
+def api_contacts_stats():
+    from contact_importer import get_contact_stats
+    return jsonify({'success': True, 'stats': get_contact_stats()})
+
+
+@app.route('/api/contacts/<import_id>', methods=['DELETE'])
+@api_auth
+@permission_required('send_broadcast')
+def api_contacts_delete(import_id):
+    from contact_importer import delete_import
+    return jsonify(delete_import(import_id))
+
+
+@app.route('/api/contacts/send', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_contacts_send():
+    from anti_ban import queue_messages
+    from contact_importer import get_contacts_for_messaging
+    data = request.json or {}
+    platform = data.get('platform', 'telegram')
+    template = data.get('template', '')
+    import_id = data.get('import_id')
+    if not template:
+        return jsonify({'success': False, 'error': 'template required'}), 400
+    contacts = get_contacts_for_messaging(platform, import_id, limit=data.get('limit', 100))
+    if not contacts:
+        return jsonify({'success': False, 'error': 'No contacts found for this platform'})
+    result = queue_messages(platform, template, contacts, import_id)
+    return jsonify(result)
+
+
+# ═══════════════════════════════════════════════════════════════
+#  ANTI-BAN SYSTEM
+# ═══════════════════════════════════════════════════════════════
+
+@app.route('/api/anti-ban/status', methods=['GET'])
+@api_auth
+@permission_required('send_broadcast')
+def api_anti_ban_status():
+    from anti_ban import get_rate_status, PLATFORM_LIMITS
+    platform = request.args.get('platform', 'telegram')
+    status = get_rate_status(platform)
+    limits = PLATFORM_LIMITS.get(platform, {})
+    return jsonify({'success': True, 'status': status, 'limits': limits})
+
+
+@app.route('/api/anti-ban/log', methods=['GET'])
+@api_auth
+@permission_required('send_broadcast')
+def api_anti_ban_log():
+    from anti_ban import get_ban_log
+    platform = request.args.get('platform')
+    limit = request.args.get('limit', 50, type=int)
+    return jsonify({'success': True, 'log': get_ban_log(platform, limit)})
+
+
+@app.route('/api/anti-ban/duplicates', methods=['GET'])
+@api_auth
+@permission_required('send_broadcast')
+def api_anti_ban_duplicates():
+    from anti_ban import get_content_duplicates
+    platform = request.args.get('platform')
+    return jsonify({'success': True, 'duplicates': get_content_duplicates(platform)})
+
+
+@app.route('/api/contacts/send-preview', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_contacts_send_preview():
+    from anti_ban import generate_unique_message, spin_text, personalize_message
+    from contact_importer import _extract_contact
+    data = request.json or {}
+    platform = data.get('platform', 'telegram')
+    template = data.get('template', '')
+    if not template:
+        return jsonify({'success': False, 'error': 'template required'}), 400
+    # Generate 3 sample variations
+    sample_contact = {'name': 'مثال', 'phone': '+201234567890', 'phone_country': 'EG', 'company': 'VEX'}
+    samples = []
+    for _ in range(3):
+        msg = generate_unique_message(template, sample_contact, platform)
+        samples.append(msg)
+    return jsonify({'success': True, 'samples': samples})
+
+
 # ===== API — Stats =====
 
 @app.route('/api/stats')

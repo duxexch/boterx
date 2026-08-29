@@ -39,6 +39,9 @@ AGENTS = {
                     'view_complaints', 'reply_ticket', 'update_ticket_status',
                     'update_setting', 'get_settings', 'create_backup', 'list_backups',
                     'broadcast', 'broadcast_queue', 'generate_post', 'create_post',
+                    'create_multi_post', 'list_multi_posts', 'publish_post', 'preview_post',
+                    'import_contacts', 'list_imports', 'contact_stats', 'send_to_contacts',
+                    'anti_ban_status', 'anti_ban_log',
                     'list_campaigns', 'campaign_stats', 'list_companies', 'company_detail',
                     'list_admins', 'add_admin', 'list_agents', 'agent_stats',
                     'game_stats', 'toggle_game', 'platform_stats',
@@ -51,7 +54,8 @@ AGENTS = {
         'personality_ar': 'مبدع، تعبيري، دقيق. يستخدم الإيموجي والتنسيق بفعالية.',
         'specialties': ['content', 'posts', 'copywriting', 'creative'],
         'actions': ['create_post', 'generate_post', 'broadcast', 'list_channels',
-                    'translate_post', 'post_history', 'post_library'],
+                    'translate_post', 'post_history', 'post_library',
+                    'create_multi_post', 'list_multi_posts', 'publish_post', 'preview_post'],
     },
     'analyst': {
         'id': 'analyst', 'name': 'Analyst', 'name_ar': 'المحلل', 'emoji': '📊', 'color': '#f59e0b',
@@ -72,7 +76,9 @@ AGENTS = {
         'actions': ['list_users', 'user_detail', 'ban_user', 'unban_user',
                     'send_message_to_user', 'view_complaints', 'reply_ticket',
                     'update_ticket_status', 'view_transactions', 'view_matching',
-                    'resolve_dispute', 'approve_match', 'reject_match'],
+                    'resolve_dispute', 'approve_match', 'reject_match',
+                    'import_contacts', 'list_imports', 'contact_stats', 'send_to_contacts',
+                    'anti_ban_status', 'anti_ban_log'],
     },
     'tech': {
         'id': 'tech', 'name': 'Tech', 'name_ar': 'التقني', 'emoji': '⚙️', 'color': '#ef4444',
@@ -449,6 +455,18 @@ ACTIONS_SCHEMA = [
     # Backup
     {"name": "create_backup", "description": "إنشاء نسخة احتياطية", "parameters": {}},
     {"name": "list_backups", "description": "عرض النسخ الاحتياطية", "parameters": {}},
+    # Multi-platform Posts
+    {"name": "create_multi_post", "description": "إنشاء منشور متعدد المنصات", "parameters": {"title": "العنوان", "content": "المحتوى", "platforms": "المنصات"}},
+    {"name": "list_multi_posts", "description": "عرض المنشورات المحفوظة", "parameters": {}},
+    {"name": "publish_post", "description": "نشر منشور على منصة", "parameters": {"post_id": "المعرف", "platform": "المنصة"}},
+    {"name": "preview_post", "description": "معاينة منشور على منصة", "parameters": {"content": "المحتوى", "platform": "المنصة"}},
+    # Contacts
+    {"name": "import_contacts", "description": "استيراد جهات اتصال من ملف", "parameters": {"file": "الملف"}},
+    {"name": "list_imports", "description": "عرض الاستيرادات", "parameters": {}},
+    {"name": "contact_stats", "description": "إحصائيات جهات الاتصال", "parameters": {}},
+    {"name": "send_to_contacts", "description": "إرسال رسالة لجهات اتصال", "parameters": {"platform": "المنصة", "template": "القالب", "import_id": "الاستيراد"}},
+    {"name": "anti_ban_status", "description": "حالة الحماية من الحظر", "parameters": {"platform": "المنصة"}},
+    {"name": "anti_ban_log", "description": "سجل الحماية من الحظر", "parameters": {}},
     # Learning
     {"name": "learn_fact", "description": "حفظ معلومة", "parameters": {"category": "الفئة", "key": "المفتاح", "value": "القيمة"}},
     {"name": "get_learning_stats", "description": "إحصائيات التعلم", "parameters": {}},
@@ -1078,12 +1096,101 @@ def _exec_list_backups(params):
     if not os.path.exists(backup_dir): return {'success': True, 'backups': []}
     try:
         files = sorted(os.listdir(backup_dir), reverse=True)[:20]
-        backups = []
-        for f in files:
-            fp = os.path.join(backup_dir, f)
-            size = os.path.getsize(fp)
-            backups.append({'name': f, 'size': f'{size/1024:.1f} KB', 'path': fp})
+        backups = [{'name': f, 'size': f'{os.path.getsize(os.path.join(backup_dir, f))/1024:.1f} KB'} for f in files]
         return {'success': True, 'backups': backups}
+    except Exception as e: return {'success': False, 'error': str(e)}
+
+
+# ── Multi-platform Posts ──────────────────────────────────────
+
+def _exec_create_multi_post(params):
+    title = params.get('title', ''); content = params.get('content', ''); platforms = params.get('platforms')
+    if not title or not content: return {'success': False, 'error': 'title و content مطلوبان'}
+    try:
+        from platform_posts import create_post
+        result = create_post(title=title, base_content=content, platforms=platforms)
+        return result
+    except Exception as e: return {'success': False, 'error': str(e)}
+
+
+def _exec_list_multi_posts(params):
+    try:
+        from platform_posts import list_posts
+        posts = list_posts(status=params.get('status'), limit=params.get('limit', 20))
+        return {'success': True, 'posts': posts, 'total': len(posts)}
+    except Exception as e: return {'success': False, 'error': str(e)}
+
+
+def _exec_publish_post(params):
+    post_id = params.get('post_id', ''); platform = params.get('platform', 'telegram')
+    if not post_id: return {'success': False, 'error': 'post_id مطلوب'}
+    try:
+        from platform_posts import publish_variant
+        return publish_variant(post_id, platform)
+    except Exception as e: return {'success': False, 'error': str(e)}
+
+
+def _exec_preview_post(params):
+    content = params.get('content', ''); platform = params.get('platform', 'telegram')
+    if not content: return {'success': False, 'error': 'content مطلوب'}
+    try:
+        from platform_posts import format_for_platform
+        result = format_for_platform(content, platform, params.get('title', ''))
+        return {'success': True, 'variant': result}
+    except Exception as e: return {'success': False, 'error': str(e)}
+
+
+# ── Contacts ──────────────────────────────────────────────────
+
+def _exec_import_contacts(params):
+    return {'success': False, 'error': 'يرجى رفع الملف من واجهة الدردشة مباشرة (زر 📎)'}
+
+
+def _exec_list_imports(params):
+    try:
+        from contact_importer import list_imports
+        imports = list_imports()
+        return {'success': True, 'imports': imports, 'total': len(imports)}
+    except Exception as e: return {'success': False, 'error': str(e)}
+
+
+def _exec_contact_stats(params):
+    try:
+        from contact_importer import get_contact_stats
+        stats = get_contact_stats(params.get('import_id'))
+        return {'success': True, 'stats': stats}
+    except Exception as e: return {'success': False, 'error': str(e)}
+
+
+def _exec_send_to_contacts(params):
+    platform = params.get('platform', 'telegram'); template = params.get('template', '')
+    import_id = params.get('import_id')
+    if not template: return {'success': False, 'error': 'template مطلوب'}
+    try:
+        from anti_ban import queue_messages
+        from contact_importer import get_contacts_for_messaging
+        contacts = get_contacts_for_messaging(platform, import_id, limit=params.get('limit', 100))
+        if not contacts: return {'success': False, 'error': 'لا توجد جهات اتصال لهذه المنصة'}
+        result = queue_messages(platform, template, contacts, import_id)
+        return result
+    except Exception as e: return {'success': False, 'error': str(e)}
+
+
+def _exec_anti_ban_status(params):
+    try:
+        from anti_ban import get_rate_status, PLATFORM_LIMITS
+        platform = params.get('platform', 'telegram')
+        status = get_rate_status(platform)
+        limits = PLATFORM_LIMITS.get(platform, {})
+        return {'success': True, 'status': status, 'limits': limits}
+    except Exception as e: return {'success': False, 'error': str(e)}
+
+
+def _exec_anti_ban_log(params):
+    try:
+        from anti_ban import get_ban_log
+        log = get_ban_log(params.get('platform'), params.get('limit', 20))
+        return {'success': True, 'log': log, 'total': len(log)}
     except Exception as e: return {'success': False, 'error': str(e)}
 
 
@@ -1143,6 +1250,11 @@ ACTION_DISPATCH = {
     'list_companies': _exec_list_companies, 'company_detail': _exec_company_detail,
     'list_admins': _exec_list_admins, 'add_admin': _exec_add_admin,
     'create_backup': _exec_create_backup, 'list_backups': _exec_list_backups,
+    'create_multi_post': _exec_create_multi_post, 'list_multi_posts': _exec_list_multi_posts,
+    'publish_post': _exec_publish_post, 'preview_post': _exec_preview_post,
+    'import_contacts': _exec_import_contacts, 'list_imports': _exec_list_imports,
+    'contact_stats': _exec_contact_stats, 'send_to_contacts': _exec_send_to_contacts,
+    'anti_ban_status': _exec_anti_ban_status, 'anti_ban_log': _exec_anti_ban_log,
     'learn_fact': _exec_learn_fact, 'get_learning_stats': _exec_get_learning_stats,
     'delegate_task': _exec_delegate_task, 'consult_all': _exec_consult_all,
 }
@@ -1485,6 +1597,52 @@ def _format_action_result(action_name, result):
     elif action_name == 'list_backups':
         backups = result.get('backups', []); lines = [f"💾 <b>النسخ الاحتياطية ({len(backups)}):</b>"]
         for b in backups[:10]: lines.append(f"• {b.get('name','')} ({b.get('size','')})")
+        return '\n'.join(lines)
+    elif action_name == 'create_multi_post':
+        return f"📤 تم إنشاء المنشور المتعدد المنصات: <b>{result.get('post_id','')}</b>\nعدد التنسيقات: {result.get('variants',0)}"
+    elif action_name == 'list_multi_posts':
+        posts = result.get('posts', []); lines = [f"📤 <b>المنشورات ({result.get('total', 0)}):</b>"]
+        for p in posts[:10]:
+            platforms = ', '.join(p.get('platforms', []))
+            lines.append(f"• {p.get('title','')} — [{platforms}] — {p.get('status','')}")
+        return '\n'.join(lines)
+    elif action_name == 'publish_post':
+        return f"✅ تم نشر المنشور على {result.get('platform','')} — {result.get('queued',0)} قناة"
+    elif action_name == 'preview_post':
+        v = result.get('variant', {})
+        return f"👁️ <b>معاينة {v.get('platform','')} ({v.get('char_count',0)}/{v.get('max_length',0)} حرف):</b>\n\n{v.get('content','')[:500]}"
+    elif action_name == 'contact_stats':
+        s = result.get('stats', {})
+        return f"""👥 <b>إحصائيات جهات الاتصال:</b>
+• الإجمالي: <b>{s.get('total',0)}</b>
+• تليجرام: <b>{s.get('telegram',0)}</b>
+• واتساب: <b>{s.get('whatsapp',0)}</b>
+• كلاهما: <b>{s.get('both',0)}</b>
+• تم الإرسال: <b>{s.get('messaged',0)}</b>
+• معلق: <b>{s.get('pending',0)}</b>"""
+    elif action_name == 'list_imports':
+        imports = result.get('imports', []); lines = [f"📥 <b>الاستيرادات ({len(imports)}):</b>"]
+        for i in imports[:10]:
+            lines.append(f"• {i.get('filename','')} — {i.get('total_contacts',0)} جهة ({i.get('telegram_contacts',0)} TG, {i.get('whatsapp_contacts',0)} WA)")
+        return '\n'.join(lines)
+    elif action_name == 'send_to_contacts':
+        return f"""📤 <b>تم إرسال الرسائل:</b>
+• تم الإرسال: <b>{result.get('queued',0)}</b>
+• تم تخطي (معدل): {result.get('skipped_rate_limit',0)}
+• تم تخطي (محتوى مكرر): {result.get('skipped_content_duplicate',0)}
+• المنصة: {result.get('platform','')}"""
+    elif action_name == 'anti_ban_status':
+        s = result.get('status', {}); l = result.get('limits', {})
+        return f"""🛡️ <b>حالة الحماية من الحظر:</b>
+• هذا الساعة: {s.get('hour_used',0)}/{s.get('hour_limit',0)}
+• اليوم: {s.get('day_used',0)}/{s.get('day_limit',0)}
+• الحد الأدنى للتأخير: {l.get('min_delay_seconds',0)} ثانية
+• الحد الأقصى للتأخير: {l.get('max_delay_seconds',0)} ثانية"""
+    elif action_name == 'anti_ban_log':
+        log = result.get('log', []); lines = [f"🛡️ <b>سجل الحماية ({len(log)}):</b>"]
+        for l in log[:10]:
+            status_emoji = '✅' if l.get('status') == 'sent' else '❌'
+            lines.append(f"• {status_emoji} {l.get('platform','')} — {l.get('delay_used',0)}s delay")
         return '\n'.join(lines)
     elif action_name == 'generate_post':
         if result.get('success'): return f"🤖 <b>البوست:</b>\n\n{result.get('text', '')}"

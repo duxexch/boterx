@@ -1051,12 +1051,14 @@ function rbac(perm) { return !Object.keys(_RBAC).length || !!_RBAC[perm]; }
     <!-- Input -->
     <div class="ai-input-wrap">
       <div class="ai-input-row">
+        <input type="file" id="aiFileInput" accept=".xlsx,.xls,.csv" @change="handleFileUpload($event)" style="display:none">
+        <button @click="document.getElementById('aiFileInput').click()" style="width:38px;height:38px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--dim);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px;transition:all .15s" title="رفع ملف اكسل">📎</button>
         <input class="ai-input" x-model="input" x-ref="chatIn" @keydown.enter.prevent="send()" :placeholder="'اكتب لـ '+activeAgent.name_ar+'...'" :disabled="typing">
         <button class="ai-send" @click="send()" :disabled="!input.trim()||typing">
           <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
         </button>
       </div>
-      <div class="ai-input-hint">💡 اضغط <code>⚡</code> للأوامر | اكتب <code>@الكاتب</code> للتحدث مع وكيل محدد</div>
+      <div class="ai-input-hint">💡 <code>⚡</code> الأوامر | <code>@الكاتب</code>وكيل | <code>📎</code> رفع ملف اكسل</div>
     </div>
   </div>
 </div>
@@ -1103,12 +1105,30 @@ function aiChat(){
         {label:'❌ رفض مطابقة',prompt:'رفض المطابقة'},
         {label:'⚖️ حل نزاع',prompt:'حل النزاع'},
       ]},
+      {icon:'📤',title:'المنشورات المتعددة',commands:[
+        {label:'📤 إنشاء منشور',prompt:'أنشئ منشور متعدد المنصات'},
+        {label:'📋 المنشورات المحفوظة',prompt:'اعرض المنشورات المحفوظة'},
+        {label:'👁️ معاينة لمنصة',prompt:'معاينة المنشور لتليجرام'},
+        {label:'🚀 نشر على منصة',prompt:'نشر المنشور على تليجرام'},
+        {label:'✈️ تنسيق تليجرام',prompt:'معاينة المحتوى لتليجرام'},
+        {label:'📱 تنسيق واتساب',prompt:'معاينة المحتوى لواتساب'},
+        {label:'📸 تنسيق إنستجرام',prompt:'معاينة المحتوى لإنستجرام'},
+        {label:'🐦 تنسيق تويتر',prompt:'معاينة المحتوى لتويتر'},
+      ]},
       {icon:'✍️',title:'المحتوى',commands:[
         {label:'✍️ اكتب بوست',prompt:'اكتب بوست ترحيبي'},
         {label:'🤖 توليد بالذكاء',prompt:'ولّد بوست عن'},
         {label:'📢 بث رسالة',prompt:'بث رسالة جماعية'},
         {label:'📋 طابور البث',prompt:'اعرض طابور البث'},
         {label:'🌐 ترجمة',prompt:'ترجم النص إلى الإنجليزية'},
+      ]},
+      {icon:'👥',title:'جهات الاتصال',commands:[
+        {label:'📥 استيراد جهات اتصال',prompt:'استيراد جهات اتصال من ملف اكسل'},
+        {label:'📋 عرض الاستيرادات',prompt:'اعرض الاستيرادات السابقة'},
+        {label:'📊 إحصائيات جهات الاتصال',prompt:'إحصائيات جهات الاتصال'},
+        {label:'📤 إرسال لجهات اتصال',prompt:'إرسال رسالة لجهات الاتصال من ملف'},
+        {label:'🛡️ حالة الحماية',prompt:'حالة الحماية من الحظر لتليجرام'},
+        {label:'📋 سجل الحماية',prompt:'سجل الحماية من الحظر'},
       ]},
       {icon:'🎫',title:'التذاكر',commands:[
         {label:'🎫 عرض التذاكر',prompt:'اعرض التذاكر المفتوحة'},
@@ -1182,7 +1202,28 @@ function aiChat(){
 
     async feedback(idx,rating){const msg=this.messages[idx];msg.feedback=rating;try{await fetch('/api/ai/assistant/feedback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message_id:msg.message_id,rating:rating,action_taken:msg.action_taken}),credentials:'same-origin'})}catch(e){}},
 
-    async sendCorrection(idx,msg){const text=this.corrections[idx];if(!text)return;try{await fetch('/api/ai/assistant/feedback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message_id:msg.message_id,rating:1,correction:text,action_taken:msg.action_taken}),credentials:'same-origin'});this.corrections[idx]='';msg.feedback=1;this.messages.push({role:'assistant',content:'✅ تم حفظ التصحيح.',agent_emoji:'🧠',agent_name:'System',agent_color:'#22c55e'});this.scroll()}catch(e){}}
+    async sendCorrection(idx,msg){const text=this.corrections[idx];if(!text)return;try{await fetch('/api/ai/assistant/feedback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message_id:msg.message_id,rating:1,correction:text,action_taken:msg.action_taken}),credentials:'same-origin'});this.corrections[idx]='';msg.feedback=1;this.messages.push({role:'assistant',content:'✅ تم حفظ التصحيح.',agent_emoji:'🧠',agent_name:'System',agent_color:'#22c55e'});this.scroll()}catch(e){}},
+
+    async handleFileUpload(event){
+      const file=event.target.files[0];if(!file)return;
+      this.messages.push({role:'user',content:'📎 جاري رفع الملف: '+file.name});
+      this.typing=true;this.scroll();
+      const formData=new FormData();formData.append('file',file);
+      try{
+        const r=await fetch('/api/contacts/import',{method:'POST',body:formData,credentials:'same-origin'});
+        const d=await r.json();
+        if(d.success){
+          this.messages.push({role:'assistant',content:'✅ <b>تم الاستيراد بنجاح!</b>\n\n• الملف: '+d.filename+'\n• الإجمالي: <b>'+d.total+'</b> جهة اتصال\n• تليجرام: <b>'+d.telegram+'</b>\n• واتساب: <b>'+d.whatsapp+'</b>\n• كلاهما: <b>'+d.both+'</b>\n\nمعرّف الاستيراد: <code>'+d.import_id+'</code>',
+            agent_emoji:'📥',agent_name:this.activeAgent.name_ar,agent_color:this.activeAgent.color});
+        }else{
+          this.messages.push({role:'assistant',content:'❌ خطأ: '+(d.error||'فشل الاستيراد'),agent_emoji:'❌',agent_name:'System',agent_color:'#ef4444'});
+        }
+      }catch(e){
+        this.messages.push({role:'assistant',content:'❌ خطأ في رفع الملف',agent_emoji:'❌',agent_name:'System',agent_color:'#ef4444'});
+      }
+      this.typing=false;this.scroll();
+      event.target.value='';
+    }
   };
 }
 </script>
