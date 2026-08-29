@@ -5843,6 +5843,136 @@ def api_browser_state_import(instance_id):
     return jsonify(import_browser_state(instance_id, data.get('state', {})))
 
 
+# ── File Upload/Download ─────────────────────────────────────
+
+@app.route('/api/browser/upload/<instance_id>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_upload(instance_id):
+    from browser_files import upload_file
+    data = request.json or {}
+    return jsonify(upload_file(instance_id, data.get('file_path', ''), data.get('selector', 'input[type="file"]')))
+
+
+@app.route('/api/browser/upload/<instance_id>/multi', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_upload_multi(instance_id):
+    from browser_files import upload_files
+    data = request.json or {}
+    return jsonify(upload_files(instance_id, data.get('file_paths', []), data.get('selector', 'input[type="file"]')))
+
+
+@app.route('/api/browser/upload/setup/<instance_id>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_upload_setup(instance_id):
+    from browser_files import setup_download_handler
+    return jsonify(setup_download_handler(instance_id))
+
+
+@app.route('/api/browser/uploads/list', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_uploads_list():
+    from browser_files import list_upload_files
+    return jsonify({'success': True, 'files': list_upload_files(), 'upload_dir': get_upload_dir()})
+
+
+@app.route('/api/browser/downloads', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_downloads_list():
+    from browser_files import list_downloads
+    iid = request.args.get('instance_id')
+    return jsonify({'success': True, 'downloads': list_downloads(iid)})
+
+
+@app.route('/api/browser/downloads/<did>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_download_delete(did):
+    from browser_files import delete_download
+    delete_download(int(did))
+    return jsonify({'success': True})
+
+
+# ── Mobile Emulation ─────────────────────────────────────────
+
+@app.route('/api/browser/devices', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_devices():
+    from browser_files import get_device_presets
+    return jsonify({'success': True, 'devices': get_device_presets()})
+
+
+@app.route('/api/browser/emulate/<instance_id>/<device>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_emulate(instance_id, device):
+    from browser_files import apply_device_preset
+    return jsonify(apply_device_preset(instance_id, device))
+
+
+@app.route('/api/browser/responsive-test/<instance_id>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_responsive_test(instance_id):
+    from browser_files import responsive_test
+    data = request.json or {}
+    return jsonify(responsive_test(instance_id, data.get('url', ''), data.get('devices')))
+
+
+# ── Task Queue ───────────────────────────────────────────────
+
+@app.route('/api/browser/queues', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_queues_list():
+    from browser_files import task_queue
+    return jsonify({'success': True, 'queues': task_queue.list_queues()})
+
+
+@app.route('/api/browser/queues', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_queue_create():
+    from browser_files import task_queue
+    data = request.json or {}
+    qid = task_queue.create_queue(data.get('name', ''), data.get('tasks', []))
+    return jsonify({'success': True, 'queue_id': qid})
+
+
+@app.route('/api/browser/queues/<qid>/start', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_queue_start(qid):
+    from browser_files import task_queue
+    data = request.json or {}
+    return jsonify(task_queue.start_queue(int(qid), data.get('instance_id', '')))
+
+
+@app.route('/api/browser/queues/<qid>', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_queue_get(qid):
+    from browser_files import task_queue
+    q = task_queue.get_queue(int(qid))
+    if not q:
+        return jsonify({'success': False, 'error': 'Not found'}), 404
+    return jsonify({'success': True, 'queue': q})
+
+
+@app.route('/api/browser/queues/<qid>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_queue_delete(qid):
+    from browser_files import task_queue
+    task_queue.delete_queue(int(qid))
+    return jsonify({'success': True})
+
+
 # ── Instance CRUD ────────────────────────────────────────────
 
 @app.route('/api/browser/instances', methods=['GET'])
