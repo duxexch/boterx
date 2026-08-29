@@ -5973,6 +5973,207 @@ def api_browser_queue_delete(qid):
     return jsonify({'success': True})
 
 
+# ── User Agent Rotation ──────────────────────────────────────
+
+@app.route('/api/browser/user-agents', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_user_agents():
+    from browser_spoof import get_all_user_agents
+    return jsonify({'success': True, 'agents': get_all_user_agents()})
+
+
+@app.route('/api/browser/user-agents/random', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_user_agent_random():
+    from browser_spoof import get_random_ua
+    platform = request.args.get('platform')
+    browser = request.args.get('browser')
+    return jsonify({'success': True, 'user_agent': get_random_ua(platform, browser)})
+
+
+@app.route('/api/browser/rotate-ua/<instance_id>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_rotate_ua(instance_id):
+    from browser_spoof import rotate_user_agent
+    return jsonify(rotate_user_agent(instance_id))
+
+
+# ── Screen/WebGL/Canvas Spoofing ─────────────────────────────
+
+@app.route('/api/browser/spoof/<instance_id>/screen', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_spoof_screen(instance_id):
+    from browser_manager import get_instance
+    from browser_spoof import get_spoof_screen_js
+    inst = get_instance(instance_id)
+    if not inst or not inst.page:
+        return jsonify({'success': False, 'error': 'Browser not running'}), 400
+    try:
+        r = inst.page.evaluate(get_spoof_screen_js())
+        return jsonify({'success': True, 'result': r})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/browser/spoof/<instance_id>/webgl', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_spoof_webgl(instance_id):
+    from browser_manager import get_instance
+    from browser_spoof import get_spoof_webgl_js
+    inst = get_instance(instance_id)
+    if not inst or not inst.page:
+        return jsonify({'success': False, 'error': 'Browser not running'}), 400
+    try:
+        r = inst.page.evaluate(get_spoof_webgl_js())
+        return jsonify({'success': True, 'result': r})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/browser/spoof/<instance_id>/canvas', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_spoof_canvas(instance_id):
+    from browser_manager import get_instance
+    from browser_spoof import get_spoof_canvas_js
+    inst = get_instance(instance_id)
+    if not inst or not inst.page:
+        return jsonify({'success': False, 'error': 'Browser not running'}), 400
+    try:
+        r = inst.page.evaluate(get_spoof_canvas_js())
+        return jsonify({'success': True, 'result': r})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/browser/spoof/<instance_id>/all', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_spoof_all(instance_id):
+    from browser_spoof import apply_full_anti_detection
+    return jsonify(apply_full_anti_detection(instance_id))
+
+
+# ── Drag & Drop ──────────────────────────────────────────────
+
+@app.route('/api/browser/drag-drop/<instance_id>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_drag_drop(instance_id):
+    from browser_spoof import simulate_drag_drop
+    data = request.json or {}
+    return jsonify(simulate_drag_drop(instance_id, data.get('source', ''), data.get('target', '')))
+
+
+@app.route('/api/browser/file-drop/<instance_id>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_file_drop(instance_id):
+    from browser_spoof import simulate_file_drop
+    data = request.json or {}
+    return jsonify(simulate_file_drop(instance_id, data.get('file_path', ''), data.get('target', '')))
+
+
+# ── Keyboard Shortcuts ───────────────────────────────────────
+
+@app.route('/api/browser/shortcuts', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_shortcuts_list():
+    from browser_spoof import get_all_shortcuts
+    return jsonify({'success': True, 'shortcuts': get_all_shortcuts()})
+
+
+@app.route('/api/browser/shortcut/<instance_id>/<name>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_shortcut_press(instance_id, name):
+    from browser_spoof import press_shortcut
+    return jsonify(press_shortcut(instance_id, name))
+
+
+@app.route('/api/browser/key/<instance_id>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_key_press(instance_id):
+    from browser_spoof import press_key
+    data = request.json or {}
+    return jsonify(press_key(instance_id, data.get('key', ''), data.get('modifiers')))
+
+
+@app.route('/api/browser/type/<instance_id>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_type_text(instance_id):
+    from browser_spoof import type_shortcut
+    data = request.json or {}
+    return jsonify(type_shortcut(instance_id, data.get('text', ''), data.get('delay', 50)))
+
+
+# ── Iframe Handling ──────────────────────────────────────────
+
+@app.route('/api/browser/iframes/<instance_id>', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_iframes(instance_id):
+    from browser_spoof import list_iframes
+    return jsonify(list_iframes(instance_id))
+
+
+@app.route('/api/browser/iframe/<instance_id>/switch', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_iframe_switch(instance_id):
+    from browser_spoof import switch_to_frame
+    data = request.json or {}
+    return jsonify(switch_to_frame(instance_id, data.get('index', 0), data.get('name', '')))
+
+
+@app.route('/api/browser/iframe/<instance_id>/main', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_iframe_main(instance_id):
+    from browser_spoof import switch_to_main_frame
+    return jsonify(switch_to_main_frame(instance_id))
+
+
+# ── Shadow DOM ───────────────────────────────────────────────
+
+@app.route('/api/browser/shadow/<instance_id>/query', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_shadow_query(instance_id):
+    from browser_spoof import query_shadow_dom
+    data = request.json or {}
+    return jsonify(query_shadow_dom(instance_id, data.get('host', ''), data.get('inner', '')))
+
+
+@app.route('/api/browser/shadow/<instance_id>/click', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_shadow_click(instance_id):
+    from browser_spoof import click_shadow_dom
+    data = request.json or {}
+    return jsonify(click_shadow_dom(instance_id, data.get('host', ''), data.get('inner', '')))
+
+
+# ── Media Devices ────────────────────────────────────────────
+
+@app.route('/api/browser/media/<instance_id>/emulate', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_media_emulate(instance_id):
+    from browser_spoof import emulate_media_devices
+    data = request.json or {}
+    return jsonify(emulate_media_devices(instance_id, data.get('camera', 1),
+                                          data.get('microphone', 1), data.get('speaker', 1)))
+
+
 # ── Instance CRUD ────────────────────────────────────────────
 
 @app.route('/api/browser/instances', methods=['GET'])
