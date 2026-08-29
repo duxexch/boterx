@@ -213,19 +213,124 @@ main, .main-content { background-color: var(--bg-primary) !important; }
 /* ===== Toast Container ===== */
 #toastContainer { position: fixed; top: 0; inset-inline-end: 0; z-index: 9999; pointer-events: none; }
 
-/* ===== Light-mode contrast fixes ===== */
-body.light-mode .bg-slate-800\/80, body.light-mode .bg-slate-800\/50,
-body.light-mode .bg-slate-800\/30 { background-color: var(--bg-card) !important; }
-body.light-mode .bg-slate-700, body.light-mode .bg-slate-700\/50,
-body.light-mode .bg-slate-700\/40, body.light-mode .bg-slate-700\/30 { background-color: var(--bg-input) !important; }
-body.light-mode .bg-slate-900 { background-color: var(--bg-primary) !important; }
-body.light-mode .hover\:bg-slate-700:hover, body.light-mode .hover\:bg-slate-600:hover,
-body.light-mode .hover\:bg-slate-700\/50:hover, body.light-mode .hover\:bg-slate-700\/30:hover { background-color: #e2e8f0 !important; }
-body.light-mode .bg-slate-600 { background-color: #cbd5e1 !important; }
-body.light-mode .text-slate-100, body.light-mode .text-slate-200,
-body.light-mode .text-white { color: var(--text-primary) !important; }
-body.light-mode .bg-black\/70, body.light-mode .bg-black\/60 { background-color: rgba(15,23,42,.45) !important; }
-body.light-mode kbd { background-color: #e2e8f0 !important; color: #334155 !important; }
+/* ===== Light-Mode: Comprehensive Tailwind Slate Overrides ===== */
+/* Base rules (lines 46-54) use CSS vars for standard classes.
+   These cover ALL remaining opacity-modified and hover variants
+   so every template works in light mode without per-file changes. */
+
+/* --- Backgrounds: opacity-modified slate cards/panels --- */
+body.light-mode .bg-slate-800, body.light-mode .bg-slate-800\/80, body.light-mode .bg-slate-800\/70,
+body.light-mode .bg-slate-800\/60, body.light-mode .bg-slate-800\/50, body.light-mode .bg-slate-800\/40,
+body.light-mode .bg-slate-800\/30, body.light-mode .bg-slate-800\/20, body.light-mode .bg-slate-800\/10 {
+    background-color: var(--bg-card) !important;
+}
+body.light-mode .bg-slate-700, body.light-mode .bg-slate-700\/80, body.light-mode .bg-slate-700\/70,
+body.light-mode .bg-slate-700\/60, body.light-mode .bg-slate-700\/50, body.light-mode .bg-slate-700\/40,
+body.light-mode .bg-slate-700\/30, body.light-mode .bg-slate-700\/20 {
+    background-color: var(--bg-input) !important;
+}
+body.light-mode .bg-slate-600, body.light-mode .bg-slate-600\/80, body.light-mode .bg-slate-600\/50 {
+    background-color: #e2e8f0 !important;
+}
+body.light-mode .bg-slate-900, body.light-mode .bg-slate-900\/80, body.light-mode .bg-slate-900\/70,
+body.light-mode .bg-slate-900\/60, body.light-mode .bg-slate-900\/50, body.light-mode .bg-slate-900\/40,
+body.light-mode .bg-slate-900\/30 {
+    background-color: var(--bg-primary) !important;
+}
+body.light-mode .bg-slate-500, body.light-mode .bg-slate-500\/80, body.light-mode .bg-slate-500\/50 {
+    background-color: #94a3b8 !important;
+}
+
+/* --- Hover backgrounds --- */
+body.light-mode .hover\:bg-slate-800:hover, body.light-mode .hover\:bg-slate-800\/50:hover,
+body.light-mode .hover\:bg-slate-800\/30:hover {
+    background-color: #e2e8f0 !important;
+}
+body.light-mode .hover\:bg-slate-700:hover, body.light-mode .hover\:bg-slate-700\/80:hover,
+body.light-mode .hover\:bg-slate-700\/60:hover, body.light-mode .hover\:bg-slate-700\/50:hover,
+body.light-mode .hover\:bg-slate-700\/40:hover, body.light-mode .hover\:bg-slate-700\/30:hover {
+    background-color: #e2e8f0 !important;
+}
+body.light-mode .hover\:bg-slate-600:hover, body.light-mode .hover\:bg-slate-600\/50:hover {
+    background-color: #cbd5e1 !important;
+}
+
+/* --- Active backgrounds --- */
+body.light-mode .active\:bg-slate-700:active, body.light-mode .active\:bg-slate-700\/50:active {
+    background-color: #cbd5e1 !important;
+}
+
+/* --- Borders --- */
+body.light-mode .border-slate-800, body.light-mode .border-slate-800\/50 { border-color: var(--border-color) !important; }
+body.light-mode .border-slate-700, body.light-mode .border-slate-700\/50, body.light-mode .border-slate-700\/30 {
+    border-color: var(--border-color) !important;
+}
+body.light-mode .border-slate-600, body.light-mode .border-slate-600\/50 { border-color: var(--border-color) !important; }
+body.light-mode .divide-slate-700 > * + * { border-color: var(--border-color) !important; }
+body.light-mode .divide-slate-800 > * + * { border-color: var(--border-color) !important; }
+body.light-mode .ring-slate-700, body.light-mode .ring-slate-600, body.light-mode .ring-slate-800 {
+    --tw-ring-color: var(--border-color) !important;
+}
+
+/* --- Text colors --- */
+body.light-mode .text-slate-100, body.light-mode .text-slate-200, body.light-mode .text-white {
+    color: var(--text-primary) !important;
+}
+body.light-mode .text-slate-300, body.light-mode .text-slate-300\/80 { color: var(--text-primary) !important; }
+body.light-mode .text-slate-400, body.light-mode .text-slate-400\/80, body.light-mode .text-slate-400\/70 {
+    color: var(--text-secondary) !important;
+}
+body.light-mode .text-slate-500, body.light-mode .text-slate-500\/80, body.light-mode .text-slate-600 {
+    color: var(--text-muted) !important;
+}
+
+/* --- Modal overlays (keep dark for contrast) --- */
+body.light-mode .bg-black\/70, body.light-mode .bg-black\/60, body.light-mode .bg-black\/50 {
+    background-color: rgba(15,23,42,.4) !important;
+}
+
+/* --- Focus ring --- */
+body.light-mode .focus\:ring-slate-700:focus { --tw-ring-color: var(--border-color) !important; }
+
+/* --- Scrollbar (keep readable in light) --- */
+body.light-mode ::-webkit-scrollbar-track { background: var(--bg-input); }
+body.light-mode ::-webkit-scrollbar-thumb { background: #94a3b8; }
+body.light-mode ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
+/* --- Sidebar in light mode --- */
+body.light-mode aside.bg-slate-800, body.light-mode aside { background-color: var(--bg-secondary) !important; }
+body.light-mode aside .border-slate-700, body.light-mode aside .border-slate-800 {
+    border-color: var(--border-color) !important;
+}
+
+/* --- Tables in light mode --- */
+body.light-mode .bg-slate-800\/80, body.light-mode .bg-slate-800 { background-color: var(--bg-card) !important; }
+body.light-mode tr.border-b { border-color: var(--border-color) !important; }
+body.light-mode tr:hover { background-color: rgba(59, 130, 246, 0.06) !important; }
+
+/* --- kbd, code inline --- */
+body.light-mode kbd { background-color: var(--bg-input) !important; color: var(--text-secondary) !important; border-color: var(--border-color) !important; }
+
+/* --- Tags / chips --- */
+body.light-mode .bg-blue-500\/20 { background-color: rgba(59,130,246,.12) !important; }
+body.light-mode .bg-green-500\/20 { background-color: rgba(34,197,94,.12) !important; }
+body.light-mode .bg-amber-500\/20 { background-color: rgba(245,158,11,.12) !important; }
+body.light-mode .bg-red-500\/20 { background-color: rgba(239,68,68,.12) !important; }
+body.light-mode .bg-purple-500\/20 { background-color: rgba(168,85,247,.12) !important; }
+body.light-mode .bg-cyan-500\/20 { background-color: rgba(6,182,212,.12) !important; }
+body.light-mode .bg-pink-500\/20 { background-color: rgba(236,72,153,.12) !important; }
+body.light-mode .bg-emerald-500\/20 { background-color: rgba(16,185,129,.12) !important; }
+
+/* --- Specific Tailwind text color overrides for light mode --- */
+body.light-mode .text-emerald-400 { color: var(--accent-green) !important; }
+body.light-mode .text-emerald-500 { color: var(--accent-green) !important; }
+body.light-mode .text-blue-400 { color: var(--accent-blue) !important; }
+body.light-mode .text-green-400 { color: var(--accent-green) !important; }
+body.light-mode .text-amber-400 { color: var(--accent-gold) !important; }
+body.light-mode .text-red-400 { color: var(--accent-red) !important; }
+body.light-mode .text-purple-400 { color: var(--accent-purple) !important; }
+body.light-mode .text-pink-400 { color: var(--accent-pink) !important; }
+body.light-mode .text-cyan-400 { color: var(--accent-cyan) !important; }
 
 /* ================================================================
    RESPONSIVE DESIGN — Mobile-First Breakpoints

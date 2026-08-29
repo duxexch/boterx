@@ -1,71 +1,80 @@
 {% extends "base.html" %}
-{% block title %}إدارة الأدمن - Boterx{% endblock %}
-{% block page_title %}إدارة الأدمن{% endblock %}
+{% block title %}إدارة الأدمن - VEX{% endblock %}
+{% block page_title %}إدارة المسؤولين{% endblock %}
 
 {% block content %}
 <div x-data="adminManagementPage()" x-init="init()">
+
     <!-- Header -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-            <h2 class="text-xl font-bold" data-i18n="manage_admins">Manage Administrators</h2>
-            <p class="text-sm text-slate-400 mt-1" data-i18n="admin_management_desc">Add, remove, and edit admin permissions</p>
+            <h2 class="text-xl font-bold text-bright">إدارة المسؤولين</h2>
+            <p class="text-sm text-dim mt-1">إضافة وحذف وتعديل صلاحيات المسؤولين</p>
         </div>
         {% if not admin_perms or admin_perms.get('manage_admins') %}
         <button @click="openAddModal()"
-            class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition flex items-center gap-2 self-start">
+            class="btn btn-primary self-start gap-2">
             <i class="fas fa-user-plus"></i> إضافة مسؤول
         </button>
         {% endif %}
     </div>
 
-    <!-- Stats -->
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
-            <div class="flex items-center gap-2 mb-1">
-                <i class="fas fa-users-cog text-blue-400"></i>
-                <p class="text-xs text-slate-400">إجمالي المسؤولين</p>
+            <div class="flex items-center gap-2 mb-2">
+                <div class="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                    <i class="fas fa-users-cog text-blue-400 text-sm"></i>
+                </div>
+                <p class="text-xs text-dim">إجمالي المسؤولين</p>
             </div>
-            <p class="text-2xl font-bold mt-1" x-text="fmtNum(stats.total)"></p>
+            <p class="text-2xl font-bold text-bright" x-text="fmtNum(stats.total)"></p>
         </div>
         <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
-            <div class="flex items-center gap-2 mb-1">
-                <i class="fas fa-user-shield text-green-400"></i>
-                <p class="text-xs text-slate-400" data-i18n="permanent">Permanent</p>
+            <div class="flex items-center gap-2 mb-2">
+                <div class="w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center">
+                    <i class="fas fa-user-shield text-green-400 text-sm"></i>
+                </div>
+                <p class="text-xs text-dim">دائمون</p>
             </div>
-            <p class="text-2xl font-bold text-green-400 mt-1" x-text="fmtNum(stats.permanent)"></p>
+            <p class="text-2xl font-bold text-success" x-text="fmtNum(stats.permanent)"></p>
         </div>
         <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
-            <div class="flex items-center gap-2 mb-1">
-                <i class="fas fa-user-clock text-amber-400"></i>
-                <p class="text-xs text-slate-400" data-i18n="temporary">Temporary</p>
+            <div class="flex items-center gap-2 mb-2">
+                <div class="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center">
+                    <i class="fas fa-user-clock text-amber-400 text-sm"></i>
+                </div>
+                <p class="text-xs text-dim">مؤقتون</p>
             </div>
-            <p class="text-2xl font-bold text-amber-400 mt-1" x-text="fmtNum(stats.temp)"></p>
+            <p class="text-2xl font-bold text-warning" x-text="fmtNum(stats.temp)"></p>
         </div>
         <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
-            <div class="flex items-center gap-2 mb-1">
-                <i class="fas fa-key text-purple-400"></i>
-                <p class="text-xs text-slate-400" data-i18n="full_access">Full Access</p>
+            <div class="flex items-center gap-2 mb-2">
+                <div class="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center">
+                    <i class="fas fa-key text-purple-400 text-sm"></i>
+                </div>
+                <p class="text-xs text-dim">صلاحية كاملة</p>
             </div>
-            <p class="text-2xl font-bold text-purple-400 mt-1" x-text="fmtNum(stats.byRole.full)"></p>
+            <p class="text-2xl font-bold text-info" x-text="fmtNum(stats.byRole.full)"></p>
         </div>
     </div>
 
-    <!-- Role breakdown mini-cards -->
+    <!-- Role Breakdown -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         <div class="bg-slate-800/60 rounded-lg p-3 border border-slate-700/50 flex items-center justify-between">
-            <span class="text-sm text-slate-300" data-i18n="full_permission">Full Permission</span>
-            <span class="text-lg font-bold text-blue-400" x-text="fmtNum(stats.byRole.full)"></span>
+            <span class="text-sm text-dim">صلاحية كاملة</span>
+            <span class="text-lg font-bold text-info" x-text="fmtNum(stats.byRole.full)"></span>
         </div>
         <div class="bg-slate-800/60 rounded-lg p-3 border border-slate-700/50 flex items-center justify-between">
-            <span class="text-sm text-slate-300" data-i18n="transactions_label">Transactions</span>
-            <span class="text-lg font-bold text-amber-400" x-text="fmtNum(stats.byRole.transactions)"></span>
+            <span class="text-sm text-dim">المعاملات</span>
+            <span class="text-lg font-bold text-warning" x-text="fmtNum(stats.byRole.transactions)"></span>
         </div>
         <div class="bg-slate-800/60 rounded-lg p-3 border border-slate-700/50 flex items-center justify-between">
-            <span class="text-sm text-slate-300" data-i18n="support">Support</span>
-            <span class="text-lg font-bold text-green-400" x-text="fmtNum(stats.byRole.support)"></span>
+            <span class="text-sm text-dim">الدعم</span>
+            <span class="text-lg font-bold text-success" x-text="fmtNum(stats.byRole.support)"></span>
         </div>
         <div class="bg-slate-800/60 rounded-lg p-3 border border-slate-700/50 flex items-center justify-between">
-            <span class="text-sm text-slate-300" data-i18n="companies">Companies</span>
+            <span class="text-sm text-dim">الشركات</span>
             <span class="text-lg font-bold text-purple-400" x-text="fmtNum(stats.byRole.companies)"></span>
         </div>
     </div>
@@ -76,38 +85,42 @@
             <table class="w-full text-sm">
                 <thead>
                     <tr class="border-b border-slate-700 bg-slate-800/80">
-                        <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="telegram_id">Telegram ID</th>
-                        <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="name">Name</th>
-                        <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="role">Role</th>
-                        <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="type">Type</th>
-                        <th class="text-right px-4 py-3 font-semibold text-slate-400" data-i18n="expiry_date">Expiry Date</th>
-                        <th class="text-right px-4 py-3 font-semibold text-slate-400">الإجراءات</th>
+                        <th class="text-right px-4 py-3 font-semibold text-dim">معرف تيليجرام</th>
+                        <th class="text-right px-4 py-3 font-semibold text-dim">الاسم</th>
+                        <th class="text-right px-4 py-3 font-semibold text-dim">الدور</th>
+                        <th class="text-right px-4 py-3 font-semibold text-dim">النوع</th>
+                        <th class="text-right px-4 py-3 font-semibold text-dim">تاريخ الانتهاء</th>
+                        <th class="text-right px-4 py-3 font-semibold text-dim">الإجراءات</th>
                     </tr>
                 </thead>
                 <tbody>
                     <template x-for="a in admins" :key="a.telegram_id">
-                        <tr class="border-b border-slate-700/50 hover:bg-slate-700/30 transition">
-                            <td class="px-4 py-3 font-mono text-xs" x-text="a.telegram_id"></td>
-                            <td class="px-4 py-3 font-medium" x-text="a.name || '—'"></td>
+                        <tr class="border-b border-slate-700/50 transition">
+                            <td class="px-4 py-3 font-mono text-xs text-bright" x-text="a.telegram_id"></td>
+                            <td class="px-4 py-3 font-medium text-bright" x-text="a.name || '—'"></td>
                             <td class="px-4 py-3">
-                                <span class="px-2 py-1 rounded-full text-xs font-semibold"
+                                <span class="px-2.5 py-1 rounded-full text-xs font-semibold"
                                     :class="roleBadgeClass(a.role)" x-text="roleLabel(a.role)"></span>
                             </td>
                             <td class="px-4 py-3">
-                                <span class="px-2 py-1 rounded-full text-xs font-semibold"
+                                <span class="px-2.5 py-1 rounded-full text-xs font-semibold"
                                     :class="a.type === 'permanent' ? 'bg-green-500/20 text-green-400' : 'bg-amber-500/20 text-amber-400'"
                                     x-text="a.type === 'permanent' ? 'دائم' : 'مؤقت'"></span>
                             </td>
-                            <td class="px-4 py-3 text-slate-300">
-                                <span x-show="a.expiry" x-text="a.expiry"></span>
-                                <span x-show="!a.expiry" class="text-slate-500">—</span>
+                            <td class="px-4 py-3 text-dim">
+                                <span x-show="a.expiry" x-text="a.expiry" class="text-bright"></span>
+                                <span x-show="!a.expiry" class="text-dim">—</span>
                             </td>
                             <td class="px-4 py-3">
                                 <div class="flex items-center gap-1" x-show="rbac('manage_admins')">
-                                    <button @click="openRoleModal(a)" class="p-1.5 rounded hover:bg-slate-600 text-slate-400 hover:text-blue-400 transition" title="Assign Role" data-i18n-title="assign_role">
+                                    <button @click="openRoleModal(a)"
+                                        class="p-2 rounded-lg hover:bg-slate-700/50 text-dim hover:text-blue-400 transition"
+                                        title="تعيين دور">
                                         <i class="fas fa-key text-sm"></i>
                                     </button>
-                                    <button @click="confirmRemove(a)" class="p-1.5 rounded hover:bg-slate-600 text-slate-400 hover:text-red-400 transition" title="Remove" data-i18n-title="remove">
+                                    <button @click="confirmRemove(a)"
+                                        class="p-2 rounded-lg hover:bg-slate-700/50 text-dim hover:text-red-400 transition"
+                                        title="إزالة">
                                         <i class="fas fa-user-minus text-sm"></i>
                                     </button>
                                 </div>
@@ -115,9 +128,9 @@
                         </tr>
                     </template>
                     <tr x-show="admins.length === 0">
-                        <td colspan="6" class="px-4 py-8 text-center text-slate-500">
-                            <i class="fas fa-user-shield text-3xl mb-2 block"></i>
-                            لا يوجد مسؤولون بعد
+                        <td colspan="6" class="px-4 py-12 text-center text-dim">
+                            <i class="fas fa-user-shield text-4xl mb-3 block opacity-30"></i>
+                            <p class="text-sm">لا يوجد مسؤولون بعد</p>
                         </td>
                     </tr>
                 </tbody>
@@ -129,44 +142,53 @@
     <div x-show="showAddModal" x-transition.opacity class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" style="display:none" @click.self="showAddModal = false">
         <div class="bg-slate-800 rounded-2xl border border-slate-700 w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl" @click.stop="">
             <div class="flex items-center justify-between p-5 border-b border-slate-700">
-                <h3 class="text-lg font-bold" data-i18n="add_new_admin">Add New Admin</h3>
-                <button @click="showAddModal = false" class="text-slate-400 hover:text-white transition">
+                <h3 class="text-lg font-bold text-bright">إضافة مسؤول جديد</h3>
+                <button @click="showAddModal = false" class="text-dim hover:text-bright transition p-1">
                     <i class="fas fa-times text-lg"></i>
                 </button>
             </div>
             <form @submit.prevent="addAdmin()" class="p-5 space-y-4">
                 <div>
-                    <label class="block text-sm text-slate-400 mb-1">معرف تيليجرام <span class="text-red-400">*</span></label>
-                    <input x-model="addForm.telegram_id" required type="text" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="123456789">
+                    <label class="block text-sm text-dim mb-1.5">معرف تيليجرام <span class="text-red-400">*</span></label>
+                    <input x-model="addForm.telegram_id" required type="text"
+                        class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-bright"
+                        placeholder="123456789">
                 </div>
                 <div>
-                    <label class="block text-sm text-slate-400 mb-1" data-i18n="name">Name</label>
-                    <input x-model="addForm.name" type="text" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Admin Name" data-i18n-placeholder="admin_name">
+                    <label class="block text-sm text-dim mb-1.5">الاسم</label>
+                    <input x-model="addForm.name" type="text"
+                        class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-bright"
+                        placeholder="اسم المسؤول">
                 </div>
                 <div>
-                    <label class="block text-sm text-slate-400 mb-1">الدور <span class="text-red-400">*</span></label>
-                    <select x-model="addForm.role" required class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="full" data-i18n="full_permission">Full Permission</option>
-                        <option value="transactions" data-i18n="transactions_label">Transactions</option>
-                        <option value="support" data-i18n="support">Support</option>
-                        <option value="companies" data-i18n="companies">Companies</option>
+                    <label class="block text-sm text-dim mb-1.5">الدور <span class="text-red-400">*</span></label>
+                    <select x-model="addForm.role" required
+                        class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-bright">
+                        <option value="full">صلاحية كاملة</option>
+                        <option value="transactions">المعاملات</option>
+                        <option value="support">الدعم</option>
+                        <option value="companies">الشركات</option>
                     </select>
                 </div>
                 <div>
-                    <label class="block text-sm text-slate-400 mb-1" data-i18n="type">Type</label>
-                    <select x-model="addForm.type" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" @change="onTypeChange()">
-                        <option value="permanent" data-i18n="permanent">Permanent</option>
-                        <option value="temp" data-i18n="temporary">Temporary</option>
+                    <label class="block text-sm text-dim mb-1.5">النوع</label>
+                    <select x-model="addForm.type"
+                        class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-bright"
+                        @change="onTypeChange()">
+                        <option value="permanent">دائم</option>
+                        <option value="temp">مؤقت</option>
                     </select>
                 </div>
                 <div x-show="addForm.type === 'temp'" x-transition>
-                    <label class="block text-sm text-slate-400 mb-1" data-i18n="duration_hours">Duration (hours)</label>
-                    <input x-model="addForm.duration_hours" type="number" min="1" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="24">
-                    <p class="text-xs text-slate-500 mt-1" data-i18n="leave_empty_permanent">Leave empty for permanent</p>
+                    <label class="block text-sm text-dim mb-1.5">المدة (ساعات)</label>
+                    <input x-model="addForm.duration_hours" type="number" min="1"
+                        class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-bright"
+                        placeholder="24">
+                    <p class="text-xs text-dim mt-1">اتركه فارغاً للدائم</p>
                 </div>
                 <div class="flex gap-3 pt-2">
-                    <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg text-sm font-semibold transition" data-i18n="add">Add</button>
-                    <button type="button" @click="showAddModal = false" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-lg text-sm transition" data-i18n="cancel">Cancel</button>
+                    <button type="submit" class="flex-1 btn btn-primary" data-i18n="add">إضافة</button>
+                    <button type="button" @click="showAddModal = false" class="flex-1 btn btn-secondary" data-i18n="cancel">إلغاء</button>
                 </div>
             </form>
         </div>
@@ -176,27 +198,28 @@
     <div x-show="showRoleModal" x-transition.opacity class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" style="display:none" @click.self="showRoleModal = false">
         <div class="bg-slate-800 rounded-2xl border border-slate-700 w-full max-w-sm shadow-2xl" @click.stop="">
             <div class="flex items-center justify-between p-5 border-b border-slate-700">
-                <h3 class="text-lg font-bold" data-i18n="assign_role">Assign Role</h3>
-                <button @click="showRoleModal = false" class="text-slate-400 hover:text-white transition">
+                <h3 class="text-lg font-bold text-bright">تعيين دور</h3>
+                <button @click="showRoleModal = false" class="text-dim hover:text-bright transition p-1">
                     <i class="fas fa-times text-lg"></i>
                 </button>
             </div>
             <form @submit.prevent="setRole()" class="p-5 space-y-4">
-                <div class="text-sm text-slate-300">
-                    <p>المسؤول: <span class="font-semibold" x-text="roleTarget?.name || roleTarget?.telegram_id"></span></p>
+                <div class="text-sm">
+                    <p class="text-dim">المسؤول: <span class="font-semibold text-bright" x-text="roleTarget?.name || roleTarget?.telegram_id"></span></p>
                 </div>
                 <div>
-                    <label class="block text-sm text-slate-400 mb-1" data-i18n="new_role">New Role</label>
-                    <select x-model="roleForm.role" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="full" data-i18n="full_permission">Full Permission</option>
-                        <option value="transactions" data-i18n="transactions_label">Transactions</option>
-                        <option value="support" data-i18n="support">Support</option>
-                        <option value="companies" data-i18n="companies">Companies</option>
+                    <label class="block text-sm text-dim mb-1.5">الدور الجديد</label>
+                    <select x-model="roleForm.role"
+                        class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-bright">
+                        <option value="full">صلاحية كاملة</option>
+                        <option value="transactions">المعاملات</option>
+                        <option value="support">الدعم</option>
+                        <option value="companies">الشركات</option>
                     </select>
                 </div>
                 <div class="flex gap-3 pt-2">
-                    <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg text-sm font-semibold transition" data-i18n="save">Save</button>
-                    <button type="button" @click="showRoleModal = false" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-lg text-sm transition" data-i18n="cancel">Cancel</button>
+                    <button type="submit" class="flex-1 btn btn-primary" data-i18n="save">حفظ</button>
+                    <button type="button" @click="showRoleModal = false" class="flex-1 btn btn-secondary" data-i18n="cancel">إلغاء</button>
                 </div>
             </form>
         </div>
@@ -209,22 +232,22 @@
                 <div class="w-14 h-14 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4">
                     <i class="fas fa-user-minus text-red-400 text-2xl"></i>
                 </div>
-                <h3 class="text-lg font-bold mb-2" data-i18n="confirm_removal">Confirm Removal</h3>
-                <p class="text-sm text-slate-400">هل أنت متأكد من إزالة "<span class="text-white font-semibold" x-text="removeTarget?.name || removeTarget?.telegram_id"></span>" من المسؤولين؟</p>
-                <p class="text-xs text-red-400 mt-2" data-i18n="permissions_revoked">All permissions will be revoked immediately.</p>
+                <h3 class="text-lg font-bold mb-2 text-bright">تأكيد الإزالة</h3>
+                <p class="text-sm text-dim">هل أنت متأكد من إزالة "<span class="text-bright font-semibold" x-text="removeTarget?.name || removeTarget?.telegram_id"></span>" من المسؤولين؟</p>
+                <p class="text-xs text-red-400 mt-2">جميع الصلاحيات ستُلغى فوراً.</p>
                 <div class="flex gap-3 mt-6">
-                    <button @click="removeAdmin()" class="flex-1 bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-lg text-sm font-semibold transition" data-i18n="remove">Remove</button>
-                    <button @click="showRemoveModal = false" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-lg text-sm transition" data-i18n="cancel">Cancel</button>
+                    <button @click="removeAdmin()" class="flex-1 btn btn-danger" data-i18n="remove">إزالة</button>
+                    <button @click="showRemoveModal = false" class="flex-1 btn btn-secondary" data-i18n="cancel">إلغاء</button>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Loading overlay -->
-    <div x-show="loading" class="fixed inset-0 bg-slate-900/50 z-40 flex items-center justify-center" style="display:none">
-        <div class="bg-slate-800 rounded-xl p-4 flex items-center gap-3">
+    <div x-show="loading" class="fixed inset-0 bg-black/50 z-40 flex items-center justify-center" style="display:none">
+        <div class="bg-slate-800 rounded-xl p-4 flex items-center gap-3 border border-slate-700">
             <img src="/static/icons/logo-full.png" alt="" class="vex-loader-logo">
-            <span class="text-sm" data-i18n="loading">Loading...</span>
+            <span class="text-sm text-bright">جاري التحميل...</span>
         </div>
     </div>
 </div>
