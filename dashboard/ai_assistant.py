@@ -43,6 +43,7 @@ AGENTS = {
                     'import_contacts', 'list_imports', 'contact_stats', 'send_to_contacts',
                     'anti_ban_status', 'anti_ban_log',
                     'list_relays', 'relay_status', 'preview_relay', 'relay_log', 'relay_stats',
+                    'browser_list', 'browser_open', 'browser_screenshot', 'browser_status',
                     'list_campaigns', 'campaign_stats', 'list_companies', 'company_detail',
                     'list_admins', 'add_admin', 'list_agents', 'agent_stats',
                     'game_stats', 'toggle_game', 'platform_stats',
@@ -474,6 +475,11 @@ ACTIONS_SCHEMA = [
     {"name": "preview_relay", "description": "معاينة محتوى بعد المعالجة", "parameters": {"text": "النص", "relay_id": "المعرف"}},
     {"name": "relay_log", "description": "سجل عمليات النقل", "parameters": {"relay_id": "المعرف"}},
     {"name": "relay_stats", "description": "إحصائيات النقل", "parameters": {}},
+    # Browser
+    {"name": "browser_list", "description": "عرض نوافذ المتصفح", "parameters": {}},
+    {"name": "browser_open", "description": "فتح موقع في المتصفح", "parameters": {"url": "الرابط", "name": "الاسم"}},
+    {"name": "browser_screenshot", "description": "لقطة شاشة من المتصفح", "parameters": {"instance_id": "معرف النافذة"}},
+    {"name": "browser_status", "description": "حالة المتصفح", "parameters": {"instance_id": "معرف النافذة"}},
     # Learning
     {"name": "learn_fact", "description": "حفظ معلومة", "parameters": {"category": "الفئة", "key": "المفتاح", "value": "القيمة"}},
     {"name": "get_learning_stats", "description": "إحصائيات التعلم", "parameters": {}},
@@ -1249,6 +1255,53 @@ def _exec_relay_stats(params):
     except Exception as e: return {'success': False, 'error': str(e)}
 
 
+# ── Browser ──────────────────────────────────────────────────
+
+def _exec_browser_list(params):
+    try:
+        from browser_manager import list_instances
+        instances = list_instances()
+        return {'success': True, 'instances': instances, 'total': len(instances)}
+    except Exception as e: return {'success': False, 'error': str(e)}
+
+
+def _exec_browser_open(params):
+    url = params.get('url', '')
+    if not url: return {'success': False, 'error': 'الرابط مطلوب'}
+    try:
+        from browser_manager import create_instance, get_instance
+        inst = create_instance(name=params.get('name', ''))
+        inst.start()
+        result = inst.navigate(url)
+        return {'success': True, 'instance_id': inst.id, 'navigate': result, 'message': f'تم فتح {url}'}
+    except Exception as e: return {'success': False, 'error': str(e)}
+
+
+def _exec_browser_screenshot(params):
+    iid = params.get('instance_id', '')
+    if not iid: return {'success': False, 'error': 'instance_id مطلوب'}
+    try:
+        from browser_manager import get_instance
+        inst = get_instance(iid)
+        if not inst: return {'success': False, 'error': 'النافذة غير موجودة'}
+        path = inst.screenshot()
+        return {'success': True, 'path': path, 'url': inst.page.url if inst.page else ''}
+    except Exception as e: return {'success': False, 'error': str(e)}
+
+
+def _exec_browser_status(params):
+    iid = params.get('instance_id', '')
+    try:
+        from browser_manager import list_instances
+        instances = list_instances()
+        if iid:
+            inst = next((i for i in instances if i['id'] == iid), None)
+            if not inst: return {'success': False, 'error': 'النافذة غير موجودة'}
+            return {'success': True, 'instance': inst}
+        return {'success': True, 'instances': instances, 'total': len(instances)}
+    except Exception as e: return {'success': False, 'error': str(e)}
+
+
 # ── Learning ──────────────────────────────────────────────────
 
 def _exec_learn_fact(params):
@@ -1313,6 +1366,8 @@ ACTION_DISPATCH = {
     'list_relays': _exec_list_relays, 'relay_status': _exec_relay_status,
     'preview_relay': _exec_preview_relay, 'relay_log': _exec_relay_log,
     'relay_stats': _exec_relay_stats,
+    'browser_list': _exec_browser_list, 'browser_open': _exec_browser_open,
+    'browser_screenshot': _exec_browser_screenshot, 'browser_status': _exec_browser_status,
     'learn_fact': _exec_learn_fact, 'get_learning_stats': _exec_get_learning_stats,
     'delegate_task': _exec_delegate_task, 'consult_all': _exec_consult_all,
 }
@@ -1733,6 +1788,31 @@ def _format_action_result(action_name, result):
 • الإجمالي: <b>{s.get('total',0)}</b>
 • ناجح: <b>{s.get('success',0)}</b> | فاشل: <b>{s.get('failed',0)}</b>
 • معالج بالـ AI: <b>{s.get('ai_processed',0)}</b>"""
+    elif action_name == 'browser_list':
+        instances = result.get('instances', []); lines = [f"🌐 <b>نوافذ المتصفح ({len(instances)}):</b>"]
+        for inst in instances[:10]:
+            status = '🟢' if inst.get('status')=='running' else '🔴'
+            lines.append(f"• {status} {inst.get('name','')} — {inst.get('current_url','about:blank')[:50]}")
+        return '\n'.join(lines)
+    elif action_name == 'browser_open':
+        return f"""🌐 <b>تم فتح المتصفح</b>
+• الرابط: {result.get('navigate',{}).get('url','')}
+• العنوان: {result.get('navigate',{}).get('title','')}
+• النافذة: {result.get('instance_id','')[:8]}"""
+    elif action_name == 'browser_screenshot':
+        return f"""📸 <b>تم أخذ لقطة الشاشة</b>
+• الرابط: {result.get('url','')}
+• الملف: {result.get('path','')}"""
+    elif action_name == 'browser_status':
+        inst = result.get('instance', {})
+        if inst:
+            return f"""🌐 <b>حالة النافذة:</b>
+• الاسم: {inst.get('name','')}
+• الحالة: {'🟢 يعمل' if inst.get('status')=='running' else '🔴 متوقف'}
+• الرابط: {inst.get('current_url','about:blank')}
+• الكوكيز: {inst.get('cookies_count',0)}
+• الصفحات: {inst.get('pages_visited',0)}"""
+        return f"🌐 <b>{result.get('total',0)} نوافذ نشطة</b>"
     elif action_name == 'generate_post':
         if result.get('success'): return f"🤖 <b>البوست:</b>\n\n{result.get('text', '')}"
         return f"❌ خطأ: {result.get('error', '')}"

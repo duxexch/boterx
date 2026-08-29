@@ -1,0 +1,439 @@
+{% extends "base.html" %}
+{% block title %}المتصفح - VEX{% endblock %}
+{% block page_title %}المتصفح المدمج{% endblock %}
+
+{% block content %}
+<div x-data="browserPage()" x-init="init()">
+
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div>
+            <h2 class="text-xl font-bold text-bright">المتصفح المدمج</h2>
+            <p class="text-sm text-dim mt-1">تصفح المواقع والتحكم بالوكلاء — جلسات محفوظة دائماً</p>
+        </div>
+        <button @click="showCreate=true" class="btn btn-primary gap-2 self-start">
+            <i class="fas fa-plus"></i> نافذة جديدة
+        </button>
+    </div>
+
+    <!-- Stats -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+        <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+            <div class="flex items-center gap-2 mb-2">
+                <div class="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                    <i class="fas fa-globe text-blue-400 text-sm"></i>
+                </div>
+                <p class="text-xs text-dim">النوافذ النشطة</p>
+            </div>
+            <p class="text-2xl font-bold text-bright" x-text="instances.length"></p>
+        </div>
+        <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+            <div class="flex items-center gap-2 mb-2">
+                <div class="w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center">
+                    <i class="fas fa-play text-green-400 text-sm"></i>
+                </div>
+                <p class="text-xs text-dim">قيد التشغيل</p>
+            </div>
+            <p class="text-2xl font-bold text-success" x-text="instances.filter(i=>i.status==='running').length"></p>
+        </div>
+        <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+            <div class="flex items-center gap-2 mb-2">
+                <div class="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center">
+                    <i class="fas fa-cookie text-amber-400 text-sm"></i>
+                </div>
+                <p class="text-xs text-dim">الكوكيز المحفوظة</p>
+            </div>
+            <p class="text-2xl font-bold text-warning" x-text="instances.reduce((a,i)=>a+(i.cookies_count||0),0)"></p>
+        </div>
+        <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+            <div class="flex items-center gap-2 mb-2">
+                <div class="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center">
+                    <i class="fas fa-file-alt text-purple-400 text-sm"></i>
+                </div>
+                <p class="text-xs text-dim">الصفحات</p>
+            </div>
+            <p class="text-2xl font-bold text-info" x-text="instances.reduce((a,i)=>a+(i.pages_visited||0),0)"></p>
+        </div>
+    </div>
+
+    <!-- Layout: sidebar + browser view -->
+    <div class="flex flex-col lg:flex-row gap-4">
+
+        <!-- Left: instance list + profiles -->
+        <div class="w-full lg:w-72 flex-shrink-0 space-y-4">
+
+            <!-- Instances -->
+            <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+                <div class="px-4 py-3 border-b border-slate-700 flex items-center justify-between">
+                    <span class="text-sm font-semibold text-bright">النوافذ (<span x-text="instances.length"></span>)</span>
+                    <button @click="loadInstances()" class="text-dim hover:text-bright text-xs"><i class="fas fa-sync-alt"></i></button>
+                </div>
+                <div class="max-h-64 overflow-y-auto">
+                    <template x-for="inst in instances" :key="inst.id">
+                        <div class="px-4 py-3 border-b border-slate-700/50 cursor-pointer transition"
+                             :class="selected===inst.id ? 'bg-blue-500/10 border-r-2 border-r-blue-500' : 'hover:bg-slate-700/30'"
+                             @click="selectInstance(inst.id)">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-sm font-medium text-bright truncate" x-text="inst.name || inst.profile_name"></span>
+                                <span class="w-2 h-2 rounded-full" :class="inst.status==='running'?'bg-green-400':'bg-slate-500'"></span>
+                            </div>
+                            <p class="text-xs text-dim truncate" x-text="inst.current_url || 'about:blank'"></p>
+                        </div>
+                    </template>
+                    <div x-show="instances.length===0" class="px-4 py-8 text-center text-dim text-sm">
+                        لا توجد نوافذ مفتوحة
+                    </div>
+                </div>
+            </div>
+
+            <!-- Active Profiles (saved sessions) -->
+            <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+                <div class="px-4 py-3 border-b border-slate-700">
+                    <span class="text-sm font-semibold text-bright">الجلسات المحفوظة</span>
+                </div>
+                <div class="max-h-48 overflow-y-auto">
+                    <template x-for="p in profiles" :key="p.id">
+                        <div class="px-4 py-2 border-b border-slate-700/50 flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-bright" x-text="p.name"></p>
+                                <p class="text-xs text-dim" x-text="(p.cookies_count||0)+' كوكيز | '+p.locale"></p>
+                            </div>
+                            <button @click="openWithProfile(p.id)" class="text-xs text-blue-400 hover:text-blue-300">فتح</button>
+                        </div>
+                    </template>
+                    <div x-show="profiles.length===0" class="px-4 py-4 text-center text-dim text-xs">
+                        لا توجد جلسات محفوظة
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: browser view -->
+        <div class="flex-1 min-w-0">
+
+            <!-- URL bar -->
+            <div class="bg-slate-800 rounded-xl border border-slate-700 p-3 mb-3 flex items-center gap-2" x-show="selected">
+                <button @click="goBack()" class="p-2 rounded-lg hover:bg-slate-700/50 text-dim hover:text-bright transition" title="رجوع">
+                    <i class="fas fa-arrow-right"></i>
+                </button>
+                <div class="flex-1 relative">
+                    <input x-model="urlInput" @keydown.enter="navigate()" type="text"
+                        class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-sm text-bright ltr text-left"
+                        placeholder="https://example.com">
+                </div>
+                <button @click="navigate()" class="btn btn-primary btn-sm gap-1">
+                    <i class="fas fa-arrow-left"></i> اذهب
+                </button>
+                <button @click="takeScreenshot()" class="p-2 rounded-lg hover:bg-slate-700/50 text-dim hover:text-bright transition" title="لقطة شاشة">
+                    <i class="fas fa-camera"></i>
+                </button>
+                <button @click="refreshView()" class="p-2 rounded-lg hover:bg-slate-700/50 text-dim hover:text-bright transition" title="تحديث">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+            </div>
+
+            <!-- Browser viewport -->
+            <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden relative" style="min-height:500px">
+                <template x-if="selected && currentInst && currentInst.status==='running'">
+                    <div>
+                        <!-- Screenshot image -->
+                        <div class="relative" x-show="screenshotData">
+                            <img :src="'data:image/png;base64,'+screenshotData" class="w-full" style="max-height:600px;object-fit:contain" alt="Browser View">
+                            <!-- Click overlay for visual mode -->
+                            <div class="absolute inset-0 cursor-crosshair" @click="handleViewportClick($event)"></div>
+                        </div>
+                        <!-- Loading -->
+                        <div x-show="!screenshotData && currentInst.status==='running'" class="flex items-center justify-center py-20">
+                            <div class="text-center">
+                                <i class="fas fa-spinner fa-spin text-3xl text-blue-400 mb-3"></i>
+                                <p class="text-sm text-dim">جاري تحميل المتصفح...</p>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+                <!-- Stopped -->
+                <template x-if="selected && currentInst && currentInst.status!=='running'">
+                    <div class="flex items-center justify-center py-20">
+                        <div class="text-center">
+                            <i class="fas fa-power-off text-4xl text-slate-500 mb-3"></i>
+                            <p class="text-sm text-dim mb-4">المتصفح متوقف</p>
+                            <button @click="startBrowser()" class="btn btn-primary gap-2">
+                                <i class="fas fa-play"></i> تشغيل
+                            </button>
+                        </div>
+                    </div>
+                </template>
+                <!-- No selection -->
+                <div x-show="!selected" class="flex items-center justify-center py-20">
+                    <div class="text-center">
+                        <i class="fas fa-globe text-5xl text-slate-500/50 mb-4"></i>
+                        <p class="text-dim mb-2">اختر نافذة أو أنشئ نافذة جديدة</p>
+                        <button @click="showCreate=true" class="btn btn-primary btn-sm gap-2 mt-2">
+                            <i class="fas fa-plus"></i> نافذة جديدة
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action bar -->
+            <div class="bg-slate-800 rounded-xl border border-slate-700 p-3 mt-3" x-show="selected && currentInst && currentInst.status==='running'">
+                <div class="flex items-center gap-2 mb-3">
+                    <span class="text-xs text-dim font-semibold">أدوات التحكم</span>
+                </div>
+                <!-- Quick actions row -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+                    <button @click="execAction('scroll',{direction:'up',amount:5})" class="btn btn-secondary btn-sm gap-1 text-xs">
+                        <i class="fas fa-arrow-up"></i> صعود
+                    </button>
+                    <button @click="execAction('scroll',{direction:'down',amount:5})" class="btn btn-secondary btn-sm gap-1 text-xs">
+                        <i class="fas fa-arrow-down"></i> نزول
+                    </button>
+                    <button @click="execAction('key',{key:'Enter'})" class="btn btn-secondary btn-sm gap-1 text-xs">
+                        <i class="fas fa-level-down-alt"></i> Enter
+                    </button>
+                    <button @click="execAction('key',{key:'Escape'})" class="btn btn-secondary btn-sm gap-1 text-xs">
+                        <i class="fas fa-times"></i> Escape
+                    </button>
+                </div>
+                <!-- JS Console -->
+                <div class="flex gap-2">
+                    <input x-model="jsInput" @keydown.enter="execJS()" type="text" class="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-xs text-bright ltr text-left font-mono" placeholder="document.title">
+                    <button @click="execJS()" class="btn btn-primary btn-sm text-xs gap-1"><i class="fas fa-code"></i> تنفيذ</button>
+                </div>
+                <div x-show="jsResult" class="mt-2 p-2 bg-slate-900 rounded-lg text-xs text-green-400 font-mono ltr text-left max-h-24 overflow-y-auto" x-text="jsResult"></div>
+            </div>
+
+            <!-- Action log -->
+            <div class="bg-slate-800 rounded-xl border border-slate-700 p-3 mt-3" x-show="selected && currentInst">
+                <span class="text-xs text-dim font-semibold block mb-2">آخر الإجراءات</span>
+                <div class="max-h-32 overflow-y-auto space-y-1">
+                    <template x-for="(act,i) in (currentInst?.recent_actions||[]).slice().reverse()" :key="i">
+                        <div class="flex items-center gap-2 text-xs">
+                            <span class="text-dim" x-text="act.time?.split('T')[1]?.split('.')[0]"></span>
+                            <span class="px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 font-mono" x-text="act.action"></span>
+                            <span class="text-dim truncate" x-text="act.detail"></span>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Modal -->
+    <div x-show="showCreate" x-transition.opacity class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" style="display:none" @click.self="showCreate=false">
+        <div class="bg-slate-800 rounded-2xl border border-slate-700 w-full max-w-md shadow-2xl" @click.stop="">
+            <div class="flex items-center justify-between p-5 border-b border-slate-700">
+                <h3 class="text-lg font-bold text-bright">نافذة متصفح جديدة</h3>
+                <button @click="showCreate=false" class="text-dim hover:text-bright transition p-1"><i class="fas fa-times"></i></button>
+            </div>
+            <form @submit.prevent="createInstance()" class="p-5 space-y-4">
+                <div>
+                    <label class="block text-sm text-dim mb-1.5">اسم النافذة</label>
+                    <input x-model="createForm.name" type="text" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm text-bright" placeholder="مثال: حساب تويتر">
+                </div>
+                <div>
+                    <label class="block text-sm text-dim mb-1.5">الرابط (اختياري)</label>
+                    <input x-model="createForm.url" type="text" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm text-bright ltr text-left" placeholder="https://twitter.com">
+                </div>
+                <div>
+                    <label class="block text-sm text-dim mb-1.5">بروكسي (اختياري)</label>
+                    <input x-model="createForm.proxy" type="text" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm text-bright ltr text-left" placeholder="socks5://user:pass@host:port">
+                </div>
+                <div class="flex gap-3 pt-2">
+                    <button type="submit" class="flex-1 btn btn-primary">إنشاء وتشغيل</button>
+                    <button type="button" @click="showCreate=false" class="flex-1 btn btn-secondary">إلغاء</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function browserPage() {
+    return {
+        instances: [],
+        profiles: [],
+        selected: null,
+        screenshotData: null,
+        urlInput: '',
+        jsInput: '',
+        jsResult: '',
+        showCreate: false,
+        createForm: { name: '', url: '', proxy: '' },
+        _pollTimer: null,
+
+        async init() {
+            await this.loadInstances();
+            await this.loadProfiles();
+        },
+
+        get currentInst() {
+            return this.instances.find(i => i.id === this.selected) || null;
+        },
+
+        async loadInstances() {
+            try {
+                const d = await api('/api/browser/instances');
+                this.instances = d.instances || [];
+            } catch(e) { console.error(e); }
+        },
+
+        async loadProfiles() {
+            try {
+                const d = await api('/api/browser/profiles');
+                this.profiles = d.profiles || [];
+            } catch(e) { console.error(e); }
+        },
+
+        selectInstance(id) {
+            this.selected = id;
+            this.screenshotData = null;
+            this.refreshView();
+        },
+
+        async createInstance() {
+            try {
+                const d = await api('/api/browser/instances', {
+                    method: 'POST',
+                    body: JSON.stringify({ name: this.createForm.name, proxy: this.createForm.proxy })
+                });
+                if (d.success) {
+                    this.selected = d.instance.id;
+                    this.showCreate = false;
+                    this.createForm = { name: '', url: '', proxy: '' };
+                    await this.startBrowser();
+                    if (this.createForm.url) {
+                        this.urlInput = this.createForm.url;
+                        await this.navigate();
+                    }
+                }
+            } catch(e) { toast('فشل إنشاء النافذة', 'error'); }
+        },
+
+        async startBrowser() {
+            if (!this.selected) return;
+            try {
+                await api(`/api/browser/instances/${this.selected}/start`, { method: 'POST' });
+                await this.loadInstances();
+                await new Promise(r => setTimeout(r, 1000));
+                await this.refreshView();
+            } catch(e) { toast('فشل تشغيل المتصفح', 'error'); }
+        },
+
+        async stopBrowser() {
+            if (!this.selected) return;
+            try {
+                await api(`/api/browser/instances/${this.selected}/stop`, { method: 'POST' });
+                this.screenshotData = null;
+                await this.loadInstances();
+            } catch(e) {}
+        },
+
+        async deleteInstance(id) {
+            try {
+                await api(`/api/browser/instances/${id}`, { method: 'DELETE' });
+                if (this.selected === id) { this.selected = null; this.screenshotData = null; }
+                await this.loadInstances();
+            } catch(e) {}
+        },
+
+        async navigate() {
+            if (!this.selected || !this.urlInput) return;
+            try {
+                let url = this.urlInput;
+                if (!url.match(/^https?:\/\//)) url = 'https://' + url;
+                this.urlInput = url;
+                await api(`/api/browser/instances/${this.selected}/navigate`, {
+                    method: 'POST', body: JSON.stringify({ url })
+                });
+                await new Promise(r => setTimeout(r, 500));
+                await this.refreshView();
+                await this.loadInstances();
+            } catch(e) { toast('فشل التنقل', 'error'); }
+        },
+
+        async refreshView() {
+            if (!this.selected) return;
+            try {
+                const d = await api(`/api/browser/instances/${this.selected}/screenshot`);
+                if (d.success) {
+                    this.screenshotData = d.screenshot;
+                    if (d.url) this.urlInput = d.url;
+                }
+            } catch(e) {}
+        },
+
+        async takeScreenshot() {
+            await this.refreshView();
+            toast('تم أخذ اللقطة', 'success');
+        },
+
+        async goBack() {
+            if (!this.selected) return;
+            try {
+                const d = await api(`/api/browser/instances/${this.selected}/back`, { method: 'POST' });
+                if (d.url) this.urlInput = d.url;
+                await new Promise(r => setTimeout(r, 500));
+                await this.refreshView();
+            } catch(e) {}
+        },
+
+        async execAction(action, params) {
+            if (!this.selected) return;
+            try {
+                await api(`/api/browser/instances/${this.selected}/${action}`, {
+                    method: 'POST', body: JSON.stringify(params)
+                });
+                await new Promise(r => setTimeout(r, 300));
+                await this.refreshView();
+            } catch(e) {}
+        },
+
+        async execJS() {
+            if (!this.selected || !this.jsInput) return;
+            try {
+                const d = await api(`/api/browser/instances/${this.selected}/evaluate`, {
+                    method: 'POST', body: JSON.stringify({ expression: this.jsInput })
+                });
+                this.jsResult = d.result || d.error || 'undefined';
+            } catch(e) { this.jsResult = 'Error: ' + e.message; }
+        },
+
+        async handleViewportClick(e) {
+            if (!this.selected) return;
+            const rect = e.target.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            const pctX = x / rect.width;
+            const pctY = y / rect.height;
+            const vp = this.currentInst?.viewport || {width:1366,height:768};
+            const absX = Math.round(pctX * vp.width);
+            const absY = Math.round(pctY * vp.height);
+            try {
+                await api(`/api/browser/instances/${this.selected}/evaluate`, {
+                    method: 'POST',
+                    body: JSON.stringify({ expression: `document.elementFromPoint(${absX},${absY})?.click()` })
+                });
+                await new Promise(r => setTimeout(r, 500));
+                await this.refreshView();
+            } catch(e) {}
+        },
+
+        async openWithProfile(profileId) {
+            try {
+                const d = await api('/api/browser/instances', {
+                    method: 'POST',
+                    body: JSON.stringify({ name: '', profile_id: profileId })
+                });
+                if (d.success) {
+                    this.selected = d.instance.id;
+                    await this.startBrowser();
+                }
+            } catch(e) { toast('فشل فتح الجلسة', 'error'); }
+        },
+    };
+}
+</script>
+{% endblock %}

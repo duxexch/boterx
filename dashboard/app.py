@@ -4154,6 +4154,258 @@ def api_relays_log_clear():
     return jsonify(clear_relay_log(relay_id))
 
 
+# ===== API — Browser =====
+
+@app.route('/browser')
+@admin_required
+@permission_required('manage_bots')
+def page_browser():
+    return render_template('browser.html', active_page='browser')
+
+
+@app.route('/api/browser/instances', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_list():
+    from browser_manager import list_instances
+    return jsonify({'success': True, 'instances': list_instances()})
+
+
+@app.route('/api/browser/instances', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_create():
+    from browser_manager import create_instance
+    data = request.json or {}
+    inst = create_instance(
+        name=data.get('name', ''),
+        profile_id=data.get('profile_id'),
+        proxy=data.get('proxy'),
+    )
+    return jsonify({'success': True, 'instance': inst.to_dict()})
+
+
+@app.route('/api/browser/instances/<iid>/start', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_start(iid):
+    from browser_manager import get_instance
+    inst = get_instance(iid)
+    if not inst:
+        return jsonify({'success': False, 'error': 'Instance not found'}), 404
+    ok = inst.start()
+    return jsonify({'success': ok, 'instance': inst.to_dict()})
+
+
+@app.route('/api/browser/instances/<iid>/stop', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_stop(iid):
+    from browser_manager import get_instance
+    inst = get_instance(iid)
+    if not inst:
+        return jsonify({'success': False, 'error': 'Instance not found'}), 404
+    inst.stop()
+    return jsonify({'success': True, 'instance': inst.to_dict()})
+
+
+@app.route('/api/browser/instances/<iid>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_delete(iid):
+    from browser_manager import remove_instance
+    remove_instance(iid)
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/instances/<iid>/navigate', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_navigate(iid):
+    from browser_manager import get_instance
+    inst = get_instance(iid)
+    if not inst:
+        return jsonify({'success': False, 'error': 'Instance not found'}), 404
+    url = (request.json or {}).get('url', '')
+    if not url:
+        return jsonify({'success': False, 'error': 'URL required'}), 400
+    return jsonify(inst.navigate(url))
+
+
+@app.route('/api/browser/instances/<iid>/click', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_click(iid):
+    from browser_manager import get_instance
+    inst = get_instance(iid)
+    if not inst:
+        return jsonify({'success': False, 'error': 'Instance not found'}), 404
+    sel = (request.json or {}).get('selector', '')
+    return jsonify(inst.click(sel))
+
+
+@app.route('/api/browser/instances/<iid>/type', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_type(iid):
+    from browser_manager import get_instance
+    inst = get_instance(iid)
+    if not inst:
+        return jsonify({'success': False, 'error': 'Instance not found'}), 404
+    data = request.json or {}
+    return jsonify(inst.type_text(data.get('selector', ''), data.get('text', ''), data.get('clear', True)))
+
+
+@app.route('/api/browser/instances/<iid>/scroll', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_scroll(iid):
+    from browser_manager import get_instance
+    inst = get_instance(iid)
+    if not inst:
+        return jsonify({'success': False, 'error': 'Instance not found'}), 404
+    data = request.json or {}
+    return jsonify(inst.scroll(data.get('direction', 'down'), data.get('amount', 3)))
+
+
+@app.route('/api/browser/instances/<iid>/screenshot', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_screenshot(iid):
+    from browser_manager import get_instance
+    inst = get_instance(iid)
+    if not inst:
+        return jsonify({'success': False, 'error': 'Instance not found'}), 404
+    b64 = inst.get_screenshot_base64()
+    if not b64:
+        return jsonify({'success': False, 'error': 'No page'}), 400
+    return jsonify({'success': True, 'screenshot': b64, 'url': inst.page.url if inst.page else ''})
+
+
+@app.route('/api/browser/instances/<iid>/content', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_content(iid):
+    from browser_manager import get_instance
+    inst = get_instance(iid)
+    if not inst:
+        return jsonify({'success': False, 'error': 'Instance not found'}), 404
+    return jsonify(inst.get_page_content())
+
+
+@app.route('/api/browser/instances/<iid>/cookies', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_cookies(iid):
+    from browser_manager import get_instance
+    inst = get_instance(iid)
+    if not inst:
+        return jsonify({'success': False, 'error': 'Instance not found'}), 404
+    return jsonify({'success': True, 'cookies': inst.get_cookies()})
+
+
+@app.route('/api/browser/instances/<iid>/evaluate', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_evaluate(iid):
+    from browser_manager import get_instance
+    inst = get_instance(iid)
+    if not inst:
+        return jsonify({'success': False, 'error': 'Instance not found'}), 404
+    expr = (request.json or {}).get('expression', '')
+    return jsonify(inst.evaluate(expr))
+
+
+@app.route('/api/browser/instances/<iid>/form', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_form(iid):
+    from browser_manager import get_instance
+    inst = get_instance(iid)
+    if not inst:
+        return jsonify({'success': False, 'error': 'Instance not found'}), 404
+    fields = (request.json or {}).get('fields', [])
+    return jsonify(inst.fill_form(fields))
+
+
+@app.route('/api/browser/instances/<iid>/key', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_key(iid):
+    from browser_manager import get_instance
+    inst = get_instance(iid)
+    if not inst:
+        return jsonify({'success': False, 'error': 'Instance not found'}), 404
+    key = (request.json or {}).get('key', '')
+    return jsonify(inst.press_key(key))
+
+
+@app.route('/api/browser/instances/<iid>/back', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_back(iid):
+    from browser_manager import get_instance
+    inst = get_instance(iid)
+    if not inst:
+        return jsonify({'success': False, 'error': 'Instance not found'}), 404
+    return jsonify(inst.go_back())
+
+
+@app.route('/api/browser/instances/<iid>/hover', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_hover(iid):
+    from browser_manager import get_instance
+    inst = get_instance(iid)
+    if not inst:
+        return jsonify({'success': False, 'error': 'Instance not found'}), 404
+    sel = (request.json or {}).get('selector', '')
+    return jsonify(inst.hover(sel))
+
+
+@app.route('/api/browser/instances/<iid>/wait', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_wait(iid):
+    from browser_manager import get_instance
+    inst = get_instance(iid)
+    if not inst:
+        return jsonify({'success': False, 'error': 'Instance not found'}), 404
+    data = request.json or {}
+    return jsonify(inst.wait_for(data.get('selector', ''), data.get('timeout', 10000)))
+
+
+@app.route('/api/browser/profiles', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_profiles():
+    from browser_manager import list_profiles
+    return jsonify({'success': True, 'profiles': list_profiles()})
+
+
+@app.route('/api/browser/profiles/<pid>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_delete_profile(pid):
+    from browser_manager import delete_profile
+    delete_profile(pid)
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/screenshot-file/<iid>', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_screenshot_file(iid):
+    from browser_manager import get_instance, SCREENSHOTS_DIR
+    inst = get_instance(iid)
+    if not inst:
+        return jsonify({'success': False, 'error': 'Instance not found'}), 404
+    path = inst.screenshot()
+    if not path:
+        return jsonify({'success': False, 'error': 'Failed'}), 500
+    return send_file(path, mimetype='image/png')
+
+
 # ===== API — Stats =====
 
 @app.route('/api/stats')
