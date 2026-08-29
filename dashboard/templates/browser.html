@@ -102,6 +102,18 @@
             <button @click="showAnalytics=!showAnalytics;loadAnalytics()" class="btn btn-secondary btn-sm gap-1">
                 <i class="fas fa-chart-bar"></i> إحصائيات
             </button>
+            <button @click="showHistory=!showHistory;loadHistory()" class="btn btn-secondary btn-sm gap-1">
+                <i class="fas fa-history"></i> سجل
+            </button>
+            <button @click="showClipboard=!showClipboard;loadClipboard()" class="btn btn-secondary btn-sm gap-1">
+                <i class="fas fa-clipboard"></i> الحافظة
+            </button>
+            <button @click="showBackups=!showBackups;loadBackups()" class="btn btn-secondary btn-sm gap-1">
+                <i class="fas fa-download"></i> نسخ احتياطي
+            </button>
+            <button @click="showDashboard=!showDashboard;loadDashboard()" class="btn btn-secondary btn-sm gap-1">
+                <i class="fas fa-tachometer-alt"></i> لوحة معلومات
+            </button>
         </div>
 
         <!-- Agent Permissions Panel -->
@@ -247,6 +259,127 @@
                         <span class="text-bright" x-text="s.visits"></span>
                     </div>
                 </template>
+            </div>
+        </div>
+
+        <!-- History Panel -->
+        <div x-show="showHistory" x-transition class="mt-4 p-3 bg-slate-900/50 rounded-lg border border-slate-700/50">
+            <div class="flex items-center justify-between mb-2">
+                <h4 class="text-xs font-semibold text-bright">سجل التصفح (<span x-text="history.length"></span>)</h4>
+                <div class="flex gap-1">
+                    <input x-model="historySearch" @input.debounce.300ms="loadHistory()" type="text" class="bg-slate-700 border border-slate-600 rounded px-2 py-0.5 text-[11px] text-bright w-32" placeholder="بحث...">
+                    <button @click="clearHistory()" class="text-[10px] px-2 py-0.5 bg-red-600/20 text-red-400 rounded hover:bg-red-600/30">مسح</button>
+                    <button @click="showHistory=false" class="text-dim hover:text-bright text-xs"><i class="fas fa-times"></i></button>
+                </div>
+            </div>
+            <div class="max-h-64 overflow-y-auto space-y-1">
+                <template x-for="h in history" :key="h.id">
+                    <div class="flex items-center justify-between text-xs py-1 border-b border-slate-700/30 group hover:bg-slate-800/30 rounded px-1">
+                        <div class="flex-1 min-w-0">
+                            <a :href="h.url" target="_blank" class="text-blue-400 hover:text-blue-300 font-mono text-[11px] truncate block" x-text="h.url"></a>
+                            <span class="text-dim text-[10px]" x-text="h.title||'-'"></span>
+                        </div>
+                        <div class="flex items-center gap-2 ml-2">
+                            <span class="text-dim text-[10px]" x-text="h.created_at?.split('T')[0]"></span>
+                            <button @click="clipboardAdd(h.url, 'url', 'history')" class="text-[10px] text-blue-400 hover:text-blue-300 opacity-0 group-hover:opacity-100" title="نسخ">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                    </div>
+                </template>
+                <div x-show="history.length===0" class="text-center text-dim text-xs py-4">لا يوجد سجل</div>
+            </div>
+        </div>
+
+        <!-- Clipboard Panel -->
+        <div x-show="showClipboard" x-transition class="mt-4 p-3 bg-slate-900/50 rounded-lg border border-slate-700/50">
+            <div class="flex items-center justify-between mb-2">
+                <h4 class="text-xs font-semibold text-bright">الحافظة (<span x-text="clipboardItems.length"></span>)</h4>
+                <div class="flex gap-1">
+                    <button @click="addClipboardItem()" class="text-[10px] px-2 py-0.5 bg-blue-600/20 text-blue-400 rounded hover:bg-blue-600/30">+ إضافة</button>
+                    <button @click="clearClipboard()" class="text-[10px] px-2 py-0.5 bg-red-600/20 text-red-400 rounded hover:bg-red-600/30">مسح غير المثبت</button>
+                    <button @click="showClipboard=false" class="text-dim hover:text-bright text-xs"><i class="fas fa-times"></i></button>
+                </div>
+            </div>
+            <div class="max-h-64 overflow-y-auto space-y-1">
+                <template x-for="c in clipboardItems" :key="c.id">
+                    <div class="flex items-center justify-between text-xs py-1 border-b border-slate-700/30 group hover:bg-slate-800/30 rounded px-1"
+                        :class="c.pinned?'bg-amber-500/5 border-l-2 border-l-amber-400':''">
+                        <div class="flex-1 min-w-0">
+                            <span class="text-bright text-[11px] font-mono truncate block" x-text="c.content.substring(0,80)"></span>
+                            <span class="text-dim text-[10px]" x-text="c.source||c.content_type"></span>
+                        </div>
+                        <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100">
+                            <button @click="copyToClipboard(c.content)" class="text-[10px] text-green-400 hover:text-green-300" title="نسخ">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                            <button @click="pinClipboard(c.id)" class="text-[10px]" :class="c.pinned?'text-amber-400':'text-dim'" title="تثبيت">
+                                <i class="fas fa-thumbtack"></i>
+                            </button>
+                            <button @click="deleteClipboard(c.id)" class="text-[10px] text-red-400 hover:text-red-300" title="حذف">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </template>
+                <div x-show="clipboardItems.length===0" class="text-center text-dim text-xs py-4">الحافظة فارغة</div>
+            </div>
+        </div>
+
+        <!-- Backups Panel -->
+        <div x-show="showBackups" x-transition class="mt-4 p-3 bg-slate-900/50 rounded-lg border border-slate-700/50">
+            <div class="flex items-center justify-between mb-2">
+                <h4 class="text-xs font-semibold text-bright">النسخ الاحتياطي</h4>
+                <button @click="createBackup()" class="text-[10px] px-2 py-0.5 bg-green-600/20 text-green-400 rounded hover:bg-green-600/30">+ نسخة جديدة</button>
+            </div>
+            <div class="max-h-48 overflow-y-auto space-y-1">
+                <template x-for="b in backups" :key="b.id">
+                    <div class="flex items-center justify-between text-xs py-1 border-b border-slate-700/30">
+                        <div class="flex-1 min-w-0">
+                            <span class="text-bright" x-text="b.name"></span>
+                            <span class="text-dim mx-1" x-text="'(' + Math.round(b.file_size/1024) + 'KB)'"></span>
+                            <span class="text-dim text-[10px]" x-text="b.created_at?.split('T')[0]"></span>
+                        </div>
+                        <div class="flex items-center gap-1">
+                            <button @click="restoreBackup(b.id)" class="text-[10px] text-green-400 hover:text-green-300" title="استعادة">استعادة</button>
+                            <button @click="deleteBackup(b.id)" class="text-[10px] text-red-400 hover:text-red-300" title="حذف">×</button>
+                        </div>
+                    </div>
+                </template>
+                <div x-show="backups.length===0" class="text-center text-dim text-xs py-4">لا توجد نسخ احتياطية</div>
+            </div>
+        </div>
+
+        <!-- Dashboard Panel -->
+        <div x-show="showDashboard" x-transition class="mt-4 p-3 bg-slate-900/50 rounded-lg border border-slate-700/50">
+            <div class="flex items-center justify-between mb-2">
+                <h4 class="text-xs font-semibold text-bright">لوحة معلومات المتصفح</h4>
+                <button @click="showDashboard=false" class="text-dim hover:text-bright text-xs"><i class="fas fa-times"></i></button>
+            </div>
+            <div x-show="dashboard" class="space-y-3">
+                <div class="grid grid-cols-3 gap-2">
+                    <div class="text-center p-2 bg-slate-800/50 rounded">
+                        <p class="text-lg font-bold text-info" x-text="dashboard?.history?.total_pages||0"></p>
+                        <p class="text-[9px] text-dim">صفحة مزاراة</p>
+                    </div>
+                    <div class="text-center p-2 bg-slate-800/50 rounded">
+                        <p class="text-lg font-bold text-success" x-text="dashboard?.history?.unique_urls||0"></p>
+                        <p class="text-[9px] text-dim">رابط فريد</p>
+                    </div>
+                    <div class="text-center p-2 bg-slate-800/50 rounded">
+                        <p class="text-lg font-bold text-warning" x-text="dashboard?.knowledge_entries||0"></p>
+                        <p class="text-[9px] text-dim">معرفة مخزنة</p>
+                    </div>
+                </div>
+                <div x-show="(dashboard?.frequent_sites||[]).length > 0">
+                    <p class="text-[10px] text-dim mb-1">المواقع الأكثر زيارة:</p>
+                    <template x-for="s in (dashboard?.frequent_sites||[]).slice(0,5)" :key="s.url">
+                        <div class="flex items-center justify-between text-[11px] py-0.5">
+                            <a :href="s.url" target="_blank" class="text-blue-400 hover:text-blue-300 truncate max-w-[200px]" x-text="s.url"></a>
+                            <span class="text-bright" x-text="s.visits+' مرة'"></span>
+                        </div>
+                    </template>
+                </div>
             </div>
         </div>
     </div>
@@ -667,6 +800,10 @@ function browserPage() {
         showProxies: false,
         showGroups: false,
         showAnalytics: false,
+        showHistory: false,
+        showClipboard: false,
+        showBackups: false,
+        showDashboard: false,
         showCreateTemplate: false,
         showImportProxies: false,
         showCreateGroup: false,
@@ -679,6 +816,11 @@ function browserPage() {
         groups: [],
         analyticsStats: [],
         topSites: [],
+        history: [],
+        historySearch: '',
+        clipboardItems: [],
+        backups: [],
+        dashboard: null,
         isRecording: false,
         recordedActions: 0,
         _pollTimer: null,
@@ -1137,6 +1279,115 @@ function browserPage() {
                 this.analyticsStats = s.stats || [];
                 const ts = await api('/api/browser/analytics/top-sites?limit=10');
                 this.topSites = ts.sites || [];
+            } catch(e) {}
+        },
+
+        async loadHistory() {
+            try {
+                const d = await api(`/api/browser/history?limit=100&q=${encodeURIComponent(this.historySearch)}`);
+                this.history = d.history || [];
+            } catch(e) {}
+        },
+
+        async clearHistory() {
+            if (!confirm('مسح كل السجل؟')) return;
+            try {
+                await api('/api/browser/history/clear', {method:'DELETE'});
+                this.history = [];
+            } catch(e) {}
+        },
+
+        async loadClipboard() {
+            try {
+                const d = await api('/api/browser/clipboard');
+                this.clipboardItems = d.clipboard || [];
+            } catch(e) {}
+        },
+
+        async addClipboardItem() {
+            const text = prompt('أدخل النص:');
+            if (!text) return;
+            try {
+                await api('/api/browser/clipboard', {
+                    method:'POST', body: JSON.stringify({content: text, source:'manual'})
+                });
+                await this.loadClipboard();
+            } catch(e) {}
+        },
+
+        async clipboardAdd(content, contentType, source) {
+            try {
+                await api('/api/browser/clipboard', {
+                    method:'POST', body: JSON.stringify({content, content_type: contentType||'text', source: source||''})
+                });
+            } catch(e) {}
+        },
+
+        async copyToClipboard(text) {
+            try {
+                await navigator.clipboard.writeText(text);
+            } catch(e) {}
+        },
+
+        async pinClipboard(id) {
+            try {
+                await api(`/api/browser/clipboard/${id}/pin`, {method:'POST'});
+                await this.loadClipboard();
+            } catch(e) {}
+        },
+
+        async deleteClipboard(id) {
+            try {
+                await api(`/api/browser/clipboard/${id}`, {method:'DELETE'});
+                this.clipboardItems = this.clipboardItems.filter(c => c.id !== id);
+            } catch(e) {}
+        },
+
+        async clearClipboard() {
+            try {
+                await api('/api/browser/clipboard/clear', {method:'DELETE'});
+                await this.loadClipboard();
+            } catch(e) {}
+        },
+
+        async loadBackups() {
+            try {
+                const d = await api('/api/browser/backups');
+                this.backups = d.backups || [];
+            } catch(e) {}
+        },
+
+        async createBackup() {
+            const name = prompt('اسم النسخة الاحتياطية:', 'backup_' + new Date().toISOString().split('T')[0]);
+            if (!name) return;
+            try {
+                await api('/api/browser/backups', {
+                    method:'POST', body: JSON.stringify({name})
+                });
+                await this.loadBackups();
+            } catch(e) {}
+        },
+
+        async restoreBackup(id) {
+            if (!confirm('استعادة هذه النسخة؟ سيتم استبدال البيانات الحالية')) return;
+            try {
+                await api(`/api/browser/backups/${id}/restore`, {method:'POST'});
+                alert('تمت الاستعادة بنجاح');
+            } catch(e) { alert('خطأ في الاستعادة'); }
+        },
+
+        async deleteBackup(id) {
+            if (!confirm('حذف النسخة الاحتياطية؟')) return;
+            try {
+                await api(`/api/browser/backups/${id}`, {method:'DELETE'});
+                this.backups = this.backups.filter(b => b.id !== id);
+            } catch(e) {}
+        },
+
+        async loadDashboard() {
+            try {
+                const d = await api('/api/browser/dashboard');
+                this.dashboard = d.overview || null;
             } catch(e) {}
         },
 

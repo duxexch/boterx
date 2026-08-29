@@ -5164,6 +5164,168 @@ def api_browser_instance_tags(instance_id):
     return jsonify({'success': True, 'tags': get_instance_tags(instance_id)})
 
 
+# ── Browser History ──────────────────────────────────────────
+
+@app.route('/api/browser/history', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_history_list():
+    from browser_utility import get_history
+    iid = request.args.get('instance_id')
+    search = request.args.get('q', '')
+    limit = request.args.get('limit', 100, type=int)
+    return jsonify({'success': True, 'history': get_history(iid, limit, search)})
+
+
+@app.route('/api/browser/history/search', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_history_search():
+    from browser_utility import search_history
+    q = request.args.get('q', '')
+    limit = request.args.get('limit', 50, type=int)
+    return jsonify({'success': True, 'results': search_history(q, limit)})
+
+
+@app.route('/api/browser/history/frequent', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_history_frequent():
+    from browser_utility import get_frequent_sites
+    iid = request.args.get('instance_id')
+    limit = request.args.get('limit', 20, type=int)
+    return jsonify({'success': True, 'sites': get_frequent_sites(iid, limit)})
+
+
+@app.route('/api/browser/history/recent', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_history_recent():
+    from browser_utility import get_recent_history
+    iid = request.args.get('instance_id')
+    hours = request.args.get('hours', 24, type=int)
+    limit = request.args.get('limit', 50, type=int)
+    return jsonify({'success': True, 'history': get_recent_history(iid, hours, limit)})
+
+
+@app.route('/api/browser/history/stats', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_history_stats():
+    from browser_utility import get_history_stats
+    iid = request.args.get('instance_id')
+    return jsonify({'success': True, 'stats': get_history_stats(iid)})
+
+
+@app.route('/api/browser/history/clear', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_history_clear():
+    from browser_utility import clear_history
+    iid = request.args.get('instance_id')
+    days = request.args.get('older_than_days', type=int)
+    clear_history(iid, days)
+    return jsonify({'success': True})
+
+
+# ── Clipboard Manager ────────────────────────────────────────
+
+@app.route('/api/browser/clipboard', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_clipboard_list():
+    from browser_utility import clipboard_get
+    search = request.args.get('q', '')
+    limit = request.args.get('limit', 50, type=int)
+    return jsonify({'success': True, 'clipboard': clipboard_get(limit, search)})
+
+
+@app.route('/api/browser/clipboard', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_clipboard_add():
+    from browser_utility import clipboard_add
+    data = request.json or {}
+    cid = clipboard_add(data.get('content', ''), data.get('instance_id', ''),
+                        data.get('content_type', 'text'), data.get('source', ''))
+    return jsonify({'success': True, 'id': cid})
+
+
+@app.route('/api/browser/clipboard/<cid>/pin', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_clipboard_pin(cid):
+    from browser_utility import clipboard_pin
+    clipboard_pin(int(cid))
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/clipboard/<cid>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_clipboard_delete(cid):
+    from browser_utility import clipboard_delete
+    clipboard_delete(int(cid))
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/clipboard/clear', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_clipboard_clear():
+    from browser_utility import clipboard_clear
+    clipboard_clear()
+    return jsonify({'success': True})
+
+
+# ── Backup/Restore ───────────────────────────────────────────
+
+@app.route('/api/browser/backups', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_backups_list():
+    from browser_utility import list_backups
+    return jsonify({'success': True, 'backups': list_backups()})
+
+
+@app.route('/api/browser/backups', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_backup_create():
+    from browser_utility import create_backup
+    data = request.json or {}
+    result = create_backup(data.get('name', 'backup'), data.get('description', ''))
+    return jsonify(result)
+
+
+@app.route('/api/browser/backups/<bid>/restore', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_backup_restore(bid):
+    from browser_utility import restore_backup
+    result = restore_backup(int(bid))
+    return jsonify(result)
+
+
+@app.route('/api/browser/backups/<bid>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_backup_delete(bid):
+    from browser_utility import delete_backup
+    delete_backup(int(bid))
+    return jsonify({'success': True})
+
+
+# ── Dashboard Overview ───────────────────────────────────────
+
+@app.route('/api/browser/dashboard', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_dashboard():
+    from browser_utility import get_dashboard_overview
+    return jsonify({'success': True, 'overview': get_dashboard_overview()})
+
+
 # ── Instance CRUD ────────────────────────────────────────────
 
 @app.route('/api/browser/instances', methods=['GET'])
