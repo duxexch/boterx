@@ -492,88 +492,145 @@
 
     <!-- TAB: Channels -->
     <div x-show="tab === 'channels'" class="space-y-4">
-        <div class="flex justify-between items-center flex-wrap gap-2">
-            <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400" data-i18n="total">Total</p><p class="text-xl font-bold text-amber-400" x-text="channels.length">0</p></div>
-                <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400" data-i18n="active_count">Active</p><p class="text-xl font-bold text-green-400" x-text="channels.filter(c => c.is_active === 'yes').length">0</p></div>
-                <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400" data-i18n="categories">Categories</p><p class="text-xl font-bold text-blue-400" x-text="Object.keys(categoryGroups).length">0</p></div>
-                <div class="bg-slate-800 rounded-lg border border-slate-700 p-3"><p class="text-xs text-slate-400">AI</p><p class="text-xl font-bold text-purple-400" x-text="channels.filter(c => c.ai_enabled === 'yes').length">0</p></div>
-            </div>
-            <button @click="showAddChannelModal = true" class="btn btn-primary btn-sm">➕ إضافة قناة</button>
+        <!-- KPI Cards -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div class="kpi-card bg-slate-800 rounded-xl border border-slate-700 p-4"><div class="flex items-center gap-3"><div class="w-10 h-10 rounded-lg bg-amber-500/15 flex items-center justify-center text-lg">📡</div><div><p class="kpi-label text-slate-400" data-i18n="total">الإجمالي</p><p class="kpi-value text-amber-400" x-text="channels.length">0</p></div></div></div>
+            <div class="kpi-card bg-slate-800 rounded-xl border border-slate-700 p-4"><div class="flex items-center gap-3"><div class="w-10 h-10 rounded-lg bg-green-500/15 flex items-center justify-center text-lg">✅</div><div><p class="kpi-label text-slate-400" data-i18n="active_count">نشط</p><p class="kpi-value text-green-400" x-text="channels.filter(c => c.is_active === 'yes').length">0</p></div></div></div>
+            <div class="kpi-card bg-slate-800 rounded-xl border border-slate-700 p-4"><div class="flex items-center gap-3"><div class="w-10 h-10 rounded-lg bg-blue-500/15 flex items-center justify-center text-lg">📂</div><div><p class="kpi-label text-slate-400" data-i18n="categories">الفئات</p><p class="kpi-value text-blue-400" x-text="Object.keys(categoryGroups).length">0</p></div></div></div>
+            <div class="kpi-card bg-slate-800 rounded-xl border border-slate-700 p-4"><div class="flex items-center gap-3"><div class="w-10 h-10 rounded-lg bg-purple-500/15 flex items-center justify-center text-lg">🤖</div><div><p class="kpi-label text-slate-400">AI</p><p class="kpi-value text-purple-400" x-text="channels.filter(c => c.ai_enabled === 'yes').length">0</p></div></div></div>
         </div>
 
-        <!-- Category filter -->
-        <div class="flex flex-wrap gap-2">
-            <button @click="filterCategory = ''" :class="filterCategory === '' ? 'bg-amber-500 text-slate-900' : 'bg-slate-700 text-slate-400'" class="px-3 py-1.5 rounded-lg text-xs font-medium transition" data-i18n="all">All</button>
-            <template x-for="(data, cat) in categoryGroups" :key="cat">
-                <button @click="filterCategory = cat" :class="filterCategory === cat ? 'bg-amber-500 text-slate-900' : 'bg-slate-700 text-slate-400'" class="px-3 py-1.5 rounded-lg text-xs font-medium transition" x-text="cat + ' (' + data.count + ')'"></button>
-            </template>
-        </div>
-
-        <!-- Channel cards -->
-                <!-- Create Post Button -->
-        <div class="flex items-center justify-between mb-4">
-            <h3 class="text-xl font-bold" x-show="tab === 'campaigns'" x-text="lang === 'ar' ? '📢 القنوات والنشر' : '📢 Channels & Publishing'"></h3>
-            <div class="flex gap-2">
-                <button @click="openPostComposer()" class="btn btn-primary">
-                    <i class="fas fa-plus"></i> <span x-text="lang === 'ar' ? 'إنشاء منشور' : 'Create Post'"></span>
-                </button>
+        <!-- Search + Filter + Actions -->
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-3">
+            <div class="flex flex-col sm:flex-row gap-3">
+                <!-- Search -->
+                <div class="relative flex-1">
+                    <i class="fas fa-search absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+                    <input type="text" x-model="channelSearch" class="input w-full pr-9 pl-3 py-2 text-sm" placeholder="🔍 بحث بالاسم أو المعرف...">
+                </div>
+                <!-- Platform filter -->
+                <div class="flex gap-1.5 flex-wrap sm:flex-nowrap">
+                    <button @click="filterPlatform = ''" :class="filterPlatform === '' ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' : 'bg-slate-700/50 text-slate-400 border-slate-600/30'" class="px-3 py-1.5 rounded-lg text-xs font-medium transition border flex-shrink-0">الكل</button>
+                    <button @click="filterPlatform = 'telegram'" :class="filterPlatform === 'telegram' ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' : 'bg-slate-700/50 text-slate-400 border-slate-600/30'" class="px-3 py-1.5 rounded-lg text-xs font-medium transition border flex-shrink-0">✈️ Telegram</button>
+                    <button @click="filterPlatform = 'whatsapp'" :class="filterPlatform === 'whatsapp' ? 'bg-green-500/20 text-green-400 border-green-500/30' : 'bg-slate-700/50 text-slate-400 border-slate-600/30'" class="px-3 py-1.5 rounded-lg text-xs font-medium transition border flex-shrink-0">💬 WhatsApp</button>
+                    <button @click="filterPlatform = 'webhook'" :class="filterPlatform === 'webhook' ? 'bg-purple-500/20 text-purple-400 border-purple-500/30' : 'bg-slate-700/50 text-slate-400 border-slate-600/30'" class="px-3 py-1.5 rounded-lg text-xs font-medium transition border flex-shrink-0">🔗 Webhook</button>
+                </div>
+                <!-- Add channel -->
+                <button @click="showAddChannelModal = true" class="btn btn-primary btn-sm flex-shrink-0"><i class="fas fa-plus"></i> إضافة قناة</button>
+            </div>
+            <!-- Category pills -->
+            <div class="flex gap-1.5 mt-2 overflow-x-auto pb-1 scrollbar-none">
+                <button @click="filterCategory = ''" :class="filterCategory === '' ? 'bg-amber-500 text-slate-900' : 'bg-slate-700/50 text-slate-400'" class="px-2.5 py-1 rounded-md text-[10px] font-medium transition whitespace-nowrap flex-shrink-0" data-i18n="all">الكل</button>
+                <template x-for="(data, cat) in categoryGroups" :key="cat">
+                    <button @click="filterCategory = cat" :class="filterCategory === cat ? 'bg-amber-500 text-slate-900' : 'bg-slate-700/50 text-slate-400'" class="px-2.5 py-1 rounded-md text-[10px] font-medium transition whitespace-nowrap flex-shrink-0" x-text="cat + ' (' + data.count + ')'"></button>
+                </template>
             </div>
         </div>
-        <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+
+        <!-- Create Post Banner -->
+        <div class="bg-gradient-to-l from-blue-600/10 to-purple-600/10 border border-blue-500/20 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center"><i class="fas fa-pen-fancy text-blue-400"></i></div>
+                <div>
+                    <h3 class="font-bold text-sm text-white">إنشاء منشور جديد</h3>
+                    <p class="text-[11px] text-slate-400">نشر عبر API أو نسخ أو رابط مباشر</p>
+                </div>
+            </div>
+            <button @click="openPostComposer()" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> إنشاء منشور</button>
+        </div>
+
+        <!-- Channel Cards Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
             <template x-for="ch in (filteredChannels || [])" :key="ch.id">
-                <div class="bg-slate-800 rounded-xl border border-slate-700 p-5 cursor-pointer hover:border-green-500/50 transition" :class="ch.is_active === 'yes' ? 'border-green-500/30' : 'opacity-60'" @click="openChannelModal(ch)">
-                    <div class="flex items-start justify-between mb-3">
-                        <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center text-xl" x-text="ch.type === 'channel' ? '📢' : (ch.type === 'group' ? '👥' : '💬')"></div>
-                            <div>
-                                <h3 class="font-bold" x-text="ch.title || 'غير معروف'"></h3>
-                                <p class="text-xs text-slate-500 font-mono" x-text="ch.chat_id"></p>
-                                <span x-show="ch.category" class="text-xs px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400" x-text="ch.category"></span>
+                <div class="bg-slate-800 rounded-xl border border-slate-700 hover:border-slate-600 transition-all duration-200 cursor-pointer group" :class="ch.is_active === 'yes' ? '' : 'opacity-55'" @click="openChannelModal(ch)">
+                    <!-- Card Header -->
+                    <div class="p-4 pb-3">
+                        <div class="flex items-start justify-between mb-2">
+                            <div class="flex items-center gap-2.5 min-w-0">
+                                <div class="w-9 h-9 rounded-lg flex items-center justify-center text-base flex-shrink-0" :class="ch.platform === 'telegram' ? 'bg-blue-500/15' : ch.platform === 'whatsapp' ? 'bg-green-500/15' : 'bg-purple-500/15'">
+                                    <span x-text="ch.platform === 'telegram' ? '✈️' : ch.platform === 'whatsapp' ? '💬' : '🔗'"></span>
+                                </div>
+                                <div class="min-w-0">
+                                    <h4 class="font-bold text-sm truncate" x-text="ch.title || 'غير معروف'"></h4>
+                                    <p class="text-[10px] text-slate-500 font-mono truncate" x-text="ch.chat_id"></p>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-1.5 flex-shrink-0">
+                                <span x-show="ch.category" class="text-[10px] px-1.5 py-0.5 rounded bg-slate-700/60 text-slate-400" x-text="ch.category"></span>
+                                <span class="text-[10px] px-1.5 py-0.5 rounded" :class="ch.is_active === 'yes' ? 'bg-green-500/15 text-green-400' : 'bg-slate-600/30 text-slate-500'" x-text="ch.is_active === 'yes' ? 'نشط' : 'متوقف'"></span>
                             </div>
                         </div>
-                        <span x-html="statusBadge(ch.is_active === 'yes' ? 'active' : 'inactive')"></span>
                     </div>
-                    <div class="space-y-2 text-sm">
-                        <div class="flex items-center justify-between p-2 bg-slate-900/50 rounded">
-                            <span class="text-slate-400">⚙️ تفعيل</span>
-                            <button @click.stop="toggleChannel(ch.id)" class="relative inline-flex h-6 w-11 items-center rounded-full transition" :class="ch.is_active === 'yes' ? 'bg-green-500' : 'bg-slate-600'"><span class="inline-block h-4 w-4 transform rounded-full bg-white transition" :class="toggleClasses(ch.is_active === 'yes')"></span></button>
-                        </div>
-                        <div class="grid grid-cols-3 gap-1 sm:grid-cols-3">
-                            <span class="text-xs text-center p-1 rounded" :class="ch.relay_to_users === 'yes' ? 'bg-green-500/20 text-green-400' : 'bg-slate-700 text-slate-500'" @click.stop="toggleSetting(ch, 'relay_to_users')">👥 <span x-text="ch.relay_to_users === 'yes' ? 'ON' : 'OFF'"></span></span>
-                            <span class="text-xs text-center p-1 rounded" :class="ch.relay_to_channels === 'yes' ? 'bg-green-500/20 text-green-400' : 'bg-slate-700 text-slate-500'" @click.stop="toggleSetting(ch, 'relay_to_channels')">📢 <span x-text="ch.relay_to_channels === 'yes' ? 'ON' : 'OFF'"></span></span>
-                            <span class="text-xs text-center p-1 rounded" :class="ch.ai_enabled === 'yes' ? 'bg-blue-500/20 text-blue-400' : 'bg-slate-700 text-slate-500'" @click.stop="toggleAI(ch.id)">🤖 <span x-text="ch.ai_enabled === 'yes' ? 'ON' : 'OFF'"></span></span>
-                        </div>
-                        <div class="p-2 bg-slate-900/50 rounded flex gap-2">
-                            <input type="text" x-model="ch.postText" class="input text-sm py-1 flex-1" placeholder="📨 رسالة سريعة" @click.stop>
-                            <button @click.stop="postToChannel(ch)" class="btn btn-primary btn-sm" data-i18n="send">Send</button>
+                    <!-- Toggles -->
+                    <div class="px-4 pb-3">
+                        <div class="bg-slate-900/40 rounded-lg p-2.5 space-y-2">
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs text-slate-400 flex items-center gap-1.5"><i class="fas fa-power-off text-[10px]"></i> تفعيل</span>
+                                <button @click.stop="toggleChannel(ch.id)" class="relative inline-flex h-5 w-9 items-center rounded-full transition" :class="ch.is_active === 'yes' ? 'bg-green-500' : 'bg-slate-600'"><span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition translate-x-0.5" :class="ch.is_active === 'yes' ? 'translate-x-4' : 'translate-x-0.5'"></span></button>
+                            </div>
+                            <div class="grid grid-cols-3 gap-1">
+                                <button @click.stop="toggleSetting(ch, 'relay_to_users')" class="text-[10px] text-center py-1 rounded transition" :class="ch.relay_to_users === 'yes' ? 'bg-green-500/15 text-green-400' : 'bg-slate-700/40 text-slate-500'">👥 <span x-text="ch.relay_to_users === 'yes' ? 'ON' : 'OFF'"></span></button>
+                                <button @click.stop="toggleSetting(ch, 'relay_to_channels')" class="text-[10px] text-center py-1 rounded transition" :class="ch.relay_to_channels === 'yes' ? 'bg-green-500/15 text-green-400' : 'bg-slate-700/40 text-slate-500'">📢 <span x-text="ch.relay_to_channels === 'yes' ? 'ON' : 'OFF'"></span></button>
+                                <button @click.stop="toggleAI(ch.id)" class="text-[10px] text-center py-1 rounded transition" :class="ch.ai_enabled === 'yes' ? 'bg-blue-500/15 text-blue-400' : 'bg-slate-700/40 text-slate-500'">🤖 <span x-text="ch.ai_enabled === 'yes' ? 'ON' : 'OFF'"></span></button>
+                            </div>
                         </div>
                     </div>
-                    <div class="mt-3 pt-3 border-t border-slate-700 flex justify-between items-center">
-                        <span class="text-xs text-slate-500" x-text="ch.added_at"></span>
-                        <button @click="deleteChannel(ch)" class="btn btn-danger btn-sm">🗑️</button>
+                    <!-- Quick Post -->
+                    <div class="px-4 pb-3" @click.stop>
+                        <div class="flex gap-1.5">
+                            <input type="text" x-model="ch.postText" class="input text-xs py-1.5 flex-1" placeholder="📨 رسالة سريعة...">
+                            <button @click="postToChannel(ch)" class="btn btn-primary btn-sm !px-3 !py-1.5 !text-xs !min-h-[32px]"><i class="fas fa-paper-plane text-[10px]"></i></button>
+                        </div>
+                    </div>
+                    <!-- Card Footer -->
+                    <div class="px-4 py-2.5 border-t border-slate-700/50 flex justify-between items-center">
+                        <span class="text-[10px] text-slate-600" x-text="ch.added_at"></span>
+                        <div class="flex gap-1" @click.stop>
+                            <button @click="openChannelModal(ch)" class="text-[10px] px-2 py-1 rounded bg-slate-700/40 text-slate-400 hover:text-white hover:bg-slate-600/50 transition"><i class="fas fa-cog"></i></button>
+                            <button @click="deleteChannel(ch)" class="text-[10px] px-2 py-1 rounded bg-slate-700/40 text-red-400/70 hover:text-red-400 hover:bg-red-500/10 transition"><i class="fas fa-trash"></i></button>
+                        </div>
                     </div>
                 </div>
             </template>
+            <!-- Empty state -->
+            <div x-show="filteredChannels.length === 0" class="col-span-full text-center py-12">
+                <div class="text-4xl mb-3">📡</div>
+                <p class="text-slate-400 text-sm">لا توجد قنوات</p>
+                <button @click="showAddChannelModal = true" class="btn btn-primary btn-sm mt-3"><i class="fas fa-plus"></i> أضف قناة</button>
+            </div>
         </div>
 
         <!-- Add Channel Modal -->
         <div x-show="showAddChannelModal" class="modal-overlay" @click.self="showAddChannelModal = false" style="display:none">
-            <div class="modal">
-                <h3 class="font-bold text-lg mb-4">➕ إضافة قناة / مجموعة</h3>
-                <div class="space-y-3">
-                    <div><label class="block text-xs text-slate-400 mb-1" data-i18n="channel_name">Channel Name</label><input type="text" x-model="addChannelForm.title" class="input w-full" placeholder="Example: News Channel" data-i18n-placeholder="channel_example"></div>
-                    <div><label class="block text-xs text-slate-400 mb-1">Chat ID (معرف القناة)</label><input type="text" x-model="addChannelForm.chat_id" class="input w-full" placeholder="-1001234567890" dir="ltr"></div>
-                    <div><label class="block text-xs text-slate-400 mb-1" data-i18n="type">Type</label><select x-model="addChannelForm.type" class="input w-full"><option value="channel">📢 قناة</option><option value="group">👥 مجموعة</option><option value="supergroup">💬 مجموعة خارقة</option></select></div>
-                    <div><label class="block text-xs text-slate-400 mb-1">Platform</label><select x-model="addChannelForm.platform" class="input w-full"><option value="telegram">Telegram</option><option value="whatsapp">WhatsApp</option><option value="webhook">Webhook</option></select></div>
-                    <div><label class="block text-xs text-slate-400 mb-1">Channel Role</label><select x-model="addChannelForm.channel_role" class="input w-full"><option value="both">Source + Publish</option><option value="source">Source only</option><option value="publish">Publish only</option></select></div>
-                    <div><label class="block text-xs text-slate-400 mb-1">Owner Admin ID</label><input type="text" x-model="addChannelForm.owner_admin_id" class="input w-full" placeholder="current admin id"></div>
-                    <div><label class="block text-xs text-slate-400 mb-1">Manager Admin IDs (|)</label><input type="text" x-model="addChannelForm.managed_by_admin_ids" class="input w-full" placeholder="2|7|9"></div>
-                    <div><label class="block text-xs text-slate-400 mb-1" data-i18n="category">Category</label><select x-model="addChannelForm.category" class="input w-full"><option value="" data-i18n="uncategorized">Uncategorized</option><option value="رياضة">⚽ رياضة</option><option value="مال">💰 مال</option><option value="تداول">💱 تداول</option><option value="ألعاب">🎮 ألعاب</option><option value="أخبار">📰 أخبار</option><option value="تسويق">📣 تسويق</option><option value="ترفيه">🎬 ترفيه</option><option value="أخرى">📦 أخرى</option></select></div>
+            <div class="modal" style="max-width:520px">
+                <div class="flex items-center gap-3 mb-5">
+                    <div class="w-10 h-10 rounded-xl bg-blue-500/15 flex items-center justify-center"><i class="fas fa-plus text-blue-400"></i></div>
+                    <div>
+                        <h3 class="font-bold text-base">إضافة قناة / مجموعة</h3>
+                        <p class="text-[11px] text-slate-500">أضف قناة لتلقي المنشورات</p>
+                    </div>
                 </div>
-                <div class="flex gap-2 justify-end mt-4">
-                    <button @click="showAddChannelModal = false" class="btn btn-secondary btn-sm" data-i18n="cancel">Cancel</button>
-                    <button @click="addChannel()" class="btn btn-primary btn-sm" data-i18n="add">Add</button>
+                <div class="space-y-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div><label class="block text-xs text-slate-400 mb-1" data-i18n="channel_name">اسم القناة</label><input type="text" x-model="addChannelForm.title" class="input w-full text-sm" placeholder="مثال: قناة الأخبار" data-i18n-placeholder="channel_example"></div>
+                        <div><label class="block text-xs text-slate-400 mb-1">Chat ID</label><input type="text" x-model="addChannelForm.chat_id" class="input w-full text-sm" placeholder="-1001234567890" dir="ltr"></div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div><label class="block text-xs text-slate-400 mb-1" data-i18n="type">النوع</label><select x-model="addChannelForm.type" class="input w-full text-sm"><option value="channel">📢 قناة</option><option value="group">👥 مجموعة</option><option value="supergroup">💬 مجموعة خارقة</option></select></div>
+                        <div><label class="block text-xs text-slate-400 mb-1">المنصة</label><select x-model="addChannelForm.platform" class="input w-full text-sm"><option value="telegram">✈️ Telegram</option><option value="whatsapp">💬 WhatsApp</option><option value="webhook">🔗 Webhook</option></select></div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div><label class="block text-xs text-slate-400 mb-1">دور القناة</label><select x-model="addChannelForm.channel_role" class="input w-full text-sm"><option value="both">source + نشر</option><option value="source">source فقط</option><option value="publish">نشر فقط</option></select></div>
+                        <div><label class="block text-xs text-slate-400 mb-1" data-i18n="category">الفئة</label><select x-model="addChannelForm.category" class="input w-full text-sm"><option value="" data-i18n="uncategorized">بدون فئة</option><option value="رياضة">⚽ رياضة</option><option value="مال">💰 مال</option><option value="تداول">💱 تداول</option><option value="ألعاب">🎮 ألعاب</option><option value="أخبار">📰 أخبار</option><option value="تسويق">📣 تسويق</option><option value="ترفيه">🎬 ترفيه</option><option value="أخرى">📦 أخرى</option></select></div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div><label class="block text-xs text-slate-400 mb-1">Owner Admin ID</label><input type="text" x-model="addChannelForm.owner_admin_id" class="input w-full text-sm" placeholder="current admin id"></div>
+                        <div><label class="block text-xs text-slate-400 mb-1">Manager Admin IDs (|)</label><input type="text" x-model="addChannelForm.managed_by_admin_ids" class="input w-full text-sm" placeholder="2|7|9" dir="ltr"></div>
+                    </div>
+                </div>
+                <div class="flex gap-2 justify-end mt-5 pt-4 border-t border-slate-700/50">
+                    <button @click="showAddChannelModal = false" class="btn btn-secondary btn-sm" data-i18n="cancel">إلغاء</button>
+                    <button @click="addChannel()" class="btn btn-primary btn-sm" data-i18n="add"><i class="fas fa-plus"></i> إضافة</button>
                 </div>
             </div>
         </div>
@@ -581,40 +638,104 @@
 
     <!-- TAB: Groups — Nested hierarchy -->
     <div x-show="tab === 'groups'" class="space-y-4">
-        <div class="flex items-center gap-2">
-            <button @click="showGroupModal = true" class="btn btn-primary btn-sm">➕ إنشاء مجموعة</button>
-            <button @click="loadGroups()" class="btn btn-secondary btn-sm">🔄 تحديث</button>
+        <!-- KPI + Actions -->
+        <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+            <div class="flex gap-3">
+                <div class="bg-slate-800 rounded-xl border border-slate-700 px-4 py-2.5 flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-lg bg-blue-500/15 flex items-center justify-center text-sm">📂</div>
+                    <div><p class="text-[10px] text-slate-500">المجموعات</p><p class="text-lg font-bold text-blue-400" x-text="groups.length">0</p></div>
+                </div>
+                <div class="bg-slate-800 rounded-xl border border-slate-700 px-4 py-2.5 flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-lg bg-green-500/15 flex items-center justify-center text-sm">📡</div>
+                    <div><p class="text-[10px] text-slate-500">القنوات في المجموعات</p><p class="text-lg font-bold text-green-400" x-text="groups.reduce((sum, g) => sum + (g.channel_ids || '').split('|').filter(c => c && !c.startsWith('GRP')).length, 0)">0</p></div>
+                </div>
+            </div>
+            <div class="flex gap-2">
+                <button @click="loadGroups()" class="btn btn-secondary btn-sm"><i class="fas fa-sync-alt"></i> تحديث</button>
+                <button @click="showGroupModal = true" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> إنشاء مجموعة</button>
+            </div>
         </div>
-        <!-- Root groups (no parent) -->
-        <template x-for="g in groups.filter(x => !x.parent_id || !groups.find(y => y.id === x.parent_id))" :key="g.id">
-            <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
-                <div class="flex justify-between items-start">
-                    <div>
-                        <h3 class="font-bold" x-text="g.name"></h3>
-                        <p class="text-xs text-slate-400" x-text="g.description || '—'"></p>
-                        <div class="flex gap-2 mt-1 flex-wrap">
-                            <span class="text-xs px-2 py-0.5 rounded bg-slate-600 text-slate-300" x-text="(g.channel_ids || '').split('|').filter(c => c && !c.startsWith('GRP')).length + ' قناة'"></span>
+
+        <!-- Groups List -->
+        <div class="space-y-3">
+            <template x-for="g in groups.filter(x => !x.parent_id || !groups.find(y => y.id === x.parent_id))" :key="g.id">
+                <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+                    <!-- Group Header -->
+                    <div class="p-4">
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="flex items-center gap-3 min-w-0">
+                                <div class="w-10 h-10 rounded-lg bg-blue-500/15 flex items-center justify-center text-lg flex-shrink-0">📂</div>
+                                <div class="min-w-0">
+                                    <h4 class="font-bold text-sm" x-text="g.name"></h4>
+                                    <p class="text-[11px] text-slate-500 truncate" x-text="g.description || '—'"></p>
+                                </div>
+                            </div>
+                            <button @click="deleteGroup(g.id)" class="text-[10px] px-2 py-1 rounded bg-slate-700/40 text-red-400/70 hover:text-red-400 hover:bg-red-500/10 transition flex-shrink-0" data-i18n="delete"><i class="fas fa-trash"></i></button>
+                        </div>
+                        <!-- Stats pills -->
+                        <div class="flex gap-2 mt-3 flex-wrap">
+                            <span class="text-[10px] px-2 py-1 rounded-lg bg-slate-700/50 text-slate-300 flex items-center gap-1"><i class="fas fa-broadcast-tower text-[9px] text-blue-400"></i> <span x-text="(g.channel_ids || '').split('|').filter(c => c && !c.startsWith('GRP')).length"></span> قناة</span>
                             <template x-if="(g.channel_ids || '').split('|').filter(c => c && c.startsWith('GRP')).length > 0">
-                                <span class="text-xs px-2 py-0.5 rounded bg-purple-600/30 text-purple-300" x-text="(g.channel_ids || '').split('|').filter(c => c.startsWith('GRP')).length + ' مجموعة فرعية'"></span>
+                                <span class="text-[10px] px-2 py-1 rounded-lg bg-purple-500/10 text-purple-300 flex items-center gap-1"><i class="fas fa-folder text-[9px]"></i> <span x-text="(g.channel_ids || '').split('|').filter(c => c.startsWith('GRP')).length"></span> مجموعة فرعية</span>
                             </template>
                         </div>
-                        <!-- Sub-groups -->
-                        <div x-show="groups.filter(x => x.parent_id === g.id).length > 0" class="mt-2 pl-4 border-l-2 border-slate-600 space-y-1">
+                    </div>
+                    <!-- Sub-groups -->
+                    <div x-show="groups.filter(x => x.parent_id === g.id).length > 0" class="border-t border-slate-700/50 bg-slate-900/30 px-4 py-3">
+                        <p class="text-[10px] text-slate-500 mb-2">المجموعات الفرعية:</p>
+                        <div class="space-y-1.5">
                             <template x-for="sub in groups.filter(x => x.parent_id === g.id)" :key="sub.id">
-                                <div class="flex items-center gap-2 text-xs">
-                                    <span class="text-slate-500">└─</span>
-                                    <span class="text-slate-300" x-text="sub.name"></span>
-                                    <span class="text-slate-500" x-text="'(' + (sub.channel_ids || '').split('|').filter(c => c && !c.startsWith('GRP')).length + ')'"></span>
+                                <div class="flex items-center gap-2 text-xs bg-slate-800/50 rounded-lg px-3 py-2">
+                                    <span class="text-slate-600">└─</span>
+                                    <span class="font-medium text-slate-300" x-text="sub.name"></span>
+                                    <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-700/50 text-slate-500" x-text="(sub.channel_ids || '').split('|').filter(c => c && !c.startsWith('GRP')).length + ' قناة'"></span>
                                 </div>
                             </template>
                         </div>
                     </div>
-                    <button @click="deleteGroup(g.id)" class="btn btn-danger btn-sm" data-i18n="delete">Delete</button>
+                </div>
+            </template>
+            <!-- Empty state -->
+            <div x-show="groups.length === 0" class="text-center py-12">
+                <div class="text-4xl mb-3">📂</div>
+                <p class="text-slate-400 text-sm">لا توجد مجموعات</p>
+                <button @click="showGroupModal = true" class="btn btn-primary btn-sm mt-3"><i class="fas fa-plus"></i> إنشاء مجموعة</button>
+            </div>
+        </div>
+
+        <!-- Create Group Modal -->
+        <div x-show="showGroupModal" class="modal-overlay" @click.self="showGroupModal = false" style="display:none">
+            <div class="modal" style="max-width:480px">
+                <div class="flex items-center gap-3 mb-5">
+                    <div class="w-10 h-10 rounded-xl bg-blue-500/15 flex items-center justify-center"><i class="fas fa-folder-plus text-blue-400"></i></div>
+                    <div>
+                        <h3 class="font-bold text-base">إنشاء مجموعة قنوات</h3>
+                        <p class="text-[11px] text-slate-500">اجمع قنوات في مجموعة واحدة</p>
+                    </div>
+                </div>
+                <div class="space-y-3">
+                    <div><label class="block text-xs text-slate-400 mb-1">اسم المجموعة</label><input type="text" x-model="groupForm.name" class="input w-full text-sm" placeholder="مثال: مجموعة الأخبار"></div>
+                    <div><label class="block text-xs text-slate-400 mb-1">الوصف</label><input type="text" x-model="groupForm.description" class="input w-full text-sm" placeholder="وصف مختصر للمجموعة"></div>
+                    <div><label class="block text-xs text-slate-400 mb-1">المجموعة الأب (اختياري)</label><select x-model="groupForm.parentId" class="input w-full text-sm"><option value="">— بدون أب —</option><template x-for="g in groups.filter(x => !x.parent_id)" :key="g.id"><option :value="g.id" x-text="g.name"></option></template></select></div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">اختر القنوات</label>
+                        <div class="max-h-40 overflow-y-auto space-y-1 bg-slate-900/40 rounded-lg p-2 border border-slate-700/50">
+                            <template x-for="ch in channels" :key="ch.id">
+                                <label class="flex items-center gap-2 p-1.5 hover:bg-slate-700/30 rounded cursor-pointer transition text-sm">
+                                    <input type="checkbox" :value="ch.id" x-model="groupForm.selectedIds" class="rounded">
+                                    <span class="truncate" x-text="ch.title"></span>
+                                </label>
+                            </template>
+                            <p x-show="channels.length === 0" class="text-xs text-slate-500 text-center py-2">لا توجد قنوات</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex gap-2 justify-end mt-5 pt-4 border-t border-slate-700/50">
+                    <button @click="showGroupModal = false" class="btn btn-secondary btn-sm" data-i18n="cancel">إلغاء</button>
+                    <button @click="createGroup()" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> إنشاء</button>
                 </div>
             </div>
-        </template>
-        <p x-show="groups.length === 0" class="text-center text-slate-400 p-8">لا توجد مجموعات</p>
-        <div x-show="showGroupModal" class="modal-overlay" @click.self="showGroupModal = false" style="display:none"><div class="modal"><h3 class="font-bold text-lg mb-4">إنشاء مجموعة قنوات</h3><input type="text" x-model="groupForm.name" class="input w-full mb-2" placeholder="اسم المجموعة"><input type="text" x-model="groupForm.description" class="input w-full mb-2" placeholder="الوصف"><div class="mb-2"><label class="text-xs text-slate-400">المجموعة الأب (اختياري — لإنشاء مجموعة فرعية)</label><select x-model="groupForm.parentId" class="input w-full"><option value="">— بدون أب —</option><template x-for="g in groups.filter(x => !x.parent_id)" :key="g.id"><option :value="g.id" x-text="g.name"></option></template></select></div><div class="max-h-40 overflow-y-auto space-y-1 mb-3"><template x-for="ch in channels" :key="ch.id"><label class="flex items-center gap-2 p-1 hover:bg-slate-700 rounded cursor-pointer"><input type="checkbox" :value="ch.id" x-model="groupForm.selectedIds"><span x-text="ch.title"></span></label></template></div><div class="flex gap-2 justify-end"><button @click="showGroupModal = false" class="btn btn-secondary btn-sm" data-i18n="cancel">Cancel</button><button @click="createGroup()" class="btn btn-primary btn-sm">إنشاء</button></div></div></div>
+        </div>
     <!-- Posting Monitor -->
     <div x-show="postingStats" class="bg-slate-800 rounded-xl border border-slate-700 p-4 mt-4">
         <div class="flex items-center justify-between mb-3">
@@ -652,12 +773,53 @@
 
     <!-- TAB: Vault -->
     <div x-show="tab === 'vault'" class="space-y-4">
-        <input type="text" x-model="vaultSearch" @input.debounce.300ms="loadVault()" class="input w-full" placeholder="🔍 بحث...">
+        <!-- Search + Stats -->
+        <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+            <div class="relative flex-1 max-w-md">
+                <i class="fas fa-search absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+                <input type="text" x-model="vaultSearch" @input.debounce.300ms="loadVault()" class="input w-full pr-9 pl-3 py-2 text-sm" placeholder="🔍 بحث في المنشورات...">
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="text-xs text-slate-500" x-text="(vaultPosts || []).length + ' منشور'"></span>
+            </div>
+        </div>
+        <!-- Posts Table -->
         <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
-            <table class="data-table"><thead><tr><th data-i18n="date">Date</th><th>المزود</th><th>الأصلي</th><th>المعالج</th><th data-i18n="actions">Actions</th></tr></thead><tbody>
-                <template x-for="p in (vaultPosts || [])" :key="p.id"><tr class="hover:bg-slate-700/50"><td class="text-xs text-slate-400" x-text="p.created_at"></td><td><span class="text-xs px-2 py-0.5 rounded bg-blue-500/20 text-blue-400" x-text="p.ai_provider || 'manual'"></span></td><td class="text-xs max-w-xs truncate" x-text="(p.original_text || '').substring(0,50) + '...'"></td><td class="text-xs max-w-xs truncate" x-text="(p.processed_text || '').substring(0,50) + '...'"></td><td><button @click="repost(p.id)" class="btn btn-primary btn-sm">↻</button><button @click="deleteVaultPost(p.id)" class="btn btn-danger btn-sm">🗑️</button></td></tr></template>
-                <tr x-show="(vaultPosts || []).length === 0"><td colspan="5" class="text-center p-6 text-slate-400">لا توجد بوستات</td></tr>
-            </tbody></table>
+            <div class="overflow-x-auto">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th data-i18n="date">التاريخ</th>
+                            <th>المزود</th>
+                            <th>الأصلي</th>
+                            <th>المعالج</th>
+                            <th data-i18n="actions">الإجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="p in (vaultPosts || [])" :key="p.id">
+                            <tr class="hover:bg-slate-700/50">
+                                <td class="text-xs text-slate-400 whitespace-nowrap" x-text="p.created_at"></td>
+                                <td><span class="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400" x-text="p.ai_provider || 'manual'"></span></td>
+                                <td class="text-xs max-w-[200px] truncate text-slate-300" x-text="(p.original_text || '').substring(0,60)"></td>
+                                <td class="text-xs max-w-[200px] truncate text-slate-400" x-text="(p.processed_text || '').substring(0,60)"></td>
+                                <td>
+                                    <div class="flex gap-1">
+                                        <button @click="repost(p.id)" class="text-[10px] px-2 py-1 rounded bg-blue-500/15 text-blue-400 hover:bg-blue-500/25 transition" title="إعادة نشر"><i class="fas fa-redo"></i></button>
+                                        <button @click="deleteVaultPost(p.id)" class="text-[10px] px-2 py-1 rounded bg-red-500/10 text-red-400/70 hover:text-red-400 hover:bg-red-500/20 transition" title="حذف"><i class="fas fa-trash"></i></button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </template>
+                        <tr x-show="(vaultPosts || []).length === 0">
+                            <td colspan="5" class="text-center py-10">
+                                <div class="text-3xl mb-2">📦</div>
+                                <p class="text-slate-400 text-sm">لا توجد منشورات</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 
@@ -1889,7 +2051,7 @@ function channelsApp() {
         agentRunResult: null,
         platformForm: { platform: 'telegram', account_name: '', api_base_url: '', access_token: '', phone_number_id: '', business_account_id: '' },
         sourceForm: { title: '', chat_id: '', target_channel_ids: '', content_filter: 'all', ai_edit_text: true, ai_edit_media: false },
-        replacements: [], vaultSearch: '', filterCategory: '',
+        replacements: [], vaultSearch: '', filterCategory: '', filterPlatform: '', channelSearch: '',
         showGroupModal: false, showAddChannelModal: false, showCampaignModal: false,
         groupForm: { name: '', description: '', selectedIds: [], parentId: '' },
         addChannelForm: { title: '', chat_id: '', type: 'channel', platform: 'telegram', channel_role: 'both', owner_admin_id: '', managed_by_admin_ids: '', category: '' },
@@ -1926,8 +2088,18 @@ function channelsApp() {
         get filteredChannels() {
             try {
                 if (!Array.isArray(this.channels)) return [];
-                if (!this.filterCategory) return this.channels;
-                return this.channels.filter(c => (c.category || 'غير مصنف') === this.filterCategory);
+                let list = this.channels;
+                if (this.filterCategory) {
+                    list = list.filter(c => (c.category || 'غير مصنف') === this.filterCategory);
+                }
+                if (this.filterPlatform) {
+                    list = list.filter(c => (c.platform || 'telegram') === this.filterPlatform);
+                }
+                if (this.channelSearch) {
+                    const q = this.channelSearch.toLowerCase();
+                    list = list.filter(c => (c.title || '').toLowerCase().includes(q) || (c.chat_id || '').includes(q));
+                }
+                return list;
             } catch(e) { return []; }
         },
         get categoryGroups() {
