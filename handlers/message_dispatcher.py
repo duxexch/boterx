@@ -27,8 +27,7 @@ class MessageDispatcherMixin:
             _txt = (message.get('text') or '').strip()
             if _txt and not self._client_feature_allowed_text(_txt):
                 self.send_message(message['chat']['id'],
-                    "🚫 هذه الخدمة غير مشمولة باشتراكك الحالي.\n"
-                    "تواصل مع الإدارة لتفعيلها.")
+                    self.tr('client_feature_not_available', 'ar'))
                 return
 
         # فحص هل الرسالة من قناة/مجموعة البوت مشرف بها ← إعادة نشر تلقائي
@@ -115,10 +114,7 @@ class MessageDispatcherMixin:
                 # إشعار النجاح ثم إعادة توجيه حسب المصدر
                 fake_msg = {'chat': {'id': message['chat']['id']}, 'from': {'id': message['from']['id']}, 'text': ''}
                 self.send_message(message['chat']['id'],
-                    f"✅ <b>تم تسجيل رقم هاتفك الحقيقي بنجاح!</b>\n\n"
-                    f"📱 الرقم: <code>{phone}</code>\n"
-                    f"✅ تم التحقق: <b>نعم</b>\n\n"
-                    f"يمكنك الآن المشاركة في اليانصيب وعجلة الحظ")
+                    self.tr('phone_registration_success', 'ar').format(phone=phone))
                 # توجيه ذكي — لو القادم من عجلة الحظ، اعرضها. لو من اليانصيب، اعرضه.
                 # افحص آخر تفاعل — لو كان wheel، اعرض wheel. افتراضياً اعرض اليانصيب.
                 self.show_lottery_panel(fake_msg)
@@ -291,7 +287,7 @@ class MessageDispatcherMixin:
             )
             if not req_id:
                 if user_id in self.user_states: del self.user_states[user_id]
-                self.send_message(chat_id, _rec_err or "⚠️ لديك طلب تعويض معلق بالفعل — انتظر مراجعة الإدارة.")
+                self.send_message(chat_id, _rec_err or self.tr('comp_already_pending', 'ar'))
                 return
 
             # إشعار المستخدم
@@ -522,7 +518,7 @@ class MessageDispatcherMixin:
                 if amount <= 0:
                     raise ValueError
             except ValueError:
-                self.send_message(chat_id, "❌ اكتب مبلغاً رقمياً صحيحاً:")
+                self.send_message(chat_id, self.tr('deposit_invalid_amount', 'ar'))
                 self.user_states[user_id] = current_state
                 return
 
@@ -608,7 +604,7 @@ class MessageDispatcherMixin:
                 if amount <= 0:
                     raise ValueError
             except ValueError:
-                self.send_message(chat_id, '❌ اكتب مبلغاً رقمياً:')
+                self.send_message(chat_id, self.tr('deposit_invalid_amount', 'ar'))
                 self.user_states[user_id] = 'game_wallet_withdraw_amount'
                 return
             try:
@@ -649,7 +645,7 @@ class MessageDispatcherMixin:
             text = message.get('text', '').strip()
             del self.user_states[user_id]
             if not text:
-                self.send_message(chat_id, "❌ أرسل إيموجي صحيح:")
+                self.send_message(chat_id, self.tr('emoji_required', 'ar'))
                 return
             # استخراج كل الإيموجي من النص
             import re as _re
@@ -667,7 +663,7 @@ class MessageDispatcherMixin:
                 if len(text) <= 4 and any(ord(c) > 127 for c in text):
                     emojis_found = [text]
                 else:
-                    self.send_message(chat_id, "❌ لم يتم العثور على إيموجي صحيح. أرسل إيموجي:")
+                    self.send_message(chat_id, self.tr('emoji_not_found', 'ar'))
                     return
             added = 0
             for em in emojis_found:
@@ -696,7 +692,7 @@ class MessageDispatcherMixin:
             chat_id = message['chat']['id']
             del self.user_states[user_id]
             if 'photo' not in message:
-                self.send_message(chat_id, "❌ أرسل صورة (وليست نصاً):")
+                self.send_message(chat_id, self.tr('deposit_screenshot_required', 'ar'))
                 return
             # أخذ أكبر حجم صورة
             photo = message['photo'][-1]
@@ -723,7 +719,7 @@ class MessageDispatcherMixin:
             chat_id = message['chat']['id']
             del self.user_states[user_id]
             if 'sticker' not in message:
-                self.send_message(chat_id, "❌ أرسل استيكر (وليست نصاً):")
+                self.send_message(chat_id, self.tr('sticker_required', 'ar'))
                 return
             sticker = message['sticker']
             file_id = sticker.get('file_id', '')
@@ -1601,7 +1597,7 @@ class MessageDispatcherMixin:
             chat_id = message['chat']['id']
             text_msg = message.get('text', '').strip()
             if len(text_msg) < 3:
-                self.send_message(chat_id, "❌ النص قصير جداً. اكتب نص الهدية:")
+                self.send_message(chat_id, self.tr('gift_text_short', 'ar'))
                 return
             parts = text_msg.split('|', 1)
             gift_text = parts[0].strip()
@@ -1663,10 +1659,10 @@ class MessageDispatcherMixin:
                 try:
                     spin_cost = float(text_msg)
                     if spin_cost < 0:
-                        self.send_message(chat_id, "❌ التكلفة يجب أن تكون 0 أو أكثر:")
+                        self.send_message(chat_id, self.tr('wheel_invalid_cost', 'ar'))
                         return
                 except ValueError:
-                    self.send_message(chat_id, "❌ اكتب رقماً صحيحاً:")
+                    self.send_message(chat_id, self.tr('enter_valid_number', 'ar'))
                     return
                 self.temp_wheel[user_id]['spin_cost'] = str(spin_cost)
                 self.user_states[user_id] = 'wheel_currency'
@@ -1680,7 +1676,7 @@ class MessageDispatcherMixin:
                 chat_id = message['chat']['id']
                 text_msg = message.get('text', '').strip().upper()
                 if len(text_msg) < 2 or len(text_msg) > 5:
-                    self.send_message(chat_id, "❌ اكتب رمز عملة صحيح (2-5 أحرف):")
+                    self.send_message(chat_id, self.tr('invalid_currency_code', 'ar'))
                     return
                 self.temp_wheel[user_id]['currency'] = text_msg
                 self.user_states[user_id] = 'wheel_max'
@@ -1719,10 +1715,10 @@ class MessageDispatcherMixin:
                 try:
                     game_speed = int(text_msg)
                     if game_speed < 500 or game_speed > 10000:
-                        self.send_message(chat_id, "❌ اكتب رقماً بين 500 و 10000 (ملي ثانية):")
+                        self.send_message(chat_id, self.tr('enter_speed_range', 'ar'))
                         return
                 except ValueError:
-                    self.send_message(chat_id, "❌ اكتب رقماً صحيحاً:")
+                    self.send_message(chat_id, self.tr('enter_valid_number', 'ar'))
                     return
                 self.temp_wheel[user_id]['game_speed_ms'] = str(game_speed)
                 self.user_states[user_id] = 'wheel_relocations'
@@ -1740,10 +1736,10 @@ class MessageDispatcherMixin:
                 try:
                     max_reloc = int(text_msg)
                     if max_reloc < 1 or max_reloc > 2:
-                        self.send_message(chat_id, "❌ اكتب 1 أو 2 فقط:")
+                        self.send_message(chat_id, self.tr('enter_1_or_2', 'ar'))
                         return
                 except ValueError:
-                    self.send_message(chat_id, "❌ اكتب رقماً صحيحاً:")
+                    self.send_message(chat_id, self.tr('enter_valid_number', 'ar'))
                     return
 
                 data = self.temp_wheel.get(user_id, {})
@@ -2782,7 +2778,7 @@ class MessageDispatcherMixin:
         if not self.is_admin(user_id):
             if user_id in self.user_states:
                 del self.user_states[user_id]
-            self.send_message(chat_id, '⛔ هذا الإجراء متاح للإدارة فقط')
+            self.send_message(chat_id, self.tr('admin_only', 'ar'))
             return
         try:
             amount = float(str(amount_text).strip())
@@ -2795,12 +2791,12 @@ class MessageDispatcherMixin:
 
         req = self.svrp.get_recovery_request(req_id)
         if not req:
-            self.send_message(chat_id, '❌ الطلب غير موجود', self.admin_keyboard())
+            self.send_message(chat_id, self.tr('request_not_found', 'ar'), self.admin_keyboard())
             if user_id in self.user_states:
                 del self.user_states[user_id]
             return
         if req.get('status') == 'approved':
-            self.send_message(chat_id, '⚠️ الطلب مُوافق عليه مسبقاً', self.admin_keyboard())
+            self.send_message(chat_id, self.tr('request_already_approved', 'ar'), self.admin_keyboard())
             if user_id in self.user_states:
                 del self.user_states[user_id]
             return

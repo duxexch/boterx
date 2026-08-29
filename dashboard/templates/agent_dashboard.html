@@ -2,333 +2,271 @@
 <html lang="ar" dir="rtl">
 <head>
 <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/icon-32.png?v=20260816">
-<link rel="icon" href="/favicon.ico?v=20260816" sizes="any">
 <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png?v=20260816">
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=5.0">
 <meta name="robots" content="noindex,nofollow">
-<title>لوحة الوكيل — {{ agent.bot_name }}</title>
+<title>Agent Dashboard — {{ agent.bot_name }}</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:system-ui,sans-serif;background:#0b0e11;color:#eef2f6;min-height:100vh}
-.nav{position:sticky;top:0;background:rgba(6,8,16,.95);backdrop-filter:blur(10px);border-bottom:1px solid #262e39;padding:10px 16px;display:flex;justify-content:space-between;align-items:center;z-index:50}
-.nav-title{font-weight:800;font-size:15px}
-.nav-title span{color:#00e701}
-.container{max-width:600px;margin:0 auto;padding:16px}
-.kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
-.kpi{background:linear-gradient(135deg,#141920,#10141a);border:1px solid #262e39;border-radius:14px;padding:14px;text-align:center}
-.kpi-label{font-size:10px;color:#8794a3;margin-bottom:4px}
-.kpi-val{font-size:22px;font-weight:800}
-.kpi-val.green{color:#00e701}.kpi-val.amber{color:#fbbf24}.kpi-val.red{color:#ff4757}.kpi-val.blue{color:#3b82f6}.kpi-val.cyan{color:#06b6d4}.kpi-val.purple{color:#a78bfa}
-.section{background:linear-gradient(135deg,#141920,#10141a);border:1px solid #262e39;border-radius:14px;padding:16px;margin-bottom:14px}
-.section-title{font-size:14px;font-weight:700;margin-bottom:12px;color:#00e701}
-table{width:100%;border-collapse:collapse;font-size:12px}
-th{text-align:right;padding:6px;color:#8794a3;border-bottom:1px solid #262e39;font-weight:600}
-td{padding:6px;border-bottom:1px solid #141920}
+:root{--bg:#0b0e11;--card:#141920;--border:#262e39;--text:#eef2f6;--dim:#8794a3;--green:#4ade80;--amber:#fbbf24;--red:#f87171;--blue:#3b82f6;--purple:#a78bfa;--cyan:#22d3ee}
+body{font-family:'Cairo',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased}
+.nav{position:sticky;top:0;background:rgba(11,14,17,.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;justify-content:space-between;align-items:center;z-index:50}
+.nav-title{font-weight:800;font-size:15px;display:flex;align-items:center;gap:8px}
+.nav-title .dot{width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.container{max-width:640px;margin:0 auto;padding:12px}
+/* KPIs */
+.kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:12px}
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center}
+.kpi-label{font-size:10px;color:var(--dim);margin-bottom:2px;font-weight:600}
+.kpi-val{font-size:20px;font-weight:800}
+.kpi-val.green{color:var(--green)}.kpi-val.amber{color:var(--amber)}.kpi-val.red{color:var(--red)}.kpi-val.blue{color:var(--blue)}.kpi-val.cyan{color:var(--cyan)}.kpi-val.purple{color:var(--purple)}
+.kpi-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+/* Sections */
+.section{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:12px}
+.section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.section-title{font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px}
+.section-badge{background:var(--border);color:var(--dim);font-size:10px;padding:2px 6px;border-radius:8px;font-weight:700}
+/* Cards */
+.req-card{background:rgba(15,23,42,.4);border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px}
+.req-card-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
+.req-card-type{font-size:11px;font-weight:700;display:flex;align-items:center;gap:4px}
+.req-card-type.deposit{color:var(--green)}.req-card-type.withdraw{color:var(--red)}
+.req-card-amount{font-size:16px;font-weight:800}
+.req-card-meta{font-size:10px;color:var(--dim);display:flex;flex-wrap:wrap;gap:4px 10px}
+.req-card-actions{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+/* Buttons */
+.btn{padding:8px 14px;border-radius:8px;border:none;font-weight:700;font-size:12px;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:4px;font-family:inherit}
+.btn:active{transform:scale(.97)}
+.btn-green{background:rgba(74,222,128,.12);border:1px solid rgba(74,222,128,.25);color:var(--green)}
+.btn-green:hover{background:rgba(74,222,128,.2)}
+.btn-red{background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.25);color:var(--red)}
+.btn-red:hover{background:rgba(248,113,113,.2)}
+.btn-blue{background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.25);color:var(--blue)}
+.btn-blue:hover{background:rgba(59,130,246,.2)}
+.btn-amber{background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.25);color:var(--amber)}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--dim)}
+.btn-ghost:hover{background:rgba(100,116,139,.15);color:var(--text)}
+.btn-full{width:100%;justify-content:center}
+/* Tags */
 .tag{display:inline-block;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:700}
-.tag-approved{background:rgba(0,231,1,.15);color:#00e701}
-.tag-pending{background:rgba(251,191,36,.15);color:#fbbf24}
-.tag-rejected{background:rgba(255,71,87,.15);color:#ff4757}
-.method{display:flex;align-items:center;gap:10px;padding:10px;background:#1a2028;border:1px solid #262e39;border-radius:10px;margin-bottom:8px}
-.method-icon{font-size:20px}
-.method-info{flex:1}
-.method-name{font-size:13px;font-weight:700}
-.method-data{font-size:11px;color:#8794a3;font-family:monospace}
-.btn{padding:10px 16px;border-radius:10px;border:none;font-weight:700;font-size:13px;cursor:pointer}
-.btn-primary{background:linear-gradient(135deg,#00e701,#0d7a2f);color:#0b0e11}
-.btn-deposit{background:rgba(0,231,1,.12);border:1px solid rgba(0,231,1,.3);color:#00e701}
-.btn-edit{background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.3);color:#3b82f6;padding:6px 10px;font-size:11px}
-input,select{background:#1a2028;border:1px solid #262e39;border-radius:8px;padding:10px;color:#eef2f6;font-size:14px;width:100%}
-.search{margin-bottom:10px}
-.empty{text-align:center;color:#8794a3;padding:20px;font-size:13px}
-.logout{color:#ff4757;text-decoration:none;font-size:12px}
+.tag-green{background:rgba(74,222,128,.12);color:var(--green)}.tag-amber{background:rgba(251,191,36,.12);color:var(--amber)}.tag-red{background:rgba(248,113,113,.12);color:var(--red)}.tag-blue{background:rgba(59,130,246,.12);color:var(--blue)}
+/* Steps */
+.step{border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:6px;background:rgba(15,23,42,.3)}
+.step-head{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.step-num{width:24px;height:24px;border-radius:50%;background:var(--border);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0}
+.step-key{font-size:12px;font-weight:600}
+.step-role{font-size:10px;color:var(--dim)}
+.step-status{font-size:10px;padding:2px 8px;border-radius:6px;font-weight:700}
+.step-actions{display:flex;gap:6px;margin-top:8px}
+/* Forms */
+.form-row{display:flex;gap:8px;margin-bottom:8px}
+input,select{background:rgba(26,32,40,.8);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font-size:13px;width:100%;font-family:inherit}
+input:focus,select:focus{outline:none;border-color:var(--green)}
+.search{margin-bottom:8px}
+/* Method card */
+.method{display:flex;align-items:center;gap:10px;padding:10px;background:rgba(15,23,42,.4);border:1px solid var(--border);border-radius:10px;margin-bottom:6px}
+.method-icon{font-size:18px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;background:rgba(100,116,139,.1);border-radius:8px;flex-shrink:0}
+.method-info{flex:1;min-width:0}
+.method-name{font-size:12px;font-weight:700}
+.method-data{font-size:10px;color:var(--dim);font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Table */
+.tbl{width:100%;border-collapse:collapse;font-size:11px}
+.tbl th{text-align:right;padding:6px;color:var(--dim);border-bottom:1px solid var(--border);font-weight:600;font-size:10px}
+.tbl td{padding:6px;border-bottom:1px solid rgba(38,46,57,.5)}
+.tbl tr:hover{background:rgba(59,130,246,.05)}
+/* Empty */
+.empty{text-align:center;color:var(--dim);padding:16px;font-size:12px}
+.empty-icon{font-size:28px;margin-bottom:6px;display:block}
+/* Logout */
+.logout{color:var(--red);text-decoration:none;font-size:12px;font-weight:600;display:flex;align-items:center;gap:4px}
+/* Lang toggle */
+.lang-toggle{background:var(--border);color:var(--dim);border:none;padding:4px 8px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer}
+/* Steps panel */
+.steps-panel{display:none;background:rgba(15,23,42,.5);border:1px solid var(--border);border-radius:12px;padding:12px;margin-top:10px}
+/* Responsive */
+@media(max-width:400px){.kpis{grid-template-columns:1fr 1fr}.kpi-val{font-size:18px}.container{padding:8px}}
+@media(min-width:641px){.container{max-width:700px}}
 </style>
-<link rel="stylesheet" href="/static/css/bg-logo.css?v=1">
 </head>
 <body>
 <div class="nav">
-  <div class="nav-title">🤖 <span>{{ agent.bot_name }}</span></div>
-  <a href="/agent-logout" class="logout">خروج ←</a>
+  <div class="nav-title"><span class="dot"></span> <span id="agentName">{{ agent.bot_name }}</span></div>
+  <div style="display:flex;align-items:center;gap:8px">
+    <button class="lang-toggle" onclick="toggleLang()" id="langBtn">EN</button>
+    <a href="/agent-logout" class="logout" data-ar="خروج" data-en="Logout">خروج ←</a>
+  </div>
 </div>
 <div class="container">
   <!-- KPIs -->
   <div class="kpis">
-    <div class="kpi"><div class="kpi-label">الرصيد</div><div class="kpi-val green" id="balance">0</div></div>
-    <div class="kpi"><div class="kpi-label">🔒 الضمان</div><div class="kpi-val cyan" id="escrow">0</div></div>
-    <div class="kpi"><div class="kpi-label">معاملات اليوم</div><div class="kpi-val blue" id="daily">0/0</div></div>
-    <div class="kpi"><div class="kpi-label">حالة المرور</div><div class="kpi-val" id="traffic">—</div></div>
+    <div class="kpi"><div class="kpi-label" data-ar="💰 الرصيد" data-en="💰 Balance">💰 الرصيد</div><div class="kpi-val green" id="balance">0</div></div>
+    <div class="kpi"><div class="kpi-label" data-ar="🔒 الضمان" data-en="🔒 Escrow">🔒 الضمان</div><div class="kpi-val cyan" id="escrow">0</div></div>
+    <div class="kpi"><div class="kpi-label" data-ar="📊 معاملات اليوم" data-en="📊 Daily Txns">📊 معاملات اليوم</div><div class="kpi-val blue" id="daily">0/0</div></div>
+    <div class="kpi"><div class="kpi-label" data-ar="📡 حالة المرور" data-en="📡 Traffic">📡 حالة المرور</div><div class="kpi-val" id="traffic">—</div></div>
   </div>
-  <!-- Performance -->
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px">
-    <div class="kpi"><div class="kpi-label">📊 الدرجة</div><div class="kpi-val" id="score">50</div></div>
-    <div class="kpi"><div class="kpi-label">التصنيف</div><div class="kpi-val" id="tier">🥉 Bronze</div></div>
-    <div class="kpi"><div class="kpi-label">⚡ سرعة الاستجابة</div><div class="kpi-val" id="speed">—</div></div>
+  <div class="kpi-row">
+    <div class="kpi"><div class="kpi-label" data-ar="الدرجة" data-en="Score">الدرجة</div><div class="kpi-val" id="score">50</div></div>
+    <div class="kpi"><div class="kpi-label" data-ar="التصنيف" data-en="Tier">التصنيف</div><div class="kpi-val" id="tier">🥉 Bronze</div></div>
+    <div class="kpi"><div class="kpi-label" data-ar="⚡ السرعة" data-en="⚡ Speed">⚡ السرعة</div><div class="kpi-val" id="speed">—</div></div>
   </div>
 
-  <!-- Pending matching requests -->
+  <!-- Pending Requests -->
   <div class="section" id="pendingSection">
-    <div class="section-title">🔔 طلبات المطابقة المعلقة <span id="pendingCount"></span></div>
+    <div class="section-head">
+      <div class="section-title">🔔 <span data-ar="طلبات المطابقة" data-en="Matching Requests">طلبات المطابقة</span> <span class="section-badge" id="pendingCount"></span></div>
+    </div>
     <div id="pendingList"></div>
-    <div id="reqStepsPanel" style="display:none;margin-top:10px;background:#10141a;border:1px solid #262e39;border-radius:12px;padding:10px"></div>
+    <div class="steps-panel" id="reqStepsPanel"></div>
   </div>
 
+  <!-- Disputes -->
   <div class="section" id="disputesSection">
-    <div class="section-title">🆘 نزاعاتي المفتوحة <span id="disputesCount"></span></div>
+    <div class="section-head">
+      <div class="section-title">🆘 <span data-ar="نزاعاتي" data-en="My Disputes">نزاعاتي</span> <span class="section-badge" id="disputesCount"></span></div>
+    </div>
     <div id="disputesList"></div>
   </div>
 
   <!-- Deposit Balance -->
   <div class="section">
-    <div class="section-title">💰 إيداع الرصيد</div>
+    <div class="section-title" style="margin-bottom:10px">💰 <span data-ar="إيداع الرصيد" data-en="Deposit Balance">إيداع الرصيد</span></div>
     <div id="depMethodBox" class="method" style="display:none">
       <span class="method-icon">🏦</span>
-      <div class="method-info">
-        <div class="method-name" id="depMethodName">—</div>
-        <div class="method-data" id="depMethodData">—</div>
-      </div>
+      <div class="method-info"><div class="method-name" id="depMethodName">—</div><div class="method-data" id="depMethodData">—</div></div>
     </div>
-    <div id="depNoMethod" class="empty" style="display:none">لم يحدد الأدمن وسيلة إيداع لك بعد — تواصل مع الإدارة</div>
-    <div style="display:flex;gap:8px;margin-bottom:8px">
-      <input type="number" id="depAmount" placeholder="المبلغ" style="flex:1">
-      <input type="text" id="depWallet" placeholder="رقم محفظتك / مرجع التحويل" style="flex:1">
+    <div id="depNoMethod" class="empty" style="display:none" data-ar="لم يحدد الأدمن وسيلة إيداع — تواصل مع الإدارة" data-en="No deposit method configured — contact admin">لم يحدد الأدمن وسيلة إيداع — تواصل مع الإدارة</div>
+    <div class="form-row">
+      <input type="number" id="depAmount" data-ar-placeholder="المبلغ" data-en-placeholder="Amount" placeholder="المبلغ" style="flex:1">
+      <input type="text" id="depWallet" data-ar-placeholder="رقم المحفظة / المرجع" data-en-placeholder="Wallet / Reference" placeholder="رقم المحفظة / المرجع" style="flex:1">
     </div>
-    <button class="btn btn-deposit" onclick="depositBalance()" style="width:100%">💸 طلب إيداع الرصيد</button>
+    <button class="btn btn-green btn-full" onclick="depositBalance()">💸 <span data-ar="طلب إيداع" data-en="Request Deposit">طلب إيداع</span></button>
     <div id="depHistory" style="margin-top:10px"></div>
   </div>
 
   <!-- Payment Methods -->
   <div class="section">
-    <div class="section-title">💳 وسائل الدفع</div>
+    <div class="section-title" style="margin-bottom:10px">💳 <span data-ar="وسائل الدفع" data-en="Payment Methods">وسائل الدفع</span></div>
     <div id="methodsList"></div>
   </div>
 
   <!-- Transactions -->
   <div class="section">
-    <div class="section-title">📜 سجل المعاملات</div>
-    <input type="text" class="search" id="txnSearch" placeholder="🔍 بحث..." oninput="loadTxns()">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
-      <select id="txnStatus" onchange="loadTxns()">
-        <option value="">كل الحالات</option>
-        <option value="pending">معلق</option>
-        <option value="approved">مقبول</option>
-        <option value="rejected">مرفوض</option>
-      </select>
-      <select id="txnType" onchange="loadTxns()">
-        <option value="">كل الأنواع</option>
-        <option value="deposit">إيداع</option>
-        <option value="withdraw">سحب</option>
-      </select>
+    <div class="section-title" style="margin-bottom:10px">📜 <span data-ar="سجل المعاملات" data-en="Transaction History">سجل المعاملات</span></div>
+    <input type="text" class="search" id="txnSearch" data-ar-placeholder="🔍 بحث..." data-en-placeholder="🔍 Search..." oninput="loadTxns()">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px">
+      <select id="txnStatus" onchange="loadTxns()"><option value="" data-ar="كل الحالات" data-en="All Status">كل الحالات</option><option value="pending" data-ar="معلق" data-en="Pending">معلق</option><option value="approved" data-ar="مقبول" data-en="Approved">مقبول</option><option value="rejected" data-ar="مرفوض" data-en="Rejected">مرفوض</option></select>
+      <select id="txnType" onchange="loadTxns()"><option value="" data-ar="كل الأنواع" data-en="All Types">كل الأنواع</option><option value="deposit" data-ar="إيداع" data-en="Deposit">إيداع</option><option value="withdraw" data-ar="سحب" data-en="Withdraw">سحب</option></select>
       <input type="date" id="txnFrom" onchange="loadTxns()">
       <input type="date" id="txnTo" onchange="loadTxns()">
-      <input type="number" id="txnMin" placeholder="أقل مبلغ" oninput="loadTxns()">
-      <input type="number" id="txnMax" placeholder="أعلى مبلغ" oninput="loadTxns()">
+      <input type="number" id="txnMin" data-ar-placeholder="أقل مبلغ" data-en-placeholder="Min amount" oninput="loadTxns()">
+      <input type="number" id="txnMax" data-ar-placeholder="أعلى مبلغ" data-en-placeholder="Max amount" oninput="loadTxns()">
     </div>
     <div id="txnTable"></div>
   </div>
 </div>
 
 <script>
+var LANG='ar';
+function t(ar,en){return LANG==='ar'?ar:en}
+function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML}
+function toggleLang(){
+  LANG=LANG==='ar'?'en':'ar';
+  document.getElementById('langBtn').textContent=LANG==='ar'?'EN':'AR';
+  document.querySelectorAll('[data-ar]').forEach(function(el){el.textContent=el.getAttribute('data-'+LANG)||el.getAttribute('data-ar')});
+  document.querySelectorAll('[data-ar-placeholder]').forEach(function(el){el.placeholder=el.getAttribute('data-'+LANG+'-placeholder')||el.getAttribute('data-ar-placeholder')});
+  document.documentElement.lang=LANG;
+  document.documentElement.dir=LANG==='ar'?'rtl':'ltr';
+  loadPending();loadDisputes();loadTxns();loadMethods();loadDepHistory();
+}
 function loadSelf(){
-  fetch('/api/agent/self').then(r=>r.json()).then(d=>{
+  fetch('/api/agent/self').then(function(r){return r.json()}).then(function(d){
     document.getElementById('balance').textContent=parseFloat(d.balance||0).toFixed(0);
     document.getElementById('escrow').textContent=parseFloat(d.escrow_balance||0).toFixed(0);
-    document.getElementById('deposit').textContent=parseFloat(d.security_deposit||0).toFixed(0);
     document.getElementById('daily').textContent=(d.current_daily_count||0)+'/'+(d.max_daily_transactions||0);
     var t=document.getElementById('traffic');
-    t.textContent=d.traffic_enabled==='yes'?'▶️ نشط':'⏸️ متوقف';
+    t.textContent=d.traffic_enabled==='yes'?t('▶️ نشط','▶️ Active'):t('⏸️ متوقف','⏸️ Stopped');
     t.className='kpi-val '+(d.traffic_enabled==='yes'?'green':'red');
-    // Performance score + tier
-    var score = parseFloat(d.performance_score||50);
-    var scoreEl = document.getElementById('score');
-    scoreEl.textContent = score.toFixed(0);
-    scoreEl.className = 'kpi-val ' + (score >= 80 ? 'purple' : score >= 60 ? 'amber' : score >= 40 ? 'blue' : 'green');
-    var tiers = {platinum:'💎 Platinum',gold:'🥇 Gold',silver:'🥈 Silver',bronze:'🥉 Bronze'};
-    var tierEl = document.getElementById('tier');
-    tierEl.textContent = tiers[d.tier] || tiers.bronze;
-    // Response speed
-    var avgSec = parseFloat(d.avg_response_seconds||0);
-    var speedEl = document.getElementById('speed');
-    speedEl.textContent = avgSec > 0 ? avgSec.toFixed(0) + ' ثانية' : '—';
-    speedEl.className = 'kpi-val ' + (avgSec < 60 ? 'green' : avgSec < 180 ? 'amber' : 'red');
-    // Deposit method
-    var box=document.getElementById('depMethodBox'), none=document.getElementById('depNoMethod');
-    if(d.deposit_method_name){
-      box.style.display='flex';none.style.display='none';
-      document.getElementById('depMethodName').textContent=d.deposit_method_name;
-      document.getElementById('depMethodData').textContent=d.deposit_method_data||'—';
-    }else{box.style.display='none';none.style.display='block'}
+    var score=parseFloat(d.performance_score||50);
+    var scoreEl=document.getElementById('score');scoreEl.textContent=score.toFixed(0);
+    scoreEl.className='kpi-val '+(score>=80?'purple':score>=60?'amber':score>=40?'blue':'green');
+    var tiers={platinum:'💎 Platinum',gold:'🥇 Gold',silver:'🥈 Silver',bronze:'🥉 Bronze'};
+    document.getElementById('tier').textContent=tiers[d.tier]||tiers.bronze;
+    var avgSec=parseFloat(d.avg_response_seconds||0);
+    var speedEl=document.getElementById('speed');
+    speedEl.textContent=avgSec>0?avgSec.toFixed(0)+(LANG==='ar'?' ثانية':'s'):'—';
+    speedEl.className='kpi-val '+(avgSec<60?'green':avgSec<180?'amber':'red');
+    var box=document.getElementById('depMethodBox'),none=document.getElementById('depNoMethod');
+    if(d.deposit_method_name){box.style.display='flex';none.style.display='none';document.getElementById('depMethodName').textContent=d.deposit_method_name;document.getElementById('depMethodData').textContent=d.deposit_method_data||'—'}
+    else{box.style.display='none';none.style.display='block'}
   });
 }
-function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML}
 function loadPending(){
-  fetch('/api/agent/self/pending').then(r=>r.json()).then(d=>{
+  fetch('/api/agent/self/pending').then(function(r){return r.json()}).then(function(d){
     var list=d.transactions||[];
-    document.getElementById('pendingCount').textContent=list.length?('('+list.length+')'):'';
+    document.getElementById('pendingCount').textContent=list.length?list.length:'';
     var h='';
-    list.forEach(function(t){
-      var tid=t.txn_id||t.id;
-      h+='<div class="method"><span class="method-icon">'+(t.type==='deposit'?'💵':'💸')+'</span>'
-        +'<div class="method-info"><div class="method-name">'+(t.type==='deposit'?'إيداع (تدفع للمستخدم)':'سحب (تستلم من المستخدم)')+' — '+esc(t.amount)+' '+esc(t.currency||'EGP')+'</div>'
-        +'<div class="method-data">'+esc(t.user_name||t.user_id||'—')
-        +(t.company_name?' · '+esc(t.company_name):'')
-        +(t.request_state?' · state:'+esc(t.request_state):'')
-        +' · '+esc((t.created_at||'').slice(0,16))
-        +(tid?' · <span style="opacity:.7">'+esc(tid)+'</span>':'')+'</div></div>'
-        +((t.request_id||'')?'<button class="btn" style="background:rgba(59,130,246,.15);color:#3b82f6;padding:6px 10px;font-size:11px" onclick="openReqSteps(\''+esc(t.request_id)+'\')">🪜 خطوات</button>':'')
-        +'<button class="btn btn-primary" style="padding:6px 10px;font-size:11px" onclick="processTxn(\''+esc(tid)+'\',\'approved\')">✔ قبول</button>'
-        +'<button class="btn" style="background:rgba(255,71,87,.15);color:#ff4757;padding:6px 10px;font-size:11px" onclick="processTxn(\''+esc(tid)+'\',\'rejected\')">✖ رفض</button></div>';
+    list.forEach(function(tx){
+      var tid=tx.txn_id||tx.id;
+      var isDep=tx.type==='deposit';
+      h+='<div class="req-card"><div class="req-card-head"><div class="req-card-type '+(isDep?'deposit':'withdraw')+'">'+(isDep?'💵':'💸')+' '+(isDep?t('إيداع','Deposit'):t('سحب','Withdraw'))+'</div><div class="req-card-amount">'+esc(tx.amount)+' '+esc(tx.currency||'EGP')+'</div></div>'
+        +'<div class="req-card-meta"><span>'+esc(tx.user_name||tx.user_id||'—')+'</span>'+(tx.company_name?'<span>'+esc(tx.company_name)+'</span>':'')+(tx.request_state?'<span>'+esc(tx.request_state)+'</span>':'')+'<span>'+esc((tx.created_at||'').slice(0,16))+'</span></div>'
+        +'<div class="req-card-actions">'
+        +((tx.request_id||'')?'<button class="btn btn-blue" onclick="openReqSteps(\''+esc(tx.request_id)+'\')">🪜 '+t('خطوات','Steps')+'</button>':'')
+        +'<button class="btn btn-green" onclick="processTxn(\''+esc(tid)+'\',\'approved\')">✔ '+t('قبول','Approve')+'</button>'
+        +'<button class="btn btn-red" onclick="processTxn(\''+esc(tid)+'\',\'rejected\')">✖ '+t('رفض','Reject')+'</button>'
+        +'</div></div>';
     });
-    if(!h)h='<div class="empty">لا توجد طلبات معلقة</div>';
+    if(!h)h='<div class="empty"><span class="empty-icon">📭</span>'+t('لا توجد طلبات معلقة','No pending requests')+'</div>';
     document.getElementById('pendingList').innerHTML=h;
   });
 }
 function processTxn(tid,decision){
-  if(!confirm(decision==='approved'?'تأكيد قبول الطلب؟':'تأكيد رفض الطلب؟'))return;
+  var msg=decision==='approved'?t('تأكيد قبول الطلب؟','Confirm approve?'):t('تأكيد رفض الطلب؟','Confirm reject?');
+  if(!confirm(msg))return;
   fetch('/api/agent/self/transactions/'+tid+'/process',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({decision:decision})})
-  .then(r=>r.json()).then(d=>{
-    if(d.success){loadSelf();loadPending();loadTxns()}
-    else{alert(d.error||'فشل')}
-  });
+  .then(function(r){return r.json()}).then(function(d){if(d.success){loadSelf();loadPending();loadTxns()}else{alert(d.error||'Failed')}});
 }
 function openReqSteps(reqId){
   fetch('/api/agent/self/requests/'+encodeURIComponent(reqId)+'/steps')
-  .then(r=>r.json()).then(function(d){
-    if(d.error){ alert(d.error); return; }
-    var req = d.request||{};
-    var panel = document.getElementById('reqStepsPanel');
-    var steps = req.steps||[];
-    var h = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
-      +'<div style="font-size:12px;color:#8794a3">طلب: <code>'+esc(req.id||reqId)+'</code> · '+esc((req.status||'')+' / '+(req.state||''))+'</div>'
-      +'<button class="btn" style="padding:4px 8px;font-size:11px" onclick="this.parentNode.parentNode.style.display=\'none\'">إغلاق</button></div>';
-    h += '<div style="display:flex;gap:6px;margin-bottom:8px">'
-      +'<button class="btn btn-primary" style="padding:6px 8px;font-size:11px" onclick="claimReq(\''+esc(req.id||reqId)+'\')">Claim</button>'
-      +'<button class="btn" style="padding:6px 8px;font-size:11px;background:rgba(255,71,87,.15);color:#ff4757" onclick="openReqDispute(\''+esc(req.id||reqId)+'\')">🆘 شكوى</button>'
-      +'</div>';
-    if(!steps.length){
-      h += '<div class="empty">لا توجد خطوات</div>';
-    } else {
-      steps.forEach(function(s){
-        var color = s.status==='confirmed' ? '#00e701' : s.status==='action_done' ? '#fbbf24' : s.status==='escalated' ? '#ff4757' : '#8794a3';
-        h += '<div style="border:1px solid #262e39;border-radius:10px;padding:8px;margin-bottom:6px">'
-          +'<div style="font-size:12px;color:'+color+';font-weight:700">#'+esc(s.seq)+' '+esc(s.step_key||'step')+' ('+esc(s.actor_role||'')+') · '+esc(s.status||'')+'</div>'
-          +(s.evidence_ref?'<div style="font-size:11px;color:#06b6d4">Evidence: '+esc(s.evidence_ref)+'</div>':'')
-          +'<div style="display:flex;gap:6px;margin-top:6px">'
-          +((['pending','rejected','escalated'].indexOf(s.status)>=0)?'<button class="btn btn-primary" style="padding:4px 8px;font-size:11px" onclick="agentStepAction(\''+esc(req.id||reqId)+'\',\''+esc(s.id)+'\')">Action</button>':'')
-          +(s.status==='action_done'?'<button class="btn" style="background:rgba(0,231,1,.15);color:#00e701;padding:4px 8px;font-size:11px" onclick="agentStepConfirm(\''+esc(req.id||reqId)+'\',\''+esc(s.id)+'\',true)">Confirm</button><button class="btn" style="background:rgba(255,71,87,.15);color:#ff4757;padding:4px 8px;font-size:11px" onclick="agentStepConfirm(\''+esc(req.id||reqId)+'\',\''+esc(s.id)+'\',false)">Reject</button>':'')
-          +'</div></div>';
-      });
-    }
-    panel.innerHTML = h;
-    panel.style.display = 'block';
+  .then(function(r){return r.json()}).then(function(d){
+    if(d.error){alert(d.error);return}
+    var req=d.request||{};var steps=req.steps||[];
+    var panel=document.getElementById('reqStepsPanel');
+    var h='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
+      +'<div style="font-size:11px;color:var(--dim)">'+t('طلب','Request')+': <code style="color:var(--blue)">'+esc(req.id||reqId)+'</code> · '+esc((req.status||'')+' / '+(req.state||''))+'</div>'
+      +'<button class="btn btn-ghost" style="padding:4px 8px;font-size:10px" onclick="this.closest(\'.steps-panel\').style.display=\'none\'">'+t('إغلاق','Close')+'</button></div>'
+      +'<div style="display:flex;gap:6px;margin-bottom:8px">'
+      +'<button class="btn btn-green" onclick="claimReq(\''+esc(req.id||reqId)+'\')">📋 '+t('استلام','Claim')+'</button>'
+      +'<button class="btn btn-red" onclick="openReqDispute(\''+esc(req.id||reqId)+'\')">🆘 '+t('شكوى','Dispute')+'</button></div>';
+    if(!steps.length){h+='<div class="empty">'+t('لا توجد خطوات','No steps')+'</div>'}
+    else{steps.forEach(function(s){
+      var color=s.status==='confirmed'?'var(--green)':s.status==='action_done'?'var(--amber)':s.status==='escalated'?'var(--red)':'var(--dim)';
+      h+='<div class="step"><div class="step-head"><div style="display:flex;align-items:center;gap:6px"><span class="step-num">'+esc(s.seq)+'</span><div><span class="step-key">'+esc(s.step_key||'step')+'</span><span class="step-role"> ('+esc(s.actor_role||'')+')</span></div></div><span class="step-status" style="background:'+color+'20;color:'+color+'">'+esc(s.status)+'</span></div>'
+        +(s.evidence_ref?'<div style="font-size:10px;color:var(--cyan);margin-top:4px">Evidence: '+esc(s.evidence_ref)+'</div>':'')
+        +'<div class="step-actions">'
+        +(s.status==='pending'||s.status==='rejected'||s.status==='escalated'?'<button class="btn btn-blue" onclick="agentStepAction(\''+esc(req.id||reqId)+'\',\''+esc(s.id)+'\')">'+t('تنفيذ','Action')+'</button>':'')
+        +(s.status==='action_done'?'<button class="btn btn-green" onclick="agentStepConfirm(\''+esc(req.id||reqId)+'\',\''+esc(s.id)+'\',true)">'+t('تأكيد','Confirm')+'</button><button class="btn btn-red" onclick="agentStepConfirm(\''+esc(req.id||reqId)+'\',\''+esc(s.id)+'\',false)">'+t('رفض','Reject')+'</button>':'')
+        +'</div></div>';
+    })}
+    panel.innerHTML=h;panel.style.display='block';
   });
 }
-function claimReq(reqId){
-  fetch('/api/agent/self/requests/'+encodeURIComponent(reqId)+'/claim',{method:'POST'})
-    .then(r=>r.json()).then(function(d){ if(d.error){alert(d.error);return;} loadPending(); openReqSteps(reqId); });
-}
-function agentStepAction(reqId, stepId){
-  var ev = prompt('مرجع/دليل (اختياري):','') || '';
-  fetch('/api/agent/self/requests/'+encodeURIComponent(reqId)+'/steps/'+encodeURIComponent(stepId)+'/action',{
-    method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({evidence_ref:ev})
-  }).then(r=>r.json()).then(function(d){ if(d.error){alert(d.error);return;} loadPending(); openReqSteps(reqId); });
-}
-function agentStepConfirm(reqId, stepId, accept){
-  var note = accept ? '' : (prompt('سبب الرفض:','') || '');
-  fetch('/api/agent/self/requests/'+encodeURIComponent(reqId)+'/steps/'+encodeURIComponent(stepId)+'/confirm',{
-    method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({accept:!!accept,note:note})
-  }).then(r=>r.json()).then(function(d){ if(d.error){alert(d.error);return;} loadPending(); openReqSteps(reqId); });
-}
-function openReqDispute(reqId){
-  var reason = prompt('اكتب سبب الشكوى:','');
-  if(reason===null)return;
-  reason = String(reason||'').trim();
-  if(reason.length < 3){alert('سبب الشكوى قصير');return;}
-  fetch('/api/agent/self/requests/'+encodeURIComponent(reqId)+'/dispute',{
-    method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reason:reason})
-  }).then(r=>r.json()).then(function(d){
-    if(d.error){alert(d.error);return;}
-    alert('تم فتح الشكوى بنجاح');
-    loadDisputes();
-    openReqSteps(reqId);
-  });
-}
-function loadDisputes(){
-  fetch('/api/agent/self/disputes').then(r=>r.json()).then(function(d){
-    var list=d.disputes||[];
-    document.getElementById('disputesCount').textContent=list.length?('('+list.length+')'):'';
-    var h='';
-    list.slice(0,10).forEach(function(x){
-      h+='<div class="method"><span class="method-icon">🧾</span>'
-        +'<div class="method-info"><div class="method-name">'+esc(x.id||'')+' · '+esc(x.status||'')+'</div>'
-        +'<div class="method-data">طلب: '+esc(x.req_id||'')+' · '+esc((x.reason||'').slice(0,120))+'</div></div>'
-        +'<button class="btn btn-edit" onclick="openReqSteps(\''+esc(x.req_id||'')+'\')">فتح الطلب</button></div>';
-    });
-    if(!h)h='<div class="empty">لا توجد نزاعات مفتوحة</div>';
-    document.getElementById('disputesList').innerHTML=h;
-  });
-}
-function loadDepHistory(){
-  fetch('/api/agent/self/deposits').then(r=>r.json()).then(d=>{
-    var list=(d.requests||[]).slice(0,5);
-    if(!list.length){document.getElementById('depHistory').innerHTML='';return}
-    var h='<table><thead><tr><th>المبلغ</th><th>الحالة</th><th>التاريخ</th></tr></thead><tbody>';
-    list.forEach(function(r){
-      h+='<tr><td>'+esc(r.amount)+'</td><td><span class="tag tag-'+esc(r.status)+'">'+esc(r.status)+'</span></td><td>'+esc((r.created_at||'').slice(0,16))+'</td></tr>';
-    });
-    document.getElementById('depHistory').innerHTML=h+'</tbody></table>';
-  });
-}
-function loadMethods(){
-  fetch('/api/agent/self/payment-methods').then(r=>r.json()).then(d=>{
-    var h='';
-    (d.methods||[]).forEach(function(m){
-      h+='<div class="method"><span class="method-icon">'+esc(m.icon||'💳')+'</span><div class="method-info"><div class="method-name">'+esc(m.method_name)+'</div><div class="method-data">'+esc(m.account_data||'—')+'</div></div><button class="btn btn-edit" data-mid="'+esc(m.id)+'" onclick="editMethod(this.dataset.mid)">✏️</button></div>';
-    });
-    if(!h)h='<div class="empty">لا توجد وسائل دفع</div>';
-    document.getElementById('methodsList').innerHTML=h;
-  });
-}
-function editMethod(mid){
-  var newData=prompt('بيانات الحساب الجديدة:');
-  if(newData===null)return;
-  fetch('/api/agent/self/payment-methods/'+mid,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({account_data:newData})}).then(r=>r.json()).then(d=>{if(d.success){loadMethods();alert('تم التحديث')}else{alert('فشل')}});
-}
-function loadTxns(){
-  var p=new URLSearchParams();
-  var s=document.getElementById('txnSearch').value; if(s)p.set('search',s);
-  var st=document.getElementById('txnStatus').value; if(st)p.set('status',st);
-  var ty=document.getElementById('txnType').value; if(ty)p.set('type',ty);
-  var f=document.getElementById('txnFrom').value; if(f)p.set('date_from',f);
-  var t2=document.getElementById('txnTo').value; if(t2)p.set('date_to',t2);
-  var mn=document.getElementById('txnMin').value; if(mn)p.set('min_amount',mn);
-  var mx=document.getElementById('txnMax').value; if(mx)p.set('max_amount',mx);
-  var qs=p.toString();
-  fetch('/api/agent/self/transactions'+(qs?'?'+qs:'')).then(r=>r.json()).then(d=>{
-    var h='<table><thead><tr><th>النوع</th><th>المبلغ</th><th>المستخدم</th><th>الحالة</th><th>التاريخ</th></tr></thead><tbody>';
-    (d.transactions||[]).forEach(function(t){
-      var cls='tag-'+(t.status||'pending');
-      h+='<tr><td>'+(t.type==='deposit'?'💵':t.type==='withdraw'?'💸':'💰')+'</td><td>'+esc(t.amount)+'</td><td>'+esc(t.user_name||'—')+'</td><td><span class="tag '+cls+'">'+esc(t.status)+'</span></td><td>'+esc((t.created_at||t.processed_at||'').slice(0,16))+'</td></tr>';
-    });
-    if(!(d.transactions||[]).length)h+='<tr><td colspan="5" class="empty">لا توجد معاملات</td></tr>';
-    h+='</tbody></table>';
-    document.getElementById('txnTable').innerHTML=h;
-  });
-}
-function depositBalance(){
-  var amt=document.getElementById('depAmount').value;
-  var wal=document.getElementById('depWallet').value;
-  if(!amt||!wal){alert('املأ جميع الحقول');return}
-  fetch('/api/agent/self/deposit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({amount:parseFloat(amt),reference:wal})})
-  .then(r=>r.json()).then(d=>{
-    if(d.success){alert(d.message||'تم');document.getElementById('depAmount').value='';document.getElementById('depWallet').value='';loadDepHistory()}
-    else{alert(d.error||'فشل')}
-  });
-}
+function claimReq(reqId){fetch('/api/agent/self/requests/'+encodeURIComponent(reqId)+'/claim',{method:'POST'}).then(function(r){return r.json()}).then(function(d){if(d.error){alert(d.error);return}loadPending();openReqSteps(reqId)})}
+function agentStepAction(reqId,stepId){var ev=prompt(t('مرجع/دليل (اختياري):','Evidence (optional):'),'')||'';fetch('/api/agent/self/requests/'+encodeURIComponent(reqId)+'/steps/'+encodeURIComponent(stepId)+'/action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({evidence_ref:ev})}).then(function(r){return r.json()}).then(function(d){if(d.error){alert(d.error);return}loadPending();openReqSteps(reqId)})}
+function agentStepConfirm(reqId,stepId,accept){var note=accept?'':(prompt(t('سبب الرفض:','Rejection reason:'),'')||'');fetch('/api/agent/self/requests/'+encodeURIComponent(reqId)+'/steps/'+encodeURIComponent(stepId)+'/confirm',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({accept:!!accept,note:note})}).then(function(r){return r.json()}).then(function(d){if(d.error){alert(d.error);return}loadPending();openReqSteps(reqId)})}
+function openReqDispute(reqId){var reason=prompt(t('اكتب سبب الشكوى:','Dispute reason:'),'');if(reason===null)return;reason=String(reason||'').trim();if(reason.length<3){alert(t('سبب الشكوى قصير','Reason too short'));return}fetch('/api/agent/self/requests/'+encodeURIComponent(reqId)+'/dispute',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reason:reason})}).then(function(r){return r.json()}).then(function(d){if(d.error){alert(d.error);return}alert(t('تم فتح الشكوى','Dispute opened'));loadDisputes();openReqSteps(reqId)})}
+function loadDisputes(){fetch('/api/agent/self/disputes').then(function(r){return r.json()}).then(function(d){var list=d.disputes||[];document.getElementById('disputesCount').textContent=list.length?list.length:'';var h='';list.slice(0,10).forEach(function(x){h+='<div class="method"><span class="method-icon">🧾</span><div class="method-info"><div class="method-name">'+esc(x.id||'')+' · '+esc(x.status||'')+'</div><div class="method-data">'+esc(x.req_id||'')+' · '+esc((x.reason||'').slice(0,100))+'</div></div><button class="btn btn-blue" onclick="openReqSteps(\''+esc(x.req_id||'')+'\')">'+t('فتح','Open')+'</button></div>'});if(!h)h='<div class="empty"><span class="empty-icon">⚖️</span>'+t('لا توجد نزاعات','No disputes')+'</div>';document.getElementById('disputesList').innerHTML=h})}
+function loadDepHistory(){fetch('/api/agent/self/deposits').then(function(r){return r.json()}).then(function(d){var list=(d.requests||[]).slice(0,5);if(!list.length){document.getElementById('depHistory').innerHTML='';return}var h='<table class="tbl"><thead><tr><th>'+t('المبلغ','Amount')+'</th><th>'+t('الحالة','Status')+'</th><th>'+t('التاريخ','Date')+'</th></tr></thead><tbody>';list.forEach(function(r){h+='<tr><td>'+esc(r.amount)+'</td><td><span class="tag tag-'+esc(r.status)+'">'+esc(r.status)+'</span></td><td>'+esc((r.created_at||'').slice(0,16))+'</td></tr>'});document.getElementById('depHistory').innerHTML=h+'</tbody></table>'})}
+function loadMethods(){fetch('/api/agent/self/payment-methods').then(function(r){return r.json()}).then(function(d){var h='';(d.methods||[]).forEach(function(m){h+='<div class="method"><span class="method-icon">'+esc(m.icon||'💳')+'</span><div class="method-info"><div class="method-name">'+esc(m.method_name)+'</div><div class="method-data">'+esc(m.account_data||'—')+'</div></div><button class="btn btn-blue" onclick="editMethod(\''+esc(m.id)+'\')">✏️</button></div>'});if(!h)h='<div class="empty"><span class="empty-icon">💳</span>'+t('لا توجد وسائل دفع','No payment methods')+'</div>';document.getElementById('methodsList').innerHTML=h})}
+function editMethod(mid){var newData=prompt(t('بيانات الحساب الجديدة:','New account data:'));if(newData===null)return;fetch('/api/agent/self/payment-methods/'+mid,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({account_data:newData})}).then(function(r){return r.json()}).then(function(d){if(d.success){loadMethods();alert(t('تم التحديث','Updated'))}else{alert(t('فشل','Failed'))}})}
+function loadTxns(){var p=new URLSearchParams();var s=document.getElementById('txnSearch').value;if(s)p.set('search',s);var st=document.getElementById('txnStatus').value;if(st)p.set('status',st);var ty=document.getElementById('txnType').value;if(ty)p.set('type',ty);var f=document.getElementById('txnFrom').value;if(f)p.set('date_from',f);var t2=document.getElementById('txnTo').value;if(t2)p.set('date_to',t2);var mn=document.getElementById('txnMin').value;if(mn)p.set('min_amount',mn);var mx=document.getElementById('txnMax').value;if(mx)p.set('max_amount',mx);var qs=p.toString();fetch('/api/agent/self/transactions'+(qs?'?'+qs:'')).then(function(r){return r.json()}).then(function(d){var h='<table class="tbl"><thead><tr><th>'+t('النوع','Type')+'</th><th>'+t('المبلغ','Amount')+'</th><th>'+t('المستخدم','User')+'</th><th>'+t('الحالة','Status')+'</th><th>'+t('التاريخ','Date')+'</th></tr></thead><tbody>';(d.transactions||[]).forEach(function(tx){h+='<tr><td>'+(tx.type==='deposit'?'💵':tx.type==='withdraw'?'💸':'💰')+'</td><td>'+esc(tx.amount)+'</td><td>'+esc(tx.user_name||'—')+'</td><td><span class="tag tag-'+esc(tx.status)+'">'+esc(tx.status)+'</span></td><td>'+esc((tx.created_at||tx.processed_at||'').slice(0,16))+'</td></tr>'});if(!(d.transactions||[]).length)h+='<tr><td colspan="5" class="empty">'+t('لا توجد معاملات','No transactions')+'</td></tr>';h+='</tbody></table>';document.getElementById('txnTable').innerHTML=h})}
+function depositBalance(){var amt=document.getElementById('depAmount').value;var wal=document.getElementById('depWallet').value;if(!amt||!wal){alert(t('املأ جميع الحقول','Fill all fields'));return}fetch('/api/agent/self/deposit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({amount:parseFloat(amt),reference:wal})}).then(function(r){return r.json()}).then(function(d){if(d.success){alert(d.message||t('تم','Done'));document.getElementById('depAmount').value='';document.getElementById('depWallet').value='';loadDepHistory()}else{alert(d.error||'Failed')}})}
 loadSelf();loadPending();loadDisputes();loadMethods();loadTxns();loadDepHistory();
 setInterval(function(){loadSelf();loadPending();loadDisputes();sendHeartbeat()},15000);
-function sendHeartbeat(){
-  fetch('/api/agent/self/heartbeat',{method:'POST'}).catch(function(){});
-}
+function sendHeartbeat(){fetch('/api/agent/self/heartbeat',{method:'POST'}).catch(function(){})}
 </script>
 </body>
 </html>

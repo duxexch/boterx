@@ -1,82 +1,122 @@
 {% extends 'base.html' %}
-{% block title %}المطابقات — Boterx{% endblock %}
-{% block page_title %}🔄 المطابقات{% endblock %}
+{% block title %}{{ t('matching') }} — VEX{% endblock %}
+{% block page_title %}🔄 {{ t('matching') }}{% endblock %}
 
 {% block content %}
-<div x-data="matchingApp()" x-init="init()" class="space-y-6">
+<div x-data="matchingApp()" x-init="init()" class="space-y-4">
 
-    <!-- Tabs -->
-    <div class="flex gap-1 bg-slate-800 rounded-xl border border-slate-700 p-1 w-fit">
-        <button @click="setTab('active')" :class="tab === 'active' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'"
-                class="px-5 py-2 rounded-lg text-sm font-medium transition">
-            <i class="fas fa-circle-check ml-1"></i> <span x-text="t('active_matches_tab')">نشطة</span>
-            <span class="ml-1 px-1.5 py-0.5 rounded text-xs bg-slate-700" x-text="activeCount"></span>
-        </button>
-        <button @click="setTab('pending')" :class="tab === 'pending' ? 'bg-amber-600 text-white' : 'text-slate-400 hover:text-white'"
-                class="px-5 py-2 rounded-lg text-sm font-medium transition">
-            <i class="fas fa-clock ml-1"></i> <span x-text="t('pending_requests_tab')">معلقة</span>
-            <span class="ml-1 px-1.5 py-0.5 rounded text-xs bg-slate-700" x-text="pendingCount"></span>
-        </button>
-        <button @click="setTab('logs')" :class="tab === 'logs' ? 'bg-green-600 text-white' : 'text-slate-400 hover:text-white'"
-                class="px-5 py-2 rounded-lg text-sm font-medium transition">
-            <i class="fas fa-list ml-1"></i> <span x-text="t('logs_tab')">السجلات</span>
-        </button>
+    <!-- KPI Cards -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div class="kpi-card bg-slate-800 rounded-xl border border-slate-700 p-4">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-blue-500/15 flex items-center justify-center text-lg">🔄</div>
+                <div>
+                    <p class="kpi-label text-slate-400" x-text="lang==='ar' ? 'نشطة' : 'Active'"></p>
+                    <p class="kpi-value text-blue-400" x-text="activeCount">0</p>
+                </div>
+            </div>
+        </div>
+        <div class="kpi-card bg-slate-800 rounded-xl border border-slate-700 p-4">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-amber-500/15 flex items-center justify-center text-lg">⏳</div>
+                <div>
+                    <p class="kpi-label text-slate-400" x-text="lang==='ar' ? 'معلقة' : 'Pending'"></p>
+                    <p class="kpi-value text-amber-400" x-text="pendingCount">0</p>
+                </div>
+            </div>
+        </div>
+        <div class="kpi-card bg-slate-800 rounded-xl border border-slate-700 p-4">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-green-500/15 flex items-center justify-center text-lg">✅</div>
+                <div>
+                    <p class="kpi-label text-slate-400" x-text="lang==='ar' ? 'مكتملة' : 'Completed'"></p>
+                    <p class="kpi-value text-green-400" x-text="logs.filter(l => l.status === 'completed').length">0</p>
+                </div>
+            </div>
+        </div>
+        <div class="kpi-card bg-slate-800 rounded-xl border border-slate-700 p-4">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-red-500/15 flex items-center justify-center text-lg">⚖️</div>
+                <div>
+                    <p class="kpi-label text-slate-400" x-text="lang==='ar' ? 'نزاعات' : 'Disputes'"></p>
+                    <p class="kpi-value text-red-400" x-text="pendingRequests.filter(r => r.state === 'disputed' || r.state === 'escalated').length">0</p>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <!-- Active matches tab -->
-    <div x-show="tab === 'active'" class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
-        <div class="p-4 border-b border-slate-700">
-            <h3 class="font-semibold"><i class="fas fa-circle-check text-green-400 ml-1"></i> المطابقات النشطة</h3>
+    <!-- Tabs + Search -->
+    <div class="bg-slate-800 rounded-xl border border-slate-700 p-3">
+        <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+            <div class="flex gap-1.5 overflow-x-auto scrollbar-none">
+                <button @click="setTab('active')" :class="tab === 'active' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'" class="px-4 py-2 rounded-lg text-xs font-medium transition flex items-center gap-1.5 flex-shrink-0">
+                    <i class="fas fa-circle-check"></i>
+                    <span x-text="lang==='ar' ? 'نشطة' : 'Active'"></span>
+                    <span class="px-1.5 py-0.5 rounded text-[10px] bg-white/15" x-text="activeCount"></span>
+                </button>
+                <button @click="setTab('pending')" :class="tab === 'pending' ? 'bg-amber-600 text-white' : 'text-slate-400 hover:text-white'" class="px-4 py-2 rounded-lg text-xs font-medium transition flex items-center gap-1.5 flex-shrink-0">
+                    <i class="fas fa-clock"></i>
+                    <span x-text="lang==='ar' ? 'معلقة' : 'Pending'"></span>
+                    <span class="px-1.5 py-0.5 rounded text-[10px] bg-white/15" x-text="pendingCount"></span>
+                </button>
+                <button @click="setTab('logs')" :class="tab === 'logs' ? 'bg-green-600 text-white' : 'text-slate-400 hover:text-white'" class="px-4 py-2 rounded-lg text-xs font-medium transition flex items-center gap-1.5 flex-shrink-0">
+                    <i class="fas fa-list"></i>
+                    <span x-text="lang==='ar' ? 'السجلات' : 'Logs'"></span>
+                </button>
+                <button @click="setTab('disputes')" :class="tab === 'disputes' ? 'bg-red-600 text-white' : 'text-slate-400 hover:text-white'" class="px-4 py-2 rounded-lg text-xs font-medium transition flex items-center gap-1.5 flex-shrink-0">
+                    <i class="fas fa-gavel"></i>
+                    <span x-text="lang==='ar' ? 'نزاعات' : 'Disputes'"></span>
+                </button>
+            </div>
+            <div class="relative flex-1 max-w-xs w-full sm:w-auto">
+                <i class="fas fa-search absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+                <input type="text" x-model="searchQuery" class="input w-full pr-9 pl-3 py-1.5 text-xs" :placeholder="lang==='ar' ? '🔍 بحث...' : '🔍 Search...'">
+            </div>
         </div>
+    </div>
+
+    <!-- Active Matches -->
+    <div x-show="tab === 'active'" class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
         <div class="overflow-x-auto">
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th x-text="t('match_id')">المعرف</th>
-                        <th x-text="t('depositor')">المودع</th>
-                        <th x-text="t('withdrawer')">الساحب</th>
-                        <th data-i18n="amount">Amount</th>
-                        <th data-i18n="company">Company</th>
-                        <th data-i18n="status">Status</th>
-                        <th>تاريخ الإنشاء</th>
-                        <th data-i18n="actions">Actions</th>
+                        <th x-text="lang==='ar' ? 'المعرف' : 'ID'"></th>
+                        <th x-text="lang==='ar' ? 'المودع' : 'Depositor'"></th>
+                        <th x-text="lang==='ar' ? 'الساحب' : 'Withdrawer'"></th>
+                        <th x-text="lang==='ar' ? 'المبلغ' : 'Amount'"></th>
+                        <th x-text="lang==='ar' ? 'الشركة' : 'Company'"></th>
+                        <th x-text="lang==='ar' ? 'الحالة' : 'Status'"></th>
+                        <th x-text="lang==='ar' ? 'التاريخ' : 'Date'"></th>
+                        <th x-text="lang==='ar' ? 'إجراءات' : 'Actions'"></th>
                     </tr>
                 </thead>
                 <tbody>
                     <template x-if="loading">
-                        <tr><td colspan="7" class="text-center p-8 text-slate-400">
-                            <i class="fas fa-spinner fa-spin text-2xl"></i>
-                            <p class="mt-2" data-i18n="loading">Loading...</p>
+                        <tr><td colspan="8" class="text-center py-10"><i class="fas fa-spinner fa-spin text-2xl text-slate-500"></i></td></tr>
+                    </template>
+                    <template x-if="!loading && filteredActive.length === 0">
+                        <tr><td colspan="8" class="text-center py-10">
+                            <div class="text-3xl mb-2">🔄</div>
+                            <p class="text-slate-400 text-sm" x-text="lang==='ar' ? 'لا توجد مطابقات نشطة' : 'No active matches'"></p>
                         </td></tr>
                     </template>
-                    <template x-if="!loading && activeMatches.length === 0">
-                        <tr><td colspan="7" class="text-center p-8 text-slate-400">
-                            <i class="fas fa-inbox text-3xl mb-2"></i>
-                            <p>لا توجد مطابقات نشطة</p>
-                        </td></tr>
-                    </template>
-                    <template x-for="m in activeMatches" :key="m.id">
-                        <tr>
-                            <td class="font-mono text-xs" x-text="m.id || '—'"></td>
+                    <template x-for="m in filteredActive" :key="m.id">
+                        <tr class="hover:bg-slate-700/50">
+                            <td class="font-mono text-xs text-blue-400" x-text="m.id"></td>
                             <td>
-                                <div class="font-medium" x-text="m.depositor_alias || '—'"></div>
-                                <div class="text-xs text-slate-500" x-text="m.depositor_id || ''"></div>
+                                <div class="font-medium text-xs" x-text="m.depositor_alias || '—'"></div>
+                                <div class="text-[10px] text-slate-500" x-text="m.depositor_id || ''"></div>
                             </td>
                             <td>
-                                <div class="font-medium" x-text="m.withdrawer_alias || '—'"></div>
-                                <div class="text-xs text-slate-500" x-text="m.withdrawer_id || ''"></div>
+                                <div class="font-medium text-xs" x-text="m.withdrawer_alias || '—'"></div>
+                                <div class="text-[10px] text-slate-500" x-text="m.withdrawer_id || ''"></div>
                             </td>
-                            <td class="font-bold" x-text="fmtAmount(m.amount, m.currency)"></td>
-                            <td>
-                                <span class="px-2 py-0.5 rounded text-xs bg-purple-500/20 text-purple-400" x-text="m.company_name || '—'"></span>
-                            </td>
+                            <td class="font-bold text-sm" x-text="fmtAmount(m.amount, m.currency)"></td>
+                            <td><span class="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-400" x-text="m.company_name || '—'"></span></td>
                             <td x-html="statusBadge(m.status)"></td>
-                            <td class="text-xs text-slate-400" x-text="m.created_at || '—'"></td>
-                            <td>
-                                <button @click="openMatchDetail(m)" class="btn btn-primary btn-sm">
-                                    <i class="fas fa-eye"></i> تفاصيل
-                                </button>
-                            </td>
+                            <td class="text-[10px] text-slate-500 whitespace-nowrap" x-text="m.created_at || '—'"></td>
+                            <td><button @click="openMatchDetail(m)" class="text-[10px] px-2 py-1 rounded bg-blue-500/15 text-blue-400 hover:bg-blue-500/25 transition"><i class="fas fa-eye"></i></button></td>
                         </tr>
                     </template>
                 </tbody>
@@ -84,75 +124,58 @@
         </div>
     </div>
 
-    <!-- Pending requests tab -->
+    <!-- Pending Requests -->
     <div x-show="tab === 'pending'" class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
-        <div class="p-4 border-b border-slate-700">
-            <h3 class="font-semibold"><i class="fas fa-clock text-amber-400 ml-1"></i> الطلبات المعلقة</h3>
-        </div>
         <div class="overflow-x-auto">
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th x-text="t('match_id')">المعرف</th>
-                        <th data-i18n="user">User</th>
-                        <th data-i18n="type">Type</th>
-                        <th data-i18n="amount">Amount</th>
-                        <th data-i18n="company">Company</th>
-                        <th>🤖 الوكيل</th>
-                        <th>State</th>
-                        <th>Alias</th>
-                        <th data-i18n="date">Date</th>
-                        <th data-i18n="actions">Actions</th>
+                        <th x-text="lang==='ar' ? 'المعرف' : 'ID'"></th>
+                        <th x-text="lang==='ar' ? 'المستخدم' : 'User'"></th>
+                        <th x-text="lang==='ar' ? 'النوع' : 'Type'"></th>
+                        <th x-text="lang==='ar' ? 'المبلغ' : 'Amount'"></th>
+                        <th x-text="lang==='ar' ? 'الشركة' : 'Company'"></th>
+                        <th x-text="lang==='ar' ? 'الوكيل' : 'Agent'"></th>
+                        <th x-text="lang==='ar' ? 'الحالة' : 'State'"></th>
+                        <th x-text="lang==='ar' ? 'التاريخ' : 'Date'"></th>
+                        <th x-text="lang==='ar' ? 'إجراءات' : 'Actions'"></th>
                     </tr>
                 </thead>
                 <tbody>
                     <template x-if="loading">
-                        <tr><td colspan="10" class="text-center p-8 text-slate-400">
-                            <i class="fas fa-spinner fa-spin text-2xl"></i>
-                            <p class="mt-2" data-i18n="loading">Loading...</p>
+                        <tr><td colspan="9" class="text-center py-10"><i class="fas fa-spinner fa-spin text-2xl text-slate-500"></i></td></tr>
+                    </template>
+                    <template x-if="!loading && filteredPending.length === 0">
+                        <tr><td colspan="9" class="text-center py-10">
+                            <div class="text-3xl mb-2">⏳</div>
+                            <p class="text-slate-400 text-sm" x-text="lang==='ar' ? 'لا توجد طلبات معلقة' : 'No pending requests'"></p>
                         </td></tr>
                     </template>
-                    <template x-if="!loading && pendingRequests.length === 0">
-                        <tr><td colspan="10" class="text-center p-8 text-slate-400">
-                            <i class="fas fa-inbox text-3xl mb-2"></i>
-                            <p>لا توجد طلبات معلقة</p>
-                        </td></tr>
-                    </template>
-                    <template x-for="r in pendingRequests" :key="r.id">
-                        <tr>
-                            <td class="font-mono text-xs" x-text="r.id || '—'"></td>
+                    <template x-for="r in filteredPending" :key="r.id">
+                        <tr class="hover:bg-slate-700/50">
+                            <td class="font-mono text-xs text-blue-400" x-text="r.id"></td>
                             <td>
-                                <div class="font-medium" x-text="r.customer_id || '—'"></div>
-                                <div class="text-xs text-slate-500" x-text="r.user_id || ''"></div>
+                                <div class="font-medium text-xs" x-text="r.customer_id || r.user_id || '—'"></div>
+                                <div class="text-[10px] text-slate-500" x-text="r.alias || ''"></div>
                             </td>
                             <td>
-                                <span x-text="r.type === 'deposit' ? '💵 إيداع' : '💸 سحب'"
-                                      :class="r.type === 'deposit' ? 'text-green-400' : 'text-red-400'"></span>
+                                <span class="text-xs font-medium" :class="r.type === 'deposit' ? 'text-green-400' : r.type === 'withdraw' ? 'text-red-400' : 'text-blue-400'" x-text="r.type === 'deposit' ? '💵 ' + (lang==='ar'?'إيداع':'Deposit') : r.type === 'withdraw' ? '💸 ' + (lang==='ar'?'سحب':'Withdraw') : r.type === 'buy_usdt' ? '📈 ' + (lang==='ar'?'شراء USDT':'Buy USDT') : '📉 ' + (lang==='ar'?'بيع USDT':'Sell USDT')"></span>
                             </td>
-                            <td class="font-bold" x-text="fmtAmount(r.amount, r.currency)"></td>
+                            <td class="font-bold text-sm" x-text="fmtAmount(r.amount, r.currency)"></td>
+                            <td><span class="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-400" x-text="r.company_name || '—'"></span></td>
                             <td>
-                                <span class="px-2 py-0.5 rounded text-xs bg-purple-500/20 text-purple-400" x-text="r.company_name || '—'"></span>
-                            </td>
-                            <td>
-                                <span x-show="r.agent_name" class="px-2 py-0.5 rounded text-xs bg-blue-500/20 text-blue-400" x-text="r.agent_name || ''"></span>
-                                <span x-show="!r.agent_name" class="text-xs text-slate-500">بدون وكيل</span>
+                                <span x-show="r.agent_name || r.assigned_agent_id" class="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400" x-text="r.agent_name || r.assigned_agent_id"></span>
+                                <span x-show="!r.agent_name && !r.assigned_agent_id" class="text-[10px] text-slate-500" x-text="lang==='ar' ? 'بدون وكيل' : 'No agent'"></span>
                             </td>
                             <td>
-                                <span class="px-2 py-0.5 rounded text-xs bg-slate-700 text-slate-200" x-text="r.state || 'created'"></span>
+                                <span class="text-[10px] px-1.5 py-0.5 rounded" :class="r.state === 'disputed' || r.state === 'escalated' ? 'bg-red-500/15 text-red-400' : r.state === 'completed' ? 'bg-green-500/15 text-green-400' : 'bg-slate-700/50 text-slate-300'" x-text="r.state || 'created'"></span>
                             </td>
-                            <td class="text-sm" x-text="r.alias || '—'"></td>
-                            <td class="text-xs text-slate-400" x-text="r.created_at || '—'"></td>
+                            <td class="text-[10px] text-slate-500 whitespace-nowrap" x-text="r.created_at || '—'"></td>
                             <td>
                                 <div class="flex gap-1">
-                                    <button @click="openRequestDetail(r)" class="btn btn-primary btn-sm">
-                                        <i class="fas fa-list-check"></i> Steps
-                                    </button>
-                                    <button @click="approveRequest(r.id)" x-show="rbac('approve_deposits')" class="btn btn-success btn-sm">
-                                        <i class="fas fa-check"></i> <span x-text="t('approve')">قبول</span>
-                                    </button>
-                                    <button @click="rejectRequest(r.id)" x-show="rbac('reject_deposits')" class="btn btn-danger btn-sm">
-                                        <i class="fas fa-xmark"></i> <span x-text="t('reject')">رفض</span>
-                                    </button>
+                                    <button @click="openRequestDetail(r)" class="text-[10px] px-2 py-1 rounded bg-blue-500/15 text-blue-400 hover:bg-blue-500/25 transition" :title="lang==='ar' ? 'الخطوات' : 'Steps'"><i class="fas fa-list-check"></i></button>
+                                    <button @click="approveRequest(r.id)" x-show="rbac('approve_deposits')" class="text-[10px] px-2 py-1 rounded bg-green-500/15 text-green-400 hover:bg-green-500/25 transition" :title="lang==='ar' ? 'قبول' : 'Approve'"><i class="fas fa-check"></i></button>
+                                    <button @click="rejectRequest(r.id)" x-show="rbac('reject_deposits')" class="text-[10px] px-2 py-1 rounded bg-red-500/15 text-red-400 hover:bg-red-500/25 transition" :title="lang==='ar' ? 'رفض' : 'Reject'"><i class="fas fa-xmark"></i></button>
                                 </div>
                             </td>
                         </tr>
@@ -162,54 +185,93 @@
         </div>
     </div>
 
-    <!-- Logs tab -->
+    <!-- Logs -->
     <div x-show="tab === 'logs'" class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
-        <div class="p-4 border-b border-slate-700">
-            <h3 class="font-semibold"><i class="fas fa-list text-blue-400 ml-1"></i> سجل المطابقات (مكتملة / ملغاة)</h3>
-        </div>
         <div class="overflow-x-auto">
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th x-text="t('match_id')">المعرف</th>
-                        <th x-text="t('depositor')">المودع</th>
-                        <th x-text="t('withdrawer')">الساحب</th>
-                        <th data-i18n="amount">Amount</th>
-                        <th data-i18n="company">Company</th>
-                        <th data-i18n="status">Status</th>
-                        <th>تاريخ الإكمال</th>
+                        <th x-text="lang==='ar' ? 'المعرف' : 'ID'"></th>
+                        <th x-text="lang==='ar' ? 'المودع' : 'Depositor'"></th>
+                        <th x-text="lang==='ar' ? 'الساحب' : 'Withdrawer'"></th>
+                        <th x-text="lang==='ar' ? 'المبلغ' : 'Amount'"></th>
+                        <th x-text="lang==='ar' ? 'الشركة' : 'Company'"></th>
+                        <th x-text="lang==='ar' ? 'الحالة' : 'Status'"></th>
+                        <th x-text="lang==='ar' ? 'التاريخ' : 'Date'"></th>
                     </tr>
                 </thead>
                 <tbody>
                     <template x-if="loading">
-                        <tr><td colspan="7" class="text-center p-8 text-slate-400">
-                            <i class="fas fa-spinner fa-spin text-2xl"></i>
-                            <p class="mt-2" data-i18n="loading">Loading...</p>
+                        <tr><td colspan="7" class="text-center py-10"><i class="fas fa-spinner fa-spin text-2xl text-slate-500"></i></td></tr>
+                    </template>
+                    <template x-if="!loading && filteredLogs.length === 0">
+                        <tr><td colspan="7" class="text-center py-10">
+                            <div class="text-3xl mb-2">📋</div>
+                            <p class="text-slate-400 text-sm" x-text="lang==='ar' ? 'لا توجد سجلات' : 'No logs'"></p>
                         </td></tr>
                     </template>
-                    <template x-if="!loading && logs.length === 0">
-                        <tr><td colspan="7" class="text-center p-8 text-slate-400">
-                            <i class="fas fa-inbox text-3xl mb-2"></i>
-                            <p>لا توجد سجلات</p>
-                        </td></tr>
-                    </template>
-                    <template x-for="m in logs" :key="m.id">
-                        <tr>
-                            <td class="font-mono text-xs" x-text="m.id || '—'"></td>
+                    <template x-for="m in filteredLogs" :key="m.id">
+                        <tr class="hover:bg-slate-700/50">
+                            <td class="font-mono text-xs text-blue-400" x-text="m.id"></td>
                             <td>
-                                <div class="font-medium" x-text="m.depositor_alias || '—'"></div>
-                                <div class="text-xs text-slate-500" x-text="m.depositor_id || ''"></div>
+                                <div class="font-medium text-xs" x-text="m.depositor_alias || '—'"></div>
+                                <div class="text-[10px] text-slate-500" x-text="m.depositor_id || ''"></div>
                             </td>
                             <td>
-                                <div class="font-medium" x-text="m.withdrawer_alias || '—'"></div>
-                                <div class="text-xs text-slate-500" x-text="m.withdrawer_id || ''"></div>
+                                <div class="font-medium text-xs" x-text="m.withdrawer_alias || '—'"></div>
+                                <div class="text-[10px] text-slate-500" x-text="m.withdrawer_id || ''"></div>
                             </td>
-                            <td class="font-bold" x-text="fmtAmount(m.amount, m.currency)"></td>
-                            <td>
-                                <span class="px-2 py-0.5 rounded text-xs bg-purple-500/20 text-purple-400" x-text="m.company_name || '—'"></span>
-                            </td>
+                            <td class="font-bold text-sm" x-text="fmtAmount(m.amount, m.currency)"></td>
+                            <td><span class="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-400" x-text="m.company_name || '—'"></span></td>
                             <td x-html="statusBadge(m.status)"></td>
-                            <td class="text-xs text-slate-400" x-text="m.completed_at || m.created_at || '—'"></td>
+                            <td class="text-[10px] text-slate-500 whitespace-nowrap" x-text="m.completed_at || m.created_at || '—'"></td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Disputes -->
+    <div x-show="tab === 'disputes'" class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th x-text="lang==='ar' ? 'المعرف' : 'ID'"></th>
+                        <th x-text="lang==='ar' ? 'المستخدم' : 'User'"></th>
+                        <th x-text="lang==='ar' ? 'النوع' : 'Type'"></th>
+                        <th x-text="lang==='ar' ? 'المبلغ' : 'Amount'"></th>
+                        <th x-text="lang==='ar' ? 'السبب' : 'Reason'"></th>
+                        <th x-text="lang==='ar' ? 'الحالة' : 'Status'"></th>
+                        <th x-text="lang==='ar' ? 'إجراءات' : 'Actions'"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-if="loading">
+                        <tr><td colspan="7" class="text-center py-10"><i class="fas fa-spinner fa-spin text-2xl text-slate-500"></i></td></tr>
+                    </template>
+                    <template x-if="!loading && filteredDisputes.length === 0">
+                        <tr><td colspan="7" class="text-center py-10">
+                            <div class="text-3xl mb-2">⚖️</div>
+                            <p class="text-slate-400 text-sm" x-text="lang==='ar' ? 'لا توجد نزاعات' : 'No disputes'"></p>
+                        </td></tr>
+                    </template>
+                    <template x-for="r in filteredDisputes" :key="r.id">
+                        <tr class="hover:bg-slate-700/50">
+                            <td class="font-mono text-xs text-blue-400" x-text="r.id"></td>
+                            <td class="text-xs" x-text="r.user_id || '—'"></td>
+                            <td>
+                                <span class="text-xs" :class="r.type === 'deposit' ? 'text-green-400' : 'text-red-400'" x-text="r.type === 'deposit' ? '💵 ' + (lang==='ar'?'إيداع':'Deposit') : '💸 ' + (lang==='ar'?'سحب':'Withdraw')"></span>
+                            </td>
+                            <td class="font-bold text-sm" x-text="fmtAmount(r.amount, r.currency)"></td>
+                            <td class="text-xs text-slate-400 max-w-[150px] truncate" x-text="r.dispute_reason || r.state || '—'"></td>
+                            <td>
+                                <span class="text-[10px] px-1.5 py-0.5 rounded bg-red-500/15 text-red-400" x-text="r.state"></span>
+                            </td>
+                            <td>
+                                <button @click="openRequestDetail(r)" class="text-[10px] px-2 py-1 rounded bg-blue-500/15 text-blue-400 hover:bg-blue-500/25 transition"><i class="fas fa-eye"></i></button>
+                            </td>
                         </tr>
                     </template>
                 </tbody>
@@ -220,52 +282,49 @@
     <!-- Match Detail Modal -->
     <div x-show="showDetail" x-transition class="modal-overlay" @click.self="showDetail = false" style="display:none">
         <div class="modal" style="max-width:600px">
-            <h3 class="font-bold text-lg mb-3">تفاصيل المطابقة</h3>
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-10 h-10 rounded-xl bg-blue-500/15 flex items-center justify-center"><i class="fas fa-info-circle text-blue-400"></i></div>
+                <div>
+                    <h3 class="font-bold text-base" x-text="lang==='ar' ? 'تفاصيل المطابقة' : 'Match Details'"></h3>
+                    <p class="text-[11px] text-slate-500" x-text="selectedMatch?.id || ''"></p>
+                </div>
+            </div>
             <template x-if="selectedMatch">
                 <div class="space-y-4">
                     <div class="grid grid-cols-2 gap-3 text-sm">
-                        <div><span class="text-slate-400">ID:</span> <span class="font-mono" x-text="selectedMatch.id"></span></div>
-                        <div><span class="text-slate-400">المبلغ:</span> <span class="font-bold" x-text="fmtAmount(selectedMatch.amount, selectedMatch.currency)"></span></div>
-                        <div><span class="text-slate-400">المودع:</span> <span x-text="selectedMatch.depositor_id"></span></div>
-                        <div><span class="text-slate-400">الساحب:</span> <span x-text="selectedMatch.withdrawer_id"></span></div>
-                        <div><span class="text-slate-400">الشركة:</span> <span x-text="selectedMatch.company_name"></span></div>
-                        <div><span class="text-slate-400">الحالة:</span> <span x-html="statusBadge(selectedMatch.status)"></span></div>
-                        <div><span class="text-slate-400">الكود:</span> <span class="font-mono text-xs" x-text="selectedMatch.confirmation_code || '—'"></span></div>
-                        <div><span class="text-slate-400">النزاع:</span> <span x-text="selectedMatch.dispute_status || 'none'"></span></div>
+                        <div class="bg-slate-900/40 rounded-lg p-3"><span class="text-[10px] text-slate-500 block" x-text="lang==='ar'?'المبلغ':'Amount'"></span><span class="font-bold text-lg" x-text="fmtAmount(selectedMatch.amount, selectedMatch.currency)"></span></div>
+                        <div class="bg-slate-900/40 rounded-lg p-3"><span class="text-[10px] text-slate-500 block" x-text="lang==='ar'?'الحالة':'Status'"></span><span x-html="statusBadge(selectedMatch.status)"></span></div>
+                        <div class="bg-slate-900/40 rounded-lg p-3"><span class="text-[10px] text-slate-500 block" x-text="lang==='ar'?'المودع':'Depositor'"></span><span class="text-xs" x-text="selectedMatch.depositor_alias || selectedMatch.depositor_id"></span></div>
+                        <div class="bg-slate-900/40 rounded-lg p-3"><span class="text-[10px] text-slate-500 block" x-text="lang==='ar'?'الساحب':'Withdrawer'"></span><span class="text-xs" x-text="selectedMatch.withdrawer_alias || selectedMatch.withdrawer_id"></span></div>
+                        <div class="bg-slate-900/40 rounded-lg p-3"><span class="text-[10px] text-slate-500 block" x-text="lang==='ar'?'الشركة':'Company'"></span><span class="text-xs" x-text="selectedMatch.company_name || '—'"></span></div>
+                        <div class="bg-slate-900/40 rounded-lg p-3"><span class="text-[10px] text-slate-500 block" x-text="lang==='ar'?'كود التأكيد':'Confirmation'"></span><span class="text-xs font-mono" x-text="selectedMatch.confirmation_code || '—'"></span></div>
                     </div>
-                    
-                    <!-- Chat messages -->
+                    <!-- Chat -->
                     <div>
-                        <h4 class="text-sm font-semibold mb-2">💬 رسائل الدردشة</h4>
+                        <h4 class="text-xs font-semibold mb-2 flex items-center gap-1.5">💬 <span x-text="lang==='ar'?'المحادثة':'Chat'"></span></h4>
                         <div class="bg-slate-900/50 rounded-lg p-3 max-h-48 overflow-y-auto space-y-2">
-                            <template x-if="chatLoading">
-                                <p class="text-center text-slate-400 text-sm"><i class="fas fa-spinner fa-spin"></i></p>
-                            </template>
-                            <template x-if="!chatLoading && chatMessages.length === 0">
-                                <p class="text-center text-slate-500 text-sm">لا توجد رسائل</p>
-                            </template>
+                            <template x-if="chatLoading"><p class="text-center text-slate-400 text-xs"><i class="fas fa-spinner fa-spin"></i></p></template>
+                            <template x-if="!chatLoading && chatMessages.length === 0"><p class="text-center text-slate-500 text-xs" x-text="lang==='ar'?'لا توجد رسائل':'No messages'"></p></template>
                             <template x-for="msg in chatMessages" :key="msg.id">
-                                <div class="text-sm p-2 rounded-lg" :class="msg.sender_id === selectedMatch.depositor_id ? 'bg-blue-500/10' : 'bg-green-500/10'">
-                                    <span class="text-xs text-slate-400" x-text="msg.sender_alias"></span>
+                                <div class="text-xs p-2 rounded-lg" :class="msg.sender_id === selectedMatch.depositor_id ? 'bg-blue-500/10' : 'bg-green-500/10'">
+                                    <span class="text-[10px] text-slate-400" x-text="msg.sender_alias"></span>
                                     <p x-text="msg.message"></p>
-                                    <span class="text-xs text-slate-500" x-text="msg.timestamp"></span>
+                                    <span class="text-[10px] text-slate-500" x-text="msg.timestamp"></span>
                                 </div>
                             </template>
                         </div>
                     </div>
-
                     <!-- Dispute resolution -->
-                    <div x-show="selectedMatch.dispute_status === 'open' && rbac('view_financial')">
-                        <h4 class="text-sm font-semibold mb-2">⚖️ حل النزاع</h4>
+                    <div x-show="selectedMatch.dispute_status === 'open' && rbac('view_financial')" class="bg-red-500/5 border border-red-500/20 rounded-lg p-3">
+                        <h4 class="text-xs font-semibold mb-2 text-red-400">⚖️ <span x-text="lang==='ar'?'حل النزاع':'Resolve Dispute'"></span></h4>
                         <div class="flex gap-2">
-                            <button @click="resolveDispute(selectedMatch.id, 'depositor')" class="btn btn-primary btn-sm flex-1">✅ لصالح المودع</button>
-                            <button @click="resolveDispute(selectedMatch.id, 'withdrawer')" class="btn btn-success btn-sm flex-1">✅ لصالح الساحب</button>
-                            <button @click="resolveDispute(selectedMatch.id, 'cancel')" class="btn btn-danger btn-sm flex-1">❌ إلغاء</button>
+                            <button @click="resolveDispute(selectedMatch.id, 'depositor')" class="btn btn-primary btn-sm flex-1" x-text="lang==='ar'?'لصالح المودع':'For Depositor'"></button>
+                            <button @click="resolveDispute(selectedMatch.id, 'withdrawer')" class="btn btn-success btn-sm flex-1" x-text="lang==='ar'?'لصالح الساحب':'For Withdrawer'"></button>
+                            <button @click="resolveDispute(selectedMatch.id, 'cancel')" class="btn btn-danger btn-sm flex-1" x-text="lang==='ar'?'إلغاء':'Cancel'"></button>
                         </div>
                     </div>
-
-                    <div class="flex justify-end pt-2 border-t border-slate-700">
-                        <button @click="showDetail = false" class="btn btn-secondary btn-sm" data-i18n="close">Close</button>
+                    <div class="flex justify-end pt-2 border-t border-slate-700/50">
+                        <button @click="showDetail = false" class="btn btn-secondary btn-sm" x-text="lang==='ar'?'إغلاق':'Close'"></button>
                     </div>
                 </div>
             </template>
@@ -274,57 +333,61 @@
 
     <!-- Request Steps Modal -->
     <div x-show="showReqDetail" x-transition class="modal-overlay" @click.self="showReqDetail = false" style="display:none">
-        <div class="modal" style="max-width:760px">
-            <h3 class="font-bold text-lg mb-3">تفاصيل الطلب + الخطوات</h3>
+        <div class="modal" style="max-width:700px">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-10 h-10 rounded-xl bg-amber-500/15 flex items-center justify-center"><i class="fas fa-list-check text-amber-400"></i></div>
+                <div>
+                    <h3 class="font-bold text-base" x-text="lang==='ar' ? 'تفاصيل الطلب والخطوات' : 'Request Details & Steps'"></h3>
+                    <p class="text-[11px] text-slate-500" x-text="selectedRequest?.id || ''"></p>
+                </div>
+            </div>
             <template x-if="selectedRequest">
                 <div class="space-y-4">
-                    <div class="grid grid-cols-2 gap-3 text-sm">
-                        <div><span class="text-slate-400">ID:</span> <span class="font-mono" x-text="selectedRequest.id"></span></div>
-                        <div><span class="text-slate-400">الحالة:</span> <span class="font-mono" x-text="(selectedRequest.status||'') + ' / ' + (selectedRequest.state||'')"></span></div>
-                        <div><span class="text-slate-400">النوع:</span> <span x-text="selectedRequest.type"></span></div>
-                        <div><span class="text-slate-400">المبلغ:</span> <span class="font-bold" x-text="fmtAmount(selectedRequest.amount, selectedRequest.currency)"></span></div>
-                        <div><span class="text-slate-400">المستخدم:</span> <span x-text="selectedRequest.user_id"></span></div>
-                        <div><span class="text-slate-400">الوكيل:</span> <span x-text="selectedRequest.agent_name || selectedRequest.assigned_agent_id || '—'"></span></div>
+                    <!-- Request Info -->
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        <div class="bg-slate-900/40 rounded-lg p-2.5"><span class="text-[10px] text-slate-500 block" x-text="lang==='ar'?'النوع':'Type'"></span><span class="text-xs font-bold" :class="selectedRequest.type === 'deposit' ? 'text-green-400' : 'text-red-400'" x-text="selectedRequest.type"></span></div>
+                        <div class="bg-slate-900/40 rounded-lg p-2.5"><span class="text-[10px] text-slate-500 block" x-text="lang==='ar'?'المبلغ':'Amount'"></span><span class="text-xs font-bold" x-text="fmtAmount(selectedRequest.amount, selectedRequest.currency)"></span></div>
+                        <div class="bg-slate-900/40 rounded-lg p-2.5"><span class="text-[10px] text-slate-500 block" x-text="lang==='ar'?'الحالة':'State'"></span><span class="text-xs" x-text="(selectedRequest.state || 'created')"></span></div>
+                        <div class="bg-slate-900/40 rounded-lg p-2.5"><span class="text-[10px] text-slate-500 block" x-text="lang==='ar'?'المستخدم':'User'"></span><span class="text-xs" x-text="selectedRequest.user_id"></span></div>
+                        <div class="bg-slate-900/40 rounded-lg p-2.5"><span class="text-[10px] text-slate-500 block" x-text="lang==='ar'?'الوكيل':'Agent'"></span><span class="text-xs" x-text="selectedRequest.agent_name || selectedRequest.assigned_agent_id || '—'"></span></div>
+                        <div class="bg-slate-900/40 rounded-lg p-2.5"><span class="text-[10px] text-slate-500 block" x-text="lang==='ar'?'المعرف':'ID'"></span><span class="text-xs font-mono text-blue-400" x-text="selectedRequest.id"></span></div>
                     </div>
-
-                    <div class="flex gap-2" x-show="rbac('approve_deposits')">
-                        <button @click="claimRequest(selectedRequest.id)" class="btn btn-primary btn-sm">Claim</button>
-                        <button @click="takeoverRequest(selectedRequest.id)" class="btn btn-warning btn-sm">Takeover</button>
-                        <button @click="reassignRequest(selectedRequest.id)" class="btn btn-secondary btn-sm">Reassign</button>
+                    <!-- Admin Actions -->
+                    <div class="flex gap-2 flex-wrap" x-show="rbac('approve_deposits')">
+                        <button @click="claimRequest(selectedRequest.id)" class="btn btn-primary btn-sm"><i class="fas fa-hand-pointer"></i> <span x-text="lang==='ar'?'استلام':'Claim'"></span></button>
+                        <button @click="takeoverRequest(selectedRequest.id)" class="btn btn-warning btn-sm"><i class="fas fa-arrow-right-arrow-left"></i> <span x-text="lang==='ar'?'سحب':'Takeover'"></span></button>
+                        <button @click="reassignRequest(selectedRequest.id)" class="btn btn-secondary btn-sm"><i class="fas fa-user-group"></i> <span x-text="lang==='ar'?'إعادة تعيين':'Reassign'"></span></button>
                     </div>
-
+                    <!-- Steps -->
                     <div>
-                        <h4 class="text-sm font-semibold mb-2">🪜 الخطوات</h4>
+                        <h4 class="text-xs font-semibold mb-2 flex items-center gap-1.5">🪜 <span x-text="lang==='ar'?'الخطوات':'Steps'"></span></h4>
                         <div class="space-y-2 max-h-80 overflow-y-auto pr-1">
-                            <template x-if="requestStepsLoading">
-                                <div class="text-center text-slate-400 py-4"><i class="fas fa-spinner fa-spin"></i></div>
-                            </template>
-                            <template x-if="!requestStepsLoading && requestSteps.length === 0">
-                                <div class="text-center text-slate-500 py-4">لا توجد خطوات</div>
-                            </template>
+                            <template x-if="requestStepsLoading"><div class="text-center py-4"><i class="fas fa-spinner fa-spin text-slate-500"></i></div></template>
+                            <template x-if="!requestStepsLoading && requestSteps.length === 0"><div class="text-center py-4 text-slate-500 text-xs" x-text="lang==='ar'?'لا توجد خطوات':'No steps'"></div></template>
                             <template x-for="s in requestSteps" :key="s.id">
-                                <div class="p-3 rounded-lg border border-slate-700 bg-slate-900/40">
-                                    <div class="flex items-center justify-between">
-                                        <div class="text-sm font-medium">
-                                            <span class="text-slate-400" x-text="'#' + s.seq"></span>
-                                            <span x-text="s.step_key"></span>
-                                            <span class="text-xs text-slate-400" x-text="'(' + (s.actor_role || '—') + ')'" style="margin-right:6px"></span>
+                                <div class="p-3 rounded-lg border border-slate-700/50 bg-slate-900/30">
+                                    <div class="flex items-center justify-between gap-2">
+                                        <div class="flex items-center gap-2 min-w-0">
+                                            <span class="w-6 h-6 rounded-full bg-slate-700/50 flex items-center justify-center text-[10px] font-bold flex-shrink-0" x-text="s.seq"></span>
+                                            <div class="min-w-0">
+                                                <span class="text-xs font-medium" x-text="s.step_key"></span>
+                                                <span class="text-[10px] text-slate-500 ml-1" x-text="'(' + (s.actor_role || '—') + ')'"></span>
+                                            </div>
                                         </div>
-                                        <span class="px-2 py-0.5 rounded text-xs" :class="stepStatusClass(s.status)" x-text="s.status"></span>
+                                        <span class="text-[10px] px-1.5 py-0.5 rounded flex-shrink-0" :class="stepStatusClass(s.status)" x-text="s.status"></span>
                                     </div>
-                                    <div class="text-xs text-slate-400 mt-1" x-show="s.evidence_ref">Evidence: <span class="font-mono" x-text="s.evidence_ref"></span></div>
-                                    <div class="flex gap-2 mt-2" x-show="rbac('approve_deposits')">
-                                        <button @click="adminStepAction(selectedRequest.id, s.id)" class="btn btn-primary btn-sm" x-show="['pending','rejected','escalated'].includes(s.status)">Action</button>
-                                        <button @click="adminStepConfirm(selectedRequest.id, s.id, true)" class="btn btn-success btn-sm" x-show="s.status==='action_done'">Confirm</button>
-                                        <button @click="adminStepConfirm(selectedRequest.id, s.id, false)" class="btn btn-danger btn-sm" x-show="s.status==='action_done'">Reject</button>
+                                    <div class="text-[10px] text-slate-500 mt-1" x-show="s.evidence_ref" x-text="'Evidence: ' + s.evidence_ref"></div>
+                                    <div class="flex gap-1.5 mt-2" x-show="rbac('approve_deposits')">
+                                        <button @click="adminStepAction(selectedRequest.id, s.id)" class="text-[10px] px-2 py-1 rounded bg-blue-500/15 text-blue-400 hover:bg-blue-500/25 transition" x-show="['pending','rejected','escalated'].includes(s.status)" x-text="lang==='ar'?'تنفيذ':'Action'"></button>
+                                        <button @click="adminStepConfirm(selectedRequest.id, s.id, true)" class="text-[10px] px-2 py-1 rounded bg-green-500/15 text-green-400 hover:bg-green-500/25 transition" x-show="s.status==='action_done'" x-text="lang==='ar'?'تأكيد':'Confirm'"></button>
+                                        <button @click="adminStepConfirm(selectedRequest.id, s.id, false)" class="text-[10px] px-2 py-1 rounded bg-red-500/15 text-red-400 hover:bg-red-500/25 transition" x-show="s.status==='action_done'" x-text="lang==='ar'?'رفض':'Reject'"></button>
                                     </div>
                                 </div>
                             </template>
                         </div>
                     </div>
-
-                    <div class="flex justify-end pt-2 border-t border-slate-700">
-                        <button @click="showReqDetail = false" class="btn btn-secondary btn-sm">Close</button>
+                    <div class="flex justify-end pt-2 border-t border-slate-700/50">
+                        <button @click="showReqDetail = false" class="btn btn-secondary btn-sm" x-text="lang==='ar'?'إغلاق':'Close'"></button>
                     </div>
                 </div>
             </template>
@@ -345,73 +408,7 @@ function matchingApp() {
         activeCount: 0,
         pendingCount: 0,
         loading: true,
-
-        init() {
-            this.loadAll();
-        },
-
-        setTab(t) {
-            this.tab = t;
-        },
-
-        async loadAll() {
-            this.loading = true;
-            await Promise.all([
-                this.loadActive(),
-                this.loadPending(),
-                this.loadLogs()
-            ]);
-            this.loading = false;
-        },
-
-        async loadActive() {
-            try {
-                const res = await fetch('/api/matching/active');
-                const data = await res.json();
-                this.activeMatches = data.matches || [];
-                this.activeCount = data.count || 0;
-            } catch (e) { console.error(e); }
-        },
-
-        async loadPending() {
-            try {
-                const res = await fetch('/api/matching/pending');
-                const data = await res.json();
-                this.pendingRequests = data.requests || [];
-                this.pendingCount = data.count || 0;
-            } catch (e) { console.error(e); }
-        },
-
-        async loadLogs() {
-            try {
-                const res = await fetch('/api/matching/logs');
-                const data = await res.json();
-                this.logs = data.matches || [];
-            } catch (e) { console.error(e); }
-        },
-
-        async approveRequest(id) {
-            if (!confirm('هل أنت متأكد من قبول هذا الطلب؟')) return;
-            try {
-                await api('/api/matching/' + id + '/approve', { method: 'POST', body: '{}' });
-                toast('تم قبول الطلب', 'success');
-                this.loadAll();
-            } catch (e) {
-                toast('فشل قبول الطلب', 'error');
-            }
-        },
-
-        async rejectRequest(id) {
-            if (!confirm('هل أنت متأكد من رفض هذا الطلب؟')) return;
-            try {
-                await api('/api/matching/' + id + '/reject', { method: 'POST', body: '{}' });
-                toast('تم رفض الطلب', 'success');
-                this.loadAll();
-            } catch (e) {
-                toast('فشل رفض الطلب', 'error');
-            }
-        },
-
+        searchQuery: '',
         showDetail: false,
         selectedMatch: null,
         chatMessages: [],
@@ -421,108 +418,106 @@ function matchingApp() {
         requestSteps: [],
         requestStepsLoading: false,
 
+        get lang() { return this.$root?.__x?..$data?.lang || (typeof lang !== 'undefined' ? lang : 'ar'); },
+
+        get filteredActive() {
+            if (!this.searchQuery) return this.activeMatches;
+            const q = this.searchQuery.toLowerCase();
+            return this.activeMatches.filter(m => (m.id||'').toLowerCase().includes(q) || (m.depositor_alias||'').toLowerCase().includes(q) || (m.withdrawer_alias||'').toLowerCase().includes(q) || (m.company_name||'').toLowerCase().includes(q));
+        },
+        get filteredPending() {
+            if (!this.searchQuery) return this.pendingRequests;
+            const q = this.searchQuery.toLowerCase();
+            return this.pendingRequests.filter(r => (r.id||'').toLowerCase().includes(q) || (r.user_id||'').toLowerCase().includes(q) || (r.customer_id||'').toLowerCase().includes(q) || (r.agent_name||'').toLowerCase().includes(q) || (r.alias||'').toLowerCase().includes(q));
+        },
+        get filteredLogs() {
+            if (!this.searchQuery) return this.logs;
+            const q = this.searchQuery.toLowerCase();
+            return this.logs.filter(m => (m.id||'').toLowerCase().includes(q) || (m.depositor_alias||'').toLowerCase().includes(q) || (m.withdrawer_alias||'').toLowerCase().includes(q));
+        },
+        get filteredDisputes() {
+            return this.filteredPending.filter(r => r.state === 'disputed' || r.state === 'escalated');
+        },
+
+        init() { this.loadAll(); },
+        setTab(t) { this.tab = t; },
+
+        async loadAll() {
+            this.loading = true;
+            await Promise.all([this.loadActive(), this.loadPending(), this.loadLogs()]);
+            this.loading = false;
+        },
+
+        async loadActive() {
+            try { const res = await fetch('/api/matching/active'); const data = await res.json(); this.activeMatches = data.matches || []; this.activeCount = data.count || 0; } catch(e) { console.error(e); }
+        },
+        async loadPending() {
+            try { const res = await fetch('/api/matching/pending'); const data = await res.json(); this.pendingRequests = data.requests || []; this.pendingCount = data.count || 0; } catch(e) { console.error(e); }
+        },
+        async loadLogs() {
+            try { const res = await fetch('/api/matching/logs'); const data = await res.json(); this.logs = data.matches || []; } catch(e) { console.error(e); }
+        },
+
+        async approveRequest(id) {
+            const msg = this.lang === 'ar' ? 'هل أنت متأكد من قبول هذا الطلب؟' : 'Are you sure you want to approve this request?';
+            if (!confirm(msg)) return;
+            try { await api('/api/matching/' + id + '/approve', { method: 'POST', body: '{}' }); toast(this.lang==='ar'?'تم قبول الطلب':'Request approved', 'success'); this.loadAll(); } catch(e) { toast(this.lang==='ar'?'فشل قبول الطلب':'Failed to approve', 'error'); }
+        },
+        async rejectRequest(id) {
+            const msg = this.lang === 'ar' ? 'هل أنت متأكد من رفض هذا الطلب؟' : 'Are you sure you want to reject this request?';
+            if (!confirm(msg)) return;
+            try { await api('/api/matching/' + id + '/reject', { method: 'POST', body: '{}' }); toast(this.lang==='ar'?'تم رفض الطلب':'Request rejected', 'success'); this.loadAll(); } catch(e) { toast(this.lang==='ar'?'فشل رفض الطلب':'Failed to reject', 'error'); }
+        },
+
         async openMatchDetail(m) {
-            this.selectedMatch = m;
-            this.showDetail = true;
-            this.chatMessages = [];
-            this.chatLoading = true;
-            try {
-                const data = await api('/api/matching/' + m.id + '/chat');
-                this.chatMessages = data.messages || [];
-            } catch(e) { this.chatMessages = []; }
+            this.selectedMatch = m; this.showDetail = true; this.chatMessages = []; this.chatLoading = true;
+            try { const data = await api('/api/matching/' + m.id + '/chat'); this.chatMessages = data.messages || []; } catch(e) { this.chatMessages = []; }
             this.chatLoading = false;
         },
-
         async resolveDispute(matchId, favor) {
-            if (!confirm('حل النزاع: ' + favor + '؟')) return;
-            try {
-                await api('/api/matching/' + matchId + '/resolve-dispute', { method: 'POST', body: JSON.stringify({ favor }) });
-                toast('تم حل النزاع', 'success');
-                this.showDetail = false;
-                this.loadAll();
-            } catch(e) { toast('فشل حل النزاع', 'error'); }
+            const msg = this.lang === 'ar' ? 'حل النزاع: ' + favor + '؟' : 'Resolve dispute: ' + favor + '?';
+            if (!confirm(msg)) return;
+            try { await api('/api/matching/' + matchId + '/resolve-dispute', { method: 'POST', body: JSON.stringify({ favor }) }); toast(this.lang==='ar'?'تم حل النزاع':'Dispute resolved', 'success'); this.showDetail = false; this.loadAll(); } catch(e) { toast(this.lang==='ar'?'فشل حل النزاع':'Failed to resolve', 'error'); }
         },
 
-        stepStatusClass(st){
+        stepStatusClass(st) {
             if (st === 'confirmed') return 'bg-green-500/20 text-green-300';
             if (st === 'action_done') return 'bg-amber-500/20 text-amber-300';
             if (st === 'escalated') return 'bg-red-500/20 text-red-300';
             if (st === 'rejected') return 'bg-rose-500/20 text-rose-300';
-            return 'bg-slate-700 text-slate-200';
+            return 'bg-slate-700/50 text-slate-300';
         },
 
-        async openRequestDetail(r){
-            this.selectedRequest = r;
-            this.showReqDetail = true;
-            this.requestStepsLoading = true;
-            this.requestSteps = [];
-            try {
-                const data = await api('/api/matching/' + r.id + '/steps');
-                this.selectedRequest = data.request || r;
-                this.requestSteps = (data.request && data.request.steps) ? data.request.steps : [];
-            } catch(e){
-                toast('فشل تحميل تفاصيل الطلب', 'error');
-            }
+        async openRequestDetail(r) {
+            this.selectedRequest = r; this.showReqDetail = true; this.requestStepsLoading = true; this.requestSteps = [];
+            try { const data = await api('/api/matching/' + r.id + '/steps'); this.selectedRequest = data.request || r; this.requestSteps = (data.request && data.request.steps) ? data.request.steps : []; } catch(e) { toast(this.lang==='ar'?'فشل تحميل التفاصيل':'Failed to load details', 'error'); }
             this.requestStepsLoading = false;
         },
-
-        async claimRequest(reqId){
-            try {
-                await api('/api/matching/' + reqId + '/claim', { method:'POST', body:'{}' });
-                toast('تم claim الطلب', 'success');
-                this.openRequestDetail({id:reqId});
-                this.loadPending();
-            } catch(e){ toast('فشل claim', 'error'); }
+        async claimRequest(reqId) {
+            try { await api('/api/matching/' + reqId + '/claim', { method:'POST', body:'{}' }); toast(this.lang==='ar'?'تم استلام الطلب':'Request claimed', 'success'); this.openRequestDetail({id:reqId}); this.loadPending(); } catch(e) { toast(this.lang==='ar'?'فشل الاستلام':'Failed to claim', 'error'); }
         },
-
-        async takeoverRequest(reqId){
-            const reason = prompt('سبب السحب من المعالج الحالي:') || '';
-            try {
-                await api('/api/matching/' + reqId + '/takeover', {
-                    method:'POST', body: JSON.stringify({reason})
-                });
-                toast('تم takeover', 'success');
-                this.openRequestDetail({id:reqId});
-                this.loadPending();
-            } catch(e){ toast('فشل takeover', 'error'); }
+        async takeoverRequest(reqId) {
+            const msg = this.lang === 'ar' ? 'سبب السحب من المعالج الحالي:' : 'Reason for takeover:';
+            const reason = prompt(msg) || '';
+            try { await api('/api/matching/' + reqId + '/takeover', { method:'POST', body: JSON.stringify({reason}) }); toast(this.lang==='ar'?'تم السحب':'Takeover done', 'success'); this.openRequestDetail({id:reqId}); this.loadPending(); } catch(e) { toast(this.lang==='ar'?'فشل السحب':'Failed to takeover', 'error'); }
         },
-
-        async reassignRequest(reqId){
-            const agentId = prompt('أدخل Agent ID الجديد:');
+        async reassignRequest(reqId) {
+            const msg1 = this.lang === 'ar' ? 'أدخل Agent ID الجديد:' : 'Enter new Agent ID:';
+            const agentId = prompt(msg1);
             if(!agentId) return;
-            const reason = prompt('سبب إعادة التعيين:') || '';
-            try {
-                await api('/api/matching/' + reqId + '/reassign', {
-                    method:'POST', body: JSON.stringify({agent_id: agentId, reason})
-                });
-                toast('تمت إعادة التعيين', 'success');
-                this.openRequestDetail({id:reqId});
-                this.loadPending();
-            } catch(e){ toast('فشل إعادة التعيين', 'error'); }
+            const msg2 = this.lang === 'ar' ? 'سبب إعادة التعيين:' : 'Reason for reassign:';
+            const reason = prompt(msg2) || '';
+            try { await api('/api/matching/' + reqId + '/reassign', { method:'POST', body: JSON.stringify({agent_id: agentId, reason}) }); toast(this.lang==='ar'?'تمت إعادة التعيين':'Reassigned', 'success'); this.openRequestDetail({id:reqId}); this.loadPending(); } catch(e) { toast(this.lang==='ar'?'فشل إعادة التعيين':'Failed to reassign', 'error'); }
         },
-
-        async adminStepAction(reqId, stepId){
-            const evidence = prompt('مرجع/دليل (اختياري):') || '';
-            try {
-                await api('/api/matching/' + reqId + '/steps/' + stepId + '/action', {
-                    method:'POST', body: JSON.stringify({evidence_ref: evidence})
-                });
-                toast('تم تنفيذ الخطوة', 'success');
-                this.openRequestDetail({id:reqId});
-                this.loadPending();
-            } catch(e){ toast('فشل تنفيذ الخطوة', 'error'); }
+        async adminStepAction(reqId, stepId) {
+            const msg = this.lang === 'ar' ? 'مرجع/دليل (اختياري):' : 'Evidence (optional):';
+            const evidence = prompt(msg) || '';
+            try { await api('/api/matching/' + reqId + '/steps/' + stepId + '/action', { method:'POST', body: JSON.stringify({evidence_ref: evidence}) }); toast(this.lang==='ar'?'تم تنفيذ الخطوة':'Step executed', 'success'); this.openRequestDetail({id:reqId}); this.loadPending(); } catch(e) { toast(this.lang==='ar'?'فشل التنفيذ':'Failed to execute', 'error'); }
         },
-
-        async adminStepConfirm(reqId, stepId, accept){
-            const note = accept ? '' : (prompt('سبب الرفض:') || '');
-            try {
-                await api('/api/matching/' + reqId + '/steps/' + stepId + '/confirm', {
-                    method:'POST', body: JSON.stringify({accept, note})
-                });
-                toast(accept ? 'تم التأكيد' : 'تم الرفض', 'success');
-                this.openRequestDetail({id:reqId});
-                this.loadPending();
-            } catch(e){ toast('فشل تأكيد الخطوة', 'error'); }
+        async adminStepConfirm(reqId, stepId, accept) {
+            const msg = accept ? '' : (this.lang==='ar'?'سبب الرفض:':'Rejection reason:');
+            const note = accept ? '' : (prompt(msg) || '');
+            try { await api('/api/matching/' + reqId + '/steps/' + stepId + '/confirm', { method:'POST', body: JSON.stringify({accept, note}) }); toast(accept ? (this.lang==='ar'?'تم التأكيد':'Confirmed') : (this.lang==='ar'?'تم الرفض':'Rejected'), 'success'); this.openRequestDetail({id:reqId}); this.loadPending(); } catch(e) { toast(this.lang==='ar'?'فشل التأكيد':'Failed to confirm', 'error'); }
         }
     }
 }

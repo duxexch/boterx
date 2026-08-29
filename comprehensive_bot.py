@@ -4925,7 +4925,7 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         if ref_code == 'web_auth':
             user = self.find_user(user_id)
             if not user:
-                self.send_message(chat_id, "🔒 يجب التسجيل أولاً في البوت قبل الدخول للموقع.\n\nأرسل /start للتسجيل.")
+                self.send_message(chat_id, self.tr('web_auth_not_registered', 'ar'))
                 return
             import random as _r, time as _t, json as _json
             code = str(_r.randint(100000, 999999))
@@ -6187,7 +6187,7 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         user = self.find_user(user_id)
         lang = user.get('language', 'ar') if user else 'ar'
         if not user:
-            self.send_message(chat_id, self.tr('a0218_تسجيل_حساب', lang) if self.tr('a0218_تسجيل_حساب', lang) != 'a0218_تسجيل_حساب' else '⚠️ يجب تسجيل حساب أولاً')
+            self.send_message(chat_id, self.tr('match_register_first', lang))
             return
         # طلب نشط بالفعل؟
         if self.match_manager:
@@ -6334,10 +6334,10 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             elif 'بيع' in text and 'USDT' in text:
                 req_type = 'sell_usdt'
             else:
-                self.send_message(chat_id, '⚠️ اختر نوع العملية من الأزرار')
+                self.send_message(chat_id, self.tr('match_choose_type', user.get('language', 'ar')))
                 return
             self.user_states[user_id] = {'step': 'match_amount', 'type': req_type}
-            self.send_message(chat_id, '💰 أدخل المبلغ المطلوب:')
+            self.send_message(chat_id, self.tr('match_enter_amount', user.get('language', 'ar')))
             return
 
         if step == 'match_amount':
@@ -6346,7 +6346,7 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                 if amount <= 0 or amount > 1000000:
                     raise ValueError
             except ValueError:
-                self.send_message(chat_id, '⚠️ أدخل مبلغاً صحيحاً (أكبر من صفر)')
+                self.send_message(chat_id, self.tr('match_invalid_amount', user.get('language', 'ar')))
                 return
             req_type = state.get('type', 'deposit')
             currency = user.get('currency', 'EGP') or 'EGP'
@@ -6883,7 +6883,7 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             logger.info(f"Snatch results: score={score}, gifts={len(caught_gifts)}")
         except Exception as e:
             logger.error(f"Snatch data parse error: {e}")
-            self.send_message(chat_id, "❌ خطأ في معالجة نتائج اللعبة", self.main_keyboard(lang, user_id))
+            self.send_message(chat_id, self.tr('game_result_error', lang), self.main_keyboard(lang, user_id))
             return
 
         if not caught_gifts:

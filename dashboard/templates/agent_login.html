@@ -2,53 +2,66 @@
 <html lang="ar" dir="rtl">
 <head>
 <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/icon-32.png?v=20260816">
-<link rel="icon" href="/favicon.ico?v=20260816" sizes="any">
 <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png?v=20260816">
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=5.0">
 <meta name="robots" content="noindex,nofollow">
-<title>وكلاء VEX — تسجيل الدخول</title>
+<title>Agent Login — VEX</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:system-ui,sans-serif;background:#0b0e11;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
-.card{background:linear-gradient(180deg,#141920,#10141a);border:1px solid #262e39;border-radius:18px;padding:30px;max-width:360px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.5)}
-.logo{font-size:28px;font-weight:900;text-align:center;margin-bottom:6px;background:linear-gradient(135deg,#00e701,#0d7a2f);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.sub{text-align:center;font-size:12px;color:#8794a3;margin-bottom:24px}
-.field{margin-bottom:14px}
-.field label{display:block;font-size:12px;color:#8794a3;margin-bottom:4px}
-.field input{width:100%;background:#1a2028;border:1px solid #262e39;border-radius:10px;padding:12px;color:#eef2f6;font-size:14px}
-.field input:focus{outline:none;border-color:#00e701}
-.btn{width:100%;padding:14px;border-radius:12px;border:none;background:linear-gradient(135deg,#00e701,#0d7a2f);color:#0b0e11;font-weight:800;font-size:15px;cursor:pointer;transition:all .2s}
+body{font-family:'Cairo',system-ui,sans-serif;background:#0b0e11;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px}
+.card{background:linear-gradient(180deg,#141920,#10141a);border:1px solid #262e39;border-radius:20px;padding:32px 24px;max-width:380px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.5)}
+.logo{text-align:center;margin-bottom:4px}
+.logo-icon{font-size:40px;margin-bottom:8px;display:block}
+.logo-text{font-size:24px;font-weight:900;background:linear-gradient(135deg,#4ade80,#059669);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.sub{text-align:center;font-size:12px;color:#8794a3;margin-bottom:28px}
+.field{margin-bottom:16px}
+.field label{display:block;font-size:12px;color:#8794a3;margin-bottom:6px;font-weight:600}
+.field input{width:100%;background:rgba(26,32,40,.8);border:1px solid #262e39;border-radius:10px;padding:12px 14px;color:#eef2f6;font-size:14px;transition:border-color .15s;font-family:inherit}
+.field input:focus{outline:none;border-color:#4ade80}
+.field input::placeholder{color:#4b5563}
+.btn{width:100%;padding:14px;border-radius:12px;border:none;background:linear-gradient(135deg,#4ade80,#059669);color:#0b0e11;font-weight:800;font-size:15px;cursor:pointer;transition:all .2s;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px}
 .btn:active{transform:scale(.97)}
-.err{color:#ff4757;font-size:12px;text-align:center;margin-top:10px;min-height:16px}
-.link{text-align:center;margin-top:16px;font-size:11px}
-.link a{color:#8794a3;text-decoration:none}
+.btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.err{color:#f87171;font-size:12px;text-align:center;margin-top:12px;min-height:16px}
+.link{text-align:center;margin-top:20px;font-size:11px}
+.link a{color:#8794a3;text-decoration:none;transition:color .15s}
+.link a:hover{color:#4ade80}
+.lang-toggle{position:fixed;top:12px;right:12px;background:#262e39;color:#8794a3;border:none;padding:6px 12px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit}
+.lang-toggle:hover{background:#374151;color:#eef2f6}
+@media(max-width:400px){.card{padding:24px 16px}.logo-text{font-size:20px}}
 </style>
-<link rel="stylesheet" href="/static/css/bg-logo.css?v=1">
 </head>
 <body>
+<button class="lang-toggle" onclick="toggleLang()" id="langBtn">EN</button>
 <div class="card">
-  <div class="logo">🤖 VEX Agents</div>
-  <div class="sub">بوابة الوكلاء — نظام المطابقة</div>
-  <div class="field"><label>اسم المستخدم</label><input type="text" id="username" placeholder="agent1" dir="ltr" autofocus></div>
-  <div class="field"><label>كلمة المرور</label><input type="password" id="password" placeholder="••••••" dir="ltr"></div>
-  <button class="btn" onclick="login()">🔐 دخول</button>
+  <div class="logo">
+    <span class="logo-icon">🤖</span>
+    <span class="logo-text">VEX Agents</span>
+  </div>
+  <div class="sub" id="subText">بوابة الوكلاء — نظام المطابقة</div>
+  <div class="field"><label id="lblUser">اسم المستخدم</label><input type="text" id="username" placeholder="agent1" dir="ltr" autofocus></div>
+  <div class="field"><label id="lblPass">كلمة المرور</label><input type="password" id="password" placeholder="••••••" dir="ltr"></div>
+  <button class="btn" onclick="login()" id="loginBtn">🔐 دخول</button>
   <div class="err" id="err"></div>
-  <div class="link"><a href="/">← العودة للموقع</a></div>
+  <div class="link"><a href="/" id="backLink">← العودة للموقع</a></div>
 </div>
 <script>
+var LANG='ar';
+var STRINGS={ar:{sub:'بوابة الوكلاء — نظام المطابقة',user:'اسم المستخدم',pass:'كلمة المرور',login:'🔐 دخول',back:'← العودة للموقع',empty:'أدخل البيانات',error:'خطأ',conn:'خطأ في الاتصال'},en:{sub:'Agent Portal — Matching System',user:'Username',pass:'Password',login:'🔐 Login',back:'← Back to site',empty:'Enter credentials',error:'Error',conn:'Connection error'}};
+function t(k){return STRINGS[LANG][k]||k}
+function toggleLang(){LANG=LANG==='ar'?'en':'ar';document.getElementById('langBtn').textContent=LANG==='ar'?'EN':'AR';document.getElementById('subText').textContent=t('sub');document.getElementById('lblUser').textContent=t('user');document.getElementById('lblPass').textContent=t('pass');document.getElementById('loginBtn').innerHTML=t('login');document.getElementById('backLink').textContent=t('back');document.getElementById('username').placeholder=LANG==='ar'?'agent1':'agent1';document.documentElement.lang=LANG;document.documentElement.dir=LANG==='ar'?'rtl':'ltr'}
 function login(){
   var u=document.getElementById('username').value.trim();
   var p=document.getElementById('password').value;
-  if(!u||!p){document.getElementById('err').textContent='أدخل البيانات';return}
+  if(!u||!p){document.getElementById('err').textContent=t('empty');return}
   document.getElementById('err').textContent='';
+  var btn=document.getElementById('loginBtn');btn.disabled=true;btn.innerHTML='⏳ '+(LANG==='ar'?'جاري...':'Loading...');
   fetch('/api/agent/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})})
   .then(function(r){return r.json()})
-  .then(function(d){
-    if(d.success){window.location=d.redirect}
-    else{document.getElementById('err').textContent=d.error||'خطأ'}
-  })
-  .catch(function(){document.getElementById('err').textContent='خطأ في الاتصال'});
+  .then(function(d){if(d.success){window.location=d.redirect}else{document.getElementById('err').textContent=d.error||t('error');btn.disabled=false;btn.innerHTML=t('login')}})
+  .catch(function(){document.getElementById('err').textContent=t('conn');btn.disabled=false;btn.innerHTML=t('login')});
 }
 document.getElementById('password').addEventListener('keydown',function(e){if(e.key==='Enter')login()});
 </script>
