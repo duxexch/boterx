@@ -219,6 +219,18 @@
                 <button @click="refreshView()" class="p-2 rounded-lg hover:bg-slate-700/50 text-dim hover:text-bright transition" title="تحديث">
                     <i class="fas fa-sync-alt"></i>
                 </button>
+                <button @click="showCookies=!showCookies" class="p-2 rounded-lg hover:bg-slate-700/50 transition"
+                    :class="showCookies?'text-amber-400':'text-dim hover:text-bright'" title="الكوكيز">
+                    <i class="fas fa-cookie-bite"></i>
+                </button>
+                <button @click="showSessions=!showSessions" class="p-2 rounded-lg hover:bg-slate-700/50 transition"
+                    :class="showSessions?'text-red-400':'text-dim hover:text-bright'" title="التسجيل">
+                    <i class="fas fa-circle" :class="isRecording?'text-red-400 animate-pulse':''"></i>
+                </button>
+                <button @click="showTabs=!showTabs;loadTabs()" class="p-2 rounded-lg hover:bg-slate-700/50 transition"
+                    :class="showTabs?'text-blue-400':'text-dim hover:text-bright'" title="النوافذ">
+                    <i class="fas fa-layer-group"></i>
+                </button>
             </div>
 
             <!-- Browser viewport -->
@@ -381,6 +393,101 @@
                     </template>
                 </div>
             </div>
+
+            <!-- Cookie Manager Panel -->
+            <div class="bg-slate-800 rounded-xl border border-slate-700 p-3 mt-3" x-show="selected && showCookies && currentInst && currentInst.status==='running'">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-xs text-dim font-semibold">🍪 الكوكيز (<span x-text="cookies.length"></span>)</span>
+                    <div class="flex gap-1">
+                        <button @click="syncCookies()" class="text-[10px] px-2 py-0.5 bg-blue-600/20 text-blue-400 rounded hover:bg-blue-600/30">مزامنة</button>
+                        <button @click="exportCookies()" class="text-[10px] px-2 py-0.5 bg-green-600/20 text-green-400 rounded hover:bg-green-600/30">تصدير</button>
+                        <button @click="clearCookies()" class="text-[10px] px-2 py-0.5 bg-red-600/20 text-red-400 rounded hover:bg-red-600/30">مسح الكل</button>
+                        <button @click="showCookies=false" class="text-dim hover:text-bright text-xs"><i class="fas fa-times"></i></button>
+                    </div>
+                </div>
+                <div class="max-h-48 overflow-y-auto space-y-1">
+                    <template x-for="c in cookies" :key="c.id">
+                        <div class="flex items-center justify-between text-xs py-1 border-b border-slate-700/30">
+                            <div class="flex-1 min-w-0">
+                                <span class="text-bright font-mono" x-text="c.name"></span>
+                                <span class="text-dim mx-1">=</span>
+                                <span class="text-dim font-mono truncate" x-text="(c.value||'').substring(0,30)"></span>
+                            </div>
+                            <div class="flex items-center gap-1 ml-2">
+                                <span class="text-[10px] text-dim" x-text="c.domain"></span>
+                                <span x-show="c.secure" class="text-[10px] text-green-400">🔒</span>
+                                <button @click="deleteCookie(c.id)" class="text-[10px] text-red-400 hover:text-red-300 px-1">×</button>
+                            </div>
+                        </div>
+                    </template>
+                    <div x-show="cookies.length===0" class="text-center text-dim text-xs py-4">لا توجد كوكيز</div>
+                </div>
+            </div>
+
+            <!-- Session Recording Panel -->
+            <div class="bg-slate-800 rounded-xl border border-slate-700 p-3 mt-3" x-show="selected && showSessions && currentInst && currentInst.status==='running'">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-xs text-dim font-semibold">🎬 تسجيل الجلسات</span>
+                    <div class="flex gap-1">
+                        <button x-show="!isRecording" @click="startRecording()" class="text-[10px] px-2 py-0.5 bg-red-600/20 text-red-400 rounded hover:bg-red-600/30">
+                            <i class="fas fa-circle text-red-400"></i> تسجيل
+                        </button>
+                        <button x-show="isRecording" @click="stopRecording()" class="text-[10px] px-2 py-0.5 bg-slate-600/20 text-slate-300 rounded hover:bg-slate-600/30">
+                            <i class="fas fa-stop"></i> إيقاف
+                        </button>
+                        <button @click="showSessions=false" class="text-dim hover:text-bright text-xs"><i class="fas fa-times"></i></button>
+                    </div>
+                </div>
+                <div x-show="isRecording" class="flex items-center gap-2 mb-2 p-2 bg-red-500/10 rounded-lg">
+                    <span class="w-2 h-2 rounded-full bg-red-400 animate-pulse"></span>
+                    <span class="text-xs text-red-400">جاري التسجيل... (<span x-text="recordedActions"></span> إجراء)</span>
+                </div>
+                <div class="max-h-48 overflow-y-auto space-y-1">
+                    <template x-for="s in sessions" :key="s.id">
+                        <div class="flex items-center justify-between text-xs py-1 border-b border-slate-700/30">
+                            <div class="flex-1 min-w-0">
+                                <span class="text-bright" x-text="s.session_name || 'جلسة #'+s.id"></span>
+                                <span class="text-dim mx-1" x-text="'('+(s.actions_count||0)+' إجراء)'"></span>
+                            </div>
+                            <div class="flex items-center gap-1">
+                                <button @click="playSession(s.id)" class="text-[10px] text-green-400 hover:text-green-300 px-1" title="تشغيل">
+                                    <i class="fas fa-play"></i>
+                                </button>
+                                <button @click="deleteSession(s.id)" class="text-[10px] text-red-400 hover:text-red-300 px-1" title="حذف">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </template>
+                    <div x-show="sessions.length===0" class="text-center text-dim text-xs py-4">لا توجد جلسات مسجلة</div>
+                </div>
+            </div>
+
+            <!-- Multi-Tab Panel -->
+            <div class="bg-slate-800 rounded-xl border border-slate-700 p-3 mt-3" x-show="selected && showTabs && currentInst && currentInst.status==='running'">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-xs text-dim font-semibold">📑 النوافذ الفرعية</span>
+                    <div class="flex gap-1">
+                        <button @click="openTab()" class="text-[10px] px-2 py-0.5 bg-blue-600/20 text-blue-400 rounded hover:bg-blue-600/30">+ نافذة جديدة</button>
+                        <button @click="showTabs=false" class="text-dim hover:text-bright text-xs"><i class="fas fa-times"></i></button>
+                    </div>
+                </div>
+                <div class="space-y-1">
+                    <template x-for="t in browserTabs" :key="t.id">
+                        <div class="flex items-center justify-between text-xs py-1.5 px-2 rounded-lg"
+                            :class="t.active?'bg-blue-500/10 border border-blue-500/30':'hover:bg-slate-700/30'">
+                            <div class="flex-1 min-w-0">
+                                <span class="text-bright text-xs" x-text="t.title || '无标题'"></span>
+                                <p class="text-[10px] text-dim truncate" x-text="t.url"></p>
+                            </div>
+                            <div class="flex items-center gap-1">
+                                <button @click="switchTab(t.id)" class="text-[10px] text-blue-400 hover:text-blue-300 px-1">تبديل</button>
+                                <button @click="closeTab(t.id)" class="text-[10px] text-red-400 hover:text-red-300 px-1">×</button>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -437,6 +544,14 @@ function browserPage() {
         agentPermissions: [],
         schedules: [],
         networkStats: {},
+        showCookies: false,
+        showSessions: false,
+        showTabs: false,
+        cookies: [],
+        sessions: [],
+        browserTabs: [],
+        isRecording: false,
+        recordedActions: 0,
         _pollTimer: null,
 
         async init() {
@@ -446,6 +561,7 @@ function browserPage() {
             await this.loadTasks();
             await this.loadPermissions();
             await this.loadSchedules();
+            await this.loadSessions();
             // Auto-refresh screenshots every 5s for active instance
             this._pollTimer = setInterval(() => {
                 if (this.selected && this.currentInst?.status === 'running') {
@@ -475,7 +591,10 @@ function browserPage() {
         selectInstance(id) {
             this.selected = id;
             this.screenshotData = null;
+            this.siteKnowledge = null;
             this.refreshView();
+            if (this.showCookies) this.loadCookies();
+            if (this.showTabs) this.loadTabs();
         },
 
         async createInstance() {
@@ -726,6 +845,129 @@ function browserPage() {
                     method: 'POST', body: JSON.stringify({ active })
                 });
                 await this.loadSchedules();
+            } catch(e) {}
+        },
+
+        async loadCookies() {
+            if (!this.selected) return;
+            try {
+                const d = await api(`/api/browser/cookies/${this.selected}`);
+                this.cookies = d.cookies || [];
+            } catch(e) {}
+        },
+
+        async syncCookies() {
+            if (!this.selected) return;
+            try {
+                await api(`/api/browser/cookies/${this.selected}/sync`, {method:'POST'});
+                await this.loadCookies();
+            } catch(e) {}
+        },
+
+        async exportCookies() {
+            if (!this.selected) return;
+            try {
+                const d = await api(`/api/browser/cookies/${this.selected}/export`);
+                const blob = new Blob([JSON.stringify(d.cookies||[])], {type:'application/json'});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a'); a.href=url; a.download=`cookies_${this.selected}.json`; a.click();
+                URL.revokeObjectURL(url);
+            } catch(e) {}
+        },
+
+        async clearCookies() {
+            if (!this.selected) return;
+            if (!confirm('مسح كل الكوكيز؟')) return;
+            try {
+                await api(`/api/browser/cookies/${this.selected}/clear`, {method:'DELETE'});
+                this.cookies = [];
+            } catch(e) {}
+        },
+
+        async deleteCookie(id) {
+            if (!this.selected) return;
+            try {
+                await api(`/api/browser/cookies/${this.selected}/delete/${id}`, {method:'DELETE'});
+                this.cookies = this.cookies.filter(c => c.id !== id);
+            } catch(e) {}
+        },
+
+        async loadSessions() {
+            try {
+                const d = await api('/api/browser/sessions');
+                this.sessions = d.sessions || [];
+            } catch(e) {}
+        },
+
+        async startRecording() {
+            if (!this.selected) return;
+            try {
+                const d = await api('/api/browser/sessions/start', {
+                    method:'POST', body: JSON.stringify({instance_id:this.selected, name:'جلسة يدوية'})
+                });
+                this.isRecording = true;
+                this.recordedActions = 0;
+            } catch(e) {}
+        },
+
+        async stopRecording() {
+            if (!this.selected) return;
+            try {
+                await api('/api/browser/sessions/stop', {
+                    method:'POST', body: JSON.stringify({instance_id:this.selected})
+                });
+                this.isRecording = false;
+                await this.loadSessions();
+            } catch(e) {}
+        },
+
+        async playSession(sid) {
+            if (!this.selected) return;
+            try {
+                await api('/api/browser/sessions/play', {
+                    method:'POST', body: JSON.stringify({session_id:sid, instance_id:this.selected})
+                });
+            } catch(e) {}
+        },
+
+        async deleteSession(sid) {
+            try {
+                await api(`/api/browser/sessions/${sid}`, {method:'DELETE'});
+                this.sessions = this.sessions.filter(s => s.id !== sid);
+            } catch(e) {}
+        },
+
+        async loadTabs() {
+            if (!this.selected) return;
+            try {
+                const d = await api(`/api/browser/tabs/${this.selected}`);
+                this.browserTabs = d.tabs || [];
+            } catch(e) {}
+        },
+
+        async openTab() {
+            if (!this.selected) return;
+            try {
+                await api(`/api/browser/tabs/${this.selected}/open`, {
+                    method:'POST', body: JSON.stringify({url:'about:blank'})
+                });
+                await this.loadTabs();
+            } catch(e) {}
+        },
+
+        async switchTab(tabId) {
+            if (!this.selected) return;
+            try {
+                await api(`/api/browser/tabs/${this.selected}/switch/${tabId}`, {method:'POST'});
+                await this.loadTabs();
+            } catch(e) {}
+        },
+
+        async closeTab(tabId) {
+            if (!this.selected) return;
+            try {
+                await api(`/api/browser/tabs/${this.selected}/close/${tabId}`, {method:'DELETE'});
+                await this.loadTabs();
             } catch(e) {}
         },
 

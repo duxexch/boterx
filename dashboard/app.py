@@ -4674,6 +4674,201 @@ def api_browser_network_stats():
     return jsonify({'success': True, 'stats': get_network_stats(iid)})
 
 
+# ── Cookie Manager ───────────────────────────────────────────
+
+@app.route('/api/browser/cookies/<instance_id>', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_cookies_get(instance_id):
+    from browser_extras import get_cookies
+    query = request.args.get('q', '')
+    if query:
+        from browser_extras import search_cookies
+        cookies = search_cookies(instance_id, query)
+    else:
+        cookies = get_cookies(instance_id)
+    return jsonify({'success': True, 'cookies': cookies, 'count': len(cookies)})
+
+
+@app.route('/api/browser/cookies/<instance_id>/sync', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_cookies_sync(instance_id):
+    from browser_extras import save_cookies_from_browser
+    from browser_manager import get_instance
+    inst = get_instance(instance_id)
+    if not inst or not inst.page:
+        return jsonify({'success': False, 'error': 'Browser not running'}), 400
+    cookies = inst.context.cookies()
+    save_cookies_from_browser(instance_id, cookies)
+    return jsonify({'success': True, 'synced': len(cookies)})
+
+
+@app.route('/api/browser/cookies/<instance_id>/delete/<cid>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_cookie_delete(instance_id, cid):
+    from browser_extras import delete_cookie
+    delete_cookie(instance_id, int(cid))
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/cookies/<instance_id>/clear', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_cookies_clear(instance_id):
+    from browser_extras import delete_all_cookies
+    delete_all_cookies(instance_id)
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/cookies/<instance_id>/export', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_cookies_export(instance_id):
+    from browser_extras import export_cookies
+    fmt = request.args.get('format', 'json')
+    data = export_cookies(instance_id, fmt)
+    if fmt == 'json':
+        return jsonify({'success': True, 'cookies': json.loads(data)})
+    return data, 200, {'Content-Type': 'text/plain', 'Content-Disposition': f'attachment; filename=cookies_{instance_id}.txt'}
+
+
+@app.route('/api/browser/cookies/<instance_id>/import', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_cookies_import(instance_id):
+    from browser_extras import import_cookies
+    data = request.json or {}
+    cookies = data.get('cookies', [])
+    success = import_cookies(instance_id, cookies)
+    return jsonify({'success': success, 'imported': len(cookies)})
+
+
+# ── Session Recording ────────────────────────────────────────
+
+@app.route('/api/browser/sessions', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_sessions_list():
+    from browser_extras import session_recorder
+    iid = request.args.get('instance_id')
+    sessions = session_recorder.list_sessions(iid)
+    return jsonify({'success': True, 'sessions': sessions})
+
+
+@app.route('/api/browser/sessions/start', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_session_start():
+    from browser_extras import session_recorder
+    data = request.json or {}
+    sid = session_recorder.start_recording(data.get('instance_id', ''), data.get('name', ''))
+    return jsonify({'success': True, 'session_id': sid})
+
+
+@app.route('/api/browser/sessions/stop', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_session_stop():
+    from browser_extras import session_recorder
+    data = request.json or {}
+    sid = session_recorder.stop_recording(data.get('instance_id', ''))
+    return jsonify({'success': True, 'session_id': sid})
+
+
+@app.route('/api/browser/sessions/<sid>', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_session_get(sid):
+    from browser_extras import session_recorder
+    session = session_recorder.get_session(int(sid))
+    if not session:
+        return jsonify({'success': False, 'error': 'Session not found'}), 404
+    return jsonify({'success': True, 'session': session})
+
+
+@app.route('/api/browser/sessions/<sid>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_session_delete(sid):
+    from browser_extras import session_recorder
+    session_recorder.delete_session(int(sid))
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/sessions/play', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_session_play():
+    from browser_extras import session_player
+    data = request.json or {}
+    result = session_player.play_session(
+        int(data.get('session_id', 0)),
+        data.get('instance_id', ''),
+        float(data.get('speed', 1.0)),
+    )
+    return jsonify(result)
+
+
+@app.route('/api/browser/sessions/stop-play', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_session_stop_play():
+    from browser_extras import session_player
+    data = request.json or {}
+    session_player.stop_playback(data.get('instance_id', ''))
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/sessions/play-status/<instance_id>', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_session_play_status(instance_id):
+    from browser_extras import session_player
+    status = session_player.get_status(instance_id)
+    return jsonify({'success': True, 'playing': status is not None, 'status': status})
+
+
+# ── Multi-Tab Manager ────────────────────────────────────────
+
+@app.route('/api/browser/tabs/<instance_id>', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_tabs_list(instance_id):
+    from browser_extras import tab_manager
+    tabs = tab_manager.list_tabs(instance_id)
+    return jsonify({'success': True, 'tabs': tabs})
+
+
+@app.route('/api/browser/tabs/<instance_id>/open', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_tab_open(instance_id):
+    from browser_extras import tab_manager
+    data = request.json or {}
+    result = tab_manager.open_tab(instance_id, data.get('url', ''), data.get('activate', True))
+    return jsonify(result)
+
+
+@app.route('/api/browser/tabs/<instance_id>/close/<tab_id>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_tab_close(instance_id, tab_id):
+    from browser_extras import tab_manager
+    result = tab_manager.close_tab(instance_id, tab_id)
+    return jsonify(result)
+
+
+@app.route('/api/browser/tabs/<instance_id>/switch/<tab_id>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_tab_switch(instance_id, tab_id):
+    from browser_extras import tab_manager
+    result = tab_manager.switch_tab(instance_id, tab_id)
+    return jsonify(result)
+
+
 # ── Instance CRUD ────────────────────────────────────────────
 
 @app.route('/api/browser/instances', methods=['GET'])
