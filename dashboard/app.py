@@ -4401,6 +4401,118 @@ def api_browser_action_log():
     return jsonify({'success': True, 'actions': get_recent_actions(domain, limit)})
 
 
+# ── Agent Tasks ──────────────────────────────────────────────
+
+@app.route('/api/browser/tasks', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_tasks_list():
+    from browser_tasks import task_executor
+    return jsonify({'success': True, 'tasks': task_executor.list_tasks()})
+
+
+@app.route('/api/browser/tasks', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_task_create():
+    from browser_tasks import task_executor
+    data = request.json or {}
+    steps = data.get('steps', [])
+    goal = data.get('goal', 'Custom task')
+    task = task_executor.create_task(goal, steps)
+    return jsonify({'success': True, 'task': task.to_dict()})
+
+
+@app.route('/api/browser/tasks/<tid>/execute', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_task_execute(tid):
+    from browser_tasks import task_executor
+    data = request.json or {}
+    instance_id = data.get('instance_id', '')
+    if not instance_id:
+        return jsonify({'success': False, 'error': 'instance_id required'}), 400
+    result = task_executor.execute_task(tid, instance_id)
+    return jsonify(result)
+
+
+@app.route('/api/browser/tasks/<tid>', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_task_get(tid):
+    from browser_tasks import task_executor
+    task = task_executor.get_task(tid)
+    if not task:
+        return jsonify({'success': False, 'error': 'Task not found'}), 404
+    return jsonify({'success': True, 'task': task.to_dict()})
+
+
+@app.route('/api/browser/tasks/<tid>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_task_delete(tid):
+    from browser_tasks import task_executor
+    task_executor.delete_task(tid)
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/tasks/templates', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_task_templates():
+    from browser_tasks import get_task_templates
+    return jsonify({'success': True, 'templates': get_task_templates()})
+
+
+@app.route('/api/browser/tasks/quick-login', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_quick_login():
+    from browser_tasks import create_from_template, task_executor
+    from browser_manager import get_instance
+    data = request.json or {}
+    instance_id = data.get('instance_id', '')
+    inst = get_instance(instance_id)
+    if not inst:
+        return jsonify({'success': False, 'error': 'Instance not found'}), 404
+    task = create_from_template('login', {
+        'url': data.get('url', ''),
+        'username': data.get('username', ''),
+        'password': data.get('password', ''),
+    })
+    if not task:
+        return jsonify({'success': False, 'error': 'Template not found'}), 400
+    result = task_executor.execute_task(task.id, instance_id)
+    return jsonify(result)
+
+
+@app.route('/api/browser/tasks/quick-scrape', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_quick_scrape():
+    from browser_tasks import create_from_template, task_executor
+    from browser_manager import get_instance
+    data = request.json or {}
+    instance_id = data.get('instance_id', '')
+    inst = get_instance(instance_id)
+    if not inst:
+        return jsonify({'success': False, 'error': 'Instance not found'}), 404
+    task = create_from_template('scrape_page', {
+        'url': data.get('url', ''),
+        'selector': data.get('selector', 'body'),
+    })
+    if not task:
+        return jsonify({'success': False, 'error': 'Template not found'}), 400
+    result = task_executor.execute_task(task.id, instance_id)
+    # Extract text from results
+    text = ''
+    for r in result.get('task', {}).get('results', []):
+        if r.get('action') == 'read_text' and r.get('detail', {}).get('success'):
+            text = r['detail'].get('result', '')
+    result['scraped_text'] = text
+    return jsonify(result)
+
+
 # ── Instance CRUD ────────────────────────────────────────────
 
 @app.route('/api/browser/instances', methods=['GET'])

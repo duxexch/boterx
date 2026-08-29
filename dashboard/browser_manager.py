@@ -99,9 +99,12 @@ class BrowserInstance:
         self._actions_log = []
         self._current_url = ''
         self._viewport = self.profile.meta.get('viewport', VIEWPORTS[0])
+        self.human = None  # Initialized on start
 
     def start(self, headless=True):
         from playwright.sync_api import sync_playwright
+        from browser_human import HumanBehavior
+        self.human = HumanBehavior()
         pw = sync_playwright().start()
         launch_args = [
             '--disable-blink-features=AutomationControlled',
@@ -213,18 +216,30 @@ class BrowserInstance:
         try:
             t0 = time.time()
             self.page.wait_for_selector(selector, timeout=10000)
-            _human_delay(0.2, 0.8)
+            # Human: hover before click
+            if self.human:
+                time.sleep(self.human.hover_before_click())
             box = self.page.locator(selector).bounding_box()
-            if box:
-                import random as r
-                x = box['x'] + r.uniform(5, max(10, box['width'] - 5))
-                y = box['y'] + r.uniform(5, max(10, box['height'] - 5))
-                self.page.mouse.move(x, y)
-                _human_delay(0.1, 0.3)
-                self.page.mouse.click(x, y)
+            if box and self.human:
+                # Human: natural click position with offset
+                cx, cy = self.human.click_position_offset(box)
+                # Human: move mouse along bezier path
+                vp = self._viewport
+                start_x = random.uniform(0, vp['width'])
+                start_y = random.uniform(0, vp['height'])
+                path = self.human.mouse_path(start_x, start_y, cx, cy)
+                for px, py in path[:15]:  # Sample path points
+                    self.page.mouse.move(px, py)
+                    time.sleep(self.human.mouse_move_delay(20))
+                # Human: pre-click delay
+                time.sleep(self.human.click_delay()[0])
+                self.page.mouse.click(cx, cy)
+                # Human: post-click delay
+                time.sleep(self.human.click_delay()[1])
+            elif box:
+                self.page.mouse.click(box['x'] + box['width']/2, box['y'] + box['height']/2)
             else:
                 self.page.locator(selector).click()
-            _human_delay(0.3, 1.0)
             duration = int((time.time() - t0) * 1000)
             self._log_action('click', selector)
             self._learn('click', selector=selector, success=True, duration_ms=duration)
@@ -240,15 +255,32 @@ class BrowserInstance:
             t0 = time.time()
             self.page.wait_for_selector(selector, timeout=10000)
             self.page.locator(selector).click()
-            _human_delay(0.2, 0.5)
+            time.sleep(0.2 + random.uniform(0.1, 0.4))
             if clear:
                 self.page.locator(selector).fill('')
-                _human_delay(0.1, 0.3)
-            for char in text:
-                self.page.keyboard.type(char, delay=_human_type_delay() * 1000)
-                if random.random() < 0.05:
-                    _human_delay(0.3, 0.8)
-            _human_delay(0.2, 0.5)
+                time.sleep(0.1 + random.uniform(0.05, 0.2))
+            # Human: type with variable speed and occasional typos
+            if self.human:
+                for char in text:
+                    # Check for typo
+                    if self.human.should_make_typo(char):
+                        typo_char = self.human.get_typo_char(char)
+                        self.page.keyboard.type(typo_char, delay=self.human.type_char_delay(typo_char) * 1000)
+                        time.sleep(self.human.type_char_delay(typo_char))
+                        # Backspace to fix typo
+                        self.page.keyboard.press('Backspace')
+                        time.sleep(0.1 + random.uniform(0.05, 0.15))
+                    self.page.keyboard.type(char, delay=self.human.type_char_delay(char) * 1000)
+                    # Occasional word pause
+                    if char == ' ':
+                        time.sleep(self.human.word_pause())
+                    # Occasional think pause
+                    if random.random() < 0.03:
+                        time.sleep(self.human.think_pause())
+            else:
+                for char in text:
+                    self.page.keyboard.type(char, delay=random.uniform(30, 100))
+            time.sleep(0.2 + random.uniform(0.1, 0.4))
             duration = int((time.time() - t0) * 1000)
             self._log_action('type', f'{selector}: {text[:30]}...')
             self._learn('type', selector=selector, value=text[:50], success=True, duration_ms=duration)
@@ -261,9 +293,21 @@ class BrowserInstance:
         if not self.page:
             return {'success': False, 'error': 'Browser not running'}
         try:
-            delta = 300 * amount if direction == 'down' else -300 * amount
-            self.page.mouse.wheel(0, delta)
-            _human_delay(0.3, 0.8)
+            # Human: variable scroll distance
+            if self.human:
+                delta = self.human.scroll_amount() * (1 if direction == 'down' else -1)
+                time.sleep(self.human.scroll_delay())
+                self.page.mouse.wheel(0, delta)
+                # Human: reading pause
+                time.sleep(self.human.scroll_pause_duration())
+                # Sometimes scroll back up
+                if self.human.should_scroll_back():
+                    time.sleep(self.human.scroll_pause_duration())
+                    self.page.mouse.wheel(0, -delta * 0.4)
+            else:
+                delta = 300 * amount * (1 if direction == 'down' else -1)
+                self.page.mouse.wheel(0, delta)
+            time.sleep(0.3 + random.uniform(0.1, 0.5))
             self._log_action('scroll', f'{direction} {amount}')
             return {'success': True}
         except Exception as e:

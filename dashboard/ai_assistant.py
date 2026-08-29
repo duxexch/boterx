@@ -46,6 +46,7 @@ AGENTS = {
                     'browser_list', 'browser_open', 'browser_screenshot', 'browser_status',
                     'daemon_status', 'sleep_all_browsers', 'wake_all_browsers',
                     'analyze_site', 'site_knowledge', 'all_knowledge', 'browser_patterns',
+                    'browser_task', 'browser_scrape', 'browser_quick_login',
                     'list_campaigns', 'campaign_stats', 'list_companies', 'company_detail',
                     'list_admins', 'add_admin', 'list_agents', 'agent_stats',
                     'game_stats', 'toggle_game', 'platform_stats',
@@ -489,6 +490,9 @@ ACTIONS_SCHEMA = [
     {"name": "site_knowledge", "description": "عرض ما تعلمته عن موقع", "parameters": {"instance_id": "معرف النافذة"}},
     {"name": "all_knowledge", "description": "عرض كل المواقع المعرفة", "parameters": {}},
     {"name": "browser_patterns", "description": "عرض أنماط النجاح المحفوظة", "parameters": {"domain": "الموقع"}},
+    {"name": "browser_task", "description": "تنفيذ مهمة في المتصفح (مثل: فتح موقع + تسجيل دخول)", "parameters": {"instance_id": "النافذة", "goal": "الهدف", "steps": "الخطوات"}},
+    {"name": "browser_scrape", "description": "استخراج محتوى من صفحة", "parameters": {"instance_id": "النافذة", "url": "الرابط"}},
+    {"name": "browser_quick_login", "description": "تسجيل دخول سريع في موقع", "parameters": {"instance_id": "النافذة", "url": "الرابط", "username": "المستخدم", "password": "كلمة المرور"}},
     # Learning
     {"name": "learn_fact", "description": "حفظ معلومة", "parameters": {"category": "الفئة", "key": "المفتاح", "value": "القيمة"}},
     {"name": "get_learning_stats", "description": "إحصائيات التعلم", "parameters": {}},
@@ -1373,6 +1377,55 @@ def _exec_browser_patterns(params):
     except Exception as e: return {'success': False, 'error': str(e)}
 
 
+# ── Browser Tasks ────────────────────────────────────────────
+
+def _exec_browser_task(params):
+    iid = params.get('instance_id', '')
+    goal = params.get('goal', '')
+    steps = params.get('steps', [])
+    if not iid: return {'success': False, 'error': 'instance_id مطلوب'}
+    if not goal: return {'success': False, 'error': 'goal مطلوب'}
+    try:
+        from browser_tasks import task_executor
+        task = task_executor.create_task(goal, steps)
+        result = task_executor.execute_task(task.id, iid)
+        return result
+    except Exception as e: return {'success': False, 'error': str(e)}
+
+
+def _exec_browser_scrape(params):
+    iid = params.get('instance_id', '')
+    url = params.get('url', '')
+    if not iid: return {'success': False, 'error': 'instance_id مطلوب'}
+    if not url: return {'success': False, 'error': 'url مطلوب'}
+    try:
+        from browser_tasks import create_from_template, task_executor
+        task = create_from_template('scrape_page', {'url': url, 'selector': params.get('selector', 'body')})
+        result = task_executor.execute_task(task.id, iid)
+        text = ''
+        for r in result.get('task', {}).get('results', []):
+            if r.get('action') == 'read_text' and r.get('detail', {}).get('success'):
+                text = r['detail'].get('result', '')
+        result['scraped_text'] = text[:2000]
+        return result
+    except Exception as e: return {'success': False, 'error': str(e)}
+
+
+def _exec_browser_quick_login(params):
+    iid = params.get('instance_id', '')
+    if not iid: return {'success': False, 'error': 'instance_id مطلوب'}
+    try:
+        from browser_tasks import create_from_template, task_executor
+        task = create_from_template('login', {
+            'url': params.get('url', ''),
+            'username': params.get('username', ''),
+            'password': params.get('password', ''),
+        })
+        result = task_executor.execute_task(task.id, iid)
+        return result
+    except Exception as e: return {'success': False, 'error': str(e)}
+
+
 # ── Learning ──────────────────────────────────────────────────
 
 def _exec_learn_fact(params):
@@ -1443,6 +1496,8 @@ ACTION_DISPATCH = {
     'wake_all_browsers': _exec_wake_all_browsers,
     'analyze_site': _exec_analyze_site, 'site_knowledge': _exec_site_knowledge,
     'all_knowledge': _exec_all_knowledge, 'browser_patterns': _exec_browser_patterns,
+    'browser_task': _exec_browser_task, 'browser_scrape': _exec_browser_scrape,
+    'browser_quick_login': _exec_browser_quick_login,
     'learn_fact': _exec_learn_fact, 'get_learning_stats': _exec_get_learning_stats,
     'delegate_task': _exec_delegate_task, 'consult_all': _exec_consult_all,
 }
@@ -1933,6 +1988,25 @@ def _format_action_result(action_name, result):
         for p in patterns[:10]:
             lines.append(f"• {p.get('site_domain','')}/{p.get('goal','')} — نجاح: {round(p.get('success_rate',0)*100)}% ({p.get('times_used',0)} مرة)")
         return '\n'.join(lines)
+    elif action_name == 'browser_task':
+        task = result.get('task', {})
+        status = '✅' if task.get('status') == 'completed' else '❌'
+        lines = [f"{status} <b>مهمة: {task.get('goal','')}</b>"]
+        lines.append(f"• الحالة: {task.get('status','')}")
+        lines.append(f"• النتائج: {len(task.get('results',[]))} خطوة")
+        if task.get('error'):
+            lines.append(f"• خطأ: {task.get('error','')}")
+        return '\n'.join(lines)
+    elif action_name == 'browser_scrape':
+        text = result.get('scraped_text', '')
+        if text:
+            return f"📄 <b>محتوى الصفحة:</b>\n{text[:1500]}"
+        return "📄 لم يتم استخراج محتوى"
+    elif action_name == 'browser_quick_login':
+        task = result.get('task', {})
+        if task.get('status') == 'completed':
+            return f"✅ <b>تم تسجيل الدخول بنجاح</b>"
+        return f"❌ <b>فشل تسجيل الدخول:</b> {task.get('error', 'خطأ غير معروف')}"
     elif action_name == 'generate_post':
         if result.get('success'): return f"🤖 <b>البوست:</b>\n\n{result.get('text', '')}"
         return f"❌ خطأ: {result.get('error', '')}"
