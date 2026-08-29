@@ -6174,6 +6174,291 @@ def api_browser_media_emulate(instance_id):
                                           data.get('microphone', 1), data.get('speaker', 1)))
 
 
+# ── Saved Profiles ───────────────────────────────────────────
+
+@app.route('/api/browser/saved-profiles', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_saved_profiles_list():
+    from browser_profiles import list_profiles
+    return jsonify({'success': True, 'profiles': list_profiles()})
+
+
+@app.route('/api/browser/saved-profiles', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_saved_profile_save():
+    from browser_profiles import save_profile
+    data = request.json or {}
+    return jsonify(save_profile(data.get('instance_id', ''), data.get('name', ''), data.get('description', '')))
+
+
+@app.route('/api/browser/saved-profiles/<pid>/restore', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_saved_profile_restore(pid):
+    from browser_profiles import restore_profile
+    data = request.json or {}
+    return jsonify(restore_profile(int(pid), data.get('instance_id')))
+
+
+@app.route('/api/browser/saved-profiles/<pid>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_saved_profile_delete(pid):
+    from browser_profiles import delete_profile
+    delete_profile(int(pid))
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/saved-profiles/<pid>/favorite', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_saved_profile_favorite(pid):
+    from browser_profiles import toggle_favorite
+    toggle_favorite(int(pid))
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/saved-profiles/<pid>/export', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_saved_profile_export(pid):
+    from browser_profiles import export_profile
+    data = export_profile(int(pid))
+    if not data:
+        return jsonify({'success': False, 'error': 'Not found'}), 404
+    return jsonify({'success': True, 'profile': data})
+
+
+@app.route('/api/browser/saved-profiles/import', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_saved_profile_import():
+    from browser_profiles import import_profile
+    data = request.json or {}
+    return jsonify(import_profile(data.get('profile', {}), data.get('name')))
+
+
+@app.route('/api/browser/saved-profiles/search', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_saved_profile_search():
+    from browser_profiles import search_profiles
+    q = request.args.get('q', '')
+    return jsonify({'success': True, 'profiles': search_profiles(q)})
+
+
+# ── Content Injection ────────────────────────────────────────
+
+@app.route('/api/browser/inject/css/<instance_id>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_inject_css(instance_id):
+    from browser_profiles import inject_css
+    data = request.json or {}
+    return jsonify(inject_css(instance_id, data.get('css', '')))
+
+
+@app.route('/api/browser/inject/js/<instance_id>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_inject_js(instance_id):
+    from browser_profiles import inject_js
+    data = request.json or {}
+    return jsonify(inject_js(instance_id, data.get('js', '')))
+
+
+@app.route('/api/browser/inject/js-file/<instance_id>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_inject_js_file(instance_id):
+    from browser_profiles import inject_js_file
+    data = request.json or {}
+    return jsonify(inject_js_file(instance_id, data.get('url', '')))
+
+
+@app.route('/api/browser/inject/remove/<instance_id>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_inject_remove(instance_id):
+    from browser_profiles import remove_injections
+    return jsonify(remove_injections(instance_id))
+
+
+@app.route('/api/browser/inject/apply-saved/<instance_id>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_inject_apply_saved(instance_id):
+    from browser_profiles import apply_saved_injections
+    return jsonify(apply_saved_injections(instance_id))
+
+
+@app.route('/api/browser/css-injections', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_css_injections_list():
+    from browser_profiles import list_css_injections
+    return jsonify({'success': True, 'injections': list_css_injections()})
+
+
+@app.route('/api/browser/css-injections', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_css_injection_create():
+    from browser_profiles import save_css_injection
+    data = request.json or {}
+    return jsonify(save_css_injection(data.get('name', ''), data.get('css', ''), data.get('url_pattern', '*')))
+
+
+@app.route('/api/browser/css-injections/<iid>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_css_injection_delete(iid):
+    from browser_profiles import delete_css_injection
+    delete_css_injection(int(iid))
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/css-injections/<iid>/toggle', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_css_injection_toggle(iid):
+    from browser_profiles import toggle_css_injection
+    toggle_css_injection(int(iid))
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/js-injections', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_js_injections_list():
+    from browser_profiles import list_js_injections
+    return jsonify({'success': True, 'injections': list_js_injections()})
+
+
+@app.route('/api/browser/js-injections', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_js_injection_create():
+    from browser_profiles import save_js_injection
+    data = request.json or {}
+    return jsonify(save_js_injection(data.get('name', ''), data.get('js', ''),
+                                     data.get('url_pattern', '*'), data.get('run_at', 'document_idle')))
+
+
+@app.route('/api/browser/js-injections/<iid>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_js_injection_delete(iid):
+    from browser_profiles import delete_js_injection
+    delete_js_injection(int(iid))
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/js-injections/<iid>/toggle', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_js_injection_toggle(iid):
+    from browser_profiles import toggle_js_injection
+    toggle_js_injection(int(iid))
+    return jsonify({'success': True})
+
+
+# ── Geolocation ──────────────────────────────────────────────
+
+@app.route('/api/browser/geolocation/<instance_id>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_geolocation_set(instance_id):
+    from browser_profiles import set_geolocation
+    data = request.json or {}
+    return jsonify(set_geolocation(instance_id, data.get('lat', 0), data.get('lng', 0), data.get('accuracy', 100)))
+
+
+@app.route('/api/browser/geolocation/presets', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_geolocation_presets():
+    from browser_profiles import get_preset_locations
+    return jsonify({'success': True, 'locations': get_preset_locations()})
+
+
+@app.route('/api/browser/geolocations', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_geolocations_list():
+    from browser_profiles import list_geolocations
+    return jsonify({'success': True, 'geolocations': list_geolocations()})
+
+
+@app.route('/api/browser/geolocations', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_geolocation_create():
+    from browser_profiles import save_geolocation
+    data = request.json or {}
+    return jsonify(save_geolocation(data.get('name', ''), data.get('lat', 0), data.get('lng', 0),
+                                    data.get('accuracy', 100), data.get('city', ''), data.get('country', '')))
+
+
+@app.route('/api/browser/geolocations/<gid>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_geolocation_delete(gid):
+    from browser_profiles import delete_geolocation
+    delete_geolocation(int(gid))
+    return jsonify({'success': True})
+
+
+# ── Network Simulation ───────────────────────────────────────
+
+@app.route('/api/browser/network/<instance_id>/simulate', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_network_simulate(instance_id):
+    from browser_profiles import simulate_network
+    data = request.json or {}
+    return jsonify(simulate_network(instance_id, data.get('profile', 'normal')))
+
+
+@app.route('/api/browser/network/presets', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_network_presets():
+    from browser_profiles import get_network_presets
+    return jsonify({'success': True, 'presets': get_network_presets()})
+
+
+@app.route('/api/browser/network/profiles', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_network_profiles_list():
+    from browser_profiles import list_network_profiles
+    return jsonify({'success': True, 'profiles': list_network_profiles()})
+
+
+@app.route('/api/browser/network/profiles', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_network_profile_create():
+    from browser_profiles import save_network_profile
+    data = request.json or {}
+    return jsonify(save_network_profile(data.get('name', ''), data.get('download', 5000000),
+                                        data.get('upload', 2000000), data.get('latency', 50),
+                                        data.get('packet_loss', 0)))
+
+
+# ── Notifications ────────────────────────────────────────────
+
+@app.route('/api/browser/notifications/<instance_id>/allow', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_notifications_allow(instance_id):
+    from browser_profiles import setup_notification_handler
+    return jsonify(setup_notification_handler(instance_id))
+
+
 # ── Instance CRUD ────────────────────────────────────────────
 
 @app.route('/api/browser/instances', methods=['GET'])
