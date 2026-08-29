@@ -9205,90 +9205,94 @@ def api_post_to_channel(channel_id):
 @permission_required('send_broadcast')
 def api_create_post():
     """
-    منشور شامل — يدعم: نص+وسائط+قنوات+مجموعات+جدولة+f rn recurring cron.
+    منشور شامل — يدعم: نص+وسائط+قنوات+مجموعةات+جدولة+cron.
+    يدعم: platform, parse_mode, silent, pin, posting_method.
     """
-    data = request.json or {}
-    message = (data.get('message') or '').strip()
-    media_urls = data.get('media_urls') or []
-    target_channels = data.get('channels') or []
-    target_groups = data.get('groups') or []
-    schedule_type = (data.get('schedule_type') or 'now').strip()  # now | timed | cron
-    scheduled_at = (data.get('scheduled_at') or '').strip()
-    cron_expr = (data.get('cron_expr') or '').strip()
-    priority = (data.get('priority') or 'normal').strip()
-    reply_markup_raw = data.get('reply_markup') or ''
-    if isinstance(reply_markup_raw, dict):
-        reply_markup_str = json.dumps(reply_markup_raw)
-    elif isinstance(reply_markup_raw, str):
-        reply_markup_str = reply_markup_raw
-    else:
-        reply_markup_str = ''
+    try:
+        data = request.json or {}
+        message = (data.get('message') or '').strip()
+        media_urls = data.get('media_urls') or []
+        target_channels = data.get('channels') or []
+        target_groups = data.get('groups') or []
+        schedule_type = (data.get('schedule_type') or 'now').strip()
+        scheduled_at = (data.get('scheduled_at') or '').strip()
+        cron_expr = (data.get('cron_expr') or '').strip()
+        priority = (data.get('priority') or 'normal').strip()
+        platform = (data.get('platform') or 'telegram').strip().lower()
+        parse_mode = (data.get('parse_mode') or '').strip()
+        silent = bool(data.get('silent', False))
+        pin = bool(data.get('pin', False))
+        posting_method = (data.get('posting_method') or 'api').strip().lower()
 
-    if not message and not media_urls:
-        return jsonify({'error': 'اكتب رسالة أو أضف وسائط'}), 400
-    if not target_channels and not target_groups:
-        return jsonify({'error': 'اختر قناة أو مجموعة واحدة على الأقل'}), 400
-
-    channels_csv = read_csv('bot_channels.csv')
-    groups_csv = read_csv('channel_groups.csv')
-    now_s = datetime.now().strftime('%Y-%m-%d %H:%M')
-    entries = []
-
-    resolved_chat_ids = set()
-
-    for ch_id in target_channels:
-        ch = next((c for c in channels_csv if c.get('id') == ch_id), None)
-        if not ch:
-            continue
-        chat_id = str(ch.get('chat_id', '') or '').strip()
-        if not chat_id or chat_id in resolved_chat_ids:
-            continue
-        resolved_chat_ids.add(chat_id)
-        entry = {
-            'id': f"POST{secrets.token_hex(4).upper()}",
-            'message': message,
-            'type': 'channel',
-            'platform': str(ch.get('platform', 'telegram') or 'telegram').lower(),
-            'target_chat_id': chat_id,
-            'platform_account_id': str(ch.get('platform_account_id', '') or ''),
-            'target_channel_id': ch.get('id', ''),
-            'created_at': now_s,
-            'created_by': str(session.get('admin_id', '')),
-            'status': 'pending',
-            'target': 'channel',
-            'recipient': 'single',
-            'priority': priority,
-            'country': 'all',
-            'media_urls': '|'.join(media_urls) if media_urls else '',
-            'target_user': '',
-            'target_name': '',
-            'scheduled_at': scheduled_at if schedule_type == 'timed' else '',
-            'cron_expr': cron_expr if schedule_type == 'cron' else '',
-                'reply_markup': reply_markup_str,
+        SUPPORTED_PLATFORMS = ('telegram', 'whatsapp', 'instagram', 'facebook', 'twitter')
+        PLATFORM_CHAR_LIMITS = {
+            'telegram': 4096,
+            'whatsapp': 65536,
+            'instagram': 2200,
+            'facebook': 63206,
+            'twitter': 280,
         }
-        entries.append(entry)
 
-    for grp_id in target_groups:
-        grp = next((g for g in groups_csv if g.get('id') == grp_id), None)
-        if not grp:
-            continue
-        channel_ids_raw = str(grp.get('channel_ids', '') or '')
-        for cid in channel_ids_raw.split('|'):
-            cid = cid.strip()
-            if not cid or cid in resolved_chat_ids:
-                continue
-            ch = next((c for c in channels_csv if c.get('id') == cid), None)
+        if platform not in SUPPORTED_PLATFORMS:
+            return jsonify({'error': f'المنصة غير مدعومة: {platform}. المدعومة: {", ".join(SUPPORTED_PLATFORMS)}'}), 400
+
+        if posting_method not in ('api', 'copy', 'download', 'deeplink', 'group'):
+            posting_method = 'api'
+
+        reply_markup_raw = data.get('reply_markup') or ''
+        if isinstance(reply_markup_raw, dict):
+            reply_markup_str = json.dumps(reply_markup_raw)
+        elif isinstance(reply_markup_raw, str):
+            reply_markup_str = reply_markup_raw
+        else:
+            reply_markup_str = ''
+
+        if not message and not media_urls:
+            return jsonify({'error': 'اكتب رسالة أو أضف وسائط'}), 400
+        if not target_channels and not target_groups:
+            return jsonify({'error': 'اختر قناة أو مجموعة واحدة على الأقل'}), 400
+
+        char_limit = PLATFORM_CHAR_LIMITS.get(platform, 4096)
+        if message and len(message) > char_limit:
+            return jsonify({
+                'error': f'النص يتجاوز الحد الأقصى لمنصة {platform}: {len(message)}/{char_limit} حرف',
+                'char_count': len(message),
+                'char_limit': char_limit,
+                'platform': platform,
+            }), 400
+
+        if platform == 'twitter' and parse_mode not in ('', 'html', 'markdown'):
+            parse_mode = ''
+
+        channels_csv = read_csv('bot_channels.csv')
+        groups_csv = read_csv('channel_groups.csv')
+        now_s = datetime.now().strftime('%Y-%m-%d %H:%M')
+        entries = []
+        skipped_channels = []
+        resolved_chat_ids = set()
+
+        for ch_id in target_channels:
+            ch = next((c for c in channels_csv if c.get('id') == ch_id), None)
             if not ch:
+                skipped_channels.append({'id': ch_id, 'reason': 'channel_not_found'})
+                continue
+            ch_platform = str(ch.get('platform', 'telegram') or 'telegram').lower()
+            if ch_platform != platform:
+                skipped_channels.append({'id': ch_id, 'reason': f'platform_mismatch: {ch_platform} ≠ {platform}'})
                 continue
             chat_id = str(ch.get('chat_id', '') or '').strip()
             if not chat_id:
+                skipped_channels.append({'id': ch_id, 'reason': 'empty_chat_id'})
+                continue
+            if chat_id in resolved_chat_ids:
+                skipped_channels.append({'id': ch_id, 'reason': 'duplicate'})
                 continue
             resolved_chat_ids.add(chat_id)
             entry = {
                 'id': f"POST{secrets.token_hex(4).upper()}",
                 'message': message,
                 'type': 'channel',
-                'platform': str(ch.get('platform', 'telegram') or 'telegram').lower(),
+                'platform': platform,
                 'target_chat_id': chat_id,
                 'platform_account_id': str(ch.get('platform_account_id', '') or ''),
                 'target_channel_id': ch.get('id', ''),
@@ -9305,58 +9309,121 @@ def api_create_post():
                 'scheduled_at': scheduled_at if schedule_type == 'timed' else '',
                 'cron_expr': cron_expr if schedule_type == 'cron' else '',
                 'reply_markup': reply_markup_str,
+                'parse_mode': parse_mode,
+                'silent': '1' if silent else '',
+                'pin': '1' if pin else '',
+                'posting_method': posting_method,
             }
             entries.append(entry)
 
-    if not entries:
-        return jsonify({'error': 'لم يتم العثور على قنوات صالحة'}), 400
+        for grp_id in target_groups:
+            grp = next((g for g in groups_csv if g.get('id') == grp_id), None)
+            if not grp:
+                continue
+            channel_ids_raw = str(grp.get('channel_ids', '') or '')
+            for cid in channel_ids_raw.split('|'):
+                cid = cid.strip()
+                if not cid or cid in resolved_chat_ids:
+                    continue
+                ch = next((c for c in channels_csv if c.get('id') == cid), None)
+                if not ch:
+                    continue
+                ch_platform = str(ch.get('platform', 'telegram') or 'telegram').lower()
+                if ch_platform != platform:
+                    continue
+                chat_id = str(ch.get('chat_id', '') or '').strip()
+                if not chat_id:
+                    continue
+                resolved_chat_ids.add(chat_id)
+                entry = {
+                    'id': f"POST{secrets.token_hex(4).upper()}",
+                    'message': message,
+                    'type': 'channel',
+                    'platform': platform,
+                    'target_chat_id': chat_id,
+                    'platform_account_id': str(ch.get('platform_account_id', '') or ''),
+                    'target_channel_id': ch.get('id', ''),
+                    'created_at': now_s,
+                    'created_by': str(session.get('admin_id', '')),
+                    'status': 'pending',
+                    'target': 'channel',
+                    'recipient': 'single',
+                    'priority': priority,
+                    'country': 'all',
+                    'media_urls': '|'.join(media_urls) if media_urls else '',
+                    'target_user': '',
+                    'target_name': '',
+                    'scheduled_at': scheduled_at if schedule_type == 'timed' else '',
+                    'cron_expr': cron_expr if schedule_type == 'cron' else '',
+                    'reply_markup': reply_markup_str,
+                    'parse_mode': parse_mode,
+                    'silent': '1' if silent else '',
+                    'pin': '1' if pin else '',
+                    'posting_method': posting_method,
+                }
+                entries.append(entry)
 
-    queue_fieldnames = get_fieldnames('broadcast_queue.csv', [
-        'id', 'message', 'type', 'platform', 'target_chat_id',
-        'platform_account_id', 'target_channel_id', 'created_at',
-        'created_by', 'status', 'target', 'recipient', 'priority',
-        'country', 'media_urls', 'target_user', 'target_name',
-        'scheduled_at', 'cron_expr', 'group_id', 'reply_markup'
-    ])
-    for e in entries:
-        append_csv('broadcast_queue.csv', e, queue_fieldnames)
+        if not entries:
+            reason = 'لم يتم العثور على قنوات صالحة'
+            if skipped_channels:
+                reasons = set(s['reason'].split(':')[0] for s in skipped_channels)
+                reason += f' — ({", ".join(reasons)})'
+            return jsonify({'error': reason, 'skipped': skipped_channels}), 400
 
-    vault_fieldnames = get_fieldnames('post_vault.csv', [
-        'id', 'source_channel', 'source_chat_id', 'original_text',
-        'processed_text', 'media_type', 'media_file_id', 'ai_provider',
-        'status', 'created_at', 'published_to_users', 'published_to_channels',
-        'views', 'category', 'cron_expr', 'scheduled_at', 'target_channels',
-        'priority'
-    ])
-    vault_entry = {
-        'id': f"VPOST{secrets.token_hex(4).upper()}",
-        'source_channel': ','.join(target_channels[:5]),
-        'source_chat_id': ','.join([next((c.get('chat_id','') for c in channels_csv if c.get('id')==cid),'') for cid in target_channels[:5]]),
-        'original_text': message,
-        'processed_text': message,
-        'media_type': 'mixed' if media_urls else 'text',
-        'media_file_id': '|'.join(media_urls) if media_urls else '',
-        'ai_provider': 'manual',
-        'status': 'scheduled' if schedule_type != 'now' else 'pending',
-        'created_at': now_s,
-        'published_to_users': '0',
-        'published_to_channels': str(len(entries)),
-        'views': '0',
-        'category': '',
-        'cron_expr': cron_expr,
-        'scheduled_at': scheduled_at,
-        'target_channels': ','.join(target_channels[:20]),
-        'priority': priority,
-    }
-    append_csv('post_vault.csv', vault_entry, vault_fieldnames)
+        queue_fieldnames = get_fieldnames('broadcast_queue.csv', [
+            'id', 'message', 'type', 'platform', 'target_chat_id',
+            'platform_account_id', 'target_channel_id', 'created_at',
+            'created_by', 'status', 'target', 'recipient', 'priority',
+            'country', 'media_urls', 'target_user', 'target_name',
+            'scheduled_at', 'cron_expr', 'group_id', 'reply_markup',
+            'parse_mode', 'silent', 'pin', 'posting_method'
+        ])
+        for e in entries:
+            append_csv('broadcast_queue.csv', e, queue_fieldnames)
 
-    log_action('create_post', f'{len(entries)} targets, msg={message[:50]}')
-    return jsonify({
-        'success': True,
-        'queued': len(entries),
-        'message': f'تم إنشاء المنشور — {len(entries)} قناة في قائمة الإرسال',
-        'vault_id': vault_entry['id']
-    })
+        vault_fieldnames = get_fieldnames('post_vault.csv', [
+            'id', 'source_channel', 'source_chat_id', 'original_text',
+            'processed_text', 'media_type', 'media_file_id', 'ai_provider',
+            'status', 'created_at', 'published_to_users', 'published_to_channels',
+            'views', 'category', 'cron_expr', 'scheduled_at', 'target_channels',
+            'priority'
+        ])
+        vault_entry = {
+            'id': f"VPOST{secrets.token_hex(4).upper()}",
+            'source_channel': ','.join(target_channels[:5]),
+            'source_chat_id': ','.join([next((c.get('chat_id','') for c in channels_csv if c.get('id')==cid),'') for cid in target_channels[:5]]),
+            'original_text': message,
+            'processed_text': message,
+            'media_type': 'mixed' if media_urls else 'text',
+            'media_file_id': '|'.join(media_urls) if media_urls else '',
+            'ai_provider': 'manual',
+            'status': 'scheduled' if schedule_type != 'now' else 'pending',
+            'created_at': now_s,
+            'published_to_users': '0',
+            'published_to_channels': str(len(entries)),
+            'views': '0',
+            'category': '',
+            'cron_expr': cron_expr,
+            'scheduled_at': scheduled_at,
+            'target_channels': ','.join(target_channels[:20]),
+            'priority': priority,
+        }
+        append_csv('post_vault.csv', vault_entry, vault_fieldnames)
+
+        log_action('create_post', f'{len(entries)} targets ({platform}/{posting_method}), msg={message[:50]}')
+        return jsonify({
+            'success': True,
+            'queued': len(entries),
+            'message': f'تم إنشاء المنشور — {len(entries)} قناة في قائمة الإرسال',
+            'vault_id': vault_entry['id'],
+            'platform': platform,
+            'posting_method': posting_method,
+            'skipped': skipped_channels if skipped_channels else None,
+        })
+
+    except Exception as e:
+        logger.error(f"api_create_post error: {e}", exc_info=True)
+        return jsonify({'error': f'خطأ داخلي: {str(e)}'}), 500
 
 
 @app.route('/api/posts/history')

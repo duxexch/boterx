@@ -66,7 +66,7 @@
                     <div><label class="block text-sm text-slate-400 mb-1" data-i18n="category">الفئة</label><select x-model="partnerForm.category" class="input w-full"><option value="" data-i18n="uncategorized">—</option><option value="رياضة" data-i18n="sports">⚽ رياضة</option><option value="مال" data-i18n="finance">💰 مال</option><option value="تداول" data-i18n="trading">💱 تداول</option><option value="ألعاب" data-i18n="games">🎮 ألعاب</option><option value="تسويق" data-i18n="marketing">📣 تسويق</option></select></div>
                     <div><label class="block text-sm text-slate-400 mb-1" data-i18n="contact">جهة الاتصال</label><input x-model="partnerForm.contact" class="input w-full" placeholder="@username"></div>
                 </div>
-                <div class="flex gap-2 justify-end mt-4"><button @click="showPartnerModal = false" class="btn btn-sm" style="background:#475569" data-i18n="cancel">إلغاء</button><button @click="addPartner()" class="btn btn-primary btn-sm" data-i18n="add">إضافة</button></div>
+                <div class="flex gap-2 justify-end mt-4"><button @click="showPartnerModal = false" class="btn btn-secondary btn-sm" data-i18n="cancel">إلغاء</button><button @click="addPartner()" class="btn btn-primary btn-sm" data-i18n="add">إضافة</button></div>
             </div>
         </div>
     </div>
@@ -150,7 +150,7 @@
                         </div>
                         <div class="flex gap-1 flex-shrink-0">
                             <button x-show="c.status === 'draft' || c.status === 'scheduled'" @click="launchCampaign(c.id)" class="btn btn-success btn-sm" title="إطلاق">▶️</button>
-                            <button x-show="c.status === 'failed'" @click="retryCampaign(c.id)" class="btn btn-sm" title="إعادة المحاولة" style="background:#f59e0b">🔄</button>
+                            <button x-show="c.status === 'failed'" @click="retryCampaign(c.id)" class="btn btn-warning btn-sm" title="إعادة المحاولة">🔄</button>
                             <button @click="deleteCampaign(c.id)" class="btn btn-danger btn-sm" title="حذف">🗑️</button>
                         </div>
                     </div>
@@ -322,7 +322,7 @@
                         </p>
                     </div>
                     <div class="flex justify-between pt-2 border-t border-slate-700">
-                        <button @click="cmpWizardStep = 1" class="btn btn-sm" style="background:#475569"><i class="fas fa-arrow-right text-xs"></i> السابق</button>
+                        <button @click="cmpWizardStep = 1" class="btn btn-secondary btn-sm"><i class="fas fa-arrow-right text-xs"></i> السابق</button>
                         <button @click="cmpWizardStep = 3" class="btn btn-primary btn-sm gap-1">
                             التالي: الجمهور <i class="fas fa-arrow-left text-xs"></i>
                         </button>
@@ -395,7 +395,7 @@
                     </div>
 
                     <div class="flex justify-between pt-2 border-t border-slate-700">
-                        <button @click="cmpWizardStep = 2" class="btn btn-sm" style="background:#475569"><i class="fas fa-arrow-right text-xs"></i> السابق</button>
+                        <button @click="cmpWizardStep = 2" class="btn btn-secondary btn-sm"><i class="fas fa-arrow-right text-xs"></i> السابق</button>
                         <button @click="cmpWizardStep = 4" class="btn btn-primary btn-sm gap-1">
                             التالي: الجدولة <i class="fas fa-arrow-left text-xs"></i>
                         </button>
@@ -474,7 +474,7 @@
                     </div>
 
                     <div class="flex justify-between pt-3 border-t border-slate-700">
-                        <button @click="cmpWizardStep = 3" class="btn btn-sm" style="background:#475569"><i class="fas fa-arrow-right text-xs"></i> السابق</button>
+                        <button @click="cmpWizardStep = 3" class="btn btn-secondary btn-sm"><i class="fas fa-arrow-right text-xs"></i> السابق</button>
                         <div class="flex gap-2">
                             <button @click="cmpForm.scheduled_at = ''; createCampaign()" class="btn btn-success btn-sm gap-1" :disabled="creating">
                                 <i class="fas fa-rocket text-xs" :class="creating ? 'fa-spin' : ''"></i>
@@ -572,7 +572,7 @@
                     <div><label class="block text-xs text-slate-400 mb-1" data-i18n="category">Category</label><select x-model="addChannelForm.category" class="input w-full"><option value="" data-i18n="uncategorized">Uncategorized</option><option value="رياضة">⚽ رياضة</option><option value="مال">💰 مال</option><option value="تداول">💱 تداول</option><option value="ألعاب">🎮 ألعاب</option><option value="أخبار">📰 أخبار</option><option value="تسويق">📣 تسويق</option><option value="ترفيه">🎬 ترفيه</option><option value="أخرى">📦 أخرى</option></select></div>
                 </div>
                 <div class="flex gap-2 justify-end mt-4">
-                    <button @click="showAddChannelModal = false" class="btn btn-sm" style="background:#475569" data-i18n="cancel">Cancel</button>
+                    <button @click="showAddChannelModal = false" class="btn btn-secondary btn-sm" data-i18n="cancel">Cancel</button>
                     <button @click="addChannel()" class="btn btn-primary btn-sm" data-i18n="add">Add</button>
                 </div>
             </div>
@@ -583,7 +583,7 @@
     <div x-show="tab === 'groups'" class="space-y-4">
         <div class="flex items-center gap-2">
             <button @click="showGroupModal = true" class="btn btn-primary btn-sm">➕ إنشاء مجموعة</button>
-            <button @click="loadGroups()" class="btn btn-sm" style="background:#475569">🔄 تحديث</button>
+            <button @click="loadGroups()" class="btn btn-secondary btn-sm">🔄 تحديث</button>
         </div>
         <!-- Root groups (no parent) -->
         <template x-for="g in groups.filter(x => !x.parent_id || !groups.find(y => y.id === x.parent_id))" :key="g.id">
@@ -614,7 +614,7 @@
             </div>
         </template>
         <p x-show="groups.length === 0" class="text-center text-slate-400 p-8">لا توجد مجموعات</p>
-        <div x-show="showGroupModal" class="modal-overlay" @click.self="showGroupModal = false" style="display:none"><div class="modal"><h3 class="font-bold text-lg mb-4">إنشاء مجموعة قنوات</h3><input type="text" x-model="groupForm.name" class="input w-full mb-2" placeholder="اسم المجموعة"><input type="text" x-model="groupForm.description" class="input w-full mb-2" placeholder="الوصف"><div class="mb-2"><label class="text-xs text-slate-400">المجموعة الأب (اختياري — لإنشاء مجموعة فرعية)</label><select x-model="groupForm.parentId" class="input w-full"><option value="">— بدون أب —</option><template x-for="g in groups.filter(x => !x.parent_id)" :key="g.id"><option :value="g.id" x-text="g.name"></option></template></select></div><div class="max-h-40 overflow-y-auto space-y-1 mb-3"><template x-for="ch in channels" :key="ch.id"><label class="flex items-center gap-2 p-1 hover:bg-slate-700 rounded cursor-pointer"><input type="checkbox" :value="ch.id" x-model="groupForm.selectedIds"><span x-text="ch.title"></span></label></template></div><div class="flex gap-2 justify-end"><button @click="showGroupModal = false" class="btn btn-sm" style="background:#475569" data-i18n="cancel">Cancel</button><button @click="createGroup()" class="btn btn-primary btn-sm">إنشاء</button></div></div></div>
+        <div x-show="showGroupModal" class="modal-overlay" @click.self="showGroupModal = false" style="display:none"><div class="modal"><h3 class="font-bold text-lg mb-4">إنشاء مجموعة قنوات</h3><input type="text" x-model="groupForm.name" class="input w-full mb-2" placeholder="اسم المجموعة"><input type="text" x-model="groupForm.description" class="input w-full mb-2" placeholder="الوصف"><div class="mb-2"><label class="text-xs text-slate-400">المجموعة الأب (اختياري — لإنشاء مجموعة فرعية)</label><select x-model="groupForm.parentId" class="input w-full"><option value="">— بدون أب —</option><template x-for="g in groups.filter(x => !x.parent_id)" :key="g.id"><option :value="g.id" x-text="g.name"></option></template></select></div><div class="max-h-40 overflow-y-auto space-y-1 mb-3"><template x-for="ch in channels" :key="ch.id"><label class="flex items-center gap-2 p-1 hover:bg-slate-700 rounded cursor-pointer"><input type="checkbox" :value="ch.id" x-model="groupForm.selectedIds"><span x-text="ch.title"></span></label></template></div><div class="flex gap-2 justify-end"><button @click="showGroupModal = false" class="btn btn-secondary btn-sm" data-i18n="cancel">Cancel</button><button @click="createGroup()" class="btn btn-primary btn-sm">إنشاء</button></div></div></div>
     <!-- Posting Monitor -->
     <div x-show="postingStats" class="bg-slate-800 rounded-xl border border-slate-700 p-4 mt-4">
         <div class="flex items-center justify-between mb-3">
@@ -666,7 +666,7 @@
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <template x-for="p in aiProviders" :key="p.name"><div class="bg-slate-800 rounded-xl border border-slate-700 p-4" :class="p.available ? 'border-green-500/30' : 'opacity-50'"><p class="font-bold" x-text="p.display_name"></p><p class="text-xs mt-1" :class="p.available ? 'text-green-400' : 'text-red-400'" x-text="p.available ? '✅ متاح' : '❌ غير مفعّل'"></p><p x-show="aiActive === p.name" class="text-xs text-blue-400 mt-1">⭐ نشط</p></div></template>
         </div>
-        <div class="bg-slate-800 rounded-xl border border-slate-700 p-4"><label class="block text-sm text-slate-400 mb-2">📝 تعليمات AI</label><textarea x-model="aiInstructions" rows="5" class="input w-full mb-2" placeholder="أعد صياغة البوست..."></textarea><button @click="saveAIInstructions()" class="btn btn-primary btn-sm">💾 حفظ</button><button @click="testAI()" class="btn btn-sm ml-2" style="background:#8B5CF6">🧪 اختبار</button></div>
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-4"><label class="block text-sm text-slate-400 mb-2">📝 تعليمات AI</label><textarea x-model="aiInstructions" rows="5" class="input w-full mb-2" placeholder="أعد صياغة البوست..."></textarea><button @click="saveAIInstructions()" class="btn btn-primary btn-sm">💾 حفظ</button><button @click="testAI()" class="btn btn-secondary btn-sm ml-2">🧪 اختبار</button></div>
         <div x-show="aiTestResult" class="bg-slate-800 rounded-xl border border-slate-700 p-4"><p class="text-sm" x-text="aiTestResult"></p></div>
         <div class="bg-slate-800 rounded-xl border border-slate-700 p-4"><h3 class="font-bold mb-2">🔁 استبدال نصوص</h3><div class="flex gap-2 mb-2"><input type="text" x-model="trForm.find_text" class="input flex-1" placeholder="Search for..." data-i18n-placeholder="find_text"><input type="text" x-model="trForm.replace_text" class="input flex-1" placeholder="Replace with..." data-i18n-placeholder="replace_with"><button @click="addReplacement()" class="btn btn-primary btn-sm">➕</button></div><template x-for="r in replacements" :key="r.id"><div class="flex items-center gap-2 p-2 bg-slate-900/50 rounded mb-1 text-sm"><span class="flex-1 truncate"><code x-text="r.find_text"></code> → <code x-text="r.replace_text"></code></span><button @click="toggleReplacement(r.id)" class="badge" :class="r.is_active === 'yes' ? 'badge-active' : 'badge-cancelled'" x-text="r.is_active === 'yes' ? '✅' : '⏸️'"></button><button @click="deleteReplacement(r.id)" class="btn btn-danger btn-sm">🗑️</button></div></template></div>
 
@@ -691,8 +691,8 @@
                                 </div>
                                 <div class="flex gap-1">
                                     <button @click="runAgent(a)" class="btn btn-success btn-sm" title="تشغيل المهمة الآن">▶️ شغّل</button>
-                                    <button @click="openAgentModal(a)" class="btn btn-sm" style="background:#334155" title="تعديل / تحكم">⚙️</button>
-                                    <button @click="testAIAgent(a)" class="btn btn-sm" style="background:#334155" title="اختبار الاتصال">🧪</button>
+                                    <button @click="openAgentModal(a)" class="btn btn-secondary btn-sm" title="تعديل / تحكم">⚙️</button>
+                                    <button @click="testAIAgent(a)" class="btn btn-secondary btn-sm" title="اختبار الاتصال">🧪</button>
                                     <button @click="toggleAgentActive(a)" class="btn btn-sm" :class="a.is_active === 'yes' ? 'bg-red-500/20 text-red-300' : 'bg-green-500/20 text-green-300'" x-text="a.is_active === 'yes' ? '⏸️' : '▶️'"></button>
                                     <button @click="deleteAIAgent(a.id)" class="btn btn-danger btn-sm">🗑️</button>
                                 </div>
@@ -758,7 +758,7 @@
                     </label>
                     <div class="flex gap-2 pt-1">
                         <button @click="saveAgent()" class="btn btn-primary btn-sm flex-1" x-text="editingAgent ? '💾 حفظ التعديلات' : '➕ إنشاء الوكيل'"></button>
-                        <button @click="cancelAgentForm()" class="btn btn-sm" style="background:#475569">إلغاء</button>
+                        <button @click="cancelAgentForm()" class="btn btn-secondary btn-sm">إلغاء</button>
                     </div>
                 </div>
             </div>
@@ -781,7 +781,7 @@
                         <span class="text-xs px-2 py-0.5 rounded bg-slate-700" x-text="acc.platform"></span>
                         <input x-model="acc.account_name" @change="savePlatformAccount(acc)" class="input py-1 px-2 text-xs flex-1">
                         <span class="text-xs" :class="acc.health_status === 'ok' ? 'text-green-400' : (acc.health_status === 'error' ? 'text-red-400' : 'text-slate-400')" x-text="acc.health_status || 'unknown'"></span>
-                        <button @click="checkPlatformHealth(acc.id)" class="btn btn-sm" style="background:#334155">💓</button>
+                        <button @click="checkPlatformHealth(acc.id)" class="btn btn-secondary btn-sm">💓</button>
                         <button @click="deletePlatformAccount(acc.id)" class="btn btn-danger btn-sm">🗑️</button>
                     </div>
                 </template>
@@ -978,8 +978,8 @@
                         </label>
                     </div>
                     <div class="flex gap-3 pt-2">
-                        <button type="submit" class="flex-1 btn btn-primary" x-text="editingSocialAccountId ? 'حفظ التعديلات' : 'إضافة الحساب'"></button>
-                        <button type="button" @click="showSocialAccountModal = false" class="flex-1 btn btn-secondary" data-i18n="cancel">Cancel</button>
+                        <button type="submit" class="flex-1 btn btn-primary btn-sm" x-text="editingSocialAccountId ? 'حفظ التعديلات' : 'إضافة الحساب'"></button>
+                        <button type="button" @click="showSocialAccountModal = false" class="flex-1 btn btn-secondary btn-sm" data-i18n="cancel">Cancel</button>
                     </div>
                 </form>
             </div>
@@ -996,8 +996,8 @@
                     <p class="text-sm text-slate-400">{% if t == 'en' %}Are you sure you want to delete the social account "<span class="text-white font-semibold" x-text="deleteSocialTarget?.account_name"></span>"?{% else %}هل أنت متأكد من حذف حساب السوشيال "<span class="text-white font-semibold" x-text="deleteSocialTarget?.account_name"></span>"?{% endif %}</p>
                     <p class="text-xs text-red-400 mt-2">{% if t == 'en' %}This action cannot be undone.{% else %}هذا الإجراء لا يمكن التراجع عنه.{% endif %}</p>
                     <div class="flex gap-3 mt-6">
-                        <button @click="deleteSocialAccount()" class="flex-1 btn btn-danger" data-i18n="delete">Delete</button>
-                        <button @click="showDeleteSocialModal = false" class="flex-1 btn btn-secondary" data-i18n="cancel">Cancel</button>
+                        <button @click="deleteSocialAccount()" class="flex-1 btn btn-danger btn-sm" data-i18n="delete">Delete</button>
+                        <button @click="showDeleteSocialModal = false" class="flex-1 btn btn-secondary btn-sm" data-i18n="cancel">Cancel</button>
                     </div>
                 </div>
             </div>
@@ -1012,11 +1012,28 @@
 .ph-btn:hover{background:rgba(51,65,85,0.8);color:#fff;border-color:rgba(100,116,139,0.6)}
 .ig-tag{padding:3px 8px;border-radius:6px;font-size:10px;font-weight:500;background:rgba(236,72,153,0.12);color:#f472b6;transition:all 0.15s}
 .ig-tag:hover{background:rgba(236,72,153,0.25)}
-.pc-modal{max-width:900px;width:100%;overflow:visible!important;padding:0!important;max-height:92vh;display:flex;flex-direction:column}
+.pc-modal{max-width:960px;width:100%;overflow:visible!important;padding:0!important;max-height:92vh;display:flex;flex-direction:column}
+@media(max-width:768px){.pc-modal{max-width:100%;max-height:100vh;border-radius:0!important;height:100vh}}
 .pm-card{display:flex;flex-direction:column;align-items:center;gap:5px;padding:10px 8px;border-radius:12px;border:1.5px solid rgba(100,116,139,0.15);background:rgba(15,23,42,0.3);cursor:pointer;transition:all 0.2s;flex:1;min-width:0}
 .pm-card:hover{border-color:rgba(100,116,139,0.4);background:rgba(30,41,59,0.5)}
 .pm-card.pm-active{border-color:rgba(59,130,246,0.5);background:rgba(59,130,246,0.08);box-shadow:0 0 0 1px rgba(59,130,246,0.2)}
 .pm-card.pm-warn{border-color:rgba(234,179,8,0.3);opacity:0.5}
+@media(max-width:768px){
+  .pc-modal .grid.grid-cols-1.lg\:grid-cols-5{grid-template-columns:1fr!important}
+  .pc-modal textarea{min-height:140px}
+  .pc-modal .pm-card{padding:8px 6px}
+  .pc-modal .pm-card .text-xl{font-size:16px}
+  .pc-modal .pm-card .text-\[11px\]{font-size:10px}
+  .pc-modal .px-6{padding-left:12px!important;padding-right:12px!important}
+  .pc-modal .py-4{padding-top:10px!important;padding-bottom:10px!important}
+  .pc-modal header{flex-wrap:wrap}
+  .pc-modal footer{flex-direction:column!important;gap:8px!important}
+  .pc-modal footer .flex{flex-wrap:wrap!important;justify-content:center!important}
+}
+.pc-btn-cancel{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;font-size:13px;font-weight:600;color:#94a3b8;background:rgba(51,65,85,0.5);border:1px solid rgba(71,85,105,0.3);transition:all 0.15s;cursor:pointer}
+.pc-btn-cancel:hover{background:rgba(71,85,105,0.5);color:#e2e8f0}
+.pc-btn-ghost{display:inline-flex;align-items:center;gap:4px;padding:4px 8px;border-radius:6px;font-size:10px;font-weight:500;color:#94a3b8;background:rgba(51,65,85,0.5);transition:all 0.15s;cursor:pointer}
+.pc-btn-ghost:hover{background:rgba(71,85,105,0.5);color:#e2e8f0}
 </style>
 <!-- ===== POST COMPOSER ===== -->
 <div x-show="showPostComposer" class="modal-overlay" @click.self="closePostComposer()" style="display:none" x-cloak>
@@ -1055,7 +1072,7 @@
                     </button>
                     <div x-show="open" @click.outside="open = false" x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-100" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="absolute top-full left-0 mt-1.5 w-72 bg-slate-800 border border-slate-700/50 rounded-xl shadow-2xl z-50 py-2 overflow-hidden">
                         <template x-for="p in platforms" :key="p.id">
-                            <button @click="activePlatform = p.id; selectedPlatformForPost = p.id; postingMethod = getDefaultMethod(p.id); open = false" class="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-slate-700/40 transition" :class="activePlatform === p.id ? 'bg-slate-700/30' : ''">
+                            <button @click="activePlatform = p.id; selectedPlatformForPost = p.id; postingMethod = getDefaultMethod(p.id); postForm.channelIds = []; postForm.groupIds = []; open = false" class="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-slate-700/40 transition" :class="activePlatform === p.id ? 'bg-slate-700/30' : ''">
                                 <span class="text-xl w-8 text-center" x-text="p.icon"></span>
                                 <div class="flex-1 min-w-0">
                                     <div class="text-[13px] font-semibold" :class="activePlatform === p.id ? 'text-white' : 'text-slate-300'" x-text="p.label"></div>
@@ -1488,7 +1505,7 @@
                             <span x-show="postForm.groupIds.length > 0" class="text-[11px] text-purple-400 font-medium" x-text="'• ' + postForm.groupIds.length + ' ' + t('groups_count')"></span>
                         </div>
                         <div class="max-h-44 overflow-y-auto space-y-0.5">
-                            <template x-for="ch in channels.filter(c => !postSearch || (c.title||'').toLowerCase().includes(postSearch.toLowerCase()) || String(c.chat_id||'').includes(postSearch))" :key="ch.id">
+                            <template x-for="ch in channels.filter(c => c.platform === activePlatform && (!postSearch || (c.title||'').toLowerCase().includes(postSearch.toLowerCase()) || String(c.chat_id||'').includes(postSearch)))" :key="ch.id">
                                 <div @click="togglePostChannel(ch.id)" class="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer transition-all select-none" :class="postForm.channelIds.includes(ch.id) ? 'bg-green-500/10 border border-green-500/25' : 'hover:bg-slate-800/60 border border-transparent'">
                                     <div class="w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-bold shrink-0 transition" :class="postForm.channelIds.includes(ch.id) ? 'bg-green-500 text-white' : 'bg-slate-700 text-slate-500'">
                                         <i x-show="postForm.channelIds.includes(ch.id)" class="fas fa-check text-[8px]"></i>
@@ -1840,7 +1857,7 @@
                     </div>
                     <div class="flex gap-2">
                         <button @click="sendChannelMessage" class="btn btn-primary btn-sm flex-1" :disabled="!msgText && (!msgMedia || msgMedia.length === 0)"><i class="fas fa-paper-plane"></i> إرسال</button>
-                        <button @click="closeChannelModal" class="btn btn-sm" style="background:#475569">إغلاق</button>
+                        <button @click="closeChannelModal" class="btn btn-secondary btn-sm">إغلاق</button>
                     </div>
                 </div>
             </div>
@@ -2670,7 +2687,7 @@ function channelsApp() {
             const chIds = (grp.channel_ids || '').split('|').map(s => s.trim()).filter(Boolean);
             chIds.forEach(cid => { if (!this.postForm.channelIds.includes(cid)) this.postForm.channelIds.push(cid); });
         },
-        selectAllChannels() { this.postForm.channelIds = this.channels.map(c => c.id).filter(Boolean); },
+        selectAllChannels() { this.postForm.channelIds = this.channels.filter(c => c.platform === this.activePlatform).map(c => c.id).filter(Boolean); },
         async uploadPostMedia(event) {
             const files = event.target.files;
             if (!files) return;
@@ -2807,6 +2824,7 @@ function channelsApp() {
                     parse_mode: this.parseMode,
                     silent: this.activePlatform === 'telegram' ? this.tgSilent : false,
                     pin: this.activePlatform === 'telegram' ? this.tgPin : false,
+                    posting_method: this.postingMethod,
                 };
                 const d = await api('/api/posts/create', { method: 'POST', body: JSON.stringify(payload) });
                 if (d.success) {

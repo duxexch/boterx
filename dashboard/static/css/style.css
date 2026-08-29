@@ -130,6 +130,8 @@ body.light-mode .data-table tbody tr:nth-child(even) { background: rgba(241, 245
 .btn-danger:hover { background: #dc2626; box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3); }
 .btn-warning { background: #f59e0b; color: #0f172a; }
 .btn-warning:hover { background: #d97706; box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3); }
+.btn-secondary { background: #475569; color: #cbd5e1; }
+.btn-secondary:hover { background: #64748b; box-shadow: 0 2px 8px rgba(100, 116, 139, 0.3); }
 .btn-sm { padding: 0.375rem 0.75rem; font-size: 0.75rem; }
 
 /* Inputs */
@@ -227,11 +229,40 @@ body.light-mode .bg-black\/70, body.light-mode .bg-black\/60 { background-color:
 body.light-mode kbd { background-color: #e2e8f0 !important; color: #334155 !important; }
 
 /* ===== Mobile usability ===== */
-@media (max-width: 640px) {
-    .data-table th, .data-table td { padding: 0.5rem 0.5rem; font-size: 0.75rem; }
-    main { padding: 0.75rem !important; }
-    .modal { max-height: 92vh; overflow-y: auto; }
-    .btn { min-height: 40px; }
-}
-/* Comfortable touch targets on sidebar links */
+/* Touch targets — all interactive elements */
 .sidebar-link { min-height: 42px; }
+.btn { min-height: 40px; }
+@media (max-width: 640px) {
+    /* Main content — no side padding waste */
+    main { padding: 0.5rem !important; }
+    /* Data tables — horizontal scroll */
+    .data-table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; white-space: nowrap; }
+    .data-table th, .data-table td { padding: 0.4rem 0.5rem; font-size: 0.7rem; }
+    /* Buttons — bigger touch targets */
+    .btn { min-height: 42px; padding: 0.5rem 1rem; }
+    .btn-sm { min-height: 36px; padding: 0.375rem 0.75rem; }
+    /* Modals — fullscreen */
+    .modal { max-width: 100% !important; max-height: 100vh !important; border-radius: 0 !important; height: 100vh; margin: 0 !important; }
+    .modal-overlay { padding: 0 !important; }
+    /* Grid layouts — single column */
+    .grid-cols-2 { grid-template-columns: 1fr !important; }
+    .grid-cols-3 { grid-template-columns: 1fr !important; }
+    .grid-cols-4 { grid-template-columns: 1fr !important; }
+    .grid-cols-5 { grid-template-columns: 1fr !important; }
+    /* KPI cards — 2 columns */
+    .grid-cols-2.md\:grid-cols-5 { grid-template-columns: repeat(2, 1fr) !important; }
+    /* Flex wrap stacks */
+    .flex-wrap { flex-wrap: wrap !important; }
+    /* Tabs — horizontal scroll */
+    .flex.gap-1.bg-slate-800 { overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap !important; scrollbar-width: none; }
+    .flex.gap-1.bg-slate-80::-webkit-scrollbar { display: none; }
+    /* Typography */
+    h1, h2, h3 { font-size: 1rem !important; }
+    /* Card padding reduction */
+    .bg-slate-800.rounded-xl { padding: 0.75rem !important; }
+}
+/* Tablet adjustments */
+@media (min-width: 641px) and (max-width: 1024px) {
+    main { padding: 1rem !important; }
+    .grid-cols-2.md\:grid-cols-5 { grid-template-columns: repeat(3, 1fr) !important; }
+}
