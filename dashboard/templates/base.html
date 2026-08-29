@@ -901,6 +901,20 @@ function rbac(perm) { return !Object.keys(_RBAC).length || !!_RBAC[perm]; }
             <div x-show="msg.action_taken" class="mt-1.5 pt-1.5 border-t border-white/10">
               <span class="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300" x-text="'⚡ ' + msg.action_taken"></span>
             </div>
+            <!-- Feedback buttons (only on assistant messages) -->
+            <div x-show="msg.role === 'assistant' && !msg.feedback && idx > 0" class="mt-1.5 pt-1.5 border-t border-white/10 flex items-center gap-1.5">
+              <button @click="giveFeedback(idx, 3)" class="p-1 rounded hover:bg-green-500/20 text-gray-500 hover:text-green-400 transition-colors text-xs" title="Good">👍</button>
+              <button @click="giveFeedback(idx, 1)" class="p-1 rounded hover:bg-red-500/20 text-gray-500 hover:text-red-400 transition-colors text-xs" title="Bad">👎</button>
+            </div>
+            <!-- Feedback given indicator -->
+            <div x-show="msg.feedback === 3" class="mt-1 text-[10px] text-green-400 opacity-60">✓ Thanks for feedback</div>
+            <div x-show="msg.feedback === 1" class="mt-1">
+              <input x-model="correctionInput[idx]" @keydown.enter="submitCorrection(idx, msg)" type="text"
+                placeholder="What was wrong? Type correction..."
+                class="w-full bg-black/20 border border-red-500/30 rounded-lg px-2 py-1 text-[11px] text-gray-300 placeholder-gray-500 focus:outline-none focus:border-red-400/50 mt-1">
+              <button @click="submitCorrection(idx, msg)" x-show="correctionInput[idx]"
+                class="mt-1 text-[10px] px-2 py-0.5 bg-red-500/20 border border-red-500/30 rounded text-red-300 hover:bg-red-500/30">Send Correction</button>
+            </div>
           </div>
         </div>
       </template>
@@ -940,6 +954,7 @@ function aiAssistant() {
     input: '',
     messages: [],
     typing: false,
+    correctionInput: {},
 
     init() {
       this.$watch('open', (v) => {
@@ -1018,6 +1033,48 @@ function aiAssistant() {
         await fetch('/api/ai/assistant/clear', { method: 'POST', credentials: 'same-origin' });
       } catch (e) {}
       this.messages = [];
+    },
+
+    async giveFeedback(idx, rating) {
+      const msg = this.messages[idx];
+      msg.feedback = rating;
+      try {
+        await fetch('/api/ai/assistant/feedback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message_id: msg.message_id || null,
+            rating: rating,
+            action_taken: msg.action_taken || null
+          }),
+          credentials: 'same-origin'
+        });
+      } catch (e) {}
+    },
+
+    async submitCorrection(idx, msg) {
+      const text = this.correctionInput[idx];
+      if (!text) return;
+      try {
+        await fetch('/api/ai/assistant/feedback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message_id: msg.message_id || null,
+            rating: 1,
+            correction: text,
+            action_taken: msg.action_taken || null
+          }),
+          credentials: 'same-origin'
+        });
+        this.correctionInput[idx] = '';
+        msg.feedback = 1;
+        this.messages.push({
+          role: 'assistant',
+          content: '✅ شكراً! تم حفظ التصحيح. المساعد سيتعلم من هذا الخطأ في المرة القادمة.'
+        });
+        this.scrollToBottom();
+      } catch (e) {}
     }
   };
 }

@@ -3657,6 +3657,90 @@ def api_ai_assistant_clear():
     return jsonify({'success': True, 'message': 'History cleared'})
 
 
+@app.route('/api/ai/assistant/feedback', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_ai_assistant_feedback():
+    """Record feedback on an AI response (thumbs up/down + optional correction)."""
+    from ai_assistant import record_feedback, record_correction
+    data = request.json or {}
+    admin_id = session.get('user_id', session.get('admin_id', 'unknown'))
+    message_id = data.get('message_id')
+    rating = data.get('rating', 2)  # 1=bad, 2=neutral, 3=good
+    correction_text = data.get('correction', '')
+
+    record_feedback(admin_id, message_id, rating, correction_text or None)
+
+    # If admin provides a correction text, also store it
+    if correction_text and rating == 1:
+        record_correction(
+            admin_id=admin_id,
+            original_action=data.get('action_taken'),
+            original_params=data.get('action_params'),
+            corrected_action=None,
+            corrected_params=None,
+            correction_text=correction_text
+        )
+
+    return jsonify({'success': True, 'message': 'Feedback recorded'})
+
+
+@app.route('/api/ai/assistant/learning', methods=['GET'])
+@api_auth
+@permission_required('send_broadcast')
+def api_ai_assistant_learning():
+    """Get learning stats and patterns."""
+    from ai_assistant import get_learning_stats, get_learned_patterns, get_knowledge, get_repeated_errors
+    stats = get_learning_stats()
+    patterns = get_learned_patterns(limit=10)
+    knowledge = get_knowledge(limit=10)
+    errors = get_repeated_errors(limit=5)
+    return jsonify({
+        'success': True,
+        'stats': stats,
+        'patterns': patterns,
+        'knowledge': knowledge,
+        'repeated_errors': errors
+    })
+
+
+@app.route('/api/ai/assistant/correction', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_ai_assistant_correction():
+    """Admin corrects an AI action — the AI learns from this."""
+    from ai_assistant import record_correction
+    data = request.json or {}
+    admin_id = session.get('user_id', session.get('admin_id', 'unknown'))
+
+    record_correction(
+        admin_id=admin_id,
+        original_action=data.get('original_action'),
+        original_params=data.get('original_params'),
+        corrected_action=data.get('corrected_action'),
+        corrected_params=data.get('corrected_params'),
+        correction_text=data.get('correction_text', '')
+    )
+
+    return jsonify({'success': True, 'message': 'Correction recorded — AI will learn from this'})
+
+
+@app.route('/api/ai/assistant/learn', methods=['POST'])
+@api_auth
+@permission_required('send_broadcast')
+def api_ai_assistant_learn():
+    """Admin teaches the AI a new fact about the project."""
+    from ai_assistant import store_knowledge
+    data = request.json or {}
+    category = data.get('category', 'general')
+    key = data.get('key', '')
+    value = data.get('value', '')
+    if not key or not value:
+        return jsonify({'success': False, 'error': 'key and value required'}), 400
+    store_knowledge(category, key, value, source='admin_taught', confidence=0.9)
+    return jsonify({'success': True, 'message': f'Knowledge stored: [{category}] {key} = {value}'})
+
+
 # ===== API — Stats =====
 
 @app.route('/api/stats')
