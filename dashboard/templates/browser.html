@@ -56,7 +56,7 @@
         </div>
     </div>
 
-    <!-- Daemon Controls -->
+            <!-- Daemon Controls -->
     <div class="bg-slate-800 rounded-xl border border-slate-700 p-4 mb-6">
         <div class="flex items-center justify-between mb-3">
             <h3 class="text-sm font-semibold text-bright">تحكم Daemon</h3>
@@ -84,6 +84,54 @@
             <button @click="loadInstances()" class="btn btn-secondary btn-sm gap-1">
                 <i class="fas fa-sync-alt"></i> تحديث
             </button>
+            <button @click="showPermissions=!showPermissions" class="btn btn-secondary btn-sm gap-1">
+                <i class="fas fa-user-shield"></i> صلاحيات الوكلاء
+            </button>
+            <button @click="showSchedules=!showSchedules" class="btn btn-secondary btn-sm gap-1">
+                <i class="fas fa-clock"></i> المهام المجدولة
+            </button>
+        </div>
+
+        <!-- Agent Permissions Panel -->
+        <div x-show="showPermissions" x-transition class="mt-4 p-3 bg-slate-900/50 rounded-lg border border-slate-700/50">
+            <h4 class="text-xs font-semibold text-bright mb-2">صلاحيات الوكيل في المتصفح</h4>
+            <div class="space-y-2">
+                <template x-for="p in agentPermissions" :key="p.agent_id">
+                    <div class="flex items-center justify-between text-xs py-1 border-b border-slate-700/30">
+                        <span class="text-bright font-medium" x-text="p.agent_id"></span>
+                        <div class="flex gap-1">
+                            <span class="px-1 rounded text-[10px]" :class="p.can_navigate?'bg-green-500/20 text-green-400':'bg-red-500/20 text-red-400'">navigate</span>
+                            <span class="px-1 rounded text-[10px]" :class="p.can_click?'bg-green-500/20 text-green-400':'bg-red-500/20 text-red-400'">click</span>
+                            <span class="px-1 rounded text-[10px]" :class="p.can_type?'bg-green-500/20 text-green-400':'bg-red-500/20 text-red-400'">type</span>
+                            <span class="px-1 rounded text-[10px]" :class="p.can_execute_js?'bg-green-500/20 text-green-400':'bg-red-500/20 text-red-400'">JS</span>
+                            <span class="px-1 rounded text-[10px]" :class="p.can_manage_profiles?'bg-green-500/20 text-green-400':'bg-red-500/20 text-red-400'">profiles</span>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        <!-- Schedules Panel -->
+        <div x-show="showSchedules" x-transition class="mt-4 p-3 bg-slate-900/50 rounded-lg border border-slate-700/50">
+            <div class="flex items-center justify-between mb-2">
+                <h4 class="text-xs font-semibold text-bright">المهام المجدولة</h4>
+                <button @click="showCreateSchedule=true" class="text-xs text-blue-400 hover:text-blue-300">+ إضافة</button>
+            </div>
+            <template x-for="s in schedules" :key="s.id">
+                <div class="flex items-center justify-between text-xs py-1 border-b border-slate-700/30">
+                    <div>
+                        <span class="text-bright" x-text="s.name"></span>
+                        <span class="text-dim mr-2" x-text="s.task_type"></span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-dim" x-text="s.interval_seconds+'ث'"></span>
+                        <button @click="toggleSchedule(s.id, !s.is_active)" class="text-xs"
+                            :class="s.is_active?'text-green-400':'text-slate-500'"
+                            x-text="s.is_active?'نشط':'متوقف'"></button>
+                    </div>
+                </div>
+            </template>
+            <div x-show="schedules.length===0" class="text-xs text-dim text-center py-2">لا توجد مهام مجدولة</div>
         </div>
     </div>
 
@@ -383,6 +431,12 @@ function browserPage() {
         healthStats: {},
         siteKnowledge: null,
         tasks: [],
+        showPermissions: false,
+        showSchedules: false,
+        showCreateSchedule: false,
+        agentPermissions: [],
+        schedules: [],
+        networkStats: {},
         _pollTimer: null,
 
         async init() {
@@ -390,6 +444,8 @@ function browserPage() {
             await this.loadProfiles();
             await this.loadDaemonStatus();
             await this.loadTasks();
+            await this.loadPermissions();
+            await this.loadSchedules();
             // Auto-refresh screenshots every 5s for active instance
             this._pollTimer = setInterval(() => {
                 if (this.selected && this.currentInst?.status === 'running') {
@@ -647,6 +703,29 @@ function browserPage() {
             try {
                 const d = await api('/api/browser/tasks');
                 this.tasks = d.tasks || [];
+            } catch(e) {}
+        },
+
+        async loadPermissions() {
+            try {
+                const d = await api('/api/browser/permissions');
+                this.agentPermissions = d.permissions || [];
+            } catch(e) {}
+        },
+
+        async loadSchedules() {
+            try {
+                const d = await api('/api/browser/schedules');
+                this.schedules = d.schedules || [];
+            } catch(e) {}
+        },
+
+        async toggleSchedule(id, active) {
+            try {
+                await api(`/api/browser/schedules/${id}/toggle`, {
+                    method: 'POST', body: JSON.stringify({ active })
+                });
+                await this.loadSchedules();
             } catch(e) {}
         },
 

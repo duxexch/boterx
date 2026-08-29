@@ -4504,13 +4504,174 @@ def api_browser_quick_scrape():
     if not task:
         return jsonify({'success': False, 'error': 'Template not found'}), 400
     result = task_executor.execute_task(task.id, instance_id)
-    # Extract text from results
     text = ''
     for r in result.get('task', {}).get('results', []):
         if r.get('action') == 'read_text' and r.get('detail', {}).get('success'):
             text = r['detail'].get('result', '')
     result['scraped_text'] = text
     return jsonify(result)
+
+
+# ── Agent Permissions ────────────────────────────────────────
+
+@app.route('/api/browser/permissions', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_permissions_list():
+    from browser_permissions import list_agent_permissions
+    return jsonify({'success': True, 'permissions': list_agent_permissions()})
+
+
+@app.route('/api/browser/permissions/<agent_id>', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_permissions_get(agent_id):
+    from browser_permissions import get_agent_permissions
+    return jsonify({'success': True, 'permissions': get_agent_permissions(agent_id)})
+
+
+@app.route('/api/browser/permissions/<agent_id>', methods=['PUT'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_permissions_set(agent_id):
+    from browser_permissions import set_agent_permissions
+    data = request.json or {}
+    set_agent_permissions(agent_id, data)
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/permissions/<agent_id>/check/<perm>', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_permissions_check(agent_id, perm):
+    from browser_permissions import check_permission
+    return jsonify({'success': True, 'allowed': check_permission(agent_id, perm)})
+
+
+# ── Schedules ────────────────────────────────────────────────
+
+@app.route('/api/browser/schedules', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_schedules_list():
+    from browser_permissions import list_schedules
+    return jsonify({'success': True, 'schedules': list_schedules()})
+
+
+@app.route('/api/browser/schedules', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_schedule_create():
+    from browser_permissions import create_schedule
+    data = request.json or {}
+    create_schedule(
+        data.get('name', ''),
+        data.get('task_type', ''),
+        data.get('config', {}),
+        data.get('cron_expr', ''),
+        data.get('interval_seconds', 3600),
+    )
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/schedules/<sid>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_schedule_delete(sid):
+    from browser_permissions import delete_schedule
+    delete_schedule(int(sid))
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/schedules/<sid>/toggle', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_schedule_toggle(sid):
+    from browser_permissions import toggle_schedule
+    active = (request.json or {}).get('active', True)
+    toggle_schedule(int(sid), active)
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/scheduler/start', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_scheduler_start():
+    from browser_scheduler import schedule_runner
+    schedule_runner.start()
+    return jsonify({'success': True, 'message': 'Scheduler started'})
+
+
+@app.route('/api/browser/scheduler/stop', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_scheduler_stop():
+    from browser_scheduler import schedule_runner
+    schedule_runner.stop()
+    return jsonify({'success': True, 'message': 'Scheduler stopped'})
+
+
+# ── Webhooks ─────────────────────────────────────────────────
+
+@app.route('/api/browser/webhooks', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_webhooks_list():
+    from browser_scheduler import webhook_trigger
+    return jsonify({'success': True, 'webhooks': webhook_trigger.list_webhooks()})
+
+
+@app.route('/api/browser/webhooks', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_webhook_create():
+    from browser_scheduler import webhook_trigger
+    data = request.json or {}
+    wid = data.get('webhook_id', f'wh_{int(time.time()*1000)}')
+    webhook_trigger.register_webhook(
+        data.get('instance_id', ''),
+        wid,
+        data.get('config', {}),
+    )
+    return jsonify({'success': True, 'webhook_id': wid})
+
+
+@app.route('/api/browser/webhooks/<wid>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_webhook_delete(wid):
+    from browser_scheduler import webhook_trigger
+    webhook_trigger.remove_webhook(wid)
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/webhook-trigger/<wid>', methods=['POST'])
+def api_browser_webhook_fire(wid):
+    """Public endpoint — fires webhook to wake browser."""
+    from browser_scheduler import webhook_trigger
+    payload = request.json or {}
+    return jsonify(webhook_trigger.handle_webhook(wid, payload))
+
+
+# ── Network Monitor ──────────────────────────────────────────
+
+@app.route('/api/browser/network-log', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_network_log():
+    from browser_permissions import get_network_log
+    iid = request.args.get('instance_id')
+    limit = request.args.get('limit', 100, type=int)
+    return jsonify({'success': True, 'log': get_network_log(iid, limit)})
+
+
+@app.route('/api/browser/network-stats', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_network_stats():
+    from browser_permissions import get_network_stats
+    iid = request.args.get('instance_id')
+    return jsonify({'success': True, 'stats': get_network_stats(iid)})
 
 
 # ── Instance CRUD ────────────────────────────────────────────

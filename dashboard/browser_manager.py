@@ -145,11 +145,41 @@ class BrowserInstance:
         self.context = self.browser.new_context(**ctx_args)
         self._stealth_inject()
         self.page = self.context.new_page()
+        self._setup_network_monitor()
         self.status = 'running'
         self.profile.meta['last_used'] = datetime.now().isoformat()
         self.profile._save_meta()
         self._log_action('start', f'Browser started with profile {self.profile.name}')
         return True
+
+    def _setup_network_monitor(self):
+        """Monitor network requests for logging."""
+        self._network_log = []
+        def on_response(response):
+            try:
+                req = response.request
+                entry = {
+                    'url': req.url[:500],
+                    'method': req.method,
+                    'status': response.status,
+                    'content_type': response.headers.get('content-type', ''),
+                    'timestamp': datetime.now().isoformat(),
+                }
+                self._network_log.append(entry)
+                if len(self._network_log) > 500:
+                    self._network_log = self._network_log[-500:]
+                # Log to DB
+                try:
+                    from browser_permissions import log_network_request
+                    log_network_request(
+                        self.id, req.url[:500], req.method, response.status,
+                        response.headers.get('content-type', ''), 0, 0
+                    )
+                except Exception:
+                    pass
+            except Exception:
+                pass
+        self.page.on('response', on_response)
 
     def _stealth_inject(self):
         stealth_js = """
