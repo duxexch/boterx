@@ -3615,34 +3615,59 @@ def api_ai_translate():
 @api_auth
 @permission_required('send_broadcast')
 def api_ai_assistant_chat():
-    """AI Assistant chat — receive message, process with AI, execute actions."""
+    """AI Assistant chat — multi-agent with @mention support."""
     from ai_assistant import process_chat_message, clear_history
 
     data = request.json or {}
     message = (data.get('message') or '').strip()
     admin_id = session.get('user_id', session.get('admin_id', 'unknown'))
+    target_agent = data.get('agent_id')  # Optional: explicit agent
 
     if not message:
         return jsonify({'success': False, 'error': 'No message provided'}), 400
 
     # Handle special commands
-    if message.lower() in ('/clear', '/reset', 'امسح المحادثة', 'مسح'):
+    if message.lower() in ('/clear', '/reset', 'امسح', 'مسح'):
         clear_history(admin_id)
         return jsonify({'success': True, 'reply': '✅ تم مسح تاريخ المحادثة.', 'action_taken': 'clear_history'})
 
-    result = process_chat_message(admin_id, message)
+    result = process_chat_message(admin_id, message, target_agent=target_agent)
     return jsonify(result)
+
+
+@app.route('/api/ai/assistant/agents', methods=['GET'])
+@api_auth
+@permission_required('send_broadcast')
+def api_ai_assistant_agents():
+    """Get list of available AI agents."""
+    from ai_assistant import get_all_agents, get_learning_stats
+    agents = get_all_agents()
+    stats = get_learning_stats()
+    agent_stats = {s['agent']: s for s in stats.get('agent_stats', [])}
+    result = []
+    for a in agents:
+        as_ = agent_stats.get(a['id'], {})
+        result.append({
+            'id': a['id'], 'name': a['name'], 'name_ar': a['name_ar'],
+            'emoji': a['emoji'], 'color': a['color'],
+            'role': a['role'], 'role_ar': a['role_ar'],
+            'description_ar': a['description_ar'],
+            'total_actions': as_.get('count', 0),
+            'successful_actions': as_.get('success', 0) or 0,
+        })
+    return jsonify({'success': True, 'agents': result})
 
 
 @app.route('/api/ai/assistant/history', methods=['GET'])
 @api_auth
 @permission_required('send_broadcast')
 def api_ai_assistant_history():
-    """Get chat history."""
+    """Get chat history, optionally filtered by agent."""
     from ai_assistant import get_conversation_history
     admin_id = session.get('user_id', session.get('admin_id', 'unknown'))
     limit = request.args.get('limit', 50, type=int)
-    history = get_conversation_history(admin_id, limit=limit)
+    agent_id = request.args.get('agent_id')
+    history = get_conversation_history(admin_id, agent_id=agent_id, limit=limit)
     return jsonify({'success': True, 'history': history})
 
 

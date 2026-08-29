@@ -841,246 +841,335 @@ function rbac(perm) { return !Object.keys(_RBAC).length || !!_RBAC[perm]; }
 {% block scripts %}{% endblock %}
 
 <!-- ===== AI ASSISTANT FLOATING CHAT ===== -->
-<div id="aiAssistant" x-data="aiAssistant()" x-init="init()" class="fixed bottom-5 right-5 z-[9999]" style="font-family: 'Cairo', system-ui, sans-serif;">
-  <!-- Floating Button -->
-  <button @click="toggleChat()" x-show="!open"
-    class="w-14 h-14 rounded-full bg-gradient-to-br from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/30 flex items-center justify-center text-2xl hover:scale-110 transition-all duration-200 active:scale-95"
-    title="AI Assistant">
-    🤖
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+.ai-chat *{box-sizing:border-box}
+.ai-chat{--ac:#8b5cf6;--bg:#090b10;--surface:#111827;--surface2:#1a2234;--border:#1f2937;--text:#f1f5f9;--dim:#64748b;--green:#22c55e;--red:#ef4444;--cyan:#06b6d4;--amber:#f59e0b;--radius:12px}
+.ai-fab{position:fixed;bottom:24px;right:24px;z-index:99999;width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;border:none;cursor:pointer;box-shadow:0 4px 24px rgba(124,58,237,.4);display:flex;align-items:center;justify-content:center;font-size:24px;transition:all .2s}
+.ai-fab:hover{transform:scale(1.08);box-shadow:0 6px 32px rgba(124,58,237,.5)}
+.ai-fab:active{transform:scale(.95)}
+.ai-panel{position:fixed;bottom:90px;right:24px;z-index:99998;width:420px;max-width:calc(100vw - 32px);height:min(640px,calc(100vh - 120px));background:var(--bg);border:1px solid var(--border);border-radius:16px;box-shadow:0 8px 48px rgba(0,0,0,.6);display:flex;flex-direction:column;overflow:hidden;font-family:'IBM Plex Sans Arabic',system-ui,sans-serif}
+.ai-header{padding:14px 16px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0}
+.ai-header-row{display:flex;align-items:center;justify-content:space-between}
+.ai-header-left{display:flex;align-items:center;gap:10px}
+.ai-header-avatar{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.ai-header-info h3{font-size:14px;font-weight:600;color:var(--text);margin:0;line-height:1.2}
+.ai-header-info p{font-size:11px;color:var(--dim);margin:0}
+.ai-header-actions{display:flex;gap:4px}
+.ai-header-actions button{width:32px;height:32px;border-radius:8px;border:none;background:transparent;color:var(--dim);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.ai-header-actions button:hover{background:var(--surface2);color:var(--text)}
+/* Agent tabs */
+.ai-agents{display:flex;gap:6px;padding:10px 16px;background:var(--surface);border-bottom:1px solid var(--border);overflow-x:auto;flex-shrink:0;scrollbar-width:none}
+.ai-agents::-webkit-scrollbar{display:none}
+.ai-agent-tab{display:flex;align-items:center;gap:5px;padding:6px 10px;border-radius:8px;border:1px solid transparent;background:transparent;color:var(--dim);cursor:pointer;font-size:11px;font-weight:500;white-space:nowrap;transition:all .15s;font-family:inherit}
+.ai-agent-tab:hover{background:var(--surface2);color:var(--text)}
+.ai-agent-tab.active{background:var(--surface2);border-color:var(--ac);color:var(--text)}
+.ai-agent-tab .dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+/* Messages */
+.ai-messages{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;scroll-behavior:smooth}
+.ai-messages::-webkit-scrollbar{width:4px}
+.ai-messages::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.ai-msg{display:flex;gap:8px;max-width:92%}
+.ai-msg.user{align-self:flex-end;flex-direction:row-reverse}
+.ai-msg-avatar{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;margin-top:2px}
+.ai-msg.user .ai-msg-avatar{background:var(--ac);color:#fff}
+.ai-msg-bubble{padding:10px 14px;border-radius:var(--radius);font-size:13px;line-height:1.7;color:var(--text);word-break:break-word}
+.ai-msg.user .ai-msg-bubble{background:var(--ac);color:#fff;border-bottom-right-radius:4px}
+.ai-msg.assistant .ai-msg-bubble{background:var(--surface2);border:1px solid var(--border);border-bottom-left-radius:4px}
+.ai-msg-meta{display:flex;align-items:center;gap:6px;margin-top:4px;font-size:10px;color:var(--dim)}
+.ai-msg-meta .agent-badge{display:inline-flex;align-items:center;gap:3px;padding:1px 6px;border-radius:4px;font-size:9px;font-weight:600}
+.ai-msg-actions{display:flex;gap:2px;margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,.06)}
+.ai-msg-actions button{padding:4px 8px;border-radius:6px;border:none;background:transparent;color:var(--dim);cursor:pointer;font-size:12px;transition:all .15s}
+.ai-msg-actions button:hover{background:rgba(255,255,255,.08);color:var(--text)}
+/* Consultation card */
+.ai-consult{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px;margin-top:6px}
+.ai-consult-head{font-size:11px;font-weight:600;color:var(--dim);margin-bottom:6px}
+.ai-consult-item{display:flex;gap:6px;padding:6px;border-radius:6px;margin-bottom:4px}
+.ai-consult-item:last-child{margin-bottom:0}
+.ai-consult-item .c-emoji{font-size:14px;flex-shrink:0;margin-top:1px}
+.ai-consult-item .c-body{flex:1}
+.ai-consult-item .c-name{font-size:10px;font-weight:600;margin-bottom:2px}
+.ai-consult-item .c-text{font-size:12px;color:var(--dim);line-height:1.5}
+/* Typing */
+.ai-typing{display:flex;gap:8px;align-items:flex-start}
+.ai-typing-dots{display:flex;gap:4px;padding:12px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);border-bottom-left-radius:4px}
+.ai-typing-dots span{width:6px;height:6px;border-radius:50%;background:var(--dim);animation:aiBounce 1.4s infinite}
+.ai-typing-dots span:nth-child(2){animation-delay:.2s}
+.ai-typing-dots span:nth-child(3){animation-delay:.4s}
+@keyframes aiBounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-6px)}}
+/* Welcome */
+.ai-welcome{text-align:center;padding:32px 16px}
+.ai-welcome-icon{font-size:48px;margin-bottom:12px;display:block}
+.ai-welcome h4{font-size:15px;font-weight:600;color:var(--text);margin:0 0 4px}
+.ai-welcome p{font-size:12px;color:var(--dim);margin:0 0 16px}
+.ai-quick{display:flex;flex-direction:column;gap:6px}
+.ai-quick button{text-align:right;padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:var(--surface);color:var(--dim);cursor:pointer;font-size:12px;font-family:inherit;transition:all .15s;display:flex;align-items:center;gap:8px}
+.ai-quick button:hover{border-color:var(--ac);color:var(--text);background:var(--surface2)}
+/* Input */
+.ai-input-wrap{padding:12px 16px;background:var(--surface);border-top:1px solid var(--border);flex-shrink:0}
+.ai-input-row{display:flex;align-items:center;gap:8px}
+.ai-input{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-size:13px;font-family:inherit;outline:none;transition:border-color .15s}
+.ai-input:focus{border-color:var(--ac)}
+.ai-input::placeholder{color:var(--dim)}
+.ai-send{width:38px;height:38px;border-radius:10px;border:none;background:var(--ac);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0}
+.ai-send:hover{opacity:.9;transform:scale(1.05)}
+.ai-send:disabled{opacity:.3;cursor:not-allowed;transform:none}
+.ai-input-hint{font-size:10px;color:var(--dim);margin-top:6px;text-align:center}
+.ai-input-hint code{background:var(--surface2);padding:1px 4px;border-radius:3px;font-size:9px}
+/* Correction */
+.ai-correction{margin-top:6px;display:flex;gap:4px}
+.ai-correction input{flex:1;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:6px;padding:6px 8px;color:var(--text);font-size:11px;font-family:inherit;outline:none}
+.ai-correction button{padding:4px 10px;border-radius:6px;border:none;background:rgba(239,68,68,.15);color:var(--red);font-size:11px;cursor:pointer;font-family:inherit}
+/* Consultation panel */
+.ai-consult-panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px;margin:8px 0}
+.ai-consult-panel h5{font-size:11px;font-weight:600;color:var(--dim);margin:0 0 8px}
+.ai-consult-agent{display:flex;gap:8px;padding:8px;border-radius:8px;background:var(--surface2);margin-bottom:6px}
+.ai-consult-agent:last-child{margin-bottom:0}
+.ai-consult-agent .ca-emoji{font-size:16px;flex-shrink:0}
+.ai-consult-agent .ca-body{flex:1}
+.ai-consult-agent .ca-name{font-size:11px;font-weight:600;margin-bottom:2px}
+.ai-consult-agent .ca-text{font-size:12px;color:var(--dim);line-height:1.5}
+@media(max-width:480px){.ai-panel{right:8px;bottom:72px;width:calc(100vw - 16px);height:calc(100vh - 88px);border-radius:12px}}
+</style>
+
+<div class="ai-chat" x-data="aiChat()" x-init="init()">
+  <!-- FAB -->
+  <button class="ai-fab" @click="toggle()" x-show="!open" x-transition>
+    <span>🤖</span>
   </button>
 
-  <!-- Chat Panel -->
-  <div x-show="open" x-cloak x-transition:enter="transition ease-out duration-200"
-    x-transition:enter-start="opacity-0 scale-95 translate-y-4" x-transition:enter-end="opacity-100 scale-100 translate-y-0"
-    x-transition:leave="transition ease-in duration-150"
-    x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
-    class="absolute bottom-0 right-0 w-[380px] max-w-[calc(100vw-2rem)] bg-[#0f1219] border border-[#262e39] rounded-2xl shadow-2xl shadow-black/50 flex flex-col overflow-hidden"
-    style="height: min(560px, calc(100vh - 100px));">
+  <!-- Panel -->
+  <div class="ai-panel" x-show="open" x-cloak x-transition:enter="transition ease-out duration-200"
+    x-transition:enter-start="opacity-0 translate-y-4 scale-95" x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+    x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0 translate-y-4">
 
     <!-- Header -->
-    <div class="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-violet-600/20 to-indigo-600/20 border-b border-[#262e39]">
-      <div class="flex items-center gap-2">
-        <span class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
-        <span class="text-sm font-bold text-white">AI Assistant</span>
-      </div>
-      <div class="flex items-center gap-1">
-        <button @click="clearChat()" class="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors" title="Clear">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-        </button>
-        <button @click="open=false" class="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-        </button>
+    <div class="ai-header">
+      <div class="ai-header-row">
+        <div class="ai-header-left">
+          <div class="ai-header-avatar" :style="'background:'+activeAgent.color+'20;color:'+activeAgent.color" x-text="activeAgent.emoji"></div>
+          <div class="ai-header-info">
+            <h3 x-text="activeAgent.name_ar"></h3>
+            <p x-text="activeAgent.role_ar"></p>
+          </div>
+        </div>
+        <div class="ai-header-actions">
+          <button @click="showLearning=!showLearning" title="Learning Stats">🧠</button>
+          <button @click="clearChat()" title="Clear">🗑️</button>
+          <button @click="open=false" title="Close">✕</button>
+        </div>
       </div>
     </div>
 
+    <!-- Agent Tabs -->
+    <div class="ai-agents">
+      <template x-for="a in agents" :key="a.id">
+        <button class="ai-agent-tab" :class="activeAgent.id===a.id && 'active'" @click="switchAgent(a.id)">
+          <span class="dot" :style="'background:'+a.color"></span>
+          <span x-text="a.emoji"></span>
+          <span x-text="a.name_ar"></span>
+        </button>
+      </template>
+    </div>
+
     <!-- Messages -->
-    <div x-ref="messages" class="flex-1 overflow-y-auto px-4 py-3 space-y-3 scroll-smooth">
-      <!-- Welcome message -->
-      <template x-if="messages.length === 0">
-        <div class="text-center py-8">
-          <div class="text-4xl mb-3">🤖</div>
-          <div class="text-sm font-bold text-white mb-1">مرحباً! أنا مساعدك الذكي</div>
-          <div class="text-xs text-gray-400 mb-4">أستطيع مساعدتك في إدارة لوحة التحكم</div>
-          <div class="space-y-2">
-            <button @click="sendQuick('كم عدد المستخدمين؟')" class="block w-full text-right px-3 py-2 bg-[#1a2028] border border-[#262e39] rounded-lg text-xs text-gray-300 hover:border-violet-500/50 hover:text-white transition-all">📊 كم عدد المستخدمين؟</button>
-            <button @click="sendQuick('اعرض لي القنوات المتاحة')" class="block w-full text-right px-3 py-2 bg-[#1a2028] border border-[#262e39] rounded-lg text-xs text-gray-300 hover:border-violet-500/50 hover:text-white transition-all">📋 اعرض لي القنوات المتاحة</button>
-            <button @click="sendQuick('اكتب بوست ترحيبي لقنوات تليجرام')" class="block w-full text-right px-3 py-2 bg-[#1a2028] border border-[#262e39] rounded-lg text-xs text-gray-300 hover:border-violet-500/50 hover:text-white transition-all">✍️ اكتب بوست ترحيبي</button>
-            <button @click="sendQuick('اعرض المعاملات المعلقة')" class="block w-full text-right px-3 py-2 bg-[#1a2028] border border-[#262e39] rounded-lg text-xs text-gray-300 hover:border-violet-500/50 hover:text-white transition-all">⏳ اعرض المعاملات المعلقة</button>
+    <div class="ai-messages" x-ref="msgs">
+      <!-- Welcome -->
+      <template x-if="messages.length===0 && !showLearning">
+        <div class="ai-welcome">
+          <span class="ai-welcome-icon" x-text="activeAgent.emoji"></span>
+          <h4>مرحباً! أنا <span x-text="activeAgent.name_ar"></span></h4>
+          <p x-text="activeAgent.description_ar"></p>
+          <div class="ai-quick">
+            <button @click="send('كم عدد المستخدمين؟')"><span>📊</span> كم عدد المستخدمين؟</button>
+            <button @click="send('اعرض القنوات')"><span>📋</span> اعرض القنوات المتاحة</button>
+            <button @click="send('اكتب بوست ترحيبي')"><span>✍️</span> اكتب بوست ترحيبي</button>
+            <button @click="send('المعاملات المعلقة')"><span>⏳</span> المعاملات المعلقة</button>
           </div>
         </div>
       </template>
 
-      <!-- Message list -->
-      <template x-for="(msg, idx) in messages" :key="idx">
-        <div :class="msg.role === 'user' ? 'flex justify-end' : 'flex justify-start'">
-          <div :class="msg.role === 'user'
-            ? 'bg-violet-600/20 border border-violet-500/30 text-white rounded-2xl rounded-br-md max-w-[85%]'
-            : 'bg-[#1a2028] border border-[#262e39] text-gray-200 rounded-2xl rounded-bl-md max-w-[85%]'"
-            class="px-3 py-2.5 text-sm leading-relaxed">
-            <div x-html="formatMessage(msg.content)" class="whitespace-pre-wrap break-words"></div>
-            <div x-show="msg.action_taken" class="mt-1.5 pt-1.5 border-t border-white/10">
-              <span class="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300" x-text="'⚡ ' + msg.action_taken"></span>
+      <!-- Learning Stats -->
+      <template x-if="showLearning">
+        <div style="padding:8px">
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px">
+            <h4 style="font-size:14px;font-weight:600;margin:0 0 12px;color:var(--text)">🧠 إحصائيات التعلم</h4>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <div style="background:var(--surface2);border-radius:8px;padding:10px;text-align:center"><div style="font-size:20px;font-weight:700;color:var(--green)" x-text="learnStats.total_actions||0"></div><div style="font-size:10px;color:var(--dim)">إجراءات</div></div>
+              <div style="background:var(--surface2);border-radius:8px;padding:10px;text-align:center"><div style="font-size:20px;font-weight:700;color:var(--cyan)" x-text="learnStats.learned_patterns||0"></div><div style="font-size:10px;color:var(--dim)">أنماط</div></div>
+              <div style="background:var(--surface2);border-radius:8px;padding:10px;text-align:center"><div style="font-size:20px;font-weight:700;color:var(--amber)" x-text="learnStats.knowledge_facts||0"></div><div style="font-size:10px;color:var(--dim)">معلومات</div></div>
+              <div style="background:var(--surface2);border-radius:8px;padding:10px;text-align:center"><div style="font-size:20px;font-weight:700;color:var(--ac)" x-text="learnStats.corrections||0"></div><div style="font-size:10px;color:var(--dim)">تصحيحات</div></div>
             </div>
-            <!-- Feedback buttons (only on assistant messages) -->
-            <div x-show="msg.role === 'assistant' && !msg.feedback && idx > 0" class="mt-1.5 pt-1.5 border-t border-white/10 flex items-center gap-1.5">
-              <button @click="giveFeedback(idx, 3)" class="p-1 rounded hover:bg-green-500/20 text-gray-500 hover:text-green-400 transition-colors text-xs" title="Good">👍</button>
-              <button @click="giveFeedback(idx, 1)" class="p-1 rounded hover:bg-red-500/20 text-gray-500 hover:text-red-400 transition-colors text-xs" title="Bad">👎</button>
+            <div style="margin-top:12px;font-size:11px;color:var(--dim);text-align:center">
+              👍 <span x-text="learnStats.positive_feedback||0"></span> · 👎 <span x-text="learnStats.negative_feedback||0"></span>
             </div>
-            <!-- Feedback given indicator -->
-            <div x-show="msg.feedback === 3" class="mt-1 text-[10px] text-green-400 opacity-60">✓ Thanks for feedback</div>
-            <div x-show="msg.feedback === 1" class="mt-1">
-              <input x-model="correctionInput[idx]" @keydown.enter="submitCorrection(idx, msg)" type="text"
-                placeholder="What was wrong? Type correction..."
-                class="w-full bg-black/20 border border-red-500/30 rounded-lg px-2 py-1 text-[11px] text-gray-300 placeholder-gray-500 focus:outline-none focus:border-red-400/50 mt-1">
-              <button @click="submitCorrection(idx, msg)" x-show="correctionInput[idx]"
-                class="mt-1 text-[10px] px-2 py-0.5 bg-red-500/20 border border-red-500/30 rounded text-red-300 hover:bg-red-500/30">Send Correction</button>
+            <button @click="showLearning=false" style="width:100%;margin-top:12px;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--dim);cursor:pointer;font-size:12px;font-family:inherit">إغلاق</button>
+          </div>
+        </div>
+      </template>
+
+      <!-- Messages -->
+      <template x-for="(msg,idx) in messages" :key="idx">
+        <div class="ai-msg" :class="msg.role">
+          <div class="ai-msg-avatar" :style="msg.role==='user'?'':'background:'+(msg.agent_color||'#8b5cf6')+'20;color:'+(msg.agent_color||'#8b5cf6')" x-text="msg.role==='user'?'👤':(msg.agent_emoji||activeAgent.emoji)"></div>
+          <div style="flex:1;min-width:0">
+            <div class="ai-msg-bubble" x-html="fmt(msg.content)"></div>
+            <!-- Agent badge + action -->
+            <div class="ai-msg-meta" x-show="msg.role==='assistant'">
+              <span class="agent-badge" x-show="msg.agent_name" :style="'background:'+(msg.agent_color||'#8b5cf6')+'15;color:'+(msg.agent_color||'#8b5cf6')" x-text="(msg.agent_emoji||'')+' '+(msg.agent_name||'')"></span>
+              <span x-show="msg.action_taken" style="opacity:.5" x-text="'⚡'+msg.action_taken"></span>
+            </div>
+            <!-- Feedback -->
+            <div class="ai-msg-actions" x-show="msg.role==='assistant' && !msg.feedback && idx>0">
+              <button @click="feedback(idx,3)">👍</button>
+              <button @click="feedback(idx,1)">👎</button>
+            </div>
+            <div x-show="msg.feedback===3" style="font-size:10px;color:var(--green);opacity:.7;margin-top:4px">✓ شكراً على التقييم</div>
+            <div x-show="msg.feedback===1" class="ai-correction">
+              <input x-model="corrections[idx]" @keydown.enter="sendCorrection(idx,msg)" placeholder="ما الذي كان خاطئاً؟">
+              <button @click="sendCorrection(idx,msg)">إرسال</button>
             </div>
           </div>
         </div>
       </template>
 
-      <!-- Typing indicator -->
-      <div x-show="typing" class="flex justify-start">
-        <div class="bg-[#1a2028] border border-[#262e39] rounded-2xl rounded-bl-md px-4 py-3">
-          <div class="flex gap-1">
-            <span class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay:0ms"></span>
-            <span class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay:150ms"></span>
-            <span class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay:300ms"></span>
-          </div>
-        </div>
+      <!-- Typing -->
+      <div class="ai-msg assistant" x-show="typing">
+        <div class="ai-msg-avatar" :style="'background:'+(activeAgent.color||'#8b5cf6')+'20;color:'+(activeAgent.color||'#8b5cf6')" x-text="activeAgent.emoji"></div>
+        <div class="ai-typing-dots"><span></span><span></span><span></span></div>
       </div>
     </div>
 
     <!-- Input -->
-    <div class="px-3 py-3 border-t border-[#262e39] bg-[#0b0e11]">
-      <form @submit.prevent="sendMessage()" class="flex items-center gap-2">
-        <input x-model="input" x-ref="chatInput" type="text"
-          placeholder="اكتب أمرك هنا..."
-          class="flex-1 bg-[#1a2028] border border-[#262e39] rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-violet-500/50 transition-colors"
-          :disabled="typing">
-        <button type="submit" :disabled="!input.trim() || typing"
-          class="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 text-white flex items-center justify-center hover:scale-105 active:scale-95 transition-all disabled:opacity-40 disabled:hover:scale-100">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+    <div class="ai-input-wrap">
+      <div class="ai-input-row">
+        <input class="ai-input" x-model="input" x-ref="chatIn" @keydown.enter.prevent="send()" :placeholder="'اكتب لـ '+activeAgent.name_ar+'...'" :disabled="typing">
+        <button class="ai-send" @click="send()" :disabled="!input.trim()||typing">
+          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
         </button>
-      </form>
+      </div>
+      <div class="ai-input-hint">اكتب <code>@الكاتب</code> أو <code>@المحلل</code> للتحدث مع وكيل محدد</div>
     </div>
   </div>
 </div>
 
 <script>
-function aiAssistant() {
-  return {
-    open: false,
-    input: '',
-    messages: [],
-    typing: false,
-    correctionInput: {},
+function aiChat(){
+  return{
+    open:false,input:'',messages:[],typing:false,corrections:{},showLearning:false,
+    agents:[],activeAgent:{id:'commander',name_ar:'القائد',emoji:'🎯',color:'#8b5cf6',role_ar:'المدير العام',description_ar:'المنسق الرئيسي'},
+    learnStats:{},
 
-    init() {
-      this.$watch('open', (v) => {
-        if (v) this.$nextTick(() => { this.$refs.chatInput?.focus(); this.scrollToBottom(); });
-      });
+    async init(){
+      try{const r=await fetch('/api/ai/assistant/agents',{credentials:'same-origin'});const d=await r.json();if(d.success){this.agents=d.agents;if(d.agents.length)this.activeAgent=d.agents[0]}}catch(e){}
+      this.$watch('open',v=>{if(v){this.loadLearning();this.$nextTick(()=>{this.$refs.chatIn?.focus();this.scroll()})}});
     },
 
-    toggleChat() { this.open = !this.open; },
+    toggle(){this.open=!this.open},
 
-    scrollToBottom() {
-      this.$nextTick(() => {
-        const el = this.$refs.messages;
-        if (el) el.scrollTop = el.scrollHeight;
-      });
+    switchAgent(id){
+      const a=this.agents.find(x=>x.id===id);if(a)this.activeAgent=a;
+      this.messages=[];
+      this.loadHistory(id);
     },
 
-    formatMessage(text) {
-      if (!text) return '';
-      // Simple HTML rendering
-      text = text.replace(/\n/g, '<br>');
-      text = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
-      text = text.replace(/`(.*?)`/g, '<code class="bg-black/30 px-1 py-0.5 rounded text-violet-300 text-xs">$1</code>');
-      text = text.replace(/^• /gm, '<span class="text-violet-400 mr-1">•</span> ');
-      return text;
+    async loadHistory(agentId){
+      try{const r=await fetch('/api/ai/assistant/history?agent_id='+agentId+'&limit=30',{credentials:'same-origin'});const d=await r.json();
+      if(d.success){this.messages=d.history.map(h=>({role:h.role,content:h.content,action_taken:h.action_taken,agent_id:h.agent_id||agentId,agent_emoji:this.getAgentEmoji(h.agent_id||agentId),agent_name:this.getAgentName(h.agent_id||agentId),agent_color:this.getAgentColor(h.agent_id||agentId)}))}}catch(e){}
     },
 
-    sendQuick(text) {
-      this.input = text;
-      this.sendMessage();
+    async loadLearning(){
+      try{const r=await fetch('/api/ai/assistant/learning',{credentials:'same-origin'});const d=await r.json();if(d.success)this.learnStats=d.stats||{}}catch(e){}
     },
 
-    async sendMessage() {
-      const msg = this.input.trim();
-      if (!msg || this.typing) return;
+    getAgentEmoji(id){const a=this.agents.find(x=>x.id===id);return a?a.emoji:'🎯'},
+    getAgentName(id){const a=this.agents.find(x=>x.id===id);return a?a.name_ar:'القائد'},
+    getAgentColor(id){const a=this.agents.find(x=>x.id===id);return a?a.color:'#8b5cf6'},
 
-      this.messages.push({ role: 'user', content: msg });
-      this.input = '';
-      this.typing = true;
-      this.scrollToBottom();
+    scroll(){this.$nextTick(()=>{const el=this.$refs.msgs;if(el)el.scrollTop=el.scrollHeight})},
 
-      try {
-        const resp = await fetch('/api/ai/assistant/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: msg }),
-          credentials: 'same-origin'
-        });
-        const data = await resp.json();
-
-        if (data.success) {
-          this.messages.push({
-            role: 'assistant',
-            content: data.reply || 'تم',
-            action_taken: data.action_taken || null
-          });
-        } else {
-          this.messages.push({
-            role: 'assistant',
-            content: '❌ ' + (data.error || 'حدث خطأ')
-          });
+    fmt(t){
+      if(!t)return'';
+      // Render consultation panel
+      if(t.includes('استشارة الفريق')){
+        const parts=t.split('\n\n');
+        let out='';let consultBlock=false;
+        for(const p of parts){
+          if(p.includes('استشارة الفريق')){
+            out+='<div class="ai-consult-panel"><h5>💬 استشارة الفريق</h5>';
+            consultBlock=true;
+          }else if(consultBlock && p.match(/^[🎯✍️📊🛡️⚙️]/)){
+            const lines=p.split('\n');
+            const emoji=lines[0].match(/^[🎯✍️📊🛡️⚙️]/)?.[0]||'';
+            const name=lines[0].replace(emoji,'').trim();
+            const body=lines.slice(1).join('\n').trim();
+            out+='<div class="ai-consult-agent"><span class="ca-emoji">'+emoji+'</span><div class="ca-body"><div class="ca-name">'+name+'</div><div class="ca-text">'+this._esc(body)+'</div></div></div>';
+          }else if(consultBlock && !p.match(/^[🎯✍️📊🛡️⚙️]/) && p.trim()){
+            out+='</div><div style="margin-top:8px">'+this._simpleFmt(p)+'</div>';
+            consultBlock=false;
+          }else{out+=this._simpleFmt(p)}
         }
-      } catch (e) {
-        this.messages.push({
-          role: 'assistant',
-          content: '❌ خطأ في الاتصال بالخادم'
-        });
+        if(consultBlock)out+='</div>';
+        return out;
       }
-
-      this.typing = false;
-      this.scrollToBottom();
+      return this._simpleFmt(t);
     },
 
-    async clearChat() {
-      if (!confirm('مسح تاريخ المحادثة؟')) return;
-      try {
-        await fetch('/api/ai/assistant/clear', { method: 'POST', credentials: 'same-origin' });
-      } catch (e) {}
-      this.messages = [];
+    _simpleFmt(t){
+      t=t.replace(/\n/g,'<br>');
+      t=t.replace(/\*\*(.*?)\*\*/g,'<b style="color:var(--text)">$1</b>');
+      t=t.replace(/`(.*?)`/g,'<code style="background:var(--surface);padding:1px 5px;border-radius:4px;font-size:11px;color:var(--cyan)">$1</code>');
+      t=t.replace(/^• /gm,'<span style="color:var(--ac);margin-left:2px">•</span> ');
+      return t;
     },
 
-    async giveFeedback(idx, rating) {
-      const msg = this.messages[idx];
-      msg.feedback = rating;
-      try {
-        await fetch('/api/ai/assistant/feedback', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            message_id: msg.message_id || null,
-            rating: rating,
-            action_taken: msg.action_taken || null
-          }),
-          credentials: 'same-origin'
-        });
-      } catch (e) {}
+    _esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')},
+
+    send(text){
+      const msg=text||this.input.trim();
+      if(!msg||this.typing)return;
+      this.messages.push({role:'user',content:msg});
+      this.input='';this.typing=true;this.scroll();
+
+      fetch('/api/ai/assistant/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:msg,agent_id:this.activeAgent.id}),credentials:'same-origin'})
+      .then(r=>r.json()).then(d=>{
+        if(d.success){
+          this.messages.push({role:'assistant',content:d.reply||'تم',action_taken:d.action_taken||null,
+            agent_id:d.agent_id||this.activeAgent.id,agent_emoji:d.agent_emoji||this.activeAgent.emoji,
+            agent_name:d.agent_name||this.activeAgent.name_ar,agent_color:d.agent_color||this.activeAgent.color});
+          // Update active agent if AI routed to different one
+          if(d.agent_id && d.agent_id!==this.activeAgent.id){
+            const a=this.agents.find(x=>x.id===d.agent_id);if(a)this.activeAgent=a;
+          }
+        }else{this.messages.push({role:'assistant',content:'❌ '+(d.error||'حدث خطأ'),agent_emoji:'❌',agent_name:'System',agent_color:'#ef4444'})}
+      }).catch(()=>{this.messages.push({role:'assistant',content:'❌ خطأ في الاتصال',agent_emoji:'❌',agent_name:'System',agent_color:'#ef4444'})})
+      .finally(()=>{this.typing=false;this.scroll()});
     },
 
-    async submitCorrection(idx, msg) {
-      const text = this.correctionInput[idx];
-      if (!text) return;
-      try {
-        await fetch('/api/ai/assistant/feedback', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            message_id: msg.message_id || null,
-            rating: 1,
-            correction: text,
-            action_taken: msg.action_taken || null
-          }),
-          credentials: 'same-origin'
-        });
-        this.correctionInput[idx] = '';
-        msg.feedback = 1;
-        this.messages.push({
-          role: 'assistant',
-          content: '✅ شكراً! تم حفظ التصحيح. المساعد سيتعلم من هذا الخطأ في المرة القادمة.'
-        });
-        this.scrollToBottom();
-      } catch (e) {}
+    async clearChat(){
+      if(!confirm('مسح المحادثة؟'))return;
+      try{await fetch('/api/ai/assistant/clear',{method:'POST',credentials:'same-origin'})}catch(e){}
+      this.messages=[];
+    },
+
+    async feedback(idx,rating){
+      const msg=this.messages[idx];msg.feedback=rating;
+      try{await fetch('/api/ai/assistant/feedback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message_id:msg.message_id,rating:rating,action_taken:msg.action_taken}),credentials:'same-origin'})}catch(e){}
+    },
+
+    async sendCorrection(idx,msg){
+      const text=this.corrections[idx];if(!text)return;
+      try{await fetch('/api/ai/assistant/feedback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message_id:msg.message_id,rating:1,correction:text,action_taken:msg.action_taken}),credentials:'same-origin'});
+      this.corrections[idx]='';msg.feedback=1;
+      this.messages.push({role:'assistant',content:'✅ تم حفظ التصحيح. سيتعلم المساعد من هذا.',agent_emoji:'🧠',agent_name:'System',agent_color:'#22c55e'});
+      this.scroll();}catch(e){}
     }
   };
 }
 </script>
 </body>
 </html>
+
 
 
 
