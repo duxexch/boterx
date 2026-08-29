@@ -1,6 +1,6 @@
 """
-AI Admin Assistant v3 — Multi-Agent System
-دردشة احترافية مع فريق وكلاء ذكاء اصطناعي.
+AI Admin Assistant v4 — Full Control Multi-Agent System
+يتحكم في كامل لوحة الإدارة بأوامر ذكية.
 """
 
 import json
@@ -11,6 +11,7 @@ import re
 import time
 import hashlib
 import logging
+import shutil
 from datetime import datetime, timedelta
 from collections import Counter
 
@@ -26,144 +27,95 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 AGENTS = {
     'commander': {
-        'id': 'commander',
-        'name': 'Commander',
-        'name_ar': 'القائد',
-        'emoji': '🎯',
-        'color': '#8b5cf6',
-        'role': 'General Manager & Coordinator',
-        'role_ar': 'المدير العام والمنسق',
-        'description': 'The main coordinator. Handles general requests, delegates tasks to specialized agents, and provides overall guidance.',
-        'description_ar': 'المنسق الرئيسي. يتعامل مع الطلبات العامة ويوزع المهام على الوكلاء المتخصصين ويقدم التوجيه العام.',
-        'personality': 'Professional, decisive, strategic. Thinks big picture. Delegates to specialists when needed.',
-        'personality_ar': 'محترف، حاسم، استراتيجي. يفكر بالصورة الكبيرة. يوزع على المتخصصين عند الحاجة.',
-        'specialties': ['general', 'delegation', 'planning', 'coordination', 'decisions'],
-        'actions': ['get_stats', 'list_channels', 'list_users', 'ban_user', 'send_message_to_user',
-                   'view_transactions', 'view_matching', 'view_complaints', 'update_setting',
-                   'learn_fact', 'get_learning_stats', 'delegate_task', 'consult_all'],
+        'id': 'commander', 'name': 'Commander', 'name_ar': 'القائد', 'emoji': '🎯', 'color': '#8b5cf6',
+        'role': 'General Manager', 'role_ar': 'المدير العام والمنسق',
+        'description_ar': 'المنسق الرئيسي. يتحكم في كل شيء ويوزع المهام.',
+        'personality_ar': 'محترف، حاسم، استراتيجي. يفكر بالصورة الكبيرة.',
+        'specialties': ['general', 'delegation', 'planning', 'coordination'],
+        'actions': ['get_stats', 'get_stats_detailed', 'list_channels', 'list_users', 'user_detail',
+                    'ban_user', 'unban_user', 'send_message_to_user', 'view_transactions',
+                    'pending_requests', 'approve_txn', 'reject_txn', 'bulk_approve',
+                    'view_matching', 'approve_match', 'reject_match', 'resolve_dispute',
+                    'view_complaints', 'reply_ticket', 'update_ticket_status',
+                    'update_setting', 'get_settings', 'create_backup', 'list_backups',
+                    'broadcast', 'broadcast_queue', 'generate_post', 'create_post',
+                    'list_campaigns', 'campaign_stats', 'list_companies', 'company_detail',
+                    'list_admins', 'add_admin', 'list_agents', 'agent_stats',
+                    'game_stats', 'toggle_game', 'platform_stats',
+                    'learn_fact', 'get_learning_stats', 'delegate_task', 'consult_all'],
     },
     'writer': {
-        'id': 'writer',
-        'name': 'Writer',
-        'name_ar': 'الكاتب',
-        'emoji': '✍️',
-        'color': '#06b6d4',
-        'role': 'Content Creator & Copywriter',
-        'role_ar': 'منشئ المحتوى وكاتب النصوص',
-        'description': 'Specializes in creating posts, writing content, copywriting, and creative text for all platforms.',
-        'description_ar': 'متخصص في إنشاء البوستات وكتابة المحتوى والنصوص الإبداعية لجميع المنصات.',
-        'personality': 'Creative, expressive, detail-oriented. Uses emojis and formatting effectively.',
+        'id': 'writer', 'name': 'Writer', 'name_ar': 'الكاتب', 'emoji': '✍️', 'color': '#06b6d4',
+        'role': 'Content Creator', 'role_ar': 'منشئ المحتوى',
+        'description_ar': 'متخصص في إنشاء البوستات والمحتوى والنصوص لجميع المنصات.',
         'personality_ar': 'مبدع، تعبيري، دقيق. يستخدم الإيموجي والتنسيق بفعالية.',
-        'specialties': ['content', 'posts', 'copywriting', 'creative', 'social_media'],
-        'actions': ['create_post', 'generate_post', 'broadcast', 'list_channels'],
+        'specialties': ['content', 'posts', 'copywriting', 'creative'],
+        'actions': ['create_post', 'generate_post', 'broadcast', 'list_channels',
+                    'translate_post', 'post_history', 'post_library'],
     },
     'analyst': {
-        'id': 'analyst',
-        'name': 'Analyst',
-        'name_ar': 'المحلل',
-        'emoji': '📊',
-        'color': '#f59e0b',
-        'role': 'Data Analyst & Reporter',
-        'role_ar': 'محلل البيانات ومعد التقارير',
-        'description': 'Specializes in statistics, data analysis, generating reports, and providing insights.',
-        'description_ar': 'متخصص في الإحصائيات وتحليل البيانات وإعداد التقارير وتقديم الأفكار.',
-        'personality': 'Analytical, precise, data-driven. Presents numbers clearly with context.',
-        'personality_ar': 'تحليلي، دقيق، مبني على البيانات. يعرض الأرقام بوضوح مع السياق.',
-        'specialties': ['statistics', 'analysis', 'reports', 'data', 'insights'],
-        'actions': ['get_stats', 'view_transactions', 'view_matching', 'view_complaints'],
+        'id': 'analyst', 'name': 'Analyst', 'name_ar': 'المحلل', 'emoji': '📊', 'color': '#f59e0b',
+        'role': 'Data Analyst', 'role_ar': 'محلل البيانات',
+        'description_ar': 'متخصص في الإحصائيات وتحليل البيانات وإعداد التقارير.',
+        'personality_ar': 'تحليلي، دقيق، مبني على البيانات. يعرض الأرقام بوضوح.',
+        'specialties': ['statistics', 'analysis', 'reports', 'data'],
+        'actions': ['get_stats', 'get_stats_detailed', 'view_transactions', 'view_matching',
+                    'game_stats', 'platform_stats', 'campaign_stats', 'agent_stats',
+                    'company_detail', 'pending_requests'],
     },
     'support': {
-        'id': 'support',
-        'name': 'Support',
-        'name_ar': 'الدعم',
-        'emoji': '🛡️',
-        'color': '#10b981',
-        'role': 'User Support & Relations',
-        'role_ar': 'دعم المستخدمين والعلاقات',
-        'description': 'Handles user management, complaints, disputes, and support-related tasks.',
-        'description_ar': 'يتعامل مع إدارة المستخدمين والشكاوى والنزاعات ومهام الدعم.',
-        'personality': 'Empathetic, patient, solution-focused. Prioritizes user satisfaction.',
-        'personality_ar': 'متعاطف، صبور، يركز على الحلول. يعطي الأولوية لرضا المستخدم.',
-        'specialties': ['users', 'complaints', 'disputes', 'support', 'relations'],
-        'actions': ['list_users', 'ban_user', 'send_message_to_user', 'view_complaints',
-                   'view_transactions', 'view_matching'],
+        'id': 'support', 'name': 'Support', 'name_ar': 'الدعم', 'emoji': '🛡️', 'color': '#10b981',
+        'role': 'User Support', 'role_ar': 'دعم المستخدمين',
+        'description_ar': 'يتعامل مع إدارة المستخدمين والشكاوى والنزاعات.',
+        'personality_ar': 'متعاطف، صبور، يركز على الحلول.',
+        'specialties': ['users', 'complaints', 'disputes', 'support'],
+        'actions': ['list_users', 'user_detail', 'ban_user', 'unban_user',
+                    'send_message_to_user', 'view_complaints', 'reply_ticket',
+                    'update_ticket_status', 'view_transactions', 'view_matching',
+                    'resolve_dispute', 'approve_match', 'reject_match'],
     },
     'tech': {
-        'id': 'tech',
-        'name': 'Tech',
-        'name_ar': 'التقني',
-        'emoji': '⚙️',
-        'color': '#ef4444',
-        'role': 'Technical Manager',
-        'role_ar': 'المدير التقني',
-        'description': 'Handles system settings, technical configuration, and infrastructure tasks.',
+        'id': 'tech', 'name': 'Tech', 'name_ar': 'التقني', 'emoji': '⚙️', 'color': '#ef4444',
+        'role': 'Technical Manager', 'role_ar': 'المدير التقني',
         'description_ar': 'يتعامل مع إعدادات النظام والتكوين التقني والبنية التحتية.',
-        'personality': 'Precise, technical, thorough. Focuses on system health and configuration.',
-        'personality_ar': 'دقيق، تقني، شامل. يركز على صحة النظام والتكوين.',
-        'specialties': ['settings', 'technical', 'configuration', 'system', 'infrastructure'],
-        'actions': ['update_setting', 'get_stats', 'list_channels'],
+        'personality_ar': 'دقيق، تقني، شامل. يركز على صحة النظام.',
+        'specialties': ['settings', 'technical', 'configuration', 'system'],
+        'actions': ['update_setting', 'get_settings', 'get_stats', 'get_stats_detailed',
+                    'create_backup', 'list_backups', 'toggle_game', 'list_channels',
+                    'platform_stats'],
     },
 }
 
-# Default agent
 DEFAULT_AGENT = 'commander'
 
 
 def get_agent(agent_id):
-    """Get agent definition by ID."""
     return AGENTS.get(agent_id, AGENTS[DEFAULT_AGENT])
 
 
 def get_all_agents():
-    """Get all agents as a list."""
     return list(AGENTS.values())
 
 
 def find_agent_by_mention(text):
-    """Find agent from @mention in text. Returns (agent_id, clean_text)."""
     for aid, agent in AGENTS.items():
-        # Check @name, @name_ar, @id patterns
-        patterns = [
-            f'@{agent["name"].lower()}',
-            f'@{agent["name_ar"]}',
-            f'@{aid}',
-        ]
-        for pattern in patterns:
+        for pattern in [f'@{agent["name"].lower()}', f'@{agent["name_ar"]}', f'@{aid}']:
             if pattern.lower() in text.lower():
-                clean_text = re.sub(re.escape(pattern), '', text, flags=re.IGNORECASE).strip()
-                return aid, clean_text
+                clean = re.sub(re.escape(pattern), '', text, flags=re.IGNORECASE).strip()
+                return aid, clean
     return None, text
 
 
 def detect_intent_agent(message):
-    """Auto-detect which agent should handle this message based on content."""
     msg_lower = message.lower()
-
-    # Content creation keywords
-    if any(w in msg_lower for w in ['بوست', 'post', 'محتوى', 'content', 'اكتب', 'write', 'نص', 'text',
-                                      'تغريدة', 'tweet', 'caption', 'troijh', '宣传', 'ترجم', 'translate']):
+    if any(w in msg_lower for w in ['بوست', 'post', 'محتوى', 'content', 'اكتب', 'write', 'نص', 'text', 'تغريدة', 'tweet', 'caption', 'ترجم', 'translate']):
         return 'writer'
-
-    # Statistics/analysis keywords
-    if any(w in msg_lower for w in ['إحصائي', 'stat', 'تقرير', 'report', 'تحليل', 'analysis', 'بيانات', 'data',
-                                      'أرقام', 'numbers', 'كم', 'how many', 'revenue', 'إيرادات']):
+    if any(w in msg_lower for w in ['إحصائي', 'stat', 'تقرير', 'report', 'تحليل', 'analysis', 'أرقام', 'numbers', 'كم', 'how many', 'إيرادات', 'revenue', 'iradat']):
         return 'analyst'
-
-    # User/support keywords
-    if any(w in msg_lower for w in ['مستخدم', 'user', 'شكوى', 'complaint', 'دعم', 'support', 'حظر', 'ban',
-                                      'رسالة', 'send', 'dispute', 'نزاع']):
+    if any(w in msg_lower for w in ['مستخدم', 'user', 'شكوى', 'complaint', 'دعم', 'support', 'حظر', 'ban', 'رسالة', 'message', 'dispute', 'نزاع']):
         return 'support'
-
-    # Technical keywords
-    if any(w in msg_lower for w in ['إعداد', 'setting', 'تكوين', 'config', 'نظام', 'system', 'تقنية', 'tech',
-                                      'تحديث', 'update', 'fix', 'إصلاح']):
+    if any(w in msg_lower for w in ['إعداد', 'setting', 'تكوين', 'config', 'نظام', 'system', 'تحديث', 'update', 'backup', 'نسخ']):
         return 'tech'
-
-    # Delegation keywords
-    if any(w in msg_lower for w in ['نادي', 'call', 'اسأل', 'ask all', 'all agents', 'all', 'الكل',
-                                      'ايgent', 'agent', 'وكلاء']):
-        return 'commander'
-
     return DEFAULT_AGENT
 
 
@@ -175,100 +127,60 @@ def _init_chat_db():
     try:
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
-
-        c.execute('''CREATE TABLE IF NOT EXISTS ai_chat_history (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            admin_id TEXT NOT NULL,
-            agent_id TEXT NOT NULL DEFAULT 'commander',
-            role TEXT NOT NULL,
-            content TEXT NOT NULL,
-            action_taken TEXT,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-        )''')
-
-        c.execute('''CREATE TABLE IF NOT EXISTS ai_action_outcomes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            admin_id TEXT NOT NULL,
-            agent_id TEXT DEFAULT 'commander',
-            action_name TEXT NOT NULL,
-            params TEXT,
-            success INTEGER NOT NULL,
-            error_message TEXT,
-            result_summary TEXT,
-            user_message TEXT,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-        )''')
-
-        c.execute('''CREATE TABLE IF NOT EXISTS ai_patterns (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            phrase_hash TEXT NOT NULL,
-            phrase_sample TEXT NOT NULL,
-            action_name TEXT NOT NULL,
-            agent_id TEXT DEFAULT 'commander',
-            params_template TEXT,
-            confidence REAL DEFAULT 0.5,
-            times_used INTEGER DEFAULT 1,
-            times_succeeded INTEGER DEFAULT 0,
-            last_used DATETIME DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(phrase_hash, action_name)
-        )''')
-
-        c.execute('''CREATE TABLE IF NOT EXISTS ai_knowledge (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            category TEXT NOT NULL,
-            fact_key TEXT NOT NULL,
-            fact_value TEXT NOT NULL,
-            source TEXT DEFAULT 'learned',
-            confidence REAL DEFAULT 0.5,
-            times_confirmed INTEGER DEFAULT 1,
-            last_updated DATETIME DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(category, fact_key)
-        )''')
-
-        c.execute('''CREATE TABLE IF NOT EXISTS ai_corrections (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            admin_id TEXT NOT NULL,
-            agent_id TEXT DEFAULT 'commander',
-            original_action TEXT,
-            original_params TEXT,
-            corrected_action TEXT,
-            corrected_params TEXT,
-            correction_text TEXT,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-        )''')
-
-        c.execute('''CREATE TABLE IF NOT EXISTS ai_preferences (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            admin_id TEXT NOT NULL,
-            pref_key TEXT NOT NULL,
-            pref_value TEXT NOT NULL,
-            confidence REAL DEFAULT 0.5,
-            last_used DATETIME DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(admin_id, pref_key)
-        )''')
-
-        c.execute('''CREATE TABLE IF NOT EXISTS ai_feedback (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            admin_id TEXT NOT NULL,
-            agent_id TEXT DEFAULT 'commander',
-            message_id INTEGER,
-            rating INTEGER NOT NULL,
-            correction_text TEXT,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-        )''')
-
-        c.execute('''CREATE TABLE IF NOT EXISTS ai_task_delegations (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            admin_id TEXT NOT NULL,
-            from_agent TEXT NOT NULL,
-            to_agent TEXT NOT NULL,
-            task_description TEXT NOT NULL,
-            task_result TEXT,
-            status TEXT DEFAULT 'pending',
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-        )''')
-
-        for idx_sql in [
+        for sql in [
+            '''CREATE TABLE IF NOT EXISTS ai_chat_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                admin_id TEXT NOT NULL, agent_id TEXT NOT NULL DEFAULT 'commander',
+                role TEXT NOT NULL, content TEXT NOT NULL,
+                action_taken TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)''',
+            '''CREATE TABLE IF NOT EXISTS ai_action_outcomes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                admin_id TEXT NOT NULL, agent_id TEXT DEFAULT 'commander',
+                action_name TEXT NOT NULL, params TEXT,
+                success INTEGER NOT NULL, error_message TEXT,
+                result_summary TEXT, user_message TEXT,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)''',
+            '''CREATE TABLE IF NOT EXISTS ai_patterns (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                phrase_hash TEXT NOT NULL, phrase_sample TEXT NOT NULL,
+                action_name TEXT NOT NULL, agent_id TEXT DEFAULT 'commander',
+                params_template TEXT, confidence REAL DEFAULT 0.5,
+                times_used INTEGER DEFAULT 1, times_succeeded INTEGER DEFAULT 0,
+                last_used DATETIME DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(phrase_hash, action_name))''',
+            '''CREATE TABLE IF NOT EXISTS ai_knowledge (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                category TEXT NOT NULL, fact_key TEXT NOT NULL,
+                fact_value TEXT NOT NULL, source TEXT DEFAULT 'learned',
+                confidence REAL DEFAULT 0.5, times_confirmed INTEGER DEFAULT 1,
+                last_updated DATETIME DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(category, fact_key))''',
+            '''CREATE TABLE IF NOT EXISTS ai_corrections (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                admin_id TEXT NOT NULL, agent_id TEXT DEFAULT 'commander',
+                original_action TEXT, original_params TEXT,
+                corrected_action TEXT, corrected_params TEXT,
+                correction_text TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)''',
+            '''CREATE TABLE IF NOT EXISTS ai_preferences (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                admin_id TEXT NOT NULL, pref_key TEXT NOT NULL,
+                pref_value TEXT NOT NULL, confidence REAL DEFAULT 0.5,
+                last_used DATETIME DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(admin_id, pref_key))''',
+            '''CREATE TABLE IF NOT EXISTS ai_feedback (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                admin_id TEXT NOT NULL, agent_id TEXT DEFAULT 'commander',
+                message_id INTEGER, rating INTEGER NOT NULL,
+                correction_text TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)''',
+            '''CREATE TABLE IF NOT EXISTS ai_task_delegations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                admin_id TEXT NOT NULL, from_agent TEXT NOT NULL,
+                to_agent TEXT NOT NULL, task_description TEXT NOT NULL,
+                task_result TEXT, status TEXT DEFAULT 'pending',
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)''',
+        ]:
+            c.execute(sql)
+        for idx in [
             'CREATE INDEX IF NOT EXISTS idx_chat_admin ON ai_chat_history(admin_id, timestamp)',
             'CREATE INDEX IF NOT EXISTS idx_chat_agent ON ai_chat_history(agent_id)',
             'CREATE INDEX IF NOT EXISTS idx_outcomes_admin ON ai_action_outcomes(admin_id, timestamp)',
@@ -277,56 +189,38 @@ def _init_chat_db():
             'CREATE INDEX IF NOT EXISTS idx_knowledge_cat ON ai_knowledge(category)',
             'CREATE INDEX IF NOT EXISTS idx_feedback_admin ON ai_feedback(admin_id, timestamp)',
         ]:
-            c.execute(idx_sql)
-
-        conn.commit()
-        conn.close()
+            c.execute(idx)
+        conn.commit(); conn.close()
     except Exception as e:
         logger.error(f"Chat DB init error: {e}")
 
 
 # ═══════════════════════════════════════════════════════════════
-#  MEMORY
+#  MEMORY & LEARNING (unchanged core)
 # ═══════════════════════════════════════════════════════════════
 
 def save_message(admin_id, agent_id, role, content, action_taken=None):
     _init_chat_db()
     try:
         conn = sqlite3.connect(DB_PATH)
-        cur = conn.execute(
-            'INSERT INTO ai_chat_history (admin_id, agent_id, role, content, action_taken) VALUES (?, ?, ?, ?, ?)',
-            (str(admin_id), agent_id, role, content, action_taken)
-        )
-        msg_id = cur.lastrowid
-        conn.commit(); conn.close()
-        return msg_id
+        cur = conn.execute('INSERT INTO ai_chat_history (admin_id, agent_id, role, content, action_taken) VALUES (?, ?, ?, ?, ?)',
+                           (str(admin_id), agent_id, role, content, action_taken))
+        msg_id = cur.lastrowid; conn.commit(); conn.close(); return msg_id
     except Exception as e:
-        logger.error(f"Save message error: {e}")
-        return None
+        logger.error(f"Save message error: {e}"); return None
 
 
 def get_conversation_history(admin_id, agent_id=None, limit=20):
     _init_chat_db()
     try:
-        conn = sqlite3.connect(DB_PATH)
-        conn.row_factory = sqlite3.Row
+        conn = sqlite3.connect(DB_PATH); conn.row_factory = sqlite3.Row
         if agent_id:
-            rows = conn.execute(
-                'SELECT role, content, action_taken, agent_id, timestamp FROM ai_chat_history '
-                'WHERE admin_id = ? AND agent_id = ? ORDER BY timestamp DESC LIMIT ?',
-                (str(admin_id), agent_id, limit)
-            ).fetchall()
+            rows = conn.execute('SELECT role, content, action_taken, agent_id, timestamp FROM ai_chat_history WHERE admin_id = ? AND agent_id = ? ORDER BY timestamp DESC LIMIT ?', (str(admin_id), agent_id, limit)).fetchall()
         else:
-            rows = conn.execute(
-                'SELECT role, content, action_taken, agent_id, timestamp FROM ai_chat_history '
-                'WHERE admin_id = ? ORDER BY timestamp DESC LIMIT ?',
-                (str(admin_id), limit)
-            ).fetchall()
-        conn.close()
-        return [dict(r) for r in reversed(rows)]
+            rows = conn.execute('SELECT role, content, action_taken, agent_id, timestamp FROM ai_chat_history WHERE admin_id = ? ORDER BY timestamp DESC LIMIT ?', (str(admin_id), limit)).fetchall()
+        conn.close(); return [dict(r) for r in reversed(rows)]
     except Exception as e:
-        logger.error(f"Get history error: {e}")
-        return []
+        logger.error(f"Get history error: {e}"); return []
 
 
 def clear_history(admin_id, agent_id=None):
@@ -334,8 +228,7 @@ def clear_history(admin_id, agent_id=None):
     try:
         conn = sqlite3.connect(DB_PATH)
         if agent_id:
-            conn.execute('DELETE FROM ai_chat_history WHERE admin_id = ? AND agent_id = ?',
-                        (str(admin_id), agent_id))
+            conn.execute('DELETE FROM ai_chat_history WHERE admin_id = ? AND agent_id = ?', (str(admin_id), agent_id))
         else:
             conn.execute('DELETE FROM ai_chat_history WHERE admin_id = ?', (str(admin_id),))
         conn.commit(); conn.close()
@@ -343,28 +236,18 @@ def clear_history(admin_id, agent_id=None):
         logger.error(f"Clear history error: {e}")
 
 
-# ═══════════════════════════════════════════════════════════════
-#  LEARNING SYSTEM
-# ═══════════════════════════════════════════════════════════════
-
 def _phrase_hash(text):
     normalized = re.sub(r'[^\w\s]', '', text.lower().strip())
     normalized = re.sub(r'\s+', ' ', normalized)
     return hashlib.md5(normalized.encode('utf-8')).hexdigest()[:12]
 
 
-def record_action_outcome(admin_id, agent_id, action_name, params, success, error_msg=None,
-                         result_summary=None, user_message=None):
+def record_action_outcome(admin_id, agent_id, action_name, params, success, error_msg=None, result_summary=None, user_message=None):
     _init_chat_db()
     try:
         conn = sqlite3.connect(DB_PATH)
-        conn.execute(
-            'INSERT INTO ai_action_outcomes '
-            '(admin_id, agent_id, action_name, params, success, error_message, result_summary, user_message) '
-            'VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-            (str(admin_id), agent_id, action_name, json.dumps(params, ensure_ascii=False),
-             1 if success else 0, error_msg, result_summary, user_message)
-        )
+        conn.execute('INSERT INTO ai_action_outcomes (admin_id, agent_id, action_name, params, success, error_message, result_summary, user_message) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                     (str(admin_id), agent_id, action_name, json.dumps(params, ensure_ascii=False), 1 if success else 0, error_msg, result_summary, user_message))
         conn.commit(); conn.close()
         if success and user_message:
             learn_pattern(user_message, action_name, params, agent_id)
@@ -377,44 +260,27 @@ def learn_pattern(phrase, action_name, params, agent_id='commander'):
     ph = _phrase_hash(phrase)
     try:
         conn = sqlite3.connect(DB_PATH)
-        existing = conn.execute(
-            'SELECT id, times_used, times_succeeded, confidence FROM ai_patterns '
-            'WHERE phrase_hash = ? AND action_name = ?', (ph, action_name)
-        ).fetchone()
+        existing = conn.execute('SELECT id, times_used, times_succeeded, confidence FROM ai_patterns WHERE phrase_hash = ? AND action_name = ?', (ph, action_name)).fetchone()
         if existing:
-            new_used = existing[1] + 1; new_succ = existing[2] + 1
-            new_conf = min(0.95, existing[3] + 0.05)
-            conn.execute('UPDATE ai_patterns SET times_used=?, times_succeeded=?, confidence=?, '
-                        'last_used=CURRENT_TIMESTAMP, params_template=? WHERE id=?',
-                        (new_used, new_succ, new_conf, json.dumps(params, ensure_ascii=False), existing[0]))
+            conn.execute('UPDATE ai_patterns SET times_used=?, times_succeeded=?, confidence=?, last_used=CURRENT_TIMESTAMP, params_template=? WHERE id=?',
+                         (existing[1]+1, existing[2]+1, min(0.95, existing[3]+0.05), json.dumps(params, ensure_ascii=False), existing[0]))
         else:
-            conn.execute('INSERT INTO ai_patterns (phrase_hash, phrase_sample, action_name, agent_id, params_template, confidence) '
-                        'VALUES (?, ?, ?, ?, ?, ?)',
-                        (ph, phrase[:200], action_name, agent_id, json.dumps(params, ensure_ascii=False), 0.5))
+            conn.execute('INSERT INTO ai_patterns (phrase_hash, phrase_sample, action_name, agent_id, params_template, confidence) VALUES (?, ?, ?, ?, ?, ?)',
+                         (ph, phrase[:200], action_name, agent_id, json.dumps(params, ensure_ascii=False), 0.5))
         conn.commit(); conn.close()
     except Exception as e:
         logger.error(f"Learn pattern error: {e}")
 
 
-def record_correction(admin_id, agent_id, original_action, original_params, corrected_action,
-                     corrected_params, correction_text):
+def record_correction(admin_id, agent_id, original_action, original_params, corrected_action, corrected_params, correction_text):
     _init_chat_db()
     try:
         conn = sqlite3.connect(DB_PATH)
-        conn.execute(
-            'INSERT INTO ai_corrections '
-            '(admin_id, agent_id, original_action, original_params, corrected_action, corrected_params, correction_text) '
-            'VALUES (?, ?, ?, ?, ?, ?, ?)',
-            (str(admin_id), agent_id, original_action,
-             json.dumps(original_params, ensure_ascii=False) if original_params else None,
-             corrected_action,
-             json.dumps(corrected_params, ensure_ascii=False) if corrected_params else None,
-             correction_text)
-        )
+        conn.execute('INSERT INTO ai_corrections (admin_id, agent_id, original_action, original_params, corrected_action, corrected_params, correction_text) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                     (str(admin_id), agent_id, original_action, json.dumps(original_params, ensure_ascii=False) if original_params else None, corrected_action, json.dumps(corrected_params, ensure_ascii=False) if corrected_params else None, correction_text))
         conn.commit(); conn.close()
         if correction_text:
-            store_knowledge('corrections', f'{original_action}_to_{corrected_action}',
-                          correction_text, source='admin_correction', confidence=0.9)
+            store_knowledge('corrections', f'{original_action}_to_{corrected_action}', correction_text, source='admin_correction', confidence=0.9)
     except Exception as e:
         logger.error(f"Record correction error: {e}")
 
@@ -423,15 +289,13 @@ def store_knowledge(category, fact_key, fact_value, source='learned', confidence
     _init_chat_db()
     try:
         conn = sqlite3.connect(DB_PATH)
-        existing = conn.execute('SELECT id FROM ai_knowledge WHERE category=? AND fact_key=?',
-                              (category, fact_key)).fetchone()
+        existing = conn.execute('SELECT id FROM ai_knowledge WHERE category=? AND fact_key=?', (category, fact_key)).fetchone()
         if existing:
-            conn.execute('UPDATE ai_knowledge SET fact_value=?, confidence=?, times_confirmed=times_confirmed+1, '
-                        'last_updated=CURRENT_TIMESTAMP WHERE id=?',
-                        (fact_value, min(0.95, confidence + 0.1), existing[0]))
+            conn.execute('UPDATE ai_knowledge SET fact_value=?, confidence=?, times_confirmed=times_confirmed+1, last_updated=CURRENT_TIMESTAMP WHERE id=?',
+                         (fact_value, min(0.95, confidence + 0.1), existing[0]))
         else:
             conn.execute('INSERT INTO ai_knowledge (category, fact_key, fact_value, source, confidence) VALUES (?, ?, ?, ?, ?)',
-                        (category, fact_key, fact_value, source, confidence))
+                         (category, fact_key, fact_value, source, confidence))
         conn.commit(); conn.close()
     except Exception as e:
         logger.error(f"Store knowledge error: {e}")
@@ -454,11 +318,9 @@ def get_learned_patterns(action_name=None, min_confidence=0.3, limit=30):
     try:
         conn = sqlite3.connect(DB_PATH); conn.row_factory = sqlite3.Row
         if action_name:
-            rows = conn.execute('SELECT * FROM ai_patterns WHERE action_name=? AND confidence>=? ORDER BY confidence DESC LIMIT ?',
-                              (action_name, min_confidence, limit)).fetchall()
+            rows = conn.execute('SELECT * FROM ai_patterns WHERE action_name=? AND confidence>=? ORDER BY confidence DESC LIMIT ?', (action_name, min_confidence, limit)).fetchall()
         else:
-            rows = conn.execute('SELECT * FROM ai_patterns WHERE confidence>=? ORDER BY confidence DESC LIMIT ?',
-                              (min_confidence, limit)).fetchall()
+            rows = conn.execute('SELECT * FROM ai_patterns WHERE confidence>=? ORDER BY confidence DESC LIMIT ?', (min_confidence, limit)).fetchall()
         conn.close(); return [dict(r) for r in rows]
     except: return []
 
@@ -467,8 +329,7 @@ def get_repeated_errors(limit=10):
     _init_chat_db()
     try:
         conn = sqlite3.connect(DB_PATH); conn.row_factory = sqlite3.Row
-        rows = conn.execute('SELECT action_name, error_message, COUNT(*) as cnt FROM ai_action_outcomes '
-                          'WHERE success=0 GROUP BY action_name, error_message ORDER BY cnt DESC LIMIT ?', (limit,)).fetchall()
+        rows = conn.execute('SELECT action_name, error_message, COUNT(*) as cnt FROM ai_action_outcomes WHERE success=0 GROUP BY action_name, error_message ORDER BY cnt DESC LIMIT ?', (limit,)).fetchall()
         conn.close(); return [dict(r) for r in rows]
     except: return []
 
@@ -477,8 +338,7 @@ def get_admin_preferences(admin_id):
     _init_chat_db()
     try:
         conn = sqlite3.connect(DB_PATH); conn.row_factory = sqlite3.Row
-        rows = conn.execute('SELECT pref_key, pref_value FROM ai_preferences WHERE admin_id=?',
-                          (str(admin_id),)).fetchall()
+        rows = conn.execute('SELECT pref_key, pref_value FROM ai_preferences WHERE admin_id=?', (str(admin_id),)).fetchall()
         conn.close(); return {r['pref_key']: r['pref_value'] for r in rows}
     except: return {}
 
@@ -487,8 +347,7 @@ def set_admin_preference(admin_id, key, value, confidence=0.7):
     _init_chat_db()
     try:
         conn = sqlite3.connect(DB_PATH)
-        conn.execute('INSERT OR REPLACE INTO ai_preferences (admin_id, pref_key, pref_value, confidence, last_used) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)',
-                    (str(admin_id), key, value, confidence))
+        conn.execute('INSERT OR REPLACE INTO ai_preferences (admin_id, pref_key, pref_value, confidence, last_used) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)', (str(admin_id), key, value, confidence))
         conn.commit(); conn.close()
     except Exception as e:
         logger.error(f"Set preference error: {e}")
@@ -499,7 +358,7 @@ def record_feedback(admin_id, agent_id, message_id, rating, correction_text=None
     try:
         conn = sqlite3.connect(DB_PATH)
         conn.execute('INSERT INTO ai_feedback (admin_id, agent_id, message_id, rating, correction_text) VALUES (?, ?, ?, ?, ?)',
-                    (str(admin_id), agent_id, message_id, rating, correction_text))
+                     (str(admin_id), agent_id, message_id, rating, correction_text))
         conn.commit(); conn.close()
         if rating == 1 and correction_text:
             store_knowledge('negative_feedback', correction_text[:200], correction_text, source='admin_feedback', confidence=0.8)
@@ -511,16 +370,18 @@ def get_learning_stats():
     _init_chat_db()
     try:
         conn = sqlite3.connect(DB_PATH); stats = {}
-        r = conn.execute('SELECT COUNT(*) FROM ai_action_outcomes').fetchone(); stats['total_actions'] = r[0] if r else 0
-        r = conn.execute('SELECT COUNT(*) FROM ai_action_outcomes WHERE success=1').fetchone(); stats['successful_actions'] = r[0] if r else 0
-        r = conn.execute('SELECT COUNT(*) FROM ai_patterns').fetchone(); stats['learned_patterns'] = r[0] if r else 0
-        r = conn.execute('SELECT COUNT(*) FROM ai_knowledge').fetchone(); stats['knowledge_facts'] = r[0] if r else 0
-        r = conn.execute('SELECT COUNT(*) FROM ai_corrections').fetchone(); stats['corrections'] = r[0] if r else 0
-        r = conn.execute('SELECT COUNT(*) FROM ai_feedback WHERE rating=3').fetchone(); stats['positive_feedback'] = r[0] if r else 0
-        r = conn.execute('SELECT COUNT(*) FROM ai_feedback WHERE rating=1').fetchone(); stats['negative_feedback'] = r[0] if r else 0
+        for key, sql in [
+            ('total_actions', 'SELECT COUNT(*) FROM ai_action_outcomes'),
+            ('successful_actions', 'SELECT COUNT(*) FROM ai_action_outcomes WHERE success=1'),
+            ('learned_patterns', 'SELECT COUNT(*) FROM ai_patterns'),
+            ('knowledge_facts', 'SELECT COUNT(*) FROM ai_knowledge'),
+            ('corrections', 'SELECT COUNT(*) FROM ai_corrections'),
+            ('positive_feedback', 'SELECT COUNT(*) FROM ai_feedback WHERE rating=3'),
+            ('negative_feedback', 'SELECT COUNT(*) FROM ai_feedback WHERE rating=1'),
+        ]:
+            stats[key] = conn.execute(sql).fetchone()[0]
         rows = conn.execute('SELECT action_name, COUNT(*) as cnt, SUM(success) as succ FROM ai_action_outcomes GROUP BY action_name ORDER BY cnt DESC LIMIT 5').fetchall()
         stats['top_actions'] = [{'action': r[0], 'count': r[1], 'success': r[2]} for r in rows]
-        # Per-agent stats
         rows = conn.execute('SELECT agent_id, COUNT(*) as cnt, SUM(success) as succ FROM ai_action_outcomes GROUP BY agent_id ORDER BY cnt DESC').fetchall()
         stats['agent_stats'] = [{'agent': r[0], 'count': r[1], 'success': r[2]} for r in rows]
         conn.close(); return stats
@@ -528,341 +389,709 @@ def get_learning_stats():
 
 
 # ═══════════════════════════════════════════════════════════════
-#  ACTIONS
+#  ACTIONS — FULL ADMIN CONTROL (50+ actions)
 # ═══════════════════════════════════════════════════════════════
 
 ACTIONS_SCHEMA = [
-    {"name": "create_post", "description": "إنشاء ونشر بوست", "parameters": {
-        "message": "نص البوست", "platform": "telegram|whatsapp", "channel_ids": "معرفات القنوات"}},
-    {"name": "broadcast", "description": "بث رسالة جماعية", "parameters": {
-        "message": "الرسالة", "target": "all|active|inactive"}},
-    {"name": "get_stats", "description": "عرض إحصائيات", "parameters": {"type": "users|transactions|revenue|matching|channels|all"}},
-    {"name": "list_channels", "description": "عرض القنوات", "parameters": {}},
+    # Stats & Dashboard
+    {"name": "get_stats", "description": "إحصائيات عامة", "parameters": {"type": "users|transactions|revenue|matching|channels|all"}},
+    {"name": "get_stats_detailed", "description": "إحصائيات مفصلة", "parameters": {"period": "today|week|month"}},
+    {"name": "platform_stats", "description": "إحصائيات المنصة", "parameters": {}},
+    # Users
     {"name": "list_users", "description": "عرض المستخدمين", "parameters": {"search": "بحث", "limit": "عدد"}},
+    {"name": "user_detail", "description": "تفاصيل مستخدم", "parameters": {"user_id": "المستخدم"}},
     {"name": "ban_user", "description": "حظر مستخدم", "parameters": {"user_id": "المستخدم", "reason": "السبب"}},
+    {"name": "unban_user", "description": "إلغاء حظر", "parameters": {"user_id": "المستخدم"}},
     {"name": "send_message_to_user", "description": "رسالة مباشرة", "parameters": {"user_id": "المستخدم", "message": "الرسالة"}},
+    # Channels
+    {"name": "list_channels", "description": "عرض القنوات", "parameters": {}},
+    {"name": "add_channel", "description": "إضافة قناة", "parameters": {"chat_id": "المعرف", "name": "الاسم", "platform": "telegram|whatsapp"}},
+    {"name": "toggle_channel", "description": "تفعيل/تعطيل قناة", "parameters": {"chat_id": "المعرف"}},
+    {"name": "delete_channel", "description": "حذف قناة", "parameters": {"chat_id": "المعرف"}},
+    # Transactions
     {"name": "view_transactions", "description": "عرض المعاملات", "parameters": {"status": "الحالة", "type": "النوع", "limit": "عدد"}},
+    {"name": "pending_requests", "description": "الطلبات المعلقة", "parameters": {}},
+    {"name": "approve_txn", "description": "approval معاملة", "parameters": {"txn_id": "المعرف"}},
+    {"name": "reject_txn", "description": "رفض معاملة", "parameters": {"txn_id": "المعرف", "reason": "السبب"}},
+    {"name": "bulk_approve", "description": "approval جماعي", "parameters": {"type": "deposits|withdrawals"}},
+    # Matching
     {"name": "view_matching", "description": "عرض المطابقة", "parameters": {"status": "الحالة", "limit": "عدد"}},
-    {"name": "update_setting", "description": "تعديل إعداد", "parameters": {"key": "الإعداد", "value": "القيمة"}},
+    {"name": "approve_match", "description": "approval مطابقة", "parameters": {"match_id": "المعرف"}},
+    {"name": "reject_match", "description": "رفض مطابقة", "parameters": {"match_id": "المعرف", "reason": "السبب"}},
+    {"name": "resolve_dispute", "description": "حل نزاع", "parameters": {"match_id": "المعرف", "resolution": "الحل"}},
+    # Complaints & Tickets
     {"name": "view_complaints", "description": "عرض الشكاوى", "parameters": {"status": "الحالة", "limit": "عدد"}},
-    {"name": "generate_post", "description": "توليد بوست بالذكاء الاصطناعي", "parameters": {"topic": "الموضوع", "content_type": "info|question|prediction|analysis"}},
+    {"name": "reply_ticket", "description": "رد على شكوى", "parameters": {"ticket_id": "المعرف", "reply": "الرد"}},
+    {"name": "update_ticket_status", "description": "تحديث حالة شكوى", "parameters": {"ticket_id": "المعرف", "status": "الحالة"}},
+    # Broadcast & Posts
+    {"name": "broadcast", "description": "بث رسالة", "parameters": {"message": "الرسالة", "target": "all|active|inactive"}},
+    {"name": "broadcast_queue", "description": "قائمة الانتظار", "parameters": {}},
+    {"name": "create_post", "description": "إنشاء بوست", "parameters": {"message": "النص", "platform": "telegram|whatsapp", "channel_ids": "المعرفات"}},
+    {"name": "generate_post", "description": "توليد بوست بالذكاء الاصطناعي", "parameters": {"topic": "الموضوع", "content_type": "info|question|prediction"}},
+    {"name": "translate_post", "description": "ترجمة نص", "parameters": {"text": "النص", "target_lang": "ar|en|tr"}},
+    {"name": "post_history", "description": "سجل البوستات", "parameters": {"limit": "عدد"}},
+    {"name": "post_library", "description": "مكتبة المحتوى", "parameters": {}},
+    # Settings
+    {"name": "update_setting", "description": "تعديل إعداد", "parameters": {"key": "الإعداد", "value": "القيمة"}},
+    {"name": "get_settings", "description": "عرض الإعدادات", "parameters": {"filter": "فلتر"}},
+    # Games
+    {"name": "toggle_game", "description": "تفعيل/تعطيل لعبة", "parameters": {"game_id": "المعرف"}},
+    {"name": "game_stats", "description": "إحصائيات الألعاب", "parameters": {}},
+    # Agents (Matching)
+    {"name": "list_agents", "description": "عرض الوكلاء", "parameters": {}},
+    {"name": "agent_stats", "description": "إحصائيات الوكلاء", "parameters": {}},
+    # Companies
+    {"name": "list_companies", "description": "عرض الشركات", "parameters": {}},
+    {"name": "company_detail", "description": "تفاصيل شركة", "parameters": {"company_id": "المعرف"}},
+    # Admins
+    {"name": "list_admins", "description": "عرض الأدمنز", "parameters": {}},
+    {"name": "add_admin", "description": "إضافة أدمن", "parameters": {"user_id": "المستخدم", "role": "الدور"}},
+    # Backup
+    {"name": "create_backup", "description": "إنشاء نسخة احتياطية", "parameters": {}},
+    {"name": "list_backups", "description": "عرض النسخ الاحتياطية", "parameters": {}},
+    # Learning
     {"name": "learn_fact", "description": "حفظ معلومة", "parameters": {"category": "الفئة", "key": "المفتاح", "value": "القيمة"}},
     {"name": "get_learning_stats", "description": "إحصائيات التعلم", "parameters": {}},
-    {"name": "delegate_task", "description": "تكليف وكيل آخر بمهام", "parameters": {"to_agent": "الوكيل", "task": "المهمة"}},
+    {"name": "delegate_task", "description": "تكليف وكيل", "parameters": {"to_agent": "الوكيل", "task": "المهمة"}},
     {"name": "consult_all", "description": "استشارة كل الوكلاء", "parameters": {"question": "السؤال"}},
 ]
 
 
-def _build_agent_system_prompt(agent_id, admin_id=None):
-    agent = get_agent(agent_id)
-    actions_desc = json.dumps([a for a in ACTIONS_SCHEMA if a['name'] in agent['actions']], ensure_ascii=False, indent=2)
-
-    learned_parts = []
-
-    patterns = get_learned_patterns(min_confidence=0.4, limit=10)
-    if patterns:
-        lines = [f"  • \"{p['phrase_sample'][:60]}\" → {p['action_name']} [ثقة: {int(p['confidence']*100)}%]" for p in patterns]
-        learned_parts.append("## أنماط مُتعلمة:\n" + '\n'.join(lines))
-
-    knowledge = get_knowledge(limit=10)
-    if knowledge:
-        lines = [f"  • [{k['category']}] {k['fact_key']}: {k['fact_value'][:80]}" for k in knowledge]
-        learned_parts.append("## معلومات عن المشروع:\n" + '\n'.join(lines))
-
-    errors = get_repeated_errors(limit=3)
-    if errors:
-        lines = [f"  ⚠️ {e['action_name']}: {e['error_message'][:60]} ({e['cnt']} مرة)" for e in errors]
-        learned_parts.append("## تجنب هذه الأخطاء:\n" + '\n'.join(lines))
-
-    if admin_id:
-        prefs = get_admin_preferences(admin_id)
-        if prefs:
-            lines = [f"  • {k}: {v}" for k, v in prefs.items()]
-            learned_parts.append("## تفضيلات الأدمن:\n" + '\n'.join(lines))
-
-    if admin_id:
-        try:
-            conn = sqlite3.connect(DB_PATH); conn.row_factory = sqlite3.Row
-            corrections = conn.execute('SELECT original_action, corrected_action, correction_text FROM ai_corrections WHERE admin_id=? ORDER BY timestamp DESC LIMIT 3',
-                                      (str(admin_id),)).fetchall()
-            conn.close()
-            if corrections:
-                lines = [f"  • {c['original_action']} → {c['corrected_action']}: {c['correction_text'][:60]}" for c in corrections]
-                learned_parts.append("## تصحيحات سابقة:\n" + '\n'.join(lines))
-        except: pass
-
-    learning_section = '\n\n'.join(learned_parts) if learned_parts else 'لم تتم تعلم أنماط بعد.'
-
-    # Other agents info
-    other_agents_info = []
-    for oid, oa in AGENTS.items():
-        if oid != agent_id:
-            other_agents_info.append(f"  • @{oa['name']} ({oa['name_ar']}) — {oa['role_ar']}")
-    agents_list = '\n'.join(other_agents_info)
-
-    return f"""أنت {agent['emoji']} {agent['name']} ({agent['name_ar']}) — {agent['role_ar']}.
-{agent['description_ar']}
-
-## شخصيتك:
-{agent['personality_ar']}
-
-## أنت تملك هذه الأدوات:
-{actions_desc}
-
-## فريق الوكلاء المتاحين (يمكنك تكليفهم أو استشارتهم):
-{agents_list}
-
-{learning_section}
-
-## قواعد العمل:
-
-1. **التنفيذ**: أرجع JSON عند طلب إجراء:
-   {{"action": "اسم", "params": {{...}}, "reply": "رسالة تأكيد"}}
-
-2. **التكليف**: لإرسال مهمة لوكيلاً آخر:
-   {{"action": "delegate_task", "params": {{"to_agent": "writer", "task": "اكتب بوست ترحيبي"}}, "reply": "✓ أكلفت الكاتب بكتابة البوست"}}
-
-3. **الاستشارة**: لسؤال كل الوكلاء:
-   {{"action": "consult_all", "params": {{"question": "ما رأيكم في..."}}, "reply": "✓ جاري استشارة الفريق"}}
-
-4. **التعلم**: استخدم أنماطك المُتعلمة مباشرة.
-
-5. **تجنب الأخطاء**: راجع الأخطاء المتكررة.
-
-6. **اللغة**: تحدث بنفس لغة الأدمن.
-
-7. **الأمان**: لا تحذف أو تعدّل كبير دون تأكيد.
-
-8. **التنسيق**:
-   - <b>نص عريض</b> للعناوين
-   - <code>نص</code> للأكواد
-   - • للقوائم
-"""
-
-
-# ═══════════════════════════════════════════════════════════════
-#  ACTION EXECUTOR
-# ═══════════════════════════════════════════════════════════════
-
-def execute_action(action_name, params):
+def _db_query(sql, params=(), fetch='one'):
     try:
-        dispatch = {
-            'create_post': _exec_create_post, 'broadcast': _exec_broadcast,
-            'get_stats': _exec_get_stats, 'list_channels': _exec_list_channels,
-            'list_users': _exec_list_users, 'ban_user': _exec_ban_user,
-            'send_message_to_user': _exec_send_to_user, 'view_transactions': _exec_view_transactions,
-            'view_matching': _exec_view_matching, 'update_setting': _exec_update_setting,
-            'view_complaints': _exec_view_complaints, 'generate_post': _exec_generate_post,
-            'learn_fact': _exec_learn_fact, 'get_learning_stats': _exec_get_learning_stats,
-            'delegate_task': _exec_delegate_task, 'consult_all': _exec_consult_all,
-        }
-        handler = dispatch.get(action_name)
-        if handler: return handler(params)
-        return {'success': False, 'error': f'Unknown action: {action_name}'}
-    except Exception as e:
-        return {'success': False, 'error': str(e)}
+        conn = sqlite3.connect(DB_PATH); conn.row_factory = sqlite3.Row
+        rows = conn.execute(sql, params).fetchall()
+        conn.close()
+        if fetch == 'one': return rows[0] if rows else None
+        return [dict(r) for r in rows]
+    except: return None if fetch == 'one' else []
 
 
-def _exec_delegate_task(params):
-    to_agent = params.get('to_agent', '')
-    task = params.get('task', '')
-    if not to_agent or not task:
-        return {'success': False, 'error': 'to_agent and task required'}
-    agent = get_agent(to_agent)
-    return {'success': True, 'to_agent': to_agent, 'agent_name': agent['name_ar'],
-            'task': task, 'message': f'✓ تمت تكليف {agent["emoji"]} {agent["name_ar"]} بالمهمة'}
+def _db_execute(sql, params=()):
+    try:
+        conn = sqlite3.connect(DB_PATH); conn.execute(sql, params); conn.commit(); conn.close(); return True
+    except: return False
 
 
-def _exec_consult_all(params):
-    question = params.get('question', '')
-    if not question:
-        return {'success': False, 'error': 'question required'}
-    return {'success': True, 'question': question,
-            'message': '✓ جاري استشارة كل الوكلاء... سيأتي رد كل وكيل على حدة'}
-
-
-def _exec_create_post(params):
-    message = params.get('message', ''); platform = params.get('platform', 'telegram')
-    channel_ids = params.get('channel_ids', []); parse_mode = params.get('parse_mode', 'HTML')
-    silent = params.get('silent', False); pin = params.get('pin', False)
-    posting_method = params.get('posting_method', 'api')
-    if not message: return {'success': False, 'error': 'No message provided'}
-    channels_path = os.path.join(BASE_DIR, 'bot_channels.csv')
-    queue_path = os.path.join(BASE_DIR, 'broadcast_queue.csv')
-    targets = []
-    if os.path.exists(channels_path):
-        with open(channels_path, 'r', encoding='utf-8-sig') as f:
-            for row in csv.DictReader(f):
-                if (row.get('platform') or 'telegram').lower() != platform.lower(): continue
-                if channel_ids and row.get('chat_id', '') not in channel_ids: continue
-                targets.append(row)
-    if not targets: return {'success': False, 'error': f'No {platform} channels found'}
-    queued = 0
-    file_exists = os.path.exists(queue_path)
-    with open(queue_path, 'a', newline='', encoding='utf-8-sig') as f:
-        writer = csv.writer(f)
-        if not file_exists:
-            writer.writerow(['chat_id','message','parse_mode','silent','pin','platform','posting_method','created_at','status'])
-        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        for ch in targets:
-            writer.writerow([ch.get('chat_id',''), message, parse_mode, str(silent).lower(), str(pin).lower(), platform, posting_method, now, 'pending'])
-            queued += 1
-    return {'success': True, 'queued': queued, 'platform': platform, 'channels': [ch.get('name', ch.get('chat_id','')) for ch in targets[:5]]}
-
-
-def _exec_broadcast(params):
-    message = params.get('message', ''); target = params.get('target', 'all')
-    if not message: return {'success': False, 'error': 'No message provided'}
-    queue_path = os.path.join(BASE_DIR, 'broadcast_queue.csv')
-    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    file_exists = os.path.exists(queue_path)
-    with open(queue_path, 'a', newline='', encoding='utf-8-sig') as f:
-        writer = csv.writer(f)
-        if not file_exists:
-            writer.writerow(['chat_id','message','parse_mode','silent','pin','platform','posting_method','created_at','status'])
-        writer.writerow(['BROADCAST_'+target.upper(), message, 'HTML', 'false', 'false', 'telegram', 'api', now, 'pending'])
-    return {'success': True, 'target': target}
-
+# ── Stats ─────────────────────────────────────────────────────
 
 def _exec_get_stats(params):
     stat_type = params.get('type', 'all'); result = {}
     try:
         conn = sqlite3.connect(DB_PATH); conn.row_factory = sqlite3.Row
         if stat_type in ('users', 'all'):
-            try: r = conn.execute('SELECT COUNT(*) as c FROM users').fetchone(); result['total_users'] = r[0] if r else 0
+            try: result['total_users'] = conn.execute('SELECT COUNT(*) FROM users').fetchone()[0]
             except: result['total_users'] = 'N/A'
             try:
                 week_ago = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
-                r = conn.execute('SELECT COUNT(DISTINCT user_id) as c FROM transactions WHERE created_at > ?', (week_ago,)).fetchone()
-                result['active_users_7d'] = r[0] if r else 0
+                result['active_users_7d'] = conn.execute('SELECT COUNT(DISTINCT user_id) FROM transactions WHERE created_at > ?', (week_ago,)).fetchone()[0]
             except: pass
         if stat_type in ('transactions', 'revenue', 'all'):
             try:
-                r = conn.execute("SELECT COUNT(*) as c, SUM(CASE WHEN status='approved' THEN amount ELSE 0 END) as total FROM transactions WHERE type='deposit'").fetchone()
-                result['total_deposits'] = r[0] if r else 0; result['total_revenue'] = float(r[1] or 0)
-            except: result['total_deposits'] = 'N/A'
-            try: r = conn.execute("SELECT COUNT(*) as c FROM transactions WHERE status='pending'").fetchone(); result['pending_transactions'] = r[0] if r else 0
+                r = conn.execute("SELECT COUNT(*), SUM(CASE WHEN status='approved' THEN amount ELSE 0 END) FROM transactions WHERE type='deposit'").fetchone()
+                result['total_deposits'] = r[0]; result['total_revenue'] = float(r[1] or 0)
+            except: pass
+            try: result['pending_transactions'] = conn.execute("SELECT COUNT(*) FROM transactions WHERE status='pending'").fetchone()[0]
             except: pass
         if stat_type in ('matching', 'all'):
-            try: r = conn.execute("SELECT COUNT(*) as c FROM match_requests WHERE status='pending'").fetchone(); result['pending_matches'] = r[0] if r else 0
-            except: result['pending_matches'] = 'N/A'
+            try: result['pending_matches'] = conn.execute("SELECT COUNT(*) FROM match_requests WHERE status='pending'").fetchone()[0]
+            except: pass
         if stat_type in ('channels', 'all'):
-            channels_path = os.path.join(BASE_DIR, 'bot_channels.csv')
-            if os.path.exists(channels_path):
-                with open(channels_path, 'r', encoding='utf-8-sig') as f: channels = list(csv.DictReader(f))
-                result['total_channels'] = len(channels)
-                result['active_channels'] = len([c for c in channels if (c.get('is_active','') or '').lower() in ('yes','true','1','')])
+            p = os.path.join(BASE_DIR, 'bot_channels.csv')
+            if os.path.exists(p):
+                with open(p, 'r', encoding='utf-8-sig') as f: ch = list(csv.DictReader(f))
+                result['total_channels'] = len(ch)
+                result['active_channels'] = len([c for c in ch if (c.get('is_active','') or '').lower() in ('yes','true','1','')])
         conn.close()
     except Exception as e: result['error'] = str(e)
     return {'success': True, 'stats': result}
 
 
-def _exec_list_channels(params):
-    channels_path = os.path.join(BASE_DIR, 'bot_channels.csv')
-    if not os.path.exists(channels_path): return {'success': True, 'channels': []}
-    with open(channels_path, 'r', encoding='utf-8-sig') as f: channels = list(csv.DictReader(f))
-    return {'success': True, 'total': len(channels), 'channels': [{'name': ch.get('name',''), 'chat_id': ch.get('chat_id',''), 'platform': ch.get('platform','telegram'), 'is_active': ch.get('is_active','')} for ch in channels[:20]]}
+def _exec_get_stats_detailed(params):
+    period = params.get('period', 'week'); result = {}
+    try:
+        conn = sqlite3.connect(DB_PATH); conn.row_factory = sqlite3.Row
+        if period == 'today':
+            start = datetime.now().strftime('%Y-%m-%d')
+        elif period == 'week':
+            start = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
+        else:
+            start = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+        try:
+            r = conn.execute("SELECT COUNT(*), SUM(amount) FROM transactions WHERE created_at >= ? AND type='deposit'", (start,)).fetchone()
+            result['deposits_count'] = r[0]; result['deposits_amount'] = float(r[1] or 0)
+        except: pass
+        try:
+            r = conn.execute("SELECT COUNT(*), SUM(amount) FROM transactions WHERE created_at >= ? AND type='withdrawal'", (start,)).fetchone()
+            result['withdrawals_count'] = r[0]; result['withdrawals_amount'] = float(r[1] or 0)
+        except: pass
+        try:
+            result['new_users'] = conn.execute("SELECT COUNT(*) FROM users WHERE created_at >= ?", (start,)).fetchone()[0]
+        except: pass
+        try:
+            result['new_matches'] = conn.execute("SELECT COUNT(*) FROM match_requests WHERE created_at >= ?", (start,)).fetchone()[0]
+        except: pass
+        try:
+            result['complaints_count'] = conn.execute("SELECT COUNT(*) FROM tickets WHERE created_at >= ?", (start,)).fetchone()[0]
+        except: pass
+        result['period'] = period; result['from'] = start
+        conn.close()
+    except Exception as e: result['error'] = str(e)
+    return {'success': True, 'stats': result}
 
+
+def _exec_platform_stats(params):
+    result = {}
+    try:
+        conn = sqlite3.connect(DB_PATH); conn.row_factory = sqlite3.Row
+        for key, sql in [
+            ('total_users', 'SELECT COUNT(*) FROM users'),
+            ('total_transactions', 'SELECT COUNT(*) FROM transactions'),
+            ('total_matches', 'SELECT COUNT(*) FROM match_requests'),
+            ('total_tickets', 'SELECT COUNT(*) FROM tickets'),
+            ('total_settings', 'SELECT COUNT(*) FROM settings'),
+        ]:
+            try: result[key] = conn.execute(sql).fetchone()[0]
+            except: result[key] = 'N/A'
+        try:
+            r = conn.execute("SELECT SUM(amount) FROM transactions WHERE status='approved' AND type='deposit'").fetchone()
+            result['total_revenue'] = float(r[0] or 0)
+        except: pass
+        try:
+            result['banned_users'] = conn.execute("SELECT COUNT(*) FROM users WHERE is_banned=1 OR is_banned='yes'").fetchone()[0]
+        except: pass
+        conn.close()
+    except Exception as e: result['error'] = str(e)
+    return {'success': True, 'stats': result}
+
+
+# ── Users ─────────────────────────────────────────────────────
 
 def _exec_list_users(params):
     search = params.get('search', ''); limit = int(params.get('limit', 10))
-    users_path = os.path.join(BASE_DIR, 'users.csv')
-    if not os.path.exists(users_path): return {'success': True, 'users': []}
-    with open(users_path, 'r', encoding='utf-8-sig') as f: users = list(csv.DictReader(f))
-    if search:
-        sl = search.lower()
-        users = [u for u in users if sl in (u.get('name','') or '').lower() or sl in (u.get('telegram_id','') or '').lower()]
-    return {'success': True, 'total': len(users), 'users': [{'telegram_id': u.get('telegram_id',''), 'name': u.get('name',''), 'balance': u.get('balance','0'), 'is_banned': u.get('is_banned','no')} for u in users[:limit]]}
+    try:
+        conn = sqlite3.connect(DB_PATH); conn.row_factory = sqlite3.Row
+        if search:
+            rows = conn.execute("SELECT * FROM users WHERE name LIKE ? OR telegram_id LIKE ? OR phone LIKE ? LIMIT ?",
+                                (f'%{search}%', f'%{search}%', f'%{search}%', limit)).fetchall()
+        else:
+            rows = conn.execute("SELECT * FROM users ORDER BY rowid DESC LIMIT ?", (limit,)).fetchall()
+        conn.close()
+        users = [dict(r) for r in rows]
+        return {'success': True, 'total': len(users), 'users': [{'telegram_id': u.get('telegram_id',''), 'name': u.get('name',''), 'balance': u.get('balance',0), 'is_banned': u.get('is_banned',0)} for u in users]}
+    except Exception as e:
+        return {'success': False, 'error': str(e)}
+
+
+def _exec_user_detail(params):
+    user_id = str(params.get('user_id', ''))
+    if not user_id: return {'success': False, 'error': 'user_id مطلوب'}
+    try:
+        conn = sqlite3.connect(DB_PATH); conn.row_factory = sqlite3.Row
+        user = conn.execute("SELECT * FROM users WHERE telegram_id=?", (user_id,)).fetchone()
+        if not user: conn.close(); return {'success': False, 'error': f'المستخدم {user_id} غير موجود'}
+        user = dict(user)
+        txns = conn.execute("SELECT * FROM transactions WHERE user_id=? ORDER BY created_at DESC LIMIT 10", (user_id,)).fetchall()
+        user['recent_transactions'] = [dict(t) for t in txns]
+        try:
+            matches = conn.execute("SELECT * FROM match_requests WHERE user_id=? OR partner_id=? ORDER BY created_at DESC LIMIT 5", (user_id, user_id)).fetchall()
+            user['recent_matches'] = [dict(m) for m in matches]
+        except: pass
+        conn.close()
+        return {'success': True, 'user': user}
+    except Exception as e:
+        return {'success': False, 'error': str(e)}
 
 
 def _exec_ban_user(params):
     user_id = str(params.get('user_id', '')); reason = params.get('reason', 'Banned via AI')
-    if not user_id: return {'success': False, 'error': 'No user_id'}
-    users_path = os.path.join(BASE_DIR, 'users.csv')
-    if not os.path.exists(users_path): return {'success': False, 'error': 'No users file'}
-    rows = []; updated = False
-    with open(users_path, 'r', encoding='utf-8-sig') as f:
-        reader = csv.DictReader(f); fn = reader.fieldnames
-        for row in reader:
-            if row.get('telegram_id') == user_id: row['is_banned'] = 'yes'; row['ban_reason'] = reason; updated = True
-            rows.append(row)
-    if not updated: return {'success': False, 'error': f'User {user_id} not found'}
-    with open(users_path, 'w', newline='', encoding='utf-8-sig') as f:
-        w = csv.DictWriter(f, fieldnames=fn); w.writeheader(); w.writerows(rows)
-    return {'success': True, 'user_id': user_id}
+    if not user_id: return {'success': False, 'error': 'user_id مطلوب'}
+    if _db_execute("UPDATE users SET is_banned=1, ban_reason=? WHERE telegram_id=?", (reason, user_id)):
+        return {'success': True, 'user_id': user_id}
+    return {'success': False, 'error': f'المستخدم {user_id} غير موجود'}
+
+
+def _exec_unban_user(params):
+    user_id = str(params.get('user_id', ''))
+    if not user_id: return {'success': False, 'error': 'user_id مطلوب'}
+    if _db_execute("UPDATE users SET is_banned=0, ban_reason=NULL WHERE telegram_id=?", (user_id,)):
+        return {'success': True, 'user_id': user_id}
+    return {'success': False, 'error': f'المستخدم {user_id} غير موجود'}
 
 
 def _exec_send_to_user(params):
     user_id = str(params.get('user_id', '')); message = params.get('message', '')
-    if not user_id or not message: return {'success': False, 'error': 'user_id and message required'}
+    if not user_id or not message: return {'success': False, 'error': 'user_id و message مطلوبان'}
     queue_path = os.path.join(BASE_DIR, 'broadcast_queue.csv'); now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     file_exists = os.path.exists(queue_path)
     with open(queue_path, 'a', newline='', encoding='utf-8-sig') as f:
-        writer = csv.writer(f)
-        if not file_exists: writer.writerow(['chat_id','message','parse_mode','silent','pin','platform','posting_method','created_at','status'])
-        writer.writerow([user_id, message, 'HTML', 'false', 'false', 'telegram', 'api', now, 'pending'])
+        w = csv.writer(f)
+        if not file_exists: w.writerow(['chat_id','message','parse_mode','silent','pin','platform','posting_method','created_at','status'])
+        w.writerow([user_id, message, 'HTML', 'false', 'false', 'telegram', 'api', now, 'pending'])
     return {'success': True, 'user_id': user_id}
 
 
+# ── Channels ──────────────────────────────────────────────────
+
+def _exec_list_channels(params):
+    p = os.path.join(BASE_DIR, 'bot_channels.csv')
+    if not os.path.exists(p): return {'success': True, 'channels': [], 'total': 0}
+    with open(p, 'r', encoding='utf-8-sig') as f: channels = list(csv.DictReader(f))
+    return {'success': True, 'total': len(channels), 'channels': [{'name': ch.get('name',''), 'chat_id': ch.get('chat_id',''), 'platform': ch.get('platform','telegram'), 'is_active': ch.get('is_active','')} for ch in channels[:30]]}
+
+
+def _exec_add_channel(params):
+    chat_id = str(params.get('chat_id', '')); name = params.get('name', ''); platform = params.get('platform', 'telegram')
+    if not chat_id: return {'success': False, 'error': 'chat_id مطلوب'}
+    p = os.path.join(BASE_DIR, 'bot_channels.csv')
+    file_exists = os.path.exists(p)
+    with open(p, 'a', newline='', encoding='utf-8-sig') as f:
+        w = csv.writer(f)
+        if not file_exists: w.writerow(['chat_id','name','platform','is_active','created_at'])
+        w.writerow([chat_id, name or f'Channel {chat_id}', platform, 'yes', datetime.now().strftime('%Y-%m-%d %H:%M:%S')])
+    return {'success': True, 'chat_id': chat_id, 'name': name}
+
+
+def _exec_toggle_channel(params):
+    chat_id = str(params.get('chat_id', ''))
+    if not chat_id: return {'success': False, 'error': 'chat_id مطلوب'}
+    p = os.path.join(BASE_DIR, 'bot_channels.csv')
+    if not os.path.exists(p): return {'success': False, 'error': 'لا يوجد ملف القنوات'}
+    rows = []; found = False; new_status = ''
+    with open(p, 'r', encoding='utf-8-sig') as f:
+        reader = csv.DictReader(f); fn = reader.fieldnames
+        for row in reader:
+            if row.get('chat_id') == chat_id:
+                cur = (row.get('is_active','') or '').lower()
+                row['is_active'] = 'no' if cur in ('yes','true','1','') else 'yes'
+                new_status = row['is_active']; found = True
+            rows.append(row)
+    if not found: return {'success': False, 'error': f'القناة {chat_id} غير موجودة'}
+    with open(p, 'w', newline='', encoding='utf-8-sig') as f:
+        w = csv.DictWriter(f, fieldnames=fn); w.writeheader(); w.writerows(rows)
+    return {'success': True, 'chat_id': chat_id, 'new_status': new_status}
+
+
+def _exec_delete_channel(params):
+    chat_id = str(params.get('chat_id', ''))
+    if not chat_id: return {'success': False, 'error': 'chat_id مطلوب'}
+    p = os.path.join(BASE_DIR, 'bot_channels.csv')
+    if not os.path.exists(p): return {'success': False, 'error': 'لا يوجد ملف القنوات'}
+    rows = []; found = False
+    with open(p, 'r', encoding='utf-8-sig') as f:
+        reader = csv.DictReader(f); fn = reader.fieldnames
+        for row in reader:
+            if row.get('chat_id') == chat_id: found = True; continue
+            rows.append(row)
+    if not found: return {'success': False, 'error': f'القناة {chat_id} غير موجودة'}
+    with open(p, 'w', newline='', encoding='utf-8-sig') as f:
+        w = csv.DictWriter(f, fieldnames=fn); w.writeheader(); w.writerows(rows)
+    return {'success': True, 'chat_id': chat_id}
+
+
+# ── Transactions ──────────────────────────────────────────────
+
 def _exec_view_transactions(params):
     status = params.get('status', ''); txn_type = params.get('type', ''); limit = int(params.get('limit', 10))
-    txns_path = os.path.join(BASE_DIR, 'transactions.csv')
-    if not os.path.exists(txns_path): return {'success': True, 'transactions': []}
-    with open(txns_path, 'r', encoding='utf-8-sig') as f: txns = list(csv.DictReader(f))
-    if status: txns = [t for t in txns if (t.get('status') or '').lower() == status.lower()]
-    if txn_type: txns = [t for t in txns if (t.get('type') or '').lower() == txn_type.lower()]
-    txns = sorted(txns, key=lambda x: x.get('created_at', ''), reverse=True)
-    return {'success': True, 'total': len(txns), 'transactions': [{'id': t.get('id',''), 'user_id': t.get('user_id',''), 'type': t.get('type',''), 'amount': t.get('amount',''), 'status': t.get('status',''), 'created_at': t.get('created_at','')} for t in txns[:limit]]}
+    try:
+        conn = sqlite3.connect(DB_PATH); conn.row_factory = sqlite3.Row
+        q = 'SELECT * FROM transactions WHERE 1=1'; pl = []
+        if status: q += ' AND status=?'; pl.append(status)
+        if txn_type: q += ' AND type=?'; pl.append(txn_type)
+        q += ' ORDER BY created_at DESC LIMIT ?'; pl.append(limit)
+        rows = conn.execute(q, pl).fetchall(); conn.close()
+        return {'success': True, 'total': len(rows), 'transactions': [dict(r) for r in rows]}
+    except Exception as e: return {'success': False, 'error': str(e)}
 
+
+def _exec_pending_requests(params):
+    result = {}
+    try:
+        conn = sqlite3.connect(DB_PATH); conn.row_factory = sqlite3.Row
+        try:
+            txns = conn.execute("SELECT * FROM transactions WHERE status='pending' ORDER BY created_at DESC LIMIT 20").fetchall()
+            result['pending_transactions'] = [dict(t) for t in txns]
+            result['pending_txn_count'] = len(txns)
+        except: result['pending_txn_count'] = 0
+        try:
+            matches = conn.execute("SELECT * FROM match_requests WHERE status='pending' ORDER BY created_at DESC LIMIT 20").fetchall()
+            result['pending_matches'] = [dict(m) for m in matches]
+            result['pending_match_count'] = len(matches)
+        except: result['pending_match_count'] = 0
+        try:
+            tickets = conn.execute("SELECT * FROM tickets WHERE status IN ('open','pending') ORDER BY created_at DESC LIMIT 20").fetchall()
+            result['pending_tickets'] = [dict(t) for t in tickets]
+            result['pending_ticket_count'] = len(tickets)
+        except: result['pending_ticket_count'] = 0
+        conn.close()
+    except Exception as e: result['error'] = str(e)
+    return {'success': True, 'stats': result}
+
+
+def _exec_approve_txn(params):
+    txn_id = str(params.get('txn_id', ''))
+    if not txn_id: return {'success': False, 'error': 'txn_id مطلوب'}
+    if _db_execute("UPDATE transactions SET status='approved', approved_at=? WHERE id=?", (datetime.now().strftime('%Y-%m-%d %H:%M:%S'), txn_id)):
+        return {'success': True, 'txn_id': txn_id}
+    return {'success': False, 'error': f'المعاملة {txn_id} غير موجودة'}
+
+
+def _exec_reject_txn(params):
+    txn_id = str(params.get('txn_id', '')); reason = params.get('reason', 'Rejected via AI')
+    if not txn_id: return {'success': False, 'error': 'txn_id مطلوب'}
+    if _db_execute("UPDATE transactions SET status='rejected', reject_reason=? WHERE id=?", (reason, txn_id)):
+        return {'success': True, 'txn_id': txn_id}
+    return {'success': False, 'error': f'المعاملة {txn_id} غير موجودة'}
+
+
+def _exec_bulk_approve(params):
+    txn_type = params.get('type', 'deposits')
+    type_filter = 'deposit' if txn_type == 'deposits' else 'withdrawal'
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        conn.execute("UPDATE transactions SET status='approved', approved_at=? WHERE status='pending' AND type=?",
+                     (datetime.now().strftime('%Y-%m-%d %H:%M:%S'), type_filter))
+        count = conn.execute("SELECT changes()").fetchone()[0]; conn.commit(); conn.close()
+        return {'success': True, 'approved_count': count, 'type': txn_type}
+    except Exception as e: return {'success': False, 'error': str(e)}
+
+
+# ── Matching ──────────────────────────────────────────────────
 
 def _exec_view_matching(params):
     status = params.get('status', ''); limit = int(params.get('limit', 10))
     try:
         conn = sqlite3.connect(DB_PATH); conn.row_factory = sqlite3.Row
         q = 'SELECT * FROM match_requests'; pl = []
-        if status: q += ' WHERE status = ?'; pl.append(status)
+        if status: q += ' WHERE status=?'; pl.append(status)
         q += ' ORDER BY created_at DESC LIMIT ?'; pl.append(limit)
         rows = conn.execute(q, pl).fetchall(); conn.close()
         return {'success': True, 'total': len(rows), 'requests': [dict(r) for r in rows]}
     except Exception as e: return {'success': False, 'error': str(e)}
 
 
-def _exec_update_setting(params):
-    key = params.get('key', ''); value = params.get('value', '')
-    if not key: return {'success': False, 'error': 'No key'}
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        conn.execute('INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, ?)',
-                    (key, value, datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
-        conn.commit(); conn.close()
-        return {'success': True, 'key': key, 'value': value}
-    except Exception as e: return {'success': False, 'error': str(e)}
+def _exec_approve_match(params):
+    match_id = str(params.get('match_id', ''))
+    if not match_id: return {'success': False, 'error': 'match_id مطلوب'}
+    if _db_execute("UPDATE match_requests SET status='approved' WHERE id=?", (match_id,)):
+        return {'success': True, 'match_id': match_id}
+    return {'success': False, 'error': f'المطابقة {match_id} غير موجودة'}
 
+
+def _exec_reject_match(params):
+    match_id = str(params.get('match_id', '')); reason = params.get('reason', 'Rejected via AI')
+    if not match_id: return {'success': False, 'error': 'match_id مطلوب'}
+    if _db_execute("UPDATE match_requests SET status='rejected', reject_reason=? WHERE id=?", (reason, match_id)):
+        return {'success': True, 'match_id': match_id}
+    return {'success': False, 'error': f'المطابقة {match_id} غير موجودة'}
+
+
+def _exec_resolve_dispute(params):
+    match_id = str(params.get('match_id', '')); resolution = params.get('resolution', '')
+    if not match_id: return {'success': False, 'error': 'match_id مطلوب'}
+    if _db_execute("UPDATE match_requests SET status='resolved', resolution=? WHERE id=?", (resolution, match_id)):
+        return {'success': True, 'match_id': match_id}
+    return {'success': False, 'error': f'النزاع {match_id} غير موجود'}
+
+
+# ── Complaints & Tickets ──────────────────────────────────────
 
 def _exec_view_complaints(params):
     status = params.get('status', ''); limit = int(params.get('limit', 10))
-    p = os.path.join(BASE_DIR, 'complaints.csv')
-    if not os.path.exists(p): return {'success': True, 'complaints': []}
-    with open(p, 'r', encoding='utf-8-sig') as f: complaints = list(csv.DictReader(f))
-    if status: complaints = [c for c in complaints if (c.get('status') or '').lower() == status.lower()]
-    complaints = sorted(complaints, key=lambda x: x.get('created_at', ''), reverse=True)
-    return {'success': True, 'total': len(complaints), 'complaints': [{'id': c.get('id',''), 'user_id': c.get('user_id',''), 'subject': c.get('subject',''), 'status': c.get('status','')} for c in complaints[:limit]]}
+    try:
+        conn = sqlite3.connect(DB_PATH); conn.row_factory = sqlite3.Row
+        q = 'SELECT * FROM tickets WHERE 1=1'; pl = []
+        if status: q += ' AND status=?'; pl.append(status)
+        q += ' ORDER BY created_at DESC LIMIT ?'; pl.append(limit)
+        rows = conn.execute(q, pl).fetchall(); conn.close()
+        return {'success': True, 'total': len(rows), 'tickets': [dict(r) for r in rows]}
+    except Exception as e: return {'success': False, 'error': str(e)}
+
+
+def _exec_reply_ticket(params):
+    ticket_id = str(params.get('ticket_id', '')); reply = params.get('reply', '')
+    if not ticket_id or not reply: return {'success': False, 'error': 'ticket_id و reply مطلوبان'}
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        conn.execute("INSERT INTO ticket_replies (ticket_id, message, admin_id, created_at) VALUES (?, ?, 'ai_assistant', ?)",
+                     (ticket_id, reply, datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+        conn.execute("UPDATE tickets SET status='replied', updated_at=? WHERE id=?",
+                     (datetime.now().strftime('%Y-%m-%d %H:%M:%S'), ticket_id))
+        conn.commit(); conn.close()
+        return {'success': True, 'ticket_id': ticket_id}
+    except Exception as e: return {'success': False, 'error': str(e)}
+
+
+def _exec_update_ticket_status(params):
+    ticket_id = str(params.get('ticket_id', '')); status = params.get('status', '')
+    if not ticket_id or not status: return {'success': False, 'error': 'ticket_id و status مطلوبان'}
+    if _db_execute("UPDATE tickets SET status=?, updated_at=? WHERE id=?",
+                   (status, datetime.now().strftime('%Y-%m-%d %H:%M:%S'), ticket_id)):
+        return {'success': True, 'ticket_id': ticket_id, 'new_status': status}
+    return {'success': False, 'error': f'الشكوى {ticket_id} غير موجودة'}
+
+
+# ── Broadcast & Posts ─────────────────────────────────────────
+
+def _exec_broadcast(params):
+    message = params.get('message', ''); target = params.get('target', 'all')
+    if not message: return {'success': False, 'error': 'الرسالة مطلوبة'}
+    queue_path = os.path.join(BASE_DIR, 'broadcast_queue.csv'); now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    file_exists = os.path.exists(queue_path)
+    with open(queue_path, 'a', newline='', encoding='utf-8-sig') as f:
+        w = csv.writer(f)
+        if not file_exists: w.writerow(['chat_id','message','parse_mode','silent','pin','platform','posting_method','created_at','status'])
+        w.writerow([f'BROADCAST_{target.upper()}', message, 'HTML', 'false', 'false', 'telegram', 'api', now, 'pending'])
+    return {'success': True, 'target': target}
+
+
+def _exec_broadcast_queue(params):
+    queue_path = os.path.join(BASE_DIR, 'broadcast_queue.csv')
+    if not os.path.exists(queue_path): return {'success': True, 'queue': [], 'total': 0}
+    with open(queue_path, 'r', encoding='utf-8-sig') as f: rows = list(csv.DictReader(f))
+    pending = [r for r in rows if r.get('status') == 'pending']
+    return {'success': True, 'total': len(pending), 'queue': pending[:20]}
+
+
+def _exec_create_post(params):
+    message = params.get('message', ''); platform = params.get('platform', 'telegram')
+    channel_ids = params.get('channel_ids', []); parse_mode = params.get('parse_mode', 'HTML')
+    if not message: return {'success': False, 'error': 'الرسالة مطلوبة'}
+    p = os.path.join(BASE_DIR, 'bot_channels.csv')
+    if not os.path.exists(p): return {'success': False, 'error': 'لا توجد قنوات'}
+    with open(p, 'r', encoding='utf-8-sig') as f: channels = list(csv.DictReader(f))
+    targets = [ch for ch in channels if (ch.get('platform') or 'telegram').lower() == platform.lower()]
+    if channel_ids: targets = [ch for ch in targets if ch.get('chat_id','') in channel_ids]
+    if not targets: return {'success': False, 'error': f'لا توجد قنوات {platform}'}
+    queue_path = os.path.join(BASE_DIR, 'broadcast_queue.csv'); now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    file_exists = os.path.exists(queue_path)
+    queued = 0
+    with open(queue_path, 'a', newline='', encoding='utf-8-sig') as f:
+        w = csv.writer(f)
+        if not file_exists: w.writerow(['chat_id','message','parse_mode','silent','pin','platform','posting_method','created_at','status'])
+        for ch in targets:
+            w.writerow([ch.get('chat_id',''), message, parse_mode, 'false', 'false', platform, 'api', now, 'pending'])
+            queued += 1
+    return {'success': True, 'queued': queued, 'platform': platform, 'channels': [ch.get('name','') for ch in targets[:5]]}
 
 
 def _exec_generate_post(params):
     topic = params.get('topic', ''); ct = params.get('content_type', 'info')
-    if not topic: return {'success': False, 'error': 'No topic'}
+    if not topic: return {'success': False, 'error': 'الموضوع مطلوب'}
     try:
         from ai_composer import get_active_keys, generate_post
         keys = get_active_keys(DB_PATH)
-        if not keys: return {'success': False, 'error': 'No AI keys'}
+        if not keys: return {'success': False, 'error': 'لا توجد مفاتيح AI'}
         return generate_post(keys[0], ct, '', {'company_name': ''}, topic, BASE_DIR)
     except Exception as e: return {'success': False, 'error': str(e)}
 
 
+def _exec_translate_post(params):
+    text = params.get('text', ''); target_lang = params.get('target_lang', 'en')
+    if not text: return {'success': False, 'error': 'النص مطلوب'}
+    try:
+        from ai_composer import get_active_keys
+        keys = get_active_keys(DB_PATH)
+        if not keys: return {'success': False, 'error': 'لا توجد مفاتيح AI'}
+        # Simple translation via AI
+        lang_name = {'ar': 'Arabic', 'en': 'English', 'tr': 'Turkish'}.get(target_lang, target_lang)
+        messages = [{'role': 'system', 'content': f'Translate the following text to {lang_name}. Return ONLY the translation, no explanations.'},
+                    {'role': 'user', 'content': text}]
+        result = _call_ai(messages)
+        if result.get('success'): return {'success': True, 'translation': result['content'], 'target_lang': target_lang}
+        return result
+    except Exception as e: return {'success': False, 'error': str(e)}
+
+
+def _exec_post_history(params):
+    limit = int(params.get('limit', 10))
+    try:
+        conn = sqlite3.connect(DB_PATH); conn.row_factory = sqlite3.Row
+        rows = conn.execute("SELECT * FROM posts ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()
+        conn.close()
+        return {'success': True, 'posts': [dict(r) for r in rows]}
+    except Exception as e:
+        return {'success': True, 'posts': [], 'note': 'سجل البوستات غير متاح'}
+
+
+def _exec_post_library(params):
+    try:
+        conn = sqlite3.connect(DB_PATH); conn.row_factory = sqlite3.Row
+        rows = conn.execute("SELECT * FROM post_library ORDER BY created_at DESC LIMIT 20").fetchall()
+        conn.close()
+        return {'success': True, 'library': [dict(r) for r in rows]}
+    except Exception as e:
+        return {'success': True, 'library': [], 'note': 'مكتبة المحتوى غير متاحة'}
+
+
+# ── Settings ──────────────────────────────────────────────────
+
+def _exec_update_setting(params):
+    key = params.get('key', ''); value = params.get('value', '')
+    if not key: return {'success': False, 'error': 'الإعداد مطلوب'}
+    if _db_execute("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, ?)",
+                   (key, value, datetime.now().strftime('%Y-%m-%d %H:%M:%S'))):
+        return {'success': True, 'key': key, 'value': value}
+    return {'success': False, 'error': 'فشل التحديث'}
+
+
+def _exec_get_settings(params):
+    flt = params.get('filter', '')
+    try:
+        conn = sqlite3.connect(DB_PATH); conn.row_factory = sqlite3.Row
+        if flt:
+            rows = conn.execute("SELECT * FROM settings WHERE key LIKE ?", (f'%{flt}%',)).fetchall()
+        else:
+            rows = conn.execute("SELECT * FROM settings ORDER BY key LIMIT 50").fetchall()
+        conn.close()
+        return {'success': True, 'settings': [dict(r) for r in rows]}
+    except Exception as e: return {'success': False, 'error': str(e)}
+
+
+# ── Games ─────────────────────────────────────────────────────
+
+def _exec_toggle_game(params):
+    game_id = str(params.get('game_id', ''))
+    if not game_id: return {'success': False, 'error': 'game_id مطلوب'}
+    try:
+        conn = sqlite3.connect(DB_PATH); conn.row_factory = sqlite3.Row
+        game = conn.execute("SELECT * FROM games WHERE id=?", (game_id,)).fetchone()
+        if not game: conn.close(); return {'success': False, 'error': f'اللعبة {game_id} غير موجودة'}
+        game = dict(game); new_status = 0 if game.get('is_enabled', 1) else 1
+        conn.execute("UPDATE games SET is_enabled=? WHERE id=?", (new_status, game_id))
+        conn.commit(); conn.close()
+        return {'success': True, 'game_id': game_id, 'new_status': 'enabled' if new_status else 'disabled'}
+    except Exception as e: return {'success': False, 'error': str(e)}
+
+
+def _exec_game_stats(params):
+    try:
+        conn = sqlite3.connect(DB_PATH); conn.row_factory = sqlite3.Row
+        games = conn.execute("SELECT * FROM games").fetchall()
+        stats = []
+        for g in games:
+            g = dict(g)
+            try:
+                r = conn.execute("SELECT COUNT(*), SUM(bet_amount) FROM game_rounds WHERE game_id=?", (g['id'],)).fetchone()
+                g['rounds'] = r[0]; g['total_bets'] = float(r[1] or 0)
+            except: g['rounds'] = 0; g['total_bets'] = 0
+            stats.append(g)
+        conn.close()
+        return {'success': True, 'games': stats}
+    except Exception as e: return {'success': False, 'error': str(e)}
+
+
+# ── Agents ────────────────────────────────────────────────────
+
+def _exec_list_agents(params):
+    try:
+        conn = sqlite3.connect(DB_PATH); conn.row_factory = sqlite3.Row
+        rows = conn.execute("SELECT * FROM agents ORDER BY rowid DESC LIMIT 20").fetchall()
+        conn.close()
+        return {'success': True, 'agents': [dict(r) for r in rows]}
+    except Exception as e:
+        return {'success': True, 'agents': [], 'note': 'الوكلاء غير متاحين'}
+
+
+def _exec_agent_stats(params):
+    try:
+        conn = sqlite3.connect(DB_PATH); conn.row_factory = sqlite3.Row
+        rows = conn.execute("""SELECT a.id, a.name, a.balance, a.is_active,
+            (SELECT COUNT(*) FROM match_requests WHERE agent_id=a.id) as total_matches,
+            (SELECT COUNT(*) FROM match_requests WHERE agent_id=a.id AND status='completed') as completed
+            FROM agents a ORDER BY total_matches DESC LIMIT 10""").fetchall()
+        conn.close()
+        return {'success': True, 'agents': [dict(r) for r in rows]}
+    except Exception as e: return {'success': False, 'error': str(e)}
+
+
+# ── Companies ─────────────────────────────────────────────────
+
+def _exec_list_companies(params):
+    try:
+        conn = sqlite3.connect(DB_PATH); conn.row_factory = sqlite3.Row
+        rows = conn.execute("SELECT * FROM companies ORDER BY rowid DESC LIMIT 20").fetchall()
+        conn.close()
+        return {'success': True, 'companies': [dict(r) for r in rows]}
+    except Exception as e:
+        return {'success': True, 'companies': [], 'note': 'الشركات غير متاحة'}
+
+
+def _exec_company_detail(params):
+    company_id = str(params.get('company_id', ''))
+    if not company_id: return {'success': False, 'error': 'company_id مطلوب'}
+    try:
+        conn = sqlite3.connect(DB_PATH); conn.row_factory = sqlite3.Row
+        company = conn.execute("SELECT * FROM companies WHERE id=?", (company_id,)).fetchone()
+        if not company: conn.close(); return {'success': False, 'error': f'الشركة {company_id} غير موجودة'}
+        company = dict(company)
+        try:
+            r = conn.execute("SELECT COUNT(*), SUM(amount) FROM transactions WHERE company_id=? AND status='approved'", (company_id,)).fetchone()
+            company['transaction_count'] = r[0]; company['total_volume'] = float(r[1] or 0)
+        except: pass
+        conn.close()
+        return {'success': True, 'company': company}
+    except Exception as e: return {'success': False, 'error': str(e)}
+
+
+# ── Admins ────────────────────────────────────────────────────
+
+def _exec_list_admins(params):
+    try:
+        conn = sqlite3.connect(DB_PATH); conn.row_factory = sqlite3.Row
+        rows = conn.execute("SELECT user_id, name, role, is_active FROM admins ORDER BY rowid DESC LIMIT 20").fetchall()
+        conn.close()
+        return {'success': True, 'admins': [dict(r) for r in rows]}
+    except Exception as e:
+        return {'success': True, 'admins': [], 'note': 'الأدمنز غير متاحين'}
+
+
+def _exec_add_admin(params):
+    user_id = str(params.get('user_id', '')); role = params.get('role', 'admin')
+    if not user_id: return {'success': False, 'error': 'user_id مطلوب'}
+    if _db_execute("INSERT OR REPLACE INTO admins (user_id, role, is_active, created_at) VALUES (?, ?, 1, ?)",
+                   (user_id, role, datetime.now().strftime('%Y-%m-%d %H:%M:%S'))):
+        return {'success': True, 'user_id': user_id, 'role': role}
+    return {'success': False, 'error': 'فشل الإضافة'}
+
+
+# ── Backup ────────────────────────────────────────────────────
+
+def _exec_create_backup(params):
+    try:
+        backup_dir = os.path.join(BASE_DIR, 'backups')
+        os.makedirs(backup_dir, exist_ok=True)
+        ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+        db_backup = os.path.join(backup_dir, f'boterx_{ts}.db')
+        shutil.copy2(DB_PATH, db_backup)
+        # Also backup CSV files
+        for csv_name in ['bot_channels.csv', 'users.csv', 'transactions.csv']:
+            src = os.path.join(BASE_DIR, csv_name)
+            if os.path.exists(src):
+                shutil.copy2(src, os.path.join(backup_dir, f'{csv_name}.{ts}.bak'))
+        return {'success': True, 'backup_file': db_backup, 'timestamp': ts}
+    except Exception as e: return {'success': False, 'error': str(e)}
+
+
+def _exec_list_backups(params):
+    backup_dir = os.path.join(BASE_DIR, 'backups')
+    if not os.path.exists(backup_dir): return {'success': True, 'backups': []}
+    try:
+        files = sorted(os.listdir(backup_dir), reverse=True)[:20]
+        backups = []
+        for f in files:
+            fp = os.path.join(backup_dir, f)
+            size = os.path.getsize(fp)
+            backups.append({'name': f, 'size': f'{size/1024:.1f} KB', 'path': fp})
+        return {'success': True, 'backups': backups}
+    except Exception as e: return {'success': False, 'error': str(e)}
+
+
+# ── Learning ──────────────────────────────────────────────────
+
 def _exec_learn_fact(params):
     cat = params.get('category', 'general'); k = params.get('key', ''); v = params.get('value', '')
-    if not k or not v: return {'success': False, 'error': 'key and value required'}
+    if not k or not v: return {'success': False, 'error': 'key و value مطلوبان'}
     store_knowledge(cat, k, v, source='ai_self_learned', confidence=0.6)
     return {'success': True}
 
@@ -871,108 +1100,180 @@ def _exec_get_learning_stats(params):
     return {'success': True, 'stats': get_learning_stats()}
 
 
+def _exec_delegate_task(params):
+    to_agent = params.get('to_agent', ''); task = params.get('task', '')
+    if not to_agent or not task: return {'success': False, 'error': 'to_agent و task مطلوبان'}
+    agent = get_agent(to_agent)
+    return {'success': True, 'to_agent': to_agent, 'agent_name': agent['name_ar'],
+            'task': task, 'message': f'✓ تمت تكليف {agent["emoji"]} {agent["name_ar"]} بالمهمة'}
+
+
+def _exec_consult_all(params):
+    question = params.get('question', '')
+    if not question: return {'success': False, 'error': 'السؤال مطلوب'}
+    return {'success': True, 'question': question, 'message': '✓ جاري استشارة كل الوكلاء...'}
+
+
+# ═══════════════════════════════════════════════════════════════
+#  ACTION DISPATCHER
+# ═══════════════════════════════════════════════════════════════
+
+ACTION_DISPATCH = {
+    'get_stats': _exec_get_stats, 'get_stats_detailed': _exec_get_stats_detailed,
+    'platform_stats': _exec_platform_stats,
+    'list_users': _exec_list_users, 'user_detail': _exec_user_detail,
+    'ban_user': _exec_ban_user, 'unban_user': _exec_unban_user,
+    'send_message_to_user': _exec_send_to_user,
+    'list_channels': _exec_list_channels, 'add_channel': _exec_add_channel,
+    'toggle_channel': _exec_toggle_channel, 'delete_channel': _exec_delete_channel,
+    'view_transactions': _exec_view_transactions, 'pending_requests': _exec_pending_requests,
+    'approve_txn': _exec_approve_txn, 'reject_txn': _exec_reject_txn,
+    'bulk_approve': _exec_bulk_approve,
+    'view_matching': _exec_view_matching, 'approve_match': _exec_approve_match,
+    'reject_match': _exec_reject_match, 'resolve_dispute': _exec_resolve_dispute,
+    'view_complaints': _exec_view_complaints, 'reply_ticket': _exec_reply_ticket,
+    'update_ticket_status': _exec_update_ticket_status,
+    'broadcast': _exec_broadcast, 'broadcast_queue': _exec_broadcast_queue,
+    'create_post': _exec_create_post, 'generate_post': _exec_generate_post,
+    'translate_post': _exec_translate_post, 'post_history': _exec_post_history,
+    'post_library': _exec_post_library,
+    'update_setting': _exec_update_setting, 'get_settings': _exec_get_settings,
+    'toggle_game': _exec_toggle_game, 'game_stats': _exec_game_stats,
+    'list_agents': _exec_list_agents, 'agent_stats': _exec_agent_stats,
+    'list_companies': _exec_list_companies, 'company_detail': _exec_company_detail,
+    'list_admins': _exec_list_admins, 'add_admin': _exec_add_admin,
+    'create_backup': _exec_create_backup, 'list_backups': _exec_list_backups,
+    'learn_fact': _exec_learn_fact, 'get_learning_stats': _exec_get_learning_stats,
+    'delegate_task': _exec_delegate_task, 'consult_all': _exec_consult_all,
+}
+
+
+def execute_action(action_name, params):
+    try:
+        handler = ACTION_DISPATCH.get(action_name)
+        if handler: return handler(params)
+        return {'success': False, 'error': f'إجراء غير معروف: {action_name}'}
+    except Exception as e:
+        return {'success': False, 'error': str(e)}
+
+
+# ═══════════════════════════════════════════════════════════════
+#  SYSTEM PROMPT
+# ═══════════════════════════════════════════════════════════════
+
+def _build_agent_system_prompt(agent_id, admin_id=None):
+    agent = get_agent(agent_id)
+    agent_actions = [a for a in ACTIONS_SCHEMA if a['name'] in agent['actions']]
+    actions_desc = json.dumps(agent_actions, ensure_ascii=False, indent=2)
+
+    learned_parts = []
+    patterns = get_learned_patterns(min_confidence=0.4, limit=10)
+    if patterns:
+        lines = [f"  • \"{p['phrase_sample'][:60]}\" → {p['action_name']} [ثقة: {int(p['confidence']*100)}%]" for p in patterns]
+        learned_parts.append("## أنماط مُتعلمة:\n" + '\n'.join(lines))
+    knowledge = get_knowledge(limit=10)
+    if knowledge:
+        lines = [f"  • [{k['category']}] {k['fact_key']}: {k['fact_value'][:80]}" for k in knowledge]
+        learned_parts.append("## معلومات:\n" + '\n'.join(lines))
+    errors = get_repeated_errors(limit=3)
+    if errors:
+        lines = [f"  ⚠️ {e['action_name']}: {e['error_message'][:60]} ({e['cnt']} مرة)" for e in errors]
+        learned_parts.append("## تجنب:\n" + '\n'.join(lines))
+    if admin_id:
+        prefs = get_admin_preferences(admin_id)
+        if prefs:
+            learned_parts.append("## تفضيلات الأدمن:\n" + '\n'.join([f"  • {k}: {v}" for k, v in prefs.items()]))
+    learning_section = '\n\n'.join(learned_parts) if learned_parts else ''
+
+    other_agents = [f"  • @{oa['name']} ({oa['name_ar']}) — {oa['role_ar']}" for oid, oa in AGENTS.items() if oid != agent_id]
+    agents_list = '\n'.join(other_agents)
+
+    rules = """1. **التنفيذ**: أرجع JSON عند طلب إجراء:
+   {"action": "اسم", "params": {...}, "reply": "رسالة تأكيد"}
+
+2. **التكليف**: {"action": "delegate_task", "params": {"to_agent": "writer", "task": "اكتب بوست"}}
+
+3. **الاستشارة**: {"action": "consult_all", "params": {"question": "ما رأيكم في..."}}"""
+
+    return (
+        f"أنت {agent['emoji']} {agent['name']} ({agent['name_ar']}) — {agent['role_ar']}.\n"
+        f"{agent['description_ar']}\n\n"
+        f"## شخصيتك:\n{agent['personality_ar']}\n\n"
+        f"## أنت تملك {len(agent_actions)} أداة لإدارة لوحة التحكم بالكامل:\n{actions_desc}\n\n"
+        f"{learning_section}\n\n"
+        f"## فريق الوكلاء:\n{agents_list}\n\n"
+        f"## قواعد العمل:\n\n{rules}\n\n"
+        f"4. **الأمان**: لا تحذف أو تعدّل كبير دون تأكيد.\n"
+        f"5. **اللغة**: تحدث بنفس لغة الأدمن.\n"
+        f"6. **التنسيق**: <b>عريض</b>، <code>كود</code>، • قوائم\n"
+    )
+
+
 # ═══════════════════════════════════════════════════════════════
 #  CHAT PROCESSOR
 # ═══════════════════════════════════════════════════════════════
 
 def process_chat_message(admin_id, user_message, target_agent=None):
-    """
-    Process a chat message with multi-agent routing.
-    target_agent: explicit agent to use, or None for auto-detect.
-    """
-    # Detect agent
     mentioned_agent, clean_text = find_agent_by_mention(user_message)
     if mentioned_agent:
-        agent_id = mentioned_agent
-        user_message = clean_text
+        agent_id = mentioned_agent; user_message = clean_text
     elif target_agent:
         agent_id = target_agent
     else:
         agent_id = detect_intent_agent(user_message)
 
     agent = get_agent(agent_id)
-
-    # Save user message
     msg_id = save_message(admin_id, agent_id, 'user', user_message)
-
-    # Get conversation history for this agent
     history = get_conversation_history(admin_id, agent_id, limit=15)
-
-    # Build system prompt
     system_prompt = _build_agent_system_prompt(agent_id, admin_id)
     messages = [{'role': 'system', 'content': system_prompt}]
     for h in history[:-1]:
         messages.append({'role': h['role'], 'content': h['content']})
     messages.append({'role': 'user', 'content': user_message})
 
-    # Call AI
     ai_result = _call_ai(messages)
     if not ai_result['success']:
         save_message(admin_id, agent_id, 'assistant', f'❌ خطأ: {ai_result["error"]}')
         return {'success': False, 'error': ai_result['error'], 'agent_id': agent_id}
 
     ai_reply = ai_result['content']
-
-    # Parse and execute action
     action_result = None; action_name = None; parsed = None
     try:
         parsed = _extract_json(ai_reply)
         if parsed and 'action' in parsed:
-            action_name = parsed['action']
-            params = parsed.get('params', {})
-
-            # Handle delegation
+            action_name = parsed['action']; params = parsed.get('params', {})
             if action_name == 'delegate_task':
-                to_agent = params.get('to_agent', 'commander')
-                task = params.get('task', '')
-                # Save delegation record
                 _init_chat_db()
                 try:
                     conn = sqlite3.connect(DB_PATH)
                     conn.execute('INSERT INTO ai_task_delegations (admin_id, from_agent, to_agent, task_description) VALUES (?, ?, ?, ?)',
-                               (str(admin_id), agent_id, to_agent, task))
+                                 (str(admin_id), agent_id, params.get('to_agent',''), params.get('task','')))
                     conn.commit(); conn.close()
                 except: pass
                 action_result = execute_action(action_name, params)
-            # Handle consultation
             elif action_name == 'consult_all':
                 question = params.get('question', user_message)
-                # Get responses from each agent
                 consultations = []
                 for oid, oa in AGENTS.items():
                     if oid == agent_id: continue
-                    consult_prompt = _build_agent_system_prompt(oid, admin_id)
-                    consult_messages = [
-                        {'role': 'system', 'content': consult_prompt},
-                        {'role': 'user', 'content': f'الأدمن يطلب استشارتك في: {question}\n\nأجب باختصار (3-4 جمل) بما يخص تخصصك فقط.'}
-                    ]
-                    consult_result = _call_ai(consult_messages)
-                    if consult_result.get('success'):
-                        consultations.append({
-                            'agent_id': oid,
-                            'agent_name': oa['name_ar'],
-                            'agent_emoji': oa['emoji'],
-                            'response': consult_result['content']
-                        })
+                    consult_messages = [{'role': 'system', 'content': _build_agent_system_prompt(oid, admin_id)},
+                                        {'role': 'user', 'content': f'الأدمن يطلب استشارتك في: {question}\n\nأجب باختصار (3-4 جمل).'}]
+                    cr = _call_ai(consult_messages)
+                    if cr.get('success'):
+                        consultations.append({'agent_id': oid, 'agent_name': oa['name_ar'], 'agent_emoji': oa['emoji'], 'response': cr['content']})
                 action_result = {'success': True, 'consultations': consultations, 'question': question}
             else:
                 action_result = execute_action(action_name, params)
+            if parsed.get('reply'): ai_reply = parsed['reply']
+    except: pass
 
-            if parsed.get('reply'):
-                ai_reply = parsed['reply']
-    except Exception as e:
-        logger.debug(f"No action parsed: {e}")
-
-    # Format response
     response_text = ai_reply
     if action_result and action_result.get('success'):
         if action_name == 'consult_all':
-            # Format multi-agent consultation
             consultations = action_result.get('consultations', [])
             lines = [f'💬 <b>استشارة الفريق — {len(consultations)} وكلاء:</b>\n']
             for c in consultations:
-                lines.append(f'{c["agent_emoji"]} <b>{c["agent_name"]}:</b>')
-                lines.append(f'{c["response"]}\n')
+                lines.append(f'{c["agent_emoji"]} <b>{c["agent_name"]}:</b>\n{c["response"]}\n')
             response_text = '\n'.join(lines)
         elif action_name == 'delegate_task':
             response_text += f'\n\n{action_result.get("message", "")}'
@@ -981,30 +1282,22 @@ def process_chat_message(admin_id, user_message, target_agent=None):
     elif action_result and not action_result.get('success'):
         response_text += f'\n\n❌ خطأ: {action_result.get("error", "")}'
 
-    # Save assistant response
     assistant_msg_id = save_message(admin_id, agent_id, 'assistant', response_text, action_taken=action_name)
-
-    # Learning loop
     success = action_result.get('success', False) if action_result else True
     error_msg = action_result.get('error') if action_result and not action_result.get('success') else None
-    record_action_outcome(admin_id, agent_id, action_name or 'chat', parsed.get('params', {}) if parsed else {},
-                         success, error_msg, str(action_result)[:500] if action_result else None, user_message)
+    record_action_outcome(admin_id, agent_id, action_name or 'chat', parsed.get('params', {}) if parsed else {}, success, error_msg, str(action_result)[:500] if action_result else None, user_message)
     _detect_preferences(admin_id, user_message)
 
-    return {
-        'success': True, 'reply': response_text, 'action_taken': action_name,
-        'action_result': action_result, 'message_id': assistant_msg_id,
-        'agent_id': agent_id, 'agent_name': agent['name_ar'], 'agent_emoji': agent['emoji'],
-        'agent_color': agent['color']
-    }
+    return {'success': True, 'reply': response_text, 'action_taken': action_name,
+            'action_result': action_result, 'message_id': assistant_msg_id,
+            'agent_id': agent_id, 'agent_name': agent['name_ar'], 'agent_emoji': agent['emoji'],
+            'agent_color': agent['color']}
 
 
 def _detect_preferences(admin_id, message):
     arabic_chars = sum(1 for c in message if '\u0600' <= c <= '\u06FF')
-    if arabic_chars > len(message) * 0.3:
-        set_admin_preference(admin_id, 'language', 'ar', confidence=0.8)
-    elif arabic_chars == 0 and len(message) > 5:
-        set_admin_preference(admin_id, 'language', 'en', confidence=0.8)
+    if arabic_chars > len(message) * 0.3: set_admin_preference(admin_id, 'language', 'ar', confidence=0.8)
+    elif arabic_chars == 0 and len(message) > 5: set_admin_preference(admin_id, 'language', 'en', confidence=0.8)
     msg_lower = message.lower()
     if any(w in msg_lower for w in ['واتساب', 'whatsapp']): set_admin_preference(admin_id, 'default_platform', 'whatsapp', confidence=0.7)
     elif any(w in msg_lower for w in ['تليجرام', 'telegram']): set_admin_preference(admin_id, 'default_platform', 'telegram', confidence=0.7)
@@ -1018,7 +1311,7 @@ def _call_ai(messages):
     try:
         from ai_composer import get_active_keys
         keys = get_active_keys(DB_PATH)
-        if not keys: return {'success': False, 'error': 'No AI API keys configured'}
+        if not keys: return {'success': False, 'error': 'لا توجد مفاتيح AI'}
         key = keys[0]
         api_key = key.get('api_key', ''); base_url = (key.get('base_url') or '').rstrip('/')
         model = key.get('default_model', ''); provider = (key.get('provider') or '').lower()
@@ -1030,7 +1323,7 @@ def _call_ai(messages):
         if not model: model = 'openai/gpt-4o-mini' if 'openrouter' in provider else 'gpt-4o-mini'
         url = base_url + '/chat/completions'
         headers = {'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'}
-        if 'openrouter' in provider: headers['HTTP-Referer'] = 'https://vex.deals'; headers['X-Title'] = 'VEX Admin Assistant'
+        if 'openrouter' in provider: headers['HTTP-Referer'] = 'https://vex.deals'; headers['X-Title'] = 'VEX Admin'
         payload = {'model': model, 'messages': messages, 'temperature': 0.4, 'max_tokens': 2048}
         try:
             import httpx
@@ -1051,7 +1344,7 @@ def _call_ai(messages):
             return {'success': False, 'error': f'API error {resp.status_code}: {detail}'}
         data = resp.json()
         content = data.get('choices', [{}])[0].get('message', {}).get('content', '').strip()
-        if not content: return {'success': False, 'error': 'Empty AI response'}
+        if not content: return {'success': False, 'error': 'رد AI فارغ'}
         return {'success': True, 'content': content}
     except Exception as e:
         logger.error(f"AI chat error: {e}"); return {'success': False, 'error': str(e)}
@@ -1080,43 +1373,136 @@ def _extract_json(text):
 
 def _format_action_result(action_name, result):
     if action_name == 'create_post':
-        channels = ', '.join(result.get('channels', [])[:3])
-        return f"📤 تم الإرسال إلى {result.get('queued', 0)} قناة: {channels}"
+        return f"📤 تم الإرسال إلى {result.get('queued', 0)} قناة"
     elif action_name == 'broadcast':
         return f"📢 تم وضع الرسالة في قائمة البث ({result.get('target', 'all')})"
+    elif action_name == 'broadcast_queue':
+        return f"📋 قائمة الانتظار: {result.get('total', 0)} رسالة معلقة"
     elif action_name == 'get_stats':
-        stats = result.get('stats', {})
-        lines = ['📊 <b>الإحصائيات:</b>']
-        if 'total_users' in stats: lines.append(f"• المستخدمون: <b>{stats['total_users']}</b>")
-        if 'total_revenue' in stats: lines.append(f"• الإيرادات: <b>{stats['total_revenue']:.0f}</b>")
-        if 'pending_transactions' in stats: lines.append(f"• معلقة: <b>{stats['pending_transactions']}</b>")
-        if 'total_channels' in stats: lines.append(f"• القنوات: <b>{stats['total_channels']}</b>")
-        if 'pending_matches' in stats: lines.append(f"• مطابقات: <b>{stats['pending_matches']}</b>")
+        stats = result.get('stats', {}); lines = ['📊 <b>الإحصائيات:</b>']
+        for k, label in [('total_users','المستخدمون'), ('total_revenue','الإيرادات'), ('pending_transactions','المعاملات المعلقة'), ('total_channels','القنوات'), ('pending_matches','المطابقات')]:
+            if k in stats: lines.append(f"• {label}: <b>{stats[k]}</b>")
+        return '\n'.join(lines)
+    elif action_name == 'get_stats_detailed':
+        stats = result.get('stats', {}); lines = [f'📊 <b>إحصائيات {stats.get("period","")}:</b>']
+        for k, label in [('deposits_count','الإيداعات'), ('deposits_amount','مبلغ الإيداعات'), ('withdrawals_count','السحوبات'), ('withdrawals_amount','مبلغ السحوبات'), ('new_users','مستخدمون جدد'), ('new_matches','مطابقات جديدة'), ('complaints_count','شكاوى')]:
+            if k in stats: lines.append(f"• {label}: <b>{stats[k]}</b>")
+        return '\n'.join(lines)
+    elif action_name == 'platform_stats':
+        stats = result.get('stats', {}); lines = ['🖥️ <b>إحصائيات المنصة:</b>']
+        for k, label in [('total_users','المستخدمون'), ('total_transactions','المعاملات'), ('total_matches','المطابقات'), ('total_tickets','التذاكر'), ('total_revenue','الإيرادات'), ('banned_users','محظورون')]:
+            if k in stats: lines.append(f"• {label}: <b>{stats[k]}</b>")
         return '\n'.join(lines)
     elif action_name == 'list_channels':
-        channels = result.get('channels', [])
-        lines = [f"📋 <b>القنوات ({result.get('total', 0)}):</b>"]
-        for ch in channels[:10]:
-            s = '🟢' if ch.get('is_active', '').lower() in ('yes', 'true', '1', '') else '🔴'
-            lines.append(f"• {s} {ch.get('name', ch.get('chat_id', ''))} ({ch.get('platform', '')})")
+        channels = result.get('channels', []); lines = [f"📋 <b>القنوات ({result.get('total', 0)}):</b>"]
+        for ch in channels[:15]:
+            s = '🟢' if str(ch.get('is_active','')).lower() in ('yes','true','1','') else '🔴'
+            lines.append(f"• {s} {ch.get('name', ch.get('chat_id',''))} ({ch.get('platform','')})")
         return '\n'.join(lines)
     elif action_name == 'list_users':
-        users = result.get('users', [])
-        lines = [f"👥 <b>المستخدمون ({result.get('total', 0)}):</b>"]
+        users = result.get('users', []); lines = [f"👥 <b>المستخدمون ({result.get('total', 0)}):</b>"]
         for u in users[:10]:
-            ban = '🚫' if u.get('is_banned') == 'yes' else ''
+            ban = '🚫' if u.get('is_banned') in (1, '1', 'yes') else ''
             lines.append(f"• {u.get('name', 'N/A')} (<code>{u.get('telegram_id', '')}</code>) {ban}")
         return '\n'.join(lines)
-    elif action_name in ('ban_user', 'send_message_to_user', 'update_setting', 'learn_fact'):
+    elif action_name == 'user_detail':
+        user = result.get('user', {}); lines = [f"👤 <b>تفاصيل المستخدم:</b>",
+            f"• الاسم: {user.get('name','N/A')}", f"• المعرف: <code>{user.get('telegram_id','')}</code>",
+            f"• الرصيد: {user.get('balance',0)}", f"• محظور: {'نعم' if user.get('is_banned') else 'لا'}"]
+        txns = user.get('recent_transactions', [])
+        if txns: lines.append(f"• آخر المعاملات: {len(txns)}")
+        return '\n'.join(lines)
+    elif action_name in ('ban_user', 'unban_user'):
         return f"✅ تم التنفيذ بنجاح"
+    elif action_name == 'send_message_to_user':
+        return f"✅ تم إرسال الرسالة للمستخدم {result.get('user_id', '')}"
+    elif action_name == 'view_transactions':
+        txns = result.get('transactions', []); lines = [f"💰 <b>المعاملات ({result.get('total', 0)}):</b>"]
+        for t in txns[:10]:
+            status_emoji = {'approved': '✅', 'pending': '⏳', 'rejected': '❌'}.get(t.get('status',''), '?')
+            lines.append(f"• {status_emoji} #{t.get('id','')} — {t.get('type','')} — {t.get('amount',0)} — {t.get('status','')}")
+        return '\n'.join(lines)
+    elif action_name == 'pending_requests':
+        stats = result.get('stats', {}); lines = ['⏳ <b>الطلبات المعلقة:</b>',
+            f"• معاملات: <b>{stats.get('pending_txn_count', 0)}</b>",
+            f"• مطابقات: <b>{stats.get('pending_match_count', 0)}</b>",
+            f"• تذاكر: <b>{stats.get('pending_ticket_count', 0)}</b>"]
+        return '\n'.join(lines)
+    elif action_name in ('approve_txn', 'reject_txn'):
+        return f"✅ تم تنفيذ الإجراء على المعاملة #{result.get('txn_id', '')}"
+    elif action_name == 'bulk_approve':
+        return f"✅ تمت approval جماعية: {result.get('approved_count', 0)} معاملة"
+    elif action_name == 'view_matching':
+        matches = result.get('requests', []); lines = [f"🔗 <b>المطابقات ({result.get('total', 0)}):</b>"]
+        for m in matches[:10]:
+            lines.append(f"• #{m.get('id','')} — {m.get('status','')} — {m.get('created_at','')}")
+        return '\n'.join(lines)
+    elif action_name in ('approve_match', 'reject_match', 'resolve_dispute'):
+        return f"✅ تم تنفيذ الإجراء على المطابقة"
+    elif action_name == 'view_complaints':
+        tickets = result.get('tickets', []); lines = [f"🎫 <b>التذاكر ({result.get('total', 0)}):</b>"]
+        for t in tickets[:10]:
+            lines.append(f"• #{t.get('id','')} — {t.get('subject', t.get('status',''))} — {t.get('status','')}")
+        return '\n'.join(lines)
+    elif action_name == 'reply_ticket':
+        return f"✅ تم الرد على التذكرة #{result.get('ticket_id', '')}"
+    elif action_name == 'update_ticket_status':
+        return f"✅ تم تحديث حالة التذكرة إلى: {result.get('new_status', '')}"
+    elif action_name == 'add_channel':
+        return f"✅ تمت إضافة القناة {result.get('name', result.get('chat_id', ''))}"
+    elif action_name == 'toggle_channel':
+        return f"✅ حالة القناة: {result.get('new_status', '')}"
+    elif action_name == 'delete_channel':
+        return f"✅ تم حذف القناة"
+    elif action_name == 'update_setting':
+        return f"✅ تم تحديث الإعداد {result.get('key', '')} إلى {result.get('value', '')}"
+    elif action_name == 'get_settings':
+        settings = result.get('settings', []); lines = [f"⚙️ <b>الإعدادات ({len(settings)}):</b>"]
+        for s in settings[:15]: lines.append(f"• <code>{s.get('key','')}</code> = {s.get('value','')}")
+        return '\n'.join(lines)
+    elif action_name == 'toggle_game':
+        return f"✅ حالة اللعبة: {result.get('new_status', '')}"
+    elif action_name == 'game_stats':
+        games = result.get('games', []); lines = ['🎮 <b>إحصائيات الألعاب:</b>']
+        for g in games[:8]: lines.append(f"• {g.get('name', g.get('id',''))} — جولات: {g.get('rounds',0)} — رهانات: {g.get('total_bets',0)}")
+        return '\n'.join(lines)
+    elif action_name == 'list_companies':
+        companies = result.get('companies', []); lines = [f"🏢 <b>الشركات ({len(companies)}):</b>"]
+        for c in companies[:10]: lines.append(f"• {c.get('name', c.get('id',''))}")
+        return '\n'.join(lines)
+    elif action_name == 'company_detail':
+        c = result.get('company', {}); lines = [f"🏢 <b>{c.get('name','')}</b>",
+            f"• المعاملات: {c.get('transaction_count',0)}", f"• الحجم: {c.get('total_volume',0)}"]
+        return '\n'.join(lines)
+    elif action_name == 'list_admins':
+        admins = result.get('admins', []); lines = [f"👤 <b>الأدمنز ({len(admins)}):</b>"]
+        for a in admins[:10]: lines.append(f"• {a.get('name', a.get('user_id',''))} — {a.get('role','')}")
+        return '\n'.join(lines)
+    elif action_name == 'add_admin':
+        return f"✅ تمت إضافة الأدمن {result.get('user_id', '')} بدور {result.get('role', '')}"
+    elif action_name == 'create_backup':
+        return f"✅ تمت إنشاء نسخة احتياطية: {result.get('backup_file', '').split('/')[-1]}"
+    elif action_name == 'list_backups':
+        backups = result.get('backups', []); lines = [f"💾 <b>النسخ الاحتياطية ({len(backups)}):</b>"]
+        for b in backups[:10]: lines.append(f"• {b.get('name','')} ({b.get('size','')})")
+        return '\n'.join(lines)
     elif action_name == 'generate_post':
         if result.get('success'): return f"🤖 <b>البوست:</b>\n\n{result.get('text', '')}"
         return f"❌ خطأ: {result.get('error', '')}"
+    elif action_name == 'translate_post':
+        return f"🌐 <b>الترجمة:</b>\n\n{result.get('translation', '')}"
     elif action_name == 'get_learning_stats':
         stats = result.get('stats', {})
-        lines = ['🧠 <b>إحصائيات التعلم:</b>',
-                 f"• إجراءات: <b>{stats.get('total_actions', 0)}</b> (ناجحة: {stats.get('successful_actions', 0)})",
-                 f"• أنماط: <b>{stats.get('learned_patterns', 0)}</b> | معلومات: <b>{stats.get('knowledge_facts', 0)}</b>",
-                 f"• تصحيحات: <b>{stats.get('corrections', 0)}</b> | تقييمات: 👍{stats.get('positive_feedback', 0)} 👎{stats.get('negative_feedback', 0)}"]
+        return f"""🧠 <b>إحصائيات التعلم:</b>
+• إجراءات: <b>{stats.get('total_actions', 0)}</b> (ناجحة: {stats.get('successful_actions', 0)})
+• أنماط: <b>{stats.get('learned_patterns', 0)}</b> | معلومات: <b>{stats.get('knowledge_facts', 0)}</b>
+• تصحيحات: <b>{stats.get('corrections', 0)}</b> | 👍{stats.get('positive_feedback', 0)} 👎{stats.get('negative_feedback', 0)}"""
+    elif action_name == 'list_agents':
+        agents = result.get('agents', []); lines = [f"🤖 <b>وكلاء المطابقة ({len(agents)}):</b>"]
+        for a in agents[:10]: lines.append(f"• {a.get('name', a.get('id',''))} — رصيد: {a.get('balance',0)}")
+        return '\n'.join(lines)
+    elif action_name == 'agent_stats':
+        agents = result.get('agents', []); lines = ['📊 <b>إحصائيات الوكلاء:</b>']
+        for a in agents[:8]: lines.append(f"• {a.get('name', a.get('id',''))} — مطابقات: {a.get('total_matches',0)} — مكتملة: {a.get('completed',0)}")
         return '\n'.join(lines)
     return json.dumps(result, ensure_ascii=False, indent=2)

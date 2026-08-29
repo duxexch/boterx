@@ -840,31 +840,45 @@ function rbac(perm) { return !Object.keys(_RBAC).length || !!_RBAC[perm]; }
 </script>
 {% block scripts %}{% endblock %}
 
-<!-- ===== AI ASSISTANT FLOATING CHAT ===== -->
+<!-- ===== AI ASSISTANT FLOATING CHAT v4 ===== -->
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 .ai-chat *{box-sizing:border-box}
-.ai-chat{--ac:#8b5cf6;--bg:#090b10;--surface:#111827;--surface2:#1a2234;--border:#1f2937;--text:#f1f5f9;--dim:#64748b;--green:#22c55e;--red:#ef4444;--cyan:#06b6d4;--amber:#f59e0b;--radius:12px}
+.ai-chat{--ac:#8b5cf6;--radius:12px}
+.ai-chat[data-theme="dark"]{--bg:#090b10;--surface:#111827;--surface2:#1a2234;--border:#1f2937;--text:#f1f5f9;--dim:#64748b;--green:#22c55e;--red:#ef4444;--cyan:#06b6d4;--amber:#f59e0b;--shadow:rgba(0,0,0,.6)}
+.ai-chat[data-theme="light"]{--bg:#f8fafc;--surface:#ffffff;--surface2:#f1f5f9;--border:#e2e8f0;--text:#0f172a;--dim:#64748b;--green:#16a34a;--red:#dc2626;--cyan:#0891b2;--d92027;--amber:#d97706;--shadow:rgba(0,0,0,.12)}
 .ai-fab{position:fixed;bottom:24px;right:24px;z-index:99999;width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;border:none;cursor:pointer;box-shadow:0 4px 24px rgba(124,58,237,.4);display:flex;align-items:center;justify-content:center;font-size:24px;transition:all .2s}
 .ai-fab:hover{transform:scale(1.08);box-shadow:0 6px 32px rgba(124,58,237,.5)}
 .ai-fab:active{transform:scale(.95)}
-.ai-panel{position:fixed;bottom:90px;right:24px;z-index:99998;width:420px;max-width:calc(100vw - 32px);height:min(640px,calc(100vh - 120px));background:var(--bg);border:1px solid var(--border);border-radius:16px;box-shadow:0 8px 48px rgba(0,0,0,.6);display:flex;flex-direction:column;overflow:hidden;font-family:'IBM Plex Sans Arabic',system-ui,sans-serif}
-.ai-header{padding:14px 16px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0}
+.ai-panel{position:fixed;bottom:90px;right:24px;z-index:99998;width:420px;max-width:calc(100vw - 32px);height:min(680px,calc(100vh - 120px));background:var(--bg);border:1px solid var(--border);border-radius:16px;box-shadow:0 8px 48px var(--shadow);display:flex;flex-direction:column;overflow:hidden;font-family:'IBM Plex Sans Arabic',system-ui,sans-serif;transition:background .3s,border-color .3s}
+.ai-header{padding:12px 16px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;transition:background .3s}
 .ai-header-row{display:flex;align-items:center;justify-content:space-between}
 .ai-header-left{display:flex;align-items:center;gap:10px}
 .ai-header-avatar{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
 .ai-header-info h3{font-size:14px;font-weight:600;color:var(--text);margin:0;line-height:1.2}
 .ai-header-info p{font-size:11px;color:var(--dim);margin:0}
-.ai-header-actions{display:flex;gap:4px}
-.ai-header-actions button{width:32px;height:32px;border-radius:8px;border:none;background:transparent;color:var(--dim);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.ai-header-actions{display:flex;gap:3px}
+.ai-header-actions button{width:30px;height:30px;border-radius:8px;border:none;background:transparent;color:var(--dim);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;font-size:14px}
 .ai-header-actions button:hover{background:var(--surface2);color:var(--text)}
 /* Agent tabs */
-.ai-agents{display:flex;gap:6px;padding:10px 16px;background:var(--surface);border-bottom:1px solid var(--border);overflow-x:auto;flex-shrink:0;scrollbar-width:none}
+.ai-agents{display:flex;gap:6px;padding:8px 16px;background:var(--surface);border-bottom:1px solid var(--border);overflow-x:auto;flex-shrink:0;scrollbar-width:none}
 .ai-agents::-webkit-scrollbar{display:none}
-.ai-agent-tab{display:flex;align-items:center;gap:5px;padding:6px 10px;border-radius:8px;border:1px solid transparent;background:transparent;color:var(--dim);cursor:pointer;font-size:11px;font-weight:500;white-space:nowrap;transition:all .15s;font-family:inherit}
+.ai-agent-tab{display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:8px;border:1px solid transparent;background:transparent;color:var(--dim);cursor:pointer;font-size:11px;font-weight:500;white-space:nowrap;transition:all .15s;font-family:inherit}
 .ai-agent-tab:hover{background:var(--surface2);color:var(--text)}
 .ai-agent-tab.active{background:var(--surface2);border-color:var(--ac);color:var(--text)}
 .ai-agent-tab .dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+/* Command palette */
+.ai-commands{padding:8px 16px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;max-height:200px;overflow-y:auto}
+.ai-commands::-webkit-scrollbar{width:3px}
+.ai-commands::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.ai-cmd-cat{margin-bottom:8px}
+.ai-cmd-cat:last-child{margin-bottom:0}
+.ai-cmd-cat-title{font-size:10px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;display:flex;align-items:center;gap:4px}
+.ai-cmd-grid{display:flex;flex-wrap:wrap;gap:4px}
+.ai-cmd-btn{padding:4px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--dim);cursor:pointer;font-size:10px;font-family:inherit;transition:all .15s;white-space:nowrap}
+.ai-cmd-btn:hover{border-color:var(--ac);color:var(--text);background:var(--bg)}
+.ai-cmd-toggle{width:100%;padding:6px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--dim);cursor:pointer;font-size:11px;font-family:inherit;transition:all .15s;text-align:center;margin-bottom:6px}
+.ai-cmd-toggle:hover{border-color:var(--ac);color:var(--text)}
 /* Messages */
 .ai-messages{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;scroll-behavior:smooth}
 .ai-messages::-webkit-scrollbar{width:4px}
@@ -878,35 +892,23 @@ function rbac(perm) { return !Object.keys(_RBAC).length || !!_RBAC[perm]; }
 .ai-msg.assistant .ai-msg-bubble{background:var(--surface2);border:1px solid var(--border);border-bottom-left-radius:4px}
 .ai-msg-meta{display:flex;align-items:center;gap:6px;margin-top:4px;font-size:10px;color:var(--dim)}
 .ai-msg-meta .agent-badge{display:inline-flex;align-items:center;gap:3px;padding:1px 6px;border-radius:4px;font-size:9px;font-weight:600}
-.ai-msg-actions{display:flex;gap:2px;margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,.06)}
+.ai-msg-actions{display:flex;gap:2px;margin-top:6px;padding-top:6px;border-top:1px solid rgba(127,127,127,.1)}
 .ai-msg-actions button{padding:4px 8px;border-radius:6px;border:none;background:transparent;color:var(--dim);cursor:pointer;font-size:12px;transition:all .15s}
-.ai-msg-actions button:hover{background:rgba(255,255,255,.08);color:var(--text)}
-/* Consultation card */
-.ai-consult{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px;margin-top:6px}
-.ai-consult-head{font-size:11px;font-weight:600;color:var(--dim);margin-bottom:6px}
-.ai-consult-item{display:flex;gap:6px;padding:6px;border-radius:6px;margin-bottom:4px}
-.ai-consult-item:last-child{margin-bottom:0}
-.ai-consult-item .c-emoji{font-size:14px;flex-shrink:0;margin-top:1px}
-.ai-consult-item .c-body{flex:1}
-.ai-consult-item .c-name{font-size:10px;font-weight:600;margin-bottom:2px}
-.ai-consult-item .c-text{font-size:12px;color:var(--dim);line-height:1.5}
-/* Typing */
+.ai-msg-actions button:hover{background:rgba(127,127,127,.1);color:var(--text)}
 .ai-typing{display:flex;gap:8px;align-items:flex-start}
 .ai-typing-dots{display:flex;gap:4px;padding:12px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);border-bottom-left-radius:4px}
 .ai-typing-dots span{width:6px;height:6px;border-radius:50%;background:var(--dim);animation:aiBounce 1.4s infinite}
 .ai-typing-dots span:nth-child(2){animation-delay:.2s}
 .ai-typing-dots span:nth-child(3){animation-delay:.4s}
 @keyframes aiBounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-6px)}}
-/* Welcome */
-.ai-welcome{text-align:center;padding:32px 16px}
+.ai-welcome{text-align:center;padding:24px 16px}
 .ai-welcome-icon{font-size:48px;margin-bottom:12px;display:block}
 .ai-welcome h4{font-size:15px;font-weight:600;color:var(--text);margin:0 0 4px}
 .ai-welcome p{font-size:12px;color:var(--dim);margin:0 0 16px}
 .ai-quick{display:flex;flex-direction:column;gap:6px}
 .ai-quick button{text-align:right;padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:var(--surface);color:var(--dim);cursor:pointer;font-size:12px;font-family:inherit;transition:all .15s;display:flex;align-items:center;gap:8px}
 .ai-quick button:hover{border-color:var(--ac);color:var(--text);background:var(--surface2)}
-/* Input */
-.ai-input-wrap{padding:12px 16px;background:var(--surface);border-top:1px solid var(--border);flex-shrink:0}
+.ai-input-wrap{padding:10px 16px 12px;background:var(--surface);border-top:1px solid var(--border);flex-shrink:0;transition:background .3s}
 .ai-input-row{display:flex;align-items:center;gap:8px}
 .ai-input{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-size:13px;font-family:inherit;outline:none;transition:border-color .15s}
 .ai-input:focus{border-color:var(--ac)}
@@ -916,11 +918,9 @@ function rbac(perm) { return !Object.keys(_RBAC).length || !!_RBAC[perm]; }
 .ai-send:disabled{opacity:.3;cursor:not-allowed;transform:none}
 .ai-input-hint{font-size:10px;color:var(--dim);margin-top:6px;text-align:center}
 .ai-input-hint code{background:var(--surface2);padding:1px 4px;border-radius:3px;font-size:9px}
-/* Correction */
 .ai-correction{margin-top:6px;display:flex;gap:4px}
-.ai-correction input{flex:1;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:6px;padding:6px 8px;color:var(--text);font-size:11px;font-family:inherit;outline:none}
-.ai-correction button{padding:4px 10px;border-radius:6px;border:none;background:rgba(239,68,68,.15);color:var(--red);font-size:11px;cursor:pointer;font-family:inherit}
-/* Consultation panel */
+.ai-correction input{flex:1;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);border-radius:6px;padding:6px 8px;color:var(--text);font-size:11px;font-family:inherit;outline:none}
+.ai-correction button{padding:4px 10px;border-radius:6px;border:none;background:rgba(239,68,68,.12);color:var(--red);font-size:11px;cursor:pointer;font-family:inherit}
 .ai-consult-panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px;margin:8px 0}
 .ai-consult-panel h5{font-size:11px;font-weight:600;color:var(--dim);margin:0 0 8px}
 .ai-consult-agent{display:flex;gap:8px;padding:8px;border-radius:8px;background:var(--surface2);margin-bottom:6px}
@@ -932,13 +932,9 @@ function rbac(perm) { return !Object.keys(_RBAC).length || !!_RBAC[perm]; }
 @media(max-width:480px){.ai-panel{right:8px;bottom:72px;width:calc(100vw - 16px);height:calc(100vh - 88px);border-radius:12px}}
 </style>
 
-<div class="ai-chat" x-data="aiChat()" x-init="init()">
-  <!-- FAB -->
-  <button class="ai-fab" @click="toggle()" x-show="!open" x-transition>
-    <span>🤖</span>
-  </button>
+<div class="ai-chat" :data-theme="theme" x-data="aiChat()" x-init="init()">
+  <button class="ai-fab" @click="toggle()" x-show="!open" x-transition><span>🤖</span></button>
 
-  <!-- Panel -->
   <div class="ai-panel" x-show="open" x-cloak x-transition:enter="transition ease-out duration-200"
     x-transition:enter-start="opacity-0 translate-y-4 scale-95" x-transition:enter-end="opacity-100 translate-y-0 scale-100"
     x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0 translate-y-4">
@@ -954,9 +950,11 @@ function rbac(perm) { return !Object.keys(_RBAC).length || !!_RBAC[perm]; }
           </div>
         </div>
         <div class="ai-header-actions">
-          <button @click="showLearning=!showLearning" title="Learning Stats">🧠</button>
-          <button @click="clearChat()" title="Clear">🗑️</button>
-          <button @click="open=false" title="Close">✕</button>
+          <button @click="showCmds=!showCmds" title="الأوامر">⚡</button>
+          <button @click="showLearning=!showLearning" title="التعلم">🧠</button>
+          <button @click="toggleTheme()" :title="theme==='dark'?'الوضع النهاري':'الوضع الليلي'" x-text="theme==='dark'?'☀️':'🌙'"></button>
+          <button @click="clearChat()" title="مسح">🗑️</button>
+          <button @click="open=false" title="إغلاق">✕</button>
         </div>
       </div>
     </div>
@@ -972,19 +970,34 @@ function rbac(perm) { return !Object.keys(_RBAC).length || !!_RBAC[perm]; }
       </template>
     </div>
 
+    <!-- Command Palette -->
+    <div class="ai-commands" x-show="showCmds" x-transition>
+      <template x-for="cat in commandCategories" :key="cat.title">
+        <div class="ai-cmd-cat">
+          <div class="ai-cmd-cat-title"><span x-text="cat.icon"></span> <span x-text="cat.title"></span></div>
+          <div class="ai-cmd-grid">
+            <template x-for="cmd in cat.commands" :key="cmd.label">
+              <button class="ai-cmd-btn" @click="send(cmd.prompt)" x-text="cmd.label"></button>
+            </template>
+          </div>
+        </div>
+      </template>
+    </div>
+
     <!-- Messages -->
     <div class="ai-messages" x-ref="msgs">
-      <!-- Welcome -->
       <template x-if="messages.length===0 && !showLearning">
         <div class="ai-welcome">
           <span class="ai-welcome-icon" x-text="activeAgent.emoji"></span>
           <h4>مرحباً! أنا <span x-text="activeAgent.name_ar"></span></h4>
           <p x-text="activeAgent.description_ar"></p>
           <div class="ai-quick">
-            <button @click="send('كم عدد المستخدمين؟')"><span>📊</span> كم عدد المستخدمين؟</button>
-            <button @click="send('اعرض القنوات')"><span>📋</span> اعرض القنوات المتاحة</button>
-            <button @click="send('اكتب بوست ترحيبي')"><span>✍️</span> اكتب بوست ترحيبي</button>
-            <button @click="send('المعاملات المعلقة')"><span>⏳</span> المعاملات المعلقة</button>
+            <button @click="send('كم عدد المستخدمين والإيرادات؟')"><span>📊</span> الإحصائيات العامة</button>
+            <button @click="send('اعرض الطلبات المعلقة')"><span>⏳</span> الطلبات المعلقة</button>
+            <button @click="send('اعرض القنوات المتاحة')"><span>📋</span> القنوات</button>
+            <button @click="send('اكتب بوست ترحيبي')"><span>✍️</span> اكتب بوست</button>
+            <button @click="send('عرض المستخدمين')"><span>👥</span> المستخدمون</button>
+            <button @click="send('عرض المعاملات')"><span>💰</span> المعاملات</button>
           </div>
         </div>
       </template>
@@ -1000,9 +1013,7 @@ function rbac(perm) { return !Object.keys(_RBAC).length || !!_RBAC[perm]; }
               <div style="background:var(--surface2);border-radius:8px;padding:10px;text-align:center"><div style="font-size:20px;font-weight:700;color:var(--amber)" x-text="learnStats.knowledge_facts||0"></div><div style="font-size:10px;color:var(--dim)">معلومات</div></div>
               <div style="background:var(--surface2);border-radius:8px;padding:10px;text-align:center"><div style="font-size:20px;font-weight:700;color:var(--ac)" x-text="learnStats.corrections||0"></div><div style="font-size:10px;color:var(--dim)">تصحيحات</div></div>
             </div>
-            <div style="margin-top:12px;font-size:11px;color:var(--dim);text-align:center">
-              👍 <span x-text="learnStats.positive_feedback||0"></span> · 👎 <span x-text="learnStats.negative_feedback||0"></span>
-            </div>
+            <div style="margin-top:12px;font-size:11px;color:var(--dim);text-align:center">👍 <span x-text="learnStats.positive_feedback||0"></span> · 👎 <span x-text="learnStats.negative_feedback||0"></span></div>
             <button @click="showLearning=false" style="width:100%;margin-top:12px;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--dim);cursor:pointer;font-size:12px;font-family:inherit">إغلاق</button>
           </div>
         </div>
@@ -1014,12 +1025,10 @@ function rbac(perm) { return !Object.keys(_RBAC).length || !!_RBAC[perm]; }
           <div class="ai-msg-avatar" :style="msg.role==='user'?'':'background:'+(msg.agent_color||'#8b5cf6')+'20;color:'+(msg.agent_color||'#8b5cf6')" x-text="msg.role==='user'?'👤':(msg.agent_emoji||activeAgent.emoji)"></div>
           <div style="flex:1;min-width:0">
             <div class="ai-msg-bubble" x-html="fmt(msg.content)"></div>
-            <!-- Agent badge + action -->
             <div class="ai-msg-meta" x-show="msg.role==='assistant'">
               <span class="agent-badge" x-show="msg.agent_name" :style="'background:'+(msg.agent_color||'#8b5cf6')+'15;color:'+(msg.agent_color||'#8b5cf6')" x-text="(msg.agent_emoji||'')+' '+(msg.agent_name||'')"></span>
               <span x-show="msg.action_taken" style="opacity:.5" x-text="'⚡'+msg.action_taken"></span>
             </div>
-            <!-- Feedback -->
             <div class="ai-msg-actions" x-show="msg.role==='assistant' && !msg.feedback && idx>0">
               <button @click="feedback(idx,3)">👍</button>
               <button @click="feedback(idx,1)">👎</button>
@@ -1033,7 +1042,6 @@ function rbac(perm) { return !Object.keys(_RBAC).length || !!_RBAC[perm]; }
         </div>
       </template>
 
-      <!-- Typing -->
       <div class="ai-msg assistant" x-show="typing">
         <div class="ai-msg-avatar" :style="'background:'+(activeAgent.color||'#8b5cf6')+'20;color:'+(activeAgent.color||'#8b5cf6')" x-text="activeAgent.emoji"></div>
         <div class="ai-typing-dots"><span></span><span></span><span></span></div>
@@ -1048,7 +1056,7 @@ function rbac(perm) { return !Object.keys(_RBAC).length || !!_RBAC[perm]; }
           <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
         </button>
       </div>
-      <div class="ai-input-hint">اكتب <code>@الكاتب</code> أو <code>@المحلل</code> للتحدث مع وكيل محدد</div>
+      <div class="ai-input-hint">💡 اضغط <code>⚡</code> للأوامر | اكتب <code>@الكاتب</code> للتحدث مع وكيل محدد</div>
     </div>
   </div>
 </div>
@@ -1056,9 +1064,66 @@ function rbac(perm) { return !Object.keys(_RBAC).length || !!_RBAC[perm]; }
 <script>
 function aiChat(){
   return{
-    open:false,input:'',messages:[],typing:false,corrections:{},showLearning:false,
-    agents:[],activeAgent:{id:'commander',name_ar:'القائد',emoji:'🎯',color:'#8b5cf6',role_ar:'المدير العام',description_ar:'المنسق الرئيسي'},
+    open:false,input:'',messages:[],typing:false,corrections:{},showLearning:false,showCmds:false,
+    theme: localStorage.getItem('ai_theme')||'dark',
+    agents:[],
+    activeAgent:{id:'commander',name_ar:'القائد',emoji:'🎯',color:'#8b5cf6',role_ar:'المدير العام',description_ar:'المنسق الرئيسي. يتحكم في كل شيء.'},
     learnStats:{},
+    commandCategories:[
+      {icon:'📊',title:'الإحصائيات',commands:[
+        {label:'📈 الإحصائيات العامة',prompt:'اعرض الإحصائيات العامة'},
+        {label:'📊 إحصائيات تفصيلية',prompt:'إحصائيات تفصيلية لآخر أسبوع'},
+        {label:'🖥️ إحصائيات المنصة',prompt:'إحصائيات المنصة الكاملة'},
+        {label:'🎮 إحصائيات الألعاب',prompt:'إحصائيات الألعاب'},
+        {label:'🤝 إحصائيات الوكلاء',prompt:'إحصائيات وكلاء المطابقة'},
+      ]},
+      {icon:'👥',title:'المستخدمون',commands:[
+        {label:'👥 عرض المستخدمين',prompt:'اعرض المستخدمين'},
+        {label:'🚫 حظر مستخدم',prompt:'حظر المستخدم'},
+        {label:'✅ إلغاء حظر',prompt:'إلغاء حظر المستخدم'},
+        {label:'👤 تفاصيل مستخدم',prompt:'تفاصيل المستخدم'},
+        {label:'✉️ إرسال رسالة',prompt:'إرسال رسالة لمستخدم'},
+      ]},
+      {icon:'📋',title:'القنوات',commands:[
+        {label:'📋 عرض القنوات',prompt:'اعرض جميع القنوات'},
+        {label:'➕ إضافة قناة',prompt:'إضافة قناة جديدة'},
+        {label:'🔄 تفعيل/تعطيل',prompt:'تفعيل أو تعطيل قناة'},
+        {label:'🗑️ حذف قناة',prompt:'حذف قناة'},
+      ]},
+      {icon:'💰',title:'المعاملات',commands:[
+        {label:'💰 عرض المعاملات',prompt:'اعرض المعاملات'},
+        {label:'⏳ المعلقة فقط',prompt:'المعاملات المعلقة فقط'},
+        {label:'✅ الموافقة على معاملة',prompt:'الموافقة على المعاملة'},
+        {label:'❌ رفض معاملة',prompt:'رفض المعاملة'},
+        {label:'📦 موافقة جماعية',prompt:'الموافقة الجماعية على الإيداعات المعلقة'},
+      ]},
+      {icon:'🔗',title:'المطابقة',commands:[
+        {label:'🔗 عرض المطابقات',prompt:'اعرض المطابقات'},
+        {label:'✅ الموافقة على مطابقة',prompt:'الموافقة على المطابقة'},
+        {label:'❌ رفض مطابقة',prompt:'رفض المطابقة'},
+        {label:'⚖️ حل نزاع',prompt:'حل النزاع'},
+      ]},
+      {icon:'✍️',title:'المحتوى',commands:[
+        {label:'✍️ اكتب بوست',prompt:'اكتب بوست ترحيبي'},
+        {label:'🤖 توليد بالذكاء',prompt:'ولّد بوست عن'},
+        {label:'📢 بث رسالة',prompt:'بث رسالة جماعية'},
+        {label:'📋 طابور البث',prompt:'اعرض طابور البث'},
+        {label:'🌐 ترجمة',prompt:'ترجم النص إلى الإنجليزية'},
+      ]},
+      {icon:'🎫',title:'التذاكر',commands:[
+        {label:'🎫 عرض التذاكر',prompt:'اعرض التذاكر المفتوحة'},
+        {label:'💬 رد على تذكرة',prompt:'رد على التذكرة'},
+        {label:'🔒 إغلاق تذكرة',prompt:'إغلاق التذكرة'},
+      ]},
+      {icon:'⚙️',title:'النظام',commands:[
+        {label:'⚙️ الإعدادات',prompt:'اعرض الإعدادات'},
+        {label:'💾 نسخ احتياطي',prompt:'إنشاء نسخة احتياطية'},
+        {label:'📋 النسخ الاحتياطية',prompt:'اعرض النسخ الاحتياطية'},
+        {label:'🏢 الشركات',prompt:'اعرض الشركات'},
+        {label:'👤 الأدمنز',prompt:'اعرض الأدمنز'},
+        {label:'🎮 تفعيل/تعطيل لعبة',prompt:'تفعيل أو تعطيل لعبة'},
+      ]},
+    ],
 
     async init(){
       try{const r=await fetch('/api/ai/assistant/agents',{credentials:'same-origin'});const d=await r.json();if(d.success){this.agents=d.agents;if(d.agents.length)this.activeAgent=d.agents[0]}}catch(e){}
@@ -1066,21 +1131,16 @@ function aiChat(){
     },
 
     toggle(){this.open=!this.open},
+    toggleTheme(){this.theme=this.theme==='dark'?'light':'dark';localStorage.setItem('ai_theme',this.theme)},
 
-    switchAgent(id){
-      const a=this.agents.find(x=>x.id===id);if(a)this.activeAgent=a;
-      this.messages=[];
-      this.loadHistory(id);
-    },
+    switchAgent(id){const a=this.agents.find(x=>x.id===id);if(a)this.activeAgent=a;this.messages=[];this.loadHistory(id)},
 
     async loadHistory(agentId){
       try{const r=await fetch('/api/ai/assistant/history?agent_id='+agentId+'&limit=30',{credentials:'same-origin'});const d=await r.json();
       if(d.success){this.messages=d.history.map(h=>({role:h.role,content:h.content,action_taken:h.action_taken,agent_id:h.agent_id||agentId,agent_emoji:this.getAgentEmoji(h.agent_id||agentId),agent_name:this.getAgentName(h.agent_id||agentId),agent_color:this.getAgentColor(h.agent_id||agentId)}))}}catch(e){}
     },
 
-    async loadLearning(){
-      try{const r=await fetch('/api/ai/assistant/learning',{credentials:'same-origin'});const d=await r.json();if(d.success)this.learnStats=d.stats||{}}catch(e){}
-    },
+    async loadLearning(){try{const r=await fetch('/api/ai/assistant/learning',{credentials:'same-origin'});const d=await r.json();if(d.success)this.learnStats=d.stats||{}}catch(e){}},
 
     getAgentEmoji(id){const a=this.agents.find(x=>x.id===id);return a?a.emoji:'🎯'},
     getAgentName(id){const a=this.agents.find(x=>x.id===id);return a?a.name_ar:'القائد'},
@@ -1090,80 +1150,39 @@ function aiChat(){
 
     fmt(t){
       if(!t)return'';
-      // Render consultation panel
       if(t.includes('استشارة الفريق')){
-        const parts=t.split('\n\n');
-        let out='';let consultBlock=false;
+        const parts=t.split('\n\n');let out='';let consultBlock=false;
         for(const p of parts){
-          if(p.includes('استشارة الفريق')){
-            out+='<div class="ai-consult-panel"><h5>💬 استشارة الفريق</h5>';
-            consultBlock=true;
-          }else if(consultBlock && p.match(/^[🎯✍️📊🛡️⚙️]/)){
-            const lines=p.split('\n');
-            const emoji=lines[0].match(/^[🎯✍️📊🛡️⚙️]/)?.[0]||'';
-            const name=lines[0].replace(emoji,'').trim();
-            const body=lines.slice(1).join('\n').trim();
-            out+='<div class="ai-consult-agent"><span class="ca-emoji">'+emoji+'</span><div class="ca-body"><div class="ca-name">'+name+'</div><div class="ca-text">'+this._esc(body)+'</div></div></div>';
-          }else if(consultBlock && !p.match(/^[🎯✍️📊🛡️⚙️]/) && p.trim()){
-            out+='</div><div style="margin-top:8px">'+this._simpleFmt(p)+'</div>';
-            consultBlock=false;
-          }else{out+=this._simpleFmt(p)}
+          if(p.includes('استشارة الفريق')){out+='<div class="ai-consult-panel"><h5>💬 استشارة الفريق</h5>';consultBlock=true}
+          else if(consultBlock && p.match(/^[🎯✍️📊🛡️⚙️]/)){const lines=p.split('\n');const emoji=lines[0].match(/^[🎯✍️📊🛡️⚙️]/)?.[0]||'';const name=lines[0].replace(emoji,'').trim();const body=lines.slice(1).join('\n').trim();out+='<div class="ai-consult-agent"><span class="ca-emoji">'+emoji+'</span><div class="ca-body"><div class="ca-name">'+name+'</div><div class="ca-text">'+this._esc(body)+'</div></div></div>'}
+          else if(consultBlock && !p.match(/^[🎯✍️📊🛡️⚙️]/) && p.trim()){out+='</div><div style="margin-top:8px">'+this._simpleFmt(p)+'</div>';consultBlock=false}
+          else{out+=this._simpleFmt(p)}
         }
-        if(consultBlock)out+='</div>';
-        return out;
+        if(consultBlock)out+='</div>';return out;
       }
       return this._simpleFmt(t);
     },
 
-    _simpleFmt(t){
-      t=t.replace(/\n/g,'<br>');
-      t=t.replace(/\*\*(.*?)\*\*/g,'<b style="color:var(--text)">$1</b>');
-      t=t.replace(/`(.*?)`/g,'<code style="background:var(--surface);padding:1px 5px;border-radius:4px;font-size:11px;color:var(--cyan)">$1</code>');
-      t=t.replace(/^• /gm,'<span style="color:var(--ac);margin-left:2px">•</span> ');
-      return t;
-    },
-
+    _simpleFmt(t){t=t.replace(/\n/g,'<br>');t=t.replace(/\*\*(.*?)\*\*/g,'<b style="color:var(--text)">$1</b>');t=t.replace(/`(.*?)`/g,'<code style="background:var(--surface);padding:1px 5px;border-radius:4px;font-size:11px;color:var(--cyan)">$1</code>');t=t.replace(/^• /gm,'<span style="color:var(--ac);margin-left:2px">•</span> ');return t},
     _esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')},
 
     send(text){
-      const msg=text||this.input.trim();
-      if(!msg||this.typing)return;
-      this.messages.push({role:'user',content:msg});
-      this.input='';this.typing=true;this.scroll();
-
+      const msg=text||this.input.trim();if(!msg||this.typing)return;
+      this.messages.push({role:'user',content:msg});this.input='';this.typing=true;this.scroll();
       fetch('/api/ai/assistant/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:msg,agent_id:this.activeAgent.id}),credentials:'same-origin'})
       .then(r=>r.json()).then(d=>{
-        if(d.success){
-          this.messages.push({role:'assistant',content:d.reply||'تم',action_taken:d.action_taken||null,
-            agent_id:d.agent_id||this.activeAgent.id,agent_emoji:d.agent_emoji||this.activeAgent.emoji,
-            agent_name:d.agent_name||this.activeAgent.name_ar,agent_color:d.agent_color||this.activeAgent.color});
-          // Update active agent if AI routed to different one
-          if(d.agent_id && d.agent_id!==this.activeAgent.id){
-            const a=this.agents.find(x=>x.id===d.agent_id);if(a)this.activeAgent=a;
-          }
-        }else{this.messages.push({role:'assistant',content:'❌ '+(d.error||'حدث خطأ'),agent_emoji:'❌',agent_name:'System',agent_color:'#ef4444'})}
+        if(d.success){this.messages.push({role:'assistant',content:d.reply||'تم',action_taken:d.action_taken||null,agent_id:d.agent_id||this.activeAgent.id,agent_emoji:d.agent_emoji||this.activeAgent.emoji,agent_name:d.agent_name||this.activeAgent.name_ar,agent_color:d.agent_color||this.activeAgent.color});
+          if(d.agent_id&&d.agent_id!==this.activeAgent.id){const a=this.agents.find(x=>x.id===d.agent_id);if(a)this.activeAgent=a}}
+        else{this.messages.push({role:'assistant',content:'❌ '+(d.error||'حدث خطأ'),agent_emoji:'❌',agent_name:'System',agent_color:'#ef4444'})}
       }).catch(()=>{this.messages.push({role:'assistant',content:'❌ خطأ في الاتصال',agent_emoji:'❌',agent_name:'System',agent_color:'#ef4444'})})
       .finally(()=>{this.typing=false;this.scroll()});
     },
 
-    async clearChat(){
-      if(!confirm('مسح المحادثة؟'))return;
-      try{await fetch('/api/ai/assistant/clear',{method:'POST',credentials:'same-origin'})}catch(e){}
-      this.messages=[];
-    },
+    async clearChat(){if(!confirm('مسح المحادثة؟'))return;try{await fetch('/api/ai/assistant/clear',{method:'POST',credentials:'same-origin'})}catch(e){}this.messages=[]},
 
-    async feedback(idx,rating){
-      const msg=this.messages[idx];msg.feedback=rating;
-      try{await fetch('/api/ai/assistant/feedback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message_id:msg.message_id,rating:rating,action_taken:msg.action_taken}),credentials:'same-origin'})}catch(e){}
-    },
+    async feedback(idx,rating){const msg=this.messages[idx];msg.feedback=rating;try{await fetch('/api/ai/assistant/feedback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message_id:msg.message_id,rating:rating,action_taken:msg.action_taken}),credentials:'same-origin'})}catch(e){}},
 
-    async sendCorrection(idx,msg){
-      const text=this.corrections[idx];if(!text)return;
-      try{await fetch('/api/ai/assistant/feedback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message_id:msg.message_id,rating:1,correction:text,action_taken:msg.action_taken}),credentials:'same-origin'});
-      this.corrections[idx]='';msg.feedback=1;
-      this.messages.push({role:'assistant',content:'✅ تم حفظ التصحيح. سيتعلم المساعد من هذا.',agent_emoji:'🧠',agent_name:'System',agent_color:'#22c55e'});
-      this.scroll();}catch(e){}
-    }
+    async sendCorrection(idx,msg){const text=this.corrections[idx];if(!text)return;try{await fetch('/api/ai/assistant/feedback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message_id:msg.message_id,rating:1,correction:text,action_taken:msg.action_taken}),credentials:'same-origin'});this.corrections[idx]='';msg.feedback=1;this.messages.push({role:'assistant',content:'✅ تم حفظ التصحيح.',agent_emoji:'🧠',agent_name:'System',agent_color:'#22c55e'});this.scroll()}catch(e){}}
   };
 }
 </script>
