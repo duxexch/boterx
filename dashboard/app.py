@@ -4869,6 +4869,301 @@ def api_browser_tab_switch(instance_id, tab_id):
     return jsonify(result)
 
 
+# ── Browser Templates ────────────────────────────────────────
+
+@app.route('/api/browser/templates', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_templates_list():
+    from browser_advanced import list_templates
+    return jsonify({'success': True, 'templates': list_templates()})
+
+
+@app.route('/api/browser/templates/<tid>', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_template_get(tid):
+    from browser_advanced import get_template
+    t = get_template(int(tid))
+    if not t:
+        return jsonify({'success': False, 'error': 'Not found'}), 404
+    return jsonify({'success': True, 'template': t})
+
+
+@app.route('/api/browser/templates', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_template_create():
+    from browser_advanced import create_template
+    data = request.json or {}
+    tid = create_template(data.get('name', ''), data)
+    return jsonify({'success': True, 'id': tid})
+
+
+@app.route('/api/browser/templates/<tid>', methods=['PUT'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_template_update(tid):
+    from browser_advanced import update_template
+    update_template(int(tid), request.json or {})
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/templates/<tid>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_template_delete(tid):
+    from browser_advanced import delete_template
+    delete_template(int(tid))
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/templates/<tid>/create-browser', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_template_create_browser(tid):
+    from browser_advanced import create_browser_from_template
+    data = request.json or {}
+    inst = create_browser_from_template(int(tid), data.get('name', ''))
+    if inst:
+        return jsonify({'success': True, 'instance_id': inst.id})
+    return jsonify({'success': False, 'error': 'Failed to create'}), 400
+
+
+# ── Proxy Manager ────────────────────────────────────────────
+
+@app.route('/api/browser/proxies', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_proxies_list():
+    from browser_advanced import list_proxies
+    return jsonify({'success': True, 'proxies': list_proxies()})
+
+
+@app.route('/api/browser/proxies', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_proxy_add():
+    from browser_advanced import add_proxy
+    data = request.json or {}
+    pid = add_proxy(
+        data.get('name', ''), data.get('host', ''), data.get('port', 80),
+        data.get('protocol', 'http'), data.get('username', ''), data.get('password', ''),
+        data.get('country', ''), data.get('city', ''), data.get('is_residential', False)
+    )
+    return jsonify({'success': True, 'id': pid})
+
+
+@app.route('/api/browser/proxies/<pid>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_proxy_delete(pid):
+    from browser_advanced import delete_proxy
+    delete_proxy(int(pid))
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/proxies/<pid>/toggle', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_proxy_toggle(pid):
+    from browser_advanced import toggle_proxy
+    active = (request.json or {}).get('active', True)
+    toggle_proxy(int(pid), active)
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/proxies/best', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_proxy_best():
+    from browser_advanced import get_best_proxy
+    country = request.args.get('country')
+    proxy = get_best_proxy(country)
+    return jsonify({'success': True, 'proxy': proxy})
+
+
+@app.route('/api/browser/proxies/import', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_proxy_import():
+    from browser_advanced import import_proxies
+    data = request.json or {}
+    count = import_proxies(data.get('proxies', []))
+    return jsonify({'success': True, 'imported': count})
+
+
+@app.route('/api/browser/proxies/stats', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_proxy_stats():
+    from browser_advanced import get_proxy_stats
+    return jsonify({'success': True, 'stats': get_proxy_stats()})
+
+
+# ── Fingerprint Rotation ─────────────────────────────────────
+
+@app.route('/api/browser/fingerprint/<instance_id>', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_fingerprint_get(instance_id):
+    from browser_advanced import get_fingerprint
+    fp = get_fingerprint(instance_id)
+    return jsonify({'success': True, 'fingerprint': fp})
+
+
+@app.route('/api/browser/fingerprint/<instance_id>/generate', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_fingerprint_generate(instance_id):
+    from browser_advanced import generate_fingerprint
+    fp = generate_fingerprint(instance_id)
+    return jsonify({'success': True, 'fingerprint': fp})
+
+
+@app.route('/api/browser/fingerprint/<instance_id>/rotate', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_fingerprint_rotate(instance_id):
+    from browser_advanced import rotate_fingerprint
+    fp = rotate_fingerprint(instance_id)
+    return jsonify({'success': True, 'fingerprint': fp})
+
+
+# ── Usage Analytics ──────────────────────────────────────────
+
+@app.route('/api/browser/analytics/stats', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_analytics_stats():
+    from browser_advanced import get_usage_stats
+    iid = request.args.get('instance_id')
+    days = request.args.get('days', 7, type=int)
+    return jsonify({'success': True, 'stats': get_usage_stats(iid, days)})
+
+
+@app.route('/api/browser/analytics/daily', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_analytics_daily():
+    from browser_advanced import get_daily_usage
+    iid = request.args.get('instance_id')
+    days = request.args.get('days', 30, type=int)
+    return jsonify({'success': True, 'daily': get_daily_usage(iid, days)})
+
+
+@app.route('/api/browser/analytics/top-sites', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_analytics_top_sites():
+    from browser_advanced import get_top_sites
+    iid = request.args.get('instance_id')
+    limit = request.args.get('limit', 10, type=int)
+    return jsonify({'success': True, 'sites': get_top_sites(iid, limit)})
+
+
+# ── Browser Groups ───────────────────────────────────────────
+
+@app.route('/api/browser/groups', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_groups_list():
+    from browser_advanced import list_groups
+    return jsonify({'success': True, 'groups': list_groups()})
+
+
+@app.route('/api/browser/groups', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_group_create():
+    from browser_advanced import create_group
+    data = request.json or {}
+    gid = create_group(data.get('name', ''), data.get('description', ''), data.get('color', '#3b82f6'))
+    return jsonify({'success': True, 'id': gid})
+
+
+@app.route('/api/browser/groups/<gid>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_group_delete(gid):
+    from browser_advanced import delete_group
+    delete_group(int(gid))
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/groups/<gid>/add/<instance_id>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_group_add(gid, instance_id):
+    from browser_advanced import add_to_group
+    add_to_group(int(gid), instance_id)
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/groups/<gid>/remove/<instance_id>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_group_remove(gid, instance_id):
+    from browser_advanced import remove_from_group
+    remove_from_group(int(gid), instance_id)
+    return jsonify({'success': True})
+
+
+# ── Browser Tags ─────────────────────────────────────────────
+
+@app.route('/api/browser/tags', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_tags_list():
+    from browser_advanced import list_tags
+    return jsonify({'success': True, 'tags': list_tags()})
+
+
+@app.route('/api/browser/tags', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_tag_create():
+    from browser_advanced import create_tag
+    data = request.json or {}
+    tid = create_tag(data.get('name', ''), data.get('color', '#6b7280'))
+    return jsonify({'success': True, 'id': tid})
+
+
+@app.route('/api/browser/tags/<tid>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_tag_delete(tid):
+    from browser_advanced import delete_tag
+    delete_tag(int(tid))
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/tags/<instance_id>/add/<tag_id>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_tag_add(instance_id, tag_id):
+    from browser_advanced import tag_instance
+    tag_instance(instance_id, int(tag_id))
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/tags/<instance_id>/remove/<tag_id>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_tag_remove(instance_id, tag_id):
+    from browser_advanced import untag_instance
+    untag_instance(instance_id, int(tag_id))
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/tags/<instance_id>', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_instance_tags(instance_id):
+    from browser_advanced import get_instance_tags
+    return jsonify({'success': True, 'tags': get_instance_tags(instance_id)})
+
+
 # ── Instance CRUD ────────────────────────────────────────────
 
 @app.route('/api/browser/instances', methods=['GET'])
