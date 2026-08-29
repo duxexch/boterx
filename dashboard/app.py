@@ -5326,6 +5326,306 @@ def api_browser_dashboard():
     return jsonify({'success': True, 'overview': get_dashboard_overview()})
 
 
+# ── Form Auto-Fill ───────────────────────────────────────────
+
+@app.route('/api/browser/form-profiles', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_form_profiles_list():
+    from browser_smart import list_form_profiles
+    return jsonify({'success': True, 'profiles': list_form_profiles()})
+
+
+@app.route('/api/browser/form-profiles/<pid>', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_form_profile_get(pid):
+    from browser_smart import get_form_profile
+    p = get_form_profile(int(pid))
+    if not p:
+        return jsonify({'success': False, 'error': 'Not found'}), 404
+    return jsonify({'success': True, 'profile': p})
+
+
+@app.route('/api/browser/form-profiles', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_form_profile_create():
+    from browser_smart import create_form_profile
+    data = request.json or {}
+    pid = create_form_profile(data.get('name', ''), data.get('data', {}),
+                               data.get('description', ''), data.get('is_default', False))
+    return jsonify({'success': True, 'id': pid})
+
+
+@app.route('/api/browser/form-profiles/<pid>', methods=['PUT'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_form_profile_update(pid):
+    from browser_smart import update_form_profile
+    update_form_profile(int(pid), (request.json or {}).get('data', {}))
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/form-profiles/<pid>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_form_profile_delete(pid):
+    from browser_smart import delete_form_profile
+    delete_form_profile(int(pid))
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/form-profiles/default', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_form_profile_default():
+    from browser_smart import get_default_profile
+    return jsonify({'success': True, 'profile': get_default_profile()})
+
+
+@app.route('/api/browser/form-fill/<instance_id>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_form_fill(instance_id):
+    from browser_manager import get_instance
+    from browser_smart import get_default_profile, match_field_to_value
+    data = request.json or {}
+    profile_id = data.get('profile_id')
+    if profile_id:
+        from browser_smart import get_form_profile
+        profile = get_form_profile(int(profile_id))
+        profile_data = profile.get('data', {}) if profile else {}
+    else:
+        profile_data = get_default_profile().get('data', {})
+
+    inst = get_instance(instance_id)
+    if not inst or not inst.page:
+        return jsonify({'success': False, 'error': 'Browser not running'}), 400
+
+    # Find all form fields and fill them
+    filled = []
+    try:
+        fields = inst.page.query_selector_all('input, textarea, select')
+        for field in fields:
+            try:
+                name = field.get_attribute('name') or ''
+                field_id = field.get_attribute('id') or ''
+                field_class = field.get_attribute('class') or ''
+                field_type = field.get_attribute('type') or 'text'
+                if field_type in ['hidden', 'submit', 'button', 'checkbox', 'radio']:
+                    continue
+                field_type_matched, value = match_field_to_value(name, field_id, field_class, profile_data)
+                if value:
+                    field.fill(value)
+                    filled.append({'field': name or field_id, 'type': field_type_matched, 'value': value[:50]})
+            except Exception:
+                continue
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+    return jsonify({'success': True, 'filled': len(filled), 'fields': filled})
+
+
+# ── Content Extraction ───────────────────────────────────────
+
+@app.route('/api/browser/extract/article', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_extract_article():
+    from browser_manager import get_instance
+    from browser_smart import extract_article
+    data = request.json or {}
+    instance_id = data.get('instance_id', '')
+    inst = get_instance(instance_id)
+    if not inst or not inst.page:
+        return jsonify({'success': False, 'error': 'Browser not running'}), 400
+    text = inst.page.inner_text('body')
+    url = inst.page.url
+    article = extract_article(text, url)
+    return jsonify({'success': True, 'article': article})
+
+
+@app.route('/api/browser/extract/prices', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_extract_prices():
+    from browser_manager import get_instance
+    from browser_smart import extract_prices
+    data = request.json or {}
+    instance_id = data.get('instance_id', '')
+    inst = get_instance(instance_id)
+    if not inst or not inst.page:
+        return jsonify({'success': False, 'error': 'Browser not running'}), 400
+    text = inst.page.inner_text('body')
+    prices = extract_prices(text)
+    return jsonify({'success': True, 'prices': prices})
+
+
+@app.route('/api/browser/extract/contacts', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_extract_contacts():
+    from browser_manager import get_instance
+    from browser_smart import extract_contacts
+    data = request.json or {}
+    instance_id = data.get('instance_id', '')
+    inst = get_instance(instance_id)
+    if not inst or not inst.page:
+        return jsonify({'success': False, 'error': 'Browser not running'}), 400
+    text = inst.page.inner_text('body')
+    contacts = extract_contacts(text)
+    return jsonify({'success': True, 'contacts': contacts})
+
+
+@app.route('/api/browser/extract/links', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_extract_links():
+    from browser_manager import get_instance
+    from browser_smart import extract_links
+    data = request.json or {}
+    instance_id = data.get('instance_id', '')
+    inst = get_instance(instance_id)
+    if not inst or not inst.page:
+        return jsonify({'success': False, 'error': 'Browser not running'}), 400
+    text = inst.page.inner_text('body')
+    url = inst.page.url
+    links = extract_links(text, url)
+    return jsonify({'success': True, 'links': links})
+
+
+@app.route('/api/browser/extract/metadata', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_extract_metadata():
+    from browser_manager import get_instance
+    from browser_smart import extract_metadata
+    data = request.json or {}
+    instance_id = data.get('instance_id', '')
+    inst = get_instance(instance_id)
+    if not inst or not inst.page:
+        return jsonify({'success': False, 'error': 'Browser not running'}), 400
+    text = inst.page.inner_text('body')
+    url = inst.page.url
+    meta = extract_metadata(text, url)
+    return jsonify({'success': True, 'metadata': meta})
+
+
+@app.route('/api/browser/extract/all', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_extract_all():
+    from browser_manager import get_instance
+    from browser_smart import extract_article, extract_prices, extract_contacts, extract_links, extract_metadata
+    data = request.json or {}
+    instance_id = data.get('instance_id', '')
+    inst = get_instance(instance_id)
+    if not inst or not inst.page:
+        return jsonify({'success': False, 'error': 'Browser not running'}), 400
+    text = inst.page.inner_text('body')
+    url = inst.page.url
+    return jsonify({
+        'success': True,
+        'article': extract_article(text, url),
+        'prices': extract_prices(text),
+        'contacts': extract_contacts(text),
+        'links': extract_links(text, url),
+        'metadata': extract_metadata(text, url),
+    })
+
+
+# ── Search Engine ────────────────────────────────────────────
+
+@app.route('/api/browser/search', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_search():
+    from browser_manager import get_instance
+    from browser_smart import get_search_url, log_search
+    data = request.json or {}
+    engine = data.get('engine', 'google')
+    query = data.get('query', '')
+    instance_id = data.get('instance_id', '')
+    if not query:
+        return jsonify({'success': False, 'error': 'Query required'}), 400
+    url = get_search_url(engine, query)
+    if instance_id:
+        inst = get_instance(instance_id)
+        if inst and inst.page:
+            inst.navigate(url)
+    log_search(engine, query, 0, instance_id)
+    return jsonify({'success': True, 'url': url, 'engine': engine})
+
+
+@app.route('/api/browser/search/history', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_search_history():
+    from browser_smart import get_search_history
+    engine = request.args.get('engine')
+    limit = request.args.get('limit', 50, type=int)
+    return jsonify({'success': True, 'history': get_search_history(engine, limit)})
+
+
+@app.route('/api/browser/search/popular', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_search_popular():
+    from browser_smart import get_popular_queries
+    limit = request.args.get('limit', 20, type=int)
+    return jsonify({'success': True, 'queries': get_popular_queries(limit)})
+
+
+# ── Screenshot Gallery ───────────────────────────────────────
+
+@app.route('/api/browser/screenshots', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_screenshots_list():
+    from browser_smart import list_screenshots
+    iid = request.args.get('instance_id')
+    limit = request.args.get('limit', 100, type=int)
+    return jsonify({'success': True, 'screenshots': list_screenshots(iid, limit)})
+
+
+@app.route('/api/browser/screenshots/search', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_screenshots_search():
+    from browser_smart import search_screenshots
+    q = request.args.get('q', '')
+    tag = request.args.get('tag', '')
+    return jsonify({'success': True, 'screenshots': search_screenshots(q, tag)})
+
+
+@app.route('/api/browser/screenshots/stats', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_screenshots_stats():
+    from browser_smart import get_screenshot_stats
+    return jsonify({'success': True, 'stats': get_screenshot_stats()})
+
+
+@app.route('/api/browser/screenshots/<sid>', methods=['PUT'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_screenshot_update(sid):
+    from browser_smart import update_screenshot
+    data = request.json or {}
+    update_screenshot(int(sid), data.get('tags'), data.get('notes'))
+    return jsonify({'success': True})
+
+
+@app.route('/api/browser/screenshots/<sid>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_screenshot_delete(sid):
+    from browser_smart import delete_screenshot
+    delete_screenshot(int(sid))
+    return jsonify({'success': True})
+
+
 # ── Instance CRUD ────────────────────────────────────────────
 
 @app.route('/api/browser/instances', methods=['GET'])

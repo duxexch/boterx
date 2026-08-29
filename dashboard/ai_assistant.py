@@ -493,6 +493,15 @@ ACTIONS_SCHEMA = [
     {"name": "browser_task", "description": "تنفيذ مهمة في المتصفح (مثل: فتح موقع + تسجيل دخول)", "parameters": {"instance_id": "النافذة", "goal": "الهدف", "steps": "الخطوات"}},
     {"name": "browser_scrape", "description": "استخراج محتوى من صفحة", "parameters": {"instance_id": "النافذة", "url": "الرابط"}},
     {"name": "browser_quick_login", "description": "تسجيل دخول سريع في موقع", "parameters": {"instance_id": "النافذة", "url": "الرابط", "username": "المستخدم", "password": "كلمة المرور"}},
+    # Smart extraction
+    {"name": "form_fill", "description": "ملأ النموذج تلقائياً بالبيانات المحفوظة", "parameters": {"instance_id": "النافذة"}},
+    {"name": "extract_article", "description": "استخراج محتوى المقال من الصفحة", "parameters": {"instance_id": "النافذة"}},
+    {"name": "extract_prices", "description": "استخراج الأسعار من الصفحة", "parameters": {"instance_id": "النافذة"}},
+    {"name": "extract_contacts", "description": "استخراج معلومات الاتصال (إيميل، هاتف، سوشال)", "parameters": {"instance_id": "النافذة"}},
+    {"name": "extract_links", "description": "استخراج كل الروابط مصنفة", "parameters": {"instance_id": "النافذة"}},
+    {"name": "extract_all", "description": "استخراج كل شيء من الصفحة (مقال+أسعار+اتصال+روابط+بيانات وصفية)", "parameters": {"instance_id": "النافذة"}},
+    {"name": "web_search", "description": "بحث في محرك بحث", "parameters": {"engine": "google/bing/duckduckgo", "query": "الاستعلام", "instance_id": "النافذة"}},
+    {"name": "screenshot_gallery", "description": "عرض لقطات الشاشة المحفوظة", "parameters": {"instance_id": "النافذة"}},
     # Learning
     {"name": "learn_fact", "description": "حفظ معلومة", "parameters": {"category": "الفئة", "key": "المفتاح", "value": "القيمة"}},
     {"name": "get_learning_stats", "description": "إحصائيات التعلم", "parameters": {}},
@@ -1426,6 +1435,119 @@ def _exec_browser_quick_login(params):
     except Exception as e: return {'success': False, 'error': str(e)}
 
 
+def _exec_form_fill(params):
+    iid = params.get('instance_id', '')
+    if not iid: return {'success': False, 'error': 'instance_id مطلوب'}
+    try:
+        from browser_manager import get_instance
+        from browser_smart import get_default_profile, match_field_to_value
+        profile_data = get_default_profile().get('data', {})
+        inst = get_instance(iid)
+        if not inst or not inst.page: return {'success': False, 'error': 'المتصفح غير نشط'}
+        filled = []
+        fields = inst.page.query_selector_all('input, textarea, select')
+        for field in fields:
+            try:
+                name = field.get_attribute('name') or ''
+                fid = field.get_attribute('id') or ''
+                fcls = field.get_attribute('class') or ''
+                ftype = field.get_attribute('type') or 'text'
+                if ftype in ['hidden', 'submit', 'button', 'checkbox', 'radio']: continue
+                ft, val = match_field_to_value(name, fid, fcls, profile_data)
+                if val: field.fill(val); filled.append({'field': name or fid, 'type': ft})
+            except: continue
+        return {'success': True, 'filled': len(filled), 'fields': filled}
+    except Exception as e: return {'success': False, 'error': str(e)}
+
+
+def _exec_extract_article(params):
+    iid = params.get('instance_id', '')
+    if not iid: return {'success': False, 'error': 'instance_id مطلوب'}
+    try:
+        from browser_manager import get_instance
+        from browser_smart import extract_article
+        inst = get_instance(iid)
+        if not inst or not inst.page: return {'success': False, 'error': 'المتصفح غير نشط'}
+        text = inst.page.inner_text('body')
+        return {'success': True, 'article': extract_article(text, inst.page.url)}
+    except Exception as e: return {'success': False, 'error': str(e)}
+
+
+def _exec_extract_prices(params):
+    iid = params.get('instance_id', '')
+    if not iid: return {'success': False, 'error': 'instance_id مطلوب'}
+    try:
+        from browser_manager import get_instance
+        from browser_smart import extract_prices
+        inst = get_instance(iid)
+        if not inst or not inst.page: return {'success': False, 'error': 'المتصفح غير نشط'}
+        return {'success': True, 'prices': extract_prices(inst.page.inner_text('body'))}
+    except Exception as e: return {'success': False, 'error': str(e)}
+
+
+def _exec_extract_contacts(params):
+    iid = params.get('instance_id', '')
+    if not iid: return {'success': False, 'error': 'instance_id مطلوب'}
+    try:
+        from browser_manager import get_instance
+        from browser_smart import extract_contacts
+        inst = get_instance(iid)
+        if not inst or not inst.page: return {'success': False, 'error': 'المتصفح غير نشط'}
+        return {'success': True, 'contacts': extract_contacts(inst.page.inner_text('body'))}
+    except Exception as e: return {'success': False, 'error': str(e)}
+
+
+def _exec_extract_links(params):
+    iid = params.get('instance_id', '')
+    if not iid: return {'success': False, 'error': 'instance_id مطلوب'}
+    try:
+        from browser_manager import get_instance
+        from browser_smart import extract_links
+        inst = get_instance(iid)
+        if not inst or not inst.page: return {'success': False, 'error': 'المتصفح غير نشط'}
+        return {'success': True, 'links': extract_links(inst.page.inner_text('body'), inst.page.url)}
+    except Exception as e: return {'success': False, 'error': str(e)}
+
+
+def _exec_extract_all(params):
+    iid = params.get('instance_id', '')
+    if not iid: return {'success': False, 'error': 'instance_id مطلوب'}
+    try:
+        from browser_manager import get_instance
+        from browser_smart import extract_article, extract_prices, extract_contacts, extract_links, extract_metadata
+        inst = get_instance(iid)
+        if not inst or not inst.page: return {'success': False, 'error': 'المتصفح غير نشط'}
+        text = inst.page.inner_text('body'); url = inst.page.url
+        return {'success': True, 'article': extract_article(text, url), 'prices': extract_prices(text),
+                'contacts': extract_contacts(text), 'links': extract_links(text, url), 'metadata': extract_metadata(text, url)}
+    except Exception as e: return {'success': False, 'error': str(e)}
+
+
+def _exec_web_search(params):
+    engine = params.get('engine', 'google'); query = params.get('query', '')
+    iid = params.get('instance_id', '')
+    if not query: return {'success': False, 'error': 'query مطلوب'}
+    try:
+        from browser_smart import get_search_url, log_search
+        url = get_search_url(engine, query)
+        if iid:
+            from browser_manager import get_instance
+            inst = get_instance(iid)
+            if inst and inst.page: inst.navigate(url)
+        log_search(engine, query, 0, iid)
+        return {'success': True, 'url': url, 'engine': engine}
+    except Exception as e: return {'success': False, 'error': str(e)}
+
+
+def _exec_screenshot_gallery(params):
+    iid = params.get('instance_id')
+    try:
+        from browser_smart import list_screenshots
+        shots = list_screenshots(iid, 20)
+        return {'success': True, 'count': len(shots), 'screenshots': shots}
+    except Exception as e: return {'success': False, 'error': str(e)}
+
+
 # ── Learning ──────────────────────────────────────────────────
 
 def _exec_learn_fact(params):
@@ -1498,6 +1620,10 @@ ACTION_DISPATCH = {
     'all_knowledge': _exec_all_knowledge, 'browser_patterns': _exec_browser_patterns,
     'browser_task': _exec_browser_task, 'browser_scrape': _exec_browser_scrape,
     'browser_quick_login': _exec_browser_quick_login,
+    'form_fill': _exec_form_fill, 'extract_article': _exec_extract_article,
+    'extract_prices': _exec_extract_prices, 'extract_contacts': _exec_extract_contacts,
+    'extract_links': _exec_extract_links, 'extract_all': _exec_extract_all,
+    'web_search': _exec_web_search, 'screenshot_gallery': _exec_screenshot_gallery,
     'learn_fact': _exec_learn_fact, 'get_learning_stats': _exec_get_learning_stats,
     'delegate_task': _exec_delegate_task, 'consult_all': _exec_consult_all,
 }
