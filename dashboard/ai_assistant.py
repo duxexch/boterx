@@ -45,6 +45,7 @@ AGENTS = {
                     'list_relays', 'relay_status', 'preview_relay', 'relay_log', 'relay_stats',
                     'browser_list', 'browser_open', 'browser_screenshot', 'browser_status',
                     'daemon_status', 'sleep_all_browsers', 'wake_all_browsers',
+                    'analyze_site', 'site_knowledge', 'all_knowledge', 'browser_patterns',
                     'list_campaigns', 'campaign_stats', 'list_companies', 'company_detail',
                     'list_admins', 'add_admin', 'list_agents', 'agent_stats',
                     'game_stats', 'toggle_game', 'platform_stats',
@@ -484,6 +485,10 @@ ACTIONS_SCHEMA = [
     {"name": "daemon_status", "description": "حالة Daemon المتصفح", "parameters": {}},
     {"name": "sleep_all_browsers", "description": "إدخال كل المتصفحات في النوم", "parameters": {}},
     {"name": "wake_all_browsers", "description": "إيقاظ كل المتصفحات", "parameters": {}},
+    {"name": "analyze_site", "description": "تحليل الموقع وتعلم من صفحته", "parameters": {"instance_id": "معرف النافذة"}},
+    {"name": "site_knowledge", "description": "عرض ما تعلمته عن موقع", "parameters": {"instance_id": "معرف النافذة"}},
+    {"name": "all_knowledge", "description": "عرض كل المواقع المعرفة", "parameters": {}},
+    {"name": "browser_patterns", "description": "عرض أنماط النجاح المحفوظة", "parameters": {"domain": "الموقع"}},
     # Learning
     {"name": "learn_fact", "description": "حفظ معلومة", "parameters": {"category": "الفئة", "key": "المفتاح", "value": "القيمة"}},
     {"name": "get_learning_stats", "description": "إحصائيات التعلم", "parameters": {}},
@@ -1329,6 +1334,45 @@ def _exec_wake_all_browsers(params):
     except Exception as e: return {'success': False, 'error': str(e)}
 
 
+# ── Browser Learning ─────────────────────────────────────────
+
+def _exec_analyze_site(params):
+    iid = params.get('instance_id', '')
+    if not iid: return {'success': False, 'error': 'instance_id مطلوب'}
+    try:
+        from browser_manager import get_instance
+        inst = get_instance(iid)
+        if not inst: return {'success': False, 'error': 'النافذة غير موجودة'}
+        findings = inst.analyze_current_page()
+        return {'success': True, 'findings': findings, 'message': 'تم تحليل الصفحة بنجاح'}
+    except Exception as e: return {'success': False, 'error': str(e)}
+
+
+def _exec_site_knowledge(params):
+    iid = params.get('instance_id', '')
+    if not iid: return {'success': False, 'error': 'instance_id مطلوب'}
+    try:
+        from browser_manager import get_instance
+        inst = get_instance(iid)
+        if not inst: return {'success': False, 'error': 'النافذة غير موجودة'}
+        return {'success': True, 'knowledge': inst.get_site_knowledge()}
+    except Exception as e: return {'success': False, 'error': str(e)}
+
+
+def _exec_all_knowledge(params):
+    try:
+        from browser_knowledge import list_sites
+        return {'success': True, 'sites': list_sites()}
+    except Exception as e: return {'success': False, 'error': str(e)}
+
+
+def _exec_browser_patterns(params):
+    try:
+        from browser_knowledge import list_patterns
+        return {'success': True, 'patterns': list_patterns(params.get('domain'))}
+    except Exception as e: return {'success': False, 'error': str(e)}
+
+
 # ── Learning ──────────────────────────────────────────────────
 
 def _exec_learn_fact(params):
@@ -1397,6 +1441,8 @@ ACTION_DISPATCH = {
     'browser_screenshot': _exec_browser_screenshot, 'browser_status': _exec_browser_status,
     'daemon_status': _exec_daemon_status, 'sleep_all_browsers': _exec_sleep_all_browsers,
     'wake_all_browsers': _exec_wake_all_browsers,
+    'analyze_site': _exec_analyze_site, 'site_knowledge': _exec_site_knowledge,
+    'all_knowledge': _exec_all_knowledge, 'browser_patterns': _exec_browser_patterns,
     'learn_fact': _exec_learn_fact, 'get_learning_stats': _exec_get_learning_stats,
     'delegate_task': _exec_delegate_task, 'consult_all': _exec_consult_all,
 }
@@ -1855,6 +1901,38 @@ def _format_action_result(action_name, result):
         return f"😴 <b>{result.get('message','')}</b>"
     elif action_name == 'wake_all_browsers':
         return f"☀️ <b>{result.get('message','')}</b>"
+    elif action_name == 'analyze_site':
+        f = result.get('findings', {})
+        lines = [f"🔍 <b>تحليل الموقع:</b>"]
+        if f.get('login_elements'):
+            lines.append(f"• عناصر تسجيل الدخول: {len(f['login_elements'])}")
+        if f.get('forms'):
+            lines.append(f"• نماذج: {len(f['forms'])}")
+        if f.get('navigation'):
+            lines.append(f"• روابط تنقل: {len(f['navigation'])}")
+        if not any(f.get(k) for k in ['login_elements', 'forms', 'navigation']):
+            lines.append("• لم يتم العثور على عناصر مميزة")
+        return '\n'.join(lines)
+    elif action_name == 'site_knowledge':
+        k = result.get('knowledge', {})
+        return f"""🧠 <b>معرفة الموقع: {k.get('domain','')}</b>
+• عناصر معرفة: {k.get('knowledge_count',0)}
+• Selectors: {k.get('selectors',0)} | نماذج: {k.get('forms',0)}
+• أنماط نجاح: {k.get('patterns',0)}
+• نسبة النجاح: {k.get('success_rate',0)}%
+• إجراءات: {k.get('total_actions',0)}"""
+    elif action_name == 'all_knowledge':
+        sites = result.get('sites', [])
+        lines = [f"🧠 <b>المواقع المعرفة ({len(sites)}):</b>"]
+        for s in sites[:15]:
+            lines.append(f"• {s.get('site_domain','')} — {s.get('total',0)} معرفة | ثقة: {round(s.get('avg_confidence',0)*100)}%")
+        return '\n'.join(lines)
+    elif action_name == 'browser_patterns':
+        patterns = result.get('patterns', [])
+        lines = [f"📋 <b>أنماط النجاح ({len(patterns)}):</b>"]
+        for p in patterns[:10]:
+            lines.append(f"• {p.get('site_domain','')}/{p.get('goal','')} — نجاح: {round(p.get('success_rate',0)*100)}% ({p.get('times_used',0)} مرة)")
+        return '\n'.join(lines)
     elif action_name == 'generate_post':
         if result.get('success'): return f"🤖 <b>البوست:</b>\n\n{result.get('text', '')}"
         return f"❌ خطأ: {result.get('error', '')}"

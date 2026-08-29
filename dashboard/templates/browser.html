@@ -246,7 +246,12 @@
 
             <!-- Action log -->
             <div class="bg-slate-800 rounded-xl border border-slate-700 p-3 mt-3" x-show="selected && currentInst">
-                <span class="text-xs text-dim font-semibold block mb-2">آخر الإجراءات</span>
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs text-dim font-semibold">آخر الإجراءات</span>
+                    <button @click="analyzePage()" class="text-xs text-blue-400 hover:text-blue-300 gap-1" x-show="currentInst?.status==='running'">
+                        <i class="fas fa-brain"></i> تحليل الصفحة
+                    </button>
+                </div>
                 <div class="max-h-32 overflow-y-auto space-y-1">
                     <template x-for="(act,i) in (currentInst?.recent_actions||[]).slice().reverse()" :key="i">
                         <div class="flex items-center gap-2 text-xs">
@@ -254,6 +259,38 @@
                             <span class="px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 font-mono" x-text="act.action"></span>
                             <span class="text-dim truncate" x-text="act.detail"></span>
                         </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Site Knowledge Panel -->
+            <div class="bg-slate-800 rounded-xl border border-slate-700 p-3 mt-3" x-show="siteKnowledge && siteKnowledge.domain">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-xs text-dim font-semibold">🧠 معرفة الموقع: <span class="text-bright" x-text="siteKnowledge.domain"></span></span>
+                    <button @click="siteKnowledge=null" class="text-dim hover:text-bright text-xs"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+                    <div class="text-center p-2 bg-slate-700/30 rounded-lg">
+                        <p class="text-lg font-bold text-info" x-text="siteKnowledge.selectors||0"></p>
+                        <p class="text-[10px] text-dim">Selectors</p>
+                    </div>
+                    <div class="text-center p-2 bg-slate-700/30 rounded-lg">
+                        <p class="text-lg font-bold text-success" x-text="siteKnowledge.forms||0"></p>
+                        <p class="text-[10px] text-dim">نماذج</p>
+                    </div>
+                    <div class="text-center p-2 bg-slate-700/30 rounded-lg">
+                        <p class="text-lg font-bold text-warning" x-text="siteKnowledge.patterns||0"></p>
+                        <p class="text-[10px] text-dim">أنماط</p>
+                    </div>
+                    <div class="text-center p-2 bg-slate-700/30 rounded-lg">
+                        <p class="text-lg font-bold" :class="(siteKnowledge.success_rate||0)>=70?'text-success':'text-danger'" x-text="(siteKnowledge.success_rate||0)+'%'"></p>
+                        <p class="text-[10px] text-dim">نجاح</p>
+                    </div>
+                </div>
+                <div x-show="(siteKnowledge.top_selectors||[]).length > 0">
+                    <p class="text-[10px] text-dim mb-1">أفضل Selectors:</p>
+                    <template x-for="s in (siteKnowledge.top_selectors||[]).slice(0,5)" :key="s.selector">
+                        <div class="text-[11px] font-mono text-dim truncate mb-0.5" x-text="s.selector+' ('+Math.round(s.confidence*100)+'%)'"></div>
                     </template>
                 </div>
             </div>
@@ -305,6 +342,7 @@ function browserPage() {
         createForm: { name: '', url: '', proxy: '' },
         daemonRunning: false,
         healthStats: {},
+        siteKnowledge: null,
         _pollTimer: null,
 
         async init() {
@@ -532,6 +570,19 @@ function browserPage() {
                 await api('/api/browser/snapshot');
                 toast('تم حفظ Snapshot', 'success');
             } catch(e) { toast('فشل', 'error'); }
+        },
+
+        async analyzePage() {
+            if (!this.selected) return;
+            try {
+                toast('جاري تحليل الصفحة...', 'info');
+                const d = await api(`/api/browser/instances/${this.selected}/analyze`, { method: 'POST' });
+                if (d.success) {
+                    const k = await api(`/api/browser/instances/${this.selected}/knowledge`);
+                    this.siteKnowledge = k.knowledge || {};
+                    toast('تم التحليل بنجاح', 'success');
+                }
+            } catch(e) { toast('فشل التحليل', 'error'); }
         },
 
         async toggleSleep(id) {

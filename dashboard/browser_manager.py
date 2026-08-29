@@ -193,20 +193,25 @@ class BrowserInstance:
         if not self.page:
             return {'success': False, 'error': 'Browser not running'}
         try:
+            t0 = time.time()
             self.page.goto(url, wait_until='domcontentloaded', timeout=30000)
             _human_delay(0.5, 1.5)
             self._current_url = self.page.url
             self.profile.meta['pages_visited'] = self.profile.meta.get('pages_visited', 0) + 1
             self.profile._save_meta()
+            duration = int((time.time() - t0) * 1000)
             self._log_action('navigate', url)
+            self._learn('navigate', url=url, success=True, duration_ms=duration)
             return {'success': True, 'url': self.page.url, 'title': self.page.title()}
         except Exception as e:
+            self._learn('navigate', url=url, success=False, error=str(e))
             return {'success': False, 'error': str(e)}
 
     def click(self, selector):
         if not self.page:
             return {'success': False, 'error': 'Browser not running'}
         try:
+            t0 = time.time()
             self.page.wait_for_selector(selector, timeout=10000)
             _human_delay(0.2, 0.8)
             box = self.page.locator(selector).bounding_box()
@@ -220,15 +225,19 @@ class BrowserInstance:
             else:
                 self.page.locator(selector).click()
             _human_delay(0.3, 1.0)
+            duration = int((time.time() - t0) * 1000)
             self._log_action('click', selector)
+            self._learn('click', selector=selector, success=True, duration_ms=duration)
             return {'success': True}
         except Exception as e:
+            self._learn('click', selector=selector, success=False, error=str(e))
             return {'success': False, 'error': str(e)}
 
     def type_text(self, selector, text, clear=True):
         if not self.page:
             return {'success': False, 'error': 'Browser not running'}
         try:
+            t0 = time.time()
             self.page.wait_for_selector(selector, timeout=10000)
             self.page.locator(selector).click()
             _human_delay(0.2, 0.5)
@@ -240,9 +249,12 @@ class BrowserInstance:
                 if random.random() < 0.05:
                     _human_delay(0.3, 0.8)
             _human_delay(0.2, 0.5)
+            duration = int((time.time() - t0) * 1000)
             self._log_action('type', f'{selector}: {text[:30]}...')
+            self._learn('type', selector=selector, value=text[:50], success=True, duration_ms=duration)
             return {'success': True}
         except Exception as e:
+            self._learn('type', selector=selector, success=False, error=str(e))
             return {'success': False, 'error': str(e)}
 
     def scroll(self, direction='down', amount=3):
@@ -382,6 +394,42 @@ class BrowserInstance:
         })
         if len(self._actions_log) > 200:
             self._actions_log = self._actions_log[-200:]
+
+    def _learn(self, action_type, selector='', value='', url='', success=True, error='', duration_ms=0):
+        """Feed action to learning engine."""
+        try:
+            from browser_learning import learning_engine
+            page_url = url or (self.page.url if self.page else '')
+            learning_engine.record_action(
+                self.id, page_url, action_type, selector, value,
+                success, error, duration_ms
+            )
+        except Exception:
+            pass
+
+    def analyze_current_page(self):
+        """Analyze current page and learn from it."""
+        try:
+            from browser_learning import learning_engine
+            from urllib.parse import urlparse
+            domain = urlparse(self.page.url).netloc.replace('www.', '') if self.page else ''
+            if domain:
+                return learning_engine.analyze_page(self.page, domain)
+        except Exception:
+            pass
+        return {}
+
+    def get_site_knowledge(self):
+        """Get what's been learned about the current site."""
+        try:
+            from browser_learning import learning_engine
+            from urllib.parse import urlparse
+            domain = urlparse(self.page.url).netloc.replace('www.', '') if self.page else ''
+            if domain:
+                return learning_engine.get_site_summary(domain)
+        except Exception:
+            pass
+        return {}
 
     def to_dict(self):
         return {

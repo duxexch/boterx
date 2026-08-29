@@ -4307,6 +4307,100 @@ def api_browser_snapshot():
     return jsonify({'success': True, 'message': 'Snapshot saved'})
 
 
+# ── Learning / Knowledge ──────────────────────────────────────
+
+@app.route('/api/browser/instances/<iid>/analyze', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_analyze(iid):
+    from browser_manager import get_instance
+    inst = get_instance(iid)
+    if not inst:
+        return jsonify({'success': False, 'error': 'Instance not found'}), 404
+    return jsonify({'success': True, 'findings': inst.analyze_current_page()})
+
+
+@app.route('/api/browser/instances/<iid>/knowledge', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_site_knowledge(iid):
+    from browser_manager import get_instance
+    inst = get_instance(iid)
+    if not inst:
+        return jsonify({'success': False, 'error': 'Instance not found'}), 404
+    return jsonify({'success': True, 'knowledge': inst.get_site_knowledge()})
+
+
+@app.route('/api/browser/knowledge', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_knowledge_list():
+    from browser_knowledge import list_sites
+    return jsonify({'success': True, 'sites': list_sites()})
+
+
+@app.route('/api/browser/knowledge/<domain>', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_knowledge_site(domain):
+    from browser_knowledge import get_site_knowledge
+    return jsonify({'success': True, 'knowledge': get_site_knowledge(domain)})
+
+
+@app.route('/api/browser/knowledge/search', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_knowledge_search():
+    q = request.args.get('q', '')
+    limit = request.args.get('limit', 20, type=int)
+    from browser_knowledge import search_knowledge
+    return jsonify({'success': True, 'results': search_knowledge(q, limit)})
+
+
+@app.route('/api/browser/patterns', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_patterns():
+    domain = request.args.get('domain')
+    from browser_knowledge import list_patterns
+    return jsonify({'success': True, 'patterns': list_patterns(domain)})
+
+
+@app.route('/api/browser/action-stats', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_action_stats():
+    domain = request.args.get('domain')
+    action = request.args.get('action')
+    from browser_knowledge import get_action_stats
+    return jsonify({'success': True, 'stats': get_action_stats(domain, action)})
+
+
+@app.route('/api/browser/instances/<iid>/suggest/<goal>', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_suggest(iid, goal):
+    from browser_manager import get_instance
+    from browser_learning import learning_engine
+    from urllib.parse import urlparse
+    inst = get_instance(iid)
+    if not inst:
+        return jsonify({'success': False, 'error': 'Instance not found'}), 404
+    domain = urlparse(inst.page.url).netloc.replace('www.', '') if inst.page else ''
+    suggestions = learning_engine.suggest_action(domain, goal)
+    return jsonify({'success': True, 'suggestions': suggestions, 'domain': domain})
+
+
+@app.route('/api/browser/action-log', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_browser_action_log():
+    domain = request.args.get('domain')
+    limit = request.args.get('limit', 50, type=int)
+    from browser_knowledge import get_recent_actions
+    return jsonify({'success': True, 'actions': get_recent_actions(domain, limit)})
+
+
 # ── Instance CRUD ────────────────────────────────────────────
 
 @app.route('/api/browser/instances', methods=['GET'])
