@@ -112,55 +112,55 @@
          - admin_perms.get(perm, False) → True only if the role explicitly grants it
          - admin_sections: empty list = super_admin (all allowed); non-empty = only listed sections shown
     -->
-    {# Macro: sidebar_link — combines permission + section checks #}
-    {% macro sidebar_link(url, active_key, icon, label, perm=None, section=None) %}
+    {# Macro: sidebar_link — combines permission + section checks. label_key = i18n key for Alpine t() #}
+    {% macro sidebar_link(url, active_key, icon, label_key, perm=None, section=None) %}
       {% set _perm_ok = (not perm) or (not admin_perms) or admin_perms.get(perm, False) %}
       {% set _sec_ok = (not section) or (not admin_sections) or (section in admin_sections) %}
       {% if _perm_ok and _sec_ok %}
         <a href="{{ url }}" class="sidebar-link {% if active_page == active_key %}active{% endif %}">
-            <i class="{{ icon }} w-5 text-center"></i> {{ label }}
+            <i class="{{ icon }} w-5 text-center"></i> <span x-text="t('{{ label_key }}')"></span>
         </a>
       {% endif %}
     {% endmacro %}
 
     <nav class="p-3 flex-1 overflow-y-auto">
         <p class="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 mt-2" data-i18n="operations">Operations</p>
-        {{ sidebar_link(url_for('dashboard'), 'dashboard', 'fas fa-chart-pie', t('dashboard')) }}
-        {{ sidebar_link(url_for('page_transactions'), 'transactions', 'fas fa-money-bill-transfer', t('transactions'), perm='approve_deposits', section='transactions') }}
-        {{ sidebar_link(url_for('page_matching'), 'matching', 'fas fa-arrows-rotate', t('matching'), perm='view_financial', section='matching') }}
-        {{ sidebar_link(url_for('page_agents'), 'agents', 'fas fa-robot', t('agents'), perm='view_financial', section='agents') }}
-        {{ sidebar_link(url_for('page_trading'), 'trading', 'fas fa-coins', t('trading'), perm='view_financial', section='trading') }}
+        {{ sidebar_link(url_for('dashboard'), 'dashboard', 'fas fa-chart-pie', 'dashboard') }}
+        {{ sidebar_link(url_for('page_transactions'), 'transactions', 'fas fa-money-bill-transfer', 'transactions', perm='approve_deposits', section='transactions') }}
+        {{ sidebar_link(url_for('page_matching'), 'matching', 'fas fa-arrows-rotate', 'matching', perm='view_financial', section='matching') }}
+        {{ sidebar_link(url_for('page_agents'), 'agents', 'fas fa-robot', 'agents', perm='view_financial', section='agents') }}
+        {{ sidebar_link(url_for('page_trading'), 'trading', 'fas fa-coins', 'trading', perm='view_financial', section='trading') }}
 
         <p class="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 mt-4" data-i18n="management">Management</p>
-        {{ sidebar_link(url_for('page_users'), 'users', 'fas fa-users', t('users'), perm='ban_users', section='users') }}
-        {{ sidebar_link(url_for('page_svrp'), 'svrp', 'fas fa-gem', t('svrp'), perm='view_financial', section='svrp') }}
-        {{ sidebar_link(url_for('page_lottery'), 'lottery', 'fas fa-dice', t('lottery'), perm='manage_games', section='lottery') }}
-        {{ sidebar_link(url_for('page_wheel'), 'wheel', 'fas fa-circle-notch', t('wheel'), perm='manage_games', section='wheel') }}
+        {{ sidebar_link(url_for('page_users'), 'users', 'fas fa-users', 'users', perm='ban_users', section='users') }}
+        {{ sidebar_link(url_for('page_svrp'), 'svrp', 'fas fa-gem', 'svrp', perm='view_financial', section='svrp') }}
+        {{ sidebar_link(url_for('page_lottery'), 'lottery', 'fas fa-dice', 'lottery', perm='manage_games', section='lottery') }}
+        {{ sidebar_link(url_for('page_wheel'), 'wheel', 'fas fa-circle-notch', 'wheel', perm='manage_games', section='wheel') }}
 
         <p class="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 mt-4" data-i18n="system">System</p>
-        {{ sidebar_link(url_for('page_companies'), 'companies', 'fas fa-building', t('companies'), perm='manage_companies', section='companies') }}
-        {{ sidebar_link(url_for('page_payment_methods'), 'payment_methods', 'fas fa-credit-card', t('payment_methods'), perm='manage_companies', section='payment_methods') }}
-        {{ sidebar_link(url_for('page_apps'), 'apps', 'fas fa-mobile-screen', t('apps'), perm='manage_companies', section='apps') }}
-        {{ sidebar_link(url_for('page_games_admin'), 'games_admin', 'fas fa-gamepad', 'VEX Games', perm='manage_games', section='games_admin') }}
-        {{ sidebar_link(url_for('page_referrals'), 'referrals', 'fas fa-gift', t('referrals'), perm='manage_companies', section='referrals') }}
-        {{ sidebar_link(url_for('page_channels'), 'channels', 'fas fa-bullhorn', t('channels'), perm='send_broadcast', section='channels') }}
-        {{ sidebar_link(url_for('page_bots'), 'bots', 'fas fa-robot', t('bots'), perm='manage_bots', section='bots') }}
-        {{ sidebar_link(url_for('page_browser'), 'browser', 'fas fa-globe', 'المتصفح', perm='manage_bots', section='browser') }}
-        {{ sidebar_link(url_for('page_clients'), 'clients', 'fas fa-tags', t('clients'), perm='manage_bots', section='clients') }}
-        {{ sidebar_link(url_for('page_complaints'), 'complaints', 'fas fa-exclamation-circle', t('complaints'), perm='ban_users', section='complaints') }}
-        {{ sidebar_link(url_for('page_tickets'), 'tickets', 'fas fa-ticket-alt', t('tickets'), perm='ban_users', section='tickets') }}
-        {{ sidebar_link(url_for('page_broadcast'), 'broadcast', 'fas fa-tower-broadcast', t('broadcast'), perm='send_broadcast', section='broadcast') }}
+        {{ sidebar_link(url_for('page_companies'), 'companies', 'fas fa-building', 'companies', perm='manage_companies', section='companies') }}
+        {{ sidebar_link(url_for('page_payment_methods'), 'payment_methods', 'fas fa-credit-card', 'payment_methods', perm='manage_companies', section='payment_methods') }}
+        {{ sidebar_link(url_for('page_apps'), 'apps', 'fas fa-mobile-screen', 'apps', perm='manage_companies', section='apps') }}
+        {{ sidebar_link(url_for('page_games_admin'), 'games_admin', 'fas fa-gamepad', 'games_admin', perm='manage_games', section='games_admin') }}
+        {{ sidebar_link(url_for('page_referrals'), 'referrals', 'fas fa-gift', 'referrals', perm='manage_companies', section='referrals') }}
+        {{ sidebar_link(url_for('page_channels'), 'channels', 'fas fa-bullhorn', 'channels', perm='send_broadcast', section='channels') }}
+        {{ sidebar_link(url_for('page_bots'), 'bots', 'fas fa-robot', 'bots', perm='manage_bots', section='bots') }}
+        {{ sidebar_link(url_for('page_browser'), 'browser', 'fas fa-globe', 'browser', perm='manage_bots', section='browser') }}
+        {{ sidebar_link(url_for('page_clients'), 'clients', 'fas fa-tags', 'clients', perm='manage_bots', section='clients') }}
+        {{ sidebar_link(url_for('page_complaints'), 'complaints', 'fas fa-exclamation-circle', 'complaints', perm='ban_users', section='complaints') }}
+        {{ sidebar_link(url_for('page_tickets'), 'tickets', 'fas fa-ticket-alt', 'tickets', perm='ban_users', section='tickets') }}
+        {{ sidebar_link(url_for('page_broadcast'), 'broadcast', 'fas fa-tower-broadcast', 'broadcast', perm='send_broadcast', section='broadcast') }}
 
         <p class="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 mt-4" data-i18n="advanced_system">Advanced System</p>
-        {{ sidebar_link(url_for('page_statistics'), 'statistics', 'fas fa-chart-bar', t('statistics'), perm='view_statistics', section='statistics') }}
-        {{ sidebar_link(url_for('page_admins'), 'admins', 'fas fa-user-shield', t('admins'), perm='manage_admins', section='admins') }}
-        {{ sidebar_link(url_for('page_admin_center'), 'admin_center', 'fas fa-users-cog', 'مركز الإدارة', perm='manage_admins', section='admin_center') }}
-        {{ sidebar_link(url_for('page_themes'), 'themes', 'fas fa-palette', t('themes'), perm='manage_settings', section='themes') }}
-        {{ sidebar_link(url_for('page_exchange_addresses'), 'exchange_addresses', 'fas fa-location-dot', t('exchange_addresses'), perm='manage_settings', section='exchange_addresses') }}
-        {{ sidebar_link(url_for('page_send_message'), 'send_message', 'fas fa-paper-plane', t('send_message'), perm='send_broadcast', section='send_message') }}
-        {{ sidebar_link(url_for('page_backup'), 'backup', 'fas fa-database', t('backup'), perm='manage_admins', section='backup') }}
-        {{ sidebar_link(url_for('page_settings'), 'settings', 'fas fa-gear', t('settings'), perm='manage_settings', section='settings') }}
-        {{ sidebar_link(url_for('page_ai_api_keys'), 'ai_api_keys', 'fas fa-key', t('ai_api_keys'), perm='manage_settings', section='ai_api_keys') }}
+        {{ sidebar_link(url_for('page_statistics'), 'statistics', 'fas fa-chart-bar', 'statistics', perm='view_statistics', section='statistics') }}
+        {{ sidebar_link(url_for('page_admins'), 'admins', 'fas fa-user-shield', 'admins', perm='manage_admins', section='admins') }}
+        {{ sidebar_link(url_for('page_admin_center'), 'admin_center', 'fas fa-users-cog', 'admin_center', perm='manage_admins', section='admin_center') }}
+        {{ sidebar_link(url_for('page_themes'), 'themes', 'fas fa-palette', 'themes', perm='manage_settings', section='themes') }}
+        {{ sidebar_link(url_for('page_exchange_addresses'), 'exchange_addresses', 'fas fa-location-dot', 'exchange_addresses', perm='manage_settings', section='exchange_addresses') }}
+        {{ sidebar_link(url_for('page_send_message'), 'send_message', 'fas fa-paper-plane', 'send_message', perm='send_broadcast', section='send_message') }}
+        {{ sidebar_link(url_for('page_backup'), 'backup', 'fas fa-database', 'backup', perm='manage_admins', section='backup') }}
+        {{ sidebar_link(url_for('page_settings'), 'settings', 'fas fa-gear', 'settings', perm='manage_settings', section='settings') }}
+        {{ sidebar_link(url_for('page_ai_api_keys'), 'ai_api_keys', 'fas fa-key', 'ai_api_keys', perm='manage_settings', section='ai_api_keys') }}
     </nav>
 
     <!-- Sidebar footer -->
