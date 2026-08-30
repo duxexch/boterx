@@ -13064,6 +13064,7 @@ def _client_public(c):
         'running': bool(_clients().is_running(c.get('id'))),
         'days_left': _clients().days_left(c),
         'expired': _clients().is_expired(c),
+        'revenue_share': int(c.get('revenue_share', 30)),
     }
 
 
@@ -13095,6 +13096,7 @@ def api_clients_create():
         contact=data.get('contact', ''),
         admin_ids=data.get('admin_ids', ''),
         notes=data.get('notes', ''),
+        revenue_share=data.get('revenue_share', 30),
     )
     if err:
         return jsonify({'error': err}), 400
@@ -13722,6 +13724,424 @@ def api_set_admin_role(admin_id):
 
     log_action('set_admin_role', f'{admin_id}: {role}')
     return jsonify({'success': True})
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ── Unified Admin Center — consolidated sub-admin + client + revenue ────────
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.route('/admin-center')
+@admin_required
+@permission_required('manage_admins')
+def page_admin_center():
+    return render_template('admin_center.html', active_page='admin_center')
+
+
+@app.route('/api/admin-center/admins', methods=['GET'])
+@api_auth
+@permission_required('manage_admins')
+def api_admin_center_list():
+    """Merge admins from admin_permissions.json + admin_roles SQLite + clients.csv."""
+    admins = []
+    seen = set()
+
+    # 1. From admin_permissions.json (Telegram bot admins)
+    perm_file = os.path.join(BASE_DIR, 'admin_permissions.json')
+    if os.path.exists(perm_file):
+        try:
+            with open(perm_file, 'r', encoding='utf-8') as f:
+                perms = json.load(f)
+                if isinstance(perms, list):
+                    for p in perms:
+                        tid = str(p.get('telegram_id', ''))
+                        if tid and tid not in seen:
+                            seen.add(tid)
+                            admins.append({
+                                'telegram_id': tid,
+                                'name': p.get('name', ''),
+                                'role': p.get('role', 'support'),
+                                'type': 'permanent' if not p.get('expires_at') else 'temp',
+                                'expires_at': p.get('expires_at', ''),
+                                'added_at': p.get('added_at', ''),
+                                'is_active': p.get('is_active', 'yes'),
+                                'tenant_id': p.get('tenant_id', ''),
+                                'description': p.get('description', ''),
+                                'source': 'permissions'
+                            })
+        except Exception:
+            pass
+
+    # 2. From admin_roles SQLite (RBAC roles)
+    try:
+        import sqlite3 as _sql
+        conn = _sql.connect(os.path.join(BASE_DIR, 'vex_games.db'), timeout=5)
+        conn.row_factory = _sql.Row
+        rows = conn.execute(
+            'SELECT uid, role, permissions, created_at, created_by FROM admin_roles'
+        ).fetchall()
+        conn.close()
+        for r in rows:
+            uid = str(r['uid'])
+            if uid and uid not in seen:
+                seen.add(uid)
+                admins.append({
+                    'telegram_id': uid,
+                    'name': '',
+                    'role': r['role'],
+                    'type': 'permanent',
+                    'expires_at': '',
+                    'added_at': r['created_at'],
+                    'is_active': 'yes',
+                    'tenant_id': '',
+                    'description': '',
+                    'source': 'rbac'
+                })
+    except Exception:
+        pass
+
+    # 3. From clients.csv (client admin usernames)
+    clients_data = read_csv('clients.csv')
+    tenants = {}
+    for c in clients_data:
+        cid = c.get('id', '')
+        tenants[cid] = c.get('name', cid)
+        admin_user = c.get('dash_username', '')
+        if admin_user and admin_user not in seen:
+            seen.add(admin_user)
+            admins.append({
+                'telegram_id': admin_user,
+                'name': c.get('name', '') + ' (أدمن العميل)',
+                'role': 'client_admin',
+                'type': 'permanent',
+                'expires_at': '',
+                'added_at': c.get('created_at', ''),
+                'is_active': 'yes',
+                'tenant_id': cid,
+                'description': 'admin login for client: ' + c.get('name', ''),
+                'source': 'client'
+            })
+
+    return jsonify({'success': True, 'admins': admins, 'tenants': tenants})
+
+
+@app.route('/api/admin-center/admins', methods=['POST'])
+@api_auth
+@permission_required('manage_admins')
+def api_admin_center_add():
+    """Add a new admin to admin_permissions.json + optional RBAC + optional tenant."""
+    data = request.json or {}
+    telegram_id = str(data.get('telegram_id', '')).strip()
+    name = data.get('name', '')
+    role = data.get('role', 'full')
+    admin_type = data.get('type', 'permanent')
+    duration_hours = int(data.get('duration_hours', 0))
+    tenant_id = data.get('tenant_id', '')
+    description = data.get('description', '')
+
+    if not telegram_id:
+        return jsonify({'success': False, 'error': 'المعرف مطلوب'}), 400
+
+    # Add to admin_permissions.json
+    perm_file = os.path.join(BASE_DIR, 'admin_permissions.json')
+    perms = []
+    if os.path.exists(perm_file):
+        try:
+            with open(perm_file, 'r', encoding='utf-8') as f:
+                perms = json.load(f)
+                if not isinstance(perms, list):
+                    perms = []
+        except Exception:
+            perms = []
+
+    expires_at = ''
+    if duration_hours > 0:
+        expires_at = (datetime.now() + timedelta(hours=duration_hours)).strftime('%Y-%m-%d %H:%M')
+
+    new_admin = {
+        'telegram_id': telegram_id,
+        'name': name,
+        'role': role,
+        'added_by': session.get('admin_id', ''),
+        'added_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
+        'expires_at': expires_at,
+        'is_active': 'yes',
+        'tenant_id': tenant_id,
+        'description': description
+    }
+    perms.append(new_admin)
+
+    try:
+        with open(perm_file, 'w', encoding='utf-8') as f:
+            json.dump(perms, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
+    # Also add to RBAC SQLite
+    try:
+        import sqlite3 as _sql
+        conn = _sql.connect(os.path.join(BASE_DIR, 'vex_games.db'), timeout=5)
+        rbac_perms = _get_role_permissions(role)
+        conn.execute(
+            'INSERT OR REPLACE INTO admin_roles (uid, role, permissions, created_at, created_by) VALUES (?,?,?,?,?)',
+            (telegram_id, role, json.dumps(rbac_perms), datetime.now().isoformat(), session.get('admin_id', ''))
+        )
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+    log_action('admin_center_add', f'{telegram_id}: {role}', details=f'tenant={tenant_id}')
+    return jsonify({'success': True})
+
+
+@app.route('/api/admin-center/admins/<admin_id>', methods=['PUT'])
+@api_auth
+@permission_required('manage_admins')
+def api_admin_center_update(admin_id):
+    """Update admin in admin_permissions.json + RBAC."""
+    data = request.json or {}
+    role = data.get('role', '')
+    name = data.get('name', '')
+    tenant_id = data.get('tenant_id', '')
+    description = data.get('description', '')
+
+    # Update admin_permissions.json
+    perm_file = os.path.join(BASE_DIR, 'admin_permissions.json')
+    if os.path.exists(perm_file):
+        try:
+            with open(perm_file, 'r', encoding='utf-8') as f:
+                perms = json.load(f)
+                if isinstance(perms, list):
+                    for p in perms:
+                        if str(p.get('telegram_id')) == str(admin_id):
+                            if role: p['role'] = role
+                            if name: p['name'] = name
+                            if 'tenant_id' in data: p['tenant_id'] = tenant_id
+                            if 'description' in data: p['description'] = description
+                            break
+                    with open(perm_file, 'w', encoding='utf-8') as f2:
+                        json.dump(perms, f2, ensure_ascii=False, indent=2)
+        except Exception:
+            pass
+
+    # Update RBAC SQLite
+    if role:
+        try:
+            import sqlite3 as _sql
+            conn = _sql.connect(os.path.join(BASE_DIR, 'vex_games.db'), timeout=5)
+            rbac_perms = _get_role_permissions(role)
+            conn.execute(
+                'INSERT OR REPLACE INTO admin_roles (uid, role, permissions, created_at, created_by) VALUES (?,?,?,?,?)',
+                (admin_id, role, json.dumps(rbac_perms), datetime.now().isoformat(), session.get('admin_id', ''))
+            )
+            conn.commit()
+            conn.close()
+        except Exception:
+            pass
+
+    log_action('admin_center_update', f'{admin_id}', details=f'role={role} tenant={tenant_id}')
+    return jsonify({'success': True})
+
+
+@app.route('/api/admin-center/admins/<admin_id>/tenant', methods=['POST'])
+@api_auth
+@permission_required('manage_admins')
+def api_admin_center_assign_tenant(admin_id):
+    """Assign admin to a specific tenant/client."""
+    data = request.json or {}
+    tenant_id = data.get('tenant_id', '')
+
+    perm_file = os.path.join(BASE_DIR, 'admin_permissions.json')
+    if os.path.exists(perm_file):
+        try:
+            with open(perm_file, 'r', encoding='utf-8') as f:
+                perms = json.load(f)
+                if isinstance(perms, list):
+                    for p in perms:
+                        if str(p.get('telegram_id')) == str(admin_id):
+                            p['tenant_id'] = tenant_id
+                            break
+                    with open(perm_file, 'w', encoding='utf-8') as f2:
+                        json.dump(perms, f2, ensure_ascii=False, indent=2)
+        except Exception:
+            pass
+
+    log_action('admin_center_assign_tenant', f'{admin_id}', details=f'tenant={tenant_id}')
+    return jsonify({'success': True})
+
+
+@app.route('/api/admin-center/admins/<admin_id>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_admins')
+def api_admin_center_delete(admin_id):
+    """Delete admin from all systems."""
+    # Remove from admin_permissions.json
+    perm_file = os.path.join(BASE_DIR, 'admin_permissions.json')
+    if os.path.exists(perm_file):
+        try:
+            with open(perm_file, 'r', encoding='utf-8') as f:
+                perms = json.load(f)
+                if isinstance(perms, list):
+                    perms = [p for p in perms if str(p.get('telegram_id')) != str(admin_id)]
+                    with open(perm_file, 'w', encoding='utf-8') as f2:
+                        json.dump(perms, f2, ensure_ascii=False, indent=2)
+        except Exception:
+            pass
+
+    # Remove from RBAC SQLite
+    try:
+        import sqlite3 as _sql
+        conn = _sql.connect(os.path.join(BASE_DIR, 'vex_games.db'), timeout=5)
+        conn.execute('DELETE FROM admin_roles WHERE uid = ?', (admin_id,))
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+    log_action('admin_center_delete', f'{admin_id}')
+    return jsonify({'success': True})
+
+
+@app.route('/api/admin-center/revenue-share/<client_id>', methods=['POST'])
+@api_auth
+@permission_required('manage_admins')
+def api_admin_center_set_revenue_share(client_id):
+    """Set revenue share percentage for a client."""
+    data = request.json or {}
+    pct = int(data.get('revenue_share', 30))
+    pct = max(0, min(100, pct))
+
+    clients_data = read_csv('clients.csv')
+    fieldnames = get_fieldnames('clients.csv', ['id', 'name', 'contact', 'bot_username', 'bot_token',
+        'dash_username', 'dash_password_hash', 'salt', 'features', 'admin_ids',
+        'subscription_start', 'subscription_end', 'status', 'bot_autostart',
+        'notes', 'created_at', 'last_login'])
+    if 'revenue_share' not in fieldnames:
+        fieldnames.append('revenue_share')
+
+    found = False
+    for c in clients_data:
+        if c.get('id') == client_id:
+            c['revenue_share'] = str(pct)
+            found = True
+            break
+
+    if found:
+        write_csv('clients.csv', clients_data, fieldnames)
+
+    log_action('admin_center_revenue_share', f'{client_id}', details=f'{pct}%')
+    return jsonify({'success': True, 'revenue_share': pct})
+
+
+@app.route('/api/admin-center/revenue', methods=['GET'])
+@api_auth
+@permission_required('manage_admins')
+def api_admin_center_revenue():
+    """Get revenue breakdown by client."""
+    import sqlite3 as _sql
+    stats = {'total_game_profit': 0, 'admin_share': 0, 'client_share': 0, 'total_rounds': 0}
+    by_client = []
+
+    try:
+        conn = _sql.connect(os.path.join(BASE_DIR, 'boterx.db'), timeout=5)
+        conn.row_factory = _sql.Row
+
+        # Total game profit
+        row = conn.execute(
+            'SELECT COALESCE(SUM(bet_amount - payout), 0) as profit, COUNT(*) as rounds FROM game_sessions WHERE payout > 0'
+        ).fetchone()
+        total_profit = float(row['profit'] or 0)
+        total_rounds = int(row['rounds'] or 0)
+
+        # Per-client breakdown using game_sessions.user_id -> users -> client
+        clients_data = read_csv('clients.csv')
+        client_revenue = {}
+        for c in clients_data:
+            cid = c.get('id', '')
+            share = int(c.get('revenue_share', 30))
+            client_revenue[cid] = {
+                'client_id': cid,
+                'client_name': c.get('name', cid),
+                'revenue_share': share,
+                'total_profit': 0,
+                'client_amount': 0,
+                'admin_amount': 0,
+                'rounds': 0
+            }
+
+        # Get user-game mapping (users created by client bots)
+        # For now, distribute profit evenly across clients as a basic model
+        if client_revenue and total_profit > 0:
+            per_client = total_profit / len(client_revenue)
+            for cid, cr in client_revenue.items():
+                cr['total_profit'] = round(per_client, 2)
+                cr['client_amount'] = round(per_client * cr['revenue_share'] / 100, 2)
+                cr['admin_amount'] = round(per_client * (100 - cr['revenue_share']) / 100, 2)
+                cr['rounds'] = total_rounds // len(client_revenue) if client_revenue else 0
+
+        stats['total_game_profit'] = round(total_profit, 2)
+        stats['admin_share'] = round(sum(c['admin_amount'] for c in client_revenue.values()), 2)
+        stats['client_share'] = round(sum(c['client_amount'] for c in client_revenue.values()), 2)
+        stats['total_rounds'] = total_rounds
+        by_client = list(client_revenue.values())
+
+        conn.close()
+    except Exception:
+        pass
+
+    return jsonify({'success': True, 'stats': stats, 'by_client': by_client})
+
+
+@app.route('/api/admin-center/audit', methods=['GET'])
+@api_auth
+@permission_required('manage_admins')
+def api_admin_center_audit():
+    """Get recent audit logs."""
+    limit = request.args.get('limit', 100, type=int)
+    try:
+        import sqlite3 as _sql
+        conn = _sql.connect(os.path.join(BASE_DIR, 'vex_games.db'), timeout=5)
+        conn.row_factory = _sql.Row
+        rows = conn.execute(
+            'SELECT id, uid, action, target, details, ip, timestamp FROM admin_audit_log ORDER BY timestamp DESC LIMIT ?',
+            (limit,)
+        ).fetchall()
+        conn.close()
+        logs = [dict(r) for r in rows]
+    except Exception:
+        logs = []
+
+    return jsonify({'success': True, 'logs': logs})
+
+
+def _get_role_permissions(role):
+    """Map role name to permission dict."""
+    ROLE_PERMISSIONS = {
+        'super_admin': {p: True for p in [
+            'approve_deposits', 'reject_deposits', 'approve_withdrawals',
+            'reject_withdrawals', 'ban_users', 'unban_users', 'manage_admins',
+            'manage_bots', 'send_broadcast', 'view_financial', 'manage_games',
+            'view_statistics', 'manage_companies', 'manage_settings'
+        ]},
+        'full': {p: True for p in [
+            'approve_deposits', 'reject_deposits', 'approve_withdrawals',
+            'reject_withdrawals', 'ban_users', 'manage_bots', 'send_broadcast',
+            'view_financial', 'manage_games', 'view_statistics'
+        ]},
+        'finance': {
+            'approve_deposits': True, 'reject_deposits': True,
+            'approve_withdrawals': True, 'reject_withdrawals': True,
+            'view_financial': True, 'view_statistics': True
+        },
+        'support': {'view_financial': True, 'ban_users': True},
+        'games': {'manage_games': True, 'view_statistics': True},
+        'broadcast': {'send_broadcast': True},
+        'viewer': {'view_statistics': True},
+        'client_admin': {p: True for p in [
+            'manage_bots', 'view_statistics', 'send_broadcast'
+        ]},
+    }
+    return ROLE_PERMISSIONS.get(role, {'view_statistics': True})
 
 
 # ── RBAC Roles Management API (super_admin only) ──────────────────────────────

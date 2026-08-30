@@ -1,0 +1,795 @@
+{% extends "base.html" %}
+{% block title %}مركز الإدارة — VEX{% endblock %}
+{% block page_title %}مركز الإدارة الموحد{% endblock %}
+
+{% block content %}
+<div x-data="adminCenter()" x-init="init()">
+
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div>
+            <h2 class="text-xl font-bold text-bright">مركز الإدارة الموحد</h2>
+            <p class="text-sm text-dim mt-1">إدارة جميع المسؤولين والعملاء والأرباح من مكان واحد</p>
+        </div>
+        <div class="flex gap-2">
+            <button @click="tab='admins'" class="btn btn-sm" :class="tab==='admins'?'btn-primary':'btn-secondary'">
+                <i class="fas fa-users-cog"></i> المسؤولين
+            </button>
+            <button @click="tab='clients';loadClients()" class="btn btn-sm" :class="tab==='clients'?'btn-primary':'btn-secondary'">
+                <i class="fas fa-building"></i> العملاء
+            </button>
+            <button @click="tab='revenue';loadRevenue()" class="btn btn-sm" :class="tab==='revenue'?'btn-primary':'btn-secondary'">
+                <i class="fas fa-coins"></i> الأرباح
+            </button>
+            <button @click="tab='audit';loadAudit()" class="btn btn-sm" :class="tab==='audit'?'btn-primary':'btn-secondary'">
+                <i class="fas fa-history"></i> السجل
+            </button>
+        </div>
+    </div>
+
+    <!-- ==================== TAB: ADMINS ==================== -->
+    <div x-show="tab==='admins'">
+        <!-- Stats -->
+        <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
+            <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+                <div class="flex items-center gap-2 mb-2">
+                    <div class="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                        <i class="fas fa-users-cog text-blue-400 text-sm"></i>
+                    </div>
+                    <p class="text-xs text-dim">إجمالي المسؤولين</p>
+                </div>
+                <p class="text-2xl font-bold text-bright" x-text="adminStats.total"></p>
+            </div>
+            <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+                <div class="flex items-center gap-2 mb-2">
+                    <div class="w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center">
+                        <i class="fas fa-user-shield text-green-400 text-sm"></i>
+                    </div>
+                    <p class="text-xs text-dim">دائمون</p>
+                </div>
+                <p class="text-2xl font-bold text-success" x-text="adminStats.permanent"></p>
+            </div>
+            <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+                <div class="flex items-center gap-2 mb-2">
+                    <div class="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center">
+                        <i class="fas fa-user-clock text-amber-400 text-sm"></i>
+                    </div>
+                    <p class="text-xs text-dim">مؤقتون</p>
+                </div>
+                <p class="text-2xl font-bold text-warning" x-text="adminStats.temp"></p>
+            </div>
+            <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+                <div class="flex items-center gap-2 mb-2">
+                    <div class="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center">
+                        <i class="fas fa-key text-purple-400 text-sm"></i>
+                    </div>
+                    <p class="text-xs text-dim">Super Admin</p>
+                </div>
+                <p class="text-2xl font-bold text-info" x-text="adminStats.super"></p>
+            </div>
+            <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+                <div class="flex items-center gap-2 mb-2">
+                    <div class="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center">
+                        <i class="fas fa-user-slash text-red-400 text-sm"></i>
+                    </div>
+                    <p class="text-xs text-dim">معطلون</p>
+                </div>
+                <p class="text-2xl font-bold text-danger" x-text="adminStats.disabled"></p>
+            </div>
+        </div>
+
+        <!-- Add Admin Button -->
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-bold text-bright">جميع المسؤولين</h3>
+            <button @click="openAddAdmin()" class="btn btn-primary btn-sm gap-2">
+                <i class="fas fa-plus"></i> إضافة مسؤول
+            </button>
+        </div>
+
+        <!-- Admins Table -->
+        <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-slate-700 bg-slate-800/80">
+                            <th class="text-right px-4 py-3 font-semibold text-dim">المعرف</th>
+                            <th class="text-right px-4 py-3 font-semibold text-dim">الاسم</th>
+                            <th class="text-right px-4 py-3 font-semibold text-dim">الدور</th>
+                            <th class="text-right px-4 py-3 font-semibold text-dim">النوع</th>
+                            <th class="text-right px-4 py-3 font-semibold text-dim">العميل المسؤول</th>
+                            <th class="text-right px-4 py-3 font-semibold text-dim">الصلاحيات</th>
+                            <th class="text-right px-4 py-3 font-semibold text-dim">تاريخ الإضافة</th>
+                            <th class="text-right px-4 py-3 font-semibold text-dim">الإجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="a in admins" :key="a.telegram_id || a.uid">
+                            <tr class="border-b border-slate-700/50 transition hover:bg-slate-700/20">
+                                <td class="px-4 py-3 font-mono text-xs text-bright" x-text="a.telegram_id || a.uid"></td>
+                                <td class="px-4 py-3 font-medium text-bright" x-text="a.name || a.uid || '—'"></td>
+                                <td class="px-4 py-3">
+                                    <span class="px-2.5 py-1 rounded-full text-xs font-semibold"
+                                        :class="roleBadgeClass(a.role)" x-text="roleLabel(a.role)"></span>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <span class="px-2.5 py-1 rounded-full text-xs font-semibold"
+                                        :class="a.type==='permanent'?'bg-green-500/20 text-green-400':a.expires_at?'bg-amber-500/20 text-amber-400':'bg-blue-500/20 text-blue-400'"
+                                        x-text="a.type==='permanent'?'دائم':a.expires_at?'مؤقت':'رئيسي'"></span>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <template x-if="a.tenant_id">
+                                        <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-cyan-500/20 text-cyan-400" x-text="getTenantName(a.tenant_id)"></span>
+                                    </template>
+                                    <template x-if="!a.tenant_id">
+                                        <span class="text-dim text-xs">النظام الرئيسي</span>
+                                    </template>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <div class="flex flex-wrap gap-1">
+                                        <template x-for="p in getPermList(a)" :key="p">
+                                            <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-600/50 text-dim" x-text="p"></span>
+                                        </template>
+                                    </div>
+                                </td>
+                                <td class="px-4 py-3 text-dim text-xs" x-text="a.added_at || a.created_at || '—'"></td>
+                                <td class="px-4 py-3">
+                                    <div class="flex items-center gap-1">
+                                        <button @click="openEditAdmin(a)" class="p-2 rounded-lg hover:bg-slate-700/50 text-dim hover:text-blue-400 transition" title="تعديل">
+                                            <i class="fas fa-pen text-sm"></i>
+                                        </button>
+                                        <button @click="openTenantAssign(a)" class="p-2 rounded-lg hover:bg-slate-700/50 text-dim hover:text-cyan-400 transition" title="تعيين لعميل">
+                                            <i class="fas fa-link text-sm"></i>
+                                        </button>
+                                        <button @click="confirmRemoveAdmin(a)" class="p-2 rounded-lg hover:bg-slate-700/50 text-dim hover:text-red-400 transition" title="حذف">
+                                            <i class="fas fa-trash text-sm"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </template>
+                        <tr x-show="admins.length===0">
+                            <td colspan="8" class="px-4 py-12 text-center text-dim">
+                                <i class="fas fa-user-shield text-4xl mb-3 block opacity-30"></i>
+                                <p class="text-sm">لا يوجد مسؤولون بعد</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== TAB: CLIENTS ==================== -->
+    <div x-show="tab==='clients'">
+        <!-- Client Stats -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+            <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+                <p class="text-xs text-dim mb-1">إجمالي العملاء</p>
+                <p class="text-2xl font-bold text-bright" x-text="clients.length"></p>
+            </div>
+            <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+                <p class="text-xs text-dim mb-1">بوتات تعمل</p>
+                <p class="text-2xl font-bold text-success" x-text="clients.filter(c=>c.running).length"></p>
+            </div>
+            <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+                <p class="text-xs text-dim mb-1">اشتراكات منتهية</p>
+                <p class="text-2xl font-bold text-danger" x-text="clients.filter(c=>c.expired).length"></p>
+            </div>
+            <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+                <p class="text-xs text-dim mb-1">نسبة الأرباح paźrednia</p>
+                <p class="text-2xl font-bold text-warning" x-text="avgRevenuePct()+'%'"></p>
+            </div>
+        </div>
+
+        <!-- Add Client Button -->
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-bold text-bright">العملاء</h3>
+            <button @click="openAddClient()" class="btn btn-primary btn-sm gap-2">
+                <i class="fas fa-plus"></i> إضافة عميل
+            </button>
+        </div>
+
+        <!-- Clients Table -->
+        <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-slate-700 bg-slate-800/80">
+                            <th class="text-right px-4 py-3 font-semibold text-dim">العميل</th>
+                            <th class="text-right px-4 py-3 font-semibold text-dim">اسم المستخدم</th>
+                            <th class="text-right px-4 py-3 font-semibold text-dim">المميزات</th>
+                            <th class="text-right px-4 py-3 font-semibold text-dim">نسبة الأرباح</th>
+                            <th class="text-right px-4 py-3 font-semibold text-dim">الاشتراك</th>
+                            <th class="text-right px-4 py-3 font-semibold text-dim">الحالة</th>
+                            <th class="text-right px-4 py-3 font-semibold text-dim">الإجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="c in clients" :key="c.id">
+                            <tr class="border-b border-slate-700/50 transition hover:bg-slate-700/20">
+                                <td class="px-4 py-3">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                                            <i class="fas fa-building text-blue-400 text-sm"></i>
+                                        </div>
+                                        <div>
+                                            <p class="font-medium text-bright text-sm" x-text="c.name"></p>
+                                            <p class="text-[10px] text-dim" x-text="c.id"></p>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-4 py-3 font-mono text-xs text-bright" x-text="c.dash_username || '—'"></td>
+                                <td class="px-4 py-3">
+                                    <div class="flex flex-wrap gap-1">
+                                        <template x-for="f in (c.features||[]).slice(0,3)" :key="f">
+                                            <span class="px-1.5 py-0.5 rounded text-[10px] bg-slate-600/50 text-dim" x-text="f"></span>
+                                        </template>
+                                        <span x-show="(c.features||[]).length > 3" class="text-[10px] text-dim" x-text="'+'+((c.features||[]).length-3)"></span>
+                                    </div>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <div class="flex items-center gap-1">
+                                        <input type="number" min="0" max="100" step="1"
+                                            :value="c.revenue_share || 30"
+                                            @change="updateRevenueShare(c.id, $event.target.value)"
+                                            class="w-16 bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-bright text-center focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                                        <span class="text-xs text-dim">%</span>
+                                    </div>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <span x-show="c.expired" class="text-red-400 text-xs font-semibold">منتهي</span>
+                                    <span x-show="!c.expired && c.days_left<=3" class="text-amber-400 text-xs font-semibold" x-text="c.days_left+' يوم'"></span>
+                                    <span x-show="!c.expired && c.days_left>3" class="text-green-400 text-xs" x-text="c.days_left+' يوم'"></span>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <span class="px-2.5 py-1 rounded-full text-xs font-semibold"
+                                        :class="c.running?'bg-green-500/20 text-green-400':c.expired?'bg-red-500/20 text-red-400':'bg-slate-500/20 text-slate-400'"
+                                        x-text="c.running?'شغال':c.expired?'منتهي':'متوقف'"></span>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <div class="flex items-center gap-1">
+                                        <button @click="openEditClient(c)" class="p-2 rounded-lg hover:bg-slate-700/50 text-dim hover:text-blue-400 transition" title="تعديل">
+                                            <i class="fas fa-pen text-sm"></i>
+                                        </button>
+                                        <button @click="toggleClient(c)" class="p-2 rounded-lg hover:bg-slate-700/50 text-dim hover:text-green-400 transition" :title="c.running?'إيقاف':'تشغيل'">
+                                            <i class="fas" :class="c.running?'fa-stop':'fa-play'"></i>
+                                        </button>
+                                        <button @click="confirmDeleteClient(c)" class="p-2 rounded-lg hover:bg-slate-700/50 text-dim hover:text-red-400 transition" title="حذف">
+                                            <i class="fas fa-trash text-sm"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </template>
+                        <tr x-show="clients.length===0">
+                            <td colspan="7" class="px-4 py-12 text-center text-dim">
+                                <i class="fas fa-building text-4xl mb-3 block opacity-30"></i>
+                                <p class="text-sm">لا يوجد عملاء بعد</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== TAB: REVENUE ==================== -->
+    <div x-show="tab==='revenue'">
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+            <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+                <p class="text-xs text-dim mb-1">إجمالي أرباح الألعاب</p>
+                <p class="text-2xl font-bold text-success" x-text="fmtMoney(revenueStats.total_game_profit)"></p>
+            </div>
+            <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+                <p class="text-xs text-dim mb-1">نصيبي (Admin)</p>
+                <p class="text-2xl font-bold text-info" x-text="fmtMoney(revenueStats.admin_share)"></p>
+            </div>
+            <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+                <p class="text-xs text-dim mb-1">نصيبي العملاء</p>
+                <p class="text-2xl font-bold text-warning" x-text="fmtMoney(revenueStats.client_share)"></p>
+            </div>
+            <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+                <p class="text-xs text-dim mb-1">عدد الجولات</p>
+                <p class="text-2xl font-bold text-bright" x-text="fmtNum(revenueStats.total_rounds)"></p>
+            </div>
+        </div>
+
+        <!-- Revenue Per Client -->
+        <h3 class="text-lg font-bold text-bright mb-4">أرباح كل عميل</h3>
+        <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-slate-700 bg-slate-800/80">
+                            <th class="text-right px-4 py-3 font-semibold text-dim">العميل</th>
+                            <th class="text-right px-4 py-3 font-semibold text-dim">نسبة العميل</th>
+                            <th class="text-right px-4 py-3 font-semibold text-dim">إجمالي الربح</th>
+                            <th class="text-right px-4 py-3 font-semibold text-dim">ربح العميل</th>
+                            <th class="text-right px-4 py-3 font-semibold text-dim">نصيبي</th>
+                            <th class="text-right px-4 py-3 font-semibold text-dim">عدد الجولات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="r in revenueByClient" :key="r.client_id">
+                            <tr class="border-b border-slate-700/50 transition hover:bg-slate-700/20">
+                                <td class="px-4 py-3 font-medium text-bright" x-text="r.client_name"></td>
+                                <td class="px-4 py-3">
+                                    <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-cyan-500/20 text-cyan-400" x-text="r.revenue_share+'%'"></span>
+                                </td>
+                                <td class="px-4 py-3 text-success font-bold" x-text="fmtMoney(r.total_profit)"></td>
+                                <td class="px-4 py-3 text-warning" x-text="fmtMoney(r.client_amount)"></td>
+                                <td class="px-4 py-3 text-info font-bold" x-text="fmtMoney(r.admin_amount)"></td>
+                                <td class="px-4 py-3 text-dim" x-text="fmtNum(r.rounds)"></td>
+                            </tr>
+                        </template>
+                        <tr x-show="revenueByClient.length===0">
+                            <td colspan="6" class="px-4 py-12 text-center text-dim">
+                                <p class="text-sm">لا توجد بيانات أرباح بعد</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== TAB: AUDIT ==================== -->
+    <div x-show="tab==='audit'">
+        <h3 class="text-lg font-bold text-bright mb-4">سجل الأنشطة</h3>
+        <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-slate-700 bg-slate-800/80">
+                            <th class="text-right px-4 py-3 font-semibold text-dim">الوقت</th>
+                            <th class="text-right px-4 py-3 font-semibold text-dim">المسؤول</th>
+                            <th class="text-right px-4 py-3 font-semibold text-dim">الإجراء</th>
+                            <th class="text-right px-4 py-3 font-semibold text-dim">الهدف</th>
+                            <th class="text-right px-4 py-3 font-semibold text-dim">التفاصيل</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="log in auditLogs" :key="log.id">
+                            <tr class="border-b border-slate-700/50 transition">
+                                <td class="px-4 py-3 text-dim text-xs font-mono" x-text="log.timestamp"></td>
+                                <td class="px-4 py-3 text-bright text-xs" x-text="log.uid"></td>
+                                <td class="px-4 py-3">
+                                    <span class="px-2 py-1 rounded text-[10px] font-semibold"
+                                        :class="actionBadgeClass(log.action)" x-text="log.action"></span>
+                                </td>
+                                <td class="px-4 py-3 text-dim text-xs" x-text="log.target || '—'"></td>
+                                <td class="px-4 py-3 text-dim text-xs max-w-[200px] truncate" x-text="log.details || '—'"></td>
+                            </tr>
+                        </template>
+                        <tr x-show="auditLogs.length===0">
+                            <td colspan="5" class="px-4 py-12 text-center text-dim">
+                                <p class="text-sm">لا يوجد سجل بعد</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== MODALS ==================== -->
+
+    <!-- Add/Edit Admin Modal -->
+    <div x-show="showAdminModal" x-transition.opacity class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" style="display:none" @click.self="showAdminModal=false">
+        <div class="bg-slate-800 rounded-2xl border border-slate-700 w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl" @click.stop="">
+            <div class="flex items-center justify-between p-5 border-b border-slate-700">
+                <h3 class="text-lg font-bold text-bright" x-text="editingAdmin?'تعديل المسؤول':'إضافة مسؤول جديد'"></h3>
+                <button @click="showAdminModal=false" class="text-dim hover:text-bright transition p-1"><i class="fas fa-times text-lg"></i></button>
+            </div>
+            <form @submit.prevent="saveAdmin()" class="p-5 space-y-4">
+                <div>
+                    <label class="block text-sm text-dim mb-1.5">المعرف (Telegram ID) <span class="text-red-400">*</span></label>
+                    <input x-model="adminForm.telegram_id" required type="text" :disabled="!!editingAdmin"
+                        class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm text-bright focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:opacity-50"
+                        placeholder="123456789">
+                </div>
+                <div>
+                    <label class="block text-sm text-dim mb-1.5">الاسم</label>
+                    <input x-model="adminForm.name" type="text"
+                        class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm text-bright focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        placeholder="اسم المسؤول">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm text-dim mb-1.5">الدور <span class="text-red-400">*</span></label>
+                        <select x-model="adminForm.role"
+                            class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm text-bright focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                            <option value="super_admin">Super Admin</option>
+                            <option value="full">صلاحية كاملة</option>
+                            <option value="finance">المالية</option>
+                            <option value="support">الدعم</option>
+                            <option value="games">الألعاب</option>
+                            <option value="broadcast">البث</option>
+                            <option value="viewer">مشاهد فقط</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm text-dim mb-1.5">النوع</label>
+                        <select x-model="adminForm.type"
+                            class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm text-bright focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                            <option value="permanent">دائم</option>
+                            <option value="temp">مؤقت</option>
+                        </select>
+                    </div>
+                </div>
+                <div x-show="adminForm.type==='temp'" x-transition>
+                    <label class="block text-sm text-dim mb-1.5">المدة (ساعات)</label>
+                    <input x-model="adminForm.duration_hours" type="number" min="1"
+                        class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm text-bright focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        placeholder="24">
+                </div>
+                <div>
+                    <label class="block text-sm text-dim mb-1.5">العميل المسؤول (اختياري)</label>
+                    <select x-model="adminForm.tenant_id"
+                        class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm text-bright focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                        <option value="">النظام الرئيسي</option>
+                        <template x-for="c in clients" :key="c.id">
+                            <option :value="c.id" x-text="c.name"></option>
+                        </template>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm text-dim mb-1.5">الوصف</label>
+                    <input x-model="adminForm.description" type="text"
+                        class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm text-bright focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        placeholder="وصف مختصر للمسؤول">
+                </div>
+                <div class="flex gap-3 pt-2">
+                    <button type="submit" class="flex-1 btn btn-primary" x-text="editingAdmin?'حفظ التعديلات':'إضافة'"></button>
+                    <button type="button" @click="showAdminModal=false" class="flex-1 btn btn-secondary">إلغاء</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Tenant Assign Modal -->
+    <div x-show="showTenantModal" x-transition.opacity class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" style="display:none" @click.self="showTenantModal=false">
+        <div class="bg-slate-800 rounded-2xl border border-slate-700 w-full max-w-sm shadow-2xl" @click.stop="">
+            <div class="flex items-center justify-between p-5 border-b border-slate-700">
+                <h3 class="text-lg font-bold text-bright">تعيين المسؤول لعميل</h3>
+                <button @click="showTenantModal=false" class="text-dim hover:text-bright transition p-1"><i class="fas fa-times text-lg"></i></button>
+            </div>
+            <form @submit.prevent="assignTenant()" class="p-5 space-y-4">
+                <p class="text-sm text-dim">المسؤول: <span class="text-bright font-semibold" x-text="tenantTarget?.name || tenantTarget?.telegram_id || tenantTarget?.uid"></span></p>
+                <div>
+                    <label class="block text-sm text-dim mb-1.5">تعيين لعميل</label>
+                    <select x-model="tenantForm.tenant_id"
+                        class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm text-bright focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                        <option value="">النظام الرئيسي (بدون عميل محدد)</option>
+                        <template x-for="c in clients" :key="c.id">
+                            <option :value="c.id" x-text="c.name"></option>
+                        </template>
+                    </select>
+                </div>
+                <div class="flex gap-3 pt-2">
+                    <button type="submit" class="flex-1 btn btn-primary">حفظ</button>
+                    <button type="button" @click="showTenantModal=false" class="flex-1 btn btn-secondary">إلغاء</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Delete Admin Confirmation -->
+    <div x-show="showDeleteModal" x-transition.opacity class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" style="display:none" @click.self="showDeleteModal=false">
+        <div class="bg-slate-800 rounded-2xl border border-slate-700 w-full max-w-sm shadow-2xl" @click.stop="">
+            <div class="p-6 text-center">
+                <div class="w-14 h-14 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4">
+                    <i class="fas fa-user-minus text-red-400 text-2xl"></i>
+                </div>
+                <h3 class="text-lg font-bold mb-2 text-bright">تأكيد الحذف</h3>
+                <p class="text-sm text-dim">هل أنت متأكد من حذف "<span class="text-bright font-semibold" x-text="deleteTarget?.name || deleteTarget?.telegram_id || deleteTarget?.uid"></span>"؟</p>
+                <p class="text-xs text-red-400 mt-2">هذا الإجراء لا يمكن التراجع عنه.</p>
+                <div class="flex gap-3 mt-6">
+                    <button @click="executeDelete()" class="flex-1 btn btn-danger">حذف</button>
+                    <button @click="showDeleteModal=false" class="flex-1 btn btn-secondary">إلغاء</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Client Confirmation -->
+    <div x-show="showDeleteClientModal" x-transition.opacity class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" style="display:none" @click.self="showDeleteClientModal=false">
+        <div class="bg-slate-800 rounded-2xl border border-slate-700 w-full max-w-sm shadow-2xl" @click.stop="">
+            <div class="p-6 text-center">
+                <div class="w-14 h-14 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4">
+                    <i class="fas fa-building text-red-400 text-2xl"></i>
+                </div>
+                <h3 class="text-lg font-bold mb-2 text-bright">حذف العميل</h3>
+                <p class="text-sm text-dim">هل أنت متأكد من حذف "<span class="text-bright font-semibold" x-text="deleteClientTarget?.name"></span>"؟</p>
+                <p class="text-xs text-red-400 mt-2">جميع بياناته ستُحذف نهائياً.</p>
+                <div class="flex gap-3 mt-6">
+                    <button @click="executeDeleteClient()" class="flex-1 btn btn-danger">حذف</button>
+                    <button @click="showDeleteClientModal=false" class="flex-1 btn btn-secondary">إلغاء</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading -->
+    <div x-show="loading" class="fixed inset-0 bg-black/50 z-40 flex items-center justify-center" style="display:none">
+        <div class="bg-slate-800 rounded-xl p-4 flex items-center gap-3 border border-slate-700">
+            <img src="/static/icons/logo-full.png" alt="" class="vex-loader-logo">
+            <span class="text-sm text-bright">جاري التحميل...</span>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function adminCenter() {
+    return {
+        tab: 'admins',
+        loading: false,
+        admins: [],
+        clients: [],
+        auditLogs: [],
+        revenueStats: { total_game_profit: 0, admin_share: 0, client_share: 0, total_rounds: 0 },
+        revenueByClient: [],
+        adminStats: { total: 0, permanent: 0, temp: 0, super: 0, disabled: 0 },
+        tenants: {},
+
+        // Admin modal
+        showAdminModal: false,
+        editingAdmin: null,
+        adminForm: { telegram_id: '', name: '', role: 'full', type: 'permanent', duration_hours: '', tenant_id: '', description: '' },
+
+        // Tenant assign modal
+        showTenantModal: false,
+        tenantTarget: null,
+        tenantForm: { tenant_id: '' },
+
+        // Delete modals
+        showDeleteModal: false,
+        deleteTarget: null,
+        deleteType: '',
+        showDeleteClientModal: false,
+        deleteClientTarget: null,
+
+        async init() {
+            await this.loadAdmins();
+            await this.loadClients();
+        },
+
+        // ── ADMINS ──
+        async loadAdmins() {
+            this.loading = true;
+            try {
+                const data = await api('/api/admin-center/admins');
+                this.admins = data.admins || [];
+                this.tenants = data.tenants || {};
+                this.computeAdminStats();
+            } catch(e) { toast('فشل تحميل المسؤولين', 'error'); }
+            this.loading = false;
+        },
+
+        computeAdminStats() {
+            const s = { total: this.admins.length, permanent: 0, temp: 0, super: 0, disabled: 0 };
+            for (const a of this.admins) {
+                if (a.type === 'permanent' || !a.expires_at) s.permanent++;
+                if (a.expires_at) s.temp++;
+                if (a.role === 'super_admin') s.super++;
+                if (a.is_active === 'no') s.disabled++;
+            }
+            this.adminStats = s;
+        },
+
+        openAddAdmin() {
+            this.editingAdmin = null;
+            this.adminForm = { telegram_id: '', name: '', role: 'full', type: 'permanent', duration_hours: '', tenant_id: '', description: '' };
+            this.showAdminModal = true;
+        },
+
+        openEditAdmin(a) {
+            this.editingAdmin = a;
+            this.adminForm = {
+                telegram_id: a.telegram_id || a.uid || '',
+                name: a.name || '',
+                role: a.role || 'full',
+                type: a.type || 'permanent',
+                duration_hours: '',
+                tenant_id: a.tenant_id || '',
+                description: a.description || ''
+            };
+            this.showAdminModal = true;
+        },
+
+        async saveAdmin() {
+            try {
+                if (this.editingAdmin) {
+                    await api('/api/admin-center/admins/' + this.adminForm.telegram_id, {
+                        method: 'PUT',
+                        body: JSON.stringify(this.adminForm)
+                    });
+                    toast('تم تحديث المسؤول', 'success');
+                } else {
+                    await api('/api/admin-center/admins', {
+                        method: 'POST',
+                        body: JSON.stringify(this.adminForm)
+                    });
+                    toast('تمت إضافة المسؤول', 'success');
+                }
+                this.showAdminModal = false;
+                await this.loadAdmins();
+            } catch(e) { toast('فشل الحفظ: ' + (e.message||''), 'error'); }
+        },
+
+        openTenantAssign(a) {
+            this.tenantTarget = a;
+            this.tenantForm.tenant_id = a.tenant_id || '';
+            this.showTenantModal = true;
+        },
+
+        async assignTenant() {
+            if (!this.tenantTarget) return;
+            try {
+                const id = this.tenantTarget.telegram_id || this.tenantTarget.uid;
+                await api('/api/admin-center/admins/' + id + '/tenant', {
+                    method: 'POST',
+                    body: JSON.stringify(this.tenantForm)
+                });
+                toast('تم التعيين', 'success');
+                this.showTenantModal = false;
+                await this.loadAdmins();
+            } catch(e) { toast('فشل التعيين', 'error'); }
+        },
+
+        confirmRemoveAdmin(a) {
+            this.deleteTarget = a;
+            this.deleteType = 'admin';
+            this.showDeleteModal = true;
+        },
+
+        confirmDeleteClient(c) {
+            this.deleteClientTarget = c;
+            this.showDeleteClientModal = true;
+        },
+
+        async executeDelete() {
+            if (!this.deleteTarget) return;
+            try {
+                if (this.deleteType === 'admin') {
+                    const id = this.deleteTarget.telegram_id || this.deleteTarget.uid;
+                    await api('/api/admin-center/admins/' + id, { method: 'DELETE' });
+                    toast('تم حذف المسؤول', 'success');
+                }
+                this.showDeleteModal = false;
+                this.deleteTarget = null;
+                await this.loadAdmins();
+            } catch(e) { toast('فشل الحذف', 'error'); }
+        },
+
+        async executeDeleteClient() {
+            if (!this.deleteClientTarget) return;
+            try {
+                await api('/api/clients/' + this.deleteClientTarget.id, { method: 'DELETE' });
+                toast('تم حذف العميل', 'success');
+                this.showDeleteClientModal = false;
+                this.deleteClientTarget = null;
+                await this.loadClients();
+            } catch(e) { toast('فشل الحذف', 'error'); }
+        },
+
+        // ── CLIENTS ──
+        async loadClients() {
+            try {
+                const data = await api('/api/clients');
+                this.clients = (data.clients || []).map(c => ({
+                    ...c,
+                    features: (c.features || '').split(',').filter(Boolean),
+                    running: c.running || false,
+                    expired: c.expired || false,
+                    days_left: c.days_left || 0
+                }));
+            } catch(e) { toast('فشل تحميل العملاء', 'error'); }
+        },
+
+        openAddClient() {
+            window.location.href = '/clients';
+        },
+
+        openEditClient(c) {
+            window.location.href = '/clients';
+        },
+
+        async toggleClient(c) {
+            try {
+                const action = c.running ? 'stop' : 'start';
+                await api('/api/clients/' + c.id + '/' + action, { method: 'POST' });
+                toast(c.running ? 'تم الإيقاف' : 'تم التشغيل', 'success');
+                await this.loadClients();
+            } catch(e) { toast('فشل', 'error'); }
+        },
+
+        async updateRevenueShare(clientId, value) {
+            const pct = parseInt(value) || 30;
+            try {
+                await api('/api/admin-center/revenue-share/' + clientId, {
+                    method: 'POST',
+                    body: JSON.stringify({ revenue_share: pct })
+                });
+                toast('تم تحديث نسبة الأرباح', 'success');
+            } catch(e) { toast('فشل', 'error'); }
+        },
+
+        avgRevenuePct() {
+            if (!this.clients.length) return 30;
+            const sum = this.clients.reduce((s,c) => s + (c.revenue_share || 30), 0);
+            return Math.round(sum / this.clients.length);
+        },
+
+        // ── REVENUE ──
+        async loadRevenue() {
+            try {
+                const data = await api('/api/admin-center/revenue');
+                this.revenueStats = data.stats || this.revenueStats;
+                this.revenueByClient = data.by_client || [];
+            } catch(e) { toast('فشل تحميل الأرباح', 'error'); }
+        },
+
+        // ── AUDIT ──
+        async loadAudit() {
+            try {
+                const data = await api('/api/admin-center/audit?limit=100');
+                this.auditLogs = data.logs || [];
+            } catch(e) { toast('فشل تحميل السجل', 'error'); }
+        },
+
+        // ── HELPERS ──
+        getTenantName(tid) {
+            const c = this.clients.find(c => c.id === tid);
+            return c ? c.name : tid;
+        },
+
+        getPermList(a) {
+            if (a.role === 'super_admin') return ['كل الصلاحيات'];
+            const map = {
+                full: ['إدارة', 'مالي', 'ألعاب', 'بث'],
+                finance: ['إيداع', 'سحب', 'مالي'],
+                support: ['دعم'],
+                games: ['ألعاب'],
+                broadcast: ['بث'],
+                viewer: ['قراءة']
+            };
+            return map[a.role] || [a.role];
+        },
+
+        roleLabel(role) {
+            const map = {
+                super_admin: 'Super Admin', full: 'صلاحية كاملة', finance: 'المالية',
+                support: 'الدعم', games: 'الألعاب', broadcast: 'البث', viewer: 'مشاهد'
+            };
+            return map[role] || role || '—';
+        },
+
+        roleBadgeClass(role) {
+            const map = {
+                super_admin: 'bg-red-500/20 text-red-400',
+                full: 'bg-blue-500/20 text-blue-400',
+                finance: 'bg-amber-500/20 text-amber-400',
+                support: 'bg-green-500/20 text-green-400',
+                games: 'bg-purple-500/20 text-purple-400',
+                broadcast: 'bg-cyan-500/20 text-cyan-400',
+                viewer: 'bg-slate-500/20 text-slate-400'
+            };
+            return map[role] || 'bg-slate-500/20 text-slate-400';
+        },
+
+        actionBadgeClass(action) {
+            if (action.includes('add') || action.includes('create')) return 'bg-green-500/20 text-green-400';
+            if (action.includes('delete') || action.includes('remove')) return 'bg-red-500/20 text-red-400';
+            if (action.includes('update') || action.includes('set') || action.includes('assign')) return 'bg-blue-500/20 text-blue-400';
+            return 'bg-slate-500/20 text-slate-400';
+        },
+
+        fmtNum(n) { return (n||0).toLocaleString(); },
+        fmtMoney(n) { return (n||0).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}); },
+    };
+}
+</script>
+{% endblock %}

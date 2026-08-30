@@ -38,6 +38,7 @@ CLIENT_FIELDS = [
     'features', 'admin_ids',
     'subscription_start', 'subscription_end',
     'status', 'bot_autostart', 'notes', 'created_at', 'last_login',
+    'revenue_share',
 ]
 
 # ── كتالوج مميزات النظام — يظهر في لوحة الإدارة ويثبَّت في بوت العميل ──
@@ -137,7 +138,7 @@ class ClientManager:
 
     def create(self, name, bot_username, bot_token, dash_username, dash_password,
                features=None, subscription_days=30, contact='', admin_ids='',
-               notes=''):
+               notes='', revenue_share=30):
         if not name or not bot_token or len(bot_token) < 20:
             return None, 'الاسم والتوكن مطلوبان (التوكن غير صالح)'
         if not dash_username or not dash_password or len(dash_password) < 6:
@@ -161,6 +162,7 @@ class ClientManager:
             'status': 'active', 'bot_autostart': 'no', 'notes': notes,
             'created_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
             'last_login': '',
+            'revenue_share': str(int(revenue_share or 30)),
         }
         with _csv_lock:
             rows = self._read_rows()
@@ -177,7 +179,7 @@ class ClientManager:
                 if r['id'] != client_id:
                     continue
                 for k in ('name', 'contact', 'bot_username', 'bot_token',
-                          'admin_ids', 'notes', 'status'):
+                          'admin_ids', 'notes', 'status', 'revenue_share'):
                     if k in data and data[k] is not None:
                         r[k] = str(data[k]).strip()
                 if 'features' in data and data['features'] is not None:

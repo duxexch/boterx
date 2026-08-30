@@ -47,6 +47,7 @@
             <th class="text-right px-4 py-3 font-semibold">دخول اللوحة</th>
             <th class="text-right px-4 py-3 font-semibold">المميزات</th>
             <th class="text-right px-4 py-3 font-semibold">الاشتراك</th>
+            <th class="text-right px-4 py-3 font-semibold">الربح</th>
             <th class="text-right px-4 py-3 font-semibold">الحالة</th>
             <th class="text-right px-4 py-3 font-semibold">إجراءات</th>
           </tr>
@@ -83,6 +84,14 @@
                 <div x-show="c.expired" class="text-red-400 text-xs font-bold">⏳ منتهي — بانتظار التجديد</div>
               </td>
               <td class="px-4 py-3">
+                <div class="text-xs">
+                  <span class="text-emerald-400 font-bold" x-text="(c.revenue_share || 30) + '%'"></span>
+                  <span class="text-slate-500 block">عميل</span>
+                  <span class="text-blue-400 font-bold" x-text="(100 - (c.revenue_share || 30)) + '%'"></span>
+                  <span class="text-slate-500 block">أنت</span>
+                </div>
+              </td>
+              <td class="px-4 py-3">
                 <span x-show="c.status === 'active' && !c.expired" class="text-xs px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300">🟢 نشط</span>
                 <span x-show="c.expired" class="text-xs px-2.5 py-1 rounded-full bg-red-500/20 text-red-300">⏳ منتهي</span>
                 <span x-show="c.status === 'suspended'" class="text-xs px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300">⏸️ موقوف</span>
@@ -102,7 +111,7 @@
             </tr>
           </template>
           <tr x-show="clients.length === 0">
-            <td colspan="7" class="px-4 py-12 text-center text-slate-500">
+            <td colspan="8" class="px-4 py-12 text-center text-slate-500">
               <div class="text-4xl mb-3">🏷️</div>
               لا يوجد عملاء بعد — أضف أول عميل وابدأ بيع المنصة كـ White-Label
             </td>
@@ -157,6 +166,14 @@
               <option value="30">30 يوم</option><option value="60">60 يوم</option>
               <option value="90">90 يوم</option><option value="180">6 أشهر</option><option value="365">سنة</option>
             </select>
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-400 mb-1.5">نسبة أرباح العميل (%)</label>
+          <div class="flex items-center gap-2">
+            <input x-model="form.revenue_share" type="number" min="0" max="100" value="30"
+              class="w-24 bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm focus:border-emerald-500 outline-none">
+            <span class="text-xs text-slate-400">% من أرباح الألعاب — نصيبك: <span x-text="100 - (form.revenue_share || 30)"></span>%</span>
           </div>
         </div>
         <div class="md:col-span-2">
@@ -260,14 +277,16 @@ function clientsPage() {
     openCreate() {
       this.form = { id: '', name: '', contact: '', bot_username: '', bot_token: '',
                     dash_username: '', dash_password: '', admin_ids: '',
-                    subscription_days: '30', features: Object.keys(this.features), notes: '' };
+                    subscription_days: '30', features: Object.keys(this.features), notes: '',
+                    revenue_share: 30 };
       this.modal = true;
     },
     openEdit(c) {
       this.form = { id: c.id, name: c.name, contact: c.contact,
                     bot_username: c.bot_username, bot_token: '',
                     dash_username: c.dash_username, dash_password: '',
-                    admin_ids: c.admin_ids, features: [...c.features], notes: c.notes };
+                    admin_ids: c.admin_ids, features: [...c.features], notes: c.notes,
+                    revenue_share: c.revenue_share || 30 };
       this.modal = true;
     },
     async save() {

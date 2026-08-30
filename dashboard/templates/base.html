@@ -219,6 +219,9 @@
         <a href="{{ url_for('page_admins') }}" class="sidebar-link {% if active_page == 'admins' %}active{% endif %}">
             <i class="fas fa-user-shield w-5 text-center"></i> <span x-text="t('admins')"></span>
         </a>
+        <a href="{{ url_for('page_admin_center') }}" class="sidebar-link {% if active_page == 'admin_center' %}active{% endif %}">
+            <i class="fas fa-users-cog w-5 text-center"></i> مركز الإدارة
+        </a>
         {% endif %}
         {% if not admin_perms or admin_perms.get('manage_settings') %}
         <a href="{{ url_for('page_themes') }}" class="sidebar-link {% if active_page == 'themes' %}active{% endif %}">
