@@ -545,6 +545,7 @@ _ROUTE_SECTION_MAP = {
     'page_bots': 'bots',
     'page_browser': 'browser',
     'page_clients': 'clients',
+    'page_rental': 'clients',
     'page_complaints': 'complaints',
     'page_tickets': 'tickets',
     'page_broadcast': 'broadcast',
@@ -3289,6 +3290,14 @@ def page_channels():
 def page_clients():
     _start_clients_watchdog()
     return render_template('clients.html', active_page='clients')
+
+
+@app.route('/rental')
+@admin_required
+@page_permission_required('manage_bots')
+def page_rental():
+    _start_clients_watchdog()
+    return render_template('rental.html', active_page='rental')
 
 
 @app.route('/bots')

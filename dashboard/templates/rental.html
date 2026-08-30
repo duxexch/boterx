@@ -1,0 +1,773 @@
+{% extends 'base.html' %}
+{% block title %}نظام التاجير — VEX{% endblock %}
+{% block content %}
+<div x-data="rentalSystem()" x-init="init()">
+
+  <!-- ═══════════════════════════════════════════════════════════════ HEADER -->
+  <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
+    <div>
+      <h1 class="text-2xl font-black text-slate-100 flex items-center gap-3">
+        <span class="text-3xl">🏢</span> نظام تاجير المنصة
+      </h1>
+      <p class="text-slate-400 text-sm mt-1">إدارة كاملة للعملاء — بوتات — دومينات — أرباح — مسؤولين — كل حاجة في مكان واحد</p>
+    </div>
+    <div class="flex gap-2 flex-wrap">
+      <button @click="openCreateClient()" class="bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-bold px-4 py-2.5 rounded-xl text-sm flex items-center gap-2">
+        <i class="fas fa-plus"></i> عميل جديد
+      </button>
+      <button @click="tab='dashboard';loadAll()" class="px-4 py-2.5 rounded-xl text-sm font-bold transition"
+        :class="tab==='dashboard'?'bg-blue-500 text-white':'bg-slate-800 text-slate-300 hover:bg-slate-700'">
+        <i class="fas fa-chart-pie"></i> لوحة التحكم
+      </button>
+      <button @click="tab='clients'" class="px-4 py-2.5 rounded-xl text-sm font-bold transition"
+        :class="tab==='clients'?'bg-blue-500 text-white':'bg-slate-800 text-slate-300 hover:bg-slate-700'">
+        <i class="fas fa-building"></i> العملاء
+      </button>
+      <button @click="tab='domains';loadDomains()" class="px-4 py-2.5 rounded-xl text-sm font-bold transition"
+        :class="tab==='domains'?'bg-blue-500 text-white':'bg-slate-800 text-slate-300 hover:bg-slate-700'">
+        <i class="fas fa-globe"></i> الدومينات
+      </button>
+      <button @click="tab='revenue';loadRevenue()" class="px-4 py-2.5 rounded-xl text-sm font-bold transition"
+        :class="tab==='revenue'?'bg-blue-500 text-white':'bg-slate-800 text-slate-300 hover:bg-slate-700'">
+        <i class="fas fa-coins"></i> الأرباح
+      </button>
+      <button @click="tab='admins';loadAdmins()" class="px-4 py-2.5 rounded-xl text-sm font-bold transition"
+        :class="tab==='admins'?'bg-blue-500 text-white':'bg-slate-800 text-slate-300 hover:bg-slate-700'">
+        <i class="fas fa-users-cog"></i> المسؤولين
+      </button>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════ TAB: DASHBOARD -->
+  <div x-show="tab==='dashboard'">
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-2 lg:grid-cols-6 gap-3 mb-6">
+      <div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
+        <div class="flex items-center gap-2 mb-2">
+          <div class="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center"><i class="fas fa-building text-blue-400 text-sm"></i></div>
+          <p class="text-[10px] text-slate-400">إجمالي العملاء</p>
+        </div>
+        <p class="text-2xl font-black text-slate-100" x-text="stats.total"></p>
+      </div>
+      <div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
+        <div class="flex items-center gap-2 mb-2">
+          <div class="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center"><i class="fas fa-check-circle text-emerald-400 text-sm"></i></div>
+          <p class="text-[10px] text-slate-400">نشطة</p>
+        </div>
+        <p class="text-2xl font-black text-emerald-400" x-text="stats.active"></p>
+      </div>
+      <div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
+        <div class="flex items-center gap-2 mb-2">
+          <div class="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center"><i class="fas fa-times-circle text-red-400 text-sm"></i></div>
+          <p class="text-[10px] text-slate-400">منتهية</p>
+        </div>
+        <p class="text-2xl font-black text-red-400" x-text="stats.expired"></p>
+      </div>
+      <div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
+        <div class="flex items-center gap-2 mb-2">
+          <div class="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center"><i class="fas fa-clock text-amber-400 text-sm"></i></div>
+          <p class="text-[10px] text-slate-400">تنتهي خلال 3 أيام</p>
+        </div>
+        <p class="text-2xl font-black text-amber-400" x-text="stats.expiringSoon"></p>
+      </div>
+      <div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
+        <div class="flex items-center gap-2 mb-2">
+          <div class="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center"><i class="fas fa-robot text-purple-400 text-sm"></i></div>
+          <p class="text-[10px] text-slate-400">بوتات تعمل</p>
+        </div>
+        <p class="text-2xl font-black text-purple-400" x-text="stats.running"></p>
+      </div>
+      <div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
+        <div class="flex items-center gap-2 mb-2">
+          <div class="w-8 h-8 rounded-lg bg-cyan-500/20 flex items-center justify-center"><i class="fas fa-coins text-cyan-400 text-sm"></i></div>
+          <p class="text-[10px] text-slate-400">إجمالي الأرباح</p>
+        </div>
+        <p class="text-2xl font-black text-cyan-400" x-text="fmtMoney(revenueStats.total_game_profit)"></p>
+      </div>
+    </div>
+
+    <!-- Recent clients + quick actions -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div class="bg-slate-800/40 border border-slate-700 rounded-2xl p-5">
+        <h3 class="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2"><i class="fas fa-clock text-blue-400"></i> آخر عملاء مضافة</h3>
+        <div class="space-y-2">
+          <template x-for="c in clients.slice(0,5)" :key="c.id">
+            <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-900/50 hover:bg-slate-800 transition cursor-pointer" @click="openEditClient(c)">
+              <div class="flex items-center gap-3">
+                <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" :class="c.running?'bg-emerald-400 animate-pulse':(c.expired?'bg-red-400':'bg-slate-500')"></span>
+                <div>
+                  <div class="text-sm font-bold text-slate-100" x-text="c.name"></div>
+                  <div class="text-[10px] text-slate-500" x-text="c.id + ' · @' + (c.bot_username||'—')"></div>
+                </div>
+              </div>
+              <div class="text-left">
+                <div class="text-xs font-bold" :class="c.expired?'text-red-400':(c.days_left<=3?'text-amber-400':'text-emerald-400')" x-text="c.expired?'منتهي':c.days_left+' يوم'"></div>
+                <div class="text-[10px] text-slate-500" x-text="c.revenue_share+'% / '+(100-c.revenue_share)+'%'"></div>
+              </div>
+            </div>
+          </template>
+          <div x-show="clients.length===0" class="text-center py-6 text-slate-500 text-sm">لا يوجد عملاء بعد</div>
+        </div>
+      </div>
+      <div class="bg-slate-800/40 border border-slate-700 rounded-2xl p-5">
+        <h3 class="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2"><i class="fas fa-bolt text-amber-400"></i> إجراءات سريعة</h3>
+        <div class="grid grid-cols-2 gap-2">
+          <button @click="openCreateClient()" class="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition text-sm font-bold flex items-center gap-2">
+            <i class="fas fa-plus"></i> إضافة عميل
+          </button>
+          <button @click="tab='clients'" class="p-3 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400 hover:bg-blue-500/20 transition text-sm font-bold flex items-center gap-2">
+            <i class="fas fa-list"></i> كل العملاء
+          </button>
+          <button @click="tab='revenue';loadRevenue()" class="p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20 transition text-sm font-bold flex items-center gap-2">
+            <i class="fas fa-chart-bar"></i> تقرير الأرباح
+          </button>
+          <button @click="tab='domains';loadDomains()" class="p-3 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-400 hover:bg-purple-500/20 transition text-sm font-bold flex items-center gap-2">
+            <i class="fas fa-globe"></i> إدارة الدومينات
+          </button>
+          <button @click="tab='admins';loadAdmins()" class="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 transition text-sm font-bold flex items-center gap-2">
+            <i class="fas fa-user-shield"></i> إدارة المسؤولين
+          </button>
+          <button @click="loadAll()" class="p-3 rounded-xl bg-slate-500/10 border border-slate-500/30 text-slate-400 hover:bg-slate-500/20 transition text-sm font-bold flex items-center gap-2">
+            <i class="fas fa-refresh"></i> تحديث البيانات
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════ TAB: CLIENTS -->
+  <div x-show="tab==='clients'">
+    <!-- Search + Filter -->
+    <div class="flex flex-col sm:flex-row gap-3 mb-4">
+      <div class="flex-1 relative">
+        <i class="fas fa-search absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
+        <input x-model="search" dir="rtl" placeholder="بحث بالاسم أو المعرف..."
+          class="w-full bg-slate-800 border border-slate-700 rounded-xl pr-10 pl-4 py-2.5 text-sm text-slate-100 focus:border-emerald-500 outline-none">
+      </div>
+      <select x-model="filterStatus" class="bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-300 outline-none">
+        <option value="">الكل</option>
+        <option value="active">نشطة</option>
+        <option value="suspended">موقوفة</option>
+        <option value="expired">منتهية</option>
+      </select>
+    </div>
+
+    <!-- Clients Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      <template x-for="c in filteredClients" :key="c.id">
+        <div class="bg-slate-800/40 border border-slate-700 rounded-2xl p-5 hover:border-slate-600 transition group">
+          <!-- Header -->
+          <div class="flex items-start justify-between mb-3">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl flex items-center justify-center text-lg font-black"
+                :class="c.running?'bg-emerald-500/20 text-emerald-400':(c.expired?'bg-red-500/20 text-red-400':'bg-slate-700 text-slate-400')">
+                <span x-text="c.name.charAt(0)"></span>
+              </div>
+              <div>
+                <div class="font-bold text-slate-100" x-text="c.name"></div>
+                <div class="text-[10px] text-slate-500 font-mono" x-text="c.id"></div>
+              </div>
+            </div>
+            <div class="flex items-center gap-1">
+              <span class="w-2.5 h-2.5 rounded-full" :class="c.running?'bg-emerald-400 animate-pulse':(c.expired?'bg-red-400':'bg-slate-500')"></span>
+              <span class="text-[10px]" :class="c.expired?'text-red-400':(c.status==='suspended'?'text-amber-400':'text-emerald-400')"
+                x-text="c.expired?'منتهي':(c.status==='suspended'?'موقوف':'نشط')"></span>
+            </div>
+          </div>
+
+          <!-- Info -->
+          <div class="space-y-1.5 mb-3">
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-slate-500">البوت</span>
+              <span class="text-slate-300 font-mono" x-text="'@'+(c.bot_username||'—')"></span>
+            </div>
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-slate-500">لوحة التحكم</span>
+              <span class="text-blue-400 font-mono" x-text="c.dash_username"></span>
+            </div>
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-slate-500">الدومين</span>
+              <span class="text-purple-400 font-mono text-[10px]" x-text="c.custom_domain || '—'"></span>
+            </div>
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-slate-500">الاشتراك</span>
+              <span :class="c.expired?'text-red-400 font-bold':(c.days_left<=3?'text-amber-400 font-bold':'text-slate-300')"
+                x-text="c.expired?'منتهي '+c.subscription_end:(c.days_left+' يوم متبقي')"></span>
+            </div>
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-slate-500">الربح</span>
+              <span>
+                <span class="text-emerald-400 font-bold" x-text="c.revenue_share+'%'"></span>
+                <span class="text-slate-500">عميل</span>
+                <span class="text-blue-400 font-bold" x-text="(100-c.revenue_share)+'%'"></span>
+                <span class="text-slate-500">أنت</span>
+              </span>
+            </div>
+          </div>
+
+          <!-- Features -->
+          <div class="flex flex-wrap gap-1 mb-3">
+            <template x-for="f in (c.features||[]).slice(0,4)" :key="f">
+              <span class="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30" x-text="features[f]||f"></span>
+            </template>
+            <span x-show="(c.features||[]).length>4" class="text-[9px] px-1.5 py-0.5 rounded-full bg-slate-700 text-slate-400"
+              x-text="'+'+((c.features||[]).length-4)"></span>
+          </div>
+
+          <!-- Actions -->
+          <div class="flex items-center gap-1 pt-2 border-t border-slate-700/50">
+            <button x-show="!c.running && !c.expired && c.status!=='suspended'" @click="control(c,'start')"
+              class="flex-1 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 text-[10px] font-bold hover:bg-emerald-500/30 transition">
+              <i class="fas fa-play"></i> تشغيل
+            </button>
+            <button x-show="c.running" @click="control(c,'stop')"
+              class="flex-1 py-1.5 rounded-lg bg-red-500/20 text-red-400 text-[10px] font-bold hover:bg-red-500/30 transition">
+              <i class="fas fa-stop"></i> إيقاف
+            </button>
+            <button @click="openEditClient(c)"
+              class="flex-1 py-1.5 rounded-lg bg-blue-500/20 text-blue-400 text-[10px] font-bold hover:bg-blue-500/30 transition">
+              <i class="fas fa-pen"></i> تعديل
+            </button>
+            <button x-show="c.expired" @click="openRenew(c)"
+              class="flex-1 py-1.5 rounded-lg bg-amber-500/20 text-amber-400 text-[10px] font-bold hover:bg-amber-500/30 transition">
+              <i class="fas fa-calendar-plus"></i> تجديد
+            </button>
+            <button x-show="c.status!=='suspended'" @click="control(c,'suspend')"
+              class="py-1.5 px-2 rounded-lg bg-amber-500/10 text-amber-400/60 text-[10px] hover:bg-amber-500/30 transition">
+              <i class="fas fa-pause"></i>
+            </button>
+            <button x-show="c.status==='suspended'" @click="control(c,'activate')"
+              class="py-1.5 px-2 rounded-lg bg-emerald-500/10 text-emerald-400/60 text-[10px] hover:bg-emerald-500/30 transition">
+              <i class="fas fa-check"></i>
+            </button>
+            <button @click="confirmDelete(c)"
+              class="py-1.5 px-2 rounded-lg bg-red-500/10 text-red-400/60 text-[10px] hover:bg-red-500/30 transition">
+              <i class="fas fa-trash"></i>
+            </button>
+          </div>
+        </div>
+      </template>
+    </div>
+    <div x-show="filteredClients.length===0" class="text-center py-12 text-slate-500">
+      <div class="text-4xl mb-3">🏢</div>
+      لا يوجد عملاء مطابقين
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════ TAB: DOMAINS -->
+  <div x-show="tab==='domains'">
+    <div class="bg-slate-800/40 border border-slate-700 rounded-2xl p-6 mb-4">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-bold text-slate-100">الدومينات المخصصة</h3>
+        <button @click="generateNginx()" class="px-4 py-2 rounded-xl bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 text-xs font-bold">
+          <i class="fas fa-code"></i> توليد nginx config
+        </button>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+        <select x-model="domainForm.client_id" class="bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm outline-none">
+          <option value="">— اختر عميل —</option>
+          <template x-for="c in clients" :key="c.id">
+            <option :value="c.id" x-text="c.name"></option>
+          </template>
+        </select>
+        <input x-model="domainForm.domain" dir="ltr" placeholder="client.vex.deals"
+          class="bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm outline-none">
+        <button @click="saveDomain()" :disabled="!domainForm.client_id||!domainForm.domain"
+          class="px-6 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-bold text-sm disabled:opacity-50">حفظ</button>
+      </div>
+      <div class="overflow-x-auto border border-slate-700 rounded-xl">
+        <table class="w-full text-xs">
+          <thead><tr class="bg-slate-900 text-slate-400">
+            <th class="text-right px-4 py-2">العميل</th>
+            <th class="text-right px-4 py-2">الدومين</th>
+            <th class="text-right px-4 py-2">الحالة</th>
+            <th class="text-right px-4 py-2">إجراءات</th>
+          </tr></thead>
+          <tbody>
+            <template x-for="d in domains" :key="d.client_id">
+              <tr class="border-t border-slate-700/50 hover:bg-slate-700/30">
+                <td class="px-4 py-2.5 font-bold text-slate-100" x-text="d.client_name"></td>
+                <td class="px-4 py-2.5"><a :href="'https://'+d.domain" target="_blank" class="text-blue-400 hover:underline font-mono" x-text="d.domain"></a></td>
+                <td class="px-4 py-2.5"><span class="text-[10px] px-2 py-0.5 rounded-full" :class="d.status==='active'?'bg-emerald-500/20 text-emerald-300':'bg-red-500/20 text-red-300'" x-text="d.status==='active'?'نشط':'معطل'"></span></td>
+                <td class="px-4 py-2.5"><button @click="removeDomain(d.client_id)" class="text-red-400/70 hover:text-red-400"><i class="fas fa-trash text-xs"></i></button></td>
+              </tr>
+            </template>
+            <tr x-show="domains.length===0"><td colspan="4" class="px-4 py-8 text-center text-slate-500">لا توجد دومينات</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div x-show="nginxConfigs.length>0" class="mt-4">
+        <h4 class="text-sm font-bold text-slate-300 mb-2">nginx configs</h4>
+        <template x-for="cfg in nginxConfigs" :key="cfg.domain">
+          <div class="bg-slate-900 rounded-xl border border-slate-700 p-3 mb-2">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-bold text-slate-100" x-text="cfg.domain"></span>
+              <button @click="navigator.clipboard.writeText(cfg.config)" class="text-[10px] text-blue-400 hover:underline">نسخ</button>
+            </div>
+            <pre class="text-[10px] text-slate-500 overflow-x-auto max-h-32" x-text="cfg.config"></pre>
+          </div>
+        </template>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════ TAB: REVENUE -->
+  <div x-show="tab==='revenue'">
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+      <div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
+        <p class="text-[10px] text-slate-400 mb-1">إجمالي أرباح الألعاب</p>
+        <p class="text-2xl font-black text-cyan-400" x-text="fmtMoney(revenueStats.total_game_profit)"></p>
+      </div>
+      <div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
+        <p class="text-[10px] text-slate-400 mb-1">نصيبي</p>
+        <p class="text-2xl font-black text-emerald-400" x-text="fmtMoney(revenueStats.admin_share)"></p>
+      </div>
+      <div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
+        <p class="text-[10px] text-slate-400 mb-1">نصيب العملاء</p>
+        <p class="text-2xl font-black text-blue-400" x-text="fmtMoney(revenueStats.client_share)"></p>
+      </div>
+      <div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
+        <p class="text-[10px] text-slate-400 mb-1">إجمالي الجولات</p>
+        <p class="text-2xl font-black text-purple-400" x-text="fmtNum(revenueStats.total_rounds)"></p>
+      </div>
+    </div>
+    <div class="bg-slate-800/40 border border-slate-700 rounded-2xl overflow-hidden">
+      <table class="w-full text-xs">
+        <thead><tr class="bg-slate-800/80 border-b border-slate-700 text-slate-400">
+          <th class="text-right px-4 py-3">العميل</th>
+          <th class="text-right px-4 py-3">نسبة العميل</th>
+          <th class="text-right px-4 py-3">إجمالي الربح</th>
+          <th class="text-right px-4 py-3">مبلغ العميل</th>
+          <th class="text-right px-4 py-3">مبلغك</th>
+          <th class="text-right px-4 py-3">الجولات</th>
+          <th class="text-right px-4 py-3">تعديل النسبة</th>
+        </tr></thead>
+        <tbody>
+          <template x-for="r in revenueByClient" :key="r.client_id">
+            <tr class="border-t border-slate-700/50 hover:bg-slate-700/30">
+              <td class="px-4 py-2.5 font-bold text-slate-100" x-text="r.client_name"></td>
+              <td class="px-4 py-2.5"><span class="text-emerald-400 font-bold" x-text="r.revenue_share+'%'"></span></td>
+              <td class="px-4 py-2.5 text-cyan-400" x-text="fmtMoney(r.total_profit)"></td>
+              <td class="px-4 py-2.5 text-blue-400" x-text="fmtMoney(r.client_amount)"></td>
+              <td class="px-4 py-2.5 text-emerald-400" x-text="fmtMoney(r.admin_amount)"></td>
+              <td class="px-4 py-2.5 text-purple-400" x-text="fmtNum(r.rounds)"></td>
+              <td class="px-4 py-2.5">
+                <div class="flex items-center gap-1">
+                  <input type="number" min="0" max="100" :value="r.revenue_share"
+                    @change="updateRevenueShare(r.client_id, $event.target.value)"
+                    class="w-16 bg-slate-900 border border-slate-600 rounded-lg px-2 py-1 text-xs text-center outline-none">
+                  <span class="text-[10px] text-slate-500">%</span>
+                </div>
+              </td>
+            </tr>
+          </template>
+          <tr x-show="revenueByClient.length===0"><td colspan="7" class="px-4 py-8 text-center text-slate-500">لا توجد بيانات أرباح</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════ TAB: ADMINS -->
+  <div x-show="tab==='admins'">
+    <div class="bg-slate-800/40 border border-slate-700 rounded-2xl p-6 mb-4">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-bold text-slate-100">المسؤولون وصلاحياتهم</h3>
+        <button @click="showAddAdmin=true" class="px-4 py-2 rounded-xl bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 text-xs font-bold">
+          <i class="fas fa-plus"></i> إضافة مسؤول
+        </button>
+      </div>
+      <div class="overflow-x-auto border border-slate-700 rounded-xl">
+        <table class="w-full text-xs">
+          <thead><tr class="bg-slate-900 text-slate-400">
+            <th class="text-right px-4 py-2">المعرف</th>
+            <th class="text-right px-4 py-2">الاسم</th>
+            <th class="text-right px-4 py-2">الدور</th>
+            <th class="text-right px-4 py-2">العميل المرتبط</th>
+            <th class="text-right px-4 py-2">الأقسام المتاحة</th>
+            <th class="text-right px-4 py-2">إجراءات</th>
+          </tr></thead>
+          <tbody>
+            <template x-for="a in admins" :key="a.telegram_id">
+              <tr class="border-t border-slate-700/50 hover:bg-slate-700/30">
+                <td class="px-4 py-2.5 font-mono text-blue-400" x-text="a.telegram_id"></td>
+                <td class="px-4 py-2.5 text-slate-100" x-text="a.name||'—'"></td>
+                <td class="px-4 py-2.5"><span class="text-[10px] px-2 py-0.5 rounded-full" :class="roleBadge(a.role)" x-text="roleLabel(a.role)"></span></td>
+                <td class="px-4 py-2.5 text-slate-300" x-text="a.tenant_id?getTenantName(a.tenant_id):'—'"></td>
+                <td class="px-4 py-2.5">
+                  <button @click="openSections(a)" class="text-[10px] text-blue-400 hover:underline">تعديل الأقسام</button>
+                </td>
+                <td class="px-4 py-2.5">
+                  <div class="flex gap-1">
+                    <button @click="openTenantAssign(a)" class="p-1.5 rounded bg-blue-500/10 text-blue-400/70 hover:text-blue-400"><i class="fas fa-link text-[10px]"></i></button>
+                    <button @click="confirmDeleteAdmin(a)" class="p-1.5 rounded bg-red-500/10 text-red-400/70 hover:text-red-400"><i class="fas fa-trash text-[10px]"></i></button>
+                  </div>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Section Access Control -->
+    <div x-show="sectionAdmin" class="bg-slate-800/40 border border-slate-700 rounded-2xl p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-sm font-bold text-slate-100">أقسام: <span class="text-blue-400" x-text="sectionAdmin"></span></h3>
+        <div class="flex gap-2">
+          <button @click="selectAllSections()" class="text-[10px] text-emerald-400 hover:underline">تحديد الكل</button>
+          <button @click="sectionForm=[]" class="text-[10px] text-red-400 hover:underline">إلغاء الكل</button>
+          <button @click="saveSections()" class="px-3 py-1 rounded-lg bg-emerald-500 text-slate-900 text-[10px] font-bold">حفظ</button>
+          <button @click="sectionAdmin=null" class="text-[10px] text-slate-400 hover:text-slate-200">✕</button>
+        </div>
+      </div>
+      <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2">
+        <template x-for="s in allSectionsList" :key="s.key">
+          <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer p-2 rounded-lg hover:bg-slate-800 transition">
+            <input type="checkbox" :value="s.key" x-model="sectionForm" class="accent-emerald-500 w-3.5 h-3.5">
+            <span x-text="s.label"></span>
+          </label>
+        </template>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════ MODALS -->
+
+  <!-- Add/Edit Client Modal -->
+  <div x-show="showClientModal" x-cloak class="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 overflow-y-auto" style="display:none">
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-2xl p-6 my-8">
+      <div class="flex items-center justify-between mb-5">
+        <h3 class="text-lg font-bold text-slate-100" x-text="clientForm.id?'تعديل: '+clientForm.name:'عميل جديد'"></h3>
+        <button @click="showClientModal=false" class="text-slate-400 hover:text-slate-200 text-xl">✕</button>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-400 mb-1">اسم العميل *</label>
+          <input x-model="clientForm.name" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm outline-none focus:border-emerald-500">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-400 mb-1">التواصل</label>
+          <input x-model="clientForm.contact" placeholder="@t" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm outline-none focus:border-emerald-500">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-400 mb-1">يوزر البوت</label>
+          <input x-model="clientForm.bot_username" dir="ltr" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm outline-none focus:border-emerald-500">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-400 mb-1">توكن البوت *</label>
+          <input x-model="clientForm.bot_token" dir="ltr" placeholder="123456:ABC..." class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm outline-none focus:border-emerald-500">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-400 mb-1">يوزر اللوحة *</label>
+          <input x-model="clientForm.dash_username" dir="ltr" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm outline-none focus:border-emerald-500">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-400 mb-1" x-text="clientForm.id?'باسورد جديد (اتركه فاضي)':'باسورد اللوحة *'"></label>
+          <input x-model="clientForm.dash_password" type="password" dir="ltr" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm outline-none focus:border-emerald-500">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-400 mb-1">أدمن بوت تيليجرام</label>
+          <input x-model="clientForm.admin_ids" dir="ltr" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm outline-none focus:border-emerald-500">
+        </div>
+        <div x-show="!clientForm.id">
+          <label class="block text-xs font-bold text-slate-400 mb-1">مدة الاشتراك</label>
+          <select x-model="clientForm.subscription_days" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm outline-none">
+            <option value="7">7 أيام</option><option value="15">15 يوم</option><option value="30" selected>30 يوم</option>
+            <option value="60">60 يوم</option><option value="90">90 يوم</option><option value="180">6 أشهر</option><option value="365">سنة</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-400 mb-1">نسبة أرباح العميل (%)</label>
+          <div class="flex items-center gap-2">
+            <input x-model="clientForm.revenue_share" type="number" min="0" max="100" class="w-20 bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm outline-none">
+            <span class="text-[10px] text-slate-500">أنت: <span class="text-emerald-400 font-bold" x-text="100-(clientForm.revenue_share||30)+'%'"></span></span>
+          </div>
+        </div>
+        <div class="md:col-span-2">
+          <label class="block text-xs font-bold text-slate-400 mb-1">المميزات</label>
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-1.5 bg-slate-900/50 border border-slate-700 rounded-xl p-3">
+            <template x-for="(label,key) in features" :key="key">
+              <label class="flex items-center gap-1.5 text-[11px] text-slate-300 cursor-pointer">
+                <input type="checkbox" :value="key" x-model="clientForm.features" class="accent-emerald-500 w-3.5 h-3.5">
+                <span x-text="label"></span>
+              </label>
+            </template>
+          </div>
+          <div class="flex gap-2 mt-1">
+            <button @click="clientForm.features=Object.keys(features)" class="text-[10px] text-emerald-400 hover:underline">تحديد الكل</button>
+            <button @click="clientForm.features=[]" class="text-[10px] text-slate-500 hover:underline">إلغاء الكل</button>
+          </div>
+        </div>
+        <div class="md:col-span-2">
+          <label class="block text-xs font-bold text-slate-400 mb-1">ملاحظات</label>
+          <textarea x-model="clientForm.notes" rows="2" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm outline-none"></textarea>
+        </div>
+      </div>
+      <div class="flex items-center justify-end gap-3 mt-5">
+        <button @click="showClientModal=false" class="px-5 py-2.5 rounded-xl text-slate-300 border border-slate-600 text-sm hover:bg-slate-700">إلغاء</button>
+        <button @click="saveClient()" :disabled="saving" class="px-6 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-bold text-sm disabled:opacity-50"
+          x-text="saving?'...':(clientForm.id?'حفظ التعديلات':'إنشاء العميل')"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Renew Modal -->
+  <div x-show="showRenew" x-cloak class="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" style="display:none">
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-sm p-6">
+      <h3 class="text-lg font-bold text-slate-100 mb-1">تجديد: <span x-text="renewTarget?.name"></span></h3>
+      <p class="text-xs text-slate-400 mb-4">ينتهي: <span x-text="renewTarget?.subscription_end"></span></p>
+      <div class="grid grid-cols-4 gap-2 mb-4">
+        <template x-for="d in [7,15,30,90]" :key="d">
+          <button @click="doRenew(d)" class="py-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-sm font-bold hover:bg-emerald-500/30" x-text="d+' يوم'"></button>
+        </template>
+      </div>
+      <button @click="showRenew=false" class="w-full py-2 rounded-xl text-slate-400 text-sm hover:bg-slate-700">إغلاق</button>
+    </div>
+  </div>
+
+  <!-- Add Admin Modal -->
+  <div x-show="showAddAdmin" x-cloak class="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" style="display:none">
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-md p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-bold text-slate-100">إضافة مسؤول</h3>
+        <button @click="showAddAdmin=false" class="text-slate-400 hover:text-slate-200">✕</button>
+      </div>
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs font-bold text-slate-400 mb-1">المعرف (Telegram ID) *</label>
+          <input x-model="addAdminForm.telegram_id" dir="ltr" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm outline-none">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-400 mb-1">الاسم</label>
+          <input x-model="addAdminForm.name" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm outline-none">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-400 mb-1">الدور</label>
+          <select x-model="addAdminForm.role" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm outline-none">
+            <option value="support_admin">دعم</option><option value="finance_admin">المالية</option>
+            <option value="game_admin">الألعاب</option><option value="broadcast_admin">البث</option>
+            <option value="super_admin">Super Admin</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-400 mb-1">ربط بعميل</label>
+          <select x-model="addAdminForm.tenant_id" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm outline-none">
+            <option value="">— بدون —</option>
+            <template x-for="c in clients" :key="c.id">
+              <option :value="c.id" x-text="c.name"></option>
+            </template>
+          </select>
+        </div>
+      </div>
+      <div class="flex justify-end gap-2 mt-5">
+        <button @click="showAddAdmin=false" class="px-4 py-2 rounded-xl text-slate-300 border border-slate-600 text-sm">إلغاء</button>
+        <button @click="saveAdmin()" class="px-5 py-2 rounded-xl bg-emerald-500 text-slate-900 font-bold text-sm">إضافة</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tenant Assign Modal -->
+  <div x-show="showTenantModal" x-cloak class="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" style="display:none">
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-sm p-6">
+      <h3 class="text-lg font-bold text-slate-100 mb-3">ربط المسؤول بعميل</h3>
+      <select x-model="tenantForm.tenant_id" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm outline-none mb-4">
+        <option value="">— بدون ربط —</option>
+        <template x-for="c in clients" :key="c.id">
+          <option :value="c.id" x-text="c.name"></option>
+        </template>
+      </select>
+      <div class="flex justify-end gap-2">
+        <button @click="showTenantModal=false" class="px-4 py-2 rounded-xl text-slate-300 border border-slate-600 text-sm">إلغاء</button>
+        <button @click="saveTenantAssign()" class="px-5 py-2 rounded-xl bg-emerald-500 text-slate-900 font-bold text-sm">حفظ</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete Confirm Modal -->
+  <div x-show="showDelete" x-cloak class="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" style="display:none">
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-sm p-6 text-center">
+      <div class="text-4xl mb-3">🗑️</div>
+      <h3 class="text-lg font-bold text-slate-100 mb-2" x-text="'حذف '+deleteType+'؟'"></h3>
+      <p class="text-sm text-slate-400 mb-5" x-text="'هل أنت متأكد من حذف '+deleteTarget?.name+'?'"></p>
+      <div class="flex justify-center gap-3">
+        <button @click="showDelete=false" class="px-5 py-2.5 rounded-xl text-slate-300 border border-slate-600 text-sm">إلغاء</button>
+        <button @click="doDelete()" class="px-5 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white font-bold text-sm">حذف</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function rentalSystem() {
+  return {
+    tab: 'dashboard', search: '', filterStatus: '', saving: false,
+    clients: [], features: {}, admins: [], domains: [], nginxConfigs: [],
+    auditLogs: [],
+    revenueStats: { total_game_profit: 0, admin_share: 0, client_share: 0, total_rounds: 0 },
+    revenueByClient: [],
+    stats: { total: 0, active: 0, expired: 0, expiringSoon: 0, running: 0 },
+
+    // Modals
+    showClientModal: false, showRenew: false, showAddAdmin: false,
+    showDelete: false, showTenantModal: false,
+    clientForm: {}, renewTarget: null, deleteTarget: null, deleteType: '',
+    addAdminForm: { telegram_id: '', name: '', role: 'support_admin', tenant_id: '' },
+    tenantTarget: null, tenantForm: { tenant_id: '' },
+
+    // Sections
+    sectionAdmin: null, sectionForm: [],
+    allSectionsList: [
+      {key:'transactions',label:'المعاملات'},{key:'matching',label:'المطابقة'},{key:'agents',label:'الوكلاء'},{key:'trading',label:'التداول'},
+      {key:'users',label:'المستخدمين'},{key:'svrp',label:'التعويض'},{key:'lottery',label:'اليانصيب'},{key:'wheel',label:'العجلة'},
+      {key:'companies',label:'الشركات'},{key:'payment_methods',label:'طرق الدفع'},{key:'apps',label:'التطبيقات'},{key:'referrals',label:'الإحالات'},
+      {key:'channels',label:'القنوات'},{key:'broadcast',label:'البث'},{key:'complaints',label:'الشكاوى'},{key:'tickets',label:'التذاكر'},
+      {key:'bots',label:'البوتات'},{key:'browser',label:'المتصفح'},{key:'clients',label:'العملاء'},{key:'statistics',label:'الإحصائيات'},
+      {key:'admins',label:'المسؤولين'},{key:'settings',label:'الإعدادات'},{key:'backup',label:'النسخ الاحتياطي'},{key:'themes',label:'الثيمات'},
+    ],
+
+    get filteredClients() {
+      return this.clients.filter(c => {
+        if (this.filterStatus === 'expired' && !c.expired) return false;
+        if (this.filterStatus === 'active' && (c.expired || c.status==='suspended')) return false;
+        if (this.filterStatus === 'suspended' && c.status!=='suspended') return false;
+        if (this.search) {
+          const s = this.search.toLowerCase();
+          return (c.name||'').toLowerCase().includes(s) || (c.id||'').toLowerCase().includes(s) || (c.bot_username||'').toLowerCase().includes(s);
+        }
+        return true;
+      });
+    },
+
+    async init() { await this.loadAll(); },
+    async loadAll() {
+      await Promise.all([this.loadClients(), this.loadRevenue()]);
+    },
+    async loadClients() {
+      try {
+        const d = await api('/api/clients');
+        this.clients = d.clients || [];
+        this.features = d.features || {};
+        this.stats = {
+          total: this.clients.length,
+          active: this.clients.filter(c=>!c.expired&&c.status!=='suspended').length,
+          expired: this.clients.filter(c=>c.expired).length,
+          expiringSoon: this.clients.filter(c=>!c.expired&&c.days_left<=3).length,
+          running: this.clients.filter(c=>c.running).length,
+        };
+      } catch(e) { toast('خطأ في تحميل العملاء','error'); }
+    },
+    async loadRevenue() {
+      try {
+        const d = await api('/api/admin-center/revenue');
+        this.revenueStats = d.stats || {};
+        this.revenueByClient = d.by_client || [];
+      } catch(e) {}
+    },
+    async loadDomains() {
+      try { const d = await api('/api/admin-center/domains'); this.domains = d.domains||[]; } catch(e) {}
+    },
+    async loadAdmins() {
+      try {
+        const d = await api('/api/admin-center/admins');
+        this.admins = d.admins||[];
+      } catch(e) {}
+    },
+
+    // ── Client CRUD ──
+    openCreateClient() {
+      this.clientForm = { id:'',name:'',contact:'',bot_username:'',bot_token:'',dash_username:'',dash_password:'',admin_ids:'',subscription_days:'30',features:Object.keys(this.features),notes:'',revenue_share:30 };
+      this.showClientModal = true;
+    },
+    openEditClient(c) {
+      this.clientForm = { id:c.id,name:c.name,contact:c.contact,bot_username:c.bot_username,bot_token:'',dash_username:c.dash_username,dash_password:'',admin_ids:c.admin_ids,features:[...c.features],notes:c.notes,revenue_share:c.revenue_share||30 };
+      this.showClientModal = true;
+    },
+    async saveClient() {
+      if (!this.clientForm.name||!this.clientForm.dash_username) { toast('الاسم واسم المستخدم مطلوبين','error'); return; }
+      if (!this.clientForm.id&&(!this.clientForm.bot_token||!this.clientForm.dash_password)) { toast('التوكن والباسورد مطلوبين لعميل جديد','error'); return; }
+      this.saving = true;
+      try {
+        const payload = {...this.clientForm};
+        if (this.clientForm.id&&!payload.bot_token) delete payload.bot_token;
+        if (this.clientForm.id&&!payload.dash_password) delete payload.dash_password;
+        const d = await api(this.clientForm.id?'/api/clients/'+this.clientForm.id:'/api/clients', {method:'POST',body:JSON.stringify(payload)});
+        if (d.error) { toast(d.error,'error'); return; }
+        this.showClientModal = false;
+        await this.loadClients();
+        toast(this.clientForm.id?'تم التعديل':'تمت الإضافة','success');
+      } catch(e) { toast('خطأ في الحفظ','error'); }
+      this.saving = false;
+    },
+    async control(c, action) {
+      await api('/api/clients/'+c.id+'/'+action, {method:'POST',body:'{}'});
+      await this.loadClients();
+    },
+    openRenew(c) { this.renewTarget=c; this.showRenew=true; },
+    async doRenew(d) { await api('/api/clients/'+this.renewTarget.id+'/renew',{method:'POST',body:JSON.stringify({days:d})}); this.showRenew=false; await this.loadClients(); },
+    confirmDelete(c) { this.deleteTarget=c; this.deleteType='العميل'; this.showDelete=true; },
+    confirmDeleteAdmin(a) { this.deleteTarget=a; this.deleteType='المسؤول'; this.showDelete=true; },
+    async doDelete() {
+      if (this.deleteType==='العميل') {
+        await api('/api/clients/'+this.deleteTarget.id+'?keep_data=0',{method:'DELETE'});
+      } else {
+        await api('/api/admin-center/admins/'+this.deleteTarget.telegram_id,{method:'DELETE'});
+        await this.loadAdmins();
+      }
+      this.showDelete=false;
+      await this.loadClients();
+    },
+
+    // ── Domains ──
+    domainForm: { client_id:'', domain:'' },
+    async saveDomain() {
+      if (!this.domainForm.client_id||!this.domainForm.domain) return;
+      const d = await api('/api/admin-center/domains',{method:'POST',body:JSON.stringify(this.domainForm)});
+      if (d.error) { toast(d.error,'error'); return; }
+      this.domainForm={client_id:'',domain:''};
+      await this.loadDomains();
+      toast('تم الحفظ','success');
+    },
+    async removeDomain(cid) { await api('/api/admin-center/domains/'+cid,{method:'DELETE'}); await this.loadDomains(); },
+    async generateNginx() { const d=await api('/api/admin-center/domains/generate-nginx'); this.nginxConfigs=d.configs||[]; },
+
+    // ── Revenue ──
+    async updateRevenueShare(cid, val) {
+      await api('/api/admin-center/revenue-share/'+cid,{method:'POST',body:JSON.stringify({revenue_share:parseInt(val)})});
+      await this.loadRevenue(); await this.loadClients();
+    },
+
+    // ── Admins ──
+    async saveAdmin() {
+      await api('/api/admin-center/admins',{method:'POST',body:JSON.stringify(this.addAdminForm)});
+      this.showAddAdmin=false;
+      await this.loadAdmins();
+      toast('تمت الإضافة','success');
+    },
+    openTenantAssign(a) { this.tenantTarget=a; this.tenantForm.tenant_id=a.tenant_id||''; this.showTenantModal=true; },
+    async saveTenantAssign() {
+      await api('/api/admin-center/admins/'+this.tenantTarget.telegram_id+'/tenant',{method:'POST',body:JSON.stringify(this.tenantForm)});
+      this.showTenantModal=false;
+      await this.loadAdmins();
+    },
+
+    // ── Sections ──
+    openSections(a) { this.sectionAdmin=a.telegram_id; this.sectionForm=a.sections||[]; },
+    selectAllSections() { this.sectionForm=this.allSectionsList.map(s=>s.key); },
+    async saveSections() {
+      await api('/api/admin-center/admins/'+this.sectionAdmin+'/sections',{method:'POST',body:JSON.stringify({sections:this.sectionForm})});
+      toast('تم الحفظ','success');
+      await this.loadAdmins();
+      this.sectionAdmin=null;
+    },
+
+    // ── Helpers ──
+    getTenantName(tid) { const c=this.clients.find(c=>c.id===tid); return c?c.name:tid; },
+    roleLabel(r) { return {super_admin:'Super Admin',finance_admin:'المالية',support_admin:'الدعم',game_admin:'الألعاب',broadcast_admin:'البث'}[r]||r; },
+    roleBadge(r) { return {super_admin:'bg-red-500/20 text-red-400',finance_admin:'bg-amber-500/20 text-amber-400',support_admin:'bg-green-500/20 text-green-400',game_admin:'bg-purple-500/20 text-purple-400',broadcast_admin:'bg-cyan-500/20 text-cyan-400'}[r]||'bg-slate-500/20 text-slate-400'; },
+    fmtNum(n) { return (n||0).toLocaleString(); },
+    fmtMoney(n) { return (n||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}); },
+  };
+}
+</script>
+{% endblock %}
