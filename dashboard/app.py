@@ -13209,6 +13209,7 @@ def _client_public(c):
         'revenue_share': int(c.get('revenue_share') or 30),
         'custom_domain': c.get('custom_domain', ''),
         'balance': float(c.get('balance') or 0),
+        'preferred_pm': c.get('preferred_pm', ''),
     }
 
 
@@ -13245,6 +13246,9 @@ def api_clients_create():
     if err:
         return jsonify({'error': err}), 400
     log_action('create_client', row['id'])
+    if data.get('preferred_pm'):
+        _clients().update(row['id'], {'preferred_pm': data['preferred_pm']})
+        row['preferred_pm'] = data['preferred_pm']
     return jsonify({'success': True, 'client': _client_public(row)})
 
 

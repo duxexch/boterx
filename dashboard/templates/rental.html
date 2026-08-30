@@ -1,564 +1,516 @@
 {% extends 'base.html' %}
 {% block title %}نظام التاجير — VEX{% endblock %}
 {% block content %}
-<div x-data="rentalSystem()" x-init="init()">
+<style>
+/* ── Rental Page Mobile-First Styles ── */
+.rental-app{--accent:#00e701;--accent2:#60a5fa;--bg2:#0f1218;--card:#161c28;--card2:#1a2233;--border:#252e3d;--text:#e8edf4;--muted:#6b7a90;--danger:#ff4757;--amber:#fbbf24;position:relative;min-height:70vh}
+.rental-app *{box-sizing:border-box}
+
+/* Bottom Tab Bar (Mobile) */
+.bottom-tabs{display:none;position:fixed;bottom:0;left:0;right:0;z-index:45;background:var(--card);border-top:1px solid var(--border);padding:6px 4px env(safe-area-inset-bottom)}
+.bottom-tabs-inner{display:flex;justify-content:space-around;align-items:center}
+.bottom-tab{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 8px;border-radius:12px;font-size:9px;font-weight:700;color:var(--muted);cursor:pointer;transition:all .2s;position:relative;min-width:52px;-webkit-tap-highlight-color:transparent}
+.bottom-tab:active{transform:scale(.93)}
+.bottom-tab.active{color:var(--accent)}
+.bottom-tab .b-icon{width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;transition:all .2s}
+.bottom-tab.active .b-icon{background:rgba(0,231,1,.15)}
+.bottom-tab .b-badge{position:absolute;top:2px;right:10px;background:var(--danger);color:#fff;font-size:8px;min-width:15px;height:15px;border-radius:99px;display:flex;align-items:center;justify-content:center;font-weight:900}
+
+/* Desktop tab bar */
+.top-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px}
+.top-tab{padding:9px 16px;border-radius:12px;font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;border:1px solid transparent;transition:all .2s;white-space:nowrap;display:flex;align-items:center;gap:6px}
+.top-tab:hover{color:var(--text);background:var(--card2)}
+.top-tab.active{background:var(--accent);color:#000;border-color:var(--accent)}
+.top-tab .t-badge{background:var(--danger);color:#fff;font-size:8px;min-width:16px;height:16px;border-radius:99px;display:flex;align-items:center;justify-content:center;font-weight:900}
+
+/* Cards */
+.r-card{background:var(--card);border:1px solid var(--border);border-radius:18px;overflow:hidden;transition:border-color .2s}
+.r-card:hover{border-color:#354055}
+.r-card-header{padding:16px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.r-card-body{padding:16px 18px}
+.r-card-footer{padding:10px 18px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap}
+
+/* Stats */
+.stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px 12px;text-align:center;transition:transform .15s}
+.stat-card:active{transform:scale(.97)}
+.stat-icon{width:36px;height:36px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;font-size:16px;margin-bottom:6px}
+.stat-val{font-size:22px;font-weight:900;line-height:1}
+.stat-label{font-size:10px;color:var(--muted);margin-top:4px}
+
+/* Client Cards */
+.client-grid{display:grid;grid-template-columns:1fr;gap:14px}
+.client-card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:16px;transition:all .2s}
+.client-card:active{transform:scale(.99);border-color:var(--accent)}
+.cc-top{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.cc-avatar{width:44px;height:44px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;flex-shrink:0}
+.cc-name{font-weight:800;font-size:15px}
+.cc-id{font-size:10px;color:var(--muted);font-family:monospace}
+.cc-status{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700}
+.cc-status .dot{width:7px;height:7px;border-radius:99px;flex-shrink:0}
+.cc-info{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-bottom:12px}
+.cc-row{display:flex;justify-content:space-between;align-items:center;font-size:11px}
+.cc-row .lbl{color:var(--muted)}
+.cc-row .val{font-weight:700;text-align:left}
+.cc-features{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px}
+.cc-feat{font-size:9px;padding:3px 8px;border-radius:99px;background:rgba(0,231,1,.08);color:rgba(0,231,1,.7);border:1px solid rgba(0,231,1,.2)}
+.cc-feat.more{background:rgba(107,122,144,.1);color:var(--muted);border-color:var(--border)}
+.cc-actions{display:flex;gap:6px;flex-wrap:wrap;padding-top:12px;border-top:1px solid var(--border)}
+.cc-btn{flex:1;min-width:60px;padding:8px;border-radius:10px;font-size:10px;font-weight:700;text-align:center;cursor:pointer;transition:all .15s;border:1px solid transparent}
+.cc-btn:active{transform:scale(.95)}
+.cc-btn.primary{background:rgba(0,231,1,.12);color:var(--accent);border-color:rgba(0,231,1,.25)}
+.cc-btn.danger{background:rgba(255,71,87,.1);color:var(--danger);border-color:rgba(255,71,87,.25)}
+.cc-btn.warn{background:rgba(251,191,36,.1);color:var(--amber);border-color:rgba(251,191,36,.25)}
+.cc-btn.info{background:rgba(96,165,250,.1);color:var(--accent2);border-color:rgba(96,165,250,.25)}
+
+/* PM Cards */
+.pm-grid{display:grid;grid-template-columns:1fr;gap:12px}
+.pm-card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:16px;transition:all .2s}
+.pm-card.active-pm{border-color:rgba(0,231,1,.4)}
+.pm-card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.pm-card-body{background:var(--bg2);border-radius:12px;padding:12px}
+.pm-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0}
+.pm-row .k{font-size:10px;color:var(--muted)}
+.pm-row .v{font-size:13px;font-weight:700;font-family:monospace}
+.pm-copy{display:inline-flex;align-items:center;gap:4px;background:rgba(0,231,1,.12);color:var(--accent);border:none;border-radius:8px;padding:5px 10px;font-size:10px;font-weight:700;cursor:pointer}
+.pm-copy:active{transform:scale(.93)}
+
+/* Transactions */
+.tx-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:10px;display:flex;align-items:center;gap:12px}
+.tx-icon{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.tx-info{flex:1;min-width:0}
+.tx-title{font-size:13px;font-weight:700}
+.tx-sub{font-size:10px;color:var(--muted);margin-top:2px}
+.tx-amount{font-size:15px;font-weight:900;text-align:left}
+.tx-status{display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:700;padding:3px 8px;border-radius:99px}
+
+/* Forms */
+.r-input{width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:11px 14px;color:var(--text);font-size:13px;outline:none;transition:border-color .2s}
+.r-input:focus{border-color:var(--accent)}
+.r-label{display:block;font-size:11px;font-weight:700;color:var(--muted);margin-bottom:6px}
+.r-btn{padding:10px 20px;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;border:none;transition:all .15s}
+.r-btn:active{transform:scale(.96)}
+.r-btn.primary{background:var(--accent);color:#000}
+.r-btn.danger{background:var(--danger);color:#fff}
+.r-btn.ghost{background:transparent;color:var(--muted);border:1px solid var(--border)}
+.r-btn.ghost:hover{color:var(--text);border-color:#45556d}
+
+/* Modal */
+.modal-overlay{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.7);display:flex;align-items:flex-end;justify-content:center;backdrop-filter:blur(3px)}
+.modal-box{background:var(--card);border:1px solid var(--border);border-radius:20px 20px 0 0;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;padding:24px 18px env(safe-area-inset-bottom);animation:slideUp .25s ease-out}
+@keyframes slideUp{from{transform:translateY(40px);opacity:0}to{transform:translateY(0);opacity:1}}
+.modal-handle{width:36px;height:4px;border-radius:99px;background:#3a4559;margin:0 auto 16px}
+
+/* Toast */
+.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:99;background:var(--card);border:1px solid var(--accent);border-radius:14px;padding:10px 20px;font-size:13px;font-weight:700;color:var(--accent);box-shadow:0 8px 30px rgba(0,0,0,.5);animation:toastIn .3s ease-out;pointer-events:none}
+@keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(-10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+
+/* Search */
+.search-box{position:relative}
+.search-box input{width:100%;background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:10px 14px 10px 36px;color:var(--text);font-size:13px;outline:none}
+.search-box .s-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:13px}
+
+/* Quick Actions */
+.qa-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.qa-btn{display:flex;align-items:center;gap:8px;padding:12px;border-radius:14px;font-size:11px;font-weight:700;cursor:pointer;transition:all .15s;border:1px solid var(--border);background:var(--card2)}
+.qa-btn:active{transform:scale(.96)}
+.qa-btn i{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px}
+
+/* Revenue Table */
+.rev-table{width:100%;font-size:11px;border-collapse:collapse}
+.rev-table th{background:var(--bg2);color:var(--muted);padding:10px 12px;font-size:10px;text-align:right;white-space:nowrap}
+.rev-table td{padding:10px 12px;border-top:1px solid var(--border);white-space:nowrap}
+
+/* Empty State */
+.empty-state{text-align:center;padding:40px 20px;color:var(--muted)}
+.empty-state i{font-size:40px;margin-bottom:12px;display:block;opacity:.5}
+
+/* Responsive */
+@media(min-width:640px){
+  .stats-grid{grid-template-columns:repeat(3,1fr)}
+  .client-grid{grid-template-columns:repeat(2,1fr)}
+  .pm-grid{grid-template-columns:repeat(2,1fr)}
+  .qa-grid{grid-template-columns:repeat(3,1fr)}
+  .modal-box{border-radius:20px;max-width:560px}
+}
+@media(min-width:1024px){
+  .stats-grid{grid-template-columns:repeat(6,1fr)}
+  .client-grid{grid-template-columns:repeat(3,1fr)}
+  .pm-grid{grid-template-columns:repeat(3,1fr)}
+  .bottom-tabs{display:none!important}
+}
+@media(max-width:1023px){
+  .top-tabs{display:none}
+  .bottom-tabs{display:block}
+  .rental-app{padding-bottom:80px}
+}
+</style>
+
+<div class="rental-app" x-data="rentalSystem()" x-init="init()">
+
+  <!-- Toast -->
+  <div x-show="toastMsg" x-transition class="toast" x-text="toastMsg"></div>
 
   <!-- ═══════════════════════════════════════════════════════════════ HEADER -->
-  <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:20px;flex-wrap:wrap">
     <div>
-      <h1 class="text-2xl font-black text-slate-100 flex items-center gap-3">
-        <span class="text-3xl">🏢</span> نظام تاجير المنصة
+      <h1 style="font-size:20px;font-weight:900;display:flex;align-items:center;gap:8px">
+        <span style="font-size:26px">🏢</span> نظام التاجير
       </h1>
-      <p class="text-slate-400 text-sm mt-1">إدارة كاملة للعملاء — بوتات — دومينات — أرباح — مسؤولين — كل حاجة في مكان واحد</p>
+      <p style="color:var(--muted);font-size:11px;margin-top:2px">إدارة شاملة للعملاء والمالي</p>
     </div>
-    <div class="flex gap-2 flex-wrap">
-      <button @click="openCreateClient()" class="bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-bold px-4 py-2.5 rounded-xl text-sm flex items-center gap-2">
-        <i class="fas fa-plus"></i> عميل جديد
-      </button>
-      <button @click="tab='dashboard';loadAll()" class="px-4 py-2.5 rounded-xl text-sm font-bold transition"
-        :class="tab==='dashboard'?'bg-blue-500 text-white':'bg-slate-800 text-slate-300 hover:bg-slate-700'">
-        <i class="fas fa-chart-pie"></i> لوحة التحكم
-      </button>
-      <button @click="tab='clients'" class="px-4 py-2.5 rounded-xl text-sm font-bold transition"
-        :class="tab==='clients'?'bg-blue-500 text-white':'bg-slate-800 text-slate-300 hover:bg-slate-700'">
-        <i class="fas fa-building"></i> العملاء
-      </button>
-      <button @click="tab='domains';loadDomains()" class="px-4 py-2.5 rounded-xl text-sm font-bold transition"
-        :class="tab==='domains'?'bg-blue-500 text-white':'bg-slate-800 text-slate-300 hover:bg-slate-700'">
-        <i class="fas fa-globe"></i> الدومينات
-      </button>
-      <button @click="tab='revenue';loadRevenue()" class="px-4 py-2.5 rounded-xl text-sm font-bold transition"
-        :class="tab==='revenue'?'bg-blue-500 text-white':'bg-slate-800 text-slate-300 hover:bg-slate-700'">
-        <i class="fas fa-coins"></i> الأرباح
-      </button>
-      <button @click="tab='admins';loadAdmins()" class="px-4 py-2.5 rounded-xl text-sm font-bold transition"
-        :class="tab==='admins'?'bg-blue-500 text-white':'bg-slate-800 text-slate-300 hover:bg-slate-700'">
-        <i class="fas fa-users-cog"></i> المسؤولين
-      </button>
-      <button @click="tab='payments';loadPaymentMethods()" class="px-4 py-2.5 rounded-xl text-sm font-bold transition relative"
-        :class="tab==='payments'?'bg-blue-500 text-white':'bg-slate-800 text-slate-300 hover:bg-slate-700'">
-        <i class="fas fa-credit-card"></i> وسائل الدفع
-        <span x-show="pendingCount>0" class="absolute -top-1 -left-1 bg-red-500 text-white text-[9px] font-bold rounded-full w-5 h-5 flex items-center justify-center" x-text="pendingCount"></span>
-      </button>
-      <button @click="tab='transactions';loadAllTransactions()" class="px-4 py-2.5 rounded-xl text-sm font-bold transition relative"
-        :class="tab==='transactions'?'bg-blue-500 text-white':'bg-slate-800 text-slate-300 hover:bg-slate-700'">
-        <i class="fas fa-exchange-alt"></i> المعاملات
-        <span x-show="pendingCount>0" class="absolute -top-1 -left-1 bg-red-500 text-white text-[9px] font-bold rounded-full w-5 h-5 flex items-center justify-center" x-text="pendingCount"></span>
-      </button>
-    </div>
+    <button @click="openCreateClient()" class="r-btn primary" style="display:flex;align-items:center;gap:6px">
+      <i class="fas fa-plus"></i> عميل جديد
+    </button>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════ DESKTOP TABS -->
+  <div class="top-tabs">
+    <div class="top-tab" :class="tab==='dashboard'&&'active'" @click="tab='dashboard';loadAll()"><i class="fas fa-chart-pie"></i> لوحة التحكم</div>
+    <div class="top-tab" :class="tab==='clients'&&'active'" @click="tab='clients'"><i class="fas fa-users"></i> العملاء</div>
+    <div class="top-tab" :class="tab==='payments'&&'active'" @click="tab='payments';loadPaymentMethods()"><i class="fas fa-credit-card"></i> وسائل الدفع</div>
+    <div class="top-tab" :class="tab==='transactions'&&'active'" @click="tab='transactions';loadAllTransactions()"><i class="fas fa-exchange-alt"></i> المعاملات <span x-show="pendingCount>0" class="t-badge" x-text="pendingCount"></span></div>
+    <div class="top-tab" :class="tab==='revenue'&&'active'" @click="tab='revenue';loadRevenue()"><i class="fas fa-coins"></i> الأرباح</div>
+    <div class="top-tab" :class="tab==='admins'&&'active'" @click="tab='admins';loadAdmins()"><i class="fas fa-user-shield"></i> المسؤولين</div>
+    <div class="top-tab" :class="tab==='domains'&&'active'" @click="tab='domains';loadDomains()"><i class="fas fa-globe"></i> الدومينات</div>
   </div>
 
   <!-- ═══════════════════════════════════════════════════════════════ TAB: DASHBOARD -->
-  <div x-show="tab==='dashboard'">
-    <!-- Stats Cards -->
-    <div class="grid grid-cols-2 lg:grid-cols-6 gap-3 mb-6">
-      <div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
-        <div class="flex items-center gap-2 mb-2">
-          <div class="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center"><i class="fas fa-building text-blue-400 text-sm"></i></div>
-          <p class="text-[10px] text-slate-400">إجمالي العملاء</p>
-        </div>
-        <p class="text-2xl font-black text-slate-100" x-text="stats.total"></p>
+  <div x-show="tab==='dashboard'" x-transition>
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon" style="background:rgba(96,165,250,.12)"><i class="fas fa-users" style="color:var(--accent2)"></i></div>
+        <div class="stat-val" style="color:var(--text)" x-text="stats.total"></div>
+        <div class="stat-label">إجمالي</div>
       </div>
-      <div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
-        <div class="flex items-center gap-2 mb-2">
-          <div class="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center"><i class="fas fa-check-circle text-emerald-400 text-sm"></i></div>
-          <p class="text-[10px] text-slate-400">نشطة</p>
-        </div>
-        <p class="text-2xl font-black text-emerald-400" x-text="stats.active"></p>
+      <div class="stat-card">
+        <div class="stat-icon" style="background:rgba(0,231,1,.12)"><i class="fas fa-check" style="color:var(--accent)"></i></div>
+        <div class="stat-val" style="color:var(--accent)" x-text="stats.active"></div>
+        <div class="stat-label">نشط</div>
       </div>
-      <div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
-        <div class="flex items-center gap-2 mb-2">
-          <div class="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center"><i class="fas fa-times-circle text-red-400 text-sm"></i></div>
-          <p class="text-[10px] text-slate-400">منتهية</p>
-        </div>
-        <p class="text-2xl font-black text-red-400" x-text="stats.expired"></p>
+      <div class="stat-card">
+        <div class="stat-icon" style="background:rgba(255,71,87,.12)"><i class="fas fa-times" style="color:var(--danger)"></i></div>
+        <div class="stat-val" style="color:var(--danger)" x-text="stats.expired"></div>
+        <div class="stat-label">منتهي</div>
       </div>
-      <div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
-        <div class="flex items-center gap-2 mb-2">
-          <div class="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center"><i class="fas fa-clock text-amber-400 text-sm"></i></div>
-          <p class="text-[10px] text-slate-400">تنتهي خلال 3 أيام</p>
-        </div>
-        <p class="text-2xl font-black text-amber-400" x-text="stats.expiringSoon"></p>
+      <div class="stat-card">
+        <div class="stat-icon" style="background:rgba(251,191,36,.12)"><i class="fas fa-clock" style="color:var(--amber)"></i></div>
+        <div class="stat-val" style="color:var(--amber)" x-text="stats.expiringSoon"></div>
+        <div class="stat-label">ينتهي قريباً</div>
       </div>
-      <div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
-        <div class="flex items-center gap-2 mb-2">
-          <div class="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center"><i class="fas fa-robot text-purple-400 text-sm"></i></div>
-          <p class="text-[10px] text-slate-400">بوتات تعمل</p>
-        </div>
-        <p class="text-2xl font-black text-purple-400" x-text="stats.running"></p>
+      <div class="stat-card">
+        <div class="stat-icon" style="background:rgba(168,85,247,.12)"><i class="fas fa-robot" style="color:#a855f7"></i></div>
+        <div class="stat-val" style="color:#a855f7" x-text="stats.running"></div>
+        <div class="stat-label">بوت شغال</div>
       </div>
-      <div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
-        <div class="flex items-center gap-2 mb-2">
-          <div class="w-8 h-8 rounded-lg bg-cyan-500/20 flex items-center justify-center"><i class="fas fa-coins text-cyan-400 text-sm"></i></div>
-          <p class="text-[10px] text-slate-400">إجمالي الأرباح</p>
-        </div>
-        <p class="text-2xl font-black text-cyan-400" x-text="fmtMoney(revenueStats.total_game_profit)"></p>
+      <div class="stat-card">
+        <div class="stat-icon" style="background:rgba(34,211,238,.12)"><i class="fas fa-coins" style="color:#22d3ee"></i></div>
+        <div class="stat-val" style="color:#22d3ee;font-size:16px" x-text="fmtMoney(revenueStats.total_game_profit)"></div>
+        <div class="stat-label">أرباح</div>
       </div>
     </div>
-
-    <!-- Recent clients + quick actions -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <div class="bg-slate-800/40 border border-slate-700 rounded-2xl p-5">
-        <h3 class="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2"><i class="fas fa-clock text-blue-400"></i> آخر عملاء مضافة</h3>
-        <div class="space-y-2">
+    <div style="display:grid;grid-template-columns:1fr;gap:16px">
+      <div class="r-card">
+        <div class="r-card-header"><span style="font-size:13px;font-weight:700">🕐 آخر العملاء</span></div>
+        <div class="r-card-body" style="padding:8px">
           <template x-for="c in clients.slice(0,5)" :key="c.id">
-            <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-900/50 hover:bg-slate-800 transition cursor-pointer" @click="openEditClient(c)">
-              <div class="flex items-center gap-3">
-                <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" :class="c.running?'bg-emerald-400 animate-pulse':(c.expired?'bg-red-400':'bg-slate-500')"></span>
+            <div @click="openEditClient(c)" style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:12px;cursor:pointer;transition:background .15s" onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background=''">
+              <div style="display:flex;align-items:center;gap:10px">
+                <span style="width:8px;height:8px;border-radius:99px;flex-shrink:0" :class="c.running?'animate-pulse':''" :style="'background:'+(c.running?'var(--accent)':c.expired?'var(--danger)':'var(--muted)')"></span>
                 <div>
-                  <div class="text-sm font-bold text-slate-100" x-text="c.name"></div>
-                  <div class="text-[10px] text-slate-500" x-text="c.id + ' · @' + (c.bot_username||'—')"></div>
+                  <div style="font-size:13px;font-weight:700" x-text="c.name"></div>
+                  <div style="font-size:10px;color:var(--muted)" x-text="'@'+(c.bot_username||'—')"></div>
                 </div>
               </div>
-              <div class="text-left">
-                <div class="text-xs font-bold" :class="c.expired?'text-red-400':(c.days_left<=3?'text-amber-400':'text-emerald-400')" x-text="c.expired?'منتهي':c.days_left+' يوم'"></div>
-                <div class="text-[10px] text-slate-500" x-text="c.revenue_share+'% / '+(100-c.revenue_share)+'%'"></div>
+              <div style="text-align:left">
+                <div style="font-size:12px;font-weight:700" :style="'color:'+(c.expired?'var(--danger)':c.days_left<=3?'var(--amber)':'var(--accent)')" x-text="c.expired?'منتهي':c.days_left+' يوم'"></div>
               </div>
             </div>
           </template>
-          <div x-show="clients.length===0" class="text-center py-6 text-slate-500 text-sm">لا يوجد عملاء بعد</div>
+          <div x-show="clients.length===0" class="empty-state" style="padding:20px"><p>لا يوجد عملاء بعد</p></div>
         </div>
       </div>
-      <div class="bg-slate-800/40 border border-slate-700 rounded-2xl p-5">
-        <h3 class="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2"><i class="fas fa-bolt text-amber-400"></i> إجراءات سريعة</h3>
-        <div class="grid grid-cols-2 gap-2">
-          <button @click="openCreateClient()" class="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition text-sm font-bold flex items-center gap-2">
-            <i class="fas fa-plus"></i> إضافة عميل
-          </button>
-          <button @click="tab='clients'" class="p-3 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400 hover:bg-blue-500/20 transition text-sm font-bold flex items-center gap-2">
-            <i class="fas fa-list"></i> كل العملاء
-          </button>
-          <button @click="tab='revenue';loadRevenue()" class="p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20 transition text-sm font-bold flex items-center gap-2">
-            <i class="fas fa-chart-bar"></i> تقرير الأرباح
-          </button>
-          <button @click="tab='domains';loadDomains()" class="p-3 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-400 hover:bg-purple-500/20 transition text-sm font-bold flex items-center gap-2">
-            <i class="fas fa-globe"></i> إدارة الدومينات
-          </button>
-          <button @click="tab='admins';loadAdmins()" class="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 transition text-sm font-bold flex items-center gap-2">
-            <i class="fas fa-user-shield"></i> إدارة المسؤولين
-          </button>
-          <button @click="loadAll()" class="p-3 rounded-xl bg-slate-500/10 border border-slate-500/30 text-slate-400 hover:bg-slate-500/20 transition text-sm font-bold flex items-center gap-2">
-            <i class="fas fa-refresh"></i> تحديث البيانات
-          </button>
+      <div class="r-card">
+        <div class="r-card-header"><span style="font-size:13px;font-weight:700">⚡ إجراءات سريعة</span></div>
+        <div class="r-card-body">
+          <div class="qa-grid">
+            <div class="qa-btn" @click="openCreateClient()"><i style="background:rgba(0,231,1,.12);color:var(--accent)" class="fas fa-plus"></i> إضافة عميل</div>
+            <div class="qa-btn" @click="tab='clients'"><i style="background:rgba(96,165,250,.12);color:var(--accent2)" class="fas fa-list"></i> كل العملاء</div>
+            <div class="qa-btn" @click="tab='revenue';loadRevenue()"><i style="background:rgba(34,211,238,.12);color:#22d3ee" class="fas fa-chart-bar"></i> الأرباح</div>
+            <div class="qa-btn" @click="tab='payments';loadPaymentMethods()"><i style="background:rgba(168,85,247,.12);color:#a855f7" class="fas fa-credit-card"></i> وسائل الدفع</div>
+            <div class="qa-btn" @click="tab='admins';loadAdmins()"><i style="background:rgba(251,191,36,.12);color:var(--amber)" class="fas fa-user-shield"></i> المسؤولين</div>
+            <div class="qa-btn" @click="loadAll()"><i style="background:rgba(107,122,144,.12);color:var(--muted)" class="fas fa-refresh"></i> تحديث</div>
+          </div>
         </div>
       </div>
     </div>
   </div>
 
   <!-- ═══════════════════════════════════════════════════════════════ TAB: CLIENTS -->
-  <div x-show="tab==='clients'">
-    <!-- Search + Filter -->
-    <div class="flex flex-col sm:flex-row gap-3 mb-4">
-      <div class="flex-1 relative">
-        <i class="fas fa-search absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
-        <input x-model="search" dir="rtl" placeholder="بحث بالاسم أو المعرف..."
-          class="w-full bg-slate-800 border border-slate-700 rounded-xl pr-10 pl-4 py-2.5 text-sm text-slate-100 focus:border-emerald-500 outline-none">
+  <div x-show="tab==='clients'" x-transition>
+    <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+      <div class="search-box" style="flex:1;min-width:200px">
+        <i class="fas fa-search s-icon"></i>
+        <input x-model="search" dir="rtl" placeholder="بحث بالاسم أو المعرف...">
       </div>
-      <select x-model="filterStatus" class="bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-300 outline-none">
-        <option value="">الكل</option>
-        <option value="active">نشطة</option>
-        <option value="suspended">موقوفة</option>
-        <option value="expired">منتهية</option>
+      <select x-model="filterStatus" class="r-input" style="width:auto;min-width:110px">
+        <option value="">الكل</option><option value="active">نشط</option><option value="suspended">موقوف</option><option value="expired">منتهي</option>
       </select>
     </div>
-
-    <!-- Clients Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+    <div class="client-grid">
       <template x-for="c in filteredClients" :key="c.id">
-        <div class="bg-slate-800/40 border border-slate-700 rounded-2xl p-5 hover:border-slate-600 transition group">
-          <!-- Header -->
-          <div class="flex items-start justify-between mb-3">
-            <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-xl flex items-center justify-center text-lg font-black"
-                :class="c.running?'bg-emerald-500/20 text-emerald-400':(c.expired?'bg-red-500/20 text-red-400':'bg-slate-700 text-slate-400')">
-                <span x-text="c.name.charAt(0)"></span>
-              </div>
-              <div>
-                <div class="font-bold text-slate-100" x-text="c.name"></div>
-                <div class="text-[10px] text-slate-500 font-mono" x-text="c.id"></div>
-              </div>
+        <div class="client-card">
+          <div class="cc-top">
+            <div class="cc-avatar" :style="'background:'+(c.running?'rgba(0,231,1,.12)':c.expired?'rgba(255,71,87,.12)':'rgba(107,122,144,.12)')+';color:'+(c.running?'var(--accent)':c.expired?'var(--danger)':'var(--muted)')" x-text="c.name.charAt(0)"></div>
+            <div style="flex:1;min-width:0">
+              <div class="cc-name" x-text="c.name"></div>
+              <div class="cc-id" x-text="c.id"></div>
             </div>
-            <div class="flex items-center gap-1">
-              <span class="w-2.5 h-2.5 rounded-full" :class="c.running?'bg-emerald-400 animate-pulse':(c.expired?'bg-red-400':'bg-slate-500')"></span>
-              <span class="text-[10px]" :class="c.expired?'text-red-400':(c.status==='suspended'?'text-amber-400':'text-emerald-400')"
-                x-text="c.expired?'منتهي':(c.status==='suspended'?'موقوف':'نشط')"></span>
+            <div class="cc-status">
+              <span class="dot" :style="'background:'+(c.running?'var(--accent)':c.expired?'var(--danger)':c.status==='suspended'?'var(--amber)':'var(--muted)')"></span>
+              <span :style="'color:'+(c.expired?'var(--danger)':c.status==='suspended'?'var(--amber)':'var(--accent)')" x-text="c.expired?'منتهي':(c.status==='suspended'?'موقوف':'نشط')"></span>
             </div>
           </div>
-
-          <!-- Info -->
-          <div class="space-y-1.5 mb-3">
-            <div class="flex items-center justify-between text-xs">
-              <span class="text-slate-500">البوت</span>
-              <span class="text-slate-300 font-mono" x-text="'@'+(c.bot_username||'—')"></span>
-            </div>
-            <div class="flex items-center justify-between text-xs">
-              <span class="text-slate-500">لوحة التحكم</span>
-              <span class="text-blue-400 font-mono" x-text="c.dash_username"></span>
-            </div>
-            <div class="flex items-center justify-between text-xs">
-              <span class="text-slate-500">الدومين</span>
-              <span class="text-purple-400 font-mono text-[10px]" x-text="c.custom_domain || '—'"></span>
-            </div>
-            <div class="flex items-center justify-between text-xs">
-              <span class="text-slate-500">الاشتراك</span>
-              <span :class="c.expired?'text-red-400 font-bold':(c.days_left<=3?'text-amber-400 font-bold':'text-slate-300')"
-                x-text="c.expired?'منتهي '+c.subscription_end:(c.days_left+' يوم متبقي')"></span>
-            </div>
-            <div class="flex items-center justify-between text-xs">
-              <span class="text-slate-500">الربح</span>
-              <span>
-                <span class="text-emerald-400 font-bold" x-text="c.revenue_share+'%'"></span>
-                <span class="text-slate-500">عميل</span>
-                <span class="text-blue-400 font-bold" x-text="(100-c.revenue_share)+'%'"></span>
-                <span class="text-slate-500">أنت</span>
-              </span>
-            </div>
+          <div class="cc-info">
+            <div class="cc-row"><span class="lbl">البوت</span><span class="val" style="color:var(--text)" x-text="'@'+(c.bot_username||'—')"></span></div>
+            <div class="cc-row"><span class="lbl">لوحة التحكم</span><span class="val" style="color:var(--accent2)" x-text="c.dash_username"></span></div>
+            <div class="cc-row"><span class="lbl">الدومين</span><span class="val" style="color:#a855f7;font-size:10px" x-text="c.custom_domain||'—'"></span></div>
+            <div class="cc-row"><span class="lbl">الاشتراك</span><span class="val" :style="'color:'+(c.expired?'var(--danger)':c.days_left<=3?'var(--amber)':'var(--accent)')" x-text="c.expired?'منتهي':c.days_left+' يوم'"></span></div>
+            <div class="cc-row"><span class="lbl">الرصيد</span><span class="val" style="color:var(--accent)" x-text="fmtMoney(c.balance)+' EGP'"></span></div>
+            <div class="cc-row"><span class="lbl">الربح</span><span class="val"><span style="color:var(--accent)" x-text="c.revenue_share+'%'"></span> / <span style="color:var(--accent2)" x-text="(100-c.revenue_share)+'%'"></span></span></div>
           </div>
-
-          <!-- Features -->
-          <div class="flex flex-wrap gap-1 mb-3">
+          <div class="cc-features">
             <template x-for="f in (c.features||[]).slice(0,4)" :key="f">
-              <span class="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30" x-text="features[f]||f"></span>
+              <span class="cc-feat" x-text="features[f]||f"></span>
             </template>
-            <span x-show="(c.features||[]).length>4" class="text-[9px] px-1.5 py-0.5 rounded-full bg-slate-700 text-slate-400"
-              x-text="'+'+((c.features||[]).length-4)"></span>
+            <span x-show="(c.features||[]).length>4" class="cc-feat more" x-text="'+'+((c.features||[]).length-4)"></span>
           </div>
-
-          <!-- Actions -->
-          <div class="flex items-center gap-1 pt-2 border-t border-slate-700/50">
-            <button x-show="!c.running && !c.expired && c.status!=='suspended'" @click="control(c,'start')"
-              class="flex-1 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 text-[10px] font-bold hover:bg-emerald-500/30 transition">
-              <i class="fas fa-play"></i> تشغيل
-            </button>
-            <button x-show="c.running" @click="control(c,'stop')"
-              class="flex-1 py-1.5 rounded-lg bg-red-500/20 text-red-400 text-[10px] font-bold hover:bg-red-500/30 transition">
-              <i class="fas fa-stop"></i> إيقاف
-            </button>
-            <button @click="openEditClient(c)"
-              class="flex-1 py-1.5 rounded-lg bg-blue-500/20 text-blue-400 text-[10px] font-bold hover:bg-blue-500/30 transition">
-              <i class="fas fa-pen"></i> تعديل
-            </button>
-            <button x-show="c.expired" @click="openRenew(c)"
-              class="flex-1 py-1.5 rounded-lg bg-amber-500/20 text-amber-400 text-[10px] font-bold hover:bg-amber-500/30 transition">
-              <i class="fas fa-calendar-plus"></i> تجديد
-            </button>
-            <button x-show="c.status!=='suspended'" @click="control(c,'suspend')"
-              class="py-1.5 px-2 rounded-lg bg-amber-500/10 text-amber-400/60 text-[10px] hover:bg-amber-500/30 transition">
-              <i class="fas fa-pause"></i>
-            </button>
-            <button x-show="c.status==='suspended'" @click="control(c,'activate')"
-              class="py-1.5 px-2 rounded-lg bg-emerald-500/10 text-emerald-400/60 text-[10px] hover:bg-emerald-500/30 transition">
-              <i class="fas fa-check"></i>
-            </button>
-            <button @click="confirmDelete(c)"
-              class="py-1.5 px-2 rounded-lg bg-red-500/10 text-red-400/60 text-[10px] hover:bg-red-500/30 transition">
-              <i class="fas fa-trash"></i>
-            </button>
+          <div class="cc-actions">
+            <div class="cc-btn primary" x-show="!c.running&&!c.expired&&c.status!=='suspended'" @click="control(c,'start')"><i class="fas fa-play"></i> تشغيل</div>
+            <div class="cc-btn danger" x-show="c.running" @click="control(c,'stop')"><i class="fas fa-stop"></i> إيقاف</div>
+            <div class="cc-btn info" @click="openEditClient(c)"><i class="fas fa-pen"></i> تعديل</div>
+            <div class="cc-btn warn" x-show="c.expired" @click="openRenew(c)"><i class="fas fa-calendar-plus"></i> تجديد</div>
+            <div class="cc-btn" x-show="c.status!=='suspended'" @click="control(c,'suspend')" style="color:var(--amber)"><i class="fas fa-pause"></i></div>
+            <div class="cc-btn" x-show="c.status==='suspended'" @click="control(c,'activate')" style="color:var(--accent)"><i class="fas fa-check"></i></div>
+            <div class="cc-btn danger" @click="confirmDelete(c)"><i class="fas fa-trash"></i></div>
           </div>
         </div>
       </template>
     </div>
-    <div x-show="filteredClients.length===0" class="text-center py-12 text-slate-500">
-      <div class="text-4xl mb-3">🏢</div>
-      لا يوجد عملاء مطابقين
-    </div>
-  </div>
-
-  <!-- ═══════════════════════════════════════════════════════════════ TAB: DOMAINS -->
-  <div x-show="tab==='domains'">
-    <div class="bg-slate-800/40 border border-slate-700 rounded-2xl p-6 mb-4">
-      <div class="flex items-center justify-between mb-4">
-        <h3 class="text-lg font-bold text-slate-100">الدومينات المخصصة</h3>
-        <button @click="generateNginx()" class="px-4 py-2 rounded-xl bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 text-xs font-bold">
-          <i class="fas fa-code"></i> توليد nginx config
-        </button>
-      </div>
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
-        <select x-model="domainForm.client_id" class="bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm outline-none">
-          <option value="">— اختر عميل —</option>
-          <template x-for="c in clients" :key="c.id">
-            <option :value="c.id" x-text="c.name"></option>
-          </template>
-        </select>
-        <input x-model="domainForm.domain" dir="ltr" placeholder="client.vex.deals"
-          class="bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm outline-none">
-        <button @click="saveDomain()" :disabled="!domainForm.client_id||!domainForm.domain"
-          class="px-6 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-bold text-sm disabled:opacity-50">حفظ</button>
-      </div>
-      <div class="overflow-x-auto border border-slate-700 rounded-xl">
-        <table class="w-full text-xs">
-          <thead><tr class="bg-slate-900 text-slate-400">
-            <th class="text-right px-4 py-2">العميل</th>
-            <th class="text-right px-4 py-2">الدومين</th>
-            <th class="text-right px-4 py-2">الحالة</th>
-            <th class="text-right px-4 py-2">إجراءات</th>
-          </tr></thead>
-          <tbody>
-            <template x-for="d in domains" :key="d.client_id">
-              <tr class="border-t border-slate-700/50 hover:bg-slate-700/30">
-                <td class="px-4 py-2.5 font-bold text-slate-100" x-text="d.client_name"></td>
-                <td class="px-4 py-2.5"><a :href="'https://'+d.domain" target="_blank" class="text-blue-400 hover:underline font-mono" x-text="d.domain"></a></td>
-                <td class="px-4 py-2.5"><span class="text-[10px] px-2 py-0.5 rounded-full" :class="d.status==='active'?'bg-emerald-500/20 text-emerald-300':'bg-red-500/20 text-red-300'" x-text="d.status==='active'?'نشط':'معطل'"></span></td>
-                <td class="px-4 py-2.5"><button @click="removeDomain(d.client_id)" class="text-red-400/70 hover:text-red-400"><i class="fas fa-trash text-xs"></i></button></td>
-              </tr>
-            </template>
-            <tr x-show="domains.length===0"><td colspan="4" class="px-4 py-8 text-center text-slate-500">لا توجد دومينات</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <div x-show="nginxConfigs.length>0" class="mt-4">
-        <h4 class="text-sm font-bold text-slate-300 mb-2">nginx configs</h4>
-        <template x-for="cfg in nginxConfigs" :key="cfg.domain">
-          <div class="bg-slate-900 rounded-xl border border-slate-700 p-3 mb-2">
-            <div class="flex items-center justify-between mb-1">
-              <span class="text-xs font-bold text-slate-100" x-text="cfg.domain"></span>
-              <button @click="navigator.clipboard.writeText(cfg.config)" class="text-[10px] text-blue-400 hover:underline">نسخ</button>
-            </div>
-            <pre class="text-[10px] text-slate-500 overflow-x-auto max-h-32" x-text="cfg.config"></pre>
-          </div>
-        </template>
-      </div>
-    </div>
-  </div>
-
-  <!-- ═══════════════════════════════════════════════════════════════ TAB: REVENUE -->
-  <div x-show="tab==='revenue'">
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-      <div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
-        <p class="text-[10px] text-slate-400 mb-1">إجمالي أرباح الألعاب</p>
-        <p class="text-2xl font-black text-cyan-400" x-text="fmtMoney(revenueStats.total_game_profit)"></p>
-      </div>
-      <div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
-        <p class="text-[10px] text-slate-400 mb-1">نصيبي</p>
-        <p class="text-2xl font-black text-emerald-400" x-text="fmtMoney(revenueStats.admin_share)"></p>
-      </div>
-      <div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
-        <p class="text-[10px] text-slate-400 mb-1">نصيب العملاء</p>
-        <p class="text-2xl font-black text-blue-400" x-text="fmtMoney(revenueStats.client_share)"></p>
-      </div>
-      <div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
-        <p class="text-[10px] text-slate-400 mb-1">إجمالي الجولات</p>
-        <p class="text-2xl font-black text-purple-400" x-text="fmtNum(revenueStats.total_rounds)"></p>
-      </div>
-    </div>
-    <div class="bg-slate-800/40 border border-slate-700 rounded-2xl overflow-hidden">
-      <table class="w-full text-xs">
-        <thead><tr class="bg-slate-800/80 border-b border-slate-700 text-slate-400">
-          <th class="text-right px-4 py-3">العميل</th>
-          <th class="text-right px-4 py-3">نسبة العميل</th>
-          <th class="text-right px-4 py-3">إجمالي الربح</th>
-          <th class="text-right px-4 py-3">مبلغ العميل</th>
-          <th class="text-right px-4 py-3">مبلغك</th>
-          <th class="text-right px-4 py-3">الجولات</th>
-          <th class="text-right px-4 py-3">تعديل النسبة</th>
-        </tr></thead>
-        <tbody>
-          <template x-for="r in revenueByClient" :key="r.client_id">
-            <tr class="border-t border-slate-700/50 hover:bg-slate-700/30">
-              <td class="px-4 py-2.5 font-bold text-slate-100" x-text="r.client_name"></td>
-              <td class="px-4 py-2.5"><span class="text-emerald-400 font-bold" x-text="r.revenue_share+'%'"></span></td>
-              <td class="px-4 py-2.5 text-cyan-400" x-text="fmtMoney(r.total_profit)"></td>
-              <td class="px-4 py-2.5 text-blue-400" x-text="fmtMoney(r.client_amount)"></td>
-              <td class="px-4 py-2.5 text-emerald-400" x-text="fmtMoney(r.admin_amount)"></td>
-              <td class="px-4 py-2.5 text-purple-400" x-text="fmtNum(r.rounds)"></td>
-              <td class="px-4 py-2.5">
-                <div class="flex items-center gap-1">
-                  <input type="number" min="0" max="100" :value="r.revenue_share"
-                    @change="updateRevenueShare(r.client_id, $event.target.value)"
-                    class="w-16 bg-slate-900 border border-slate-600 rounded-lg px-2 py-1 text-xs text-center outline-none">
-                  <span class="text-[10px] text-slate-500">%</span>
-                </div>
-              </td>
-            </tr>
-          </template>
-          <tr x-show="revenueByClient.length===0"><td colspan="7" class="px-4 py-8 text-center text-slate-500">لا توجد بيانات أرباح</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- ═══════════════════════════════════════════════════════════════ TAB: ADMINS -->
-  <div x-show="tab==='admins'">
-    <div class="bg-slate-800/40 border border-slate-700 rounded-2xl p-6 mb-4">
-      <div class="flex items-center justify-between mb-4">
-        <h3 class="text-lg font-bold text-slate-100">المسؤولون وصلاحياتهم</h3>
-        <button @click="showAddAdmin=true" class="px-4 py-2 rounded-xl bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 text-xs font-bold">
-          <i class="fas fa-plus"></i> إضافة مسؤول
-        </button>
-      </div>
-      <div class="overflow-x-auto border border-slate-700 rounded-xl">
-        <table class="w-full text-xs">
-          <thead><tr class="bg-slate-900 text-slate-400">
-            <th class="text-right px-4 py-2">المعرف</th>
-            <th class="text-right px-4 py-2">الاسم</th>
-            <th class="text-right px-4 py-2">الدور</th>
-            <th class="text-right px-4 py-2">العميل المرتبط</th>
-            <th class="text-right px-4 py-2">الأقسام المتاحة</th>
-            <th class="text-right px-4 py-2">إجراءات</th>
-          </tr></thead>
-          <tbody>
-            <template x-for="a in admins" :key="a.telegram_id">
-              <tr class="border-t border-slate-700/50 hover:bg-slate-700/30">
-                <td class="px-4 py-2.5 font-mono text-blue-400" x-text="a.telegram_id"></td>
-                <td class="px-4 py-2.5 text-slate-100" x-text="a.name||'—'"></td>
-                <td class="px-4 py-2.5"><span class="text-[10px] px-2 py-0.5 rounded-full" :class="roleBadge(a.role)" x-text="roleLabel(a.role)"></span></td>
-                <td class="px-4 py-2.5 text-slate-300" x-text="a.tenant_id?getTenantName(a.tenant_id):'—'"></td>
-                <td class="px-4 py-2.5">
-                  <button @click="openSections(a)" class="text-[10px] text-blue-400 hover:underline">تعديل الأقسام</button>
-                </td>
-                <td class="px-4 py-2.5">
-                  <div class="flex gap-1">
-                    <button @click="openTenantAssign(a)" class="p-1.5 rounded bg-blue-500/10 text-blue-400/70 hover:text-blue-400"><i class="fas fa-link text-[10px]"></i></button>
-                    <button @click="confirmDeleteAdmin(a)" class="p-1.5 rounded bg-red-500/10 text-red-400/70 hover:text-red-400"><i class="fas fa-trash text-[10px]"></i></button>
-                  </div>
-                </td>
-              </tr>
-            </template>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Section Access Control -->
-    <div x-show="sectionAdmin" class="bg-slate-800/40 border border-slate-700 rounded-2xl p-6">
-      <div class="flex items-center justify-between mb-4">
-        <h3 class="text-sm font-bold text-slate-100">أقسام: <span class="text-blue-400" x-text="sectionAdmin"></span></h3>
-        <div class="flex gap-2">
-          <button @click="selectAllSections()" class="text-[10px] text-emerald-400 hover:underline">تحديد الكل</button>
-          <button @click="sectionForm=[]" class="text-[10px] text-red-400 hover:underline">إلغاء الكل</button>
-          <button @click="saveSections()" class="px-3 py-1 rounded-lg bg-emerald-500 text-slate-900 text-[10px] font-bold">حفظ</button>
-          <button @click="sectionAdmin=null" class="text-[10px] text-slate-400 hover:text-slate-200">✕</button>
-        </div>
-      </div>
-      <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2">
-        <template x-for="s in allSectionsList" :key="s.key">
-          <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer p-2 rounded-lg hover:bg-slate-800 transition">
-            <input type="checkbox" :value="s.key" x-model="sectionForm" class="accent-emerald-500 w-3.5 h-3.5">
-            <span x-text="s.label"></span>
-          </label>
-        </template>
-      </div>
-    </div>
+    <div x-show="filteredClients.length===0" class="empty-state"><i class="fas fa-building"></i> لا يوجد عملاء مطابقين</div>
   </div>
 
   <!-- ═══════════════════════════════════════════════════════════════ TAB: PAYMENT METHODS -->
-  <div x-show="tab==='payments'">
-    <div class="flex items-center justify-between mb-4">
-      <h2 class="text-lg font-bold text-slate-100">💳 وسائل الدفع المتاحة</h2>
-      <button @click="showAddPM=true;pmForm={name:'',pm_type:'bank_transfer',account_number:'',bank_name:'',holder_name:''}" class="bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-bold px-4 py-2 rounded-xl text-sm">
-        <i class="fas fa-plus"></i> إضافة وسيلة دفع
+  <div x-show="tab==='payments'" x-transition>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <h2 style="font-size:16px;font-weight:900">💳 وسائل الدفع</h2>
+      <button @click="showAddPM=true;pmForm={name:'',pm_type:'bank_transfer',account_number:'',bank_name:'',holder_name:''}" class="r-btn primary" style="font-size:12px">
+        <i class="fas fa-plus"></i> إضافة
       </button>
     </div>
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div class="pm-grid">
       <template x-for="pm in paymentMethods" :key="pm.id">
-        <div class="bg-slate-800/60 border rounded-2xl p-5" :class="pm.status==='active'?'border-emerald-500/30':'border-slate-700 opacity-60'">
-          <div class="flex items-center justify-between mb-3">
-            <div class="flex items-center gap-2">
-              <span class="text-2xl" x-text="pm.pm_type==='bank_transfer'?'🏦':pm.pm_type==='vodafone_cash'?'📱':pm.pm_type==='usdt'?'💵':'💰'"></span>
+        <div class="pm-card" :class="pm.status==='active'&&'active-pm'">
+          <div class="pm-card-header">
+            <div style="display:flex;align-items:center;gap:10px">
+              <span style="font-size:24px" x-text="pm.pm_type==='bank_transfer'?'🏦':pm.pm_type==='vodafone_cash'?'📱':pm.pm_type==='usdt'?'💵':'💰'"></span>
               <div>
-                <p class="text-sm font-bold text-slate-100" x-text="pm.name"></p>
-                <p class="text-[10px] text-slate-400" x-text="pm.pm_type==='bank_transfer'?'تحويل بنكي':pm.pm_type==='vodafone_cash'?'فودافون كاش':'USDT'"></p>
+                <div style="font-size:14px;font-weight:700" x-text="pm.name"></div>
+                <div style="font-size:10px;color:var(--muted)" x-text="pm.pm_type==='bank_transfer'?'تحويل بنكي':pm.pm_type==='vodafone_cash'?'فودافون كاش':'USDT'"></div>
               </div>
             </div>
-            <div class="flex gap-1">
-              <button @click="togglePMStatus(pm)" class="w-7 h-7 rounded-lg flex items-center justify-center text-xs transition"
-                :class="pm.status==='active'?'bg-emerald-500/20 text-emerald-400':'bg-slate-600/20 text-slate-400'"
-                :title="pm.status==='active'?'تعطيل':'تفعيل'">
+            <div style="display:flex;gap:6px">
+              <button @click="togglePMStatus(pm)" class="pm-copy" :style="'background:'+(pm.status==='active'?'rgba(0,231,1,.12)':'rgba(107,122,144,.12)')">
                 <i :class="pm.status==='active'?'fas fa-check':'fas fa-ban'"></i>
               </button>
-              <button @click="deletePM(pm)" class="w-7 h-7 rounded-lg bg-red-500/20 text-red-400 flex items-center justify-center text-xs" title="حذف">
-                <i class="fas fa-trash"></i>
-              </button>
+              <button @click="deletePM(pm)" class="pm-copy" style="background:rgba(255,71,87,.12);color:var(--danger)"><i class="fas fa-trash"></i></button>
             </div>
           </div>
-          <div class="bg-slate-900/60 rounded-xl p-3 space-y-2">
-            <div class="flex items-center justify-between">
-              <span class="text-[10px] text-slate-500">رقم الحساب</span>
-              <div class="flex items-center gap-2">
-                <span class="text-sm font-mono text-emerald-400" x-text="pm.account_number"></span>
-                <button @click="copyText(pm.account_number)" class="text-slate-400 hover:text-emerald-400 text-xs" title="نسخ"><i class="fas fa-copy"></i></button>
+          <div class="pm-card-body">
+            <div class="pm-row">
+              <span class="k">رقم الحساب</span>
+              <div style="display:flex;align-items:center;gap:6px">
+                <span class="v" style="color:var(--accent)" x-text="pm.account_number"></span>
+                <button @click="copyText(pm.account_number)" class="pm-copy"><i class="fas fa-copy"></i> نسخ</button>
               </div>
             </div>
-            <div x-show="pm.bank_name" class="flex items-center justify-between">
-              <span class="text-[10px] text-slate-500">البنك</span>
-              <span class="text-xs text-slate-300" x-text="pm.bank_name"></span>
-            </div>
-            <div x-show="pm.holder_name" class="flex items-center justify-between">
-              <span class="text-[10px] text-slate-500">اسم الحساب</span>
-              <span class="text-xs text-slate-300" x-text="pm.holder_name"></span>
-            </div>
+            <div x-show="pm.bank_name" class="pm-row"><span class="k">البنك</span><span class="v" x-text="pm.bank_name"></span></div>
+            <div x-show="pm.holder_name" class="pm-row"><span class="k">المالك</span><span class="v" x-text="pm.holder_name"></span></div>
           </div>
         </div>
       </template>
-      <div x-show="paymentMethods.length===0" class="col-span-3 text-center py-12 text-slate-500">
-        <i class="fas fa-credit-card text-4xl mb-3 block"></i>
-        <p>لا توجد وسائل دفع مضافة</p>
-      </div>
     </div>
+    <div x-show="paymentMethods.length===0" class="empty-state"><i class="fas fa-credit-card"></i> لا توجد وسائل دفع</div>
   </div>
 
   <!-- ═══════════════════════════════════════════════════════════════ TAB: TRANSACTIONS -->
-  <div x-show="tab==='transactions'">
-    <div class="flex items-center justify-between mb-4">
-      <h2 class="text-lg font-bold text-slate-100">🔄 طلبات الإيداع والسحب</h2>
-      <div class="flex gap-2">
-        <select x-model="txFilter" @change="loadAllTransactions()" class="bg-slate-800 border border-slate-600 rounded-xl px-3 py-2 text-slate-300 text-sm">
+  <div x-show="tab==='transactions'" x-transition>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+      <h2 style="font-size:16px;font-weight:900">🔄 المعاملات</h2>
+      <div style="display:flex;gap:8px">
+        <select x-model="txFilter" @change="loadAllTransactions()" class="r-input" style="width:auto;min-width:90px;padding:8px 12px;font-size:11px">
           <option value="">الكل</option><option value="pending">معلق</option><option value="approved">مقبول</option><option value="rejected">مرفوض</option>
         </select>
-        <select x-model="txTypeFilter" @change="loadAllTransactions()" class="bg-slate-800 border border-slate-600 rounded-xl px-3 py-2 text-slate-300 text-sm">
+        <select x-model="txTypeFilter" @change="loadAllTransactions()" class="r-input" style="width:auto;min-width:90px;padding:8px 12px;font-size:11px">
           <option value="">الكل</option><option value="deposit">إيداع</option><option value="withdraw">سحب</option>
         </select>
       </div>
     </div>
-    <!-- Pending Banner -->
-    <div x-show="pendingCount>0" class="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 mb-4 flex items-center gap-3">
-      <span class="text-2xl">⚠️</span>
+    <div x-show="pendingCount>0" style="background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.25);border-radius:16px;padding:14px;margin-bottom:14px;display:flex;align-items:center;gap:10px">
+      <span style="font-size:24px">⚠️</span>
       <div>
-        <p class="text-sm font-bold text-amber-400" x-text="pendingCount+' طلبات معلقة تحتاج مراجعتك'"></p>
-        <p class="text-xs text-slate-400">راجع طلبات الإيداع والسحب وقم بالقرار المناسب</p>
+        <div style="font-size:13px;font-weight:700;color:var(--amber)" x-text="pendingCount+' طلبات معلقة'"></div>
+        <div style="font-size:10px;color:var(--muted)">راجعها واتخذ القرار</div>
       </div>
     </div>
-    <!-- Transactions Table -->
-    <div class="bg-slate-800/60 border border-slate-700 rounded-2xl overflow-hidden">
-      <div class="overflow-x-auto">
-        <table class="w-full text-sm">
-          <thead><tr class="text-slate-400 text-xs border-b border-slate-700">
-            <th class="px-4 py-3 text-right">التاريخ</th><th class="px-4 py-3 text-right">العميل</th>
-            <th class="px-4 py-3 text-right">النوع</th><th class="px-4 py-3 text-right">المبلغ</th>
-            <th class="px-4 py-3 text-right">الوسيلة</th><th class="px-4 py-3 text-right">الحالة</th>
-            <th class="px-4 py-3 text-right">إجراءات</th>
-          </tr></thead>
+    <!-- Card-based transactions (mobile) -->
+    <div style="display:grid;gap:10px">
+      <template x-for="tx in allTransactions" :key="tx.id">
+        <div class="tx-card">
+          <div class="tx-icon" :style="'background:'+(tx.type==='deposit'?'rgba(0,231,1,.1)':'rgba(255,71,87,.1)')">
+            <span x-text="tx.type==='deposit'?'💰':'💸'"></span>
+          </div>
+          <div class="tx-info">
+            <div class="tx-title" x-text="tx.client_name||tx.client_id"></div>
+            <div class="tx-sub"><span x-text="tx.method||'—'"></span> · <span x-text="tx.created_at"></span></div>
+          </div>
+          <div style="text-align:left">
+            <div class="tx-amount" :style="'color:'+(tx.type==='deposit'?'var(--accent)':'var(--danger)')" x-text="(tx.type==='deposit'?'+':'-')+fmtMoney(tx.amount)"></div>
+            <div class="tx-status" style="margin-top:4px"
+              :style="'background:'+(tx.status==='pending'?'rgba(251,191,36,.12)':tx.status==='approved'?'rgba(0,231,1,.12)':'rgba(255,71,87,.12)')+';color:'+(tx.status==='pending'?'var(--amber)':tx.status==='approved'?'var(--accent)':'var(--danger)')"
+              x-text="tx.status==='pending'?'⏳ معلق':tx.status==='approved'?'✅ مقبول':'❌ مرفوض'"></div>
+          </div>
+        </div>
+      </template>
+    </div>
+    <div x-show="allTransactions.length===0" class="empty-state"><i class="fas fa-exchange-alt"></i> لا توجد معاملات</div>
+    <!-- Quick approve/reject buttons at bottom for pending -->
+    <div x-show="pendingCount>0" style="position:fixed;bottom:70px;left:16px;right:16px;z-index:40;display:flex;gap:10px" class="lg:hidden">
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════ TAB: REVENUE -->
+  <div x-show="tab==='revenue'" x-transition>
+    <div class="stats-grid" style="grid-template-columns:repeat(2,1fr)">
+      <div class="stat-card"><div class="stat-label">إجمالي الربح</div><div class="stat-val" style="color:#22d3ee;font-size:16px" x-text="fmtMoney(revenueStats.total_game_profit)"></div></div>
+      <div class="stat-card"><div class="stat-label">نصيبي</div><div class="stat-val" style="color:var(--accent);font-size:16px" x-text="fmtMoney(revenueStats.admin_share)"></div></div>
+      <div class="stat-card"><div class="stat-label">نصيب العملاء</div><div class="stat-val" style="color:var(--accent2);font-size:16px" x-text="fmtMoney(revenueStats.client_share)"></div></div>
+      <div class="stat-card"><div class="stat-label">الجولات</div><div class="stat-val" style="color:#a855f7;font-size:16px" x-text="fmtNum(revenueStats.total_rounds)"></div></div>
+    </div>
+    <div class="r-card">
+      <div class="r-card-body" style="overflow-x:auto;padding:0">
+        <table class="rev-table">
+          <thead><tr><th>العميل</th><th>النسبة</th><th>الربح</th><th>نصيبه</th><th>نصيبي</th><th>الجولات</th><th>تعديل</th></tr></thead>
           <tbody>
-            <template x-for="tx in allTransactions" :key="tx.id">
-              <tr class="border-b border-slate-700/50 hover:bg-slate-700/20">
-                <td class="px-4 py-3 text-slate-300 text-xs" x-text="tx.created_at"></td>
-                <td class="px-4 py-3 text-slate-100 font-bold">
-                  <span x-text="tx.client_name||tx.client_id"></span>
-                </td>
-                <td class="px-4 py-3">
-                  <span class="px-2 py-1 rounded-lg text-[10px] font-bold" :class="tx.type==='deposit'?'bg-emerald-500/20 text-emerald-400':'bg-red-500/20 text-red-400'" x-text="tx.type==='deposit'?'💰 إيداع':'💸 سحب'"></span>
-                </td>
-                <td class="px-4 py-3 text-slate-100 font-bold" x-text="fmtMoney(tx.amount)"></td>
-                <td class="px-4 py-3 text-slate-300 text-xs" x-text="tx.method||'—'"></td>
-                <td class="px-4 py-3">
-                  <span class="px-2 py-1 rounded-lg text-[10px] font-bold"
-                    :class="tx.status==='pending'?'bg-amber-500/20 text-amber-400':tx.status==='approved'?'bg-emerald-500/20 text-emerald-400':'bg-red-500/20 text-red-400'"
-                    x-text="tx.status==='pending'?'⏳ معلق':tx.status==='approved'?'✅ مقبول':'❌ مرفوض'"></span>
-                </td>
-                <td class="px-4 py-3" x-show="tx.status==='pending'">
-                  <div class="flex gap-1">
-                    <button @click="processTx(tx,'approved')" class="px-2 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 text-[10px] font-bold hover:bg-emerald-500/30">✓ قبول</button>
-                    <button @click="processTx(tx,'rejected')" class="px-2 py-1 rounded-lg bg-red-500/20 text-red-400 text-[10px] font-bold hover:bg-red-500/30">✕ رفض</button>
-                  </div>
-                </td>
-                <td class="px-4 py-3 text-slate-500 text-xs" x-show="tx.status!=='pending'" x-text="tx.processed_at||'—'"></td>
+            <template x-for="r in revenueByClient" :key="r.client_id">
+              <tr>
+                <td style="font-weight:700" x-text="r.client_name"></td>
+                <td style="color:var(--accent);font-weight:700" x-text="r.revenue_share+'%'"></td>
+                <td style="color:#22d3ee" x-text="fmtMoney(r.total_profit)"></td>
+                <td style="color:var(--accent2)" x-text="fmtMoney(r.client_amount)"></td>
+                <td style="color:var(--accent)" x-text="fmtMoney(r.admin_amount)"></td>
+                <td style="color:#a855f7" x-text="fmtNum(r.rounds)"></td>
+                <td><input type="number" min="0" max="100" :value="r.revenue_share" @change="updateRevenueShare(r.client_id,$event.target.value)" class="r-input" style="width:60px;padding:6px;text-align:center;font-size:11px">%</td>
               </tr>
             </template>
           </tbody>
         </table>
-        <div x-show="allTransactions.length===0" class="text-center py-12 text-slate-500">
-          <i class="fas fa-exchange-alt text-4xl mb-3 block"></i>
-          <p>لا توجد معاملات</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════ TAB: ADMINS -->
+  <div x-show="tab==='admins'" x-transition>
+    <div class="r-card" style="margin-bottom:16px">
+      <div class="r-card-header">
+        <span style="font-size:14px;font-weight:700">👥 المسؤولون</span>
+        <button @click="showAddAdmin=true" class="r-btn primary" style="font-size:11px;padding:7px 14px"><i class="fas fa-plus"></i> إضافة</button>
+      </div>
+      <div class="r-card-body" style="overflow-x:auto;padding:0">
+        <table class="rev-table">
+          <thead><tr><th>المعرف</th><th>الاسم</th><th>الدور</th><th>العميل</th><th>الأقسام</th><th>إجراءات</th></tr></thead>
+          <tbody>
+            <template x-for="a in admins" :key="a.telegram_id">
+              <tr>
+                <td style="font-family:monospace;color:var(--accent2)" x-text="a.telegram_id"></td>
+                <td style="font-weight:700" x-text="a.name||'—'"></td>
+                <td><span style="font-size:10px;padding:3px 8px;border-radius:99px;font-weight:700" :class="roleBadge(a.role)" x-text="roleLabel(a.role)"></span></td>
+                <td x-text="a.tenant_id?getTenantName(a.tenant_id):'—'"></td>
+                <td><button @click="openSections(a)" style="color:var(--accent2);font-size:10px">تعديل</button></td>
+                <td style="display:flex;gap:4px">
+                  <button @click="openTenantAssign(a)" class="pm-copy" style="background:rgba(96,165,250,.1);color:var(--accent2)"><i class="fas fa-link"></i></button>
+                  <button @click="confirmDeleteAdmin(a)" class="pm-copy" style="background:rgba(255,71,87,.1);color:var(--danger)"><i class="fas fa-trash"></i></button>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div x-show="sectionAdmin" class="r-card">
+      <div class="r-card-header">
+        <span style="font-size:13px;font-weight:700">الأقسام: <span style="color:var(--accent2)" x-text="sectionAdmin"></span></span>
+        <div style="display:flex;gap:8px">
+          <button @click="selectAllSections()" style="color:var(--accent);font-size:10px">تحديد الكل</button>
+          <button @click="sectionForm=[]" style="color:var(--danger);font-size:10px">إلغاء الكل</button>
+          <button @click="saveSections()" class="r-btn primary" style="font-size:10px;padding:5px 12px">حفظ</button>
+          <button @click="sectionAdmin=null" style="color:var(--muted);font-size:14px">✕</button>
+        </div>
+      </div>
+      <div class="r-card-body">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px">
+          <template x-for="s in allSectionsList" :key="s.key">
+            <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;cursor:pointer;font-size:12px;transition:background .15s" onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background=''">
+              <input type="checkbox" :value="s.key" x-model="sectionForm" style="accent-color:var(--accent);width:15px;height:15px">
+              <span x-text="s.label"></span>
+            </label>
+          </template>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════ TAB: DOMAINS -->
+  <div x-show="tab==='domains'" x-transition>
+    <div class="r-card">
+      <div class="r-card-header">
+        <span style="font-size:14px;font-weight:700">🌐 الدومينات</span>
+        <button @click="generateNginx()" class="r-btn ghost" style="font-size:11px;padding:7px 14px"><i class="fas fa-code"></i> توليد nginx</button>
+      </div>
+      <div class="r-card-body">
+        <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+          <select x-model="domainForm.client_id" class="r-input" style="flex:1;min-width:140px">
+            <option value="">— عميل —</option>
+            <template x-for="c in clients" :key="c.id"><option :value="c.id" x-text="c.name"></option></template>
+          </select>
+          <input x-model="domainForm.domain" dir="ltr" placeholder="client.vex.deals" class="r-input" style="flex:1;min-width:160px">
+          <button @click="saveDomain()" :disabled="!domainForm.client_id||!domainForm.domain" class="r-btn primary" style="font-size:12px">حفظ</button>
+        </div>
+        <div style="display:grid;gap:8px">
+          <template x-for="d in domains" :key="d.client_id">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;background:var(--bg2);border-radius:12px;border:1px solid var(--border)">
+              <div>
+                <div style="font-size:13px;font-weight:700" x-text="d.client_name"></div>
+                <a :href="'https://'+d.domain" target="_blank" style="font-size:11px;color:var(--accent2);font-family:monospace" x-text="d.domain"></a>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <span style="font-size:9px;padding:3px 8px;border-radius:99px;font-weight:700" :style="'background:'+(d.status==='active'?'rgba(0,231,1,.1)':'rgba(255,71,87,.1)')+';color:'+(d.status==='active'?'var(--accent)':'var(--danger)')" x-text="d.status==='active'?'نشط':'معطل'"></span>
+                <button @click="removeDomain(d.client_id)" style="color:var(--danger);font-size:12px"><i class="fas fa-trash"></i></button>
+              </div>
+            </div>
+          </template>
+          <div x-show="domains.length===0" class="empty-state" style="padding:20px">لا توجد دومينات</div>
+        </div>
+        <div x-show="nginxConfigs.length>0" style="margin-top:16px">
+          <template x-for="cfg in nginxConfigs" :key="cfg.domain">
+            <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:8px">
+              <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+                <span style="font-size:12px;font-weight:700" x-text="cfg.domain"></span>
+                <button @click="copyText(cfg.config)" class="pm-copy"><i class="fas fa-copy"></i></button>
+              </div>
+              <pre style="font-size:10px;color:var(--muted);overflow-x:auto;max-height:80px;white-space:pre-wrap" x-text="cfg.config"></pre>
+            </div>
+          </template>
         </div>
       </div>
     </div>
@@ -567,207 +519,239 @@
   <!-- ═══════════════════════════════════════════════════════════════ MODALS -->
 
   <!-- Add/Edit Client Modal -->
-  <div x-show="showClientModal" x-cloak class="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 overflow-y-auto" style="display:none">
-    <div class="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-2xl p-6 my-8">
-      <div class="flex items-center justify-between mb-5">
-        <h3 class="text-lg font-bold text-slate-100" x-text="clientForm.id?'تعديل: '+clientForm.name:'عميل جديد'"></h3>
-        <button @click="showClientModal=false" class="text-slate-400 hover:text-slate-200 text-xl">✕</button>
+  <div x-show="showClientModal" x-cloak class="modal-overlay" @click.self="showClientModal=false" style="display:none">
+    <div class="modal-box">
+      <div class="modal-handle"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+        <h3 style="font-size:17px;font-weight:900" x-text="clientForm.id?'تعديل: '+clientForm.name:'عميل جديد'"></h3>
+        <button @click="showClientModal=false" style="color:var(--muted);font-size:18px">✕</button>
       </div>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div style="display:grid;gap:14px">
         <div>
-          <label class="block text-xs font-bold text-slate-400 mb-1">اسم العميل *</label>
-          <input x-model="clientForm.name" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm outline-none focus:border-emerald-500">
+          <label class="r-label">اسم العميل *</label>
+          <input x-model="clientForm.name" class="r-input">
         </div>
-        <div>
-          <label class="block text-xs font-bold text-slate-400 mb-1">التواصل</label>
-          <input x-model="clientForm.contact" placeholder="@t" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm outline-none focus:border-emerald-500">
-        </div>
-        <div>
-          <label class="block text-xs font-bold text-slate-400 mb-1">يوزر البوت</label>
-          <input x-model="clientForm.bot_username" dir="ltr" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm outline-none focus:border-emerald-500">
-        </div>
-        <div>
-          <label class="block text-xs font-bold text-slate-400 mb-1">توكن البوت *</label>
-          <input x-model="clientForm.bot_token" dir="ltr" placeholder="123456:ABC..." class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm outline-none focus:border-emerald-500">
-        </div>
-        <div>
-          <label class="block text-xs font-bold text-slate-400 mb-1">يوزر اللوحة *</label>
-          <input x-model="clientForm.dash_username" dir="ltr" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm outline-none focus:border-emerald-500">
-        </div>
-        <div>
-          <label class="block text-xs font-bold text-slate-400 mb-1" x-text="clientForm.id?'باسورد جديد (اتركه فاضي)':'باسورد اللوحة *'"></label>
-          <input x-model="clientForm.dash_password" type="password" dir="ltr" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm outline-none focus:border-emerald-500">
-        </div>
-        <div>
-          <label class="block text-xs font-bold text-slate-400 mb-1">أدمن بوت تيليجرام</label>
-          <input x-model="clientForm.admin_ids" dir="ltr" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm outline-none focus:border-emerald-500">
-        </div>
-        <div x-show="!clientForm.id">
-          <label class="block text-xs font-bold text-slate-400 mb-1">مدة الاشتراك</label>
-          <select x-model="clientForm.subscription_days" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm outline-none">
-            <option value="7">7 أيام</option><option value="15">15 يوم</option><option value="30" selected>30 يوم</option>
-            <option value="60">60 يوم</option><option value="90">90 يوم</option><option value="180">6 أشهر</option><option value="365">سنة</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-xs font-bold text-slate-400 mb-1">نسبة أرباح العميل (%)</label>
-          <div class="flex items-center gap-2">
-            <input x-model="clientForm.revenue_share" type="number" min="0" max="100" class="w-20 bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm outline-none">
-            <span class="text-[10px] text-slate-500">أنت: <span class="text-emerald-400 font-bold" x-text="100-(clientForm.revenue_share||30)+'%'"></span></span>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div>
+            <label class="r-label">التواصل</label>
+            <input x-model="clientForm.contact" placeholder="@telegram" class="r-input">
+          </div>
+          <div>
+            <label class="r-label">يوزر البوت</label>
+            <input x-model="clientForm.bot_username" dir="ltr" class="r-input">
           </div>
         </div>
-        <div class="md:col-span-2">
-          <label class="block text-xs font-bold text-slate-400 mb-1">المميزات</label>
-          <div class="grid grid-cols-2 sm:grid-cols-3 gap-1.5 bg-slate-900/50 border border-slate-700 rounded-xl p-3">
+        <div>
+          <label class="r-label">توكن البوت *</label>
+          <input x-model="clientForm.bot_token" dir="ltr" placeholder="123456:ABC-..." class="r-input">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div>
+            <label class="r-label">يوزر اللوحة *</label>
+            <input x-model="clientForm.dash_username" dir="ltr" class="r-input">
+          </div>
+          <div>
+            <label class="r-label" x-text="clientForm.id?'باسورد جديد':'باسورد اللوحة *'"></label>
+            <input x-model="clientForm.dash_password" type="password" dir="ltr" class="r-input">
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div>
+            <label class="r-label">أدمن تيليجرام</label>
+            <input x-model="clientForm.admin_ids" dir="ltr" class="r-input">
+          </div>
+          <div x-show="!clientForm.id">
+            <label class="r-label">مدة الاشتراك</label>
+            <select x-model="clientForm.subscription_days" class="r-input">
+              <option value="7">7 أيام</option><option value="15">15 يوم</option><option value="30">30 يوم</option>
+              <option value="60">60 يوم</option><option value="90">90 يوم</option><option value="180">6 أشهر</option><option value="365">سنة</option>
+            </select>
+          </div>
+        </div>
+        <!-- Revenue Share -->
+        <div>
+          <label class="r-label">نسبة أرباح العميل</label>
+          <div style="display:flex;align-items:center;gap:10px">
+            <input x-model="clientForm.revenue_share" type="number" min="0" max="100" class="r-input" style="width:80px;text-align:center">
+            <span style="font-size:12px;color:var(--muted)">أنت: <b style="color:var(--accent)" x-text="100-(clientForm.revenue_share||30)+'%'"></b></span>
+          </div>
+        </div>
+        <!-- Payment Method -->
+        <div>
+          <label class="r-label">💳 وسيلة الدفع المفضلة</label>
+          <select x-model="clientForm.preferred_pm" class="r-input">
+            <option value="">— بدون —</option>
+            <template x-for="pm in paymentMethods.filter(p=>p.status==='active')" :key="pm.id">
+              <option :value="pm.id" x-text="pm.name+' ('+pm.account_number+')'"></option>
+            </template>
+          </select>
+          <p style="font-size:10px;color:var(--muted);margin-top:4px">العميل يقدر يغيرها من لوحته</p>
+        </div>
+        <!-- Features -->
+        <div>
+          <label class="r-label">المميزات</label>
+          <div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px">
             <template x-for="(label,key) in features" :key="key">
-              <label class="flex items-center gap-1.5 text-[11px] text-slate-300 cursor-pointer">
-                <input type="checkbox" :value="key" x-model="clientForm.features" class="accent-emerald-500 w-3.5 h-3.5">
+              <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;padding:4px 6px;border-radius:8px">
+                <input type="checkbox" :value="key" x-model="clientForm.features" style="accent-color:var(--accent);width:14px;height:14px">
                 <span x-text="label"></span>
               </label>
             </template>
           </div>
-          <div class="flex gap-2 mt-1">
-            <button @click="clientForm.features=Object.keys(features)" class="text-[10px] text-emerald-400 hover:underline">تحديد الكل</button>
-            <button @click="clientForm.features=[]" class="text-[10px] text-slate-500 hover:underline">إلغاء الكل</button>
+          <div style="display:flex;gap:10px;margin-top:4px">
+            <button @click="clientForm.features=Object.keys(features)" style="color:var(--accent);font-size:10px">تحديد الكل</button>
+            <button @click="clientForm.features=[]" style="color:var(--muted);font-size:10px">إلغاء الكل</button>
           </div>
         </div>
-        <div class="md:col-span-2">
-          <label class="block text-xs font-bold text-slate-400 mb-1">ملاحظات</label>
-          <textarea x-model="clientForm.notes" rows="2" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm outline-none"></textarea>
+        <!-- Notes -->
+        <div>
+          <label class="r-label">ملاحظات</label>
+          <textarea x-model="clientForm.notes" rows="2" class="r-input" style="resize:vertical"></textarea>
         </div>
       </div>
-      <div class="flex items-center justify-end gap-3 mt-5">
-        <button @click="showClientModal=false" class="px-5 py-2.5 rounded-xl text-slate-300 border border-slate-600 text-sm hover:bg-slate-700">إلغاء</button>
-        <button @click="saveClient()" :disabled="saving" class="px-6 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-bold text-sm disabled:opacity-50"
-          x-text="saving?'...':(clientForm.id?'حفظ التعديلات':'إنشاء العميل')"></button>
+      <div style="display:flex;gap:10px;margin-top:20px">
+        <button @click="showClientModal=false" class="r-btn ghost" style="flex:1">إلغاء</button>
+        <button @click="saveClient()" :disabled="saving" class="r-btn primary" style="flex:1" x-text="saving?'...':(clientForm.id?'حفظ':'إنشاء')"></button>
       </div>
     </div>
   </div>
 
   <!-- Renew Modal -->
-  <div x-show="showRenew" x-cloak class="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" style="display:none">
-    <div class="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-sm p-6">
-      <h3 class="text-lg font-bold text-slate-100 mb-1">تجديد: <span x-text="renewTarget?.name"></span></h3>
-      <p class="text-xs text-slate-400 mb-4">ينتهي: <span x-text="renewTarget?.subscription_end"></span></p>
-      <div class="grid grid-cols-4 gap-2 mb-4">
+  <div x-show="showRenew" x-cloak class="modal-overlay" @click.self="showRenew=false" style="display:none">
+    <div class="modal-box" style="max-width:360px">
+      <div class="modal-handle"></div>
+      <h3 style="font-size:16px;font-weight:900;margin-bottom:4px">تجديد: <span x-text="renewTarget?.name"></span></h3>
+      <p style="font-size:11px;color:var(--muted);margin-bottom:16px">ينتهي: <span x-text="renewTarget?.subscription_end"></span></p>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:14px">
         <template x-for="d in [7,15,30,90]" :key="d">
-          <button @click="doRenew(d)" class="py-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-sm font-bold hover:bg-emerald-500/30" x-text="d+' يوم'"></button>
+          <button @click="doRenew(d)" style="padding:12px;border-radius:12px;background:rgba(0,231,1,.1);border:1px solid rgba(0,231,1,.25);color:var(--accent);font-size:13px;font-weight:700;cursor:pointer" x-text="d+' يوم'"></button>
         </template>
       </div>
-      <button @click="showRenew=false" class="w-full py-2 rounded-xl text-slate-400 text-sm hover:bg-slate-700">إغلاق</button>
+      <button @click="showRenew=false" class="r-btn ghost" style="width:100%">إغلاق</button>
     </div>
   </div>
 
   <!-- Add Admin Modal -->
-  <div x-show="showAddAdmin" x-cloak class="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" style="display:none">
-    <div class="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-md p-6">
-      <div class="flex items-center justify-between mb-4">
-        <h3 class="text-lg font-bold text-slate-100">إضافة مسؤول</h3>
-        <button @click="showAddAdmin=false" class="text-slate-400 hover:text-slate-200">✕</button>
+  <div x-show="showAddAdmin" x-cloak class="modal-overlay" @click.self="showAddAdmin=false" style="display:none">
+    <div class="modal-box" style="max-width:420px">
+      <div class="modal-handle"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+        <h3 style="font-size:16px;font-weight:900">إضافة مسؤول</h3>
+        <button @click="showAddAdmin=false" style="color:var(--muted);font-size:18px">✕</button>
       </div>
-      <div class="space-y-3">
+      <div style="display:grid;gap:12px">
+        <div><label class="r-label">Telegram ID *</label><input x-model="addAdminForm.telegram_id" dir="ltr" class="r-input"></div>
+        <div><label class="r-label">الاسم</label><input x-model="addAdminForm.name" class="r-input"></div>
         <div>
-          <label class="block text-xs font-bold text-slate-400 mb-1">المعرف (Telegram ID) *</label>
-          <input x-model="addAdminForm.telegram_id" dir="ltr" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm outline-none">
-        </div>
-        <div>
-          <label class="block text-xs font-bold text-slate-400 mb-1">الاسم</label>
-          <input x-model="addAdminForm.name" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm outline-none">
-        </div>
-        <div>
-          <label class="block text-xs font-bold text-slate-400 mb-1">الدور</label>
-          <select x-model="addAdminForm.role" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm outline-none">
+          <label class="r-label">الدور</label>
+          <select x-model="addAdminForm.role" class="r-input">
             <option value="support_admin">دعم</option><option value="finance_admin">المالية</option>
             <option value="game_admin">الألعاب</option><option value="broadcast_admin">البث</option>
             <option value="super_admin">Super Admin</option>
           </select>
         </div>
         <div>
-          <label class="block text-xs font-bold text-slate-400 mb-1">ربط بعميل</label>
-          <select x-model="addAdminForm.tenant_id" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm outline-none">
+          <label class="r-label">ربط بعميل</label>
+          <select x-model="addAdminForm.tenant_id" class="r-input">
             <option value="">— بدون —</option>
-            <template x-for="c in clients" :key="c.id">
-              <option :value="c.id" x-text="c.name"></option>
-            </template>
+            <template x-for="c in clients" :key="c.id"><option :value="c.id" x-text="c.name"></option></template>
           </select>
         </div>
       </div>
-      <div class="flex justify-end gap-2 mt-5">
-        <button @click="showAddAdmin=false" class="px-4 py-2 rounded-xl text-slate-300 border border-slate-600 text-sm">إلغاء</button>
-        <button @click="saveAdmin()" class="px-5 py-2 rounded-xl bg-emerald-500 text-slate-900 font-bold text-sm">إضافة</button>
+      <div style="display:flex;gap:10px;margin-top:18px">
+        <button @click="showAddAdmin=false" class="r-btn ghost" style="flex:1">إلغاء</button>
+        <button @click="saveAdmin()" class="r-btn primary" style="flex:1">إضافة</button>
       </div>
     </div>
   </div>
 
   <!-- Tenant Assign Modal -->
-  <div x-show="showTenantModal" x-cloak class="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" style="display:none">
-    <div class="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-sm p-6">
-      <h3 class="text-lg font-bold text-slate-100 mb-3">ربط المسؤول بعميل</h3>
-      <select x-model="tenantForm.tenant_id" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm outline-none mb-4">
-        <option value="">— بدون ربط —</option>
-        <template x-for="c in clients" :key="c.id">
-          <option :value="c.id" x-text="c.name"></option>
-        </template>
+  <div x-show="showTenantModal" x-cloak class="modal-overlay" @click.self="showTenantModal=false" style="display:none">
+    <div class="modal-box" style="max-width:360px">
+      <div class="modal-handle"></div>
+      <h3 style="font-size:16px;font-weight:900;margin-bottom:14px">ربط المسؤول بعميل</h3>
+      <select x-model="tenantForm.tenant_id" class="r-input" style="margin-bottom:14px">
+        <option value="">— بدون —</option>
+        <template x-for="c in clients" :key="c.id"><option :value="c.id" x-text="c.name"></option></template>
       </select>
-      <div class="flex justify-end gap-2">
-        <button @click="showTenantModal=false" class="px-4 py-2 rounded-xl text-slate-300 border border-slate-600 text-sm">إلغاء</button>
-        <button @click="saveTenantAssign()" class="px-5 py-2 rounded-xl bg-emerald-500 text-slate-900 font-bold text-sm">حفظ</button>
+      <div style="display:flex;gap:10px">
+        <button @click="showTenantModal=false" class="r-btn ghost" style="flex:1">إلغاء</button>
+        <button @click="saveTenantAssign()" class="r-btn primary" style="flex:1">حفظ</button>
       </div>
     </div>
   </div>
 
   <!-- Add Payment Method Modal -->
-  <div x-show="showAddPM" x-cloak class="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" style="display:none">
-    <div class="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-md p-6">
-      <div class="flex items-center justify-between mb-4">
-        <h3 class="text-lg font-bold text-slate-100">💳 إضافة وسيلة دفع جديدة</h3>
-        <button @click="showAddPM=false" class="text-slate-400 hover:text-slate-200">✕</button>
+  <div x-show="showAddPM" x-cloak class="modal-overlay" @click.self="showAddPM=false" style="display:none">
+    <div class="modal-box" style="max-width:420px">
+      <div class="modal-handle"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+        <h3 style="font-size:16px;font-weight:900">💳 وسيلة دفع جديدة</h3>
+        <button @click="showAddPM=false" style="color:var(--muted);font-size:18px">✕</button>
       </div>
-      <div class="space-y-3">
+      <div style="display:grid;gap:12px">
+        <div><label class="r-label">اسم الوسيلة *</label><input x-model="pmForm.name" placeholder="مثال: بنك الأهلي" class="r-input"></div>
         <div>
-          <label class="block text-xs font-bold text-slate-400 mb-1">اسم الوسيلة *</label>
-          <input x-model="pmForm.name" placeholder="مثال: حساب بنك الأهلي" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm outline-none focus:border-emerald-500">
-        </div>
-        <div>
-          <label class="block text-xs font-bold text-slate-400 mb-1">نوع الوسيلة *</label>
-          <select x-model="pmForm.pm_type" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm outline-none focus:border-emerald-500">
+          <label class="r-label">النوع *</label>
+          <select x-model="pmForm.pm_type" class="r-input">
             <option value="bank_transfer">🏦 تحويل بنكي</option>
             <option value="vodafone_cash">📱 فودافون كاش</option>
             <option value="usdt">💵 USDT</option>
             <option value="instapay">⚡ InstaPay</option>
           </select>
         </div>
-        <div>
-          <label class="block text-xs font-bold text-slate-400 mb-1">رقم الحساب / المحفظة *</label>
-          <input x-model="pmForm.account_number" dir="ltr" placeholder="رقم الحساب أو العنوان" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm outline-none focus:border-emerald-500 font-mono">
-        </div>
-        <div>
-          <label class="block text-xs font-bold text-slate-400 mb-1">اسم البنك / الخدمة</label>
-          <input x-model="pmForm.bank_name" placeholder="مثال: البنك الأهلي المصري" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm outline-none focus:border-emerald-500">
-        </div>
-        <div>
-          <label class="block text-xs font-bold text-slate-400 mb-1">اسم صاحب الحساب</label>
-          <input x-model="pmForm.holder_name" placeholder="اسم المستخدم" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm outline-none focus:border-emerald-500">
-        </div>
+        <div><label class="r-label">رقم الحساب *</label><input x-model="pmForm.account_number" dir="ltr" class="r-input" style="font-family:monospace"></div>
+        <div><label class="r-label">البنك / الخدمة</label><input x-model="pmForm.bank_name" class="r-input"></div>
+        <div><label class="r-label">صاحب الحساب</label><input x-model="pmForm.holder_name" class="r-input"></div>
       </div>
-      <div class="flex justify-end gap-3 mt-5">
-        <button @click="showAddPM=false" class="px-4 py-2 rounded-xl text-slate-300 border border-slate-600 text-sm">إلغاء</button>
-        <button @click="savePM()" class="px-5 py-2 rounded-xl bg-emerald-500 text-slate-900 font-bold text-sm">
-          <i class="fas fa-save"></i> حفظ
-        </button>
+      <div style="display:flex;gap:10px;margin-top:18px">
+        <button @click="showAddPM=false" class="r-btn ghost" style="flex:1">إلغاء</button>
+        <button @click="savePM()" class="r-btn primary" style="flex:1"><i class="fas fa-save"></i> حفظ</button>
       </div>
     </div>
   </div>
 
   <!-- Delete Confirm Modal -->
-  <div x-show="showDelete" x-cloak class="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" style="display:none">
-    <div class="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-sm p-6 text-center">
-      <div class="text-4xl mb-3">🗑️</div>
-      <h3 class="text-lg font-bold text-slate-100 mb-2" x-text="'حذف '+deleteType+'؟'"></h3>
-      <p class="text-sm text-slate-400 mb-5" x-text="'هل أنت متأكد من حذف '+deleteTarget?.name+'?'"></p>
-      <div class="flex justify-center gap-3">
-        <button @click="showDelete=false" class="px-5 py-2.5 rounded-xl text-slate-300 border border-slate-600 text-sm">إلغاء</button>
-        <button @click="doDelete()" class="px-5 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white font-bold text-sm">حذف</button>
+  <div x-show="showDelete" x-cloak class="modal-overlay" @click.self="showDelete=false" style="display:none">
+    <div class="modal-box" style="max-width:340px;text-align:center">
+      <div class="modal-handle"></div>
+      <div style="font-size:36px;margin-bottom:8px">🗑️</div>
+      <h3 style="font-size:16px;font-weight:900;margin-bottom:4px" x-text="'حذف '+deleteType+'؟'"></h3>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:18px" x-text="'هل أنت متأكد من حذف '+deleteTarget?.name+'?'"></p>
+      <div style="display:flex;gap:10px">
+        <button @click="showDelete=false" class="r-btn ghost" style="flex:1">إلغاء</button>
+        <button @click="doDelete()" class="r-btn danger" style="flex:1">حذف</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════ BOTTOM TABS (Mobile) -->
+  <div class="bottom-tabs">
+    <div class="bottom-tabs-inner">
+      <div class="bottom-tab" :class="tab==='dashboard'&&'active'" @click="tab='dashboard';loadAll()">
+        <div class="b-icon"><i class="fas fa-chart-pie"></i></div>
+        <span>لوحة</span>
+      </div>
+      <div class="bottom-tab" :class="tab==='clients'&&'active'" @click="tab='clients'">
+        <div class="b-icon"><i class="fas fa-users"></i></div>
+        <span>عملاء</span>
+      </div>
+      <div class="bottom-tab" :class="tab==='payments'&&'active'" @click="tab='payments';loadPaymentMethods()">
+        <div class="b-icon"><i class="fas fa-credit-card"></i></div>
+        <span>دفع</span>
+      </div>
+      <div class="bottom-tab" :class="tab==='transactions'&&'active'" @click="tab='transactions';loadAllTransactions()">
+        <div class="b-icon"><i class="fas fa-exchange-alt"></i></div>
+        <span>معاملات</span>
+        <span x-show="pendingCount>0" class="b-badge" x-text="pendingCount"></span>
+      </div>
+      <div class="bottom-tab" :class="tab==='revenue'&&'active'" @click="tab='revenue';loadRevenue()">
+        <div class="b-icon"><i class="fas fa-coins"></i></div>
+        <span>أرباح</span>
+      </div>
+      <div class="bottom-tab" :class="(tab==='admins'||tab==='domains')&&'active'" @click="tab='admins';loadAdmins()">
+        <div class="b-icon"><i class="fas fa-cog"></i></div>
+        <span>إعدادات</span>
       </div>
     </div>
   </div>
@@ -775,25 +759,23 @@
 </div>
 
 <script>
-function rentalSystem() {
+function rentalSystem(){
   return {
-    tab: 'dashboard', search: '', filterStatus: '', saving: false,
-    clients: [], features: {}, admins: [], domains: [], nginxConfigs: [],
-    auditLogs: [],
-    revenueStats: { total_game_profit: 0, admin_share: 0, client_share: 0, total_rounds: 0 },
-    revenueByClient: [],
-    stats: { total: 0, active: 0, expired: 0, expiringSoon: 0, running: 0 },
-
-    // Modals
-    showClientModal: false, showRenew: false, showAddAdmin: false,
-    showDelete: false, showTenantModal: false,
-    clientForm: {}, renewTarget: null, deleteTarget: null, deleteType: '',
-    addAdminForm: { telegram_id: '', name: '', role: 'support_admin', tenant_id: '' },
-    tenantTarget: null, tenantForm: { tenant_id: '' },
-
-    // Sections
-    sectionAdmin: null, sectionForm: [],
-    allSectionsList: [
+    tab:'dashboard',search:'',filterStatus:'',saving:false,
+    clients:[],features:{},admins:[],domains:[],nginxConfigs:[],
+    auditLogs:[],toastMsg:'',
+    revenueStats:{total_game_profit:0,admin_share:0,client_share:0,total_rounds:0},
+    revenueByClient:[],
+    stats:{total:0,active:0,expired:0,expiringSoon:0,running:0},
+    showClientModal:false,showRenew:false,showAddAdmin:false,showDelete:false,showTenantModal:false,showAddPM:false,
+    clientForm:{},renewTarget:null,deleteTarget:null,deleteType:'',
+    addAdminForm:{telegram_id:'',name:'',role:'support_admin',tenant_id:''},
+    tenantTarget:null,tenantForm:{tenant_id:''},
+    paymentMethods:[],allTransactions:[],pendingCount:0,
+    pmForm:{name:'',pm_type:'bank_transfer',account_number:'',bank_name:'',holder_name:''},
+    txFilter:'',txTypeFilter:'',
+    sectionAdmin:null,sectionForm:[],
+    allSectionsList:[
       {key:'transactions',label:'المعاملات'},{key:'matching',label:'المطابقة'},{key:'agents',label:'الوكلاء'},{key:'trading',label:'التداول'},
       {key:'users',label:'المستخدمين'},{key:'svrp',label:'التعويض'},{key:'lottery',label:'اليانصيب'},{key:'wheel',label:'العجلة'},
       {key:'companies',label:'الشركات'},{key:'payment_methods',label:'طرق الدفع'},{key:'apps',label:'التطبيقات'},{key:'referrals',label:'الإحالات'},
@@ -801,203 +783,72 @@ function rentalSystem() {
       {key:'bots',label:'البوتات'},{key:'browser',label:'المتصفح'},{key:'clients',label:'العملاء'},{key:'statistics',label:'الإحصائيات'},
       {key:'admins',label:'المسؤولين'},{key:'settings',label:'الإعدادات'},{key:'backup',label:'النسخ الاحتياطي'},{key:'themes',label:'الثيمات'},
     ],
-
-    // Payment Methods & Transactions
-    paymentMethods: [], allTransactions: [], pendingCount: 0,
-    showAddPM: false, pmForm: { name: '', pm_type: 'bank_transfer', account_number: '', bank_name: '', holder_name: '' },
-    txFilter: '', txTypeFilter: '',
-
-    get filteredClients() {
-      return this.clients.filter(c => {
-        if (this.filterStatus === 'expired' && !c.expired) return false;
-        if (this.filterStatus === 'active' && (c.expired || c.status==='suspended')) return false;
-        if (this.filterStatus === 'suspended' && c.status!=='suspended') return false;
-        if (this.search) {
-          const s = this.search.toLowerCase();
-          return (c.name||'').toLowerCase().includes(s) || (c.id||'').toLowerCase().includes(s) || (c.bot_username||'').toLowerCase().includes(s);
-        }
+    get filteredClients(){
+      return this.clients.filter(c=>{
+        if(this.filterStatus==='expired'&&!c.expired)return false;
+        if(this.filterStatus==='active'&&(c.expired||c.status==='suspended'))return false;
+        if(this.filterStatus==='suspended'&&c.status!=='suspended')return false;
+        if(this.search){const s=this.search.toLowerCase();return c.name.toLowerCase().includes(s)||c.id.toLowerCase().includes(s)||(c.bot_username||'').toLowerCase().includes(s)}
         return true;
       });
     },
-
-    async init() { await this.loadAll(); await this.loadPendingCount(); },
-    async loadAll() {
-      await Promise.all([this.loadClients(), this.loadRevenue()]);
+    async init(){await this.loadAll();await this.loadPendingCount();this.loadPaymentMethods()},
+    async loadAll(){await Promise.all([this.loadClients(),this.loadRevenue()])},
+    async loadPendingCount(){try{const d=await api('/api/rental/pending-count');this.pendingCount=d.count||0}catch(e){}setInterval(()=>{this.loadPendingCount()},30000)},
+    async loadClients(){try{const d=await api('/api/clients');this.clients=d.clients||[];this.features=d.features||{};this.stats={total:this.clients.length,active:this.clients.filter(c=>!c.expired&&c.status!=='suspended').length,expired:this.clients.filter(c=>c.expired).length,expiringSoon:this.clients.filter(c=>!c.expired&&c.days_left<=3).length,running:this.clients.filter(c=>c.running).length}}catch(e){}},
+    async loadRevenue(){try{const d=await api('/api/admin-center/revenue');this.revenueStats=d.stats||{};this.revenueByClient=d.by_client||[]}catch(e){}},
+    async loadDomains(){try{const d=await api('/api/admin-center/domains');this.domains=d.domains||[]}catch(e){}},
+    async loadAdmins(){try{const d=await api('/api/admin-center/admins');this.admins=d.admins||[]}catch(e){}},
+    openCreateClient(){this.clientForm={name:'',contact:'',bot_username:'',bot_token:'',dash_username:'',dash_password:'',admin_ids:'',subscription_days:30,revenue_share:30,features:Object.keys(this.features),notes:'',preferred_pm:''};this.showClientModal=true},
+    openEditClient(c){this.clientForm={...c,features:[...(c.features||[])]};this.showClientModal=true},
+    openRenew(c){this.renewTarget=c;this.showRenew=true},
+    async saveClient(){
+      this.saving=true;
+      try{
+        if(this.clientForm.id){
+          await api('/api/clients/'+this.clientForm.id,{method:'POST',body:JSON.stringify(this.clientForm)});
+          toast('تم الحفظ','success');
+        }else{
+          await api('/api/clients',{method:'POST',body:JSON.stringify(this.clientForm)});
+          toast('تم الإنشاء','success');
+        }
+        this.showClientModal=false;await this.loadClients();
+      }catch(e){toast(e.message||'خطأ','error')}
+      this.saving=false;
     },
-    async loadPendingCount() {
-      try { const d = await api('/api/rental/pending-count'); this.pendingCount = d.count||0; } catch(e) {}
-      setInterval(() => { this.loadPendingCount(); }, 30000);
+    async doRenew(d){try{await api('/api/clients/'+this.renewTarget.id+'/renew',{method:'POST',body:JSON.stringify({days:d})});toast('تم التجديد','success');this.showRenew=false;await this.loadClients()}catch(e){toast('خطأ','error')}},
+    async control(c,action){try{await api('/api/clients/'+c.id+'/'+action,{method:'POST'});await this.loadClients();toast('تم '+action,'success')}catch(e){toast('خطأ','error')}},
+    confirmDelete(c){this.deleteTarget=c;this.deleteType='عميل';this.showDelete=true},
+    confirmDeleteAdmin(a){this.deleteTarget=a;this.deleteType='مسؤول';this.showDelete=true},
+    async doDelete(){
+      try{
+        if(this.deleteType==='عميل'){await api('/api/clients/'+this.deleteTarget.id,{method:'DELETE'})}
+        else{await api('/api/admin-center/admins/'+this.deleteTarget.telegram_id,{method:'DELETE'})}
+        toast('تم الحذف','success');this.showDelete=false;this.deleteType==='عميل'?await this.loadClients():await this.loadAdmins();
+      }catch(e){toast('خطأ','error')}
     },
-    async loadClients() {
-      try {
-        const d = await api('/api/clients');
-        this.clients = d.clients || [];
-        this.features = d.features || {};
-        this.stats = {
-          total: this.clients.length,
-          active: this.clients.filter(c=>!c.expired&&c.status!=='suspended').length,
-          expired: this.clients.filter(c=>c.expired).length,
-          expiringSoon: this.clients.filter(c=>!c.expired&&c.days_left<=3).length,
-          running: this.clients.filter(c=>c.running).length,
-        };
-      } catch(e) { toast('خطأ في تحميل العملاء','error'); }
-    },
-    async loadRevenue() {
-      try {
-        const d = await api('/api/admin-center/revenue');
-        this.revenueStats = d.stats || {};
-        this.revenueByClient = d.by_client || [];
-      } catch(e) {}
-    },
-    async loadDomains() {
-      try { const d = await api('/api/admin-center/domains'); this.domains = d.domains||[]; } catch(e) {}
-    },
-    async loadAdmins() {
-      try {
-        const d = await api('/api/admin-center/admins');
-        this.admins = d.admins||[];
-      } catch(e) {}
-    },
-
-    // ── Client CRUD ──
-    openCreateClient() {
-      this.clientForm = { id:'',name:'',contact:'',bot_username:'',bot_token:'',dash_username:'',dash_password:'',admin_ids:'',subscription_days:'30',features:Object.keys(this.features),notes:'',revenue_share:30 };
-      this.showClientModal = true;
-    },
-    openEditClient(c) {
-      this.clientForm = { id:c.id,name:c.name,contact:c.contact,bot_username:c.bot_username,bot_token:'',dash_username:c.dash_username,dash_password:'',admin_ids:c.admin_ids,features:[...c.features],notes:c.notes,revenue_share:c.revenue_share||30 };
-      this.showClientModal = true;
-    },
-    async saveClient() {
-      if (!this.clientForm.name||!this.clientForm.dash_username) { toast('الاسم واسم المستخدم مطلوبين','error'); return; }
-      if (!this.clientForm.id&&(!this.clientForm.bot_token||!this.clientForm.dash_password)) { toast('التوكن والباسورد مطلوبين لعميل جديد','error'); return; }
-      this.saving = true;
-      try {
-        const payload = {...this.clientForm};
-        if (this.clientForm.id&&!payload.bot_token) delete payload.bot_token;
-        if (this.clientForm.id&&!payload.dash_password) delete payload.dash_password;
-        const d = await api(this.clientForm.id?'/api/clients/'+this.clientForm.id:'/api/clients', {method:'POST',body:JSON.stringify(payload)});
-        if (d.error) { toast(d.error,'error'); return; }
-        this.showClientModal = false;
-        await this.loadClients();
-        toast(this.clientForm.id?'تم التعديل':'تمت الإضافة','success');
-      } catch(e) { toast('خطأ في الحفظ','error'); }
-      this.saving = false;
-    },
-    async control(c, action) {
-      await api('/api/clients/'+c.id+'/'+action, {method:'POST',body:'{}'});
-      await this.loadClients();
-    },
-    openRenew(c) { this.renewTarget=c; this.showRenew=true; },
-    async doRenew(d) { await api('/api/clients/'+this.renewTarget.id+'/renew',{method:'POST',body:JSON.stringify({days:d})}); this.showRenew=false; await this.loadClients(); },
-    confirmDelete(c) { this.deleteTarget=c; this.deleteType='العميل'; this.showDelete=true; },
-    confirmDeleteAdmin(a) { this.deleteTarget=a; this.deleteType='المسؤول'; this.showDelete=true; },
-    async doDelete() {
-      if (this.deleteType==='العميل') {
-        await api('/api/clients/'+this.deleteTarget.id+'?keep_data=0',{method:'DELETE'});
-      } else {
-        await api('/api/admin-center/admins/'+this.deleteTarget.telegram_id,{method:'DELETE'});
-        await this.loadAdmins();
-      }
-      this.showDelete=false;
-      await this.loadClients();
-    },
-
-    // ── Domains ──
-    domainForm: { client_id:'', domain:'' },
-    async saveDomain() {
-      if (!this.domainForm.client_id||!this.domainForm.domain) return;
-      const d = await api('/api/admin-center/domains',{method:'POST',body:JSON.stringify(this.domainForm)});
-      if (d.error) { toast(d.error,'error'); return; }
-      this.domainForm={client_id:'',domain:''};
-      await this.loadDomains();
-      toast('تم الحفظ','success');
-    },
-    async removeDomain(cid) { await api('/api/admin-center/domains/'+cid,{method:'DELETE'}); await this.loadDomains(); },
-    async generateNginx() { const d=await api('/api/admin-center/domains/generate-nginx'); this.nginxConfigs=d.configs||[]; },
-
-    // ── Revenue ──
-    async updateRevenueShare(cid, val) {
-      await api('/api/admin-center/revenue-share/'+cid,{method:'POST',body:JSON.stringify({revenue_share:parseInt(val)})});
-      await this.loadRevenue(); await this.loadClients();
-    },
-
-    // ── Admins ──
-    async saveAdmin() {
-      await api('/api/admin-center/admins',{method:'POST',body:JSON.stringify(this.addAdminForm)});
-      this.showAddAdmin=false;
-      await this.loadAdmins();
-      toast('تمت الإضافة','success');
-    },
-    openTenantAssign(a) { this.tenantTarget=a; this.tenantForm.tenant_id=a.tenant_id||''; this.showTenantModal=true; },
-    async saveTenantAssign() {
-      await api('/api/admin-center/admins/'+this.tenantTarget.telegram_id+'/tenant',{method:'POST',body:JSON.stringify(this.tenantForm)});
-      this.showTenantModal=false;
-      await this.loadAdmins();
-    },
-
-    // ── Sections ──
-    openSections(a) { this.sectionAdmin=a.telegram_id; this.sectionForm=a.sections||[]; },
-    selectAllSections() { this.sectionForm=this.allSectionsList.map(s=>s.key); },
-    async saveSections() {
-      await api('/api/admin-center/admins/'+this.sectionAdmin+'/sections',{method:'POST',body:JSON.stringify({sections:this.sectionForm})});
-      toast('تم الحفظ','success');
-      await this.loadAdmins();
-      this.sectionAdmin=null;
-    },
-
-    // ── Payment Methods ──
-    async loadPaymentMethods() {
-      try { const d = await api('/api/rental/payment-methods'); this.paymentMethods = d.methods||[]; } catch(e) {}
-    },
-    async savePM() {
-      if (!this.pmForm.name||!this.pmForm.account_number) { toast('الاسم ورقم الحساب مطلوبان','error'); return; }
-      try {
-        await api('/api/rental/payment-methods',{method:'POST',body:JSON.stringify(this.pmForm)});
-        toast('تمت الإضافة','success'); this.showAddPM=false; await this.loadPaymentMethods();
-      } catch(e) { toast('خطأ: '+e.message,'error'); }
-    },
-    async togglePMStatus(pm) {
-      const newStatus = pm.status==='active'?'inactive':'active';
-      await api('/api/rental/payment-methods/'+pm.id,{method:'PUT',body:JSON.stringify({status:newStatus})});
-      await this.loadPaymentMethods();
-    },
-    async deletePM(pm) {
-      if (!confirm('حذف وسيلة الدفع "'+pm.name+'"؟')) return;
-      await api('/api/rental/payment-methods/'+pm.id,{method:'DELETE'});
-      await this.loadPaymentMethods();
-    },
-    copyText(text) {
-      navigator.clipboard.writeText(text).then(()=>toast('تم النسخ','success')).catch(()=>{});
-    },
-
-    // ── Transactions ──
-    async loadAllTransactions() {
-      try {
-        let url = '/api/rental/all-transactions';
-        const params = [];
-        if (this.txFilter) params.push('status='+this.txFilter);
-        if (this.txTypeFilter) params.push('type='+this.txTypeFilter);
-        if (params.length) url += '?' + params.join('&');
-        const d = await api(url); this.allTransactions = d.transactions||[];
-      } catch(e) {}
-    },
-    async processTx(tx, action) {
-      const label = action==='approved'?'قبول':'رفض';
-      if (!confirm(label+' طلب '+tx.type+' بقيمة '+this.fmtMoney(tx.amount)+'؟')) return;
-      try {
-        await api('/api/rental/transactions/'+tx.client_id+'/'+tx.id,{method:'POST',body:JSON.stringify({action})});
-        toast('تم '+label,'success');
-        await this.loadAllTransactions(); await this.loadPendingCount();
-      } catch(e) { toast('خطأ: '+e.message,'error'); }
-    },
-
-    // ── Helpers ──
-    getTenantName(tid) { const c=this.clients.find(c=>c.id===tid); return c?c.name:tid; },
-    roleLabel(r) { return {super_admin:'Super Admin',finance_admin:'المالية',support_admin:'الدعم',game_admin:'الألعاب',broadcast_admin:'البث'}[r]||r; },
-    roleBadge(r) { return {super_admin:'bg-red-500/20 text-red-400',finance_admin:'bg-amber-500/20 text-amber-400',support_admin:'bg-green-500/20 text-green-400',game_admin:'bg-purple-500/20 text-purple-400',broadcast_admin:'bg-cyan-500/20 text-cyan-400'}[r]||'bg-slate-500/20 text-slate-400'; },
-    fmtNum(n) { return (n||0).toLocaleString(); },
-    fmtMoney(n) { return (n||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}); },
+    async saveDomain(){try{await api('/api/admin-center/domains',{method:'POST',body:JSON.stringify(this.domainForm)});toast('تم الحفظ','success');this.domainForm={client_id:'',domain:''};await this.loadDomains()}catch(e){toast('خطأ','error')}},
+    async removeDomain(cid){if(!confirm('حذف الدومين؟'))return;await api('/api/admin-center/domains/'+cid,{method:'DELETE'});await this.loadDomains()},
+    async generateNginx(){const d=await api('/api/admin-center/domains/generate-nginx');this.nginxConfigs=d.configs||[];toast('تم التوليد','success')},
+    async updateRevenueShare(cid,val){await api('/api/admin-center/revenue-share/'+cid,{method:'POST',body:JSON.stringify({revenue_share:parseInt(val)})});toast('تم التحديث','success')},
+    async saveAdmin(){await api('/api/admin-center/admins',{method:'POST',body:JSON.stringify(this.addAdminForm)});toast('تمت الإضافة','success');this.showAddAdmin=false;await this.loadAdmins()},
+    async saveTenantAssign(){await api('/api/admin-center/admins/'+this.tenantTarget.telegram_id+'/tenant',{method:'POST',body:JSON.stringify(this.tenantForm)});toast('تم الربط','success');this.showTenantModal=false;await this.loadAdmins()},
+    openSections(a){this.sectionAdmin=a.telegram_id;this.sectionForm=a.sections||[]},
+    selectAllSections(){this.sectionForm=this.allSectionsList.map(s=>s.key)},
+    async saveSections(){await api('/api/admin-center/admins/'+this.sectionAdmin+'/sections',{method:'POST',body:JSON.stringify({sections:this.sectionForm})});toast('تم الحفظ','success');await this.loadAdmins();this.sectionAdmin=null},
+    async loadPaymentMethods(){try{const d=await api('/api/rental/payment-methods');this.paymentMethods=d.methods||[]}catch(e){}},
+    async savePM(){if(!this.pmForm.name||!this.pmForm.account_number){toast('الاسم ورقم الحساب مطلوبان','error');return}await api('/api/rental/payment-methods',{method:'POST',body:JSON.stringify(this.pmForm)});toast('تمت الإضافة','success');this.showAddPM=false;await this.loadPaymentMethods()},
+    async togglePMStatus(pm){await api('/api/rental/payment-methods/'+pm.id,{method:'PUT',body:JSON.stringify({status:pm.status==='active'?'inactive':'active'})});await this.loadPaymentMethods()},
+    async deletePM(pm){if(!confirm('حذف "'+pm.name+'"؟'))return;await api('/api/rental/payment-methods/'+pm.id,{method:'DELETE'});await this.loadPaymentMethods()},
+    async loadAllTransactions(){try{let url='/api/rental/all-transactions';const p=[];if(this.txFilter)p.push('status='+this.txFilter);if(this.txTypeFilter)p.push('type='+this.txTypeFilter);if(p.length)url+='?'+p.join('&');const d=await api(url);this.allTransactions=d.transactions||[]}catch(e){}},
+    async processTx(tx,action){if(!confirm((action==='approved'?'قبول':'رفض')+' طلب '+tx.type+'؟'))return;await api('/api/rental/transactions/'+tx.client_id+'/'+tx.id,{method:'POST',body:JSON.stringify({action})});toast('تم','success');await this.loadAllTransactions();await this.loadPendingCount()},
+    copyText(t){navigator.clipboard.writeText(t).then(()=>toast('تم النسخ','success')).catch(()=>{})},
+    toast(msg){this.toastMsg=msg;setTimeout(()=>{this.toastMsg=''},2000)},
+    getTenantName(tid){const c=this.clients.find(c=>c.id===tid);return c?c.name:tid},
+    roleLabel(r){return{super_admin:'Super Admin',finance_admin:'المالية',support_admin:'الدعم',game_admin:'الألعاب',broadcast_admin:'البث'}[r]||r},
+    roleBadge(r){return{super_admin:'background:rgba(255,71,87,.12);color:var(--danger)',finance_admin:'background:rgba(251,191,36,.12);color:var(--amber)',support_admin:'background:rgba(0,231,1,.12);color:var(--accent)',game_admin:'background:rgba(168,85,247,.12);color:#a855f7',broadcast_admin:'background:rgba(34,211,238,.12);color:#22d3ee'}[r]||'background:rgba(107,122,144,.12);color:var(--muted)'},
+    fmtNum(n){return(n||0).toLocaleString()},
+    fmtMoney(n){return(n||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})},
   };
 }
 </script>

@@ -38,7 +38,7 @@ CLIENT_FIELDS = [
     'features', 'admin_ids',
     'subscription_start', 'subscription_end',
     'status', 'bot_autostart', 'notes', 'created_at', 'last_login',
-    'revenue_share', 'custom_domain', 'balance',
+    'revenue_share', 'custom_domain', 'balance', 'preferred_pm',
 ]
 
 # ── كتالوج مميزات النظام — يظهر في لوحة الإدارة ويثبَّت في بوت العميل ──
@@ -165,6 +165,7 @@ class ClientManager:
             'revenue_share': str(int(revenue_share or 30)),
             'custom_domain': '',
             'balance': '0',
+            'preferred_pm': '',
         }
         with _csv_lock:
             rows = self._read_rows()
@@ -181,7 +182,7 @@ class ClientManager:
                 if r['id'] != client_id:
                     continue
                 for k in ('name', 'contact', 'bot_username', 'bot_token',
-                          'admin_ids', 'notes', 'status', 'revenue_share'):
+                          'admin_ids', 'notes', 'status', 'revenue_share', 'preferred_pm'):
                     if k in data and data[k] is not None:
                         r[k] = str(data[k]).strip()
                 if 'features' in data and data['features'] is not None:
