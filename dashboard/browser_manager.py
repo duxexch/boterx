@@ -539,7 +539,20 @@ def create_instance(name='', profile_id=None, proxy=None):
 
 
 def get_instance(instance_id):
-    return _instances.get(instance_id)
+    inst = _instances.get(instance_id)
+    if inst:
+        return inst
+    # Fall back to daemon's instance registry
+    try:
+        from browser_daemon import browser_daemon
+        if browser_daemon._initialized:
+            inst = browser_daemon.get_instance(instance_id)
+            if inst:
+                _instances[instance_id] = inst
+                return inst
+    except Exception:
+        pass
+    return None
 
 
 def list_instances():
