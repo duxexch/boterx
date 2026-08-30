@@ -13040,7 +13040,7 @@ def api_bots():
 def api_add_bot():
     data = request.json
     bots = read_csv('bot_tokens.csv')
-    fieldnames = get_fieldnames('bot_tokens.csv', ['id','name','token','is_active','created_at','admin_ids','last_started','total_users','total_transactions','freeze_until','status','description','can_manage_bots'])
+    fieldnames = get_fieldnames('bot_tokens.csv', ['id','name','token','is_active','created_at','admin_ids','last_started','total_users','total_transactions','freeze_until','status','description','can_manage_bots','features'])
     new_id = f"BOT{str(int(datetime.now().timestamp()))[-6:]}"
     new_bot = {
         'id': new_id,
@@ -13055,7 +13055,8 @@ def api_add_bot():
         'freeze_until': data.get('freeze_until', ''),
         'status': 'inactive',
         'description': data.get('description', ''),
-        'can_manage_bots': data.get('can_manage_bots', 'no')
+        'can_manage_bots': data.get('can_manage_bots', 'no'),
+        'features': data.get('features', ''),
     }
     append_csv('bot_tokens.csv', new_bot, fieldnames)
     log_action('add_bot', new_id)
@@ -13066,7 +13067,7 @@ def api_add_bot():
 @permission_required('manage_bots')
 def api_toggle_bot(bot_id):
     bots = read_csv('bot_tokens.csv')
-    fieldnames = get_fieldnames('bot_tokens.csv', ['id','name','token','is_active','created_at','admin_ids','last_started','total_users','total_transactions','freeze_until','status','description','can_manage_bots'])
+    fieldnames = get_fieldnames('bot_tokens.csv', ['id','name','token','is_active','created_at','admin_ids','last_started','total_users','total_transactions','freeze_until','status','description','can_manage_bots','features'])
     for b in bots:
         if b.get('id') == bot_id:
             b['is_active'] = 'no' if b.get('is_active') == 'yes' else 'yes'
@@ -13080,10 +13081,28 @@ def api_toggle_bot(bot_id):
 @permission_required('manage_bots')
 def api_delete_bot(bot_id):
     bots = read_csv('bot_tokens.csv')
-    fieldnames = get_fieldnames('bot_tokens.csv', ['id','name','token','is_active','created_at','admin_ids','last_started','total_users','total_transactions','freeze_until','status','description','can_manage_bots'])
+    fieldnames = get_fieldnames('bot_tokens.csv', ['id','name','token','is_active','created_at','admin_ids','last_started','total_users','total_transactions','freeze_until','status','description','can_manage_bots','features'])
     bots = [b for b in bots if b.get('id') != bot_id]
     write_csv('bot_tokens.csv', bots, fieldnames)
     log_action('delete_bot', bot_id)
+    return jsonify({'success': True})
+
+
+@app.route('/api/bots/<bot_id>/features', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_bot_features(bot_id):
+    """تحديث مميزات بوت معين"""
+    data = request.json or {}
+    features = data.get('features', '')
+    bots = read_csv('bot_tokens.csv')
+    fieldnames = get_fieldnames('bot_tokens.csv', ['id','name','token','is_active','created_at','admin_ids','last_started','total_users','total_transactions','freeze_until','status','description','can_manage_bots','features'])
+    for b in bots:
+        if b.get('id') == bot_id:
+            b['features'] = features
+            break
+    write_csv('bot_tokens.csv', bots, fieldnames)
+    log_action('update_bot_features', bot_id)
     return jsonify({'success': True})
 
 

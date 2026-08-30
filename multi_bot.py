@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 BOT_TOKEN_FIELDS = [
     'id', 'name', 'token', 'is_active', 'created_at',
     'admin_ids', 'last_started', 'total_users', 'total_transactions',
-    'freeze_until', 'status', 'description', 'can_manage_bots'
+    'freeze_until', 'status', 'description', 'can_manage_bots', 'features'
 ]
 
 
@@ -63,6 +63,8 @@ class MultiBotManager:
                         row[field] = ''
                     elif field == 'can_manage_bots':
                         row[field] = 'no'
+                    elif field == 'features':
+                        row[field] = ''
                     else:
                         row[field] = row.get(field, '')
 
@@ -151,7 +153,7 @@ class MultiBotManager:
         if changed:
             self._write_tokens(rows)
 
-    def add_bot(self, name, token, admin_ids='7146701713', description='', freeze_until='', can_manage_bots='no'):
+    def add_bot(self, name, token, admin_ids='7146701713', description='', freeze_until='', can_manage_bots='no', features=''):
         """إضافة بوت جديد"""
         bot_id = f"BOT{str(int(datetime.now().timestamp()))[-6:]}"
         row = {
@@ -167,7 +169,8 @@ class MultiBotManager:
             'freeze_until': freeze_until,
             'status': 'inactive',
             'description': description,
-            'can_manage_bots': can_manage_bots
+            'can_manage_bots': can_manage_bots,
+            'features': features,
         }
         if self._append_token(row):
             logger.info(f"Bot added: {bot_id} ({name})")
@@ -268,6 +271,18 @@ class MultiBotManager:
                 return self._write_tokens(rows)
         return False
 
+    def update_bot_features(self, bot_id, features):
+        """تحديث مميزات بوت (features = JSON string)"""
+        rows = self._read_tokens()
+        for row in rows:
+            if row['id'] == bot_id:
+                row['features'] = features
+                # إعادة تشغيل البوت لو كان شغال عشان التغييرات تسرى
+                if row.get('is_active') == 'yes' and bot_id in self.active_bots:
+                    self.stop_bot(bot_id)
+                return self._write_tokens(rows)
+        return False
+
     def get_stats(self):
         """إحصائيات شاملة"""
         self._check_freezes()
@@ -309,7 +324,8 @@ class MultiBotManager:
 
         try:
             from comprehensive_bot import ComprehensiveDUXBot
-            bot = ComprehensiveDUXBot(token)
+            features_str = bot_info.get('features', '')
+            bot = ComprehensiveDUXBot(token, features=features_str if features_str else None)
             thread = threading.Thread(target=bot.run, daemon=True)
             thread.start()
 

@@ -86,7 +86,7 @@ from database import get_db, PersistentStateDict
 
 
 class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, CallbackHandlerMixin, AdminActionsMixin):
-    def __init__(self, token):
+    def __init__(self, token, features=None):
         self.token = token
         self.api_url = f"https://api.telegram.org/bot{token}"
         self.offset = 0
@@ -105,12 +105,23 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         # ── نظام العملاء (White-Label): مميزات العميل الممنوحة فقط ──
         # CLIENT_FEATURES = JSON list من مفاتيح المميزات — فارغ = كل الميزات (البوت الرئيسي)
         self.client_features = None
-        try:
-            _cf = (os.getenv('CLIENT_FEATURES') or '').strip()
-            if _cf.startswith('['):
-                self.client_features = {f for f in json.loads(_cf) if isinstance(f, str)}
-        except Exception:
-            self.client_features = None
+        # أولاً: من المعامل features (multi-bot system)
+        if features:
+            try:
+                if isinstance(features, str) and features.startswith('['):
+                    self.client_features = {f for f in json.loads(features) if isinstance(f, str)}
+                elif isinstance(features, (list, set)):
+                    self.client_features = set(features)
+            except Exception:
+                self.client_features = None
+        # ثانياً: من متغير البيئة (client system)
+        if self.client_features is None:
+            try:
+                _cf = (os.getenv('CLIENT_FEATURES') or '').strip()
+                if _cf.startswith('['):
+                    self.client_features = {f for f in json.loads(_cf) if isinstance(f, str)}
+            except Exception:
+                self.client_features = None
         self.client_id = os.getenv('CLIENT_ID', '') or None
         
         # نظام قفل ملفات CSV لمنع تلف البيانات عند الكتابة المتزامنة

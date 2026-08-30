@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}البوتات - Boterx{% endblock %}
+{% block title %}البوتات - VEX{% endblock %}
 {% block page_title %}البوتات{% endblock %}
 
 {% block content %}
@@ -7,80 +7,98 @@
     <!-- Header -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-            <h2 class="text-xl font-bold">إدارة البوتات</h2>
-            <p class="text-sm text-slate-400 mt-1">إضافة وإدارة بوتات تيليجرام المتصلة بالنظام</p>
+            <h2 class="text-xl font-bold">🤖 إدارة البوتات</h2>
+            <p class="text-sm text-slate-400 mt-1">كل بوت يشتغل على ميزة أو نظام معين — المستخدم يشوف بس اللي ليه علاقة</p>
         </div>
-        {% if not admin_perms or admin_perms.get('manage_bots') %}
-        <button @click="openAddModal()"
-            class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition flex items-center gap-2 self-start">
-            <i class="fas fa-plus"></i> إضافة بوت
+        <button @click="openAddModal()" class="bg-emerald-500 hover:bg-emerald-600 text-slate-900 px-5 py-2.5 rounded-xl text-sm font-bold transition flex items-center gap-2">
+            <i class="fas fa-plus"></i> بوت جديد
         </button>
-        {% endif %}
     </div>
 
-    <!-- Bots Cards Grid -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+    <!-- Feature Legend -->
+    <div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4 mb-6">
+        <h3 class="text-sm font-bold text-slate-300 mb-3">📋 المميزات المتاحة لكل بوت</h3>
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+            <template x-for="(label,key) in allFeatures" :key="key">
+                <div class="flex items-center gap-2 text-xs text-slate-400 p-2 rounded-lg bg-slate-900/50">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0"></span>
+                    <span x-text="label"></span>
+                    <span class="text-[9px] text-slate-600 font-mono" x-text="key"></span>
+                </div>
+            </template>
+        </div>
+    </div>
+
+    <!-- Bots Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
         <template x-for="bot in bots" :key="bot.id">
-            <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden hover:border-slate-500 transition group">
-                <!-- Card header -->
+            <div class="bg-slate-800/60 border border-slate-700 rounded-2xl overflow-hidden hover:border-slate-500 transition">
+                <!-- Header -->
                 <div class="p-5 pb-3">
                     <div class="flex items-start justify-between">
                         <div class="flex items-center gap-3">
                             <div class="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
-                                :class="bot.freeze_until ? 'bg-amber-500/20' : (bot.is_active ? 'bg-green-500/20' : 'bg-red-500/20')">
+                                :class="bot.status==='frozen'?'bg-amber-500/20':bot.is_active==='yes'?'bg-emerald-500/20':'bg-red-500/20'">
                                 <i class="fas fa-robot text-xl"
-                                    :class="bot.freeze_until ? 'text-amber-400' : (bot.is_active ? 'text-green-400' : 'text-red-400')"></i>
+                                    :class="bot.status==='frozen'?'text-amber-400':bot.is_active==='yes'?'text-emerald-400':'text-red-400'"></i>
                             </div>
                             <div>
-                                <h3 class="font-bold" x-text="bot.name || 'بوت'"></h3>
-                                <p class="text-[10px] text-slate-500 font-mono" x-text="'#' + bot.id"></p>
+                                <h3 class="font-bold" x-text="bot.name||'بوت'"></h3>
+                                <p class="text-[10px] text-slate-500 font-mono" x-text="'#'+bot.id"></p>
                             </div>
                         </div>
-                        <!-- Status -->
-                        <span x-show="bot.freeze_until" class="px-2 py-1 rounded-full text-[10px] font-semibold bg-amber-500/20 text-amber-400">مُجمّد</span>
-                        <span x-show="!bot.freeze_until && bot.is_active" class="px-2 py-1 rounded-full text-[10px] font-semibold bg-green-500/20 text-green-400">نشط</span>
-                        <span x-show="!bot.freeze_until && !bot.is_active" class="px-2 py-1 rounded-full text-[10px] font-semibold bg-red-500/20 text-red-400">غير نشط</span>
+                        <span class="px-2 py-1 rounded-full text-[10px] font-bold"
+                            :class="bot.status==='frozen'?'bg-amber-500/20 text-amber-400':bot.is_active==='yes'?'bg-emerald-500/20 text-emerald-400':'bg-red-500/20 text-red-400'"
+                            x-text="bot.status==='frozen'?'مجمّد':bot.is_active==='yes'?'نشط':'معطّل'"></span>
                     </div>
                 </div>
 
-                <!-- Stats row -->
+                <!-- Stats -->
                 <div class="px-5 py-2 border-t border-slate-700/50 grid grid-cols-2 gap-3">
-                    <div class="bg-slate-700/50 rounded-lg p-2 text-center">
-                        <p class="text-[10px] text-slate-400" data-i18n="total_users_label">Users</p>
-                        <p class="text-lg font-bold" x-text="fmtNum(bot.users_count || 0)"></p>
+                    <div class="bg-slate-900/50 rounded-lg p-2 text-center">
+                        <p class="text-[10px] text-slate-400">المستخدمين</p>
+                        <p class="text-lg font-bold" x-text="fmtNum(bot.total_users||0)"></p>
                     </div>
-                    <div class="bg-slate-700/50 rounded-lg p-2 text-center">
-                        <p class="text-[10px] text-slate-400" data-i18n="transactions_label">Transactions</p>
-                        <p class="text-lg font-bold" x-text="fmtNum(bot.transactions_count || 0)"></p>
+                    <div class="bg-slate-900/50 rounded-lg p-2 text-center">
+                        <p class="text-[10px] text-slate-400">المعاملات</p>
+                        <p class="text-lg font-bold" x-text="fmtNum(bot.total_transactions||0)"></p>
+                    </div>
+                </div>
+
+                <!-- Features Badges -->
+                <div class="px-5 py-3">
+                    <p class="text-[10px] text-slate-500 mb-2">المميزات المفعّلة:</p>
+                    <div class="flex flex-wrap gap-1">
+                        <template x-for="f in parseFeatures(bot.features)" :key="f">
+                            <span class="text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-bold"
+                                x-text="allFeatures[f]||f"></span>
+                        </template>
+                        <span x-show="!bot.features" class="text-[9px] px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-300 border border-blue-500/30 font-bold">كل المميزات</span>
                     </div>
                 </div>
 
                 <!-- Description -->
-                <div class="px-5 py-2" x-show="bot.description">
+                <div x-show="bot.description" class="px-5 py-1">
                     <p class="text-xs text-slate-400 line-clamp-2" x-text="bot.description"></p>
                 </div>
 
                 <!-- Freeze info -->
                 <div x-show="bot.freeze_until" class="px-5 py-2">
-                    <p class="text-xs text-amber-400/80">
-                        <i class="fas fa-snowflake text-xs ml-1"></i>
-                        مجمّد حتى: <span x-text="bot.freeze_until"></span>
-                    </p>
+                    <p class="text-xs text-amber-400/80"><i class="fas fa-snowflake text-xs ml-1"></i>مجمّد حتى: <span x-text="bot.freeze_until"></span></p>
                 </div>
 
-                <!-- Card footer -->
-                <div class="px-5 py-3 bg-slate-900/40 border-t border-slate-700/50 flex items-center justify-between">
-                    <div class="flex items-center gap-1" x-show="rbac('manage_bots')">
-                        <button @click="toggleActive(bot)"
-                            class="px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1"
-                            :class="bot.is_active ? 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30' : 'bg-green-500/20 text-green-400 hover:bg-green-500/30'">
-                            <i class="fas fa-power-off text-xs"></i>
-                            <span x-text="bot.is_active ? 'تعطيل' : 'تفعيل'"></span>
+                <!-- Footer Actions -->
+                <div class="px-5 py-3 bg-slate-900/40 border-t border-slate-700/50 flex items-center justify-between flex-wrap gap-2">
+                    <div class="flex items-center gap-1">
+                        <button @click="toggleActive(bot)" class="px-3 py-1.5 rounded-lg text-xs font-bold transition"
+                            :class="bot.is_active==='yes'?'bg-amber-500/20 text-amber-400':'bg-emerald-500/20 text-emerald-400'">
+                            <i class="fas fa-power-off text-xs"></i> <span x-text="bot.is_active==='yes'?'تعطيل':'تفعيل'"></span>
                         </button>
-                        <button @click="confirmDelete(bot)"
-                            class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-500/20 text-red-400 hover:bg-red-500/30 transition flex items-center gap-1">
+                        <button @click="editFeatures(bot)" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-500/20 text-blue-400 transition">
+                            <i class="fas fa-sliders-h text-xs"></i> المميزات
+                        </button>
+                        <button @click="confirmDelete(bot)" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-red-500/20 text-red-400 transition">
                             <i class="fas fa-trash text-xs"></i>
-                            <span data-i18n="delete">Delete</span>
                         </button>
                     </div>
                 </div>
@@ -88,68 +106,103 @@
         </template>
 
         <!-- Empty state -->
-        <div x-show="bots.length === 0" class="col-span-full">
-            <div class="bg-slate-800 rounded-xl border border-slate-700 p-10 text-center">
+        <div x-show="bots.length===0" class="col-span-full">
+            <div class="bg-slate-800 rounded-2xl border border-slate-700 p-10 text-center">
                 <i class="fas fa-robot text-5xl text-slate-600 mb-4 block"></i>
                 <p class="text-slate-400 text-lg">لا توجد بوتات</p>
-                <p class="text-slate-500 text-sm mt-1">أضف البوت الأول بالنقر على الزر أعلاه</p>
+                <p class="text-slate-500 text-sm mt-1">أضف بوت جديد واختر الميزة اللي يشتغل عليها</p>
             </div>
         </div>
     </div>
 
     <!-- Add Bot Modal -->
-    <div x-show="showModal" x-transition.opacity class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" style="display:none" @click.self="showModal = false">
-        <div class="bg-slate-800 rounded-2xl border border-slate-700 w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl" @click.stop="">
+    <div x-show="showModal" x-transition.opacity class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" style="display:none" @click.self="showModal=false">
+        <div class="bg-slate-800 rounded-2xl border border-slate-700 w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl" @click.stop>
             <div class="flex items-center justify-between p-5 border-b border-slate-700">
-                <h3 class="text-lg font-bold">إضافة بوت جديد</h3>
-                <button @click="showModal = false" class="text-slate-400 hover:text-white transition">
-                    <i class="fas fa-times text-lg"></i>
-                </button>
+                <h3 class="text-lg font-bold">🤖 بوت جديد</h3>
+                <button @click="showModal=false" class="text-slate-400 hover:text-white"><i class="fas fa-times text-lg"></i></button>
             </div>
             <form @submit.prevent="saveBot()" class="p-5 space-y-4">
                 <div>
                     <label class="block text-sm text-slate-400 mb-1">اسم البوت <span class="text-red-400">*</span></label>
-                    <input x-model="form.name" required type="text" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="MyBot">
+                    <input x-model="form.name" required class="w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-2.5 text-sm text-slate-100 outline-none focus:border-emerald-500" placeholder="مثال: بوت التعويضات">
                 </div>
                 <div>
                     <label class="block text-sm text-slate-400 mb-1">Token <span class="text-red-400">*</span></label>
-                    <input x-model="form.token" required type="text" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono" placeholder="123456:ABC-DEF1234...">
+                    <input x-model="form.token" required dir="ltr" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-2.5 text-sm text-slate-100 outline-none focus:border-emerald-500 font-mono" placeholder="123456:ABC-DEF...">
                 </div>
                 <div>
-                    <label class="block text-sm text-slate-400 mb-1">معرفات المدراء</label>
-                    <input x-model="form.admin_ids" type="text" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono" placeholder="123456789,987654321">
-                    <p class="text-[10px] text-slate-500 mt-1">أدخل معرفات تيليجرام مفصولة بفواصل</p>
+                    <label class="block text-sm text-slate-400 mb-1">المميزات المفعّلة</label>
+                    <p class="text-[10px] text-slate-500 mb-2">اختر الميزة اللي البوت يشتغل عليها — المستخدم يشوف بس الزراير دي</p>
+                    <div class="grid grid-cols-2 gap-2 bg-slate-900/50 border border-slate-700 rounded-xl p-3">
+                        <template x-for="(label,key) in allFeatures" :key="key">
+                            <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer p-2 rounded-lg hover:bg-slate-800 transition">
+                                <input type="checkbox" :value="key" x-model="form.features" class="accent-emerald-500 w-4 h-4">
+                                <span x-text="label"></span>
+                            </label>
+                        </template>
+                    </div>
+                    <div class="flex gap-2 mt-1">
+                        <button type="button" @click="form.features=Object.keys(allFeatures)" class="text-[10px] text-emerald-400 hover:underline">تحديد الكل</button>
+                        <button type="button" @click="form.features=[]" class="text-[10px] text-slate-500 hover:underline">إلغاء الكل</button>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">أدمن تيليجرام</label>
+                    <input x-model="form.admin_ids" dir="ltr" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-2.5 text-sm text-slate-100 outline-none focus:border-emerald-500 font-mono" placeholder="123456789,987654321">
                 </div>
                 <div>
                     <label class="block text-sm text-slate-400 mb-1">الوصف</label>
-                    <textarea x-model="form.description" rows="2" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="وصف البوت"></textarea>
-                </div>
-                <div>
-                    <label class="block text-sm text-slate-400 mb-1">تاريخ تجميد البوت</label>
-                    <input x-model="form.freeze_until" type="datetime-local" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <p class="text-[10px] text-slate-500 mt-1">اتركه فارغاً إذا كان البوت غير مجمّد</p>
+                    <textarea x-model="form.description" rows="2" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-2.5 text-sm text-slate-100 outline-none focus:border-emerald-500" placeholder="وصف مختصر للبوت"></textarea>
                 </div>
                 <div class="flex gap-3 pt-2">
-                    <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg text-sm font-semibold transition">إضافة البوت</button>
-                    <button type="button" @click="showModal = false" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-lg text-sm transition" data-i18n="cancel">Cancel</button>
+                    <button type="submit" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-slate-900 py-2.5 rounded-xl text-sm font-bold transition">إنشاء البوت</button>
+                    <button type="button" @click="showModal=false" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-xl text-sm transition">إلغاء</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- Delete Confirmation Modal -->
-    <div x-show="showDeleteModal" x-transition.opacity class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" style="display:none" @click.self="showDeleteModal = false">
-        <div class="bg-slate-800 rounded-2xl border border-slate-700 w-full max-w-sm shadow-2xl" @click.stop="">
-            <div class="p-6 text-center">
-                <div class="w-14 h-14 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4">
-                    <i class="fas fa-exclamation-triangle text-red-400 text-2xl"></i>
+    <!-- Edit Features Modal -->
+    <div x-show="showFeaturesModal" x-transition.opacity class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" style="display:none" @click.self="showFeaturesModal=false">
+        <div class="bg-slate-800 rounded-2xl border border-slate-700 w-full max-w-md shadow-2xl" @click.stop>
+            <div class="flex items-center justify-between p-5 border-b border-slate-700">
+                <h3 class="text-lg font-bold">⚙️ تعديل مميزات: <span class="text-blue-400" x-text="editingBot?.name"></span></h3>
+                <button @click="showFeaturesModal=false" class="text-slate-400 hover:text-white"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="p-5">
+                <p class="text-xs text-slate-400 mb-3">اختر الميزة اللي البوت يشتغل عليها. لو فاضي = كل الميزات.</p>
+                <div class="grid grid-cols-1 gap-2 bg-slate-900/50 border border-slate-700 rounded-xl p-4">
+                    <template x-for="(label,key) in allFeatures" :key="key">
+                        <label class="flex items-center gap-3 text-sm text-slate-300 cursor-pointer p-2.5 rounded-lg hover:bg-slate-800 transition">
+                            <input type="checkbox" :value="key" x-model="editingFeatures" class="accent-emerald-500 w-4 h-4">
+                            <span x-text="label"></span>
+                            <span class="text-[9px] text-slate-600 font-mono mr-auto" x-text="key"></span>
+                        </label>
+                    </template>
                 </div>
+                <div class="flex gap-2 mt-2">
+                    <button @click="editingFeatures=Object.keys(allFeatures)" type="button" class="text-[10px] text-emerald-400 hover:underline">تحديد الكل</button>
+                    <button @click="editingFeatures=[]" type="button" class="text-[10px] text-slate-500 hover:underline">إلغاء الكل</button>
+                </div>
+                <div class="flex gap-3 mt-5">
+                    <button @click="saveFeatures()" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-slate-900 py-2.5 rounded-xl text-sm font-bold transition">حفظ</button>
+                    <button @click="showFeaturesModal=false" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-xl text-sm transition">إلغاء</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div x-show="showDeleteModal" x-transition.opacity class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" style="display:none" @click.self="showDeleteModal=false">
+        <div class="bg-slate-800 rounded-2xl border border-slate-700 w-full max-w-sm shadow-2xl" @click.stop>
+            <div class="p-6 text-center">
+                <div class="w-14 h-14 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4"><i class="fas fa-exclamation-triangle text-red-400 text-2xl"></i></div>
                 <h3 class="text-lg font-bold mb-2">تأكيد الحذف</h3>
-                <p class="text-sm text-slate-400">هل أنت متأكد من حذف البوت "<span class="text-white font-semibold" x-text="deleteTarget?.name"></span>"؟</p>
-                <p class="text-xs text-red-400 mt-2">هذا الإجراء لا يمكن التراجع عنه.</p>
+                <p class="text-sm text-slate-400">هل أنت متأكد من حذف "<span class="text-white font-bold" x-text="deleteTarget?.name"></span>"؟</p>
                 <div class="flex gap-3 mt-6">
-                    <button @click="deleteBot()" class="flex-1 bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-lg text-sm font-semibold transition" data-i18n="delete">Delete</button>
-                    <button @click="showDeleteModal = false" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-lg text-sm transition" data-i18n="cancel">Cancel</button>
+                    <button @click="deleteBot()" class="flex-1 bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-xl text-sm font-bold transition">حذف</button>
+                    <button @click="showDeleteModal=false" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-xl text-sm transition">إلغاء</button>
                 </div>
             </div>
         </div>
@@ -159,73 +212,67 @@
 
 {% block scripts %}
 <script>
-function botsPage() {
+function botsPage(){
     return {
         bots: [],
         showModal: false,
         showDeleteModal: false,
+        showFeaturesModal: false,
         deleteTarget: null,
-        form: { name: '', token: '', admin_ids: '', description: '', freeze_until: '' },
-
-        async init() {
-            await this.loadBots();
+        editingBot: null,
+        editingFeatures: [],
+        form: { name:'', token:'', admin_ids:'', description:'', freeze_until:'', features:[] },
+        allFeatures: {
+            deposit:'💰 إيداع', withdraw:'💸 سحب', matching:'🔄 مطابقة P2P',
+            trading:'💱 تداول', compensation:'💎 تعويض 100%', games:'🎮 ألعاب',
+            referral:'🎁 إحالات', complaints:'📨 شكاوى', apps:'📱 تطبيقات',
+            multi_lang:'🌐 لغات', lottery:'🎲 يانصيب', wheel:'🎡 عجلة',
         },
-
-        async loadBots() {
-            try {
-                const data = await api('/api/bots');
-                this.bots = data.bots || data || [];
-            } catch (e) {
-                toast('فشل تحميل البوتات', 'error');
-            }
+        async init(){ await this.loadBots() },
+        async loadBots(){
+            try { const d = await api('/api/bots'); this.bots = d.bots||d||[] } catch(e) { toast('فشل التحميل','error') }
         },
-
-        openAddModal() {
-            this.form = { name: '', token: '', admin_ids: '', description: '', freeze_until: '' };
+        openAddModal(){
+            this.form = { name:'', token:'', admin_ids:'', description:'', freeze_until:'', features:[] };
             this.showModal = true;
         },
-
-        async saveBot() {
+        async saveBot(){
             try {
-                await api('/api/bots', {
-                    method: 'POST',
-                    body: JSON.stringify(this.form),
-                });
-                toast('تمت إضافة البوت بنجاح', 'success');
-                this.showModal = false;
-                await this.loadBots();
-            } catch (e) {
-                toast('فشل إضافة البوت: ' + (e.message || 'خطأ غير معروف'), 'error');
-            }
+                const payload = {...this.form, features: JSON.stringify(this.form.features)};
+                await api('/api/bots', { method:'POST', body: JSON.stringify(payload) });
+                toast('تم الإنشاء','success'); this.showModal=false; await this.loadBots();
+            } catch(e) { toast('فشل: '+(e.message||''),'error') }
         },
-
-        async toggleActive(bot) {
+        async toggleActive(bot){
             try {
-                await api(`/api/bots/${bot.id}/toggle`, { method: 'POST' });
-                toast(bot.is_active ? 'تم تعطيل البوت' : 'تم تفعيل البوت', 'success');
+                await api('/api/bots/'+bot.id+'/toggle', { method:'POST' });
                 await this.loadBots();
-            } catch (e) {
-                toast('فشل تغيير الحالة', 'error');
-            }
+            } catch(e) { toast('فشل','error') }
         },
-
-        confirmDelete(bot) {
-            this.deleteTarget = bot;
-            this.showDeleteModal = true;
+        editFeatures(bot){
+            this.editingBot = bot;
+            this.editingFeatures = this.parseFeatures(bot.features);
+            this.showFeaturesModal = true;
         },
-
-        async deleteBot() {
-            if (!this.deleteTarget) return;
+        async saveFeatures(){
             try {
-                await api(`/api/bots/${this.deleteTarget.id}`, { method: 'DELETE' });
-                toast('تم حذف البوت بنجاح', 'success');
-                this.showDeleteModal = false;
-                this.deleteTarget = null;
-                await this.loadBots();
-            } catch (e) {
-                toast('فشل حذف البوت', 'error');
-            }
+                await api('/api/bots/'+this.editingBot.id+'/features', { method:'POST', body: JSON.stringify({features: JSON.stringify(this.editingFeatures)}) });
+                toast('تم الحفظ','success'); this.showFeaturesModal=false; await this.loadBots();
+            } catch(e) { toast('فشل','error') }
         },
+        confirmDelete(bot){ this.deleteTarget=bot; this.showDeleteModal=true },
+        async deleteBot(){
+            if(!this.deleteTarget) return;
+            try {
+                await api('/api/bots/'+this.deleteTarget.id, { method:'DELETE' });
+                toast('تم الحذف','success'); this.showDeleteModal=false; this.deleteTarget=null; await this.loadBots();
+            } catch(e) { toast('فشل','error') }
+        },
+        parseFeatures(f){
+            if(!f) return [];
+            try { return typeof f==='string' ? JSON.parse(f) : f } catch(e) { return [] }
+        },
+        fmtNum(n){ return (n||0).toLocaleString() },
     };
 }
 </script>
