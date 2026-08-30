@@ -11,12 +11,18 @@
             <h2 class="text-xl font-bold text-bright">مركز الإدارة الموحد</h2>
             <p class="text-sm text-dim mt-1">إدارة جميع المسؤولين والعملاء والأرباح من مكان واحد</p>
         </div>
-        <div class="flex gap-2">
+        <div class="flex gap-2 flex-wrap">
             <button @click="tab='admins'" class="btn btn-sm" :class="tab==='admins'?'btn-primary':'btn-secondary'">
                 <i class="fas fa-users-cog"></i> المسؤولين
             </button>
+            <button @click="tab='sections'" class="btn btn-sm" :class="tab==='sections'?'btn-primary':'btn-secondary'">
+                <i class="fas fa-lock"></i> الأقسام
+            </button>
             <button @click="tab='clients';loadClients()" class="btn btn-sm" :class="tab==='clients'?'btn-primary':'btn-secondary'">
                 <i class="fas fa-building"></i> العملاء
+            </button>
+            <button @click="tab='domains';loadDomains()" class="btn btn-sm" :class="tab==='domains'?'btn-primary':'btn-secondary'">
+                <i class="fas fa-globe"></i> الدومينات
             </button>
             <button @click="tab='revenue';loadRevenue()" class="btn btn-sm" :class="tab==='revenue'?'btn-primary':'btn-secondary'">
                 <i class="fas fa-coins"></i> الأرباح
@@ -159,6 +165,161 @@
         </div>
     </div>
 
+    <!-- ==================== TAB: SECTIONS (Feature Toggles) ==================== -->
+    <div x-show="tab==='sections'">
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-6 mb-6">
+            <h3 class="text-lg font-bold text-bright mb-2">تقييد أقسام المسؤولين الفرعيين</h3>
+            <p class="text-sm text-dim mb-4">اختر المسؤول ثم حدد الأقسام المسموح له بها. إذا كان القسم مغلق، المستخدمين بتوعه مش هيدخلوا عليه.</p>
+
+            <!-- Select Admin -->
+            <div class="flex flex-wrap gap-3 mb-6">
+                <div class="flex-1 min-w-[200px]">
+                    <label class="block text-xs font-bold text-dim mb-1">اختر المسؤول</label>
+                    <select x-model="sectionAdmin" @change="loadSections()"
+                        class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-bright text-sm focus:border-emerald-500 outline-none">
+                        <option value="">— اختر —</option>
+                        <template x-for="a in admins" :key="a.telegram_id">
+                            <option :value="a.telegram_id" x-text="a.name || a.telegram_id + ' (' + a.role + ')'"></option>
+                        </template>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Section toggles -->
+            <div x-show="sectionAdmin" class="space-y-3">
+                <div class="flex items-center justify-between mb-4">
+                    <h4 class="text-sm font-bold text-bright">الأقسام المتاحة</h4>
+                    <div class="flex gap-2">
+                        <button @click="selectAllSections()" class="text-xs text-emerald-400 hover:underline">تحديد الكل</button>
+                        <button @click="sectionForm = []" class="text-xs text-red-400 hover:underline">إلغاء الكل</button>
+                        <button @click="saveSections()" :disabled="savingSections"
+                            class="px-4 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-bold text-xs disabled:opacity-50"
+                            x-text="savingSections ? '...' : 'حفظ'"></button>
+                    </div>
+                </div>
+
+                <!-- Operations -->
+                <div class="bg-slate-900/50 rounded-xl p-4 border border-slate-700">
+                    <p class="text-xs font-bold text-slate-400 mb-3">العمليات</p>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer p-2 rounded-lg hover:bg-slate-800">
+                            <input type="checkbox" value="transactions" x-model="sectionForm" class="accent-emerald-500 w-4 h-4"> المعاملات
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer p-2 rounded-lg hover:bg-slate-800">
+                            <input type="checkbox" value="matching" x-model="sectionForm" class="accent-emerald-500 w-4 h-4"> المطابقة
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer p-2 rounded-lg hover:bg-slate-800">
+                            <input type="checkbox" value="agents" x-model="sectionForm" class="accent-emerald-500 w-4 h-4"> الوكلاء
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer p-2 rounded-lg hover:bg-slate-800">
+                            <input type="checkbox" value="trading" x-model="sectionForm" class="accent-emerald-500 w-4 h-4"> التداول
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Management -->
+                <div class="bg-slate-900/50 rounded-xl p-4 border border-slate-700">
+                    <p class="text-xs font-bold text-slate-400 mb-3">الإدارة</p>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer p-2 rounded-lg hover:bg-slate-800">
+                            <input type="checkbox" value="users" x-model="sectionForm" class="accent-emerald-500 w-4 h-4"> المستخدمين
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer p-2 rounded-lg hover:bg-slate-800">
+                            <input type="checkbox" value="svrp" x-model="sectionForm" class="accent-emerald-500 w-4 h-4"> التعويض
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer p-2 rounded-lg hover:bg-slate-800">
+                            <input type="checkbox" value="lottery" x-model="sectionForm" class="accent-emerald-500 w-4 h-4"> اليانصيب
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer p-2 rounded-lg hover:bg-slate-800">
+                            <input type="checkbox" value="wheel" x-model="sectionForm" class="accent-emerald-500 w-4 h-4"> العجلة
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer p-2 rounded-lg hover:bg-slate-800">
+                            <input type="checkbox" value="companies" x-model="sectionForm" class="accent-emerald-500 w-4 h-4"> الشركات
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer p-2 rounded-lg hover:bg-slate-800">
+                            <input type="checkbox" value="payment_methods" x-model="sectionForm" class="accent-emerald-500 w-4 h-4"> طرق الدفع
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer p-2 rounded-lg hover:bg-slate-800">
+                            <input type="checkbox" value="apps" x-model="sectionForm" class="accent-emerald-500 w-4 h-4"> التطبيقات
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer p-2 rounded-lg hover:bg-slate-800">
+                            <input type="checkbox" value="referrals" x-model="sectionForm" class="accent-emerald-500 w-4 h-4"> الإحالات
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Games & Content -->
+                <div class="bg-slate-900/50 rounded-xl p-4 border border-slate-700">
+                    <p class="text-xs font-bold text-slate-400 mb-3">الألعاب والمحتوى</p>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer p-2 rounded-lg hover:bg-slate-800">
+                            <input type="checkbox" value="games_admin" x-model="sectionForm" class="accent-emerald-500 w-4 h-4"> ألعاب VEX
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer p-2 rounded-lg hover:bg-slate-800">
+                            <input type="checkbox" value="channels" x-model="sectionForm" class="accent-emerald-500 w-4 h-4"> القنوات
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer p-2 rounded-lg hover:bg-slate-800">
+                            <input type="checkbox" value="broadcast" x-model="sectionForm" class="accent-emerald-500 w-4 h-4"> البث
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer p-2 rounded-lg hover:bg-slate-800">
+                            <input type="checkbox" value="complaints" x-model="sectionForm" class="accent-emerald-500 w-4 h-4"> الشكاوى
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer p-2 rounded-lg hover:bg-slate-800">
+                            <input type="checkbox" value="tickets" x-model="sectionForm" class="accent-emerald-500 w-4 h-4"> التذاكر
+                        </label>
+                    </div>
+                </div>
+
+                <!-- System -->
+                <div class="bg-slate-900/50 rounded-xl p-4 border border-slate-700">
+                    <p class="text-xs font-bold text-slate-400 mb-3">النظام</p>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer p-2 rounded-lg hover:bg-slate-800">
+                            <input type="checkbox" value="bots" x-model="sectionForm" class="accent-emerald-500 w-4 h-4"> البوتات
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer p-2 rounded-lg hover:bg-slate-800">
+                            <input type="checkbox" value="browser" x-model="sectionForm" class="accent-emerald-500 w-4 h-4"> المتصفح
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer p-2 rounded-lg hover:bg-slate-800">
+                            <input type="checkbox" value="clients" x-model="sectionForm" class="accent-emerald-500 w-4 h-4"> العملاء
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer p-2 rounded-lg hover:bg-slate-800">
+                            <input type="checkbox" value="statistics" x-model="sectionForm" class="accent-emerald-500 w-4 h-4"> الإحصائيات
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer p-2 rounded-lg hover:bg-slate-800">
+                            <input type="checkbox" value="admins" x-model="sectionForm" class="accent-emerald-500 w-4 h-4"> المسؤولين
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer p-2 rounded-lg hover:bg-slate-800">
+                            <input type="checkbox" value="admin_center" x-model="sectionForm" class="accent-emerald-500 w-4 h-4"> مركز الإدارة
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer p-2 rounded-lg hover:bg-slate-800">
+                            <input type="checkbox" value="themes" x-model="sectionForm" class="accent-emerald-500 w-4 h-4"> الثيمات
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer p-2 rounded-lg hover:bg-slate-800">
+                            <input type="checkbox" value="settings" x-model="sectionForm" class="accent-emerald-500 w-4 h-4"> الإعدادات
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer p-2 rounded-lg hover:bg-slate-800">
+                            <input type="checkbox" value="backup" x-model="sectionForm" class="accent-emerald-500 w-4 h-4"> النسخ الاحتياطي
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer p-2 rounded-lg hover:bg-slate-800">
+                            <input type="checkbox" value="send_message" x-model="sectionForm" class="accent-emerald-500 w-4 h-4"> إرسال رسالة
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer p-2 rounded-lg hover:bg-slate-800">
+                            <input type="checkbox" value="exchange_addresses" x-model="sectionForm" class="accent-emerald-500 w-4 h-4"> عناوين الصرف
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer p-2 rounded-lg hover:bg-slate-800">
+                            <input type="checkbox" value="ai_api_keys" x-model="sectionForm" class="accent-emerald-500 w-4 h-4"> مفاتيح AI
+                        </label>
+                    </div>
+                </div>
+
+                <p x-show="sectionAdmin && sectionForm.length === 0" class="text-xs text-amber-400 mt-2">
+                    ⚠️ لا توجد أقسام محددة — المسؤول هيقدر يشوف كل الأقسام
+                </p>
+            </div>
+        </div>
+    </div>
+
     <!-- ==================== TAB: CLIENTS ==================== -->
     <div x-show="tab==='clients'">
         <!-- Client Stats -->
@@ -269,6 +430,103 @@
                         </tr>
                     </tbody>
                 </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== TAB: DOMAINS ==================== -->
+    <div x-show="tab==='domains'">
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-6 mb-6">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h3 class="text-lg font-bold text-bright">الدومينات المخصصة</h3>
+                    <p class="text-sm text-dim mt-1">كل عميل يقدر يلاقي دومين فريد يدخل عليه هو والمستخدمين بتوعه</p>
+                </div>
+                <button @click="generateNginx()" class="px-4 py-2 rounded-lg bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 text-xs font-bold">
+                    <i class="fas fa-code"></i> توليد nginx config
+                </button>
+            </div>
+
+            <!-- Add Domain -->
+            <div class="bg-slate-900/50 rounded-xl p-4 border border-slate-700 mb-6">
+                <h4 class="text-sm font-bold text-bright mb-3">إضافة / تعديل دومين</h4>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-dim mb-1">العميل</label>
+                        <select x-model="domainForm.client_id"
+                            class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-bright text-sm focus:border-emerald-500 outline-none">
+                            <option value="">— اختر عميل —</option>
+                            <template x-for="c in clients" :key="c.id">
+                                <option :value="c.id" x-text="c.name + ' (' + c.id + ')'"></option>
+                            </template>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-dim mb-1">الدومين</label>
+                        <input x-model="domainForm.domain" dir="ltr" placeholder="client1.vex.deals"
+                            class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-bright text-sm focus:border-emerald-500 outline-none">
+                    </div>
+                    <div class="flex items-end">
+                        <button @click="saveDomain()" :disabled="!domainForm.client_id || !domainForm.domain"
+                            class="px-6 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-bold text-sm disabled:opacity-50">
+                            حفظ الدومين
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Domains List -->
+            <div class="bg-slate-900/50 rounded-xl border border-slate-700 overflow-hidden">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-slate-700 bg-slate-800/80">
+                            <th class="text-right px-4 py-3 font-semibold text-dim">العميل</th>
+                            <th class="text-right px-4 py-3 font-semibold text-dim">الدومين</th>
+                            <th class="text-right px-4 py-3 font-semibold text-dim">الحالة</th>
+                            <th class="text-right px-4 py-3 font-semibold text-dim">إجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="d in domains" :key="d.client_id">
+                            <tr class="border-b border-slate-700/50 hover:bg-slate-700/30">
+                                <td class="px-4 py-3">
+                                    <span class="font-bold text-bright" x-text="d.client_name"></span>
+                                    <span class="text-xs text-dim block" x-text="d.client_id"></span>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <a :href="'https://' + d.domain" target="_blank" class="text-blue-400 hover:underline font-mono text-sm" x-text="d.domain"></a>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <span class="text-xs px-2 py-1 rounded-full"
+                                        :class="d.status==='active'?'bg-emerald-500/20 text-emerald-300':'bg-red-500/20 text-red-300'"
+                                        x-text="d.status==='active'?'نشط':'معطل'"></span>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <button @click="removeDomain(d.client_id)" class="p-2 rounded-lg bg-red-500/10 text-red-400/70 hover:bg-red-500/30">
+                                        <i class="fas fa-trash text-xs"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        </template>
+                        <tr x-show="domains.length === 0">
+                            <td colspan="4" class="px-4 py-8 text-center text-dim text-sm">لا توجد دومينات مخصصة بعد</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Nginx Config Output -->
+            <div x-show="nginxConfigs.length > 0" class="mt-6">
+                <h4 class="text-sm font-bold text-bright mb-3">nginx configs (<span x-text="nginxConfigs.length"></span>)</h4>
+                <template x-for="cfg in nginxConfigs" :key="cfg.domain">
+                    <div class="bg-slate-900 rounded-xl border border-slate-700 p-4 mb-3">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-sm font-bold text-bright" x-text="cfg.domain"></span>
+                            <button @click="copyNginx(cfg.config)" class="text-xs text-blue-400 hover:underline">نسخ</button>
+                        </div>
+                        <pre class="text-xs text-slate-400 overflow-x-auto whitespace-pre-wrap" x-text="cfg.config"></pre>
+                    </div>
+                </template>
             </div>
         </div>
     </div>
@@ -528,6 +786,7 @@ function adminCenter() {
         loading: false,
         admins: [],
         clients: [],
+        domains: [],
         auditLogs: [],
         revenueStats: { total_game_profit: 0, admin_share: 0, client_share: 0, total_rounds: 0 },
         revenueByClient: [],
@@ -550,6 +809,15 @@ function adminCenter() {
         deleteType: '',
         showDeleteClientModal: false,
         deleteClientTarget: null,
+
+        // Sections (feature toggles)
+        sectionAdmin: '',
+        sectionForm: [],
+        savingSections: false,
+
+        // Domains
+        domainForm: { client_id: '', domain: '' },
+        nginxConfigs: [],
 
         async init() {
             await this.loadAdmins();
@@ -789,6 +1057,71 @@ function adminCenter() {
 
         fmtNum(n) { return (n||0).toLocaleString(); },
         fmtMoney(n) { return (n||0).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}); },
+
+        // ── SECTIONS (Feature Toggles) ──
+        async loadSections() {
+            if (!this.sectionAdmin) { this.sectionForm = []; return; }
+            try {
+                const data = await api('/api/admin-center/admins/' + this.sectionAdmin + '/sections');
+                this.sectionForm = data.sections || [];
+            } catch(e) { toast('فشل تحميل الأقسام', 'error'); }
+        },
+        selectAllSections() {
+            this.sectionForm = ['dashboard','transactions','matching','agents','trading','users','svrp',
+                'lottery','wheel','companies','payment_methods','apps','referrals','channels','bots',
+                'browser','clients','complaints','tickets','broadcast','statistics','admins',
+                'admin_center','themes','exchange_addresses','send_message','backup','settings',
+                'ai_api_keys','games_admin'];
+        },
+        async saveSections() {
+            if (!this.sectionAdmin) return;
+            this.savingSections = true;
+            try {
+                await api('/api/admin-center/admins/' + this.sectionAdmin + '/sections', {
+                    method: 'POST', body: JSON.stringify({ sections: this.sectionForm })
+                });
+                toast('تم حفظ الأقسام', 'success');
+            } catch(e) { toast('فشل الحفظ', 'error'); }
+            this.savingSections = false;
+        },
+
+        // ── DOMAINS ──
+        async loadDomains() {
+            try {
+                const data = await api('/api/admin-center/domains');
+                this.domains = data.domains || [];
+            } catch(e) { toast('فشل تحميل الدومينات', 'error'); }
+        },
+        async saveDomain() {
+            if (!this.domainForm.client_id || !this.domainForm.domain) return;
+            try {
+                const data = await api('/api/admin-center/domains', {
+                    method: 'POST', body: JSON.stringify(this.domainForm)
+                });
+                if (data.error) { toast(data.error, 'error'); return; }
+                toast('تم حفظ الدومين', 'success');
+                this.domainForm = { client_id: '', domain: '' };
+                await this.loadDomains();
+            } catch(e) { toast('فشل الحفظ', 'error'); }
+        },
+        async removeDomain(clientId) {
+            if (!confirm('إزالة الدومين من هذا العميل؟')) return;
+            try {
+                await api('/api/admin-center/domains/' + clientId, { method: 'DELETE' });
+                toast('تمت الإزالة', 'success');
+                await this.loadDomains();
+            } catch(e) { toast('فشل الإزالة', 'error'); }
+        },
+        async generateNginx() {
+            try {
+                const data = await api('/api/admin-center/domains/generate-nginx');
+                this.nginxConfigs = data.configs || [];
+                toast('تم توليد ' + this.nginxConfigs.length + ' config', 'success');
+            } catch(e) { toast('فشل التوليد', 'error'); }
+        },
+        copyNginx(text) {
+            navigator.clipboard.writeText(text).then(() => toast('تم النسخ', 'success'));
+        },
     };
 }
 </script>

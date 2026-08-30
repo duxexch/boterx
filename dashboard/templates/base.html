@@ -108,147 +108,59 @@
     
     <!-- Navigation with grouping
          Visibility rules (default-deny for assigned roles; empty admin_perms = super_admin = show all):
-         - not admin_perms â†’ context processor returned {} (super_admin or unauthenticated) â†’ show link
-         - admin_perms.get(perm, False) â†’ True only if the role explicitly grants it
+         - not admin_perms → context processor returned {} (super_admin or unauthenticated) → show link
+         - admin_perms.get(perm, False) → True only if the role explicitly grants it
+         - admin_sections: empty list = super_admin (all allowed); non-empty = only listed sections shown
     -->
+    {# Macro: sidebar_link — combines permission + section checks #}
+    {% macro sidebar_link(url, active_key, icon, label, perm=None, section=None) %}
+      {% set _perm_ok = (not perm) or (not admin_perms) or admin_perms.get(perm, False) %}
+      {% set _sec_ok = (not section) or (not admin_sections) or (section in admin_sections) %}
+      {% if _perm_ok and _sec_ok %}
+        <a href="{{ url }}" class="sidebar-link {% if active_page == active_key %}active{% endif %}">
+            <i class="{{ icon }} w-5 text-center"></i> {{ label }}
+        </a>
+      {% endif %}
+    {% endmacro %}
+
     <nav class="p-3 flex-1 overflow-y-auto">
         <p class="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 mt-2" data-i18n="operations">Operations</p>
-        <a href="{{ url_for('dashboard') }}" class="sidebar-link {% if active_page == 'dashboard' %}active{% endif %}">
-            <i class="fas fa-chart-pie w-5 text-center"></i> <span x-text="t('dashboard')"></span>
-        </a>
-        {# Financial operations â€” visible to finance_admin (approve/reject) and view_financial roles #}
-        {% if not admin_perms or admin_perms.get('approve_deposits') or admin_perms.get('reject_deposits') or admin_perms.get('view_financial') %}
-        <a href="{{ url_for('page_transactions') }}" class="sidebar-link {% if active_page == 'transactions' %}active{% endif %}">
-            <i class="fas fa-money-bill-transfer w-5 text-center"></i> <span x-text="t('transactions')"></span>
-        </a>
-        {% endif %}
-        {% if not admin_perms or admin_perms.get('view_financial') or admin_perms.get('approve_deposits') %}
-        <a href="{{ url_for('page_matching') }}" class="sidebar-link {% if active_page == 'matching' %}active{% endif %}">
-            <i class="fas fa-arrows-rotate w-5 text-center"></i> <span x-text="t('matching')"></span>
-        </a>
-        <a href="{{ url_for('page_agents') }}" class="sidebar-link {% if active_page == 'agents' %}active{% endif %}">
-            <i class="fas fa-robot w-5 text-center"></i> <span x-text="t('agents')"></span>
-        </a>
-        <a href="{{ url_for('page_trading') }}" class="sidebar-link {% if active_page == 'trading' %}active{% endif %}">
-            <i class="fas fa-coins w-5 text-center"></i> <span x-text="t('trading')"></span>
-        </a>
-        {% endif %}
+        {{ sidebar_link(url_for('dashboard'), 'dashboard', 'fas fa-chart-pie', t('dashboard')) }}
+        {{ sidebar_link(url_for('page_transactions'), 'transactions', 'fas fa-money-bill-transfer', t('transactions'), perm='approve_deposits', section='transactions') }}
+        {{ sidebar_link(url_for('page_matching'), 'matching', 'fas fa-arrows-rotate', t('matching'), perm='view_financial', section='matching') }}
+        {{ sidebar_link(url_for('page_agents'), 'agents', 'fas fa-robot', t('agents'), perm='view_financial', section='agents') }}
+        {{ sidebar_link(url_for('page_trading'), 'trading', 'fas fa-coins', t('trading'), perm='view_financial', section='trading') }}
 
         <p class="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 mt-4" data-i18n="management">Management</p>
-        {# Users page â€” support can see users; ban requires ban_users #}
-        {% if not admin_perms or admin_perms.get('ban_users') or admin_perms.get('view_financial') %}
-        <a href="{{ url_for('page_users') }}" class="sidebar-link {% if active_page == 'users' %}active{% endif %}">
-            <i class="fas fa-users w-5 text-center"></i> <span x-text="t('users')"></span>
-        </a>
-        {% endif %}
-        {% if not admin_perms or admin_perms.get('view_financial') or admin_perms.get('approve_deposits') %}
-        <a href="{{ url_for('page_svrp') }}" class="sidebar-link {% if active_page == 'svrp' %}active{% endif %}">
-            <i class="fas fa-gem w-5 text-center"></i> <span x-text="t('svrp')"></span>
-        </a>
-        {% endif %}
-        {% if not admin_perms or admin_perms.get('manage_games') %}
-        <a href="{{ url_for('page_lottery') }}" class="sidebar-link {% if active_page == 'lottery' %}active{% endif %}">
-            <i class="fas fa-dice w-5 text-center"></i> <span x-text="t('lottery')"></span>
-        </a>
-        <a href="{{ url_for('page_wheel') }}" class="sidebar-link {% if active_page == 'wheel' %}active{% endif %}">
-            <i class="fas fa-circle-notch w-5 text-center"></i> <span x-text="t('wheel')"></span>
-        </a>
-        {% endif %}
+        {{ sidebar_link(url_for('page_users'), 'users', 'fas fa-users', t('users'), perm='ban_users', section='users') }}
+        {{ sidebar_link(url_for('page_svrp'), 'svrp', 'fas fa-gem', t('svrp'), perm='view_financial', section='svrp') }}
+        {{ sidebar_link(url_for('page_lottery'), 'lottery', 'fas fa-dice', t('lottery'), perm='manage_games', section='lottery') }}
+        {{ sidebar_link(url_for('page_wheel'), 'wheel', 'fas fa-circle-notch', t('wheel'), perm='manage_games', section='wheel') }}
 
         <p class="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 mt-4" data-i18n="system">System</p>
-        {% if not admin_perms or admin_perms.get('manage_companies') %}
-        <a href="{{ url_for('page_companies') }}" class="sidebar-link {% if active_page == 'companies' %}active{% endif %}">
-            <i class="fas fa-building w-5 text-center"></i> <span x-text="t('companies')"></span>
-        </a>
-        <a href="{{ url_for('page_payment_methods') }}" class="sidebar-link {% if active_page == 'payment_methods' %}active{% endif %}">
-            <i class="fas fa-credit-card w-5 text-center"></i> <span x-text="t('payment_methods')"></span>
-        </a>
-        <a href="{{ url_for('page_apps') }}" class="sidebar-link {% if active_page == 'apps' %}active{% endif %}">
-            <i class="fas fa-mobile-screen w-5 text-center"></i> <span x-text="t('apps')"></span>
-        </a>
-        {% endif %}
-        {% if not admin_perms or admin_perms.get('manage_games') %}
-        <a href="{{ url_for('page_games_admin') }}" class="sidebar-link {% if active_page == 'games_admin' %}active{% endif %}">
-            <i class="fas fa-gamepad w-5 text-center"></i> <span>VEX Games</span>
-        </a>
-        {% endif %}
-        {% if not admin_perms or admin_perms.get('manage_companies') %}
-        <a href="{{ url_for('page_referrals') }}" class="sidebar-link {% if active_page == 'referrals' %}active{% endif %}">
-            <i class="fas fa-gift w-5 text-center"></i> <span x-text="t('referrals')"></span>
-        </a>
-        {% endif %}
-        {% if not admin_perms or admin_perms.get('send_broadcast') %}
-        <a href="{{ url_for('page_channels') }}" class="sidebar-link {% if active_page == 'channels' %}active{% endif %}">
-            <i class="fas fa-bullhorn w-5 text-center"></i> <span x-text="t('channels')"></span>
-        </a>
-        {% endif %}
-        {% if not admin_perms or admin_perms.get('manage_bots') %}
-        <a href="{{ url_for('page_bots') }}" class="sidebar-link {% if active_page == 'bots' %}active{% endif %}">
-            <i class="fas fa-robot w-5 text-center"></i> <span x-text="t('bots')"></span>
-        </a>
-        {% endif %}
-        {% if not admin_perms or admin_perms.get('manage_bots') %}
-        <a href="{{ url_for('page_browser') }}" class="sidebar-link {% if active_page == 'browser' %}active{% endif %}">
-            <i class="fas fa-globe w-5 text-center"></i> <span>المتصفح</span>
-        </a>
-        <a href="{{ url_for('page_clients') }}" class="sidebar-link {% if active_page == 'clients' %}active{% endif %}">
-            <i class="fas fa-tags w-5 text-center"></i> <span x-text="t('clients')"></span>
-        </a>
-        {% endif %}
-        {% if not admin_perms or admin_perms.get('ban_users') %}
-        <a href="{{ url_for('page_complaints') }}" class="sidebar-link {% if active_page == 'complaints' %}active{% endif %}">
-            <i class="fas fa-exclamation-circle w-5 text-center"></i> <span x-text="t('complaints')"></span>
-        </a>
-        <a href="{{ url_for('page_tickets') }}" class="sidebar-link {% if active_page == 'tickets' %}active{% endif %}">
-            <i class="fas fa-ticket-alt w-5 text-center"></i> <span x-text="t('tickets')"></span>
-        </a>
-        {% endif %}
-        {% if not admin_perms or admin_perms.get('send_broadcast') %}
-        <a href="{{ url_for('page_broadcast') }}" class="sidebar-link {% if active_page == 'broadcast' %}active{% endif %}">
-            <i class="fas fa-tower-broadcast w-5 text-center"></i> <span x-text="t('broadcast')"></span>
-        </a>
-        {% endif %}
-        
+        {{ sidebar_link(url_for('page_companies'), 'companies', 'fas fa-building', t('companies'), perm='manage_companies', section='companies') }}
+        {{ sidebar_link(url_for('page_payment_methods'), 'payment_methods', 'fas fa-credit-card', t('payment_methods'), perm='manage_companies', section='payment_methods') }}
+        {{ sidebar_link(url_for('page_apps'), 'apps', 'fas fa-mobile-screen', t('apps'), perm='manage_companies', section='apps') }}
+        {{ sidebar_link(url_for('page_games_admin'), 'games_admin', 'fas fa-gamepad', 'VEX Games', perm='manage_games', section='games_admin') }}
+        {{ sidebar_link(url_for('page_referrals'), 'referrals', 'fas fa-gift', t('referrals'), perm='manage_companies', section='referrals') }}
+        {{ sidebar_link(url_for('page_channels'), 'channels', 'fas fa-bullhorn', t('channels'), perm='send_broadcast', section='channels') }}
+        {{ sidebar_link(url_for('page_bots'), 'bots', 'fas fa-robot', t('bots'), perm='manage_bots', section='bots') }}
+        {{ sidebar_link(url_for('page_browser'), 'browser', 'fas fa-globe', 'المتصفح', perm='manage_bots', section='browser') }}
+        {{ sidebar_link(url_for('page_clients'), 'clients', 'fas fa-tags', t('clients'), perm='manage_bots', section='clients') }}
+        {{ sidebar_link(url_for('page_complaints'), 'complaints', 'fas fa-exclamation-circle', t('complaints'), perm='ban_users', section='complaints') }}
+        {{ sidebar_link(url_for('page_tickets'), 'tickets', 'fas fa-ticket-alt', t('tickets'), perm='ban_users', section='tickets') }}
+        {{ sidebar_link(url_for('page_broadcast'), 'broadcast', 'fas fa-tower-broadcast', t('broadcast'), perm='send_broadcast', section='broadcast') }}
+
         <p class="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 mt-4" data-i18n="advanced_system">Advanced System</p>
-        {% if not admin_perms or admin_perms.get('view_statistics') %}
-        <a href="{{ url_for('page_statistics') }}" class="sidebar-link {% if active_page == 'statistics' %}active{% endif %}">
-            <i class="fas fa-chart-bar w-5 text-center"></i> <span x-text="t('statistics')"></span>
-        </a>
-        {% endif %}
-        {% if not admin_perms or admin_perms.get('manage_admins') %}
-        <a href="{{ url_for('page_admins') }}" class="sidebar-link {% if active_page == 'admins' %}active{% endif %}">
-            <i class="fas fa-user-shield w-5 text-center"></i> <span x-text="t('admins')"></span>
-        </a>
-        <a href="{{ url_for('page_admin_center') }}" class="sidebar-link {% if active_page == 'admin_center' %}active{% endif %}">
-            <i class="fas fa-users-cog w-5 text-center"></i> مركز الإدارة
-        </a>
-        {% endif %}
-        {% if not admin_perms or admin_perms.get('manage_settings') %}
-        <a href="{{ url_for('page_themes') }}" class="sidebar-link {% if active_page == 'themes' %}active{% endif %}">
-            <i class="fas fa-palette w-5 text-center"></i> <span x-text="t('themes')"></span>
-        </a>
-        <a href="{{ url_for('page_exchange_addresses') }}" class="sidebar-link {% if active_page == 'exchange_addresses' %}active{% endif %}">
-            <i class="fas fa-location-dot w-5 text-center"></i> <span x-text="t('exchange_addresses')"></span>
-        </a>
-        {% endif %}
-        {% if not admin_perms or admin_perms.get('send_broadcast') %}
-        <a href="{{ url_for('page_send_message') }}" class="sidebar-link {% if active_page == 'send_message' %}active{% endif %}">
-            <i class="fas fa-paper-plane w-5 text-center"></i> <span x-text="t('send_message')"></span>
-        </a>
-        {% endif %}
-        {% if not admin_perms or admin_perms.get('manage_admins') %}
-        <a href="{{ url_for('page_backup') }}" class="sidebar-link {% if active_page == 'backup' %}active{% endif %}">
-            <i class="fas fa-database w-5 text-center"></i> <span x-text="t('backup')"></span>
-        </a>
-        {% endif %}
-        {% if not admin_perms or admin_perms.get('manage_settings') %}
-        <a href="{{ url_for('page_settings') }}" class="sidebar-link {% if active_page == 'settings' %}active{% endif %}">
-            <i class="fas fa-gear w-5 text-center"></i> <span x-text="t('settings')"></span>
-        </a>
-        <a href="{{ url_for('page_ai_api_keys') }}" class="sidebar-link {% if active_page == 'ai_api_keys' %}active{% endif %}">
-            <i class="fas fa-key w-5 text-center"></i> <span x-text="t('ai_api_keys')"></span>
-        </a>
-        {% endif %}
+        {{ sidebar_link(url_for('page_statistics'), 'statistics', 'fas fa-chart-bar', t('statistics'), perm='view_statistics', section='statistics') }}
+        {{ sidebar_link(url_for('page_admins'), 'admins', 'fas fa-user-shield', t('admins'), perm='manage_admins', section='admins') }}
+        {{ sidebar_link(url_for('page_admin_center'), 'admin_center', 'fas fa-users-cog', 'مركز الإدارة', perm='manage_admins', section='admin_center') }}
+        {{ sidebar_link(url_for('page_themes'), 'themes', 'fas fa-palette', t('themes'), perm='manage_settings', section='themes') }}
+        {{ sidebar_link(url_for('page_exchange_addresses'), 'exchange_addresses', 'fas fa-location-dot', t('exchange_addresses'), perm='manage_settings', section='exchange_addresses') }}
+        {{ sidebar_link(url_for('page_send_message'), 'send_message', 'fas fa-paper-plane', t('send_message'), perm='send_broadcast', section='send_message') }}
+        {{ sidebar_link(url_for('page_backup'), 'backup', 'fas fa-database', t('backup'), perm='manage_admins', section='backup') }}
+        {{ sidebar_link(url_for('page_settings'), 'settings', 'fas fa-gear', t('settings'), perm='manage_settings', section='settings') }}
+        {{ sidebar_link(url_for('page_ai_api_keys'), 'ai_api_keys', 'fas fa-key', t('ai_api_keys'), perm='manage_settings', section='ai_api_keys') }}
     </nav>
 
     <!-- Sidebar footer -->

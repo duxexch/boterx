@@ -1759,6 +1759,53 @@ def has_permission(uid: str, permission: str) -> bool:
     return bool(role_data['permissions'].get(permission, False))
 
 
+# ── Admin Sections — controls which pages a sub-admin can access ─────────────
+# All available section keys (must match sidebar route names)
+ALL_SECTIONS = [
+    'dashboard', 'transactions', 'matching', 'agents', 'trading',
+    'users', 'svrp', 'lottery', 'wheel', 'companies', 'payment_methods',
+    'apps', 'referrals', 'channels', 'bots', 'browser', 'clients',
+    'complaints', 'tickets', 'broadcast', 'statistics',
+    'admins', 'admin_center', 'themes', 'exchange_addresses',
+    'send_message', 'backup', 'settings', 'ai_api_keys', 'games_admin',
+]
+
+def get_admin_sections(uid: str) -> list:
+    """Return list of allowed section keys for an admin.
+    Empty list = super_admin (all sections allowed).
+    """
+    role_data = get_admin_role(uid)
+    perms = role_data.get('permissions', {})
+    sections = perms.get('__sections__', [])
+    if role_data.get('role') == 'super_admin':
+        return []  # empty = all allowed
+    return sections if isinstance(sections, list) else []
+
+
+def set_admin_sections(uid: str, sections: list) -> bool:
+    """Update allowed sections for an admin. Preserves other permissions."""
+    import json as _json
+    conn = _get_conn()
+    try:
+        row = conn.execute(
+            'SELECT role, permissions FROM admin_roles WHERE uid=?', (str(uid),)
+        ).fetchone()
+        if not row:
+            return False
+        perms = _json.loads(row['permissions'] or '{}')
+        perms['__sections__'] = sections
+        conn.execute(
+            'UPDATE admin_roles SET permissions=? WHERE uid=?',
+            (_json.dumps(perms), str(uid))
+        )
+        conn.commit()
+        return True
+    except Exception:
+        return False
+    finally:
+        conn.close()
+
+
 def log_admin_action(uid: str, action: str, target: str = '',
                      details: str = '', ip: str = '') -> None:
     """Append a row to the admin_audit_log table."""

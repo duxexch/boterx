@@ -38,7 +38,7 @@ CLIENT_FIELDS = [
     'features', 'admin_ids',
     'subscription_start', 'subscription_end',
     'status', 'bot_autostart', 'notes', 'created_at', 'last_login',
-    'revenue_share',
+    'revenue_share', 'custom_domain',
 ]
 
 # ── كتالوج مميزات النظام — يظهر في لوحة الإدارة ويثبَّت في بوت العميل ──

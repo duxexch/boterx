@@ -432,6 +432,9 @@ try:
                              get_admin_role as _rbac_get_role,
                              log_admin_action as _rbac_log,
                              set_admin_role as _rbac_set_role,
+                             get_admin_sections as _rbac_get_sections,
+                             set_admin_sections as _rbac_set_sections,
+                             ALL_SECTIONS as ALL_SECTIONS,
                              ROLE_PERMISSIONS as _ROLE_PERMISSIONS)
     _RBAC_AVAILABLE = True
 except ImportError:
@@ -440,6 +443,9 @@ except ImportError:
     def _rbac_get_role(uid): return {'role': 'super_admin', 'permissions': {}}
     def _rbac_log(*a, **k): pass
     def _rbac_set_role(*a, **k): return False
+    def _rbac_get_sections(uid): return []  # empty = all allowed
+    def _rbac_set_sections(*a, **k): return False
+    ALL_SECTIONS = []
     _ROLE_PERMISSIONS = {}
 
 
@@ -508,21 +514,100 @@ def page_permission_required(permission_key):
     return decorator
 
 
+def section_required(section_key):
+    """Decorator: require access to a specific section (page navigation)."""
+    def decorator(f):
+        @wraps(f)
+        def decorated_fn(*args, **kwargs):
+            return f(*args, **kwargs)
+        return decorated_fn
+    return decorator
+
+
+# ── Section access enforcement via before_request ─────────────────────────────
+# Maps Flask endpoint names to section keys. If an admin's allowed sections
+# don't include the section, the request is blocked.
+_ROUTE_SECTION_MAP = {
+    'dashboard': None,  # always allowed
+    'page_transactions': 'transactions',
+    'page_matching': 'matching',
+    'page_agents': 'agents',
+    'page_trading': 'trading',
+    'page_users': 'users',
+    'page_svrp': 'svrp',
+    'page_lottery': 'lottery',
+    'page_wheel': 'wheel',
+    'page_companies': 'companies',
+    'page_payment_methods': 'payment_methods',
+    'page_apps': 'apps',
+    'page_referrals': 'referrals',
+    'page_channels': 'channels',
+    'page_bots': 'bots',
+    'page_browser': 'browser',
+    'page_clients': 'clients',
+    'page_complaints': 'complaints',
+    'page_tickets': 'tickets',
+    'page_broadcast': 'broadcast',
+    'page_statistics': 'statistics',
+    'page_admins': 'admins',
+    'page_admin_center': 'admin_center',
+    'page_themes': 'themes',
+    'page_exchange_addresses': 'exchange_addresses',
+    'page_send_message': 'send_message',
+    'page_backup': 'backup',
+    'page_settings': 'settings',
+    'page_ai_api_keys': 'ai_api_keys',
+    'page_games_admin': 'games_admin',
+}
+
+
+@app.before_request
+def _section_access_guard():
+    """Block access to pages if the admin's sections don't include it."""
+    if not session.get('logged_in') or not session.get('is_admin'):
+        return None
+    endpoint = request.endpoint
+    if not endpoint:
+        return None
+    required_section = _ROUTE_SECTION_MAP.get(endpoint)
+    if required_section is None:
+        return None  # no restriction
+    uid = str(session.get('admin_id', ''))
+    allowed = _rbac_get_sections(uid)
+    if not allowed:
+        return None  # super_admin (empty = all allowed)
+    if required_section not in allowed:
+        if request.path.startswith('/api/'):
+            return jsonify({'error': 'هذا القسم مغلق', 'section': required_section}), 403
+        html = (
+            '<!doctype html><html lang="ar" dir="rtl">'
+            '<head><meta charset="utf-8"><title>403 — القسم مغلق</title>'
+            '<style>body{font-family:sans-serif;background:#0f172a;color:#94a3b8;'
+            'display:flex;align-items:center;justify-content:center;height:100vh;margin:0}'
+            '.box{text-align:center}.icon{font-size:4rem;margin-bottom:1rem}'
+            'h1{color:#f43f5e;font-size:1.5rem}a{color:#60a5fa}</style></head>'
+            '<body><div class="box"><div class="icon">🔒</div>'
+            '<h1>هذا القسم مغلق بالنسبة لك</h1>'
+            '<p>تواصل مع الإدارة لفتح هذا القسم</p>'
+            '<a href="/dashboard">العودة للوحة التحكم</a></div></body></html>'
+        )
+        return html, 403
+    return None
+
+
 @app.context_processor
 def _inject_admin_context():
-    """Inject admin_role and admin_perms into every template render.
-
-    Templates use these to conditionally show/hide sidebar links and actions.
-    The call is a single SQLite SELECT (~0.1 ms) so the per-request cost is
-    negligible.
-    """
+    """Inject admin_role, admin_perms, and admin_sections into every template."""
     if session.get('logged_in'):
         uid = str(session.get('admin_id', ''))
         try:
             role_data = _rbac_get_role(uid)
+            sections = _rbac_get_sections(uid)
             return {
                 'admin_role': role_data.get('role') or 'super_admin',
                 'admin_perms': role_data.get('permissions') or {},
+                'admin_sections': sections,
+                'all_sections': ALL_SECTIONS,
                 'showcase_readonly': bool(session.get('showcase_readonly')),
                 'showcase_exp': session.get('showcase_exp'),
             }
@@ -531,6 +616,8 @@ def _inject_admin_context():
     return {
         'admin_role': None,
         'admin_perms': {},
+        'admin_sections': [],
+        'all_sections': ALL_SECTIONS,
         'showcase_readonly': bool(session.get('showcase_readonly')),
         'showcase_exp': session.get('showcase_exp'),
     }
@@ -2351,6 +2438,28 @@ def _hermes_auth_hook():
     if provided and HERMES_API_KEY and hmac.compare_digest(provided, HERMES_API_KEY):
         g.hermes_auth = True
         g.hermes_admin_id = 'hermes'
+
+
+@app.before_request
+def _detect_tenant_domain():
+    """Detect custom domain from request Host header and set g.tenant_id."""
+    g.tenant_id = None
+    g.tenant_client = None
+    host = request.host.split(':')[0]  # strip port
+    # Skip main domain and localhost
+    if host in ('vex.deals', 'www.vex.deals', '127.0.0.1', 'localhost', '69.169.108.197'):
+        return None
+    # Look up domain in clients.csv
+    try:
+        clients_data = read_csv('clients.csv')
+        for c in clients_data:
+            if c.get('custom_domain', '').strip().lower() == host.lower():
+                g.tenant_id = c.get('id', '')
+                g.tenant_client = c
+                return None
+    except Exception:
+        pass
+    return None
 
 
 @app.route('/api/v1/ping')
@@ -13065,6 +13174,7 @@ def _client_public(c):
         'days_left': _clients().days_left(c),
         'expired': _clients().is_expired(c),
         'revenue_share': int(c.get('revenue_share') or 30),
+        'custom_domain': c.get('custom_domain', ''),
     }
 
 
@@ -14112,6 +14222,159 @@ def api_admin_center_audit():
         logs = []
 
     return jsonify({'success': True, 'logs': logs})
+
+
+# ── Section Management API ────────────────────────────────────────────────────
+
+@app.route('/api/admin-center/admins/<admin_id>/sections', methods=['GET'])
+@api_auth
+@permission_required('manage_admins')
+def api_admin_center_get_sections(admin_id):
+    """Get allowed sections for an admin."""
+    sections = _rbac_get_sections(admin_id)
+    return jsonify({'success': True, 'admin_id': admin_id, 'sections': sections, 'all_sections': ALL_SECTIONS})
+
+
+@app.route('/api/admin-center/admins/<admin_id>/sections', methods=['POST'])
+@api_auth
+@permission_required('manage_admins')
+def api_admin_center_set_sections(admin_id):
+    """Set allowed sections for an admin. Empty list = all allowed (super_admin)."""
+    data = request.json or {}
+    sections = data.get('sections', [])
+    # Validate sections
+    valid = [s for s in sections if s in ALL_SECTIONS]
+    ok = _rbac_set_sections(admin_id, valid)
+    if not ok:
+        return jsonify({'success': False, 'error': 'Admin not found in RBAC'}), 404
+    log_action('admin_center_set_sections', f'{admin_id}: {valid}')
+    return jsonify({'success': True, 'sections': valid})
+
+
+# ── Domain Management API ─────────────────────────────────────────────────────
+
+@app.route('/api/admin-center/domains', methods=['GET'])
+@api_auth
+@permission_required('manage_admins')
+def api_admin_center_domains():
+    """List all client domains."""
+    clients_data = read_csv('clients.csv')
+    domains = []
+    for c in clients_data:
+        domain = c.get('custom_domain', '').strip()
+        if domain:
+            domains.append({
+                'client_id': c.get('id', ''),
+                'client_name': c.get('name', ''),
+                'domain': domain,
+                'status': c.get('status', 'active'),
+            })
+    return jsonify({'success': True, 'domains': domains})
+
+
+@app.route('/api/admin-center/domains', methods=['POST'])
+@api_auth
+@permission_required('manage_admins')
+def api_admin_center_set_domain():
+    """Set custom domain for a client."""
+    data = request.json or {}
+    client_id = data.get('client_id', '')
+    domain = data.get('domain', '').strip().lower()
+
+    if not client_id:
+        return jsonify({'success': False, 'error': 'client_id مطلوب'}), 400
+
+    # Validate domain format
+    if domain and not all(c.isalnum() or c in '-.' for c in domain):
+        return jsonify({'success': False, 'error': 'דומיין غير صالح'}), 400
+
+    # Check no duplicate domain
+    clients_data = read_csv('clients.csv')
+    for c in clients_data:
+        if c.get('id') != client_id and c.get('custom_domain', '').strip().lower() == domain and domain:
+            return jsonify({'success': False, 'error': f'الدومين مستخدم بالفعل от клиента {c.get("name", "")}'}), 400
+
+    fieldnames = get_fieldnames('clients.csv', ['id', 'name', 'contact', 'bot_username', 'bot_token',
+        'dash_username', 'dash_password_hash', 'salt', 'features', 'admin_ids',
+        'subscription_start', 'subscription_end', 'status', 'bot_autostart',
+        'notes', 'created_at', 'last_login', 'revenue_share'])
+    if 'custom_domain' not in fieldnames:
+        fieldnames.append('custom_domain')
+
+    for c in clients_data:
+        if c.get('id') == client_id:
+            c['custom_domain'] = domain
+            break
+    write_csv('clients.csv', clients_data, fieldnames)
+
+    log_action('admin_center_set_domain', f'{client_id}: {domain}')
+    return jsonify({'success': True, 'client_id': client_id, 'domain': domain})
+
+
+@app.route('/api/admin-center/domains/<client_id>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_admins')
+def api_admin_center_remove_domain(client_id):
+    """Remove custom domain for a client."""
+    clients_data = read_csv('clients.csv')
+    fieldnames = get_fieldnames('clients.csv', ['id', 'name', 'contact', 'bot_username', 'bot_token',
+        'dash_username', 'dash_password_hash', 'salt', 'features', 'admin_ids',
+        'subscription_start', 'subscription_end', 'status', 'bot_autostart',
+        'notes', 'created_at', 'last_login', 'revenue_share'])
+    if 'custom_domain' not in fieldnames:
+        fieldnames.append('custom_domain')
+
+    for c in clients_data:
+        if c.get('id') == client_id:
+            c['custom_domain'] = ''
+            break
+    write_csv('clients.csv', clients_data, fieldnames)
+
+    log_action('admin_center_remove_domain', client_id)
+    return jsonify({'success': True})
+
+
+@app.route('/api/admin-center/domains/generate-nginx', methods=['GET'])
+@api_auth
+@permission_required('manage_admins')
+def api_admin_center_generate_nginx():
+    """Generate nginx config snippets for all client domains."""
+    clients_data = read_csv('clients.csv')
+    configs = []
+    for c in clients_data:
+        domain = c.get('custom_domain', '').strip()
+        if domain and c.get('status') == 'active':
+            config = f"""# Client: {c.get('name', '')} ({c.get('id', '')})
+server {{
+    listen 80;
+    server_name {domain};
+    return 301 https://$server_name$request_uri;
+}}
+server {{
+    listen 443 ssl http2;
+    server_name {domain};
+
+    ssl_certificate /etc/letsencrypt/live/{domain}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/{domain}/privkey.pem;
+
+    location /static/ {{
+        alias /opt/bot/dashboard/static/;
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+    }}
+
+    location / {{
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Client-Domain {domain};
+    }}
+}}
+"""
+            configs.append({'client_id': c.get('id'), 'domain': domain, 'config': config})
+    return jsonify({'success': True, 'configs': configs, 'count': len(configs)})
 
 
 def _get_role_permissions(role):
