@@ -13064,7 +13064,7 @@ def _client_public(c):
         'running': bool(_clients().is_running(c.get('id'))),
         'days_left': _clients().days_left(c),
         'expired': _clients().is_expired(c),
-        'revenue_share': int(c.get('revenue_share', 30)),
+        'revenue_share': int(c.get('revenue_share') or 30),
     }
 
 
@@ -13890,7 +13890,7 @@ def api_admin_center_add():
     except Exception:
         pass
 
-    log_action('admin_center_add', f'{telegram_id}: {role}', details=f'tenant={tenant_id}')
+    log_action('admin_center_add', f'{telegram_id}: {role} tenant={tenant_id}')
     return jsonify({'success': True})
 
 
@@ -13939,7 +13939,7 @@ def api_admin_center_update(admin_id):
         except Exception:
             pass
 
-    log_action('admin_center_update', f'{admin_id}', details=f'role={role} tenant={tenant_id}')
+    log_action('admin_center_update', f'{admin_id} role={role} tenant={tenant_id}')
     return jsonify({'success': True})
 
 
@@ -13966,7 +13966,7 @@ def api_admin_center_assign_tenant(admin_id):
         except Exception:
             pass
 
-    log_action('admin_center_assign_tenant', f'{admin_id}', details=f'tenant={tenant_id}')
+    log_action('admin_center_assign_tenant', f'{admin_id} tenant={tenant_id}')
     return jsonify({'success': True})
 
 
@@ -14029,7 +14029,7 @@ def api_admin_center_set_revenue_share(client_id):
     if found:
         write_csv('clients.csv', clients_data, fieldnames)
 
-    log_action('admin_center_revenue_share', f'{client_id}', details=f'{pct}%')
+    log_action('admin_center_revenue_share', f'{client_id} {pct}%')
     return jsonify({'success': True, 'revenue_share': pct})
 
 
@@ -14058,7 +14058,7 @@ def api_admin_center_revenue():
         client_revenue = {}
         for c in clients_data:
             cid = c.get('id', '')
-            share = int(c.get('revenue_share', 30))
+            share = int(c.get('revenue_share') or 30)
             client_revenue[cid] = {
                 'client_id': cid,
                 'client_name': c.get('name', cid),

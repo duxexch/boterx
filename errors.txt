@@ -1,0 +1,14 @@
+Aug 30 16:14:30 vps3524672 python3[162360]:     rv = self.handle_user_exception(e)
+Aug 30 16:14:30 vps3524672 python3[162360]: ValueError: invalid literal for int() with base 10: ''
+Aug 30 16:14:36 vps3524672 python3[162360]: 2026-08-30 16:14:36,834 - VEX Security Bot - Exception on /api/clients [GET]
+Aug 30 16:14:36 vps3524672 python3[162360]: Traceback (most recent call last):
+Aug 30 16:14:36 vps3524672 python3[162360]:     rv = self.handle_user_exception(e)
+Aug 30 16:14:36 vps3524672 python3[162360]: ValueError: invalid literal for int() with base 10: ''
+Aug 30 16:14:40 vps3524672 python3[162360]: 2026-08-30 16:14:40,220 - VEX Security Bot - Exception on /api/admin-center/admins [POST]
+Aug 30 16:14:40 vps3524672 python3[162360]: Traceback (most recent call last):
+Aug 30 16:14:40 vps3524672 python3[162360]:     rv = self.handle_user_exception(e)
+Aug 30 16:14:40 vps3524672 python3[162360]: TypeError: log_action() got multiple values for argument 'details'
+Aug 30 16:14:43 vps3524672 python3[162360]: 2026-08-30 16:14:43,472 - VEX Security Bot - Exception on /api/clients [GET]
+Aug 30 16:14:43 vps3524672 python3[162360]: Traceback (most recent call last):
+Aug 30 16:14:43 vps3524672 python3[162360]:     rv = self.handle_user_exception(e)
+Aug 30 16:14:43 vps3524672 python3[162360]: ValueError: invalid literal for int() with base 10: ''

@@ -1,0 +1,8 @@
+STDOUT:
+✅ Game Engine: Using SQLite for balance operations
+Migration error: [Errno 2] No such file or directory: 'users.csv'
+Payment methods migration error: [Errno 2] No such file or directory: 'payment_methods.csv'
+[startup] Database tables initialized.
+[startup] No expired game sessions to refund.
+Migration error: [Errno 2] No such file or directory: 'users.csv'
+Payment methods migration error: [Errno 2] No such file or directory: 'payment_methods.csv'
