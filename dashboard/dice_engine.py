@@ -99,13 +99,28 @@ def _hit_chance(uid, target_x):
     chance = min(chance, MAX_RTP / float(target_x))
     return chance
 
-def _generate_result(predicted, hit_chance):
+def _generate_result(predicted, hit_chance, pf_result=None):
     """Server-authoritative roll.
 
     3% instant loss (die lands on a non-predicted face), otherwise the
     predicted face wins with the exact computed probability. Uniform
     distribution over the remaining faces otherwise.
+
+    When pf_result is provided (from ProvablyFair), it's used for determinism.
     """
+    if pf_result is not None:
+        # PF-based: pf_result is a float in [0, 1)
+        if pf_result < INSTANT_LOSS_CHANCE:
+            # 3% instant loss: pick from non-predicted faces deterministically
+            others = [n for n in range(1, 7) if n != predicted]
+            return others[int(pf_result * 1000) % len(others)]
+        # Normalize the remaining portion to [0, 1) for hit check
+        norm = (pf_result - INSTANT_LOSS_CHANCE) / (1 - INSTANT_LOSS_CHANCE)
+        if norm < hit_chance:
+            return predicted
+        others = [n for n in range(1, 7) if n != predicted]
+        return others[int(pf_result * 10000) % len(others)]
+
     rng = _secure_random
     if rng.random() < INSTANT_LOSS_CHANCE:
         others = [n for n in range(1, 7) if n != predicted]
@@ -115,10 +130,19 @@ def _generate_result(predicted, hit_chance):
     others = [n for n in range(1, 7) if n != predicted]
     return rng.choice(others)
 
-def _generate_evenodd(target_mod, hit_chance):
+def _generate_evenodd(target_mod, hit_chance, pf_result=None):
     """Roll a die that matches (or misses) the predicted parity at hit_chance.
 
     target_mod: 0 = even wanted, 1 = odd wanted."""
+    if pf_result is not None:
+        if pf_result < INSTANT_LOSS_CHANCE:
+            want_mod = 1 - target_mod
+        else:
+            norm = (pf_result - INSTANT_LOSS_CHANCE) / (1 - INSTANT_LOSS_CHANCE)
+            want_mod = 1 - target_mod if norm >= hit_chance else target_mod
+        faces = [n for n in range(1, 7) if (n % 2) == want_mod]
+        return faces[int(pf_result * 10000) % len(faces)]
+
     rng = _secure_random
     want_mod = target_mod
     if rng.random() < INSTANT_LOSS_CHANCE:
@@ -211,16 +235,40 @@ def init_dice_engine(app, get_uid, get_gm, get_pf, is_pf, is_vex, webapp_auth=No
         # Generate result FIRST (server-authoritative), then settle bet+payout
         # in ONE atomic SQLite transaction — a crash can never leave the bet
         # debited without the win credited, and request_id makes retries safe.
+
+        # Provably Fair integration
+        pf_session = None
+        pf_data = {}
+        pf_session_id = None
+        if _is_pf() and _pf:
+            try:
+                pf_session_id = f"dice_{uid}_{int(time.time()*1000)}"
+                client_seed = data.get('client_seed') or None
+                pf_session = _pf.create_session(pf_session_id, client_seed)
+                pf_result = _pf.generate_float(pf_session_id, 0.0, 1.0)
+                pf_data = {
+                    'pf_session_id': pf_session_id,
+                    'pf_seed_hash': pf_session['seed_hash'],
+                    'pf_client_seed': pf_session['client_seed'],
+                    'pf_nonce': pf_result['nonce'],
+                }
+                pf_float = pf_result['value']
+            except Exception:
+                pf_session = None
+                pf_float = None
+        else:
+            pf_float = None
+
         if bet_mode == 'exact':
             chance = _hit_chance(uid, target_x)
-            result_num = _generate_result(predicted, chance)
+            result_num = _generate_result(predicted, chance, pf_float)
             won = (result_num == predicted)
             actual_x = target_x
         else:
             # Even/odd: fixed 1.70x, P = 0.97 x 0.5 (same edge as exact bets)
             chance = 0.5
             target_mod = 0 if bet_mode == 'even' else 1
-            result_num = _generate_evenodd(target_mod, chance)
+            result_num = _generate_evenodd(target_mod, chance, pf_float)
             won = ((result_num % 2) == target_mod)
             actual_x = EVENODD_PAYOUT
         payout = round(amount * actual_x, 2) if won else 0
@@ -236,6 +284,7 @@ def init_dice_engine(app, get_uid, get_gm, get_pf, is_pf, is_vex, webapp_auth=No
             'win_chance': round(chance, 4),
             'balance_after': 0,  # filled by settlement
         }
+        template.update(pf_data)
         ok, stored, race_cached = _gm.settle_with_idempotency(uid, amount, payout, req_id, template)
         if race_cached:
             return jsonify(race_cached)
@@ -289,6 +338,18 @@ def init_dice_engine(app, get_uid, get_gm, get_pf, is_pf, is_vex, webapp_auth=No
                 })
         except Exception:
             pass
+
+        # Reveal PF seed immediately (dice is instant — round is over)
+        if pf_session and pf_session_id and _pf:
+            try:
+                revealed = _pf.reveal_seed(pf_session_id)
+                if revealed:
+                    stored['pf_server_seed'] = revealed['server_seed']
+                    stored['pf_seed_hash'] = revealed['seed_hash']
+                    stored['pf_client_seed'] = revealed['client_seed']
+                    stored['pf_nonce'] = revealed['nonce']
+            except Exception:
+                pass
 
         return jsonify(stored)
 

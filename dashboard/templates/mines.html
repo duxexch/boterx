@@ -114,6 +114,7 @@
 <script src="/static/js/game-base.js?v=20260819b"></script>
 <script>
 'use strict';
+pfGameName='mines';
 var MINES_OPTIONS = [1,3,5,7,10,15,20,24];
 var selectedMines = 3;
 var gameActive = false;
@@ -282,6 +283,9 @@ function showResult(win, payout, mult) {
     document.getElementById('phaseMsg').style.color = 'var(--red)';
     streakWin = 0; updateStreak(document.getElementById('streakBadge'));
     hapticNotif('error');
+  }
+  if(typeof addGameRound==='function'){
+    addGameRound({game:'mines',bet:betAmount,payout:payout||0,multiplier:mult||0,result:win?'win':'lose'});
   }
 }
 

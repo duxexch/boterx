@@ -276,11 +276,110 @@ function injectPFBadge() {
   }
 }
 
-// Auto-init provably fair when DOM is ready
+// ---- Game History System ----
+let gameHistory = [];
+const GAME_HISTORY_KEY = 'vex_game_history';
+
+function loadGameHistory() {
+  try { gameHistory = JSON.parse(localStorage.getItem(GAME_HISTORY_KEY) || '[]'); } catch(e) { gameHistory = []; }
+}
+
+function addGameRound(round) {
+  // round: {game, bet, payout, multiplier, result, pf_session_id, pf_seed_hash, timestamp}
+  gameHistory.unshift(Object.assign({ timestamp: Date.now() }, round));
+  if (gameHistory.length > 50) gameHistory.length = 50;
+  localStorage.setItem(GAME_HISTORY_KEY, JSON.stringify(gameHistory));
+  updateHistoryBadge();
+}
+
+function updateHistoryBadge() {
+  const el = document.getElementById('histCount');
+  if (el) el.textContent = gameHistory.length;
+}
+
+function showGameHistoryModal() {
+  loadGameHistory();
+  const overlay = document.createElement('div');
+  overlay.id = 'histModal';
+  overlay.className = 'modal-overlay';
+  overlay.style.display = 'flex';
+  overlay.innerHTML = `<div class="modal-box" id="histBox" style="max-width:420px;max-height:80vh;overflow-y:auto"></div>`;
+  document.body.appendChild(overlay);
+  const box = document.getElementById('histBox');
+
+  let rows = '';
+  if (gameHistory.length === 0) {
+    rows = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">لا توجد جولات بعد<br>No rounds yet</div>';
+  } else {
+    gameHistory.slice(0, 30).forEach((r, i) => {
+      const isWin = r.result === 'win';
+      const color = isWin ? 'var(--green)' : 'var(--red)';
+      const icon = isWin ? '✅' : '❌';
+      const mult = r.multiplier ? r.multiplier.toFixed(2) + 'x' : '-';
+      const time = r.timestamp ? new Date(r.timestamp).toLocaleTimeString() : '';
+      const gameNames = {mines:'💣 مناجم',plinko:'🔵 بلينكو',wheel:'🎡 عجلة',aviator:'✈️ أفياتور',crash:'🚀 كراش',dice:'🎲 نرد',snatch:'🎯 اخطف',lottery:'🎰 يانصيب'};
+      const gameName = gameNames[r.game] || r.game || '';
+      rows += `<div style="display:flex;align-items:center;gap:8px;padding:8px;border-bottom:1px solid var(--border)">
+        <span style="font-size:16px">${icon}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;font-weight:600;color:var(--text)">${gameName}</div>
+          <div style="font-size:10px;color:var(--muted)">رهان: ${(r.bet||0).toLocaleString()} → ${mult} → ${(r.payout||0).toLocaleString()}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:11px;font-weight:700;color:${color}">${isWin ? '+' + (r.payout - r.bet).toLocaleString() : '-' + (r.bet||0).toLocaleString()}</div>
+          <div style="font-size:9px;color:var(--muted)">${time}</div>
+        </div>
+        ${r.pf_session_id ? '<button onclick="showPFDetailForRound(\'' + r.pf_session_id + '\')" style="font-size:9px;color:var(--cyan);background:none;border:none;cursor:pointer;padding:2px">🔐</button>' : ''}
+      </div>`;
+    });
+  }
+
+  box.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 16px 12px;border-bottom:1px solid var(--border)">
+      <div>
+        <div style="font-size:16px;font-weight:700;color:var(--text)">📊 سجل الجولات</div>
+        <div style="font-size:11px;color:var(--muted)">Game History (${gameHistory.length})</div>
+      </div>
+      <button onclick="document.getElementById('histModal').remove()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px">✕</button>
+    </div>
+    <div style="padding:8px">${rows}</div>
+    ${gameHistory.length > 0 ? '<div style="padding:8px 16px;border-top:1px solid var(--border);text-align:center"><button onclick="clearGameHistory()" style="font-size:11px;color:var(--red);background:none;border:none;cursor:pointer">🗑 مسح السجل</button></div>' : ''}
+  `;
+}
+
+function showPFDetailForRound(sessionId) {
+  document.getElementById('histModal')?.remove();
+  showProvablyFairModal();
+}
+
+function clearGameHistory() {
+  gameHistory = [];
+  localStorage.removeItem(GAME_HISTORY_KEY);
+  updateHistoryBadge();
+  document.getElementById('histModal')?.remove();
+}
+
+// Inject history badge + button into topbar
+function injectHistBadge() {
+  const topbar = document.querySelector('.topbar-right');
+  if (topbar && !document.getElementById('histBadge')) {
+    const badge = document.createElement('span');
+    badge.id = 'histBadge';
+    badge.className = 'pf-badge';
+    badge.style.cssText = 'display:block;background:rgba(59,130,246,0.15);color:var(--cyan);border-color:rgba(59,130,246,0.3)';
+    badge.onclick = showGameHistoryModal;
+    badge.innerHTML = '📊 <span id="histCount">0</span>';
+    topbar.insertBefore(badge, topbar.firstChild);
+    loadGameHistory();
+    updateHistoryBadge();
+  }
+}
+
+// Auto-init
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => { injectPFBadge(); initProvablyFair(); });
+  document.addEventListener('DOMContentLoaded', () => { injectPFBadge(); injectHistBadge(); initProvablyFair(); });
 } else {
-  injectPFBadge(); initProvablyFair();
+  injectPFBadge(); injectHistBadge(); initProvablyFair();
 }
 
 // ---- Haptics ----
@@ -682,6 +781,8 @@ let pfClientSeed = null;
 let pfNonce = 0;
 let pfRevealedSeed = null;
 
+let pfGameName = 'game';  // set by each game template
+
 async function initProvablyFair() {
   try {
     const r = await apiFetch(`${BASE}/api/provably-fair/seed`);
@@ -710,47 +811,93 @@ function showProvablyFairModal() {
   overlay.id = 'pfModal';
   overlay.className = 'modal-overlay';
   overlay.style.display = 'flex';
-  overlay.innerHTML = `<div class="modal-box" id="pfBox"></div>`;
+  overlay.innerHTML = `<div class="modal-box" id="pfBox" style="max-width:420px"></div>`;
   document.body.appendChild(overlay);
   const box = document.getElementById('pfBox');
 
-  const hashShort = pfSeedHash ? pfSeedHash.substring(0, 32) + '...' : '---';
-  const seedShort = pfRevealedSeed ? pfRevealedSeed.substring(0, 32) + '...' : I18N.t('gb_pf_hidden');
+  const hashFull = pfSeedHash || '---';
+  const hashShort = pfSeedHash ? pfSeedHash.substring(0, 16) + '...' + pfSeedHash.substring(pfSeedHash.length - 8) : '---';
+  const clientFull = pfClientSeed || '---';
+  const seedFull = pfRevealedSeed || '';
+  const seedShort = pfRevealedSeed ? pfRevealedSeed.substring(0, 16) + '...' + pfRevealedSeed.substring(pfRevealedSeed.length - 8) : I18N.t('gb_pf_hidden');
+  const gameId = typeof pfGameName !== 'undefined' ? pfGameName : 'game';
+  const gameIcons = {mines:'💣',plinko:'🔵',wheel:'🎡',aviator:'✈️',crash:'🚀',dice:'🎲',snatch:'🎯',lottery:'🎰'};
+  const gameIcon = gameIcons[gameId] || '🎮';
 
   box.innerHTML = `
-    <div class="modal-title">${I18N.t('gb_pf_title')}</div>
-    <div class="modal-subtitle">${I18N.t('gb_pf_subtitle')}</div>
-    <div style="background:var(--surface-2);border-radius:8px;padding:10px;margin:6px 0">
-      <div style="font-size:10px;color:var(--muted);margin-bottom:4px">${I18N.t('gb_pf_hash_lbl')}</div>
-      <code style="font-size:11px;color:var(--gold);word-break:break-all">${hashShort}</code>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 16px 12px;border-bottom:1px solid var(--border)">
+      <div>
+        <div style="font-size:16px;font-weight:700;color:var(--text)">${gameIcon} ${I18N.t('gb_pf_title')}</div>
+        <div style="font-size:11px;color:var(--muted)">${I18N.t('gb_pf_subtitle')}</div>
+      </div>
+      <button onclick="document.getElementById('pfModal').remove()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px">✕</button>
     </div>
-    <div style="background:var(--surface-2);border-radius:8px;padding:10px;margin:6px 0">
-      <div style="font-size:10px;color:var(--muted);margin-bottom:4px">${I18N.t('gb_pf_client_lbl')}</div>
-      <code style="font-size:12px;color:var(--cyan)">${pfClientSeed || '---'}</code>
+
+    <div style="padding:12px 16px">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
+        <span style="font-size:10px;color:var(--muted)">الخطوة 1</span>
+        <div style="flex:1;height:1px;background:var(--border)"></div>
+        <span style="font-size:10px;color:var(--muted)">قبل الجولة</span>
+      </div>
+      <div style="background:var(--surface-2);border-radius:10px;padding:10px;margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:10px;color:var(--muted)">🔐 Server Seed Hash</span>
+          <button onclick="navigator.clipboard.writeText('${hashFull}');showToast('تم النسخ','info')" style="font-size:9px;color:var(--cyan);background:rgba(0,231,229,0.1);border:none;border-radius:4px;padding:2px 6px;cursor:pointer">📋 نسخ</button>
+        </div>
+        <code style="font-size:11px;color:var(--gold);word-break:break-all;display:block;margin-top:4px">${hashShort}</code>
+      </div>
+      <div style="background:var(--surface-2);border-radius:10px;padding:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:10px;color:var(--muted)">🔑 Client Seed</span>
+          <button onclick="navigator.clipboard.writeText('${clientFull}');showToast('تم النسخ','info')" style="font-size:9px;color:var(--cyan);background:rgba(0,231,229,0.1);border:none;border-radius:4px;padding:2px 6px;cursor:pointer">📋 نسخ</button>
+        </div>
+        <code style="font-size:11px;color:var(--cyan);word-break:break-all;display:block;margin-top:4px">${clientFull}</code>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:6px;margin:12px 0 10px">
+        <span style="font-size:10px;color:var(--muted)">الخطوة 2</span>
+        <div style="flex:1;height:1px;background:var(--border)"></div>
+        <span style="font-size:10px;color:var(--muted)">توليد النتيجة</span>
+      </div>
+      <div style="background:var(--surface-2);border-radius:10px;padding:10px">
+        <div style="font-size:10px;color:var(--muted)">🎲 Nonce ( rolls )</div>
+        <code style="font-size:18px;color:var(--green);font-weight:700;display:block;margin-top:4px">${pfNonce}</code>
+        <div style="font-size:9px;color:var(--muted);margin-top:4px">HMAC-SHA256(server_seed, client_seed:${pfNonce})</div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:6px;margin:12px 0 10px">
+        <span style="font-size:10px;color:var(--muted)">الخطوة 3</span>
+        <div style="flex:1;height:1px;background:var(--border)"></div>
+        <span style="font-size:10px;color:var(--muted)">كشف النتيجة</span>
+      </div>
+      <div style="background:var(--surface-2);border-radius:10px;padding:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:10px;color:var(--muted)">🔓 Server Seed</span>
+          ${pfRevealedSeed ? '<button onclick="navigator.clipboard.writeText(\'' + seedFull + '\');showToast(\'تم النسخ\',\'info\')" style="font-size:9px;color:var(--cyan);background:rgba(0,231,229,0.1);border:none;border-radius:4px;padding:2px 6px;cursor:pointer">📋 نسخ</button>' : ''}
+        </div>
+        <code style="font-size:11px;color:${pfRevealedSeed ? 'var(--green)' : 'var(--muted)'};word-break:break-all;display:block;margin-top:4px">${seedShort}</code>
+      </div>
+
+      ${pfRevealedSeed ? `
+      <div style="background:rgba(0,231,1,0.08);border:1px solid rgba(0,231,1,0.3);border-radius:10px;padding:10px;margin-top:10px">
+        <div style="font-size:11px;color:var(--green);font-weight:600;text-align:center">✅ يمكنك التحقق من النتيجة</div>
+        <div style="font-size:10px;color:var(--muted);text-align:center;margin-top:4px">SHA256(server_seed) = seed_hash</div>
+        <button class="modal-btn-primary" style="width:100%;margin-top:8px" onclick="verifyPF()">${I18N.t('gb_pf_verify_btn')}</button>
+      </div>
+      ` : `
+      <div style="font-size:11px;color:var(--muted);text-align:center;padding:10px;background:var(--surface-2);border-radius:10px;margin-top:10px">
+        ⏳ ${I18N.t('gb_pf_reveal_note')}
+      </div>
+      `}
+
+      <div style="font-size:9px;color:var(--muted);text-align:center;margin-top:12px;line-height:1.6;padding:8px;background:var(--surface-2);border-radius:8px">
+        🔐 HMAC-SHA256 يضمن عدم التلاعب بالنتيجة<br>
+        لا يمكن للخادم تغيير النتيجة بعد إرسال الـ seed hash
+      </div>
     </div>
-    <div style="background:var(--surface-2);border-radius:8px;padding:10px;margin:6px 0">
-      <div style="font-size:10px;color:var(--muted);margin-bottom:4px">${I18N.t('gb_pf_nonce_lbl')}</div>
-      <code style="font-size:14px;color:var(--green)">${pfNonce}</code>
+    <div style="padding:8px 16px 16px">
+      <button class="modal-btn-secondary" style="width:100%" onclick="document.getElementById('pfModal').remove()">${I18N.t('close')}</button>
     </div>
-    <div style="background:var(--surface-2);border-radius:8px;padding:10px;margin:6px 0">
-      <div style="font-size:10px;color:var(--muted);margin-bottom:4px">${I18N.t('gb_pf_revealed_lbl')}</div>
-      <code style="font-size:11px;color:${pfRevealedSeed ? 'var(--green)' : 'var(--muted)'};word-break:break-all">${seedShort}</code>
-    </div>
-    ${pfRevealedSeed ? `
-    <div style="background:rgba(0,231,1,0.08);border:1px solid rgba(0,231,1,0.3);border-radius:8px;padding:8px;margin:6px 0;text-align:center">
-      <div style="font-size:11px;color:var(--green)">${I18N.t('gb_pf_can_verify')}</div>
-      <div style="font-size:10px;color:var(--muted);margin-top:4px">SHA256(server_seed) = seed_hash</div>
-    </div>
-    <button class="modal-btn-primary" onclick="verifyPF()">${I18N.t('gb_pf_verify_btn')}</button>
-    ` : `
-    <div style="font-size:11px;color:var(--muted);text-align:center;padding:8px">
-      ${I18N.t('gb_pf_reveal_note')}
-    </div>
-    `}
-    <div style="font-size:10px;color:var(--muted);text-align:center;margin-top:8px;line-height:1.5">
-      ${I18N.t('gb_pf_footer')}
-    </div>
-    <button class="modal-btn-secondary" onclick="document.getElementById('pfModal').remove()">${I18N.t('close')}</button>
   `;
 }
 
@@ -773,14 +920,26 @@ async function verifyPF() {
     if (d.valid) {
       const box = document.getElementById('pfBox');
       box.innerHTML = `
-        <div class="modal-title">${I18N.t('gb_pf_verified_title')}</div>
-        <div style="background:rgba(0,231,1,0.08);border:1px solid rgba(0,231,1,0.3);border-radius:8px;padding:12px;margin:8px 0;text-align:center">
-          <div style="font-size:28px">✅</div>
-          <div style="font-size:13px;color:var(--green);font-weight:700">${I18N.t('gb_pf_result_ok')}</div>
-          <div style="font-size:11px;color:var(--muted);margin-top:4px">SHA256 matched ✓</div>
-          <div style="font-size:11px;color:var(--muted)">Results: ${d.results.join(', ')}</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 16px 12px;border-bottom:1px solid var(--border)">
+          <div style="font-size:16px;font-weight:700;color:var(--green)">✅ تم التحقق بنجاح</div>
+          <button onclick="document.getElementById('pfModal').remove()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px">✕</button>
         </div>
-        <button class="modal-btn-secondary" onclick="document.getElementById('pfModal').remove()">${I18N.t('close')}</button>
+        <div style="padding:16px">
+          <div style="text-align:center;padding:16px;background:rgba(0,231,1,0.08);border:1px solid rgba(0,231,1,0.3);border-radius:12px">
+            <div style="font-size:32px;margin-bottom:8px">✅</div>
+            <div style="font-size:14px;color:var(--green);font-weight:700">النتيجة صحيحة!</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:4px">SHA256 تطابق ✓</div>
+          </div>
+          <div style="margin-top:12px;background:var(--surface-2);border-radius:10px;padding:10px">
+            <div style="font-size:10px;color:var(--muted);margin-bottom:6px">التحقق خطوة بخطوة:</div>
+            <div style="font-size:10px;color:var(--text);line-height:1.8">
+              <div>1. SHA256(server_seed) = <span style="color:var(--green)">✓</span></div>
+              <div>2. HMAC-SHA256(server_seed, client_seed:nonce)</div>
+              <div>3. النتائج: <span style="color:var(--gold)">${d.results.join(', ')}</span></div>
+            </div>
+          </div>
+          <button class="modal-btn-secondary" style="width:100%;margin-top:12px" onclick="document.getElementById('pfModal').remove()">${I18N.t('close')}</button>
+        </div>
       `;
       soundWin();
     } else {

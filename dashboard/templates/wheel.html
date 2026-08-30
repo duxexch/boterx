@@ -105,6 +105,7 @@ html,body{margin:0;padding:0;height:100%;touch-action:manipulation;user-select:n
 <script src="/static/js/game-base.js?v=20260819b"></script>
 <script>
 'use strict';
+pfGameName='wheel';
 var canvas = document.getElementById('wheelCanvas');
 var ctx = canvas.getContext('2d');
 var spinning = false;
@@ -340,6 +341,10 @@ function showResult(seg, payout, bet, mult){
   }
   multEl.classList.add('show'); subEl.classList.add('show');
   loadBalance(); // Real-time balance update
+  if(typeof addGameRound==='function'){
+    var isWin = seg.mult > 1.0;
+    addGameRound({game:'wheel',bet:bet||0,payout:payout||0,multiplier:mult||seg.mult,result:isWin?'win':'lose'});
+  }
 }
 
 function fmtAmount(n){ return parseFloat(n||0).toLocaleString(); }

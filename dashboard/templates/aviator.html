@@ -155,6 +155,7 @@
 <script src="/static/js/game-base.js?v=20260819b"></script>
 <script>
 'use strict';
+pfGameName='aviator';
 var canvas=document.getElementById('canvas'),ctx=canvas.getContext('2d');
 var roundPhase='connecting',currentMult=1.0,crashPoint=0;
 var pollTimer=null,animF=null,_flyStartT=0,trail=[];
@@ -442,6 +443,9 @@ function doJump(s){
   soundCashOut();haptic('medium');fireConfetti(document.getElementById('gameArea'));
   if(currentMult>=3)showBigWin(pay,currentMult);
   sessionW++;sessionPL+=pay-bets[s].amt;updateSessionStats();
+  if(typeof addGameRound==='function'){
+    addGameRound({game:'aviator',bet:bets[s].amt,payout:pay,multiplier:currentMult,result:'win'});
+  }
   // باراشوت مع المبلغ يتحرك للأسفل
   spawnParachuteWithMoney(planeX,planeY,pay);
   var req='c'+s+'_'+Date.now()+'_'+Math.random().toString(36).substr(2,6);

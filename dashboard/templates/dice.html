@@ -44,8 +44,12 @@
 .num-btn.selected{border-color:#7eff9a;background:linear-gradient(135deg,#0d7a1f,#1a8a2e);color:#fff;box-shadow:0 0 20px rgba(0,231,1,.4),inset 0 0 10px rgba(255,255,255,.1)}
 .num-btn .num-label{position:absolute;bottom:2px;font-size:9px;font-weight:700;opacity:.7}
 .num-btn.selected .num-label{opacity:1;color:#7eff9a}
-.bet-row{display:flex;gap:6px;align-items:center}
-.bet-input{flex:1;background:var(--bg);border:2px solid var(--border);border-radius:8px;padding:8px;color:var(--text);font-size:16px;font-weight:700;text-align:center;outline:none;font-family:'Courier New',monospace}
+.bet-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.bet-actions{display:flex;gap:3px}
+.bet-action-btn{padding:6px 10px;border-radius:6px;background:var(--surface-3);border:1px solid var(--border);color:var(--muted);font-size:11px;font-weight:800;cursor:pointer;transition:all .1s}
+.bet-action-btn:active{transform:scale(.9)}
+.bet-action-btn.bet-max-btn{background:rgba(251,191,36,.1);color:var(--gold);border-color:rgba(251,191,36,.3)}
+.bet-input{flex:1;min-width:60px;background:var(--bg);border:2px solid var(--border);border-radius:8px;padding:8px;color:var(--text);font-size:16px;font-weight:700;text-align:center;outline:none;font-family:'Courier New',monospace}
 .bet-input:focus{border-color:#7eff9a}
 .quick-bets{display:flex;gap:3px;flex-wrap:wrap}
 .qb{padding:4px 8px;border-radius:6px;background:var(--surface-3);border:1px solid var(--border);color:var(--muted);font-size:10px;font-weight:700;cursor:pointer;transition:all .1s}
@@ -136,6 +140,11 @@
       <div class="x-picker" id="xPicker"></div>
     </div>
     <div class="bet-row">
+      <div class="bet-actions">
+        <button class="bet-action-btn" onclick="halfBet()" title="نصف">½</button>
+        <button class="bet-action-btn" onclick="doubleBet()" title="ضعف">2×</button>
+        <button class="bet-action-btn bet-max-btn" onclick="maxBet()" title="أقصى رهان">MAX</button>
+      </div>
       <input type="number" class="bet-input" id="betAmount" value="10" min="1" placeholder="المبلغ" data-i18n-ph="x052">
       <div class="quick-bets">
         <div class="qb" onclick="setBet(10)">10</div>
@@ -157,8 +166,10 @@
         <option value="5">5 رميات</option>
         <option value="10" selected>10 رميات</option>
         <option value="25">25 رمية</option>
+        <option value="50">50 رمية</option>
       </select>
       <label class="auto-stop"><input type="checkbox" id="autoStopWin"> ⏹ عند الربح</label>
+      <label class="auto-stop"><input type="checkbox" id="autoStopLoss"> ⏹ عند الخسارة <input type="number" id="autoLossLimit" value="100" min="1" style="width:60px;background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:2px 4px;font-size:10px;margin:0 4px"> </label>
     </div>
     <button class="roll-btn idle" id="rollBtn" onclick="onRoll()" data-i18n="x034">ارمِ النرد 🎲</button>
   </div>
@@ -175,6 +186,8 @@ var predictedNum=0,selectedX=5.0,power=50,isRolling=false,isRequesting=false;
 var betMode='exact';
 var autoRunning=false,autoRemaining=0;
 var sessionW=0,sessionL=0,sessionPL=0;
+var autoSessionPL=0;
+pfGameName='dice';
 var diceX=0,diceY=0,diceRotX=0,diceRotY=0,diceRotZ=0,diceVX=0,diceVY=0,diceVRot=0;
 var diceScale=1,diceBounces=0,animF=null;
 var histTimer=null;
@@ -243,23 +256,51 @@ document.addEventListener('input',function(e){
 
 function setBet(v){document.getElementById('betAmount').value=v;updatePotential()}
 
+function halfBet(){
+  var inp=document.getElementById('betAmount');
+  var v=parseFloat(inp.value)||0;
+  inp.value=Math.max(1,Math.floor(v/2));
+  updatePotential();
+}
+function doubleBet(){
+  var inp=document.getElementById('betAmount');
+  var v=parseFloat(inp.value)||0;
+  inp.value=Math.min(100000,v*2);
+  updatePotential();
+}
+function maxBet(){
+  var bal=parseFloat(document.getElementById('bal')?.textContent?.replace(/,/g,''))||0;
+  var inp=document.getElementById('betAmount');
+  inp.value=Math.max(1,Math.floor(bal));
+  updatePotential();
+}
+
 // ── Auto-roll ──
 function toggleAuto(){
   autoRunning=!autoRunning;
   var t=document.getElementById('autoToggle');
   if(autoRunning){
+    autoSessionPL=0;
     autoRemaining=parseInt(document.getElementById('autoCount').value)||10;
     t.classList.add('on');t.textContent='⏹ إيقاف التلقائي';
     if(!isRolling&&!isRequesting)onRoll();
   }else{
     t.classList.remove('on');t.textContent='🤖 تلقائي: إيقاف';
     autoRemaining=0;
+    autoSessionPL=0;
   }
 }
+var autoSessionPL=0;
 function autoNext(d){
   if(!autoRunning||autoRemaining<=0)return;
   var stopWin=document.getElementById('autoStopWin').checked;
-  if(stopWin&&d&&d.won){toggleAuto();return}
+  var stopLoss=document.getElementById('autoStopLoss').checked;
+  var lossLimit=parseFloat(document.getElementById('autoLossLimit').value)||100;
+  if(d){
+    autoSessionPL+=(d.payout||0)-(d.bet||0);
+    if(stopWin&&d.won){toggleAuto();return}
+    if(stopLoss&&autoSessionPL<=-lossLimit){toggleAuto();showToast('⏹ تم الإيقاف: وصلت حد الخسارة','error');return}
+  }
   setTimeout(function(){if(autoRunning&&!isRolling&&!isRequesting)onRoll()},600);
 }
 
@@ -684,6 +725,14 @@ function showResult(d){
   disp.classList.add('show');
   setTimeout(function(){disp.classList.remove('show')},3000);
   updateSessionStats();loadBalance();
+
+  // Track in game history for shared history panel
+  if(typeof addGameRound==='function'){
+    addGameRound({game:'dice',bet:betAmt,payout:d.payout||0,multiplier:d.multiplier,result:d.won?'win':'lose',
+      pf_session_id:d.pf_session_id,pf_seed_hash:d.pf_seed_hash});
+  }
+  // Update PF badge with this round's data
+  if(d.pf_seed_hash){pfSeedHash=d.pf_seed_hash;pfNonce=d.pf_nonce||0;pfRevealedSeed=d.pf_server_seed;pfClientSeed=d.pf_client_seed;updatePFBadge()}
 }
 
 function updateSessionStats(){

@@ -121,8 +121,9 @@ html,body{width:100%;height:100%;overflow:hidden;touch-action:manipulation;backg
     </div>
     <div class="controls-mid">
       <button class="ctrl-btn" onclick="adjBet(0.5)">½</button>
-      <input class="bet-inp" type="number" id="betInp" value="10" min="1">
       <button class="ctrl-btn" onclick="adjBet(2)">2×</button>
+      <button class="ctrl-btn" style="color:var(--gold)" onclick="maxBetPlinko()">MAX</button>
+      <input class="bet-inp" type="number" id="betInp" value="10" min="1">
       <div class="auto-section"><span class="auto-label">🔁</span><input class="auto-inp" type="number" id="autoCount" value="1" min="1" max="100"></div>
     </div>
     <div class="drop-btn-wrap">
@@ -145,6 +146,7 @@ html,body{width:100%;height:100%;overflow:hidden;touch-action:manipulation;backg
 
 var cv = document.getElementById('plinkoCanvas');
 var ctx = cv.getContext('2d');
+pfGameName='plinko';
 var gameArea = document.getElementById('gameArea');
 
 var W = 0, H = 0, DPR = 1;
@@ -177,6 +179,7 @@ function sndJackpot(){[392,523,659,784,1047,1319,1568].forEach(function(f,i){set
 function fmtA(n){return parseFloat(n||0).toLocaleString()}
 
 function adjBet(f){var i=document.getElementById('betInp');i.value=Math.max(1,Math.floor((parseFloat(i.value)||10)*f))}
+function maxBetPlinko(){var bal=parseFloat(document.getElementById('bal')?.textContent?.replace(/,/g,''))||0;document.getElementById('betInp').value=Math.max(1,Math.floor(bal))}
 function setRows(r){if(dropping)return;rows=r;document.querySelectorAll('.opt-btn').forEach(function(b){if(b.id&&b.id.startsWith('r'))b.classList.remove('active')});var rb=document.getElementById('r'+r);if(rb)rb.classList.add('active');initBoard()}
 function setRisk(r){if(dropping)return;risk=r;document.querySelectorAll('.opt-btn').forEach(function(b){if(b.id&&b.id.startsWith('rk'))b.classList.remove('active')});var rk=document.getElementById('rk'+r.charAt(0).toUpperCase());if(rk)rk.classList.add('active');initBoard()}
 
@@ -488,6 +491,9 @@ function showResult(mult,payout,bet){
   }else if(mult>=2){sndWin(mult);haptic('medium')}
   else if(mult>=1){sndWin(mult)}
   else{sndLose();haptic('light')}
+  if(typeof addGameRound==='function'){
+    addGameRound({game:'plinko',bet:bet||0,payout:payout||0,multiplier:mult,result:mult>=1?'win':'lose'});
+  }
   var ac=parseInt(document.getElementById('autoCount').value)||1;
   if(ac>1){document.getElementById('autoCount').value=ac-1;setTimeout(function(){dropBall(50)},1000)}
 }

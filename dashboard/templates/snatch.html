@@ -88,6 +88,7 @@
 <script src="/static/js/game-base.js?v=20260819b"></script>
 <script>
 'use strict';
+pfGameName='snatch';
 var canvas = document.getElementById('gameCanvas');
 var ctx = canvas.getContext('2d');
 var gameRunning = false;
@@ -200,6 +201,9 @@ function startGame() {
           + ' + بونص مهارة: <b style="color:#00e701">+' + fmtAmount(payout - d.base_payout) + '</b>'
           + ' (نقاط: ' + (d.score || 0) + ')';
         if (payoutEl && payoutEl.parentNode) payoutEl.parentNode.insertBefore(detail, payoutEl.nextSibling);
+      }
+      if(typeof addGameRound==='function'){
+        addGameRound({game:'snatch',bet:0,payout:payout,multiplier:d.multiplier||0,result:d.won!==false?'win':'lose'});
       }
       loadBalance();
     } else if (d && d.error && /settled|refunded|not found/i.test(d.error)) {

@@ -32,7 +32,7 @@
                 <div class="w-8 h-8 rounded-lg" :class="daemonRunning?'bg-green-500/20':'bg-red-500/20'">
                     <i class="fas fa-server text-sm" :class="daemonRunning?'text-green-400':'text-red-400'"></i>
                 </div>
-                <p class="text-xs text-dim">ال服务 (Daemon)</p>
+                <p class="text-xs text-dim">الخدمة (Daemon)</p>
             </div>
             <p class="text-2xl font-bold" :class="daemonRunning?'text-success':'text-danger'" x-text="daemonRunning?'نشط':'متوقف'"></p>
         </div>
@@ -741,7 +741,7 @@
                         <div class="flex items-center justify-between text-xs py-1.5 px-2 rounded-lg"
                             :class="t.active?'bg-blue-500/10 border border-blue-500/30':'hover:bg-slate-700/30'">
                             <div class="flex-1 min-w-0">
-                                <span class="text-bright text-xs" x-text="t.title || '无标题'"></span>
+                                <span class="text-bright text-xs" x-text="t.title || 'بدون عنوان'"></span>
                                 <p class="text-[10px] text-dim truncate" x-text="t.url"></p>
                             </div>
                             <div class="flex items-center gap-1">

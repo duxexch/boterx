@@ -175,6 +175,7 @@
 <script src="/static/js/game-base.js?v=20260819b"></script>
 <script>
 'use strict';
+pfGameName='crash';
 var canvas=document.getElementById('canvas'),ctx=canvas.getContext('2d');
 var roundPhase='connecting',currentMult=1.0,crashPoint=0;
 var pollTimer=null,animF=null,_flyStartT=0,trail=[];
@@ -415,11 +416,16 @@ function onCrashed(d){
       setBtnCrash('crash-done','✓ '+payout.toFixed(0));
       showRecovery(I18N.t('y148')+crashBet.target.toFixed(1)+'x','+'+payout.toFixed(0),'#00e701');
       spawnParachuteWithMoney(rocketX,rocketY,payout);fireConfetti(document.getElementById('gameArea'));soundCashOut();
+      if(typeof addGameRound==='function')addGameRound({game:'crash',bet:crashBet.amt,payout:payout,multiplier:crashBet.target,result:'win'});
     } else {
       var drain=(cm-crashBet.target)/crashBet.target*0.5;
       var remaining=Math.max(0,crashBet.amt*(1-drain));
-      if(remaining>0){crashBet.st='done';sessionW++;sessionPL+=remaining-crashBet.amt;setBtnCrash('crash-done','✓ '+remaining.toFixed(0));showRecovery(I18N.t('y119'),I18N.t('y023')+remaining.toFixed(0),'#00e701');}
-      else{crashBet.st='lost';sessionL++;sessionPL-=crashBet.amt;setBtnCrash('crash-done',I18N.t('y146'));showRecovery(I18N.t('y157'),'','#ff4757');}
+      if(remaining>0){crashBet.st='done';sessionW++;sessionPL+=remaining-crashBet.amt;setBtnCrash('crash-done','✓ '+remaining.toFixed(0));showRecovery(I18N.t('y119'),I18N.t('y023')+remaining.toFixed(0),'#00e701');
+        if(typeof addGameRound==='function')addGameRound({game:'crash',bet:crashBet.amt,payout:remaining,multiplier:crashBet.target,result:'win'});
+      }
+      else{crashBet.st='lost';sessionL++;sessionPL-=crashBet.amt;setBtnCrash('crash-done',I18N.t('y146'));showRecovery(I18N.t('y157'),'','#ff4757');
+        if(typeof addGameRound==='function')addGameRound({game:'crash',bet:crashBet.amt,payout:0,multiplier:0,result:'lose'});
+      }
     }
   }
   if(crashBet.st!=='queued'){crashBet={st:'idle',amt:0,target:0,req:''};}
@@ -511,6 +517,7 @@ function doExit(){
       msg.textContent='✅ +'+pay.toFixed(2)+' @ '+d.multiplier.toFixed(2)+'x';
       msg.style.color='var(--gold)';msg.classList.add('show');
       soundCashOut();haptic('medium');fireConfetti(document.getElementById('gameArea'));spawnParachuteWithMoney(rocketX,rocketY,pay);
+      if(typeof addGameRound==='function')addGameRound({game:'crash',bet:crashBet.amt,payout:pay,multiplier:d.multiplier||0,result:'win'});
     } else {setBtnCrash('crash-done','💥');}
   }).catch(function(){setBtnCrash('crash-done','💥')});
 }
