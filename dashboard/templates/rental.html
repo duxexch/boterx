@@ -35,6 +35,16 @@
         :class="tab==='admins'?'bg-blue-500 text-white':'bg-slate-800 text-slate-300 hover:bg-slate-700'">
         <i class="fas fa-users-cog"></i> المسؤولين
       </button>
+      <button @click="tab='payments';loadPaymentMethods()" class="px-4 py-2.5 rounded-xl text-sm font-bold transition relative"
+        :class="tab==='payments'?'bg-blue-500 text-white':'bg-slate-800 text-slate-300 hover:bg-slate-700'">
+        <i class="fas fa-credit-card"></i> وسائل الدفع
+        <span x-show="pendingCount>0" class="absolute -top-1 -left-1 bg-red-500 text-white text-[9px] font-bold rounded-full w-5 h-5 flex items-center justify-center" x-text="pendingCount"></span>
+      </button>
+      <button @click="tab='transactions';loadAllTransactions()" class="px-4 py-2.5 rounded-xl text-sm font-bold transition relative"
+        :class="tab==='transactions'?'bg-blue-500 text-white':'bg-slate-800 text-slate-300 hover:bg-slate-700'">
+        <i class="fas fa-exchange-alt"></i> المعاملات
+        <span x-show="pendingCount>0" class="absolute -top-1 -left-1 bg-red-500 text-white text-[9px] font-bold rounded-full w-5 h-5 flex items-center justify-center" x-text="pendingCount"></span>
+      </button>
     </div>
   </div>
 
@@ -431,6 +441,129 @@
     </div>
   </div>
 
+  <!-- ═══════════════════════════════════════════════════════════════ TAB: PAYMENT METHODS -->
+  <div x-show="tab==='payments'">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-lg font-bold text-slate-100">💳 وسائل الدفع المتاحة</h2>
+      <button @click="showAddPM=true;pmForm={name:'',pm_type:'bank_transfer',account_number:'',bank_name:'',holder_name:''}" class="bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-bold px-4 py-2 rounded-xl text-sm">
+        <i class="fas fa-plus"></i> إضافة وسيلة دفع
+      </button>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <template x-for="pm in paymentMethods" :key="pm.id">
+        <div class="bg-slate-800/60 border rounded-2xl p-5" :class="pm.status==='active'?'border-emerald-500/30':'border-slate-700 opacity-60'">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+              <span class="text-2xl" x-text="pm.pm_type==='bank_transfer'?'🏦':pm.pm_type==='vodafone_cash'?'📱':pm.pm_type==='usdt'?'💵':'💰'"></span>
+              <div>
+                <p class="text-sm font-bold text-slate-100" x-text="pm.name"></p>
+                <p class="text-[10px] text-slate-400" x-text="pm.pm_type==='bank_transfer'?'تحويل بنكي':pm.pm_type==='vodafone_cash'?'فودافون كاش':'USDT'"></p>
+              </div>
+            </div>
+            <div class="flex gap-1">
+              <button @click="togglePMStatus(pm)" class="w-7 h-7 rounded-lg flex items-center justify-center text-xs transition"
+                :class="pm.status==='active'?'bg-emerald-500/20 text-emerald-400':'bg-slate-600/20 text-slate-400'"
+                :title="pm.status==='active'?'تعطيل':'تفعيل'">
+                <i :class="pm.status==='active'?'fas fa-check':'fas fa-ban'"></i>
+              </button>
+              <button @click="deletePM(pm)" class="w-7 h-7 rounded-lg bg-red-500/20 text-red-400 flex items-center justify-center text-xs" title="حذف">
+                <i class="fas fa-trash"></i>
+              </button>
+            </div>
+          </div>
+          <div class="bg-slate-900/60 rounded-xl p-3 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] text-slate-500">رقم الحساب</span>
+              <div class="flex items-center gap-2">
+                <span class="text-sm font-mono text-emerald-400" x-text="pm.account_number"></span>
+                <button @click="copyText(pm.account_number)" class="text-slate-400 hover:text-emerald-400 text-xs" title="نسخ"><i class="fas fa-copy"></i></button>
+              </div>
+            </div>
+            <div x-show="pm.bank_name" class="flex items-center justify-between">
+              <span class="text-[10px] text-slate-500">البنك</span>
+              <span class="text-xs text-slate-300" x-text="pm.bank_name"></span>
+            </div>
+            <div x-show="pm.holder_name" class="flex items-center justify-between">
+              <span class="text-[10px] text-slate-500">اسم الحساب</span>
+              <span class="text-xs text-slate-300" x-text="pm.holder_name"></span>
+            </div>
+          </div>
+        </div>
+      </template>
+      <div x-show="paymentMethods.length===0" class="col-span-3 text-center py-12 text-slate-500">
+        <i class="fas fa-credit-card text-4xl mb-3 block"></i>
+        <p>لا توجد وسائل دفع مضافة</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════ TAB: TRANSACTIONS -->
+  <div x-show="tab==='transactions'">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-lg font-bold text-slate-100">🔄 طلبات الإيداع والسحب</h2>
+      <div class="flex gap-2">
+        <select x-model="txFilter" @change="loadAllTransactions()" class="bg-slate-800 border border-slate-600 rounded-xl px-3 py-2 text-slate-300 text-sm">
+          <option value="">الكل</option><option value="pending">معلق</option><option value="approved">مقبول</option><option value="rejected">مرفوض</option>
+        </select>
+        <select x-model="txTypeFilter" @change="loadAllTransactions()" class="bg-slate-800 border border-slate-600 rounded-xl px-3 py-2 text-slate-300 text-sm">
+          <option value="">الكل</option><option value="deposit">إيداع</option><option value="withdraw">سحب</option>
+        </select>
+      </div>
+    </div>
+    <!-- Pending Banner -->
+    <div x-show="pendingCount>0" class="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 mb-4 flex items-center gap-3">
+      <span class="text-2xl">⚠️</span>
+      <div>
+        <p class="text-sm font-bold text-amber-400" x-text="pendingCount+' طلبات معلقة تحتاج مراجعتك'"></p>
+        <p class="text-xs text-slate-400">راجع طلبات الإيداع والسحب وقم بالقرار المناسب</p>
+      </div>
+    </div>
+    <!-- Transactions Table -->
+    <div class="bg-slate-800/60 border border-slate-700 rounded-2xl overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead><tr class="text-slate-400 text-xs border-b border-slate-700">
+            <th class="px-4 py-3 text-right">التاريخ</th><th class="px-4 py-3 text-right">العميل</th>
+            <th class="px-4 py-3 text-right">النوع</th><th class="px-4 py-3 text-right">المبلغ</th>
+            <th class="px-4 py-3 text-right">الوسيلة</th><th class="px-4 py-3 text-right">الحالة</th>
+            <th class="px-4 py-3 text-right">إجراءات</th>
+          </tr></thead>
+          <tbody>
+            <template x-for="tx in allTransactions" :key="tx.id">
+              <tr class="border-b border-slate-700/50 hover:bg-slate-700/20">
+                <td class="px-4 py-3 text-slate-300 text-xs" x-text="tx.created_at"></td>
+                <td class="px-4 py-3 text-slate-100 font-bold">
+                  <span x-text="tx.client_name||tx.client_id"></span>
+                </td>
+                <td class="px-4 py-3">
+                  <span class="px-2 py-1 rounded-lg text-[10px] font-bold" :class="tx.type==='deposit'?'bg-emerald-500/20 text-emerald-400':'bg-red-500/20 text-red-400'" x-text="tx.type==='deposit'?'💰 إيداع':'💸 سحب'"></span>
+                </td>
+                <td class="px-4 py-3 text-slate-100 font-bold" x-text="fmtMoney(tx.amount)"></td>
+                <td class="px-4 py-3 text-slate-300 text-xs" x-text="tx.method||'—'"></td>
+                <td class="px-4 py-3">
+                  <span class="px-2 py-1 rounded-lg text-[10px] font-bold"
+                    :class="tx.status==='pending'?'bg-amber-500/20 text-amber-400':tx.status==='approved'?'bg-emerald-500/20 text-emerald-400':'bg-red-500/20 text-red-400'"
+                    x-text="tx.status==='pending'?'⏳ معلق':tx.status==='approved'?'✅ مقبول':'❌ مرفوض'"></span>
+                </td>
+                <td class="px-4 py-3" x-show="tx.status==='pending'">
+                  <div class="flex gap-1">
+                    <button @click="processTx(tx,'approved')" class="px-2 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 text-[10px] font-bold hover:bg-emerald-500/30">✓ قبول</button>
+                    <button @click="processTx(tx,'rejected')" class="px-2 py-1 rounded-lg bg-red-500/20 text-red-400 text-[10px] font-bold hover:bg-red-500/30">✕ رفض</button>
+                  </div>
+                </td>
+                <td class="px-4 py-3 text-slate-500 text-xs" x-show="tx.status!=='pending'" x-text="tx.processed_at||'—'"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+        <div x-show="allTransactions.length===0" class="text-center py-12 text-slate-500">
+          <i class="fas fa-exchange-alt text-4xl mb-3 block"></i>
+          <p>لا توجد معاملات</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ═══════════════════════════════════════════════════════════════ MODALS -->
 
   <!-- Add/Edit Client Modal -->
@@ -583,6 +716,49 @@
     </div>
   </div>
 
+  <!-- Add Payment Method Modal -->
+  <div x-show="showAddPM" x-cloak class="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" style="display:none">
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-md p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-bold text-slate-100">💳 إضافة وسيلة دفع جديدة</h3>
+        <button @click="showAddPM=false" class="text-slate-400 hover:text-slate-200">✕</button>
+      </div>
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs font-bold text-slate-400 mb-1">اسم الوسيلة *</label>
+          <input x-model="pmForm.name" placeholder="مثال: حساب بنك الأهلي" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm outline-none focus:border-emerald-500">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-400 mb-1">نوع الوسيلة *</label>
+          <select x-model="pmForm.pm_type" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm outline-none focus:border-emerald-500">
+            <option value="bank_transfer">🏦 تحويل بنكي</option>
+            <option value="vodafone_cash">📱 فودافون كاش</option>
+            <option value="usdt">💵 USDT</option>
+            <option value="instapay">⚡ InstaPay</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-400 mb-1">رقم الحساب / المحفظة *</label>
+          <input x-model="pmForm.account_number" dir="ltr" placeholder="رقم الحساب أو العنوان" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm outline-none focus:border-emerald-500 font-mono">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-400 mb-1">اسم البنك / الخدمة</label>
+          <input x-model="pmForm.bank_name" placeholder="مثال: البنك الأهلي المصري" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm outline-none focus:border-emerald-500">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-400 mb-1">اسم صاحب الحساب</label>
+          <input x-model="pmForm.holder_name" placeholder="اسم المستخدم" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-100 text-sm outline-none focus:border-emerald-500">
+        </div>
+      </div>
+      <div class="flex justify-end gap-3 mt-5">
+        <button @click="showAddPM=false" class="px-4 py-2 rounded-xl text-slate-300 border border-slate-600 text-sm">إلغاء</button>
+        <button @click="savePM()" class="px-5 py-2 rounded-xl bg-emerald-500 text-slate-900 font-bold text-sm">
+          <i class="fas fa-save"></i> حفظ
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Delete Confirm Modal -->
   <div x-show="showDelete" x-cloak class="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" style="display:none">
     <div class="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-sm p-6 text-center">
@@ -626,6 +802,11 @@ function rentalSystem() {
       {key:'admins',label:'المسؤولين'},{key:'settings',label:'الإعدادات'},{key:'backup',label:'النسخ الاحتياطي'},{key:'themes',label:'الثيمات'},
     ],
 
+    // Payment Methods & Transactions
+    paymentMethods: [], allTransactions: [], pendingCount: 0,
+    showAddPM: false, pmForm: { name: '', pm_type: 'bank_transfer', account_number: '', bank_name: '', holder_name: '' },
+    txFilter: '', txTypeFilter: '',
+
     get filteredClients() {
       return this.clients.filter(c => {
         if (this.filterStatus === 'expired' && !c.expired) return false;
@@ -639,9 +820,13 @@ function rentalSystem() {
       });
     },
 
-    async init() { await this.loadAll(); },
+    async init() { await this.loadAll(); await this.loadPendingCount(); },
     async loadAll() {
       await Promise.all([this.loadClients(), this.loadRevenue()]);
+    },
+    async loadPendingCount() {
+      try { const d = await api('/api/rental/pending-count'); this.pendingCount = d.count||0; } catch(e) {}
+      setInterval(() => { this.loadPendingCount(); }, 30000);
     },
     async loadClients() {
       try {
@@ -759,6 +944,52 @@ function rentalSystem() {
       toast('تم الحفظ','success');
       await this.loadAdmins();
       this.sectionAdmin=null;
+    },
+
+    // ── Payment Methods ──
+    async loadPaymentMethods() {
+      try { const d = await api('/api/rental/payment-methods'); this.paymentMethods = d.methods||[]; } catch(e) {}
+    },
+    async savePM() {
+      if (!this.pmForm.name||!this.pmForm.account_number) { toast('الاسم ورقم الحساب مطلوبان','error'); return; }
+      try {
+        await api('/api/rental/payment-methods',{method:'POST',body:JSON.stringify(this.pmForm)});
+        toast('تمت الإضافة','success'); this.showAddPM=false; await this.loadPaymentMethods();
+      } catch(e) { toast('خطأ: '+e.message,'error'); }
+    },
+    async togglePMStatus(pm) {
+      const newStatus = pm.status==='active'?'inactive':'active';
+      await api('/api/rental/payment-methods/'+pm.id,{method:'PUT',body:JSON.stringify({status:newStatus})});
+      await this.loadPaymentMethods();
+    },
+    async deletePM(pm) {
+      if (!confirm('حذف وسيلة الدفع "'+pm.name+'"؟')) return;
+      await api('/api/rental/payment-methods/'+pm.id,{method:'DELETE'});
+      await this.loadPaymentMethods();
+    },
+    copyText(text) {
+      navigator.clipboard.writeText(text).then(()=>toast('تم النسخ','success')).catch(()=>{});
+    },
+
+    // ── Transactions ──
+    async loadAllTransactions() {
+      try {
+        let url = '/api/rental/all-transactions';
+        const params = [];
+        if (this.txFilter) params.push('status='+this.txFilter);
+        if (this.txTypeFilter) params.push('type='+this.txTypeFilter);
+        if (params.length) url += '?' + params.join('&');
+        const d = await api(url); this.allTransactions = d.transactions||[];
+      } catch(e) {}
+    },
+    async processTx(tx, action) {
+      const label = action==='approved'?'قبول':'رفض';
+      if (!confirm(label+' طلب '+tx.type+' بقيمة '+this.fmtMoney(tx.amount)+'؟')) return;
+      try {
+        await api('/api/rental/transactions/'+tx.client_id+'/'+tx.id,{method:'POST',body:JSON.stringify({action})});
+        toast('تم '+label,'success');
+        await this.loadAllTransactions(); await this.loadPendingCount();
+      } catch(e) { toast('خطأ: '+e.message,'error'); }
     },
 
     // ── Helpers ──

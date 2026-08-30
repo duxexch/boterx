@@ -38,7 +38,7 @@ CLIENT_FIELDS = [
     'features', 'admin_ids',
     'subscription_start', 'subscription_end',
     'status', 'bot_autostart', 'notes', 'created_at', 'last_login',
-    'revenue_share', 'custom_domain',
+    'revenue_share', 'custom_domain', 'balance',
 ]
 
 # ── كتالوج مميزات النظام — يظهر في لوحة الإدارة ويثبَّت في بوت العميل ──
@@ -163,6 +163,8 @@ class ClientManager:
             'created_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
             'last_login': '',
             'revenue_share': str(int(revenue_share or 30)),
+            'custom_domain': '',
+            'balance': '0',
         }
         with _csv_lock:
             rows = self._read_rows()
@@ -329,6 +331,104 @@ class ClientManager:
                 except Exception:
                     pass
         return stopped
+
+    # ──────────────────── نظام المالية (إيداع / سحب / رصيد) ────────────────────
+
+    def get_balance(self, client_id):
+        """جلب رصيد العميل"""
+        c = self.get(client_id)
+        return float(c.get('balance') or 0) if c else 0
+
+    def set_balance(self, client_id, amount):
+        """تحديث رصيد العميل"""
+        with _csv_lock:
+            rows = self._read_rows()
+            for r in rows:
+                if r['id'] == client_id:
+                    r['balance'] = str(round(float(amount), 2))
+                    self._write_rows(rows)
+                    return True
+        return False
+
+    def _tx_file(self, client_id):
+        return os.path.join(self.client_dir(client_id), 'client_transactions.csv')
+
+    def _read_tx(self, client_id):
+        path = self._tx_file(client_id)
+        if not os.path.exists(path):
+            return []
+        with open(path, 'r', encoding='utf-8-sig', newline='') as f:
+            return list(csv.DictReader(f))
+
+    def _write_tx(self, client_id, rows):
+        path = self._tx_file(client_id)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'w', encoding='utf-8-sig', newline='') as f:
+            if rows:
+                w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+                w.writeheader()
+                w.writerows(rows)
+
+    def add_transaction(self, client_id, tx_type, amount, method='', note='', status='pending'):
+        """إضافة معاملة (إيداع/سحب)"""
+        if not os.path.exists(self.client_dir(client_id)):
+            return None
+        tx_id = f"TX{int(__import__('time').time()*1000)}{__import__('secrets').token_hex(2).upper()}"
+        tx = {
+            'id': tx_id, 'type': tx_type,
+            'amount': str(round(float(amount), 2)),
+            'method': method, 'note': note, 'status': status,
+            'created_at': __import__('datetime').datetime.now().strftime('%Y-%m-%d %H:%M'),
+            'processed_at': '', 'admin_note': '',
+        }
+        with _csv_lock:
+            rows = self._read_tx(client_id)
+            rows.append(tx)
+            self._write_tx(client_id, rows)
+        return tx
+
+    def get_transactions(self, client_id, status=None, tx_type=None):
+        """جلب معاملات العميل"""
+        rows = self._read_tx(client_id)
+        if status:
+            rows = [r for r in rows if r.get('status') == status]
+        if tx_type:
+            rows = [r for r in rows if r.get('type') == tx_type]
+        return rows
+
+    def process_transaction(self, client_id, tx_id, action, amount_override=None, admin_note=''):
+        """معالجة معاملة (approve/reject)"""
+        with _csv_lock:
+            rows = self._read_tx(client_id)
+            for tx in rows:
+                if tx['id'] != tx_id:
+                    continue
+                if action not in ('approved', 'rejected'):
+                    return None, 'إجراء غير صالح'
+                tx['status'] = action
+                tx['processed_at'] = __import__('datetime').datetime.now().strftime('%Y-%m-%d %H:%M')
+                tx['admin_note'] = admin_note
+                amount = float(amount_override or tx['amount'])
+                if action == 'approved':
+                    current = self.get_balance(client_id)
+                    if tx['type'] == 'deposit':
+                        self.set_balance(client_id, current + amount)
+                    elif tx['type'] == 'withdraw':
+                        if current < amount:
+                            return None, f'الرصيد غير كافٍ ({current:.2f} < {amount:.2f})'
+                        self.set_balance(client_id, current - amount)
+                self._write_tx(client_id, rows)
+                return tx, None
+        return None, 'المعاملة غير موجودة'
+
+    def get_pending_count(self, client_id=None):
+        """عدد المعاملات المعلقة"""
+        if client_id:
+            return len(self.get_transactions(client_id, status='pending'))
+        total = 0
+        for c in self.get_all():
+            total += len(self.get_transactions(c['id'], status='pending'))
+        return total
 
     # ─────────────────────────── تشغيل البوت ───────────────────────────
 
@@ -521,6 +621,85 @@ class ClientManager:
 # مفرد للوحة
 _manager = None
 _manager_lock = threading.Lock()
+
+
+# ────────────────── إدارة وسائل الدفع (للإيداع والسحب) ──────────────────
+
+PAYMENT_METHODS_FILE = os.path.join(BASE_DIR, 'rental_payment_methods.csv')
+_pm_lock = threading.RLock()
+PM_FIELDS = ['id', 'name', 'pm_type', 'account_number', 'bank_name', 'holder_name', 'status', 'created_at']
+
+
+class RentalPaymentManager:
+    """إدارة وسائل الدفع التي يستخدمها العميلون للإيداع والسحب"""
+
+    def _read(self):
+        if not os.path.exists(PAYMENT_METHODS_FILE):
+            return []
+        with open(PAYMENT_METHODS_FILE, 'r', encoding='utf-8-sig', newline='') as f:
+            return list(csv.DictReader(f))
+
+    def _write(self, rows):
+        with open(PAYMENT_METHODS_FILE, 'w', encoding='utf-8-sig', newline='') as f:
+            if rows:
+                w = csv.DictWriter(f, fieldnames=PM_FIELDS)
+                w.writeheader()
+                w.writerows(rows)
+
+    def get_all(self, active_only=False):
+        with _pm_lock:
+            rows = self._read()
+        if active_only:
+            rows = [r for r in rows if r.get('status') == 'active']
+        return rows
+
+    def get(self, pm_id):
+        return next((r for r in self._read() if r['id'] == pm_id), None)
+
+    def create(self, name, pm_type, account_number, bank_name='', holder_name=''):
+        pm_id = f"PM{int(__import__('time').time()*1000)}{__import__('secrets').token_hex(2).upper()}"
+        row = {
+            'id': pm_id, 'name': name, 'pm_type': pm_type,
+            'account_number': account_number, 'bank_name': bank_name,
+            'holder_name': holder_name, 'status': 'active',
+            'created_at': __import__('datetime').datetime.now().strftime('%Y-%m-%d %H:%M'),
+        }
+        with _pm_lock:
+            rows = self._read()
+            rows.append(row)
+            self._write(rows)
+        return row
+
+    def update(self, pm_id, data):
+        with _pm_lock:
+            rows = self._read()
+            for r in rows:
+                if r['id'] == pm_id:
+                    for k in ('name', 'pm_type', 'account_number', 'bank_name', 'holder_name', 'status'):
+                        if k in data:
+                            r[k] = data[k]
+                    self._write(rows)
+                    return r
+        return None
+
+    def delete(self, pm_id):
+        with _pm_lock:
+            rows = self._read()
+            rows = [r for r in rows if r['id'] != pm_id]
+            self._write(rows)
+        return True
+
+
+_payment_mgr = None
+_pm_mgr_lock = threading.Lock()
+
+
+def get_payment_manager() -> RentalPaymentManager:
+    global _payment_mgr
+    with _pm_mgr_lock:
+        if _payment_mgr is None:
+            _payment_mgr = RentalPaymentManager()
+        return _payment_mgr
 
 
 def get_client_manager() -> ClientManager:

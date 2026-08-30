@@ -81,6 +81,45 @@ td{padding:9px 14px;border-top:1px solid var(--border);white-space:nowrap;max-wi
     </div>
   </div>
 
+  <!-- Balance Card -->
+  <div class="card" style="border-color:rgba(0,231,1,.3)">
+    <h3>💰 رصيدك الحالي</h3>
+    <div style="padding:18px;text-align:center">
+      <div style="font-size:32px;font-weight:900;color:var(--green)" id="balance">0.00</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px">EGP</div>
+    </div>
+  </div>
+
+  <!-- Deposit / Withdraw Section -->
+  <div class="card">
+    <h3>💳 إيداع / سحب</h3>
+    <div class="tabs" id="finTabs">
+      <button class="on" onclick="swFin(this,'deposit')">💰 إيداع</button>
+      <button onclick="swFin(this,'withdraw')">💸 سحب</button>
+      <button onclick="swFin(this,'history')">📋 سجل المعاملات</button>
+    </div>
+    <div id="finDeposit" style="padding:18px">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px">اختر وسيلة الدفع وأدخل المبلغ لإرسال طلب إيداع</div>
+      <div id="pmList" style="margin-bottom:14px"></div>
+      <input id="depAmount" type="number" min="1" placeholder="المبلغ (EGP)" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-size:13px;margin-bottom:10px">
+      <input id="depNote" type="text" placeholder="ملاحظة (اختياري)" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-size:13px;margin-bottom:14px">
+      <button onclick="submitDeposit()" style="width:100%;background:var(--green);color:#000;border:none;border-radius:10px;padding:11px;font-size:13px;font-weight:700;cursor:pointer">إرسال طلب الإيداع</button>
+    </div>
+    <div id="finWithdraw" style="padding:18px;display:none">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px">اختر وسيلة السحب وأدخل المبلغ (يُخصم من رصيدك)</div>
+      <div id="pmListW" style="margin-bottom:14px"></div>
+      <input id="wdAmount" type="number" min="1" placeholder="المبلغ (EGP)" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-size:13px;margin-bottom:10px">
+      <input id="wdNote" type="text" placeholder="ملاحظة (اختياري)" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-size:13px;margin-bottom:14px">
+      <button onclick="submitWithdraw()" style="width:100%;background:var(--amber);color:#000;border:none;border-radius:10px;padding:11px;font-size:13px;font-weight:700;cursor:pointer">إرسال طلب السحب</button>
+    </div>
+    <div id="finHistory" style="display:none">
+      <div class="tbl-wrap">
+        <table><thead id="finThead"></thead><tbody id="finTbody"></tbody></table>
+        <div class="empty" id="finEmpty" style="display:none">لا توجد معاملات بعد</div>
+      </div>
+    </div>
+  </div>
+
   <div class="card">
     <h3>📊 عملياتك</h3>
     <div class="tabs">
@@ -151,8 +190,86 @@ function logout(){
 }
 render();
 sw(document.querySelector('.tabs button'),'users');
-// تحديث دوري خفيف للإحصائيات
-setInterval(function(){fetch('/api/client/me').then(function(r){return r.json()}).then(function(d){if(!d.error){ME=d;render();}})},30000);
+
+// ── Deposit / Withdraw ──
+var selectedPM = '';
+function loadPaymentMethods(){
+  fetch('/api/client/payment-methods').then(function(r){return r.json()}).then(function(d){
+    var ms = d.methods||[];
+    var html = ms.map(function(m){
+      var icon = m.pm_type==='bank_transfer'?'🏦':m.pm_type==='vodafone_cash'?'📱':m.pm_type==='usdt'?'💵':'💰';
+      return '<div class="pm-opt" data-id="'+m.id+'" onclick="selectPM(\''+m.id+'\',\''+esc(m.name)+'\')" style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:8px;cursor:pointer;display:flex;align-items:center;gap:10px">'
+        +'<span style="font-size:22px">'+icon+'</span>'
+        +'<div style="flex:1"><div style="font-size:12px;font-weight:700">'+esc(m.name)+'</div>'
+        +'<div style="font-size:10px;color:var(--muted)">'+esc(m.bank_name||m.pm_type)+'</div></div>'
+        +'<button onclick="event.stopPropagation();copyAcc(\''+esc(m.account_number)+'\')" style="background:rgba(0,231,1,.15);color:var(--green);border:none;border-radius:8px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer">📋 نسخ</button>'
+        +'</div>';
+    }).join('');
+    document.getElementById('pmList').innerHTML = html || '<div class="empty">لا توجد وسائل دفع</div>';
+    document.getElementById('pmListW').innerHTML = html || '<div class="empty">لا توجد وسائل دفع</div>';
+  });
+}
+function selectPM(id,name){
+  selectedPM=id;
+  document.querySelectorAll('.pm-opt').forEach(function(el){el.style.borderColor=el.dataset.id===id?'var(--green)':'var(--border)'});
+}
+function copyAcc(num){navigator.clipboard.writeText(num).then(function(){alert('تم النسخ: '+num)})}
+function swFin(btn,kind){
+  document.getElementById('finTabs').querySelectorAll('button').forEach(function(b){b.classList.remove('on')});
+  btn.classList.add('on');
+  document.getElementById('finDeposit').style.display=kind==='deposit'?'block':'none';
+  document.getElementById('finWithdraw').style.display=kind==='withdraw'?'block':'none';
+  document.getElementById('finHistory').style.display=kind==='history'?'block':'none';
+  if (kind==='history') loadFinHistory();
+}
+function submitDeposit(){
+  var amt=parseFloat(document.getElementById('depAmount').value);
+  var note=document.getElementById('depNote').value;
+  if (!selectedPM){alert('اختر وسيلة الدفع');return}
+  if (!amt||amt<=0){alert('أدخل مبلغ صحيح');return}
+  fetch('/api/client/deposit-request',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({amount:amt,method:selectedPM,note:note})
+  }).then(function(r){return r.json()}).then(function(d){
+    if(d.success){alert('✅ تم إرسال طلب الإيداع — في انتظار مراجعة الإدارة');document.getElementById('depAmount').value='';document.getElementById('depNote').value='';}
+    else{alert('❌ '+d.error)}
+  });
+}
+function submitWithdraw(){
+  var amt=parseFloat(document.getElementById('wdAmount').value);
+  var note=document.getElementById('wdNote').value;
+  if (!selectedPM){alert('اختر وسيلة السحب');return}
+  if (!amt||amt<=0){alert('أدخل مبلغ صحيح');return}
+  fetch('/api/client/withdraw-request',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({amount:amt,method:selectedPM,note:note})
+  }).then(function(r){return r.json()}).then(function(d){
+    if(d.success){alert('✅ تم إرسال طلب السحب — في انتظار مراجعة الإدارة');document.getElementById('wdAmount').value='';document.getElementById('wdNote').value='';}
+    else{alert('❌ '+d.error)}
+  });
+}
+function loadFinHistory(){
+  fetch('/api/client/my-transactions').then(function(r){return r.json()}).then(function(d){
+    var txs=d.transactions||[];
+    document.getElementById('finThead').innerHTML='<tr><th>التاريخ</th><th>النوع</th><th>المبلغ</th><th>الوسيلة</th><th>الحالة</th></tr>';
+    document.getElementById('finTbody').innerHTML=txs.map(function(tx){
+      var typeLabel=tx.type==='deposit'?'💰 إيداع':'💸 سحب';
+      var statusLabel=tx.status==='pending'?'⏳ معلق':tx.status==='approved'?'✅ مقبول':'❌ مرفوض';
+      var statusColor=tx.status==='pending'?'var(--amber)':tx.status==='approved'?'var(--green)':'var(--red)';
+      return '<tr><td>'+esc(tx.created_at)+'</td><td>'+typeLabel+'</td><td style="font-weight:700">'+parseFloat(tx.amount).toFixed(2)+'</td><td>'+esc(tx.method)+'</td><td style="color:'+statusColor+';font-weight:700">'+statusLabel+'</td></tr>';
+    }).join('');
+    document.getElementById('finEmpty').style.display=txs.length?'none':'block';
+  });
+}
+loadPaymentMethods();
+
+// تحديث رصيد و معاملات
+setInterval(function(){
+  fetch('/api/client/balance').then(function(r){return r.json()}).then(function(d){
+    if(d.balance!==undefined) document.getElementById('balance').textContent=parseFloat(d.balance).toFixed(2);
+  });
+},30000);
+fetch('/api/client/balance').then(function(r){return r.json()}).then(function(d){
+  if(d.balance!==undefined) document.getElementById('balance').textContent=parseFloat(d.balance).toFixed(2);
+});
 </script>
 </body>
 </html>

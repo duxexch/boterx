@@ -969,6 +969,30 @@ def _send_lockdown_alert():
     )
 
 
+def _notify_rental_admin(msg):
+    """إرسال إشعار للإدارة حول طلبات الإيداع/السحب"""
+    import urllib.request as _ur
+    import urllib.error as _ue
+    token = ALERT_BOT_TOKEN or BOT_TOKEN
+    if not token or not ADMIN_IDS:
+        return
+    for uid in ADMIN_IDS:
+        try:
+            payload = json.dumps({
+                'chat_id': uid, 'text': msg, 'parse_mode': 'HTML'
+            }).encode('utf-8')
+            req = _ur.Request(
+                f'https://api.telegram.org/bot{token}/sendMessage',
+                data=payload,
+                headers={'Content-Type': 'application/json'},
+                method='POST'
+            )
+            with _ur.urlopen(req, timeout=10) as resp:
+                pass
+        except Exception:
+            pass
+
+
 # ── Startup safety check ─────────────────────────────────────────────────────
 # Rule: in production, BOT_TOKEN is ALWAYS required.
 # ALLOW_DEV_AUTH is never consulted in production — it cannot override this.
@@ -13184,6 +13208,7 @@ def _client_public(c):
         'expired': _clients().is_expired(c),
         'revenue_share': int(c.get('revenue_share') or 30),
         'custom_domain': c.get('custom_domain', ''),
+        'balance': float(c.get('balance') or 0),
     }
 
 
@@ -13377,6 +13402,108 @@ def api_client_data():
     rows, fields = _clients().client_data(c['id'], kind, limit=limit)
     rows.reverse()
     return jsonify({'rows': rows[:limit], 'fields': fields})
+
+
+@app.route('/api/client/payment-methods')
+def api_client_pm_list():
+    """وسائل الدفع المتاحة للعميل (للإيداع)"""
+    c = _client_session()
+    if not c:
+        return jsonify({'error': 'غير مسجل الدخول'}), 401
+    from clients_manager import get_payment_manager
+    pm = get_payment_manager()
+    return jsonify({'success': True, 'methods': pm.get_all(active_only=True)})
+
+
+@app.route('/api/client/balance')
+def api_client_balance():
+    """رصيد العميل الحالي"""
+    c = _client_session()
+    if not c:
+        return jsonify({'error': 'غير مسجل الدخول'}), 401
+    from clients_manager import get_client_manager
+    cm = get_client_manager()
+    return jsonify({'success': True, 'balance': cm.get_balance(c['id'])})
+
+
+@app.route('/api/client/deposit-request', methods=['POST'])
+def api_client_deposit_request():
+    """طلب إيداع من العميل"""
+    c = _client_session()
+    if not c:
+        return jsonify({'error': 'غير مسجل الدخول'}), 401
+    data = request.get_json(force=True, silent=True) or {}
+    amount = data.get('amount', 0)
+    method = data.get('method', '').strip()
+    note = data.get('note', '')
+    try:
+        amount = float(amount)
+        if amount <= 0:
+            raise ValueError()
+    except Exception:
+        return jsonify({'success': False, 'error': 'المبلغ غير صالح'}), 400
+    if not method:
+        return jsonify({'success': False, 'error': 'اختر وسيلة الدفع'}), 400
+    from clients_manager import get_client_manager
+    cm = get_client_manager()
+    tx = cm.add_transaction(c['id'], 'deposit', amount, method, note, status='pending')
+    # إشعار الأدمن
+    try:
+        _notify_rental_admin(
+            f"💰 طلب إيداع جديد من العميل <b>{c.get('name','')}</b>\n"
+            f"المبلغ: <b>{amount:.2f}</b>\nالوسيلة: {method}\nملاحظة: {note or '—'}"
+        )
+    except Exception:
+        pass
+    return jsonify({'success': True, 'transaction': tx})
+
+
+@app.route('/api/client/withdraw-request', methods=['POST'])
+def api_client_withdraw_request():
+    """طلب سحب من العميل"""
+    c = _client_session()
+    if not c:
+        return jsonify({'error': 'غير مسجل الدخول'}), 401
+    data = request.get_json(force=True, silent=True) or {}
+    amount = data.get('amount', 0)
+    method = data.get('method', '').strip()
+    note = data.get('note', '')
+    try:
+        amount = float(amount)
+        if amount <= 0:
+            raise ValueError()
+    except Exception:
+        return jsonify({'success': False, 'error': 'المبلغ غير صالح'}), 400
+    if not method:
+        return jsonify({'success': False, 'error': 'اختر وسيلة السحب'}), 400
+    from clients_manager import get_client_manager
+    cm = get_client_manager()
+    balance = cm.get_balance(c['id'])
+    if balance < amount:
+        return jsonify({'success': False, 'error': f'الرصيد غير كافٍ (متوفر: {balance:.2f})'}), 400
+    tx = cm.add_transaction(c['id'], 'withdraw', amount, method, note, status='pending')
+    # إشعار الأدمن
+    try:
+        _notify_rental_admin(
+            f"💸 طلب سحب جديد من العميل <b>{c.get('name','')}</b>\n"
+            f"المبلغ: <b>{amount:.2f}</b>\nالرصيد: {balance:.2f}\nالوسيلة: {method}\nملاحظة: {note or '—'}"
+        )
+    except Exception:
+        pass
+    return jsonify({'success': True, 'transaction': tx})
+
+
+@app.route('/api/client/my-transactions')
+def api_client_my_transactions():
+    """سجل معاملات العميل"""
+    c = _client_session()
+    if not c:
+        return jsonify({'error': 'غير مسجل الدخول'}), 401
+    from clients_manager import get_client_manager
+    cm = get_client_manager()
+    txs = cm.get_transactions(c['id'])
+    txs.reverse()
+    return jsonify({'success': True, 'transactions': txs})
 
 
 # ===== API — Complaints =====
@@ -14384,6 +14511,174 @@ server {{
 """
             configs.append({'client_id': c.get('id'), 'domain': domain, 'config': config})
     return jsonify({'success': True, 'configs': configs, 'count': len(configs)})
+
+
+# ── Rental Payment Methods API ──────────────────────────────────────────────
+
+@app.route('/api/rental/payment-methods', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_rental_pm_list():
+    from clients_manager import get_payment_manager
+    pm = get_payment_manager()
+    return jsonify({'success': True, 'methods': pm.get_all()})
+
+
+@app.route('/api/rental/payment-methods', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_rental_pm_create():
+    from clients_manager import get_payment_manager
+    data = request.get_json(force=True, silent=True) or {}
+    name = data.get('name', '').strip()
+    pm_type = data.get('pm_type', '').strip()
+    account = data.get('account_number', '').strip()
+    if not name or not pm_type or not account:
+        return jsonify({'success': False, 'error': 'الاسم، النوع، ورقم الحساب مطلوبان'}), 400
+    pm = get_payment_manager()
+    row = pm.create(name, pm_type, account, data.get('bank_name', ''), data.get('holder_name', ''))
+    return jsonify({'success': True, 'method': row})
+
+
+@app.route('/api/rental/payment-methods/<pm_id>', methods=['PUT'])
+@api_auth
+@permission_required('manage_bots')
+def api_rental_pm_update(pm_id):
+    from clients_manager import get_payment_manager
+    data = request.get_json(force=True, silent=True) or {}
+    pm = get_payment_manager()
+    row = pm.update(pm_id, data)
+    if not row:
+        return jsonify({'success': False, 'error': 'وسيلة الدفع غير موجودة'}), 404
+    return jsonify({'success': True, 'method': row})
+
+
+@app.route('/api/rental/payment-methods/<pm_id>', methods=['DELETE'])
+@api_auth
+@permission_required('manage_bots')
+def api_rental_pm_delete(pm_id):
+    from clients_manager import get_payment_manager
+    pm = get_payment_manager()
+    pm.delete(pm_id)
+    return jsonify({'success': True})
+
+
+# ── Rental Client Transactions (deposit/withdraw) API ──────────────────────
+
+@app.route('/api/rental/transactions/<client_id>', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_rental_tx_list(client_id):
+    from clients_manager import get_client_manager
+    cm = get_client_manager()
+    status = request.args.get('status')
+    tx_type = request.args.get('type')
+    txs = cm.get_transactions(client_id, status=status, tx_type=tx_type)
+    return jsonify({'success': True, 'transactions': txs})
+
+
+@app.route('/api/rental/transactions/<client_id>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_rental_tx_create(client_id):
+    from clients_manager import get_client_manager
+    data = request.get_json(force=True, silent=True) or {}
+    tx_type = data.get('type', '').strip()
+    amount = data.get('amount', 0)
+    method = data.get('method', '')
+    note = data.get('note', '')
+    if tx_type not in ('deposit', 'withdraw'):
+        return jsonify({'success': False, 'error': 'نوع المعاملة يجب أن يكون deposit أو withdraw'}), 400
+    try:
+        amount = float(amount)
+        if amount <= 0:
+            raise ValueError()
+    except Exception:
+        return jsonify({'success': False, 'error': 'المبلغ غير صالح'}), 400
+    cm = get_client_manager()
+    tx = cm.add_transaction(client_id, tx_type, amount, method, note, status='pending')
+    if not tx:
+        return jsonify({'success': False, 'error': 'العميل غير موجود'}), 404
+    # إرسال إشعار للأدمن
+    try:
+        c = cm.get(client_id)
+        cname = c.get('name', client_id) if c else client_id
+        ttype = '💰 إيداع' if tx_type == 'deposit' else '💸 سحب'
+        msg = f"{ttype} جديد من العميل <b>{cname}</b>\nالمبلغ: <b>{amount:.2f}</b>\nالوسيلة: {method}\nملاحظة: {note or '—'}"
+        _notify_rental_admin(msg)
+    except Exception:
+        pass
+    return jsonify({'success': True, 'transaction': tx})
+
+
+@app.route('/api/rental/transactions/<client_id>/<tx_id>', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_rental_tx_process(client_id, tx_id):
+    from clients_manager import get_client_manager
+    data = request.get_json(force=True, silent=True) or {}
+    action = data.get('action', '')
+    amount_override = data.get('amount')
+    admin_note = data.get('admin_note', '')
+    cm = get_client_manager()
+    tx, err = cm.process_transaction(client_id, tx_id, action, amount_override, admin_note)
+    if err:
+        return jsonify({'success': False, 'error': err}), 400
+    return jsonify({'success': True, 'transaction': tx})
+
+
+@app.route('/api/rental/pending-count', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_rental_pending_count():
+    from clients_manager import get_client_manager
+    cm = get_client_manager()
+    return jsonify({'success': True, 'count': cm.get_pending_count()})
+
+
+@app.route('/api/rental/all-transactions', methods=['GET'])
+@api_auth
+@permission_required('manage_bots')
+def api_rental_all_transactions():
+    from clients_manager import get_client_manager
+    cm = get_client_manager()
+    status = request.args.get('status')
+    tx_type = request.args.get('type')
+    all_txs = []
+    for c in cm.get_all():
+        txs = cm.get_transactions(c['id'], status=status, tx_type=tx_type)
+        for tx in txs:
+            tx['client_id'] = c['id']
+            tx['client_name'] = c.get('name', '')
+        all_txs.extend(txs)
+    all_txs.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+    return jsonify({'success': True, 'transactions': all_txs})
+
+
+@app.route('/api/rental/quick-deposit', methods=['POST'])
+@api_auth
+@permission_required('manage_bots')
+def api_rental_quick_deposit():
+    """إيداع سريع من الأدمن لعميل (بدون طلب)"""
+    from clients_manager import get_client_manager
+    data = request.get_json(force=True, silent=True) or {}
+    client_id = data.get('client_id', '').strip()
+    amount = data.get('amount', 0)
+    note = data.get('note', 'إيداع يدوي')
+    try:
+        amount = float(amount)
+        if amount <= 0:
+            raise ValueError()
+    except Exception:
+        return jsonify({'success': False, 'error': 'المبلغ غير صالح'}), 400
+    cm = get_client_manager()
+    c = cm.get(client_id)
+    if not c:
+        return jsonify({'success': False, 'error': 'العميل غير موجود'}), 404
+    current = cm.get_balance(client_id)
+    cm.set_balance(client_id, current + amount)
+    tx = cm.add_transaction(client_id, 'deposit', amount, 'إيداع يدوي', note, status='approved')
+    return jsonify({'success': True, 'balance': cm.get_balance(client_id), 'transaction': tx})
 
 
 def _get_role_permissions(role):
