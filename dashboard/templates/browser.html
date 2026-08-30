@@ -3,17 +3,24 @@
 {% block page_title %}المتصفح المدمج{% endblock %}
 
 {% block content %}
+<script src="/static/js/browser-i18n.js?v=20260830"></script>
 <div x-data="browserPage()" x-init="init()">
 
     <!-- Header -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-            <h2 class="text-xl font-bold text-bright">المتصفح المدمج</h2>
-            <p class="text-sm text-dim mt-1">تصفح المواقع والتحكم بالوكلاء — جلسات محفوظة دائماً</p>
+            <h2 class="text-xl font-bold text-bright" data-i18n="المتصفح المدمج">المتصفح المدمج</h2>
+            <p class="text-sm text-dim mt-1" data-i18n="تصفح المواقع والتحكم بالوكلاء — جلسات محفوظة دائماً">تصفح المواقع والتحكم بالوكلاء — جلسات محفوظة دائماً</p>
         </div>
-        <button @click="showCreate=true" class="btn btn-primary gap-2 self-start">
-            <i class="fas fa-plus"></i> نافذة جديدة
-        </button>
+        <div class="flex gap-2 self-start">
+            <button @click="toggleLang()" class="btn btn-ghost gap-2 text-xs" style="padding:6px 10px" :title="btLang()==='ar'?'Switch to English':'تبديل إلى العربية'">
+                {{ btLang() if btLang is defined else '🌐' }}
+                <span x-text="btLang()==='ar'?'EN':'AR'"></span>
+            </button>
+            <button @click="showCreate=true" class="btn btn-primary gap-2 self-start">
+                <i class="fas fa-plus"></i> <span data-i18n="نافذة جديدة">نافذة جديدة</span>
+            </button>
+        </div>
     </div>
 
     <!-- Stats -->
@@ -23,7 +30,7 @@
                 <div class="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center">
                     <i class="fas fa-globe text-blue-400 text-sm"></i>
                 </div>
-                <p class="text-xs text-dim">النوافذ النشطة</p>
+                <p class="text-xs text-dim" x-text="bt('النوافذ النشطة')">النوافذ النشطة</p>
             </div>
             <p class="text-2xl font-bold text-bright" x-text="instances.length"></p>
         </div>
@@ -32,16 +39,16 @@
                 <div class="w-8 h-8 rounded-lg" :class="daemonRunning?'bg-green-500/20':'bg-red-500/20'">
                     <i class="fas fa-server text-sm" :class="daemonRunning?'text-green-400':'text-red-400'"></i>
                 </div>
-                <p class="text-xs text-dim">الخدمة (Daemon)</p>
+                <p class="text-xs text-dim" x-text="bt('الخدمة (Daemon)')">الخدمة (Daemon)</p>
             </div>
-            <p class="text-2xl font-bold" :class="daemonRunning?'text-success':'text-danger'" x-text="daemonRunning?'نشط':'متوقف'"></p>
+            <p class="text-2xl font-bold" :class="daemonRunning?'text-success':'text-danger'" x-text="daemonRunning?bt('نشط'):bt('متوقف')"></p>
         </div>
         <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
             <div class="flex items-center gap-2 mb-2">
                 <div class="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center">
                     <i class="fas fa-moon text-amber-400 text-sm"></i>
                 </div>
-                <p class="text-xs text-dim">في النوم</p>
+                <p class="text-xs text-dim" x-text="bt('في النوم')">في النوم</p>
             </div>
             <p class="text-2xl font-bold text-warning" x-text="instances.filter(i=>i.sleep_state==='sleeping').length"></p>
         </div>
@@ -50,7 +57,7 @@
                 <div class="w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center">
                     <i class="fas fa-heartbeat text-green-400 text-sm"></i>
                 </div>
-                <p class="text-xs text-dim">الصحة</p>
+                <p class="text-xs text-dim" x-text="bt('الصحة')">الصحة</p>
             </div>
             <p class="text-2xl font-bold text-success" x-text="healthStats.healthy||0"></p>
         </div>
@@ -59,72 +66,72 @@
             <!-- Daemon Controls -->
     <div class="bg-slate-800 rounded-xl border border-slate-700 p-4 mb-6">
         <div class="flex items-center justify-between mb-3">
-            <h3 class="text-sm font-semibold text-bright">تحكم Daemon</h3>
+            <h3 class="text-sm font-semibold text-bright" x-text="bt('تحكم Daemon')">تحكم Daemon</h3>
             <div class="flex items-center gap-2">
                 <span class="w-2 h-2 rounded-full" :class="daemonRunning?'bg-green-400':'bg-red-400'"></span>
-                <span class="text-xs text-dim" x-text="daemonRunning?'Daemon نشط':'Daemon متوقف'"></span>
+                <span class="text-xs text-dim" x-text="daemonRunning?bt(' Daemon نشط'):bt(' Daemon متوقف')"></span>
             </div>
         </div>
         <div class="flex flex-wrap gap-2">
             <button @click="startDaemon()" class="btn btn-success btn-sm gap-1" x-show="!daemonRunning">
-                <i class="fas fa-play"></i> تشغيل Daemon
+                <i class="fas fa-play"></i> <span x-text="bt('تشغيل Daemon')">تشغيل Daemon</span>
             </button>
             <button @click="stopDaemon()" class="btn btn-danger btn-sm gap-1" x-show="daemonRunning">
-                <i class="fas fa-stop"></i> إيقاف Daemon
+                <i class="fas fa-stop"></i> <span x-text="bt('إيقاف Daemon')">إيقاف Daemon</span>
             </button>
             <button @click="sleepAll()" class="btn btn-secondary btn-sm gap-1">
-                <i class="fas fa-moon"></i> إدخال الكل في النوم
+                <i class="fas fa-moon"></i> <span x-text="bt('إدخال الكل في النوم')">إدخال الكل في النوم</span>
             </button>
             <button @click="wakeAll()" class="btn btn-primary btn-sm gap-1">
-                <i class="fas fa-sun"></i> إيقاظ الكل
+                <i class="fas fa-sun"></i> <span x-text="bt('إيقاظ الكل')">إيقاظ الكل</span>
             </button>
             <button @click="saveSnapshot()" class="btn btn-secondary btn-sm gap-1">
-                <i class="fas fa-camera"></i> حفظ Snapshot
+                <i class="fas fa-camera"></i> <span x-text="bt('حفظ Snapshot')">حفظ Snapshot</span>
             </button>
             <button @click="loadInstances()" class="btn btn-secondary btn-sm gap-1">
-                <i class="fas fa-sync-alt"></i> تحديث
+                <i class="fas fa-sync-alt"></i> <span x-text="bt('تحديث')">تحديث</span>
             </button>
             <button @click="showPermissions=!showPermissions" class="btn btn-secondary btn-sm gap-1">
-                <i class="fas fa-user-shield"></i> صلاحيات
+                <i class="fas fa-user-shield"></i> <span x-text="bt('صلاحيات')">صلاحيات</span>
             </button>
             <button @click="showSchedules=!showSchedules" class="btn btn-secondary btn-sm gap-1">
-                <i class="fas fa-clock"></i> جدولة
+                <i class="fas fa-clock"></i> <span x-text="bt('جدولة')">جدولة</span>
             </button>
             <button @click="showTemplates=!showTemplates;loadTemplates()" class="btn btn-secondary btn-sm gap-1">
-                <i class="fas fa-clone"></i> قوالب
+                <i class="fas fa-clone"></i> <span x-text="bt('قوالب')">قوالب</span>
             </button>
             <button @click="showProxies=!showProxies;loadProxies()" class="btn btn-secondary btn-sm gap-1">
-                <i class="fas fa-shield-alt"></i> بروكسي
+                <i class="fas fa-shield-alt"></i> <span x-text="bt('بروكسي')">بروكسي</span>
             </button>
             <button @click="showGroups=!showGroups;loadGroups()" class="btn btn-secondary btn-sm gap-1">
-                <i class="fas fa-folder"></i> مجموعات
+                <i class="fas fa-folder"></i> <span x-text="bt('مجموعات')">مجموعات</span>
             </button>
             <button @click="showAnalytics=!showAnalytics;loadAnalytics()" class="btn btn-secondary btn-sm gap-1">
-                <i class="fas fa-chart-bar"></i> إحصائيات
+                <i class="fas fa-chart-bar"></i> <span x-text="bt('إحصائيات')">إحصائيات</span>
             </button>
             <button @click="showHistory=!showHistory;loadHistory()" class="btn btn-secondary btn-sm gap-1">
-                <i class="fas fa-history"></i> سجل
+                <i class="fas fa-history"></i> <span x-text="bt('سجل')">سجل</span>
             </button>
             <button @click="showClipboard=!showClipboard;loadClipboard()" class="btn btn-secondary btn-sm gap-1">
-                <i class="fas fa-clipboard"></i> الحافظة
+                <i class="fas fa-clipboard"></i> <span x-text="bt('الحافظة')">الحافظة</span>
             </button>
             <button @click="showBackups=!showBackups;loadBackups()" class="btn btn-secondary btn-sm gap-1">
-                <i class="fas fa-download"></i> نسخ احتياطي
+                <i class="fas fa-download"></i> <span x-text="bt('نسخ احتياطي')">نسخ احتياطي</span>
             </button>
             <button @click="showDashboard=!showDashboard;loadDashboard()" class="btn btn-secondary btn-sm gap-1">
-                <i class="fas fa-tachometer-alt"></i> لوحة معلومات
+                <i class="fas fa-tachometer-alt"></i> <span x-text="bt('لوحة معلومات')">لوحة معلومات</span>
             </button>
             <button @click="toggleAdBlock()" class="btn btn-secondary btn-sm gap-1" :class="adBlockEnabled?'bg-green-600/20 text-green-400':''">
-                <i class="fas fa-shield-alt"></i> حجب الإعلانات
+                <i class="fas fa-shield-alt"></i> <span x-text="bt('حجب الإعلانات')">حجب الإعلانات</span>
             </button>
             <button @click="enableConsole()" class="btn btn-secondary btn-sm gap-1">
-                <i class="fas fa-terminal"></i> وحدة التحكم
+                <i class="fas fa-terminal"></i> <span x-text="bt('وحدة التحكم')">وحدة التحكم</span>
             </button>
             <button @click="exportPDF()" class="btn btn-secondary btn-sm gap-1">
-                <i class="fas fa-file-pdf"></i> تصدير PDF
+                <i class="fas fa-file-pdf"></i> <span x-text="bt('تصدير PDF')">تصدير PDF</span>
             </button>
             <button @click="showPerformance=!showPerformance;loadPerformance()" class="btn btn-secondary btn-sm gap-1">
-                <i class="fas fa-bolt"></i> الأداء
+                <i class="fas fa-bolt"></i> <span x-text="bt('الأداء')">الأداء</span>
             </button>
             <button @click="loadRealtimeEvents()" class="btn btn-secondary btn-sm gap-1">
                 <i class="fas fa-satellite-dish"></i> أحداث مباشرة
@@ -163,10 +170,10 @@
                         <span class="text-dim mr-2" x-text="s.task_type"></span>
                     </div>
                     <div class="flex items-center gap-2">
-                        <span class="text-dim" x-text="s.interval_seconds+'ث'"></span>
+                        <span class="text-dim" x-text="s.interval_seconds+bt('ث')"></span>
                         <button @click="toggleSchedule(s.id, !s.is_active)" class="text-xs"
                             :class="s.is_active?'text-green-400':'text-slate-500'"
-                            x-text="s.is_active?'نشط':'متوقف'"></button>
+                            x-text="s.is_active?bt('نشط'):bt('متوقف')"></button>
                     </div>
                 </div>
             </template>
@@ -247,7 +254,7 @@
                     <div class="flex items-center gap-2">
                         <span class="w-3 h-3 rounded-full" :style="'background:'+g.color"></span>
                         <span class="text-bright" x-text="g.name"></span>
-                        <span class="text-dim" x-text="'('+g.member_count+' متصفح)'"></span>
+                        <span class="text-dim" x-text="'('+g.member_count+bt(' متصفح)')"></span>
                     </div>
                     <button @click="deleteGroup(g.id)" class="text-[10px] text-red-400 hover:text-red-300">×</button>
                 </div>
@@ -391,7 +398,7 @@
                     <template x-for="s in (dashboard?.frequent_sites||[]).slice(0,5)" :key="s.url">
                         <div class="flex items-center justify-between text-[11px] py-0.5">
                             <a :href="s.url" target="_blank" class="text-blue-400 hover:text-blue-300 truncate max-w-[200px]" x-text="s.url"></a>
-                            <span class="text-bright" x-text="s.visits+' مرة'"></span>
+                            <span class="text-bright" x-text="s.visits+bt(' مرة')"></span>
                         </div>
                     </template>
                 </div>
@@ -408,7 +415,7 @@
             <!-- Instances -->
             <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
                 <div class="px-4 py-3 border-b border-slate-700 flex items-center justify-between">
-                    <span class="text-sm font-semibold text-bright">النوافذ (<span x-text="instances.length"></span>)</span>
+                    <span class="text-sm font-semibold text-bright" x-text="bt('النوافذ')+' ('+instances.length+')'">النوافذ</span>
                     <button @click="loadInstances()" class="text-dim hover:text-bright text-xs"><i class="fas fa-sync-alt"></i></button>
                 </div>
                 <div class="max-h-64 overflow-y-auto">
@@ -420,7 +427,7 @@
                                 <span class="text-sm font-medium text-bright truncate" x-text="inst.name || inst.profile_name"></span>
                                 <div class="flex items-center gap-1.5">
                                     <button @click.stop="toggleSleep(inst.id)" class="text-xs p-1 rounded hover:bg-slate-600/50"
-                                        :title="inst.sleep_state==='sleeping'?'إيقاظ':'إدخال في النوم'">
+                                        :title="inst.sleep_state==='sleeping'?bt('إيقاظ'):bt('إدخال في النوم')">
                                         <i :class="inst.sleep_state==='sleeping'?'fas fa-sun text-amber-400':'fas fa-moon text-slate-400'"></i>
                                     </button>
                                     <span class="w-2 h-2 rounded-full"
@@ -429,12 +436,12 @@
                             </div>
                             <p class="text-xs text-dim truncate" x-text="inst.current_url || 'about:blank'"></p>
                             <div class="flex items-center gap-2 mt-1" x-show="inst.idle_for">
-                                <span class="text-[10px] text-dim">خامل: <span x-text="Math.round((inst.idle_for||0)/60)+'د'"></span></span>
+                                <span class="text-[10px] text-dim"><span x-text="bt('خامل:')">خامل:</span> <span x-text="Math.round((inst.idle_for||0)/60)+bt('د')"></span></span>
                             </div>
                         </div>
                     </template>
                     <div x-show="instances.length===0" class="px-4 py-8 text-center text-dim text-sm">
-                        لا توجد نوافذ مفتوحة
+                        <span x-text="bt('لا توجد نوافذ مفتوحة')">لا توجد نوافذ مفتوحة</span>
                     </div>
                 </div>
             </div>
@@ -442,20 +449,20 @@
             <!-- Active Profiles (saved sessions) -->
             <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
                 <div class="px-4 py-3 border-b border-slate-700">
-                    <span class="text-sm font-semibold text-bright">الجلسات المحفوظة</span>
+                    <span class="text-sm font-semibold text-bright" x-text="bt('الجلسات المحفوظة')">الجلسات المحفوظة</span>
                 </div>
                 <div class="max-h-48 overflow-y-auto">
                     <template x-for="p in profiles" :key="p.id">
                         <div class="px-4 py-2 border-b border-slate-700/50 flex items-center justify-between">
                             <div>
                                 <p class="text-sm text-bright" x-text="p.name"></p>
-                                <p class="text-xs text-dim" x-text="(p.cookies_count||0)+' كوكيز | '+p.locale"></p>
+                                <p class="text-xs text-dim" x-text="(p.cookies_count||0)+bt(' كوكيز | ')+p.locale"></p>
                             </div>
-                            <button @click="openWithProfile(p.id)" class="text-xs text-blue-400 hover:text-blue-300">فتح</button>
+                            <button @click="openWithProfile(p.id)" class="text-xs text-blue-400 hover:text-blue-300" x-text="bt('فتح')">فتح</button>
                         </div>
                     </template>
                     <div x-show="profiles.length===0" class="px-4 py-4 text-center text-dim text-xs">
-                        لا توجد جلسات محفوظة
+                        <span x-text="bt('لا توجد جلسات محفوظة')">لا توجد جلسات محفوظة</span>
                     </div>
                 </div>
             </div>
@@ -466,7 +473,7 @@
 
             <!-- URL bar -->
             <div class="bg-slate-800 rounded-xl border border-slate-700 p-3 mb-3 flex items-center gap-2" x-show="selected">
-                <button @click="goBack()" class="p-2 rounded-lg hover:bg-slate-700/50 text-dim hover:text-bright transition" title="رجوع">
+                <button @click="goBack()" class="p-2 rounded-lg hover:bg-slate-700/50 text-dim hover:text-bright transition" :title="bt('رجوع')">
                     <i class="fas fa-arrow-right"></i>
                 </button>
                 <div class="flex-1 relative">
@@ -475,24 +482,24 @@
                         placeholder="https://example.com">
                 </div>
                 <button @click="navigate()" class="btn btn-primary btn-sm gap-1">
-                    <i class="fas fa-arrow-left"></i> اذهب
+                    <i class="fas fa-arrow-left"></i> <span x-text="bt('اذهب')">اذهب</span>
                 </button>
-                <button @click="takeScreenshot()" class="p-2 rounded-lg hover:bg-slate-700/50 text-dim hover:text-bright transition" title="لقطة شاشة">
+                <button @click="takeScreenshot()" class="p-2 rounded-lg hover:bg-slate-700/50 text-dim hover:text-bright transition" :title="bt('لقطة شاشة')">
                     <i class="fas fa-camera"></i>
                 </button>
-                <button @click="refreshView()" class="p-2 rounded-lg hover:bg-slate-700/50 text-dim hover:text-bright transition" title="تحديث">
+                <button @click="refreshView()" class="p-2 rounded-lg hover:bg-slate-700/50 text-dim hover:text-bright transition" :title="bt('تحديث')">
                     <i class="fas fa-sync-alt"></i>
                 </button>
                 <button @click="showCookies=!showCookies" class="p-2 rounded-lg hover:bg-slate-700/50 transition"
-                    :class="showCookies?'text-amber-400':'text-dim hover:text-bright'" title="الكوكيز">
+                    :class="showCookies?'text-amber-400':'text-dim hover:text-bright'" :title="bt('الكوكيز')">
                     <i class="fas fa-cookie-bite"></i>
                 </button>
                 <button @click="showSessions=!showSessions" class="p-2 rounded-lg hover:bg-slate-700/50 transition"
-                    :class="showSessions?'text-red-400':'text-dim hover:text-bright'" title="التسجيل">
+                    :class="showSessions?'text-red-400':'text-dim hover:text-bright'" :title="bt('التسجيل')">
                     <i class="fas fa-circle" :class="isRecording?'text-red-400 animate-pulse':''"></i>
                 </button>
                 <button @click="showTabs=!showTabs;loadTabs()" class="p-2 rounded-lg hover:bg-slate-700/50 transition"
-                    :class="showTabs?'text-blue-400':'text-dim hover:text-bright'" title="النوافذ">
+                    :class="showTabs?'text-blue-400':'text-dim hover:text-bright'" :title="bt('النوافذ')">
                     <i class="fas fa-layer-group"></i>
                 </button>
             </div>
@@ -521,9 +528,9 @@
                     <div class="flex items-center justify-center py-20">
                         <div class="text-center">
                             <i class="fas fa-power-off text-4xl text-slate-500 mb-3"></i>
-                            <p class="text-sm text-dim mb-4">المتصفح متوقف</p>
+                            <p class="text-sm text-dim mb-4" x-text="bt('المتصفح متوقف')">المتصفح متوقف</p>
                             <button @click="startBrowser()" class="btn btn-primary gap-2">
-                                <i class="fas fa-play"></i> تشغيل
+                                <i class="fas fa-play"></i> <span x-text="bt('تشغيل')">تشغيل</span>
                             </button>
                         </div>
                     </div>
@@ -532,9 +539,9 @@
                 <div x-show="!selected" class="flex items-center justify-center py-20">
                     <div class="text-center">
                         <i class="fas fa-globe text-5xl text-slate-500/50 mb-4"></i>
-                        <p class="text-dim mb-2">اختر نافذة أو أنشئ نافذة جديدة</p>
+                        <p class="text-dim mb-2" x-text="bt('اختر نافذة أو أنشئ نافذة جديدة')">اختر نافذة أو أنشئ نافذة جديدة</p>
                         <button @click="showCreate=true" class="btn btn-primary btn-sm gap-2 mt-2">
-                            <i class="fas fa-plus"></i> نافذة جديدة
+                            <i class="fas fa-plus"></i> <span x-text="bt('نافذة جديدة')">نافذة جديدة</span>
                         </button>
                     </div>
                 </div>
@@ -543,15 +550,15 @@
             <!-- Action bar -->
             <div class="bg-slate-800 rounded-xl border border-slate-700 p-3 mt-3" x-show="selected && currentInst && currentInst.status==='running'">
                 <div class="flex items-center gap-2 mb-3">
-                    <span class="text-xs text-dim font-semibold">أدوات التحكم</span>
+                    <span class="text-xs text-dim font-semibold" x-text="bt('أدوات التحكم')">أدوات التحكم</span>
                 </div>
                 <!-- Quick actions row -->
                 <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
                     <button @click="execAction('scroll',{direction:'up',amount:5})" class="btn btn-secondary btn-sm gap-1 text-xs">
-                        <i class="fas fa-arrow-up"></i> صعود
+                        <i class="fas fa-arrow-up"></i> <span x-text="bt('صعود')">صعود</span>
                     </button>
                     <button @click="execAction('scroll',{direction:'down',amount:5})" class="btn btn-secondary btn-sm gap-1 text-xs">
-                        <i class="fas fa-arrow-down"></i> نزول
+                        <i class="fas fa-arrow-down"></i> <span x-text="bt('نزول')">نزول</span>
                     </button>
                     <button @click="execAction('key',{key:'Enter'})" class="btn btn-secondary btn-sm gap-1 text-xs">
                         <i class="fas fa-level-down-alt"></i> Enter
@@ -563,7 +570,7 @@
                 <!-- JS Console -->
                 <div class="flex gap-2">
                     <input x-model="jsInput" @keydown.enter="execJS()" type="text" class="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-xs text-bright ltr text-left font-mono" placeholder="document.title">
-                    <button @click="execJS()" class="btn btn-primary btn-sm text-xs gap-1"><i class="fas fa-code"></i> تنفيذ</button>
+                    <button @click="execJS()" class="btn btn-primary btn-sm text-xs gap-1"><i class="fas fa-code"></i> <span x-text="bt('تنفيذ')">تنفيذ</span></button>
                 </div>
                 <div x-show="jsResult" class="mt-2 p-2 bg-slate-900 rounded-lg text-xs text-green-400 font-mono ltr text-left max-h-24 overflow-y-auto" x-text="jsResult"></div>
             </div>
@@ -571,9 +578,9 @@
             <!-- Action log -->
             <div class="bg-slate-800 rounded-xl border border-slate-700 p-3 mt-3" x-show="selected && currentInst">
                 <div class="flex items-center justify-between mb-2">
-                    <span class="text-xs text-dim font-semibold">آخر الإجراءات</span>
+                    <span class="text-xs text-dim font-semibold" x-text="bt('آخر الإجراءات')">آخر الإجراءات</span>
                     <button @click="analyzePage()" class="text-xs text-blue-400 hover:text-blue-300 gap-1" x-show="currentInst?.status==='running'">
-                        <i class="fas fa-brain"></i> تحليل الصفحة
+                        <i class="fas fa-brain"></i> <span x-text="bt('تحليل الصفحة')">تحليل الصفحة</span>
                     </button>
                 </div>
                 <div class="max-h-32 overflow-y-auto space-y-1">
@@ -590,7 +597,7 @@
             <!-- Site Knowledge Panel -->
             <div class="bg-slate-800 rounded-xl border border-slate-700 p-3 mt-3" x-show="siteKnowledge && siteKnowledge.domain">
                 <div class="flex items-center justify-between mb-3">
-                    <span class="text-xs text-dim font-semibold">🧠 معرفة الموقع: <span class="text-bright" x-text="siteKnowledge.domain"></span></span>
+                    <span class="text-xs text-dim font-semibold">🧠 <span x-text="bt('معرف')">معرف</span>ة الموقع: <span class="text-bright" x-text="siteKnowledge.domain"></span></span>
                     <button @click="siteKnowledge=null" class="text-dim hover:text-bright text-xs"><i class="fas fa-times"></i></button>
                 </div>
                 <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
@@ -704,14 +711,14 @@
                 </div>
                 <div x-show="isRecording" class="flex items-center gap-2 mb-2 p-2 bg-red-500/10 rounded-lg">
                     <span class="w-2 h-2 rounded-full bg-red-400 animate-pulse"></span>
-                    <span class="text-xs text-red-400">جاري التسجيل... (<span x-text="recordedActions"></span> إجراء)</span>
+                    <span class="text-xs text-red-400"><span x-text="bt('جاري التسجيل...')">جاري التسجيل...</span> (<span x-text="recordedActions"></span> <span x-text="bt('إجراء')">إجراء</span>)</span>
                 </div>
                 <div class="max-h-48 overflow-y-auto space-y-1">
                     <template x-for="s in sessions" :key="s.id">
                         <div class="flex items-center justify-between text-xs py-1 border-b border-slate-700/30">
                             <div class="flex-1 min-w-0">
-                                <span class="text-bright" x-text="s.session_name || 'جلسة #'+s.id"></span>
-                                <span class="text-dim mx-1" x-text="'('+(s.actions_count||0)+' إجراء)'"></span>
+                                <span class="text-bright" x-text="s.session_name || bt('جلسة #')+s.id"></span>
+                                <span class="text-dim mx-1" x-text="'('+(s.actions_count||0)+bt(' إجراء)')"></span>
                             </div>
                             <div class="flex items-center gap-1">
                                 <button @click="playSession(s.id)" class="text-[10px] text-green-400 hover:text-green-300 px-1" title="تشغيل">
@@ -741,7 +748,7 @@
                         <div class="flex items-center justify-between text-xs py-1.5 px-2 rounded-lg"
                             :class="t.active?'bg-blue-500/10 border border-blue-500/30':'hover:bg-slate-700/30'">
                             <div class="flex-1 min-w-0">
-                                <span class="text-bright text-xs" x-text="t.title || 'بدون عنوان'"></span>
+                                <span class="text-bright text-xs" x-text="t.title || bt('بدون عنوان')"></span>
                                 <p class="text-[10px] text-dim truncate" x-text="t.url"></p>
                             </div>
                             <div class="flex items-center gap-1">
@@ -802,6 +809,8 @@ function browserPage() {
         healthStats: {},
         siteKnowledge: null,
         tasks: [],
+        btLang: typeof btLang === 'function' ? btLang() : 'ar',
+        bt: typeof bt === 'function' ? bt : function(s){return s},
         showPermissions: false,
         showSchedules: false,
         showCreateSchedule: false,
@@ -904,7 +913,7 @@ function browserPage() {
                         await this.navigate();
                     }
                 }
-            } catch(e) { toast('فشل إنشاء النافذة', 'error'); }
+            } catch(e) { toast(bt('فشل إنشاء النافذة'), 'error'); }
         },
 
         async startBrowser() {
@@ -914,7 +923,7 @@ function browserPage() {
                 await this.loadInstances();
                 await new Promise(r => setTimeout(r, 1000));
                 await this.refreshView();
-            } catch(e) { toast('فشل تشغيل المتصفح', 'error'); }
+            } catch(e) { toast(bt('فشل تشغيل المتصفح'), 'error'); }
         },
 
         async stopBrowser() {
@@ -946,7 +955,7 @@ function browserPage() {
                 await new Promise(r => setTimeout(r, 500));
                 await this.refreshView();
                 await this.loadInstances();
-            } catch(e) { toast('فشل التنقل', 'error'); }
+            } catch(e) { toast(bt('فشل التنقل'), 'error'); }
         },
 
         async refreshView() {
@@ -962,7 +971,7 @@ function browserPage() {
 
         async takeScreenshot() {
             await this.refreshView();
-            toast('تم أخذ اللقطة', 'success');
+            toast(bt('تم أخذ اللقطة'), 'success');
         },
 
         async goBack() {
@@ -1026,7 +1035,7 @@ function browserPage() {
                     this.selected = d.instance.id;
                     await this.startBrowser();
                 }
-            } catch(e) { toast('فشل فتح الجلسة', 'error'); }
+            } catch(e) { toast(bt('فشل فتح الجلسة'), 'error'); }
         },
 
         // ── Daemon Controls ───────────────────────
@@ -1043,24 +1052,24 @@ function browserPage() {
             try {
                 await api('/api/browser/daemon/start', { method: 'POST' });
                 await this.loadDaemonStatus();
-                toast('تم تشغيل Daemon', 'success');
-            } catch(e) { toast('فشل تشغيل Daemon', 'error'); }
+                toast(bt('تم تشغيل Daemon'), 'success');
+            } catch(e) { toast(bt('فشل تشغيل Daemon'), 'error'); }
         },
 
         async stopDaemon() {
             try {
                 await api('/api/browser/daemon/stop', { method: 'POST' });
                 await this.loadDaemonStatus();
-                toast('تم إيقاف Daemon', 'success');
-            } catch(e) { toast('فشل إيقاف Daemon', 'error'); }
+                toast(bt('تم إيقاف Daemon'), 'success');
+            } catch(e) { toast(bt('فشل إيقاف Daemon'), 'error'); }
         },
 
         async sleepAll() {
             try {
                 await api('/api/browser/daemon/sleep-all', { method: 'POST' });
                 await this.loadInstances();
-                toast('تم إدخال الكل في النوم', 'success');
-            } catch(e) { toast('فشل', 'error'); }
+                toast(bt('تم إدخال الكل في النوم'), 'success');
+            } catch(e) { toast(bt('فشل'), 'error'); }
         },
 
         async wakeAll() {
@@ -1068,45 +1077,45 @@ function browserPage() {
                 await api('/api/browser/daemon/wake-all', { method: 'POST' });
                 await this.loadInstances();
                 await this.refreshView();
-                toast('تم إيقاظ الكل', 'success');
-            } catch(e) { toast('فشل', 'error'); }
+                toast(bt('تم إيقاظ الكل'), 'success');
+            } catch(e) { toast(bt('فشل'), 'error'); }
         },
 
         async saveSnapshot() {
             try {
                 await api('/api/browser/snapshot');
-                toast('تم حفظ Snapshot', 'success');
-            } catch(e) { toast('فشل', 'error'); }
+                toast(bt('تم حفظ Snapshot'), 'success');
+            } catch(e) { toast(bt('فشل'), 'error'); }
         },
 
         async analyzePage() {
             if (!this.selected) return;
             try {
-                toast('جاري تحليل الصفحة...', 'info');
+                toast(bt('جاري تحليل الصفحة...'), 'info');
                 const d = await api(`/api/browser/instances/${this.selected}/analyze`, { method: 'POST' });
                 if (d.success) {
                     const k = await api(`/api/browser/instances/${this.selected}/knowledge`);
                     this.siteKnowledge = k.knowledge || {};
-                    toast('تم التحليل بنجاح', 'success');
+                    toast(bt('تم التحليل بنجاح'), 'success');
                 }
-            } catch(e) { toast('فشل التحليل', 'error'); }
+            } catch(e) { toast(bt('فشل التحليل'), 'error'); }
         },
 
         async scrapeCurrentPage() {
             if (!this.selected || !this.currentInst?.current_url) return;
             try {
-                toast('جاري استخراج المحتوى...', 'info');
+                toast(bt('جاري استخراج المحتوى...'), 'info');
                 const d = await api('/api/browser/tasks/quick-scrape', {
                     method: 'POST',
                     body: JSON.stringify({ instance_id: this.selected, url: this.currentInst.current_url })
                 });
                 if (d.success && d.scraped_text) {
-                    toast('تم الاستخراج: ' + d.scraped_text.substring(0, 100) + '...', 'success');
+                    toast(bt('تم الاستخراج: ') + d.scraped_text.substring(0, 100) + '...', 'success');
                 } else {
-                    toast('لم يتم استخراج محتوى', 'info');
+                    toast(bt('لم يتم استخراج محتوى'), 'info');
                 }
                 await this.loadTasks();
-            } catch(e) { toast('فشل الاستخراج', 'error'); }
+            } catch(e) { toast(bt('فشل الاستخراج'), 'error'); }
         },
 
         async loadTasks() {
@@ -1168,7 +1177,7 @@ function browserPage() {
 
         async clearCookies() {
             if (!this.selected) return;
-            if (!confirm('مسح كل الكوكيز؟')) return;
+            if (!confirm(bt('مسح كل الكوكيز؟'))) return;
             try {
                 await api(`/api/browser/cookies/${this.selected}/clear`, {method:'DELETE'});
                 this.cookies = [];
@@ -1271,7 +1280,7 @@ function browserPage() {
         },
 
         async deleteProxy(id) {
-            if (!confirm('حذف البروكسي؟')) return;
+            if (!confirm(bt('حذف البروكسي؟'))) return;
             try {
                 await api(`/api/browser/proxies/${id}`, {method:'DELETE'});
                 await this.loadProxies();
@@ -1286,7 +1295,7 @@ function browserPage() {
         },
 
         async deleteGroup(id) {
-            if (!confirm('حذف المجموعة؟')) return;
+            if (!confirm(bt('حذف المجموعة؟'))) return;
             try {
                 await api(`/api/browser/groups/${id}`, {method:'DELETE'});
                 await this.loadGroups();
@@ -1310,7 +1319,7 @@ function browserPage() {
         },
 
         async clearHistory() {
-            if (!confirm('مسح كل السجل؟')) return;
+            if (!confirm(bt('مسح كل السجل؟'))) return;
             try {
                 await api('/api/browser/history/clear', {method:'DELETE'});
                 this.history = [];
@@ -1325,7 +1334,7 @@ function browserPage() {
         },
 
         async addClipboardItem() {
-            const text = prompt('أدخل النص:');
+            const text = prompt(bt('أدخل النص:'));
             if (!text) return;
             try {
                 await api('/api/browser/clipboard', {
@@ -1378,7 +1387,7 @@ function browserPage() {
         },
 
         async createBackup() {
-            const name = prompt('اسم النسخة الاحتياطية:', 'backup_' + new Date().toISOString().split('T')[0]);
+            const name = prompt(bt('اسم النسخة الاحتياطية:'), 'backup_' + new Date().toISOString().split('T')[0]);
             if (!name) return;
             try {
                 await api('/api/browser/backups', {
@@ -1389,15 +1398,15 @@ function browserPage() {
         },
 
         async restoreBackup(id) {
-            if (!confirm('استعادة هذه النسخة؟ سيتم استبدال البيانات الحالية')) return;
+            if (!confirm(bt('استعادة هذه النسخة؟ سيتم استبدال البيانات الحالية'))) return;
             try {
                 await api(`/api/browser/backups/${id}/restore`, {method:'POST'});
-                alert('تمت الاستعادة بنجاح');
-            } catch(e) { alert('خطأ في الاستعادة'); }
+                alert(bt('تمت الاستعادة بنجاح'));
+            } catch(e) { alert(bt('خطأ في الاستعادة')); }
         },
 
         async deleteBackup(id) {
-            if (!confirm('حذف النسخة الاحتياطية؟')) return;
+            if (!confirm(bt('حذف النسخة الاحتياطية؟'))) return;
             try {
                 await api(`/api/browser/backups/${id}`, {method:'DELETE'});
                 this.backups = this.backups.filter(b => b.id !== id);
@@ -1508,7 +1517,14 @@ function browserPage() {
                 }
                 await this.loadInstances();
                 if (this.selected === id) await this.refreshView();
-            } catch(e) { toast('فشل', 'error'); }
+            } catch(e) { toast(bt('فشل'), 'error'); }
+        },
+
+        toggleLang() {
+            var cur = localStorage.getItem('vex_admin_lang') || 'ar';
+            var next = cur === 'ar' ? 'en' : 'ar';
+            localStorage.setItem('vex_admin_lang', next);
+            location.reload();
         },
     };
 }
