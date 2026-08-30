@@ -426,7 +426,7 @@ class ClientManager:
         if client_id:
             return len(self.get_transactions(client_id, status='pending'))
         total = 0
-        for c in self.get_all():
+        for c in self.list_clients():
             total += len(self.get_transactions(c['id'], status='pending'))
         return total
 

@@ -14645,7 +14645,7 @@ def api_rental_all_transactions():
     status = request.args.get('status')
     tx_type = request.args.get('type')
     all_txs = []
-    for c in cm.get_all():
+    for c in cm.list_clients():
         txs = cm.get_transactions(c['id'], status=status, tx_type=tx_type)
         for tx in txs:
             tx['client_id'] = c['id']
