@@ -3307,6 +3307,12 @@ def page_channels():
     return render_template('channels.html', active_page='channels')
 
 
+@app.route('/clients')
+@app.route('/bots')
+def page_redirect_old():
+    return redirect(url_for('page_rental'))
+
+
 @app.route('/rental')
 @admin_required
 @page_permission_required('manage_bots')
