@@ -104,7 +104,7 @@ body.light-mode .rental-app .modal-overlay{background:rgba(0,0,0,.3)}
 @media(max-width:1023px){.top-tabs{display:none}.bottom-tabs{display:block}.rental-app{padding-bottom:80px}}
 </style>
 
-<div class="rental-app" x-data="rentalSystem()" x-init="init()" :dir="rl==='ar'?'rtl':'ltr'">
+<div class="rental-app" x-data="rentalSystem()" x-init="init()" :dir="(localStorage.getItem('lang')||'ar')==='ar'?'rtl':'ltr'">
   <div x-show="toastMsg" x-transition class="toast" x-text="toastMsg"></div>
 
   <!-- HEADER -->
@@ -113,7 +113,7 @@ body.light-mode .rental-app .modal-overlay{background:rgba(0,0,0,.3)}
       <h1 style="font-size:20px;font-weight:900;display:flex;align-items:center;gap:8px">
         <span style="font-size:26px">🏢</span> <span x-text="rt('title')"></span>
       </h1>
-      <button @click="toggleRl()" style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:11px;font-weight:700;color:var(--accent2);cursor:pointer" x-text="rl==='ar'?'EN':'AR'"></button>
+      <button @click="toggleLang()" style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:11px;font-weight:700;color:var(--accent2);cursor:pointer" x-text="(localStorage.getItem('lang')||'ar')==='ar'?'EN':'AR'"></button>
     </div>
     <button @click="openCreateClient()" class="r-btn primary" style="display:flex;align-items:center;gap:6px">
       <i class="fas fa-plus"></i> <span x-text="rt('new_client')"></span>
@@ -183,7 +183,7 @@ body.light-mode .rental-app .modal-overlay{background:rgba(0,0,0,.3)}
     <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap">
       <div class="search-box" style="flex:1;min-width:200px">
         <i class="fas fa-search s-icon"></i>
-        <input x-model="search" :dir="rl==='ar'?'rtl':'ltr'" :placeholder="rt('search_placeholder')">
+        <input x-model="search" :dir="(localStorage.getItem('lang')||'ar')==='ar'?'rtl':'ltr'" :placeholder="rt('search_placeholder')">
       </div>
       <select x-model="filterStatus" class="r-input" style="width:auto;min-width:110px">
         <option value="" x-text="rt('all')"></option><option value="active" x-text="rt('stat_active')"></option><option value="suspended" x-text="rt('suspended')"></option><option value="expired" x-text="rt('expired')"></option>
@@ -361,7 +361,7 @@ body.light-mode .rental-app .modal-overlay{background:rgba(0,0,0,.3)}
           <template x-for="s in allSectionsList" :key="s.key">
             <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;cursor:pointer;font-size:12px;transition:background .15s" onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background=''">
               <input type="checkbox" :value="s.key" x-model="sectionForm" style="accent-color:var(--accent);width:15px;height:15px">
-              <span x-text="rl==='ar'?s.label:s.en||s.label"></span>
+              <span x-text="(localStorage.getItem('lang')||'ar')==='ar'?s.label:s.en||s.label"></span>
             </label>
           </template>
         </div>
@@ -583,7 +583,7 @@ function rentalSystem(){
     {key:'admins',label:'المسؤولين',en:'Admins'},{key:'settings',label:'الإعدادات',en:'Settings'},{key:'backup',label:'النسخ الاحتياطي',en:'Backup'},{key:'themes',label:'الثيمات',en:'Themes'},
   ];
   return {
-    rl: localStorage.getItem('rental_lang') || 'ar',
+    rl: (localStorage.getItem('lang') || 'ar'),
     tab:'dashboard',search:'',filterStatus:'',saving:false,
     clients:[],features:{},admins:[],domains:[],nginxConfigs:[],
     auditLogs:[],toastMsg:'',
@@ -600,8 +600,8 @@ function rentalSystem(){
     sectionAdmin:null,sectionForm:[],
     allSectionsList:ALL_SECTIONS,
     domainForm:{client_id:'',domain:''},
-    rt(key){ return (I18N[this.rl]||I18N.ar)[key]||key },
-    toggleRl(){localStorage.setItem('rental_lang',this.rl==='ar'?'en':'ar');location.reload()},
+    rt(key){ var _l=localStorage.getItem('lang')||'ar'; return (I18N[_l]||I18N.ar)[key]||key },
+    toggleLang(){var l=localStorage.getItem('lang')==='en'?'ar':'en';localStorage.setItem('lang',l);location.reload()},
     get filteredClients(){
       return this.clients.filter(c=>{
         if(this.filterStatus==='expired'&&!c.expired)return false;
@@ -634,8 +634,8 @@ function rentalSystem(){
     },
     async doRenew(d){try{await api('/api/clients/'+this.renewTarget.id+'/renew',{method:'POST',body:JSON.stringify({days:d})});toast(this.rt('renew'),'success');this.showRenew=false;await this.loadClients()}catch(e){toasrt('Error','error')}},
     async control(c,action){try{await api('/api/clients/'+c.id+'/'+action,{method:'POST'});await this.loadClients();toast(action,'success')}catch(e){toasrt('Error','error')}},
-    confirmDelete(c){this.deleteTarget=c;this.deleteType=this.rl==='ar'?'عميل':'client';this.showDelete=true},
-    confirmDeleteAdmin(a){this.deleteTarget=a;this.deleteType=this.rl==='ar'?'مسؤول':'admin';this.showDelete=true},
+    confirmDelete(c){this.deleteTarget=c;this.deleteType=(localStorage.getItem('lang')||'ar')==='ar'?'عميل':'client';this.showDelete=true},
+    confirmDeleteAdmin(a){this.deleteTarget=a;this.deleteType=(localStorage.getItem('lang')||'ar')==='ar'?'مسؤول':'admin';this.showDelete=true},
     async doDelete(){
       try{
         if(this.deleteType==='عميل'||this.deleteType==='client'){await api('/api/clients/'+this.deleteTarget.id,{method:'DELETE'})}
@@ -662,7 +662,7 @@ function rentalSystem(){
     copyText(t){navigator.clipboard.writeText(t).then(()=>toast(this.rt('copy'),'success')).catch(()=>{})},
     toast(msg){this.toastMsg=msg;setTimeout(()=>{this.toastMsg=''},2000)},
     getTenantName(tid){const c=this.clients.find(c=>c.id===tid);return c?c.name:tid},
-    roleLabel(r){const m={ar:{super_admin:'Super Admin',finance_admin:'المالية',support_admin:'الدعم',game_admin:'الألعاب',broadcast_admin:'البث'},en:{super_admin:'Super Admin',finance_admin:'Finance',support_admin:'Support',game_admin:'Games',broadcast_admin:'Broadcast'}};return(m[this.rl]||m.ar)[r]||r},
+    roleLabel(r){var _l=localStorage.getItem('lang')||'ar';const m={ar:{super_admin:'Super Admin',finance_admin:'المالية',support_admin:'الدعم',game_admin:'الألعاب',broadcast_admin:'البث'},en:{super_admin:'Super Admin',finance_admin:'Finance',support_admin:'Support',game_admin:'Games',broadcast_admin:'Broadcast'}};return(m[_l]||m.ar)[r]||r},
     roleBadge(r){return{super_admin:'background:rgba(255,71,87,.12);color:var(--danger)',finance_admin:'background:rgba(251,191,36,.12);color:var(--amber)',support_admin:'background:rgba(0,231,1,.12);color:var(--accent)',game_admin:'background:rgba(168,85,247,.12);color:#a855f7',broadcast_admin:'background:rgba(34,211,238,.12);color:#22d3ee'}[r]||'background:rgba(107,122,144,.12);color:var(--muted)'},
     fmtNum(n){return(n||0).toLocaleString()},
     fmtMoney(n){return(n||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})},
