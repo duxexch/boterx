@@ -3,7 +3,7 @@
  * Cache + Push Notifications + Notification Click
  */
 
-const CACHE_VER  = 'vex-v5';
+const CACHE_VER  = 'vex-v6';
 const STATIC_EXT = ['.css','.js','.png','.jpg','.jpeg','.gif','.svg','.woff2','.ico'];
 
 const PRECACHE = [

@@ -1384,14 +1384,11 @@ def _add_security_headers(response):
     response.headers.setdefault('X-XSS-Protection', '1; mode=block')
     response.headers.setdefault('Referrer-Policy', 'strict-origin-when-cross-origin')
     response.headers.setdefault('Permissions-Policy', 'geolocation=(), microphone=(), camera=()')
-    # Allow service worker and iframe for WebApp pages
-    if not request.path.startswith('/webapp/'):
+    # CSP is handled by nginx (more restrictive = better). Only add for WebApp pages.
+    if request.path.startswith('/webapp/'):
         response.headers.setdefault(
             'Content-Security-Policy',
             "default-src 'self' https: data:; "
-            # 'unsafe-eval' is required: Alpine.js and the Tailwind runtime
-            # compile expressions with new Function(). Without it every page's
-            # JS silently dies (no data, broken sidebar, stuck panels).
             "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
             "style-src 'self' 'unsafe-inline' https:; "
             "img-src 'self' data: https:; "
