@@ -5154,7 +5154,8 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                 with open('users.csv', 'a', newline='', encoding='utf-8-sig') as f:
                     writer = csv.writer(f)
                     writer.writerow([str(user_id), name, pre_phone, customer_id, final_lang,
-                                   datetime.now().strftime('%Y-%m-%d'), 'no', '', detected_currency])
+                                   datetime.now().strftime('%Y-%m-%d'), 'no', '', detected_currency,
+                                   '0', 'no', '0'])
 
                 # ── تحديث الكاش فوراً — بدون هذا، find_user بترجع None والمستخدم بيدور في حلقة تسجيل ──
                 self._refresh_user_in_cache(user_id)

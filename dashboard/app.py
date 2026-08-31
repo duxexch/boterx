@@ -7500,6 +7500,13 @@ def api_users():
     users = read_csv('users.csv')
     users = [u for u in users if u.get('telegram_id', '').strip()]
 
+    def _sort_key(u):
+        try:
+            return u.get('date', '') or ''
+        except Exception:
+            return ''
+    users.sort(key=_sort_key, reverse=True)
+
     if search:
         sl = search.lower()
         users = [u for u in users if sl in u.get('name', '').lower() or
