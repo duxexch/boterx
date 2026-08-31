@@ -13146,7 +13146,7 @@ def api_smart_auto_replies():
 
 @app.route('/api/smart/auto-replies', methods=['POST'])
 @api_auth
-@api_permission_required('manage_bots')
+@permission_required('manage_bots')
 def api_smart_add_auto_reply():
     """إضافة رد ذكي"""
     data = request.json or {}
@@ -13170,7 +13170,7 @@ def api_smart_add_auto_reply():
 
 @app.route('/api/smart/auto-replies/<reply_id>', methods=['DELETE'])
 @api_auth
-@api_permission_required('manage_bots')
+@permission_required('manage_bots')
 def api_smart_delete_auto_reply(reply_id):
     """حذف رد ذكي"""
     engine = _get_smart_engine()
@@ -13196,7 +13196,7 @@ def api_smart_chains():
 
 @app.route('/api/smart/chains', methods=['POST'])
 @api_auth
-@api_permission_required('manage_bots')
+@permission_required('manage_bots')
 def api_smart_add_chain():
     """إضافة سلسلة بوتات"""
     data = request.json or {}
@@ -13229,7 +13229,7 @@ def api_smart_notifications():
 
 @app.route('/api/smart/notifications', methods=['POST'])
 @api_auth
-@api_permission_required('manage_bots')
+@permission_required('manage_bots')
 def api_smart_add_notification():
     """إضافة إشعار ذكي"""
     data = request.json or {}
@@ -13260,7 +13260,7 @@ def api_smart_webhooks():
 
 @app.route('/api/smart/webhooks', methods=['POST'])
 @api_auth
-@api_permission_required('manage_bots')
+@permission_required('manage_bots')
 def api_smart_add_webhook():
     """إضافة webhook"""
     data = request.json or {}
@@ -13279,7 +13279,7 @@ def api_smart_add_webhook():
 
 @app.route('/api/smart/webhooks/<hook_id>', methods=['DELETE'])
 @api_auth
-@api_permission_required('manage_bots')
+@permission_required('manage_bots')
 def api_smart_delete_webhook(hook_id):
     """حذف webhook"""
     engine = _get_smart_engine()
