@@ -1400,6 +1400,10 @@ def _add_security_headers(response):
     # Allow the service worker (served from /static/) to control scope '/'
     if request.path == '/static/sw.js':
         response.headers['Service-Worker-Allowed'] = '/'
+    # Prevent browser from caching API responses (avoids stale/empty data)
+    if request.path.startswith('/api/'):
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
     return response
 
 
@@ -7488,10 +7492,13 @@ def api_export_transactions():
 def api_users():
     search = request.args.get('search', '')
     banned = request.args.get('banned', '')
+    language = request.args.get('language', '')
+    currency = request.args.get('currency', '')
     page = int(request.args.get('page', '1'))
     per_page = int(request.args.get('per_page', '20'))
 
     users = read_csv('users.csv')
+    users = [u for u in users if u.get('telegram_id', '').strip()]
     users.reverse()
 
     if search:
@@ -7504,24 +7511,32 @@ def api_users():
         users = [u for u in users if u.get('is_banned') == 'yes']
     elif banned == 'no':
         users = [u for u in users if u.get('is_banned') != 'yes']
+    if language:
+        users = [u for u in users if u.get('language', '').lower() == language.lower()]
+    if currency:
+        users = [u for u in users if u.get('currency', '').upper() == currency.upper()]
 
     total = len(users)
     start = (page - 1) * per_page
     end = start + per_page
 
+    all_rows = [u for u in read_csv('users.csv') if u.get('telegram_id', '').strip()]
     stats = {
-        'total': len(read_csv('users.csv')),
-        'banned': sum(1 for u in read_csv('users.csv') if u.get('is_banned') == 'yes'),
-        'verified': sum(1 for u in read_csv('users.csv') if u.get('phone_verified') == 'yes'),
-        'today': sum(1 for u in read_csv('users.csv') if u.get('date', '').startswith(datetime.now().strftime('%Y-%m-%d')))
+        'total': len(all_rows),
+        'banned': sum(1 for u in all_rows if u.get('is_banned') == 'yes'),
+        'verified': sum(1 for u in all_rows if u.get('phone_verified') == 'yes'),
+        'today': sum(1 for u in all_rows if u.get('date', '').startswith(datetime.now().strftime('%Y-%m-%d')))
     }
 
-    return jsonify({
+    resp = jsonify({
         'users': users[start:end],
         'total': total, 'page': page, 'per_page': per_page,
-        'pages': (total + per_page - 1) // per_page,
+        'pages': max(1, (total + per_page - 1) // per_page),
         'stats': stats
     })
+    resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    resp.headers['Pragma'] = 'no-cache'
+    return resp
 
 @app.route('/api/users/<user_id>/detail')
 @api_auth
