@@ -199,6 +199,176 @@
         </div>
     </div>
 
+    <!-- ═══ USER-FACING THEMES (landing page & user web only) ═══ -->
+    <div class="mb-8">
+        <div class="flex items-center gap-3 mb-4">
+            <div class="w-10 h-10 rounded-xl bg-indigo-500/20 flex items-center justify-center">
+                <i class="fas fa-globe text-indigo-400"></i>
+            </div>
+            <div>
+                <h3 class="text-lg font-bold">سمات واجهة المستخدم</h3>
+                <p class="text-xs text-slate-400">تؤثر على صفحة الدخول والألعاب فقط — لا تؤثر على لوحة التحكم</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="user-themes-grid">
+            <!-- VEX Default -->
+            <div class="bg-slate-800 rounded-xl border-2 p-4 transition-all cursor-pointer"
+                 :class="activeUserTheme === 'vex' ? 'border-emerald-400 shadow-lg shadow-emerald-400/10' : 'border-slate-700 hover:border-slate-600'"
+                 @click="activateUserTheme('vex')">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold" style="background:#00e701;color:#0b0e11;">V</div>
+                        <div>
+                            <h4 class="text-sm font-bold">VEX النيون</h4>
+                            <p class="text-[10px] text-slate-400">الأخضر الافتراضي</p>
+                        </div>
+                    </div>
+                    <span x-show="activeUserTheme === 'vex'" class="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-semibold">
+                        <i class="fas fa-check-circle ml-0.5"></i>نشط
+                    </span>
+                </div>
+                <div class="flex gap-1.5 mb-3">
+                    <div class="w-5 h-5 rounded-full border border-slate-600" style="background:#0b0e11;" title="خلفية"></div>
+                    <div class="w-5 h-5 rounded-full border border-slate-600" style="background:#141920;" title="سطح"></div>
+                    <div class="w-5 h-5 rounded-full border border-slate-600" style="background:#00e701;" title="أساسي"></div>
+                    <div class="w-5 h-5 rounded-full border border-slate-600" style="background:#ffd700;" title="点缀"></div>
+                </div>
+                <button @click.stop="activateUserTheme('vex')"
+                    class="w-full py-1.5 rounded-lg text-xs font-semibold transition"
+                    :class="activeUserTheme === 'vex' ? 'bg-emerald-500/20 text-emerald-400 cursor-default' : 'bg-emerald-600 hover:bg-emerald-700 text-white'"
+                    :disabled="activeUserTheme === 'vex'">
+                    <span x-show="activeUserTheme !== 'vex'"><i class="fas fa-check ml-1"></i>تفعيل</span>
+                    <span x-show="activeUserTheme === 'vex'">مُفعّل</span>
+                </button>
+            </div>
+
+            <!-- BetJam Purple -->
+            <div class="bg-slate-800 rounded-xl border-2 p-4 transition-all cursor-pointer"
+                 :class="activeUserTheme === 'betjam' ? 'border-purple-400 shadow-lg shadow-purple-400/10' : 'border-slate-700 hover:border-slate-600'"
+                 @click="activateUserTheme('betjam')">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold" style="background:#7B00FF;color:#fff;">B</div>
+                        <div>
+                            <h4 class="text-sm font-bold">BetJam بنفسجي</h4>
+                            <p class="text-[10px] text-slate-400">بنفسجي + برتقالي</p>
+                        </div>
+                    </div>
+                    <span x-show="activeUserTheme === 'betjam'" class="px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-400 text-[10px] font-semibold">
+                        <i class="fas fa-check-circle ml-0.5"></i>نشط
+                    </span>
+                </div>
+                <div class="flex gap-1.5 mb-3">
+                    <div class="w-5 h-5 rounded-full border border-slate-600" style="background:#0D001A;" title="خلفية"></div>
+                    <div class="w-5 h-5 rounded-full border border-slate-600" style="background:#1A0033;" title="سطح"></div>
+                    <div class="w-5 h-5 rounded-full border border-slate-600" style="background:#7B00FF;" title="أساسي"></div>
+                    <div class="w-5 h-5 rounded-full border border-slate-600" style="background:#FFA500;" title="点缀"></div>
+                </div>
+                <button @click.stop="activateUserTheme('betjam')"
+                    class="w-full py-1.5 rounded-lg text-xs font-semibold transition"
+                    :class="activeUserTheme === 'betjam' ? 'bg-purple-500/20 text-purple-400 cursor-default' : 'bg-purple-600 hover:bg-purple-700 text-white'"
+                    :disabled="activeUserTheme === 'betjam'">
+                    <span x-show="activeUserTheme !== 'betjam'"><i class="fas fa-check ml-1"></i>تفعيل</span>
+                    <span x-show="activeUserTheme === 'betjam'">مُفعّل</span>
+                </button>
+            </div>
+
+            <!-- Gold -->
+            <div class="bg-slate-800 rounded-xl border-2 p-4 transition-all cursor-pointer"
+                 :class="activeUserTheme === 'gold' ? 'border-yellow-400 shadow-lg shadow-yellow-400/10' : 'border-slate-700 hover:border-slate-600'"
+                 @click="activateUserTheme('gold')">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold" style="background:#FFD700;color:#0C0A06;">G</div>
+                        <div>
+                            <h4 class="text-sm font-bold">الذهبي</h4>
+                            <p class="text-[10px] text-slate-400">ذهبي فاخر</p>
+                        </div>
+                    </div>
+                    <span x-show="activeUserTheme === 'gold'" class="px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400 text-[10px] font-semibold">
+                        <i class="fas fa-check-circle ml-0.5"></i>نشط
+                    </span>
+                </div>
+                <div class="flex gap-1.5 mb-3">
+                    <div class="w-5 h-5 rounded-full border border-slate-600" style="background:#0C0A06;" title="خلفية"></div>
+                    <div class="w-5 h-5 rounded-full border border-slate-600" style="background:#1C1810;" title="سطح"></div>
+                    <div class="w-5 h-5 rounded-full border border-slate-600" style="background:#FFD700;" title="أساسي"></div>
+                    <div class="w-5 h-5 rounded-full border border-slate-600" style="background:#FFA500;" title="点缀"></div>
+                </div>
+                <button @click.stop="activateUserTheme('gold')"
+                    class="w-full py-1.5 rounded-lg text-xs font-semibold transition"
+                    :class="activeUserTheme === 'gold' ? 'bg-yellow-500/20 text-yellow-400 cursor-default' : 'bg-yellow-600 hover:bg-yellow-700 text-white'"
+                    :disabled="activeUserTheme === 'gold'">
+                    <span x-show="activeUserTheme !== 'gold'"><i class="fas fa-check ml-1"></i>تفعيل</span>
+                    <span x-show="activeUserTheme === 'gold'">مُفعّل</span>
+                </button>
+            </div>
+
+            <!-- Ocean Blue -->
+            <div class="bg-slate-800 rounded-xl border-2 p-4 transition-all cursor-pointer"
+                 :class="activeUserTheme === 'ocean' ? 'border-cyan-400 shadow-lg shadow-cyan-400/10' : 'border-slate-700 hover:border-slate-600'"
+                 @click="activateUserTheme('ocean')">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold" style="background:#00B4D8;color:#040D1A;">O</div>
+                        <div>
+                            <h4 class="text-sm font-bold">أزرق المحيط</h4>
+                            <p class="text-[10px] text-slate-400">أزرق بحري</p>
+                        </div>
+                    </div>
+                    <span x-show="activeUserTheme === 'ocean'" class="px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-400 text-[10px] font-semibold">
+                        <i class="fas fa-check-circle ml-0.5"></i>نشط
+                    </span>
+                </div>
+                <div class="flex gap-1.5 mb-3">
+                    <div class="w-5 h-5 rounded-full border border-slate-600" style="background:#040D1A;" title="خلفية"></div>
+                    <div class="w-5 h-5 rounded-full border border-slate-600" style="background:#0C1E33;" title="سطح"></div>
+                    <div class="w-5 h-5 rounded-full border border-slate-600" style="background:#00B4D8;" title="أساسي"></div>
+                    <div class="w-5 h-5 rounded-full border border-slate-600" style="background:#48CAE4;" title="点缀"></div>
+                </div>
+                <button @click.stop="activateUserTheme('ocean')"
+                    class="w-full py-1.5 rounded-lg text-xs font-semibold transition"
+                    :class="activeUserTheme === 'ocean' ? 'bg-cyan-500/20 text-cyan-400 cursor-default' : 'bg-cyan-600 hover:bg-cyan-700 text-white'"
+                    :disabled="activeUserTheme === 'ocean'">
+                    <span x-show="activeUserTheme !== 'ocean'"><i class="fas fa-check ml-1"></i>تفعيل</span>
+                    <span x-show="activeUserTheme === 'ocean'">مُفعّل</span>
+                </button>
+            </div>
+
+            <!-- Crimson -->
+            <div class="bg-slate-800 rounded-xl border-2 p-4 transition-all cursor-pointer"
+                 :class="activeUserTheme === 'crimson' ? 'border-red-400 shadow-lg shadow-red-400/10' : 'border-slate-700 hover:border-slate-600'"
+                 @click="activateUserTheme('crimson')">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold" style="background:#E63946;color:#fff;">C</div>
+                        <div>
+                            <h4 class="text-sm font-bold">القرمزي</h4>
+                            <p class="text-[10px] text-slate-400">أحمر ناري</p>
+                        </div>
+                    </div>
+                    <span x-show="activeUserTheme === 'crimson'" class="px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 text-[10px] font-semibold">
+                        <i class="fas fa-check-circle ml-0.5"></i>نشط
+                    </span>
+                </div>
+                <div class="flex gap-1.5 mb-3">
+                    <div class="w-5 h-5 rounded-full border border-slate-600" style="background:#0D0408;" title="خلفية"></div>
+                    <div class="w-5 h-5 rounded-full border border-slate-600" style="background:#200C16;" title="سطح"></div>
+                    <div class="w-5 h-5 rounded-full border border-slate-600" style="background:#E63946;" title="أساسي"></div>
+                    <div class="w-5 h-5 rounded-full border border-slate-600" style="background:#FF6B6B;" title="点缀"></div>
+                </div>
+                <button @click.stop="activateUserTheme('crimson')"
+                    class="w-full py-1.5 rounded-lg text-xs font-semibold transition"
+                    :class="activeUserTheme === 'crimson' ? 'bg-red-500/20 text-red-400 cursor-default' : 'bg-red-600 hover:bg-red-700 text-white'"
+                    :disabled="activeUserTheme === 'crimson'">
+                    <span x-show="activeUserTheme !== 'crimson'"><i class="fas fa-check ml-1"></i>تفعيل</span>
+                    <span x-show="activeUserTheme === 'crimson'">مُفعّل</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Info note -->
     <div class="bg-slate-800/50 rounded-xl border border-slate-700 p-4 flex items-start gap-3">
         <i class="fas fa-info-circle text-blue-400 mt-0.5"></i>
@@ -223,11 +393,13 @@
 function themesPage() {
     return {
         activeTheme: 'vex',
+        activeUserTheme: 'vex',
         loading: false,
         loadingText: 'جارٍ التحميل...',
 
         async init() {
             await this.loadThemes();
+            await this.loadUserThemes();
         },
 
         async loadThemes() {
@@ -260,6 +432,33 @@ function themesPage() {
                 toast(`تم تفعيل سمة ${names[theme] || theme}`, 'success');
             } catch (e) {
                 toast('فشل تفعيل السمة', 'error');
+            }
+            this.loading = false;
+        },
+
+        async loadUserThemes() {
+            try {
+                const data = await api('/api/user-themes');
+                this.activeUserTheme = data.active_theme || 'vex';
+            } catch (e) {
+                console.error('Failed to load user themes');
+            }
+        },
+
+        async activateUserTheme(theme) {
+            if (theme === this.activeUserTheme) return;
+            this.loading = true;
+            this.loadingText = 'جارٍ تفعيل سمة المستخدمين...';
+            try {
+                await api('/api/user-themes', {
+                    method: 'POST',
+                    body: JSON.stringify({ theme_id: theme }),
+                });
+                this.activeUserTheme = theme;
+                const names = { vex: 'VEX النيون', betjam: 'BetJam بنفسجي', gold: 'الذهبي', ocean: 'أزرق المحيط', crimson: 'القرمزي' };
+                toast(`تم تفعيل سمة المستخدمين: ${names[theme] || theme}`, 'success');
+            } catch (e) {
+                toast('فشل تفعيل سمة المستخدمين', 'error');
             }
             this.loading = false;
         },

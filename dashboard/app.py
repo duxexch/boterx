@@ -15049,6 +15049,56 @@ def api_set_theme():
     return jsonify({'success': True, 'active_theme': theme_id})
 
 
+# ===== API — User-Facing Themes (landing page & user web — NOT admin dashboard) =====
+
+_USER_THEMES = [
+    {'id': 'vex',    'name': 'VEX النيون',      'name_en': 'VEX Neon',      'colors': {'primary': '#00e701', 'accent': '#ffd700', 'bg': '#0b0e11'}},
+    {'id': 'betjam', 'name': 'BetJam بنفسجي',    'name_en': 'BetJam Purple', 'colors': {'primary': '#7B00FF', 'accent': '#FFA500', 'bg': '#0D001A'}},
+    {'id': 'gold',   'name': 'الذهبي',           'name_en': 'Gold',          'colors': {'primary': '#FFD700', 'accent': '#FFA500', 'bg': '#0C0A06'}},
+    {'id': 'ocean',  'name': 'أزرق المحيط',      'name_en': 'Ocean Blue',    'colors': {'primary': '#00B4D8', 'accent': '#48CAE4', 'bg': '#040D1A'}},
+    {'id': 'crimson','name': 'القرمزي',           'name_en': 'Crimson',       'colors': {'primary': '#E63946', 'accent': '#FF6B6B', 'bg': '#0D0408'}},
+]
+
+@app.route('/api/user-themes')
+def api_user_themes():
+    """Public endpoint — returns available user-facing themes."""
+    settings = read_csv('system_settings.csv')
+    active = next((s.get('setting_value', 'vex') for s in settings if s.get('setting_key') == 'user_theme'), 'vex')
+    valid_ids = {t['id'] for t in _USER_THEMES}
+    if active not in valid_ids:
+        active = 'vex'
+    return jsonify({'themes': _USER_THEMES, 'active_theme': active})
+
+
+@app.route('/api/user-themes', methods=['POST'])
+@api_auth
+@permission_required('manage_settings')
+def api_set_user_theme():
+    """Set the active user-facing theme (admin only)."""
+    payload = request.json or {}
+    theme_id = payload.get('theme_id') or payload.get('theme') or 'vex'
+    valid_ids = {t['id'] for t in _USER_THEMES}
+    if theme_id not in valid_ids:
+        return jsonify({'error': 'invalid theme'}), 400
+    settings = read_csv('system_settings.csv')
+    fieldnames = get_fieldnames('system_settings.csv', ['setting_key', 'setting_value', 'description'])
+    found = False
+    for s in settings:
+        if s.get('setting_key') == 'user_theme':
+            s['setting_value'] = theme_id
+            found = True
+            break
+    if not found:
+        settings.append({
+            'setting_key': 'user_theme',
+            'setting_value': theme_id,
+            'description': 'Active user-facing theme (landing page & user web)'
+        })
+    write_csv('system_settings.csv', settings, fieldnames)
+    log_action('set_user_theme', theme_id)
+    return jsonify({'success': True, 'active_theme': theme_id})
+
+
 # ===== API — Exchange Addresses =====
 
 @app.route('/api/exchange-addresses')

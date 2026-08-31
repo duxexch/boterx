@@ -46,6 +46,7 @@
   <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png?v=20260816">
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='vendor/fontawesome.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/user-themes.css') }}">
   <script src="/static/js/i18n.js?v=20260823"></script>
   <script src="/static/js/i18n-auto.js"></script>
   <script>
@@ -996,6 +997,20 @@ function startCounters(){document.querySelectorAll('[data-count]').forEach(el=>c
     }
     checkNotifs();
     setInterval(checkNotifs, 10000);
+})();
+</script>
+<script>
+// Load active user-facing theme (does NOT affect admin dashboard)
+(function(){
+  var saved = localStorage.getItem('user_theme');
+  if (saved) {
+    document.documentElement.setAttribute('data-user-theme', saved);
+  }
+  fetch('/api/user-themes').then(function(r){return r.json()}).then(function(d){
+    var theme = d.active_theme || 'vex';
+    document.documentElement.setAttribute('data-user-theme', theme);
+    localStorage.setItem('user_theme', theme);
+  }).catch(function(){});
 })();
 </script>
 <script src="/static/js/auth-gate.js?v=20260818a"></script>

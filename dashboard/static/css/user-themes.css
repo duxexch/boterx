@@ -1,0 +1,421 @@
+/* VEX User-Facing Themes — Applied to landing page & user web interface ONLY */
+/* Does NOT affect admin dashboard */
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* DEFAULT VEX THEME                                                        */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+[data-user-theme="vex"] {
+  --green: #00e701;
+  --green2: #00b301;
+  --green-dim: rgba(0,231,1,0.1);
+  --gold: #ffd700;
+  --gold-dim: #c9a800;
+  --dark: #0b0e11;
+  --dark2: #10141a;
+  --surface: #141920;
+  --card: rgba(20,25,32,0.75);
+  --border: rgba(255,255,255,0.08);
+  --text: #eef2f6;
+  --muted: #8794a3;
+  --primary: #00e701;
+  --primary2: #00b301;
+  --primary-dim: rgba(0,231,1,0.1);
+  --accent: #ffd700;
+  --accent-dim: rgba(255,215,0,0.1);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* BETJAM THEME — Purple + Orange (exact match betjam.com)                  */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+[data-user-theme="betjam"] {
+  --green: #7B00FF;
+  --green2: #6200CC;
+  --green-dim: rgba(123,0,255,0.12);
+  --gold: #FFA500;
+  --gold-dim: rgba(255,165,0,0.12);
+  --dark: #0D001A;
+  --dark2: #130026;
+  --surface: #1A0033;
+  --card: rgba(26,0,51,0.85);
+  --border: rgba(123,0,255,0.15);
+  --text: #F0E6FF;
+  --muted: #9B7FCF;
+  --primary: #7B00FF;
+  --primary2: #6200CC;
+  --primary-dim: rgba(123,0,255,0.12);
+  --accent: #FFA500;
+  --accent-dim: rgba(255,165,0,0.12);
+}
+
+[data-user-theme="betjam"] body::before {
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(123,0,255,0.15) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 60% at 90% 80%, rgba(255,165,0,0.08) 0%, transparent 50%),
+    radial-gradient(ellipse 40% 50% at 5% 30%, rgba(123,0,255,0.06) 0%, transparent 55%) !important;
+}
+
+[data-user-theme="betjam"] nav {
+  background: rgba(13,0,26,0.92) !important;
+  border-bottom-color: rgba(123,0,255,0.2) !important;
+}
+
+[data-user-theme="betjam"] nav::after {
+  background: linear-gradient(90deg, transparent, rgba(123,0,255,0.7), rgba(255,165,0,0.5), transparent) !important;
+}
+
+[data-user-theme="betjam"] .nav-brand {
+  background: linear-gradient(135deg, #fff, #7B00FF) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+}
+
+[data-user-theme="betjam"] .btn-play-nav {
+  background: linear-gradient(135deg, #7B00FF, #6200CC) !important;
+  color: #fff !important;
+}
+
+[data-user-theme="betjam"] .btn-play-nav:hover {
+  box-shadow: 0 4px 20px rgba(123,0,255,0.4) !important;
+}
+
+[data-user-theme="betjam"] .btn-nav-login {
+  background: rgba(123,0,255,0.12) !important;
+  border-color: rgba(123,0,255,0.3) !important;
+  color: #7B00FF !important;
+}
+
+[data-user-theme="betjam"] .btn-nav-login:hover {
+  background: rgba(123,0,255,0.2) !important;
+}
+
+[data-user-theme="betjam"] .hero-badge {
+  background: rgba(123,0,255,0.12) !important;
+  border-color: rgba(123,0,255,0.3) !important;
+  color: #B366FF !important;
+}
+
+[data-user-theme="betjam"] .hero h1 span,
+[data-user-theme="betjam"] .hero-title-accent {
+  background: linear-gradient(135deg, #7B00FF, #FFA500) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+}
+
+[data-user-theme="betjam"] .btn-cta {
+  background: linear-gradient(135deg, #7B00FF, #6200CC) !important;
+  color: #fff !important;
+  border: none !important;
+}
+
+[data-user-theme="betjam"] .btn-cta:hover {
+  box-shadow: 0 4px 24px rgba(123,0,255,0.4) !important;
+  transform: translateY(-2px) !important;
+}
+
+[data-user-theme="betjam"] .btn-outline {
+  border-color: rgba(123,0,255,0.4) !important;
+  color: #B366FF !important;
+}
+
+[data-user-theme="betjam"] .btn-outline:hover {
+  background: rgba(123,0,255,0.12) !important;
+  border-color: #7B00FF !important;
+}
+
+[data-user-theme="betjam"] .game-card {
+  background: rgba(26,0,51,0.6) !important;
+  border-color: rgba(123,0,255,0.12) !important;
+}
+
+[data-user-theme="betjam"] .game-card:hover {
+  border-color: rgba(123,0,255,0.4) !important;
+  box-shadow: 0 8px 32px rgba(123,0,255,0.15) !important;
+}
+
+[data-user-theme="betjam"] .game-tag {
+  background: rgba(123,0,255,0.15) !important;
+  color: #B366FF !important;
+}
+
+[data-user-theme="betjam"] .stat-card {
+  background: rgba(26,0,51,0.5) !important;
+  border-color: rgba(123,0,255,0.1) !important;
+}
+
+[data-user-theme="betjam"] .stat-num {
+  color: #7B00FF !important;
+}
+
+[data-user-theme="betjam"] .jackpot-card {
+  background: rgba(26,0,51,0.6) !important;
+  border-color: rgba(255,165,0,0.2) !important;
+}
+
+[data-user-theme="betjam"] .jackpot-amount {
+  background: linear-gradient(135deg, #7B00FF, #FFA500) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+}
+
+[data-user-theme="betjam"] .feat-card {
+  background: rgba(26,0,51,0.5) !important;
+  border-color: rgba(123,0,255,0.1) !important;
+}
+
+[data-user-theme="betjam"] .feat-icon {
+  background: rgba(123,0,255,0.12) !important;
+  color: #7B00FF !important;
+}
+
+[data-user-theme="betjam"] .footer {
+  background: rgba(13,0,26,0.95) !important;
+  border-top-color: rgba(123,0,255,0.15) !important;
+}
+
+[data-user-theme="betjam"] .footer a {
+  color: #B366FF !important;
+}
+
+[data-user-theme="betjam"] .footer a:hover {
+  color: #FFA500 !important;
+}
+
+[data-user-theme="betjam"] .fxp.g {
+  background: rgba(123,0,255,0.5) !important;
+  box-shadow: 0 0 8px rgba(123,0,255,0.6) !important;
+}
+
+[data-user-theme="betjam"] .fxp.y {
+  background: rgba(255,165,0,0.45) !important;
+  box-shadow: 0 0 8px rgba(255,165,0,0.5) !important;
+}
+
+[data-user-theme="betjam"] .ticker-item {
+  border-color: rgba(123,0,255,0.15) !important;
+}
+
+[data-user-theme="betjam"] .step-num {
+  background: rgba(123,0,255,0.15) !important;
+  color: #7B00FF !important;
+}
+
+[data-user-theme="betjam"] .step-card {
+  border-color: rgba(123,0,255,0.1) !important;
+}
+
+[data-user-theme="betjam"] .faq-item {
+  border-color: rgba(123,0,255,0.1) !important;
+}
+
+[data-user-theme="betjam"] .faq-q {
+  color: #B366FF !important;
+}
+
+[data-user-theme="betjam"] .cta-section {
+  background: linear-gradient(135deg, rgba(13,0,26,0.95), rgba(26,0,51,0.8)) !important;
+  border-color: rgba(123,0,255,0.2) !important;
+}
+
+[data-user-theme="betjam"] .grid-bg {
+  background-image: linear-gradient(rgba(123,0,255,0.03) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(123,0,255,0.03) 1px, transparent 1px) !important;
+}
+
+[data-user-theme="betjam"] .game-iframe-wrap {
+  border-color: rgba(123,0,255,0.2) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* GOLD THEME                                                               */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+[data-user-theme="gold"] {
+  --green: #FFD700;
+  --green2: #DAA520;
+  --green-dim: rgba(255,215,0,0.1);
+  --gold: #FFA500;
+  --gold-dim: rgba(255,165,0,0.1);
+  --dark: #0C0A06;
+  --dark2: #14110A;
+  --surface: #1C1810;
+  --card: rgba(28,24,16,0.8);
+  --border: rgba(255,215,0,0.1);
+  --text: #FFF8E7;
+  --muted: #B8A67A;
+  --primary: #FFD700;
+  --primary2: #DAA520;
+  --primary-dim: rgba(255,215,0,0.1);
+  --accent: #FFA500;
+  --accent-dim: rgba(255,165,0,0.1);
+}
+
+[data-user-theme="gold"] body::before {
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(255,215,0,0.1) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 60% at 90% 80%, rgba(255,165,0,0.06) 0%, transparent 50%),
+    radial-gradient(ellipse 40% 50% at 5% 30%, rgba(255,215,0,0.04) 0%, transparent 55%) !important;
+}
+
+[data-user-theme="gold"] nav {
+  background: rgba(12,10,6,0.92) !important;
+}
+
+[data-user-theme="gold"] nav::after {
+  background: linear-gradient(90deg, transparent, rgba(255,215,0,0.6), rgba(255,165,0,0.4), transparent) !important;
+}
+
+[data-user-theme="gold"] .nav-brand {
+  background: linear-gradient(135deg, #fff, #FFD700) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+}
+
+[data-user-theme="gold"] .btn-play-nav {
+  background: linear-gradient(135deg, #FFD700, #DAA520) !important;
+  color: #0C0A06 !important;
+}
+
+[data-user-theme="gold"] .hero h1 span,
+[data-user-theme="gold"] .hero-title-accent {
+  background: linear-gradient(135deg, #FFD700, #FFA500) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+}
+
+[data-user-theme="gold"] .btn-cta {
+  background: linear-gradient(135deg, #FFD700, #DAA520) !important;
+  color: #0C0A06 !important;
+  border: none !important;
+}
+
+[data-user-theme="gold"] .stat-num { color: #FFD700 !important; }
+[data-user-theme="gold"] .game-tag { background: rgba(255,215,0,0.12) !important; color: #FFD700 !important; }
+[data-user-theme="gold"] .feat-icon { background: rgba(255,215,0,0.1) !important; color: #FFD700 !important; }
+[data-user-theme="gold"] .fxp.g { background: rgba(255,215,0,0.5) !important; box-shadow: 0 0 8px rgba(255,215,0,0.6) !important; }
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* OCEAN THEME                                                              */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+[data-user-theme="ocean"] {
+  --green: #00B4D8;
+  --green2: #0077BE;
+  --green-dim: rgba(0,180,216,0.1);
+  --gold: #48CAE4;
+  --gold-dim: rgba(72,202,228,0.1);
+  --dark: #040D1A;
+  --dark2: #081426;
+  --surface: #0C1E33;
+  --card: rgba(12,30,51,0.8);
+  --border: rgba(0,180,216,0.12);
+  --text: #E6F4FF;
+  --muted: #6BA3BE;
+  --primary: #00B4D8;
+  --primary2: #0077BE;
+  --primary-dim: rgba(0,180,216,0.1);
+  --accent: #48CAE4;
+  --accent-dim: rgba(72,202,228,0.1);
+}
+
+[data-user-theme="ocean"] body::before {
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(0,180,216,0.12) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 60% at 90% 80%, rgba(72,202,228,0.06) 0%, transparent 50%),
+    radial-gradient(ellipse 40% 50% at 5% 30%, rgba(0,180,216,0.04) 0%, transparent 55%) !important;
+}
+
+[data-user-theme="ocean"] nav {
+  background: rgba(4,13,26,0.92) !important;
+}
+
+[data-user-theme="ocean"] nav::after {
+  background: linear-gradient(90deg, transparent, rgba(0,180,216,0.6), rgba(72,202,228,0.4), transparent) !important;
+}
+
+[data-user-theme="ocean"] .nav-brand {
+  background: linear-gradient(135deg, #fff, #00B4D8) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+}
+
+[data-user-theme="ocean"] .btn-play-nav {
+  background: linear-gradient(135deg, #00B4D8, #0077BE) !important;
+}
+
+[data-user-theme="ocean"] .hero h1 span,
+[data-user-theme="ocean"] .hero-title-accent {
+  background: linear-gradient(135deg, #00B4D8, #48CAE4) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+}
+
+[data-user-theme="ocean"] .btn-cta {
+  background: linear-gradient(135deg, #00B4D8, #0077BE) !important;
+}
+
+[data-user-theme="ocean"] .stat-num { color: #00B4D8 !important; }
+[data-user-theme="ocean"] .game-tag { background: rgba(0,180,216,0.12) !important; color: #00B4D8 !important; }
+[data-user-theme="ocean"] .feat-icon { background: rgba(0,180,216,0.1) !important; color: #00B4D8 !important; }
+[data-user-theme="ocean"] .fxp.g { background: rgba(0,180,216,0.5) !important; box-shadow: 0 0 8px rgba(0,180,216,0.6) !important; }
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* CRIMSON THEME                                                            */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+[data-user-theme="crimson"] {
+  --green: #E63946;
+  --green2: #C1121F;
+  --green-dim: rgba(230,57,70,0.1);
+  --gold: #FF6B6B;
+  --gold-dim: rgba(255,107,107,0.1);
+  --dark: #0D0408;
+  --dark2: #170810;
+  --surface: #200C16;
+  --card: rgba(32,12,22,0.8);
+  --border: rgba(230,57,70,0.12);
+  --text: #FFE8EC;
+  --muted: #B87080;
+  --primary: #E63946;
+  --primary2: #C1121F;
+  --primary-dim: rgba(230,57,70,0.1);
+  --accent: #FF6B6B;
+  --accent-dim: rgba(255,107,107,0.1);
+}
+
+[data-user-theme="crimson"] body::before {
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(230,57,70,0.12) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 60% at 90% 80%, rgba(255,107,107,0.06) 0%, transparent 50%),
+    radial-gradient(ellipse 40% 50% at 5% 30%, rgba(230,57,70,0.04) 0%, transparent 55%) !important;
+}
+
+[data-user-theme="crimson"] nav {
+  background: rgba(13,4,8,0.92) !important;
+}
+
+[data-user-theme="crimson"] nav::after {
+  background: linear-gradient(90deg, transparent, rgba(230,57,70,0.6), rgba(255,107,107,0.4), transparent) !important;
+}
+
+[data-user-theme="crimson"] .nav-brand {
+  background: linear-gradient(135deg, #fff, #E63946) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+}
+
+[data-user-theme="crimson"] .btn-play-nav {
+  background: linear-gradient(135deg, #E63946, #C1121F) !important;
+}
+
+[data-user-theme="crimson"] .hero h1 span,
+[data-user-theme="crimson"] .hero-title-accent {
+  background: linear-gradient(135deg, #E63946, #FF6B6B) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+}
+
+[data-user-theme="crimson"] .btn-cta {
+  background: linear-gradient(135deg, #E63946, #C1121F) !important;
+}
+
+[data-user-theme="crimson"] .stat-num { color: #E63946 !important; }
+[data-user-theme="crimson"] .game-tag { background: rgba(230,57,70,0.12) !important; color: #E63946 !important; }
+[data-user-theme="crimson"] .feat-icon { background: rgba(230,57,70,0.1) !important; color: #E63946 !important; }
+[data-user-theme="crimson"] .fxp.g { background: rgba(230,57,70,0.5) !important; box-shadow: 0 0 8px rgba(230,57,70,0.6) !important; }
