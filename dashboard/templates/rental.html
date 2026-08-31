@@ -287,6 +287,10 @@
             <div class="tx-status" style="margin-top:4px" :style="'background:'+(tx.status==='pending'?'rgba(251,191,36,.12)':tx.status==='approved'?'rgba(0,231,1,.12)':'rgba(255,71,87,.12)')+';color:'+(tx.status==='pending'?'var(--amber)':tx.status==='approved'?'var(--accent)':'var(--danger)')" x-text="tx.status==='pending'?'⏳ '+t('pending'):tx.status==='approved'?'✅ '+t('approved'):'❌ '+t('rejected')"></div>
           </div>
         </div>
+        <div x-show="tx.status==='pending'" style="display:flex;gap:6px;padding:0 14px 12px">
+          <div class="cc-btn primary" @click="processTx(tx,'approved')" style="flex:1;text-align:center"><i class="fas fa-check"></i> <span x-text="t('approved')"></span></div>
+          <div class="cc-btn danger" @click="processTx(tx,'rejected')" style="flex:1;text-align:center"><i class="fas fa-times"></i> <span x-text="t('rejected')"></span></div>
+        </div>
       </template>
     </div>
     <div x-show="allTransactions.length===0" class="empty-state"><i class="fas fa-exchange-alt"></i> <span x-text="t('no_transactions')"></span></div>
@@ -548,7 +552,7 @@ function rentalSystem(){
       admins:'المسؤولون',name:'الاسم',role:'الدور',sections:'الأقسام',actions:'إجراءات',role_support:'الدعم',role_finance:'المالية',role_games:'الألعاب',role_broadcast:'البث',assign_client:'ربط بعميل',add_admin:'إضافة مسؤول',
       generate_nginx:'توليد nginx',no_domains:'لا توجد دومينات',disabled:'معطل',
       bank_transfer:'تحويل بنكي',vodafone_cash:'فودافون كاش',account_number:'رقم الحساب',bank:'البنك',holder:'المالك',copy:'نسخ',no_payment_methods:'لا توجد وسائل دفع',new_payment_method:'وسيلة دفع جديدة',pm_name:'اسم الوسيلة',type:'النوع',
-      confirm_delete:'هل أنت متأكد من حذف',btab_dash:'لوحة',btab_clients:'عملاء',btab_pay:'دفع',btab_tx:'معاملات',btab_rev:'أرباح',btab_settings:'إعدادات',
+      id:'المعرف',expires:'ينتهي',confirm_delete:'هل أنت متأكد من حذف',btab_dash:'لوحة',btab_clients:'عملاء',btab_pay:'دفع',btab_tx:'معاملات',btab_rev:'أرباح',btab_settings:'إعدادات',
     },
     en: {
       title:'Rental System',new_client:'New Client',tab_dashboard:'Dashboard',tab_clients:'Clients',tab_payments:'Payment Methods',tab_transactions:'Transactions',tab_revenue:'Revenue',tab_admins:'Admins',tab_domains:'Domains',
@@ -564,7 +568,7 @@ function rentalSystem(){
       admins:'Admins',name:'Name',role:'Role',sections:'Sections',actions:'Actions',role_support:'Support',role_finance:'Finance',role_games:'Games',role_broadcast:'Broadcast',assign_client:'Assign to Client',add_admin:'Add Admin',
       generate_nginx:'Generate Nginx',no_domains:'No domains',disabled:'Disabled',
       bank_transfer:'Bank Transfer',vodafone_cash:'Vodafone Cash',account_number:'Account Number',bank:'Bank',holder:'Holder',copy:'Copy',no_payment_methods:'No payment methods',new_payment_method:'New Payment Method',pm_name:'Method Name',type:'Type',
-      confirm_delete:'Are you sure you want to delete',btab_dash:'Home',btab_clients:'Clients',btab_pay:'Pay',btab_tx:'Tx',btab_rev:'Revenue',btab_settings:'Settings',
+      id:'ID',expires:'Expires',confirm_delete:'Are you sure you want to delete',btab_dash:'Home',btab_clients:'Clients',btab_pay:'Pay',btab_tx:'Tx',btab_rev:'Revenue',btab_settings:'Settings',
     }
   };
   const ALL_SECTIONS = [
@@ -592,6 +596,7 @@ function rentalSystem(){
     txFilter:'',txTypeFilter:'',
     sectionAdmin:null,sectionForm:[],
     allSectionsList:ALL_SECTIONS,
+    domainForm:{client_id:'',domain:''},
     t(key){ return (I18N[this.lang]||I18N.ar)[key]||key },
     get filteredClients(){
       return this.clients.filter(c=>{
@@ -641,6 +646,7 @@ function rentalSystem(){
     async updateRevenueShare(cid,val){await api('/api/admin-center/revenue-share/'+cid,{method:'POST',body:JSON.stringify({revenue_share:parseInt(val)})});toast(this.t('save'),'success')},
     async saveAdmin(){await api('/api/admin-center/admins',{method:'POST',body:JSON.stringify(this.addAdminForm)});toast(this.t('add'),'success');this.showAddAdmin=false;await this.loadAdmins()},
     async saveTenantAssign(){await api('/api/admin-center/admins/'+this.tenantTarget.telegram_id+'/tenant',{method:'POST',body:JSON.stringify(this.tenantForm)});toast(this.t('save'),'success');this.showTenantModal=false;await this.loadAdmins()},
+    openTenantAssign(a){this.tenantTarget=a;this.tenantForm={tenant_id:a.tenant_id||''};this.showTenantModal=true},
     openSections(a){this.sectionAdmin=a.telegram_id;this.sectionForm=a.sections||[]},
     selectAllSections(){this.sectionForm=this.allSectionsList.map(s=>s.key)},
     async saveSections(){await api('/api/admin-center/admins/'+this.sectionAdmin+'/sections',{method:'POST',body:JSON.stringify({sections:this.sectionForm})});toast(this.t('save'),'success');await this.loadAdmins();this.sectionAdmin=null},
@@ -648,7 +654,7 @@ function rentalSystem(){
     async savePM(){if(!this.pmForm.name||!this.pmForm.account_number){toast(this.t('account_number')+' required','error');return}await api('/api/rental/payment-methods',{method:'POST',body:JSON.stringify(this.pmForm)});toast(this.t('add'),'success');this.showAddPM=false;await this.loadPaymentMethods()},
     async togglePMStatus(pm){await api('/api/rental/payment-methods/'+pm.id,{method:'PUT',body:JSON.stringify({status:pm.status==='active'?'inactive':'active'})});await this.loadPaymentMethods()},
     async deletePM(pm){if(!confirm(this.t('delete')+' "'+pm.name+'"'))return;await api('/api/rental/payment-methods/'+pm.id,{method:'DELETE'});await this.loadPaymentMethods()},
-    async loadAllTransactions(){try{let url='/api/rental/all-transactions';const p=[];if(this.txFilter)p.push('status='+this.txFilter);if(this.txTypeFilter)p.push('type='+this.txTypeFilter);if(p.length)url+='?'+p.join('&');const d=await api(url);this.allTransactions=d.transactions||[]}catch(e){},
+    async loadAllTransactions(){try{let url='/api/rental/all-transactions';const p=[];if(this.txFilter)p.push('status='+this.txFilter);if(this.txTypeFilter)p.push('type='+this.txTypeFilter);if(p.length)url+='?'+p.join('&');const d=await api(url);this.allTransactions=d.transactions||[]}catch(e){}},
     async processTx(tx,action){if(!confirm((action==='approved'?this.t('approved'):this.t('rejected'))+'?'))return;await api('/api/rental/transactions/'+tx.client_id+'/'+tx.id,{method:'POST',body:JSON.stringify({action})});toast(this.t('save'),'success');await this.loadAllTransactions();await this.loadPendingCount()},
     copyText(t){navigator.clipboard.writeText(t).then(()=>toast(this.t('copy'),'success')).catch(()=>{})},
     toast(msg){this.toastMsg=msg;setTimeout(()=>{this.toastMsg=''},2000)},
