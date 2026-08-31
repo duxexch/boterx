@@ -532,11 +532,8 @@ _ROUTE_SECTION_MAP = {
     'page_transactions': 'transactions',
     'page_matching': 'matching',
     'page_agents': 'agents',
-    'page_trading': 'trading',
+    'page_games': 'games',
     'page_users': 'users',
-    'page_svrp': 'svrp',
-    'page_lottery': 'lottery',
-    'page_wheel': 'wheel',
     'page_companies': 'companies',
     'page_payment_methods': 'payment_methods',
     'page_apps': 'apps',
@@ -556,7 +553,6 @@ _ROUTE_SECTION_MAP = {
     'page_backup': 'backup',
     'page_settings': 'settings',
     'page_ai_api_keys': 'ai_api_keys',
-    'page_games_admin': 'games_admin',
 }
 
 
@@ -2755,11 +2751,20 @@ def api_find_available_agent():
         return jsonify({'found': False})
     return jsonify({'found': True, 'agent': agent})
 
+@app.route('/lottery')
+@app.route('/wheel')
+@app.route('/trading')
 @app.route('/svrp')
+@app.route('/games-admin')
+def page_games_redirect():
+    return redirect(url_for('page_games'))
+
+
+@app.route('/games')
 @admin_required
-@page_permission_required('view_financial')
-def page_svrp():
-    return render_template('svrp.html', active_page='svrp')
+@page_permission_required('manage_games')
+def page_games():
+    return render_template('games.html', active_page='games')
 
 # ===== Agent Web Dashboard (Phase 5) =====
 
@@ -3222,24 +3227,6 @@ def api_agent_ticket_reply(ticket_id):
         ticket_id, 'agent', agent_id, message, data.get('status', 'in_progress') or None)
     return jsonify({'success': ok})
 
-
-@app.route('/trading')
-@admin_required
-@page_permission_required('view_financial')
-def page_trading():
-    return render_template('trading.html', active_page='trading')
-
-@app.route('/lottery')
-@admin_required
-@page_permission_required('manage_games')
-def page_lottery():
-    return render_template('lottery.html', active_page='lottery')
-
-@app.route('/wheel')
-@admin_required
-@page_permission_required('manage_games')
-def page_wheel():
-    return render_template('wheel.html', active_page='wheel')
 
 @app.route('/webapp/snatch')
 def webapp_snatch():
@@ -18048,13 +18035,6 @@ def webapp_play(game_id):
     if not game:
         return "Game not found", 404
     return render_template('game_play.html', uid=uid, lang=lang, game=game)
-
-@app.route('/games-admin')
-@admin_required
-@page_permission_required('manage_games')
-def page_games_admin():
-    """لوحة إدارة الألعاب"""
-    return render_template('games_admin.html', active_page='games_admin')
 
 # ===== Aviator — WebApp + API =====
 

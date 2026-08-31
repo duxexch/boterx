@@ -129,19 +129,15 @@
         {{ sidebar_link(url_for('page_transactions'), 'transactions', 'fas fa-money-bill-transfer', 'transactions', perm='approve_deposits', section='transactions') }}
         {{ sidebar_link(url_for('page_matching'), 'matching', 'fas fa-arrows-rotate', 'matching', perm='view_financial', section='matching') }}
         {{ sidebar_link(url_for('page_agents'), 'agents', 'fas fa-robot', 'agents', perm='view_financial', section='agents') }}
-        {{ sidebar_link(url_for('page_trading'), 'trading', 'fas fa-coins', 'trading', perm='view_financial', section='trading') }}
 
         <p class="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 mt-4" data-i18n="management">Management</p>
         {{ sidebar_link(url_for('page_users'), 'users', 'fas fa-users', 'users', perm='ban_users', section='users') }}
-        {{ sidebar_link(url_for('page_svrp'), 'svrp', 'fas fa-gem', 'svrp', perm='view_financial', section='svrp') }}
-        {{ sidebar_link(url_for('page_lottery'), 'lottery', 'fas fa-dice', 'lottery', perm='manage_games', section='lottery') }}
-        {{ sidebar_link(url_for('page_wheel'), 'wheel', 'fas fa-circle-notch', 'wheel', perm='manage_games', section='wheel') }}
+        {{ sidebar_link(url_for('page_games'), 'games', 'fas fa-gamepad', 'games', perm='manage_games', section='games_admin') }}
 
         <p class="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 mt-4" data-i18n="system">System</p>
         {{ sidebar_link(url_for('page_companies'), 'companies', 'fas fa-building', 'companies', perm='manage_companies', section='companies') }}
         {{ sidebar_link(url_for('page_payment_methods'), 'payment_methods', 'fas fa-credit-card', 'payment_methods', perm='manage_companies', section='payment_methods') }}
         {{ sidebar_link(url_for('page_apps'), 'apps', 'fas fa-mobile-screen', 'apps', perm='manage_companies', section='apps') }}
-        {{ sidebar_link(url_for('page_games_admin'), 'games_admin', 'fas fa-gamepad', 'games_admin', perm='manage_games', section='games_admin') }}
         {{ sidebar_link(url_for('page_referrals'), 'referrals', 'fas fa-gift', 'referrals', perm='manage_companies', section='referrals') }}
         {{ sidebar_link(url_for('page_channels'), 'channels', 'fas fa-bullhorn', 'channels', perm='send_broadcast', section='channels') }}
         {{ sidebar_link(url_for('page_browser'), 'browser', 'fas fa-globe', 'browser', perm='manage_bots', section='browser') }}

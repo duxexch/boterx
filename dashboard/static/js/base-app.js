@@ -209,10 +209,10 @@ function baseApp() {
                 'new_txn': { bg: 'bg-blue-600', icon: '📥', url: '/transactions' },
                 'new_match': { bg: 'bg-green-600', icon: '🔄', url: '/matching' },
                 'new_complaint': { bg: 'bg-red-600', icon: '📢', url: '/complaints' },
-                'new_trade': { bg: 'bg-amber-600', icon: '💱', url: '/trading' },
-                'new_svrp': { bg: 'bg-purple-600', icon: '💎', url: '/svrp' },
-                'new_lottery': { bg: 'bg-amber-600', icon: '🎰', url: '/lottery' },
-                'new_wheel': { bg: 'bg-blue-600', icon: '🎡', url: '/wheel' },
+                'new_trade': { bg: 'bg-amber-600', icon: '💱', url: '/games' },
+                'new_svrp': { bg: 'bg-purple-600', icon: '💎', url: '/games' },
+                'new_lottery': { bg: 'bg-amber-600', icon: '🎰', url: '/games' },
+                'new_wheel': { bg: 'bg-blue-600', icon: '🎡', url: '/games' },
                 'new_user': { bg: 'bg-green-600', icon: '👤', url: '/users' },
             };
             const c = colors[type] || { bg: 'bg-blue-600', icon: '🔔', url: '/dashboard' };
