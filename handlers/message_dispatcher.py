@@ -9,6 +9,7 @@ import logging
 import os
 import csv
 import json
+import time
 from datetime import datetime
 
 
@@ -357,6 +358,56 @@ class MessageDispatcherMixin:
             self._svrp_admin_approve_recovery(chat_id, user_id, req_id, text)
             return
 
+        if isinstance(current_state, str) and current_state == 'src_waiting_chat_id':
+            # إضافة قناة مصدرية
+            user_id = message['from']['id']
+            chat_id = message['chat']['id']
+            text = message.get('text', '').strip()
+
+            if text in [self.tr('a0010_إلغاء', 'ar'), self.tr('a0011_الغاء', 'ar'), '🔙', '❌ إلغاء']:
+                if user_id in self.user_states: del self.user_states[user_id]
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_channels_admin(fake_msg)
+                return
+
+            chat_id_input = text.strip()
+            if not chat_id_input:
+                self.send_message(chat_id, "⚠️ أرسل معرف القناة أو رابطها")
+                return
+
+            # حفظ القناة المصدرية
+            try:
+                sources = []
+                try:
+                    with open('source_channels.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        sources = list(reader)
+                except:
+                    pass
+
+                fieldnames = ['chat_id', 'brand_voice', 'added_by', 'added_at']
+                new_source = {
+                    'chat_id': chat_id_input,
+                    'brand_voice': '',
+                    'added_by': str(user_id),
+                    'added_at': str(int(time.time()))
+                }
+                sources.append(new_source)
+
+                with open('source_channels.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                    writer = csv.DictWriter(f, fieldnames=fieldnames)
+                    writer.writeheader()
+                    writer.writerows(sources)
+
+                self.send_message(chat_id, f"✅ <b>تمت إضافة القناة المصدرية!</b>\n\n📌 <code>{chat_id_input}</code>")
+            except Exception as e:
+                self.send_message(chat_id, f"❌ خطأ في الحفظ: {e}")
+
+            if user_id in self.user_states: del self.user_states[user_id]
+            fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+            self.show_source_channels_admin(fake_msg)
+            return
+
         if isinstance(current_state, str) and current_state.startswith('svrp_dep_balance_'):
             # إيداع من الرصيد المتاح
             user_id = message['from']['id']
@@ -430,7 +481,73 @@ class MessageDispatcherMixin:
                 del self.user_states[user_id]
             return
 
-        if isinstance(current_state, str) and current_state == 'svrp_send_customer':
+        if isinstance(current_state, str) and current_state.startswith('svrp_wd_amount_'):
+            # سحب من رصيد الشركة
+            user_id = message['from']['id']
+            chat_id = message['chat']['id']
+            text = message.get('text', '').strip()
+
+            if text in [self.tr('a0010_إلغاء', 'ar'), self.tr('a0011_الغاء', 'ar'), '🔙']:
+                if user_id in self.user_states: del self.user_states[user_id]
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_svrp_panel(fake_msg)
+                return
+
+            parts = current_state.replace('svrp_wd_amount_', '').split('_', 1)
+            if len(parts) != 2:
+                return
+            company_id = parts[0]
+            company_name = parts[1]
+
+            try:
+                amount = float(text)
+                if amount <= 0:
+                    self.send_message(chat_id, self.tr('a0144_المبلغ_يجب', 'ar'))
+                    return
+            except ValueError:
+                self.send_message(chat_id, self.tr('a0162_اكتب_مبلغاً', 'ar'))
+                return
+
+            account = self.svrp.get_user_company_account(user_id, company_id)
+            if not account:
+                self.send_message(chat_id, self.tr('a0163_لا_يوجد', 'ar'))
+                if user_id in self.user_states: del self.user_states[user_id]
+                return
+
+            success, msg = self.svrp.create_withdrawal_request(user_id, company_id, company_name, amount)
+            if success:
+                user = self.find_user(user_id)
+                user_currency = user.get('currency', 'SAR') if user else 'SAR'
+                self.send_message(chat_id,
+                    f"✅ <b>تم طلب السحب!</b>\n\n"
+                    f"🆔 <code>{msg}</code>\n"
+                    f"🏢 الشركة: {company_name}\n"
+                    f"📋 رقم حسابك: <code>{account.get('account_number', '')}</code>\n"
+                    f"💰 المبلغ: <b>{amount:.2f}</b> {user_currency}\n\n"
+                    f"⏳ سيتم مراجعة طلبك من الإدارة")
+
+                for admin_id in self.admin_ids:
+                    try:
+                        admin_msg = (
+                            f"💸 <b>طلب سحب</b>\n\n"
+                            f"🆔 <code>{msg}</code>\n"
+                            f"👤 العميل: {user.get('name', '')} ({user.get('customer_id', '')})\n"
+                            f"🏢 الشركة: {company_name}\n"
+                            f"💰 المبلغ: <b>{amount:.2f}</b> {user_currency}\n"
+                        )
+                        inline_btns = [
+                            [{'text': '✅ تأكيد', 'callback_data': f'approve_{msg}'},
+                             {'text': '❌ رفض', 'callback_data': f'reject_{msg}'}]
+                        ]
+                        self.send_inline_message(admin_id, admin_msg, inline_btns)
+                    except Exception as e:
+                        logger.error(f"خطأ في إشعار الأدمن بالسحب: {e}")
+            else:
+                self.send_message(chat_id, f"❌ {msg}")
+
+            if user_id in self.user_states:
+                del self.user_states[user_id]
+            return
             # إرسال رصيد مجمد خطوة 1: معرف العميل
             user_id = message['from']['id']
             chat_id = message['chat']['id']

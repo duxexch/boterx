@@ -168,6 +168,24 @@ class CallbackHandlerMixin:
                     del self.user_states[user_id]
                 self.edit_message(chat_id, message.get('message_id'), self.tr('a0224_تم_الإلغاء', lang))
                 return
+
+            # تعديل اسم الشركة
+            elif data == 'edit_company_name':
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0758_اسم_الشركة', lang))
+                self.user_states[user_id] = 'adding_company_name'
+                return
+
+            # تعديل نوع الشركة
+            elif data == 'edit_company_type':
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0759_نوع_الخدمة', lang))
+                self.user_states[user_id] = 'adding_company_type'
+                return
+
+            # تعديل تفاصيل الشركة
+            elif data == 'edit_company_details':
+                self.edit_message(chat_id, message.get('message_id'), self.tr('a0760_تفاصيل_الشركة', lang))
+                self.user_states[user_id] = 'adding_company_details'
+                return
             
             # تأكيد طلب السحب (inline button)
             elif data == 'withdraw_confirm':
@@ -349,6 +367,21 @@ class CallbackHandlerMixin:
             elif data == 'src_channels':
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                 self.show_source_channels_admin(fake_msg)
+                return
+
+            elif data == 'ch_back_admin':
+                if user_id in self.user_states:
+                    del self.user_states[user_id]
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_channels_admin(fake_msg)
+                return
+
+            elif data == 'src_add':
+                self.edit_message(chat_id, message.get('message_id'),
+                    "📥 <b>إضافة قناة مصدرية</b>\n\n"
+                    "أرسل معرف القناة (Chat ID) أو رابط القناة:\n"
+                    "مثال: <code>@channel_name</code> أو <code>-1001234567890</code>")
+                self.user_states[user_id] = 'src_waiting_chat_id'
                 return
 
             elif data == 'ch_daily_report':
@@ -540,13 +573,6 @@ class CallbackHandlerMixin:
             elif data == 'stk_back':
                 fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
                 self.show_sticker_library(fake_msg)
-                return
-
-            # ==================== 📢 القنوات/المجموعات ====================
-            elif data == 'ch_refresh':
-                self.edit_message(chat_id, message.get('message_id'), self.tr('a0439_تم_التحديث', 'ar'))
-                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
-                self.show_channels_admin(fake_msg)
                 return
 
             elif data.startswith('ch_relay_u_'):
@@ -2206,50 +2232,51 @@ class CallbackHandlerMixin:
                 self.send_inline_message(chat_id, f"{len(pending)} تذكرة معلقة", inline_btns)
                 return
 
+            # تأكيد إلغاء جولة
+            elif data.startswith('lot_cancel_confirm_'):
+                round_id = data.replace('lot_cancel_confirm_', '')
+                try:
+                    rows = []
+                    with open('lottery_rounds.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        fieldnames = reader.fieldnames
+                        for row in reader:
+                            if row.get('id') == round_id:
+                                row['status'] = 'cancelled'
+                            rows.append(row)
+                    with open('lottery_rounds.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                        writer = csv.DictWriter(f, fieldnames=fieldnames)
+                        writer.writeheader()
+                        writer.writerows(rows)
+                except:
+                    pass
+                # إشعار المشاركين
+                try:
+                    with open('lottery_tickets.csv', 'r', encoding='utf-8-sig') as f:
+                        reader = csv.DictReader(f)
+                        notified = set()
+                        for t in reader:
+                            if t.get('round_id') == round_id and t.get('user_id') not in notified:
+                                self.send_message(int(t.get('user_id', 0)),
+                                    self.tr('a0505_تم_إلغاء', 'ar'))
+                                notified.add(t.get('user_id'))
+                except:
+                    pass
+                toast_msg = self.tr('a0506_تم_إلغاء', 'ar')
+                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
+                self.show_lottery_admin(fake_msg)
+                return
+
             # إلغاء جولة
             elif data.startswith('lot_cancel_'):
                 round_id = data.replace('lot_cancel_', '')
-                if not confirm_action_str:
-                    self.edit_message(chat_id, message.get('message_id'),
-                        self.tr('a0503_تأكيد_إلغاء', 'ar'))
-                    self.send_inline_message(chat_id, self.tr('a0504_تأكيد_الإلغاء', 'ar'), [
-                        [{'text': '✅ نعم، ألغِ', 'callback_data': f'lot_cancel_confirm_{round_id}'},
-                         {'text': '❌ تراجع', 'callback_data': 'lot_admin_back'}]
-                    ])
-                    return
-                elif data.startswith('lot_cancel_confirm_'):
-                    round_id = data.replace('lot_cancel_confirm_', '')
-                    try:
-                        rows = []
-                        with open('lottery_rounds.csv', 'r', encoding='utf-8-sig') as f:
-                            reader = csv.DictReader(f)
-                            fieldnames = reader.fieldnames
-                            for row in reader:
-                                if row.get('id') == round_id:
-                                    row['status'] = 'cancelled'
-                                rows.append(row)
-                        with open('lottery_rounds.csv', 'w', newline='', encoding='utf-8-sig') as f:
-                            writer = csv.DictWriter(f, fieldnames=fieldnames)
-                            writer.writeheader()
-                            writer.writerows(rows)
-                    except:
-                        pass
-                    # إشعار المشاركين
-                    try:
-                        with open('lottery_tickets.csv', 'r', encoding='utf-8-sig') as f:
-                            reader = csv.DictReader(f)
-                            notified = set()
-                            for t in reader:
-                                if t.get('round_id') == round_id and t.get('user_id') not in notified:
-                                    self.send_message(int(t.get('user_id', 0)),
-                                        self.tr('a0505_تم_إلغاء', 'ar'))
-                                    notified.add(t.get('user_id'))
-                    except:
-                        pass
-                    toast_msg = self.tr('a0506_تم_إلغاء', 'ar')
-                    fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
-                    self.show_lottery_admin(fake_msg)
-                    return
+                self.edit_message(chat_id, message.get('message_id'),
+                    self.tr('a0503_تأكيد_إلغاء', 'ar'))
+                self.send_inline_message(chat_id, self.tr('a0504_تأكيد_الإلغاء', 'ar'), [
+                    [{'text': '✅ نعم، ألغِ', 'callback_data': f'lot_cancel_confirm_{round_id}'},
+                     {'text': '❌ تراجع', 'callback_data': 'lot_admin_back'}]
+                ])
+                return
 
             # تعديل جولة
             elif data.startswith('lot_edit_'):
@@ -2927,6 +2954,25 @@ class CallbackHandlerMixin:
 
                 self.edit_message(chat_id, message.get('message_id'), text)
                 self.send_inline_message(chat_id, self.tr('a0538_اختر_الشركة', 'ar'), inline_btns)
+                return
+
+            # سحب من شركة محددة
+            elif data.startswith('svrp_wd_company_'):
+                company_id = data.replace('svrp_wd_company_', '')
+                accounts = self.svrp.get_user_company_accounts(user_id) if self.svrp else []
+                selected = None
+                for acc in accounts:
+                    if str(acc.get('company_id', '')) == str(company_id):
+                        selected = acc
+                        break
+                if not selected:
+                    self.edit_message(chat_id, message.get('message_id'), "⚠️ الشركة غير موجودة")
+                    return
+                company_name = selected.get('company_name', '')
+                self.edit_message(chat_id, message.get('message_id'),
+                    f"💰 <b>سحب من {company_name}</b>\n\n"
+                    f"اكتب المبلغ الذي تريد سحبه:")
+                self.user_states[user_id] = f'svrp_wd_amount_{company_id}_{company_name}'
                 return
 
             elif data == 'profile_back_main':
@@ -3707,65 +3753,6 @@ class CallbackHandlerMixin:
                 return
 
             # ==================== 💎 تعويض 100% — أزرار العميل ====================
-
-            elif data == 'svrp_main_menu':
-                user = self.find_user(user_id)
-                lang = user.get('language', 'ar') if user else 'ar'
-                self.edit_message(chat_id, message.get('message_id'), self.tr('a0597_تم_العودة', lang))
-                welcome = self.tr('choose_service', lang, name=user.get('name',''), customer_id=user.get('customer_id','')) if user else ''
-                self.send_message(chat_id, welcome, self.main_keyboard(lang, user_id))
-                return
-
-            elif data == 'svrp_recovery_request':
-                # طلب استرداد — يجب اختيار الشركة أولاً
-                self._svrp_recovery_pick_company(chat_id, user_id, message)
-                return
-
-            elif data == 'svrp_deposit':
-                self.edit_message(chat_id, message.get('message_id'), self.tr('a0598_جارٍ_تحويلك', lang))
-                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
-                self.create_deposit_request(fake_msg)
-                return
-
-            elif data == 'svrp_withdraw':
-                self.edit_message(chat_id, message.get('message_id'), self.tr('a0599_جارٍ_تحويلك', lang))
-                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
-                self.create_withdrawal_request(fake_msg)
-                return
-
-            elif data == 'profile_back_main':
-                user = self.find_user(user_id)
-                lang = user.get('language', 'ar') if user else 'ar'
-                self.edit_message(chat_id, message.get('message_id'), self.tr('a0142_العودة', lang))
-                welcome = self.tr('choose_service', lang, name=user.get('name', ''), customer_id=user.get('customer_id', '')) if user else ''
-                self.send_message(chat_id, welcome, self.main_keyboard(lang, user_id))
-                return
-
-            elif data == 'svrp_wallet':
-                fake_msg = {'chat': {'id': chat_id}, 'from': {'id': user_id}, 'text': ''}
-                self.show_svrp_wallet(fake_msg)
-                return
-
-            elif data == 'svrp_send_credits':
-                self.edit_message(chat_id, message.get('message_id'),
-                    "📤 <b>إرسال رصيد مجمد</b>\n\n"
-                    "💡 سيتم خصم المبلغ من رصيدك المجمد\n"
-                    "وإضافته للرصيد المجمد للعميل الآخر\n"
-                    "ونقل نفس المبلغ من مجمده إلى متاحك\n\n"
-                    "1️⃣ اكتب <b>معرف العميل</b> (مثل: C123456):")
-                self.user_states[user_id] = 'svrp_send_customer'
-                return
-
-            elif data == 'svrp_invite':
-                user = self.find_user(user_id)
-                ref_code = self.get_user_referral_code(user) if user else ''
-                ref_count = self.get_referral_count(user_id)
-                self.edit_message(chat_id, message.get('message_id'),
-                    f"👥 <b>دعوة صديق</b>\n\n"
-                    f"📋 كود الإحالة: <code>{ref_code}</code>\n"
-                    f"👥 الإحالات: <b>{ref_count}</b>\n\n"
-                    f"شارك الكود مع أصدقائك!")
-                return
 
             # ==================== 💎 تعويض 100% — موافقة الأدمن ====================
 
