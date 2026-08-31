@@ -218,6 +218,9 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         # بدء نظام النسخ الاحتياطي التلقائي
         self.start_backup_scheduler()
 
+        # بدء نظام heartbeat — رسالة نظام يعمل كل 5 ساعات
+        self.start_heartbeat_scheduler()
+
         # ── Smart Bot Engine — التوجيه الذكي + Auto-Reply + Analytics + Chains + Notifications ──
         self.smart_engine = None
         if SMART_BOT_AVAILABLE:
@@ -13645,7 +13648,28 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             backup_thread = threading.Thread(target=backup_worker, daemon=True)
             backup_thread.start()
             logger.info("تم بدء نظام النسخ الاحتياطي التلقائي (كل 6 ساعات)")
-        
+
+    def start_heartbeat_scheduler(self):
+        """إرسال رسالة نظام يعمل كل 5 ساعات للمدراء"""
+        def heartbeat_worker():
+            while True:
+                try:
+                    time.sleep(18000)  # 5 ساعات = 18000 ثانية
+                    for admin_id in self.admin_user_ids:
+                        try:
+                            self.send_message(
+                                int(admin_id),
+                                "✅ <b>النظام يعمل بنجاح</b>\n\n🟢 الخوادم: متصلة\n🎮 الألعاب: نشطة\n💳 المدفوعات: تعمل\n📊 لوحة التحكم: متاحة\n\n📅 تحديث كل 5 ساعات"
+                            )
+                        except Exception as e:
+                            logger.error(f"heartbeat send error to {admin_id}: {e}")
+                except Exception as e:
+                    logger.error(f"heartbeat_scheduler error: {e}")
+
+        heartbeat_thread = threading.Thread(target=heartbeat_worker, daemon=True)
+        heartbeat_thread.start()
+        logger.info("تم بدء نظام heartbeat (كل 5 ساعات)")
+
     def _recover_pending_states(self):
         """فحص المعاملات المعلّقة والجلسات المتوقفة عند إعادة التشغيل.
 

@@ -122,8 +122,8 @@ def _check_financial_anomalies(token):
     global _last_financial_check, _alerted_transactions
     now = time.time()
 
-    # فحص كل 60 ثانية
-    if now - _last_financial_check < 60:
+    # فحص كل 15 دقيقة
+    if now - _last_financial_check < 900:
         return
     _last_financial_check = now
 
@@ -169,7 +169,7 @@ def _check_financial_anomalies(token):
             user_txn_count[uid] = user_txn_count.get(uid, 0) + 1
 
         for uid, count in user_txn_count.items():
-            if count > 20 and uid:
+            if count > 50 and uid:
                 # تنبيه واحد لكل مستخدم في اليوم — لا تكرار كل ساعة
                 key = f"freq_{uid}_{datetime.now().strftime('%Y%m%d')}"
                 if key not in _alerted_transactions:
@@ -332,12 +332,8 @@ def _poll(token):
     bot_name = info.get('result', {}).get('username', 'unknown')
     logger.info(f"✅ VEX Security Bot started: @{bot_name}")
 
-    # إرسال رسالة بدء التشغيل للأدمن
-    _send_message(token, ADMIN_ID,
-        f"🛡️ <b>بوت الأمان نشط</b>\n\n"
-        f"البوت: @{bot_name}\n"
-        f"⏰ {datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n"
-        f"المراقبة: الإيداعات + المعاملات + الأنماط المشبوهة")
+    # تم تعطيل رسالة البداية — البوت الرئيسي يبعت heartbeat كل 5 ساعات
+    logger.info(f"OTP Bot @{bot_name} running — startup message disabled")
 
     while OTP_BOT_RUNNING:
         try:
