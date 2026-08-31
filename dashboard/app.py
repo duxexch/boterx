@@ -7499,7 +7499,6 @@ def api_users():
 
     users = read_csv('users.csv')
     users = [u for u in users if u.get('telegram_id', '').strip()]
-    users.reverse()
 
     if search:
         sl = search.lower()
