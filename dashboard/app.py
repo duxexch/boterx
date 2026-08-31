@@ -542,10 +542,8 @@ _ROUTE_SECTION_MAP = {
     'page_apps': 'apps',
     'page_referrals': 'referrals',
     'page_channels': 'channels',
-    'page_bots': 'bots',
     'page_browser': 'browser',
-    'page_clients': 'clients',
-    'page_rental': 'clients',
+    'page_rental': 'rental',
     'page_complaints': 'complaints',
     'page_tickets': 'tickets',
     'page_broadcast': 'broadcast',
@@ -3308,13 +3306,6 @@ def page_referrals():
 def page_channels():
     return render_template('channels.html', active_page='channels')
 
-@app.route('/clients')
-@admin_required
-@page_permission_required('manage_bots')
-def page_clients():
-    _start_clients_watchdog()
-    return render_template('clients.html', active_page='clients')
-
 
 @app.route('/rental')
 @admin_required
@@ -3323,12 +3314,6 @@ def page_rental():
     _start_clients_watchdog()
     return render_template('rental.html', active_page='rental')
 
-
-@app.route('/bots')
-@admin_required
-@page_permission_required('manage_bots')
-def page_bots():
-    return render_template('bots.html', active_page='bots')
 
 @app.route('/settings')
 @admin_required
