@@ -613,10 +613,16 @@ body::after {
   z-index: 200;
 }
 .loader-screen::before {
-  content: '';
+  content: 'V';
   width: 110px;
   height: 112px;
-  background: url('/static/icons/logo-full.png') center/contain no-repeat;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 48px;
+  font-weight: 900;
+  color: var(--green, #00e701);
+  text-shadow: 0 0 30px rgba(0,231,1,0.5);
   animation: logoPulse 1.4s ease-in-out infinite;
 }
 .loader-screen .skeleton-bar,
