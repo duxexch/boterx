@@ -650,6 +650,29 @@ class AdminActionsMixin:
         except:
             pass
         
+        # ── Smart Engine: Fire webhook + chain event for transaction status change ──
+        if success and getattr(self, 'smart_engine', None):
+            try:
+                # Find the transaction to get user info
+                trans = None
+                for t in transactions:
+                    if t['id'] == trans_id:
+                        trans = t
+                        break
+                if trans:
+                    event_type = f"transaction_{new_status}"
+                    extra = {
+                        'trans_id': trans_id,
+                        'type': trans.get('type', ''),
+                        'amount': trans.get('amount', ''),
+                        'user_id': trans.get('telegram_id', ''),
+                        'status': new_status,
+                    }
+                    self.smart_engine.fire_event(event_type, trans.get('telegram_id', ''), extra)
+                    self.smart_engine.trigger_webhook(event_type, extra)
+            except Exception:
+                pass
+        
         return success
     
     def get_transaction(self, trans_id):

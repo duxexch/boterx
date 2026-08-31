@@ -53,6 +53,12 @@ try:
 except ImportError:
     MULTI_BOT_AVAILABLE = False
 
+try:
+    from smart_bot import SmartBotEngine
+    SMART_BOT_AVAILABLE = True
+except ImportError:
+    SMART_BOT_AVAILABLE = False
+
 # تحميل ملف .env من نفس المجلد
 load_dotenv(".env")
 
@@ -211,6 +217,16 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
 
         # بدء نظام النسخ الاحتياطي التلقائي
         self.start_backup_scheduler()
+
+        # ── Smart Bot Engine — التوجيه الذكي + Auto-Reply + Analytics + Chains + Notifications ──
+        self.smart_engine = None
+        if SMART_BOT_AVAILABLE:
+            try:
+                self.smart_engine = SmartBotEngine(self)
+                logger.info(f"Smart Bot Engine initialized for bot {self.smart_engine.bot_id}")
+            except Exception as e:
+                logger.error(f"Smart Bot Engine init failed: {e}")
+                self.smart_engine = None
 
         # بدء استرداد المعاملات المعلّقة بعد 15 ثانية من انطلاق البوت
         # (نمنح وقتاً للبوت كي يتجهز ثم نرسل إشعارات الاسترداد)
@@ -5014,10 +5030,20 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                     "📱 <b>تطبيقات</b> — تحميل التطبيقات\n"
                 )
                 welcome_text += self.tr('a0127_اختر_ما', lang)
+                # ── Smart Router: إضافة قسم البوتات الشقيقة ──
+                if self.smart_engine:
+                    sister_section = self.smart_engine.build_start_sister_bots_section(lang)
+                    if sister_section:
+                        welcome_text += sister_section
             else:
                 welcome_text = self.tr('choose_service', lang, name=name, customer_id=customer_id)
                 if stats_bar:
                     welcome_text = f"{stats_bar}\n\n" + welcome_text
+            # ── Analytics: log /start event ──
+            if self.smart_engine:
+                self.smart_engine.log_event(user_id, 'command', '/start', 'handle_start')
+                # ── Fire event for chains ──
+                self.smart_engine.fire_event('first_message', user_id, {'name': name, 'lang': lang})
             self.send_message(chat_id, welcome_text, self.main_keyboard(lang, user_id))
         else:
             # تخزين كود الإحالة مؤقتاً
@@ -6039,7 +6065,32 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                 )
                 self.send_message(message['chat']['id'], welcome_text, self.main_keyboard(lang))
             else:
-                self.send_message(message['chat']['id'], self.tr('unknown_command', user.get('language', 'ar')))
+                # ── Smart Engine: Auto-Reply + Sister Bot Suggestions ──
+                user = self.find_user(user_id)
+                lang = user.get('language', 'ar') if user else 'ar'
+                replied = False
+
+                # 1) Auto-Reply: فحص الردود الذكية أولاً
+                if self.smart_engine:
+                    auto_reply = self.smart_engine.check_auto_reply(text, lang)
+                    if auto_reply:
+                        self.send_message(message['chat']['id'], auto_reply)
+                        self.smart_engine.log_event(user_id, 'auto_reply', text, text[:50])
+                        replied = True
+
+                # 2) Smart Router: اقتراح بوت مناسب
+                if not replied and self.smart_engine:
+                    suggestion = self.smart_engine.suggest_bots_for_text(text, lang)
+                    if suggestion:
+                        self.send_message(message['chat']['id'], suggestion)
+                        self.smart_engine.log_event(user_id, 'sister_suggestion', text, text[:50])
+                        replied = True
+
+                # 3) الرد الافتراضي
+                if not replied:
+                    self.send_message(message['chat']['id'], self.tr('unknown_command', lang))
+                    if self.smart_engine:
+                        self.smart_engine.log_event(user_id, 'unknown', text, '')
             
         # (معالج قديم محذوف لأن نظام السحب تم تحديثه)
     

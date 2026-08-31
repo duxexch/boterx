@@ -66,6 +66,10 @@ class MessageDispatcherMixin:
         text = self.normalize_button_text(text)
         chat_id = message['chat']['id']
         user_id = message['from']['id']
+
+        # ── Smart Engine: تسجيل الرسالة في التحليلات ──
+        if getattr(self, 'smart_engine', None):
+            self.smart_engine.log_event(user_id, 'message', text[:200], '')
         
         # معالجة جميع الحالات أولاً (قبل الـ rate limiter)
         # لأن المستخدم في حالة نشطة يجب ألا يُحظر

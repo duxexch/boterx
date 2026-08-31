@@ -13106,6 +13106,223 @@ def api_bot_features(bot_id):
     return jsonify({'success': True})
 
 
+# ═══════════════════════════════════════════════════════════════════
+# ===== Smart Bot Engine API — لوحة التحكم الذكية =====
+# ═══════════════════════════════════════════════════════════════════
+
+@app.route('/api/smart/analytics')
+@app.route('/api/smart/analytics/<bot_id>')
+@api_auth
+def api_smart_analytics(bot_id=None):
+    """تحليلات البوتات"""
+    try:
+        from smart_bot import SmartBotEngine
+        days = int(request.args.get('days', 7))
+        # Use the first running bot's smart engine or create a dummy
+        engine = _get_smart_engine()
+        if not engine:
+            return jsonify({'error': 'Smart engine not available'}), 500
+        stats = engine.get_analytics(bot_id=bot_id or '', days=days)
+        return jsonify(stats)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/smart/auto-replies')
+@api_auth
+def api_smart_auto_replies():
+    """قائمة الردود الذكية"""
+    try:
+        from smart_bot import SmartBotEngine
+        engine = _get_smart_engine()
+        if not engine:
+            return jsonify({'replies': []})
+        bot_id = request.args.get('bot_id', '')
+        replies = engine.list_auto_replies(bot_id)
+        return jsonify({'replies': replies})
+    except Exception as e:
+        return jsonify({'replies': [], 'error': str(e)})
+
+
+@app.route('/api/smart/auto-replies', methods=['POST'])
+@api_auth
+@api_permission_required('manage_bots')
+def api_smart_add_auto_reply():
+    """إضافة رد ذكي"""
+    data = request.json or {}
+    engine = _get_smart_engine()
+    if not engine:
+        return jsonify({'error': 'Smart engine not available'}), 500
+    keyword = data.get('keyword', '').strip()
+    response = data.get('response', '').strip()
+    if not keyword or not response:
+        return jsonify({'error': 'keyword and response required'}), 400
+    reply_id = engine.add_auto_reply(
+        keyword=keyword,
+        response=response,
+        match_type=data.get('match_type', 'contains'),
+        bot_id=data.get('bot_id', ''),
+        priority=int(data.get('priority', 0))
+    )
+    log_action('add_auto_reply', reply_id)
+    return jsonify({'success': True, 'id': reply_id})
+
+
+@app.route('/api/smart/auto-replies/<reply_id>', methods=['DELETE'])
+@api_auth
+@api_permission_required('manage_bots')
+def api_smart_delete_auto_reply(reply_id):
+    """حذف رد ذكي"""
+    engine = _get_smart_engine()
+    if not engine:
+        return jsonify({'error': 'Smart engine not available'}), 500
+    engine.delete_auto_reply(reply_id)
+    log_action('delete_auto_reply', reply_id)
+    return jsonify({'success': True})
+
+
+@app.route('/api/smart/chains')
+@api_auth
+def api_smart_chains():
+    """قائمة سلاسل البوتات"""
+    try:
+        engine = _get_smart_engine()
+        if not engine:
+            return jsonify({'chains': []})
+        return jsonify({'chains': engine.list_chains()})
+    except Exception as e:
+        return jsonify({'chains': [], 'error': str(e)})
+
+
+@app.route('/api/smart/chains', methods=['POST'])
+@api_auth
+@api_permission_required('manage_bots')
+def api_smart_add_chain():
+    """إضافة سلسلة بوتات"""
+    data = request.json or {}
+    engine = _get_smart_engine()
+    if not engine:
+        return jsonify({'error': 'Smart engine not available'}), 500
+    chain_id = engine.add_chain(
+        trigger_event=data.get('trigger_event', ''),
+        source_bot=data.get('source_bot', ''),
+        target_bot=data.get('target_bot', ''),
+        action=data.get('action', 'send_message'),
+        message_template=data.get('message_template', '')
+    )
+    log_action('add_bot_chain', chain_id)
+    return jsonify({'success': True, 'id': chain_id})
+
+
+@app.route('/api/smart/notifications')
+@api_auth
+def api_smart_notifications():
+    """قائمة الإشعارات الذكية"""
+    try:
+        engine = _get_smart_engine()
+        if not engine:
+            return jsonify({'notifications': []})
+        return jsonify({'notifications': engine.list_smart_notifications()})
+    except Exception as e:
+        return jsonify({'notifications': [], 'error': str(e)})
+
+
+@app.route('/api/smart/notifications', methods=['POST'])
+@api_auth
+@api_permission_required('manage_bots')
+def api_smart_add_notification():
+    """إضافة إشعار ذكي"""
+    data = request.json or {}
+    engine = _get_smart_engine()
+    if not engine:
+        return jsonify({'error': 'Smart engine not available'}), 500
+    notif_id = engine.add_smart_notification(
+        trigger=data.get('trigger', ''),
+        message_template=data.get('message_template', ''),
+        bot_id=data.get('bot_id', '')
+    )
+    log_action('add_smart_notification', notif_id)
+    return jsonify({'success': True, 'id': notif_id})
+
+
+@app.route('/api/smart/webhooks')
+@api_auth
+def api_smart_webhooks():
+    """قائمة الويب هوكس"""
+    try:
+        engine = _get_smart_engine()
+        if not engine:
+            return jsonify({'webhooks': []})
+        return jsonify({'webhooks': engine.list_webhooks()})
+    except Exception as e:
+        return jsonify({'webhooks': [], 'error': str(e)})
+
+
+@app.route('/api/smart/webhooks', methods=['POST'])
+@api_auth
+@api_permission_required('manage_bots')
+def api_smart_add_webhook():
+    """إضافة webhook"""
+    data = request.json or {}
+    engine = _get_smart_engine()
+    if not engine:
+        return jsonify({'error': 'Smart engine not available'}), 500
+    hook_id = engine.add_webhook(
+        name=data.get('name', ''),
+        url=data.get('url', ''),
+        events=data.get('events', '*'),
+        secret=data.get('secret', '')
+    )
+    log_action('add_webhook', hook_id)
+    return jsonify({'success': True, 'id': hook_id})
+
+
+@app.route('/api/smart/webhooks/<hook_id>', methods=['DELETE'])
+@api_auth
+@api_permission_required('manage_bots')
+def api_smart_delete_webhook(hook_id):
+    """حذف webhook"""
+    engine = _get_smart_engine()
+    if not engine:
+        return jsonify({'error': 'Smart engine not available'}), 500
+    engine.delete_webhook(hook_id)
+    log_action('delete_webhook', hook_id)
+    return jsonify({'success': True})
+
+
+@app.route('/api/smart/templates')
+@api_auth
+def api_smart_templates():
+    """قوالب البوتات الجاهزة"""
+    from smart_bot import BOT_TEMPLATES
+    return jsonify({'templates': BOT_TEMPLATES})
+
+
+def _get_smart_engine():
+    """الحصول على SmartBotEngine من أي بوت نشط"""
+    try:
+        from multi_bot import MultiBotManager
+        manager = MultiBotManager()
+        # Try to get from active bots
+        for bot_id, info in manager.active_bots.items():
+            bot = info.get('bot')
+            if bot and hasattr(bot, 'smart_engine') and bot.smart_engine:
+                return bot.smart_engine
+        # Fallback: create from first active bot's token
+        active = manager.get_active_bots()
+        if active:
+            token = active[0].get('token', '')
+            if token:
+                from comprehensive_bot import ComprehensiveDUXBot
+                from smart_bot import SmartBotEngine
+                dummy = ComprehensiveDUXBot.__new__(ComprehensiveDUXBot)
+                dummy.token = token
+                return SmartBotEngine(dummy)
+    except Exception as e:
+        logger.error(f"Error getting smart engine: {e}")
+    return None
+
+
 # ===== نظام العملاء (White-Label / Agency) =====
 # كل عميل: بوت خاص + دخول لوحة خاص + مميزات محددة + اشتراك زمني + عزل بيانات كامل.
 

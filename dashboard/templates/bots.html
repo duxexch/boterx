@@ -1,119 +1,288 @@
 {% extends "base.html" %}
-{% block title %}البوتات - VEX{% endblock %}
-{% block page_title %}البوتات{% endblock %}
+{% block title %}البوتات الذكية - VEX{% endblock %}
+{% block page_title %}البوتات الذكية{% endblock %}
 
 {% block content %}
 <div x-data="botsPage()" x-init="init()">
     <!-- Header -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-            <h2 class="text-xl font-bold">🤖 إدارة البوتات</h2>
-            <p class="text-sm text-slate-400 mt-1">كل بوت يشتغل على ميزة أو نظام معين — المستخدم يشوف بس اللي ليه علاقة</p>
+            <h2 class="text-xl font-bold">🤖 البوتات الذكية</h2>
+            <p class="text-sm text-slate-400 mt-1">إدارة + توجيه ذكي + ردود آلية + تحليلات + سلاسل</p>
         </div>
-        <button @click="openAddModal()" class="bg-emerald-500 hover:bg-emerald-600 text-slate-900 px-5 py-2.5 rounded-xl text-sm font-bold transition flex items-center gap-2">
-            <i class="fas fa-plus"></i> بوت جديد
-        </button>
     </div>
 
-    <!-- Feature Legend -->
-    <div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4 mb-6">
-        <h3 class="text-sm font-bold text-slate-300 mb-3">📋 المميزات المتاحة لكل بوت</h3>
-        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-            <template x-for="(label,key) in allFeatures" :key="key">
-                <div class="flex items-center gap-2 text-xs text-slate-400 p-2 rounded-lg bg-slate-900/50">
-                    <span class="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0"></span>
-                    <span x-text="label"></span>
-                    <span class="text-[9px] text-slate-600 font-mono" x-text="key"></span>
+    <!-- Tabs Navigation -->
+    <div class="flex gap-1 mb-6 overflow-x-auto pb-2">
+        <template x-for="tab in tabs" :key="tab.key">
+            <button @click="activeTab=tab.key" class="px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition flex items-center gap-2"
+                :class="activeTab===tab.key?'bg-emerald-500 text-slate-900':'bg-slate-800 text-slate-400 hover:text-white'">
+                <span x-text="tab.icon"></span> <span x-text="tab.label"></span>
+                <span x-show="tab.count" class="text-[10px] bg-white/20 px-1.5 rounded-full" x-text="tab.count"></span>
+            </button>
+        </template>
+    </div>
+
+    <!-- ═══ TAB: Bots ═══ -->
+    <div x-show="activeTab==='bots'">
+        <!-- Feature Legend -->
+        <div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4 mb-6">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="text-sm font-bold text-slate-300">📋 المميزات المتاحة لكل بوت</h3>
+                <button @click="openAddModal()" class="bg-emerald-500 hover:bg-emerald-600 text-slate-900 px-4 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-2">
+                    <i class="fas fa-plus"></i> بوت جديد
+                </button>
+            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+                <template x-for="(label,key) in allFeatures" :key="key">
+                    <div class="flex items-center gap-2 text-xs text-slate-400 p-2 rounded-lg bg-slate-900/50">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0"></span>
+                        <span x-text="label"></span>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        <!-- Bots Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            <template x-for="bot in bots" :key="bot.id">
+                <div class="bg-slate-800/60 border border-slate-700 rounded-2xl overflow-hidden hover:border-slate-500 transition">
+                    <div class="p-5 pb-3">
+                        <div class="flex items-start justify-between">
+                            <div class="flex items-center gap-3">
+                                <div class="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
+                                    :class="bot.status==='frozen'?'bg-amber-500/20':bot.is_active==='yes'?'bg-emerald-500/20':'bg-red-500/20'">
+                                    <i class="fas fa-robot text-xl"
+                                        :class="bot.status==='frozen'?'text-amber-400':bot.is_active==='yes'?'text-emerald-400':'text-red-400'"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-bold" x-text="bot.name||'بوت'"></h3>
+                                    <p class="text-[10px] text-slate-500 font-mono" x-text="'#'+bot.id"></p>
+                                </div>
+                            </div>
+                            <span class="px-2 py-1 rounded-full text-[10px] font-bold"
+                                :class="bot.status==='frozen'?'bg-amber-500/20 text-amber-400':bot.is_active==='yes'?'bg-emerald-500/20 text-emerald-400':'bg-red-500/20 text-red-400'"
+                                x-text="bot.status==='frozen'?'مجمّد':bot.is_active==='yes'?'نشط':'معطّل'"></span>
+                        </div>
+                    </div>
+                    <div class="px-5 py-2 border-t border-slate-700/50 grid grid-cols-2 gap-3">
+                        <div class="bg-slate-900/50 rounded-lg p-2 text-center">
+                            <p class="text-[10px] text-slate-400">المستخدمين</p>
+                            <p class="text-lg font-bold" x-text="fmtNum(bot.total_users||0)"></p>
+                        </div>
+                        <div class="bg-slate-900/50 rounded-lg p-2 text-center">
+                            <p class="text-[10px] text-slate-400">المعاملات</p>
+                            <p class="text-lg font-bold" x-text="fmtNum(bot.total_transactions||0)"></p>
+                        </div>
+                    </div>
+                    <div class="px-5 py-3">
+                        <p class="text-[10px] text-slate-500 mb-2">المميزات المفعّلة:</p>
+                        <div class="flex flex-wrap gap-1">
+                            <template x-for="f in parseFeatures(bot.features)" :key="f">
+                                <span class="text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-bold"
+                                    x-text="allFeatures[f]||f"></span>
+                            </template>
+                            <span x-show="!bot.features" class="text-[9px] px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-300 border border-blue-500/30 font-bold">كل المميزات</span>
+                        </div>
+                    </div>
+                    <div x-show="bot.description" class="px-5 py-1">
+                        <p class="text-xs text-slate-400 line-clamp-2" x-text="bot.description"></p>
+                    </div>
+                    <div x-show="bot.freeze_until" class="px-5 py-2">
+                        <p class="text-xs text-amber-400/80"><i class="fas fa-snowflake text-xs ml-1"></i>مجمّد حتى: <span x-text="bot.freeze_until"></span></p>
+                    </div>
+                    <div class="px-5 py-3 bg-slate-900/40 border-t border-slate-700/50 flex items-center justify-between flex-wrap gap-2">
+                        <div class="flex items-center gap-1">
+                            <button @click="toggleActive(bot)" class="px-3 py-1.5 rounded-lg text-xs font-bold transition"
+                                :class="bot.is_active==='yes'?'bg-amber-500/20 text-amber-400':'bg-emerald-500/20 text-emerald-400'">
+                                <i class="fas fa-power-off text-xs"></i> <span x-text="bot.is_active==='yes'?'تعطيل':'تفعيل'"></span>
+                            </button>
+                            <button @click="editFeatures(bot)" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-500/20 text-blue-400 transition">
+                                <i class="fas fa-sliders-h text-xs"></i> المميزات
+                            </button>
+                            <button @click="confirmDelete(bot)" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-red-500/20 text-red-400 transition">
+                                <i class="fas fa-trash text-xs"></i>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </template>
+            <div x-show="bots.length===0" class="col-span-full">
+                <div class="bg-slate-800 rounded-2xl border border-slate-700 p-10 text-center">
+                    <i class="fas fa-robot text-5xl text-slate-600 mb-4 block"></i>
+                    <p class="text-slate-400 text-lg">لا توجد بوتات</p>
+                    <p class="text-slate-500 text-sm mt-1">أضف بوت جديد واختر الميزة اللي يشتغل عليها</p>
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- Bots Cards -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-        <template x-for="bot in bots" :key="bot.id">
-            <div class="bg-slate-800/60 border border-slate-700 rounded-2xl overflow-hidden hover:border-slate-500 transition">
-                <!-- Header -->
-                <div class="p-5 pb-3">
-                    <div class="flex items-start justify-between">
-                        <div class="flex items-center gap-3">
-                            <div class="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
-                                :class="bot.status==='frozen'?'bg-amber-500/20':bot.is_active==='yes'?'bg-emerald-500/20':'bg-red-500/20'">
-                                <i class="fas fa-robot text-xl"
-                                    :class="bot.status==='frozen'?'text-amber-400':bot.is_active==='yes'?'text-emerald-400':'text-red-400'"></i>
+    <!-- ═══ TAB: Auto-Replies ═══ -->
+    <div x-show="activeTab==='replies'">
+        <div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-5 mb-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-bold text-slate-300">🤖 الردود الذكية</h3>
+                <button @click="showAddReplyModal=true" class="bg-emerald-500 hover:bg-emerald-600 text-slate-900 px-4 py-1.5 rounded-xl text-xs font-bold transition">
+                    <i class="fas fa-plus"></i> رد جديد
+                </button>
+            </div>
+            <p class="text-xs text-slate-500 mb-4">البوت يرد تلقائياً على الأسئلة الشائعة — بدون تدخل الأدمن</p>
+            <div class="space-y-2">
+                <template x-for="r in autoReplies" :key="r.id">
+                    <div class="bg-slate-900/50 border border-slate-700/50 rounded-xl p-3 flex items-center justify-between gap-3">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono" x-text="r.match_type"></span>
+                                <span class="text-xs font-bold text-white truncate" x-text="r.keyword"></span>
                             </div>
-                            <div>
-                                <h3 class="font-bold" x-text="bot.name||'بوت'"></h3>
-                                <p class="text-[10px] text-slate-500 font-mono" x-text="'#'+bot.id"></p>
-                            </div>
+                            <p class="text-[11px] text-slate-400 truncate" x-text="r.response"></p>
                         </div>
-                        <span class="px-2 py-1 rounded-full text-[10px] font-bold"
-                            :class="bot.status==='frozen'?'bg-amber-500/20 text-amber-400':bot.is_active==='yes'?'bg-emerald-500/20 text-emerald-400':'bg-red-500/20 text-red-400'"
-                            x-text="bot.status==='frozen'?'مجمّد':bot.is_active==='yes'?'نشط':'معطّل'"></span>
+                        <button @click="deleteAutoReply(r.id)" class="text-red-400 hover:text-red-300 p-2"><i class="fas fa-trash text-xs"></i></button>
                     </div>
+                </template>
+                <div x-show="autoReplies.length===0" class="text-center py-8 text-slate-500 text-sm">
+                    لا توجد ردود ذكية بعد — أضف أول رد
                 </div>
-
-                <!-- Stats -->
-                <div class="px-5 py-2 border-t border-slate-700/50 grid grid-cols-2 gap-3">
-                    <div class="bg-slate-900/50 rounded-lg p-2 text-center">
-                        <p class="text-[10px] text-slate-400">المستخدمين</p>
-                        <p class="text-lg font-bold" x-text="fmtNum(bot.total_users||0)"></p>
-                    </div>
-                    <div class="bg-slate-900/50 rounded-lg p-2 text-center">
-                        <p class="text-[10px] text-slate-400">المعاملات</p>
-                        <p class="text-lg font-bold" x-text="fmtNum(bot.total_transactions||0)"></p>
-                    </div>
-                </div>
-
-                <!-- Features Badges -->
-                <div class="px-5 py-3">
-                    <p class="text-[10px] text-slate-500 mb-2">المميزات المفعّلة:</p>
-                    <div class="flex flex-wrap gap-1">
-                        <template x-for="f in parseFeatures(bot.features)" :key="f">
-                            <span class="text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-bold"
-                                x-text="allFeatures[f]||f"></span>
-                        </template>
-                        <span x-show="!bot.features" class="text-[9px] px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-300 border border-blue-500/30 font-bold">كل المميزات</span>
-                    </div>
-                </div>
-
-                <!-- Description -->
-                <div x-show="bot.description" class="px-5 py-1">
-                    <p class="text-xs text-slate-400 line-clamp-2" x-text="bot.description"></p>
-                </div>
-
-                <!-- Freeze info -->
-                <div x-show="bot.freeze_until" class="px-5 py-2">
-                    <p class="text-xs text-amber-400/80"><i class="fas fa-snowflake text-xs ml-1"></i>مجمّد حتى: <span x-text="bot.freeze_until"></span></p>
-                </div>
-
-                <!-- Footer Actions -->
-                <div class="px-5 py-3 bg-slate-900/40 border-t border-slate-700/50 flex items-center justify-between flex-wrap gap-2">
-                    <div class="flex items-center gap-1">
-                        <button @click="toggleActive(bot)" class="px-3 py-1.5 rounded-lg text-xs font-bold transition"
-                            :class="bot.is_active==='yes'?'bg-amber-500/20 text-amber-400':'bg-emerald-500/20 text-emerald-400'">
-                            <i class="fas fa-power-off text-xs"></i> <span x-text="bot.is_active==='yes'?'تعطيل':'تفعيل'"></span>
-                        </button>
-                        <button @click="editFeatures(bot)" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-500/20 text-blue-400 transition">
-                            <i class="fas fa-sliders-h text-xs"></i> المميزات
-                        </button>
-                        <button @click="confirmDelete(bot)" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-red-500/20 text-red-400 transition">
-                            <i class="fas fa-trash text-xs"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </template>
-
-        <!-- Empty state -->
-        <div x-show="bots.length===0" class="col-span-full">
-            <div class="bg-slate-800 rounded-2xl border border-slate-700 p-10 text-center">
-                <i class="fas fa-robot text-5xl text-slate-600 mb-4 block"></i>
-                <p class="text-slate-400 text-lg">لا توجد بوتات</p>
-                <p class="text-slate-500 text-sm mt-1">أضف بوت جديد واختر الميزة اللي يشتغل عليها</p>
             </div>
         </div>
     </div>
+
+    <!-- ═══ TAB: Analytics ═══ -->
+    <div x-show="activeTab==='analytics'">
+        <div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-5 mb-6">
+            <h3 class="text-sm font-bold text-slate-300 mb-4">📊 تحليلات البوتات</h3>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                <div class="bg-slate-900/50 rounded-xl p-3 text-center">
+                    <p class="text-[10px] text-slate-400">إجمالي الأحداث</p>
+                    <p class="text-2xl font-bold text-emerald-400" x-text="fmtNum(analytics.total_events||0)"></p>
+                </div>
+                <div class="bg-slate-900/50 rounded-xl p-3 text-center">
+                    <p class="text-[10px] text-slate-400">مستخدمين فريدون</p>
+                    <p class="text-2xl font-bold text-blue-400" x-text="fmtNum(analytics.unique_users||0)"></p>
+                </div>
+                <div class="bg-slate-900/50 rounded-xl p-3 text-center">
+                    <p class="text-[10px] text-slate-400">رسائل</p>
+                    <p class="text-2xl font-bold text-purple-400" x-text="fmtNum(analytics.message_count||0)"></p>
+                </div>
+                <div class="bg-slate-900/50 rounded-xl p-3 text-center">
+                    <p class="text-[10px] text-slate-400">ردود ذكية</p>
+                    <p class="text-2xl font-bold text-amber-400" x-text="fmtNum(analytics.auto_reply_hits||0)"></p>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+                <div class="bg-slate-900/50 rounded-xl p-3 text-center">
+                    <p class="text-[10px] text-slate-400">搬ewhat callbacks</p>
+                    <p class="text-lg font-bold text-cyan-400" x-text="fmtNum(analytics.callback_count||0)"></p>
+                </div>
+                <div class="bg-slate-900/50 rounded-xl p-3 text-center">
+                    <p class="text-[10px] text-slate-400">أوامر مجهولة</p>
+                    <p class="text-lg font-bold text-red-400" x-text="fmtNum(analytics.unknown_count||0)"></p>
+                </div>
+                <div class="bg-slate-900/50 rounded-xl p-3 text-center">
+                    <p class="text-[10px] text-slate-400">اقتراحات بوتات</p>
+                    <p class="text-lg font-bold text-blue-300" x-text="fmtNum(analytics.sister_bot_suggestions||0)"></p>
+                </div>
+            </div>
+            <!-- Top Actions -->
+            <div x-show="Object.keys(analytics.top_actions||{}).length > 0">
+                <h4 class="text-xs font-bold text-slate-400 mb-2">🔥 الأوامر الأكثر استخداماً</h4>
+                <div class="space-y-1">
+                    <template x-for="[action, count] in Object.entries(analytics.top_actions||{}).slice(0,5)" :key="action">
+                        <div class="flex items-center justify-between bg-slate-900/30 rounded-lg px-3 py-1.5">
+                            <span class="text-xs text-slate-300 truncate" x-text="action"></span>
+                            <span class="text-xs font-bold text-emerald-400" x-text="count"></span>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ TAB: Bot Chains ═══ -->
+    <div x-show="activeTab==='chains'">
+        <div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-5 mb-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-bold text-slate-300">🔗 سلاسل البوتات</h3>
+                <button @click="showAddChainModal=true" class="bg-emerald-500 hover:bg-emerald-600 text-slate-900 px-4 py-1.5 rounded-xl text-xs font-bold transition">
+                    <i class="fas fa-plus"></i> سلسلة جديدة
+                </button>
+            </div>
+            <p class="text-xs text-slate-500 mb-4">بوت بيشغل بوت — حدث في بوت X يُسبب إجراء في بوت Y</p>
+            <div class="space-y-2">
+                <template x-for="c in chains" :key="c.id">
+                    <div class="bg-slate-900/50 border border-slate-700/50 rounded-xl p-3">
+                        <div class="flex items-center gap-2 text-xs">
+                            <span class="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-mono" x-text="c.trigger_event"></span>
+                            <i class="fas fa-arrow-right text-slate-500"></i>
+                            <span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300" x-text="c.action"></span>
+                        </div>
+                        <p class="text-[11px] text-slate-400 mt-1 truncate" x-text="c.message_template"></p>
+                    </div>
+                </template>
+                <div x-show="chains.length===0" class="text-center py-8 text-slate-500 text-sm">
+                    لا توجد سلاسل بعد — أنشئ أول سلسلة
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ TAB: Smart Notifications ═══ -->
+    <div x-show="activeTab==='notif'">
+        <div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-5 mb-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-bold text-slate-300">🔔 إشعارات ذكية</h3>
+                <button @click="showAddNotifModal=true" class="bg-emerald-500 hover:bg-emerald-600 text-slate-900 px-4 py-1.5 rounded-xl text-xs font-bold transition">
+                    <i class="fas fa-plus"></i> إشعار جديد
+                </button>
+            </div>
+            <p class="text-xs text-slate-500 mb-4">إشعارات تلقائية مبنية على سلوك المستخدم</p>
+            <div class="space-y-2">
+                <template x-for="n in smartNotifs" :key="n.id">
+                    <div class="bg-slate-900/50 border border-slate-700/50 rounded-xl p-3">
+                        <div class="flex items-center gap-2 text-xs">
+                            <span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono" x-text="n.trigger"></span>
+                        </div>
+                        <p class="text-[11px] text-slate-400 mt-1 truncate" x-text="n.message_template"></p>
+                    </div>
+                </template>
+                <div x-show="smartNotifs.length===0" class="text-center py-8 text-slate-500 text-sm">
+                    لا توجد إشعارات ذكية بعد
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ TAB: Webhooks ═══ -->
+    <div x-show="activeTab==='webhooks'">
+        <div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-5 mb-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-bold text-slate-300">🔌 Webhooks</h3>
+                <button @click="showAddWebhookModal=true" class="bg-emerald-500 hover:bg-emerald-600 text-slate-900 px-4 py-1.5 rounded-xl text-xs font-bold transition">
+                    <i class="fas fa-plus"></i> Webhook جديد
+                </button>
+            </div>
+            <p class="text-xs text-slate-500 mb-4">ربط البوت مع خدمات خارجية (بوابات دفع، CRM، إلخ)</p>
+            <div class="space-y-2">
+                <template x-for="w in webhooks" :key="w.id">
+                    <div class="bg-slate-900/50 border border-slate-700/50 rounded-xl p-3 flex items-center justify-between">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="text-xs font-bold text-white" x-text="w.name"></span>
+                                <span class="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300" x-text="w.events"></span>
+                            </div>
+                            <p class="text-[10px] text-slate-500 font-mono truncate" x-text="w.url"></p>
+                        </div>
+                        <button @click="deleteWebhook(w.id)" class="text-red-400 hover:text-red-300 p-2"><i class="fas fa-trash text-xs"></i></button>
+                    </div>
+                </template>
+                <div x-show="webhooks.length===0" class="text-center py-8 text-slate-500 text-sm">
+                    لا توجد webhooks بعد
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ MODALS ═══ -->
 
     <!-- Add Bot Modal -->
     <div x-show="showModal" x-transition.opacity class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" style="display:none" @click.self="showModal=false">
@@ -121,6 +290,15 @@
             <div class="flex items-center justify-between p-5 border-b border-slate-700">
                 <h3 class="text-lg font-bold">🤖 بوت جديد</h3>
                 <button @click="showModal=false" class="text-slate-400 hover:text-white"><i class="fas fa-times text-lg"></i></button>
+            </div>
+            <!-- Quick Templates -->
+            <div class="px-5 pt-4">
+                <p class="text-xs text-slate-400 mb-2">⚡ أو اختار قالب جاهز:</p>
+                <div class="flex flex-wrap gap-2">
+                    <template x-for="(tmpl,key) in templates" :key="key">
+                        <button @click="applyTemplate(key)" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-700 text-slate-300 hover:bg-emerald-500/20 hover:text-emerald-300 transition" x-text="tmpl.name"></button>
+                    </template>
+                </div>
             </div>
             <form @submit.prevent="saveBot()" class="p-5 space-y-4">
                 <div>
@@ -133,7 +311,7 @@
                 </div>
                 <div>
                     <label class="block text-sm text-slate-400 mb-1">المميزات المفعّلة</label>
-                    <p class="text-[10px] text-slate-500 mb-2">اختر الميزة اللي البوت يشتغل عليها — المستخدم يشوف بس الزراير دي</p>
+                    <p class="text-[10px] text-slate-500 mb-2">اختر الميزة اللي البوت يشتغل عليها</p>
                     <div class="grid grid-cols-2 gap-2 bg-slate-900/50 border border-slate-700 rounded-xl p-3">
                         <template x-for="(label,key) in allFeatures" :key="key">
                             <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer p-2 rounded-lg hover:bg-slate-800 transition">
@@ -207,6 +385,132 @@
             </div>
         </div>
     </div>
+
+    <!-- Add Auto-Reply Modal -->
+    <div x-show="showAddReplyModal" x-transition.opacity class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" style="display:none" @click.self="showAddReplyModal=false">
+        <div class="bg-slate-800 rounded-2xl border border-slate-700 w-full max-w-md shadow-2xl" @click.stop>
+            <div class="flex items-center justify-between p-5 border-b border-slate-700">
+                <h3 class="text-lg font-bold">🤖 رد ذكي جديد</h3>
+                <button @click="showAddReplyModal=false" class="text-slate-400 hover:text-white"><i class="fas fa-times"></i></button>
+            </div>
+            <form @submit.prevent="addAutoReply()" class="p-5 space-y-4">
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">الكلمة / العبارة <span class="text-red-400">*</span></label>
+                    <input x-model="replyForm.keyword" required class="w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-2.5 text-sm text-slate-100 outline-none focus:border-emerald-500" placeholder="مثال: إيه هو التعويض">
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">الرد <span class="text-red-400">*</span></label>
+                    <textarea x-model="replyForm.response" rows="3" required class="w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-2.5 text-sm text-slate-100 outline-none focus:border-emerald-500" placeholder="رد البوت على المستخدم"></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">نوع المطابقة</label>
+                    <select x-model="replyForm.match_type" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-2.5 text-sm text-slate-100 outline-none focus:border-emerald-500">
+                        <option value="contains">يحتوي على</option>
+                        <option value="exact">تطابق تام</option>
+                        <option value="starts_with">يبدأ بـ</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">الأولوية</label>
+                    <input type="number" x-model="replyForm.priority" min="0" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-2.5 text-sm text-slate-100 outline-none focus:border-emerald-500">
+                </div>
+                <div class="flex gap-3 pt-2">
+                    <button type="submit" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-slate-900 py-2.5 rounded-xl text-sm font-bold transition">إضافة</button>
+                    <button type="button" @click="showAddReplyModal=false" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-xl text-sm transition">إلغاء</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Chain Modal -->
+    <div x-show="showAddChainModal" x-transition.opacity class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" style="display:none" @click.self="showAddChainModal=false">
+        <div class="bg-slate-800 rounded-2xl border border-slate-700 w-full max-w-md shadow-2xl" @click.stop>
+            <div class="flex items-center justify-between p-5 border-b border-slate-700">
+                <h3 class="text-lg font-bold">🔗 سلسلة بوتات جديدة</h3>
+                <button @click="showAddChainModal=false" class="text-slate-400 hover:text-white"><i class="fas fa-times"></i></button>
+            </div>
+            <form @submit.prevent="addChain()" class="p-5 space-y-4">
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">حدث المُشغّل <span class="text-red-400">*</span></label>
+                    <select x-model="chainForm.trigger_event" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-2.5 text-sm text-slate-100">
+                        <option value="new_user">مستخدم جديد</option>
+                        <option value="deposit">إيداع</option>
+                        <option value="withdrawal">سحب</option>
+                        <option value="game_play">لعب</option>
+                        <option value="first_message">أول رسالة</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">رسالة الإجراء <span class="text-red-400">*</span></label>
+                    <textarea x-model="chainForm.message_template" rows="2" required class="w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-2.5 text-sm text-slate-100" placeholder="مرحباً {name}! 🎁"></textarea>
+                </div>
+                <div class="flex gap-3 pt-2">
+                    <button type="submit" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-slate-900 py-2.5 rounded-xl text-sm font-bold transition">إضافة</button>
+                    <button type="button" @click="showAddChainModal=false" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-xl text-sm transition">إلغاء</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Notification Modal -->
+    <div x-show="showAddNotifModal" x-transition.opacity class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" style="display:none" @click.self="showAddNotifModal=false">
+        <div class="bg-slate-800 rounded-2xl border border-slate-700 w-full max-w-md shadow-2xl" @click.stop>
+            <div class="flex items-center justify-between p-5 border-b border-slate-700">
+                <h3 class="text-lg font-bold">🔔 إشعار ذكي جديد</h3>
+                <button @click="showAddNotifModal=false" class="text-slate-400 hover:text-white"><i class="fas fa-times"></i></button>
+            </div>
+            <form @submit.prevent="addNotif()" class="p-5 space-y-4">
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">الشرط <span class="text-red-400">*</span></label>
+                    <select x-model="notifForm.trigger" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-2.5 text-sm text-slate-100">
+                        <option value="inactive_3days"> مستخدم نشط 3 أيام ومبيعدش</option>
+                        <option value="inactive_7days">مستخدم نشط 7 أيام ومبيعدش</option>
+                        <option value="new_user_24h">مستخدم جديد بعد 24 ساعة</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">الرسالة <span class="text-red-400">*</span></label>
+                    <textarea x-model="notifForm.message_template" rows="2" required class="w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-2.5 text-sm text-slate-100" placeholder="وحشتنا يا {name}! 🎮"></textarea>
+                </div>
+                <div class="flex gap-3 pt-2">
+                    <button type="submit" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-slate-900 py-2.5 rounded-xl text-sm font-bold transition">إضافة</button>
+                    <button type="button" @click="showAddNotifModal=false" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-xl text-sm transition">إلغاء</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Webhook Modal -->
+    <div x-show="showAddWebhookModal" x-transition.opacity class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" style="display:none" @click.self="showAddWebhookModal=false">
+        <div class="bg-slate-800 rounded-2xl border border-slate-700 w-full max-w-md shadow-2xl" @click.stop>
+            <div class="flex items-center justify-between p-5 border-b border-slate-700">
+                <h3 class="text-lg font-bold">🔌 Webhook جديد</h3>
+                <button @click="showAddWebhookModal=false" class="text-slate-400 hover:text-white"><i class="fas fa-times"></i></button>
+            </div>
+            <form @submit.prevent="addWebhook()" class="p-5 space-y-4">
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">الاسم <span class="text-red-400">*</span></label>
+                    <input x-model="webhookForm.name" required class="w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-2.5 text-sm text-slate-100" placeholder="مثال: بوابة الدفع">
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">الرابط <span class="text-red-400">*</span></label>
+                    <input x-model="webhookForm.url" required dir="ltr" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-2.5 text-sm text-slate-100 font-mono" placeholder="https://api.example.com/webhook">
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">الأحداث</label>
+                    <input x-model="webhookForm.events" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-2.5 text-sm text-slate-100" placeholder="transaction_approved, deposit, withdrawal (أو * للكل)">
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">المفتاح السري (اختياري)</label>
+                    <input x-model="webhookForm.secret" dir="ltr" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-2.5 text-sm text-slate-100 font-mono" placeholder="للوصول المُصادَق عليه">
+                </div>
+                <div class="flex gap-3 pt-2">
+                    <button type="submit" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-slate-900 py-2.5 rounded-xl text-sm font-bold transition">إضافة</button>
+                    <button type="button" @click="showAddWebhookModal=false" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-xl text-sm transition">إلغاء</button>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
@@ -214,27 +518,73 @@
 <script>
 function botsPage(){
     return {
+        activeTab: 'bots',
+        tabs: [
+            {key:'bots', icon:'🤖', label:'البوتات', count:0},
+            {key:'replies', icon:'💬', label:'الردود الذكية', count:0},
+            {key:'analytics', icon:'📊', label:'التحليلات', count:0},
+            {key:'chains', icon:'🔗', label:'السلاسل', count:0},
+            {key:'notif', icon:'🔔', label:'الإشعارات الذكية', count:0},
+            {key:'webhooks', icon:'🔌', label:'Webhooks', count:0},
+        ],
         bots: [],
+        autoReplies: [],
+        analytics: {},
+        chains: [],
+        smartNotifs: [],
+        webhooks: [],
+        templates: {},
         showModal: false,
         showDeleteModal: false,
         showFeaturesModal: false,
+        showAddReplyModal: false,
+        showAddChainModal: false,
+        showAddNotifModal: false,
+        showAddWebhookModal: false,
         deleteTarget: null,
         editingBot: null,
         editingFeatures: [],
         form: { name:'', token:'', admin_ids:'', description:'', freeze_until:'', features:[] },
+        replyForm: { keyword:'', response:'', match_type:'contains', priority:0 },
+        chainForm: { trigger_event:'new_user', message_template:'' },
+        notifForm: { trigger:'inactive_3days', message_template:'' },
+        webhookForm: { name:'', url:'', events:'*', secret:'' },
         allFeatures: {
             deposit:'💰 إيداع', withdraw:'💸 سحب', matching:'🔄 مطابقة P2P',
             trading:'💱 تداول', compensation:'💎 تعويض 100%', games:'🎮 ألعاب',
             referral:'🎁 إحالات', complaints:'📨 شكاوى', apps:'📱 تطبيقات',
             multi_lang:'🌐 لغات', lottery:'🎲 يانصيب', wheel:'🎡 عجلة',
         },
-        async init(){ await this.loadBots() },
-        async loadBots(){
-            try { const d = await api('/api/bots'); this.bots = d.bots||d||[] } catch(e) { toast('فشل التحميل','error') }
+        async init(){
+            await Promise.all([
+                this.loadBots(),
+                this.loadAutoReplies(),
+                this.loadAnalytics(),
+                this.loadChains(),
+                this.loadSmartNotifs(),
+                this.loadWebhooks(),
+                this.loadTemplates(),
+            ]);
+            this.tabs[0].count = this.bots.length;
+            this.tabs[1].count = this.autoReplies.length;
+            this.tabs[3].count = this.chains.length;
+            this.tabs[4].count = this.smartNotifs.length;
+            this.tabs[5].count = this.webhooks.length;
         },
-        openAddModal(){
-            this.form = { name:'', token:'', admin_ids:'', description:'', freeze_until:'', features:[] };
-            this.showModal = true;
+        async loadBots(){ try { const d = await api('/api/bots'); this.bots = d.bots||d||[] } catch(e){} },
+        async loadAutoReplies(){ try { const d = await api('/api/smart/auto-replies'); this.autoReplies = d.replies||[] } catch(e){} },
+        async loadAnalytics(){ try { this.analytics = await api('/api/smart/analytics?days=30') } catch(e){} },
+        async loadChains(){ try { const d = await api('/api/smart/chains'); this.chains = d.chains||[] } catch(e){} },
+        async loadSmartNotifs(){ try { const d = await api('/api/smart/notifications'); this.smartNotifs = d.notifications||[] } catch(e){} },
+        async loadWebhooks(){ try { const d = await api('/api/smart/webhooks'); this.webhooks = d.webhooks||[] } catch(e){} },
+        async loadTemplates(){ try { const d = await api('/api/smart/templates'); this.templates = d.templates||{} } catch(e){} },
+        openAddModal(){ this.form = { name:'', token:'', admin_ids:'', description:'', freeze_until:'', features:[] }; this.showModal = true; },
+        applyTemplate(key){
+            const t = this.templates[key];
+            if(!t) return;
+            this.form.name = t.default_name;
+            this.form.features = t.features ? JSON.parse(t.features) : [];
+            this.form.description = t.description;
         },
         async saveBot(){
             try {
@@ -244,34 +594,51 @@ function botsPage(){
             } catch(e) { toast('فشل: '+(e.message||''),'error') }
         },
         async toggleActive(bot){
-            try {
-                await api('/api/bots/'+bot.id+'/toggle', { method:'POST' });
-                await this.loadBots();
-            } catch(e) { toast('فشل','error') }
+            try { await api('/api/bots/'+bot.id+'/toggle', { method:'POST' }); await this.loadBots(); } catch(e){ toast('فشل','error') }
         },
-        editFeatures(bot){
-            this.editingBot = bot;
-            this.editingFeatures = this.parseFeatures(bot.features);
-            this.showFeaturesModal = true;
-        },
+        editFeatures(bot){ this.editingBot=bot; this.editingFeatures=this.parseFeatures(bot.features); this.showFeaturesModal=true; },
         async saveFeatures(){
             try {
                 await api('/api/bots/'+this.editingBot.id+'/features', { method:'POST', body: JSON.stringify({features: JSON.stringify(this.editingFeatures)}) });
                 toast('تم الحفظ','success'); this.showFeaturesModal=false; await this.loadBots();
-            } catch(e) { toast('فشل','error') }
+            } catch(e){ toast('فشل','error') }
         },
         confirmDelete(bot){ this.deleteTarget=bot; this.showDeleteModal=true },
         async deleteBot(){
             if(!this.deleteTarget) return;
+            try { await api('/api/bots/'+this.deleteTarget.id, { method:'DELETE' }); toast('تم الحذف','success'); this.showDeleteModal=false; this.deleteTarget=null; await this.loadBots(); } catch(e){ toast('فشل','error') }
+        },
+        async addAutoReply(){
             try {
-                await api('/api/bots/'+this.deleteTarget.id, { method:'DELETE' });
-                toast('تم الحذف','success'); this.showDeleteModal=false; this.deleteTarget=null; await this.loadBots();
-            } catch(e) { toast('فشل','error') }
+                await api('/api/smart/auto-replies', { method:'POST', body: JSON.stringify(this.replyForm) });
+                toast('تمت الإضافة','success'); this.showAddReplyModal=false; this.replyForm={keyword:'',response:'',match_type:'contains',priority:0}; await this.loadAutoReplies();
+            } catch(e){ toast('فشل','error') }
         },
-        parseFeatures(f){
-            if(!f) return [];
-            try { return typeof f==='string' ? JSON.parse(f) : f } catch(e) { return [] }
+        async deleteAutoReply(id){
+            try { await api('/api/smart/auto-replies/'+id, {method:'DELETE'}); await this.loadAutoReplies(); } catch(e){ toast('فشل','error') }
         },
+        async addChain(){
+            try {
+                await api('/api/smart/chains', { method:'POST', body: JSON.stringify(this.chainForm) });
+                toast('تمت الإضافة','success'); this.showAddChainModal=false; this.chainForm={trigger_event:'new_user',message_template:''}; await this.loadChains();
+            } catch(e){ toast('فشل','error') }
+        },
+        async addNotif(){
+            try {
+                await api('/api/smart/notifications', { method:'POST', body: JSON.stringify(this.notifForm) });
+                toast('تمت الإضافة','success'); this.showAddNotifModal=false; this.notifForm={trigger:'inactive_3days',message_template:''}; await this.loadSmartNotifs();
+            } catch(e){ toast('فشل','error') }
+        },
+        async addWebhook(){
+            try {
+                await api('/api/smart/webhooks', { method:'POST', body: JSON.stringify(this.webhookForm) });
+                toast('تمت الإضافة','success'); this.showAddWebhookModal=false; this.webhookForm={name:'',url:'',events:'*',secret:''}; await this.loadWebhooks();
+            } catch(e){ toast('فشل','error') }
+        },
+        async deleteWebhook(id){
+            try { await api('/api/smart/webhooks/'+id, {method:'DELETE'}); await this.loadWebhooks(); } catch(e){ toast('فشل','error') }
+        },
+        parseFeatures(f){ if(!f) return []; try { return typeof f==='string' ? JSON.parse(f) : f } catch(e){ return [] } },
         fmtNum(n){ return (n||0).toLocaleString() },
     };
 }
