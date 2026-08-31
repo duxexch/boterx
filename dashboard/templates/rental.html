@@ -113,7 +113,7 @@ body.light-mode .rental-app .modal-overlay{background:rgba(0,0,0,.3)}
       <h1 style="font-size:20px;font-weight:900;display:flex;align-items:center;gap:8px">
         <span style="font-size:26px">🏢</span> <span x-text="rt('title')"></span>
       </h1>
-      <button @click="rl=rl==='ar'?'en':'ar'" style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:11px;font-weight:700;color:var(--accent2);cursor:pointer" x-text="rl==='ar'?'EN':'AR'"></button>
+      <button @click="toggleRl()" style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:11px;font-weight:700;color:var(--accent2);cursor:pointer" x-text="rl==='ar'?'EN':'AR'"></button>
     </div>
     <button @click="openCreateClient()" class="r-btn primary" style="display:flex;align-items:center;gap:6px">
       <i class="fas fa-plus"></i> <span x-text="rt('new_client')"></span>
@@ -601,6 +601,7 @@ function rentalSystem(){
     allSectionsList:ALL_SECTIONS,
     domainForm:{client_id:'',domain:''},
     rt(key){ return (I18N[this.rl]||I18N.ar)[key]||key },
+    toggleRl(){localStorage.setItem('rental_lang',this.rl==='ar'?'en':'ar');location.reload()},
     get filteredClients(){
       return this.clients.filter(c=>{
         if(this.filterStatus==='expired'&&!c.expired)return false;
@@ -611,7 +612,6 @@ function rentalSystem(){
       });
     },
     async init(){
-      this.$watch('rl',v=>localStorage.setItem('rental_lang',v));
       await this.loadAll();await this.loadPendingCount();this.loadPaymentMethods();
     },
     async loadAll(){await Promise.all([this.loadClients(),this.loadRevenue()])},
