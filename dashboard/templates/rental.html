@@ -1,8 +1,7 @@
-{% extends 'base.html' %}
-{% block title %}Rental System — VEX{% endblock %}
+﻿{% extends 'base.html' %}
+{% block title %}{{ rt('title') }} — VEX{% endblock %}
 {% block content %}
 <style>
-/* ── Rental Page Mobile-First Styles ── */
 .rental-app{--accent:#00e701;--accent2:#60a5fa;--bg2:#0f1218;--card:#161c28;--card2:#1a2233;--border:#252e3d;--text:#e8edf4;--muted:#6b7a90;--danger:#ff4757;--amber:#fbbf24;position:relative;min-height:70vh}
 .rental-app *{box-sizing:border-box}
 .bottom-tabs{display:none;position:fixed;bottom:0;left:0;right:0;z-index:45;background:var(--card);border-top:1px solid var(--border);padding:6px 4px env(safe-area-inset-bottom)}
@@ -99,19 +98,27 @@ body.light-mode .rental-app .modal-overlay{background:rgba(0,0,0,.3)}
 .rev-table td{padding:10px 12px;border-top:1px solid var(--border);white-space:nowrap}
 .empty-state{text-align:center;padding:40px 20px;color:var(--muted)}
 .empty-state i{font-size:40px;margin-bottom:12px;display:block;opacity:.5}
+.sub-tabs{display:flex;gap:6px;margin-bottom:16px;overflow-x:auto;padding-bottom:4px}
+.sub-tab{padding:7px 14px;border-radius:10px;font-size:11px;font-weight:700;color:var(--muted);cursor:pointer;border:1px solid transparent;transition:all .2s;white-space:nowrap;display:flex;align-items:center;gap:5px}
+.sub-tab:hover{color:var(--text);background:var(--card2)}
+.sub-tab.active{background:var(--accent2);color:#fff;border-color:var(--accent2)}
+.bot-card{background:var(--card);border:1px solid var(--border);border-radius:18px;overflow:hidden;transition:border-color .2s}
+.bot-card:hover{border-color:#354055}
+.data-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
+.data-cell{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center}
 @media(min-width:640px){.stats-grid{grid-template-columns:repeat(3,1fr)}.client-grid{grid-template-columns:repeat(2,1fr)}.pm-grid{grid-template-columns:repeat(2,1fr)}.qa-grid{grid-template-columns:repeat(3,1fr)}.modal-box{border-radius:20px;max-width:560px}}
 @media(min-width:1024px){.stats-grid{grid-template-columns:repeat(6,1fr)}.client-grid{grid-template-columns:repeat(3,1fr)}.pm-grid{grid-template-columns:repeat(3,1fr)}.bottom-tabs{display:none!important}}
 @media(max-width:1023px){.top-tabs{display:none}.bottom-tabs{display:block}.rental-app{padding-bottom:80px}}
 </style>
 
+
 <div class="rental-app" x-data="rentalSystem()" x-init="init()" :dir="(localStorage.getItem('lang')||'ar')==='ar'?'rtl':'ltr'">
   <div x-show="toastMsg" x-transition class="toast" x-text="toastMsg"></div>
 
-  <!-- HEADER -->
   <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:20px;flex-wrap:wrap">
     <div style="display:flex;align-items:center;gap:10px">
       <h1 style="font-size:20px;font-weight:900;display:flex;align-items:center;gap:8px">
-        <span style="font-size:26px">🏢</span> <span x-text="rt('title')"></span>
+        <span style="font-size:26px">ðŸ¢</span> <span x-text="rt('title')"></span>
       </h1>
       <button @click="toggleLang()" style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:11px;font-weight:700;color:var(--accent2);cursor:pointer" x-text="(localStorage.getItem('lang')||'ar')==='ar'?'EN':'AR'"></button>
     </div>
@@ -120,18 +127,15 @@ body.light-mode .rental-app .modal-overlay{background:rgba(0,0,0,.3)}
     </button>
   </div>
 
-  <!-- DESKTOP TABS -->
   <div class="top-tabs">
     <div class="top-tab" :class="tab==='dashboard'&&'active'" @click="tab='dashboard';loadAll()"><i class="fas fa-chart-pie"></i> <span x-text="rt('tab_dashboard')"></span></div>
     <div class="top-tab" :class="tab==='clients'&&'active'" @click="tab='clients'"><i class="fas fa-users"></i> <span x-text="rt('tab_clients')"></span></div>
-    <div class="top-tab" :class="tab==='payments'&&'active'" @click="tab='payments';loadPaymentMethods()"><i class="fas fa-credit-card"></i> <span x-text="rt('tab_payments')"></span></div>
-    <div class="top-tab" :class="tab==='transactions'&&'active'" @click="tab='transactions';loadAllTransactions()"><i class="fas fa-exchange-alt"></i> <span x-text="rt('tab_transactions')"></span> <span x-show="pendingCount>0" class="t-badge" x-text="pendingCount"></span></div>
-    <div class="top-tab" :class="tab==='revenue'&&'active'" @click="tab='revenue';loadRevenue()"><i class="fas fa-coins"></i> <span x-text="rt('tab_revenue')"></span></div>
+    <div class="top-tab" :class="tab==='bots'&&'active'" @click="tab='bots';loadBots()"><i class="fas fa-robot"></i> <span x-text="rt('tab_bots')"></span></div>
+    <div class="top-tab" :class="tab==='finance'&&'active'" @click="tab='finance';loadPaymentMethods()"><i class="fas fa-coins"></i> <span x-text="rt('tab_finance')"></span> <span x-show="pendingCount>0" class="t-badge" x-text="pendingCount"></span></div>
     <div class="top-tab" :class="tab==='admins'&&'active'" @click="tab='admins';loadAdmins()"><i class="fas fa-user-shield"></i> <span x-text="rt('tab_admins')"></span></div>
     <div class="top-tab" :class="tab==='domains'&&'active'" @click="tab='domains';loadDomains()"><i class="fas fa-globe"></i> <span x-text="rt('tab_domains')"></span></div>
   </div>
 
-  <!-- ═══ TAB: DASHBOARD ═══ -->
   <div x-show="tab==='dashboard'" x-transition>
     <div class="stats-grid">
       <div class="stat-card"><div class="stat-icon" style="background:rgba(96,165,250,.12)"><i class="fas fa-users" style="color:var(--accent2)"></i></div><div class="stat-val" style="color:var(--text)" x-text="stats.total"></div><div class="stat-label" x-text="rt('stat_total')"></div></div>
@@ -143,7 +147,7 @@ body.light-mode .rental-app .modal-overlay{background:rgba(0,0,0,.3)}
     </div>
     <div style="display:grid;grid-template-columns:1fr;gap:16px">
       <div class="r-card">
-        <div class="r-card-header"><span style="font-size:13px;font-weight:700">🕐 <span x-text="rt('recent_clients')"></span></span></div>
+        <div class="r-card-header"><span style="font-size:13px;font-weight:700">ðŸ• <span x-text="rt('recent_clients')"></span></span></div>
         <div class="r-card-body" style="padding:8px">
           <template x-for="c in clients.slice(0,5)" :key="c.id">
             <div @click="openEditClient(c)" style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:12px;cursor:pointer;transition:background .15s" onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background=''">
@@ -151,7 +155,7 @@ body.light-mode .rental-app .modal-overlay{background:rgba(0,0,0,.3)}
                 <span style="width:8px;height:8px;border-radius:99px;flex-shrink:0" :class="c.running?'animate-pulse':''" :style="'background:'+(c.running?'var(--accent)':c.expired?'var(--danger)':'var(--muted)')"></span>
                 <div>
                   <div style="font-size:13px;font-weight:700" x-text="c.name"></div>
-                  <div style="font-size:10px;color:var(--muted)" x-text="'@'+(c.bot_username||'—')"></div>
+                  <div style="font-size:10px;color:var(--muted)" x-text="'@'+(c.bot_username||'\u2014')"></div>
                 </div>
               </div>
               <div style="text-align:left">
@@ -163,13 +167,13 @@ body.light-mode .rental-app .modal-overlay{background:rgba(0,0,0,.3)}
         </div>
       </div>
       <div class="r-card">
-        <div class="r-card-header"><span style="font-size:13px;font-weight:700">⚡ <span x-text="rt('quick_actions')"></span></span></div>
+        <div class="r-card-header"><span style="font-size:13px;font-weight:700">âš¡ <span x-text="rt('quick_actions')"></span></span></div>
         <div class="r-card-body">
           <div class="qa-grid">
             <div class="qa-btn" @click="openCreateClient()"><i style="background:rgba(0,231,1,.12);color:var(--accent)" class="fas fa-plus"></i> <span x-text="rt('add_client')"></span></div>
             <div class="qa-btn" @click="tab='clients'"><i style="background:rgba(96,165,250,.12);color:var(--accent2)" class="fas fa-list"></i> <span x-text="rt('all_clients')"></span></div>
-            <div class="qa-btn" @click="tab='revenue';loadRevenue()"><i style="background:rgba(34,211,238,.12);color:#22d3ee" class="fas fa-chart-bar"></i> <span x-text="rt('tab_revenue')"></span></div>
-            <div class="qa-btn" @click="tab='payments';loadPaymentMethods()"><i style="background:rgba(168,85,247,.12);color:#a855f7" class="fas fa-credit-card"></i> <span x-text="rt('tab_payments')"></span></div>
+            <div class="qa-btn" @click="tab='finance';finSubTab='revenue';loadRevenue()"><i style="background:rgba(34,211,238,.12);color:#22d3ee" class="fas fa-chart-bar"></i> <span x-text="rt('tab_revenue')"></span></div>
+            <div class="qa-btn" @click="tab='finance';finSubTab='payments';loadPaymentMethods()"><i style="background:rgba(168,85,247,.12);color:#a855f7" class="fas fa-credit-card"></i> <span x-text="rt('tab_payments')"></span></div>
             <div class="qa-btn" @click="tab='admins';loadAdmins()"><i style="background:rgba(251,191,36,.12);color:var(--amber)" class="fas fa-user-shield"></i> <span x-text="rt('tab_admins')"></span></div>
             <div class="qa-btn" @click="loadAll()"><i style="background:rgba(107,122,144,.12);color:var(--muted)" class="fas fa-refresh"></i> <span x-text="rt('refresh')"></span></div>
           </div>
@@ -178,7 +182,6 @@ body.light-mode .rental-app .modal-overlay{background:rgba(0,0,0,.3)}
     </div>
   </div>
 
-  <!-- ═══ TAB: CLIENTS ═══ -->
   <div x-show="tab==='clients'" x-transition>
     <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap">
       <div class="search-box" style="flex:1;min-width:200px">
@@ -201,9 +204,9 @@ body.light-mode .rental-app .modal-overlay{background:rgba(0,0,0,.3)}
             </div>
           </div>
           <div class="cc-info">
-            <div class="cc-row"><span class="lbl" x-text="rt('bot')"></span><span class="val" style="color:var(--text)" x-text="'@'+(c.bot_username||'—')"></span></div>
+            <div class="cc-row"><span class="lbl" x-text="rt('bot')"></span><span class="val" style="color:var(--text)" x-text="'@'+(c.bot_username||'\u2014')"></span></div>
             <div class="cc-row"><span class="lbl" x-text="rt('dashboard_login')"></span><span class="val" style="color:var(--accent2)" x-text="c.dash_username"></span></div>
-            <div class="cc-row"><span class="lbl" x-text="rt('domain')"></span><span class="val" style="color:#a855f7;font-size:10px" x-text="c.custom_domain||'—'"></span></div>
+            <div class="cc-row"><span class="lbl" x-text="rt('domain')"></span><span class="val" style="color:#a855f7;font-size:10px" x-text="c.custom_domain||'\u2014'"></span></div>
             <div class="cc-row"><span class="lbl" x-text="rt('subscription')"></span><span class="val" :style="'color:'+(c.expired?'var(--danger)':c.days_left<=3?'var(--amber)':'var(--accent)')" x-text="c.expired?rt('expired'):c.days_left+' '+rt('days')"></span></div>
             <div class="cc-row"><span class="lbl" x-text="rt('balance')"></span><span class="val" style="color:var(--accent)" x-text="fmtMoney(c.balance)+' EGP'"></span></div>
             <div class="cc-row"><span class="lbl" x-text="rt('revenue_share')"></span><span class="val"><span style="color:var(--accent)" x-text="c.revenue_share+'%'"></span> / <span style="color:var(--accent2)" x-text="(100-c.revenue_share)+'%'"></span></span></div>
@@ -216,6 +219,7 @@ body.light-mode .rental-app .modal-overlay{background:rgba(0,0,0,.3)}
             <div class="cc-btn primary" x-show="!c.running&&!c.expired&&c.status!=='suspended'" @click="control(c,'start')"><i class="fas fa-play"></i> <span x-text="rt('start')"></span></div>
             <div class="cc-btn danger" x-show="c.running" @click="control(c,'stop')"><i class="fas fa-stop"></i> <span x-text="rt('stop')"></span></div>
             <div class="cc-btn info" @click="openEditClient(c)"><i class="fas fa-pen"></i> <span x-text="rt('edit')"></span></div>
+            <div class="cc-btn info" @click="openData(c)"><i class="fas fa-database"></i> <span x-text="rt('view_data')"></span></div>
             <div class="cc-btn warn" x-show="c.expired" @click="openRenew(c)"><i class="fas fa-calendar-plus"></i> <span x-text="rt('renew')"></span></div>
             <div class="cc-btn" x-show="c.status!=='suspended'" @click="control(c,'suspend')" style="color:var(--amber)"><i class="fas fa-pause"></i></div>
             <div class="cc-btn" x-show="c.status==='suspended'" @click="control(c,'activate')" style="color:var(--accent)"><i class="fas fa-check"></i></div>
@@ -227,106 +231,317 @@ body.light-mode .rental-app .modal-overlay{background:rgba(0,0,0,.3)}
     <div x-show="filteredClients.length===0" class="empty-state"><i class="fas fa-building"></i> <span x-text="rt('no_matching')"></span></div>
   </div>
 
-  <!-- ═══ TAB: PAYMENT METHODS ═══ -->
-  <div x-show="tab==='payments'" x-transition>
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-      <h2 style="font-size:16px;font-weight:900">💳 <span x-text="rt('tab_payments')"></span></h2>
-      <button @click="showAddPM=true;pmForm={name:'',pm_type:'bank_transfer',account_number:'',bank_name:'',holder_name:''}" class="r-btn primary" style="font-size:12px"><i class="fas fa-plus"></i> <span x-text="rt('add')"></span></button>
+  <div x-show="tab==='bots'" x-transition>
+    <div class="sub-tabs">
+      <div class="sub-tab" :class="botSubTab==='list'&&'active'" @click="botSubTab='list';loadBots()"><span>ðŸ¤–</span> <span x-text="rt('smart_bots')"></span></div>
+      <div class="sub-tab" :class="botSubTab==='replies'&&'active'" @click="botSubTab='replies';loadAutoReplies()"><span>ðŸ’¬</span> <span x-text="rt('auto_replies')"></span></div>
+      <div class="sub-tab" :class="botSubTab==='analytics'&&'active'" @click="botSubTab='analytics';loadAnalytics()"><span>ðŸ“Š</span> <span x-text="rt('analytics')"></span></div>
+      <div class="sub-tab" :class="botSubTab==='chains'&&'active'" @click="botSubTab='chains';loadChains()"><span>ðŸ”—</span> <span x-text="rt('chains')"></span></div>
+      <div class="sub-tab" :class="botSubTab==='notif'&&'active'" @click="botSubTab='notif';loadSmartNotifs()"><span>ðŸ””</span> <span x-text="rt('smart_notifs')"></span></div>
+      <div class="sub-tab" :class="botSubTab==='webhooks'&&'active'" @click="botSubTab='webhooks';loadWebhooks()"><span>ðŸ”Œ</span> <span x-text="rt('webhooks')"></span></div>
     </div>
-    <div class="pm-grid">
-      <template x-for="pm in paymentMethods" :key="pm.id">
-        <div class="pm-card" :class="pm.status==='active'&&'active-pm'">
-          <div class="pm-card-header">
-            <div style="display:flex;align-items:center;gap:10px">
-              <span style="font-size:24px" x-text="pm.pm_type==='bank_transfer'?'🏦':pm.pm_type==='vodafone_cash'?'📱':pm.pm_type==='usdt'?'💵':'💰'"></span>
-              <div>
-                <div style="font-size:14px;font-weight:700" x-text="pm.name"></div>
-                <div style="font-size:10px;color:var(--muted)" x-text="pm.pm_type==='bank_transfer'?rt('bank_transfer'):pm.pm_type==='vodafone_cash'?rt('vodafone_cash'):'USDT'"></div>
+
+    <!-- Bot SubTab: List -->
+    <div x-show="botSubTab==='list'">
+      <div class="r-card" style="margin-bottom:14px">
+        <div class="r-card-header">
+          <span style="font-size:13px;font-weight:700">ðŸ“‹ <span x-text="rt('all_features')"></span></span>
+          <button @click="openAddBotModal()" class="r-btn primary" style="font-size:11px;padding:7px 14px"><i class="fas fa-plus"></i> <span x-text="rt('new_bot')"></span></button>
+        </div>
+        <div class="r-card-body">
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px">
+            <template x-for="(label,key) in allFeatures" :key="key">
+              <div style="display:flex;align-items:center;gap:6px;font-size:10px;color:var(--muted);padding:6px;border-radius:8px;background:var(--bg2)">
+                <span style="width:6px;height:6px;border-radius:99px;background:var(--accent);flex-shrink:0"></span>
+                <span x-text="label"></span>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr;gap:14px">
+        <template x-for="bot in bots" :key="bot.id">
+          <div class="bot-card">
+            <div style="padding:16px">
+              <div style="display:flex;align-items:flex-start;justify-content:space-between">
+                <div style="display:flex;align-items:center;gap:10px">
+                  <div style="width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0"
+                    :style="'background:'+(bot.status==='frozen'?'rgba(251,191,36,.12)':bot.is_active==='yes'?'rgba(0,231,1,.12)':'rgba(255,71,87,.12)')">
+                    <i class="fas fa-robot" style="font-size:18px"
+                      :style="'color:'+(bot.status==='frozen'?'var(--amber)':bot.is_active==='yes'?'var(--accent)':'var(--danger)')"></i>
+                  </div>
+                  <div>
+                    <div style="font-size:14px;font-weight:800" x-text="bot.name||'Bot'"></div>
+                    <div style="font-size:10px;color:var(--muted);font-family:monospace" x-text="'#'+bot.id"></div>
+                  </div>
+                </div>
+                <span style="font-size:9px;padding:3px 8px;border-radius:99px;font-weight:700"
+                  :style="'background:'+(bot.status==='frozen'?'rgba(251,191,36,.12)':bot.is_active==='yes'?'rgba(0,231,1,.12)':'rgba(255,71,87,.12)')+';color:'+(bot.status==='frozen'?'var(--amber)':bot.is_active==='yes'?'var(--accent)':'var(--danger)')"
+                  x-text="bot.status==='frozen'?'Frozen':bot.is_active==='yes'?rt('stat_active'):rt('disabled')"></span>
               </div>
             </div>
-            <div style="display:flex;gap:6px">
-              <button @click="togglePMStatus(pm)" class="pm-copy" :style="'background:'+(pm.status==='active'?'rgba(0,231,1,.12)':'rgba(107,122,144,.12)')"><i :class="pm.status==='active'?'fas fa-check':'fas fa-ban'"></i></button>
-              <button @click="deletePM(pm)" class="pm-copy" style="background:rgba(255,71,87,.12);color:var(--danger)"><i class="fas fa-trash"></i></button>
+            <div style="padding:0 16px 8px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <div style="background:var(--bg2);border-radius:10px;padding:10px;text-align:center">
+                <div style="font-size:10px;color:var(--muted)" x-text="rt('d_users')"></div>
+                <div style="font-size:17px;font-weight:900" x-text="fmtNum(bot.total_users||0)"></div>
+              </div>
+              <div style="background:var(--bg2);border-radius:10px;padding:10px;text-align:center">
+                <div style="font-size:10px;color:var(--muted)" x-text="rt('d_transactions')"></div>
+                <div style="font-size:17px;font-weight:900" x-text="fmtNum(bot.total_transactions||0)"></div>
+              </div>
+            </div>
+            <div style="padding:8px 16px">
+              <div style="font-size:10px;color:var(--muted);margin-bottom:6px" x-text="rt('bot_features')+':'"></div>
+              <div style="display:flex;flex-wrap:wrap;gap:4px">
+                <template x-for="f in parseFeatures(bot.features)" :key="f">
+                  <span style="font-size:9px;padding:2px 6px;border-radius:99px;background:rgba(0,231,1,.08);color:rgba(0,231,1,.7);border:1px solid rgba(0,231,1,.2);font-weight:700" x-text="allFeatures[f]||f"></span>
+                </template>
+                <span x-show="!bot.features" style="font-size:9px;padding:2px 6px;border-radius:99px;background:rgba(96,165,250,.08);color:var(--accent2);border:1px solid rgba(96,165,250,.2);font-weight:700">All</span>
+              </div>
+            </div>
+            <div x-show="bot.description" style="padding:4px 16px"><div style="font-size:11px;color:var(--muted)" x-text="bot.description"></div></div>
+            <div x-show="bot.freeze_until" style="padding:8px 16px"><div style="font-size:11px;color:var(--amber)"><i class="fas fa-snowflake"></i> Frozen: <span x-text="bot.freeze_until"></span></div></div>
+            <div style="padding:10px 16px;background:var(--bg2);border-top:1px solid var(--border);display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+              <button @click="toggleActiveBot(bot)" style="font-size:10px;font-weight:700;padding:6px 10px;border-radius:8px;cursor:pointer;border:none" :style="'background:'+(bot.is_active==='yes'?'rgba(251,191,36,.12)':'rgba(0,231,1,.12)')+';color:'+(bot.is_active==='yes'?'var(--amber)':'var(--accent)')"><i class="fas fa-power-off"></i> <span x-text="bot.is_active==='yes'?rt('disabled'):rt('stat_active')"></span></button>
+              <button @click="editFeatures(bot)" style="font-size:10px;font-weight:700;padding:6px 10px;border-radius:8px;background:rgba(96,165,250,.12);color:var(--accent2);cursor:pointer;border:none"><i class="fas fa-sliders-h"></i> <span x-text="rt('features')"></span></button>
+              <button @click="confirmDeleteBot(bot)" style="font-size:10px;font-weight:700;padding:6px 10px;border-radius:8px;background:rgba(255,71,87,.1);color:var(--danger);cursor:pointer;border:none"><i class="fas fa-trash"></i></button>
             </div>
           </div>
-          <div class="pm-card-body">
-            <div class="pm-row"><span class="k" x-text="rt('account_number')"></span><div style="display:flex;align-items:center;gap:6px"><span class="v" style="color:var(--accent)" x-text="pm.account_number"></span><button @click="copyText(pm.account_number)" class="pm-copy"><i class="fas fa-copy"></i> <span x-text="rt('copy')"></span></button></div></div>
-            <div x-show="pm.bank_name" class="pm-row"><span class="k" x-text="rt('bank')"></span><span class="v" x-text="pm.bank_name"></span></div>
-            <div x-show="pm.holder_name" class="pm-row"><span class="k" x-text="rt('holder')"></span><span class="v" x-text="pm.holder_name"></span></div>
-          </div>
-        </div>
-      </template>
+        </template>
+      </div>
+      <div x-show="bots.length===0" class="empty-state"><i class="fas fa-robot"></i> <span x-text="rt('no_clients')"></span></div>
     </div>
-    <div x-show="paymentMethods.length===0" class="empty-state"><i class="fas fa-credit-card"></i> <span x-text="rt('no_payment_methods')"></span></div>
-  </div>
 
-  <!-- ═══ TAB: TRANSACTIONS ═══ -->
-  <div x-show="tab==='transactions'" x-transition>
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
-      <h2 style="font-size:16px;font-weight:900">🔄 <span x-text="rt('tab_transactions')"></span></h2>
-      <div style="display:flex;gap:8px">
-        <select x-model="txFilter" @change="loadAllTransactions()" class="r-input" style="width:auto;min-width:90px;padding:8px 12px;font-size:11px">
-          <option value="" x-text="rt('all')"></option><option value="pending" x-text="rt('pending')"></option><option value="approved" x-text="rt('approved')"></option><option value="rejected" x-text="rt('rejected')"></option>
-        </select>
-        <select x-model="txTypeFilter" @change="loadAllTransactions()" class="r-input" style="width:auto;min-width:90px;padding:8px 12px;font-size:11px">
-          <option value="" x-text="rt('all')"></option><option value="deposit" x-text="rt('deposit')"></option><option value="withdraw" x-text="rt('withdraw')"></option>
-        </select>
+    <!-- Bot SubTab: Auto-Replies -->
+    <div x-show="botSubTab==='replies'">
+      <div class="r-card">
+        <div class="r-card-header">
+          <span style="font-size:14px;font-weight:700">ðŸ’¬ <span x-text="rt('auto_replies')"></span></span>
+          <button @click="showAddReplyModal=true;replyForm={keyword:'',response:'',match_type:'contains',priority:0}" class="r-btn primary" style="font-size:11px;padding:7px 14px"><i class="fas fa-plus"></i> <span x-text="rt('add_reply')"></span></button>
+        </div>
+        <div class="r-card-body" style="padding:8px">
+          <template x-for="r in autoReplies" :key="r.id">
+            <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+              <div style="flex:1;min-width:0">
+                <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+                  <span style="font-size:9px;padding:2px 6px;border-radius:99px;background:rgba(0,231,1,.12);color:var(--accent);font-weight:700" x-text="r.match_type"></span>
+                  <span style="font-size:12px;font-weight:700;color:var(--text)" x-text="r.keyword"></span>
+                </div>
+                <div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" x-text="r.response"></div>
+              </div>
+              <button @click="deleteAutoReply(r.id)" style="color:var(--danger);padding:6px;cursor:pointer"><i class="fas fa-trash" style="font-size:11px"></i></button>
+            </div>
+          </template>
+          <div x-show="autoReplies.length===0" class="empty-state" style="padding:20px"><p x-text="rt('no_transactions')"></p></div>
+        </div>
       </div>
     </div>
-    <div x-show="pendingCount>0" style="background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.25);border-radius:16px;padding:14px;margin-bottom:14px;display:flex;align-items:center;gap:10px">
-      <span style="font-size:24px">⚠️</span>
-      <div>
-        <div style="font-size:13px;font-weight:700;color:var(--amber)" x-text="pendingCount+' '+rt('pending_requests')"></div>
-        <div style="font-size:10px;color:var(--muted)" x-text="rt('review_action')"></div>
-      </div>
-    </div>
-    <div style="display:grid;gap:10px">
-      <template x-for="tx in allTransactions" :key="tx.id">
-        <div class="tx-card">
-          <div class="tx-icon" :style="'background:'+(tx.type==='deposit'?'rgba(0,231,1,.1)':'rgba(255,71,87,.1)')"><span x-text="tx.type==='deposit'?'💰':'💸'"></span></div>
-          <div class="tx-info"><div class="tx-title" x-text="tx.client_name||tx.client_id"></div><div class="tx-sub"><span x-text="tx.method||'—'"></span> · <span x-text="tx.created_at"></span></div></div>
-          <div style="text-align:left">
-            <div class="tx-amount" :style="'color:'+(tx.type==='deposit'?'var(--accent)':'var(--danger)')" x-text="(tx.type==='deposit'?'+':'-')+fmtMoney(tx.amount)"></div>
-            <div class="tx-status" style="margin-top:4px" :style="'background:'+(tx.status==='pending'?'rgba(251,191,36,.12)':tx.status==='approved'?'rgba(0,231,1,.12)':'rgba(255,71,87,.12)')+';color:'+(tx.status==='pending'?'var(--amber)':tx.status==='approved'?'var(--accent)':'var(--danger)')" x-text="tx.status==='pending'?'⏳ '+rt('pending'):tx.status==='approved'?'✅ '+rt('approved'):'❌ '+rt('rejected')"></div>
+
+    <!-- Bot SubTab: Analytics -->
+    <div x-show="botSubTab==='analytics'">
+      <div class="r-card">
+        <div class="r-card-header"><span style="font-size:14px;font-weight:700">ðŸ“Š <span x-text="rt('analytics')"></span></span></div>
+        <div class="r-card-body">
+          <div class="stats-grid" style="grid-template-columns:repeat(2,1fr)">
+            <div class="stat-card"><div class="stat-label" x-text="rt('total_events')"></div><div class="stat-val" style="color:var(--accent);font-size:16px" x-text="fmtNum(analytics.total_events||0)"></div></div>
+            <div class="stat-card"><div class="stat-label" x-text="rt('unique_users')"></div><div class="stat-val" style="color:var(--accent2);font-size:16px" x-text="fmtNum(analytics.unique_users||0)"></div></div>
+            <div class="stat-card"><div class="stat-label" x-text="rt('messages')"></div><div class="stat-val" style="color:#a855f7;font-size:16px" x-text="fmtNum(analytics.message_count||0)"></div></div>
+            <div class="stat-card"><div class="stat-label" x-text="rt('reply_hits')"></div><div class="stat-val" style="color:var(--amber);font-size:16px" x-text="fmtNum(analytics.auto_reply_hits||0)"></div></div>
+            <div class="stat-card"><div class="stat-label" x-text="rt('callbacks')"></div><div class="stat-val" style="color:#22d3ee;font-size:16px" x-text="fmtNum(analytics.callback_count||0)"></div></div>
+            <div class="stat-card"><div class="stat-label" x-text="rt('unknown')"></div><div class="stat-val" style="color:var(--danger);font-size:16px" x-text="fmtNum(analytics.unknown_count||0)"></div></div>
+          </div>
+          <div x-show="Object.keys(analytics.top_actions||{}).length>0" style="margin-top:14px">
+            <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:8px" x-text="rt('top_actions')"></div>
+            <template x-for="[action, count] in Object.entries(analytics.top_actions||{}).slice(0,5)" :key="action">
+              <div style="display:flex;align-items:center;justify-content:space-between;background:var(--bg2);border-radius:8px;padding:8px 12px;margin-bottom:4px">
+                <span style="font-size:11px;color:var(--text)" x-text="action"></span>
+                <span style="font-size:11px;font-weight:700;color:var(--accent)" x-text="count"></span>
+              </div>
+            </template>
           </div>
         </div>
-        <div x-show="tx.status==='pending'" style="display:flex;gap:6px;padding:0 14px 12px">
-          <div class="cc-btn primary" @click="processTx(tx,'approved')" style="flex:1;text-align:center"><i class="fas fa-check"></i> <span x-text="rt('approved')"></span></div>
-          <div class="cc-btn danger" @click="processTx(tx,'rejected')" style="flex:1;text-align:center"><i class="fas fa-times"></i> <span x-text="rt('rejected')"></span></div>
+      </div>
+    </div>
+
+    <!-- Bot SubTab: Chains -->
+    <div x-show="botSubTab==='chains'">
+      <div class="r-card">
+        <div class="r-card-header">
+          <span style="font-size:14px;font-weight:700">ðŸ”— <span x-text="rt('chains')"></span></span>
+          <button @click="showAddChainModal=true;chainForm={trigger_event:'new_user',message_template:''}" class="r-btn primary" style="font-size:11px;padding:7px 14px"><i class="fas fa-plus"></i> <span x-text="rt('add_chain')"></span></button>
         </div>
-      </template>
+        <div class="r-card-body" style="padding:8px">
+          <template x-for="ch in chains" :key="ch.id">
+            <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:8px">
+              <div style="display:flex;align-items:center;gap:6px;font-size:11px">
+                <span style="padding:2px 6px;border-radius:8px;background:rgba(96,165,250,.12);color:var(--accent2);font-family:monospace" x-text="ch.trigger_event"></span>
+                <i class="fas fa-arrow-right" style="color:var(--muted);font-size:10px"></i>
+                <span style="padding:2px 6px;border-radius:8px;background:rgba(0,231,1,.12);color:var(--accent)" x-text="ch.action"></span>
+              </div>
+              <div style="font-size:11px;color:var(--muted);margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" x-text="ch.message_template"></div>
+            </div>
+          </template>
+          <div x-show="chains.length===0" class="empty-state" style="padding:20px"><p x-text="rt('no_transactions')"></p></div>
+        </div>
+      </div>
     </div>
-    <div x-show="allTransactions.length===0" class="empty-state"><i class="fas fa-exchange-alt"></i> <span x-text="rt('no_transactions')"></span></div>
+
+    <!-- Bot SubTab: Smart Notifications -->
+    <div x-show="botSubTab==='notif'">
+      <div class="r-card">
+        <div class="r-card-header">
+          <span style="font-size:14px;font-weight:700">ðŸ”” <span x-text="rt('smart_notifs')"></span></span>
+          <button @click="showAddNotifModal=true;notifForm={trigger:'inactive_3days',message_template:''}" class="r-btn primary" style="font-size:11px;padding:7px 14px"><i class="fas fa-plus"></i> <span x-text="rt('add_notif')"></span></button>
+        </div>
+        <div class="r-card-body" style="padding:8px">
+          <template x-for="n in smartNotifs" :key="n.id">
+            <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:8px">
+              <div style="display:flex;align-items:center;gap:6px;font-size:11px">
+                <span style="padding:2px 6px;border-radius:8px;background:rgba(251,191,36,.12);color:var(--amber);font-family:monospace" x-text="n.trigger"></span>
+              </div>
+              <div style="font-size:11px;color:var(--muted);margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" x-text="n.message_template"></div>
+            </div>
+          </template>
+          <div x-show="smartNotifs.length===0" class="empty-state" style="padding:20px"><p x-text="rt('no_transactions')"></p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bot SubTab: Webhooks -->
+    <div x-show="botSubTab==='webhooks'">
+      <div class="r-card">
+        <div class="r-card-header">
+          <span style="font-size:14px;font-weight:700">ðŸ”Œ Webhooks</span>
+          <button @click="showAddWebhookModal=true;webhookForm={name:'',url:'',events:'*',secret:''}" class="r-btn primary" style="font-size:11px;padding:7px 14px"><i class="fas fa-plus"></i> <span x-text="rt('add_webhook')"></span></button>
+        </div>
+        <div class="r-card-body" style="padding:8px">
+          <template x-for="w in webhooks" :key="w.id">
+            <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+              <div style="flex:1;min-width:0">
+                <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+                  <span style="font-size:12px;font-weight:700;color:var(--text)" x-text="w.name"></span>
+                  <span style="font-size:9px;padding:2px 6px;border-radius:99px;background:rgba(0,231,1,.12);color:var(--accent)" x-text="w.events"></span>
+                </div>
+                <div style="font-size:10px;color:var(--muted);font-family:monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" x-text="w.url"></div>
+              </div>
+              <button @click="deleteWebhook(w.id)" style="color:var(--danger);padding:6px;cursor:pointer"><i class="fas fa-trash" style="font-size:11px"></i></button>
+            </div>
+          </template>
+          <div x-show="webhooks.length===0" class="empty-state" style="padding:20px"><p x-text="rt('no_transactions')"></p></div>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <!-- ═══ TAB: REVENUE ═══ -->
-  <div x-show="tab==='revenue'" x-transition>
-    <div class="stats-grid" style="grid-template-columns:repeat(2,1fr)">
-      <div class="stat-card"><div class="stat-label" x-text="rt('total_profit')"></div><div class="stat-val" style="color:#22d3ee;font-size:16px" x-text="fmtMoney(revenueStats.total_game_profit)"></div></div>
-      <div class="stat-card"><div class="stat-label" x-text="rt('my_share')"></div><div class="stat-val" style="color:var(--accent);font-size:16px" x-text="fmtMoney(revenueStats.admin_share)"></div></div>
-      <div class="stat-card"><div class="stat-label" x-text="rt('client_share')"></div><div class="stat-val" style="color:var(--accent2);font-size:16px" x-text="fmtMoney(revenueStats.client_share)"></div></div>
-      <div class="stat-card"><div class="stat-label" x-text="rt('rounds')"></div><div class="stat-val" style="color:#a855f7;font-size:16px" x-text="fmtNum(revenueStats.total_rounds)"></div></div>
+  <div x-show="tab==='finance'" x-transition>
+    <div class="sub-tabs">
+      <div class="sub-tab" :class="finSubTab==='payments'&&'active'" @click="finSubTab='payments';loadPaymentMethods()"><span>ðŸ’³</span> <span x-text="rt('tab_payments')"></span></div>
+      <div class="sub-tab" :class="finSubTab==='transactions'&&'active'" @click="finSubTab='transactions';loadAllTransactions()"><span>ðŸ”„</span> <span x-text="rt('tab_transactions')"></span> <span x-show="pendingCount>0" class="t-badge" x-text="pendingCount"></span></div>
+      <div class="sub-tab" :class="finSubTab==='revenue'&&'active'" @click="finSubTab='revenue';loadRevenue()"><span>ðŸ’°</span> <span x-text="rt('tab_revenue')"></span></div>
     </div>
-    <div class="r-card"><div class="r-card-body" style="overflow-x:auto;padding:0">
-      <table class="rev-table">
-        <thead><tr><th x-text="rt('client')"></th><th x-text="rt('revenue_share')"></th><th x-text="rt('profit')"></th><th x-text="rt('client_share')"></th><th x-text="rt('my_share')"></th><th x-text="rt('rounds')"></th><th x-text="rt('edit')"></th></tr></thead>
-        <tbody><template x-for="r in revenueByClient" :key="r.client_id"><tr>
-          <td style="font-weight:700" x-text="r.client_name"></td>
-          <td style="color:var(--accent);font-weight:700" x-text="r.revenue_share+'%'"></td>
-          <td style="color:#22d3ee" x-text="fmtMoney(r.total_profit)"></td>
-          <td style="color:var(--accent2)" x-text="fmtMoney(r.client_amount)"></td>
-          <td style="color:var(--accent)" x-text="fmtMoney(r.admin_amount)"></td>
-          <td style="color:#a855f7" x-text="fmtNum(r.rounds)"></td>
-          <td><input type="number" min="0" max="100" :value="r.revenue_share" @change="updateRevenueShare(r.client_id,$event.target.value)" class="r-input" style="width:60px;padding:6px;text-align:center;font-size:11px">%</td>
-        </tr></template></tbody>
-      </table>
-    </div></div>
+
+    <!-- Finance: Payments -->
+    <div x-show="finSubTab==='payments'">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <h2 style="font-size:16px;font-weight:900">ðŸ’³ <span x-text="rt('tab_payments')"></span></h2>
+        <button @click="showAddPM=true;pmForm={name:'',pm_type:'bank_transfer',account_number:'',bank_name:'',holder_name:''}" class="r-btn primary" style="font-size:12px"><i class="fas fa-plus"></i> <span x-text="rt('add')"></span></button>
+      </div>
+      <div class="pm-grid">
+        <template x-for="pm in paymentMethods" :key="pm.id">
+          <div class="pm-card" :class="pm.status==='active'&&'active-pm'">
+            <div class="pm-card-header">
+              <div style="display:flex;align-items:center;gap:10px">
+                <span style="font-size:24px" x-text="pm.pm_type==='bank_transfer'?'ðŸ¦':pm.pm_type==='vodafone_cash'?'ðŸ“±':pm.pm_type==='usdt'?'ðŸ’µ':'ðŸ’°'"></span>
+                <div>
+                  <div style="font-size:14px;font-weight:700" x-text="pm.name"></div>
+                  <div style="font-size:10px;color:var(--muted)" x-text="pm.pm_type==='bank_transfer'?rt('bank_transfer'):pm.pm_type==='vodafone_cash'?rt('vodafone_cash'):'USDT'"></div>
+                </div>
+              </div>
+              <div style="display:flex;gap:6px">
+                <button @click="togglePMStatus(pm)" class="pm-copy" :style="'background:'+(pm.status==='active'?'rgba(0,231,1,.12)':'rgba(107,122,144,.12)')"><i :class="pm.status==='active'?'fas fa-check':'fas fa-ban'"></i></button>
+                <button @click="deletePM(pm)" class="pm-copy" style="background:rgba(255,71,87,.12);color:var(--danger)"><i class="fas fa-trash"></i></button>
+              </div>
+            </div>
+            <div class="pm-card-body">
+              <div class="pm-row"><span class="k" x-text="rt('account_number')"></span><div style="display:flex;align-items:center;gap:6px"><span class="v" style="color:var(--accent)" x-text="pm.account_number"></span><button @click="copyText(pm.account_number)" class="pm-copy"><i class="fas fa-copy"></i> <span x-text="rt('copy')"></span></button></div></div>
+              <div x-show="pm.bank_name" class="pm-row"><span class="k" x-text="rt('bank')"></span><span class="v" x-text="pm.bank_name"></span></div>
+              <div x-show="pm.holder_name" class="pm-row"><span class="k" x-text="rt('holder')"></span><span class="v" x-text="pm.holder_name"></span></div>
+            </div>
+          </div>
+        </template>
+      </div>
+      <div x-show="paymentMethods.length===0" class="empty-state"><i class="fas fa-credit-card"></i> <span x-text="rt('no_payment_methods')"></span></div>
+    </div>
+
+    <!-- Finance: Transactions -->
+    <div x-show="finSubTab==='transactions'">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+        <h2 style="font-size:16px;font-weight:900">ðŸ”„ <span x-text="rt('tab_transactions')"></span></h2>
+        <div style="display:flex;gap:8px">
+          <select x-model="txFilter" @change="loadAllTransactions()" class="r-input" style="width:auto;min-width:90px;padding:8px 12px;font-size:11px">
+            <option value="" x-text="rt('all')"></option><option value="pending" x-text="rt('pending')"></option><option value="approved" x-text="rt('approved')"></option><option value="rejected" x-text="rt('rejected')"></option>
+          </select>
+          <select x-model="txTypeFilter" @change="loadAllTransactions()" class="r-input" style="width:auto;min-width:90px;padding:8px 12px;font-size:11px">
+            <option value="" x-text="rt('all')"></option><option value="deposit" x-text="rt('deposit')"></option><option value="withdraw" x-text="rt('withdraw')"></option>
+          </select>
+        </div>
+      </div>
+      <div x-show="pendingCount>0" style="background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.25);border-radius:16px;padding:14px;margin-bottom:14px;display:flex;align-items:center;gap:10px">
+        <span style="font-size:24px">âš ï¸</span>
+        <div>
+          <div style="font-size:13px;font-weight:700;color:var(--amber)" x-text="pendingCount+' '+rt('pending_requests')"></div>
+          <div style="font-size:10px;color:var(--muted)" x-text="rt('review_action')"></div>
+        </div>
+      </div>
+      <div style="display:grid;gap:10px">
+        <template x-for="tx in allTransactions" :key="tx.id">
+          <div>
+            <div class="tx-card">
+              <div class="tx-icon" :style="'background:'+(tx.type==='deposit'?'rgba(0,231,1,.1)':'rgba(255,71,87,.1)')"><span x-text="tx.type==='deposit'?'ðŸ’°':'ðŸ’¸'"></span></div>
+              <div class="tx-info"><div class="tx-title" x-text="tx.client_name||tx.client_id"></div><div class="tx-sub"><span x-text="tx.method||'\u2014'"></span> \xB7 <span x-text="tx.created_at"></span></div></div>
+              <div style="text-align:left">
+                <div class="tx-amount" :style="'color:'+(tx.type==='deposit'?'var(--accent)':'var(--danger)')" x-text="(tx.type==='deposit'?'+':'-')+fmtMoney(tx.amount)"></div>
+                <div class="tx-status" style="margin-top:4px" :style="'background:'+(tx.status==='pending'?'rgba(251,191,36,.12)':tx.status==='approved'?'rgba(0,231,1,.12)':'rgba(255,71,87,.12)')+';color:'+(tx.status==='pending'?'var(--amber)':tx.status==='approved'?'var(--accent)':'var(--danger)')" x-text="tx.status==='pending'?'\u23F3 '+rt('pending'):tx.status==='approved'?'\u2705 '+rt('approved'):'\u274C '+rt('rejected')"></div>
+              </div>
+            </div>
+            <div x-show="tx.status==='pending'" style="display:flex;gap:6px;padding:0 14px 12px">
+              <div class="cc-btn primary" @click="processTx(tx,'approved')" style="flex:1;text-align:center"><i class="fas fa-check"></i> <span x-text="rt('approved')"></span></div>
+              <div class="cc-btn danger" @click="processTx(tx,'rejected')" style="flex:1;text-align:center"><i class="fas fa-times"></i> <span x-text="rt('rejected')"></span></div>
+            </div>
+          </div>
+        </template>
+      </div>
+      <div x-show="allTransactions.length===0" class="empty-state"><i class="fas fa-exchange-alt"></i> <span x-text="rt('no_transactions')"></span></div>
+    </div>
+
+    <!-- Finance: Revenue -->
+    <div x-show="finSubTab==='revenue'">
+      <div class="stats-grid" style="grid-template-columns:repeat(2,1fr)">
+        <div class="stat-card"><div class="stat-label" x-text="rt('total_profit')"></div><div class="stat-val" style="color:#22d3ee;font-size:16px" x-text="fmtMoney(revenueStats.total_game_profit)"></div></div>
+        <div class="stat-card"><div class="stat-label" x-text="rt('my_share')"></div><div class="stat-val" style="color:var(--accent);font-size:16px" x-text="fmtMoney(revenueStats.admin_share)"></div></div>
+        <div class="stat-card"><div class="stat-label" x-text="rt('client_share')"></div><div class="stat-val" style="color:var(--accent2);font-size:16px" x-text="fmtMoney(revenueStats.client_share)"></div></div>
+        <div class="stat-card"><div class="stat-label" x-text="rt('rounds')"></div><div class="stat-val" style="color:#a855f7;font-size:16px" x-text="fmtNum(revenueStats.total_rounds)"></div></div>
+      </div>
+      <div class="r-card"><div class="r-card-body" style="overflow-x:auto;padding:0">
+        <table class="rev-table">
+          <thead><tr><th x-text="rt('client')"></th><th x-text="rt('revenue_share')"></th><th x-text="rt('profit')"></th><th x-text="rt('client_share')"></th><th x-text="rt('my_share')"></th><th x-text="rt('rounds')"></th><th x-text="rt('edit')"></th></tr></thead>
+          <tbody><template x-for="r in revenueByClient" :key="r.client_id"><tr>
+            <td style="font-weight:700" x-text="r.client_name"></td>
+            <td style="color:var(--accent);font-weight:700" x-text="r.revenue_share+'%'"></td>
+            <td style="color:#22d3ee" x-text="fmtMoney(r.total_profit)"></td>
+            <td style="color:var(--accent2)" x-text="fmtMoney(r.client_amount)"></td>
+            <td style="color:var(--accent)" x-text="fmtMoney(r.admin_amount)"></td>
+            <td style="color:#a855f7" x-text="fmtNum(r.rounds)"></td>
+            <td><input type="number" min="0" max="100" :value="r.revenue_share" @change="updateRevenueShare(r.client_id,$event.target.value)" class="r-input" style="width:60px;padding:6px;text-align:center;font-size:11px">%</td>
+          </tr></template></tbody>
+        </table>
+      </div></div>
+    </div>
   </div>
 
-  <!-- ═══ TAB: ADMINS ═══ -->
   <div x-show="tab==='admins'" x-transition>
     <div class="r-card" style="margin-bottom:16px">
-      <div class="r-card-header"><span style="font-size:14px;font-weight:700">👥 <span x-text="rt('admins')"></span></span>
+      <div class="r-card-header"><span style="font-size:14px;font-weight:700">ðŸ‘¥ <span x-text="rt('admins')"></span></span>
         <button @click="showAddAdmin=true" class="r-btn primary" style="font-size:11px;padding:7px 14px"><i class="fas fa-plus"></i> <span x-text="rt('add')"></span></button>
       </div>
       <div class="r-card-body" style="overflow-x:auto;padding:0">
@@ -334,9 +549,9 @@ body.light-mode .rental-app .modal-overlay{background:rgba(0,0,0,.3)}
           <thead><tr><th x-text="rt('id')"></th><th x-text="rt('name')"></th><th x-text="rt('role')"></th><th x-text="rt('client')"></th><th x-text="rt('sections')"></th><th x-text="rt('actions')"></th></tr></thead>
           <tbody><template x-for="a in admins" :key="a.telegram_id"><tr>
             <td style="font-family:monospace;color:var(--accent2)" x-text="a.telegram_id"></td>
-            <td style="font-weight:700" x-text="a.name||'—'"></td>
+            <td style="font-weight:700" x-text="a.name||'\u2014'"></td>
             <td><span style="font-size:10px;padding:3px 8px;border-radius:99px;font-weight:700" :class="roleBadge(a.role)" x-text="roleLabel(a.role)"></span></td>
-            <td x-text="a.tenant_id?getTenantName(a.tenant_id):'—'"></td>
+            <td x-text="a.tenant_id?getTenantName(a.tenant_id):'\u2014'"></td>
             <td><button @click="openSections(a)" style="color:var(--accent2);font-size:10px" x-text="rt('edit')"></button></td>
             <td style="display:flex;gap:4px">
               <button @click="openTenantAssign(a)" class="pm-copy" style="background:rgba(96,165,250,.1);color:var(--accent2)"><i class="fas fa-link"></i></button>
@@ -353,7 +568,7 @@ body.light-mode .rental-app .modal-overlay{background:rgba(0,0,0,.3)}
           <button @click="selectAllSections()" style="color:var(--accent);font-size:10px" x-text="rt('select_all')"></button>
           <button @click="sectionForm=[]" style="color:var(--danger);font-size:10px" x-text="rt('deselect_all')"></button>
           <button @click="saveSections()" class="r-btn primary" style="font-size:10px;padding:5px 12px" x-text="rt('save')"></button>
-          <button @click="sectionAdmin=null" style="color:var(--muted);font-size:14px">✕</button>
+          <button @click="sectionAdmin=null" style="color:var(--muted);font-size:14px">âœ•</button>
         </div>
       </div>
       <div class="r-card-body">
@@ -369,16 +584,15 @@ body.light-mode .rental-app .modal-overlay{background:rgba(0,0,0,.3)}
     </div>
   </div>
 
-  <!-- ═══ TAB: DOMAINS ═══ -->
   <div x-show="tab==='domains'" x-transition>
     <div class="r-card">
       <div class="r-card-header">
-        <span style="font-size:14px;font-weight:700">🌐 <span x-text="rt('tab_domains')"></span></span>
+        <span style="font-size:14px;font-weight:700">ðŸŒ <span x-text="rt('tab_domains')"></span></span>
         <button @click="generateNginx()" class="r-btn ghost" style="font-size:11px;padding:7px 14px"><i class="fas fa-code"></i> <span x-text="rt('generate_nginx')"></span></button>
       </div>
       <div class="r-card-body">
         <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
-          <select x-model="domainForm.client_id" class="r-input" style="flex:1;min-width:140px"><option value="" x-text="'— '+rt('client')+' —'"></option><template x-for="c in clients" :key="c.id"><option :value="c.id" x-text="c.name"></option></template></select>
+          <select x-model="domainForm.client_id" class="r-input" style="flex:1;min-width:140px"><option value="" x-text="'\u2014 '+rt('client')+' \u2014'"></option><template x-for="c in clients" :key="c.id"><option :value="c.id" x-text="c.name"></option></template></select>
           <input x-model="domainForm.domain" dir="ltr" placeholder="client.vex.deals" class="r-input" style="flex:1;min-width:160px">
           <button @click="saveDomain()" :disabled="!domainForm.client_id||!domainForm.domain" class="r-btn primary" style="font-size:12px" x-text="rt('save')"></button>
         </div>
@@ -406,7 +620,36 @@ body.light-mode .rental-app .modal-overlay{background:rgba(0,0,0,.3)}
     </div>
   </div>
 
-  <!-- ═══ MODALS ═══ -->
+  <div x-show="dataModal" x-cloak class="modal-overlay" @click.self="dataModal=false" style="display:none">
+    <div class="modal-box" style="max-width:700px">
+      <div class="modal-handle"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <h3 style="font-size:16px;font-weight:900">ðŸ“Š <span x-text="dataClient&&dataClient.name"></span></h3>
+        <button @click="dataModal=false" style="color:var(--muted);font-size:18px">âœ•</button>
+      </div>
+      <div class="data-grid" style="margin-bottom:14px">
+        <template x-for="s in dataStatsItems" :key="s[0]">
+          <div class="data-cell"><div style="font-size:11px;color:var(--muted)" x-text="s[0]"></div><div style="font-size:18px;font-weight:900;color:var(--text)" x-text="s[1]"></div></div>
+        </template>
+      </div>
+      <div class="sub-tabs">
+        <template x-for="t in [['users',rt('d_users')],['transactions',rt('d_transactions')],['svrp_wallets',rt('d_wallets')],['companies',rt('d_companies')],['bonus_requests',rt('d_bonuses')],['recovery_requests',rt('d_recovery')]]" :key="t[0]">
+          <div class="sub-tab" :class="dataKind===t[0]&&'active'" @click="loadClientData(t[0])" x-text="t[1]"></div>
+        </template>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="rev-table">
+          <thead><tr><template x-for="f in dataFields.slice(0,8)" :key="f"><th x-text="f"></th></template></tr></thead>
+          <tbody>
+            <template x-for="(r,i) in dataRows" :key="i">
+              <tr><template x-for="f in dataFields.slice(0,8)" :key="f"><td x-text="r[f]||'-'"></td></template></tr>
+            </template>
+          </tbody>
+        </table>
+        <div x-show="dataRows.length===0" class="empty-state" style="padding:20px"><span x-text="rt('no_data')"></span></div>
+      </div>
+    </div>
+  </div>
 
   <!-- Add/Edit Client Modal -->
   <div x-show="showClientModal" x-cloak class="modal-overlay" @click.self="showClientModal=false" style="display:none">
@@ -414,7 +657,7 @@ body.light-mode .rental-app .modal-overlay{background:rgba(0,0,0,.3)}
       <div class="modal-handle"></div>
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
         <h3 style="font-size:17px;font-weight:900" x-text="clientForm.id?rt('edit')+': '+clientForm.name:rt('new_client')"></h3>
-        <button @click="showClientModal=false" style="color:var(--muted);font-size:18px">✕</button>
+        <button @click="showClientModal=false" style="color:var(--muted);font-size:18px">âœ•</button>
       </div>
       <div style="display:grid;gap:14px">
         <div><label class="r-label" x-text="rt('client_name')+' *'"></label><input x-model="clientForm.name" class="r-input"></div>
@@ -436,8 +679,8 @@ body.light-mode .rental-app .modal-overlay{background:rgba(0,0,0,.3)}
         <div><label class="r-label" x-text="rt('revenue_share')"></label>
           <div style="display:flex;align-items:center;gap:10px"><input x-model="clientForm.revenue_share" type="number" min="0" max="100" class="r-input" style="width:80px;text-align:center"><span style="font-size:12px;color:var(--muted)" x-text="rt('you')+': '+(100-(clientForm.revenue_share||30))+'%'"></span></div>
         </div>
-        <div><label class="r-label">💳 <span x-text="rt('preferred_pm')"></span></label>
-          <select x-model="clientForm.preferred_pm" class="r-input"><option value="" x-text="'— '+rt('none')+' —'"></option><template x-for="pm in paymentMethods.filter(p=>p.status==='active')" :key="pm.id"><option :value="pm.id" x-text="pm.name+' ('+pm.account_number+')'"></option></template></select>
+        <div><label class="r-label">ðŸ’³ <span x-text="rt('preferred_pm')"></span></label>
+          <select x-model="clientForm.preferred_pm" class="r-input"><option value="" x-text="'\u2014 '+rt('none')+' \u2014'"></option><template x-for="pm in paymentMethods.filter(function(p){return p.status==='active'})" :key="pm.id"><option :value="pm.id" x-text="pm.name+' ('+pm.account_number+')'"></option></template></select>
           <p style="font-size:10px;color:var(--muted);margin-top:4px" x-text="rt('pm_change_hint')"></p>
         </div>
         <div><label class="r-label" x-text="rt('features')"></label>
@@ -459,8 +702,8 @@ body.light-mode .rental-app .modal-overlay{background:rgba(0,0,0,.3)}
   <div x-show="showRenew" x-cloak class="modal-overlay" @click.self="showRenew=false" style="display:none">
     <div class="modal-box" style="max-width:360px">
       <div class="modal-handle"></div>
-      <h3 style="font-size:16px;font-weight:900;margin-bottom:4px" x-text="rt('renew')+': '+renewTarget?.name"></h3>
-      <p style="font-size:11px;color:var(--muted);margin-bottom:16px"><span x-text="rt('expires')+': '+renewTarget?.subscription_end"></span></p>
+      <h3 style="font-size:16px;font-weight:900;margin-bottom:4px" x-text="rt('renew')+': '+(renewTarget?renewTarget.name:'')"></h3>
+      <p style="font-size:11px;color:var(--muted);margin-bottom:16px"><span x-text="rt('expires')+': '+(renewTarget?renewTarget.subscription_end:'')"></span></p>
       <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:14px">
         <template x-for="d in [7,15,30,90]" :key="d"><button @click="doRenew(d)" style="padding:12px;border-radius:12px;background:rgba(0,231,1,.1);border:1px solid rgba(0,231,1,.25);color:var(--accent);font-size:13px;font-weight:700;cursor:pointer" x-text="d+' '+rt('days')"></button></template>
       </div>
@@ -472,14 +715,14 @@ body.light-mode .rental-app .modal-overlay{background:rgba(0,0,0,.3)}
   <div x-show="showAddAdmin" x-cloak class="modal-overlay" @click.self="showAddAdmin=false" style="display:none">
     <div class="modal-box" style="max-width:420px">
       <div class="modal-handle"></div>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px"><h3 style="font-size:16px;font-weight:900" x-text="rt('add_admin')"></h3><button @click="showAddAdmin=false" style="color:var(--muted);font-size:18px">✕</button></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px"><h3 style="font-size:16px;font-weight:900" x-text="rt('add_admin')"></h3><button @click="showAddAdmin=false" style="color:var(--muted);font-size:18px">âœ•</button></div>
       <div style="display:grid;gap:12px">
         <div><label class="r-label">Telegram ID *</label><input x-model="addAdminForm.telegram_id" dir="ltr" class="r-input"></div>
         <div><label class="r-label" x-text="rt('name')"></label><input x-model="addAdminForm.name" class="r-input"></div>
         <div><label class="r-label" x-text="rt('role')"></label>
           <select x-model="addAdminForm.role" class="r-input"><option value="support_admin" x-text="rt('role_support')"></option><option value="finance_admin" x-text="rt('role_finance')"></option><option value="game_admin" x-text="rt('role_games')"></option><option value="broadcast_admin" x-text="rt('role_broadcast')"></option><option value="super_admin">Super Admin</option></select>
         </div>
-        <div><label class="r-label" x-text="rt('assign_client')"></label><select x-model="addAdminForm.tenant_id" class="r-input"><option value="" x-text="'— '+rt('none')+' —'"></option><template x-for="c in clients" :key="c.id"><option :value="c.id" x-text="c.name"></option></template></select></div>
+        <div><label class="r-label" x-text="rt('assign_client')"></label><select x-model="addAdminForm.tenant_id" class="r-input"><option value="" x-text="'\u2014 '+rt('none')+' \u2014'"></option><template x-for="c in clients" :key="c.id"><option :value="c.id" x-text="c.name"></option></template></select></div>
       </div>
       <div style="display:flex;gap:10px;margin-top:18px"><button @click="showAddAdmin=false" class="r-btn ghost" style="flex:1" x-text="rt('cancel')"></button><button @click="saveAdmin()" class="r-btn primary" style="flex:1" x-text="rt('add')"></button></div>
     </div>
@@ -490,7 +733,7 @@ body.light-mode .rental-app .modal-overlay{background:rgba(0,0,0,.3)}
     <div class="modal-box" style="max-width:360px">
       <div class="modal-handle"></div>
       <h3 style="font-size:16px;font-weight:900;margin-bottom:14px" x-text="rt('assign_client')"></h3>
-      <select x-model="tenantForm.tenant_id" class="r-input" style="margin-bottom:14px"><option value="" x-text="'— '+rt('none')+' —'"></option><template x-for="c in clients" :key="c.id"><option :value="c.id" x-text="c.name"></option></template></select>
+      <select x-model="tenantForm.tenant_id" class="r-input" style="margin-bottom:14px"><option value="" x-text="'\u2014 '+rt('none')+' \u2014'"></option><template x-for="c in clients" :key="c.id"><option :value="c.id" x-text="c.name"></option></template></select>
       <div style="display:flex;gap:10px"><button @click="showTenantModal=false" class="r-btn ghost" style="flex:1" x-text="rt('cancel')"></button><button @click="saveTenantAssign()" class="r-btn primary" style="flex:1" x-text="rt('save')"></button></div>
     </div>
   </div>
@@ -499,11 +742,11 @@ body.light-mode .rental-app .modal-overlay{background:rgba(0,0,0,.3)}
   <div x-show="showAddPM" x-cloak class="modal-overlay" @click.self="showAddPM=false" style="display:none">
     <div class="modal-box" style="max-width:420px">
       <div class="modal-handle"></div>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px"><h3 style="font-size:16px;font-weight:900">💳 <span x-text="rt('new_payment_method')"></span></h3><button @click="showAddPM=false" style="color:var(--muted);font-size:18px">✕</button></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px"><h3 style="font-size:16px;font-weight:900">ðŸ’³ <span x-text="rt('new_payment_method')"></span></h3><button @click="showAddPM=false" style="color:var(--muted);font-size:18px">âœ•</button></div>
       <div style="display:grid;gap:12px">
         <div><label class="r-label" x-text="rt('pm_name')+' *'"></label><input x-model="pmForm.name" class="r-input"></div>
         <div><label class="r-label" x-text="rt('type')+' *'"></label>
-          <select x-model="pmForm.pm_type" class="r-input"><option value="bank_transfer" x-text="'🏦 '+rt('bank_transfer')"></option><option value="vodafone_cash" x-text="'📱 '+rt('vodafone_cash')"></option><option value="usdt">💵 USDT</option><option value="instapay">⚡ InstaPay</option></select>
+          <select x-model="pmForm.pm_type" class="r-input"><option value="bank_transfer" x-text="'\u{1F3E6} '+rt('bank_transfer')"></option><option value="vodafone_cash" x-text="'\u{1F4F1} '+rt('vodafone_cash')"></option><option value="usdt">ðŸ’µ USDT</option><option value="instapay">âš¡ InstaPay</option></select>
         </div>
         <div><label class="r-label" x-text="rt('account_number')+' *'"></label><input x-model="pmForm.account_number" dir="ltr" class="r-input" style="font-family:monospace"></div>
         <div><label class="r-label" x-text="rt('bank')"></label><input x-model="pmForm.bank_name" class="r-input"></div>
@@ -517,73 +760,286 @@ body.light-mode .rental-app .modal-overlay{background:rgba(0,0,0,.3)}
   <div x-show="showDelete" x-cloak class="modal-overlay" @click.self="showDelete=false" style="display:none">
     <div class="modal-box" style="max-width:340px;text-align:center">
       <div class="modal-handle"></div>
-      <div style="font-size:36px;margin-bottom:8px">🗑️</div>
+      <div style="font-size:36px;margin-bottom:8px">ðŸ—‘ï¸</div>
       <h3 style="font-size:16px;font-weight:900;margin-bottom:4px" x-text="rt('delete')+' '+deleteType+'?'"></h3>
-      <p style="font-size:12px;color:var(--muted);margin-bottom:18px" x-text="rt('confirm_delete')+' '+deleteTarget?.name+'?'"></p>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:18px" x-text="rt('confirm_delete')+' '+(deleteTarget?deleteTarget.name:'')+'?'"></p>
       <div style="display:flex;gap:10px"><button @click="showDelete=false" class="r-btn ghost" style="flex:1" x-text="rt('cancel')"></button><button @click="doDelete()" class="r-btn danger" style="flex:1" x-text="rt('delete')"></button></div>
     </div>
   </div>
 
-  <!-- BOTTOM TABS (Mobile) -->
+  <!-- Add Bot Modal -->
+  <div x-show="showBotModal" x-cloak class="modal-overlay" @click.self="showBotModal=false" style="display:none">
+    <div class="modal-box">
+      <div class="modal-handle"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+        <h3 style="font-size:17px;font-weight:900">ðŸ¤– <span x-text="rt('new_bot')"></span></h3>
+        <button @click="showBotModal=false" style="color:var(--muted);font-size:18px">âœ•</button>
+      </div>
+      <div style="margin-bottom:14px">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px" x-text="rt('template_label')"></div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          <template x-for="(tmpl,key) in botTemplates" :key="key">
+            <button @click="applyTemplate(key)" style="padding:6px 12px;border-radius:8px;font-size:11px;font-weight:700;background:var(--bg2);color:var(--text);border:1px solid var(--border);cursor:pointer" x-text="tmpl.name"></button>
+          </template>
+        </div>
+      </div>
+      <div style="display:grid;gap:14px">
+        <div><label class="r-label" x-text="rt('bot_name')+' *'"></label><input x-model="botForm.name" class="r-input" required></div>
+        <div><label class="r-label" x-text="rt('bot_token_label')+' *'"></label><input x-model="botForm.token" dir="ltr" class="r-input" style="font-family:monospace" required placeholder="123456:ABC-DEF..."></div>
+        <div><label class="r-label" x-text="rt('features')"></label>
+          <div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px">
+            <template x-for="(label,key) in allFeatures" :key="key"><label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;padding:4px 6px;border-radius:8px"><input type="checkbox" :value="key" x-model="botForm.features" style="accent-color:var(--accent);width:14px;height:14px"><span x-text="label"></span></label></template>
+          </div>
+          <div style="display:flex;gap:10px;margin-top:4px"><button @click="botForm.features=Object.keys(allFeatures)" style="color:var(--accent);font-size:10px" x-text="rt('select_all')"></button><button @click="botForm.features=[]" style="color:var(--muted);font-size:10px" x-text="rt('deselect_all')"></button></div>
+        </div>
+        <div><label class="r-label" x-text="rt('bot_admin')"></label><input x-model="botForm.admin_ids" dir="ltr" class="r-input" style="font-family:monospace" placeholder="123456789,987654321"></div>
+        <div><label class="r-label" x-text="rt('bot_desc')"></label><textarea x-model="botForm.description" rows="2" class="r-input" style="resize:vertical"></textarea></div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:20px">
+        <button @click="saveBot()" class="r-btn primary" style="flex:1" x-text="rt('create')"></button>
+        <button @click="showBotModal=false" class="r-btn ghost" style="flex:1" x-text="rt('cancel')"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Bot Features Modal -->
+  <div x-show="showFeaturesModal" x-cloak class="modal-overlay" @click.self="showFeaturesModal=false" style="display:none">
+    <div class="modal-box" style="max-width:480px">
+      <div class="modal-handle"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+        <h3 style="font-size:16px;font-weight:900">âš™ï¸ <span x-text="rt('features')"></span>: <span style="color:var(--accent2)" x-text="editingBot?editingBot.name:''"></span></h3>
+        <button @click="showFeaturesModal=false" style="color:var(--muted);font-size:18px">âœ•</button>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px" x-text="rt('all_features')"></div>
+      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:12px;display:grid;gap:4px">
+        <template x-for="(label,key) in allFeatures" :key="key">
+          <label style="display:flex;align-items:center;gap:8px;padding:8px;border-radius:8px;cursor:pointer;font-size:12px;transition:background .15s" onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background=''">
+            <input type="checkbox" :value="key" x-model="editingFeatures" style="accent-color:var(--accent);width:15px;height:15px">
+            <span x-text="label"></span>
+            <span style="font-size:9px;color:var(--muted);font-family:monospace;margin-left:auto" x-text="key"></span>
+          </label>
+        </template>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:6px"><button @click="editingFeatures=Object.keys(allFeatures)" style="color:var(--accent);font-size:10px" x-text="rt('select_all')"></button><button @click="editingFeatures=[]" style="color:var(--muted);font-size:10px" x-text="rt('deselect_all')"></button></div>
+      <div style="display:flex;gap:10px;margin-top:18px">
+        <button @click="saveBotFeatures()" class="r-btn primary" style="flex:1" x-text="rt('save')"></button>
+        <button @click="showFeaturesModal=false" class="r-btn ghost" style="flex:1" x-text="rt('cancel')"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete Bot Modal -->
+  <div x-show="showDeleteBotModal" x-cloak class="modal-overlay" @click.self="showDeleteBotModal=false" style="display:none">
+    <div class="modal-box" style="max-width:340px;text-align:center">
+      <div class="modal-handle"></div>
+      <div style="font-size:36px;margin-bottom:8px">ðŸ¤–</div>
+      <h3 style="font-size:16px;font-weight:900;margin-bottom:4px" x-text="rt('confirm_delete_bot')"></h3>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:18px"><span x-text="deleteBotTarget?deleteBotTarget.name:''"></span></p>
+      <div style="display:flex;gap:10px"><button @click="showDeleteBotModal=false" class="r-btn ghost" style="flex:1" x-text="rt('cancel')"></button><button @click="deleteBot()" class="r-btn danger" style="flex:1" x-text="rt('delete')"></button></div>
+    </div>
+  </div>
+
+  <!-- Add Auto-Reply Modal -->
+  <div x-show="showAddReplyModal" x-cloak class="modal-overlay" @click.self="showAddReplyModal=false" style="display:none">
+    <div class="modal-box" style="max-width:480px">
+      <div class="modal-handle"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+        <h3 style="font-size:16px;font-weight:900">ðŸ’¬ <span x-text="rt('add_reply')"></span></h3>
+        <button @click="showAddReplyModal=false" style="color:var(--muted);font-size:18px">âœ•</button>
+      </div>
+      <div style="display:grid;gap:14px">
+        <div><label class="r-label" x-text="rt('reply_keyword')+' *'"></label><input x-model="replyForm.keyword" class="r-input" required></div>
+        <div><label class="r-label" x-text="rt('reply_response')+' *'"></label><textarea x-model="replyForm.response" rows="3" class="r-input" style="resize:vertical" required></textarea></div>
+        <div><label class="r-label" x-text="rt('reply_match')"></label>
+          <select x-model="replyForm.match_type" class="r-input"><option value="contains" x-text="rt('contains')"></option><option value="exact" x-text="rt('exact')"></option><option value="starts_with" x-text="rt('starts_with')"></option></select>
+        </div>
+        <div><label class="r-label" x-text="rt('reply_priority')"></label><input type="number" x-model="replyForm.priority" min="0" class="r-input"></div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:20px">
+        <button @click="addAutoReply()" class="r-btn primary" style="flex:1" x-text="rt('add')"></button>
+        <button @click="showAddReplyModal=false" class="r-btn ghost" style="flex:1" x-text="rt('cancel')"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Chain Modal -->
+  <div x-show="showAddChainModal" x-cloak class="modal-overlay" @click.self="showAddChainModal=false" style="display:none">
+    <div class="modal-box" style="max-width:480px">
+      <div class="modal-handle"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+        <h3 style="font-size:16px;font-weight:900">ðŸ”— <span x-text="rt('add_chain')"></span></h3>
+        <button @click="showAddChainModal=false" style="color:var(--muted);font-size:18px">âœ•</button>
+      </div>
+      <div style="display:grid;gap:14px">
+        <div><label class="r-label" x-text="rt('trigger_event')+' *'"></label>
+          <select x-model="chainForm.trigger_event" class="r-input"><option value="new_user" x-text="rt('new_user')"></option><option value="deposit" x-text="rt('deposit')"></option><option value="withdrawal" x-text="rt('withdraw')"></option><option value="game_play" x-text="rt('game_play')"></option><option value="first_message" x-text="rt('first_message')"></option></select>
+        </div>
+        <div><label class="r-label" x-text="rt('action_message')+' *'"></label><textarea x-model="chainForm.message_template" rows="2" class="r-input" style="resize:vertical" required placeholder="{name}"></textarea></div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:20px">
+        <button @click="addChain()" class="r-btn primary" style="flex:1" x-text="rt('add')"></button>
+        <button @click="showAddChainModal=false" class="r-btn ghost" style="flex:1" x-text="rt('cancel')"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Notification Modal -->
+  <div x-show="showAddNotifModal" x-cloak class="modal-overlay" @click.self="showAddNotifModal=false" style="display:none">
+    <div class="modal-box" style="max-width:480px">
+      <div class="modal-handle"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+        <h3 style="font-size:16px;font-weight:900">ðŸ”” <span x-text="rt('add_notif')"></span></h3>
+        <button @click="showAddNotifModal=false" style="color:var(--muted);font-size:18px">âœ•</button>
+      </div>
+      <div style="display:grid;gap:14px">
+        <div><label class="r-label" x-text="rt('notif_trigger')+' *'"></label>
+          <select x-model="notifForm.trigger" class="r-input"><option value="inactive_3days" x-text="rt('inactive_3days')"></option><option value="inactive_7days" x-text="rt('inactive_7days')"></option><option value="new_user_24h" x-text="rt('new_user_24h')"></option></select>
+        </div>
+        <div><label class="r-label" x-text="rt('notif_message')+' *'"></label><textarea x-model="notifForm.message_template" rows="2" class="r-input" style="resize:vertical" required placeholder="{name}"></textarea></div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:20px">
+        <button @click="addNotif()" class="r-btn primary" style="flex:1" x-text="rt('add')"></button>
+        <button @click="showAddNotifModal=false" class="r-btn ghost" style="flex:1" x-text="rt('cancel')"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Webhook Modal -->
+  <div x-show="showAddWebhookModal" x-cloak class="modal-overlay" @click.self="showAddWebhookModal=false" style="display:none">
+    <div class="modal-box" style="max-width:480px">
+      <div class="modal-handle"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+        <h3 style="font-size:16px;font-weight:900">ðŸ”Œ <span x-text="rt('add_webhook')"></span></h3>
+        <button @click="showAddWebhookModal=false" style="color:var(--muted);font-size:18px">âœ•</button>
+      </div>
+      <div style="display:grid;gap:14px">
+        <div><label class="r-label" x-text="rt('webhook_name')+' *'"></label><input x-model="webhookForm.name" class="r-input" required></div>
+        <div><label class="r-label" x-text="rt('webhook_url')+' *'"></label><input x-model="webhookForm.url" dir="ltr" class="r-input" style="font-family:monospace" required placeholder="https://api.example.com/webhook"></div>
+        <div><label class="r-label" x-text="rt('webhook_events')"></label><input x-model="webhookForm.events" class="r-input" placeholder="transaction_approved, deposit, withdrawal (*)"></div>
+        <div><label class="r-label" x-text="rt('webhook_secret')"></label><input x-model="webhookForm.secret" dir="ltr" class="r-input" style="font-family:monospace"></div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:20px">
+        <button @click="addWebhook()" class="r-btn primary" style="flex:1" x-text="rt('add')"></button>
+        <button @click="showAddWebhookModal=false" class="r-btn ghost" style="flex:1" x-text="rt('cancel')"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOTTOM TABS -->
   <div class="bottom-tabs">
     <div class="bottom-tabs-inner">
       <div class="bottom-tab" :class="tab==='dashboard'&&'active'" @click="tab='dashboard';loadAll()"><div class="b-icon"><i class="fas fa-chart-pie"></i></div><span x-text="rt('btab_dash')"></span></div>
       <div class="bottom-tab" :class="tab==='clients'&&'active'" @click="tab='clients'"><div class="b-icon"><i class="fas fa-users"></i></div><span x-text="rt('btab_clients')"></span></div>
-      <div class="bottom-tab" :class="tab==='payments'&&'active'" @click="tab='payments';loadPaymentMethods()"><div class="b-icon"><i class="fas fa-credit-card"></i></div><span x-text="rt('btab_pay')"></span></div>
-      <div class="bottom-tab" :class="tab==='transactions'&&'active'" @click="tab='transactions';loadAllTransactions()"><div class="b-icon"><i class="fas fa-exchange-alt"></i></div><span x-text="rt('btab_tx')"></span><span x-show="pendingCount>0" class="b-badge" x-text="pendingCount"></span></div>
-      <div class="bottom-tab" :class="tab==='revenue'&&'active'" @click="tab='revenue';loadRevenue()"><div class="b-icon"><i class="fas fa-coins"></i></div><span x-text="rt('btab_rev')"></span></div>
-      <div class="bottom-tab" :class="(tab==='admins'||tab==='domains')&&'active'" @click="tab='admins';loadAdmins()"><div class="b-icon"><i class="fas fa-cog"></i></div><span x-text="rt('btab_settings')"></span></div>
+      <div class="bottom-tab" :class="tab==='bots'&&'active'" @click="tab='bots';loadBots()"><div class="b-icon"><i class="fas fa-robot"></i></div><span x-text="rt('btab_bots')"></span></div>
+      <div class="bottom-tab" :class="tab==='finance'&&'active'" @click="tab='finance';loadPaymentMethods()"><div class="b-icon"><i class="fas fa-coins"></i></div><span x-text="rt('btab_finance')"></span><span x-show="pendingCount>0" class="b-badge" x-text="pendingCount"></span></div>
+      <div class="bottom-tab" :class="tab==='admins'&&'active'" @click="tab='admins';loadAdmins()"><div class="b-icon"><i class="fas fa-user-shield"></i></div><span x-text="rt('btab_admins')"></span></div>
+      <div class="bottom-tab" :class="tab==='domains'&&'active'" @click="tab='domains';loadDomains()"><div class="b-icon"><i class="fas fa-globe"></i></div><span x-text="rt('btab_domains')"></span></div>
     </div>
   </div>
-
 </div>
 
 <script>
 function rentalSystem(){
   const I18N = {
     ar: {
-      title:'نظام التاجير',new_client:'عميل جديد',tab_dashboard:'لوحة التحكم',tab_clients:'العملاء',tab_payments:'وسائل الدفع',tab_transactions:'المعاملات',tab_revenue:'الأرباح',tab_admins:'المسؤولين',tab_domains:'الدومينات',
-      stat_total:'إجمالي',stat_active:'نشط',stat_expired:'منتهي',stat_expiring:'ينتهي قريباً',stat_running:'بوت شغال',stat_revenue:'أرباح',
-      recent_clients:'آخر العملاء',quick_actions:'إجراءات سريعة',add_client:'إضافة عميل',all_clients:'كل العملاء',refresh:'تحديث',no_clients:'لا يوجد عملاء بعد',no_matching:'لا يوجد عملاء مطابقين',
-      search_placeholder:'بحث بالاسم أو المعرف...',all:'الكل',suspended:'موقوف',expired:'منتهي',days:'يوم',
-      start:'تشغيل',stop:'إيقاف',edit:'تعديل',renew:'تجديد',delete:'حذف',save:'حفظ',cancel:'إلغاء',create:'إنشاء',add:'إضافة',close:'إغلاق',
-      bot:'البوت',dashboard_login:'لوحة التحكم',domain:'الدومين',subscription:'الاشتراك',balance:'الرصيد',revenue_share:'نسبة الربح',
-      client_name:'اسم العميل',contact:'التواصل',bot_username:'يوزر البوت',bot_token:'توكن البوت',dash_user:'يوزر اللوحة',dash_pass:'باسورد اللوحة',new_password:'باسورد جديد',admin_ids:'أدمن تيليجرام',sub_duration:'مدة الاشتراك',preferred_pm:'وسيلة الدفع المفضلة',pm_change_hint:'العميل يقدر يغيرها من لوحته',features:'المميزات',notes:'ملاحظات',select_all:'تحديد الكل',deselect_all:'إلغاء الكل',
-      client:'العميل',profit:'الربح',you:'أنت',none:'بدون',
-      pending:'معلق',approved:'مقبول',rejected:'مرفوض',deposit:'إيداع',withdraw:'سحب',pending_requests:'طلبات معلقة',review_action:'راجعها واتخذ القرار',no_transactions:'لا توجد معاملات',
-      total_profit:'إجمالي الربح',my_share:'نصيبي',client_share:'نصيب العملاء',rounds:'الجولات',
-      admins:'المسؤولون',name:'الاسم',role:'الدور',sections:'الأقسام',actions:'إجراءات',role_support:'الدعم',role_finance:'المالية',role_games:'الألعاب',role_broadcast:'البث',assign_client:'ربط بعميل',add_admin:'إضافة مسؤول',
-      generate_nginx:'توليد nginx',no_domains:'لا توجد دومينات',disabled:'معطل',
-      bank_transfer:'تحويل بنكي',vodafone_cash:'فودافون كاش',account_number:'رقم الحساب',bank:'البنك',holder:'المالك',copy:'نسخ',no_payment_methods:'لا توجد وسائل دفع',new_payment_method:'وسيلة دفع جديدة',pm_name:'اسم الوسيلة',type:'النوع',
-      id:'المعرف',expires:'ينتهي',confirm_delete:'هل أنت متأكد من حذف',btab_dash:'لوحة',btab_clients:'عملاء',btab_pay:'دفع',btab_tx:'معاملات',btab_rev:'أرباح',btab_settings:'إعدادات',
+      title:'\u0646\u0638\u0627\u0645 \u0627\u0644\u062A\u0627\u062C\u064A\u0631',new_client:'\u0639\u0645\u064A\u0644 \u062C\u062F\u064A\u062F',
+      tab_dashboard:'\u0644\u0648\u062D\u0629 \u0627\u0644\u062A\u062D\u0643\u0645',tab_clients:'\u0627\u0644\u0639\u0645\u0644\u0627\u0621',tab_bots:'\u0627\u0644\u0628\u0648\u062A\u0627\u062A \u0627\u0644\u0630\u0643\u064A\u0629',
+      tab_finance:'\u0627\u0644\u0645\u0627\u0644\u064A\u0629',tab_payments:'\u0648\u0633\u0627\u0626\u0644 \u0627\u0644\u062F\u0641\u0639',tab_transactions:'\u0627\u0644\u0645\u0639\u0627\u0645\u0644\u0627\u062A',
+      tab_revenue:'\u0627\u0644\u0623\u0631\u0628\u0627\u062D',tab_admins:'\u0627\u0644\u0645\u0633\u0624\u0648\u0644\u064A\u0646',tab_domains:'\u0627\u0644\u062F\u0648\u0645\u064A\u0646\u0627\u062A',
+      stat_total:'\u0625\u062C\u0645\u0627\u0644\u064A',stat_active:'\u0646\u0634\u0637',stat_expired:'\u0645\u0646\u062A\u0647\u064A',
+      stat_expiring:'\u064A\u0646\u062A\u0647\u064A \u0642\u0631\u064A\u0628\u0627\u064B',stat_running:'\u0628\u0648\u062A \u0634\u063A\u0627\u0644',stat_revenue:'\u0623\u0631\u0628\u0627\u062D',
+      recent_clients:'\u0622\u062E\u0631 \u0627\u0644\u0639\u0645\u0644\u0627\u0621',quick_actions:'\u0625\u062C\u0631\u0627\u0621\u0627\u062A \u0633\u0631\u064A\u0639\u0629',add_client:'\u0625\u0636\u0627\u0641\u0629 \u0639\u0645\u064A\u0644',all_clients:'\u0643\u0644 \u0627\u0644\u0639\u0645\u0644\u0627\u0621',
+      refresh:'\u062A\u062D\u062F\u064A\u062B',no_clients:'\u0644\u0627 \u064A\u0648\u062C\u062F \u0639\u0645\u0644\u0627\u0621 \u0628\u0639\u062F',no_matching:'\u0644\u0627 \u064A\u0648\u062C\u062F \u0639\u0645\u0644\u0627\u0621 \u0645\u0637\u0627\u0628\u0642\u064A\u0646',
+      search_placeholder:'\u0628\u062D\u062B \u0628\u0627\u0644\u0627\u0633\u0645 \u0623\u0648 \u0627\u0644\u0645\u0639\u0631\u0641...',all:'\u0627\u0644\u0643\u0644',suspended:'\u0645\u0648\u0642\u0648\u0641',expired:'\u0645\u0646\u062A\u0647\u064A',days:'\u064A\u0648\u0645',
+      start:'\u062A\u0634\u063A\u064A\u0644',stop:'\u0625\u064A\u0642\u0627\u0641',edit:'\u062A\u0639\u062F\u064A\u0644',renew:'\u062A\u062C\u062F\u064A\u062F',delete:'\u062D\u0630\u0641',save:'\u062D\u0641\u0638',cancel:'\u0625\u0644\u063A\u0627\u0621',create:'\u0625\u0646\u0634\u0627\u0621',add:'\u0625\u0636\u0627\u0641\u0629',close:'\u0625\u063A\u0644\u0627\u0642',
+      bot:'\u0627\u0644\u0628\u0648\u062A',dashboard_login:'\u0644\u0648\u062D\u0629 \u0627\u0644\u062A\u062D\u0643\u0645',domain:'\u0627\u0644\u062F\u0648\u0645\u064A\u0646',subscription:'\u0627\u0644\u0627\u0634\u062A\u0631\u0627\u0643',balance:'\u0627\u0644\u0631\u0635\u064A\u062F',revenue_share:'\u0646\u0633\u0628\u0629 \u0627\u0644\u0631\u0628\u062D',
+      client_name:'\u0627\u0633\u0645 \u0627\u0644\u0639\u0645\u064A\u0644',contact:'\u0627\u0644\u062A\u0648\u0627\u0635\u0644',bot_username:'\u064A\u0648\u0632\u0631 \u0627\u0644\u0628\u0648\u062A',bot_token:'\u062A\u0648\u0643\u0646 \u0627\u0644\u0628\u0648\u062A',
+      dash_user:'\u064A\u0648\u0632\u0631 \u0627\u0644\u0644\u0648\u062D\u0629',dash_pass:'\u0628\u0627\u0633\u0648\u0631\u062F \u0627\u0644\u0644\u0648\u062D\u0629',new_password:'\u0628\u0627\u0633\u0648\u0631\u062F \u062C\u062F\u064A\u062F',admin_ids:'\u0623\u062F\u0645\u0646 \u062A\u064A\u0644\u064A\u062C\u0631\u0627\u0645',
+      sub_duration:'\u0645\u062F\u0629 \u0627\u0644\u0627\u0634\u062A\u0631\u0627\u0643',preferred_pm:'\u0648\u0633\u064A\u0644\u0629 \u0627\u0644\u062F\u0641\u0639 \u0627\u0644\u0645\u0641\u0636\u0644\u0629',
+      pm_change_hint:'\u0627\u0644\u0639\u0645\u064A\u0644 \u064A\u0642\u062F\u0631 \u064A\u063A\u064A\u0631\u0647\u0627 \u0645\u0646 \u0644\u0648\u062D\u062A\u0647',features:'\u0627\u0644\u0645\u0645\u064A\u0632\u0627\u062A',notes:'\u0645\u0644\u0627\u062D\u0638\u0627\u062A',select_all:'\u062A\u062D\u062F\u064A\u0633 \u0627\u0644\u0643\u0644',deselect_all:'\u0625\u0644\u063A\u0627\u0621 \u0627\u0644\u0643\u0644',
+      client:'\u0627\u0644\u0639\u0645\u064A\u0644',profit:'\u0627\u0644\u0631\u0628\u062D',you:'\u0623\u0646\u062A',none:'\u0628\u062F\u0648\u0646',
+      pending:'\u0645\u0639\u0644\u0642',approved:'\u0645\u0642\u0628\u0648\u0644',rejected:'\u0645\u0631\u0641\u0648\u0636',deposit:'\u0625\u064A\u062F\u0627\u0639',withdraw:'\u0633\u062D\u0628',
+      pending_requests:'\u0637\u0644\u0628\u0627\u062A \u0645\u0639\u0644\u0642\u0629',review_action:'\u0631\u0627\u062C\u0639\u0647\u0627 \u0648\u0627\u062A\u062E\u0630 \u0627\u0644\u0642\u0631\u0627\u0631',no_transactions:'\u0644\u0627 \u062A\u0648\u062C\u062F \u0645\u0639\u0627\u0645\u0644\u0627\u062A',
+      total_profit:'\u0625\u062C\u0645\u0627\u0644\u064A \u0627\u0644\u0631\u0628\u062D',my_share:'\u0646\u0635\u064A\u0628\u064A',client_share:'\u0646\u0635\u064A\u0628 \u0627\u0644\u0639\u0645\u0644\u0627\u0621',rounds:'\u0627\u0644\u062C\u0648\u0644\u0627\u062A',
+      admins:'\u0627\u0644\u0645\u0633\u0624\u0648\u0644\u064A\u0646',name:'\u0627\u0644\u0627\u0633\u0645',role:'\u0627\u0644\u062F\u0648\u0631',sections:'\u0627\u0644\u0623\u0642\u0633\u0627\u0645',actions:'\u0625\u062C\u0631\u0627\u0621\u0627\u062A',
+      role_support:'\u0627\u0644\u062F\u0639\u0645',role_finance:'\u0627\u0644\u0645\u0627\u0644\u064A\u0629',role_games:'\u0627\u0644\u0623\u0644\u0639\u0627\u0628',role_broadcast:'\u0627\u0644\u0628\u062B',
+      assign_client:'\u0631\u0628\u0637 \u0628\u0639\u0645\u064A\u0644',add_admin:'\u0625\u0636\u0627\u0641\u0629 \u0645\u0633\u0624\u0648\u0644',
+      generate_nginx:'\u062A\u0648\u0644\u064A\u062F nginx',no_domains:'\u0644\u0627 \u062A\u0648\u062C\u062F \u062F\u0648\u0645\u064A\u0646\u0627\u062A',disabled:'\u0645\u0639\u0637\u0644',
+      bank_transfer:'\u062A\u062D\u0648\u064A\u0644 \u0628\u0646\u0643\u064A',vodafone_cash:'\u0641\u0648\u062F\u0627\u0641\u0648\u0646 \u0643\u0627\u0634',account_number:'\u0631\u0642\u0645 \u0627\u0644\u062D\u0633\u0627\u0628',bank:'\u0627\u0644\u0628\u0646\u0643',holder:'\u0627\u0644\u0645\u0627\u0644\u0643',copy:'\u0646\u0633\u062E',
+      no_payment_methods:'\u0644\u0627 \u062A\u0648\u062C\u062F \u0648\u0633\u0627\u0626\u0644 \u062F\u0641\u0639',new_payment_method:'\u0648\u0633\u064A\u0644\u0629 \u062F\u0641\u0639 \u062C\u062F\u064A\u062F\u0629',pm_name:'\u0627\u0633\u0645 \u0627\u0644\u0648\u0633\u064A\u0644\u0629',type:'\u0627\u0644\u0646\u0648\u0639',
+      id:'\u0627\u0644\u0645\u0639\u0631\u0641',expires:'\u064A\u0646\u062A\u0647\u064A',confirm_delete:'\u0647\u0644 \u0623\u0646\u062A \u0645\u062A\u0623\u0643\u062F \u0645\u0646 \u062D\u0630\u0641',
+      btab_dash:'\u0644\u0648\u062D\u0637\u0629',btab_clients:'\u0639\u0645\u0644\u0627\u0621',btab_bots:'\u0628\u0648\u062A\u0627\u062A',btab_finance:'\u0645\u0627\u0644\u064A\u0629',btab_admins:'\u0645\u0633\u0624\u0648\u0644\u064A\u0646',btab_domains:'\u062F\u0648\u0645\u064A\u0646\u0627\u062A',
+      smart_bots:'\u0627\u0644\u0628\u0648\u062A\u0627\u062A \u0627\u0644\u0630\u0643\u064A\u0629',auto_replies:'\u0627\u0644\u0631\u062F\u0648\u062F \u0627\u0644\u0630\u0643\u064A\u0629',analytics:'\u0627\u0644\u062A\u062D\u0644\u064A\u0644\u0627\u062A',chains:'\u0627\u0644\u0633\u0644\u0627\u0633\u0644',smart_notifs:'\u0627\u0644\u0625\u0634\u0639\u0627\u0631\u0627\u062A',webhooks:'Webhooks',
+      bot_name:'\u0627\u0633\u0645 \u0627\u0644\u0628\u0648\u062A',bot_token_label:'\u062A\u0648\u0643\u0646 \u0627\u0644\u0628\u0648\u062A',bot_features:'\u0627\u0644\u0645\u0645\u064A\u0632\u0627\u062A',bot_desc:'\u0627\u0644\u0648\u0635\u0641',bot_admin:'\u0623\u062F\u0645\u0646 \u062A\u064A\u0644\u064A\u062C\u0631\u0627\u0645',
+      new_bot:'\u0628\u0648\u062A \u062C\u062F\u064A\u062F',all_features:'\u0643\u0644 \u0627\u0644\u0645\u0645\u064A\u0632\u0627\u062A',
+      add_reply:'\u0631\u062F \u062C\u062F\u064A\u062F',reply_keyword:'\u0627\u0644\u0643\u0644\u0645\u0629',reply_response:'\u0627\u0644\u0631\u062F',reply_match:'\u0646\u0648\u0639 \u0627\u0644\u0645\u0637\u0627\u0628\u0642\u0629',reply_priority:'\u0627\u0644\u0623\u0648\u0644\u0648\u064A\u0629',
+      contains:'\u064A\u062D\u062A\u0648\u064A \u0639\u0644\u0649',exact:'\u062A\u0637\u0627\u0628\u0642 \u062A\u0627\u0645',starts_with:'\u064A\u0628\u062F\u0623 \u0628\u0640',
+      add_chain:'\u0633\u0644\u0633\u0644\u0629 \u062C\u062F\u064A\u062F\u0629',trigger_event:'\u062D\u062F\u062B \u0627\u0644\u0645\u064F\u0634\u063A\u0651\u0644',action_message:'\u0631\u0633\u0627\u0644\u0629 \u0627\u0644\u0625\u062C\u0631\u0627\u0621',
+      new_user:'\u0645\u0633\u062A\u062E\u062F\u0645 \u062C\u062F\u064A\u062F',game_play:'\u0644\u0639\u0628',first_message:'\u0623\u0648\u0644 \u0631\u0633\u0627\u0644\u0629',
+      add_notif:'\u0625\u0634\u0639\u0627\u0631 \u062C\u062F\u064A\u062F',notif_trigger:'\u0627\u0644\u0634\u0631\u0637',notif_message:'\u0627\u0644\u0631\u0633\u0627\u0644\u0629',
+      inactive_3days:'3 \u0623\u064A\u0627\u0645 \u0628\u062F\u0648\u0646 \u0646\u0634\u0627\u0637',inactive_7days:'7 \u0623\u064A\u0627\u0645 \u0628\u062F\u0648\u0646 \u0646\u0634\u0627\u0637',new_user_24h:'\u0645\u0633\u062A\u062E\u062F\u0645 \u062C\u062F\u064A\u062F \u0628\u0639\u062F 24 \u0633\u0627\u0639\u0629',
+      add_webhook:'Webhook \u062C\u062F\u064A\u062F',webhook_name:'\u0627\u0644\u0627\u0633\u0645',webhook_url:'\u0627\u0644\u0631\u0627\u0628\u0637',webhook_events:'\u0627\u0644\u0623\u062D\u062F\u0627\u062B',webhook_secret:'\u0627\u0644\u0645\u0641\u062A\u0627\u062D \u0627\u0644\u0633\u0631\u064A',all_events:'\u0643\u0644 \u0627\u0644\u0623\u062D\u062F\u0627\u062B',
+      total_events:'\u0625\u062C\u0645\u0627\u0644\u064A \u0627\u0644\u0623\u062D\u062F\u0627\u062B',unique_users:'\u0645\u0633\u062A\u062E\u062F\u0645\u064A\u0646 \u0641\u0631\u064A\u062F\u064A\u0646',messages:'\u0631\u0633\u0627\u0626\u0644',
+      reply_hits:'\u0631\u062F\u0648\u062F \u0630\u0643\u064A\u0629',callbacks:'\u0627\u0644\u0627\u0633\u062A\u062F\u0639\u0627\u0621\u0627\u062A',unknown:'\u0645\u062C\u0647\u0648\u0644\u0629',top_actions:'\u0627\u0644\u0623\u0648\u0627\u0645\u0631 \u0627\u0644\u0623\u0643\u062B\u0631 \u0627\u0633\u062A\u062E\u062F\u0627\u0645\u0627\u064B',
+      view_data:'\u0628\u064A\u0627\u0646\u0627\u062A \u0627\u0644\u0639\u0645\u064A\u0644',no_data:'\u0644\u0627 \u062A\u0648\u062C\u062F \u0628\u064A\u0627\u0646\u0627\u062A',
+      d_users:'\u0627\u0644\u0645\u0633\u062A\u062E\u062F\u0645\u064A\u0646',d_transactions:'\u0627\u0644\u0645\u0639\u0627\u0645\u0644\u0627\u062A',d_wallets:'\u0627\u0644\u0645\u062D\u0627\u0641\u0638',d_companies:'\u0627\u0644\u0634\u0631\u0643\u0627\u062A',d_bonuses:'\u0627\u0644\u0645\u0643\u0627\u0641\u0622\u062A',d_recovery:'\u0627\u0644\u0627\u0633\u062A\u0631\u062F\u0627\u062F\u0627\u062A',
+      confirm_delete_bot:'\u0647\u0644 \u0623\u0646\u062A \u0645\u062A\u0623\u0643\u062F \u0645\u0646 \u062D\u0630\u0641 \u0627\u0644\u0628\u0648\u062A\u061F',template_label:'\u0623\u0648 \u0627\u062E\u062A\u0631 \u0642\u0627\u0644\u0628 \u062C\u0627\u0647\u0638:',
     },
     en: {
-      title:'Rental System',new_client:'New Client',tab_dashboard:'Dashboard',tab_clients:'Clients',tab_payments:'Payment Methods',tab_transactions:'Transactions',tab_revenue:'Revenue',tab_admins:'Admins',tab_domains:'Domains',
-      stat_total:'Total',stat_active:'Active',stat_expired:'Expired',stat_expiring:'Expiring Soon',stat_running:'Bot Running',stat_revenue:'Revenue',
-      recent_clients:'Recent Clients',quick_actions:'Quick Actions',add_client:'Add Client',all_clients:'All Clients',refresh:'Refresh',no_clients:'No clients yet',no_matching:'No matching clients',
+      title:'Rental System',new_client:'New Client',
+      tab_dashboard:'Dashboard',tab_clients:'Clients',tab_bots:'Smart Bots',
+      tab_finance:'Finance',tab_payments:'Payment Methods',tab_transactions:'Transactions',
+      tab_revenue:'Revenue',tab_admins:'Admins',tab_domains:'Domains',
+      stat_total:'Total',stat_active:'Active',stat_expired:'Expired',
+      stat_expiring:'Expiring Soon',stat_running:'Bot Running',stat_revenue:'Revenue',
+      recent_clients:'Recent Clients',quick_actions:'Quick Actions',add_client:'Add Client',all_clients:'All Clients',
+      refresh:'Refresh',no_clients:'No clients yet',no_matching:'No matching clients',
       search_placeholder:'Search by name or ID...',all:'All',suspended:'Suspended',expired:'Expired',days:'days',
       start:'Start',stop:'Stop',edit:'Edit',renew:'Renew',delete:'Delete',save:'Save',cancel:'Cancel',create:'Create',add:'Add',close:'Close',
       bot:'Bot',dashboard_login:'Dashboard',domain:'Domain',subscription:'Subscription',balance:'Balance',revenue_share:'Revenue Share',
-      client_name:'Client Name',contact:'Contact',bot_username:'Bot Username',bot_token:'Bot Token',dash_user:'Dashboard User',dash_pass:'Dashboard Pass',new_password:'New Password',admin_ids:'Admin Telegram',sub_duration:'Duration',preferred_pm:'Preferred Payment',pm_change_hint:'Client can change it from their panel',features:'Features',notes:'Notes',select_all:'Select All',deselect_all:'Deselect All',
+      client_name:'Client Name',contact:'Contact',bot_username:'Bot Username',bot_token:'Bot Token',
+      dash_user:'Dashboard User',dash_pass:'Dashboard Pass',new_password:'New Password',admin_ids:'Admin Telegram',
+      sub_duration:'Duration',preferred_pm:'Preferred Payment',pm_change_hint:'Client can change it from their panel',
+      features:'Features',notes:'Notes',select_all:'Select All',deselect_all:'Deselect All',
       client:'Client',profit:'Profit',you:'You',none:'None',
-      pending:'Pending',approved:'Approved',rejected:'Rejected',deposit:'Deposit',withdraw:'Withdraw',pending_requests:'pending requests',review_action:'Review and take action',no_transactions:'No transactions',
+      pending:'Pending',approved:'Approved',rejected:'Rejected',deposit:'Deposit',withdraw:'Withdraw',
+      pending_requests:'pending requests',review_action:'Review and take action',no_transactions:'No transactions',
       total_profit:'Total Profit',my_share:'My Share',client_share:'Client Share',rounds:'Rounds',
-      admins:'Admins',name:'Name',role:'Role',sections:'Sections',actions:'Actions',role_support:'Support',role_finance:'Finance',role_games:'Games',role_broadcast:'Broadcast',assign_client:'Assign to Client',add_admin:'Add Admin',
+      admins:'Admins',name:'Name',role:'Role',sections:'Sections',actions:'Actions',
+      role_support:'Support',role_finance:'Finance',role_games:'Games',role_broadcast:'Broadcast',
+      assign_client:'Assign to Client',add_admin:'Add Admin',
       generate_nginx:'Generate Nginx',no_domains:'No domains',disabled:'Disabled',
-      bank_transfer:'Bank Transfer',vodafone_cash:'Vodafone Cash',account_number:'Account Number',bank:'Bank',holder:'Holder',copy:'Copy',no_payment_methods:'No payment methods',new_payment_method:'New Payment Method',pm_name:'Method Name',type:'Type',
-      id:'ID',expires:'Expires',confirm_delete:'Are you sure you want to delete',btab_dash:'Home',btab_clients:'Clients',btab_pay:'Pay',btab_tx:'Tx',btab_rev:'Revenue',btab_settings:'Settings',
+      bank_transfer:'Bank Transfer',vodafone_cash:'Vodafone Cash',account_number:'Account Number',bank:'Bank',holder:'Holder',copy:'Copy',
+      no_payment_methods:'No payment methods',new_payment_method:'New Payment Method',pm_name:'Method Name',type:'Type',
+      id:'ID',expires:'Expires',confirm_delete:'Are you sure you want to delete',
+      btab_dash:'Home',btab_clients:'Clients',btab_bots:'Bots',btab_finance:'Finance',btab_admins:'Admins',btab_domains:'Domains',
+      smart_bots:'Smart Bots',auto_replies:'Auto-Replies',analytics:'Analytics',chains:'Chains',smart_notifs:'Notifications',webhooks:'Webhooks',
+      bot_name:'Bot Name',bot_token_label:'Bot Token',bot_features:'Features',bot_desc:'Description',bot_admin:'Admin Telegram',
+      new_bot:'New Bot',all_features:'All Features',
+      add_reply:'New Reply',reply_keyword:'Keyword',reply_response:'Response',reply_match:'Match Type',reply_priority:'Priority',
+      contains:'Contains',exact:'Exact',starts_with:'Starts With',
+      add_chain:'New Chain',trigger_event:'Trigger Event',action_message:'Action Message',
+      new_user:'New User',game_play:'Game Play',first_message:'First Message',
+      add_notif:'New Notification',notif_trigger:'Trigger',notif_message:'Message',
+      inactive_3days:'Inactive 3 days',inactive_7days:'Inactive 7 days',new_user_24h:'New user after 24h',
+      add_webhook:'New Webhook',webhook_name:'Name',webhook_url:'URL',webhook_events:'Events',webhook_secret:'Secret',all_events:'All Events',
+      total_events:'Total Events',unique_users:'Unique Users',messages:'Messages',
+      reply_hits:'Reply Hits',callbacks:'Callbacks',unknown:'Unknown',top_actions:'Top Actions',
+      view_data:'View Client Data',no_data:'No data available',
+      d_users:'Users',d_transactions:'Transactions',d_wallets:'Wallets',d_companies:'Companies',d_bonuses:'Bonuses',d_recovery:'Recovery',
+      confirm_delete_bot:'Are you sure you want to delete this bot?',template_label:'Or choose a template:',
     }
   };
   const ALL_SECTIONS = [
-    {key:'transactions',label:'المعاملات',en:'Transactions'},{key:'matching',label:'المطابقة',en:'Matching'},{key:'agents',label:'الوكلاء',en:'Agents'},{key:'trading',label:'التداول',en:'Trading'},
-    {key:'users',label:'المستخدمين',en:'Users'},{key:'svrp',label:'التعويض',en:'Compensation'},{key:'lottery',label:'اليانصيب',en:'Lottery'},{key:'wheel',label:'العجلة',en:'Wheel'},
-    {key:'companies',label:'الشركات',en:'Companies'},{key:'payment_methods',label:'طرق الدفع',en:'Payments'},{key:'apps',label:'التطبيقات',en:'Apps'},{key:'referrals',label:'الإحالات',en:'Referrals'},
-    {key:'channels',label:'القنوات',en:'Channels'},{key:'broadcast',label:'البث',en:'Broadcast'},{key:'complaints',label:'الشكاوى',en:'Complaints'},{key:'tickets',label:'التذاكر',en:'Tickets'},
-    {key:'bots',label:'البوتات',en:'Bots'},{key:'browser',label:'المتصفح',en:'Browser'},{key:'clients',label:'العملاء',en:'Clients'},{key:'statistics',label:'الإحصائيات',en:'Statistics'},
-    {key:'admins',label:'المسؤولين',en:'Admins'},{key:'settings',label:'الإعدادات',en:'Settings'},{key:'backup',label:'النسخ الاحتياطي',en:'Backup'},{key:'themes',label:'الثيمات',en:'Themes'},
+    {key:'transactions',label:'\u0627\u0644\u0645\u0639\u0627\u0645\u0644\u0627\u062A',en:'Transactions'},{key:'matching',label:'\u0627\u0644\u0645\u0637\u0627\u0628\u0642\u0629',en:'Matching'},{key:'agents',label:'\u0627\u0644\u0648\u0643\u0644\u0627\u0621',en:'Agents'},{key:'trading',label:'\u0627\u0644\u062A\u062F\u0627\u0648\u0644',en:'Trading'},
+    {key:'users',label:'\u0627\u0644\u0645\u0633\u062A\u062E\u062F\u0645\u064A\u0646',en:'Users'},{key:'svrp',label:'\u0627\u0644\u062A\u0639\u0648\u064A\u0636',en:'Compensation'},{key:'lottery',label:'\u0627\u0644\u064A\u0627\u0646\u0635\u064A\u0628',en:'Lottery'},{key:'wheel',label:'\u0627\u0644\u0639\u062C\u0644\u0629',en:'Wheel'},
+    {key:'companies',label:'\u0627\u0644\u0634\u0631\u0643\u0627\u062A',en:'Companies'},{key:'payment_methods',label:'\u0637\u0631\u0642 \u0627\u0644\u062F\u0641\u0639',en:'Payments'},{key:'apps',label:'\u0627\u0644\u062A\u0637\u0628\u064A\u0642\u0627\u062A',en:'Apps'},{key:'referrals',label:'\u0627\u0644\u0625\u062D\u0627\u0644\u0627\u062A',en:'Referrals'},
+    {key:'channels',label:'\u0627\u0644\u0642\u0646\u0648\u0627\u062A',en:'Channels'},{key:'broadcast',label:'\u0627\u0644\u0628\u062B',en:'Broadcast'},{key:'complaints',label:'\u0627\u0644\u0634\u0643\u0627\u0648\u0649',en:'Complaints'},{key:'tickets',label:'\u0627\u0644\u062A\u0630\u0627\u0643\u0631',en:'Tickets'},
+    {key:'bots',label:'\u0627\u0644\u0628\u0648\u062A\u0627\u062A',en:'Bots'},{key:'browser',label:'\u0627\u0644\u0645\u062A\u0635\u0641\u062D',en:'Browser'},{key:'clients',label:'\u0627\u0644\u0639\u0645\u0644\u0627\u0621',en:'Clients'},{key:'statistics',label:'\u0627\u0644\u0625\u062D\u0635\u0627\u0626\u064A\u0627\u062A',en:'Statistics'},
+    {key:'admins',label:'\u0627\u0644\u0645\u0633\u0624\u0648\u0644\u064A\u0646',en:'Admins'},{key:'settings',label:'\u0627\u0644\u0625\u0639\u062F\u0627\u062F\u0627\u062A',en:'Settings'},{key:'backup',label:'\u0627\u0644\u0646\u0633\u062E \u0627\u0644\u0627\u062D\u062A\u064A\u0627\u0637\u064A',en:'Backup'},{key:'themes',label:'\u0627\u0644\u062B\u064A\u0645\u0627\u062A',en:'Themes'},
   ];
   return {
-    rl: (localStorage.getItem('lang') || 'ar'),
+    rl:(localStorage.getItem('lang')||'ar'),
     tab:'dashboard',search:'',filterStatus:'',saving:false,
     clients:[],features:{},admins:[],domains:[],nginxConfigs:[],
     auditLogs:[],toastMsg:'',
@@ -600,28 +1056,46 @@ function rentalSystem(){
     sectionAdmin:null,sectionForm:[],
     allSectionsList:ALL_SECTIONS,
     domainForm:{client_id:'',domain:''},
-    rt(key){ var _l=localStorage.getItem('lang')||'ar'; return (I18N[_l]||I18N.ar)[key]||key },
+    botSubTab:'list',finSubTab:'payments',
+    bots:[],autoReplies:[],analytics:{},chains:[],smartNotifs:[],webhooks:[],botTemplates:{},
+    showBotModal:false,showFeaturesModal:false,showDeleteBotModal:false,
+    showAddReplyModal:false,showAddChainModal:false,showAddNotifModal:false,showAddWebhookModal:false,
+    deleteBotTarget:null,editingBot:null,editingFeatures:[],
+    botForm:{name:'',token:'',admin_ids:'',description:'',features:[]},
+    replyForm:{keyword:'',response:'',match_type:'contains',priority:0},
+    chainForm:{trigger_event:'new_user',message_template:''},
+    notifForm:{trigger:'inactive_3days',message_template:''},
+    webhookForm:{name:'',url:'',events:'*',secret:''},
+    allFeatures:{deposit:'\u{1F4B5} \u0625\u064A\u062F\u0627\u0639',withdraw:'\u{1F4B8} \u0633\u062D\u0628',matching:'\u{1F504} \u0645\u0637\u0627\u0628\u0642\u0629 P2P',trading:'\u{1F4B4} \u062A\u062F\u0627\u0648\u0644',compensation:'\u{1F48E} \u062A\u0639\u0648\u064A\u0636 100%',games:'\u{1F3AE} \u0623\u0644\u0639\u0627\u0628',referral:'\u{1F381} \u0625\u062D\u0627\u0644\u0627\u062A',complaints:'\u{1F4E8} \u0634\u0643\u0627\u0648\u0649',apps:'\u{1F4F1} \u062A\u0637\u0628\u064A\u0642\u0627\u062A',multi_lang:'\u{1F310} \u0644\u063A\u0627\u062A',lottery:'\u{1F3B2} \u064A\u0627\u0646\u0635\u064A\u0628',wheel:'\u{1F3A1} \u0639\u062C\u0644\u0629'},
+    dataModal:false,dataClient:null,dataKind:'users',dataRows:[],dataFields:[],dataStats:{},
+    get dataStatsItems(){
+      var s=this.dataStats;var items=[];
+      if(!s||typeof s!=='object')return items;
+      var map={total_users:1,total_transactions:1,deposits:1,withdrawals:1,pending:1,banned:1};
+      for(var k in map){if(s[k]!==undefined){var label=k.replace(/_/g,' ');items.push([label,s[k]]);}}
+      return items;
+    },
+    rt(key){var _l=localStorage.getItem('lang')||'ar';return(I18N[_l]||I18N.ar)[key]||key},
     toggleLang(){var l=localStorage.getItem('lang')==='en'?'ar':'en';localStorage.setItem('lang',l);location.reload()},
     get filteredClients(){
-      return this.clients.filter(c=>{
-        if(this.filterStatus==='expired'&&!c.expired)return false;
-        if(this.filterStatus==='active'&&(c.expired||c.status==='suspended'))return false;
-        if(this.filterStatus==='suspended'&&c.status!=='suspended')return false;
-        if(this.search){const s=this.search.toLowerCase();return c.name.toLowerCase().includes(s)||c.id.toLowerCase().includes(s)||(c.bot_username||'').toLowerCase().includes(s)}
+      var self=this;
+      return this.clients.filter(function(c){
+        if(self.filterStatus==='expired'&&!c.expired)return false;
+        if(self.filterStatus==='active'&&(c.expired||c.status==='suspended'))return false;
+        if(self.filterStatus==='suspended'&&c.status!=='suspended')return false;
+        if(self.search){var s=self.search.toLowerCase();return c.name.toLowerCase().indexOf(s)!==-1||c.id.toLowerCase().indexOf(s)!==-1||(c.bot_username||'').toLowerCase().indexOf(s)!==-1}
         return true;
       });
     },
-    async init(){
-      await this.loadAll();await this.loadPendingCount();this.loadPaymentMethods();
-    },
+    async init(){await this.loadAll();await this.loadPendingCount();this.loadPaymentMethods()},
     async loadAll(){await Promise.all([this.loadClients(),this.loadRevenue()])},
-    async loadPendingCount(){try{const d=await api('/api/rental/pending-count');this.pendingCount=d.count||0}catch(e){}setInterval(()=>{this.loadPendingCount()},30000)},
-    async loadClients(){try{const d=await api('/api/clients');this.clients=d.clients||[];this.features=d.features||{};this.stats={total:this.clients.length,active:this.clients.filter(c=>!c.expired&&c.status!=='suspended').length,expired:this.clients.filter(c=>c.expired).length,expiringSoon:this.clients.filter(c=>!c.expired&&c.days_left<=3).length,running:this.clients.filter(c=>c.running).length}}catch(e){}},
-    async loadRevenue(){try{const d=await api('/api/admin-center/revenue');this.revenueStats=d.stats||{};this.revenueByClient=d.by_client||[]}catch(e){}},
-    async loadDomains(){try{const d=await api('/api/admin-center/domains');this.domains=d.domains||[]}catch(e){}},
-    async loadAdmins(){try{const d=await api('/api/admin-center/admins');this.admins=d.admins||[]}catch(e){}},
+    async loadPendingCount(){try{var d=await api('/api/rental/pending-count');this.pendingCount=d.count||0}catch(e){}var self=this;setInterval(function(){self.loadPendingCount()},30000)},
+    async loadClients(){try{var d=await api('/api/clients');this.clients=d.clients||[];this.features=d.features||{};this.stats={total:this.clients.length,active:this.clients.filter(function(c){return!c.expired&&c.status!=='suspended'}).length,expired:this.clients.filter(function(c){return c.expired}).length,expiringSoon:this.clients.filter(function(c){return!c.expired&&c.days_left<=3}).length,running:this.clients.filter(function(c){return c.running}).length}}catch(e){}},
+    async loadRevenue(){try{var d=await api('/api/admin-center/revenue');this.revenueStats=d.stats||{};this.revenueByClient=d.by_client||[]}catch(e){}},
+    async loadDomains(){try{var d=await api('/api/admin-center/domains');this.domains=d.domains||[]}catch(e){}},
+    async loadAdmins(){try{var d=await api('/api/admin-center/admins');this.admins=d.admins||[]}catch(e){}},
     openCreateClient(){this.clientForm={name:'',contact:'',bot_username:'',bot_token:'',dash_username:'',dash_password:'',admin_ids:'',subscription_days:30,revenue_share:30,features:Object.keys(this.features),notes:'',preferred_pm:''};this.showClientModal=true},
-    openEditClient(c){this.clientForm={...c,features:[...(c.features||[])]};this.showClientModal=true},
+    openEditClient(c){this.clientForm={id:c.id,name:c.name,contact:c.contact,bot_username:c.bot_username,bot_token:'',dash_username:c.dash_username,dash_password:'',admin_ids:c.admin_ids||'',subscription_days:30,revenue_share:c.revenue_share||30,features:[...(c.features||[])],notes:c.notes||'',preferred_pm:c.preferred_pm||''};this.showClientModal=true},
     openRenew(c){this.renewTarget=c;this.showRenew=true},
     async saveClient(){
       this.saving=true;
@@ -632,40 +1106,66 @@ function rentalSystem(){
       }catch(e){toast(e.message||'Error','error')}
       this.saving=false;
     },
-    async doRenew(d){try{await api('/api/clients/'+this.renewTarget.id+'/renew',{method:'POST',body:JSON.stringify({days:d})});toast(this.rt('renew'),'success');this.showRenew=false;await this.loadClients()}catch(e){toasrt('Error','error')}},
-    async control(c,action){try{await api('/api/clients/'+c.id+'/'+action,{method:'POST'});await this.loadClients();toast(action,'success')}catch(e){toasrt('Error','error')}},
-    confirmDelete(c){this.deleteTarget=c;this.deleteType=(localStorage.getItem('lang')||'ar')==='ar'?'عميل':'client';this.showDelete=true},
-    confirmDeleteAdmin(a){this.deleteTarget=a;this.deleteType=(localStorage.getItem('lang')||'ar')==='ar'?'مسؤول':'admin';this.showDelete=true},
+    async doRenew(d){try{await api('/api/clients/'+this.renewTarget.id+'/renew',{method:'POST',body:JSON.stringify({days:d})});toast(this.rt('renew'),'success');this.showRenew=false;await this.loadClients()}catch(e){toast('Error','error')}},
+    async control(c,action){try{await api('/api/clients/'+c.id+'/'+action,{method:'POST'});await this.loadClients();toast(action,'success')}catch(e){toast('Error','error')}},
+    confirmDelete(c){this.deleteTarget=c;this.deleteType=(localStorage.getItem('lang')||'ar')==='ar'?'\u0639\u0645\u064A\u0644':'client';this.showDelete=true},
+    confirmDeleteAdmin(a){this.deleteTarget=a;this.deleteType=(localStorage.getItem('lang')||'ar')==='ar'?'\u0645\u0633\u0624\u0648\u0644':'admin';this.showDelete=true},
     async doDelete(){
       try{
-        if(this.deleteType==='عميل'||this.deleteType==='client'){await api('/api/clients/'+this.deleteTarget.id,{method:'DELETE'})}
+        if(this.deleteType==='\u0639\u0645\u064A\u0644'||this.deleteType==='client'){await api('/api/clients/'+this.deleteTarget.id,{method:'DELETE'})}
         else{await api('/api/admin-center/admins/'+this.deleteTarget.telegram_id,{method:'DELETE'})}
-        toast(this.rt('delete'),'success');this.showDelete=false;(this.deleteType==='عميل'||this.deleteType==='client')?await this.loadClients():await this.loadAdmins();
-      }catch(e){toasrt('Error','error')}
+        toast(this.rt('delete'),'success');this.showDelete=false;
+        if(this.deleteType==='\u0639\u0645\u064A\u0644'||this.deleteType==='client'){await this.loadClients()}else{await this.loadAdmins()}
+      }catch(e){toast('Error','error')}
     },
-    async saveDomain(){try{await api('/api/admin-center/domains',{method:'POST',body:JSON.stringify(this.domainForm)});toast(this.rt('save'),'success');this.domainForm={client_id:'',domain:''};await this.loadDomains()}catch(e){toasrt('Error','error')}},
+    async saveDomain(){try{await api('/api/admin-center/domains',{method:'POST',body:JSON.stringify(this.domainForm)});toast(this.rt('save'),'success');this.domainForm={client_id:'',domain:''};await this.loadDomains()}catch(e){toast('Error','error')}},
     async removeDomain(cid){if(!confirm(this.rt('delete')+'?'))return;await api('/api/admin-center/domains/'+cid,{method:'DELETE'});await this.loadDomains()},
-    async generateNginx(){const d=await api('/api/admin-center/domains/generate-nginx');this.nginxConfigs=d.configs||[];toast(this.rt('save'),'success')},
+    async generateNginx(){var d=await api('/api/admin-center/domains/generate-nginx');this.nginxConfigs=d.configs||[];toast(this.rt('save'),'success')},
     async updateRevenueShare(cid,val){await api('/api/admin-center/revenue-share/'+cid,{method:'POST',body:JSON.stringify({revenue_share:parseInt(val)})});toast(this.rt('save'),'success')},
     async saveAdmin(){await api('/api/admin-center/admins',{method:'POST',body:JSON.stringify(this.addAdminForm)});toast(this.rt('add'),'success');this.showAddAdmin=false;await this.loadAdmins()},
     async saveTenantAssign(){await api('/api/admin-center/admins/'+this.tenantTarget.telegram_id+'/tenant',{method:'POST',body:JSON.stringify(this.tenantForm)});toast(this.rt('save'),'success');this.showTenantModal=false;await this.loadAdmins()},
     openTenantAssign(a){this.tenantTarget=a;this.tenantForm={tenant_id:a.tenant_id||''};this.showTenantModal=true},
     openSections(a){this.sectionAdmin=a.telegram_id;this.sectionForm=a.sections||[]},
-    selectAllSections(){this.sectionForm=this.allSectionsList.map(s=>s.key)},
+    selectAllSections(){this.sectionForm=this.allSectionsList.map(function(s){return s.key})},
     async saveSections(){await api('/api/admin-center/admins/'+this.sectionAdmin+'/sections',{method:'POST',body:JSON.stringify({sections:this.sectionForm})});toast(this.rt('save'),'success');await this.loadAdmins();this.sectionAdmin=null},
-    async loadPaymentMethods(){try{const d=await api('/api/rental/payment-methods');this.paymentMethods=d.methods||[]}catch(e){}},
+    async loadPaymentMethods(){try{var d=await api('/api/rental/payment-methods');this.paymentMethods=d.methods||[]}catch(e){}},
     async savePM(){if(!this.pmForm.name||!this.pmForm.account_number){toast(this.rt('account_number')+' required','error');return}await api('/api/rental/payment-methods',{method:'POST',body:JSON.stringify(this.pmForm)});toast(this.rt('add'),'success');this.showAddPM=false;await this.loadPaymentMethods()},
     async togglePMStatus(pm){await api('/api/rental/payment-methods/'+pm.id,{method:'PUT',body:JSON.stringify({status:pm.status==='active'?'inactive':'active'})});await this.loadPaymentMethods()},
     async deletePM(pm){if(!confirm(this.rt('delete')+' "'+pm.name+'"'))return;await api('/api/rental/payment-methods/'+pm.id,{method:'DELETE'});await this.loadPaymentMethods()},
-    async loadAllTransactions(){try{let url='/api/rental/all-transactions';const p=[];if(this.txFilter)p.push('status='+this.txFilter);if(this.txTypeFilter)p.push('type='+this.txTypeFilter);if(p.length)url+='?'+p.join('&');const d=await api(url);this.allTransactions=d.transactions||[]}catch(e){}},
+    async loadAllTransactions(){try{var url='/api/rental/all-transactions';var p=[];if(this.txFilter)p.push('status='+this.txFilter);if(this.txTypeFilter)p.push('type='+this.txTypeFilter);if(p.length)url+='?'+p.join('&');var d=await api(url);this.allTransactions=d.transactions||[]}catch(e){}},
     async processTx(tx,action){if(!confirm((action==='approved'?this.rt('approved'):this.rt('rejected'))+'?'))return;await api('/api/rental/transactions/'+tx.client_id+'/'+tx.id,{method:'POST',body:JSON.stringify({action})});toast(this.rt('save'),'success');await this.loadAllTransactions();await this.loadPendingCount()},
-    copyText(t){navigator.clipboard.writeText(t).then(()=>toast(this.rt('copy'),'success')).catch(()=>{})},
-    toast(msg){this.toastMsg=msg;setTimeout(()=>{this.toastMsg=''},2000)},
-    getTenantName(tid){const c=this.clients.find(c=>c.id===tid);return c?c.name:tid},
-    roleLabel(r){var _l=localStorage.getItem('lang')||'ar';const m={ar:{super_admin:'Super Admin',finance_admin:'المالية',support_admin:'الدعم',game_admin:'الألعاب',broadcast_admin:'البث'},en:{super_admin:'Super Admin',finance_admin:'Finance',support_admin:'Support',game_admin:'Games',broadcast_admin:'Broadcast'}};return(m[_l]||m.ar)[r]||r},
+    copyText(t){navigator.clipboard.writeText(t).then(function(){toast(this.rt('copy'),'success')}.bind(this)).catch(function(){})},
+    toast(msg){this.toastMsg=msg;setTimeout(function(){this.toastMsg=''}.bind(this),2000)},
+    getTenantName(tid){var c=this.clients.find(function(x){return x.id===tid});return c?c.name:tid},
+    roleLabel(r){var _l=localStorage.getItem('lang')||'ar';var m={ar:{super_admin:'Super Admin',finance_admin:'\u0627\u0644\u0645\u0627\u0644\u064A\u0629',support_admin:'\u0627\u0644\u062F\u0639\u0645',game_admin:'\u0627\u0644\u0623\u0644\u0639\u0627\u0628',broadcast_admin:'\u0627\u0644\u0628\u062B'},en:{super_admin:'Super Admin',finance_admin:'Finance',support_admin:'Support',game_admin:'Games',broadcast_admin:'Broadcast'}};return(m[_l]||m.ar)[r]||r},
     roleBadge(r){return{super_admin:'background:rgba(255,71,87,.12);color:var(--danger)',finance_admin:'background:rgba(251,191,36,.12);color:var(--amber)',support_admin:'background:rgba(0,231,1,.12);color:var(--accent)',game_admin:'background:rgba(168,85,247,.12);color:#a855f7',broadcast_admin:'background:rgba(34,211,238,.12);color:#22d3ee'}[r]||'background:rgba(107,122,144,.12);color:var(--muted)'},
     fmtNum(n){return(n||0).toLocaleString()},
     fmtMoney(n){return(n||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})},
+    openData(c){this.dataClient=c;this.dataModal=true;this.dataStats={};this.dataRows=[];this.dataFields=[];this.loadClientData('users');this.loadClientStats(c.id)},
+    async loadClientStats(cid){try{var d=await api('/api/clients/'+cid+'/stats');this.dataStats=d||{}}catch(e){this.dataStats={}}},
+    async loadClientData(kind){this.dataKind=kind;try{var d=await api('/api/clients/'+this.dataClient.id+'/data?type='+kind+'&limit=100');this.dataRows=d.rows||[];this.dataFields=d.fields||[]}catch(e){this.dataRows=[];this.dataFields=[]}},
+    async loadBots(){try{var d=await api('/api/bots');this.bots=d.bots||d||[]}catch(e){}},
+    async loadAutoReplies(){try{var d=await api('/api/smart/auto-replies');this.autoReplies=d.replies||[]}catch(e){}},
+    async loadAnalytics(){try{this.analytics=await api('/api/smart/analytics?days=30')}catch(e){}},
+    async loadChains(){try{var d=await api('/api/smart/chains');this.chains=d.chains||[]}catch(e){}},
+    async loadSmartNotifs(){try{var d=await api('/api/smart/notifications');this.smartNotifs=d.notifications||[]}catch(e){}},
+    async loadWebhooks(){try{var d=await api('/api/smart/webhooks');this.webhooks=d.webhooks||[]}catch(e){}},
+    async loadTemplates(){try{var d=await api('/api/smart/templates');this.botTemplates=d.templates||{}}catch(e){}},
+    openAddBotModal(){this.botForm={name:'',token:'',admin_ids:'',description:'',features:[]};this.showBotModal=true;this.loadTemplates()},
+    applyTemplate(key){var t=this.botTemplates[key];if(!t)return;this.botForm.name=t.default_name||'';this.botForm.features=t.features?JSON.parse(t.features):[];this.botForm.description=t.description||''},
+    async saveBot(){try{var payload={name:this.botForm.name,token:this.botForm.token,admin_ids:this.botForm.admin_ids,description:this.botForm.description,features:JSON.stringify(this.botForm.features)};await api('/api/bots',{method:'POST',body:JSON.stringify(payload)});toast('OK','success');this.showBotModal=false;await this.loadBots()}catch(e){toast(e.message||'Error','error')}},
+    async toggleActiveBot(bot){try{await api('/api/bots/'+bot.id+'/toggle',{method:'POST'});await this.loadBots()}catch(e){toast('Error','error')}},
+    editFeatures(bot){this.editingBot=bot;this.editingFeatures=this.parseFeatures(bot.features);this.showFeaturesModal=true},
+    async saveBotFeatures(){try{await api('/api/bots/'+this.editingBot.id+'/features',{method:'POST',body:JSON.stringify({features:JSON.stringify(this.editingFeatures)})});toast(this.rt('save'),'success');this.showFeaturesModal=false;await this.loadBots()}catch(e){toast('Error','error')}},
+    confirmDeleteBot(bot){this.deleteBotTarget=bot;this.showDeleteBotModal=true},
+    async deleteBot(){if(!this.deleteBotTarget)return;try{await api('/api/bots/'+this.deleteBotTarget.id,{method:'DELETE'});toast(this.rt('delete'),'success');this.showDeleteBotModal=false;this.deleteBotTarget=null;await this.loadBots()}catch(e){toast('Error','error')}},
+    async addAutoReply(){try{await api('/api/smart/auto-replies',{method:'POST',body:JSON.stringify(this.replyForm)});toast(this.rt('add'),'success');this.showAddReplyModal=false;this.replyForm={keyword:'',response:'',match_type:'contains',priority:0};await this.loadAutoReplies()}catch(e){toast('Error','error')}},
+    async deleteAutoReply(id){try{await api('/api/smart/auto-replies/'+id,{method:'DELETE'});await this.loadAutoReplies()}catch(e){toast('Error','error')}},
+    async addChain(){try{await api('/api/smart/chains',{method:'POST',body:JSON.stringify(this.chainForm)});toast(this.rt('add'),'success');this.showAddChainModal=false;this.chainForm={trigger_event:'new_user',message_template:''};await this.loadChains()}catch(e){toast('Error','error')}},
+    async addNotif(){try{await api('/api/smart/notifications',{method:'POST',body:JSON.stringify(this.notifForm)});toast(this.rt('add'),'success');this.showAddNotifModal=false;this.notifForm={trigger:'inactive_3days',message_template:''};await this.loadSmartNotifs()}catch(e){toast('Error','error')}},
+    async addWebhook(){try{await api('/api/smart/webhooks',{method:'POST',body:JSON.stringify(this.webhookForm)});toast(this.rt('add'),'success');this.showAddWebhookModal=false;this.webhookForm={name:'',url:'',events:'*',secret:''};await this.loadWebhooks()}catch(e){toast('Error','error')}},
+    async deleteWebhook(id){try{await api('/api/smart/webhooks/'+id,{method:'DELETE'});await this.loadWebhooks()}catch(e){toast('Error','error')}},
+    parseFeatures(f){if(!f)return[];try{return typeof f==='string'?JSON.parse(f):f}catch(e){return[]}},
   };
 }
 </script>
