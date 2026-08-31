@@ -235,7 +235,8 @@ class CallbackHandlerMixin:
                             date=datetime.now().strftime('%Y-%m-%d %H:%M'))
                         
                         self.edit_message(chat_id, message.get('message_id'), confirmation_text)
-                        self.send_message(chat_id, self.tr('main_menu', lang), self.main_keyboard(lang, user_id))
+                        nav_btns = [[{'text': '🏠 القائمة الرئيسية', 'callback_data': 'main_menu'}]]
+                        self.send_inline_message(chat_id, self.tr('main_menu', lang), nav_btns)
                         
                         # إشعار الأدمن
                         for admin_id in self.admin_ids:
@@ -1486,14 +1487,15 @@ class CallbackHandlerMixin:
                 except:
                     pass
 
-                self.send_message(chat_id,
+                nav_btns = [[{'text': '🎡 عجلة الحظ', 'callback_data': 'wheel_refresh'},
+                             {'text': '🏠 القائمة', 'callback_data': 'main_menu'}]]
+                self.send_inline_message(chat_id,
                     f"🎉🎉🎉 <b>النتيجة!</b> 🎉🎉🎉\n\n"
                     f"━━━━━━━━━━━━━━━━━━\n"
                     f"🎁 <b>ربحت: {prize_won}</b>\n"
                     f"━━━━━━━━━━━━━━━━━━\n\n"
                     f"🎯 دوراتك: <code>{my_spins + 1}/{max_spins}</code>\n\n"
-                    f"🎁 مبروك! تواصل مع الإدارة لاستلام جائزتك",
-                    self.main_keyboard(lang, user_id))
+                    f"🎁 مبروك! تواصل مع الإدارة لاستلام جائزتك", nav_btns)
 
                 # إشعار الأدمن بالفائز
                 user_obj = self.find_user(user_id)
@@ -1752,11 +1754,13 @@ class CallbackHandlerMixin:
                         target_uid = result.get('user_id', '')
                         amount = result.get('amount', '0')
                         if target_uid:
-                            self.send_message(int(target_uid),
+                            nav_btns = [[{'text': '🎮 محفظة الألعاب', 'callback_data': 'game_wallet_deposit'},
+                                         {'text': '🏠 القائمة', 'callback_data': 'main_menu'}]]
+                            self.send_inline_message(int(target_uid),
                                 f"✅ <b>تم تأكيد إيداعك!</b>\n\n"
                                 f"💰 المبلغ: <code>{amount}</code>\n"
                                 f"💎 تم إضافة الرصيد لمحفظة الألعاب\n\n"
-                                f"🎮 يمكنك الآن مواصلة اللعب!")
+                                f"🎮 يمكنك الآن مواصلة اللعب!", nav_btns)
                         self.edit_message(chat_id, message.get('message_id'),
                             f"✅ تمت الموافقة وإضافة {amount} لرصيد اللاعب")
                     else:

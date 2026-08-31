@@ -234,12 +234,14 @@ class MessageDispatcherMixin:
                         bonus_req = r
                         break
                 if bonus_req:
+                    nav_btns = [[{'text': '💎 لوحة التعويض', 'callback_data': 'svrp_back_panel'},
+                                 {'text': '🏠 القائمة', 'callback_data': 'main_menu'}]]
                     self.notify_user(int(bonus_req['user_id']),
                         f"✅ <b>تمت الموافقة على طلب المكافأة!</b>\n\n"
                         f"💎 الشركة: {bonus_req.get('company_name', '')}\n"
                         f"💰 المبلغ: <code>{amount:.2f}</code>\n"
                         f"🧊 حالة الرصيد: <b>مجمد</b>",
-                        'bonus_approved')
+                        'bonus_approved', nav_btns)
 
             if user_id in self.user_states:
                 del self.user_states[user_id]
@@ -296,13 +298,14 @@ class MessageDispatcherMixin:
                 return
 
             # إشعار المستخدم
-            self.send_message(chat_id,
+            nav_btns = [[{'text': '💎 لوحة التعويض', 'callback_data': 'svrp_back_panel'},
+                         {'text': '🏠 القائمة', 'callback_data': 'main_menu'}]]
+            self.send_inline_message(chat_id,
                 f"✅ <b>تم إرسال طلب التعويض</b>\n\n"
                 f"🆔 <code>{req_id}</code>\n"
                 f"🏢 الشركة: {company_name}\n"
                 f"📋 رقم الحساب: <code>{account_number}</code>\n"
-                f"⏳ بانتظار مراجعة الإدارة",
-                self.main_keyboard(user.get('language', 'ar'), user_id))
+                f"⏳ بانتظار مراجعة الإدارة", nav_btns)
 
             # رابط الأفيليه للشركة — يظهر للأدمن للتحقق
             affiliate_link = ''
@@ -448,13 +451,15 @@ class MessageDispatcherMixin:
                 user = self.find_user(user_id)
                 user_currency = user.get('currency', 'SAR') if user else 'SAR'
 
-                self.send_message(chat_id,
+                nav_btns = [[{'text': '💎 لوحة التعويض', 'callback_data': 'svrp_back_panel'},
+                             {'text': '🏠 القائمة', 'callback_data': 'main_menu'}]]
+                self.send_inline_message(chat_id,
                     f"✅ <b>تم طلب الإيداع!</b>\n\n"
                     f"🆔 <code>{msg}</code>\n"
                     f"🏢 الشركة: {company_name}\n"
                     f"📋 رقم حسابك: <code>{account.get('account_number', '')}</code>\n"
                     f"💰 المبلغ: <b>{amount:.2f}</b> {user_currency}\n\n"
-                    f"⏳ سيتم مراجعة طلبك من الإدارة")
+                    f"⏳ سيتم مراجعة طلبك من الإدارة", nav_btns)
 
                 # إشعار الأدمن
                 for admin_id in self.admin_ids:
@@ -518,13 +523,15 @@ class MessageDispatcherMixin:
             if success:
                 user = self.find_user(user_id)
                 user_currency = user.get('currency', 'SAR') if user else 'SAR'
-                self.send_message(chat_id,
+                nav_btns = [[{'text': '💎 لوحة التعويض', 'callback_data': 'svrp_back_panel'},
+                             {'text': '🏠 القائمة', 'callback_data': 'main_menu'}]]
+                self.send_inline_message(chat_id,
                     f"✅ <b>تم طلب السحب!</b>\n\n"
                     f"🆔 <code>{msg}</code>\n"
                     f"🏢 الشركة: {company_name}\n"
                     f"📋 رقم حسابك: <code>{account.get('account_number', '')}</code>\n"
                     f"💰 المبلغ: <b>{amount:.2f}</b> {user_currency}\n\n"
-                    f"⏳ سيتم مراجعة طلبك من الإدارة")
+                    f"⏳ سيتم مراجعة طلبك من الإدارة", nav_btns)
 
                 for admin_id in self.admin_ids:
                     try:
@@ -594,11 +601,13 @@ class MessageDispatcherMixin:
                             if row.get('customer_id', '') == target_customer_id:
                                 recv_tid = row.get('telegram_id', '')
                                 if recv_tid:
+                                    nav_btns = [[{'text': '💎 لوحة التعويض', 'callback_data': 'svrp_back_panel'},
+                                                 {'text': '📤 إرسال رصيد', 'callback_data': 'svrp_send_credits'}]]
                                     self.notify_user(int(recv_tid),
                                         f"📥 <b>تم استلام رصيد مجمد!</b>\n\n"
                                         f"💰 المبلغ: <code>{amount:.2f}</code> 👈 اضغط للنسخ\n"
                                         f"🧊 حالة الرصيد: <b>مجمد</b>\n\n"
-                                        f"💡 أرسل رصيداً لأصدقائك لفك التجميد")
+                                        f"💡 أرسل رصيداً لأصدقائك لفك التجميد", 'frozen_credits', nav_btns)
                                 break
                 except:
                     pass
@@ -684,15 +693,16 @@ class MessageDispatcherMixin:
                 pass
 
             # إشعار العميل
-            self.send_message(chat_id,
+            nav_btns = [[{'text': '🎮 محفظة الألعاب', 'callback_data': 'game_wallet_deposit'},
+                         {'text': '🏠 القائمة', 'callback_data': 'main_menu'}]]
+            self.send_inline_message(chat_id,
                 f"⏳ <b>طلب إيداع لمحفظة الألعاب</b>\n\n"
                 f"💰 المبلغ: <code>{amount} {currency}</code>\n"
                 f"📱 الوسيلة: {method_name}\n"
                 f"🏦 الحساب: <code>{account_number}</code> 👈 اضغط للنسخ\n"
                 f"🆔 الطلب: <code>{dep_id}</code>\n\n"
                 f"⏳ بانتظار تأكيد الإدارة...\n"
-                f"💎 سيُضاف الرصيد لمحفظتك فور الموافقة",
-                self.main_keyboard('ar', user_id))
+                f"💎 سيُضاف الرصيد لمحفظتك فور الموافقة", nav_btns)
 
             # إشعار الأدمن
             user_name = user_obj.get('name', '') if user_obj else str(user_id)
@@ -1571,12 +1581,13 @@ class MessageDispatcherMixin:
                     except:
                         pass
                     del self.user_states[user_id]
-                    self.send_message(chat_id,
+                    nav_btns = [[{'text': '🎰 اليانصيب', 'callback_data': 'lot_back_main'},
+                                 {'text': '🏠 القائمة', 'callback_data': 'main_menu'}]]
+                    self.send_inline_message(chat_id,
                         f"🎫 <b>تم إرسال طلب شراء {count} تذكرة!</b>\n\n"
                         f"⏳ بانتظار موافقة الإدارة على الدفع\n"
                         f"🔢 سيتم توليد أرقام التذاكر بعد التأكيد\n\n"
-                        f"🍀 حظاً موفقاً!",
-                        self.main_keyboard(lang, user_id))
+                        f"🍀 حظاً موفقاً!", nav_btns)
                     # إشعار الأدمن
                     for admin_id in self.admin_ids:
                         try:

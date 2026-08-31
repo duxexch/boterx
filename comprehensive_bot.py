@@ -10583,12 +10583,14 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             try:
                 uid = winner.get('user_id', '0')
                 if uid and uid != '0':
+                    nav_btns = [[{'text': '💎 لوحة التعويض', 'callback_data': 'svrp_back_panel'},
+                                 {'text': '🎰 اليانصيب', 'callback_data': 'lot_back_main'}]]
                     self.notify_user(int(uid),
                         f"🎉 <b>مبروك! ربحت في اليانصيب!</b>\n\n"
                         f"{emoji} المرتبة: #{rank}\n"
                         f"🎫 التذكرة: <code>#{winner.get('ticket_number', '')}</code>\n"
                         f"💰 الجائزة: <code>{prize:.2f}</code> {round_data.get('currency', '')}\n\n"
-                        f"💎 تم إضافة الجائزة لرصيدك المجمد")
+                        f"💎 تم إضافة الجائزة لرصيدك المجمد", 'lottery_winner', nav_btns)
             except:
                 pass
 
@@ -10927,7 +10929,9 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                     f"📤 حوّل المال إلى وسيلة الدفع أعلاه\n"
                     f"📸 ثم أرسل لقطة شاشة الدفع"
                 )
-                self.notify_user(int(order.get('buyer_id', 0)), buyer_msg)
+                nav_btns = [[{'text': '💱 التداول', 'callback_data': 'trade_back_panel'},
+                             {'text': '🏠 القائمة', 'callback_data': 'main_menu'}]]
+                self.notify_user(int(order.get('buyer_id', 0)), buyer_msg, 'trade_accepted', nav_btns)
                 # تعيين حالة العميل لانتظار لقطة الشاشة
                 self.user_states[int(order.get('buyer_id', 0))] = {
                     'step': 'trade_buyer_screenshot', 'order_id': order_id
@@ -14251,13 +14255,12 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
                 
                 if customer_telegram_id:
                     customer_message = self.tr('a1020_رد_على', 'ar', complaint_id=complaint_id, reply_message=reply_message)
+                    nav_btns = [[{'text': '📩 شكواي', 'callback_data': 'main_menu'},
+                                 {'text': '🏠 القائمة', 'callback_data': 'main_menu'}]]
                     
-                    # إرسال الرد للعميل بدون كيبورد لعدم التداخل
-                    result = self.send_message_without_keyboard(customer_telegram_id, customer_message)
-                    if result and result.get('ok'):
-                        logger.info(f"✅ تم إرسال رد الشكوى {complaint_id} للعميل {customer_telegram_id} بنجاح")
-                    else:
-                        logger.error(f"❌ فشل في إرسال رد الشكوى {complaint_id} للعميل {customer_telegram_id}")
+                    # إرسال الرد مع أزرار التنقل
+                    result = self.send_inline_message(int(customer_telegram_id), customer_message, nav_btns)
+                    if not result:
                         # محاولة أخرى بالطريقة العادية
                         self.send_message(customer_telegram_id, customer_message)
                     

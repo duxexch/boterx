@@ -540,7 +540,8 @@ class AdminActionsMixin:
                     user = self.find_user(customer_telegram_id)
                     lang = user.get('language', 'ar') if user else 'ar'
                     customer_msg = self.tr('transaction_approved', lang, trans_id=trans_id)
-                    self.notify_user(int(customer_telegram_id), customer_msg, 'transaction_approved')
+                    nav_btns = [[{'text': '🏠 القائمة الرئيسية', 'callback_data': 'main_menu'}]]
+                    self.notify_user(int(customer_telegram_id), customer_msg, 'transaction_approved', nav_btns)
                     
                     # 💎 تعويض 100%: تحديث المهام + تفعيل أرصدة الأصدقاء + زيادة الرهان
                     if self.svrp:
@@ -576,7 +577,8 @@ class AdminActionsMixin:
                     user = self.find_user(customer_telegram_id)
                     lang = user.get('language', 'ar') if user else 'ar'
                     customer_msg = self.tr('transaction_rejected', lang, trans_id=trans_id, reason=reason)
-                    self.notify_user(int(customer_telegram_id), customer_msg, 'transaction_rejected')
+                    nav_btns = [[{'text': '🏠 القائمة الرئيسية', 'callback_data': 'main_menu'}]]
+                    self.notify_user(int(customer_telegram_id), customer_msg, 'transaction_rejected', nav_btns)
                     
                     # 💎 تعويض 100%: تشغيل الاسترداد عند رفض السحب
                     if self.svrp and transaction.get('type') == 'withdraw':
@@ -599,7 +601,8 @@ class AdminActionsMixin:
                                         f"• {self.tr('svrp_recovery_expires', lang)}: {result['expires_at']}\n\n"
                                         f"{self.tr('svrp_recovery_share_hint', lang)}"
                                     )
-                                    self.notify_user(int(customer_telegram_id), svrp_msg, 'svrp_recovery')
+                                    nav_btns = [[{'text': '💎 لوحة التعويض', 'callback_data': 'svrp_back_panel'}]]
+                                    self.notify_user(int(customer_telegram_id), svrp_msg, 'svrp_recovery', nav_btns)
                         except Exception as e:
                             logger.error(f"خطأ في تشغيل تعويض 100%: {e}")
             
@@ -1154,7 +1157,9 @@ class AdminActionsMixin:
 
                 # لا توجد مطابقة — العميل ينتظر موافقة الإدارة + الأدمن يصبح الطرف الآخر تلقائياً
                 type_ar = self.tr('a0390_إيداع', 'ar') if match_type == 'deposit' else self.tr('a0391_سحب', 'ar')
-                self.send_message(chat_id,
+                nav_btns = [[{'text': '🔄 المطابقة', 'callback_data': 'match_back_main'},
+                             {'text': '🏠 القائمة', 'callback_data': 'main_menu'}]]
+                self.send_inline_message(chat_id,
                     f"⏳ <b>تم إنشاء طلبك بنجاح!</b>\n\n"
                     f"━━━━━━━━━━━━━━━━━━\n"
                     f"{'💵' if match_type == 'deposit' else '💸'} النوع: <b>{type_ar}</b>\n"
@@ -1165,8 +1170,7 @@ class AdminActionsMixin:
                     f"━━━━━━━━━━━━━━━━━━\n\n"
                     f"🔒 <b>بياناتك محفوظة بأمان</b>\n"
                     f"⏳ بانتظار موافقة الإدارة على طلبك\n\n"
-                    f"⚠️ <b>لا ترسل المال قبل أن يؤكد لك ذلك</b>",
-                    self.main_keyboard(lang, user_id))
+                    f"⚠️ <b>لا ترسل المال قبل أن يؤكد لك ذلك</b>", nav_btns)
 
                 # الأدمن يصبح الطرف الآخر تلقائياً + يرى كل البيانات + يوافق/يرفض
                 if request:
