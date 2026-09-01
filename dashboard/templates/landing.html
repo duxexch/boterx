@@ -50,27 +50,36 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(248,250,252,
 .section{max-width:1100px;margin:0 auto;padding:32px 16px}
 .section h2{font-size:1.5rem;font-weight:900;margin-bottom:6px}
 .section .sub{color:var(--muted);font-size:12px;margin-bottom:14px}
-.comp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
-.comp-card{background:linear-gradient(180deg,rgba(255,255,255,.03),var(--surface));border:1px solid var(--border);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;transition:transform .15s,border-color .15s}
-.comp-card:hover{transform:translateY(-3px);border-color:rgba(0,231,1,.25)}
-.comp-head{display:flex;gap:10px;padding:12px;border-bottom:1px solid var(--border);align-items:center}
-.comp-icon{width:42px;height:42px;border-radius:10px;background:#0b0e11;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:20px;overflow:hidden}
+.comp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+.comp-card{position:relative;background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;display:flex;flex-direction:column;box-shadow:var(--shadow);transition:all .2s cubic-bezier(.4,0,.2,1)}
+.comp-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--green),var(--gold));opacity:0;transition:opacity .2s}
+.comp-card:hover{transform:translateY(-4px);box-shadow:0 12px 32px rgba(0,0,0,.12);border-color:rgba(0,231,1,.2)}
+.comp-card:hover::before{opacity:1}
+.comp-head{display:flex;gap:12px;padding:16px 16px 12px;align-items:center}
+.comp-icon{width:48px;height:48px;border-radius:12px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:22px;overflow:hidden;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,.06)}
 .comp-icon img{width:100%;height:100%;object-fit:cover}
-.comp-name{font-weight:900;font-size:13px}
-.comp-meta{font-size:10px;color:var(--muted)}
-.badge{font-size:9px;padding:2px 6px;border-radius:999px;background:rgba(0,231,1,.1);color:var(--green);border:1px solid rgba(0,231,1,.2)}
-.comp-body{padding:10px 12px;flex:1}
-.comp-desc{font-size:11px;color:var(--muted);line-height:1.6;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
-.comp-table{width:100%;font-size:11px;border-collapse:collapse;margin-top:8px}
-.comp-table td{padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04)}
-.comp-table td:first-child{color:var(--muted);width:40%}
-.pros-cons{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;font-size:11px}
-.pros-cons ul{list-style:none;padding:0}
-.pros-cons li{padding:2px 0;display:flex;gap:4px}
-.comp-cta{padding:10px 12px;display:flex;gap:6px}
-.comp-cta a{flex:1;text-align:center;padding:9px;border-radius:8px;font-weight:800;font-size:12px;text-decoration:none}
-.cta-main{background:linear-gradient(135deg,var(--green),var(--green2));color:#04210a}
-.cta-sec{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+.comp-name{font-weight:900;font-size:14px;line-height:1.2}
+.comp-meta{font-size:10px;color:var(--muted);display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
+.comp-meta span{display:inline-flex;align-items:center;gap:3px;background:var(--surface2);border:1px solid var(--border);padding:2px 6px;border-radius:999px}
+.badge{font-size:9px;padding:3px 8px;border-radius:999px;background:rgba(0,231,1,.1);color:var(--green);border:1px solid rgba(0,231,1,.2);font-weight:800}
+.comp-body{padding:0 16px 12px;flex:1}
+.comp-desc{font-size:12px;color:var(--muted);line-height:1.7;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.comp-table{width:100%;font-size:11px;border-collapse:separate;border-spacing:0;margin-top:10px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.comp-table td{padding:7px 10px;border-bottom:1px solid var(--border)}
+.comp-table tr:last-child td{border-bottom:none}
+.comp-table td:first-child{color:var(--muted);width:36%;background:rgba(0,0,0,.02);font-weight:600}
+[data-theme="dark"] .comp-table td:first-child{background:rgba(255,255,255,.02)}
+.pros-cons{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.pros-cons div{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px}
+.pros-cons strong{font-size:10px;display:block;margin-bottom:4px}
+.pros-cons ul{list-style:none;padding:0;margin:0}
+.pros-cons li{font-size:11px;padding:2px 0;display:flex;gap:4px;color:var(--muted)}
+.comp-cta{padding:12px 16px;display:flex;gap:8px;background:var(--surface2);border-top:1px solid var(--border)}
+.comp-cta a{flex:1;text-align:center;padding:10px;border-radius:9px;font-weight:800;font-size:12px;text-decoration:none;transition:transform .12s,box-shadow .12s}
+.comp-cta a:active{transform:scale(.97)}
+.cta-main{background:linear-gradient(135deg,var(--green),var(--green2));color:#fff;box-shadow:0 2px 12px rgba(22,163,74,.25)}
+[data-theme="dark"] .cta-main{color:#04210a}
+.cta-sec{background:var(--surface);color:var(--text);border:1px solid var(--border)}
 .vex-card{border:1px solid rgba(255,215,0,.25);background:linear-gradient(135deg,rgba(255,215,0,.06),var(--surface));box-shadow:0 0 24px rgba(255,215,0,.08)}
 .vex-badge{background:linear-gradient(135deg,#ffd700,#b8860b);color:#000}
 details{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px}
@@ -137,7 +146,7 @@ footer{padding:24px 16px;text-align:center;color:var(--muted);font-size:11px;bor
   <div style="display:flex;gap:6px;align-items:center">
     <button id="themeToggle" onclick="toggleTheme()" class="btn btn-o" style="padding:8px 10px;min-width:36px" title="تبديل الوضع">🌙</button>
     <a href="#companies" class="btn btn-o">الشركات</a>
-    <a href="https://t.me/vex_otp_bot?start=web_auth" class="btn btn-p">دخول</a>
+    <a href="https://t.me/vex_wallet_bot?start=web_auth" class="btn btn-p">دخول</a>
   </div>
 </nav>
 
@@ -147,7 +156,8 @@ footer{padding:24px 16px;text-align:center;color:var(--muted);font-size:11px;bor
   <p>مراجعات خبيرة، تراخيص حقيقية، أكواد برومو حصرية وروابط تسجيل مباشرة — VEX شريك معتمد مع 1xBet و Melbet و 6 شركات كبرى. اختر الأفضل، سجّل في ثوانٍ، والعب بثقة.</p>
   <div class="hero-cta">
     <a href="#companies" class="btn btn-p">استعرض الشركات ↓</a>
-    <a href="#vex" class="btn btn-o">من نحن — VEX</a>
+    <a href="/home" class="btn btn-o" style="background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:#fff;border:none">🎮 ألعابي على الويب</a>
+    <a href="https://t.me/vex_wallet_bot" target="_blank" class="btn btn-o">💬 @vex_wallet_bot</a>
   </div>
   <div style="margin-top:14px;display:flex;gap:6px;justify-content:center;flex-wrap:wrap;font-size:10px;color:var(--muted)">
     <span>✅ 8 شركات مرخصة</span><span>•</span><span>🌍 17 لغة</span><span>•</span><span>🔒 Provably Fair</span><span>•</span><span>⚡ إيداع فوري</span>
@@ -166,7 +176,7 @@ footer{padding:24px 16px;text-align:center;color:var(--muted);font-size:11px;bor
         <div class="comp-icon">{% if c.icon.startswith('/static') %}<img src="{{ c.icon }}" alt="{{ c.name }}" loading="lazy">{% else %}{{ c.icon }}{% endif %}</div>
         <div style="flex:1;min-width:0">
           <div class="comp-name" itemprop="name">{{ c.name }}</div>
-          <div class="comp-meta">{{ c.license }} • {{ c.headquarters }} • منذ {{ c.founded }} • <span itemprop="reviewRating" itemscope itemtype="https://schema.org/Rating"><span itemprop="ratingValue">{{ c.rating }}</span>/5</span> ★</div>
+          <div class="comp-meta"><span>🛡️ {{ c.license }}</span><span>📍 {{ c.headquarters }}</span><span>🗓️ {{ c.founded }}</span><span itemprop="reviewRating" itemscope itemtype="https://schema.org/Rating">⭐ <span itemprop="ratingValue">{{ c.rating }}</span>/5</span></div>
         </div>
         <span class="badge">موثوق</span>
       </div>
@@ -183,8 +193,8 @@ footer{padding:24px 16px;text-align:center;color:var(--muted);font-size:11px;bor
           <tr><td>كود البرومو</td><td><code style="background:rgba(255,215,0,.12);padding:2px 6px;border-radius:6px">{{ c.promo_code or 'VEX' }}</code></td></tr>
         </table>
         <div class="pros-cons">
-          <ul><li>✅ دفع فوري</li><li>✅ دعم عربي</li></ul>
-          <ul><li>✅ بونص ترحيبي</li><li>✅ مرخصة</li></ul>
+          <div><strong>✅ المميزات</strong><ul><li>دفع فوري</li><li>دعم عربي</li></ul></div>
+          <div><strong>⭐ لماذا VEX؟</strong><ul><li>بونص حصري</li><li>شريك معتمد</li></ul></div>
         </div>
       </div>
       <div class="comp-cta">
@@ -215,12 +225,12 @@ footer{padding:24px 16px;text-align:center;color:var(--muted);font-size:11px;bor
       <table class="comp-table">
         <tr><td>الترخيص</td><td>VEX-2026 / Curacao</td></tr>
         <tr><td>الخدمات</td><td>8 ألعاب (مناجم/كراش/أفياتور/بلينكو/عجلة/يانصيب/نرد/سناتش)</td></tr>
-        <tr><td>الدعم</td><td>24/7 عربي/إنجليزي عبر @vex_otp_bot</td></tr>
+        <tr><td>الدعم</td><td>24/7 عربي/إنجليزي عبر @vex_wallet_bot</td></tr>
         <tr><td>الأمان</td><td>تشفير كامل + حماية من التلاعب + سحب/إيداع بإشراف</td></tr>
       </table>
     </div>
     <div class="comp-cta">
-      <a href="https://t.me/vex_otp_bot?start=web_auth" class="cta-main">🚀 ابدأ مع VEX</a>
+      <a href="https://t.me/vex_wallet_bot?start=web_auth" class="cta-main">🚀 ابدأ مع VEX</a>
       <a href="#how" class="cta-sec">كيف نعمل؟</a>
     </div>
   </div>
@@ -246,7 +256,7 @@ footer{padding:24px 16px;text-align:center;color:var(--muted);font-size:11px;bor
 
 <footer>
   <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:8px">
-    <a href="https://t.me/vex_otp_bot">البوت</a> • <a href="/go/1">1xBet</a> • <a href="#companies">الشركات</a> • <a href="#vex">VEX</a>
+    <a href="https://t.me/vex_wallet_bot">البوت</a> • <a href="/go/1">1xBet</a> • <a href="#companies">الشركات</a> • <a href="#vex">VEX</a>
   </div>
   <div>© 2026 VEX Games — شريك معتمد • 8 شركات مرخصة • 17 لغة • Provably Fair</div>
   <div style="margin-top:6px;font-size:10px">18+ — العب بمسؤولية • <a href="/sitemap.xml">sitemap</a> • <a href="/robots.txt">robots</a></div>
