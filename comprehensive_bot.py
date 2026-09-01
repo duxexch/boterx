@@ -1680,12 +1680,26 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
             if row:
                 inline_btns.append(row)
 
+        # ── أزرار تسجيل حساب لكل شركة (رابط الإحالة مباشر) ──
+        try:
+            comps = []
+            with open('companies.csv', 'r', encoding='utf-8-sig') as f:
+                import csv as _csv
+                for r in _csv.DictReader(f):
+                    if (r.get('is_active','') or '').lower() in ('active','yes','1','true') and r.get('affiliate_link','').strip():
+                        comps.append(r)
+            if comps:
+                for c in comps:
+                    btn_text = f"📝 تسجيل حساب — {c.get('name','')[:14]}"
+                    inline_btns.append([{'text': btn_text, 'url': c.get('affiliate_link','').strip()}])
+        except: pass
+
         inline_btns.append([{'text': self.tr('a0142_العودة', lang), 'callback_data': 'apps_back_main'}])
 
         # إرسال نص بسيط + شبكة الأزرار
         self.send_inline_message(message['chat']['id'],
             f"📱 <b>التطبيقات</b>\n\n"
-            f"👇 اختر تطبيقاً:",
+            f"👇 اختر تطبيقاً أو سجّل حساب بشركة:",
             inline_btns)
 
     def show_app_detail(self, chat_id, app_id, user_id=None):
@@ -6852,12 +6866,12 @@ class ComprehensiveDUXBot(DepositWithdrawMixin, MessageDispatcherMixin, Callback
         threading.Thread(target=_fsm_cleanup_worker, daemon=True, name='fsm-cleanup').start()
 
         # ── Main polling loop — submits to thread pool, never blocks ─────────
-        with ThreadPoolExecutor(max_workers=20, thread_name_prefix='bot_worker') as pool:
+        with ThreadPoolExecutor(max_workers=30, thread_name_prefix='bot_worker') as pool:
             while True:
                 try:
                     updates = self.get_updates()
                     if not updates or not updates.get('ok'):
-                        time.sleep(0.3)
+                        time.sleep(0.05)
                         continue
 
                     for update in updates['result']:
