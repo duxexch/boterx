@@ -729,6 +729,25 @@ footer{padding:24px 16px;text-align:center;color:var(--muted);font-size:11px;bor
   <div class="nav-logo"><i>V</i> VEX Games</div>
   <div style="display:flex;gap:6px;align-items:center">
     <button id="themeToggle" onclick="toggleTheme()" class="btn btn-o" style="padding:8px 10px;min-width:36px" title="تبديل الوضع">🌙</button>
+    <select id="langSelect" onchange="changeLang(this.value)" class="btn btn-o" style="padding:8px 10px;font-size:11px;min-width:100px">
+      <option value="ar" selected>🇸🇦 العربية</option>
+      <option value="en">🇺🇸 English</option>
+      <option value="fr">🇫🇷 Français</option>
+      <option value="es">🇪🇸 Español</option>
+      <option value="de">🇩🇪 Deutsch</option>
+      <option value="it">🇮🇹 Italiano</option>
+      <option value="pt">🇵🇹 Português</option>
+      <option value="ru">🇷🇺 Русский</option>
+      <option value="zh">🇨🇳 中文</option>
+      <option value="tr">🇹🇷 Türkçe</option>
+      <option value="ur">🇵🇰 اردو</option>
+      <option value="hi">🇮🇳 हिन्दी</option>
+      <option value="fa">🇮🇷 فارسی</option>
+      <option value="id">🇮🇩 Indonesia</option>
+      <option value="ja">🇯🇵 日本語</option>
+      <option value="ko">🇰🇷 한국어</option>
+      <option value="th">🇹🇭 ไทย</option>
+    </select>
     <a href="#companies" class="btn btn-o">الشركات</a>
     <a href="https://t.me/vex_wallet_bot?start=web_auth" class="btn btn-p">دخول</a>
   </div>
@@ -920,6 +939,13 @@ footer{padding:24px 16px;text-align:center;color:var(--muted);font-size:11px;bor
 const t=document.getElementById('ticker'); if(t){t.textContent+=t.textContent;}
 </script>
 <script>
+function changeLang(lang){
+  const href = window.location.pathname + window.location.search;
+  const url = new URL(window.location.href);
+  url.searchParams.set('lang', lang);
+  window.location.href = url.toString();
+}
+
 function toggleTheme(){
   const cur=document.documentElement.getAttribute('data-theme');
   const next=cur==='dark'?'light':'dark';
