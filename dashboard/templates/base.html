@@ -243,6 +243,12 @@
                     <i class="fas fa-compress text-lg" x-show="isFullscreen"></i>
                 </button>
 
+                <!-- Publishing global toggle — يوقف كل النشر -->
+                <button @click="togglePublishing()" :class="publishingEnabled ? 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10' : 'text-red-400 border-red-500/30 bg-red-500/10 animate-pulse'" class="flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-bold transition" :title="publishingEnabled ? 'النشر يعمل — انقر للإيقاف' : 'النشر متوقف — انقر للتفعيل'">
+                    <i class="fas" :class="publishingEnabled ? 'fa-broadcast-tower' : 'fa-ban'"></i>
+                    <span x-text="publishingEnabled ? 'النشر يعمل' : 'النشر متوقف'" class="hidden sm:inline"></span>
+                </button>
+
                 <!-- Notification bell -->
                 <div class="relative" x-data="{ showNotif: false }">
                     <button @click="showNotif = !showNotif" class="relative text-slate-400 hover:text-emerald-400 transition">
@@ -375,6 +381,7 @@ function baseApp() {
         mobileSidebar: false,
         darkMode: localStorage.getItem('darkMode') !== 'false',
         isFullscreen: false,
+        publishingEnabled: true,
         notifCount: 0,
         notifications: [],
         activityTicker: [],
@@ -385,6 +392,7 @@ function baseApp() {
             this.applyDarkMode();
             this.applyLang();
             this.startLiveStats();
+            this.fetchPublishingStatus();
         },
 
         t(key) { return tr(key); },
@@ -423,6 +431,28 @@ function baseApp() {
             } else {
                 document.exitFullscreen().then(() => { this.isFullscreen = false; });
             }
+        },
+
+        async fetchPublishingStatus() {
+            try {
+                const r = await fetch('/api/publishing/status', {credentials:'same-origin'});
+                if (r.ok) { const d = await r.json(); this.publishingEnabled = !!d.enabled; }
+            } catch(e) {}
+        },
+        async togglePublishing() {
+            const next = !this.publishingEnabled;
+            const msg = next ? 'تفعيل النشر؟' : 'إيقاف كل النشر؟ سيتوقف البث والنشر التلقائي والقنوات.';
+            if (!confirm(msg)) return;
+            try {
+                const r = await fetch('/api/publishing/toggle', {method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body: JSON.stringify({enabled: next})});
+                const d = await r.json();
+                if (r.ok && d.success) {
+                    this.publishingEnabled = !!d.enabled;
+                    this.notify(d.enabled ? '✅ تم تفعيل النشر' : '⛔ تم إيقاف النشر', d.enabled ? 'success' : 'warning');
+                } else {
+                    alert(d.error || 'فشل التبديل');
+                }
+            } catch(e) { alert('خطأ في الاتصال'); }
         },
 
         startLiveStats() {

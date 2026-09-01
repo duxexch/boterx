@@ -590,6 +590,33 @@ def _section_access_guard():
     return None
 
 
+@app.before_request
+def _publishing_guard():
+    """يمنع أي عملية نشر إذا كان النشر متوقفاً عبر الزر العام."""
+    if _is_publishing_enabled():
+        return None
+    # لا نمنع الاستعلام عن الحالة أو التبديل نفسه
+    if request.path in ('/api/publishing/status', '/api/publishing/toggle'):
+        return None
+    p = request.path
+    # مسارات النشر المحظورة عند الإيقاف
+    blocked = (
+        p.startswith('/api/multi-posts') and request.method == 'POST'
+        or p.startswith('/api/broadcast') 
+        or p.startswith('/api/send-broadcast')
+        or p.startswith('/api/send_message') and request.method == 'POST'
+        or p.startswith('/api/channels') and request.method in ('POST','PUT','DELETE')
+        or p.startswith('/api/auto-post')
+        or p.startswith('/api/publish')
+        or p.startswith('/api/campaign') and request.method == 'POST'
+    )
+    if blocked:
+        if request.path.startswith('/api/'):
+            return jsonify({'error': '⛔ النشر متوقف حالياً — فعّله من الزر العلوي'}), 503
+        return '<h1>⛔ النشر متوقف</h1><p>فعّل النشر من لوحة الأدمن</p>', 503
+    return None
+
+
 @app.context_processor
 def _inject_admin_context():
     """Inject admin_role, admin_perms, and admin_sections into every template."""
@@ -7654,6 +7681,35 @@ def _get_system_setting(key):
         pass
     return ''
 
+def _is_publishing_enabled():
+    v = (_get_system_setting('publishing_enabled') or 'yes').strip().lower()
+    return v not in ('no', '0', 'false', 'off', 'disabled')
+
+def _set_publishing_enabled(enabled: bool):
+    settings = read_csv('system_settings.csv')
+    fieldnames = get_fieldnames('system_settings.csv', ['key', 'value', 'updated_at'])
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    val = 'yes' if enabled else 'no'
+    found = False
+    for s_ in settings:
+        k = s_.get('key', '') or s_.get('setting_key', '')
+        if k == 'publishing_enabled':
+            if 'value' in s_: s_['value'] = val
+            if 'setting_value' in s_: s_['setting_value'] = val
+            if 'updated_at' in fieldnames: s_['updated_at'] = now
+            found = True
+            break
+    if not found:
+        row = {fn: '' for fn in fieldnames}
+        if 'key' in fieldnames: row['key'] = 'publishing_enabled'
+        if 'setting_key' in fieldnames: row['setting_key'] = 'publishing_enabled'
+        if 'value' in fieldnames: row['value'] = val
+        if 'setting_value' in fieldnames: row['setting_value'] = val
+        if 'updated_at' in fieldnames: row['updated_at'] = now
+        settings.append(row)
+    write_csv('system_settings.csv', settings, fieldnames)
+    return val
+
 
 @app.route('/api/bot-icon-settings')
 @api_auth
@@ -7700,6 +7756,27 @@ def api_save_bot_icon_settings():
     write_csv('system_settings.csv', settings, fieldnames)
     log_action('save_bot_icon_settings', f'{mode}/{size}')
     return jsonify({'success': True})
+
+
+@app.route('/api/publishing/status')
+@api_auth
+def api_publishing_status():
+    return jsonify({'enabled': _is_publishing_enabled()})
+
+
+@app.route('/api/publishing/toggle', methods=['POST'])
+@api_auth
+@permission_required('manage_settings')
+def api_publishing_toggle():
+    data = request.json or {}
+    # toggle if no explicit value
+    if 'enabled' in data:
+        enabled = bool(data['enabled'])
+    else:
+        enabled = not _is_publishing_enabled()
+    val = _set_publishing_enabled(enabled)
+    log_action('toggle_publishing', val)
+    return jsonify({'success': True, 'enabled': enabled, 'value': val})
 
 
 # ===== API — Icon Upload (companies & payment methods) =====
