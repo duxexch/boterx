@@ -722,12 +722,117 @@ footer{padding:24px 16px;text-align:center;color:var(--muted);font-size:11px;bor
 .lang-list button:active{background:rgba(0,231,1,.08)}
 .lang-list .flag{font-size:16px;flex-shrink:0}
 .lang-list button[role="option"][aria-selected="true"]{background:rgba(0,231,1,.08);color:var(--green)}
+@media(max-width:600px){.comp-grid{grid-template-columns:1fr}}
+
+/* ===== NEW NAVBAR STYLES ===== */
+.navbar{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(248,250,252,.92);backdrop-filter:blur(16px);border-bottom:1px solid var(--border);padding:10px 16px;display:flex;align-items:center;justify-content:space-between;transition:background .3s,box-shadow .3s;box-shadow:var(--shadow)}
+[data-theme="dark"] .navbar{background:rgba(11,14,17,.92);border-bottom-color:var(--border)}
+.navbar-brand{flex-shrink:0}
+.brand-link{display:flex;align-items:center;gap:8px;text-decoration:none;color:var(--text)}
+.brand-icon{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--green),var(--green2));display:flex;align-items:center;justify-content:center;font-weight:900;color:#04210a;font-size:16px;flex-shrink:0;box-shadow:0 2px 8px rgba(22,163,74,.25)}
+.brand-text{font-weight:900;font-size:1.1rem;color:var(--text);white-space:nowrap}
+
+.navbar-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+
+/* Language Selector - Modern Dropdown */
+.lang-selector{position:relative;display:inline-block}
+.lang-trigger{display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:12px;cursor:pointer;font-size:13px;font-weight:600;color:var(--text);transition:all .15s;gap:10px;min-width:140px;justify-content:space-between}
+.lang-trigger:hover{background:var(--surface2);border-color:var(--green);box-shadow:0 4px 16px rgba(0,231,1,.1)}
+.lang-trigger:focus{outline:2px solid var(--green);outline-offset:2px}
+.lang-trigger:active{transform:scale(.98)}
+.lang-icon{font-size:16px}
+.lang-text{font-weight:600;color:var(--text);white-space:nowrap}
+.lang-arrow{font-size:10px;color:var(--muted);transition:transform .2s}
+.lang-selector.open .lang-arrow{transform:rotate(180deg)}
+.lang-menu{position:absolute;top:calc(100% + 8px);right:0;min-width:220px;max-height:340px;background:var(--surface);border:1px solid var(--border);border-radius:16px;box-shadow:0 16px 40px rgba(0,0,0,.18);overflow:hidden;z-index:200;opacity:0;visibility:hidden;transform:translateY(-8px);transition:all .2s cubic-bezier(.4,0,.2,1);margin-top:6px}
+.lang-selector.open .lang-menu{opacity:1;visibility:visible;transform:translateY(0)}
+.lang-search{padding:10px;border-bottom:1px solid var(--border)}
+.lang-search input{width:100%;padding:10px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:13px;outline:none}
+.lang-search input:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(22,163,74,.15)}
+.lang-list{max-height:280px;overflow-y:auto;padding:6px}
+.lang-list button{display:flex;align-items:center;gap:12px;width:100%;padding:12px 14px;background:transparent;border:none;color:var(--text);font-size:14px;text-align:right;cursor:pointer;border-radius:10px;transition:background .12s,color .12s}
+.lang-list button:hover,.lang-list button:focus{background:var(--surface2);outline:none}
+.lang-list button:active{background:rgba(0,231,1,.08)}
+.lang-list button[role="option"][aria-selected="true"]{background:rgba(0,231,1,.08);color:var(--green)}
+.lang-list .flag{font-size:18px;flex-shrink:0}
+.lang-list button[role="option"][aria-selected="true"]{background:rgba(0,231,1,.08);color:var(--green)}
+.lang-search{padding:10px;border-bottom:1px solid var(--border)}
+.lang-search input{width:100%;padding:10px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:13px;outline:none}
+.lang-search input:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(22,163,74,.15)}
 @media(max-width:640px){
   .lang-menu{right:-40px;min-width:260px}
   .lang-trigger .lang-text{display:none}
-  .lang-trigger{min-width:auto;padding:8px}
+  .lang-trigger{min-width:auto;padding:10px}
+}
+
+/* Theme Toggle Button */
+.btn-icon{width:44px;height:44px;border-radius:12px;background:var(--surface);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;color:var(--text);flex-shrink:0}
+.btn-icon:hover{background:var(--surface2);border-color:var(--green);box-shadow:0 4px 16px rgba(0,231,1,.15)}
+.btn-icon:focus{outline:2px solid var(--green);outline-offset:2px}
+.btn-icon:active{transform:scale(.96)}
+.btn-icon svg,.btn-icon span{font-size:18px}
+
+/* Action Buttons */
+.btn-primary,.btn-secondary{display:inline-flex;align-items:center;gap:8px;padding:10px 18px;border-radius:10px;font-weight:700;font-size:13px;text-decoration:none;transition:all .15s;white-space:nowrap}
+.btn-primary{background:linear-gradient(135deg,var(--green),var(--green2));color:#fff;box-shadow:0 2px 12px rgba(22,163,74,.25)}
+.btn-primary:hover{box-shadow:0 4px 20px rgba(22,163,74,.35);transform:translateY(-1px)}
+.btn-primary:active{transform:scale(.98)}
+.btn-secondary{background:var(--surface);color:var(--text);border:1px solid var(--border)}
+.btn-secondary:hover{background:var(--surface2);border-color:var(--green)}
+.btn-secondary:active{transform:scale(.97)}
+.btn-text{font-weight:600}
+
+/* Hamburger Menu */
+.hamburger{display:none;flex-direction:column;gap:5px;width:40px;height:40px;padding:8px;background:var(--surface);border:1px solid var(--border);border-radius:10px;cursor:pointer;transition:all .15s}
+.hamburger:hover{background:var(--surface2);border-color:var(--green)}
+.hamburger:focus{outline:2px solid var(--green);outline-offset:2px}
+.hamburger-line{display:block;height:2px;width:100%;background:var(--text);border-radius:2px;transition:all .2s cubic-bezier(.4,0,.2,1);transform-origin:center}
+.hamburger[aria-expanded="true"] .hamburger-line:nth-child(1){transform:translateY(7px) rotate(45deg)}
+.hamburger[aria-expanded="true"] .hamburger-line:nth-child(2){opacity:0}
+.hamburger[aria-expanded="true"] .hamburger-line:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
+
+/* Mobile Menu */
+.mobile-menu{position:fixed;top:0;right:0;bottom:0;width:100%;max-width:320px;background:var(--surface);border-left:1px solid var(--border);z-index:200;transform:translateX(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column}
+.mobile-menu.open{transform:translateX(0)}
+.mobile-menu-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:199;opacity:0;visibility:hidden;transition:all .3s}
+.mobile-menu.open ~ .mobile-menu-bg{opacity:1;visibility:visible}
+.mobile-menu-header{display:flex;align-items:center;justify-content:space-between;padding:16px;border-bottom:1px solid var(--border)}
+.mobile-menu-title{font-weight:700;font-size:16px;color:var(--text)}
+.mobile-close{width:36px;height:36px;border-radius:10px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);transition:all .15s}
+.mobile-close:hover{background:var(--surface);border-color:var(--green);color:var(--green)}
+.mobile-close:focus{outline:2px solid var(--green);outline-offset:2px}
+.mobile-nav{padding:12px;flex:1;overflow-y:auto}
+.mobile-nav-link{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:10px;color:var(--text);text-decoration:none;font-size:14px;font-weight:600;transition:all .12s}
+.mobile-nav-link:hover{background:var(--surface2);color:var(--green)}
+.mobile-nav-link:active{background:rgba(0,231,1,.08)}
+.mobile-nav-primary{background:linear-gradient(135deg,var(--green),var(--green2));color:#fff !important}
+.mobile-nav-primary:hover{background:linear-gradient(135deg,var(--green2),var(--green));transform:translateX(2px)}
+.mobile-divider{height:1px;background:var(--border);margin:12px 0}
+.mobile-lang-selector{padding:8px 0}
+.mobile-label{display:block;font-size:11px;color:var(--muted);margin-bottom:6px;font-weight:600}
+.mobile-select{width:100%;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;background-size:16px;padding-right:40px}
+.mobile-select:focus{outline:none;border-color:var(--green);box-shadow:0 0 0 3px rgba(22,163,74,.15)}
+@media(max-width:1024px){
+  .hamburger{display:flex}
+  .navbar-actions .btn-text{display:none}
+  .btn-primary .btn-text,.btn-secondary .btn-text{display:inline}
+  .lang-trigger .lang-text{display:none}
+  .lang-trigger{min-width:44px;padding:10px}
+  .btn-icon{min-width:44px}
+  .btn-primary .btn-text,.btn-secondary .btn-text{font-size:12px;padding:0 8px}
+}
+@media(min-width:1025px){
+  .mobile-menu{display:none}
+  .mobile-menu-bg{display:none}
+}
+@media(max-width:640px){
+  .lang-menu{right:-40px;min-width:260px}
+  .lang-trigger .lang-text{display:none}
+  .lang-trigger{min-width:auto;padding:10px}
+  .brand-text{display:none}
 }
 @media(max-width:600px){.comp-grid{grid-template-columns:1fr}}
+
 </style>
 <script type="application/ld+json">
 {
@@ -752,21 +857,25 @@ footer{padding:24px 16px;text-align:center;color:var(--muted);font-size:11px;bor
 </script>
 </head>
 <body>
-<nav>
-  <div class="nav-logo"><i>V</i> VEX Games</div>
-  <div style="display:flex;gap:6px;align-items:center">
-    <button id="themeToggle" onclick="toggleTheme()" class="btn btn-o" style="padding:8px 10px;min-width:36px" title="تبديل الوضع">🌙</button>
-    
-    <!-- Custom Language Selector -->
+<nav class="navbar">
+  <div class="navbar-brand">
+    <a href="/" class="brand-link" aria-label="VEX Games - الرئيسية">
+      <span class="brand-icon" aria-hidden="true">V</span>
+      <span class="brand-text">VEX Games</span>
+    </a>
+  </div>
+
+  <div class="navbar-actions" id="navbarActions">
+    <!-- Language Selector -->
     <div class="lang-selector" id="langSelector">
-      <button type="button" class="lang-trigger" onclick="toggleLangMenu()" aria-expanded="false" aria-haspopup="true" title="اختر اللغة">
-        <span class="lang-icon">🌐</span>
+      <button type="button" class="lang-trigger" onclick="toggleLangMenu()" aria-expanded="false" aria-haspopup="true" aria-label="اختر اللغة" title="اختر اللغة">
+        <span class="lang-icon" aria-hidden="true">🌐</span>
         <span class="lang-text" id="currentLang">العربية</span>
-        <span class="lang-arrow">▼</span>
+        <span class="lang-arrow" aria-hidden="true">▼</span>
       </button>
       <div class="lang-menu" id="langMenu" role="menu" hidden>
         <div class="lang-search">
-          <input type="text" id="langSearch" placeholder="البحث عن لغة..." placeholder="Search language..." autocomplete="off">
+          <input type="text" id="langSearch" placeholder="البحث عن لغة..." placeholder="Search language..." autocomplete="off" aria-label="البحث عن لغة">
         </div>
         <div class="lang-list" role="listbox">
           <button type="button" role="option" data-lang="ar" onclick="changeLang('ar')"><span class="flag">🇸🇦</span> العربية</button>
@@ -789,9 +898,70 @@ footer{padding:24px 16px;text-align:center;color:var(--muted);font-size:11px;bor
         </div>
       </div>
     </div>
-    
-    <a href="#companies" class="btn btn-o">الشركات</a>
-    <a href="https://t.me/vex_wallet_bot?start=web_auth" class="btn btn-p">دخول</a>
+
+    <!-- Theme Toggle -->
+    <button id="themeToggle" class="btn-icon" onclick="toggleTheme()" aria-label="تبديل الوضع" title="تبديل الوضع">
+      <span id="themeIcon">🌙</span>
+    </button>
+
+    <!-- Web Games Button -->
+    <a href="/home" class="btn btn-secondary" aria-label="ألعابي على الويب">
+      <span aria-hidden="true">🎮</span>
+      <span class="btn-text">ألعابي</span>
+    </a>
+
+    <!-- Login Button -->
+    <a href="https://t.me/vex_wallet_bot?start=web_auth" class="btn btn-primary" target="_blank" rel="noopener" aria-label="تسجيل الدخول">
+      <span aria-hidden="true">💬</span>
+      <span class="btn-text">دخول</span>
+    </a>
+
+    <!-- Mobile Menu Toggle -->
+    <button class="hamburger" id="hamburger" aria-label="القائمة" aria-expanded="false" aria-controls="mobileMenu">
+      <span class="hamburger-line"></span>
+      <span class="hamburger-line"></span>
+      <span class="hamburger-line"></span>
+    </button>
+  </div>
+
+  <!-- Mobile Menu -->
+  <div class="mobile-menu" id="mobileMenu" hidden>
+    <div class="mobile-menu-header">
+      <span class="mobile-menu-title">القائمة</span>
+      <button class="mobile-close" onclick="closeMobileMenu()" aria-label="إغلاق القائمة">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 6L6 18M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+    <nav class="mobile-nav" aria-label="قائمة الجوال">
+      <a href="#companies" class="mobile-nav-link" onclick="closeMobileMenu()">🏢 الشركات</a>
+      <a href="/home" class="mobile-nav-link" onclick="closeMobileMenu()">🎮 ألعابي</a>
+      <a href="https://t.me/vex_wallet_bot?start=web_auth" class="mobile-nav-link mobile-nav-primary" target="_blank" rel="noopener">💬 دخول</a>
+      <div class="mobile-divider"></div>
+      <div class="mobile-lang-selector">
+        <label for="mobileLangSelect" class="mobile-label">🌐 اللغة</label>
+        <select id="mobileLangSelect" onchange="changeLang(this.value)" class="mobile-select">
+          <option value="ar" selected>🇸🇦 العربية</option>
+          <option value="en">🇺🇸 English</option>
+          <option value="fr">🇫🇷 Français</option>
+          <option value="es">🇪🇸 Español</option>
+          <option value="de">🇩🇪 Deutsch</option>
+          <option value="it">🇮🇹 Italiano</option>
+          <option value="pt">🇵🇹 Português</option>
+          <option value="ru">🇷🇺 Русский</option>
+          <option value="zh">🇨🇳 中文</option>
+          <option value="tr">🇹🇷 Türkçe</option>
+          <option value="ur">🇵🇰 اردو</option>
+          <option value="hi">🇮🇳 हिन्दी</option>
+          <option value="fa">🇮🇷 فارسی</option>
+          <option value="id">🇮🇩 Indonesia</option>
+          <option value="ja">🇯🇵 日本語</option>
+          <option value="ko">🇰🇷 한국어</option>
+          <option value="th">🇹🇭 ไทย</option>
+        </select>
+      </div>
+    </nav>
   </div>
 </nav>
 
