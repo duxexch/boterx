@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="ar" dir="rtl" data-theme="light">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
@@ -26,11 +26,13 @@
 <link rel="icon" href="/static/icons/favicon.png" type="image/png">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-:root{--green:#00e701;--green2:#0d7a1f;--gold:#ffd700;--dark:#0b0e11;--surface:#141920;--surface2:#1a2030;--border:rgba(255,255,255,.07);--text:#eef2f6;--muted:#8794a3}
+:root{--green:#16a34a;--green2:#15803d;--gold:#d97706;--bg:#f8fafc;--dark:#f8fafc;--surface:#ffffff;--surface2:#f1f5f9;--border:#e2e8f0;--text:#0f172a;--muted:#64748b;--shadow:0 1px 3px rgba(0,0,0,.08),0 8px 24px rgba(0,0,0,.04)}
+[data-theme="dark"]{--green:#00e701;--green2:#0d7a1f;--gold:#ffd700;--bg:#0b0e11;--dark:#0b0e11;--surface:#141920;--surface2:#1a2030;--border:rgba(255,255,255,.07);--text:#eef2f6;--muted:#8794a3;--shadow:0 8px 32px rgba(0,0,0,.4)}
 html{scroll-behavior:smooth}
-body{font-family:'Cairo',system-ui,sans-serif;background:var(--dark);color:var(--text);line-height:1.6}
+body{font-family:'Cairo',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;transition:background .3s,color .3s}
 a{color:inherit}
-nav{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(11,14,17,.88);backdrop-filter:blur(14px);border-bottom:1px solid var(--border);padding:10px 16px;display:flex;align-items:center;justify-content:space-between}
+nav{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(248,250,252,.88);backdrop-filter:blur(14px);border-bottom:1px solid var(--border);padding:10px 16px;display:flex;align-items:center;justify-content:space-between;transition:background .3s}
+[data-theme="dark"] nav{background:rgba(11,14,17,.88)}
 .nav-logo{display:flex;align-items:center;gap:8px;font-weight:900}
 .nav-logo i{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,var(--green),var(--green2));display:flex;align-items:center;justify-content:center;color:#04210a}
 .btn{padding:8px 14px;border-radius:9px;font-weight:800;border:none;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;font-size:12px;transition:transform .15s}
@@ -78,6 +80,33 @@ details summary::-webkit-details-marker{display:none}
 .ticker-track{display:inline-block;animation:scroll 30s linear infinite}
 @keyframes scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 footer{padding:24px 16px;text-align:center;color:var(--muted);font-size:11px;border-top:1px solid var(--border)}
+/* Responsive — mobile first, tablet, desktop */
+@media(max-width:640px){
+  nav{padding:8px 12px}
+  .nav-logo{font-size:13px}
+  .btn{padding:7px 10px;font-size:11px}
+  .hero{padding:72px 12px 20px}
+  .hero h1{font-size:1.7rem}
+  .section{padding:20px 12px}
+  .comp-grid{grid-template-columns:1fr;gap:10px}
+  .comp-card{border-radius:12px}
+  .trust{padding:0 12px}
+}
+@media(min-width:641px) and (max-width:1024px){
+  .comp-grid{grid-template-columns:repeat(2,1fr)}
+  .section{padding:28px 16px}
+}
+@media(min-width:1025px){
+  .comp-grid{grid-template-columns:repeat(3,1fr)}
+  .hero{padding:96px 24px 36px}
+  .hero h1{font-size:3.2rem}
+}
+/* Professional polish */
+.comp-card{box-shadow:var(--shadow);will-change:transform}
+.comp-card:focus-within{outline:2px solid var(--green);outline-offset:2px}
+.btn:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+.hero-cta .btn{box-shadow:var(--shadow)}
+.trust-item{box-shadow:0 1px 2px rgba(0,0,0,.04)}
 @media(max-width:600px){.comp-grid{grid-template-columns:1fr}}
 </style>
 <script type="application/ld+json">
@@ -105,7 +134,8 @@ footer{padding:24px 16px;text-align:center;color:var(--muted);font-size:11px;bor
 <body>
 <nav>
   <div class="nav-logo"><i>V</i> VEX Games</div>
-  <div style="display:flex;gap:6px">
+  <div style="display:flex;gap:6px;align-items:center">
+    <button id="themeToggle" onclick="toggleTheme()" class="btn btn-o" style="padding:8px 10px;min-width:36px" title="تبديل الوضع">🌙</button>
     <a href="#companies" class="btn btn-o">الشركات</a>
     <a href="https://t.me/vex_otp_bot?start=web_auth" class="btn btn-p">دخول</a>
   </div>
@@ -246,6 +276,24 @@ footer{padding:24px 16px;text-align:center;color:var(--muted);font-size:11px;bor
 <script>
 // lazy ticker duplicate
 const t=document.getElementById('ticker'); if(t){t.textContent+=t.textContent;}
+</script>
+<script>
+function toggleTheme(){
+  const cur=document.documentElement.getAttribute('data-theme');
+  const next=cur==='dark'?'light':'dark';
+  document.documentElement.setAttribute('data-theme',next);
+  localStorage.setItem('vex_theme',next);
+  const b=document.getElementById('themeToggle');
+  if(b) b.textContent=next==='dark'?'☀️':'🌙';
+}
+(function(){
+  const s=localStorage.getItem('vex_theme');
+  const prefersDark=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const init=s||(prefersDark?'dark':'light');
+  document.documentElement.setAttribute('data-theme',init);
+  const b=document.getElementById('themeToggle');
+  if(b) b.textContent=init==='dark'?'☀️':'🌙';
+})();
 </script>
 </body>
 </html>
