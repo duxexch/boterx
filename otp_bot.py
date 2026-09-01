@@ -221,18 +221,13 @@ def _process_update(token, update):
         # Generate code
         code = _generate_and_store_code(contact_user_id, full_name, phone)
 
-        # Send code (with VEX artwork)
+        # Send code — نص فقط بدون صورة (نسخ بنقرة واحدة)
         caption = ("🔐 <b>رمز دخول موقع VEX</b>\n\n"
-                   f"<code>{code}</code>\n\n"
+                   f"<code>{code}</code> 👈 اضغط للنسخ\n\n"
                    "⏰ صالح لمدة 5 دقائق\n"
-                   "🌐 أدخل الرمز في: https://vex.deals\n\n"
-                   "📋 انسخ الرمز أعلاه وألصقه في خانة الدخول بالموقع")
-        try:
-            _api(token, 'sendPhoto', chat_id=chat_id,
-                 photo='https://vex.deals/static/icons/og-image.jpg?v=20260821b',
-                 caption=caption, parse_mode='HTML')
-        except Exception:
-            _send_message(token, chat_id, caption, parse_mode='HTML')
+                   "🌐 أدخله في: https://vex.deals\n\n"
+                   "📋 اضغط على الرمز أعلاه لنسخه بنقرة واحدة ثم ألصقه في خانة الدخول بالموقع")
+        _send_message(token, chat_id, caption, parse_mode='HTML')
         logger.info(f"OTP code sent to user {contact_user_id} ({full_name}) phone={phone}")
         return
 
