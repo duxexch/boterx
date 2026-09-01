@@ -1818,7 +1818,29 @@ def index():
     """Landing page (public) — admin dashboard redirect only when logged in."""
     if session.get('logged_in'):
         return redirect(url_for('dashboard'), code=303)
-    return render_template('landing.html')
+    # SSR companies for SEO (global)
+    try:
+        _comps = []
+        for c in read_csv('companies.csv'):
+            if (c.get('is_active','') or '').lower() not in ('active','yes','1','true'):
+                continue
+            # SEO fallback
+            slug = c.get('id','').lower().replace(' ','-')
+            _comps.append({
+                'id': c.get('id',''),
+                'slug': slug,
+                'name': c.get('name',''),
+                'icon': c.get('icon','') or '🏢',
+                'affiliate_link': c.get('affiliate_link',''),
+                'promo_code': c.get('promo_code',''),
+                'address': c.get('address',''),
+                'license': c.get('license','Curacao 8048/JAZ') if c.get('license') else 'Curacao 8048/JAZ',
+                'founded': c.get('founded','2007') if c.get('founded') else '2007',
+                'rating': c.get('rating','4.8') if c.get('rating') else '4.8',
+                'headquarters': c.get('headquarters','Cyprus') if c.get('headquarters') else 'Cyprus',
+            })
+    except: _comps=[]
+    return render_template('landing.html', companies=_comps)
 
 
 @app.route('/x/showcase')

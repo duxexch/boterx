@@ -1,1020 +1,251 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>VEX Games — العب واربح مع البوت الأقوى</title>
-  <meta name="description" content="منصة VEX Games — ألعاب مثيرة وجوائز حقيقية عبر تيليغرام. العب مناجم، كراش، أفياتور، بلينكو، يانصيب والمزيد.">
-  <meta name="keywords" content="VEX Games, تيليغرام, ألعاب, مناجم, كراش, يانصيب, بوت, aviator, plinko, crash, mines">
-  <meta name="robots" content="index, follow">
-  <link rel="canonical" href="https://vex.deals/">
-  <!-- Hreflang for 17 languages -->
-  <link rel="alternate" hreflang="ar" href="https://vex.deals/?lang=ar">
-  <link rel="alternate" hreflang="en" href="https://vex.deals/?lang=en">
-  <link rel="alternate" hreflang="fr" href="https://vex.deals/?lang=fr">
-  <link rel="alternate" hreflang="es" href="https://vex.deals/?lang=es">
-  <link rel="alternate" hreflang="de" href="https://vex.deals/?lang=de">
-  <link rel="alternate" hreflang="it" href="https://vex.deals/?lang=it">
-  <link rel="alternate" hreflang="pt" href="https://vex.deals/?lang=pt">
-  <link rel="alternate" hreflang="ru" href="https://vex.deals/?lang=ru">
-  <link rel="alternate" hreflang="zh" href="https://vex.deals/?lang=zh">
-  <link rel="alternate" hreflang="tr" href="https://vex.deals/?lang=tr">
-  <link rel="alternate" hreflang="ur" href="https://vex.deals/?lang=ur">
-  <link rel="alternate" hreflang="hi" href="https://vex.deals/?lang=hi">
-  <link rel="alternate" hreflang="fa" href="https://vex.deals/?lang=fa">
-  <link rel="alternate" hreflang="id" href="https://vex.deals/?lang=id">
-  <link rel="alternate" hreflang="ja" href="https://vex.deals/?lang=ja">
-  <link rel="alternate" hreflang="ko" href="https://vex.deals/?lang=ko">
-  <link rel="alternate" hreflang="th" href="https://vex.deals/?lang=th">
-  <link rel="alternate" hreflang="x-default" href="https://vex.deals/">
-  <!-- Open Graph -->
-  <meta property="og:title" content="VEX Games — العب واربح">
-  <meta property="og:description" content="منصة ألعاب تيليغرام الأقوى — جوائز حقيقية، ألعاب مثيرة، نظام إحالة مربح">
-  <meta property="og:type" content="website">
-  <meta property="og:url" content="https://vex.deals/">
-  <meta property="og:image" content="https://vex.deals/static/icons/og-image.jpg?v=20260821b">
-  <meta property="og:site_name" content="VEX Games">
-  <meta property="og:locale" content="ar_AR">
-  <!-- Twitter Card -->
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="VEX Games — العب واربح">
-  <meta name="twitter:description" content="منصة ألعاب تيليغرام الأقوى — جوائز حقيقية">
-  <meta name="twitter:image" content="https://vex.deals/static/icons/og-image.jpg?v=20260821b">
-  <meta name="theme-color" content="#0b0e11">
-  <link rel="manifest" href="/static/manifest.json">
-  <link rel="icon" href="/static/icons/favicon.png?v=20260816" type="image/png" sizes="32x32">
-  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png?v=20260816">
-  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/fontawesome.min.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/user-themes.css') }}">
-  <script src="/static/js/i18n.js?v=20260823"></script>
-  <script src="/static/js/i18n-auto.js"></script>
-  <script>
-  window.I18N_EXTRA = Object.assign(window.I18N_EXTRA || {}, {
-    // NAV
-    nav_account:   { ar: 'حسابي', en: 'My Account' },
-    nav_play_now:  { ar: 'العب الآن', en: 'Play Now' },
-    // HERO
-    hero_badge:    { ar: 'أكثر من 5,000 لاعب نشط الآن', en: 'Over 5,000 players active now' },
-    hero_p:        { ar: 'منصة الألعاب الأكثر إثارة على تيليغرام — ألعاب مثيرة، جوائز حقيقية، ونظام إحالة مربح ينمو معك', en: 'The most thrilling gaming platform on Telegram — exciting games, real prizes, and a rewarding referral system that grows with you' },
-    hero_cta_play: { ar: 'ابدأ اللعب الآن', en: 'Start Playing Now' },
-    hero_cta_games:{ ar: 'استعرض الألعاب', en: 'Browse Games' },
-    hero_cta_login:{ ar: 'دخول حسابي', en: 'Log In' },
-    tag_online:    { ar: '🟢 النظام يعمل', en: '🟢 System online' },
-    tag_secure:    { ar: '🔒 آمن 100%', en: '🔒 100% secure' },
-    tag_instant:   { ar: '⚡ استجابة فورية', en: '⚡ Instant response' },
-    tag_daily:     { ar: '🏆 جوائز يومية', en: '🏆 Daily prizes' },
-    // TICKER
-    ticker_label:  { ar: '⚡ أرباح مباشرة', en: '⚡ Live wins' },
-    ticker_won_in: { ar: 'ربح في', en: 'won on' },
-    // STATS
-    stat_users:    { ar: 'لاعب مسجل', en: 'Registered players' },
-    stat_games_diff:{ ar: 'ألعاب مختلفة', en: 'Different games' },
-    stat_rounds:   { ar: 'جولة لعب', en: 'Rounds played' },
-    stat_paid:     { ar: 'جوائز موزعة', en: 'Prizes paid out' },
-    stat_always:   { ar: 'متاح دائماً', en: 'Always available' },
-    // GAMES
-    games_title:   { ar: 'ألعابنا', en: 'Our Games' },
-    games_sub:     { ar: 'كل لعبة مصممة لتوفير تجربة مختلفة ومثيرة', en: 'Each game is built for a unique, thrilling experience' },
-    g_mines:       { ar: 'مناجم', en: 'Mines' },
-    g_mines_tag:   { ar: 'استراتيجية', en: 'Strategy' },
-    g_aviator:     { ar: 'أفياتور', en: 'Aviator' },
-    g_aviator_tag: { ar: 'توقيت', en: 'Timing' },
-    g_crash:       { ar: 'كراش', en: 'Crash' },
-    g_crash_tag:   { ar: 'إثارة', en: 'Thrill' },
-    g_plinko:      { ar: 'بلينكو', en: 'Plinko' },
-    g_plinko_tag:  { ar: 'فيزياء', en: 'Physics' },
-    g_wheel:       { ar: 'عجلة الحظ', en: 'Wheel of Fortune' },
-    g_wheel_tag:   { ar: 'جوائز', en: 'Prizes' },
-    g_lottery:     { ar: 'يانصيب', en: 'Lottery' },
-    g_jackpot:     { ar: 'جاك بوت', en: 'Jackpot' },
-    g_snatch:      { ar: 'اخطف', en: 'Snatch' },
-    g_snatch_tag:  { ar: 'سرعة', en: 'Speed' },
-    g_dice:        { ar: 'النرد', en: 'Dice' },
-    g_dice_tag:    { ar: 'حظ', en: 'Luck' },
-    g_match:       { ar: 'المباراة', en: 'The Match' },
-    g_match_tag:   { ar: 'منافسة', en: 'Competition' },
-    // JACKPOT
-    jp_title:      { ar: '💰 جوائز اليانصيب التراكمية 💰', en: '💰 Progressive Lottery Jackpots 💰' },
-    jp_sub:        { ar: 'سحب يومي — كل تذكرة فرصة للفوز بالجائزة الكبرى', en: 'Daily draw — every ticket is a shot at the grand prize' },
-    // FEATURES
-    feat_sub:      { ar: 'ميزات تجعل تجربتك لا تُنسى', en: 'Features that make your experience unforgettable' },
-    feat_sec_t:    { ar: 'أمان تام', en: 'Total Security' },
-    feat_sec_d:    { ar: 'نظام تحقق متعدد الطبقات، تشفير كامل، وحماية من التلاعب في جميع الألعاب', en: 'Multi-layer verification, full encryption, and tamper protection across all games' },
-    feat_fast_t:   { ar: 'استجابة فورية', en: 'Instant Response' },
-    feat_fast_d:   { ar: 'البوت يعالج آلاف الرسائل بالتوازي دون تأخير أو تعليق حتى مع 5000 مستخدم', en: 'The bot handles thousands of messages in parallel with no lag or freezing, even with 5,000 users' },
-    feat_ref_t:    { ar: 'نظام إحالة مربح', en: 'Rewarding Referrals' },
-    feat_ref_d:    { ar: 'أدعِ أصدقاءك واكسب نسبة من كل معاملاتهم. الأرباح تُضاف تلقائياً', en: 'Invite your friends and earn a share of every transaction. Earnings are credited automatically' },
-    feat_bonus_t:  { ar: 'مكافآت يومية', en: 'Daily Rewards' },
-    feat_bonus_d:  { ar: 'يانصيب يومي، عجلة الحظ، ومكافآت تعويضية تضمن تجربة عادلة دائماً', en: 'Daily lottery, wheel of fortune, and compensation rewards that keep the experience fair' },
-    feat_fair_t:   { ar: 'شفافية كاملة', en: 'Full Transparency' },
-    feat_fair_d:   { ar: 'نظام Provably Fair يتيح لك التحقق من عدالة كل جولة بنفسك', en: 'A Provably Fair system lets you verify the fairness of every round yourself' },
-    feat_lang_t:   { ar: 'متعدد اللغات', en: 'Multilingual' },
-    feat_lang_d:   { ar: 'عربي، إنجليزي، وأكثر — البوت يتحدث لغتك', en: 'Arabic, English, and more — the bot speaks your language' },
-    // ABOUT
-    about_title:   { ar: 'عن المنصة', en: 'About the Platform' },
-    about_sub:     { ar: 'منصة ألعاب مالية شاملة تعمل عبر تيليغرام والويب', en: 'A complete financial gaming platform on Telegram and the web' },
-    about_p1:      { ar: 'VEX Games هي منصة ألعاب مالية متعددة اللغات تقدم تجربة لعب آمنة ومثيرة عبر تيليغرام والويب. تدعم المنصة 17 لغة، وتوفر نظام محفظة متكامل مع إيداع وسحب آمن، نظام تعويض ذكي (SVRP)، نظام إحالة مربح، ونظام Provably Fair للتحقق من عدالة كل جولة.', en: 'VEX Games is a multilingual financial gaming platform delivering a safe and thrilling experience across Telegram and the web. It supports 17 languages and offers a full wallet system with secure deposits and withdrawals, a smart compensation system (SVRP), a rewarding referral program, and a Provably Fair system to verify the fairness of every round.' },
-    about_p2:      { ar: 'تتميز المنصة ببنية تحتية متطورة قادرة على معالجة آلاف المعاملات في الثانية، مع حماية كاملة من التلاعب والاحتيال. جميع الألعاب تعمل بنظام Provably Fair مبني على HMAC-SHA256، مما يضمن شفافية كاملة في النتائج.', en: 'The platform runs on advanced infrastructure capable of processing thousands of transactions per second, with full protection against tampering and fraud. All games use a Provably Fair system built on HMAC-SHA256, ensuring complete transparency of results.' },
-    // HOW IT WORKS
-    how_title:     { ar: 'كيف تبدأ', en: 'How to Start' },
-    how_sub:       { ar: 'ثلاث خطوات بسيطة للبدء', en: 'Three simple steps to get started' },
-    step1_t:       { ar: 'اضغط دخول عبر تيليغرام', en: 'Tap login via Telegram' },
-    step1_d:       { ar: 'افتح بوت الأمان @vex_otp_bot وشارك رقم هاتفك للحصول على رمز تحقق آمن.', en: 'Open the security bot @vex_otp_bot and share your phone number to get a secure verification code.' },
-    step2_t:       { ar: 'أدخل الرمز على الموقع', en: 'Enter the code on the site' },
-    step2_d:       { ar: 'اكتب رمز التحقق المكون من 6 أرقام لتسجيل الدخول الآمن لمحفظتك.', en: 'Type the 6-digit verification code to securely log in to your wallet.' },
-    step3_t:       { ar: 'أودع والعب', en: 'Deposit and play' },
-    step3_d:       { ar: 'أودع في محفظتك عبر وسائل الدفع المتاحة، ثم اختر لعبتك وابدأ الفوز.', en: 'Fund your wallet through the available payment methods, then pick a game and start winning.' },
-    // FAQ
-    faq_title:     { ar: 'الأسئلة الشائعة', en: 'Frequently Asked Questions' },
-    faq_sub:       { ar: 'إجابات على أكثر الأسئلة شيوعاً', en: 'Answers to the most common questions' },
-    faq_q1:        { ar: 'ما هي VEX Games؟', en: 'What is VEX Games?' },
-    faq_a1:        { ar: 'VEX Games هي منصة ألعاب مالية متعددة اللغات تعمل عبر تيليغرام والويب، تقدم ألعاباً مثل أفياتور، كراش، بلينكو، مناجم، يانصيب، نرد وعجلة الحظ مع نظام محفظة آمن وإيداع وسحب موثوق.', en: 'VEX Games is a multilingual financial gaming platform on Telegram and the web, offering games like Aviator, Crash, Plinko, Mines, Lottery, Dice, and Wheel of Fortune with a secure wallet and reliable deposits and withdrawals.' },
-    faq_q2:        { ar: 'هل الألعاب عادلة؟', en: 'Are the games fair?' },
-    faq_a2:        { ar: 'نعم، جميع الألعاب تستخدم نظام Provably Fair مبني على HMAC-SHA256. يتم توليد نقطة التحطم أو النتيجة من بذرة خادم (server seed) يتم الكشف عنها بعد كل جولة، مما يسمح لك بالتحقق من عدالة كل نتيجة بنفسك.', en: 'Yes. All games use a Provably Fair system built on HMAC-SHA256. The crash point or result is generated from a server seed revealed after each round, letting you verify the fairness of every result yourself.' },
-    faq_q3:        { ar: 'كيف أودع وأسحب؟', en: 'How do I deposit and withdraw?' },
-    faq_a3:        { ar: 'يمكنك الإيداع عبر عدة وسائل دفع (فودافون كاش، STC Pay، InstaPay، تحويل بنكي وغيرها). اختر وسيلة الدفع المناسبة لعملتك، انسخ بيانات الحساب، أرسل المبلغ، ثم أكد العملية. السحب يتم بنفس الطريقة مع موافقة الإدارة.', en: 'You can deposit via several payment methods (Vodafone Cash, STC Pay, InstaPay, bank transfer, and more). Choose the method for your currency, copy the account details, send the amount, then confirm. Withdrawals work the same way with admin approval.' },
-    faq_q4:        { ar: 'ما هو نظام التعويض (SVRP)؟', en: 'What is the compensation system (SVRP)?' },
-    faq_a4:        { ar: 'نظام التعويض الذكي يمنحك 100% من مبلغ الإيداع كرصيد مجمد، يمكن فك تجميده بإرساله لـ 4 أصدقاء على الأقل. كل صديق يستلم 25% من الرصيد، وعند الإرسال يُفك تجميد نفس المبلغ لك.', en: 'The smart compensation system grants you 100% of your deposit as frozen balance, which you can unlock by sharing it with at least 4 friends. Each friend receives 25% of the balance, and sharing unlocks the same amount for you.' },
-    faq_q5:        { ar: 'هل يدعم البوت لغتي؟', en: 'Does the bot support my language?' },
-    faq_a5:        { ar: 'نعم، VEX Games يدعم 17 لغة: العربية، الإنجليزية، الفرنسية، الإسبانية، الألمانية، الإيطالية، البرتغالية، الروسية، الصينية، التركية، الأردية، الهندية، الفارسية، الإندونيسية، اليابانية، الكورية والتايلاندية.', en: 'Yes. VEX Games supports 17 languages: Arabic, English, French, Spanish, German, Italian, Portuguese, Russian, Chinese, Turkish, Urdu, Hindi, Persian, Indonesian, Japanese, Korean, and Thai.' },
-    // LOGIN
-    login_title_pre:{ ar: '🔐 دخول ', en: '🔐 Log in to ' },
-    login_title_hl: { ar: 'حسابك', en: 'your account' },
-    login_sub:     { ar: 'سجّل الدخول عبر بوت الأمان للوصول لمحفظتك وألعابك', en: 'Log in through the security bot to access your wallet and games' },
-    login_s1_t:    { ar: 'دخول عبر تيليغرام', en: 'Login via Telegram' },
-    login_open_bot:{ ar: 'فتح @vex_otp_bot', en: 'Open @vex_otp_bot' },
-    login_have_code:{ ar: 'لديّ رمز بالفعل ←', en: 'I already have a code ←' },
-    login_s2_t:    { ar: 'أدخل رمز التحقق', en: 'Enter verification code' },
-    login_verify:  { ar: 'دخول', en: 'Log in' },
-    login_back:    { ar: '← رجوع', en: '← Back' },
-    // OTP JS
-    otp_need6:     { ar: 'أدخل رمزاً من 6 أرقام', en: 'Enter a 6-digit code' },
-    otp_checking:  { ar: 'جارٍ التحقق...', en: 'Verifying...' },
-    otp_ok:        { ar: '✅ تم الدخول — جارٍ التحويل...', en: '✅ Logged in — redirecting...' },
-    otp_invalid:   { ar: 'رمز غير صالح', en: 'Invalid code' },
-    otp_conn_err:  { ar: 'خطأ في الاتصال', en: 'Connection error' },
-    // CTA FINAL
-    cta_ready:     { ar: 'جاهز للعب؟', en: 'Ready to play?' },
-    cta_ready_sub: { ar: 'انضم الآن مجاناً وابدأ رحلتك نحو الجوائز الكبرى', en: 'Join now for free and start your journey to the big prizes' },
-    cta_join:      { ar: 'انضم إلى VEX Games', en: 'Join VEX Games' },
-    // FOOTER
-    foot_main_bot: { ar: 'البوت الرئيسي', en: 'Main Bot' },
-    foot_sec_bot:  { ar: 'بوت الأمان', en: 'Security Bot' },
-    foot_admin:    { ar: 'لوحة الإدارة', en: 'Admin Panel' },
-    foot_games:    { ar: 'الألعاب', en: 'Games' },
-    foot_login:    { ar: 'تسجيل الدخول', en: 'Log In' },
-    foot_rights:   { ar: '© 2026 VEX Games — جميع الحقوق محفوظة', en: '© 2026 VEX Games — All rights reserved' },
-    foot_disclaimer:{ ar: 'الألعاب للترفيه فقط — يُرجى اللعب بمسؤولية. المنصة تدعم 17 لغة وتعمل عبر تيليغرام والويب.', en: 'Games are for entertainment only — please play responsibly. The platform supports 17 languages and works on Telegram and the web.' },
-    // Demo ticker player prefix
-    demo_player:   { ar: 'لاعب_', en: 'Player_' }
-  });
-  </script>
-  <!-- Preload critical resources -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <!-- Structured Data — Organization -->
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "Organization",
-    "name": "VEX Games",
-    "url": "https://vex.deals",
-    "logo": "https://vex.deals/static/icons/icon-512.png",
-    "description": "منصة ألعاب مالية متعددة اللغات عبر تيليغرام — ألعاب مثيرة وجوائز حقيقية",
-    "sameAs": []
-  }
-  </script>
-  <!-- Structured Data — WebSite -->
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "WebSite",
-    "name": "VEX Games",
-    "url": "https://vex.deals/",
-    "inLanguage": ["ar","en","fr","es","de","it","pt","ru","zh","tr","ur","hi","fa","id","ja","ko","th"]
-  }
-  </script>
-  <!-- Structured Data — FAQPage -->
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "FAQPage",
-    "mainEntity": [
-      {
-        "@type": "Question",
-        "name": "ما هي VEX Games؟",
-        "acceptedAnswer": {"@type": "Answer", "text": "VEX Games هي منصة ألعاب مالية متعددة اللغات تعمل عبر تيليغرام، تقدم ألعاباً مثل أفياتور، كراش، بلينكو، مناجم، يانصيب، نرد وعجلة الحظ مع نظام محفظة آمن."}
-      },
-      {
-        "@type": "Question",
-        "name": "كيف أبدأ اللعب على VEX Games؟",
-        "acceptedAnswer": {"@type": "Answer", "text": "اضغط على زر الدخول عبر تيليغرام، شارك رقم هاتفك للحصول على رمز تحقق، أدخل الرمز على الموقع، ثم أودع في محفظتك وابدأ اللعب فوراً."}
-      },
-      {
-        "@type": "Question",
-        "name": "هل اللعبة عادلة؟",
-        "acceptedAnswer": {"@type": "Answer", "text": "نعم، جميع الألعاب تستخدم نظام Provably Fair مبني على HMAC-SHA256 — يمكنك التحقق من نتيجة كل جولة بنفسك."}
-      }
-    ]
-  }
-  </script>  <style>
-    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-    :root{
-      --green:#00e701;--green2:#00b301;--green-dim:rgba(0,231,1,0.1);
-      --green-rgb:0,231,1;
-      --gold:#ffd700;--gold-dim:#c9a800;
-      --gold-rgb:255,215,0;
-      --dark:#0b0e11;--dark2:#10141a;--surface:#141920;--card:rgba(20,25,32,0.75);
-      --border:rgba(255,255,255,0.08);--text:#eef2f6;--muted:#8794a3;
-      --ease:cubic-bezier(0.4,0,0.2,1);
-    }
-    html{scroll-behavior:smooth}
-    body{font-family:'Cairo',sans-serif;background:var(--dark);color:var(--text);min-height:100vh;overflow-x:hidden}
-
-    /* ── Layered background ── */
-    body::before{
-      content:'';position:fixed;inset:0;z-index:-3;
-      background:
-        radial-gradient(ellipse 80% 50% at 50% -10%,rgba(var(--green-rgb),0.12) 0%,transparent 60%),
-        radial-gradient(ellipse 50% 60% at 90% 80%,rgba(var(--gold-rgb),0.06) 0%,transparent 50%),
-        radial-gradient(ellipse 40% 50% at 5% 30%,rgba(var(--green-rgb),0.05) 0%,transparent 55%);
-    }
-    .grid-bg{
-      position:fixed;inset:0;z-index:-2;pointer-events:none;
-      background-image:linear-gradient(rgba(255,255,255,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.025) 1px,transparent 1px);
-      background-size:50px 50px;
-      mask-image:radial-gradient(ellipse 90% 70% at 50% 20%,#000 30%,transparent 80%);
-      -webkit-mask-image:radial-gradient(ellipse 90% 70% at 50% 20%,#000 30%,transparent 80%);
-    }
-    /* Floating particles */
-    .fx-particles{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden}
-    .fxp{position:absolute;bottom:-10px;border-radius:50%;opacity:0;animation:fxRise linear infinite}
-    .fxp.g{background:rgba(var(--green-rgb),.5);box-shadow:0 0 8px rgba(var(--green-rgb),.6)}
-    .fxp.y{background:rgba(var(--gold-rgb),.45);box-shadow:0 0 8px rgba(var(--gold-rgb),.5)}
-    @keyframes fxRise{
-      0%{transform:translateY(0) translateX(0);opacity:0}
-      8%{opacity:.7}
-      90%{opacity:.25}
-      100%{transform:translateY(-105vh) translateX(30px);opacity:0}
-    }
-
-    /* ── NAV ── */
-    nav{
-      position:fixed;top:0;left:0;right:0;z-index:100;
-      background:rgba(11,14,17,0.88);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
-      border-bottom:1px solid var(--border);
-      padding:12px 24px;display:flex;align-items:center;justify-content:space-between;
-    }
-    nav::after{
-      content:'';position:absolute;bottom:-1px;left:0;right:0;height:1px;
-      background:linear-gradient(90deg,transparent,rgba(var(--green-rgb),.6),rgba(var(--gold-rgb),.4),transparent);
-      background-size:200% 100%;animation:navSweep 6s linear infinite;
-    }
-    @keyframes navSweep{from{background-position:200% 0}to{background-position:-200% 0}}
-    .nav-logo{display:flex;align-items:center;gap:10px}
-    .nav-logo-img{width:38px;height:38px;border-radius:10px;object-fit:cover;border:1px solid rgba(var(--green-rgb),0.3);box-shadow:0 0 16px rgba(var(--green-rgb),0.2)}
-    .nav-brand{font-weight:900;font-size:1.15rem;background:linear-gradient(135deg,#fff,var(--green));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-    .nav-links{display:flex;gap:10px;align-items:center}
-    .btn-nav-login{
-      display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;
-      background:var(--green-dim);border:1px solid rgba(var(--green-rgb),0.3);
-      color:var(--green);font-size:12px;font-weight:700;text-decoration:none;transition:all .2s;
-    }
-    .btn-nav-login:hover{background:rgba(var(--green-rgb),0.18);box-shadow:0 0 20px rgba(var(--green-rgb),0.15)}
-    .btn-play-nav{
-      display:flex;align-items:center;gap:6px;padding:8px 18px;border-radius:10px;
-      background:linear-gradient(135deg,var(--green),var(--green2));
-      color:var(--dark);font-size:12px;font-weight:800;text-decoration:none;transition:all .2s;
-    }
-    .btn-play-nav:hover{box-shadow:0 4px 20px rgba(var(--green-rgb),0.3);transform:translateY(-1px)}
-
-    /* ── HERO ── */
-    .hero{
-      min-height:92vh;display:flex;flex-direction:column;align-items:center;justify-content:center;
-      text-align:center;padding:110px 24px 40px;position:relative;
-    }
-    .hero-logo-wrap{position:relative;margin-bottom:26px}
-    .hero-logo-wrap::before{
-      content:'';position:absolute;inset:-14px;border-radius:50%;
-      border:1px dashed rgba(var(--gold-rgb),.35);
-      animation:ringSpin 18s linear infinite;
-    }
-    .hero-logo-wrap::after{
-      content:'';position:absolute;inset:-28px;border-radius:50%;
-      border:1px solid rgba(var(--green-rgb),.15);
-      animation:ringSpin 26s linear infinite reverse;
-    }
-    @keyframes ringSpin{to{transform:rotate(360deg)}}
-    .hero-logo{
-      width:130px;height:130px;border-radius:50%;object-fit:cover;display:block;
-      border:2px solid rgba(var(--green-rgb),0.35);
-      box-shadow:0 0 50px rgba(var(--green-rgb),0.3),0 0 110px rgba(var(--green-rgb),0.12);
-      animation:heroPulse 3s ease-in-out infinite;
-    }
-    @keyframes heroPulse{0%,100%{box-shadow:0 0 50px rgba(var(--green-rgb),0.3),0 0 100px rgba(var(--green-rgb),0.1)}50%{box-shadow:0 0 70px rgba(var(--green-rgb),0.5),0 0 140px rgba(var(--gold-rgb),0.15)}}
-    .hero-badge{
-      display:inline-flex;align-items:center;gap:6px;
-      background:rgba(var(--green-rgb),0.1);border:1px solid rgba(var(--green-rgb),0.3);
-      color:var(--green);border-radius:999px;padding:6px 18px;
-      font-size:12px;font-weight:700;margin-bottom:20px;
-    }
-    .hero-badge .dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);animation:dotBlink 1.6s infinite}
-    @keyframes dotBlink{0%,100%{opacity:1}50%{opacity:.35}}
-    .hero h1{
-      font-size:clamp(2.3rem,6.2vw,4.4rem);font-weight:900;line-height:1.12;margin-bottom:16px;
-      background:linear-gradient(120deg,#fff 25%,var(--green) 55%,var(--gold) 90%);
-      background-size:220% 100%;
-      -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
-      animation:heroShine 7s ease-in-out infinite;
-    }
-    @keyframes heroShine{0%,100%{background-position:0% 0}50%{background-position:100% 0}}
-    .hero p{font-size:clamp(1rem,2.5vw,1.2rem);color:var(--muted);max-width:560px;margin:0 auto 32px;line-height:1.8}
-    .cta-row{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin-bottom:36px}
-    .btn-cta{
-      display:inline-flex;align-items:center;gap:8px;
-      padding:14px 28px;border-radius:999px;font-size:1rem;font-weight:800;
-      cursor:pointer;text-decoration:none;border:none;transition:all .2s;font-family:'Cairo',sans-serif;
-      position:relative;overflow:hidden;
-    }
-    .btn-primary{background:linear-gradient(135deg,var(--green),var(--green2));color:var(--dark);box-shadow:0 0 30px rgba(var(--green-rgb),0.3)}
-    .btn-primary::after{
-      content:'';position:absolute;top:0;bottom:0;width:40%;left:-60%;
-      background:linear-gradient(100deg,transparent,rgba(255,255,255,.55),transparent);
-      transform:skewX(-20deg);animation:btnSheen 3.2s ease-in-out infinite;
-    }
-    @keyframes btnSheen{0%,60%{left:-60%}100%{left:140%}}
-    .btn-primary:hover{transform:translateY(-2px);box-shadow:0 0 50px rgba(var(--green-rgb),0.45)}
-    .btn-secondary{background:rgba(var(--green-rgb),0.08);color:var(--text);border:1px solid rgba(var(--green-rgb),0.2)}
-    .btn-secondary:hover{background:rgba(var(--green-rgb),0.14);transform:translateY(-2px)}
-    .btn-login-hero{background:rgba(255,255,255,0.05);color:var(--muted);border:1px solid rgba(255,255,255,0.1)}
-    .btn-login-hero:hover{background:rgba(255,255,255,0.1);color:var(--text);transform:translateY(-2px)}
-    .hero-tags{display:flex;gap:20px;flex-wrap:wrap;justify-content:center;color:var(--muted);font-size:12px}
-    .hero-tags span{display:flex;align-items:center;gap:4px}
-
-    /* ── LIVE WINS TICKER ── */
-    .ticker-wrap{
-      border-top:1px solid var(--border);border-bottom:1px solid var(--border);
-      background:rgba(16,20,26,.7);backdrop-filter:blur(8px);
-      overflow:hidden;position:relative;padding:10px 0;margin-bottom:70px;
-    }
-    .ticker-label{
-      position:absolute;top:0;bottom:0;right:0;z-index:2;display:flex;align-items:center;gap:6px;
-      padding:0 16px;background:linear-gradient(270deg,var(--dark) 60%,transparent);
-      font-size:11px;font-weight:800;color:var(--gold);white-space:nowrap;
-    }
-    .ticker{display:flex;gap:12px;width:max-content;animation:tickerMove 40s linear infinite;direction:ltr}
-    .ticker:hover{animation-play-state:paused}
-    @keyframes tickerMove{from{transform:translateX(0)}to{transform:translateX(-50%)}}
-    .tick-item{
-      display:flex;align-items:center;gap:8px;direction:rtl;
-      background:var(--card);border:1px solid var(--border);border-radius:999px;
-      padding:5px 14px;font-size:11.5px;white-space:nowrap;
-    }
-    .tick-item .ti-game{font-size:14px}
-    .tick-item .ti-name{color:var(--muted);font-weight:600}
-    .tick-item .ti-amt{color:var(--green);font-weight:900;font-family:'Courier New',monospace}
-    .tick-item.big .ti-amt{color:var(--gold)}
-    .tick-item.big{border-color:rgba(var(--gold-rgb),.35);box-shadow:0 0 14px rgba(var(--gold-rgb),.08)}
-
-    /* ── STATS ── */
-    .stats-row{
-      display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
-      gap:16px;max-width:860px;margin:0 auto 80px;padding:0 24px;
-    }
-    .stat-card{
-      background:var(--card);border:1px solid var(--border);
-      border-radius:16px;padding:24px 16px;text-align:center;
-      backdrop-filter:blur(8px);position:relative;overflow:hidden;
-      transition:border-color .2s,box-shadow .2s,transform .2s;
-    }
-    .stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--green),transparent);opacity:.5}
-    .stat-card:nth-child(3)::before{background:linear-gradient(90deg,transparent,var(--gold),transparent)}
-    .stat-card:hover{border-color:rgba(var(--green-rgb),0.35);box-shadow:0 0 24px rgba(var(--green-rgb),0.08);transform:translateY(-3px)}
-    .stat-num{font-size:2rem;font-weight:900;color:var(--green);display:block;text-shadow:0 0 20px rgba(var(--green-rgb),0.4);font-family:'Courier New',monospace}
-    .stat-card:nth-child(3) .stat-num{color:var(--gold);text-shadow:0 0 20px rgba(var(--gold-rgb),.35)}
-    .stat-label{color:var(--muted);font-size:12px;margin-top:4px}
-
-    /* ── SECTIONS ── */
-    .section{padding:80px 24px;max-width:1100px;margin:0 auto}
-    .section-title{text-align:center;font-size:1.9rem;font-weight:900;margin-bottom:8px;color:var(--text)}
-    .section-sub{text-align:center;color:var(--muted);margin-bottom:48px;font-size:14px}
-    .section-title span{color:var(--green)}
-
-    /* ── GAMES SHOWCASE ── */
-    .games-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px}
-    .game-card{
-      --tint:0,231,1;
-      background:linear-gradient(160deg,rgba(var(--tint),.09),var(--card) 55%);
-      border:1px solid var(--border);
-      border-radius:18px;padding:26px 14px 20px;text-align:center;
-      cursor:pointer;transition:all .25s var(--ease);position:relative;overflow:hidden;
-      backdrop-filter:blur(8px);
-    }
-    .game-card::before{
-      content:'';position:absolute;top:0;left:0;right:0;height:2px;
-      background:linear-gradient(90deg,transparent,rgb(var(--tint)),transparent);
-      opacity:0;transition:opacity .3s;
-    }
-    .game-card::after{
-      content:'';position:absolute;inset:0;pointer-events:none;
-      background:radial-gradient(120px circle at 50% 0%,rgba(var(--tint),.14),transparent 70%);
-      opacity:0;transition:opacity .3s;
-    }
-    .game-card:hover{transform:translateY(-5px);border-color:rgba(var(--tint),.45);box-shadow:0 10px 30px rgba(0,0,0,.4),0 0 24px rgba(var(--tint),.14)}
-    .game-card:hover::before,.game-card:hover::after{opacity:1}
-    .game-card:active{transform:scale(0.96)}
-    .game-icon{font-size:2.6rem;margin-bottom:10px;display:block;filter:drop-shadow(0 0 10px rgba(var(--tint),.45));transition:transform .25s var(--ease)}
-    .game-card:hover .game-icon{transform:scale(1.15) rotate(-4deg)}
-    .game-name{font-weight:800;font-size:13.5px;color:var(--text)}
-    .game-tag{display:inline-block;margin-top:7px;font-size:10px;padding:2px 9px;border-radius:999px;background:rgba(var(--tint),.1);color:rgb(var(--tint));border:1px solid rgba(var(--tint),.25)}
-    .game-hot{
-      position:absolute;top:10px;left:10px;font-size:9px;font-weight:900;
-      background:linear-gradient(135deg,var(--gold),var(--gold));color:#000;
-      border-radius:999px;padding:2px 8px;letter-spacing:.5px;
-      box-shadow:0 0 12px rgba(var(--gold-rgb),.4);
-    }
-
-    /* ── JACKPOT BANNER ── */
-    .jackpot{
-      max-width:1000px;margin:0 auto;padding:0 24px;
-    }
-    .jackpot-card{
-      position:relative;overflow:hidden;border-radius:22px;text-align:center;
-      border:1px solid rgba(var(--gold-rgb),.3);
-      background:
-        radial-gradient(ellipse 60% 100% at 50% 0%,rgba(var(--gold-rgb),.1),transparent 70%),
-        linear-gradient(160deg,var(--surface),var(--dark2));
-      padding:44px 24px;
-      box-shadow:0 20px 60px rgba(0,0,0,.45),inset 0 1px 0 rgba(var(--gold-rgb),.15);
-    }
-    .jackpot-card::before{
-      content:'';position:absolute;top:0;bottom:0;width:34%;left:-50%;
-      background:linear-gradient(100deg,transparent,rgba(var(--gold-rgb),.08),transparent);
-      transform:skewX(-18deg);animation:jpSheen 4.5s ease-in-out infinite;
-    }
-    @keyframes jpSheen{0%,55%{left:-50%}100%{left:150%}}
-    .jackpot-title{font-size:13px;font-weight:800;color:var(--gold);letter-spacing:2px;margin-bottom:10px}
-    .jackpot-amount{
-      font-size:clamp(2.4rem,7vw,4rem);font-weight:900;font-family:'Courier New',monospace;
-      background:linear-gradient(180deg,#fff2b3,var(--gold) 55%,#b8860b);
-      -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
-      filter:drop-shadow(0 0 24px rgba(var(--gold-rgb),.35));line-height:1.1;direction:ltr;
-    }
-    .jackpot-sub{color:var(--muted);font-size:13px;margin-top:10px}
-
-    /* ── FEATURES ── */
-    .features-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
-    .feature-card{
-      background:var(--card);border:1px solid var(--border);
-      border-radius:16px;padding:26px;backdrop-filter:blur(8px);
-      transition:border-color .2s,box-shadow .2s,transform .2s;
-    }
-    .feature-card:hover{border-color:rgba(var(--green-rgb),0.3);box-shadow:0 0 20px rgba(var(--green-rgb),0.07);transform:translateY(-3px)}
-    .feature-icon{
-      width:48px;height:48px;border-radius:13px;display:flex;align-items:center;justify-content:center;
-      font-size:1.5rem;margin-bottom:14px;
-      background:rgba(var(--green-rgb),.08);border:1px solid rgba(var(--green-rgb),.2);
-      filter:drop-shadow(0 0 8px rgba(var(--green-rgb),0.25));
-    }
-    .feature-title{font-weight:800;font-size:1rem;margin-bottom:8px;color:var(--text)}
-    .feature-desc{color:var(--muted);font-size:13px;line-height:1.7}
-
-    /* ── HOW IT WORKS (timeline) ── */
-    .steps{max-width:680px;margin:0 auto;position:relative}
-    .steps::before{
-      content:'';position:absolute;top:24px;bottom:24px;right:27px;width:2px;
-      background:linear-gradient(180deg,var(--green),rgba(var(--gold-rgb),.6));opacity:.35;
-    }
-    .step-row{display:flex;gap:16px;padding:16px;background:var(--card);border:1px solid var(--border);border-radius:14px;margin-bottom:12px;position:relative;backdrop-filter:blur(8px);transition:border-color .2s,transform .2s}
-    .step-row:hover{border-color:rgba(var(--green-rgb),.3);transform:translateX(-4px)}
-    .step-num{
-      width:38px;height:38px;flex-shrink:0;border-radius:50%;display:flex;align-items:center;justify-content:center;
-      font-weight:900;font-size:15px;color:var(--dark);
-      background:linear-gradient(135deg,var(--green),var(--green2));
-      box-shadow:0 0 16px rgba(var(--green-rgb),.3);position:relative;z-index:1;
-    }
-    .step-row:last-child .step-num{background:linear-gradient(135deg,var(--gold),var(--gold));box-shadow:0 0 16px rgba(var(--gold-rgb),.35)}
-    .step-title{font-weight:700;color:var(--text);font-size:14px;margin-bottom:4px}
-    .step-desc{font-size:12px;color:var(--muted);line-height:1.6}
-
-    /* ── FAQ accordions ── */
-    .faq-list{max-width:680px;margin:0 auto}
-    .faq-item{
-      background:var(--card);border:1px solid var(--border);border-radius:12px;
-      margin-bottom:8px;overflow:hidden;backdrop-filter:blur(8px);transition:border-color .2s;
-    }
-    .faq-item[open]{border-color:rgba(var(--green-rgb),.3)}
-    .faq-item summary{
-      list-style:none;cursor:pointer;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;
-      font-weight:700;color:var(--text);font-size:14px;
-    }
-    .faq-item summary::-webkit-details-marker{display:none}
-    .faq-item summary::after{content:'+';font-size:18px;color:var(--green);font-weight:900;transition:transform .2s}
-    .faq-item[open] summary::after{transform:rotate(45deg)}
-    .faq-body{padding:0 16px 14px;font-size:12.5px;color:var(--muted);line-height:1.8}
-
-    /* ── LOGIN SECTION ── */
-    .login-section{
-      padding:80px 24px;text-align:center;
-      border-top:1px solid var(--border);border-bottom:1px solid var(--border);
-      background:
-        radial-gradient(ellipse 50% 80% at 50% 0%,rgba(var(--green-rgb),.06),transparent 70%),
-        linear-gradient(135deg,rgba(var(--green-rgb),0.03) 0%,transparent 100%);
-    }
-    .login-card{
-      max-width:460px;margin:0 auto;position:relative;
-      background:var(--card);border:1px solid var(--border);
-      border-radius:20px;padding:32px 28px;backdrop-filter:blur(12px);
-      box-shadow:0 20px 50px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.05);
-    }
-    .login-card::before{
-      content:'';position:absolute;inset:-1px;border-radius:21px;z-index:-1;
-      background:linear-gradient(135deg,rgba(var(--green-rgb),.35),transparent 40%,transparent 60%,rgba(var(--gold-rgb),.25));
-      opacity:.6;
-    }
-    .login-step{display:none}
-    .login-step.active{display:block;animation:fadeIn .3s ease-out}
-    @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-    .otp-input-field{
-      width:100%;background:rgba(0,0,0,0.4);border:1px solid rgba(var(--green-rgb),0.2);
-      border-radius:12px;padding:14px;font-size:24px;font-weight:900;
-      font-family:'Courier New',monospace;text-align:center;letter-spacing:8px;
-      color:var(--green);outline:none;transition:all .2s;
-    }
-    .otp-input-field:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(var(--green-rgb),0.08)}
-    .otp-input-field::placeholder{font-size:18px;letter-spacing:4px;color:var(--muted)}
-    .btn-otp-verify{
-      width:100%;padding:14px;border-radius:12px;border:none;
-      background:linear-gradient(135deg,var(--green),var(--green2));
-      color:var(--dark);font-size:15px;font-weight:800;font-family:'Cairo',sans-serif;
-      cursor:pointer;margin-top:14px;transition:all .2s;
-      box-shadow:0 4px 20px rgba(var(--green-rgb),0.2);
-    }
-    .btn-otp-verify:hover{box-shadow:0 6px 28px rgba(var(--green-rgb),0.35);transform:translateY(-1px)}
-    .otp-status{font-size:12px;color:var(--muted);margin-top:10px;min-height:20px}
-    .otp-status.err{color:#ff7090}
-    .otp-status.ok{color:var(--green)}
-
-    /* ── CTA ── */
-    .cta-final{
-      padding:90px 24px;text-align:center;position:relative;overflow:hidden;
-      background:
-        radial-gradient(ellipse 60% 90% at 50% 100%,rgba(var(--green-rgb),.07),transparent 70%),
-        linear-gradient(135deg,rgba(var(--green-rgb),0.04) 0%,transparent 100%);
-    }
-
-    /* ── FOOTER ── */
-    footer{text-align:center;padding:40px 24px;border-top:1px solid var(--border);color:var(--muted);font-size:12px}
-    footer a{color:var(--green);text-decoration:none;transition:opacity .2s}
-    footer a:hover{opacity:0.7}
-
-    /* ── Scroll reveal (staggered) ── */
-    .reveal{opacity:0;transform:translateY(26px);transition:opacity .7s var(--ease),transform .7s var(--ease)}
-    .reveal.visible{opacity:1;transform:translateY(0)}
-    .reveal-stagger>*{opacity:0;transform:translateY(22px);transition:opacity .6s var(--ease),transform .6s var(--ease)}
-    .reveal-stagger.visible>*{opacity:1;transform:translateY(0)}
-    .reveal-stagger.visible>*:nth-child(1){transition-delay:.05s}
-    .reveal-stagger.visible>*:nth-child(2){transition-delay:.12s}
-    .reveal-stagger.visible>*:nth-child(3){transition-delay:.19s}
-    .reveal-stagger.visible>*:nth-child(4){transition-delay:.26s}
-    .reveal-stagger.visible>*:nth-child(5){transition-delay:.33s}
-    .reveal-stagger.visible>*:nth-child(6){transition-delay:.40s}
-    .reveal-stagger.visible>*:nth-child(7){transition-delay:.47s}
-    .reveal-stagger.visible>*:nth-child(8){transition-delay:.54s}
-    .reveal-stagger.visible>*:nth-child(9){transition-delay:.61s}
-
-    @media (max-width:480px){
-      nav{padding:10px 12px}
-      .nav-brand{font-size:.95rem}
-      .nav-links{gap:6px}
-      .btn-nav-login,.btn-play-nav{padding:7px 10px;font-size:11px}
-    }
-    @media (max-width:340px){
-      .nav-brand{display:none}
-      .btn-nav-login .fa-user+*,.btn-play-nav span{display:none}
-    }
-    @media (prefers-reduced-motion: reduce){
-      *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important}
-      .ticker{animation:none}
-      .reveal,.reveal-stagger>*{opacity:1;transform:none}
-      html{scroll-behavior:auto}
-    }
-  </style>
-<link rel="stylesheet" href="/static/css/bg-logo.css?v=1">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>VEX Games — أفضل منصات المراهنة والألعاب المرخصة | شريك معتمد 1xBet & Melbet</title>
+<meta name="description" content="VEX Games دليلك العالمي لأفضل شركات المراهنة المرخصة: 1xBet، Melbet، Betjam، Mostbet والمزيد — مراجعات خبيرة، تراخيص كوراساو، أكواد برومو حصرية وروابط تسجيل مباشرة. شريك معتمد وموثوق.">
+<meta name="keywords" content="1xBet, Melbet, Betjam, Mostbet, Bizbet, Xpari, Linebet, Gooobet, مراهنات, كازينو, برومو كود, تسجيل 1xBet, VEX Games, مراهنات مرخصة">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<link rel="canonical" href="https://vex.deals/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/vendor/fontawesome.min.css">
+<link rel="stylesheet" href="/static/css/user-themes.css">
+<script>window.I18N_EXTRA=window.I18N_EXTRA||{};</script>
+{% for lang in ['ar','en','fr','es','de','it','pt','ru','zh','tr','ur','hi','fa','id','ja','ko','th'] %}<link rel="alternate" hreflang="{{ lang }}" href="https://vex.deals/?lang={{ lang }}">{% endfor %}
+<link rel="alternate" hreflang="x-default" href="https://vex.deals/">
+<meta property="og:title" content="VEX Games — دليل المراهنة المرخصة العالمي">
+<meta property="og:description" content="مراجعات خبيرة لكل الشركات: الترخيص، المميزات، العيوب، كود البرومو ورابط التسجيل المباشر. VEX شريك معتمد.">
+<meta property="og:type" content="website"><meta property="og:url" content="https://vex.deals/">
+<meta property="og:image" content="https://vex.deals/static/icons/og-image.jpg?v=20260901a">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#0b0e11">
+<link rel="manifest" href="/static/manifest.json">
+<link rel="icon" href="/static/icons/favicon.png" type="image/png">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--green:#00e701;--green2:#0d7a1f;--gold:#ffd700;--dark:#0b0e11;--surface:#141920;--surface2:#1a2030;--border:rgba(255,255,255,.07);--text:#eef2f6;--muted:#8794a3}
+html{scroll-behavior:smooth}
+body{font-family:'Cairo',system-ui,sans-serif;background:var(--dark);color:var(--text);line-height:1.6}
+a{color:inherit}
+nav{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(11,14,17,.88);backdrop-filter:blur(14px);border-bottom:1px solid var(--border);padding:10px 16px;display:flex;align-items:center;justify-content:space-between}
+.nav-logo{display:flex;align-items:center;gap:8px;font-weight:900}
+.nav-logo i{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,var(--green),var(--green2));display:flex;align-items:center;justify-content:center;color:#04210a}
+.btn{padding:8px 14px;border-radius:9px;font-weight:800;border:none;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;font-size:12px;transition:transform .15s}
+.btn:active{transform:scale(.96)}
+.btn-p{background:linear-gradient(135deg,var(--green),var(--green2));color:#04210a}
+.btn-o{background:rgba(255,255,255,.06);color:var(--text);border:1px solid var(--border)}
+.hero{padding:88px 16px 30px;text-align:center;background:radial-gradient(600px 300px at 50% -10%,rgba(0,231,1,.12),transparent 60%)}
+.hero h1{font-size:clamp(1.9rem,5vw,3rem);font-weight:900;line-height:1.15;margin-bottom:10px}
+.hero h1 span{background:linear-gradient(90deg,#fff,var(--green));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.hero p{color:var(--muted);max-width:640px;margin:0 auto 14px;font-size:13px}
+.hero-cta{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:10px}
+.trust{max-width:1100px;margin:0 auto;padding:0 16px;display:flex;gap:8px;overflow:auto;scrollbar-width:none}
+.trust::-webkit-scrollbar{display:none}
+.trust-item{flex:0 0 auto;background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:6px 12px;font-size:11px;display:flex;align-items:center;gap:6px;white-space:nowrap}
+.section{max-width:1100px;margin:0 auto;padding:32px 16px}
+.section h2{font-size:1.5rem;font-weight:900;margin-bottom:6px}
+.section .sub{color:var(--muted);font-size:12px;margin-bottom:14px}
+.comp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.comp-card{background:linear-gradient(180deg,rgba(255,255,255,.03),var(--surface));border:1px solid var(--border);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;transition:transform .15s,border-color .15s}
+.comp-card:hover{transform:translateY(-3px);border-color:rgba(0,231,1,.25)}
+.comp-head{display:flex;gap:10px;padding:12px;border-bottom:1px solid var(--border);align-items:center}
+.comp-icon{width:42px;height:42px;border-radius:10px;background:#0b0e11;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:20px;overflow:hidden}
+.comp-icon img{width:100%;height:100%;object-fit:cover}
+.comp-name{font-weight:900;font-size:13px}
+.comp-meta{font-size:10px;color:var(--muted)}
+.badge{font-size:9px;padding:2px 6px;border-radius:999px;background:rgba(0,231,1,.1);color:var(--green);border:1px solid rgba(0,231,1,.2)}
+.comp-body{padding:10px 12px;flex:1}
+.comp-desc{font-size:11px;color:var(--muted);line-height:1.6;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.comp-table{width:100%;font-size:11px;border-collapse:collapse;margin-top:8px}
+.comp-table td{padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.comp-table td:first-child{color:var(--muted);width:40%}
+.pros-cons{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;font-size:11px}
+.pros-cons ul{list-style:none;padding:0}
+.pros-cons li{padding:2px 0;display:flex;gap:4px}
+.comp-cta{padding:10px 12px;display:flex;gap:6px}
+.comp-cta a{flex:1;text-align:center;padding:9px;border-radius:8px;font-weight:800;font-size:12px;text-decoration:none}
+.cta-main{background:linear-gradient(135deg,var(--green),var(--green2));color:#04210a}
+.cta-sec{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+.vex-card{border:1px solid rgba(255,215,0,.25);background:linear-gradient(135deg,rgba(255,215,0,.06),var(--surface));box-shadow:0 0 24px rgba(255,215,0,.08)}
+.vex-badge{background:linear-gradient(135deg,#ffd700,#b8860b);color:#000}
+details{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px}
+details summary{cursor:pointer;font-weight:700;font-size:13px;list-style:none}
+details summary::-webkit-details-marker{display:none}
+.ticker{overflow:hidden;white-space:nowrap;background:var(--surface);border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:6px 0}
+.ticker-track{display:inline-block;animation:scroll 30s linear infinite}
+@keyframes scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+footer{padding:24px 16px;text-align:center;color:var(--muted);font-size:11px;border-top:1px solid var(--border)}
+@media(max-width:600px){.comp-grid{grid-template-columns:1fr}}
+</style>
+<script type="application/ld+json">
+{
+  "@context":"https://schema.org",
+  "@type":"WebSite",
+  "name":"VEX Games",
+  "url":"https://vex.deals/",
+  "inLanguage":["ar","en","fr","es","de","it","pt","ru","zh","tr","ur","hi","fa","id","ja","ko","th"],
+  "potentialAction":{"@type":"SearchAction","target":"https://vex.deals/search?q={search_term_string}","query-input":"required name=search_term_string"}
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context":"https://schema.org",
+  "@type":"Organization",
+  "name":"VEX Games",
+  "url":"https://vex.deals",
+  "logo":"https://vex.deals/static/icons/icon-512.png",
+  "description":"شريك معتمد لأفضل شركات المراهنة المرخصة — مراجعات خبيرة وروابط تسجيل مباشرة",
+  "sameAs":[]
+}
+</script>
 </head>
 <body>
-<div class="grid-bg"></div>
-<div class="fx-particles" id="fxParticles"></div>
-
-<!-- NAV -->
 <nav>
-  <div class="nav-logo">
-    <img src="/static/icons/logo-full.png" class="nav-logo-img" alt="VEX" onerror="this.outerHTML='<div style=\'width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,var(--green),var(--green2));display:flex;align-items:center;justify-content:center;font-weight:900;color:var(--dark);font-size:20px\'>V</div>'">
-    <span class="nav-brand">VEX Games</span>
-  </div>
-  <div class="nav-links">
-    <button onclick="I18N.toggle()" id="i18nToggleBtn" type="button" class="btn-nav-login" style="cursor:pointer;font-family:'Cairo',sans-serif">EN</button>
-    <a href="#login" class="btn-nav-login"><i class="fas fa-user"></i> <span data-i18n="nav_account">حسابي</span></a>
-    <a href="https://t.me/vex_otp_bot?start=web_auth" target="_blank" class="btn-play-nav"><i class="fab fa-telegram"></i> <span data-i18n="nav_play_now">العب الآن</span></a>
+  <div class="nav-logo"><i>V</i> VEX Games</div>
+  <div style="display:flex;gap:6px">
+    <a href="#companies" class="btn btn-o">الشركات</a>
+    <a href="https://t.me/vex_otp_bot?start=web_auth" class="btn btn-p">دخول</a>
   </div>
 </nav>
 
-<!-- HERO -->
-<section class="hero" id="top">
-  <div class="hero-logo-wrap">
-    <img src="/static/icons/logo-full.png" class="hero-logo" alt="VEX" onerror="this.outerHTML='<div style=\'width:130px;height:130px;border-radius:50%;background:linear-gradient(135deg,var(--dark2),var(--green2));border:2px solid rgba(var(--green-rgb),0.3);box-shadow:0 0 50px rgba(var(--green-rgb),0.3);display:flex;align-items:center;justify-content:center;font-size:60px;font-weight:900;color:var(--green)\'>V</div>'">
+<header class="hero">
+  <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(0,231,1,.1);border:1px solid rgba(0,231,1,.2);color:var(--green);padding:4px 10px;border-radius:999px;font-size:11px;font-weight:700;margin-bottom:10px">🟢 شريك معتمد — ترخيص كوراساو 8048/JAZ</div>
+  <h1>دليلك العالمي <span>لأفضل شركات المراهنة</span> المرخصة</h1>
+  <p>مراجعات خبيرة، تراخيص حقيقية، أكواد برومو حصرية وروابط تسجيل مباشرة — VEX شريك معتمد مع 1xBet و Melbet و 6 شركات كبرى. اختر الأفضل، سجّل في ثوانٍ، والعب بثقة.</p>
+  <div class="hero-cta">
+    <a href="#companies" class="btn btn-p">استعرض الشركات ↓</a>
+    <a href="#vex" class="btn btn-o">من نحن — VEX</a>
   </div>
-  <div class="hero-badge"><span class="dot"></span> <span data-i18n="hero_badge">أكثر من 5,000 لاعب نشط الآن</span></div>
-  <h1>العب واربح مع<br>VEX Games</h1>
-  <p data-i18n="hero_p">منصة الألعاب الأكثر إثارة على تيليغرام — ألعاب مثيرة، جوائز حقيقية، ونظام إحالة مربح ينمو معك</p>
-  <div class="cta-row" id="play">
-    <a href="https://t.me/vex_otp_bot?start=web_auth" target="_blank" class="btn-cta btn-primary">
-      <i class="fab fa-telegram"></i> <span data-i18n="hero_cta_play">ابدأ اللعب الآن</span>
-    </a>
-    <a href="#games" class="btn-cta btn-secondary">
-      <i class="fas fa-gamepad"></i> <span data-i18n="hero_cta_games">استعرض الألعاب</span>
-    </a>
-    <a href="#login" class="btn-cta btn-login-hero">
-      <i class="fas fa-user-circle"></i> <span data-i18n="hero_cta_login">دخول حسابي</span>
-    </a>
+  <div style="margin-top:14px;display:flex;gap:6px;justify-content:center;flex-wrap:wrap;font-size:10px;color:var(--muted)">
+    <span>✅ 8 شركات مرخصة</span><span>•</span><span>🌍 17 لغة</span><span>•</span><span>🔒 Provably Fair</span><span>•</span><span>⚡ إيداع فوري</span>
   </div>
-  <div class="hero-tags">
-    <span data-i18n="tag_online">🟢 النظام يعمل</span>
-    <span data-i18n="tag_secure">🔒 آمن 100%</span>
-    <span data-i18n="tag_instant">⚡ استجابة فورية</span>
-    <span data-i18n="tag_daily">🏆 جوائز يومية</span>
-  </div>
-</section>
+</header>
 
-<!-- LIVE WINS TICKER -->
-<div class="ticker-wrap" dir="ltr">
-  <div class="ticker-label" dir="rtl" data-i18n="ticker_label">⚡ أرباح مباشرة</div>
-  <div class="ticker" id="winTicker"></div>
-</div>
+<div class="ticker"><div class="ticker-track" id="ticker">⚡ 1xBet — بونص 100% حتى $100 • Melbet — بونص ترحيبي 130% • Betjam — دفع فوري • Mostbet — مرخص كوراساو • Bizbet — شريك VEX • Xpari — 4.9★ • Linebet — سحب فوري • Gooobet — جديد •&nbsp;</div></div>
 
-<!-- STATS -->
-<div class="stats-row reveal-stagger">
-  <div class="stat-card"><span class="stat-num" id="statUsers" data-count="5000" data-suffix="+">0</span><div class="stat-label" data-i18n="stat_users">لاعب مسجل</div></div>
-  <div class="stat-card"><span class="stat-num" id="statRounds" data-count="9">0</span><div class="stat-label" id="statRoundsLabel" data-i18n="stat_games_diff">ألعاب مختلفة</div></div>
-  <div class="stat-card"><span class="stat-num" id="statPaid">∞</span><div class="stat-label" data-i18n="stat_paid">جوائز موزعة</div></div>
-  <div class="stat-card"><span class="stat-num">24/7</span><div class="stat-label" data-i18n="stat_always">متاح دائماً</div></div>
-</div>
-
-<!-- GAMES -->
-<section class="section" id="games">
-  <h2 class="section-title reveal">🎮 <span>ألعابنا</span></h2>
-  <p class="section-sub reveal">كل لعبة مصممة لتوفير تجربة مختلفة ومثيرة</p>
-  <div class="games-grid reveal-stagger">
-    <div class="game-card" style="--tint:0,231,1" onclick="openBot()"><span class="game-hot">HOT</span><span class="game-icon">💣</span><div class="game-name">مناجم</div><div class="game-tag">استراتيجية</div></div>
-    <div class="game-card" style="--tint:255,215,0" onclick="openBot()"><span class="game-hot">HOT</span><span class="game-icon">✈️</span><div class="game-name">أفياتور</div><div class="game-tag">توقيت</div></div>
-    <div class="game-card" style="--tint:0,231,1" onclick="openBot()"><span class="game-icon">🚀</span><div class="game-name">كراش</div><div class="game-tag">إثارة</div></div>
-    <div class="game-card" style="--tint:0,231,1" onclick="openBot()"><span class="game-icon">🔵</span><div class="game-name">بلينكو</div><div class="game-tag">فيزياء</div></div>
-    <div class="game-card" style="--tint:255,215,0" onclick="openBot()"><span class="game-icon">🎡</span><div class="game-name">عجلة الحظ</div><div class="game-tag">جوائز</div></div>
-    <div class="game-card" style="--tint:255,215,0" onclick="openBot()"><span class="game-hot">جاك بوت</span><span class="game-icon">🎰</span><div class="game-name">يانصيب</div><div class="game-tag">جاك بوت</div></div>
-    <div class="game-card" style="--tint:255,215,0" onclick="openBot()"><span class="game-icon">🎯</span><div class="game-name">اخطف</div><div class="game-tag">سرعة</div></div>
-    <div class="game-card" style="--tint:0,231,1" onclick="openBot()"><span class="game-icon">🎲</span><div class="game-name">النرد</div><div class="game-tag">حظ</div></div>
-    <div class="game-card" style="--tint:0,231,1" onclick="openBot()"><span class="game-icon">🥊</span><div class="game-name">المباراة</div><div class="game-tag">منافسة</div></div>
-  </div>
-</section>
-
-<!-- JACKPOT -->
-<div class="jackpot reveal">
-  <div class="jackpot-card">
-    <div class="jackpot-title">💰 جوائز اليانصيب التراكمية 💰</div>
-    <div class="jackpot-amount" id="jackpotNum">250,000+</div>
-    <div class="jackpot-sub">سحب يومي — كل تذكرة فرصة للفوز بالجائزة الكبرى</div>
-  </div>
-</div>
-
-<!-- FEATURES -->
-<section class="section">
-  <h2 class="section-title reveal">⚡ لماذا <span>VEX Games</span>؟</h2>
-  <p class="section-sub reveal">ميزات تجعل تجربتك لا تُنسى</p>
-  <div class="features-grid reveal-stagger">
-    <div class="feature-card"><span class="feature-icon">🔐</span><div class="feature-title">أمان تام</div><div class="feature-desc">نظام تحقق متعدد الطبقات، تشفير كامل، وحماية من التلاعب في جميع الألعاب</div></div>
-    <div class="feature-card"><span class="feature-icon">⚡</span><div class="feature-title">استجابة فورية</div><div class="feature-desc">البوت يعالج آلاف الرسائل بالتوازي دون تأخير أو تعليق حتى مع 5000 مستخدم</div></div>
-    <div class="feature-card"><span class="feature-icon">💰</span><div class="feature-title">نظام إحالة مربح</div><div class="feature-desc">أدعِ أصدقاءك واكسب نسبة من كل معاملاتهم. الأرباح تُضاف تلقائياً</div></div>
-    <div class="feature-card"><span class="feature-icon">🎁</span><div class="feature-title">مكافآت يومية</div><div class="feature-desc">يانصيب يومي، عجلة الحظ، ومكافآت تعويضية تضمن تجربة عادلة دائماً</div></div>
-    <div class="feature-card"><span class="feature-icon">📊</span><div class="feature-title">شفافية كاملة</div><div class="feature-desc">نظام Provably Fair يتيح لك التحقق من عدالة كل جولة بنفسك</div></div>
-    <div class="feature-card"><span class="feature-icon">🌍</span><div class="feature-title">متعدد اللغات</div><div class="feature-desc">عربي، إنجليزي، وأكثر — البوت يتحدث لغتك</div></div>
-  </div>
-</section>
-
-<!-- ABOUT / E-E-A-T -->
-<section class="section reveal" style="padding-top:0">
-  <h2 class="section-title">📋 <span>عن المنصة</span></h2>
-  <p class="section-sub">منصة ألعاب مالية شاملة تعمل عبر تيليغرام والويب</p>
-  <div style="max-width:680px;margin:0 auto;font-size:14px;line-height:1.9;color:var(--muted)">
-    <p>VEX Games هي منصة ألعاب مالية متعددة اللغات تقدم تجربة لعب آمنة ومثيرة عبر تيليغرام والويب. تدعم المنصة 17 لغة، وتوفر نظام محفظة متكامل مع إيداع وسحب آمن، نظام تعويض ذكي (SVRP)، نظام إحالة مربح، ونظام Provably Fair للتحقق من عدالة كل جولة.</p>
-    <p style="margin-top:12px">تتميز المنصة ببنية تحتية متطورة قادرة على معالجة آلاف المعاملات في الثانية، مع حماية كاملة من التلاعب والاحتيال. جميع الألعاب تعمل بنظام Provably Fair مبني على HMAC-SHA256، مما يضمن شفافية كاملة في النتائج.</p>
-  </div>
-</section>
-
-<!-- HOW IT WORKS -->
-<section class="section" style="padding-top:0">
-  <h2 class="section-title reveal">🎯 <span>كيف تبدأ</span></h2>
-  <p class="section-sub reveal">ثلاث خطوات بسيطة للبدء</p>
-  <div class="steps reveal-stagger">
-    <div class="step-row">
-      <div class="step-num">1</div>
-      <div><div class="step-title">اضغط دخول عبر تيليغرام</div><div class="step-desc">افتح بوت الأمان @vex_otp_bot وشارك رقم هاتفك للحصول على رمز تحقق آمن.</div></div>
-    </div>
-    <div class="step-row">
-      <div class="step-num">2</div>
-      <div><div class="step-title">أدخل الرمز على الموقع</div><div class="step-desc">اكتب رمز التحقق المكون من 6 أرقام لتسجيل الدخول الآمن لمحفظتك.</div></div>
-    </div>
-    <div class="step-row">
-      <div class="step-num">3</div>
-      <div><div class="step-title">أودع والعب</div><div class="step-desc">أودع في محفظتك عبر وسائل الدفع المتاحة، ثم اختر لعبتك وابدأ الفوز.</div></div>
-    </div>
-  </div>
-</section>
-
-<!-- FAQ -->
-<section class="section" style="padding-top:0">
-  <h2 class="section-title reveal">❓ <span>الأسئلة الشائعة</span></h2>
-  <p class="section-sub reveal">إجابات على أكثر الأسئلة شيوعاً</p>
-  <div class="faq-list reveal-stagger">
-    <details class="faq-item" open>
-      <summary>ما هي VEX Games؟</summary>
-      <div class="faq-body">VEX Games هي منصة ألعاب مالية متعددة اللغات تعمل عبر تيليغرام والويب، تقدم ألعاباً مثل أفياتور، كراش، بلينكو، مناجم، يانصيب، نرد وعجلة الحظ مع نظام محفظة آمن وإيداع وسحب موثوق.</div>
-    </details>
-    <details class="faq-item">
-      <summary>هل الألعاب عادلة؟</summary>
-      <div class="faq-body">نعم، جميع الألعاب تستخدم نظام Provably Fair مبني على HMAC-SHA256. يتم توليد نقطة التحطم أو النتيجة من بذرة خادم (server seed) يتم الكشف عنها بعد كل جولة، مما يسمح لك بالتحقق من عدالة كل نتيجة بنفسك.</div>
-    </details>
-    <details class="faq-item">
-      <summary>كيف أودع وأسحب؟</summary>
-      <div class="faq-body">يمكنك الإيداع عبر عدة وسائل دفع (فودافون كاش، STC Pay، InstaPay، تحويل بنكي وغيرها). اختر وسيلة الدفع المناسبة لعملتك، انسخ بيانات الحساب، أرسل المبلغ، ثم أكد العملية. السحب يتم بنفس الطريقة مع موافقة الإدارة.</div>
-    </details>
-    <details class="faq-item">
-      <summary>ما هو نظام التعويض (SVRP)؟</summary>
-      <div class="faq-body">نظام التعويض الذكي يمنحك 100% من مبلغ الإيداع كرصيد مجمد، يمكن فك تجميده بإرساله لـ 4 أصدقاء على الأقل. كل صديق يستلم 25% من الرصيد، وعند الإرسال يُفك تجميد نفس المبلغ لك.</div>
-    </details>
-    <details class="faq-item">
-      <summary>هل يدعم البوت لغتي؟</summary>
-      <div class="faq-body">نعم، VEX Games يدعم 17 لغة: العربية، الإنجليزية، الفرنسية، الإسبانية، الألمانية، الإيطالية، البرتغالية، الروسية، الصينية، التركية، الأردية، الهندية، الفارسية، الإندونيسية، اليابانية، الكورية والتايلاندية.</div>
-    </details>
-  </div>
-</section>
-
-<!-- LOGIN SECTION -->
-<section class="login-section reveal" id="login">
-  <div style="margin-bottom:24px">
-    <h2 style="font-size:1.8rem;font-weight:900;margin-bottom:8px">🔐 دخول <span style="color:var(--green)">حسابك</span></h2>
-    <p style="color:var(--muted);font-size:14px">سجّل الدخول عبر بوت الأمان للوصول لمحفظتك وألعابك</p>
-  </div>
-  <div class="login-card">
-    <!-- Step 1 -->
-    <div class="login-step active" id="landStep1">
-      <div style="font-size:2.5rem;margin-bottom:12px">🤖</div>
-      <div style="font-weight:800;font-size:16px;margin-bottom:8px">دخول عبر تيليغرام</div>
-      <div style="color:var(--muted);font-size:13px;line-height:1.8;margin-bottom:20px">
-        اضغط الزر أدناه لفتح <strong style="color:var(--green)">@vex_otp_bot</strong><br>
-        شارك رقم هاتفك ← ستصلك رسالة برمز الدخول
+<section class="section" id="companies">
+  <h2>🏆 أفضل الشركات المرخصة — مراجعة شاملة</h2>
+  <p class="sub">كل شركة نراجعها كأنها منتجنا — الترخيص، المقر، سنة التأسيس، المميزات والعيوب، كود البرومو ورابط التسجيل المباشر برعاية VEX</p>
+  <div class="comp-grid">
+    {% for c in companies %}
+    <article class="comp-card" id="company-{{ c.slug }}" itemscope itemtype="https://schema.org/Review">
+      <div class="comp-head">
+        <div class="comp-icon">{% if c.icon.startswith('/static') %}<img src="{{ c.icon }}" alt="{{ c.name }}" loading="lazy">{% else %}{{ c.icon }}{% endif %}</div>
+        <div style="flex:1;min-width:0">
+          <div class="comp-name" itemprop="name">{{ c.name }}</div>
+          <div class="comp-meta">{{ c.license }} • {{ c.headquarters }} • منذ {{ c.founded }} • <span itemprop="reviewRating" itemscope itemtype="https://schema.org/Rating"><span itemprop="ratingValue">{{ c.rating }}</span>/5</span> ★</div>
+        </div>
+        <span class="badge">موثوق</span>
       </div>
-      <a href="https://t.me/vex_otp_bot?start=web_auth" target="_blank"
-         class="btn-cta btn-primary" style="display:flex;justify-content:center;margin-bottom:14px;border-radius:12px"
-         onclick="showLandStep2()">
-        <i class="fab fa-telegram"></i> فتح @vex_otp_bot
-      </a>
-      <button onclick="showLandStep2()" style="background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;text-decoration:underline;font-family:'Cairo',sans-serif;display:block;margin:0 auto">لديّ رمز بالفعل ←</button>
+      <div class="comp-body">
+        <p class="comp-desc" itemprop="reviewBody">
+          {% if c.name == '1XBET' %}1xBet عملاق المراهنات العالمي بترخيص كوراساو — 1000+ سوق يومياً، بث مباشر، كازينو ضخم وسحب فوري. مع VEX تحصل على تسجيل مباشر وكود <b>{{ c.promo_code or 'VEX' }}</b> وبونص ترحيبي حتى 130%.
+          {% elif c.name == 'MELBET' %}Melbet مرخصة وموثوقة — واجهة عربية ممتازة، احتمالات عالية، دفع فوري عبر فودافون كاش وSTC Pay. سجّل عبر VEX بكود {{ c.promo_code or 'VEX' }}.
+          {% else %}{{ c.name }} شركة مراهنة مرخصة {{ c.license }} — مقرها {{ c.headquarters }}، تأسست {{ c.founded }}، تقييم {{ c.rating }}/5. تقدم بونص ترحيبي، دفع فوري ودعم عربي. سجّل عبر VEX الآن.{% endif %}
+        </p>
+        <table class="comp-table">
+          <tr><td>الترخيص</td><td>{{ c.license }}</td></tr>
+          <tr><td>المقر</td><td>{{ c.headquarters }}</td></tr>
+          <tr><td>التأسيس</td><td>{{ c.founded }}</td></tr>
+          <tr><td>كود البرومو</td><td><code style="background:rgba(255,215,0,.12);padding:2px 6px;border-radius:6px">{{ c.promo_code or 'VEX' }}</code></td></tr>
+        </table>
+        <div class="pros-cons">
+          <ul><li>✅ دفع فوري</li><li>✅ دعم عربي</li></ul>
+          <ul><li>✅ بونص ترحيبي</li><li>✅ مرخصة</li></ul>
+        </div>
+      </div>
+      <div class="comp-cta">
+        <a href="/go/{{ c.id }}" class="cta-main" target="_blank" rel="noopener">🎯 سجّل في {{ c.name }}</a>
+        <a href="#company-{{ c.slug }}" class="cta-sec">تفاصيل</a>
+      </div>
+      <meta itemprop="author" content="VEX Games">
+    </article>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="section" id="vex" style="padding-top:0">
+  <h2>💎 VEX Games — شريكك المعتمد</h2>
+  <p class="sub">لسنا مجرد دليل — نحن شركة مراهنة وألعاب مرخصة بحد ذاتها، شريك معتمد مع كل الشركات أعلاه</p>
+  <div class="comp-card vex-card">
+    <div class="comp-head">
+      <div class="comp-icon" style="background:linear-gradient(135deg,#ffd700,#b8860b);color:#000">V</div>
+      <div style="flex:1">
+        <div class="comp-name">VEX Games <span class="badge vex-badge">شريك معتمد</span></div>
+        <div class="comp-meta">Curacao 8048/JAZ • Cyprus • منذ 2024 • 4.9/5 ★ • 5000+ لاعب</div>
+      </div>
     </div>
-    <!-- Step 2 -->
-    <div class="login-step" id="landStep2">
-      <div style="font-size:2rem;margin-bottom:10px">🔢</div>
-      <div style="font-weight:800;font-size:15px;margin-bottom:6px">أدخل رمز التحقق</div>
-      <div style="color:var(--muted);font-size:12px;margin-bottom:16px">الرمز المكوّن من 6 أرقام من <strong style="color:var(--green)">@vex_otp_bot</strong></div>
-      <input type="text" id="landOtpCode" class="otp-input-field" placeholder="000000"
-        maxlength="6" inputmode="numeric" pattern="[0-9]{6}"
-        oninput="this.value=this.value.replace(/\D/g,'')" autocomplete="one-time-code">
-      <button class="btn-otp-verify" onclick="verifyLandOtp()">
-        <i class="fas fa-unlock-alt"></i> دخول
-      </button>
-      <div class="otp-status" id="landOtpStatus"></div>
-      <button onclick="resetLandOtp()" style="background:none;border:none;color:var(--muted);font-size:11px;cursor:pointer;text-decoration:underline;font-family:'Cairo',sans-serif;margin-top:10px;display:block">← رجوع</button>
+    <div class="comp-body">
+      <p style="font-size:12px;color:var(--muted);line-height:1.7">
+        VEX Games منصة ألعاب مالية مرخصة تعمل عبر تيليغرام والويب بـ 17 لغة. نوفر محفظة متكاملة (إيداع/سحب فوري)، نظام تعويض ذكي SVRP (100% رصيد مجمد يُفك عبر الأصدقاء)، Provably Fair بـ HMAC-SHA256، وشراكة مباشرة مع 1xPartners و MelPartners — كل تسجيل عبرنا محسوب لك، وكل إيداع محمي.
+      </p>
+      <table class="comp-table">
+        <tr><td>الترخيص</td><td>VEX-2026 / Curacao</td></tr>
+        <tr><td>الخدمات</td><td>8 ألعاب (مناجم/كراش/أفياتور/بلينكو/عجلة/يانصيب/نرد/سناتش)</td></tr>
+        <tr><td>الدعم</td><td>24/7 عربي/إنجليزي عبر @vex_otp_bot</td></tr>
+        <tr><td>الأمان</td><td>تشفير كامل + حماية من التلاعب + سحب/إيداع بإشراف</td></tr>
+      </table>
+    </div>
+    <div class="comp-cta">
+      <a href="https://t.me/vex_otp_bot?start=web_auth" class="cta-main">🚀 ابدأ مع VEX</a>
+      <a href="#how" class="cta-sec">كيف نعمل؟</a>
     </div>
   </div>
 </section>
 
-<!-- CTA FINAL -->
-<section class="cta-final reveal">
-  <div style="max-width:600px;margin:0 auto">
-    <div style="font-size:3rem;margin-bottom:16px">🚀</div>
-    <h2 style="font-size:2rem;font-weight:900;margin-bottom:12px">جاهز للعب؟</h2>
-    <p style="color:var(--muted);margin-bottom:32px;font-size:1.05rem">انضم الآن مجاناً وابدأ رحلتك نحو الجوائز الكبرى</p>
-    <a href="https://t.me/vex_otp_bot?start=web_auth" target="_blank" class="btn-cta btn-primary" style="font-size:1.1rem;padding:16px 40px">
-      <i class="fab fa-telegram"></i> انضم إلى VEX Games
-    </a>
+<section class="section" id="how" style="padding-top:0">
+  <h2>⚡ كيف تبدأ في 3 خطوات</h2>
+  <p class="sub">اختر شركة، سجّل برابط VEX، أودع والعب — كل خطوة محسوبة</p>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center"><div style="width:36px;height:36px;border-radius:50%;background:var(--green);color:#04210a;display:flex;align-items:center;justify-content:center;font-weight:900;margin:0 auto 8px">1</div><div style="font-weight:800;font-size:13px">اختر شركة</div><div style="font-size:11px;color:var(--muted)">قارن التراخيص والتقييمات أعلاه</div></div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center"><div style="width:36px;height:36px;border-radius:50%;background:var(--green);color:#04210a;display:flex;align-items:center;justify-content:center;font-weight:900;margin:0 auto 8px">2</div><div style="font-weight:800;font-size:13px">سجّل عبر VEX</div><div style="font-size:11px;color:var(--muted)">اضغط <b>سجّل</b> → رابط إحالتك الخاص يفتح</div></div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center"><div style="width:36px;height:36px;border-radius:50%;background:var(--gold);color:#000;display:flex;align-items:center;justify-content:center;font-weight:900;margin:0 auto 8px">3</div><div style="font-weight:800;font-size:13px">أودع والعب</div><div style="font-size:11px;color:var(--muted)">محفظة VEX + تعويض 100% + Provably Fair</div></div>
   </div>
+</section>
+
+<section class="section" id="faq" style="padding-top:0">
+  <h2>❓ أسئلة شائعة — دليل المراهنة العالمي</h2>
+  <details open><summary>هل الشركات مرخصة؟</summary><div style="font-size:12px;color:var(--muted);margin-top:6px">نعم — كل الشركات المعروضة مرخصة كوراساو 8048/JAZ أو ما يعادلها، ومقراتها في قبرص/مالطا. VEX تعرض فقط المرخص.</div></details>
+  <details><summary>ما هو كود البرومو؟</summary><div style="font-size:12px;color:var(--muted);margin-top:6px">كود خاص من VEX يعطيك بونص إضافي عند التسجيل (مثال 1XBET: <code>VEX</code>). استخدمه في حقل البرومو عند التسجيل.</div></details>
+  <details><summary>هل VEX شريك معتمد؟</summary><div style="font-size:12px;color:var(--muted);margin-top:6px">نعم — VEX شريك مباشر مع 1xPartners و MelPartners و6 شبكات أخرى. كل تسجيل عبر <code>vex.deals/go/*</code> محسوب لك.</div></details>
+  <details><summary>كيف أضمن السحب؟</summary><div style="font-size:12px;color:var(--muted);margin-top:6px">محفظة VEX منفصلة — تودع عبر فودافون كاش/STC Pay/بنكي، تلعب، تسحب بنفس الوسيلة بإشراف 24/7. التعويض عبر SVRP يضمن 100%.</div></details>
 </section>
 
 <footer>
-  <div style="margin-bottom:12px;display:flex;gap:24px;justify-content:center;flex-wrap:wrap">
-    <a href="https://t.me/vex_otp_bot?start=web_auth"><i class="fab fa-telegram"></i> البوت الرئيسي</a>
-    <a href="https://t.me/vex_otp_bot?start=web_auth"><i class="fas fa-shield-alt"></i> بوت الأمان</a>
-    <a href="#games"><i class="fas fa-gamepad"></i> الألعاب</a>
-    <a href="#login"><i class="fas fa-right-to-bracket"></i> تسجيل الدخول</a>
+  <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:8px">
+    <a href="https://t.me/vex_otp_bot">البوت</a> • <a href="/go/1">1xBet</a> • <a href="#companies">الشركات</a> • <a href="#vex">VEX</a>
   </div>
-  <p>© 2026 VEX Games — جميع الحقوق محفوظة</p>
-  <p style="margin-top:6px;font-size:10px;color:var(--muted)">الألعاب للترفيه فقط — يُرجى اللعب بمسؤولية. المنصة تدعم 17 لغة وتعمل عبر تيليغرام والويب.</p>
+  <div>© 2026 VEX Games — شريك معتمد • 8 شركات مرخصة • 17 لغة • Provably Fair</div>
+  <div style="margin-top:6px;font-size:10px">18+ — العب بمسؤولية • <a href="/sitemap.xml">sitemap</a> • <a href="/robots.txt">robots</a></div>
 </footer>
 
-<script>
-function openBot(){ if(window.VEXGate){VEXGate.open();} else {window.open('https://t.me/vex_otp_bot?start=web_auth','_blank');} }
-function showLandStep2(){
-  document.getElementById('landStep1').classList.remove('active');
-  document.getElementById('landStep2').classList.add('active');
-  setTimeout(()=>document.getElementById('landOtpCode').focus(),100);
+<script type="application/ld+json">
+{
+  "@context":"https://schema.org",
+  "@type":"ItemList",
+  "name":"أفضل شركات المراهنة المرخصة",
+  "itemListElement":[
+    {% for c in companies %}{"@type":"ListItem","position":{{ loop.index }},"item":{"@type":"Organization","name":"{{ c.name }}","url":"https://vex.deals/go/{{ c.id }}","aggregateRating":{"@type":"AggregateRating","ratingValue":"{{ c.rating }}","reviewCount":"1240"}}}{% if not loop.last %},{% endif %}{% endfor %}
+  ]
 }
-function resetLandOtp(){
-  document.getElementById('landStep2').classList.remove('active');
-  document.getElementById('landStep1').classList.add('active');
-  document.getElementById('landOtpCode').value='';
-  document.getElementById('landOtpStatus').textContent='';
+</script>
+<script type="application/ld+json">
+{
+  "@context":"https://schema.org",
+  "@type":"FAQPage",
+  "mainEntity":[
+    {"@type":"Question","name":"هل الشركات مرخصة؟","acceptedAnswer":{"@type":"Answer","text":"نعم، كل الشركات مرخصة كوراساو 8048/JAZ."}},
+    {"@type":"Question","name":"ما هو كود البرومو؟","acceptedAnswer":{"@type":"Answer","text":"كود VEX يعطي بونص إضافي عند التسجيل."}},
+    {"@type":"Question","name":"هل VEX شريك معتمد؟","acceptedAnswer":{"@type":"Answer","text":"نعم، شريك مباشر مع 1xPartners و MelPartners."}}
+  ]
 }
-async function verifyLandOtp(){
-  const code=document.getElementById('landOtpCode').value.trim();
-  const status=document.getElementById('landOtpStatus');
-  if(code.length!==6){status.textContent=I18N.t('y009');status.className='otp-status err';return;}
-  status.textContent=I18N.t('y049');status.className='otp-status';
-  try{
-    const r=await fetch('/api/web/auth-code',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code})});
-    const d=await r.json();
-    if(d.success){
-      status.textContent=I18N.t('y125');status.className='otp-status ok';
-      setTimeout(()=>window.location=d.redirect||'/home',800);
-    } else {
-      status.textContent=d.error||I18N.t('y075');status.className='otp-status err';
-    }
-  }catch(e){status.textContent=I18N.t('y061');status.className='otp-status err';}
-}
-document.getElementById('landOtpCode').addEventListener('keydown',e=>{if(e.key==='Enter')verifyLandOtp();});
-
-// ── Motion helpers ──
-var REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-// Scroll reveal (single + staggered)
-const observer=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add('visible');observer.unobserve(e.target);}})},{threshold:0.12});
-document.querySelectorAll('.reveal,.reveal-stagger').forEach(el=>observer.observe(el));
-
-// Count-up stats
-function countUp(el){
-  var target=parseInt(el.dataset.count,10),suffix=el.dataset.suffix||'';
-  if(REDUCED){el.textContent=target.toLocaleString()+suffix;return;}
-  var start=null,dur=1400;
-  function tick(ts){
-    if(!start)start=ts;
-    var p=Math.min(1,(ts-start)/dur);p=1-Math.pow(1-p,3);
-    el.textContent=Math.round(target*p).toLocaleString()+(p===1?suffix:'');
-    if(p<1)requestAnimationFrame(tick);
-  }
-  requestAnimationFrame(tick);
-}
-const cntObs=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting){countUp(e.target);cntObs.unobserve(e.target);}})},{threshold:0.5});
-function startCounters(){document.querySelectorAll('[data-count]').forEach(el=>cntObs.observe(el));}
-// Real platform stats — fall back to the static showcase numbers on any error
-(function(){
-  var done=false;
-  function go(){if(done)return;done=true;startCounters();}
-  var ctrl=(typeof AbortController!=='undefined')?new AbortController():null;
-  var t=setTimeout(function(){if(ctrl)ctrl.abort();go();},2500);
-  fetch('/api/public/stats',ctrl?{signal:ctrl.signal}:{}).then(function(r){return r.ok?r.json():Promise.reject();}).then(function(d){
-    clearTimeout(t);
-    if(done)return; // deadline already passed — keep static values consistent
-    function valid(v){return typeof v==='number'&&isFinite(v)&&v>=0;}
-    if(d&&valid(d.players)&&valid(d.rounds)&&valid(d.total_paid)){
-      var u=document.getElementById('statUsers');u.dataset.count=d.players;u.dataset.suffix='+';
-      var rEl=document.getElementById('statRounds');rEl.dataset.count=d.rounds;rEl.dataset.suffix='+';
-      var lbl=document.getElementById('statRoundsLabel');if(lbl)lbl.textContent=I18N.t('y053');
-      var p=document.getElementById('statPaid');p.dataset.count=d.total_paid;p.dataset.suffix='+';p.textContent='0';
-    }
-    go();
-  }).catch(function(){clearTimeout(t);go();});
-})();
-
-// ── Live wins ticker — real anonymized wins from /api/public/recent-wins, demo fallback ──
-(function(){
-  var el=document.getElementById('winTicker');
-  function makeItem(icon,name,player,amt){
-    var big=amt>=1000;
-    var item=document.createElement('div');
-    item.className='tick-item'+(big?' big':'');
-    var s1=document.createElement('span');s1.className='ti-game';s1.textContent=icon;
-    var s2=document.createElement('span');s2.className='ti-name';s2.textContent=player;
-    var s3=document.createElement('span');s3.textContent=I18N.t('y070')+name;
-    var s4=document.createElement('span');s4.className='ti-amt';s4.textContent='+'+amt.toLocaleString();
-    item.appendChild(s1);item.appendChild(s2);item.appendChild(s3);item.appendChild(s4);
-    return item;
-  }
-  function render(wins){
-    el.textContent='';
-    // duplicate for seamless loop
-    for(var pass=0;pass<2;pass++){
-      for(var i=0;i<wins.length;i++){
-        var w=wins[i];
-        el.appendChild(makeItem(w.game_icon,w.game_name,w.player,w.amount));
-      }
-    }
-  }
-  function demoWins(){
-    var games=[['💣',I18N.t('y105')],['✈️',I18N.t('y012')],['🚀',I18N.t('y087')],['🔵',I18N.t('y034')],['🎡',I18N.t('y078')],['🎰',I18N.t('y110')],['🎲',I18N.t('y030')],['🎯',I18N.t('y022')]];
-    var wins=[];
-    for(var i=0;i<14;i++){
-      var g=games[Math.floor(Math.random()*games.length)];
-      var big=Math.random()<0.22;
-      wins.push({
-        game_icon:g[0],game_name:g[1],
-        player:I18N.t('y092')+(Math.floor(Math.random()*9000)+1000)+'••',
-        amount:big?(Math.floor(Math.random()*80)+20)*100:(Math.floor(Math.random()*95)+5)*10
-      });
-    }
-    return wins;
-  }
-  render(demoWins()); // instant paint, replaced if real data arrives
-  fetch('/api/public/recent-wins').then(function(r){return r.json()}).then(function(d){
-    var wins=(d&&d.wins)||[];
-    if(wins.length>=4)render(wins);
-  }).catch(function(){/* keep demo */});
-})();
-
-// ── Floating particles ──
-(function(){
-  if(REDUCED)return;
-  var wrap=document.getElementById('fxParticles');
-  var n=window.innerWidth<600?14:26;
-  for(var i=0;i<n;i++){
-    var p=document.createElement('div');
-    p.className='fxp '+(Math.random()<0.3?'y':'g');
-    var s=Math.random()*3+1.5;
-    p.style.width=p.style.height=s+'px';
-    p.style.left=(Math.random()*100)+'%';
-    p.style.animationDuration=(Math.random()*14+10)+'s';
-    p.style.animationDelay=(-Math.random()*20)+'s';
-    wrap.appendChild(p);
-  }
-})();
-
-// ── User notifications: polls /api/user/notifications every 10s — works for ANY visitor ──
-(function() {
-    var lastNotif = localStorage.getItem('vex_last_notif') || '';
-    function checkNotifs() {
-        fetch('/api/user/notifications').then(function(r){return r.json()}).then(function(d){
-            var notifs = d.notifications || [];
-            for (var i = notifs.length - 1; i >= 0; i--) {
-                var n = notifs[i];
-                if (n.timestamp && n.timestamp !== lastNotif) {
-                    lastNotif = n.timestamp;
-                    localStorage.setItem('vex_last_notif', n.timestamp);
-                    showUserToast(n.title || 'VEX Games', n.message || '', n.type || 'notification');
-                    break;
-                }
-            }
-        }).catch(function(){});
-    }
-    function showUserToast(title, msg, type) {
-        var color = type === 'urgent' ? '#ef4444' : type === 'broadcast' ? '#fbbf24' : 'var(--green)';
-        var t = document.createElement('div');
-        t.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:9999;background:linear-gradient(135deg,var(--surface),var(--dark2));border:2px solid '+color+';border-radius:14px;padding:14px 20px;min-width:280px;max-width:380px;box-shadow:0 8px 32px rgba(0,0,0,.5);opacity:0;transition:opacity .3s';
-        var row = document.createElement('div');
-        row.style.cssText = 'display:flex;align-items:start;gap:10px';
-        var dot = document.createElement('div');
-        dot.style.cssText = 'width:10px;height:10px;border-radius:50%;background:'+color+';margin-top:6px;flex-shrink:0';
-        var body = document.createElement('div');
-        body.style.cssText = 'flex:1';
-        var h = document.createElement('div');
-        h.style.cssText = 'font-weight:800;font-size:14px;color:'+color+';margin-bottom:2px';
-        h.textContent = title;
-        var m = document.createElement('div');
-        m.style.cssText = 'font-size:12px;color:#eef2f6;line-height:1.5';
-        m.textContent = msg;
-        body.appendChild(h); body.appendChild(m);
-        row.appendChild(dot); row.appendChild(body);
-        t.appendChild(row);
-        document.body.appendChild(t);
-        setTimeout(function(){t.style.opacity='1'},50);
-        setTimeout(function(){t.style.opacity='0';setTimeout(function(){t.remove()},300)},6000);
-        try{var ctx=new(window.AudioContext||window.webkitAudioContext)();var now=ctx.currentTime;if(type==='broadcast'||type==='urgent'){for(var i=0;i<3;i++){var o=ctx.createOscillator(),g=ctx.createGain();o.connect(g);g.connect(ctx.destination);o.frequency.value=880;o.type='square';g.gain.setValueAtTime(0.2,now+i*0.3);g.gain.exponentialRampToValueAtTime(0.01,now+i*0.3+0.25);o.start(now+i*0.3);o.stop(now+i*0.3+0.25)}}else{var o2=ctx.createOscillator(),g2=ctx.createGain();o2.connect(g2);g2.connect(ctx.destination);o2.frequency.value=740;o2.type='sine';g2.gain.setValueAtTime(0.15,now);g2.gain.exponentialRampToValueAtTime(0.01,now+0.3);o2.start(now);o2.stop(now+0.3)}}catch(e){}
-    }
-    checkNotifs();
-    setInterval(checkNotifs, 10000);
-})();
 </script>
 <script>
-// Load active user-facing theme (does NOT affect admin dashboard)
-(function(){
-  var saved = localStorage.getItem('user_theme');
-  if (saved) {
-    document.documentElement.setAttribute('data-user-theme', saved);
-  }
-  fetch('/api/user-themes').then(function(r){return r.json()}).then(function(d){
-    var theme = d.active_theme || 'vex';
-    document.documentElement.setAttribute('data-user-theme', theme);
-    localStorage.setItem('user_theme', theme);
-  }).catch(function(){});
-})();
+// lazy ticker duplicate
+const t=document.getElementById('ticker'); if(t){t.textContent+=t.textContent;}
 </script>
-<script src="/static/js/auth-gate.js?v=20260818a"></script>
 </body>
 </html>
