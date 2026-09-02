@@ -356,11 +356,6 @@
                         </div>
                         <p class="text-xs text-slate-500 mt-1">يُخزّن بشكل مشفر — لن يظهر في السجلات</p>
                     </div>
-                    <button @click="saveApiSettings()" :disabled="apiSettingsSaving" class="w-full bg-amber-600 hover:bg-amber-700 text-white py-2.5 rounded-lg text-sm font-semibold transition"
-                        :class="apiSettingsSaving && 'opacity-50'">
-                        <i class="fas" :class="apiSettingsSaving ? 'fa-spinner fa-spin' : 'fa-save'"></i>
-                        <span x-text="apiSettingsSaving ? 'جارٍ الحفظ...' : 'حفظ إعدادات API'"></span>
-                    </button>
                 </div>
 
                 <!-- SEO Section -->
@@ -455,6 +450,7 @@
                     </button>
                 <div class="flex gap-3 pt-2 sticky bottom-0 bg-slate-800 py-4 -mx-5 px-5 border-t border-slate-700">
                     <button x-show="transTab === 'translations'" @click="saveTranslations()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg text-sm font-semibold transition" x-text="transSaving ? 'جارٍ الحفظ...' : 'حفظ الترجمات'"></button>
+                    <button x-show="transTab === 'api_settings'" @click="saveApiSettings()" class="flex-1 bg-amber-600 hover:bg-amber-700 text-white py-2.5 rounded-lg text-sm font-semibold transition" x-text="apiSettingsSaving ? 'جارٍ الحفظ...' : 'حفظ إعدادات API'"></button>
                     <button @click="showTranslationsModal = false" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-lg text-sm transition">إغلاق</button>
                 </div>
             </div>
