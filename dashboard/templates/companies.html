@@ -99,6 +99,9 @@
                                     <button @click="openEditModal(c)" class="p-1.5 rounded hover:bg-slate-600 text-slate-400 hover:text-blue-400 transition" title="Edit" data-i18n-title="edit">
                                         <i class="fas fa-edit text-sm"></i>
                                     </button>
+                                    <button @click="openTranslationsModal(c)" class="p-1.5 rounded hover:bg-slate-600 text-slate-400 hover:text-green-400 transition" title="الترجمات">
+                                        <i class="fas fa-language text-sm"></i>
+                                    </button>
                                     <button @click="toggleActive(c)" class="p-1.5 rounded hover:bg-slate-600 text-slate-400 hover:text-amber-400 transition" title="تبديل الحالة">
                                         <i class="fas fa-power-off text-sm"></i>
                                     </button>
@@ -235,6 +238,65 @@
         </div>
     </div>
 
+    <!-- Translations Modal -->
+    <div x-show="showTranslationsModal" x-transition.opacity class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" style="display:none" @click.self="showTranslationsModal = false">
+        <div class="bg-slate-800 rounded-2xl border border-slate-700 w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl" @click.stop="">
+            <div class="flex items-center justify-between p-5 border-b border-slate-700 sticky top-0 bg-slate-800 z-10">
+                <h3 class="text-lg font-bold">ترجمات <span class="text-green-400" x-text="transCompany"></span></h3>
+                <button @click="showTranslationsModal = false" class="text-slate-400 hover:text-white transition">
+                    <i class="fas fa-times text-lg"></i>
+                </button>
+            </div>
+            <div class="p-5 space-y-4">
+                <!-- Color -->
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">لون الشركة</label>
+                    <div class="flex items-center gap-3">
+                        <input x-model="transData.color" type="color" class="w-10 h-10 rounded-lg border border-slate-600 cursor-pointer">
+                        <input x-model="transData.color" type="text" class="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm" placeholder="#16a34a">
+                    </div>
+                </div>
+                <!-- Auto Translate Button -->
+                <div class="flex items-center gap-3 bg-slate-700/50 rounded-xl p-4">
+                    <div class="flex-1">
+                        <p class="text-sm font-semibold">ترجمة تلقائية</p>
+                        <p class="text-xs text-slate-400">ترجم الوصف والمميزات والعيوب من العربية لكل اللغات</p>
+                    </div>
+                    <button @click="autoTranslate()" :disabled="transLoading" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2" :class="transLoading && 'opacity-50'">
+                        <i class="fas" :class="transLoading ? 'fa-spinner fa-spin' : 'fa-magic'"></i>
+                        <span x-text="transLoading ? 'جارٍ الترجمة...' : 'ترجم تلقائي'"></span>
+                    </button>
+                </div>
+                <!-- Language Tabs -->
+                <div class="flex gap-1 flex-wrap">
+                    <template x-for="lang in transLangs" :key="lang">
+                        <button @click="transActiveLang = lang" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition"
+                            :class="transActiveLang === lang ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'" x-text="langNames[lang] || lang"></button>
+                    </template>
+                </div>
+                <!-- Translation Fields -->
+                <div x-show="transActiveLang" class="space-y-3">
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">الوصف</label>
+                        <textarea :value="getTransField('description')" @input="setTransField('description', $event.target.value)" rows="3" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="وصف الشركة..."></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">المميزات (كل سطر ميزة)</label>
+                        <textarea :value="getTransField('pros')" @input="setTransField('pros', $event.target.value)" rows="3" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="ميزة 1&#10;ميزة 2"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">العيوب (كل سطر عيب)</label>
+                        <textarea :value="getTransField('cons')" @input="setTransField('cons', $event.target.value)" rows="2" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="عيب 1&#10;عيب 2"></textarea>
+                    </div>
+                </div>
+                <div class="flex gap-3 pt-2 sticky bottom-0 bg-slate-800 py-4 -mx-5 px-5 border-t border-slate-700">
+                    <button @click="saveTranslations()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg text-sm font-semibold transition" x-text="transSaving ? 'جارٍ الحفظ...' : 'حفظ الترجمات'"></button>
+                    <button @click="showTranslationsModal = false" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-lg text-sm transition">إغلاق</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Loading overlay -->
     <div x-show="loading" class="fixed inset-0 bg-slate-900/50 z-40 flex items-center justify-center" style="display:none">
         <div class="bg-slate-800 rounded-xl p-4 flex items-center gap-3">
@@ -253,11 +315,20 @@ function companiesPage() {
         stats: { total: 0, active: 0, deposit: 0, withdraw: 0 },
         showModal: false,
         showDeleteModal: false,
+        showTranslationsModal: false,
         editingId: null,
         deleteTarget: null,
         loading: false,
         uploadingIcon: false,
         uploadingBotIcon: false,
+        transCompany: '',
+        transCompanyId: '',
+        transActiveLang: 'ar',
+        transLoading: false,
+        transSaving: false,
+        transLangs: ['ar','en','fr','es','de','it','pt','ru','zh','tr','ur','hi','fa','id','ja','ko','th'],
+        transData: {},
+        langNames: {ar:'العربية',en:'English',fr:'Français',es:'Español',de:'Deutsch',it:'Italiano',pt:'Português',ru:'Русский',zh:'中文',tr:'Türkçe',ur:'اردو',hi:'हिन्दी',fa:'فارسی',id:'Indonesia',ja:'日本語',ko:'한국어',th:'ไทย'},
 
         isImgIcon(icon) {
             return typeof icon === 'string' && (icon.startsWith('/static/') || icon.startsWith('http'));
@@ -416,6 +487,72 @@ function companiesPage() {
             } catch (e) {
                 toast('فشل حذف الشركة', 'error');
             }
+        },
+
+        async openTranslationsModal(company) {
+            this.transCompany = company.name;
+            this.transCompanyId = company.id;
+            this.transActiveLang = 'ar';
+            this.transData = {};
+            this.showTranslationsModal = true;
+            try {
+                const data = await api(`/api/companies/${company.id}/translations`);
+                this.transData = data.translations || {};
+                if (!this.transData.color) this.transData.color = '#16a34a';
+                this.transLangs.forEach(l => {
+                    if (!this.transData[l]) this.transData[l] = { description: '', pros: [], cons: [] };
+                });
+            } catch (e) {
+                toast('فشل تحميل الترجمات', 'error');
+            }
+        },
+
+        getTransField(field) {
+            var lang = this.transActiveLang;
+            if (!this.transData[lang]) this.transData[lang] = { description: '', pros: [], cons: [] };
+            if (field === 'pros') return (this.transData[lang].pros || []).join('\n');
+            if (field === 'cons') return (this.transData[lang].cons || []).join('\n');
+            return this.transData[lang][field] || '';
+        },
+
+        setTransField(field, val) {
+            var lang = this.transActiveLang;
+            if (!this.transData[lang]) this.transData[lang] = { description: '', pros: [], cons: [] };
+            if (field === 'pros') { this.transData[lang].pros = val.split('\n').filter(x => x.trim()); return; }
+            if (field === 'cons') { this.transData[lang].cons = val.split('\n').filter(x => x.trim()); return; }
+            this.transData[lang][field] = val;
+        },
+
+        async autoTranslate() {
+            this.transLoading = true;
+            try {
+                const data = await api(`/api/companies/${this.transCompanyId}/translate`, {
+                    method: 'POST',
+                    body: JSON.stringify({ source_lang: 'ar' }),
+                });
+                toast(`تم الترجمة إلى ${data.translated} لغة بنجاح`, 'success');
+                const refreshed = await api(`/api/companies/${this.transCompanyId}/translations`);
+                this.transData = refreshed.translations || {};
+            } catch (e) {
+                toast('فشلت الترجمة: ' + (e.message || 'خطأ'), 'error');
+            }
+            this.transLoading = false;
+        },
+
+        async saveTranslations() {
+            this.transSaving = true;
+            try {
+                await api(`/api/companies/${this.transCompanyId}/translations`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ color: this.transData.color, translations: this.transData }),
+                });
+                toast('تم حفظ الترجمات بنجاح', 'success');
+                this.showTranslationsModal = false;
+                await this.loadCompanies();
+            } catch (e) {
+                toast('فشل حفظ الترجمات', 'error');
+            }
+            this.transSaving = false;
         },
     };
 }
