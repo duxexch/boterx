@@ -1,0 +1,17 @@
+User-agent: *
+Allow: /
+Disallow: /vex/admin/
+Disallow: /admin-center
+Disallow: /admins
+Disallow: /api/
+Disallow: /seo-dashboard
+Disallow: /settings
+Disallow: /ai-api-keys
+Disallow: /games-admin
+Disallow: /matching
+Disallow: /channels
+Disallow: /broadcast
+Disallow: /statistics
+Disallow: /backup
+
+Sitemap: https://vex.deals/sitemap.xml

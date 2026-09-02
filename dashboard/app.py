@@ -2233,9 +2233,10 @@ def robots_txt():
 
 @app.route('/sitemap.xml')
 def sitemap_xml():
-    """Dynamic sitemap — ONLY vex.deals URLs (Google rejects external domains)."""
+    """Dynamic sitemap with company pages, hreflang, and language variants."""
     from datetime import datetime as _dt
     now = _dt.now().strftime('%Y-%m-%d')
+    langs = ['ar','en','fr','es','de','it','pt','ru','zh','tr','ur','hi','fa','id','ja','ko','th']
     pages = [
         {'url': 'https://vex.deals/', 'priority': '1.0', 'changefreq': 'daily'},
         {'url': 'https://vex.deals/webapp/games', 'priority': '0.9', 'changefreq': 'daily'},
@@ -2249,18 +2250,29 @@ def sitemap_xml():
         {'url': 'https://vex.deals/webapp/stats', 'priority': '0.6', 'changefreq': 'weekly'},
         {'url': 'https://vex.deals/webapp/account', 'priority': '0.5', 'changefreq': 'weekly'},
     ]
-    # NOTE: External referral links (refpa*.com) are NOT included — Google requires
-    # sitemap URLs to be on the same domain. They are linked from landing.html
-    # and app pages instead, which Google discovers via crawling.
+    # Add company pages with hreflang
+    companies = read_csv('companies.csv')
+    for c in companies:
+        cid = c.get('id', '')
+        if cid:
+            pages.append({'url': f'https://vex.deals/company/{cid}', 'priority': '0.9', 'changefreq': 'weekly', 'company': True, 'id': cid})
 
     xml = '<?xml version="1.0" encoding="UTF-8"?>\n'
-    xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+    xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"\n'
+    xml += '        xmlns:xhtml="http://www.w3.org/1999/xhtml">\n'
     for p in pages:
         xml += f'  <url>\n'
         xml += f'    <loc>{p["url"]}</loc>\n'
         xml += f'    <lastmod>{now}</lastmod>\n'
         xml += f'    <changefreq>{p["changefreq"]}</changefreq>\n'
         xml += f'    <priority>{p["priority"]}</priority>\n'
+        # Add hreflang for landing and company pages
+        if p.get('company'):
+            base = f'https://vex.deals/company/{p["id"]}'
+        else:
+            base = p['url'].split('?')[0]
+        for lang in langs:
+            xml += f'    <xhtml:link rel="alternate" hreflang="{lang}" href="{base}?lang={lang}"/>\n'
         xml += f'  </url>\n'
     xml += '</urlset>'
     return Response(xml, mimetype='application/xml')
