@@ -609,12 +609,10 @@ window.I18N_TRANSLATIONS = {
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{--green:#16a34a;--green2:#15803d;--gold:#d97706;--bg:#f8fafc;--dark:#f8fafc;--surface:#ffffff;--surface2:#f1f5f9;--border:#e2e8f0;--text:#0f172a;--muted:#64748b;--shadow:0 1px 3px rgba(0,0,0,.08),0 8px 24px rgba(0,0,0,.04)}
-[data-theme="dark"]{--green:#00e701;--green2:#0d7a1f;--gold:#ffd700;--bg:#0b0e11;--dark:#0b0e11;--surface:#141920;--surface2:#1a2030;--border:rgba(255,255,255,.07);--text:#eef2f6;--muted:#8794a3;--shadow:0 8px 32px rgba(0,0,0,.4)}
 html{scroll-behavior:smooth}
 body{font-family:'Cairo',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;transition:background .3s,color .3s}
 a{color:inherit}
 nav{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(248,250,252,.88);backdrop-filter:blur(14px);border-bottom:1px solid var(--border);padding:10px 16px;display:flex;align-items:center;justify-content:space-between;transition:background .3s}
-[data-theme="dark"] nav{background:rgba(11,14,17,.88)}
 .nav-logo{display:flex;align-items:center;gap:8px;font-weight:900}
 .nav-logo i{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,var(--green),var(--green2));display:flex;align-items:center;justify-content:center;color:#04210a}
 .btn{padding:8px 14px;border-radius:9px;font-weight:800;border:none;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;font-size:12px;transition:transform .15s}
@@ -650,7 +648,6 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(248,250,252,
 .comp-table td{padding:7px 10px;border-bottom:1px solid var(--border)}
 .comp-table tr:last-child td{border-bottom:none}
 .comp-table td:first-child{color:var(--muted);width:36%;background:rgba(0,0,0,.02);font-weight:600}
-[data-theme="dark"] .comp-table td:first-child{background:rgba(255,255,255,.02)}
 .pros-cons{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
 .pros-cons div{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px}
 .pros-cons strong{font-size:10px;display:block;margin-bottom:4px}
@@ -660,7 +657,6 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(248,250,252,
 .comp-cta a{flex:1;text-align:center;padding:10px;border-radius:9px;font-weight:800;font-size:12px;text-decoration:none;transition:transform .12s,box-shadow .12s}
 .comp-cta a:active{transform:scale(.97)}
 .cta-main{background:linear-gradient(135deg,var(--green),var(--green2));color:#fff;box-shadow:0 2px 12px rgba(22,163,74,.25)}
-[data-theme="dark"] .cta-main{color:#04210a}
 .cta-sec{background:var(--surface);color:var(--text);border:1px solid var(--border)}
 .vex-card{border:1px solid rgba(255,215,0,.25);background:linear-gradient(135deg,rgba(255,215,0,.06),var(--surface));box-shadow:0 0 24px rgba(255,215,0,.08)}
 .vex-badge{background:linear-gradient(135deg,#ffd700,#b8860b);color:#000}
@@ -724,7 +720,6 @@ footer{padding:24px 16px;text-align:center;color:var(--muted);font-size:11px;bor
 
 /* ===== NEW NAVBAR STYLES ===== */
 .navbar{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(248,250,252,.92);backdrop-filter:blur(16px);border-bottom:1px solid var(--border);padding:10px 16px;display:flex;align-items:center;justify-content:space-between;transition:background .3s,box-shadow .3s;box-shadow:var(--shadow)}
-[data-theme="dark"] .navbar{background:rgba(11,14,17,.92);border-bottom-color:var(--border)}
 .navbar-brand{flex-shrink:0}
 .brand-link{display:flex;align-items:center;gap:8px;text-decoration:none;color:var(--text)}
 .brand-icon{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--green),var(--green2));display:flex;align-items:center;justify-content:center;font-weight:900;color:#04210a;font-size:16px;flex-shrink:0;box-shadow:0 2px 8px rgba(22,163,74,.25)}
@@ -764,10 +759,6 @@ footer{padding:24px 16px;text-align:center;color:var(--muted);font-size:11px;bor
 }
 
 /* Theme Toggle Button */
-.btn-icon{width:44px;height:44px;border-radius:12px;background:var(--surface);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;color:var(--text);flex-shrink:0}
-.btn-icon:hover{background:var(--surface2);border-color:var(--green);box-shadow:0 4px 16px rgba(0,231,1,.15)}
-.btn-icon:focus{outline:2px solid var(--green);outline-offset:2px}
-.btn-icon:active{transform:scale(.96)}
 .btn-icon svg,.btn-icon span{font-size:18px}
 
 /* Action Buttons */
@@ -816,8 +807,7 @@ footer{padding:24px 16px;text-align:center;color:var(--muted);font-size:11px;bor
   .btn-primary .btn-text,.btn-secondary .btn-text{display:inline}
   .lang-trigger .lang-text{display:none}
   .lang-trigger{min-width:44px;padding:10px}
-  .btn-icon{min-width:44px}
-  .btn-primary .btn-text,.btn-secondary .btn-text{font-size:12px;padding:0 8px}
+    .btn-primary .btn-text,.btn-secondary .btn-text{font-size:12px;padding:0 8px}
 }
 @media(min-width:1025px){
   .mobile-menu{display:none}
@@ -921,12 +911,7 @@ footer{padding:24px 16px;text-align:center;color:var(--muted);font-size:11px;bor
       </div>
     </div>
 
-    <!-- Theme Toggle -->
-    <button id="themeToggle" class="btn-icon" onclick="toggleTheme()" aria-label="تبديل الوضع" title="تبديل الوضع">
-      <span id="themeIcon">🌙</span>
-    </button>
-
-    <!-- Web Games Button -->
+<!-- Web Games Button -->
     <a href="/home" class="btn btn-secondary" aria-label="ألعابي على الويب">
       <span aria-hidden="true">🎮</span>
       <span class="btn-text">ألعابي</span>
@@ -1187,14 +1172,7 @@ function changeLang(lang){
   window.location.href=url.toString();
 }
 
-function toggleTheme(){
-  const cur=document.documentElement.getAttribute('data-theme');
-  const next=cur==='dark'?'light':'dark';
-  document.documentElement.setAttribute('data-theme',next);
-  localStorage.setItem('vex_theme',next);
-  const b=document.getElementById('themeToggle');
-  if(b) b.textContent=next==='dark'?'☀️':'🌙';
-}
+
 
 function closeLangMenu(e){
   const selector=document.getElementById('langSelector');
@@ -1286,23 +1264,9 @@ document.addEventListener('keydown',(e)=>{
 // Close language menu on click outside
 document.addEventListener('click', closeLangMenu);
 
-// Keyboard navigation
-document.addEventListener('keydown',(e)=>{
-  if(e.key==='Escape'){
-    const selector=document.getElementById('langSelector');
-    if(selector.classList.contains('open')){
-      selector.classList.remove('open');
-      document.querySelector('.lang-trigger').setAttribute('aria-expanded','false');
-    }
-    const menu=document.getElementById('mobileMenu');
-    if(menu?.classList.contains('open')){
-      closeMobileMenu();
-    }
-  }
-});
 
-// Close language menu on click outside
-document.addEventListener('click', closeLangMenu);
+
+
 
 // Keyboard navigation
 document.addEventListener('keydown',(e)=>{
@@ -1345,67 +1309,55 @@ function changeLang(lang){
 }
 
 (function(){
-  const s=localStorage.getItem('vex_theme');
-  const prefersDark=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;
-  const init=s||(prefersDark?'dark':'light');
-  document.documentElement.setAttribute('data-theme',init);
-  const b=document.getElementById('themeToggle');
-  if(b) b.textContent=init==='dark'?'☀️':'🌙';
-  
-  // Set initial language display
   const urlParams=new URLSearchParams(window.location.search);
-  const lang=urlParams.get('lang')||'ar';
+  let lang=urlParams.get('lang');
+  
+  // Auto-detect browser language if no ?lang= param
+  if(!lang){
+    const saved=localStorage.getItem('vex_lang');
+    if(saved){
+      lang=saved;
+    } else {
+      const bl=(navigator.language||navigator.userLanguage||'ar').toLowerCase().split('-')[0];
+      const supported=['ar','en','fr','es','de','it','pt','ru','zh','tr','ur','hi','fa','id','ja','ko','th'];
+      lang=supported.includes(bl)?bl:'ar';
+      // Redirect to detected language
+      const url=new URL(window.location.href);
+      url.searchParams.set('lang',lang);
+      window.location.replace(url.toString());
+      return;
+    }
+  }
+  
+  // Save preference
+  localStorage.setItem('vex_lang',lang);
+  
+  // Set language display
   const langNames={
     ar:'العربية',en:'English',fr:'Français',es:'Español',de:'Deutsch',
     it:'Italiano',pt:'Português',ru:'Русский',zh:'中文',tr:'Türkçe',
     ur:'اردو',hi:'हिन्दी',fa:'فارسی',id:'Indonesia',ja:'日本語',
     ko:'한국어',th:'ไทย'
   };
-  document.getElementById('currentLang').textContent=langNames[lang]||'العربية';
-
-// Apply translations based on ?lang= parameter
-function applyTranslations(){
-  const urlParams = new URLSearchParams(window.location.search);
-  const lang = urlParams.get('lang') || 'ar';
-  const t = window.I18N_TRANSLATIONS && window.I18N_TRANSLATIONS[lang];
-  if(!t) return;
+  const el=document.getElementById('currentLang');
+  if(el) el.textContent=langNames[lang]||'العربية';
   
-  // Update document direction for RTL languages
-  const rtlLangs = ['ar','fa','ur','he'];
-  document.documentElement.dir = rtlLangs.includes(lang) ? 'rtl' : 'ltr';
-  document.documentElement.lang = lang;
-  
-  // Update all elements with data-i18n attribute
-  document.querySelectorAll('[data-i18n]').forEach(el => {
-    const key = el.getAttribute('data-i18n');
-    if(t[key]){
-      el.innerHTML = t[key];
-    }
-  });
-  
-  // Update page title
-  if(t.hero_title){
-    document.title = t.hero_title.replace(/<[^>]+>/g, '') + ' | VEX Games';
+  // Apply translations
+  const t=window.I18N_TRANSLATIONS&&window.I18N_TRANSLATIONS[lang];
+  if(t){
+    const rtlLangs=['ar','fa','ur','he'];
+    document.documentElement.dir=rtlLangs.includes(lang)?'rtl':'ltr';
+    document.documentElement.lang=lang;
+    document.querySelectorAll('[data-i18n]').forEach(function(e){
+      var key=e.getAttribute('data-i18n');
+      if(t[key]) e.innerHTML=t[key];
+    });
+    if(t.hero_title) document.title=t.hero_title.replace(/<[^>]+>/g,'')+' | VEX Games';
+    var md=document.querySelector('meta[name="description"]');
+    if(md&&t.hero_subtitle) md.content=t.hero_subtitle.replace(/<[^>]+>/g,'');
+    var ms=document.getElementById('mobileLangSelect');
+    if(ms) ms.value=lang;
   }
-  
-  // Update meta description
-  const metaDesc = document.querySelector('meta[name="description"]');
-  if(metaDesc && t.hero_subtitle){
-    metaDesc.content = t.hero_subtitle.replace(/<[^>]+>/g, '');
-  }
-  
-  // Update mobile lang select
-  const mobileSelect = document.getElementById('mobileLangSelect');
-  if(mobileSelect) mobileSelect.value = lang;
-  
-  // Update nav items
-  const navBot = document.querySelector('.mobile-nav-link[href*="vex_wallet_bot"]');
-  if(navBot && t.nav_bot) navBot.innerHTML = t.nav_bot;
-}
-
-// Apply on load
-applyTranslations();
-;
 })();
 </script>
 </body>
