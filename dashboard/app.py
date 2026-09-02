@@ -1838,6 +1838,10 @@ def index():
                 'address': c.get('address',''),
                 'color': comp_tr.get('color', '#16a34a'),
                 'app_link': c.get('app_link',''),
+                'license': comp_tr.get('ar',{}).get('license','') or c.get('license','') or 'Curacao 8048/JAZ',
+                'headquarters': comp_tr.get('ar',{}).get('headquarters','') or c.get('headquarters','') or 'Cyprus',
+                'founded': comp_tr.get('ar',{}).get('founded','') or c.get('founded','') or '2020',
+                'rating': comp_tr.get('ar',{}).get('rating','') or c.get('rating','') or '4.5',
             })
     except: _comps=[]
     return render_template('landing.html', companies=_comps, company_translations=json.dumps(_tr_data, ensure_ascii=False))
