@@ -1206,6 +1206,142 @@ document.addEventListener('keydown',(e)=>{
   }
 });
 
+// Mobile Menu
+function toggleMobileMenu(){
+  const menu=document.getElementById('mobileMenu');
+  const overlay=document.querySelector('.mobile-menu-bg');
+  const hamburger=document.getElementById('hamburger');
+  const isOpen=menu.classList.toggle('open');
+  if(overlay) overlay.style.opacity = isOpen ? '1' : '0';
+  if(overlay) overlay.style.visibility = isOpen ? 'visible' : 'hidden';
+  hamburger.setAttribute('aria-expanded', isOpen);
+  document.body.style.overflow = isOpen ? 'hidden' : '';
+}
+
+function closeMobileMenu(){
+  const menu=document.getElementById('mobileMenu');
+  const overlay=document.querySelector('.mobile-menu-bg');
+  const hamburger=document.getElementById('hamburger');
+  menu.classList.remove('open');
+  if(overlay){
+    overlay.style.opacity = '0';
+    overlay.style.visibility = 'hidden';
+  }
+  hamburger.setAttribute('aria-expanded', 'false');
+  document.body.style.overflow = '';
+}
+
+// Close mobile menu on link click
+document.querySelectorAll('.mobile-nav-link').forEach(link=>{
+  link.addEventListener('click', closeMobileMenu);
+});
+
+// Close mobile menu on overlay click
+document.querySelector('.mobile-menu-bg')?.addEventListener('click', closeMobileMenu);
+
+// Language selector
+function toggleLangMenu(){
+  const selector=document.getElementById('langSelector');
+  const isOpen=selector.classList.toggle('open');
+  const trigger=selector.querySelector('.lang-trigger');
+  if(trigger) trigger.setAttribute('aria-expanded', selector.classList.contains('open'));
+}
+
+function changeLang(lang){
+  const url=new URL(window.location.href);
+  url.searchParams.set('lang', lang);
+  window.location.href=url.toString();
+}
+
+function closeLangMenu(e){
+  const selector=document.getElementById('langSelector');
+  const trigger=document.querySelector('.lang-trigger');
+  if(selector && !selector.contains(e.target)){
+    selector.classList.remove('open');
+    trigger.setAttribute('aria-expanded','false');
+  }
+}
+
+function filterLang(){
+  const search=document.getElementById('langSearch').value.toLowerCase();
+  document.querySelectorAll('#langMenu button[role="option"]').forEach(btn=>{
+    const text=btn.textContent.toLowerCase();
+    btn.style.display=text.includes(search)?'flex':'none';
+  });
+}
+
+// Close menu on click outside
+document.addEventListener('click', closeLangMenu);
+
+// Keyboard navigation
+document.addEventListener('keydown',(e)=>{
+  if(e.key==='Escape'){
+    const selector=document.getElementById('langSelector');
+    if(selector.classList.contains('open')){
+      selector.classList.remove('open');
+      document.querySelector('.lang-trigger').setAttribute('aria-expanded','false');
+    }
+    const menu=document.getElementById('mobileMenu');
+    if(menu?.classList.contains('open')){
+      closeMobileMenu();
+    }
+  }
+});
+
+// Close language menu on click outside
+document.addEventListener('click', closeLangMenu);
+
+// Keyboard navigation
+document.addEventListener('keydown',(e)=>{
+  if(e.key==='Escape'){
+    const selector=document.getElementById('langSelector');
+    if(selector.classList.contains('open')){
+      selector.classList.remove('open');
+      document.querySelector('.lang-trigger').setAttribute('aria-expanded','false');
+    }
+    const menu=document.getElementById('mobileMenu');
+    if(menu?.classList.contains('open')){
+      closeMobileMenu();
+    }
+  }
+});
+
+// Close language menu on click outside
+document.addEventListener('click', closeLangMenu);
+
+// Keyboard navigation
+document.addEventListener('keydown',(e)=>{
+  if(e.key==='Escape'){
+    const selector=document.getElementById('langSelector');
+    if(selector.classList.contains('open')){
+      selector.classList.remove('open');
+      document.querySelector('.lang-trigger').setAttribute('aria-expanded','false');
+    }
+    const menu=document.getElementById('mobileMenu');
+    if(menu?.classList.contains('open')){
+      closeMobileMenu();
+    }
+  }
+});
+
+// Close language menu on click outside
+document.addEventListener('click', closeLangMenu);
+
+// Keyboard navigation
+document.addEventListener('keydown',(e)=>{
+  if(e.key==='Escape'){
+    const selector=document.getElementById('langSelector');
+    if(selector.classList.contains('open')){
+      selector.classList.remove('open');
+      document.querySelector('.lang-trigger').setAttribute('aria-expanded','false');
+    }
+    const menu=document.getElementById('mobileMenu');
+    if(menu?.classList.contains('open')){
+      closeMobileMenu();
+    }
+  }
+});
+
 function toggleTheme(){
   const cur=document.documentElement.getAttribute('data-theme');
   const next=cur==='dark'?'light':'dark';
