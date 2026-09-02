@@ -1920,6 +1920,10 @@ function changeLang(lang){
   var ms=document.getElementById('mobileLangSelect');
   if(ms)ms.value=lang;
   document.querySelectorAll('#langMenu button[role="option"]').forEach(function(b){b.setAttribute('aria-selected',b.getAttribute('data-lang')===lang?'true':'false');});
+  document.querySelectorAll('a[href^="/company/"]').forEach(function(a){
+    var href=a.getAttribute('href').split('?lang=')[0];
+    a.setAttribute('href',href+'?lang='+lang);
+  });
   closeLangMenu();
 }
 
@@ -1984,6 +1988,10 @@ function copyPromo(id, code){
     window.history.replaceState({},'',url.toString());
   }
   applyAllTranslations(lang);
+  document.querySelectorAll('a[href^="/company/"]').forEach(function(a){
+    var href=a.getAttribute('href');
+    if(href.indexOf('?lang=')<0) a.setAttribute('href',href+'?lang='+lang);
+  });
 })();
 </script>
 </body>

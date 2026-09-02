@@ -805,6 +805,13 @@ function applyTranslations(companyName){
       md.content=t.detail_desc.replace('{company}',companyName);
     }
   }
+  document.querySelectorAll('a[href^="/company/"]').forEach(function(a){
+    var href=a.getAttribute('href').split('?lang=')[0];
+    a.setAttribute('href',href+'?lang='+lang);
+  });
+  document.querySelectorAll('a[href="/"]').forEach(function(a){
+    a.setAttribute('href','/?lang='+lang);
+  });
 }
 
 var companyName='{{ company.name }}';
