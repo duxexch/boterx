@@ -167,7 +167,7 @@ window.I18N_TRANSLATIONS = {
     vex_services_val: '8 games (Mines/Crash/Aviator/Plinko/Wheel/Lottery/Dice/Snatch)',
     vex_support_val: '24/7 Arabic/English via @vex_wallet_bot',
     vex_security_val: 'Full encryption + anti-tampering + supervised deposit/withdrawal',
-    comp_desc_1xbet: '1xBet is the world\',
+    comp_desc_1xbet: "1xBet is the world's largest betting platform with Curaçao license — 1000+ daily markets, live streaming, huge casino and instant withdrawals. Register via VEX with code <b>{promo}</b> for up to 130% welcome bonus.",
     comp_desc_melbet: 'Melbet is a licensed and trusted bookmaker — excellent Arabic interface, high odds, instant payouts via Vodafone Cash and STC Pay. Register via VEX with code <b>{promo}</b>.',
     comp_desc_default: 'Licensed betting company — headquartered in Europe, recently established, offering a welcome bonus, instant payouts and Arabic support. Register through VEX now.',
     footer_responsible: "18+ \u2014 Play Responsibly",
@@ -243,7 +243,7 @@ window.I18N_TRANSLATIONS = {
     vex_services_val: '8 jeux (Mines/Crash/Aviator/Plinko/Roue/Loterie/Dés/Snatch)',
     vex_support_val: '24/7 arabe/anglais via @vex_wallet_bot',
     vex_security_val: 'Chiffrement complet + protection anti-altération + dépôt/retrait supervisé',
-    comp_desc_1xbet: '1xBet est la plateforme de paris mondiale sous licence de Curaçao — plus de 1000 marchés quotidiens, streaming en direct, énorme casino et retraits instantanés. Inscrivez-vous via VEX avec le code <b>{promo}</b> pour un bonus jusqu\',
+    comp_desc_1xbet: "1xBet est la plateforme de paris mondiale sous licence de Curaçao — plus de 1000 marchés quotidiens, streaming en direct, énorme casino et retraits instantanés. Inscrivez-vous via VEX avec le code <b>{promo}</b> pour un bonus jusqu'à 130%.",
     comp_desc_melbet: 'Melbet est un bookmaker licencié et de confiance — interface arabe excellente, cotes élevées, paiements instantanés via Vodafone Cash et STC Pay. Inscrivez-vous via VEX avec le code <b>{promo}</b>.',
     comp_desc_default: 'Société de paris agréée — basée en Europe, récemment fondée, offrant un bonus de bienvenue, des paiements instantanés et un support arabe. Inscrivez-vous via VEX maintenant.',
     footer_responsible: "18+ \u2014 Jouez de Mani\u00e8re Responsable",
@@ -475,7 +475,7 @@ window.I18N_TRANSLATIONS = {
     comp_desc_melbet: 'Melbet è un bookmaker licenziato e affidabile — eccellente interfaccia araba, alte quote, pagamenti istantanei tramite Vodafone Cash e STC Pay. Registrati su VEX con codice <b>{promo}</b>.',
     comp_desc_default: 'Società di scommesse con licenza — con sede in Europa, fondata di recente, offre bonus di benvenuto, pagamenti istantanei e supporto in arabo. Registrati tramite VEX ora.',
     footer_responsible: "Gioco Responsabile",
-    comp_desc_generic: '{name} è un\',
+    comp_desc_generic: "{name} è una società di scommesse con licenza ({license}) — sede a {hq}, fondata nel {founded}, valutata {rating}/5. Offre bonus di benvenuto, pagamenti istantanei e supporto in arabo.",
   },
   pt: {
     hero_badge: "Parceiro Verificado — Licença Curaçao 8048/JAZ",
@@ -770,12 +770,12 @@ window.I18N_TRANSLATIONS = {
     why_vex_bonus: 'Özel bonus',
     why_vex_verified: 'Doğrulanmış partner',
     why_vex_wallet: 'Güvenli cüzdan',
-    vex_meta_info: 'Curacao 8048/JAZ • Kıbrıs • 2024\',
+    vex_meta_info: "Curacao 8048/JAZ \u2022 Kıbrıs \u2022 2024",
     vex_desc: 'VEX Games, Telegram ve Web üzerinden 17 dilde faaliyet gösteren lisanslı bir finansal oyun platformudur. Entegre bir cüzdan (anında yatırım/çekme), akıllı SVRP tazminat sistemi (arkadaşlar aracılığıyla açılan %100 dondurulmuş bakiye), HMAC-SHA256 ile Provably Fair ve 1xPartners ile MelPartners ile doğrudan ortaklıklar sunuyoruz — bizim üzerimizden yapılan her kayıt sizin için sayılır ve her yatırım korunur.',
     vex_services_val: '8 oyun (Mines/Crash/Aviator/Plinko/Çarkı/ Piyango/Zar/Snatch)',
     vex_support_val: '24/7 Arapça/İngilizce @vex_wallet_bot üzerinden',
     vex_security_val: 'Tam şifreleme + manipülasyon koruması + denetimli yatırım/çekme',
-    comp_desc_1xbet: '1xBet, Curaçao lisanslı küresel bahis platformu — 1000+ günlük pazar, canlı yayın, devasa casino ve anında çekimler. VEX üzerinden <b>{promo}</b> koduyla kayıt olun, %130\',
+    comp_desc_1xbet: "1xBet, Curaçao lisanslı küresel bahis platformu — 1000+ günlük pazar, canlı yayın, devasa casino ve anında çekimler. VEX üzerinden <b>{promo}</b> koduyla kayıt olun, %130 hoşgeldin bonusu.",
     comp_desc_melbet: 'Melbet, lisanslı ve güvenilir bahisçi — mükemmel Arapça arayüz, yüksek oranlar, Vodafone Cash ve STC Pay ile anında ödemeler. VEX üzerinden <b>{promo}</b> koduyla kayıt olun.',
     comp_desc_default: 'Lisanslı bahis şirketi — Avrupa merkezli, yakın zamanda kurulmuş, hoş geldin bonusu, anında ödemeler ve Arapça destek sunuyor. Şimdi VEX üzerinden kayıt olun.',
     footer_responsible: "Sorumlu Oyun",
@@ -1841,144 +1841,72 @@ footer a:hover{text-decoration:underline}
 const t=document.getElementById('ticker'); if(t){t.textContent+=t.textContent;}
 </script>
 <script>
-// Language selector
 function toggleLangMenu(){
-  const selector=document.getElementById('langSelector');
-  const menu=document.getElementById('langMenu');
-  const isOpen=selector.classList.toggle('open');
-  const trigger=selector.querySelector('.lang-trigger');
+  var selector=document.getElementById('langSelector');
+  var menu=document.getElementById('langMenu');
+  var isOpen=selector.classList.toggle('open');
+  var trigger=selector.querySelector('.lang-trigger');
   if(trigger) trigger.setAttribute('aria-expanded', String(isOpen));
   if(isOpen){menu.removeAttribute('hidden');}else{menu.setAttribute('hidden','');}
 }
 
-
-function closeLangMenu(e){
-  const selector=document.getElementById('langSelector');
-  const menu=document.getElementById('langMenu');
-  const trigger=document.querySelector('.lang-trigger');
-  if(selector && !selector.contains(e.target)){
-    selector.classList.remove('open');
-    trigger.setAttribute('aria-expanded','false');
-  }
+function closeLangMenu(){
+  var selector=document.getElementById('langSelector');
+  var menu=document.getElementById('langMenu');
+  var trigger=selector?selector.querySelector('.lang-trigger'):null;
+  if(selector){selector.classList.remove('open');}
+  if(menu){menu.setAttribute('hidden','');}
+  if(trigger){trigger.setAttribute('aria-expanded','false');}
 }
 
 function filterLang(){
-  const search=document.getElementById('langSearch').value.toLowerCase();
-  document.querySelectorAll('#langMenu button[role="option"]').forEach(btn=>{
-    const text=btn.textContent.toLowerCase();
-    btn.style.display=text.includes(search)?'flex':'none';
+  var search=document.getElementById('langSearch');
+  if(!search)return;
+  var q=search.value.toLowerCase();
+  document.querySelectorAll('#langMenu button[role="option"]').forEach(function(btn){
+    var text=btn.textContent.toLowerCase();
+    btn.style.display=text.indexOf(q)>=0?'flex':'none';
   });
 }
 
-// Close menu on click outside
-document.addEventListener('click', closeLangMenu);
-
-// Keyboard navigation
-document.addEventListener('keydown',(e)=>{
-  if(e.key==='Escape'){
-    const selector=document.getElementById('langSelector');
-    if(selector.classList.contains('open')){
-      selector.classList.remove('open');
-      document.querySelector('.lang-trigger').setAttribute('aria-expanded','false');
-    }
-  }
-});
-
-// Mobile Menu
 function toggleMobileMenu(){
-  const menu=document.getElementById('mobileMenu');
-  const overlay=document.querySelector('.mobile-menu-bg');
-  const hamburger=document.getElementById('hamburger');
-  const isOpen=menu.classList.toggle('open');
-  if(overlay) overlay.style.opacity = isOpen ? '1' : '0';
-  if(overlay) overlay.style.visibility = isOpen ? 'visible' : 'hidden';
-  hamburger.setAttribute('aria-expanded', isOpen);
-  document.body.style.overflow = isOpen ? 'hidden' : '';
+  var menu=document.getElementById('mobileMenu');
+  var overlay=document.querySelector('.mobile-menu-bg');
+  var hamburger=document.getElementById('hamburger');
+  var isOpen=menu.classList.toggle('open');
+  if(overlay){overlay.style.opacity=isOpen?'1':'0';overlay.style.visibility=isOpen?'visible':'hidden';}
+  if(hamburger)hamburger.setAttribute('aria-expanded',isOpen);
+  document.body.style.overflow=isOpen?'hidden':'';
 }
 
 function closeMobileMenu(){
-  const menu=document.getElementById('mobileMenu');
-  const overlay=document.querySelector('.mobile-menu-bg');
-  const hamburger=document.getElementById('hamburger');
-  menu.classList.remove('open');
-  if(overlay){
-    overlay.style.opacity = '0';
-    overlay.style.visibility = 'hidden';
-  }
-  hamburger.setAttribute('aria-expanded', 'false');
-  document.body.style.overflow = '';
+  var menu=document.getElementById('mobileMenu');
+  var overlay=document.querySelector('.mobile-menu-bg');
+  var hamburger=document.getElementById('hamburger');
+  if(menu)menu.classList.remove('open');
+  if(overlay){overlay.style.opacity='0';overlay.style.visibility='hidden';}
+  if(hamburger)hamburger.setAttribute('aria-expanded','false');
+  document.body.style.overflow='';
 }
 
-// Close mobile menu on link click
-document.querySelectorAll('.mobile-nav-link').forEach(link=>{
-  link.addEventListener('click', closeMobileMenu);
+document.querySelectorAll('.mobile-nav-link').forEach(function(link){
+  link.addEventListener('click',closeMobileMenu);
 });
+var _mobBg=document.querySelector('.mobile-menu-bg');
+if(_mobBg)_mobBg.addEventListener('click',closeMobileMenu);
 
-// Close mobile menu on overlay click
-document.querySelector('.mobile-menu-bg')?.addEventListener('click', closeMobileMenu);
-
-// Language selector
-
-
-
-
-
-
-// Keyboard navigation
-document.addEventListener('keydown',(e)=>{
+document.addEventListener('keydown',function(e){
   if(e.key==='Escape'){
-    const selector=document.getElementById('langSelector');
-    if(selector.classList.contains('open')){
-      selector.classList.remove('open');
-      document.querySelector('.lang-trigger').setAttribute('aria-expanded','false');
-    }
-    const menu=document.getElementById('mobileMenu');
-    if(menu?.classList.contains('open')){
-      closeMobileMenu();
-    }
+    var selector=document.getElementById('langSelector');
+    if(selector&&selector.classList.contains('open'))closeLangMenu();
+    var menu=document.getElementById('mobileMenu');
+    if(menu&&menu.classList.contains('open'))closeMobileMenu();
   }
 });
-
-// Close language menu on click outside
-document.addEventListener('click', closeLangMenu);
-
-
-
-
-
-// Keyboard navigation
-document.addEventListener('keydown',(e)=>{
-  if(e.key==='Escape'){
-    const selector=document.getElementById('langSelector');
-    if(selector.classList.contains('open')){
-      selector.classList.remove('open');
-      document.querySelector('.lang-trigger').setAttribute('aria-expanded','false');
-    }
-    const menu=document.getElementById('mobileMenu');
-    if(menu?.classList.contains('open')){
-      closeMobileMenu();
-    }
-  }
+document.addEventListener('click',function(e){
+  var selector=document.getElementById('langSelector');
+  if(selector&&!selector.contains(e.target))closeLangMenu();
 });
-
-// Close language menu on click outside
-document.addEventListener('click', closeLangMenu);
-
-// Keyboard navigation
-document.addEventListener('keydown',(e)=>{
-  if(e.key==='Escape'){
-    const selector=document.getElementById('langSelector');
-    if(selector.classList.contains('open')){
-      selector.classList.remove('open');
-      document.querySelector('.lang-trigger').setAttribute('aria-expanded','false');
-    }
-    const menu=document.getElementById('mobileMenu');
-    if(menu?.classList.contains('open')){
-      closeMobileMenu();
-    }
-  }
-});
-
 
 function changeLang(lang){
   localStorage.setItem('vex_lang',lang);
