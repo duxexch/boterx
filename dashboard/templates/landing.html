@@ -988,16 +988,16 @@ footer{padding:24px 16px;text-align:center;color:var(--muted);font-size:11px;bor
 </nav>
 
 <header class="hero">
-  <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(0,231,1,.1);border:1px solid rgba(0,231,1,.2);color:var(--green);padding:4px 10px;border-radius:999px;font-size:11px;font-weight:700;margin-bottom:10px">🟢 شريك معتمد — ترخيص كوراساو 8048/JAZ</div>
-  <h1>دليلك العالمي <span>لأفضل شركات المراهنة</span> المرخصة</h1>
-  <p>مراجعات خبيرة، تراخيص حقيقية، أكواد برومو حصرية وروابط تسجيل مباشرة — VEX شريك معتمد مع 1xBet و Melbet و 6 شركات كبرى. اختر الأفضل، سجّل في ثوانٍ، والعب بثقة.</p>
+  <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(0,231,1,.1);border:1px solid rgba(0,231,1,.2);color:var(--green);padding:4px 10px;border-radius:999px;font-size:11px;font-weight:700;margin-bottom:10px" data-i18n="hero_badge">🟢 شريك معتمد — ترخيص كوراساو 8048/JAZ</div>
+  <h1 data-i18n="hero_title">دليلك العالمي <span>لأفضل شركات المراهنة</span> المرخصة</h1>
+  <p data-i18n="hero_subtitle">مراجعات خبيرة، تراخيص حقيقية، أكواد برومو حصرية وروابط تسجيل مباشرة — VEX شريك معتمد مع 1xBet و Melbet و 6 شركات كبرى. اختر الأفضل، سجّل في ثوانٍ، والعب بثقة.</p>
   <div class="hero-cta">
-    <a href="#companies" class="btn btn-p">استعرض الشركات ↓</a>
-    <a href="/home" class="btn btn-o" style="background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:#fff;border:none">🎮 ألعابي على الويب</a>
-    <a href="https://t.me/vex_wallet_bot" target="_blank" class="btn btn-o">💬 @vex_wallet_bot</a>
+    <a href="#companies" class="btn btn-p" data-i18n="cta_companies">استعرض الشركات ↓</a>
+    <a href="/home" class="btn btn-o" style="background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:#fff;border:none" data-i18n="cta_games">🎮 ألعابي على الويب</a>
+    <a href="https://t.me/vex_wallet_bot" target="_blank" class="btn btn-o" data-i18n="cta_bot">💬 @vex_wallet_bot</a>
   </div>
   <div style="margin-top:14px;display:flex;gap:6px;justify-content:center;flex-wrap:wrap;font-size:10px;color:var(--muted)">
-    <span>✅ 8 شركات مرخصة</span><span>•</span><span>🌍 17 لغة</span><span>•</span><span>🔒 Provably Fair</span><span>•</span><span>⚡ إيداع فوري</span>
+    <span data-i18n="trust_licensed">✅ 8 شركات مرخصة</span><span>•</span><span data-i18n="trust_langs">🌍 17 لغة</span><span>•</span><span data-i18n="trust_fair">🔒 Provably Fair</span><span>•</span><span data-i18n="trust_instant">⚡ إيداع فوري</span>
   </div>
 </header>
 
@@ -1052,8 +1052,8 @@ footer{padding:24px 16px;text-align:center;color:var(--muted);font-size:11px;bor
   ]
 }
 </script>
-  <h2>🏆 أفضل الشركات المرخصة — مراجعة شاملة</h2>
-  <p class="sub">كل شركة نراجعها كأنها منتجنا — الترخيص، المقر، سنة التأسيس، المميزات والعيوب، كود البرومو ورابط التسجيل المباشر برعاية VEX</p>
+  <h2 data-i18n="companies_title">🏆 أفضل الشركات المرخصة — مراجعة شاملة</h2>
+  <p class="sub" data-i18n="companies_sub">كل شركة نراجعها كأنها منتجنا — الترخيص، المقر، سنة التأسيس، المميزات والعيوب، كود البرومو ورابط التسجيل المباشر برعاية VEX</p>
   <div class="comp-grid">
     {% for c in companies %}
     <article class="comp-card" id="company-{{ c.slug }}" itemscope itemtype="https://schema.org/Review">
@@ -1093,8 +1093,8 @@ footer{padding:24px 16px;text-align:center;color:var(--muted);font-size:11px;bor
 </section>
 
 <section class="section" id="vex" style="padding-top:0">
-  <h2>💎 VEX Games — شريكك المعتمد</h2>
-  <p class="sub">لسنا مجرد دليل — نحن شركة مراهنة وألعاب مرخصة بحد ذاتها، شريك معتمد مع كل الشركات أعلاه</p>
+  <h2 data-i18n="vex_title">💎 VEX Games — شريكك المعتمد</h2>
+  <p class="sub" data-i18n="vex_subtitle">لسنا مجرد دليل — نحن شركة مراهنة وألعاب مرخصة بحد ذاتها، شريك معتمد مع كل الشركات أعلاه</p>
   <div class="comp-card vex-card">
     <div class="comp-head">
       <div class="comp-icon" style="background:linear-gradient(135deg,#ffd700,#b8860b);color:#000">V</div>
@@ -1115,33 +1115,33 @@ footer{padding:24px 16px;text-align:center;color:var(--muted);font-size:11px;bor
       </table>
     </div>
     <div class="comp-cta">
-      <a href="https://t.me/vex_wallet_bot?start=web_auth" class="cta-main">🚀 ابدأ مع VEX</a>
-      <a href="#how" class="cta-sec">كيف نعمل؟</a>
+      <a href="https://t.me/vex_wallet_bot?start=web_auth" class="cta-main" data-i18n="vex_start">🚀 ابدأ مع VEX</a>
+      <a href="#how" class="cta-sec" data-i18n="vex_how">كيف نعمل؟</a>
     </div>
   </div>
 </section>
 
 <section class="section" id="how" style="padding-top:0">
-  <h2>⚡ كيف تبدأ في 3 خطوات</h2>
-  <p class="sub">اختر شركة، سجّل برابط VEX، أودع والعب — كل خطوة محسوبة</p>
+  <h2 data-i18n="how_title">⚡ كيف تبدأ في 3 خطوات</h2>
+  <p class="sub" data-i18n="how_subtitle">اختر شركة، سجّل برابط VEX، أودع والعب — كل خطوة محسوبة</p>
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center"><div style="width:36px;height:36px;border-radius:50%;background:var(--green);color:#04210a;display:flex;align-items:center;justify-content:center;font-weight:900;margin:0 auto 8px">1</div><div style="font-weight:800;font-size:13px">اختر شركة</div><div style="font-size:11px;color:var(--muted)">قارن التراخيص والتقييمات أعلاه</div></div>
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center"><div style="width:36px;height:36px;border-radius:50%;background:var(--green);color:#04210a;display:flex;align-items:center;justify-content:center;font-weight:900;margin:0 auto 8px">2</div><div style="font-weight:800;font-size:13px">سجّل عبر VEX</div><div style="font-size:11px;color:var(--muted)">اضغط <b>سجّل</b> → رابط إحالتك الخاص يفتح</div></div>
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center"><div style="width:36px;height:36px;border-radius:50%;background:var(--gold);color:#000;display:flex;align-items:center;justify-content:center;font-weight:900;margin:0 auto 8px">3</div><div style="font-weight:800;font-size:13px">أودع والعب</div><div style="font-size:11px;color:var(--muted)">محفظة VEX + تعويض 100% + Provably Fair</div></div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center"><div style="width:36px;height:36px;border-radius:50%;background:var(--green);color:#04210a;display:flex;align-items:center;justify-content:center;font-weight:900;margin:0 auto 8px">1</div><div style="font-weight:800;font-size:13px" data-i18n="step1_title">اختر شركة</div><div style="font-size:11px;color:var(--muted)">قارن التراخيص والتقييمات أعلاه</div></div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center"><div style="width:36px;height:36px;border-radius:50%;background:var(--green);color:#04210a;display:flex;align-items:center;justify-content:center;font-weight:900;margin:0 auto 8px">2</div><div style="font-weight:800;font-size:13px" data-i18n="step2_title">سجّل عبر VEX</div><div style="font-size:11px;color:var(--muted)">اضغط <b>سجّل</b> → رابط إحالتك الخاص يفتح</div></div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center"><div style="width:36px;height:36px;border-radius:50%;background:var(--gold);color:#000;display:flex;align-items:center;justify-content:center;font-weight:900;margin:0 auto 8px">3</div><div style="font-weight:800;font-size:13px" data-i18n="step3_title">أودع والعب</div><div style="font-size:11px;color:var(--muted)">محفظة VEX + تعويض 100% + Provably Fair</div></div>
   </div>
 </section>
 
 <section class="section" id="faq" style="padding-top:0">
-  <h2>❓ أسئلة شائعة — دليل المراهنة العالمي</h2>
-  <details open><summary>هل الشركات مرخصة؟</summary><div style="font-size:12px;color:var(--muted);margin-top:6px">نعم — كل الشركات المعروضة مرخصة كوراساو 8048/JAZ أو ما يعادلها، ومقراتها في قبرص/مالطا. VEX تعرض فقط المرخص.</div></details>
-  <details><summary>ما هو كود البرومو؟</summary><div style="font-size:12px;color:var(--muted);margin-top:6px">كود خاص من VEX يعطيك بونص إضافي عند التسجيل (مثال 1XBET: <code>VEX</code>). استخدمه في حقل البرومو عند التسجيل.</div></details>
-  <details><summary>هل VEX شريك معتمد؟</summary><div style="font-size:12px;color:var(--muted);margin-top:6px">نعم — VEX شريك مباشر مع 1xPartners و MelPartners و6 شبكات أخرى. كل تسجيل عبر <code>vex.deals/go/*</code> محسوب لك.</div></details>
-  <details><summary>كيف أضمن السحب؟</summary><div style="font-size:12px;color:var(--muted);margin-top:6px">محفظة VEX منفصلة — تودع عبر فودافون كاش/STC Pay/بنكي، تلعب، تسحب بنفس الوسيلة بإشراف 24/7. التعويض عبر SVRP يضمن 100%.</div></details>
+  <h2 data-i18n="faq_title">❓ أسئلة شائعة — دليل المراهنة العالمي</h2>
+  <details open><summary data-i18n="faq_q1">هل الشركات مرخصة؟</summary><div style="font-size:12px;color:var(--muted);margin-top:6px">نعم — كل الشركات المعروضة مرخصة كوراساو 8048/JAZ أو ما يعادلها، ومقراتها في قبرص/مالطا. VEX تعرض فقط المرخص.</div></details>
+  <details><summary data-i18n="faq_q2">ما هو كود البرومو؟</summary><div style="font-size:12px;color:var(--muted);margin-top:6px">كود خاص من VEX يعطيك بونص إضافي عند التسجيل (مثال 1XBET: <code>VEX</code>). استخدمه في حقل البرومو عند التسجيل.</div></details>
+  <details><summary data-i18n="faq_q3">هل VEX شريك معتمد؟</summary><div style="font-size:12px;color:var(--muted);margin-top:6px">نعم — VEX شريك مباشر مع 1xPartners و MelPartners و6 شبكات أخرى. كل تسجيل عبر <code>vex.deals/go/*</code> محسوب لك.</div></details>
+  <details><summary data-i18n="faq_q4">كيف أضمن السحب؟</summary><div style="font-size:12px;color:var(--muted);margin-top:6px">محفظة VEX منفصلة — تودع عبر فودافون كاش/STC Pay/بنكي، تلعب، تسحب بنفس الوسيلة بإشراف 24/7. التعويض عبر SVRP يضمن 100%.</div></details>
 </section>
 
 <footer>
   <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:8px">
-    <a href="https://t.me/vex_wallet_bot">البوت</a> • <a href="/go/1">1xBet</a> • <a href="#companies">الشركات</a> • <a href="#vex">VEX</a>
+    <a href="https://t.me/vex_wallet_bot" data-i18n="nav_bot">💬 @vex_wallet_bot</a> • <a href="/go/1">1xBet</a> • <a href="#companies" data-i18n="nav_companies">الشركات</a> • <a href="#vex">VEX</a>
   </div>
   <div>© 2026 VEX Games — شريك معتمد • 8 شركات مرخصة • 17 لغة • Provably Fair</div>
   <div style="margin-top:6px;font-size:10px">18+ — العب بمسؤولية • <a href="/sitemap.xml">sitemap</a> • <a href="/robots.txt">robots</a></div>
@@ -1362,6 +1362,50 @@ function changeLang(lang){
     ko:'한국어',th:'ไทย'
   };
   document.getElementById('currentLang').textContent=langNames[lang]||'العربية';
+
+// Apply translations based on ?lang= parameter
+function applyTranslations(){
+  const urlParams = new URLSearchParams(window.location.search);
+  const lang = urlParams.get('lang') || 'ar';
+  const t = window.I18N_TRANSLATIONS && window.I18N_TRANSLATIONS[lang];
+  if(!t) return;
+  
+  // Update document direction for RTL languages
+  const rtlLangs = ['ar','fa','ur','he'];
+  document.documentElement.dir = rtlLangs.includes(lang) ? 'rtl' : 'ltr';
+  document.documentElement.lang = lang;
+  
+  // Update all elements with data-i18n attribute
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if(t[key]){
+      el.innerHTML = t[key];
+    }
+  });
+  
+  // Update page title
+  if(t.hero_title){
+    document.title = t.hero_title.replace(/<[^>]+>/g, '') + ' | VEX Games';
+  }
+  
+  // Update meta description
+  const metaDesc = document.querySelector('meta[name="description"]');
+  if(metaDesc && t.hero_subtitle){
+    metaDesc.content = t.hero_subtitle.replace(/<[^>]+>/g, '');
+  }
+  
+  // Update mobile lang select
+  const mobileSelect = document.getElementById('mobileLangSelect');
+  if(mobileSelect) mobileSelect.value = lang;
+  
+  // Update nav items
+  const navBot = document.querySelector('.mobile-nav-link[href*="vex_wallet_bot"]');
+  if(navBot && t.nav_bot) navBot.innerHTML = t.nav_bot;
+}
+
+// Apply on load
+applyTranslations();
+;
 })();
 </script>
 </body>
