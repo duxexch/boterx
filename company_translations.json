@@ -291,7 +291,7 @@
         "دعم عربي 24/7"
       ],
       "cons": [
-        "سرعة في بعض الدفعات",
+        "بطء في بعض الدفعات",
         "بعض الألعاب محظورة في مناطق معينة"
       ]
     },
@@ -321,7 +321,7 @@
         "Assistance en arabe 24h/24 et 7j/7"
       ],
       "cons": [
-        "Rapidité dans certains lots",
+        "Lent sur certains paiements",
         "Certains jeux sont interdits dans certaines régions"
       ]
     },
@@ -336,7 +336,7 @@
         "Soporte árabe 24 horas al día, 7 días a la semana"
       ],
       "cons": [
-        "Velocidad en algunos lotes",
+        "Lento en algunos pagos",
         "Algunos juegos están prohibidos en determinadas regiones."
       ]
     },
@@ -351,7 +351,7 @@
         "Arabischer Support rund um die Uhr"
       ],
       "cons": [
-        "Geschwindigkeit in einigen Chargen",
+        "Langsam bei einigen Auszahlungen",
         "Einige Spiele sind in bestimmten Regionen verboten"
       ]
     },
@@ -366,7 +366,7 @@
         "Supporto arabo 24 ore su 24, 7 giorni su 7"
       ],
       "cons": [
-        "Velocità in alcuni lotti",
+        "Lento su alcuni pagamenti",
         "Alcuni giochi sono vietati in alcune regioni"
       ]
     },
@@ -381,7 +381,7 @@
         "Suporte árabe 24 horas por dia, 7 dias por semana"
       ],
       "cons": [
-        "Velocidade em alguns lotes",
+        "Lento em alguns pagamentos",
         "Alguns jogos são proibidos em certas regiões"
       ]
     },
@@ -396,7 +396,7 @@
         "Поддержка арабского языка 24/7"
       ],
       "cons": [
-        "Скорость в некоторых партиях",
+        "Медленно при некоторых выплатах",
         "Некоторые игры запрещены в определенных регионах"
       ]
     },
@@ -411,7 +411,7 @@
         "阿拉伯语支持 24/7"
       ],
       "cons": [
-        "部分批次的速度",
+        "部分支付较慢",
         "某些游戏在某些地区被禁止"
       ]
     },
@@ -426,7 +426,7 @@
         "Arapça desteği 7/24"
       ],
       "cons": [
-        "Bazı partilerde hız",
+        "Bazı ödemelerde yavaşlık",
         "Bazı oyunlar belirli bölgelerde yasaklandı"
       ]
     },
@@ -441,7 +441,7 @@
         "عربی سپورٹ 24/7"
       ],
       "cons": [
-        "کچھ بیچوں میں رفتار",
+        "کچھ ادائیگیوں میں سستی",
         "بعض علاقوں میں کچھ گیمز پر پابندی ہے۔"
       ]
     },
@@ -456,7 +456,7 @@
         "अरबी समर्थन 24/7"
       ],
       "cons": [
-        "कुछ बैचों में गति",
+        "कुछ भुगतान में धीमापन",
         "कुछ खेलों पर कुछ क्षेत्रों में प्रतिबंध लगा दिया गया है"
       ]
     },
@@ -471,7 +471,7 @@
         "پشتیبانی عربی 24/7"
       ],
       "cons": [
-        "سرعت در برخی دسته ها",
+        "کند در برخی پرداخت‌ها",
         "برخی از بازی ها در مناطق خاصی ممنوع هستند"
       ]
     },
@@ -486,7 +486,7 @@
         "Dukungan bahasa Arab 24/7"
       ],
       "cons": [
-        "Kecepatan dalam beberapa batch",
+        "Lambat pada beberapa pembayaran",
         "Beberapa permainan dilarang di wilayah tertentu"
       ]
     },
@@ -501,7 +501,7 @@
         "アラビア語サポート 24 時間年中無休"
       ],
       "cons": [
-        "一部のバッチでの速度",
+        "一部の支払いが遅い",
         "一部のゲームは特定の地域で禁止されています"
       ]
     },
@@ -516,7 +516,7 @@
         "연중무휴 아랍어 지원"
       ],
       "cons": [
-        "일부 배치의 속도",
+        "일부 결제가 느림",
         "일부 게임은 특정 지역에서 금지됩니다"
       ]
     },
@@ -531,7 +531,7 @@
         "รองรับภาษาอาหรับตลอด 24 ชั่วโมงทุกวัน"
       ],
       "cons": [
-        "ความเร็วในบางชุด",
+        "การจ่ายเงินช้าในบางกรณี",
         "เกมบางเกมถูกแบนในบางภูมิภาค"
       ]
     }
@@ -539,7 +539,7 @@
   "BETJAM": {
     "color": "#FF6D00",
     "ar": {
-      "description": "Betjam هي شركة مراهنة ناشئة تأسست عام 2020 وحصلت على ترخيص كوراساو. تتميز بواجهة حديثة وسهلة الاستخدام مع تركيز على تجربة المستخدم العربي. تقدم بونص ترحيبي حصرية ودفع فوري عبر طرق الدفع المحلية. دعم عربي متميز.",
+      "description": "Betjam هي شركة مراهنة ناشئة تأسست عام 2020 وحصلت على ترخيص كوراساو. تتميز بواجهة حديثة وسهلة الاستخدام مع تركيز على تجربة المستخدم العربي. تقدم بونص ترحيبي حصري ودفع فوري عبر طرق الدفع المحلية. دعم عربي متميز.",
       "pros": [
         "واجهة حديثة",
         "سرعة في الدفع",
