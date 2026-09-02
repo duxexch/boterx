@@ -1739,7 +1739,7 @@ footer a:hover{text-decoration:underline}
           <tr><td data-i18n="comp_headquarters">المقر</td><td>{{ c.headquarters }}</td></tr>
           <tr><td data-i18n="comp_founded">التأسيس</td><td>{{ c.founded }}</td></tr>
           {% if c.promo_code %}
-          <tr><td data-i18n="comp_promo">كود البرومو</td><td><div class="promo-code-row"><code class="promo-code" id="promo-{{ c.id }}">{{ c.promo_code }}</code><button class="copy-btn" onclick="copyPromo('{{ c.id }}','{{ c.promo_code }}')" title="Copy code">نسخ</button></div></td></tr>
+          <tr><td data-i18n="comp_promo">كود البرومو</td><td><div class="promo-code-row"><code class="promo-code" id="promo-{{ c.id }}">{{ c.promo_code }}</code><button class="copy-btn" onclick="copyPromo('{{ c.id }}','{{ c.promo_code }}')" title="Copy code" data-i18n="copy_code_btn">نسخ</button></div></td></tr>
           {% endif %}
         </table>
         <div class="pros-cons">
