@@ -1941,16 +1941,20 @@ function applyAllTranslations(lang){
   });
   document.querySelectorAll('[data-company]').forEach(function(e){
     var name=e.getAttribute('data-company');
-    var key=name==='1XBET'?'comp_desc_1xbet':name==='MELBET'?'comp_desc_melbet':'comp_desc_generic';
-    if(!t[key])return;
-    var val=t[key];
-    val=val.replace(/\{name\}/g,name||'');
-    val=val.replace(/\{promo\}/g,e.getAttribute('data-promo')||'VEX');
-    val=val.replace(/\{license\}/g,e.getAttribute('data-license')||'');
-    val=val.replace(/\{hq\}/g,e.getAttribute('data-hq')||'');
-    val=val.replace(/\{founded\}/g,e.getAttribute('data-founded')||'');
-    val=val.replace(/\{rating\}/g,e.getAttribute('data-rating')||'');
-    e.innerHTML=val;
+    if(window.COMPANY_TRANS&&window.COMPANY_TRANS[name]&&window.COMPANY_TRANS[name][lang]&&window.COMPANY_TRANS[name][lang].description){
+      e.innerHTML=window.COMPANY_TRANS[name][lang].description;
+    }else{
+      var key=name==='1XBET'?'comp_desc_1xbet':name==='MELBET'?'comp_desc_melbet':'comp_desc_generic';
+      if(!t[key])return;
+      var val=t[key];
+      val=val.replace(/\{name\}/g,name||'');
+      val=val.replace(/\{promo\}/g,e.getAttribute('data-promo')||'VEX');
+      val=val.replace(/\{license\}/g,e.getAttribute('data-license')||'');
+      val=val.replace(/\{hq\}/g,e.getAttribute('data-hq')||'');
+      val=val.replace(/\{founded\}/g,e.getAttribute('data-founded')||'');
+      val=val.replace(/\{rating\}/g,e.getAttribute('data-rating')||'');
+      e.innerHTML=val;
+    }
   });
   if(t.hero_title)document.title=t.hero_title.replace(/<[^>]+>/g,'')+' | VEX Games';
   var md=document.querySelector('meta[name="description"]');
@@ -1973,6 +1977,8 @@ function copyPromo(id, code){
     if(btn){btn.classList.add('copied');btn.textContent='\u2705';setTimeout(()=>{btn.classList.remove('copied');btn.textContent='\uD83D\uDCCB';},1500);}
   });
 }
+
+window.COMPANY_TRANS = {{ company_translations | safe }};
 
 (function(){
   var supported=['ar','en','fr','es','de','it','pt','ru','zh','tr','ur','hi','fa','id','ja','ko','th'];

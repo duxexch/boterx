@@ -1,0 +1,1985 @@
+{
+  "1XBET": {
+    "color": "#E31937",
+    "ar": {
+      "description": "1xBet هي واحدة من أكبر شركات المراهنة والألعاب في العالم. تأسست عام 2007 وحصلت على ترخيص كوراساو 8048/JAZ. تقدم أكثر من 1000 سوق يومياً في أكثر من 50 رياضة، بالإضافة إلى كازينو ضخم يضم آلاف الألعاب. تدعم أكثر من 200 طريقة دفع وتوفر تطبيقات للأندرويد والآيفون. واجهة عربية ممتازة ودعم فني على مدار الساعة.",
+      "pros": [
+        "أكبر سوق مراهنة في العالم",
+        "1000+ سوق يومياً",
+        "بث مباشر مجاني",
+        "كازينو ضخم",
+        "سحب فوري",
+        "200+ طريقة دفع",
+        "تطبيق احترافي"
+      ],
+      "cons": [
+        "قد يكون معقد للمبتدئين",
+        "بعض الدول محظورة"
+      ],
+      "license": "Curacao 8048/JAZ",
+      "founded": "2007",
+      "rating": "4.8",
+      "headquarters": "Cyprus"
+    },
+    "en": {
+      "description": "1xBet is one of the world's largest betting and gaming companies. Founded in 2007, licensed under Curaçao 8048/JAZ. Offers 1000+ daily markets across 50+ sports, plus a massive casino with thousands of games. Supports 200+ payment methods with Android and iOS apps. Excellent Arabic interface and 24/7 support.",
+      "pros": [
+        "World's largest betting market",
+        "1000+ daily markets",
+        "Free live streaming",
+        "Massive casino",
+        "Instant withdrawals",
+        "200+ payment methods",
+        "Professional app"
+      ],
+      "cons": [
+        "May be complex for beginners",
+        "Some countries blocked"
+      ]
+    },
+    "fr": {
+      "description": "1xBet est l'une des plus grandes entreprises de paris et jeux au monde. Fondée en 2007, sous licence de Curaçao 8048/JAZ. Offre plus de 1000 marchés quotidiens dans 50+ sports, plus un énorme casino avec des milliers de jeux. Supporte 200+ méthodes de paiement avec apps Android et iOS. Excellente interface arabe et support 24/7.",
+      "pros": [
+        "Plus grand marché de paris au monde",
+        "1000+ marchés quotidiens",
+        "Streaming en direct gratuit",
+        "Énorme casino",
+        "Retraits instantanés",
+        "200+ méthodes de paiement",
+        "App professionnelle"
+      ],
+      "cons": [
+        "Peut être complexe pour les débutants",
+        "Certains pays bloqués"
+      ]
+    },
+    "es": {
+      "description": "1xBet es una de las mayores empresas de apuestas y juegos del mundo. Fundada en 2007, con licencia de Curazao 8048/JAZ. Ofrece más de 1000 mercados diarios en 50+ deportes, más un enorme casino con miles de juegos. Soporta 200+ métodos de pago con apps Android e iOS. Excelente interfaz árabe y soporte 24/7.",
+      "pros": [
+        "Mayor mercado de apuestas del mundo",
+        "1000+ mercados diarios",
+        "Streaming en vivo gratuito",
+        "Enorme casino",
+        "Retiros instantáneos",
+        "200+ métodos de pago",
+        "App profesional"
+      ],
+      "cons": [
+        "Puede ser complejo para principiantes",
+        "Algunos países bloqueados"
+      ]
+    },
+    "de": {
+      "description": "1xBet ist eines der größten Wett- und Gaming-Unternehmen der Welt. Gegründet 2007, lizenziert unter Curaçao 8048/JAZ. Bietet 1000+ tägliche Märkte in 50+ Sportarten plus riesiges Casino mit Tausenden von Spielen. Unterstützt 200+ Zahlungsmethoden mit Android- und iOS-Apps. Hervorragende arabische Oberfläche und 24/7-Support.",
+      "pros": [
+        "Größter Wetmarkt der Welt",
+        "1000+ tägliche Märkte",
+        "Kostenloses Live-Streaming",
+        "Riesiges Casino",
+        "Sofortige Auszahlungen",
+        "200+ Zahlungsmethoden",
+        "Professionelle App"
+      ],
+      "cons": [
+        "Kann für Anfänger komplex sein",
+        "Einige Länder blockiert"
+      ]
+    },
+    "it": {
+      "description": "1xBet è una delle più grandi aziende di scommesse e giochi al mondo. Fondata nel 2007, con licenza di Curaçao 8048/JAZ. Offre oltre 1000 mercati giornalieri in 50+ sport, più un enorme casinò con migliaia di giochi. Supporta 200+ metodi di pagamento con app Android e iOS. Eccellente interfaccia araba e supporto 24/7.",
+      "pros": [
+        "Maggior mercato di scommesse al mondo",
+        "1000+ mercati giornalieri",
+        "Streaming live gratuito",
+        "Enorme casinò",
+        "Prelievi istantanei",
+        "200+ metodi di pagamento",
+        "App professionale"
+      ],
+      "cons": [
+        "Può essere complesso per i principianti",
+        "Alcuni paesi bloccati"
+      ]
+    },
+    "pt": {
+      "description": "1xBet é uma das maiores empresas de apostas e jogos do mundo. Fundada em 2007, licenciada sob Curaçao 8048/JAZ. Oferece mais de 1000 mercados diários em 50+ esportes, além de um enorme cassino com milhares de jogos. Suporta 200+ métodos de pagamento com apps Android e iOS. Excelente interface árabe e suporte 24/7.",
+      "pros": [
+        "Maior mercado de apostas do mundo",
+        "1000+ mercados diários",
+        "Streaming ao vivo gratuito",
+        "Enorme cassino",
+        "Saques instantâneos",
+        "200+ métodos de pagamento",
+        "App profissional"
+      ],
+      "cons": [
+        "Pode ser complexo para iniciantes",
+        "Alguns países bloqueados"
+      ]
+    },
+    "ru": {
+      "description": "1xBet — одна из крупнейших букмекерских и игровых компаний мира. Основана в 2007 году, лицензия Кюрасао 8048/JAZ. Более 1000 рынков ежедневно в 50+ видах спорта, плюс огромное казино с тысячами игр. Поддерживает 200+ способов оплаты с приложениями Android и iOS. Отличный арабский интерфейс и поддержка 24/7.",
+      "pros": [
+        "Крупнейший рынок ставок в мире",
+        "1000+ рынков ежедневно",
+        "Бесплатная прямая трансляция",
+        "Огромное казино",
+        "Мгновенные выплаты",
+        "200+ способов оплаты",
+        "Профессиональное приложение"
+      ],
+      "cons": [
+        "Может быть сложным для новичков",
+        "Некоторые страны заблокированы"
+      ]
+    },
+    "zh": {
+      "description": "1xBet是全球最大的博彩和游戏公司之一。成立于2007年，持有库拉索8048/JAZ许可证。提供50多项体育赛事的1000多个每日市场，以及拥有数千款游戏的大型赌场。支持200多种支付方式，提供Android和iOS应用程序。出色的阿拉伯语界面和24/7支持。",
+      "pros": [
+        "全球最大博彩市场",
+        "1000+每日市场",
+        "免费直播",
+        "大型赌场",
+        "即时提款",
+        "200+支付方式",
+        "专业应用"
+      ],
+      "cons": [
+        "对初学者可能复杂",
+        "部分国家被封"
+      ]
+    },
+    "tr": {
+      "description": "1xBet, dünyanın en büyük bahis ve oyun şirketlerinden biridir. 2007'de kurulmuş, Curaçao 8048/JAZ lisansına sahiptir. 50+ spor dalında 1000+ günlük pazar, binlerce oyunla devasa casino. 200+ ödeme yöntemi ile Android ve iOS uygulamaları. Mükemmel Arapça arayüz ve 7/24 destek.",
+      "pros": [
+        "Dünyanın en büyük bahis pazarı",
+        "1000+ günlük pazar",
+        "Ücretsiz canlı yayın",
+        "Devasa casino",
+        "Anında çekimler",
+        "200+ ödeme yöntemi",
+        "Profesyonel uygulama"
+      ],
+      "cons": [
+        "Yeni başlayanlar için karmaşık olabilir",
+        "Bazı ülkeler engelli"
+      ]
+    },
+    "ur": {
+      "description": "1xBet دنیا کی سب سے بڑی بیٹنگ اور گیمنگ کمپنیوں میں سے ایک ہے۔ 2007 میں قائم، کوراساؤ 8048/JAZ لائسنس۔ 50+ کھیلوں میں 1000+ روزانہ مارکیٹس، ہزاروں کھیلوں والا عظیم کیزینو۔ 200+ ادائیگی کے طریقے، اینڈرائیڈ اور آئی فون ایپس۔ بہترین عربی انٹرفیس اور 24/7 سپورٹ۔",
+      "pros": [
+        "دنیا کا سب سے بڑا بیٹنگ مارکیٹ",
+        "1000+ روزانہ مارکیٹس",
+        "مفت لائیو اسٹریمنگ",
+        "عظیم کیزینو",
+        "فوری واپسی",
+        "200+ ادائیگی کے طریقے",
+        "پیشہ ورانہ ایپ"
+      ],
+      "cons": [
+        "نئوں کے لیے پیچیدہ ہو سکتا ہے",
+        "کچھ ملک بند ہیں"
+      ]
+    },
+    "hi": {
+      "description": "1xBet दुनिया की सबसे बड़ी बेटिंग और गेमिंग कंपनियों में से एक है। 2007 में स्थापित, कुरासाओ 8048/JAZ लाइसेंस। 50+ खेलों में 1000+ दैनिक बाज़ार, हजारों खेलों वाला विशाल कैसीनो। 200+ भुगतान विधियाँ, एंड्रॉइड और आईओएस ऐप्स। उत्कृष्ट अरबी इंटरफ़ेस और 24/7 समर्थन।",
+      "pros": [
+        "दुनिया का सबसे बड़ा बेटिंग बाज़ार",
+        "1000+ दैनिक बाज़ार",
+        "मुफ्त लाइव स्ट्रीमिंग",
+        "विशाल कैसीनो",
+        "तत्काल निकासी",
+        "200+ भुगतान विधियाँ",
+        "पेशेवर ऐप"
+      ],
+      "cons": [
+        "शुरुआती के लिए जटिल हो सकता है",
+        "कुछ देश अवरुद्ध"
+      ]
+    },
+    "fa": {
+      "description": "1xBet یکی از بزرگترین شرکت‌های شرط‌بندی و بازی در جهان است. تأسیس 2007، مجوز کوراسائو 8048/JAZ. بیش از 1000 بازار روزانه در 50+ ورزش، به همراه کازینوی عظیم با هزاران بازی. پشتیبانی از 200+ روش پرداخت با اپ‌های اندروید و iOS. رابط عربی عالی و پشتیبانی 24/7.",
+      "pros": [
+        "بزرگترین بازار شرط‌بندی جهان",
+        "1000+ بازار روزانه",
+        "پخش زنده رایگان",
+        "کازینوی عظیم",
+        "برداشت فوری",
+        "200+ روش پرداخت",
+        "اپ حرفه‌ای"
+      ],
+      "cons": [
+        "ممکن است برای مبتدیان پیچیده باشد",
+        "برخی کشورها مسدود"
+      ]
+    },
+    "id": {
+      "description": "1xBet adalah salah satu perusahaan taruhan dan gaming terbesar di dunia. Didirikan tahun 2007, lisensi Curaçao 8048/JAZ. Menawarkan 1000+ pasar harian di 50+ olahraga, plus kasino masif dengan ribuan game. Mendukung 200+ metode pembayaran dengan aplikasi Android dan iOS. Antarmuka Arab yang sangat baik dan dukungan 24/7.",
+      "pros": [
+        "Pasar taruhan terbesar di dunia",
+        "1000+ pasar harian",
+        "Streaming langsung gratis",
+        "Kasino masif",
+        "Penarikan instan",
+        "200+ metode pembayaran",
+        "Aplikasi profesional"
+      ],
+      "cons": [
+        "Mungkin rumit untuk pemula",
+        "Beberapa negara diblokir"
+      ]
+    },
+    "ja": {
+      "description": "1xBetは世界最大級のベッティングおよびゲーミング企業の一つです。2007年設立、キュラソー8048/JAZライセンス。50以上のスポーツで1000以上の日次マーケット、数千のゲームを備えた大規模カジノ。200以上の決済方法、Android・iOSアプリ対応。優れたアラビア語インターフェースと24時間サポート。",
+      "pros": [
+        "世界最大のベッティング市場",
+        "1000+日次マーケット",
+        "無料ライブ配信",
+        "大規模カジノ",
+        "即時出金",
+        "200+決済方法",
+        "プロフェッショナルアプリ"
+      ],
+      "cons": [
+        "初心者には複雑な場合がある",
+        "一部国で制限あり"
+      ]
+    },
+    "ko": {
+      "description": "1xBet은 세계 최대의 베팅 및 게이밍 기업 중 하나입니다. 2007년 설립, 퀴라소 8048/JAZ 라이선스. 50개 이상의 스포츠에서 1000개 이상의 일일 마켓, 수천 개의 게임을 갖춘 대규모 카지노. 200개 이상의 결제 방식, Android 및 iOS 앱 지원. 뛰어난 아랍어 인터페이스와 24/7 지원.",
+      "pros": [
+        "세계 최대 베팅 시장",
+        "1000+ 일일 마켓",
+        "무료 라이브 스트리밍",
+        "대규모 카지노",
+        "즉시 출금",
+        "200+ 결제 방식",
+        "전문 앱"
+      ],
+      "cons": [
+        "초보자에게 복잡할 수 있음",
+        "일부 국가 차단됨"
+      ]
+    },
+    "th": {
+      "description": "1xBet เป็นหนึ่งในบริษัทเดิมพันและเกมที่ใหญ่ที่สุดในโลก ก่อตั้งปี 2007 ใบอนุญาตคูราเซา 8048/JAZ มีตลาดรายวันมากกว่า 1000 รายการใน 50+ กีฬา พร้อมคาสิโนขนาดใหญ่ที่มีเกมหลายพันรายการ รองรับวิธีการชำระเงินมากกว่า 200 วิธี พร้อมแอป Android และ iOS อินเทอร์เฟซภาษาอาหรับที่ยอดเยี่ยมและการสนับสนุน 24/7",
+      "pros": [
+        "ตลาดเดิมพันที่ใหญ่ที่สุดในโลก",
+        "1000+ ตลาดรายวัน",
+        "สตรีมมิ่งสดฟรี",
+        "คาสิโนขนาดใหญ่",
+        "การจ่ายเงินทันที",
+        "200+ วิธีชำระเงิน",
+        "แอปมืออาชีพ"
+      ],
+      "cons": [
+        "อาจซับซ้อนสำหรับผู้เริ่มต้น",
+        "บางประเทศถูกบล็อก"
+      ]
+    }
+  },
+  "MELBET": {
+    "color": "#1565C0",
+    "ar": {
+      "description": "Melbet هي شركة مراهنة مرخصة تأسست عام 2012 وحصلت على ترخيص كوراساو. تتميز بواجهة عربية سهلة الاستخدام واحتمالات عالية. تقدم دفعاً فورياً عبر فودافون كاش وSTC Pay وبنكي. الكازينو يضم أكثر من 5000 لعبة من أفضل المطورين العالميين. دعم فني عربي على مدار الساعة.",
+      "pros": [
+        "واجهة عربية ممتازة",
+        "دفع فوري فودافون كاش",
+        "5000+ لعبة كازينو",
+        "احتمالات عالية",
+        "بونص 130%",
+        "دعم عربي 24/7"
+      ],
+      "cons": [
+        "سرعة في بعض الدفعات",
+        "بعض الألعاب محظورة في مناطق معينة"
+      ]
+    },
+    "en": {
+      "description": "Melbet is a licensed betting company founded in 2012 with a Curaçao license. Features an excellent Arabic interface and high odds. Offers instant payouts via Vodafone Cash, STC Pay and Benki. Casino features 5000+ games from top developers. 24/7 Arabic support.",
+      "pros": [
+        "Excellent Arabic interface",
+        "Instant Vodafone Cash payouts",
+        "5000+ casino games",
+        "High odds",
+        "130% bonus",
+        "24/7 Arabic support"
+      ],
+      "cons": [
+        "Slow on some payouts",
+        "Some games restricted in certain regions"
+      ]
+    },
+    "fr": {
+      "description": "Melbet est une société de paris agréée fondée en 2012 et a obtenu une licence à Curaçao. Il se caractérise par une interface arabe facile à utiliser et des capacités élevées. Il propose un paiement instantané via Vodafone Cash, STC Pay et ma banque. Le casino comprend plus de 5 000 jeux des meilleurs développeurs internationaux. Assistance technique en arabe 24 heures sur 24.",
+      "pros": [
+        "Excellente interface arabe",
+        "Paiement instantané Vodafone Cash",
+        "Plus de 5000 jeux de casino",
+        "Cotes élevées",
+        "Bonus 130%",
+        "Assistance en arabe 24h/24 et 7j/7"
+      ],
+      "cons": [
+        "Rapidité dans certains lots",
+        "Certains jeux sont interdits dans certaines régions"
+      ]
+    },
+    "es": {
+      "description": "Melbet es una empresa de apuestas con licencia fundada en 2012 y obtuvo una licencia de Curazao. Se caracteriza por una interfaz árabe fácil de usar y altas capacidades. Ofrece pago instantáneo a través de Vodafone Cash, STC Pay y mi banco. El casino incluye más de 5.000 juegos de los mejores desarrolladores internacionales. Soporte técnico árabe las 24 horas.",
+      "pros": [
+        "Excelente interfaz árabe",
+        "Pago instantáneo Vodafone Efectivo",
+        "Más de 5000 juegos de casino",
+        "altas probabilidades",
+        "Bonificación 130%",
+        "Soporte árabe 24 horas al día, 7 días a la semana"
+      ],
+      "cons": [
+        "Velocidad en algunos lotes",
+        "Algunos juegos están prohibidos en determinadas regiones."
+      ]
+    },
+    "de": {
+      "description": "Melbet ist ein lizenziertes Wettunternehmen, das 2012 gegründet wurde und eine Curaçao-Lizenz erhalten hat. Es zeichnet sich durch eine einfach zu bedienende arabische Benutzeroberfläche und hohe Fähigkeiten aus. Es bietet sofortige Zahlung über Vodafone Cash, STC Pay und meine Bank. Das Casino umfasst mehr als 5.000 Spiele der besten internationalen Entwickler. Arabischer technischer Support rund um die Uhr.",
+      "pros": [
+        "Ausgezeichnete arabische Benutzeroberfläche",
+        "Sofortige Zahlung Vodafone Cash",
+        "Über 5000 Casinospiele",
+        "Hohe Chancen",
+        "Bonus 130 %",
+        "Arabischer Support rund um die Uhr"
+      ],
+      "cons": [
+        "Geschwindigkeit in einigen Chargen",
+        "Einige Spiele sind in bestimmten Regionen verboten"
+      ]
+    },
+    "it": {
+      "description": "Melbet è una società di scommesse autorizzata fondata nel 2012 e ha ottenuto una licenza Curaçao. È caratterizzato da un'interfaccia araba facile da usare e da elevate capacità. Offre il pagamento istantaneo tramite Vodafone Cash, STC Pay e la mia banca. Il casinò include più di 5.000 giochi dei migliori sviluppatori internazionali. Supporto tecnico in arabo 24 ore su 24.",
+      "pros": [
+        "Eccellente interfaccia araba",
+        "Pagamento immediato Vodafone Cash",
+        "Oltre 5000 giochi da casinò",
+        "Elevate probabilità",
+        "Bonus 130%",
+        "Supporto arabo 24 ore su 24, 7 giorni su 7"
+      ],
+      "cons": [
+        "Velocità in alcuni lotti",
+        "Alcuni giochi sono vietati in alcune regioni"
+      ]
+    },
+    "pt": {
+      "description": "Melbet é uma empresa de apostas licenciada fundada em 2012 e que obteve uma licença de Curaçao. É caracterizado por uma interface árabe fácil de usar e altos recursos. Oferece pagamento instantâneo via Vodafone Cash, STC Pay e meu banco. O cassino inclui mais de 5.000 jogos dos melhores desenvolvedores internacionais. Suporte técnico árabe 24 horas por dia.",
+      "pros": [
+        "Excelente interface árabe",
+        "Pagamento instantâneo Vodafone Cash",
+        "Mais de 5.000 jogos de cassino",
+        "Probabilidades altas",
+        "Bônus 130%",
+        "Suporte árabe 24 horas por dia, 7 dias por semana"
+      ],
+      "cons": [
+        "Velocidade em alguns lotes",
+        "Alguns jogos são proibidos em certas regiões"
+      ]
+    },
+    "ru": {
+      "description": "Melbet — лицензированная букмекерская компания, основанная в 2012 году и получившая лицензию Кюрасао. Он отличается простым в использовании арабским интерфейсом и высокими возможностями. Он предлагает мгновенную оплату через Vodafone Cash, STC Pay и мой банк. В казино представлено более 5000 игр от лучших мировых разработчиков. Арабская техническая поддержка круглосуточно.",
+      "pros": [
+        "Отличный арабский интерфейс",
+        "Мгновенная оплата Vodafone Cash",
+        "5000+ игр казино",
+        "Высокие шансы",
+        "Бонус 130%",
+        "Поддержка арабского языка 24/7"
+      ],
+      "cons": [
+        "Скорость в некоторых партиях",
+        "Некоторые игры запрещены в определенных регионах"
+      ]
+    },
+    "zh": {
+      "description": "Melbet 是一家持牌博彩公司，成立于 2012 年，并获得库拉索岛牌照。它的特点是易于使用的阿拉伯语界面和强大的功能。它通过沃达丰现金、STC Pay 和我的银行提供即时付款。赌场拥有来自最好的国际开发商的 5,000 多种游戏。全天候阿拉伯语技术支持。",
+      "pros": [
+        "优秀的阿拉伯语界面",
+        "即时支付沃达丰现金",
+        "5000+ 赌场游戏",
+        "高赔率",
+        "奖金130%",
+        "阿拉伯语支持 24/7"
+      ],
+      "cons": [
+        "部分批次的速度",
+        "某些游戏在某些地区被禁止"
+      ]
+    },
+    "tr": {
+      "description": "Melbet 2012 yılında kurulmuş ve Curaçao lisansı almış lisanslı bir bahis şirketidir. Kullanımı kolay bir Arapça arayüz ve yüksek yeteneklerle karakterizedir. Vodafone Cash, STC Pay ve bankam aracılığıyla anında ödeme olanağı sunuyor. Kumarhanede en iyi uluslararası geliştiricilerin 5.000'den fazla oyunu bulunmaktadır. Günün her saati Arapça teknik destek.",
+      "pros": [
+        "Mükemmel Arapça arayüz",
+        "Anında ödeme Vodafone Nakit",
+        "5000'den fazla kumarhane oyunu",
+        "Yüksek oranlar",
+        "Bonusu %130",
+        "Arapça desteği 7/24"
+      ],
+      "cons": [
+        "Bazı partilerde hız",
+        "Bazı oyunlar belirli bölgelerde yasaklandı"
+      ]
+    },
+    "ur": {
+      "description": "میلبیٹ ایک لائسنس یافتہ بیٹنگ کمپنی ہے جس کی بنیاد 2012 میں رکھی گئی تھی اور اس نے Curaçao لائسنس حاصل کیا تھا۔ اس کی خصوصیت استعمال میں آسان عربی انٹرفیس اور اعلیٰ صلاحیتوں سے ہے۔ یہ Vodafone Cash، STC Pay، اور My Bank کے ذریعے فوری ادائیگی کی پیشکش کرتا ہے۔ کیسینو میں بہترین بین الاقوامی ڈویلپرز کے 5,000 سے زیادہ گیمز شامل ہیں۔ چوبیس گھنٹے عربی تکنیکی مدد۔",
+      "pros": [
+        "بہترین عربی انٹرفیس",
+        "فوری ادائیگی ووڈافون کیش",
+        "5000+ کیسینو گیمز",
+        "اعلی مشکلات",
+        "بونس 130%",
+        "عربی سپورٹ 24/7"
+      ],
+      "cons": [
+        "کچھ بیچوں میں رفتار",
+        "بعض علاقوں میں کچھ گیمز پر پابندی ہے۔"
+      ]
+    },
+    "hi": {
+      "description": "मेलबेट एक लाइसेंस प्राप्त सट्टेबाजी कंपनी है जिसकी स्थापना 2012 में हुई थी और इसने कुराकाओ लाइसेंस प्राप्त किया था। यह उपयोग में आसान अरबी इंटरफ़ेस और उच्च क्षमताओं की विशेषता है। यह वोडाफोन कैश, एसटीसी पे और माय बैंक के माध्यम से तत्काल भुगतान की पेशकश करता है। कैसीनो में सर्वश्रेष्ठ अंतरराष्ट्रीय डेवलपर्स के 5,000 से अधिक गेम शामिल हैं। चौबीसों घंटे अरबी तकनीकी सहायता।",
+      "pros": [
+        "उत्कृष्ट अरबी इंटरफ़ेस",
+        "तत्काल भुगतान वोडाफोन कैश",
+        "5000+ कैसीनो गेम",
+        "उच्च संभावनाएँ",
+        "बोनस 130%",
+        "अरबी समर्थन 24/7"
+      ],
+      "cons": [
+        "कुछ बैचों में गति",
+        "कुछ खेलों पर कुछ क्षेत्रों में प्रतिबंध लगा दिया गया है"
+      ]
+    },
+    "fa": {
+      "description": "Melbet یک شرکت شرط بندی دارای مجوز است که در سال 2012 تأسیس شد و مجوز Curaçao را دریافت کرد. با رابط کاربری عربی آسان و قابلیت های بالا مشخص می شود. این پرداخت فوری از طریق Vodafone Cash، STC Pay و بانک من ارائه می دهد. کازینو شامل بیش از 5000 بازی از بهترین توسعه دهندگان بین المللی است. پشتیبانی فنی عربی شبانه روزی.",
+      "pros": [
+        "رابط عربی عالی",
+        "پرداخت فوری Vodafone Cash",
+        "بیش از 5000 بازی کازینو",
+        "شانس بالا",
+        "پاداش 130%",
+        "پشتیبانی عربی 24/7"
+      ],
+      "cons": [
+        "سرعت در برخی دسته ها",
+        "برخی از بازی ها در مناطق خاصی ممنوع هستند"
+      ]
+    },
+    "id": {
+      "description": "Melbet adalah perusahaan taruhan berlisensi yang didirikan pada tahun 2012 dan memperoleh lisensi Curaçao. Hal ini ditandai dengan antarmuka Arab yang mudah digunakan dan kemampuan tinggi. Ia menawarkan pembayaran instan melalui Vodafone Cash, STC Pay, dan bank saya. Kasino ini mencakup lebih dari 5.000 permainan dari pengembang internasional terbaik. Dukungan teknis bahasa Arab sepanjang waktu.",
+      "pros": [
+        "Antarmuka bahasa Arab yang luar biasa",
+        "Pembayaran instan Vodafone Tunai",
+        "5000+ permainan kasino",
+        "Peluang tinggi",
+        "Bonusnya 130%",
+        "Dukungan bahasa Arab 24/7"
+      ],
+      "cons": [
+        "Kecepatan dalam beberapa batch",
+        "Beberapa permainan dilarang di wilayah tertentu"
+      ]
+    },
+    "ja": {
+      "description": "Melbet は 2012 年に設立され、キュラソー島のライセンスを取得した認可された賭博会社です。使いやすいアラビア語インターフェースと高い機能が特徴です。 Vodafone Cash、STC Pay、および私の銀行を介した即時支払いを提供します。カジノには、最高の国際開発者による 5,000 以上のゲームが含まれています。アラビア語の技術サポートは 24 時間体制です。",
+      "pros": [
+        "優れたアラビア語インターフェース",
+        "即時支払い Vodafone Cash",
+        "5000以上のカジノゲーム",
+        "高い確率",
+        "ボーナス 130%",
+        "アラビア語サポート 24 時間年中無休"
+      ],
+      "cons": [
+        "一部のバッチでの速度",
+        "一部のゲームは特定の地域で禁止されています"
+      ]
+    },
+    "ko": {
+      "description": "Melbet은 2012년에 설립되어 Curaçao 라이센스를 취득한 라이센스 베팅 회사입니다. 사용하기 쉬운 아랍어 인터페이스와 높은 기능이 특징입니다. Vodafone Cash, STC Pay, 마이뱅크를 통해 즉시 결제가 가능합니다. 카지노에는 최고의 국제 개발자가 만든 5,000개 이상의 게임이 포함되어 있습니다. 24시간 내내 아랍어 기술 지원을 제공합니다.",
+      "pros": [
+        "뛰어난 아랍어 인터페이스",
+        "즉시결제 Vodafone Cash",
+        "5000개 이상의 카지노 게임",
+        "높은 확률",
+        "보너스 130%",
+        "연중무휴 아랍어 지원"
+      ],
+      "cons": [
+        "일부 배치의 속도",
+        "일부 게임은 특정 지역에서 금지됩니다"
+      ]
+    },
+    "th": {
+      "description": "Melbet เป็นบริษัทพนันที่ได้รับใบอนุญาต ก่อตั้งขึ้นในปี 2012 และได้รับใบอนุญาตCuraçao โดดเด่นด้วยอินเทอร์เฟซภาษาอาหรับที่ใช้งานง่ายและความสามารถสูง ให้บริการชำระเงินทันทีผ่าน Vodafone Cash, STC Pay และธนาคารของฉัน คาสิโนมีเกมมากกว่า 5,000 เกมจากผู้พัฒนาระดับนานาชาติที่ดีที่สุด การสนับสนุนทางเทคนิคภาษาอาหรับตลอดเวลา",
+      "pros": [
+        "อินเทอร์เฟซภาษาอาหรับที่ยอดเยี่ยม",
+        "ชำระเงินทันที Vodafone Cash",
+        "เกมคาสิโนมากกว่า 5,000 เกม",
+        "อัตราต่อรองสูง",
+        "โบนัส 130%",
+        "รองรับภาษาอาหรับตลอด 24 ชั่วโมงทุกวัน"
+      ],
+      "cons": [
+        "ความเร็วในบางชุด",
+        "เกมบางเกมถูกแบนในบางภูมิภาค"
+      ]
+    }
+  },
+  "BETJAM": {
+    "color": "#FF6D00",
+    "ar": {
+      "description": "Betjam هي شركة مراهنة ناشئة تأسست عام 2020 وحصلت على ترخيص كوراساو. تتميز بواجهة حديثة وسهلة الاستخدام مع تركيز على تجربة المستخدم العربي. تقدم بونص ترحيبي حصرية ودفع فوري عبر طرق الدفع المحلية. دعم عربي متميز.",
+      "pros": [
+        "واجهة حديثة",
+        "سرعة في الدفع",
+        "بونص حصري",
+        "دعم عربي متميز",
+        "سهولة الاستخدام"
+      ],
+      "cons": [
+        "شركة ناشئة",
+        "أسواق أقل من العلامات التجارية الراسخة"
+      ]
+    },
+    "en": {
+      "description": "Betjam is an emerging betting company founded in 2020 with a Curaçao license. Features a modern, easy-to-use interface focused on Arabic user experience. Offers exclusive welcome bonus and instant payouts via local payment methods. Outstanding Arabic support.",
+      "pros": [
+        "Modern interface",
+        "Fast payouts",
+        "Exclusive bonus",
+        "Outstanding Arabic support",
+        "Easy to use"
+      ],
+      "cons": [
+        "New company",
+        "Fewer markets than established brands"
+      ]
+    },
+    "fr": {
+      "description": "Betjam est une startup de paris fondée en 2020 et a obtenu une licence Curaçao. Il présente une interface moderne et facile à utiliser, axée sur l'expérience utilisateur arabe. Offrant un bonus de bienvenue exclusif et un paiement instantané via les méthodes de paiement locales. Support arabe distinctif.",
+      "pros": [
+        "Interface moderne",
+        "Vitesse de paiement",
+        "Bonus exclusif",
+        "Prise en charge arabe distinctive",
+        "Facilité d'utilisation"
+      ],
+      "cons": [
+        "Entreprise en démarrage",
+        "Moins de marchés que les marques établies"
+      ]
+    },
+    "es": {
+      "description": "Betjam es una startup de apuestas fundada en 2020 y obtuvo una licencia de Curazao. Cuenta con una interfaz moderna y fácil de usar centrada en la experiencia del usuario árabe. Ofreciendo un bono de bienvenida exclusivo y pago instantáneo a través de métodos de pago locales. Soporte árabe distintivo.",
+      "pros": [
+        "Interfaz moderna",
+        "Velocidad de pago",
+        "Bono exclusivo",
+        "Soporte árabe distintivo",
+        "Facilidad de uso"
+      ],
+      "cons": [
+        "empresa de nueva creación",
+        "Menos mercados que las marcas establecidas"
+      ]
+    },
+    "de": {
+      "description": "Betjam ist ein Wett-Startup, das 2020 gegründet wurde und eine Curaçao-Lizenz erhalten hat. Es verfügt über eine moderne und benutzerfreundliche Oberfläche mit Schwerpunkt auf der arabischen Benutzererfahrung. Bietet einen exklusiven Willkommensbonus und sofortige Zahlung über lokale Zahlungsmethoden. Ausgeprägte arabische Unterstützung.",
+      "pros": [
+        "Moderne Schnittstelle",
+        "Zahlungsgeschwindigkeit",
+        "Exklusiver Bonus",
+        "Ausgeprägte arabische Unterstützung",
+        "Benutzerfreundlichkeit"
+      ],
+      "cons": [
+        "Start-up-Unternehmen",
+        "Weniger Märkte als etablierte Marken"
+      ]
+    },
+    "it": {
+      "description": "Betjam è una startup di scommesse fondata nel 2020 e ha ottenuto una licenza Curaçao. È dotato di un'interfaccia moderna e facile da usare con particolare attenzione all'esperienza dell'utente arabo. Offre un bonus di benvenuto esclusivo e un pagamento immediato tramite metodi di pagamento locali. Supporto arabo distintivo.",
+      "pros": [
+        "Interfaccia moderna",
+        "Velocità di pagamento",
+        "Bonus esclusivo",
+        "Supporto arabo distintivo",
+        "Facilità d'uso"
+      ],
+      "cons": [
+        "Azienda in fase di avvio",
+        "Meno mercati rispetto ai marchi affermati"
+      ]
+    },
+    "pt": {
+      "description": "Betjam é uma startup de apostas fundada em 2020 e obteve licença de Curaçao. Possui uma interface moderna e fácil de usar com foco na experiência do usuário árabe. Oferecendo um bônus de boas-vindas exclusivo e pagamento instantâneo através de métodos de pagamento locais. Suporte árabe distinto.",
+      "pros": [
+        "Interface moderna",
+        "Velocidade de pagamento",
+        "Bônus exclusivo",
+        "Suporte árabe diferenciado",
+        "Facilidade de uso"
+      ],
+      "cons": [
+        "Empresa iniciante",
+        "Menos mercados do que marcas estabelecidas"
+      ]
+    },
+    "ru": {
+      "description": "Betjam — букмекерский стартап, основанный в 2020 году и получивший лицензию Кюрасао. Он имеет современный и простой в использовании интерфейс, ориентированный на арабских пользователей. Предлагает эксклюзивный приветственный бонус и мгновенную оплату местными способами оплаты. Отличительная арабская поддержка.",
+      "pros": [
+        "Современный интерфейс",
+        "Скорость оплаты",
+        "Эксклюзивный бонус",
+        "Отличительная арабская поддержка",
+        "Простота использования"
+      ],
+      "cons": [
+        "Стартап компания",
+        "Меньше рынков, чем у известных брендов"
+      ]
+    },
+    "zh": {
+      "description": "Betjam 是一家博彩初创公司，成立于 2020 年，并获得了库拉索岛牌照。它具有现代且易于使用的界面，重点关注阿拉伯用户体验。提供独家欢迎奖金并通过本地支付方式即时付款。独特的阿拉伯语支持。",
+      "pros": [
+        "现代界面",
+        "支付速度",
+        "独家奖金",
+        "独特的阿拉伯语支持",
+        "易于使用"
+      ],
+      "cons": [
+        "初创公司",
+        "市场少于知名品牌"
+      ]
+    },
+    "tr": {
+      "description": "Betjam, 2020 yılında kurulmuş ve Curaçao lisansı almış bir bahis girişimidir. Arap kullanıcı deneyimine odaklanan modern ve kullanımı kolay bir arayüze sahiptir. Özel bir hoş geldin bonusu ve yerel ödeme yöntemleriyle anında ödeme imkanı sunuyor. Ayırt edici Arapça desteği.",
+      "pros": [
+        "Modern arayüz",
+        "Ödeme hızı",
+        "Özel bonus",
+        "Ayırt edici Arapça desteği",
+        "Kullanım kolaylığı"
+      ],
+      "cons": [
+        "Yeni kurulan şirket",
+        "Yerleşik markalara göre daha az pazar"
+      ]
+    },
+    "ur": {
+      "description": "Betjam ایک بیٹنگ اسٹارٹ اپ ہے جس کی بنیاد 2020 میں رکھی گئی تھی اور اس نے Curaçao لائسنس حاصل کیا تھا۔ اس میں ایک جدید اور استعمال میں آسان انٹرفیس ہے جس میں عرب صارف کے تجربے پر توجہ دی گئی ہے۔ مقامی ادائیگی کے طریقوں کے ذریعے ایک خصوصی ویلکم بونس اور فوری ادائیگی کی پیشکش۔ مخصوص عربی سپورٹ۔",
+      "pros": [
+        "جدید انٹرفیس",
+        "ادائیگی کی رفتار",
+        "خصوصی بونس",
+        "مخصوص عربی سپورٹ",
+        "استعمال میں آسانی"
+      ],
+      "cons": [
+        "اسٹارٹ اپ کمپنی",
+        "قائم کردہ برانڈز کے مقابلے کم بازار"
+      ]
+    },
+    "hi": {
+      "description": "बेटजाम एक सट्टेबाजी स्टार्टअप है जिसकी स्थापना 2020 में हुई और इसने कुराकाओ लाइसेंस प्राप्त किया। इसमें अरब उपयोगकर्ता अनुभव पर ध्यान देने के साथ एक आधुनिक और उपयोग में आसान इंटरफ़ेस है। स्थानीय भुगतान विधियों के माध्यम से एक विशेष स्वागत बोनस और त्वरित भुगतान की पेशकश। विशिष्ट अरबी समर्थन.",
+      "pros": [
+        "आधुनिक इंटरफ़ेस",
+        "भुगतान की गति",
+        "विशेष बोनस",
+        "विशिष्ट अरबी समर्थन",
+        "उपयोग में आसानी"
+      ],
+      "cons": [
+        "स्टार्ट-अप कंपनी",
+        "स्थापित ब्रांडों की तुलना में कम बाज़ार"
+      ]
+    },
+    "fa": {
+      "description": "Bejam یک استارتاپ شرط بندی است که در سال 2020 تأسیس شد و مجوز Curaçao را دریافت کرد. این دارای یک رابط کاربری مدرن و آسان با تمرکز بر تجربه کاربر عرب است. ارائه یک جایزه خوش‌آمدگویی انحصاری و پرداخت فوری از طریق روش‌های پرداخت محلی. پشتیبانی متمایز عربی.",
+      "pros": [
+        "رابط مدرن",
+        "سرعت پرداخت",
+        "پاداش انحصاری",
+        "پشتیبانی متمایز عربی",
+        "سهولت استفاده"
+      ],
+      "cons": [
+        "شرکت نوپا",
+        "بازارهای کمتر از برندهای معتبر"
+      ]
+    },
+    "id": {
+      "description": "Betjam adalah startup taruhan yang didirikan pada tahun 2020 dan memperoleh lisensi Curaçao. Ini menampilkan antarmuka modern dan mudah digunakan dengan fokus pada pengalaman pengguna Arab. Menawarkan bonus sambutan eksklusif dan pembayaran instan melalui metode pembayaran lokal. Dukungan khas Arab.",
+      "pros": [
+        "Antarmuka modern",
+        "Kecepatan pembayaran",
+        "Bonus eksklusif",
+        "Dukungan khas Arab",
+        "Kemudahan penggunaan"
+      ],
+      "cons": [
+        "Perusahaan pemula",
+        "Lebih sedikit pasar dibandingkan merek yang sudah mapan"
+      ]
+    },
+    "ja": {
+      "description": "Betjam は 2020 年に設立され、キュラソー島のライセンスを取得した賭博スタートアップです。アラブのユーザー エクスペリエンスに重点を置いた、モダンで使いやすいインターフェイスが特徴です。特別なウェルカムボーナスと現地の支払い方法による即時支払いを提供します。独特のアラビア語のサポート。",
+      "pros": [
+        "最新のインターフェース",
+        "支払い速度",
+        "限定特典",
+        "独特のアラビア語のサポート",
+        "使いやすさ"
+      ],
+      "cons": [
+        "スタートアップ企業",
+        "確立されたブランドに比べて市場が少ない"
+      ]
+    },
+    "ko": {
+      "description": "Betjam은 2020년에 설립되어 Curaçao 라이센스를 취득한 베팅 스타트업입니다. 아랍 사용자 경험에 초점을 맞춘 현대적이고 사용하기 쉬운 인터페이스가 특징입니다. 현지 결제 수단을 통해 독점적인 환영 보너스와 즉시 결제를 제공합니다. 독특한 아랍어 지원.",
+      "pros": [
+        "현대적인 인터페이스",
+        "결제 속도",
+        "독점 보너스",
+        "독특한 아랍어 지원",
+        "사용의 용이성"
+      ],
+      "cons": [
+        "스타트업 회사",
+        "기존 브랜드에 비해 시장이 적음"
+      ]
+    },
+    "th": {
+      "description": "Betjam เป็นสตาร์ทอัพด้านการเดิมพันที่ก่อตั้งขึ้นในปี 2020 และได้รับใบอนุญาตCuraçao มีอินเทอร์เฟซที่ทันสมัยและใช้งานง่ายโดยเน้นที่ประสบการณ์ผู้ใช้ชาวอาหรับ เสนอโบนัสต้อนรับพิเศษและการชำระเงินทันทีผ่านวิธีการชำระเงินในท้องถิ่น การสนับสนุนภาษาอาหรับที่โดดเด่น",
+      "pros": [
+        "อินเตอร์เฟซที่ทันสมัย",
+        "ความเร็วในการชำระเงิน",
+        "โบนัสพิเศษ",
+        "การสนับสนุนภาษาอาหรับที่โดดเด่น",
+        "ใช้งานง่าย"
+      ],
+      "cons": [
+        "บริษัทสตาร์ทอัพ",
+        "ตลาดน้อยกว่าแบรนด์ที่จัดตั้งขึ้น"
+      ]
+    }
+  },
+  "MOSTBET": {
+    "color": "#2E7D32",
+    "ar": {
+      "description": "Mostbet هي شركة مراهنة روسية تأسست عام 2009 وحصلت على ترخيص كوراساو. تقدم أكثر من 800 سوق يومياً وتدعم رياضات متعددة. تتميز بسرعة السحب والدعم الفني المتخصص. واجهة عربية متوفرة وتطبيقات للهواتف.",
+      "pros": [
+        "سرعة السحب",
+        "800+ سوق يومياً",
+        "مجتمع نشط",
+        "تطبيق ممتاز",
+        "دعم فني متخصص"
+      ],
+      "cons": [
+        "واجهة ليست الأفضل",
+        "طرق دفع محدودة"
+      ]
+    },
+    "en": {
+      "description": "Mostbet is a Russian betting company founded in 2009 with a Curaçao license. Offers 800+ daily markets and supports multiple sports. Known for fast withdrawals and specialized support. Arabic interface available with mobile apps.",
+      "pros": [
+        "Fast withdrawals",
+        "800+ daily markets",
+        "Active community",
+        "Excellent app",
+        "Specialized support"
+      ],
+      "cons": [
+        "Interface could be better",
+        "Limited payment methods"
+      ]
+    },
+    "fr": {
+      "description": "Mostbet est une société de paris russe fondée en 2009 et agréée à Curaçao. Il propose quotidiennement plus de 800 marchés et prend en charge plusieurs sports. Il se caractérise par une vitesse de retrait rapide et un support technique spécialisé. Interface et applications arabes disponibles pour téléphones.",
+      "pros": [
+        "Vitesse de dessin",
+        "Plus de 800 marchés par jour",
+        "Communauté active",
+        "Excellente application",
+        "Support technique spécialisé"
+      ],
+      "cons": [
+        "L'interface n'est pas la meilleure",
+        "Méthodes de paiement limitées"
+      ]
+    },
+    "es": {
+      "description": "Mostbet es una empresa de apuestas rusa fundada en 2009 y con licencia en Curazao. Ofrece más de 800 mercados diarios y admite múltiples deportes. Se caracteriza por una rápida velocidad de retiro y soporte técnico especializado. Disponible interfaz árabe y aplicaciones para teléfonos.",
+      "pros": [
+        "Velocidad de dibujo",
+        "Más de 800 mercados diarios",
+        "Comunidad activa",
+        "Excelente aplicación",
+        "Soporte técnico especializado"
+      ],
+      "cons": [
+        "La interfaz no es la mejor.",
+        "Métodos de pago limitados"
+      ]
+    },
+    "de": {
+      "description": "Mostbet ist ein russisches Wettunternehmen, das 2009 gegründet wurde und in Curaçao lizenziert ist. Es bietet täglich mehr als 800 Märkte und unterstützt mehrere Sportarten. Es zeichnet sich durch schnelle Auszahlungsgeschwindigkeit und spezialisierten technischen Support aus. Verfügbare arabische Benutzeroberfläche und Anwendungen für Telefone.",
+      "pros": [
+        "Zeichengeschwindigkeit",
+        "Über 800 Märkte täglich",
+        "Aktive Gemeinschaft",
+        "Ausgezeichnete Anwendung",
+        "Spezialisierter technischer Support"
+      ],
+      "cons": [
+        "Schnittstelle ist nicht die beste",
+        "Begrenzte Zahlungsmethoden"
+      ]
+    },
+    "it": {
+      "description": "Mostbet è una società di scommesse russa fondata nel 2009 e autorizzata a Curaçao. Offre più di 800 mercati al giorno e supporta molteplici sport. È caratterizzato da una rapida velocità di ritiro e da un supporto tecnico specializzato. Disponibile interfaccia araba e applicazioni per telefoni.",
+      "pros": [
+        "Velocità di disegno",
+        "Oltre 800 mercati al giorno",
+        "Comunità attiva",
+        "Ottima applicazione",
+        "Supporto tecnico specializzato"
+      ],
+      "cons": [
+        "L'interfaccia non è delle migliori",
+        "Metodi di pagamento limitati"
+      ]
+    },
+    "pt": {
+      "description": "Mostbet é uma empresa de apostas russa fundada em 2009 e licenciada em Curaçao. Oferece mais de 800 mercados diariamente e oferece suporte a diversos esportes. Caracteriza-se pela rápida velocidade de retirada e suporte técnico especializado. Interface árabe disponível e aplicativos para telefones.",
+      "pros": [
+        "Velocidade de desenho",
+        "Mais de 800 mercados diariamente",
+        "Comunidade ativa",
+        "Excelente aplicação",
+        "Suporte técnico especializado"
+      ],
+      "cons": [
+        "Interface não é das melhores",
+        "Métodos de pagamento limitados"
+      ]
+    },
+    "ru": {
+      "description": "Мостбет — российская букмекерская компания, основанная в 2009 году и имеющая лицензию Кюрасао. Он ежедневно предлагает более 800 рынков и поддерживает несколько видов спорта. Он характеризуется быстрой скоростью вывода средств и специализированной технической поддержкой. Доступен арабский интерфейс и приложения для телефонов.",
+      "pros": [
+        "Скорость рисования",
+        "800+ рынков ежедневно",
+        "Активное сообщество",
+        "Отличное приложение",
+        "Специализированная техническая поддержка"
+      ],
+      "cons": [
+        "Интерфейс не лучший",
+        "Ограниченные способы оплаты"
+      ]
+    },
+    "zh": {
+      "description": "Mostbet 是一家俄罗斯博彩公司，成立于 2009 年，并在库拉索岛获得许可。它每天提供 800 多个市场，并支持多种运动。其特点是提现速度快、技术支持专业。可用的手机阿拉伯语界面和应用程序。",
+      "pros": [
+        "绘图速度",
+        "每天 800 多个市场",
+        "活跃的社区",
+        "优秀的应用",
+        "专业技术支持"
+      ],
+      "cons": [
+        "界面不是最好的",
+        "付款方式有限"
+      ]
+    },
+    "tr": {
+      "description": "Mostbet, 2009 yılında kurulmuş ve Curaçao'da lisanslı bir Rus bahis şirketidir. Günlük 800'den fazla pazar sunuyor ve birden fazla sporu destekliyor. Hızlı para çekme hızı ve özel teknik destek ile karakterizedir. Telefonlar için mevcut Arapça arayüz ve uygulamalar.",
+      "pros": [
+        "Çizim hızı",
+        "Günlük 800'den fazla pazar",
+        "Aktif topluluk",
+        "Mükemmel uygulama",
+        "Uzmanlaşmış teknik destek"
+      ],
+      "cons": [
+        "Arayüz en iyisi değil",
+        "Sınırlı ödeme yöntemleri"
+      ]
+    },
+    "ur": {
+      "description": "Mostbet ایک روسی بیٹنگ کمپنی ہے جس کی بنیاد 2009 میں رکھی گئی تھی اور Curaçao میں لائسنس یافتہ ہے۔ یہ روزانہ 800 سے زیادہ بازار پیش کرتا ہے اور متعدد کھیلوں کو سپورٹ کرتا ہے۔ یہ تیز رفتار واپسی کی رفتار اور خصوصی تکنیکی مدد کی طرف سے خصوصیات ہے. دستیاب عربی انٹرفیس اور فونز کے لیے ایپلی کیشنز۔",
+      "pros": [
+        "ڈرائنگ کی رفتار",
+        "روزانہ 800+ مارکیٹیں۔",
+        "فعال کمیونٹی",
+        "بہترین درخواست",
+        "خصوصی تکنیکی مدد"
+      ],
+      "cons": [
+        "انٹرفیس بہترین نہیں ہے۔",
+        "ادائیگی کے محدود طریقے"
+      ]
+    },
+    "hi": {
+      "description": "मोस्टबेट एक रूसी सट्टेबाजी कंपनी है जिसकी स्थापना 2009 में हुई थी और इसे कुराकाओ में लाइसेंस प्राप्त है। यह प्रतिदिन 800 से अधिक बाज़ारों की पेशकश करता है और कई खेलों का समर्थन करता है। इसकी विशेषता तेज़ निकासी गति और विशेष तकनीकी सहायता है। फोन के लिए अरबी इंटरफ़ेस और एप्लिकेशन उपलब्ध हैं।",
+      "pros": [
+        "ड्राइंग गति",
+        "प्रतिदिन 800+ बाज़ार",
+        "सक्रिय समुदाय",
+        "उत्कृष्ट अनुप्रयोग",
+        "विशिष्ट तकनीकी सहायता"
+      ],
+      "cons": [
+        "इंटरफ़ेस सर्वोत्तम नहीं है",
+        "सीमित भुगतान विधियाँ"
+      ]
+    },
+    "fa": {
+      "description": "Mostbet یک شرکت شرط بندی روسی است که در سال 2009 تأسیس شد و در کوراسائو مجوز گرفت. روزانه بیش از 800 بازار ارائه می دهد و از ورزش های متعدد پشتیبانی می کند. با سرعت برداشت سریع و پشتیبانی فنی تخصصی مشخص می شود. رابط عربی و برنامه های کاربردی موجود برای گوشی ها.",
+      "pros": [
+        "سرعت ترسیم",
+        "800+ بازار روزانه",
+        "جامعه فعال",
+        "برنامه عالی",
+        "پشتیبانی فنی تخصصی"
+      ],
+      "cons": [
+        "رابط کاربری بهترین نیست",
+        "روش های پرداخت محدود"
+      ]
+    },
+    "id": {
+      "description": "Mostbet adalah perusahaan taruhan Rusia yang didirikan pada tahun 2009 dan berlisensi di Curaçao. Ini menawarkan lebih dari 800 pasar setiap hari dan mendukung berbagai olahraga. Hal ini ditandai dengan kecepatan penarikan yang cepat dan dukungan teknis khusus. Antarmuka dan aplikasi berbahasa Arab yang tersedia untuk ponsel.",
+      "pros": [
+        "Kecepatan menggambar",
+        "800+ pasar setiap hari",
+        "Komunitas aktif",
+        "Aplikasi luar biasa",
+        "Dukungan teknis khusus"
+      ],
+      "cons": [
+        "Antarmuka bukan yang terbaik",
+        "Metode pembayaran terbatas"
+      ]
+    },
+    "ja": {
+      "description": "Mostbet は、2009 年に設立され、キュラソー島でライセンスを取得したロシアの賭博会社です。毎日 800 以上のマーケットを提供し、複数のスポーツをサポートしています。出金スピードの速さと専門的な技術サポートが特徴です。電話用のアラビア語インターフェイスとアプリケーションが利用可能です。",
+      "pros": [
+        "描画速度",
+        "毎日 800 以上の市場",
+        "アクティブなコミュニティ",
+        "優れたアプリケーション",
+        "専門的な技術サポート"
+      ],
+      "cons": [
+        "インターフェースが最高ではない",
+        "限られた支払い方法"
+      ]
+    },
+    "ko": {
+      "description": "Mostbet은 2009년에 설립되어 Curaçao에서 라이센스를 받은 러시아 베팅 회사입니다. 매일 800개 이상의 시장을 제공하며 다양한 스포츠를 지원합니다. 빠른 출금 속도와 전문적인 기술 지원이 특징입니다. 휴대폰용 아랍어 인터페이스 및 애플리케이션을 사용할 수 있습니다.",
+      "pros": [
+        "그리기 속도",
+        "매일 800개 이상의 시장",
+        "활발한 커뮤니티",
+        "우수한 적용",
+        "전문적인 기술 지원"
+      ],
+      "cons": [
+        "인터페이스가 최고는 아니다",
+        "제한된 결제 수단"
+      ]
+    },
+    "th": {
+      "description": "Mostbet เป็นบริษัทพนันสัญชาติรัสเซียที่ก่อตั้งในปี 2009 และได้รับอนุญาตใน Curaçao ให้บริการตลาดมากกว่า 800 แห่งทุกวันและรองรับกีฬาหลายประเภท โดดเด่นด้วยความเร็วในการถอนเงินที่รวดเร็วและการสนับสนุนทางเทคนิคเฉพาะทาง มีอินเทอร์เฟซและแอปพลิเคชันภาษาอาหรับสำหรับโทรศัพท์",
+      "pros": [
+        "ความเร็วในการวาด",
+        "ตลาดมากกว่า 800 แห่งทุกวัน",
+        "ชุมชนที่ใช้งานอยู่",
+        "แอปพลิเคชั่นที่ยอดเยี่ยม",
+        "การสนับสนุนด้านเทคนิคเฉพาะทาง"
+      ],
+      "cons": [
+        "อินเทอร์เฟซไม่ได้ดีที่สุด",
+        "วิธีการชำระเงินมีจำกัด"
+      ]
+    }
+  },
+  "BIZBET": {
+    "color": "#7B1FA2",
+    "ar": {
+      "description": "Bizbet هي شركة مراهنة مرخصة تأسست عام 2018. تتميز بسهولة الاستخدام وسرعة المعاملات. تقدم بونص ترحيبي ودفع فوري. دعم عربي على مدار الساعة وواجهة محسّنة للهاتف.",
+      "pros": [
+        "سهولة الاستخدام",
+        "سرعة المعاملات",
+        "بونص ترحيبي",
+        "دعم عربي",
+        "واجهة محسّنة للهاتف"
+      ],
+      "cons": [
+        "أقل شهرة",
+        "عروض أقل"
+      ]
+    },
+    "en": {
+      "description": "Bizbet is a licensed betting company founded in 2018. Known for ease of use and fast transactions. Offers welcome bonus and instant payouts. 24/7 Arabic support with mobile-optimized interface.",
+      "pros": [
+        "Easy to use",
+        "Fast transactions",
+        "Welcome bonus",
+        "Arabic support",
+        "Mobile-optimized"
+      ],
+      "cons": [
+        "Less known",
+        "Fewer promotions"
+      ]
+    },
+    "fr": {
+      "description": "Bizbet est une société de paris agréée fondée en 2018. Elle se caractérise par sa facilité d'utilisation et sa vitesse de transaction rapide. Offre un bonus de bienvenue et un paiement instantané. Assistance en arabe 24 heures sur 24 et interface téléphonique améliorée.",
+      "pros": [
+        "Facilité d'utilisation",
+        "Vitesse des transactions",
+        "Bonus de bienvenue",
+        "Prise en charge de l'arabe",
+        "Interface téléphonique améliorée"
+      ],
+      "cons": [
+        "Moins connu",
+        "Moins d'offres"
+      ]
+    },
+    "es": {
+      "description": "Bizbet es una empresa de apuestas con licencia fundada en 2018. Se caracteriza por su facilidad de uso y su rápida velocidad de transacción. Ofrece un bono de bienvenida y pago instantáneo. Soporte árabe las 24 horas y una interfaz telefónica mejorada.",
+      "pros": [
+        "Facilidad de uso",
+        "Velocidad de transacción",
+        "Bono de bienvenida",
+        "Soporte árabe",
+        "Interfaz telefónica mejorada"
+      ],
+      "cons": [
+        "Menos conocido",
+        "Menos ofertas"
+      ]
+    },
+    "de": {
+      "description": "Bizbet ist ein lizenziertes Wettunternehmen, das 2018 gegründet wurde. Es zeichnet sich durch Benutzerfreundlichkeit und schnelle Transaktionsgeschwindigkeit aus. Bietet einen Willkommensbonus und sofortige Zahlung. Arabischer Support rund um die Uhr und eine verbesserte Telefonschnittstelle.",
+      "pros": [
+        "Benutzerfreundlichkeit",
+        "Transaktionsgeschwindigkeit",
+        "Willkommensbonus",
+        "Arabische Unterstützung",
+        "Verbesserte Telefonschnittstelle"
+      ],
+      "cons": [
+        "Weniger bekannt",
+        "Weniger Angebote"
+      ]
+    },
+    "it": {
+      "description": "Bizbet è una società di scommesse autorizzata fondata nel 2018. Si caratterizza per la facilità d'uso e l'elevata velocità delle transazioni. Offre un bonus di benvenuto e un pagamento immediato. Supporto arabo 24 ore su 24 e interfaccia telefonica migliorata.",
+      "pros": [
+        "Facilità d'uso",
+        "Velocità di transazione",
+        "Bonus di benvenuto",
+        "Supporto arabo",
+        "Interfaccia telefonica migliorata"
+      ],
+      "cons": [
+        "Meno conosciuto",
+        "Meno offerte"
+      ]
+    },
+    "pt": {
+      "description": "Bizbet é uma empresa de apostas licenciada fundada em 2018. Caracteriza-se pela facilidade de uso e rápida velocidade de transação. Oferece um bônus de boas-vindas e pagamento instantâneo. Suporte árabe 24 horas por dia e uma interface de telefone aprimorada.",
+      "pros": [
+        "Facilidade de uso",
+        "Velocidade de transação",
+        "Bônus de boas-vindas",
+        "Suporte árabe",
+        "Interface de telefone aprimorada"
+      ],
+      "cons": [
+        "Menos conhecido",
+        "Menos ofertas"
+      ]
+    },
+    "ru": {
+      "description": "Bizbet — лицензированная букмекерская компания, основанная в 2018 году. Ее отличает простота использования и высокая скорость транзакций. Предлагает приветственный бонус и мгновенную оплату. Круглосуточная арабская поддержка и улучшенный интерфейс телефона.",
+      "pros": [
+        "Простота использования",
+        "Скорость транзакции",
+        "Приветственный бонус",
+        "Арабская поддержка",
+        "Улучшен интерфейс телефона."
+      ],
+      "cons": [
+        "Менее известный",
+        "Меньше предложений"
+      ]
+    },
+    "zh": {
+      "description": "Bizbet是一家成立于2018年的持牌博彩公司。其特点是易于使用、交易速度快。提供欢迎奖金和即时付款。全天候阿拉伯语支持和改进的电话界面。",
+      "pros": [
+        "易于使用",
+        "交易速度",
+        "欢迎奖金",
+        "阿拉伯语支持",
+        "改进的电话界面"
+      ],
+      "cons": [
+        "鲜为人知",
+        "优惠减少"
+      ]
+    },
+    "tr": {
+      "description": "Bizbet, 2018 yılında kurulmuş lisanslı bir bahis şirketidir. Kullanım kolaylığı ve hızlı işlem hızı ile öne çıkmaktadır. Hoş geldin bonusu ve anında ödeme imkanı sunar. Günün her saati Arapça desteği ve geliştirilmiş telefon arayüzü.",
+      "pros": [
+        "Kullanım kolaylığı",
+        "İşlem hızı",
+        "Hoş geldin bonusu",
+        "Arapça desteği",
+        "Geliştirilmiş telefon arayüzü"
+      ],
+      "cons": [
+        "Daha az bilinen",
+        "Daha az teklif"
+      ]
+    },
+    "ur": {
+      "description": "Bizbet ایک لائسنس یافتہ بیٹنگ کمپنی ہے جس کی بنیاد 2018 میں رکھی گئی تھی۔ اس کی خصوصیت استعمال میں آسانی اور لین دین کی تیز رفتار ہے۔ ایک خوش آئند بونس اور فوری ادائیگی کی پیشکش کرتا ہے۔ چوبیس گھنٹے عربی سپورٹ اور ایک بہتر فون انٹرفیس۔",
+      "pros": [
+        "استعمال میں آسانی",
+        "لین دین کی رفتار",
+        "خوش آمدید بونس",
+        "عربی حمایت",
+        "بہتر فون انٹرفیس"
+      ],
+      "cons": [
+        "کم معلوم",
+        "کم آفرز"
+      ]
+    },
+    "hi": {
+      "description": "बिज़बेट 2018 में स्थापित एक लाइसेंस प्राप्त सट्टेबाजी कंपनी है। यह उपयोग में आसानी और तेज़ लेनदेन गति की विशेषता है। एक स्वागत योग्य बोनस और त्वरित भुगतान प्रदान करता है। चौबीसों घंटे अरबी समर्थन और एक बेहतर फ़ोन इंटरफ़ेस।",
+      "pros": [
+        "उपयोग में आसानी",
+        "लेनदेन की गति",
+        "स्वागत बोनस",
+        "अरबी समर्थन",
+        "बेहतर फ़ोन इंटरफ़ेस"
+      ],
+      "cons": [
+        "कम ज्ञात",
+        "कम ऑफर"
+      ]
+    },
+    "fa": {
+      "description": "Bizbet یک شرکت شرط بندی دارای مجوز است که در سال 2018 تأسیس شد. ویژگی آن سهولت در استفاده و سرعت تراکنش سریع است. یک جایزه خوش آمدگویی و پرداخت فوری ارائه می دهد. پشتیبانی شبانه روزی عربی و رابط تلفن بهبود یافته.",
+      "pros": [
+        "سهولت استفاده",
+        "سرعت تراکنش",
+        "پاداش خوش آمد گویی",
+        "پشتیبانی عربی",
+        "رابط تلفن بهبود یافته"
+      ],
+      "cons": [
+        "کمتر شناخته شده است",
+        "پیشنهادات کمتر"
+      ]
+    },
+    "id": {
+      "description": "Bizbet adalah perusahaan taruhan berlisensi yang didirikan pada tahun 2018. Hal ini ditandai dengan kemudahan penggunaan dan kecepatan transaksi yang cepat. Menawarkan bonus selamat datang dan pembayaran instan. Dukungan bahasa Arab sepanjang waktu dan antarmuka telepon yang ditingkatkan.",
+      "pros": [
+        "Kemudahan penggunaan",
+        "Kecepatan transaksi",
+        "Bonus selamat datang",
+        "dukungan bahasa Arab",
+        "Antarmuka telepon yang ditingkatkan"
+      ],
+      "cons": [
+        "Kurang diketahui",
+        "Lebih sedikit penawaran"
+      ]
+    },
+    "ja": {
+      "description": "Bizbet は 2018 年に設立された認可された賭博会社です。使いやすさと取引速度の速さが特徴です。ウェルカムボーナスと即時支払いを提供します。アラビア語は 24 時間サポートされ、電話インターフェイスが改善されました。",
+      "pros": [
+        "使いやすさ",
+        "トランザクション速度",
+        "ウェルカムボーナス",
+        "アラビア語のサポート",
+        "電話インターフェースの改善"
+      ],
+      "cons": [
+        "あまり知られていない",
+        "オファーが少ない"
+      ]
+    },
+    "ko": {
+      "description": "비즈벳은 2018년에 설립된 라이센스 배팅 회사입니다. 사용 편의성과 빠른 거래 속도가 특징입니다. 환영 보너스와 즉시 결제를 제공합니다. 24시간 내내 아랍어가 지원되며 전화 인터페이스가 개선되었습니다.",
+      "pros": [
+        "사용의 용이성",
+        "거래 속도",
+        "환영 보너스",
+        "아랍어 지원",
+        "향상된 전화 인터페이스"
+      ],
+      "cons": [
+        "덜 알려진",
+        "더 적은 제안"
+      ]
+    },
+    "th": {
+      "description": "Bizbet เป็นบริษัทพนันที่ได้รับใบอนุญาต ก่อตั้งในปี 2018 โดดเด่นด้วยความสะดวกในการใช้งานและความเร็วในการทำธุรกรรมที่รวดเร็ว เสนอโบนัสต้อนรับและการชำระเงินทันที รองรับภาษาอาหรับตลอดเวลาและอินเทอร์เฟซโทรศัพท์ที่ได้รับการปรับปรุง",
+      "pros": [
+        "ใช้งานง่าย",
+        "ความเร็วของการทำธุรกรรม",
+        "โบนัสต้อนรับ",
+        "การสนับสนุนภาษาอาหรับ",
+        "อินเทอร์เฟซโทรศัพท์ที่ได้รับการปรับปรุง"
+      ],
+      "cons": [
+        "รู้จักกันน้อย",
+        "ข้อเสนอที่น้อยลง"
+      ]
+    }
+  },
+  "XPARI": {
+    "color": "#00838F",
+    "ar": {
+      "description": "Xpari هي شركة مراهنة مرخصة تقدم تجربة مراهنة شاملة. تتميز بالاحتمالات العالية والمجتمع النشط. تقدم أكثر من 50 رياضة وأكثر من 1000 سوق يومياً. دفع فوري ودعم عربي.",
+      "pros": [
+        "احتمالات عالية",
+        "مجتمع نشط",
+        "50+ رياضة",
+        "1000+ سوق",
+        "دفع فوري"
+      ],
+      "cons": [
+        "علامة تجارية أقل شهرة",
+        "دعم عملاء محدود"
+      ]
+    },
+    "en": {
+      "description": "Xpari is a licensed betting company offering a comprehensive betting experience. Features high odds and active community. Offers 50+ sports and 1000+ daily markets. Instant payouts and Arabic support.",
+      "pros": [
+        "High odds",
+        "Active community",
+        "50+ sports",
+        "1000+ markets",
+        "Instant payouts"
+      ],
+      "cons": [
+        "Less known brand",
+        "Limited customer support"
+      ]
+    },
+    "fr": {
+      "description": "Xpari est une société de paris agréée qui propose une expérience de pari tout-en-un. Il présente des cotes élevées et une communauté active. Proposant plus de 50 sports et plus de 1 000 marchés quotidiennement. Paiement instantané et support en arabe.",
+      "pros": [
+        "Cotes élevées",
+        "Communauté active",
+        "50+ sports",
+        "1000+ marchés",
+        "Paiement instantané"
+      ],
+      "cons": [
+        "Marque moins connue",
+        "Support client limité"
+      ]
+    },
+    "es": {
+      "description": "Xpari es una empresa de apuestas con licencia que ofrece una experiencia de apuestas todo en uno. Presenta altas probabilidades y una comunidad activa. Ofreciendo más de 50 deportes y más de 1000 mercados diarios. Pago instantáneo y soporte árabe.",
+      "pros": [
+        "altas probabilidades",
+        "Comunidad activa",
+        "Más de 50 deportes",
+        "Más de 1000 mercados",
+        "Pago instantáneo"
+      ],
+      "cons": [
+        "Marca menos conocida",
+        "Atención al cliente limitada"
+      ]
+    },
+    "de": {
+      "description": "Xpari ist ein lizenziertes Wettunternehmen, das ein All-in-One-Wetterlebnis bietet. Es zeichnet sich durch hohe Gewinnchancen und eine aktive Community aus. Bietet täglich über 50 Sportarten und über 1.000 Märkte. Sofortige Zahlung und arabischer Support.",
+      "pros": [
+        "Hohe Chancen",
+        "Aktive Gemeinschaft",
+        "50+ Sport",
+        "Über 1000 Märkte",
+        "Sofortige Zahlung"
+      ],
+      "cons": [
+        "Weniger bekannte Marke",
+        "Eingeschränkter Kundensupport"
+      ]
+    },
+    "it": {
+      "description": "Xpari è una società di scommesse autorizzata che offre un'esperienza di scommesse tutto in uno. Presenta quote elevate e una comunità attiva. Offre oltre 50 sport e oltre 1.000 mercati al giorno. Pagamento immediato e supporto in arabo.",
+      "pros": [
+        "Elevate probabilità",
+        "Comunità attiva",
+        "Oltre 50 sport",
+        "Oltre 1000 mercati",
+        "Pagamento immediato"
+      ],
+      "cons": [
+        "Marchio meno conosciuto",
+        "Assistenza clienti limitata"
+      ]
+    },
+    "pt": {
+      "description": "Xpari é uma empresa de apostas licenciada que oferece uma experiência de apostas completa. Possui probabilidades altas e uma comunidade ativa. Oferecendo mais de 50 esportes e mais de 1.000 mercados diariamente. Pagamento instantâneo e suporte em árabe.",
+      "pros": [
+        "Probabilidades altas",
+        "Comunidade ativa",
+        "Mais de 50 esportes",
+        "Mais de 1000 mercados",
+        "Pagamento instantâneo"
+      ],
+      "cons": [
+        "Marca menos conhecida",
+        "Suporte ao cliente limitado"
+      ]
+    },
+    "ru": {
+      "description": "Xpari — лицензированная букмекерская компания, предлагающая универсальные возможности ставок. Он отличается высокими коэффициентами и активным сообществом. Ежедневно предлагает более 50 видов спорта и более 1000 рынков. Мгновенная оплата и поддержка на арабском языке.",
+      "pros": [
+        "Высокие шансы",
+        "Активное сообщество",
+        "50+ видов спорта",
+        "1000+ рынков",
+        "Мгновенная оплата"
+      ],
+      "cons": [
+        "Менее известный бренд",
+        "Ограниченная поддержка клиентов"
+      ]
+    },
+    "zh": {
+      "description": "Xpari 是一家获得许可的博彩公司，提供一体化博彩体验。它具有高赔率和活跃的社区。每天提供 50 多种体育运动和 1,000 多个市场。即时付款和阿拉伯语支持。",
+      "pros": [
+        "高赔率",
+        "活跃的社区",
+        "50+ 运动",
+        "1000+ 市场",
+        "即时支付"
+      ],
+      "cons": [
+        "不太知名的品牌",
+        "有限的客户支持"
+      ]
+    },
+    "tr": {
+      "description": "Xpari, hepsi bir arada bahis deneyimi sunan lisanslı bir bahis şirketidir. Yüksek oranlara ve aktif bir topluluğa sahiptir. Günlük 50'den fazla spor ve 1.000'den fazla pazar sunuyor. Anında ödeme ve Arapça desteği.",
+      "pros": [
+        "Yüksek oranlar",
+        "Aktif topluluk",
+        "50+ Spor",
+        "1000'den fazla pazar",
+        "Anında ödeme"
+      ],
+      "cons": [
+        "Daha az bilinen marka",
+        "Sınırlı müşteri desteği"
+      ]
+    },
+    "ur": {
+      "description": "Xpari ایک لائسنس یافتہ بیٹنگ کمپنی ہے جو بیٹنگ کا ایک مکمل تجربہ پیش کرتی ہے۔ یہ اعلی مشکلات اور ایک فعال کمیونٹی کی خصوصیات ہے. روزانہ 50 سے زیادہ کھیلوں اور 1,000 سے زیادہ مارکیٹوں کی پیشکش۔ فوری ادائیگی اور عربی سپورٹ۔",
+      "pros": [
+        "اعلی مشکلات",
+        "فعال کمیونٹی",
+        "50+ کھیل",
+        "1000+ مارکیٹس",
+        "فوری ادائیگی"
+      ],
+      "cons": [
+        "کم معروف برانڈ",
+        "محدود کسٹمر سپورٹ"
+      ]
+    },
+    "hi": {
+      "description": "एक्सपारी एक लाइसेंस प्राप्त सट्टेबाजी कंपनी है जो ऑल-इन-वन सट्टेबाजी अनुभव प्रदान करती है। इसमें उच्च संभावनाएँ और एक सक्रिय समुदाय है। प्रतिदिन 50 से अधिक खेलों और 1,000 से अधिक बाजारों की पेशकश। त्वरित भुगतान और अरबी समर्थन।",
+      "pros": [
+        "उच्च संभावनाएँ",
+        "सक्रिय समुदाय",
+        "50+ खेल",
+        "1000+ बाजार",
+        "तुरंत भुगतान"
+      ],
+      "cons": [
+        "कम ज्ञात ब्रांड",
+        "सीमित ग्राहक सहायता"
+      ]
+    },
+    "fa": {
+      "description": "Xpari یک شرکت شرط بندی دارای مجوز است که یک تجربه شرط بندی همه در یک را ارائه می دهد. دارای شانس بالا و یک جامعه فعال است. ارائه بیش از 50 ورزش و بیش از 1000 بازار روزانه. پرداخت آنی و پشتیبانی عربی.",
+      "pros": [
+        "شانس بالا",
+        "جامعه فعال",
+        "50+ ورزش",
+        "1000+ بازار",
+        "پرداخت آنی"
+      ],
+      "cons": [
+        "نام تجاری کمتر شناخته شده",
+        "پشتیبانی مشتری محدود"
+      ]
+    },
+    "id": {
+      "description": "Xpari adalah perusahaan taruhan berlisensi yang menawarkan pengalaman taruhan lengkap. Ini menampilkan peluang tinggi dan komunitas aktif. Menawarkan lebih dari 50 olahraga dan lebih dari 1.000 pasar setiap hari. Pembayaran instan dan dukungan bahasa Arab.",
+      "pros": [
+        "Peluang tinggi",
+        "Komunitas aktif",
+        "50+ Olahraga",
+        "1000+ pasar",
+        "Pembayaran instan"
+      ],
+      "cons": [
+        "Merek yang kurang dikenal",
+        "Dukungan pelanggan terbatas"
+      ]
+    },
+    "ja": {
+      "description": "Xpari は、オールインワンのベッティング体験を提供する認可を受けたベッティング会社です。高いオッズと活発なコミュニティが特徴です。毎日 50 以上のスポーツと 1,000 以上のマーケットを提供します。即時支払いとアラビア語のサポート。",
+      "pros": [
+        "高い確率",
+        "アクティブなコミュニティ",
+        "50以上のスポーツ",
+        "1000以上の市場",
+        "即時支払い"
+      ],
+      "cons": [
+        "あまり知られていないブランド",
+        "限定的なカスタマーサポート"
+      ]
+    },
+    "ko": {
+      "description": "Xpari는 올인원 베팅 경험을 제공하는 라이센스를 받은 베팅 회사입니다. 높은 확률과 활발한 커뮤니티가 특징입니다. 매일 50개 이상의 스포츠와 1,000개 이상의 시장을 제공합니다. 즉시 결제 및 아랍어 지원.",
+      "pros": [
+        "높은 확률",
+        "활발한 커뮤니티",
+        "50개 이상의 스포츠",
+        "1000개 이상의 시장",
+        "즉시결제"
+      ],
+      "cons": [
+        "덜 알려진 브랜드",
+        "제한된 고객 지원"
+      ]
+    },
+    "th": {
+      "description": "Xpari เป็นบริษัทพนันที่ได้รับใบอนุญาตซึ่งนำเสนอประสบการณ์การเดิมพันแบบครบวงจร มันมีอัตราต่อรองสูงและชุมชนที่กระตือรือร้น นำเสนอกีฬามากกว่า 50 รายการและตลาดมากกว่า 1,000 รายการทุกวัน การชำระเงินทันทีและการสนับสนุนภาษาอาหรับ",
+      "pros": [
+        "อัตราต่อรองสูง",
+        "ชุมชนที่ใช้งานอยู่",
+        "กีฬามากกว่า 50 รายการ",
+        "ตลาดมากกว่า 1,000 แห่ง",
+        "ชำระเงินทันที"
+      ],
+      "cons": [
+        "แบรนด์ที่ไม่ค่อยมีใครรู้จัก",
+        "การสนับสนุนลูกค้ามีจำกัด"
+      ]
+    }
+  },
+  "LINEBET": {
+    "color": "#3949AB",
+    "ar": {
+      "description": "Linebet هي شركة مراهنة مرخصة تأسست عام 2012. تتميز بواجهة بسيطة وسهلة الاستخدام مع سرعة في المعاملات. تقدم أكثر من 40 رياضة وكازينو ضخم. دعم فني عربي ودفع فوري.",
+      "pros": [
+        "واجهة بسيطة",
+        "سرعة المعاملات",
+        "كازينو ضخم",
+        "دعم عربي",
+        "40+ رياضة"
+      ],
+      "cons": [
+        "واجهة بسيطة جداً",
+        "تغطية إسبورت محدودة"
+      ]
+    },
+    "en": {
+      "description": "Linebet is a licensed betting company founded in 2012. Features a simple, easy-to-use interface with fast transactions. Offers 40+ sports and a huge casino. Arabic support and instant payouts.",
+      "pros": [
+        "Simple interface",
+        "Fast transactions",
+        "Huge casino",
+        "Arabic support",
+        "40+ sports"
+      ],
+      "cons": [
+        "Very simple interface",
+        "Limited esports coverage"
+      ]
+    },
+    "fr": {
+      "description": "Linebet est une société de paris agréée fondée en 2012. Elle possède une interface simple et facile à utiliser avec des vitesses de transaction rapides. Offrant plus de 40 sports et un immense casino. Support technique arabe et paiement immédiat.",
+      "pros": [
+        "Interface simple",
+        "Vitesse des transactions",
+        "Immense casino",
+        "Prise en charge de l'arabe",
+        "40+ sports"
+      ],
+      "cons": [
+        "Interface très simple",
+        "La couverture Esport est limitée"
+      ]
+    },
+    "es": {
+      "description": "Linebet es una empresa de apuestas con licencia fundada en 2012. Tiene una interfaz sencilla y fácil de usar con velocidades de transacción rápidas. Ofreciendo más de 40 deportes y un enorme casino. Soporte técnico árabe y pago inmediato.",
+      "pros": [
+        "Interfaz sencilla",
+        "Velocidad de transacción",
+        "Casino enorme",
+        "Soporte árabe",
+        "Más de 40 deportes"
+      ],
+      "cons": [
+        "Interfaz muy simple",
+        "La cobertura de deportes electrónicos es limitada"
+      ]
+    },
+    "de": {
+      "description": "Linebet ist ein lizenziertes Wettunternehmen, das 2012 gegründet wurde. Es verfügt über eine einfache und benutzerfreundliche Oberfläche mit schnellen Transaktionsgeschwindigkeiten. Bietet über 40 Sportarten und ein riesiges Casino. Arabischer technischer Support und sofortige Zahlung.",
+      "pros": [
+        "Einfache Schnittstelle",
+        "Transaktionsgeschwindigkeit",
+        "Riesiges Casino",
+        "Arabische Unterstützung",
+        "40+ Sport"
+      ],
+      "cons": [
+        "Sehr einfache Schnittstelle",
+        "Die E-Sport-Berichterstattung ist begrenzt"
+      ]
+    },
+    "it": {
+      "description": "Linebet è una società di scommesse autorizzata fondata nel 2012. Ha un'interfaccia semplice e facile da usare con velocità di transazione elevate. Offre oltre 40 sport e un enorme casinò. Supporto tecnico in arabo e pagamento immediato.",
+      "pros": [
+        "Interfaccia semplice",
+        "Velocità di transazione",
+        "Casinò enorme",
+        "Supporto arabo",
+        "Oltre 40 sport"
+      ],
+      "cons": [
+        "Interfaccia molto semplice",
+        "La copertura degli eSport è limitata"
+      ]
+    },
+    "pt": {
+      "description": "Linebet é uma empresa de apostas licenciada fundada em 2012. Possui uma interface simples e fácil de usar com velocidades de transação rápidas. Oferecendo mais de 40 esportes e um enorme cassino. Suporte técnico árabe e pagamento imediato.",
+      "pros": [
+        "Interface simples",
+        "Velocidade de transação",
+        "Cassino enorme",
+        "Suporte árabe",
+        "Mais de 40 esportes"
+      ],
+      "cons": [
+        "Interface muito simples",
+        "A cobertura esportiva é limitada"
+      ]
+    },
+    "ru": {
+      "description": "Linebet — лицензированная букмекерская компания, основанная в 2012 году. Она имеет простой и удобный интерфейс с высокой скоростью транзакций. Предлагает более 40 видов спорта и огромное казино. Техническая поддержка на арабском языке и немедленная оплата.",
+      "pros": [
+        "Простой интерфейс",
+        "Скорость транзакции",
+        "Огромное казино",
+        "Арабская поддержка",
+        "40+ Спорт"
+      ],
+      "cons": [
+        "Очень простой интерфейс",
+        "Охват киберспорта ограничен"
+      ]
+    },
+    "zh": {
+      "description": "Linebet是一家成立于2012年的持牌博彩公司。它拥有简单易用的界面和快速的交易速度。提供 40 多种体育项目和一个大型赌场。阿拉伯语技术支持和立即付款。",
+      "pros": [
+        "界面简单",
+        "交易速度",
+        "巨大的赌场",
+        "阿拉伯语支持",
+        "40+ 运动"
+      ],
+      "cons": [
+        "界面非常简单",
+        "电子竞技覆盖范围有限"
+      ]
+    },
+    "tr": {
+      "description": "Linebet, 2012 yılında kurulmuş lisanslı bir bahis şirketidir. Yüksek işlem hızlarına sahip, basit ve kullanımı kolay bir arayüze sahiptir. 40'tan fazla spor ve büyük bir kumarhane sunuyor. Arapça teknik destek ve anında ödeme.",
+      "pros": [
+        "Basit arayüz",
+        "İşlem hızı",
+        "Büyük kumarhane",
+        "Arapça desteği",
+        "40+ Spor"
+      ],
+      "cons": [
+        "Çok basit arayüz",
+        "Espor kapsamı sınırlıdır"
+      ]
+    },
+    "ur": {
+      "description": "لائن بیٹ ایک لائسنس یافتہ بیٹنگ کمپنی ہے جس کی بنیاد 2012 میں رکھی گئی تھی۔ اس کے پاس لین دین کی تیز رفتار کے ساتھ آسان اور استعمال میں آسان انٹرفیس ہے۔ 40 سے زیادہ کھیلوں اور ایک بہت بڑا کیسینو پیش کرنا۔ عربی تکنیکی مدد اور فوری ادائیگی۔",
+      "pros": [
+        "سادہ انٹرفیس",
+        "لین دین کی رفتار",
+        "بہت بڑا کیسینو",
+        "عربی حمایت",
+        "40+ کھیل"
+      ],
+      "cons": [
+        "بہت آسان انٹرفیس",
+        "اسپورٹس کوریج محدود ہے۔"
+      ]
+    },
+    "hi": {
+      "description": "लाइनबेट 2012 में स्थापित एक लाइसेंस प्राप्त सट्टेबाजी कंपनी है। इसमें तेज लेनदेन गति के साथ एक सरल और उपयोग में आसान इंटरफ़ेस है। 40 से अधिक खेलों और एक विशाल कैसीनो की पेशकश। अरबी तकनीकी सहायता और तत्काल भुगतान।",
+      "pros": [
+        "सरल इंटरफ़ेस",
+        "लेनदेन की गति",
+        "विशाल कैसीनो",
+        "अरबी समर्थन",
+        "40+ खेल"
+      ],
+      "cons": [
+        "बहुत ही सरल इंटरफ़ेस",
+        "ईस्पोर्ट कवरेज सीमित है"
+      ]
+    },
+    "fa": {
+      "description": "Linebet یک شرکت شرط بندی دارای مجوز است که در سال 2012 تأسیس شد. این یک رابط کاربری ساده و آسان با سرعت تراکنش های سریع دارد. ارائه بیش از 40 ورزش و یک کازینو بزرگ. پشتیبانی فنی عربی و پرداخت فوری.",
+      "pros": [
+        "رابط کاربری ساده",
+        "سرعت تراکنش",
+        "کازینو بزرگ",
+        "پشتیبانی عربی",
+        "40+ ورزش"
+      ],
+      "cons": [
+        "رابط کاربری بسیار ساده",
+        "پوشش ورزشی محدود است"
+      ]
+    },
+    "id": {
+      "description": "Linebet adalah perusahaan taruhan berlisensi yang didirikan pada tahun 2012. Memiliki antarmuka yang sederhana dan mudah digunakan dengan kecepatan transaksi yang cepat. Menawarkan lebih dari 40 olahraga dan kasino besar. Dukungan teknis bahasa Arab dan pembayaran segera.",
+      "pros": [
+        "Antarmuka yang sederhana",
+        "Kecepatan transaksi",
+        "Kasino besar",
+        "dukungan bahasa Arab",
+        "40+ Olahraga"
+      ],
+      "cons": [
+        "Antarmuka yang sangat sederhana",
+        "Cakupan esport terbatas"
+      ]
+    },
+    "ja": {
+      "description": "Linebet は、2012 年に設立されたライセンスを取得した賭博会社です。シンプルで使いやすいインターフェイスと高速な取引速度を備えています。 40 以上のスポーツと巨大なカジノを提供します。アラビア語の技術サポートと即時支払い。",
+      "pros": [
+        "シンプルなインターフェース",
+        "トランザクション速度",
+        "巨大なカジノ",
+        "アラビア語のサポート",
+        "40以上のスポーツ"
+      ],
+      "cons": [
+        "非常にシンプルなインターフェース",
+        "eスポーツの対象範囲は限られています"
+      ]
+    },
+    "ko": {
+      "description": "Linebet은 2012년에 설립된 라이센스 베팅 회사입니다. 빠른 거래 속도와 간단하고 사용하기 쉬운 인터페이스를 갖추고 있습니다. 40개 이상의 스포츠와 거대한 카지노를 제공합니다. 아랍어 기술 지원 및 즉시 결제.",
+      "pros": [
+        "간단한 인터페이스",
+        "거래 속도",
+        "거대한 카지노",
+        "아랍어 지원",
+        "40+ 스포츠"
+      ],
+      "cons": [
+        "매우 간단한 인터페이스",
+        "e스포츠 적용 범위가 제한되어 있습니다."
+      ]
+    },
+    "th": {
+      "description": "Linebet เป็นบริษัทพนันที่ได้รับใบอนุญาต ก่อตั้งขึ้นในปี 2555 มีอินเทอร์เฟซที่เรียบง่ายและใช้งานง่ายพร้อมความเร็วการทำธุรกรรมที่รวดเร็ว มีกีฬามากกว่า 40 รายการและคาสิโนขนาดใหญ่ การสนับสนุนด้านเทคนิคภาษาอาหรับและการชำระเงินทันที",
+      "pros": [
+        "อินเตอร์เฟซที่เรียบง่าย",
+        "ความเร็วของการทำธุรกรรม",
+        "คาสิโนขนาดใหญ่",
+        "การสนับสนุนภาษาอาหรับ",
+        "กีฬามากกว่า 40 รายการ"
+      ],
+      "cons": [
+        "อินเทอร์เฟซที่เรียบง่ายมาก",
+        "ความคุ้มครอง Esport มีจำกัด"
+      ]
+    }
+  },
+  "GOOOBET": {
+    "color": "#C2185B",
+    "ar": {
+      "description": "Gooobet هي شركة مراهنة حديثة تقدم تجربة مراهنة مبتكرة. تتميز بواجهة عصرية وسرعة في التحميل. تقدم ألعاب كازينو متنوعة وبرامج ولاء حصرية.",
+      "pros": [
+        "تجربة مبتكرة",
+        "واجهة عصرية",
+        "سرعة تحميل",
+        "ألعاب متنوعة",
+        "برامج ولاء"
+      ],
+      "cons": [
+        "جديدة جداً",
+        "لا تزال تبني سمعتها"
+      ]
+    },
+    "en": {
+      "description": "Gooobet is a modern betting company offering an innovative betting experience. Features a trendy design and fast loading. Offers diverse casino games and exclusive loyalty programs.",
+      "pros": [
+        "Innovative experience",
+        "Trendy design",
+        "Fast loading",
+        "Diverse games",
+        "Loyalty programs"
+      ],
+      "cons": [
+        "Very new",
+        "Still building reputation"
+      ]
+    },
+    "fr": {
+      "description": "Gooobet est une société de paris moderne qui propose une expérience de pari innovante. Il présente une interface moderne et un chargement rapide. Il propose divers jeux de casino et des programmes de fidélité exclusifs.",
+      "pros": [
+        "Une expérience innovante",
+        "Interface moderne",
+        "Vitesse de téléchargement",
+        "Jeux divers",
+        "Programmes de fidélité"
+      ],
+      "cons": [
+        "Très nouveau",
+        "Toujours en train de bâtir sa réputation"
+      ]
+    },
+    "es": {
+      "description": "Gooobet es una empresa de apuestas moderna que ofrece una experiencia de apuestas innovadora. Cuenta con una interfaz moderna y carga rápida. Ofrece varios juegos de casino y programas de fidelización exclusivos.",
+      "pros": [
+        "Una experiencia innovadora",
+        "Interfaz moderna",
+        "Velocidad de descarga",
+        "Varios juegos",
+        "Programas de fidelización"
+      ],
+      "cons": [
+        "muy nuevo",
+        "Sigue construyendo su reputación"
+      ]
+    },
+    "de": {
+      "description": "Gooobet ist ein modernes Wettunternehmen, das ein innovatives Wetterlebnis bietet. Es verfügt über eine moderne Benutzeroberfläche und schnelles Laden. Es bietet verschiedene Casinospiele und exklusive Treueprogramme.",
+      "pros": [
+        "Ein innovatives Erlebnis",
+        "Moderne Schnittstelle",
+        "Download-Geschwindigkeit",
+        "Verschiedene Spiele",
+        "Treueprogramme"
+      ],
+      "cons": [
+        "Sehr neu",
+        "Baut seinen Ruf immer noch auf"
+      ]
+    },
+    "it": {
+      "description": "Gooobet è una moderna società di scommesse che offre un'esperienza di scommessa innovativa. Presenta un'interfaccia moderna e un caricamento veloce. Offre vari giochi da casinò e programmi fedeltà esclusivi.",
+      "pros": [
+        "Un'esperienza innovativa",
+        "Interfaccia moderna",
+        "Velocità di download",
+        "Giochi vari",
+        "Programmi fedeltà"
+      ],
+      "cons": [
+        "Molto nuovo",
+        "Sta ancora costruendo la sua reputazione"
+      ]
+    },
+    "pt": {
+      "description": "Gooobet é uma empresa de apostas moderna que oferece uma experiência de apostas inovadora. Possui uma interface moderna e carregamento rápido. Oferece vários jogos de cassino e programas de fidelidade exclusivos.",
+      "pros": [
+        "Uma experiência inovadora",
+        "Interface moderna",
+        "Velocidade de download",
+        "Vários jogos",
+        "Programas de fidelidade"
+      ],
+      "cons": [
+        "Muito novo",
+        "Ainda construindo sua reputação"
+      ]
+    },
+    "ru": {
+      "description": "Gooobet — современная букмекерская компания, предлагающая инновационные возможности ставок. Он отличается современным интерфейсом и быстрой загрузкой. Он предлагает различные игры казино и эксклюзивные программы лояльности.",
+      "pros": [
+        "Инновационный опыт",
+        "Современный интерфейс",
+        "Скорость загрузки",
+        "Различные игры",
+        "Программы лояльности"
+      ],
+      "cons": [
+        "Очень новый",
+        "Продолжаем строить свою репутацию"
+      ]
+    },
+    "zh": {
+      "description": "Gooobet 是一家提供创新投注体验的现代化投注公司。它具有现代化的界面和快速加载。它提供各种赌场游戏和独家忠诚度计划。",
+      "pros": [
+        "创新体验",
+        "现代界面",
+        "下载速度",
+        "各种游戏",
+        "忠诚度计划"
+      ],
+      "cons": [
+        "很新",
+        "仍在建立声誉"
+      ]
+    },
+    "tr": {
+      "description": "Gooobet yenilikçi bir bahis deneyimi sunan modern bir bahis şirketidir. Modern bir arayüze ve hızlı yüklemeye sahiptir. Çeşitli casino oyunları ve özel sadakat programları sunmaktadır.",
+      "pros": [
+        "Yenilikçi bir deneyim",
+        "Modern arayüz",
+        "İndirme hızı",
+        "Çeşitli oyunlar",
+        "Sadakat programları"
+      ],
+      "cons": [
+        "Çok yeni",
+        "Halen itibarını artırıyor"
+      ]
+    },
+    "ur": {
+      "description": "Gooobet ایک جدید بیٹنگ کمپنی ہے جو بیٹنگ کا ایک جدید تجربہ پیش کرتی ہے۔ اس میں جدید انٹرفیس اور تیز لوڈنگ کی خصوصیات ہیں۔ یہ مختلف کیسینو گیمز اور خصوصی لائلٹی پروگرام پیش کرتا ہے۔",
+      "pros": [
+        "ایک جدید تجربہ",
+        "جدید انٹرفیس",
+        "ڈاؤن لوڈ کی رفتار",
+        "مختلف کھیل",
+        "وفاداری کے پروگرام"
+      ],
+      "cons": [
+        "بہت نیا",
+        "اب بھی اپنی ساکھ بنا رہا ہے۔"
+      ]
+    },
+    "hi": {
+      "description": "Gooobet एक आधुनिक सट्टेबाजी कंपनी है जो एक अभिनव सट्टेबाजी अनुभव प्रदान करती है। इसमें आधुनिक इंटरफ़ेस और तेज़ लोडिंग की सुविधा है। यह विभिन्न कैसीनो गेम और विशेष लॉयल्टी कार्यक्रम प्रदान करता है।",
+      "pros": [
+        "एक अभिनव अनुभव",
+        "आधुनिक इंटरफ़ेस",
+        "डाउनलोड की गति",
+        "विभिन्न खेल",
+        "विश्वसनीयता कार्यक्रम"
+      ],
+      "cons": [
+        "बहुत नया",
+        "अभी भी अपनी प्रतिष्ठा बना रहा है"
+      ]
+    },
+    "fa": {
+      "description": "Gooobet یک شرکت شرط بندی مدرن است که یک تجربه شرط بندی نوآورانه را ارائه می دهد. دارای یک رابط مدرن و بارگذاری سریع است. این بازی های مختلف کازینو و برنامه های وفاداری انحصاری را ارائه می دهد.",
+      "pros": [
+        "یک تجربه نوآورانه",
+        "رابط مدرن",
+        "سرعت دانلود",
+        "بازی های مختلف",
+        "برنامه های وفاداری"
+      ],
+      "cons": [
+        "بسیار جدید",
+        "هنوز هم شهرت خود را می سازد"
+      ]
+    },
+    "id": {
+      "description": "Gooobet adalah perusahaan taruhan modern yang menawarkan pengalaman taruhan inovatif. Ini fitur antarmuka modern dan pemuatan cepat. Ini menawarkan berbagai permainan kasino dan program loyalitas eksklusif.",
+      "pros": [
+        "Pengalaman yang inovatif",
+        "Antarmuka modern",
+        "Kecepatan unduh",
+        "Berbagai permainan",
+        "Program loyalitas"
+      ],
+      "cons": [
+        "Sangat baru",
+        "Masih membangun reputasinya"
+      ]
+    },
+    "ja": {
+      "description": "Gooobet は、革新的なベッティング体験を提供する現代的なベッティング会社です。最新のインターフェイスと高速な読み込みが特徴です。さまざまなカジノ ゲームや特別なロイヤルティ プログラムを提供しています。",
+      "pros": [
+        "革新的な体験",
+        "最新のインターフェース",
+        "ダウンロード速度",
+        "いろいろなゲーム",
+        "ロイヤルティ プログラム"
+      ],
+      "cons": [
+        "とても新しい",
+        "まだ評判を築いています"
+      ]
+    },
+    "ko": {
+      "description": "Gooobet은 혁신적인 베팅 경험을 제공하는 현대적인 베팅 회사입니다. 현대적인 인터페이스와 빠른 로딩이 특징입니다. 다양한 카지노 게임과 독점적인 로열티 프로그램을 제공합니다.",
+      "pros": [
+        "혁신적인 경험",
+        "현대적인 인터페이스",
+        "다운로드 속도",
+        "다양한 게임",
+        "로열티 프로그램"
+      ],
+      "cons": [
+        "아주 새로운",
+        "아직도 그 명성을 쌓아가고 있습니다."
+      ]
+    },
+    "th": {
+      "description": "Gooobet คือบริษัทเดิมพันสมัยใหม่ที่นำเสนอประสบการณ์การเดิมพันที่เป็นนวัตกรรมใหม่ มันมีอินเทอร์เฟซที่ทันสมัยและการโหลดที่รวดเร็ว มีเกมคาสิโนหลากหลายและโปรแกรมความภักดีพิเศษ",
+      "pros": [
+        "ประสบการณ์ที่สร้างสรรค์",
+        "อินเตอร์เฟซที่ทันสมัย",
+        "ความเร็วในการดาวน์โหลด",
+        "เกมส์ต่างๆ",
+        "โปรแกรมความภักดี"
+      ],
+      "cons": [
+        "ใหม่มาก",
+        "ยังคงสร้างชื่อเสียง"
+      ]
+    }
+  }
+}

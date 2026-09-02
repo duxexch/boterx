@@ -1818,30 +1818,28 @@ def index():
     """Landing page (public) — admin dashboard redirect only when logged in."""
     if session.get('logged_in'):
         return redirect(url_for('dashboard'), code=303)
-    # SSR companies for SEO (global)
+    _tr_data = _read_company_translations()
     try:
         _comps = []
         for c in read_csv('companies.csv'):
             if (c.get('is_active','') or '').lower() not in ('active','yes','1','true'):
                 continue
-            # SEO fallback
             slug = c.get('id','').lower().replace(' ','-')
+            name = c.get('name','')
+            comp_tr = _tr_data.get(name, {})
             _comps.append({
                 'id': c.get('id',''),
                 'slug': slug,
-                'name': c.get('name',''),
+                'name': name,
                 'icon': c.get('icon','') or '🏢',
                 'affiliate_link': c.get('affiliate_link',''),
                 'promo_code': c.get('promo_code',''),
                 'address': c.get('address',''),
-                'license': c.get('license','Curacao 8048/JAZ') if c.get('license') else 'Curacao 8048/JAZ',
-                'founded': c.get('founded','2007') if c.get('founded') else '2007',
-                'rating': c.get('rating','4.8') if c.get('rating') else '4.8',
-                'headquarters': c.get('headquarters','Cyprus') if c.get('headquarters') else 'Cyprus',
+                'color': comp_tr.get('color', '#16a34a'),
                 'app_link': c.get('app_link',''),
             })
     except: _comps=[]
-    return render_template('landing.html', companies=_comps)
+    return render_template('landing.html', companies=_comps, company_translations=json.dumps(_tr_data, ensure_ascii=False))
 
 
 COMPANY_COLORS = {
@@ -1898,20 +1896,24 @@ def company_detail(company_id):
             return 'Company not found', 404
 
         name = company.get('name', '')
-        accent = COMPANY_COLORS.get(name, '#16a34a')
-        description = COMPANY_DESCRIPTIONS.get(name, f'{name} شركة مراهنة مرخصة بمقرها في {company.get("headquarters", "Cyprus")}، تأسست عام {company.get("founded", "2007")}. تقدم بونص ترحيبي ودفع فوري ودعم عربي.')
-        pros = COMPANY_PROS.get(name, ['دفع فوري', 'دعم عربي', 'بونص ترحيبي'])
-        cons = COMPANY_CONS.get(name, ['محدودية في بعض الدول'])
+        _tr_data = _read_company_translations()
+        comp_tr = _tr_data.get(name, {})
+        accent = comp_tr.get('color', '#16a34a')
+        ar_tr = comp_tr.get('ar', {})
+        description = ar_tr.get('description', f'{name} شركة مراهنة مرخصة.')
+        pros = ar_tr.get('pros', ['دفع فوري', 'دعم عربي', 'بونص ترحيبي'])
+        cons = ar_tr.get('cons', ['محدودية في بعض الدول'])
 
-        # Similar companies (exclude current)
         similar = []
         for c in all_companies:
             if c.get('id') != company_id and (c.get('is_active', '').lower() in ('active', 'yes', '1', 'true')):
+                s_tr = _tr_data.get(c.get('name',''), {})
                 similar.append({
                     'id': c.get('id', ''),
                     'name': c.get('name', ''),
                     'icon': c.get('icon', '') or '',
                     'rating': c.get('rating', '4.8') or '4.8',
+                    'color': s_tr.get('color', '#16a34a'),
                 })
             if len(similar) >= 4:
                 break
@@ -1934,6 +1936,7 @@ def company_detail(company_id):
             },
             accent_color=accent,
             similar=similar,
+            company_translations=json.dumps(comp_tr, ensure_ascii=False),
         )
     except Exception as e:
         return f'Error: {str(e)}', 500
@@ -8102,6 +8105,137 @@ def api_edit_company(company_id):
         write_csv('companies.csv', companies, fieldnames)
         log_action('edit_company', company_id)
         return jsonify({'success': True})
+
+# ===== Company Translations System =====
+import urllib.parse as _urlparse
+
+_COMPANY_TRANSLATIONS_FILE = os.path.join(BASE_DIR, 'company_translations.json')
+
+def _read_company_translations():
+    try:
+        with open(_COMPANY_TRANSLATIONS_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except:
+        return {}
+
+def _write_company_translations(data):
+    tmp = _COMPANY_TRANSLATIONS_FILE + '.tmp'
+    with open(tmp, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, _COMPANY_TRANSLATIONS_FILE)
+
+def _google_translate_text(text, src_lang, tgt_lang):
+    if src_lang == tgt_lang or not text or not text.strip():
+        return text
+    try:
+        url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=' + src_lang + '&tl=' + tgt_lang + '&dt=t&q=' + _urlparse.quote(text)
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        resp = urllib.request.urlopen(req, timeout=15)
+        data = json.loads(resp.read().decode())
+        return ''.join([s[0] for s in data[0] if s[0]])
+    except:
+        return text
+
+ALL_TRANSLATION_LANGS = ['ar','en','fr','es','de','it','pt','ru','zh','tr','ur','hi','fa','id','ja','ko','th']
+
+@app.route('/api/companies/<company_id>/translations', methods=['GET'])
+@api_auth
+@permission_required('manage_companies')
+def api_get_company_translations(company_id):
+    data = _read_company_translations()
+    companies = read_csv('companies.csv')
+    company_name = ''
+    for c in companies:
+        if c.get('id') == company_id:
+            company_name = c.get('name', '')
+            break
+    if not company_name:
+        return jsonify({'error': 'Company not found'}), 404
+    return jsonify({'translations': data.get(company_name, {}), 'company_name': company_name, 'languages': ALL_TRANSLATION_LANGS})
+
+@app.route('/api/companies/<company_id>/translations', methods=['PUT'])
+@api_auth
+@permission_required('manage_companies')
+def api_save_company_translations(company_id):
+    data = _read_company_translations()
+    companies = read_csv('companies.csv')
+    company_name = ''
+    for c in companies:
+        if c.get('id') == company_id:
+            company_name = c.get('name', '')
+            break
+    if not company_name:
+        return jsonify({'error': 'Company not found'}), 404
+    body = request.json
+    if company_name not in data:
+        data[company_name] = {}
+    if 'color' in body:
+        data[company_name]['color'] = body['color']
+    if 'translations' in body:
+        for lang, tr in body['translations'].items():
+            data[company_name][lang] = tr
+    _write_company_translations(data)
+    log_action('save_company_translations', company_id)
+    return jsonify({'success': True})
+
+@app.route('/api/companies/<company_id>/translate', methods=['POST'])
+@api_auth
+@permission_required('manage_companies')
+def api_auto_translate_company(company_id):
+    data = _read_company_translations()
+    companies = read_csv('companies.csv')
+    company_name = ''
+    for c in companies:
+        if c.get('id') == company_id:
+            company_name = c.get('name', '')
+            break
+    if not company_name:
+        return jsonify({'error': 'Company not found'}), 404
+    body = request.json or {}
+    src_lang = body.get('source_lang', 'ar')
+    target_langs = body.get('target_langs', [l for l in ALL_TRANSLATION_LANGS if l != src_lang])
+    if company_name not in data:
+        data[company_name] = {}
+    src = data[company_name].get(src_lang, {})
+    if not src or not src.get('description'):
+        return jsonify({'error': 'No source translations found for ' + src_lang}), 400
+    translated = {}
+    for lang in target_langs:
+        desc = _google_translate_text(src['description'], src_lang, lang)
+        time.sleep(0.3)
+        pros = [_google_translate_text(p, src_lang, lang) for p in src.get('pros', [])]
+        time.sleep(0.3)
+        cons = [_google_translate_text(c, src_lang, lang) for c in src.get('cons', [])]
+        time.sleep(0.3)
+        translated[lang] = {'description': desc, 'pros': pros, 'cons': cons}
+    for lang, tr in translated.items():
+        data[company_name][lang] = tr
+    _write_company_translations(data)
+    log_action('auto_translate_company', company_id, details=f'{src_lang} -> {len(target_langs)} languages')
+    return jsonify({'success': True, 'translated': len(translated), 'languages': target_langs})
+
+@app.route('/api/company-public/<company_id>/translations')
+def api_public_company_translations(company_id):
+    lang = request.args.get('lang', 'ar')
+    data = _read_company_translations()
+    companies = read_csv('companies.csv')
+    company_name = ''
+    for c in companies:
+        if c.get('id') == company_id:
+            company_name = c.get('name', '')
+            break
+    if not company_name:
+        return jsonify({})
+    return jsonify(data.get(company_name, {}).get(lang, {}))
+
+@app.route('/api/public/company-translations/<lang>')
+def api_public_all_translations(lang):
+    data = _read_company_translations()
+    result = {}
+    for name, translations in data.items():
+        result[name] = translations.get(lang, translations.get('ar', {}))
+        result[name]['color'] = translations.get('color', '#16a34a')
+    return jsonify(result)
 
 # ===== نظام التعويض (Compensation) — player web flow + admin approvals =====
 
