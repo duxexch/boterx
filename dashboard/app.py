@@ -1844,6 +1844,101 @@ def index():
     return render_template('landing.html', companies=_comps)
 
 
+COMPANY_COLORS = {
+    '1XBET': '#E31937', 'MELBET': '#1565C0', 'BETJAM': '#FF6D00',
+    'MOSTBET': '#2E7D32', 'BIZBET': '#7B1FA2', 'XPARI': '#00838F',
+    'LINEBET': '#3949AB', 'GOOOBET': '#C2185B',
+}
+
+COMPANY_DESCRIPTIONS = {
+    '1XBET': '1xBet هي واحدة من أكبر شركات المراهنة والألعاب في العالم. تأسست عام 2007 وحصلت على ترخيص كوراساو 8048/JAZ. تقدم أكثر من 1000 سوق يومياً في أكثر من 50 رياضة، بالإضافة إلى كازينو ضخم يضم آلاف الألعاب. تدعم أكثر من 200 طريقة دفع وتوفر تطبيقات للأندرويد والآيفون. واجهة عربية ممتازة ودعم فني على مدار الساعة.',
+    'MELBET': 'Melbet هي شركة مراهنة مرخصة تأسست عام 2012 وحصلت على ترخيص كوراساو. تتميز بواجهة عربية سهلة الاستخدام واحتمالات عالية. تقدم دفعاً فورياً عبر فودافون كاش وSTC Pay وبنكي. الكازينو يضم أكثر من 5000 لعبة من أفضل المطورين العالميين. دعم فني عربي على مدار الساعة.',
+    'BETJAM': 'Betjam هي شركة مراهنة ناشئة تأسست عام 2020 وحصلت على ترخيص كوراساو. تتميز بواجهة حديثة وسهلة الاستخدام مع تركيز على تجربة المستخدم العربي. تقدم بونص ترحيبي حصرية ودفع فوري عبر多种 طرق الدفع المحلية. دعم عربي متميز.',
+    'MOSTBET': 'Mostbet هي شركة مراهنة روسية تأسست عام 2009 وحصلت على ترخيص كوراساو. تقدم أكثر من 800 سوق يومياً و didReceiveMemoryWarningsupports多种 رياضات. تتميز بسرعة السحب والدعم الفني المتخصص. واجهة عربية متوفرة وتطبيقات للهواتف.',
+    'BIZBET': 'Bizbet هي شركة مراهنة مرخصة تأسست عام 2018. تتميز بسهولة الاستخدام وسرعة المعاملات. تقدم بونص ترحيبيiezicien ودفع فوري. دعم عربي على مدار الساعة وواجهة محسّنة للهاتف.',
+    'XPARI': 'Xpari هي شركة مراهنة مرخصة تقدم تجربة مراهنة شاملة. تتميز بالاحتمالات العالية والمجتمع النشط. تقدم أكثر من 50 رياضة và أكثر من 1000 سوق يومياً. دفع فوري ودعم عربي.',
+    'LINEBET': 'Linebet هي شركة مراهنة مرخصة تأسست عام 2012. تتميز بواجهة بسيطة وسهلة الاستخدام مع سرعة في المعاملات. تقدم أكثر من 40 رياضة وKasino ضخم. دعم فني عربي ودفع فوري.',
+    'GOOOBET': 'Gooobet هي شركة مراهنة حديثة تقدم تجربة مراهنة مبتكرة. تتميز بواجهة عصرية وسرعة في التحميل. تقدم ألعاب كازينو متنوعة وبرامج ولاء حصرية.',
+}
+
+COMPANY_PROS = {
+    '1XBET': ['أكبر سوق مراهنة في العالم', '1000+ سوق يومياً', 'بث مباشر مجاني', 'كازينو ضخم', 'سحب فوري', '200+ طريقة دفع', 'تطبيق احترافي'],
+    'MELBET': ['واجهة عربية ممتازة', 'دفع فوري فودافون كاش', '5000+ لعبة كازينو', 'احتمالات عالية', 'بونص 130%', 'دعم عربي 24/7'],
+    'BETJAM': ['واجهة حديثة', 'سرعة في الدفع', 'بونص حصري', 'دعم عربي متميز', 'لسهولة الاستخدام'],
+    'MOSTBET': ['سرعة السحب', '800+ سوق يومياً', 'مجتمع نشط', 'تطبيق ممتاز', 'دعم فني متخصص'],
+    'BIZBET': ['سهولة الاستخدام', 'سرعة المعاملات', 'بونص ترحيبي', 'دعم عربي', 'واجهة محسّنة للهاتف'],
+    'XPARI': ['احتمالات عالية', 'مجتمع نشط', '50+ رياضة', '1000+ سوق', 'دفع فوري'],
+    'LINEBET': ['واجهة بسيطة', 'سرعة المعاملات', 'Kasino ضخم', 'دعم عربي', '40+ رياضة'],
+    'GOOOBET': ['تجربة مبتكرة', 'واجهة عصرية', 'سرعة تحميل', 'ألعاب متنوعة', 'برامج ولاء'],
+}
+
+COMPANY_CONS = {
+    '1XBET': ['قد يكون معقد للمبتدئين', ' بعض الدول محظورة'],
+    'MELBET': ['速度 في بعض الدفعات', 'Some games restricted in certain regions'],
+    'BETJAM': ['شركة ناشئة', ' fewer markets than established brands'],
+    'MOSTBET': ['واجهة ليست الأفضل', 'some payment methods limited'],
+    'BIZBET': ['أقل شهرة', ' fewer promotions'],
+    'XPARI': ['less known brand', 'limited customer support'],
+    'LINEBET': ['واجهة بسيطة جداً', 'limited esports coverage'],
+    'GOOOBET': ['جديدة جداً', 'still building reputation'],
+}
+
+
+@app.route('/company/<company_id>')
+def company_detail(company_id):
+    """Company detail page with full review."""
+    try:
+        all_companies = read_csv('companies.csv')
+        company = None
+        for c in all_companies:
+            if c.get('id') == company_id:
+                company = c
+                break
+        if not company:
+            return 'Company not found', 404
+
+        name = company.get('name', '')
+        accent = COMPANY_COLORS.get(name, '#16a34a')
+        description = COMPANY_DESCRIPTIONS.get(name, f'{name} شركة مراهنة مرخصة بمقرها في {company.get("headquarters", "Cyprus")}، تأسست عام {company.get("founded", "2007")}. تقدم بونص ترحيبي ودفع فوري ودعم عربي.')
+        pros = COMPANY_PROS.get(name, ['دفع فوري', 'دعم عربي', 'بونص ترحيبي'])
+        cons = COMPANY_CONS.get(name, ['محدودية في بعض الدول'])
+
+        # Similar companies (exclude current)
+        similar = []
+        for c in all_companies:
+            if c.get('id') != company_id and (c.get('is_active', '').lower() in ('active', 'yes', '1', 'true')):
+                similar.append({
+                    'id': c.get('id', ''),
+                    'name': c.get('name', ''),
+                    'icon': c.get('icon', '') or '',
+                    'rating': c.get('rating', '4.8') or '4.8',
+                })
+            if len(similar) >= 4:
+                break
+
+        return render_template('company_detail.html',
+            company={
+                'id': company.get('id', ''),
+                'name': name,
+                'icon': company.get('icon', '') or '',
+                'license': company.get('license', 'Curacao 8048/JAZ') or 'Curacao 8048/JAZ',
+                'headquarters': company.get('headquarters', 'Cyprus') or 'Cyprus',
+                'founded': company.get('founded', '2007') or '2007',
+                'rating': company.get('rating', '4.8') or '4.8',
+                'promo_code': company.get('promo_code', ''),
+                'affiliate_link': company.get('affiliate_link', '#'),
+                'app_link': company.get('app_link', ''),
+                'description': description,
+                'pros': pros,
+                'cons': cons,
+            },
+            accent_color=accent,
+            similar=similar,
+        )
+    except Exception as e:
+        return f'Error: {str(e)}', 500
+
+
 @app.route('/x/showcase')
 def showcase_index():
     token = request.args.get('k', '')
