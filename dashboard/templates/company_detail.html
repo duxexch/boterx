@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl" id="htmlRoot">
+<html lang="en" dir="ltr" id="htmlRoot">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
@@ -747,7 +747,7 @@ window.I18N_TRANSLATIONS = {
 function applyTranslations(companyName){
   var params=new URLSearchParams(window.location.search);
   var lang=params.get('lang')||localStorage.getItem('vex_lang');
-  if(!lang)lang='ar';
+  if(!lang)lang='en';
   var t=window.I18N_TRANSLATIONS[lang];
   if(!t)return;
 
