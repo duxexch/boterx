@@ -1,218 +1,13 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl" id="htmlRoot">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>{{ company.name }} - مراجعة شاملة | VEX Games</title>
-<meta name="description" content="مراجعة شاملة لشركة {{ company.name }} - الترخيص، المميزات، العيوب، كود البرومو {{ company.promo_code }} ورابط التسجيل المباشر.">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-:root{--green:#16a34a;--green2:#15803d;--gold:#d97706;--bg:#f8fafc;--surface:#ffffff;--surface2:#f1f5f9;--border:#e2e8f0;--text:#0f172a;--muted:#475569;--shadow:0 1px 3px rgba(0,0,0,.08),0 8px 24px rgba(0,0,0,.04)}
-body{font-family:'Cairo',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.7}
-a{color:inherit;text-decoration:none}
+import sys, io
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 
-/* Topbar */
-.topbar{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(255,255,255,.95);backdrop-filter:blur(16px);border-bottom:1px solid var(--border);padding:12px 20px;display:flex;align-items:center;justify-content:space-between}
-.topbar-brand{display:flex;align-items:center;gap:10px;font-weight:900;font-size:1.1rem;color:var(--text)}
-.topbar-brand span{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--green),var(--green2));display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px}
-.topbar-back{display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;background:var(--surface);border:1px solid var(--border);font-weight:700;font-size:14px;cursor:pointer;transition:all .15s}
-.topbar-back:hover{border-color:var(--green);background:var(--surface2)}
+path = r'C:\Users\gnz\Downloads\boterx-dev\dashboard\templates\company_detail.html'
+with open(path, 'r', encoding='utf-8') as f:
+    content = f.read()
 
-/* Hero */
-.detail-hero{margin-top:60px;padding:40px 20px 30px;text-align:center}
-.detail-hero-inner{max-width:800px;margin:0 auto;display:flex;flex-direction:column;align-items:center;gap:16px}
-.detail-icon{width:80px;height:80px;border-radius:20px;background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 15%,transparent),color-mix(in srgb,var(--accent) 8%,transparent));border:2px solid color-mix(in srgb,var(--accent) 25%,transparent);display:flex;align-items:center;justify-content:center;font-size:36px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.08)}
-.detail-icon img{width:100%;height:100%;object-fit:cover}
-.detail-name{font-size:2rem;font-weight:900;letter-spacing:-.02em}
-.detail-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:999px;font-size:13px;font-weight:700}
-.detail-meta{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;font-size:14px;color:var(--muted)}
-.detail-meta span{display:flex;align-items:center;gap:4px;background:var(--surface);border:1px solid var(--border);padding:4px 12px;border-radius:999px;font-weight:600}
-
-/* Content */
-.detail-content{max-width:800px;margin:0 auto;padding:0 20px 40px}
-.detail-section{margin-bottom:28px}
-.detail-section h2{font-size:1.3rem;font-weight:900;margin-bottom:10px;display:flex;align-items:center;gap:8px}
-.detail-section p{font-size:15px;color:var(--muted);line-height:1.8}
-
-/* Table */
-.detail-table{width:100%;font-size:14px;border-collapse:separate;border-spacing:0;background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;box-shadow:var(--shadow)}
-.detail-table td{padding:12px 16px;border-bottom:1px solid var(--border)}
-.detail-table tr:last-child td{border-bottom:none}
-.detail-table td:first-child{color:var(--muted);width:35%;background:color-mix(in srgb,var(--accent) 5%,transparent);font-weight:700}
-
-/* Promo Code */
-.promo-box{display:flex;align-items:center;gap:10px;background:var(--surface);border:2px dashed color-mix(in srgb,var(--gold) 40%,var(--border));border-radius:14px;padding:16px 20px;margin-top:12px}
-.promo-label{font-size:13px;color:var(--muted);font-weight:700}
-.promo-value{font-size:20px;font-weight:900;color:var(--text);letter-spacing:1px;flex:1}
-.promo-copy{padding:10px 20px;border-radius:10px;background:var(--green);color:#fff;border:none;font-weight:800;font-size:14px;cursor:pointer;transition:all .15s;font-family:inherit}
-.promo-copy:hover{background:var(--green2);transform:scale(1.02)}
-.promo-copy:active{transform:scale(.98)}
-
-/* Pros/Cons Grid */
-.pros-cons-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px}
-.pros-box,.cons-box{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;box-shadow:var(--shadow)}
-.pros-box{border-top:3px solid var(--green)}
-.cons-box{border-top:3px solid #ef4444}
-.pros-box h3,.cons-box h3{font-size:15px;font-weight:800;margin-bottom:8px}
-.pros-box li,.cons-box li{font-size:14px;padding:4px 0;color:var(--muted);list-style:none;display:flex;align-items:center;gap:6px}
-
-/* CTA Buttons */
-.detail-cta{display:flex;gap:12px;margin-top:20px;flex-wrap:wrap}
-.detail-cta a{flex:1;min-width:200px;text-align:center;padding:16px 24px;border-radius:14px;font-weight:800;font-size:16px;transition:all .15s}
-.detail-cta a:active{transform:scale(.97)}
-.cta-register{background:linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent) 80%,#000));color:#fff;box-shadow:0 6px 24px color-mix(in srgb,var(--accent) 30%,transparent)}
-.cta-register:hover{box-shadow:0 8px 32px color-mix(in srgb,var(--accent) 40%,transparent);transform:translateY(-2px)}
-.cta-app{background:linear-gradient(135deg,#1a73e8,#0d47a1);color:#fff;box-shadow:0 6px 24px rgba(26,115,232,.25)}
-.cta-app:hover{box-shadow:0 8px 32px rgba(26,115,232,.35);transform:translateY(-2px)}
-
-/* Similar Companies */
-.similar-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-top:12px}
-.similar-card{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 16px;transition:all .15s}
-.similar-card:hover{border-color:var(--green);transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.08)}
-.similar-icon{width:40px;height:40px;border-radius:10px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:18px;overflow:hidden;flex-shrink:0}
-.similar-icon img{width:100%;height:100%;object-fit:cover}
-.similar-name{font-weight:800;font-size:14px}
-.similar-rating{font-size:12px;color:var(--muted)}
-
-/* Responsive */
-@media(max-width:640px){
-  .detail-hero{padding:30px 14px 20px}
-  .detail-name{font-size:1.5rem}
-  .pros-cons-grid{grid-template-columns:1fr}
-  .detail-cta{flex-direction:column}
-  .detail-cta a{min-width:auto}
-  .similar-grid{grid-template-columns:1fr}
-}
-</style>
-</head>
-<body>
-<div class="topbar">
-  <a href="/" class="topbar-brand"><span>V</span> VEX Games</a>
-  <a href="/" class="topbar-back" data-i18n="back_to_home">العودة للرئيسية</a>
-</div>
-
-<header class="detail-hero" style="--accent:{{ accent_color }}">
-  <div class="detail-hero-inner">
-    <div class="detail-icon" style="--accent:{{ accent_color }}">
-      {% if company.icon.startswith('/static') %}<img src="{{ company.icon }}" alt="{{ company.name }}">{% else %}{{ company.icon }}{% endif %}
-    </div>
-    <h1 class="detail-name">{{ company.name }}</h1>
-    <span class="detail-badge" style="background:color-mix(in srgb,{{ accent_color }} 12%,transparent);color:{{ accent_color }};border:1px solid color-mix(in srgb,{{ accent_color }} 25%,transparent)" data-i18n="detail_badge">شريك معتمد VEX</span>
-    <div class="detail-meta">
-      <span>{{ company.license }}</span>
-      <span>{{ company.headquarters }}</span>
-      <span data-i18n="detail_founded">تأسست {{ company.founded }}</span>
-      <span>{{ company.rating }}/5 <span data-i18n="detail_stars">نجوم</span></span>
-    </div>
-  </div>
-</header>
-
-<main class="detail-content">
-
-  <!-- Promo Code -->
-  {% if company.promo_code %}
-  <div class="detail-section">
-    <h2 data-i18n="detail_promo_title">كود البرومو الحصري</h2>
-    <div class="promo-box">
-      <div>
-        <div class="promo-label" data-i18n="detail_promo_hint">استخدم هذا الكود عند التسجيل</div>
-        <div class="promo-value">{{ company.promo_code }}</div>
-      </div>
-      <button class="promo-copy" onclick="copyCode(this,'{{ company.promo_code }}')" data-i18n="detail_copy_btn">نسخ الكود</button>
-    </div>
-  </div>
-  {% endif %}
-
-  <!-- CTA Buttons -->
-  <div class="detail-cta">
-    <a href="{{ company.affiliate_link }}" class="cta-register" target="_blank" rel="noopener" style="--accent:{{ accent_color }}" data-i18n="detail_cta_register">سجّل في {{ company.name }} الآن</a>
-    {% if company.app_link %}
-    <a href="{{ company.app_link }}" class="cta-app" target="_blank" rel="noopener" data-i18n="detail_cta_app">تحميل التطبيق</a>
-    {% endif %}
-  </div>
-
-  <!-- About -->
-  <div class="detail-section">
-    <h2 data-i18n="detail_overview">نظرة عامة</h2>
-    <p>{{ company.description }}</p>
-  </div>
-
-  <!-- Details Table -->
-  <div class="detail-section">
-    <h2 data-i18n="detail_table_title">تفاصيل الشركة</h2>
-    <table class="detail-table" style="--accent:{{ accent_color }}">
-      <tr><td data-i18n="detail_label_name">الاسم</td><td>{{ company.name }}</td></tr>
-      <tr><td data-i18n="detail_label_license">الترخيص</td><td>{{ company.license }}</td></tr>
-      <tr><td data-i18n="detail_label_hq">المقر</td><td>{{ company.headquarters }}</td></tr>
-      <tr><td data-i18n="detail_label_founded">التأسيس</td><td>{{ company.founded }}</td></tr>
-      <tr><td data-i18n="detail_label_rating">التقييم</td><td>{{ company.rating }} / 5 نجوم</td></tr>
-      {% if company.promo_code %}
-      <tr><td data-i18n="detail_label_promo">كود البرومو</td><td>{{ company.promo_code }}</td></tr>
-      {% endif %}
-    </table>
-  </div>
-
-  <!-- Pros & Cons -->
-  <div class="detail-section">
-    <h2 data-i18n="detail_pros_cons">المميزات والعيوب</h2>
-    <div class="pros-cons-grid">
-      <div class="pros-box">
-        <h3 data-i18n="detail_pros">المميزات</h3>
-        <ul>
-          {% for p in company.pros %}
-          <li>{{ p }}</li>
-          {% endfor %}
-        </ul>
-      </div>
-      <div class="cons-box">
-        <h3 data-i18n="detail_cons">العيوب</h3>
-        <ul>
-          {% for c_item in company.cons %}
-          <li>{{ c_item }}</li>
-          {% endfor %}
-        </ul>
-      </div>
-    </div>
-  </div>
-
-  <!-- VEX Partnership -->
-  <div class="detail-section">
-    <h2 data-i18n="detail_why_title">لماذا تسجل عبر VEX؟</h2>
-    <p><span data-i18n="detail_why_desc">VEX شريك معتمد مباشر مع {{ company.name }}. كل تسجيل عبر روابطنا محسوب لك بشكل مباشر. نوفر لك كود البرومو الحصري ورابط التسجيل المباشر WITHOUT أي عمولات إضافية عليك.</span></p>
-  </div>
-
-  <!-- Similar Companies -->
-  {% if similar %}
-  <div class="detail-section">
-    <h2 data-i18n="detail_similar">شركات مشابهة</h2>
-    <div class="similar-grid">
-      {% for s in similar %}
-      <a href="/company/{{ s.id }}" class="similar-card">
-        <div class="similar-icon">
-          {% if s.icon.startswith('/static') %}<img src="{{ s.icon }}" alt="{{ s.name }}">{% else %}{{ s.icon }}{% endif %}
-        </div>
-        <div>
-          <div class="similar-name">{{ s.name }}</div>
-          <div class="similar-rating">{{ s.rating }}/5 <span data-i18n="detail_stars">نجوم</span></div>
-        </div>
-      </a>
-      {% endfor %}
-    </div>
-  </div>
-  {% endif %}
-
-</main>
-
-<footer style="padding:24px 20px;text-align:center;color:var(--muted);font-size:13px;border-top:1px solid var(--border)">
-  <a href="/" style="color:var(--green);font-weight:700">VEX Games</a> - <span data-i18n="detail_footer_partner">شريك معتمد</span><br>
-  <div style="margin-top:6px;font-size:12px"><span data-i18n="detail_footer_responsible">18+ - العب بمسؤولية</span></div>
-</footer>
-
-
-
+# Add I18N_TRANSLATIONS and applyTranslations before closing </script> or before </body>
+# Find the last </script> tag and insert before it
+i18n_block = '''
 <script>
 window.I18N_TRANSLATIONS = {
   ar: {
@@ -760,5 +555,37 @@ function copyCode(btn,code){
   });
 }
 </script>
-</body>
-</html>
+'''
+
+# Insert before the closing </body> tag
+content = content.replace('</body>', i18n_block + '</body>')
+
+# Also remove the old inline copyCode function
+old_copy_fn = '''<script>
+function copyCode(btn,code){
+  navigator.clipboard.writeText(code).then(function(){
+    btn.textContent='تم النسخ';
+    btn.style.background='#16a34a';
+    setTimeout(function(){btn.textContent='نسخ الكود';btn.style.background='';},2000);
+  }).catch(function(){
+    var ta=document.createElement('textarea');
+    ta.value=code;document.body.appendChild(ta);ta.select();
+    document.execCommand('copy');document.body.removeChild(ta);
+    btn.textContent='تم النسخ';
+    btn.style.background='#16a34a';
+    setTimeout(function(){btn.textContent='نسخ الكود';btn.style.background='';},2000);
+  });
+}
+</script>'''
+content = content.replace(old_copy_fn, '')
+
+with open(path, 'w', encoding='utf-8') as f:
+    f.write(content)
+
+with open(path, 'r', encoding='utf-8') as f:
+    content = f.read()
+
+i18n_count = content.count('data-i18n=')
+print(f"File: {len(content)} chars, {content.count(chr(10))+1} lines")
+print(f"data-i18n attributes: {i18n_count}")
+print(f"I18N languages: {content.count('ar: {')}, {content.count('en: {')}, {content.count('fr: {')}, {content.count('es: {')}, {content.count('de: {')}")
