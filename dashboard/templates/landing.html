@@ -1566,8 +1566,8 @@ footer a:hover{text-decoration:underline}
 <body>
 <nav class="navbar">
   <div class="navbar-brand">
-    <a href="/" class="brand-link" aria-label="VEX Games - الرئيسية">
-      <span class="brand-icon" aria-hidden="true">V</span>
+    <a href="/" class="brand-link" aria-label="VEX Games">
+      <img src="/static/icons/logo-full.png" alt="VEX Games" class="brand-logo" style="height:38px;width:auto">
       <span class="brand-text">VEX Games</span>
     </a>
   </div>
@@ -1981,9 +1981,48 @@ document.addEventListener('keydown',(e)=>{
 
 
 function changeLang(lang){
-  const url=new URL(window.location.href);
-  url.searchParams.set('lang', lang);
-  window.location.href=url.toString();
+  localStorage.setItem('vex_lang',lang);
+  var url=new URL(window.location.href);
+  url.searchParams.set('lang',lang);
+  window.history.replaceState({},'',url.toString());
+  applyAllTranslations(lang);
+  var el=document.getElementById('currentLang');
+  var names={ar:'العربية',en:'English',fr:'Français',es:'Español',de:'Deutsch',it:'Italiano',pt:'Português',ru:'Русский',zh:'中文',tr:'Türkçe',ur:'اردو',hi:'हिन्दी',fa:'فارسی',id:'Indonesia',ja:'日本語',ko:'한국어',th:'ไทย'};
+  if(el)el.textContent=names[lang]||'English';
+  var ms=document.getElementById('mobileLangSelect');
+  if(ms)ms.value=lang;
+  document.querySelectorAll('#langMenu button[role="option"]').forEach(function(b){b.setAttribute('aria-selected',b.getAttribute('data-lang')===lang?'true':'false');});
+  closeLangMenu();
+}
+
+function applyAllTranslations(lang){
+  var t=window.I18N_TRANSLATIONS&&window.I18N_TRANSLATIONS[lang];
+  if(!t)return;
+  var rtlLangs=['ar','fa','ur','he'];
+  document.documentElement.dir=rtlLangs.indexOf(lang)>=0?'rtl':'ltr';
+  document.documentElement.lang=lang;
+  var htmlKeys=['hero_title','hero_badge','faq_a1','faq_a2','faq_a3','faq_a4','step2_desc'];
+  document.querySelectorAll('[data-i18n]').forEach(function(e){
+    var key=e.getAttribute('data-i18n');
+    if(!t[key])return;
+    if(htmlKeys.indexOf(key)>=0){e.innerHTML=t[key];}else{e.textContent=t[key];}
+  });
+  document.querySelectorAll('[data-company]').forEach(function(e){
+    var name=e.getAttribute('data-company');
+    var key=name==='1XBET'?'comp_desc_1xbet':name==='MELBET'?'comp_desc_melbet':'comp_desc_generic';
+    if(!t[key])return;
+    var val=t[key];
+    val=val.replace(/\{name\}/g,name||'');
+    val=val.replace(/\{promo\}/g,e.getAttribute('data-promo')||'VEX');
+    val=val.replace(/\{license\}/g,e.getAttribute('data-license')||'');
+    val=val.replace(/\{hq\}/g,e.getAttribute('data-hq')||'');
+    val=val.replace(/\{founded\}/g,e.getAttribute('data-founded')||'');
+    val=val.replace(/\{rating\}/g,e.getAttribute('data-rating')||'');
+    e.innerHTML=val;
+  });
+  if(t.hero_title)document.title=t.hero_title.replace(/<[^>]+>/g,'')+' | VEX Games';
+  var md=document.querySelector('meta[name="description"]');
+  if(md&&t.hero_subtitle)md.content=t.hero_subtitle.replace(/<[^>]+>/g,'');
 }
 
 function copyPromo(id, code){
@@ -2008,79 +2047,15 @@ function copyPromo(id, code){
   var urlParams=new URLSearchParams(window.location.search);
   var urlLang=urlParams.get('lang');
   var savedLang=localStorage.getItem('vex_lang');
-
-  // Priority: URL param > saved preference > default English
   var lang=urlLang||savedLang||'en';
-  if(!supported.includes(lang)) lang='en';
-
-  // Save to localStorage for persistence
+  if(supported.indexOf(lang)<0) lang='en';
   localStorage.setItem('vex_lang',lang);
-
-  // Update URL param if missing (without reload)
   if(!urlLang){
     var url=new URL(window.location.href);
     url.searchParams.set('lang',lang);
     window.history.replaceState({},'',url.toString());
   }
-
-  // Set language display name
-  var langNames={
-    ar:'العربية',en:'English',fr:'Français',es:'Español',de:'Deutsch',
-    it:'Italiano',pt:'Português',ru:'Русский',zh:'中文',tr:'Türkçe',
-    ur:'اردو',hi:'हिन्दी',fa:'فارسی',id:'Indonesia',ja:'日本語',
-    ko:'한국어',th:'ไทย'
-  };
-  var el=document.getElementById('currentLang');
-  if(el) el.textContent=langNames[lang]||'English';
-
-  // Set mobile language selector
-  var ms=document.getElementById('mobileLangSelect');
-  if(ms) ms.value=lang;
-
-  // Highlight active language in dropdown
-  document.querySelectorAll('#langMenu button[role="option"]').forEach(function(btn){
-    btn.setAttribute('aria-selected',btn.getAttribute('data-lang')===lang?'true':'false');
-  });
-
-  // Apply translations
-  var t=window.I18N_TRANSLATIONS&&window.I18N_TRANSLATIONS[lang];
-  if(t){
-    var rtlLangs=['ar','fa','ur','he'];
-    var isRtl=rtlLangs.includes(lang);
-    document.documentElement.dir=isRtl?'rtl':'ltr';
-    document.documentElement.lang=lang;
-
-    var htmlKeys=['hero_title','hero_badge','faq_a1','faq_a2','faq_a3','faq_a4','step2_desc'];
-    document.querySelectorAll('[data-i18n]').forEach(function(e){
-      var key=e.getAttribute('data-i18n');
-      if(!t[key])return;
-      if(htmlKeys.indexOf(key)>=0){
-        e.innerHTML=t[key];
-      }else{
-        e.textContent=t[key];
-      }
-    });
-    document.querySelectorAll('[data-company]').forEach(function(e){
-      var name=e.getAttribute('data-company');
-      var key=name==='1XBET'?'comp_desc_1xbet':name==='MELBET'?'comp_desc_melbet':'comp_desc_generic';
-      if(!t[key])return;
-      var val=t[key];
-      val=val.replace(/\{name\}/g,name||'');
-      val=val.replace(/\{promo\}/g,e.getAttribute('data-promo')||'VEX');
-      val=val.replace(/\{license\}/g,e.getAttribute('data-license')||'');
-      val=val.replace(/\{hq\}/g,e.getAttribute('data-hq')||'');
-      val=val.replace(/\{founded\}/g,e.getAttribute('data-founded')||'');
-      val=val.replace(/\{rating\}/g,e.getAttribute('data-rating')||'');
-      e.innerHTML=val;
-    });
-
-    // Update page title
-    if(t.hero_title) document.title=t.hero_title.replace(/<[^>]+>/g,'')+' | VEX Games';
-
-    // Update meta description
-    var md=document.querySelector('meta[name="description"]');
-    if(md&&t.hero_subtitle) md.content=t.hero_subtitle.replace(/<[^>]+>/g,'');
-  }
+  applyAllTranslations(lang);
 })();
 </script>
 </body>
