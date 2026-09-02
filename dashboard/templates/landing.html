@@ -846,6 +846,219 @@ footer{padding:24px 16px;text-align:center;color:var(--muted);font-size:11px;bor
 }
 
 </style>
+<style>
+/* ===== IMPROVED TYPOGRAPHY ===== */
+:root{
+  --green:#16a34a;--green2:#15803d;--gold:#d97706;
+  --bg:#f8fafc;--surface:#ffffff;--surface2:#f1f5f9;
+  --border:#e2e8f0;--text:#0f172a;--muted:#475569;
+  --shadow:0 1px 3px rgba(0,0,0,.08),0 8px 24px rgba(0,0,0,.04);
+  --accent-1xbet:#E31937;--accent-melbet:#1565C0;--accent-betjam:#FF6D00;
+  --accent-mostbet:#2E7D32;--accent-bizbet:#7B1FA2;--accent-xpari:#00838F;
+  --accent-linebet:#3949AB;--accent-gooobet:#C2185B;
+}
+body{font-family:'Cairo',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.7;font-size:15px}
+
+/* Hero */
+.hero{padding:90px 16px 36px;text-align:center;background:radial-gradient(700px 400px at 50% -15%,rgba(22,163,74,.10),transparent 60%)}
+.hero h1{font-size:clamp(1.8rem,5vw,2.8rem);font-weight:900;line-height:1.25;margin-bottom:14px;letter-spacing:-.02em}
+.hero h1 span{background:linear-gradient(90deg,var(--green),var(--green2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.hero p{color:var(--muted);max-width:660px;margin:0 auto 18px;font-size:15px;line-height:1.8}
+.hero-cta{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:12px}
+
+/* Buttons */
+.btn{padding:10px 18px;border-radius:10px;font-weight:800;border:none;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:8px;font-size:14px;transition:all .15s}
+.btn:active{transform:scale(.96)}
+.btn-p{background:linear-gradient(135deg,var(--green),var(--green2));color:#fff;box-shadow:0 4px 16px rgba(22,163,74,.25)}
+.btn-p:hover{box-shadow:0 6px 24px rgba(22,163,74,.35);transform:translateY(-1px)}
+.btn-o{background:var(--surface);color:var(--text);border:1px solid var(--border)}
+.btn-o:hover{border-color:var(--green);background:rgba(22,163,74,.04)}
+
+/* Trust bar */
+.trust{max-width:1100px;margin:0 auto;padding:0 16px;display:flex;gap:10px;overflow:auto;scrollbar-width:none}
+.trust::-webkit-scrollbar{display:none}
+.trust-item{flex:0 0 auto;background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:8px 16px;font-size:13px;display:flex;align-items:center;gap:6px;white-space:nowrap;font-weight:600}
+
+/* Sections */
+.section{max-width:1100px;margin:0 auto;padding:36px 16px}
+.section h2{font-size:1.6rem;font-weight:900;margin-bottom:8px;line-height:1.3;letter-spacing:-.01em}
+.section .sub{color:var(--muted);font-size:14px;margin-bottom:18px;line-height:1.7}
+
+/* ===== COMPANY CARDS - DISTINCT COLORS ===== */
+.comp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:20px}
+.comp-card{position:relative;background:var(--surface);border:1px solid var(--border);border-radius:18px;overflow:hidden;display:flex;flex-direction:column;box-shadow:var(--shadow);transition:all .25s cubic-bezier(.4,0,.2,1);border-top:3px solid var(--card-accent,var(--green))}
+.comp-card:hover{transform:translateY(-6px);box-shadow:0 16px 40px rgba(0,0,0,.10);border-color:var(--card-accent,var(--green))}
+.comp-head{display:flex;gap:14px;padding:18px 18px 14px;align-items:center}
+.comp-icon{width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,color-mix(in srgb,var(--card-accent,var(--green)) 15%,transparent),color-mix(in srgb,var(--card-accent,var(--green)) 8%,transparent));border:1px solid color-mix(in srgb,var(--card-accent,var(--green)) 20%,transparent);display:flex;align-items:center;justify-content:center;font-size:24px;overflow:hidden;flex-shrink:0;box-shadow:0 4px 12px rgba(0,0,0,.06)}
+.comp-icon img{width:100%;height:100%;object-fit:cover}
+.comp-name{font-weight:900;font-size:17px;line-height:1.2;color:var(--text);letter-spacing:-.01em}
+.comp-meta{font-size:12px;color:var(--muted);display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+.comp-meta span{display:inline-flex;align-items:center;gap:4px;background:var(--surface2);border:1px solid var(--border);padding:3px 8px;border-radius:999px;font-weight:500}
+.badge{font-size:11px;padding:4px 10px;border-radius:999px;background:color-mix(in srgb,var(--card-accent,var(--green)) 12%,transparent);color:var(--card-accent,var(--green));border:1px solid color-mix(in srgb,var(--card-accent,var(--green)) 25%,transparent);font-weight:800}
+
+/* Card body with tinted background */
+.comp-body{padding:0 18px 14px;flex:1;background:linear-gradient(180deg,color-mix(in srgb,var(--card-accent,var(--green)) 3%,transparent),transparent)}
+.comp-desc{font-size:14px;color:var(--muted);line-height:1.8;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+
+/* Card table with accent tint */
+.comp-table{width:100%;font-size:13px;border-collapse:separate;border-spacing:0;margin-top:12px;background:color-mix(in srgb,var(--card-accent,var(--green)) 4%,var(--surface2));border:1px solid color-mix(in srgb,var(--card-accent,var(--green)) 12%,var(--border));border-radius:12px;overflow:hidden}
+.comp-table td{padding:9px 12px;border-bottom:1px solid var(--border)}
+.comp-table tr:last-child td{border-bottom:none}
+.comp-table td:first-child{color:var(--muted);width:36%;background:color-mix(in srgb,var(--card-accent,var(--green)) 5%,transparent);font-weight:700;font-size:12px}
+
+/* Pros/Cons */
+.pros-cons{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.pros-cons div{background:color-mix(in srgb,var(--card-accent,var(--green)) 4%,var(--surface2));border:1px solid color-mix(in srgb,var(--card-accent,var(--green)) 10%,var(--border));border-radius:10px;padding:10px}
+.pros-cons strong{font-size:12px;display:block;margin-bottom:6px;color:var(--text)}
+.pros-cons ul{list-style:none;padding:0;margin:0}
+.pros-cons li{font-size:13px;padding:3px 0;display:flex;gap:5px;color:var(--muted)}
+
+/* Card CTA */
+.comp-cta{padding:14px 18px;display:flex;gap:10px;background:color-mix(in srgb,var(--card-accent,var(--green)) 3%,var(--surface2));border-top:1px solid var(--border)}
+.comp-cta a{flex:1;text-align:center;padding:12px;border-radius:10px;font-weight:800;font-size:14px;text-decoration:none;transition:all .15s}
+.comp-cta a:active{transform:scale(.97)}
+.cta-main{background:linear-gradient(135deg,var(--card-accent,var(--green)),color-mix(in srgb,var(--card-accent,var(--green)) 85%,#000));color:#fff;box-shadow:0 4px 16px color-mix(in srgb,var(--card-accent,var(--green)) 30%,transparent)}
+.cta-main:hover{box-shadow:0 6px 24px color-mix(in srgb,var(--card-accent,var(--green)) 40%,transparent);transform:translateY(-1px)}
+.cta-sec{background:var(--surface);color:var(--text);border:1px solid var(--border)}
+.cta-sec:hover{border-color:var(--card-accent,var(--green))}
+
+/* FAQ */
+details{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:10px;transition:border-color .2s}
+details[open]{border-color:color-mix(in srgb,var(--green) 30%,var(--border))}
+details summary{cursor:pointer;font-weight:700;font-size:15px;list-style:none;line-height:1.5}
+details summary::-webkit-details-marker{display:none}
+details div{font-size:14px;color:var(--muted);margin-top:8px;line-height:1.7}
+
+/* Steps */
+.step-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px;text-align:center;transition:all .2s}
+.step-card:hover{border-color:var(--green);transform:translateY(-2px)}
+.step-num{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:16px;margin:0 auto 10px}
+.step-title{font-weight:800;font-size:15px;margin-bottom:4px}
+.step-desc{font-size:13px;color:var(--muted);line-height:1.6}
+
+/* VEX Card */
+.vex-card{border:2px solid rgba(255,215,0,.3);background:linear-gradient(135deg,rgba(255,215,0,.06),var(--surface));box-shadow:0 0 30px rgba(255,215,0,.08)}
+.vex-badge{background:linear-gradient(135deg,#ffd700,#b8860b);color:#000}
+
+/* Footer */
+footer{padding:28px 16px;text-align:center;color:var(--muted);font-size:13px;border-top:1px solid var(--border);line-height:1.8}
+footer a{color:var(--green);text-decoration:none;font-weight:600}
+footer a:hover{text-decoration:underline}
+
+/* ===== LANGUAGE SELECTOR ===== */
+.lang-selector{position:relative;display:inline-block}
+.lang-trigger{display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--surface);border:2px solid var(--border);border-radius:12px;cursor:pointer;font-size:14px;font-weight:700;color:var(--text);transition:all .15s;min-width:150px;justify-content:space-between}
+.lang-trigger:hover{border-color:var(--green);box-shadow:0 4px 16px rgba(22,163,74,.12)}
+.lang-trigger:focus{outline:2px solid var(--green);outline-offset:2px}
+.lang-icon{font-size:18px}
+.lang-text{font-weight:700;color:var(--text);white-space:nowrap}
+.lang-arrow{font-size:11px;color:var(--muted);transition:transform .2s}
+.lang-selector.open .lang-arrow{transform:rotate(180deg)}
+.lang-menu{position:absolute;top:calc(100% + 8px);right:0;min-width:240px;max-height:360px;background:var(--surface);border:1px solid var(--border);border-radius:16px;box-shadow:0 16px 48px rgba(0,0,0,.15);overflow:hidden;z-index:200;opacity:0;visibility:hidden;transform:translateY(-8px);transition:all .2s cubic-bezier(.4,0,.2,1);margin-top:6px}
+.lang-selector.open .lang-menu{opacity:1;visibility:visible;transform:translateY(0)}
+.lang-search{padding:12px;border-bottom:1px solid var(--border)}
+.lang-search input{width:100%;padding:10px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:14px;outline:none}
+.lang-search input:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(22,163,74,.1)}
+.lang-list{max-height:280px;overflow-y:auto;padding:6px}
+.lang-list button{display:flex;align-items:center;gap:12px;width:100%;padding:12px 14px;background:transparent;border:none;color:var(--text);font-size:15px;text-align:right;cursor:pointer;border-radius:10px;transition:background .12s;font-weight:600}
+.lang-list button:hover,.lang-list button:focus{background:var(--surface2);outline:none}
+.lang-list button:active{background:rgba(22,163,74,.08)}
+.lang-list button[role="option"][aria-selected="true"]{background:rgba(22,163,74,.1);color:var(--green)}
+.lang-list .flag{font-size:20px;flex-shrink:0}
+
+/* ===== NAVBAR ===== */
+.navbar{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(248,250,252,.95);backdrop-filter:blur(16px);border-bottom:1px solid var(--border);padding:10px 16px;display:flex;align-items:center;justify-content:space-between;transition:background .3s,box-shadow .3s;box-shadow:var(--shadow)}
+.navbar-brand{flex-shrink:0}
+.brand-link{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--text)}
+.brand-icon{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,var(--green),var(--green2));display:flex;align-items:center;justify-content:center;font-weight:900;color:#fff;font-size:17px;flex-shrink:0;box-shadow:0 3px 12px rgba(22,163,74,.3)}
+.brand-text{font-weight:900;font-size:1.15rem;color:var(--text);white-space:nowrap}
+.navbar-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+
+/* Action buttons */
+.btn-primary,.btn-secondary{display:inline-flex;align-items:center;gap:8px;padding:10px 18px;border-radius:10px;font-weight:700;font-size:14px;text-decoration:none;transition:all .15s;white-space:nowrap}
+.btn-primary{background:linear-gradient(135deg,var(--green),var(--green2));color:#fff;box-shadow:0 3px 14px rgba(22,163,74,.25)}
+.btn-primary:hover{box-shadow:0 5px 20px rgba(22,163,74,.35);transform:translateY(-1px)}
+.btn-primary:active{transform:scale(.98)}
+.btn-secondary{background:var(--surface);color:var(--text);border:1px solid var(--border)}
+.btn-secondary:hover{background:var(--surface2);border-color:var(--green)}
+.btn-text{font-weight:700}
+
+/* Hamburger */
+.hamburger{display:none;flex-direction:column;gap:5px;width:44px;height:44px;padding:10px;background:var(--surface);border:1px solid var(--border);border-radius:11px;cursor:pointer;transition:all .15s;align-items:center;justify-content:center}
+.hamburger:hover{background:var(--surface2);border-color:var(--green)}
+.hamburger:focus{outline:2px solid var(--green);outline-offset:2px}
+.hamburger-line{display:block;height:2px;width:100%;background:var(--text);border-radius:2px;transition:all .2s cubic-bezier(.4,0,.2,1);transform-origin:center}
+.hamburger[aria-expanded="true"] .hamburger-line:nth-child(1){transform:translateY(7px) rotate(45deg)}
+.hamburger[aria-expanded="true"] .hamburger-line:nth-child(2){opacity:0}
+.hamburger[aria-expanded="true"] .hamburger-line:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
+
+/* Mobile Menu */
+.mobile-menu{position:fixed;top:0;right:0;bottom:0;width:100%;max-width:320px;background:var(--surface);border-left:1px solid var(--border);z-index:200;transform:translateX(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column}
+.mobile-menu.open{transform:translateX(0)}
+.mobile-menu-bg{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:199;opacity:0;visibility:hidden;transition:all .3s}
+.mobile-menu.open~.mobile-menu-bg{opacity:1;visibility:visible}
+.mobile-menu-header{display:flex;align-items:center;justify-content:space-between;padding:18px;border-bottom:1px solid var(--border)}
+.mobile-menu-title{font-weight:800;font-size:18px;color:var(--text)}
+.mobile-close{width:38px;height:38px;border-radius:10px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);transition:all .15s}
+.mobile-close:hover{background:var(--surface);border-color:var(--green);color:var(--green)}
+.mobile-nav{padding:14px;flex:1;overflow-y:auto}
+.mobile-nav-link{display:flex;align-items:center;gap:14px;padding:16px;border-radius:12px;color:var(--text);text-decoration:none;font-size:15px;font-weight:700;transition:all .12s}
+.mobile-nav-link:hover{background:var(--surface2);color:var(--green)}
+.mobile-nav-primary{background:linear-gradient(135deg,var(--green),var(--green2));color:#fff !important}
+.mobile-nav-primary:hover{transform:translateX(2px)}
+.mobile-divider{height:1px;background:var(--border);margin:14px 0}
+.mobile-lang-selector{padding:10px 0}
+.mobile-label{display:block;font-size:12px;color:var(--muted);margin-bottom:8px;font-weight:700}
+.mobile-select{width:100%;padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:15px;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;background-size:16px;padding-right:40px}
+.mobile-select:focus{outline:none;border-color:var(--green);box-shadow:0 0 0 3px rgba(22,163,74,.1)}
+
+/* Ticker */
+.ticker{overflow:hidden;white-space:nowrap;background:var(--surface);border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:8px 0}
+.ticker-track{display:inline-block;animation:scroll 30s linear infinite;font-size:13px;font-weight:600}
+@keyframes scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+
+/* ===== RESPONSIVE ===== */
+@media(max-width:1024px){
+  .hamburger{display:flex}
+  .navbar-actions .btn-text{display:none}
+  .btn-primary .btn-text,.btn-secondary .btn-text{display:inline}
+  .lang-trigger .lang-text{display:none}
+  .lang-trigger{min-width:48px;padding:10px}
+  .btn-primary .btn-text,.btn-secondary .btn-text{font-size:13px;padding:0 8px}
+}
+@media(min-width:1025px){
+  .mobile-menu{display:none}
+  .mobile-menu-bg{display:none}
+}
+@media(max-width:640px){
+  .hero{padding:76px 14px 24px}
+  .hero h1{font-size:1.6rem}
+  .hero p{font-size:14px}
+  .section{padding:24px 14px}
+  .section h2{font-size:1.3rem}
+  .comp-grid{grid-template-columns:1fr;gap:14px}
+  .comp-card{border-radius:14px}
+  .comp-head{padding:14px}
+  .comp-body{padding:0 14px 12px}
+  .comp-cta{padding:12px 14px}
+  .comp-meta{font-size:11px}
+  .comp-meta span{padding:2px 6px}
+  .comp-desc{font-size:13px}
+  .comp-table{font-size:12px}
+  .details summary{font-size:14px}
+  details div{font-size:13px}
+  .mobile-menu{max-width:100%}
+  .mobile-nav-link{min-height:50px}
+  .mobile-select{min-height:46px;font-size:16px}
+  footer{padding:22px 14px}
+  .lang-menu{right:-40px;min-width:260px}
+  .brand-text{display:none}
+}
+@media(max-width:380px){
+  .hero h1{font-size:1.4rem}
+  .comp-card{border-radius:12px}
+}
+</style>
 <script type="application/ld+json">
 {
   "@context":"https://schema.org",
@@ -1041,7 +1254,7 @@ footer{padding:24px 16px;text-align:center;color:var(--muted);font-size:11px;bor
   <p class="sub" data-i18n="companies_sub">كل شركة نراجعها كأنها منتجنا — الترخيص، المقر، سنة التأسيس، المميزات والعيوب، كود البرومو ورابط التسجيل المباشر برعاية VEX</p>
   <div class="comp-grid">
     {% for c in companies %}
-    <article class="comp-card" id="company-{{ c.slug }}" itemscope itemtype="https://schema.org/Review">
+    <article class="comp-card" style="--card-accent:{% if c.name == "1XBET" %}var(--accent-1xbet){% elif c.name == "MELBET" %}var(--accent-melbet){% elif c.name == "BETJAM" %}var(--accent-betjam){% elif c.name == "MOSTBET" %}var(--accent-mostbet){% elif c.name == "BIZBET" %}var(--accent-bizbet){% elif c.name == "XPARI" %}var(--accent-xpari){% elif c.name == "LINEBET" %}var(--accent-linebet){% elif c.name == "GOOOBET" %}var(--accent-gooobet){% else %}var(--green){% endif %}" id="company-{{ c.slug }}" itemscope itemtype="https://schema.org/Review">
       <div class="comp-head">
         <div class="comp-icon">{% if c.icon.startswith('/static') %}<img src="{{ c.icon }}" alt="{{ c.name }}" loading="lazy">{% else %}{{ c.icon }}{% endif %}</div>
         <div style="flex:1;min-width:0">
@@ -1089,7 +1302,7 @@ footer{padding:24px 16px;text-align:center;color:var(--muted);font-size:11px;bor
       </div>
     </div>
     <div class="comp-body">
-      <p style="font-size:12px;color:var(--muted);line-height:1.7">
+      <p style="font-size:14px;color:var(--muted);line-height:1.8">
         VEX Games منصة ألعاب مالية مرخصة تعمل عبر تيليغرام والويب بـ 17 لغة. نوفر محفظة متكاملة (إيداع/سحب فوري)، نظام تعويض ذكي SVRP (100% رصيد مجمد يُفك عبر الأصدقاء)، Provably Fair بـ HMAC-SHA256، وشراكة مباشرة مع 1xPartners و MelPartners — كل تسجيل عبرنا محسوب لك، وكل إيداع محمي.
       </p>
       <table class="comp-table">
@@ -1109,19 +1322,19 @@ footer{padding:24px 16px;text-align:center;color:var(--muted);font-size:11px;bor
 <section class="section" id="how" style="padding-top:0">
   <h2 data-i18n="how_title">⚡ كيف تبدأ في 3 خطوات</h2>
   <p class="sub" data-i18n="how_subtitle">اختر شركة، سجّل برابط VEX، أودع والعب — كل خطوة محسوبة</p>
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center"><div style="width:36px;height:36px;border-radius:50%;background:var(--green);color:#04210a;display:flex;align-items:center;justify-content:center;font-weight:900;margin:0 auto 8px">1</div><div style="font-weight:800;font-size:13px" data-i18n="step1_title">اختر شركة</div><div style="font-size:11px;color:var(--muted)">قارن التراخيص والتقييمات أعلاه</div></div>
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center"><div style="width:36px;height:36px;border-radius:50%;background:var(--green);color:#04210a;display:flex;align-items:center;justify-content:center;font-weight:900;margin:0 auto 8px">2</div><div style="font-weight:800;font-size:13px" data-i18n="step2_title">سجّل عبر VEX</div><div style="font-size:11px;color:var(--muted)">اضغط <b>سجّل</b> → رابط إحالتك الخاص يفتح</div></div>
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center"><div style="width:36px;height:36px;border-radius:50%;background:var(--gold);color:#000;display:flex;align-items:center;justify-content:center;font-weight:900;margin:0 auto 8px">3</div><div style="font-weight:800;font-size:13px" data-i18n="step3_title">أودع والعب</div><div style="font-size:11px;color:var(--muted)">محفظة VEX + تعويض 100% + Provably Fair</div></div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px">
+    <div class="step-card"><div class="step-num" style="background:var(--green);color:#fff">1</div><div class="step-title" data-i18n="step1_title">اختر شركة</div><div class="step-desc">قارن التراخيص والتقييمات أعلاه</div></div>
+    <div class="step-card"><div class="step-num" style="background:var(--green);color:#fff">2</div><div class="step-title" data-i18n="step2_title">سجّل عبر VEX</div><div class="step-desc">اضغط <b>سجّل</b> → رابط إحالتك الخاص يفتح</div></div>
+    <div class="step-card"><div class="step-num" style="background:var(--gold);color:#fff">3</div><div class="step-title" data-i18n="step3_title">أودع والعب</div><div class="step-desc">محفظة VEX + تعويض 100% + Provably Fair</div></div>
   </div>
 </section>
 
 <section class="section" id="faq" style="padding-top:0">
   <h2 data-i18n="faq_title">❓ أسئلة شائعة — دليل المراهنة العالمي</h2>
-  <details open><summary data-i18n="faq_q1">هل الشركات مرخصة؟</summary><div style="font-size:12px;color:var(--muted);margin-top:6px">نعم — كل الشركات المعروضة مرخصة كوراساو 8048/JAZ أو ما يعادلها، ومقراتها في قبرص/مالطا. VEX تعرض فقط المرخص.</div></details>
-  <details><summary data-i18n="faq_q2">ما هو كود البرومو؟</summary><div style="font-size:12px;color:var(--muted);margin-top:6px">كود خاص من VEX يعطيك بونص إضافي عند التسجيل (مثال 1XBET: <code>VEX</code>). استخدمه في حقل البرومو عند التسجيل.</div></details>
-  <details><summary data-i18n="faq_q3">هل VEX شريك معتمد؟</summary><div style="font-size:12px;color:var(--muted);margin-top:6px">نعم — VEX شريك مباشر مع 1xPartners و MelPartners و6 شبكات أخرى. كل تسجيل عبر <code>vex.deals/go/*</code> محسوب لك.</div></details>
-  <details><summary data-i18n="faq_q4">كيف أضمن السحب؟</summary><div style="font-size:12px;color:var(--muted);margin-top:6px">محفظة VEX منفصلة — تودع عبر فودافون كاش/STC Pay/بنكي، تلعب، تسحب بنفس الوسيلة بإشراف 24/7. التعويض عبر SVRP يضمن 100%.</div></details>
+  <details open><summary data-i18n="faq_q1">هل الشركات مرخصة؟</summary><div>نعم — كل الشركات المعروضة مرخصة كوراساو 8048/JAZ أو ما يعادلها، ومقراتها في قبرص/مالطا. VEX تعرض فقط المرخص.</div></details>
+  <details><summary data-i18n="faq_q2">ما هو كود البرومو؟</summary><div>كود خاص من VEX يعطيك بونص إضافي عند التسجيل (مثال 1XBET: <code>VEX</code>). استخدمه في حقل البرومو عند التسجيل.</div></details>
+  <details><summary data-i18n="faq_q3">هل VEX شريك معتمد؟</summary><div>نعم — VEX شريك مباشر مع 1xPartners و MelPartners و6 شبكات أخرى. كل تسجيل عبر <code>vex.deals/go/*</code> محسوب لك.</div></details>
+  <details><summary data-i18n="faq_q4">كيف أضمن السحب؟</summary><div>محفظة VEX منفصلة — تودع عبر فودافون كاش/STC Pay/بنكي، تلعب، تسحب بنفس الوسيلة بإشراف 24/7. التعويض عبر SVRP يضمن 100%.</div></details>
 </section>
 
 <footer>
@@ -1129,7 +1342,7 @@ footer{padding:24px 16px;text-align:center;color:var(--muted);font-size:11px;bor
     <a href="https://t.me/vex_wallet_bot" data-i18n="nav_bot">💬 @vex_wallet_bot</a> • <a href="/go/1">1xBet</a> • <a href="#companies" data-i18n="nav_companies">الشركات</a> • <a href="#vex">VEX</a>
   </div>
   <div>© 2026 VEX Games — شريك معتمد • 8 شركات مرخصة • 17 لغة • Provably Fair</div>
-  <div style="margin-top:6px;font-size:10px">18+ — العب بمسؤولية • <a href="/sitemap.xml">sitemap</a> • <a href="/robots.txt">robots</a></div>
+  <div style="margin-top:8px;font-size:12px">18+ — العب بمسؤولية • <a href="/sitemap.xml">sitemap</a> • <a href="/robots.txt">robots</a></div>
 </footer>
 
 <script type="application/ld+json">
