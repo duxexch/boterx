@@ -1838,6 +1838,7 @@ def index():
                 'founded': c.get('founded','2007') if c.get('founded') else '2007',
                 'rating': c.get('rating','4.8') if c.get('rating') else '4.8',
                 'headquarters': c.get('headquarters','Cyprus') if c.get('headquarters') else 'Cyprus',
+                'app_link': c.get('app_link',''),
             })
     except: _comps=[]
     return render_template('landing.html', companies=_comps)

@@ -674,13 +674,24 @@ body{font-family:'Cairo',system-ui,sans-serif;background:var(--bg);color:var(--t
 .pros-cons li{font-size:13px;padding:3px 0;display:flex;gap:5px;color:var(--muted)}
 
 /* Card CTA */
-.comp-cta{padding:14px 18px;display:flex;gap:10px;background:color-mix(in srgb,var(--card-accent,var(--green)) 3%,var(--surface2));border-top:1px solid var(--border)}
-.comp-cta a{flex:1;text-align:center;padding:12px;border-radius:10px;font-weight:800;font-size:14px;text-decoration:none;transition:all .15s}
+.comp-cta{padding:14px 18px;display:flex;gap:10px;flex-wrap:wrap;background:color-mix(in srgb,var(--card-accent,var(--green)) 3%,var(--surface2));border-top:1px solid var(--border)}
+.comp-cta a{flex:1;min-width:0;text-align:center;padding:12px;border-radius:10px;font-weight:800;font-size:14px;text-decoration:none;transition:all .15s}
 .comp-cta a:active{transform:scale(.97)}
 .cta-main{background:linear-gradient(135deg,var(--card-accent,var(--green)),color-mix(in srgb,var(--card-accent,var(--green)) 85%,#000));color:#fff;box-shadow:0 4px 16px color-mix(in srgb,var(--card-accent,var(--green)) 30%,transparent)}
 .cta-main:hover{box-shadow:0 6px 24px color-mix(in srgb,var(--card-accent,var(--green)) 40%,transparent);transform:translateY(-1px)}
+.cta-app{background:linear-gradient(135deg,#1a73e8,#0d47a1);color:#fff;box-shadow:0 4px 16px rgba(26,115,232,.25)}
+.cta-app:hover{box-shadow:0 6px 24px rgba(26,115,232,.35);transform:translateY(-1px)}
 .cta-sec{background:var(--surface);color:var(--text);border:1px solid var(--border)}
 .cta-sec:hover{border-color:var(--card-accent,var(--green))}
+
+/* Promo Code Copy */
+.promo-code-row{display:flex;align-items:center;gap:6px}
+.promo-code{background:rgba(255,215,0,.12);padding:4px 10px;border-radius:8px;font-weight:800;font-size:14px;color:var(--text);letter-spacing:.5px;cursor:pointer;border:1px dashed rgba(255,215,0,.3);transition:all .15s}
+.promo-code:hover{background:rgba(255,215,0,.2);border-color:rgba(255,215,0,.5)}
+.copy-btn{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:4px 8px;cursor:pointer;font-size:14px;transition:all .15s;display:flex;align-items:center;justify-content:center}
+.copy-btn:hover{background:var(--green);border-color:var(--green);transform:scale(1.1)}
+.copy-btn:active{transform:scale(.95)}
+.copy-btn.copied{background:var(--green);border-color:var(--green)}
 
 /* FAQ */
 details{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:10px;transition:border-color .2s}
@@ -1018,7 +1029,9 @@ footer a:hover{text-decoration:underline}
           <tr><td>الترخيص</td><td>{{ c.license }}</td></tr>
           <tr><td>المقر</td><td>{{ c.headquarters }}</td></tr>
           <tr><td>التأسيس</td><td>{{ c.founded }}</td></tr>
-          <tr><td>كود البرومو</td><td><code style="background:rgba(255,215,0,.12);padding:2px 6px;border-radius:6px">{{ c.promo_code or 'VEX' }}</code></td></tr>
+          {% if c.promo_code %}
+          <tr><td>كود البرومو</td><td><div class="promo-code-row"><code class="promo-code" id="promo-{{ c.id }}">{{ c.promo_code }}</code><button class="copy-btn" onclick="copyPromo('{{ c.id }}','{{ c.promo_code }}')" title="نسخ الكود">📋</button></div></td></tr>
+          {% endif %}
         </table>
         <div class="pros-cons">
           <div><strong>✅ المميزات</strong><ul><li>دفع فوري</li><li>دعم عربي</li></ul></div>
@@ -1027,6 +1040,9 @@ footer a:hover{text-decoration:underline}
       </div>
       <div class="comp-cta">
         <a href="/go/{{ c.id }}" class="cta-main" target="_blank" rel="noopener">🎯 سجّل في {{ c.name }}</a>
+        {% if c.app_link %}
+        <a href="{{ c.app_link }}" class="cta-app" target="_blank" rel="noopener">📱 تحميل التطبيق</a>
+        {% endif %}
         <a href="#company-{{ c.slug }}" class="cta-sec">تفاصيل</a>
       </div>
       <meta itemprop="author" content="VEX Games">
@@ -1123,13 +1139,6 @@ function toggleLangMenu(){
   const trigger=selector.querySelector('.lang-trigger');
   if(trigger) trigger.setAttribute('aria-expanded', selector.classList.contains('open'));
 }
-
-function changeLang(lang){
-  const url=new URL(window.location.href);
-  url.searchParams.set('lang', lang);
-  window.location.href=url.toString();
-}
-
 
 
 function closeLangMenu(e){
@@ -1264,6 +1273,23 @@ function changeLang(lang){
   const url=new URL(window.location.href);
   url.searchParams.set('lang', lang);
   window.location.href=url.toString();
+}
+
+function copyPromo(id, code){
+  navigator.clipboard.writeText(code).then(()=>{
+    const btn=document.querySelector('[onclick*="'+id+'"]');
+    if(btn){
+      btn.classList.add('copied');
+      btn.textContent='\u2705';
+      setTimeout(()=>{btn.classList.remove('copied');btn.textContent='\uD83D\uDCCB';},1500);
+    }
+  }).catch(()=>{
+    const ta=document.createElement('textarea');
+    ta.value=code;document.body.appendChild(ta);ta.select();
+    document.execCommand('copy');document.body.removeChild(ta);
+    const btn=document.querySelector('[onclick*="'+id+'"]');
+    if(btn){btn.classList.add('copied');btn.textContent='\u2705';setTimeout(()=>{btn.classList.remove('copied');btn.textContent='\uD83D\uDCCB';},1500);}
+  });
 }
 
 (function(){
