@@ -1,19 +1,24 @@
-import paramiko, sys, io
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-ssh = paramiko.SSHClient()
-ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-ssh.connect('69.169.108.197', username='root', password='M12122099m@@@@', timeout=30)
-
-# Reload nginx
-stdin, stdout, stderr = ssh.exec_command("nginx -s reload 2>&1", timeout=10)
-print("Nginx reload:", stdout.read().decode("utf-8", "ignore").strip())
-
-# Verify gzip is working
-stdin, stdout, stderr = ssh.exec_command("curl -sI -H 'Accept-Encoding: gzip' 'https://vex.deals/static/js/app.js' 2>/dev/null | grep -i 'content-encoding\\|content-length'", timeout=10)
-print("Gzip check:", stdout.read().decode("utf-8", "ignore").strip())
-
-# Check new gunicorn workers
-stdin, stdout, stderr = ssh.exec_command("ps aux | grep gunicorn | grep -v grep", timeout=10)
-print("Workers:", stdout.read().decode("utf-8", "ignore").strip())
-
-ssh.close()
+import sys,io
+sys.stdout=io.TextIOWrapper(sys.stdout.buffer,encoding='utf-8',errors='replace')
+with open('dashboard/templates/landing.html','r',encoding='utf-8') as f:
+    content=f.read()
+idx=content.find('comp_desc_1xbet')
+after=content[idx:idx+500]
+if '</span>' in after.split('{% elif')[0]:
+    print('OK: 1XBET span closed')
+else:
+    print('PROBLEM: 1XBET span NOT closed')
+idx=content.find('comp_desc_melbet')
+after=content[idx:idx+500]
+if '</span>' in after.split('{% else')[0]:
+    print('OK: MELBET span closed')
+else:
+    print('PROBLEM: MELBET span NOT closed')
+if 'English' in content.split('currentLang')[1][:50]:
+    print('OK: currentLang shows English')
+else:
+    print('PROBLEM: currentLang')
+if 'textContent' in content and 'innerHTML' in content:
+    print('OK: IIFE has textContent+innerHTML')
+count=content.count('placeholder=')
+print(f'Placeholder attributes: {count}')

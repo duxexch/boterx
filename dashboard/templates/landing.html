@@ -1742,7 +1742,7 @@ footer a:hover{text-decoration:underline}
 .lang-search input{width:100%;padding:10px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:14px;outline:none}
 .lang-search input:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(22,163,74,.1)}
 .lang-list{max-height:280px;overflow-y:auto;padding:6px}
-.lang-list button{display:flex;align-items:center;gap:12px;width:100%;padding:12px 14px;background:transparent;border:none;color:var(--text);font-size:15px;text-align:right;cursor:pointer;border-radius:10px;transition:background .12s;font-weight:600}
+.lang-list button{display:flex;align-items:center;gap:12px;width:100%;padding:12px 14px;background:transparent;border:none;color:var(--text);font-size:15px;text-align:left;cursor:pointer;border-radius:10px;transition:background .12s;font-weight:600}
 .lang-list button:hover,.lang-list button:focus{background:var(--surface2);outline:none}
 .lang-list button:active{background:rgba(22,163,74,.08)}
 .lang-list button[role="option"][aria-selected="true"]{background:rgba(22,163,74,.1);color:var(--green)}
@@ -1877,12 +1877,12 @@ footer a:hover{text-decoration:underline}
     <div class="lang-selector" id="langSelector">
       <button type="button" class="lang-trigger" onclick="toggleLangMenu()" aria-expanded="false" aria-haspopup="true" aria-label="Select language" title="Select language">
         <span class="lang-icon" aria-hidden="true">🌐</span>
-        <span class="lang-text" id="currentLang">العربية</span>
+        <span class="lang-text" id="currentLang">English</span>
         <span class="lang-arrow" aria-hidden="true">▼</span>
       </button>
       <div class="lang-menu" id="langMenu" role="menu">
         <div class="lang-search">
-          <input type="text" id="langSearch" placeholder="Search language..." placeholder="Search language..." autocomplete="off" aria-label="Search language">
+          <input type="text" id="langSearch" placeholder="Search language..." autocomplete="off" aria-label="Search language">
         </div>
         <div class="lang-list" role="listbox">
           <button type="button" role="option" data-lang="ar" onclick="changeLang('ar')"><span class="flag">🇸🇦</span> العربية</button>
@@ -1928,7 +1928,7 @@ footer a:hover{text-decoration:underline}
   <div class="mobile-menu" id="mobileMenu">
     <div class="mobile-menu-header">
       <span class="mobile-menu-title" data-i18n="mobile_menu_title">Menu</span>
-      <button class="mobile-close" onclick="closeMobileMenu()" aria-label="إغلاق Menu">
+      <button class="mobile-close" onclick="closeMobileMenu()" aria-label="Close menu">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M18 6L6 18M6 6l12 12"/>
         </svg>
@@ -2030,9 +2030,9 @@ footer a:hover{text-decoration:underline}
       </div>
       <div class="comp-body">
         <p class="comp-desc" itemprop="reviewBody">
-          {% if c.name == '1XBET' %}<span data-i18n="comp_desc_1xbet">1xBet عملاق المراهنات العالمي بترخيص كوراساو — 1000+ سوق يومياً، بث مباشر، كازينو ضخم وسحب فوري. مع VEX تحصل على تسجيل مباشر وكود <b>{{ c.promo_code or 'VEX' }}</b> وبونص ترحيبي حتى 130%.
-          {% elif c.name == 'MELBET' %}<span data-i18n="comp_desc_melbet">Melbet مرخصة وموثوقة — واجهة عربية ممتازة، احتمالات عالية، دفع فوري عبر فودافون كاش وSTC Pay. سجّل عبر VEX بكود {{ c.promo_code or 'VEX' }}.
-          {% else %}<span data-i18n="comp_desc_default">{{ c.name }} شركة مراهنة مرخصة {{ c.license }} — مقرها {{ c.headquarters }}، تأسست {{ c.founded }}، تقييم {{ c.rating }}/5. تقدم بونص ترحيبي، دفع فوري ودعم عربي. سجّل عبر VEX الآن.</span>{% endif %}
+          {% if c.name == '1XBET' %}1xBet عملاق المراهنات العالمي بترخيص كوراساو — 1000+ سوق يومياً، بث مباشر، كازينو ضخم وسحب فوري. مع VEX تحصل على تسجيل مباشر وكود <b>{{ c.promo_code or 'VEX' }}</b> وبونص ترحيبي حتى 130%.
+          {% elif c.name == 'MELBET' %}Melbet مرخصة وموثوقة — واجهة عربية ممتازة، احتمالات عالية، دفع فوري عبر فودافون كاش وSTC Pay. سجّل عبر VEX بكود {{ c.promo_code or 'VEX' }}.
+          {% else %}{{ c.name }} شركة مراهنة مرخصة {{ c.license }} — مقرها {{ c.headquarters }}، تأسست {{ c.founded }}، تقييم {{ c.rating }}/5. تقدم بونص ترحيبي، دفع فوري ودعم عربي. سجّل عبر VEX الآن.{% endif %}
         </p>
         <table class="comp-table">
           <tr><td data-i18n="comp_license">الترخيص</td><td>{{ c.license }}</td></tr>
@@ -2350,9 +2350,15 @@ function copyPromo(id, code){
     document.documentElement.dir=isRtl?'rtl':'ltr';
     document.documentElement.lang=lang;
 
+    var htmlKeys=['hero_title','hero_badge','faq_a1','faq_a2','faq_a3','faq_a4','step2_desc'];
     document.querySelectorAll('[data-i18n]').forEach(function(e){
       var key=e.getAttribute('data-i18n');
-      if(t[key]) e.innerHTML=t[key];
+      if(!t[key])return;
+      if(htmlKeys.indexOf(key)>=0){
+        e.innerHTML=t[key];
+      }else{
+        e.textContent=t[key];
+      }
     });
 
     // Update page title
