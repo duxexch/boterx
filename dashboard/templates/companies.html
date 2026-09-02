@@ -267,15 +267,30 @@
                         <span x-text="transLoading ? 'جارٍ الترجمة...' : 'ترجم تلقائي'"></span>
                     </button>
                 </div>
-                <!-- Language Tabs -->
-                <div class="flex gap-1 flex-wrap">
+                <!-- Section Tabs: Languages / API Settings / SEO -->
+                <div class="flex gap-1 flex-wrap border-b border-slate-700 pb-2">
+                    <button @click="transTab = 'translations'" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition"
+                        :class="transTab === 'translations' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'">
+                        <i class="fas fa-language ml-1"></i> الترجمات
+                    </button>
+                    <button @click="transTab = 'api_settings'; loadApiSettings()" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition"
+                        :class="transTab === 'api_settings' ? 'bg-amber-600 text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'">
+                        <i class="fas fa-key ml-1"></i> إعدادات API
+                    </button>
+                    <button @click="transTab = 'seo'; loadSeoData()" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition"
+                        :class="transTab === 'seo' ? 'bg-green-600 text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'">
+                        <i class="fas fa-search ml-1"></i> SEO
+                    </button>
+                </div>
+                <!-- Language Tabs (only shown in translations tab) -->
+                <div x-show="transTab === 'translations'" class="flex gap-1 flex-wrap">
                     <template x-for="lang in transLangs" :key="lang">
                         <button @click="transActiveLang = lang" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition"
                             :class="transActiveLang === lang ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'" x-text="langNames[lang] || lang"></button>
                     </template>
                 </div>
                 <!-- Translation Fields -->
-                <div x-show="transActiveLang" class="space-y-3">
+                <div x-show="transTab === 'translations' && transActiveLang" class="space-y-3">
                     <div>
                         <label class="block text-xs text-slate-400 mb-1">الوصف</label>
                         <textarea :value="getTransField('description')" @input="setTransField('description', $event.target.value)" rows="3" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="وصف الشركة..."></textarea>
@@ -289,8 +304,138 @@
                         <textarea :value="getTransField('cons')" @input="setTransField('cons', $event.target.value)" rows="2" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="عيب 1&#10;عيب 2"></textarea>
                     </div>
                 </div>
+
+                <!-- API Settings Section -->
+                <div x-show="transTab === 'api_settings'" class="space-y-4">
+                    <div class="bg-slate-700/50 rounded-xl p-4 mb-4">
+                        <p class="text-sm font-semibold text-amber-400 mb-1"><i class="fas fa-shield-alt ml-1"></i> إعدادات API للشركة</p>
+                        <p class="text-xs text-slate-400">بيانات الاتصال الخاصة بالشركة — تُستخدم للربط مع الأنظمة الخارجية</p>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">مفتاح API <span class="text-amber-400 text-[10px]">API Key</span></label>
+                        <input x-model="apiSettingsForm.api_key" type="text" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-amber-500" placeholder="sk-xxxxxxxxxxxxxxxx">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">رابط الـ API <span class="text-amber-400 text-[10px]">API URL</span></label>
+                        <input x-model="apiSettingsForm.api_url" type="url" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500" placeholder="https://api.example.com/v1">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">رابط الويب هوك <span class="text-amber-400 text-[10px]">Webhook URL</span></label>
+                        <input x-model="apiSettingsForm.webhook_url" type="url" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500" placeholder="https://your-server.com/webhook">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">معرف الشريك <span class="text-amber-400 text-[10px]">Affiliate ID</span></label>
+                        <input x-model="apiSettingsForm.affiliate_id" type="text" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500" placeholder="AFF-12345">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">السر <span class="text-amber-400 text-[10px]">API Secret</span></label>
+                        <div class="relative">
+                            <input :type="showApiSecret ? 'text' : 'password'" x-model="apiSettingsForm.api_secret" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-amber-500" placeholder="secret-xxxxxxxxxxxxxxxx">
+                            <button type="button" @click="showApiSecret = !showApiSecret" class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white">
+                                <i class="fas" :class="showApiSecret ? 'fa-eye-slash' : 'fa-eye'"></i>
+                            </button>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-1">يُخزّن بشكل مشفر — لن يظهر في السجلات</p>
+                    </div>
+                    <button @click="saveApiSettings()" :disabled="apiSettingsSaving" class="w-full bg-amber-600 hover:bg-amber-700 text-white py-2.5 rounded-lg text-sm font-semibold transition"
+                        :class="apiSettingsSaving && 'opacity-50'">
+                        <i class="fas" :class="apiSettingsSaving ? 'fa-spinner fa-spin' : 'fa-save'"></i>
+                        <span x-text="apiSettingsSaving ? 'جارٍ الحفظ...' : 'حفظ إعدادات API'"></span>
+                    </button>
+                </div>
+
+                <!-- SEO Section -->
+                <div x-show="transTab === 'seo'" class="space-y-4">
+                    <div class="bg-slate-700/50 rounded-xl p-4">
+                        <p class="text-sm font-semibold text-green-400 mb-1"><i class="fas fa-search ml-1"></i> تحليل SEO للشركة</p>
+                        <p class="text-xs text-slate-400">تقييم تحسين محركات البحث وتوصيات التحسين</p>
+                    </div>
+
+                    <!-- SEO Score -->
+                    <div x-show="seoData.score !== undefined" class="bg-slate-700/30 rounded-xl p-4 border border-slate-600">
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-sm font-semibold">التقييم</span>
+                            <div class="flex items-center gap-2">
+                                <span class="text-2xl font-bold"
+                                    :class="seoData.score >= 70 ? 'text-green-400' : (seoData.score >= 40 ? 'text-amber-400' : 'text-red-400')"
+                                    x-text="seoData.score || 0"></span>
+                                <span class="text-xs text-slate-400">/100</span>
+                                <span x-show="seoData.score_change" class="text-xs px-2 py-0.5 rounded-full"
+                                    :class="seoData.score_change > 0 ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'"
+                                    x-text="(seoData.score_change > 0 ? '+' : '') + (seoData.score_change || 0)"></span>
+                            </div>
+                        </div>
+                        <div class="w-full bg-slate-600 rounded-full h-2">
+                            <div class="h-2 rounded-full transition-all duration-500"
+                                :class="seoData.score >= 70 ? 'bg-green-500' : (seoData.score >= 40 ? 'bg-amber-500' : 'bg-red-500')"
+                                :style="'width: ' + (seoData.score || 0) + '%'"></div>
+                        </div>
+                        <p x-show="seoData.analyzed_at" class="text-xs text-slate-500 mt-2">
+                            آخر تحليل: <span x-text="seoData.analyzed_at"></span>
+                        </p>
+                    </div>
+
+                    <!-- SEO Meta Fields -->
+                    <div class="space-y-3">
+                        <h4 class="text-xs font-semibold text-slate-400 uppercase">البيانات الوصفية</h4>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">عنوان الصفحة (Meta Title)</label>
+                            <input x-model="seoForm.meta_title" type="text" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="عنوان SEO للشركة">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">الوصف (Meta Description)</label>
+                            <textarea x-model="seoForm.meta_description" rows="2" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="وصف SEO للشركة (120-160 حرف)"></textarea>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">الكلمات المفتاحية (Keywords)</label>
+                            <input x-model="seoForm.keywords" type="text" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="كلمة1, كلمة2, كلمة3">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">صورة OG Image</label>
+                            <input x-model="seoForm.og_image" type="url" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="https://...">
+                        </div>
+                    </div>
+
+                    <!-- SEO Issues -->
+                    <div x-show="seoData.issues && seoData.issues.length > 0" class="space-y-2">
+                        <h4 class="text-xs font-semibold text-red-400 uppercase"><i class="fas fa-exclamation-triangle ml-1"></i> المشاكل</h4>
+                        <template x-for="issue in (seoData.issues || [])" :key="issue">
+                            <div class="flex items-start gap-2 text-xs bg-red-500/10 rounded-lg p-2">
+                                <i class="fas fa-times-circle text-red-400 mt-0.5 shrink-0"></i>
+                                <span x-text="issue" class="text-slate-300"></span>
+                            </div>
+                        </template>
+                    </div>
+
+                    <!-- SEO Recommendations -->
+                    <div x-show="seoData.recommendations && seoData.recommendations.length > 0" class="space-y-2">
+                        <h4 class="text-xs font-semibold text-green-400 uppercase"><i class="fas fa-lightbulb ml-1"></i> التوصيات</h4>
+                        <template x-for="rec in (seoData.recommendations || [])" :key="rec">
+                            <div class="flex items-start gap-2 text-xs bg-green-500/10 rounded-lg p-2">
+                                <i class="fas fa-check-circle text-green-400 mt-0.5 shrink-0"></i>
+                                <span x-text="rec" class="text-slate-300"></span>
+                            </div>
+                        </template>
+                    </div>
+
+                    <!-- SEO Actions -->
+                    <div class="flex gap-3">
+                        <button @click="runSeoAnalysis()" :disabled="seoAnalyzing" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-lg text-sm font-semibold transition flex items-center justify-center gap-2"
+                            :class="seoAnalyzing && 'opacity-50'">
+                            <i class="fas" :class="seoAnalyzing ? 'fa-spinner fa-spin' : 'fa-search'"></i>
+                            <span x-text="seoAnalyzing ? 'جارٍ التحليل...' : 'تحليل SEO'"></span>
+                        </button>
+                        <button @click="generateSeoMeta()" class="flex-1 bg-slate-600 hover:bg-slate-500 text-white py-2.5 rounded-lg text-sm font-semibold transition flex items-center justify-center gap-2">
+                            <i class="fas fa-magic"></i> توليد تلقائي
+                        </button>
+                    </div>
+                    <button @click="saveSeoData()" :disabled="seoSaving" class="w-full bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-lg text-sm font-semibold transition"
+                        :class="seoSaving && 'opacity-50'">
+                        <i class="fas" :class="seoSaving ? 'fa-spinner fa-spin' : 'fa-save'"></i>
+                        <span x-text="seoSaving ? 'جارٍ الحفظ...' : 'حفظ إعدادات SEO'"></span>
+                    </button>
                 <div class="flex gap-3 pt-2 sticky bottom-0 bg-slate-800 py-4 -mx-5 px-5 border-t border-slate-700">
-                    <button @click="saveTranslations()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg text-sm font-semibold transition" x-text="transSaving ? 'جارٍ الحفظ...' : 'حفظ الترجمات'"></button>
+                    <button x-show="transTab === 'translations'" @click="saveTranslations()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg text-sm font-semibold transition" x-text="transSaving ? 'جارٍ الحفظ...' : 'حفظ الترجمات'"></button>
                     <button @click="showTranslationsModal = false" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-lg text-sm transition">إغلاق</button>
                 </div>
             </div>
@@ -324,11 +469,19 @@ function companiesPage() {
         transCompany: '',
         transCompanyId: '',
         transActiveLang: 'ar',
+        transTab: 'translations',
         transLoading: false,
         transSaving: false,
         transLangs: ['ar','en','fr','es','de','it','pt','ru','zh','tr','ur','hi','fa','id','ja','ko','th'],
         transData: {},
         langNames: {ar:'العربية',en:'English',fr:'Français',es:'Español',de:'Deutsch',it:'Italiano',pt:'Português',ru:'Русский',zh:'中文',tr:'Türkçe',ur:'اردو',hi:'हिन्दी',fa:'فارسی',id:'Indonesia',ja:'日本語',ko:'한국어',th:'ไทย'},
+        apiSettingsForm: { api_key: '', api_url: '', webhook_url: '', affiliate_id: '', api_secret: '' },
+        apiSettingsSaving: false,
+        showApiSecret: false,
+        seoForm: { meta_title: '', meta_description: '', keywords: '', og_title: '', og_description: '', og_image: '' },
+        seoData: { score: 0, issues: [], recommendations: [], analyzed_at: '' },
+        seoAnalyzing: false,
+        seoSaving: false,
 
         isImgIcon(icon) {
             return typeof icon === 'string' && (icon.startsWith('/static/') || icon.startsWith('http'));
@@ -493,7 +646,11 @@ function companiesPage() {
             this.transCompany = company.name;
             this.transCompanyId = company.id;
             this.transActiveLang = 'ar';
+            this.transTab = 'translations';
             this.transData = {};
+            this.apiSettingsForm = { api_key: '', api_url: '', webhook_url: '', affiliate_id: '', api_secret: '' };
+            this.seoForm = { meta_title: '', meta_description: '', keywords: '', og_title: '', og_description: '', og_image: '' };
+            this.seoData = { score: 0, issues: [], recommendations: [], analyzed_at: '' };
             this.showTranslationsModal = true;
             try {
                 const data = await api(`/api/companies/${company.id}/translations`);
@@ -502,6 +659,12 @@ function companiesPage() {
                 this.transLangs.forEach(l => {
                     if (!this.transData[l]) this.transData[l] = { description: '', pros: [], cons: [] };
                 });
+                if (this.transData.api_settings) {
+                    this.apiSettingsForm = { ...this.apiSettingsForm, ...this.transData.api_settings };
+                }
+                if (this.transData.seo) {
+                    this.seoForm = { ...this.seoForm, ...this.transData.seo };
+                }
             } catch (e) {
                 toast('فشل تحميل الترجمات', 'error');
             }
@@ -553,6 +716,106 @@ function companiesPage() {
                 toast('فشل حفظ الترجمات', 'error');
             }
             this.transSaving = false;
+        },
+
+        async loadApiSettings() {
+            try {
+                const data = await api(`/api/companies/${this.transCompanyId}/translations`);
+                const settings = (data.translations || {}).api_settings || {};
+                this.apiSettingsForm = {
+                    api_key: settings.api_key || '',
+                    api_url: settings.api_url || '',
+                    webhook_url: settings.webhook_url || '',
+                    affiliate_id: settings.affiliate_id || '',
+                    api_secret: settings.api_secret || '',
+                };
+            } catch (e) {
+                toast('فشل تحميل إعدادات API', 'error');
+            }
+        },
+
+        async saveApiSettings() {
+            this.apiSettingsSaving = true;
+            try {
+                await api(`/api/companies/${this.transCompanyId}/translations`, {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        translations: { api_settings: this.apiSettingsForm },
+                    }),
+                });
+                toast('تم حفظ إعدادات API بنجاح', 'success');
+            } catch (e) {
+                toast('فشل حفظ إعدادات API', 'error');
+            }
+            this.apiSettingsSaving = false;
+        },
+
+        async loadSeoData() {
+            try {
+                const data = await api(`/api/companies/${this.transCompanyId}/seo`);
+                if (data.seo_data) {
+                    this.seoData = data.seo_data;
+                }
+                if (data.seo_form) {
+                    this.seoForm = { ...this.seoForm, ...data.seo_form };
+                }
+            } catch (e) {
+                toast('فشل تحميل بيانات SEO', 'error');
+            }
+        },
+
+        async runSeoAnalysis() {
+            this.seoAnalyzing = true;
+            try {
+                const data = await api(`/api/companies/${this.transCompanyId}/seo/analyze`, {
+                    method: 'POST',
+                });
+                this.seoData = data.result || {};
+                if (this.seoData.details) {
+                    if (this.seoData.details.title) this.seoForm.meta_title = this.seoData.details.title;
+                    if (this.seoData.details.meta_description) this.seoForm.meta_description = this.seoData.details.meta_description;
+                    if (this.seoData.details.keywords) this.seoForm.keywords = this.seoData.details.keywords;
+                    if (this.seoData.details.og_image) this.seoForm.og_image = this.seoData.details.og_image;
+                }
+                toast('تم تحليل SEO بنجاح — التقييم: ' + (this.seoData.score || 0), this.seoData.score >= 70 ? 'success' : (this.seoData.score >= 40 ? 'warning' : 'error'));
+            } catch (e) {
+                toast('فشل تحليل SEO: ' + (e.message || 'خطأ'), 'error');
+            }
+            this.seoAnalyzing = false;
+        },
+
+        async generateSeoMeta() {
+            try {
+                const data = await api(`/api/companies/${this.transCompanyId}/seo/generate`, {
+                    method: 'POST',
+                });
+                if (data.meta) {
+                    this.seoForm.meta_title = data.meta.title || '';
+                    this.seoForm.meta_description = data.meta.description || '';
+                    this.seoForm.keywords = data.meta.keywords || '';
+                    this.seoForm.og_title = data.meta.og_title || '';
+                    this.seoForm.og_description = data.meta.og_description || '';
+                }
+                toast('تم توليد البيانات الوصفية تلقائياً', 'success');
+            } catch (e) {
+                toast('فشل التوليد التلقائي', 'error');
+            }
+        },
+
+        async saveSeoData() {
+            this.seoSaving = true;
+            try {
+                await api(`/api/companies/${this.transCompanyId}/translations`, {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        translations: { seo: this.seoForm },
+                    }),
+                });
+                toast('تم حفظ إعدادات SEO بنجاح', 'success');
+            } catch (e) {
+                toast('فشل حفظ إعدادات SEO', 'error');
+            }
+            this.seoSaving = false;
         },
     };
 }

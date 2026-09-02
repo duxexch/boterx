@@ -8172,8 +8172,16 @@ def api_save_company_translations(company_id):
     if 'color' in body:
         data[company_name]['color'] = body['color']
     if 'translations' in body:
-        for lang, tr in body['translations'].items():
-            data[company_name][lang] = tr
+        for key, val in body['translations'].items():
+            if key in ('api_settings', 'seo'):
+                if key not in data[company_name]:
+                    data[company_name][key] = {}
+                if isinstance(val, dict):
+                    data[company_name][key].update(val)
+                else:
+                    data[company_name][key] = val
+            else:
+                data[company_name][key] = val
     _write_company_translations(data)
     log_action('save_company_translations', company_id)
     return jsonify({'success': True})
@@ -8236,6 +8244,168 @@ def api_public_all_translations(lang):
         result[name] = translations.get(lang, translations.get('ar', {}))
         result[name]['color'] = translations.get('color', '#16a34a')
     return jsonify(result)
+
+# ===== Company API Settings =====
+
+@app.route('/api/companies/<company_id>/api-settings', methods=['GET'])
+@api_auth
+@permission_required('manage_companies')
+def api_get_company_api_settings(company_id):
+    data = _read_company_translations()
+    companies = read_csv('companies.csv')
+    company_name = ''
+    for c in companies:
+        if c.get('id') == company_id:
+            company_name = c.get('name', '')
+            break
+    if not company_name:
+        return jsonify({'error': 'Company not found'}), 404
+    settings = data.get(company_name, {}).get('api_settings', {})
+    masked = dict(settings)
+    if masked.get('api_secret'):
+        masked['api_secret'] = '***' + masked['api_secret'][-4:] if len(masked['api_secret']) > 4 else '****'
+    return jsonify({'api_settings': masked})
+
+@app.route('/api/companies/<company_id>/api-settings', methods=['PUT'])
+@api_auth
+@permission_required('manage_companies')
+def api_save_company_api_settings(company_id):
+    data = _read_company_translations()
+    companies = read_csv('companies.csv')
+    company_name = ''
+    for c in companies:
+        if c.get('id') == company_id:
+            company_name = c.get('name', '')
+            break
+    if not company_name:
+        return jsonify({'error': 'Company not found'}), 404
+    body = request.json or {}
+    if company_name not in data:
+        data[company_name] = {}
+    settings = data[company_name].get('api_settings', {})
+    for key in ('api_key', 'api_url', 'webhook_url', 'affiliate_id', 'api_secret'):
+        if key in body:
+            settings[key] = body[key]
+    data[company_name]['api_settings'] = settings
+    _write_company_translations(data)
+    log_action('save_company_api_settings', company_id)
+    return jsonify({'success': True})
+
+# ===== Company SEO Agent =====
+
+@app.route('/api/companies/<company_id>/seo', methods=['GET'])
+@api_auth
+@permission_required('manage_companies')
+def api_get_company_seo(company_id):
+    data = _read_company_translations()
+    companies = read_csv('companies.csv')
+    company_name = ''
+    for c in companies:
+        if c.get('id') == company_id:
+            company_name = c.get('name', '')
+            break
+    if not company_name:
+        return jsonify({'error': 'Company not found'}), 404
+    seo_form = data.get(company_name, {}).get('seo', {})
+    try:
+        from seo_agent import load_seo_data
+        seo_data = load_seo_data().get(company_name, {}).get('current', {})
+    except Exception:
+        seo_data = {}
+    return jsonify({'seo_form': seo_form, 'seo_data': seo_data, 'company_name': company_name})
+
+@app.route('/api/companies/<company_id>/seo/analyze', methods=['POST'])
+@api_auth
+@permission_required('manage_companies')
+def api_analyze_company_seo(company_id):
+    companies = read_csv('companies.csv')
+    company_name = ''
+    company_url = None
+    for c in companies:
+        if c.get('id') == company_id:
+            company_name = c.get('name', '')
+            break
+    if not company_name:
+        return jsonify({'error': 'Company not found'}), 404
+    try:
+        from seo_agent import analyze_and_store
+        result = analyze_and_store(company_name, company_url)
+        data = _read_company_translations()
+        if company_name in data:
+            if 'seo' not in data[company_name]:
+                data[company_name]['seo'] = {}
+            data[company_name]['seo']['last_score'] = result.get('score', 0)
+            data[company_name]['seo']['last_analysis'] = result.get('analyzed_at', '')
+            _write_company_translations(data)
+        log_action('analyze_company_seo', company_id, details=f'score={result.get("score", 0)}')
+        return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/companies/<company_id>/seo/generate', methods=['POST'])
+@api_auth
+@permission_required('manage_companies')
+def api_generate_company_seo_meta(company_id):
+    companies = read_csv('companies.csv')
+    company_name = ''
+    for c in companies:
+        if c.get('id') == company_id:
+            company_name = c.get('name', '')
+            break
+    if not company_name:
+        return jsonify({'error': 'Company not found'}), 404
+    try:
+        from seo_agent import generate_optimized_meta
+        data = _read_company_translations()
+        desc = data.get(company_name, {}).get('ar', {}).get('description', '')
+        meta = generate_optimized_meta(company_name, desc)
+        return jsonify({'success': True, 'meta': meta})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/seo/run-daily', methods=['POST'])
+@api_auth
+@permission_required('manage_companies')
+def api_seo_run_daily():
+    try:
+        from seo_agent import analyze_all_companies
+        companies = read_csv('companies.csv')
+        active = [c for c in companies if c.get('is_active', '').lower() in ('yes', 'true', '1', 'active', '')]
+        results = analyze_all_companies(active)
+        return jsonify({'success': True, 'analyzed': len(results), 'results': results})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/seo/daily-schedule', methods=['POST'])
+@api_auth
+@permission_required('manage_settings')
+def api_seo_daily_schedule():
+    data = request.json or {}
+    enabled = data.get('enabled', True)
+    _set_system_setting('seo_daily_enabled', 'yes' if enabled else 'no')
+    log_action('seo_daily_schedule', f'enabled={enabled}')
+    return jsonify({'success': True, 'enabled': enabled})
+
+@app.route('/api/seo/daily-status')
+@api_auth
+@permission_required('manage_companies')
+def api_seo_daily_status():
+    enabled = (_get_system_setting('seo_daily_enabled') or 'yes').lower() not in ('no', '0', 'false')
+    try:
+        from seo_agent import load_seo_data
+        seo_data = load_seo_data()
+        summary = {}
+        for name, info in seo_data.items():
+            current = info.get('current', {})
+            summary[name] = {
+                'score': current.get('score', 0),
+                'last_analysis': current.get('analyzed_at', ''),
+                'issues_count': len(current.get('issues', [])),
+            }
+        return jsonify({'enabled': enabled, 'summary': summary})
+    except Exception:
+        return jsonify({'enabled': enabled, 'summary': {}})
+
 
 # ===== نظام التعويض (Compensation) — player web flow + admin approvals =====
 

@@ -276,6 +276,23 @@
         "อาจซับซ้อนสำหรับผู้เริ่มต้น",
         "บางประเทศถูกบล็อก"
       ]
+    },
+    "api_settings": {
+      "api_key": "",
+      "api_url": "",
+      "webhook_url": "",
+      "affiliate_id": "",
+      "api_secret": ""
+    },
+    "seo": {
+      "meta_title": "",
+      "meta_description": "",
+      "keywords": "",
+      "og_title": "",
+      "og_description": "",
+      "og_image": "",
+      "last_score": 0,
+      "last_analysis": ""
     }
   },
   "MELBET": {
@@ -534,6 +551,23 @@
         "การจ่ายเงินช้าในบางกรณี",
         "เกมบางเกมถูกแบนในบางภูมิภาค"
       ]
+    },
+    "api_settings": {
+      "api_key": "",
+      "api_url": "",
+      "webhook_url": "",
+      "affiliate_id": "",
+      "api_secret": ""
+    },
+    "seo": {
+      "meta_title": "",
+      "meta_description": "",
+      "keywords": "",
+      "og_title": "",
+      "og_description": "",
+      "og_image": "",
+      "last_score": 0,
+      "last_analysis": ""
     }
   },
   "BETJAM": {
@@ -775,6 +809,23 @@
         "บริษัทสตาร์ทอัพ",
         "ตลาดน้อยกว่าแบรนด์ที่จัดตั้งขึ้น"
       ]
+    },
+    "api_settings": {
+      "api_key": "",
+      "api_url": "",
+      "webhook_url": "",
+      "affiliate_id": "",
+      "api_secret": ""
+    },
+    "seo": {
+      "meta_title": "",
+      "meta_description": "",
+      "keywords": "",
+      "og_title": "",
+      "og_description": "",
+      "og_image": "",
+      "last_score": 0,
+      "last_analysis": ""
     }
   },
   "MOSTBET": {
@@ -1016,6 +1067,23 @@
         "อินเทอร์เฟซไม่ได้ดีที่สุด",
         "วิธีการชำระเงินมีจำกัด"
       ]
+    },
+    "api_settings": {
+      "api_key": "",
+      "api_url": "",
+      "webhook_url": "",
+      "affiliate_id": "",
+      "api_secret": ""
+    },
+    "seo": {
+      "meta_title": "",
+      "meta_description": "",
+      "keywords": "",
+      "og_title": "",
+      "og_description": "",
+      "og_image": "",
+      "last_score": 0,
+      "last_analysis": ""
     }
   },
   "BIZBET": {
@@ -1257,6 +1325,23 @@
         "รู้จักกันน้อย",
         "ข้อเสนอที่น้อยลง"
       ]
+    },
+    "api_settings": {
+      "api_key": "",
+      "api_url": "",
+      "webhook_url": "",
+      "affiliate_id": "",
+      "api_secret": ""
+    },
+    "seo": {
+      "meta_title": "",
+      "meta_description": "",
+      "keywords": "",
+      "og_title": "",
+      "og_description": "",
+      "og_image": "",
+      "last_score": 0,
+      "last_analysis": ""
     }
   },
   "XPARI": {
@@ -1498,6 +1583,23 @@
         "แบรนด์ที่ไม่ค่อยมีใครรู้จัก",
         "การสนับสนุนลูกค้ามีจำกัด"
       ]
+    },
+    "api_settings": {
+      "api_key": "",
+      "api_url": "",
+      "webhook_url": "",
+      "affiliate_id": "",
+      "api_secret": ""
+    },
+    "seo": {
+      "meta_title": "",
+      "meta_description": "",
+      "keywords": "",
+      "og_title": "",
+      "og_description": "",
+      "og_image": "",
+      "last_score": 0,
+      "last_analysis": ""
     }
   },
   "LINEBET": {
@@ -1739,6 +1841,23 @@
         "อินเทอร์เฟซที่เรียบง่ายมาก",
         "ความคุ้มครอง Esport มีจำกัด"
       ]
+    },
+    "api_settings": {
+      "api_key": "",
+      "api_url": "",
+      "webhook_url": "",
+      "affiliate_id": "",
+      "api_secret": ""
+    },
+    "seo": {
+      "meta_title": "",
+      "meta_description": "",
+      "keywords": "",
+      "og_title": "",
+      "og_description": "",
+      "og_image": "",
+      "last_score": 0,
+      "last_analysis": ""
     }
   },
   "GOOOBET": {
@@ -1980,6 +2099,23 @@
         "ใหม่มาก",
         "ยังคงสร้างชื่อเสียง"
       ]
+    },
+    "api_settings": {
+      "api_key": "",
+      "api_url": "",
+      "webhook_url": "",
+      "affiliate_id": "",
+      "api_secret": ""
+    },
+    "seo": {
+      "meta_title": "",
+      "meta_description": "",
+      "keywords": "",
+      "og_title": "",
+      "og_description": "",
+      "og_image": "",
+      "last_score": 0,
+      "last_analysis": ""
     }
   }
 }
